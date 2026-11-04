@@ -11,7 +11,7 @@ use crate::unit_ai::task_finder::Actor;
 use crate::unit_ai::task_finder::world::TaskWorld;
 use crate::unit_ai::task_finder::{TaskOn, find_task};
 use crate::world::World;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 
 impl World {
     /// The unit at `idx` of player `player` as the task finder's actor.

@@ -119,54 +119,54 @@ impl Settings {
     pub fn tech_mode_allows(&self, mode: TechMode) -> GenieResult<bool> {
         let mode = mode.get();
         let positive = match mode.unsigned_abs() {
-            n @ 2..=18 => self.rule_mode(n)?,
-            n @ 19..=25 => self.resource_level.get() == i32::from(n) - 19,
+            mode @ 2..=18 => self.rule_mode(mode)?,
+            mode @ 19..=25 => self.resource_level.get() == i32::from(mode) - 19,
             26 => self.flags.contains(OptionFlags::ANTIQUITY),
             32 if mode < 0 => return Ok(true),
-            n @ 27..=34 => self.age_mode(n)?,
+            number @ 27..=34 => self.age_mode(number)?,
             _ => return Ok(true),
         };
         Ok(if mode < 0 { !positive } else { positive })
     }
 
-    /// [`Settings::tech_mode_allows`]'s modes 2 to 18 (`n`), by the game mode, the sub mode
+    /// [`Settings::tech_mode_allows`]'s modes 2 to 18 (`mode`), by the game mode, the sub mode
     /// flag's bits and the options.
     ///
     /// # Errors
     ///
     /// Mode 15 (the root's `+0x560` entry, not held).
-    fn rule_mode(&self, n: u16) -> GenieResult<bool> {
-        let (m, flags) = (self.game_mode.get(), self.sub_game_mode_flag);
-        Ok(match n {
-            2 => m == 0,
-            3 => m == 2,
+    fn rule_mode(&self, mode: u16) -> GenieResult<bool> {
+        let (game_mode, flags) = (self.game_mode.get(), self.sub_game_mode_flag);
+        Ok(match mode {
+            2 => game_mode == 0,
+            3 => game_mode == 2,
             4 => self.empire_wars(),
-            5 => m == 7,
-            6 => m == 8,
-            7 => m == 11 || flags.contains(SubModeFlags::SUDDEN_DEATH),
-            8 => m == 6 || flags.contains(SubModeFlags::WONDER_RACE),
-            9 => m == 10,
-            10 => m == 12,
-            11 => m == 1,
+            5 => game_mode == 7,
+            6 => game_mode == 8,
+            7 => game_mode == 11 || flags.contains(SubModeFlags::SUDDEN_DEATH),
+            8 => game_mode == 6 || flags.contains(SubModeFlags::WONDER_RACE),
+            9 => game_mode == 10,
+            10 => game_mode == 12,
+            11 => game_mode == 1,
             12 => self.flags.contains(OptionFlags::TURBO),
-            13 => matches!(m, 4 | 3 | 5 | 15),
+            13 => matches!(game_mode, 4 | 3 | 5 | 15),
             14 => flags.contains(SubModeFlags::REGICIDE),
             15 => return Err(ROOT_MODE),
-            16 => m == 16,
+            16 => game_mode == 16,
             17 => self.farm_mode == FarmMode::Fixed,
             18 => self.flags.contains(OptionFlags::SHARED_EXPLORATION),
-            _ => return Err(mode_outside("a rule mode outside 2 to 18", n)),
+            _ => return Err(mode_outside("a rule mode outside 2 to 18", mode)),
         })
     }
 
-    /// [`Settings::tech_mode_allows`]'s modes 27 to 34 (`n`), by the starting age, its default 0
+    /// [`Settings::tech_mode_allows`]'s modes 27 to 34 (`mode`), by the starting age, its default 0
     /// by the game mode.
-    fn age_mode(&self, n: u16) -> GenieResult<bool> {
-        let (m, age) = (self.game_mode.get(), self.starting_age.get());
-        let below = |n: u32| (age as u32) < n;
-        let default_in = |modes: &[i32]| age == 0 && modes.contains(&m);
-        Ok(match n {
-            27 => age == 2 || (age == 0 && !matches!(m, 13 | 2 | 12)),
+    fn age_mode(&self, mode: u16) -> GenieResult<bool> {
+        let (game_mode, age) = (self.game_mode.get(), self.starting_age.get());
+        let below = |bound: u32| (age as u32) < bound;
+        let default_in = |modes: &[i32]| age == 0 && modes.contains(&game_mode);
+        Ok(match mode {
+            27 => age == 2 || (age == 0 && !matches!(game_mode, 13 | 2 | 12)),
             28 => age == 3 || default_in(&[13]),
             29 => age == 4,
             30 => age == 5,
@@ -174,7 +174,7 @@ impl Settings {
             32 => !below(3) || default_in(&[13, 2, 12]),
             33 => !below(4) || default_in(&[2, 12]),
             34 => !below(5) || default_in(&[2, 12]),
-            _ => return Err(mode_outside("an age mode outside 27 to 34", n)),
+            _ => return Err(mode_outside("an age mode outside 27 to 34", mode)),
         })
     }
 
@@ -278,8 +278,8 @@ mod tests {
             ..Settings::default()
         };
         assert!(with(1).explored_all() && with(2).explored_all());
-        for t in [0, 3, -1] {
-            assert!(!with(t).explored_all(), "type {t}");
+        for kind in [0, 3, -1] {
+            assert!(!with(kind).explored_all(), "type {kind}");
         }
     }
 
@@ -406,21 +406,21 @@ mod tests {
             (33, mode(2)),
             (34, age(5)),
         ];
-        for (m, allows) in cases {
+        for (tech_mode, allows) in cases {
             assert_eq!(
-                allows.tech_mode_allows(TechMode::of_data(m)),
+                allows.tech_mode_allows(TechMode::of_data(tech_mode)),
                 Ok(true),
-                "{m}"
+                "{tech_mode}"
             );
             assert_eq!(
-                allows.tech_mode_allows(TechMode::of_data(-m)),
-                Ok(m == 32),
-                "-{m}"
+                allows.tech_mode_allows(TechMode::of_data(-tech_mode)),
+                Ok(tech_mode == 32),
+                "-{tech_mode}"
             );
             assert_eq!(
-                mode(9).tech_mode_allows(TechMode::of_data(m)),
+                mode(9).tech_mode_allows(TechMode::of_data(tech_mode)),
                 Ok(false),
-                "{m} in mode 9"
+                "{tech_mode} in mode 9"
             );
         }
         let walkable = Settings {
@@ -491,7 +491,7 @@ mod tests {
         // mode 2 (death match) with the default age: at least Castle and Imperial and 5, not
         // Feudal (27) and not 28
         assert_eq!(
-            [27, 28, 32, 33, 34].map(|m| settings.tech_mode_allows(TechMode::of_data(m))),
+            [27, 28, 32, 33, 34].map(|mode| settings.tech_mode_allows(TechMode::of_data(mode))),
             [Ok(false), Ok(false), Ok(true), Ok(true), Ok(true)]
         );
         assert_eq!(settings.tech_mode_allows(TechMode::of_data(-32)), Ok(true));
@@ -500,7 +500,7 @@ mod tests {
             ..Settings::default()
         };
         assert_eq!(
-            [27, -27, 32, 34].map(|m| feudal.tech_mode_allows(TechMode::of_data(m))),
+            [27, -27, 32, 34].map(|mode| feudal.tech_mode_allows(TechMode::of_data(mode))),
             [Ok(true), Ok(false), Ok(false), Ok(false)]
         );
         // the default age in the random map mode (0) is Feudal's (27)
@@ -516,7 +516,8 @@ mod tests {
             ..Settings::default()
         };
         assert_eq!(
-            [4, 22, 21, -22, 17, -17, 26].map(|m| options.tech_mode_allows(TechMode::of_data(m))),
+            [4, 22, 21, -22, 17, -17, 26]
+                .map(|mode| options.tech_mode_allows(TechMode::of_data(mode))),
             [
                 Ok(true),
                 Ok(true),

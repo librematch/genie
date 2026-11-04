@@ -71,14 +71,14 @@ mod tests {
     #[test]
     fn its_states_read_back_from_their_values_in_order() {
         let mut last = None;
-        for v in -1..=4 {
-            let research_state = ResearchState::of_int(v).unwrap();
-            assert_eq!(research_state.get(), v);
-            assert!(last < Some(research_state), "{v}");
+        for value in -1..=4 {
+            let research_state = ResearchState::of_int(value).unwrap();
+            assert_eq!(research_state.get(), value);
+            assert!(last < Some(research_state), "{value}");
             last = Some(research_state);
         }
-        for v in [i16::MIN, -2, 5, 255, i16::MAX] {
-            assert!(ResearchState::of_int(v).is_err(), "{v}");
+        for value in [i16::MIN, -2, 5, 255, i16::MAX] {
+            assert!(ResearchState::of_int(value).is_err(), "{value}");
         }
         assert_eq!(ResearchState::Disabled.to_string(), "-1");
     }

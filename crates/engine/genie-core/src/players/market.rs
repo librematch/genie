@@ -24,7 +24,7 @@ use crate::world::World;
 use crate::world::layer::AttributeRoles;
 use crate::world::layer::Roles;
 use crate::world::layer::generated::MarketTuning;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 
 /// The hundredths of a trade's step (`DAT_14330ebcc`) and the sign flip of a negative growth
 /// (`DAT_14330ec20`).
@@ -122,33 +122,33 @@ impl Market {
         market_tuning: &MarketTuning,
     ) {
         let (min, max) = (self.min_price, self.max_price);
-        let Some((c, start)) = self.commodity(commodity, roles, market_tuning) else {
+        let Some((commodity, start)) = self.commodity(commodity, roles, market_tuning) else {
             return;
         };
-        c.trades = c.trades.traded(trade);
-        if c.trades == NetTrades::ZERO {
-            c.swing = PriceSwing::ZERO;
-            c.price = start;
+        commodity.trades = commodity.trades.traded(trade);
+        if commodity.trades == NetTrades::ZERO {
+            commodity.swing = PriceSwing::ZERO;
+            commodity.price = start;
             return;
         }
-        let next = c.swing.get() + market_tuning.swing;
-        let mut growth = next - c.swing.get();
+        let next = commodity.swing.get() + market_tuning.swing;
+        let mut growth = next - commodity.swing.get();
         if 0.0 > growth {
             growth *= FLIP;
         }
         let step = cvttss2si(growth) as f32 / PERCENT;
         if trade == MarketTrade::Buy {
             // ADDSS step, price: a NaN price stays itself (the step is never one)
-            c.price = c.price.raised(step);
-            c.swing = PriceSwing::new(next);
-            if c.price > max {
-                c.price = max;
+            commodity.price = commodity.price.raised(step);
+            commodity.swing = PriceSwing::new(next);
+            if commodity.price > max {
+                commodity.price = max;
             }
         } else {
-            c.price = c.price.lowered(step);
-            c.swing = PriceSwing::new(next);
-            if min > c.price {
-                c.price = min;
+            commodity.price = commodity.price.lowered(step);
+            commodity.swing = PriceSwing::new(next);
+            if min > commodity.price {
+                commodity.price = min;
             }
         }
     }
@@ -495,18 +495,22 @@ mod tests {
     /// payment. A cheap lot costs at least 21.
     #[test]
     fn purchase_costs_the_lot_worth_and_the_fee_at_least_21() {
-        let mut t = trading();
-        t.players[1].attributes[attribute::GOLD.index()] = Amount::new(170.0);
-        t.buy(player_id(1), attribute::FOOD, TradeLots::of_data(2))
+        let mut world = trading();
+        world.players[1].attributes[attribute::GOLD.index()] = Amount::new(170.0);
+        world
+            .buy(player_id(1), attribute::FOOD, TradeLots::of_data(2))
             .unwrap();
-        let player = &t.players[1];
+        let player = &world.players[1];
         assert_eq!(player.resources(), amounts([200.0, 100.0, 100.0, 21.0]));
         assert_eq!(
             (player.attributes[49], player.attributes[169]),
             (Amount::ZERO, Amount::ZERO)
         );
         assert_eq!(
-            (t.market.food.price.get(), t.market.food.trades.get()),
+            (
+                world.market.food.price.get(),
+                world.market.food.trades.get()
+            ),
             (0.02 + 1.15, 1)
         );
         let mut world = trading();

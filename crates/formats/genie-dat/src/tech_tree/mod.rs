@@ -39,17 +39,17 @@ pub enum TechTreeStatus {
 }
 
 impl From<u8> for TechTreeStatus {
-    fn from(n: u8) -> Self {
-        match n {
+    fn from(byte: u8) -> Self {
+        match byte {
             1 => Self::None,
             2 => Self::AvailablePlayer,
             3 => Self::NotAvailablePlayer,
             4 => Self::Researching,
             5 => Self::ResearchedCompleted,
             10..=255 => Self::AvailableTeam {
-                civilization_id: (n - 10).into(),
+                civilization_id: (byte - 10).into(),
             },
-            n => Self::Other(n),
+            other => Self::Other(other),
         }
     }
 }
@@ -63,7 +63,7 @@ impl From<TechTreeStatus> for u8 {
             TechTreeStatus::Researching => 4,
             TechTreeStatus::ResearchedCompleted => 5,
             TechTreeStatus::AvailableTeam { civilization_id } => Self::from(civilization_id) + 10,
-            TechTreeStatus::Other(n) => n,
+            TechTreeStatus::Other(other) => other,
         }
     }
 }
@@ -304,8 +304,13 @@ impl TechTreeDependencies {
         }
         output.write_u8(self.len() as u8)?;
         output.write_all(&[0, 0, 0])?;
-        for i in 0..10 {
-            output.write_i32::<LE>(self.0.get(i).copied().map_or(0, TechTreeDependency::raw_id))?;
+        for index in 0..10 {
+            output.write_i32::<LE>(
+                self.0
+                    .get(index)
+                    .copied()
+                    .map_or(0, TechTreeDependency::raw_id),
+            )?;
         }
         for index in 0..10 {
             output.write_i32::<LE>(

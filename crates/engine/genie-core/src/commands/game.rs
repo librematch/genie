@@ -17,8 +17,8 @@ use crate::world::AiSwitches;
 use crate::world::AutoQueues;
 use crate::world::World;
 use crate::world::settings::OptionFlags;
-use crate::world::slots::CheckedIndex;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::CheckedIndexExt;
+use crate::world::slots::PlayerSlotsExt;
 use crate::world::{LureDestination, Percent, TargetingMode, VillagerGarrison};
 use crate::{GenieError, GenieResult};
 
@@ -33,7 +33,7 @@ pub struct GameCommand {
     /// `+8`: the world player it is for.
     pub player: i16,
     /// `+0xa`: a second player, a count, a code or a flag (its low byte).
-    pub a: i16,
+    pub argument: i16,
     /// `+0xc`: the game speed of sub-command 1.
     pub speed: f32,
     /// `+0x10`: a relation, or an AI setting's value (its low byte for some).
@@ -122,7 +122,7 @@ impl World {
         match game_command.sub {
             GameSub::Diplomacy if self.alliance_locked == 0 => {
                 // a relation without a stance or a player number outside a byte changes nothing
-                let other = u8::try_from(game_command.a).ok().map(PlayerId::from);
+                let other = u8::try_from(game_command.argument).ok().map(PlayerId::from);
                 if let (Some(from_player), Some(to_player), Some(stance)) =
                     (target, other, Stance::of_diplomacy(game_command.value))
                 {
@@ -136,8 +136,9 @@ impl World {
                 }
             }
             GameSub::AlliedVictory if self.alliance_locked == 0 => {
-                if let Some(p) = target {
-                    self.players.player_mut(p)?.allied_victory = game_command.a as u8;
+                if let Some(player_id) = target {
+                    self.players.player_mut(player_id)?.allied_victory =
+                        game_command.argument as u8;
                     self.resolve_teams();
                 }
             }
@@ -145,18 +146,19 @@ impl World {
                 return Err(CHEAT);
             }
             GameSub::ProductionQueue => {
-                if let Some(p) = target {
-                    self.players.player_mut(p)?.production_queue_on = game_command.a as u8;
+                if let Some(player_id) = target {
+                    self.players.player_mut(player_id)?.production_queue_on =
+                        game_command.argument as u8;
                 }
             }
             GameSub::Treason => {
-                if let Some(p) = target {
-                    self.game_treason(p)?;
+                if let Some(player_id) = target {
+                    self.game_treason(player_id)?;
                 }
             }
             GameSub::AiSetting => {
-                if let Some(p) = target {
-                    self.game_ai_setting(p, game_command)?;
+                if let Some(player_id) = target {
+                    self.game_ai_setting(player_id, game_command)?;
                 }
             }
             GameSub::FarmQueue
@@ -167,8 +169,8 @@ impl World {
             | GameSub::FishTrapQueue
             | GameSub::FishTrapUnqueue
             | GameSub::AutoFishTrapQueue => {
-                if let Some(p) = target {
-                    self.game_queue(p, game_command)?;
+                if let Some(player_id) = target {
+                    self.game_queue(player_id, game_command)?;
                 }
             }
             GameSub::Posture => {
@@ -207,7 +209,7 @@ impl World {
         game_command: &GameCommand,
     ) -> GenieResult<()> {
         if self.players.player(player_id)?.kind.is_computer() {
-            self.set_ai_setting(player_id, game_command.a, game_command.value)?;
+            self.set_ai_setting(player_id, game_command.argument, game_command.value)?;
         }
         Ok(())
     }
@@ -222,7 +224,7 @@ impl World {
     ///
     /// What the purchase and the refund do not model.
     fn game_queue(&mut self, player_id: PlayerId, game_command: &GameCommand) -> GenieResult<()> {
-        let count = QueueCount::of_data(i32::from(game_command.a));
+        let count = QueueCount::of_data(i32::from(game_command.argument));
         match game_command.sub {
             GameSub::FarmQueue => {
                 let _ = self.queue_farms(player_id, count, self.model.slots.master.farm)?;
@@ -365,12 +367,12 @@ mod tests {
         )
     }
 
-    fn game(issuer: u8, sub: GameSub, player: i16, a: i16, value: u32) -> GameCommand {
+    fn game(issuer: u8, sub: GameSub, player: i16, argument: i16, value: u32) -> GameCommand {
         GameCommand {
             issuer: player_id(issuer),
             sub,
             player,
-            a,
+            argument,
             speed: 0.0,
             value,
         }
@@ -463,7 +465,7 @@ mod tests {
             costing(FISH_TRAP, 100),
         ]);
         world.model.masters = vec![Arc::new(Masters::new([])), Arc::new(masters)];
-        let wood = |t: &World| t.players[1].attributes[1];
+        let wood = |world: &World| world.players[1].attributes[1];
         world.game(&game(1, GameSub::FarmQueue, 1, 2, 0)).unwrap();
         assert_eq!(
             (world.players[1].farm_queue, wood(&world)),
@@ -515,19 +517,19 @@ mod tests {
     /// 1, 4 and 0xf for anyone; an issuer outside the world runs nothing.
     #[test]
     fn sub_command_for_another_player_needs_the_game_cheats() {
-        let mut t = world();
-        assert!(t.game_allowed(&game(1, GameSub::Posture, 1, 0, 0)));
-        assert!(!t.game_allowed(&game(1, GameSub::Posture, 2, 0, 0)));
-        assert!(t.game_allowed(&game(1, GameSub::Speed, 2, 0, 0)));
-        assert!(t.game_allowed(&game(1, GameSub::QuickBuild, 2, 0, 0)));
-        assert!(t.game_allowed(&game(1, GameSub::Open0xf, 2, 0, 0)));
-        assert!(!t.game_allowed(&game(9, GameSub::Posture, 9, 0, 0)));
-        t.settings.flags.set(OptionFlags::CHEATS_ENABLED, true);
-        assert!(t.game_allowed(&game(1, GameSub::Posture, 2, 0, 0)));
+        let mut scene = world();
+        assert!(scene.game_allowed(&game(1, GameSub::Posture, 1, 0, 0)));
+        assert!(!scene.game_allowed(&game(1, GameSub::Posture, 2, 0, 0)));
+        assert!(scene.game_allowed(&game(1, GameSub::Speed, 2, 0, 0)));
+        assert!(scene.game_allowed(&game(1, GameSub::QuickBuild, 2, 0, 0)));
+        assert!(scene.game_allowed(&game(1, GameSub::Open0xf, 2, 0, 0)));
+        assert!(!scene.game_allowed(&game(9, GameSub::Posture, 9, 0, 0)));
+        scene.settings.flags.set(OptionFlags::CHEATS_ENABLED, true);
+        assert!(scene.game_allowed(&game(1, GameSub::Posture, 2, 0, 0)));
         // refused: nothing changes
-        let mut t = world();
-        t.game(&game(1, GameSub::Posture, 2, 0, 0)).unwrap();
-        assert_eq!(t.players[2].posture, Posture::Aggressive);
+        let mut world = world();
+        world.game(&game(1, GameSub::Posture, 2, 0, 0)).unwrap();
+        assert_eq!(world.players[2].posture, Posture::Aggressive);
     }
 
     /// 0x10, 0x13 and 0x14 flip their flags; a player outside the world changes nothing.
@@ -601,8 +603,9 @@ mod tests {
         world.settings.flags.set(OptionFlags::CHEATS_ENABLED, true);
         world.game(&game(1, GameSub::AiSetting, 1, 1, 30)).unwrap();
         assert_eq!(world.players[1].dodge_chance, Chance::NONE);
-        let set = |t: &mut World, setting: i16, value: u32| {
-            t.game(&game(1, GameSub::AiSetting, 2, setting, value))
+        let set = |world: &mut World, setting: i16, value: u32| {
+            world
+                .game(&game(1, GameSub::AiSetting, 2, setting, value))
                 .unwrap();
         };
         set(&mut world, 1, 0x1_1e);
@@ -658,8 +661,8 @@ mod tests {
     fn the_other_ai_settings_take_their_values() {
         let mut world = world();
         world.players[2].kind = PlayerKind::Computer;
-        let set = |t: &mut World, setting: i16, value: u32| {
-            t.set_ai_setting(player_id(2), setting, value).unwrap();
+        let set = |world: &mut World, setting: i16, value: u32| {
+            world.set_ai_setting(player_id(2), setting, value).unwrap();
         };
         set(&mut world, 4, 0x1_07);
         set(&mut world, 5, 0x2_03);

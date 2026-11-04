@@ -92,37 +92,37 @@ impl Victim {
 #[must_use]
 pub fn bonus_damage(attacker: &Victim, target: &Victim, roles: &Roles) -> f32 {
     let mut sum = 0.0f32;
-    for t in attacker
+    for task in attacker
         .bonus_tasks
         .iter()
         .filter(|task| task.action_kind == BONUS_DAMAGE)
     {
-        let any = t.object_id.is_none()
-            && t.object_group.is_none()
+        let any = task.object_id.is_none()
+            && task.object_group.is_none()
             && (roles
                 .of_class(target.class)
                 .intersects(ClassRoles::PACKED_TREBUCHET | ClassRoles::UNPACKED_TREBUCHET)
                 || target.kind < MasterKind::BUILDING);
-        if !(any || t.object_id == Some(target.master_id) || t.for_class(target.class)) {
+        if !(any || task.object_id == Some(target.master_id) || task.for_class(target.class)) {
             continue;
         }
-        let whose = if at_most_or_unordered(t.work_range.get(), 0.0) {
+        let whose = if at_most_or_unordered(task.work_range.get(), 0.0) {
             attacker
         } else {
             target
         };
         // the task's `+0x26` read as a flag: other than 0 (none, −1, is other too)
-        let share = whose.hp_share(if AttributeId::field(t.attribute_kind4) == 0 {
+        let share = whose.hp_share(if AttributeId::field(task.attribute_kind4) == 0 {
             HpPart::Held
         } else {
             HpPart::Lacking
         });
-        if at_most_or_unordered(t.work_val2.get(), 0.0)
+        if at_most_or_unordered(task.work_val2.get(), 0.0)
             || at_most_or_unordered(target.shown_hp().get(), 0.0)
         {
             continue;
         }
-        sum += libm::floorf(share / t.work_val2.get() + EPSILON) * t.work_val1.get();
+        sum += libm::floorf(share / task.work_val2.get() + EPSILON) * task.work_val1.get();
     }
     maxss(sum, 0.0)
 }
@@ -130,12 +130,12 @@ pub fn bonus_damage(attacker: &Victim, target: &Victim, roles: &Roles) -> f32 {
 /// What the attack and the range a combat object shows (slots 0x878 and 0x880) read besides the
 /// object as a hit reads it.
 #[derive(Clone, Copy, Debug, Default)]
-pub struct Shown<'a> {
+pub struct Shown<'world> {
     /// The target of its top action when that attacks (action type 9 or 7, `FUN_14107cc30`).
-    pub(crate) target: Option<&'a Victim>,
+    pub(crate) target: Option<&'world Victim>,
     /// The weapons (class, amount) of its master's charge projectile (`+0x928`) when its player
     /// holds that master (`FUN_141659d20`).
-    pub(crate) projectile: Option<&'a [ClassAmount]>,
+    pub(crate) projectile: Option<&'world [ClassAmount]>,
     /// Its master's `charge_event` (`+0x920`), which a ready charge of type 6 or 7 adds to its
     /// range.
     pub(crate) charge_event: ChargeEvent,
@@ -171,10 +171,10 @@ pub(super) enum Weapons {
 pub(super) fn best_attack(weapons: &[ClassAmount], of: Weapons) -> DamageAmount {
     weapons
         .iter()
-        .filter(|w| {
+        .filter(|class_amount| {
             of == Weapons::Any
                 || matches!(
-                    w.class,
+                    class_amount.class,
                     DamageClass::PIERCE | DamageClass::MELEE | DamageClass::CLASS_31
                 )
         })
@@ -197,20 +197,20 @@ pub(super) fn best_attack(weapons: &[ClassAmount], of: Weapons) -> DamageAmount 
 /// or 3 adds the charge (`+0x9e0`). A combat object of type 50 or 60 has no powerups (its slots
 /// answer 0). The sums wrap at 16 bits.
 #[must_use]
-pub fn shown_attack(v: &Victim, shown: &Shown<'_>, roles: &Roles) -> DamageAmount {
-    let attacker = &v.source;
-    let charge = charge_shown(v, shown.target, roles);
+pub fn shown_attack(target: &Victim, shown: &Shown<'_>, roles: &Roles) -> DamageAmount {
+    let attacker = &target.source;
+    let charge = charge_shown(target, shown.target, roles);
     if charge
         && attacker.charge_kind.ranged()
         && let Some(weapons) = shown.projectile
     {
         return best_attack(weapons, Weapons::Fighting);
     }
-    let mut attack = best_attack(&v.weapons, Weapons::Fighting);
+    let mut attack = best_attack(&target.weapons, Weapons::Fighting);
     if attack == DamageAmount::ZERO {
-        attack = best_attack(&v.weapons, Weapons::Any);
+        attack = best_attack(&target.weapons, Weapons::Any);
     }
-    let powerup = if v.tribe() {
+    let powerup = if target.tribe() {
         attacker.attack_powerup.get()
     } else {
         0.0
@@ -219,7 +219,7 @@ pub fn shown_attack(v: &Victim, shown: &Shown<'_>, roles: &Roles) -> DamageAmoun
         .plus(DamageAmount::of_effect(powerup))
         .plus(DamageAmount::of_effect(0.0));
     if let Some(victim) = shown.target {
-        attack = attack.plus(DamageAmount::of_effect(bonus_damage(v, victim, roles)));
+        attack = attack.plus(DamageAmount::of_effect(bonus_damage(target, victim, roles)));
     }
     if charge && attacker.charge_kind.adds_to_attack() {
         attack = attack.plus(DamageAmount::of_effect(attacker.charge.get()));

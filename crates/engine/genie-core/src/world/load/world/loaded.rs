@@ -87,14 +87,14 @@ pub fn hunted_origins(turns: &mut World, start: &Header) {
                 continue;
             };
             let leash = masters
-                .and_then(|m| m.get(unit.life.master_id))
+                .and_then(|masters| masters.get(unit.life.master_id))
                 .and_then(|master| {
                     master
                         .action_part()
                         .tasks
                         .iter()
                         .rev()
-                        .find(|t| t.action_kind == ActionKind::HUNT_RANGE)
+                        .find(|task| task.action_kind == ActionKind::HUNT_RANGE)
                 })
                 .map_or(Distance::ZERO, |task| task.work_range);
             ai.hunted = Some(Hunted { origin, leash });

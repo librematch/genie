@@ -37,23 +37,23 @@ impl HuntAction {
         hunt_reads: &HuntReads,
         herd: &Herd,
     ) -> GenieResult<()> {
-        self.tear_down(step.w.parts.mover_mut(unit.id))?;
+        self.tear_down(step.world.parts.mover_mut(unit.id))?;
         self.state = HuntState::Lead;
         self.lead.still_time = 0;
         let at = fight.victim.position;
         self.lead.start = at.ground();
         self.face_animal(
-            (unit.position(), step.w.parts.mover_mut(unit.id)),
+            (unit.position(), step.world.parts.mover_mut(unit.id)),
             at,
             hunt_reads.attack.world_time,
         )?;
         if let Some(graphic) = herd.special_graphic {
             new_sprite(
                 &mut unit.sprite,
-                step.w.parts.move_stats_mut(unit.id),
+                step.world.parts.move_stats_mut(unit.id),
                 graphic,
-                step.w.streams.get(Stream::Sprite),
-                step.w.model.tuning.sprite,
+                step.world.streams.get_mut(Stream::Sprite),
+                step.world.model.tuning.sprite,
             );
         }
         self.timer = LEAD_WAIT;
@@ -112,7 +112,7 @@ impl HuntAction {
             return Ok(HuntNext::Stay);
         }
         let ground = step
-            .w
+            .world
             .parts
             .mover_of(unit.id)
             .map(|mover| mover.stats.radius.ground())
@@ -122,7 +122,7 @@ impl HuntAction {
         {
             self.lead.start = position.ground();
             self.face_animal(
-                (unit.position(), step.w.parts.mover_mut(unit.id)),
+                (unit.position(), step.world.parts.mover_mut(unit.id)),
                 position,
                 hunt_reads.attack.world_time,
             )?;
@@ -130,17 +130,17 @@ impl HuntAction {
             return Ok(HuntNext::Stay);
         }
         let walks = hunt_reads.walks(
-            &step.w.model.graphics,
-            (unit, step.w.parts.mover_of(unit.id)),
+            &step.world.model.graphics,
+            (unit, step.world.parts.mover_of(unit.id)),
         );
         let player = fight.own.player;
         self.set_walk(
-            (&step.w.spatial, unit.position()),
-            step.w.parts.motion_mut(unit.id),
+            (&step.world.spatial, unit.position()),
+            step.world.parts.motion_mut(unit.id),
             &fight.victim,
             player,
             &walks,
-            &step.w.model,
+            &step.world.model,
         )?;
         Ok(HuntNext::Stay)
     }

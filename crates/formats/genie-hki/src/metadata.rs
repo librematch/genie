@@ -171,9 +171,9 @@ impl IntoIterator for HotkeyInfoMetadata {
     }
 }
 
-impl<'a> IntoIterator for &'a HotkeyInfoMetadata {
-    type Item = &'a StringKey;
-    type IntoIter = slice::Iter<'a, StringKey>;
+impl<'metadata> IntoIterator for &'metadata HotkeyInfoMetadata {
+    type Item = &'metadata StringKey;
+    type IntoIter = slice::Iter<'metadata, StringKey>;
     fn into_iter(self) -> Self::IntoIter {
         self.0.iter()
     }

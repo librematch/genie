@@ -87,7 +87,7 @@ impl Unstartable {
 /// only between two runs.
 impl Diff for DefaultTask {
     fn diff(&self, other: &Self, differ: &mut Differ) {
-        let is = |t: &Self, v: Self| *t == v;
+        let is = |task: &Self, wanted: Self| *task == wanted;
         if differ.compares_unsaved() {
             differ.field("fly", &is(self, Self::Fly), &is(other, Self::Fly));
         }
@@ -123,7 +123,7 @@ impl DefaultTask {
 #[must_use]
 pub fn default_start(master: &Master) -> DefaultTask {
     match master.default_task() {
-        Some(t) if t.action_kind == MAKE => DefaultTask::Make,
+        Some(first_task) if first_task.action_kind == MAKE => DefaultTask::Make,
         Some(task) if ACTION_FACTORY_KINDS.contains(&task.action_kind) => {
             DefaultTask::Fails(Unstartable::Unported(task.action_kind))
         }
@@ -146,16 +146,16 @@ mod tests {
         ] {
             assert_eq!(default_task.fails(), None, "{default_task:?}");
         }
-        let e = Unstartable::Unported(ActionKind::named(6)).error();
-        assert_eq!(e.reason(), "a default task the slice does not model");
+        let error = Unstartable::Unported(ActionKind::named(6)).error();
+        assert_eq!(error.reason(), "a default task the slice does not model");
         let error = Unstartable::Unread(UnreadDefault::OwnMaster).error();
         assert_eq!(error.reason(), "the default task of an object's own master");
     }
 
     #[test]
     fn comparison_reads_each_start_in_its_scope() {
-        let paths = |a, b, scope| {
-            differences(&a, &b, scope)
+        let paths = |left, right, scope| {
+            differences(&left, &right, scope)
                 .into_iter()
                 .map(|difference| difference.path)
                 .collect::<Vec<_>>()

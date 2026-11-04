@@ -489,7 +489,7 @@ fn patrol_and_attack_move_keep_every_waypoint_slot() {
             units: unit_list(object_ids([5])),
             waypoints: Waypoints {
                 count: 2,
-                points: from_fn(|i| match i {
+                points: from_fn(|index| match index {
                     0 => Point::new(1.0, 2.0),
                     1 => Point::new(7.0, 0.0),
                     9 => Point::new(0.0, 8.0),
@@ -900,7 +900,7 @@ fn flare_trade_and_game_keep_their_fields() {
                 issuer: player_id(2),
                 sub: GameSub::Speed,
                 player: 3,
-                a: -1,
+                argument: -1,
                 speed: 1.7,
                 value: 9,
             }),
@@ -1072,7 +1072,7 @@ fn command_its_packet_cannot_hold_is_an_error() {
     let refused = |command: &Command| encode(command).map_err(|error| error.kind());
     let most = (usize::from(u16::MAX) + 4 - packets::Stop::FIXED) / 4;
     assert_eq!(
-        encode(&stop(player_id(1), vec![0; most])).map(|p| p.len()),
+        encode(&stop(player_id(1), vec![0; most])).map(|packet| packet.len()),
         Ok(65536)
     );
     assert_eq!(

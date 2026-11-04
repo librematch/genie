@@ -67,13 +67,13 @@ pub(super) fn effective(victim: &Victim) -> HitPoints {
 /// its `invulnerability_level` floor; another object (`FUN_141189160`) just loses it. Not modelled
 /// (no update of this recording fills either list): the kill credits of a dying object's active
 /// stingers (`+0xb58`) and a surviving object's hit point transforms (`+0xb20`, `FUN_141204450`).
-pub fn lose(victim: &mut Victim, d: HitPoints) {
+pub fn lose(victim: &mut Victim, damage: HitPoints) {
     let unit = matches!(victim.kind, MasterKind::COMBAT | MasterKind::BUILDING);
     let Some(armored) = victim.armored.as_mut().filter(|_| unit) else {
-        victim.hp -= d;
+        victim.hp -= damage;
         return;
     };
-    let Some(hit_points) = armored.hp_powerup.absorb(d) else {
+    let Some(hit_points) = armored.hp_powerup.absorb(damage) else {
         return;
     };
     let floor = hp_floor(armored, victim.master_hp);

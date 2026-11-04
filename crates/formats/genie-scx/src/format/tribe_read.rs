@@ -458,7 +458,7 @@ mod tests {
 
     /// Little-endian words.
     fn words(ws: &[i32]) -> Vec<u8> {
-        ws.iter().flat_map(|w| w.to_le_bytes()).collect()
+        ws.iter().flat_map(|word| word.to_le_bytes()).collect()
     }
 
     /// The separator from 1.02 on; before, nothing.
@@ -569,10 +569,10 @@ mod tests {
     #[test]
     fn the_de_options_follow_their_version() {
         let string = |text: &str| {
-            let mut b = vec![0x60, 0x0a];
-            b.extend(u16::try_from(text.len()).unwrap().to_le_bytes());
-            b.extend(text.as_bytes());
-            b
+            let mut bytes = vec![0x60, 0x0a];
+            bytes.extend(u16::try_from(text.len()).unwrap().to_le_bytes());
+            bytes.extend(text.as_bytes());
+            bytes
         };
         assert_eq!(
             DeOptions::read_from(&[][..], 1.29).unwrap(),

@@ -334,7 +334,10 @@ mod tests {
         assert_eq!(cpx.name(), "DER FALL VON SACSAHUAMÁN - TEIL I");
         assert_eq!(cpx.len(), 1);
 
-        let names: Vec<_> = cpx.entries().map(|e| &e.name).collect();
+        let names: Vec<_> = cpx
+            .entries()
+            .map(|scenario_meta| &scenario_meta.name)
+            .collect();
         assert_eq!(names, vec!["Der Weg nach Sacsahuamán"]);
         let filenames: Vec<_> = cpx
             .entries()
@@ -353,7 +356,10 @@ mod tests {
         assert_eq!(campaign.version(), AOE_AOK);
         assert_eq!(campaign.name(), "Armies at War, A Combat Showcase");
         assert_eq!(campaign.len(), 1);
-        let names: Vec<_> = campaign.entries().map(|e| &e.name).collect();
+        let names: Vec<_> = campaign
+            .entries()
+            .map(|scenario_meta| &scenario_meta.name)
+            .collect();
         assert_eq!(names, vec!["Bronze Age Art of War"]);
         let filenames: Vec<_> = campaign
             .entries()
@@ -436,13 +442,16 @@ mod tests {
 
     #[test]
     fn aoe_de2() -> GenieResult<()> {
-        let f = File::open("test/campaigns/acam1.aoe2campaign")?;
-        let c = Campaign::read_from(f)?;
+        let file = File::open("test/campaigns/acam1.aoe2campaign")?;
+        let campaign = Campaign::read_from(file)?;
 
-        assert_eq!(c.version(), AOE2_DE);
-        assert_eq!(c.name(), "acam1");
-        assert_eq!(c.len(), 5);
-        let filenames: Vec<_> = c.entries().map(|e| &e.filename).collect();
+        assert_eq!(campaign.version(), AOE2_DE);
+        assert_eq!(campaign.name(), "acam1");
+        assert_eq!(campaign.len(), 5);
+        let filenames: Vec<_> = campaign
+            .entries()
+            .map(|scenario_meta| &scenario_meta.filename)
+            .collect();
         assert_eq!(
             filenames,
             vec![

@@ -145,11 +145,11 @@ fn get(attributes: &[Amount], attribute_id: AttributeId) -> Amount {
         .unwrap_or(Amount::ZERO)
 }
 
-/// Attribute `attribute_id` of `attributes` takes `v`; none past them (the game's array holds them
-/// all).
-fn set(attributes: &mut [Amount], attribute_id: AttributeId, v: Amount) {
+/// Attribute `attribute_id` of `attributes` takes `value`; none past them (the game's array holds
+/// them all).
+fn set(attributes: &mut [Amount], attribute_id: AttributeId, value: Amount) {
     if let Some(amount) = attributes.get_mut(attribute_id.index()) {
-        *amount = v;
+        *amount = value;
     }
 }
 

@@ -67,8 +67,8 @@ const DEFAULT_SOUND_EVENT: u32 = 0x62d4_b3ec;
 pub(super) fn sound_event(event: u32, sound: i16, sounds: &[Sound]) -> i32 {
     let has_files = usize::try_from(sound)
         .ok()
-        .and_then(|i| sounds.get(i))
-        .is_some_and(|s| !s.items.is_empty());
+        .and_then(|index| sounds.get(index))
+        .is_some_and(|sound| !sound.items.is_empty());
     if event == 0 && has_files {
         DEFAULT_SOUND_EVENT.cast_signed()
     } else {
@@ -185,7 +185,9 @@ pub(super) fn dat_work(id: MasterId, unit: &Unit, sounds: &[Sound]) -> GenieResu
             garrison_kind: GarrisonKinds::from_bits_retain(building.garrison_kind),
             garrison_heal_rate: HitPoints::new(building.garrison_heal_rate),
             garrison_repair_rate: HitPoints::new(building.garrison_repair_rate),
-            annexes: building.annexes.map(|a| MasterId::of_data(a.unit_id)),
+            annexes: building
+                .annexes
+                .map(|building_annex| MasterId::of_data(building_annex.unit_id)),
             annex_offsets: building
                 .annexes
                 .map(|building_annex| GroundOffset::from(building_annex.misplacement)),
@@ -281,11 +283,13 @@ fn dat_creatable(creatable: &Creatable) -> GenieResult<work::CreatablePart> {
         build_time: creatable
             .train_locations
             .first()
-            .map_or(WholeSeconds::ZERO, |t| WholeSeconds::of_data(t.queue_time)),
+            .map_or(WholeSeconds::ZERO, |train_location| {
+                WholeSeconds::of_data(train_location.queue_time)
+            }),
         trained_at: creatable
             .train_locations
             .iter()
-            .filter_map(|t| MasterId::of_data(t.location_id))
+            .filter_map(|train_location| MasterId::of_data(train_location.location_id))
             .collect(),
         // the whole entries, which the attribute setters change (a .dat before VER 8.7 holds no
         // hotkey: 0)
@@ -347,7 +351,7 @@ fn dat_action(bird: &Bird, sounds: &[Sound]) -> GenieResult<work::ActionPart> {
         drop_sites: bird
             .drop_sites
             .iter()
-            .filter_map(|&d| MasterId::of_data(d))
+            .filter_map(|&id| MasterId::of_data(id))
             .collect(),
         run_pattern: RunPattern::of_data(bird.run_pattern),
     })

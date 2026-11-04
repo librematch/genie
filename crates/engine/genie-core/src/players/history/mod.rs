@@ -32,7 +32,7 @@ use crate::players::PlayerId;
 use crate::world::WorldTime;
 use crate::world::layer::Slots;
 use crate::world::layer::generated::HistoryTuning;
-use crate::world::slots::CheckedIndex;
+use crate::world::slots::CheckedIndexExt;
 
 /// A history event's kind (`event`, `+0x0`): an age reached, a castle or wonder built or
 /// destroyed, a battle or a defeat. Every byte is a kind (a save may hold kinds the slice
@@ -276,7 +276,7 @@ impl History {
         let battles = self
             .events
             .iter()
-            .filter(|e| e.kind == EventKind::Battle)
+            .filter(|event| event.kind == EventKind::Battle)
             .count();
         let Some(new) = self.events.first_mut() else {
             return BattleMark::Kept;
@@ -305,8 +305,8 @@ impl History {
                 }
             }
         }
-        if let Some(i) = furthest {
-            let _ = self.events.remove(i);
+        if let Some(index) = furthest {
+            let _ = self.events.remove(index);
             BattleMark::Kept
         } else {
             let _ = self.events.remove(0);
@@ -333,7 +333,7 @@ impl History {
                 let _ = first.get_or_insert(index as i32 + 1);
             }
         }
-        first.map(|f| (f, count))
+        first.map(|first| (first, count))
     }
 
     /// The AI's current age time (`FUN_140b077d0`, its fact's): the world's seconds, less those
@@ -383,10 +383,10 @@ impl History {
         }
         self.update_count = self.update_count.wrapping_sub(period);
         // the save holds every attribute of the .dat's count, these among them
-        let a = |i: usize| attributes.get(i).copied().unwrap_or(Amount::ZERO);
-        let tally = |i: usize| Tally::of_amount(a(i));
-        let civilian = a(slots.attribute.civilian_population.index());
-        let military = a(slots.attribute.military_population.index());
+        let attribute = |index: usize| attributes.get(index).copied().unwrap_or(Amount::ZERO);
+        let tally = |index: usize| Tally::of_amount(attribute(index));
+        let civilian = attribute(slots.attribute.civilian_population.index());
+        let military = attribute(slots.attribute.military_population.index());
         if military + civilian < Amount::ZERO {
             self.add_entry(EntryKind::POPULATION, Population::ZERO, Population::ZERO);
         } else {
@@ -471,9 +471,9 @@ impl History {
         self.old_current_build_value_buildings = tally(slots.attribute.buildings_value.index());
         if self.battle_flag == 0 {
             for (index, kill) in self.old_player_kill_bv.iter_mut().enumerate() {
-                *kill = Tally::of_amount_64(a(KILL_VALUE_OF + index));
-                if let Some(r) = self.old_player_razing_bv.get_mut(index) {
-                    *r = Tally::of_amount_64(a(RAZING_VALUE_OF + index));
+                *kill = Tally::of_amount_64(attribute(KILL_VALUE_OF + index));
+                if let Some(tally) = self.old_player_razing_bv.get_mut(index) {
+                    *tally = Tally::of_amount_64(attribute(RAZING_VALUE_OF + index));
                 }
             }
         }
@@ -489,22 +489,24 @@ impl History {
         value: Tally,
         world_time: WorldTime,
     ) -> GenieResult<()> {
-        let a = |i: usize| attributes.get(i).copied().unwrap_or(Amount::ZERO);
+        let attribute = |index: usize| attributes.get(index).copied().unwrap_or(Amount::ZERO);
         let players = self.old_player_kill_bv.len();
         let kills: Vec<Tally> = self
             .old_player_kill_bv
             .iter()
             .enumerate()
-            .map(|(i, &old)| Tally::of_amount_64(a(KILL_VALUE_OF + i)).wrapping_sub(old))
+            .map(|(index, &old)| {
+                Tally::of_amount_64(attribute(KILL_VALUE_OF + index)).wrapping_sub(old)
+            })
             .collect();
         let razings: Vec<Tally> = (0..players)
-            .map(|i| {
+            .map(|index| {
                 let old = self
                     .old_player_razing_bv
-                    .get(i)
+                    .get(index)
                     .copied()
                     .unwrap_or(Tally::ZERO);
-                Tally::of_amount_64(a(RAZING_VALUE_OF + i)).wrapping_sub(old)
+                Tally::of_amount_64(attribute(RAZING_VALUE_OF + index)).wrapping_sub(old)
             })
             .collect();
         let mut best = 0.0f32;
@@ -595,25 +597,25 @@ mod tests {
     /// indefinite's low half, 0.
     #[test]
     fn an_entry_grows_the_buffer_by_sixty_and_keeps_shorts() {
-        let pop = |c: f32, m: f32| (Population::of_count(c), Population::of_count(m));
+        let pop = |count: f32, most: f32| (Population::of_count(count), Population::of_count(most));
         let mut history = History::default();
-        let (c, m) = pop(7.9, 70_000.0);
-        history.add_entry(EntryKind::POPULATION, c, m);
+        let (count, most) = pop(7.9, 70_000.0);
+        history.add_entry(EntryKind::POPULATION, count, most);
         assert_eq!(
             (history.max_entries, history.entries.clone()),
             (TimeSlice::of_data(60), vec![entry(7, 70_000_i32 as i16)])
         );
-        let (c, m) = pop(3.0, 4.0);
-        history.add_entry(EntryKind::of_data(1), c, m);
-        let (c, m) = pop(f32::NAN, -2.5);
-        history.add_entry(EntryKind::POPULATION, c, m);
+        let (count, most) = pop(3.0, 4.0);
+        history.add_entry(EntryKind::of_data(1), count, most);
+        let (count, most) = pop(f32::NAN, -2.5);
+        history.add_entry(EntryKind::POPULATION, count, most);
         assert_eq!(
             history.entries,
             vec![entry(7, 4464), entry(0, 0), entry(0, -2)]
         );
         history.entries.resize(60, HistoryEntry::default());
-        let (c, m) = pop(1.0, 1.0);
-        history.add_entry(EntryKind::POPULATION, c, m);
+        let (count, most) = pop(1.0, 1.0);
+        history.add_entry(EntryKind::POPULATION, count, most);
         assert_eq!(
             (history.max_entries, history.entries.len()),
             (TimeSlice::of_data(120), 61)
@@ -675,15 +677,15 @@ mod tests {
     #[test]
     fn fourth_battle_pushes_out_the_weakest_of_the_newest_three() {
         let mut history = with_entry();
-        for d in [0.2, 0.9, 0.3] {
-            history.add_event(EventKind::Battle, 1.0, d, 0, WorldTime::ZERO);
+        for data in [0.2, 0.9, 0.3] {
+            history.add_event(EventKind::Battle, 1.0, data, 0, WorldTime::ZERO);
         }
         assert_eq!(history.events.len(), 3);
-        assert!(history.events.iter().all(|e| e.data3 == 1.0));
+        assert!(history.events.iter().all(|event| event.data3 == 1.0));
         // the newest three are 0.5 (new), 0.3, 0.9: 0.3 lies furthest below
         history.add_event(EventKind::Battle, 1.0, 0.5, 0, WorldTime::ZERO);
-        let d: Vec<f32> = history.events.iter().map(|e| e.data2).collect();
-        assert_eq!(d, vec![0.5, 0.9, 0.2]);
+        let data: Vec<f32> = history.events.iter().map(|event| event.data2).collect();
+        assert_eq!(data, vec![0.5, 0.9, 0.2]);
         // a new battle below the newest three goes itself; 0.2 is fourth and not compared
         history.events.insert(
             0,
@@ -715,8 +717,8 @@ mod tests {
         let mut history = with_entry();
         history.events = vec![battle(0.1), Event::default(), battle(0.1), battle(0.9)];
         history.add_event(EventKind::Battle, 3.0, 0.6, 0, WorldTime::ZERO);
-        let d: Vec<f32> = history.events.iter().map(|event| event.data2).collect();
-        assert_eq!(d, vec![0.6, 0.0, 0.1, 0.9]);
+        let data: Vec<f32> = history.events.iter().map(|event| event.data2).collect();
+        assert_eq!(data, vec![0.6, 0.0, 0.1, 0.9]);
     }
 
     /// `FUN_141560e20` and `get_history_event_by_time`: the newest of a kind; the first position

@@ -28,7 +28,7 @@ use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 use crate::world::lets::release;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 use crate::world::step::Step;
 use crate::{GenieError, GenieResult};
 
@@ -65,7 +65,7 @@ impl BuildAction {
         roles: &Roles,
     ) -> GenieResult<()> {
         let desolid = step
-            .w
+            .world
             .parts
             .building_of(Self::site_unit(step, reads)?.ok_or(FOREIGN_SITE)?.id)
             .construction
@@ -77,7 +77,7 @@ impl BuildAction {
             return self.join(step, builder, roles);
         }
         let site = self.target.ok_or(SITE_GONE)?;
-        let placed = *step.w.spatial.get_known(site)?.ok_or(SITE_GONE)?;
+        let placed = *step.world.spatial.get_known(site)?.ok_or(SITE_GONE)?;
         let clearing = ClearingSite {
             player: placed.player,
             master: placed.master,
@@ -87,21 +87,23 @@ impl BuildAction {
             by: Clearer::Builder,
         };
         let cleared = footprint_clearing(
-            &step.w.spatial,
+            &step.world.spatial,
             &clearing,
             &reads.looks,
             roles,
-            &step.w.model.tuning.build,
+            &step.world.model.tuning.build,
         )?;
         for cl in cleared.iter().filter(|cl| cl.record_goes) {
-            step.w.pathing.removed(cl.id);
-            step.w.spatial.drop_record(cl.id);
+            step.world.pathing.removed(cl.id);
+            step.world.spatial.drop_record(cl.id);
         }
-        step.w.pathing.tiles_changed(step.w.spatial.take_changes());
+        step.world
+            .pathing
+            .tiles_changed(step.world.spatial.take_changes());
         let cleared_ids: Vec<ObjectId> = cleared.iter().map(|cl| cl.id).collect();
         let occupants = site_occupants(step, site, &placed, &cleared_ids, reads)?;
         for cl in cleared {
-            step.w.clear_object(cl, RecordDrop::Dropped)?;
+            step.world.clear_object(cl, RecordDrop::Dropped)?;
         }
         let parts = self.part_tests(step, builder, actions, (site.id(), &cleared_ids), reads)?;
         // the foundation's placement test (its master's slot 0x50, FUN_14123aee0): one that may
@@ -118,9 +120,9 @@ impl BuildAction {
             .filter(|&id| id != builder.id)
             .collect();
         if stays && !others.is_empty() {
-            step.w.evacuate(site, &others)?;
+            step.world.evacuate(site, &others)?;
         }
-        if step.w.spatial.foreign_marks(&placed) {
+        if step.world.spatial.foreign_marks(&placed) {
             // FUN_1411d4b80: a human owner's foundation goes (FUN_1411ccbb0), the interface hears
             // of it (FUN_140c898a0 0x88, not held), and set_state(2) halts the Build: the
             // standing sprite, the foundation let go, no point
@@ -174,7 +176,7 @@ impl BuildAction {
         reads: &BuildReads,
     ) -> GenieResult<PartTests> {
         let mut parts = Vec::new();
-        let by_id = step.w.objects();
+        let by_id = step.world.objects();
         if let Some(main) = by_id.annex_of(site) {
             parts.push(main.id());
             parts.extend(by_id.annexes(main.id()).ids());
@@ -185,11 +187,11 @@ impl BuildAction {
             occupied: false,
         };
         for part in parts {
-            let placed = *step.w.spatial.get_known(part)?.ok_or(SITE_GONE)?;
+            let placed = *step.world.spatial.get_known(part)?.ok_or(SITE_GONE)?;
             let own = with_annexes(step, part);
-            let (_, unit) = step.w.object(part).ok_or(SITE_GONE)?;
+            let (_, unit) = step.world.object(part).ok_or(SITE_GONE)?;
             let desolid = step
-                .w
+                .world
                 .parts
                 .building_of(unit.id)
                 .construction
@@ -206,7 +208,7 @@ impl BuildAction {
                         .filter(|&id| id != builder.id)
                         .collect();
                 if !others.is_empty() {
-                    step.w.evacuate(FoundationId::new(part), &others)?;
+                    step.world.evacuate(FoundationId::new(part), &others)?;
                     tests.occupied = true;
                 }
             }
@@ -232,9 +234,9 @@ impl BuildAction {
         let Some(site) = self.target else {
             return Ok(None);
         };
-        let annexes = step.w.objects().annexes(site);
+        let annexes = step.world.objects().annexes(site);
         for annex in annexes.ids() {
-            let placed = step.w.spatial.get_known(annex)?.ok_or(SITE_GONE)?;
+            let placed = step.world.spatial.get_known(annex)?.ok_or(SITE_GONE)?;
             let (ax, ay) = (placed.position.x(), placed.position.y());
             let sized = EPSILON < placed.radius.x() && EPSILON < placed.radius.y();
             if sized && (bx - ax).abs() < radius.x() && (by - ay).abs() < radius.y() {
@@ -302,7 +304,7 @@ impl BuildAction {
         builder: &Unit,
         roles: &Roles,
     ) -> GenieResult<()> {
-        let placed = *step.w.spatial.get(self.target).ok_or(SITE_GONE)?;
+        let placed = *step.world.spatial.get(self.target).ok_or(SITE_GONE)?;
         let [bx, by] = [builder.position().x() as i32, builder.position().y() as i32];
         let [tx, mut ty] = [placed.position.x() as i32, placed.position.y() as i32];
         let (rx, ry) = (placed.radius.x(), placed.radius.y());
@@ -317,14 +319,15 @@ impl BuildAction {
         }
         let (dx, dy) = (bx - tx, by - ty);
         if dx.abs() == dy.abs() {
-            let (a, b) = beside_diagonal(bx, by, dx, dy);
+            let (one_side, other_side) = beside_diagonal(bx, by, dx, dy);
             let player = placed.player;
             let walled = |tile: Tile| {
-                step.w.spatial.object_on_tile(tile, |o| {
-                    roles.of_class(o.class).contains(ClassRoles::WALL) && o.player != player
+                step.world.spatial.object_on_tile(tile, |placed| {
+                    roles.of_class(placed.class).contains(ClassRoles::WALL)
+                        && placed.player != player
                 })
             };
-            if walled(a) && walled(b) {
+            if walled(one_side) && walled(other_side) {
                 return Err(GenieError::unsupported(
                     "walls beside a diagonal builder (set_state 2)",
                 ));
@@ -357,27 +360,28 @@ impl BuildAction {
         let site = Self::site_unit(step, reads)?.ok_or(FOREIGN_SITE)?;
         let mut rate = self.task.work_rate * self.task.work_value * step.dt.seconds();
         let mut factor = step
-            .w
+            .world
             .players
             .player(step.player)?
-            .construction_rate(step.w.model.slots)
+            .construction_rate(step.world.model.slots)
             .get();
         if step
-            .w
+            .world
             .model
             .roles
             .of_master(site.life.master_id)
             .contains(MasterRoles::WONDER)
-            && step.w.model.tuning.build.wonder_rate < factor
+            && step.world.model.tuning.build.wonder_rate < factor
         {
-            factor = step.w.model.tuning.build.wonder_rate;
+            factor = step.world.model.tuning.build.wonder_rate;
         }
         if 0.0 < factor {
             rate *= factor;
         }
-        let n = Self::builders(step, self.target)?.as_f32();
-        if 1.0 < n {
-            rate *= ((n - 1.0) * step.w.model.tuning.build.extra_builder + 1.0) / n;
+        let builders = Self::builders(step, self.target)?.as_f32();
+        if 1.0 < builders {
+            rate *=
+                ((builders - 1.0) * step.world.model.tuning.build.extra_builder + 1.0) / builders;
         }
         if self.work_on(step, builder, actions, Seconds::new(rate))? == BuildProgress::Ongoing {
             return Ok(());
@@ -411,19 +415,23 @@ impl BuildAction {
         roles: &Roles,
     ) -> GenieResult<()> {
         let by_id = ObjectsRef::new(
-            &step.w.players,
-            &step.w.index,
-            &step.w.model.masters,
-            &step.w.parts,
-            &step.w.model.roles,
-            &step.w.model.tuning,
+            &step.world.players,
+            &step.world.index,
+            &step.world.model.masters,
+            &step.world.parts,
+            &step.world.model.roles,
+            &step.world.model.tuning,
         );
-        let mover = step.w.parts.mover_of(builder.id).ok_or(BUILDER_UNMOVING)?;
-        let site = step.w.spatial.get(footprint).ok_or(SITE_GONE)?;
+        let mover = step
+            .world
+            .parts
+            .mover_of(builder.id)
+            .ok_or(BUILDER_UNMOVING)?;
+        let site = step.world.spatial.get(footprint).ok_or(SITE_GONE)?;
         let site = (site.position, site.radius);
         let at = builder.position();
         let spot = step
-            .w
+            .world
             .spatial
             .spot_beside(
                 at,
@@ -437,12 +445,17 @@ impl BuildAction {
             ))?;
         self.state = BuildState::Clear { move_to: None };
         let move_reads = builder.move_to_reads(
-            step.w.parts.motion.mover(builder.id),
-            MasterTables::new(&step.w.model.masters, &step.w.parts.own_master),
+            step.world.parts.motion.mover(builder.id),
+            MasterTables::new(&step.world.model.masters, &step.world.parts.own_master),
             step.player,
             (
-                &step.w.model.graphics,
-                step.w.parts.combat_of(builder.id).abilities.look.as_ref(),
+                &step.world.model.graphics,
+                step.world
+                    .parts
+                    .combat_of(builder.id)
+                    .abilities
+                    .look
+                    .as_ref(),
             ),
             roles,
         )?;
@@ -451,7 +464,7 @@ impl BuildAction {
                 spot.with_height(at.z()),
                 Distance::ZERO,
                 self.task.moving,
-                &step.w.model.tuning.move_to,
+                &step.world.model.tuning.move_to,
             )?,
         };
         Ok(())
@@ -472,7 +485,7 @@ fn with_annexes(step: &Step<'_>, id: ObjectId) -> Vec<ObjectId> {
     let mut own = vec![id];
     let mut next = 0;
     while let Some(&part) = own.get(next) {
-        own.extend(step.w.objects().annexes(part).ids());
+        own.extend(step.world.objects().annexes(part).ids());
         next += 1;
     }
     own
@@ -494,7 +507,7 @@ fn site_occupants(
     reads: &BuildReads,
 ) -> GenieResult<Vec<ObjectId>> {
     Ok(step
-        .w
+        .world
         .spatial
         .footprint_occupants(site, placed, &reads.looks)?
         .into_iter()

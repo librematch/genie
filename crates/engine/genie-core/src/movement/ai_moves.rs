@@ -10,7 +10,7 @@ use crate::movement::move_to::Patience;
 use crate::objects::ObjectId;
 use crate::objects::layers::MotionMut;
 use crate::objects::masters::ClassId;
-use crate::objects::masters::PlayersMasters;
+use crate::objects::masters::PlayersMastersExt;
 use crate::objects::sprite::Cargo;
 use crate::players::PlayerId;
 use crate::unit_ai::Answer;
@@ -52,19 +52,19 @@ use crate::world::{Unread, WALKER_UNMOVING};
 /// the unit's terrain look and the build's roles ([`Unit::ai_move_with`],
 /// [`Unit::head_takes_point`]).
 #[derive(Clone, Copy, Debug)]
-pub(crate) struct MoveSprites<'a> {
+pub(crate) struct MoveSprites<'world> {
     /// The unit's owner's masters.
-    pub(crate) masters: OwnerMasters<'a>,
+    pub(crate) masters: OwnerMasters<'world>,
     /// The sprites' table.
-    pub(crate) graphics: &'a Graphics,
+    pub(crate) graphics: &'world Graphics,
     /// The unit's terrain look.
-    pub(crate) look: Option<&'a Look>,
+    pub(crate) look: Option<&'world Look>,
     /// The build's roles.
-    pub(crate) roles: &'a Roles,
+    pub(crate) roles: &'world Roles,
     /// The sprites' tuning values.
     pub(crate) sprite_tuning: SpriteTuning,
     /// The `MoveTo`'s tuning values.
-    pub(crate) move_to_tuning: &'a MoveToTuning,
+    pub(crate) move_to_tuning: &'world MoveToTuning,
 }
 
 impl Unit {
@@ -73,50 +73,54 @@ impl Unit {
     pub(crate) fn ai_move(
         &mut self,
         actions: &mut Action,
-        m: AiMove,
+        requested: AiMove,
         class: ClassId,
         step: &mut Step<'_>,
         roles: &Roles,
     ) -> GenieResult<()> {
         let by = self.releaser(step)?;
-        let sprite_rng = step.w.streams.get(Stream::Sprite);
+        let sprite_rng = step.world.streams.get_mut(Stream::Sprite);
         let (mut releases, mut leaves) = (Vec::new(), Vec::new());
         let sails = self.ai_move_with(
-            (actions, step.w.parts.unread.get(self.id)),
-            step.w.parts.motion.layer_mut(self.id),
-            m,
+            (actions, step.world.parts.unread.get(self.id)),
+            step.world.parts.motion.layer_mut(self.id),
+            requested,
             (class, step.player),
             (&mut releases, &mut leaves, by),
             (
                 MoveSprites {
                     masters: OwnerMasters::new(
-                        &step.w.parts.own_master,
-                        step.w.model.masters.of(step.player),
+                        &step.world.parts.own_master,
+                        step.world.model.masters.of(step.player),
                     ),
-                    graphics: &step.w.model.graphics,
-                    look: step.w.parts.combat.of(self.id).abilities.look.as_ref(),
+                    graphics: &step.world.model.graphics,
+                    look: step.world.parts.combat.of(self.id).abilities.look.as_ref(),
                     roles,
-                    sprite_tuning: step.w.model.tuning.sprite,
-                    move_to_tuning: &step.w.model.tuning.move_to,
+                    sprite_tuning: step.world.model.tuning.sprite,
+                    move_to_tuning: &step.world.model.tuning.move_to,
                 },
                 sprite_rng,
             ),
         )?;
         torn_down(step, self, (leaves, releases))?;
         if let MoveWith::Sails(transport_action) = sails {
-            let sprite_rng = step.w.streams.get(Stream::Sprite);
+            let sprite_rng = step.world.streams.get_mut(Stream::Sprite);
             self.transport_sail(
                 (transport_action, actions),
-                step.w.parts.motion.layer_mut(self.id),
-                m.point,
-                (&step.w.spatial, &mut step.w.zones, &mut step.w.pathing),
-                &step.w.model,
+                step.world.parts.motion.layer_mut(self.id),
+                requested.point,
+                (
+                    &step.world.spatial,
+                    &mut step.world.zones,
+                    &mut step.world.pathing,
+                ),
+                &step.world.model,
                 (
                     OwnerMasters::new(
-                        &step.w.parts.own_master,
-                        step.w.model.masters.of(step.player),
+                        &step.world.parts.own_master,
+                        step.world.model.masters.of(step.player),
                     ),
-                    step.w.parts.combat.of(self.id).abilities.look.as_ref(),
+                    step.world.parts.combat.of(self.id).abilities.look.as_ref(),
                     sprite_rng,
                 ),
             )?;
@@ -188,8 +192,8 @@ impl Unit {
             sprites,
         )? {
             PointMove::Taken(released) => {
-                if let Some(t) = released {
-                    releases.push((t, by));
+                if let Some(object_id) = released {
+                    releases.push((object_id, by));
                 }
                 return Ok(MoveWith::Walks);
             }
@@ -326,7 +330,10 @@ impl Unit {
 
     /// The sprites a `MoveTo` to a point that the unit's head action makes takes for none
     /// (`FUN_140aa0d30`'s default from the unit's master and terrain look).
-    fn point_sprites<'g>(&self, sprites: MoveSprites<'g>) -> GenieResult<SpriteReads<'g>> {
+    fn point_sprites<'world>(
+        &self,
+        sprites: MoveSprites<'world>,
+    ) -> GenieResult<SpriteReads<'world>> {
         Ok(SpriteReads::of(
             self.master_in(sprites.masters)?,
             sprites.look,
@@ -436,21 +443,21 @@ impl Unit {
         step: &mut Step<'_>,
         roles: &Roles,
     ) -> GenieResult<()> {
-        if step.w.parts.unread.contains(self.id) {
+        if step.world.parts.unread.contains(self.id) {
             return Err(GenieError::unsupported(
                 "an AI move to an object of a unit with an action",
             ));
         }
-        if step.w.parts.mover_of(self.id).is_none() {
+        if step.world.parts.mover_of(self.id).is_none() {
             return Err(GenieError::unsupported(
                 "an AI move to an object of a unit that does not move",
             ));
         }
         let livestock = roles
-            .of_class(self.master(step.w.master_tables(), step.player)?.class)
+            .of_class(self.master(step.world.master_tables(), step.player)?.class)
             .contains(ClassRoles::LIVESTOCK);
         let master = step
-            .w
+            .world
             .spatial
             .get_known(target)?
             .ok_or(TARGET_LACKING)?
@@ -462,44 +469,44 @@ impl Unit {
         let (mut releases, mut leaves) = (Vec::new(), Vec::new());
         self.clear_own_actions(
             actions,
-            step.w.parts.motion_mut(self.id),
+            step.world.parts.motion_mut(self.id),
             &mut releases,
             &mut leaves,
             by,
         )?;
         torn_down(step, self, (leaves, releases))?;
-        let own = self.master(step.w.master_tables(), step.player)?;
-        let range = object_range(range, Some(own), &step.w.model.tuning.order);
+        let own = self.master(step.world.master_tables(), step.player)?;
+        let range = object_range(range, Some(own), &step.world.model.tuning.order);
         let sprite = ai_sprite(own, Pace::Run)
             .or_else(|| object_sprite(own))
-            .and_then(|id| step.w.model.graphics.get(id).copied());
+            .and_then(|id| step.world.model.graphics.get(id).copied());
         let here = self.position();
         let mover = step
-            .w
+            .world
             .parts
             .mover_mut(self.id)
             .ok_or(GenieError::unreachable(
                 "a walker tested above without its mover",
             ))?;
         let move_to = MoveToAction::to_object(
-            &step.w.spatial,
+            &step.world.spatial,
             here,
             mover,
             (target, state),
             range,
             (sprite, livestock),
-            &step.w.model,
+            &step.world.model,
         )?;
         if move_to.shows_standing() {
             self.shows_standing_sprite(
-                step.w.parts.motion.layer_mut(self.id),
+                step.world.parts.motion.layer_mut(self.id),
                 OwnerMasters::new(
-                    &step.w.parts.own_master,
-                    step.w.model.masters.of(step.player),
+                    &step.world.parts.own_master,
+                    step.world.model.masters.of(step.player),
                 ),
-                &step.w.model.graphics,
-                step.w.streams.get(Stream::Sprite),
-                step.w.model.tuning.sprite,
+                &step.world.model.graphics,
+                step.world.streams.get_mut(Stream::Sprite),
+                step.world.model.tuning.sprite,
             )?;
         }
         actions.list.set_move_to(Some(move_to));

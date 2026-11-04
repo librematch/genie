@@ -33,7 +33,7 @@ impl RecordId {
     pub const fn value(self) -> i32 {
         match self {
             Self::Object(id) => id.get(),
-            Self::Tile(t) => (t.x() << 12) | t.y() | TILE_BITS.cast_signed(),
+            Self::Tile(at) => (at.x() << 12) | at.y() | TILE_BITS.cast_signed(),
             Self::Edge(tile) => (tile.x() << 12) | tile.y() | EDGE_BITS.cast_signed(),
         }
     }

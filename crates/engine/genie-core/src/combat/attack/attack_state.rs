@@ -164,24 +164,24 @@ mod tests {
     fn attack_states_read_back_from_their_bytes() {
         for index in 0..=255_u8 {
             match AttackState::of_byte(index, None) {
-                Ok(s) => assert_eq!(s.get(), index),
+                Ok(attack_state) => assert_eq!(attack_state.get(), index),
                 Err(_) => assert!(matches!(index, 3 | 8..=10 | 12 | 14..), "{index}"),
             }
         }
         let keeping: Vec<u8> = (0..=13)
-            .filter_map(|b| AttackState::of_byte(b, None).ok())
-            .filter(|s| s.keeps_target())
+            .filter_map(|byte| AttackState::of_byte(byte, None).ok())
+            .filter(|attack_state| attack_state.keeps_target())
             .map(AttackState::get)
             .collect();
         assert_eq!(keeping, [4, 5, 6, 7, 11]);
         assert_eq!(AttackState::Swing.to_string(), "7");
         assert_eq!(AttackState::default(), AttackState::New);
         let walk = MoveToAction::sub_in(MoveTo::Moving);
-        for b in [4, 5, 11] {
-            let mut attack_state = AttackState::of_byte(b, Some(walk)).unwrap();
+        for byte in [4, 5, 11] {
+            let mut attack_state = AttackState::of_byte(byte, Some(walk)).unwrap();
             assert_eq!(
                 (attack_state.get(), attack_state.move_to()),
-                (b, Some(&walk))
+                (byte, Some(&walk))
             );
             assert_eq!(attack_state.bare().move_to(), None);
             assert_eq!(attack_state.take_move_to(), Some(walk));

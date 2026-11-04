@@ -17,7 +17,7 @@ use crate::objects::masters::ClassId;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObstructionKind;
-use crate::objects::masters::PlayersMasters;
+use crate::objects::masters::PlayersMastersExt;
 use crate::orders::OrderSource;
 use crate::orders::Work;
 use crate::orders::set_stance;
@@ -31,7 +31,7 @@ use crate::vision::visibility::LosSight;
 use crate::world::World;
 use crate::world::index::Place;
 use crate::world::layer::ClassRoles;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 use crate::{GenieError, GenieResult};
 
 impl World {
@@ -90,7 +90,7 @@ impl World {
             .map(|queued_order| queued_order.point.ground());
         let toward = if point.x() == NO_POINT {
             match (gather, queue_first) {
-                (None, Some(q)) => Some(q),
+                (None, Some(point)) => Some(point),
                 _ => gather
                     .filter(|bid_gather_point| bid_gather_point.target != Some(bid))
                     .map(|gather_point| gather_point.point.ground()),
@@ -175,26 +175,26 @@ impl World {
         let (bid, id) = (live.id, self.players.live(up, ui)?.id);
         let bm = live.master(self.master_tables(), player)?.clone();
         let share = self.unloaded_share((player, container), (up, ui), made, &bm)?;
-        let b = self.players.live_mut(player, container)?;
+        let unit = self.players.live_mut(player, container)?;
         if let Some(share) = share {
-            self.parts.combat_mut(b.id)?.firepower -= share;
+            self.parts.combat_mut(unit.id)?.firepower -= share;
         }
         // the unit out of its list (`FUN_141197e10`)
-        if let Some(k) = b.garrison.iter().position(|&object_id| object_id == id) {
-            let _ = b.garrison.swap_remove(k);
+        if let Some(slot) = unit.garrison.iter().position(|&object_id| object_id == id) {
+            let _ = unit.garrison.swap_remove(slot);
         }
         // COMISS volley, firepower; JBE keeps it: a NaN firepower stays
-        if b.garrison.is_empty()
-            || self.parts.combat_of(b.id).firepower < bm.creatable_part().volley_fire
+        if unit.garrison.is_empty()
+            || self.parts.combat_of(unit.id).firepower < bm.creatable_part().volley_fire
         {
-            self.parts.combat_mut(b.id)?.firepower = bm.creatable_part().volley_fire;
+            self.parts.combat_mut(unit.id)?.firepower = bm.creatable_part().volley_fire;
         }
         // a building's sight lets the circle of 5 go (slot 0x1d8 with 5)
-        let (building_at, building_radius) = (b.position(), bm.radius);
+        let (building_at, building_radius) = (unit.position(), bm.radius);
         if bm.kind == MasterKind::BUILDING
-            && let Some(v) = self.spatial.sight.as_mut()
+            && let Some(visibility) = self.spatial.sight.as_mut()
         {
-            v.sight_off_los(
+            visibility.sight_off_los(
                 bid,
                 LosSight::tile_circle(building_at, building_radius, INSIDE_SIGHT),
                 &self.model.roles,
@@ -335,7 +335,7 @@ impl World {
                 }
                 gather_point.point.ground()
             }
-            LetOutAim::Point(p) => p,
+            LetOutAim::Point(point) => point,
         };
         if to.x() == NO_POINT || to.y() == NO_POINT {
             // neither a point nor a gather point: the unit AI stops its action (slot 0xb0 with
@@ -437,12 +437,12 @@ pub(super) fn let_out_aim(
     building: ObjectId,
 ) -> LetOutAim {
     match gather {
-        Some(g)
+        Some(gather)
             if point.x() == NO_POINT
-                && g.state == GatherPointState::Point
-                && g.target != Some(building) =>
+                && gather.state == GatherPointState::Point
+                && gather.target != Some(building) =>
         {
-            LetOutAim::Target(g)
+            LetOutAim::Target(gather)
         }
         Some(gather_point) if gather_point.state == GatherPointState::Kept => {
             LetOutAim::Point(gather_point.point.ground())

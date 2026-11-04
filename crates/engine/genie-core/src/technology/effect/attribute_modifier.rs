@@ -18,7 +18,7 @@ use crate::objects::masters::MasterAttribute;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObstructionKind;
-use crate::objects::masters::PlayersMasters;
+use crate::objects::masters::PlayersMastersExt;
 use crate::objects::masters::TaskSprites;
 use crate::objects::masters::follow;
 use crate::objects::masters::follow_moving;
@@ -29,7 +29,7 @@ use crate::technology::effect::object_slots::ObjectChange;
 use crate::technology::effect::{CAPPED, Change, OBJECT_GONE, has_actions, within_table};
 use crate::world::World;
 use crate::world::index::Place;
-use crate::world::slots::{CheckedIndex, PlayerSlots};
+use crate::world::slots::{CheckedIndexExt, PlayerSlotsExt};
 use crate::{GenieError, GenieResult};
 
 /// Which side of a player's change a hook runs on (`FUN_141614f40`'s flag): before it (0: the
@@ -45,7 +45,7 @@ pub(super) enum EffectHook {
 
 impl World {
     /// Slot 0x148 (`FUN_1416121b0`) of player `player_id`: the hooks before (`FUN_141614f40` with
-    /// 0), the change of attribute `attribute` by `v` on master `unit` or on the masters and
+    /// 0), the change of attribute `attribute` by `value` on master `unit` or on the masters and
     /// objects of class `class` ([`World::change_attribute`]), the hooks after (with 1). A master
     /// it reaches whose loader left the changed value unfilled ([`Master::unloaded_for`]) stops it
     /// first.
@@ -55,7 +55,7 @@ impl World {
         change: Change,
         unit: Option<MasterId>,
         class: Option<ClassId>,
-        v: f32,
+        value: f32,
         attribute: MasterAttribute,
     ) -> GenieResult<()> {
         if let Some(why) = self
@@ -72,7 +72,7 @@ impl World {
             return Err(GenieError::unsupported(why));
         }
         self.effect_hooks(player_id, EffectHook::Before, unit, class, attribute)?;
-        self.change_attribute(player_id, change, unit, class, v, attribute)?;
+        self.change_attribute(player_id, change, unit, class, value, attribute)?;
         self.effect_hooks(player_id, EffectHook::After, unit, class, attribute)
     }
 
@@ -95,13 +95,13 @@ impl World {
             .player(player_id)?
             .objects
             .iter()
-            .map(|u| u.id)
+            .map(|unit| unit.id)
             .collect();
         for id in ids {
-            let Some((_, u)) = self.object(id) else {
+            let Some((_, held)) = self.object(id) else {
                 continue;
             };
-            let master = u.master(self.master_tables(), player_id)?;
+            let master = held.master(self.master_tables(), player_id)?;
             let (kind, master_id, master_class) = (master.kind, master.id, master.class);
             if matches!(kind, MasterKind::COMBAT | MasterKind::BUILDING) {
                 self.garrison_volleys(player_id, id, hook)?;
@@ -117,29 +117,30 @@ impl World {
     }
 
     /// `FUN_141217ac0` ([`EffectHook::Before`]) and `FUN_14120b910` ([`EffectHook::After`]) on
-    /// object `id` of player `p`:
+    /// object `id` of player `owner`:
     /// with units inside, a reload above 0 and an attack rate above 0 (`COMISS`, `JBE`: not a
     /// NaN; [`crate::garrison::attack_rate`]), each combat unit inside takes its share
     /// ([`crate::garrison::share`]) off its volleys (`+0xa00`), or adds it.
     pub(super) fn garrison_volleys(
         &mut self,
-        p: PlayerId,
+        owner: PlayerId,
         id: ObjectId,
         hook: EffectHook,
     ) -> GenieResult<()> {
         use crate::math::fmath::at_most_or_unordered;
-        let Some((_, u)) = self.object(id) else {
+        let Some((_, held)) = self.object(id) else {
             return Ok(());
         };
-        let masters = self.model.masters.checked(p.index())?;
-        let master = u.master(self.master_tables(), p)?;
-        if u.garrison.is_empty() || at_most_or_unordered(master.combat_part().reload.get(), 0.0) {
+        let masters = self.model.masters.checked(owner.index())?;
+        let master = held.master(self.master_tables(), owner)?;
+        if held.garrison.is_empty() || at_most_or_unordered(master.combat_part().reload.get(), 0.0)
+        {
             return Ok(());
         }
         let rate = attack_rate(
             master,
             masters,
-            self.parts.combat_of(u.id).reload_powerup,
+            self.parts.combat_of(held.id).reload_powerup,
             &self.model.roles,
             &self.model.tuning.garrison,
         );
@@ -147,14 +148,14 @@ impl World {
             return Ok(());
         }
         let mut shares = Vec::new();
-        for &inside in &u.garrison {
+        for &inside in &held.garrison {
             let Some((player_id, unit)) = self.object(inside) else {
                 continue;
             };
-            let m = unit.master(self.master_tables(), player_id)?;
-            if m.kind == MasterKind::COMBAT {
+            let master = unit.master(self.master_tables(), player_id)?;
+            if master.kind == MasterKind::COMBAT {
                 shares.push(share(
-                    m,
+                    master,
                     self.model.masters.checked(player_id.index())?,
                     self.parts.combat_of(unit.id).reload_powerup,
                     rate,
@@ -174,35 +175,36 @@ impl World {
         Ok(())
     }
 
-    /// The sprite part of `FUN_141614f40` after a sprite's change on object `id` of player `p`:
-    /// one below type 40 or without actions shows its master's standing sprite again when the
-    /// change was to the one it shows (71 with its idle variant `+0x78c` 0, 72 with 1;
+    /// The sprite part of `FUN_141614f40` after a sprite's change on object `id` of player
+    /// `player`: one below type 40 or without actions shows its master's standing sprite again when
+    /// the change was to the one it shows (71 with its idle variant `+0x78c` 0, 72 with 1;
     /// `FUN_141189760`, slot 0x68); one with actions has each take its master's sprites
     /// (`FUN_140a97970` -> `FUN_140a78150`): an Attack's (`FUN_140a7f800`) its moving, attack and
     /// standing sprites from its master unless they are its task's, and from type 70 on its idle
-    /// attack and second attack sprites; a `MoveTo` keeps the sprite it holds (it is not one of
-    /// the master's new ones) and shows it again (slot 0x60, which the unit shows already); the
-    /// other actions' slot 0x50 does nothing.
+    /// attack and second attack sprites; a `MoveTo` keeps the sprite it holds (it is not one of the
+    /// master's new ones) and shows it again (slot 0x60, which the unit shows already); the other
+    /// actions' slot 0x50 does nothing.
     pub(super) fn show_changed_sprite(
         &mut self,
-        p: PlayerId,
+        player: PlayerId,
         id: ObjectId,
         attribute: MasterAttribute,
     ) -> GenieResult<()> {
         use crate::objects::masters::MasterAttribute;
-        let Some((_, u)) = self.object(id) else {
+        let Some((_, held)) = self.object(id) else {
             return Ok(());
         };
-        let master = u.master(self.master_tables(), p)?.clone();
-        let g = |id: Option<SpriteId>| id.and_then(|id| self.model.graphics.get(id)).copied();
+        let master = held.master(self.master_tables(), player)?.clone();
+        let graphic_of =
+            |id: Option<SpriteId>| id.and_then(|id| self.model.graphics.get(id)).copied();
         if master.kind < MasterKind::ACTION
             || !has_actions(
-                self.parts.actions_of(u.id),
-                self.parts.production.get(u.id),
-                self.parts.missile.get(u.id),
+                self.parts.actions_of(held.id),
+                self.parts.production.get(held.id),
+                self.parts.missile.get(held.id),
             )
         {
-            let sprite = match (attribute, u.idle_variant) {
+            let sprite = match (attribute, held.idle_variant) {
                 (MasterAttribute::STANDING_GRAPHIC, 0) => master.standing_sprite,
                 (MasterAttribute::STANDING_GRAPHIC_2, 1) => master.standing_sprite_2,
                 _ => return Ok(()),
@@ -210,13 +212,14 @@ impl World {
             // slot 0x68 with no sprite (a second standing sprite the table lacks) shows none,
             // which the slice's sprites cannot hold; without the graphics the Sprite stream is not
             // modelled
-            let (Some(graphic), false) = (g(sprite), self.model.graphics.is_empty()) else {
+            let (Some(graphic), false) = (graphic_of(sprite), self.model.graphics.is_empty())
+            else {
                 return Ok(());
             };
             let place = self.place(id).ok_or(OBJECT_GONE)?;
-            let rng = self.streams.get(Stream::Sprite);
+            let rng = self.streams.get_mut(Stream::Sprite);
             let unit = match place {
-                Place::Live(q, i) => self.players.live_mut(q, i)?,
+                Place::Live(owner, slot) => self.players.live_mut(owner, slot)?,
                 Place::Sleeping(player_id, list_index) => {
                     self.players.asleep_mut(player_id, list_index)?
                 }
@@ -236,11 +239,11 @@ impl World {
             return Ok(());
         }
         let sprites = MasterSprites {
-            moving: g(master.moving_part().move_sprite),
-            attack: g(master.combat_part().attack_sprite),
-            standing: g(master.standing_sprite),
-            idle_attack: g(master.creatable_part().idle_attack_sprite),
-            second: g(master.combat_part().attack_sprite2),
+            moving: graphic_of(master.moving_part().move_sprite),
+            attack: graphic_of(master.combat_part().attack_sprite),
+            standing: graphic_of(master.standing_sprite),
+            idle_attack: graphic_of(master.creatable_part().idle_attack_sprite),
+            second: graphic_of(master.combat_part().attack_sprite2),
             combat: MasterKind::COMBAT <= master.kind,
         };
         // the object the read above found: its action layer
@@ -269,7 +272,7 @@ impl World {
         change: Change,
         unit: Option<MasterId>,
         class: Option<ClassId>,
-        v: f32,
+        value: f32,
         attribute: MasterAttribute,
     ) -> GenieResult<()> {
         let Some(masters) = self.model.masters.of(player_id) else {
@@ -277,7 +280,7 @@ impl World {
         };
         if let Some(unit) = unit.filter(|&master_id| within_table(masters, master_id)) {
             return match masters.get(unit) {
-                Some(_) => self.change_master_attribute(player_id, change, unit, v, attribute),
+                Some(_) => self.change_master_attribute(player_id, change, unit, value, attribute),
                 None => Ok(()),
             };
         }
@@ -286,14 +289,15 @@ impl World {
         };
         let (done, pending) = self.tracked_class(player_id, class)?;
         for id in done {
-            if self.change_object(id, change, v, attribute)? == ObjectChange::NotHeld {
+            if self.change_object(id, change, value, attribute)? == ObjectChange::NotHeld {
                 continue;
             }
             let annexes = match self.object(id) {
-                Some((_, u))
-                    if u.master(self.master_tables(), player_id)?.kind == MasterKind::BUILDING =>
+                Some((_, unit))
+                    if unit.master(self.master_tables(), player_id)?.kind
+                        == MasterKind::BUILDING =>
                 {
-                    self.parts.building_of(u.id).annexes
+                    self.parts.building_of(unit.id).annexes
                 }
                 _ => continue,
             };
@@ -311,15 +315,15 @@ impl World {
                         .next()
                         .is_some();
                 if !own_annexes && am.class == class {
-                    let _ = self.change_object(annex, change, v, attribute)?;
+                    let _ = self.change_object(annex, change, value, attribute)?;
                 }
             }
         }
         for id in pending {
-            let _ = self.change_object(id, change, v, attribute)?;
+            let _ = self.change_object(id, change, value, attribute)?;
         }
         for id in self.reached_masters(player_id, unit, Some(class)) {
-            self.change_one_master(player_id, id, change, v, attribute)?;
+            self.change_one_master(player_id, id, change, value, attribute)?;
         }
         Ok(())
     }
@@ -347,7 +351,7 @@ impl World {
         };
         masters
             .iter()
-            .filter(|m| m.class == class)
+            .filter(|master| master.class == class)
             .map(|master| master.id)
             .collect()
     }
@@ -366,7 +370,7 @@ impl World {
         player_id: PlayerId,
         change: Change,
         unit: MasterId,
-        v: f32,
+        value: f32,
         attribute: MasterAttribute,
     ) -> GenieResult<()> {
         use crate::objects::masters::MasterAttribute;
@@ -374,41 +378,41 @@ impl World {
         let (done, pending) = self.tracked_master(player_id, &master)?;
         let mut kept = Vec::new();
         for id in done {
-            let Some((_, u)) = self.object(id) else {
+            let Some((_, unit)) = self.object(id) else {
                 continue;
             };
             let kind = master.kind;
             let unrecorded = match attribute {
                 // a char compare of the new type with the object's master's
                 MasterAttribute::OBSTRUCTION_KIND => {
-                    ObstructionKind::from(cvttss2si(v) as u8) != master.obstruction_kind
+                    ObstructionKind::from(cvttss2si(value) as u8) != master.obstruction_kind
                 }
                 MasterAttribute::SIZE_Z => true,
                 _ => false,
             };
             if unrecorded {
-                self.take_record(id, u.life.inside.is_some(), &master);
+                self.take_record(id, unit.life.inside.is_some(), &master);
                 kept.push(id);
             } else if attribute == MasterAttribute::HERO_STATUS && MasterKind::COMBAT <= kind {
-                let _ = self.change_object(id, change, v, attribute)?;
+                let _ = self.change_object(id, change, value, attribute)?;
                 kept.push(id);
             } else {
-                let _ = self.change_object(id, change, v, attribute)?;
+                let _ = self.change_object(id, change, value, attribute)?;
             }
         }
         if MasterKind::BUILDING <= master.kind {
             for id in pending {
-                let _ = self.change_object(id, change, v, attribute)?;
+                let _ = self.change_object(id, change, value, attribute)?;
             }
         }
-        self.change_one_master(player_id, unit, change, v, attribute)?;
+        self.change_one_master(player_id, unit, change, value, attribute)?;
         let master = self.master(player_id, unit)?.clone();
         for id in kept {
             match attribute {
                 MasterAttribute::SIZE_Z => {
                     let desolid = self
                         .object(id)
-                        .and_then(|(_, u)| self.parts.building_of(u.id).construction.as_ref())
+                        .and_then(|(_, unit)| self.parts.building_of(unit.id).construction.as_ref())
                         .is_some_and(|construction| construction.desolid);
                     if master.kind == MasterKind::BUILDING
                         && !desolid
@@ -419,7 +423,10 @@ impl World {
                 }
                 MasterAttribute::OBSTRUCTION_KIND => self.give_record(id, &master),
                 _ => {
-                    if self.object(id).is_some_and(|(_, u)| u.group.id.is_some()) {
+                    if self
+                        .object(id)
+                        .is_some_and(|(_, unit)| unit.group.id.is_some())
+                    {
                         return Err(GenieError::unsupported(
                             "a hero status change of a unit in a group (removeUnit, FUN_14102c160)",
                         ));
@@ -480,7 +487,7 @@ impl World {
         player_id: PlayerId,
         id: MasterId,
         change: Change,
-        v: f32,
+        value: f32,
         attribute: MasterAttribute,
     ) -> GenieResult<()> {
         {
@@ -501,9 +508,9 @@ impl World {
                 return Ok(());
             };
             match change {
-                Change::Set => master.set_attribute(attribute, v, &world),
-                Change::Add => master.add_attribute(attribute, v, &world),
-                Change::Multiply => master.multiply_attribute(attribute, v, &world),
+                Change::Set => master.set_attribute(attribute, value, &world),
+                Change::Add => master.add_attribute(attribute, value, &world),
+                Change::Multiply => master.multiply_attribute(attribute, value, &world),
             }
             follow(master, attribute, &self.model.graphics, terrain);
         }
@@ -528,14 +535,14 @@ impl World {
         let terrain = self.spatial.terrain.as_ref();
         let player = self.players.player_mut(player_id)?;
         let mut ids = Vec::new();
-        for u in player
+        for unit in player
             .objects
             .iter_mut()
             .chain(player.sleeping.iter_mut())
             .filter(|unit| unit.life.master_id == id)
         {
-            ids.push(u.id);
-            if let Some(mover) = self.parts.mover_mut(u.id) {
+            ids.push(unit.id);
+            if let Some(mover) = self.parts.mover_mut(unit.id) {
                 follow_moving(
                     &master,
                     &mut mover.stats,
@@ -544,7 +551,7 @@ impl World {
                     terrain,
                 );
                 // the top speed the unit reads with the sprite it shows, from the new base
-                if let Some(shown) = u
+                if let Some(shown) = unit
                     .sprite
                     .as_ref()
                     .map(|active_sprite| &active_sprite.graphic)
@@ -554,14 +561,14 @@ impl World {
             }
             match attribute {
                 MasterAttribute::DYING_GRAPHIC => {
-                    u.life.dying_sprite = master.death_sprite;
+                    unit.life.dying_sprite = master.death_sprite;
                 }
                 MasterAttribute::DEAD_UNIT_ID => {
-                    u.life.death_spawn = master.death_spawns[0].is_some();
+                    unit.life.death_spawn = master.death_spawns[0].is_some();
                 }
                 _ => {}
             }
-            if let Some(construction) = self.parts.building_mut(u.id)?.construction.as_mut() {
+            if let Some(construction) = self.parts.building_mut(unit.id)?.construction.as_mut() {
                 match attribute {
                     MasterAttribute::HIT_POINTS => construction.hit_points = master.hit_points,
                     MasterAttribute::TRAIN_TIME
@@ -618,12 +625,12 @@ pub(crate) struct MasterSprites {
 /// carrying sprites; none for a unit's own Attack), and from type 70 on its idle attack and
 /// second attack sprites.
 pub(crate) fn follow_master(arms: &mut Arms, task: Option<TaskSprites>, sprites: &MasterSprites) {
-    let of_task = |s: Option<Graphic>, pick: fn(TaskSprites) -> Option<SpriteId>| {
-        task.zip(s)
-            .is_some_and(|(t, graphic)| pick(t) == Some(graphic.id))
+    let of_task = |shown: Option<Graphic>, pick: fn(TaskSprites) -> Option<SpriteId>| {
+        task.zip(shown)
+            .is_some_and(|(task_sprites, graphic)| pick(task_sprites) == Some(graphic.id))
     };
-    let proceeding = |t: TaskSprites| t.proceeding;
-    let working = |t: TaskSprites| t.working;
+    let proceeding = |task_sprites: TaskSprites| task_sprites.proceeding;
+    let working = |task_sprites: TaskSprites| task_sprites.working;
     if arms.move_sprite.is_some() && !of_task(arms.move_sprite, |task_sprites| task_sprites.moving)
     {
         arms.move_sprite = sprites.moving;

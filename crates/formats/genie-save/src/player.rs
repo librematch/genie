@@ -18,24 +18,24 @@ pub struct PlayerEnds {
 /// load (`WorldPlayer.cpp` and the class's own fields), then the masters, maps and objects
 /// (`WorldPlayer` vtable slot 29).
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct PlayerSection<'a> {
+pub struct PlayerSection<'save> {
     /// Where it starts.
     pub start: usize,
     /// The player as read.
-    pub player: &'a Player,
+    pub player: &'save Player,
     /// The player load of the section's class, found when the section was made.
-    world_player: &'a WorldPlayer,
+    world_player: &'save WorldPlayer,
     /// The masters, maps and objects, found likewise.
-    objects: &'a PlayerObjects,
+    objects: &'save PlayerObjects,
 }
 
-impl<'a> PlayerSection<'a> {
+impl<'save> PlayerSection<'save> {
     /// The section of `player`, read at `start`.
     ///
     /// # Errors
     ///
     /// A player type no creator handles (the game's `InvalidPlayerType`).
-    pub fn new(start: usize, player: &'a Player) -> GenieResult<Self> {
+    pub fn new(start: usize, player: &'save Player) -> GenieResult<Self> {
         let (Some(world_player), Some(objects)) = (player.world_player(), player.objects()) else {
             return Err(GenieError::invalid_input("InvalidPlayerType")
                 .with("type", player.kind)
@@ -64,23 +64,23 @@ impl<'a> PlayerSection<'a> {
 
     /// The player load of the section's class.
     #[must_use]
-    pub const fn world_player(&self) -> &'a WorldPlayer {
+    pub const fn world_player(&self) -> &'save WorldPlayer {
         self.world_player
     }
 
     /// The masters, maps and objects.
     #[must_use]
-    pub const fn objects(&self) -> &'a PlayerObjects {
+    pub const fn objects(&self) -> &'save PlayerObjects {
         self.objects
     }
 
     /// The live objects (the list the checkpoint sums over).
-    pub fn live_objects(&self) -> impl Iterator<Item = &'a Object> {
+    pub fn live_objects(&self) -> impl Iterator<Item = &'save Object> {
         self.objects.objects.objects()
     }
 
     /// The sleeping objects.
-    pub fn sleeping_objects(&self) -> impl Iterator<Item = &'a Object> {
+    pub fn sleeping_objects(&self) -> impl Iterator<Item = &'save Object> {
         self.objects.sleeping_objects.objects()
     }
 }

@@ -13,7 +13,7 @@ fn slot_takes_its_saved_state() {
         }],
         ..saved::Formation::default()
     };
-    let f = formation(&saved(3)).unwrap();
-    assert_eq!(f.slots[0].state, SlotState::InPlace);
+    let loaded = formation(&saved(3)).unwrap();
+    assert_eq!(loaded.slots[0].state, SlotState::InPlace);
     assert!(formation(&saved(4)).is_err());
 }

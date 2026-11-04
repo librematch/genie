@@ -17,7 +17,7 @@ use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterKind;
 use crate::orders::object_gone;
 use crate::orders::town_bell::BellShelter;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 use crate::{GenieError, GenieResult};
 
 use crate::garrison::transport::Around;
@@ -87,21 +87,21 @@ impl World {
             let container = match unit.life.inside {
                 // a container lets its units out before it leaves the world (its death's
                 // ungarrison)
-                Some(c) => {
-                    let (cp, cu) = self.object(c).ok_or(GenieError::unreachable(
+                Some(role_id) => {
+                    let (cp, cu) = self.object(role_id).ok_or(GenieError::unreachable(
                         "a unit inside an object the world does not hold",
                     ))?;
-                    Some((c, cu.master(self.master_tables(), cp)?.kind))
+                    Some((role_id, cu.master(self.master_tables(), cp)?.kind))
                 }
                 None => None,
             };
             // a unit inside a building leaves it toward the point (`FUN_1411e7220` with no work
             // and its sound); a combat unit is no longer under the town bell (`+0x9dc`), and its
             // unit AI's orders go (`FUN_140c5e010`)
-            if let Some((c, kind)) = container
+            if let Some((role_id, kind)) = container
                 && MasterKind::BUILDING <= kind
             {
-                self.leave_building(c.id(), id, point)?;
+                self.leave_building(role_id.id(), id, point)?;
                 continue;
             }
             let unit = self.players.live(player, idx)?;
@@ -214,12 +214,12 @@ impl World {
                 .live(up, ui)?
                 .master(self.master_tables(), up)?
                 .kind;
-            let u = self.players.live_mut(up, ui)?;
+            let unit = self.players.live_mut(up, ui)?;
             // a unit (type 70) is no longer under the town bell (`+0x9dc`)
             if MasterKind::COMBAT <= kind {
-                self.parts.set_town_bell_flag(u.id, BellShelter::Free);
+                self.parts.set_town_bell_flag(unit.id, BellShelter::Free);
             }
-            if let Some(ai) = self.parts.unit_ai.get_mut(u.id) {
+            if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
                 ai.orders.clear();
             }
         }
@@ -427,7 +427,7 @@ impl World {
         let (up, ui) = match from {
             Some(_) => self.live_inside(id)?,
             None => match self.place(id) {
-                Some(Place::Live(p, list_index)) => (p, list_index),
+                Some(Place::Live(player_id, list_index)) => (player_id, list_index),
                 // the callers pass an object of type 70 or more the world holds, which never
                 // sleeps
                 _ => return Ok(WorkReturn::Stayed),
@@ -452,7 +452,11 @@ impl World {
             )?;
         }
         let Some((player_id, building)) = from else {
-            return self.back_outside(id, found.map(|f| f.id), record.point);
+            return self.back_outside(
+                id,
+                found.map(|record_target| record_target.id),
+                record.point,
+            );
         };
         let out = self.let_out(
             player_id,
@@ -488,14 +492,19 @@ impl World {
         // the object flags 4 to 6 name: its master, and whether it is the unit's player's (or
         // the world does not hold it)
         let named = match pick {
-            UnloadPick::SameMaster(o) | UnloadPick::AllBut(o) | UnloadPick::OtherMasters(o) => self
-                .object(o)
-                .map(|(p, o)| o.master(self.master_tables(), p).map(|m| (p, m)))
+            UnloadPick::SameMaster(object_id)
+            | UnloadPick::AllBut(object_id)
+            | UnloadPick::OtherMasters(object_id) => self
+                .object(object_id)
+                .map(|(player_id, unit)| {
+                    unit.master(self.master_tables(), player_id)
+                        .map(|master| (player_id, master))
+                })
                 .transpose()?,
             _ => None,
         };
         let same_player = named.is_none_or(|(player_id, _)| player_id == player);
-        let named = named.map(|(_, m)| m);
+        let named = named.map(|(_, master)| master);
         Ok(match pick {
             UnloadPick::All(_) => !self
                 .model
@@ -504,10 +513,10 @@ impl World {
                 .contains(ClassRoles::WHOLE_GARRISON_SHARE),
             UnloadPick::Player(number) => player.index() as i32 == number,
             UnloadPick::Group(group) => unload_group_takes(group, class, &self.model.roles),
-            UnloadPick::Object(o) => Some(id) == o,
+            UnloadPick::Object(object) => Some(id) == object,
             UnloadPick::SameMaster(_) => match named.filter(|_| same_player) {
-                Some(m) if m.id == master.id => true,
-                Some(m) => {
+                Some(picked) if picked.id == master.id => true,
+                Some(pick) => {
                     self.model
                         .roles
                         .of_class(class)
@@ -515,7 +524,7 @@ impl World {
                         && self
                             .model
                             .roles
-                            .of_class(m.class)
+                            .of_class(pick.class)
                             .contains(ClassRoles::VILLAGER)
                 }
                 None => false,
@@ -530,7 +539,7 @@ impl World {
                         .contains(ClassRoles::WHOLE_GARRISON_SHARE)
             }
             UnloadPick::OtherMasters(_) => match named.filter(|_| same_player) {
-                Some(m) if m.id != master.id => {
+                Some(pick) if pick.id != master.id => {
                     if self
                         .model
                         .roles
@@ -540,7 +549,7 @@ impl World {
                         !self
                             .model
                             .roles
-                            .of_class(m.class)
+                            .of_class(pick.class)
                             .contains(ClassRoles::VILLAGER)
                     } else {
                         !self

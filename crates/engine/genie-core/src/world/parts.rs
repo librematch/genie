@@ -199,9 +199,9 @@ impl World {
     }
 }
 
-impl<'a, T> IntoIterator for &'a PartTable<T> {
-    type Item = (ObjectId, &'a T);
-    type IntoIter = Zip<Copied<SliceIter<'a, ObjectId>>, SliceIter<'a, T>>;
+impl<'table, T> IntoIterator for &'table PartTable<T> {
+    type Item = (ObjectId, &'table T);
+    type IntoIter = Zip<Copied<SliceIter<'table, ObjectId>>, SliceIter<'table, T>>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
@@ -211,7 +211,7 @@ impl<'a, T> IntoIterator for &'a PartTable<T> {
 impl<T: PartialEq> PartialEq for PartTable<T> {
     /// Two tables are equal when the same objects hold equal parts, in any order.
     fn eq(&self, other: &Self) -> bool {
-        self.len() == other.len() && self.iter().all(|(id, p)| other.get(id) == Some(p))
+        self.len() == other.len() && self.iter().all(|(id, part)| other.get(id) == Some(part))
     }
 }
 
@@ -276,11 +276,11 @@ static NO_BUILDING: Building = Building::NONE;
 /// # Errors
 ///
 /// None (an unreachable error where the combat table lost the part it took).
-pub(in crate::world) fn repairers_in<'a>(
-    buildings: &'a mut PartTable<Building>,
-    combats: &'a mut PartTable<Combat>,
+pub(in crate::world) fn repairers_in<'world>(
+    buildings: &'world mut PartTable<Building>,
+    combats: &'world mut PartTable<Combat>,
     id: ObjectId,
-) -> GenieResult<&'a mut BuilderCount> {
+) -> GenieResult<&'world mut BuilderCount> {
     if let Some(construction) = buildings
         .get_mut(id)
         .and_then(|building| building.construction.as_mut())
@@ -310,17 +310,17 @@ impl Parts {
             actions,
             unread,
         } = parts;
-        if let Some(m) = dead_master {
-            let _ = self.dead_master.insert(id, m);
+        if let Some(master) = dead_master {
+            let _ = self.dead_master.insert(id, master);
         }
-        if let Some(g) = gather_point {
-            let _ = self.gather_point.insert(id, g);
+        if let Some(gather_point) = gather_point {
+            let _ = self.gather_point.insert(id, gather_point);
         }
-        if let Some(p) = production {
-            let _ = self.production.insert(id, p);
+        if let Some(production) = production {
+            let _ = self.production.insert(id, production);
         }
-        if let Some(m) = missile {
-            let _ = self.missile.insert(id, m);
+        if let Some(missile) = missile {
+            let _ = self.missile.insert(id, missile);
         }
         if let Some(master) = own_master {
             let _ = self.own_master.insert(id, master);
@@ -337,14 +337,14 @@ impl Parts {
         if combat != Combat::default() {
             let _ = self.combat.insert(id, combat);
         }
-        if let Some(m) = motion {
-            let _ = self.motion.insert(id, m);
+        if let Some(motion) = motion {
+            let _ = self.motion.insert(id, motion);
         }
         if actions != Action::default() {
             let _ = self.actions.insert(id, actions);
         }
-        if let Some(u) = unread {
-            let _ = self.unread.insert(id, u);
+        if let Some(unread) = unread {
+            let _ = self.unread.insert(id, unread);
         }
     }
 
@@ -542,8 +542,8 @@ impl World {
             );
         }
         match part {
-            Part::DeadMaster(m) => {
-                let _ = self.parts.dead_master.insert(id, *m);
+            Part::DeadMaster(dead) => {
+                let _ = self.parts.dead_master.insert(id, *dead);
             }
             Part::GatherPoint(Some(gather_point)) => {
                 let _ = self.parts.gather_point.insert(id, gather_point);
@@ -573,13 +573,13 @@ impl World {
             Part::UnitAi(None) => {
                 let _ = self.parts.unit_ai.remove(id);
             }
-            Part::Building(b) if *b == Building::NONE => {
+            Part::Building(building_part) if *building_part == Building::NONE => {
                 let _ = self.parts.building.remove(id);
             }
             Part::Building(building) => {
                 let _ = self.parts.building.insert(id, *building);
             }
-            Part::Combat(b) if *b == Combat::default() => {
+            Part::Combat(held) if *held == Combat::default() => {
                 let _ = self.parts.combat.remove(id);
             }
             Part::Combat(combat) => {
@@ -647,7 +647,7 @@ impl World {
     /// Object `unit` of the world's lists with its parts from the world's tables, as a
     /// comparison reads it.
     #[must_use]
-    pub fn object_view<'a>(&'a self, unit: &'a Unit) -> ObjectView<'a> {
+    pub fn object_view<'world>(&'world self, unit: &'world Unit) -> ObjectView<'world> {
         ObjectView {
             unit,
             parts: Cow::Owned(self.parts.of(unit.id)),
@@ -717,25 +717,25 @@ mod tests {
     /// order are equal.
     #[test]
     fn part_table_packs_its_parts_and_finds_them_by_id() {
-        let mut t = PartTable::default();
-        assert_eq!(t.insert(object_id(5), 'a'), None);
-        assert_eq!(t.insert(object_id(-3), 'b'), None);
-        assert_eq!(t.insert(object_id(9), 'c'), None);
-        assert_eq!(t.insert(object_id(9), 'd'), Some('c'));
-        assert_eq!((t.len(), t.get(object_id(-3))), (3, Some(&'b')));
-        assert_eq!(t.remove(object_id(5)), Some('a'));
-        assert_eq!(t.remove(object_id(5)), None);
-        assert_eq!(t.get(object_id(9)), Some(&'d'));
+        let mut table = PartTable::default();
+        assert_eq!(table.insert(object_id(5), 'a'), None);
+        assert_eq!(table.insert(object_id(-3), 'b'), None);
+        assert_eq!(table.insert(object_id(9), 'c'), None);
+        assert_eq!(table.insert(object_id(9), 'd'), Some('c'));
+        assert_eq!((table.len(), table.get(object_id(-3))), (3, Some(&'b')));
+        assert_eq!(table.remove(object_id(5)), Some('a'));
+        assert_eq!(table.remove(object_id(5)), None);
+        assert_eq!(table.get(object_id(9)), Some(&'d'));
         assert_eq!(
-            t.iter().collect::<Vec<_>>(),
+            table.iter().collect::<Vec<_>>(),
             [(object_id(9), &'d'), (object_id(-3), &'b')]
         );
-        *t.get_mut(object_id(-3)).unwrap() = 'e';
+        *table.get_mut(object_id(-3)).unwrap() = 'e';
         let mut part_table = PartTable::default();
         let _ = part_table.insert(object_id(-3), 'e');
         let _ = part_table.insert(object_id(9), 'd');
-        assert_eq!(t, part_table);
-        assert!(!t.contains(object_id(5)) && !t.is_empty());
+        assert_eq!(table, part_table);
+        assert!(!table.contains(object_id(5)) && !table.is_empty());
     }
 
     /// The world files an object's parts with it: a part made in its life only for an object
@@ -862,7 +862,7 @@ mod tests {
         use crate::players::PlayerId;
         use crate::unit_ai::NotifyKind;
         let id = object_id(5);
-        let mut t = World::new(
+        let mut game = World::new(
             WorldTime::ZERO,
             FrameSeed::of_data(1),
             PlayerId::new(0),
@@ -873,30 +873,31 @@ mod tests {
             id,
             ..Unit::default()
         };
-        let _ = t
+        let _ = game
             .push_live(PlayerId::new(0), Object::with_ai(unit, UnitAi::default()))
             .unwrap();
-        t.check_parts().unwrap();
-        let post = |t: &mut World| {
-            t.parts
+        game.check_parts().unwrap();
+        let post = |world: &mut World| {
+            world
+                .parts
                 .unit_ai
                 .inbox(id, ObjectState::Alive)
                 .post(NotifyKind::DAMAGED, [1, 2, 3])
                 .unwrap();
         };
         let heard = |world: &World| world.parts.unit_ai.get(id).map(|ai| ai.notifies.len());
-        post(&mut t);
-        assert_eq!(heard(&t), Some(1));
-        let ai = t.lend_unit_ai(id).unwrap();
-        post(&mut t);
-        assert_eq!(heard(&t), None);
-        t.return_unit_ai(id, ai);
-        assert_eq!(heard(&t), Some(1));
-        let gone = t
+        post(&mut game);
+        assert_eq!(heard(&game), Some(1));
+        let ai = game.lend_unit_ai(id).unwrap();
+        post(&mut game);
+        assert_eq!(heard(&game), None);
+        game.return_unit_ai(id, ai);
+        assert_eq!(heard(&game), Some(1));
+        let gone = game
             .swap_remove_live(PlayerId::new(0), ListIndex::FIRST)
             .unwrap();
         assert_eq!(gone.parts.unit_ai.map(|ai| ai.notifies.len()), Some(1));
-        assert!(t.parts.unit_ai.is_empty());
+        assert!(game.parts.unit_ai.is_empty());
     }
 
     /// A building's production lists are made empty at their first use and found again after;
@@ -1051,7 +1052,7 @@ mod tests {
             },
             ..Unit::default()
         };
-        let mut t = World::new(
+        let mut game = World::new(
             WorldTime::ZERO,
             FrameSeed::of_data(1),
             PlayerId::new(0),
@@ -1066,11 +1067,11 @@ mod tests {
             hit_points: MasterHitPoints::of_data(hp),
             ..Master::default()
         };
-        t.model.masters = vec![Arc::new(Masters::new([master(25)]))];
-        t.set_part(id, Part::OwnMaster(Box::new(master(40))))
+        game.model.masters = vec![Arc::new(Masters::new([master(25)]))];
+        game.set_part(id, Part::OwnMaster(Box::new(master(40))))
             .unwrap();
-        let hp = |world: &World, i: usize| {
-            let players = &world.players[0].objects[ListIndex::new(i)];
+        let hp = |world: &World, index: usize| {
+            let players = &world.players[0].objects[ListIndex::new(index)];
             let own = players
                 .master(world.master_tables(), PlayerId::new(0))
                 .unwrap();
@@ -1080,12 +1081,15 @@ mod tests {
             assert_eq!(own, in_owner);
             own.hit_points.get()
         };
-        assert_eq!((hp(&t, 0), hp(&t, 1)), (40, 25));
-        let gone = t
+        assert_eq!((hp(&game, 0), hp(&game, 1)), (40, 25));
+        let gone = game
             .swap_remove_live(PlayerId::new(0), ListIndex::FIRST)
             .unwrap();
-        assert_eq!(gone.parts.own_master.map(|m| m.hit_points.get()), Some(40));
-        assert!(t.parts.own_master.is_empty());
+        assert_eq!(
+            gone.parts.own_master.map(|master| master.hit_points.get()),
+            Some(40)
+        );
+        assert!(game.parts.own_master.is_empty());
     }
 
     /// A gather point at `x` on no target.
@@ -1106,11 +1110,11 @@ mod tests {
     #[test]
     fn whole_object_compares_its_parts_at_their_old_paths() {
         use genie_diff::{Scope, differences};
-        let a = Object::from(Unit {
+        let original = Object::from(Unit {
             id: object_id(1),
             ..Unit::default()
         });
-        let mut object = a.clone();
+        let mut object = original.clone();
         object.parts.dead_master = Some(Master::default());
         object.unit.life.hp = HitPoints::new(7.0);
         object.parts.gather_point = Some(gather_point(2.0));
@@ -1128,7 +1132,7 @@ mod tests {
         object.parts.building.garrison_time = WorldTime::from_millis(5);
         object.parts.combat.armor_removed = ArmorPair::new(1, 0);
         let paths = |scope| {
-            differences(&a, &object, scope)
+            differences(&original, &object, scope)
                 .into_iter()
                 .map(|difference| difference.path)
                 .collect::<Vec<_>>()

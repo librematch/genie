@@ -18,7 +18,7 @@ use crate::unit_ai::Notify;
 use crate::unit_ai::task_finder::world::{SideWorld, TaskWorld};
 use crate::world::World;
 use crate::world::others::OthersRef;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 use crate::world::step::Step;
 use crate::{GenieError, GenieResult};
 
@@ -134,7 +134,7 @@ impl World {
                 .combat_part()
                 .area_effect,
         )
-        .filter(|&r| Distance::ZERO < r)
+        .filter(|&distance| Distance::ZERO < distance)
         .map(|distance| distance + Distance::new(6.0) + Distance::new(2.0));
         let mut near: Vec<Victim> = Vec::new();
         if let Some(reach) = reach {
@@ -161,13 +161,13 @@ impl World {
         }
         let mains: Vec<ObjectId> = target
             .into_iter()
-            .chain(near.iter().map(|v| v.id))
+            .chain(near.iter().map(|victim| victim.id))
             .filter_map(|id| self.objects().annex_of(id).map(MainBuildingId::id))
             .collect();
         for object_id in mains {
             if object_id != unit.id
                 && Some(object_id) != target
-                && !near.iter().any(|v| v.id == object_id)
+                && !near.iter().any(|victim| victim.id == object_id)
                 && let Some(victim) = self.victim(object_id, player_id)?
             {
                 near.push(victim);
@@ -202,14 +202,14 @@ impl KillLeft {
 
 /// The object `id` a hit of the updating unit can read ([`victim`]) with its owner and master:
 /// one of any list, live or asleep, of a master its owner has.
-pub(crate) fn readable<'o>(
-    step: &'o Step<'_>,
+pub(crate) fn readable<'world>(
+    step: &'world Step<'_>,
     id: impl ObjectKey,
-) -> GenieResult<Option<(PlayerId, &'o Unit, &'o Master)>> {
-    let Some((player_id, unit, _)) = step.w.locate(id) else {
+) -> GenieResult<Option<(PlayerId, &'world Unit, &'world Master)>> {
+    let Some((player_id, unit, _)) = step.world.locate(id) else {
         return Ok(None);
     };
-    let master = unit.master(step.w.master_tables(), player_id)?;
+    let master = unit.master(step.world.master_tables(), player_id)?;
     Ok(Some((player_id, unit, master)))
 }
 
@@ -223,9 +223,9 @@ pub(crate) fn victim(
     let Some((player_id, unit, master)) = readable(step, id)? else {
         return Ok(None);
     };
-    let view = OthersRef::of(&step.w.players, &step.w.index, step.player)?;
+    let view = OthersRef::of(&step.world.players, &step.world.index, step.player)?;
     let attributes = if player_id == step.player {
-        &step.w.players.player(step.player)?.attributes[..]
+        &step.world.players.player(step.player)?.attributes[..]
     } else {
         let Some(owner) = view.players().player(player_id) else {
             return Ok(None);
@@ -234,23 +234,23 @@ pub(crate) fn victim(
     };
     let sides = SideWorld {
         player: step.player,
-        relations: &step.w.players.player(step.player)?.relations,
+        relations: &step.world.players.player(step.player)?.relations,
         foreign: view.players(),
-        drop_sites: &step.w.model.drop_sites,
+        drop_sites: &step.world.model.drop_sites,
     };
     Ok(Some(victim_in(
         (
             unit,
-            step.w.parts.unit_ai.contains(unit.id),
-            step.w.parts.building_of(unit.id),
-            step.w.parts.combat_of(unit.id),
-            step.w.parts.actions.of(unit.id),
-            step.w.parts.unread.get(unit.id),
+            step.world.parts.unit_ai.contains(unit.id),
+            step.world.parts.building_of(unit.id),
+            step.world.parts.combat_of(unit.id),
+            step.world.parts.actions.of(unit.id),
+            step.world.parts.unread.get(unit.id),
         ),
         (player_id, master, attributes),
         (step.player, &sides),
-        &step.w.spatial,
-        step.w.mode_680,
+        &step.world.spatial,
+        step.world.mode_680,
         roles,
     )))
 }
@@ -278,22 +278,22 @@ pub(crate) fn write_back(
         razed: victim
             .building
             .as_mut()
-            .map(|b| take(&mut b.razed))
+            .map(|building| take(&mut building.razed))
             .unwrap_or_default(),
     };
-    let Some((_, _, sleeps)) = step.w.locate(victim.id) else {
+    let Some((_, _, sleeps)) = step.world.locate(victim.id) else {
         return Ok(None);
     };
     if sleeps {
-        let (_, u) = step.w.object_mut(victim.id).ok_or(NOT_LOCATED)?;
-        u.life.hp = victim.hp;
-        u.life.amount = victim.amount;
+        let (_, unit) = step.world.object_mut(victim.id).ok_or(NOT_LOCATED)?;
+        unit.life.hp = victim.hp;
+        unit.life.amount = victim.amount;
         if at_most_or_unordered(1.0, victim.hp.get()) {
             return Ok(None);
         }
-        let _ = step.w.wake_sleeper(victim.id)?;
+        let _ = step.world.wake_sleeper(victim.id)?;
     }
-    let (_, unit) = step.w.object_mut(victim.id).ok_or(NOT_LOCATED)?;
+    let (_, unit) = step.world.object_mut(victim.id).ok_or(NOT_LOCATED)?;
     unit.life.hp = victim.hp;
     unit.life.amount = victim.amount;
     unit.life.goto_sleep = victim.goto_sleep;
@@ -301,32 +301,32 @@ pub(crate) fn write_back(
     if let Some(master_data) = unit.life.master.as_mut() {
         master_data.decay = victim.decay;
     }
-    let struck = victim.building.as_ref().filter(|b| b.struck);
-    if let Some(b) = struck {
-        unit.damaged_lately = b.damaged_lately;
+    let struck = victim.building.as_ref().filter(|building| building.struck);
+    if let Some(building) = struck {
+        unit.damaged_lately = building.damaged_lately;
     }
     let state = unit.life.state;
-    let combat = step.w.parts.combat_mut(victim.id)?;
+    let combat = step.world.parts.combat_mut(victim.id)?;
     if let Some(armored) = victim.armored.as_ref() {
         combat.hp_powerup = armored.hp_powerup;
     }
     // a shield spends its charge
     combat.charge = victim.source.charge;
     // the damage notify (500) to its unit AI
-    if let Some(ai) = step.w.parts.unit_ai.get_mut(victim.id) {
-        for &(attacker, p) in &damaged {
+    if let Some(ai) = step.world.parts.unit_ai.get_mut(victim.id) {
+        for &(attacker, params) in &damaged {
             let notify = Notify {
                 caller: attacker,
                 recipient: victim.id,
                 kind: NotifyKind::DAMAGED,
-                p,
+                params,
             };
             ai.post(notify, state)?;
         }
     }
     for &object_id in struck.map_or(&[][..], |building| &building.annexes) {
-        if let Some((_, _, false)) = step.w.locate(object_id) {
-            let (_, x) = step.w.object_mut(object_id).ok_or(NOT_LOCATED)?;
+        if let Some((_, _, false)) = step.world.locate(object_id) {
+            let (_, x) = step.world.object_mut(object_id).ok_or(NOT_LOCATED)?;
             x.life.hp = victim.hp;
         }
     }
@@ -350,21 +350,21 @@ pub(crate) fn file_kill(
     roles: &Roles,
 ) -> GenieResult<()> {
     if kill_left.id != step.me {
-        return step.w.kill_left(&kill_left);
+        return step.world.kill_left(&kill_left);
     }
     if let Some(kill) = kill_left.kill {
-        let master = me.master(step.w.master_tables(), step.player)?.clone();
-        step.w.count_killed(step.player, &master, kill)?;
+        let master = me.master(step.world.master_tables(), step.player)?.clone();
+        step.world.count_killed(step.player, &master, kill)?;
         if kill.to_gaia {
             me.ai_change_owner(actions, PlayerId::GAIA, step, roles)?;
         }
     }
-    step.w.count_razed(&kill_left.razed)
+    step.world.count_razed(&kill_left.razed)
 }
 
 /// A strike's write-back where it ran ([`write_back`]), each object's kill and razings right
 /// after it ([`file_kill`], `me` the updating object): the blast's objects (`blasted`, which go
-/// back to the update's) in their order, then its target `v`.
+/// back to the update's) in their order, then its target `struck`.
 ///
 /// # Errors
 ///
@@ -374,16 +374,16 @@ pub(crate) fn write_struck(
     me: &mut Unit,
     actions: &mut Action,
     mut blasted: Vec<Victim>,
-    v: &mut Victim,
+    struck: &mut Victim,
     roles: &Roles,
 ) -> GenieResult<()> {
     for victim in &mut blasted {
-        if let Some(k) = write_back(step, victim)? {
-            file_kill(step, (me, actions), k, roles)?;
+        if let Some(kill_left) = write_back(step, victim)? {
+            file_kill(step, (me, actions), kill_left, roles)?;
         }
     }
     step.blasted = blasted;
-    if let Some(kill_left) = write_back(step, v)? {
+    if let Some(kill_left) = write_back(step, struck)? {
         file_kill(step, (me, actions), kill_left, roles)?;
     }
     Ok(())
@@ -430,15 +430,15 @@ impl World {
     ///
     /// An attribute a player lacks.
     pub(crate) fn count_razed(&mut self, razed: &[Razed]) -> GenieResult<()> {
-        for r in razed {
-            if let Some(kind) = r.event {
+        for razed in razed {
+            if let Some(kind) = razed.event {
                 let now = self.world_time;
                 self.players
-                    .player_mut(r.attacker_player)?
+                    .player_mut(razed.attacker_player)?
                     .history
-                    .add_event(kind, r.owner.index() as f32, 0.0, 0, now);
+                    .add_event(kind, razed.owner.index() as f32, 0.0, 0, now);
             }
-            for &(player_id, attribute, amount) in &r.adds {
+            for &(player_id, attribute, amount) in &razed.adds {
                 self.players
                     .player_mut(player_id)?
                     .add_attribute(attribute, amount)?;

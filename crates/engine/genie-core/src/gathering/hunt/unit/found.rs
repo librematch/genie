@@ -37,15 +37,15 @@ impl Unit {
         found: ObjectId,
         roles: &Roles,
     ) -> GenieResult<()> {
-        let master = self.master(step.w.master_tables(), step.player)?;
-        let (owner, unit) = OthersRef::of(&step.w.players, &step.w.index, step.player)?
+        let master = self.master(step.world.master_tables(), step.player)?;
+        let (owner, unit) = OthersRef::of(&step.world.players, &step.world.index, step.player)?
             .find(found)
             .ok_or(GenieError::unsupported(
                 "a hunt's new target the slice does not hold",
             ))?;
-        let target_master = unit.master(step.w.master_tables(), owner)?;
+        let target_master = unit.master(step.world.master_tables(), owner)?;
         let relations = step
-            .w
+            .world
             .spatial
             .relations
             .get(step.player)
@@ -67,36 +67,36 @@ impl Unit {
             player: owner,
             amount: unit.life.amount,
             allied: allied(relations, step.player, owner, AllyTest::WithRelation4),
-            top_action: step.w.parts.actions_of(unit.id).top_action_kind(),
+            top_action: step.world.parts.actions_of(unit.id).top_action_kind(),
             drop_site: false,
         };
         let (me_at, them) = (
-            step.w
+            step.world
                 .spatial
                 .get_known(self.id)?
                 .ok_or(GenieError::unsupported("a hunter without a place"))?,
-            step.w
+            step.world
                 .spatial
                 .get_known(found)?
                 .ok_or(GenieError::unsupported("a hunt's target without a place"))?,
         );
         let speed = step
-            .w
+            .world
             .parts
             .mover_of(self.id)
-            .map_or(Speed::ZERO, |m| m.stats.speed);
+            .map_or(Speed::ZERO, |mover| mover.stats.speed);
         let engagement = engagement(
-            step.w.parts.unit_ai.get(self.id),
+            step.world.parts.unit_ai.get(self.id),
             speed,
             master,
             me_at,
             them,
-            step.w.world_time,
+            step.world.world_time,
         )?;
         let moving = hunt.task.walk_sprite_id(self.life.held());
         let arms = arms(
             master,
-            &step.w.model.graphics,
+            &step.world.model.graphics,
             hunt.task.sprites,
             moving,
             roles,
@@ -106,17 +106,17 @@ impl Unit {
             .drop_sites
             .contains(&unit.life.master_id);
         let walks = self.move_walks(
-            step.w.parts.mover_of(self.id),
-            MasterTables::new(&step.w.model.masters, &step.w.parts.own_master),
+            step.world.parts.mover_of(self.id),
+            MasterTables::new(&step.world.model.masters, &step.world.parts.own_master),
             step.player,
             (
-                &step.w.model.graphics,
-                step.w.parts.combat_of(self.id).abilities.look.as_ref(),
+                &step.world.model.graphics,
+                step.world.parts.combat_of(self.id).abilities.look.as_ref(),
             ),
             roles,
         )?;
         let by = self.releaser(step)?;
-        let Some(mover) = step.w.parts.mover_mut(self.id) else {
+        let Some(mover) = step.world.parts.mover_mut(self.id) else {
             return Err(GenieError::unsupported(
                 "a hunter without its hunt or movement state",
             ));
@@ -133,10 +133,10 @@ impl Unit {
             mover,
             BeginLayer {
                 roles,
-                attack_tuning: &step.w.model.tuning.attack,
-                move_to_tuning: &step.w.model.tuning.move_to,
+                attack_tuning: &step.world.model.tuning.attack,
+                move_to_tuning: &step.world.model.tuning.move_to,
             },
-            &step.w.model.tuning.hunt,
+            &step.world.model.tuning.hunt,
         );
         actions.list.set_hunt(Some(*hunt));
         if let Some(move_start) = retargeted? {
@@ -144,9 +144,9 @@ impl Unit {
                 show_arrived(
                     &arms,
                     &mut self.sprite,
-                    step.w.parts.motion_mut(self.id),
-                    step.w.streams.get(Stream::Sprite),
-                    step.w.model.tuning.sprite,
+                    step.world.parts.motion_mut(self.id),
+                    step.world.streams.get_mut(Stream::Sprite),
+                    step.world.model.tuning.sprite,
                 )?;
             }
             take(step, self, found, by, roles)?;
@@ -161,11 +161,11 @@ impl Unit {
             return Ok(());
         }
         let standing = self
-            .master(step.w.master_tables(), step.player)?
+            .master(step.world.master_tables(), step.player)?
             .standing_sprite
-            .and_then(|sprite_id| step.w.model.graphics.get(sprite_id))
+            .and_then(|sprite_id| step.world.model.graphics.get(sprite_id))
             .copied();
-        if let Some(mover) = step.w.parts.mover_mut(self.id) {
+        if let Some(mover) = step.world.parts.mover_mut(self.id) {
             mover.shows(standing.as_ref());
         }
         if self.sprite.is_some() {
@@ -174,10 +174,10 @@ impl Unit {
             ))?;
             new_sprite(
                 &mut self.sprite,
-                step.w.parts.move_stats_mut(self.id),
+                step.world.parts.move_stats_mut(self.id),
                 standing,
-                step.w.streams.get(Stream::Sprite),
-                step.w.model.tuning.sprite,
+                step.world.streams.get_mut(Stream::Sprite),
+                step.world.model.tuning.sprite,
             );
         }
         Ok(())

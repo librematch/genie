@@ -1,16 +1,16 @@
 //! The short pather (`FUN_140f9e540` -> `FUN_140fa53d0`): a fixed-point any-angle search around the
 //! shapes of the obstruction manager's [`Mesh`], for the path a unit walks next.
 //!
-//! All coordinates are fixed point, 2^22 units per tile ([`ONE`]). A unit of radius `r` tests every
-//! shape shrunk by `d = 0x200000 - r` (shapes are stored grown by half a tile). The map of the
-//! search, its node types and its ties: `docs/AoE2DE_s_exe_SHORT_PATHER.md`.
+//! All coordinates are fixed point, 2^22 units per tile ([`ONE`]). A unit of radius `radius` tests
+//! every shape shrunk by `clearance = 0x200000 - radius` (shapes are stored grown by half a tile).
+//! The map of the search, its node types and its ties: `docs/AoE2DE_s_exe_SHORT_PATHER.md`.
 
 use crate::math::fmath::sqrt;
 use crate::pathing::FixedRect;
 use crate::pathing::mesh::{Mesh, ONE};
 use crate::pathing::{FixedDistance, FixedDistanceSquared};
 use crate::pathing::{FixedPoint, ShapeId, ShapeSide};
-use crate::world::slots::CheckedIndex;
+use crate::world::slots::CheckedIndexExt;
 use crate::{GenieError, GenieResult};
 
 mod axis_dir;
@@ -40,31 +40,31 @@ use crate::math::image::short_path::{
 const TO_FLOAT: f32 = SHORT_PATH_TO_FLOAT;
 pub(crate) const TO_FIXED: f32 = SHORT_PATH_TO_FIXED;
 
-/// `(v + 0x3fffff) >> 22` for a negative `v`: the tile of a coordinate, truncated toward zero.
-const fn tile_of(v: i32) -> i32 {
-    if v < 0 {
-        v.wrapping_add(0x3f_ffff) >> 22
+/// `(v + 0x3fffff) >> 22` for a negative `value`: the tile of a coordinate, truncated toward zero.
+const fn tile_of(value: i32) -> i32 {
+    if value < 0 {
+        value.wrapping_add(0x3f_ffff) >> 22
     } else {
-        v >> 22
+        value >> 22
     }
 }
 
 /// `FUN_14087c720`: the integer square root of a 64-bit value, bit by bit (its low 32 bits).
 #[must_use]
-pub const fn isqrt(mut v: u64) -> u32 {
+pub const fn isqrt(mut value: u64) -> u32 {
     let mut root: u64 = 0;
     let mut bit: u64 = 1 << 62;
-    if v <= 0x3fff_ffff_ffff_ffff {
+    if value <= 0x3fff_ffff_ffff_ffff {
         loop {
             bit >>= 2;
-            if v >= bit {
+            if value >= bit {
                 break;
             }
         }
     }
     while bit != 0 {
-        if bit + root <= v {
-            v -= bit + root;
+        if bit + root <= value {
+            value -= bit + root;
             root += bit * 2;
         }
         root >>= 1;
@@ -73,15 +73,15 @@ pub const fn isqrt(mut v: u64) -> u32 {
     root as u32
 }
 
-/// `(int)((float)v * 2^-22 * 2^22)`: a cost through float, 24 bits kept.
-fn through_float(v: i32) -> FixedDistance {
-    FixedDistance::new(((v as f32) * TO_FLOAT * TO_FIXED) as i32)
+/// `(int)((float)value * 2^-22 * 2^22)`: a cost through float, 24 bits kept.
+fn through_float(value: i32) -> FixedDistance {
+    FixedDistance::new(((value as f32) * TO_FLOAT * TO_FIXED) as i32)
 }
 
 /// The Euclidean distance in fixed point through float (`sqrtf` of the float differences).
-fn float_distance(a: FixedPoint, b: FixedPoint) -> FixedDistance {
-    let dy = (a.y().wrapping_sub(b.y())) as f32 * TO_FLOAT;
-    let dx = (a.x().wrapping_sub(b.x())) as f32 * TO_FLOAT;
+fn float_distance(from: FixedPoint, to: FixedPoint) -> FixedDistance {
+    let dy = (from.y().wrapping_sub(to.y())) as f32 * TO_FLOAT;
+    let dx = (from.x().wrapping_sub(to.x())) as f32 * TO_FLOAT;
     FixedDistance::new((sqrt(dx * dx + dy * dy) * TO_FIXED) as i32)
 }
 
@@ -92,11 +92,11 @@ const fn strictly_inside(
     fixed_distance: FixedDistance,
 ) -> bool {
     let [x, y] = fixed_point.get();
-    let k = fixed_distance.get();
-    fixed_rect.x0() + k < x
-        && fixed_rect.y0() + k < y
-        && x < fixed_rect.x1() - k
-        && y < fixed_rect.y1() - k
+    let fixed_distance = fixed_distance.get();
+    fixed_rect.x0() + fixed_distance < x
+        && fixed_rect.y0() + fixed_distance < y
+        && x < fixed_rect.x1() - fixed_distance
+        && y < fixed_rect.y1() - fixed_distance
 }
 
 /// `FUN_14087c650`: `fixed_point` inside `fixed_rect` shrunk by `fixed_distance`, edges included.
@@ -106,11 +106,11 @@ const fn inside(
     fixed_distance: FixedDistance,
 ) -> bool {
     let [x, y] = fixed_point.get();
-    let k = fixed_distance.get();
-    fixed_rect.x0() + k <= x
-        && fixed_rect.y0() + k <= y
-        && x <= fixed_rect.x1() - k
-        && y <= fixed_rect.y1() - k
+    let fixed_distance = fixed_distance.get();
+    fixed_rect.x0() + fixed_distance <= x
+        && fixed_rect.y0() + fixed_distance <= y
+        && x <= fixed_rect.x1() - fixed_distance
+        && y <= fixed_rect.y1() - fixed_distance
 }
 
 /// A hit of the raycast or a sweep: the shape and its side.
@@ -166,13 +166,13 @@ enum Callback {
 
 /// What the searches share for a unit: the mesh, the shapes it ignores, its shrinking.
 #[derive(Debug)]
-pub struct Ctx<'a> {
+pub struct Ctx<'mesh> {
     /// The mesh.
-    pub(crate) mesh: &'a Mesh,
+    pub(crate) mesh: &'mesh Mesh,
     /// Per shape id: ignored (`pather + 0xd8`).
-    pub(crate) ignore: &'a [bool],
+    pub(crate) ignore: &'mesh [bool],
     /// How far the searches shrink a shape's box (`FUN_140fa8460`, `FUN_14087c650`).
-    pub(crate) d: FixedDistance,
+    pub(crate) clearance: FixedDistance,
 }
 
 /// `DAT_1439e60e5`: 1 in the image and at run time: the rectangle heuristic (0 is the Euclidean).
@@ -198,7 +198,7 @@ const OPEN_CORNER_WITHOUT_EMIT: GenieError =
 #[derive(Clone, Copy, Debug)]
 struct Goal {
     at: FixedPoint,
-    r: FixedDistance,
+    radius: FixedDistance,
     rx: FixedDistance,
     ry: FixedDistance,
     rrx: FixedDistance,
@@ -214,7 +214,7 @@ impl Goal {
         let fixed_distance = fixed.radius;
         Self {
             at,
-            r: fixed_distance,
+            radius: fixed_distance,
             rx: fixed.half_x,
             ry: fixed.half_y,
             rrx: fixed_distance.wrapping_add(fixed.half_x),
@@ -231,9 +231,9 @@ impl Goal {
             - i64::from(self.rrx.get());
         let ly = i64::from((fixed_point.y().wrapping_sub(self.at.y())).wrapping_abs())
             - i64::from(self.rry.get());
-        let a = if lx < 0 { 0 } else { lx * lx };
-        let b = if ly < 0 { 0 } else { ly * ly };
-        FixedDistanceSquared::new((b >> 22) + (a >> 22))
+        let lx_squared = if lx < 0 { 0 } else { lx * lx };
+        let ly_squared = if ly < 0 { 0 } else { ly * ly };
+        FixedDistanceSquared::new((ly_squared >> 22) + (lx_squared >> 22))
     }
 
     /// `FUN_140fa3f10`: the estimate from `fixed_point` to the goal.
@@ -247,9 +247,11 @@ impl Goal {
             - i64::from(self.rrx.get());
         let ly = i64::from((fixed_point.y().wrapping_sub(self.at.y())).wrapping_abs())
             - i64::from(self.rry.get());
-        let a = if lx < 0 { 0 } else { (lx * lx) as u64 };
-        let b = if ly < 0 { 0 } else { (ly * ly) as u64 };
-        FixedDistance::new(isqrt((b & !0x3f_ffff).wrapping_add(a & !0x3f_ffff)) as i32)
+        let lx_squared = if lx < 0 { 0 } else { (lx * lx) as u64 };
+        let ly_squared = if ly < 0 { 0 } else { (ly * ly) as u64 };
+        FixedDistance::new(
+            isqrt((ly_squared & !0x3f_ffff).wrapping_add(lx_squared & !0x3f_ffff)) as i32,
+        )
     }
 }
 
@@ -279,9 +281,9 @@ enum Kind {
 struct PolyIndex(u32);
 
 impl PolyIndex {
-    /// The polygon at slice index `i`, as the game's 32 bits.
-    const fn of(i: usize) -> Self {
-        Self(i as u32)
+    /// The polygon at slice index `index`, as the game's 32 bits.
+    const fn of(index: usize) -> Self {
+        Self(index as u32)
     }
 
     /// The place as a slice index.
@@ -310,9 +312,9 @@ impl VertexIndex {
     /// The polygon's first vertex.
     const FIRST: Self = Self(0);
 
-    /// Vertex `i`.
-    const fn new(i: u32) -> Self {
-        Self(i)
+    /// Vertex `index`.
+    const fn new(index: u32) -> Self {
+        Self(index)
     }
 
     /// The place as a slice index.
@@ -369,9 +371,9 @@ impl NodeIndex {
     /// The start node, the arena's first.
     const START: Self = Self(0);
 
-    /// Node `i`.
-    const fn new(i: u32) -> Self {
-        Self(i)
+    /// Node `index`.
+    const fn new(index: u32) -> Self {
+        Self(index)
     }
 
     /// The place the next node appended to `arena` gets (its length, as the game's 32 bits).
@@ -388,8 +390,8 @@ impl NodeIndex {
 /// A node (`0x34` bytes).
 #[derive(Clone, Copy, Debug)]
 struct Node {
-    g: FixedDistance,
-    f: FixedDistance,
+    cost: FixedDistance,
+    total: FixedDistance,
     idx: NodeIndex,
     parent: Option<NodeIndex>,
     at: FixedPoint,
@@ -440,8 +442,8 @@ impl Poly {
 }
 
 /// One search's state (the pather's arrays at `+0x08`..`+0x80`).
-struct Search<'a> {
-    ctx: Ctx<'a>,
+struct Search<'mesh> {
+    ctx: Ctx<'mesh>,
     goal: Goal,
     bounds: FixedRect,
     open: Vec<Node>,

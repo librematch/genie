@@ -8,11 +8,16 @@ const DOES_NOT_FIT: GenieError = GenieError::invalid_input("a value that does no
 
 /// The text of a fixed name field up to its first NUL.
 pub(crate) fn name_to_nul(bytes: &[u8]) -> GenieResult<String> {
-    String::from_utf8(bytes.iter().copied().take_while(|b| *b != 0).collect()).map_err(
-        |from_utf8_error| {
-            GenieError::invalid_input("a name that is no UTF-8").with_source(from_utf8_error)
-        },
+    String::from_utf8(
+        bytes
+            .iter()
+            .copied()
+            .take_while(|byte| *byte != 0)
+            .collect(),
     )
+    .map_err(|from_utf8_error| {
+        GenieError::invalid_input("a name that is no UTF-8").with_source(from_utf8_error)
+    })
 }
 
 /// `value` as the type of the field it is read from or written to.

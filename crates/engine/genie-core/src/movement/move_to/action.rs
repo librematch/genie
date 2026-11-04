@@ -124,9 +124,10 @@ pub fn object_range(
     if range != Distance::ZERO {
         return range;
     }
-    let cart = master.is_some_and(|m| {
-        m.kind == MasterKind::BUILDING
-            && m.action_part()
+    let cart = master.is_some_and(|master| {
+        master.kind == MasterKind::BUILDING
+            && master
+                .action_part()
                 .tasks
                 .iter()
                 .any(|task| task.action_kind == CART_TASK)
@@ -217,11 +218,11 @@ impl MoveDefaults {
 /// (an own `MoveTo` is not quiet) slot 0x798's ([`standing`]). Slot 0x68 shows the master's
 /// standing sprite (`+0x470`) for a null one.
 #[derive(Debug)]
-pub struct Shows<'a> {
+pub struct Shows<'world> {
     /// The unit's sprite.
-    pub(crate) sprite: &'a mut Option<ActiveSprite>,
+    pub(crate) sprite: &'world mut Option<ActiveSprite>,
     /// The Sprite stream.
-    pub(crate) rng: &'a mut Well512,
+    pub(crate) rng: &'world mut Well512,
     /// Slot 0x798's sprite, the unit's standing one.
     pub(crate) standing: Option<Graphic>,
     /// The master's standing sprite (`+0x470`), which slot 0x68 shows for a null one.
@@ -328,7 +329,7 @@ impl MoveToAction {
         mover: Option<&mut Mover>,
     ) -> Self {
         let state = match mover {
-            Some(m) if m.stats.speed != Speed::ZERO => MoveTo::Start,
+            Some(mover) if mover.stats.speed != Speed::ZERO => MoveTo::Start,
             Some(_) | None => MoveTo::Failed,
         };
         Self {
@@ -646,21 +647,21 @@ mod tests {
         use crate::movement::tests::WalkRig;
         let mut rig = WalkRig::on_the_path();
         let mut looks = Looks::default();
-        let mut m = own_move_to(MoveTo::Start, Some(RUNNING), -1);
-        let step = m
+        let mut move_to = own_move_to(MoveTo::Start, Some(RUNNING), -1);
+        let step = move_to
             .update(rig.walk(0), PathAsk::default(), looks.shows())
             .unwrap();
         assert_eq!(step, MoveStep::default());
         assert_eq!(
-            (m.state, m.wait.state),
+            (move_to.state, move_to.wait.state),
             (MoveTo::Moving, MoveWaitState::AskedAgain)
         );
         assert_eq!(looks.shown(), Some(SpriteId::named(13154)));
         assert_eq!(rig.mover_mut().stats.speed, Speed::new(0.8 * 1.5));
-        let step = m
+        let step = move_to
             .update(rig.walk(0), PathAsk::default(), looks.shows())
             .unwrap();
-        assert_eq!((m.state, step), (MoveTo::Moving, MoveStep::default()));
+        assert_eq!((move_to.state, step), (MoveTo::Moving, MoveStep::default()));
         let mut on = own_move_to(MoveTo::Start, Some(WALKING), 10028);
         let _ = on
             .update(rig.walk(0), PathAsk::default(), looks.shows())
@@ -675,11 +676,11 @@ mod tests {
         );
         let ended = |state| {
             let mut rig = WalkRig::on_the_path();
-            let mut m = own_move_to(state, Some(WALKING), -1);
-            let step = m
+            let mut move_to_action = own_move_to(state, Some(WALKING), -1);
+            let step = move_to_action
                 .update(rig.walk(0), PathAsk::default(), Looks::default().shows())
                 .unwrap();
-            (step, m.state)
+            (step, move_to_action.state)
         };
         let done = MoveStep {
             end: StepEnd::Done,
@@ -692,18 +693,21 @@ mod tests {
         assert_eq!(ended(MoveTo::Arrived), (done, MoveTo::Arrived));
         assert_eq!(ended(MoveTo::Failed), (failed, MoveTo::Failed));
         // the walk is a tenth of a second: the wait of 0.15 asks again on its second update
-        let mut w = own_move_to(MoveTo::Waiting, Some(WALKING), -1);
-        let _ = w
+        let mut move_to = own_move_to(MoveTo::Waiting, Some(WALKING), -1);
+        let _ = move_to
             .update(rig.walk(0), PathAsk::default(), looks.shows())
             .unwrap();
         assert_eq!(
-            (w.state, w.wait.timer),
+            (move_to.state, move_to.wait.timer),
             (MoveTo::Waiting, Seconds::new(0.1))
         );
-        let _ = w
+        let _ = move_to
             .update(rig.walk(0), PathAsk::default(), looks.shows())
             .unwrap();
-        assert_eq!((w.state, w.wait.timer), (MoveTo::Start, Seconds::ZERO));
+        assert_eq!(
+            (move_to.state, move_to.wait.timer),
+            (MoveTo::Start, Seconds::ZERO)
+        );
         let reason = |mut move_to_action: MoveToAction| {
             let mut rig = WalkRig::on_the_path();
             move_to_action

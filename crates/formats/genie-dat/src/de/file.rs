@@ -28,14 +28,14 @@ impl Version {
         VERSIONS
             .iter()
             .zip(14u8..)
-            .find(|(v, _)| file_version[..7] == v[..])
-            .map(|(_, n)| Self(n))
+            .find(|(magic, _)| file_version[..7] == magic[..])
+            .map(|(_, number)| Self(number))
     }
 
-    /// Whether the file is at least genieutils' `GV_C``n`.
+    /// Whether the file is at least genieutils' `GV_C``version`.
     #[must_use]
-    pub const fn at_least(self, n: u8) -> bool {
-        self.0 >= n
+    pub const fn at_least(self, version: u8) -> bool {
+        self.0 >= version
     }
 }
 
@@ -67,14 +67,14 @@ pub(super) fn read_present<T, A, R>(
     args: A,
 ) -> BinResult<Vec<Option<T>>>
 where
-    T: for<'a> BinRead<Args<'a> = A>,
+    T: for<'args> BinRead<Args<'args> = A>,
     A: Clone,
     R: Read + IoSeek,
 {
     pointers
         .iter()
-        .map(|&p| {
-            (p != 0)
+        .map(|&pointer| {
+            (pointer != 0)
                 .then(|| T::read_options(reader, endian, args.clone()))
                 .transpose()
         })
@@ -88,7 +88,7 @@ pub(super) fn write_present<T, W>(
     endian: Endian,
 ) -> BinResult<()>
 where
-    T: for<'a> BinWrite<Args<'a> = ()>,
+    T: for<'args> BinWrite<Args<'args> = ()>,
     W: Write + IoSeek,
 {
     for entry in list.iter().flatten() {
@@ -100,7 +100,7 @@ where
 /// The whole file, inflated.
 #[binrw]
 #[brw(little)]
-#[br(import(v: Version))]
+#[br(import(version: Version))]
 #[derive(Clone, Debug, PartialEq)]
 pub struct DatFile {
     /// The version string: `VER 7.1` to `VER 8.9`, then a NUL byte.
@@ -135,11 +135,11 @@ pub struct DatFile {
     #[br(count = graphic_count)]
     pub graphic_pointers: Vec<i32>,
     /// The graphics, indexed by graphic id; `None` where the slot's pointer is zero.
-    #[br(parse_with = |r, e, (): ()| read_present(r, e, &graphic_pointers, ()))]
-    #[bw(write_with = |l, w, e, (): ()| write_present(l, w, e))]
+    #[br(parse_with = |reader, endian, (): ()| read_present(reader, endian, &graphic_pointers, ()))]
+    #[bw(write_with = |list, writer, endian, (): ()| write_present(list, writer, endian))]
     pub graphics: Vec<Option<Graphic>>,
     /// The map settings and the terrain definitions.
-    #[br(args(v))]
+    #[br(args(version))]
     pub terrain_block: TerrainBlock,
     /// The random map definitions.
     pub random_maps: RandomMaps,
@@ -151,17 +151,17 @@ pub struct DatFile {
     /// Number of unit headers (one per unit id).
     pub unit_header_count: i32,
     /// The shared task lists, indexed by unit id.
-    #[br(count = unit_header_count, args { inner: (v,) })]
+    #[br(count = unit_header_count, args { inner: (version,) })]
     pub unit_headers: Vec<UnitHeader>,
     /// Number of civilizations, Gaia included.
     pub civ_count: i16,
     /// The civilizations, indexed by civilization id (Gaia is 0).
-    #[br(count = civ_count, args { inner: (v,) })]
+    #[br(count = civ_count, args { inner: (version,) })]
     pub civs: Vec<Civ>,
     /// Number of techs.
     pub tech_count: i16,
     /// The techs, indexed by tech id.
-    #[br(count = tech_count, args { inner: (v,) })]
+    #[br(count = tech_count, args { inner: (version,) })]
     pub techs: Vec<Tech>,
     /// Not known yet; the first of seven engine-wide integers between the techs and the tech tree.
     pub time_slice: i32,
@@ -178,7 +178,7 @@ pub struct DatFile {
     /// Not known yet (an engine-wide integer, presumably for score keeping).
     pub razing_kill_total: i32,
     /// The tech tree screen's layout.
-    #[br(args(v))]
+    #[br(args(version))]
     pub tech_tree: TechTree,
 }
 
@@ -212,9 +212,9 @@ impl DatFile {
     /// [`ErrorKind::InvalidInput`]: genie_error::ErrorKind::InvalidInput
     /// [`ErrorKind::Unsupported`]: genie_error::ErrorKind::Unsupported
     pub fn from_inflated(data: &[u8]) -> GenieResult<Self> {
-        let version = |v: &[u8]| {
+        let version = |bytes: &[u8]| {
             GenieError::unsupported("a data file version other than VER 7.1 to VER 8.9")
-                .with("version", String::from_utf8_lossy(v))
+                .with("version", String::from_utf8_lossy(bytes))
         };
         let mut start = [0u8; 8];
         start.copy_from_slice(data.get(..8).ok_or_else(|| version(&[]))?);

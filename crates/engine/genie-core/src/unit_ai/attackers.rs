@@ -38,8 +38,8 @@ impl Attackers {
     pub fn add(&mut self, id: Option<ObjectId>) -> bool {
         match self.search(id) {
             Ok(_) => false,
-            Err(i) => {
-                self.0.insert(i, id);
+            Err(index) => {
+                self.0.insert(index, id);
                 true
             }
         }
@@ -47,15 +47,15 @@ impl Attackers {
 
     /// `id` leaves the set (`FUN_140bf4cb0`); one not in it changes nothing.
     pub fn remove(&mut self, id: Option<ObjectId>) {
-        if let Ok(i) = self.search(id) {
-            let _ = self.0.remove(i);
+        if let Ok(index) = self.search(id) {
+            let _ = self.0.remove(index);
         }
     }
 
     /// The first attacker in the set's order that is `gone` leaves it.
     pub fn remove_first(&mut self, mut gone: impl FnMut(Option<ObjectId>) -> bool) {
-        if let Some(i) = self.0.iter().position(|&id| gone(id)) {
-            let _ = self.0.remove(i);
+        if let Some(index) = self.0.iter().position(|&id| gone(id)) {
+            let _ = self.0.remove(index);
         }
     }
 

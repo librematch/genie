@@ -22,9 +22,16 @@ fn chapter(data: &[u8]) -> GenieResult<de::Chapter<'_>> {
 }
 
 /// Three little-endian f32s of a saved vector (`[u8; 12]`).
-fn vec3(b: &[u8; 12]) -> [f32; 3] {
-    let f = |i: usize| f32::from_le_bytes([b[i], b[i + 1], b[i + 2], b[i + 3]]);
-    [f(0), f(4), f(8)]
+fn vec3(bytes: &[u8; 12]) -> [f32; 3] {
+    let float_at = |offset: usize| {
+        f32::from_le_bytes([
+            bytes[offset],
+            bytes[offset + 1],
+            bytes[offset + 2],
+            bytes[offset + 3],
+        ])
+    };
+    [float_at(0), float_at(4), float_at(8)]
 }
 
 /// The world's unit groups (`saveUnitGroups`: `world+0x50`'s list, as genie-save's generated
@@ -41,19 +48,19 @@ pub fn groups(data: &[u8], full: bool) -> GenieResult<String> {
 
 /// [`groups`] of a save read.
 fn groups_of(header: &Header, full: bool) -> String {
-    let g = &header.world.base_world.unit_groups;
+    let saved_groups = &header.world.base_world.unit_groups;
     let mut out = String::new();
     let _ = writeln!(
         out,
         "{} unit groups, counter {}",
-        g.number_unit_groups, g.unit_group_counter
+        saved_groups.number_unit_groups, saved_groups.unit_group_counter
     );
     if full {
         // the state as genie-core holds it, every vector decoded
         match unit_groups(&header.world.base_world) {
             Ok(groups) => {
-                for u in &groups.groups {
-                    let _ = writeln!(out, "{u:#?}");
+                for group in &groups.groups {
+                    let _ = writeln!(out, "{group:#?}");
                 }
             }
             Err(error) => {
@@ -62,7 +69,7 @@ fn groups_of(header: &Header, full: bool) -> String {
         }
         return out;
     }
-    for group in &g.unit_group {
+    for group in &saved_groups.unit_group {
         group_lines(&mut out, group);
     }
     out
@@ -98,11 +105,11 @@ fn group_lines(out: &mut String, group: &UnitGroup) {
             member.seconds_since_attacking
         );
     }
-    for (name, f) in [
+    for (name, found) in [
         ("previous", group.previous_formation.as_deref()),
         ("current", group.current_formation.as_deref()),
     ] {
-        if let Some(formation) = f {
+        if let Some(formation) = found {
             formation_lines(out, name, formation);
         }
     }
@@ -216,8 +223,9 @@ fn objects_of(header: &Header, player: usize, actions_of: Option<i32>) -> GenieR
     Ok(out)
 }
 
-/// The current sprite (`+0x140`, the save's `sprite`) and its node in the sprite list: `a` with
-/// the animated node's `animate_flag`, `rge_static_object` for a static node, `-` without a node.
+/// The current sprite (`+0x140`, the save's `sprite`) and its node in the sprite list:
+/// `rge_active_animated_sprite` with the animated node's `animate_flag`, `rge_static_object` for a
+/// static node, `-` without a node.
 fn sprite_column(rge_static_object: &RgeStaticObject) -> String {
     let nodes = || {
         rge_static_object
@@ -227,8 +235,11 @@ fn sprite_column(rge_static_object: &RgeStaticObject) -> String {
             .filter_map(|entry| entry.kind.as_deref())
     };
     let node = nodes()
-        .filter_map(|n| n.rge_active_animated_sprite.as_deref())
-        .find(|a| a.rge_active_sprite.sprite_id as i16 == rge_static_object.sprite)
+        .filter_map(|active_sprite| active_sprite.rge_active_animated_sprite.as_deref())
+        .find(|rge_active_animated_sprite| {
+            rge_active_animated_sprite.rge_active_sprite.sprite_id as i16
+                == rge_static_object.sprite
+        })
         .map(|rge_active_animated_sprite| format!("a{}", rge_active_animated_sprite.animate_flag))
         .or_else(|| {
             nodes()
@@ -255,9 +266,16 @@ fn action_object(object: &Object) -> Option<&RgeActionObject> {
     })
 }
 
-fn f3(b: &[u8; 12]) -> [f32; 3] {
-    let f = |i: usize| f32::from_le_bytes([b[i], b[i + 1], b[i + 2], b[i + 3]]);
-    [f(0), f(4), f(8)]
+fn f3(bytes: &[u8; 12]) -> [f32; 3] {
+    let float_at = |offset: usize| {
+        f32::from_le_bytes([
+            bytes[offset],
+            bytes[offset + 1],
+            bytes[offset + 2],
+            bytes[offset + 3],
+        ])
+    };
+    [float_at(0), float_at(4), float_at(8)]
 }
 
 /// The saved movement state of a player's objects `ids`: position, velocity data, orientation,
@@ -344,19 +362,19 @@ fn moving_lines(
         .chain(rge_moving_object.future_path_data.as_deref())
     {
         let _ = writeln!(out, "  path data {path_data:?}");
-        for p in paths
+        for path in paths
             .iter()
             .filter(|path| path.id_value == path_data.path_id)
         {
-            let points: Vec<[f32; 3]> = p.waypoints.iter().map(f3).collect();
+            let points: Vec<[f32; 3]> = path.waypoints.iter().map(f3).collect();
             let _ = writeln!(
                 out,
                 "    path {} points {points:?} length {} created {} flags {:#x} refs {}",
-                p.id_value,
-                p.path_length_value,
-                p.creation_time_value,
-                p.flags_bits,
-                p.reference_count
+                path.id_value,
+                path.path_length_value,
+                path.creation_time_value,
+                path.flags_bits,
+                path.reference_count
             );
         }
     }
@@ -478,10 +496,10 @@ pub fn tiles(data: &[u8], x: (usize, usize), y: (usize, usize)) -> GenieResult<S
     let header = chapter.header()?;
     let map = &header.world.base_world.map;
     let mut out = format!("map {} x {}\n", map.map_width, map.map_height);
-    let at = |r: usize, c: usize| {
+    let at = |row_index: usize, column_index: usize| {
         map.rows
-            .get(r)
-            .and_then(|row| row.tiles.get(c))
+            .get(row_index)
+            .and_then(|row| row.tiles.get(column_index))
             .map(|rge_tile| rge_tile.elevation)
     };
     for (name, transposed) in [("rows[y][x]", false), ("rows[x][y]", true)] {
@@ -489,8 +507,9 @@ pub fn tiles(data: &[u8], x: (usize, usize), y: (usize, usize)) -> GenieResult<S
         for row in y.0..=y.1 {
             let line: Vec<String> = (x.0..=x.1)
                 .map(|col| {
-                    let (r, c) = if transposed { (col, row) } else { (row, col) };
-                    at(r, c).map_or_else(|| "-".into(), |e| e.to_string())
+                    let (row_index, column_index) =
+                        if transposed { (col, row) } else { (row, col) };
+                    at(row_index, column_index).map_or_else(|| "-".into(), |tile| tile.to_string())
                 })
                 .collect();
             let _ = writeln!(out, "  y {row:3}: {}", line.join(" "));
@@ -516,8 +535,8 @@ pub fn checkpoints(rec: &[u8], masters: &MasterTable, updates: usize) -> GenieRe
     let chapter = chapter(rec)?;
     let players = chapter.header()?.players().len();
     let ids: Vec<u32> = (0..players)
-        .map(|p| {
-            u32::try_from(p)
+        .map(|player| {
+            u32::try_from(player)
                 .map_err(|_| GenieError::invalid_input("a save with 2^32 players or more"))
         })
         .collect::<GenieResult<_>>()?;
@@ -542,17 +561,17 @@ fn checkpoint_lines(chapter: &de::Chapter<'_>, blocks: &[Vec<[u32; 11]>]) -> Gen
                 for lane in checkpoint
                     .lanes
                     .iter()
-                    .filter(|l| l.iter().any(|&w| w != 0))
+                    .filter(|candidate| candidate.iter().any(|&word| word != 0))
                 {
-                    let p = lane[8] as usize;
+                    let player = lane[8] as usize;
                     let differ: Vec<(usize, u32, u32)> = (0..11)
-                        .filter(|&w| row[p][w] != lane[w])
-                        .map(|w| (w, row[p][w], lane[w]))
+                        .filter(|&word| row[player][word] != lane[word])
+                        .map(|word| (word, row[player][word], lane[word]))
                         .collect();
                     let _ = if differ.is_empty() {
-                        write!(out, " p{p} ok")
+                        write!(out, " p{player} ok")
                     } else {
-                        write!(out, " p{p} {differ:?}")
+                        write!(out, " p{player} {differ:?}")
                     };
                 }
                 out.push('\n');

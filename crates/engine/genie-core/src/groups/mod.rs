@@ -26,7 +26,7 @@ use crate::unit_ai::UnitStance;
 use crate::world::Millis;
 use crate::world::Seconds;
 use crate::world::WorldTime;
-use crate::world::slots::CheckedIndex;
+use crate::world::slots::CheckedIndexExt;
 use crate::{GenieError, GenieResult};
 
 mod command_kind;
@@ -277,8 +277,11 @@ impl PointLine {
             self.length += stretch(self.points.checked(0)?, self.points.checked(1)?);
         }
         if self.desired_length < self.length && 1 < self.points.len() {
-            let n = self.points.len();
-            let mut distance = stretch(self.points.checked(n - 1)?, self.points.checked(n - 2)?);
+            let length = self.points.len();
+            let mut distance = stretch(
+                self.points.checked(length - 1)?,
+                self.points.checked(length - 2)?,
+            );
             while self.desired_length < self.length - distance {
                 if self.points.len() < 2 {
                     break;
@@ -301,10 +304,10 @@ impl PointLine {
 }
 
 /// The 3D distance between two stored points (`FUN_14087e560`, `FUN_14099ef70`).
-fn stretch(a: &LinePoint, b: &LinePoint) -> Distance {
-    let d = a.point - b.point;
+fn stretch(from: &LinePoint, to: &LinePoint) -> Distance {
+    let offset = from.point - to.point;
     Distance::new(sqrt(
-        d.x() * d.x() + d.height() * d.height() + d.y() * d.y(),
+        offset.x() * offset.x() + offset.height() * offset.height() + offset.y() * offset.y(),
     ))
 }
 
@@ -579,7 +582,7 @@ impl UnitGroup {
     pub fn member_reason(&self, id: ObjectId) -> MoveReason {
         self.members
             .iter()
-            .find(|m| m.id == id)
+            .find(|member| member.id == id)
             .map_or(MoveReason::None, |member| member.specific_move.reason)
     }
 
@@ -589,7 +592,7 @@ impl UnitGroup {
     pub fn slot_in_place(&self, id: ObjectId) -> bool {
         self.current_formation
             .as_ref()
-            .and_then(|formation| formation.slots.iter().find(|s| s.unit_id == Some(id)))
+            .and_then(|formation| formation.slots.iter().find(|slot| slot.unit_id == Some(id)))
             .is_some_and(|slot| slot.state == SlotState::InPlace)
     }
 }

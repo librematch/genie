@@ -29,7 +29,7 @@ use crate::world::World;
 use crate::world::index::ObjectsRef;
 use crate::world::index::Place;
 use crate::world::layer::generated::GroupTuning;
-use crate::world::slots::{CheckedIndex, PlayerSlots};
+use crate::world::slots::{CheckedIndexExt, PlayerSlotsExt};
 use std::mem::take;
 
 /// A group holds fewer than this many members (`FUN_1410083c0`'s `0x46`: "No room in this
@@ -84,16 +84,16 @@ impl UnitGroup {
     }
 
     /// `FUN_14102d710`: the members' arrays (ids `+0xf0`, own moves `+0xf8`,
-    /// `mSecondsSinceAttacking` `+0x480`) grow to `n`. Unchanged for `n` of 0
+    /// `mSecondsSinceAttacking` `+0x480`) grow to `capacity`. Unchanged for `capacity` of 0
     /// or less or not above the capacity (`+0xe8`). Else the members keep their ids, moves and
     /// seconds, and every place past them is fresh: no unit (-1), no move (active 0, path and
     /// reason -1, the rest 0) and its seconds at `f32::MAX` (`0x7f7fffff`), an earlier spare
-    /// value gone; the capacity is `n`. Allocation failure is Rust's abort.
-    pub fn resize_members(&mut self, n: i32) -> Resize {
-        if n <= 0 || n as usize <= self.member_capacity() {
+    /// value gone; the capacity is `capacity`. Allocation failure is Rust's abort.
+    pub fn resize_members(&mut self, capacity: i32) -> Resize {
+        if capacity <= 0 || capacity as usize <= self.member_capacity() {
             return Resize::Unchanged;
         }
-        self.spare_seconds = vec![Seconds::MAX; n as usize - self.members.len()];
+        self.spare_seconds = vec![Seconds::MAX; capacity as usize - self.members.len()];
         Resize::Grown
     }
 
@@ -160,10 +160,10 @@ impl UnitGroup {
         scratch: &mut Vec<UnitKind>,
     ) -> bool {
         let leave = |stat: &mut UnitKindStatistic, scratch: &mut Vec<UnitKind>| {
-            let Some(i) = stat.units.iter().position(|&object_id| object_id == id) else {
+            let Some(index) = stat.units.iter().position(|&object_id| object_id == id) else {
                 return false;
             };
-            let _ = stat.units.remove(i);
+            let _ = stat.units.remove(index);
             count_unit_kinds(stat, objects, scratch);
             true
         };
@@ -215,20 +215,20 @@ impl World {
         walk: LeavingWalk,
     ) -> GenieResult<bool> {
         let _ = target;
-        let Some(g) = self.groups.get(group) else {
+        let Some(unit_group) = self.groups.get(group) else {
             return Ok(false);
         };
-        let Some(index) = g
+        let Some(index) = unit_group
             .members
             .iter()
             .position(|index_member| index_member.id == id)
         else {
             return Ok(false);
         };
-        let group_id = g.id;
+        let group_id = unit_group.id;
         if let Some(place) = self.place(id) {
             let unit = match place {
-                Place::Live(p, i) => self.players.live_mut(p, i)?,
+                Place::Live(owner, slot) => self.players.live_mut(owner, slot)?,
                 Place::Sleeping(player_id, list_index) => {
                     self.players.asleep_mut(player_id, list_index)?
                 }
@@ -246,11 +246,11 @@ impl World {
         let seconds: Vec<Seconds> = unit_group
             .members
             .iter()
-            .map(|m| m.seconds_since_attacking)
+            .map(|member| member.seconds_since_attacking)
             .collect();
         let _ = unit_group.members.remove(index);
-        for (member, &s) in unit_group.members.iter_mut().zip(&seconds) {
-            member.seconds_since_attacking = s;
+        for (member, &seconds) in unit_group.members.iter_mut().zip(&seconds) {
+            member.seconds_since_attacking = seconds;
         }
         unit_group
             .spare_seconds
@@ -313,33 +313,38 @@ pub(crate) fn count_unit_kinds(
 ) {
     scratch.resize(50, UnitKind::CLEARED);
     let mut counts = vec![0u32; 50];
-    let mut n = 0usize;
+    let mut filled = 0usize;
     for &id in &stat.units {
         let Some(master) = objects.get(id).map(|unit| unit.life.master_id) else {
             continue;
         };
         let master = UnitKind::of(master);
-        if let Some(k) = scratch.iter().take(n).position(|&t| t == master) {
+        if let Some(slot) = scratch
+            .iter()
+            .take(filled)
+            .position(|&unit_kind| unit_kind == master)
+        {
             // k < n <= 50, the counts' length
-            if let Some(count) = counts.get_mut(k) {
+            if let Some(count) = counts.get_mut(slot) {
                 *count += 1;
             }
             continue;
         }
-        if n < 50
-            && let (Some(unit_kind), Some(count)) = (scratch.get_mut(n), counts.get_mut(n))
+        if filled < 50
+            && let (Some(unit_kind), Some(count)) =
+                (scratch.get_mut(filled), counts.get_mut(filled))
         {
             *unit_kind = master;
             *count = 1;
         }
-        n += 1;
-        if 50 < n {
+        filled += 1;
+        if 50 < filled {
             break;
         }
     }
     stat.unit_kinds.clone_from(scratch);
     stat.unit_kind_counts = counts;
-    stat.number_unit_kinds = n as i32;
+    stat.number_unit_kinds = filled as i32;
 }
 
 impl World {
@@ -370,14 +375,17 @@ impl World {
         };
         let sub = self.unit_category(Some(object))?;
         // a ghost (type 25) has no sub-formation: only a unit gets past this
-        let WorldObject::Unit(p, u, _) = object else {
+        let WorldObject::Unit(owner, world_unit, _) = object else {
             return Ok(Join::Refused);
         };
         if sub == FormationCategory::ANY {
             return Ok(Join::Refused);
         }
-        let unit = FormationUnit::of(u.master(self.master_tables(), p)?, &self.model.tuning.group);
-        let old = u.group.id;
+        let unit = FormationUnit::of(
+            world_unit.master(self.master_tables(), owner)?,
+            &self.model.tuning.group,
+        );
+        let old = world_unit.group.id;
         let held = self.groups.held(group)?;
         if held.has(id) {
             return Ok(Join::Joined);
@@ -392,16 +400,16 @@ impl World {
             let _ = self.remove_unit(old, id, None, LeavingWalk::Stands)?;
         }
         let place = self.place(id).ok_or_else(|| member_gone(id))?;
-        let ai_rng = self.streams.get(Stream::Ai);
+        let ai_rng = self.streams.get_mut(Stream::Ai);
         // a sleeping unit joins as a live one
-        let u = match place {
-            Place::Live(q, i) => self.players.live_mut(q, i)?,
+        let member = match place {
+            Place::Live(owner, slot) => self.players.live_mut(owner, slot)?,
             Place::Sleeping(player_id, list_index) => {
                 self.players.asleep_mut(player_id, list_index)?
             }
         };
-        u.group.id = Some(group);
-        if let Some(ai) = self.parts.unit_ai.get_mut(u.id) {
+        member.group.id = Some(group);
+        if let Some(ai) = self.parts.unit_ai.get_mut(member.id) {
             if ai
                 .current_action
                 .is_some_and(|ai_action| CLEARED_ACTIONS.contains(&ai_action))
@@ -515,14 +523,14 @@ mod tests {
     /// their seconds since attacking 1, 2 and 3, 11 the lead and walking.
     fn three() -> World {
         let unit = |id: i32, master: MasterId, x: f32| {
-            let mut u = Unit {
+            let mut unit = Unit {
                 id: object_id(id),
                 place: Static::at(Position::new(x, 0.0, 0.0)),
                 ..Unit::default()
             };
-            u.life.master_id = master;
-            u.group.id = Some(group_id(1));
-            u
+            unit.life.master_id = master;
+            unit.group.id = Some(group_id(1));
+            unit
         };
         let walking = unit(11, master_id(4), 2.0);
         let mut mover = walker();
@@ -565,9 +573,9 @@ mod tests {
         let mut group = UnitGroup::new(group_id(1));
         group.members = [(10, 1.0), (11, 2.0), (12, 3.0)]
             .iter()
-            .map(|&(id, s)| Member {
+            .map(|&(id, seconds)| Member {
                 id: object_id(id),
-                seconds_since_attacking: Seconds::new(s),
+                seconds_since_attacking: Seconds::new(seconds),
                 ..Member::default()
             })
             .collect();
@@ -665,12 +673,12 @@ mod tests {
     fn unit_leaves_only_its_own_sub_formation_statistic() {
         let mut world = three();
         let unit = |id: i32, master: MasterId| {
-            let mut u = Unit {
+            let mut unit = Unit {
                 id: object_id(id),
                 ..Unit::default()
             };
-            u.life.master_id = master;
-            u
+            unit.life.master_id = master;
+            unit
         };
         let _ = world
             .push_live(PlayerId::new(1), unit(14, ids::ID_7))
@@ -798,9 +806,9 @@ mod tests {
         world.spatial.sight = Some(visibility);
         world.spatial.relations = ByPlayer::new(vec![relation_row([0, 0]), relation_row([0, 0])]);
         world.spatial.unit_diplomacy = ByPlayer::new(vec![relations([1, 2]), relations([0, 1])]);
-        let g = world.groups.get_mut(group_id(1)).unwrap();
-        g.flags |= GroupFlags::RELAYOUT;
-        g.motion.flags &= !MotionFlags::NEW;
+        let group = world.groups.get_mut(group_id(1)).unwrap();
+        group.flags |= GroupFlags::RELAYOUT;
+        group.motion.flags &= !MotionFlags::NEW;
         assert!(
             !world
                 .statistics_only(group_id(1), FarMembers::Stay)
@@ -857,9 +865,9 @@ mod tests {
     fn the_group_takes_its_members_most_common_stance() {
         use crate::unit_ai::UnitStance;
         let with = |stances: [UnitStance; 3]| {
-            let mut t = three();
-            for (unit, stance) in t.players[1].objects.iter_mut().zip(stances) {
-                t.parts.set_unit_ai(
+            let mut world = three();
+            for (unit, stance) in world.players[1].objects.iter_mut().zip(stances) {
+                world.parts.set_unit_ai(
                     unit.id,
                     Some(UnitAi {
                         stance,
@@ -867,24 +875,28 @@ mod tests {
                     }),
                 );
             }
-            t.stances_state(group_id(1), FormationKind::UserDefined)
+            world
+                .stances_state(group_id(1), FormationKind::UserDefined)
                 .unwrap();
-            t.groups.get(group_id(1)).unwrap().stance
+            world.groups.get(group_id(1)).unwrap().stance
         };
-        let (a, d, s) = (
+        let (aggressive, defensive, standing) = (
             UnitStance::Aggressive,
             UnitStance::Defensive,
             UnitStance::StandGround,
         );
-        assert_eq!(with([d, s, d]), Some(d));
-        assert_eq!(with([s, s, a]), Some(s));
-        assert_eq!(with([a, d, s]), Some(a));
+        assert_eq!(with([defensive, standing, defensive]), Some(defensive));
+        assert_eq!(with([standing, standing, aggressive]), Some(standing));
+        assert_eq!(with([aggressive, defensive, standing]), Some(aggressive));
         assert_eq!(with([UnitStance::NoAttack; 3]), Some(UnitStance::NoAttack));
         let mut world = three();
         world
             .stances_state(group_id(1), FormationKind::UserDefined)
             .unwrap();
-        assert_eq!(world.groups.get(group_id(1)).unwrap().stance, Some(a));
+        assert_eq!(
+            world.groups.get(group_id(1)).unwrap().stance,
+            Some(aggressive)
+        );
     }
 
     /// `LockFormation` (`FUN_141024e70`) re-reads the spacing (`+0x15c`) for every member
@@ -894,9 +906,9 @@ mod tests {
     fn lock_formation_takes_the_first_member_spacing() {
         let mut world = three();
         for masters in &mut world.model.masters {
-            for (id, r) in [(4, 0.2f32), (6, 0.5)] {
+            for (id, radius) in [(4, 0.2f32), (6, 0.5)] {
                 let master = Arc::make_mut(masters).get_mut(master_id(id)).unwrap();
-                master.radius = Footprint::new(r, r);
+                master.radius = Footprint::new(radius, radius);
                 master.height = Distance::new(1.0);
                 if let Some(creatable_part) = master.creatable.as_mut() {
                     creatable_part.spacing_modifier = SpacingModifier::new(1.0);
@@ -913,14 +925,16 @@ mod tests {
     /// statistic that holds it.
     #[test]
     fn unit_kept_moving_walks_on_and_gone_one_leaves_its_statistic() {
-        let mut t = three();
+        let mut world = three();
         assert!(
-            t.remove_unit(group_id(1), object_id(11), None, LeavingWalk::KeepsMoving)
+            world
+                .remove_unit(group_id(1), object_id(11), None, LeavingWalk::KeepsMoving)
                 .unwrap()
         );
         assert_eq!(
-            t.parts
-                .mover_of(t.players[1].objects[ListIndex::new(1)].id)
+            world
+                .parts
+                .mover_of(world.players[1].objects[ListIndex::new(1)].id)
                 .unwrap()
                 .paths[0]
                 .state,

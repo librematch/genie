@@ -135,13 +135,13 @@ pub struct FoundObject {
 
 /// What `bestUnitToAttack` asks of the world while its unit AI runs: the unit AI's picker for
 /// its reads and tests, the search's reachability for its paths (slot 0x3d0).
-pub(crate) struct AttackField<'p, 'r, 'w> {
+pub(crate) struct AttackField<'field, 'env, 'world> {
     /// The unit AI's reads and tests of the unit and the objects.
-    pub(crate) picker: &'p WorldPicker<'w>,
+    pub(crate) picker: &'field WorldPicker<'world>,
     /// The unit's path to an object (slot 0x3d0).
-    pub(crate) reach: &'p mut Reach<'r>,
+    pub(crate) reach: &'field mut Reach<'env>,
     /// The spatial index the search and the picker's reads go through.
-    pub(crate) world: &'p mut Spatial,
+    pub(crate) world: &'field mut Spatial,
 }
 
 impl AttackField<'_, '_, '_> {

@@ -1,4 +1,4 @@
-use crate::element::{OptionalReadableElement, WritableHeaderElement};
+use crate::element::{ReadOptionalHeader, WriteHeader};
 use crate::errors::not_written;
 use crate::test_support::{Bytes, header_reader, read_all};
 use crate::unit::Unit;
@@ -96,10 +96,10 @@ fn an_object_from_11_58_has_no_selected_group() {
 /// A unit of class 0 is the end of a list; any other reads the classes up to its own.
 #[test]
 fn static_unit_reads_only_its_static_attributes() {
-    let end = OptionalReadableElement::read_from(&mut header_reader(&[0], 11.58));
+    let end = ReadOptionalHeader::read_from(&mut header_reader(&[0], 11.58));
     assert!(matches!(end, Ok(None::<Unit>)));
     let bytes = Bytes::default().u8(10).raw(&rest(identity()).0).0;
-    let unit: Unit = OptionalReadableElement::read_from(&mut header_reader(&bytes, 11.58))
+    let unit: Unit = ReadOptionalHeader::read_from(&mut header_reader(&bytes, 11.58))
         .unwrap()
         .unwrap();
     assert_eq!(unit.unit_base_class, UnitBaseClass::Static);
@@ -109,7 +109,7 @@ fn static_unit_reads_only_its_static_attributes() {
 #[test]
 fn the_old_format_units_are_read_only() {
     let bytes = Bytes::default().u8(10).raw(&rest(identity()).0).0;
-    let unit: Unit = OptionalReadableElement::read_from(&mut header_reader(&bytes, 11.58))
+    let unit: Unit = ReadOptionalHeader::read_from(&mut header_reader(&bytes, 11.58))
         .unwrap()
         .unwrap();
     let error = unit.write_to(&mut vec![]).unwrap_err();

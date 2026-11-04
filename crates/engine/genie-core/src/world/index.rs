@@ -39,7 +39,7 @@ use crate::world::parts::Object;
 use crate::world::parts::no_parts;
 use crate::world::parts::{PartTable, Parts};
 use crate::world::player::Player;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 use std::sync::Arc;
 #[cfg(test)]
 use std::sync::LazyLock;
@@ -124,8 +124,8 @@ impl ObjectIndex {
     pub fn of(players: &[Player]) -> Self {
         let mut index = Self::default();
         for (player_id, player) in PlayerId::each(players.len()).zip(players) {
-            for (i, u) in player.objects.indexed() {
-                index.file(u.id, Place::Live(player_id, i));
+            for (list_index, unit) in player.objects.indexed() {
+                index.file(unit.id, Place::Live(player_id, list_index));
             }
             for (list_index, unit) in player.sleeping.indexed() {
                 index.file(unit.id, Place::Sleeping(player_id, list_index));
@@ -176,11 +176,11 @@ impl ObjectIndex {
     }
 
     /// Object `id` among `players`' lists with its owner and whether it sleeps.
-    pub(crate) fn locate<'a>(
+    pub(crate) fn locate<'world>(
         &self,
-        players: &'a [Player],
+        players: &'world [Player],
         id: impl ObjectKey,
-    ) -> Option<(PlayerId, &'a Unit, bool)> {
+    ) -> Option<(PlayerId, &'world Unit, bool)> {
         let place = self.place(players, id)?;
         let unit = players.at(place).ok()?;
         Some((place.player(), unit, place.sleeping()))
@@ -283,12 +283,12 @@ impl ObjectIndex {
 
 /// The part tables [`ObjectsRef::of_tables`] reads: the building, combat and action layers, the
 /// objects the load could not read whole and the motion layers (one of them lent out).
-pub type PartTables<'a> = (
-    &'a PartTable<Building>,
-    &'a PartTable<Combat>,
-    &'a PartTable<Action>,
-    &'a PartTable<Unread>,
-    Lent<'a, Motion>,
+pub type PartTables<'world> = (
+    &'world PartTable<Building>,
+    &'world PartTable<Combat>,
+    &'world PartTable<Action>,
+    &'world PartTable<Unread>,
+    Lent<'world, Motion>,
 );
 
 /// The world's objects by id, to read, beside the parts a caller holds apart (a walk holds the
@@ -296,31 +296,31 @@ pub type PartTables<'a> = (
 /// the objects' parts and the build's roles of their classes and masters. An object out for its
 /// update is none.
 #[derive(Clone, Copy, Debug)]
-pub struct ObjectsRef<'a> {
-    players: &'a [Player],
-    index: &'a ObjectIndex,
-    masters: MasterTables<'a>,
-    buildings: &'a PartTable<Building>,
-    combats: &'a PartTable<Combat>,
-    actions: &'a PartTable<Action>,
-    unread: &'a PartTable<Unread>,
-    motions: Lent<'a, Motion>,
-    roles: &'a Roles,
-    tuning: &'a Tuning,
+pub struct ObjectsRef<'world> {
+    players: &'world [Player],
+    index: &'world ObjectIndex,
+    masters: MasterTables<'world>,
+    buildings: &'world PartTable<Building>,
+    combats: &'world PartTable<Combat>,
+    actions: &'world PartTable<Action>,
+    unread: &'world PartTable<Unread>,
+    motions: Lent<'world, Motion>,
+    roles: &'world Roles,
+    tuning: &'world Tuning,
 }
 
-impl<'a> ObjectsRef<'a> {
+impl<'world> ObjectsRef<'world> {
     /// The objects of `players`, which the world's table `index` finds, with the players'
     /// `masters`, the objects' `parts` (their own masters, their building, combat and motion
     /// layers), the build's `roles` and its `tuning`.
     #[must_use]
     pub fn new(
-        players: &'a [Player],
-        index: &'a ObjectIndex,
-        masters: &'a [Arc<Masters>],
-        parts: &'a Parts,
-        roles: &'a Roles,
-        tuning: &'a Tuning,
+        players: &'world [Player],
+        index: &'world ObjectIndex,
+        masters: &'world [Arc<Masters>],
+        parts: &'world Parts,
+        roles: &'world Roles,
+        tuning: &'world Tuning,
     ) -> Self {
         Self::of_tables(
             players,
@@ -346,12 +346,12 @@ impl<'a> ObjectsRef<'a> {
     /// [`crate::world::parts::PartTable::lend`]), the build's `roles` and its `tuning`.
     #[must_use]
     pub const fn of_tables(
-        players: &'a [Player],
-        index: &'a ObjectIndex,
-        masters: MasterTables<'a>,
-        (buildings, combats, actions, unread, motions): PartTables<'a>,
-        roles: &'a Roles,
-        tuning: &'a Tuning,
+        players: &'world [Player],
+        index: &'world ObjectIndex,
+        masters: MasterTables<'world>,
+        (buildings, combats, actions, unread, motions): PartTables<'world>,
+        roles: &'world Roles,
+        tuning: &'world Tuning,
     ) -> Self {
         Self {
             players,
@@ -370,7 +370,7 @@ impl<'a> ObjectsRef<'a> {
     /// Object `id`'s mover; none for an object that does not move, one the world does not hold
     /// or one out for its update.
     #[must_use]
-    pub fn mover_of(&self, id: impl ObjectKey) -> Option<&'a Mover> {
+    pub fn mover_of(&self, id: impl ObjectKey) -> Option<&'world Mover> {
         let unit = self.get(id)?;
         self.motions.get(unit.id).and_then(Motion::mover)
     }
@@ -378,25 +378,25 @@ impl<'a> ObjectsRef<'a> {
     /// Object `id`'s combat layer, an object out for its update's too: a new object's where
     /// the table holds none ([`crate::world::parts::Parts::combat_of`]).
     #[must_use]
-    pub fn combat_of(&self, id: ObjectId) -> &'a Combat {
+    pub fn combat_of(&self, id: ObjectId) -> &'world Combat {
         self.combats.of(id)
     }
 
     /// The world's masters these objects read: the players' tables and the objects' own.
     #[must_use]
-    pub const fn masters(&self) -> MasterTables<'a> {
+    pub const fn masters(&self) -> MasterTables<'world> {
         self.masters
     }
 
     /// The build's roles of these objects' classes and masters (FD-046-D45).
     #[must_use]
-    pub const fn roles(&self) -> &'a Roles {
+    pub const fn roles(&self) -> &'world Roles {
         self.roles
     }
 
     /// The build's tuning values these objects' systems read (FD-046-D49).
     #[must_use]
-    pub const fn tuning(&self) -> &'a Tuning {
+    pub const fn tuning(&self) -> &'world Tuning {
         self.tuning
     }
 
@@ -415,7 +415,7 @@ impl<'a> ObjectsRef<'a> {
 
     /// Object `id`, live or sleeping.
     #[must_use]
-    pub fn get(&self, id: impl ObjectKey) -> Option<&'a Unit> {
+    pub fn get(&self, id: impl ObjectKey) -> Option<&'world Unit> {
         self.index.locate(self.players, id).map(|(_, unit, _)| unit)
     }
 
@@ -428,7 +428,7 @@ impl<'a> ObjectsRef<'a> {
     pub fn with_master(
         &self,
         id: impl ObjectKey,
-    ) -> GenieResult<Option<(PlayerId, &'a Unit, &'a Master)>> {
+    ) -> GenieResult<Option<(PlayerId, &'world Unit, &'world Master)>> {
         let Some((player_id, unit, _)) = self.index.locate(self.players, id) else {
             return Ok(None);
         };
@@ -453,21 +453,21 @@ impl<'a> ObjectsRef<'a> {
     /// The building layer of object `id` ([`crate::world::parts::Parts::building_of`]); none
     /// for an object the world does not hold or one out for its update.
     #[must_use]
-    pub fn building(&self, id: impl ObjectKey) -> Option<&'a Building> {
+    pub fn building(&self, id: impl ObjectKey) -> Option<&'world Building> {
         Some(self.buildings.of(self.get(id)?.id))
     }
 
     /// The action layer of object `id` ([`crate::world::parts::Parts::actions_of`]); none for
     /// an object the world does not hold or one out for its update.
     #[must_use]
-    pub fn actions(&self, id: impl ObjectKey) -> Option<&'a Action> {
+    pub fn actions(&self, id: impl ObjectKey) -> Option<&'world Action> {
         Some(self.actions.of(self.get(id)?.id))
     }
 
     /// Why the load could not read object `id` whole ([`crate::world::Unread`]), none for one it
     /// read. The updating object's too: its entry stays in the table while its row is out.
     #[must_use]
-    pub fn unread(&self, id: ObjectId) -> Option<&'a Unread> {
+    pub fn unread(&self, id: ObjectId) -> Option<&'world Unread> {
         self.unread.get(id)
     }
 
@@ -528,8 +528,8 @@ impl TestObjects {
         let Some(player) = self.players.first_mut() else {
             return;
         };
-        let made = gait.map(|g| {
-            let object = unit_with_gait(id, g);
+        let made = gait.map(|gait| {
+            let object = unit_with_gait(id, gait);
             let _ = self
                 .parts
                 .motion
@@ -587,7 +587,7 @@ impl TestObjects {
     }
 
     /// The units by id under the layer's `roles` in place of build 158041's.
-    pub(crate) fn view_with<'a>(&'a self, roles: &'a Roles) -> ObjectsRef<'a> {
+    pub(crate) fn view_with<'world>(&'world self, roles: &'world Roles) -> ObjectsRef<'world> {
         ObjectsRef::new(
             &self.players,
             &self.index,
@@ -619,8 +619,8 @@ fn scan(players: &[Player], id: ObjectId) -> Option<Place> {
     PlayerId::each(players.len())
         .zip(players)
         .find_map(|(player_id, player)| {
-            if let Some(i) = player.objects.position_of(id) {
-                return Some(Place::Live(player_id, i));
+            if let Some(list_index) = player.objects.position_of(id) {
+                return Some(Place::Live(player_id, list_index));
             }
             let list_index = player.sleeping.position_of(id)?;
             Some(Place::Sleeping(player_id, list_index))
@@ -842,7 +842,7 @@ mod tests {
         }
     }
 
-    /// A world of `n` players whose live lists hold `live` (by player) and nothing asleep.
+    /// A world whose live lists hold `live` (one list a player) and nothing asleep.
     fn world(live: &[&[i32]]) -> World {
         let players = live
             .iter()
@@ -860,12 +860,12 @@ mod tests {
         )
     }
 
-    fn live(p: u8, i: usize) -> Place {
-        Place::Live(PlayerId::new(p), ListIndex::new(i))
+    fn live(player: u8, index: usize) -> Place {
+        Place::Live(PlayerId::new(player), ListIndex::new(index))
     }
 
-    fn asleep(p: u8, i: usize) -> Place {
-        Place::Sleeping(PlayerId::new(p), ListIndex::new(i))
+    fn asleep(player: u8, index: usize) -> Place {
+        Place::Sleeping(PlayerId::new(player), ListIndex::new(index))
     }
 
     /// The walk's view by id: each unit's gait as the unit gives it ([`Unit::gait`]); none for
@@ -931,7 +931,7 @@ mod tests {
         assert_eq!(
             world
                 .locate(object_id(4))
-                .map(|(player_id, u, s)| (player_id, u.id, s)),
+                .map(|(player_id, unit, sleeping)| (player_id, unit.id, sleeping)),
             Some((PlayerId::new(1), object_id(4), true))
         );
     }

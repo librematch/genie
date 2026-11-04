@@ -30,8 +30,8 @@ use crate::world::index::Place;
 use crate::world::parts::Part;
 use crate::world::player::Player;
 use crate::world::settings::OptionFlags;
-use crate::world::slots::CheckedIndex;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::CheckedIndexExt;
+use crate::world::slots::PlayerSlotsExt;
 use crate::world::{BLOCKS_RESEARCH, World};
 use crate::{GenieError, GenieResult};
 
@@ -89,11 +89,11 @@ impl World {
             }
             let unit = &self.players.live(player, list_index)?;
             let old = self.parts.gather_point.get(unit.id).copied();
-            let kept = old.is_some_and(|g| g.state == GatherPointState::Kept);
-            let z = old.map_or(0.0, |g| g.point.z());
+            let kept = old.is_some_and(|gather_point| gather_point.state == GatherPointState::Kept);
+            let z = old.map_or(0.0, |gather_point| gather_point.point.z());
             let gather = if own {
                 let (target, target_master) = match old {
-                    Some(g) if kept => (g.target, g.target_master),
+                    Some(gather_point) if kept => (gather_point.target, gather_point.target_master),
                     _ => (Some(unit.id), Some(unit.life.master_id)),
                 };
                 Some(GatherPoint {
@@ -106,7 +106,7 @@ impl World {
                 None
             } else {
                 let (target, target_master) = match old {
-                    Some(g) if kept => (g.target, g.target_master),
+                    Some(gather_point) if kept => (gather_point.target, gather_point.target_master),
                     _ => (target, target_master),
                 };
                 Some(GatherPoint {
@@ -188,10 +188,10 @@ impl World {
                 // the target's class, which the order on a gone target reads as a master of the
                 // owner (the game's)
                 let (target, owner, class) = match turns.object(object_id) {
-                    Some((tp, u)) => (
+                    Some((tp, unit)) => (
                         object_id,
                         Some(tp),
-                        OrderTargetKind::of_class(u.master(turns.master_tables(), tp)?.class),
+                        OrderTargetKind::of_class(unit.master(turns.master_tables(), tp)?.class),
                     ),
                     None => (None, None, None),
                 };

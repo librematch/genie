@@ -4,7 +4,7 @@
 use crate::map::Distance;
 use crate::map::Position;
 use crate::movement::LevelFlags;
-use crate::movement::Levels;
+use crate::movement::LevelsExt;
 use crate::movement::PathState;
 use crate::movement::WaypointIndex;
 use crate::movement::path_points::GoalReach;
@@ -66,9 +66,9 @@ impl NewPath {
 /// The request's way to the walked level's waypoint: the goal and the include list, where the unit
 /// last moved to (`+0x824`), the waypoint and the ground distance between, the unit's radius, the
 /// level's number, range and target, and the roles of the unit's class (a trade cart's).
-pub(super) struct Way<'a> {
-    pub(super) goal: Goal<'a>,
-    pub(super) include: &'a [ObjectId],
+pub(super) struct Way<'world> {
+    pub(super) goal: Goal<'world>,
+    pub(super) include: &'world [ObjectId],
     pub(super) position: BVector,
     pub(super) waypoint: BVector,
     pub(super) distance: Distance,
@@ -201,12 +201,12 @@ impl Mover {
         np: &mut NewPath,
         by_id: ObjectsRef<'_>,
     ) -> GenieResult<()> {
-        let target_moves = way.goal.target.is_some_and(|(_, t)| t.moves);
+        let target_moves = way.goal.target.is_some_and(|(_, placed)| placed.moves);
         let target_radius = way
             .goal
             .target
             .filter(|_| !target_moves)
-            .map_or(0.0, |(_, t)| t.radius.x());
+            .map_or(0.0, |(_, placed)| placed.radius.x());
         let ask = TileAsk {
             goal: way.waypoint,
             radii: Distance::new(target_radius + way.radius.get()),
@@ -465,8 +465,8 @@ impl Mover {
         let target_radius = way
             .goal
             .target
-            .filter(|(_, t)| !t.moves)
-            .map_or(0.0, |(_, t)| t.radius.x());
+            .filter(|(_, placed)| !placed.moves)
+            .map_or(0.0, |(_, placed)| placed.radius.x());
         let mut other = Path::default();
         let ask = TileAsk {
             goal: way.waypoint,
@@ -483,8 +483,8 @@ impl Mover {
             // the game's `result - 1 < 2 || 4 < result`: above 4 the planner never returns
             if found.leads() && end < np.end_gap {
                 np.path.points.clear();
-                for &p in &other.points {
-                    let _ = np.path.push(p);
+                for &point in &other.points {
+                    let _ = np.path.push(point);
                 }
                 np.flags |= PlanFlags::PLANNED;
                 np.flags |= PlanFlags::FOUND;

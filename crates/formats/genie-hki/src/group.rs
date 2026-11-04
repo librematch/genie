@@ -84,8 +84,8 @@ impl HotkeyGroup {
             .hotkeys
             .iter()
             .enumerate()
-            .map(|(i, &hk)| {
-                if i == index {
+            .map(|(position, &hk)| {
+                if position == index {
                     hk.key(key).ctrl(ctrl).alt(alt).shift(shift)
                 } else {
                     hk
@@ -100,8 +100,8 @@ impl HotkeyGroup {
     /// # fn main() -> anyhow::Result<()> {
     /// use std::fs::File;
     /// use genie_hki::HotkeyInfo;
-    /// let mut f = File::open("test/files/aoc1.hki")?;
-    /// let info = HotkeyInfo::read_from(&mut f)?;
+    /// let mut file = File::open("test/files/aoc1.hki")?;
+    /// let info = HotkeyInfo::read_from(&mut file)?;
     /// // Villager hotkeys are group 3 in AoC and HD Edition.
     /// let group = info
     ///     .group(3)
@@ -160,17 +160,17 @@ impl IntoIterator for HotkeyGroup {
     }
 }
 
-impl<'a> IntoIterator for &'a HotkeyGroup {
-    type Item = &'a Hotkey;
-    type IntoIter = slice::Iter<'a, Hotkey>;
+impl<'group> IntoIterator for &'group HotkeyGroup {
+    type Item = &'group Hotkey;
+    type IntoIter = slice::Iter<'group, Hotkey>;
     fn into_iter(self) -> Self::IntoIter {
         self.hotkeys.iter()
     }
 }
 
-impl<'a> IntoIterator for &'a mut HotkeyGroup {
-    type Item = &'a mut Hotkey;
-    type IntoIter = slice::IterMut<'a, Hotkey>;
+impl<'group> IntoIterator for &'group mut HotkeyGroup {
+    type Item = &'group mut Hotkey;
+    type IntoIter = slice::IterMut<'group, Hotkey>;
     fn into_iter(self) -> Self::IntoIter {
         self.hotkeys.iter_mut()
     }

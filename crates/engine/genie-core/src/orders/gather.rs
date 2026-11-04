@@ -34,7 +34,7 @@ use crate::unit_ai::task_finder::world::TaskWorld;
 use crate::world::World;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 use crate::world::{ATTACKER_UNPLACED, TARGET_UNPLACED};
 use crate::{GenieError, GenieResult};
 
@@ -140,7 +140,7 @@ impl World {
             ));
         };
         let old = gather.targets();
-        let rng = self.streams.get(Stream::Action);
+        let rng = self.streams.get_mut(Stream::Action);
         gather.retarget(
             GatherRetarget {
                 target: &resource,
@@ -267,7 +267,7 @@ impl World {
             target
         };
         let main_master = match self.object(main) {
-            Some((mp, m)) => m.master(self.master_tables(), mp)?.id,
+            Some((mp, unit)) => unit.master(self.master_tables(), mp)?.id,
             None => tm.id,
         };
         let unit = &self.players.live(player, idx)?;
@@ -291,9 +291,9 @@ impl World {
         target: ObjectId,
         point: Position,
     ) -> GenieResult<Answer> {
-        let mut q = self.quarry(player, target)?;
-        q.drop_site = self.drops_at_main(player, idx, target)?;
-        let quarry = Some(q);
+        let mut quarry = self.quarry(player, target)?;
+        quarry.drop_site = self.drops_at_main(player, idx, target)?;
+        let quarry = Some(quarry);
         let gap = self.engagement(player, idx, target)?.gap;
         let by = self.releaser(player, idx)?;
         let unit = self.players.live_mut(player, idx)?;
@@ -323,7 +323,7 @@ impl World {
                 point,
                 player,
                 walks,
-                drops_here: quarry.as_ref().is_some_and(|q| q.drop_site),
+                drops_here: quarry.as_ref().is_some_and(|quarry| quarry.drop_site),
                 my_pasture,
                 gap,
             },
@@ -462,7 +462,7 @@ impl World {
             .mover_mut(unit.id)
             .ok_or(GenieError::unsupported("a gatherer without movement state"))?;
         let mut held = unit.life.held();
-        let rng = self.streams.get(Stream::Action);
+        let rng = self.streams.get_mut(Stream::Action);
         gather.start(
             GatherStart {
                 target: &resource,
@@ -518,7 +518,7 @@ impl World {
             Some(target),
             point,
             notifies,
-            self.streams.get(Stream::Ai),
+            self.streams.get_mut(Stream::Ai),
         )?;
         self.remember_order(
             player,

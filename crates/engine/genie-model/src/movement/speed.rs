@@ -52,9 +52,9 @@ impl Speed {
 impl Mul<f32> for Speed {
     type Output = Self;
 
-    /// The speed scaled by `f` (one `f32` product, the speed first).
-    fn mul(self, f: f32) -> Self {
-        Self(self.0 * f)
+    /// The speed scaled by `factor` (one `f32` product, the speed first).
+    fn mul(self, factor: f32) -> Self {
+        Self(self.0 * factor)
     }
 }
 
@@ -68,19 +68,19 @@ impl Mul<Speed> for f32 {
 }
 
 impl MulAssign<f32> for Speed {
-    /// The speed scaled by `f` in place (one `f32` product: a master's speed times a
+    /// The speed scaled by `factor` in place (one `f32` product: a master's speed times a
     /// technology's factor).
-    fn mul_assign(&mut self, f: f32) {
-        self.0 *= f;
+    fn mul_assign(&mut self, factor: f32) {
+        self.0 *= factor;
     }
 }
 
 impl Div<f32> for Speed {
     type Output = Self;
 
-    /// The speed divided by `f` (one `f32` quotient).
-    fn div(self, f: f32) -> Self {
-        Self(self.0 / f)
+    /// The speed divided by `divisor` (one `f32` quotient).
+    fn div(self, divisor: f32) -> Self {
+        Self(self.0 / divisor)
     }
 }
 
@@ -126,18 +126,18 @@ mod tests {
     /// Each operator is the one `f32` operation, bit for bit and in its operand order.
     #[test]
     fn speeds_do_the_game_f32_operations() {
-        let (a, b) = (Speed::new(0.1), Speed::new(0.2));
-        assert_eq!((a + b).get().to_bits(), (0.1_f32 + 0.2).to_bits());
-        assert_eq!((a - b).get().to_bits(), (0.1_f32 - 0.2).to_bits());
-        assert_eq!((-a).get().to_bits(), (-0.1_f32).to_bits());
-        assert_eq!((a * 3.0).get().to_bits(), (0.1_f32 * 3.0).to_bits());
-        assert_eq!((3.0 * a).get().to_bits(), (3.0_f32 * 0.1).to_bits());
-        assert_eq!((a / 3.0).get().to_bits(), (0.1_f32 / 3.0).to_bits());
-        assert_eq!((b / a).to_bits(), (0.2_f32 / 0.1).to_bits());
+        let (first, second) = (Speed::new(0.1), Speed::new(0.2));
+        assert_eq!((first + second).get().to_bits(), (0.1_f32 + 0.2).to_bits());
+        assert_eq!((first - second).get().to_bits(), (0.1_f32 - 0.2).to_bits());
+        assert_eq!((-first).get().to_bits(), (-0.1_f32).to_bits());
+        assert_eq!((first * 3.0).get().to_bits(), (0.1_f32 * 3.0).to_bits());
+        assert_eq!((3.0 * first).get().to_bits(), (3.0_f32 * 0.1).to_bits());
+        assert_eq!((first / 3.0).get().to_bits(), (0.1_f32 / 3.0).to_bits());
+        assert_eq!((second / first).to_bits(), (0.2_f32 / 0.1).to_bits());
         let mut speed = Speed::new(1.1);
         speed *= 1.15;
         assert_eq!(speed.get().to_bits(), (1.1_f32 * 1.15).to_bits());
-        assert!(Speed::ZERO < a && a <= a && a < Speed::MAX);
+        assert!(Speed::ZERO < first && first <= first && first < Speed::MAX);
         assert_eq!(Speed::new(f32::NAN).partial_cmp(&Speed::ZERO), None);
         assert_eq!(Speed::new(0.5).to_string(), "0.5");
     }

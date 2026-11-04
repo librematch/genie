@@ -10,7 +10,7 @@ use crate::map::Tile;
 use crate::map::spatial::{Placed, RecordId, Spatial};
 use crate::math::conversions::cvttss2si_64;
 use crate::movement::LevelFlags;
-use crate::movement::Levels;
+use crate::movement::LevelsExt;
 use crate::movement::LinkedPathKind;
 use crate::movement::PathFlags;
 use crate::movement::PathState;
@@ -39,7 +39,7 @@ use crate::world::index::ObjectsRef;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::generated::MovementTuning;
 use crate::world::layer::generated::TilePathTuning;
-use crate::world::slots::CheckedIndex;
+use crate::world::slots::CheckedIndexExt;
 use crate::{GenieError, GenieResult, pathing::short_path};
 
 impl Mover {
@@ -140,13 +140,13 @@ impl Mover {
         }
         let mut count = path.points.len() as i32 - 1;
         while 0 < count {
-            let (a, b) = (
+            let (from, to) = (
                 *path.points.checked(count as usize)?,
                 *path.points.checked(count as usize - 1)?,
             );
-            let mut d = a - b;
-            d = d.with_height(0.0);
-            if movement_tuning.split < d.x() * d.x() + 0.0 + d.y() * d.y() {
+            let mut offset = from - to;
+            offset = offset.with_height(0.0);
+            if movement_tuning.split < offset.x() * offset.x() + 0.0 + offset.y() * offset.y() {
                 split(&mut path, count - 1);
             }
             count -= 1;
@@ -213,7 +213,7 @@ impl Mover {
         }
         // the query runs for a unit that does not move (slot 0x5c8); a hit counts only with a
         // target and the unit's action in state 8
-        if let Some((target_id, t)) = target
+        if let Some((target_id, target_placed)) = target
             && !self.is_moving()
             && me.action_state.get() == 8
         {
@@ -222,15 +222,15 @@ impl Mover {
             let (x, y) = (self.moved_at.x(), self.moved_at.y());
             let rect = Rect::new(x, y, x, y);
             world.check_known_records(rect.grown(Distance::new(grow)))?;
-            let owner = world.get(me.id).map(|p| p.player);
-            let r = self.stats.radius.x();
+            let owner = world.get(me.id).map(|placed| placed.player);
+            let radius = self.stats.radius.x();
             let skip = [RecordId::from(me.id), RecordId::from(target_id)];
             for id in world.obstruction_candidates(rect, Distance::new(grow), &skip) {
                 let Some(placed) = world.get(id) else {
                     continue;
                 };
                 let gait = by_id.gait(id);
-                if gait.is_some_and(|g| g.moving) {
+                if gait.is_some_and(|gait| gait.moving) {
                     continue;
                 }
                 // a worker whose path is this update's walks: it is passed
@@ -260,16 +260,20 @@ impl Mover {
                 }
                 // FUN_140fa0110 runs for each such hit: its temporary shapes leave the mesh's
                 // free list reversed each time, so it is not run once for all
-                if !self.start_blocked(world, plan, t, line)? {
+                if !self.start_blocked(world, plan, target_placed, line)? {
                     continue;
                 }
                 let allied = owner.is_some_and(|player_id| {
                     let relations = world.relations.get(placed.player).unwrap_or(&NO_RELATIONS);
                     task_finder_allied(relations, placed.player, player_id, AllyTest::WithRelation4)
                 });
-                let gap =
-                    footprint_gap_squared(placed.position, placed.radius, t.position, t.radius);
-                if !allied || gap <= DistanceSquared::new(r * r) {
+                let gap = footprint_gap_squared(
+                    placed.position,
+                    placed.radius,
+                    target_placed.position,
+                    target_placed.radius,
+                );
+                if !allied || gap <= DistanceSquared::new(radius * radius) {
                     continue;
                 }
                 list.push(id);
@@ -289,7 +293,7 @@ impl Mover {
         (from, to): (Point, Point),
     ) -> GenieResult<bool> {
         // CVTTSS2SI into a 64-bit register, its low 32 bits kept
-        let fixed = |f: f32| cvttss2si_64(f * short_path::TO_FIXED) as i32;
+        let fixed = |value: f32| cvttss2si_64(value * short_path::TO_FIXED) as i32;
         let query = short_path::Query {
             from: FixedPoint::new(fixed(from.x()), fixed(from.y())),
             to: FixedPoint::new(fixed(to.x()), fixed(to.y())),
@@ -505,9 +509,9 @@ impl Mover {
 /// the unit's movement state, place, walker and master, the path planners and the world's objects;
 /// the spatial index comes with each test, which writes its scratch.
 #[derive(Debug)]
-pub struct UnitReach<'a, 'p> {
+pub struct UnitReach<'world, 'plan> {
     /// The unit's movement state.
-    pub(crate) mover: &'a Mover,
+    pub(crate) mover: &'world Mover,
     /// Its place.
     pub(crate) at: Position,
     /// What its walk reads of it.
@@ -515,9 +519,9 @@ pub struct UnitReach<'a, 'p> {
     /// Its master.
     pub(crate) master: MasterId,
     /// The path planners and the walk's reads beside them.
-    pub(crate) plan: &'a mut Planning<'p>,
+    pub(crate) plan: &'world mut Planning<'plan>,
     /// The world's objects by id.
-    pub(crate) objects: ObjectsRef<'a>,
+    pub(crate) objects: ObjectsRef<'world>,
 }
 
 impl UnitReach<'_, '_> {

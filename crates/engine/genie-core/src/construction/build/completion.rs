@@ -22,7 +22,7 @@ use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 use crate::world::layer::Slots;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 use crate::{GenieError, GenieResult};
 use genie_model::model::Model;
 
@@ -54,8 +54,8 @@ impl World {
         if self.attribute_204() {
             return Err(REVEAL_UNITS);
         }
-        let (player_id, u) = self.object(id).ok_or(NOT_HELD)?;
-        let master = u.master(self.master_tables(), player_id)?.clone();
+        let (player_id, held) = self.object(id).ok_or(NOT_HELD)?;
+        let master = held.master(self.master_tables(), player_id)?.clone();
         let building = master.building.ok_or(GenieError::unsupported(
             "a completion of a master that is no building",
         ))?;
@@ -63,7 +63,7 @@ impl World {
         // FUN_1411e5670 while still in state 0 (2 lies within 1 to 6)
         if self
             .object(id)
-            .is_some_and(|(_, u)| u.life.state == ObjectState::Foundation)
+            .is_some_and(|(_, unit)| unit.life.state == ObjectState::Foundation)
         {
             self.construction_starts(player_id, id)?;
         }
@@ -171,7 +171,7 @@ impl World {
             master,
             parts.building.of(id).build_frame,
             graphics,
-            streams.get(Stream::Sprite),
+            streams.get_mut(Stream::Sprite),
             self.model.tuning.sprite,
         );
         Ok(())

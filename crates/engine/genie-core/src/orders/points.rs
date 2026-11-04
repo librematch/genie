@@ -48,15 +48,15 @@ impl Spread {
 
     /// A value: below the least so far it moves only the least, else above the greatest the
     /// greatest; the sum takes it either way.
-    fn take(&mut self, v: f32) {
-        if self.least <= v {
-            if self.most < v {
-                self.most = v;
+    fn take(&mut self, value: f32) {
+        if self.least <= value {
+            if self.most < value {
+                self.most = value;
             }
         } else {
-            self.least = v;
+            self.least = value;
         }
-        self.sum += v;
+        self.sum += value;
     }
 }
 
@@ -85,13 +85,13 @@ pub(super) fn offset_point(
 
 /// An order's point on one axis kept on a map of `size` tiles: below 0 it becomes `OrderTuning::edge`, at
 /// the size or beyond the size less `OrderTuning::edge`.
-pub(super) fn inside_map(v: f32, size: i32, order_tuning: &OrderTuning) -> f32 {
-    if v < 0.0 {
+pub(super) fn inside_map(coordinate: f32, size: i32, order_tuning: &OrderTuning) -> f32 {
+    if coordinate < 0.0 {
         order_tuning.edge
-    } else if size as f32 <= v {
+    } else if size as f32 <= coordinate {
         size as f32 - order_tuning.edge
     } else {
-        v
+        coordinate
     }
 }
 
@@ -144,31 +144,32 @@ pub(super) fn follow_spread(points: &[Point], order_tuning: &OrderTuning) -> Opt
 /// A FOLLOW offset's coordinate on a map of `size` tiles (`FUN_14161c920`): above the size less
 /// `GroupTuning::short_length` (at least 0, `MAXSS`) it is that (`COMISS`, `JA`), below 0 it is 0, else itself
 /// (a NaN too).
-pub(super) fn follow_axis(v: f32, size: i32, group_tuning: &GroupTuning) -> f32 {
+pub(super) fn follow_axis(coordinate: f32, size: i32, group_tuning: &GroupTuning) -> f32 {
     let most = maxss(size as f32 - group_tuning.short_length, 0.0);
-    if v > most {
+    if coordinate > most {
         most
-    } else if 0.0 > v {
+    } else if 0.0 > coordinate {
         0.0
     } else {
-        v
+        coordinate
     }
 }
 
-/// The cell of the `i`th of `n` units in MOVE's grid (`FUN_140e67800`): `side` cells a row, the
-/// root of `n` times `OrderTuning::grid_area` truncated; the unit's column and row, less half the side, a
-/// `OrderTuning::grid_step` each from the order's point, kept on the map ([`inside_map`]).
+/// The cell of the `index`th of `count` units in MOVE's grid (`FUN_140e67800`): `side` cells a row,
+/// the root of `count` times `OrderTuning::grid_area` truncated; the unit's column and row, less
+/// half the side, a `OrderTuning::grid_step` each from the order's point, kept on the map
+/// ([`inside_map`]).
 pub(super) fn grid_point(
-    i: usize,
-    n: usize,
+    unit_index: usize,
+    count: usize,
     point: Point,
     map: GridSize,
     order_tuning: &OrderTuning,
 ) -> Point {
-    let side = sqrt(n as i32 as f32 * order_tuning.grid_area) as i32;
-    let (i, half) = (i as i32, side / 2);
-    let x = (i % side - half) as f32 * order_tuning.grid_step + point.x();
-    let y = (i / side - half) as f32 * order_tuning.grid_step + point.y();
+    let side = sqrt(count as i32 as f32 * order_tuning.grid_area) as i32;
+    let (index, half) = (unit_index as i32, side / 2);
+    let x = (index % side - half) as f32 * order_tuning.grid_step + point.x();
+    let y = (index / side - half) as f32 * order_tuning.grid_step + point.y();
     Point::new(
         inside_map(x, map.width(), order_tuning),
         inside_map(y, map.height(), order_tuning),

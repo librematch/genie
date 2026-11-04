@@ -138,36 +138,46 @@ impl Attack {
     pub(super) fn ready_to_attack(
         &mut self,
         unit: &mut Unit,
-        g: &mut Ground<'_>,
+        ground_view: &mut Ground<'_>,
         fight: &Fight,
         attack_reads: &AttackReads,
         at_once: AtOnce,
     ) -> GenieResult<Readiness> {
-        let move_to_tuning = &g.by_id.tuning().move_to;
-        let sprite_tuning = g.by_id.tuning().sprite;
-        let roles = g.by_id.roles();
-        let attack_tuning = &g.by_id.tuning().attack;
-        let (target, placed) = self.held_target(g.map)?;
-        let speed = g.motion.mover().ok_or(ATTACKER_UNMOVING)?.stats.speed;
-        if target_unseen(g.map, fight, &placed)? {
+        let move_to_tuning = &ground_view.by_id.tuning().move_to;
+        let sprite_tuning = ground_view.by_id.tuning().sprite;
+        let roles = ground_view.by_id.roles();
+        let attack_tuning = &ground_view.by_id.tuning().attack;
+        let (target, placed) = self.held_target(ground_view.map)?;
+        let speed = ground_view
+            .motion
+            .mover()
+            .ok_or(ATTACKER_UNMOVING)?
+            .stats
+            .speed;
+        if target_unseen(ground_view.map, fight, &placed)? {
             if attack_reads.stance == UnitStance::Aggressive
                 && Speed::ZERO < speed
                 && attack_reads.flags.contains(AttackerFlags::CAN_MOVE)
             {
                 self.wait_at_seen(
                     unit,
-                    g.motion.reborrow(),
+                    ground_view.motion.reborrow(),
                     fight,
                     attack_reads,
-                    g.graphics,
+                    ground_view.graphics,
                     move_to_tuning,
                 )?;
                 return Ok(Readiness::Waiting);
             }
-            return self.fail(unit, g.motion.reborrow(), g.sprite_rng, sprite_tuning);
+            return self.fail(
+                unit,
+                ground_view.motion.reborrow(),
+                ground_view.sprite_rng,
+                sprite_tuning,
+            );
         }
         let at = unit.place.position();
-        let ground = g
+        let ground = ground_view
             .motion
             .mover()
             .map(|mover| mover.stats.radius.ground())
@@ -187,8 +197,11 @@ impl Attack {
             )
         {
             return self.face(
-                (at, g.motion.mover_mut()),
-                (placed.position, g.by_id.combat_of(unit.id).attack_timer),
+                (at, ground_view.motion.mover_mut()),
+                (
+                    placed.position,
+                    ground_view.by_id.combat_of(unit.id).attack_timer,
+                ),
                 fight,
                 attack_reads,
                 roles,
@@ -196,40 +209,53 @@ impl Attack {
         }
         if gap < self.min_range {
             if self.voice.is_loud() {
-                g.post(unit, NotifyKind::TOO_CLOSE, [-1; 3])?;
+                ground_view.post(unit, NotifyKind::TOO_CLOSE, [-1; 3])?;
             }
             if speed != Speed::ZERO && attack_reads.flags.contains(AttackerFlags::CAN_MOVE) {
                 return Ok(Readiness::Waiting);
             }
-            return self.fail(unit, g.motion.reborrow(), g.sprite_rng, sprite_tuning);
+            return self.fail(
+                unit,
+                ground_view.motion.reborrow(),
+                ground_view.sprite_rng,
+                sprite_tuning,
+            );
         }
         // a gate's reach is to the nearest of it and its first two parts (slot 0x680, MINSS)
         let gap = gate_gap(
-            g.map,
+            ground_view.map,
             (at, ground),
             (target, &placed),
             gap,
             |distance| distance,
-            g.by_id,
+            ground_view.by_id,
             roles,
         );
         if self.reach() < gap {
             if self.voice.is_loud() {
-                g.post(unit, NotifyKind::OUT_OF_REACH, [0; 3])?;
+                ground_view.post(unit, NotifyKind::OUT_OF_REACH, [0; 3])?;
             }
             if (attack_reads.stance == UnitStance::Defensive
                 && self.off_leash(placed.position, attack_reads.state_position, attack_tuning))
                 || speed == Speed::ZERO
                 || !attack_reads.flags.contains(AttackerFlags::CAN_MOVE)
             {
-                return self.fail(unit, g.motion.reborrow(), g.sprite_rng, sprite_tuning);
+                return self.fail(
+                    unit,
+                    ground_view.motion.reborrow(),
+                    ground_view.sprite_rng,
+                    sprite_tuning,
+                );
             }
             return Ok(Readiness::Away(gap));
         }
         self.point = placed.position;
         self.face(
-            (at, g.motion.mover_mut()),
-            (placed.position, g.by_id.combat_of(unit.id).attack_timer),
+            (at, ground_view.motion.mover_mut()),
+            (
+                placed.position,
+                ground_view.by_id.combat_of(unit.id).attack_timer,
+            ),
             fight,
             attack_reads,
             roles,
@@ -265,7 +291,7 @@ impl Attack {
             to.z() - position.z(),
         ]
         .iter()
-        .any(|d| below_or_unordered(HALF, d.abs()));
+        .any(|offset| below_or_unordered(HALF, offset.abs()));
         !moved || (!far && (moves_or_volleys || in_range(near, self.range, self.min_range)))
     }
 

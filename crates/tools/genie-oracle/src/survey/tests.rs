@@ -14,8 +14,8 @@ use genie_core::combat::AttackCount;
 use genie_core::objects::layers::Combat;
 use genie_core::world::parts::ObjectParts;
 
-fn every(n: usize) -> NonZeroUsize {
-    NonZeroUsize::new(n).unwrap()
+fn every(count: usize) -> NonZeroUsize {
+    NonZeroUsize::new(count).unwrap()
 }
 
 /// A field's path without its indices and keys, nested ones too.
@@ -37,7 +37,7 @@ fn survey_counts_each_field_over_the_window_saves() {
         &quiet,
         &(0..5).map(|_| Op::Sync { dt: 50 }).collect::<Vec<_>>(),
     );
-    let mut games = |u: usize| (u != 4).then(|| recording(&game, &[]));
+    let mut games = |update: usize| (update != 4).then(|| recording(&game, &[]));
     let survey =
         header_survey(&rec, None, &[1], (2, 5), every(1), Scope::Saved, &mut games).unwrap();
     assert_eq!(survey.saves, 3);

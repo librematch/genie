@@ -13,7 +13,7 @@ use crate::players::tracker::ListKey;
 use crate::unit_ai::task_finder::allied;
 use crate::world::World;
 use crate::world::layer::MasterRoles;
-use crate::world::slots::{CheckedIndex, PlayerSlots};
+use crate::world::slots::{CheckedIndexExt, PlayerSlotsExt};
 
 impl World {
     /// `FUN_14160ffb0`: player `player_id` has a castle (0x52; 0xd1 with the loaded world's content
@@ -71,18 +71,18 @@ impl World {
             .attributes
             .checked_mut(self.model.slots.attribute.gold.index())? = gold - Amount::new(cost);
         let count = self.players.len();
-        for i in PlayerId::each(count).skip(1) {
+        for other in PlayerId::each(count).skip(1) {
             if allied(
                 &self.players.player(buyer)?.relations,
                 buyer,
-                i,
+                other,
                 AllyTest::AlliesOnly,
             ) {
                 continue;
             }
             let Some(king) = self
                 .players
-                .player(i)?
+                .player(other)?
                 .objects
                 .iter()
                 // The king (`0x1b2`), whom the treason reveals.
@@ -145,22 +145,22 @@ mod tests {
 
     /// Gaia and three players; player 1 holds 500 gold and is allied with 3.
     fn world() -> World {
-        let player = |p: usize| Player {
+        let player = |own: usize| Player {
             attributes: vec![Amount::ZERO; 300],
-            relations: relation_row(
-                (0..4).map(|q| u8::from(!(q == p || (p, q) == (1, 3) || (p, q) == (3, 1))) * 3),
-            ),
+            relations: relation_row((0..4).map(|other| {
+                u8::from(!(other == own || (own, other) == (1, 3) || (own, other) == (3, 1))) * 3
+            })),
             ..Player::default()
         };
-        let mut t = World::new(
+        let mut world = World::new(
             WorldTime::ZERO,
             FrameSeed::of_data(1),
             PlayerId::new(0),
             vec![Millis::ZERO; 4],
             (0..4).map(player).collect(),
         );
-        t.players[1].attributes[attribute::GOLD.index()] = Amount::new(500.0);
-        t
+        world.players[1].attributes[attribute::GOLD.index()] = Amount::new(500.0);
+        world
     }
 
     /// Without the regicide rule, or with too little gold, nothing happens.
@@ -233,43 +233,43 @@ mod tests {
     /// allied player's king (3's) gives none.
     #[test]
     fn treason_flares_the_kings_for_the_player_and_its_allies() {
-        let mut t = world();
-        t.settings.game_mode = GameMode::of_data(1);
-        with_flares(&mut t);
-        t.next_object_id = object_id(100);
-        t.players[2].objects = vec![
+        let mut game = world();
+        game.settings.game_mode = GameMode::of_data(1);
+        with_flares(&mut game);
+        game.next_object_id = object_id(100);
+        game.players[2].objects = vec![
             king(20, Position::new(5.0, 6.0, 0.0), None),
             king(21, Position::new(9.0, 9.0, 0.0), None),
         ]
         .into();
-        t.players[3].objects = vec![king(30, Position::new(1.0, 1.0, 0.0), None)].into();
-        t.reindex();
-        t.treason(PlayerId::new(1)).unwrap();
-        let flares = |t: &World, p: usize| -> Vec<(i32, Position)> {
-            t.players[p]
+        game.players[3].objects = vec![king(30, Position::new(1.0, 1.0, 0.0), None)].into();
+        game.reindex();
+        game.treason(PlayerId::new(1)).unwrap();
+        let flares = |world: &World, player: usize| -> Vec<(i32, Position)> {
+            world.players[player]
                 .objects
                 .iter()
-                .filter(|u| u.life.master_id == ids::FLARE_4)
+                .filter(|unit| unit.life.master_id == ids::FLARE_4)
                 .map(|unit| (unit.id.get(), unit.position()))
                 .collect()
         };
-        assert_eq!(flares(&t, 1), [(100, Position::new(5.0, 6.0, 0.0))]);
-        assert_eq!(flares(&t, 3), [(101, Position::new(5.0, 6.0, 0.0))]);
-        assert_eq!(flares(&t, 2), []);
+        assert_eq!(flares(&game, 1), [(100, Position::new(5.0, 6.0, 0.0))]);
+        assert_eq!(flares(&game, 3), [(101, Position::new(5.0, 6.0, 0.0))]);
+        assert_eq!(flares(&game, 2), []);
         // a king inside a building: the flares go to the building's place
-        let mut t = world();
-        t.settings.game_mode = GameMode::of_data(1);
-        with_flares(&mut t);
+        let mut world = world();
+        world.settings.game_mode = GameMode::of_data(1);
+        with_flares(&mut world);
         let mut castle = king(40, Position::new(12.0, 13.0, 0.0), None);
         castle.life.master_id = CASTLE;
-        t.players[2].objects = vec![
+        world.players[2].objects = vec![
             king(20, Position::new(5.0, 6.0, 0.0), Some(object_id(40))),
             castle,
         ]
         .into();
-        t.reindex();
-        t.treason(PlayerId::new(1)).unwrap();
-        assert_eq!(flares(&t, 1)[0].1, Position::new(12.0, 13.0, 0.0));
+        world.reindex();
+        world.treason(PlayerId::new(1)).unwrap();
+        assert_eq!(flares(&world, 1)[0].1, Position::new(12.0, 13.0, 0.0));
     }
 
     /// The castle test asks the player's masters and its tracker.

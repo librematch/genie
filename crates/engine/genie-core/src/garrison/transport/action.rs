@@ -42,7 +42,7 @@ use crate::world::layer::generated::SpriteTuning;
 use crate::world::layer::generated::TransportTuning;
 use crate::world::layer::generated::Tuning;
 use crate::world::parts::PartTable;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 use crate::world::step::Step;
 use crate::{GenieError, GenieResult};
 use genie_model::model::Model;
@@ -261,7 +261,7 @@ impl TransportAction {
         transport_reads: &TransportReads,
     ) -> GenieResult<UpdateCode> {
         let walked = self.walk(step, unit, me)?;
-        let player_kind = step.w.players.player(step.player)?.kind;
+        let player_kind = step.world.players.player(step.player)?.kind;
         let World {
             spatial,
             zones,
@@ -272,7 +272,7 @@ impl TransportAction {
                 graphics, tuning, ..
             },
             ..
-        } = &mut *step.w;
+        } = &mut *step.world;
         let sprites = SpriteReads {
             defaults: transport_reads.defaults,
             graphics,
@@ -293,7 +293,7 @@ impl TransportAction {
             ship.position,
             &tuning.tile_path,
         )?;
-        let look = (transport_reads.standing, streams.get(Stream::Sprite));
+        let look = (transport_reads.standing, streams.get_mut(Stream::Sprite));
         let id = unit.id;
         let posts = (&mut *unit, parts.motion.layer_mut(id), &mut parts.unit_ai);
         match self.state_update(
@@ -472,7 +472,7 @@ impl TransportAction {
                     .action_part()
                     .tasks
                     .iter()
-                    .find(|t| t.id == id)
+                    .find(|task| task.id == id)
                     .ok_or_else(|| {
                         GenieError::missing_data("a Transport's task its master lacks")
                             .with("task", id.get())
@@ -512,10 +512,10 @@ impl TransportAction {
         let walks = start || state == MoveTo::Moving;
         let ask = if start {
             UnitAi::path_ask(
-                step.w.parts.unit_ai.get_mut(unit.id),
+                step.world.parts.unit_ai.get_mut(unit.id),
                 unit.place.position().ground(),
                 self.point.ground(),
-                &step.w.model.tuning.unit_ai,
+                &step.world.model.tuning.unit_ai,
             )
         } else {
             PathAsk::default()
@@ -531,8 +531,8 @@ impl TransportAction {
         };
         if walks {
             unit.post_in_the_way(
-                step.w.parts.motion.mover_mut(unit.id),
-                &mut step.w.parts.unit_ai,
+                step.world.parts.motion.mover_mut(unit.id),
+                &mut step.world.parts.unit_ai,
             )?;
         }
         Ok(code)
@@ -556,11 +556,11 @@ impl TransportAction {
     ) -> GenieResult<bool> {
         let (ux, uy) = (ship.position.x(), ship.position.y());
         let (rx, ry) = (ship.radius.x(), ship.radius.y());
-        let (w, h) = (ship.map.width(), ship.map.height());
+        let (width, height) = (ship.map.width(), ship.map.height());
         let x0 = cvttss2si((ux - rx) - transport_tuning.shore_margin).max(0);
         let y0 = cvttss2si((uy - ry) - transport_tuning.shore_margin).max(0);
-        let x1 = cvttss2si((ux + rx) + transport_tuning.shore_margin).min(w - 1);
-        let y1 = cvttss2si((uy + ry) + transport_tuning.shore_margin).min(h - 1);
+        let x1 = cvttss2si((ux + rx) + transport_tuning.shore_margin).min(width - 1);
+        let y1 = cvttss2si((uy + ry) + transport_tuning.shore_margin).min(height - 1);
         let (x, _y) = (self.point.x(), self.point.y());
         let zone = if x == NONE {
             None
@@ -599,9 +599,9 @@ pub(crate) fn stand(
     sprite_tuning: SpriteTuning,
 ) -> GenieResult<()> {
     if changed.stopped
-        && let Some(m) = motion.mover_mut()
+        && let Some(mover) = motion.mover_mut()
     {
-        m.stop()?;
+        mover.stop()?;
     }
     if !changed.stands {
         return Ok(());
@@ -624,7 +624,7 @@ pub(crate) fn stand(
     Ok(())
 }
 
-impl<'a> Ship<'a> {
+impl<'graphics> Ship<'graphics> {
     /// What the Transport on `task` reads of `unit` with its mover of `master` on a map of `map`
     /// tiles, with the sprites' table and the unit's terrain look (`graphics`, [`Ship::of`]).
     ///
@@ -635,7 +635,7 @@ impl<'a> Ship<'a> {
         (unit, mover): (&Unit, Option<&Mover>),
         master: &Master,
         map: GridSize,
-        graphics: (&'a Graphics, Option<&Look>),
+        graphics: (&'graphics Graphics, Option<&Look>),
         task: Option<TaskId>,
         roles: &Roles,
     ) -> GenieResult<Self> {
@@ -651,7 +651,7 @@ impl<'a> Ship<'a> {
         unit: &Unit,
         radius: Footprint,
         map: GridSize,
-        walk: MoveToReads<'a>,
+        walk: MoveToReads<'graphics>,
         given: Option<SpriteId>,
     ) -> Self {
         Self {

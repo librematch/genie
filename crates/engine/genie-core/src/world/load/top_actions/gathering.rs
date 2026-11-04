@@ -130,7 +130,7 @@ pub fn import_hunt(
 fn hunt_attack(saved: &Saved<'_>, sub: &Action) -> GenieResult<Attack> {
     let mut attack = saved_attack(sub, saved.graphics)?;
     if attack.state == AttackState::Swing && !attack.pending {
-        let reload = saved_reload(saved.object, saved.s, saved.objects).ok_or(
+        let reload = saved_reload(saved.object, saved.static_part, saved.objects).ok_or(
             GenieError::unsupported("a saved swing without its unit's reload"),
         )?;
         let graphic = attack.arms.sprite.ok_or(GenieError::unsupported(

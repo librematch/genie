@@ -5,7 +5,7 @@ use crate::combat::damage::{
     Armored, Attacker, Building, EPSILON, ONE, Razed, Victim, charge_hit, damage, effective,
     elevation_factor, facing_offset, hp_floor, lose, special_charge_ready,
 };
-use crate::world::slots::CheckedIndex;
+use crate::world::slots::CheckedIndexExt;
 use crate::{GenieError, GenieResult};
 
 /// One kill or razing, as the counts add it to an attribute.
@@ -35,9 +35,9 @@ use std::mem::replace;
 /// One hit as a building takes it ([`take_building`]): the attacker's weapons, the factor they
 /// take and the blast damage the target took already.
 #[derive(Clone, Copy, Debug)]
-pub(super) struct Strike<'a> {
+pub(super) struct Strike<'world> {
     /// The attacker's attacks by armour class.
-    weapons: &'a [ClassAmount],
+    weapons: &'world [ClassAmount],
     /// The factor its attacks take.
     factor: f32,
     /// The blast damage the target took already.
@@ -190,7 +190,7 @@ pub(super) enum HitRoute {
 /// / `JC` past) to its effects ([`attack_effects`]). [`BuildingHit::Past`] when the hit got past
 /// the hit point test.
 pub(super) fn take_building(
-    t: &mut Victim,
+    target: &mut Victim,
     src: &mut Victim,
     others: &mut [&mut Victim],
     strike: Strike<'_>,
@@ -207,20 +207,20 @@ pub(super) fn take_building(
         factor,
         blast_taken,
     } = strike;
-    let before = t.hp;
-    let main = t.building.as_ref().and_then(|b| b.main);
+    let before = target.hp;
+    let main = target.building.as_ref().and_then(|building| building.main);
     if route == HitRoute::Dealt
         && let Some(main) = main
     {
-        forward_to_main(t, src, others, strike, main, layer)?;
+        forward_to_main(target, src, others, strike, main, layer)?;
         return Ok(BuildingHit::Stopped);
     }
-    if HitPoints::ZERO >= t.hp {
+    if HitPoints::ZERO >= target.hp {
         return Ok(BuildingHit::Stopped);
     }
-    damage(t, src, weapons, factor, blast_taken, roles)?;
+    damage(target, src, weapons, factor, blast_taken, roles)?;
     // the kill of its damage ran slot 0x8b0, which counts it (+0x954)
-    let counted = t.killed.is_some();
+    let counted = target.killed.is_some();
     if blast_taken == HitPoints::ZERO {
         let least = if src.source.mode_680.is_one()
             && roles
@@ -231,15 +231,15 @@ pub(super) fn take_building(
         } else {
             ONE
         };
-        if least > (before - t.hp).get() {
-            lose(t, HitPoints::new(least));
+        if least > (before - target.hp).get() {
+            lose(target, HitPoints::new(least));
         }
     }
-    let building = t.building.get_or_insert_with(Building::default);
-    if t.player != PlayerId::GAIA && ONE > t.hp.get() {
-        let (ap, player_id) = (src.player, t.player);
+    let building = target.building.get_or_insert_with(Building::default);
+    if target.player != PlayerId::GAIA && ONE > target.hp.get() {
+        let (ap, player_id) = (src.player, target.player);
         let event = {
-            let held = roles.of_master(t.master_id);
+            let held = roles.of_master(target.master_id);
             if held.contains(MasterRoles::CASTLE) {
                 Some(EventKind::CastleDestroyed)
             } else if held.contains(MasterRoles::WONDER) {
@@ -249,7 +249,7 @@ pub(super) fn take_building(
             }
         };
         let mut adds = Vec::new();
-        if building.main.is_none() && !roles.of_class(t.class).contains(ClassRoles::WALL) {
+        if building.main.is_none() && !roles.of_class(target.class).contains(ClassRoles::WALL) {
             let cost = building.cost;
             if !building.trebuchet {
                 adds.extend(razing_counts((ap, player_id), cost, slots)?);
@@ -272,15 +272,17 @@ pub(super) fn take_building(
     building.damaged_lately = DamagedTimer::HIT;
     building.struck = true;
     let annexes = building.annexes.clone();
-    for a in others
+    for victim in others
         .iter_mut()
         .filter(|victim| annexes.contains(&victim.id))
     {
-        a.hp = t.hp;
+        victim.hp = target.hp;
     }
-    if route == HitRoute::Dealt && MasterKind::RGE_COMBAT <= src.kind && t.hp >= HitPoints::new(ONE)
+    if route == HitRoute::Dealt
+        && MasterKind::RGE_COMBAT <= src.kind
+        && target.hp >= HitPoints::new(ONE)
     {
-        attack_effects(&src.source, t)?;
+        attack_effects(&src.source, target)?;
     }
     Ok(BuildingHit::Past)
 }
@@ -295,32 +297,35 @@ pub(super) enum BuildingHit {
     Stopped,
 }
 
-/// [`take_building`]'s forward of an annex `t`'s hit to its main building `main` among
+/// [`take_building`]'s forward of an annex `target`'s hit to its main building `main` among
 /// `others` (out of the slice while it takes the hit, not forwarded again): the annex takes the
 /// main building's hit points when the hit got past its test and the main building lists it.
 /// Its caller answers [`BuildingHit::Stopped`].
 fn forward_to_main(
-    t: &mut Victim,
+    target: &mut Victim,
     src: &mut Victim,
     others: &mut [&mut Victim],
     strike: Strike<'_>,
     main: MainBuildingId,
     layer: HitLayer<'_>,
 ) -> GenieResult<()> {
-    let k = others
+    let main_index = others
         .iter()
-        .position(|v| v.id == main.id())
+        .position(|victim| victim.id == main.id())
         .ok_or(NOT_HELD)?;
-    let mut victim = replace(&mut **others.checked_mut(k)?, Victim::placeholder());
+    let mut victim = replace(
+        &mut **others.checked_mut(main_index)?,
+        Victim::placeholder(),
+    );
     let struck = take_building(&mut victim, src, others, strike, HitRoute::Forwarded, layer);
     let annexed = victim
         .building
         .as_ref()
-        .is_some_and(|building| building.annexes.contains(&t.id));
+        .is_some_and(|building| building.annexes.contains(&target.id));
     if matches!(struck, Ok(BuildingHit::Past)) && annexed {
-        t.hp = victim.hp;
+        target.hp = victim.hp;
     }
-    **others.checked_mut(k)? = victim;
+    **others.checked_mut(main_index)? = victim;
     struck.map(|_| ())
 }
 

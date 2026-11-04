@@ -255,10 +255,10 @@ pub const SIEGE_TOWER_CARED: [ClassId; 2] = classes([27, 39]);
 /// cared list, the fishing ship's foundations).
 pub(crate) const fn classes<const N: usize>(values: [i16; N]) -> [ClassId; N] {
     let mut out = [ClassId::of_master(-1); N];
-    let mut i = 0;
-    while i < N {
-        out[i] = ClassId::named(values[i]);
-        i += 1;
+    let mut index = 0;
+    while index < N {
+        out[index] = ClassId::named(values[index]);
+        index += 1;
     }
     out
 }

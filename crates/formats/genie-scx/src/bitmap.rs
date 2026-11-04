@@ -42,11 +42,16 @@ impl BitmapInfo {
         };
 
         for _ in 0..256 {
-            let r = input.read_u8()?;
-            let g = input.read_u8()?;
-            let b = input.read_u8()?;
-            let a = input.read_u8()?;
-            bitmap.colors.push(RGBA8 { r, g, b, a });
+            let red = input.read_u8()?;
+            let green = input.read_u8()?;
+            let blue = input.read_u8()?;
+            let alpha = input.read_u8()?;
+            bitmap.colors.push(RGBA8 {
+                r: red,
+                g: green,
+                b: blue,
+                a: alpha,
+            });
         }
 
         Ok(bitmap)
@@ -164,8 +169,8 @@ mod tests {
             bytes.extend(word.to_le_bytes());
         }
         bytes.extend(1u16.to_le_bytes());
-        bytes.extend((0..40u8).map(|b| b.wrapping_mul(7)));
-        bytes.extend((0..1024u32).map(|i| u8::try_from(i % 251).unwrap()));
+        bytes.extend((0..40u8).map(|byte| byte.wrapping_mul(7)));
+        bytes.extend((0..1024u32).map(|index| u8::try_from(index % 251).unwrap()));
         bytes.extend([9u8; 12]);
         let bitmap = Bitmap::read_from(bytes.as_slice()).unwrap().unwrap();
         assert_eq!(bitmap.info.colors.len(), 256);

@@ -57,14 +57,14 @@ impl Unit {
         }
         if action.result != StrikeResult::Shielded {
             let blaster = if !charge && action.fired_from.is_some() {
-                OthersRef::of(&step.w.players, &step.w.index, step.player)?
+                OthersRef::of(&step.world.players, &step.world.index, step.player)?
                     .own(action.fired_from)
                     .map(|unit| unit.life.master_id)
             } else {
                 Some(self.life.master_id)
             };
             let area = blaster
-                .and_then(|id| player_master(&step.w.model.masters, step.player, id))
+                .and_then(|id| player_master(&step.world.model.masters, step.player, id))
                 .map(|master| master.combat_part().area_effect)
                 .ok_or(GenieError::unsupported(
                     "a landed missile's blast of a master the slice does not have",
@@ -154,18 +154,23 @@ impl Unit {
             self.life.hp = HitPoints::ZERO;
             self.life.goto_sleep = false;
             self.life.state = ObjectState::Removed;
-            step.w.spatial.sight_state(
+            step.world.spatial.sight_state(
                 self.id,
                 ObjectState::Removed,
-                &step.w.model.roles,
-                step.w.model.tuning.visibility,
+                &step.world.model.roles,
+                step.world.model.tuning.visibility,
             )?;
             if before < ObjectState::DyingSprite {
                 let master = self.master(
-                    MasterTables::new(&step.w.model.masters, &step.w.parts.own_master),
+                    MasterTables::new(&step.world.model.masters, &step.world.parts.own_master),
                     step.player,
                 )?;
-                forget_resource(&mut step.w.spatial, Some(master), self.id, self.position())?;
+                forget_resource(
+                    &mut step.world.spatial,
+                    Some(master),
+                    self.id,
+                    self.position(),
+                )?;
             }
         }
         Ok(())

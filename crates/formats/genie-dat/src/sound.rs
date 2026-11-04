@@ -10,8 +10,8 @@ use std::io::{Read, Write};
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct SoundId(u16);
 impl From<u16> for SoundId {
-    fn from(n: u16) -> Self {
-        Self(n)
+    fn from(number: u16) -> Self {
+        Self(number)
     }
 }
 

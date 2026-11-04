@@ -13,7 +13,7 @@ use crate::technology::effect::attribute_modifier::EffectHook;
 use crate::world::AllySharing;
 use crate::world::World;
 use crate::world::layer::AttributeRoles;
-use crate::world::slots::{CheckedIndex, PlayerSlots};
+use crate::world::slots::{CheckedIndexExt, PlayerSlotsExt};
 use crate::{GenieError, GenieResult};
 
 impl World {
@@ -39,16 +39,16 @@ impl World {
         self.all_garrison_volleys(player_id, EffectHook::After)
     }
 
-    /// Slot 0x1b8 (`FUN_141620e30`) of player `player_id` on resource `attribute` by `v`: as
-    /// [`World::modify_resource`], the attribute set to its value times `v` (`FUN_1416614c0`).
+    /// Slot 0x1b8 (`FUN_141620e30`) of player `player_id` on resource `attribute` by `factor`: as
+    /// [`World::modify_resource`], the attribute set to its value times `factor` (`FUN_1416614c0`).
     pub(super) fn multiply_resource(
         &mut self,
         player_id: PlayerId,
         attribute: AttributeId,
-        v: f32,
+        factor: f32,
     ) -> GenieResult<()> {
         self.all_garrison_volleys(player_id, EffectHook::Before)?;
-        let value = self.attribute_of(player_id, attribute) * v;
+        let value = self.attribute_of(player_id, attribute) * factor;
         self.set_player_attribute(player_id, attribute, value)?;
         self.all_garrison_volleys(player_id, EffectHook::After)
     }
@@ -65,7 +65,7 @@ impl World {
             .player(player_id)?
             .objects
             .iter()
-            .map(|u| u.id)
+            .map(|unit| unit.id)
             .collect();
         for id in ids {
             let kind = self
@@ -98,29 +98,30 @@ impl World {
         Ok(())
     }
 
-    /// Slot 0xf0 (`FUN_14162d610`) of player `p`: attribute `attribute` takes `amount`
+    /// Slot 0xf0 (`FUN_14162d610`) of player `player`: attribute `attribute` takes `amount`
     /// ([`World::store_attribute`]), with its side effects: 0x32 turns the allied vision on first
     /// ([`World::allied_vision_on`]); 0xc4 changes nothing for a player above 0 and spreads to the
     /// others at most 0 ([`AttributeRoles::SPREAD_ATTRIBUTE`]); 0xb7 rebuilds the masks after; 0x21
     /// above 0 calls the scripts' `EffectFunction<amount>` (the XS runtime is not modelled).
     pub(crate) fn set_player_attribute(
         &mut self,
-        p: PlayerId,
+        player: PlayerId,
         attribute: AttributeId,
         amount: Amount,
     ) -> GenieResult<()> {
         {
             let held = self.model.roles.of_attribute(attribute);
             if held.contains(AttributeRoles::ALLIED_VISION) {
-                self.allied_vision_on(p)?;
+                self.allied_vision_on(player)?;
             } else if held.contains(AttributeRoles::SPREAD_ATTRIBUTE) {
-                if Amount::ZERO < self.attribute_of(p, self.model.slots.attribute.spread_attribute)
+                if Amount::ZERO
+                    < self.attribute_of(player, self.model.slots.attribute.spread_attribute)
                 {
                     return Ok(());
                 }
                 // the message to the players is the interface's
                 for player_id in PlayerId::each(self.players.len()).skip(1) {
-                    if player_id != p
+                    if player_id != player
                         && self.attribute_of(player_id, self.model.slots.attribute.spread_attribute)
                             <= Amount::ZERO
                     {
@@ -137,7 +138,7 @@ impl World {
                 ));
             }
         }
-        self.store_attribute(p, attribute, amount)?;
+        self.store_attribute(player, attribute, amount)?;
         if self
             .model
             .roles
@@ -150,31 +151,32 @@ impl World {
         Ok(())
     }
 
-    /// Slot 0xf8 (`FUN_141616820`) of player `p` with no statistics (`param_4` 0): `amount` adds to
-    /// attribute `attribute` ([`crate::world::Player::add_attribute`]), with the side effects of
-    /// 0x32 (the allied vision on first), 0xb7 (the masks rebuilt first, with the old value) and
-    /// 0xc4 (nothing for a player above 0; the others at most 0 add it too).
+    /// Slot 0xf8 (`FUN_141616820`) of player `player` with no statistics (`param_4` 0): `amount`
+    /// adds to attribute `attribute` ([`crate::world::Player::add_attribute`]), with the side
+    /// effects of 0x32 (the allied vision on first), 0xb7 (the masks rebuilt first, with the old
+    /// value) and 0xc4 (nothing for a player above 0; the others at most 0 add it too).
     pub(crate) fn add_player_attribute(
         &mut self,
-        p: PlayerId,
+        player: PlayerId,
         attribute: AttributeId,
         amount: Amount,
     ) -> GenieResult<()> {
         {
             let held = self.model.roles.of_attribute(attribute);
             if held.contains(AttributeRoles::ALLIED_VISION) {
-                self.allied_vision_on(p)?;
+                self.allied_vision_on(player)?;
             } else if held.contains(AttributeRoles::SHARED_VISION) {
                 self.rebuild_vision()?;
             } else if held.contains(AttributeRoles::SPREAD_ATTRIBUTE) {
-                if Amount::ZERO < self.attribute_of(p, self.model.slots.attribute.spread_attribute)
+                if Amount::ZERO
+                    < self.attribute_of(player, self.model.slots.attribute.spread_attribute)
                 {
                     return Ok(());
                 }
                 for player_id in PlayerId::each(self.players.len()).skip(1) {
                     let theirs =
                         self.attribute_of(player_id, self.model.slots.attribute.spread_attribute);
-                    if player_id != p && theirs <= Amount::ZERO {
+                    if player_id != player && theirs <= Amount::ZERO {
                         self.store_attribute(
                             player_id,
                             self.model.slots.attribute.spread_attribute,
@@ -183,12 +185,15 @@ impl World {
                     }
                 }
             } else {
-                return self.players.player_mut(p)?.add_attribute(attribute, amount);
+                return self
+                    .players
+                    .player_mut(player)?
+                    .add_attribute(attribute, amount);
             }
         }
         // FUN_14165d040's store of the sum
-        let sum = amount + self.attribute_of(p, attribute);
-        self.store_attribute(p, attribute, sum)?;
+        let sum = amount + self.attribute_of(player, attribute);
+        self.store_attribute(player, attribute, sum)?;
         Ok(())
     }
 
@@ -210,8 +215,8 @@ impl World {
     /// files under the farm masters (`DAT_142f925d0`'s keys: the build's `farm`, `rice_farm`,
     /// `pasture` and `pasture_mangrove`, 50, 1187, 1897 and 1893; their done objects, in that
     /// order, [`World::tracked_key`]) from type 40 on with an action (its Make) has the food still
-    /// to make (`+0x44`) grow: with `held` its food (`+0x310`) and `f = held + still to make`, it
-    /// takes `(f / before)^exponent × amount + f − held` (`powf`, here libm's).
+    /// to make (`+0x44`) grow: with `held` its food (`+0x310`) and `food = held + still to make`,
+    /// it takes `(food / before)^exponent × amount + food − held` (`powf`, here libm's).
     pub(super) fn farm_food(
         &mut self,
         owner: PlayerId,
@@ -245,9 +250,9 @@ impl World {
             let Some(make) = self.parts.actions_mut(id)?.list.make_mut() else {
                 continue;
             };
-            let f = (held + make.remaining).get();
-            let grown = libm::powf(f / before, exponent);
-            make.remaining = Amount::new((grown * amount + f) - held.get());
+            let food = (held + make.remaining).get();
+            let grown = libm::powf(food / before, exponent);
+            make.remaining = Amount::new((grown * amount + food) - held.get());
         }
         Ok(())
     }

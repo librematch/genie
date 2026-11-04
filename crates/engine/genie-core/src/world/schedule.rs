@@ -132,11 +132,11 @@ impl UpdateStep {
 }
 
 /// What an update's steps hand on to its later steps.
-struct UpdateRun<'a> {
+struct UpdateRun<'commands> {
     /// The update's game milliseconds.
     dt: Millis,
     /// The commands recorded in the update.
-    commands: &'a [Command],
+    commands: &'commands [Command],
     /// Which players' gates are open (`BaseWorld::update`'s flags), from `OpenGates` to
     /// `CloseGates`.
     gates_open: Vec<bool>,
@@ -186,13 +186,14 @@ impl World {
             observe(self, UpdateStep::World(step));
         }
         for player in self.player_ids() {
-            let p = player;
+            let player_id = player;
             let _player =
-                tracing::debug_span!(target: UPDATE, "player", player = p.index()).entered();
+                tracing::debug_span!(target: UPDATE, "player", player = player_id.index())
+                    .entered();
             for step in EACH_PLAYER {
                 let _step = tracing::trace_span!(target: UPDATE, "step", step = %step).entered();
-                if let Err(e) = self.player_step(step, &mut run, p) {
-                    self.stop_player(p, e);
+                if let Err(error) = self.player_step(step, &mut run, player_id) {
+                    self.stop_player(player_id, error);
                 }
                 observe(self, UpdateStep::Player(step, player));
             }
@@ -246,15 +247,15 @@ impl World {
             }
             WorldStep::Draw => {
                 self.grow_unknown(run.dt.seconds());
-                run.seed = self.streams.get(Stream::World).rand15();
+                run.seed = self.streams.get_mut(Stream::World).rand15();
             }
             // every player's ghosts (FUN_141166550 on +0x40), then every player's watched list
             // (FUN_1410905e0); the objects' visibility masks (FUN_14107d280 on +0x80, before the
             // draw) are the registry's, kept as the objects update
             WorldStep::Ghosts => {
-                for p in PlayerId::each(self.players.len()) {
-                    if let Err(e) = self.update_ghosts(p) {
-                        self.stop_player(p, e);
+                for player_id in PlayerId::each(self.players.len()) {
+                    if let Err(error) = self.update_ghosts(player_id) {
+                        self.stop_player(player_id, error);
                     }
                 }
             }
@@ -273,7 +274,7 @@ impl World {
             }
             WorldStep::Victory => self.victory_check()?,
             WorldStep::FrameSeed => {
-                self.frame_seed = FrameSeed::of_data(self.streams.get(Stream::World).rand15());
+                self.frame_seed = FrameSeed::of_data(self.streams.get_mut(Stream::World).rand15());
             }
             // setLastRandoms (0x140d3ce20): the multiplayer sync's draws
             WorldStep::LastRandoms => {
@@ -350,14 +351,14 @@ mod tests {
         AFTER_PLAYERS, BEFORE_PLAYERS, EACH_PLAYER, PlayerStep, UpdateStep, WorldStep,
     };
 
-    /// A world of `n` players without objects, its turn at player 1.
-    fn bare(n: usize) -> World {
+    /// A world of `count` players without objects, its turn at player 1.
+    fn bare(count: usize) -> World {
         World::new(
             WorldTime::ZERO,
             FrameSeed::of_data(29910),
             PlayerId::new(1),
-            vec![Millis::ZERO; n],
-            vec![Player::default(); n],
+            vec![Millis::ZERO; count],
+            vec![Player::default(); count],
         )
     }
 
@@ -447,7 +448,7 @@ mod tests {
             }
             _ => {}
         });
-        let ms = |v: [u32; 3]| v.map(Millis::new).to_vec();
+        let ms = |values: [u32; 3]| values.map(Millis::new).to_vec();
         assert_eq!(clocks, [ms([10, 0, 0]), ms([10, 10, 0]), ms([10, 10, 10])]);
         // player 1's turn ends: its time starts over and the turn passes to player 2
         assert_eq!(turns, [(PlayerId::new(2), ms([10, 0, 10]))]);
@@ -456,10 +457,10 @@ mod tests {
     /// An observed update leaves the world as the update without an observer does.
     #[test]
     fn an_observed_update_is_the_update() {
-        let (mut a, mut b) = (bare(3), bare(3));
-        a.tick(Millis::new(10));
-        b.tick_observed(Millis::new(10), &[], &mut |_, _| {});
-        assert_eq!(a, b);
+        let (mut plain, mut observed) = (bare(3), bare(3));
+        plain.tick(Millis::new(10));
+        observed.tick_observed(Millis::new(10), &[], &mut |_, _| {});
+        assert_eq!(plain, observed);
     }
 
     /// A step's name is its variant's, for the harness's game points and the traces.

@@ -10,7 +10,7 @@ use crate::map::Distance;
 use crate::objects::ObjectId;
 use crate::unit_ai::UnitStance;
 use crate::world::World;
-use crate::world::slots::CheckedIndex;
+use crate::world::slots::CheckedIndexExt;
 
 impl World {
     /// `CalcFormationType` (`FUN_14100b940`): the members' unit AIs' formation types (`+0x1d4`,
@@ -52,8 +52,8 @@ impl World {
         if 3 <= best {
             return self.lock_formation(group, FormationKind::of_vote(best));
         }
-        if let Some(g) = self.groups.get_mut(group) {
-            g.formation_locked_kind = Some(FormationKind::Horde);
+        if let Some(group) = self.groups.get_mut(group) {
+            group.formation_locked_kind = Some(FormationKind::Horde);
         }
         self.update_desired_positions(group, None)?;
         self.stances_state(group, FormationKind::Horde)?;
@@ -90,9 +90,9 @@ impl World {
             if spacing != Distance::ZERO {
                 break;
             }
-            if let Some((player_id, u)) = self.object(member.id) {
+            if let Some((player_id, held)) = self.object(member.id) {
                 let unit = FormationUnit::of(
-                    u.master(self.master_tables(), player_id)?,
+                    held.master(self.master_tables(), player_id)?,
                     &self.model.tuning.group,
                 );
                 let distance = unit.radius * self.model.tuning.group.spacing_factor;
@@ -123,11 +123,11 @@ impl World {
         group: GroupId,
         formation_kind: FormationKind,
     ) -> GenieResult<()> {
-        let Some(g) = self.groups.get(group) else {
+        let Some(unit_group) = self.groups.get(group) else {
             return Ok(());
         };
-        let ids: Vec<ObjectId> = g.members.iter().map(|member| member.id).collect();
-        let mut n = [0i32; 4];
+        let ids: Vec<ObjectId> = unit_group.members.iter().map(|member| member.id).collect();
+        let mut stances = [0i32; 4];
         for &id in &ids {
             if let Some(at) = self
                 .parts
@@ -135,20 +135,22 @@ impl World {
                 .get(id)
                 .and_then(|ai| ai.stance.counted())
             {
-                *n.checked_mut(at)? += 1;
+                *stances.checked_mut(at)? += 1;
             }
         }
-        let stance = if ids.is_empty() || (n[1] <= n[0] && n[2] <= n[0] && n[3] <= n[0]) {
+        let stance = if ids.is_empty()
+            || (stances[1] <= stances[0] && stances[2] <= stances[0] && stances[3] <= stances[0])
+        {
             UnitStance::Aggressive
-        } else if n[2] <= n[1] && n[3] <= n[1] {
+        } else if stances[2] <= stances[1] && stances[3] <= stances[1] {
             UnitStance::Defensive
-        } else if n[3] <= n[2] {
+        } else if stances[3] <= stances[2] {
             UnitStance::StandGround
         } else {
             UnitStance::NoAttack
         };
-        if let Some(g) = self.groups.get_mut(group) {
-            g.stance = Some(stance);
+        if let Some(group) = self.groups.get_mut(group) {
+            group.stance = Some(stance);
         }
         // FUN_1415417a0 finds sleeping members too
         for &id in &ids {

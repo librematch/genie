@@ -190,22 +190,22 @@ impl TryFrom<u8> for TargetMoved {
 /// moves, its movement state), who it is, and the world; the planners and the world's time for
 /// a path request (None where the caller has none).
 #[derive(Debug)]
-pub struct Walk<'a> {
+pub struct Walk<'world> {
     /// The unit's place, its row's static layer.
-    pub(crate) place: &'a mut Static,
+    pub(crate) place: &'world mut Static,
     /// The unit's animated and moving layers, lent out of the world's table for the walk (none
     /// for a static object).
-    pub(crate) motion: Option<&'a mut layers::Motion>,
+    pub(crate) motion: Option<&'world mut layers::Motion>,
     /// The unit.
     pub(crate) me: Me,
     /// The world's dt in seconds.
     pub(crate) dt: Seconds,
     /// The objects' places; the motion step moves the unit onto a waypoint it reached.
-    pub(crate) world: &'a mut Spatial,
+    pub(crate) world: &'world mut Spatial,
     /// The planners and the world's time for a path request, None where the caller has none.
-    pub(crate) plan: Option<Planning<'a>>,
+    pub(crate) plan: Option<Planning<'world>>,
     /// The objects by id: what the walk reads of the units it meets ([`ObjectsRef::gait`]).
-    pub(crate) by_id: ObjectsRef<'a>,
+    pub(crate) by_id: ObjectsRef<'world>,
 }
 
 impl Walk<'_> {
@@ -361,18 +361,23 @@ pub fn graphic_of(graphics: &Graphics, id: Option<SpriteId>) -> GenieResult<Opti
 /// What a `MoveTo`'s constructor reads for its sprite (`+0x58`) when its maker gives none: the
 /// defaults of the unit's master and terrain look, and the sprites' table that holds them.
 #[derive(Clone, Copy, Debug)]
-pub struct SpriteReads<'a> {
+pub struct SpriteReads<'graphics> {
     /// The constructors' defaults ([`MoveDefaults::of`]).
     pub(crate) defaults: MoveDefaults,
     /// The sprites' table.
-    pub(crate) graphics: &'a Graphics,
+    pub(crate) graphics: &'graphics Graphics,
 }
 
-impl<'a> SpriteReads<'a> {
+impl<'graphics> SpriteReads<'graphics> {
     /// The defaults of a unit of `master` with the terrain look `look` ([`MoveDefaults::of`]),
     /// and the sprites' table.
     #[must_use]
-    pub fn of(master: &Master, look: Option<&Look>, graphics: &'a Graphics, roles: &Roles) -> Self {
+    pub fn of(
+        master: &Master,
+        look: Option<&Look>,
+        graphics: &'graphics Graphics,
+        roles: &Roles,
+    ) -> Self {
         Self {
             defaults: MoveDefaults::of(master, look, roles),
             graphics,
@@ -401,13 +406,13 @@ impl<'a> SpriteReads<'a> {
 /// The unit's sprite, the Sprite stream and the sprites' table: an action that holds its
 /// `MoveTo`'s sprite as an id shows it through them ([`Sprites::shown`]).
 #[derive(Debug)]
-pub struct Sprites<'a> {
+pub struct Sprites<'world> {
     /// The unit's sprite.
-    pub(crate) sprite: &'a mut Option<ActiveSprite>,
+    pub(crate) sprite: &'world mut Option<ActiveSprite>,
     /// The Sprite stream.
-    pub(crate) rng: &'a mut Well512,
+    pub(crate) rng: &'world mut Well512,
     /// The sprites' table.
-    pub(crate) graphics: &'a Graphics,
+    pub(crate) graphics: &'world Graphics,
 }
 
 impl Sprites<'_> {
@@ -429,11 +434,11 @@ impl Sprites<'_> {
 /// The unit's sprite, the Sprite stream and the sprite a walk shows: a `MoveTo` that turns to
 /// state 4 shows its sprite (`0x140aa29e0`, slot 0x68 with `+0x58`).
 #[derive(Debug)]
-pub struct Shown<'a> {
+pub struct Shown<'world> {
     /// The unit's sprite.
-    pub(crate) sprite: &'a mut Option<ActiveSprite>,
+    pub(crate) sprite: &'world mut Option<ActiveSprite>,
     /// The Sprite stream.
-    pub(crate) rng: &'a mut Well512,
+    pub(crate) rng: &'world mut Well512,
     /// The `MoveTo`'s sprite.
     pub(crate) graphic: Option<Graphic>,
 }
@@ -551,17 +556,17 @@ pub fn target_left(
     let mover = walk.mover().ok_or(WALKER_UNMOVING)?;
     if mover.walks_to_path_end()? {
         let me = walk.position();
-        let (a, b) = (me.ground(), at.ground());
+        let (from, to) = (me.ground(), at.ground());
         let grow = walk.world.manager_grow();
         walk.world.check_known_records(Rect::new(
-            a.x().min(b.x()) - grow.get(),
-            a.y().min(b.y()) - grow.get(),
-            a.x().max(b.x()) + grow.get(),
-            a.y().max(b.y()) + grow.get(),
+            from.x().min(to.x()) - grow.get(),
+            from.y().min(to.y()) - grow.get(),
+            from.x().max(to.x()) + grow.get(),
+            from.y().max(to.y()) + grow.get(),
         ))?;
         if !walk
             .world
-            .segment_blocked(a, b, grow, mover.stats.restriction_mask)
+            .segment_blocked(from, to, grow, mover.stats.restriction_mask)
         {
             return Ok(Follow::PathEnd(at));
         }
@@ -604,7 +609,7 @@ mod tests {
     fn sub_move_to_starts_moves_waits_and_reports_its_code() {
         use crate::movement::tests::WalkRig;
         let mut rig = WalkRig::on_the_path();
-        let mut m = MoveToAction {
+        let mut move_to = MoveToAction {
             point: Position::new(30.0, 88.0, 0.0),
             target: Some(object_id(10028)),
             range: Distance::new(0.1),
@@ -632,37 +637,40 @@ mod tests {
                 &mut inbox,
             )
         };
-        assert_eq!(update(&mut m), Ok(SubCode::UnderWay));
+        assert_eq!(update(&mut move_to), Ok(SubCode::UnderWay));
         assert_eq!(
-            (m.state, m.wait.state),
+            (move_to.state, move_to.wait.state),
             (MoveTo::Moving, MoveWaitState::AskedAgain)
         );
-        assert_eq!(update(&mut m), Ok(SubCode::UnderWay));
-        assert_eq!(m.state, MoveTo::Moving);
+        assert_eq!(update(&mut move_to), Ok(SubCode::UnderWay));
+        assert_eq!(move_to.state, MoveTo::Moving);
         // the walk is a tenth of a second: the wait of 0.15 asks again on its second update
-        m.state = MoveTo::Waiting;
-        m.wait = MoveWait {
+        move_to.state = MoveTo::Waiting;
+        move_to.wait = MoveWait {
             state: MoveWaitState::Waiting,
             timer: Seconds::ZERO,
             delay: Seconds::new(0.15),
         };
-        assert_eq!(update(&mut m), Ok(SubCode::UnderWay));
+        assert_eq!(update(&mut move_to), Ok(SubCode::UnderWay));
         assert_eq!(
-            (m.state, m.wait.timer),
+            (move_to.state, move_to.wait.timer),
             (MoveTo::Waiting, Seconds::new(0.1))
         );
-        assert_eq!(update(&mut m), Ok(SubCode::UnderWay));
-        assert_eq!((m.state, m.wait.timer), (MoveTo::Start, Seconds::ZERO));
-        m.wait.timer = Seconds::new(f32::NAN);
-        m.state = MoveTo::Waiting;
-        assert_eq!(update(&mut m), Ok(SubCode::UnderWay));
-        assert_eq!(m.state, MoveTo::Waiting);
+        assert_eq!(update(&mut move_to), Ok(SubCode::UnderWay));
+        assert_eq!(
+            (move_to.state, move_to.wait.timer),
+            (MoveTo::Start, Seconds::ZERO)
+        );
+        move_to.wait.timer = Seconds::new(f32::NAN);
+        move_to.state = MoveTo::Waiting;
+        assert_eq!(update(&mut move_to), Ok(SubCode::UnderWay));
+        assert_eq!(move_to.state, MoveTo::Waiting);
         for (state, code) in [
             (MoveTo::Arrived, SubCode::Done),
             (MoveTo::Failed, SubCode::Failed),
         ] {
-            m.state = state;
-            assert_eq!(update(&mut m), Ok(code));
+            move_to.state = state;
+            assert_eq!(update(&mut move_to), Ok(code));
         }
         let mut lost = MoveToAction {
             target: Some(object_id(4242)),
@@ -824,7 +832,7 @@ mod tests {
     #[test]
     fn move_to_lets_dying_target_go_and_walks_on_from_one_the_world_lost() {
         let checked = |voice: Voice, target: i32, state: Option<ObjectState>| {
-            let mut m = MoveToAction {
+            let mut move_to_action = MoveToAction {
                 target: ObjectId::of_field(target),
                 voice,
                 ..MoveToAction::sub_in(MoveTo::Moving)
@@ -835,14 +843,14 @@ mod tests {
                 ..UnitAi::default()
             });
             let mut inbox = Inbox::of(&mut ai, object_id(9177), ObjectState::Alive);
-            let code = m.check_held(state, &mut inbox).unwrap();
+            let code = move_to_action.check_held(state, &mut inbox).unwrap();
             let posted: Vec<(NotifyKind, [i32; 3])> = ai.map_or(vec![], |ai| {
                 ai.notifies
                     .iter()
-                    .map(|notify| (notify.kind, notify.p))
+                    .map(|notify| (notify.kind, notify.params))
                     .collect()
             });
-            (code, ObjectId::field(m.target), posted)
+            (code, ObjectId::field(move_to_action.target), posted)
         };
         assert_eq!(
             checked(Voice::Quiet, -1, Some(ObjectState::Gone)),
@@ -931,7 +939,7 @@ mod tests {
             let posted: Vec<(NotifyKind, [i32; 3])> = ai.map_or(vec![], |ai| {
                 ai.notifies
                     .iter()
-                    .map(|notify| (notify.kind, notify.p))
+                    .map(|notify| (notify.kind, notify.params))
                     .collect()
             });
             (code, posted)
@@ -965,10 +973,12 @@ mod tests {
     /// farther it starts with speed (a NaN speed too) and fails without; one to a point is far.
     #[test]
     fn an_added_sub_move_to_arrives_starts_or_fails_and_dying_unit_adds_none() {
-        let m = MoveToAction::sub_to_point(Position::new(1.0, 2.0, 0.0), Distance::new(0.5), None);
+        let move_to =
+            MoveToAction::sub_to_point(Position::new(1.0, 2.0, 0.0), Distance::new(0.5), None);
         let state = |unit_state, gap, speed| {
-            m.added(unit_state, gap, speed, &tuning().move_to)
-                .map(|a| a.state)
+            move_to
+                .added(unit_state, gap, speed, &tuning().move_to)
+                .map(|move_to_action| move_to_action.state)
         };
         assert_eq!(
             state(ObjectState::Alive, Distance::new(0.01), Speed::ZERO),
@@ -1022,7 +1032,7 @@ mod tests {
             state(ObjectState::Removed, Distance::new(0.5), Speed::new(1.0)),
             None
         );
-        let added = m.added(
+        let added = move_to.added(
             ObjectState::Alive,
             Distance::new(0.5),
             Speed::new(1.0),
@@ -1034,7 +1044,7 @@ mod tests {
                 move_to_action.range,
                 move_to_action.voice
             )),
-            Some((m.point, Distance::new(0.5), Voice::Quiet))
+            Some((move_to.point, Distance::new(0.5), Voice::Quiet))
         );
     }
 

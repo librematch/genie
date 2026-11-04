@@ -6,9 +6,9 @@ use crate::world::layer::generated::VisibilityTuning;
 /// What a sight change reads of the build layer (FD-046-D45, D49): the roles (the capture kinds
 /// and the classes a sight tests) and the visibility's tuning values.
 #[derive(Clone, Copy, Debug)]
-pub struct SightLayer<'a> {
+pub struct SightLayer<'model> {
     /// The build's roles.
-    pub(crate) roles: &'a Roles,
+    pub(crate) roles: &'model Roles,
     /// The visibility's tuning values.
     pub(crate) visibility_tuning: VisibilityTuning,
 }

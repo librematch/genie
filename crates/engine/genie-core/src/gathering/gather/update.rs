@@ -71,9 +71,9 @@ impl GatherAction {
     /// The unit's stop that the motion step does not model.
     pub fn tear_down(&mut self, mover: Option<&mut Mover>) -> GenieResult<()> {
         if self.state.take_move_to().is_some()
-            && let Some(m) = mover
+            && let Some(mover) = mover
         {
-            m.stop()?;
+            mover.stop()?;
         }
         Ok(())
     }
@@ -217,17 +217,24 @@ impl GatherAction {
         }
         self.timer = Seconds::ZERO;
         let walks = gather_reads.walks(
-            &step.w.model.graphics,
-            (unit, step.w.parts.mover_of(unit.id)),
+            &step.world.model.graphics,
+            (unit, step.world.parts.mover_of(unit.id)),
         );
-        let mover = step.w.parts.mover_mut(unit.id).ok_or(UNMOVING)?;
+        let mover = step.world.parts.mover_mut(unit.id).ok_or(UNMOVING)?;
         if self.stops.several() {
-            let rng = step.w.streams.get(Stream::Action);
+            let rng = step.world.streams.get_mut(Stream::Action);
             let to = self.walk_to(target, Distance::ZERO);
-            self.set_walk(to, target.radius, mover, rng, &walks, &step.w.model.tuning)?;
+            self.set_walk(
+                to,
+                target.radius,
+                mover,
+                rng,
+                &walks,
+                &step.world.model.tuning,
+            )?;
         } else {
             let radius = if step
-                .w
+                .world
                 .model
                 .roles
                 .of_master(target.master_id)
@@ -241,7 +248,7 @@ impl GatherAction {
                 Distance::new(radius),
                 mover,
                 &walks,
-                &step.w.model.tuning.move_to,
+                &step.world.model.tuning.move_to,
             )?;
         }
         Ok(Next::Stay)
@@ -277,8 +284,8 @@ impl GatherAction {
             }
         }
         let at = unit.place.position();
-        let mover = step.w.parts.mover_mut(unit.id).ok_or(UNMOVING)?;
-        if face_target(mover, at, target.position, step.w.world_time)? == Aim::Turning {
+        let mover = step.world.parts.mover_mut(unit.id).ok_or(UNMOVING)?;
+        if face_target(mover, at, target.position, step.world.world_time)? == Aim::Turning {
             return Ok(Next::Stay);
         }
         if Amount::ZERO < target.amount
@@ -316,13 +323,20 @@ impl GatherAction {
                     self.current_stop = self.current_stop.next();
                 }
                 let walks = gather_reads.walks(
-                    &step.w.model.graphics,
-                    (unit, step.w.parts.mover_of(unit.id)),
+                    &step.world.model.graphics,
+                    (unit, step.world.parts.mover_of(unit.id)),
                 );
-                let mover = step.w.parts.mover_mut(unit.id).ok_or(UNMOVING)?;
-                let rng = step.w.streams.get(Stream::Action);
+                let mover = step.world.parts.mover_mut(unit.id).ok_or(UNMOVING)?;
+                let rng = step.world.streams.get_mut(Stream::Action);
                 let to = self.walk_to(target, Distance::ZERO);
-                self.set_walk(to, target.radius, mover, rng, &walks, &step.w.model.tuning)?;
+                self.set_walk(
+                    to,
+                    target.radius,
+                    mover,
+                    rng,
+                    &walks,
+                    &step.world.model.tuning,
+                )?;
                 return Ok(Next::Stay);
             }
         }
@@ -347,18 +361,18 @@ impl GatherAction {
         match self.update_list(step, unit, me, gather_reads, roles)? {
             SubCode::UnderWay => Ok(Next::Stay),
             SubCode::Done => {
-                self.tear_down(step.w.parts.mover_mut(unit.id))?;
+                self.tear_down(step.world.parts.mover_mut(unit.id))?;
                 self.set_face(step, unit, target, gather_reads, roles)
             }
             // code 3: near a target with more than 3 workers it searches (set_state 3), else it
             // waits a random while (LAB_140a8ef80)
             SubCode::Failed => {
-                let mover = step.w.parts.mover_of(unit.id).ok_or(UNMOVING)?;
+                let mover = step.world.parts.mover_of(unit.id).ok_or(UNMOVING)?;
                 let me = mover.stats.radius.ground();
                 let at = unit.place.position();
                 let gap = footprint_gap_squared(at, me, target.position, target.radius);
-                if target.workers.as_f32() <= step.w.model.tuning.gather.wait_workers
-                    || step.w.model.tuning.gather.wait_gap <= gap.get()
+                if target.workers.as_f32() <= step.world.model.tuning.gather.wait_workers
+                    || step.world.model.tuning.gather.wait_gap <= gap.get()
                 {
                     self.random_wait(step, unit);
                     return Ok(Next::Stay);
@@ -370,11 +384,16 @@ impl GatherAction {
             SubCode::TargetGone => {
                 self.target = None;
                 let walks = gather_reads.walks(
-                    &step.w.model.graphics,
-                    (unit, step.w.parts.mover_of(unit.id)),
+                    &step.world.model.graphics,
+                    (unit, step.world.parts.mover_of(unit.id)),
                 );
-                let mover = step.w.parts.mover_mut(unit.id).ok_or(UNMOVING)?;
-                self.set_walk_back(Distance::ZERO, mover, &walks, &step.w.model.tuning.move_to)?;
+                let mover = step.world.parts.mover_mut(unit.id).ok_or(UNMOVING)?;
+                self.set_walk_back(
+                    Distance::ZERO,
+                    mover,
+                    &walks,
+                    &step.world.model.tuning.move_to,
+                )?;
                 Ok(Next::Stay)
             }
         }
@@ -429,8 +448,8 @@ impl GatherAction {
         };
         if matches!(state, Some(MoveTo::Start | MoveTo::Moving)) {
             unit.post_in_the_way(
-                step.w.parts.motion.mover_mut(unit.id),
-                &mut step.w.parts.unit_ai,
+                step.world.parts.motion.mover_mut(unit.id),
+                &mut step.world.parts.unit_ai,
             )?;
         }
         Ok(code)

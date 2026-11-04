@@ -469,7 +469,10 @@ mod tests {
     /// entries come, so the read fails at the file's end, not on its allocation.
     #[test]
     fn random_map_lists_past_the_file_fail_at_its_end() {
-        let mut head: Vec<u8> = [0i32; 10].iter().flat_map(|w| w.to_le_bytes()).collect();
+        let mut head: Vec<u8> = [0i32; 10]
+            .iter()
+            .flat_map(|word| word.to_le_bytes())
+            .collect();
         for count in [u32::MAX, 0, 0, 0, 0, 0, 0, 0] {
             head.extend(count.to_le_bytes());
         }
@@ -484,7 +487,7 @@ mod tests {
     fn map_elevation_writes_back_its_six_words() {
         let bytes: Vec<u8> = [30i32, 2, 5, 3, -1, 0]
             .iter()
-            .flat_map(|w| w.to_le_bytes())
+            .flat_map(|word| word.to_le_bytes())
             .collect();
         let elevation = RandomMapElevation::read_from(&mut bytes.as_slice()).unwrap();
         assert_eq!(

@@ -96,8 +96,9 @@ pub fn saved_world(
     let (mut techs, tech_error) = match header
         .players()
         .iter()
-        .map(|p| {
-            p.world_player()
+        .map(|player_section| {
+            player_section
+                .world_player()
                 .tech_tree
                 .tech_player_tree
                 .iter()
@@ -107,7 +108,7 @@ pub fn saved_world(
         .collect::<Result<Vec<_>, _>>()
     {
         Ok(techs) => (techs, None),
-        Err(e) => (Vec::new(), Some(e)),
+        Err(error) => (Vec::new(), Some(error)),
     };
     // each object's parts, for the world's tables once its lists stand
     let mut parts: Vec<(ObjectId, ObjectParts)> = Vec::new();
@@ -115,15 +116,15 @@ pub fn saved_world(
         .players()
         .iter()
         .enumerate()
-        .map(|(i, p)| {
-            let civ = CivId::new(p.world_player().base.civ_id);
-            let attributes = &p.world_player().base.attributes;
+        .map(|(index, player_section)| {
+            let civ = CivId::new(player_section.world_player().base.civ_id);
+            let attributes = &player_section.world_player().base.attributes;
             let mut rows = |saved: &mut dyn Iterator<Item = &genie_save::Object>| -> Vec<Unit> {
                 saved
-                    .map(|o| {
+                    .map(|saved| {
                         let whole = object(
-                            o,
-                            p.objects(),
+                            saved,
+                            player_section.objects(),
                             &header.world.base_world.path,
                             civ,
                             masters,
@@ -137,129 +138,169 @@ pub fn saved_world(
                     })
                     .collect()
             };
-            let live = rows(&mut p.live_objects());
-            let sleeping = rows(&mut p.sleeping_objects());
+            let live = rows(&mut player_section.live_objects());
+            let sleeping = rows(&mut player_section.sleeping_objects());
             Ok(Player {
                 objects: live.into(),
                 sleeping: sleeping.into(),
-                kind: PlayerKind::try_from(p.player.kind)?,
-                attributes: attributes.iter().map(|&a| Amount::new(a)).collect(),
+                kind: PlayerKind::try_from(player_section.player.kind)?,
+                attributes: attributes
+                    .iter()
+                    .map(|&amount| Amount::new(amount))
+                    .collect(),
                 // the second attribute array (+0x658), floats as their bits
-                generated: p
+                generated: player_section
                     .world_player()
                     .base
                     .attributes_2
                     .iter()
-                    .map(|&b| Amount::new(f32::from_bits(b)))
+                    .map(|&bits| Amount::new(f32::from_bits(bits)))
                     .collect(),
                 civ,
-                relations: Relations::of_bytes(p.world_player().base.relation.iter().copied()),
+                relations: Relations::of_bytes(
+                    player_section.world_player().base.relation.iter().copied(),
+                ),
                 auto_queues: {
                     let mut flags = AutoQueues::empty();
-                    flags.set(AutoQueues::FARMS, p.world_player().auto_farm_queue != 0);
+                    flags.set(
+                        AutoQueues::FARMS,
+                        player_section.world_player().auto_farm_queue != 0,
+                    );
                     flags.set(
                         AutoQueues::FISH_TRAPS,
-                        p.world_player().auto_fish_trap_queue != 0,
+                        player_section.world_player().auto_fish_trap_queue != 0,
                     );
                     flags
                 },
-                farm_queue: QueueCount::of_data(p.world_player().farm_queue_count),
-                fish_trap_queue: QueueCount::of_data(p.world_player().fish_trap_queue_count),
-                production_queue_on: p.world_player().prod_queue_on,
-                diplomacy: p
+                farm_queue: QueueCount::of_data(player_section.world_player().farm_queue_count),
+                fish_trap_queue: QueueCount::of_data(
+                    player_section.world_player().fish_trap_queue_count,
+                ),
+                production_queue_on: player_section.world_player().prod_queue_on,
+                diplomacy: player_section
                     .world_player()
                     .per_player
                     .iter()
-                    .map(|e| Stance::from(e.diplomacy))
+                    .map(|entry| Stance::from(entry.diplomacy))
                     .collect(),
-                ai_settings: ai_settings(&p.world_player().base),
+                ai_settings: ai_settings(&player_section.world_player().base),
                 formations: Formations {
-                    auto: p.world_player().base.auto_formations != 0,
-                    influence: Distance::new(p.world_player().base.formation_influence_distance),
-                    by_speed: p.world_player().base.break_auto_formations_by_speed == 1,
+                    auto: player_section.world_player().base.auto_formations != 0,
+                    influence: Distance::new(
+                        player_section
+                            .world_player()
+                            .base
+                            .formation_influence_distance,
+                    ),
+                    by_speed: player_section
+                        .world_player()
+                        .base
+                        .break_auto_formations_by_speed
+                        == 1,
                     min_column_distance: WholeDistance::of_data(
-                        p.world_player().base.min_column_distance,
+                        player_section.world_player().base.min_column_distance,
                     ),
                     column_to_line_distance: WholeDistance::of_data(
-                        p.world_player().base.column_to_line_distance,
+                        player_section.world_player().base.column_to_line_distance,
                     ),
                 },
-                pending_debit: p.world_player().base.pending_debit.map(Amount::new),
-                techs: techs.get_mut(i).map(take).unwrap_or_default(),
+                pending_debit: player_section
+                    .world_player()
+                    .base
+                    .pending_debit
+                    .map(Amount::new),
+                techs: techs.get_mut(index).map(take).unwrap_or_default(),
                 unsupported: None,
                 freezes: Vec::new(),
                 stopped: false,
-                game_status: GameStatus::of_data(p.world_player().base.game_status),
+                game_status: GameStatus::of_data(player_section.world_player().base.game_status),
                 // `+0x8b` holds the drop in its bit 1 (the load moves it to `+0x8c`)
                 departures: {
                     let mut flags = Departures::empty();
                     flags.set(
                         Departures::RESIGNED,
-                        p.world_player().base.resigned & 2 == 0
-                            && p.world_player().base.resigned != 0,
+                        player_section.world_player().base.resigned & 2 == 0
+                            && player_section.world_player().base.resigned != 0,
                     );
-                    flags.set(Departures::DROPPED, p.world_player().base.resigned & 2 != 0);
+                    flags.set(
+                        Departures::DROPPED,
+                        player_section.world_player().base.resigned & 2 != 0,
+                    );
                     flags
                 },
-                allied_victory: p.world_player().base.allied_victory,
+                allied_victory: player_section.world_player().base.allied_victory,
                 ally_sharing: {
                     let mut flags = AllySharing::empty();
                     flags.set(
                         AllySharing::VISION,
-                        p.world_player().base.allied_los_enable != 0,
+                        player_section.world_player().base.allied_los_enable != 0,
                     );
                     flags.set(
                         AllySharing::RESOURCES,
-                        p.world_player().sharing_is_caring != 0,
+                        player_section.world_player().sharing_is_caring != 0,
                     );
                     flags
                 },
                 // the reveal of the enemies' town centres (attribute 209) is done once any
                 // mTCFlared bit is set; the saved map then already holds the revealed tiles
-                tc_flared: p.world_player().tc_flared.iter().map(|&b| b != 0).collect(),
-                commodity_volume: LotVolume::of_data(p.world_player().commodity_volumn_delta),
+                tc_flared: player_section
+                    .world_player()
+                    .tc_flared
+                    .iter()
+                    .map(|&byte| byte != 0)
+                    .collect(),
+                commodity_volume: LotVolume::of_data(
+                    player_section.world_player().commodity_volumn_delta,
+                ),
                 victory: VictoryState::of_data(
                     victory
-                        .get(i)
+                        .get(index)
                         .map_or(0, |rge_victory_conditions| rge_victory_conditions.victory),
                 ),
-                fealty: Fealty::of_data(p.world_player().fealty as i16),
+                fealty: Fealty::of_data(player_section.world_player().fealty as i16),
                 // the load sets it 0 (`FUN_14163e970`)
                 posture: Posture::Aggressive,
-                dodge_chance: Chance::of_data(p.world_player().chance_to_dodge_missiles),
+                dodge_chance: Chance::of_data(
+                    player_section.world_player().chance_to_dodge_missiles,
+                ),
                 keep_distance_chance: Chance::of_data(
-                    p.world_player().chance_for_archers_to_maintain_distance,
+                    player_section
+                        .world_player()
+                        .chance_for_archers_to_maintain_distance,
                 ),
                 // the load builds the watched lists (World::build_watched)
                 watched: Vec::new(),
                 // the saved ghosts follow once the world stands (a ghost without an id stops it)
                 ghosts: Vec::new(),
-                history: history(&p.world_player().history),
+                history: history(&player_section.world_player().history),
                 // the load files the objects (World::load_trackers, once the masters are in)
                 tracker: Tracker::default(),
                 // +0x1378 is not saved
                 one_military_queued: false,
-                update_time: Seconds::new(p.world_player().update_time),
-                gaia_update_time: p
+                update_time: Seconds::new(player_section.world_player().update_time),
+                gaia_update_time: player_section
                     .player
                     .gaia_player
                     .as_deref()
                     .map_or(Seconds::ZERO, |gaia_player| {
                         Seconds::new(gaia_player.world_player_gaia.update_time)
                     }),
-                escrow: p.world_player().base.escrow.map(Amount::new),
-                escrow_percentage: p
+                escrow: player_section.world_player().base.escrow.map(Amount::new),
+                escrow_percentage: player_section
                     .world_player()
                     .base
                     .escrow_percentage
                     .map(EscrowShare::of_data),
-                sudden_death_eliminable: p.world_player().sudden_death_can_be_eliminated != 0,
+                sudden_death_eliminable: player_section
+                    .world_player()
+                    .sudden_death_can_be_eliminated
+                    != 0,
                 victory_times: VictoryTimes {
                     // the world's load resets every player's (FUN_140c90040), then a wonder's
                     // action in state 7 sets its time (its load, FUN_140ae8fa0)
-                    wonder: wonder_time(p),
-                    ruins: Seconds::new(p.world_player().ruin_held_time),
-                    artifacts: Seconds::new(p.world_player().artifact_held_time),
+                    wonder: wonder_time(player_section),
+                    ruins: Seconds::new(player_section.world_player().ruin_held_time),
+                    artifacts: Seconds::new(player_section.world_player().artifact_held_time),
                 },
             })
         })
@@ -285,10 +326,10 @@ pub fn saved_world(
             turns.next_object_id = next;
             turns.recycling.next_id = reusable;
         }
-        Err(e) => stop_all(&mut turns, &e),
+        Err(error) => stop_all(&mut turns, &error),
     }
-    if let Some(e) = tech_error {
-        stop_all(&mut turns, &e);
+    if let Some(error) = tech_error {
+        stop_all(&mut turns, &error);
     }
     file_parts(&mut turns, parts);
     match header
@@ -302,7 +343,7 @@ pub fn saved_world(
                 player.ghosts = ghosts;
             }
         }
-        Err(e) => stop_all(&mut turns, &e),
+        Err(error) => stop_all(&mut turns, &error),
     }
     turns.market = market(&header.world);
     turns.local_player = PlayerId::try_from(usize::try_from(world.local_player_index).unwrap_or(0))
@@ -315,12 +356,13 @@ pub fn saved_world(
     let none = TerrainTable::default();
     let terrain = masters.map_or(&none, |master_table| &master_table.terrain);
     match spatial(header, terrain, build) {
-        Ok(s) => turns.spatial = s,
-        Err(e) => stop_all(&mut turns, &e),
+        Ok(spatial) => turns.spatial = spatial,
+        Err(error) => stop_all(&mut turns, &error),
     }
     // the players' scout maps (`mIsScoutMapEnabled` and its InfluenceMap, player+0x1370)
-    for (i, p) in PlayerId::each(header.players().len()).zip(header.players()) {
-        let wp = p.world_player();
+    for (player_id, player_section) in PlayerId::each(header.players().len()).zip(header.players())
+    {
+        let wp = player_section.world_player();
         if wp.is_scout_map_enabled.unwrap_or_default() == 0 {
             continue;
         }
@@ -335,7 +377,7 @@ pub fn saved_world(
                 })
                 .collect();
             turns.spatial.set_scout_map(
-                i,
+                player_id,
                 InfluenceMap {
                     size: GridSize::new(
                         tribe_information_ai_module.xsize_value,
@@ -352,9 +394,12 @@ pub fn saved_world(
         }
     }
     // the computer players' AI modules (player+0x7a8, saved only where the AI was created)
-    for (player_id, p) in PlayerId::each(header.players().len()).zip(header.players()) {
-        if let Some(tribe_main_decision_ai) =
-            p.world_player().tribe_main_decision_ai_module.as_deref()
+    for (player_id, player_section) in PlayerId::each(header.players().len()).zip(header.players())
+    {
+        if let Some(tribe_main_decision_ai) = player_section
+            .world_player()
+            .tribe_main_decision_ai_module
+            .as_deref()
         {
             turns.ai.set(player_id, ai_module(tribe_main_decision_ai));
         }
@@ -394,8 +439,8 @@ pub fn saved_world(
     turns.pathing.budgets = header
         .players()
         .iter()
-        .map(|p| {
-            let world_player_base = &p.world_player().base;
+        .map(|player_section| {
+            let world_player_base = &player_section.world_player().base;
             PlanBudget {
                 attempt_cap: PlanCap::of_data(world_player_base.pathing_attempt_cap_value),
                 delay_cap: PlanCap::of_data(world_player_base.pathing_delay_cap_value),
@@ -411,16 +456,15 @@ pub fn saved_world(
     turns.victory_conquest = world.tribe_scenario.base_scenario.victory_conquest != 0;
     match unit_groups(world) {
         Ok(groups) => turns.groups = groups,
-        Err(e) => stop_all(&mut turns, &e),
+        Err(error) => stop_all(&mut turns, &error),
     }
     if let Some(table) = masters {
         turns.history_period = table.time_slice;
         // the unit lines' tables, which the game builds at its first load with Gaia's master
         // count (`FUN_141533cb0` -> `FUN_140fde680`)
-        let gaia_masters = header
-            .players()
-            .first()
-            .map_or(0, |p| p.objects().master_object_num);
+        let gaia_masters = header.players().first().map_or(0, |player_section| {
+            player_section.objects().master_object_num
+        });
         let masters = header
             .players()
             .iter()
@@ -433,8 +477,8 @@ pub fn saved_world(
                 .map(Arc::new)
             })
             .collect::<Result<_, _>>()
-            .unwrap_or_else(|e| {
-                stop_all(&mut turns, &e);
+            .unwrap_or_else(|error| {
+                stop_all(&mut turns, &error);
                 Vec::new()
             });
         // the tech tree is not loaded (MISSING.md): the default table
@@ -456,12 +500,13 @@ pub fn saved_world(
                 .masters
                 .iter()
                 .skip(1)
-                .flat_map(|m| m.iter())
-                .filter(|m| m.kind == MasterKind::COMBAT)
+                .flat_map(|masters| masters.iter())
+                .filter(|master| master.kind == MasterKind::COMBAT)
         };
         turns.spatial.fastest = all()
-            .filter_map(|m| {
-                m.move_stats
+            .filter_map(|master| {
+                master
+                    .move_stats
                     .as_ref()
                     .map(|move_stats| move_stats.speed.get())
             })
@@ -483,8 +528,8 @@ pub fn saved_world(
         // the planners the load makes and the shape mesh it builds (a dump of the game's mesh
         // replaces it)
         turns.register_planners();
-        if let Err(e) = turns.build_mesh() {
-            stop_all(&mut turns, &e);
+        if let Err(error) = turns.build_mesh() {
+            stop_all(&mut turns, &error);
         }
     }
     // the players' object trackers, which the objects' loads fill
@@ -565,12 +610,12 @@ pub fn saved_ghosts(section: &PlayerSection<'_>) -> GenieResult<Vec<Ghost>> {
         .doppleganger_objects
         .objects()
         .filter_map(|object| {
-            let d = object
+            let rge_doppleganger_object = object
                 .rge_object
                 .as_deref()?
                 .rge_doppleganger_object
                 .as_deref()?;
-            Some((object.static_part()?, d))
+            Some((object.static_part()?, rge_doppleganger_object))
         })
         .map(|(rge_static_object, rge_doppleganger_object)| {
             let original = ObjectId::of_field(rge_doppleganger_object.long_val as i32);

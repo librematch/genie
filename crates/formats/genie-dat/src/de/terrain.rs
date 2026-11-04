@@ -46,7 +46,7 @@ pub(super) const TERRAIN_UNITS: usize = 30;
 /// was saved from.
 #[binrw]
 #[brw(little)]
-#[br(import(v: Version))]
+#[br(import(version: Version))]
 #[derive(Clone, Debug, PartialEq)]
 pub struct TerrainBlock {
     /// An in-memory pointer the game saved with the file.

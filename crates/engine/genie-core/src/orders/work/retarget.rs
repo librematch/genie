@@ -20,7 +20,7 @@ use crate::unit_ai::Notifies;
 use crate::unit_ai::OrderKind;
 use crate::world::World;
 use crate::world::layer::MasterRoles;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 use crate::{GenieError, GenieResult};
 
 impl World {
@@ -133,7 +133,7 @@ impl World {
                 Some((target, class)),
                 point,
                 notifies,
-                self.streams.get(Stream::Ai),
+                self.streams.get_mut(Stream::Ai),
             )?;
             self.remember_order(player, idx, (Some(OrderKind::Hunt), Some(AiAction::Hunt)))?;
         }
@@ -172,7 +172,7 @@ impl World {
                     Some((target, class)),
                     point,
                     notifies,
-                    self.streams.get(Stream::Ai),
+                    self.streams.get_mut(Stream::Ai),
                 )?;
                 self.remember_order(
                     player,

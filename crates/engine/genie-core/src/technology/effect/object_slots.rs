@@ -34,7 +34,7 @@ use crate::world::Seconds;
 use crate::world::WholeSeconds;
 use crate::world::World;
 use crate::world::layer::AttributeRoles;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 
 /// A storage flag of `'@'` (64): the object's storage stays with it (`FUN_141195a50`).
 pub(super) const KEPT_STORAGE: u8 = 64;
@@ -99,16 +99,19 @@ impl World {
             .collect();
         let mut pending = Vec::new();
         if MasterKind::BUILDING <= master.kind {
-            let stack = master.building.as_ref().and_then(|b| b.stack_unit);
+            let stack = master
+                .building
+                .as_ref()
+                .and_then(|building_master| building_master.stack_unit);
             let key = stack
                 .and_then(|stack| player_master(&self.model.masters, player_id, stack))
-                .filter(|s| {
-                    s.kind == MasterKind::BUILDING
-                        && s.building.as_ref().is_some_and(|building_master| {
+                .filter(|candidate| {
+                    candidate.kind == MasterKind::BUILDING
+                        && candidate.building.as_ref().is_some_and(|building_master| {
                             building_master.head_unit == Some(master.id)
                         })
                 })
-                .map_or(master.id, |s| s.id);
+                .map_or(master.id, |master| master.id);
             pending = tracked_ids(player.tracker.list(ListKey::master(key).pending()));
         }
         Ok((done, pending))
@@ -131,15 +134,15 @@ fn tracked_ids(list: &[Option<ObjectId>]) -> Vec<ObjectId> {
 }
 
 impl World {
-    /// `FUN_14165bae0` and the objects' slots 0x78, 0x80, 0x88 (by `change`) on object `id` of
-    /// player `p`: nothing for an object the world lacks (or one with a master of its own,
+    /// `FUN_14165bae0` and the objects' slots 0x78, 0x80, 0x88 (by `change`) on object `id`:
+    /// nothing for an object the world lacks (or one with a master of its own,
     /// `FUN_141188bc0`, which the slice does not hold: none taken to have one); else its type's
     /// slot, which reads its master's values before the master changes ([`ObjectChange::Ran`]).
     pub(crate) fn change_object(
         &mut self,
         id: ObjectId,
         change: Change,
-        v: f32,
+        value: f32,
         attribute: MasterAttribute,
     ) -> GenieResult<ObjectChange> {
         let Some((owner, unit)) = self.object(id) else {
@@ -148,28 +151,31 @@ impl World {
         let master = unit.master(self.master_tables(), owner)?.clone();
         match master.kind {
             MasterKind::BUILDING => {
-                self.change_building(owner, id, &master, change, v, attribute)?;
+                self.change_building(owner, id, &master, change, value, attribute)?;
             }
-            MasterKind::COMBAT => self.change_combat(owner, id, &master, change, v, attribute)?,
-            _ => self.change_static(owner, id, &master, change, v, attribute)?,
+            MasterKind::COMBAT => {
+                self.change_combat(owner, id, &master, change, value, attribute)?;
+            }
+            _ => self.change_static(owner, id, &master, change, value, attribute)?,
         }
         Ok(ObjectChange::Ran)
     }
 
-    /// `FUN_141195a50`, `FUN_141196060`, `FUN_1411962e0`: the static object's slots. The hit
-    /// points take the master's share (a set: `v × hp / master's`, an add: `(master's + v) × hp /
-    /// master's`, truncated to a short; a multiply: `v × hp + 0.5`, truncated, held at 32767 when
-    /// that is not below it under the player's `+0x648` ([`CAPPED`])); the line of sight lets the old circle go and takes
-    /// the new one (an object on the map in state 2: slot 0x1d8, then 0x1d0 with the new value,
-    /// truncated); a set of a resource storage (21, 26, 27) moves its player's attribute from the
-    /// old amount to the new one (slot 0xf8 twice) unless the master keeps it (flag `'@'`).
+    /// `FUN_141195a50`, `FUN_141196060`, `FUN_1411962e0`: the static object's slots. The hit points
+    /// take the master's share (a set: `value × hp / master's`, an add: `(master's + v) × hp /
+    /// master's`, truncated to a short; a multiply: `value × hp + 0.5`, truncated, held at 32767
+    /// when that is not below it under the player's `+0x648` ([`CAPPED`])); the line of sight lets
+    /// the old circle go and takes the new one (an object on the map in state 2: slot 0x1d8, then
+    /// 0x1d0 with the new value, truncated); a set of a resource storage (21, 26, 27) moves its
+    /// player's attribute from the old amount to the new one (slot 0xf8 twice) unless the master
+    /// keeps it (flag `'@'`).
     pub(super) fn change_static(
         &mut self,
         player_id: PlayerId,
         id: ObjectId,
         master: &Master,
         change: Change,
-        v: f32,
+        value: f32,
         attribute: MasterAttribute,
     ) -> GenieResult<()> {
         use crate::objects::masters::MasterAttribute;
@@ -180,22 +186,22 @@ impl World {
                 let hp = unit.life.hp.get();
                 let short = |x: f32| f32::from(cvttss2si(x) as i16);
                 unit.life.hp = HitPoints::new(match change {
-                    Change::Set => short(v * hp / full),
-                    Change::Add => short((full + v) * hp / full),
+                    Change::Set => short(value * hp / full),
+                    Change::Add => short((full + value) * hp / full),
                     // COMISS 32767, x; JBE: a NaN holds the cap too
                     Change::Multiply
-                        if CAPPED && at_most_or_unordered(OBJECT_HP_CAP, v * hp + ROUND) =>
+                        if CAPPED && at_most_or_unordered(OBJECT_HP_CAP, value * hp + ROUND) =>
                     {
                         OBJECT_HP_CAP
                     }
-                    Change::Multiply => short(v * hp + ROUND),
+                    Change::Multiply => short(value * hp + ROUND),
                 });
             }
             MasterAttribute::LINE_OF_SIGHT => {
                 let los = match change {
-                    Change::Set => v,
-                    Change::Add => v + master.line_of_sight.get(),
-                    Change::Multiply => (v * master.line_of_sight).get(),
+                    Change::Set => value,
+                    Change::Add => value + master.line_of_sight.get(),
+                    Change::Multiply => (value * master.line_of_sight).get(),
                 };
                 self.sight_again(id, SightTiles::of(Distance::new(los)))?;
             }
@@ -204,17 +210,17 @@ impl World {
             | MasterAttribute::STORAGE_3
                 if change == Change::Set =>
             {
-                let j = match attribute {
+                let slot = match attribute {
                     MasterAttribute::STORAGE_1 => 0,
                     MasterAttribute::STORAGE_2 => 1,
                     _ => 2,
                 };
-                if let Some(&(Some(kind), amount, flag)) = master.storage.get(j)
+                if let Some(&(Some(kind), amount, flag)) = master.storage.get(slot)
                     && flag != KEPT_STORAGE
                 {
                     let owner = self.players.player_mut(player_id)?;
                     owner.add_attribute(kind, -amount)?;
-                    owner.add_attribute(kind, Amount::new(v))?;
+                    owner.add_attribute(kind, Amount::new(value))?;
                 }
             }
             _ => {}
@@ -269,7 +275,7 @@ impl World {
         id: ObjectId,
         master: &Master,
         change: Change,
-        v: f32,
+        value: f32,
         attribute: MasterAttribute,
     ) -> GenieResult<()> {
         use crate::objects::masters::MasterAttribute;
@@ -278,40 +284,44 @@ impl World {
             (MasterAttribute::MAXIMUM_CHARGE, _) => {
                 let _ = self.object(id).ok_or(OBJECT_GONE)?;
                 let combat = self.parts.combat_mut(id)?;
-                combat.charge =
-                    charge_after(combat.charge, master.creatable_part().max_charge, change, v);
+                combat.charge = charge_after(
+                    combat.charge,
+                    master.creatable_part().max_charge,
+                    change,
+                    value,
+                );
                 Ok(())
             }
-            (MasterAttribute::TOTAL_MISSILES, _) => self.change_firepower(id, change, v),
+            (MasterAttribute::TOTAL_MISSILES, _) => self.change_firepower(id, change, value),
             (MasterAttribute::POPULATION, Change::Set) => {
-                self.population_storage(player_id, master, v)
+                self.population_storage(player_id, master, value)
             }
-            _ => self.change_static(player_id, id, master, change, v, attribute),
+            _ => self.change_static(player_id, id, master, change, value, attribute),
         }
     }
 
-    /// [`World::change_combat`]'s volleys (`+0xa00`) of object `id`: a set takes `v`, an add
+    /// [`World::change_combat`]'s volleys (`+0xa00`) of object `id`: a set takes `value`, an add
     /// adds it, a multiply scales them.
-    fn change_firepower(&mut self, id: ObjectId, change: Change, v: f32) -> GenieResult<()> {
+    fn change_firepower(&mut self, id: ObjectId, change: Change, value: f32) -> GenieResult<()> {
         let _ = self.object(id).ok_or(OBJECT_GONE)?;
         let combat = self.parts.combat_mut(id)?;
         combat.firepower = match change {
-            Change::Set => Firepower::new(v),
-            Change::Add => Firepower::new(v) + combat.firepower,
-            Change::Multiply => Firepower::new(v * combat.firepower.get()),
+            Change::Set => Firepower::new(value),
+            Change::Add => Firepower::new(value) + combat.firepower,
+            Change::Multiply => Firepower::new(value * combat.firepower.get()),
         };
         Ok(())
     }
 
     /// `FUN_1412163c0`'s population (110): for each of the master's three storage entries (`+0x60a`
     /// to `+0x60e`, their amounts `+0x610` on), one of the headroom (4) adds the old amount's
-    /// magnitude then `v`; one of the population (11) or resource 19 its negation then `v`'s
-    /// magnitude (slot 0xf8 each).
+    /// magnitude then `value`; one of the population (11) or resource 19 its negation then
+    /// `value`'s magnitude (slot 0xf8 each).
     pub(super) fn population_storage(
         &mut self,
         player_id: PlayerId,
         master: &Master,
-        v: f32,
+        value: f32,
     ) -> GenieResult<()> {
         let owner = self.players.player_mut(player_id)?;
         for &(kind, amount, _) in master.storage.iter().take(3) {
@@ -321,21 +331,21 @@ impl World {
             let held = self.model.roles.of_some_attribute(kind);
             if held.contains(AttributeRoles::HEADROOM) {
                 owner.add_attribute(self.model.slots.attribute.headroom, amount.abs())?;
-                owner.add_attribute(self.model.slots.attribute.headroom, Amount::new(v))?;
+                owner.add_attribute(self.model.slots.attribute.headroom, Amount::new(value))?;
             } else if held.contains(AttributeRoles::MAGNITUDE_STORAGE)
                 && let Some(kind) = kind
             {
                 owner.add_attribute(kind, -amount)?;
-                owner.add_attribute(kind, Amount::new(v.abs()))?;
+                owner.add_attribute(kind, Amount::new(value.abs()))?;
             }
         }
         Ok(())
     }
 
     /// `FUN_1411d4e70`, `FUN_1411d4f30`, `FUN_1411d4fe0`: a building's slots. Its build points
-    /// (`+0xc50`) keep their share of its master's build time (its first train location's,
-    /// `t`): a set `v / t × points`, an add `(t + v) / t × points`, a multiply
-    /// `points / t × (t × v + 0.5, truncated to a short)`, or `1 × that` for a time of at most 0;
+    /// (`+0xc50`) keep their share of its master's build time (its first train location's, `time`):
+    /// a set `value / time × points`, an add `(time + value) / time × points`, a multiply `points /
+    /// time × (time × value + 0.5, truncated to a short)`, or `1 × that` for a time of at most 0;
     /// its icon override (17, `+0xe`) is the interface's; the rest is the combat unit's.
     pub(super) fn change_building(
         &mut self,
@@ -343,7 +353,7 @@ impl World {
         id: ObjectId,
         master: &Master,
         change: Change,
-        v: f32,
+        value: f32,
         attribute: MasterAttribute,
     ) -> GenieResult<()> {
         use crate::objects::masters::MasterAttribute;
@@ -356,12 +366,12 @@ impl World {
                         construction.progress,
                         master.creatable_part().build_time,
                         change,
-                        v,
+                        value,
                     );
                 }
                 Ok(())
             }
-            _ => self.change_combat(player_id, id, master, change, v, attribute),
+            _ => self.change_combat(player_id, id, master, change, value, attribute),
         }
     }
 }
@@ -374,34 +384,38 @@ pub(super) const ONE: f32 = EFFECT_ONE;
 pub(super) const CAPPED: bool = false;
 
 /// A combat unit's charge after its master's maximum charge (`max`, the old) changes
-/// (`FUN_1412163c0`'s `;`): a set takes `v / max × charge` (`v` without a maximum), an add
-/// `(v + max) / max × charge` (`v + charge` without one), a multiply `v × charge`.
-pub(super) fn charge_after(charge: Charge, max: Charge, change: Change, v: f32) -> Charge {
+/// (`FUN_1412163c0`'s `;`): a set takes `value / max × charge` (`value` without a maximum), an add
+/// `(value + max) / max × charge` (`value + charge` without one), a multiply `value × charge`.
+pub(super) fn charge_after(charge: Charge, max: Charge, change: Change, value: f32) -> Charge {
     let (charge, max) = (charge.get(), max.get());
     Charge::new(match change {
-        Change::Set if max != 0.0 => v / max * charge,
-        Change::Set => v,
-        Change::Add if max != 0.0 => (v + max) / max * charge,
-        Change::Add => v + charge,
-        Change::Multiply => v * charge,
+        Change::Set if max != 0.0 => value / max * charge,
+        Change::Set => value,
+        Change::Add if max != 0.0 => (value + max) / max * charge,
+        Change::Add => value + charge,
+        Change::Multiply => value * charge,
     })
 }
 
 /// A building's build points after its master's build time (`time`, the old) changes
-/// (`FUN_1411d4e70`'s `e`).
+/// (in `FUN_1411d4e70`).
 pub(super) fn build_points_after(
     points: Seconds,
     time: WholeSeconds,
     change: Change,
-    v: f32,
+    value: f32,
 ) -> Seconds {
-    let (points, t) = (points.get(), Seconds::of_master(time).get());
+    let (points, seconds) = (points.get(), Seconds::of_master(time).get());
     Seconds::new(match change {
-        Change::Set => v / t * points,
-        Change::Add => (t + v) / t * points,
+        Change::Set => value / seconds * points,
+        Change::Add => (seconds + value) / seconds * points,
         Change::Multiply => {
-            let new = f32::from(cvttss2si(t * v + ROUND) as i16);
-            if 0.0 < t { points / t * new } else { ONE * new }
+            let new = f32::from(cvttss2si(seconds * value + ROUND) as i16);
+            if 0.0 < seconds {
+                points / seconds * new
+            } else {
+                ONE * new
+            }
         }
     })
 }
@@ -431,5 +445,5 @@ pub(super) fn has_actions(
         || actions.list.transport().is_some()
         || missile.is_some()
         || actions.list.make().is_some()
-        || production.is_some_and(|q| q.action.is_some())
+        || production.is_some_and(|production| production.action.is_some())
 }

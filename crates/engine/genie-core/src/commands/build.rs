@@ -12,7 +12,7 @@ use crate::players::PlayerId;
 use crate::world::World;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 
 /// BUILD (0x66, `FUN_140e7a400`): the player places a foundation of `master` at `position` (state
 /// 0, hit points 1), with the unit AI the factory gives its master. The player pays the master's

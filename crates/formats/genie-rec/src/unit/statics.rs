@@ -1,6 +1,6 @@
 //! The attributes every object has, and the animated base class's.
 
-use crate::element::{ReadableHeaderElement, WritableHeaderElement, read_xyz};
+use crate::element::{ReadHeader, WriteHeader, read_xyz};
 use crate::fits;
 use crate::reader::RecordingHeaderReader;
 use crate::unit::SpriteList;
@@ -69,7 +69,7 @@ pub struct StaticUnitAttributes {
     pub sprite_list: Option<SpriteList>,
 }
 
-impl ReadableHeaderElement for StaticUnitAttributes {
+impl ReadHeader for StaticUnitAttributes {
     // Reads the object's fields in file order, section by section.
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let mut attrs = Self::read_identity(input)?;
@@ -144,7 +144,7 @@ impl StaticUnitAttributes {
 
 // The old format's objects are read only: the writer has no save version for the selected
 // group, which only versions before 11.58 have.
-impl WritableHeaderElement for StaticUnitAttributes {}
+impl WriteHeader for StaticUnitAttributes {}
 
 /// The attributes the animated base class adds.
 #[derive(Debug, Default, Clone, Copy)]
@@ -153,14 +153,14 @@ pub struct AnimatedUnitAttributes {
     pub speed: f32,
 }
 
-impl ReadableHeaderElement for AnimatedUnitAttributes {
+impl ReadHeader for AnimatedUnitAttributes {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let speed = input.read_f32::<LE>()?;
         Ok(Self { speed })
     }
 }
 
-impl WritableHeaderElement for AnimatedUnitAttributes {
+impl WriteHeader for AnimatedUnitAttributes {
     fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         output.write_f32::<LE>(self.speed)?;
         Ok(())

@@ -125,7 +125,7 @@ mod tests {
         assert_eq!((row.len(), row.is_empty()), (3, false));
         let each: Vec<(u8, u8)> = row
             .iter()
-            .map(|(player_id, &v)| (player_id.get(), v))
+            .map(|(player_id, &value)| (player_id.get(), value))
             .collect();
         assert_eq!(each, [(0, 7), (1, 8), (2, 4)]);
         assert_eq!(row, ByPlayer::new(vec![7, 8, 4]));

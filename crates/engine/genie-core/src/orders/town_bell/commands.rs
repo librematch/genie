@@ -20,7 +20,7 @@ use crate::players::tracker::ListKey;
 use crate::world::World;
 use crate::world::layer::{ClassRoles, MasterRoles};
 use crate::world::settings::OptionFlags;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 
 impl World {
     /// `TOWN_BELL` (0x7f, `do_command`): the object `id` (none for −1, `FUN_140e6bad0`) of the
@@ -85,9 +85,9 @@ impl World {
                 continue;
             }
             let id = unit.id;
-            let m = unit.master(self.master_tables(), owner)?;
-            let (kind, class, master) = (m.kind, m.class, m.id);
-            let takes_villagers = m.building.is_some_and(|building_master| {
+            let unit_master = unit.master(self.master_tables(), owner)?;
+            let (kind, class, master) = (unit_master.kind, unit_master.class, unit_master.id);
+            let takes_villagers = unit_master.building.is_some_and(|building_master| {
                 building_master
                     .garrison_kind
                     .contains(GarrisonKinds::VILLAGERS)

@@ -14,7 +14,7 @@ use std::path::Path;
 use std::process::ExitCode;
 
 fn main() -> ExitCode {
-    let check = env::args().skip(1).any(|a| a == "--check");
+    let check = env::args().skip(1).any(|text| text == "--check");
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../contracts/genie.ncl");
     let mut generator = SchemaGenerator::default();
     let _ = generator.subschema_for::<Model>();

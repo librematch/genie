@@ -53,29 +53,38 @@ fn ghost_lists_differ_by_their_members_or_their_order() {
     let same = [Vec::new(), vec![ghost(1), ghost(2)]];
     assert_eq!(ghost_differences(&turns, &same), []);
     let order = [Vec::new(), vec![ghost(2), ghost(1)]];
-    let d = ghost_differences(&turns, &order);
-    assert_eq!(d.len(), 1);
-    assert!(d[0].1.starts_with("ghosts in another order"), "{d:?}");
-    let other = [Vec::new(), vec![ghost(1), ghost(3)]];
-    let d = ghost_differences(&turns, &other);
-    assert_eq!(d[0].0, 1);
+    let differences = ghost_differences(&turns, &order);
+    assert_eq!(differences.len(), 1);
     assert!(
-        d[0].1.starts_with("ghosts the slice's alone [(2, 102"),
-        "{d:?}"
+        differences[0].1.starts_with("ghosts in another order"),
+        "{differences:?}"
+    );
+    let other = [Vec::new(), vec![ghost(1), ghost(3)]];
+    let differences = ghost_differences(&turns, &other);
+    assert_eq!(differences[0].0, 1);
+    assert!(
+        differences[0]
+            .1
+            .starts_with("ghosts the slice's alone [(2, 102"),
+        "{differences:?}"
     );
     // a ghost alone on one side, none on the other, is no other order
     let extra = [Vec::new(), vec![ghost(1), ghost(2), ghost(3)]];
-    let d = ghost_differences(&turns, &extra);
+    let differences = ghost_differences(&turns, &extra);
     assert!(
-        d[0].1
+        differences[0]
+            .1
             .starts_with("ghosts the slice's alone [], the game's alone [(3, 103"),
-        "{d:?}"
+        "{differences:?}"
     );
     // a player the slice does not hold has no ghosts
     let more = [Vec::new(), vec![ghost(1), ghost(2)], vec![ghost(5)]];
-    let d = ghost_differences(&turns, &more);
-    assert_eq!(d[0].0, 2);
-    assert!(d[0].1.starts_with("ghosts the slice's alone []"), "{d:?}");
+    let differences = ghost_differences(&turns, &more);
+    assert_eq!(differences[0].0, 2);
+    assert!(
+        differences[0].1.starts_with("ghosts the slice's alone []"),
+        "{differences:?}"
+    );
 }
 
 /// Groups `ids`, each owned by player 1.
@@ -139,19 +148,24 @@ fn the_groups_compare_with_the_globals_beside_the_save() {
         ..GameState::default()
     };
     assert_eq!(owned_group_differences(&turns, &mut game, None), []);
-    let d = owned_group_differences(&turns, &mut game, Some("group_commands 4\n"));
+    let differences = owned_group_differences(&turns, &mut game, Some("group_commands 4\n"));
     assert_eq!(
         game.groups.as_ref().unwrap().commands,
         Differentiator::of_data(4)
     );
-    assert_eq!(d.len(), 1);
-    assert_eq!(d[0].0, 0);
+    assert_eq!(differences.len(), 1);
+    assert_eq!(differences[0].0, 0);
     let mut other = GameState {
         groups: Some(groups(&[5])),
         ..GameState::default()
     };
-    let d = owned_group_differences(&turns, &mut other, None);
-    assert!(d.iter().any(|(p, _)| *p == 0), "{d:?}");
+    let owned_group_differences = owned_group_differences(&turns, &mut other, None);
+    assert!(
+        owned_group_differences
+            .iter()
+            .any(|(player, _)| *player == 0),
+        "{owned_group_differences:?}"
+    );
 }
 
 /// Bytes that are no save are the run's error, before any update.
@@ -170,9 +184,9 @@ fn quiet() -> Vec<u8> {
     recording(&header(vec![gaia(Vec::new()), human(Vec::new())]), &[])
 }
 
-/// A recording of the same save and `n` syncs of 50 ms.
-fn syncs(n: usize) -> Vec<u8> {
-    let ops: Vec<_> = (0..n).map(|_| Op::Sync { dt: 50 }).collect();
+/// A recording of the same save and `count` syncs of 50 ms.
+fn syncs(count: usize) -> Vec<u8> {
+    let ops: Vec<_> = (0..count).map(|_| Op::Sync { dt: 50 }).collect();
     recording(&header(vec![gaia(Vec::new()), human(Vec::new())]), &ops)
 }
 
@@ -198,7 +212,7 @@ fn quiet_step_has_no_differences() {
 #[test]
 fn the_continuous_run_reports_each_update_and_forces_the_games_state() {
     let (save, rec) = (quiet(), syncs(4));
-    let after = |u: usize| (u <= 2).then(quiet);
+    let after = |update: usize| (update <= 2).then(quiet);
     let no_dump = |_: usize, _: &str| None;
     let (reports, _) = forced_run(
         &save,
@@ -234,13 +248,13 @@ fn the_continuous_run_reports_each_update_and_forces_the_games_state() {
 fn run_from_later_update_compares_the_updates_after_it() {
     let (save, rec) = (quiet(), syncs(4));
     let asked = Mutex::new(Vec::new());
-    let after = |u: usize| {
-        asked.lock().unwrap().push(u);
+    let after = |update: usize| {
+        asked.lock().unwrap().push(update);
         Some(quiet())
     };
     let dumped = RefCell::new(Vec::new());
-    let dump_after = |u: usize, what: &str| {
-        dumped.borrow_mut().push((u, what.to_owned()));
+    let dump_after = |update: usize, what: &str| {
+        dumped.borrow_mut().push((update, what.to_owned()));
         None
     };
     let (reports, _) = forced_run(
@@ -255,8 +269,17 @@ fn run_from_later_update_compares_the_updates_after_it() {
         1,
     )
     .unwrap();
-    assert_eq!(reports.iter().map(|r| r.start).collect::<Vec<_>>(), [1, 2]);
-    assert!(reports.iter().all(|r| r.ticks == 1), "{reports:?}");
+    assert_eq!(
+        reports
+            .iter()
+            .map(|tick_report| tick_report.start)
+            .collect::<Vec<_>>(),
+        [1, 2]
+    );
+    assert!(
+        reports.iter().all(|tick_report| tick_report.ticks == 1),
+        "{reports:?}"
+    );
     let mut saves = asked.lock().unwrap().clone();
     saves.sort_unstable();
     // the window of 1 asks for one save ahead of the run
@@ -265,7 +288,7 @@ fn run_from_later_update_compares_the_updates_after_it() {
     let globals: Vec<usize> = dumped
         .iter()
         .filter(|(_, what)| what == "globals")
-        .map(|&(u, _)| u)
+        .map(|&(update, _)| update)
         .collect();
     assert_eq!(globals, [2, 3]);
     assert_eq!(dumped.len(), 6, "{dumped:?}");

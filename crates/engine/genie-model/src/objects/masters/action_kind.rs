@@ -139,10 +139,10 @@ impl ActionKind {
 #[must_use]
 pub const fn kinds<const N: usize>(values: [i16; N]) -> [ActionKind; N] {
     let mut out = [ActionKind(0); N];
-    let mut i = 0;
-    while i < N {
-        out[i] = ActionKind::named(values[i]);
-        i += 1;
+    let mut index = 0;
+    while index < N {
+        out[index] = ActionKind::named(values[index]);
+        index += 1;
     }
     out
 }

@@ -28,7 +28,7 @@ pub(super) const EPSILON: f32 = GARRISON_EPSILON;
 pub(super) fn weapons_sum(weapons: &[ClassAmount], counts: impl Fn(DamageClass) -> bool) -> f32 {
     weapons
         .iter()
-        .filter(|w| counts(w.class))
+        .filter(|class_amount| counts(class_amount.class))
         .fold(0.0, |sum, class_amount| sum + class_amount.amount.as_f32())
 }
 
@@ -66,9 +66,9 @@ pub fn attack_rate(
         });
     let sum = volley.map_or_else(
         || {
-            weapons_sum(&master.combat_part().weapons, |c| {
+            weapons_sum(&master.combat_part().weapons, |damage_class| {
                 matches!(
-                    c,
+                    damage_class,
                     DamageClass::MELEE
                         | DamageClass::PIERCE
                         | DamageClass::CLASS_31
@@ -76,8 +76,8 @@ pub fn attack_rate(
                 )
             })
         },
-        |v| {
-            weapons_sum(&v.combat_part().weapons, |damage_class| {
+        |master| {
+            weapons_sum(&master.combat_part().weapons, |damage_class| {
                 matches!(damage_class, DamageClass::PIERCE | DamageClass::CLASS_38)
             })
         },
@@ -116,9 +116,9 @@ pub fn firepower(master: &Master, masters: &Masters, reload_powerup: Seconds) ->
             .filter(|&id| in_table(masters, id))
             .or_else(|| master.combat_part().missile.master())
             .and_then(|id| masters.get(id));
-        if let Some(m) = missile {
+        if let Some(projectile) = missile {
             let extra = cvttss2si(master.creatable_part().volley_fire.get() - ONE_MISSILE);
-            for &ClassAmount { class, amount } in &m.combat_part().weapons {
+            for &ClassAmount { class, amount } in &projectile.combat_part().weapons {
                 if matches!(class, DamageClass::PIERCE | DamageClass::CLASS_38) {
                     // IMUL EAX, R8D then CVTDQ2PS
                     sum += i32::from(amount.get()).wrapping_mul(extra) as f32;
@@ -170,16 +170,16 @@ pub fn share(
     if master.object_flags.contains(ObjectFlags::TRANSFORMS) {
         // MOVZX of the ushort at +0x656; the game reads the slot without a test, so a null one
         // would crash it: a master the player has is the only case it runs
-        if let Some(m) = master
+        if let Some(master) = master
             .object_flags
             .piece()
             .and_then(|id| masters.get(id))
             // `SEEK_SHELTER`'s villagers: class 4 of type 70.
             // The type of a combat unit: the master a transforming master names (`+0x656`), and a unit a
             // transport takes in (`FUN_14120eb10`).
-            && m.kind == MasterKind::COMBAT
+            && master.kind == MasterKind::COMBAT
         {
-            floor = firepower(m, masters, reload_powerup).over(rate);
+            floor = firepower(master, masters, reload_powerup).over(rate);
         }
     }
     Ok(Firepower::new(maxss(

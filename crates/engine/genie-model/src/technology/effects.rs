@@ -59,7 +59,9 @@ impl Effects {
     /// `TRIBE_Effects::do_effect` skips.
     #[must_use]
     pub fn get(&self, id: EffectId) -> Option<&Effect> {
-        usize::try_from(id.get()).ok().and_then(|i| self.0.get(i))
+        usize::try_from(id.get())
+            .ok()
+            .and_then(|index| self.0.get(index))
     }
 
     /// How many effects the table holds.

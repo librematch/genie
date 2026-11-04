@@ -16,7 +16,7 @@ use crate::players::PlayerId;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::OrderKind;
 use crate::world::World;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 use crate::world::{HUNTER_UNMOVING, NO_STANDING_SPRITE};
 
 impl World {
@@ -44,7 +44,7 @@ impl World {
                 Some((target, quarry.class)),
                 point,
                 notifies,
-                self.streams.get(Stream::Ai),
+                self.streams.get_mut(Stream::Ai),
             )?;
             self.remember_order(player, idx, (Some(OrderKind::Hunt), Some(AiAction::Hunt)))?;
         }
@@ -115,7 +115,7 @@ impl World {
                 &mut unit.sprite,
                 self.parts.move_stats_mut(unit.id),
                 graphic,
-                self.streams.get(Stream::Sprite),
+                self.streams.get_mut(Stream::Sprite),
                 self.model.tuning.sprite,
             );
             self.parts.set_anim_speed(unit.id, Speed::ZERO);

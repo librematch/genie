@@ -17,12 +17,12 @@ use crate::world::step::Step;
 use crate::{GenieError, GenieResult};
 
 impl World {
-    /// One object's step with its `Step` (`f`: the unit's update, or one part of its unit AI for a
-    /// command): object `list_index` of player `player_id` leaves its list (its stand-in holds the
-    /// slot) and its action layer the table ([`Parts::take_actions`]), and `f` gets both and the
-    /// `Step`, which holds the world (FD-045-D28; the objects it makes join the list at their
+    /// One object's step with its `Step` (`work`: the unit's update, or one part of its unit AI for
+    /// a command): object `list_index` of player `player_id` leaves its list (its stand-in holds
+    /// the slot) and its action layer the table ([`Parts::take_actions`]), and `work` gets both and
+    /// the `Step`, which holds the world (FD-045-D28; the objects it makes join the list at their
     /// making). It goes back to the slot its stand-in holds then ([`World::put_back_own`]), its
-    /// layer to the table. Returns `f`'s result (an error of the put-back, then of the sight's
+    /// layer to the table. Returns `work`'s result (an error of the put-back, then of the sight's
     /// registry first): its outcome and its answer `R`.
     ///
     /// [`Parts::take_actions`]: crate::world::parts::Parts::take_actions
@@ -31,7 +31,7 @@ impl World {
         &mut self,
         (player_id, list_index): (PlayerId, ListIndex),
         (dt, turn): (Millis, Option<Millis>),
-        f: impl FnOnce(&mut Unit, &mut Action, &mut Step<'_>) -> GenieResult<(Outcome, R)>,
+        work: impl FnOnce(&mut Unit, &mut Action, &mut Step<'_>) -> GenieResult<(Outcome, R)>,
     ) -> GenieResult<(Outcome, R)> {
         let mut unit = self.take_out(player_id, list_index)?;
         let mut actions = self.parts.take_actions(unit.id);
@@ -39,7 +39,7 @@ impl World {
         // the objects a hit's blast may reach about its target (one a hit can read), or about
         // the unit for its blast at death (TRIBE_Combat_Object::update)
         let target = match actions.attack_target() {
-            Some(t) if self.victim(t, player_id)?.is_some() => Some(t),
+            Some(object_id) if self.victim(object_id, player_id)?.is_some() => Some(object_id),
             _ => None,
         };
         let blasted = match target {
@@ -57,7 +57,7 @@ impl World {
         };
         let me = unit.id;
         let mut step = Step {
-            w: self,
+            world: self,
             me,
             dt,
             turn,
@@ -67,18 +67,18 @@ impl World {
             building_handover: false,
             side_notifies: None,
         };
-        let mut result = f(&mut unit, &mut actions, &mut step);
-        if let Some(w) = watch {
-            w.report(
-                (&unit, &actions, step.w.parts.unit_ai.get(unit.id)),
-                step.w.ticks,
+        let mut result = work(&mut unit, &mut actions, &mut step);
+        if let Some(watch) = watch {
+            watch.report(
+                (&unit, &actions, step.world.parts.unit_ai.get(unit.id)),
+                step.world.ticks,
                 player_id,
             );
         }
-        if let Some(e) = self.take_sight_unsupported()
+        if let Some(error) = self.take_sight_unsupported()
             && result.is_ok()
         {
-            result = Err(e);
+            result = Err(error);
         }
         // back to its stand-in's slot, which a removal in the step may have moved
         self.parts.put_actions(unit.id, actions);
@@ -88,32 +88,32 @@ impl World {
         result
     }
 
-    /// Runs `f` on object `list_index` of player `player_id` with its step outside its update: a
+    /// Runs `work` on object `list_index` of player `player_id` with its step outside its update: a
     /// command's part the game runs on the object at once (`UNIT_ORDER`'s drop-off),
-    /// [`World::step_object`] without the update's own parts. Returns `f`'s answer.
+    /// [`World::step_object`] without the update's own parts. Returns `work`'s answer.
     ///
     /// # Errors
     ///
-    /// `f`'s, and what its effects do not model.
+    /// `work`'s, and what its effects do not model.
     pub(crate) fn run_on_step<R>(
         &mut self,
         player_id: PlayerId,
         list_index: ListIndex,
-        f: impl FnOnce(&mut Unit, &mut Action, &mut Step<'_>) -> GenieResult<R>,
+        work: impl FnOnce(&mut Unit, &mut Action, &mut Step<'_>) -> GenieResult<R>,
     ) -> GenieResult<R> {
         self.step_answering(
             (player_id, list_index),
             (Millis::ZERO, None, false),
-            |unit, actions, step| Ok((Outcome::Stay, f(unit, actions, step)?)),
+            |unit, actions, step| Ok((Outcome::Stay, work(unit, actions, step)?)),
         )
         .map(|(_, answer)| answer)
     }
 
-    /// Runs `f` on the unit AI of object `list_index` of player `player_id` for a world routine
+    /// Runs `work` on the unit AI of object `list_index` of player `player_id` for a world routine
     /// outside its update that gives the AI only the unit's place (a stance, a stop of the game's
     /// status, a let-out or an unload, a move's cleared notifies): the object's step
     /// ([`World::step_object`] without the update's own parts) whose only part is the AI's run with
-    /// its side ([`Unit::run_calls`]: its calls on the unit at once). Returns `f`'s answer.
+    /// its side ([`Unit::run_calls`]: its calls on the unit at once). Returns `work`'s answer.
     ///
     /// # Errors
     ///
@@ -121,18 +121,18 @@ impl World {
     pub(crate) fn run_ai_calls<R>(
         &mut self,
         (player_id, list_index): (PlayerId, ListIndex),
-        f: impl FnOnce(&mut UnitAi, &mut UnitView<'_, '_>, &mut Well512) -> GenieResult<R>,
+        work: impl FnOnce(&mut UnitAi, &mut UnitView<'_, '_>, &mut Well512) -> GenieResult<R>,
     ) -> GenieResult<R> {
         self.step_answering(
             (player_id, list_index),
             (Millis::ZERO, None, false),
-            |unit, actions, step| Ok((Outcome::Stay, unit.run_calls(actions, step, f)?)),
+            |unit, actions, step| Ok((Outcome::Stay, unit.run_calls(actions, step, work)?)),
         )
         .map(|(_, answer)| answer)
     }
 
-    /// Runs `f` on the unit AI of object `list_index` of player `player_id` outside its update (a
-    /// command's immediate order, `FUN_140c55c90`): the object's step ([`World::step_object`]
+    /// Runs `work` on the unit AI of object `list_index` of player `player_id` outside its update
+    /// (a command's immediate order, `FUN_140c55c90`): the object's step ([`World::step_object`]
     /// without the update's own parts) whose only part is the AI's run with what it reads of the
     /// world ([`Unit::run_ai`]).
     ///
@@ -142,7 +142,7 @@ impl World {
     pub(crate) fn run_unit_ai(
         &mut self,
         (player_id, list_index): (PlayerId, ListIndex),
-        f: impl FnOnce(
+        work: impl FnOnce(
             &mut UnitAi,
             &Surroundings,
             &mut UnitView<'_, '_>,
@@ -153,7 +153,7 @@ impl World {
         let stepped = self.step_object(
             (player_id, list_index),
             (Millis::ZERO, None, false),
-            |unit, actions, step| unit.run_ai(actions, step, f).map(|()| Outcome::Stay),
+            |unit, actions, step| unit.run_ai(actions, step, work).map(|()| Outcome::Stay),
         )?;
         match stepped.outcome {
             Outcome::Stay => Ok(()),

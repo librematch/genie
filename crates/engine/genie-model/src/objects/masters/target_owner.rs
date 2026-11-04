@@ -43,14 +43,14 @@ impl TargetOwner {
 }
 
 impl Display for TargetOwner {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        write!(f, "{}", self.0)
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> Result<(), Error> {
+        write!(formatter, "{}", self.0)
     }
 }
 
 impl genie_diff::Diff for TargetOwner {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        self.0.diff(&other.0, d);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        self.0.diff(&other.0, differ);
     }
 }
 

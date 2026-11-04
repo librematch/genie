@@ -29,7 +29,7 @@ use crate::world::layer::Roles;
 use crate::world::layer::Slots;
 use crate::world::lets::{release, take};
 use crate::world::others::OthersRef;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 use crate::world::step::Step;
 use crate::{GenieError, GenieResult};
 use std::mem::replace;
@@ -92,25 +92,28 @@ impl BuildAction {
         slots: Slots,
         roles: &Roles,
     ) -> GenieResult<DropSearch> {
-        let view = OthersRef::of(&step.w.players, &step.w.index, step.player)?;
+        let view = OthersRef::of(&step.world.players, &step.world.index, step.player)?;
         let masters = step
-            .w
+            .world
             .model
             .masters
             .get(step.player.index())
             .ok_or(OBJECT_MASTER)?;
-        let own = builder.master_in(OwnerMasters::new(&step.w.parts.own_master, Some(masters)))?;
+        let own = builder.master_in(OwnerMasters::new(
+            &step.world.parts.own_master,
+            Some(masters),
+        ))?;
         let at = builder.position().ground();
         let look = |id: ObjectId| view.own(id).map(|unit| (unit.life.state, unit.position()));
         let found = nearest_table_site(
             (
-                &step.w.model.drop_sites,
-                step.w.players.player(step.player)?.civ,
-                &step.w.players.player(step.player)?.tracker,
+                &step.world.model.drop_sites,
+                step.world.players.player(step.player)?.civ,
+                &step.world.players.player(step.player)?.tracker,
             ),
             (at, builder.life.attribute_kind, own.class),
             look,
-            &step.w.model.tuning.order,
+            &step.world.model.tuning.order,
         );
         let Some((id, _)) = found else {
             return Ok(DropSearch::Nothing);
@@ -122,10 +125,10 @@ impl BuildAction {
             }
             view.find(object_id)
         };
-        let every = MasterTables::new(&step.w.model.masters, &step.w.parts.own_master);
+        let every = MasterTables::new(&step.world.model.masters, &step.world.parts.own_master);
         let task = match (
-            task_target_with(id.id(), 1, &find, &step.w.parts, every)?,
-            task_target_with(id.id(), 2, &find, &step.w.parts, every)?,
+            task_target_with(id.id(), 1, &find, &step.world.parts, every)?,
+            task_target_with(id.id(), 2, &find, &step.world.parts, every)?,
         ) {
             (Some(task_target), Some(general)) => {
                 use crate::unit_ai::task_finder::world::SideWorld;
@@ -136,20 +139,20 @@ impl BuildAction {
                     player,
                     held: builder.life.held(),
                     attribute_95: step
-                        .w
+                        .world
                         .players
                         .player(step.player)?
                         .attributes
                         .get(95)
                         .copied()
                         .unwrap_or(Amount::ZERO),
-                    civ: step.w.players.player(step.player)?.civ,
+                    civ: step.world.players.player(step.player)?.civ,
                 };
                 let dip = SideWorld {
                     player,
-                    relations: &step.w.players.player(step.player)?.relations,
+                    relations: &step.world.players.player(step.player)?.relations,
                     foreign,
-                    drop_sites: &step.w.model.drop_sites,
+                    drop_sites: &step.world.model.drop_sites,
                 };
                 // slot 0x820's point: x, y and z −1, no terrain
                 let on = TaskOn {
@@ -161,8 +164,8 @@ impl BuildAction {
             }
             _ => None,
         };
-        let range = task.map_or(task_range, |(t, _)| t.work_range);
-        let sprite = task.and_then(|(t, _)| t.sprites.carrying);
+        let range = task.map_or(task_range, |(task, _)| task.work_range);
+        let sprite = task.and_then(|(task, _)| task.sprites.carrying);
         Ok(DropSearch::Site { id, range, sprite })
     }
 
@@ -207,24 +210,29 @@ impl BuildAction {
         }
         let Some((id, range, sprite)) = found else {
             builder.post_own(
-                &mut step.w.parts.unit_ai,
+                &mut step.world.parts.unit_ai,
                 NotifyKind::NO_DROP_SITE,
                 [AiAction::Build.value(), 0, 0],
             )?;
             return self.restart(step, builder, roles);
         };
         let move_reads = builder.move_to_reads(
-            step.w.parts.motion.mover(builder.id),
-            MasterTables::new(&step.w.model.masters, &step.w.parts.own_master),
+            step.world.parts.motion.mover(builder.id),
+            MasterTables::new(&step.world.model.masters, &step.world.parts.own_master),
             step.player,
             (
-                &step.w.model.graphics,
-                step.w.parts.combat_of(builder.id).abilities.look.as_ref(),
+                &step.world.model.graphics,
+                step.world
+                    .parts
+                    .combat_of(builder.id)
+                    .abilities
+                    .look
+                    .as_ref(),
             ),
             roles,
         )?;
         let to = move_reads
-            .walk_to(step.w, Some(id.id()))?
+            .walk_to(step.world, Some(id.id()))?
             .ok_or(GenieError::unsupported("a drop site without a place"))?;
         let given = sprite.or(self.task.moving);
         self.state = BuildState::Drop {
@@ -233,7 +241,7 @@ impl BuildAction {
                 range,
                 given,
                 TargetMoved::AsksAgain,
-                &step.w.model.tuning.move_to,
+                &step.world.model.tuning.move_to,
             )?,
         };
         Ok(())
@@ -290,12 +298,12 @@ impl BuildAction {
             self.halt_in(step, builder, reads)?;
             return Ok(HeadCode::Keeps);
         }
-        if step.w.model.tuning.build.drop_reach < drop.gap_squared.get() {
+        if step.world.model.tuning.build.drop_reach < drop.gap_squared.get() {
             self.timer = DROP_WAIT;
-            step.w.parts.set_anim_speed(builder.id, Speed::ZERO);
+            step.world.parts.set_anim_speed(builder.id, Speed::ZERO);
             return Ok(HeadCode::Keeps);
         }
-        let attributes = step.w.players.player(step.player)?.attributes.len();
+        let attributes = step.world.players.player(step.player)?.attributes.len();
         let kind = resource_kind(builder.life.attribute_kind, attributes, slots);
         let amount = builder.life.amount;
         Self::drop_load(step, builder, kind, amount)?;
@@ -323,7 +331,7 @@ impl BuildAction {
             self.restart(step, builder, roles)?;
             return Ok(HeadCode::Keeps);
         }
-        if let Some(ai) = step.w.parts.unit_ai.get_mut(builder.id) {
+        if let Some(ai) = step.world.parts.unit_ai.get_mut(builder.id) {
             let gone = &reads.gone_orders;
             ai.orders.retain(|queued_order| {
                 !(DROPPED_ORDERS.contains(&queued_order.order)
@@ -340,7 +348,7 @@ impl BuildAction {
         }
         // UCOMISS against −1 (DAT_14330ec20): a NaN is not
         if self.point.x() == -1.0 || self.point.y() == -1.0 {
-            if step.w.players.player(step.player)?.kind.is_computer() {
+            if step.world.players.player(step.player)?.kind.is_computer() {
                 self.end(step, builder, BuildState::Done)?;
             } else {
                 self.halt_in(step, builder, reads)?;

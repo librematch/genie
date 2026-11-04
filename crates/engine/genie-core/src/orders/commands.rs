@@ -25,7 +25,7 @@ use crate::world::index::Place;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::settings::OptionFlags;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 use crate::{GenieError, GenieResult};
 
 impl World {
@@ -52,8 +52,8 @@ impl World {
             let Some(place) = self.place(id) else {
                 continue;
             };
-            let (p, idx) = match place {
-                Place::Live(p, i) => (p, i),
+            let (player, idx) = match place {
+                Place::Live(owner, slot) => (owner, slot),
                 // only slot 0x180 puts an object to sleep, one of a type below 30, which has no
                 // unit AI: the handler passes it over
                 Place::Sleeping(player_id, list_index)
@@ -70,11 +70,11 @@ impl World {
                     ));
                 }
             };
-            let unit = &self.players.live(p, idx)?;
+            let unit = &self.players.live(player, idx)?;
             if !self.parts.unit_ai.contains(unit.id) {
                 continue;
             }
-            let master = unit.master(self.master_tables(), p)?;
+            let master = unit.master(self.master_tables(), player)?;
             if state.leashed()
                 && (self
                     .model
@@ -90,11 +90,11 @@ impl World {
                 continue;
             }
             let class = master.class;
-            let unit = &self.players.live(p, idx)?;
+            let unit = &self.players.live(player, idx)?;
             let place = (unit.position().ground(), Some(class));
             // slot 0x1c0, its stop a call on the unit at once
             let roles = self.model.roles.clone();
-            self.run_ai_calls((p, idx), |ai, side, rng| {
+            self.run_ai_calls((player, idx), |ai, side, rng| {
                 set_stance(ai, state, place, side, rng, &roles)
             })?;
         }
@@ -120,7 +120,7 @@ impl World {
         let now = self.world_time;
         let (layer, mover) = self.parts.building_and_mover_mut(id)?;
         // slot 0x668: the lock's value (a building without its gate state is lock_gate's)
-        let locked = layer.gate.is_some_and(|g| g.locked);
+        let locked = layer.gate.is_some_and(|gate| gate.locked);
         lock_gate((mover, layer), !locked, now)?;
         Ok(())
     }
@@ -149,8 +149,8 @@ impl World {
             let Some(place) = self.place(id) else {
                 continue;
             };
-            let (p, idx) = match place {
-                Place::Live(p, i) => (p, i),
+            let (player, idx) = match place {
+                Place::Live(owner, slot) => (owner, slot),
                 // only slot 0x180 puts an object to sleep, one of a type below 30, which has no
                 // unit AI: the handler passes it over
                 Place::Sleeping(player_id, list_index)
@@ -167,11 +167,11 @@ impl World {
                     ));
                 }
             };
-            let unit = &self.players.live(p, idx)?;
+            let unit = &self.players.live(player, idx)?;
             if !self.parts.unit_ai.contains(unit.id) {
                 continue;
             }
-            let master = unit.master(self.master_tables(), p)?;
+            let master = unit.master(self.master_tables(), player)?;
             if !master.object_flags.contains(ObjectFlags::SCOUT) {
                 if self
                     .model
@@ -193,7 +193,7 @@ impl World {
                 .get(unit.id)
                 .is_some_and(|ai| ai.current_action == Some(AiAction::AutoScout));
             let order = QueuedOrder {
-                issuer: Some(Issuer::Player(p)),
+                issuer: Some(Issuer::Player(player)),
                 order: if scouts {
                     OrderKind::Stop
                 } else {
@@ -212,7 +212,7 @@ impl World {
             let roles = self.model.roles.clone();
             let slots = self.model.slots;
             let unit_ai_tuning = self.model.tuning.unit_ai;
-            self.run_ai_calls((p, idx), |ai, side, rng| {
+            self.run_ai_calls((player, idx), |ai, side, rng| {
                 ai.take_order_now(
                     state,
                     order,
@@ -260,19 +260,21 @@ impl World {
         let units: Vec<ObjectId> = list.iter().flatten().copied().collect();
         for &id in &units {
             let unit = match self.place(id) {
-                Some(Place::Live(p, i)) => self.players.live_mut(p, i)?,
-                Some(Place::Sleeping(p, list_index)) => self.players.asleep_mut(p, list_index)?,
+                Some(Place::Live(owner, slot)) => self.players.live_mut(owner, slot)?,
+                Some(Place::Sleeping(player_id, list_index)) => {
+                    self.players.asleep_mut(player_id, list_index)?
+                }
                 None => continue,
             };
             if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
-                ai.reset_for_order(self.streams.get(Stream::Ai));
+                ai.reset_for_order(self.streams.get_mut(Stream::Ai));
             }
         }
         if 1 < list.len() {
-            let group = common_group(&list, |id| self.object(id).map(|(_, u)| u.group));
+            let group = common_group(&list, |id| self.object(id).map(|(_, unit)| unit.group));
             if group
                 .and_then(|id| self.groups.get(id))
-                .is_some_and(|g| g.members.len() == list.len())
+                .is_some_and(|group| group.members.len() == list.len())
             {
                 return Err(GenieError::unsupported(
                     "a STOP of a whole unit group (FUN_1410110c0)",
@@ -293,8 +295,8 @@ impl World {
             if self.object(id).is_none() {
                 continue;
             }
-            if let Some(m) = self.parts.mover_mut(id) {
-                m.ignore_units.clear();
+            if let Some(mover) = self.parts.mover_mut(id) {
+                mover.ignore_units.clear();
             }
             // a sleeping object is of a type below 30 (only slot 0x180 puts one to sleep), whose
             // slots 0x148 and 0x560 are empty (0x141072730, 0x141072740)
@@ -379,9 +381,9 @@ impl World {
                     UnloadPick::Object(object_id)
                     | UnloadPick::SameMaster(object_id)
                     | UnloadPick::AllBut(object_id)
-                    | UnloadPick::OtherMasters(object_id) => {
-                        self.place(object_id).is_some_and(|p| p.player() == player)
-                    }
+                    | UnloadPick::OtherMasters(object_id) => self
+                        .place(object_id)
+                        .is_some_and(|place| place.player() == player),
                     UnloadPick::All(_) | UnloadPick::Group(_) | UnloadPick::Other(..) => false,
                 }
         };
@@ -444,11 +446,11 @@ impl World {
         let graphic = shown.ok_or(GenieError::unsupported(
             "a unit without its standing sprite",
         ))?;
-        let rng = self.streams.get(Stream::Sprite);
-        let u = self.players.live_mut(player_id, idx)?;
+        let rng = self.streams.get_mut(Stream::Sprite);
+        let unit = self.players.live_mut(player_id, idx)?;
         new_sprite(
-            &mut u.sprite,
-            self.parts.move_stats_mut(u.id),
+            &mut unit.sprite,
+            self.parts.move_stats_mut(unit.id),
             graphic,
             rng,
             self.model.tuning.sprite,

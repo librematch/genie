@@ -71,10 +71,10 @@ impl CellKind {
     /// No mark.
     pub const NONE: Self = Self::empty();
 
-    /// Child `k`'s off-map bit (`1 << k`).
+    /// Child `child`'s off-map bit (`1 << child`).
     #[must_use]
-    pub const fn child_off_map(k: usize) -> Self {
-        Self::from_bits_retain(1 << k)
+    pub const fn child_off_map(child: usize) -> Self {
+        Self::from_bits_retain(1 << child)
     }
 
     /// The low nibble: the children that lie off the map.
@@ -138,10 +138,10 @@ pub(super) struct CellIndex(
 );
 
 impl CellIndex {
-    /// Place `i`.
+    /// Place `index`.
     #[must_use]
-    pub(super) const fn new(i: usize) -> Self {
-        Self(i)
+    pub(super) const fn new(index: usize) -> Self {
+        Self(index)
     }
 }
 
@@ -156,10 +156,10 @@ impl Cells {
         Self(vec![Cell::EMPTY; total])
     }
 
-    /// The `n` cells from place `start` on (a level's).
+    /// The `count` cells from place `start` on (a level's).
     #[must_use]
-    pub(super) fn run(&self, start: CellIndex, n: usize) -> &[Cell] {
-        &self.0[start.0..start.0 + n]
+    pub(super) fn run(&self, start: CellIndex, count: usize) -> &[Cell] {
+        &self.0[start.0..start.0 + count]
     }
 }
 

@@ -153,23 +153,23 @@ pub enum StartingAge {
 }
 
 impl StartingAge {
-    /// The starting age that number `n` names in data version `version`: before 1.25 −1 to 4
+    /// The starting age that number `number` names in data version `version`: before 1.25 −1 to 4
     /// (the default, then Dark to Post-Imperial), from 1.25 on −1 or 0 (the default), 1 (Nomad)
     /// and 2 to 6; any other number is [`StartingAge::Other`].
     #[must_use]
-    pub const fn from_i32(n: i32, version: f32) -> Self {
+    pub const fn from_i32(number: i32, version: f32) -> Self {
         if version < 1.25 {
-            match n {
+            match number {
                 -1 => Self::Default,
                 0 => Self::DarkAge,
                 1 => Self::FeudalAge,
                 2 => Self::CastleAge,
                 3 => Self::ImperialAge,
                 4 => Self::PostImperialAge,
-                n => Self::Other(n),
+                other => Self::Other(other),
             }
         } else {
-            match n {
+            match number {
                 -1 | 0 => Self::Default,
                 1 => Self::Nomad,
                 2 => Self::DarkAge,
@@ -177,7 +177,7 @@ impl StartingAge {
                 4 => Self::CastleAge,
                 5 => Self::ImperialAge,
                 6 => Self::PostImperialAge,
-                n => Self::Other(n),
+                other => Self::Other(other),
             }
         }
     }
@@ -193,7 +193,7 @@ impl StartingAge {
                 Self::CastleAge => 2,
                 Self::ImperialAge => 3,
                 Self::PostImperialAge => 4,
-                Self::Other(n) => n,
+                Self::Other(other) => other,
             }
         } else {
             match self {
@@ -204,7 +204,7 @@ impl StartingAge {
                 Self::CastleAge => 4,
                 Self::ImperialAge => 5,
                 Self::PostImperialAge => 6,
-                Self::Other(n) => n,
+                Self::Other(other) => other,
             }
         }
     }
@@ -244,8 +244,8 @@ pub enum VictoryCondition {
 }
 
 impl From<u8> for VictoryCondition {
-    fn from(n: u8) -> Self {
-        match n {
+    fn from(byte: u8) -> Self {
+        match byte {
             0 => Self::Capture,
             1 => Self::Create,
             2 => Self::Destroy,
@@ -258,7 +258,7 @@ impl From<u8> for VictoryCondition {
             9 => Self::DestroyAll,
             10 => Self::DestroyPlayer,
             11 => Self::Points,
-            n => Self::Other(n),
+            other => Self::Other(other),
         }
     }
 }
@@ -278,7 +278,7 @@ impl From<VictoryCondition> for u8 {
             VictoryCondition::DestroyAll => 9,
             VictoryCondition::DestroyPlayer => 10,
             VictoryCondition::Points => 11,
-            VictoryCondition::Other(n) => n,
+            VictoryCondition::Other(other) => other,
         }
     }
 }

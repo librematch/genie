@@ -11,7 +11,7 @@ use crate::movement::move_to::MoveDefaults;
 use crate::objects::layers::Action;
 use crate::objects::layers::MotionMut;
 use crate::objects::masters::OwnerMasters;
-use crate::objects::masters::PlayersMasters;
+use crate::objects::masters::PlayersMastersExt;
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Unit;
 use crate::objects::unit::object_master;
@@ -35,9 +35,9 @@ impl Unit {
         roles: &Roles,
     ) -> GenieResult<HeadCode> {
         let master = object_master(
-            step.w.parts.own_master.get(self.id),
+            step.world.parts.own_master.get(self.id),
             (self.id, self.life.master_id),
-            step.w.model.masters.of(step.player),
+            step.world.model.masters.of(step.player),
         )?;
         let given = TransportAction::given_sprite(transport_action.task, master)?;
         let reads = TransportReads {
@@ -45,13 +45,13 @@ impl Unit {
             restriction: master.terrain_restriction,
             defaults: MoveDefaults::of(
                 master,
-                step.w.parts.combat_of(self.id).abilities.look.as_ref(),
+                step.world.parts.combat_of(self.id).abilities.look.as_ref(),
                 roles,
             ),
             given,
             standing: master
                 .standing_sprite
-                .and_then(|sprite_id| step.w.model.graphics.get(sprite_id))
+                .and_then(|sprite_id| step.world.model.graphics.get(sprite_id))
                 .copied(),
         };
         // written back before an error too: the stop's context reads the list

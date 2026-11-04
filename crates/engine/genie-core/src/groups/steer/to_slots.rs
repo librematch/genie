@@ -22,7 +22,7 @@ use crate::objects::masters::MasterKind;
 use crate::objects::unit::Unit;
 use crate::players::PlayerId;
 use crate::world::World;
-use crate::world::slots::CheckedIndex;
+use crate::world::slots::CheckedIndexExt;
 use crate::{GenieError, GenieResult};
 
 impl World {
@@ -61,16 +61,16 @@ impl World {
         group: GroupId,
         differentiators: &[ObjectId],
     ) -> GenieResult<()> {
-        let mut i = 0;
+        let mut member_index = 0;
         loop {
             let held = self.groups.held(group)?;
-            let Some(m) = held.members.get(i).copied() else {
+            let Some(held_member) = held.members.get(member_index).copied() else {
                 break;
             };
-            let index = i;
-            i += 1;
+            let index = member_index;
+            member_index += 1;
             // members are units: the world's table holds ghosts only at negative ids
-            let Some((_, unit)) = self.object(m.id) else {
+            let Some((_, unit)) = self.object(held_member.id) else {
                 continue;
             };
             // the member's slot, by its unit's id (the first); no routine of the steer changes
@@ -80,19 +80,19 @@ impl World {
                     .slots
                     .iter()
                     .enumerate()
-                    .find(|(_, s)| s.unit_id == Some(m.id))
-                    .map(|(i, s)| (i, *s))
+                    .find(|(_, slot)| slot.unit_id == Some(held_member.id))
+                    .map(|(slot_index, slot)| (slot_index, *slot))
             });
             let Some(slot) = found else {
-                self.stop_free_member(m.id)?;
+                self.stop_free_member(held_member.id)?;
                 continue;
             };
-            if m.specific_move.active == 1 {
+            if held_member.specific_move.active == 1 {
                 let to = slot.1.transform_position;
                 let members: Vec<ObjectId> = held.members.iter().map(|member| member.id).collect();
                 let from = unit.moved_vector(self.parts.mover_of(unit.id));
                 let clear = self.line_clear(
-                    m.id,
+                    held_member.id,
                     from,
                     to,
                     Distance::new(self.model.tuning.group.clearance),
@@ -111,8 +111,8 @@ impl World {
                 if !ends {
                     continue;
                 }
-                if self.object(m.id).is_some()
-                    && let Some(mover) = self.parts.mover_mut(m.id)
+                if self.object(held_member.id).is_some()
+                    && let Some(mover) = self.parts.mover_mut(held_member.id)
                 {
                     mover.stand()?;
                 }
@@ -172,7 +172,7 @@ impl World {
             return Err(unread.error());
         }
         let top = actions.top_action();
-        let state = top.map_or(ActionState::NO_ACTION, |a| a.state);
+        let state = top.map_or(ActionState::NO_ACTION, |top_action| top_action.state);
         let move_to = top.is_some_and(|top_action| top_action.kind == MOVE_TO);
         Ok((move_to || KEEPS_MOVING.contains(&state.get()), state))
     }
@@ -278,24 +278,24 @@ impl World {
         &mut self,
         group: GroupId,
         index: usize,
-        (slot, s): (usize, Slot),
+        (slot, target_slot): (usize, Slot),
         differentiators: &[ObjectId],
     ) -> GenieResult<()> {
-        let g = self.groups.held(group)?;
-        let id = g.members.checked(index)?.id;
-        let Some((_, u)) = self.object(id) else {
+        let unit_group = self.groups.held(group)?;
+        let id = unit_group.members.checked(index)?.id;
+        let Some((_, unit)) = self.object(id) else {
             return Ok(());
         };
-        if !self.parts.unit_ai.contains(u.id) {
+        if !self.parts.unit_ai.contains(unit.id) {
             return Ok(());
         }
-        let to = s.transform_position;
-        let late = s.time < self.world_time;
-        let at = u.moved_vector(self.parts.mover_of(u.id));
-        let mut d = to - at;
-        d = d.with_height(0.0);
-        let gap = sqrt(d.x() * d.x() + 0.0 + d.y() * d.y());
-        if !below_or_unordered(EPSILON, gap) && s.state == SlotState::InPlace {
+        let to = target_slot.transform_position;
+        let late = target_slot.time < self.world_time;
+        let at = unit.moved_vector(self.parts.mover_of(unit.id));
+        let mut offset = to - at;
+        offset = offset.with_height(0.0);
+        let gap = sqrt(offset.x() * offset.x() + 0.0 + offset.y() * offset.y());
+        if !below_or_unordered(EPSILON, gap) && target_slot.state == SlotState::InPlace {
             self.groups
                 .held_mut(group)?
                 .members
@@ -306,7 +306,8 @@ impl World {
             return Ok(());
         }
         if MOST_FAILURES
-            < g.members
+            < unit_group
+                .members
                 .checked(index)?
                 .specific_move
                 .consecutive_move_failures
@@ -323,11 +324,11 @@ impl World {
             return Ok(());
         }
         if !self.member_idle(id)? {
-            return self.steer_busy_member(group, (index, slot, s.state), id);
+            return self.steer_busy_member(group, (index, slot, target_slot.state), id);
         }
         let held = self.groups.held(group)?;
         let (moving, waits) = (held.motion.moving(), held.motion.waits_to_move());
-        let mut state = s.state;
+        let mut state = target_slot.state;
         if state == SlotState::InPlace && (moving || waits) {
             state = SlotState::Steering;
             self.set_slot_state(group, slot, state)?;

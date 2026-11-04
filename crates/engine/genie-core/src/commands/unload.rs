@@ -69,14 +69,14 @@ impl UnloadPick {
     #[must_use]
     pub const fn packet(self) -> (u8, i32) {
         match self {
-            Self::All(v) => (0, v),
-            Self::Player(v) => (1, v),
-            Self::Group(v) => (2, v),
-            Self::Object(o) => (3, ObjectId::field(o)),
-            Self::SameMaster(o) => (4, ObjectId::field(o)),
-            Self::AllBut(o) => (5, ObjectId::field(o)),
+            Self::All(raw) => (0, raw),
+            Self::Player(raw) => (1, raw),
+            Self::Group(raw) => (2, raw),
+            Self::Object(id) => (3, ObjectId::field(id)),
+            Self::SameMaster(id) => (4, ObjectId::field(id)),
+            Self::AllBut(object) => (5, ObjectId::field(object)),
             Self::OtherMasters(object_id) => (6, ObjectId::field(object_id)),
-            Self::Other(flag, v) => (flag, v),
+            Self::Other(flag, value) => (flag, value),
         }
     }
 

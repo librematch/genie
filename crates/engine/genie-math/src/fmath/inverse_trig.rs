@@ -22,7 +22,7 @@ pub(super) fn acos_r(z: f32) -> f32 {
     ((ACOS_P1 - z * ACOS_P2) * z + ACOS_P0) * z / (ONE - z * ACOS_Q1)
 }
 
-/// The arc cosine: the game's acosf `0x14099dc60` (msun's `e_acosf.c`). |x| from 1 up and NaN
+/// The arc cosine: the game's acosf `0x14099dc60` (msun's `e_acosf.tail`). |x| from 1 up and NaN
 /// take the bit test's branch: ±1 give 0 and π, the rest the invalid `0 / (x − x)`. Below 1/2 it
 /// is π/2 less x's series, above 1/2 twice the arc sine of `sqrt((1 ∓ x) / 2)`.
 #[must_use]
@@ -49,16 +49,16 @@ pub fn acos(x: f32) -> f32 {
     }
     if hx >> 31 != 0 {
         let z = (x + ONE) * HALF;
-        let s = sqrt(z);
-        let h = PIO2_HI - (acos_r(z) * s - PIO2_LO + s);
-        return h + h;
+        let root = sqrt(z);
+        let half_angle = PIO2_HI - (acos_r(z) * root - PIO2_LO + root);
+        return half_angle + half_angle;
     }
     let z = (ONE - x) * HALF;
-    let s = sqrt(z);
-    let df = f32::from_bits(s.to_bits() & 0xffff_f000);
-    let c = (z - df * df) / (df + s);
-    let h = acos_r(z) * s + c + df;
-    h + h
+    let root = sqrt(z);
+    let df = f32::from_bits(root.to_bits() & 0xffff_f000);
+    let tail = (z - df * df) / (df + root);
+    let half_angle = acos_r(z) * root + tail + df;
+    half_angle + half_angle
 }
 
 /// atanf of a negative x from 2^26 down: −π/2's leading bits (`DAT_142ec8a74`).
@@ -118,7 +118,7 @@ pub fn atan(x: f32) -> f32 {
             PIO2_HI
         };
     }
-    let (id, t) = if ix < 0x3ee0_0000 {
+    let (id, reduced) = if ix < 0x3ee0_0000 {
         if ix < 0x3980_0000 {
             // a subnormal x is squared into a dead store (msun raises underflow): x it is
             return x;
@@ -141,16 +141,16 @@ pub fn atan(x: f32) -> f32 {
             (Some(3), MINUS_ONE / abs_x)
         }
     };
-    let z = t * t;
-    let w = z * z;
-    let s2 = (ATAN_T1 - w * ATAN_T3) * w;
-    let s1 = ((w * ATAN_T4 + ATAN_T2) * w + ATAN_T0) * z;
-    let series = (s2 + s1) * t;
+    let z = reduced * reduced;
+    let fourth_power = z * z;
+    let s2 = (ATAN_T1 - fourth_power * ATAN_T3) * fourth_power;
+    let s1 = ((fourth_power * ATAN_T4 + ATAN_T2) * fourth_power + ATAN_T0) * z;
+    let series = (s2 + s1) * reduced;
     let Some(id) = id else {
-        return t - series;
+        return reduced - series;
     };
-    let r = ATAN_HI[id] - ((series - ATAN_LO[id]) - t);
-    if negative { -r } else { r }
+    let angle = ATAN_HI[id] - ((series - ATAN_LO[id]) - reduced);
+    if negative { -angle } else { angle }
 }
 
 /// π (`DAT_142eb0c68`).
@@ -175,7 +175,7 @@ pub(super) const MINUS_ZERO: f32 = f32::from_bits(0x8000_0000);
 pub(super) const PI_LO: f32 = f32::from_bits(0xb3bb_bd2e);
 
 /// `atan2f(y, x)`: the game's atan2f `0x14099e020` (msun's `e_atan2f.c`), the angle of the point
-/// (x, y). A NaN in either gives `y + x`; x = 1 is atanf(y). `m` holds x's sign (bit 1) and y's
+/// (x, y). A NaN in either gives `y + x`; x = 1 is atanf(y). `signs` holds x's sign (bit 1) and y's
 /// (bit 0): it picks the quadrant of the zeros, the infinities and of atanf(|y / x|).
 #[must_use]
 pub fn atan2(y: f32, x: f32) -> f32 {
@@ -188,17 +188,17 @@ pub fn atan2(y: f32, x: f32) -> f32 {
         return atan(y);
     }
     let hy = y.to_bits();
-    let m = ((hx & 0xbfff_ffff) | (hy >> 1)) >> 30;
+    let signs = ((hx & 0xbfff_ffff) | (hy >> 1)) >> 30;
     let ix = hx & 0x7fff_ffff;
     let iy = hy & 0x7fff_ffff;
     if iy == 0 {
-        return match m {
+        return match signs {
             0 | 1 => y,
             2 => PI,
             _ => MINUS_PI,
         };
     }
-    let up_or_down = if m & 1 == 0 {
+    let up_or_down = if signs & 1 == 0 {
         FRAC_PI_2
     } else {
         MINUS_FRAC_PI_2
@@ -208,14 +208,14 @@ pub fn atan2(y: f32, x: f32) -> f32 {
     }
     if ix == 0x7f80_0000 {
         return if iy == 0x7f80_0000 {
-            match m {
+            match signs {
                 0 => FRAC_PI_4,
                 1 => MINUS_FRAC_PI_4,
                 2 => THREE_FRAC_PI_4,
                 _ => MINUS_THREE_FRAC_PI_4,
             }
         } else {
-            match m {
+            match signs {
                 0 => 0.0,
                 1 => MINUS_ZERO,
                 2 => PI,
@@ -228,12 +228,12 @@ pub fn atan2(y: f32, x: f32) -> f32 {
         return up_or_down;
     }
     // |y / x| below 2^-26 with x negative: 0, else atanf(|y / x|)
-    let z = if m & 2 != 0 && iy + 0x0d00_0000 < ix {
+    let z = if signs & 2 != 0 && iy + 0x0d00_0000 < ix {
         0.0
     } else {
         atan(fabs(y / x))
     };
-    match m {
+    match signs {
         0 => z,
         1 => -z,
         2 => PI - (z - PI_LO),

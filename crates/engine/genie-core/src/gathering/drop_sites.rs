@@ -29,18 +29,18 @@ use crate::world::layer::Roles;
 use crate::world::others::OthersRef;
 
 /// The unit a drop-site search goes from ([`drop_site_search`]).
-pub(crate) struct Seeker<'a, 'b> {
+pub(crate) struct Seeker<'world, 'plan> {
     /// The unit.
-    pub(crate) unit: &'a Unit,
+    pub(crate) unit: &'world Unit,
     /// Its action layer, whose top action's target the search reads (slot 0x190).
-    pub(crate) actions: &'a Action,
+    pub(crate) actions: &'world Action,
     /// Why the load could not read it whole, if it could not ([`crate::world::Unread`]).
-    pub(crate) unread: Option<&'a Unread>,
+    pub(crate) unread: Option<&'world Unread>,
     pub(crate) me: Me,
-    pub(crate) mover: &'a Mover,
-    pub(crate) plan: &'a mut Planning<'b>,
-    pub(crate) spatial: &'a mut Spatial,
-    pub(crate) zones: &'a ZoneMap,
+    pub(crate) mover: &'world Mover,
+    pub(crate) plan: &'world mut Planning<'plan>,
+    pub(crate) spatial: &'world mut Spatial,
+    pub(crate) zones: &'world ZoneMap,
     /// Its master's class.
     pub(crate) class: ClassId,
     /// How the nearest is measured (`FUN_1411671e0`'s argument 9: by path a human player's).
@@ -171,7 +171,7 @@ impl Seeker<'_, '_> {
         Ok(self
             .spatial
             .get_known(target)?
-            .filter(|p| roles.of_class(p.class).contains(ClassRoles::FARM))
+            .filter(|placed| roles.of_class(placed.class).contains(ClassRoles::FARM))
             .map(|placed| placed.position.ground()))
     }
 }
@@ -211,8 +211,8 @@ pub(crate) fn counted(
 /// point [`NO_POINT`] on both axes takes the first object of a master in `sites` in state 2; a
 /// point at or below it on either axis has no zone and goes by the squared distance. The first
 /// of equals wins.
-pub(crate) fn drop_site_search<'u>(
-    units: impl IntoIterator<Item = &'u Unit>,
+pub(crate) fn drop_site_search<'world>(
+    units: impl IntoIterator<Item = &'world Unit>,
     masters: OwnerMasters<'_>,
     sites: &[MasterId],
     at: Position,
@@ -223,15 +223,15 @@ pub(crate) fn drop_site_search<'u>(
     let roles = by_id.roles();
     let (mut x, mut y) = (at.x(), at.y());
     let pointless = x <= NO_POINT || y <= NO_POINT;
-    let fishing = seeker.as_ref().is_some_and(|s| s.fishing(roles));
+    let fishing = seeker.as_ref().is_some_and(|seeker| seeker.fishing(roles));
     let own_zone = seeker
         .as_ref()
         .filter(|_| !fishing && !pointless)
-        .map(|s| s.zones.zone(Tile::new(x as i32, y as i32)));
+        .map(|seeker| seeker.zones.zone(Tile::new(x as i32, y as i32)));
     let mut nearest = seeker
         .as_ref()
         .filter(|_| !pointless)
-        .map_or(DropMeasure::ByDistance, |s| s.nearest);
+        .map_or(DropMeasure::ByDistance, |seeker| seeker.nearest);
     let mut best: Option<DropSiteId> = None;
     let mut best_d = NO_DROP_DISTANCE;
     let mut last = NO_DROP_DISTANCE;
@@ -277,16 +277,18 @@ pub(crate) fn drop_site_search<'u>(
         }
         let (dx, dy) = (x - unit.position().x(), y - unit.position().y());
         let squared = dy * dy + dx * dx;
-        let d = match seeker.as_mut() {
-            Some(s) => match s.measure(unit, master, nearest, squared, &mut last, by_id)? {
-                Some(d) => d,
-                None => continue,
-            },
+        let measured = match seeker.as_mut() {
+            Some(seeker) => {
+                match seeker.measure(unit, master, nearest, squared, &mut last, by_id)? {
+                    Some(distance) => distance,
+                    None => continue,
+                }
+            }
             None => squared,
         };
-        if d < best_d {
+        if measured < best_d {
             best = Some(DropSiteId::new(unit.id));
-            best_d = d;
+            best_d = measured;
         }
     }
     Ok(best)
@@ -310,9 +312,9 @@ pub(crate) fn nearest_drop_site(
         }
         let (x, y) = (at.x(), at.y());
         let (dx, dy) = (x - unit.position().x(), y - unit.position().y());
-        let d = DistanceSquared::new(dy * dy + dx * dx);
-        if best.is_none_or(|(_, distance_squared)| d < distance_squared) {
-            best = Some((DropSiteId::new(unit.id), d));
+        let gap = DistanceSquared::new(dy * dy + dx * dx);
+        if best.is_none_or(|(_, distance_squared)| gap < distance_squared) {
+            best = Some((DropSiteId::new(unit.id), gap));
         }
     }
     best
@@ -414,9 +416,9 @@ mod tests {
         Object::with_actions(
             object(10, ids::VILLAGER_MALE, Point::new(20.0, 20.0)),
             Action {
-                list: ActionList::default().with_build(target.map(|t| {
+                list: ActionList::default().with_build(target.map(|id| {
                     started(
-                        object_id(t),
+                        object_id(id),
                         Position::new(20.0, 17.0, 0.0),
                         Distance::ZERO,
                         task,
@@ -442,13 +444,13 @@ mod tests {
             unknown: None,
             obstruction: None,
         };
-        let mut s = Spatial::default();
-        s.insert(object_id(800), placed(farm, class::FARM));
-        s.insert(
+        let mut spatial = Spatial::default();
+        spatial.insert(object_id(800), placed(farm, class::FARM));
+        spatial.insert(
             object_id(801),
             placed(Point::new(20.0, 17.0), class::BUILDING),
         );
-        s
+        spatial
     }
 
     /// The search over `units` from `at` with `seeker`'s unit (of `class`) as the seeker by path,

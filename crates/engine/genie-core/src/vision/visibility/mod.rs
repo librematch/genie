@@ -3,10 +3,10 @@
 //!
 //! A player's map counts, per tile, the player's objects whose line of sight covers the tile: -1
 //! for a tile the player never saw, 0 for one it saw before, more for one it sees now. The unified
-//! map holds, per tile, bit `p` while player `p` sees the tile and bit `32 + p` once it saw it. An
-//! object's sight comes and goes with its tile (`RGE_Static_Object::new_position`, `0x1411a58b0`),
-//! its master (`FUN_1411a6a70`), its death (`FUN_14119d710`) and a building's construction
-//! (`FUN_1411e5670`, `FUN_1411dbb70`).
+//! map holds, per tile, bit `player` while player `player` sees the tile and bit `32 + player` once
+//! it saw it. An object's sight comes and goes with its tile (`RGE_Static_Object::new_position`,
+//! `0x1411a58b0`), its master (`FUN_1411a6a70`), its death (`FUN_14119d710`) and a building's
+//! construction (`FUN_1411e5670`, `FUN_1411dbb70`).
 //!
 //! The map's tiles also link a building's tiles to its anchor tile (the map tile's `+0x19` and
 //! `+0x1a`, `FUN_140f73900`), and the map keeps a list of the buildings' extents (the saved UMV
@@ -39,7 +39,7 @@ use crate::players::PlayerKind;
 use crate::vision::TileCount;
 use crate::vision::VisionBits;
 use crate::vision::registry::Registry;
-use crate::world::slots::CheckedIndex;
+use crate::world::slots::CheckedIndexExt;
 use crate::{GenieError, GenieResult};
 
 mod building_links;
@@ -184,7 +184,7 @@ impl VisibleResources {
         else {
             return;
         };
-        if usize::try_from(*capacity).is_ok_and(|c| c == list.len()) {
+        if usize::try_from(*capacity).is_ok_and(|capacity| capacity == list.len()) {
             *capacity *= 2;
         }
         list.push(VisibleResource {
@@ -205,14 +205,14 @@ impl VisibleResources {
         if list.is_empty() {
             return 0;
         }
-        let Some(i) = list
+        let Some(index) = list
             .iter()
             .position(|visible_resource| visible_resource.id == id)
         else {
             return -1;
         };
-        let _ = list.swap_remove(i);
-        i as i32
+        let _ = list.swap_remove(index);
+        index as i32
     }
 
     /// `Get_Closest_Resource` (`FUN_141289000`): the record of list `group` nearest (`x`, `y`)
@@ -222,11 +222,11 @@ impl VisibleResources {
         let list = self.lists.get_mut(group.index())?;
         let (x, y) = (at.x(), at.y());
         // COMISS r, p; JBE: a record at or below the point (or NaN) measures p - r
-        let gap = |r: f32, p: f32| {
-            if at_most_or_unordered(r, p) {
-                p - r
+        let gap = |record: f32, point: f32| {
+            if at_most_or_unordered(record, point) {
+                point - record
             } else {
-                r - p
+                record - point
             }
         };
         let mut best = None;
@@ -236,14 +236,14 @@ impl VisibleResources {
                 gap(visible_resource.at.x(), x),
                 gap(visible_resource.at.y(), y),
             );
-            let d = dy * dy + dx * dx;
-            if d < nearest && !skip.contains(&visible_resource.id) {
+            let distance = dy * dy + dx * dx;
+            if distance < nearest && !skip.contains(&visible_resource.id) {
                 best = Some(index);
-                nearest = d;
+                nearest = distance;
             }
         }
-        if let Some(i) = best {
-            list.get_mut(i)?.distance = Distance::new(sqrt(nearest));
+        if let Some(index) = best {
+            list.get_mut(index)?.distance = Distance::new(sqrt(nearest));
         }
         best
     }
@@ -320,14 +320,14 @@ pub fn capture_kind(
 
 /// The tile of a position as `new_position` files the object (`0x1411a58b0`): the position held
 /// on the map (`DAT_142eb1e9c` below its size), the tile held on the map.
-fn tile_of(v: f32, size: i32) -> i32 {
-    let v = if v < 0.0 { 0.0 } else { v };
-    let v = if size as f32 <= v {
+fn tile_of(position: f32, size: i32) -> i32 {
+    let coordinate = if position < 0.0 { 0.0 } else { position };
+    let coordinate = if size as f32 <= coordinate {
         size as f32 - 0.001
     } else {
-        v
+        coordinate
     };
-    (v as i32).clamp(0, size - 1)
+    (coordinate as i32).clamp(0, size - 1)
 }
 
 impl Visibility {
@@ -341,13 +341,13 @@ impl Visibility {
         extents_capacity: i32,
         player_kinds: Vec<PlayerKind>,
     ) -> Self {
-        let n = (size.width().max(0) * size.height().max(0)) as usize;
+        let tiles = (size.width().max(0) * size.height().max(0)) as usize;
         let players = maps.len();
         Self {
             size,
             maps,
             unified,
-            links: vec![(0, 0); n],
+            links: vec![(0, 0); tiles],
             extents,
             extents_capacity,
             player_kinds,

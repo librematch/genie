@@ -22,7 +22,7 @@ use crate::vision::visibility::{Seer, Visibility, tile_of};
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 use crate::world::layer::generated::VisibilityTuning;
-use crate::world::slots::CheckedIndex;
+use crate::world::slots::CheckedIndexExt;
 
 /// An object's own sight, as the base class explores it ([`Visibility::base_sight_on`]'s
 /// arguments, `FUN_141192560`'s).
@@ -140,10 +140,10 @@ impl Visibility {
             los,
             centre,
         } = sight;
-        let Some(s) = self.seers.get(id).copied() else {
+        let Some(found) = self.seers.get(id).copied() else {
             return Ok(TileCount::ZERO);
         };
-        let (shape, centre) = match s.building {
+        let (shape, centre) = match found.building {
             Some(building_sight) if building_sight != BuildingSight::Built => {
                 if building_sight == BuildingSight::Unstarted {
                     if let Some(seer) = self.seers.get_mut(id) {
@@ -155,11 +155,11 @@ impl Visibility {
             }
             Some(_) => {
                 // The master whose sight the AI players' market lists follow (`FUN_1411d0190`: id 84).
-                if roles.of_master(s.master).contains(MasterRoles::MARKET)
+                if roles.of_master(found.master).contains(MasterRoles::MARKET)
                     && !self
                         .player_kinds
-                        .get(s.player.index())
-                        .is_some_and(|t| t.is_computer())
+                        .get(found.player.index())
+                        .is_some_and(|player_kind| player_kind.is_computer())
                 {
                     // its tile goes to the allied computer players' lists (player +0x180)
                     if self
@@ -177,7 +177,7 @@ impl Visibility {
         self.base_sight_on(
             SightOn {
                 id,
-                seer: s,
+                seer: found,
                 position,
                 radius,
                 shape,
@@ -198,7 +198,7 @@ impl Visibility {
     ) -> GenieResult<TileCount> {
         let SightOn {
             id,
-            seer: s,
+            seer,
             position,
             radius,
             shape,
@@ -206,7 +206,7 @@ impl Visibility {
             centre,
         } = on;
         let shape = if roles
-            .of_master(s.master)
+            .of_master(seer.master)
             .contains(MasterRoles::CIRCLE_SIGHT)
         {
             SightShape::Circle
@@ -223,7 +223,7 @@ impl Visibility {
                 return Ok(TileCount::ZERO);
             }
             self.explore_rect(
-                s.player,
+                seer.player,
                 TileRect::new(
                     (x - rx) as i32,
                     (y - ry) as i32,
@@ -232,7 +232,7 @@ impl Visibility {
                 ),
             )?
         } else {
-            self.explore(s.player, Tile::new(x as i32, y as i32), los, centre)?
+            self.explore(seer.player, Tile::new(x as i32, y as i32), los, centre)?
         };
         if let Some(seer) = self.seers.get_mut(id) {
             seer.explored = true;
@@ -403,7 +403,10 @@ impl Visibility {
         if old == new || (new < old && new != ObjectState::Foundation) {
             return Ok(());
         }
-        let master_sees = self.seers.get(id).is_some_and(|s| Distance::ZERO < s.los);
+        let master_sees = self
+            .seers
+            .get(id)
+            .is_some_and(|seer| Distance::ZERO < seer.los);
         if old == ObjectState::Alive && (ObjectState::Alive < new || new == ObjectState::Foundation)
         {
             self.sight_off(

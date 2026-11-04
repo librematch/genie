@@ -8,7 +8,7 @@ use crate::objects::ObjectId;
 use crate::objects::layers::Action;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::PlayersMasters;
+use crate::objects::masters::PlayersMastersExt;
 use crate::objects::unit::{Outcome, Unit, object_master};
 use crate::ownership::CaptureKind;
 use crate::ownership::capture::Captured;
@@ -24,7 +24,7 @@ use crate::world::UNIT_AI_MASTER;
 use crate::world::layer::Roles;
 use crate::world::others::OthersRef;
 use crate::world::parts::PartTable;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 use crate::world::step::Step;
 use crate::{GenieError, GenieResult};
 use std::mem::{replace, take};
@@ -52,21 +52,22 @@ impl Unit {
         // an object others take over by seeing it (`+0x924` 1) gives it to the first player that
         // sees it ([`crate::vision::visibility::sight_taker`]) when that one has its master
         let mut captured = captured;
-        let combat = MasterKind::COMBAT <= self.master(step.w.master_tables(), step.player)?.kind;
+        let combat =
+            MasterKind::COMBAT <= self.master(step.world.master_tables(), step.player)?.kind;
         if combat
             && let Some(mask) = step
-                .w
+                .world
                 .spatial
-                .combat_sight(self.id, step.w.parts.building_of(self.id).annex_of)?
+                .combat_sight(self.id, step.world.parts.building_of(self.id).annex_of)?
             && let Some(player_id) = sight_taker(
                 mask,
                 step.player,
-                step.w.settings.game_mode,
-                &step.w.players,
-                &step.w.allow_gaia_capture,
+                step.world.settings.game_mode,
+                &step.world.players,
+                &step.world.allow_gaia_capture,
             )
             && step
-                .w
+                .world
                 .model
                 .masters
                 .get(player_id.index())
@@ -92,13 +93,13 @@ impl Unit {
                 building: take(&mut step.building_handover),
             });
         }
-        if let Some(k) = captured {
-            return Ok(Outcome::Captured(k));
+        if let Some(captured) = captured {
+            return Ok(Outcome::Captured(captured));
         }
         Ok(leaves)
     }
 
-    /// Runs `f` on the unit's AI with its side ([`UnitView`]: the unit without its AI, on the
+    /// Runs `work` on the unit's AI with its side ([`UnitView`]: the unit without its AI, on the
     /// update's step, the owner as `view` names it) and the AI stream, with `attacker` for the
     /// attack tests ([`Unit::attacker_of`]), as player `player` (of `player_type`); the AI is the
     /// unit's again after it and is posted the notifies the side's calls gave it.
@@ -109,7 +110,7 @@ impl Unit {
     ///
     /// # Errors
     ///
-    /// `f`'s, a notify the AI's queue does not take, and a draw from the AI stream in a world
+    /// `work`'s, a notify the AI's queue does not take, and a draw from the AI stream in a world
     /// routine the side called while the AI held the stream.
     pub(crate) fn with_side<R>(
         &mut self,
@@ -118,15 +119,15 @@ impl Unit {
         view: &OwnerView,
         attacker: Attacker,
         (player, player_kind): (PlayerId, PlayerKind),
-        f: impl FnOnce(&mut UnitAi, &mut UnitView<'_, '_>, &mut Well512) -> GenieResult<R>,
+        work: impl FnOnce(&mut UnitAi, &mut UnitView<'_, '_>, &mut Well512) -> GenieResult<R>,
     ) -> GenieResult<R> {
-        let mut ai = step.w.lend_unit_ai(self.id).ok_or(NO_UNIT_AI)?;
+        let mut ai = step.world.lend_unit_ai(self.id).ok_or(NO_UNIT_AI)?;
         // the AI stream is the AI's while it runs: no world routine the side calls draws from it
-        let held = step.w.streams.get(Stream::Ai).clone();
+        let held = step.world.streams.get_mut(Stream::Ai).clone();
         let mut ai_stream = held.clone();
         let outer = step.side_notifies.replace(Vec::new());
         let mut side = UnitView {
-            c: &mut *step,
+            step: &mut *step,
             unit: self,
             actions,
             attacker,
@@ -136,13 +137,13 @@ impl Unit {
             civ: view.civ,
             ai_settings: view.ai_settings,
         };
-        let result = f(&mut ai, &mut side, &mut ai_stream);
+        let result = work(&mut ai, &mut side, &mut ai_stream);
         let own = replace(&mut step.side_notifies, outer).unwrap_or_default();
         let posted = own
             .into_iter()
             .try_for_each(|(notify, state)| ai.post(notify, state));
-        step.w.return_unit_ai(self.id, ai);
-        let stream = step.w.streams.get(Stream::Ai);
+        step.world.return_unit_ai(self.id, ai);
+        let stream = step.world.streams.get_mut(Stream::Ai);
         if *stream != held {
             return Err(GenieError::unreachable(
                 "a world routine drew from the AI stream while the unit AI held it",
@@ -154,7 +155,7 @@ impl Unit {
         Ok(answer)
     }
 
-    /// The unit's AI run outside its update (a command's immediate order): `f` gets the AI, what
+    /// The unit's AI run outside its update (a command's immediate order): `work` gets the AI, what
     /// it reads of the unit and the world ([`Unit::surroundings`], as the updating player's own
     /// unit), its side ([`Unit::with_side`], whose calls on the unit run at once), the owner's
     /// computer flag and the AI stream.
@@ -162,12 +163,12 @@ impl Unit {
     /// # Errors
     ///
     /// A unit without a unit AI, slot 0x2d0 and the surroundings' parts the slice does not model,
-    /// and what `f` and its calls do not.
+    /// and what `work` and its calls do not.
     pub(crate) fn run_ai(
         &mut self,
         actions: &mut Action,
         step: &mut Step<'_>,
-        f: impl FnOnce(
+        work: impl FnOnce(
             &mut UnitAi,
             &Surroundings,
             &mut UnitView<'_, '_>,
@@ -177,17 +178,17 @@ impl Unit {
     ) -> GenieResult<()> {
         // every caller tests the unit for its unit AI first (`World::run_ai_calls`'s and
         // `World::run_unit_ai`'s callers, the capture's stop)
-        let Some(ai_kind) = step.w.parts.unit_ai.get(self.id).map(|ai| ai.ai_kind) else {
+        let Some(ai_kind) = step.world.parts.unit_ai.get(self.id).map(|ai| ai.ai_kind) else {
             return Err(GenieError::unreachable(
                 "a unit AI's run of a unit without one (its callers test for one)",
             ));
         };
-        let busy = actions.top_action_kind().is_some() || step.w.parts.unread.contains(self.id);
-        let master = Some(self.master(step.w.master_tables(), step.player)?);
+        let busy = actions.top_action_kind().is_some() || step.world.parts.unread.contains(self.id);
+        let master = Some(self.master(step.world.master_tables(), step.player)?);
         let class = master.map(|ms| ms.class);
-        let (player, player_kind) = (step.player, step.w.players.player(step.player)?.kind);
+        let (player, player_kind) = (step.player, step.world.players.player(step.player)?.kind);
         let view = OwnerView::of(step, None)?;
-        let interruptible = actions.interruptible(step.w.parts.unread.get(self.id))?;
+        let interruptible = actions.interruptible(step.world.parts.unread.get(self.id))?;
         let at = self.surroundings(
             actions,
             step,
@@ -200,11 +201,11 @@ impl Unit {
             ai_kind,
             master,
             (player, player_kind),
-            step.w.settings.game_mode,
+            step.world.settings.game_mode,
             (
                 at.capture,
-                step.w.parts.combat_of(self.id).firepower,
-                step.w
+                step.world.parts.combat_of(self.id).firepower,
+                step.world
                     .parts
                     .mover_of(self.id)
                     .map_or(Speed::ZERO, |mover| mover.stats.speed),
@@ -216,44 +217,44 @@ impl Unit {
             &view,
             attacker,
             (player, player_kind),
-            |ai, side, rng| f(ai, &at, side, player_kind, rng),
+            |ai, side, rng| work(ai, &at, side, player_kind, rng),
         )
     }
 
     /// The unit's AI run by a world routine that gives it only the unit's place (a stance, a
-    /// stop of the game's status, a let-out, an unload, a capture's stop): `f` gets the AI, its
+    /// stop of the game's status, a let-out, an unload, a capture's stop): `work` gets the AI, its
     /// side ([`Unit::with_side`], whose calls on the unit run at once, the updating player's) and
     /// the AI stream.
     ///
     /// # Errors
     ///
-    /// A unit without a unit AI, and what `f` and its calls do not model.
+    /// A unit without a unit AI, and what `work` and its calls do not model.
     pub(crate) fn run_calls<R>(
         &mut self,
         actions: &mut Action,
         step: &mut Step<'_>,
-        f: impl FnOnce(&mut UnitAi, &mut UnitView<'_, '_>, &mut Well512) -> GenieResult<R>,
+        work: impl FnOnce(&mut UnitAi, &mut UnitView<'_, '_>, &mut Well512) -> GenieResult<R>,
     ) -> GenieResult<R> {
         // every caller tests the unit for its unit AI first (`World::run_ai_calls`'s and
         // `World::run_unit_ai`'s callers, the capture's stop)
-        let Some(ai_kind) = step.w.parts.unit_ai.get(self.id).map(|ai| ai.ai_kind) else {
+        let Some(ai_kind) = step.world.parts.unit_ai.get(self.id).map(|ai| ai.ai_kind) else {
             return Err(GenieError::unreachable(
                 "a unit AI's run of a unit without one (its callers test for one)",
             ));
         };
-        let master = Some(self.master(step.w.master_tables(), step.player)?);
-        let (player, player_kind) = (step.player, step.w.players.player(step.player)?.kind);
+        let master = Some(self.master(step.world.master_tables(), step.player)?);
+        let (player, player_kind) = (step.player, step.world.players.player(step.player)?.kind);
         let view = OwnerView::of(step, None)?;
         let attacker = self.attacker_of(
             actions,
             ai_kind,
             master,
             (player, player_kind),
-            step.w.settings.game_mode,
+            step.world.settings.game_mode,
             (
                 self.capture_kind(step),
-                step.w.parts.combat_of(self.id).firepower,
-                step.w
+                step.world.parts.combat_of(self.id).firepower,
+                step.world
                     .parts
                     .mover_of(self.id)
                     .map_or(Speed::ZERO, |mover| mover.stats.speed),
@@ -265,13 +266,13 @@ impl Unit {
             &view,
             attacker,
             (player, player_kind),
-            |ai, side, rng| f(ai, side, rng),
+            |ai, side, rng| work(ai, side, rng),
         )
     }
 
     /// The capture kind its seer has in the players' sight (0 without one).
     pub(super) fn capture_kind(&self, step: &Step<'_>) -> CaptureKind {
-        step.w
+        step.world
             .spatial
             .sight
             .as_ref()
@@ -295,52 +296,57 @@ impl Unit {
         captured: Option<&Captured>,
         after: Option<AfterOrder>,
     ) -> GenieResult<Option<AfterOrder>> {
-        let busy = actions.top_action_kind().is_some() || step.w.parts.unread.contains(self.id);
+        let busy = actions.top_action_kind().is_some() || step.world.parts.unread.contains(self.id);
         // the unit's master: its own (a captured unit's copy), else its owner's
         let master = object_master(
-            step.w.parts.own_master.get(self.id),
+            step.world.parts.own_master.get(self.id),
             (self.id, self.life.master_id),
-            step.w.model.masters.of(step.player),
+            step.world.model.masters.of(step.player),
         )
         .ok();
         let class = master.map(|ms| ms.class);
         // a captured unit's unit AI runs as its new owner's (RGE_Combat_Object::update reads the
         // owner then): on that player's turn, with its time as it stands
         let (turn, player, player_kind) = match captured {
-            Some(k) if k.main => (
-                (k.new == step.w.player_turn)
-                    .then(|| step.w.player_time.get(k.new.index()).copied())
+            Some(captured) if captured.main => (
+                (captured.new == step.world.player_turn)
+                    .then(|| step.world.player_time.get(captured.new.index()).copied())
                     .flatten(),
-                k.new,
-                step.w
+                captured.new,
+                step.world
                     .players
-                    .get(k.new.index())
-                    .map_or(PlayerKind::Phantom, |q| q.kind),
+                    .get(captured.new.index())
+                    .map_or(PlayerKind::Phantom, |player| player.kind),
             ),
             _ => (
                 step.turn,
                 step.player,
-                step.w.players.player(step.player)?.kind,
+                step.world.players.player(step.player)?.kind,
             ),
         };
-        let view = OwnerView::of(step, captured.filter(|k| k.main).map(|k| k.new))?;
+        let view = OwnerView::of(
+            step,
+            captured
+                .filter(|captured| captured.main)
+                .map(|captured| captured.new),
+        )?;
         // RGE_Combat_Object::update: on the owner's turn the full update (slot 4), else
         // FUN_140c68980 for a unit not inside another; a dead unit's full update only adds the
         // world's dt to its time since the last enemy sighting (`+0x1b4`) before it returns
-        if turn.is_some() && step.w.parts.unit_ai.contains(self.id) && after.is_none() {
+        if turn.is_some() && step.world.parts.unit_ai.contains(self.id) && after.is_none() {
             // the full update's start lets the unit AIs' search cache go
-            step.w.spatial.forget_search();
+            step.world.spatial.forget_search();
         }
         if turn.is_some()
             && after.is_none()
             && !self.life.is_alive()
-            && let Some(ai) = step.w.parts.unit_ai.get_mut(self.id)
+            && let Some(ai) = step.world.parts.unit_ai.get_mut(self.id)
         {
             ai.time_since_enemy += step.dt.seconds();
         }
         let runs = turn.is_some() || self.life.inside.is_none();
         let Some((orders, ai_kind)) = step
-            .w
+            .world
             .parts
             .unit_ai
             .get(self.id)
@@ -350,8 +356,8 @@ impl Unit {
             return Ok(None);
         };
         // slot 0x2d0 matters only to a queue with orders
-        let interruptible = match actions.interruptible(step.w.parts.unread.get(self.id)) {
-            Ok(i) => i,
+        let interruptible = match actions.interruptible(step.world.parts.unread.get(self.id)) {
+            Ok(answer) => answer,
             Err(error) if orders => return Err(error),
             Err(_) => false,
         };
@@ -363,17 +369,17 @@ impl Unit {
             (player, busy, interruptible),
         )?;
         // the unit AI runs on its own; what it asks of its unit comes back through `UnitView`
-        let world_time = step.w.world_time;
+        let world_time = step.world.world_time;
         let attacker = self.attacker_of(
             actions,
             ai_kind,
             master,
             (player, player_kind),
-            step.w.settings.game_mode,
+            step.world.settings.game_mode,
             (
                 at.capture,
-                step.w.parts.combat_of(self.id).firepower,
-                step.w
+                step.world.parts.combat_of(self.id).firepower,
+                step.world
                     .parts
                     .mover_of(self.id)
                     .map_or(Speed::ZERO, |mover| mover.stats.speed),
@@ -408,15 +414,17 @@ impl Unit {
     /// changed the target before (the Build's work order on a resource).
     pub(super) fn ai_target(&self, step: &Step<'_>, viewer: PlayerId) -> GenieResult<Option<Seen>> {
         match step
-            .w
+            .world
             .parts
             .unit_ai
             .get(self.id)
             .and_then(|ai| ai.current_target)
         {
             None => Ok(None),
-            Some(t) if t == self.id => step.w.seen_of(self, step.player, viewer).map(Some),
-            Some(object_id) => step.w.seen(Some(object_id), viewer),
+            Some(target) if target == self.id => {
+                step.world.seen_of(self, step.player, viewer).map(Some)
+            }
+            Some(object_id) => step.world.seen(Some(object_id), viewer),
         }
     }
 
@@ -433,19 +441,24 @@ impl Unit {
         view: &OwnerView,
         master: Option<&Master>,
     ) -> GenieResult<Vec<UnitSeen>> {
-        let Some(ai) = step.w.parts.unit_ai.get(self.id) else {
+        let Some(ai) = step.world.parts.unit_ai.get(self.id) else {
             return Ok(Vec::new());
         };
         let damaged = ai
             .notifies
             .iter()
-            .filter(|n| matches!(n.kind, NotifyKind::DAMAGED | NotifyKind::MISSILE_WARNING))
-            .map(|n| n.caller);
+            .filter(|notify| {
+                matches!(
+                    notify.kind,
+                    NotifyKind::DAMAGED | NotifyKind::MISSILE_WARNING
+                )
+            })
+            .map(|notify| notify.caller);
         let in_the_way = ai
             .notifies
             .iter()
-            .filter(|n| n.kind == NotifyKind::IN_THE_WAY)
-            .map(|notify| ObjectId::of_field(notify.p[0]));
+            .filter(|notify| notify.kind == NotifyKind::IN_THE_WAY)
+            .map(|notify| ObjectId::of_field(notify.params[0]));
         // none (−1) names no object the world holds
         let mut ids: Vec<ObjectId> = ai
             .attackers
@@ -459,19 +472,19 @@ impl Unit {
         let mut seen = Vec::new();
         for id in ids {
             let found = others.find(id);
-            let (Some((owner, unit)), Some(placed)) = (found, step.w.spatial.get(id)) else {
+            let (Some((owner, unit)), Some(placed)) = (found, step.world.spatial.get(id)) else {
                 continue;
             };
-            let m = unit.master(step.w.master_tables(), owner)?;
+            let unit_master = unit.master(step.world.master_tables(), owner)?;
             let me = master.ok_or(UNIT_AI_MASTER)?;
             seen.push(UnitSeen {
                 id,
-                class: m.class,
+                class: unit_master.class,
                 owner,
-                combat_level: m.combat_level,
+                combat_level: unit_master.combat_level,
                 state: unit.life.state,
                 target: step
-                    .w
+                    .world
                     .parts
                     .unit_ai
                     .get(unit.id)
@@ -485,10 +498,10 @@ impl Unit {
                 position: placed.position,
                 hp: unit.life.hp,
                 master: unit.life.master_id,
-                kind: m.kind,
-                main: step.w.parts.building_of(unit.id).annex_of,
+                kind: unit_master.kind,
+                main: step.world.parts.building_of(unit.id).annex_of,
                 allied: allied(
-                    view.relations(step.w)?,
+                    view.relations(step.world)?,
                     view.player,
                     owner,
                     AllyTest::WithRelation4,
@@ -504,9 +517,9 @@ impl Unit {
         &self,
         ais: &mut PartTable<UnitAi>,
         kind: NotifyKind,
-        p: [i32; 3],
+        params: [i32; 3],
     ) -> GenieResult<()> {
-        ais.inbox(self.id, self.life.state).post(kind, p)
+        ais.inbox(self.id, self.life.state).post(kind, params)
     }
 
     /// The units in the way the motion step told the unit AI of ([`crate::unit_ai::NotifyKind::IN_THE_WAY`],
@@ -521,7 +534,9 @@ impl Unit {
         mover: Option<&mut Mover>,
         ais: &mut PartTable<UnitAi>,
     ) -> GenieResult<()> {
-        let in_the_way = mover.map(|m| take(&mut m.in_the_way)).unwrap_or_default();
+        let in_the_way = mover
+            .map(|mover| take(&mut mover.in_the_way))
+            .unwrap_or_default();
         for id in in_the_way {
             self.post_own(ais, NotifyKind::IN_THE_WAY, [id.get(), -1, -1])?;
         }

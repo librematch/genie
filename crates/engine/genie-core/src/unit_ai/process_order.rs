@@ -234,7 +234,9 @@ impl UnitAi {
         let (at, player_kind) = world.ok_or(OUTSIDE_ORDER)?;
         // an order on no target (−1): each case's lookup finds nothing, so it takes no order
         Ok(match (queued_order.order, queued_order.target) {
-            (OrderKind::Attack, Some(t)) => self.attack_slot(t, TargetRules::Any, at, side, ai)?,
+            (OrderKind::Attack, Some(target)) => {
+                self.attack_slot(target, TargetRules::Any, at, side, ai)?
+            }
             (OrderKind::Defend, target) => {
                 if roles.of_master(at.master).contains(MasterRoles::DEFENDLESS) {
                     return Ok(Answer::NotTaken);
@@ -246,19 +248,23 @@ impl UnitAi {
                         OrderForce::Forced,
                         at,
                     ),
-                    Some(t) => {
-                        self.defend_object(t, queued_order.range, OrderForce::Forced, at, side)?
-                    }
+                    Some(object_id) => self.defend_object(
+                        object_id,
+                        queued_order.range,
+                        OrderForce::Forced,
+                        at,
+                        side,
+                    )?,
                 }
             }
             (OrderKind::RunAway, _) => {
                 self.run_away(OrderForce::Forced, at, player_kind, ai, side)?
             }
-            (OrderKind::SeekAndDestroy, Some(t)) => {
+            (OrderKind::SeekAndDestroy, Some(target)) => {
                 let tiles = queued_order.point.tile();
-                self.seek_and_destroy(t, tiles, OrderForce::Forced, at, side)?
+                self.seek_and_destroy(target, tiles, OrderForce::Forced, at, side)?
             }
-            (OrderKind::AttackRoundup, Some(t)) => self.attack_roundup(t, at, side)?,
+            (OrderKind::AttackRoundup, Some(object)) => self.attack_roundup(object, at, side)?,
             (OrderKind::AttackMove, target) => {
                 if let Some(object_id) = target
                     && roles
@@ -296,18 +302,18 @@ impl UnitAi {
         // an order on no target (−1): each case's lookup finds nothing, so it takes no order;
         // the hunt's stops the unit (`hunt_order`)
         Ok(match (queued_order.order, queued_order.target) {
-            (OrderKind::Build, Some(t)) => {
-                self.build_object(FoundationId::new(t), OrderForce::Forced, at, side, rng)?
+            (OrderKind::Build, Some(target)) => {
+                self.build_object(FoundationId::new(target), OrderForce::Forced, at, side, rng)?
             }
-            (OrderKind::Heal | OrderKind::Convert | OrderKind::Repair, Some(t)) => {
+            (OrderKind::Heal | OrderKind::Convert | OrderKind::Repair, Some(target)) => {
                 let (action, command) = match queued_order.order {
-                    OrderKind::Heal => (AiAction::Heal, UnitCommand::Heal(t)),
-                    OrderKind::Convert => (AiAction::Convert, UnitCommand::Convert(t)),
-                    _ => (AiAction::Repair, UnitCommand::Repair(t)),
+                    OrderKind::Heal => (AiAction::Heal, UnitCommand::Heal(target)),
+                    OrderKind::Convert => (AiAction::Convert, UnitCommand::Convert(target)),
+                    _ => (AiAction::Repair, UnitCommand::Repair(target)),
                 };
-                self.work_object(t, OrderForce::Forced, (action, command), (at, side))?
+                self.work_object(target, OrderForce::Forced, (action, command), (at, side))?
             }
-            (OrderKind::Gather, Some(t)) => self.gather_order(t, at, side, rng)?,
+            (OrderKind::Gather, Some(object)) => self.gather_order(object, at, side, rng)?,
             (OrderKind::Hunt | OrderKind::AutoBoarLuring, target) => {
                 let hunts = self.hunt_order(target, at, side, rng)?;
                 if queued_order.order == OrderKind::AutoBoarLuring {
@@ -341,9 +347,14 @@ impl UnitAi {
         let (at, _) = world.ok_or(OUTSIDE_ORDER)?;
         // an order on no target (−1): its lookup finds nothing, so it takes no order
         Ok(match (queued_order.order, queued_order.target) {
-            (OrderKind::Follow, Some(t)) => {
-                self.follow_object(t, queued_order.range, OrderForce::Forced, at, side, rng)?
-            }
+            (OrderKind::Follow, Some(target)) => self.follow_object(
+                target,
+                queued_order.range,
+                OrderForce::Forced,
+                at,
+                side,
+                rng,
+            )?,
             (OrderKind::Transport, _) => {
                 self.transport_to(queued_order.point, OrderForce::Forced, side)?
             }
@@ -421,11 +432,16 @@ impl UnitAi {
         let Some(id) = side.top_target_now() else {
             return Ok(None);
         };
-        if let Some(t) = at.top_target.filter(|top_target| top_target.id == id) {
+        if let Some(top_target) = at.top_target.filter(|top_target| top_target.id == id) {
             return Ok(Some(LiveTop {
                 id,
-                kind: t.kind,
-                gap_squared: footprint_gap_squared(at.position, at.size, t.position, t.radius),
+                kind: top_target.kind,
+                gap_squared: footprint_gap_squared(
+                    at.position,
+                    at.size,
+                    top_target.position,
+                    top_target.radius,
+                ),
             }));
         }
         Ok(Self::world_object(id, at, side)?.map(|unit_seen| LiveTop {

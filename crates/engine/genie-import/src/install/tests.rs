@@ -57,8 +57,8 @@ fn modded_files_get_keys_of_their_own() {
     };
     let mut beside = files(b"dat");
     beside.beside[2] = Some(String::new());
-    for f in [files(b"dat"), files(b"dau"), beside] {
-        let _ = cached(&f, &dir, import).unwrap();
+    for files in [files(b"dat"), files(b"dau"), beside] {
+        let _ = cached(&files, &dir, import).unwrap();
     }
     assert_eq!((imports.get(), cache_files(&dir)), (3, 3));
     remove_dir_all(&dir).unwrap();
@@ -92,7 +92,7 @@ fn missing_or_foreign_dats_fail_with_their_path_or_their_reason() {
         assert!(
             error
                 .context()
-                .any(|(k, text)| k == "path" && text == dat.display().to_string())
+                .any(|(key, text)| key == "path" && text == dat.display().to_string())
         );
     }
     write(&dat, b"not a dat").unwrap();
@@ -150,7 +150,9 @@ fn the_tables_beside_replace_their_own_where_they_are() {
         let error = with_beside(MasterTable::default(), beside).unwrap_err();
         assert_eq!(error.kind(), ErrorKind::InvalidInput);
         assert!(
-            error.context().any(|(k, text)| k == "file" && text == file),
+            error
+                .context()
+                .any(|(key, text)| key == "file" && text == file),
             "{file}"
         );
     }

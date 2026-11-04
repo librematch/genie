@@ -64,9 +64,9 @@ impl Amount {
 impl Mul<f32> for Amount {
     type Output = Self;
 
-    /// The amount scaled by `f` (one `f32` product, the amount first).
-    fn mul(self, f: f32) -> Self {
-        Self(self.0 * f)
+    /// The amount scaled by `factor` (one `f32` product, the amount first).
+    fn mul(self, factor: f32) -> Self {
+        Self(self.0 * factor)
     }
 }
 
@@ -82,9 +82,9 @@ impl Mul<Amount> for f32 {
 impl Div<f32> for Amount {
     type Output = Self;
 
-    /// The amount divided by `f` (one `f32` quotient).
-    fn div(self, f: f32) -> Self {
-        Self(self.0 / f)
+    /// The amount divided by `divisor` (one `f32` quotient).
+    fn div(self, divisor: f32) -> Self {
+        Self(self.0 / divisor)
     }
 }
 
@@ -131,25 +131,25 @@ mod tests {
     /// Each operator is the one `f32` operation, bit for bit and in its operand order.
     #[test]
     fn amounts_do_the_game_f32_operations() {
-        let (a, b) = (Amount::new(0.1), Amount::new(0.2));
-        assert_eq!((a + b).get().to_bits(), (0.1_f32 + 0.2).to_bits());
-        assert_eq!((a - b).get().to_bits(), (0.1_f32 - 0.2).to_bits());
-        assert_eq!((-a).get().to_bits(), (-0.1_f32).to_bits());
-        assert_eq!((a * 3.0).get().to_bits(), (0.1_f32 * 3.0).to_bits());
-        assert_eq!((3.0 * a).get().to_bits(), (3.0_f32 * 0.1).to_bits());
-        assert_eq!((a / 3.0).get().to_bits(), (0.1_f32 / 3.0).to_bits());
-        assert_eq!((b / a).to_bits(), (0.2_f32 / 0.1).to_bits());
+        let (first, second) = (Amount::new(0.1), Amount::new(0.2));
+        assert_eq!((first + second).get().to_bits(), (0.1_f32 + 0.2).to_bits());
+        assert_eq!((first - second).get().to_bits(), (0.1_f32 - 0.2).to_bits());
+        assert_eq!((-first).get().to_bits(), (-0.1_f32).to_bits());
+        assert_eq!((first * 3.0).get().to_bits(), (0.1_f32 * 3.0).to_bits());
+        assert_eq!((3.0 * first).get().to_bits(), (3.0_f32 * 0.1).to_bits());
+        assert_eq!((first / 3.0).get().to_bits(), (0.1_f32 / 3.0).to_bits());
+        assert_eq!((second / first).to_bits(), (0.2_f32 / 0.1).to_bits());
         let mut held = Amount::new(10.0);
         held += Amount::new(0.7);
         assert_eq!(held.get().to_bits(), (10.0_f32 + 0.7).to_bits());
         held -= Amount::new(0.7);
         assert_eq!(held.get().to_bits(), (10.0_f32 + 0.7 - 0.7).to_bits());
         assert_eq!(
-            (a - b).abs().get().to_bits(),
+            (first - second).abs().get().to_bits(),
             (0.1_f32 - 0.2).abs().to_bits()
         );
         assert_eq!(Amount::new(-0.0).abs().get().to_bits(), 0.0_f32.to_bits());
-        assert!(Amount::ZERO < a && a <= a);
+        assert!(Amount::ZERO < first && first <= first);
         assert_eq!(Amount::new(f32::NAN).partial_cmp(&Amount::ZERO), None);
         assert_eq!(Amount::new(2.5).to_string(), "2.5");
     }

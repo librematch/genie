@@ -18,7 +18,7 @@ fn corpus() -> Option<PathBuf> {
 fn expected(section: &str) -> usize {
     FIXTURE
         .lines()
-        .filter(|l| !l.starts_with('#'))
+        .filter(|text| !text.starts_with('#'))
         .find_map(|text| {
             let mut fields = text.split_whitespace();
             (fields.next() == Some(section)).then(|| {
@@ -32,7 +32,7 @@ fn expected(section: &str) -> usize {
 fn expected_start(section: &str) -> usize {
     FIXTURE
         .lines()
-        .filter(|l| !l.starts_with('#'))
+        .filter(|text| !text.starts_with('#'))
         .find_map(|text| {
             let mut fields = text.split_whitespace();
             (fields.next() == Some(section)).then(|| {
@@ -46,7 +46,7 @@ fn expected_start(section: &str) -> usize {
 fn expected_count(section: &str) -> usize {
     FIXTURE
         .lines()
-        .filter(|l| !l.starts_with('#'))
+        .filter(|text| !text.starts_with('#'))
         .find_map(|text| {
             let mut fields = text.split_whitespace();
             (fields.next() == Some(section)).then(|| fields.nth(2).unwrap().parse().unwrap())
@@ -86,22 +86,26 @@ fn marvinblue_sections_end_where_imhex_says() {
     assert_eq!(players.len(), 3);
     // The boundaries inside a player section are checked against the game's own reads
     // (tests/de_oracle.rs); against ImHex, the section starts, ends and counts.
-    for (i, p) in players.iter().enumerate() {
-        let name = |part: &str| format!("player{i}{part}");
+    for (index, player_section) in players.iter().enumerate() {
+        let name = |part: &str| format!("player{index}{part}");
         assert_eq!(
-            p.ends().unwrap().start,
+            player_section.ends().unwrap().start,
             expected_start(&name("")),
-            "player {i}"
+            "player {index}"
         );
         assert_eq!(
-            p.objects().masters.as_ref().map_or(0, Vec::len),
+            player_section
+                .objects()
+                .masters
+                .as_ref()
+                .map_or(0, Vec::len),
             expected_count(&name(".initial_objects")),
-            "player {i}"
+            "player {index}"
         );
         assert_eq!(
-            p.live_objects().count(),
+            player_section.live_objects().count(),
             expected_count(&name(".objects")),
-            "player {i}"
+            "player {index}"
         );
     }
     // Every section, Gaia's included, is read to its end, and the next one starts right there. The
@@ -163,15 +167,15 @@ fn an_objects_own_master_is_its_static_master() {
     let object = |id| {
         players[0]
             .live_objects()
-            .filter_map(|o| o.static_part())
-            .find(|s| s.id == id)
+            .filter_map(|object| object.static_part())
+            .find(|rge_static_object| rge_static_object.id == id)
             .unwrap()
     };
     let own = object(11664).own_master().unwrap();
     assert_eq!(own.read_temp, 600);
     let without = players[0]
         .live_objects()
-        .filter_map(|o| o.static_part())
+        .filter_map(|object| object.static_part())
         .find(|rge_static_object| rge_static_object.has_own_master_object == 0)
         .unwrap();
     assert!(without.own_master().is_none());

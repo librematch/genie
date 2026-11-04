@@ -49,7 +49,10 @@ impl ObjectList {
     /// The object whose stand-in holds slot `list_index` now, if one does.
     #[must_use]
     pub fn out_at(&self, list_index: ListIndex) -> Option<ObjectId> {
-        self.outs.iter().find(|o| o.1 == list_index).map(|o| o.0)
+        self.outs
+            .iter()
+            .find(|out| out.1 == list_index)
+            .map(|out| out.0)
     }
 
     /// The object in slot `list_index`, if the list holds the slot.
@@ -99,7 +102,7 @@ impl ObjectList {
     #[must_use]
     pub const fn last_place(&self) -> Option<ListIndex> {
         match self.units.len().checked_sub(1) {
-            Some(i) => Some(ListIndex::new(i)),
+            Some(index) => Some(ListIndex::new(index)),
             None => None,
         }
     }
@@ -137,7 +140,7 @@ impl ObjectList {
         self.units
             .iter()
             .enumerate()
-            .map(|(i, unit)| (ListIndex::new(i), unit))
+            .map(|(index, unit)| (ListIndex::new(index), unit))
     }
 
     /// The first object, if any.
@@ -199,10 +202,10 @@ impl ObjectList {
     ///
     /// The unit, when its stand-in left the list (or it was never taken out).
     pub fn put_back(&mut self, unit: Unit) -> Result<ListIndex, Box<Unit>> {
-        let Some(n) = self.outs.iter().rposition(|&(id, _)| id == unit.id) else {
+        let Some(out_index) = self.outs.iter().rposition(|&(id, _)| id == unit.id) else {
             return Err(Box::new(unit));
         };
-        let (_, slot) = self.outs.swap_remove(n);
+        let (_, slot) = self.outs.swap_remove(out_index);
         let Some(held) = self.units.get_mut(slot.get()) else {
             return Err(Box::new(unit));
         };
@@ -261,8 +264,8 @@ impl ObjectList {
         }
         let gone = self.units.remove(list_index.get());
         self.forget(gone.id, list_index);
-        for o in self.outs.iter_mut().filter(|o| o.1 > list_index) {
-            o.1 = ListIndex::new(o.1.get() - 1);
+        for out in self.outs.iter_mut().filter(|out| out.1 > list_index) {
+            out.1 = ListIndex::new(out.1.get() - 1);
         }
         Ok(gone)
     }
@@ -286,10 +289,10 @@ impl ObjectList {
         let kept: Vec<bool> = self.units.iter().map(&mut keep).collect();
         // each slot's place once the objects before it that go have gone
         let mut slot = Vec::with_capacity(kept.len());
-        let mut n = 0;
-        for &k in &kept {
-            slot.push(n);
-            n += usize::from(k);
+        let mut kept_count = 0;
+        for &keeps in &kept {
+            slot.push(kept_count);
+            kept_count += usize::from(keeps);
         }
         // a stand-in's slot the list does not hold (it cannot be: the stand-ins are in the list)
         // goes with its record
@@ -317,14 +320,14 @@ impl ObjectList {
     /// Object `id` left slot `list_index`: a stand-in's object stays out for good.
     fn forget(&mut self, id: ObjectId, list_index: ListIndex) {
         if id == TAKEN_OUT {
-            self.outs.retain(|o| o.1 != list_index);
+            self.outs.retain(|out| out.1 != list_index);
         }
     }
 
     /// The stand-in in slot `from` moved to slot `to`.
     fn moved_out(&mut self, from: ListIndex, to: ListIndex) {
-        for o in self.outs.iter_mut().filter(|o| o.1 == from) {
-            o.1 = to;
+        for out in self.outs.iter_mut().filter(|out| out.1 == from) {
+            out.1 = to;
         }
     }
 }
@@ -367,18 +370,18 @@ impl IntoIterator for ObjectList {
     }
 }
 
-impl<'a> IntoIterator for &'a ObjectList {
-    type Item = &'a Unit;
-    type IntoIter = Iter<'a, Unit>;
+impl<'list> IntoIterator for &'list ObjectList {
+    type Item = &'list Unit;
+    type IntoIter = Iter<'list, Unit>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.units.iter()
     }
 }
 
-impl<'a> IntoIterator for &'a mut ObjectList {
-    type Item = &'a mut Unit;
-    type IntoIter = IterMut<'a, Unit>;
+impl<'list> IntoIterator for &'list mut ObjectList {
+    type Item = &'list mut Unit;
+    type IntoIter = IterMut<'list, Unit>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.units.iter_mut()
@@ -422,11 +425,11 @@ mod tests {
 
     /// Every id's slot as a scan of the list finds it.
     fn indexed_as_scanned(object_list: &ObjectList) -> bool {
-        object_list.iter().all(|u| {
-            object_list.position_of(u.id)
+        object_list.iter().all(|listed| {
+            object_list.position_of(listed.id)
                 == object_list
                     .iter()
-                    .position(|v| v.id == u.id)
+                    .position(|unit| unit.id == listed.id)
                     .map(ListIndex::new)
         })
     }
@@ -438,10 +441,13 @@ mod tests {
             object_list.position_of(object_id(7)),
             Some(ListIndex::new(1))
         );
-        assert_eq!(object_list.by_id(object_id(9)).map(|u| u.id.get()), Some(9));
+        assert_eq!(
+            object_list.by_id(object_id(9)).map(|unit| unit.id.get()),
+            Some(9)
+        );
         assert!(object_list.by_id(object_id(8)).is_none());
-        if let Some(u) = object_list.by_id_mut(object_id(5)) {
-            u.life.hp = HitPoints::new(3.0);
+        if let Some(unit) = object_list.by_id_mut(object_id(5)) {
+            unit.life.hp = HitPoints::new(3.0);
         }
         assert_eq!(object_list[ListIndex::new(0)].life.hp, HitPoints::new(3.0));
         object_list.push(unit(11));
@@ -467,9 +473,9 @@ mod tests {
             (ListIndex::new(3), Some(ListIndex::new(2)))
         );
         // the loop holds no borrow of the list: it may change it
-        for i in object_list.places().rev() {
-            object_list.checked_mut(i).unwrap().life.hp = HitPoints::new(1.0);
-            let _ = object_list.swap_remove(i).unwrap();
+        for list_index in object_list.places().rev() {
+            object_list.checked_mut(list_index).unwrap().life.hp = HitPoints::new(1.0);
+            let _ = object_list.swap_remove(list_index).unwrap();
         }
         assert!(object_list.is_empty());
         assert_eq!(
@@ -484,14 +490,14 @@ mod tests {
             object_list.checked(ListIndex::FIRST).unwrap().id,
             object_id(9)
         );
-        if let Some(u) = object_list.last_mut() {
-            u.life.hp = HitPoints::new(2.0);
+        if let Some(unit) = object_list.last_mut() {
+            unit.life.hp = HitPoints::new(2.0);
         }
         assert_eq!(object_list[ListIndex::FIRST].life.hp, HitPoints::new(2.0));
         assert!(object_list.holds(ListIndex::FIRST) && !object_list.holds(ListIndex::new(1)));
         let indexed: Vec<_> = object_list
             .indexed()
-            .map(|(list_index, u)| (list_index, u.id))
+            .map(|(list_index, unit)| (list_index, unit.id))
             .collect();
         assert_eq!(indexed, [(ListIndex::FIRST, object_id(9))]);
     }
@@ -520,11 +526,14 @@ mod tests {
             object_list.position_of(object_id(6)),
             Some(ListIndex::new(0))
         );
-        assert_eq!(object_list.pop().map(|u| u.id.get()), Some(5));
+        assert_eq!(object_list.pop().map(|unit| unit.id.get()), Some(5));
         assert!(object_list.by_id(object_id(5)).is_none());
         object_list.truncate(2);
         assert_eq!(
-            object_list.iter().map(|u| u.id.get()).collect::<Vec<_>>(),
+            object_list
+                .iter()
+                .map(|unit| unit.id.get())
+                .collect::<Vec<_>>(),
             [6, 3]
         );
         assert!(object_list.by_id(object_id(4)).is_none());
@@ -590,17 +599,20 @@ mod tests {
     #[test]
     fn nested_take_outs_go_back_each_to_its_own_slot() {
         let mut object_list = list(&[1, 2, 3, 4, 5]);
-        let a = object_list.take_out(ListIndex::new(1)).unwrap();
-        let take_out = object_list.take_out(ListIndex::new(3)).unwrap();
+        let first_taken = object_list.take_out(ListIndex::new(1)).unwrap();
+        let second_taken = object_list.take_out(ListIndex::new(3)).unwrap();
         assert_eq!(
             object_list.remove(ListIndex::new(0)).unwrap().id,
             object_id(1),
             "both stand-ins move up"
         );
-        assert_eq!(object_list.put_back(take_out).ok(), Some(ListIndex::new(2)));
+        assert_eq!(
+            object_list.put_back(second_taken).ok(),
+            Some(ListIndex::new(2))
+        );
         object_list.retain(|unit| unit.id != object_id(3));
         assert_eq!(
-            object_list.put_back(a).ok(),
+            object_list.put_back(first_taken).ok(),
             Some(ListIndex::new(0)),
             "the stand-in kept its place"
         );
@@ -610,15 +622,22 @@ mod tests {
 
     #[test]
     fn stand_in_that_left_its_list_takes_nothing_back() {
-        let mut l = list(&[1, 2]);
-        let out = l.take_out(ListIndex::new(1)).unwrap();
-        assert_eq!(l.pop().map(|u| u.id), Some(TAKEN_OUT));
-        assert_eq!(l.put_back(out).ok(), None);
-        let out = l.take_out(ListIndex::new(0)).unwrap();
-        assert_eq!(l.swap_remove(ListIndex::new(0)).unwrap().id, TAKEN_OUT);
-        assert_eq!(l.put_back(out).ok(), None);
-        assert_eq!(l.put_back(unit(9)).ok(), None, "an object never taken out");
-        assert!(l.is_empty());
+        let mut object_list = list(&[1, 2]);
+        let out = object_list.take_out(ListIndex::new(1)).unwrap();
+        assert_eq!(object_list.pop().map(|unit| unit.id), Some(TAKEN_OUT));
+        assert_eq!(object_list.put_back(out).ok(), None);
+        let out = object_list.take_out(ListIndex::new(0)).unwrap();
+        assert_eq!(
+            object_list.swap_remove(ListIndex::new(0)).unwrap().id,
+            TAKEN_OUT
+        );
+        assert_eq!(object_list.put_back(out).ok(), None);
+        assert_eq!(
+            object_list.put_back(unit(9)).ok(),
+            None,
+            "an object never taken out"
+        );
+        assert!(object_list.is_empty());
         let mut object_list = list(&[1, 2]);
         let out = object_list.take_out(ListIndex::new(0)).unwrap();
         assert_eq!(object_list.remove(ListIndex::new(0)).unwrap().id, TAKEN_OUT);
@@ -632,7 +651,7 @@ mod tests {
     #[test]
     fn two_stand_ins_leave_the_lookup_answering() {
         let mut object_list = list(&[1, 2, 3]);
-        let (a, b) = (
+        let (first, second) = (
             object_list.take_out(ListIndex::new(0)).unwrap(),
             object_list.take_out(ListIndex::new(2)).unwrap(),
         );
@@ -641,7 +660,10 @@ mod tests {
             Some(ListIndex::new(1))
         );
         assert_eq!(
-            (object_list.put_back(a).ok(), object_list.put_back(b).ok()),
+            (
+                object_list.put_back(first).ok(),
+                object_list.put_back(second).ok()
+            ),
             (Some(ListIndex::new(0)), Some(ListIndex::new(2)))
         );
         assert!(indexed_as_scanned(&object_list));
@@ -676,23 +698,23 @@ mod tests {
 
     #[test]
     fn lists_compare_by_their_objects_in_order() {
-        let mut a = list(&[1, 2]);
-        let b = list(&[1, 2]);
-        assert_eq!(a, b);
-        assert_eq!(a, vec![unit(1), unit(2)]);
-        assert_eq!(a, [unit(1), unit(2)]);
-        let _ = a.swap_remove(ListIndex::new(0)).unwrap();
-        assert_ne!(a, b);
-        let ids: Vec<ObjectId> = b.into_iter().map(|u| u.id).collect();
+        let mut object_list = list(&[1, 2]);
+        let other = list(&[1, 2]);
+        assert_eq!(object_list, other);
+        assert_eq!(object_list, vec![unit(1), unit(2)]);
+        assert_eq!(object_list, [unit(1), unit(2)]);
+        let _ = object_list.swap_remove(ListIndex::new(0)).unwrap();
+        assert_ne!(object_list, other);
+        let ids: Vec<ObjectId> = other.into_iter().map(|unit| unit.id).collect();
         assert_eq!(ids, [object_id(1), object_id(2)]);
         let mut object_list = list(&[3]);
-        for u in &mut object_list {
-            u.life.hp = HitPoints::new(2.0);
+        for unit in &mut object_list {
+            unit.life.hp = HitPoints::new(2.0);
         }
         assert_eq!(
             (&object_list)
                 .into_iter()
-                .map(|u| u.life.hp.get())
+                .map(|unit| unit.life.hp.get())
                 .sum::<f32>(),
             2.0
         );

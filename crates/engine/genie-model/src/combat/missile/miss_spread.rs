@@ -30,8 +30,8 @@ impl MissSpread {
 
 impl MulAssign<f32> for MissSpread {
     /// A multiply effect's product (one `f32` product).
-    fn mul_assign(&mut self, f: f32) {
-        self.0 *= f;
+    fn mul_assign(&mut self, factor: f32) {
+        self.0 *= factor;
     }
 }
 

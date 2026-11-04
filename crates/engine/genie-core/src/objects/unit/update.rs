@@ -14,7 +14,7 @@ use crate::objects::facing::SpriteFacets;
 use crate::objects::layers::{Action as LayersAction, Building};
 use crate::objects::lifecycle::Class;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::PlayersMasters;
+use crate::objects::masters::PlayersMastersExt;
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::object_master;
 use crate::objects::unit::{Outcome, Unit, loses_actions};
@@ -65,20 +65,20 @@ impl Unit {
     ) -> GenieResult<Option<Outcome>> {
         self.death_blast(actions, step, roles)?;
         if self.go_to_sleep(
-            step.w.parts.mover_of(self.id),
-            step.w.parts.unit_ai.get(self.id),
+            step.world.parts.mover_of(self.id),
+            step.world.parts.unit_ai.get(self.id),
         )? == SleepCheck::FallsAsleep
         {
             return Ok(None);
         }
-        self.take_sprite_facets(step.w.parts.mover_mut(self.id));
+        self.take_sprite_facets(step.world.parts.mover_mut(self.id));
         self.let_removed_links_go(step, roles)?;
         self.gate_update(actions, step, roles)?;
         self.complete_on_update(actions, step, roles)?;
         self.building_seconds(step, roles)?;
         // a new object's combat layer (none in the table) has no timer to run down
-        if let Some(combat) = step.w.parts.combat.get_mut(self.id) {
-            run_down_attack_timers(combat, step.dt.seconds(), step.w.world_time);
+        if let Some(combat) = step.world.parts.combat.get_mut(self.id) {
+            run_down_attack_timers(combat, step.dt.seconds(), step.world.world_time);
         }
         self.motion_step(actions, step, roles)?;
         let leaves = self.life_step(actions, step, roles)?;
@@ -156,9 +156,9 @@ impl Unit {
                 self.transport_update(*transport_action, actions, step, me, roles)
             }
             Some(Action::WaitSolidify(_)) => Ok(actions.wait_solidify_part(
-                OthersRef::of(&step.w.players, &step.w.index, step.player)?,
-                &step.w.parts.building,
-                step.w.model.tuning.wait_solidify,
+                OthersRef::of(&step.world.players, &step.world.index, step.player)?,
+                &step.world.parts.building,
+                step.world.model.tuning.wait_solidify,
             )),
             Some(Action::Missile(_)) => self.fly(actions, step, roles).map(|()| HeadCode::Keeps),
             Some(Action::MoveTo(_)) => self.move_to_part(actions, step, me, roles),
@@ -261,23 +261,24 @@ impl Unit {
     /// The animated object's update (`0x141071880`): its sprite's clock at its animation speed,
     /// then its idle swap, which reads the loop this update's clock made.
     pub(crate) fn animate(&mut self, step: &mut Step<'_>) {
-        if let (Some(sprite), Some(speed)) =
-            (self.sprite.as_mut(), step.w.parts.anim_speed_of(self.id))
-        {
-            sprite.update(step.dt.seconds(), speed, step.w.model.tuning.sprite);
+        if let (Some(sprite), Some(speed)) = (
+            self.sprite.as_mut(),
+            step.world.parts.anim_speed_of(self.id),
+        ) {
+            sprite.update(step.dt.seconds(), speed, step.world.model.tuning.sprite);
             if let Ok(master) = object_master(
-                step.w.parts.own_master.get(self.id),
+                step.world.parts.own_master.get(self.id),
                 (self.id, self.life.master_id),
-                step.w.model.masters.of(step.player),
+                step.world.model.masters.of(step.player),
             ) {
                 let (standing, second) = (master.standing_sprite, master.standing_sprite_2);
                 self.idle_swap(
-                    step.w.parts.motion_mut(self.id),
+                    step.world.parts.motion_mut(self.id),
                     standing,
                     second,
-                    &step.w.model.graphics,
-                    step.w.streams.get(Stream::Sprite),
-                    step.w.model.tuning.sprite,
+                    &step.world.model.graphics,
+                    step.world.streams.get_mut(Stream::Sprite),
+                    step.world.model.tuning.sprite,
                 );
             }
         }
@@ -292,7 +293,7 @@ impl Unit {
         step: &mut Step<'_>,
     ) -> GenieResult<()> {
         if let Some(error) = step
-            .w
+            .world
             .parts
             .unread
             .get(self.id)
@@ -301,12 +302,12 @@ impl Unit {
         {
             return Err(error);
         }
-        if loses_actions(&self.life, &step.w.model.roles) {
+        if loses_actions(&self.life, &step.world.model.roles) {
             let by = self.releaser(step)?;
             let (mut releases, mut leaves) = (Vec::new(), Vec::new());
             self.clear_own_actions(
                 actions,
-                step.w.parts.motion.layer_mut(self.id),
+                step.world.parts.motion.layer_mut(self.id),
                 &mut releases,
                 &mut leaves,
                 by,
@@ -321,7 +322,7 @@ impl Unit {
     /// whose walk met others in its way is not modelled.
     pub(crate) fn after_actions(&self, step: &mut Step<'_>) -> GenieResult<()> {
         let Some(pauses) = step
-            .w
+            .world
             .parts
             .mover_mut(self.id)
             .map(|pauses_mover| take(&mut pauses_mover.pauses))
@@ -329,11 +330,11 @@ impl Unit {
             return Ok(());
         };
         for (id, pause) in pauses {
-            if step.w.object(id).is_none() {
+            if step.world.object(id).is_none() {
                 continue;
             }
             let Some(level) = step
-                .w
+                .world
                 .parts
                 .mover_mut(id)
                 .and_then(|level_mover| level_mover.paths.first_mut())
@@ -343,7 +344,7 @@ impl Unit {
             level.pause_time = pause;
         }
         if step
-            .w
+            .world
             .parts
             .mover_of(self.id)
             .is_some_and(|mover| !mover.in_the_way.is_empty())
@@ -356,12 +357,12 @@ impl Unit {
     /// [`Unit::ai_part`]'s first step: the pathing grid takes a unit of a master of kind 40 or
     /// more where it stands, moving or not.
     pub(crate) fn refresh_pathing(&self, step: &mut Step<'_>) -> GenieResult<()> {
-        let master = self.master(step.w.master_tables(), step.player)?;
+        let master = self.master(step.world.master_tables(), step.player)?;
         if MasterKind::ACTION <= master.kind
-            && let Some(placed) = step.w.spatial.get(self.id).copied()
+            && let Some(placed) = step.world.spatial.get(self.id).copied()
         {
-            let moving = MoveState::of_mover(step.w.parts.mover_of(self.id));
-            step.w
+            let moving = MoveState::of_mover(step.world.parts.mover_of(self.id));
+            step.world
                 .pathing
                 .refresh(self.id, &placed, moving, master.outline);
         }

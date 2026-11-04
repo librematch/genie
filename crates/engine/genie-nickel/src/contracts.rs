@@ -231,7 +231,7 @@ fn record(object: &Map<String, Value>, depth: usize) -> GenieResult<String> {
 fn alternatives(variants: &[Value], depth: usize) -> GenieResult<String> {
     let present: Vec<&Value> = variants
         .iter()
-        .filter(|v| v.get("type").and_then(Value::as_str) != Some("null"))
+        .filter(|value| value.get("type").and_then(Value::as_str) != Some("null"))
         .collect();
     if let [single] = present.as_slice() {
         return contract(single, depth);
@@ -239,10 +239,13 @@ fn alternatives(variants: &[Value], depth: usize) -> GenieResult<String> {
     let mut tags_of = Vec::new();
     for variant in &present {
         match variant {
-            Value::Object(v) if v.contains_key("enum") || v.contains_key("const") => {
-                let names = v.get("enum").and_then(Value::as_array).cloned();
-                let names = names.unwrap_or_else(|| v.get("const").cloned().into_iter().collect());
-                tags_of.extend(names.into_iter().map(|n| (n, None)));
+            Value::Object(object)
+                if object.contains_key("enum") || object.contains_key("const") =>
+            {
+                let names = object.get("enum").and_then(Value::as_array).cloned();
+                let names =
+                    names.unwrap_or_else(|| object.get("const").cloned().into_iter().collect());
+                tags_of.extend(names.into_iter().map(|value| (value, None)));
             }
             Value::Object(map) => {
                 let Some(Value::Object(properties)) = map.get("properties") else {
@@ -260,7 +263,7 @@ fn alternatives(variants: &[Value], depth: usize) -> GenieResult<String> {
 }
 
 /// An enum contract of tags, each with the contract of the value it holds, if any.
-fn tags<'a>(names: impl Iterator<Item = (&'a Value, Option<String>)>) -> GenieResult<String> {
+fn tags<'json>(names: impl Iterator<Item = (&'json Value, Option<String>)>) -> GenieResult<String> {
     let mut rows = Vec::new();
     for (name, payload) in names {
         let Value::String(name) = name else {
@@ -297,8 +300,10 @@ fn is_identifier(name: &str) -> bool {
     let mut chars = name.chars();
     chars
         .next()
-        .is_some_and(|c| c.is_ascii_alphabetic() || c == '_')
-        && chars.all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | '\''))
+        .is_some_and(|character| character.is_ascii_alphabetic() || character == '_')
+        && chars.all(|character| {
+            character.is_ascii_alphanumeric() || matches!(character, '_' | '-' | '\'')
+        })
 }
 
 /// The schema's description as a `| doc` annotation, if it has one.
@@ -312,15 +317,15 @@ fn description(schema: &Value) -> String {
 /// `text` as a Nickel string literal.
 fn quoted(text: &str) -> String {
     let mut out = String::from("\"");
-    for c in text.chars() {
-        match c {
+    for character in text.chars() {
+        match character {
             '"' => out.push_str("\\\""),
             '\\' => out.push_str("\\\\"),
             '%' => out.push_str("\\%"),
             '\n' => out.push_str("\\n"),
             '\t' => out.push_str("\\t"),
             '\r' => out.push_str("\\r"),
-            c => out.push(c),
+            other => out.push(other),
         }
     }
     out.push('"');

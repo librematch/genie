@@ -14,7 +14,7 @@ use crate::players::attribute::AttributeId;
 use crate::production::Payment;
 use crate::world::Seconds;
 use crate::world::player::Player;
-use crate::world::slots::CheckedIndex;
+use crate::world::slots::CheckedIndexExt;
 use crate::{GenieError, GenieResult};
 
 use genie_model::technology::command_args;
@@ -185,11 +185,11 @@ impl TechState {
                 continue;
             };
             let adj = self.cost_adj.checked(index)?.get();
-            let mut v = (i32::from(adj) * i32::from(scale) + i32::from(base.get())) as f32;
+            let mut cost = (i32::from(adj) * i32::from(scale) + i32::from(base.get())) as f32;
             if 0.0 < modifier {
-                v *= modifier;
+                cost *= modifier;
             }
-            *slot = (Some(attribute), Amount::new(v));
+            *slot = (Some(attribute), Amount::new(cost));
         }
         Ok(out)
     }
@@ -217,14 +217,14 @@ impl TechState {
             let Some(attr) = attr.filter(|_| cost.paid.is_paid()) else {
                 continue;
             };
-            let mut v = if cost_override.used == OverrideUse::OVERRIDE {
+            let mut due = if cost_override.used == OverrideUse::OVERRIDE {
                 cost_override.amount.as_f32()
             } else {
                 (i32::from(self.cost_adj.checked(index)?.get()) * i32::from(scale)) as f32
                     + cost.amount.as_f32()
             };
             if 0.0 < modifier {
-                v = f32::from((v * modifier) as i32 as i16);
+                due = f32::from((due * modifier) as i32 as i16);
             }
             let before = paid
                 .iter()
@@ -237,10 +237,10 @@ impl TechState {
                     "a research cost the building holds (FUN_141204310)",
                 ));
             }
-            if attributes.get(attr)?.get() + before < v {
+            if attributes.get(attr)?.get() + before < due {
                 return Ok(false);
             }
-            if 0.0 < v - before {
+            if 0.0 < due - before {
                 return Err(GenieError::unsupported(
                     "a research's start that pays a difference (FUN_1411c68b0)",
                 ));
@@ -272,23 +272,23 @@ impl TechState {
             if attribute.is_none() {
                 continue;
             }
-            let mut v = self
+            let mut cost = self
                 .cost_adj
                 .checked(index)?
                 .get()
                 .wrapping_mul(scale)
                 .wrapping_add(base.get());
             if 0.0 < modifier {
-                v = (f32::from(v) * modifier) as i32 as i16;
+                cost = (f32::from(cost) * modifier) as i32 as i16;
             }
-            slot.1 = v;
+            slot.1 = cost;
         }
         for slot in &mut out {
             if slot.1 < 1 {
                 slot.0 = None;
             }
         }
-        Ok(out.map(|(attribute_id, n)| (attribute_id, CostAmount::of_data(n))))
+        Ok(out.map(|(attribute_id, amount)| (attribute_id, CostAmount::of_data(amount))))
     }
 
     /// A cost entry as the research test and the payment read it: the attribute (the
@@ -298,11 +298,11 @@ impl TechState {
     fn payment(
         &self,
         def: &TechDef,
-        j: usize,
+        index: usize,
         (modifier, scale): (f32, i16),
     ) -> Option<(AttributeId, f32, CostPaid)> {
-        let cost_override = *self.overrides.get(j)?;
-        let cost = *def.costs.get(j)?;
+        let cost_override = *self.overrides.get(index)?;
+        let cost = *def.costs.get(index)?;
         let attribute = if cost_override.used == OverrideUse::OVERRIDE {
             cost_override.attribute
         } else {
@@ -310,16 +310,16 @@ impl TechState {
         };
         let attribute =
             attribute.filter(|_| cost.paid.is_paid() || cost_override.used != OverrideUse::NONE)?;
-        let mut v = if cost_override.used == OverrideUse::OVERRIDE {
+        let mut due = if cost_override.used == OverrideUse::OVERRIDE {
             cost_override.amount.as_f32()
         } else {
-            (i32::from(self.cost_adj.get(j)?.get()) * i32::from(scale)) as f32
+            (i32::from(self.cost_adj.get(index)?.get()) * i32::from(scale)) as f32
                 + cost.amount.as_f32()
         };
         if 0.0 < modifier {
-            v = f32::from((v * modifier) as i32 as i16);
+            due = f32::from((due * modifier) as i32 as i16);
         }
-        Some((attribute, v, cost.paid))
+        Some((attribute, due, cost.paid))
     }
 
     /// The research test (`FUN_1413cd600` without a building's holdings, `param_4` and `param_5`
@@ -515,7 +515,7 @@ mod tests {
             tech_state
                 .listed_costs(&tech_def, (0.0, 1))
                 .unwrap()
-                .map(|(a, cost_amount)| (a, cost_amount.get())),
+                .map(|(attribute_id, cost_amount)| (attribute_id, cost_amount.get())),
             [(Some(attribute::GOLD), 50), (None, 0), (None, 0)]
         );
         assert!(!tech_state.repeatable(&tech_def, RepeatLimit::Own));

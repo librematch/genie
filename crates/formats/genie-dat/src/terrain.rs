@@ -19,14 +19,14 @@ use std::io::{Read, Write};
 pub struct TerrainId(u16);
 
 impl From<u8> for TerrainId {
-    fn from(n: u8) -> Self {
-        Self(n.into())
+    fn from(number: u8) -> Self {
+        Self(number.into())
     }
 }
 
 impl From<u16> for TerrainId {
-    fn from(n: u16) -> Self {
-        Self(n)
+    fn from(number: u16) -> Self {
+        Self(number)
     }
 }
 
@@ -638,9 +638,9 @@ fn read_terrain_name<R: Read>(input: &mut R, output: &mut TerrainName) -> GenieR
     bytes
         .iter()
         .copied()
-        .take_while(|b| *b != 0)
+        .take_while(|byte| *byte != 0)
         .map(char::from)
-        .for_each(|c| output.push(c));
+        .for_each(|character| output.push(character));
     Ok(())
 }
 

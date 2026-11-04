@@ -13,9 +13,9 @@ const PLAYERS: usize = 3;
 
 /// A saved queue record holding order value `order`.
 fn record(order: i32) -> [u8; 52] {
-    let mut b = [0; 52];
-    b[4..8].copy_from_slice(&order.to_le_bytes());
-    b
+    let mut bytes = [0; 52];
+    bytes[4..8].copy_from_slice(&order.to_le_bytes());
+    bytes
 }
 
 /// A saved unit AI without an order or an action (−1 in each field, as the game's saves hold
@@ -189,12 +189,12 @@ fn the_saved_unit_ai_is_the_object_part() {
         current_order_value: 0x2c9,
         ..idle()
     });
-    let o = whole(&object);
+    let loaded = whole(&object);
     assert_eq!(
-        o.parts.unit_ai,
+        loaded.parts.unit_ai,
         unit_ai(&object, object_id(5), PLAYERS).unwrap()
     );
-    assert!(o.parts.unit_ai.is_some());
+    assert!(loaded.parts.unit_ai.is_some());
     let odd = whole(&with_ai(UnitAiModule {
         current_order_value: 0x262,
         ..idle()

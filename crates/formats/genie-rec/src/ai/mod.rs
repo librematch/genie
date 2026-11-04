@@ -5,7 +5,7 @@
 //! reader and the AI's own terms; values whose meaning is not known say so.
 
 use crate::ObjectId;
-use crate::element::ReadableHeaderElement;
+use crate::element::ReadHeader;
 use crate::reader::RecordingHeaderReader;
 use byteorder::{LE, ReadBytesExt};
 use genie_error::GenieResult;
@@ -31,7 +31,7 @@ pub struct MainAi {
     pub objects: Vec<ObjectId>,
 }
 
-impl ReadableHeaderElement for MainAi {
+impl ReadHeader for MainAi {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let num_objects = input.read_u32::<LE>()?;
         let mut objects = vec![];
@@ -63,7 +63,7 @@ pub struct PlayerAi {
     pub strategy_ai: StrategyAi,
 }
 
-impl ReadableHeaderElement for PlayerAi {
+impl ReadHeader for PlayerAi {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let main_ai = MainAi::read_from(input)?;
         let build_ai = BuildAi::read_from(input)?;

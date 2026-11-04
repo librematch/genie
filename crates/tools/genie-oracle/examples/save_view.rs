@@ -22,7 +22,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
     let data = read(save)?;
     let numbers = |from: usize| -> Result<Vec<i32>, ParseIntError> {
-        rest[from..].iter().map(|a| a.parse()).collect()
+        rest[from..].iter().map(|text| text.parse()).collect()
     };
     let text = match (view.as_str(), rest) {
         ("objects", [player]) => objects(&data, player.parse()?, None)?,

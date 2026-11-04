@@ -19,10 +19,10 @@ impl DamageGraphicEntry {
         Self(value)
     }
 
-    /// The entry an effect selects: the int `n`'s low byte.
+    /// The entry an effect selects: the int `selected`'s low byte.
     #[must_use]
-    pub const fn of_selected(n: i32) -> Self {
-        Self(n as u8)
+    pub const fn of_selected(selected: i32) -> Self {
+        Self(selected as u8)
     }
 
     /// The byte.
@@ -53,10 +53,10 @@ impl TrainLocationEntry {
         Self(value)
     }
 
-    /// The entry an effect selects: the int `n`'s low 16 bits.
+    /// The entry an effect selects: the int `selected`'s low 16 bits.
     #[must_use]
-    pub const fn of_selected(n: i32) -> Self {
-        Self(n as i16)
+    pub const fn of_selected(selected: i32) -> Self {
+        Self(selected as i16)
     }
 
     /// The short.
@@ -98,6 +98,6 @@ mod tests {
         assert_eq!(TrainLocationEntry::of_selected(0x1_0003).get(), 3);
         assert_eq!(TrainLocationEntry::of_data(2).index(), Some(2));
         let none = TrainLocationEntry::of_data(-1).index();
-        assert!(none.is_none_or(|i| i > 1 << 40));
+        assert!(none.is_none_or(|index| index > 1 << 40));
     }
 }

@@ -19,8 +19,8 @@ use crate::technology::{TechDef, factors};
 use crate::world::World;
 use crate::world::layer::Slots;
 use crate::world::player::Player;
-use crate::world::slots::CheckedIndex;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::CheckedIndexExt;
+use crate::world::slots::PlayerSlotsExt;
 use crate::{GenieError, GenieResult};
 use std::mem::take;
 
@@ -52,9 +52,9 @@ impl World {
             .get()
             .wrapping_add(state.times_researched.get());
         let cap = state.research_cap.limit();
-        let mut n = count.get();
-        if state.stack && i32::from(cap) - i32::from(done) < i32::from(n) {
-            n = cap.wrapping_sub(done);
+        let mut count = count.get();
+        if state.stack && i32::from(cap) - i32::from(done) < i32::from(count) {
+            count = cap.wrapping_sub(done);
         }
         // FUN_14162fd90's repeat flag: the player's +0x648 (not held) or FUN_1413d1050
         let repeat = if state.repeatable(def, RepeatLimit::Own) {
@@ -63,8 +63,15 @@ impl World {
             Repeat::Denied
         };
         let building = owner.objects.checked(list_index)?.life.master_id;
-        n = pay_researches(owner, (def, tech), repeat, building, n, self.model.slots)?;
-        if n <= 0 {
+        count = pay_researches(
+            owner,
+            (def, tech),
+            repeat,
+            building,
+            count,
+            self.model.slots,
+        )?;
+        if count <= 0 {
             return Ok(QueueOutcome::NoneQueued);
         }
         let listed = owner
@@ -74,16 +81,16 @@ impl World {
         let costs = as_entry_costs(listed);
         let id = owner.objects.checked(list_index)?.id;
         let production = self.production_or_new(id)?;
-        if join_last(&mut production.queue, tech, &costs, n)? == EntryJoin::Joined {
+        if join_last(&mut production.queue, tech, &costs, count)? == EntryJoin::Joined {
             let state = self.players.player_mut(player)?.techs.checked_mut(index)?;
-            state.pending = state.pending.plus(n);
+            state.pending = state.pending.plus(count);
             return Ok(QueueOutcome::Queued);
         }
         self.new_entry(
             player,
             list_index,
             (master, Some(tech)),
-            QueuedUnits::of_data(n),
+            QueuedUnits::of_data(count),
             button,
             None,
         )?;
@@ -93,12 +100,12 @@ impl World {
             .techs
             .checked_mut(index)?
             .pending;
-        *pending = pending.plus(n);
+        *pending = pending.plus(count);
         Ok(QueueOutcome::Queued)
     }
 }
 
-/// [`World::queue_techs`]'s payment (`FUN_14162fd90`) of up to `n` researches of `tech` (its
+/// [`World::queue_techs`]'s payment (`FUN_14162fd90`) of up to `count` researches of `tech` (its
 /// definition `def`) at a building of master `building`: each is paid until one cannot be; the
 /// count paid.
 fn pay_researches(
@@ -106,12 +113,12 @@ fn pay_researches(
     (def, tech): (&TechDef, TechId),
     repeat: Repeat,
     building: MasterId,
-    n: i16,
+    count: i16,
     slots: Slots,
 ) -> GenieResult<i16> {
     let index = tech.index();
     let mut paid = 0i16;
-    while paid < n {
+    while paid < count {
         let factors = factors(tech, &*owner, slots)?;
         let mut state = take(owner.techs.checked_mut(index)?);
         let ok = state.pay(def, factors, repeat, building, owner, slots);
@@ -121,17 +128,17 @@ fn pay_researches(
         }
         paid += 1;
     }
-    Ok(n)
+    Ok(count)
 }
 
-/// [`World::queue_techs`]'s `n` researches of `tech` join the queue's last entry when it is of
+/// [`World::queue_techs`]'s `count` researches of `tech` join the queue's last entry when it is of
 /// that technology and its costs are `costs` (`FUN_1411c81a0` -> `FUN_1413d4a00`): its count,
 /// the total and the change counter grow. Whether they joined.
 fn join_last(
     queue: &mut Queue,
     tech: TechId,
     costs: &[(Option<AttributeId>, Amount); 3],
-    n: i16,
+    count: i16,
 ) -> GenieResult<EntryJoin> {
     let Some(last) = queue.last() else {
         return Ok(EntryJoin::NewEntry);
@@ -139,10 +146,10 @@ fn join_last(
     if last.tech != Some(tech) || !same_costs(&last.costs, costs) {
         return Ok(EntryJoin::NewEntry);
     }
-    let k = (queue.count.get() - 1) as usize;
-    let slot = queue.slots.checked_mut(k)?;
-    slot.count = slot.count.plus(QueuedUnits::of_data(n));
-    queue.total = queue.total.plus(QueuedUnits::of_data(n));
+    let last = (queue.count.get() - 1) as usize;
+    let slot = queue.slots.checked_mut(last)?;
+    slot.count = slot.count.plus(QueuedUnits::of_data(count));
+    queue.total = queue.total.plus(QueuedUnits::of_data(count));
     queue.changes = queue.changes.bumped();
     Ok(EntryJoin::Joined)
 }

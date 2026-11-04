@@ -51,7 +51,7 @@ impl UnitGroups {
         /// The long pather's list holds this many (`0xff`).
         const LOWERED: usize = 255;
         self.get(group?)
-            .map(|g| self.differentiator_units(g, LOWERED))
+            .map(|group| self.differentiator_units(group, LOWERED))
     }
 
     /// `FUN_14100bbe0` of group `group` with `cap`: the members of each group of its
@@ -60,10 +60,10 @@ impl UnitGroups {
     pub fn differentiator_units(&self, group: &UnitGroup, cap: usize) -> Vec<ObjectId> {
         let mut out = Vec::new();
         for &id in &group.differentiator_groups {
-            let Some(g) = self.get(id) else {
+            let Some(group) = self.get(id) else {
                 continue;
             };
-            for member in &g.members {
+            for member in &group.members {
                 out.push(member.id);
                 if cap <= out.len() {
                     return out;

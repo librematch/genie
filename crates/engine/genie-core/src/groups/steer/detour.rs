@@ -29,7 +29,7 @@ use crate::players::PlayerKind;
 use crate::world::World;
 use crate::world::index::ObjectsRef;
 use crate::world::layer::MasterRoles;
-use crate::world::slots::CheckedIndex;
+use crate::world::slots::CheckedIndexExt;
 use crate::{GenieError, GenieResult};
 
 impl World {
@@ -155,11 +155,11 @@ impl World {
     /// # Errors
     ///
     /// A member of a master the slice does not have.
-    fn rounder<'d>(
+    fn rounder<'ids>(
         &self,
         id: ObjectId,
-        differentiators: &'d [ObjectId],
-    ) -> GenieResult<Rounder<'d>> {
+        differentiators: &'ids [ObjectId],
+    ) -> GenieResult<Rounder<'ids>> {
         let (player_id, unit) = self.object(id).ok_or_else(|| member_gone(id))?;
         let master = unit.master(self.master_tables(), player_id)?;
         let mover = self.parts.mover_of(unit.id).ok_or(NO_MOVER)?;
@@ -186,11 +186,11 @@ impl World {
         })
     }
 
-    /// Whether the member could stand at `p` (slot 0x270, [`Spatial::point_clear_among`]: the
+    /// Whether the member could stand at `point` (slot 0x270, [`Spatial::point_clear_among`]: the
     /// records grown by the short pather's radius, the differentiators ignored).
     ///
     /// [`Spatial::point_clear_among`]: crate::map::spatial::Spatial::point_clear_among
-    fn round_clear(&mut self, rounder: &Rounder<'_>, p: BVector) -> GenieResult<bool> {
+    fn round_clear(&mut self, rounder: &Rounder<'_>, point: BVector) -> GenieResult<bool> {
         let by_id = ObjectsRef::new(
             &self.players,
             &self.index,
@@ -201,7 +201,7 @@ impl World {
         );
         self.spatial.point_clear_among(
             rounder.id,
-            p.ground(),
+            point.ground(),
             rounder.grow,
             rounder.mask,
             rounder.differentiators,
@@ -394,7 +394,7 @@ impl World {
             pathing: &mut self.pathing,
             now: self.world_time,
             player_kind,
-            object: self.streams.get(Stream::Object),
+            object: self.streams.get_mut(Stream::Object),
             groups: &self.groups,
         };
         let short_found = short_path_for(
@@ -491,7 +491,7 @@ impl World {
 /// moved to (slot 0x520) and its place, its restriction and mask, the radius the position tests
 /// grow the records by, its master's radii and height radius (`+0x5e0`), whether it has a
 /// footprint and a height (`FUN_141194060`) and the ignore list.
-pub(super) struct Rounder<'d> {
+pub(super) struct Rounder<'ids> {
     pub(super) id: ObjectId,
     pub(super) walker: Walker,
     pub(super) player_kind: PlayerKind,
@@ -503,7 +503,7 @@ pub(super) struct Rounder<'d> {
     pub(super) radius: Footprint,
     pub(super) height: Distance,
     pub(super) solid: bool,
-    pub(super) differentiators: &'d [ObjectId],
+    pub(super) differentiators: &'ids [ObjectId],
 }
 
 impl Rounder<'_> {
@@ -547,20 +547,20 @@ pub(super) fn one_step_toward(
     forward: BVector,
     map: GridSize,
 ) -> BVector {
-    let d = to - rounder.at;
-    let mut dir = if d.x().abs() <= ROUND_STILL && d.y().abs() <= ROUND_STILL {
+    let offset = to - rounder.at;
+    let mut dir = if offset.x().abs() <= ROUND_STILL && offset.y().abs() <= ROUND_STILL {
         forward
     } else {
-        d
+        offset
     };
     dir = dir.with_height(0.0);
     let len = sqrt(dir.x() * dir.x() + 0.0 + dir.y() * dir.y());
     let dir = BVector::new(dir.x() / len, dir.height() / len, dir.y() / len);
     let mut step = rounder.at + 1.0 * dir;
-    let (w, h) = (map.width(), map.height());
+    let (width, height) = (map.width(), map.height());
     let (top_x, top_y) = (
-        w as f32 - rounder.radius.x(),
-        h as f32 - rounder.height.get(),
+        width as f32 - rounder.radius.x(),
+        height as f32 - rounder.height.get(),
     );
     if rounder.radius.x() > step.x() {
         step = step.with_x(rounder.radius.x());
@@ -579,7 +579,9 @@ pub(super) fn one_step_toward(
 /// from the slot `to` on the ground.
 pub(super) fn ends_farther(record: &Path, to: BVector, gap: Distance) -> bool {
     let end = record.points.last().copied().unwrap_or(OUTSIDE_PATH);
-    let mut d = to - end;
-    d = d.with_height(0.0);
-    gap < Distance::new(sqrt(d.x() * d.x() + 0.0 + d.y() * d.y()))
+    let mut offset = to - end;
+    offset = offset.with_height(0.0);
+    gap < Distance::new(sqrt(
+        offset.x() * offset.x() + 0.0 + offset.y() * offset.y(),
+    ))
 }

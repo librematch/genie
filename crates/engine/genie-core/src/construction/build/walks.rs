@@ -58,12 +58,17 @@ impl BuildAction {
         roles: &Roles,
     ) -> GenieResult<(Option<WalkTo>, Option<MoveToAction>)> {
         let move_reads = builder.move_to_reads(
-            step.w.parts.motion.mover(builder.id),
-            MasterTables::new(&step.w.model.masters, &step.w.parts.own_master),
+            step.world.parts.motion.mover(builder.id),
+            MasterTables::new(&step.world.model.masters, &step.world.parts.own_master),
             step.player,
             (
-                &step.w.model.graphics,
-                step.w.parts.combat_of(builder.id).abilities.look.as_ref(),
+                &step.world.model.graphics,
+                step.world
+                    .parts
+                    .combat_of(builder.id)
+                    .abilities
+                    .look
+                    .as_ref(),
             ),
             roles,
         )?;
@@ -72,14 +77,14 @@ impl BuildAction {
         } else {
             Some(
                 move_reads
-                    .walk_to(step.w, self.target.map(FoundationId::id))?
+                    .walk_to(step.world, self.target.map(FoundationId::id))?
                     .ok_or(SITE_GONE)?,
             )
         };
         Ok((
             to,
             self.task
-                .walk(&move_reads, to, &step.w.model.tuning.move_to)?,
+                .walk(&move_reads, to, &step.world.model.tuning.move_to)?,
         ))
     }
 

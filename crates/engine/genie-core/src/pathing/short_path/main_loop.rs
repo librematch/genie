@@ -10,7 +10,7 @@ use crate::pathing::short_path::{
     in_box, isqrt, through_float,
 };
 use crate::pathing::{FixedDistance, ShapeId, ShapeSide, ShortFound};
-use crate::world::slots::CheckedIndex;
+use crate::world::slots::CheckedIndexExt;
 use crate::{GenieError, GenieResult};
 
 /// What a polygon's re-walk keeps fixed: the node it comes from, the polygon and its vertex count.
@@ -31,10 +31,10 @@ impl Search<'_> {
         side: ShapeSide,
     ) -> GenieResult<Option<ShortPath>> {
         let fixed_point = node.at;
-        let fixed_distance = self.ctx.d;
-        for i in 0..self.polys.len() {
+        let fixed_distance = self.ctx.clearance;
+        for index in 0..self.polys.len() {
             let Some(vertex_index) = Self::edge_holding(
-                self.polys.checked(i)?,
+                self.polys.checked(index)?,
                 fixed_point,
                 side,
                 self.ctx.mesh,
@@ -43,10 +43,10 @@ impl Search<'_> {
             ) else {
                 continue;
             };
-            if !RECT_HEURISTIC || !self.polys.checked(i)?.flag {
+            if !RECT_HEURISTIC || !self.polys.checked(index)?.flag {
                 return Ok(None);
             }
-            self.rewalk(node, PolyIndex::of(i), vertex_index)?;
+            self.rewalk(node, PolyIndex::of(index), vertex_index)?;
             return Ok(None);
         }
         self.polys.push(Poly::default());
@@ -55,10 +55,10 @@ impl Search<'_> {
         let mut failed =
             self.trace(shape, side, Some(fixed_point), &mut poly)? == Outline::StepLimit;
         let last = self.polys.len() - 1;
-        'older: for j in 0..last {
+        'older: for earlier in 0..last {
             for index in 0..poly.vertices.len() {
                 let hit = Self::edge_holding(
-                    self.polys.checked(j)?,
+                    self.polys.checked(earlier)?,
                     *poly.vertices.checked(index)?,
                     *poly.sides.checked(index)?,
                     self.ctx.mesh,
@@ -79,7 +79,7 @@ impl Search<'_> {
                 points: Vec::new(),
             }));
         }
-        self.walk_new(PolyIndex::of(last), fixed_point, node.g, node.idx)?;
+        self.walk_new(PolyIndex::of(last), fixed_point, node.cost, node.idx)?;
         Ok(None)
     }
 
@@ -98,8 +98,8 @@ impl Search<'_> {
         let next0 = vertex_index.next_in(count);
         let mut bv = vertex_index;
         let mut fv = next0;
-        let mut gb = cheb(poly.vertex(vertex_index)?, fixed_point).wrapping_add(node.g);
-        let mut gf = cheb(poly.vertex(next0)?, fixed_point).wrapping_add(node.g);
+        let mut gb = cheb(poly.vertex(vertex_index)?, fixed_point).wrapping_add(node.cost);
+        let mut gf = cheb(poly.vertex(next0)?, fixed_point).wrapping_add(node.cost);
         let alive = |cost: FixedDistance, fixed_distance: FixedDistance| {
             fixed_distance < cost || cost == UNSET
         };
@@ -182,13 +182,13 @@ impl Search<'_> {
         &self,
         walk: &Rewalk,
         poly: &Poly,
-        (from, g): (VertexIndex, FixedDistance),
+        (from, start_cost): (VertexIndex, FixedDistance),
         dir: WalkDir,
     ) -> GenieResult<(VertexIndex, FixedDistance, bool)> {
         let count = walk.count;
         // the costs as the search holds them, the vertices from the walk's copy
         let costs = self.poly(walk.poly)?;
-        let (mut vi, mut fixed_distance) = (from, g);
+        let (mut vi, mut fixed_distance) = (from, start_cost);
         let mut at = poly.vertex(from)?;
         loop {
             vi = if dir == WalkDir::Forward {
@@ -213,7 +213,7 @@ impl Search<'_> {
         let at = corner.at;
         let mut range_point = range_point(self.goal.range, at, self.goal.at)?;
         let mut frac = RayFraction::START;
-        let reach = corner.g.wrapping_add(float_distance(range_point, at));
+        let reach = corner.cost.wrapping_add(float_distance(range_point, at));
         if !self.beats_goal(reach)? {
             return Ok(());
         }
@@ -252,18 +252,18 @@ impl Search<'_> {
             let mut fixed_point = Self::at_fraction(at, range_point, frac);
             let shape = self.settle(&mut fixed_point, hit)?;
             if fixed_point != at {
-                let g = corner.g.wrapping_add(float_distance(at, fixed_point));
-                self.side_node(g, corner.idx, shape, hit.side, fixed_point);
+                let fixed_distance = corner.cost.wrapping_add(float_distance(at, fixed_point));
+                self.side_node(fixed_distance, corner.idx, shape, hit.side, fixed_point);
             }
             return Ok(());
         }
-        let fixed_distance = corner.g.wrapping_add(float_distance(at, range_point));
+        let fixed_distance = corner.cost.wrapping_add(float_distance(at, range_point));
         let kind = Kind::Corner {
             run: None,
             emit: None,
         };
         let node = self.add(fixed_distance, corner.idx, range_point, kind);
-        if self.beats_goal(node.g)? {
+        if self.beats_goal(node.cost)? {
             self.goal_node = Some(node.idx);
         }
         Ok(())
@@ -273,14 +273,14 @@ impl Search<'_> {
     /// side node; with both legs clear, one tile toward `toward` (at most) becomes a waypoint that
     /// may be the best (by cost, not estimate).
     pub(super) fn corner_axis(&mut self, corner: Node, toward: FixedPoint) -> GenieResult<()> {
-        let p = corner.at;
-        let dx = toward.x().wrapping_sub(p.x());
-        let dy = toward.y().wrapping_sub(p.y());
-        let fixed_point = FixedPoint::new(toward.x(), p.y());
-        let sw = self.ctx.sweep(p, fixed_point, AxisDir::of_dx(dx))?;
+        let corner_at = corner.at;
+        let dx = toward.x().wrapping_sub(corner_at.x());
+        let dy = toward.y().wrapping_sub(corner_at.y());
+        let fixed_point = FixedPoint::new(toward.x(), corner_at.y());
+        let sw = self.ctx.sweep(corner_at, fixed_point, AxisDir::of_dx(dx))?;
         if let Some((shape, side, at)) = sw.counted()? {
-            let g = corner.g.wrapping_add(float_distance(p, at));
-            self.side_node(g, corner.idx, shape, side, at);
+            let fixed_distance = corner.cost.wrapping_add(float_distance(corner_at, at));
+            self.side_node(fixed_distance, corner.idx, shape, side, at);
             return Ok(());
         }
         let sw2 = self.ctx.sweep(fixed_point, toward, AxisDir::of_dy(dy))?;
@@ -291,25 +291,27 @@ impl Search<'_> {
                 (1.0f32.copysign(dx as f32 * TO_FLOAT) * TO_FIXED) as i32
             };
             let node = self.add(
-                corner.g.wrapping_add(FixedDistance::new(dx.wrapping_abs())),
+                corner
+                    .cost
+                    .wrapping_add(FixedDistance::new(dx.wrapping_abs())),
                 corner.idx,
-                FixedPoint::new(step.wrapping_add(p.x()), p.y()),
+                FixedPoint::new(step.wrapping_add(corner_at.x()), corner_at.y()),
                 Kind::Waypoint,
             );
             // the game's test of the best for none (−1) never holds: it starts as the start node
-            if node.g < self.node(self.best)?.g {
+            if node.cost < self.node(self.best)?.cost {
                 self.best = node.idx;
             }
             return Ok(());
         };
         let mid = self.add(
-            through_float(dx.wrapping_abs()).wrapping_add(corner.g),
+            through_float(dx.wrapping_abs()).wrapping_add(corner.cost),
             corner.idx,
             fixed_point,
             Kind::Waypoint,
         );
-        let fixed_distance =
-            through_float((at.y().wrapping_sub(p.y())).wrapping_abs()).wrapping_add(mid.g);
+        let fixed_distance = through_float((at.y().wrapping_sub(corner_at.y())).wrapping_abs())
+            .wrapping_add(mid.cost);
         self.side_node(fixed_distance, mid.idx, shape, side, at);
         Ok(())
     }
@@ -336,8 +338,8 @@ impl Search<'_> {
         }
         self.goal_node = None;
         self.best = NodeIndex::START;
-        while let Some(n) = self.open.pop() {
-            if let Some(direct) = self.expand(n, start)? {
+        while let Some(node) = self.open.pop() {
+            if let Some(direct) = self.expand(node, start)? {
                 return Ok(direct);
             }
         }
@@ -358,19 +360,19 @@ impl Search<'_> {
                     ..
                 } => {
                     pts.push(node.at);
-                    let v = self.poly(poly)?;
-                    let count = v.count();
+                    let poly = self.poly(poly)?;
+                    let count = poly.count();
                     if dir == WalkDir::Backward {
-                        let mut k = lo;
-                        while k != hi {
-                            pts.push(v.vertex(k)?);
-                            k = k.next_in(count);
+                        let mut vertex_index = lo;
+                        while vertex_index != hi {
+                            pts.push(poly.vertex(vertex_index)?);
+                            vertex_index = vertex_index.next_in(count);
                         }
                     } else {
                         let mut vertex_index = hi;
                         while vertex_index != lo {
                             vertex_index = vertex_index.prev_in(count);
-                            pts.push(v.vertex(vertex_index)?);
+                            pts.push(poly.vertex(vertex_index)?);
                         }
                     }
                 }
@@ -382,24 +384,24 @@ impl Search<'_> {
             pts.push(start);
         }
         // the smoothing, with half the radius
-        let r = i64::from(self.goal.r.get());
-        let r2 = ((r * 0x40_0000 + ((r >> 63) & 0x7f_ffff)) >> 23) as i32;
+        let radius = i64::from(self.goal.radius.get());
+        let r2 = ((radius * 0x40_0000 + ((radius >> 63) & 0x7f_ffff)) >> 23) as i32;
         let sight = Ctx {
             mesh: self.ctx.mesh,
             ignore: self.ctx.ignore,
-            d: FixedDistance::new(0x20_0000 - r2),
+            clearance: FixedDistance::new(0x20_0000 - r2),
         };
-        let mut i = 0;
-        while i < pts.len() {
-            let mut j = i + 2;
-            while j < pts.len() {
-                if !sight.sight_blocked(*pts.checked(j)?, *pts.checked(i)?)? {
-                    let _ = pts.drain(i + 1..j);
-                    j = i + 1;
+        let mut index = 0;
+        while index < pts.len() {
+            let mut ahead = index + 2;
+            while ahead < pts.len() {
+                if !sight.sight_blocked(*pts.checked(ahead)?, *pts.checked(index)?)? {
+                    let _ = pts.drain(index + 1..ahead);
+                    ahead = index + 1;
                 }
-                j += 1;
+                ahead += 1;
             }
-            i += 1;
+            index += 1;
         }
         if started != Started::Free {
             pts.push(start);
@@ -418,7 +420,7 @@ impl Search<'_> {
         start: FixedPoint,
     ) -> GenieResult<Option<ShortPath>> {
         let at = node.at;
-        let d = self.ctx.d;
+        let clearance = self.ctx.clearance;
         match node.kind {
             Kind::Waypoint => {
                 let _ = self.pop_test(&node)?;
@@ -445,7 +447,8 @@ impl Search<'_> {
                     Some((_, hit)) => {
                         let mut fixed_point = Self::at_fraction(at, range_point, frac);
                         let shape = self.settle(&mut fixed_point, hit)?;
-                        let fixed_distance = node.g.wrapping_add(float_distance(at, fixed_point));
+                        let fixed_distance =
+                            node.cost.wrapping_add(float_distance(at, fixed_point));
                         self.side_node(fixed_distance, node.idx, shape, hit.side, fixed_point);
                     }
                 }
@@ -463,17 +466,17 @@ impl Search<'_> {
                 self.corner_expand(node, emit.ok_or(OPEN_CORNER_WITHOUT_EMIT)?)?;
             }
         }
-        let _ = d;
+        let _ = clearance;
         Ok(None)
     }
 
-    /// Type 0, `k == 2`: back off to a free point toward `t`, then the two L-shaped legs toward
+    /// Type 0, `k == 2`: back off to a free point toward `to`, then the two L-shaped legs toward
     /// the touched shape's centre.
     pub(super) fn touch_from(
         &mut self,
         node: Node,
-        p: FixedPoint,
-        t: FixedPoint,
+        from: FixedPoint,
+        to: FixedPoint,
         hit_t: RayFraction,
         hit: Hit,
     ) -> GenieResult<()> {
@@ -481,17 +484,17 @@ impl Search<'_> {
         let mut frac = RayFraction::new(hit_t.get() - 0x6_6666);
         let mut base = node;
         while 1 <= frac.get() {
-            let qp = Self::at_fraction(p, t, frac);
+            let qp = Self::at_fraction(from, to, frac);
             if self.ctx.holder(qp)?.is_none() {
-                let f = i64::from(frac.get());
-                let dx = ((i64::from(t.x().wrapping_sub(p.x())) * f) >> 22) as i32;
-                let dy = ((i64::from(t.y().wrapping_sub(p.y())) * f) >> 22) as i32;
+                let scale = i64::from(frac.get());
+                let dx = ((i64::from(to.x().wrapping_sub(from.x())) * scale) >> 22) as i32;
+                let dy = ((i64::from(to.y().wrapping_sub(from.y())) * scale) >> 22) as i32;
                 let fy = dy as f32 * TO_FLOAT;
                 let fx = dx as f32 * TO_FLOAT;
                 let fixed_distance =
                     FixedDistance::new((sqrt(fx * fx + fy * fy) * TO_FIXED) as i32);
                 base = self.add(
-                    node.g.wrapping_add(fixed_distance),
+                    node.cost.wrapping_add(fixed_distance),
                     node.idx,
                     qp,
                     Kind::Waypoint,
@@ -535,8 +538,8 @@ impl Search<'_> {
             },
         );
         let delta = FixedPoint::new(
-            fixed_point.x().wrapping_sub(p.x()),
-            fixed_point.y().wrapping_sub(p.y()),
+            fixed_point.x().wrapping_sub(from.x()),
+            fixed_point.y().wrapping_sub(from.y()),
         );
         let dir_x = AxisDir::of_dx(delta.x());
         let dir_y = AxisDir::of_dy(delta.y());

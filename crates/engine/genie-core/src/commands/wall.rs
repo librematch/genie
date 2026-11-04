@@ -35,8 +35,8 @@ use crate::world::World;
 use crate::world::index::Place;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::generated::WallTuning;
-use crate::world::slots::CheckedIndex;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::CheckedIndexExt;
+use crate::world::slots::PlayerSlotsExt;
 use crate::{GenieError, GenieResult};
 use std::cmp::Ordering;
 
@@ -101,23 +101,23 @@ pub fn segments(from: Tile, to: Tile) -> Vec<(Tile, Tile)> {
         return vec![(from, to)];
     }
     if dy < dx {
-        let d = (y1 - y2).abs();
-        let s = if x2 <= x1 { d } else { -d };
-        if d < (x1 - x2).abs() - d {
-            let corner = Tile::new(x2 + s, y1);
+        let span = (y1 - y2).abs();
+        let offset = if x2 <= x1 { span } else { -span };
+        if span < (x1 - x2).abs() - span {
+            let corner = Tile::new(x2 + offset, y1);
             vec![(from, corner), (corner, to)]
         } else {
-            let corner = Tile::new(x1 - s, y2);
+            let corner = Tile::new(x1 - offset, y2);
             vec![(from, corner), (corner, to)]
         }
     } else {
-        let d = (x1 - x2).abs();
-        let s = if y2 <= y1 { d } else { -d };
-        if d < (y1 - y2).abs() - d {
-            let corner = Tile::new(x1, y2 + s);
+        let span = (x1 - x2).abs();
+        let offset = if y2 <= y1 { span } else { -span };
+        if span < (y1 - y2).abs() - span {
+            let corner = Tile::new(x1, y2 + offset);
             vec![(from, corner), (corner, to)]
         } else {
-            let corner = Tile::new(x2, y1 - s);
+            let corner = Tile::new(x2, y1 - offset);
             vec![(from, corner), (corner, to)]
         }
     }
@@ -137,9 +137,9 @@ pub fn tiles(from: Tile, to: Tile) -> GenieResult<Vec<Tile>> {
         ));
     }
     let (sx, sy) = (dx.signum(), dy.signum());
-    let n = dx.abs().max(dy.abs());
-    Ok((0..=n)
-        .map(|k| Tile::new(from.x() + k * sx, from.y() + k * sy))
+    let steps = dx.abs().max(dy.abs());
+    Ok((0..=steps)
+        .map(|step| Tile::new(from.x() + step * sx, from.y() + step * sy))
         .collect())
 }
 
@@ -156,14 +156,14 @@ pub fn snap(radius: Footprint, map: GridSize, at: Point, wall_tuning: WallTuning
     let far_x = map.width() as f32 - wall_tuning.map_margin;
     let far_y = map.height() as f32 - wall_tuning.map_margin;
     if low_x < 0.0 {
-        let d = 0.0 - low_x;
-        high_x += d;
-        x += d;
+        let shift = 0.0 - low_x;
+        high_x += shift;
+        x += shift;
     }
     if low_y < 0.0 {
-        let d = 0.0 - low_y;
-        high_y += d;
-        y += d;
+        let shift = 0.0 - low_y;
+        high_y += shift;
+        y += shift;
     }
     if far_x <= high_x {
         x += far_x - high_x;
@@ -178,38 +178,44 @@ pub fn snap(radius: Footprint, map: GridSize, at: Point, wall_tuning: WallTuning
 }
 
 /// One coordinate of [`snap`].
-fn snap_one(v: f32, radius: Distance) -> f32 {
-    let whole = |f: f32| f32::from(f as i32 as i16);
-    let t = whole(v);
+fn snap_one(coordinate: f32, radius: Distance) -> f32 {
+    let whole = |value: f32| f32::from(value as i32 as i16);
+    let truncated = whole(coordinate);
     if radius - Distance::new(whole(radius.get())) == Distance::ZERO {
-        if HALF < v - t { t + ONE } else { t }
+        if HALF < coordinate - truncated {
+            truncated + ONE
+        } else {
+            truncated
+        }
     } else {
-        t + HALF
+        truncated + HALF
     }
 }
 
-/// The foundation the `i`-th builder takes when `capable` of them can build and `placed`
+/// The foundation the `index`-th builder takes when `capable` of them can build and `placed`
 /// foundations were placed (`FUN_140e7b2e0`'s last loop): with fewer builders than foundations
 /// the first takes the first, the last capable one the last, the others the ones spread between;
 /// else they take them in turn. None where the game's index falls outside the foundations.
 #[must_use]
-pub fn share(i: usize, capable: usize, placed: usize) -> Option<usize> {
+pub fn share(index: usize, capable: usize, placed: usize) -> Option<usize> {
     if capable < placed {
-        if i == 0 {
+        if index == 0 {
             Some(0)
-        } else if i == capable - 1 {
+        } else if index == capable - 1 {
             Some(placed - 1)
         } else {
             let spread = (placed as i32 - 2) as f32 / (capable as i32 - 1) as f32;
-            let at = spread * (i as i32 - 1) as f32;
+            let at = spread * (index as i32 - 1) as f32;
             // the game's conversion of a value out of range is its own (0x80000000)
             if !at.is_finite() || i32::MAX as f32 <= at {
                 return None;
             }
-            usize::try_from(at as i32 + 1).ok().filter(|&k| k < placed)
+            usize::try_from(at as i32 + 1)
+                .ok()
+                .filter(|&foundation| foundation < placed)
         }
     } else {
-        Some(i % placed)
+        Some(index % placed)
     }
 }
 
@@ -290,8 +296,8 @@ impl World {
     ) -> GenieResult<Vec<(FoundationId, Position)>> {
         let (player, master) = (build_wall_command.player, build_wall_command.master);
         let mut placed: Vec<(FoundationId, Position)> = Vec::new();
-        for (a, b) in segments(build_wall_command.from, build_wall_command.to) {
-            for tile in tiles(a, b)? {
+        for (start, end) in segments(build_wall_command.from, build_wall_command.to) {
+            for tile in tiles(start, end)? {
                 let at = snap(
                     radius,
                     self.spatial.map,
@@ -333,9 +339,9 @@ impl World {
             };
             let footprint = unit.master(self.master_tables(), owner)?.radius;
             // the packet's word converted (`CVTSI2SS` of a word: exact)
-            let gap = |end: i32, at: f32, r: f32| {
-                let g = ((end as f32 + HALF) - at).abs() - r;
-                if 0.0 <= g { g } else { 0.0 }
+            let gap = |end: i32, at: f32, reach: f32| {
+                let beyond = ((end as f32 + HALF) - at).abs() - reach;
+                if 0.0 <= beyond { beyond } else { 0.0 }
             };
             let gx = gap(
                 build_wall_command.to.x(),
@@ -354,7 +360,7 @@ impl World {
                 "BUILD_WALL with more builders than the insertion sort takes (FUN_140e6eee0)",
             ));
         }
-        sorted.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(Ordering::Equal));
+        sorted.sort_by(|left, right| right.1.partial_cmp(&left.1).unwrap_or(Ordering::Equal));
         Ok(sorted)
     }
 
@@ -438,7 +444,7 @@ impl World {
                 .iter()
                 // The builder the train locations name for every villager (`FUN_141262270`: `0x76`).
                 // The action type of the task another unit builds with (`FUN_141262270`: `0x65`).
-                .find(|t| t.action_kind == ActionKind::BUILD)
+                .find(|task| task.action_kind == ActionKind::BUILD)
                 .is_some_and(|task| task.object_id == Some(building)));
         }
         Ok(
@@ -454,59 +460,63 @@ mod tests {
     use crate::testing::tuning;
 
     /// The tile at `x`, `y`.
-    const fn t(x: i32, y: i32) -> Tile {
+    const fn tile(x: i32, y: i32) -> Tile {
         Tile::new(x, y)
     }
 
     #[test]
     fn line_is_one_segment_when_straight_or_diagonal() {
-        assert_eq!(segments(t(3, 4), t(3, 4)), [(t(3, 4), t(3, 4))]);
-        assert_eq!(segments(t(3, 4), t(9, 4)), [(t(3, 4), t(9, 4))]);
-        assert_eq!(segments(t(3, 4), t(3, 1)), [(t(3, 4), t(3, 1))]);
-        assert_eq!(segments(t(3, 4), t(6, 7)), [(t(3, 4), t(6, 7))]);
+        assert_eq!(segments(tile(3, 4), tile(3, 4)), [(tile(3, 4), tile(3, 4))]);
+        assert_eq!(segments(tile(3, 4), tile(9, 4)), [(tile(3, 4), tile(9, 4))]);
+        assert_eq!(segments(tile(3, 4), tile(3, 1)), [(tile(3, 4), tile(3, 1))]);
+        assert_eq!(segments(tile(3, 4), tile(6, 7)), [(tile(3, 4), tile(6, 7))]);
     }
 
     #[test]
     fn bent_line_puts_its_longer_part_first() {
         // 8 across, 2 down: the straight part (6) is longer than the diagonal (2)
         assert_eq!(
-            segments(t(0, 0), t(8, 2)),
-            [(t(0, 0), t(6, 0)), (t(6, 0), t(8, 2))]
+            segments(tile(0, 0), tile(8, 2)),
+            [(tile(0, 0), tile(6, 0)), (tile(6, 0), tile(8, 2))]
         );
         // 4 across, 3 down: the diagonal (3) first, then the straight part (1)
         assert_eq!(
-            segments(t(0, 0), t(4, 3)),
-            [(t(0, 0), t(3, 3)), (t(3, 3), t(4, 3))]
+            segments(tile(0, 0), tile(4, 3)),
+            [(tile(0, 0), tile(3, 3)), (tile(3, 3), tile(4, 3))]
         );
         // leftwards and upwards, taller than wide
         assert_eq!(
-            segments(t(10, 10), t(8, 2)),
-            [(t(10, 10), t(10, 4)), (t(10, 4), t(8, 2))]
+            segments(tile(10, 10), tile(8, 2)),
+            [(tile(10, 10), tile(10, 4)), (tile(10, 4), tile(8, 2))]
         );
         assert_eq!(
-            segments(t(10, 10), t(7, 6)),
-            [(t(10, 10), t(7, 7)), (t(7, 7), t(7, 6))]
+            segments(tile(10, 10), tile(7, 6)),
+            [(tile(10, 10), tile(7, 7)), (tile(7, 7), tile(7, 6))]
         );
-        for (a, b) in [
-            (t(0, 0), t(8, 2)),
-            (t(0, 0), t(4, 3)),
-            (t(10, 10), t(8, 2)),
-            (t(10, 10), t(7, 6)),
+        for (from, to) in [
+            (tile(0, 0), tile(8, 2)),
+            (tile(0, 0), tile(4, 3)),
+            (tile(10, 10), tile(8, 2)),
+            (tile(10, 10), tile(7, 6)),
         ] {
-            let s = segments(a, b);
-            assert!(s.iter().all(|&(f, t)| tiles(f, t).is_ok()));
-            assert_eq!((s[0].0, s[s.len() - 1].1), (a, b));
+            let segments = segments(from, to);
+            assert!(
+                segments
+                    .iter()
+                    .all(|&(start, end)| tiles(start, end).is_ok())
+            );
+            assert_eq!((segments[0].0, segments[segments.len() - 1].1), (from, to));
         }
     }
 
     #[test]
     fn segment_walks_both_coordinates() {
         assert_eq!(
-            tiles(t(5, 5), t(7, 3)).unwrap(),
-            [t(5, 5), t(6, 4), t(7, 3)]
+            tiles(tile(5, 5), tile(7, 3)).unwrap(),
+            [tile(5, 5), tile(6, 4), tile(7, 3)]
         );
-        assert_eq!(tiles(t(5, 5), t(5, 5)).unwrap(), [t(5, 5)]);
-        assert!(tiles(t(0, 0), t(2, 1)).is_err());
+        assert_eq!(tiles(tile(5, 5), tile(5, 5)).unwrap(), [tile(5, 5)]);
+        assert!(tiles(tile(0, 0), tile(2, 1)).is_err());
     }
 
     #[test]
@@ -554,13 +564,13 @@ mod tests {
     #[test]
     fn builders_are_shared_out_over_the_foundations() {
         // three builders over seven foundations: the ends and the middle
-        let k: Vec<_> = (0..3).map(|i| share(i, 3, 7)).collect();
-        assert_eq!(k, [Some(0), Some(1), Some(6)]);
-        let k: Vec<_> = (0..4).map(|i| share(i, 4, 7)).collect();
-        assert_eq!(k, [Some(0), Some(1), Some(2), Some(6)]);
+        let shares: Vec<_> = (0..3).map(|builder| share(builder, 3, 7)).collect();
+        assert_eq!(shares, [Some(0), Some(1), Some(6)]);
+        let shares: Vec<_> = (0..4).map(|builder| share(builder, 4, 7)).collect();
+        assert_eq!(shares, [Some(0), Some(1), Some(2), Some(6)]);
         // as many builders as foundations or more: in turn
-        let k: Vec<_> = (0..5).map(|i| share(i, 5, 2)).collect();
-        assert_eq!(k, [Some(0), Some(1), Some(0), Some(1), Some(0)]);
+        let shares: Vec<_> = (0..5).map(|builder| share(builder, 5, 2)).collect();
+        assert_eq!(shares, [Some(0), Some(1), Some(0), Some(1), Some(0)]);
         // a builder past the capable ones lands outside
         assert_eq!(share(1, 1, 3), None);
     }

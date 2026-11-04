@@ -64,7 +64,7 @@ impl World {
             let id = if let Some(common) = common {
                 match self.groups.get(common) {
                     None => continue,
-                    Some(g) if g.members.len() != group_units.len() => {
+                    Some(group) if group.members.len() != group_units.len() => {
                         self.form_group(&split, group_units, number)?
                     }
                     Some(_) => {
@@ -79,8 +79,8 @@ impl World {
                 listed.push(id);
             }
             let commands = self.groups.commands;
-            if let Some(g) = self.groups.get_mut(id) {
-                g.differentiator_id = commands;
+            if let Some(group) = self.groups.get_mut(id) {
+                group.differentiator_id = commands;
             }
             self.lock_formation(id, formation)?;
         }
@@ -142,9 +142,9 @@ impl World {
             return Ok(());
         }
         if self.live_object(player_id, id).is_some()
-            && let Some(m) = self.parts.mover_mut(id)
+            && let Some(mover) = self.parts.mover_mut(id)
         {
-            m.ignore_units.clear();
+            mover.ignore_units.clear();
         }
         self.object_stop(player_id, idx)?;
         if self.live_object(player_id, id).is_some()

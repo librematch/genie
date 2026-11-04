@@ -15,9 +15,9 @@ fn quiet() -> Vec<u8> {
     recording(&header(vec![gaia(Vec::new()), human(Vec::new())]), &[])
 }
 
-/// A recording of the same save and `n` syncs of 50 ms.
-fn syncs(n: usize) -> Vec<u8> {
-    let ops: Vec<_> = (0..n).map(|_| Op::Sync { dt: 50 }).collect();
+/// A recording of the same save and `count` syncs of 50 ms.
+fn syncs(count: usize) -> Vec<u8> {
+    let ops: Vec<_> = (0..count).map(|_| Op::Sync { dt: 50 }).collect();
     recording(&header(vec![gaia(Vec::new()), human(Vec::new())]), &ops)
 }
 
@@ -47,8 +47,9 @@ fn quiet_update_parts_at_no_step() {
 #[test]
 fn step_without_the_game_save_is_not_compared() {
     let (save, rec) = (quiet(), syncs(3));
-    let game_at =
-        |s| matches!(s, UpdateStep::Player(PlayerStep::Objects, _)).then(|| (quiet(), None));
+    let game_at = |update_step| {
+        matches!(update_step, UpdateStep::Player(PlayerStep::Objects, _)).then(|| (quiet(), None))
+    };
     let steps = steps_from_save(&save, &rec, 1, None, Dumps::default(), &game_at).unwrap();
     let compared: Vec<String> = steps
         .iter()

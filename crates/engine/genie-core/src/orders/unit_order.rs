@@ -31,7 +31,7 @@ use crate::world::index::Place;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::others::OthersRef;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 use crate::{GenieError, GenieResult};
 
 impl World {
@@ -97,11 +97,11 @@ impl World {
             )?,
             None => Default::default(),
         };
-        if let Some(t) = targets.released {
-            self.release(t, by)?;
+        if let Some(object_id) = targets.released {
+            self.release(object_id, by)?;
         }
-        if let Some(t) = targets.taken {
-            self.take(t, by)?;
+        if let Some(object_id) = targets.taken {
+            self.take(object_id, by)?;
         }
         // set_state(5)'s sub-actions went: the Enter it held lets its building or transport go
         if let Some(object_id) = gone.released {
@@ -136,7 +136,7 @@ impl World {
 
     /// `FUN_140ac4c60` from the animal `sheep` (`listed` the animals sent so far, a static list of
     /// 16): it joins the list; while it holds fewer than 16, the tiles within 3 of the animal's (x
-    /// outer, y inner, held to the map) that player `p` sees (`FUN_141663500` 0xf), each in its
+    /// outer, y inner, held to the map) that player `owner` sees (`FUN_141663500` 0xf), each in its
     /// list's order, give the next: livestock (class 58) of the player in state 2 whose top action
     /// has neither a target nor a point
     /// ([`Action::top_action_idle`](crate::objects::layers::Action::top_action_idle)) and not
@@ -144,7 +144,7 @@ impl World {
     /// ends.
     pub(super) fn herd_from(
         &mut self,
-        p: PlayerId,
+        owner: PlayerId,
         sheep: ObjectId,
         site: DropSiteId,
         listed: &mut Vec<ObjectId>,
@@ -160,12 +160,18 @@ impl World {
             .1
             .position();
         let (x, y) = (cvttss2si(at.x()), cvttss2si(at.y()));
-        let (w, h) = (self.spatial.map.width(), self.spatial.map.height());
-        let (x0, x1) = ((x - 3).max(0), if x + 3 < w { x + 3 } else { w - 1 });
-        let (y0, y1) = ((y - 3).max(0), if y + 3 < h { y + 3 } else { h - 1 });
+        let (width, height) = (self.spatial.map.width(), self.spatial.map.height());
+        let (x0, x1) = (
+            (x - 3).max(0),
+            if x + 3 < width { x + 3 } else { width - 1 },
+        );
+        let (y0, y1) = (
+            (y - 3).max(0),
+            if y + 3 < height { y + 3 } else { height - 1 },
+        );
         for tx in x0..=x1 {
             for ty in y0..=y1 {
-                if !self.spatial.sees_tile(p, Tile::new(tx, ty)) {
+                if !self.spatial.sees_tile(owner, Tile::new(tx, ty)) {
                     continue;
                 }
                 let ids = self.spatial.tiles().list(Tile::new(tx, ty)).to_vec();
@@ -174,7 +180,7 @@ impl World {
                         continue;
                     };
                     let unit = &self.players.live(player_id, list_index)?;
-                    if player_id != p
+                    if player_id != owner
                         || unit.life.state != ObjectState::Alive
                         || !self
                             .model
@@ -189,8 +195,8 @@ impl World {
                     {
                         continue;
                     }
-                    self.send_to_site(p, id, site)?;
-                    self.herd_from(p, id, site, listed)?;
+                    self.send_to_site(owner, id, site)?;
+                    self.herd_from(owner, id, site, listed)?;
                     if HERD_MOST <= listed.len() {
                         return Ok(());
                     }
@@ -200,10 +206,10 @@ impl World {
         Ok(())
     }
 
-    /// Slot 0x138 of player `p`'s animal `sheep` to the drop site `site` at its place.
+    /// Slot 0x138 of player `player`'s animal `sheep` to the drop site `site` at its place.
     pub(super) fn send_to_site(
         &mut self,
-        p: PlayerId,
+        player: PlayerId,
         sheep: ObjectId,
         site: DropSiteId,
     ) -> GenieResult<()> {
@@ -212,14 +218,14 @@ impl World {
                 "a led animal the slice does not hold live",
             ));
         };
-        if player_id != p {
+        if player_id != player {
             return Err(GenieError::unsupported("a led animal of another player"));
         }
         // the hunt's drop site is a raw field yet
         let (site, point) = Some(site)
             .and_then(|id| self.spatial.get(id).map(|placed| (id, placed.position)))
             .ok_or(GenieError::unsupported("a drop site without a place"))?;
-        self.move_to_object(p, idx, site.id(), point)
+        self.move_to_object(player, idx, site.id(), point)
     }
 
     /// `UNIT_ORDER`'s action 4 (`FUN_14161e370` case 4) to the objects `ids`: each the world
@@ -442,7 +448,7 @@ impl World {
             spatial: &mut self.spatial,
             zones: &mut self.zones,
             pathing: &mut self.pathing,
-            object: self.streams.get(Stream::Object),
+            object: self.streams.get_mut(Stream::Object),
             world_time: self.world_time,
             player_kind: player.kind,
             groups: &self.groups,

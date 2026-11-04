@@ -20,7 +20,7 @@ use crate::players::UnitRelation;
 use crate::players::UnitRelations;
 use crate::vision::VisionBits;
 use crate::world::layer::generated::RegistryTuning;
-use crate::world::slots::CheckedIndex;
+use crate::world::slots::CheckedIndexExt;
 use crate::{GenieError, GenieResult};
 
 /// The players a mask has room for in `Update_Unit_Info`'s loop: the object's record pointers
@@ -83,7 +83,7 @@ pub struct UnitUpdate {
 /// A query for the visible units of a player ([`Registry::visible_units`]'s arguments,
 /// `FUN_141288c00`'s).
 #[derive(Clone, Copy, Debug)]
-pub struct VisibleQuery<'a> {
+pub struct VisibleQuery<'world> {
     /// The player whose lists it reads.
     pub(crate) player: PlayerId,
     /// The searcher's place (x, y).
@@ -93,9 +93,9 @@ pub struct VisibleQuery<'a> {
     /// 0: a rounded box, 1: a box.
     pub(crate) mode: i32,
     /// The classes it reads.
-    pub(crate) classes: &'a [ClassId],
+    pub(crate) classes: &'world [ClassId],
     /// What the owners are to the player (none for a saved value past the relations).
-    pub(crate) relations: &'a UnitRelations,
+    pub(crate) relations: &'world UnitRelations,
     /// The searcher's radii (x, y).
     pub(crate) size: Footprint,
     /// The relations kept, one bit each.
@@ -171,29 +171,29 @@ impl Registry {
                 let list = self.lists.checked_mut(index)?.checked_mut(class)?;
                 if seen & 1 == 0 {
                     if !list.is_empty() {
-                        let i = slot.ok_or(GenieError::unsupported(
+                        let slot_index = slot.ok_or(GenieError::unsupported(
                             "a registry removal of an object without its record",
                         ))?;
                         let last = list.len() - 1;
-                        if i != last {
-                            list.swap(i, last);
-                            let moved = list.checked(i)?.id;
-                            if let Some(s) = self
+                        if slot_index != last {
+                            list.swap(slot_index, last);
+                            let moved = list.checked(slot_index)?.id;
+                            if let Some(entry) = self
                                 .entries
                                 .get_mut(moved)
                                 .and_then(|moved_entry| moved_entry.slots.get_mut(index))
                             {
-                                *s = Some(i);
+                                *entry = Some(slot_index);
                             }
                         }
                         let _ = self.lists.checked_mut(index)?.checked_mut(class)?.pop();
                     }
-                    if let Some(s) = self
+                    if let Some(entry) = self
                         .entries
                         .get_mut(id)
-                        .and_then(|e| e.slots.get_mut(index))
+                        .and_then(|entry| entry.slots.get_mut(index))
                     {
-                        *s = None;
+                        *entry = None;
                     }
                 } else {
                     list.push(Record {
@@ -204,12 +204,12 @@ impl Registry {
                         radius: radii,
                     });
                     let count = list.len() - 1;
-                    if let Some(s) = self
+                    if let Some(entry) = self
                         .entries
                         .get_mut(id)
                         .and_then(|entry| entry.slots.get_mut(index))
                     {
-                        *s = Some(count);
+                        *entry = Some(count);
                     }
                 }
             }
@@ -225,13 +225,13 @@ impl Registry {
             return Ok(());
         };
         for (index, slot) in entry.slots.iter().enumerate().take(self.players) {
-            let Some(i) = *slot else { continue };
+            let Some(position) = *slot else { continue };
             let record = self
                 .lists
                 .checked_mut(index)?
                 .iter_mut()
-                .filter_map(|list| list.get_mut(i))
-                .find(|r| r.id == id)
+                .filter_map(|list| list.get_mut(position))
+                .find(|record| record.id == id)
                 .ok_or(GenieError::unsupported(
                     "an object's registry slot without its record",
                 ))?;
@@ -250,8 +250,8 @@ impl Registry {
             return;
         };
         for (index, slot) in entry.slots.iter().enumerate().take(self.players) {
-            if let Some(record) =
-                slot.and_then(|i| self.lists.get_mut(index)?.get_mut(class)?.get_mut(i))
+            if let Some(record) = slot
+                .and_then(|position| self.lists.get_mut(index)?.get_mut(class)?.get_mut(position))
             {
                 record.at = Point::new(x, y);
             }
@@ -305,7 +305,7 @@ impl Registry {
         for &class in classes {
             let list = class
                 .index()
-                .and_then(|c| self.lists.get(player.index())?.get(c))
+                .and_then(|class_index| self.lists.get(player.index())?.get(class_index))
                 .ok_or(GenieError::unsupported(
                     "a query of a class beyond the registry's",
                 ))?;

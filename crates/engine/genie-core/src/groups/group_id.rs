@@ -108,7 +108,7 @@ mod tests {
     #[test]
     fn minus_one_is_no_group() {
         assert_eq!(
-            GroupId::try_from(-1_i32).map_err(|e| e.kind()),
+            GroupId::try_from(-1_i32).map_err(|error| error.kind()),
             Err(ErrorKind::InvalidInput)
         );
         assert_eq!(

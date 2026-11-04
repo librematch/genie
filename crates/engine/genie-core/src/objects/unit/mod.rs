@@ -131,11 +131,11 @@ impl Unit {
     ///
     /// No master of its own and none of its id in the player's table, which the game's object
     /// always has ([`crate::world::OBJECT_MASTER`], with the object, its master and the player).
-    pub fn master<'a>(
+    pub fn master<'masters>(
         &self,
-        tables: MasterTables<'a>,
+        tables: MasterTables<'masters>,
         player: PlayerId,
-    ) -> GenieResult<&'a Master> {
+    ) -> GenieResult<&'masters Master> {
         self.master_in(tables.of(player))
             .map_err(|error| error.with("player", player))
     }
@@ -146,7 +146,10 @@ impl Unit {
     /// # Errors
     ///
     /// No master of its own and none of its id in the owner's table.
-    pub(crate) fn master_in<'a>(&self, masters: OwnerMasters<'a>) -> GenieResult<&'a Master> {
+    pub(crate) fn master_in<'masters>(
+        &self,
+        masters: OwnerMasters<'masters>,
+    ) -> GenieResult<&'masters Master> {
         object_master(
             masters.own.get(self.id),
             (self.id, self.life.master_id),
@@ -234,11 +237,11 @@ pub(crate) fn second_target_checked(
 /// # Errors
 ///
 /// No master of its own and none of `master_id` in `table`.
-pub(crate) fn object_master<'a>(
-    own: Option<&'a Master>,
+pub(crate) fn object_master<'masters>(
+    own: Option<&'masters Master>,
     (id, master_id): (ObjectId, MasterId),
-    table: Option<&'a Masters>,
-) -> GenieResult<&'a Master> {
+    table: Option<&'masters Masters>,
+) -> GenieResult<&'masters Master> {
     own.or_else(|| table?.get(master_id))
         .ok_or_else(|| OBJECT_MASTER.with("object", id).with("master", master_id))
 }
@@ -277,7 +280,7 @@ pub(crate) fn missed_passes(
         return true;
     }
     let other = Some(id) != target;
-    step.w.spatial.allied_with(step.player, player)
+    step.world.spatial.allied_with(step.player, player)
         || (other && player == PlayerId::new(0) && MasterKind::TREE < kind)
         || (other && !blast_level.reaches(level))
 }

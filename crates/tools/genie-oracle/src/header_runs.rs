@@ -71,7 +71,7 @@ pub(super) fn run(turns: &mut World, decoder: &mut Decoder, frames: &[Frame<'_>]
         let commands: Vec<Command> = frame
             .commands
             .iter()
-            .filter_map(|p| decoder.command(p))
+            .filter_map(|packet| decoder.command(packet))
             .collect();
         if trace {
             for command in &commands {
@@ -102,13 +102,18 @@ pub fn simulate_word9(recording: &[u8], masters: Option<&MasterTable>) -> GenieR
     let (first, checkpoint) = all
         .iter()
         .enumerate()
-        .find_map(|(i, f)| f.checkpoint.as_ref().map(|c| (i, c)))
+        .find_map(|(index, frame)| {
+            frame
+                .checkpoint
+                .as_ref()
+                .map(|checkpoint| (index, checkpoint))
+        })
         .ok_or(no_checkpoint())?;
     let group_command = all[..first].iter().enumerate().find_map(|(index, frame)| {
         let packet = frame
             .commands
             .iter()
-            .find(|p| GROUP_COMMANDS.contains(&p[0]))?;
+            .find(|packet| GROUP_COMMANDS.contains(&packet[0]))?;
         Some(GroupCommand {
             tick: index as u32 + 1,
             player: packet.get(1).copied().unwrap_or_default(),
@@ -120,7 +125,7 @@ pub fn simulate_word9(recording: &[u8], masters: Option<&MasterTable>) -> GenieR
     checkpoint
         .lanes
         .iter()
-        .filter(|lane| lane.iter().any(|&w| w != 0))
+        .filter(|lane| lane.iter().any(|&word| word != 0))
         .map(|lane| {
             let id = lane[8];
             let section = sections
@@ -179,7 +184,9 @@ pub(super) fn checkpoint_action(
     actions: &Action,
     production: Option<&Production>,
 ) -> Option<ActionTerm> {
-    let making = production.and_then(|p| p.action).map(|a| a.state());
+    let making = production
+        .and_then(|production| production.action)
+        .map(|making| making.state());
     match (top_action(actions), making) {
         (Some(top), Some(state)) => Some(ActionTerm {
             kind: Some(top.kind),
@@ -306,9 +313,9 @@ pub fn slice_from_header(header: &Header, masters: Option<&MasterTable>) -> Geni
 
 /// A recording opened for a run from its header: its first chapter, the chapter's header save
 /// and the slice from it as the header's load leaves it ([`header_slice`]).
-pub(super) struct Opened<'r> {
+pub(super) struct Opened<'data> {
     /// The recording's first chapter.
-    pub(super) chapter: de::Chapter<'r>,
+    pub(super) chapter: de::Chapter<'data>,
     /// The chapter's header save.
     pub(super) header: Header,
     /// The slice from the header, the load's run-time state in it, not the bare `slice`.
@@ -320,10 +327,10 @@ pub(super) struct Opened<'r> {
 /// # Errors
 ///
 /// The recording or its header does not read, or the build layer does not evaluate.
-pub(super) fn open<'r>(
-    recording: &'r [u8],
+pub(super) fn open<'data>(
+    recording: &'data [u8],
     masters: Option<&MasterTable>,
-) -> GenieResult<Opened<'r>> {
+) -> GenieResult<Opened<'data>> {
     let chapter = chapters(recording)?[0];
     let header = chapter.header()?;
     let turns = header_slice(&header, masters)?;

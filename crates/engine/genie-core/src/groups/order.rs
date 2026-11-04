@@ -66,9 +66,9 @@ impl World {
         point: Point,
         order: CommandArgs,
     ) -> GenieResult<GroupMove> {
-        let g = self.groups.held_mut(group)?;
-        g.flags &= !GroupFlags::MEMBERS_SENT;
-        let target = target.filter(|&t| self.world_object(t).is_some());
+        let unit_group = self.groups.held_mut(group)?;
+        unit_group.flags &= !GroupFlags::MEMBERS_SENT;
+        let target = target.filter(|&object_id| self.world_object(object_id).is_some());
         let task = match target {
             Some(object_id) => self.group_task(group, object_id, point, order)?,
             None => None,
@@ -78,8 +78,8 @@ impl World {
                 "a horde's command (commandHorde, FUN_141010180)",
             ));
         }
-        let g = self.groups.held_mut(group)?;
-        g.replaces_queue = u8::from(!order.queued);
+        let unit_group = self.groups.held_mut(group)?;
+        unit_group.replaces_queue = u8::from(!order.queued);
         let command = task.map(|target_task| GroupCommandKind::of_action(target_task.command));
         let mut moved = GroupMove::NotBegun;
         if command.is_none_or(|group_command_kind| group_command_kind == MOVE_COMMAND) {
@@ -142,7 +142,7 @@ impl World {
         range: Distance,
         order: CommandArgs,
     ) -> GenieResult<GroupMove> {
-        let g = self.groups.held_mut(group)?;
+        let unit_group = self.groups.held_mut(group)?;
         let entry = |approved: u8| GroupCommand {
             command,
             target_id: Some(target),
@@ -153,24 +153,27 @@ impl World {
             approved_2: u16::MAX,
         };
         if order.queued {
-            g.queue_command(entry(u8::from(order.direct)));
-            if g.current_command == GroupCommandKind::NONE && order.direct && g.hibernating != 1 {
-                g.hibernating = 1;
+            unit_group.queue_command(entry(u8::from(order.direct)));
+            if unit_group.current_command == GroupCommandKind::NONE
+                && order.direct
+                && unit_group.hibernating != 1
+            {
+                unit_group.hibernating = 1;
             }
             return Ok(GroupMove::NotBegun);
         }
-        if !order.direct && !g.command_queue.is_empty() {
-            g.queue_command(entry(0));
-            g.approve_queued();
+        if !order.direct && !unit_group.command_queue.is_empty() {
+            unit_group.queue_command(entry(0));
+            unit_group.approve_queued();
             self.check_queued_orders(group)?;
             return Ok(GroupMove::Begun);
         }
-        if g.replaces_queue != 0 {
-            g.clear_command_queue();
+        if unit_group.replaces_queue != 0 {
+            unit_group.clear_command_queue();
         }
-        g.forget_target_data();
-        g.current_target.range = Distance::ZERO;
-        for member in &mut g.members {
+        unit_group.forget_target_data();
+        unit_group.current_target.range = Distance::ZERO;
+        for member in &mut unit_group.members {
             member.seconds_since_attacking = Seconds::MAX;
         }
         let moved = self.command_move_to(

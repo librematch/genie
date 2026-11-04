@@ -67,11 +67,11 @@ pub enum PointWalk {
 
 /// What a hunt's start takes besides its attack and its mover ([`HuntAction::start`]'s arguments).
 #[derive(Debug)]
-pub struct HuntStart<'a> {
+pub struct HuntStart<'world> {
     /// The task.
     pub(crate) task: HuntTask,
     /// The target.
-    pub(crate) target: &'a Quarry,
+    pub(crate) target: &'world Quarry,
     /// The owner.
     pub(crate) player: PlayerId,
     /// The owner's type (`player+0x10`; [`PlayerKind::is_computer`] is `FUN_141659cf0`).
@@ -79,21 +79,21 @@ pub struct HuntStart<'a> {
     /// The game settings' test `FUN_141302150`.
     pub(crate) carry_rule: bool,
     /// What the hunter carries, its resource kind and amount.
-    pub(crate) held: &'a mut Held,
+    pub(crate) held: &'world mut Held,
     /// What its `MoveTo`s' constructors read of the hunter; its load is `held`'s.
-    pub(crate) walks: Walks<'a>,
+    pub(crate) walks: Walks<'world>,
 }
 
 /// What a hunt's retarget takes besides its attack and its mover ([`HuntAction::retarget`]'s
 /// arguments).
 #[derive(Clone, Copy, Debug)]
-pub struct HuntRetarget<'a> {
+pub struct HuntRetarget<'world> {
     /// The work command's new target.
-    pub(crate) target: &'a Quarry,
+    pub(crate) target: &'world Quarry,
     /// The owner.
     pub(crate) player: PlayerId,
     /// What the hunter carries, and what its `MoveTo`s' constructors read of it.
-    pub(crate) walks: Walks<'a>,
+    pub(crate) walks: Walks<'world>,
     /// The target is a drop site of the hunter's master.
     pub(crate) drops_here: bool,
 }
@@ -101,26 +101,26 @@ pub struct HuntRetarget<'a> {
 /// What a hunt's chase of its target takes besides its attack and its mover
 /// ([`HuntAction::chase`]'s arguments).
 #[derive(Clone, Copy, Debug)]
-pub struct HuntChase<'a> {
+pub struct HuntChase<'world> {
     /// The target.
-    pub(crate) target: &'a Quarry,
+    pub(crate) target: &'world Quarry,
     /// The hunter's owner.
     pub(crate) player: PlayerId,
     /// What its `MoveTo`s' constructors read of the hunter.
-    pub(crate) walks: &'a Walks<'a>,
+    pub(crate) walks: &'world Walks<'world>,
 }
 
 /// A move a hunt may take ([`HuntAction::take_move`]'s arguments before the mover).
 #[derive(Clone, Copy, Debug)]
-pub struct HuntMove<'a> {
+pub struct HuntMove<'world> {
     /// The move's target (none for a point).
-    pub(crate) target: Option<&'a Quarry>,
+    pub(crate) target: Option<&'world Quarry>,
     /// The move's point.
     pub(crate) point: Position,
     /// The owner.
     pub(crate) player: PlayerId,
     /// What the hunter carries, and what its `MoveTo`s' constructors read of it.
-    pub(crate) walks: Walks<'a>,
+    pub(crate) walks: Walks<'world>,
     /// The target is a drop site of the hunter's master.
     pub(crate) drops_here: bool,
     /// The pasture the unit is on (`mMyPastureId`).
@@ -282,7 +282,7 @@ impl HuntAction {
         }
         self.state = HuntState::Attack { attack: None };
         let reads = walks.live(mover);
-        let (a, move_start) = Attack::start(
+        let (attack, move_start) = Attack::start(
             target.id,
             attack,
             arms,
@@ -294,7 +294,9 @@ impl HuntAction {
                 move_to_tuning,
             },
         )?;
-        self.state = HuntState::Attack { attack: Some(a) };
+        self.state = HuntState::Attack {
+            attack: Some(attack),
+        };
         Ok(move_start)
     }
 
@@ -402,25 +404,25 @@ impl HuntAction {
             return Ok(Answer::NotTaken);
         }
         if my_pasture.is_some()
-            && target.is_none_or(|t| Some(t.id) != my_pasture.map(PastureId::id))
+            && target.is_none_or(|quarry| Some(quarry.id) != my_pasture.map(PastureId::id))
         {
             return Err(GenieError::unsupported(
                 "a hunter leaving its pasture (FUN_141189ca0)",
             ));
         }
-        if let Some(t) =
+        if let Some(quarry) =
             target.filter(|quarry| quarry.player == player && drops_here && Amount::ZERO < held)
         {
-            if Some(t.id) == self.carry_to.map(DropSiteId::id)
+            if Some(quarry.id) == self.carry_to.map(DropSiteId::id)
                 && matches!(self.state, HuntState::Drop { .. })
             {
                 return Ok(Answer::Taken);
             }
             self.set_target(None);
             self.point = Position::from([-1.0; 3]);
-            self.target_class = Some(t.class);
-            self.carry_to = Some(DropSiteId::new(t.id));
-            self.set_drop(t.position, gap, mover, &walks, move_to_tuning)?;
+            self.target_class = Some(quarry.class);
+            self.carry_to = Some(DropSiteId::new(quarry.id));
+            self.set_drop(quarry.position, gap, mover, &walks, move_to_tuning)?;
             return Ok(Answer::Taken);
         }
         self.point = point;
@@ -542,7 +544,7 @@ impl HuntAction {
                 "a computer player's hunt whose walk to a point failed (set_state 13)"
             }));
         }
-        self.tear_down(step.w.parts.mover_mut(unit.id))?;
+        self.tear_down(step.world.parts.mover_mut(unit.id))?;
         if matches!(self.state, HuntState::WalkSearch { .. }) {
             self.state = HuntState::Search;
             return Ok(PointWalk::Search);

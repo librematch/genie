@@ -11,7 +11,7 @@ use genie_core::objects::ObjectId;
 use genie_core::objects::ObjectState;
 use genie_core::objects::lifecycle::Held;
 use genie_core::objects::masters::ActionKind;
-use genie_core::objects::masters::PlayersMasters;
+use genie_core::objects::masters::PlayersMastersExt;
 use genie_core::objects::masters::{MasterId, Masters};
 use genie_core::players::AllyTest;
 use genie_core::players::Amount;
@@ -166,8 +166,13 @@ pub fn finder_world(save: &[u8], table: &MasterTable) -> GenieResult<FinderWorld
     let sections = header.players();
     let masters = sections
         .iter()
-        .map(|p| {
-            work_masters(p.objects(), CivId::new(p.world_player().base.civ_id), table).map(Arc::new)
+        .map(|player_section| {
+            work_masters(
+                player_section.objects(),
+                CivId::new(player_section.world_player().base.civ_id),
+                table,
+            )
+            .map(Arc::new)
         })
         .collect::<Result<_, _>>()?;
     let objects = finder_objects(&sections)?;
@@ -177,12 +182,15 @@ pub fn finder_world(save: &[u8], table: &MasterTable) -> GenieResult<FinderWorld
         objects,
         relations: sections
             .iter()
-            .map(|p| Relations::of_bytes(p.world_player().base.relation.iter().copied()))
+            .map(|player_section| {
+                Relations::of_bytes(player_section.world_player().base.relation.iter().copied())
+            })
             .collect(),
         attribute_95: sections
             .iter()
-            .map(|p| {
-                p.world_player()
+            .map(|player_section| {
+                player_section
+                    .world_player()
                     .base
                     .attributes
                     .get(95)
@@ -227,7 +235,7 @@ fn finder_object(
     (object, rge_static_object): (&genie_save::Object, &RgeStaticObject),
 ) -> GenieResult<FinderObject> {
     let combat = object.combat();
-    let powerup = |f: fn(&TribeCombatObject) -> f32| combat.map_or(0.0, f);
+    let powerup = |field: fn(&TribeCombatObject) -> f32| combat.map_or(0.0, field);
     let master_hp = section
         .objects()
         .master(rge_static_object.master_obj)
@@ -245,7 +253,8 @@ fn finder_object(
         },
         hp: HitPoints::new(
             rge_static_object.hp
-                + (powerup(|c| c.hitpoints_max_powerup) - powerup(|c| c.hitpoints_powerup)),
+                + (powerup(|tribe_combat_object| tribe_combat_object.hitpoints_max_powerup)
+                    - powerup(|tribe_combat_object| tribe_combat_object.hitpoints_powerup)),
         ),
         max_hp: HitPoints::new(
             master_hp + powerup(|tribe_combat_object| tribe_combat_object.hitpoints_max_powerup),

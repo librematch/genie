@@ -59,8 +59,8 @@ mod tests {
             SpeedMultiplier::of_data(1.5).applied_to(base),
             Speed::new(0.8 * 1.5)
         );
-        for f in [0.0, -1.0, f32::NAN] {
-            assert_eq!(SpeedMultiplier::of_data(f).applied_to(base), base);
+        for factor in [0.0, -1.0, f32::NAN] {
+            assert_eq!(SpeedMultiplier::of_data(factor).applied_to(base), base);
         }
         assert_eq!(SpeedMultiplier::ONE.get(), 1.0);
     }

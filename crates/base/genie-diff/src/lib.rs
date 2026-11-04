@@ -141,10 +141,10 @@ impl Differ {
 
     /// Compares two sequences: their length, then each element both hold by its index, then
     /// each element only one holds.
-    pub fn sequence<'a, T: Diff + 'a>(
+    pub fn sequence<'item, T: Diff + 'item>(
         &mut self,
-        left: impl ExactSizeIterator<Item = &'a T>,
-        right: impl ExactSizeIterator<Item = &'a T>,
+        left: impl ExactSizeIterator<Item = &'item T>,
+        right: impl ExactSizeIterator<Item = &'item T>,
     ) {
         let (lengths, mut left, mut right) = ((left.len(), right.len()), left, right);
         if lengths.0 != lengths.1 {
@@ -152,8 +152,12 @@ impl Differ {
         }
         for index in 0..lengths.0.max(lengths.1) {
             match (left.next(), right.next()) {
-                (Some(a), Some(b)) => self.under(Step::Index(index), |d| a.diff(b, d)),
-                (a, b) => self.under(Step::Index(index), |differ| differ.one_side(a, b)),
+                (Some(left_item), Some(right_item)) => self.under(Step::Index(index), |differ| {
+                    left_item.diff(right_item, differ);
+                }),
+                (left, right) => {
+                    self.under(Step::Index(index), |differ| differ.one_side(left, right));
+                }
             }
         }
     }
@@ -162,18 +166,21 @@ impl Differ {
     /// other side.
     pub fn map<K: Ord + Debug, V: Diff>(&mut self, left: &BTreeMap<K, V>, right: &BTreeMap<K, V>) {
         let keys: BTreeSet<&K> = left.keys().chain(right.keys()).collect();
-        for k in keys {
-            let step = Step::Key(format!("{k:?}"));
-            match (left.get(k), right.get(k)) {
-                (Some(a), Some(b)) => self.under(step, |d| a.diff(b, d)),
-                (a, b) => self.under(step, |differ| differ.one_side(a, b)),
+        for key in keys {
+            let step = Step::Key(format!("{key:?}"));
+            match (left.get(key), right.get(key)) {
+                (Some(left_item), Some(right_item)) => {
+                    self.under(step, |differ| left_item.diff(right_item, differ));
+                }
+                (left, right) => self.under(step, |differ| differ.one_side(left, right)),
             }
         }
     }
 
     /// A value one side holds and the other does not.
     fn one_side<T: Debug + ?Sized>(&mut self, left: Option<&T>, right: Option<&T>) {
-        let text = |v: Option<&T>| v.map_or_else(|| ABSENT.to_owned(), |v| format!("{v:?}"));
+        let text =
+            |side: Option<&T>| side.map_or_else(|| ABSENT.to_owned(), |value| format!("{value:?}"));
         self.record(text(left), text(right));
     }
 
@@ -195,8 +202,8 @@ impl Differ {
             let _ = match step {
                 Step::Field(name) if text.is_empty() => write!(text, "{name}"),
                 Step::Field(name) => write!(text, ".{name}"),
-                Step::Index(i) => write!(text, "[{i}]"),
-                Step::Key(k) => write!(text, "[{k}]"),
+                Step::Index(index) => write!(text, "[{index}]"),
+                Step::Key(key) => write!(text, "[{key}]"),
             };
         }
         text
@@ -207,8 +214,8 @@ impl Differ {
 macro_rules! by_equality {
     ($($t:ty),* $(,)?) => {
         $(impl Diff for $t {
-            fn diff(&self, other: &Self, d: &mut Differ) {
-                d.equal(self, other);
+            fn diff(&self, other: &Self, differ: &mut Differ) {
+                differ.equal(self, other);
             }
         })*
     };
@@ -238,15 +245,15 @@ by_equality!(
 macro_rules! by_bits {
     ($($t:ty: $width:literal),*) => {
         $(impl Diff for $t {
-            fn diff(&self, other: &Self, d: &mut Differ) {
+            fn diff(&self, other: &Self, differ: &mut Differ) {
                 if self.to_bits() == other.to_bits() {
                     return;
                 }
                 if self.is_nan() && other.is_nan() {
-                    let nan = |v: &$t| format!("NaN ({:#0w$x})", v.to_bits(), w = $width);
-                    d.record(nan(self), nan(other));
+                    let nan = |value: &$t| format!("NaN ({:#0width$x})", value.to_bits(), width = $width);
+                    differ.record(nan(self), nan(other));
                 } else {
-                    d.differs(self, other);
+                    differ.differs(self, other);
                 }
             }
         })*
@@ -258,7 +265,7 @@ by_bits!(f32: 10, f64: 18);
 impl<T: Diff> Diff for Option<T> {
     fn diff(&self, other: &Self, differ: &mut Differ) {
         match (self, other) {
-            (Some(a), Some(b)) => a.diff(b, differ),
+            (Some(left), Some(right)) => left.diff(right, differ),
             (None, None) => {}
             _ => differ.differs(self, other),
         }
@@ -302,11 +309,11 @@ impl<K: Ord + Debug, V: Diff> Diff for BTreeMap<K, V> {
 }
 
 impl<T: Ord + Debug> Diff for BTreeSet<T> {
-    fn diff(&self, other: &Self, d: &mut Differ) {
+    fn diff(&self, other: &Self, diffs: &mut Differ) {
         for value in self.symmetric_difference(other) {
             let step = Step::Key(format!("{value:?}"));
             let (left, right) = (self.get(value), other.get(value));
-            d.under(step, |differ| differ.one_side(left, right));
+            diffs.under(step, |differ| differ.one_side(left, right));
         }
     }
 }
@@ -315,8 +322,8 @@ impl<T: Ord + Debug> Diff for BTreeSet<T> {
 macro_rules! tuple {
     ($($name:ident $index:tt),+) => {
         impl<$($name: Diff),+> Diff for ($($name,)+) {
-            fn diff(&self, other: &Self, d: &mut Differ) {
-                $(d.field(stringify!($index), &self.$index, &other.$index);)+
+            fn diff(&self, other: &Self, differ: &mut Differ) {
+                $(differ.field(stringify!($index), &self.$index, &other.$index);)+
             }
         }
     };

@@ -25,13 +25,13 @@ use crate::{GenieError, GenieResult};
 /// What the auto scout's searches ([`crate::movement::explore`]) and the AI's explorer
 /// ([`crate::players::ai_module::InfoModule::closest_unexplored_tile`]) read of the world for
 /// one unit.
-pub(crate) struct ScoutArea<'a> {
-    pub(crate) spatial: &'a mut Spatial,
+pub(crate) struct ScoutArea<'world> {
+    pub(crate) spatial: &'world mut Spatial,
     /// The world's objects, whose gaits the stand and reach tests read.
-    pub(crate) by_id: ObjectsRef<'a>,
-    pub(crate) zones: &'a ZoneMap,
-    pub(crate) plan: Planning<'a>,
-    pub(crate) mover: &'a Mover,
+    pub(crate) by_id: ObjectsRef<'world>,
+    pub(crate) zones: &'world ZoneMap,
+    pub(crate) plan: Planning<'world>,
+    pub(crate) mover: &'world Mover,
     /// The scout's place (its row's static layer), which the search does not move.
     pub(crate) at: Position,
     pub(crate) me: Me,
@@ -44,7 +44,7 @@ pub(crate) struct ScoutArea<'a> {
     pub(crate) scouted: bool,
 }
 
-impl<'a> ScoutArea<'a> {
+impl<'world> ScoutArea<'world> {
     /// The searches' reads for `unit` of player `player` (`me` its actions' state, `player_kind`
     /// its owner's kind), with the map's size and the unit's line of sight: the zones of its
     /// mover's restriction (`FUN_1411931c0`), its master's footprint, and its reach, the line of
@@ -56,7 +56,7 @@ impl<'a> ScoutArea<'a> {
     /// A unit without its master or movement state, a map without its terrain, or a restriction
     /// the terrain has not got.
     pub(crate) fn of(
-        world: &'a mut World,
+        world: &'world mut World,
         unit: &Unit,
         me: Me,
         player: PlayerId,
@@ -99,7 +99,7 @@ impl<'a> ScoutArea<'a> {
                 pathing: &mut world.pathing,
                 now: world.world_time,
                 player_kind,
-                object: world.streams.get(Stream::Object),
+                object: world.streams.get_mut(Stream::Object),
                 groups: &world.groups,
             },
             mover,
@@ -126,7 +126,7 @@ impl<'a> ScoutArea<'a> {
                 .spatial
                 .scout_map(self.player)
                 .and_then(|influence_map| influence_map.get(tile))
-                .map(|v| v == 1)
+                .map(|value| value == 1)
                 .ok_or(GenieError::unsupported("a tile off the player's scout map"));
         }
         self.spatial.explored(self.player, tile)
@@ -187,9 +187,9 @@ impl<'a> ScoutArea<'a> {
     /// `FUN_14118faf0`: the gap from the unit's footprint to the tile on each axis (at least 0),
     /// then its length.
     pub(crate) fn distance(&self, tile: Tile) -> f32 {
-        let gap = |d: f32, r: f32| {
-            let g = d.abs() - r;
-            if g <= 0.0 { 0.0 } else { g }
+        let gap = |delta: f32, radius: f32| {
+            let beyond = delta.abs() - radius;
+            if beyond <= 0.0 { 0.0 } else { beyond }
         };
         let gx = gap(tile.x() as f32 - self.at.x(), self.radius.x());
         let gy = gap(tile.y() as f32 - self.at.y(), self.radius.y());

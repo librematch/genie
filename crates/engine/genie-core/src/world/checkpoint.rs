@@ -78,25 +78,25 @@ pub struct PlayerState {
 /// The player's 11-word block, in the order the recording stores it.
 #[must_use]
 pub fn player_block(player: &PlayerState) -> [u32; 11] {
-    let mut w = [0u32; 11];
-    w[0] = player.sleeping_count;
-    w[1] = player.resources.iter().fold(0u32, |acc, amount| {
+    let mut words = [0u32; 11];
+    words[0] = player.sleeping_count;
+    words[1] = player.resources.iter().fold(0u32, |acc, amount| {
         acc.wrapping_add(cvttss2si(amount.get()) as u32)
     });
     for checkpoint_object in &player.live {
-        w[2] = w[2].wrapping_add(i32::from(checkpoint_object.main_id.get()) as u32);
-        w[3] = w[3].wrapping_add(u32::from(checkpoint_object.state.get()));
-        w[4] = w[4].wrapping_add(cvttss2si(checkpoint_object.amount_held.get()) as u32);
+        words[2] = words[2].wrapping_add(i32::from(checkpoint_object.main_id.get()) as u32);
+        words[3] = words[3].wrapping_add(u32::from(checkpoint_object.state.get()));
+        words[4] = words[4].wrapping_add(cvttss2si(checkpoint_object.amount_held.get()) as u32);
         for axis in checkpoint_object.position.get() {
-            w[7] = w[7].wrapping_add(cvttss2si(axis * 100.0) as u32);
+            words[7] = words[7].wrapping_add(cvttss2si(axis * 100.0) as u32);
         }
-        w[9] = w[9].wrapping_add(action_checksum(checkpoint_object));
-        w[10] = w[10].wrapping_add(checkpoint_object.id.get() as u32);
+        words[9] = words[9].wrapping_add(action_checksum(checkpoint_object));
+        words[10] = words[10].wrapping_add(checkpoint_object.id.get() as u32);
     }
     // w[5] (ObjectWaypoints) stays 0: the engine zeroes it and never writes it.
-    w[6] = player.live.len() as u32;
-    w[8] = player.id;
-    w
+    words[6] = player.live.len() as u32;
+    words[8] = player.id;
+    words
 }
 
 /// Word 9's term for one object: action type + action state byte + unit-AI retarget timer. An

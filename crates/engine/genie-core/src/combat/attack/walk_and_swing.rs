@@ -66,7 +66,7 @@ impl Attack {
         attack_reads: &AttackReads,
         (target, radius): (Position, Footprint),
     ) -> GenieResult<UpdateCode> {
-        let roles = &step.w.model.roles.clone();
+        let roles = &step.world.model.roles.clone();
         let gives_up = GiveUp {
             patience: if !attack_reads.player_kind.is_computer()
                 && roles
@@ -84,13 +84,13 @@ impl Attack {
                 self.within_reach(step, unit, fight, attack_reads, (target, radius))
             }
             SubCode::Done => {
-                self.delete_move_to(step.w.parts.mover_mut(unit.id))?;
+                self.delete_move_to(step.world.parts.mover_mut(unit.id))?;
                 if !matches!(self.state, AttackState::Move { .. }) {
                     return self.arrived_at_seen(step, unit, fight, attack_reads, target);
                 }
                 self.ready(
                     unit,
-                    &mut step.w.attack_ground(unit.id),
+                    &mut step.world.attack_ground(unit.id),
                     fight,
                     attack_reads,
                 )?;
@@ -112,20 +112,20 @@ impl Attack {
         (target, radius): (Position, Footprint),
     ) -> GenieResult<UpdateCode> {
         let ground = step
-            .w
+            .world
             .parts
             .mover_of(unit.id)
             .map(|mover| mover.stats.radius.ground())
             .ok_or(ATTACKER_UNMOVING)?;
         let at = unit.place.position();
-        let reach = squared_reach(self.range, &step.w.model.tuning.attack);
+        let reach = squared_reach(self.range, &step.world.model.tuning.attack);
         if reach.get().abs() <= EPSILON || reach < footprint_gap_squared(at, ground, target, radius)
         {
             return Ok(UpdateCode::UnderWay);
         }
         self.ready(
             unit,
-            &mut step.w.attack_ground(unit.id),
+            &mut step.world.attack_ground(unit.id),
             fight,
             attack_reads,
         )?;
@@ -145,13 +145,13 @@ impl Attack {
         self.finish_in(
             AttackState::Failed,
             unit,
-            step.w.parts.motion_mut(unit.id),
-            step.w.streams.get(Stream::Sprite),
-            step.w.model.tuning.sprite,
+            step.world.parts.motion_mut(unit.id),
+            step.world.streams.get_mut(Stream::Sprite),
+            step.world.model.tuning.sprite,
         )?;
         if self.voice.is_loud() {
             unit.post_own(
-                &mut step.w.parts.unit_ai,
+                &mut step.world.parts.unit_ai,
                 NotifyKind::ACTION_FAILED,
                 [600, 0, 0],
             )?;
@@ -197,7 +197,7 @@ impl Attack {
         attack_reads: &AttackReads,
         sprite: ActiveSprite,
     ) -> GenieResult<()> {
-        let roles = &step.w.model.roles.clone();
+        let roles = &step.world.model.roles.clone();
         let ranged = self.arms.missile.is_some();
         if roles
             .of_class(fight.own.class)
@@ -246,7 +246,7 @@ impl Attack {
         attack_reads: &AttackReads,
         sprite: ActiveSprite,
     ) -> GenieResult<()> {
-        let roles = &step.w.model.roles.clone();
+        let roles = &step.world.model.roles.clone();
         let ranged = self.arms.missile.is_some();
         let frame = if self.arms.fire_frame == Frame::ZERO && !ranged {
             sprite.graphic.frames.half()
@@ -254,11 +254,11 @@ impl Attack {
             self.arms.fire_frame
         };
         set_attack_timer(
-            step.w.parts.combat_mut(unit.id)?,
+            step.world.parts.combat_mut(unit.id)?,
             attack_reads.world_time,
             attack_reads.reload
                 - Seconds::new(frame.as_f32() * sprite.graphic.frame_duration.get()),
-            &step.w.model.tuning.attack,
+            &step.world.model.tuning.attack,
         );
         // slot 0x858 (FUN_14120c0a0): the volley, but for a unit without a missile, volley
         // missile or charge projectile, whose hit is FUN_141081020's melee one
@@ -282,7 +282,7 @@ impl Attack {
                 ));
             }
             let executed = {
-                let object = step.w.streams.get(Stream::Object);
+                let object = step.world.streams.get_mut(Stream::Object);
                 Self::hit(
                     fight,
                     &mut step.blasted,
@@ -290,14 +290,14 @@ impl Attack {
                     object,
                     HitLayer {
                         roles,
-                        slots: step.w.model.slots,
-                        damage_tuning: &step.w.model.tuning.damage,
+                        slots: step.world.model.slots,
+                        damage_tuning: &step.world.model.tuning.damage,
                     },
                 )?
             };
             if let Some(target) = executed {
                 unit.post_own(
-                    &mut step.w.parts.unit_ai,
+                    &mut step.world.parts.unit_ai,
                     NotifyKind::ACTION_EXECUTED,
                     [600, target.get(), 0],
                 )?;
@@ -306,7 +306,7 @@ impl Attack {
         }
         self.pending = false;
         if fight.victim.hp <= HitPoints::ZERO {
-            return self.enter(AttackState::Killed, step.w.parts.motion_mut(unit.id));
+            return self.enter(AttackState::Killed, step.world.parts.motion_mut(unit.id));
         }
         let rest = attack_reads.reload
             - Seconds::new(sprite.graphic.frames.as_f32() * sprite.graphic.frame_duration.get());
@@ -331,9 +331,9 @@ impl Attack {
         attack_reads: &AttackReads,
         sprite: ActiveSprite,
     ) -> GenieResult<()> {
-        let sprite_tuning = step.w.model.tuning.sprite;
-        let timer = step.w.parts.combat_of(unit.id).attack_timer;
-        let mut ground = step.w.attack_ground(unit.id);
+        let sprite_tuning = step.world.model.tuning.sprite;
+        let timer = step.world.parts.combat_of(unit.id).attack_timer;
+        let mut ground = step.world.attack_ground(unit.id);
         match after_hit(
             self.arms.missile,
             timer,
@@ -477,8 +477,8 @@ impl Attack {
         )?;
         let taken = blast_so_far(&fight.victim, blasted)?;
         let draw = object_rng.raw64();
-        let r = (i64::from(draw as u32 & 0x7fff_ffff) * 100) / DRAW_SCALE;
-        if r <= i64::from(chance.get()) {
+        let roll = (i64::from(draw as u32 & 0x7fff_ffff) * 100) / DRAW_SCALE;
+        if roll <= i64::from(chance.get()) {
             let factor = elevation_factor(
                 fight.own.position.z(),
                 fight.own.attack_elevation,

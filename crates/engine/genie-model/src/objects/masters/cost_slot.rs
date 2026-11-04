@@ -70,7 +70,7 @@ mod tests {
         assert_eq!(villager[1].entry(), None);
         assert_eq!(
             entries(&villager)
-                .map(|(attribute_id, cost_amount, p)| (attribute_id, cost_amount.get(), p))
+                .map(|(attribute_id, cost_amount, paid)| (attribute_id, cost_amount.get(), paid))
                 .collect::<Vec<_>>(),
             [(attribute::FOOD, 50, true), (attribute::HEADROOM, 1, false)]
         );

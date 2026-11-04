@@ -18,18 +18,18 @@ use crate::players::PlayerId;
 use crate::world::Formations;
 use crate::world::World;
 use crate::world::layer::generated::OrderTuning;
-use crate::world::slots::CheckedIndex;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::CheckedIndexExt;
+use crate::world::slots::PlayerSlotsExt;
 use crate::{GenieError, GenieResult};
 use std::collections::BTreeSet;
 
 /// Which units of an order the splitter keeps after its sort ([`World::split`]).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum Kept<'a> {
+pub(crate) enum Kept<'world> {
     /// Every unit.
     All,
     /// The units listed: the garrison command's test (`FUN_140fd9ae0` for command `0x2713`).
-    Listed(&'a [ObjectId]),
+    Listed(&'world [ObjectId]),
 }
 
 impl Kept<'_> {
@@ -85,7 +85,7 @@ impl World {
             let others: Vec<ObjectId> = loose
                 .iter()
                 .enumerate()
-                .filter(|&(j, _)| j != index)
+                .filter(|&(other, _)| other != index)
                 .map(|(_, &object_id)| object_id)
                 .collect();
             self.interact_unit(player, id, &others, centroid, order)?;
@@ -152,7 +152,7 @@ impl World {
         // equal ids are one object, so any sort gives the game's order
         let mut sorted: Vec<Option<ObjectId>> =
             units.iter().map(|&id| self.object(id).and(id)).collect();
-        sorted.sort_unstable_by_key(|u| u.map_or(-1, ObjectId::get));
+        sorted.sort_unstable_by_key(|object_id| object_id.map_or(-1, ObjectId::get));
         for object_id in &mut sorted {
             if object_id.is_some_and(|id| !kept.keeps(id)) {
                 *object_id = None;
@@ -181,84 +181,89 @@ impl World {
         let mut left = self.keep_world_groups(left, split)?;
         let formations = self.players.player(owner)?.formations;
         if !formations.auto {
-            split.loose.extend(left.iter().map(|u| u.id));
+            split
+                .loose
+                .extend(left.iter().map(|splittable| splittable.id));
             return Ok(());
         }
         // units above type 69 of formation category 0 stay loose (the dock test FUN_141158210 is
         // 1 only on an `E` tile in game type 12)
         let (loose, rest): (Vec<Splittable>, Vec<Splittable>) = left
             .into_iter()
-            .partition(|u| MAX_UNGROUPED < u.kind && !u.grouped);
-        split.loose.extend(loose.into_iter().map(|u| u.id));
+            .partition(|splittable| MAX_UNGROUPED < splittable.kind && !splittable.grouped);
+        split
+            .loose
+            .extend(loose.into_iter().map(|splittable| splittable.id));
         left = rest;
         // the path between two near units: the tile planner of the second's restriction, from
         // it to the first (FUN_140f7c530, its result and the measured path's length)
         let tiles = self.spatial.tiles();
         let pathing = &mut self.pathing;
-        let mut path = |a: &Splittable, b: &Splittable| -> GenieResult<Option<(Found, Distance)>> {
-            let Some(restriction) = b.restriction else {
-                return Ok(None);
+        let mut path =
+            |target: &Splittable, walker: &Splittable| -> GenieResult<Option<(Found, Distance)>> {
+                let Some(restriction) = walker.restriction else {
+                    return Ok(None);
+                };
+                let Some(planner) = pathing.planner(restriction, tiles) else {
+                    return Ok(None);
+                };
+                let req = Request {
+                    from: walker.position.ground(),
+                    to: target.position.ground(),
+                    radii: target.radius,
+                    range: walker.radius,
+                    closed: Vec::new(),
+                    full: false,
+                };
+                let mut path = Path::default();
+                let found = planner.plan::<GenieError>(
+                    &req,
+                    false,
+                    &mut path,
+                    None,
+                    &self.model.tuning.tile_path,
+                )?;
+                path.measure();
+                Ok(Some((found, path.length)))
             };
-            let Some(planner) = pathing.planner(restriction, tiles) else {
-                return Ok(None);
-            };
-            let req = Request {
-                from: b.position.ground(),
-                to: a.position.ground(),
-                radii: a.radius,
-                range: b.radius,
-                closed: Vec::new(),
-                full: false,
-            };
-            let mut p = Path::default();
-            let found = planner.plan::<GenieError>(
-                &req,
-                false,
-                &mut p,
-                None,
-                &self.model.tuning.tile_path,
-            )?;
-            p.measure();
-            Ok(Some((found, p.length)))
-        };
         // then the unit with the most others that join it, the first of equals, with them
         while !left.is_empty() {
             let mut best = (0, 0);
-            for (index, a) in left.iter().enumerate() {
-                let mut n = 1;
-                for b in left.iter().filter(|splittable| splittable.id != a.id) {
+            for (index, first) in left.iter().enumerate() {
+                let mut joined = 1;
+                for splittable in left.iter().filter(|splittable| splittable.id != first.id) {
                     let joins = splits_together(
-                        a,
-                        b,
+                        first,
+                        splittable,
                         formations,
                         JoinTest::Count,
                         &mut path,
                         &mut split.far,
                         &self.model.tuning.order,
                     )?;
-                    n += usize::from(joins);
+                    joined += usize::from(joins);
                 }
-                if best.1 < n {
-                    best = (index, n);
+                if best.1 < joined {
+                    best = (index, joined);
                 }
             }
             let chosen = left.remove(best.0);
             let mut group = vec![chosen.id];
             if !control.is_held() {
-                let mut i = 0;
-                while i < left.len() {
+                let mut index = 0;
+                while index < left.len() {
                     if splits_together(
                         &chosen,
-                        left.checked(i)?,
+                        left.checked(index)?,
                         formations,
                         JoinTest::Group,
                         &mut path,
                         &mut split.far,
                         &self.model.tuning.order,
                     )? {
-                        group.push(left.remove(i).id);
+                        group.push(left.remove(index).id);
                     } else {
-                        i += 1;
+                        index += 1;
                     }
                 }
                 if group.len() < 2 {
@@ -295,12 +300,12 @@ impl World {
                 speed: self
                     .parts
                     .mover_of(unit.id)
-                    .map_or(Speed::ZERO, |m| m.stats.speed),
+                    .map_or(Speed::ZERO, |mover| mover.stats.speed),
                 position: unit.position(),
                 moved_at: self
                     .parts
                     .mover_of(unit.id)
-                    .map_or_else(|| unit.position().ground(), |m| m.moved_at.ground()),
+                    .map_or_else(|| unit.position().ground(), |mover| mover.moved_at.ground()),
                 state: unit.life.state,
                 radius: Distance::new(master.radius.x()),
                 restriction: self
@@ -321,18 +326,18 @@ impl World {
     ) -> GenieResult<Vec<Splittable>> {
         // the units in a group the world holds, with the order's other members of their group
         let mut taken = vec![false; left.len()];
-        for (i, first) in left.iter().enumerate() {
-            if *taken.checked(i)? {
+        for (position, first) in left.iter().enumerate() {
+            if *taken.checked(position)? {
                 continue;
             }
             let Some(group) = first.group.and_then(|id| self.groups.get(id)) else {
                 continue;
             };
-            *taken.checked_mut(i)? = true;
+            *taken.checked_mut(position)? = true;
             let mut members = vec![first.id];
-            for (index, u) in left.iter().enumerate() {
-                if !*taken.checked(index)? && group.has(u.id) {
-                    members.push(u.id);
+            for (index, splittable) in left.iter().enumerate() {
+                if !*taken.checked(index)? && group.has(splittable.id) {
+                    members.push(splittable.id);
                     *taken.checked_mut(index)? = true;
                 }
             }
@@ -414,53 +419,56 @@ pub(super) enum JoinTest {
     Group,
 }
 
-/// `FUN_140fd76d0`'s test whether `b` joins `a`: both above type 69, both of formation category
-/// 0 or neither, the same object flags' bit 1, speeds within `OrderTuning::split_speed_gap` where the player
-/// breaks formations by speed (`COMISS`, `JA`: a NaN gap is within), then (for
-/// [`JoinTest::Group`], also `b` in a state of 2 or more) within the player's influence distance
-/// on the ground (between where each last moved to, slot 0x520: `FUN_14087e560` with the height
-/// zeroed; `COMISS`, `JA`: a NaN distance is within). Below `OrderTuning::split_path_reach` (`COMISS`, `JBE`:
-/// a NaN distance is not) the game measures a path instead, when the planner of `b`'s
-/// restriction exists: from `b`'s place to `a`'s (`FUN_140f7c530` with `a`'s radius on x as the
-/// radii and `b`'s as the range, no tile search), which joins `b` when it reaches the goal
-/// (result 1) no longer than the influence distance (a NaN length is not longer); else `b` joins
-/// the splitter's far units (`FUN_140a3e380`).
+/// `FUN_140fd76d0`'s test whether `splittable` joins `other`: both above type 69, both of formation
+/// category 0 or neither, the same object flags' bit 1, speeds within
+/// `OrderTuning::split_speed_gap` where the player breaks formations by speed (`COMISS`, `JA`: a
+/// NaN gap is within), then (for [`JoinTest::Group`], also `splittable` in a state of 2 or more)
+/// within the player's influence distance on the ground (between where each last moved to, slot
+/// 0x520: `FUN_14087e560` with the height zeroed; `COMISS`, `JA`: a NaN distance is within). Below
+/// `OrderTuning::split_path_reach` (`COMISS`, `JBE`: a NaN distance is not) the game measures a
+/// path instead, when the planner of `splittable`'s restriction exists: from `splittable`'s place
+/// to `other`'s (`FUN_140f7c530` with `other`'s radius on x as the radii and `splittable`'s as the
+/// range, no tile search), which joins `splittable` when it reaches the goal (result 1) no longer
+/// than the influence distance (a NaN length is not longer); else `splittable` joins the splitter's
+/// far units (`FUN_140a3e380`).
 pub(super) fn splits_together(
-    a: &Splittable,
-    b: &Splittable,
+    other: &Splittable,
+    splittable: &Splittable,
     formations: Formations,
     test: JoinTest,
     path: &mut SplitPath<'_>,
     far: &mut BTreeSet<ObjectId>,
     order_tuning: &OrderTuning,
 ) -> GenieResult<bool> {
-    if a.kind <= MAX_UNGROUPED || b.kind <= MAX_UNGROUPED {
+    if other.kind <= MAX_UNGROUPED || splittable.kind <= MAX_UNGROUPED {
         return Ok(false);
     }
-    if a.grouped != b.grouped || a.turns != b.turns {
+    if other.grouped != splittable.grouped || other.turns != splittable.turns {
         return Ok(false);
     }
-    if formations.by_speed && order_tuning.split_speed_gap < (a.speed - b.speed).get().abs() {
+    if formations.by_speed
+        && order_tuning.split_speed_gap < (other.speed - splittable.speed).get().abs()
+    {
         return Ok(false);
     }
-    if test == JoinTest::Group && b.state < ObjectState::Alive {
+    if test == JoinTest::Group && splittable.state < ObjectState::Alive {
         return Ok(false);
     }
     let (dx, dy) = (
-        a.moved_at.x() - b.moved_at.x(),
-        a.moved_at.y() - b.moved_at.y(),
+        other.moved_at.x() - splittable.moved_at.x(),
+        other.moved_at.y() - splittable.moved_at.y(),
     );
-    let d = sqrt(dx * dx + 0.0 + dy * dy);
+    let distance = sqrt(dx * dx + 0.0 + dy * dy);
     if SPLIT_BY_PATH
-        && d < order_tuning.split_path_reach
-        && let Some((found, length)) = path(a, b)?
+        && distance < order_tuning.split_path_reach
+        && let Some((found, length)) = path(other, splittable)?
     {
         let joins =
             found == Found::Goal && at_most_or_unordered(length.get(), formations.influence.get());
         if !joins {
-            let _ = far.insert(b.id);
+            let _ = far.insert(splittable.id);
         }
         return Ok(joins);
     }
-    Ok(at_most_or_unordered(d, formations.influence.get()))
+    Ok(at_most_or_unordered(distance, formations.influence.get()))
 }

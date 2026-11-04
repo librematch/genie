@@ -45,7 +45,7 @@ use std::sync::Arc;
 /// (or none above 0) is +0.
 #[test]
 fn the_attacks_sum_is_the_positive_ones() {
-    let m = |weapons: Vec<ClassAmount>| Master {
+    let master_of = |weapons: Vec<ClassAmount>| Master {
         combat: Some(CombatPart {
             weapons,
             ..CombatPart::default()
@@ -53,7 +53,7 @@ fn the_attacks_sum_is_the_positive_ones() {
         ..Master::default()
     };
     assert_eq!(
-        attacks(&m(vec![
+        attacks(&master_of(vec![
             ClassAmount::new(4, 6),
             ClassAmount::new(3, -2),
             ClassAmount::new(11, 1)
@@ -61,9 +61,13 @@ fn the_attacks_sum_is_the_positive_ones() {
         .to_bits(),
         7.0f32.to_bits()
     );
-    assert_eq!(attacks(&m(vec![])).to_bits(), 0.0f32.to_bits());
+    assert_eq!(attacks(&master_of(vec![])).to_bits(), 0.0f32.to_bits());
     assert_eq!(
-        attacks(&m(vec![ClassAmount::new(4, 0), ClassAmount::new(3, -5)])).to_bits(),
+        attacks(&master_of(vec![
+            ClassAmount::new(4, 0),
+            ClassAmount::new(3, -5)
+        ]))
+        .to_bits(),
         0.0f32.to_bits()
     );
 }
@@ -310,39 +314,39 @@ fn villager_fights_back_weak_attacker_of_its_own_master() {
         ..Master::default()
     };
     assert!(harmless(villager.clone()));
-    let with = |f: &dyn Fn(&mut Master)| {
-        let mut m = villager.clone();
-        f(&mut m);
-        harmless(m)
+    let with = |setup: &dyn Fn(&mut Master)| {
+        let mut master = villager.clone();
+        setup(&mut master);
+        harmless(master)
     };
-    assert!(!with(&|m| m.object_flags = ObjectFlags::NONE));
-    assert!(!with(&|m| m.copy_id = Some(ids::VILLAGER_FEMALE)));
-    assert!(!with(&|m| m
+    assert!(!with(&|master| master.object_flags = ObjectFlags::NONE));
+    assert!(!with(&|master| master.copy_id = Some(ids::VILLAGER_FEMALE)));
+    assert!(!with(&|master| master
         .combat
         .get_or_insert_with(Default::default)
         .weapons = vec![ClassAmount::new(4, 5)]));
     // an attack of 4 below 60 hit points
-    assert!(with(&|m| m
+    assert!(with(&|master| master
         .combat
         .get_or_insert_with(Default::default)
         .weapons = vec![ClassAmount::new(4, 4)]));
-    assert!(!with(&|m| {
-        m.combat.get_or_insert_with(Default::default).weapons = vec![ClassAmount::new(4, 4)];
-        m.hit_points = MasterHitPoints::of_data(60);
+    assert!(!with(&|master| {
+        master.combat.get_or_insert_with(Default::default).weapons = vec![ClassAmount::new(4, 4)];
+        master.hit_points = MasterHitPoints::of_data(60);
     }));
-    assert!(with(&|m| {
-        m.combat.get_or_insert_with(Default::default).weapons = vec![ClassAmount::new(4, 3)];
-        m.hit_points = MasterHitPoints::of_data(60);
+    assert!(with(&|master| {
+        master.combat.get_or_insert_with(Default::default).weapons = vec![ClassAmount::new(4, 3)];
+        master.hit_points = MasterHitPoints::of_data(60);
     }));
-    assert!(!with(&|m| m
+    assert!(!with(&|master| master
         .combat
         .get_or_insert_with(Default::default)
         .armors = vec![ClassAmount::new(4, 1)]));
-    assert!(with(&|m| m
+    assert!(with(&|master| master
         .combat
         .get_or_insert_with(Default::default)
         .weapon_range = Distance::new(0.5)));
-    assert!(!with(&|m| m
+    assert!(!with(&|master| master
         .combat
         .get_or_insert_with(Default::default)
         .weapon_range = Distance::new(0.6)));

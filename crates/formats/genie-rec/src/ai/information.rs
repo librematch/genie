@@ -4,7 +4,7 @@ use crate::ai::{
     AttackMemory, BuildingLot, ImportantObjectMemory, InfluenceMap, PerimeterWall, QuadrantLog,
     ResourceMemory, read_id_list,
 };
-use crate::element::ReadableHeaderElement;
+use crate::element::ReadHeader;
 use crate::errors::not_read;
 use crate::reader::RecordingHeaderReader;
 use crate::{ObjectId, fits};
@@ -56,7 +56,7 @@ pub struct InformationAi {
     pub quadrant_log: [QuadrantLog; 4],
 }
 
-impl ReadableHeaderElement for InformationAi {
+impl ReadHeader for InformationAi {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let mut ai = Self::default();
         ai.read_goals_and_resources(input)?;

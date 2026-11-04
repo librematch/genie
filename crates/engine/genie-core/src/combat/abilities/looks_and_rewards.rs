@@ -13,7 +13,7 @@ use crate::objects::masters::cost_entries;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::world::World;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 
 /// A terrain look task's terrain mask (`0x141207501`, a `std::bitset<8>`): a terrain below 0
 /// is the mask of its negation's low byte, 1 to 8 sets the bit of that less 1, above 8 none.
@@ -23,8 +23,8 @@ use crate::world::slots::PlayerSlots;
 pub const fn terrain_mask(terrain: TaskTerrain) -> Option<TerrainFlags> {
     let terrain = terrain.get();
     match terrain {
-        t if t < 0 => Some(TerrainFlags::from_bits_retain(
-            t.wrapping_neg().to_le_bytes()[0],
+        terrain if terrain < 0 => Some(TerrainFlags::from_bits_retain(
+            terrain.wrapping_neg().to_le_bytes()[0],
         )),
         1..=8 => Some(TerrainFlags::from_bits_retain(1 << (terrain - 1))),
         0 => None,
@@ -84,9 +84,9 @@ pub fn reward(
     let out = task.attribute_kind3;
     let mut rate = task.work_val1.get();
     if task.attribute_kind2.is_some()
-        && let Some(m) = multiplier
+        && let Some(amount) = multiplier
     {
-        rate *= m.get();
+        rate *= amount.get();
     }
     let mut amount = rate;
     if !task.combat_level_flag.is_empty() {
@@ -128,7 +128,7 @@ impl World {
         let at = self
             .parts
             .mover_of(unit.id)
-            .map_or_else(|| unit.position(), |m| m.moved_at);
+            .map_or_else(|| unit.position(), |mover| mover.moved_at);
         let flags = self
             .spatial
             .terrain

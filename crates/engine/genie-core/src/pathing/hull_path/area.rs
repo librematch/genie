@@ -13,7 +13,7 @@ use crate::pathing::ShortFound;
 use crate::pathing::hull_path::{
     EPSILON, EntranceIndex, HullIndex, HullPather, MOST_AREA, PATHS, Point, Target, Waypoints,
 };
-use crate::world::slots::CheckedIndex;
+use crate::world::slots::CheckedIndexExt;
 use crate::{GenieError, GenieResult};
 
 /// Whether the hull search's area grew ([`HullPather::grow_area`]).
@@ -58,7 +58,7 @@ impl HullPather<'_> {
             let mut others = self.ignore.clone();
             others.extend(
                 near.iter()
-                    .filter(|&&o| o != id)
+                    .filter(|&&object_id| object_id != id)
                     .map(|&object_id| RecordId::from(object_id)),
             );
             if !self
@@ -67,11 +67,11 @@ impl HullPather<'_> {
             {
                 continue;
             }
-            let Some(p) = self.world.get(id) else {
+            let Some(placed) = self.world.get(id) else {
                 continue;
             };
-            if !self.passes(id, p, self.player)? {
-                held.push(p);
+            if !self.passes(id, placed, self.player)? {
+                held.push(placed);
             }
         }
         match held[..] {
@@ -106,8 +106,8 @@ impl HullPather<'_> {
             return Ok(false);
         }
         let radius = self.radius.get();
-        let (w, h) = (self.world.map.width(), self.world.map.height());
-        self.bounds = Rect::new(0.0, 0.0, w as f32 - 0.0, h as f32 - 0.0);
+        let (width, height) = (self.world.map.width(), self.world.map.height());
+        self.bounds = Rect::new(0.0, 0.0, width as f32 - 0.0, height as f32 - 0.0);
         let rect = self.bounds;
         let (bx0, by0, bx1, by1) = (rect.x0(), rect.y0(), rect.x1(), rect.y1());
         let on_map = at_most_or_unordered(bx0, to.x())
@@ -115,7 +115,12 @@ impl HullPather<'_> {
             && at_most_or_unordered(by0, to.y())
             && at_most_or_unordered(to.y(), by1);
         if on_map {
-            self.bounds = Rect::new(radius, radius, w as f32 - radius, h as f32 - radius);
+            self.bounds = Rect::new(
+                radius,
+                radius,
+                width as f32 - radius,
+                height as f32 - radius,
+            );
         }
         Ok(on_map)
     }
@@ -140,13 +145,13 @@ impl HullPather<'_> {
             path.points.clear();
             result = ShortFound::Blocked;
         }
-        let d =
+        let squared =
             (last.y() - to.y()) * (last.y() - to.y()) + (last.x() - to.x()) * (last.x() - to.x());
         // `COMISS`/`JC` (0x140f876ca): an unordered distance counts as nearer
         let start =
             (from.y() - to.y()) * (from.y() - to.y()) + (from.x() - to.x()) * (from.x() - to.x());
-        if below_or_unordered(d, start) {
-            if d < range.squared().get() {
+        if below_or_unordered(squared, start) {
+            if squared < range.squared().get() {
                 result = ShortFound::Reached;
             }
         } else {
@@ -160,11 +165,11 @@ impl HullPather<'_> {
     /// cliffs about it); [`AreaGrowth::TooLarge`] when it would hold more than [`MOST_AREA`]
     /// tiles.
     pub(super) fn grow_area(&mut self) -> GenieResult<AreaGrowth> {
-        let (w, h) = (self.world.map.width(), self.world.map.height());
+        let (width, height) = (self.world.map.width(), self.world.map.height());
         let x0 = (self.area.x0() - 2).max(0);
         let y0 = (self.area.y0() - 2).max(0);
-        let x1 = (self.area.x1() + 2).min(w - 1);
-        let y1 = (self.area.y1() + 2).min(h - 1);
+        let x1 = (self.area.x1() + 2).min(width - 1);
+        let y1 = (self.area.y1() + 2).min(height - 1);
         if MOST_AREA < (x1 - x0) * (y1 - y0) {
             return Ok(AreaGrowth::TooLarge);
         }
@@ -194,32 +199,33 @@ impl HullPather<'_> {
         let mut order: Vec<usize> = (0..count).collect();
         let mut by: Vec<usize> = sides.head(count)?.to_vec();
         let points = &self.hulls.checked(hull.index())?.points;
-        let mut d: Vec<f32> = (0..count)
-            .map(|k| {
+        let mut distances: Vec<f32> = (0..count)
+            .map(|index| {
                 let last = *self
                     .entrances
-                    .checked(k)?
+                    .checked(index)?
                     .points
                     .last()
                     .unwrap_or(&Point::ORIGIN);
-                let i = if *by.checked(k)? == 0 {
+                let vertex = if *by.checked(index)? == 0 {
                     points.len()
                 } else {
-                    *by.checked(k)?
+                    *by.checked(index)?
                 };
-                let point = *points.checked(i - 1)?;
+                let point = *points.checked(vertex - 1)?;
                 Ok((last.y() - point.y()) * (last.y() - point.y())
                     + (last.x() - point.x()) * (last.x() - point.x()))
             })
             .collect::<GenieResult<_>>()?;
-        for a in 0..count {
-            for b in a + 1..count {
-                if *by.checked(b)? < *by.checked(a)?
-                    || (*by.checked(a)? == *by.checked(b)? && *d.checked(b)? < *d.checked(a)?)
+        for index in 0..count {
+            for other in index + 1..count {
+                if *by.checked(other)? < *by.checked(index)?
+                    || (*by.checked(index)? == *by.checked(other)?
+                        && *distances.checked(other)? < *distances.checked(index)?)
                 {
-                    by.swap(a, b);
-                    d.swap(a, b);
-                    order.swap(a, b);
+                    by.swap(index, other);
+                    distances.swap(index, other);
+                    order.swap(index, other);
                 }
             }
         }

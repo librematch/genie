@@ -43,8 +43,8 @@ pub fn refund(
         let back = costs
             .iter()
             .rev()
-            .find(|c| c.0 == Some(attribute))
-            .map_or(Amount::ZERO, |c| c.1);
+            .find(|cost| cost.0 == Some(attribute))
+            .map_or(Amount::ZERO, |cost| cost.1);
         let held = owner.get(attribute)?;
         owner.set_attribute(attribute, held + back)?;
     }
@@ -126,12 +126,12 @@ pub fn refund_tech(
         let Some(attribute) = cost.attribute.filter(|_| cost.paid.is_paid()) else {
             continue;
         };
-        let mut v = (i32::from(adj.get()) + i32::from(cost.amount.get())) as f32;
+        let mut refund = (i32::from(adj.get()) + i32::from(cost.amount.get())) as f32;
         if 0.0 < modifier {
-            v = f32::from(cvttss2si(v * modifier) as i16);
+            refund = f32::from(cvttss2si(refund * modifier) as i16);
         }
         let held = owner.get(attribute)?;
-        owner.set_attribute(attribute, held + Amount::new(v))?;
+        owner.set_attribute(attribute, held + Amount::new(refund))?;
     }
     state.state = ResearchState::Available;
     state.research_done = Seconds::ZERO;
@@ -141,12 +141,12 @@ pub fn refund_tech(
 /// The cost multiplier `FUN_14162ef60`'s callers pass (`DAT_14330eb8c`, 1.0).
 const ONE: CostCount = CostCount::ONE;
 
-/// A master's cost entry `j` `(attribute, amount, paid)`, none for an entry it lacks.
-fn cost_entry(master: &Master, j: usize) -> Option<(AttributeId, CostAmount, bool)> {
+/// A master's cost entry `index` `(attribute, amount, paid)`, none for an entry it lacks.
+fn cost_entry(master: &Master, index: usize) -> Option<(AttributeId, CostAmount, bool)> {
     master
         .creatable_part()
         .cost
-        .get(j)
+        .get(index)
         .and_then(|slot| slot.entry())
 }
 
@@ -155,7 +155,10 @@ fn cost_entry(master: &Master, j: usize) -> Option<(AttributeId, CostAmount, boo
 /// has) reads its head's, and the head's stack unit's (`+0x986`) when the player has that one,
 /// then only the paid entries (the second value true).
 #[must_use]
-pub fn costed<'m>(masters: &'m Masters, master: &'m Master) -> (&'m Master, bool) {
+pub fn costed<'masters>(
+    masters: &'masters Masters,
+    master: &'masters Master,
+) -> (&'masters Master, bool) {
     // The buildings' master type (`'P'`), whose annex's costs the cost test reads.
     if master.kind != MasterKind::BUILDING {
         return (master, false);
@@ -163,7 +166,7 @@ pub fn costed<'m>(masters: &'m Masters, master: &'m Master) -> (&'m Master, bool
     let Some(head) = master
         .building
         .as_ref()
-        .and_then(|b| b.head_unit)
+        .and_then(|building_master| building_master.head_unit)
         .and_then(|head| masters.get(head))
     else {
         return (master, false);
@@ -201,12 +204,15 @@ pub fn cost_test(
     roles: &Roles,
     slots: Slots,
 ) -> GenieResult<bool> {
-    let Some(m) = masters.get(master).filter(|m| MasterKind::COMBAT <= m.kind) else {
+    let Some(master) = masters
+        .get(master)
+        .filter(|master| MasterKind::COMBAT <= master.kind)
+    else {
         return Ok(false);
     };
-    let (m, annex) = costed(masters, m);
+    let (master, annex) = costed(masters, master);
     for index in 0..3 {
-        let Some((attribute, amount, paid)) = cost_entry(m, index) else {
+        let Some((attribute, amount, paid)) = cost_entry(master, index) else {
             continue;
         };
         if annex && !paid {
@@ -267,11 +273,11 @@ pub fn pay(
         return Ok(Payment::Unpaid);
     }
     // the cost test found the master
-    let Some(m) = masters.get(master) else {
+    let Some(master) = masters.get(master) else {
         return Ok(Payment::Unpaid);
     };
     for index in 0..3 {
-        let Some((attribute, amount, true)) = cost_entry(m, index) else {
+        let Some((attribute, amount, true)) = cost_entry(master, index) else {
             continue;
         };
         attributes.subtract(attribute, Amount::new(amount.as_f32() * count.get()))?;
@@ -304,12 +310,15 @@ pub fn master_costs(
         roles,
         slots,
     )?;
-    let Some(m) = masters.get(master).filter(|m| MasterKind::COMBAT <= m.kind) else {
-        return Ok(out.map(|(a, n)| (a, CostAmount::of_data(n))));
+    let Some(master) = masters
+        .get(master)
+        .filter(|master| MasterKind::COMBAT <= master.kind)
+    else {
+        return Ok(out.map(|(attribute_id, amount)| (attribute_id, CostAmount::of_data(amount))));
     };
     let mut extra = 0i16;
     for (index, slot) in out.iter_mut().enumerate() {
-        let Some((attribute, amount, _)) = cost_entry(m, index) else {
+        let Some((attribute, amount, _)) = cost_entry(master, index) else {
             continue;
         };
         slot.0 = Some(attribute);
@@ -322,8 +331,11 @@ pub fn master_costs(
         }
     }
     if 0 < extra {
-        let gold = |a: Option<AttributeId>| {
-            a.is_none() || roles.of_some_attribute(a).contains(AttributeRoles::GOLD)
+        let gold = |attribute_id: Option<AttributeId>| {
+            attribute_id.is_none()
+                || roles
+                    .of_some_attribute(attribute_id)
+                    .contains(AttributeRoles::GOLD)
         };
         if gold(out[0].0) {
             out[0] = (Some(slots.attribute.gold), out[0].1.wrapping_add(extra));
@@ -338,7 +350,7 @@ pub fn master_costs(
             slot.0 = None;
         }
     }
-    Ok(out.map(|(attribute_id, n)| (attribute_id, CostAmount::of_data(n))))
+    Ok(out.map(|(attribute_id, amount)| (attribute_id, CostAmount::of_data(amount))))
 }
 
 /// The costs a queue entry records from listed ones (`FUN_1411c3190`, `FUN_1411c81a0`): each

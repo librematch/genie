@@ -16,7 +16,7 @@ use crate::objects::ObjectState;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::OwnerMasters;
-use crate::objects::masters::PlayersMasters;
+use crate::objects::masters::PlayersMastersExt;
 use crate::objects::sprite::Cargo;
 use crate::objects::sprite::Graphic;
 use crate::orders::Dispatch;
@@ -42,7 +42,7 @@ use crate::world::World;
 use crate::world::index::Place;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 use crate::{GenieError, GenieResult};
 
 /// What a work order leaves of the pasture its unit tends ([`World::work_pasture`]).
@@ -75,7 +75,7 @@ impl World {
         let Some(place) = self.place(id) else {
             return Ok(());
         };
-        let Place::Live(p, idx) = place else {
+        let Place::Live(owner, idx) = place else {
             return Err(GenieError::unsupported(
                 "a move of a unit the slice does not hold live",
             ));
@@ -85,7 +85,7 @@ impl World {
         // other's units ([`crate::world::settings::Settings::cheats_enabled`]): such a unit takes the
         // move as its own player's, the issuer only queuing it
         let issuer = player;
-        let player = p;
+        let player = owner;
         let master = self
             .players
             .live(player, idx)?
@@ -104,7 +104,7 @@ impl World {
         }
         let target = self
             .object(order.target)
-            .map(|(tp, t)| (t.life.master_id, tp));
+            .map(|(tp, unit)| (unit.life.master_id, tp));
         let unit = self.players.live_mut(player, idx)?;
         // FUN_141197da0, then slot 0x2a0 with 1: it waits to move
         let mover = self
@@ -175,7 +175,7 @@ impl World {
         // target kept; slot 0x2d8's walk and show targets are not held
         let unit = self.players.live_mut(player, idx)?;
         if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
-            let ai_stream = self.streams.get(Stream::Ai);
+            let ai_stream = self.streams.get_mut(Stream::Ai);
             match cell {
                 None => ai.notify_move(taken == Answer::NotTaken, None, order.point, ai_stream),
                 Some(point) => ai.notify_grid_move(point, ai_stream),
@@ -246,7 +246,7 @@ impl World {
                     self.parts.motion.layer_mut(unit.id),
                     OwnerMasters::new(&self.parts.own_master, self.model.masters.of(player)),
                     &self.model.graphics,
-                    self.streams.get(Stream::Sprite),
+                    self.streams.get_mut(Stream::Sprite),
                     self.model.tuning.sprite,
                 )?;
             }
@@ -307,7 +307,7 @@ impl World {
                     sprite_tuning: self.model.tuning.sprite,
                     move_to_tuning: &self.model.tuning.move_to,
                 },
-                self.streams.get(Stream::Sprite),
+                self.streams.get_mut(Stream::Sprite),
             ),
         )?;
         if let MoveWith::Sails(transport_action) = sails {

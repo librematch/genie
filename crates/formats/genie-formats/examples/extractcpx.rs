@@ -47,9 +47,9 @@ fn list(args: List) {
         .map(|entry| entry.filename.clone())
         .collect::<Vec<String>>();
 
-    (0..campaign.len()).for_each(|i| {
-        let bytes = campaign.by_index_raw(i).expect("missing scenario data");
-        println!("- {} ({})", names[i], format_bytes(bytes.len()));
+    (0..campaign.len()).for_each(|index| {
+        let bytes = campaign.by_index_raw(index).expect("missing scenario data");
+        println!("- {} ({})", names[index], format_bytes(bytes.len()));
     });
 }
 
@@ -66,10 +66,10 @@ fn extract(args: Extract) {
         .map(|entry| entry.filename.clone())
         .collect::<Vec<String>>();
 
-    (0..campaign.len()).for_each(|i| {
-        let bytes = campaign.by_index_raw(i).expect("missing scenario data");
-        println!("{}", names[i]);
-        write(dir.join(&names[i]), bytes).expect("failed to write");
+    (0..campaign.len()).for_each(|index| {
+        let bytes = campaign.by_index_raw(index).expect("missing scenario data");
+        println!("{}", names[index]);
+        write(dir.join(&names[index]), bytes).expect("failed to write");
     });
 }
 

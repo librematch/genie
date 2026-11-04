@@ -7,7 +7,7 @@ use crate::errors::not_read;
 use crate::test_support::{header_reader, read_all};
 
 /// How many bytes reading `T` from zeros at `version` takes.
-fn size_of_zeros<T: ReadableHeaderElement>(version: f32) -> usize {
+fn size_of_zeros<T: ReadHeader>(version: f32) -> usize {
     let zeros = vec![0u8; 1 << 16];
     let mut reader = header_reader(&zeros, version);
     let _ = T::read_from(&mut reader).unwrap();

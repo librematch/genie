@@ -122,15 +122,18 @@ mod tests {
     fn its_states_read_back_from_their_bytes() {
         for index in 0..=255_u8 {
             match EnterState::of_byte(index, None) {
-                Ok(s) => assert_eq!(s.get(), index),
+                Ok(enter_state) => assert_eq!(enter_state.get(), index),
                 Err(_) => assert!(matches!(index, 0 | 3 | 5..=10 | 12 | 14..), "{index}"),
             }
         }
         assert_eq!(EnterState::Failed.to_string(), "13");
         let walk = MoveToAction::sub_in(MoveTo::Moving);
-        for b in [4, 11] {
-            let mut enter_state = EnterState::of_byte(b, Some(walk)).unwrap();
-            assert_eq!((enter_state.get(), enter_state.move_to()), (b, Some(&walk)));
+        for byte in [4, 11] {
+            let mut enter_state = EnterState::of_byte(byte, Some(walk)).unwrap();
+            assert_eq!(
+                (enter_state.get(), enter_state.move_to()),
+                (byte, Some(&walk))
+            );
             assert_eq!(enter_state.bare().move_to(), None);
             assert_eq!(enter_state.take_move_to(), Some(walk));
             assert_eq!(enter_state.move_to(), None);

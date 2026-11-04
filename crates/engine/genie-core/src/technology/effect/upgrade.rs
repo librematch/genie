@@ -14,7 +14,7 @@ use crate::objects::masters::Master;
 use crate::objects::masters::MasterAttribute;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::PlayersMasters;
+use crate::objects::masters::PlayersMastersExt;
 use crate::objects::masters::cost_resource;
 use crate::objects::masters::player_master;
 use crate::objects::unit::Unit;
@@ -30,17 +30,17 @@ use crate::world::World;
 use crate::world::index::Place;
 use crate::world::layer::MasterRoles;
 use crate::world::parts::Part;
-use crate::world::slots::{CheckedIndex, PlayerSlots};
+use crate::world::slots::{CheckedIndexExt, PlayerSlotsExt};
 use crate::{GenieError, GenieResult};
 use std::sync::Arc;
 
 /// The masters [`World::upgrade_walk`] reads: the table's old and new ones, and the dead unit
 /// master whose objects take masters of their own.
 #[derive(Clone, Copy)]
-struct Masters<'a> {
-    old: &'a Master,
-    new: &'a Master,
-    dead: Option<&'a Master>,
+struct Masters<'master> {
+    old: &'master Master,
+    new: &'master Master,
+    dead: Option<&'master Master>,
 }
 
 impl World {
@@ -94,10 +94,10 @@ impl World {
         // differs by its copy id
         let dead = old.death_spawns[0]
             .and_then(|id| masters.get(id))
-            .filter(|d| {
+            .filter(|other| {
                 new.death_spawns[0]
                     .and_then(|id| masters.get(id))
-                    .is_some_and(|e| d.copy_id != e.copy_id)
+                    .is_some_and(|master| other.copy_id != master.copy_id)
             });
         let dead = dead.cloned();
         let keep = if mode.keeps_masters() {
@@ -165,10 +165,10 @@ impl World {
     ) -> GenieResult<()> {
         use crate::technology::upgrade::upgradable;
         use crate::world::index::Place;
-        for i in self.players.player(player_id)?.objects.places() {
-            let place = Place::Live(player_id, i);
+        for list_index in self.players.player(player_id)?.objects.places() {
+            let place = Place::Live(player_id, list_index);
             let (id, master_id, state) = {
-                let live = self.players.live(player_id, i)?;
+                let live = self.players.live(player_id, list_index)?;
                 (live.id, live.life.master_id, live.life.state)
             };
             let table = !self.parts.own_master.contains(id);
@@ -176,10 +176,10 @@ impl World {
                 if upgradable(old.kind, state) {
                     self.upgrade_object(player_id, place, (old, new), keep)?;
                 } else {
-                    self.own_and_dead_master(player_id, i, old)?;
+                    self.own_and_dead_master(player_id, list_index, old)?;
                 }
-            } else if table && let Some(d) = dead.filter(|d| d.id == master_id) {
-                self.set_part(id, Part::OwnMaster(Box::new(d.clone())))?;
+            } else if table && let Some(master) = dead.filter(|master| master.id == master_id) {
+                self.set_part(id, Part::OwnMaster(Box::new(master.clone())))?;
             } else if mode.own_masters()
                 && let Some(own) = self
                     .parts
@@ -251,9 +251,9 @@ impl World {
         }
         if !self.parts.dead_master.contains(id)
             && old.death_spawns[0].is_some()
-            && let Some(d) = dead.filter(|master| DEAD_COPY_KINDS.contains(&master.kind))
+            && let Some(master) = dead.filter(|master| DEAD_COPY_KINDS.contains(&master.kind))
         {
-            self.set_part(id, Part::DeadMaster(Box::new(d)))?;
+            self.set_part(id, Part::DeadMaster(Box::new(master)))?;
         }
         Ok(())
     }
@@ -275,15 +275,15 @@ impl World {
         (master, at): (Option<MasterId>, Option<MasterId>),
         count: i16,
     ) -> GenieResult<()> {
-        let has = |q: usize, id: MasterId| {
+        let has = |player: usize, id: MasterId| {
             self.model
                 .masters
-                .get(q)
+                .get(player)
                 .is_some_and(|masters| masters.get(id).is_some())
         };
         let building = at
             .and_then(|at| player_master(&self.model.masters, player_id, at))
-            .is_some_and(|m| m.kind == MasterKind::BUILDING);
+            .is_some_and(|master| master.kind == MasterKind::BUILDING);
         let (Some(master), Some(at)) = (master, at) else {
             return Ok(());
         };
@@ -295,15 +295,20 @@ impl World {
         } else {
             PlayerId::GAIA
         };
-        let attribute =
-            |player: &Player, i: usize| player.attributes.get(i).copied().unwrap_or(Amount::ZERO);
+        let attribute = |player: &Player, attribute: usize| {
+            player
+                .attributes
+                .get(attribute)
+                .copied()
+                .unwrap_or(Amount::ZERO)
+        };
         let limit = attribute(self.players.player(player_id)?, 234).get() as i32;
         let buildings: Vec<ObjectId> = self
             .players
             .player(player_id)?
             .objects
             .iter()
-            .filter(|u| u.life.master_id == at && u.life.state == ObjectState::Alive)
+            .filter(|unit| unit.life.master_id == at && unit.life.state == ObjectState::Alive)
             .map(|unit| unit.id)
             .collect();
         for (index, &object_id) in buildings.iter().enumerate() {
@@ -317,7 +322,7 @@ impl World {
                     .of_master(master)
                     .contains(MasterRoles::VILLAGER_MALE)
                 {
-                    let draw = self.streams.get(Stream::Player).rand15() as i32;
+                    let draw = self.streams.get_mut(Stream::Player).rand15() as i32;
                     if 49 < draw % 100 {
                         // The male and female villagers' masters.
                         // The relic's master, which the world counts.
@@ -364,11 +369,11 @@ impl World {
         Ok(())
     }
 
-    /// The objects' kinds (`FUN_140ec2ac0`'s 200 to 206): 200 to 202 change the
-    /// objects with masters of their own of master `a` or class `b` (`FUN_141659dd0`; the slice
-    /// holds no own masters: none); 203 to 205 the effect's object, which first takes a master of
-    /// its own (`FUN_14165abe0`, `FUN_141186d10`, not held); 206 changes the effect's object's
-    /// master (`FUN_14165ae40`). Without an object only 200 to 202 run.
+    /// The objects' kinds (`FUN_140ec2ac0`'s 200 to 206): 200 to 202 change the objects with
+    /// masters of their own of the command's master (`first`) or class (`second`) (`FUN_141659dd0`;
+    /// the slice holds no own masters: none); 203 to 205 the effect's object, which first takes a
+    /// master of its own (`FUN_14165abe0`, `FUN_141186d10`, not held); 206 changes the effect's
+    /// object's master (`FUN_14165ae40`). Without an object only 200 to 202 run.
     pub(super) const fn object_effect(
         kind: ObjectsKind,
         object: Option<ObjectId>,

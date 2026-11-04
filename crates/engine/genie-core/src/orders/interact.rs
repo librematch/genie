@@ -29,7 +29,7 @@ use crate::unit_ai::UnitAi;
 use crate::unit_ai::{Issuer, OrderPriority, OrderTargetKind, QueuedOrder};
 use crate::world::World;
 use crate::world::layer::ClassRoles;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 use crate::{GenieError, GenieResult};
 
 /// What the loop over the splitter's groups takes of its order ([`World::order_groups`]).
@@ -76,7 +76,7 @@ impl World {
         let Some(place) = self.place(id) else {
             return Ok(());
         };
-        let Place::Live(p, idx) = place else {
+        let Place::Live(owner, idx) = place else {
             return Err(GenieError::unsupported(
                 "an order to a unit the slice does not hold live",
             ));
@@ -87,7 +87,7 @@ impl World {
         // no owner test (`FUN_140e6b750`): such a unit takes the order as its own player's, the
         // issuer only queuing it
         let issuer = player;
-        let player = p;
+        let player = owner;
         let master = self
             .players
             .live(player, idx)?
@@ -113,7 +113,7 @@ impl World {
         }
         let target = self
             .object(order.target)
-            .map(|(tp, t)| (t.life.master_id, tp));
+            .map(|(tp, unit)| (unit.life.master_id, tp));
         let map = self.spatial.map;
         let unit = self.players.live_mut(player, idx)?;
         // its ignore list empties, it waits to move and lists the others; an object that does
@@ -135,10 +135,10 @@ impl World {
         }
         let point = centroid.map_or_else(
             || order.point,
-            |c| {
+            |point| {
                 offset_point(
                     unit.position().ground(),
-                    c,
+                    point,
                     order.point,
                     map,
                     &self.model.tuning.order,
@@ -298,7 +298,7 @@ impl World {
             order.priority,
             Some(class),
             TakenAs::Order,
-            self.streams.get(Stream::Ai),
+            self.streams.get_mut(Stream::Ai),
             &self.model.roles,
         );
         Ok(())
@@ -360,7 +360,7 @@ impl World {
             let others: Vec<ObjectId> = loose
                 .iter()
                 .enumerate()
-                .filter(|&(j, _)| j != index)
+                .filter(|&(other, _)| other != index)
                 .map(|(_, &object_id)| object_id)
                 .collect();
             let cell = narrow.then(|| {
@@ -440,13 +440,13 @@ impl World {
         let mut listed: Vec<GroupId> = Vec::new();
         for units in split.groups.clone() {
             let units = &units[..];
-            let common = common_group(units, |id| self.object(id).map(|(_, u)| u.group));
+            let common = common_group(units, |id| self.object(id).map(|(_, unit)| unit.group));
             // the units' common group, kept when it holds them all
             let kept = match common {
                 None => None,
                 Some(common) => match self.groups.get(common) {
                     None => continue,
-                    Some(g) => (g.members.len() == units.len()).then_some(common),
+                    Some(group) => (group.members.len() == units.len()).then_some(common),
                 },
             };
             let new = kept.is_none();
@@ -471,8 +471,8 @@ impl World {
                 listed.push(id);
             }
             let commands = self.groups.commands;
-            if let Some(g) = self.groups.get_mut(id) {
-                g.differentiator_id = commands;
+            if let Some(group) = self.groups.get_mut(id) {
+                group.differentiator_id = commands;
             }
             if order.lock_line {
                 self.lock_formation(id, FormationKind::Line)?;

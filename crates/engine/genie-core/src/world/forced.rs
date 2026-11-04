@@ -24,7 +24,7 @@ use crate::world::World;
 use crate::world::layer::Roles;
 use crate::world::layer::generated::VisibilityTuning;
 use crate::world::parts::{Object, Part};
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 use crate::world::{FrameSeed, PlayState};
 use crate::{GenieError, GenieResult};
 
@@ -84,9 +84,9 @@ impl World {
     /// The objects' inside lists in the game's order (`+0x2f8`, the tick oracle's dump): each
     /// container listed takes the order when it holds the same objects. Returns how many did.
     pub fn force_garrisons(&mut self, lists: &[(ObjectId, Vec<ObjectId>)]) -> usize {
-        let mut n = 0;
+        let mut count = 0;
         for (id, order) in lists {
-            let Some(c) = self
+            let Some(unit) = self
                 .players
                 .iter_mut()
                 .flat_map(|player| player.objects.iter_mut().chain(player.sleeping.iter_mut()))
@@ -94,12 +94,12 @@ impl World {
             else {
                 continue;
             };
-            if same_members(&c.garrison, order) {
-                c.garrison.clone_from(order);
-                n += 1;
+            if same_members(&unit.garrison, order) {
+                unit.garrison.clone_from(order);
+                count += 1;
             }
         }
-        n
+        count
     }
 
     /// The forced replay's step after a tick: the frame seed is the game's, and so is every
@@ -123,7 +123,13 @@ impl World {
         let mut known: Vec<ObjectId> = self
             .players
             .iter()
-            .flat_map(|player| player.objects.iter().chain(&player.sleeping).map(|u| u.id))
+            .flat_map(|player| {
+                player
+                    .objects
+                    .iter()
+                    .chain(&player.sleeping)
+                    .map(|unit| unit.id)
+            })
             .collect();
         known.sort_unstable();
         for player_id in PlayerId::each(self.players.len()) {
@@ -133,8 +139,8 @@ impl World {
             // an error here belongs to the player, not to an object
             let restart = match self.force_player_values(player_id, game) {
                 Ok(restart) => restart,
-                Err(e) => {
-                    notes.push((player_id, None, e));
+                Err(error) => {
+                    notes.push((player_id, None, error));
                     continue;
                 }
             };
@@ -199,9 +205,9 @@ impl World {
         let player = self.players.player_mut(player_id)?;
         let stopped = player.stopped;
         if stopped {
-            if let Some(r) = game.resources.get(player_id.index()) {
-                for (amount, r) in player.attributes.iter_mut().zip(r) {
-                    *amount = Amount::new(*r);
+            if let Some(resources) = game.resources.get(player_id.index()) {
+                for (amount, value) in player.attributes.iter_mut().zip(resources) {
+                    *amount = Amount::new(*value);
                 }
             }
             if let Some(amounts) = game.pending_debit.get(player_id.index()) {
@@ -251,7 +257,7 @@ impl World {
                 list_index = list_index.next();
                 continue;
             }
-            let Some(g) = theirs.iter().find(|g| g.unit.id == id) else {
+            let Some(recorded) = theirs.iter().find(|object| object.unit.id == id) else {
                 let elsewhere = game
                     .players
                     .iter()
@@ -271,7 +277,7 @@ impl World {
                 }
                 continue;
             };
-            if g.unit.life.master_id != unit.life.master_id {
+            if recorded.unit.life.master_id != unit.life.master_id {
                 notes.push((
                     player_id,
                     Some(id),
@@ -280,7 +286,7 @@ impl World {
                 list_index = list_index.next();
                 continue;
             }
-            self.take_game_object(player_id, list_index, g)?;
+            self.take_game_object(player_id, list_index, recorded)?;
             list_index = list_index.next();
         }
         Ok(())
@@ -410,8 +416,8 @@ fn keep_unsaved(unit: &Unit, forced: &mut Unit) {
 const fn keep_unsaved_ai(old: Option<&UnitAi>, forced: Option<&mut UnitAi>) {
     if let (Some(old), Some(new)) = (old, forced) {
         new.hunted = old.hunted;
-        if let (Some(o), Some(n)) = (old.home, new.home.as_mut()) {
-            n.homeward = o.homeward;
+        if let (Some(old_home), Some(new_home)) = (old.home, new.home.as_mut()) {
+            new_home.homeward = old_home.homeward;
         }
     }
 }
@@ -465,32 +471,33 @@ mod tests {
                 Distance::new(6.0),
             )
         };
-        let state = |s: &Spatial| {
-            s.sight
+        let state = |spatial: &Spatial| {
+            spatial
+                .sight
                 .as_ref()
                 .and_then(|visibility| visibility.seer(id))
                 .map(|seer| seer.state)
         };
-        let mut s = world();
-        assert_eq!(state(&s), Some(ObjectState::Alive));
+        let mut spatial = world();
+        assert_eq!(state(&spatial), Some(ObjectState::Alive));
         sight_follows(
-            &mut s,
+            &mut spatial,
             id,
             (ObjectState::Alive, ObjectState::Dying),
             &roles(),
             tuning().visibility,
         )
         .unwrap();
-        assert_eq!(state(&s), Some(ObjectState::Dying));
+        assert_eq!(state(&spatial), Some(ObjectState::Dying));
         sight_follows(
-            &mut s,
+            &mut spatial,
             id,
             (ObjectState::Dying, ObjectState::Removed),
             &roles(),
             tuning().visibility,
         )
         .unwrap();
-        assert_eq!(state(&s), Some(ObjectState::Removed));
+        assert_eq!(state(&spatial), Some(ObjectState::Removed));
         let mut spatial = world();
         sight_follows(
             &mut spatial,
@@ -607,7 +614,12 @@ mod tests {
         let mut theirs: Vec<Object> = forage_world.players[1]
             .objects
             .iter()
-            .map(|u| Object::with_ai(u.clone(), forage_world.parts.unit_ai.get(u.id).cloned()))
+            .map(|unit| {
+                Object::with_ai(
+                    unit.clone(),
+                    forage_world.parts.unit_ai.get(unit.id).cloned(),
+                )
+            })
             .collect();
         theirs[0]
             .unit

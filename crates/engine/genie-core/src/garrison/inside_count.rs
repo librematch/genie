@@ -13,10 +13,10 @@ impl InsideCount {
     /// One unit.
     pub const ONE: Self = Self(1);
 
-    /// A count of `n` units.
+    /// A count of `count` units.
     #[must_use]
-    pub const fn new(n: i32) -> Self {
-        Self(n)
+    pub const fn new(count: i32) -> Self {
+        Self(count)
     }
 
     /// The count.

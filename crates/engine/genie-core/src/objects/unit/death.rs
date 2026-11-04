@@ -14,7 +14,7 @@ use crate::objects::lifecycle::death_parts::{built_death, combat_dies, farm_bonu
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::PlayersMasters;
+use crate::objects::masters::PlayersMastersExt;
 use crate::objects::sprite::{building_death, dying, new_sprite};
 use crate::objects::unit::{NO_DYING_SPRITE, Unit};
 use crate::players::Amount;
@@ -22,7 +22,7 @@ use crate::players::tracker::key;
 use crate::technology::TechId;
 use crate::vision::SightLayer;
 use crate::world::layer::Roles;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 use crate::world::step::Step;
 
 impl Unit {
@@ -41,26 +41,26 @@ impl Unit {
         // FUN_1411dbb70 to state 3 from 2: the storage leaves (FUN_1411e63f0), the owner's
         // watched list lets it go (FUN_141091310), the tiles unlink (FUN_140f65580), and
         // a monastery's, wonder's or castle's count leaves, at least 0 left
-        let player_kind = step.w.players.player(step.player)?.kind;
-        let (id, annex_of) = (self.id, step.w.parts.building_of(self.id).annex_of);
+        let player_kind = step.world.players.player(step.player)?.kind;
+        let (id, annex_of) = (self.id, step.world.parts.building_of(self.id).annex_of);
         let death = built_death(
-            (self, step.w.parts.combat_mut(id)?),
+            (self, step.world.parts.combat_mut(id)?),
             annex_of,
             master,
             player_kind,
-            &step.w.model.roles,
-            step.w.model.slots,
+            &step.world.model.roles,
+            step.world.model.slots,
         )?;
-        step.w
+        step.world
             .players
             .player_mut(step.player)?
             .add_attributes(death.adds)?;
-        step.w.unwatch(step.player, self.id)?;
-        if let (Some(visibility), Some(at)) = (step.w.spatial.sight.as_mut(), death.unlink) {
-            visibility.unlink_building(at, master.radius, step.w.model.tuning.visibility)?;
+        step.world.unwatch(step.player, self.id)?;
+        if let (Some(visibility), Some(at)) = (step.world.spatial.sight.as_mut(), death.unlink) {
+            visibility.unlink_building(at, master.radius, step.world.model.tuning.visibility)?;
         }
         if let Some(kind) = death.building.count {
-            step.w
+            step.world
                 .players
                 .player_mut(step.player)?
                 .take_at_least_zero(kind, Amount::new(1.0))?;
@@ -86,7 +86,9 @@ impl Unit {
         roles: &Roles,
     ) -> GenieResult<()> {
         // its master as the death starts: the world's calls below change other objects
-        let master = &self.master(step.w.master_tables(), step.player)?.clone();
+        let master = &self
+            .master(step.world.master_tables(), step.player)?
+            .clone();
         // the last building of a master with a technology withdraws it, after the combat part
         let mut tech = None;
         if master.kind == MasterKind::BUILDING {
@@ -94,10 +96,10 @@ impl Unit {
             // each slot (`+0xbc0`..) clears and its annex's `+0xbb8` with it, and each annex takes
             // the building's hit points (`+0x278`), so it dies in its own update; the set_state
             // (FUN_1411dbb70) then finds no annex to take along
-            let annexes = step.w.parts.building_of(self.id).annexes;
-            step.w.parts.building_mut(self.id)?.annexes.clear();
+            let annexes = step.world.parts.building_of(self.id).annexes;
+            step.world.parts.building_mut(self.id)?.annexes.clear();
             for annex in annexes.ids() {
-                if let Some((unit, layer)) = step.w.object_and_layer_mut(annex)? {
+                if let Some((unit, layer)) = step.world.object_and_layer_mut(annex)? {
                     layer.annex_of = None;
                     unit.life.hp = self.life.hp;
                 }
@@ -122,22 +124,22 @@ impl Unit {
         }
         combat_dies(
             self,
-            step.w.parts.building_of(self.id),
+            step.world.parts.building_of(self.id),
             master,
-            &mut step.w.spatial,
-            &mut step.w.pathing,
+            &mut step.world.spatial,
+            &mut step.world.pathing,
             roles,
-            step.w.model.tuning.visibility,
+            step.world.model.tuning.visibility,
         )?;
         if before == ObjectState::Alive {
             // FUN_14121cc40: the paid cost leaves attributes 98 and 164 (a building's 98 and
             // 165), each at least 0 (slots 0xf8, then 0xf0 with 0)
-            let owner = step.w.players.player_mut(step.player)?;
+            let owner = step.world.players.player_mut(step.player)?;
             for (kind, cost) in refund_of(
                 master,
-                step.w.parts.building_of(self.id).annex_of,
+                step.world.parts.building_of(self.id).annex_of,
                 roles,
-                step.w.model.slots,
+                step.world.model.slots,
             ) {
                 owner.take_at_least_zero(kind, cost)?;
             }
@@ -152,10 +154,10 @@ impl Unit {
         }
         // the static update's sprite after the death (0x14118ad50): a building's by its build
         // points (its destruction sprite unbuilt), any other combat object's slot 0x7a0's
-        let look = step.w.parts.combat_of(self.id).abilities.look.as_ref();
+        let look = step.world.parts.combat_of(self.id).abilities.look.as_ref();
         let shown = if master.kind == MasterKind::BUILDING {
             let built = step
-                .w
+                .world
                 .parts
                 .building_of(self.id)
                 .construction
@@ -176,7 +178,7 @@ impl Unit {
     /// dying sprite).
     fn show_dying(&mut self, step: &mut Step<'_>, id: SpriteId) -> GenieResult<()> {
         let graphic = step
-            .w
+            .world
             .model
             .graphics
             .get(id)
@@ -184,10 +186,10 @@ impl Unit {
             .ok_or(NO_DYING_SPRITE)?;
         new_sprite(
             &mut self.sprite,
-            step.w.parts.move_stats_mut(self.id),
+            step.world.parts.move_stats_mut(self.id),
             graphic,
-            step.w.streams.get(Stream::Sprite),
-            step.w.model.tuning.sprite,
+            step.world.streams.get_mut(Stream::Sprite),
+            step.world.model.tuning.sprite,
         );
         Ok(())
     }
@@ -207,9 +209,9 @@ impl Unit {
         master: &Master,
         roles: &Roles,
     ) -> GenieResult<()> {
-        let ai = step.w.parts.unit_ai.contains(self.id);
+        let ai = step.world.parts.unit_ai.contains(self.id);
         let construction = step
-            .w
+            .world
             .parts
             .building_mut(self.id)?
             .construction
@@ -217,58 +219,58 @@ impl Unit {
             .ok_or(NO_CONSTRUCTION)?;
         let completion = Completion {
             master: Some(master),
-            farm_bonus: farm_bonus(&step.w.players.player(step.player)?.attributes),
-            masters: step.w.model.masters.of(step.player),
-            player_kind: step.w.players.player(step.player)?.kind,
+            farm_bonus: farm_bonus(&step.world.players.player(step.player)?.attributes),
+            masters: step.world.model.masters.of(step.player),
+            player_kind: step.world.players.player(step.player)?.kind,
             ai,
         };
         let part = completion.first_part(construction, roles)?;
         // its tracker part (FUN_14104eac0): the foundation leaves the pending lists
         let key = key(
-            step.w.model.masters.of(step.player),
-            &step.w.model.lines,
+            step.world.model.masters.of(step.player),
+            &step.world.model.lines,
             self.life.master_id,
             roles,
         );
-        step.w
+        step.world
             .players
             .player_mut(step.player)?
             .tracker
             .complete(self.id, key);
-        step.w
+        step.world
             .players
             .player_mut(step.player)?
             .add_attributes(part.attributes)?;
         // a pasture's livestock and a mule cart's search (from state 0), the foundation lent to
         // the world for what they place and search
         if part.pasture || part.cart {
-            let (p, id) = (step.player, self.id);
-            step.lend((&mut *self, &mut *actions), |w| {
+            let (player_id, id) = (step.player, self.id);
+            step.lend((&mut *self, &mut *actions), |world| {
                 if part.pasture {
-                    w.setup_pasture(p, PastureId::new(id))?;
+                    world.setup_pasture(player_id, PastureId::new(id))?;
                 }
                 if part.cart {
-                    w.cart_search(p, id, ObjectState::Foundation)?;
+                    world.cart_search(player_id, id, ObjectState::Foundation)?;
                 }
                 Ok(())
             })?;
         }
-        let (layer, mover) = step.w.parts.building_and_mover_mut(self.id)?;
+        let (layer, mover) = step.world.parts.building_and_mover_mut(self.id)?;
         let construction = layer.construction.as_mut().ok_or(NO_CONSTRUCTION)?;
         let started = Construction::begin(
             self.id,
             construction,
             mover,
-            &mut step.w.spatial,
-            &mut step.w.pathing,
-            step.w.world_time,
+            &mut step.world.spatial,
+            &mut step.world.pathing,
+            step.world.world_time,
             SightLayer {
                 roles,
-                visibility_tuning: step.w.model.tuning.visibility,
+                visibility_tuning: step.world.model.tuning.visibility,
             },
         )?;
         if started == ConstructionStart::Begun {
-            step.w.parts.combat_mut(self.id)?.firepower = master.creatable_part().volley_fire;
+            step.world.parts.combat_mut(self.id)?.firepower = master.creatable_part().volley_fire;
             let (player_id, id) = (step.player, self.id);
             step.lend((&mut *self, &mut *actions), |world| {
                 world.watch_started(player_id, id)

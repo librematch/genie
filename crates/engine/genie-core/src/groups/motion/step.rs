@@ -21,7 +21,7 @@ use crate::movement::{Planning, footprint_gap, footprint_gap_squared};
 use crate::world::Seconds;
 use crate::world::index::ObjectsRef;
 use crate::world::layer::generated::GroupTuning;
-use crate::world::slots::CheckedIndex;
+use crate::world::slots::CheckedIndexExt;
 
 /// One pass's end (the routine's labels).
 pub(super) enum Pass {
@@ -35,12 +35,12 @@ pub(super) enum Pass {
 }
 
 /// The world as `BMotion`'s path step reads it.
-pub(crate) struct StepWorld<'w, 'p> {
-    pub(crate) spatial: &'w mut Spatial,
-    pub(crate) plan: &'w mut Planning<'p>,
+pub(crate) struct StepWorld<'world, 'plan> {
+    pub(crate) spatial: &'world mut Spatial,
+    pub(crate) plan: &'world mut Planning<'plan>,
     pub(crate) dt: Seconds,
     /// The objects by id: what the walk reads of the units it meets.
-    pub(crate) by_id: ObjectsRef<'w>,
+    pub(crate) by_id: ObjectsRef<'world>,
 }
 
 /// `FUN_14104a270` (the path step of `BMotion`'s update) on `motion`, for a group whose lead is
@@ -94,7 +94,7 @@ pub(crate) fn path_step(
     let mut passes = 1;
     loop {
         match pass(motion, group, lead, world, budget)? {
-            Pass::Done(r) => return Ok(r),
+            Pass::Done(arrived) => return Ok(arrived),
             Pass::Reached => set_flag(&mut motion.paths, LevelFlags::REACHED, FlagChange::Set),
             Pass::Next => {}
         }
@@ -121,7 +121,7 @@ pub(super) fn pass(
     }
     let target_id = level.target;
     // the game tests the sign: a recyclable object's id is no target here
-    let target: Option<Placed> = match target_id.filter(|t| !t.is_recyclable()) {
+    let target: Option<Placed> = match target_id.filter(|object_id| !object_id.is_recyclable()) {
         Some(object_id) => spatial.get_known(object_id)?.copied(),
         None => None,
     };
@@ -173,9 +173,9 @@ pub(super) fn pass(
         // another link: the level walks on in its state
     }
     if motion.paths.checked(0)?.state == PathState::WantsPath
-        && let Some(p) = request(motion, lead, world, budget, target.as_ref(), target_gap2)?
+        && let Some(requested) = request(motion, lead, world, budget, target.as_ref(), target_gap2)?
     {
-        return Ok(p);
+        return Ok(requested);
     }
     steer(motion, group, lead, world, target.as_ref())
 }

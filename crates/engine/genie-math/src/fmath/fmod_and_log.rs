@@ -15,9 +15,9 @@ pub fn fmod(x: f32, y: f32) -> f32 {
     let sx = uxi & 0x8000_0000;
     if uyi << 1 == 0 || y.is_nan() || ex == 0xff {
         // the invalid operation's default NaN, or the NaN argument quieted
-        let p = x * y;
+        let product = x * y;
         #[allow(clippy::eq_op)]
-        return sse_nan(p / p, &[x, y]);
+        return sse_nan(product / product, &[x, y]);
     }
     if uxi << 1 <= uyi << 1 {
         // |x| at most |y|: a signed zero when equal, else x
@@ -29,10 +29,10 @@ pub fn fmod(x: f32, y: f32) -> f32 {
     }
     // the significands with their leading bit, a subnormal's shifted up
     if ex == 0 {
-        let mut i = uxi << 9;
-        while i >> 31 == 0 {
+        let mut bits = uxi << 9;
+        while bits >> 31 == 0 {
             ex -= 1;
-            i <<= 1;
+            bits <<= 1;
         }
         uxi <<= 1 - ex;
     } else {
@@ -40,10 +40,10 @@ pub fn fmod(x: f32, y: f32) -> f32 {
         uxi |= 1 << 23;
     }
     if ey == 0 {
-        let mut i = uyi << 9;
-        while i >> 31 == 0 {
+        let mut bits = uyi << 9;
+        while bits >> 31 == 0 {
             ey -= 1;
-            i <<= 1;
+            bits <<= 1;
         }
         uyi <<= 1 - ey;
     } else {
@@ -52,22 +52,22 @@ pub fn fmod(x: f32, y: f32) -> f32 {
     }
     // x mod y, one exponent step at a time
     while ex > ey {
-        let i = uxi.wrapping_sub(uyi);
-        if i >> 31 == 0 {
-            if i == 0 {
+        let difference = uxi.wrapping_sub(uyi);
+        if difference >> 31 == 0 {
+            if difference == 0 {
                 return f32::from_bits(sx);
             }
-            uxi = i;
+            uxi = difference;
         }
         uxi <<= 1;
         ex -= 1;
     }
-    let i = uxi.wrapping_sub(uyi);
-    if i >> 31 == 0 {
-        if i == 0 {
+    let difference = uxi.wrapping_sub(uyi);
+    if difference >> 31 == 0 {
+        if difference == 0 {
             return f32::from_bits(sx);
         }
-        uxi = i;
+        uxi = difference;
     }
     while uxi >> 23 == 0 {
         uxi <<= 1;
@@ -110,7 +110,7 @@ pub(super) fn log_f64(x: f64) -> f64 {
     let bits = x.to_bits();
     let (mut hx, lx) = ((bits >> 32) as i32, bits as u32);
     let mut x = x;
-    let mut k = 0;
+    let mut exponent = 0;
     if hx < 0x0010_0000 {
         if (hx & 0x7fff_ffff) as u32 | lx == 0 {
             return f64::NEG_INFINITY;
@@ -120,58 +120,58 @@ pub(super) fn log_f64(x: f64) -> f64 {
             return sse_nan_f64((x - x) / 0.0, &[x]);
         }
         // a subnormal, scaled up
-        k -= 54;
+        exponent -= 54;
         x *= TWO_POW_54;
         hx = (x.to_bits() >> 32) as i32;
     }
     if hx >= 0x7ff0_0000 {
         return sse_nan_f64(x + x, &[x]);
     }
-    k += (hx >> 20) - 1023;
+    exponent += (hx >> 20) - 1023;
     hx &= 0x000f_ffff;
-    let i = (hx + 0x95f64) & 0x0010_0000;
+    let bump = (hx + 0x95f64) & 0x0010_0000;
     // x or x/2 normalised into [√2/2, √2)
-    let high = (hx | (i ^ 0x3ff0_0000)) as u32;
+    let high = (hx | (bump ^ 0x3ff0_0000)) as u32;
     x = f64::from_bits((u64::from(high) << 32) | (x.to_bits() & 0xffff_ffff));
-    k += i >> 20;
-    let f = x - 1.0;
-    let dk = f64::from(k);
+    exponent += bump >> 20;
+    let fraction = x - 1.0;
+    let dk = f64::from(exponent);
     if (0x000f_ffff & (2 + hx)) < 3 {
         // |f| below 2^-20
-        if f == 0.0 {
-            return if k == 0 {
+        if fraction == 0.0 {
+            return if exponent == 0 {
                 0.0
             } else {
                 dk * LN2_HI + dk * LN2_LO
             };
         }
-        let r = f * f * (0.5 - THIRD_F64 * f);
-        return if k == 0 {
-            f - r
+        let quadratic = fraction * fraction * (0.5 - THIRD_F64 * fraction);
+        return if exponent == 0 {
+            fraction - quadratic
         } else {
-            dk * LN2_HI - ((r - dk * LN2_LO) - f)
+            dk * LN2_HI - ((quadratic - dk * LN2_LO) - fraction)
         };
     }
-    let s = f / (2.0 + f);
-    let z = s * s;
-    let mut i = hx - 0x6147a;
-    let w = z * z;
-    let j = 0x6b851 - hx;
-    let t1 = w * (LOG_LG[1] + w * (LOG_LG[3] + w * LOG_LG[5]));
-    let t2 = z * (LOG_LG[0] + w * (LOG_LG[2] + w * (LOG_LG[4] + w * LOG_LG[6])));
-    i |= j;
-    let r = t2 + t1;
-    if i > 0 {
-        let hfsq = 0.5 * f * f;
-        if k == 0 {
-            f - (hfsq - s * (hfsq + r))
+    let ratio = fraction / (2.0 + fraction);
+    let z = ratio * ratio;
+    let mut upper = hx - 0x6147a;
+    let fourth = z * z;
+    let lower = 0x6b851 - hx;
+    let t1 = fourth * (LOG_LG[1] + fourth * (LOG_LG[3] + fourth * LOG_LG[5]));
+    let t2 = z * (LOG_LG[0] + fourth * (LOG_LG[2] + fourth * (LOG_LG[4] + fourth * LOG_LG[6])));
+    upper |= lower;
+    let series = t2 + t1;
+    if upper > 0 {
+        let hfsq = 0.5 * fraction * fraction;
+        if exponent == 0 {
+            fraction - (hfsq - ratio * (hfsq + series))
         } else {
-            dk * LN2_HI - ((hfsq - (s * (hfsq + r) + dk * LN2_LO)) - f)
+            dk * LN2_HI - ((hfsq - (ratio * (hfsq + series) + dk * LN2_LO)) - fraction)
         }
-    } else if k == 0 {
-        f - s * (f - r)
+    } else if exponent == 0 {
+        fraction - ratio * (fraction - series)
     } else {
-        dk * LN2_HI - ((s * (f - r) - dk * LN2_LO) - f)
+        dk * LN2_HI - ((ratio * (fraction - series) - dk * LN2_LO) - fraction)
     }
 }
 

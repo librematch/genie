@@ -30,7 +30,7 @@ use crate::world::World;
 use crate::world::WorldTime;
 use crate::world::index::ObjectsRef;
 use crate::world::layer::generated::GroupTuning;
-use crate::world::slots::CheckedIndex;
+use crate::world::slots::CheckedIndexExt;
 use std::mem::take;
 
 /// The walk of the walked level (`LAB_14104b6b4`): see [`path_step`]. A group on its waypoint
@@ -59,8 +59,12 @@ pub(super) fn steer(
     // FUN_141046080: the direction on the ground
     let mut direction = waypoint - at;
     direction = direction.with_height(0.0);
-    let l = sqrt(direction.x() * direction.x() + 0.0 + direction.y() * direction.y());
-    direction = BVector::new(direction.x() / l, direction.height() / l, direction.y() / l);
+    let length = sqrt(direction.x() * direction.x() + 0.0 + direction.y() * direction.y());
+    direction = BVector::new(
+        direction.x() / length,
+        direction.height() / length,
+        direction.y() / length,
+    );
     let step = (dt.get() * motion.acceleration.y() + motion.velocity.y()) * dt.get();
     let next = at + step * direction;
     match passes_waypoint(waypoint, at, next, group_tuning) {
@@ -218,8 +222,12 @@ fn walk_ends(
                 && let Some(top) = top
             {
                 let end = point(top, WaypointIndex::last_of(top.points.len()));
-                let d = at - end;
-                let gap = sqrt(d.height() * d.height() + d.x() * d.x() + d.y() * d.y());
+                let offset = at - end;
+                let gap = sqrt(
+                    offset.height() * offset.height()
+                        + offset.x() * offset.x()
+                        + offset.y() * offset.y(),
+                );
                 if gap - level.range.get() < EPSILON {
                     reset_level(&mut motion.paths)?;
                     motion.stand();
@@ -246,8 +254,12 @@ fn walk_ends(
 /// the yaw the turn rate allows in `dt` ([`Motion::calculate_yaw_angle`], [`Motion::turn`]).
 fn turn_toward(motion: &mut Motion, direction: BVector, dt: Seconds) {
     let forward = motion.position[1].with_height(0.0);
-    let f = sqrt(forward.x() * forward.x() + 0.0 + forward.y() * forward.y());
-    let forward = BVector::new(forward.x() / f, forward.height() / f, forward.y() / f);
+    let length = sqrt(forward.x() * forward.x() + 0.0 + forward.y() * forward.y());
+    let forward = BVector::new(
+        forward.x() / length,
+        forward.height() / length,
+        forward.y() / length,
+    );
     let yaw = motion.calculate_yaw_angle(forward, direction, dt, YawLimit::Clamped);
     motion.turn(yaw);
 }
@@ -260,27 +272,33 @@ fn pull_to_members(motion: &mut Motion, group: &GroupView, group_tuning: &GroupT
     let all_acting = group
         .members
         .iter()
-        .all(|m| m.is_some_and(|(target, _)| target.is_some()));
+        .all(|member| member.is_some_and(|(target, _)| target.is_some()));
     if !all_acting {
         return;
     }
     let count = group.members.len();
     let mut centre = BVector::ZERO;
     if count != 0 {
-        for &(_, p) in group.members.iter().flatten() {
+        for &(_, at) in group.members.iter().flatten() {
             centre = BVector::new(
-                centre.x() + p.x(),
-                p.height() + centre.height(),
-                p.y() + centre.y(),
+                centre.x() + at.x(),
+                at.height() + centre.height(),
+                at.y() + centre.y(),
             );
         }
-        let n = count as f32;
-        centre = BVector::new(centre.x() / n, centre.height() / n, centre.y() / n);
+        let members = count as f32;
+        centre = BVector::new(
+            centre.x() / members,
+            centre.height() / members,
+            centre.y() / members,
+        );
     }
     let ground_centre = centre.with_height(0.0);
     let here = motion.position[0].with_height(0.0);
-    let d = here - ground_centre;
-    if group_tuning.pull_distance <= d.x() * d.x() + d.height() * d.height() + d.y() * d.y() {
+    let offset = here - ground_centre;
+    if group_tuning.pull_distance
+        <= offset.x() * offset.x() + offset.height() * offset.height() + offset.y() * offset.y()
+    {
         motion.new_position[0] = group_tuning.pull_share * ground_centre
             + group_tuning.pull_keep * motion.new_position[0];
     }
@@ -299,18 +317,18 @@ impl World {
     /// When the world does not hold `group`: the game's routine gets the group itself, from a
     /// caller that holds it.
     pub fn motion_update(&mut self, group: GroupId, budget: PathBudget) -> GenieResult<()> {
-        let Some(g) = self.groups.get(group) else {
+        let Some(unit_group) = self.groups.get(group) else {
             return Ok(());
         };
-        let Some(lead) = self.lead_view(g.motion.lead) else {
+        let Some(lead) = self.lead_view(unit_group.motion.lead) else {
             return Ok(());
         };
         let view = GroupView {
-            player_kind: g
+            player_kind: unit_group
                 .owner
                 .and_then(|player_id| self.players.get(player_id.index()))
                 .map_or(PlayerKind::Phantom, |player| player.kind),
-            members: g
+            members: unit_group
                 .members
                 .iter()
                 .map(|member| {
@@ -330,7 +348,7 @@ impl World {
                 pathing: &mut self.pathing,
                 now: self.world_time,
                 player_kind: lead.player_kind,
-                object: self.streams.get(Stream::Object),
+                object: self.streams.get_mut(Stream::Object),
                 groups: &self.groups,
             };
             let mut world = StepWorld {

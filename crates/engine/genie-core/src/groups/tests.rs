@@ -24,7 +24,7 @@ use crate::objects::masters::HeroFlags;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObstructionKind;
-use crate::objects::masters::PlayersMasters;
+use crate::objects::masters::PlayersMastersExt;
 use crate::objects::masters::TargetOwner;
 use crate::objects::masters::TaskGroup;
 use crate::objects::masters::{Master, Masters, Task, WorkValue};
@@ -229,8 +229,8 @@ fn clearing_lines_points_keeps_its_lengths() {
 
 #[test]
 fn the_stored_positions_keep_their_desired_length() {
-    let at = |x: f32, h: f32| LinePoint {
-        point: BVector::new(x, h, 0.0),
+    let at = |x: f32, height: f32| LinePoint {
+        point: BVector::new(x, height, 0.0),
         ..LinePoint::default()
     };
     let mut line = PointLine {
@@ -605,8 +605,8 @@ fn master_with_board_task_and_no_task_found_is_not_modelled() {
         .task_by_group = TaskGroup::NONE;
     // its own list finds the board task for any target, so give it one for another object
     own.action.get_or_insert_with(Default::default).tasks[0].object_id = Some(master_id(999));
-    let t = tasked_world(vec![own.clone(), building_master()], 9.0);
-    assert!(t.member_task(member_11(), &query_on(60)).is_err());
+    let world = tasked_world(vec![own.clone(), building_master()], 9.0);
+    assert!(world.member_task(member_11(), &query_on(60)).is_err());
     own.kind = MasterKind::of_data(0x27);
     let world = tasked_world(vec![own, building_master()], 9.0);
     assert_eq!(world.member_task(member_11(), &query_on(60)).unwrap(), None);
@@ -720,7 +720,7 @@ fn attack_world(members: &[(i32, i16, f32, f32)]) -> World {
 fn register(world: &mut World) {
     let placed: Vec<(i32, Placed)> = PlayerId::each(world.players.len())
         .zip(&world.players)
-        .flat_map(|(p, player)| player.objects.iter().map(move |u| (p, u)))
+        .flat_map(|(player_id, player)| player.objects.iter().map(move |unit| (player_id, unit)))
         .filter_map(|(player_id, unit)| {
             let master = world
                 .model
@@ -868,29 +868,38 @@ fn group_with_two_queued_commands_takes_its_smallest_unit_range() {
 /// within its weapon's reach of the target and not nearer than its minimum range is sent at it.
 #[test]
 fn the_reach_pass_raises_the_range_and_sends_member_in_reach() {
-    let mut t = attack_world(&[(7, 4, 10.0, 10.0), (8, 4, 38.0, 45.0)]);
-    register(&mut t);
-    for u in &mut t.players[1].objects {
-        t.parts.set_unit_ai(
-            u.id,
+    let mut world = attack_world(&[(7, 4, 10.0, 10.0), (8, 4, 38.0, 45.0)]);
+    register(&mut world);
+    for unit in &mut world.players[1].objects {
+        world.parts.set_unit_ai(
+            unit.id,
             Some(UnitAi {
                 retarget_timer: Millis::new(7),
                 ..UnitAi::default()
             }),
         );
-        t.parts.put_mover(u.id, Some(walker()));
+        world.parts.put_mover(unit.id, Some(walker()));
     }
-    let mut reference = t.streams.clone();
-    let draw = reference.get(Stream::Ai).rand15();
+    let mut reference = world.streams.clone();
+    let draw = reference.get_mut(Stream::Ai).rand15();
     let mut range = -1.0;
-    t.reach_pass(group_id(1), object_id(60), attack_on(None), &mut range)
+    world
+        .reach_pass(group_id(1), object_id(60), attack_on(None), &mut range)
         .unwrap();
     assert_eq!(range, 4.0);
     // member 8 touches the target (a gap 0, so the timer's span is the least, 1000); 7 is far
-    let timers: Vec<u32> = t.players[1]
+    let timers: Vec<u32> = world.players[1]
         .objects
         .iter()
-        .map(|unit| t.parts.unit_ai.get(unit.id).unwrap().retarget_timer.get())
+        .map(|unit| {
+            world
+                .parts
+                .unit_ai
+                .get(unit.id)
+                .unwrap()
+                .retarget_timer
+                .get()
+        })
         .collect();
     assert_eq!(timers, [7, 750 + draw % 500]);
     let mut world = attack_world(&[(7, 4, 10.0, 10.0)]);
@@ -1056,9 +1065,9 @@ fn general_command_queues_or_runs_the_queue() {
             .unwrap(),
         GroupMove::NotBegun
     );
-    let g = world.groups.get(group_id(1)).unwrap();
-    assert_eq!((g.command_queue.len(), g.hibernating), (1, 1));
-    let node = g.command_queue[0];
+    let group = world.groups.get(group_id(1)).unwrap();
+    assert_eq!((group.command_queue.len(), group.hibernating), (1, 1));
+    let node = group.command_queue[0];
     assert_eq!(
         (
             node.command,
@@ -1425,14 +1434,15 @@ fn the_special_units_of_masters_6_and_7_and_of_the_category_classes() {
         }
         attack_world
     };
-    let mut t = world(class::BUILDING, ids::ID_7);
-    t.refill_special_units(group_id(1), object_id(60)).unwrap();
+    let mut game = world(class::BUILDING, ids::ID_7);
+    game.refill_special_units(group_id(1), object_id(60))
+        .unwrap();
     assert_eq!(
-        t.groups.get(group_id(1)).unwrap().special_units,
+        game.groups.get(group_id(1)).unwrap().special_units,
         [object_id(8), object_id(10)]
     );
-    let mut t = world(class::VILLAGER, ids::HOUSE);
-    t.groups.get_mut(group_id(1)).unwrap().unit_kinds = vec![
+    let mut game = world(class::VILLAGER, ids::HOUSE);
+    game.groups.get_mut(group_id(1)).unwrap().unit_kinds = vec![
         UnitKindStatistic {
             formation_category: FormationCategory::named(2),
             units: vec![object_id(9), object_id(10)],
@@ -1444,16 +1454,19 @@ fn the_special_units_of_masters_6_and_7_and_of_the_category_classes() {
             ..UnitKindStatistic::default()
         },
     ];
-    t.refill_special_units(group_id(1), object_id(60)).unwrap();
+    game.refill_special_units(group_id(1), object_id(60))
+        .unwrap();
     // category 1 first, then 2, up to four
     assert_eq!(
-        t.groups.get(group_id(1)).unwrap().special_units,
+        game.groups.get(group_id(1)).unwrap().special_units,
         [object_id(7), object_id(8), object_id(11), object_id(9)]
     );
-    let mut t = world(class::CLASS_57, ids::HOUSE);
-    t.refill_special_units(group_id(1), object_id(60)).unwrap();
+    let mut world = world(class::CLASS_57, ids::HOUSE);
+    world
+        .refill_special_units(group_id(1), object_id(60))
+        .unwrap();
     assert_eq!(
-        t.groups.get(group_id(1)).unwrap().special_units,
+        world.groups.get(group_id(1)).unwrap().special_units,
         [object_id(9), object_id(8), object_id(10)]
     );
 }

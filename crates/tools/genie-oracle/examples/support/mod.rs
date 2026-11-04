@@ -29,7 +29,7 @@ pub fn filter(rust_log: Option<&str>) -> Result<Option<EnvFilter>, String> {
 #[must_use]
 pub fn subscriber<W>(filter: EnvFilter, writer: W) -> impl Subscriber + Send + Sync
 where
-    W: for<'w> MakeWriter<'w> + Send + Sync + 'static,
+    W: for<'writer> MakeWriter<'writer> + Send + Sync + 'static,
 {
     tracing_subscriber::fmt()
         .with_env_filter(filter)

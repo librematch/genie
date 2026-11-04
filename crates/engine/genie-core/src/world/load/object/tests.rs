@@ -15,8 +15,9 @@ use crate::world::load::fixtures::{
     action_list, building_mut, building_object, combat_master, combat_mut, combat_object,
     missile_tuning, with_masters,
 };
+use crate::world::load::object::building::annexes;
 use crate::world::load::object::object as saved_unit_object;
-use crate::world::load::object::{annexes, object};
+use crate::world::load::object::object;
 use genie_import::dat::{DefaultAction, MasterTable};
 use genie_save::generated::world::{
     Action, PlayerObjects, RgeAction, RgeActionByKind, RgeMissileObject, RgeObject,
@@ -64,8 +65,8 @@ fn saved_building_parts_are_its_object_s() {
             &missile_tuning(),
         )
     };
-    let o = whole(1);
-    let gather_point = o.parts.gather_point.unwrap();
+    let object = whole(1);
+    let gather_point = object.parts.gather_point.unwrap();
     assert_eq!(
         (
             gather_point.state,
@@ -74,15 +75,15 @@ fn saved_building_parts_are_its_object_s() {
         ),
         (GatherPointState::Point, 3.5, None)
     );
-    assert!(o.parts.dead_master.is_none());
-    let disabled = o
+    assert!(object.parts.dead_master.is_none());
+    let disabled = object
         .parts
         .production
         .map(|production| production.disabled_techs);
     assert_eq!(disabled, Some(vec![TechId::try_from(3).unwrap()]));
-    let o = whole(0x100);
-    assert!(o.parts.gather_point.is_none());
-    assert!(o.parts.unread.is_some());
+    let object = whole(0x100);
+    assert!(object.parts.gather_point.is_none());
+    assert!(object.parts.unread.is_some());
 }
 
 /// A save from the start: livestock's default task is the Artifact, which exists from the
@@ -299,12 +300,12 @@ fn the_back_to_work_actions_import_as_their_kinds() {
         (Some(AiAction::Gather), None)
     );
     combat_mut(&mut object).back_to_work2_town_bell_action = 0x2c6;
-    let o = whole(&object);
+    let whole = whole(&object);
     assert_eq!(
-        o.parts.unread.map(|unread| unread.error().kind()),
+        whole.parts.unread.map(|unread| unread.error().kind()),
         Some(crate::ErrorKind::InvalidInput)
     );
-    assert_eq!(o.parts.town_bell, TownBell::default());
+    assert_eq!(whole.parts.town_bell, TownBell::default());
 }
 
 /// The save's linked object ids fill a main building's four annex slots in their order, −1 an

@@ -11,11 +11,11 @@ use crate::players::PlayerId;
 use crate::unit_ai::world_view::{WorldPicker, owner_view};
 use crate::world::World;
 use crate::world::index::ObjectsRef;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 
-/// Runs `f` on the picker of object `me` of player `player` over `world` and on `world`'s spatial
-/// index: its unit AI's seeker, the attacker its unit, master, mover and seer make, its owner's
-/// type, attributes, diplomacy and AI settings, its master's terrain restriction.
+/// Runs `work` on the picker of object `me` of player `player` over `world` and on `world`'s
+/// spatial index: its unit AI's seeker, the attacker its unit, master, mover and seer make, its
+/// owner's type, attributes, diplomacy and AI settings, its master's terrain restriction.
 ///
 /// # Panics
 ///
@@ -23,7 +23,7 @@ use crate::world::slots::PlayerSlots;
 pub(crate) fn with_picker<R>(
     world: &mut World,
     (player, me): (PlayerId, ObjectId),
-    f: impl FnOnce(&mut WorldPicker<'_>, &mut Spatial) -> R,
+    work: impl FnOnce(&mut WorldPicker<'_>, &mut Spatial) -> R,
 ) -> R {
     let World {
         players,
@@ -40,7 +40,7 @@ pub(crate) fn with_picker<R>(
     let unit = owner
         .objects
         .iter()
-        .find(|u| u.id == me)
+        .find(|unit| unit.id == me)
         .expect("the unit in its player's list");
     let every = MasterTables::new(&model.masters, &parts.own_master);
     let master = unit.master(every, player).expect("the unit's master");
@@ -92,5 +92,5 @@ pub(crate) fn with_picker<R>(
         now: *world_time,
         mode_680: *mode_680,
     };
-    f(&mut picker, spatial)
+    work(&mut picker, spatial)
 }

@@ -51,8 +51,8 @@ pub fn read_cached(dir: &Path, key: &Key) -> GenieResult<Option<MasterTable>> {
     match read(&path) {
         Ok(bytes) => decode(&bytes)
             .map(Some)
-            .map_err(|e| e.with("path", path.display())),
-        Err(e) if e.kind() == ErrorKind::NotFound => Ok(None),
+            .map_err(|error| error.with("path", path.display())),
+        Err(failure) if failure.kind() == ErrorKind::NotFound => Ok(None),
         Err(error) => Err(GenieError::io("a cache file that does not read")
             .with("path", path.display())
             .with_source(error)),
@@ -72,16 +72,16 @@ static WRITES: AtomicU64 = AtomicU64::new(0);
 #[cfg(feature = "fs")]
 pub fn write_cached(dir: &Path, key: &Key, table: &MasterTable) -> GenieResult<()> {
     let bytes = encode(table)?;
-    let io = |reason: &'static str, path: &Path, e: IoError| {
+    let io = |reason: &'static str, path: &Path, error: IoError| {
         GenieError::io(reason)
             .with("path", path.display())
-            .with_source(e)
+            .with_source(error)
     };
     create_dir_all(dir)
         .map_err(|dir_error| io("a cache directory that cannot be made", dir, dir_error))?;
     let written = WRITES.fetch_add(1, Ordering::Relaxed);
     let tmp = dir.join(format!("{}.tmp-{}-{written}", key.hex(), process::id()));
-    write(&tmp, &bytes).map_err(|e| io("a cache file that cannot be written", &tmp, e))?;
+    write(&tmp, &bytes).map_err(|error| io("a cache file that cannot be written", &tmp, error))?;
     let path = dir.join(key.hex());
     rename(&tmp, &path).map_err(|error| {
         // the temporary file goes too; a failed removal leaves only a stray file

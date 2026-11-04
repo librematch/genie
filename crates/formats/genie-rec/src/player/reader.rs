@@ -2,7 +2,7 @@
 
 use crate::ObjectId;
 use crate::ai::PlayerAi;
-use crate::element::{OptionalReadableElement, ReadableHeaderElement};
+use crate::element::{ReadHeader, ReadOptionalHeader};
 use crate::fits;
 use crate::player::{
     DiplomacyOffer, GaiaData, HistoryInfo, Player, PlayerTech, UserPatchData, VisibleMap,
@@ -17,7 +17,7 @@ use genie_error::GenieResult;
 use genie_support::{ReadStringsExt, read_bytes, read_le};
 use std::io::Read;
 
-impl ReadableHeaderElement for Player {
+impl ReadHeader for Player {
     // Reads the player's fields in file order, section by section; the sections it does not
     // keep it skips.
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {

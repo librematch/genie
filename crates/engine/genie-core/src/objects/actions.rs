@@ -60,25 +60,25 @@ macro_rules! action_kinds {
                 #[doc = concat!("The list's `", stringify!($variant), "`, if it holds one.")]
                 #[must_use]
                 pub fn $get(&self) -> Option<&$ty> {
-                    self.0.iter().find_map(|a| match a {
-                        Action::$variant(x) => Some(x),
+                    self.0.iter().find_map(|action| match action {
+                        Action::$variant(held) => Some(held),
                         _ => None,
                     })
                 }
 
                 #[doc = concat!("The list's `", stringify!($variant), "` to change, if it holds one.")]
                 pub fn $get_mut(&mut self) -> Option<&mut $ty> {
-                    self.0.iter_mut().find_map(|a| match a {
-                        Action::$variant(x) => Some(x),
+                    self.0.iter_mut().find_map(|action| match action {
+                        Action::$variant(held) => Some(held),
                         _ => None,
                     })
                 }
 
                 #[doc = concat!("The list's `", stringify!($variant), "` leaves it (no teardown runs).")]
                 pub fn $take(&mut self) -> Option<$ty> {
-                    let i = self.0.iter().position(|a| matches!(a, Action::$variant(_)))?;
-                    match self.0.remove(i) {
-                        Action::$variant(x) => Some(x),
+                    let index = self.0.iter().position(|action| matches!(action, Action::$variant(_)))?;
+                    match self.0.remove(index) {
+                        Action::$variant(held) => Some(held),
                         _ => None,
                     }
                 }
@@ -87,8 +87,8 @@ macro_rules! action_kinds {
                 #[doc = "if it holds one, else at the head; None takes it out ([`ActionList::put`])."]
                 pub fn $set(&mut self, action: Option<$ty>) {
                     match action {
-                        Some(x) => self.put(Action::$variant(x)),
-                        None => self.0.retain(|a| !matches!(a, Action::$variant(_))),
+                        Some(held) => self.put(Action::$variant(held)),
+                        None => self.0.retain(|listed| !matches!(listed, Action::$variant(_))),
                     }
                 }
 
@@ -229,7 +229,11 @@ impl ActionList {
     /// `action` replaces the list's action of its kind in its place, or else becomes the head.
     pub fn put(&mut self, action: Action) {
         let kind = discriminant(&action);
-        match self.0.iter_mut().find(|a| discriminant(*a) == kind) {
+        match self
+            .0
+            .iter_mut()
+            .find(|action| discriminant(*action) == kind)
+        {
             Some(held) => *held = action,
             None => self.0.insert(0, action),
         }
@@ -277,9 +281,9 @@ impl ActionList {
     }
 }
 
-impl<'a> IntoIterator for &'a ActionList {
-    type Item = &'a Action;
-    type IntoIter = Iter<'a, Action>;
+impl<'list> IntoIterator for &'list ActionList {
+    type Item = &'list Action;
+    type IntoIter = Iter<'list, Action>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.iter()
@@ -328,8 +332,8 @@ mod tests {
         let mut list = ActionList::default().with_artifact(Some(artifact(ArtifactState::Wait)));
         assert_eq!(list.artifact(), Some(&artifact(ArtifactState::Wait)));
         assert_eq!(list.make(), None);
-        if let Some(a) = list.artifact_mut() {
-            a.state = ArtifactState::ToGaia;
+        if let Some(artifact) = list.artifact_mut() {
+            artifact.state = ArtifactState::ToGaia;
         }
         assert_eq!(list.make_mut(), None);
         assert_eq!(list.take_make(), None);

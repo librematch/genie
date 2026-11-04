@@ -36,7 +36,7 @@ pub(crate) fn retry_point(
     rng: &mut Well512,
     transport_tuning: &TransportTuning,
 ) -> (Point, bool) {
-    let (w, h) = (map.width(), map.height());
+    let (width, height) = (map.width(), map.height());
     let mut seen = DEEP_WATER;
     let mut at = point;
     let mut left = RETRIES;
@@ -50,7 +50,7 @@ pub(crate) fn retry_point(
         let y = (rng.rand15() / RETRY_STEP) as f32 + point.y() - transport_tuning.retry_spread;
         at = Point::new(x, y);
         let (tx, ty) = (cvttss2si(x), cvttss2si(y));
-        if 0 <= tx && 0 <= ty && tx < w && ty < h {
+        if 0 <= tx && 0 <= ty && tx < width && ty < height {
             seen = terrain.read(Tile::new(tx, ty).short());
         }
         if left <= 0 {
@@ -78,24 +78,24 @@ pub struct Around {
 /// calls; none yet is [`STACK_PLACE`]). The caller tests each place on the map
 /// ([`DropDraws::next_on_map`]): the first in its zone that the unit's master may take and the
 /// unit could stand on is the drop location.
-pub(crate) struct DropDraws<'a> {
+pub(crate) struct DropDraws<'world> {
     around: Around,
     unit_radius: Footprint,
     map: GridSize,
-    last: &'a mut Option<Point>,
-    rng: &'a mut Well512,
+    last: &'world mut Option<Point>,
+    rng: &'world mut Well512,
     left: u16,
 }
 
-impl<'a> DropDraws<'a> {
+impl<'world> DropDraws<'world> {
     /// The draws for a unit of master radii `unit_radius` about `around` on a map of `map`
     /// tiles, the place the last draw left in `last`, drawing from `rng`.
     pub(crate) const fn new(
         around: Around,
         unit_radius: Footprint,
         map: GridSize,
-        last: &'a mut Option<Point>,
-        rng: &'a mut Well512,
+        last: &'world mut Option<Point>,
+        rng: &'world mut Well512,
     ) -> Self {
         Self {
             around,
@@ -117,14 +117,14 @@ impl<'a> DropDraws<'a> {
         &mut self,
         transport_tuning: &TransportTuning,
     ) -> GenieResult<Option<Point>> {
-        let (w, h) = (self.map.width() as f32, self.map.height() as f32);
+        let (width, height) = (self.map.width() as f32, self.map.height() as f32);
         while 0 < self.left {
             self.left -= 1;
             let (x, y) = {
                 let point = self.draw(transport_tuning)?;
                 (point.x(), point.y())
             };
-            if 0.0 > x || 0.0 > y || x >= w || y >= h {
+            if 0.0 > x || 0.0 > y || x >= width || y >= height {
                 continue;
             }
             return Ok(Some(Point::new(x, y)));
@@ -138,8 +138,8 @@ impl<'a> DropDraws<'a> {
         let (rx, ry) = (self.around.radius.x(), self.around.radius.y());
         let off_x = rx + (self.unit_radius.x() + transport_tuning.drop_gap);
         let off_y = ry + (self.unit_radius.y() + transport_tuning.drop_gap);
-        let along = |r: u32, radius: Distance, centre: f32| {
-            ((r as i32 as f32 * (radius + radius)) / DRAW_SCALE - radius) + Distance::new(centre)
+        let along = |draw: u32, radius: Distance, centre: f32| {
+            ((draw as i32 as f32 * (radius + radius)) / DRAW_SCALE - radius) + Distance::new(centre)
         };
         let side = (self.rng.rand15() as i32 * 4) / 0x7fff;
         let place = match side {
@@ -185,52 +185,53 @@ pub(crate) fn in_zone(
     };
     let (tx, ty) = (cvttss2si(x), cvttss2si(y));
     let tile_zone = match zone_map {
-        Some(m) if 0 <= tx && 0 <= ty => m.zone(Tile::new(tx, ty)),
+        Some(zone_map) if 0 <= tx && 0 <= ty => zone_map.zone(Tile::new(tx, ty)),
         _ => ZoneId::OFF_MAP,
     };
     let low = tile_zone.byte();
     if u16::from(low) == zone.get() {
         return Ok(true);
     }
-    let Some(m) = zone_map else {
+    let Some(zone_map) = zone_map else {
         return Ok(false);
     };
     // the adjacency table covers its zones, and `adjacent` answers false for a zone past them
-    m.adjacent(
-        ZoneId::new(u16::from(low)),
-        ZoneId::new(u16::from(zone.byte())),
-    )
-    .ok_or(GenieError::unreachable("a zone adjacency past its table"))
+    zone_map
+        .adjacent(
+            ZoneId::new(u16::from(low)),
+            ZoneId::new(u16::from(zone.byte())),
+        )
+        .ok_or(GenieError::unreachable("a zone adjacency past its table"))
 }
 
 /// The map as a unit's Transport reads it: the map's terrain, the zone maps and the
 /// planners, the unit's terrain restriction (its master's `+0x606`; none below 0), its tile and
 /// the tile paths' tuning values (the shore point's walk).
 #[derive(Debug)]
-pub struct MapShore<'a> {
-    pub(super) terrain: &'a Terrain,
-    pub(super) zones: &'a mut Zones,
-    pub(super) pathing: &'a mut Pathing,
-    pub(super) tiles: &'a Tiles,
+pub struct MapShore<'world> {
+    pub(super) terrain: &'world Terrain,
+    pub(super) zones: &'world mut Zones,
+    pub(super) pathing: &'world mut Pathing,
+    pub(super) tiles: &'world Tiles,
     pub(super) map: GridSize,
     pub(super) restriction: Option<RestrictionId>,
     pub(super) tile: Tile,
-    pub(super) tile_path_tuning: &'a TilePathTuning,
+    pub(super) tile_path_tuning: &'world TilePathTuning,
 }
 
-impl<'a> MapShore<'a> {
+impl<'world> MapShore<'world> {
     /// The map about a unit of terrain restriction `restriction` at `position`.
     ///
     /// # Errors
     ///
     /// A map without its terrain.
     pub(crate) fn new(
-        spatial: &'a Spatial,
-        zones: &'a mut Zones,
-        pathing: &'a mut Pathing,
+        spatial: &'world Spatial,
+        zones: &'world mut Zones,
+        pathing: &'world mut Pathing,
         restriction: Option<RestrictionId>,
         position: Position,
-        tile_path_tuning: &'a TilePathTuning,
+        tile_path_tuning: &'world TilePathTuning,
     ) -> GenieResult<Self> {
         let terrain = spatial.terrain.as_ref().ok_or(NO_TERRAIN)?;
         Ok(Self {
@@ -254,9 +255,9 @@ impl<'a> MapShore<'a> {
             .terrain
             .restriction(restriction_id)
             .ok_or(UNKNOWN_RESTRICTION)?;
-        let (w, h) = (self.map.width(), self.map.height());
+        let (width, height) = (self.map.width(), self.map.height());
         Ok(Some(self.zones.of(
-            GridSize::new(w, h),
+            GridSize::new(width, height),
             &self.terrain.kinds,
             values,
         )?))

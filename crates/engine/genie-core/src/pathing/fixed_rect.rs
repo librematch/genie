@@ -47,11 +47,11 @@ impl FixedRect {
         self.0[3]
     }
 
-    /// Corner `k` (`FUN_14087c6b0`): 0 = (x0, y0), 1 = (x1, y0), 2 = (x1, y1), 3 = (x0, y1).
+    /// Corner `index` (`FUN_14087c6b0`): 0 = (x0, y0), 1 = (x1, y0), 2 = (x1, y1), 3 = (x0, y1).
     #[must_use]
-    pub const fn corner(self, k: u32) -> FixedPoint {
+    pub const fn corner(self, index: u32) -> FixedPoint {
         let [x0, y0, x1, y1] = self.0;
-        match k {
+        match index {
             0 => FixedPoint::new(x0, y0),
             1 => FixedPoint::new(x1, y0),
             2 => FixedPoint::new(x1, y1),

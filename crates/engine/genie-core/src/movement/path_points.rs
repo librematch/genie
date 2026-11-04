@@ -20,13 +20,13 @@ use crate::world::Seconds;
 use crate::world::WorldTime;
 use crate::world::layer::generated::MovementTuning;
 
-/// `FUN_140f98dd0`: the path ends before its point `i` (the points from `i` on go) and is
+/// `FUN_140f98dd0`: the path ends before its point `index` (the points from `index` on go) and is
 /// measured again (`FUN_140f95a60`, true); an index outside the path, or an empty path, changes
 /// nothing (false).
-pub(super) fn cut_path(path: &mut Path, i: i32) -> bool {
-    match usize::try_from(i) {
-        Ok(k) if k < path.points.len() => {
-            path.points.truncate(k);
+pub(super) fn cut_path(path: &mut Path, index: i32) -> bool {
+    match usize::try_from(index) {
+        Ok(cut) if cut < path.points.len() => {
+            path.points.truncate(cut);
             path.measure();
             true
         }
@@ -39,7 +39,7 @@ pub(super) fn cut_path(path: &mut Path, i: i32) -> bool {
 pub(super) fn point_or_zero(path: &Path, index: WaypointIndex) -> BVector {
     index
         .slot()
-        .and_then(|i| path.points.get(i))
+        .and_then(|index| path.points.get(index))
         .copied()
         .unwrap_or(BVector::ZERO)
 }
@@ -48,7 +48,7 @@ pub(super) fn point_or_zero(path: &Path, index: WaypointIndex) -> BVector {
 pub(super) fn point_or_zero_of(level: &PathData, index: WaypointIndex) -> BVector {
     index
         .slot()
-        .and_then(|i| level.points.get(i))
+        .and_then(|index| level.points.get(index))
         .copied()
         .unwrap_or(BVector::ZERO)
 }
@@ -58,7 +58,7 @@ pub(super) fn point_or_zero_of(level: &PathData, index: WaypointIndex) -> BVecto
 pub(super) fn moved_far(from: Position, to: Position) -> bool {
     [to.x() - from.x(), to.y() - from.y(), to.z() - from.z()]
         .iter()
-        .any(|d| EPSILON < d.abs())
+        .any(|delta| EPSILON < delta.abs())
 }
 
 /// The motion step's start-test line for the ignore list (`FUN_141150f00`'s calls of
@@ -67,11 +67,13 @@ pub(super) const fn ground_line(at: Position, waypoint: BVector) -> (Point, Poin
     (at.ground(), waypoint.ground())
 }
 
-/// The length on the ground from `a` to `b`.
-pub(super) fn ground(a: BVector, b: BVector) -> Distance {
-    let mut d = a - b;
-    d = d.with_height(0.0);
-    Distance::new(sqrt(d.x() * d.x() + 0.0 + d.y() * d.y()))
+/// The length on the ground from `from` to `to`.
+pub(super) fn ground(from: BVector, to: BVector) -> Distance {
+    let mut offset = from - to;
+    offset = offset.with_height(0.0);
+    Distance::new(sqrt(
+        offset.x() * offset.x() + 0.0 + offset.y() * offset.y(),
+    ))
 }
 
 /// Whether a walk's goal is in the short pather's reach ([`Mover::near_goal`]).
@@ -120,56 +122,58 @@ pub(super) fn too_short(path: &Path, movement_tuning: &MovementTuning) -> bool {
     path.points.len() < 2 || path.length < Distance::new(movement_tuning.shortest)
 }
 
-/// `FUN_140f9b8f0`: a midpoint between points `i` and `i + 1` (from `i` half the stretch along
-/// it), unless the stretch is shorter than 1e-7.
-pub(super) fn split(path: &mut Path, i: i32) {
-    let Ok(at) = usize::try_from(i) else {
+/// `FUN_140f9b8f0`: a midpoint between points `stretch` and `stretch + 1` (from `stretch` half the
+/// stretch along it), unless the stretch is shorter than 1e-7.
+pub(super) fn split(path: &mut Path, stretch: i32) {
+    let Ok(at) = usize::try_from(stretch) else {
         return;
     };
     // a signed `count - 1`: an empty path has no stretch
-    let Some(&[a, b]) = path.points.get(at..at + 2) else {
+    let Some(&[start, end]) = path.points.get(at..at + 2) else {
         return;
     };
-    let d = b - a;
-    let length = sqrt(d.x() * d.x() + d.height() * d.height() + d.y() * d.y());
+    let delta = end - start;
+    let length =
+        sqrt(delta.x() * delta.x() + delta.height() * delta.height() + delta.y() * delta.y());
     if length < EPSILON {
         return;
     }
-    let again = sqrt(d.x() * d.x() + d.height() * d.height() + d.y() * d.y());
+    let again =
+        sqrt(delta.x() * delta.x() + delta.height() * delta.height() + delta.y() * delta.y());
     let half = length * 0.5;
     let step = BVector::new(
-        (d.x() / again) * half,
-        (d.height() / again) * half,
-        (d.y() / again) * half,
+        (delta.x() / again) * half,
+        (delta.height() / again) * half,
+        (delta.y() / again) * half,
     );
-    let _ = path.insert(at + 1, a + step);
+    let _ = path.insert(at + 1, start + step);
 }
 
 /// What the motion step knows of where the walked level goes: its target, the gap to it
 /// (`fVar38`, far without one) and the gap to where the top level's path ends, or the target's
 /// (`fVar40`).
 #[derive(Clone, Copy, Debug)]
-pub(super) struct Goal<'w> {
-    pub(super) target: Option<(ObjectId, &'w Placed)>,
+pub(super) struct Goal<'world> {
+    pub(super) target: Option<(ObjectId, &'world Placed)>,
     pub(super) gap: Distance,
     pub(super) to_end: Distance,
 }
 
 /// What the motion step's planning needs of the world besides the objects' places.
 #[derive(Debug)]
-pub struct Planning<'a> {
+pub struct Planning<'world> {
     /// The planners, the mesh and the short pather.
-    pub(crate) pathing: &'a mut Pathing,
+    pub(crate) pathing: &'world mut Pathing,
     /// The world's time this update (`FUN_1415300d0`), which a new path records.
     pub(crate) now: WorldTime,
     /// The owner's type (`player+0x10`): a computer player's (`FUN_141659cf0`) plans may stop
     /// near the goal.
     pub(crate) player_kind: PlayerKind,
     /// The Object stream (`DAT_143f07160`), which a long new path's repath time draws from.
-    pub(crate) object: &'a mut Well512,
+    pub(crate) object: &'world mut Well512,
     /// The world's unit groups as they are now, which the long pather reads for a unit in a
     /// group (its group's differentiator units, `FUN_140f9eb70`).
-    pub(crate) groups: &'a UnitGroups,
+    pub(crate) groups: &'world UnitGroups,
 }
 
 impl Planning<'_> {
@@ -226,13 +230,13 @@ pub(crate) enum AfterRequest {
 /// centre distance minus both radii, at least 0, squared and summed.
 #[must_use]
 pub fn footprint_gap_squared(
-    a: Position,
+    centre_a: Position,
     radius_a: Footprint,
-    b: Position,
+    position: Position,
     radius_b: Footprint,
 ) -> DistanceSquared {
-    let x = ((b.x() - a.x()).abs() - (radius_a.x() + radius_b.x())).max(0.0);
-    let y = ((b.y() - a.y()).abs() - (radius_a.y() + radius_b.y())).max(0.0);
+    let x = ((position.x() - centre_a.x()).abs() - (radius_a.x() + radius_b.x())).max(0.0);
+    let y = ((position.y() - centre_a.y()).abs() - (radius_a.y() + radius_b.y())).max(0.0);
     DistanceSquared::new(x * x + y * y)
 }
 
@@ -240,12 +244,12 @@ pub fn footprint_gap_squared(
 /// distance minus both radii, at least 0, then the length of the two.
 #[must_use]
 pub fn footprint_gap(
-    a: Position,
+    centre_a: Position,
     radius_a: Footprint,
-    b: Position,
+    position: Position,
     radius_b: Footprint,
 ) -> Distance {
-    let x = ((b.x() - a.x()).abs() - (radius_b.x() + radius_a.x())).max(0.0);
-    let y = ((b.y() - a.y()).abs() - (radius_b.y() + radius_a.y())).max(0.0);
+    let x = ((position.x() - centre_a.x()).abs() - (radius_b.x() + radius_a.x())).max(0.0);
+    let y = ((position.y() - centre_a.y()).abs() - (radius_b.y() + radius_a.y())).max(0.0);
     Distance::new(sqrt(x * x + y * y))
 }

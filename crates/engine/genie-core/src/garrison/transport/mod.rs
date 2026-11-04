@@ -111,7 +111,7 @@ pub struct TransportAction {
 
 /// What the Transport reads of its unit.
 #[derive(Clone, Copy, Debug)]
-pub struct Ship<'a> {
+pub struct Ship<'graphics> {
     /// The unit's place.
     pub(crate) position: Position,
     /// Its master's radii (x, y).
@@ -122,7 +122,7 @@ pub struct Ship<'a> {
     pub(crate) map: GridSize,
     /// What a `MoveTo` that `set_state` makes reads of the unit ([`MoveToReads`]): its speed
     /// (slot 0x208: without one the `MoveTo` starts failed) and the sprites' defaults.
-    pub(crate) walk: MoveToReads<'a>,
+    pub(crate) walk: MoveToReads<'graphics>,
     /// The sprite its maker gives a `MoveTo` (`+0x58`): the task's moving one, without a task
     /// the master's walking sprite ([`TransportAction::given_sprite`]).
     pub(crate) given: Option<SpriteId>,

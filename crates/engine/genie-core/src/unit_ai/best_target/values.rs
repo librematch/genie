@@ -47,8 +47,8 @@ impl TargetScore {
 
 impl MulAssign<f32> for TargetScore {
     /// One `f32` product.
-    fn mul_assign(&mut self, f: f32) {
-        self.0 *= f;
+    fn mul_assign(&mut self, factor: f32) {
+        self.0 *= factor;
     }
 }
 
@@ -109,13 +109,13 @@ mod tests {
     /// Each operator is the one `f32` or int operation; the order is the float's.
     #[test]
     fn the_statistics_values_do_the_game_operations() {
-        let (a, b) = (TargetScore::new(0.1), TargetScore::new(0.2));
-        assert_eq!((a + b).get().to_bits(), (0.1_f32 + 0.2).to_bits());
-        let mut target_score = a;
+        let (first, second) = (TargetScore::new(0.1), TargetScore::new(0.2));
+        assert_eq!((first + second).get().to_bits(), (0.1_f32 + 0.2).to_bits());
+        let mut target_score = first;
         target_score *= 3.0;
         assert_eq!(target_score.get().to_bits(), (0.1_f32 * 3.0).to_bits());
-        assert!(TargetScore::ZERO < a);
-        assert_eq!(TargetScore::new(f32::NAN).partial_cmp(&a), None);
+        assert!(TargetScore::ZERO < first);
+        assert_eq!(TargetScore::new(f32::NAN).partial_cmp(&first), None);
         assert!(KillTime::new(1.0) < KillTime::new(f32::MAX));
         assert_eq!(KillTime::default().get(), 0.0);
         let mut entry_count = EntryCount::ZERO;

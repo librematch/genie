@@ -9,8 +9,8 @@ pub struct UnitKindId(u16);
 
 impl From<u16> for UnitKindId {
     #[inline]
-    fn from(n: u16) -> Self {
-        Self(n)
+    fn from(number: u16) -> Self {
+        Self(number)
     }
 }
 
@@ -52,8 +52,8 @@ fallible_try_from!(UnitKindId, u32);
 pub struct TechId(u16);
 
 impl From<u16> for TechId {
-    fn from(n: u16) -> Self {
-        Self(n)
+    fn from(number: u16) -> Self {
+        Self(number)
     }
 }
 
@@ -78,8 +78,8 @@ fallible_try_from!(TechId, u32);
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct SpriteId(u16);
 impl From<u16> for SpriteId {
-    fn from(n: u16) -> Self {
-        Self(n)
+    fn from(number: u16) -> Self {
+        Self(number)
     }
 }
 
@@ -177,7 +177,7 @@ impl StringKey {
 impl fmt::Display for StringKey {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Num(n) => write!(formatter, "{n}"),
+            Self::Num(number) => write!(formatter, "{number}"),
             Self::Name(text) => write!(formatter, "{text}"),
         }
     }
@@ -185,35 +185,35 @@ impl fmt::Display for StringKey {
 
 impl From<u32> for StringKey {
     #[inline]
-    fn from(n: u32) -> Self {
-        Self::Num(n)
+    fn from(number: u32) -> Self {
+        Self::Num(number)
     }
 }
 
 impl From<u16> for StringKey {
     #[inline]
-    fn from(n: u16) -> Self {
-        Self::Num(n.into())
+    fn from(number: u16) -> Self {
+        Self::Num(number.into())
     }
 }
 
 impl TryFrom<i32> for StringKey {
     type Error = GenieError;
     #[inline]
-    fn try_from(n: i32) -> GenieResult<Self> {
-        u32::try_from(n)
+    fn try_from(number: i32) -> GenieResult<Self> {
+        u32::try_from(number)
             .map(Self::Num)
-            .map_err(|_| GenieError::invalid_input("a negative string key").with("key", n))
+            .map_err(|_| GenieError::invalid_input("a negative string key").with("key", number))
     }
 }
 
 impl TryFrom<i16> for StringKey {
     type Error = GenieError;
     #[inline]
-    fn try_from(n: i16) -> GenieResult<Self> {
-        u32::try_from(n)
+    fn try_from(number: i16) -> GenieResult<Self> {
+        u32::try_from(number)
             .map(Self::Num)
-            .map_err(|_| GenieError::invalid_input("a negative string key").with("key", n))
+            .map_err(|_| GenieError::invalid_input("a negative string key").with("key", number))
     }
 }
 
@@ -246,7 +246,7 @@ macro_rules! try_from_string_key {
             #[inline]
             fn try_from(key: &StringKey) -> GenieResult<Self> {
                 match key {
-                    StringKey::Num(n) => (*n).try_into().map_err(|_| not_fitting(key)),
+                    StringKey::Num(number) => (*number).try_into().map_err(|_| not_fitting(key)),
                     _ => Err(not_fitting(key)),
                 }
             }
@@ -266,8 +266,8 @@ mod tests {
     /// Tests converting from an int to a string key.
     #[test]
     fn string_key_from_int() {
-        if let StringKey::Num(n) = StringKey::from(0u32) {
-            assert_eq!(0, n);
+        if let StringKey::Num(number) = StringKey::from(0u32) {
+            assert_eq!(0, number);
         } else {
             panic!();
         }
@@ -277,8 +277,8 @@ mod tests {
     #[test]
     fn string_key_from_str_to_int() {
         let text = "57329";
-        if let StringKey::Num(n) = StringKey::from(text) {
-            assert_eq!(57329, n);
+        if let StringKey::Num(number) = StringKey::from(text) {
+            assert_eq!(57329, number);
         } else {
             panic!();
         }
@@ -287,9 +287,9 @@ mod tests {
     /// Tests converting from a string not representing an int to a string key.
     #[test]
     fn string_key_from_str_to_str() {
-        let s = "grassDaut";
-        if let StringKey::Name(text) = StringKey::from(s) {
-            assert_eq!(s, text);
+        let name = "grassDaut";
+        if let StringKey::Name(text) = StringKey::from(name) {
+            assert_eq!(name, text);
         } else {
             panic!();
         }

@@ -132,17 +132,17 @@ mod tests {
     fn its_states_read_back_from_their_bytes() {
         for index in 0..=255_u8 {
             match TransportState::of_byte(index, None) {
-                Ok(s) => assert_eq!(s.get(), index),
+                Ok(transport_state) => assert_eq!(transport_state.get(), index),
                 Err(_) => assert!(matches!(index, 3 | 5 | 7..=10 | 12 | 14..), "{index}"),
             }
         }
         assert_eq!(TransportState::Failed.to_string(), "13");
         let sail = MoveToAction::sub_in(MoveTo::Moving);
-        for b in [4, 11] {
-            let mut transport_state = TransportState::of_byte(b, Some(sail)).unwrap();
+        for byte in [4, 11] {
+            let mut transport_state = TransportState::of_byte(byte, Some(sail)).unwrap();
             assert_eq!(
                 (transport_state.get(), transport_state.move_to()),
-                (b, Some(&sail))
+                (byte, Some(&sail))
             );
             assert_eq!(transport_state.bare().move_to(), None);
             assert_eq!(transport_state.take_move_to(), Some(sail));

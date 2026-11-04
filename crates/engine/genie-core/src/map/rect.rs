@@ -21,21 +21,21 @@ impl Rect {
         Self([x0, y0, x1, y1])
     }
 
-    /// The box from corner `a` to corner `b`.
+    /// The box from corner `from` to corner `to`.
     #[must_use]
-    pub const fn between(a: Point, b: Point) -> Self {
-        Self([a.x(), a.y(), b.x(), b.y()])
+    pub const fn between(from: Point, to: Point) -> Self {
+        Self([from.x(), from.y(), to.x(), to.y()])
     }
 
-    /// The box a walk from `a` to `b` spans: the lower x and y of the two (`f32::min`) and the
+    /// The box a walk from `from` to `to` spans: the lower x and y of the two (`f32::min`) and the
     /// higher (`f32::max`).
     #[must_use]
-    pub const fn spanning(a: Point, b: Point) -> Self {
+    pub const fn spanning(from: Point, to: Point) -> Self {
         Self([
-            a.x().min(b.x()),
-            a.y().min(b.y()),
-            a.x().max(b.x()),
-            a.y().max(b.y()),
+            from.x().min(to.x()),
+            from.y().min(to.y()),
+            from.x().max(to.x()),
+            from.y().max(to.y()),
         ])
     }
 
@@ -113,8 +113,11 @@ impl Rect {
     /// one beyond the size (`COMISS`: a NaN does not leave).
     #[must_use]
     pub fn leaves_map(self, map: GridSize) -> bool {
-        let (w, h) = (map.width(), map.height());
-        self.x0() < 0.0 || self.y0() < 0.0 || (w as f32) < self.x1() || (h as f32) < self.y1()
+        let (width, height) = (map.width(), map.height());
+        self.x0() < 0.0
+            || self.y0() < 0.0
+            || (width as f32) < self.x1()
+            || (height as f32) < self.y1()
     }
 
     /// The box with its corners in order, low x and y first: each axis's second value when it is
@@ -134,8 +137,8 @@ impl Rect {
 
 impl From<[f32; 4]> for Rect {
     /// The box of four floats in their order (x0, y0, x1, y1), as a record holds them.
-    fn from(c: [f32; 4]) -> Self {
-        Self(c)
+    fn from(corners: [f32; 4]) -> Self {
+        Self(corners)
     }
 }
 
@@ -164,9 +167,9 @@ mod tests {
     /// overlaps another with the edges included but not with a NaN, and orders its corners.
     #[test]
     fn box_keeps_its_bits_grows_overlaps_and_orders_its_corners() {
-        let b = Rect::new(-0.0, 1.0, f32::from_bits(0x7fc0_0001), 3.0);
+        let rect = Rect::new(-0.0, 1.0, f32::from_bits(0x7fc0_0001), 3.0);
         assert_eq!(
-            b.get().map(f32::to_bits),
+            rect.get().map(f32::to_bits),
             [0x8000_0000, 1.0f32.to_bits(), 0x7fc0_0001, 3.0f32.to_bits()]
         );
         assert_eq!(

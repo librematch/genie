@@ -43,7 +43,7 @@ use crate::world::Seconds;
 use crate::world::World;
 use crate::world::WorldTime;
 use crate::world::index::Place;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 use crate::{GenieError, GenieResult};
 
 mod actions;
@@ -295,8 +295,8 @@ struct Followed {
 
 /// The splitter's path from one unit to another (`FUN_140f7cb30` -> `FUN_140f7c530`): the
 /// planner's result and the path's length; None without a planner for the restriction.
-type SplitPath<'a> =
-    dyn FnMut(&Splittable, &Splittable) -> GenieResult<Option<(Found, Distance)>> + 'a;
+type SplitPath<'env> =
+    dyn FnMut(&Splittable, &Splittable) -> GenieResult<Option<(Found, Distance)>> + 'env;
 
 /// The action's point on neither axis (`DAT_14330ec20`).
 const NO_POINT: f32 = GARRISON_NO_POINT;
@@ -329,14 +329,14 @@ impl World {
     /// id), else the live slot [`World::place`] finds.
     pub(crate) fn live_slot(
         &self,
-        (p, i, id): (PlayerId, ListIndex, ObjectId),
+        (owner, slot, id): (PlayerId, ListIndex, ObjectId),
     ) -> Option<(PlayerId, ListIndex)> {
         let held = self
             .players
-            .get(p.index())
-            .and_then(|player| player.objects.get(i));
+            .get(owner.index())
+            .and_then(|player| player.objects.get(slot));
         if held.is_some_and(|unit| unit.id == id) {
-            return Some((p, i));
+            return Some((owner, slot));
         }
         match self.place(id)? {
             Place::Live(player_id, list_index) => Some((player_id, list_index)),
@@ -420,7 +420,7 @@ impl World {
         for _ in 0..steps {
             match self
                 .object(id)
-                .and_then(|(_, u)| self.parts.building_of(u.id).annex_of)
+                .and_then(|(_, unit)| self.parts.building_of(unit.id).annex_of)
             {
                 Some(main) => id = main.id(),
                 None => break,
@@ -492,11 +492,11 @@ const fn clear_powerups(combat: &mut Combat) {
 /// `FUN_140c4da50`: the target of the first order in unit AI `ai`'s queue (`+0x20`, count
 /// `+0x18`) that has one (not negative) and that its own unit `id` issued; −1 for none.
 /// The adjusted idle timeout and secondary timer `FUN_14161b970` gives the unit AI of the
-/// order's `i`th entry: 750 ms and the world's dt (`world+0x7c`) more for each six before it
-/// (`(i / 6) as f64 * dt as f64`, `CVTTSD2SI` to 64 bits, the low 32 plus 750; the product
+/// order's `index`th entry: 750 ms and the world's dt (`world+0x7c`) more for each six before it
+/// (`(index / 6) as f64 * dt as f64`, `CVTTSD2SI` to 64 bits, the low 32 plus 750; the product
 /// stays below 2^42, so the conversion never sees a value it cannot hold).
-fn patrol_timeout(i: usize, dt: Millis) -> Millis {
-    let stagger = ((i / 6) as f64 * f64::from(dt.get())) as i64;
+fn patrol_timeout(index: usize, dt: Millis) -> Millis {
+    let stagger = ((index / 6) as f64 * f64::from(dt.get())) as i64;
     Millis::new((stagger as u32).wrapping_add(750))
 }
 
@@ -542,7 +542,7 @@ fn own_order_target(ai: &UnitAi, id: ObjectId) -> Option<ObjectId> {
     // the issuer compares as the game's integer (a player's number equals that object's id)
     ai.orders
         .iter()
-        .filter(|o| o.issuer.is_some_and(|issuer| issuer == id))
+        .filter(|queued_order| queued_order.issuer.is_some_and(|issuer| issuer == id))
         .find_map(|queued_order| {
             queued_order
                 .target
@@ -686,9 +686,9 @@ pub(crate) fn nearest_table_site(
                 continue;
             }
             let (dx, dy) = (at.x() - position.x(), at.y() - position.y());
-            let d = dy * dy + dx * dx;
-            if d < best.1 {
-                best = (Some((DropSiteId::new(id), position)), d);
+            let distance = dy * dy + dx * dx;
+            if distance < best.1 {
+                best = (Some((DropSiteId::new(id), position)), distance);
             }
         }
     }

@@ -17,7 +17,7 @@ use crate::map::Rect;
 use crate::math::rng::Stream;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
-use crate::objects::masters::PlayersMasters;
+use crate::objects::masters::PlayersMastersExt;
 use crate::objects::masters::{Master, OwnerMasters};
 use crate::pathing::zones::Relabel;
 use crate::pathing::zones::ZoneId;
@@ -29,8 +29,8 @@ use crate::unit_ai::alert_owner;
 use crate::world::index::ObjectsRef;
 use crate::world::layer::ClassRoles;
 use crate::world::parts::Parts;
-use crate::world::slots::CheckedIndex;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::CheckedIndexExt;
+use crate::world::slots::PlayerSlotsExt;
 use crate::world::{Player, World};
 use crate::{GenieError, GenieResult};
 
@@ -74,7 +74,7 @@ impl World {
             .list
             .transport()
             .filter(|_| existing)
-            .and_then(|t| t.task);
+            .and_then(|transport_action| transport_action.task);
         let ship = {
             let unit = self.players.live(player_id, list_index)?;
             let master = unit.master(self.master_tables(), player_id)?;
@@ -104,7 +104,7 @@ impl World {
             &self.model.tuning.tile_path,
         )?;
         let unit = self.players.live_mut(player_id, list_index)?;
-        let changes = if let Some(t) = self
+        let changes = if let Some(transport_action) = self
             .parts
             .actions
             .of_mut(unit.id)?
@@ -112,7 +112,7 @@ impl World {
             .transport_mut()
             .filter(|_| existing)
         {
-            vec![t.work(
+            vec![transport_action.work(
                 ship.position,
                 TransportTarget::Ship,
                 &ship,
@@ -162,7 +162,7 @@ impl World {
         transport_action: TransportAction,
         point: Position,
     ) -> GenieResult<()> {
-        let rng = self.streams.get(Stream::Sprite);
+        let rng = self.streams.get_mut(Stream::Sprite);
         let id = self.players.live(player_id, list_index)?.id;
         self.players
             .live_mut(player_id, list_index)?
@@ -196,7 +196,7 @@ impl World {
             mover.stop()?;
         }
         if changed.stands {
-            let rng = self.streams.get(Stream::Sprite);
+            let rng = self.streams.get_mut(Stream::Sprite);
             unit.show_standing(
                 self.parts.motion.layer_mut(unit.id),
                 OwnerMasters::new(&self.parts.own_master, self.model.masters.of(player_id)),
@@ -230,7 +230,7 @@ impl World {
         list_index: ListIndex,
     ) -> GenieResult<()> {
         let unit = self.players.live(player_id, list_index)?;
-        let t = self
+        let transport = self
             .parts
             .actions_of(unit.id)
             .list
@@ -240,7 +240,7 @@ impl World {
         let restriction = unit
             .master(self.master_tables(), player_id)?
             .terrain_restriction;
-        let (x, y) = (t.point.x(), t.point.y());
+        let (x, y) = (transport.point.x(), transport.point.y());
         let zone = if x == NONE {
             None
         } else {
@@ -252,7 +252,7 @@ impl World {
                 unit.position(),
                 &self.model.tuning.tile_path,
             )?;
-            Some(shore.zone(t.point.tile())?)
+            Some(shore.zone(transport.point.tile())?)
         };
         let count = self.unload_all(player_id, list_index, zone)?;
         let player_kind = self.players.player(player_id)?.kind;
@@ -267,14 +267,14 @@ impl World {
                     &self.model.graphics,
                     self.parts.combat_of(unit.id).abilities.look.as_ref(),
                 ),
-                t.task,
+                transport.task,
                 &self.model.roles,
             )?
         };
         let mut changes = Vec::new();
         if count == 0 {
             let terrain = self.spatial.terrain.as_ref().ok_or(NO_TERRAIN)?;
-            let rng = self.streams.get(Stream::Action);
+            let rng = self.streams.get_mut(Stream::Action);
             let (point, sails) = retry_point(
                 Point::new(x, y),
                 ship.map,
@@ -290,18 +290,19 @@ impl World {
                 ship.position,
                 &self.model.tuning.tile_path,
             )?;
-            let t = transport_mut(&self.players, &mut self.parts, player_id, list_index)?;
+            let transport_action =
+                transport_mut(&self.players, &mut self.parts, player_id, list_index)?;
             let (x, y) = (point.x(), point.y());
-            t.point = t.point.with_x(x).with_y(y);
+            transport_action.point = transport_action.point.with_x(x).with_y(y);
             if sails {
-                changes.push(t.set_state(
+                changes.push(transport_action.set_state(
                     TransportState::SailToUnload { move_to: None },
                     &ship,
                     &mut shore,
                     &self.model.tuning.transport,
                     &self.model.tuning.move_to,
                 )?);
-                t.retarget = true;
+                transport_action.retarget = true;
             } else {
                 alert_owner(player_kind)?;
             }
@@ -354,14 +355,14 @@ impl World {
             center: ship.position().ground(),
             radius,
         };
-        let mut k = 1;
+        let mut spot_index = 1;
         let mut count = 0u8;
         // the drop locations' last place, across the units (FUN_141191b40's locals)
         let mut last = None;
-        let mut j = ship.garrison.len();
-        while 0 < j {
-            j -= 1;
-            let Some(&id) = self.players.live(player_id, list_index)?.garrison.get(j) else {
+        let mut slot = ship.garrison.len();
+        while 0 < slot {
+            slot -= 1;
+            let Some(&id) = self.players.live(player_id, list_index)?.garrison.get(slot) else {
                 continue;
             };
             // the game skips a null entry; an id the world no longer holds is one
@@ -369,27 +370,27 @@ impl World {
                 continue;
             };
             let made = unit.master(self.master_tables(), up)?.clone();
-            while 0 < k {
+            while 0 < spot_index {
                 if let Some(spot) = self.drop_location(
                     (player_id, list_index),
                     id,
                     &made,
-                    *spots.checked(k)?,
+                    *spots.checked(spot_index)?,
                     zone,
                     &mut last,
                 )? {
                     self.come_ashore((player_id, list_index), id, &made, spot)?;
                     count = count.wrapping_add(1);
-                    if k < SPOTS {
-                        k += 1;
-                        *spots.checked_mut(k)? = Around {
+                    if spot_index < SPOTS {
+                        spot_index += 1;
+                        *spots.checked_mut(spot_index)? = Around {
                             center: spot,
                             radius: made.radius,
                         };
                     }
                     break;
                 }
-                k -= 1;
+                spot_index -= 1;
             }
         }
         Ok(count)
@@ -434,18 +435,20 @@ impl World {
         let _ = terrain
             .restriction(moving.restriction)
             .ok_or(UNKNOWN_RESTRICTION)?;
-        let unit = self.object(id).map(|(_, u)| u);
-        let (grow, mask) = unit.and_then(|u| self.parts.mover_of(u.id)).map_or_else(
-            || {
-                (
-                    made.radius.x(),
-                    terrain.restriction_mask(moving.restriction),
-                )
-            },
-            |mover| (mover.stats.radius.x(), mover.stats.restriction_mask),
-        );
-        let zone_map = zone_map.map(|k| self.zones.map(k)).transpose()?;
-        let mut rng = self.streams.get(Stream::Object).clone();
+        let unit = self.object(id).map(|(_, unit)| unit);
+        let (grow, mask) = unit
+            .and_then(|unit| self.parts.mover_of(unit.id))
+            .map_or_else(
+                || {
+                    (
+                        made.radius.x(),
+                        terrain.restriction_mask(moving.restriction),
+                    )
+                },
+                |mover| (mover.stats.radius.x(), mover.stats.restriction_mask),
+            );
+        let zone_map = zone_map.map(|index| self.zones.map(index)).transpose()?;
+        let mut rng = self.streams.get_mut(Stream::Object).clone();
         let mut draws = DropDraws::new(around, made.radius, self.spatial.map, last, &mut rng);
         let mut found = None;
         // the place's tests, each only after the one before passed
@@ -502,7 +505,7 @@ impl World {
                 break;
             }
         }
-        *self.streams.get(Stream::Object) = rng;
+        *self.streams.get_mut(Stream::Object) = rng;
         Ok(found)
     }
 
@@ -553,12 +556,12 @@ impl World {
 /// # Errors
 ///
 /// A slot the world does not hold, and an object without its Transport.
-fn transport_mut<'a>(
+fn transport_mut<'world>(
     players: &[Player],
-    parts: &'a mut Parts,
+    parts: &'world mut Parts,
     player_id: PlayerId,
     list_index: ListIndex,
-) -> GenieResult<&'a mut TransportAction> {
+) -> GenieResult<&'world mut TransportAction> {
     let id = players.live(player_id, list_index)?.id;
     parts
         .actions_mut(id)?

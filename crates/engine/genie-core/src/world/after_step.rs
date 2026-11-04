@@ -8,7 +8,7 @@ use crate::objects::unit::{Outcome, Unit};
 use crate::players::PlayerId;
 use crate::world::Millis;
 use crate::world::World;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 use crate::world::step::Step;
 use crate::{GenieError, GenieResult};
 
@@ -22,7 +22,7 @@ pub(super) struct Stepped {
 }
 
 impl World {
-    /// An object's step ([`World::run_object`], `f`: the unit's update, or one part of its unit
+    /// An object's step ([`World::run_object`], `work`: the unit's update, or one part of its unit
     /// AI for a command) and what follows it in the game's update: the regeneration, passive
     /// abilities and production of a full update, then a construction start's clearing and the
     /// changed tiles. Returns the step and the object's slot, which it looks up by id after each
@@ -37,15 +37,15 @@ impl World {
         &mut self,
         at: (PlayerId, ListIndex),
         timing: (Millis, Option<Millis>, bool),
-        f: impl FnOnce(&mut Unit, &mut Action, &mut Step<'_>) -> GenieResult<Outcome>,
+        work: impl FnOnce(&mut Unit, &mut Action, &mut Step<'_>) -> GenieResult<Outcome>,
     ) -> GenieResult<Stepped> {
         self.step_answering(at, timing, |unit, actions, step| {
-            f(unit, actions, step).map(|outcome| (outcome, ()))
+            work(unit, actions, step).map(|outcome| (outcome, ()))
         })
         .map(|(stepped, ())| stepped)
     }
 
-    /// [`World::step_object`] with `f`'s answer `R` beside its outcome: the step and the
+    /// [`World::step_object`] with `work`'s answer `R` beside its outcome: the step and the
     /// answer.
     ///
     /// # Errors
@@ -55,10 +55,10 @@ impl World {
         &mut self,
         (player_id, list_index): (PlayerId, ListIndex),
         (dt, turn, full): (Millis, Option<Millis>, bool),
-        f: impl FnOnce(&mut Unit, &mut Action, &mut Step<'_>) -> GenieResult<(Outcome, R)>,
+        work: impl FnOnce(&mut Unit, &mut Action, &mut Step<'_>) -> GenieResult<(Outcome, R)>,
     ) -> GenieResult<(Stepped, R)> {
         let id = self.players.live(player_id, list_index)?.id;
-        let (outcome, answer) = self.run_object((player_id, list_index), (dt, turn), f)?;
+        let (outcome, answer) = self.run_object((player_id, list_index), (dt, turn), work)?;
         let at = (player_id, self.slot_of(player_id, id)?, id);
         self.finish_own_update(at, (dt, full), &outcome)?;
         self.hand_changed_tiles();

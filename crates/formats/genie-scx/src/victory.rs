@@ -351,8 +351,8 @@ impl VictoryConditions {
     // The format stores the entry counts as i32.
     #[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
     pub fn write_to(&self, mut output: impl Write, version: Option<f32>) -> GenieResult<()> {
-        if let Some(v) = version {
-            output.write_f32::<LE>(v)?;
+        if let Some(saved) = version {
+            output.write_f32::<LE>(saved)?;
         }
 
         let version = version.unwrap_or(f32::MIN);

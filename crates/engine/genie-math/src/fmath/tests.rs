@@ -1,11 +1,11 @@
 use super::*;
 use std::f32::consts::{FRAC_PI_2, LN_2, PI};
 
-/// `f` gives the game's bits on each `(input, output)` pair, a NaN's payload included. The
+/// `routine` gives the game's bits on each `(input, output)` pair, a NaN's payload included. The
 /// outputs are build 158041's own routines, run on these inputs in unicorn.
-fn assert_bits(name: &str, f: impl Fn(f32) -> f32, cases: &[(u32, u32)]) {
+fn assert_bits(name: &str, routine: impl Fn(f32) -> f32, cases: &[(u32, u32)]) {
     for &(x, game) in cases {
-        let got = f(f32::from_bits(x)).to_bits();
+        let got = routine(f32::from_bits(x)).to_bits();
         assert_eq!(got, game, "{name}({x:08x}): {got:08x}, game {game:08x}");
     }
 }
@@ -534,7 +534,7 @@ fn floor_is_the_games_floor() {
 /// (into the subnormals, rounded once), and the non-finite.
 #[test]
 fn scalbn_is_the_games_scalbn() {
-    for (x, n, game) in [
+    for (x, exponent, game) in [
         (0x3ff0_0000_0000_0000, 5, 0x4040_0000_0000_0000),
         (0x3ff0_0000_0000_0000, 0, 0x3ff0_0000_0000_0000),
         (0x4008_0000_0000_0000, -2, 0x3fe8_0000_0000_0000),
@@ -557,10 +557,10 @@ fn scalbn_is_the_games_scalbn() {
         (0x8000_0000_0000_0000, 7, 0x8000_0000_0000_0000),
         (0xc01d_0000_0000_0000, 3, 0xc04d_0000_0000_0000),
     ] {
-        let got = scalbn(f64::from_bits(x), n).to_bits();
+        let got = scalbn(f64::from_bits(x), exponent).to_bits();
         assert_eq!(
             got, game,
-            "scalbn({x:016x}, {n}): {got:016x}, game {game:016x}"
+            "scalbn({x:016x}, {exponent}): {got:016x}, game {game:016x}"
         );
     }
 }
@@ -569,7 +569,7 @@ fn scalbn_is_the_games_scalbn() {
 /// rounded quotient, above by `__rem_pio2_large`, the non-finite as `x − x` with 0.
 #[test]
 fn rem_pio2_is_the_games_reduction() {
-    for (x, n, game) in [
+    for (x, quadrant, game) in [
         (0x3f49_0fdb, 1, 0xbfe9_21fb_4888_5a31),
         (0x3fc9_0fdb, 1, 0x3e67_77a5_cf72_cece),
         (0x4049_0fdb, 2, 0x3e77_77a5_cf72_cece),
@@ -597,8 +597,8 @@ fn rem_pio2_is_the_games_reduction() {
         let (got_n, got) = rem_pio2(f32::from_bits(x));
         assert_eq!(
             (got_n, got.to_bits()),
-            (n, game),
-            "rem_pio2({x:08x}): {got_n} {:016x}, game {n} {game:016x}",
+            (quadrant, game),
+            "rem_pio2({x:08x}): {got_n} {:016x}, game {quadrant} {game:016x}",
             got.to_bits()
         );
     }
@@ -609,7 +609,7 @@ fn rem_pio2_is_the_games_reduction() {
 /// 2 with the high chunk's bit test (ih 1), and a negative input.
 #[test]
 fn rem_pio2_takes_more_terms_when_the_fraction_chunks_are_zero() {
-    for (x, n, game) in [
+    for (x, quadrant, game) in [
         (0x6f79_be45, 5, 0x3e1b_bdd5_2a58_eafb),
         (0x7b16_75c0, 3, 0x3e70_e91f_c449_51b6),
         (0x57b8_2989, 3, 0x3e6c_b7dc_b9c8_a533),
@@ -640,8 +640,8 @@ fn rem_pio2_takes_more_terms_when_the_fraction_chunks_are_zero() {
         let (got_n, got) = rem_pio2(f32::from_bits(x));
         assert_eq!(
             (got_n, got.to_bits()),
-            (n, game),
-            "rem_pio2({x:08x}): {got_n} {:016x}, game {n} {game:016x}",
+            (quadrant, game),
+            "rem_pio2({x:08x}): {got_n} {:016x}, game {quadrant} {game:016x}",
             got.to_bits()
         );
     }
@@ -860,11 +860,11 @@ fn rem_pio2_large_is_the_games_at_every_precision() {
             ],
         ),
     ];
-    for (x, e0, prec, n, game) in cases {
+    for (x, e0, prec, quadrant, game) in cases {
         let (got_n, y) = rem_pio2_large(x, e0, prec);
         assert_eq!(
             (got_n, y.map(f64::to_bits)),
-            (n, game),
+            (quadrant, game),
             "rem_pio2_large({x:?}, {e0}, {prec})"
         );
     }
@@ -1020,7 +1020,7 @@ fn points_distance_from_line() {
 /// subnormal base normalised; beyond 2^128 +∞ (−∞ with the sign bias), below 2^-150 ±0.
 #[test]
 fn powf_takes_the_image_branches_and_exact_powers() {
-    let bits = |v: f32| v.to_bits();
+    let bits = |value: f32| value.to_bits();
     for (x, y, want) in [
         (2.0f32, 10.0f32, 1024.0f32),
         (1.5, 2.0, 2.25),

@@ -31,10 +31,10 @@ impl HitMode {
         self.0
     }
 
-    /// The mode an add effect of `n` makes of it: the byte's sum, wrapping.
+    /// The mode an add effect of `by` makes of it: the byte's sum, wrapping.
     #[must_use]
-    pub const fn plus(self, n: u8) -> Self {
-        Self(self.0.wrapping_add(n))
+    pub const fn plus(self, by: u8) -> Self {
+        Self(self.0.wrapping_add(by))
     }
 
     /// Whether a missile that lands on its target strikes it: in mode 0 or 2, or in mode 1 when

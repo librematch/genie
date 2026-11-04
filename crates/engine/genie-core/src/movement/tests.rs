@@ -344,9 +344,9 @@ fn drop_off_world(class: u8, near: &[(i32, Point, f32, ClassId, PlayerId)]) -> S
         GridSize::new(16, 16),
         Tiles::new(GridSize::new(16, 16), vec![class; 256]),
     );
-    let placed = |at: Point, r: f32, class, player| Placed {
+    let placed = |at: Point, radius: f32, class, player| Placed {
         position: at.with_height(0.0),
-        radius: Footprint::new(r, r),
+        radius: Footprint::new(radius, radius),
         class,
         player,
         master: master_id(class.get()),
@@ -376,8 +376,8 @@ fn drop_off_world(class: u8, near: &[(i32, Point, f32, ClassId, PlayerId)]) -> S
             )
         },
     );
-    for &(id, at, r, class, player) in near {
-        spatial.insert(object_id(id), placed(at, r, class, player));
+    for &(id, at, radius, class, player) in near {
+        spatial.insert(object_id(id), placed(at, radius, class, player));
     }
     spatial.relations = ByPlayer::new(vec![ByPlayer::default(); 5]);
     // player 4 is player 2's ally; player 3 is not
@@ -641,7 +641,7 @@ fn big_unit_short_path_takes_the_old_pather() {
     let mut out = Path::default();
     let _ = out.push(BVector::new(1.0, 0.0, 1.0));
     let goal = (BVector::new(8.5, 0.0, 5.5), Distance::ZERO, None);
-    let r = short_path_for(
+    let short_found = short_path_for(
         walker,
         Point::new(4.5, 5.5),
         (&mut world, ObjectsRef::empty()),
@@ -666,7 +666,7 @@ fn big_unit_short_path_takes_the_old_pather() {
         )
         .unwrap();
     assert_eq!(
-        (r, result),
+        (short_found, result),
         (Ok(ShortFound::Reached), ShortFound::Reached),
         "{path:?}"
     );
@@ -678,7 +678,7 @@ fn big_unit_short_path_takes_the_old_pather() {
     assert_eq!(out.points, points);
     assert_eq!(out.points.len(), 4);
     // off the map: emptied too, 4
-    let r = short_path_for(
+    let short_found = short_path_for(
         walker,
         Point::new(4.5, 5.5),
         (&mut world, ObjectsRef::empty()),
@@ -687,7 +687,10 @@ fn big_unit_short_path_takes_the_old_pather() {
         &[object_id(9171)],
         &mut out,
     );
-    assert_eq!((r, out.points.len()), (Ok(ShortFound::Invalid), 0));
+    assert_eq!(
+        (short_found, out.points.len()),
+        (Ok(ShortFound::Invalid), 0)
+    );
     let small = Walker {
         radius: Distance::new(0.5),
         ..walker
@@ -764,9 +767,9 @@ fn stop_clears_the_animation_speed_within_the_call() {
     mover.animated.speed = Speed::new(0.8);
     mover.waiting = 1;
     mover.ignore_units = vec![object_id(9175)];
-    if let Some(v) = mover.velocity.as_mut() {
-        v.velocity = v.velocity.with_y(0.5);
-        v.acceleration = v.acceleration.with_y(0.1);
+    if let Some(velocity) = mover.velocity.as_mut() {
+        velocity.velocity = velocity.velocity.with_y(0.5);
+        velocity.acceleration = velocity.acceleration.with_y(0.1);
     }
     mover.stop().unwrap();
     assert_eq!(
@@ -893,7 +896,7 @@ fn kept_hits_join_the_include_list_up_to_its_room() {
     let mut pathing = Pathing::default();
     pathing.start_mesh(120);
     let mut include = vec![object_id(0); INCLUDED - 1];
-    let shapes = |p: &Pathing| p.mesh().unwrap().shapes.len();
+    let shapes = |pathing: &Pathing| pathing.mesh().unwrap().shapes.len();
     let before = shapes(&pathing);
     assert_eq!(
         include_kept(
@@ -937,9 +940,9 @@ fn big_unit_path_request_takes_the_old_pather_with_the_walk_kept_hits() {
         GridSize::new(20, 20),
         Tiles::new(GridSize::new(20, 20), vec![4; 400]),
     );
-    let unit = |x: f32, r: f32| Placed {
+    let unit = |x: f32, radius: f32| Placed {
         position: Position::new(x, 5.5, 0.0),
-        radius: Footprint::new(r, r),
+        radius: Footprint::new(radius, radius),
         class: class::VILLAGER,
         player: PlayerId::new(2),
         master: ids::ID_0,
@@ -1133,7 +1136,13 @@ fn nan_most_turns_the_whole_angle_unclipped() {
         ),
         Ok(Turn::Whole)
     );
-    assert!(mover.forward.get().iter().all(|c| c.is_finite()));
+    assert!(
+        mover
+            .forward
+            .get()
+            .iter()
+            .all(|component| component.is_finite())
+    );
     assert!(0.99 < mover.forward.y());
     // a small most clips the turn
     mover.forward = BVector::new(1.0, 0.0, 0.0);
@@ -1371,13 +1380,17 @@ fn an_arrived_level_hands_looping_parent_its_next_waypoint() {
         gap: Distance::new(FAR),
         to_end: Distance::new(FAR),
     };
-    let mut m = builder_9177();
-    m.paths[0].linked_kind = LinkedPathKind::of_data(2);
-    m.paths[1].path_flags = PathFlags::LOOPS;
-    m.paths[1].waypoint = WaypointIndex::of_data(1);
-    assert!(matches!(m.arrived(goal), Ok(Next::Again)));
+    let mut mover = builder_9177();
+    mover.paths[0].linked_kind = LinkedPathKind::of_data(2);
+    mover.paths[1].path_flags = PathFlags::LOOPS;
+    mover.paths[1].waypoint = WaypointIndex::of_data(1);
+    assert!(matches!(mover.arrived(goal), Ok(Next::Again)));
     assert_eq!(
-        (m.paths.len(), m.paths[0].state, m.paths[0].waypoint.get()),
+        (
+            mover.paths.len(),
+            mover.paths[0].state,
+            mover.paths[0].waypoint.get()
+        ),
         (1, PathState::WantsPath, 0)
     );
     let mut mover = builder_9177();
@@ -1423,8 +1436,8 @@ fn loop_reached_waypoint_moves_on_and_its_first_ends_the_step() {
         gap: Distance::new(FAR),
         to_end: Distance::new(FAR),
     };
-    let (mut place, mut m) = looping(WaypointIndex::of_data(1));
-    let next = m.reached(
+    let (mut place, mut mover) = looping(WaypointIndex::of_data(1));
+    let next = mover.reached(
         (&mut place, &me),
         &mut world,
         None,
@@ -1434,11 +1447,11 @@ fn loop_reached_waypoint_moves_on_and_its_first_ends_the_step() {
     );
     assert!(matches!(next, Ok(Reached::Pass(Next::Dispatch))));
     assert_eq!(
-        (m.paths[0].waypoint.get(), m.paths[0].state),
+        (mover.paths[0].waypoint.get(), mover.paths[0].state),
         (2, PathState::WantsPath)
     );
-    let (mut place, mut m) = looping(WaypointIndex::of_data(2));
-    let next = m.reached(
+    let (mut place, mut mover) = looping(WaypointIndex::of_data(2));
+    let next = mover.reached(
         (&mut place, &me),
         &mut world,
         None,
@@ -1448,7 +1461,7 @@ fn loop_reached_waypoint_moves_on_and_its_first_ends_the_step() {
     );
     assert!(matches!(next, Ok(Reached::LoopEnd)));
     assert_eq!(
-        (m.paths[0].waypoint.get(), m.paths[0].state),
+        (mover.paths[0].waypoint.get(), mover.paths[0].state),
         (0, PathState::WantsPath)
     );
     let (_, mut mover) = looping(WaypointIndex::of_data(2));
@@ -1553,7 +1566,7 @@ fn gate_gap_is_the_least_over_it_and_its_annexes() {
         near,
         (object_id(100), &gate),
         own,
-        |g| g - Distance::new(tuning().movement.range_floor),
+        |distance| distance - Distance::new(tuning().movement.range_floor),
         objects.view(),
         &roles(),
     );
@@ -1637,8 +1650,8 @@ fn the_top_level_has_more_waypoints_unless_its_count_less_one_reaches_its_index(
     assert!(!mover.top_has_more());
 }
 
-/// `FUN_140f9b8f0` compares `i` with the point count less one, signed: an empty path or the
-/// last point has no stretch to split; any other stretch gets its midpoint.
+/// `FUN_140f9b8f0` compares the point's index with the point count less one, signed: an empty path
+/// or the last point has no stretch to split; any other stretch gets its midpoint.
 #[test]
 fn split_takes_the_midpoint_of_stretch_and_skips_an_empty_path() {
     let mut empty = Path::default();
@@ -1665,9 +1678,9 @@ fn split_takes_the_midpoint_of_stretch_and_skips_an_empty_path() {
 /// goes past the first test and stops at the second (JBE on unordered): short.
 #[test]
 fn nan_waypoint_distance_is_short() {
-    let w = BVector::new(f32::NAN, 0.0, 5.0);
+    let waypoint = BVector::new(f32::NAN, 0.0, 5.0);
     assert!(matches!(
-        reach(w, BVector::ZERO, BVector::new(1.0, 0.0, 0.0)),
+        reach(waypoint, BVector::ZERO, BVector::new(1.0, 0.0, 0.0)),
         Reach::Short
     ));
     assert!(matches!(
@@ -1693,11 +1706,11 @@ fn nan_waypoint_distance_is_short() {
 #[test]
 fn direction_of_nan_length_is_nan() {
     let mover = walker();
-    let d = mover.direction_to(
+    let direction_to = mover.direction_to(
         BVector::new(f32::NAN, 0.0, 0.0),
         BVector::new(1.0, 0.0, 1.0),
     );
-    assert!(d.x().is_nan() && d.y().is_nan());
+    assert!(direction_to.x().is_nan() && direction_to.y().is_nan());
     let direction_to = mover.direction_to(BVector::new(0.0, 0.0, 0.0), BVector::new(3.0, 0.0, 4.0));
     assert_eq!(direction_to, BVector::new(0.6, 0.0, 0.8));
 }
@@ -1705,19 +1718,29 @@ fn direction_of_nan_length_is_nan() {
 #[test]
 fn two_boxes_overlap_by_the_lesser_of_their_axes() {
     // the cow 9517 at (21.8, 92.2) and Gaia's cow 9519 at (22.5, 91.5), radii 0.5 and 0.5
-    let a = BVector::new(21.8, 0.0, 92.2);
-    let b = BVector::new(22.5, 0.0, 91.5);
-    let d = overlap(a, Footprint::new(0.5, 0.5), b, Footprint::new(0.5, 0.5));
-    assert_eq!(d, (21.8f32 + 0.5) - (22.5 - 0.5));
+    let cow = BVector::new(21.8, 0.0, 92.2);
+    let other_cow = BVector::new(22.5, 0.0, 91.5);
+    let overlapped = overlap(
+        cow,
+        Footprint::new(0.5, 0.5),
+        other_cow,
+        Footprint::new(0.5, 0.5),
+    );
+    assert_eq!(overlapped, (21.8f32 + 0.5) - (22.5 - 0.5));
     assert_eq!(
-        overlap(a, Footprint::new(0.2, 0.2), b, Footprint::new(0.2, 0.2)),
+        overlap(
+            cow,
+            Footprint::new(0.2, 0.2),
+            other_cow,
+            Footprint::new(0.2, 0.2)
+        ),
         0.0
     );
     // a NaN goes past the four tests (COMISS/JNC) into MINSS/MAXSS, whose second operand wins
     let nan = overlap(
         BVector::new(f32::NAN, 0.0, 92.2),
         Footprint::new(0.5, 0.5),
-        b,
+        other_cow,
         Footprint::new(0.5, 0.5),
     );
     assert_eq!(
@@ -1732,9 +1755,9 @@ fn two_boxes_overlap_by_the_lesser_of_their_axes() {
 #[test]
 fn level_0_looks_ahead_to_the_farthest_parent_waypoint_it_walks_to_straight() {
     // a cow at its level 0 waypoint (21.8, 92.2), its level 1 parent's waypoint 1 of three
-    let mut m = builder_9177();
-    m.moved_at = Position::new(21.8, 92.2, 0.0);
-    m.paths = vec![
+    let mut mover = builder_9177();
+    mover.moved_at = Position::new(21.8, 92.2, 0.0);
+    mover.paths = vec![
         level(
             0,
             &[
@@ -1755,7 +1778,7 @@ fn level_0_looks_ahead_to_the_farthest_parent_waypoint_it_walks_to_straight() {
             PathState::Idle,
         ),
     ];
-    m.paths[1].waypoint = WaypointIndex::of_data(1);
+    mover.paths[1].waypoint = WaypointIndex::of_data(1);
     let me = Me {
         human_order: WorldTime::ZERO,
         id: object_id(9517),
@@ -1769,15 +1792,15 @@ fn level_0_looks_ahead_to_the_farthest_parent_waypoint_it_walks_to_straight() {
     );
     // on open ground: waypoint 3 is beyond 10 tiles, waypoint 2 within, so it takes 2
     assert_eq!(
-        m.look_ahead(&me, &mut spatial, ObjectsRef::empty()),
+        mover.look_ahead(&me, &mut spatial, ObjectsRef::empty()),
         Ok(LookAhead::MovedAhead)
     );
-    assert_eq!(m.paths.len(), 1);
+    assert_eq!(mover.paths.len(), 1);
     assert_eq!(
         (
-            m.paths[0].level.get(),
-            m.paths[0].waypoint.get(),
-            m.paths[0].state
+            mover.paths[0].level.get(),
+            mover.paths[0].waypoint.get(),
+            mover.paths[0].state
         ),
         (1, 2, PathState::WantsPath)
     );
@@ -1982,7 +2005,7 @@ pub(crate) fn tiled_world(classes: Vec<u8>) -> Spatial {
     spatial
 }
 
-/// `FUN_14114cc60` from where the unit last moved (`+0x824`) to `p` (x, height, y): a clear
+/// `FUN_14114cc60` from where the unit last moved (`+0x824`) to a point (x, height, y): a clear
 /// line closes in; a point off the map, a line through terrain the unit's mask lacks, or one
 /// through another unit (9175 at (30, 89)) does not, but for the target, which the query
 /// ignores.
@@ -2149,9 +2172,9 @@ fn long_path_ends_before_its_first_walled_stretch() {
         if let Some(placed) = block {
             world.insert(object_id(500), placed);
         }
-        let mut p = path();
-        let walled_off = mover.walled_off(&me, &mut world, None, &mut p, ObjectsRef::empty());
-        (walled_off, p.points.len())
+        let mut path = path();
+        let walled_off = mover.walled_off(&me, &mut world, None, &mut path, ObjectsRef::empty());
+        (walled_off, path.points.len())
     };
     assert_eq!(walled(true, None), (Ok(true), 3));
     assert_eq!(
@@ -2263,10 +2286,10 @@ fn long_plan_reaches_its_waypoint_stops_short_or_ends_at_band() {
 #[test]
 fn level_without_path_marks_its_waypoint_pauses_or_waits() {
     let target = *world().get(object_id(10028)).unwrap();
-    let mut m = builder_9177();
-    m.paths[0].flags = LevelFlags::MET_TARGET;
+    let mut walker = builder_9177();
+    walker.paths[0].flags = LevelFlags::MET_TARGET;
     assert!(matches!(
-        m.no_path(
+        walker.no_path(
             PlanFlags::empty(),
             Some(&target),
             Distance::new(0.5),
@@ -2275,39 +2298,43 @@ fn level_without_path_marks_its_waypoint_pauses_or_waits() {
         Ok(AfterRequest::Paused)
     ));
     assert_eq!(
-        m.paths[0].pause_time,
+        walker.paths[0].pause_time,
         Seconds::new(tuning().movement.stuck_pause)
     );
     assert_eq!(
-        (m.paths[0].flags, m.paths[1].flags),
+        (walker.paths[0].flags, walker.paths[1].flags),
         (LevelFlags::NONE, LevelFlags::MET_TARGET)
     );
     let out = |edit: &dyn Fn(&mut Mover)| {
-        let mut m = builder_9177();
-        m.paths[0].continue_counter = PlanTries::of_data(0);
-        edit(&mut m);
-        let no_path = m.no_path(
+        let mut mover = builder_9177();
+        mover.paths[0].continue_counter = PlanTries::of_data(0);
+        edit(&mut mover);
+        let no_path = mover.no_path(
             PlanFlags::empty(),
             None,
             Distance::new(0.5),
             &tuning().movement,
         );
-        (no_path, m)
+        (no_path, mover)
     };
-    let (r, m) = out(&|m| m.paths[1].waypoint = WaypointIndex::of_data(0));
-    assert!(matches!(r, Ok(AfterRequest::Again)));
-    assert_eq!(m.paths[0].state, PathState::Unplanned);
+    let (after_request, walker) = out(&|mover| mover.paths[1].waypoint = WaypointIndex::of_data(0));
+    assert!(matches!(after_request, Ok(AfterRequest::Again)));
+    assert_eq!(walker.paths[0].state, PathState::Unplanned);
     assert!(out(&|_| {}).0.is_err());
     assert!(
-        out(&|m| m.paths[0].path_flags |= PathFlags::LOOPS)
+        out(&|mover| mover.paths[0].path_flags |= PathFlags::LOOPS)
             .0
             .is_err()
     );
-    assert!(out(&|m| m.attack_moving = true).0.is_err());
-    assert!(out(&|m| m.paths[0].level = WaypointLevel::Top).0.is_err());
-    let (after_request, m) = out(&|m| m.paths[0].waypoint = WaypointIndex::of_data(0));
+    assert!(out(&|mover| mover.attack_moving = true).0.is_err());
+    assert!(
+        out(&|mover| mover.paths[0].level = WaypointLevel::Top)
+            .0
+            .is_err()
+    );
+    let (after_request, mover) = out(&|mover| mover.paths[0].waypoint = WaypointIndex::of_data(0));
     assert!(matches!(after_request, Ok(AfterRequest::Again)));
-    assert_eq!(m.paths[0].flags, LevelFlags::REACHED);
+    assert_eq!(mover.paths[0].flags, LevelFlags::REACHED);
     let mut mover = builder_9177();
     assert!(
         mover
@@ -2477,8 +2504,9 @@ fn walk_on_or_past_its_waypoint_counts_it_reached() {
         group: None,
         action_state: ActionState::NO_ACTION,
     };
-    let levels = |m: &Mover| {
-        m.paths
+    let levels = |mover: &Mover| {
+        mover
+            .paths
             .iter()
             .map(|path_data| (path_data.waypoint.get(), path_data.flags, path_data.state))
             .collect::<Vec<_>>()
@@ -2487,22 +2515,22 @@ fn walk_on_or_past_its_waypoint_counts_it_reached() {
         Position::new(30.0, 88.0, 0.0),
         Position::new(31.0, 87.5, 0.0),
     ] {
-        let mut w = world();
-        let mut m = builder_9177();
-        m.moved_at = at;
+        let mut spatial = world();
+        let mut mover = builder_9177();
+        mover.moved_at = at;
         let mut place = Static::at(at);
-        let motion = m
+        let motion = mover
             .motion(
                 &mut place,
                 &me(),
                 Seconds::new(DT),
-                &mut w,
+                &mut spatial,
                 None,
                 ObjectsRef::empty(),
             )
             .unwrap();
         assert_eq!(motion, Motion::Arrived);
-        assert_eq!(levels(&m), [(0, LevelFlags::NONE, PathState::Idle)]);
+        assert_eq!(levels(&mover), [(0, LevelFlags::NONE, PathState::Idle)]);
     }
     let mut spatial = world();
     let mut mover = builder_9177();
@@ -2717,9 +2745,9 @@ fn the_gap_is_the_distance_between_the_footprints() {
 fn walk_to_point_goes_on_until_its_range() {
     let mut hawk_place = Static::at(Position::new(28.0, 89.0, 0.0));
     let mut hawk = builder_9177();
-    for l in &mut hawk.paths {
-        l.target = None;
-        l.range = Distance::ZERO;
+    for path_data in &mut hawk.paths {
+        path_data.target = None;
+        path_data.range = Distance::ZERO;
     }
     let me = Me {
         human_order: WorldTime::ZERO,
@@ -2798,7 +2826,7 @@ fn top_level_short_of_its_moved_target_arrives() {
         builder.stats.weapon_range = weapon_range;
         builder
     };
-    let mut run = |m: &mut Mover, last_move: u32, target_player: PlayerId, target_id: i32| {
+    let mut run = |mover: &mut Mover, last_move: u32, target_player: PlayerId, target_id: i32| {
         let mut world = Spatial::new(GridSize::new(120, 120));
         let placed = Placed {
             position: Position::new(40.0, 88.0, 0.0),
@@ -2828,13 +2856,13 @@ fn top_level_short_of_its_moved_target_arrives() {
             action_state: ActionState::NO_ACTION,
         };
         let mut place = Static::at(Position::new(30.0, 88.0, 0.0));
-        m.paths[0].target = ObjectId::of_field(target_id);
+        mover.paths[0].target = ObjectId::of_field(target_id);
         let goal = Goal {
             target: Some((object_id(target_id), &placed)),
             gap: Distance::new(9.0),
             to_end: Distance::new(9.0),
         };
-        m.reached(
+        mover.reached(
             (&mut place, &me),
             &mut world,
             None,
@@ -2843,28 +2871,28 @@ fn top_level_short_of_its_moved_target_arrives() {
             objects.view(),
         )
     };
-    let mut m = walk(Distance::ZERO);
+    let mut mover = walk(Distance::ZERO);
     assert!(matches!(
-        run(&mut m, 150, PlayerId::new(0), 500),
+        run(&mut mover, 150, PlayerId::new(0), 500),
         Ok(Reached::Pass(Next::Done(Motion::Arrived)))
     ));
-    assert_eq!(m.paths.len(), 1);
-    assert_eq!(m.paths[0].created, WorldTime::ZERO);
-    let mut m = walk(Distance::ZERO);
+    assert_eq!(mover.paths.len(), 1);
+    assert_eq!(mover.paths[0].created, WorldTime::ZERO);
+    let mut mover = walk(Distance::ZERO);
     assert!(matches!(
-        run(&mut m, 50, PlayerId::new(0), 500),
+        run(&mut mover, 50, PlayerId::new(0), 500),
         Ok(Reached::Pass(Next::Done(Motion::Done)))
     ));
-    assert_eq!(m.paths[0].state, PathState::GaveUp);
-    let mut m = walk(Distance::new(2.0));
+    assert_eq!(mover.paths[0].state, PathState::GaveUp);
+    let mut mover = walk(Distance::new(2.0));
     assert!(matches!(
-        run(&mut m, 150, PlayerId::new(0), 500),
+        run(&mut mover, 150, PlayerId::new(0), 500),
         Ok(Reached::Pass(Next::Done(Motion::Done)))
     ));
     // a tie: a target of a higher id yields, a lower one does not
-    let mut m = walk(Distance::ZERO);
+    let mut mover = walk(Distance::ZERO);
     assert!(matches!(
-        run(&mut m, 100, PlayerId::new(0), 9500),
+        run(&mut mover, 100, PlayerId::new(0), 9500),
         Ok(Reached::Pass(Next::Done(Motion::Arrived)))
     ));
     let mut mover = walk(Distance::ZERO);
@@ -2930,8 +2958,8 @@ fn next_waypoint_an_object_stands_on_goes() {
         gap: Distance::new(FAR),
         to_end: Distance::new(FAR),
     };
-    let (mut place, mut m) = walk();
-    let _ = m
+    let (mut place, mut mover) = walk();
+    let _ = mover
         .reached(
             (&mut place, &me),
             &mut world,
@@ -2942,18 +2970,18 @@ fn next_waypoint_an_object_stands_on_goes() {
         )
         .unwrap();
     assert_eq!(
-        m.paths[0].points,
+        mover.paths[0].points,
         vec![
             BVector::new(28.0, 0.0, 89.0),
             BVector::new(30.0, 0.0, 88.0),
             BVector::new(32.0, 0.0, 88.0)
         ]
     );
-    assert_eq!(m.paths[0].waypoint.get(), 2);
+    assert_eq!(mover.paths[0].waypoint.get(), 2);
     // the house in the manager's ignore list: the waypoint stays
     world.set_manager_ignore(&[RecordId::from(object_id(500))]);
-    let (mut place, mut m) = walk();
-    let _ = m
+    let (mut place, mut mover) = walk();
+    let _ = mover
         .reached(
             (&mut place, &me),
             &mut world,
@@ -2963,7 +2991,7 @@ fn next_waypoint_an_object_stands_on_goes() {
             ObjectsRef::empty(),
         )
         .unwrap();
-    assert_eq!(m.paths[0].points.len(), 4);
+    assert_eq!(mover.paths[0].points.len(), 4);
     // the next waypoint out of reach: no query
     world.set_manager_ignore(&[]);
     let (mut place, mut mover) = walk();
@@ -3089,8 +3117,8 @@ fn path_request_makes_the_top_level_from_the_unit_to_its_goal() {
 #[test]
 fn unit_with_no_speed_or_no_path_is_done() {
     let mut place = Static::at(Position::new(28.0, 89.0, 0.0));
-    let mut m = builder_9177();
-    m.stats.speed = Speed::ZERO;
+    let mut mover = builder_9177();
+    mover.stats.speed = Speed::ZERO;
     let me = Me {
         human_order: WorldTime::ZERO,
         id: object_id(9177),
@@ -3098,7 +3126,7 @@ fn unit_with_no_speed_or_no_path_is_done() {
         action_state: ActionState::NO_ACTION,
     };
     assert_eq!(
-        m.motion(
+        mover.motion(
             &mut place,
             &me,
             Seconds::new(DT),
@@ -3549,50 +3577,54 @@ fn request_in_reach_of_its_target_or_on_its_waypoint_goes_again() {
         to_end: Distance::new(FAR),
     };
     let place = Static::at(Position::new(28.0, 89.0, 0.0));
-    let mut m = builder_9177();
+    let mut mover = builder_9177();
     assert_eq!(
-        m.in_reach(place.position(), near, start, &tuning().movement)
+        mover
+            .in_reach(place.position(), near, start, &tuning().movement)
             .unwrap(),
         Some(AfterRequest::Again)
     );
-    assert_eq!(m.paths[0].state, PathState::Arrived);
+    assert_eq!(mover.paths[0].state, PathState::Arrived);
     let place = Static::at(Position::new(28.0, 89.0, 0.0));
-    let mut m = builder_9177();
-    m.paths[0].range = Distance::ZERO;
+    let mut mover = builder_9177();
+    mover.paths[0].range = Distance::ZERO;
     let floor = Goal {
         gap: Distance::new(tuning().movement.range_floor),
         ..near
     };
     assert_eq!(
-        m.in_reach(place.position(), floor, start, &tuning().movement)
+        mover
+            .in_reach(place.position(), floor, start, &tuning().movement)
             .unwrap(),
         Some(AfterRequest::Again)
     );
-    assert_eq!(m.paths[0].state, PathState::Arrived);
+    assert_eq!(mover.paths[0].state, PathState::Arrived);
     let far = Goal {
         target: None,
         gap: Distance::new(FAR),
         to_end: Distance::new(FAR),
     };
     let place = Static::at(Position::new(28.0, 89.0, 0.0));
-    let mut m = builder_9177();
+    let mut mover = builder_9177();
     assert_eq!(
-        m.in_reach(place.position(), far, start, &tuning().movement)
+        mover
+            .in_reach(place.position(), far, start, &tuning().movement)
             .unwrap(),
         None
     );
     assert_eq!(
-        (m.paths[0].state, m.paths[0].flags),
+        (mover.paths[0].state, mover.paths[0].flags),
         (PathState::Walking, LevelFlags::NONE)
     );
     let waypoint = BVector::new(30.0, 0.0, 88.0);
     assert_eq!(
-        m.in_reach(place.position(), far, waypoint, &tuning().movement)
+        mover
+            .in_reach(place.position(), far, waypoint, &tuning().movement)
             .unwrap(),
         Some(AfterRequest::Again)
     );
     assert_eq!(
-        m.paths[0].flags,
+        mover.paths[0].flags,
         LevelFlags::REACHED | LevelFlags::AT_WAYPOINT
     );
     let place = Static::at(house.position);
@@ -3617,33 +3649,36 @@ fn request_in_reach_of_its_target_or_on_its_waypoint_goes_again() {
 /// (`CONTINUE`) and goes on (flag 1).
 #[test]
 fn request_spends_try_and_gives_up_or_goes_on_without_more() {
-    let mut m = builder_9177();
-    assert_eq!(m.spend_try(), Ok(None));
-    assert_eq!(m.paths[0].continue_counter, PlanTries::of_data(9));
+    let mut walker = builder_9177();
+    assert_eq!(walker.spend_try(), Ok(None));
+    assert_eq!(walker.paths[0].continue_counter, PlanTries::of_data(9));
     let mut looping = builder_9177();
     looping.paths[1].path_flags |= PathFlags::LOOPS;
     let mut attacking = builder_9177();
     attacking.attack_moving = true;
-    for mut m in [looping, attacking] {
-        assert_eq!(m.spend_try(), Ok(None));
-        assert_eq!(m.paths[0].continue_counter, PlanTries::of_data(10));
+    for mut mover in [looping, attacking] {
+        assert_eq!(mover.spend_try(), Ok(None));
+        assert_eq!(mover.paths[0].continue_counter, PlanTries::of_data(10));
     }
     let last_try = || {
-        let mut m = builder_9177();
-        m.paths[0].continue_counter = PlanTries::of_data(1);
-        m
+        let mut mover = builder_9177();
+        mover.paths[0].continue_counter = PlanTries::of_data(1);
+        mover
     };
-    let mut m = last_try();
-    m.paths[1].waypoint = WaypointIndex::of_data(0);
-    assert_eq!(m.spend_try(), Ok(Some(AfterRequest::Again)));
-    assert_eq!(m.paths[0].state, PathState::Unplanned);
-    let mut m = last_try();
-    assert_eq!(m.spend_try(), Ok(Some(AfterRequest::GaveUp)));
-    assert_eq!((m.paths.len(), m.paths[0].state), (1, PathState::GaveUp));
-    assert_eq!(m.animated.speed, Speed::new(0.0));
-    let mut m = last_try();
-    m.paths[0].level = WaypointLevel::Top;
-    assert_eq!(m.spend_try(), Ok(Some(AfterRequest::GaveUp)));
+    let mut mover = last_try();
+    mover.paths[1].waypoint = WaypointIndex::of_data(0);
+    assert_eq!(mover.spend_try(), Ok(Some(AfterRequest::Again)));
+    assert_eq!(mover.paths[0].state, PathState::Unplanned);
+    let mut mover = last_try();
+    assert_eq!(mover.spend_try(), Ok(Some(AfterRequest::GaveUp)));
+    assert_eq!(
+        (mover.paths.len(), mover.paths[0].state),
+        (1, PathState::GaveUp)
+    );
+    assert_eq!(mover.animated.speed, Speed::new(0.0));
+    let mut mover = last_try();
+    mover.paths[0].level = WaypointLevel::Top;
+    assert_eq!(mover.spend_try(), Ok(Some(AfterRequest::GaveUp)));
     let mut mover = last_try();
     mover.paths[0].level = WaypointLevel::Top;
     mover.paths[0].waypoint = WaypointIndex::of_data(0);
@@ -3682,19 +3717,19 @@ fn waypoint_in_range_ends_the_level_or_gives_up_on_fresh_path() {
         gap,
         to_end: Distance::new(FAR),
     };
-    let mut m = builder_9177();
+    let mut mover = builder_9177();
     assert_eq!(
-        m.waypoint_in_range(
+        mover.waypoint_in_range(
             &way_9177(point(Distance::new(0.05)), Distance::new(0.1)),
             WorldTime::from_millis(16360),
             &tuning().movement
         ),
         Ok(AfterRequest::Again)
     );
-    assert_eq!(m.paths[0].state, PathState::Arrived);
-    let mut m = builder_9177();
+    assert_eq!(mover.paths[0].state, PathState::Arrived);
+    let mut mover = builder_9177();
     assert_eq!(
-        m.waypoint_in_range(
+        mover.waypoint_in_range(
             &way_9177(point(Distance::new(0.5)), Distance::new(0.1)),
             WorldTime::from_millis(16000),
             &tuning().movement
@@ -3702,19 +3737,22 @@ fn waypoint_in_range_ends_the_level_or_gives_up_on_fresh_path() {
         Ok(AfterRequest::Again)
     );
     assert_eq!(
-        (m.paths[0].state, m.paths[0].flags),
+        (mover.paths[0].state, mover.paths[0].flags),
         (PathState::Walking, LevelFlags::REACHED)
     );
-    let mut m = builder_9177();
+    let mut mover = builder_9177();
     assert_eq!(
-        m.waypoint_in_range(
+        mover.waypoint_in_range(
             &way_9177(point(Distance::new(0.5)), Distance::new(0.1)),
             WorldTime::from_millis(16360),
             &tuning().movement
         ),
         Ok(AfterRequest::GaveUp)
     );
-    assert_eq!((m.paths.len(), m.paths[0].state), (1, PathState::GaveUp));
+    assert_eq!(
+        (mover.paths.len(), mover.paths[0].state),
+        (1, PathState::GaveUp)
+    );
     let house = world_target();
     let target = Goal {
         target: Some((object_id(10028), &house)),
@@ -3737,10 +3775,10 @@ fn waypoint_in_range_ends_the_level_or_gives_up_on_fresh_path() {
 /// waypoint, found; past the level's last waypoint the way has only its start.
 #[test]
 fn unit_without_footprint_takes_the_straight_way() {
-    let m = builder_9177();
+    let mover = builder_9177();
     let start = BVector::new(28.0, 0.0, 89.0);
     let mut np = NewPath::new(WorldTime::ZERO);
-    m.straight_way(start, &mut np).unwrap();
+    mover.straight_way(start, &mut np).unwrap();
     assert_eq!(np.path.points, [start, BVector::new(30.0, 0.0, 88.0)]);
     assert!(np.flags.contains(PlanFlags::FOUND));
     let mut mover = builder_9177();

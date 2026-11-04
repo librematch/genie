@@ -29,14 +29,14 @@ use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 use crate::world::layer::generated::UnitAiTuning;
-use crate::world::slots::CheckedIndex;
+use crate::world::slots::CheckedIndexExt;
 use crate::{GenieError, GenieResult};
 
 /// What a priest's conversion test (`FUN_140c1af00`, the priest's slot 0x1b8) reads of the
 /// priest: its master's class and id, its faith (`+0x310`), its owner's attributes and its
 /// master's tasks.
 #[derive(Clone, Copy, Debug)]
-pub struct Converter<'a> {
+pub struct Converter<'world> {
     /// Its master's class.
     pub(crate) class: ClassId,
     /// Its master's id.
@@ -44,9 +44,9 @@ pub struct Converter<'a> {
     /// Its faith (`+0x310`, what it holds).
     pub(crate) faith: Amount,
     /// Its owner's attributes (`player+0x100`, count `+0x90`).
-    pub(crate) attributes: &'a [Amount],
+    pub(crate) attributes: &'world [Amount],
     /// Its master's tasks (`+0x788`).
-    pub(crate) tasks: &'a [Task],
+    pub(crate) tasks: &'world [Task],
 }
 
 /// What the conversion test reads of the object: its owner, its master's class, id and hero
@@ -87,7 +87,7 @@ pub enum TargetRules {
 #[must_use]
 pub fn can_convert(
     converter: &Converter<'_>,
-    t: Option<&Convertee>,
+    target: Option<&Convertee>,
     rules: TargetRules,
     roles: &Roles,
     unit_ai_tuning: &UnitAiTuning,
@@ -103,14 +103,14 @@ pub fn can_convert(
     if rules == TargetRules::Own && !faithful {
         return false;
     }
-    let Some(convertee) = t else {
+    let Some(convertee) = target else {
         return false;
     };
     if convertee.owner == PlayerId::GAIA
         || converter
             .attributes
             .get(67)
-            .is_some_and(|&a| a <= Amount::ZERO)
+            .is_some_and(|&amount| amount <= Amount::ZERO)
         || roles
             .of_class(convertee.class)
             .contains(ClassRoles::LIVESTOCK)
@@ -142,21 +142,21 @@ pub fn can_convert(
         return false;
     }
     let mut task = None;
-    for k in converter
+    for candidate in converter
         .tasks
         .iter()
-        .filter(|k| k.action_kind == ActionKind::CONVERT)
+        .filter(|task| task.action_kind == ActionKind::CONVERT)
     {
-        if k.object_group.is_none() && k.object_id.is_none() {
-            task = Some(k);
+        if candidate.object_group.is_none() && candidate.object_id.is_none() {
+            task = Some(candidate);
         }
-        if k.object_id == Some(convertee.master) || k.for_class(convertee.class) {
-            task = Some(k);
+        if candidate.object_id == Some(convertee.master) || candidate.for_class(convertee.class) {
+            task = Some(candidate);
             break;
         }
     }
-    if let Some(k) = task
-        && let Some(attribute_id) = k.attribute_kind4
+    if let Some(task) = task
+        && let Some(attribute_id) = task.attribute_kind4
         && let Some(&amount) = converter.attributes.get(attribute_id.index())
         && at_most_or_unordered(amount.get(), 0.0)
     {
@@ -322,12 +322,21 @@ pub fn siege_attacks_neutral(
 /// `FUN_140f95e10`'s first least distance (`DAT_14330ebf4`, the largest f32).
 pub(super) const PATROL_FARTHEST: f32 = UNIT_AI_PATROL_FARTHEST;
 
-/// `FUN_14087e7c0`: the distance from `p` to the line through `a` and `b` (the cross product's
-/// length over the direction's, its squares divided before `sqrtf`, in the routine's order).
-/// Its flag whether `p` lies between the two (the dot products' signs) is not read here.
-pub(super) fn line_distance(p: BVector, a: BVector, b: BVector) -> Distance {
-    let [px, py, pz] = [p.x() - a.x(), p.height() - a.height(), p.y() - a.y()];
-    let [dx, dy, dz] = [b.x() - a.x(), b.height() - a.height(), b.y() - a.y()];
+/// `FUN_14087e7c0`: the distance from `point` to the line through `start` and `end` (the cross
+/// product's length over the direction's, its squares divided before `sqrtf`, in the routine's
+/// order). Its flag whether `point` lies between the two (the dot products' signs) is not read
+/// here.
+pub(super) fn line_distance(point: BVector, start: BVector, end: BVector) -> Distance {
+    let [px, py, pz] = [
+        point.x() - start.x(),
+        point.height() - start.height(),
+        point.y() - start.y(),
+    ];
+    let [dx, dy, dz] = [
+        end.x() - start.x(),
+        end.height() - start.height(),
+        end.y() - start.y(),
+    ];
     let c1 = py * dz - pz * dy;
     let c3 = px * dy - py * dx;
     let c2 = pz * dx - px * dz;

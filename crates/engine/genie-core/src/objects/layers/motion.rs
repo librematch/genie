@@ -49,13 +49,13 @@ impl Motion {
     #[must_use]
     pub fn of(animated: Option<Animated>, mover: Option<Mover>) -> Option<Self> {
         match (animated, mover) {
-            (a, Some(mut m)) => {
-                if let Some(a) = a {
-                    m.animated = a;
+            (mover_animated, Some(mut mover)) => {
+                if let Some(animated) = mover_animated {
+                    mover.animated = animated;
                 }
-                Some(Self::Moving(m))
+                Some(Self::Moving(mover))
             }
-            (Some(a), None) => Some(Self::Animated(a)),
+            (Some(animated), None) => Some(Self::Animated(animated)),
             (None, None) => None,
         }
     }
@@ -64,7 +64,7 @@ impl Motion {
     #[must_use]
     pub const fn mover(&self) -> Option<&Mover> {
         match self {
-            Self::Moving(m) => Some(m),
+            Self::Moving(mover) => Some(mover),
             Self::Animated(_) => None,
         }
     }
@@ -81,7 +81,7 @@ impl Motion {
     #[must_use]
     pub const fn animated(&self) -> &Animated {
         match self {
-            Self::Animated(a) | Self::Moving(Mover { animated: a, .. }) => a,
+            Self::Animated(animated) | Self::Moving(Mover { animated, .. }) => animated,
         }
     }
 
@@ -105,12 +105,12 @@ impl Motion {
 /// table lends it, [`crate::world::parts::Parts::motion_mut`]): what a routine that stops,
 /// shows or speeds its object reaches of the layers above its place.
 #[derive(Debug)]
-pub struct MotionMut<'a>(Option<&'a mut Motion>);
+pub struct MotionMut<'world>(Option<&'world mut Motion>);
 
-impl<'a> MotionMut<'a> {
+impl<'world> MotionMut<'world> {
     /// The layer `motion` to change (none for a static object).
     #[must_use]
-    pub const fn new(motion: Option<&'a mut Motion>) -> Self {
+    pub const fn new(motion: Option<&'world mut Motion>) -> Self {
         Self(motion)
     }
 
@@ -150,7 +150,7 @@ impl<'a> MotionMut<'a> {
 
     /// The mover for as long as the layer was lent, none for an object that does not move.
     #[must_use]
-    pub fn into_mover(self) -> Option<&'a mut Mover> {
+    pub fn into_mover(self) -> Option<&'world mut Mover> {
         self.0.and_then(Motion::mover_mut)
     }
 }
@@ -170,12 +170,12 @@ mod tests {
         let animated = Animated::new(Speed::new(0.5));
         assert_eq!(Motion::of(None, None), None, "a static object has none");
         assert_eq!(
-            Motion::of(Some(animated), None).map(|m| m.animated().speed),
+            Motion::of(Some(animated), None).map(|motion| motion.animated().speed),
             Some(Speed::new(0.5))
         );
         let moving = Motion::of(Some(animated), Some(mover())).unwrap();
         assert_eq!(
-            moving.mover().map(|m| m.animated.speed),
+            moving.mover().map(|mover| mover.animated.speed),
             Some(Speed::new(0.5))
         );
         assert_eq!(moving.animated().speed, Speed::new(0.5));
@@ -199,7 +199,7 @@ mod tests {
         let mut walker = Motion::Moving(mover());
         walker.animated_mut().speed = Speed::new(2.0);
         assert_eq!(
-            walker.mover_mut().map(|m| m.animated.speed),
+            walker.mover_mut().map(|mover| mover.animated.speed),
             Some(Speed::new(2.0))
         );
     }

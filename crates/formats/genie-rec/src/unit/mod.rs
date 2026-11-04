@@ -1,4 +1,4 @@
-use crate::element::{OptionalReadableElement, ReadableHeaderElement, WritableHeaderElement};
+use crate::element::{ReadHeader, ReadOptionalHeader, WriteHeader};
 use crate::fits;
 use crate::reader::RecordingHeaderReader;
 use crate::unit_kind::UnitBaseClass;
@@ -51,7 +51,7 @@ pub struct Unit {
     pub building: Option<BuildingUnitAttributes>,
 }
 
-impl OptionalReadableElement for Unit {
+impl ReadOptionalHeader for Unit {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Option<Self>> {
         let raw_class = input.read_u8()?;
         if raw_class == 0 {
@@ -97,4 +97,4 @@ impl OptionalReadableElement for Unit {
 
 // The old format's units are read only: their static attributes have no writer (see
 // `StaticUnitAttributes`), nor have the moving, action and combat ones.
-impl WritableHeaderElement for Unit {}
+impl WriteHeader for Unit {}

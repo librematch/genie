@@ -1,6 +1,6 @@
 //! What the unit tests share: a header reader over bytes and the write-read-write check.
 
-use crate::element::{ReadableHeaderElement, WritableHeaderElement};
+use crate::element::{ReadHeader, WriteHeader};
 use crate::reader::RecordingHeaderReader;
 use genie_error::GenieResult;
 use std::io::Read;
@@ -34,7 +34,7 @@ pub fn consumed(reader: &mut RecordingHeaderReader<&[u8]>) -> bool {
 
 /// `value` written, read back at `version` after `setup` (a map size, a player count) and
 /// written again: the same bytes, all of them read. Gives the value read.
-pub fn writes_back_with<T: ReadableHeaderElement + WritableHeaderElement>(
+pub fn writes_back_with<T: ReadHeader + WriteHeader>(
     value: &T,
     version: f32,
     setup: impl FnOnce(&mut RecordingHeaderReader<&[u8]>),
@@ -43,7 +43,7 @@ pub fn writes_back_with<T: ReadableHeaderElement + WritableHeaderElement>(
     value.write_to(&mut bytes).unwrap();
     let mut reader = header_reader(&bytes, version);
     setup(&mut reader);
-    let read = <T as ReadableHeaderElement>::read_from(&mut reader).unwrap();
+    let read = <T as ReadHeader>::read_from(&mut reader).unwrap();
     assert!(consumed(&mut reader), "bytes left after the read");
     let mut again = vec![];
     read.write_to(&mut again).unwrap();
@@ -52,26 +52,26 @@ pub fn writes_back_with<T: ReadableHeaderElement + WritableHeaderElement>(
 }
 
 /// [`writes_back_with`] without a setup.
-pub fn writes_back<T: ReadableHeaderElement + WritableHeaderElement>(value: &T, version: f32) -> T {
+pub fn writes_back<T: ReadHeader + WriteHeader>(value: &T, version: f32) -> T {
     writes_back_with(value, version, |_| {})
 }
 
 /// The element of type `T` read from `bytes` at `version`, all of them read.
-pub fn read_all<T: ReadableHeaderElement>(bytes: &[u8], version: f32) -> T {
+pub fn read_all<T: ReadHeader>(bytes: &[u8], version: f32) -> T {
     let mut reader = header_reader(bytes, version);
-    let read = <T as ReadableHeaderElement>::read_from(&mut reader).unwrap();
+    let read = <T as ReadHeader>::read_from(&mut reader).unwrap();
     assert!(consumed(&mut reader), "bytes left after the read");
     read
 }
 
 /// Little-endian words.
 pub fn words(ws: &[i32]) -> Vec<u8> {
-    ws.iter().flat_map(|w| w.to_le_bytes()).collect()
+    ws.iter().flat_map(|word| word.to_le_bytes()).collect()
 }
 
 /// Little-endian floats.
 pub fn floats(fs: &[f32]) -> Vec<u8> {
-    fs.iter().flat_map(|f| f.to_le_bytes()).collect()
+    fs.iter().flat_map(|float| float.to_le_bytes()).collect()
 }
 
 /// Little-endian bytes built field by field, in a reader's order.

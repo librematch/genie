@@ -28,7 +28,7 @@ use crate::players::PlayerKind;
 use crate::world::Millis;
 use crate::world::World;
 use crate::world::layer::ClassRoles;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 
 /// The retarget timer of a unit sent at a target is the milliseconds it needs to get there at
 /// its speed, drawn around (the immediate `2000`, as a 32-bit product).
@@ -140,10 +140,10 @@ impl World {
             .world_object(id)
             .zip(self.world_object(part))
             .ok_or_else(|| member_gone(id))?;
-        let WorldObject::Unit(player, u, _) = unit else {
+        let WorldObject::Unit(player, own_unit, _) = unit else {
             return Ok(());
         };
-        let speed = self.unit_speed(player, u)?;
+        let speed = self.unit_speed(player, own_unit)?;
         let span = match rule {
             Travel::Fast if at_most_or_unordered(speed, EPSILON) => return Ok(()),
             Travel::Any if speed == 0.0 => STANDING_SPAN,
@@ -155,10 +155,10 @@ impl World {
             }
         };
         let slot = self.live_index(player, id);
-        let rng = self.streams.get(Stream::Ai);
+        let rng = self.streams.get_mut(Stream::Ai);
         if let Some(ai) = slot
             .and_then(|list_index| self.players.live_mut(player, list_index).ok())
-            .and_then(|u| self.parts.unit_ai.get_mut(u.id))
+            .and_then(|unit| self.parts.unit_ai.get_mut(unit.id))
         {
             ai.set_randomized_retarget_timer(span, rng);
         }
@@ -178,24 +178,24 @@ impl World {
         id: ObjectId,
         target: ObjectId,
     ) -> GenieResult<ObjectId> {
-        let (unit, t) = self
+        let (unit, target) = self
             .world_object(id)
             .zip(self.world_object(target))
             .ok_or_else(|| member_gone(id))?;
-        let master = self.master(t.player(), t.master_id(self.model.slots))?;
+        let master = self.master(target.player(), target.master_id(self.model.slots))?;
         if master.kind != MasterKind::BUILDING
             || !self
                 .model
                 .roles
                 .of_class(master.class)
                 .contains(ClassRoles::GATE)
-            || self.in_weapon_range(unit, t)?
+            || self.in_weapon_range(unit, target)?
         {
-            return Ok(t.id());
+            return Ok(target.id());
         }
-        let mut part = t;
-        let mut nearest = self.footprint_gap_squared(unit, t)?;
-        for annex in self.objects().annexes(t.id()).ids().take(ANNEXES) {
+        let mut part = target;
+        let mut nearest = self.footprint_gap_squared(unit, target)?;
+        for annex in self.objects().annexes(target.id()).ids().take(ANNEXES) {
             let Some(world_object) = self.world_object(annex) else {
                 continue;
             };

@@ -5,7 +5,7 @@ use crate::map::Point;
 use crate::map::Tile;
 use crate::players::PlayerId;
 use crate::world::World;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 
 impl World {
     /// `Process_New_Tiles` (`FUN_1412899a0`, the end of `WorldPlayerBase::update`): on each tile
@@ -87,7 +87,7 @@ impl World {
             explored.push(self.spatial.explored(player_id, Tile::new(tx, ty))?);
         }
         if let Some(visibility) = self.spatial.sight.as_mut() {
-            for (index, _) in explored.iter().enumerate().filter(|&(_, &e)| e) {
+            for (index, _) in explored.iter().enumerate().filter(|&(_, &seen)| seen) {
                 if let Some(visible_resources) = visibility.resources.get_mut(index) {
                     visible_resources.add(id, group, Point::new(x, y));
                 }

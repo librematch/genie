@@ -129,7 +129,10 @@ impl TechEffect {
         let mut effect = Self::default();
         let mut bytes = [0; 31];
         input.read_exact(&mut bytes)?;
-        let bytes = &bytes[..bytes.iter().position(|&c| c == 0).unwrap_or(bytes.len())];
+        let bytes = &bytes[..bytes
+            .iter()
+            .position(|&byte| byte == 0)
+            .unwrap_or(bytes.len())];
         let (name, _encoding, _failed) = WINDOWS_1252.decode(bytes);
         effect.name = TechEffectName::from(&name).map_err(|_| invalid_input(NAME_TOO_LONG))?;
 
@@ -231,7 +234,10 @@ impl Tech {
         tech.name = {
             let name_len = input.read_u16::<LE>()?;
             let bytes = read_bytes(&mut input, usize::from(name_len))?;
-            let bytes = &bytes[..bytes.iter().position(|&c| c == 0).unwrap_or(bytes.len())];
+            let bytes = &bytes[..bytes
+                .iter()
+                .position(|&byte| byte == 0)
+                .unwrap_or(bytes.len())];
             let (name, _encoding, _failed) = WINDOWS_1252.decode(bytes);
             name.to_string()
         };
@@ -277,8 +283,8 @@ impl Tech {
     // The count of required techs is at most 6.
     #[allow(clippy::cast_possible_truncation)]
     fn write_requirements(&self, mut output: impl Write) -> GenieResult<()> {
-        for i in 0..6 {
-            match self.required_techs.get(i) {
+        for index in 0..6 {
+            match self.required_techs.get(index) {
                 Some(&id) => output.write_u16::<LE>(id.into())?,
                 None => output.write_i16::<LE>(-1)?,
             }

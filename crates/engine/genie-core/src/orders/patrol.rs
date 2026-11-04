@@ -31,8 +31,8 @@ use crate::unit_ai::OrderKind;
 use crate::unit_ai::Pace;
 use crate::world::Millis;
 use crate::world::World;
-use crate::world::slots::CheckedIndex;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::CheckedIndexExt;
+use crate::world::slots::PlayerSlotsExt;
 use crate::{GenieError, GenieResult};
 
 /// What PATROL's and `ATTACK_MOVE`'s flag `+0x8` (`FUN_14161b970`'s `param_6`) does to the listed
@@ -136,7 +136,7 @@ impl World {
                 .and_then(|place| self.players.at_mut(place).ok())
                 .and_then(|unit| self.parts.unit_ai.get_mut(unit.id));
             if let Some(ai) = ai {
-                ai.reset_for_order(self.streams.get(Stream::Ai));
+                ai.reset_for_order(self.streams.get_mut(Stream::Ai));
             }
         }
     }
@@ -183,12 +183,12 @@ impl World {
         let mut split = self.split(ids, Kept::All, ControlKey::Up)?;
         let mut listed: Vec<GroupId> = Vec::new();
         for units in split.groups.clone() {
-            let common = common_group(&units, |id| self.object(id).map(|(_, u)| u.group));
+            let common = common_group(&units, |id| self.object(id).map(|(_, unit)| unit.group));
             let kept = match common {
                 None => None,
                 Some(id) => match self.groups.get(id) {
                     None => continue,
-                    Some(g) => (g.members.len() == units.len()).then_some(id),
+                    Some(group) => (group.members.len() == units.len()).then_some(id),
                 },
             };
             let id = if let Some(id) = kept {
@@ -281,11 +281,11 @@ impl World {
         group: GroupId,
         target: Option<ObjectId>,
     ) -> GenieResult<()> {
-        let mut i = 0;
-        while i < split.loose.len() {
-            let id = *split.loose.checked(i)?;
+        let mut index = 0;
+        while index < split.loose.len() {
+            let id = *split.loose.checked(index)?;
             let Some((player_id, unit)) = self.object(id) else {
-                i += 1;
+                index += 1;
                 continue;
             };
             let master = unit.master(self.master_tables(), player_id)?;
@@ -293,13 +293,13 @@ impl World {
                 || !master.creatable_part().formation_category.grouped()
                 || split.far.contains(&id)
             {
-                i += 1;
+                index += 1;
                 continue;
             }
             if let Some(object_id) = target
                 && !self.out_of_sight(unit, master, object_id)?
             {
-                i += 1;
+                index += 1;
                 continue;
             }
             let held = self.groups.held(group)?;
@@ -308,7 +308,7 @@ impl World {
             let moved = self
                 .parts
                 .mover_of(unit.id)
-                .map_or_else(|| unit.position(), |m| m.moved_at);
+                .map_or_else(|| unit.position(), |mover| mover.moved_at);
             let restriction = self
                 .parts
                 .mover_of(unit.id)
@@ -334,21 +334,23 @@ impl World {
                     &self.model.tuning.tile_path,
                 )? != Found::Goal
                 {
-                    i += 1;
+                    index += 1;
                     continue;
                 }
             }
             // slot 0x520: +0x824 as the game holds it (x, height, y)
-            let d = BVector::new(moved.x(), moved.z(), moved.y()) - at;
+            let offset = BVector::new(moved.x(), moved.z(), moved.y()) - at;
             let influence = self.players.player(player_id)?.formations.influence.get();
-            if d.x() * d.x() + d.height() * d.height() + d.y() * d.y() <= influence * influence {
-                let _ = split.loose.remove(i);
+            if offset.x() * offset.x() + offset.height() * offset.height() + offset.y() * offset.y()
+                <= influence * influence
+            {
+                let _ = split.loose.remove(index);
                 let _ = self.add_to_group(group, id)?;
-                if let Some(g) = self.groups.get_mut(group) {
-                    g.flags |= GroupFlags::JOINED;
+                if let Some(group) = self.groups.get_mut(group) {
+                    group.flags |= GroupFlags::JOINED;
                 }
             }
-            i += 1;
+            index += 1;
         }
         Ok(())
     }
@@ -375,35 +377,35 @@ impl World {
     pub(super) fn sweep_unit(
         &mut self,
         loose: &[ObjectId],
-        i: usize,
+        loose_index: usize,
         waypoints: &[Point],
         sweep: Sweep,
     ) -> GenieResult<()> {
-        let id = *loose.checked(i)?;
-        let Some((p, u)) = self.object(id) else {
+        let id = *loose.checked(loose_index)?;
+        let Some((player, unit)) = self.object(id) else {
             return Ok(());
         };
         if !sweep.patrol
             && self
                 .parts
                 .unit_ai
-                .get(u.id)
+                .get(unit.id)
                 .is_some_and(|ai| sweep.queued || (!sweep.ignore_pending && ai.has_unready_order()))
         {
             return Err(ATTACK_MOVE_QUEUED);
         }
-        let kind = u.master(self.master_tables(), p)?.kind;
+        let kind = unit.master(self.master_tables(), player)?.kind;
         self.leave_group_of(id, None)?;
         // the group's leave moves its member's slot at most (`World::leave_group_of`)
-        let (_, u) = self.object(id).ok_or_else(|| object_gone(id))?;
-        let at = u.position();
-        if let Some(m) = self.parts.mover_mut(id) {
-            m.clear_user_waypoints();
-            m.ignore_units.clear();
-            m.waiting = 1;
+        let (_, unit) = self.object(id).ok_or_else(|| object_gone(id))?;
+        let at = unit.position();
+        if let Some(mover) = self.parts.mover_mut(id) {
+            mover.clear_user_waypoints();
+            mover.ignore_units.clear();
+            mover.waiting = 1;
             for (index, &other) in loose.iter().enumerate() {
-                if index != i {
-                    ignore_unit(&mut m.ignore_units, other);
+                if index != loose_index {
+                    ignore_unit(&mut mover.ignore_units, other);
                 }
             }
         }
@@ -423,7 +425,7 @@ impl World {
         }
         // a sleeping object is of a type below 30 (only slot 0x180 puts one to sleep)
         if MasterKind::RGE_COMBAT <= kind
-            && let Some(Place::Live(p, idx)) = self.place(id)
+            && let Some(Place::Live(player_id, idx)) = self.place(id)
         {
             let walk = AiMove {
                 point: Position::new(lx, ly, z),
@@ -435,16 +437,16 @@ impl World {
                 },
                 pace: Pace::Walk,
             };
-            self.move_aside(p, idx, walk)?;
+            self.move_aside(player_id, idx, walk)?;
         }
         let unit = match self.place(id) {
-            Some(Place::Live(p, i)) => self.players.live_mut(p, i)?,
+            Some(Place::Live(owner, slot)) => self.players.live_mut(owner, slot)?,
             Some(Place::Sleeping(player_id, list_index)) => {
                 self.players.asleep_mut(player_id, list_index)?
             }
             None => return Ok(()),
         };
-        let rng = self.streams.get(Stream::Ai);
+        let rng = self.streams.get_mut(Stream::Ai);
         if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
             let shown = waypoints.last().copied().unwrap_or_default();
             ai.set_order(

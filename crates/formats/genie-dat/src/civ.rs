@@ -15,8 +15,8 @@ use std::io::{Read, Write};
 pub struct CivilizationId(u8);
 
 impl From<u8> for CivilizationId {
-    fn from(n: u8) -> Self {
-        Self(n)
+    fn from(number: u8) -> Self {
+        Self(number)
     }
 }
 
@@ -86,7 +86,10 @@ impl Civilization {
         let mut civ = Self::default();
         let mut bytes = [0; 20];
         input.read_exact(&mut bytes)?;
-        let bytes = &bytes[..bytes.iter().position(|&c| c == 0).unwrap_or(bytes.len())];
+        let bytes = &bytes[..bytes
+            .iter()
+            .position(|&byte| byte == 0)
+            .unwrap_or(bytes.len())];
         let (name, _encoding, _failed) = WINDOWS_1252.decode(bytes);
         civ.name = CivName::from(&name).map_err(|_| invalid_input(NAME_TOO_LONG))?;
         let num_attributes = input.read_u16::<LE>()?;
@@ -131,8 +134,8 @@ impl Civilization {
         output.write_u16::<LE>(fits(self.attributes.len())?)?;
         output.write_u16::<LE>(self.civ_effect)?;
         output.write_u16::<LE>(self.bonus_effect.unwrap_or(0xFFFF))?;
-        for v in &self.attributes {
-            output.write_f32::<LE>(*v)?;
+        for attribute in &self.attributes {
+            output.write_f32::<LE>(*attribute)?;
         }
         output.write_u8(self.culture)?;
 

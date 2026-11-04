@@ -50,16 +50,16 @@ impl WorkRate {
 impl Mul<f32> for WorkRate {
     type Output = Self;
 
-    /// The rate scaled by `f` (one `f32` product, the rate first: a task's work value).
-    fn mul(self, f: f32) -> Self {
-        Self(self.0 * f)
+    /// The rate scaled by `factor` (one `f32` product, the rate first: a task's work value).
+    fn mul(self, factor: f32) -> Self {
+        Self(self.0 * factor)
     }
 }
 
 impl MulAssign<f32> for WorkRate {
-    /// The rate scaled by `f` in place (an effect's multiplier).
-    fn mul_assign(&mut self, f: f32) {
-        self.0 *= f;
+    /// The rate scaled by `factor` in place (an effect's multiplier).
+    fn mul_assign(&mut self, factor: f32) {
+        self.0 *= factor;
     }
 }
 
@@ -96,25 +96,25 @@ mod tests {
     /// Each operator is the one `f32` operation, bit for bit and in its operand order.
     #[test]
     fn work_rates_do_the_game_f32_operations() {
-        let (a, b) = (WorkRate::new(0.1), WorkRate::new(0.2));
-        assert_eq!((a + b).get().to_bits(), (0.1_f32 + 0.2).to_bits());
-        let mut c = a;
-        c += b;
-        assert_eq!(c.get().to_bits(), (0.1_f32 + 0.2).to_bits());
-        assert_eq!((a * 3.0).get().to_bits(), (0.1_f32 * 3.0).to_bits());
-        let mut work_rate = a;
+        let (first, second) = (WorkRate::new(0.1), WorkRate::new(0.2));
+        assert_eq!((first + second).get().to_bits(), (0.1_f32 + 0.2).to_bits());
+        let mut work_rate = first;
+        work_rate += second;
+        assert_eq!(work_rate.get().to_bits(), (0.1_f32 + 0.2).to_bits());
+        assert_eq!((first * 3.0).get().to_bits(), (0.1_f32 * 3.0).to_bits());
+        let mut work_rate = first;
         work_rate *= 3.0;
-        assert_eq!(work_rate, a * 3.0);
+        assert_eq!(work_rate, first * 3.0);
         assert_eq!(
-            ((a * 3.0) * Seconds::new(0.7)).to_bits(),
+            ((first * 3.0) * Seconds::new(0.7)).to_bits(),
             ((0.1_f32 * 3.0) * 0.7).to_bits()
         );
         assert_eq!(
-            (a * WorkValue::new(0.7)).get().to_bits(),
+            (first * WorkValue::new(0.7)).get().to_bits(),
             (0.1_f32 * 0.7).to_bits()
         );
-        assert!(WorkRate::ZERO < a && a <= a);
-        assert_eq!(WorkRate::new(f32::NAN).partial_cmp(&a), None);
+        assert!(WorkRate::ZERO < first && first <= first);
+        assert_eq!(WorkRate::new(f32::NAN).partial_cmp(&first), None);
         assert_eq!(WorkRate::new(2.5).to_string(), "2.5");
     }
 }

@@ -144,31 +144,31 @@ pub fn visibility_differences(slice: &Visibility, game: &Visibility, player: usi
             .unified
             .iter()
             .zip(&game.unified)
-            .all(|(&u, &v)| u & bits == v & bits)
+            .all(|(&slice_bits, &game_bits)| slice_bits & bits == game_bits & bits)
     };
     // the usual case, every tile the same, without a look at each tile's place
     if player_visible_map.counts == visible_map.counts && unified_same() {
         return out;
     }
-    for (index, (&c, &g)) in player_visible_map
+    for (index, (&slice_count, &game_count)) in player_visible_map
         .counts
         .iter()
         .zip(&visible_map.counts)
         .enumerate()
     {
-        let (u, v) = (slice.unified[index] & bits, game.unified[index] & bits);
-        if c == g && u == v {
+        let (slice_bits, game_bits) = (slice.unified[index] & bits, game.unified[index] & bits);
+        if slice_count == game_count && slice_bits == game_bits {
             continue;
         }
         let (x, y) = (index % width, index / width);
-        if c != g {
+        if slice_count != game_count {
             out.push(format!(
-                "player {player} tile ({x}, {y}) count {c}, the game {g}"
+                "player {player} tile ({x}, {y}) count {slice_count}, the game {game_count}"
             ));
         }
-        if u != v {
+        if slice_bits != game_bits {
             out.push(format!(
-                "player {player} tile ({x}, {y}) unified bits {u:#x}, the game {v:#x}"
+                "player {player} tile ({x}, {y}) unified bits {slice_bits:#x}, the game {game_bits:#x}"
             ));
         }
     }
@@ -202,13 +202,13 @@ pub(super) fn resource_differences(
             player_visible_resources.capacities, visible_resources.capacities
         ));
     }
-    let bits = |r: &VisibleResource| {
+    let bits = |visible_resource: &VisibleResource| {
         (
-            r.id,
-            r.distance.get().to_bits(),
-            r.zone,
-            r.at.x().to_bits(),
-            r.at.y().to_bits(),
+            visible_resource.id,
+            visible_resource.distance.get().to_bits(),
+            visible_resource.zone,
+            visible_resource.at.x().to_bits(),
+            visible_resource.at.y().to_bits(),
         )
     };
     for (index, (x, y)) in player_visible_resources
@@ -217,10 +217,14 @@ pub(super) fn resource_differences(
         .zip(&visible_resources.lists)
         .enumerate()
     {
-        if let Some(k) = x.iter().zip(y).position(|(r, s)| bits(r) != bits(s)) {
+        if let Some(first) = x
+            .iter()
+            .zip(y)
+            .position(|(ours, theirs)| bits(ours) != bits(theirs))
+        {
             out.push(format!(
-                "player {player} visible resources {index}: record {k} {:?}, the game {:?}",
-                x[k], y[k]
+                "player {player} visible resources {index}: record {first} {:?}, the game {:?}",
+                x[first], y[first]
             ));
         } else if x.len() != y.len() {
             out.push(format!(

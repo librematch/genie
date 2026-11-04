@@ -54,17 +54,18 @@ impl UnitView<'_, '_> {
         if !self.player_kind.is_computer() || notify.kind != NotifyKind::REQUIRES_SEARCH {
             return Ok(());
         }
-        let Some(mut module) = self.c.w.ai.take(player) else {
+        let Some(mut module) = self.step.world.ai.take(player) else {
             return Ok(());
         };
-        let saved = self.c.w.streams.clone();
+        let saved = self.step.world.streams.clone();
         let heard = self.hear_explore(&mut module, notify, roles);
-        self.c.w.streams = saved;
-        self.c.w.ai.put_back(player, module);
+        self.step.world.streams = saved;
+        self.step.world.ai.put_back(player, module);
         match heard? {
             Heard::Nothing => Ok(()),
-            Heard::Task(tile) => alert_owner(PlayerKind::Computer).map_err(|e| {
-                e.with("tasks explorer", ObjectId::field(notify.caller))
+            Heard::Task(tile) => alert_owner(PlayerKind::Computer).map_err(|error| {
+                error
+                    .with("tasks explorer", ObjectId::field(notify.caller))
                     .with("to", format_args!("({}, {})", tile.x(), tile.y()))
             }),
             Heard::Detask => alert_owner(PlayerKind::Computer)
@@ -87,42 +88,44 @@ impl UnitView<'_, '_> {
             AiAction::Explore.value(),
             AiAction::ExploreAndDestroy.value(),
         ];
-        if !explore.contains(&notify.p[0]) {
+        if !explore.contains(&notify.params[0]) {
             return Ok(Heard::Nothing);
         }
-        let own = self.unit.master(self.c.w.master_tables(), self.player)?;
+        let own = self
+            .unit
+            .master(self.step.world.master_tables(), self.player)?;
         let (class_id, sight, flags) = (own.class, own.line_of_sight, own.object_flags);
         let id = self.unit.id;
         let unit = SearchUnit {
             position: self.unit.position().ground(),
             civilian: roles.of_class(class_id).contains(ClassRoles::VILLAGER),
         };
-        let now = self.c.w.world_time;
-        let group_tuning = self.c.w.model.tuning.group;
+        let now = self.step.world.world_time;
+        let group_tuning = self.step.world.model.tuning.group;
         let slot = module.tactical.slot(WAIT_SLOT);
         let (explorer_alive, centre) = {
             let view = owner_view(
-                &self.c.w.players,
-                &self.c.w.index,
-                self.c.player,
+                &self.step.world.players,
+                &self.step.world.index,
+                self.step.player,
                 self.new_owner,
             )?;
             let alive = module
                 .info
                 .explorer
-                .is_some_and(|e| e == id || view.find(e).is_some());
-            let centre = match town_centre_unit(view, self.c.w.model.slots.master)? {
-                Some(u) => {
-                    let sight = u
-                        .master(self.c.w.master_tables(), self.player)?
+                .is_some_and(|object_id| object_id == id || view.find(object_id).is_some());
+            let centre = match town_centre_unit(view, self.step.world.model.slots.master)? {
+                Some(unit) => {
+                    let sight = unit
+                        .master(self.step.world.master_tables(), self.player)?
                         .line_of_sight;
-                    Some((u.position().ground(), sight))
+                    Some((unit.position().ground(), sight))
                 }
                 None => None,
             };
             (alive, centre)
         };
-        let mut unsynced = self.c.w.streams.get(Stream::Unsynced).clone();
+        let mut unsynced = self.step.world.streams.get_mut(Stream::Unsynced).clone();
         let (mut area, map, _) = self.scout_area()?;
         let info = &mut module.info;
         let mut search = |info: &mut InfoModule, from: Point| {
@@ -160,9 +163,9 @@ impl UnitView<'_, '_> {
         // one more turn than the stack holds points: a point already on top is met twice
         for _ in 0..=info.search.len() {
             if !info.tile_uncovered(tile)?
-                && let Some(p) = search(info, Point::new(tile.x() as f32, tile.y() as f32))?
+                && let Some(found) = search(info, Point::new(tile.x() as f32, tile.y() as f32))?
             {
-                return Ok(Heard::Task(p));
+                return Ok(Heard::Task(found));
             }
             tile = info.pop_point();
         }

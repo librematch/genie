@@ -96,7 +96,7 @@ impl UnitAi {
         alert_owner(player_kind)?;
         let _ = self.attackers.add(notify.caller);
         side.set_under_attack(true);
-        if notify.p[1] < 1 {
+        if notify.params[1] < 1 {
             self.end_notifies(time, at, side, ai_rng)?;
             return Ok(DEAD);
         }
@@ -284,9 +284,11 @@ impl UnitAi {
         {
             return Ok(GO_ON);
         }
-        let t = side.duel(target.id)?;
+        let target_duel = side.duel(target.id)?;
         // "my current target cannot damage me": UCOMISS, JP, JNZ (exactly 0)
-        if (t.attacks == 0.0 || t.harms == HitPoints::ZERO) && !t.converts {
+        if (target_duel.attacks == 0.0 || target_duel.harms == HitPoints::ZERO)
+            && !target_duel.converts
+        {
             if matches!(
                 self.current_order,
                 Some(OrderKind::Patrol | OrderKind::AttackMove)
@@ -299,8 +301,8 @@ impl UnitAi {
                 self.current_order = None;
             }
         }
-        let target_time = if HitPoints::ZERO < t.harmed {
-            t.hp / t.harmed
+        let target_time = if HitPoints::ZERO < target_duel.harmed {
+            target_duel.hp / target_duel.harmed
         } else {
             unit_ai_tuning.never_killed
         };
@@ -311,7 +313,7 @@ impl UnitAi {
             unit_ai_tuning.never_killed
         };
         // "my current target will take longer to kill"
-        if !t.converts && (attacker_time < target_time || duel.converts) {
+        if !target_duel.converts && (attacker_time < target_time || duel.converts) {
             let _ = self.strike_back(attacker_id, at, ai_rng, side)?;
         }
         Ok(GO_ON)
@@ -361,7 +363,7 @@ impl UnitAi {
             && at.combat_level == CombatLevel::ANIMAL;
         // p1 the unit met (−1 names none the update holds)
         if !boar
-            && let Some(met) = ObjectId::of_field(notify.p[0])
+            && let Some(met) = ObjectId::of_field(notify.params[0])
             && at.unit(met).is_some()
             && self.retarget_disabled == 0
             && self.current_order.is_none()
@@ -392,11 +394,11 @@ impl UnitAi {
         unit_ai_tuning: &UnitAiTuning,
     ) -> GenieResult<u32> {
         let radius = Footprint::new(
-            notify.p[0] as f32 / unit_ai_tuning.radius_scale,
-            notify.p[1] as f32 / unit_ai_tuning.radius_scale,
+            notify.params[0] as f32 / unit_ai_tuning.radius_scale,
+            notify.params[1] as f32 / unit_ai_tuning.radius_scale,
         );
         // p3 the foundation: none (−1) has no footprint, so the unit has nowhere to go
-        let Some(site) = FoundationId::of_field(notify.p[2]) else {
+        let Some(site) = FoundationId::of_field(notify.params[2]) else {
             return Ok(GO_ON);
         };
         let off = side.off_footprint(site, radius)?;
@@ -511,8 +513,8 @@ impl UnitAi {
         } else {
             side.seek_unexplored(self, ai_rng)?
         };
-        if let Some(t) = found {
-            let _ = self.explore_at(t, OrderForce::Forced, side, ai_rng, unit_ai_tuning)?;
+        if let Some(tile) = found {
+            let _ = self.explore_at(tile, OrderForce::Forced, side, ai_rng, unit_ai_tuning)?;
             self.last_action = self.current_action;
             self.current_action = action;
             return Ok(BREAK);

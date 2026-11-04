@@ -287,30 +287,36 @@ pub enum EffectCommand {
 }
 
 impl EffectCommand {
-    /// The command of kind `kind` with the `.dat`'s arguments `a`, `b`, `c` and `d`, as the two
-    /// switches read them.
+    /// The command of kind `kind` with the `.dat`'s arguments `first`, `second`, `third` and
+    /// `amount`, as the two switches read them.
     ///
     /// # Errors
     ///
     /// A class (an attribute command's second argument) or a cost's resource (`'e'`'s second)
     /// below −1.
-    pub fn of_data(kind: u8, a: i16, b: i16, c: i16, d: f32) -> GenieResult<Self> {
+    pub fn of_data(
+        kind: u8,
+        first: i16,
+        second: i16,
+        third: i16,
+        amount: f32,
+    ) -> GenieResult<Self> {
         // the third argument's low byte, the mode of the technology and resource commands
-        let low = |v: i16| v.to_le_bytes()[0];
+        let low = |value: i16| value.to_le_bytes()[0];
         Ok(match kind {
             TECH_COST => Self::TechCost {
-                tech: TechId::of_data(a),
-                resource: AttributeId::of_field(b)?,
-                amount: d,
-                mode: ChangeMode::of_data(low(c)),
+                tech: TechId::of_data(first),
+                resource: AttributeId::of_field(second)?,
+                amount,
+                mode: ChangeMode::of_data(low(third)),
             },
             TECH_DISABLE => Self::TechDisable {
-                tech: DisabledTech::of_data(cvttss2si(d)),
+                tech: DisabledTech::of_data(cvttss2si(amount)),
             },
             TECH_TIME => Self::TechTime {
-                tech: TechId::of_data(a),
-                amount: d,
-                mode: ChangeMode::of_data(low(c)),
+                tech: TechId::of_data(first),
+                amount,
+                mode: ChangeMode::of_data(low(third)),
             },
             kind::OBJECTS_SET..kind::OBJECT_SET => {
                 Self::Objects(ObjectsKind::OwnMasters(change_of(kind - kind::OBJECTS_SET)))
@@ -320,12 +326,12 @@ impl EffectCommand {
             }
             kind::OBJECT_UPGRADE => Self::Objects(ObjectsKind::ObjectMaster),
             _ if 4 < kind / 10 || 8 < kind % 10 => Self::Inert(kind),
-            _ => Self::of_block(kind, a, b, c, d)?,
+            _ => Self::of_block(kind, first, second, third, amount)?,
         })
     }
 
     /// The base's kinds of a block (0 to 48, the units 0 to 8).
-    fn of_block(kind: u8, a: i16, b: i16, c: i16, d: f32) -> GenieResult<Self> {
+    fn of_block(kind: u8, first: i16, second: i16, third: i16, amount: f32) -> GenieResult<Self> {
         let party = Party::of_block(kind / 10);
         Ok(match kind % 10 {
             kind::SET | kind::ADD | kind::MULTIPLY => {
@@ -334,69 +340,69 @@ impl EffectCommand {
                     kind::ADD => Change::Add,
                     _ => Change::Multiply,
                 };
-                let attribute = MasterAttribute::of_effect(c);
+                let attribute = MasterAttribute::of_effect(third);
                 if change == Change::Multiply
-                    && COST_ATTRIBUTES.contains(&c)
-                    && 0.0 > d
+                    && COST_ATTRIBUTES.contains(&third)
+                    && 0.0 > amount
                     && party != Party::Gaia
                 {
                     Self::Costs {
                         party,
-                        units: CostUnits::of_unit(if b < 0 { a } else { b }),
+                        units: CostUnits::of_unit(if second < 0 { first } else { second }),
                         attribute,
-                        edit: CostEdit::of_how(cvttss2si(d)),
+                        edit: CostEdit::of_how(cvttss2si(amount)),
                     }
                 } else {
                     Self::Attribute {
                         party,
                         change,
-                        master: MasterId::of_data(a),
-                        class: ClassId::of_field(b)?,
+                        master: MasterId::of_data(first),
+                        class: ClassId::of_field(second)?,
                         attribute,
-                        amount: d,
+                        amount,
                     }
                 }
             }
             kind::RESOURCE => Self::Resource {
                 party,
-                attribute: AttributeId::of_data(a),
-                change: if b.to_le_bytes()[0] == 0 {
+                attribute: AttributeId::of_data(first),
+                change: if second.to_le_bytes()[0] == 0 {
                     ResourceChange::Set
                 } else {
                     ResourceChange::Add
                 },
-                scale: AttributeId::of_data(c),
-                amount: d,
+                scale: AttributeId::of_data(third),
+                amount,
             },
             kind::RESOURCE_MULTIPLY => Self::ResourceMultiply {
                 party,
-                attribute: AttributeId::of_data(a),
-                amount: d,
+                attribute: AttributeId::of_data(first),
+                amount,
             },
             kind::ENABLE => Self::Enable {
                 party,
-                master: MasterId::of_data(a),
-                enable: b.to_le_bytes()[0],
-                one: c == 1,
+                master: MasterId::of_data(first),
+                enable: second.to_le_bytes()[0],
+                one: third == 1,
             },
             kind::UPGRADE => Self::Upgrade {
                 party,
-                from: MasterId::of_data(a),
-                to: MasterId::of_data(b),
-                mode: UpgradeMode::of_data(c),
+                from: MasterId::of_data(first),
+                to: MasterId::of_data(second),
+                mode: UpgradeMode::of_data(third),
             },
             kind::SPAWN => Self::Spawn {
                 party,
-                master: MasterId::of_data(a),
-                at: MasterId::of_data(b),
-                count: c,
+                master: MasterId::of_data(first),
+                at: MasterId::of_data(second),
+                count: third,
             },
             kind::TECH => Self::Tech {
                 party,
-                tech: TechId::of_data(a),
-                mode: ModifyMode::of_data(b),
-                amount: d,
-                location: ModifyLocation::of_data(c),
+                tech: TechId::of_data(first),
+                mode: ModifyMode::of_data(second),
+                amount,
+                location: ModifyLocation::of_data(third),
             },
             _ => Self::Inert(kind),
         })
@@ -426,8 +432,8 @@ mod tests {
     };
     use crate::test_ids::master_id;
 
-    fn parse(kind: u8, a: i16, b: i16, c: i16, d: f32) -> EffectCommand {
-        EffectCommand::of_data(kind, a, b, c, d).unwrap()
+    fn parse(kind: u8, first: i16, second: i16, third: i16, amount: f32) -> EffectCommand {
+        EffectCommand::of_data(kind, first, second, third, amount).unwrap()
     }
 
     /// A kind's tens name its block's players and its units the command; 9 and 49 up are none.
@@ -445,7 +451,7 @@ mod tests {
             }
         );
         assert_eq!(
-            [0, 10, 20, 30, 40].map(|k| match parse(k, -1, -1, 0, 1.0) {
+            [0, 10, 20, 30, 40].map(|kind| match parse(kind, -1, -1, 0, 1.0) {
                 EffectCommand::Attribute { party, change, .. } => Some((party, change)),
                 _ => None,
             }),
@@ -457,8 +463,8 @@ mod tests {
                 Some((Party::Gaia, Change::Set)),
             ]
         );
-        for k in [9, 19, 49, 50, 100, 104, 199, 207, 255] {
-            assert_eq!(parse(k, 1, 2, 3, 4.0), EffectCommand::Inert(k));
+        for kind in [9, 19, 49, 50, 100, 104, 199, 207, 255] {
+            assert_eq!(parse(kind, 1, 2, 3, 4.0), EffectCommand::Inert(kind));
         }
     }
 
@@ -558,7 +564,7 @@ mod tests {
             }
         );
         assert_eq!(
-            [200, 202, 203, 205, 206].map(|k| parse(k, -1, -1, 0, 1.0)),
+            [200, 202, 203, 205, 206].map(|kind| parse(kind, -1, -1, 0, 1.0)),
             [
                 EffectCommand::Objects(ObjectsKind::OwnMasters(Change::Set)),
                 EffectCommand::Objects(ObjectsKind::OwnMasters(Change::Multiply)),

@@ -18,7 +18,7 @@ use crate::players::PlayerId;
 use crate::players::game_status::GameStatus;
 use crate::world::AllySharing;
 use crate::world::World;
-use crate::world::slots::{CheckedIndex, PlayerSlots};
+use crate::world::slots::{CheckedIndexExt, PlayerSlotsExt};
 use crate::{GenieError, GenieResult};
 
 pub(crate) mod explored;
@@ -78,32 +78,37 @@ impl World {
         let count = self.players.len();
         let mut masks: ByPlayer<VisionMasks> = PlayerId::each(self.players.len())
             .zip(&self.players)
-            .map(|(p, player)| own_masks(p, player.game_status))
+            .map(|(player_id, player)| own_masks(player_id, player.game_status))
             .collect();
         let mut flares = Vec::new();
-        for (p, me) in PlayerId::each(self.players.len())
+        for (viewer, me) in PlayerId::each(self.players.len())
             .zip(&self.players)
             .skip(1)
         {
-            let attribute = |i: usize| me.attributes.get(i).copied().unwrap_or(Amount::ZERO);
-            let allies = |q: PlayerId| {
-                me.relations.get(q) == Some(&Relation::Ally)
-                    && self.players.player(q).ok().and_then(|o| o.relations.get(p))
+            let attribute =
+                |index: usize| me.attributes.get(index).copied().unwrap_or(Amount::ZERO);
+            let allies = |player_id: PlayerId| {
+                me.relations.get(player_id) == Some(&Relation::Ally)
+                    && self
+                        .players
+                        .player(player_id)
+                        .ok()
+                        .and_then(|player| player.relations.get(viewer))
                         == Some(&Relation::Ally)
             };
-            let mine = masks.checked_mut(p)?;
+            let mine = masks.checked_mut(viewer)?;
             if me.ally_sharing.contains(AllySharing::VISION) {
-                for q in PlayerId::each(count).skip(1) {
-                    if q != p && allies(q) {
-                        mine.visible |= VisionBits::visible(q);
-                        mine.explored |= VisionBits::explored(q);
+                for player_id in PlayerId::each(count).skip(1) {
+                    if player_id != viewer && allies(player_id) {
+                        mine.visible |= VisionBits::visible(player_id);
+                        mine.explored |= VisionBits::explored(player_id);
                     }
                 }
             }
             if attribute(REVEAL_ALL) != Amount::ZERO {
-                for q in PlayerId::each(count).skip(1) {
-                    mine.visible |= VisionBits::visible(q);
-                    mine.explored |= VisionBits::explored(q);
+                for player_id in PlayerId::each(count).skip(1) {
+                    mine.visible |= VisionBits::visible(player_id);
+                    mine.explored |= VisionBits::explored(player_id);
                 }
             }
             // attribute 209 does not touch the masks: it flares the town centres of the players
@@ -111,28 +116,36 @@ impl World {
             // (`mTCFlared`), unless the screen's mode is 4 (`FUN_140c87f20`, the editor's: a
             // playback has no such screen, the probe reads 0)
             if REVEAL_CENTRES < me.attributes.len() && Amount::ZERO < attribute(REVEAL_CENTRES) {
-                for q in PlayerId::each(count).skip(1) {
-                    if allies(q) || me.tc_flared.get(q.index()).copied().unwrap_or(false) {
+                for player_id in PlayerId::each(count).skip(1) {
+                    if allies(player_id)
+                        || me
+                            .tc_flared
+                            .get(player_id.index())
+                            .copied()
+                            .unwrap_or(false)
+                    {
                         continue;
                     }
                     flares.extend(
                         self.players
-                            .player(q)?
+                            .player(player_id)?
                             .objects
                             .iter()
                             // The town centre the reveal finds (`0x6d`) and the flare it makes there (`0x2b9`).
-                            .filter(|u| {
+                            .filter(|unit| {
                                 self.model
                                     .roles
-                                    .of_master(u.life.master_id)
+                                    .of_master(unit.life.master_id)
                                     .contains(MasterRoles::TOWN_CENTRE)
                             })
-                            .map(|unit| (p, q, unit.position())),
+                            .map(|unit| (viewer, player_id, unit.position())),
                     );
                 }
             }
             if SHARED_MASKS[1] < me.attributes.len()
-                && SHARED_MASKS.iter().any(|&i| attribute(i) != Amount::ZERO)
+                && SHARED_MASKS
+                    .iter()
+                    .any(|&index| attribute(index) != Amount::ZERO)
             {
                 return Err(GenieError::unsupported(
                     "a scenario's shared vision masks (attributes 285, 286)",
@@ -142,14 +155,14 @@ impl World {
         self.spatial.vision = masks;
         // the flares (slot 0x1c0 with master 697, [`World::remains`]), in the players' order, each
         // town centre in its owner's list order; each flared player is recorded
-        for (p, q, at) in flares {
-            self.remains(p, self.model.slots.master.flare_4, at, None)?;
-            self.made_new_object(p)?;
-            let flared = &mut self.players.player_mut(p)?.tc_flared;
-            if flared.len() <= q.index() {
-                flared.resize(q.index() + 1, false);
+        for (owner, target, at) in flares {
+            self.remains(owner, self.model.slots.master.flare_4, at, None)?;
+            self.made_new_object(owner)?;
+            let flared = &mut self.players.player_mut(owner)?.tc_flared;
+            if flared.len() <= target.index() {
+                flared.resize(target.index() + 1, false);
             }
-            *flared.checked_mut(q.index())? = true;
+            *flared.checked_mut(target.index())? = true;
         }
         Ok(())
     }
@@ -292,7 +305,7 @@ mod tests {
             world.spatial.vision.get(PlayerId::new(2)),
             Some(&masks(0x2000_0014, 0x2000_0014_0000_0000))
         );
-        assert!(!world.players[2].tc_flared.iter().any(|&f| f));
+        assert!(!world.players[2].tc_flared.iter().any(|&flared| flared));
     }
 
     /// `World::update` ends with the world's slot 0x78 (`FUN_1415e92b0`, at `0x1415e9266`) after
@@ -317,7 +330,7 @@ mod tests {
             world.players[2]
                 .objects
                 .iter()
-                .filter(|u| u.life.master_id == ids::FLARE_4)
+                .filter(|unit| unit.life.master_id == ids::FLARE_4)
                 .map(|unit| (unit.id.get(), unit.position()))
                 .collect()
         };

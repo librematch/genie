@@ -44,10 +44,16 @@ impl Spatial {
         let (roles, spatial_tuning) = (checks.roles, checks.spatial_tuning);
         let at = self.objects.get(me);
         let searcher = Searcher {
-            class_10: at.is_some_and(|m| roles.of_class(m.class).contains(ClassRoles::PREDATOR)),
+            class_10: at
+                .is_some_and(|placed| roles.of_class(placed.class).contains(ClassRoles::PREDATOR)),
             // The villagers' class, which gathers from farms (`FUN_141195750`).
-            farmer: at.is_some_and(|m| roles.of_class(m.class).contains(ClassRoles::VILLAGER)),
-            trapper: at.is_some_and(|m| roles.of_master(m.master).contains(MasterRoles::TRAPPER)),
+            farmer: at
+                .is_some_and(|placed| roles.of_class(placed.class).contains(ClassRoles::VILLAGER)),
+            trapper: at.is_some_and(|placed| {
+                roles
+                    .of_master(placed.master)
+                    .contains(MasterRoles::TRAPPER)
+            }),
         };
         let spared = filter.spared.map(QueryRelation::list);
         let mut best: Option<(ObjectId, f32)> = None;
@@ -93,7 +99,7 @@ impl Spatial {
             }
         }
         // the distance starts at `DAT_14330ec20` (−1) without a find
-        Ok(best.map_or((None, -1.0), |(id, d)| (Some(id), d)))
+        Ok(best.map_or((None, -1.0), |(id, distance)| (Some(id), distance)))
     }
 }
 
@@ -244,9 +250,9 @@ pub(super) fn farm_kept(
 /// goes to the lower id (a NaN distance so far gives way).
 pub(super) fn nearer(best: Option<(ObjectId, f32)>, record: &Record) -> Option<(ObjectId, f32)> {
     match best {
-        Some((id, d)) if d <= record.distance.get() => {
-            if record.distance == Distance::new(d) && record.id < id {
-                Some((record.id, d))
+        Some((id, distance)) if distance <= record.distance.get() => {
+            if record.distance == Distance::new(distance) && record.id < id {
+                Some((record.id, distance))
             } else {
                 best
             }

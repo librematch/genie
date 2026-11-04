@@ -70,13 +70,13 @@ pub(super) fn reach(waypoint: BVector, position: BVector, projected: BVector) ->
 /// (the target's gaps are from it), its radii on the ground, its restriction's mask, whether it
 /// moves (its speed, slot 0x208, is not 0, or its master is 42) and its ignore units (`+0x670`).
 #[derive(Clone, Debug)]
-pub(crate) struct LongWalker<'a> {
+pub(crate) struct LongWalker<'world> {
     pub(crate) id: ObjectId,
     pub(crate) position: Position,
     pub(crate) radius: Footprint,
     pub(crate) mask: TerrainMask,
     pub(crate) moves: bool,
-    pub(crate) ignore_units: &'a [ObjectId],
+    pub(crate) ignore_units: &'world [ObjectId],
     /// For a walker in a group the world holds (`+0x6d0`, `FUN_14152ff40`), its group's
     /// differentiator units (`FUN_14100bbe0` with 255, [`crate::groups::UnitGroups::group_units`]).
     pub(crate) group_units: Option<Vec<ObjectId>>,
@@ -139,17 +139,27 @@ pub(crate) fn long_path_for(
     by_id: ObjectsRef<'_>,
 ) -> GenieResult<(bool, Path)> {
     let long_path_tuning = &by_id.tuning().long_path;
-    let long_target = target.map(|(_, t)| {
-        let gap2 = footprint_gap_squared(walker.position, walker.radius, t.position, t.radius);
-        let gap = footprint_gap(walker.position, walker.radius, t.position, t.radius);
-        LongTarget::new(t.position, t.radius, gap, gap2, *long_path_tuning)
+    let long_target = target.map(|(_, placed)| {
+        let gap2 = footprint_gap_squared(
+            walker.position,
+            walker.radius,
+            placed.position,
+            placed.radius,
+        );
+        let gap = footprint_gap(
+            walker.position,
+            walker.radius,
+            placed.position,
+            placed.radius,
+        );
+        LongTarget::new(placed.position, placed.radius, gap, gap2, *long_path_tuning)
     });
     let listed = lowered_units(walker, world, target.map(|(id, _)| id), by_id);
     let lowered = listed
         .into_iter()
         .filter_map(|id| world.get(id))
-        .filter(|p| p.tall)
-        .map(|p| Tile::new(p.position.x() as i32, p.position.y() as i32))
+        .filter(|placed| placed.tall)
+        .map(|placed| Tile::new(placed.position.x() as i32, placed.position.y() as i32))
         .collect();
     let req = LongRequest {
         from: Tile::new(from.x() as i32, from.y() as i32),
@@ -164,7 +174,7 @@ pub(crate) fn long_path_for(
         near_player: false,
         allies: world
             .get(walker.id)
-            .map_or(PlayerSet::NONE, |p| world.allies_of(p.player)),
+            .map_or(PlayerSet::NONE, |placed| world.allies_of(placed.player)),
     };
     let player = world.get(walker.id).map(|placed| placed.player);
     let gates = |tile| {
@@ -183,7 +193,7 @@ pub(crate) fn long_path_for(
 
 /// What the tile pathfinder is asked besides its walker ([`tile_plan_for`]'s arguments).
 #[derive(Clone, Copy, Debug)]
-pub struct TileAsk<'a> {
+pub struct TileAsk<'world> {
     /// The goal (x, height, y).
     pub(crate) goal: BVector,
     /// The walker's and the target's radii added.
@@ -191,13 +201,13 @@ pub struct TileAsk<'a> {
     /// How near the goal counts.
     pub(crate) range: Distance,
     /// The target object's record.
-    pub(crate) target: Option<&'a Placed>,
+    pub(crate) target: Option<&'world Placed>,
 }
 
 /// What the short pather is asked besides its walker ([`short_path_including`]'s goal and
 /// lists, `FUN_140f9e540`'s arguments 3 to 5 and 6 to 9).
 #[derive(Clone, Copy, Debug)]
-pub struct ShortAsk<'a> {
+pub struct ShortAsk<'world> {
     /// The goal (x, height, y).
     pub(crate) goal: BVector,
     /// How near the goal counts.
@@ -205,9 +215,9 @@ pub struct ShortAsk<'a> {
     /// The target object (if any).
     pub(crate) target: Option<ObjectId>,
     /// The objects the pather ignores.
-    pub(crate) ignore: &'a [ObjectId],
+    pub(crate) ignore: &'world [ObjectId],
     /// The objects the old pather tests even moving.
-    pub(crate) include: &'a [ObjectId],
+    pub(crate) include: &'world [ObjectId],
 }
 
 /// The tile pathfinder (`FUN_140f7c530`) for `walker` from `from` (x, y on the map) to `to`,
@@ -258,8 +268,8 @@ pub(crate) fn tile_plan_for(
         full: !plan.player_kind.is_computer(),
     };
     let annexes = level_target
-        .filter(|&t| by_id.annex_of(t).is_none())
-        .map(|t| by_id.annexes(t).ids().collect::<Vec<_>>())
+        .filter(|&object_id| by_id.annex_of(object_id).is_none())
+        .map(|object_id| by_id.annexes(object_id).ids().collect::<Vec<_>>())
         .unwrap_or_default();
     let (slots, ignore) = plan.pathing.smoothing_ignore(
         walker.id,
@@ -481,8 +491,8 @@ pub(crate) fn short_path_including(
             "a short path without the game's mesh",
         ))?;
     let found = pather.search(mesh, &words, &query, &shapes)?;
-    for p in to_path(&found.points).points {
-        let _ = out.push(p);
+    for point in to_path(&found.points).points {
+        let _ = out.push(point);
     }
     Ok(found.result)
 }

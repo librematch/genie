@@ -145,7 +145,7 @@ impl Pathing {
 pub fn shape_rect(placed: &Placed) -> FixedRect {
     let (x, y) = (placed.position.x(), placed.position.y());
     let (rx, ry) = (placed.radius.x(), placed.radius.y());
-    let fixed = |v: f32| (v * ONE as f32) as i64 as i32;
+    let fixed = |value: f32| (value * ONE as f32) as i64 as i32;
     FixedRect::new(
         fixed((x - rx) - 0.5),
         fixed((y - ry) - 0.5),
@@ -158,7 +158,7 @@ pub fn shape_rect(placed: &Placed) -> FixedRect {
 /// the radii each in fixed point by truncation, the box grown by half a tile (`0x200000`).
 #[must_use]
 pub fn refreshed_rect(position: Position, radius: Footprint) -> FixedRect {
-    let fixed = |v: f32| (v * ONE as f32) as i64 as i32;
+    let fixed = |value: f32| (value * ONE as f32) as i64 as i32;
     let (x, y) = (position.x(), position.y());
     let (rx, ry) = (fixed(radius.x()), fixed(radius.y()));
     let half = ONE / 2;
@@ -207,14 +207,14 @@ impl Pathing {
         };
         slots[1] = target;
         let mut count = 2;
-        for (i, (cell, &object_id)) in slots
+        for (index, (cell, &object_id)) in slots
             .iter_mut()
             .skip(1)
             .zip(annexes.iter().take(4))
             .enumerate()
         {
             *cell = object_id;
-            count = 3 + i;
+            count = 3 + index;
         }
         (slots, slots.iter().take(count).copied().collect())
     }
@@ -285,7 +285,10 @@ impl Pathing {
                 let values = values.values();
                 own.len() != values.len()
                     || own.is_empty()
-                    || own.iter().zip(values).all(|(a, b)| a == b)
+                    || own
+                        .iter()
+                        .zip(values)
+                        .all(|(own_value, value)| own_value == value)
             })
     }
 
@@ -295,8 +298,8 @@ impl Pathing {
     /// changes first. None for a restriction the data has not got.
     pub fn planner(&mut self, restriction: RestrictionId, tiles: &Tiles) -> Option<&mut Planner> {
         for rect in self.pending.drain(..) {
-            for p in self.planners.values_mut() {
-                p.update(rect, tiles);
+            for planner in self.planners.values_mut() {
+                planner.update(rect, tiles);
             }
         }
         let _ = self.restrictions.get(restriction.index())?;
@@ -331,17 +334,17 @@ impl Pathing {
             return;
         }
         if moving == MoveState::Moving {
-            if let Some(s) = self.shapes.remove(id) {
-                mesh.remove(s);
+            if let Some(shape_id) = self.shapes.remove(id) {
+                mesh.remove(shape_id);
             }
             return;
         }
         let rect = shape_rect(placed);
-        let s = match self.shapes.get(id) {
+        let shape = match self.shapes.get(id) {
             None => mesh.add(rect),
             Some(&shape_id) => mesh.replace(shape_id, rect),
         };
-        let _ = self.shapes.insert(id, s);
+        let _ = self.shapes.insert(id, shape);
     }
 
     /// `FUN_141056460`'s shape for an object that does not move, by its master's obstruction
@@ -351,11 +354,11 @@ impl Pathing {
             return;
         };
         let rect = shape_rect(placed);
-        let s = match self.shapes.get(id) {
+        let shape = match self.shapes.get(id) {
             None => mesh.add(rect),
             Some(&shape_id) => mesh.replace(shape_id, rect),
         };
-        let _ = self.shapes.insert(id, s);
+        let _ = self.shapes.insert(id, shape);
     }
 
     /// The end of an action object's update (`RGE_Action_Object::update` -> `FUN_141163080` ->
@@ -379,8 +382,8 @@ impl Pathing {
             return;
         }
         if moving == MoveState::Moving {
-            if let Some(s) = self.shapes.remove(id) {
-                mesh.remove(s);
+            if let Some(shape_id) = self.shapes.remove(id) {
+                mesh.remove(shape_id);
             }
             return;
         }
@@ -390,11 +393,11 @@ impl Pathing {
             placed.radius
         };
         let rect = refreshed_rect(placed.position, radius);
-        let s = match self.shapes.get(id) {
+        let shape = match self.shapes.get(id) {
             None => mesh.add(rect),
             Some(&shape_id) => mesh.replace(shape_id, rect),
         };
-        let _ = self.shapes.insert(id, s);
+        let _ = self.shapes.insert(id, shape);
     }
 
     /// A temporary shape for a kept hit of the walk (`FUN_141054fe0` with 1 on an object without a

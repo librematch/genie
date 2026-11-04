@@ -7,7 +7,7 @@ use crate::math::rng::Stream;
 use crate::objects::ObjectId;
 use crate::world::World;
 use crate::world::index::Place;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 
 impl World {
     /// Run a command in the command phase (`TRIBE_Command::do_command`, `0x140e77b00`): its own
@@ -28,10 +28,10 @@ impl World {
                 .players
                 .iter_mut()
                 .flat_map(|player| player.objects.iter_mut())
-                .find(|o| o.id == id)
-                .filter(|o| self.parts.unit_ai.contains(o.id));
-            if let Some(u) = unit {
-                u.last_human_order = self.world_time;
+                .find(|unit| unit.id == id)
+                .filter(|unit| self.parts.unit_ai.contains(unit.id));
+            if let Some(unit) = unit {
+                unit.last_human_order = self.world_time;
             }
         }
     }
@@ -48,18 +48,18 @@ impl World {
             let Some(place) = self.place(id) else {
                 continue;
             };
-            let (p, i) = match place {
+            let (owner, slot) = match place {
                 Place::Live(player_id, list_index) | Place::Sleeping(player_id, list_index) => {
                     (player_id, list_index)
                 }
             };
-            let player = self.players.player_mut(p)?;
+            let player = self.players.player_mut(owner)?;
             let unit = match place {
-                Place::Live(..) => player.objects.checked_mut(i)?,
-                Place::Sleeping(..) => player.sleeping.checked_mut(i)?,
+                Place::Live(..) => player.objects.checked_mut(slot)?,
+                Place::Sleeping(..) => player.sleeping.checked_mut(slot)?,
             };
             if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
-                ai.reset_for_order(self.streams.get(Stream::Ai));
+                ai.reset_for_order(self.streams.get_mut(Stream::Ai));
             }
         }
         Ok(())

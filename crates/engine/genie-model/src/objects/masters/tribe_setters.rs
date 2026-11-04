@@ -41,8 +41,9 @@ impl Master {
         self.creatable
             .iter_mut()
             .flat_map(|creatable_part| creatable_part.cost.iter_mut())
-            .filter(move |c| {
-                c.attribute.is_some() && ((c.paid && resource.is_none()) || c.attribute == resource)
+            .filter(move |cost_slot| {
+                cost_slot.attribute.is_some()
+                    && ((cost_slot.paid && resource.is_none()) || cost_slot.attribute == resource)
             })
             .map(|cost_slot| &mut cost_slot.amount)
     }
@@ -51,7 +52,7 @@ impl Master {
     pub(super) fn set_tribe_combat(
         &mut self,
         attribute: MasterAttribute,
-        v: f32,
+        value: f32,
         world: &AttributeWorld<'_>,
     ) {
         use crate::objects::masters::MasterAttribute;
@@ -74,8 +75,8 @@ impl Master {
             | MasterAttribute::SPAWNING_AREA_LENGTH
             | MasterAttribute::SPAWNING_AREA_RANDOMNESS => {
                 let hit_points = self.hit_points;
-                if let Some(p) = self.creatable.as_mut() {
-                    p.set_value(attribute, v, hit_points);
+                if let Some(creatable_part) = self.creatable.as_mut() {
+                    creatable_part.set_value(attribute, value, hit_points);
                 }
             }
             MasterAttribute::TRAIN_LOCATION
@@ -83,44 +84,46 @@ impl Master {
             | MasterAttribute::HOTKEY_ID
             | MasterAttribute::TRAIN_TIME
             | MasterAttribute::TRAIN_LOCATIONS_ENTRY_MOD
-            | MasterAttribute::TRAIN_LOCATIONS_TOTAL_NUM => self.set_train_attribute(attribute, v),
+            | MasterAttribute::TRAIN_LOCATIONS_TOTAL_NUM => {
+                self.set_train_attribute(attribute, value);
+            }
             MasterAttribute::MAXIMUM_CHARGE
             | MasterAttribute::RECHARGE_RATE
             | MasterAttribute::CHARGE_EVENT
             | MasterAttribute::CHARGE_KIND
-            | MasterAttribute::CHARGE_PROJECTILE_UNIT => self.set_charge(attribute, v),
+            | MasterAttribute::CHARGE_PROJECTILE_UNIT => self.set_charge(attribute, value),
             MasterAttribute::SPECIAL_GRAPHIC
             | MasterAttribute::IDLE_ATTACK_GRAPHIC
             | MasterAttribute::HERO_GLOW_GRAPHIC
             | MasterAttribute::GARRISON_GRAPHIC
-            | MasterAttribute::ATTACK_GRAPHIC_2 => self.set_tribe_sprite(attribute, v, world),
+            | MasterAttribute::ATTACK_GRAPHIC_2 => self.set_tribe_sprite(attribute, value, world),
             MasterAttribute::RESOURCE_COSTS
             | MasterAttribute::FOOD_COSTS
             | MasterAttribute::WOOD_COSTS
             | MasterAttribute::GOLD_COSTS
             | MasterAttribute::STONE_COSTS => {
                 for cost_amount in self.costs_of(attribute) {
-                    *cost_amount = CostAmount::of_data(low16(v));
+                    *cost_amount = CostAmount::of_data(low16(value));
                 }
             }
             MasterAttribute::POPULATION => {
                 // the unpaid entries take the negated amount; the storage of population (4) the
                 // amount, of resources 11 and 19 its negation
-                let negated = -v;
-                for c in self
+                let negated = -value;
+                for cost_slot in self
                     .creatable
                     .iter_mut()
                     .flat_map(|creatable_part| creatable_part.cost.iter_mut())
                     .filter(|cost_slot| cost_slot.attribute.is_some() && !cost_slot.paid)
                 {
-                    c.amount = CostAmount::of_data(low16(negated));
+                    cost_slot.amount = CostAmount::of_data(low16(negated));
                 }
-                for s in &mut self.storage {
-                    let held = world.roles.of_some_attribute(s.0);
+                for stored in &mut self.storage {
+                    let held = world.roles.of_some_attribute(stored.0);
                     if held.contains(AttributeRoles::HEADROOM) {
-                        s.1 = Amount::new(v);
+                        stored.1 = Amount::new(value);
                     } else if held.contains(AttributeRoles::MAGNITUDE_STORAGE) {
-                        s.1 = Amount::new(negated);
+                        stored.1 = Amount::new(negated);
                     }
                 }
             }
@@ -129,39 +132,39 @@ impl Master {
             | MasterAttribute::ABILITY_SHORT_TOOLTIP_ID
             | MasterAttribute::ABILITY_EXTENDED_TOOLTIP_ID
             | MasterAttribute::ABILITY_HOTKEY_ACTION => {}
-            _ => self.set_combat(attribute, v, world),
+            _ => self.set_combat(attribute, value, world),
         }
     }
 
     /// [`Master::set_tribe_combat`]'s charge (`FUN_1412661d0`): its most, its recharge rate, its
     /// event, its type and its projectile.
-    pub(super) fn set_charge(&mut self, attribute: MasterAttribute, v: f32) {
+    pub(super) fn set_charge(&mut self, attribute: MasterAttribute, value: f32) {
         use crate::math::conversions::cvttss2si;
         use crate::objects::masters::MasterAttribute;
         match attribute {
             MasterAttribute::MAXIMUM_CHARGE => {
-                if let Some(p) = self.creatable.as_mut() {
-                    p.max_charge = Charge::new(v);
+                if let Some(creatable_part) = self.creatable.as_mut() {
+                    creatable_part.max_charge = Charge::new(value);
                 }
             }
             MasterAttribute::RECHARGE_RATE => {
-                if let Some(p) = self.creatable.as_mut() {
-                    p.recharge_rate = ChargeRate::new(v);
+                if let Some(creatable_part) = self.creatable.as_mut() {
+                    creatable_part.recharge_rate = ChargeRate::new(value);
                 }
             }
             MasterAttribute::CHARGE_EVENT => {
-                if let Some(p) = self.creatable.as_mut() {
-                    p.charge_event = ChargeEvent::of_data(low16(v));
+                if let Some(creatable_part) = self.creatable.as_mut() {
+                    creatable_part.charge_event = ChargeEvent::of_data(low16(value));
                 }
             }
             MasterAttribute::CHARGE_KIND => {
-                if let Some(p) = self.creatable.as_mut() {
-                    p.charge_kind = ChargeKind::of_data(low16(v));
+                if let Some(creatable_part) = self.creatable.as_mut() {
+                    creatable_part.charge_kind = ChargeKind::of_data(low16(value));
                 }
             }
             MasterAttribute::CHARGE_PROJECTILE_UNIT => {
                 if let Some(creatable_part) = self.creatable.as_mut() {
-                    creatable_part.charge_projectile = id_of(cvttss2si(v));
+                    creatable_part.charge_projectile = id_of(cvttss2si(value));
                 }
             }
             _ => {}
@@ -173,35 +176,43 @@ impl Master {
     pub(super) fn set_tribe_sprite(
         &mut self,
         attribute: MasterAttribute,
-        v: f32,
+        value: f32,
         world: &AttributeWorld<'_>,
     ) {
         use crate::math::conversions::cvttss2si;
         use crate::objects::masters::MasterAttribute;
         match attribute {
             MasterAttribute::SPECIAL_GRAPHIC => {
-                if let Some(p) = self.creatable.as_mut() {
-                    set_sprite(&mut p.special_sprite, cvttss2si(v), world);
+                if let Some(creatable_part) = self.creatable.as_mut() {
+                    set_sprite(&mut creatable_part.special_sprite, cvttss2si(value), world);
                 }
             }
             MasterAttribute::IDLE_ATTACK_GRAPHIC => {
-                if let Some(p) = self.creatable.as_mut() {
-                    set_sprite(&mut p.idle_attack_sprite, cvttss2si(v), world);
+                if let Some(creatable_part) = self.creatable.as_mut() {
+                    set_sprite(
+                        &mut creatable_part.idle_attack_sprite,
+                        cvttss2si(value),
+                        world,
+                    );
                 }
             }
             MasterAttribute::HERO_GLOW_GRAPHIC => {
-                if let Some(p) = self.creatable.as_mut() {
-                    set_sprite(&mut p.hero_glow_sprite, cvttss2si(v), world);
+                if let Some(creatable_part) = self.creatable.as_mut() {
+                    set_sprite(
+                        &mut creatable_part.hero_glow_sprite,
+                        cvttss2si(value),
+                        world,
+                    );
                 }
             }
             MasterAttribute::GARRISON_GRAPHIC => {
                 if let Some(creatable_part) = self.creatable.as_mut() {
-                    set_sprite(&mut creatable_part.garrison_sprite, cvttss2si(v), world);
+                    set_sprite(&mut creatable_part.garrison_sprite, cvttss2si(value), world);
                 }
             }
             MasterAttribute::ATTACK_GRAPHIC_2 => {
                 if let Some(combat_part) = self.combat.as_mut() {
-                    set_sprite(&mut combat_part.attack_sprite2, cvttss2si(v), world);
+                    set_sprite(&mut combat_part.attack_sprite2, cvttss2si(value), world);
                 }
             }
             _ => {}
@@ -210,35 +221,36 @@ impl Master {
 
     /// [`Master::set_tribe_combat`]'s train locations (`FUN_1412661d0`): the selected entry's
     /// location, button, hotkey and time, the selection (at most the last) and the count.
-    pub(super) fn set_train_attribute(&mut self, attribute: MasterAttribute, v: f32) {
+    pub(super) fn set_train_attribute(&mut self, attribute: MasterAttribute, value: f32) {
         use crate::math::conversions::cvttss2si;
         use crate::objects::masters::MasterAttribute;
         match attribute {
             MasterAttribute::TRAIN_LOCATION => {
-                if let Some(t) = self.train_location_mut() {
-                    t.location = MasterId::of_data(low16(v));
+                if let Some(train_location) = self.train_location_mut() {
+                    train_location.location = MasterId::of_data(low16(value));
                 }
             }
             MasterAttribute::TRAIN_BUTTON => {
-                if let Some(t) = self.train_location_mut() {
-                    t.button = LocationButton::of_data(low8(v));
+                if let Some(train_location) = self.train_location_mut() {
+                    train_location.button = LocationButton::of_data(low8(value));
                 }
             }
             MasterAttribute::HOTKEY_ID => {
-                if let Some(t) = self.train_location_mut() {
-                    t.hotkey = HotkeyId::of_data(cvttss2si(v));
+                if let Some(train_location) = self.train_location_mut() {
+                    train_location.hotkey = HotkeyId::of_data(cvttss2si(value));
                 }
             }
             MasterAttribute::TRAIN_TIME => {
                 if let Some(train_location) = self.train_location_mut() {
-                    train_location.time = WholeSeconds::of_data(low16(v));
+                    train_location.time = WholeSeconds::of_data(low16(value));
                 }
             }
             MasterAttribute::TRAIN_LOCATIONS_ENTRY_MOD => {
-                if let Some(p) = self.creatable.as_mut()
-                    && let Some(n) = select_entry(p.train_locations.len(), cvttss2si(v))
+                if let Some(creatable_part) = self.creatable.as_mut()
+                    && let Some(selected) =
+                        select_entry(creatable_part.train_locations.len(), cvttss2si(value))
                 {
-                    p.train_location_entry = TrainLocationEntry::of_selected(n);
+                    creatable_part.train_location_entry = TrainLocationEntry::of_selected(selected);
                 }
             }
             MasterAttribute::TRAIN_LOCATIONS_TOTAL_NUM => {
@@ -246,7 +258,7 @@ impl Master {
                     resize_train_locations(
                         &mut creatable_part.train_locations,
                         &mut creatable_part.train_location_entry,
-                        v,
+                        value,
                     );
                 }
             }
@@ -260,7 +272,7 @@ impl Master {
     pub(super) fn add_tribe_combat(
         &mut self,
         attribute: MasterAttribute,
-        v: f32,
+        value: f32,
         world: &AttributeWorld<'_>,
     ) {
         use crate::objects::masters::MasterAttribute;
@@ -290,7 +302,7 @@ impl Master {
             | MasterAttribute::TRAIN_LOCATIONS_TOTAL_NUM => {
                 let hit_points = self.hit_points;
                 if let Some(creatable_part) = self.creatable.as_mut() {
-                    creatable_part.add_value(attribute, v, hit_points, world);
+                    creatable_part.add_value(attribute, value, hit_points, world);
                 }
             }
             MasterAttribute::RESOURCE_COSTS
@@ -299,25 +311,25 @@ impl Master {
             | MasterAttribute::GOLD_COSTS
             | MasterAttribute::STONE_COSTS => {
                 for cost_amount in self.costs_of(attribute) {
-                    *cost_amount = cost_amount.plus(low16(v));
+                    *cost_amount = cost_amount.plus(low16(value));
                 }
             }
             MasterAttribute::TRAIN_TIME => {
                 if let Some(train_location) = self.train_location_mut() {
-                    train_location.time = train_location.time.plus(low16(v));
+                    train_location.time = train_location.time.plus(low16(value));
                 }
             }
             // FUN_141533c70 tests the new id; the game takes the sprite from the same table
             MasterAttribute::ATTACK_GRAPHIC_2 => {
                 if let Some(combat_part) = self.combat.as_mut() {
-                    add_sprite(&mut combat_part.attack_sprite2, v, world);
+                    add_sprite(&mut combat_part.attack_sprite2, value, world);
                 }
             }
             MasterAttribute::ABILITY_BUTTON_ICON_ID
             | MasterAttribute::ABILITY_SHORT_TOOLTIP_ID
             | MasterAttribute::ABILITY_EXTENDED_TOOLTIP_ID
             | MasterAttribute::ABILITY_HOTKEY_ACTION => {}
-            _ => self.add_combat(attribute, v, world),
+            _ => self.add_combat(attribute, value, world),
         }
     }
 
@@ -325,7 +337,7 @@ impl Master {
     pub(super) fn multiply_tribe_combat(
         &mut self,
         attribute: MasterAttribute,
-        v: f32,
+        value: f32,
         world: &AttributeWorld<'_>,
     ) {
         use crate::objects::masters::MasterAttribute;
@@ -346,7 +358,7 @@ impl Master {
             | MasterAttribute::TRAIN_LOCATIONS_ENTRY_MOD
             | MasterAttribute::TRAIN_LOCATIONS_TOTAL_NUM => {
                 if let Some(creatable_part) = self.creatable.as_mut() {
-                    creatable_part.multiply_value(attribute, v);
+                    creatable_part.multiply_value(attribute, value);
                 }
             }
             MasterAttribute::RESOURCE_COSTS
@@ -355,18 +367,18 @@ impl Master {
             | MasterAttribute::GOLD_COSTS
             | MasterAttribute::STONE_COSTS => {
                 for cost_amount in self.costs_of(attribute) {
-                    *cost_amount = CostAmount::of_data(low16(cost_amount.as_f32() * v + ROUND));
+                    *cost_amount = CostAmount::of_data(low16(cost_amount.as_f32() * value + ROUND));
                 }
             }
             MasterAttribute::TRAIN_TIME => {
                 // FUN_140ace5e0 reads 0 past the list; FUN_14126ade0 writes only within it
                 if let Some(train_location) = self.train_location_mut() {
                     train_location.time = WholeSeconds::of_data(low16(
-                        f32::from(train_location.time.get()) * v + ROUND,
+                        f32::from(train_location.time.get()) * value + ROUND,
                     ));
                 }
             }
-            _ => self.multiply_combat(attribute, v, world),
+            _ => self.multiply_combat(attribute, value, world),
         }
     }
 
@@ -375,29 +387,29 @@ impl Master {
     pub(super) fn set_building(
         &mut self,
         attribute: MasterAttribute,
-        v: f32,
+        value: f32,
         world: &AttributeWorld<'_>,
     ) {
         use crate::objects::masters::MasterAttribute;
         match attribute {
             MasterAttribute::BUILDING_ICON_OVERRIDE => {
-                if let Some(b) = self.building.as_mut() {
-                    b.facet = low16(v);
+                if let Some(building_master) = self.building.as_mut() {
+                    building_master.facet = low16(value);
                 }
             }
             MasterAttribute::GARRISON_KIND => {
-                if let Some(b) = self.building.as_mut() {
-                    b.garrison_kind = GarrisonKinds::from_bits_retain(low8(v));
+                if let Some(building_master) = self.building.as_mut() {
+                    building_master.garrison_kind = GarrisonKinds::from_bits_retain(low8(value));
                 }
             }
             MasterAttribute::FOUNDATION_TERRAIN => {
-                if let Some(b) = self.building.as_mut() {
-                    b.foundation_terrain = TerrainId::of_data(low16(v));
+                if let Some(building_master) = self.building.as_mut() {
+                    building_master.foundation_terrain = TerrainId::of_data(low16(value));
                 }
             }
             MasterAttribute::GARRISON_HEAL_RATE => {
                 if let Some(building_master) = self.building.as_mut() {
-                    building_master.garrison_heal_rate = HitPoints::new(v);
+                    building_master.garrison_heal_rate = HitPoints::new(value);
                 }
             }
             MasterAttribute::CONSTRUCTION_GRAPHIC
@@ -410,7 +422,7 @@ impl Master {
             | MasterAttribute::CONSTRUCTION_SOUND_EVENT
             | MasterAttribute::TRANSFORM_SOUND
             | MasterAttribute::TRANSFORM_SOUND_EVENT => {}
-            _ => self.set_tribe_combat(attribute, v, world),
+            _ => self.set_tribe_combat(attribute, value, world),
         }
     }
 
@@ -418,34 +430,38 @@ impl Master {
     pub(super) fn add_building(
         &mut self,
         attribute: MasterAttribute,
-        v: f32,
+        value: f32,
         world: &AttributeWorld<'_>,
     ) {
         use crate::objects::masters::MasterAttribute;
         match attribute {
             MasterAttribute::BUILDING_ICON_OVERRIDE => {
-                if let Some(b) = self.building.as_mut() {
-                    b.facet = b.facet.wrapping_add(low16(v));
+                if let Some(building_master) = self.building.as_mut() {
+                    building_master.facet = building_master.facet.wrapping_add(low16(value));
                 }
             }
             MasterAttribute::GARRISON_KIND => {
-                if let Some(b) = self.building.as_mut() {
-                    b.garrison_kind = GarrisonKinds::from_bits_retain(
-                        b.garrison_kind.bits().wrapping_add(low8(v)),
+                if let Some(building_master) = self.building.as_mut() {
+                    building_master.garrison_kind = GarrisonKinds::from_bits_retain(
+                        building_master
+                            .garrison_kind
+                            .bits()
+                            .wrapping_add(low8(value)),
                     );
                 }
             }
             MasterAttribute::FOUNDATION_TERRAIN => {
-                if let Some(b) = self.building.as_mut() {
-                    let was = b
+                if let Some(building_master) = self.building.as_mut() {
+                    let was = building_master
                         .foundation_terrain
                         .map_or(-1, |terrain_id| i16::from(terrain_id.get()));
-                    b.foundation_terrain = TerrainId::of_data(was.wrapping_add(low16(v)));
+                    building_master.foundation_terrain =
+                        TerrainId::of_data(was.wrapping_add(low16(value)));
                 }
             }
             MasterAttribute::GARRISON_HEAL_RATE => {
                 if let Some(building_master) = self.building.as_mut() {
-                    building_master.garrison_heal_rate += HitPoints::new(v);
+                    building_master.garrison_heal_rate += HitPoints::new(value);
                 }
             }
             MasterAttribute::CONSTRUCTION_GRAPHIC
@@ -456,7 +472,7 @@ impl Master {
             | MasterAttribute::RESEARCH_COMPLETED_GRAPHIC
             | MasterAttribute::CONSTRUCTION_SOUND
             | MasterAttribute::TRANSFORM_SOUND => {}
-            _ => self.add_tribe_combat(attribute, v, world),
+            _ => self.add_tribe_combat(attribute, value, world),
         }
     }
 
@@ -464,15 +480,15 @@ impl Master {
     pub(super) fn multiply_building(
         &mut self,
         attribute: MasterAttribute,
-        v: f32,
+        value: f32,
         world: &AttributeWorld<'_>,
     ) {
         match (attribute, self.building.as_mut()) {
             (MasterAttribute::GARRISON_HEAL_RATE, Some(building_master)) => {
-                building_master.garrison_heal_rate *= v;
+                building_master.garrison_heal_rate *= value;
             }
             (MasterAttribute::GARRISON_HEAL_RATE, None) => {}
-            _ => self.multiply_tribe_combat(attribute, v, world),
+            _ => self.multiply_tribe_combat(attribute, value, world),
         }
     }
 }

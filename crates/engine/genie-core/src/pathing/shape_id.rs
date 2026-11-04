@@ -42,7 +42,7 @@ impl ShapeId {
     pub const fn of_link(word: i32) -> Option<Self> {
         match word {
             -1 => None,
-            w => Some(Self(w as u32)),
+            word => Some(Self(word as u32)),
         }
     }
 }

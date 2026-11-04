@@ -13,8 +13,8 @@ impl Planner {
     pub(super) fn steps_to(&self, to: PlanTile, level: GridLevel, cell: PlanTile) -> u16 {
         let dy = (to.y() - cell.y()).max(0);
         let dx = (to.x() - cell.x()).max(0);
-        let c = self.cell(level, cell);
-        if !c.kind.contains(CellKind::OFF_MAP) && !c.edges.is_empty() {
+        let cell = self.cell(level, cell);
+        if !cell.kind.contains(CellKind::OFF_MAP) && !cell.edges.is_empty() {
             (dy + dx) as u16
         } else {
             0xffff
@@ -31,21 +31,25 @@ impl Planner {
             // the children in the order (2x, 2y), (2x, 2y + 1), (2x + 1, 2y), (2x + 1, 2y + 1)
             let [c0, c1, c2, c3] = at.children();
             let to = goal.at_level(grid_level.down());
-            let d = [
+            let distances = [
                 self.steps_to(to, cl, c0),
                 self.steps_to(to, cl, c2),
                 self.steps_to(to, cl, c1),
                 self.steps_to(to, cl, c3),
             ];
-            let mut best = if d[0] < 9999 { d[0] } else { 9999 };
-            let mut which: i32 = if 9998 < d[0] { -1 } else { 0 };
-            for (index, &dk) in d.iter().enumerate().skip(1).take(2) {
+            let mut best = if distances[0] < 9999 {
+                distances[0]
+            } else {
+                9999
+            };
+            let mut which: i32 = if 9998 < distances[0] { -1 } else { 0 };
+            for (index, &dk) in distances.iter().enumerate().skip(1).take(2) {
                 if -1 < dk as i16 && (dk as i16) < best as i16 {
                     which = index as i32;
                     best = dk;
                 }
             }
-            at = if -1 < d[3] as i16 && (d[3] as i16) < best as i16 {
+            at = if -1 < distances[3] as i16 && (distances[3] as i16) < best as i16 {
                 c3
             } else {
                 match which {
@@ -71,21 +75,21 @@ impl Planner {
     ) -> Option<i16> {
         let mut off: i16 = 9999;
         let mut found = None;
-        let mut s = at;
-        while s <= hi {
-            if tile_at(s).edges.intersects(dir) {
-                off = s - at;
-                found = Some(s);
+        let mut scan = at;
+        while scan <= hi {
+            if tile_at(scan).edges.intersects(dir) {
+                off = scan - at;
+                found = Some(scan);
                 break;
             }
-            s += 1;
+            scan += 1;
         }
-        let mut s = at;
-        while lo <= s && 0 < off {
-            if tile_at(s).edges.intersects(dir) {
-                return Some(s);
+        let mut at = at;
+        while lo <= at && 0 < off {
+            if tile_at(at).edges.intersects(dir) {
+                return Some(at);
             }
-            s -= 1;
+            at -= 1;
             off -= 1;
         }
         found
@@ -97,7 +101,7 @@ impl Planner {
         let node = self.nodes[node_index];
         let parent = self.nodes[node.parent?];
         // the levels as the shifts from a cell to its tiles
-        let (smaller, l) = if parent.level < node.level {
+        let (smaller, shift) = if parent.level < node.level {
             (parent.at, parent.level.get())
         } else {
             (node.at, node.level.get())
@@ -106,10 +110,10 @@ impl Planner {
         let (x, y) = (smaller.x(), smaller.y());
         let (nx, ny) = (node.at.x(), node.at.y());
         let dir = node.dir;
-        let span = |v: i16| {
-            let lo = v << l;
-            if 0 < l {
-                (lo, (1 << (l - 1)) + lo, (1 << l) - 1 + lo)
+        let span = |coordinate: i16| {
+            let lo = coordinate << shift;
+            if 0 < shift {
+                (lo, (1 << (shift - 1)) + lo, (1 << shift) - 1 + lo)
             } else {
                 (lo, lo, lo)
             }
@@ -121,9 +125,9 @@ impl Planner {
             } else {
                 ((ny + 1) << nl) - 1
             };
-            let x = if 0 < l {
-                self.nearest_on_boundary(mid, lo, hi, dir, |s| {
-                    self.cell(GridLevel::TILES, PlanTile::new(s, row))
+            let x = if 0 < shift {
+                self.nearest_on_boundary(mid, lo, hi, dir, |coordinate| {
+                    self.cell(GridLevel::TILES, PlanTile::new(coordinate, row))
                 })
                 .unwrap_or(mid)
             } else {
@@ -137,9 +141,9 @@ impl Planner {
             } else {
                 ((nx + 1) << nl) - 1
             };
-            let y = if 0 < l {
-                self.nearest_on_boundary(mid, lo, hi, dir, |s| {
-                    self.cell(GridLevel::TILES, PlanTile::new(col, s))
+            let y = if 0 < shift {
+                self.nearest_on_boundary(mid, lo, hi, dir, |coordinate| {
+                    self.cell(GridLevel::TILES, PlanTile::new(col, coordinate))
                 })
                 .unwrap_or(mid)
             } else {
@@ -182,12 +186,12 @@ impl Planner {
         let (tx, ty, lx, ly) = (toward.x(), toward.y(), from.x(), from.y());
         let dir = node.dir;
         let (dxl, dyl) = (tx.wrapping_sub(lx), ty.wrapping_sub(ly));
-        // where the line meets the edge, `d` tiles from the last point along the other axis
-        let along = |base: i16, d: i16, num: i16, den: i16| {
-            if d == 0 || den == 0 {
+        // where the line meets the edge, `steps` tiles from the last point along the other axis
+        let along = |base: i16, steps: i16, num: i16, den: i16| {
+            if steps == 0 || den == 0 {
                 base
             } else {
-                (i32::from(base) + (i32::from(d) * i32::from(num)) / i32::from(den)) as i16
+                (i32::from(base) + (i32::from(steps) * i32::from(num)) / i32::from(den)) as i16
             }
         };
         let (lo, hi, at, fixed) = if dir == CellEdges::N || dir == CellEdges::S {
@@ -199,8 +203,8 @@ impl Planner {
             let hi = hi.min(last.x());
             let bottom = bottom.min(last.y());
             if dir == CellEdges::N {
-                let d = if top <= ly { top - ly } else { 0 };
-                (lo, hi, along(lx, d, dxl, dyl), top)
+                let steps = if top <= ly { top - ly } else { 0 };
+                (lo, hi, along(lx, steps, dxl, dyl), top)
             } else if ly <= bottom {
                 (lo, hi, along(lx, bottom - ly, dxl, dyl), bottom)
             } else {
@@ -212,19 +216,19 @@ impl Planner {
             let lo = by << bl;
             let hi = ((by + 1) << bl) - 1;
             if dir == CellEdges::W {
-                let d = if left <= lx { left - lx } else { 0 };
-                (lo, hi, along(ly, d, dyl, dxl), left)
+                let steps = if left <= lx { left - lx } else { 0 };
+                (lo, hi, along(ly, steps, dyl, dxl), left)
             } else if lx <= right {
                 (lo, hi, along(ly, right - lx, dyl, dxl), right)
             } else {
                 (lo, hi, ly, right)
             }
         };
-        let passes = |s: i16| {
+        let passes = |coordinate: i16| {
             let cell = if dir == CellEdges::N || dir == CellEdges::S {
-                self.cell(GridLevel::TILES, PlanTile::new(s, fixed))
+                self.cell(GridLevel::TILES, PlanTile::new(coordinate, fixed))
             } else {
-                self.cell(GridLevel::TILES, PlanTile::new(fixed, s))
+                self.cell(GridLevel::TILES, PlanTile::new(fixed, coordinate))
             };
             cell.edges.intersects(dir)
         };
@@ -232,14 +236,14 @@ impl Planner {
             if at < hi {
                 let mut off: i16 = 9999;
                 let mut found = -1;
-                let mut s = at;
-                while s <= hi {
-                    if passes(s) {
-                        off = s - at;
-                        found = s;
+                let mut scan = at;
+                while scan <= hi {
+                    if passes(scan) {
+                        off = scan - at;
+                        found = scan;
                         break;
                     }
-                    s += 1;
+                    scan += 1;
                 }
                 let mut cur = at;
                 loop {
@@ -256,10 +260,15 @@ impl Planner {
                     }
                 }
             } else {
-                (lo..=hi).rev().find(|&s| passes(s)).unwrap_or(-1)
+                (lo..=hi)
+                    .rev()
+                    .find(|&coordinate| passes(coordinate))
+                    .unwrap_or(-1)
             }
         } else {
-            (lo..=hi).find(|&s| passes(s)).unwrap_or(-1)
+            (lo..=hi)
+                .find(|&coordinate| passes(coordinate))
+                .unwrap_or(-1)
         };
         Some(if dir == CellEdges::N || dir == CellEdges::S {
             PlanTile::new(result, fixed)
@@ -294,7 +303,7 @@ impl Planner {
         loop {
             let parent = self.nodes[node].parent;
             let toward = parent
-                .and_then(|p| self.nodes[p].parent)
+                .and_then(|node_index| self.nodes[node_index].parent)
                 .and_then(|gp| self.crossing(gp))
                 .unwrap_or(start);
             if let Some(at) = self.aim(node, toward, self.last) {

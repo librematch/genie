@@ -118,10 +118,10 @@ mod tests {
     /// 0, 1, 2, 10, 11 and 13 mark their tiles.
     #[test]
     fn the_kinds_record_file_test_and_mark_as_the_game_does() {
-        let kinds = |f: fn(ObstructionKind) -> bool| -> Vec<u8> {
+        let kinds = |test: fn(ObstructionKind) -> bool| -> Vec<u8> {
             (0..16)
                 .map(ObstructionKind::from)
-                .filter(|&obstruction_kind| f(obstruction_kind))
+                .filter(|&obstruction_kind| test(obstruction_kind))
                 .map(ObstructionKind::get)
                 .collect()
         };
@@ -138,7 +138,9 @@ mod tests {
     /// An effect keeps the table's types and the bytes past it and makes the others 0.
     #[test]
     fn an_effect_sets_the_tables_kinds_and_clears_the_others() {
-        let set: Vec<u8> = (0..16).map(|b| ObstructionKind::set(b).get()).collect();
+        let set: Vec<u8> = (0..16)
+            .map(|bits| ObstructionKind::set(bits).get())
+            .collect();
         assert_eq!(set, [0, 1, 2, 3, 0, 5, 0, 0, 0, 0, 10, 11, 12, 13, 14, 15]);
     }
 }

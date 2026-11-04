@@ -47,12 +47,12 @@ pub(super) fn compare_players(
 /// The world's game state and the map's terrain against the game's: Gaia's differences.
 pub(super) fn world_differences(turns: &World, after: &SavedStep, report: &mut TickReport) {
     if turns.game_state != after.game.game_state {
-        let d = format!(
+        let text = format!(
             "game state slice {} game {}",
             turns.game_state.get(),
             after.game.game_state.get()
         );
-        report.differences.push((0, d));
+        report.differences.push((0, text));
     }
     if let Some(terrain) = turns.spatial.terrain.as_ref() {
         for text in tile_differences(terrain, after.width, &after.terrain) {
@@ -61,29 +61,32 @@ pub(super) fn world_differences(turns: &World, after: &SavedStep, report: &mut T
     }
 }
 
-/// Player `p`'s stops, state, objects and sight against the game's save `after`.
+/// Player `player_index`'s stops, state, objects and sight against the game's save `after`.
 fn player_differences(
     turns: &World,
     after: &SavedStep,
     tick: Option<u32>,
-    p: usize,
+    player_index: usize,
     report: &mut TickReport,
 ) -> GenieResult<()> {
-    let player = &turns.players[p];
-    let id = p as u32;
+    let player = &turns.players[player_index];
+    let id = player_index as u32;
     let frozen = stops(player, id, tick, report);
-    let game = after.objects.get(p).ok_or_else(|| no_such_player(id))?;
+    let game = after
+        .objects
+        .get(player_index)
+        .ok_or_else(|| no_such_player(id))?;
     if !player.stopped {
-        stock_differences(player, &after.game, p, report);
+        stock_differences(player, &after.game, player_index, report);
     }
-    if let Some(&(status, resigned)) = after.game.statuses.get(p)
+    if let Some(&(status, resigned)) = after.game.statuses.get(player_index)
         && (status, resigned)
             != (
                 player.game_status,
                 player.departures.contains(Departures::RESIGNED),
             )
     {
-        let d = format!(
+        let text = format!(
             "game status slice {:?} game {:?} (status, resigned)",
             (
                 player.game_status.get(),
@@ -91,24 +94,24 @@ fn player_differences(
             ),
             (status.get(), resigned)
         );
-        report.differences.push((id, d));
+        report.differences.push((id, text));
     }
     if !player.stopped {
-        for d in tech_differences(player, &after.game, p) {
-            report.differences.push((id, d));
+        for text in tech_differences(player, &after.game, player_index) {
+            report.differences.push((id, text));
         }
-        for d in object_differences(crate::object_rows(turns, p), game) {
-            let object = d
+        for difference in object_differences(crate::object_rows(turns, player_index), game) {
+            let object = difference
                 .split(':')
                 .next()
-                .and_then(|o| o.parse::<i32>().ok().and_then(ObjectId::of_field));
+                .and_then(|text| text.parse::<i32>().ok().and_then(ObjectId::of_field));
             if !object.is_some_and(|object_id| frozen.contains(&object_id)) {
-                report.differences.push((id, d));
+                report.differences.push((id, difference));
             }
         }
     }
     if let Some(sight) = turns.spatial.sight.as_ref() {
-        for text in visibility_differences(sight, &after.seen, p) {
+        for text in visibility_differences(sight, &after.seen, player_index) {
             report.differences.push((id, text));
         }
     }
@@ -119,23 +122,23 @@ fn player_differences(
 /// only that update's); returns the objects whose differences are left out: the stopped and the
 /// frozen ones, of any update.
 fn stops(player: &Player, id: u32, tick: Option<u32>, report: &mut TickReport) -> Vec<ObjectId> {
-    let now = |t: u32| tick.is_none_or(|n| n == t);
-    if let Some((t, _, why)) = player
+    let now = |at: u32| tick.is_none_or(|wanted| wanted == at);
+    if let Some((tick, _, why)) = player
         .unsupported
         .clone()
-        .filter(|u| player.stopped && now(u.0.get()))
+        .filter(|unmodelled| player.stopped && now(unmodelled.0.get()))
     {
-        report.unsupported.push((id, None, t.get(), why));
+        report.unsupported.push((id, None, tick.get(), why));
     }
-    for (t, o, why) in player.freezes.iter().filter(|f| now(f.0.get())) {
+    for (tick, object_id, why) in player.freezes.iter().filter(|freeze| now(freeze.0.get())) {
         report
             .unsupported
-            .push((id, Some(*o), t.get(), why.clone()));
+            .push((id, Some(*object_id), tick.get(), why.clone()));
     }
     player
         .objects
         .iter()
-        .filter(|u| u.stopped)
+        .filter(|unit| unit.stopped)
         .map(|unit| unit.id)
         .chain(player.freezes.iter().map(|&(_, object_id, _)| object_id))
         .collect()
@@ -143,16 +146,21 @@ fn stops(player: &Player, id: u32, tick: Option<u32>, report: &mut TickReport) -
 
 /// A player's resources against the game's (one difference), then each other attribute the
 /// slice holds that differs (reported apart).
-fn stock_differences(player: &Player, game: &GameState, p: usize, report: &mut TickReport) {
-    let id = p as u32;
+fn stock_differences(
+    player: &Player,
+    game: &GameState,
+    player_index: usize,
+    report: &mut TickReport,
+) {
+    let id = player_index as u32;
     let resources = player.resources().map(Amount::get);
-    if let Some(r) = game.resources.get(p)
-        && *r != resources
+    if let Some(theirs) = game.resources.get(player_index)
+        && *theirs != resources
     {
-        let text = format!("resources slice {resources:?} game {r:?}");
+        let text = format!("resources slice {resources:?} game {theirs:?}");
         report.differences.push((id, text));
     }
-    if let Some(saved) = game.attributes.get(p) {
+    if let Some(saved) = game.attributes.get(player_index) {
         report.attributes.extend(
             player
                 .attributes
@@ -160,43 +168,51 @@ fn stock_differences(player: &Player, game: &GameState, p: usize, report: &mut T
                 .zip(saved)
                 .enumerate()
                 .skip(4)
-                .filter(|(_, (a, b))| a.get().to_bits() != b.to_bits())
-                .map(|(i, (amount, b))| (id, i, amount.get().to_bits(), b.to_bits())),
+                .filter(|(_, (amount, game_amount))| {
+                    amount.get().to_bits() != game_amount.to_bits()
+                })
+                .map(|(attribute, (amount, game_amount))| {
+                    (id, attribute, amount.get().to_bits(), game_amount.to_bits())
+                }),
         );
     }
 }
 
 /// A player's pending debit and technology states against the game's: per technology its state,
 /// researches queued and done, work done and building.
-pub(super) fn tech_differences(player: &Player, game: &GameState, p: usize) -> Vec<String> {
+pub(super) fn tech_differences(
+    player: &Player,
+    game: &GameState,
+    player_index: usize,
+) -> Vec<String> {
     let mut out = Vec::new();
-    if let Some(d) = game
+    if let Some(amounts) = game
         .pending_debit
-        .get(p)
+        .get(player_index)
         .filter(|&&amounts| amounts != player.pending_debit)
     {
         out.push(format!(
             "pending debit slice {:?} game {:?}",
             player.pending_debit.map(Amount::get),
-            d.map(Amount::get)
+            amounts.map(Amount::get)
         ));
     }
-    let Some(theirs) = game.techs.get(p) else {
+    let Some(theirs) = game.techs.get(player_index) else {
         return out;
     };
-    let key = |t: &TechState| {
+    let key = |tech_state: &TechState| {
         (
-            t.state,
-            t.pending,
-            t.times_researched,
-            t.research_done,
-            t.building_master,
+            tech_state.state,
+            tech_state.pending,
+            tech_state.times_researched,
+            tech_state.research_done,
+            tech_state.building_master,
         )
     };
-    for (i, (index, tech_state)) in player.techs.iter().zip(theirs).enumerate() {
+    for (tech, (index, tech_state)) in player.techs.iter().zip(theirs).enumerate() {
         if key(index) != key(tech_state) {
             out.push(format!(
-                "tech {i}: slice {:?} game {:?} (state, queued, done, work, building)",
+                "tech {tech}: slice {:?} game {:?} (state, queued, done, work, building)",
                 key(index),
                 key(tech_state)
             ));
@@ -326,11 +342,11 @@ pub(super) fn load_dumps(turns: &mut World, dumps: Dumps<'_>) -> GenieResult<()>
 
 /// The recording's first `limit` frames, the hunted animals' origins taken from its start
 /// ([`hunted_origins`]).
-pub(super) fn played_frames<'a>(
+pub(super) fn played_frames<'data>(
     turns: &mut World,
-    recording: &'a [u8],
+    recording: &'data [u8],
     limit: usize,
-) -> GenieResult<Vec<Frame<'a>>> {
+) -> GenieResult<Vec<Frame<'data>>> {
     let played = chapters(recording)?[0];
     hunted_origins(turns, &played.header()?);
     frames(&played, limit)
@@ -342,12 +358,13 @@ pub(super) fn primed(turns: &mut World, all: &[Frame<'_>], updates: usize) -> De
     turns.ticks = Tick::new(updates as u32);
     let mut decoder = Decoder::default();
     decoder.prime(&all[..updates.min(all.len())]);
-    for (&p, units) in &decoder.last_commanded {
-        if turns.last_commanded.len() <= p {
-            turns.last_commanded.resize(p + 1, Vec::new());
+    for (&player_index, units) in &decoder.last_commanded {
+        if turns.last_commanded.len() <= player_index {
+            turns.last_commanded.resize(player_index + 1, Vec::new());
         }
-        let most = PlayerId::try_from(p).map_or(0, |player_id| turns.most_units(player_id));
-        turns.last_commanded[p] = units[..units.len().min(most)].to_vec();
+        let most =
+            PlayerId::try_from(player_index).map_or(0, |player_id| turns.most_units(player_id));
+        turns.last_commanded[player_index] = units[..units.len().min(most)].to_vec();
     }
     decoder
 }
@@ -358,7 +375,7 @@ pub(super) fn frame_commands(turns: &mut World, decoder: &mut Decoder, frame: Op
         let commands: Vec<Command> = frame
             .commands
             .iter()
-            .filter_map(|p| decoder.command(p))
+            .filter_map(|packet| decoder.command(packet))
             .collect();
         turns.command_phase(frame.dt, &commands);
     }

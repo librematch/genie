@@ -94,17 +94,17 @@ fn the_worlds_sight_hands_its_explored_tiles_to_the_players_module() {
         vec![Millis::ZERO; 3],
         Vec::new(),
     );
-    let n = 16 * 16;
+    let tiles = 16 * 16;
     let mut visibility = Visibility::new(
         GridSize::new(16, 16),
         vec![
             VisibleMap {
-                counts: vec![-1; n],
+                counts: vec![-1; tiles],
                 explored: TileCount::ZERO,
             };
             3
         ],
-        vec![VisionBits::NONE; n],
+        vec![VisionBits::NONE; tiles],
         Vec::new(),
         0,
         vec![PlayerKind::Human, PlayerKind::Computer, PlayerKind::Human],
@@ -295,17 +295,23 @@ fn another_zone_ends_the_branch_only_where_the_tile_is_wanted() {
     let size = GridSize::new(4, 4);
     let module = |water: u8| {
         let mut info = info(size, UNEXPLORED);
-        for t in [[0, 1], [1, 1], [3, 2], [0, 3], [1, 3], [2, 3], [3, 3]] {
-            info.path_map.set(Tile::new(t[0], t[1]), EXPLORED);
+        for tile in [[0, 1], [1, 1], [3, 2], [0, 3], [1, 3], [2, 3], [3, 3]] {
+            info.path_map.set(Tile::new(tile[0], tile[1]), EXPLORED);
         }
         info.path_map.set(Tile::new(2, 1), water);
         info
     };
     let seen = [Tile::new(0, 1), Tile::new(1, 1)];
     let scene = || Scene::rows(&["~~~~", "..~.", "###.", "...."]);
-    let mut w = searched(scene(), &seen, at, 4.0);
-    let mut m = module(EXPLORED);
-    let picked = search(&mut m, &mut w, &unit(true, at), at, &mut Well512::default());
+    let mut world = searched(scene(), &seen, at, 4.0);
+    let mut info_module = module(EXPLORED);
+    let picked = search(
+        &mut info_module,
+        &mut world,
+        &unit(true, at),
+        at,
+        &mut Well512::default(),
+    );
     assert_eq!(picked, Some(Tile::new(3, 1)));
     let mut world = searched(scene(), &seen, at, 4.0);
     let mut info_module = module(UNEXPLORED);
@@ -333,17 +339,17 @@ fn the_flood_compares_the_zones_low_bytes() {
         info.path_map.set(open, UNEXPLORED);
         info
     };
-    let mut w = searched(scene(), &[], CORNER, 5.0);
+    let mut world = searched(scene(), &[], CORNER, 5.0);
     {
-        let (area, _, _) = scout_area(&mut w);
+        let (area, _, _) = scout_area(&mut world);
         assert_eq!(area.own_zone(), ZoneId::new(0));
         assert_eq!(area.zone(Tile::new(1, 4)), ZoneId::new(0x200));
         assert_eq!(area.zone(Tile::new(1, 2)), ZoneId::new(2));
     }
-    let mut m = module(Tile::new(1, 4));
+    let mut info_module = module(Tile::new(1, 4));
     let picked = search(
-        &mut m,
-        &mut w,
+        &mut info_module,
+        &mut world,
         &unit(true, CORNER),
         CORNER,
         &mut Well512::default(),
@@ -393,8 +399,8 @@ fn punt_from_the_units_place_picks_corner_of_the_lowest_scored_quadrant() {
     let mut info_module = info(size, EXPLORED);
     info_module.path_map.set(Tile::new(4, 4), UNEXPLORED);
     // quadrant 6 (column 1, row 2) scores far below the others
-    for (index, q) in info_module.quadrants.iter_mut().enumerate() {
-        q[0] = if index == 6 { 0 } else { 1000 };
+    for (index, quadrant) in info_module.quadrants.iter_mut().enumerate() {
+        quadrant[0] = if index == 6 { 0 } else { 1000 };
     }
     let scene = walled(Scene::open(size), Tile::new(3, 3), Tile::new(5, 5));
     let mut world = searched(scene, &[], CORNER, 2.0);

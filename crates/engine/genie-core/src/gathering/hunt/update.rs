@@ -49,7 +49,7 @@ impl HuntAction {
         fight: &mut Fight,
         hunt_reads: &HuntReads,
     ) -> GenieResult<HuntNext> {
-        let roles = &step.w.model.roles.clone();
+        let roles = &step.world.model.roles.clone();
         if hunt_reads.attack.player_kind.is_computer() {
             return Err(GenieError::unsupported(
                 "a computer player's hunt (FUN_140fde4f0)",
@@ -62,15 +62,15 @@ impl HuntAction {
             // case 3: a hunt that gave up on its MoveTo waits (its timer below 0), then set_state 11
             HuntState::Walk { .. } if self.timer < Seconds::ZERO => {
                 let walks = hunt_reads.walks(
-                    &step.w.model.graphics,
-                    (unit, step.w.parts.mover_of(unit.id)),
+                    &step.world.model.graphics,
+                    (unit, step.world.parts.mover_of(unit.id)),
                 );
-                let mover = step.w.parts.mover_mut(unit.id).ok_or(HUNTER_UNMOVING)?;
+                let mover = step.world.parts.mover_mut(unit.id).ok_or(HUNTER_UNMOVING)?;
                 self.wait_then_walk(
                     step.dt.seconds(),
                     mover,
                     &walks,
-                    &step.w.model.tuning.move_to,
+                    &step.world.model.tuning.move_to,
                 )?;
                 Ok(HuntNext::Stay)
             }
@@ -123,7 +123,7 @@ impl HuntAction {
         fight: &mut Fight,
         hunt_reads: &HuntReads,
     ) -> GenieResult<HuntNext> {
-        let roles = &step.w.model.roles.clone();
+        let roles = &step.world.model.roles.clone();
         let attack =
             self.state
                 .attack_mut()
@@ -137,7 +137,7 @@ impl HuntAction {
         {
             0 | 6.. => Ok(HuntNext::Stay),
             1 | 2 | 5 if self.target.is_none() => {
-                self.tear_down(step.w.parts.mover_mut(unit.id))?;
+                self.tear_down(step.world.parts.mover_mut(unit.id))?;
                 self.state = HuntState::Search;
                 Ok(HuntNext::Search)
             }
@@ -155,17 +155,17 @@ impl HuntAction {
             1 | 2 | 5 => {
                 self.decay_check(step, unit, actions, hunt_reads.decay, fight, roles)?;
                 let walks = hunt_reads.walks(
-                    &step.w.model.graphics,
-                    (unit, step.w.parts.mover_of(unit.id)),
+                    &step.world.model.graphics,
+                    (unit, step.world.parts.mover_of(unit.id)),
                 );
                 let player = fight.own.player;
                 self.set_walk(
-                    (&step.w.spatial, unit.position()),
-                    step.w.parts.motion_mut(unit.id),
+                    (&step.world.spatial, unit.position()),
+                    step.world.parts.motion_mut(unit.id),
                     &fight.victim,
                     player,
                     &walks,
-                    &step.w.model,
+                    &step.world.model,
                 )?;
                 Ok(HuntNext::Stay)
             }
@@ -174,15 +174,15 @@ impl HuntAction {
                 let target = self.let_go();
                 unit.hunt_release(step, [target])?;
                 let walks = hunt_reads.walks(
-                    &step.w.model.graphics,
-                    (unit, step.w.parts.mover_of(unit.id)),
+                    &step.world.model.graphics,
+                    (unit, step.world.parts.mover_of(unit.id)),
                 );
-                let mover = step.w.parts.mover_mut(unit.id).ok_or(HUNTER_UNMOVING)?;
+                let mover = step.world.parts.mover_mut(unit.id).ok_or(HUNTER_UNMOVING)?;
                 self.set_point_walk(
                     |move_to| HuntState::WalkSearch { move_to },
                     mover,
                     &walks,
-                    &step.w.model.tuning.move_to,
+                    &step.world.model.tuning.move_to,
                 )?;
                 Ok(HuntNext::Stay)
             }
@@ -204,7 +204,7 @@ impl HuntAction {
         fight: &mut Fight,
         hunt_reads: &HuntReads,
     ) -> GenieResult<HuntNext> {
-        let roles = &step.w.model.roles.clone();
+        let roles = &step.world.model.roles.clone();
         let gives_up = GiveUp {
             patience: if !hunt_reads.attack.player_kind.is_computer()
                 && roles
@@ -221,7 +221,7 @@ impl HuntAction {
             SubCode::UnderWay => Ok(HuntNext::Stay),
             SubCode::Done => self.walk_arrived(step, unit, actions, fight, hunt_reads, roles),
             SubCode::Failed => self
-                .walk_failed(step.w.parts.motion_mut(unit.id), hunt_reads, roles)
+                .walk_failed(step.world.parts.motion_mut(unit.id), hunt_reads, roles)
                 .map(|()| HuntNext::Stay),
             SubCode::TargetGone => self
                 .lost_on_the_way(step, unit, hunt_reads, roles)
@@ -258,7 +258,7 @@ impl HuntAction {
         hunt_reads: &HuntReads,
         roles: &Roles,
     ) -> GenieResult<HuntNext> {
-        self.tear_down(step.w.parts.mover_mut(unit.id))?;
+        self.tear_down(step.world.parts.mover_mut(unit.id))?;
         // a target the hunt let go (the `MoveTo`'s went from the world): `FUN_140ac44b0` does
         // nothing, and `set_state(6)` without a target only shows the walking sprite
         if self.target.is_none() {
@@ -281,17 +281,17 @@ impl HuntAction {
         hunt_reads: &HuntReads,
     ) -> GenieResult<HuntNext> {
         self.face_animal(
-            (unit.position(), step.w.parts.mover_mut(unit.id)),
+            (unit.position(), step.world.parts.mover_mut(unit.id)),
             fight.victim.position,
             hunt_reads.attack.world_time,
         )?;
         if Amount::ZERO < fight.victim.amount {
             self.set_gather(
                 unit,
-                step.w.parts.motion_mut(unit.id),
-                step.w.streams.get(Stream::Sprite),
+                step.world.parts.motion_mut(unit.id),
+                step.world.streams.get_mut(Stream::Sprite),
                 hunt_reads,
-                step.w.model.tuning.sprite,
+                step.world.model.tuning.sprite,
             );
             return Ok(HuntNext::Stay);
         }
@@ -313,15 +313,15 @@ impl HuntAction {
         self.no_tree_search(hunt_reads, roles)?;
         self.set_target(None);
         let walks = hunt_reads.walks(
-            &step.w.model.graphics,
-            (unit, step.w.parts.mover_of(unit.id)),
+            &step.world.model.graphics,
+            (unit, step.world.parts.mover_of(unit.id)),
         );
-        let mover = step.w.parts.mover_mut(unit.id).ok_or(HUNTER_UNMOVING)?;
+        let mover = step.world.parts.mover_mut(unit.id).ok_or(HUNTER_UNMOVING)?;
         self.set_point_walk(
             |move_to| HuntState::WalkSearch { move_to },
             mover,
             &walks,
-            &step.w.model.tuning.move_to,
+            &step.world.model.tuning.move_to,
         )
     }
 
@@ -351,16 +351,16 @@ impl HuntAction {
         roles: &Roles,
     ) -> GenieResult<()> {
         let reads = unit.move_to_reads(
-            step.w.parts.motion.mover(unit.id),
-            MasterTables::new(&step.w.model.masters, &step.w.parts.own_master),
+            step.world.parts.motion.mover(unit.id),
+            MasterTables::new(&step.world.model.masters, &step.world.parts.own_master),
             step.player,
             (
-                &step.w.model.graphics,
-                step.w.parts.combat_of(unit.id).abilities.look.as_ref(),
+                &step.world.model.graphics,
+                step.world.parts.combat_of(unit.id).abilities.look.as_ref(),
             ),
             roles,
         )?;
-        let mover = step.w.parts.mover_mut(unit.id).ok_or(HUNTER_UNMOVING)?;
+        let mover = step.world.parts.mover_mut(unit.id).ok_or(HUNTER_UNMOVING)?;
         self.state = HuntState::Attack { attack: None };
         let (attack, move_start) = Attack::start(
             herd.target.id(),
@@ -370,16 +370,16 @@ impl HuntAction {
             &reads,
             BeginLayer {
                 roles,
-                attack_tuning: &step.w.model.tuning.attack,
-                move_to_tuning: &step.w.model.tuning.move_to,
+                attack_tuning: &step.world.model.tuning.attack,
+                move_to_tuning: &step.world.model.tuning.move_to,
             },
         )?;
         if move_start == MoveStart::Arrived {
             attack.arrived_sprite(
                 unit,
-                step.w.parts.motion_mut(unit.id),
-                step.w.streams.get(Stream::Sprite),
-                step.w.model.tuning.sprite,
+                step.world.parts.motion_mut(unit.id),
+                step.world.streams.get_mut(Stream::Sprite),
+                step.world.model.tuning.sprite,
             )?;
         }
         self.state = HuntState::Attack {

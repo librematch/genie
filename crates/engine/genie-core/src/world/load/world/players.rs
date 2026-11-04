@@ -91,9 +91,9 @@ pub fn ai_settings(world_player_base: &WorldPlayerBase) -> AiSettings {
 /// events in the list's order (the load links each after the last), and the running totals'
 /// low 16 bits into the zeroed ints.
 #[must_use]
-pub fn history(h: &WorldHistory) -> History {
+pub fn history(saved: &WorldHistory) -> History {
     History {
-        entries: h
+        entries: saved
             .history
             .iter()
             .map(|history_entry| HistoryEntry {
@@ -101,8 +101,8 @@ pub fn history(h: &WorldHistory) -> History {
                 military: Population::of_data(history_entry.history_military_pop),
             })
             .collect(),
-        max_entries: TimeSlice::of_data(h.max_number_of_entries),
-        events: h
+        max_entries: TimeSlice::of_data(saved.max_number_of_entries),
+        events: saved
             .events
             .iter()
             .map(|history_event| Event {
@@ -114,41 +114,41 @@ pub fn history(h: &WorldHistory) -> History {
                 data3: history_event.temp_data3,
             })
             .collect(),
-        number_of_events: h.number_of_events,
-        update_count: HistoryUpdates::of_data(h.update_history_count),
-        old_total_razings: Tally::of_data(h.old_total_razings),
-        old_build_value_razings: Tally::of_data(h.old_build_value_razings),
-        old_total_razings_other: Tally::of_data(h.old_total_razings_other),
-        old_build_value_razings_other: Tally::of_data(h.old_build_value_razings_other),
-        old_total_kills: Tally::of_data(h.old_total_kills),
-        old_build_value_kills: Tally::of_data(h.old_build_value_kills),
-        old_total_kills_other: Tally::of_data(h.old_total_kills_other),
-        old_build_value_kills_other: Tally::of_data(h.old_build_value_kills_other),
-        razings_weight: h.razings_weight,
-        kills_weight: h.kills_weight,
-        razing_percent: Share::of_data(h.razing_percent),
-        kills_percent: Share::of_data(h.kills_perecent),
-        razings_flag: h.razings_flag,
-        battle_flag: h.battle_flag,
-        old_current_build_value_units: Tally::of_data(h.old_current_build_value_units as i32),
+        number_of_events: saved.number_of_events,
+        update_count: HistoryUpdates::of_data(saved.update_history_count),
+        old_total_razings: Tally::of_data(saved.old_total_razings),
+        old_build_value_razings: Tally::of_data(saved.old_build_value_razings),
+        old_total_razings_other: Tally::of_data(saved.old_total_razings_other),
+        old_build_value_razings_other: Tally::of_data(saved.old_build_value_razings_other),
+        old_total_kills: Tally::of_data(saved.old_total_kills),
+        old_build_value_kills: Tally::of_data(saved.old_build_value_kills),
+        old_total_kills_other: Tally::of_data(saved.old_total_kills_other),
+        old_build_value_kills_other: Tally::of_data(saved.old_build_value_kills_other),
+        razings_weight: saved.razings_weight,
+        kills_weight: saved.kills_weight,
+        razing_percent: Share::of_data(saved.razing_percent),
+        kills_percent: Share::of_data(saved.kills_perecent),
+        razings_flag: saved.razings_flag,
+        battle_flag: saved.battle_flag,
+        old_current_build_value_units: Tally::of_data(saved.old_current_build_value_units as i32),
         old_current_build_value_buildings: Tally::of_data(
-            h.old_current_build_value_buildings as i32,
+            saved.old_current_build_value_buildings as i32,
         ),
-        old_player_kill_bv: h
+        old_player_kill_bv: saved
             .old_player_kill_bv
             .iter()
-            .map(|&v| Tally::of_data(v as i32))
+            .map(|&value| Tally::of_data(value as i32))
             .collect(),
-        old_player_razing_bv: h
+        old_player_razing_bv: saved
             .old_player_razing_bv
             .iter()
-            .map(|&v| Tally::of_data(v as i32))
+            .map(|&value| Tally::of_data(value as i32))
             .collect(),
-        running_ave_bv_percent: Share::of_data(h.running_ave_bv_percent),
-        running_total_bv_kills: Tally::of_data(h.running_total_bv_kills as i32),
-        running_total_bv_razings: Tally::of_data(h.running_total_bv_razings as i32),
-        running_total_kills: Tally::of_data(i32::from(h.running_total_kills)),
-        running_total_razings: Tally::of_data(i32::from(h.running_total_razings)),
+        running_ave_bv_percent: Share::of_data(saved.running_ave_bv_percent),
+        running_total_bv_kills: Tally::of_data(saved.running_total_bv_kills as i32),
+        running_total_bv_razings: Tally::of_data(saved.running_total_bv_razings as i32),
+        running_total_kills: Tally::of_data(i32::from(saved.running_total_kills)),
+        running_total_razings: Tally::of_data(i32::from(saved.running_total_razings)),
     }
 }
 
@@ -197,29 +197,32 @@ pub fn ai_module(tribe_main_decision_ai: &TribeMainDecisionAi) -> AiModule {
 ///
 /// A saved state that names none.
 pub fn tech_state(tech_player_tree: &TechPlayerTree) -> GenieResult<TechState> {
-    let o = |j: usize| {
+    let override_at = |index: usize| {
         tech_player_tree
             .cost_override
-            .get(j)
-            .map_or(CostOverride::UNSET, |e| CostOverride {
-                amount: CostAmount::of_data(e.tech_player_tree_cost_amount_override as i16),
+            .get(index)
+            .map_or(CostOverride::UNSET, |entry| CostOverride {
+                amount: CostAmount::of_data(entry.tech_player_tree_cost_amount_override as i16),
                 attribute: AttributeId::of_data(
-                    e.tech_player_tree_cost_attribute_kind_override as i16,
+                    entry.tech_player_tree_cost_attribute_kind_override as i16,
                 ),
-                used: OverrideUse::of_data(e.tech_player_tree_cost_attribute_used_override as i16),
+                used: OverrideUse::of_data(
+                    entry.tech_player_tree_cost_attribute_used_override as i16,
+                ),
             })
     };
     Ok(TechState {
         research_done: Seconds::new(tech_player_tree.research_done),
         state: ResearchState::of_int(tech_player_tree.state)?,
-        cost_adj: [0, 1, 2]
-            .map(|j| CostAmount::of_data(tech_player_tree.cost_adj.get(j).copied().unwrap_or(0))),
+        cost_adj: [0, 1, 2].map(|index| {
+            CostAmount::of_data(tech_player_tree.cost_adj.get(index).copied().unwrap_or(0))
+        }),
         times_researched: ResearchCount::of_data(
             tech_player_tree.tech_player_tree_times_researched as i16,
         ),
         allow_multiple: tech_player_tree.tech_player_tree_allow_multiple_research != 0,
         stack: tech_player_tree.tech_player_tree_stack_tech != 0,
-        overrides: [o(0), o(1), o(2)],
+        overrides: [override_at(0), override_at(1), override_at(2)],
         research_cap: ResearchCap::of_data(tech_player_tree.tech_player_tree_research_cap as i16),
         pending: ResearchCount::of_data(tech_player_tree.tech_player_tree_pending_count as i16),
         enabled: tech_player_tree.tech_player_tree_enabled_tech != 0,

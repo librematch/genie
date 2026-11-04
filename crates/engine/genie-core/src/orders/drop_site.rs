@@ -20,7 +20,7 @@ use crate::objects::ObjectId;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::OwnerMasters;
-use crate::objects::masters::PlayersMasters;
+use crate::objects::masters::PlayersMastersExt;
 use crate::orders::Dispatch;
 use crate::orders::MasterSwap;
 use crate::orders::OrderSource;
@@ -41,7 +41,7 @@ use crate::world::layer::AttributeRoles;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::others::OthersRef;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 use crate::{GenieError, GenieResult};
 
 impl World {
@@ -166,7 +166,7 @@ impl World {
             spatial: &mut self.spatial,
             zones: &mut self.zones,
             pathing: &mut self.pathing,
-            object: self.streams.get(Stream::Object),
+            object: self.streams.get_mut(Stream::Object),
             world_time: self.world_time,
             player_kind: player.kind,
             groups: &self.groups,
@@ -246,7 +246,7 @@ impl World {
                 Some(id) => {
                     let found =
                         self.find_work_task(player_id, idx, id.id(), None, MasterSwap::Keep)?;
-                    let range = found.map_or(task_range, |t| t.work_range);
+                    let range = found.map_or(task_range, |task| task.work_range);
                     let sprite = found.and_then(|task| task.sprites.carrying);
                     DropSearch::Site { id, range, sprite }
                 }
@@ -283,29 +283,30 @@ impl World {
     }
 
     /// The villager's case 0x21c ([`crate::unit_ai::AiCommand::DropElsewhere`]) for the unit at
-    /// (`p`, `idx`) with the drop-site table's building `site` at `point`, its place where the
-    /// table's search found it (`FUN_141658e20`), and the target
-    /// its top action had (`back`, slot 0x190: the action's target id, `+0x30`, that the world
-    /// holds): it works on the site at its place (slot 0x128: the carried-resource test, any task,
-    /// `+0xa14` 0, [`World::order_work`]); with a target its unit AI then queues the order on it
-    /// (slot 0x30: `0x2db` issued by the unit, the target's master as its type and its owner's
-    /// number, its place, shown at its x and y, range 0, priority 100, ready, neither at once nor
-    /// in front).
+    /// (`unit_owner`, `idx`) with the drop-site table's building `site` at `point`, its place where
+    /// the table's search found it (`FUN_141658e20`), and the target its top action had (`back`,
+    /// slot 0x190: the action's target id, `+0x30`, that the world holds): it works on the site at
+    /// its place (slot 0x128: the carried-resource test, any task, `+0xa14` 0,
+    /// [`World::order_work`]); with a target its unit AI then queues the order on it (slot 0x30:
+    /// `0x2db` issued by the unit, the target's master as its type and its owner's number, its
+    /// place, shown at its x and y, range 0, priority 100, ready, neither at once nor in front).
     ///
     /// # Errors
     ///
     /// What the work and the queue do not model.
     pub(crate) fn drop_elsewhere(
         &mut self,
-        p: PlayerId,
+        unit_owner: PlayerId,
         idx: ListIndex,
         (site, point): (DropSiteId, Position),
         back: Option<ObjectId>,
     ) -> GenieResult<()> {
-        let back = back.filter(|t| !t.is_recyclable()).and_then(|object_id| {
-            let (player_id, o) = self.object(object_id)?;
-            Some((object_id, o.life.master_id, player_id, o.position()))
-        });
+        let back = back
+            .filter(|object_id| !object_id.is_recyclable())
+            .and_then(|object_id| {
+                let (player_id, unit) = self.object(object_id)?;
+                Some((object_id, unit.life.master_id, player_id, unit.position()))
+            });
         let work = Work {
             target: Some(site.id()),
             point,
@@ -313,11 +314,11 @@ impl World {
             filter: None,
             source: OrderSource::Queued,
         };
-        self.order_work(p, idx, &work)?;
+        self.order_work(unit_owner, idx, &work)?;
         let Some((target, master, owner, place)) = back else {
             return Ok(());
         };
-        let unit = self.players.live_mut(p, idx)?;
+        let unit = self.players.live_mut(unit_owner, idx)?;
         let (id, state) = (unit.id, unit.life.state);
         if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
             let order = QueuedOrder {
@@ -356,15 +357,15 @@ impl World {
         let (found, record) = bell.back_to_work(self.objects(), &self.model.roles)?;
         let target = match found {
             Some(record_target) => {
-                let (op, o) = self
+                let (op, unit) = self
                     .object(record_target.id)
                     .ok_or_else(|| object_gone(record_target.id))?;
-                let master = o.master(self.master_tables(), op)?.id;
+                let master = unit.master(self.master_tables(), op)?.id;
                 (
                     Some(record_target.id),
                     Some(OrderTargetKind::of_master(master)),
                     Some(op),
-                    o.position().ground(),
+                    unit.position().ground(),
                 )
             }
             None => (

@@ -25,7 +25,7 @@ use crate::objects::ObjectId;
 use crate::objects::SpriteId;
 use crate::objects::Voice;
 use crate::objects::layers::MotionMut;
-use crate::objects::masters::PlayersMasters;
+use crate::objects::masters::PlayersMastersExt;
 use crate::objects::masters::TaskSprites;
 use crate::objects::masters::{Master, MasterTables, OwnerMasters};
 use crate::objects::sprite::ActiveSprite;
@@ -53,13 +53,13 @@ use crate::{GenieError, GenieResult};
 /// master, the attack's tuning values and its `MoveTo`'s, one argument of [`Attack::start`] and
 /// [`Attack::begin`].
 #[derive(Clone, Copy, Debug)]
-pub(crate) struct BeginLayer<'a> {
+pub(crate) struct BeginLayer<'model> {
     /// The build's roles.
-    pub(crate) roles: &'a Roles,
+    pub(crate) roles: &'model Roles,
     /// The attack's tuning values.
-    pub(crate) attack_tuning: &'a AttackTuning,
+    pub(crate) attack_tuning: &'model AttackTuning,
     /// The `MoveTo`'s tuning values.
-    pub(crate) move_to_tuning: &'a MoveToTuning,
+    pub(crate) move_to_tuning: &'model MoveToTuning,
 }
 
 impl Attack {
@@ -224,47 +224,47 @@ impl Attack {
         roles: &Roles,
     ) -> GenieResult<(Self, Vec<Posted>)> {
         let reads = unit.move_to_reads(
-            step.w.parts.motion.mover(unit.id),
-            MasterTables::new(&step.w.model.masters, &step.w.parts.own_master),
+            step.world.parts.motion.mover(unit.id),
+            MasterTables::new(&step.world.model.masters, &step.world.parts.own_master),
             step.player,
             (
-                &step.w.model.graphics,
-                step.w.parts.combat_of(unit.id).abilities.look.as_ref(),
+                &step.world.model.graphics,
+                step.world.parts.combat_of(unit.id).abilities.look.as_ref(),
             ),
             roles,
         )?;
-        let (mover, by_id) = step
-            .w
-            .parts
-            .lend_mover(unit.id, (&step.w.players, &step.w.index, &step.w.model));
+        let (mover, by_id) = step.world.parts.lend_mover(
+            unit.id,
+            (&step.world.players, &step.world.index, &step.world.model),
+        );
         let mover = mover.ok_or(ATTACKER_UNMOVING)?;
         let (mut attack, begun, mut posted) =
-            Self::own_start(cmd, (&step.w.spatial, by_id), mover, &reads)?;
+            Self::own_start(cmd, (&step.world.spatial, by_id), mover, &reads)?;
         if begun.failed_first() {
-            step.w.parts.set_anim_speed(unit.id, Speed::new(1.0));
+            step.world.parts.set_anim_speed(unit.id, Speed::new(1.0));
         }
         if begun == Begun::Failed {
             attack.fail_at_start(
                 &mut unit.sprite,
-                step.w.parts.motion_mut(unit.id),
-                step.w.streams.get(Stream::Sprite),
-                step.w.model.tuning.sprite,
+                step.world.parts.motion_mut(unit.id),
+                step.world.streams.get_mut(Stream::Sprite),
+                step.world.model.tuning.sprite,
             )?;
         }
         if begun == Begun::Ready {
             let ready = cmd.ready.as_ref().ok_or(GenieError::unsupported(
                 "an attack's target the slice does not hold live",
             ))?;
-            let (motion, by_id) = step
-                .w
-                .parts
-                .lend_motion(unit.id, (&step.w.players, &step.w.index, &step.w.model));
+            let (motion, by_id) = step.world.parts.lend_motion(
+                unit.id,
+                (&step.world.players, &step.world.index, &step.world.model),
+            );
             let mut ground = Ground {
-                map: &step.w.spatial,
-                sprite_rng: step.w.streams.get(Stream::Sprite),
+                map: &step.world.spatial,
+                sprite_rng: step.world.streams.get_mut(Stream::Sprite),
                 object_rng: None,
                 posts: Posts::Held(&mut posted),
-                graphics: &step.w.model.graphics,
+                graphics: &step.world.model.graphics,
                 by_id,
                 motion,
             };
@@ -272,14 +272,14 @@ impl Attack {
         }
         if begun.start() == MoveStart::Arrived {
             unit.shows_standing_sprite(
-                step.w.parts.motion.layer_mut(unit.id),
+                step.world.parts.motion.layer_mut(unit.id),
                 OwnerMasters::new(
-                    &step.w.parts.own_master,
-                    step.w.model.masters.of(step.player),
+                    &step.world.parts.own_master,
+                    step.world.model.masters.of(step.player),
                 ),
-                &step.w.model.graphics,
-                step.w.streams.get(Stream::Sprite),
-                step.w.model.tuning.sprite,
+                &step.world.model.graphics,
+                step.world.streams.get_mut(Stream::Sprite),
+                step.world.model.tuning.sprite,
             )?;
         }
         Ok((attack, posted))
@@ -477,15 +477,15 @@ pub fn arms_looking(
     moving: Option<SpriteId>,
     roles: &Roles,
 ) -> Arms {
-    let g = |id: Option<SpriteId>| id.and_then(|sprite_id| graphics.get(sprite_id).copied());
+    let graphic = |id: Option<SpriteId>| id.and_then(|sprite_id| graphics.get(sprite_id).copied());
     Arms {
-        move_sprite: g(moving)
-            .or_else(|| g(running(master, look)))
-            .or_else(|| g(walking(master, look, Cargo::Empty, roles))),
-        sprite: g(sprites.proceeding).or_else(|| g(master.combat_part().attack_sprite)),
-        second_sprite: g(master.combat_part().attack_sprite2),
-        idle_sprite: g(master.standing_sprite),
-        idle_attack_sprite: g(master.creatable_part().idle_attack_sprite),
+        move_sprite: graphic(moving)
+            .or_else(|| graphic(running(master, look)))
+            .or_else(|| graphic(walking(master, look, Cargo::Empty, roles))),
+        sprite: graphic(sprites.proceeding).or_else(|| graphic(master.combat_part().attack_sprite)),
+        second_sprite: graphic(master.combat_part().attack_sprite2),
+        idle_sprite: graphic(master.standing_sprite),
+        idle_attack_sprite: graphic(master.creatable_part().idle_attack_sprite),
         missile: master.combat_part().missile.master(),
         fire_frame: master.combat_part().fire_frame,
         interrupt_frame: master.combat_part().interrupt_frame,

@@ -71,8 +71,8 @@ pub(super) struct Node {
     /// `+0xc`, `+0xe`: the tile the cost is measured from.
     pub(super) entry: PlanTile,
     /// `+0x10`: cost so far plus the estimate to the goal; `+0x14`: the cost so far.
-    pub(super) f: Distance,
-    pub(super) g: Distance,
+    pub(super) total: Distance,
+    pub(super) cost: Distance,
     /// `+0x18`.
     pub(super) level: GridLevel,
     /// `+0x19`: the edge back to the parent (none for the start).
@@ -110,27 +110,27 @@ impl OpenList {
     /// `FUN_140f9cba0`: into the lowest bucket before the first node from the back that costs
     /// more; into a new lowest or a higher bucket at its end.
     pub(super) fn push(&mut self, node: NodeIndex, nodes: &Nodes) {
-        let distance = nodes[node].f;
-        let b = distance.get() as i32;
-        let index = b as usize;
+        let distance = nodes[node].total;
+        let slot = distance.get() as i32;
+        let index = slot as usize;
         if self.buckets.len() <= index {
             self.buckets.resize_with(index + 1, Vec::new);
         }
         match self.min {
-            Some(m) if b == m => {
+            Some(least) if slot == least => {
                 let bucket = &mut self.buckets[index];
                 let at = (1..=bucket.len())
                     .rev()
-                    .find(|&k| distance < nodes[bucket[k - 1]].f)
+                    .find(|&index| distance < nodes[bucket[index - 1]].total)
                     .unwrap_or(0);
                 bucket.insert(at, node);
                 return;
             }
-            Some(m) if m < b => {}
-            _ => self.min = Some(b),
+            Some(lowest) if lowest < slot => {}
+            _ => self.min = Some(slot),
         }
-        if self.max.is_none_or(|m| m < b) {
-            self.max = Some(b);
+        if self.max.is_none_or(|highest| highest < slot) {
+            self.max = Some(slot);
         }
         self.buckets[index].push(node);
     }
@@ -142,20 +142,22 @@ impl OpenList {
     ///
     /// What the sort of the next bucket fails on.
     pub(super) fn pop(&mut self, nodes: &Nodes) -> GenieResult<Option<NodeIndex>> {
-        let Some(m) = self.min else {
+        let Some(lowest) = self.min else {
             return Ok(None);
         };
-        let bucket = &mut self.buckets[m as usize];
+        let bucket = &mut self.buckets[lowest as usize];
         let Some(node) = bucket.pop() else {
             return Ok(None);
         };
         if bucket.is_empty() {
-            let max = self.max.unwrap_or(m);
-            if let Some(i) = (m + 1..=max).find(|&i| !self.buckets[i as usize].is_empty()) {
-                self.min = Some(i);
+            let max = self.max.unwrap_or(lowest);
+            if let Some(next) =
+                (lowest + 1..=max).find(|&candidate| !self.buckets[candidate as usize].is_empty())
+            {
+                self.min = Some(next);
                 sort(
-                    &mut self.buckets[i as usize],
-                    &|a: NodeIndex, b: NodeIndex| nodes[a].f > nodes[b].f,
+                    &mut self.buckets[next as usize],
+                    &|left: NodeIndex, right: NodeIndex| nodes[left].total > nodes[right].total,
                 )?;
             } else {
                 self.min = None;
@@ -191,7 +193,7 @@ impl Planner {
         let TileNode {
             at,
             level,
-            cost: g,
+            cost,
             estimate: distance,
             parent,
             dir,
@@ -202,8 +204,8 @@ impl Planner {
             cell,
             at,
             entry,
-            f: g + distance,
-            g,
+            total: cost + distance,
+            cost,
             level,
             dir,
             shortcut: false,
@@ -242,10 +244,10 @@ impl Planner {
             };
             if turn {
                 let gp = &self.nodes[gp];
-                return (gp.g, gp.entry, true);
+                return (gp.cost, gp.entry, true);
             }
         }
-        (node.g, node.entry, false)
+        (node.cost, node.entry, false)
     }
 
     /// `FUN_140f764c0`: the neighbour across edge `dir` (the neighbour's edge back) of a node, at
@@ -254,7 +256,7 @@ impl Planner {
         &mut self,
         level: GridLevel,
         at: PlanTile,
-        g: Distance,
+        cost: Distance,
         parent: NodeIndex,
         dir: CellEdges,
     ) -> Option<NodeIndex> {
@@ -266,48 +268,48 @@ impl Planner {
         }
         if !cell.kind.contains(CellKind::NODE) {
             if !cell.kind.contains(CellKind::MIXED) {
-                return self.expand(level.up(), at.parent(), g, parent, dir);
+                return self.expand(level.up(), at.parent(), cost, parent, dir);
             }
             // the children on the edge `dir`: (2x, 2y) above and left, (2x + 1, 2y) above and
             // right, (2x, 2y + 1) left and below, (2x + 1, 2y + 1) right and below
             let ([c0, c1, c2, c3], grid_level) = (at.children(), level.down());
             if dir.intersects(Ed::N | Ed::W)
-                && let Some(n) = self.expand(grid_level, c0, g, parent, dir)
+                && let Some(node_index) = self.expand(grid_level, c0, cost, parent, dir)
             {
-                return Some(n);
+                return Some(node_index);
             }
             if dir.intersects(Ed::N | Ed::E)
-                && let Some(n) = self.expand(grid_level, c1, g, parent, dir)
+                && let Some(node_index) = self.expand(grid_level, c1, cost, parent, dir)
             {
-                return Some(n);
+                return Some(node_index);
             }
             if dir.intersects(Ed::W | Ed::S)
-                && let Some(n) = self.expand(grid_level, c2, g, parent, dir)
+                && let Some(node_index) = self.expand(grid_level, c2, cost, parent, dir)
             {
-                return Some(n);
+                return Some(node_index);
             }
             if !dir.intersects(Ed::E | Ed::S) {
                 return None;
             }
-            return self.expand(grid_level, c3, g, parent, dir);
+            return self.expand(grid_level, c3, cost, parent, dir);
         }
         if cell.edges.contains(CellEdges::CLOSED) {
             return None;
         }
         let centre = at.centre_at(level);
         let (g0, entry, shortcut) = match self.measured_from(parent, dir) {
-            (_, _, false) => (g, self.nodes[parent].entry, false),
+            (_, _, false) => (cost, self.nodes[parent].entry, false),
             found => found,
         };
         let dx = i32::from(entry.x()) - i32::from(centre.x());
         let dy = i32::from(entry.y()) - i32::from(centre.y());
-        let d = Distance::new(sqrt((dy * dy + dx * dx) as f32));
-        let distance = self.estimate_from(centre);
+        let distance = Distance::new(sqrt((dy * dy + dx * dx) as f32));
+        let estimate = self.estimate_from(centre);
         let node_index = self.alloc(TileNode {
             at,
             level,
-            cost: d + g0,
-            estimate: distance,
+            cost: distance + g0,
+            estimate,
             parent: Some(parent),
             dir,
             entry: centre,
@@ -328,7 +330,7 @@ impl Planner {
     pub(super) fn expand0(
         &mut self,
         at: PlanTile,
-        g: Distance,
+        cost: Distance,
         parent: NodeIndex,
         dir: CellEdges,
         tile_path_tuning: &TilePathTuning,
@@ -340,17 +342,17 @@ impl Planner {
         }
         let (g0, entry, shortcut) = match self.measured_from(parent, dir) {
             (gp, entry, true) => (gp * tile_path_tuning.shortcut_cost, entry, true),
-            _ => (g, self.nodes[parent].entry, false),
+            _ => (cost, self.nodes[parent].entry, false),
         };
         let dx = i32::from(entry.x()) - i32::from(at.x());
         let dy = i32::from(entry.y()) - i32::from(at.y());
-        let d = Distance::new(sqrt((dy * dy + dx * dx) as f32));
-        let distance = self.estimate_from(at);
+        let distance = Distance::new(sqrt((dy * dy + dx * dx) as f32));
+        let estimate = self.estimate_from(at);
         let node_index = self.alloc(TileNode {
             at,
             level: GridLevel::TILES,
-            cost: d + g0,
-            estimate: distance,
+            cost: distance + g0,
+            estimate,
             parent: Some(parent),
             dir,
             entry: at,
@@ -375,7 +377,7 @@ impl Planner {
             return None;
         }
         self.cells[cell].edges = cell_edges.plus(CellEdges::CLOSED);
-        let distance = self.nodes[node_index].f - self.nodes[node_index].g;
+        let distance = self.nodes[node_index].total - self.nodes[node_index].cost;
         if distance < self.best_cost {
             self.best_cost = distance;
             self.best = Some(node_index);
@@ -430,7 +432,7 @@ impl Planner {
                 continue;
             };
             let node = self.nodes[node_index];
-            let distance = node.f - node.g;
+            let distance = node.total - node.cost;
             if !full
                 && distance <= Distance::new(tile_path_tuning.early_left)
                 && h0 <= Distance::new(tile_path_tuning.early_start)
@@ -444,7 +446,7 @@ impl Planner {
                     && let Some(found) = self.expand(
                         node.level,
                         node.at.stepped(dx, dy),
-                        node.g,
+                        node.cost,
                         node_index,
                         back,
                     )
@@ -500,7 +502,7 @@ impl Planner {
                 if cell_edges.intersects(edge)
                     && let Some(found) = self.expand0(
                         node.at.stepped(dx, dy),
-                        node.g,
+                        node.cost,
                         node_index,
                         back,
                         tile_path_tuning,

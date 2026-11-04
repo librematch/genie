@@ -7,7 +7,7 @@ use crate::orders::OrderFlags;
 use crate::orders::{Interact, MoveOrder};
 use crate::players::PlayerId;
 use crate::world::World;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 use crate::{GenieError, GenieResult};
 
 /// WORK's and RETREAT's runs (`FUN_140e6a9f0`, `FUN_140e69f00`).
@@ -69,8 +69,8 @@ impl OrderCommand {
             return Ok(());
         }
         let human = match order {
-            Order::Interact(o) => o.flags.contains(OrderFlags::HUMAN),
-            Order::Move(o) => o.flags.contains(OrderFlags::HUMAN),
+            Order::Interact(interact) => interact.flags.contains(OrderFlags::HUMAN),
+            Order::Move(move_order) => move_order.flags.contains(OrderFlags::HUMAN),
             Order::Follow(_) | Order::Guard(_) => Self::any_human_unit(world, &units)?,
             Order::Work(_) | Order::Retreat(_) => false,
         };

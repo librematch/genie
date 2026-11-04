@@ -13,7 +13,7 @@ use crate::objects::masters::GatherGroup;
 use crate::players::Amount;
 use crate::vision::SightTiles;
 use crate::world::layer::generated::GatherSearchTuning;
-use crate::world::slots::CheckedIndex;
+use crate::world::slots::CheckedIndexExt;
 use crate::{GenieError, GenieResult};
 
 /// [`closest_resource`](crate::gathering::gather_search::closest_resource)'s passes: from a
@@ -40,12 +40,12 @@ pub(super) fn search_passes(
     };
     let mut passes = Vec::with_capacity(2);
     match site {
-        Some(s) if s.footprint => {
-            let mut seeds = footprint_seeds(s, map, passable);
+        Some(site) if site.footprint => {
+            let mut seeds = footprint_seeds(site, map, passable);
             sort(&mut seeds, nearer)?;
             passes.push(Pass {
-                origin: Tile::new(s.position.x() as i32, s.position.y() as i32),
-                max_steps: SightTiles::of(s.line_of_sight).get().wrapping_add(10),
+                origin: Tile::new(site.position.x() as i32, site.position.y() as i32),
+                max_steps: SightTiles::of(site.line_of_sight).get().wrapping_add(10),
                 seeds,
             });
             passes.push(single(unit_tile));
@@ -73,13 +73,13 @@ pub(super) fn push_neighbours(
     Cell { tile, steps }: Cell,
     map: GridSize,
 ) -> GenieResult<()> {
-    for n in tile.beside() {
-        let c = seen.checked_mut(at(n))?;
-        if !*c {
-            *c = true;
-            if map.holds(n) {
+    for tile in tile.beside() {
+        let visited = seen.checked_mut(at(tile))?;
+        if !*visited {
+            *visited = true;
+            if map.holds(tile) {
                 queue.push(Cell {
-                    tile: n,
+                    tile,
                     steps: steps + 1,
                 });
             }
@@ -177,7 +177,7 @@ pub(super) fn first_resource(
     on_tile: &[Candidate],
     kind: GatherGroup,
 ) -> GenieResult<Option<Candidate>> {
-    let open = |o: &Candidate| o.pasture.is_some() || !o.untargetable;
+    let open = |candidate: &Candidate| candidate.pasture.is_some() || !candidate.untargetable;
     let found: Vec<&Candidate> = on_tile
         .iter()
         .filter(|candidate| {

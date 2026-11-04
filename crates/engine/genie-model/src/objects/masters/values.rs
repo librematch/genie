@@ -37,20 +37,20 @@ pub(super) const MOST_TRAIN_LOCATIONS: u64 = 0x7fff;
 
 /// What the masters' attribute setters read beyond the master.
 #[derive(Clone, Copy)]
-pub struct AttributeWorld<'a> {
+pub struct AttributeWorld<'world> {
     /// The world's sprite table (`+0xc0`, its count `+0xd0`): a sprite attribute takes an id only
     /// where the table holds a sprite (`FUN_14152e360`, `FUN_141533c70`).
-    pub sprites: &'a Graphics,
+    pub sprites: &'world Graphics,
     /// The player's handicap's attack factor (`player+0x668`, its `+0x14`), None without one.
     pub handicap: Option<f32>,
     /// The player's `+0x648`, which an add or a multiply passes: hit points and carry capacity
     /// stop at 32767, the speed at its cap.
     pub capped: bool,
     /// The build layer's roles: the storages the population attribute sets (FD-046-D48).
-    pub roles: &'a Roles,
+    pub roles: &'world Roles,
     /// The build layer's tuning values of the masters: the speed caps, the handicap's floor
     /// (FD-046-D49).
-    pub masters_tuning: &'a MastersTuning,
+    pub masters_tuning: &'world MastersTuning,
 }
 
 /// The sprite table shows as its absence of a name.
@@ -65,13 +65,13 @@ impl Debug for AttributeWorld<'_> {
 }
 
 /// `CVTTSS2SI` into a 32-bit register, then its low 16 bits.
-pub(super) fn low16(v: f32) -> i16 {
-    cvttss2si(v) as i16
+pub(super) fn low16(value: f32) -> i16 {
+    cvttss2si(value) as i16
 }
 
 /// `CVTTSS2SI` into a 32-bit register, then its low byte.
-pub(super) fn low8(v: f32) -> u8 {
-    cvttss2si(v) as u8
+pub(super) fn low8(value: f32) -> u8 {
+    cvttss2si(value) as u8
 }
 
 /// A saved id (an `int` field) as the slice holds it: None for one below 0 or beyond a short,
@@ -92,25 +92,25 @@ pub(super) fn set_sprite(field: &mut Option<SpriteId>, id: i32, world: &Attribut
 
 /// An add to a sprite attribute: its id (−1 for none) plus the amount (`CVTTSS2SI`, in 32
 /// bits), then [`set_sprite`].
-pub(super) fn add_sprite(field: &mut Option<SpriteId>, v: f32, world: &AttributeWorld<'_>) {
-    let id = i32::from(field.map_or(-1, SpriteId::get)) + cvttss2si(v);
+pub(super) fn add_sprite(field: &mut Option<SpriteId>, value: f32, world: &AttributeWorld<'_>) {
+    let id = i32::from(field.map_or(-1, SpriteId::get)) + cvttss2si(value);
     set_sprite(field, id, world);
 }
 
 /// An add to the hit points or the carry capacity (`FUN_141126af0`): capped, a sum of at least
 /// 32767 (or NaN, `COMISS` then `JBE`) holds 0x7fff; else the amount's low 16 bits add.
-pub(super) fn add_short(value: i16, v: f32, capped: bool) -> i16 {
-    if capped && at_most_or_unordered(SHORT_CAP, f32::from(value) + v) {
+pub(super) fn add_short(value: i16, amount: f32, capped: bool) -> i16 {
+    if capped && at_most_or_unordered(SHORT_CAP, f32::from(value) + amount) {
         0x7fff
     } else {
-        low16(v).wrapping_add(value)
+        low16(amount).wrapping_add(value)
     }
 }
 
-/// A multiply of the hit points or the carry capacity (`FUN_1411271e0`): `value × v + 0.5`,
+/// A multiply of the hit points or the carry capacity (`FUN_1411271e0`): `value × amount + 0.5`,
 /// truncated; capped, a product of at least 32767 (or NaN) holds 0x7fff.
-pub(super) fn multiply_short(value: i16, v: f32, capped: bool) -> i16 {
-    let x = f32::from(value) * v + ROUND;
+pub(super) fn multiply_short(value: i16, amount: f32, capped: bool) -> i16 {
+    let x = f32::from(value) * amount + ROUND;
     if capped && at_most_or_unordered(SHORT_CAP, x) {
         0x7fff
     } else {
@@ -120,13 +120,13 @@ pub(super) fn multiply_short(value: i16, v: f32, capped: bool) -> i16 {
 
 /// An armor or attack amount's class (its high byte) and amount (its low byte, negated for a
 /// negative amount; `COMISS` with 0 then `JC`, so a NaN takes the negative branch).
-pub(super) fn class_amount(v: f32) -> ClassAmount {
-    if below_or_unordered(v, 0.0) {
-        let u = cvttss2si(-v) as u16;
-        ClassAmount::new((u as i16) >> 8, ((u & 0xff) as i16).wrapping_neg())
+pub(super) fn class_amount(value: f32) -> ClassAmount {
+    if below_or_unordered(value, 0.0) {
+        let bits = cvttss2si(-value) as u16;
+        ClassAmount::new((bits as i16) >> 8, ((bits & 0xff) as i16).wrapping_neg())
     } else {
-        let u = cvttss2si(v) as u16;
-        ClassAmount::new((u as i16) >> 8, (u & 0xff) as i16)
+        let bits = cvttss2si(value) as u16;
+        ClassAmount::new((bits as i16) >> 8, (bits & 0xff) as i16)
     }
 }
 
@@ -137,10 +137,10 @@ pub(super) fn handicapped(
     class: DamageClass,
     masters_tuning: &MastersTuning,
 ) -> Option<f32> {
-    let f = handicap?;
-    let raised = !at_most_or_unordered(f, masters_tuning.handicap_floor)
+    let handicap = handicap?;
+    let raised = !at_most_or_unordered(handicap, masters_tuning.handicap_floor)
         && (0x21 < class.get() as u16 || UNHANDICAPPED >> (class.get() as u16 & 0x3f) & 1 == 0);
-    raised.then_some(f)
+    raised.then_some(handicap)
 }
 
 /// The resource a cost attribute names (`FUN_1412661d0`'s 100, 103 to 106): none (−1) every
@@ -160,20 +160,20 @@ pub const fn cost_resource(attribute: MasterAttribute) -> Option<AttributeId> {
 /// `FUN_1410e87c0`: the list takes `count` entries (`MAXSS` with 0, so a NaN stays and becomes
 /// the most; to an unsigned 64-bit count, at most `most`), new ones `fill`; the selected entry
 /// (`entry`) stays below the count (an unsigned compare: with none left it stays).
-pub(super) fn resize_count(v: f32) -> u64 {
-    let clamped = maxss(0.0, v);
+pub(super) fn resize_count(value: f32) -> u64 {
+    let clamped = maxss(0.0, value);
     // `CVTTSS2SI RBX` plus 2^63 past 2^63: any value from there on is past the most
     cvttss2si_64(clamped) as u64
 }
 
-/// The damage sprites resized to `v` (`FUN_1410e87c0`): new entries are zero, the selected entry
-/// (an unsigned byte compare with the count less one) at most the last.
+/// The damage sprites resized to `value` (`FUN_1410e87c0`): new entries are zero, the selected
+/// entry (an unsigned byte compare with the count less one) at most the last.
 pub(super) fn resize_damage_graphics(
     list: &mut Vec<DamageGraphic>,
     entry: &mut DamageGraphicEntry,
-    v: f32,
+    value: f32,
 ) {
-    let resize_count = resize_count(v).min(MOST_DAMAGE_GRAPHICS) as usize;
+    let resize_count = resize_count(value).min(MOST_DAMAGE_GRAPHICS) as usize;
     list.resize(resize_count, DamageGraphic::default());
     let last = DamageGraphicEntry::of_data((resize_count as u8).wrapping_sub(1));
     if last < *entry {
@@ -181,15 +181,15 @@ pub(super) fn resize_damage_graphics(
     }
 }
 
-/// The train locations resized to `v` (`FUN_141249220`): new entries copy the last one (zero
+/// The train locations resized to `value` (`FUN_141249220`): new entries copy the last one (zero
 /// for an empty list), the selected entry (a signed short compare with the count less one) at
 /// most the last, −1 for none.
 pub(super) fn resize_train_locations(
     list: &mut Vec<TrainLocation>,
     entry: &mut TrainLocationEntry,
-    v: f32,
+    value: f32,
 ) {
-    let resize_count = resize_count(v).min(MOST_TRAIN_LOCATIONS) as usize;
+    let resize_count = resize_count(value).min(MOST_TRAIN_LOCATIONS) as usize;
     let fill = list.last().copied().unwrap_or_default();
     list.resize(resize_count, fill);
     let last = TrainLocationEntry::of_data((resize_count as i16).wrapping_sub(1));
@@ -198,16 +198,16 @@ pub(super) fn resize_train_locations(
     }
 }
 
-/// A multiply of the damage sprites' selected entry (`FUN_1410e8680`): `v` truncated (32 bits);
+/// A multiply of the damage sprites' selected entry (`FUN_1410e8680`): `value` truncated (32 bits);
 /// below 0 the entry at its complement (at most the last) goes, else a zero entry comes at it
 /// (at most the count; none past 0xfe entries). The selected entry is that place, at most the
 /// last (−1, so 0xff, with none left); an empty list or a full one changes nothing.
 pub(super) fn insert_damage_graphic(
     list: &mut Vec<DamageGraphic>,
     entry: &mut DamageGraphicEntry,
-    v: f32,
+    value: f32,
 ) {
-    let mut at = cvttss2si(v);
+    let mut at = cvttss2si(value);
     if at < 0 {
         if list.is_empty() {
             return;
@@ -231,9 +231,9 @@ pub(super) fn insert_damage_graphic(
 pub(super) fn insert_train_location(
     list: &mut Vec<TrainLocation>,
     entry: &mut TrainLocationEntry,
-    v: f32,
+    value: f32,
 ) {
-    let mut at = cvttss2si(v);
+    let mut at = cvttss2si(value);
     if at < 0 {
         if list.is_empty() {
             return;
@@ -252,8 +252,8 @@ pub(super) fn insert_train_location(
     *entry = TrainLocationEntry::of_selected(if last < at { last } else { at });
 }
 
-/// The selected entry moved to `n` (the attributes 154 and 158): at most the last of `count`
+/// The selected entry moved to `wanted` (the attributes 154 and 158): at most the last of `count`
 /// (a signed compare), nothing for an empty list.
-pub(super) fn select_entry(count: usize, n: i32) -> Option<i32> {
-    (count != 0).then(|| (count as i32 - 1).min(n))
+pub(super) fn select_entry(count: usize, wanted: i32) -> Option<i32> {
+    (count != 0).then(|| (count as i32 - 1).min(wanted))
 }

@@ -53,7 +53,7 @@ impl CensusStop {
             at: why.location().to_string(),
             context: why
                 .context()
-                .map(|(k, text)| (k, text.to_owned()))
+                .map(|(key, text)| (key, text.to_owned()))
                 .collect(),
         }
     }
@@ -120,7 +120,7 @@ pub fn census_run(
     let header = chapter.header()?;
     let sections = header.players();
     let (syncs, checkpoints) = recorded_checkpoints(&chapter)?;
-    let total = limit.map_or(syncs, |l| l.min(syncs));
+    let total = limit.map_or(syncs, |most| most.min(syncs));
     let mut turns = header_slice(&header, masters)?;
     let mut decoder = Decoder::default();
     let mut census = Census::new(sections.len(), checkpoints);
@@ -198,7 +198,7 @@ impl Census {
                 && let Some((tick, object, why)) = turns
                     .players
                     .get(index)
-                    .and_then(|q| q.unsupported.as_ref())
+                    .and_then(|player| player.unsupported.as_ref())
             {
                 player.stop = Some(CensusStop::of(tick.get(), *object, why));
             }
@@ -219,12 +219,15 @@ impl Census {
     /// The checkpoint after `at` syncs: each used lane against its player's block, for a player
     /// still running.
     fn compare(&mut self, turns: &World, sections: &[PlayerSection<'_>], at: usize, lanes: &Lanes) {
-        for lane in lanes.iter().filter(|l| l.iter().any(|&w| w != 0)) {
-            let p = lane[8] as usize;
+        for lane in lanes
+            .iter()
+            .filter(|candidate| candidate.iter().any(|&word| word != 0))
+        {
+            let player = lane[8] as usize;
             let (Some(section), Some(state), Some(player)) = (
-                sections.get(p),
-                turns.players.get(p),
-                self.players.get_mut(p),
+                sections.get(player),
+                turns.players.get(player),
+                self.players.get_mut(player),
             ) else {
                 continue;
             };
@@ -233,8 +236,8 @@ impl Census {
             }
             let block = lane_block(section, lane[8], state, &turns.parts);
             let words: Vec<(usize, u32, u32)> = (0..11)
-                .filter(|&w| block[w] != lane[w])
-                .map(|w| (w, block[w], lane[w]))
+                .filter(|&word| block[word] != lane[word])
+                .map(|word| (word, block[word], lane[word]))
                 .collect();
             if words.is_empty() {
                 player.checkpoints_held += 1;
@@ -268,11 +271,11 @@ pub struct Divergence {
 }
 
 /// The recording run from its header as the census runs it, the objects of each of `players`
-/// compared after each update `u` from `first` to `last` with the game's save that holds the state
-/// after update `u` (`save(u)`, read once for all players; the tick oracle's per-update saves name
-/// it `u - 1`, a missing save is skipped): per player, whether its objects followed, it stopped
-/// first, or the first update whose objects differ. A player's comparisons end at its stop or
-/// its first divergence; the run ends when every player's have.
+/// compared after each update from `first` to `last` with the game's save that holds the state
+/// after that update (`save(update)`, read once for all players; the tick oracle's per-update saves
+/// name it `update - 1`, a missing save is skipped): per player, whether its objects followed, it
+/// stopped first, or the first update whose objects differ. A player's comparisons end at its stop
+/// or its first divergence; the run ends when every player's have.
 ///
 /// # Errors
 ///
@@ -288,21 +291,24 @@ pub fn header_divergences(
     let header = chapter.header()?;
     let mut turns = header_slice(&header, masters)?;
     let mut decoder = Decoder::default();
-    if let Some(&p) = players.iter().find(|&&p| turns.players.len() <= p as usize) {
-        return Err(no_such_player(p));
+    if let Some(&player) = players
+        .iter()
+        .find(|&&player| turns.players.len() <= player as usize)
+    {
+        return Err(no_such_player(player));
     }
     let mut out: Vec<Followed> = vec![Followed::Follows; players.len()];
     let mut done = vec![false; players.len()];
-    for (i, frame) in frames(&chapter, last)?.iter().enumerate() {
+    for (frame_index, frame) in frames(&chapter, last)?.iter().enumerate() {
         run(&mut turns, &mut decoder, from_ref(frame));
-        let update = i + 1;
-        for (k, &p) in players.iter().enumerate() {
-            if let (false, Some(stop)) = (done[k], stop_of(&turns, p)) {
-                out[k] = Followed::Stops(stop);
-                done[k] = true;
+        let update = frame_index + 1;
+        for (index, &player) in players.iter().enumerate() {
+            if let (false, Some(stop)) = (done[index], stop_of(&turns, player)) {
+                out[index] = Followed::Stops(stop);
+                done[index] = true;
             }
         }
-        if done.iter().all(|&d| d) {
+        if done.iter().all(|&finished| finished) {
             break;
         }
         if update < first {
@@ -313,13 +319,13 @@ pub fn header_divergences(
         };
         let saved = chapters(&game)?[0];
         let saved = saved.header()?;
-        for (index, &p) in players.iter().enumerate() {
+        for (index, &player) in players.iter().enumerate() {
             if done[index] {
                 continue;
             }
             let differences = crate::object_field_differences(
-                crate::object_rows(&turns, p as usize),
-                &crate::header_objects(&saved, p, masters)?,
+                crate::object_rows(&turns, player as usize),
+                &crate::header_objects(&saved, player, masters)?,
             );
             if !differences.is_empty() {
                 out[index] = Followed::Leaves(Divergence {
@@ -333,9 +339,9 @@ pub fn header_divergences(
     Ok(out)
 }
 
-/// Player `p`'s stop, once the slice could not model one of its updates.
-pub(crate) fn stop_of(world: &World, p: u32) -> Option<CensusStop> {
-    world.players[p as usize]
+/// Player `player`'s stop, once the slice could not model one of its updates.
+pub(crate) fn stop_of(world: &World, player: u32) -> Option<CensusStop> {
+    world.players[player as usize]
         .unsupported
         .as_ref()
         .map(|(tick, object, why)| CensusStop::of(tick.get(), *object, why))

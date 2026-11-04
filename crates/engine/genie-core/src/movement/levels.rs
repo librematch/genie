@@ -10,7 +10,7 @@ const NO_LEVEL: GenieError =
 /// The levels of a unit's path data (`+0x858`, each level's parent at `+8`) by their role, as
 /// errors where an index would panic: the walked level is the first, its parent the second.
 /// A caller reaches them after it found the path data not empty.
-pub(crate) trait Levels {
+pub(crate) trait LevelsExt {
     /// The walked level.
     ///
     /// # Errors
@@ -33,7 +33,7 @@ pub(crate) trait Levels {
     fn parent(&self) -> GenieResult<&PathData>;
 }
 
-impl Levels for [PathData] {
+impl LevelsExt for [PathData] {
     fn walked(&self) -> GenieResult<&PathData> {
         self.first().ok_or(NO_LEVEL)
     }

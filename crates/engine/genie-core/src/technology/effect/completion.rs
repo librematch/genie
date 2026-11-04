@@ -30,7 +30,7 @@ use crate::world::World;
 use crate::world::layer::AttributeRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::settings::OptionFlags;
-use crate::world::slots::{CheckedIndex, PlayerSlots};
+use crate::world::slots::{CheckedIndexExt, PlayerSlotsExt};
 use crate::{GenieError, GenieResult};
 use std::sync::Arc;
 
@@ -57,9 +57,9 @@ impl World {
         tech_id: TechId,
         building: Option<MasterId>,
     ) -> GenieResult<Research> {
-        let (tech, t) = (tech_id, tech_id.index());
-        let def = self.model.techs.checked(t)?.clone();
-        let state = &self.players.player(player_id)?.techs.checked(t)?;
+        let (tech, index) = (tech_id, tech_id.index());
+        let def = self.model.techs.checked(index)?.clone();
+        let state = &self.players.player(player_id)?.techs.checked(index)?;
         if !(ResearchState::Unavailable..=ResearchState::Researching).contains(&state.state) {
             return Ok(Research::NotDone);
         }
@@ -77,23 +77,25 @@ impl World {
         self.players
             .player_mut(player_id)?
             .techs
-            .checked_mut(t)?
+            .checked_mut(index)?
             .state = ResearchState::Researched;
         let effect = self
             .players
             .player(player_id)?
             .techs
-            .checked(t)?
+            .checked(index)?
             .effect(&def);
         self.do_table_effect(player_id, effect, None)?;
         self.update_dependents(player_id, tech)?;
         let owner = &self.players.player(player_id)?;
-        let state = owner.techs.checked(t)?;
+        let state = owner.techs.checked(index)?;
         let location = building.map_or_else(
             || state.locations.first(),
             |master_id| state.location(master_id),
         );
-        if location.is_some_and(|l| l.building.is_some() && l.button != LocationButton::NONE) {
+        if location.is_some_and(|location| {
+            location.building.is_some() && location.button != LocationButton::NONE
+        }) {
             let factors = factors(tech, *owner, self.model.slots)?;
             let listed = state.listed_costs(&def, factors)?;
             let spent = listed
@@ -110,7 +112,7 @@ impl World {
                 Amount::new(spent),
             )?;
         }
-        let age = match t {
+        let age = match index {
             101 => Some(EventKind::FeudalAge),
             102 => Some(EventKind::CastleAge),
             103 => Some(EventKind::ImperialAge),
@@ -126,14 +128,18 @@ impl World {
         Ok(Research::Completed)
     }
 
-    /// Whether the effect player `player_id`'s technology `t` gives (`FUN_1413ce9b0`,
+    /// Whether the effect player `player_id`'s technology `researched` gives (`FUN_1413ce9b0`,
     /// [`crate::technology::TechState::effect`]: its override's when it has one) runs here, with
     /// the research's building as the effect's object (`FUN_1413cdcd0`'s
     /// `param_4`, which the callers do not pass yet): an effect that reaches its object (an
     /// enable for one building, an upgrade of the object, the object's kinds 203 to 206, a
     /// disable of a building's own technology) would differ without it.
-    pub(super) fn research_effect_known(&self, player_id: PlayerId, t: TechId) -> GenieResult<()> {
-        let index = t.index();
+    pub(super) fn research_effect_known(
+        &self,
+        player_id: PlayerId,
+        researched: TechId,
+    ) -> GenieResult<()> {
+        let index = researched.index();
         let def = self.model.techs.checked(index)?;
         let state = &self.players.player(player_id)?.techs.checked(index)?;
         let shared = |tech: DisabledTech| {
@@ -228,9 +234,9 @@ impl World {
         self.update_dependents(player_id, tech)
     }
 
-    /// `FUN_1413cce70` for player `player_id`'s technology `t`: each technology that requires it,
-    /// by id (`+0x38`'s lists), not of the shared kind: one in state 0 or 1 and not held by `+0x60`
-    /// turns to −1 when it is another civ's (or its civ's under the full tech tree,
+    /// `FUN_1413cce70` for player `player_id`'s technology `tech`: each technology that requires
+    /// it, by id (`+0x38`'s lists), not of the shared kind: one in state 0 or 1 and not held by
+    /// `+0x60` turns to −1 when it is another civ's (or its civ's under the full tech tree,
     /// [`crate::world::settings::OptionFlags::FULL_TECH_TREE`], while not of mode 1) or not for
     /// this game mode; else with fewer of its requirements researched than it needs it turns to 0
     /// (from above 0), with them all to 1 (from below 1) unless its research is done already (its
@@ -249,31 +255,31 @@ impl World {
         }
         if counted == 0 {
             let owner = self.players.player_mut(player_id)?;
-            if let Some(v) = owner
+            if let Some(amount) = owner
                 .attributes
                 .get_mut(ATTRIBUTE_39)
                 .filter(|amount| **amount == Amount::ZERO)
             {
-                *v = Amount::new(1.0);
+                *amount = Amount::new(1.0);
             }
         }
         Ok(())
     }
 
-    /// One technology `d` of [`World::update_dependents`]'s walk, for player `player_id` of civ
-    /// `civ` and the changed technology `t`: how much it adds to the count.
+    /// One technology `dependent` of [`World::update_dependents`]'s walk, for player `player_id` of
+    /// civ `civ` and the changed technology `tech`: how much it adds to the count.
     fn update_dependent(
         &mut self,
         player_id: PlayerId,
         civ: CivId,
-        (d, t): (usize, TechId),
+        (dependent, tech): (usize, TechId),
     ) -> GenieResult<i32> {
         let mut counted = 0;
-        let def = self.model.techs.checked(d)?;
-        if !def.required.contains(&Some(t)) || def.kind == TechKind::SHARED {
+        let def = self.model.techs.checked(dependent)?;
+        if !def.required.contains(&Some(tech)) || def.kind == TechKind::SHARED {
             return Ok(counted);
         }
-        let Some(state) = self.players.player(player_id)?.techs.get(d) else {
+        let Some(state) = self.players.player(player_id)?.techs.get(dependent) else {
             return Ok(counted);
         };
         match state.state {
@@ -291,7 +297,7 @@ impl World {
             self.players
                 .player_mut(player_id)?
                 .techs
-                .checked_mut(d)?
+                .checked_mut(dependent)?
                 .state = ResearchState::Disabled;
             return Ok(counted);
         }
@@ -300,22 +306,26 @@ impl World {
         let met = def
             .required
             .iter()
-            .filter(|&&r| {
-                r.is_some_and(|tech_id| {
+            .filter(|&&required| {
+                required.is_some_and(|tech_id| {
                     techs
                         .get(tech_id.index())
                         .is_some_and(|tech_state| tech_state.state == ResearchState::Researched)
                 })
             })
             .count() as i16;
-        let state = self.players.player_mut(player_id)?.techs.checked_mut(d)?;
+        let state = self
+            .players
+            .player_mut(player_id)?
+            .techs
+            .checked_mut(dependent)?;
         if met < def.required_count {
             if ResearchState::Unavailable < state.state {
                 state.state = ResearchState::Unavailable;
             }
             return Ok(counted);
         }
-        Ok(counted + self.finish_dependent(player_id, d)?)
+        Ok(counted + self.finish_dependent(player_id, dependent)?)
     }
 
     /// Whether the technology `def` is out of reach for a player of civ `civ`: another civ's (or
@@ -335,18 +345,22 @@ impl World {
         Ok(other_civ || !self.settings.tech_mode_allows(def.mode)?)
     }
 
-    /// The end of [`World::update_dependent`] for the technology `d` whose requirements are all
-    /// met: the change to the count.
-    fn finish_dependent(&mut self, player_id: PlayerId, d: usize) -> GenieResult<i32> {
+    /// The end of [`World::update_dependent`] for the technology `dependent` whose requirements are
+    /// all met: the change to the count.
+    fn finish_dependent(&mut self, player_id: PlayerId, dependent: usize) -> GenieResult<i32> {
         let mut counted = 0;
-        let state = self.players.player_mut(player_id)?.techs.checked_mut(d)?;
-        let reached = |l: &Location| {
-            let at = l
+        let state = self
+            .players
+            .player_mut(player_id)?
+            .techs
+            .checked_mut(dependent)?;
+        let reached = |location: &Location| {
+            let at = location
                 .building
                 .and_then(|master_id| state.location(master_id))
                 .copied()
-                .unwrap_or(*l);
-            Seconds::of_master(l.time) + at.adjustment <= state.research_done
+                .unwrap_or(*location);
+            Seconds::of_master(location.time) + at.adjustment <= state.research_done
         };
         // its research done already: it completes (`FUN_1413cdcd0` with `param_3` 0 and no
         // building), once per location reached without a building of its own (each
@@ -354,7 +368,7 @@ impl World {
         // else once for its building's
         if let Some(building_master) = state.building_master {
             if state.location(building_master).is_some_and(reached) {
-                let _ = self.complete_research(player_id, TechId::of_index(d)?, None)?;
+                let _ = self.complete_research(player_id, TechId::of_index(dependent)?, None)?;
                 return Ok(counted);
             }
         } else {
@@ -365,13 +379,18 @@ impl World {
                 .count();
             if 0 < reached {
                 for _ in 0..reached {
-                    let _ = self.complete_research(player_id, TechId::of_index(d)?, None)?;
+                    let _ =
+                        self.complete_research(player_id, TechId::of_index(dependent)?, None)?;
                     counted -= 1;
                 }
                 return Ok(counted);
             }
         }
-        let state = self.players.player_mut(player_id)?.techs.checked_mut(d)?;
+        let state = self
+            .players
+            .player_mut(player_id)?
+            .techs
+            .checked_mut(dependent)?;
         if state.state < ResearchState::Available {
             state.state = ResearchState::Available;
         }
@@ -397,15 +416,15 @@ impl World {
             .techs
             .len()
             .min(self.model.techs.len());
-        let Some(t) = Some(tech.index()).filter(|&t| t < tree) else {
+        let Some(tech_index) = Some(tech.index()).filter(|&tech_index| tech_index < tree) else {
             return Ok(());
         };
-        let costs = self.model.techs.checked(t)?.costs;
+        let costs = self.model.techs.checked(tech_index)?.costs;
         let adjustments = &mut self
             .players
             .player_mut(player_id)?
             .techs
-            .checked_mut(t)?
+            .checked_mut(tech_index)?
             .cost_adj;
         for (cost, adj) in costs.iter().zip(adjustments.iter_mut()) {
             if !cost.paid.is_paid()
@@ -432,29 +451,32 @@ impl World {
         Ok(())
     }
 
-    /// The disable command (`'f'`, `FUN_14163a500` with `param_3` 0) of player `p`'s technology
-    /// `tech`: one of the shared kind (`FUN_1413d1020`) is a building's own, which a command
-    /// without a building as its object lets be (with one, `FUN_1411c49a0` files it in the
+    /// The disable command (`'f'`, `FUN_14163a500` with `param_3` 0) of player `player`'s
+    /// technology `tech`: one of the shared kind (`FUN_1413d1020`) is a building's own, which a
+    /// command without a building as its object lets be (with one, `FUN_1411c49a0` files it in the
     /// building's list `+0xd00`, which the slice does not hold); any other goes through
-    /// `FUN_1413cdb00`: a technology of type 0x21 turns to 1 (it may be researched), any other
-    /// but a researched one (state 3) to −1; a negative id does so to every technology.
+    /// `FUN_1413cdb00`: a technology of type 0x21 turns to 1 (it may be researched), any other but
+    /// a researched one (state 3) to −1; a negative id does so to every technology.
     pub(super) fn disable_tech(
         &mut self,
-        p: PlayerId,
+        player: PlayerId,
         tech: DisabledTech,
         object: Option<ObjectId>,
     ) -> GenieResult<()> {
         let count = self
             .players
-            .player(p)?
+            .player(player)?
             .techs
             .len()
             .min(self.model.techs.len());
-        let held = tech.whole().map(TechId::index).filter(|&t| t < count);
-        if held.is_some_and(|t| {
+        let held = tech
+            .whole()
+            .map(TechId::index)
+            .filter(|&tech_index| tech_index < count);
+        if held.is_some_and(|tech_index| {
             self.model
                 .techs
-                .get(t)
+                .get(tech_index)
                 .is_some_and(|tech_def| tech_def.kind == TechKind::SHARED)
         }) {
             let building = match object.and_then(|id| self.object(id)) {
@@ -470,8 +492,9 @@ impl World {
             }
             return Ok(());
         }
-        let disable = |defs: &[TechDef], states: &mut [TechState], t: usize| {
-            let (Some(def), Some(state)) = (defs.get(t), states.get_mut(t)) else {
+        let disable = |defs: &[TechDef], states: &mut [TechState], tech_index: usize| {
+            let (Some(def), Some(state)) = (defs.get(tech_index), states.get_mut(tech_index))
+            else {
                 return;
             };
             if def.kind == TechKind::REENABLED {
@@ -483,9 +506,12 @@ impl World {
         };
         // FUN_1413cdb00 takes the id's low 16 bits (MOVZX EDX, BX in FUN_14163a500)
         let short = tech.short();
-        let states = &mut self.players.player_mut(p)?.techs;
-        match usize::try_from(short).ok().filter(|&t| t < count) {
-            Some(t) => disable(&self.model.techs, states, t),
+        let states = &mut self.players.player_mut(player)?.techs;
+        match usize::try_from(short)
+            .ok()
+            .filter(|&tech_index| tech_index < count)
+        {
+            Some(tech_index) => disable(&self.model.techs, states, tech_index),
             None if short < 0 => {
                 for index in 0..count {
                     disable(&self.model.techs, states, index);
@@ -496,7 +522,7 @@ impl World {
         Ok(())
     }
 
-    /// The enable command (`FUN_1416665b0`) of player `p` on its master `master` with `enable`
+    /// The enable command (`FUN_1416665b0`) of player `player` on its master `master` with `enable`
     /// (the command's low byte): a master the player does not have is let be (its id check
     /// against `+0x260` is taken to hold). Without `one` building (a third argument of 1) and
     /// its object, the master's slot 0x58 (`FUN_141126280`) sets `available` unless it is
@@ -506,13 +532,13 @@ impl World {
     /// one building (`FUN_1411c69f0`, `FUN_1411c6a50`: the building's list, not held).
     pub(super) fn enable_master(
         &mut self,
-        p: PlayerId,
+        player: PlayerId,
         master: MasterId,
         enable: u8,
         one: bool,
         object: Option<ObjectId>,
     ) -> GenieResult<()> {
-        if player_master(&self.model.masters, p, master).is_none() {
+        if player_master(&self.model.masters, player, master).is_none() {
             return Ok(());
         }
         if enable == 1
@@ -545,11 +571,11 @@ impl World {
             }
             return Ok(());
         }
-        let m = Arc::make_mut(self.model.masters.checked_mut(p.index())?)
+        let master = Arc::make_mut(self.model.masters.checked_mut(player.index())?)
             .get_mut(master)
             .ok_or(NO_MASTER)?;
-        if !m.disabled.is_disabled() {
-            m.available = Availability::of_data(enable);
+        if !master.disabled.is_disabled() {
+            master.available = Availability::of_data(enable);
         }
         Ok(())
     }

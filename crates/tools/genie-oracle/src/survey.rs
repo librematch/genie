@@ -66,22 +66,25 @@ pub fn header_survey(
     let header = chapter.header()?;
     let mut turns = header_slice(&header, masters)?;
     let mut decoder = Decoder::default();
-    if let Some(&p) = players.iter().find(|&&p| turns.players.len() <= p as usize) {
-        return Err(no_such_player(p));
+    if let Some(&player) = players
+        .iter()
+        .find(|&&player| turns.players.len() <= player as usize)
+    {
+        return Err(no_such_player(player));
     }
     let mut survey = Survey::default();
     let mut rows: BTreeMap<String, SurveyRow> = BTreeMap::new();
     let mut stopped = vec![false; players.len()];
-    for (i, frame) in frames(&chapter, last)?.iter().enumerate() {
+    for (frame_index, frame) in frames(&chapter, last)?.iter().enumerate() {
         run(&mut turns, &mut decoder, from_ref(frame));
-        let update = i + 1;
-        for (k, &p) in players.iter().enumerate() {
-            if let (false, Some(stop)) = (stopped[k], stop_of(&turns, p)) {
-                survey.stops.push((p, stop));
-                stopped[k] = true;
+        let update = frame_index + 1;
+        for (index, &player) in players.iter().enumerate() {
+            if let (false, Some(stop)) = (stopped[index], stop_of(&turns, player)) {
+                survey.stops.push((player, stop));
+                stopped[index] = true;
             }
         }
-        if stopped.iter().all(|&s| s) {
+        if stopped.iter().all(|&stop| stop) {
             break;
         }
         if update < first || (update - first) % every.get() != 0 {
@@ -93,23 +96,23 @@ pub fn header_survey(
         let saved = chapters(&game)?[0];
         let saved = saved.header()?;
         survey.saves += 1;
-        for (index, &p) in players.iter().enumerate() {
+        for (index, &player) in players.iter().enumerate() {
             if stopped[index] {
                 continue;
             }
-            let game = header_objects(&saved, p, masters)?;
+            let game = header_objects(&saved, player, masters)?;
             for difference in
-                object_field_differences_in(object_rows(&turns, p as usize), &game, scope)
+                object_field_differences_in(object_rows(&turns, player as usize), &game, scope)
             {
                 let field = field_key(&difference.field);
                 let _ = rows
                     .entry(field.clone())
-                    .and_modify(|r| r.count += 1)
+                    .and_modify(|survey_row| survey_row.count += 1)
                     .or_insert(SurveyRow {
                         field,
                         count: 1,
                         first: update,
-                        player: p,
+                        player,
                         example: difference,
                     });
             }
@@ -125,8 +128,8 @@ pub fn header_survey(
 pub(crate) fn field_key(path: &str) -> String {
     let mut key = String::with_capacity(path.len());
     let mut depth = 0usize;
-    for c in path.chars() {
-        match c {
+    for character in path.chars() {
+        match character {
             '[' => {
                 if depth == 0 {
                     key.push_str("[]");
@@ -134,7 +137,7 @@ pub(crate) fn field_key(path: &str) -> String {
                 depth += 1;
             }
             ']' => depth = depth.saturating_sub(1),
-            _ if depth == 0 => key.push(c),
+            _ if depth == 0 => key.push(character),
             _ => {}
         }
     }

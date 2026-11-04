@@ -146,10 +146,10 @@ pub const CLASS_37: ClassId = ClassId::named(37);
 #[must_use]
 pub const fn classes<const N: usize>(values: [i16; N]) -> [ClassId; N] {
     let mut out = [NO_CLASS; N];
-    let mut i = 0;
-    while i < N {
-        out[i] = ClassId::named(values[i]);
-        i += 1;
+    let mut index = 0;
+    while index < N {
+        out[index] = ClassId::named(values[index]);
+        index += 1;
     }
     out
 }

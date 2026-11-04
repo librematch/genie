@@ -93,13 +93,13 @@ use crate::world::layer::generated::DamageTuning;
 /// it tests, the slots of the attributes it counts into and the damage's tuning values, one
 /// argument of [`take`] and [`blast`].
 #[derive(Clone, Copy, Debug)]
-pub struct HitLayer<'a> {
+pub struct HitLayer<'model> {
     /// The build layer's roles.
-    pub(crate) roles: &'a Roles,
+    pub(crate) roles: &'model Roles,
     /// The build layer's slots.
     pub(crate) slots: Slots,
     /// The damage's tuning values.
-    pub(crate) damage_tuning: &'a DamageTuning,
+    pub(crate) damage_tuning: &'model DamageTuning,
 }
 
 /// The gap below which the game takes a distance as zero (`DAT_142eb0c60`), and the share of

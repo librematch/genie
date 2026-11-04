@@ -60,10 +60,12 @@ fn exact_f64(x: f64) -> (String, String) {
 }
 
 /// The rational of a decimal string (`0.010000001`, `-3.5`, `1e-7` as Rust prints it).
-fn decimal(s: &str) -> (String, String) {
-    let (mantissa, exponent) = s
+fn decimal(text: &str) -> (String, String) {
+    let (mantissa, exponent) = text
         .split_once('e')
-        .map_or((s, 0), |(m, e)| (m, e.parse::<i64>().unwrap()));
+        .map_or((text, 0), |(mantissa, exponent)| {
+            (mantissa, exponent.parse::<i64>().unwrap())
+        });
     let (int, frac) = mantissa.split_once('.').unwrap_or((mantissa, ""));
     let digits = format!("{int}{frac}");
     let scale = exponent - i64::try_from(frac.len()).unwrap();
@@ -118,15 +120,15 @@ fn every_sampled_f32_comes_back_from_its_exact_rational_and_its_shortest_decimal
             .filter(|x| x.is_finite()),
     );
     for x in samples {
-        let (n, d) = exact_f32(x);
+        let (numerator, denominator) = exact_f32(x);
         assert_eq!(
-            round_to_f32(&n, &d).unwrap().to_bits(),
+            round_to_f32(&numerator, &denominator).unwrap().to_bits(),
             x.to_bits(),
             "exact {x:e}"
         );
-        let (n, d) = decimal(&format!("{x:e}"));
+        let (numerator, denominator) = decimal(&format!("{x:e}"));
         assert_eq!(
-            round_to_f32(&n, &d).unwrap().to_bits(),
+            round_to_f32(&numerator, &denominator).unwrap().to_bits(),
             x.to_bits(),
             "shortest {x:e}"
         );
@@ -154,15 +156,15 @@ fn every_sampled_f64_comes_back_from_its_exact_rational_and_its_shortest_decimal
             .filter(|x| x.is_finite()),
     );
     for x in samples {
-        let (n, d) = exact_f64(x);
+        let (numerator, denominator) = exact_f64(x);
         assert_eq!(
-            round_to_f64(&n, &d).unwrap().to_bits(),
+            round_to_f64(&numerator, &denominator).unwrap().to_bits(),
             x.to_bits(),
             "exact {x:e}"
         );
-        let (n, d) = decimal(&format!("{x:e}"));
+        let (numerator, denominator) = decimal(&format!("{x:e}"));
         assert_eq!(
-            round_to_f64(&n, &d).unwrap().to_bits(),
+            round_to_f64(&numerator, &denominator).unwrap().to_bits(),
             x.to_bits(),
             "shortest {x:e}"
         );
@@ -174,15 +176,19 @@ fn every_sampled_f64_comes_back_from_its_exact_rational_and_its_shortest_decimal
 fn halfway_values_round_to_the_even_neighbour() {
     // 1 + 2^-24 lies halfway between 1.0 (even) and 1.0000001 (odd)
     let half_ulp = BigUint::from(1u8) << 24usize;
-    let n = (&half_ulp + 1u8).to_string();
+    let text = (&half_ulp + 1u8).to_string();
     assert_eq!(
-        round_to_f32(&n, &half_ulp.to_string()).unwrap().to_bits(),
+        round_to_f32(&text, &half_ulp.to_string())
+            .unwrap()
+            .to_bits(),
         1.0f32.to_bits()
     );
     // 1 + 3·2^-24 lies halfway between 1.0000001 (odd) and 1.0000002 (even)
-    let n = (&half_ulp + 3u8).to_string();
+    let text = (&half_ulp + 3u8).to_string();
     assert_eq!(
-        round_to_f32(&n, &half_ulp.to_string()).unwrap().to_bits(),
+        round_to_f32(&text, &half_ulp.to_string())
+            .unwrap()
+            .to_bits(),
         0x3f80_0002
     );
     // 1 + 2^-53 lies halfway between 1.0 and the next f64: the even one, 1.0
@@ -199,10 +205,10 @@ fn halfway_values_round_to_the_even_neighbour() {
 #[test]
 fn values_just_above_halfway_round_up_where_rounding_twice_through_f64_rounds_down() {
     // 1 + 2^-24 + 2^-80: f64 rounds it to the halfway 1 + 2^-24, which then rounds to even, 1.0
-    let d = BigUint::from(1u8) << 80usize;
-    let n = &d + (BigUint::from(1u8) << 56usize) + 1u8;
+    let denominator = BigUint::from(1u8) << 80usize;
+    let numerator = &denominator + (BigUint::from(1u8) << 56usize) + 1u8;
     assert_eq!(
-        round_to_f32(&n.to_string(), &d.to_string())
+        round_to_f32(&numerator.to_string(), &denominator.to_string())
             .unwrap()
             .to_bits(),
         0x3f80_0001
@@ -213,8 +219,8 @@ fn values_just_above_halfway_round_up_where_rounding_twice_through_f64_rounds_do
 /// zero numerator is 0.
 #[test]
 fn values_beyond_the_largest_float_or_no_rational_fail() {
-    let (n, d) = decimal("340282360000000000000000000000000000000");
-    assert!(round_to_f32(&n, &d).is_err());
+    let (numerator, denominator) = decimal("340282360000000000000000000000000000000");
+    assert!(round_to_f32(&numerator, &denominator).is_err());
     assert!(round_to_f32("1", "0").is_err());
     assert!(round_to_f32("1.5", "1").is_err());
     assert_eq!(round_to_f32("0", "7").unwrap().to_bits(), 0);

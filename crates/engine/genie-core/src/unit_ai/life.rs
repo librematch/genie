@@ -34,7 +34,7 @@ use crate::world::WorldTime;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
 use crate::world::layer::generated::UnitAiTuning;
-use crate::world::slots::CheckedIndex;
+use crate::world::slots::CheckedIndexExt;
 use crate::{GenieError, GenieResult};
 
 /// Whether the order setter ([`UnitAi::set_order_with`]) keeps the order before as the last
@@ -262,17 +262,17 @@ impl UnitAi {
         now: WorldTime,
         seen: &mut dyn FnMut(ObjectId) -> GenieResult<Option<UnitSeen>>,
     ) -> GenieResult<()> {
-        let mut i = 0;
-        while i < self.retries.len() {
-            let (target, timeout) = *self.retries.checked(i)?;
+        let mut index = 0;
+        while index < self.retries.len() {
+            let (target, timeout) = *self.retries.checked(index)?;
             if seen(target)?.is_none_or(|unit_seen| unit_seen.hp < HitPoints::new(1.0)) {
                 self.retries.clear();
                 break;
             }
             if now < timeout {
-                i += 1;
+                index += 1;
             } else {
-                let _ = self.retries.remove(i);
+                let _ = self.retries.remove(index);
             }
         }
         Ok(())
@@ -381,8 +381,9 @@ impl UnitAi {
                 ai.zero_patrol();
             } else {
                 let (dx, dy) = (point.x() - at.x(), point.y() - at.y());
-                let d = sqrt(dy * dy + dx * dx);
-                ask.back_and_forth = at_most_or_unordered(unit_ai_tuning.patrol_turn_reach, d);
+                let distance = sqrt(dy * dy + dx * dx);
+                ask.back_and_forth =
+                    at_most_or_unordered(unit_ai_tuning.patrol_turn_reach, distance);
             }
         }
         ask.attack_move = ai

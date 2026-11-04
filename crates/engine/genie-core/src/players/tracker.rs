@@ -38,7 +38,7 @@ use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::Masters;
-use crate::objects::masters::PlayersMasters;
+use crate::objects::masters::PlayersMastersExt;
 use crate::players::PlayerId;
 use crate::production::QueuedUnits;
 use crate::world::Seconds;
@@ -46,7 +46,7 @@ use crate::world::World;
 use crate::world::index::ObjectsRef;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 use std::collections::BTreeMap;
 use std::mem::take;
 
@@ -158,15 +158,17 @@ impl Key {
 #[must_use]
 pub fn key(masters: Option<&Masters>, lines: &UnitLines, master: MasterId, roles: &Roles) -> Key {
     let get = |id: MasterId| masters?.get(id).filter(|_| id < TRACKED_MASTERS);
-    let Some(m) = get(master) else {
+    let Some(found) = get(master) else {
         return Key::NONE;
     };
     let mut out = Key::NONE;
     let mut classed = true;
     // The buildings' type, which wait in the pending lists.
-    let id = if m.kind == MasterKind::BUILDING {
-        let building = m.building.as_ref();
-        if building.is_some_and(|b| b.head_unit.is_some() && b.annexes[0].is_none()) {
+    let id = if found.kind == MasterKind::BUILDING {
+        let building = found.building.as_ref();
+        if building.is_some_and(|building_master| {
+            building_master.head_unit.is_some() && building_master.annexes[0].is_none()
+        }) {
             classed = false;
         }
         out.pending = true;
@@ -178,17 +180,23 @@ pub fn key(masters: Option<&Masters>, lines: &UnitLines, master: MasterId, roles
     } else {
         lines.base(master)
     };
-    let Some(k) = id.and_then(get) else {
+    let Some(master) = id.and_then(get) else {
         return Key::NONE;
     };
     out.master = id;
-    if classed && (0..CLASSES).contains(&k.class.get()) {
-        out.class = Some(k.class);
-        if roles.of_class(k.class).contains(ClassRoles::NEVER_PENDING) {
+    if classed && (0..CLASSES).contains(&master.class.get()) {
+        out.class = Some(master.class);
+        if roles
+            .of_class(master.class)
+            .contains(ClassRoles::NEVER_PENDING)
+        {
             out.pending = false;
             out.military = false;
         }
-        if roles.of_class(k.class).contains(ClassRoles::MILITARY_KEY) {
+        if roles
+            .of_class(master.class)
+            .contains(ClassRoles::MILITARY_KEY)
+        {
             out.military = true;
         }
     }
@@ -226,9 +234,9 @@ impl Tracker {
     /// `FUN_140a63bd0` on the first `id` of list `key`: the ids after it move up.
     fn erase(&mut self, key: ListKey, id: ObjectId) {
         if let Some(list) = self.lists.get_mut(&key)
-            && let Some(k) = list.iter().position(|&x| x == Some(id))
+            && let Some(index) = list.iter().position(|&x| x == Some(id))
         {
-            let _ = list.remove(k);
+            let _ = list.remove(index);
         }
     }
 
@@ -716,11 +724,11 @@ mod tests {
 
     #[test]
     fn unit_keys_by_its_lines_first_master_and_building_by_its_stack_unit() {
-        let (m, unit_lines) = (masters(), lines());
-        let k = |id| key(Some(&m), &unit_lines, id, &roles());
+        let (masters, unit_lines) = (masters(), lines());
+        let key_of = |id| key(Some(&masters), &unit_lines, id, &roles());
         // the crossbowman (24) files under the archer (4), class 0 a military one
         assert_eq!(
-            k(master_id(24)),
+            key_of(master_id(24)),
             Key {
                 master: Some(master_id(4)),
                 class: Some(class::CLASS_0),
@@ -729,7 +737,7 @@ mod tests {
             }
         );
         assert_eq!(
-            k(ids::VILLAGER_MALE),
+            key_of(ids::VILLAGER_MALE),
             Key {
                 master: Some(master_id(83)),
                 class: Some(class::VILLAGER),
@@ -739,7 +747,7 @@ mod tests {
         );
         // a building waits; a stack unit is its key master (with its class)
         assert_eq!(
-            k(ids::TOWN_CENTRE),
+            key_of(ids::TOWN_CENTRE),
             Key {
                 master: Some(master_id(109)),
                 class: Some(class::BUILDING),
@@ -748,7 +756,7 @@ mod tests {
             }
         );
         assert_eq!(
-            k(master_id(1189)),
+            key_of(master_id(1189)),
             Key {
                 master: Some(master_id(79)),
                 class: Some(class::TOWER),
@@ -758,7 +766,7 @@ mod tests {
         );
         // an annex files under no class; a stack unit out of range gives none
         assert_eq!(
-            k(master_id(618)),
+            key_of(master_id(618)),
             Key {
                 master: Some(master_id(618)),
                 class: None,
@@ -766,23 +774,23 @@ mod tests {
                 military: false
             }
         );
-        assert_eq!(k(master_id(1190)), Key::NONE);
+        assert_eq!(key_of(master_id(1190)), Key::NONE);
         // classes 51 and 54 do not wait; a class of 100 or more is none and the building waits
         assert_eq!(
-            (k(ids::ID_42).pending, k(ids::ID_42).class),
+            (key_of(ids::ID_42).pending, key_of(ids::ID_42).class),
             (false, Some(class::CLASS_54))
         );
         assert_eq!(
-            (k(master_id(43)).pending, k(master_id(43)).class),
+            (key_of(master_id(43)).pending, key_of(master_id(43)).class),
             (true, None)
         );
         assert_eq!(
-            (k(ids::ID_331).pending, k(ids::ID_331).class),
+            (key_of(ids::ID_331).pending, key_of(ids::ID_331).class),
             (false, Some(class::CLASS_54))
         );
         // a master the player lacks, a line whose first master it lacks, no table
-        assert_eq!(k(ids::ID_7), Key::NONE);
-        assert_eq!(k(master_id(492)), Key::NONE);
+        assert_eq!(key_of(ids::ID_7), Key::NONE);
+        assert_eq!(key_of(master_id(492)), Key::NONE);
         assert_eq!(
             key(None, &unit_lines, ids::VILLAGER_MALE, &roles()),
             Key::NONE
@@ -791,8 +799,8 @@ mod tests {
 
     #[test]
     fn building_waits_until_its_completion_moves_it_to_the_end_of_the_done_lists() {
-        let (m, unit_lines) = (masters(), lines());
-        let tc = key(Some(&m), &unit_lines, ids::TOWN_CENTRE, &roles());
+        let (masters, unit_lines) = (masters(), lines());
+        let tc = key(Some(&masters), &unit_lines, ids::TOWN_CENTRE, &roles());
         let mut tracker = Tracker::default();
         tracker.add(object_id(10), tc);
         tracker.add(object_id(11), tc);
@@ -827,7 +835,7 @@ mod tests {
             [Some(object_id(11)), Some(object_id(10))]
         );
         // a key that does not wait changes nothing
-        let villager = key(Some(&m), &unit_lines, ids::VILLAGER_MALE, &roles());
+        let villager = key(Some(&masters), &unit_lines, ids::VILLAGER_MALE, &roles());
         tracker.add(object_id(20), villager);
         tracker.complete(object_id(20), villager);
         assert_eq!(tracker.class_list(class::VILLAGER), [Some(object_id(20))]);
@@ -835,13 +843,13 @@ mod tests {
 
     #[test]
     fn removal_keeps_the_others_order() {
-        let (m, unit_lines) = (masters(), lines());
-        let v = key(Some(&m), &unit_lines, ids::VILLAGER_MALE, &roles());
+        let (masters, unit_lines) = (masters(), lines());
+        let villager_key = key(Some(&masters), &unit_lines, ids::VILLAGER_MALE, &roles());
         let mut tracker = Tracker::default();
         for id in [1, 2, 3, 4] {
-            tracker.add(object_id(id), v);
+            tracker.add(object_id(id), villager_key);
         }
-        tracker.remove(object_id(2), v);
+        tracker.remove(object_id(2), villager_key);
         assert_eq!(
             (
                 tracker.list(list_of(83)),
@@ -853,7 +861,7 @@ mod tests {
             )
         );
         // a pending building leaves both its lists, done or not
-        let tc = key(Some(&m), &unit_lines, ids::TOWN_CENTRE, &roles());
+        let tc = key(Some(&masters), &unit_lines, ids::TOWN_CENTRE, &roles());
         tracker.add(object_id(30), tc);
         tracker.add(object_id(31), tc);
         tracker.complete(object_id(31), tc);
@@ -871,10 +879,10 @@ mod tests {
 
     #[test]
     fn promotion_moves_an_object_to_the_end_of_its_new_lists() {
-        let (m, unit_lines) = (masters(), lines());
+        let (masters, unit_lines) = (masters(), lines());
         let (villager, builder) = (
-            key(Some(&m), &unit_lines, ids::VILLAGER_MALE, &roles()),
-            key(Some(&m), &unit_lines, ids::BUILDER, &roles()),
+            key(Some(&masters), &unit_lines, ids::VILLAGER_MALE, &roles()),
+            key(Some(&masters), &unit_lines, ids::BUILDER, &roles()),
         );
         let mut tracker = Tracker::default();
         for id in [1, 2, 3] {
@@ -894,8 +902,8 @@ mod tests {
             [Some(object_id(2)), Some(object_id(3)), Some(object_id(1))]
         );
         // an archer upgraded in its line stays under the archer, last
-        let archer = key(Some(&m), &unit_lines, master_id(4), &roles());
-        let crossbow = key(Some(&m), &unit_lines, master_id(24), &roles());
+        let archer = key(Some(&masters), &unit_lines, master_id(4), &roles());
+        let crossbow = key(Some(&masters), &unit_lines, master_id(24), &roles());
         tracker.add(object_id(7), archer);
         tracker.add(object_id(8), archer);
         tracker.promote(object_id(7), archer, crossbow);
@@ -915,12 +923,12 @@ mod tests {
         use crate::objects::unit::Unit;
         use crate::world::{Player, World};
         let unit = |id: i32, master: MasterId| {
-            let mut u = Unit {
+            let mut unit = Unit {
                 id: object_id(id),
                 ..Unit::default()
             };
-            u.life.master_id = master;
-            u
+            unit.life.master_id = master;
+            unit
         };
         let site = |id: i32, progress: f32| {
             (
@@ -955,7 +963,7 @@ mod tests {
             sleeping: vec![unit(15, ids::VILLAGER_MALE)].into(),
             ..Player::default()
         };
-        let mut t = World::new(
+        let mut world = World::new(
             WorldTime::ZERO,
             FrameSeed::of_data(0),
             PlayerId::new(0),
@@ -963,9 +971,9 @@ mod tests {
             vec![Player::default(), player],
         )
         .with_buildings([site(10, 150.0), site(12, 149.9), site(14, f32::NAN)]);
-        t.model.masters = vec![Arc::new(masters()), Arc::new(masters())];
-        t.model.lines = Arc::new(lines());
-        t
+        world.model.masters = vec![Arc::new(masters()), Arc::new(masters())];
+        world.model.lines = Arc::new(lines());
+        world
     }
 
     #[test]

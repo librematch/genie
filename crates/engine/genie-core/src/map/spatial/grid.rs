@@ -20,7 +20,7 @@ use crate::{GenieError, GenieResult};
 
 /// A walk's obstruction query ([`Spatial::walk_hits`]'s arguments).
 #[derive(Clone, Copy, Debug)]
-pub struct WalkQuery<'a> {
+pub struct WalkQuery<'world> {
     /// The step's start.
     pub(crate) start: Point,
     /// The step's end.
@@ -35,9 +35,9 @@ pub struct WalkQuery<'a> {
     /// The walker's player.
     pub(crate) player: Option<PlayerId>,
     /// The objects the query ignores.
-    pub(crate) ignore: &'a [RecordId],
+    pub(crate) ignore: &'world [RecordId],
     /// The world's objects, whose gaits the query reads ([`ObjectsRef::moving`]).
-    pub(crate) objects: ObjectsRef<'a>,
+    pub(crate) objects: ObjectsRef<'world>,
 }
 
 /// Whether a line query ([`Spatial::line_hits`]) meets the temporary tile records too.
@@ -84,9 +84,14 @@ impl Spatial {
             x1 -= 0.001;
             y1 -= 0.001;
         }
-        let (w, h) = (self.map.width(), self.map.height());
-        let tile = |v: f32, n: i32| (v as i32).clamp(0, n - 1);
-        let (tx0, ty0, tx1, ty1) = (tile(x0, w), tile(y0, h), tile(x1, w), tile(y1, h));
+        let (width, height) = (self.map.width(), self.map.height());
+        let tile = |coordinate: f32, size: i32| (coordinate as i32).clamp(0, size - 1);
+        let (tx0, ty0, tx1, ty1) = (
+            tile(x0, width),
+            tile(y0, height),
+            tile(x1, width),
+            tile(y1, height),
+        );
         let level = self
             .grid
             .level((tx1 ^ tx0) >> 3)
@@ -115,9 +120,12 @@ impl Spatial {
     /// ([`Spatial::visits_cell`]): x and y from, then x and y to, each inclusive.
     pub(super) fn visited_cells(&self, level: i32, rect: Rect) -> [i32; 4] {
         let shift = self.grid.shift(level);
-        let (w, h) = (self.map.width(), self.map.height());
+        let (width, height) = (self.map.width(), self.map.height());
         let (qx0, qy0) = ((rect.x0() as i32).max(0), (rect.y0() as i32).max(0));
-        let (qx1, qy1) = ((rect.x1() as i32).min(w), (rect.y1() as i32).min(h));
+        let (qx1, qy1) = (
+            (rect.x1() as i32).min(width),
+            (rect.y1() as i32).min(height),
+        );
         [qx0 >> shift, qy0 >> shift, qx1 >> shift, qy1 >> shift]
     }
 
@@ -146,9 +154,9 @@ impl Spatial {
             }
         }
         match cell {
-            Some(c) => {
-                let _ = records.filed.insert(id, c);
-                let _ = records.cells.entry(c).or_default().insert(id);
+            Some(cell) => {
+                let _ = records.filed.insert(id, cell);
+                let _ = records.cells.entry(cell).or_default().insert(id);
             }
             None => {
                 let _ = records.filed.remove(id);
@@ -172,8 +180,8 @@ impl Spatial {
             if span as usize <= self.records.cells.len() {
                 for cy in y0..=y1 {
                     for cx in x0..=x1 {
-                        if let Some(c) = self.records.cells.get(&(level, cx, cy)) {
-                            ids.extend(c);
+                        if let Some(object_ids) = self.records.cells.get(&(level, cx, cy)) {
+                            ids.extend(object_ids);
                         }
                     }
                 }

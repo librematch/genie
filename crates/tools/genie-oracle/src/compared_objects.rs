@@ -19,10 +19,11 @@ use genie_core::world::load::object::object;
 /// world's tables ([`World::object_view`]); none for a player it lacks.
 #[must_use]
 pub fn object_rows(world: &World, player: usize) -> Vec<ObjectView<'_>> {
-    world.players.get(player).map_or_else(Vec::new, |p| {
-        p.objects
+    world.players.get(player).map_or_else(Vec::new, |player| {
+        player
+            .objects
             .iter()
-            .filter(|u| listed(u))
+            .filter(|unit| listed(unit))
             .map(|unit| world.object_view(unit))
             .collect()
     })
@@ -56,10 +57,10 @@ pub(crate) fn header_objects(
     let missile_tuning = &layer()?.tuning.missile;
     Ok(section
         .live_objects()
-        .map(|o| {
+        .map(|saved| {
             let players = sections.len();
             object(
-                o,
+                saved,
                 section.objects(),
                 paths,
                 civ,
@@ -68,6 +69,6 @@ pub(crate) fn header_objects(
                 missile_tuning,
             )
         })
-        .filter(|o| listed(&o.unit))
+        .filter(|object| listed(&object.unit))
         .collect())
 }

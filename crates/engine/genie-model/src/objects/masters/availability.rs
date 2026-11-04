@@ -46,10 +46,10 @@ impl Availability {
         self.0 != 0
     }
 
-    /// The byte plus `n`, wrapping as the attribute setters' add does (`FUN_141126400`).
+    /// The byte plus `by`, wrapping as the attribute setters' add does (`FUN_141126400`).
     #[must_use]
-    pub const fn plus(self, n: u8) -> Self {
-        Self(self.0.wrapping_add(n))
+    pub const fn plus(self, by: u8) -> Self {
+        Self(self.0.wrapping_add(by))
     }
 }
 

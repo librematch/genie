@@ -243,11 +243,11 @@ impl PatrolCommand {
         let waypoint_count = input.read_u8()?;
         let _padding = input.read_u8()?;
         let mut raw_waypoints = [(0.0, 0.0); 10];
-        for w in &mut raw_waypoints {
-            w.0 = input.read_f32::<LE>()?;
+        for waypoint in &mut raw_waypoints {
+            waypoint.0 = input.read_f32::<LE>()?;
         }
-        for w in &mut raw_waypoints {
-            w.1 = input.read_f32::<LE>()?;
+        for waypoint in &mut raw_waypoints {
+            waypoint.1 = input.read_f32::<LE>()?;
         }
         command
             .waypoints
@@ -270,8 +270,8 @@ impl PatrolCommand {
         output.write_i8(fits(self.objects.len())?)?;
         output.write_u8(fits(self.waypoints.len())?)?;
         output.write_u8(0)?;
-        for i in 0..10 {
-            output.write_f32::<LE>(self.waypoints.get(i).copied().unwrap_or_default().0)?;
+        for index in 0..10 {
+            output.write_f32::<LE>(self.waypoints.get(index).copied().unwrap_or_default().0)?;
         }
         for index in 0..10 {
             output.write_f32::<LE>(self.waypoints.get(index).copied().unwrap_or_default().1)?;
@@ -391,8 +391,8 @@ impl UserPatchAiCommand {
         output.write_u8(self.ai_action)?;
         output.write_u8(self.player_id.into())?;
         output.write_u8(0)?;
-        for p in &self.params {
-            output.write_u32::<LE>(*p)?;
+        for param in &self.params {
+            output.write_u32::<LE>(*param)?;
         }
         Ok(())
     }

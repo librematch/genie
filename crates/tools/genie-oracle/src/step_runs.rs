@@ -44,7 +44,7 @@ pub fn steps_from_save(
     let commands: Vec<_> = frame
         .commands
         .iter()
-        .filter_map(|p| decoder.command(p))
+        .filter_map(|packet| decoder.command(packet))
         .collect();
     let mut steps = Vec::new();
     let mut failed = None;

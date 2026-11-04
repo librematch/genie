@@ -19,7 +19,7 @@ use crate::world::Millis;
 use crate::world::Seconds;
 use crate::world::WorldTime;
 use crate::world::layer::generated::BestTargetTuning;
-use crate::world::slots::CheckedIndex;
+use crate::world::slots::CheckedIndexExt;
 use crate::world::{Percent, TargetingMode};
 
 /// The statistics' table holds at most this many objects (`FUN_140c66590`: `+0x1668` below
@@ -151,15 +151,15 @@ impl Default for Statistics {
 
 /// A value [`Bounds`] holds: a float, which the table's reset sets to the largest float and −1.
 pub trait Bounded: Copy + PartialOrd {
-    /// The value of the float `v`.
-    fn of_float(v: f32) -> Self;
+    /// The value of the float `value`.
+    fn of_float(value: f32) -> Self;
     /// The float.
     fn float(self) -> f32;
 }
 
 impl Bounded for Distance {
-    fn of_float(v: f32) -> Self {
-        Self::new(v)
+    fn of_float(value: f32) -> Self {
+        Self::new(value)
     }
 
     fn float(self) -> f32 {
@@ -168,8 +168,8 @@ impl Bounded for Distance {
 }
 
 impl Bounded for KillTime {
-    fn of_float(v: f32) -> Self {
-        Self::new(v)
+    fn of_float(value: f32) -> Self {
+        Self::new(value)
     }
 
     fn float(self) -> f32 {
@@ -196,14 +196,14 @@ impl<T: Bounded> Bounds<T> {
         }
     }
 
-    /// `v` joins the bounds: the least takes it when above it (`COMISS least, v`, `JBE`: a NaN
-    /// changes nothing), then the most when below it (`COMISS v, most`, `JBE`).
-    pub fn take(&mut self, v: T) {
-        if self.least > v {
-            self.least = v;
+    /// `value` joins the bounds: the least takes it when above it (`COMISS least, value`, `JBE`: a
+    /// NaN changes nothing), then the most when below it (`COMISS value, most`, `JBE`).
+    pub fn take(&mut self, value: T) {
+        if self.least > value {
+            self.least = value;
         }
-        if v > self.most {
-            self.most = v;
+        if value > self.most {
+            self.most = value;
         }
     }
 
@@ -379,16 +379,16 @@ impl Statistics {
     /// A slot or an entry the sort does not hold.
     pub(super) fn partition(&mut self, lo: usize, hi: usize) -> GenieResult<usize> {
         let pivot = *self.entries.checked(*self.order.checked(hi)?)?;
-        let mut i = lo;
+        let mut boundary = lo;
         for index in lo..hi {
             let entry = *self.entries.checked(*self.order.checked(index)?)?;
             if pivot.rank < entry.rank || (entry.rank == pivot.rank && entry.id < pivot.id) {
-                self.order.swap(i, index);
-                i += 1;
+                self.order.swap(boundary, index);
+                boundary += 1;
             }
         }
-        self.order.swap(i, hi);
-        Ok(i)
+        self.order.swap(boundary, hi);
+        Ok(boundary)
     }
 
     /// `FUN_140c41b40` over the order slots `lo..=hi` (the quicksort, its second half by the
@@ -416,7 +416,7 @@ impl Statistics {
     ///
     /// A slot or an entry the sort does not hold.
     pub fn sort(&mut self) -> GenieResult<()> {
-        let Some(last) = self.entries.len().checked_sub(1).filter(|&l| 0 < l) else {
+        let Some(last) = self.entries.len().checked_sub(1).filter(|&count| 0 < count) else {
             return Ok(());
         };
         let pivot = self.partition(0, last)?;

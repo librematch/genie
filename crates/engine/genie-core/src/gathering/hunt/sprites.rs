@@ -19,16 +19,17 @@ pub(crate) fn stand_sprite(
     held: Held,
     graphics: &Graphics,
 ) -> Option<Graphic> {
-    let g = |id: Option<SpriteId>| id.and_then(|sprite_id| graphics.get(sprite_id).copied());
+    let graphic_of =
+        |id: Option<SpriteId>| id.and_then(|sprite_id| graphics.get(sprite_id).copied());
     let carrying = task.sprites.carrying;
     if task.resource.is_some()
         && task.resource == held.kind
         && 1 <= held.amount.get() as i32
-        && g(carrying).is_some()
+        && graphic_of(carrying).is_some()
     {
-        g(carrying)
+        graphic_of(carrying)
     } else {
-        g(standing)
+        graphic_of(standing)
     }
 }
 

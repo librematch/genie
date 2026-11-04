@@ -12,9 +12,9 @@ fn quiet() -> Header {
     header(vec![gaia(Vec::new()), human(Vec::new())])
 }
 
-/// `n` syncs.
-fn syncs(n: usize) -> Vec<Op<'static>> {
-    (0..n).map(|_| Op::Sync { dt: 50 }).collect()
+/// `count` syncs.
+fn syncs(count: usize) -> Vec<Op<'static>> {
+    (0..count).map(|_| Op::Sync { dt: 50 }).collect()
 }
 
 /// A checkpoint of `lanes`.
@@ -28,10 +28,10 @@ fn checkpoint(lanes: &[[u32; 11]; 8]) -> Op<'static> {
     }
 }
 
-/// Player `p`'s lane, every word but its player wrong.
-fn wrong(p: u32) -> [u32; 11] {
+/// Player `player`'s lane, every word but its player wrong.
+fn wrong(player: u32) -> [u32; 11] {
     let mut lane = [7; 11];
-    lane[8] = p;
+    lane[8] = player;
     lane
 }
 
@@ -108,7 +108,7 @@ fn stop_is_the_players_first_unmodelled_update() {
 /// The game's saves after each update (a chapter, as the tick oracle writes them), the same as
 /// the start's; none after update 2.
 fn same(save: &Header) -> impl FnMut(usize) -> Option<Vec<u8>> + '_ {
-    move |u| (u != 2).then(|| recording(save, &[]))
+    move |update| (update != 2).then(|| recording(save, &[]))
 }
 
 #[test]
@@ -126,7 +126,7 @@ fn player_leaves_where_its_objects_first_differ() {
     let save = quiet();
     let rec = recording(&save, &syncs(3));
     let game = header(vec![gaia(Vec::new()), human(vec![combat_object(7, 83)])]);
-    let mut games = |u: usize| (u == 3).then(|| recording(&game, &[]));
+    let mut games = |update: usize| (update == 3).then(|| recording(&game, &[]));
     let Followed::Leaves(divergence) =
         header_divergence(&rec, None, 1, (1, 3), &mut games).unwrap()
     else {
@@ -161,12 +161,13 @@ fn the_next_object_id_leaves_the_game_at_its_first_differing_save() {
     let mut ahead = quiet();
     ahead.world.base_world.next_object_id = save.world.base_world.next_object_id + 1;
     let start = save.world.base_world.next_object_id;
-    let mut games = |u: usize| Some(recording(if u < 3 { &save } else { &ahead }, &[]));
+    let mut games = |update: usize| Some(recording(if update < 3 { &save } else { &ahead }, &[]));
     assert_eq!(
         next_id_divergence(&rec, None, (1, 3), &mut games).unwrap(),
         Some((3, start, start + 1))
     );
-    let mut from_two = |u: usize| Some(recording(if u < 2 { &ahead } else { &save }, &[]));
+    let mut from_two =
+        |update: usize| Some(recording(if update < 2 { &ahead } else { &save }, &[]));
     assert_eq!(
         next_id_divergence(&rec, None, (2, 3), &mut from_two).unwrap(),
         None

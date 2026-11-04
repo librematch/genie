@@ -13,10 +13,10 @@ impl TileCount {
     /// One tile.
     pub const ONE: Self = Self(1);
 
-    /// A count of `n` tiles.
+    /// A count of `count` tiles.
     #[must_use]
-    pub const fn new(n: i32) -> Self {
-        Self(n)
+    pub const fn new(count: i32) -> Self {
+        Self(count)
     }
 
     /// The count.

@@ -214,14 +214,14 @@ pub fn walled_off(
 ///
 /// An object whose master the slice lacks.
 fn buildings_on(spatial: &Spatial, masters: &[Arc<Masters>], tile: Tile) -> GenieResult<usize> {
-    let mut n = 0;
+    let mut count = 0;
     for (_, placed) in spatial.objects_on(tile) {
         let master = player_master(masters, placed.player, placed.master).ok_or(
             GenieError::unsupported("an object on a tile of a master the slice lacks"),
         )?;
-        n += usize::from(master.kind == MasterKind::BUILDING);
+        count += usize::from(master.kind == MasterKind::BUILDING);
     }
-    Ok(n)
+    Ok(count)
 }
 
 /// [`MeetingTarget`] of the target `unit` with its action layer `target_actions`, why the load
@@ -377,19 +377,19 @@ fn shore(
 
 /// What `FUN_140a85c30`'s tile test ([`walled_off`]) reads.
 #[derive(Debug)]
-pub struct Walls<'a> {
+pub struct Walls<'world> {
     /// Where the unit last moved to (`+0x824`), x and y.
     pub(crate) me: Point,
     /// Where the target last moved to (slot 0x520), x and y.
     pub(crate) them: Point,
     /// The map's places and tiles.
-    pub(crate) spatial: &'a mut Spatial,
+    pub(crate) spatial: &'world mut Spatial,
     /// Each player's masters, which tell the buildings.
-    pub(crate) masters: &'a [Arc<Masters>],
+    pub(crate) masters: &'world [Arc<Masters>],
     /// The unit's id.
     pub(crate) id: ObjectId,
     /// The unit's movement state.
-    pub(crate) stats: &'a MoveStats,
+    pub(crate) stats: &'world MoveStats,
 }
 
 impl Walls<'_> {
@@ -430,7 +430,7 @@ pub(crate) fn enter_reach(
         "an Enter's building without a place",
     ))?;
     let gap = footprint_gap_squared(me.position, me.radius, them.position, them.radius);
-    let speed = target_mover.map_or(Speed::ZERO, |m| m.stats.speed);
+    let speed = target_mover.map_or(Speed::ZERO, |mover| mover.stats.speed);
     let them_at = target_mover.map_or(them.position, |mover| mover.moved_at);
     let mut walls = Walls {
         me: moved_at.ground(),
@@ -443,7 +443,7 @@ pub(crate) fn enter_reach(
     EnterAction::in_reach(range, gap, speed, &mut walls, by_id)
 }
 
-/// What an Enter's update reads of its target `t` with its mover (of master `tm`, with `room`
+/// What an Enter's update reads of its target `target` with its mover (of master `tm`, with `room`
 /// for `unit`, with its mover): the
 /// [`EnterTarget`] (allied: its own player's; the reach by [`enter_reach`] with the task's
 /// `range`), and the footprints' gap (`FUN_14118f680`) and the unit's speed for a new `MoveTo`
@@ -456,7 +456,7 @@ pub(crate) fn enter_view(
     spatial: &mut Spatial,
     masters: &[Arc<Masters>],
     (unit, mover): (&Unit, Option<&Mover>),
-    ((t, target_mover), tm, room): ((&Unit, Option<&Mover>), &Master, bool),
+    ((target, target_mover), tm, room): ((&Unit, Option<&Mover>), &Master, bool),
     range: Distance,
     by_id: ObjectsRef<'_>,
 ) -> GenieResult<(EnterTarget, WalkStart)> {
@@ -465,8 +465,8 @@ pub(crate) fn enter_view(
     } else {
         EnterKind::Transport
     };
-    let stats = mover.map(|m| m.stats).ok_or(NO_SPEED)?;
-    let moved_at = mover.map_or_else(|| unit.position(), |m| m.moved_at);
+    let stats = mover.map(|mover| mover.stats).ok_or(NO_SPEED)?;
+    let moved_at = mover.map_or_else(|| unit.position(), |mover| mover.moved_at);
     let target_mover = if kind == EnterKind::Building {
         None
     } else {
@@ -476,7 +476,7 @@ pub(crate) fn enter_view(
         spatial,
         masters,
         (unit.id, &stats, moved_at),
-        (t.id, target_mover),
+        (target.id, target_mover),
         range,
         by_id,
     )?;
@@ -487,15 +487,15 @@ pub(crate) fn enter_view(
                 .with("object", id)
         })
     };
-    let (me, them) = (placed(unit.id)?, placed(t.id)?);
+    let (me, them) = (placed(unit.id)?, placed(target.id)?);
     let gap = footprint_gap(me.position, me.radius, them.position, them.radius);
     Ok((
         EnterTarget {
-            id: ContainerId::new(t.id),
-            state: t.life.state,
+            id: ContainerId::new(target.id),
+            state: target.life.state,
             allied: true,
             room,
-            position: t.position(),
+            position: target.position(),
             in_reach,
             kind,
         },
@@ -506,27 +506,27 @@ pub(crate) fn enter_view(
 /// What `FUN_140a85f30` ([`meeting_point`]) reads where an Enter's `set_state(4)` or its constructor
 /// meets its target: the map and its zones, the target with its master and whether it has room
 /// for the unit, and the unit.
-pub(crate) struct Meeting<'a> {
+pub(crate) struct Meeting<'world> {
     /// The map, its places and its terrain.
-    pub(crate) spatial: &'a mut Spatial,
+    pub(crate) spatial: &'world mut Spatial,
     /// The zone maps the shore's test reads (built on first use).
-    pub(crate) zones: &'a mut Zones,
+    pub(crate) zones: &'world mut Zones,
     /// The target.
-    pub(crate) target: &'a Unit,
+    pub(crate) target: &'world Unit,
     /// The target's action layer.
-    pub(crate) target_actions: &'a Action,
+    pub(crate) target_actions: &'world Action,
     /// Why the load could not read the target whole, if it could not ([`crate::world::Unread`]).
-    pub(crate) target_unread: Option<&'a Unread>,
+    pub(crate) target_unread: Option<&'world Unread>,
     /// The target's master.
-    pub(crate) master: &'a Master,
+    pub(crate) master: &'world Master,
     /// The target has room for the unit (slot 0x198).
     pub(crate) room: bool,
     /// The entering unit.
-    pub(crate) unit: &'a Unit,
+    pub(crate) unit: &'world Unit,
     /// The entering unit's mover (its motion layer's), none for one that does not move.
-    pub(crate) mover: Option<&'a Mover>,
+    pub(crate) mover: Option<&'world Mover>,
     /// The target's mover, none for one that does not move.
-    pub(crate) target_mover: Option<&'a Mover>,
+    pub(crate) target_mover: Option<&'world Mover>,
 }
 
 impl Meeting<'_> {
@@ -574,12 +574,12 @@ pub(crate) fn ship_reaches(
     by_id: ObjectsRef<'_>,
 ) -> GenieResult<bool> {
     let garrison_tuning = &by_id.tuning().garrison;
-    let Some(m) = mover else {
+    let Some(mover) = mover else {
         return Ok(false);
     };
     let me = ship.me(actions);
     let goal = Point::new(cvttss2si(to.x()) as f32, cvttss2si(to.y()) as f32);
-    m.reaches(
+    mover.reaches(
         (ship.position(), &me),
         (world, by_id),
         plan,

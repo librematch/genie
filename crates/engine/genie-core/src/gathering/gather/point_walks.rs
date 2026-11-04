@@ -165,7 +165,7 @@ impl GatherAction {
         unit: &mut Unit,
         gather_reads: &GatherReads,
     ) -> GenieResult<Next> {
-        self.tear_down(step.w.parts.mover_mut(unit.id))?;
+        self.tear_down(step.world.parts.mover_mut(unit.id))?;
         self.state = GatherState::FarmWait;
         self.timer = FARM_WAIT_TIME;
         Self::show(step, unit, self.stand_sprite(unit, gather_reads));
@@ -194,14 +194,14 @@ impl GatherAction {
         if self.timer < Seconds::ZERO {
             return Ok(Next::Stay);
         }
-        let radius = target.map_or(0.0, |t| {
+        let radius = target.map_or(0.0, |victim| {
             if roles
-                .of_master(t.master_id)
+                .of_master(victim.master_id)
                 .contains(MasterRoles::STOP_FARM)
             {
                 0.0
             } else {
-                t.radius.x()
+                victim.radius.x()
             }
         });
         if !self.worked {
@@ -211,33 +211,33 @@ impl GatherAction {
                 && target.is_some_and(|victim| WorkerCount::ONE < victim.workers)
             {
                 let walks = gather_reads.walks(
-                    &step.w.model.graphics,
-                    (unit, step.w.parts.mover_of(unit.id)),
+                    &step.world.model.graphics,
+                    (unit, step.world.parts.mover_of(unit.id)),
                 );
-                let mover = step.w.parts.mover_mut(unit.id).ok_or(UNMOVING)?;
+                let mover = step.world.parts.mover_mut(unit.id).ok_or(UNMOVING)?;
                 self.set_walk_back(
                     Distance::new(radius),
                     mover,
                     &walks,
-                    &step.w.model.tuning.move_to,
+                    &step.world.model.tuning.move_to,
                 )?;
                 self.target = None;
                 return Ok(Next::Stay);
             }
-            self.tear_down(step.w.parts.mover_mut(unit.id))?;
+            self.tear_down(step.world.parts.mover_mut(unit.id))?;
             self.set_idle(step, unit, gather_reads);
             return Ok(Next::Stay);
         }
         let walks = gather_reads.walks(
-            &step.w.model.graphics,
-            (unit, step.w.parts.mover_of(unit.id)),
+            &step.world.model.graphics,
+            (unit, step.world.parts.mover_of(unit.id)),
         );
-        let mover = step.w.parts.mover_mut(unit.id).ok_or(UNMOVING)?;
+        let mover = step.world.parts.mover_mut(unit.id).ok_or(UNMOVING)?;
         self.begin_reseed_walk(
             Distance::new(radius),
             mover,
             &walks,
-            &step.w.model.tuning.move_to,
+            &step.world.model.tuning.move_to,
         )?;
         Ok(Next::Stay)
     }
@@ -259,7 +259,7 @@ impl GatherAction {
         match self.update_list(step, unit, me, gather_reads, roles)? {
             SubCode::UnderWay => Ok(Next::Stay),
             SubCode::Done | SubCode::TargetGone => {
-                self.tear_down(step.w.parts.mover_mut(unit.id))?;
+                self.tear_down(step.world.parts.mover_mut(unit.id))?;
                 if let Some(victim) = target
                     && !(ObjectState::Alive < victim.state && victim.state != ObjectState::Undead)
                 {
@@ -294,7 +294,7 @@ impl GatherAction {
         let mut mover = mover;
         self.tear_down(mover.as_deref_mut())?;
         self.timer = Seconds::ZERO;
-        stand.show(mover.map(|m| &mut m.stats));
+        stand.show(mover.map(|mover| &mut mover.stats));
         if end == WalkEnd::Arrived && player_kind.is_computer() {
             // State 1: done; its update returns 1 and the action list removes it.
             self.state = GatherState::Done;
@@ -317,7 +317,7 @@ impl GatherAction {
         unit: &mut Unit,
         gather_reads: &GatherReads,
     ) -> GenieResult<Next> {
-        self.tear_down(step.w.parts.mover_mut(unit.id))?;
+        self.tear_down(step.world.parts.mover_mut(unit.id))?;
         self.state = GatherState::Search;
         self.timer = SEARCH_WAIT;
         Self::show(step, unit, self.stand_sprite(unit, gather_reads));
@@ -364,7 +364,7 @@ impl GatherAction {
         match self.update_list(step, unit, me, gather_reads, roles)? {
             SubCode::UnderWay => Ok(Next::Stay),
             code @ (SubCode::Done | SubCode::Failed | SubCode::TargetGone) => {
-                self.tear_down(step.w.parts.mover_mut(unit.id))?;
+                self.tear_down(step.world.parts.mover_mut(unit.id))?;
                 if code != SubCode::Failed && gather_reads.player_kind.is_computer() {
                     self.set_done(step, unit, gather_reads);
                 } else {

@@ -85,9 +85,9 @@ impl LangFile {
     /// lang_file.insert(StringKey::from(0u32), String::from("a"));
     /// lang_file.insert(StringKey::from(1u32), String::from("b"));
     ///
-    /// for (k, v) in lang_file.drain().take(1) {
-    ///     assert!(k == StringKey::from(0u32) || k == StringKey::from(1u32));
-    ///     assert!(v == "a" || v == "b");
+    /// for (key, value) in lang_file.drain().take(1) {
+    ///     assert!(key == StringKey::from(0u32) || key == StringKey::from(1u32));
+    ///     assert!(value == "a" || value == "b");
     /// }
     /// assert!(lang_file.is_empty());
     /// ```
@@ -212,7 +212,7 @@ impl LangFile {
 
     /// Retains only the elements specified by the predicate.
     ///
-    /// In other words, removes all pairs `(k, v)` such that `f(&k, &mut v)`
+    /// In other words, removes all pairs `(key, value)` such that `keep(&key, &mut value)`
     /// returns `false`.
     ///
     /// # Examples
@@ -225,14 +225,14 @@ impl LangFile {
     /// lang_file.insert(StringKey::from("a"), String::from("a"));
     /// lang_file.insert(StringKey::from(1u32), String::from("one"));
     /// lang_file.insert(StringKey::from("2"), String::from("two"));
-    /// lang_file.retain(|k, _| match k {
+    /// lang_file.retain(|key, _| match key {
     ///     StringKey::Num(_) => true,
     ///     StringKey::Name(_) => false,
     /// });
     /// assert_eq!(3, lang_file.len());
     /// ```
-    pub fn retain<F: FnMut(&StringKey, &mut String) -> bool>(&mut self, f: F) {
-        self.0.retain(f);
+    pub fn retain<F: FnMut(&StringKey, &mut String) -> bool>(&mut self, keep: F) {
+        self.0.retain(keep);
     }
 
     /// An iterator visiting all key-value pairs in an arbitrary order.
@@ -249,7 +249,7 @@ impl LangFile {
     /// lang_file.insert(StringKey::from(1u32), String::from("one"));
     /// lang_file.insert(StringKey::from("2"), String::from("two"));
     ///
-    /// for (k, v) in lang_file.iter() { println!("key: {}, val: {}", k, v); }
+    /// for (key, value) in lang_file.iter() { println!("key: {}, val: {}", key, value); }
     /// ```
     #[must_use]
     pub fn iter(&self) -> Iter<'_, StringKey, String> {
@@ -271,8 +271,8 @@ impl LangFile {
     /// lang_file.insert(StringKey::from(1u32), String::from("one"));
     /// lang_file.insert(StringKey::from("2"), String::from("two"));
     ///
-    /// for (_, v) in lang_file.iter_mut() { v.push('A'); }
-    /// for (k, v) in &lang_file { println!("key: {}, val: {}", k, v); }
+    /// for (_, value) in lang_file.iter_mut() { value.push('A'); }
+    /// for (key, value) in &lang_file { println!("key: {}, val: {}", key, value); }
     /// ```
     pub fn iter_mut(&mut self) -> IterMut<'_, StringKey, String> {
         self.0.iter_mut()
@@ -292,7 +292,7 @@ impl LangFile {
     /// lang_file.insert(StringKey::from(1u32), String::from("one"));
     /// lang_file.insert(StringKey::from("2"), String::from("two"));
     ///
-    /// for k in lang_file.keys() { println!("key: {}", k); }
+    /// for key in lang_file.keys() { println!("key: {}", key); }
     /// ```
     #[must_use]
     pub fn keys(&self) -> Keys<'_, StringKey, String> {
@@ -313,7 +313,7 @@ impl LangFile {
     /// lang_file.insert(StringKey::from(1u32), String::from("one"));
     /// lang_file.insert(StringKey::from("2"), String::from("two"));
     ///
-    /// for v in lang_file.values() { println!("value: {}", v); }
+    /// for value in lang_file.values() { println!("value: {}", value); }
     /// ```
     #[must_use]
     pub fn values(&self) -> Values<'_, StringKey, String> {
@@ -334,8 +334,8 @@ impl LangFile {
     /// lang_file.insert(StringKey::from(1u32), String::from("one"));
     /// lang_file.insert(StringKey::from("2"), String::from("two"));
     ///
-    /// for v in lang_file.values_mut() { v.push('A'); }
-    /// for v in lang_file.values() { println!("{}", v); }
+    /// for value in lang_file.values_mut() { value.push('A'); }
+    /// for value in lang_file.values() { println!("{}", value); }
     /// ```
     pub fn values_mut(&mut self) -> ValuesMut<'_, StringKey, String> {
         self.0.values_mut()
@@ -350,17 +350,17 @@ impl IntoIterator for LangFile {
     }
 }
 
-impl<'a> IntoIterator for &'a LangFile {
-    type Item = (&'a StringKey, &'a String);
-    type IntoIter = Iter<'a, StringKey, String>;
+impl<'file> IntoIterator for &'file LangFile {
+    type Item = (&'file StringKey, &'file String);
+    type IntoIter = Iter<'file, StringKey, String>;
     fn into_iter(self) -> Self::IntoIter {
         self.0.iter()
     }
 }
 
-impl<'a> IntoIterator for &'a mut LangFile {
-    type Item = (&'a StringKey, &'a mut String);
-    type IntoIter = IterMut<'a, StringKey, String>;
+impl<'file> IntoIterator for &'file mut LangFile {
+    type Item = (&'file StringKey, &'file mut String);
+    type IntoIter = IterMut<'file, StringKey, String>;
     fn into_iter(self) -> Self::IntoIter {
         self.0.iter_mut()
     }

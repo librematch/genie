@@ -221,11 +221,11 @@ impl UnitAi {
         let roles = &at.roles;
         let current = Self::world_object(self.current_target, at, side)?;
         let (from, distance, checks) =
-            current.map_or((at.position, 0.0, AttackChecks::ANY_CLASS), |t| {
+            current.map_or((at.position, 0.0, AttackChecks::ANY_CLASS), |unit_seen| {
                 let mut checks = AttackChecks::empty();
                 checks.set(AttackChecks::ANY_CLASS, search.building);
                 checks.set(AttackChecks::WORK_STATE, search.work_state);
-                (t.position, unit_ai_tuning.retarget_reach, checks)
+                (unit_seen.position, unit_ai_tuning.retarget_reach, checks)
             });
         let (classes, radius) = self.search_area(at, player_kind);
         let found = side.closest(&Search {
@@ -257,9 +257,10 @@ impl UnitAi {
         let new = Self::world_object(found.id, at, side)?;
         if !keeps
             && self.current_order == Some(OrderKind::Attack)
-            && let (Some(n), Some(c)) = (new, current)
-            && c.state == ObjectState::Alive
-            && category(n.master, n.class, roles) != category(c.master, c.class, roles)
+            && let (Some(found), Some(held)) = (new, current)
+            && held.state == ObjectState::Alive
+            && category(found.master, found.class, roles)
+                != category(held.master, held.class, roles)
         {
             return Ok(9);
         }
@@ -267,21 +268,21 @@ impl UnitAi {
             return Ok(9);
         }
         let mut id = found.id;
-        if let Some(n) = new {
-            if n.kind == MasterKind::BUILDING {
+        if let Some(found) = new {
+            if found.kind == MasterKind::BUILDING {
                 let farm_rule = current.is_none_or(|unit_seen| {
                     !roles.of_class(unit_seen.class).contains(ClassRoles::FARM)
-                }) || roles.of_class(n.class).contains(ClassRoles::FARM);
+                }) || roles.of_class(found.class).contains(ClassRoles::FARM);
                 if !roles
-                    .of_class(n.class)
+                    .of_class(found.class)
                     .intersects(ClassRoles::PACKED_TREBUCHET | ClassRoles::UNPACKED_TREBUCHET)
                     && farm_rule
                 {
                     return Ok(10);
                 }
             }
-            if MasterKind::BUILDING <= n.kind
-                && let Some(main) = n.main
+            if MasterKind::BUILDING <= found.kind
+                && let Some(main) = found.main
             {
                 id = Some(main.id());
             }
@@ -406,17 +407,17 @@ impl UnitAi {
         let unit_ai_tuning = &at.unit_ai_tuning;
         let mut defended = None;
         if let Some(target) = self.defend_target {
-            let held = Self::world_object(target, at, side)?.filter(|t| t.allied);
+            let held = Self::world_object(target, at, side)?.filter(|unit_seen| unit_seen.allied);
             let ends = match held {
                 None => true,
-                Some(t) => {
+                Some(unit_seen) => {
                     if self.target_point.x() == INVALID_POINT {
                         self.target_point = self
                             .target_point
-                            .with_x(t.position.x())
-                            .with_y(t.position.y());
+                            .with_x(unit_seen.position.x())
+                            .with_y(unit_seen.position.y());
                     }
-                    ObjectState::Alive < t.state && t.owner != PlayerId::GAIA
+                    ObjectState::Alive < unit_seen.state && unit_seen.owner != PlayerId::GAIA
                 }
             };
             if ends {
@@ -427,7 +428,7 @@ impl UnitAi {
                 self.current_order = None;
                 return Ok(MiscEnd::Ends);
             }
-            defended = held.map(|t| (target, t));
+            defended = held.map(|unit_seen| (target, unit_seen));
         }
         let toward_it = self.current_action == Some(AiAction::Move)
             && Self::top_target_live(at, side)?.map(|live_top| live_top.id) == self.defend_target;
@@ -438,9 +439,9 @@ impl UnitAi {
         {
             return Ok(MiscEnd::GoesOn);
         }
-        let gap = if let Some((_, t)) = defended {
-            self.target_point = t.position;
-            t.gap_squared
+        let gap = if let Some((_, unit_seen)) = defended {
+            self.target_point = unit_seen.position;
+            unit_seen.gap_squared
         } else {
             point_gap_squared(self.target_point.ground(), at.position, at.size)
         };

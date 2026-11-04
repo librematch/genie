@@ -2,7 +2,7 @@
 
 use crate::ObjectId;
 use crate::ai::read_id_list;
-use crate::element::{ReadableHeaderElement, WritableHeaderElement};
+use crate::element::{ReadHeader, WriteHeader};
 use crate::errors::not_read;
 use crate::reader::RecordingHeaderReader;
 use crate::unit::Waypoint;
@@ -22,7 +22,7 @@ pub struct DiplomacyAi {
     pub changeable: [u8; 10],
 }
 
-impl ReadableHeaderElement for DiplomacyAi {
+impl ReadHeader for DiplomacyAi {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let mut ai = Self::default();
         for index in 0..10 {
@@ -41,7 +41,7 @@ pub struct EmotionalAi {
     pub state: [u32; 6],
 }
 
-impl ReadableHeaderElement for EmotionalAi {
+impl ReadHeader for EmotionalAi {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let mut ai = Self::default();
         input.read_u32_into::<LE>(&mut ai.state)?;
@@ -56,14 +56,14 @@ pub struct ResourceAi {
     pub num_resources: u32,
 }
 
-impl ReadableHeaderElement for ResourceAi {
+impl ReadHeader for ResourceAi {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let num_resources = input.read_u32::<LE>()?;
         Ok(Self { num_resources })
     }
 }
 
-impl WritableHeaderElement for ResourceAi {
+impl WriteHeader for ResourceAi {
     fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         output.write_u32::<LE>(self.num_resources)?;
         Ok(())
@@ -103,7 +103,7 @@ pub struct StrategyAi {
     pub expert_list_id: Option<u32>,
 }
 
-impl ReadableHeaderElement for StrategyAi {
+impl ReadHeader for StrategyAi {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         Ok(Self {
             current_victory_condition: input.read_u32::<LE>()?,
@@ -178,7 +178,7 @@ pub struct TacticalAi {
     pub groups: Vec<()>,
 }
 
-impl ReadableHeaderElement for TacticalAi {
+impl ReadHeader for TacticalAi {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let mut ai = Self {
             civilians: read_id_list(input)?,

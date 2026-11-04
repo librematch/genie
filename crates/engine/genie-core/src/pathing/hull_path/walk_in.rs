@@ -9,20 +9,20 @@ use crate::pathing::hull_path::{
     HULL_ITERATIONS, HullIndex, HullPather, NUDGE, NodeIndex, NodeList, PATHS, Point, SIDES,
     Target, WalkResult, Waypoints, Within,
 };
-use crate::world::slots::CheckedIndex;
+use crate::world::slots::CheckedIndexExt;
 
 /// The ways in a walk into a hull keeps: its paths, the hull side each leaves by, how many it
 /// keeps at most and how many it kept.
-struct Ways<'a> {
-    paths: &'a mut [Waypoints],
-    sides_out: &'a mut [usize; PATHS],
+struct Ways<'ways> {
+    paths: &'ways mut [Waypoints],
+    sides_out: &'ways mut [usize; PATHS],
     most: usize,
-    count: &'a mut usize,
+    count: &'ways mut usize,
 }
 
 /// A walk into a hull ([`HullPather::walk_in`]'s arguments, `FUN_140f88ee0`'s order).
 #[derive(Debug)]
-pub(super) struct WalkIn<'a> {
+pub(super) struct WalkIn<'ways> {
     /// The hull the goal is inside.
     pub(super) hull: HullIndex,
     /// The goal, where the walk starts.
@@ -32,13 +32,13 @@ pub(super) struct WalkIn<'a> {
     /// The target.
     pub(super) target: Option<Target>,
     /// The entrance paths it leaves.
-    pub(super) paths: &'a mut [Waypoints],
+    pub(super) paths: &'ways mut [Waypoints],
     /// The hull side each way out leaves by.
-    pub(super) sides_out: &'a mut [usize; PATHS],
+    pub(super) sides_out: &'ways mut [usize; PATHS],
     /// How many ways out it keeps at most.
     pub(super) most: usize,
     /// How many it kept.
-    pub(super) count: &'a mut usize,
+    pub(super) count: &'ways mut usize,
 }
 
 impl HullPather<'_> {
@@ -139,13 +139,13 @@ impl HullPather<'_> {
                     .checked(inside.unwrap_or(0))?
                     .bounds
             }
-            Some(t) => {
+            Some(target) => {
                 let distance = self.radius;
                 Rect::new(
-                    (t.at.x() - t.radius.x()) - distance.get(),
-                    (t.at.y() - t.radius.y()) - distance.get(),
-                    t.at.x() + t.radius.x() + distance.get(),
-                    t.at.y() + t.radius.y() + distance.get(),
+                    (target.at.x() - target.radius.x()) - distance.get(),
+                    (target.at.y() - target.radius.y()) - distance.get(),
+                    target.at.x() + target.radius.x() + distance.get(),
+                    target.at.y() + target.radius.y() + distance.get(),
                 )
             }
         };
@@ -173,18 +173,18 @@ impl HullPather<'_> {
                 if !Self::may_cast(&checked, side) {
                     continue;
                 }
-                if let Some((q, b, box_side)) =
-                    self.hulls
-                        .checked(hull.index())?
-                        .ray_to_box(at, side, checked.hull)
+                if let Some((point, hull_index, box_side)) = self
+                    .hulls
+                    .checked(hull.index())?
+                    .ray_to_box(at, side, checked.hull)
                 {
                     let _ = self.add_node(NewNode {
                         list: NodeList::WALKS,
                         open: true,
                         parent: Some(node),
-                        position: q,
+                        position: point,
                         goal: Some(to),
-                        hull: b as i32,
+                        hull: hull_index as i32,
                         vertex: box_side,
                         direction: side,
                         by_place: true,
@@ -215,9 +215,9 @@ impl HullPather<'_> {
                     vertex: -1,
                     direction: -1,
                     by_place: false,
-                })? && let Some(k) = self.keep_path(ways.paths, ways.count, end)?
+                })? && let Some(kept) = self.keep_path(ways.paths, ways.count, end)?
                 {
-                    *ways.sides_out.checked_mut(k)? = edge;
+                    *ways.sides_out.checked_mut(kept)? = edge;
                 }
             }
         }

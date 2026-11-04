@@ -12,7 +12,7 @@ use crate::pathing::short_path::{
     inside, shrunk_corner,
 };
 use crate::pathing::{ShapeId, ShapeSide};
-use crate::world::slots::CheckedIndex;
+use crate::world::slots::CheckedIndexExt;
 
 /// A vertex the tracer adds to the outline being traced ([`Search::append`]'s arguments after
 /// the polygon).
@@ -119,7 +119,7 @@ impl Search<'_> {
         pos: &mut FixedPoint,
         first: &mut FixedPoint,
         side: &mut ShapeSide,
-        u: &mut i32,
+        along: &mut i32,
         steps: i32,
     ) -> GenieResult<Option<ShapeId>> {
         let fixed_rect = self.bounds;
@@ -148,7 +148,7 @@ impl Search<'_> {
             if steps == 0 {
                 *first = target;
             }
-            *u = new_u;
+            *along = new_u;
             *side = shape_side;
             *pos = target;
             return Ok(None);
@@ -156,7 +156,7 @@ impl Search<'_> {
         if steps == 0 {
             *first = hp;
         }
-        *u = new_u;
+        *along = new_u;
         *side = hs;
         *pos = hp;
         Ok(Some(hid))
@@ -173,7 +173,7 @@ impl Search<'_> {
         start: Option<FixedPoint>,
         poly: &mut Poly,
     ) -> GenieResult<Outline> {
-        let fixed_distance = self.ctx.d;
+        let fixed_distance = self.ctx.clearance;
         let mesh = self.ctx.mesh;
         let fixed_rect = self.bounds;
         let vertical = s0.along_y();
@@ -183,20 +183,20 @@ impl Search<'_> {
         let mut shape = shape0;
         let mut side = s0;
         let mut pos = match start {
-            Some(p) => p,
+            Some(fixed_point) => fixed_point,
             None => shrunk_corner(
                 *mesh.shapes.checked(shape.index())?,
                 s0.first_corner(),
                 fixed_distance,
             ),
         };
-        let mut u = Self::along(pos, s0);
+        let mut along = Self::along(pos, s0);
         let mut first = pos;
         'segment: loop {
             let contacts = mesh.sides.checked(shape.index())?.checked(side.index())?;
             let next_side;
-            if let Some(k) = self.nearest_contact(contacts, side, u) {
-                let contact = *contacts.checked(k)?;
+            if let Some(index) = self.nearest_contact(contacts, side, along) {
+                let contact = *contacts.checked(index)?;
                 let fixed_point = contact_point(
                     contact.at,
                     contact.side,
@@ -210,7 +210,7 @@ impl Search<'_> {
                 if side != contact.side {
                     winding -= 1;
                 }
-                u = Self::along(fixed_point, contact.side);
+                along = Self::along(fixed_point, contact.side);
                 side = contact.side;
                 shape = contact.other;
             } else {
@@ -224,7 +224,7 @@ impl Search<'_> {
                     first = corner;
                 }
                 // an empty side list measures the old point; it lies on the side's line too
-                u = if contacts.is_empty() {
+                along = if contacts.is_empty() {
                     Self::along(pos, side.prev())
                 } else {
                     Self::along(corner, side.prev())
@@ -271,7 +271,7 @@ impl Search<'_> {
                         wprev = winding;
                         continue 'segment;
                     }
-                    on = self.border_walk(&mut pos, &mut first, &mut side, &mut u, steps)?;
+                    on = self.border_walk(&mut pos, &mut first, &mut side, &mut along, steps)?;
                     if let Some(met) = on {
                         shape = met;
                         break;
@@ -290,15 +290,16 @@ impl Search<'_> {
 
     /// [`Search::trace`]'s next contact on a side: of the side's contacts (`contacts`), those wider
     /// than twice `fixed_distance`, not ignored and whose contact point lies in the bounds, the one
-    /// nearest ahead of `u` along `side` (each one's run start moved by `fixed_distance`, back for
-    /// a flagged contact on the same side; the sides 2 and 3 measure backwards); ties to the first.
+    /// nearest ahead of `along` along `side` (each one's run start moved by `fixed_distance`, back
+    /// for a flagged contact on the same side; the sides 2 and 3 measure backwards); ties to the
+    /// first.
     pub(super) fn nearest_contact(
         &self,
         contacts: &[Contact],
         side: ShapeSide,
-        u: i32,
+        along: i32,
     ) -> Option<usize> {
-        let fixed_distance = self.ctx.d;
+        let fixed_distance = self.ctx.clearance;
         let mut chosen = None;
         let mut best_key = 0x7fc0_0000_i32;
         for (index, contact) in contacts.iter().enumerate() {
@@ -326,7 +327,7 @@ impl Search<'_> {
             } else {
                 contact.along.wrapping_sub(off)
             };
-            key = key.wrapping_sub(u);
+            key = key.wrapping_sub(along);
             if !forward {
                 key = key.wrapping_neg();
             }
@@ -359,21 +360,21 @@ impl Search<'_> {
         let mut limit = count;
         let mut prev = *sides.get(count.wrapping_sub(2) as usize % sides.len())?;
         let mut cur = count - 1;
-        let mut i: u32 = 0;
+        let mut index: u32 = 0;
         loop {
             let cur_side = *sides.get(cur as usize)?;
-            let mut side_i = *sides.get(i as usize)?;
-            let mut nxt = i;
+            let mut side_i = *sides.get(index as usize)?;
+            let mut nxt = index;
             if side_i == cur_side {
                 loop {
-                    i = (i + 1) % count;
-                    side_i = *sides.get(i as usize)?;
+                    index = (index + 1) % count;
+                    side_i = *sides.get(index as usize)?;
                     if side_i != cur_side {
                         break;
                     }
                 }
-                nxt = i;
-                if i < cur && cur != count - 1 {
+                nxt = index;
+                if index < cur && cur != count - 1 {
                     limit = 0;
                 }
             }
@@ -393,10 +394,10 @@ impl Search<'_> {
             {
                 return Some(VertexIndex::new(cur));
             }
-            i = nxt + 1;
+            index = nxt + 1;
             prev = cur_side;
             cur = nxt;
-            if i >= limit {
+            if index >= limit {
                 return None;
             }
         }
@@ -411,7 +412,7 @@ impl Search<'_> {
         shape: ShapeId,
         fixed_distance: FixedDistance,
     ) -> bool {
-        let d = fixed_distance.get();
+        let fixed_distance = fixed_distance.get();
         let Some(vs) = vs.filter(|_| fixed_point == vc) else {
             return false;
         };
@@ -419,27 +420,27 @@ impl Search<'_> {
         else {
             return false;
         };
-        let y1 = if sr.y1() - d < vr.y1() - d {
-            sr.y1() - d
+        let y1 = if sr.y1() - fixed_distance < vr.y1() - fixed_distance {
+            sr.y1() - fixed_distance
         } else {
-            vr.y1() - d
+            vr.y1() - fixed_distance
         };
-        let x1 = if sr.x1() - d < vr.x1() - d {
-            sr.x1() - d
+        let x1 = if sr.x1() - fixed_distance < vr.x1() - fixed_distance {
+            sr.x1() - fixed_distance
         } else {
-            vr.x1() - d
+            vr.x1() - fixed_distance
         };
-        let y0 = if vr.y0() + d < sr.y0() + d {
+        let y0 = if vr.y0() + fixed_distance < sr.y0() + fixed_distance {
             sr.y0()
         } else {
             vr.y0()
         };
-        let x0 = if vr.x0() + d < sr.x0() + d {
+        let x0 = if vr.x0() + fixed_distance < sr.x0() + fixed_distance {
             sr.x0()
         } else {
             vr.x0()
         };
-        let fixed_rect = FixedRect::new(x0 + d, y0 + d, x1, y1);
+        let fixed_rect = FixedRect::new(x0 + fixed_distance, y0 + fixed_distance, x1, y1);
         fixed_rect.x0() < fixed_rect.x1()
             && fixed_rect.y0() < fixed_rect.y1()
             && inside(fixed_rect, fixed_point, FixedDistance::ZERO)
@@ -459,59 +460,59 @@ impl Search<'_> {
         // like name two neighbouring sides
         match cur_side {
             LowY if vc.y() == fixed_point.y() => {
-                let (a, b) = (vc.x(), vn.x());
+                let (current, following) = (vc.x(), vn.x());
                 let start = if matches!(prev, LowY | HighX) {
-                    a <= fixed_point.x()
+                    current <= fixed_point.x()
                 } else {
-                    a < fixed_point.x()
+                    current < fixed_point.x()
                 };
                 start
                     && if matches!(next, LowX | LowY) {
-                        fixed_point.x() <= b
+                        fixed_point.x() <= following
                     } else {
-                        fixed_point.x() < b
+                        fixed_point.x() < following
                     }
             }
             HighX if vc.x() == fixed_point.x() => {
-                let (a, b) = (vc.y(), vn.y());
+                let (current, following) = (vc.y(), vn.y());
                 let start = if matches!(prev, HighX | HighY) {
-                    a <= fixed_point.y()
+                    current <= fixed_point.y()
                 } else {
-                    a < fixed_point.y()
+                    current < fixed_point.y()
                 };
                 start
                     && if matches!(next, LowY | HighX) {
-                        fixed_point.y() <= b
+                        fixed_point.y() <= following
                     } else {
-                        fixed_point.y() < b
+                        fixed_point.y() < following
                     }
             }
             HighY if vc.y() == fixed_point.y() => {
-                let (a, b) = (vc.x(), vn.x());
+                let (current, following) = (vc.x(), vn.x());
                 let start = if matches!(next, HighX | HighY) {
-                    b <= fixed_point.x()
+                    following <= fixed_point.x()
                 } else {
-                    b < fixed_point.x()
+                    following < fixed_point.x()
                 };
                 start
                     && if matches!(prev, HighY | LowX) {
-                        fixed_point.x() <= a
+                        fixed_point.x() <= current
                     } else {
-                        fixed_point.x() < a
+                        fixed_point.x() < current
                     }
             }
             LowX if vc.x() == fixed_point.x() => {
-                let (a, b) = (vc.y(), vn.y());
+                let (current, following) = (vc.y(), vn.y());
                 let start = if matches!(next, HighY | LowX) {
-                    b <= fixed_point.y()
+                    following <= fixed_point.y()
                 } else {
-                    b < fixed_point.y()
+                    following < fixed_point.y()
                 };
                 start
                     && if matches!(prev, LowY | LowX) {
-                        fixed_point.y() <= a
+                        fixed_point.y() <= current
                     } else {
-                        fixed_point.y() < a
+                        fixed_point.y() < current
                     }
             }
             _ => false,

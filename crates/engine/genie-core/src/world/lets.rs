@@ -37,19 +37,19 @@ use crate::{GenieError, GenieResult};
 /// unit lines (a wake's tracker key), the updating player's tracker, and the notifies for the
 /// updating object's own unit AI while the AI runs (taken out of the unit, it is posted them,
 /// with the unit's state, when its side's call returns: [`crate::objects::unit::Unit::with_side`]).
-pub(crate) struct Lets<'l> {
+pub(crate) struct Lets<'world> {
     pub(crate) player: PlayerId,
-    pub(crate) relations: &'l Relations,
-    pub(crate) masters: MasterTables<'l>,
+    pub(crate) relations: &'world Relations,
+    pub(crate) masters: MasterTables<'world>,
     /// The units' AIs ([`crate::world::parts::Parts::unit_ai`]).
-    pub(crate) ais: &'l mut PartTable<UnitAi>,
+    pub(crate) ais: &'world mut PartTable<UnitAi>,
     /// The buildings' layers ([`crate::world::parts::Parts::building`]).
-    pub(crate) buildings: &'l mut PartTable<Building>,
+    pub(crate) buildings: &'world mut PartTable<Building>,
     /// The combat layers ([`crate::world::parts::Parts::combat`]).
-    pub(crate) combats: &'l mut PartTable<Combat>,
-    pub(crate) lines: &'l UnitLines,
-    pub(crate) tracker: &'l mut Tracker,
-    pub(crate) own_notifies: &'l mut Vec<(Notify, ObjectState)>,
+    pub(crate) combats: &'world mut PartTable<Combat>,
+    pub(crate) lines: &'world UnitLines,
+    pub(crate) tracker: &'world mut Tracker,
+    pub(crate) own_notifies: &'world mut Vec<(Notify, ObjectState)>,
 }
 
 /// A counted builder leaves the building `site` (`+0x9e8` one less): its construction's
@@ -69,18 +69,18 @@ fn leave_site(
 }
 
 impl World {
-    /// `f` with the world's [`Lets`] for player `player`'s calls and a view of every player's
+    /// `work` with the world's [`Lets`] for player `player`'s calls and a view of every player's
     /// objects: [`World::take`], [`World::release`] and [`World::leave_builders`] run the
     /// update's calls on it, and an update's own ([`take`], [`release`], [`leave_builders`])
     /// with the updating object, out of its slot, as `me`.
     pub(crate) fn with_lets<R>(
         &mut self,
         player: PlayerId,
-        f: impl FnOnce(&mut Lets<'_>, &mut Others<'_>) -> R,
+        work: impl FnOnce(&mut Lets<'_>, &mut Others<'_>) -> R,
     ) -> GenieResult<R> {
         // no unit AI's side runs here: an updating unit holds its AI (one without has none to
         // tell), so nothing waits for a side's return
-        self.with_lets_for(player, &mut Vec::new(), f)
+        self.with_lets_for(player, &mut Vec::new(), work)
     }
 
     /// [`World::with_lets`] for the side of the updating unit's AI ([`crate::unit_ai::world_view::UnitView`]),
@@ -89,7 +89,7 @@ impl World {
         &mut self,
         player: PlayerId,
         own_notifies: &mut Vec<(Notify, ObjectState)>,
-        f: impl FnOnce(&mut Lets<'_>, &mut Others<'_>) -> R,
+        work: impl FnOnce(&mut Lets<'_>, &mut Others<'_>) -> R,
     ) -> GenieResult<R> {
         let no_player = || {
             GenieError::unreachable("lets for a player the world does not hold")
@@ -124,19 +124,19 @@ impl World {
             tracker,
             own_notifies,
         };
-        Ok(f(&mut lets, &mut others))
+        Ok(work(&mut lets, &mut others))
     }
 }
 
-/// `f` with the updating player's [`Lets`] for a call on the updating object itself: its unit
+/// `work` with the updating player's [`Lets`] for a call on the updating object itself: its unit
 /// AI's notifies go to the side's buffer while its side runs ([`Step::side_notifies`]).
 fn own_lets<R>(
     step: &mut Step<'_>,
-    f: impl FnOnce(&mut Lets<'_>, &mut Others<'_>) -> R,
+    work: impl FnOnce(&mut Lets<'_>, &mut Others<'_>) -> R,
 ) -> GenieResult<R> {
     match step.side_notifies.as_mut() {
-        Some(own) => step.w.with_lets_for(step.player, own, f),
-        None => step.w.with_lets(step.player, f),
+        Some(own) => step.world.with_lets_for(step.player, own, work),
+        None => step.world.with_lets(step.player, work),
     }
 }
 
@@ -162,7 +162,7 @@ pub(crate) fn take(
             lets.take(others, Some(me), id, by, roles)
         })?
     } else {
-        step.w.take(id, by)
+        step.world.take(id, by)
     }
 }
 
@@ -185,7 +185,7 @@ pub(crate) fn release(
     if id == step.me {
         return own_lets(step, |lets, others| lets.release(others, Some(me), id, by))?;
     }
-    step.w.release(id, by)
+    step.world.release(id, by)
 }
 
 /// A counted builder's leave of the building a Build on `id` counted it in, from an update
@@ -253,18 +253,18 @@ impl Lets<'_> {
         by: Releaser,
         roles: &Roles,
     ) -> GenieResult<()> {
-        if let Some(u) = me.filter(|u| u.id == id) {
+        if let Some(unit) = me.filter(|unit| unit.id == id) {
             let allied = self.allied(others.view(), by.player, self.player);
-            self.taken_live(u, (self.player, allied), by)?;
+            self.taken_live(unit, (self.player, allied), by)?;
             return Ok(());
         }
         let Some((player_id, _, sleeps)) = others.locate(id) else {
             return Ok(());
         };
         if sleeps {
-            let (_, u) = others.get_mut(id).ok_or_else(|| object_gone(id))?;
-            if u.workers < WorkerCount::MOST {
-                u.workers = u.workers.plus(1);
+            let (_, unit) = others.get_mut(id).ok_or_else(|| object_gone(id))?;
+            if unit.workers < WorkerCount::MOST {
+                unit.workers = unit.workers.plus(1);
             }
             let _ = others.wake(id, self.tracker, (self.masters.players, self.lines), roles);
             return Ok(());
@@ -314,8 +314,8 @@ impl Lets<'_> {
         id: ObjectId,
         by: Releaser,
     ) -> GenieResult<()> {
-        if let Some(u) = me.filter(|u| u.id == id) {
-            return self.release_own(others, u, by);
+        if let Some(unit) = me.filter(|unit| unit.id == id) {
+            return self.release_own(others, unit, by);
         }
         let Some((player_id, _, sleeps)) = others.locate(id) else {
             return Ok(());
@@ -323,9 +323,9 @@ impl Lets<'_> {
         if sleeps {
             // a sleeping object (static: only those sleep) counts a worker less
             // (FUN_141197d00); asleep already (`+0x641`), it is not flagged again
-            let (_, u) = others.get_mut(id).ok_or_else(|| object_gone(id))?;
-            if WorkerCount::ZERO < u.workers {
-                u.workers = u.workers.plus(-1);
+            let (_, unit) = others.get_mut(id).ok_or_else(|| object_gone(id))?;
+            if WorkerCount::ZERO < unit.workers {
+                unit.workers = unit.workers.plus(-1);
             }
             return Ok(());
         }
@@ -382,13 +382,13 @@ impl Lets<'_> {
         me: Option<&mut Unit>,
         id: ObjectId,
     ) -> GenieResult<()> {
-        let site = if let Some(u) = me.as_deref().filter(|u| u.id == id) {
-            self.site_of(u, self.player, id)?
+        let site = if let Some(unit) = me.as_deref().filter(|unit| unit.id == id) {
+            self.site_of(unit, self.player, id)?
         } else {
-            let Some((player_id, f, _)) = others.locate(id) else {
+            let Some((player_id, unit, _)) = others.locate(id) else {
                 return Ok(());
             };
-            self.site_of(f, player_id, id)?
+            self.site_of(unit, player_id, id)?
         };
         let held = me.is_some_and(|unit| unit.id == site) || others.get_mut(site).is_some();
         if held {

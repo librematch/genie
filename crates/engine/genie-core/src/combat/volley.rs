@@ -21,7 +21,7 @@ use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::OwnerMasters;
-use crate::objects::masters::PlayersMasters;
+use crate::objects::masters::PlayersMastersExt;
 use crate::objects::masters::VolleySpread;
 use crate::objects::unit::Unit;
 use crate::objects::unit::object_master;
@@ -56,12 +56,12 @@ impl Unit {
         combat.charge = own.source.charge;
         combat.charge_hit = own.source.charge_hit;
         if let Some(ai) = ai {
-            for &(attacker, p) in &own.damaged {
+            for &(attacker, params) in &own.damaged {
                 let notify = Notify {
                     caller: attacker,
                     recipient: self.id,
                     kind: NotifyKind::DAMAGED,
-                    p,
+                    params,
                 };
                 ai.post(notify, self.life.state)?;
             }
@@ -97,9 +97,9 @@ impl Unit {
         roles: &Roles,
     ) -> GenieResult<()> {
         let master = object_master(
-            step.w.parts.own_master.get(self.id),
+            step.world.parts.own_master.get(self.id),
             (self.id, self.life.master_id),
-            step.w.model.masters.of(step.player),
+            step.world.model.masters.of(step.player),
         )?;
         if (roles.of_master(master.id).intersects(
             MasterRoles::DEMOLITION_SHIP
@@ -162,11 +162,11 @@ impl Unit {
             // at the attacker's place, which lasts twice as long from a trebuchet (class 54:
             // its amount, +0x310, doubled)
             if aimed.player != PlayerId::GAIA {
-                step.w
+                step.world
                     .make_flare(aimed.player, self.position(), trebuchet)?;
             }
             for _ in 0..extra {
-                let object = step.w.streams.get(Stream::Object);
+                let object = step.world.streams.get_mut(Stream::Object);
                 let (x, y) = (object.rand15(), object.rand15());
                 let scatter = GroundOffset::new(scatter(x, spread_x), scatter(y, spread_y));
                 self.volley_missile(step, &aimed, scatter, roles)?;
@@ -174,7 +174,7 @@ impl Unit {
         }
         if (extra != 0 || missile)
             && step
-                .w
+                .world
                 .players
                 .get(aimed.player.index())
                 .is_some_and(|player| player.kind.is_computer())
@@ -201,9 +201,9 @@ impl Unit {
         (max_volley, spread, full): (MissileCount, VolleySpread, bool),
         notifies: bool,
     ) -> GenieResult<(bool, i32)> {
-        let count = volley_count(step.w.parts.combat_of(self.id).firepower, max_volley);
-        let old = step.w.parts.combat_of(self.id).next_volley;
-        let mut n = count - old.counted();
+        let count = volley_count(step.world.parts.combat_of(self.id).firepower, max_volley);
+        let old = step.world.parts.combat_of(self.id).next_volley;
+        let mut shots = count - old.counted();
         let VolleySpread {
             x: spread_x,
             y: spread_y,
@@ -211,26 +211,26 @@ impl Unit {
         } = spread;
         let mut all = true;
         if !full {
-            let k = if Distance::ZERO < spread_x || Distance::ZERO < spread_y {
-                let draw = step.w.streams.get(Stream::Object).rand15() as i32;
+            let most = if Distance::ZERO < spread_x || Distance::ZERO < spread_y {
+                let draw = step.world.streams.get_mut(Stream::Object).rand15() as i32;
                 (draw * 2) / 0x7fff + 1
             } else {
                 1
             };
-            if k < n {
-                let combat = step.w.parts.combat_mut(self.id)?;
-                combat.next_volley = combat.next_volley.plus(k as u8);
+            if most < shots {
+                let combat = step.world.parts.combat_mut(self.id)?;
+                combat.next_volley = combat.next_volley.plus(most as u8);
                 // an immediate 0.05
                 combat.attack_timer = Seconds::new(0.05);
-                n = k;
+                shots = most;
                 all = false;
             }
         }
         if all {
-            step.w.parts.combat_mut(self.id)?.next_volley = MissileCount::ZERO;
+            step.world.parts.combat_mut(self.id)?.next_volley = MissileCount::ZERO;
             if notifies {
                 self.post_own(
-                    &mut step.w.parts.unit_ai,
+                    &mut step.world.parts.unit_ai,
                     NotifyKind::ACTION_EXECUTED,
                     [600, -1, 0],
                 )?;
@@ -238,7 +238,11 @@ impl Unit {
         }
         Ok((
             old == MissileCount::ZERO,
-            if old == MissileCount::ZERO { n - 1 } else { n },
+            if old == MissileCount::ZERO {
+                shots - 1
+            } else {
+                shots
+            },
         ))
     }
 
@@ -257,16 +261,16 @@ impl Unit {
         aimed: &Aimed,
         roles: &Roles,
     ) -> GenieResult<()> {
-        let combat = step.w.parts.combat_mut(self.id)?;
+        let combat = step.world.parts.combat_mut(self.id)?;
         combat.attack_count = combat.attack_count.next();
-        let master = self.master(step.w.master_tables(), step.player)?;
+        let master = self.master(step.world.master_tables(), step.player)?;
         if master.creatable_part().charge_kind.ranged() {
             return Err(GenieError::unsupported(
                 "a charge projectile (charge types 6 and 7, slot 0x2f8)",
             ));
         }
         let facing = step
-            .w
+            .world
             .parts
             .mover_of(self.id)
             .map(|mover| mover.angle)
@@ -284,7 +288,7 @@ impl Unit {
             reach: reach(
                 master.radius,
                 master.combat_part().weapon_range,
-                &step.w.model.tuning.missile,
+                &step.world.model.tuning.missile,
             ),
             shooter: true,
             aimer: Aimer {
@@ -292,7 +296,7 @@ impl Unit {
                 spread: master.combat_part().missed_spread,
                 class: master.class,
             },
-            attack_count: step.w.parts.combat_of(self.id).attack_count,
+            attack_count: step.world.parts.combat_of(self.id).attack_count,
         };
         let (weapon_range, blast_level) = (
             master.combat_part().weapon_range,
@@ -304,7 +308,7 @@ impl Unit {
             .intersects(MasterRoles::CHU_KO_NU | MasterRoles::ELITE_CHU_KO_NU)
         {
             self.post_own(
-                &mut step.w.parts.unit_ai,
+                &mut step.world.parts.unit_ai,
                 NotifyKind::ACTION_EXECUTED,
                 [600, ObjectId::field(aimed.target), 0],
             )?;
@@ -312,7 +316,7 @@ impl Unit {
         let spares_friends = blast_level.spares_friends(weapon_range);
         if !spares_friends
             && step
-                .w
+                .world
                 .players
                 .get(aimed.player.index())
                 .is_some_and(|player| player.kind.is_computer())
@@ -341,14 +345,17 @@ impl Unit {
         roles: &Roles,
     ) -> GenieResult<()> {
         let masters = step
-            .w
+            .world
             .model
             .masters
             .get(step.player.index())
             .ok_or(GenieError::unsupported("a volley without the masters"))?;
-        let master = self.master_in(OwnerMasters::new(&step.w.parts.own_master, Some(masters)))?;
+        let master = self.master_in(OwnerMasters::new(
+            &step.world.parts.own_master,
+            Some(masters),
+        ))?;
         let facing = step
-            .w
+            .world
             .parts
             .mover_of(self.id)
             .map(|mover| mover.angle)
@@ -367,7 +374,7 @@ impl Unit {
             .volley_missile
             .and_then(|id| masters.get(id));
         let made = match volley {
-            Some(v) => v,
+            Some(found) => found,
             None if master.combat_part().missile.master().is_some() => master
                 .combat_part()
                 .missile
@@ -399,7 +406,7 @@ impl Unit {
             reach: volley_reach(
                 master.radius,
                 master.combat_part().weapon_range,
-                &step.w.model.tuning.missile,
+                &step.world.model.tuning.missile,
             ),
             shooter,
             aimer: Aimer {
@@ -415,7 +422,7 @@ impl Unit {
             .intersects(MasterRoles::CHU_KO_NU | MasterRoles::ELITE_CHU_KO_NU)
         {
             self.post_own(
-                &mut step.w.parts.unit_ai,
+                &mut step.world.parts.unit_ai,
                 NotifyKind::ACTION_EXECUTED,
                 [600, -1, 0],
             )?;

@@ -28,13 +28,13 @@ pub const BESIDE: [&str; 3] = ["dropsites.json", "linkedTechs.json", "unitlines.
 
 /// The texts of the tables beside the `.dat` ([`BESIDE`]), each where there is one.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct Beside<'a> {
+pub struct Beside<'text> {
     /// `dropsites.json`'s ([`drop_sites`]).
-    pub drop_sites: Option<&'a str>,
+    pub drop_sites: Option<&'text str>,
     /// `linkedTechs.json`'s ([`linked_techs`]).
-    pub linked_techs: Option<&'a str>,
+    pub linked_techs: Option<&'text str>,
     /// `unitlines.json`'s ([`unit_lines`]).
-    pub unit_lines: Option<&'a str>,
+    pub unit_lines: Option<&'text str>,
 }
 
 /// The tables of the `.dat` bytes `dat`, compressed as the game ships them, with the tables
@@ -51,7 +51,7 @@ pub fn load_bytes(dat: &[u8], beside: Beside<'_>) -> GenieResult<MasterTable> {
 /// `table` with the tables `beside` the `.dat` in place of its own, each that is there.
 fn with_beside(mut table: MasterTable, beside: Beside<'_>) -> GenieResult<MasterTable> {
     if let Some(json) = beside.drop_sites {
-        table.drop_sites = drop_sites(json).map_err(|e| e.with("file", BESIDE[0]))?;
+        table.drop_sites = drop_sites(json).map_err(|error| error.with("file", BESIDE[0]))?;
     }
     if let Some(json) = beside.linked_techs {
         table.linked_techs =
@@ -110,14 +110,14 @@ impl Files {
         for (text, name) in beside.iter_mut().zip(BESIDE) {
             let path = dat.with_file_name(name);
             match read_file(&path) {
-                Ok(b) => {
-                    *text = Some(String::from_utf8(b).map_err(|from_utf8_error| {
+                Ok(bytes) => {
+                    *text = Some(String::from_utf8(bytes).map_err(|from_utf8_error| {
                         GenieError::invalid_input("a table beside the .dat that is not UTF-8")
                             .with("file", name)
                             .with_source(from_utf8_error)
                     })?);
                 }
-                Err(e) if e.kind() == ErrorKind::NotFound => {}
+                Err(failure) if failure.kind() == ErrorKind::NotFound => {}
                 Err(error) => {
                     return Err(GenieError::io("a table beside the .dat that does not read")
                         .with("path", path.display())
@@ -146,8 +146,8 @@ impl Files {
     fn key(&self) -> Key {
         let mut parts = vec![("empires2_x2_p1.dat", self.dat.as_slice())];
         for (text, name) in self.beside.iter().zip(BESIDE) {
-            if let Some(t) = text {
-                parts.push((name, t.as_bytes()));
+            if let Some(text) = text {
+                parts.push((name, text.as_bytes()));
             }
         }
         key(&parts, &layout())

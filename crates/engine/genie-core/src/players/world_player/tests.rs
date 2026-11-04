@@ -74,15 +74,15 @@ fn world() -> World {
         attributes: attributes(),
         ..Player::default()
     };
-    let mut t = World::new(
+    let mut world = World::new(
         WorldTime::from_millis(10_000),
         FrameSeed::of_data(1),
         PlayerId::new(0),
         vec![Millis::ZERO; 4],
         vec![gaia, human(), human(), human()],
     );
-    t.dt_seconds = Seconds::new(1.0);
-    t
+    world.dt_seconds = Seconds::new(1.0);
+    world
 }
 
 /// A master of `kind` and `class`, `id`.
@@ -224,7 +224,7 @@ fn the_trickles_give_sixtieth_of_their_rate_each_second() {
     let player = &world.players[1];
     assert_eq!(player.resources(), amounts([6.0 / 60.0, 0.0, 0.0, 1.0]));
     assert_eq!(
-        [166, 167, 168, 169, 49].map(|k| player.attributes[k]),
+        [166, 167, 168, 169, 49].map(|attribute| player.attributes[attribute]),
         amounts([6.0 / 60.0, 0.0, 0.0, 1.0, 1.0])
     );
     world.players[1].game_status = GameStatus::Lost;
@@ -284,10 +284,10 @@ fn mill_livestock_makes_food() {
 /// an enemy, Gaia and a one-sided ally nothing.
 #[test]
 fn the_income_fills_computer_escrow_and_goes_to_mutual_allies() {
-    let mut t = world();
-    t.players[1].kind = PlayerKind::Computer;
-    t.players[1].escrow_percentage = [0.5, 0.0, 0.0, 0.0].map(EscrowShare::of_data);
-    t.add_resource(
+    let mut game = world();
+    game.players[1].kind = PlayerKind::Computer;
+    game.players[1].escrow_percentage = [0.5, 0.0, 0.0, 0.0].map(EscrowShare::of_data);
+    game.add_resource(
         PlayerId::new(1),
         attribute::FOOD,
         Amount::new(10.0),
@@ -296,10 +296,10 @@ fn the_income_fills_computer_escrow_and_goes_to_mutual_allies() {
     )
     .unwrap();
     assert_eq!(
-        (t.players[1].attributes[0], t.players[1].escrow[0]),
+        (game.players[1].attributes[0], game.players[1].escrow[0]),
         (Amount::new(10.0), Amount::new(5.0))
     );
-    t.add_resource(
+    game.add_resource(
         PlayerId::new(1),
         attribute::FOOD,
         Amount::new(-20.0),
@@ -307,33 +307,36 @@ fn the_income_fills_computer_escrow_and_goes_to_mutual_allies() {
         ResourceShare::Shared,
     )
     .unwrap();
-    assert_eq!(t.players[1].escrow[0], Amount::ZERO);
+    assert_eq!(game.players[1].escrow[0], Amount::ZERO);
     // sharing: 1 and 2 count each other, 3 counts 1 but not the other way round
-    let mut t = world();
-    t.players[1].ally_sharing.set(AllySharing::RESOURCES, true);
-    t.players[1].relations = relation_row([1, 0, 0, 3]);
-    t.players[2].relations = relation_row([1, 0, 0, 3]);
-    t.players[3].relations = relation_row([1, 0, 3, 0]);
-    t.add_resource(
-        PlayerId::new(1),
-        attribute::WOOD,
-        Amount::new(4.0),
-        ResourceStat::Gathered,
-        ResourceShare::Shared,
-    )
-    .unwrap();
+    let mut world = world();
+    world.players[1]
+        .ally_sharing
+        .set(AllySharing::RESOURCES, true);
+    world.players[1].relations = relation_row([1, 0, 0, 3]);
+    world.players[2].relations = relation_row([1, 0, 0, 3]);
+    world.players[3].relations = relation_row([1, 0, 3, 0]);
+    world
+        .add_resource(
+            PlayerId::new(1),
+            attribute::WOOD,
+            Amount::new(4.0),
+            ResourceStat::Gathered,
+            ResourceShare::Shared,
+        )
+        .unwrap();
     assert_eq!(
-        [1, 2, 3].map(|p| (
-            t.players[p].attributes[1].get(),
-            t.players[p].attributes[167].get()
+        [1, 2, 3].map(|player| (
+            world.players[player].attributes[1].get(),
+            world.players[player].attributes[167].get()
         )),
         [(4.0, 4.0), (4.0, 4.0), (0.0, 0.0)]
     );
-    assert_eq!(t.players[0].attributes[1], Amount::ZERO);
+    assert_eq!(world.players[0].attributes[1], Amount::ZERO);
     assert!(
-        t.shares_with(PlayerId::new(1), PlayerId::new(2))
-            && !t.shares_with(PlayerId::new(1), PlayerId::new(3))
-            && !t.shares_with(PlayerId::new(1), PlayerId::new(0))
+        world.shares_with(PlayerId::new(1), PlayerId::new(2))
+            && !world.shares_with(PlayerId::new(1), PlayerId::new(3))
+            && !world.shares_with(PlayerId::new(1), PlayerId::new(0))
     );
 }
 
@@ -370,16 +373,16 @@ fn player_without_an_object_that_keeps_it_loses() {
         },
     ]);
     let keeps = |objects: Vec<Unit>, game_mode: i32| {
-        let mut t = world();
-        t.model.masters = vec![masters.clone(); 4].into_iter().map(Arc::new).collect();
-        t.settings.game_mode = GameMode::of_data(game_mode);
-        t.players[1].objects = objects.into();
-        t.reindex();
-        let player = &t.players[1];
+        let mut world = world();
+        world.model.masters = vec![masters.clone(); 4].into_iter().map(Arc::new).collect();
+        world.settings.game_mode = GameMode::of_data(game_mode);
+        world.players[1].objects = objects.into();
+        world.reindex();
+        let player = &world.players[1];
         let kept: Vec<bool> = player
             .objects
             .iter()
-            .map(|unit| t.keeps_alive(PlayerId::new(1), unit).unwrap())
+            .map(|unit| world.keeps_alive(PlayerId::new(1), unit).unwrap())
             .collect();
         kept
     };
@@ -413,29 +416,29 @@ fn player_without_an_object_that_keeps_it_loses() {
         [false]
     );
     // a player with only a wall loses, attribute 45 cleared
-    let mut t = world();
-    t.model.masters = vec![masters.clone(); 4].into_iter().map(Arc::new).collect();
-    t.players[1].victory_times = VictoryTimes::default();
-    t.players[1].objects = vec![object(3, master_id(117), ObjectState::Alive)].into();
-    t.reindex();
-    t.players[1].attributes[45] = Amount::new(1.0);
-    t.update_world_player(PlayerId::new(1)).unwrap();
-    assert_eq!(t.players[1].game_status, GameStatus::Lost);
-    assert_eq!(t.players[1].attributes[45], Amount::ZERO);
+    let mut game = world();
+    game.model.masters = vec![masters.clone(); 4].into_iter().map(Arc::new).collect();
+    game.players[1].victory_times = VictoryTimes::default();
+    game.players[1].objects = vec![object(3, master_id(117), ObjectState::Alive)].into();
+    game.reindex();
+    game.players[1].attributes[45] = Amount::new(1.0);
+    game.update_world_player(PlayerId::new(1)).unwrap();
+    assert_eq!(game.players[1].game_status, GameStatus::Lost);
+    assert_eq!(game.players[1].attributes[45], Amount::ZERO);
     // one that a villager keeps plays on
-    let mut t = world();
-    t.model.masters = vec![masters; 4].into_iter().map(Arc::new).collect();
-    t.players[1].victory_times = VictoryTimes::default();
-    t.players[1].objects = vec![
+    let mut world = world();
+    world.model.masters = vec![masters; 4].into_iter().map(Arc::new).collect();
+    world.players[1].victory_times = VictoryTimes::default();
+    world.players[1].objects = vec![
         object(3, master_id(117), ObjectState::Alive),
         object(1, ids::VILLAGER_MALE, ObjectState::Alive),
     ]
     .into();
-    t.reindex();
-    t.players[1].attributes[45] = Amount::new(1.0);
-    t.update_world_player(PlayerId::new(1)).unwrap();
-    assert_eq!(t.players[1].game_status, GameStatus::Playing);
-    assert_eq!(t.players[1].attributes[45], Amount::new(1.0));
+    world.reindex();
+    world.players[1].attributes[45] = Amount::new(1.0);
+    world.update_world_player(PlayerId::new(1)).unwrap();
+    assert_eq!(world.players[1].game_status, GameStatus::Playing);
+    assert_eq!(world.players[1].attributes[45], Amount::new(1.0));
 }
 
 /// Each victory timer at 0 or more keeps the player; −1 and NaN do not.
@@ -466,7 +469,7 @@ fn running_victory_timer_keeps_the_player() {
 }
 
 /// `FUN_1416597e0`: the tracker's town centres in its order, 109's list then 444's, those the
-/// world holds in any state; the `n`-th of them.
+/// world holds in any state; the `nth`-th of them.
 #[test]
 fn the_nth_town_centre_follows_the_tracker_and_skips_what_the_world_lacks() {
     let key = |master| Key {
@@ -490,7 +493,7 @@ fn the_nth_town_centre_follows_the_tracker_and_skips_what_the_world_lacks() {
             .add(object_id(id), key(master_id(master)));
     }
     let all: Vec<Option<ObjectId>> = (0..4)
-        .map(|n| world.town_centre_at(PlayerId::new(1), n))
+        .map(|nth| world.town_centre_at(PlayerId::new(1), nth))
         .collect();
     assert_eq!(
         all,
@@ -518,34 +521,34 @@ fn sudden_death_and_regicide_end_player_their_ways() {
         pending: false,
         military: false,
     };
-    let mut t = world();
-    t.model.masters = vec![masters.clone(); 4].into_iter().map(Arc::new).collect();
-    t.settings.game_mode = GameMode::of_data(11);
-    t.players[1].victory_times = VictoryTimes::default();
-    t.players[1].objects = vec![
+    let mut game = world();
+    game.model.masters = vec![masters.clone(); 4].into_iter().map(Arc::new).collect();
+    game.settings.game_mode = GameMode::of_data(11);
+    game.players[1].victory_times = VictoryTimes::default();
+    game.players[1].objects = vec![
         object(1, ids::VILLAGER_MALE, ObjectState::Alive),
         object(5, ids::TOWN_CENTRE, ObjectState::Alive),
     ]
     .into();
-    t.reindex();
-    t.players[1].tracker.add(object_id(5), tc_key);
-    t.update_world_player(PlayerId::new(1)).unwrap();
-    assert!(t.players[1].sudden_death_eliminable);
-    assert_eq!(t.players[1].game_status, GameStatus::Playing);
-    assert_eq!(t.first_town_centre(PlayerId::new(1)), Some(object_id(5)));
+    game.reindex();
+    game.players[1].tracker.add(object_id(5), tc_key);
+    game.update_world_player(PlayerId::new(1)).unwrap();
+    assert!(game.players[1].sudden_death_eliminable);
+    assert_eq!(game.players[1].game_status, GameStatus::Playing);
+    assert_eq!(game.first_town_centre(PlayerId::new(1)), Some(object_id(5)));
     // the town centre falls (state 3): the villager no longer keeps the player
-    t.players[1].objects[ListIndex::new(1)].life.state = ObjectState::Dying;
-    assert_eq!(t.first_town_centre(PlayerId::new(1)), None);
-    t.update_world_player(PlayerId::new(1)).unwrap();
-    assert_eq!(t.players[1].game_status, GameStatus::Lost);
+    game.players[1].objects[ListIndex::new(1)].life.state = ObjectState::Dying;
+    assert_eq!(game.first_town_centre(PlayerId::new(1)), None);
+    game.update_world_player(PlayerId::new(1)).unwrap();
+    assert_eq!(game.players[1].game_status, GameStatus::Lost);
     // regicide (sub-mode bit 2): no king, a villager notwithstanding
-    let mut t = world();
-    t.model.masters = vec![masters; 4].into_iter().map(Arc::new).collect();
-    t.settings.sub_game_mode_flag = SubModeFlags::from_bits_retain(4);
-    t.players[1].objects = vec![object(1, ids::VILLAGER_MALE, ObjectState::Alive)].into();
-    t.reindex();
-    t.update_world_player(PlayerId::new(1)).unwrap();
-    assert_eq!(t.players[1].game_status, GameStatus::Lost);
+    let mut game = world();
+    game.model.masters = vec![masters; 4].into_iter().map(Arc::new).collect();
+    game.settings.sub_game_mode_flag = SubModeFlags::from_bits_retain(4);
+    game.players[1].objects = vec![object(1, ids::VILLAGER_MALE, ObjectState::Alive)].into();
+    game.reindex();
+    game.update_world_player(PlayerId::new(1)).unwrap();
+    assert_eq!(game.players[1].game_status, GameStatus::Lost);
     let mut t2 = world();
     t2.settings.game_mode = GameMode::of_data(1);
     t2.players[1].tracker.add(
@@ -674,7 +677,7 @@ fn the_tech_tree_answers_by_civilisation_building_and_unit() {
         unique_units: Vec::new(),
     };
     let settings = Settings::default();
-    let q = |civ, building, unit, ages_out| TreeQuery {
+    let query = |civ, building, unit, ages_out| TreeQuery {
         civ,
         building: TreeMaster::of_data(building),
         unit: TreeMaster::of_data(unit),
@@ -683,25 +686,28 @@ fn the_tech_tree_answers_by_civilisation_building_and_unit() {
         fallback: CivId::new(0),
     };
     let none = [false; 3];
-    assert!(tree.has(&q(CivId::new(0), 12, 74, none)));
+    assert!(tree.has(&query(CivId::new(0), 12, 74, none)));
     assert_eq!(
         (
-            tree.link(&q(CivId::new(0), 12, 74, none)),
-            tree.tech(&q(CivId::new(0), 12, 74, none))
+            tree.link(&query(CivId::new(0), 12, 74, none)),
+            tree.tech(&query(CivId::new(0), 12, 74, none))
         ),
         (TreeMaster::of_data(75), TreeTech::of_data(87))
     );
-    assert!(!tree.has(&q(CivId::new(0), 12, 4, none)));
-    assert_eq!(tree.link(&q(CivId::new(0), 12, 4, none)), TreeMaster::NONE);
-    assert!(!tree.has(&q(CivId::new(0), 87, 4, none)));
+    assert!(!tree.has(&query(CivId::new(0), 12, 4, none)));
     assert_eq!(
-        tree.link(&q(CivId::new(5), 12, 74, none)),
+        tree.link(&query(CivId::new(0), 12, 4, none)),
+        TreeMaster::NONE
+    );
+    assert!(!tree.has(&query(CivId::new(0), 87, 4, none)));
+    assert_eq!(
+        tree.link(&query(CivId::new(5), 12, 74, none)),
         TreeMaster::of_data(0)
     );
     // the Castle Age out of reach
-    assert!(!tree.has(&q(CivId::new(0), 12, 93, [false, true, false])));
+    assert!(!tree.has(&query(CivId::new(0), 12, 93, [false, true, false])));
     assert_eq!(
-        tree.tech(&q(CivId::new(0), 12, 93, [false, true, false])),
+        tree.tech(&query(CivId::new(0), 12, 93, [false, true, false])),
         TreeTech::of_data(0)
     );
     // the last age 3: age 3 is out
@@ -711,7 +717,7 @@ fn the_tech_tree_answers_by_civilisation_building_and_unit() {
     };
     let late = TreeQuery {
         settings: &early,
-        ..q(CivId::new(0), 12, 93, none)
+        ..query(CivId::new(0), 12, 93, none)
     };
     assert!(!tree.has(&late));
     // the full tech tree: civilisation 1 lacks the barracks, the fallback 0 has it
@@ -721,11 +727,11 @@ fn the_tech_tree_answers_by_civilisation_building_and_unit() {
     };
     let fell = TreeQuery {
         settings: &full,
-        ..q(CivId::new(1), 12, 74, none)
+        ..query(CivId::new(1), 12, 74, none)
     };
     assert!(tree.has(&fell));
     assert_eq!(tree.link(&fell), TreeMaster::of_data(75));
-    assert!(!tree.has(&q(CivId::new(1), 12, 74, none)));
+    assert!(!tree.has(&query(CivId::new(1), 12, 74, none)));
 }
 
 /// `FUN_141610470`'s count: a master trained at the building counts when the tree has it,

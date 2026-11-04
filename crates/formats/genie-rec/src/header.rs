@@ -1,5 +1,5 @@
 use crate::GameVersion;
-use crate::element::{ReadableHeaderElement, read_counted};
+use crate::element::{ReadHeader, read_counted};
 use crate::fits;
 use crate::map::Map;
 use crate::player::Player;
@@ -24,7 +24,7 @@ pub struct AiCommand {
     pub parameters: [i32; 4],
 }
 
-impl ReadableHeaderElement for AiCommand {
+impl ReadHeader for AiCommand {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let mut cmd = Self {
             command_kind: input.read_i32::<LE>()?,
@@ -50,7 +50,7 @@ pub struct AiListRule {
     actions: Vec<AiCommand>,
 }
 
-impl ReadableHeaderElement for AiListRule {
+impl ReadHeader for AiListRule {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let mut rule = Self {
             in_use: input.read_u32::<LE>()? != 0,
@@ -84,7 +84,7 @@ pub struct AiList {
     rules: Vec<AiListRule>,
 }
 
-impl ReadableHeaderElement for AiList {
+impl ReadHeader for AiList {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let mut list = Self {
             in_use: input.read_u32::<LE>()? != 0,
@@ -110,7 +110,7 @@ pub struct AiGroupTable {
     groups: Vec<u16>,
 }
 
-impl ReadableHeaderElement for AiGroupTable {
+impl ReadHeader for AiGroupTable {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let mut table = Self {
             max_groups: input.read_u16::<LE>()?,
@@ -185,7 +185,7 @@ impl Debug for AiFactState {
     }
 }
 
-impl ReadableHeaderElement for AiFactState {
+impl ReadHeader for AiFactState {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let save_version = input.read_f32::<LE>()?;
         let version = input.read_f32::<LE>()?;
@@ -245,7 +245,7 @@ pub struct AiScripts {
     pub fact_state: AiFactState,
 }
 
-impl ReadableHeaderElement for AiScripts {
+impl ReadHeader for AiScripts {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let string_table = StringTable::read_from(input)?;
         let _max_facts = input.read_u16::<LE>()?;
@@ -293,7 +293,7 @@ impl Header {
     }
 }
 
-impl ReadableHeaderElement for Header {
+impl ReadHeader for Header {
     // Reads the header's parts in file order; the parts it does not keep it skips.
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let mut header = Self {
@@ -444,7 +444,7 @@ struct Particle {
     pub flags: u8,
 }
 
-impl ReadableHeaderElement for Particle {
+impl ReadHeader for Particle {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         Ok(Self {
             start: input.read_u32::<LE>()?,
@@ -468,7 +468,7 @@ struct ParticleSystem {
     pub particles: Vec<Particle>,
 }
 
-impl ReadableHeaderElement for ParticleSystem {
+impl ReadHeader for ParticleSystem {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let world_time = input.read_u32::<LE>()?;
         let particles = read_counted(input)?;

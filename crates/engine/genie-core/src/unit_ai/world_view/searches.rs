@@ -37,7 +37,7 @@ use crate::unit_ai::{Search, UnitAi};
 use crate::world::index::ObjectsRef;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 use crate::{GenieError, GenieResult};
 
 impl UnitView<'_, '_> {
@@ -49,7 +49,7 @@ impl UnitView<'_, '_> {
     ///
     /// What the search does not model.
     pub(crate) fn closest(&mut self, search: &Search<'_>) -> GenieResult<Found> {
-        let roles = &self.c.w.model.roles.clone();
+        let roles = &self.step.world.model.roles.clone();
         let seeker = match search.pick {
             Pick::Attack { seeker, .. } => Some(seeker),
             _ => None,
@@ -60,68 +60,71 @@ impl UnitView<'_, '_> {
             me: self.unit.id,
             player: self.player,
             others: owner_view(
-                &self.c.w.players,
-                &self.c.w.index,
-                self.c.player,
+                &self.step.world.players,
+                &self.step.world.index,
+                self.step.player,
                 self.new_owner,
             )?,
             foreign: owner_view(
-                &self.c.w.players,
-                &self.c.w.index,
-                self.c.player,
+                &self.step.world.players,
+                &self.step.world.index,
+                self.step.player,
                 self.new_owner,
             )?
             .players(),
-            every: MasterTables::new(&self.c.w.model.masters, &self.c.w.parts.own_master),
-            parts: &self.c.w.parts,
+            every: MasterTables::new(
+                &self.step.world.model.masters,
+                &self.step.world.parts.own_master,
+            ),
+            parts: &self.step.world.parts,
             by_id: ObjectsRef::new(
-                &self.c.w.players,
-                &self.c.w.index,
-                &self.c.w.model.masters,
-                &self.c.w.parts,
-                &self.c.w.model.roles,
-                &self.c.w.model.tuning,
+                &self.step.world.players,
+                &self.step.world.index,
+                &self.step.world.model.masters,
+                &self.step.world.parts,
+                &self.step.world.model.roles,
+                &self.step.world.model.tuning,
             ),
             restriction: self
                 .unit
-                .master(self.c.w.master_tables(), self.player)?
+                .master(self.step.world.master_tables(), self.player)?
                 .terrain_restriction,
             unit: &*self.unit,
             actions: &*self.actions,
-            attributes: &self.c.w.players.player(self.player)?.attributes,
-            relations: &self.c.w.players.player(self.player)?.relations,
+            attributes: &self.step.world.players.player(self.player)?.attributes,
+            relations: &self.step.world.players.player(self.player)?.relations,
             ai_settings: self.ai_settings,
-            now: self.c.w.world_time,
-            mode_680: self.c.w.mode_680,
+            now: self.step.world.world_time,
+            mode_680: self.step.world.mode_680,
         };
         // ClosestObject's reachability check (slot 0x3d0) walks the unit's paths
         let mut plan = Planning {
-            pathing: &mut self.c.w.pathing,
-            now: self.c.w.world_time,
+            pathing: &mut self.step.world.pathing,
+            now: self.step.world.world_time,
             player_kind: self.player_kind,
-            object: self.c.w.streams.get(Stream::Object),
-            groups: &self.c.w.groups,
+            object: self.step.world.streams.get_mut(Stream::Object),
+            groups: &self.step.world.groups,
         };
         let unit = &*self.unit;
         let walker = unit.me(self.actions);
         let (mover, master_id, at) = (
-            self.c.w.parts.mover_of(unit.id),
+            self.step.world.parts.mover_of(unit.id),
             unit.life.master_id,
             unit.position(),
         );
         let by_id = ObjectsRef::new(
-            &self.c.w.players,
-            &self.c.w.index,
-            &self.c.w.model.masters,
-            &self.c.w.parts,
-            &self.c.w.model.roles,
-            &self.c.w.model.tuning,
+            &self.step.world.players,
+            &self.step.world.index,
+            &self.step.world.model.masters,
+            &self.step.world.parts,
+            &self.step.world.model.roles,
+            &self.step.world.model.tuning,
         );
         let mut reach = |spatial: &mut Spatial, id: ObjectId, range: Distance| {
-            let m = mover.ok_or(GenieError::unsupported(
+            let mover = mover.ok_or(GenieError::unsupported(
                 "a reach test of a unit that does not move",
             ))?;
-            m.reaches_object(
+            mover.reaches_object(
                 (at, &walker),
                 (spatial, by_id),
                 &mut plan,
@@ -130,7 +133,7 @@ impl UnitView<'_, '_> {
                 master_id,
             )
         };
-        self.c.w.spatial.search(
+        self.step.world.spatial.search(
             SearchQuery {
                 searcher: unit.id,
                 player: self.player,
@@ -140,9 +143,9 @@ impl UnitView<'_, '_> {
                 objects: by_id,
             },
             roles,
-            &self.c.w.model.tuning.best_target,
-            &self.c.w.model.tuning.spatial,
-            self.c.w.model.tuning.registry,
+            &self.step.world.model.tuning.best_target,
+            &self.step.world.model.tuning.spatial,
+            self.step.world.model.tuning.registry,
         )
     }
 
@@ -160,7 +163,7 @@ impl UnitView<'_, '_> {
         target: ObjectId,
         seeker: &UnitAiSeeker,
     ) -> GenieResult<Option<(ClassId, Position)>> {
-        let roles = &self.c.w.model.roles.clone();
+        let roles = &self.step.world.model.roles.clone();
         if !self.view_holds(target)? {
             return Ok(None);
         }
@@ -199,25 +202,25 @@ impl UnitView<'_, '_> {
     pub(crate) fn table_drop_site(&self) -> GenieResult<Option<(DropSiteId, Position)>> {
         let class = self
             .unit
-            .master(self.c.w.master_tables(), self.player)?
+            .master(self.step.world.master_tables(), self.player)?
             .class;
         let at = self.unit.position().ground();
         let view = owner_view(
-            &self.c.w.players,
-            &self.c.w.index,
-            self.c.player,
+            &self.step.world.players,
+            &self.step.world.index,
+            self.step.player,
             self.new_owner,
         )?;
         let look = |id: ObjectId| view.own(id).map(|unit| (unit.life.state, unit.position()));
         Ok(nearest_table_site(
             (
-                &self.c.w.model.drop_sites,
+                &self.step.world.model.drop_sites,
                 self.civ,
-                &self.c.w.players.player(self.c.player)?.tracker,
+                &self.step.world.players.player(self.step.player)?.tracker,
             ),
             (at, self.unit.life.attribute_kind, class),
             look,
-            &self.c.w.model.tuning.order,
+            &self.step.world.model.tuning.order,
         ))
     }
 
@@ -252,14 +255,19 @@ impl UnitView<'_, '_> {
         /// The classes that never help: 1 to 3, 18 to 21, 27 and 39.
         const NO_HELP_CLASSES: ClassMask = ClassMask::new(0x0080_083c_000e, 0x28);
 
-        let roles = &self.c.w.model.roles.clone();
-        let lists = self.c.w.spatial.searched().ok_or(GenieError::unsupported(
-            "a search that reads the registry's last answer (before any query)",
-        ))?;
+        let roles = &self.step.world.model.roles.clone();
+        let lists = self
+            .step
+            .world
+            .spatial
+            .searched()
+            .ok_or(GenieError::unsupported(
+                "a search that reads the registry's last answer (before any query)",
+            ))?;
         let others = owner_view(
-            &self.c.w.players,
-            &self.c.w.index,
-            self.c.player,
+            &self.step.world.players,
+            &self.step.world.index,
+            self.step.player,
             self.new_owner,
         )?;
         let find = |id: ObjectId| others.find(id);
@@ -267,7 +275,7 @@ impl UnitView<'_, '_> {
         let me = self.unit.id;
         let my_radius = self
             .unit
-            .master(self.c.w.master_tables(), self.player)?
+            .master(self.step.world.master_tables(), self.player)?
             .radius;
         for record in lists[UnitRelation::Own]
             .iter()
@@ -279,10 +287,12 @@ impl UnitView<'_, '_> {
             let Some((owner, unit)) = find(record.id) else {
                 continue;
             };
-            if !self.c.w.parts.unit_ai.contains(unit.id) || ObjectState::Dying <= unit.life.state {
+            if !self.step.world.parts.unit_ai.contains(unit.id)
+                || ObjectState::Dying <= unit.life.state
+            {
                 continue;
             }
-            let master = unit.master(self.c.w.master_tables(), owner)?;
+            let master = unit.master(self.step.world.master_tables(), owner)?;
             let no_help = NO_HELP_CLASSES.contains(master.class);
             if no_help
                 || roles
@@ -294,7 +304,7 @@ impl UnitView<'_, '_> {
             if !gaia_attacker && roles.of_class(master.class).contains(ClassRoles::VILLAGER) {
                 continue;
             }
-            if owner != self.player && !self.c.w.spatial.allied_with(owner, self.player) {
+            if owner != self.player && !self.step.world.spatial.allied_with(owner, self.player) {
                 continue;
             }
             let gap = footprint_gap_squared(
@@ -303,13 +313,13 @@ impl UnitView<'_, '_> {
                 unit.position(),
                 master.radius,
             );
-            if DistanceSquared::new(self.c.w.model.tuning.unit_ai.help_reach) < gap {
+            if DistanceSquared::new(self.step.world.model.tuning.unit_ai.help_reach) < gap {
                 continue;
             }
             if !self.helper_free(
                 owner,
                 unit,
-                self.c.w.parts.actions_of(unit.id),
+                self.step.world.parts.actions_of(unit.id),
                 master,
                 attacker,
                 roles,
@@ -335,16 +345,16 @@ impl UnitView<'_, '_> {
     ) -> GenieResult<Option<Tile>> {
         let tc = town_centre(
             owner_view(
-                &self.c.w.players,
-                &self.c.w.index,
-                self.c.player,
+                &self.step.world.players,
+                &self.step.world.index,
+                self.step.player,
                 self.new_owner,
             )?,
-            self.c.w.model.slots.master,
+            self.step.world.model.slots.master,
         )?;
         let (at, player_kind) = (self.unit.position(), self.player_kind);
         // the search about the town centre only while the player has no scout map
-        let scout_map = self.c.w.spatial.scout_map(self.player).is_some();
+        let scout_map = self.step.world.spatial.scout_map(self.player).is_some();
         let (mut area, map, line_of_sight) = self.scout_area()?;
         if !scout_map && let Some(tile) = unexplored_area(tc, map, &mut area)? {
             return Ok(Some(tile));
@@ -368,13 +378,13 @@ impl UnitView<'_, '_> {
     /// What the search does not model.
     pub(crate) fn seek_beyond_sight(&mut self, rng: &mut Well512) -> GenieResult<Option<Tile>> {
         let (at, player) = (self.unit.position(), self.player);
-        let scouted = self.c.w.spatial.scout_map(player).is_some();
+        let scouted = self.step.world.spatial.scout_map(player).is_some();
         let (mut area, map, line_of_sight) = self.scout_area()?;
         area.scouted = scouted;
         let found = beyond_sight(&mut area, at, line_of_sight, map, rng)?;
         // the point found is marked in the scout map (FUN_140f4d5e0 with 1)
         if let Some(tile) = found {
-            self.c.w.spatial.scout(player, tile);
+            self.step.world.spatial.scout(player, tile);
         }
         Ok(found)
     }
@@ -386,12 +396,15 @@ impl UnitView<'_, '_> {
     pub(crate) fn make_scout_map(&mut self) {
         let size = SCOUT_MAP_SIZE;
         let mut influence_map = InfluenceMap::new(GridSize::new(size, size), 0);
-        let (w, h) = (self.c.w.spatial.map.width(), self.c.w.spatial.map.height());
-        for y in 0..h {
-            for x in 0..w {
+        let (width, height) = (
+            self.step.world.spatial.map.width(),
+            self.step.world.spatial.map.height(),
+        );
+        for y in 0..height {
+            for x in 0..width {
                 if self
-                    .c
-                    .w
+                    .step
+                    .world
                     .spatial
                     .scout_sight(self.player, Tile::new(x, y))
                     .is_some_and(TileSight::seen)
@@ -400,6 +413,9 @@ impl UnitView<'_, '_> {
                 }
             }
         }
-        self.c.w.spatial.set_scout_map(self.player, influence_map);
+        self.step
+            .world
+            .spatial
+            .set_scout_map(self.player, influence_map);
     }
 }

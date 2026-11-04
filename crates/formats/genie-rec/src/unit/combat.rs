@@ -1,7 +1,7 @@
 //! The base combat, missile and combat base classes' attributes.
 
 use crate::ObjectId;
-use crate::element::{ReadableHeaderElement, WritableHeaderElement};
+use crate::element::{ReadHeader, WriteHeader};
 use crate::reader::RecordingHeaderReader;
 use crate::unit::UnitAi;
 use byteorder::{LE, ReadBytesExt};
@@ -31,7 +31,7 @@ pub struct BaseCombatUnitAttributes {
     pub attack_count: u32,
 }
 
-impl ReadableHeaderElement for BaseCombatUnitAttributes {
+impl ReadHeader for BaseCombatUnitAttributes {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let mut attrs = Self::default();
         if input.version() >= 9.05 {
@@ -54,7 +54,7 @@ impl ReadableHeaderElement for BaseCombatUnitAttributes {
     }
 }
 
-impl WritableHeaderElement for BaseCombatUnitAttributes {}
+impl WriteHeader for BaseCombatUnitAttributes {}
 
 /// The attributes the missile (projectile) base class adds.
 #[derive(Debug, Default, Clone)]
@@ -67,7 +67,7 @@ pub struct MissileUnitAttributes {
     pub own_base: Option<UnitKind>,
 }
 
-impl ReadableHeaderElement for MissileUnitAttributes {
+impl ReadHeader for MissileUnitAttributes {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         Ok(Self {
             max_range: input.read_f32::<LE>()?,
@@ -87,7 +87,7 @@ fn read_own_base<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<O
     Ok(Some(UnitKind::read_from(&mut *input, version)?))
 }
 
-impl WritableHeaderElement for MissileUnitAttributes {}
+impl WriteHeader for MissileUnitAttributes {}
 
 /// The attributes the combat base class adds.
 #[derive(Debug, Default, Clone)]
@@ -131,7 +131,7 @@ pub struct CombatUnitAttributes {
     pub num_healers: u8,
 }
 
-impl ReadableHeaderElement for CombatUnitAttributes {
+impl ReadHeader for CombatUnitAttributes {
     // Reads the combat unit's fields in file order, section by section.
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let mut attrs = Self {
@@ -213,7 +213,7 @@ impl CombatUnitAttributes {
     }
 }
 
-impl WritableHeaderElement for CombatUnitAttributes {}
+impl WriteHeader for CombatUnitAttributes {}
 
 #[cfg(test)]
 mod tests;

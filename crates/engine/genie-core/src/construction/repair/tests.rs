@@ -468,7 +468,7 @@ fn heard(world: &World) -> Vec<NotifyKind> {
     let repair = AiAction::Repair.value();
     ai.notifies
         .iter()
-        .inspect(|n| assert_eq!(n.p, [repair, 0, 0]))
+        .inspect(|notify| assert_eq!(notify.params, [repair, 0, 0]))
         .map(|notify| notify.kind)
         .collect()
 }
@@ -497,21 +497,21 @@ fn the_house(world: &World) -> (f32, u8, i32) {
 fn repair_move_to_shows_its_task_moving_sprite_else_its_default() {
     let graphics = graphics();
     let shown = |task| {
-        let r = RepairAction { task, ..started() };
+        let repair_action = RepairAction { task, ..started() };
         let id = |move_to_action: MoveToAction| move_to_action.sprite.map(|graphic| graphic.id);
         [
-            id(
-                r.walk(&move_reads(&graphics), Some(TARGET), &tuning().move_to)
-                    .unwrap()
-                    .unwrap(),
-            ),
-            id(r.to_point(
-                Position::new(1.0, 2.0, 0.0),
-                &move_reads(&graphics),
-                &tuning().move_to,
-            )
-            .unwrap()
-            .unwrap()),
+            id(repair_action
+                .walk(&move_reads(&graphics), Some(TARGET), &tuning().move_to)
+                .unwrap()
+                .unwrap()),
+            id(repair_action
+                .to_point(
+                    Position::new(1.0, 2.0, 0.0),
+                    &move_reads(&graphics),
+                    &tuning().move_to,
+                )
+                .unwrap()
+                .unwrap()),
         ]
     };
     assert_eq!(
@@ -645,7 +645,7 @@ fn repairer_shows_its_task_sprites_as_it_faces_and_works() {
 #[test]
 fn repair_walk_to_its_point_shows_its_sprite_as_it_starts() {
     for (task, shown) in [(TASK, 20), (SHOWING, 3)] {
-        let mut world = repair_at(NEAR, |r| r.task = task);
+        let mut world = repair_at(NEAR, |repair_action| repair_action.task = task);
         let unit = &mut world.players[1].objects[ListIndex::new(0)];
         let mover = world.parts.motion.mover_mut(unit.id);
         let repair_action = world
@@ -686,36 +686,44 @@ fn repair_ends_with_its_target_gone_foreign_or_dead() {
     type Change = fn(&mut World);
     let cases: [(Change, bool); 4] = [
         (
-            |t| drop(t.remove_live(PlayerId::new(1), ListIndex::new(1)).unwrap()),
+            |world| {
+                drop(
+                    world
+                        .remove_live(PlayerId::new(1), ListIndex::new(1))
+                        .unwrap(),
+                );
+            },
             false,
         ),
         (
-            |t| t.players[1].objects[ListIndex::new(1)].life.state = ObjectState::Dying,
+            |world| world.players[1].objects[ListIndex::new(1)].life.state = ObjectState::Dying,
             true,
         ),
         (
-            |t| t.players[1].objects[ListIndex::new(1)].life.hp = HitPoints::new(0.25),
+            |world| world.players[1].objects[ListIndex::new(1)].life.hp = HitPoints::new(0.25),
             true,
         ),
         (
-            |t| {
-                let house = t.remove_live(PlayerId::new(1), ListIndex::new(1)).unwrap();
-                t.players.push(Player {
+            |world| {
+                let house = world
+                    .remove_live(PlayerId::new(1), ListIndex::new(1))
+                    .unwrap();
+                world.players.push(Player {
                     objects: vec![house.unit].into(),
                     attributes: vec![Amount::ZERO; 300],
                     relations: relation_row([1, 0, 0]),
                     ..Player::default()
                 });
-                t.reindex();
-                t.players[1].relations = relation_row([1, 0, 3]);
-                t.model.masters.push(t.model.masters[1].clone());
+                world.reindex();
+                world.players[1].relations = relation_row([1, 0, 3]);
+                world.model.masters.push(world.model.masters[1].clone());
             },
             true,
         ),
     ];
     for (change, held) in cases {
-        let mut world = repair_at(NEAR, |r| {
-            r.state = moving(MoveTo::Arrived);
+        let mut world = repair_at(NEAR, |repair_action| {
+            repair_action.state = moving(MoveTo::Arrived);
         });
         change(&mut world);
         assert_eq!(repaired(&mut world), Ok(HeadCode::Keeps));
@@ -738,8 +746,8 @@ fn repair_ends_with_its_target_gone_foreign_or_dead() {
 /// (`set_state(1)`: notify 0x1fa, the standing sprite).
 #[test]
 fn repair_whose_move_to_target_died_lets_go_and_ends() {
-    let mut world = repair_at(NEAR, |r| {
-        r.state = RepairState::Move {
+    let mut world = repair_at(NEAR, |repair_action| {
+        repair_action.state = RepairState::Move {
             move_to: Some(MoveToAction {
                 target: Some(object_id(777)),
                 ..MoveToAction::sub_in(MoveTo::Moving)
@@ -788,24 +796,26 @@ fn gaia_object_is_repaired() {
 /// it waits (10) with a quick path to it, else fails (13), whose update posts 0x1f9.
 #[test]
 fn repairer_at_its_target_faces_it_or_waits_or_fails() {
-    let arrived = |r: &mut RepairAction| r.state = moving(MoveTo::Arrived);
-    let mut t = repair_at(NEAR, arrived);
-    assert_eq!(repaired(&mut t), Ok(HeadCode::Keeps));
-    let r = repair_of(&t);
+    let arrived = |repair_action: &mut RepairAction| repair_action.state = moving(MoveTo::Arrived);
+    let mut world = repair_at(NEAR, arrived);
+    assert_eq!(repaired(&mut world), Ok(HeadCode::Keeps));
+    let repair = repair_of(&world);
     assert_eq!(
-        (r.state, r.state.move_to().copied()),
+        (repair.state, repair.state.move_to().copied()),
         (RepairState::Face, None)
     );
     // no MoveTo (the sub-action list empty, FUN_140a992b0's 1) counts as at the target
-    let mut t = repair_at(NEAR, |r| r.state = RepairState::Move { move_to: None });
-    assert_eq!(repaired(&mut t), Ok(HeadCode::Keeps));
-    assert_eq!(repair_of(&t).state, RepairState::Face);
-    let mut t = repair_at(Position::new(30.0, 95.0, 0.0), arrived);
-    passable(&mut t);
-    assert_eq!(repaired(&mut t), Ok(HeadCode::Keeps));
-    let repair_action = repair_of(&t);
+    let mut world = repair_at(NEAR, |repair_action| {
+        repair_action.state = RepairState::Move { move_to: None }
+    });
+    assert_eq!(repaired(&mut world), Ok(HeadCode::Keeps));
+    assert_eq!(repair_of(&world).state, RepairState::Face);
+    let mut world = repair_at(Position::new(30.0, 95.0, 0.0), arrived);
+    passable(&mut world);
+    assert_eq!(repaired(&mut world), Ok(HeadCode::Keeps));
+    let repair_action = repair_of(&world);
     assert_eq!(
-        (repair_action.state, repair_action.timer, sprite_of(&t)),
+        (repair_action.state, repair_action.timer, sprite_of(&world)),
         (
             RepairState::Wait,
             Seconds::new(1.0),
@@ -826,27 +836,29 @@ fn repairer_at_its_target_faces_it_or_waits_or_fails() {
 /// posts 0x1fb and ends it too; a target that walked out of reach sends the unit walking.
 #[test]
 fn repairer_works_until_the_target_is_full_or_the_player_cannot_pay() {
-    let working = |r: &mut RepairAction| r.state = RepairState::Work;
-    let mut t = repair_at(NEAR, working);
-    t.parts
-        .building_mut(t.players[1].objects[ListIndex::new(1)].id)
+    let working = |repair_action: &mut RepairAction| repair_action.state = RepairState::Work;
+    let mut world = repair_at(NEAR, working);
+    world
+        .parts
+        .building_mut(world.players[1].objects[ListIndex::new(1)].id)
         .unwrap()
         .construction
         .as_mut()
         .unwrap()
         .builders = BuilderCount::of_data(1);
-    t.parts
+    world
+        .parts
         .actions
-        .of_mut(t.players[1].objects[ListIndex::new(0)].id)
+        .of_mut(world.players[1].objects[ListIndex::new(0)].id)
         .unwrap()
         .list
         .repair_mut()
         .unwrap()
         .counted = true;
-    assert_eq!(repaired(&mut t), Ok(HeadCode::Keeps));
-    assert_eq!(repair_of(&t).state.bare(), RepairState::Work);
+    assert_eq!(repaired(&mut world), Ok(HeadCode::Keeps));
+    assert_eq!(repair_of(&world).state.bare(), RepairState::Work);
     assert_eq!(
-        the_house(&t),
+        the_house(&world),
         (
             300.0
                 + work_amount(
@@ -861,31 +873,32 @@ fn repairer_works_until_the_target_is_full_or_the_player_cannot_pay() {
             1
         )
     );
-    let unit = &mut t.players[1].objects[ListIndex::new(1)];
+    let unit = &mut world.players[1].objects[ListIndex::new(1)];
     unit.life.hp = HitPoints::new(549.99);
     let id = unit.id;
-    t.parts.combat_mut(id).unwrap().armor_removed = ArmorPair::new(3, 4);
-    assert_eq!(repaired(&mut t), Ok(HeadCode::Keeps));
-    assert_eq!(repair_of(&t).state.bare(), RepairState::Done);
-    assert_eq!(the_house(&t), (550.0, 0, 0));
+    world.parts.combat_mut(id).unwrap().armor_removed = ArmorPair::new(3, 4);
+    assert_eq!(repaired(&mut world), Ok(HeadCode::Keeps));
+    assert_eq!(repair_of(&world).state.bare(), RepairState::Done);
+    assert_eq!(the_house(&world), (550.0, 0, 0));
     assert_eq!(
-        t.parts
-            .combat_of(t.players[1].objects[ListIndex::new(1)].id)
+        world
+            .parts
+            .combat_of(world.players[1].objects[ListIndex::new(1)].id)
             .armor_removed,
         ArmorPair::ZERO
     );
-    assert_eq!(heard(&t), [NotifyKind::ACTION_COMPLETED]);
+    assert_eq!(heard(&world), [NotifyKind::ACTION_COMPLETED]);
     // the player without the wood the building repair cost asks
-    let mut t = repair_at(NEAR, working);
-    t.players[1].attributes.resize(300, Amount::ZERO);
-    t.players[1].attributes[BUILDING_REPAIR_COST] = Amount::new(1.0);
-    t.players[1].attributes[..4].copy_from_slice(&[Amount::ZERO; 4]);
-    assert_eq!(repaired(&mut t), Ok(HeadCode::Keeps));
+    let mut world = repair_at(NEAR, working);
+    world.players[1].attributes.resize(300, Amount::ZERO);
+    world.players[1].attributes[BUILDING_REPAIR_COST] = Amount::new(1.0);
+    world.players[1].attributes[..4].copy_from_slice(&[Amount::ZERO; 4]);
+    assert_eq!(repaired(&mut world), Ok(HeadCode::Keeps));
     assert_eq!(
-        heard(&t),
+        heard(&world),
         [NotifyKind::ACTION_INVALIDATED, NotifyKind::ACTION_COMPLETED]
     );
-    assert_eq!(the_house(&t).0, 300.0);
+    assert_eq!(the_house(&world).0, 300.0);
     // the house moved out of reach: the repairer walks again, no longer counted
     let mut world = repair_at(NEAR, working);
     world
@@ -952,16 +965,16 @@ fn repair_heals_an_object_below_kind_70_free_until_it_is_full() {
         repair_at.players[1].attributes[..4].copy_from_slice(&[Amount::ZERO; 4]);
         repair_at
     };
-    let mut t = below_70(None);
-    assert_eq!(repaired(&mut t), Ok(HeadCode::Keeps));
-    assert_eq!(repair_of(&t).state.bare(), RepairState::Work);
-    let hp = the_house(&t).0;
+    let mut game = below_70(None);
+    assert_eq!(repaired(&mut game), Ok(HeadCode::Keeps));
+    assert_eq!(repair_of(&game).state.bare(), RepairState::Work);
+    let hp = the_house(&game).0;
     assert!(300.0 < hp && hp < 550.0, "{hp}");
-    assert_eq!(t.players[1].attributes[..4], [Amount::ZERO; 4]);
-    t.players[1].objects[ListIndex::new(1)].life.hp = HitPoints::new(549.99);
-    assert_eq!(repaired(&mut t), Ok(HeadCode::Keeps));
-    assert_eq!(repair_of(&t).state.bare(), RepairState::Done);
-    assert_eq!(the_house(&t).0, 550.0);
+    assert_eq!(game.players[1].attributes[..4], [Amount::ZERO; 4]);
+    game.players[1].objects[ListIndex::new(1)].life.hp = HitPoints::new(549.99);
+    assert_eq!(repaired(&mut game), Ok(HeadCode::Keeps));
+    assert_eq!(repair_of(&game).state.bare(), RepairState::Done);
+    assert_eq!(the_house(&game).0, 550.0);
     for class in [class::CLASS_51, class::CLASS_54] {
         let mut world = below_70(Some(class));
         assert_eq!(
@@ -975,19 +988,19 @@ fn repair_heals_an_object_below_kind_70_free_until_it_is_full() {
 /// or waits a second again.
 #[test]
 fn waiting_repairer_looks_again_each_second() {
-    let waiting = |r: &mut RepairAction| {
-        (r.state, r.timer) = (RepairState::Wait, Seconds::new(0.1));
+    let waiting = |repair_action: &mut RepairAction| {
+        (repair_action.state, repair_action.timer) = (RepairState::Wait, Seconds::new(0.1));
     };
-    let mut t = repair_at(Position::new(30.0, 95.0, 0.0), waiting);
-    passable(&mut t);
-    assert_eq!(repaired(&mut t), Ok(HeadCode::Keeps));
+    let mut world = repair_at(Position::new(30.0, 95.0, 0.0), waiting);
+    passable(&mut world);
+    assert_eq!(repaired(&mut world), Ok(HeadCode::Keeps));
     assert_eq!(
-        (repair_of(&t).state, repair_of(&t).timer),
+        (repair_of(&world).state, repair_of(&world).timer),
         (RepairState::Wait, Seconds::new(0.1 - 0.05))
     );
-    assert_eq!(repaired(&mut t), Ok(HeadCode::Keeps));
+    assert_eq!(repaired(&mut world), Ok(HeadCode::Keeps));
     assert_eq!(
-        (repair_of(&t).state, repair_of(&t).timer),
+        (repair_of(&world).state, repair_of(&world).timer),
         (RepairState::Wait, Seconds::new(1.0))
     );
     let mut world = repair_at(NEAR, |repair_action| {
@@ -1004,11 +1017,15 @@ fn waiting_repairer_looks_again_each_second() {
 #[test]
 fn repair_without_its_target_ends_or_waits_as_it_is() {
     for state in [RepairState::Face, RepairState::Work] {
-        let mut t = repair_at(NEAR, |r| {
-            (r.state, r.target, r.counted) = (state, None, false);
+        let mut world = repair_at(NEAR, |repair_action| {
+            (
+                repair_action.state,
+                repair_action.target,
+                repair_action.counted,
+            ) = (state, None, false);
         });
-        assert_eq!(repaired(&mut t), Ok(HeadCode::Keeps));
-        assert_eq!(repair_of(&t).state, RepairState::Done, "{state:?}");
+        assert_eq!(repaired(&mut world), Ok(HeadCode::Keeps));
+        assert_eq!(repair_of(&world).state, RepairState::Done, "{state:?}");
     }
     let mut world = repair_at(NEAR, |repair_action| {
         (
@@ -1030,14 +1047,14 @@ fn repair_without_its_target_ends_or_waits_as_it_is() {
 #[test]
 fn move_sends_the_repairer_to_its_point() {
     let mut mover = walker();
-    let mut r = RepairAction {
+    let mut repair = RepairAction {
         state: RepairState::Work,
         counted: true,
         ..started()
     };
     let graphics = graphics();
     assert_eq!(
-        r.take_point(
+        repair.take_point(
             Position::new(30.0, 5.0, 0.0),
             Some(&mut mover),
             &move_reads(&graphics),
@@ -1047,13 +1064,14 @@ fn move_sends_the_repairer_to_its_point() {
     );
     assert_eq!(
         (
-            r.state.bare(),
-            r.target,
-            r.state
+            repair.state.bare(),
+            repair.target,
+            repair
+                .state
                 .move_to()
                 .copied()
                 .and_then(|move_to_action| move_to_action.goal()),
-            r.counted
+            repair.counted
         ),
         (
             RepairState::WalkPoint { move_to: None },
@@ -1062,7 +1080,7 @@ fn move_sends_the_repairer_to_its_point() {
             false
         )
     );
-    let mut world = repair_at(NEAR, |repair_action| *repair_action = r);
+    let mut world = repair_at(NEAR, |repair_action| *repair_action = repair);
     world
         .parts
         .actions

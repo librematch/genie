@@ -5,8 +5,8 @@ use crate::map::Point;
 use crate::map::Tile;
 use crate::pathing::tile_path::GridLevel;
 
-/// A place on the tile planner's grid as the planner's shorts (x, y): at level 0 a tile, at
-/// level `l` a cell of 2^l × 2^l tiles (`+8`, `+0xa` of a node; the goal's tile `+0x410`).
+/// A place on the tile planner's grid as the planner's shorts (x, y): at level 0 a tile, at level
+/// `level` a cell of 2^level × 2^level tiles (`+8`, `+0xa` of a node; the goal's tile `+0x410`).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct PlanTile(
     /// Its x and y.
@@ -53,8 +53,8 @@ impl PlanTile {
     /// The cell holding a tile at `level`: x and y shifted right by the level.
     #[must_use]
     pub const fn at_level(self, level: GridLevel) -> Self {
-        let l = level.get();
-        Self([self.0[0] >> l, self.0[1] >> l])
+        let level = level.get();
+        Self([self.0[0] >> level, self.0[1] >> level])
     }
 
     /// The cell holding a cell a level up: x and y shifted right by one.
@@ -79,20 +79,20 @@ impl PlanTile {
     /// A cell's first tile at `level`: x and y shifted left.
     #[must_use]
     pub const fn corner_at(self, level: GridLevel) -> Self {
-        let l = level.get();
-        Self([self.0[0] << l, self.0[1] << l])
+        let level = level.get();
+        Self([self.0[0] << level, self.0[1] << level])
     }
 
     /// A cell's centre tile at `level` (its first tile plus half its side); the tile itself at
     /// level 0.
     #[must_use]
     pub const fn centre_at(self, level: GridLevel) -> Self {
-        let l = level.get();
-        if l == 0 {
+        let level = level.get();
+        if level == 0 {
             return self;
         }
-        let half = 1i16 << (l - 1);
-        Self([(self.0[0] << l) + half, (self.0[1] << l) + half])
+        let half = 1i16 << (level - 1);
+        Self([(self.0[0] << level) + half, (self.0[1] << level) + half])
     }
 
     /// The tile at level 0, widened.
@@ -128,8 +128,11 @@ impl PlanRect {
     #[must_use]
     pub const fn holds_at(self, level: GridLevel, cell: PlanTile) -> bool {
         let [x0, y0, x1, y1] = self.0;
-        let l = level.get();
-        x0 >> l <= cell.x() && y0 >> l <= cell.y() && cell.x() <= x1 >> l && cell.y() <= y1 >> l
+        let level = level.get();
+        x0 >> level <= cell.x()
+            && y0 >> level <= cell.y()
+            && cell.x() <= x1 >> level
+            && cell.y() <= y1 >> level
     }
 }
 

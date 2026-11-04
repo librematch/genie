@@ -71,18 +71,18 @@ pub type Color = RGB<u8>;
 pub struct PaletteIndex(u8);
 impl From<u8> for PaletteIndex {
     #[inline]
-    fn from(n: u8) -> Self {
-        Self(n)
+    fn from(index: u8) -> Self {
+        Self(index)
     }
 }
 
 impl TryFrom<i32> for PaletteIndex {
     type Error = GenieError;
     #[inline]
-    fn try_from(n: i32) -> GenieResult<Self> {
-        n.try_into().map(Self).map_err(|try_from_int_error| {
+    fn try_from(index: i32) -> GenieResult<Self> {
+        index.try_into().map(Self).map_err(|try_from_int_error| {
             GenieError::invalid_input("a palette index past a byte")
-                .with("index", n)
+                .with("index", index)
                 .with_source(try_from_int_error)
         })
     }
@@ -139,13 +139,20 @@ fn parse_number<Parsed: FromStr>(input: &[u8]) -> IResult<&[u8], Parsed> {
 
 /// Eat and return an RGB value (three `u8` components).
 fn parse_rgb(input: &[u8]) -> IResult<&[u8], Color> {
-    let (input, r) = parse_number(input)?;
+    let (input, red) = parse_number(input)?;
     let (input, ()) = whitespace(input)?;
-    let (input, g) = parse_number(input)?;
+    let (input, green) = parse_number(input)?;
     let (input, ()) = whitespace(input)?;
-    let (input, b) = parse_number(input)?;
+    let (input, blue) = parse_number(input)?;
 
-    Ok((input, RGB { r, g, b }))
+    Ok((
+        input,
+        RGB {
+            r: red,
+            g: green,
+            b: blue,
+        },
+    ))
 }
 
 /// The bytes of the shortest colour line, `0 0 0\r\n`.
@@ -331,9 +338,9 @@ impl IntoIterator for Palette {
     }
 }
 
-impl<'a> IntoIterator for &'a Palette {
-    type Item = &'a Color;
-    type IntoIter = Iter<'a, Color>;
+impl<'palette> IntoIterator for &'palette Palette {
+    type Item = &'palette Color;
+    type IntoIter = Iter<'palette, Color>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -393,11 +400,11 @@ mod tests {
     #[test]
     fn make() {
         let mut pal = Palette::new();
-        for r in 0..=255 {
+        for index in 0..=255 {
             pal.add(RGB {
-                r,
-                g: 255 - r,
-                b: 127_u8.wrapping_add(r),
+                r: index,
+                g: 255 - index,
+                b: 127_u8.wrapping_add(index),
             });
         }
         let text = pal.to_string();

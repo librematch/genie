@@ -44,8 +44,8 @@ impl AttackCategory {
         }
         u8::try_from(value)
             .ok()
-            .filter(|&v| usize::from(v) < Self::COUNT)
-            .map(|v| Some(Self(v)))
+            .filter(|&value| usize::from(value) < Self::COUNT)
+            .map(|value| Some(Self(value)))
             .ok_or_else(|| {
                 GenieError::invalid_input("an attack category past 0 to 11").with("category", value)
             })

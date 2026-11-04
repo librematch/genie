@@ -16,16 +16,19 @@ use crate::world::layer::generated::MoveToTuning;
 /// the `MoveTo` ([`MoveToReads`]), and what the unit carries: the task's walking sprite
 /// (`FUN_140a8b660`) depends on the load.
 #[derive(Clone, Copy, Debug)]
-pub struct Walks<'a> {
+pub struct Walks<'graphics> {
     /// What every new sub-action `MoveTo` reads of the unit.
-    pub(crate) reads: MoveToReads<'a>,
+    pub(crate) reads: MoveToReads<'graphics>,
     /// What the unit carries: its resource kind (`+0x308`) and amount (`+0x310`).
     pub(crate) held: Held,
 }
 
-impl<'a> Walks<'a> {
+impl<'graphics> Walks<'graphics> {
     /// The reads of `unit` with the sprites `sprites`, and what it carries.
-    pub(crate) fn of(sprites: SpriteReads<'a>, (unit, mover): (&Unit, Option<&Mover>)) -> Self {
+    pub(crate) fn of(
+        sprites: SpriteReads<'graphics>,
+        (unit, mover): (&Unit, Option<&Mover>),
+    ) -> Self {
         Self {
             reads: MoveToReads::with_sprites(sprites, (unit, mover)),
             held: unit.life.held(),
@@ -34,7 +37,7 @@ impl<'a> Walks<'a> {
 
     /// The reads with the speed `mover` has now (slot 0x208, which a start reads as the
     /// constructor runs).
-    pub(crate) const fn live(&self, mover: &Mover) -> MoveToReads<'a> {
+    pub(crate) const fn live(&self, mover: &Mover) -> MoveToReads<'graphics> {
         MoveToReads {
             speed: mover.stats.speed,
             ..self.reads
@@ -45,16 +48,16 @@ impl<'a> Walks<'a> {
 impl GatherReads {
     /// What the `MoveTo`s the update makes read of `unit` with its mover, with the sprites'
     /// table `graphics`.
-    pub(crate) fn walks<'g>(
+    pub(crate) fn walks<'graphics>(
         &self,
-        graphics: &'g Graphics,
+        graphics: &'graphics Graphics,
         unit: (&Unit, Option<&Mover>),
-    ) -> Walks<'g> {
+    ) -> Walks<'graphics> {
         Walks::of(self.sprites_of(graphics), unit)
     }
 
     /// The sprites a `MoveTo` takes when its maker gives none.
-    const fn sprites_of<'g>(&self, graphics: &'g Graphics) -> SpriteReads<'g> {
+    const fn sprites_of<'graphics>(&self, graphics: &'graphics Graphics) -> SpriteReads<'graphics> {
         SpriteReads {
             defaults: self.defaults,
             graphics,

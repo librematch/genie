@@ -45,8 +45,8 @@ impl LangFile {
     /// TODO specify
     pub(super) fn load_pe_directory(&mut self, directory: Directory<'_>) -> GenieResult<()> {
         for entry in directory.entries() {
-            let base_index = if let Name::Id(n) = entry.name().map_err(unreadable_dll)? {
-                (n - 1) * 16
+            let base_index = if let Name::Id(id) = entry.name().map_err(unreadable_dll)? {
+                (id - 1) * 16
             } else {
                 continue;
             };
@@ -162,12 +162,12 @@ impl LangFile {
         let mut iter = line.chars();
         let id: String = iter
             .by_ref()
-            .take_while(|&c| !char::is_whitespace(c))
+            .take_while(|&character| !char::is_whitespace(character))
             .collect();
         let string_key = StringKey::from(id);
 
         // TODO unquoting and un-escaping
-        let mut iter = iter.skip_while(|&c| char::is_whitespace(c));
+        let mut iter = iter.skip_while(|&character| char::is_whitespace(character));
         let value = if iter.next() == Some('"') {
             unescape(iter, true)
         } else {
@@ -210,11 +210,11 @@ impl LangFile {
 pub(super) fn unescape(escaped: impl Iterator<Item = char>, quoted: bool) -> String {
     let mut unescaped = String::new();
     let mut prev = 'x'; // Innocuous character
-    for c in escaped {
+    for current in escaped {
         // NOTE this does not support escapes like "\\n", which should
         // print out "\n" literally, instead we get "\" followed by a newline.
         // Could be solved by making `prev` an Option
-        match (prev, c) {
+        match (prev, current) {
             ('\\', '\\') => unescaped.push('\\'),
             ('\\', 'n') => unescaped.push('\n'),
             ('\\', 'r') => unescaped.push('\r'),
@@ -222,15 +222,15 @@ pub(super) fn unescape(escaped: impl Iterator<Item = char>, quoted: bool) -> Str
             ('\\', '"') if quoted => unescaped.push('"'),
             (_, '"') if quoted => break,
             (_, '\\') => {} // Might be escape, wait for one more
-            ('\\', c) => {
+            ('\\', escaped_character) => {
                 // Previous character was escape,
                 // but this is not part of a sequence
                 unescaped.push('\\');
-                unescaped.push(c);
+                unescaped.push(escaped_character);
             }
-            (_, c) => unescaped.push(c),
+            (_, plain) => unescaped.push(plain),
         }
-        prev = c;
+        prev = current;
     }
     unescaped
 }
@@ -238,14 +238,14 @@ pub(super) fn unescape(escaped: impl Iterator<Item = char>, quoted: bool) -> Str
 // TODO specify
 pub(super) fn escape(source: &str, quoted: bool) -> String {
     let mut escaped = String::new();
-    for c in source.chars() {
-        match c {
+    for character in source.chars() {
+        match character {
             '\\' => escaped.push_str(r"\\"),
             '\n' => escaped.push_str(r"\n"),
             '\r' => escaped.push_str(r"\r"),
             '\t' => escaped.push_str(r"\t"),
             '"' if quoted => escaped.push_str(r#"\""#),
-            c => escaped.push(c),
+            other => escaped.push(other),
         }
     }
     escaped

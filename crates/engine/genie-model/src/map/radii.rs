@@ -58,7 +58,7 @@ impl Radii {
     /// Each of the three is above 0 (a NaN is not): the object has a size along every axis.
     #[must_use]
     pub fn sized(self) -> bool {
-        self.0.iter().all(|&r| 0.0 < r)
+        self.0.iter().all(|&radius| 0.0 < radius)
     }
 
     /// The radii with height `z`.
@@ -70,8 +70,8 @@ impl Radii {
 
 impl From<[f32; 3]> for Radii {
     /// The radii of three floats in the map's order (x, y, z), as a save holds them.
-    fn from(c: [f32; 3]) -> Self {
-        Self(c)
+    fn from(components: [f32; 3]) -> Self {
+        Self(components)
     }
 }
 
@@ -122,7 +122,7 @@ impl Footprint {
     /// Both are above 0 (a NaN is not): the object covers an area on the ground.
     #[must_use]
     pub fn sized(self) -> bool {
-        self.0.iter().all(|&r| 0.0 < r)
+        self.0.iter().all(|&radius| 0.0 < radius)
     }
 
     /// The footprint with x `x`.
@@ -146,8 +146,8 @@ impl Footprint {
 
 impl From<[f32; 2]> for Footprint {
     /// The footprint of two floats in the map's order (x, y), as a save holds them.
-    fn from(c: [f32; 2]) -> Self {
-        Self(c)
+    fn from(components: [f32; 2]) -> Self {
+        Self(components)
     }
 }
 

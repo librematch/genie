@@ -28,49 +28,52 @@ pub fn garrison_firepower(turns: &mut World) {
 /// unit that is not of type 70 or a building whose master the table lacks).
 type Entered = (ObjectId, ObjectId, Option<GenieResult<Firepower>>);
 
-/// Player `p`'s units inside a building of its own, in list order, each with its building and
-/// its share ([`garrison_firepower`]).
-fn entered_shares(turns: &World, p: usize) -> Vec<Entered> {
-    let (Some(masters), Some(player)) = (turns.model.masters.get(p), turns.players.get(p)) else {
+/// Player `player_index`'s units inside a building of its own, in list order, each with its
+/// building and its share ([`garrison_firepower`]).
+fn entered_shares(turns: &World, player_index: usize) -> Vec<Entered> {
+    let (Some(masters), Some(player)) = (
+        turns.model.masters.get(player_index),
+        turns.players.get(player_index),
+    ) else {
         return Vec::new();
     };
     let lists = || player.objects.iter().chain(&player.sleeping);
     let mut entered = Vec::new();
-    for u in lists() {
-        let Some(building) = u.life.inside else {
+    for listed in lists() {
+        let Some(building) = listed.life.inside else {
             continue;
         };
-        let Some(b) = lists().find(|unit| unit.id == building.id()) else {
+        let Some(unit) = lists().find(|unit| unit.id == building.id()) else {
             continue;
         };
         let share = masters
-            .get(u.life.master_id)
+            .get(listed.life.master_id)
             .filter(|master| master.kind == MasterKind::COMBAT)
             .and_then(|me| {
-                let bm = masters.get(b.life.master_id)?;
+                let bm = masters.get(unit.life.master_id)?;
                 let rate = attack_rate(
                     bm,
                     masters,
-                    turns.parts.combat_of(b.id).reload_powerup,
+                    turns.parts.combat_of(unit.id).reload_powerup,
                     &turns.model.roles,
                     &turns.model.tuning.garrison,
                 );
                 Some(garrison_share(
                     me,
                     masters,
-                    turns.parts.combat_of(u.id).reload_powerup,
+                    turns.parts.combat_of(listed.id).reload_powerup,
                     rate,
                     &turns.model.roles,
                 ))
             });
-        entered.push((b.id, u.id, share));
+        entered.push((unit.id, listed.id, share));
     }
     entered
 }
 
-/// Each building of player `p` lists the units `entered` inside it and adds their shares to
-/// its volleys; a share the world does not model leaves the building unmodelled.
-fn file_garrisons(turns: &mut World, p: usize, entered: Vec<Entered>) {
+/// Each building of player `player_index` lists the units `entered` inside it and adds their shares
+/// to its volleys; a share the world does not model leaves the building unmodelled.
+fn file_garrisons(turns: &mut World, player_index: usize, entered: Vec<Entered>) {
     for (object_id, id, share) in entered {
         let unmodelled = match share {
             Some(Ok(share)) => {
@@ -80,10 +83,10 @@ fn file_garrisons(turns: &mut World, p: usize, entered: Vec<Entered>) {
                     .set_part(object_id, Part::Combat(Box::new(combat)))
                     .err()
             }
-            Some(Err(e)) => Some(e),
+            Some(Err(error)) => Some(error),
             None => None,
         };
-        let Some(building) = turns.players.get_mut(p).and_then(|player| {
+        let Some(building) = turns.players.get_mut(player_index).and_then(|player| {
             player
                 .objects
                 .iter_mut()
@@ -93,8 +96,8 @@ fn file_garrisons(turns: &mut World, p: usize, entered: Vec<Entered>) {
             continue;
         };
         building.garrison.push(id);
-        if let Some(e) = unmodelled {
-            let unread = Part::Unread(Some(Unread::new(e)));
+        if let Some(why) = unmodelled {
+            let unread = Part::Unread(Some(Unread::new(why)));
             // the world holds the building (it is in its player's lists): the write cannot fail
             if let Err(error) = turns.set_part(object_id, unread) {
                 stop_all(turns, &error);

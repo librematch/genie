@@ -32,7 +32,7 @@ use crate::world::others::OthersRef;
 use crate::world::parts::PartTable;
 use crate::world::parts::Parts;
 use crate::world::player::Player;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 
 /// The terrain the task finder's general search reads at `point` (`FUN_1411a8ba0`,
 /// [`Terrain::at_task_point`]); none on a world without its map's terrain.
@@ -41,9 +41,9 @@ pub(crate) fn point_terrain(map: Option<&Terrain>, point: Position) -> Option<Te
 }
 
 /// The players' relations and the drop sites, as the task finder reads them.
-pub(crate) struct TaskWorld<'a> {
-    pub(crate) players: &'a [Player],
-    pub(crate) drop_sites: &'a [DropSite],
+pub(crate) struct TaskWorld<'world> {
+    pub(crate) players: &'world [Player],
+    pub(crate) drop_sites: &'world [DropSite],
 }
 
 impl Diplomacy for TaskWorld<'_> {
@@ -64,11 +64,11 @@ impl Diplomacy for TaskWorld<'_> {
 /// The players' relations and the drop sites as the task finder reads them while a unit's owner's
 /// list is out for its update ([`UnitView`](crate::unit_ai::world_view::UnitView)): the owner's
 /// relations, the others'.
-pub(crate) struct SideWorld<'a> {
+pub(crate) struct SideWorld<'world> {
     pub(crate) player: PlayerId,
-    pub(crate) relations: &'a Relations,
-    pub(crate) foreign: Foreign<'a>,
-    pub(crate) drop_sites: &'a [DropSite],
+    pub(crate) relations: &'world Relations,
+    pub(crate) foreign: Foreign<'world>,
+    pub(crate) drop_sites: &'world [DropSite],
 }
 
 impl Diplomacy for SideWorld<'_> {
@@ -119,16 +119,16 @@ pub(crate) fn state_of(id: Option<ObjectId>, others: OthersRef<'_>) -> Option<Ob
 /// and `every` the players' masters, `parts` the objects' parts; an annex stands for its main
 /// building (`+0xbb8` of its building layer), `steps` times (`World::task_target`'s reading).
 /// None when `find` does not hold it.
-pub(crate) fn task_target_with<'a>(
+pub(crate) fn task_target_with<'world>(
     id: ObjectId,
     steps: usize,
-    find: &impl Fn(ObjectId) -> Option<(PlayerId, &'a Unit)>,
+    find: &impl Fn(ObjectId) -> Option<(PlayerId, &'world Unit)>,
     parts: &Parts,
-    every: MasterTables<'a>,
-) -> GenieResult<Option<TaskTarget<'a>>> {
+    every: MasterTables<'world>,
+) -> GenieResult<Option<TaskTarget<'world>>> {
     let mut id = id;
     for _ in 0..steps {
-        match find(id).and_then(|(_, u)| parts.building_of(u.id).annex_of) {
+        match find(id).and_then(|(_, unit)| parts.building_of(unit.id).annex_of) {
             Some(main) => id = main.id(),
             None => break,
         }
@@ -162,15 +162,15 @@ pub(crate) fn task_target_with<'a>(
 /// target's place ([`point_terrain`]), which only a task for a terrain reads (as
 /// `World::find_work_task`, the same routine's port in `crate::orders`, which this module cannot
 /// call).
-pub(crate) fn task_search<'m>(
-    masters: &'m Masters,
+pub(crate) fn task_search<'masters>(
+    masters: &'masters Masters,
     actor: &Actor<'_>,
     on: &TaskOn<'_, '_>,
     filter: Option<ActionKind>,
     dip: &impl Diplomacy,
     slots: Slots,
     roles: &Roles,
-) -> GenieResult<Option<(Task, Option<&'m Master>)>> {
+) -> GenieResult<Option<(Task, Option<&'masters Master>)>> {
     let own = actor.master;
     let find = |list: &Master, filter: Option<ActionKind>| {
         find_task(list, actor, on, filter, dip, slots, roles).map(Option::<&Task>::copied)

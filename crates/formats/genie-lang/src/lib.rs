@@ -11,8 +11,8 @@
 //! # fn main() -> anyhow::Result<()> {
 //! use genie_lang::{LangFileKind::Dll, StringKey};
 //! use std::fs::File;
-//! let f = File::open("./test/dlls/language_x1_p1.dll")?;
-//! let lang_file = Dll.read_from(f)?;
+//! let file = File::open("./test/dlls/language_x1_p1.dll")?;
+//! let lang_file = Dll.read_from(file)?;
 //! assert_eq!(
 //!     lang_file.get(&StringKey::from(30177u32)),
 //!     Some(&String::from("Turbo Random Map - Buildings create units faster, villagers gather faster, build faster, and carry more.")));
@@ -41,8 +41,8 @@
 //! ; a comment
 //! 46524=Uighurs: Yes, that is the pelt of the great wolf. We will join you, Genghis Khan. And to seal the agreement, we will give you the gift of flaming arrows!
 //! "#;
-//! let f = Cursor::new(&text[..]);
-//! let lang_file = Ini.read_from(f)?;
+//! let text_reader = Cursor::new(&text[..]);
+//! let lang_file = Ini.read_from(text_reader)?;
 //! assert_eq!(
 //!     lang_file.get(&StringKey::from(46523u32)),
 //!     Some(&String::from("The Uighurs will join if you kill Ornlu the wolf and return to tell the tale.")));
@@ -60,8 +60,8 @@
 //! 46604 "Kill the traitor, Kushluk.\n\nPrevent the tent of Genghis Khan (Wonder) from being destroyed."
 //! LOBBYBROWSER_DATMOD_TITLE_FORMAT "DatMod: \"%s\""
 //! "#;
-//! let f = Cursor::new(&text[..]);
-//! let lang_file = KeyValue.read_from(f)?;
+//! let text_reader = Cursor::new(&text[..]);
+//! let lang_file = KeyValue.read_from(text_reader)?;
 //! assert_eq!(
 //!     lang_file.get(&StringKey::from(46523u32)),
 //!     Some(&String::from("The Uighurs will join if you kill Ornlu the wolf and return to tell the tale.")));
@@ -135,7 +135,7 @@ impl LangFileKind {
     ///
     /// Returns an error if reading fails, if a DLL is not a valid PE file with string resources,
     /// or if an INI line has a non-numeric string ID.
-    pub fn read_from(&self, r: impl Read) -> GenieResult<LangFile> {
+    pub fn read_from(&self, reader: impl Read) -> GenieResult<LangFile> {
         use LangFileKind::{Dll, Ini, KeyValue};
         let mut lang_file = LangFile::new();
         let from_method = match self {
@@ -143,7 +143,7 @@ impl LangFileKind {
             Ini => LangFile::read_ini,
             KeyValue => LangFile::read_keyval,
         };
-        from_method(&mut lang_file, r)?;
+        from_method(&mut lang_file, reader)?;
         Ok(lang_file)
     }
 }
@@ -180,17 +180,17 @@ mod error_tests {
     /// fail as invalid input, each with its reason.
     #[test]
     fn unknown_kind_bad_id_and_bad_dll_are_invalid_input() {
-        let e = "xml".parse::<LangFileKind>().unwrap_err();
+        let error = "xml".parse::<LangFileKind>().unwrap_err();
         assert_eq!(
-            (e.kind(), e.reason()),
+            (error.kind(), error.reason()),
             (
                 ErrorKind::InvalidInput,
                 "a language file type this reader does not know"
             )
         );
-        let e = LangFileKind::Ini.read_from(&b"x=y\n"[..]).unwrap_err();
+        let error = LangFileKind::Ini.read_from(&b"x=y\n"[..]).unwrap_err();
         assert_eq!(
-            (e.kind(), e.reason()),
+            (error.kind(), error.reason()),
             (ErrorKind::InvalidInput, "a string id that is no number")
         );
         let error = LangFileKind::Dll.read_from(&b"MZ"[..]).unwrap_err();

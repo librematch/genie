@@ -30,7 +30,7 @@ use crate::world::Seconds;
 use crate::world::World;
 use crate::world::index::{ObjectsRef, Place};
 use crate::world::layer::MasterRoles;
-use crate::world::slots::{CheckedIndex, PlayerSlots};
+use crate::world::slots::{CheckedIndexExt, PlayerSlotsExt};
 
 impl World {
     /// `FUN_141025fb0` for a slot whose time is past (`0x1410263e4`..`0x1410267c5`): true when
@@ -103,7 +103,7 @@ impl World {
                 pathing: &mut self.pathing,
                 now: self.world_time,
                 player_kind,
-                object: self.streams.get(Stream::Object),
+                object: self.streams.get_mut(Stream::Object),
                 groups: &self.groups,
             };
             let mut path = Path::default();
@@ -226,8 +226,8 @@ impl World {
         let (_, unit) = self.object(id).ok_or_else(|| member_gone(id))?;
         let paused = self.parts.mover_of(unit.id).is_some_and(Mover::paused);
         let held = self.groups.held(group)?;
-        let patrol =
-            top_path(&held.motion.paths).is_some_and(|p| p.path_flags.contains(PathFlags::LOOPS));
+        let patrol = top_path(&held.motion.paths)
+            .is_some_and(|path_data| path_data.path_flags.contains(PathFlags::LOOPS));
         let walks = held
             .motion
             .paths
@@ -254,14 +254,14 @@ impl World {
             let _ = self.show_walking(id)?;
             self.groups.held_mut(group)?.flags |= GroupFlags::CATCHING_UP;
         } else {
-            let v = if at_most_or_unordered(self.model.tuning.group.catch_up_span, gap) {
+            let catch_up = if at_most_or_unordered(self.model.tuning.group.catch_up_span, gap) {
                 speed * self.model.tuning.group.catch_up
             } else {
                 speed
                     + ((speed * self.model.tuning.group.catch_up - speed) * gap)
                         / self.model.tuning.group.catch_up_span
             };
-            self.set_member_speed(id, Speed::new(v));
+            self.set_member_speed(id, Speed::new(catch_up));
             if self.show_running(id)? == SpriteShow::NoSprite {
                 let _ = self.show_walking(id)?;
             }
@@ -345,13 +345,13 @@ impl World {
         let Some(place) = self.place(id) else {
             return Ok(());
         };
-        let (p, master_id) = {
-            let (p, u) = self.object(id).ok_or_else(|| member_gone(id))?;
-            (p, u.life.master_id)
+        let (player, master_id) = {
+            let (player_id, unit) = self.object(id).ok_or_else(|| member_gone(id))?;
+            (player_id, unit.life.master_id)
         };
-        let kind = self.master(p, master_id)?.kind;
+        let kind = self.master(player, master_id)?.kind;
         let unit = match place {
-            Place::Live(p, i) => self.players.live_mut(p, i)?,
+            Place::Live(owner, slot) => self.players.live_mut(owner, slot)?,
             Place::Sleeping(player_id, list_index) => {
                 self.players.asleep_mut(player_id, list_index)?
             }
@@ -399,7 +399,7 @@ impl World {
         let Some(index) = self
             .groups
             .get(group)
-            .and_then(|g| g.members.iter().position(|member| member.id == id))
+            .and_then(|group| group.members.iter().position(|member| member.id == id))
         else {
             return Ok(MemberMove::NoMember);
         };

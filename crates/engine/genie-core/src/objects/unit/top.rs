@@ -32,7 +32,7 @@ impl Unit {
     #[must_use]
     pub(crate) fn moved_vector(&self, mover: Option<&Mover>) -> BVector {
         mover
-            .map_or_else(|| self.position(), |m| m.moved_at)
+            .map_or_else(|| self.position(), |mover| mover.moved_at)
             .vector()
     }
 
@@ -122,23 +122,23 @@ impl Unit {
     /// `mover` (none for an object that does not move).
     #[must_use]
     pub fn gait(&self, actions: &Action, mover: Option<&Mover>) -> Option<Gait> {
-        let m = mover?;
+        let mover = mover?;
         Some(Gait {
-            moving: m
+            moving: mover
                 .velocity
                 .as_ref()
                 .is_some_and(|velocity| 0.0 < length(velocity.velocity)),
-            waits: m.waiting != 0
+            waits: mover.waiting != 0
                 && !actions
                     .top_action()
                     .is_some_and(|top_action| matches!(top_action.state.get(), 6 | 7)),
-            last_move: m.last_move,
-            pause: m.paths.first().map(|l| l.pause_time),
+            last_move: mover.last_move,
+            pause: mover.paths.first().map(|path| path.pause_time),
             human_order: self.last_human_order,
-            path_made: m
+            path_made: mover
                 .paths
                 .first()
-                .filter(|l| !l.points.is_empty())
+                .filter(|level| !level.points.is_empty())
                 .map(|path_data| path_data.created),
             group: self.group.id,
         })
@@ -187,7 +187,7 @@ impl Action {
                 self.list
                     .gather()
                     .and_then(|gather_action| gather_action.target)
-                    .map(|t| Some(t.id()))
+                    .map(|role_id| Some(role_id.id()))
             })
             .or_else(|| {
                 self.list

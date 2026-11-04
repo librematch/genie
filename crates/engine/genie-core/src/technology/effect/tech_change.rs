@@ -23,7 +23,7 @@ use crate::technology::effect::{ONE, ROUND};
 use crate::technology::{Location, ResearchCap, factors};
 use crate::world::Seconds;
 use crate::world::World;
-use crate::world::slots::{CheckedIndex, PlayerSlots};
+use crate::world::slots::{CheckedIndexExt, PlayerSlotsExt};
 
 /// The modes of `FUN_1415c3f20`'s technology change (kind 8) that change a cost, with the
 /// resource and the cost modifier's mode (`DAT_142ed71b0`'s map: 0 to 3 set food, wood, stone,
@@ -63,21 +63,21 @@ type LocationAt = (Option<usize>, Option<MasterId>);
 
 impl World {
     /// `FUN_1415c3f20`'s technology change (kind 8, its `0x6f` case) for player `player_id`'s
-    /// technology `tech` by `mode` and `v` at location `location` (below 1: every location; past
-    /// the technology's locations a new one is added, a copy of the last with no building): a cost
-    /// mode changes a cost ([`World::tech_cost`]); 4 sets the location's building to a master the
-    /// player has, 5 its button; 9 the stacking, 10 the research cap; 12 the state; 18 the effect
-    /// override (an already researched technology gives its new effect at once, `FUN_1413d4320`);
-    /// the research time modes ([`tech_time_mode`]) change the time ([`World::research_time`]) and
-    /// update the dependents. The icon (6), name (7), description (8) and hotkey (11) overrides are
-    /// the interface's. A technology past the player's tree changes nothing (the game also reads
-    /// its one past the end, not modelled).
+    /// technology `tech` by `mode` and `value` at location `location` (below 1: every location;
+    /// past the technology's locations a new one is added, a copy of the last with no building): a
+    /// cost mode changes a cost ([`World::tech_cost`]); 4 sets the location's building to a master
+    /// the player has, 5 its button; 9 the stacking, 10 the research cap; 12 the state; 18 the
+    /// effect override (an already researched technology gives its new effect at once,
+    /// `FUN_1413d4320`); the research time modes ([`tech_time_mode`]) change the time
+    /// ([`World::research_time`]) and update the dependents. The icon (6), name (7), description
+    /// (8) and hotkey (11) overrides are the interface's. A technology past the player's tree
+    /// changes nothing (the game also reads its one past the end, not modelled).
     pub(super) fn modify_tech(
         &mut self,
         player_id: PlayerId,
         tech: TechId,
         mode: ModifyMode,
-        v: f32,
+        value: f32,
         location: ModifyLocation,
     ) -> GenieResult<()> {
         let tree = self.players.player(player_id)?.techs.len();
@@ -88,19 +88,19 @@ impl World {
             return Ok(());
         };
         if let Some((resource, cost_mode)) = tech_cost_mode(mode) {
-            self.tech_cost(player_id, tech, resource, v, cost_mode)?;
+            self.tech_cost(player_id, tech, resource, value, cost_mode)?;
             return Ok(());
         }
         if let Some(time_mode) = tech_time_mode(mode) {
-            self.research_time(player_id, tech, v, time_mode, building)?;
+            self.research_time(player_id, tech, value, time_mode, building)?;
             return self.update_dependents(player_id, tech_id);
         }
-        self.set_tech_field(player_id, tech_id, (mode, v), at)
+        self.set_tech_field(player_id, tech_id, (mode, value), at)
     }
 
-    /// The location a modify command names of player `player_id`'s technology `t` (`location` above
-    /// 0: the entry at that index, or a copy of the last one with no building): its index and its
-    /// building. `None` for a technology without locations to copy.
+    /// The location a modify command names of player `player_id`'s technology `tech_id` (`location`
+    /// above 0: the entry at that index, or a copy of the last one with no building): its index and
+    /// its building. `None` for a technology without locations to copy.
     fn tech_location(
         &mut self,
         player_id: PlayerId,
@@ -109,15 +109,15 @@ impl World {
     ) -> GenieResult<Option<LocationAt>> {
         let index = tech_id.index();
         let (mut at, mut building) = (None, None);
-        if let Some(i) = location.entry() {
+        if let Some(entry) = location.entry() {
             let state = self
                 .players
                 .player_mut(player_id)?
                 .techs
                 .checked_mut(index)?;
-            if i < state.locations.len() {
-                building = state.locations.checked(i)?.building;
-                at = Some(i);
+            if entry < state.locations.len() {
+                building = state.locations.checked(entry)?.building;
+                at = Some(entry);
             } else {
                 // the game copies the last entry; a technology without locations would read before
                 // an empty list's start (a crash no recording shows)
@@ -141,18 +141,22 @@ impl World {
         &mut self,
         player_id: PlayerId,
         tech_id: TechId,
-        (mode, v): (ModifyMode, f32),
+        (mode, value): (ModifyMode, f32),
         at: Option<usize>,
     ) -> GenieResult<()> {
-        let (tech, t) = (tech_id, tech_id.index());
-        let short = cvttss2si(v) as i16;
+        let (tech, tech_index) = (tech_id, tech_id.index());
+        let short = cvttss2si(value) as i16;
         match mode {
-            ModifyMode::Building => self.set_tech_building(player_id, tech, v, at)?,
+            ModifyMode::Building => self.set_tech_building(player_id, tech, value, at)?,
             ModifyMode::Button => {
-                let state = self.players.player_mut(player_id)?.techs.checked_mut(t)?;
+                let state = self
+                    .players
+                    .player_mut(player_id)?
+                    .techs
+                    .checked_mut(tech_index)?;
                 for (index, location) in state.locations.iter_mut().enumerate() {
-                    if at.is_none_or(|a| a == index) {
-                        location.button = LocationButton::of_data(cvttss2si(v) as u8);
+                    if at.is_none_or(|wanted| wanted == index) {
+                        location.button = LocationButton::of_data(cvttss2si(value) as u8);
                     }
                 }
             }
@@ -160,21 +164,25 @@ impl World {
                 self.players
                     .player_mut(player_id)?
                     .techs
-                    .checked_mut(t)?
-                    .stack = v != 0.0;
+                    .checked_mut(tech_index)?
+                    .stack = value != 0.0;
             }
             ModifyMode::ResearchCap => {
                 self.players
                     .player_mut(player_id)?
                     .techs
-                    .checked_mut(t)?
+                    .checked_mut(tech_index)?
                     .research_cap = ResearchCap::of_data(short);
             }
-            ModifyMode::State => self.set_tech_state(player_id, tech, v)?,
+            ModifyMode::State => self.set_tech_state(player_id, tech, value)?,
             ModifyMode::EffectOverride => {
                 // `FUN_1413d4320`: a researched technology gives its new effect at once, with no
                 // object
-                let state = self.players.player_mut(player_id)?.techs.checked_mut(t)?;
+                let state = self
+                    .players
+                    .player_mut(player_id)?
+                    .techs
+                    .checked_mut(tech_index)?;
                 state.effect_override = EffectId::of_data(short);
                 if state.state == ResearchState::Researched {
                     let effect = state.effect_override;
@@ -187,16 +195,16 @@ impl World {
     }
 
     /// Mode 4: the building of player `player_id`'s technology `tech_id`'s locations (those of
-    /// `at`, all without one), when `v` names a master.
+    /// `at`, all without one), when `value` names a master.
     fn set_tech_building(
         &mut self,
         player_id: PlayerId,
         tech_id: TechId,
-        v: f32,
+        value: f32,
         at: Option<usize>,
     ) -> GenieResult<()> {
-        let t = tech_id.index();
-        let short = MasterId::of_data(cvttss2si(v) as i16);
+        let tech_index = tech_id.index();
+        let short = MasterId::of_data(cvttss2si(value) as i16);
         if let Some(short) = short
             && self
                 .model
@@ -204,9 +212,13 @@ impl World {
                 .get(player_id.index())
                 .is_some_and(|masters| masters.get(short).is_some())
         {
-            let state = self.players.player_mut(player_id)?.techs.checked_mut(t)?;
+            let state = self
+                .players
+                .player_mut(player_id)?
+                .techs
+                .checked_mut(tech_index)?;
             for (index, location) in state.locations.iter_mut().enumerate() {
-                if at.is_none_or(|a| a == index) {
+                if at.is_none_or(|wanted| wanted == index) {
                     location.building = Some(short);
                 }
             }
@@ -214,19 +226,28 @@ impl World {
         Ok(())
     }
 
-    /// Mode 12: the state of player `player_id`'s technology `tech_id` (`v` 0 none, then
+    /// Mode 12: the state of player `player_id`'s technology `tech_id` (`value` 0 none, then
     /// unavailable, available, or researched, which researches it).
-    fn set_tech_state(&mut self, player_id: PlayerId, tech_id: TechId, v: f32) -> GenieResult<()> {
-        let (tech, t) = (tech_id, tech_id.index());
-        let state = self.players.player_mut(player_id)?.techs.checked_mut(t)?;
-        if v == 0.0 {
+    fn set_tech_state(
+        &mut self,
+        player_id: PlayerId,
+        tech_id: TechId,
+        value: f32,
+    ) -> GenieResult<()> {
+        let (tech, index) = (tech_id, tech_id.index());
+        let state = self
+            .players
+            .player_mut(player_id)?
+            .techs
+            .checked_mut(index)?;
+        if value == 0.0 {
             state.state = ResearchState::Disabled;
-        } else if v == STATE_UNAVAILABLE {
+        } else if value == STATE_UNAVAILABLE {
             state.state = ResearchState::Unavailable;
-        } else if v == STATE_AVAILABLE {
+        } else if value == STATE_AVAILABLE {
             state.state = ResearchState::Available;
             state.enabled = true;
-        } else if v == STATE_RESEARCHED {
+        } else if value == STATE_RESEARCHED {
             let _ = self.force_research(player_id, tech)?;
         }
         Ok(())
@@ -241,24 +262,24 @@ impl World {
         player_id: PlayerId,
         tech_id: TechId,
     ) -> GenieResult<Research> {
-        let (tech, t) = (tech_id, tech_id.index());
+        let (tech, index) = (tech_id, tech_id.index());
         if (ResearchState::Unavailable..=ResearchState::Researching)
-            .contains(&self.players.player(player_id)?.techs.checked(t)?.state)
+            .contains(&self.players.player(player_id)?.techs.checked(index)?.state)
         {
             return self.complete_research(player_id, tech, None);
         }
-        let def = self.model.techs.checked(t)?.clone();
+        let def = self.model.techs.checked(index)?.clone();
         self.research_effect_known(player_id, tech)?;
         let effect = self
             .players
             .player(player_id)?
             .techs
-            .checked(t)?
+            .checked(index)?
             .effect(&def);
         self.do_table_effect(player_id, effect, None)?;
         let owner = self.players.player(player_id)?;
         let factors = factors(tech, owner, self.model.slots)?;
-        let listed = owner.techs.checked(t)?.listed_costs(&def, factors)?;
+        let listed = owner.techs.checked(index)?.listed_costs(&def, factors)?;
         let spent = listed
             .iter()
             .map(|&(_, cost_amount)| i32::from(cost_amount.get()))
@@ -276,17 +297,17 @@ impl World {
     }
 
     /// The research time modifier (`'g'`, `FUN_1413d1210`) of player `player_id`'s technology
-    /// `tech` by `v` in `mode`: each location (`location` −1; else its location of that building,
-    /// `FUN_1413c8930`) changes its adjustment (`+0xc`) against the `.dat`'s time there (−1 without
-    /// one): mode 2 adds `(v − 1) × time` rounded half away from 1 (in 16 bits), mode 0 sets it so
-    /// the time is `v` (none for −1, which leaves 0), any other adds `v` (in 16 bits). A technology
-    /// in state 1 whose work done reaches its new time completes ([`World::complete_research`]),
-    /// but for a set to −1. The game walks a copy of the locations.
+    /// `tech` by `value` in `mode`: each location (`location` −1; else its location of that
+    /// building, `FUN_1413c8930`) changes its adjustment (`+0xc`) against the `.dat`'s time there
+    /// (−1 without one): mode 2 adds `(value − 1) × time` rounded half away from 1 (in 16 bits),
+    /// mode 0 sets it so the time is `value` (none for −1, which leaves 0), any other adds `value`
+    /// (in 16 bits). A technology in state 1 whose work done reaches its new time completes
+    /// ([`World::complete_research`]), but for a set to −1. The game walks a copy of the locations.
     pub(super) fn research_time(
         &mut self,
         player_id: PlayerId,
         tech: TechId,
-        v: f32,
+        value: f32,
         mode: ChangeMode,
         location: Option<MasterId>,
     ) -> GenieResult<()> {
@@ -302,7 +323,7 @@ impl World {
                 .checked(index)?
                 .locations
                 .iter()
-                .map(|l| l.building)
+                .map(|location| location.building)
                 .collect()
         } else {
             vec![location]
@@ -324,36 +345,40 @@ impl World {
                 .player_mut(player_id)?
                 .techs
                 .checked_mut(index)?;
-            let i = state
+            let slot = state
                 .locations
                 .iter()
-                .position(|l| l.building == building)
+                .position(|location| location.building == building)
                 .unwrap_or(0);
             // a building comes from the locations (kind 8 adds one first), so only an empty list
             // finds none, which the game's walk of the copy never reaches
-            let Some(entry) = state.locations.get_mut(i) else {
+            let Some(entry) = state.locations.get_mut(slot) else {
                 continue;
             };
             let short = |x: f32| f32::from(cvttss2si(x) as i16);
             let adjustment = match mode {
                 ChangeMode::Scale => {
-                    let half = if below_or_unordered(v, ONE) {
+                    let half = if below_or_unordered(value, ONE) {
                         -ROUND
                     } else {
                         ROUND
                     };
-                    Seconds::new(short((v - ONE) * time + half)) + entry.adjustment
+                    Seconds::new(short((value - ONE) * time + half)) + entry.adjustment
                 }
                 ChangeMode::Set => {
-                    let s = if v == NO_TIME { 0 } else { cvttss2si(v) as i16 };
-                    Seconds::new(f32::from(s) - time)
+                    let seconds = if value == NO_TIME {
+                        0
+                    } else {
+                        cvttss2si(value) as i16
+                    };
+                    Seconds::new(f32::from(seconds) - time)
                 }
-                _ => Seconds::new(short(v)) + entry.adjustment,
+                _ => Seconds::new(short(value)) + entry.adjustment,
             };
             entry.adjustment = adjustment;
             let done = state.state == ResearchState::Available
                 && adjustment + Seconds::new(time) <= state.research_done
-                && (mode != ChangeMode::Set || v != NO_TIME);
+                && (mode != ChangeMode::Set || value != NO_TIME);
             if done {
                 let _ = self.complete_research(player_id, tech_id, None)?;
             }

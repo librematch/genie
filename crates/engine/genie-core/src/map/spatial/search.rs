@@ -124,18 +124,19 @@ impl Spatial {
         roles: &Roles,
         visibility_tuning: VisibilityTuning,
     ) -> GenieResult<()> {
-        if let Some(p) = self.objects.get_mut(id) {
-            let from = p.position;
-            p.position = position;
+        if let Some(record) = self.objects.get_mut(id) {
+            let from = record.position;
+            record.position = position;
             let (old, new) = (self.tiles.tile_of(from), self.tiles.tile_of(position));
             if old != new {
                 let objects = &self.objects;
-                if let Some(i) = old {
-                    self.tiles.take_off(i, id, |o| Self::is_tall(objects, o));
-                }
-                if let Some(i) = new {
+                if let Some(tile) = old {
                     self.tiles
-                        .append(i, id, |object_id| Self::is_tall(objects, object_id));
+                        .take_off(tile, id, |object_id| Self::is_tall(objects, object_id));
+                }
+                if let Some(tile) = new {
+                    self.tiles
+                        .append(tile, id, |object_id| Self::is_tall(objects, object_id));
                 }
             }
             self.refile(id);
@@ -158,9 +159,9 @@ impl Spatial {
             return Ok(());
         };
         let near = self.frozen().any(|(id, placed)| {
-            let Some(u) = placed
+            let Some(unknown) = placed
                 .unknown
-                .filter(|&u| 0.0 < u && placed.player == player)
+                .filter(|&unknown| 0.0 < unknown && placed.player == player)
             else {
                 return false;
             };
@@ -170,7 +171,7 @@ impl Spatial {
             if !los.sees() {
                 return false;
             }
-            let grow = u + los.get() as f32 + 1.0;
+            let grow = unknown + los.get() as f32 + 1.0;
             rect.overlaps(placed.bounds().grown(Distance::new(grow)))
         });
         if near {
@@ -362,7 +363,9 @@ impl Spatial {
                 Ok(Found {
                     id,
                     enemies: !found[UnitRelation::Enemy].is_empty(),
-                    position: id.and_then(|id| self.objects.get(id)).map(|p| p.position),
+                    position: id
+                        .and_then(|id| self.objects.get(id))
+                        .map(|placed| placed.position),
                     fresh,
                     players: players_seen(found),
                     distance: WholeDistance::of_data(cvttss2si(distance)),
@@ -392,8 +395,8 @@ impl Spatial {
                 )?;
                 let id = choice.target;
                 let mut retries = [None; 3];
-                for (slot, r) in retries.iter_mut().zip(choice.retries) {
-                    *slot = Some(r);
+                for (slot, retry) in retries.iter_mut().zip(choice.retries) {
+                    *slot = Some(retry);
                 }
                 Ok(Found {
                     id,
@@ -452,23 +455,23 @@ const NO_PICKER: GenieError =
 
 /// What a unit AI's search takes ([`Spatial::search`]): the searcher, its [`Search`], and the
 /// callers' answers for what the search reads of the world beyond the spatial index.
-pub struct SearchQuery<'a> {
+pub struct SearchQuery<'world> {
     /// The searching object.
     pub(crate) searcher: ObjectId,
     /// Its player.
     pub(crate) player: PlayerId,
     /// What it searches for.
-    pub(crate) search: &'a Search<'a>,
+    pub(crate) search: &'world Search<'world>,
     /// An attack pick's reads of the unit and the objects; a search that picks no attack has
     /// none.
-    pub(crate) attack: Option<&'a WorldPicker<'a>>,
+    pub(crate) attack: Option<&'world WorldPicker<'world>>,
     /// The reachability of a found object (slot 0x3d0).
-    pub(crate) reach: &'a mut Reach<'a>,
+    pub(crate) reach: &'world mut Reach<'world>,
     /// The world's objects by id: whether livestock is herded
     /// ([`herded`](crate::map::spatial::closest::herded)), the masters a class-10 searcher passes
     /// ([`shuns`](crate::map::spatial::closest::shuns)), a farm's workers and pasture
     /// ([`farm_kept`](crate::map::spatial::closest::farm_kept)).
-    pub(crate) objects: ObjectsRef<'a>,
+    pub(crate) objects: ObjectsRef<'world>,
 }
 
 impl Debug for SearchQuery<'_> {

@@ -78,20 +78,21 @@ pub(crate) fn damage_sprites(
         return Ok(share);
     }
     let (mut now, mut was) = (None, None);
-    for (index, e) in entries.iter().enumerate() {
-        if e.percent < share {
+    for (index, damage_graphic) in entries.iter().enumerate() {
+        if damage_graphic.percent < share {
             now = Some(index);
         }
-        if e.percent < before {
+        if damage_graphic.percent < before {
             was = Some(index);
         }
     }
     if now == was {
         return Ok(share);
     }
-    let shown = |i: Option<usize>| {
-        i.and_then(|i| entries.get(i).copied())
-            .filter(|e| e.sprite.is_some())
+    let shown = |index: Option<usize>| {
+        index
+            .and_then(|slot| entries.get(slot).copied())
+            .filter(|damage_graphic| damage_graphic.sprite.is_some())
     };
     let graphic =
         |id: Option<SpriteId>| id.and_then(|id| graphics.get(id)).copied().ok_or(NO_SPRITE);

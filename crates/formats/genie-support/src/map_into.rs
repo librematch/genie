@@ -12,9 +12,9 @@ pub trait MapInto<T> {
     /// ```rust
     /// use genie_support::MapInto;
     ///
-    /// let a: Option<u8> = Some(10);
-    /// let b: Option<u16> = a.map_into();
-    /// assert_eq!(b, Some(10u16));
+    /// let small: Option<u8> = Some(10);
+    /// let wide: Option<u16> = small.map_into();
+    /// assert_eq!(wide, Some(10u16));
     /// ```
     fn map_into(self) -> T;
 }

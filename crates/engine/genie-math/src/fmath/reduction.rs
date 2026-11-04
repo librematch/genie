@@ -10,18 +10,18 @@ pub(super) const FLOOR_TO_INT: f64 = f64::from_bits(0x4330_0000_0000_0000);
 /// in size 0 or −1 by the sign; else `x` plus the distance to its rounded neighbour, less 1 when
 /// that rounded up.
 pub(super) fn floor(x: f64) -> f64 {
-    let u = x.to_bits();
-    let e = (u >> 52) as u32 & 0x7ff;
-    if e >= 0x433 || x == 0.0 {
+    let bits = x.to_bits();
+    let exponent = (bits >> 52) as u32 & 0x7ff;
+    if exponent >= 0x433 || x == 0.0 {
         return x;
     }
-    let negative = u >> 63 != 0;
+    let negative = bits >> 63 != 0;
     let y = if negative {
         x - FLOOR_TO_INT + FLOOR_TO_INT - x
     } else {
         x + FLOOR_TO_INT - FLOOR_TO_INT - x
     };
-    if e <= 0x3fe {
+    if exponent <= 0x3fe {
         return if negative { -1.0 } else { 0.0 };
     }
     if y > 0.0 { y + x - ONE_F64 } else { y + x }
@@ -34,31 +34,31 @@ pub(super) const TWO_POW_MINUS_969: f64 = f64::from_bits(0x0360_0000_0000_0000);
 
 /// scalbn `0x14099ecd0` (musl's): `x` · 2^n, the exponent brought into range by at most two steps
 /// of 2^1023 or 2^-969 (so a subnormal result rounds once), then capped.
-pub(super) fn scalbn(x: f64, n: i32) -> f64 {
+pub(super) fn scalbn(x: f64, power: i32) -> f64 {
     let mut y = x;
-    let mut n = n;
-    if n > 1023 {
+    let mut exponent = power;
+    if exponent > 1023 {
         y *= TWO_POW_1023;
-        n -= 1023;
-        if n > 1023 {
+        exponent -= 1023;
+        if exponent > 1023 {
             y *= TWO_POW_1023;
-            n -= 1023;
-            if n > 1023 {
-                n = 1023;
+            exponent -= 1023;
+            if exponent > 1023 {
+                exponent = 1023;
             }
         }
-    } else if n < -1022 {
+    } else if exponent < -1022 {
         y *= TWO_POW_MINUS_969;
-        n += 969;
-        if n < -1022 {
+        exponent += 969;
+        if exponent < -1022 {
             y *= TWO_POW_MINUS_969;
-            n += 969;
-            if n < -1022 {
-                n = -1022;
+            exponent += 969;
+            if exponent < -1022 {
+                exponent = -1022;
             }
         }
     }
-    f64::from_bits(((0x3ff + n) as u64) << 52) * y
+    f64::from_bits(((0x3ff + exponent) as u64) << 52) * y
 }
 
 /// The chunks' 2^-24 (`DAT_142ec8940`).
@@ -114,51 +114,51 @@ pub(super) fn rem_pio2_large(x: &[f64], e0: i32, prec: usize) -> (i32, [f64; 3])
     let jx = x.len() - 1;
     let jv = ((e0 - 3) / 24).max(0) as usize;
     let mut q0 = e0 - 24 * (jv as i32 + 1);
-    let mut f = [0.0; 20];
-    let mut q = [0.0; 20];
+    let mut chunks = [0.0; 20];
+    let mut products = [0.0; 20];
     let mut fq = [0.0; 20];
     let mut iq = [0_i32; 20];
 
     // f[0..=jx + jk]: 2/π's chunks from jv − jx on, 0 before the table
-    for (i, f) in f.iter_mut().enumerate().take(jx + jk + 1) {
-        let j = (jv + i).checked_sub(jx);
-        *f = j.map_or(0.0, |j| f64::from(IPIO2[j]));
+    for (index, chunk) in chunks.iter_mut().enumerate().take(jx + jk + 1) {
+        let table_index = (jv + index).checked_sub(jx);
+        *chunk = table_index.map_or(0.0, |slot| f64::from(IPIO2[slot]));
     }
     // q[0..=jk]: the products x · f
-    for i in 0..=jk {
+    for term in 0..=jk {
         let mut fw = 0.0;
-        for j in 0..=jx {
-            fw += x[j] * f[jx + i - j];
+        for index in 0..=jx {
+            fw += x[index] * chunks[jx + term - index];
         }
-        q[i] = fw;
+        products[term] = fw;
     }
 
     let mut jz = jk;
-    let (mut n, mut ih, mut z);
+    let (mut quadrant, mut ih, mut z);
     loop {
         // q[] into the integer chunks iq[], highest last
-        z = q[jz];
-        let mut j = jz;
-        let mut i = 0;
-        while j > 0 {
+        z = products[jz];
+        let mut remaining = jz;
+        let mut filled = 0;
+        while remaining > 0 {
             let fw = f64::from((TWO_POW_MINUS_24 * z) as i32);
-            iq[i] = (z - TWO_POW_24 * fw) as i32;
-            z = q[j - 1] + fw;
-            i += 1;
-            j -= 1;
+            iq[filled] = (z - TWO_POW_24 * fw) as i32;
+            z = products[remaining - 1] + fw;
+            filled += 1;
+            remaining -= 1;
         }
 
         // the quadrant count n, z its fraction
         z = scalbn(z, q0);
         z -= EIGHT * floor(z * EIGHTH);
-        n = z as i32;
-        z -= f64::from(n);
+        quadrant = z as i32;
+        z -= f64::from(quadrant);
         ih = 0;
         if q0 > 0 {
             // iq[jz − 1] holds n's low bits
-            let i = iq[jz - 1] >> (24 - q0);
-            n += i;
-            iq[jz - 1] -= i << (24 - q0);
+            let high_bits = iq[jz - 1] >> (24 - q0);
+            quadrant += high_bits;
+            iq[jz - 1] -= high_bits << (24 - q0);
             ih = iq[jz - 1] >> (23 - q0);
         } else if q0 == 0 {
             ih = iq[jz - 1] >> 23;
@@ -168,7 +168,7 @@ pub(super) fn rem_pio2_large(x: &[f64], e0: i32, prec: usize) -> (i32, [f64; 3])
 
         if ih > 0 {
             // the fraction above 1/2: take 1 − q
-            n += 1;
+            quadrant += 1;
             let carry = complement_chunks(&mut iq[..jz], q0);
             if ih == 2 {
                 z = ONE_F64 - z;
@@ -179,20 +179,20 @@ pub(super) fn rem_pio2_large(x: &[f64], e0: i32, prec: usize) -> (i32, [f64; 3])
         }
 
         // all of the fraction's chunks 0: take more terms of 2/π and compute again
-        if z == 0.0 && iq[jk..jz].iter().fold(0, |j, &chunk| j | chunk) == 0 {
-            let mut k = 1;
-            while iq[jk - k] == 0 {
-                k += 1;
+        if z == 0.0 && iq[jk..jz].iter().fold(0, |bits, &chunk| bits | chunk) == 0 {
+            let mut more = 1;
+            while iq[jk - more] == 0 {
+                more += 1;
             }
-            for i in jz + 1..=jz + k {
-                f[jx + i] = f64::from(IPIO2[jv + i]);
+            for term_index in jz + 1..=jz + more {
+                chunks[jx + term_index] = f64::from(IPIO2[jv + term_index]);
                 let mut fw = 0.0;
-                for j in 0..=jx {
-                    fw += x[j] * f[jx + i - j];
+                for index in 0..=jx {
+                    fw += x[index] * chunks[jx + term_index - index];
                 }
-                q[i] = fw;
+                products[term_index] = fw;
             }
-            jz += k;
+            jz += more;
             continue;
         }
         break;
@@ -221,22 +221,22 @@ pub(super) fn rem_pio2_large(x: &[f64], e0: i32, prec: usize) -> (i32, [f64; 3])
 
     // the chunks back to doubles
     let mut fw = scalbn(ONE_F64, q0);
-    for i in (0..=jz).rev() {
-        q[i] = fw * f64::from(iq[i]);
+    for index in (0..=jz).rev() {
+        products[index] = fw * f64::from(iq[index]);
         fw *= TWO_POW_MINUS_24;
     }
     // fq[jz − i] = π/2 · q[i..], at most jp + 1 pieces of π/2
     for index in (0..=jz).rev() {
         let mut fw = 0.0;
-        let mut k = 0;
-        while k <= jp && k <= jz - index {
-            fw += PIO2[k] * q[index + k];
-            k += 1;
+        let mut term = 0;
+        while term <= jp && term <= jz - index {
+            fw += PIO2[term] * products[index + term];
+            term += 1;
         }
         fq[jz - index] = fw;
     }
 
-    (n & 7, remainder_pieces(&mut fq, jz, prec, ih != 0))
+    (quadrant & 7, remainder_pieces(&mut fq, jz, prec, ih != 0))
 }
 
 /// [`rem_pio2_large`]'s `1 − q` once the fraction lies above 1/2: from the lowest chunk on, each
@@ -272,38 +272,38 @@ pub(super) fn remainder_pieces(
     prec: usize,
     negative: bool,
 ) -> [f64; 3] {
-    let sign = |v: f64| if negative { -v } else { v };
+    let sign = |value: f64| if negative { -value } else { value };
     let mut y = [0.0; 3];
     match prec {
         0 => {
             let mut fw = 0.0;
-            for i in (0..=jz).rev() {
-                fw += fq[i];
+            for index in (0..=jz).rev() {
+                fw += fq[index];
             }
             y[0] = sign(fw);
         }
         1 | 2 => {
             let mut fw = 0.0;
-            for i in (0..=jz).rev() {
-                fw += fq[i];
+            for index in (0..=jz).rev() {
+                fw += fq[index];
             }
             y[0] = sign(fw);
             fw = fq[0] - fw;
-            for v in &fq[1..=jz] {
-                fw += v;
+            for piece in &fq[1..=jz] {
+                fw += piece;
             }
             y[1] = sign(fw);
         }
         _ => {
-            for i in (1..=jz).rev() {
-                let fw = fq[i - 1] + fq[i];
-                fq[i] += fq[i - 1] - fw;
-                fq[i - 1] = fw;
+            for index in (1..=jz).rev() {
+                let fw = fq[index - 1] + fq[index];
+                fq[index] += fq[index - 1] - fw;
+                fq[index - 1] = fw;
             }
-            for i in (2..=jz).rev() {
-                let fw = fq[i - 1] + fq[i];
-                fq[i] += fq[i - 1] - fw;
-                fq[i - 1] = fw;
+            for index in (2..=jz).rev() {
+                let fw = fq[index - 1] + fq[index];
+                fq[index] += fq[index - 1] - fw;
+                fq[index - 1] = fw;
             }
             let mut fw = 0.0;
             for index in (2..=jz).rev() {
@@ -336,21 +336,21 @@ pub(super) fn rem_pio2(x: f32) -> (i32, f64) {
     let hx = x.to_bits();
     let ix = hx & 0x7fff_ffff;
     if ix < 0x4dc9_0fdb {
-        let d = f64::from(x);
-        let mut fw = d * INV_PIO2 + TO_INT - TO_INT;
-        let mut n = fw as i32;
-        let mut y = d - fw * PIO2_HI_F64 - fw * PIO2_TAIL_F64;
+        let wide = f64::from(x);
+        let mut fw = wide * INV_PIO2 + TO_INT - TO_INT;
+        let mut quadrant = fw as i32;
+        let mut y = wide - fw * PIO2_HI_F64 - fw * PIO2_TAIL_F64;
         // COMISD −π/4, y then JBE; COMISD y, π/4 then JBE
         if MINUS_FRAC_PI_4_F64 > y {
             fw += MINUS_ONE_F64;
-            n -= 1;
-            y = d - fw * PIO2_HI_F64 - fw * PIO2_TAIL_F64;
+            quadrant -= 1;
+            y = wide - fw * PIO2_HI_F64 - fw * PIO2_TAIL_F64;
         } else if y > FRAC_PI_4_F64 {
             fw += ONE_F64;
-            n += 1;
-            y = d - fw * PIO2_HI_F64 - fw * PIO2_TAIL_F64;
+            quadrant += 1;
+            y = wide - fw * PIO2_HI_F64 - fw * PIO2_TAIL_F64;
         }
-        return (n, y);
+        return (quadrant, y);
     }
     if ix >= 0x7f80_0000 {
         #[allow(clippy::eq_op)]
@@ -359,10 +359,10 @@ pub(super) fn rem_pio2(x: f32) -> (i32, f64) {
     // x's 24 bits with the exponent 23, scaled by 2^e0
     let e0 = (ix >> 23) as i32 - 150;
     let chunk = f64::from(f32::from_bits(ix - ((e0 as u32) << 23)));
-    let (n, y) = rem_pio2_large(&[chunk], e0, 0);
+    let (quadrant, y) = rem_pio2_large(&[chunk], e0, 0);
     if hx >> 31 != 0 {
-        (-n, -y[0])
+        (-quadrant, -y[0])
     } else {
-        (n, y[0])
+        (quadrant, y[0])
     }
 }

@@ -10,7 +10,7 @@ use crate::map::spatial::{Spatial, WalkQuery};
 use crate::math::fmath::BVector;
 use crate::math::fmath::sqrt;
 use crate::movement::LevelFlags;
-use crate::movement::Levels;
+use crate::movement::LevelsExt;
 use crate::movement::LinkedPathKind;
 use crate::movement::MoveAlgorithm;
 use crate::movement::PathFlags;
@@ -29,7 +29,7 @@ use crate::pathing::Pathing;
 use crate::vision::SightLayer;
 use crate::world::WorldTime;
 use crate::world::index::ObjectsRef;
-use crate::world::slots::CheckedIndex;
+use crate::world::slots::CheckedIndexExt;
 use crate::{GenieError, GenieResult};
 
 /// Where and when a unit moved inside the motion step ([`Mover::moved_to`]).
@@ -262,7 +262,7 @@ impl Mover {
     ) -> GenieResult<Next> {
         let level = self.paths.walked()?;
         let created = level.created;
-        let own = world.get(me.id).map(|p| p.player);
+        let own = world.get(me.id).map(|placed| placed.player);
         let yields = self.stats.weapon_range == Distance::ZERO
             && goal.target.is_some_and(|(target, placed)| {
                 let moved = by_id
@@ -304,8 +304,8 @@ impl Mover {
         let mut waypoint_index = from.ahead(5).min(last);
         while from < waypoint_index {
             let checked = *parent.points.checked(waypoint_index.get() as usize)?;
-            let d = checked - at;
-            if d.x() * d.x() + 0.0 + d.y() * d.y() <= movement_tuning.look_ahead
+            let offset = checked - at;
+            if offset.x() * offset.x() + 0.0 + offset.y() * offset.y() <= movement_tuning.look_ahead
                 && self.straight(me, checked, target, world, by_id)?
             {
                 break;
@@ -322,17 +322,18 @@ impl Mover {
         Ok(LookAhead::MovedAhead)
     }
 
-    /// `FUN_141142750` with its last argument 1: whether the unit walks straight to `p`. The point
-    /// must lie within the map less the unit's radii (the game takes the height radius for the low
-    /// edge in y); then the walk's query (`FUN_14114cc60` with the tiles' records, flags `0x190`,
-    /// its radius times 0.5) must find nothing but the unit and its target with their annexes
-    /// ([`ObjectsRef::query_ignore`](crate::world::index::ObjectsRef::query_ignore)): no tile its
-    /// terrain mask lacks, no static record (kinds 2, 11, 13) ([`Spatial::segment_blocked`]). The
-    /// game also writes the straight path into a scratch path, which it drops.
+    /// `FUN_141142750` with its last argument 1: whether the unit walks straight to `point`. The
+    /// point must lie within the map less the unit's radii (the game takes the height radius for
+    /// the low edge in y); then the walk's query (`FUN_14114cc60` with the tiles' records, flags
+    /// `0x190`, its radius times 0.5) must find nothing but the unit and its target with their
+    /// annexes ([`ObjectsRef::query_ignore`](crate::world::index::ObjectsRef::query_ignore)): no
+    /// tile its terrain mask lacks, no static record (kinds 2, 11, 13)
+    /// ([`Spatial::segment_blocked`]). The game also writes the straight path into a scratch path,
+    /// which it drops.
     pub(super) fn straight(
         &self,
         me: &Me,
-        p: BVector,
+        point: BVector,
         target: Option<ObjectId>,
         world: &mut Spatial,
         by_id: ObjectsRef<'_>,
@@ -343,16 +344,16 @@ impl Mover {
             self.stats.radius.y(),
             self.stats.radius.z(),
         );
-        let (w, h) = (world.map.width(), world.map.height());
-        let (x, y) = (p.x(), p.y());
-        if !(rx <= x && rz <= y && x <= w as f32 - rx && y <= h as f32 - ry) {
+        let (width, height) = (world.map.width(), world.map.height());
+        let (x, y) = (point.x(), point.y());
+        if !(rx <= x && rz <= y && x <= width as f32 - rx && y <= height as f32 - ry) {
             return Ok(false);
         }
         // FUN_14114cc60 sets the manager's ignore list to them first (FUN_1410562e0), and the
         // queries after it read the list it left
         world.set_manager_ignore(&by_id.query_ignore(&[Some(me.id), target]));
         // the query starts at +0x824, where the unit last moved to
-        let (from, to) = self.query_ends(self.moved_at.vector(), p, world.map);
+        let (from, to) = self.query_ends(self.moved_at.vector(), point, world.map);
         let grow = rx * movement_tuning.straight_grow;
         world.check_known_records(Rect::new(
             from.x().min(to.x()) - grow,
@@ -376,7 +377,7 @@ impl Mover {
     pub(super) fn close_in(
         &self,
         me: &Me,
-        p: BVector,
+        point: BVector,
         target: Option<ObjectId>,
         world: &mut Spatial,
         by_id: ObjectsRef<'_>,
@@ -386,9 +387,9 @@ impl Mover {
             self.stats.radius.y(),
             self.stats.radius.z(),
         );
-        let (w, h) = (world.map.width(), world.map.height());
-        let (x, y) = (p.x(), p.y());
-        if !(rx <= x && rz <= y && x <= w as f32 - rx && y <= h as f32 - ry) {
+        let (width, height) = (world.map.width(), world.map.height());
+        let (x, y) = (point.x(), point.y());
+        if !(rx <= x && rz <= y && x <= width as f32 - rx && y <= height as f32 - ry) {
             return Ok(false);
         }
         let ignore = by_id.query_ignore(&[Some(me.id), target]);
@@ -396,7 +397,7 @@ impl Mover {
         // the tiles block
         world.set_manager_ignore(&ignore);
         // the query starts at +0x824, where the unit last moved to
-        let (from, to) = self.query_ends(self.moved_at.vector(), p, world.map);
+        let (from, to) = self.query_ends(self.moved_at.vector(), point, world.map);
         let rect = Rect::spanning(from, to);
         world.check_known_records(rect.grown(Distance::new(rx)))?;
         if world.tiles_block(from, to, Distance::new(rx), self.stats.restriction_mask) {

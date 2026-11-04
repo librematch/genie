@@ -104,13 +104,13 @@ impl World {
         at: Position,
     ) -> Position {
         let fly_mode = player_master(&self.model.masters, player_id, master)
-            .map_or(FlyMode::GROUND, |m| m.fly_mode);
+            .map_or(FlyMode::GROUND, |master| master.fly_mode);
         self.spatial
             .terrain
             .as_ref()
             .and_then(|terrain| terrain.ground(at.ground()).ok())
-            .map_or(at, |g| {
-                Position::new(at.x(), at.y(), grounded(at.z(), g, fly_mode))
+            .map_or(at, |ground| {
+                Position::new(at.x(), at.y(), grounded(at.z(), ground, fly_mode))
             })
     }
 }

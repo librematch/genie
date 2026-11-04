@@ -51,7 +51,7 @@ pub(super) fn attacks(master: &Master) -> f32 {
         .combat_part()
         .weapons
         .iter()
-        .filter(|w| DamageAmount::ZERO < w.amount)
+        .filter(|class_amount| DamageAmount::ZERO < class_amount.amount)
         .fold(0.0, |sum, class_amount| sum + class_amount.amount.as_f32())
 }
 
@@ -62,9 +62,9 @@ pub(crate) const NOT_HELD: GenieError =
 
 /// What `bestUnitToAttack` reads of the world for the unit whose AI runs: the objects it found,
 /// by what the world holds of them, and the unit's quick path to them.
-pub(crate) struct WorldPicker<'a> {
+pub(crate) struct WorldPicker<'world> {
     /// What the tests read of the unit.
-    pub(crate) attacker: &'a Attacker,
+    pub(crate) attacker: &'world Attacker,
     /// What they read of its unit AI; None outside `bestUnitToAttack`.
     pub(crate) seeker: Option<Seeker>,
     /// The unit.
@@ -72,26 +72,26 @@ pub(crate) struct WorldPicker<'a> {
     /// Its owner.
     pub(crate) player: PlayerId,
     /// The owner's other objects.
-    pub(crate) others: OthersRef<'a>,
+    pub(crate) others: OthersRef<'world>,
     /// The world's objects, whose gaits the quick path reads.
-    pub(crate) by_id: ObjectsRef<'a>,
+    pub(crate) by_id: ObjectsRef<'world>,
     /// The other players' lists.
-    pub(crate) foreign: Foreign<'a>,
+    pub(crate) foreign: Foreign<'world>,
     /// Every player's masters.
-    pub(crate) every: MasterTables<'a>,
+    pub(crate) every: MasterTables<'world>,
     /// The world's parts by id ([`crate::world::parts::Parts`]): the units' AIs (the unit's own
     /// is out of the table) and the buildings' layers.
-    pub(crate) parts: &'a Parts,
+    pub(crate) parts: &'world Parts,
     /// The unit's master's terrain restriction (`+0x606`).
     pub(crate) restriction: Option<RestrictionId>,
     /// The unit itself.
-    pub(crate) unit: &'a Unit,
+    pub(crate) unit: &'world Unit,
     /// Its action layer, out of the table with it.
-    pub(crate) actions: &'a Action,
+    pub(crate) actions: &'world Action,
     /// Its owner's attributes, diplomacy and AI settings.
-    pub(crate) attributes: &'a [Amount],
+    pub(crate) attributes: &'world [Amount],
     /// Its owner's diplomacy (`player+0x260`).
-    pub(crate) relations: &'a Relations,
+    pub(crate) relations: &'world Relations,
     /// Its owner's AI settings.
     pub(crate) ai_settings: AiSettings,
     /// The world's time.
@@ -101,7 +101,7 @@ pub(crate) struct WorldPicker<'a> {
 }
 
 /// An object the picker reads: its owner, the object, its owner's attributes and its master.
-type Held<'a> = (PlayerId, &'a Unit, &'a [Amount], &'a Master);
+type Held<'world> = (PlayerId, &'world Unit, &'world [Amount], &'world Master);
 
 impl WorldPicker<'_> {
     /// The action layer of object `id`: the unit's own (out of the table with it, as its row is
@@ -117,10 +117,10 @@ impl WorldPicker<'_> {
     /// The object `id` (another player's, the owner's others or the unit itself) with its owner,
     /// its owner's attributes and its master (its own, else its owner's).
     pub(super) fn held(&self, id: ObjectId) -> GenieResult<Option<Held<'_>>> {
-        let (q, u, attributes) = if id == self.me {
+        let (owner, unit, attributes) = if id == self.me {
             (self.player, self.unit, self.attributes)
-        } else if let Some(u) = self.others.own(id) {
-            (self.player, u, self.attributes)
+        } else if let Some(unit) = self.others.own(id) {
+            (self.player, unit, self.attributes)
         } else {
             let Some((player_id, unit)) = self.others.foreign(id) else {
                 return Ok(None);
@@ -130,8 +130,8 @@ impl WorldPicker<'_> {
             };
             (player_id, unit, &foreign.attributes[..])
         };
-        let master = u.master(self.every, q)?;
-        Ok(Some((q, u, attributes, master)))
+        let master = unit.master(self.every, owner)?;
+        Ok(Some((owner, unit, attributes, master)))
     }
 
     /// The priest's slot 0x1b8 of object `who` (a unit AI of another type answers false): may it

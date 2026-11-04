@@ -59,7 +59,7 @@ fn sequence_compares_its_length_and_elements() {
         ]
     );
     assert_eq!(found(&[1_u8, 2], &[1, 3]), [row("[1]", "2", "3")]);
-    let deque = |v: &[u8]| v.iter().copied().collect::<VecDeque<u8>>();
+    let deque = |bytes: &[u8]| bytes.iter().copied().collect::<VecDeque<u8>>();
     assert_eq!(
         found(&deque(&[1]), &deque(&[1, 2])),
         [row("len", "1", "2"), row("[1]", "absent", "2")]

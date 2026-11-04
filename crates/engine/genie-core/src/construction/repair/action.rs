@@ -24,7 +24,7 @@ use crate::objects::SpriteId;
 use crate::objects::Voice;
 use crate::objects::WorkRate;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::PlayersMasters;
+use crate::objects::masters::PlayersMastersExt;
 use crate::objects::masters::{OwnerMasters, WorkValue};
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Unit;
@@ -46,7 +46,7 @@ mod enter;
 
 /// The work of one update (`0x140adaa20` case 6): the work `rate` times the task's
 /// `work_value` times the world's `dt`; with more than one repairer (`repairers`, `COMISS` with
-/// `JBE`) it is scaled by `((n − 1) × 0.5 + 1) / n`.
+/// `JBE`) it is scaled by `((repairers − 1) × 0.5 + 1) / repairers`.
 #[must_use]
 pub fn work_amount(
     rate: WorkRate,
@@ -57,9 +57,9 @@ pub fn work_amount(
 ) -> HitPoints {
     let mut amount = rate * work_value * dt;
     if let Some(builder_count) = repairers {
-        let n = builder_count.as_f32();
-        if ONE < n {
-            amount *= ((n - ONE) * repair_tuning.extra_repairer + ONE) / n;
+        let repairers = builder_count.as_f32();
+        if ONE < repairers {
+            amount *= ((repairers - ONE) * repair_tuning.extra_repairer + ONE) / repairers;
         }
     }
     HitPoints::new(amount)
@@ -69,7 +69,7 @@ pub fn work_amount(
 /// (the world's).
 fn notify(step: &mut Step<'_>, repairer: &Unit, kind: NotifyKind) -> GenieResult<()> {
     repairer.post_own(
-        &mut step.w.parts.unit_ai,
+        &mut step.world.parts.unit_ai,
         kind,
         [AiAction::Repair.value(), 0, 0],
     )
@@ -78,14 +78,14 @@ fn notify(step: &mut Step<'_>, repairer: &Unit, kind: NotifyKind) -> GenieResult
 /// The repairer shows its master's standing sprite ([`Unit::show_standing`]).
 fn standing(step: &mut Step<'_>, repairer: &mut Unit) -> GenieResult<()> {
     repairer.show_standing(
-        step.w.parts.motion.layer_mut(repairer.id),
+        step.world.parts.motion.layer_mut(repairer.id),
         OwnerMasters::new(
-            &step.w.parts.own_master,
-            step.w.model.masters.of(step.player),
+            &step.world.parts.own_master,
+            step.world.model.masters.of(step.player),
         ),
-        &step.w.model.graphics,
-        step.w.streams.get(Stream::Sprite),
-        step.w.model.tuning.sprite,
+        &step.world.model.graphics,
+        step.world.streams.get_mut(Stream::Sprite),
+        step.world.model.tuning.sprite,
     )
 }
 
@@ -99,12 +99,12 @@ fn show(
 ) -> GenieResult<()> {
     let mut sprites = Sprites {
         sprite: &mut repairer.sprite,
-        rng: step.w.streams.get(Stream::Sprite),
-        graphics: &step.w.model.graphics,
+        rng: step.world.streams.get_mut(Stream::Sprite),
+        graphics: &step.world.model.graphics,
     };
     sprites.shown(id.or(standing))?.show(
-        step.w.parts.move_stats_mut(repairer.id),
-        step.w.model.tuning.sprite,
+        step.world.parts.move_stats_mut(repairer.id),
+        step.world.model.tuning.sprite,
     );
     Ok(())
 }
@@ -224,7 +224,7 @@ impl RepairAction {
         }
         if let Some(repairee) = reads.target
             && (repairee.state != ObjectState::Alive
-                || step.w.model.tuning.repair.least_hp > repairee.hp.get()
+                || step.world.model.tuning.repair.least_hp > repairee.hp.get()
                 || (!repairee.allied && repairee.owner != PlayerId::GAIA))
         {
             self.drop_target(step, repairer, reads)?;
@@ -268,13 +268,13 @@ impl RepairAction {
         };
         let at = repairer.place.position();
         let mover = step
-            .w
+            .world
             .parts
             .mover_mut(repairer.id)
             .ok_or(GenieError::unreachable(
                 "a repairer without movement state (an action object always has one)",
             ))?;
-        if face_target(mover, at, repairee.position, step.w.world_time)? == Aim::Faces {
+        if face_target(mover, at, repairee.position, step.world.world_time)? == Aim::Faces {
             self.set_state(step, repairer, RepairState::Work, reads, roles)?;
         }
         Ok(())
@@ -298,7 +298,7 @@ impl RepairAction {
         if below_or_unordered(0.0, self.timer.get()) {
             return Ok(());
         }
-        if Self::reaches(repairer, reads, &step.w.model.tuning.repair) {
+        if Self::reaches(repairer, reads, &step.world.model.tuning.repair) {
             self.set_state(step, repairer, RepairState::Face, reads, roles)?;
         } else {
             self.timer = Seconds::new(ONE);
@@ -349,7 +349,7 @@ impl RepairAction {
             }
             SubCode::Done | SubCode::Failed => {}
         }
-        if Self::reaches(repairer, reads, &step.w.model.tuning.repair) {
+        if Self::reaches(repairer, reads, &step.world.model.tuning.repair) {
             return self.set_state(step, repairer, RepairState::Face, reads, roles);
         }
         let next = if self.can_path(step, repairer, reads)? {
@@ -370,14 +370,14 @@ impl RepairAction {
         reads: &RepairReads,
     ) -> GenieResult<bool> {
         let by_id = ObjectsRef::new(
-            &step.w.players,
-            &step.w.index,
-            &step.w.model.masters,
-            &step.w.parts,
-            &step.w.model.roles,
-            &step.w.model.tuning,
+            &step.world.players,
+            &step.world.index,
+            &step.world.model.masters,
+            &step.world.parts,
+            &step.world.model.roles,
+            &step.world.model.tuning,
         );
-        let spatial = &mut step.w.spatial;
+        let spatial = &mut step.world.spatial;
         let terrain = spatial.terrain.as_ref().ok_or(NO_TERRAIN)?;
         let restriction_id = reads.restriction.ok_or(NO_RESTRICTION)?;
         let mask = terrain.restriction_mask(restriction_id);
@@ -387,7 +387,7 @@ impl RepairAction {
             self.target.map(RepairTargetId::id),
             mask,
             Distance::new(reads.radius.x()),
-            Distance::new(step.w.model.tuning.repair.reach),
+            Distance::new(step.world.model.tuning.repair.reach),
         )
     }
 
@@ -469,8 +469,8 @@ impl RepairAction {
         let moved =
             repairee.position.x() != self.point.x() || repairee.position.y() != self.point.y();
         if moved {
-            let gap = Self::gap(repairer, reads, repairee, &step.w.model.tuning.repair);
-            if step.w.model.tuning.repair.reach < gap.get() {
+            let gap = Self::gap(repairer, reads, repairee, &step.world.model.tuning.repair);
+            if step.world.model.tuning.repair.reach < gap.get() {
                 return self.set_state(
                     step,
                     repairer,
@@ -487,15 +487,15 @@ impl RepairAction {
             self.task.work_value,
             step.dt.seconds(),
             repairers,
-            &step.w.model.tuning.repair,
+            &step.world.model.tuning.repair,
         );
         let (answer, kind) = repair_target(step, self.target, amount, roles)?;
         match answer {
             RepairOutcome::Full => {
                 if MasterKind::COMBAT <= kind
-                    && let Some(id) = step.w.object(self.target).map(|(_, unit)| unit.id)
+                    && let Some(id) = step.world.object(self.target).map(|(_, unit)| unit.id)
                 {
-                    step.w.parts.combat_mut(id)?.armor_removed = ArmorPair::ZERO;
+                    step.world.parts.combat_mut(id)?.armor_removed = ArmorPair::ZERO;
                 }
                 self.set_state(step, repairer, RepairState::Done, reads, roles)
             }
@@ -515,9 +515,9 @@ impl RepairAction {
     /// None (an unreachable error where a table lost the part it took).
     fn count(step: &mut Step<'_>, reads: &RepairReads, by: i8) -> GenieResult<()> {
         if let Some((id, _)) = reads.counted_in
-            && step.w.object(id).is_some()
+            && step.world.object(id).is_some()
         {
-            let builder_count = step.w.parts.repairers_mut(id)?;
+            let builder_count = step.world.parts.repairers_mut(id)?;
             *builder_count = builder_count.changed_by(by);
         }
         Ok(())
@@ -566,7 +566,7 @@ impl RepairAction {
             self.counted = false;
         }
         if self.state.take_move_to().is_some()
-            && let Some(mover) = step.w.parts.mover_mut(repairer.id)
+            && let Some(mover) = step.world.parts.mover_mut(repairer.id)
         {
             mover.stop()?;
         }
@@ -590,9 +590,9 @@ impl RepairAction {
     ) -> GenieResult<()> {
         let walk = self.walk(move_reads, Some(to), move_to_tuning)?;
         if self.state.take_move_to().is_some()
-            && let Some(m) = mover
+            && let Some(mover) = mover
         {
-            m.stop()?;
+            mover.stop()?;
         }
         self.point = to.at;
         self.state = RepairState::Move { move_to: walk };
@@ -620,9 +620,9 @@ impl RepairAction {
         let counted = replace(&mut self.counted, false);
         let old = self.target.take();
         if self.state.take_move_to().is_some()
-            && let Some(m) = mover
+            && let Some(mover) = mover
         {
-            m.stop()?;
+            mover.stop()?;
         }
         self.state = RepairState::WalkPoint { move_to: walk };
         Ok((old.map(RepairTargetId::id), counted))
@@ -638,9 +638,9 @@ impl RepairAction {
     pub fn halt(&mut self, mover: Option<&mut Mover>) -> GenieResult<RepairerCount> {
         let counted = replace(&mut self.counted, false);
         if self.state.take_move_to().is_some()
-            && let Some(m) = mover
+            && let Some(mover) = mover
         {
-            m.stop()?;
+            mover.stop()?;
         }
         self.state = RepairState::Halted;
         Ok(if counted {

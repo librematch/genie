@@ -250,26 +250,30 @@ fn second_saved_action_is_refused() {
 
 #[test]
 fn move_to_takes_its_state_point_range_and_wait() {
-    let m = imported(MOVE_TO, move_to(4, 0.5))
+    let imported_move = imported(MOVE_TO, move_to(4, 0.5))
         .unwrap()
         .list
         .move_to()
         .copied()
         .unwrap();
-    assert_eq!(m.state, MoveTo::Moving);
+    assert_eq!(imported_move.state, MoveTo::Moving);
     assert_eq!(
-        (m.target, bits3(m.point)),
+        (imported_move.target, bits3(imported_move.point)),
         (None, bits3(Position::new(1.0, 2.0, 0.0)))
     );
     assert_eq!(
-        (m.target, m.range.get().to_bits(), m.sprite),
+        (
+            imported_move.target,
+            imported_move.range.get().to_bits(),
+            imported_move.sprite
+        ),
         (None, 0.5_f32.to_bits(), None)
     );
     assert_eq!(
         (
-            m.wait.state,
-            m.wait.timer.get().to_bits(),
-            m.wait.delay.get().to_bits()
+            imported_move.wait.state,
+            imported_move.wait.timer.get().to_bits(),
+            imported_move.wait.delay.get().to_bits()
         ),
         (
             MoveWaitState::AskedAgain,
@@ -307,11 +311,12 @@ fn move_to_takes_its_state_point_range_and_wait() {
 /// makes, is refused; one to a point may be loud (the Fly's, the Artifact's walk to a point).
 #[test]
 fn saved_move_to_takes_its_voice_from_the_save() {
-    let voice = |a: &Action| saved_move_to(a, None).map(|move_to_action| move_to_action.voice);
+    let voice =
+        |action: &Action| saved_move_to(action, None).map(|move_to_action| move_to_action.voice);
     assert_eq!(voice(&move_to(4, 0.5)), Ok(Voice::Loud));
     assert_eq!(voice(&quiet(move_to(4, 0.5))), Ok(Voice::Quiet));
-    let to_object = |a: Action| {
-        let mut action = a;
+    let to_object = |saved: Action| {
+        let mut action = saved;
         if let Some(rge_action_move_to) = action
             .rge_action_by_kind
             .as_mut()
@@ -376,7 +381,7 @@ fn move_to_takes_its_sprite_from_the_sprites_table() {
             .short_val_2 = sprite;
         let object = acting(MOVE_TO, action.clone());
         import_drawn(&object, &PlayerObjects::default(), graphics)
-            .map(|a| a.list.move_to().copied().unwrap().sprite)
+            .map(|action| action.list.move_to().copied().unwrap().sprite)
     };
     assert_eq!(shown(5, Some(&graphics)), Ok(Some(walking)));
     assert_eq!(shown(-1, None), Ok(None));
@@ -407,21 +412,26 @@ fn artifact(rge_action: RgeAction) -> Action {
 /// to 6.
 #[test]
 fn an_artifact_waits_or_walks_to_its_target() {
-    let a = imported(ARTIFACT_KIND, artifact(base(ArtifactState::Wait.get())))
+    let imported_artifact = imported(ARTIFACT_KIND, artifact(base(ArtifactState::Wait.get())))
         .unwrap()
         .list
         .artifact()
         .copied()
         .unwrap();
     assert_eq!(
-        (a.state, a.target, a.move_to().copied(), a.goal),
+        (
+            imported_artifact.state,
+            imported_artifact.target,
+            imported_artifact.move_to().copied(),
+            imported_artifact.goal
+        ),
         (ArtifactState::Wait, None, None, None)
     );
-    assert!(a.gaia);
+    assert!(imported_artifact.gaia);
     let mut rge_action = base(ArtifactState::Check.get());
     rge_action.target_id = 9;
     rge_action.target_x = 4.0;
-    let a = imported(
+    let imported_artifact = imported(
         ARTIFACT_KIND,
         artifact(with_sub(
             rge_action.clone(),
@@ -434,9 +444,12 @@ fn an_artifact_waits_or_walks_to_its_target() {
     .artifact()
     .copied()
     .unwrap();
-    let walk = a.move_to().copied().unwrap();
+    let walk = imported_artifact.move_to().copied().unwrap();
     assert_eq!((walk.state, walk.voice), (MoveTo::Moving, Voice::Quiet));
-    assert_eq!(a.goal.map(bits3), Some(bits3(Position::new(4.0, 2.0, 0.0))));
+    assert_eq!(
+        imported_artifact.goal.map(bits3),
+        Some(bits3(Position::new(4.0, 2.0, 0.0)))
+    );
     assert!(
         matches!(walk.walks_to(), Goal::Point(position) if bits3(position) == bits3(Position::new(1.0, 2.0, 0.0)))
     );
@@ -451,7 +464,7 @@ fn an_artifact_waits_or_walks_to_its_target() {
         .unwrap()
         .rge_action
         .target_id = 9;
-    let a = imported(
+    let imported_artifact = imported(
         ARTIFACT_KIND,
         artifact(with_sub(rge_action.clone(), MOVE_TO, to_object)),
     )
@@ -461,19 +474,25 @@ fn an_artifact_waits_or_walks_to_its_target() {
     .copied()
     .unwrap();
     assert_eq!(
-        a.move_to().copied().map(|m| m.walks_to()),
+        imported_artifact
+            .move_to()
+            .copied()
+            .map(|move_to_action| move_to_action.walks_to()),
         Some(Goal::Target(object_id(9)))
     );
     // the target's place is its goal however near the origin; an unset place (-1) is none
     let mut near = base(ArtifactState::Check.get());
     near.target_id = 9;
-    let a = imported(ARTIFACT_KIND, artifact(near.clone()))
+    let imported_artifact = imported(ARTIFACT_KIND, artifact(near.clone()))
         .unwrap()
         .list
         .artifact()
         .copied()
         .unwrap();
-    assert_eq!(a.goal.map(bits3), Some(bits3(Position::new(1.0, 2.0, 0.0))));
+    assert_eq!(
+        imported_artifact.goal.map(bits3),
+        Some(bits3(Position::new(1.0, 2.0, 0.0)))
+    );
     near.target_x = -1.0;
     let near_artifact = imported(ARTIFACT_KIND, artifact(near))
         .unwrap()
@@ -483,7 +502,7 @@ fn an_artifact_waits_or_walks_to_its_target() {
         .unwrap();
     assert_eq!(near_artifact.goal, None);
     // without a target the goal is the MoveTo's point, the action's own
-    let a = imported(
+    let imported_artifact = imported(
         ARTIFACT_KIND,
         artifact(with_sub(
             base(ArtifactState::Check.get()),
@@ -496,10 +515,14 @@ fn an_artifact_waits_or_walks_to_its_target() {
     .artifact()
     .copied()
     .unwrap();
-    assert_eq!(a.goal.map(bits3), Some(bits3(Position::new(1.0, 2.0, 0.0))));
+    assert_eq!(
+        imported_artifact.goal.map(bits3),
+        Some(bits3(Position::new(1.0, 2.0, 0.0)))
+    );
     // a move to the point: its MoveTo is not quiet, its AI hears the end
     assert_eq!(
-        a.move_to()
+        imported_artifact
+            .move_to()
             .copied()
             .map(|move_to_action| move_to_action.voice),
         Some(Voice::Loud)
@@ -566,16 +589,16 @@ fn missile_of(distance: f32, charge: u8) -> genie_save::Object {
 fn missile_flies_with_its_actions_course() {
     assert!(import(&missile(), &PlayerObjects::default()).is_ok());
     let tuning = missile_tuning();
-    let m = saved_missile(&missile(), &tuning).unwrap();
+    let loaded = saved_missile(&missile(), &tuning).unwrap();
     assert_eq!(
-        (m.fired_from, m.max_range.get().to_bits()),
+        (loaded.fired_from, loaded.max_range.get().to_bits()),
         (Some(ShooterId::new(object_id(900))), 7.0_f32.to_bits())
     );
-    assert!(m.flying && !m.charge);
+    assert!(loaded.flying && !loaded.charge);
     // a charge projectile; one at the landing distance has landed
     let landing = tuning.landing;
-    let m = saved_missile(&missile_of(landing, 1), &tuning).unwrap();
-    assert!(m.charge && !m.flying);
+    let saved_missile = saved_missile(&missile_of(landing, 1), &tuning).unwrap();
+    assert!(saved_missile.charge && !saved_missile.flying);
     let action = import(&missile(), &PlayerObjects::default())
         .unwrap()
         .list
@@ -606,10 +629,10 @@ fn missile_flies_with_its_actions_course() {
 #[test]
 fn farms_make_takes_its_timers_and_task() {
     use crate::gathering::make::{MAKE, MakeState};
-    let make = |b: RgeAction| {
+    let make = |rge_action: RgeAction| {
         by_kind(|rge_action_by_kind| {
             rge_action_by_kind.rge_action_make = Some(Box::new(RgeActionMake {
-                rge_action: b,
+                rge_action,
                 work_timer: 9.0,
             }));
         })
@@ -655,18 +678,18 @@ fn birds_fly_takes_its_home_and_move_to() {
             rge_action_by_kind.rge_action_bird = Some(Box::new(rge_action));
         })
     };
-    let f = imported(FLY, bird(base(3)))
+    let fly = imported(FLY, bird(base(3)))
         .unwrap()
         .list
         .fly()
         .copied()
         .unwrap();
     assert_eq!(
-        (f.state, f.task.id),
+        (fly.state, fly.task.id),
         (FlyState::Choosing, TaskId::of_task(8))
     );
     assert_eq!(
-        f.home.get().map(f32::to_bits),
+        fly.home.get().map(f32::to_bits),
         [1.0_f32, 2.0].map(f32::to_bits)
     );
     let fly = imported(FLY, bird(with_sub(base(4), MOVE_TO, move_to(4, 0.5))))
@@ -818,7 +841,7 @@ fn repair_takes_its_task_and_counts_its_builder() {
     let mut rge_action = base(4);
     rge_action.short_val = 2;
     rge_action.sub_action_value = 1;
-    let r = imported(
+    let repair_action = imported(
         REPAIR,
         repair(with_sub(
             rge_action.clone(),
@@ -831,12 +854,17 @@ fn repair_takes_its_task_and_counts_its_builder() {
     .repair()
     .copied()
     .unwrap();
-    let walk = r.state.move_to().copied().unwrap();
+    let walk = repair_action.state.move_to().copied().unwrap();
     assert_eq!(
-        (r.task.id, walk.state, walk.voice, r.range.get().to_bits()),
+        (
+            repair_action.task.id,
+            walk.state,
+            walk.voice,
+            repair_action.range.get().to_bits()
+        ),
         (TaskId::of_task(2), MoveTo::Moving, Voice::Quiet, 0)
     );
-    assert!(r.counted && r.voice == Voice::Quiet);
+    assert!(repair_action.counted && repair_action.voice == Voice::Quiet);
     // a MoveTo without a target walks to its point, within its own range
     assert!(
         matches!(walk.walks_to(), Goal::Point(position) if bits3(position) == bits3(Position::new(1.0, 2.0, 0.0)))
@@ -883,14 +911,18 @@ fn hunt(rge_action: RgeAction) -> Action {
 #[test]
 fn hunt_takes_its_task_lead_and_move_to() {
     use crate::gathering::hunt::{HUNT, HuntState};
-    let h = imported(HUNT, hunt(base(HuntState::Idle.get())))
+    let hunt_action = imported(HUNT, hunt(base(HuntState::Idle.get())))
         .unwrap()
         .list
         .hunt()
         .copied()
         .unwrap();
     assert_eq!(
-        (h.target_class, h.drop_site, h.task.id),
+        (
+            hunt_action.target_class,
+            hunt_action.drop_site,
+            hunt_action.task.id
+        ),
         (
             Some(ClassId::named(4)),
             Some(DropSiteId::new(object_id(40))),
@@ -898,10 +930,12 @@ fn hunt_takes_its_task_lead_and_move_to() {
         )
     );
     assert!(
-        h.lead.moved && h.state.attack().copied().is_none() && h.state.move_to().copied().is_none()
+        hunt_action.lead.moved
+            && hunt_action.state.attack().copied().is_none()
+            && hunt_action.state.move_to().copied().is_none()
     );
     assert_eq!(
-        h.lead.start.get().map(f32::to_bits),
+        hunt_action.lead.start.get().map(f32::to_bits),
         [6.0_f32, 7.0].map(f32::to_bits)
     );
     let hunt_action = imported(
@@ -999,22 +1033,26 @@ fn gather(rge_action: RgeAction) -> Action {
 #[test]
 fn gather_takes_its_stops_and_move_to() {
     use crate::gathering::gather::{GATHER, GatherState};
-    let g = imported(GATHER, gather(base(GatherState::Work.get())))
+    let gather_action = imported(GATHER, gather(base(GatherState::Work.get())))
         .unwrap()
         .list
         .gather()
         .copied()
         .unwrap();
     assert_eq!(
-        (g.target_class, g.stops, g.task.id),
+        (
+            gather_action.target_class,
+            gather_action.stops,
+            gather_action.task.id
+        ),
         (
             Some(ClassId::try_from(5).unwrap()),
             FarmStops::of_data(2),
             TaskId::of_task(0)
         )
     );
-    assert!(g.worked && g.state.move_to().copied().is_none());
-    assert_eq!(g.farm.x().to_bits(), 3.0_f32.to_bits());
+    assert!(gather_action.worked && gather_action.state.move_to().copied().is_none());
+    assert_eq!(gather_action.farm.x().to_bits(), 3.0_f32.to_bits());
     let gather_action = imported(
         GATHER,
         gather(with_sub(
@@ -1212,13 +1250,13 @@ fn transport_takes_its_base_alone() {
 #[test]
 fn an_explore_takes_its_quiet_move_to_with_its_wait() {
     use crate::movement::explore::{EXPLORE, ExploreState};
-    let e = imported(EXPLORE, explore(base(ExploreState::Wait.get())))
+    let explore_action = imported(EXPLORE, explore(base(ExploreState::Wait.get())))
         .unwrap()
         .list
         .explore()
         .copied()
         .unwrap();
-    assert_eq!(e.state, ExploreState::Wait);
+    assert_eq!(explore_action.state, ExploreState::Wait);
     let explore_action = imported(
         EXPLORE,
         explore(with_sub(
@@ -1291,9 +1329,9 @@ fn an_attack_needs_the_sprites_table() {
 #[test]
 fn wait_solidify_waits_for_its_foundation() {
     use crate::construction::wait_solidify::{WAIT_SOLIDIFY, WaitSolidifyState};
-    let wait = |b: RgeAction| Action {
+    let wait = |rge_action: RgeAction| Action {
         tribe_action_wait_solidify: Some(Box::new(TribeActionWaitSolidify {
-            rge_action: b,
+            rge_action,
             target_building_id: 40,
         })),
         ..Action::default()
@@ -1380,7 +1418,7 @@ fn hunts_swing_past_its_hit_rests_the_reload_less_the_swing() {
     };
     let sprites = swing_sprites();
     let swing = |state: AttackState, pending: bool, objects: &PlayerObjects| {
-        let a = import_drawn(
+        let import_drawn = import_drawn(
             &acting(
                 HUNT,
                 hunt(with_sub(
@@ -1401,7 +1439,10 @@ fn hunts_swing_past_its_hit_rests_the_reload_less_the_swing() {
         .attack()
         .copied()
         .unwrap();
-        (a.swing.get().to_bits(), a.rest.get().to_bits())
+        (
+            import_drawn.swing.get().to_bits(),
+            import_drawn.rest.get().to_bits(),
+        )
     };
     let rest = 2.5_f32 - 10.0 * 0.1_f32;
     assert_eq!(

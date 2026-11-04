@@ -13,7 +13,7 @@ use crate::pathing::tile_path::{
     Cell, CellEdges, CellIndex, CellKind, Cells, GridLevel, NO_COST, NodeIndex, Nodes, OpenList,
     PlanRect, PlanTile,
 };
-use crate::world::slots::CheckedIndex;
+use crate::world::slots::CheckedIndexExt;
 
 /// A terrain restriction's planner (`0x4a8` bytes, built by `FUN_140f74f90`).
 #[derive(Clone, Debug, PartialEq)]
@@ -71,15 +71,16 @@ impl Planner {
         passable: Restriction,
         tiles: &Tiles,
     ) -> Self {
-        let (w, h) = (size.width() as i16, size.height() as i16);
-        let w0 = (w.wrapping_add(7)) & !7;
-        let h0 = (h.wrapping_add(7)) & !7;
-        let levels = [0, 1, 2, 3].map(|l| GridSize::new(i32::from(w0 >> l), i32::from(h0 >> l)));
-        let area = |l: usize| levels[l].width() * levels[l].height();
+        let (width, height) = (size.width() as i16, size.height() as i16);
+        let w0 = (width.wrapping_add(7)) & !7;
+        let h0 = (height.wrapping_add(7)) & !7;
+        let levels =
+            [0, 1, 2, 3].map(|level| GridSize::new(i32::from(w0 >> level), i32::from(h0 >> level)));
+        let area = |level: usize| levels[level].width() * levels[level].height();
         let offsets = [0, area(0), area(0) + area(1), area(0) + area(1) + area(2)];
         let total = (offsets[3] + area(3)).max(0) as usize;
         let mut planner = Self {
-            size: GridSize::new(i32::from(w), i32::from(h)),
+            size: GridSize::new(i32::from(width), i32::from(height)),
             levels,
             offsets,
             cells: Cells::cleared(total),
@@ -100,7 +101,7 @@ impl Planner {
                 planner.init_cell(GridLevel::TOP, PlanTile::new(x, y));
             }
         }
-        planner.update(PlanRect::new(0, 0, w, h), tiles);
+        planner.update(PlanRect::new(0, 0, width, height), tiles);
         planner
     }
 
@@ -120,8 +121,8 @@ impl Planner {
     pub fn level(&self, level: GridLevel) -> &[Cell] {
         let start = CellIndex::new(self.offsets[level.index()] as usize);
         let size = self.levels[level.index()];
-        let n = (size.width() * size.height()) as usize;
-        self.cells.run(start, n)
+        let count = (size.width() * size.height()) as usize;
+        self.cells.run(start, count)
     }
 
     /// Whether the tile level's cell of `tile` has no edges, so no tile path leaves it (the
@@ -144,11 +145,11 @@ impl Planner {
 
     /// The cell `at` of `level`'s place in the cells.
     pub(super) fn index(&self, level: GridLevel, at: PlanTile) -> CellIndex {
-        let l = level.index();
-        let i = i64::from(self.levels[l].width()) * i64::from(at.y())
+        let index = level.index();
+        let offset = i64::from(self.levels[index].width()) * i64::from(at.y())
             + i64::from(at.x())
-            + i64::from(self.offsets[l]);
-        CellIndex::new(usize::try_from(i).expect("a cell outside the planner's grid"))
+            + i64::from(self.offsets[index]);
+        CellIndex::new(usize::try_from(offset).expect("a cell outside the planner's grid"))
     }
 
     pub(super) fn cell(&self, level: GridLevel, at: PlanTile) -> Cell {
@@ -183,10 +184,10 @@ impl Planner {
     /// `FUN_140f799b0` (through the passability lambda, `0x140f7b110`): 1 when the tile is
     /// blocked, else a bit per passable neighbour (2 left, 4 right, 8 above, 0x10 below).
     pub(super) fn adjacency(&self, tile: Tile, tiles: &Tiles) -> u32 {
-        let (w, h) = (self.size.width(), self.size.height());
-        let passes = |t: Tile| {
-            let kind = self.terrain[(t.y() * w + t.x()) as usize];
-            self.passable.passes(kind) && !tiles.blocked(t)
+        let (width, height) = (self.size.width(), self.size.height());
+        let passes = |tile: Tile| {
+            let kind = self.terrain[(tile.y() * width + tile.x()) as usize];
+            self.passable.passes(kind) && !tiles.blocked(tile)
         };
         if !passes(tile) {
             return 1;
@@ -197,13 +198,13 @@ impl Planner {
         if 0 < x && passes(left) {
             bits = 2;
         }
-        if x < w - 1 && passes(right) {
+        if x < width - 1 && passes(right) {
             bits |= 4;
         }
         if 0 < y && passes(up) {
             bits |= 8;
         }
-        if y < h - 1 && passes(down) {
+        if y < height - 1 && passes(down) {
             bits |= 0x10;
         }
         bits
@@ -231,17 +232,17 @@ impl Planner {
     /// `FUN_140f7e5e0`: a cell's edges and kind from its tile (level 0) or its children; returns
     /// the cell.
     pub(super) fn rebuild(&mut self, level: GridLevel, at: PlanTile, tiles: &Tiles) -> Cell {
-        let i = self.index(level, at);
-        let old = self.cells[i].kind;
+        let cell_at = self.index(level, at);
+        let old = self.cells[cell_at].kind;
         let mut low = old.off_map();
         if level == GridLevel::TILES {
-            self.cells[i].kind = low;
+            self.cells[cell_at].kind = low;
             if old.contains(CellKind::LONE) {
-                self.cells[i].kind = low.plus(CellKind::LONE);
+                self.cells[cell_at].kind = low.plus(CellKind::LONE);
             }
             if self.region.holds_at(GridLevel::TILES, at) {
                 let adjacency = self.adjacency(at.tile(), tiles);
-                self.cells[i].edges = CellEdges::NONE;
+                self.cells[cell_at].edges = CellEdges::NONE;
                 if adjacency & 1 == 0 {
                     let mut cell_edges = CellEdges::NONE;
                     if adjacency & 2 != 0 {
@@ -256,26 +257,30 @@ impl Planner {
                     if adjacency & 0x10 != 0 {
                         cell_edges |= CellEdges::S;
                     }
-                    self.cells[i].edges = cell_edges;
+                    self.cells[cell_at].edges = cell_edges;
                     if cell_edges.is_empty() {
-                        self.cells[i].kind |= CellKind::LONE | CellKind::NODE;
+                        self.cells[cell_at].kind |= CellKind::LONE | CellKind::NODE;
                     } else {
-                        self.cells[i].kind &= !CellKind::LONE;
+                        self.cells[cell_at].kind &= !CellKind::LONE;
                     }
                 }
             }
-            return self.cells[i];
+            return self.cells[cell_at];
         }
         let grid_level = level.down();
         let children = at.children();
         let mut child = [Cell::EMPTY; 4];
-        for (k, &plan_tile) in children.iter().enumerate() {
-            if low.is_empty() || !self.cells[i].kind.intersects(CellKind::child_off_map(k)) {
-                child[k] = self.rebuild(grid_level, plan_tile, tiles);
+        for (index, &plan_tile) in children.iter().enumerate() {
+            if low.is_empty()
+                || !self.cells[cell_at]
+                    .kind
+                    .intersects(CellKind::child_off_map(index))
+            {
+                child[index] = self.rebuild(grid_level, plan_tile, tiles);
             }
         }
-        let [d0, d1, d2, d3] = child.map(|c| c.edges);
-        low = self.cells[i].kind.off_map();
+        let [d0, d1, d2, d3] = child.map(|cell| cell.edges);
+        low = self.cells[cell_at].kind.off_map();
         // the game adds the four disjoint edges
         let dirs = ((d3 | d2) & CellEdges::S)
             .plus((d3 | d1) & CellEdges::E)
@@ -283,7 +288,7 @@ impl Planner {
             .plus((d1 | d0) & CellEdges::N);
         let complex = child
             .iter()
-            .any(|c| c.kind.intersects(CellKind::MIXED | CellKind::LONE))
+            .any(|cell| cell.kind.intersects(CellKind::MIXED | CellKind::LONE))
             || self.splits(child.map(|cell| cell.edges), dirs);
         if complex {
             low = low.plus(CellKind::MIXED);
@@ -299,16 +304,16 @@ impl Planner {
         } else if level == GridLevel::TOP {
             low = low.plus(CellKind::NODE);
         }
-        self.cells[i] = Cell {
+        self.cells[cell_at] = Cell {
             edges: dirs,
             kind: low,
         };
-        self.cells[i]
+        self.cells[cell_at]
     }
 
-    /// Whether four children with edges `d` fall apart as one cell (`FUN_140f7e5e0`'s labels):
-    /// three links among the ring of children, no edge out but a passable child, or children with
-    /// edges that join none of the others.
+    /// Whether four children with edges `d0` to `d3` fall apart as one cell (`FUN_140f7e5e0`'s
+    /// labels): three links among the ring of children, no edge out but a passable child, or
+    /// children with edges that join none of the others.
     pub(super) fn splits(&self, [d0, d1, d2, d3]: [CellEdges; 4], dirs: CellEdges) -> bool {
         let link01 = d0.contains(CellEdges::E);
         let mut b4: u8 = if d1.is_empty() { 0 } else { 2 };
@@ -344,10 +349,10 @@ impl Planner {
             return true;
         }
         let mut seen = 0;
-        for b in labels {
-            if b != 0 {
-                if seen == 0 || seen == b {
-                    seen = b;
+        for label in labels {
+            if label != 0 {
+                if seen == 0 || seen == label {
+                    seen = label;
                 } else {
                     return true;
                 }

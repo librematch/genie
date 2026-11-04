@@ -22,7 +22,7 @@ use crate::objects::ListIndex;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::PlayersMasters;
+use crate::objects::masters::PlayersMastersExt;
 use crate::objects::masters::player_master;
 use crate::players::Amount;
 use crate::players::PlayerId;
@@ -37,7 +37,7 @@ use crate::world::AutoQueues;
 use crate::world::World;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 
 /// A queue takes a purchase only below this count (`0x28`).
 pub const QUEUE_LIMIT: QueueCount = QueueCount::of_data(40);
@@ -199,8 +199,8 @@ impl World {
         }
         // the game reads the master without a test: a queue of a master the player lacks
         // cannot have been paid for
-        if let Some(m) = player_master(&self.model.masters, player_id, master) {
-            refund_master(m, queue_count, player)?;
+        if let Some(master) = player_master(&self.model.masters, player_id, master) {
+            refund_master(master, queue_count, player)?;
         }
         Ok(Refund::Refunded)
     }
@@ -215,16 +215,16 @@ impl World {
         let Some(ms) = self.model.masters.of(player_id) else {
             return Ok(false);
         };
-        let Some(m) = ms.get(master) else {
+        let Some(master) = ms.get(master) else {
             return Ok(false);
         };
-        let Some(based) = m
+        let Some(based) = master
             .base_id
             .and_then(|based_master_id| ms.get(based_master_id))
         else {
             return Ok(false);
         };
-        let mut base = m.base_id;
+        let mut base = master.base_id;
         if based.kind == MasterKind::BUILDING
             && let Some(head) = based
                 .building
@@ -236,7 +236,7 @@ impl World {
             };
             base = head_master.base_id;
         }
-        let Some(b) = base.and_then(|master_id| ms.get(master_id)) else {
+        let Some(master) = base.and_then(|master_id| ms.get(master_id)) else {
             return Ok(false);
         };
         // The farm class (49), whose masters the reseed takes (`FUN_141658b40`'s `-0xe7b`).
@@ -259,7 +259,7 @@ impl World {
                 return Ok(true);
             }
         }
-        Ok(b.available.is_available())
+        Ok(master.available.is_available())
     }
 
     /// `FUN_141658b40`: the farm a reseeding villager of player `player_id` makes: the farm (0x32)
@@ -329,16 +329,16 @@ impl World {
         {
             own.push(target.id());
             let is_building = match self.object(target) {
-                Some((player_id, t)) => {
-                    t.master(self.master_tables(), player_id)?.kind == MasterKind::BUILDING
+                Some((player_id, unit)) => {
+                    unit.master(self.master_tables(), player_id)?.kind == MasterKind::BUILDING
                 }
                 None => false,
             };
             if is_building {
-                let mut k = 0;
-                while let Some(&object_id) = own.get(k) {
+                let mut index = 0;
+                while let Some(&object_id) = own.get(index) {
                     own.extend(self.objects().annexes(object_id).ids());
-                    k += 1;
+                    index += 1;
                 }
             }
         }
@@ -495,7 +495,7 @@ impl World {
             Stand {
                 graphic: stand,
                 sprite: &mut unit.sprite,
-                rng: self.streams.get(Stream::Sprite),
+                rng: self.streams.get_mut(Stream::Sprite),
                 sprite_tuning: &self.model.tuning.sprite,
             },
         )?;
@@ -566,7 +566,7 @@ mod tests {
             attributes: attributes(300, [0.0, wood, 0.0, 0.0]),
             ..Player::default()
         };
-        let mut t = World::new(
+        let mut world = World::new(
             WorldTime::ZERO,
             FrameSeed::of_data(1),
             PlayerId::new(0),
@@ -581,8 +581,8 @@ mod tests {
             ),
             master(FISH_TRAP, &[(attribute::WOOD, 100, true)]),
         ]);
-        t.model.masters = vec![Arc::new(Masters::new([])), Arc::new(masters)];
-        t
+        world.model.masters = vec![Arc::new(Masters::new([])), Arc::new(masters)];
+        world
     }
 
     /// A purchase pays for the most of `count` the player can, then queues them.

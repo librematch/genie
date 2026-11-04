@@ -33,9 +33,16 @@ use genie_save::generated::world::{Path, PathData, PlayerObjects, RgeStaticObjec
 
 /// A saved vector's three `f32`s, as the save holds them (little-endian).
 #[must_use]
-pub fn vec3(b: &[u8; 12]) -> BVector {
-    let f = |i: usize| f32::from_le_bytes([b[i], b[i + 1], b[i + 2], b[i + 3]]);
-    BVector::new(f(0), f(4), f(8))
+pub fn vec3(bytes: &[u8; 12]) -> BVector {
+    let float_at = |offset: usize| {
+        f32::from_le_bytes([
+            bytes[offset],
+            bytes[offset + 1],
+            bytes[offset + 2],
+            bytes[offset + 3],
+        ])
+    };
+    BVector::new(float_at(0), float_at(4), float_at(8))
 }
 
 /// One saved level of path data, with its path's waypoints from the world's path table.
@@ -43,14 +50,9 @@ pub fn path_level(path_data: &PathData, paths: &[Path]) -> GenieResult<MovementP
     // a level without a path (id -1) holds none: a bird's top level
     let path = match path_data.path_id {
         -1 => None,
-        id => Some(
-            paths
-                .iter()
-                .find(|p| p.id_value == id)
-                .ok_or(GenieError::unsupported(
-                    "path data whose path is not in the world's table",
-                ))?,
-        ),
+        id => Some(paths.iter().find(|path| path.id_value == id).ok_or(
+            GenieError::unsupported("path data whose path is not in the world's table"),
+        )?),
     };
     Ok(MovementPathData {
         level: WaypointLevel::of_byte(path_data.waypoint_level),
@@ -59,25 +61,25 @@ pub fn path_level(path_data: &PathData, paths: &[Path]) -> GenieResult<MovementP
             vec3_path.waypoints.iter().map(vec3).collect()
         }),
         has_path: path.is_some(),
-        path_flags: PathFlags::from_bits_retain(path.map_or(0, |p| p.flags_bits)),
+        path_flags: PathFlags::from_bits_retain(path.map_or(0, |path| path.flags_bits)),
         waypoint: WaypointIndex::of_data(path_data.waypoint),
         state: PathState::of_int(path_data.state)?,
         range: Distance::new(path_data.range),
         target: ObjectId::of_field(path_data.target_id),
         pause_time: Seconds::new(f32::from_bits(path_data.pause_time)),
         flags: LevelFlags::from_bits_retain(path_data.flags_bits),
-        length: path.map_or(Distance::ZERO, |p| Distance::new(p.path_length_value)),
-        created: path.map_or(WorldTime::ZERO, |p| {
-            WorldTime::from_millis(p.creation_time_value)
+        length: path.map_or(Distance::ZERO, |path| Distance::new(path.path_length_value)),
+        created: path.map_or(WorldTime::ZERO, |path| {
+            WorldTime::from_millis(path.creation_time_value)
         }),
         continue_counter: PlanTries::of_data(path_data.continue_counter),
         repath_time: Seconds::new(path_data.repath_time),
         ignore: path.map_or_else(
             || Ok(Vec::new()),
-            |p| {
-                p.data
+            |path| {
+                path.data
                     .iter()
-                    .take(p.number_ignore_units.max(0) as usize)
+                    .take(path.number_ignore_units.max(0) as usize)
                     .map(|&id| ObjectId::try_from(id as i32))
                     .collect()
             },
@@ -128,9 +130,9 @@ pub fn mover(
                 }),
             own.object_flags,
             // an own master copy (a captured animal's) shows its master's sprites
-            masters.and_then(|t| {
+            masters.and_then(|master_table| {
                 let master = objects.master(rge_static_object.master_obj)?;
-                master_facets(master, master.static_part()?, t)
+                master_facets(master, master.static_part()?, master_table)
             }),
         ),
         (Some(_), None) => {
@@ -183,7 +185,7 @@ pub fn mover(
     };
     let speed = factor.applied_to(Speed::new(base));
     let turning = dat_id(objects, rge_static_object.master_obj)
-        .and_then(|m| table.turning(civ, m))
+        .and_then(|master_id| table.turning(civ, master_id))
         .ok_or(GenieError::unsupported(
             "a moving master the data file does not have",
         ))?;
@@ -256,16 +258,16 @@ pub fn mover(
         last_move: WorldTime::from_millis(rge_moving_object.last_move_time_value),
         // the save's x, height, y
         moved_at: {
-            let f = |i: usize| {
+            let float_at = |index: usize| {
                 let position_value = &rge_moving_object.position_value;
                 f32::from_le_bytes([
-                    position_value[i],
-                    position_value[i + 1],
-                    position_value[i + 2],
-                    position_value[i + 3],
+                    position_value[index],
+                    position_value[index + 1],
+                    position_value[index + 2],
+                    position_value[index + 3],
                 ])
             };
-            Position::new(f(0), f(8), f(4))
+            Position::new(float_at(0), float_at(8), float_at(4))
         },
         substitute_count: SubstituteCount::of_data(rge_moving_object.consecutive_substitute_count),
         ignore_units,

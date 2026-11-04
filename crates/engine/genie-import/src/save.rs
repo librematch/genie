@@ -188,21 +188,21 @@ pub fn task_at(
     master: i16,
     index: i16,
 ) -> GenieResult<Task> {
-    let i = usize::try_from(index)
+    let task_index = usize::try_from(index)
         .map_err(|_| GenieError::unsupported("a saved action without its task"))?;
     let saved = objects
         .master(master)
         .and_then(action_part)
         .and_then(|rge_master_action_object| rge_master_action_object.tasks.as_deref());
     if let Some(tasks) = saved {
-        let entry = tasks.list.get(i).ok_or(GenieError::unsupported(
+        let entry = tasks.list.get(task_index).ok_or(GenieError::unsupported(
             "a saved action's task beyond its master's list",
         ))?;
         return core_task(&entry.task);
     }
     masters
         .and_then(|master_table| master_table.work(civ, dat_id(objects, master)?))
-        .and_then(|w| w.action_part().tasks.get(i))
+        .and_then(|master| master.action_part().tasks.get(task_index))
         .copied()
         .ok_or(GenieError::unsupported(
             "a saved action's task the data file does not have",
@@ -306,7 +306,7 @@ pub fn work_masters(
             action.search_radius = Distance::new(rge_master_action_object.search_radius);
             action.run_pattern = RunPattern::of_data(rge_master_action_object.run_pattern);
             if let Some(tasks) = rge_master_action_object.tasks.as_deref() {
-                action.tasks = match tasks.list.iter().map(|e| task(&e.task)).collect() {
+                action.tasks = match tasks.list.iter().map(|entry| task(&entry.task)).collect() {
                     Ok(tasks) => tasks,
                     Err(error) => return Some(Err(error)),
                 };
@@ -324,39 +324,51 @@ pub fn work_masters(
         });
         // the creatable layer is the save's TRIBE combat part: a master without one has no
         // costs or train locations, whatever its copy's are
-        if let Some(c) = combat {
+        if let Some(tribe_master_combat_object) = combat {
             let creatable_part = work.creatable.get_or_insert_with(Default::default);
-            creatable_part.cost = build_cost(&c.build_inventory);
-            creatable_part.build_time = c
+            creatable_part.cost = build_cost(&tribe_master_combat_object.build_inventory);
+            creatable_part.build_time = tribe_master_combat_object
                 .train_location
                 .first()
-                .map_or(WholeSeconds::ZERO, |t| WholeSeconds::of_data(t.train_time));
-            creatable_part.charge_kind = ChargeKind::of_data(c.charge_kind);
-            creatable_part.formation_category = FormationClass::of_data(c.temp_formation_category);
-            creatable_part.hero_flag = HeroFlags::from_bits_retain(c.hero_flag);
-            creatable_part.volley_fire = Firepower::new(c.volley_fire_amount);
-            creatable_part.max_volley = MissileCount::of_data(c.max_attacks_in_volley);
+                .map_or(WholeSeconds::ZERO, |entry| {
+                    WholeSeconds::of_data(entry.train_time)
+                });
+            creatable_part.charge_kind =
+                ChargeKind::of_data(tribe_master_combat_object.charge_kind);
+            creatable_part.formation_category =
+                FormationClass::of_data(tribe_master_combat_object.temp_formation_category);
+            creatable_part.hero_flag =
+                HeroFlags::from_bits_retain(tribe_master_combat_object.hero_flag);
+            creatable_part.volley_fire =
+                Firepower::new(tribe_master_combat_object.volley_fire_amount);
+            creatable_part.max_volley =
+                MissileCount::of_data(tribe_master_combat_object.max_attacks_in_volley);
             creatable_part.volley_spread = VolleySpread {
-                x: Distance::new(c.volley_xspread),
-                y: Distance::new(c.volley_yspread),
-                start: Distance::new(c.volley_start_spread_adjustment),
+                x: Distance::new(tribe_master_combat_object.volley_xspread),
+                y: Distance::new(tribe_master_combat_object.volley_yspread),
+                start: Distance::new(tribe_master_combat_object.volley_start_spread_adjustment),
             };
             let id = |id: i32| i16::try_from(id).ok().and_then(MasterId::of_data);
-            creatable_part.volley_missile = id(c.volley_missile_id);
-            creatable_part.charge_projectile = id(c.charge_projectile_unit);
-            creatable_part.invulnerability = InvulnerabilityLevel::new(c.invulnerability_level);
-            creatable_part.attack_priority = AttackPriority::of_byte(c.attack_priority);
-            creatable_part.special_attack = SpecialAttack::of_data(c.special_attack_flag);
-            creatable_part.max_charge = Charge::new(c.max_charge);
-            creatable_part.charge_target = ChargeTarget::of_data(c.charge_target);
-            creatable_part.train_locations = c
+            creatable_part.volley_missile = id(tribe_master_combat_object.volley_missile_id);
+            creatable_part.charge_projectile =
+                id(tribe_master_combat_object.charge_projectile_unit);
+            creatable_part.invulnerability =
+                InvulnerabilityLevel::new(tribe_master_combat_object.invulnerability_level);
+            creatable_part.attack_priority =
+                AttackPriority::of_byte(tribe_master_combat_object.attack_priority);
+            creatable_part.special_attack =
+                SpecialAttack::of_data(tribe_master_combat_object.special_attack_flag);
+            creatable_part.max_charge = Charge::new(tribe_master_combat_object.max_charge);
+            creatable_part.charge_target =
+                ChargeTarget::of_data(tribe_master_combat_object.charge_target);
+            creatable_part.train_locations = tribe_master_combat_object
                 .train_location
                 .iter()
-                .map(|t| TrainLocation {
-                    location: MasterId::of_data(t.train_location_id),
-                    time: WholeSeconds::of_data(t.train_time),
-                    button: LocationButton::of_data(t.button_location_id),
-                    hotkey: HotkeyId::of_data(t.hotkey_id),
+                .map(|entry| TrainLocation {
+                    location: MasterId::of_data(entry.train_location_id),
+                    time: WholeSeconds::of_data(entry.train_time),
+                    button: LocationButton::of_data(entry.button_location_id),
+                    hotkey: HotkeyId::of_data(entry.hotkey_id),
                 })
                 .collect();
             creatable_part.trained_at = creatable_part
@@ -374,7 +386,7 @@ pub fn work_masters(
                 master
                     .rge_master
                     .as_deref()
-                    .and_then(|r| r.rge_master_missile_object.as_deref())
+                    .and_then(|rge_master| rge_master.rge_master_missile_object.as_deref())
                     .map(|mm| &mm.rge_master_combat_object)
             });
         // the combat layer is the save's RGE combat part: a master without one has no attack,
@@ -395,13 +407,13 @@ pub fn work_masters(
             combat_part.weapons = rc
                 .weapon
                 .iter()
-                .map(|&w| ClassAmount::new((w & 0xffff) as i16, (w >> 16) as i16))
+                .map(|&word| ClassAmount::new((word & 0xffff) as i16, (word >> 16) as i16))
                 .collect();
             combat_part.base_armor = DamageAmount::new(rc.base_armor);
             combat_part.armors = rc
                 .armor
                 .iter()
-                .map(|&a| ClassAmount::new((a & 0xffff) as i16, (a >> 16) as i16))
+                .map(|&word| ClassAmount::new((word & 0xffff) as i16, (word >> 16) as i16))
                 .collect();
             combat_part.resistance = DamageShare::new(rc.bonus_damage_resistance);
             combat_part.combat_ability = CombatAbility::from_bits_retain(rc.combat_ability);
@@ -417,11 +429,11 @@ pub fn work_masters(
         work.storage = rge_master_static_object
             .attribute
             .iter()
-            .map(|e| {
+            .map(|entry| {
                 (
-                    AttributeId::of_data(e.attribute_kind_held),
-                    Amount::new(e.attribute_amount_held),
-                    e.attribute_flag,
+                    AttributeId::of_data(entry.attribute_kind_held),
+                    Amount::new(entry.attribute_amount_held),
+                    entry.attribute_flag,
                 )
             })
             .collect();
@@ -450,7 +462,7 @@ pub fn work_masters(
             .and_then(|rge_master| rge_master.rge_master_missile_object.as_deref())
             .map(|mm| MissilePart {
                 projectile_kind: MasterId::of_data(rge_master_static_object.copy_id())
-                    .and_then(|m| table.projectile_kind(civ, m))
+                    .and_then(|master_id| table.projectile_kind(civ, master_id))
                     .unwrap_or_default(),
                 smart_mode: SmartMode::from_bits_retain(mm.targetting_kind),
                 hit_mode: HitMode::of_data(mm.missile_hit_info),
@@ -483,7 +495,7 @@ pub fn work_masters(
             })
             .collect();
         work.fly_mode = MasterId::of_data(rge_master_static_object.copy_id())
-            .and_then(|m| table.fly_mode(civ, m))
+            .and_then(|master_id| table.fly_mode(civ, master_id))
             .unwrap_or_default();
         work.standing_sprite = SpriteId::of_data(rge_master_static_object.idle_sprite_id);
         work.standing_sprite_2 = SpriteId::of_data(rge_master_static_object.idle2_sprite_id);
@@ -575,10 +587,10 @@ pub fn build_cost(inventory: &[[u8; 6]]) -> [CostSlot; COST_SLOTS] {
 pub fn build_entries(inventory: &[[u8; 6]]) -> Vec<(i16, i16, bool)> {
     inventory
         .iter()
-        .map(|e| {
-            let kind = i16::from_le_bytes([e[0], e[1]]);
-            let amount = i16::from_le_bytes([e[2], e[3]]);
-            let flag = i16::from_le_bytes([e[4], e[5]]);
+        .map(|bytes| {
+            let kind = i16::from_le_bytes([bytes[0], bytes[1]]);
+            let amount = i16::from_le_bytes([bytes[2], bytes[3]]);
+            let flag = i16::from_le_bytes([bytes[4], bytes[5]]);
             (kind, amount, flag != 0)
         })
         .collect()

@@ -37,8 +37,8 @@ impl ArcRatio {
 
 impl MulAssign<f32> for ArcRatio {
     /// A multiply effect's product (one `f32` product).
-    fn mul_assign(&mut self, f: f32) {
-        self.0 *= f;
+    fn mul_assign(&mut self, factor: f32) {
+        self.0 *= factor;
     }
 }
 

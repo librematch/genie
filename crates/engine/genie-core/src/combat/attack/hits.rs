@@ -160,27 +160,29 @@ pub(crate) fn strike(
         struck.executed = Some(victim.id);
     }
     let draw = object_rng.raw64();
-    let r = (i64::from(draw as u32 & 0x7fff_ffff) * 100) / DRAW_SCALE;
-    if i64::from(hit.chance.get()) < r && attacker.missile.is_none() {
+    let roll = (i64::from(draw as u32 & 0x7fff_ffff) * 100) / DRAW_SCALE;
+    if i64::from(hit.chance.get()) < roll && attacker.missile.is_none() {
         return Ok(struck);
     }
     // a building's slot 0x1f0 (FUN_1411cc890) scales the factor by its relics and a building
     // target's
     let factor = hit.from_z.map_or(1.0, |z| {
         let elevation_factor = elevation_factor(z, own.attack_elevation, victim, damage_tuning);
-        own.building.as_ref().map_or(elevation_factor, |b| {
-            let theirs = victim
-                .building
-                .as_ref()
-                .map_or(Relics::NONE, |building| building.relics);
-            building_elevation_factor(
-                elevation_factor,
-                b.relics,
-                victim.kind,
-                theirs,
-                damage_tuning,
-            )
-        })
+        own.building
+            .as_ref()
+            .map_or(elevation_factor, |own_building| {
+                let theirs = victim
+                    .building
+                    .as_ref()
+                    .map_or(Relics::NONE, |building| building.relics);
+                building_elevation_factor(
+                    elevation_factor,
+                    own_building.relics,
+                    victim.kind,
+                    theirs,
+                    damage_tuning,
+                )
+            })
     });
     let weapons = own.weapons.clone();
     let mut others: Vec<&mut Victim> = blasted.iter_mut().collect();
@@ -215,9 +217,10 @@ pub(super) fn blast_so_far(victim: &Victim, blasted: &[Victim]) -> GenieResult<H
     };
     blasted
         .iter()
-        .find(|v| v.id == main.id())
-        .map(|m| {
-            m.building
+        .find(|victim| victim.id == main.id())
+        .map(|victim| {
+            victim
+                .building
                 .as_ref()
                 .map_or(HitPoints::ZERO, |mb| mb.blast_taken)
         })

@@ -4,7 +4,7 @@ use crate::groups::MoveReason;
 use crate::map::Distance;
 use crate::map::Tile;
 use crate::movement::LevelFlags;
-use crate::movement::Levels;
+use crate::movement::LevelsExt;
 use crate::movement::PathFlags;
 use crate::movement::PathState;
 use crate::movement::Speed;
@@ -89,13 +89,13 @@ impl Mover {
         } = ask;
         // FUN_14114fea0 and FUN_14114ffc0 hand the unit's +0x824 (x, height, y) as the start
         let (x, y, height_at) = (self.moved_at.x(), self.moved_at.y(), self.moved_at.z());
-        let (w, h) = (world.map.width(), world.map.height());
+        let (map_width, map_height) = (world.map.width(), world.map.height());
         // COMISS 0, v; JA and COMISS v, size; JNC (0x140fa03f1..0x140fa0459): a NaN passes
         let on_map = |px: f32, py: f32| {
             at_most_or_unordered(0.0, px)
                 && at_most_or_unordered(0.0, py)
-                && below_or_unordered(px, w as f32)
-                && below_or_unordered(py, h as f32)
+                && below_or_unordered(px, map_width as f32)
+                && below_or_unordered(py, map_height as f32)
         };
         if !on_map(x, y) || !on_map(to.x(), to.y()) {
             return Ok(false);
@@ -105,10 +105,12 @@ impl Mover {
         // the target is read where it is tested: the short path below is handed the spatial
         // index, which it writes
         let placed = target_placed(world, target)?;
-        let target_radius = placed.map_or(0.0, |t| t.radius.x());
-        let bonus = placed.is_some_and(|t| {
-            roles.of_master(t.master).contains(MasterRoles::DOCK)
-                || roles.of_class(t.class).contains(ClassRoles::WIDE_REACH)
+        let target_radius = placed.map_or(0.0, |placed| placed.radius.x());
+        let bonus = placed.is_some_and(|placed| {
+            roles.of_master(placed.master).contains(MasterRoles::DOCK)
+                || roles
+                    .of_class(placed.class)
+                    .contains(ClassRoles::WIDE_REACH)
         });
         let mut path = Path::default();
         if let Some(planner) = plan.pathing.planner(self.stats.restriction, world.tiles()) {
@@ -136,7 +138,7 @@ impl Mover {
             let goal = BVector::new(to.x(), 0.0, to.y());
             // FUN_140fa0370 hands the start test both vectors' first two floats: x and the
             // height, the unit's (`+0x824`) and the target's (slot 0x520), not x and y
-            let height = placed.map_or(0.0, |t| t.position.z());
+            let height = placed.map_or(0.0, |placed| placed.position.z());
             let line = (Point::new(x, height_at), Point::new(to.x(), height));
             let ignore = self.ignore_list(me, world, plan, target.zip(placed), line, by_id)?;
             let ask = ShortAsk {
@@ -153,23 +155,23 @@ impl Mover {
                 return Ok(true);
             }
         }
-        let long_target = if let Some(t) = target_placed(world, target)? {
-            let gap2 = footprint_gap_squared(at, ground, t.position, t.radius);
+        let long_target = if let Some(placed) = target_placed(world, target)? {
+            let gap2 = footprint_gap_squared(at, ground, placed.position, placed.radius);
             if gap2 < DistanceSquared::new(movement_tuning.reach_near) {
                 return Ok(false);
             }
-            let gap = footprint_gap(at, ground, t.position, t.radius);
+            let gap = footprint_gap(at, ground, placed.position, placed.radius);
             Some(LongTarget::new(
-                t.position,
-                t.radius,
+                placed.position,
+                placed.radius,
                 gap,
                 gap2,
                 *long_path_tuning,
             ))
         } else {
-            let gap = |d: f32, r: f32| {
-                let g = d.abs() - r;
-                if 0.0 <= g { g } else { 0.0 }
+            let gap = |delta: f32, radius: f32| {
+                let beyond = delta.abs() - radius;
+                if 0.0 <= beyond { beyond } else { 0.0 }
             };
             // the gap from the unit's place (its decoded x and y), not +0x824
             let (px, py) = (at.x(), at.y());
@@ -196,8 +198,8 @@ impl Mover {
         let lowered = lowered_units(&walker, world, target, by_id)
             .into_iter()
             .filter_map(|id| world.get(id))
-            .filter(|p| p.tall)
-            .map(|p| Tile::new(p.position.x() as i32, p.position.y() as i32))
+            .filter(|placed| placed.tall)
+            .map(|placed| Tile::new(placed.position.x() as i32, placed.position.y() as i32))
             .collect();
         let req = LongRequest {
             from: Tile::new(cvttss2si(x), cvttss2si(y)),
@@ -215,9 +217,9 @@ impl Mover {
             near_player: false,
             allies: world
                 .get(me.id)
-                .map_or(PlayerSet::NONE, |p| world.allies_of(p.player)),
+                .map_or(PlayerSet::NONE, |placed| world.allies_of(placed.player)),
         };
-        let player = world.get(me.id).map(|p| p.player);
+        let player = world.get(me.id).map(|placed| placed.player);
         let gates = |tile| {
             player.map_or(Ok(false), |player_id| {
                 gate_lets_pass(world, by_id, player_id, tile)
@@ -255,8 +257,12 @@ impl Mover {
     pub fn follow_path_end(&mut self, point: Position) {
         let point = point.vector();
         if let Some(level) = self.paths.first_mut() {
-            if let Some(w) = level.waypoint.slot().and_then(|i| level.points.get_mut(i)) {
-                *w = point;
+            if let Some(waypoint) = level
+                .waypoint
+                .slot()
+                .and_then(|index| level.points.get_mut(index))
+            {
+                *waypoint = point;
             }
             level.flags &= !(LevelFlags::REACHED | LevelFlags::AT_WAYPOINT);
         }
@@ -275,7 +281,7 @@ impl Mover {
         self.paths
             .last()
             .map(|path_data| &path_data.points)
-            .filter(|p| !p.is_empty())
+            .filter(|path| !path.is_empty())
     }
 
     /// The path request of a `MoveTo` without its unit AI's say ([`Mover::request_path_asked`]
@@ -356,16 +362,16 @@ impl Mover {
         if ask.resume == WaypointIndex::NONE {
             let _ = path.insert(0, start);
         }
-        for &w in &self.user_waypoints {
-            let _ = path.push(w);
+        for &waypoint in &self.user_waypoints {
+            let _ = path.push(waypoint);
         }
         self.clear_user_waypoints();
         if ask.resume == WaypointIndex::NONE {
             let end = goal.vector();
             let last = point_or_zero(&path, WaypointIndex::last_of(path.points.len()));
-            let mut d = end - last;
-            d = d.with_height(0.0);
-            if EPSILON < sqrt(d.x() * d.x() + 0.0 + d.y() * d.y()) {
+            let mut offset = end - last;
+            offset = offset.with_height(0.0);
+            if EPSILON < sqrt(offset.x() * offset.x() + 0.0 + offset.y() * offset.y()) {
                 let _ = path.push(end);
             }
         }
@@ -420,12 +426,12 @@ impl Mover {
     /// `JBE`: not a NaN) moves to that tile's middle. Its array's growth (5, then twice) fails only
     /// without memory.
     pub fn add_user_waypoint(&mut self, at: Position, movement_tuning: &MovementTuning) {
-        let snap = |v: f32| {
-            let whole = libm::floorf(v);
-            if (v - whole).abs() < EPSILON {
+        let snap = |value: f32| {
+            let whole = libm::floorf(value);
+            if (value - whole).abs() < EPSILON {
                 whole + movement_tuning.user_waypoint_middle
             } else {
-                v
+                value
             }
         };
         self.user_waypoints
@@ -621,8 +627,8 @@ impl Mover {
                     continue;
                 }
                 // slot 0x528's walked level, paused for dt more when its pause is shorter
-                if let Some(p) = self.pause_of(id, by_id).filter(|&seconds| seconds < dt) {
-                    pauses.push((id, p + dt));
+                if let Some(seconds) = self.pause_of(id, by_id).filter(|&seconds| seconds < dt) {
+                    pauses.push((id, seconds + dt));
                 }
             }
         }

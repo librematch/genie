@@ -15,7 +15,7 @@ use crate::pathing::tile_path::{Path, Request};
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
 use crate::world::lets::release;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 use crate::world::step::Step;
 use crate::{GenieError, GenieResult};
 
@@ -50,16 +50,20 @@ impl BuildAction {
         {
             let at = builder.position();
             let ground = step
-                .w
+                .world
                 .parts
                 .mover_of(builder.id)
                 .map(|mover| mover.stats.radius.ground())
                 .ok_or(BUILDER_UNMOVING)?;
-            let placed = *step.w.spatial.get_known(self.target)?.ok_or(SITE_GONE)?;
+            let placed = *step
+                .world
+                .spatial
+                .get_known(self.target)?
+                .ok_or(SITE_GONE)?;
             let gap = footprint_gap_squared(at, ground, placed.position, placed.radius);
             let range = self.task.range;
             if !(gap <= range.squared()
-                || gap <= DistanceSquared::new(step.w.model.tuning.build.reach))
+                || gap <= DistanceSquared::new(step.world.model.tuning.build.reach))
             {
                 return self.restart(step, builder, roles);
             }
@@ -95,17 +99,17 @@ impl BuildAction {
         roles: &Roles,
     ) -> GenieResult<()> {
         if let Some(target) = self.target {
-            let s = Self::site_unit(step, reads)?.ok_or(FOREIGN_SITE)?;
+            let unit = Self::site_unit(step, reads)?.ok_or(FOREIGN_SITE)?;
             let desolid = step
-                .w
+                .world
                 .parts
-                .building_of(s.id)
+                .building_of(unit.id)
                 .construction
                 .is_some_and(|construction| construction.desolid);
-            let placed = *step.w.spatial.get_known(target)?.ok_or(SITE_GONE)?;
-            if desolid && step.w.spatial.foreign_marks(&placed) {
+            let placed = *step.world.spatial.get_known(target)?.ok_or(SITE_GONE)?;
+            if desolid && step.world.spatial.foreign_marks(&placed) {
                 let seen = step
-                    .w
+                    .world
                     .spatial
                     .building_sight(target.id(), placed.position, placed.player)
                     .ok_or(UNSEEN_SITE)?
@@ -116,7 +120,11 @@ impl BuildAction {
                 }
             }
         }
-        let mover = step.w.parts.mover_of(builder.id).ok_or(BUILDER_UNMOVING)?;
+        let mover = step
+            .world
+            .parts
+            .mover_of(builder.id)
+            .ok_or(BUILDER_UNMOVING)?;
         let (restriction, ground, moved_at) = (
             mover.stats.restriction,
             mover.stats.radius.x(),
@@ -125,22 +133,29 @@ impl BuildAction {
         let mut found = Found::Nothing;
         // the foundation's place and its master's radius, read before the planner's borrow
         let known = step
-            .w
+            .world
             .spatial
             .get_known(self.target)
             .map(Option::<&_>::copied);
         let master_radius = match Self::site_unit(step, reads)? {
-            Some(unit) => Some(unit.master(step.w.master_tables(), step.player)?.radius.x()),
+            Some(unit) => Some(
+                unit.master(step.world.master_tables(), step.player)?
+                    .radius
+                    .x(),
+            ),
             None => None,
         };
         if self.target.is_some()
-            && let Some(planner) = step.w.pathing.planner(restriction, step.w.spatial.tiles())
+            && let Some(planner) = step
+                .world
+                .pathing
+                .planner(restriction, step.world.spatial.tiles())
         {
-            let t = known?.ok_or(SITE_GONE)?;
-            let radius = master_radius.unwrap_or_else(|| t.radius.x());
+            let placed = known?.ok_or(SITE_GONE)?;
+            let radius = master_radius.unwrap_or_else(|| placed.radius.x());
             let req = Request {
                 from: moved_at.ground(),
-                to: t.position.ground(),
+                to: placed.position.ground(),
                 radii: Distance::new(radius + ground),
                 range: Distance::ZERO,
                 closed: Vec::new(),
@@ -152,7 +167,7 @@ impl BuildAction {
                 false,
                 &mut path,
                 None,
-                &step.w.model.tuning.tile_path,
+                &step.world.model.tuning.tile_path,
             )?;
         }
         if found.reaches() {
@@ -170,10 +185,10 @@ impl BuildAction {
     /// What the removal does not model.
     pub(super) fn remove_marked(&self, step: &mut Step<'_>) -> GenieResult<()> {
         if let Some(target) = self.target
-            && let Some((player_id, _)) = step.w.object(target)
-            && !step.w.players.player(player_id)?.kind.is_computer()
+            && let Some((player_id, _)) = step.world.object(target)
+            && !step.world.players.player(player_id)?.kind.is_computer()
         {
-            step.w.remove_building(player_id, target.id())?;
+            step.world.remove_building(player_id, target.id())?;
         }
         Ok(())
     }
@@ -220,12 +235,17 @@ impl BuildAction {
         self.leave(step, builder)?;
         self.state = BuildState::WalkPoint { move_to: None };
         let move_reads = builder.move_to_reads(
-            step.w.parts.motion.mover(builder.id),
-            MasterTables::new(&step.w.model.masters, &step.w.parts.own_master),
+            step.world.parts.motion.mover(builder.id),
+            MasterTables::new(&step.world.model.masters, &step.world.parts.own_master),
             step.player,
             (
-                &step.w.model.graphics,
-                step.w.parts.combat_of(builder.id).abilities.look.as_ref(),
+                &step.world.model.graphics,
+                step.world
+                    .parts
+                    .combat_of(builder.id)
+                    .abilities
+                    .look
+                    .as_ref(),
             ),
             roles,
         )?;
@@ -234,7 +254,7 @@ impl BuildAction {
                 self.point,
                 Distance::ZERO,
                 self.task.moving,
-                &step.w.model.tuning.move_to,
+                &step.world.model.tuning.move_to,
             )?,
         };
         Ok(())

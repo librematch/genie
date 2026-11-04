@@ -85,16 +85,16 @@ impl genie_diff::Diff for MasterHitPoints {
 impl Mul<f32> for HitPoints {
     type Output = Self;
 
-    /// The points scaled by `f` (one `f32` product, the points first).
-    fn mul(self, f: f32) -> Self {
-        Self(self.0 * f)
+    /// The points scaled by `factor` (one `f32` product, the points first).
+    fn mul(self, factor: f32) -> Self {
+        Self(self.0 * factor)
     }
 }
 
 impl MulAssign<f32> for HitPoints {
-    /// The points scaled by `f` in place (an effect's multiplier).
-    fn mul_assign(&mut self, f: f32) {
-        self.0 *= f;
+    /// The points scaled by `factor` in place (an effect's multiplier).
+    fn mul_assign(&mut self, factor: f32) {
+        self.0 *= factor;
     }
 }
 
@@ -110,9 +110,9 @@ impl Mul<HitPoints> for f32 {
 impl Div<f32> for HitPoints {
     type Output = Self;
 
-    /// The points divided by `f` (one `f32` quotient).
-    fn div(self, f: f32) -> Self {
-        Self(self.0 / f)
+    /// The points divided by `divisor` (one `f32` quotient).
+    fn div(self, divisor: f32) -> Self {
+        Self(self.0 / divisor)
     }
 }
 
@@ -138,23 +138,23 @@ mod tests {
     /// Each operator is the one `f32` operation, bit for bit and in its operand order.
     #[test]
     fn hit_points_do_the_game_f32_operations() {
-        let (a, b) = (HitPoints::new(0.1), HitPoints::new(0.2));
-        assert_eq!((a + b).get().to_bits(), (0.1_f32 + 0.2).to_bits());
-        assert_eq!((a - b).get().to_bits(), (0.1_f32 - 0.2).to_bits());
-        assert_eq!((-a).get().to_bits(), (-0.1_f32).to_bits());
-        assert_eq!((a * 3.0).get().to_bits(), (0.1_f32 * 3.0).to_bits());
-        let mut scaled = a;
+        let (first, second) = (HitPoints::new(0.1), HitPoints::new(0.2));
+        assert_eq!((first + second).get().to_bits(), (0.1_f32 + 0.2).to_bits());
+        assert_eq!((first - second).get().to_bits(), (0.1_f32 - 0.2).to_bits());
+        assert_eq!((-first).get().to_bits(), (-0.1_f32).to_bits());
+        assert_eq!((first * 3.0).get().to_bits(), (0.1_f32 * 3.0).to_bits());
+        let mut scaled = first;
         scaled *= 3.0;
-        assert_eq!(scaled, a * 3.0);
-        assert_eq!((3.0 * a).get().to_bits(), (3.0_f32 * 0.1).to_bits());
-        assert_eq!((a / 3.0).get().to_bits(), (0.1_f32 / 3.0).to_bits());
-        assert_eq!((b / a).to_bits(), (0.2_f32 / 0.1).to_bits());
+        assert_eq!(scaled, first * 3.0);
+        assert_eq!((3.0 * first).get().to_bits(), (3.0_f32 * 0.1).to_bits());
+        assert_eq!((first / 3.0).get().to_bits(), (0.1_f32 / 3.0).to_bits());
+        assert_eq!((second / first).to_bits(), (0.2_f32 / 0.1).to_bits());
         let mut hp = HitPoints::new(45.0);
         hp -= HitPoints::new(4.4);
         assert_eq!(hp.get().to_bits(), (45.0_f32 - 4.4).to_bits());
         hp += HitPoints::new(4.4);
         assert_eq!(hp.get().to_bits(), (45.0_f32 - 4.4 + 4.4).to_bits());
-        assert!(HitPoints::ZERO < a && a <= a);
+        assert!(HitPoints::ZERO < first && first <= first);
         assert_eq!(HitPoints::new(f32::NAN).partial_cmp(&HitPoints::ZERO), None);
         assert_eq!(HitPoints::new(2.5).to_string(), "2.5");
     }

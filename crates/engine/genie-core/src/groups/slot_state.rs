@@ -78,8 +78,8 @@ mod tests {
         for index in 0..=3 {
             assert_eq!(SlotState::of_int(index).map(SlotState::get), Ok(index));
         }
-        for v in [i32::MIN, -1, 4, 256] {
-            assert!(SlotState::of_int(v).is_err(), "{v}");
+        for value in [i32::MIN, -1, 4, 256] {
+            assert!(SlotState::of_int(value).is_err(), "{value}");
         }
         assert_eq!(SlotState::of_passing(Passing::Short), SlotState::Steering);
         assert_eq!(SlotState::of_passing(Passing::Reaches), SlotState::Arriving);

@@ -16,7 +16,7 @@ use crate::objects::ObjectState;
 use crate::objects::UpdateCode;
 use crate::objects::layers::Action;
 use crate::objects::masters::MasterTables;
-use crate::objects::masters::PlayersMasters;
+use crate::objects::masters::PlayersMastersExt;
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Presence;
 use crate::objects::unit::object_master;
@@ -35,7 +35,7 @@ use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
 use crate::world::lets::release;
 use crate::world::others::OthersRef;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 use crate::world::step::Step;
 use crate::{GenieError, GenieResult};
 
@@ -53,7 +53,7 @@ impl Unit {
             let state = readable(step, target)?.map(|(_, unit, _)| unit.life.state);
             let gone = match state {
                 Some(object_state) => ObjectState::Undead < object_state,
-                None if step.w.spatial.get(target).is_some() => {
+                None if step.world.spatial.get(target).is_some() => {
                     return Err(GenieError::unsupported(
                         "a hunt's target the slice cannot read",
                     ));
@@ -69,13 +69,13 @@ impl Unit {
             }
         }
         let site = hunt.carry_to;
-        let held = Presence::of_found(step.w.spatial.get(site));
+        let held = Presence::of_found(step.world.spatial.get(site));
         let (kept, let_go) = second_target_checked(
             site,
             held,
             state_of(
                 site.map(DropSiteId::id),
-                OthersRef::of(&step.w.players, &step.w.index, step.player)?,
+                OthersRef::of(&step.world.players, &step.world.index, step.player)?,
             ),
         );
         hunt.carry_to = kept;
@@ -95,12 +95,12 @@ impl Unit {
             && hunt.state.move_to().is_some_and(|move_to_action| {
                 move_to_action.state == MoveTo::Failed
                     || move_to_action.target.is_some_and(|object_id| {
-                        step.w
+                        step.world
                             .object_state(object_id)
                             .is_some_and(|object_state| ObjectState::Undead < object_state)
                     })
             })
-            && step.w.parts.unit_ai.get(self.id).is_some_and(|ai| {
+            && step.world.parts.unit_ai.get(self.id).is_some_and(|ai| {
                 let class = ai.target_class.or(hunt.target_class);
                 roles.of_some_class(class).contains(ClassRoles::TREE)
             })
@@ -155,7 +155,9 @@ impl Unit {
                 && self.hunt_tree_search(
                     (hunt, actions),
                     step,
-                    Some(Distance::new(step.w.model.tuning.turn.tree_search_within)),
+                    Some(Distance::new(
+                        step.world.model.tuning.turn.tree_search_within,
+                    )),
                     None,
                     roles,
                 )? == TreeSearch::Found => {}
@@ -200,17 +202,17 @@ impl Unit {
         roles: &Roles,
     ) -> GenieResult<HeadCode> {
         let master = object_master(
-            step.w.parts.own_master.get(self.id),
+            step.world.parts.own_master.get(self.id),
             (self.id, self.life.master_id),
-            step.w.model.masters.of(step.player),
+            step.world.model.masters.of(step.player),
         )?;
         let me_at = step
-            .w
+            .world
             .spatial
             .get_known(self.id)?
             .ok_or(GenieError::unsupported("a hunter without a place"))?;
         let (me_position, me_radius) = (me_at.position, me_at.radius);
-        let site = match step.w.spatial.get_known(hunt.carry_to)? {
+        let site = match step.world.spatial.get_known(hunt.carry_to)? {
             Some(placed) => {
                 let actor = Actor {
                     id: self.id,
@@ -218,17 +220,17 @@ impl Unit {
                     player: step.player,
                     held: self.life.held(),
                     attribute_95: step
-                        .w
+                        .world
                         .players
                         .player(step.player)?
                         .attributes
                         .get(95)
                         .copied()
                         .unwrap_or(Amount::ZERO),
-                    civ: step.w.players.player(step.player)?.civ,
+                    civ: step.world.players.player(step.player)?.civ,
                 };
                 Some(DropOff {
-                    takes: drops_at(&step.w.model.drop_sites, placed.master, &actor),
+                    takes: drops_at(&step.world.model.drop_sites, placed.master, &actor),
                     gap_squared: footprint_gap_squared(
                         me_position,
                         me_radius,
@@ -240,10 +242,10 @@ impl Unit {
             None => None,
         };
         let who = PointWalker {
-            player_kind: step.w.players.player(step.player)?.kind,
+            player_kind: step.world.players.player(step.player)?.kind,
             villager: roles.of_class(master.class).contains(ClassRoles::VILLAGER),
             stance: step
-                .w
+                .world
                 .parts
                 .unit_ai
                 .get(self.id)
@@ -283,7 +285,7 @@ impl Unit {
     /// state holds no sub-action (its `set_state` dropped them).
     pub(crate) fn hunt_failed(&self, step: &mut Step<'_>) -> GenieResult<HeadCode> {
         self.post_own(
-            &mut step.w.parts.unit_ai,
+            &mut step.world.parts.unit_ai,
             NotifyKind::ACTION_FAILED,
             [AiAction::Hunt.value(), 0, 0],
         )?;
@@ -304,15 +306,15 @@ impl Unit {
         roles: &Roles,
     ) -> GenieResult<()> {
         let master = object_master(
-            step.w.parts.own_master.get(self.id),
+            step.world.parts.own_master.get(self.id),
             (self.id, self.life.master_id),
-            step.w.model.masters.of(step.player),
+            step.world.model.masters.of(step.player),
         )?;
         let who = PointWalker {
-            player_kind: step.w.players.player(step.player)?.kind,
+            player_kind: step.world.players.player(step.player)?.kind,
             villager: roles.of_class(master.class).contains(ClassRoles::VILLAGER),
             stance: step
-                .w
+                .world
                 .parts
                 .unit_ai
                 .get(self.id)
@@ -363,21 +365,21 @@ impl Unit {
         roles: &Roles,
     ) -> GenieResult<()> {
         let walks = self.move_walks(
-            step.w.parts.mover_of(self.id),
-            MasterTables::new(&step.w.model.masters, &step.w.parts.own_master),
+            step.world.parts.mover_of(self.id),
+            MasterTables::new(&step.world.model.masters, &step.world.parts.own_master),
             step.player,
             (
-                &step.w.model.graphics,
-                step.w.parts.combat_of(self.id).abilities.look.as_ref(),
+                &step.world.model.graphics,
+                step.world.parts.combat_of(self.id).abilities.look.as_ref(),
             ),
             roles,
         )?;
-        let mover = step.w.parts.mover_mut(self.id).ok_or(HUNTER_UNMOVING)?;
+        let mover = step.world.parts.mover_mut(self.id).ok_or(HUNTER_UNMOVING)?;
         let walked = hunt.wait_then_walk(
             step.dt.seconds(),
             mover,
             &walks,
-            &step.w.model.tuning.move_to,
+            &step.world.model.tuning.move_to,
         );
         actions.list.set_hunt(Some(*hunt));
         walked

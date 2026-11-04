@@ -295,7 +295,7 @@ mod tests {
     #[test]
     fn codes_1_and_3_delete_the_head() {
         let deleting: Vec<u8> = (0..=u8::MAX)
-            .filter(|&c| HeadCode::of(UpdateCode::of_data(c)) == HeadCode::Deletes)
+            .filter(|&code| HeadCode::of(UpdateCode::of_data(code)) == HeadCode::Deletes)
             .collect();
         assert_eq!(deleting, [1, 3]);
         assert_eq!(HeadCode::ended(true), HeadCode::Deletes);

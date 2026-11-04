@@ -13,7 +13,7 @@ use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::WorkerCount;
 use crate::objects::masters::GatherGroup;
-use crate::objects::masters::PlayersMasters;
+use crate::objects::masters::PlayersMastersExt;
 use crate::objects::masters::{MasterTables, OwnerMasters};
 use crate::orders::OrderSource;
 use crate::orders::Work;
@@ -24,7 +24,7 @@ use crate::world::World;
 use crate::world::index::ObjectsRef;
 use crate::world::layer::ClassRoles;
 use crate::world::others::OthersRef;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 use crate::{GenieError, GenieResult};
 use std::mem::replace;
 
@@ -175,7 +175,7 @@ impl World {
                     pathing: &mut self.pathing,
                     now: self.world_time,
                     player_kind: player.kind,
-                    object: self.streams.get(Stream::Object),
+                    object: self.streams.get_mut(Stream::Object),
                     groups: &self.groups,
                 },
             };
@@ -187,7 +187,7 @@ impl World {
             );
             let mut found = Vec::new();
             for kind in kinds {
-                let (f, _) = closest_resource_of(
+                let (object_id, _) = closest_resource_of(
                     (
                         &cart,
                         self.parts.actions_of(cart.id),
@@ -207,8 +207,8 @@ impl World {
                     ),
                     &self.model.roles,
                 )?;
-                if let Some(f) = f {
-                    found.push(f);
+                if let Some(object_id) = object_id {
+                    found.push(object_id);
                 }
             }
             Ok::<_, GenieError>(found)
@@ -222,14 +222,14 @@ impl World {
         let at = self.players.live(player_id, idx)?.position();
         let mut best: Option<(ObjectId, Position)> = None;
         let mut best_d = DistanceSquared::new(self.model.tuning.turn.cart_reach);
-        for f in found {
-            let Some(placed) = self.spatial.get(f) else {
+        for object_id in found {
+            let Some(placed) = self.spatial.get(object_id) else {
                 continue;
             };
             let distance_squared =
                 footprint_gap_squared(at, cart_master.radius, placed.position, placed.radius);
             if distance_squared < best_d {
-                best = Some((f, placed.position));
+                best = Some((object_id, placed.position));
                 best_d = distance_squared;
             }
         }

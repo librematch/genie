@@ -10,7 +10,7 @@ use crate::map::{Tile, TileRect};
 use crate::math::fmath::BVector;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
-use crate::world::slots::CheckedIndex;
+use crate::world::slots::CheckedIndexExt;
 use std::collections::BTreeMap;
 
 use crate::GenieResult;
@@ -86,21 +86,21 @@ impl Spatial {
             .collect();
         let mut visited = vec![false; (size * size) as usize];
         let reach = half - 1;
-        let mut i = 0;
-        while i < list.len() {
-            let checked = *list.checked(i)?;
+        let mut index = 0;
+        while index < list.len() {
+            let checked = *list.checked(index)?;
             if (cx - checked.x()).abs() < reach && (cy - checked.y()).abs() < reach {
-                for n in checked.beside() {
-                    let at = ((ox + n.x()) * size + n.y() + oy) as usize;
+                for tile in checked.beside() {
+                    let at = ((ox + tile.x()) * size + tile.y() + oy) as usize;
                     if !*visited.checked(at)?
-                        && self.passable(n, mask, me, Distance::new(radius_x), by_id)?
+                        && self.passable(tile, mask, me, Distance::new(radius_x), by_id)?
                     {
                         *visited.checked_mut(at)? = true;
-                        list.push(n);
+                        list.push(tile);
                     }
                 }
             }
-            i += 1;
+            index += 1;
         }
         let mut best = if pick == SpotPick::Farthest {
             0.0
@@ -116,7 +116,7 @@ impl Spatial {
             let (x, y) = (tile.x(), tile.y());
             let was_empty = empty;
             let count = self.tiles.objects(Tile::new(x, y));
-            if empty && count.is_some_and(|n| n != 0) {
+            if empty && count.is_some_and(|count| count != 0) {
                 continue;
             }
             if count == Some(0) {
@@ -124,12 +124,14 @@ impl Spatial {
             }
             // the tile's centre as the game's vector (x, height, y), at the unit's height
             let centre = BVector::new(x as f32 + CENTRE, from.z(), y as f32 + CENTRE);
-            let d = BVector::new(
+            let offset = BVector::new(
                 from.x() - centre.x(),
                 from.z() - centre.height(),
                 from.y() - centre.y(),
             );
-            let distance = d.x() * d.x() + d.height() * d.height() + d.y() * d.y();
+            let distance = offset.x() * offset.x()
+                + offset.height() * offset.height()
+                + offset.y() * offset.y();
             let beats = if pick == SpotPick::Farthest {
                 best < distance
             } else {
@@ -165,7 +167,7 @@ impl Spatial {
         let (sx, sy) = (site.position.x(), site.position.y());
         let (rx, ry) = (site.radius.x(), site.radius.y());
         self.check_known(Rect::new(sx - rx, sy - ry, sx + rx, sy + ry))?;
-        let counts = |id: ObjectId, o: &Placed| {
+        let counts = |id: ObjectId, placed: &Placed| {
             looks.get(&id).is_none_or(|clear_look| {
                 let alive = clear_look.state < ObjectState::Dying
                     || (clear_look.kind != MasterKind::BUILDING
@@ -173,8 +175,8 @@ impl Spatial {
                 let foundation = clear_look.kind == MasterKind::BUILDING && clear_look.desolid;
                 alive
                     && (!foundation
-                        || (self.allied(site.player, o.player)
-                            && self.allied(o.player, site.player)))
+                        || (self.allied(site.player, placed.player)
+                            && self.allied(placed.player, site.player)))
             })
         };
         Ok(self
@@ -204,10 +206,10 @@ impl Spatial {
         use crate::math::conversions::cvttss2si;
         let (sx, sy) = (site.position.x(), site.position.y());
         let (rx, ry) = (site.radius.x(), site.radius.y());
-        let (w, h) = (self.tiles.size.width(), self.tiles.size.height());
+        let (width, height) = (self.tiles.size.width(), self.tiles.size.height());
         let (x0, y0) = (cvttss2si(sx - rx).max(0), cvttss2si(sy - ry).max(0));
-        let x1 = cvttss2si((sx + rx) - 0.001).min(w - 1);
-        let y1 = cvttss2si((sy + ry) - 0.001).min(h - 1);
+        let x1 = cvttss2si((sx + rx) - 0.001).min(width - 1);
+        let y1 = cvttss2si((sy + ry) - 0.001).min(height - 1);
         let own = 1u32 << (site.player.index() as u32 & 0x1f);
         (y0..=y1).any(|y| {
             (x0..=x1).any(|x| {
@@ -370,7 +372,7 @@ impl Spatial {
         let (x, y) = (point.x() as i32, point.y() as i32);
         self.tiles
             .word(Tile::new(x, y))
-            .is_some_and(|w| w & (mask.classes() | 0x80) == 0)
+            .is_some_and(|word| word & (mask.classes() | 0x80) == 0)
             && !self.tile_records.contains(&(y, x))
     }
 
@@ -388,9 +390,9 @@ impl Spatial {
     ) -> Vec<ObjectId> {
         let query = rect.grown(grow);
         self.records_in(query)
-            .filter(|(id, p)| {
-                p.obstruction.is_some_and(|obstruction| {
-                    obstruction.kind.tested() && self.visits(p, obstruction.kind, query)
+            .filter(|(id, placed)| {
+                placed.obstruction.is_some_and(|obstruction| {
+                    obstruction.kind.tested() && self.visits(placed, obstruction.kind, query)
                 }) && !ignore.contains(&RecordId::from(*id))
             })
             .filter(|(_, placed)| rect.overlaps(placed.bounds().grown(grow)))

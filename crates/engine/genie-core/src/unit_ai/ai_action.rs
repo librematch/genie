@@ -166,8 +166,8 @@ mod tests {
     /// Every action value converts back from its value; the values are 30 distinct ones.
     #[test]
     fn every_action_converts_back_from_its_value() {
-        for a in AiAction::ALL {
-            assert_eq!(AiAction::try_from(a.value()), Ok(a));
+        for ai_action in AiAction::ALL {
+            assert_eq!(AiAction::try_from(ai_action.value()), Ok(ai_action));
         }
         let mut values: Vec<i32> = AiAction::ALL
             .iter()
@@ -185,9 +185,9 @@ mod tests {
     /// A value no action names is an error; −1 is a field's none.
     #[test]
     fn value_no_action_names_is_an_error() {
-        for v in [0, 0x25e, 0x263, 0x2c1, 0x2c6, 700 + 100] {
+        for value in [0, 0x25e, 0x263, 0x2c1, 0x2c6, 700 + 100] {
             assert_eq!(
-                AiAction::try_from(v).map_err(|error| error.kind()),
+                AiAction::try_from(value).map_err(|error| error.kind()),
                 Err(ErrorKind::InvalidInput)
             );
         }

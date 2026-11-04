@@ -37,7 +37,7 @@ pub struct IdTable<T> {
 struct Column<T> {
     /// The values by index.
     values: Vec<Option<T>>,
-    /// Bit `i % 64` of word `i / 64`: index `i` holds a value.
+    /// Bit `index % 64` of word `index / 64`: index `index` holds a value.
     held: Vec<u64>,
 }
 
@@ -51,42 +51,44 @@ impl<T> Default for Column<T> {
 }
 
 impl<T> Column<T> {
-    /// The value at `i`.
-    fn get(&self, i: usize) -> Option<&T> {
-        self.values.get(i)?.as_ref()
+    /// The value at `index`.
+    fn get(&self, index: usize) -> Option<&T> {
+        self.values.get(index)?.as_ref()
     }
 
-    /// The value at `i` to change.
-    fn get_mut(&mut self, i: usize) -> Option<&mut T> {
-        self.values.get_mut(i)?.as_mut()
+    /// The value at `index` to change.
+    fn get_mut(&mut self, index: usize) -> Option<&mut T> {
+        self.values.get_mut(index)?.as_mut()
     }
 
-    /// `value` at `i`, the column grown to hold it; the value it held.
-    fn put(&mut self, i: usize, value: T) -> Option<T> {
-        if self.values.len() <= i {
-            self.values.resize_with(i + 1, || None);
-            self.held.resize(i / 64 + 1, 0);
+    /// `value` at `index`, the column grown to hold it; the value it held.
+    fn put(&mut self, index: usize, value: T) -> Option<T> {
+        if self.values.len() <= index {
+            self.values.resize_with(index + 1, || None);
+            self.held.resize(index / 64 + 1, 0);
         }
-        if let Some(word) = self.held.get_mut(i / 64) {
-            *word |= 1 << (i % 64);
+        if let Some(word) = self.held.get_mut(index / 64) {
+            *word |= 1 << (index % 64);
         }
-        self.values.get_mut(i).and_then(|slot| slot.replace(value))
+        self.values
+            .get_mut(index)
+            .and_then(|slot| slot.replace(value))
     }
 
-    /// The value at `i` taken out.
-    fn take(&mut self, i: usize) -> Option<T> {
-        if let Some(word) = self.held.get_mut(i / 64) {
-            *word &= !(1 << (i % 64));
+    /// The value at `index` taken out.
+    fn take(&mut self, index: usize) -> Option<T> {
+        if let Some(word) = self.held.get_mut(index / 64) {
+            *word &= !(1 << (index % 64));
         }
-        self.values.get_mut(i).and_then(Option::take)
+        self.values.get_mut(index).and_then(Option::take)
     }
 }
 
 /// The indices whose bit is set in a column's words, rising or (`down`) falling.
 #[derive(Clone, Debug)]
-struct Bits<'a> {
+struct Bits<'words> {
     /// The words.
-    words: &'a [u64],
+    words: &'words [u64],
     /// The word being walked; `words.len()` (rising) or none left (falling) at the end.
     word: usize,
     /// Its bits not walked yet.
@@ -95,9 +97,9 @@ struct Bits<'a> {
     down: bool,
 }
 
-impl<'a> Bits<'a> {
+impl<'words> Bits<'words> {
     /// The set bits of `words`, rising.
-    fn up(words: &'a [u64]) -> Self {
+    fn up(words: &'words [u64]) -> Self {
         Self {
             words,
             word: 0,
@@ -107,7 +109,7 @@ impl<'a> Bits<'a> {
     }
 
     /// The set bits of `words`, falling.
-    fn down(words: &'a [u64]) -> Self {
+    fn down(words: &'words [u64]) -> Self {
         let word = words.len().saturating_sub(1);
         Self {
             words,
@@ -166,29 +168,29 @@ enum Slot {
 
 /// The slot of `id`.
 fn slot(id: ObjectId) -> Slot {
-    let v = id.get();
-    if v >= 0 {
-        usize::try_from(v)
+    let id = id.get();
+    if id >= 0 {
+        usize::try_from(id)
             .ok()
-            .filter(|&i| i < DENSE)
+            .filter(|&index| index < DENSE)
             .map_or(Slot::FarAbove, Slot::Ahead)
     } else {
         // −2 is behind[0]; no object's id is −1
-        usize::try_from(-i64::from(v) - 2)
+        usize::try_from(-i64::from(id) - 2)
             .ok()
-            .filter(|&i| i < DENSE)
+            .filter(|&index| index < DENSE)
             .map_or(Slot::FarBelow, Slot::Behind)
     }
 }
 
-/// The id of `ahead[i]`.
-fn ahead_id(i: usize) -> Option<ObjectId> {
-    ObjectId::of_field(i32::try_from(i).ok()?)
+/// The id of `ahead[index]`.
+fn ahead_id(index: usize) -> Option<ObjectId> {
+    ObjectId::of_field(i32::try_from(index).ok()?)
 }
 
-/// The id of `behind[i]`.
-fn behind_id(i: usize) -> Option<ObjectId> {
-    ObjectId::of_field(-i32::try_from(i).ok()? - 2)
+/// The id of `behind[index]`.
+fn behind_id(index: usize) -> Option<ObjectId> {
+    ObjectId::of_field(-i32::try_from(index).ok()? - 2)
 }
 
 impl<T> IdTable<T> {
@@ -214,8 +216,8 @@ impl<T> IdTable<T> {
     #[must_use]
     pub fn get(&self, id: ObjectId) -> Option<&T> {
         match slot(id) {
-            Slot::Ahead(i) => self.ahead.get(i),
-            Slot::Behind(i) => self.behind.get(i),
+            Slot::Ahead(ahead_index) => self.ahead.get(ahead_index),
+            Slot::Behind(index) => self.behind.get(index),
             Slot::FarBelow => self.far_below.get(&id),
             Slot::FarAbove => self.far_above.get(&id),
         }
@@ -224,8 +226,8 @@ impl<T> IdTable<T> {
     /// The value of `id` to change.
     pub fn get_mut(&mut self, id: ObjectId) -> Option<&mut T> {
         match slot(id) {
-            Slot::Ahead(i) => self.ahead.get_mut(i),
-            Slot::Behind(i) => self.behind.get_mut(i),
+            Slot::Ahead(ahead_index) => self.ahead.get_mut(ahead_index),
+            Slot::Behind(index) => self.behind.get_mut(index),
             Slot::FarBelow => self.far_below.get_mut(&id),
             Slot::FarAbove => self.far_above.get_mut(&id),
         }
@@ -240,8 +242,8 @@ impl<T> IdTable<T> {
     /// `value` for `id`; the value it held before.
     pub fn insert(&mut self, id: ObjectId, value: T) -> Option<T> {
         let old = match slot(id) {
-            Slot::Ahead(i) => self.ahead.put(i, value),
-            Slot::Behind(i) => self.behind.put(i, value),
+            Slot::Ahead(ahead_index) => self.ahead.put(ahead_index, value),
+            Slot::Behind(index) => self.behind.put(index, value),
             Slot::FarBelow => self.far_below.insert(id, value),
             Slot::FarAbove => self.far_above.insert(id, value),
         };
@@ -278,8 +280,8 @@ impl<T> IdTable<T> {
     /// The value of `id` taken out.
     pub fn remove(&mut self, id: ObjectId) -> Option<T> {
         let old = match slot(id) {
-            Slot::Ahead(i) => self.ahead.take(i),
-            Slot::Behind(i) => self.behind.take(i),
+            Slot::Ahead(ahead_index) => self.ahead.take(ahead_index),
+            Slot::Behind(index) => self.behind.take(index),
             Slot::FarBelow => self.far_below.remove(&id),
             Slot::FarAbove => self.far_above.remove(&id),
         };
@@ -324,130 +326,130 @@ impl<T> IdTable<T> {
 
     /// Every value, in its id's order.
     pub fn values(&self) -> impl Iterator<Item = &T> {
-        self.iter().map(|(_, v)| v)
+        self.iter().map(|(_, value)| value)
     }
 
     /// Every value to change, in its id's order.
     pub fn values_mut(&mut self) -> impl Iterator<Item = &mut T> {
-        self.iter_mut().map(|(_, v)| v)
+        self.iter_mut().map(|(_, value)| value)
     }
 }
 
 /// [`IdTable::iter`]'s walk.
 #[derive(Clone, Debug)]
-pub struct Iter<'a, T> {
+pub struct Iter<'table, T> {
     /// The ids below the columns.
-    far_below: btree_map::Iter<'a, ObjectId, T>,
+    far_below: btree_map::Iter<'table, ObjectId, T>,
     /// The negative column, falling indices (rising ids).
-    behind: (&'a [Option<T>], Bits<'a>),
+    behind: (&'table [Option<T>], Bits<'table>),
     /// The non-negative column, rising.
-    ahead: (&'a [Option<T>], Bits<'a>),
+    ahead: (&'table [Option<T>], Bits<'table>),
     /// The ids past the columns.
-    far_above: btree_map::Iter<'a, ObjectId, T>,
+    far_above: btree_map::Iter<'table, ObjectId, T>,
 }
 
-impl<'a, T> Iterator for Iter<'a, T> {
-    type Item = (ObjectId, &'a T);
+impl<'table, T> Iterator for Iter<'table, T> {
+    type Item = (ObjectId, &'table T);
 
     fn next(&mut self) -> Option<Self::Item> {
-        if let Some((&id, v)) = self.far_below.next() {
-            return Some((id, v));
+        if let Some((&id, value)) = self.far_below.next() {
+            return Some((id, value));
         }
-        for i in self.behind.1.by_ref() {
-            if let (Some(id), Some(Some(v))) = (behind_id(i), self.behind.0.get(i)) {
-                return Some((id, v));
+        for index in self.behind.1.by_ref() {
+            if let (Some(id), Some(Some(value))) = (behind_id(index), self.behind.0.get(index)) {
+                return Some((id, value));
             }
         }
-        for i in self.ahead.1.by_ref() {
-            if let (Some(id), Some(Some(v))) = (ahead_id(i), self.ahead.0.get(i)) {
-                return Some((id, v));
+        for index in self.ahead.1.by_ref() {
+            if let (Some(id), Some(Some(value))) = (ahead_id(index), self.ahead.0.get(index)) {
+                return Some((id, value));
             }
         }
-        self.far_above.next().map(|(&id, v)| (id, v))
+        self.far_above.next().map(|(&id, value)| (id, value))
     }
 }
 
 /// A walk past its last id stays at its end: each part's walk does.
 impl<T> FusedIterator for Iter<'_, T> {}
 
-impl<'a, T> IntoIterator for &'a IdTable<T> {
-    type Item = (ObjectId, &'a T);
-    type IntoIter = Iter<'a, T>;
+impl<'table, T> IntoIterator for &'table IdTable<T> {
+    type Item = (ObjectId, &'table T);
+    type IntoIter = Iter<'table, T>;
 
-    fn into_iter(self) -> Iter<'a, T> {
+    fn into_iter(self) -> Iter<'table, T> {
         self.iter()
     }
 }
 
 /// The negative column's values to change, falling indices: each taken off the slice's end.
 #[derive(Debug)]
-struct Falling<'a, T> {
+struct Falling<'table, T> {
     /// The values not passed yet (indices below the last one walked).
-    values: &'a mut [Option<T>],
+    values: &'table mut [Option<T>],
     /// The held indices, falling.
-    bits: Bits<'a>,
+    bits: Bits<'table>,
 }
 
 /// The non-negative column's values to change, rising: each taken off the slice's front.
 #[derive(Debug)]
-struct Rising<'a, T> {
+struct Rising<'table, T> {
     /// The values not passed yet, from index `at` on.
-    values: &'a mut [Option<T>],
+    values: &'table mut [Option<T>],
     /// The index of `values[0]`.
     at: usize,
     /// The held indices, rising.
-    bits: Bits<'a>,
+    bits: Bits<'table>,
 }
 
 /// [`IdTable::iter_mut`]'s walk.
 #[derive(Debug)]
-pub struct IterMut<'a, T> {
+pub struct IterMut<'table, T> {
     /// The ids below the columns.
-    far_below: btree_map::IterMut<'a, ObjectId, T>,
+    far_below: btree_map::IterMut<'table, ObjectId, T>,
     /// The negative column.
-    behind: Falling<'a, T>,
+    behind: Falling<'table, T>,
     /// The non-negative column.
-    ahead: Rising<'a, T>,
+    ahead: Rising<'table, T>,
     /// The ids past the columns.
-    far_above: btree_map::IterMut<'a, ObjectId, T>,
+    far_above: btree_map::IterMut<'table, ObjectId, T>,
 }
 
-impl<'a, T> Iterator for IterMut<'a, T> {
-    type Item = (ObjectId, &'a mut T);
+impl<'table, T> Iterator for IterMut<'table, T> {
+    type Item = (ObjectId, &'table mut T);
 
     fn next(&mut self) -> Option<Self::Item> {
-        if let Some((&id, v)) = self.far_below.next() {
-            return Some((id, v));
+        if let Some((&id, value)) = self.far_below.next() {
+            return Some((id, value));
         }
-        for i in self.behind.bits.by_ref() {
+        for index in self.behind.bits.by_ref() {
             // a held index lies below the values not passed yet, so the split finds it
-            let (head, tail) = mem_take(&mut self.behind.values).split_at_mut_checked(i)?;
+            let (head, tail) = mem_take(&mut self.behind.values).split_at_mut_checked(index)?;
             self.behind.values = head;
-            if let (Some(id), Some(Some(v))) = (behind_id(i), tail.first_mut()) {
-                return Some((id, v));
+            if let (Some(id), Some(Some(value))) = (behind_id(index), tail.first_mut()) {
+                return Some((id, value));
             }
         }
-        for i in self.ahead.bits.by_ref() {
+        for index in self.ahead.bits.by_ref() {
             let rest = mem_take(&mut self.ahead.values);
-            let (head, tail) = rest.split_at_mut_checked(i.checked_sub(self.ahead.at)? + 1)?;
+            let (head, tail) = rest.split_at_mut_checked(index.checked_sub(self.ahead.at)? + 1)?;
             self.ahead.values = tail;
-            self.ahead.at = i + 1;
-            if let (Some(id), Some(Some(v))) = (ahead_id(i), head.last_mut()) {
-                return Some((id, v));
+            self.ahead.at = index + 1;
+            if let (Some(id), Some(Some(value))) = (ahead_id(index), head.last_mut()) {
+                return Some((id, value));
             }
         }
-        self.far_above.next().map(|(&id, v)| (id, v))
+        self.far_above.next().map(|(&id, value)| (id, value))
     }
 }
 
 /// A walk past its last id stays at its end: each part's walk does.
 impl<T> FusedIterator for IterMut<'_, T> {}
 
-impl<'a, T> IntoIterator for &'a mut IdTable<T> {
-    type Item = (ObjectId, &'a mut T);
-    type IntoIter = IterMut<'a, T>;
+impl<'table, T> IntoIterator for &'table mut IdTable<T> {
+    type Item = (ObjectId, &'table mut T);
+    type IntoIter = IterMut<'table, T>;
 
-    fn into_iter(self) -> IterMut<'a, T> {
+    fn into_iter(self) -> IterMut<'table, T> {
         self.iter_mut()
     }
 }
@@ -520,26 +522,26 @@ mod tests {
             1,
         ];
         let mut seed = 7_u32;
-        for (index, &v) in ids.iter().cycle().take(400).enumerate() {
+        for (index, &value) in ids.iter().cycle().take(400).enumerate() {
             seed = seed.wrapping_mul(1_103_515_245).wrapping_add(12_345);
             if seed >> 30 == 0 {
-                assert_eq!(table.remove(id(v)), map.remove(&id(v)));
+                assert_eq!(table.remove(id(value)), map.remove(&id(value)));
             } else {
-                assert_eq!(table.insert(id(v), index), map.insert(id(v), index));
+                assert_eq!(table.insert(id(value), index), map.insert(id(value), index));
             }
             assert_eq!(table.len(), map.len());
             assert!(
                 table
                     .iter()
-                    .map(|(k, &x)| (k, x))
-                    .eq(map.iter().map(|(&k, &x)| (k, x)))
+                    .map(|(object_id, &x)| (object_id, x))
+                    .eq(map.iter().map(|(&object_id, &x)| (object_id, x)))
             );
             let walked: Vec<ObjectId> = table.iter_mut().map(|(object_id, _)| object_id).collect();
             assert!(walked.into_iter().eq(map.keys().copied()));
         }
-        for &v in &ids {
-            assert_eq!(table.get(id(v)), map.get(&id(v)));
-            assert_eq!(table.contains_key(id(v)), map.contains_key(&id(v)));
+        for &value in &ids {
+            assert_eq!(table.get(id(value)), map.get(&id(value)));
+            assert_eq!(table.contains_key(id(value)), map.contains_key(&id(value)));
         }
     }
 
@@ -551,8 +553,8 @@ mod tests {
             .into_iter()
             .collect();
         *table.get_mut(id(-4)).unwrap() += 5;
-        for v in table.values_mut() {
-            *v *= 10;
+        for value in table.values_mut() {
+            *value *= 10;
         }
         assert_eq!(table.values().copied().collect::<Vec<_>>(), [70, 10, 90]);
         assert_eq!(

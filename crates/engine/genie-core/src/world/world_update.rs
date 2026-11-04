@@ -6,7 +6,7 @@ use crate::construction::build::CART_TASK;
 use crate::movement::Speed;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
-use crate::objects::masters::PlayersMasters;
+use crate::objects::masters::PlayersMastersExt;
 use crate::objects::masters::player_master;
 use crate::objects::unit::Outcome;
 use crate::ownership::capture::Captured;
@@ -17,7 +17,7 @@ use crate::trace::{UPDATE, object_freezes, player_unsupported};
 use crate::world::Millis;
 use crate::world::Seconds;
 use crate::world::World;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 use crate::{GenieError, GenieResult};
 
 /// Whether the object list's loop counts on past the object it filed ([`World::file_step`]).
@@ -53,7 +53,7 @@ impl World {
             let stopped: Vec<bool> = self
                 .players
                 .iter()
-                .map(|p| p.unsupported.is_some())
+                .map(|player| player.unsupported.is_some())
                 .collect();
             self.run(command);
             // a player the command stopped: its error names the command
@@ -76,7 +76,7 @@ impl World {
         let masters = &self.model.masters;
         self.spatial.grow_unknown(dt, |player, master| {
             player_master(masters, player, master)
-                .and_then(|m| m.move_stats)
+                .and_then(|master| master.move_stats)
                 .map_or(Speed::new(f32::INFINITY), |move_stats| move_stats.base)
         });
     }
@@ -99,8 +99,9 @@ impl World {
             .map(|masters| {
                 masters
                     .iter()
-                    .filter(|m| {
-                        m.action_part()
+                    .filter(|master| {
+                        master
+                            .action_part()
                             .tasks
                             .iter()
                             .any(|task| task.action_kind == CART_TASK)
@@ -158,7 +159,7 @@ impl World {
             match self.step_object(
                 (player_id, list_index),
                 (dt, turn, true),
-                |u, action, step| u.update(action, step, &roles, slots),
+                |unit, action, step| unit.update(action, step, &roles, slots),
             ) {
                 Ok(stepped) => {
                     if self.file_step(player_id, stepped.slot, stepped.outcome)?
@@ -195,13 +196,13 @@ impl World {
         match outcome {
             Outcome::Leave => {
                 let gone = self.swap_remove_live(player_id, list_index)?;
-                if let Err(e) = self.leave_world(player_id, &gone) {
-                    player_unsupported(self.ticks, player_id, &e);
+                if let Err(error) = self.leave_world(player_id, &gone) {
+                    player_unsupported(self.ticks, player_id, &error);
                     let _ = self
                         .players
                         .player_mut(player_id)?
                         .unsupported
-                        .get_or_insert((self.ticks, list_index, e));
+                        .get_or_insert((self.ticks, list_index, error));
                 }
                 // the list's last object took its place
                 Ok(ListCount::Again)
@@ -229,7 +230,7 @@ impl World {
                 // and its new owner's parts
                 let player = self.players.player(player_id)?;
                 let id = player.live(list_index)?.id;
-                let watched = player.watched.iter().any(|w| w.id == id);
+                let watched = player.watched.iter().any(|watched| watched.id == id);
                 if let Err(error) = self.building_changes_hands(player_id, id, new, watched) {
                     player_unsupported(self.ticks, player_id, &error);
                     let _ = self
@@ -248,8 +249,8 @@ impl World {
         }
     }
 
-    /// The units of player `player_id` a takeover in object `i`'s update captured go to their new
-    /// owner: the object itself when the new owner has its master (`main`), and the units taken
+    /// The units of player `player_id` a takeover in object `slot`'s update captured go to their
+    /// new owner: the object itself when the new owner has its master (`main`), and the units taken
     /// with it (`also`). The old owner's list loses them (`FUN_1411664a0`, the last in each place;
     /// the loop goes on past the first) and the new owner's gains them (`FUN_141616200`), each with
     /// its attributes ([`World::hand_over_attributes`]).
@@ -260,7 +261,7 @@ impl World {
     fn hand_over_units(
         &mut self,
         player_id: PlayerId,
-        i: ListIndex,
+        slot: ListIndex,
         taken: Captured,
     ) -> GenieResult<()> {
         let Captured {
@@ -268,7 +269,7 @@ impl World {
         } = taken;
         let mut moved = Vec::new();
         if main {
-            moved.push(self.swap_remove_live(player_id, i)?);
+            moved.push(self.swap_remove_live(player_id, slot)?);
         }
         for id in also {
             if let Some(list_index) = self.live_index(player_id, id) {
@@ -276,9 +277,11 @@ impl World {
             }
         }
         let mut failed = None;
-        for u in &moved {
-            if let Err(e) = self.hand_over_attributes(player_id, new, u.parts.own_master.as_ref()) {
-                let _ = failed.get_or_insert(e);
+        for object in &moved {
+            if let Err(error) =
+                self.hand_over_attributes(player_id, new, object.parts.own_master.as_ref())
+            {
+                let _ = failed.get_or_insert(error);
             }
         }
         if let Some(error) = failed {
@@ -287,7 +290,7 @@ impl World {
                 .players
                 .player_mut(player_id)?
                 .unsupported
-                .get_or_insert((self.ticks, i, error));
+                .get_or_insert((self.ticks, slot, error));
         }
         // each one's slot 0x70: the old owner's remove (slot 0x2d8), the new owner's add (slot
         // 0x2d0), each tracker by its own masters
@@ -303,21 +306,24 @@ impl World {
                 .player_mut(player_id)?
                 .tracker
                 .remove(object.unit.id, old);
-            let k = key(
+            let key = key(
                 self.model.masters.of(new),
                 &self.model.lines,
                 master_id,
                 &self.model.roles,
             );
-            self.players.player_mut(new)?.tracker.add(object.unit.id, k);
+            self.players
+                .player_mut(new)?
+                .tracker
+                .add(object.unit.id, key);
         }
         self.extend_live(new, moved)
     }
 
-    /// Object `id` of player `player_id`, whose step at the loop's count `i` failed with `error`,
-    /// freezes: it stays in its list, stopped, its error in the player's freezes, and the player
-    /// keeps its first error with the object's slot (the count, once the step took it from the
-    /// list).
+    /// Object `id` of player `player_id`, whose step at the loop's count `list_slot` failed with
+    /// `error`, freezes: it stays in its list, stopped, its error in the player's freezes, and the
+    /// player keeps its first error with the object's slot (the count, once the step took it from
+    /// the list).
     ///
     /// # Errors
     ///
@@ -325,22 +331,22 @@ impl World {
     fn freeze_object(
         &mut self,
         player_id: PlayerId,
-        (i, id): (ListIndex, ObjectId),
-        e: GenieError,
+        (list_slot, id): (ListIndex, ObjectId),
+        why: GenieError,
     ) -> GenieResult<()> {
         let slot = self.live_index(player_id, id);
         let player = self.players.player_mut(player_id)?;
         let error = match slot {
-            Some(k) => {
-                player
-                    .live(k)?
-                    .in_context(self.parts.actions_of(id), self.parts.unit_ai.get(id), e)
-            }
-            None => e.with("object", id),
+            Some(list_index) => player.live(list_index)?.in_context(
+                self.parts.actions_of(id),
+                self.parts.unit_ai.get(id),
+                why,
+            ),
+            None => why.with("object", id),
         };
         object_freezes(self.ticks, player_id, id, &error);
         player.freezes.push((self.ticks, id, error.clone()));
-        let first = (self.ticks, slot.unwrap_or(i), error);
+        let first = (self.ticks, slot.unwrap_or(list_slot), error);
         let _ = player.unsupported.get_or_insert(first);
         if let Some(list_index) = slot {
             player.live_mut(list_index)?.stopped = true;

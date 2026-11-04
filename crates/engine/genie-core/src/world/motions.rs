@@ -20,15 +20,15 @@ use std::mem::replace;
 /// others read as the table's, the lent one as none (its object is out for its update, as its
 /// row is out of its list).
 #[derive(Debug)]
-pub struct Lent<'a, T> {
+pub struct Lent<'table, T> {
     /// The parts before the lent one's slot (all of them where none is lent).
-    before: &'a [T],
+    before: &'table [T],
     /// The parts after the lent one's slot.
-    after: &'a [T],
+    after: &'table [T],
     /// The slot of the part lent out, none where none is.
     out: Option<usize>,
     /// Each object's slot.
-    slots: &'a IdTable<usize>,
+    slots: &'table IdTable<usize>,
 }
 
 impl<T> Clone for Lent<'_, T> {
@@ -39,10 +39,10 @@ impl<T> Clone for Lent<'_, T> {
 
 impl<T> Copy for Lent<'_, T> {}
 
-impl<'a, T> Lent<'a, T> {
+impl<'table, T> Lent<'table, T> {
     /// Object `id`'s part, none for an object without one or the one lent out.
     #[must_use]
-    pub fn get(&self, id: ObjectId) -> Option<&'a T> {
+    pub fn get(&self, id: ObjectId) -> Option<&'table T> {
         let slot = *self.slots.get(id)?;
         match self.out {
             None => self.before.get(slot),
@@ -180,11 +180,11 @@ impl Parts {
     /// static object) and the world's objects by id beside it (`players`, `index` and
     /// the other parts' tables and the `model`'s masters, roles and tuning), which read the
     /// others' motion.
-    pub(crate) fn lend_motion<'a>(
-        &'a mut self,
+    pub(crate) fn lend_motion<'world>(
+        &'world mut self,
         id: ObjectId,
-        (players, index, model): (&'a [Player], &'a ObjectIndex, &'a Model),
-    ) -> (MotionMut<'a>, ObjectsRef<'a>) {
+        (players, index, model): (&'world [Player], &'world ObjectIndex, &'world Model),
+    ) -> (MotionMut<'world>, ObjectsRef<'world>) {
         let (motion, motions) = self.motion.lend(id);
         (
             MotionMut::new(motion),
@@ -208,11 +208,11 @@ impl Parts {
     /// Object `id`'s mover lent out of the motion table to change (none for an object that does
     /// not move) and the world's objects by id beside it ([`Parts::lend_motion`]): its walk
     /// reads the others' gaits while it moves.
-    pub(crate) fn lend_mover<'a>(
-        &'a mut self,
+    pub(crate) fn lend_mover<'world>(
+        &'world mut self,
         id: ObjectId,
-        tables: (&'a [Player], &'a ObjectIndex, &'a Model),
-    ) -> (Option<&'a mut Mover>, ObjectsRef<'a>) {
+        tables: (&'world [Player], &'world ObjectIndex, &'world Model),
+    ) -> (Option<&'world mut Mover>, ObjectsRef<'world>) {
         let (motion, by_id) = self.lend_motion(id, tables);
         (motion.into_mover(), by_id)
     }
@@ -256,7 +256,7 @@ impl Parts {
     /// animated layer alone. The caller holds the object: its row is borrowed from the world's
     /// lists, which this borrow leaves alone.
     pub(crate) fn put_mover(&mut self, id: ObjectId, mover: Option<Mover>) {
-        let animated = self.motion.get(id).map(|m| *m.animated());
+        let animated = self.motion.get(id).map(|motion| *motion.animated());
         match Motion::of(animated, mover) {
             Some(motion) => {
                 let _ = self.motion.insert(id, motion);

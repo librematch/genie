@@ -59,8 +59,8 @@ fn sse_nan(result: f32, operands: &[f32]) -> f32 {
     if !result.is_nan() {
         return result;
     }
-    let nan = operands.iter().find(|o| o.is_nan());
-    f32::from_bits(nan.map_or(INDEFINITE, |o| o.to_bits() | QUIET))
+    let nan = operands.iter().find(|operand| operand.is_nan());
+    f32::from_bits(nan.map_or(INDEFINITE, |operand| operand.to_bits() | QUIET))
 }
 
 /// [`sse_nan`] in f64.
@@ -68,8 +68,8 @@ fn sse_nan_f64(result: f64, operands: &[f64]) -> f64 {
     if !result.is_nan() {
         return result;
     }
-    let nan = operands.iter().find(|o| o.is_nan());
-    f64::from_bits(nan.map_or(INDEFINITE_F64, |o| o.to_bits() | QUIET_F64))
+    let nan = operands.iter().find(|operand| operand.is_nan());
+    f64::from_bits(nan.map_or(INDEFINITE_F64, |operand| operand.to_bits() | QUIET_F64))
 }
 
 /// An f64 rounded to f32 as `CVTSD2SS` does: a NaN keeps its sign and the top 23 bits of its
@@ -78,9 +78,12 @@ const fn narrow(x: f64) -> f32 {
     if !x.is_nan() {
         return x as f32;
     }
-    let b = x.to_bits();
+    let bits = x.to_bits();
     f32::from_bits(
-        ((b >> 32) as u32 & 0x8000_0000) | 0x7f80_0000 | ((b >> 29) as u32 & 0x007f_ffff) | QUIET,
+        ((bits >> 32) as u32 & 0x8000_0000)
+            | 0x7f80_0000
+            | ((bits >> 29) as u32 & 0x007f_ffff)
+            | QUIET,
     )
 }
 
@@ -89,9 +92,12 @@ fn widen(x: f32) -> f64 {
     if !x.is_nan() {
         return f64::from(x);
     }
-    let b = u64::from(x.to_bits());
+    let bits = u64::from(x.to_bits());
     f64::from_bits(
-        ((b & 0x8000_0000) << 32) | 0x7ff0_0000_0000_0000 | ((b & 0x007f_ffff) << 29) | QUIET_F64,
+        ((bits & 0x8000_0000) << 32)
+            | 0x7ff0_0000_0000_0000
+            | ((bits & 0x007f_ffff) << 29)
+            | QUIET_F64,
     )
 }
 
@@ -109,32 +115,36 @@ const fn fabs(x: f32) -> f32 {
 /// `0x14099e870`, msun's isnan as the game compiles it: `x` widened to a double (`CVTSS2SD`), the
 /// high word without its sign plus 1 for a non-zero low word, above the infinity's `0x7ff00000`.
 fn is_nan(x: f32) -> bool {
-    let d = f64::from(x).to_bits();
-    ((d >> 32) as u32 & 0x7fff_ffff) + u32::from(d as u32 != 0) > 0x7ff0_0000
+    let bits = f64::from(x).to_bits();
+    ((bits >> 32) as u32 & 0x7fff_ffff) + u32::from(bits as u32 != 0) > 0x7ff0_0000
 }
 
-/// `COMISS a, b` then `JC`: taken when `a` is less than `b` or either is NaN (unordered).
+/// `COMISS left, right` then `JC`: taken when `left` is less than `right` or either is NaN
+/// (unordered).
 #[must_use]
-pub fn below_or_unordered(a: f32, b: f32) -> bool {
-    a < b || a.is_nan() || b.is_nan()
+pub fn below_or_unordered(left: f32, right: f32) -> bool {
+    left < right || left.is_nan() || right.is_nan()
 }
 
-/// `COMISS a, b` then `JBE`: taken when `a` is at most `b` or either is NaN (unordered).
+/// `COMISS left, right` then `JBE`: taken when `left` is at most `right` or either is NaN
+/// (unordered).
 #[must_use]
-pub fn at_most_or_unordered(a: f32, b: f32) -> bool {
-    a <= b || a.is_nan() || b.is_nan()
+pub fn at_most_or_unordered(left: f32, right: f32) -> bool {
+    left <= right || left.is_nan() || right.is_nan()
 }
 
-/// `MINSS a, b`: `a` when it is less than `b`, else `b` (also when either is NaN).
+/// `MINSS left, right`: `left` when it is less than `right`, else `right` (also when either is
+/// NaN).
 #[must_use]
-pub fn minss(a: f32, b: f32) -> f32 {
-    if a < b { a } else { b }
+pub fn minss(left: f32, right: f32) -> f32 {
+    if left < right { left } else { right }
 }
 
-/// `MAXSS a, b`: `a` when it is greater than `b`, else `b` (also when either is NaN).
+/// `MAXSS left, right`: `left` when it is greater than `right`, else `right` (also when either is
+/// NaN).
 #[must_use]
-pub fn maxss(a: f32, b: f32) -> f32 {
-    if a > b { a } else { b }
+pub fn maxss(left: f32, right: f32) -> f32 {
+    if left > right { left } else { right }
 }
 
 #[cfg(test)]

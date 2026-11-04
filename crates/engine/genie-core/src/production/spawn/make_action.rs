@@ -23,8 +23,8 @@ use crate::unit_ai::NotifyKind;
 use crate::world::PlayState;
 use crate::world::Seconds;
 use crate::world::World;
-use crate::world::slots::CheckedIndex;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::CheckedIndexExt;
+use crate::world::slots::PlayerSlotsExt;
 use crate::{GenieError, GenieResult};
 
 /// A queue that is enabled and counts an entry, but holds none.
@@ -149,7 +149,7 @@ impl World {
             .parts
             .production
             .get(self.players.live(player_id, list_index)?.id)
-            .and_then(|q| q.queue.first().copied())
+            .and_then(|production| production.queue.first().copied())
         else {
             return Ok(());
         };
@@ -227,7 +227,7 @@ impl World {
             .parts
             .production
             .get(self.players.live(player_id, list_index)?.id)
-            .and_then(|q| q.queue.first())
+            .and_then(|production| production.queue.first())
             .and_then(|entry| entry.tech)
             && self
                 .model
@@ -297,7 +297,7 @@ impl World {
         list_index: ListIndex,
         make_tech: &mut MakeTech,
     ) -> GenieResult<()> {
-        let (t, def) = self.research_tech(player_id, make_tech.tech)?;
+        let (tech_index, def) = self.research_tech(player_id, make_tech.tech)?;
         let owner = self.players.player(player_id)?;
         let factors = factors(make_tech.tech, owner, self.model.slots)?;
         let paid = self
@@ -308,7 +308,7 @@ impl World {
             .map_or(NO_COSTS, |entry| entry.costs);
         if !owner
             .techs
-            .checked(t)?
+            .checked(tech_index)?
             .start_test(def, factors, &paid, owner)?
         {
             return Err(GenieError::unsupported(
@@ -316,7 +316,11 @@ impl World {
             ));
         }
         let master = owner.objects.checked(list_index)?.life.master_id;
-        let state = self.players.player_mut(player_id)?.techs.checked_mut(t)?;
+        let state = self
+            .players
+            .player_mut(player_id)?
+            .techs
+            .checked_mut(tech_index)?;
         state.state = ResearchState::Researching;
         state.building_master = Some(master);
         make_tech.state = MakeTechState::Researching;
@@ -374,13 +378,13 @@ impl World {
             .and_then(|master_id| player_master(&self.model.masters, player_id, master_id));
         let time = Seconds::of_master(make.time(made, building.life.master_id)).get();
         let progress = Seconds::new(rate * dt_seconds) + make.progress;
-        if let Some(Some(Making::Unit(m))) = self
+        if let Some(Some(Making::Unit(make_obj))) = self
             .parts
             .production
             .get_mut(self.players.live(player_id, list_index)?.id)
-            .map(|q| q.action.as_mut())
+            .map(|production| production.action.as_mut())
         {
-            m.progress = progress;
+            make_obj.progress = progress;
         }
         if below_or_unordered(progress.get(), time) {
             return Ok(UpdateCode::UnderWay);
@@ -450,7 +454,9 @@ impl World {
             let made = make
                 .master
                 .and_then(|master_id| player_master(&self.model.masters, player_id, master_id));
-            let pop = made.map_or(Amount::ZERO, |m| population(&m.storage, &self.model.roles));
+            let pop = made.map_or(Amount::ZERO, |master| {
+                population(&master.storage, &self.model.roles)
+            });
             let refund = (!make.paid).then(|| made.cloned()).flatten();
             let owner = self.players.player_mut(player_id)?;
             owner.add_attribute(self.model.slots.attribute.in_production, -pop)?;

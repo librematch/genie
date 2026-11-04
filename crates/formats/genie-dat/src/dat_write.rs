@@ -215,16 +215,32 @@ mod tests {
             usize,
         );
         let blocks: [Block; 4] = [
-            (|o| write_map_header(o), |i| skip_map_header(i), 24),
-            (|o| write_map_bounds(o), |i| skip_map_bounds(i), 4 + 24 + 28),
-            (|o| write_map_search(o), |i| skip_map_search(i), 8 + 3 + 649),
-            (|o| write_kill_rates(o), |i| skip_kill_rates(i), 28),
+            (
+                |output| write_map_header(output),
+                |input| skip_map_header(input),
+                24,
+            ),
+            (
+                |output| write_map_bounds(output),
+                |input| skip_map_bounds(input),
+                4 + 24 + 28,
+            ),
+            (
+                |output| write_map_search(output),
+                |input| skip_map_search(input),
+                8 + 3 + 649,
+            ),
+            (
+                |output| write_kill_rates(output),
+                |input| skip_kill_rates(input),
+                28,
+            ),
         ];
         for (write, skip, len) in blocks {
             let mut bytes = vec![];
             write(&mut bytes).unwrap();
             assert_eq!(bytes.len(), len);
-            assert!(bytes.iter().all(|&b| b == 0));
+            assert!(bytes.iter().all(|&byte| byte == 0));
             let mut input = bytes.as_slice();
             skip(&mut input).unwrap();
             assert_eq!(input, []);

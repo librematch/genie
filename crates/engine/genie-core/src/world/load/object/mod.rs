@@ -13,20 +13,16 @@ use crate::combat::missile::{MISSILE, Missile};
 use crate::construction::Annexes;
 use crate::construction::BuilderCount;
 use crate::construction::MainBuildingId;
-use crate::construction::build::Construction;
 use crate::garrison::RaiderCountdown;
 use crate::gathering::PastureId;
 use crate::groups::{GroupId, GroupLink};
 use crate::map::Distance;
 use crate::map::Point;
-use crate::map::Snow;
-use crate::map::spatial::Obstruction;
 use crate::map::{Offset, Position};
 use crate::movement::Speed;
 use crate::objects::DamagedTimer;
 use crate::objects::HitPoints;
 use crate::objects::HpPowerup;
-use crate::objects::MasterHitPoints;
 use crate::objects::ObjectId;
 use crate::objects::Regeneration;
 use crate::objects::RelicCount;
@@ -39,8 +35,6 @@ use crate::objects::lifecycle::Lifecycle;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
-use crate::objects::masters::ObstructionClass;
-use crate::objects::masters::ObstructionKind;
 use crate::objects::unit::Unit;
 use crate::objects::unit::UnitFlags;
 use crate::orders::town_bell::{BellShelter, TownBell};
@@ -50,11 +44,15 @@ use crate::players::CivId;
 use crate::players::attribute::AttributeId;
 use crate::unit_ai::{AiAction, UnitAi};
 use crate::world::Seconds;
-use crate::world::WholeSeconds;
+use crate::world::Unread;
 use crate::world::WorldTime;
 use crate::world::layer::generated::MissileTuning;
 use crate::world::load::movers::mover;
-use crate::world::load::object_ids;
+use crate::world::load::object::building::BuildingLists;
+use crate::world::load::object::building::annexes;
+use crate::world::load::object::building::building_lists;
+use crate::world::load::object::building::construction;
+use crate::world::load::object::building::saved_gate;
 use crate::world::load::object_parts::lifecycle;
 use crate::world::load::object_parts::unit_ai;
 use crate::world::load::sub_actions::DefaultStart;
@@ -66,12 +64,13 @@ use crate::world::load::sub_actions::production;
 use crate::world::load::sub_actions::saved_sprite;
 use crate::world::load::top_actions::saved_actions;
 use crate::world::parts::{Object, ObjectParts};
-use crate::world::{Gate, Unread};
 use crate::{GenieError, GenieResult};
 use genie_import::dat::MasterTable;
 use genie_import::save::task_at;
 use genie_save::generated::world::TribeCombatObject;
 use genie_save::generated::world::{Path, PlayerObjects, RgeMissileObject, RgeStaticObject};
+
+pub mod building;
 
 /// The slice's view of one saved object, whole: its row ([`unit`]) and its parts (the gather
 /// point, the production lists, the missile's own fields, the town bell, the unit AI; the dead
@@ -139,7 +138,7 @@ pub fn saved_missile(
         max_range: Distance::new(mo.max_range),
         fired_from: ObjectId::of_field(mo.fired_from_id).map(ShooterId::new),
         charge: mo.is_charge_projectile != 0,
-        flying: distance.is_none_or(|d| missile_tuning.landing < d),
+        flying: distance.is_none_or(|travelled| missile_tuning.landing < travelled),
         step,
     })
 }
@@ -169,7 +168,7 @@ fn row(
     players: usize,
 ) -> (Unit, ObjectParts) {
     let saved = object.static_part();
-    let named = saved.and_then(|s| ObjectId::try_from(s.id).ok());
+    let named = saved.and_then(|rge_static_object| ObjectId::try_from(rge_static_object.id).ok());
     let (Some(rge_static_object), Some(id)) = (saved, named) else {
         let unit = Unit {
             id: ObjectId::UNSAVED,
@@ -196,62 +195,70 @@ fn row(
     // an order or action value no order or action holds: the object's first unmodelled part
     let ((ai, town_bell), ai_read) = match ai_parts(object, id, players) {
         Ok(parts) => (parts, Ok(())),
-        Err(e) => ((None, TownBell::default()), Err(e)),
+        Err(error) => ((None, TownBell::default()), Err(error)),
     };
     let (life, life_read) =
         match lifecycle(object, (rge_static_object, master), objects, civ, masters) {
             Ok(life) => (life, Ok(())),
-            Err(e) => (Lifecycle::default(), Err(e)),
+            Err(error) => (Lifecycle::default(), Err(error)),
         };
     let (lists, lists_read) = match building_lists(object) {
         Ok(lists) => (lists, Ok(())),
-        Err(e) => (BuildingLists::default(), Err(e)),
+        Err(error) => (BuildingLists::default(), Err(error)),
     };
     let gather_read = gather_point(object).map(|_| ());
     // a capture flag no store of the game writes: the object's unmodelled part
-    let capture = object.combat().map_or(Ok(CaptureKind::None), |c| {
-        CaptureKind::try_from(c.rge_combat_object.capture_flag)
-    });
+    let capture = object
+        .combat()
+        .map_or(Ok(CaptureKind::None), |tribe_combat_object| {
+            CaptureKind::try_from(tribe_combat_object.rge_combat_object.capture_flag)
+        });
     let (capture_flag, capture_read) = match capture {
         Ok(capture_kind) => (capture_kind, Ok(())),
-        Err(e) => (CaptureKind::None, Err(e)),
+        Err(error) => (CaptureKind::None, Err(error)),
     };
     let (construction, construction_read) = match construction(object, rge_static_object, objects) {
-        Ok(c) => (c, Ok(())),
-        Err(e) => (None, Err(e)),
+        Ok(construction) => (construction, Ok(())),
+        Err(error) => (None, Err(error)),
     };
     let building = Building {
         construction,
         annex_of: object
             .tribe_building_object
             .as_deref()
-            .and_then(|b| ObjectId::of_field(b.mupt_linked_object_references_linked_owner_id))
-            .map(MainBuildingId::new),
-        annexes: object
-            .tribe_building_object
-            .as_deref()
-            .map_or(Annexes::NONE, |b| {
-                annexes(&b.mupt_linked_object_references_linked_object_ids)
-            }),
-        garrison_time: object
-            .tribe_building_object
-            .as_deref()
-            .map_or(WorldTime::ZERO, |b| {
-                WorldTime::from_millis(b.last_garrison_time)
-            }),
-        relics: object
-            .tribe_building_object
-            .as_deref()
-            .map_or(Relics::NONE, |b| {
-                Relics::new(
-                    RelicCount::of_data(b.relic_count),
-                    RelicCount::of_data(b.specific_relic_count),
+            .and_then(|tribe_building_object| {
+                ObjectId::of_field(
+                    tribe_building_object.mupt_linked_object_references_linked_owner_id,
                 )
-            }),
+            })
+            .map(MainBuildingId::new),
+        annexes: object.tribe_building_object.as_deref().map_or(
+            Annexes::NONE,
+            |tribe_building_object| {
+                annexes(&tribe_building_object.mupt_linked_object_references_linked_object_ids)
+            },
+        ),
+        garrison_time: object.tribe_building_object.as_deref().map_or(
+            WorldTime::ZERO,
+            |tribe_building_object| {
+                WorldTime::from_millis(tribe_building_object.last_garrison_time)
+            },
+        ),
+        relics: object.tribe_building_object.as_deref().map_or(
+            Relics::NONE,
+            |tribe_building_object| {
+                Relics::new(
+                    RelicCount::of_data(tribe_building_object.relic_count),
+                    RelicCount::of_data(tribe_building_object.specific_relic_count),
+                )
+            },
+        ),
         livestock_summation: object
             .tribe_building_object
             .as_deref()
-            .map_or(Amount::ZERO, |b| Amount::new(b.livestock_summation)),
+            .map_or(Amount::ZERO, |tribe_building_object| {
+                Amount::new(tribe_building_object.livestock_summation)
+            }),
         livestock: lists.livestock,
         pasture_workers: lists.pasture_workers,
         attacking_units: lists.attacking_units,
@@ -262,94 +269,135 @@ fn row(
             .tribe_building_object
             .as_deref()
             .and_then(|tribe_building_object| tribe_building_object.is_on_mangrove_shallows)
-            .is_some_and(|v| v != 0),
+            .is_some_and(|byte| byte != 0),
         ..Default::default()
     };
     let combat = Combat {
         work_rate_powerup: object
             .combat()
-            .map_or(WorkRate::ZERO, |c| WorkRate::new(c.work_rate_powerup)),
+            .map_or(WorkRate::ZERO, |tribe_combat_object| {
+                WorkRate::new(tribe_combat_object.work_rate_powerup)
+            }),
         capture_flag,
-        hp_powerup: object.combat().map_or(HpPowerup::NONE, |c| HpPowerup {
-            taken: HitPoints::new(c.hitpoints_powerup),
-            max: HitPoints::new(c.hitpoints_max_powerup),
-        }),
+        hp_powerup: object
+            .combat()
+            .map_or(HpPowerup::NONE, |tribe_combat_object| HpPowerup {
+                taken: HitPoints::new(tribe_combat_object.hitpoints_powerup),
+                max: HitPoints::new(tribe_combat_object.hitpoints_max_powerup),
+            }),
         regen_timer: object
             .combat()
-            .map_or(Seconds::ZERO, |c| Seconds::new(c.berserker_timer)),
+            .map_or(Seconds::ZERO, |tribe_combat_object| {
+                Seconds::new(tribe_combat_object.berserker_timer)
+            }),
         // a building's +0x9e8 is its construction's
         builders: object
             .combat()
             .filter(|_| object.tribe_building_object.is_none())
-            .map_or(BuilderCount::NONE, |c| {
-                BuilderCount::of_data(c.num_builders)
+            .map_or(BuilderCount::NONE, |tribe_combat_object| {
+                BuilderCount::of_data(tribe_combat_object.num_builders)
             }),
-        regen_powerup: Regeneration::new(
-            object.combat().map_or(0.0, |c| c.regeneration_rate_powerup),
+        regen_powerup: Regeneration::new(object.combat().map_or(0.0, |tribe_combat_object| {
+            tribe_combat_object.regeneration_rate_powerup
+        })),
+        regen_stinger: Regeneration::new(object.combat().map_or(0.0, |tribe_combat_object| {
+            tribe_combat_object.regeneration_stinger
+        })),
+        next_volley: MissileCount::of_data(
+            object
+                .combat()
+                .map_or(0, |tribe_combat_object| tribe_combat_object.next_volley),
         ),
-        regen_stinger: Regeneration::new(object.combat().map_or(0.0, |c| c.regeneration_stinger)),
-        next_volley: MissileCount::of_data(object.combat().map_or(0, |c| c.next_volley)),
         raider_countdown: RaiderCountdown::of_data(
-            object.combat().map_or(0, |c| c.raider_build_countdown),
+            object.combat().map_or(0, |tribe_combat_object| {
+                tribe_combat_object.raider_build_countdown
+            }),
         ),
         reload_worldtime: WorldTime::from_millis(
             object
                 .combat()
-                .and_then(|c| c.rge_combat_object.reload_worldtime)
+                .and_then(|tribe_combat_object| {
+                    tribe_combat_object.rge_combat_object.reload_worldtime
+                })
                 .unwrap_or(0),
         ),
         // the load's (FUN_14121ec90): the master's volley fire; the shares of the units inside
         // follow in `garrison_firepower`
         firepower: objects
             .master(rge_static_object.master_obj)
-            .and_then(|m| {
-                m.tribe_master_combat_object.as_deref().or_else(|| {
-                    m.tribe_master_building_object
-                        .as_deref()
-                        .map(|tribe_master_building_object| {
+            .and_then(|master| {
+                master.tribe_master_combat_object.as_deref().or_else(|| {
+                    master.tribe_master_building_object.as_deref().map(
+                        |tribe_master_building_object| {
                             &tribe_master_building_object.tribe_master_combat_object
-                        })
+                        },
+                    )
                 })
             })
             .map_or(Firepower::ZERO, |tribe_master_combat_object| {
                 Firepower::new(tribe_master_combat_object.volley_fire_amount)
             }),
-        attack_timer: object.combat().map_or(Seconds::ZERO, |c| {
-            Seconds::new(c.rge_combat_object.attack_timer)
-        }),
+        attack_timer: object
+            .combat()
+            .map_or(Seconds::ZERO, |tribe_combat_object| {
+                Seconds::new(tribe_combat_object.rge_combat_object.attack_timer)
+            }),
         // the movement damage timer (+0x9a4) is saved; the attack timer's rate and the terrain
         // look are not (the constructor's 1 and none, until the first update's abilities)
         abilities: Abilities {
             movement_damage_timer: object
                 .combat()
-                .map_or(Seconds::ZERO, |c| Seconds::new(c.movement_damage_timer)),
+                .map_or(Seconds::ZERO, |tribe_combat_object| {
+                    Seconds::new(tribe_combat_object.movement_damage_timer)
+                }),
             ..Abilities::default()
         },
         reload_stinger: object
             .combat()
-            .map_or(Seconds::ZERO, |c| Seconds::new(c.reload_stinger)),
+            .map_or(Seconds::ZERO, |tribe_combat_object| {
+                Seconds::new(tribe_combat_object.reload_stinger)
+            }),
         reload_powerup: object
             .combat()
-            .map_or(Seconds::ZERO, |c| Seconds::new(c.reload_powerup)),
-        attack_powerup: AttackPowerup::new(object.combat().map_or(0.0, |c| c.attack_powerup)),
+            .map_or(Seconds::ZERO, |tribe_combat_object| {
+                Seconds::new(tribe_combat_object.reload_powerup)
+            }),
+        attack_powerup: AttackPowerup::new(object.combat().map_or(0.0, |tribe_combat_object| {
+            tribe_combat_object.attack_powerup
+        })),
         range_powerup: object
             .combat()
-            .map_or(Distance::ZERO, |c| Distance::new(c.max_range_powerup)),
-        armor_powerups: object.combat().map_or(ArmorPair::ZERO, |c| {
-            ArmorPair::new(c.melee_armor_powerup as i16, c.pierce_armor_powerup as i16)
-        }),
-        armor_removed: object.combat().map_or(ArmorPair::ZERO, |c| {
-            ArmorPair::new(c.melee_armor_removed, c.pierce_armor_removed)
-        }),
-        charge: object
+            .map_or(Distance::ZERO, |tribe_combat_object| {
+                Distance::new(tribe_combat_object.max_range_powerup)
+            }),
+        armor_powerups: object
             .combat()
-            .map_or(Charge::ZERO, |c| Charge::new(c.charge)),
-        charge_hit: object
+            .map_or(ArmorPair::ZERO, |tribe_combat_object| {
+                ArmorPair::new(
+                    tribe_combat_object.melee_armor_powerup as i16,
+                    tribe_combat_object.pierce_armor_powerup as i16,
+                )
+            }),
+        armor_removed: object
             .combat()
-            .is_some_and(|c| c.rge_combat_object.hit_something_valid_for_charge_attack != 0),
+            .map_or(ArmorPair::ZERO, |tribe_combat_object| {
+                ArmorPair::new(
+                    tribe_combat_object.melee_armor_removed,
+                    tribe_combat_object.pierce_armor_removed,
+                )
+            }),
+        charge: object.combat().map_or(Charge::ZERO, |tribe_combat_object| {
+            Charge::new(tribe_combat_object.charge)
+        }),
+        charge_hit: object.combat().is_some_and(|tribe_combat_object| {
+            tribe_combat_object
+                .rge_combat_object
+                .hit_something_valid_for_charge_attack
+                != 0
+        }),
         attack_count: object
             .combat()
-            .map(|c| &c.rge_combat_object)
+            .map(|tribe_combat_object| &tribe_combat_object.rge_combat_object)
             .or_else(|| {
                 object
                     .rge_object
@@ -420,7 +468,8 @@ fn row(
             rge_static_object.tz,
         )),
         // every animated object's current sprite, which slot 0x68 and the sprite list read
-        sprite: masters.and_then(|t| saved_sprite(rge_static_object, &t.graphics)),
+        sprite: masters
+            .and_then(|master_table| saved_sprite(rge_static_object, &master_table.graphics)),
         ..Unit::default()
     };
     let mut actions = Action::default();
@@ -431,14 +480,14 @@ fn row(
             rge_static_object,
             objects,
             // the Build's task with the builder's powerup (its combat layer's)
-            |m| {
-                build_task(objects, civ, masters, m).map(|mut t| {
-                    t.work_rate += combat.work_rate_powerup;
-                    t
+            |master| {
+                build_task(objects, civ, masters, master).map(|mut build_task| {
+                    build_task.work_rate += combat.work_rate_powerup;
+                    build_task
                 })
             },
-            |m| fly_task(objects, civ, masters, m),
-            |m, i| task_at(objects, civ, masters, m, i),
+            |master| fly_task(objects, civ, masters, master),
+            |master, index| task_at(objects, civ, masters, master, index),
             masters.map(|master_table| &master_table.graphics),
             &mut actions,
         )
@@ -457,7 +506,7 @@ fn row(
     actions.default_task = default_start(default, saved);
     let production = production(object).map(|_| ());
     let (mover, moving) = match mover(object, rge_static_object, objects, paths, civ, masters) {
-        Ok(m) => (m, Ok(())),
+        Ok(mover) => (mover, Ok(())),
         Err(error) => (None, Err(error)),
     };
     let unread = life_read
@@ -500,48 +549,6 @@ fn default_start(default: Result<Option<DefaultStart>, Unstartable>, saved: bool
         Ok(Some(DefaultStart::Artifact(_))) => DefaultTask::Artifact,
         Err(unstartable) => DefaultTask::Fails(unstartable),
     }
-}
-
-/// A saved building's lists of objects (none for another object).
-#[derive(Default)]
-struct BuildingLists {
-    /// The livestock it holds.
-    livestock: Vec<ObjectId>,
-    /// Its pasture's workers.
-    pasture_workers: Vec<ObjectId>,
-    /// `attackingUnits` (+0xce0): the unallied takers of a foundation with a stack unit.
-    attacking_units: Vec<ObjectId>,
-}
-
-/// A main building's annex slots (`+0xbc0`..`+0xbd8`) from the save's linked object ids, −1
-/// for an empty slot.
-fn annexes(ids: &[i32]) -> Annexes {
-    let mut slots = [None; Annexes::SLOTS];
-    for (slot, &id) in slots.iter_mut().zip(ids) {
-        *slot = ObjectId::of_field(id);
-    }
-    Annexes::new(slots)
-}
-
-/// A saved object's [`BuildingLists`].
-///
-/// # Errors
-///
-/// An entry of −1, which names no object.
-fn building_lists(object: &genie_save::Object) -> GenieResult<BuildingLists> {
-    let Some(tribe_building_object) = object.tribe_building_object.as_deref() else {
-        return Ok(BuildingLists::default());
-    };
-    let workers: Vec<i32> = tribe_building_object
-        .pasture_worker_id
-        .iter()
-        .map(|&w| w as i32)
-        .collect();
-    Ok(BuildingLists {
-        livestock: object_ids(&tribe_building_object.livestock_id)?,
-        pasture_workers: object_ids(&workers)?,
-        attacking_units: object_ids(&tribe_building_object.unit_id)?,
-    })
 }
 
 /// The parts of a saved object that hold its unit AI's order and action values: the unit AI
@@ -595,71 +602,9 @@ pub fn town_bell(tribe_combat_object: &TribeCombatObject) -> GenieResult<TownBel
     })
 }
 
-/// A saved building's gate state ([`crate::world::Gate`]): its lock, first update and close
-/// timer, and whether a saved open or shut master or its original owner's would take part in a
-/// toggle.
-#[must_use]
-pub fn saved_gate(object: &genie_save::Object) -> Option<Gate> {
-    let tribe_building_object = object.tribe_building_object.as_deref()?;
-    Some(Gate {
-        locked: tribe_building_object.gate_locked != 0,
-        first_update: tribe_building_object.first_update != 0,
-        close_timer: Seconds::new(tribe_building_object.close_timer),
-        other_masters: tribe_building_object.has_open_closed_master_object != 0
-            || tribe_building_object.original_owner != -1,
-    })
-}
-
 /// A saved Build's or Repair's sub-action other than a `MoveTo`.
 pub const OTHER_SUB_ACTION: GenieError =
     GenieError::unsupported("a saved Build or Repair action with another sub-action");
-
-/// A saved building's construction: its `build_pts`, `desolid_flag` and `num_builders`, its
-/// master's hit points (the sixth `readTemp`), build time (the first train location's) and
-/// obstruction kind and class. None for an object that is not a building.
-///
-/// # Errors
-///
-/// A snow flag that is not the game's (above 2).
-pub fn construction(
-    object: &genie_save::Object,
-    rge_static_object: &RgeStaticObject,
-    objects: &PlayerObjects,
-) -> GenieResult<Option<Construction>> {
-    let Some(tribe_building_object) = object.tribe_building_object.as_deref() else {
-        return Ok(None);
-    };
-    let Some(master) = objects.master(rge_static_object.master_obj) else {
-        return Ok(None);
-    };
-    let Some(ms) = master.static_part() else {
-        return Ok(None);
-    };
-    let build_time = master
-        .tribe_master_building_object
-        .as_deref()
-        .map(|tribe_master_building_object| {
-            &tribe_master_building_object.tribe_master_combat_object
-        })
-        .or(master.tribe_master_combat_object.as_deref())
-        .and_then(|tribe_master_combat_object| tribe_master_combat_object.train_location.first())
-        .map_or(WholeSeconds::ZERO, |entry| {
-            WholeSeconds::of_data(entry.train_time)
-        });
-    Ok(Some(Construction {
-        progress: Seconds::new(tribe_building_object.build_pts),
-        desolid: tribe_building_object.desolid_flag != 0,
-        builders: BuilderCount::of_data(tribe_building_object.tribe_combat_object.num_builders),
-        hit_points: MasterHitPoints::of_data(ms.read_temp_6),
-        build_time,
-        record: Obstruction {
-            kind: ObstructionKind::from(ms.obstruction_kind),
-            class: ObstructionClass::from(ms.obstruction_class),
-        },
-        snow: Snow::of_byte(tribe_building_object.snow_flag)?,
-        sprite_override: rge_static_object.sprite_override_id != -1,
-    }))
-}
 
 /// An object's unit group link as saved (`mGroupID`, `mGroupFlag`).
 #[must_use]

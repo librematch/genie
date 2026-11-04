@@ -10,7 +10,7 @@ use crate::objects::ObjectId;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::PlayersMasters;
+use crate::objects::masters::PlayersMastersExt;
 use crate::objects::masters::cost_entries;
 use crate::objects::masters::{Masters, player_master};
 use crate::objects::unit::Unit;
@@ -34,8 +34,8 @@ use crate::world::layer::AttributeRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 use crate::world::player::Player;
-use crate::world::slots::CheckedIndex;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::CheckedIndexExt;
+use crate::world::slots::PlayerSlotsExt;
 use crate::world::{COMPUTER_QUEUE_LIMIT, QUEUE_LIMIT, World, villager};
 use crate::{GenieError, GenieResult};
 
@@ -184,15 +184,15 @@ impl World {
         let mut pick: Option<usize> = None;
         while 0 < amount {
             amount -= 1;
-            let Some(k) = least_loaded(&rooms, &loads, pick) else {
+            let Some(least) = least_loaded(&rooms, &loads, pick) else {
                 return Ok(None);
             };
-            *rooms.checked_mut(k)? -= 1;
-            *counts.checked_mut(k)? += 1;
-            let at = self.at(*found.checked(k)?)?.1.life.master_id;
+            *rooms.checked_mut(least)? -= 1;
+            *counts.checked_mut(least)? += 1;
+            let at = self.at(*found.checked(least)?)?.1.life.master_id;
             let time = train_time(&unit.creatable_part().train_locations, at, button);
-            *loads.checked_mut(k)? += Seconds::of_master(time);
-            pick = Some(k);
+            *loads.checked_mut(least)? += Seconds::of_master(time);
+            pick = Some(least);
         }
         Ok(Some(counts))
     }
@@ -200,7 +200,7 @@ impl World {
     /// The object at `place`, with its player.
     fn at(&self, place: Place) -> GenieResult<(PlayerId, &Unit)> {
         Ok(match place {
-            Place::Live(p, i) => (p, self.players.live(p, i)?),
+            Place::Live(owner, slot) => (owner, self.players.live(owner, slot)?),
             Place::Sleeping(player_id, list_index) => {
                 (player_id, self.players.asleep(player_id, list_index)?)
             }
@@ -253,7 +253,9 @@ impl World {
     ) -> GenieResult<Option<ObjectId>> {
         let load = |id: ObjectId| -> GenieResult<Seconds> {
             self.object(id)
-                .map_or(Ok(Seconds::ZERO), |(q, u)| self.production_load(q, u))
+                .map_or(Ok(Seconds::ZERO), |(player_id, unit)| {
+                    self.production_load(player_id, unit)
+                })
         };
         let is_building = |id: Option<ObjectId>| -> GenieResult<bool> {
             match self.object(id) {
@@ -279,8 +281,8 @@ impl World {
             } else {
                 60
             };
-            let n = usize::from(research_command.count as u16).min(limit);
-            for id in buildings.iter().take(n).flatten().copied() {
+            let count = usize::from(research_command.count as u16).min(limit);
+            for id in buildings.iter().take(count).flatten().copied() {
                 if self.object(id).is_none() {
                     continue;
                 }
@@ -316,14 +318,14 @@ impl World {
         for entry in queue.slots.head(entries)? {
             if let Some(master) = entry.master {
                 let time = player_master(&self.model.masters, player_id, master)
-                    .and_then(|m| m.creatable_part().train_locations.first())
+                    .and_then(|master| master.creatable_part().train_locations.first())
                     .map_or(WholeSeconds::ZERO, |train_location| train_location.time);
                 queued +=
                     Seconds::new((i32::from(entry.count.get()) * i32::from(time.get())) as f32);
             } else if let Some(tech) = entry.tech {
                 // a queued research has its locations (the queue checked them)
                 let (time, adjustment) = Some(tech.index())
-                    .and_then(|t| owner.techs.get(t))
+                    .and_then(|index| owner.techs.get(index))
                     .and_then(|tech_state| tech_state.location(building.life.master_id))
                     .map_or((WholeSeconds::ZERO, Seconds::ZERO), |location| {
                         (location.time, location.adjustment)
@@ -377,7 +379,7 @@ impl World {
             .contains(MasterRoles::VILLAGER_MALE)
         {
             master = Some(villager(
-                self.streams.get(Stream::Action).raw64(),
+                self.streams.get_mut(Stream::Action).raw64(),
                 self.model.slots.master,
             ));
             if 0 < count.wrapping_sub(1) as i16 {
@@ -416,7 +418,7 @@ impl World {
         }
     }
 
-    /// `FUN_1411cbc40`'s unit branch: `n` of `master` paid at once (`FUN_14162fb60`,
+    /// `FUN_1411cbc40`'s unit branch: `count` of `master` paid at once (`FUN_14162fb60`,
     /// [`crate::production::pay`]), the count lowered while the player cannot (at one, nothing
     /// is queued); attribute 80 (the queued units) grows by the master's population times the
     /// count (slot 0xf8); the player's tracker counts them and places each
@@ -436,13 +438,13 @@ impl World {
     ) -> GenieResult<QueueOutcome> {
         use crate::production::{as_entry_costs, master_costs, pay, population};
         let empty = Masters::default();
-        let mut n = count.get();
+        let mut count = count.get();
         loop {
             let masters = self.model.masters.of(player).unwrap_or(&empty);
             if pay(
                 masters,
                 master,
-                CostCount::new(f32::from(n)),
+                CostCount::new(f32::from(count)),
                 self.players.player_mut(player)?,
                 &self.model.roles,
                 self.model.slots,
@@ -450,17 +452,19 @@ impl World {
             {
                 break;
             }
-            if n < 2 {
+            if count < 2 {
                 return Ok(QueueOutcome::NoneQueued);
             }
-            n -= 1;
+            count -= 1;
         }
         let class = self.tracker_key(player, master).class;
         let masters = self.model.masters.of(player).unwrap_or(&empty);
         let made = masters.get(master);
-        let pop = made.map_or(Amount::ZERO, |m| population(&m.storage, &self.model.roles));
+        let pop = made.map_or(Amount::ZERO, |master| {
+            population(&master.storage, &self.model.roles)
+        });
         let owner = self.players.player_mut(player)?;
-        owner.add_attribute(self.model.slots.attribute.queued, pop * f32::from(n))?;
+        owner.add_attribute(self.model.slots.attribute.queued, pop * f32::from(count))?;
         let costs = as_entry_costs(master_costs(
             masters,
             master,
@@ -468,8 +472,8 @@ impl World {
             &self.model.roles,
             self.model.slots,
         )?);
-        owner.tracker.count_queued(QueuedUnits::of_data(n));
-        for _ in 0..n {
+        owner.tracker.count_queued(QueuedUnits::of_data(count));
+        for _ in 0..count {
             owner.tracker.place(Some(master), class);
         }
         let (building, id) = {
@@ -477,8 +481,8 @@ impl World {
             (unit.life.master_id, unit.id)
         };
         let time = made
-            .filter(|m| MasterKind::COMBAT <= m.kind)
-            .map(|m| train_time(&m.creatable_part().train_locations, building, button));
+            .filter(|master| MasterKind::COMBAT <= master.kind)
+            .map(|master| train_time(&master.creatable_part().train_locations, building, button));
         let production = self.production_or_new(id)?;
         if let Some(last) = production.queue.last()
             && last.master == Some(master)
@@ -486,10 +490,10 @@ impl World {
             && same_costs(&last.costs, &costs)
         {
             let queue = &mut production.queue;
-            let k = (queue.count.get() - 1) as usize;
-            let slot = queue.slots.checked_mut(k)?;
-            slot.count = slot.count.plus(QueuedUnits::of_data(n));
-            queue.total = queue.total.plus(QueuedUnits::of_data(n));
+            let last = (queue.count.get() - 1) as usize;
+            let slot = queue.slots.checked_mut(last)?;
+            slot.count = slot.count.plus(QueuedUnits::of_data(count));
+            queue.total = queue.total.plus(QueuedUnits::of_data(count));
             queue.changes = queue.changes.bumped();
             return Ok(QueueOutcome::Queued);
         }
@@ -497,7 +501,7 @@ impl World {
             player,
             list_index,
             (Some(master), None),
-            QueuedUnits::of_data(n),
+            QueuedUnits::of_data(count),
             button,
             time,
         )?;
@@ -572,18 +576,18 @@ impl World {
                 self.model.slots,
             )?));
         }
-        let Some((tech, t)) = tech
+        let Some((tech, tech_index)) = tech
             .map(|tech| (tech, tech.index()))
-            .filter(|&(_, t)| t < owner.techs.len())
+            .filter(|&(_, tech_index)| tech_index < owner.techs.len())
         else {
             return Ok(NO_COSTS);
         };
-        let Some(def) = self.model.techs.get(t) else {
+        let Some(def) = self.model.techs.get(tech_index) else {
             return Ok(NO_COSTS);
         };
         owner
             .techs
-            .checked(t)?
+            .checked(tech_index)?
             .entry_costs(def, factors(tech, owner, self.model.slots)?)
     }
 }
@@ -594,18 +598,22 @@ impl World {
 /// most room, the first of equals; none without room.
 pub(crate) fn least_loaded(rooms: &[i32], loads: &[Seconds], pick: Option<usize>) -> Option<usize> {
     let mut best = pick;
-    for (k, (&room, &load)) in rooms.iter().zip(loads).enumerate() {
+    for (index, (&room, &load)) in rooms.iter().zip(loads).enumerate() {
         if 0 < room
             && best
-                .and_then(|b| loads.get(b))
+                .and_then(|index| loads.get(index))
                 .is_none_or(|&seconds| seconds > load)
         {
-            best = Some(k);
+            best = Some(index);
         }
     }
     if best.is_none() {
         for (index, &room) in rooms.iter().enumerate() {
-            if 0 < room && best.and_then(|b| rooms.get(b)).is_none_or(|&b| b < room) {
+            if 0 < room
+                && best
+                    .and_then(|index| rooms.get(index))
+                    .is_none_or(|&best_room| best_room < room)
+            {
                 best = Some(index);
             }
         }

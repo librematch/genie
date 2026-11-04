@@ -53,7 +53,7 @@ fn pool_dump_out_of_shape_is_an_error() {
 /// none).
 fn mask_line(id: i32, slots: &[i64]) -> String {
     let words: Vec<String> = (0..SLOTS)
-        .map(|k| slots.get(k).copied().unwrap_or(-1).to_string())
+        .map(|index| slots.get(index).copied().unwrap_or(-1).to_string())
         .collect();
     format!("mask {id} 3 {}", words.join(" "))
 }

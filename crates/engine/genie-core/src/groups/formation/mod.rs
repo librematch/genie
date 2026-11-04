@@ -6,7 +6,7 @@ use crate::groups::FormationCategory;
 use crate::groups::UnitKind;
 use crate::groups::{Formation, FormationLine, Slot};
 use crate::math::fmath::BVector;
-use crate::world::slots::CheckedIndex;
+use crate::world::slots::CheckedIndexExt;
 
 mod column_line;
 mod desired_positions;
@@ -57,11 +57,11 @@ impl Formation {
         self.slots.len() + self.spare_slots.len()
     }
 
-    /// `FUN_14102d580`: a larger slots' array of `n`, each new slot without a unit (-1), its
+    /// `FUN_14102d580`: a larger slots' array of `count`, each new slot without a unit (-1), its
     /// desired category and sub-category -1, the rest 0; the slots in use are copied but for
     /// their transform mark, the spare ones not.
-    pub(crate) fn resize_slots(&mut self, n: usize) {
-        if n == 0 || n <= self.slot_capacity() {
+    pub(crate) fn resize_slots(&mut self, count: usize) {
+        if count == 0 || count <= self.slot_capacity() {
             return;
         }
         let fresh = Slot {
@@ -70,7 +70,7 @@ impl Formation {
             desired_sub_category: UnitKind::NONE,
             ..Slot::default()
         };
-        self.spare_slots = vec![fresh; n - self.slots.len()];
+        self.spare_slots = vec![fresh; count - self.slots.len()];
         // the copy moves `+0x00..+0x43` (0x14102d646..0x14102d6bf): the transform mark (`+0x44`)
         // is the new array's 0
         for slot in &mut self.slots {
@@ -78,12 +78,12 @@ impl Formation {
         }
     }
 
-    /// `FUN_14102d490`: a new lines' array of `n` (the old lines go), each line empty.
-    pub(crate) fn resize_lines(&mut self, n: usize) {
-        if n == 0 || n <= self.lines.len() {
+    /// `FUN_14102d490`: a new lines' array of `count` (the old lines go), each line empty.
+    pub(crate) fn resize_lines(&mut self, count: usize) {
+        if count == 0 || count <= self.lines.len() {
             return;
         }
-        self.lines = vec![FormationLine::default(); n];
+        self.lines = vec![FormationLine::default(); count];
     }
 
     /// `FUN_141041810`: every slot of the array (in use and spare) loses its unit and its filled
@@ -95,13 +95,13 @@ impl Formation {
         }
     }
 
-    /// The slot at `i` of the whole array (in use or spare).
-    pub(super) fn slot_mut(&mut self, i: usize) -> GenieResult<&mut Slot> {
+    /// The slot at `index` of the whole array (in use or spare).
+    pub(super) fn slot_mut(&mut self, index: usize) -> GenieResult<&mut Slot> {
         let used = self.slots.len();
-        if i < used {
-            self.slots.checked_mut(i)
+        if index < used {
+            self.slots.checked_mut(index)
         } else {
-            self.spare_slots.checked_mut(i - used)
+            self.spare_slots.checked_mut(index - used)
         }
     }
 
@@ -110,12 +110,12 @@ impl Formation {
         self.slots.iter_mut().chain(self.spare_slots.iter_mut())
     }
 
-    /// `mNumberSlots` (`+0x4`) set to `n`: the array's first `n` slots are the ones in use.
-    pub(super) fn use_slots(&mut self, n: usize) {
+    /// `mNumberSlots` (`+0x4`) set to `count`: the array's first `count` slots are the ones in use.
+    pub(super) fn use_slots(&mut self, in_use: usize) {
         let mut all: Vec<Slot> = take(&mut self.slots);
         all.append(&mut self.spare_slots);
-        let n = n.min(all.len());
-        self.spare_slots = all.split_off(n);
+        let count = in_use.min(all.len());
+        self.spare_slots = all.split_off(count);
         self.slots = all;
     }
 }

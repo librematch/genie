@@ -24,12 +24,12 @@ use crate::world::layer::Slots;
 /// sits in the table's negative half (`world+0x178`, at the id's negation); one recycled out of
 /// the game (`RGE_Static_Object::recycle_out_of_game`) leaves its player's list, so the table.
 #[derive(Clone, Copy, Debug)]
-pub(crate) enum WorldObject<'a> {
+pub(crate) enum WorldObject<'world> {
     /// An object of player `.0`'s live or sleeping list, with its mover (none for one that does
     /// not move).
-    Unit(PlayerId, &'a Unit, Option<&'a Mover>),
+    Unit(PlayerId, &'world Unit, Option<&'world Mover>),
     /// A ghost of player `.0`'s doppelganger list (type 25, its master `243`).
-    Ghost(PlayerId, &'a Ghost),
+    Ghost(PlayerId, &'world Ghost),
 }
 
 impl WorldObject<'_> {
@@ -94,7 +94,7 @@ impl WorldObject<'_> {
     /// animated or doppelganger object's (0, 0, 0) (`FUN_141071e10`).
     pub(crate) fn forward(&self) -> BVector {
         match *self {
-            Self::Unit(_, _, m) => m.map_or(BVector::ZERO, |mover| mover.forward),
+            Self::Unit(_, _, moves) => moves.map_or(BVector::ZERO, |mover| mover.forward),
             Self::Ghost(..) => BVector::ZERO,
         }
     }
@@ -118,17 +118,21 @@ impl World {
         if id == ObjectId::TAKEN_OUT {
             return None;
         }
-        if let Some((p, unit)) = self.object(id) {
-            return Some(WorldObject::Unit(p, unit, self.parts.mover_of(unit.id)));
+        if let Some((player_id, unit)) = self.object(id) {
+            return Some(WorldObject::Unit(
+                player_id,
+                unit,
+                self.parts.mover_of(unit.id),
+            ));
         }
         if id.get() < 0 {
             for (player_id, player) in PlayerId::each(self.players.len()).zip(&self.players) {
-                if let Some(g) = player
+                if let Some(ghost) = player
                     .ghosts
                     .iter()
                     .find(|ghost| ghost.id.key() == Some(id))
                 {
-                    return Some(WorldObject::Ghost(player_id, g));
+                    return Some(WorldObject::Ghost(player_id, ghost));
                 }
             }
         }
@@ -155,7 +159,7 @@ pub fn sub_formation(
     }
     match formation_category.get() {
         0 | 5 => Some(FormationCategory::PROTECTED),
-        c @ 1..=4 => Some(FormationCategory::named(i32::from(c))),
+        category @ 1..=4 => Some(FormationCategory::named(i32::from(category))),
         6 => Some(FormationCategory::named(0)),
         _ => None,
     }

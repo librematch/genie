@@ -143,8 +143,8 @@ impl UnitAi {
         let (x, y, z) = (at.position.x(), at.position.y(), at.position.z());
         let dx = unit_seen.position.x() - x;
         let dy = unit_seen.position.y() - y;
-        let d = sqrt(dy * dy + dx * dx);
-        let point = Position::new(x - (dx / d) * reach, y - (dy / d) * reach, z);
+        let distance = sqrt(dy * dy + dx * dx);
+        let point = Position::new(x - (dx / distance) * reach, y - (dy / distance) * reach, z);
         let _ = self.evasive_move(point, (OrderForce::Forced, BadPoint::Moves), at, ai, side)?;
         Ok(IdleOutcome::Acted)
     }
@@ -189,8 +189,8 @@ impl UnitAi {
         let mut target = Self::top_target_in_range(at, side)?;
         if self.retarget_disabled != 0 && at.target.is_some() {
             // slot 0x3d0 with the top target (−1 answers 0) and the weapon range
-            if let Some(t) = target
-                && side.reaches(t, at.weapon_range)?
+            if let Some(object_id) = target
+                && side.reaches(object_id, at.weapon_range)?
             {
                 return Ok(IdleOutcome::Idle);
             }
@@ -391,14 +391,14 @@ impl UnitAi {
         let held =
             (self.retarget_disabled != 0 && at.target.is_some()).then_some(self.current_target);
         let target = match held {
-            Some(t) => Some(t),
+            Some(object_id) => Some(object_id),
             None => Self::top_target_in_range(at, side)?.map(Some),
         };
         if player_kind.is_computer() {
             computer_idle_check()?;
         }
         let target = match target {
-            Some(t) => t,
+            Some(object_id) => object_id,
             None => self.soldier_best(at, player_kind, side)?,
         };
         if let Some(object_id) = target

@@ -238,14 +238,14 @@ impl Scene {
     /// player past Gaia; its terrain table holds [`LAND`] and [`WATER`].
     #[must_use]
     pub fn open(size: GridSize) -> Self {
-        let n = (size.width() * size.height()) as usize;
+        let tiles = (size.width() * size.height()) as usize;
         Self {
             size,
-            terrain: vec![LAND; n],
+            terrain: vec![LAND; tiles],
             terrains: vec![TerrainFlags::LAND, TerrainFlags::WATER],
-            elevation: vec![0; n],
+            elevation: vec![0; tiles],
             rocks: Vec::new(),
-            sight: vec![TileSight::Seen; n],
+            sight: vec![TileSight::Seen; tiles],
             scout: None,
             players: 1,
             relations: Vec::new(),
@@ -263,16 +263,16 @@ impl Scene {
     /// Rows of unequal length, or another character.
     #[must_use]
     pub fn rows(rows: &[&str]) -> Self {
-        let width = rows.first().map_or(0, |r| r.len());
+        let width = rows.first().map_or(0, |text| text.len());
         assert!(
             rows.iter().all(|text| text.len() == width),
             "rows of one length"
         );
         let mut scene = Self::open(GridSize::new(width as i32, rows.len() as i32));
         for (y, row) in rows.iter().enumerate() {
-            for (x, c) in row.chars().enumerate() {
+            for (x, character) in row.chars().enumerate() {
                 let tile = Tile::new(x as i32, y as i32);
-                match c {
+                match character {
                     '.' => {}
                     '~' => scene = scene.water([tile]),
                     '#' => scene = scene.rocks([tile]),
@@ -289,8 +289,8 @@ impl Scene {
         self.terrain_on(tiles, WATER)
     }
 
-    /// The terrain table: terrain `t` has the flags `flags[t]`. A terrain with water is of the
-    /// water class and no restriction passes it; every other is of the land class and passes.
+    /// The terrain table: terrain `index` has the flags `flags[index]`. A terrain with water is of
+    /// the water class and no restriction passes it; every other is of the land class and passes.
     #[must_use]
     pub fn terrains(mut self, flags: impl IntoIterator<Item = TerrainFlags>) -> Self {
         self.terrains = flags.into_iter().collect();
@@ -413,18 +413,21 @@ impl Scene {
             PLAYER,
             vec![Millis::ZERO; players],
             (0..players)
-                .map(|p| player(p, players, &self.relations, &self.kinds))
+                .map(|index| player(index, players, &self.relations, &self.kinds))
                 .collect(),
         );
-        let wet = |t: &TerrainId| {
+        let wet = |terrain_id: &TerrainId| {
             self.terrains
-                .get(t.index())
-                .is_some_and(|f| f.contains(TerrainFlags::WATER))
+                .get(terrain_id.index())
+                .is_some_and(|terrain_flags| terrain_flags.contains(TerrainFlags::WATER))
         };
-        let classes = self
-            .terrain
-            .iter()
-            .map(|t| if wet(t) { WATER_CLASS } else { LAND_CLASS });
+        let classes = self.terrain.iter().map(|terrain_id| {
+            if wet(terrain_id) {
+                WATER_CLASS
+            } else {
+                LAND_CLASS
+            }
+        });
         world.spatial = Spatial::with_tiles(size, Tiles::new(size, classes.collect()));
         let values = self.terrains.iter().map(|terrain_flags| {
             if terrain_flags.contains(TerrainFlags::WATER) {
@@ -453,14 +456,19 @@ impl Scene {
         world.pathing = Pathing::new(size, self.terrain.clone(), restrictions, 0);
         world.pathing.start_mesh(size.width() as u32);
         world.spatial.sight = Some(sight(size, &self.sight, players));
-        world.spatial.relations =
-            ByPlayer::new(world.players.iter().map(|q| q.relations.clone()).collect());
+        world.spatial.relations = ByPlayer::new(
+            world
+                .players
+                .iter()
+                .map(|player| player.relations.clone())
+                .collect(),
+        );
         world.spatial.unit_diplomacy = ByPlayer::new(
             world
                 .players
                 .iter()
                 .enumerate()
-                .map(|(p, q)| unit_diplomacy(p, &q.relations))
+                .map(|(index, player)| unit_diplomacy(index, &player.relations))
                 .collect(),
         );
         for (index, &tile) in self.rocks.iter().enumerate() {
@@ -497,7 +505,7 @@ impl Scene {
 
     /// The masters every player's table holds: the scout's and the objects'.
     fn masters(&self) -> Masters {
-        let scout = self.scout.map(|s| scout_master(s.line_of_sight));
+        let scout = self.scout.map(|scout| scout_master(scout.line_of_sight));
         Masters::new(
             scout.into_iter().chain(
                 self.objects
@@ -513,17 +521,17 @@ impl Scene {
     }
 }
 
-/// Player `p` of `players`: its own ally and every other's enemy, but for `relations`, of the
+/// Player `own` of `players`: its own ally and every other's enemy, but for `relations`, of the
 /// type the last of `kinds` for it gives.
 fn player(
-    p: usize,
+    own: usize,
     players: usize,
     relations: &[(PlayerId, PlayerId, Relation)],
     kinds: &[(PlayerId, PlayerKind)],
 ) -> Player {
     let mut row: Vec<Relation> = (0..players)
-        .map(|q| {
-            if q == p {
+        .map(|other| {
+            if other == own {
                 Relation::Ally
             } else {
                 Relation::Enemy
@@ -531,14 +539,14 @@ fn player(
         })
         .collect();
     for &(from, to, relation) in relations {
-        if from.index() == p {
+        if from.index() == own {
             row[to.index()] = relation;
         }
     }
     let kind = kinds
         .iter()
         .rev()
-        .find(|(player_id, _)| player_id.index() == p)
+        .find(|(player_id, _)| player_id.index() == own)
         .map_or_else(PlayerKind::default, |&(_, kind)| kind);
     Player {
         kind,
@@ -547,15 +555,15 @@ fn player(
     }
 }
 
-/// What player `p`'s queries make of each player's objects (`player+0x278`) as its diplomacy
+/// What player `own`'s queries make of each player's objects (`player+0x278`) as its diplomacy
 /// `relations` writes it: its own, an ally's, a neutral's or an enemy's.
-fn unit_diplomacy(p: usize, relations: &Relations) -> UnitRelations {
+fn unit_diplomacy(own: usize, relations: &Relations) -> UnitRelations {
     relations
         .values()
         .iter()
         .enumerate()
-        .map(|(q, &relation)| {
-            if q == p {
+        .map(|(other, &relation)| {
+            if other == own {
                 return Some(UnitRelation::Own);
             }
             match relation {

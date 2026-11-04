@@ -69,7 +69,7 @@ macro_rules! role_set_schemas {
                 }
 
                 fn json_schema(_: &mut SchemaGenerator) -> Schema {
-                    let names: Vec<&str> = <$set as Flags>::FLAGS.iter().map(|f| f.name()).collect();
+                    let names: Vec<&str> = <$set as Flags>::FLAGS.iter().map(|flag| flag.name()).collect();
                     json_schema!({ "type": "string", "enum": names })
                 }
             }

@@ -25,8 +25,8 @@ use crate::technology::Attributes;
 use crate::world::World;
 use crate::world::layer::MasterSlots;
 use crate::world::layer::generated::PastureTuning;
-use crate::world::slots::CheckedIndex;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::CheckedIndexExt;
+use crate::world::slots::PlayerSlotsExt;
 use crate::{GenieError, GenieResult};
 
 /// The livestock a pasture holds (`DAT_143f51db0`, which the static constructor `FUN_140174900`
@@ -48,21 +48,26 @@ pub const fn livestock(masters: MasterSlots) -> [MasterId; 2] {
 pub fn edge_points(at: Position, radius_x: Distance, pasture_tuning: &PastureTuning) -> Vec<Point> {
     let distance = radius_x - Distance::new(pasture_tuning.inset);
     let (x, y) = (at.x(), at.y());
-    let c = [
+    let points = [
         Point::new(x - distance.get(), y - distance.get()),
         Point::new(x + distance.get(), y - distance.get()),
         Point::new(x + distance.get(), y + distance.get()),
         Point::new(x - distance.get(), y + distance.get()),
     ];
-    let edges = [(c[0], c[1]), (c[2], c[1]), (c[2], c[3]), (c[0], c[3])];
+    let edges = [
+        (points[0], points[1]),
+        (points[2], points[1]),
+        (points[2], points[3]),
+        (points[0], points[3]),
+    ];
     let mut points = Vec::new();
-    for (a, b) in edges {
+    for (start, end) in edges {
         let mut fraction = 0.0f32;
         // COMISS END, t with JNC: on while END is at least t
         while fraction <= pasture_tuning.end {
             points.push(Point::new(
-                (b.x() - a.x()) * fraction + a.x(),
-                (b.y() - a.y()) * fraction + a.y(),
+                (end.x() - start.x()) * fraction + start.x(),
+                (end.y() - start.y()) * fraction + start.y(),
             ));
             fraction += pasture_tuning.step;
         }
@@ -70,14 +75,14 @@ pub fn edge_points(at: Position, radius_x: Distance, pasture_tuning: &PastureTun
     points
 }
 
-/// A draw of the Object stream modulo `n` (`CDQE` then `DIV`: the draw is at most 0x7fff).
-fn draw_below(turns: &mut World, n: usize) -> usize {
-    turns.streams.get(Stream::Object).rand15() as usize % n
+/// A draw of the Object stream modulo `modulus` (`CDQE` then `DIV`: the draw is at most 0x7fff).
+fn draw_below(turns: &mut World, modulus: usize) -> usize {
+    turns.streams.get_mut(Stream::Object).rand15() as usize % modulus
 }
 
 impl World {
-    /// `FUN_1411c8410` on player `p`'s pasture `id`: the points along its edges ([`edge_points`]
-    /// with its master's ground radius on x), its owner's
+    /// `FUN_1411c8410` on player `player_id`'s pasture `id`: the points along its edges
+    /// ([`edge_points`] with its master's ground radius on x), its owner's
     /// [`AttributeSlots::pasture_livestock`](crate::world::layer::AttributeSlots::pasture_livestock)
     /// cut to an integer (CVTTSS2SI) as the count and
     /// [`AttributeSlots::pasture_food`](crate::world::layer::AttributeSlots::pasture_food) over it
@@ -103,7 +108,7 @@ impl World {
     pub(crate) fn setup_pasture(&mut self, player_id: PlayerId, id: PastureId) -> GenieResult<()> {
         let (at, master) = self
             .object(id)
-            .map(|(_, u)| (u.position(), u.life.master_id))
+            .map(|(_, unit)| (unit.position(), unit.life.master_id))
             .ok_or(GenieError::unreachable("a pasture its completion names"))?;
         let radius_x = self.master(player_id, master)?.radius.x();
         let mut points = edge_points(at, Distance::new(radius_x), &self.model.tuning.pasture);
@@ -116,10 +121,10 @@ impl World {
         while made < count && !points.is_empty() {
             let kinds = livestock(self.model.slots.master);
             let kind = *kinds.checked(draw_below(self, kinds.len()))?;
-            let mut i = draw_below(self, points.len());
+            let mut index = draw_below(self, points.len());
             loop {
                 let (x, y) = {
-                    let checked = points.checked(i)?;
+                    let checked = points.checked(index)?;
                     (checked.x(), checked.y())
                 };
                 let (tx, ty) = (cvttss2si(x), cvttss2si(y));
@@ -127,14 +132,14 @@ impl World {
                 if on_map && !self.holds_livestock_of(id, Tile::new(tx, ty)) {
                     break;
                 }
-                let _ = points.remove(i);
+                let _ = points.remove(index);
                 if points.is_empty() {
                     return Ok(());
                 }
-                i = draw_below(self, points.len());
+                index = draw_below(self, points.len());
             }
             let (x, y) = {
-                let point = points.checked(i)?;
+                let point = points.checked(index)?;
                 (point.x(), point.y())
             };
             if let Some(new) = self.make_new_object(
@@ -143,7 +148,7 @@ impl World {
                 Position::new(x, y, at.z()),
                 MakeMode::Plain,
             )? {
-                let _ = points.remove(i);
+                let _ = points.remove(index);
                 if let Some((_, layer)) = self.object_and_layer_mut(id)? {
                     layer.livestock.push(new);
                 }
@@ -155,18 +160,20 @@ impl World {
                 unit.pasture = Some(id);
                 unit.life.amount = food;
                 let graphic = unit.sprite.map(|active_sprite| active_sprite.graphic);
-                if let Some(g) =
-                    graphic.filter(|g| g.flags.contains(SpriteFlags::RANDOM_FIRST_FRAME))
+                if let Some(graphic) = graphic
+                    .filter(|graphic| graphic.flags.contains(SpriteFlags::RANDOM_FIRST_FRAME))
                 {
-                    let draw = self.streams.get(Stream::Object).rand15() as i32;
+                    let draw = self.streams.get_mut(Stream::Object).rand15() as i32;
                     // the `.dat` can give the livestock such a sprite: the game's `IDIV` by 0
                     // stops it
-                    let _ = draw.checked_rem(g.facets.counted() - 1).ok_or_else(|| {
-                        GenieError::invalid_input(
-                            "a random first facet of a livestock sprite of one facet",
-                        )
-                        .with("sprite", g.id)
-                    })?;
+                    let _ = draw
+                        .checked_rem(graphic.facets.counted() - 1)
+                        .ok_or_else(|| {
+                            GenieError::invalid_input(
+                                "a random first facet of a livestock sprite of one facet",
+                            )
+                            .with("sprite", graphic.id)
+                        })?;
                 }
             }
             made += 1;
@@ -190,11 +197,11 @@ impl World {
             })
     }
 
-    /// `FUN_1411c7670`: the livestock of pasture `pasture` that player `p`'s unit at `idx` tends,
-    /// with its place, −1 for none (a unit of another player, too): its livestock the world holds
-    /// with their workers and their footprints' squared gap to the unit (`FUN_14118f8c0`), sorted
-    /// by the gap (`std::sort`, [`crate::math::msvc::sort`]); the first without workers, else the
-    /// first whose workers are below the owner's
+    /// `FUN_1411c7670`: the livestock of pasture `pasture` that player `player`'s unit at `idx`
+    /// tends, with its place, −1 for none (a unit of another player, too): its livestock the world
+    /// holds with their workers and their footprints' squared gap to the unit (`FUN_14118f8c0`),
+    /// sorted by the gap (`std::sort`, [`crate::math::msvc::sort`]); the first without workers,
+    /// else the first whose workers are below the owner's
     /// [`AttributeSlots::pasture_workers`](crate::world::layer::AttributeSlots::pasture_workers).
     ///
     /// # Errors
@@ -203,27 +210,27 @@ impl World {
     pub(crate) fn pasture_pick(
         &self,
         pasture: PastureId,
-        p: PlayerId,
+        player: PlayerId,
         idx: ListIndex,
     ) -> GenieResult<Option<(ObjectId, Position)>> {
         let Some((pasture_player_id, pasture_unit)) = self.object(pasture) else {
             return Ok(None);
         };
-        if pasture_player_id != p {
+        if pasture_player_id != player {
             return Ok(None);
         }
-        let unit = &self.players.live(p, idx)?;
-        let reach = unit.master(self.master_tables(), p)?.radius;
+        let unit = &self.players.live(player, idx)?;
+        let reach = unit.master(self.master_tables(), player)?.radius;
         let mut tended = Vec::new();
         for &id in &self.parts.building_of(pasture_unit.id).livestock {
-            let Some((player_id, l)) = self.object(id) else {
+            let Some((player_id, livestock)) = self.object(id) else {
                 continue;
             };
-            let radius = l.master(self.master_tables(), player_id)?.radius;
-            let gap = footprint_gap_squared(l.position(), radius, unit.position(), reach);
-            tended.push((id, l.workers, gap, l.position()));
+            let radius = livestock.master(self.master_tables(), player_id)?.radius;
+            let gap = footprint_gap_squared(livestock.position(), radius, unit.position(), reach);
+            tended.push((id, livestock.workers, gap, livestock.position()));
         }
-        sort(&mut tended, &|a, b| a.2 < b.2)?;
+        sort(&mut tended, &|left, right| left.2 < right.2)?;
         let room = Attributes::get(
             self.players.player(pasture_player_id)?,
             self.model.slots.attribute.pasture_workers,
@@ -240,27 +247,26 @@ impl World {
         Ok(pick)
     }
 
-    /// `FUN_141189ca0`: player `p`'s unit at `idx` tends `pasture`, none (−1) to tend none. The
-    /// building it names (the one the unit tends, `+0x794`, for none; none for an object that is
-    /// no building) takes the unit last among its workers unless it lists it already, or for none
-    /// drops it
-    /// (`FUN_1411cafa0`, [`crate::objects::layers::Building::pasture_workers`]); then the unit tends `pasture`
-    /// ([`crate::objects::unit::Unit::my_pasture`]).
+    /// `FUN_141189ca0`: player `player`'s unit at `idx` tends `pasture`, none (−1) to tend none.
+    /// The building it names (the one the unit tends, `+0x794`, for none; none for an object that
+    /// is no building) takes the unit last among its workers unless it lists it already, or for
+    /// none drops it (`FUN_1411cafa0`, [`crate::objects::layers::Building::pasture_workers`]); then
+    /// the unit tends `pasture` ([`crate::objects::unit::Unit::my_pasture`]).
     ///
     /// # Errors
     ///
     /// A master the players have not got.
     pub(crate) fn tend_pasture(
         &mut self,
-        p: PlayerId,
+        player: PlayerId,
         idx: ListIndex,
         pasture: Option<PastureId>,
     ) -> GenieResult<()> {
-        let unit = &self.players.live(p, idx)?;
+        let unit = &self.players.live(player, idx)?;
         let (id, named) = (unit.id, pasture.or(unit.my_pasture));
         let building = match self.object(named) {
-            Some((player_id, b)) => {
-                b.master(self.master_tables(), player_id)?.kind == MasterKind::BUILDING
+            Some((player_id, unit)) => {
+                unit.master(self.master_tables(), player_id)?.kind == MasterKind::BUILDING
             }
             None => false,
         };
@@ -271,7 +277,7 @@ impl World {
                 layer.pasture_workers.push(id);
             }
         }
-        self.players.live_mut(p, idx)?.my_pasture = pasture;
+        self.players.live_mut(player, idx)?.my_pasture = pasture;
         Ok(())
     }
 
@@ -303,9 +309,9 @@ mod tests {
             &tuning().pasture,
         );
         assert_eq!(points.len(), 16);
-        let t = [0.0f32, 0.3, 0.6, 0.3 + 0.3 + 0.3];
+        let fractions = [0.0f32, 0.3, 0.6, 0.3 + 0.3 + 0.3];
         assert_eq!(points[0], Point::new(134.5, 70.5));
-        assert_eq!(points[3], Point::new(3.0 * t[3] + 134.5, 70.5));
+        assert_eq!(points[3], Point::new(3.0 * fractions[3] + 134.5, 70.5));
         assert_eq!(points[3], Point::new(137.2, 70.5));
         // the right edge from (137.5, 73.5) down to (137.5, 70.5)
         assert_eq!(points[4], Point::new(137.5, 73.5));

@@ -80,8 +80,8 @@ impl UnitAi {
         };
         if home.homeward {
             let ai_move = self.move_to(go_home);
-            if let Some(h) = self.home.as_mut() {
-                h.homeward = false;
+            if let Some(home) = self.home.as_mut() {
+                home.homeward = false;
             }
             return (true, ai_move);
         }
@@ -152,8 +152,8 @@ impl UnitAi {
         let (x, y, z) = (at.position.x(), at.position.y(), at.position.z());
         let reach = (at.speed * unit_ai_tuning.evade_reach).get();
         let (dx, dy) = (other.x() - x, other.y() - y);
-        let d = sqrt(dy * dy + dx * dx);
-        let point = Position::new(x - (dx / d) * reach, y - (dy / d) * reach, z);
+        let distance = sqrt(dy * dy + dx * dx);
+        let point = Position::new(x - (dx / distance) * reach, y - (dy / distance) * reach, z);
         let _ = self.evasive_move(point, (OrderForce::Forced, BadPoint::Kept), at, ai, side)?;
         Ok(())
     }
@@ -203,8 +203,8 @@ impl UnitAi {
         if DistanceSquared::ZERO < leash {
             let gap = point_gap_squared(hunted.origin.ground(), at.position, at.size);
             if leash < gap {
-                if let Some(m) = self.move_to(go_home) {
-                    side.effect_now(Effect::Move(m), self, ai)?;
+                if let Some(ai_move) = self.move_to(go_home) {
+                    side.effect_now(Effect::Move(ai_move), self, ai)?;
                 }
                 return Ok(IdleOutcome::Acted);
             }
@@ -255,11 +255,11 @@ impl UnitAi {
                 return Ok(IdleOutcome::Acted);
             }
             let step = |ai: &mut Well512| {
-                let n = (ai.rand15() % (2 * HUNTED_STEP as u32)) as i32;
-                if HUNTED_STEP <= n {
-                    n - 2 * HUNTED_STEP
+                let offset = (ai.rand15() % (2 * HUNTED_STEP as u32)) as i32;
+                if HUNTED_STEP <= offset {
+                    offset - 2 * HUNTED_STEP
                 } else {
-                    n + 1
+                    offset + 1
                 }
             };
             let sx = step(ai) as f32;

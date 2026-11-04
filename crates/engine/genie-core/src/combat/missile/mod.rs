@@ -101,10 +101,10 @@ impl Origin {
 
     /// The save's 28 bytes: seven 32-bit words.
     #[must_use]
-    pub fn from_bytes(b: &[u8; 28]) -> Self {
+    pub fn from_bytes(raw: &[u8; 28]) -> Self {
         let mut words = [0u32; 7];
-        for (w, bytes) in words.iter_mut().zip(b.as_chunks::<4>().0) {
-            *w = u32::from_le_bytes(*bytes);
+        for (word, bytes) in words.iter_mut().zip(raw.as_chunks::<4>().0) {
+            *word = u32::from_le_bytes(*bytes);
         }
         let [x, y, z, rx, ry, master, owner] = words;
         Self {
@@ -173,10 +173,10 @@ pub struct Missile {
 /// cos·ox + sin·oy, the height by oz.
 #[must_use]
 pub fn spawn_point(at: Position, angle: Angle, offset: Offset) -> Position {
-    let (c, s) = (cos(angle.get()), sin(angle.get()));
+    let (cosine, sine) = (cos(angle.get()), sin(angle.get()));
     let (ox, oy) = (offset.x(), offset.y());
-    let y = c * ox + s * oy + at.y();
-    let x = (c * oy - s * ox) + at.x();
+    let y = cosine * ox + sine * oy + at.y();
+    let x = (cosine * oy - sine * ox) + at.x();
     Position::new(x, y, at.z() + offset.z())
 }
 
@@ -194,8 +194,8 @@ pub fn reach(radius: Footprint, range: Distance, missile_tuning: &MissileTuning)
 /// missiles past a hair) up to its master's `max_attacks_in_volley`.
 #[must_use]
 pub fn volley_count(firepower: Firepower, max_volley: MissileCount) -> i32 {
-    let n = (firepower.get() + VOLLEY_EPSILON) as i64 as i32;
-    n.min(max_volley.counted())
+    let count = (firepower.get() + VOLLEY_EPSILON) as i64 as i32;
+    count.min(max_volley.counted())
 }
 
 /// `FUN_14120c0a0`'s scatter of a volley's extra missile along a spread: an Object-stream draw
@@ -272,7 +272,7 @@ pub struct Aimer {
 
 /// What a missile's aim takes besides the Action stream's draw ([`aim`]'s arguments).
 #[derive(Debug)]
-pub struct AimAt<'a> {
+pub struct AimAt<'missile> {
     /// The point it aims for.
     pub(crate) point: Position,
     /// Where the missile is.
@@ -286,7 +286,7 @@ pub struct AimAt<'a> {
     /// The missile's attack count (`+0x900`).
     pub(crate) attack_count: AttackCount,
     /// The hit mode, which a miss sets to 1.
-    pub(crate) hit_mode: &'a mut HitMode,
+    pub(crate) hit_mode: &'missile mut HitMode,
 }
 
 /// `FUN_140a9c600`: where a missile at `from` aims for its `point`: a target's height rises by a
@@ -330,8 +330,8 @@ pub fn aim(
     {
         chance = HitChance::of_data(0x50);
     }
-    let r = draw();
-    if i32::from(chance.get()) < (r as i32 * 100) / 0x7fff {
+    let roll = draw();
+    if i32::from(chance.get()) < (roll as i32 * 100) / 0x7fff {
         if *hit_mode == HitMode::TARGET_ALONE {
             *hit_mode = HitMode::MISSED;
         }
@@ -404,19 +404,19 @@ impl MissileAction {
         let (acceleration, velocity) = if way <= 0.0 || stats.arc.is_flat() {
             (0.0, 0.0)
         } else {
-            let t = if stats.speed <= Speed::ZERO {
+            let flight_time = if stats.speed <= Speed::ZERO {
                 0.0
             } else {
                 way / stats.speed.get()
             };
-            let t = t * HALF;
+            let apex_time = flight_time * HALF;
             let rise = if stats.arc <= ArcRatio::FLAT {
                 way * stats.arc.get() * way
             } else {
                 -(way * stats.arc.get())
             };
-            let a = (rise + rise) / (t * t);
-            (a, -a * t)
+            let acceleration = (rise + rise) / (apex_time * apex_time);
+            (acceleration, -acceleration * apex_time)
         };
         self.ballistic_acceleration = Acceleration::new(acceleration);
         self.ballistic_velocity = Speed::new(velocity);
@@ -476,8 +476,8 @@ impl MissileAction {
 /// most `height` below the missile and at most `missile_height` above.
 #[must_use]
 pub fn meets_height(z: f32, height: f32, missile_z: f32, missile_height: f32) -> bool {
-    let d = z - missile_z;
-    -height <= d && d <= missile_height
+    let above = z - missile_z;
+    -height <= above && above <= missile_height
 }
 
 /// The ground hit's box test (`FUN_140a9e6e0`): a missile at `at` with radii `radius` lies on
@@ -593,7 +593,7 @@ mod tests {
         let from = Position::new(10.0, 10.0, 1.0);
         let target = Some((Radii::new(0.2, 0.2, 1.5), class::CLASS_6));
         let aim_with = |draws: [u32; 3], master: MasterId, count: i32, mode: &mut HitMode| {
-            let mut d = draws.into_iter();
+            let mut drawn = draws.into_iter();
             aim(
                 AimAt {
                     point,
@@ -604,7 +604,7 @@ mod tests {
                     attack_count: AttackCount::of_data(count),
                     hit_mode: mode,
                 },
-                &mut || d.next().unwrap(),
+                &mut || drawn.next().unwrap(),
                 &roles(),
                 &tuning().missile,
             )
@@ -647,7 +647,7 @@ mod tests {
             class: class::CLASS_54,
             ..aimer
         };
-        let mut d = once(26213u32);
+        let mut drawn = once(26213u32);
         let narrow = Some((Radii::new(0.5, 0.5, 0.0), class::BUILDING));
         assert_eq!(
             aim(
@@ -660,7 +660,7 @@ mod tests {
                     attack_count: AttackCount::of_data(0),
                     hit_mode: &mut mode
                 },
-                &mut || d.next().unwrap(),
+                &mut || drawn.next().unwrap(),
                 &roles(),
                 &tuning().missile
             ),
@@ -752,7 +752,7 @@ mod tests {
     fn building_volley_missile_starts_at_its_target_when_the_target_is_nearer_than_its_offset() {
         let at = Position::new(10.0, 10.0, 0.0);
         // facing x (angle 0): the offset's x goes along -y, its y along x
-        let p = volley_spawn_point(
+        let position = volley_spawn_point(
             at,
             Angle::ZERO,
             Offset::new(0.0, 2.0, 1.0),
@@ -760,9 +760,9 @@ mod tests {
             GroundOffset::ZERO,
             None,
         );
-        assert_eq!(p, Position::new(12.0, 10.0, 1.0));
+        assert_eq!(position, Position::new(12.0, 10.0, 1.0));
         // the scatter over the adjustment adds to the offset
-        let p = volley_spawn_point(
+        let position = volley_spawn_point(
             at,
             Angle::ZERO,
             Offset::new(0.0, 2.0, 1.0),
@@ -770,9 +770,9 @@ mod tests {
             GroundOffset::new(0.0, 0.25),
             None,
         );
-        assert_eq!(p, Position::new(12.5, 10.0, 1.0));
+        assert_eq!(position, Position::new(12.5, 10.0, 1.0));
         // a building's target a tile off: nearer than the offset's 2
-        let p = volley_spawn_point(
+        let position = volley_spawn_point(
             at,
             Angle::ZERO,
             Offset::new(0.0, 2.0, 1.0),
@@ -780,7 +780,7 @@ mod tests {
             GroundOffset::ZERO,
             Some(Point::new(11.0, 10.0)),
         );
-        assert_eq!(p, Position::new(11.0, 10.0, 1.0));
+        assert_eq!(position, Position::new(11.0, 10.0, 1.0));
         let position = volley_spawn_point(
             at,
             Angle::ZERO,

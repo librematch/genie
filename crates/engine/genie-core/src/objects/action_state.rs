@@ -15,10 +15,10 @@ impl ActionState {
     /// The number an object without an action reads (slot 0x2b0 gives 0).
     pub const NO_ACTION: Self = Self(0);
 
-    /// The state of number `n`.
+    /// The state of number `value`.
     #[must_use]
-    pub const fn new(n: u8) -> Self {
-        Self(n)
+    pub const fn new(value: u8) -> Self {
+        Self(value)
     }
 
     /// The number, as the action holds it.

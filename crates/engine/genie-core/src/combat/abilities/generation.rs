@@ -21,7 +21,7 @@ use crate::world::AllySharing;
 use crate::world::Seconds;
 use crate::world::Unread;
 use crate::world::World;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 
 /// What a generation task's test reads of the object's top action (`FUN_140a986f0`): its type
 /// (`+0x8`), its state (`+0x18`) and its target as the world holds it (`FUN_140a78450`), None
@@ -100,16 +100,16 @@ pub fn generated(dt: Seconds, task: &Task, multiplier: Amount) -> Amount {
 /// player does not have (an attribute past its count, which no `.dat` task names) takes nothing;
 /// a task without an attribute (−1) has no store, which the caller passes over.
 pub fn store(amount: Amount, out: AttributeId, stores: &mut [Amount]) -> Option<Amount> {
-    let s = stores.get_mut(out.index())?;
+    let store = stores.get_mut(out.index())?;
     let mut amount = amount;
     if Amount::ZERO < amount {
-        *s += amount;
-        amount = *s;
+        *store += amount;
+        amount = *store;
     }
     if below_or_unordered(amount.get(), ONE) {
         return None;
     }
-    *s = Amount::ZERO;
+    *store = Amount::ZERO;
     Some(amount)
 }
 
@@ -154,7 +154,7 @@ impl World {
                         .parts
                         .actions_of(unit.id)
                         .top_target()
-                        .filter(|t| works && !t.is_recyclable())
+                        .filter(|object_id| works && !object_id.is_recyclable())
                     {
                         Some(object_id) => self.work_target(object_id)?,
                         None => None,
@@ -218,7 +218,10 @@ impl World {
         let master = unit.master(self.master_tables(), player_id)?;
         Ok(Some(WorkTarget {
             hp: unit.life.hp,
-            storage: master.storage.first().map_or(Amount::ZERO, |s| s.1),
+            storage: master
+                .storage
+                .first()
+                .map_or(Amount::ZERO, |stored| stored.1),
             class: master.class,
         }))
     }

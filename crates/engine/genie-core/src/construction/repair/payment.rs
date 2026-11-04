@@ -24,7 +24,7 @@ use crate::world::NO_ATTRIBUTE;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
 use crate::world::layer::Slots;
-use crate::world::slots::CheckedIndex;
+use crate::world::slots::CheckedIndexExt;
 use crate::{GenieError, GenieResult};
 use std::fmt::{Debug, Error, Formatter};
 
@@ -75,11 +75,11 @@ pub struct Repaired {
 
 /// What a repair pays with: the repairer's player's masters and attributes (`FUN_14162fb60`
 /// with the repairer's player).
-pub struct Payer<'a> {
+pub struct Payer<'world> {
     /// The repairer's player's masters.
-    pub(crate) masters: &'a Masters,
+    pub(crate) masters: &'world Masters,
     /// The repairer's player's attributes.
-    pub(crate) attributes: &'a mut dyn Attributes,
+    pub(crate) attributes: &'world mut dyn Attributes,
 }
 
 impl Debug for Payer<'_> {
@@ -139,19 +139,27 @@ pub fn repair_building(
     if from == RepairFrom::Repairer
         && let Some(main) = checked.main
     {
-        let m = find(set, main.id())?;
-        return repair_building(set, m, amount, RepairFrom::Repairer, payer, roles, slots);
+        let main_index = find(set, main.id())?;
+        return repair_building(
+            set,
+            main_index,
+            amount,
+            RepairFrom::Repairer,
+            payer,
+            roles,
+            slots,
+        );
     }
     for annex in checked.annexes.clone() {
-        let a = find(set, annex)?;
-        match set.checked(a)?.kind {
+        let annex_index = find(set, annex)?;
+        match set.checked(annex_index)?.kind {
             MasterKind::COMBAT => {
-                let _ = repair_unit(set, a, amount, payer, roles, slots)?;
+                let _ = repair_unit(set, annex_index, amount, payer, roles, slots)?;
             }
             MasterKind::BUILDING => {
                 let _ = repair_building(
                     set,
-                    a,
+                    annex_index,
                     amount,
                     RepairFrom::MainBuilding,
                     payer,

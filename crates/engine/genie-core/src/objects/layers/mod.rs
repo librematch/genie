@@ -198,7 +198,7 @@ mod tests {
             "it keeps its height"
         );
         assert_eq!(
-            world.get(object_id(7)).map(|p| p.position),
+            world.get(object_id(7)).map(|placed| placed.position),
             Some(Position::new(4.0, 5.0, 0.5))
         );
         assert!(
@@ -212,7 +212,7 @@ mod tests {
             "a copy of the container's place"
         );
         assert_eq!(
-            world.get(object_id(7)).map(|p| p.position),
+            world.get(object_id(7)).map(|placed| placed.position),
             Some(Position::new(4.0, 5.0, 1.0))
         );
         let record = world.come_out(object_id(7)).expect("its record inside");

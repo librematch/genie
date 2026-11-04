@@ -9,7 +9,7 @@ use crate::objects::layers::Action;
 use crate::objects::layers::MotionMut;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::OwnerMasters;
-use crate::objects::masters::PlayersMasters;
+use crate::objects::masters::PlayersMastersExt;
 use crate::objects::release::Releaser;
 use crate::objects::sprite::new_sprite;
 use crate::objects::unit::Unit;
@@ -34,21 +34,21 @@ impl Unit {
         step: &mut Step<'_>,
     ) -> GenieResult<()> {
         let by = self.releaser(step)?;
-        let sprite = step.w.streams.get(Stream::Sprite);
+        let sprite = step.world.streams.get_mut(Stream::Sprite);
         let (mut releases, mut leaves) = (Vec::new(), Vec::new());
         self.stop_with(
             (
                 actions,
-                step.w.parts.unread.get(self.id),
-                step.w.parts.motion.layer_mut(self.id),
+                step.world.parts.unread.get(self.id),
+                step.world.parts.motion.layer_mut(self.id),
             ),
             (&mut releases, &mut leaves),
             by,
             OwnerMasters::new(
-                &step.w.parts.own_master,
-                step.w.model.masters.of(step.player),
+                &step.world.parts.own_master,
+                step.world.model.masters.of(step.player),
             ),
-            &step.w.model,
+            &step.world.model,
             sprite,
         )?;
         torn_down(step, self, (leaves, releases))
@@ -189,7 +189,7 @@ impl Unit {
         let by = self.releaser(step)?;
         let torn = actions
             .list
-            .delete_head(step.w.parts.motion_mut(self.id), self.life.state)?;
+            .delete_head(step.world.parts.motion_mut(self.id), self.life.state)?;
         torn.let_go(step, self, by)
     }
 
@@ -221,15 +221,15 @@ impl Unit {
                 let class = class.ok_or(GenieError::unsupported(
                     "an AI move of a master the slice does not have",
                 ))?;
-                let m = match effect {
-                    Effect::Move(m) => Some(m),
+                let moves = match effect {
+                    Effect::Move(ai_move) => Some(ai_move),
                     _ => Self::restore_patrol(
-                        step.w.parts.unit_ai.get(self.id),
-                        step.w.parts.motion.mover_mut(self.id),
-                        &step.w.model.tuning.movement,
+                        step.world.parts.unit_ai.get(self.id),
+                        step.world.parts.motion.mover_mut(self.id),
+                        &step.world.model.tuning.movement,
                     ),
                 };
-                m.map_or(Ok(()), |ai_move| {
+                moves.map_or(Ok(()), |ai_move| {
                     self.ai_move(actions, ai_move, class, step, roles)
                 })
             }
@@ -263,18 +263,18 @@ impl Unit {
         step: &mut Step<'_>,
     ) -> GenieResult<()> {
         match command {
-            AiCommand::MoveAside(ai_move) => step
-                .lend_at((&mut *self, &mut *actions), |w, p, i| {
-                    w.move_aside(p, i, ai_move)
-                }),
-            AiCommand::HuntObject(target) => step
-                .lend_at((&mut *self, &mut *actions), |w, p, i| {
-                    w.hunt_command(p, i, target)
-                }),
-            AiCommand::GatherObject(target) => step
-                .lend_at((&mut *self, &mut *actions), |w, p, i| {
-                    w.gather_command(p, i, target)
-                }),
+            AiCommand::MoveAside(ai_move) => step.lend_at(
+                (&mut *self, &mut *actions),
+                |world, player_id, list_index| world.move_aside(player_id, list_index, ai_move),
+            ),
+            AiCommand::HuntObject(target) => step.lend_at(
+                (&mut *self, &mut *actions),
+                |world, player_id, list_index| world.hunt_command(player_id, list_index, target),
+            ),
+            AiCommand::GatherObject(target) => step.lend_at(
+                (&mut *self, &mut *actions),
+                |world, player_id, list_index| world.gather_command(player_id, list_index, target),
+            ),
             AiCommand::WorkOn { target, point } => {
                 let work = Work {
                     target: Some(target),
@@ -283,9 +283,10 @@ impl Unit {
                     filter: None,
                     source: OrderSource::Queued,
                 };
-                step.lend_at((&mut *self, &mut *actions), |w, p, i| {
-                    w.order_work(p, i, &work)
-                })
+                step.lend_at(
+                    (&mut *self, &mut *actions),
+                    |world, player_id, list_index| world.order_work(player_id, list_index, &work),
+                )
             }
             AiCommand::BuildObject(target) => step.lend_at(
                 (&mut *self, &mut *actions),

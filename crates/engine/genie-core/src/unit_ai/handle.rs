@@ -97,7 +97,7 @@ impl UnitAi {
             NotifyKind::ACTION_FAILED
             | NotifyKind::ACTION_COMPLETED
             | NotifyKind::ACTION_INVALIDATED => self.current_order.map_or_else(
-                || AiAction::field(self.current_action) == notify.p[0],
+                || AiAction::field(self.current_action) == notify.params[0],
                 |order_kind| order_kind.owns(self.current_action),
             ),
             // "Target is still visible.": the world holds the target, which its owner sees

@@ -7,7 +7,7 @@ use crate::objects::masters::Availability;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::PlayersMasters;
+use crate::objects::masters::PlayersMastersExt;
 use crate::objects::masters::player_master;
 use crate::players::Amount;
 use crate::players::PlayerId;
@@ -43,11 +43,11 @@ impl World {
             })
     }
 
-    /// `FUN_1416597e0(player, n)`: the `n`-th object the world holds (`FUN_1415417a0`, in any
+    /// `FUN_1416597e0(player, n)`: the `nth`-th object the world holds (`FUN_1415417a0`, in any
     /// state) among the ids player `player_id`'s tracker files under masters 109 and 444
     /// (`FUN_14104f560`, `FUN_14104f4b0`: the first list, then the second).
     #[must_use]
-    pub fn town_centre_at(&self, player_id: PlayerId, n: usize) -> Option<ObjectId> {
+    pub fn town_centre_at(&self, player_id: PlayerId, nth: usize) -> Option<ObjectId> {
         let tracker = &self.players.get(player_id.index())?.tracker;
         // a queued unit's place (−1) names no object the world holds
         town_centres(self.model.slots.master)
@@ -60,7 +60,7 @@ impl World {
                     .flatten()
             })
             .filter(|&id| self.object(id).is_some())
-            .nth(n)
+            .nth(nth)
     }
 
     /// `FUN_141658a30`: player `player_id`'s town centres not dying (state below 3): those its
@@ -102,11 +102,11 @@ impl World {
             return 0;
         };
         let mut count = 0i16;
-        for m in masters {
-            let flags = m.disabled.get();
-            if MasterKind::COMBAT <= m.kind
-                && m.available.is_available()
-                && self.trains_at(m, building)
+        for master in masters {
+            let flags = master.disabled.get();
+            if MasterKind::COMBAT <= master.kind
+                && master.available.is_available()
+                && self.trains_at(master, building)
                 && flags & 1 == 0
             {
                 count = count.wrapping_add(1);
@@ -167,7 +167,7 @@ impl World {
         let state = |tree_tech: TreeTech| {
             tree_tech
                 .index()
-                .and_then(|t| player.techs.get(t))
+                .and_then(|index| player.techs.get(index))
                 .map(|tech_state| tech_state.state)
         };
         let ages_out =
@@ -188,11 +188,11 @@ impl World {
                 }
             });
         let mut count = 0i16;
-        for m in masters {
-            if m.kind < MasterKind::COMBAT || !self.trains_at(m, building) {
+        for trained in masters {
+            if trained.kind < MasterKind::COMBAT || !self.trains_at(trained, building) {
                 continue;
             }
-            let flags = m.disabled.get();
+            let flags = trained.disabled.get();
             if flags & 6 != 0 {
                 count = count.wrapping_add(1);
                 continue;
@@ -200,12 +200,12 @@ impl World {
             let tree_query = TreeQuery {
                 civ,
                 building: TreeMaster::of_master(building),
-                unit: TreeMaster::of_master(m.id),
+                unit: TreeMaster::of_master(trained.id),
                 ages_out,
                 settings: &self.settings,
                 fallback,
             };
-            if (!full || TreeMaster::of_master(m.id) != unique)
+            if (!full || TreeMaster::of_master(trained.id) != unique)
                 && !self.model.tech_tree.has(&tree_query)
             {
                 continue;
@@ -214,7 +214,7 @@ impl World {
             let had = link
                 .master()
                 .and_then(|master_id| masters.get(master_id))
-                .map(|l| l.available);
+                .map(|master| master.available);
             if had.is_none_or(Availability::is_available) {
                 let tech = self.model.tech_tree.tech(&tree_query);
                 if state(tech)
@@ -245,28 +245,28 @@ impl World {
         count
     }
 
-    /// `FUN_141263610`: master `m` trains at `building`: one of its train locations (`+0x898`)
-    /// is `building`, or the building's stack unit (`+0x986`) when the local player's master of
-    /// it ([`World::local_player`], `FUN_140c88440`) is of class 3, disappears when built
+    /// `FUN_141263610`: master `trained` trains at `building`: one of its train locations
+    /// (`+0x898`) is `building`, or the building's stack unit (`+0x986`) when the local player's
+    /// master of it ([`World::local_player`], `FUN_140c88440`) is of class 3, disappears when built
     /// (`+0x984`) and has one (0 or more). A master without train locations trains nowhere.
     #[must_use]
-    pub fn trains_at(&self, m: &Master, building: MasterId) -> bool {
-        if m.creatable_part().trained_at.is_empty() {
+    pub fn trains_at(&self, trained: &Master, building: MasterId) -> bool {
+        if trained.creatable_part().trained_at.is_empty() {
             return false;
         }
         let mut at = building;
         let local = player_master(&self.model.masters, self.local_player, building);
-        if let Some(b) = local.filter(|master| {
+        if let Some(master) = local.filter(|master| {
             self.model
                 .roles
                 .of_class(master.class)
                 .contains(ClassRoles::BUILDING)
-        }) && let Some(site) = b.building.as_ref()
+        }) && let Some(site) = master.building.as_ref()
             && site.disappears_when_built.disappears()
             && let Some(stack) = site.stack_unit
         {
             at = stack;
         }
-        m.creatable_part().trained_at.contains(&at)
+        trained.creatable_part().trained_at.contains(&at)
     }
 }

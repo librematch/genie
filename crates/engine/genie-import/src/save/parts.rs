@@ -94,7 +94,7 @@ pub fn combat_master(master: &Master) -> Option<&RgeMasterCombatObject> {
         master
             .rge_master
             .as_deref()
-            .and_then(|r| r.rge_master_combat_object.as_deref())
+            .and_then(|rge_master| rge_master.rge_master_combat_object.as_deref())
     })
     .or_else(|| {
         master.rge_master.as_deref().and_then(|rge_master| {

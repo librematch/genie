@@ -25,7 +25,7 @@ use crate::objects::Voice;
 use crate::objects::layers::Action;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::ClassId;
-use crate::objects::masters::PlayersMasters;
+use crate::objects::masters::PlayersMastersExt;
 use crate::objects::masters::Task;
 use crate::objects::masters::{MasterTables, OwnerMasters};
 use crate::objects::teardown::HeadCode;
@@ -298,14 +298,14 @@ impl EnterAction {
         self.state = EnterState::Wait;
         self.timer = WAIT_SECONDS;
         unit.shows_standing_sprite(
-            step.w.parts.motion.layer_mut(unit.id),
+            step.world.parts.motion.layer_mut(unit.id),
             OwnerMasters::new(
-                &step.w.parts.own_master,
-                step.w.model.masters.of(step.player),
+                &step.world.parts.own_master,
+                step.world.model.masters.of(step.player),
             ),
-            &step.w.model.graphics,
-            step.w.streams.get(Stream::Sprite),
-            step.w.model.tuning.sprite,
+            &step.world.model.graphics,
+            step.world.streams.get_mut(Stream::Sprite),
+            step.world.model.tuning.sprite,
         )
     }
 
@@ -403,7 +403,7 @@ impl EnterAction {
         enter_target: &EnterTarget,
         reads: &EnterReads,
     ) -> GenieResult<()> {
-        let roles = &step.w.model.roles.clone();
+        let roles = &step.world.model.roles.clone();
         let walked_again = self.target_moved(enter_target);
         let entered = walked_again
             && self.again(step, unit, actions, enter_target, reads, roles)? == EnterAgain::Entered;
@@ -486,7 +486,7 @@ impl EnterAction {
             enter_target.position.y(),
             enter_target.position.z(),
         );
-        let moved = |d: f32| HALF_TILE < d.abs();
+        let moved = |delta: f32| HALF_TILE < delta.abs();
         enter_target.position != self.point
             && (moved(x - self.point.x()) || moved(y - self.point.y()) || moved(z - self.point.z()))
     }
@@ -513,36 +513,38 @@ impl EnterAction {
         roles: &Roles,
     ) -> GenieResult<EnterAgain> {
         if self.state.move_to().is_some()
-            && let Some(mover) = step.w.parts.mover_mut(unit.id)
+            && let Some(mover) = step.world.parts.mover_mut(unit.id)
         {
             mover.stop()?;
         }
         let walking = {
-            let w = &mut *step.w;
+            let world = &mut *step.world;
             // the update's reads found it (`held_target`), and the Enter's own update removes
             // no other object
-            let (tp, target) = OthersRef::of(&w.players, &w.index, step.player)?
+            let (tp, target) = OthersRef::of(&world.players, &world.index, step.player)?
                 .find(self.target)
                 .ok_or(GenieError::unreachable(
                     "an Enter's held target gone in its update",
                 ))?;
-            let master =
-                target.master(MasterTables::new(&w.model.masters, &w.parts.own_master), tp)?;
+            let master = target.master(
+                MasterTables::new(&world.model.masters, &world.parts.own_master),
+                tp,
+            )?;
             let meeting = Meeting {
-                spatial: &mut w.spatial,
-                zones: &mut w.zones,
+                spatial: &mut world.spatial,
+                zones: &mut world.zones,
                 target,
                 master,
                 room: enter_target.room,
                 unit,
-                mover: w.parts.mover_of(unit.id),
-                target_actions: w.parts.actions_of(target.id),
-                target_unread: w.parts.unread.get(target.id),
-                target_mover: w.parts.mover_of(target.id),
+                mover: world.parts.mover_of(unit.id),
+                target_actions: world.parts.actions_of(target.id),
+                target_unread: world.parts.unread.get(target.id),
+                target_mover: world.parts.mover_of(target.id),
             };
             let sprites = SpriteReads {
                 defaults: reads.defaults,
-                graphics: &w.model.graphics,
+                graphics: &world.model.graphics,
             };
             let moves = MoveToReads::with_sprites(sprites, (meeting.unit, meeting.mover));
             self.walk_again(
@@ -551,12 +553,12 @@ impl EnterAction {
                 meeting,
                 &moves,
                 ObjectsRef::new(
-                    &w.players,
-                    &w.index,
-                    &w.model.masters,
-                    &w.parts,
-                    &w.model.roles,
-                    &w.model.tuning,
+                    &world.players,
+                    &world.index,
+                    &world.model.masters,
+                    &world.parts,
+                    &world.model.roles,
+                    &world.model.tuning,
                 ),
             )?
         };
@@ -596,21 +598,21 @@ impl EnterAction {
         })
     }
 
-    /// Runs `f` on `unit` and its action layer `actions` with this copy of its Enter written back
-    /// to the layer (a routine that reads or changes the unit's Enter, or lends the unit to the
-    /// world), then takes the Enter back as `f` left it.
+    /// Runs `work` on `unit` and its action layer `actions` with this copy of its Enter written
+    /// back to the layer (a routine that reads or changes the unit's Enter, or lends the unit to
+    /// the world), then takes the Enter back as `work` left it.
     ///
     /// # Errors
     ///
-    /// `f`'s, or a unit whose Enter `f` took.
+    /// `work`'s, or a unit whose Enter `work` took.
     fn on_unit<R>(
         &mut self,
         unit: &mut Unit,
         actions: &mut Action,
-        f: impl FnOnce(&mut Unit, &mut Action) -> GenieResult<R>,
+        work: impl FnOnce(&mut Unit, &mut Action) -> GenieResult<R>,
     ) -> GenieResult<R> {
         actions.list.set_enter(Some(*self));
-        let answer = f(unit, actions);
+        let answer = work(unit, actions);
         // the routines run here (the enter, `entered_again`, the transport's move) change the
         // Enter's state, and none takes it from the list
         *self = *actions

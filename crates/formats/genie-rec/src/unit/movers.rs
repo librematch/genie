@@ -1,6 +1,6 @@
 //! The moving and action base classes' attributes: paths, movement and the action stack.
 
-use crate::element::{ReadableHeaderElement, WritableHeaderElement, read_counted, read_xyz};
+use crate::element::{ReadHeader, WriteHeader, read_counted, read_xyz};
 use crate::reader::RecordingHeaderReader;
 use crate::unit_action::UnitAction;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
@@ -40,7 +40,7 @@ pub struct PathData {
     pub flags: u32,
 }
 
-impl ReadableHeaderElement for PathData {
+impl ReadHeader for PathData {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let mut path = Self {
             id: input.read_u32::<LE>()?,
@@ -154,7 +154,7 @@ pub struct MovingUnitAttributes {
     pub consecutive_substitute_count: u32,
 }
 
-impl ReadableHeaderElement for MovingUnitAttributes {
+impl ReadHeader for MovingUnitAttributes {
     // Reads the moving unit's fields in file order, section by section.
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let mut attrs = Self::read_motion(input)?;
@@ -226,7 +226,7 @@ impl MovingUnitAttributes {
     }
 }
 
-impl WritableHeaderElement for MovingUnitAttributes {}
+impl WriteHeader for MovingUnitAttributes {}
 
 /// The attributes the action base class adds: the action stack.
 #[derive(Debug, Default, Clone)]
@@ -241,7 +241,7 @@ pub struct ActionUnitAttributes {
     pub actions: Vec<UnitAction>,
 }
 
-impl ReadableHeaderElement for ActionUnitAttributes {
+impl ReadHeader for ActionUnitAttributes {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let mut attrs = Self {
             waiting: input.read_u8()? != 0,
@@ -259,7 +259,7 @@ impl ReadableHeaderElement for ActionUnitAttributes {
     }
 }
 
-impl WritableHeaderElement for ActionUnitAttributes {}
+impl WriteHeader for ActionUnitAttributes {}
 
 #[cfg(test)]
 mod tests;

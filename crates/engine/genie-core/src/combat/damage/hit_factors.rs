@@ -49,21 +49,21 @@ pub fn building_elevation_factor(
     victim_relics: Relics,
     damage_tuning: &DamageTuning,
 ) -> f32 {
-    let mut f = factor;
+    let mut factor = factor;
     if RelicCount::ZERO < relics.specific {
-        f *= damage_tuning.specific_relic_boost;
+        factor *= damage_tuning.specific_relic_boost;
     } else if RelicCount::ZERO < relics.count {
-        f *= damage_tuning.relic_boost;
+        factor *= damage_tuning.relic_boost;
     }
     if kind == MasterKind::BUILDING {
         if RelicCount::ZERO < victim_relics.specific {
-            return f / damage_tuning.specific_relic_boost;
+            return factor / damage_tuning.specific_relic_boost;
         }
         if RelicCount::ZERO < victim_relics.count {
-            f /= damage_tuning.relic_boost;
+            factor /= damage_tuning.relic_boost;
         }
     }
-    f
+    factor
 }
 
 /// `FUN_14114eaa0` toward another object: how far `other` lies from where an object at `at`

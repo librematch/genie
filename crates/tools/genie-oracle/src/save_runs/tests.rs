@@ -40,7 +40,7 @@ fn same(save: &Header, turns: &World) -> SavedStep {
                 player
                     .objects
                     .iter()
-                    .filter(|u| listed(u))
+                    .filter(|unit| listed(unit))
                     .map(|unit| turns.object_of(unit))
                     .collect()
             })
@@ -96,26 +96,26 @@ fn the_state_the_status_and_the_unfrozen_objects_differ() {
     }
     let mut report = TickReport::default();
     compare_players(&turns, &after, Some(6), &mut report).unwrap();
-    let d: Vec<_> = report
+    let differences: Vec<_> = report
         .differences
         .iter()
-        .map(|(p, d)| (*p, d.as_str()))
+        .map(|(player, text)| (*player, text.as_str()))
         .collect();
-    assert_eq!(d[0], (0, "game state slice 2 game 0"));
+    assert_eq!(differences[0], (0, "game state slice 2 game 0"));
     assert_eq!(
-        d[1],
+        differences[1],
         (
             1,
             "game status slice (0, false) game (1, false) (status, resigned)"
         )
     );
     assert!(
-        d[2..]
+        differences[2..]
             .iter()
-            .all(|(p, text)| *p == 1 && text.starts_with("8:")),
-        "{d:?}"
+            .all(|(player, text)| *player == 1 && text.starts_with("8:")),
+        "{differences:?}"
     );
-    assert_eq!(d.len(), 3, "{d:?}");
+    assert_eq!(differences.len(), 3, "{differences:?}");
     // the freeze is of update 5, not 6
     assert_eq!(report.unsupported, []);
 }
@@ -161,7 +161,7 @@ fn stops_and_freezes_are_reported_by_their_update() {
         report
             .unsupported
             .iter()
-            .map(|(p, o, t, _)| (*p, *o, *t))
+            .map(|(player, object_id, tick, _)| (*player, *object_id, *tick))
             .collect::<Vec<_>>(),
         [(1, None, 5)]
     );
@@ -175,7 +175,7 @@ fn stops_and_freezes_are_reported_by_their_update() {
         report
             .unsupported
             .iter()
-            .map(|(p, o, t, _)| (*p, *o, *t))
+            .map(|(player, object_id, tick, _)| (*player, *object_id, *tick))
             .collect::<Vec<_>>(),
         [(1, Some(object_id(40)), 6)]
     );
@@ -201,7 +201,7 @@ fn stopped_player_stock_is_not_compared() {
         report
             .differences
             .iter()
-            .any(|(p, d)| *p == 1 && d.starts_with("resources ")),
+            .any(|(player, text)| *player == 1 && text.starts_with("resources ")),
         "{report:?}"
     );
     turns.players[1].stopped = true;
@@ -281,21 +281,21 @@ fn dump_out_of_shape_is_an_error() {
             mesh: Some("tile 0 0 1\n"),
             ..Dumps::default()
         })
-        .is_err_and(|e| e == bad_mesh_dump())
+        .is_err_and(|error| error == bad_mesh_dump())
     );
     assert!(
         bad(Dumps {
             tiles: Some("x\n"),
             ..Dumps::default()
         })
-        .is_err_and(|e| e == bad_tile_dump())
+        .is_err_and(|error| error == bad_tile_dump())
     );
     assert!(
         bad(Dumps {
             inside: Some("x\n"),
             ..Dumps::default()
         })
-        .is_err_and(|e| e == bad_tile_dump())
+        .is_err_and(|error| error == bad_tile_dump())
     );
     assert!(
         bad(Dumps {

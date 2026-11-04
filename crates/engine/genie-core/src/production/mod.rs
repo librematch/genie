@@ -27,7 +27,7 @@ use crate::players::attribute::AttributeId;
 use crate::technology::TechId;
 use crate::world::Seconds;
 use crate::world::WholeSeconds;
-use crate::world::slots::CheckedIndex;
+use crate::world::slots::CheckedIndexExt;
 use genie_diff::Diff;
 
 mod outcomes;
@@ -157,10 +157,12 @@ impl Default for Queue {
 /// integer and its amount as a float (`UCOMISS`, `JP`: a NaN differs).
 #[must_use]
 pub fn same_costs(
-    a: &[(Option<AttributeId>, Amount); 3],
-    b: &[(Option<AttributeId>, Amount); 3],
+    left: &[(Option<AttributeId>, Amount); 3],
+    right: &[(Option<AttributeId>, Amount); 3],
 ) -> bool {
-    a.iter().zip(b).all(|(x, y)| x.0 == y.0 && x.1 == y.1)
+    left.iter()
+        .zip(right)
+        .all(|(x, y)| x.0 == y.0 && x.1 == y.1)
 }
 
 /// The kind of entry a production queue closes ([`Queue::close`]): a unit's, whose train time
@@ -202,21 +204,21 @@ impl Queue {
         if entries.is_empty() {
             return None;
         }
-        let (mut e, mut k) = (0usize, 0i32);
+        let (mut entry, mut unit) = (0usize, 0i32);
         for _ in 0..index.get() {
-            k += 1;
-            if i32::from(entries.get(e)?.count.get()) <= k {
-                e += 1;
-                k = 0;
-                if entries.len() <= e {
+            unit += 1;
+            if i32::from(entries.get(entry)?.count.get()) <= unit {
+                entry += 1;
+                unit = 0;
+                if entries.len() <= entry {
                     return None;
                 }
             }
         }
-        Some(e)
+        Some(entry)
     }
 
-    /// An emptied entry `i` goes (its caller lowered `+0xbf2` first in the game; here this
+    /// An emptied entry `index` goes (its caller lowered `+0xbf2` first in the game; here this
     /// does): each later entry moves down a slot, its master, count, technology, costs and
     /// button, and its train time for a [`QueueEntry::Train`] (`FUN_1411d61e0`'s research branch
     /// does not move it); the serials stay, and the slot of the old last entry keeps what it held.
@@ -224,12 +226,12 @@ impl Queue {
     /// # Errors
     ///
     /// A slot the buffer does not hold (the count past the buffer).
-    pub fn close(&mut self, i: usize, entry: QueueEntry) -> GenieResult<()> {
+    pub fn close(&mut self, index: usize, entry: QueueEntry) -> GenieResult<()> {
         self.count = self.count.shrunk();
-        let mut j = i;
-        while (j as i32) < i32::from(self.count.get()) {
-            let next = *self.slots.checked(j + 1)?;
-            let slot = self.slots.checked_mut(j)?;
+        let mut position = index;
+        while (position as i32) < i32::from(self.count.get()) {
+            let next = *self.slots.checked(position + 1)?;
+            let slot = self.slots.checked_mut(position)?;
             slot.master = next.master;
             slot.count = next.count;
             slot.tech = next.tech;
@@ -238,7 +240,7 @@ impl Queue {
             if entry == QueueEntry::Train {
                 slot.train_time = next.train_time;
             }
-            j += 1;
+            position += 1;
         }
         Ok(())
     }
@@ -324,7 +326,9 @@ pub fn train_time(
     building: MasterId,
     button: QueueButton,
 ) -> WholeSeconds {
-    let first = locations.first().map_or(WholeSeconds::ZERO, |l| l.time);
+    let first = locations
+        .first()
+        .map_or(WholeSeconds::ZERO, |train_location| train_location.time);
     if button == QueueButton::NONE {
         return first;
     }
@@ -383,13 +387,17 @@ impl MakeObj {
     pub fn time(&self, master: Option<&Master>, building: MasterId) -> WholeSeconds {
         // The first master type that is a `TRIBE_Master_Combat_Object` (the dynamic casts of
         // `FUN_1411cbc40` and `FUN_140acf280`).
-        let Some(m) = master.filter(|m| MasterKind::COMBAT <= m.kind) else {
+        let Some(master) = master.filter(|master| MasterKind::COMBAT <= master.kind) else {
             return WholeSeconds::ZERO;
         };
-        if m.object_flags.contains(ObjectFlags::OWN_TRAIN_TIME) {
+        if master.object_flags.contains(ObjectFlags::OWN_TRAIN_TIME) {
             return self.train_time;
         }
-        train_time(&m.creatable_part().train_locations, building, self.button)
+        train_time(
+            &master.creatable_part().train_locations,
+            building,
+            self.button,
+        )
     }
 }
 
@@ -492,17 +500,16 @@ pub fn population(storage: &[(Option<AttributeId>, Amount, u8)], roles: &Roles) 
 /// production and this one stays within the cap (`COMISS`, `JBE`: a NaN passes), and the
 /// headroom covers them. A building that fails it waits (housed).
 pub fn housed(attributes: &[Amount], pop: Amount, slots: Slots) -> GenieResult<bool> {
-    let a = |attribute_id: AttributeId| {
+    let attribute = |attribute_id: AttributeId| {
         attributes
             .get(attribute_id.index())
             .copied()
             .ok_or(NO_ATTRIBUTE)
     };
-    let in_production = a(slots.attribute.in_production)?;
-    Ok(
-        a(slots.attribute.population_cap)? < a(slots.attribute.population)? + in_production + pop
-            || (a(slots.attribute.headroom)? - in_production) - pop < Amount::ZERO,
-    )
+    let in_production = attribute(slots.attribute.in_production)?;
+    Ok(attribute(slots.attribute.population_cap)?
+        < attribute(slots.attribute.population)? + in_production + pop
+        || (attribute(slots.attribute.headroom)? - in_production) - pop < Amount::ZERO)
 }
 
 #[cfg(test)]
@@ -572,8 +579,8 @@ mod tests {
     fn queue(entries: &[Entry]) -> Queue {
         let mut slots = vec![Entry::default(); 10];
         slots[..entries.len()].copy_from_slice(entries);
-        for (index, s) in slots.iter_mut().enumerate() {
-            s.serial = EntrySerial::new(index as i64);
+        for (index, entry) in slots.iter_mut().enumerate() {
+            entry.serial = EntrySerial::new(index as i64);
         }
         Queue {
             slots,
@@ -593,7 +600,7 @@ mod tests {
             unit(ids::VILLAGER_MALE, 2, 50.0),
         ]);
         let at: Vec<_> = (0..6)
-            .map(|i| queue.entry_of_unit(UnitIndex::of_data(i)))
+            .map(|unit| queue.entry_of_unit(UnitIndex::of_data(unit)))
             .collect();
         assert_eq!(at, [Some(0), Some(0), Some(0), Some(1), Some(1), None]);
         assert_eq!(Queue::default().entry_of_unit(UnitIndex::of_data(0)), None);
@@ -603,16 +610,16 @@ mod tests {
     /// old last slot keeps its copy; without `time` the train times stay as they were.
     #[test]
     fn closing_an_entry_moves_the_later_ones_down_but_not_their_serials() {
-        let mut q = queue(&[
+        let mut queued = queue(&[
             unit(master_id(4), 0, 25.0),
             unit(ids::VILLAGER_MALE, 2, 50.0),
             unit(master_id(5), 1, 30.0),
         ]);
-        q.slots[2].train_time = WholeSeconds::of_data(40);
-        q.close(0, QueueEntry::Train).unwrap();
-        assert_eq!(q.count.get(), 2);
+        queued.slots[2].train_time = WholeSeconds::of_data(40);
+        queued.close(0, QueueEntry::Train).unwrap();
+        assert_eq!(queued.count.get(), 2);
         assert_eq!(
-            q.slots[..3]
+            queued.slots[..3]
                 .iter()
                 .map(|entry| (
                     entry.master,
@@ -628,14 +635,14 @@ mod tests {
             ]
         );
         // a research's cancel (FUN_1411d61e0) leaves the train times in their slots
-        let mut q = queue(&[
+        let mut queue = queue(&[
             unit(master_id(4), 0, 25.0),
             unit(ids::VILLAGER_MALE, 2, 50.0),
         ]);
-        q.slots[0].train_time = WholeSeconds::of_data(7);
-        q.close(0, QueueEntry::Research).unwrap();
+        queue.slots[0].train_time = WholeSeconds::of_data(7);
+        queue.close(0, QueueEntry::Research).unwrap();
         assert_eq!(
-            (q.slots[0].master, q.slots[0].train_time),
+            (queue.slots[0].master, queue.slots[0].train_time),
             (Some(ids::VILLAGER_MALE), WholeSeconds::of_data(7))
         );
     }
@@ -648,9 +655,9 @@ mod tests {
         assert!(!queue.full());
         // each old slot's own costs: its place's attribute, its place as the amount
         let refill: Vec<_> = (0..queue.slots.len())
-            .map(|i| {
+            .map(|index| {
                 [
-                    (AttributeId::of_index(i), Amount::new(i as f32)),
+                    (AttributeId::of_index(index), Amount::new(index as f32)),
                     NO_COSTS[1],
                     NO_COSTS[2],
                 ]
@@ -668,7 +675,7 @@ mod tests {
         );
         assert_eq!(queue.slots[15], Entry::default());
         // a new entry takes the next serial and no costs
-        let i = queue
+        let added = queue
             .open(
                 Some(master_id(5)),
                 QueuedUnits::of_data(2),
@@ -677,7 +684,7 @@ mod tests {
             )
             .unwrap();
         assert_eq!(
-            (i, queue.slots[1].serial.get(), queue.slots[1].costs),
+            (added, queue.slots[1].serial.get(), queue.slots[1].costs),
             (1, 10, NO_COSTS)
         );
         assert_eq!(queue.next_serial, EntrySerial::new(11));
@@ -714,14 +721,14 @@ mod tests {
     /// `FUN_1411cbc40`'s join compares the amounts as floats: a NaN never joins.
     #[test]
     fn costs_join_only_when_equal_and_not_nan() {
-        let a = [
+        let costs = [
             (Some(attribute::FOOD), Amount::new(50.0)),
             (None, Amount::ZERO),
             (None, Amount::ZERO),
         ];
-        assert!(same_costs(&a, &a));
+        assert!(same_costs(&costs, &costs));
         assert!(!same_costs(
-            &a,
+            &costs,
             &[
                 (Some(attribute::WOOD), Amount::new(50.0)),
                 (None, Amount::ZERO),
@@ -881,27 +888,27 @@ mod tests {
             let refund = refund_tech(state, &def, tech, &mut held, slots());
             (refund, held.attributes[0], held.attributes[1])
         };
-        let mut s = state(ResearchState::Researching);
+        let mut tech_state = state(ResearchState::Researching);
         assert_eq!(
-            refunded(&mut s, tech_id(22), Amount::ZERO),
+            refunded(&mut tech_state, tech_id(22), Amount::ZERO),
             (Ok(Refund::Refunded), Amount::new(90.0), Amount::ZERO)
         );
         assert_eq!(
-            (s.state, s.research_done),
+            (tech_state.state, tech_state.research_done),
             (ResearchState::Available, Seconds::ZERO)
         );
-        let mut s = state(ResearchState::Queued);
+        let mut tech_state = state(ResearchState::Queued);
         assert_eq!(
-            refunded(&mut s, tech_id(22), Amount::new(0.75)),
+            refunded(&mut tech_state, tech_id(22), Amount::new(0.75)),
             (Ok(Refund::Refunded), Amount::new(67.0), Amount::ZERO)
         );
-        let mut s = state(ResearchState::Queued);
+        let mut tech_state = state(ResearchState::Queued);
         assert_eq!(
-            refunded(&mut s, tech_id(101), Amount::new(0.75)),
+            refunded(&mut tech_state, tech_id(101), Amount::new(0.75)),
             (Ok(Refund::Refunded), Amount::new(90.0), Amount::ZERO)
         );
         // the scaled amount wraps at 16 bits: 40000 is -25536
-        let mut s = TechState {
+        let mut tech_state = TechState {
             cost_adj: [
                 CostAmount::of_data(19_900),
                 CostAmount::ZERO,
@@ -910,7 +917,7 @@ mod tests {
             ..state(ResearchState::Researching)
         };
         assert_eq!(
-            refunded(&mut s, tech_id(22), Amount::new(2.0)),
+            refunded(&mut tech_state, tech_id(22), Amount::new(2.0)),
             (Ok(Refund::Refunded), Amount::new(-25_536.0), Amount::ZERO)
         );
         let mut tech_state = state(ResearchState::Researched);
@@ -1048,14 +1055,14 @@ mod tests {
             (attribute::FOOD, 50, true),
             (attribute::HEADROOM, 1, false),
         ])]);
-        let mut h = held();
+        let mut player = held();
         assert!(
             cost_test(
                 &ms,
                 ids::VILLAGER_MALE,
                 CostCount::new(2.0),
                 PopulationTest::Tested,
-                &h,
+                &player,
                 &roles(),
                 slots()
             )
@@ -1067,34 +1074,34 @@ mod tests {
                 ids::VILLAGER_MALE,
                 CostCount::new(3.0),
                 PopulationTest::Tested,
-                &h,
+                &player,
                 &roles(),
                 slots()
             )
             .unwrap()
         );
         // 4 queued: 4 + 4 + 1 is the headroom's 9; one more queued is not
-        h.attributes[80] = Amount::new(4.0);
+        player.attributes[80] = Amount::new(4.0);
         assert!(
             cost_test(
                 &ms,
                 ids::VILLAGER_MALE,
                 CostCount::ONE,
                 PopulationTest::Tested,
-                &h,
+                &player,
                 &roles(),
                 slots()
             )
             .unwrap()
         );
-        h.attributes[80] = Amount::new(5.0);
+        player.attributes[80] = Amount::new(5.0);
         assert!(
             !cost_test(
                 &ms,
                 ids::VILLAGER_MALE,
                 CostCount::ONE,
                 PopulationTest::Tested,
-                &h,
+                &player,
                 &roles(),
                 slots()
             )
@@ -1106,7 +1113,7 @@ mod tests {
                 ids::VILLAGER_MALE,
                 CostCount::ONE,
                 PopulationTest::Skipped,
-                &h,
+                &player,
                 &roles(),
                 slots()
             )
@@ -1264,7 +1271,7 @@ mod tests {
         assert_eq!(
             master_costs(&ms, master_id(2), &player, &roles(), slots())
                 .unwrap()
-                .map(|(a, n)| (a, n.get())),
+                .map(|(attribute_id, cost_amount)| (attribute_id, cost_amount.get())),
             [
                 (Some(attribute::FOOD), 20),
                 (Some(attribute::STONE), 5),
@@ -1290,7 +1297,7 @@ mod tests {
         assert_eq!(
             master_costs(&ms, master_id(2), &player, &roles(), slots())
                 .unwrap()
-                .map(|(a, n)| (a, n.get())),
+                .map(|(attribute_id, cost_amount)| (attribute_id, cost_amount.get())),
             [
                 (Some(attribute::GOLD), 70),
                 (Some(attribute::FOOD), 10),
@@ -1302,13 +1309,13 @@ mod tests {
         assert_eq!(
             master_costs(&ms, ids::VILLAGER_MALE, &player, &roles(), slots())
                 .unwrap()
-                .map(|(a, n)| (a, n.get())),
+                .map(|(attribute_id, cost_amount)| (attribute_id, cost_amount.get())),
             [(Some(attribute::GOLD), 50), (None, 0), (None, 0)]
         );
         assert_eq!(
             master_costs(&ms, ids::ID_7, &player, &roles(), slots())
                 .unwrap()
-                .map(|(a, cost_amount)| (a, cost_amount.get())),
+                .map(|(attribute_id, cost_amount)| (attribute_id, cost_amount.get())),
             [(None, 0); 3]
         );
         assert_eq!(

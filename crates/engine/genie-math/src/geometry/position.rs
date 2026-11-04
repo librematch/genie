@@ -88,8 +88,8 @@ impl Position {
 
 impl From<[f32; 3]> for Position {
     /// The place of three floats in the map's order (x, y, z), as a save holds them.
-    fn from(c: [f32; 3]) -> Self {
-        Self(c)
+    fn from(components: [f32; 3]) -> Self {
+        Self(components)
     }
 }
 

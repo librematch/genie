@@ -392,10 +392,10 @@ fn each_action_with_its_own_stop_halts_and_answers_true() {
         },
     ));
     game.set_motion(object_id(33), Some(Motion::Moving(walker())));
-    let head = |world: &World, i: ListIndex| {
+    let head = |world: &World, list_index: ListIndex| {
         world
             .parts
-            .actions_of(world.players[1].objects[i].id)
+            .actions_of(world.players[1].objects[list_index].id)
             .list
             .head()
             .cloned()
@@ -439,7 +439,7 @@ fn each_action_with_its_own_stop_halts_and_answers_true() {
             .actions_of(unit.id)
             .list
             .attack()
-            .map(|a| a.state),
+            .map(|attack| attack.state),
         Some(AttackState::Done)
     );
     assert_eq!(game.parts.anim_speed_of(unit.id), Some(Speed::new(1.0)));
@@ -449,7 +449,7 @@ fn each_action_with_its_own_stop_halts_and_answers_true() {
             .actions_of(objects[artifact].id)
             .list
             .artifact()
-            .map(|a| a.state),
+            .map(|artifact| artifact.state),
         Some(ArtifactState::Check)
     );
     let sail = ActionsAction::Transport(TransportAction::new(Position::new(1.0, 1.0, 0.0)));
@@ -538,7 +538,7 @@ fn stopped_hunter_keeps_its_halted_hunt() {
             .actions_of(unit.id)
             .list
             .hunt()
-            .map(|h| h.state),
+            .map(|hunt_action| hunt_action.state),
         Some(HuntState::Idle)
     );
     // its target went through slot 0x68 (FUN_140ac7980), which clears the lead
@@ -583,8 +583,11 @@ fn cancel_gives_back_one_queued_unit() {
         .production
         .get(players.objects[ListIndex::new(0)].id)
         .unwrap();
-    let q = &production.queue;
-    assert_eq!((q.count.get(), q.total.get(), q.changes.get()), (1, 1, 1));
+    let queue = &production.queue;
+    assert_eq!(
+        (queue.count.get(), queue.total.get(), queue.changes.get()),
+        (1, 1, 1)
+    );
     assert!(production.action.is_some());
     assert_eq!(players.tracker.queued, -1);
     world
@@ -623,38 +626,50 @@ fn cancel_gives_back_one_queued_unit() {
 /// 2 keeps its queue for its production step.
 #[test]
 fn dying_building_cancels_its_queue_in_its_update() {
-    let mut t = game();
-    let tc = t
+    let mut world = game();
+    let tc = world
         .parts
         .production
-        .get_mut(t.players[1].objects[ListIndex::new(0)].id)
+        .get_mut(world.players[1].objects[ListIndex::new(0)].id)
         .unwrap();
     tc.queue = queue(&[villager(Some(ids::VILLAGER_MALE), 4, 50.0)]);
-    t.players[1].attributes[80] = Amount::new(4.0);
-    t.players[1].objects[ListIndex::new(0)].life.state = ObjectState::Dying;
-    t.building_production(PlayerId::new(1), ListIndex::new(0), Seconds::new(0.05))
+    world.players[1].attributes[80] = Amount::new(4.0);
+    world.players[1].objects[ListIndex::new(0)].life.state = ObjectState::Dying;
+    world
+        .building_production(PlayerId::new(1), ListIndex::new(0), Seconds::new(0.05))
         .unwrap();
-    let players = &t.players[1];
+    let players = &world.players[1];
     assert_eq!(
         (players.attributes[0], players.attributes[80]),
         (Amount::new(200.0), Amount::ZERO)
     );
-    let q = &t
+    let production = &world
         .parts
         .production
         .get(players.objects[ListIndex::new(0)].id)
         .unwrap()
         .queue;
-    assert_eq!((q.count.get(), q.total.get(), q.changes.get()), (0, 0, 1));
-    t.building_production(PlayerId::new(1), ListIndex::new(0), Seconds::new(0.05))
+    assert_eq!(
+        (
+            production.count.get(),
+            production.total.get(),
+            production.changes.get()
+        ),
+        (0, 0, 1)
+    );
+    world
+        .building_production(PlayerId::new(1), ListIndex::new(0), Seconds::new(0.05))
         .unwrap();
-    let q = &t
+    let production_queue = &world
         .parts
         .production
-        .get(t.players[1].objects[ListIndex::new(0)].id)
+        .get(world.players[1].objects[ListIndex::new(0)].id)
         .unwrap()
         .queue;
-    assert_eq!((q.count.get(), q.changes.get()), (0, 2));
+    assert_eq!(
+        (production_queue.count.get(), production_queue.changes.get()),
+        (0, 2)
+    );
     let mut world = game();
     let tc = world
         .parts
@@ -777,17 +792,17 @@ fn cancel_of_all_takes_five_villagers_of_both_sexes() {
         .production
         .get(player.objects[ListIndex::new(0)].id)
         .unwrap();
-    let q = &production.queue;
+    let production_queue = &production.queue;
     assert_eq!(
         (
-            q.count.get(),
-            q.total.get(),
-            q.slots[0].master,
-            q.slots[0].count.get()
+            production_queue.count.get(),
+            production_queue.total.get(),
+            production_queue.slots[0].master,
+            production_queue.slots[0].count.get()
         ),
         (1, 2, Some(master_id(293)), 2)
     );
-    assert_eq!(q.changes, QueueChanges::of_data(2));
+    assert_eq!(production_queue.changes, QueueChanges::of_data(2));
     assert!(production.action.is_none());
     assert_eq!(player.tracker.queued, -10);
     // from the second unit the make action goes on for the other sex
@@ -833,8 +848,8 @@ fn cancel_of_all_goes_on_into_villagers_and_stops_at_research() {
         ],
         ..villager(Some(master_id(4)), count, 0.0)
     };
-    let mut t = game();
-    let ms = &mut t.model.masters[1];
+    let mut world = game();
+    let ms = &mut world.model.masters[1];
     *ms = Arc::new(Masters::new(ms.iter().cloned().chain([Master {
         id: master_id(4),
         kind: MasterKind::COMBAT,
@@ -849,25 +864,27 @@ fn cancel_of_all_goes_on_into_villagers_and_stops_at_research() {
         }),
         ..Master::default()
     }])));
-    t.players[1].attributes[80] = Amount::new(4.0);
-    let tc = t
+    world.players[1].attributes[80] = Amount::new(4.0);
+    let tc = world
         .parts
         .production
-        .get_mut(t.players[1].objects[ListIndex::new(0)].id)
+        .get_mut(world.players[1].objects[ListIndex::new(0)].id)
         .unwrap();
     tc.queue = queue(&[archer(2), villager(Some(ids::VILLAGER_MALE), 2, 46.0)]);
-    t.cancel_queued(
-        PlayerId::new(1),
-        ListIndex::new(0),
-        UnitIndex::of_data(0),
-        Batch::Five,
-    )
-    .unwrap();
-    let player = &t.players[1];
+    world
+        .cancel_queued(
+            PlayerId::new(1),
+            ListIndex::new(0),
+            UnitIndex::of_data(0),
+            Batch::Five,
+        )
+        .unwrap();
+    let player = &world.players[1];
     assert_eq!(player.resources(), amounts([92.0, 50.0, 0.0, 90.0]));
     assert_eq!(player.attributes[80], Amount::ZERO);
     assert_eq!(
-        t.parts
+        world
+            .parts
             .production
             .get(player.objects[ListIndex::new(0)].id)
             .unwrap()
@@ -902,7 +919,7 @@ fn cancel_of_all_goes_on_into_villagers_and_stops_at_research() {
             Batch::Five,
         )
         .unwrap();
-    let q = &world
+    let queue = &world
         .parts
         .production
         .get(world.players[1].objects[ListIndex::new(0)].id)
@@ -910,8 +927,8 @@ fn cancel_of_all_goes_on_into_villagers_and_stops_at_research() {
         .queue;
     assert_eq!(
         (
-            q.count.get(),
-            q.slots[0].tech,
+            queue.count.get(),
+            queue.slots[0].tech,
             world.players[1].attributes[0]
         ),
         (1, Some(tech_id(22)), Amount::new(92.0))
@@ -1000,10 +1017,11 @@ fn researching(progress: f32) -> World {
 /// the centre's unit AI it failed.
 #[test]
 fn cancel_of_all_researches_gives_back_the_entry_three() {
-    let mut t = researching(10.0);
-    t.cancel_order(&object_ids([9]), UnitIndex::of_data(0), Batch::Five)
+    let mut world = researching(10.0);
+    world
+        .cancel_order(&object_ids([9]), UnitIndex::of_data(0), Batch::Five)
         .unwrap();
-    let players = &t.players[1];
+    let players = &world.players[1];
     assert_eq!(players.attributes[3], Amount::new(150.0));
     let tech_state = &players.techs[22];
     assert_eq!(
@@ -1016,17 +1034,17 @@ fn cancel_of_all_researches_gives_back_the_entry_three() {
     );
     let tc = &players.objects[ListIndex::new(0)];
     assert_eq!(
-        t.parts.combat_of(tc.id).store,
+        world.parts.combat_of(tc.id).store,
         adds([(attribute::WOOD, 20.0)])
     );
-    let production = t.parts.production.get(tc.id).unwrap();
+    let production = world.parts.production.get(tc.id).unwrap();
     assert_eq!(production.disabled_techs, [tech_id(5)]);
     assert_eq!(
         (production.queue.count.get(), production.queue.total.get()),
         (0, 0)
     );
     assert!(production.action.is_none());
-    assert_eq!(t.parts.unit_ai.get(tc.id).unwrap().notifies.len(), 1);
+    assert_eq!(world.parts.unit_ai.get(tc.id).unwrap().notifies.len(), 1);
     // one research of the second unit: 50 gold, the technology in state 1 though two stay
     // queued, the research going on
     let mut world = researching(10.0);
@@ -1056,11 +1074,13 @@ fn cancel_of_all_researches_gives_back_the_entry_three() {
 /// researched once more and queued once less, in state 1 below its cap.
 #[test]
 fn queue_cancel_gives_back_its_researches_and_the_destructor_counts_done_one() {
-    let mut t = researching(30.0);
-    let s = &mut t.players[1].techs[22];
-    (s.stack, s.research_cap) = (true, ResearchCap::of_data(5));
-    t.cancel_queue(PlayerId::new(1), ListIndex::new(0)).unwrap();
-    let player = &t.players[1];
+    let mut world = researching(30.0);
+    let tech_state = &mut world.players[1].techs[22];
+    (tech_state.stack, tech_state.research_cap) = (true, ResearchCap::of_data(5));
+    world
+        .cancel_queue(PlayerId::new(1), ListIndex::new(0))
+        .unwrap();
+    let player = &world.players[1];
     assert_eq!(player.attributes[3], Amount::new(150.0));
     let techs = &player.techs[22];
     assert_eq!(
@@ -1072,7 +1092,7 @@ fn queue_cancel_gives_back_its_researches_and_the_destructor_counts_done_one() {
         ),
         (ResearchState::Available, 1, -1, Seconds::new(30.0))
     );
-    let production = t
+    let production = world
         .parts
         .production
         .get(player.objects[ListIndex::new(0)].id)
@@ -1239,35 +1259,38 @@ fn early_in_the_game_resignation_leaves_the_objects_alone() {
 
 #[test]
 fn one_side_left_after_resignation_ends_conquest_game() {
-    let mut c = Count::default();
-    c.add(
+    let mut count = Count::default();
+    count.add(
         PlayerId::new(1),
         GameStatus::Lost,
         0,
         (Relation::Ally, Relation::Ally),
     );
-    c.add(
+    count.add(
         PlayerId::new(2),
         GameStatus::Playing,
         0,
         (Relation::Ally, Relation::Ally),
     );
-    assert_eq!((c.playing, c.side, c.lost, c.won), (1, 1, 1, 0));
+    assert_eq!(
+        (count.playing, count.side, count.lost, count.won),
+        (1, 1, 1, 0)
+    );
     // two players still playing, enemies: two sides
-    let mut c = Count::default();
-    c.add(
+    let mut count = Count::default();
+    count.add(
         PlayerId::new(1),
         GameStatus::Playing,
         0,
         (Relation::Ally, Relation::Ally),
     );
-    c.add(
+    count.add(
         PlayerId::new(2),
         GameStatus::Playing,
         0,
         (Relation::Enemy, Relation::Enemy),
     );
-    assert_eq!((c.playing, c.side), (2, -1));
+    assert_eq!((count.playing, count.side), (2, -1));
     // allies with the allied victory are one side
     let mut count = Count::default();
     count.add(

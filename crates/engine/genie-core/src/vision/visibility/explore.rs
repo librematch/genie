@@ -10,7 +10,7 @@ use crate::vision::SightTiles;
 use crate::vision::TileCount;
 use crate::vision::VisionBits;
 use crate::vision::visibility::{ANCHOR, LINKED, MOST, Visibility};
-use crate::world::slots::CheckedIndex;
+use crate::world::slots::CheckedIndexExt;
 
 impl Visibility {
     // The visible map's routines (`RGE_Visible_Map`).
@@ -41,13 +41,13 @@ impl Visibility {
             for tx in x0..=x1 {
                 let tile = Tile::new(tx, ty);
                 let index = self.index(tile);
-                let mut c = self
+                let mut count = self
                     .maps
                     .checked(player.index())?
                     .counts
                     .checked(index)?
                     .wrapping_add(1);
-                if c == 0 {
+                if count == 0 {
                     newly += TileCount::ONE;
                     self.maps.checked_mut(player.index())?.explored += TileCount::ONE;
                     self.new_tile(player, tile);
@@ -61,17 +61,17 @@ impl Visibility {
                     if self.links.checked(index)?.0 & (LINKED | ANCHOR) != 0 {
                         self.reveal_building(player, tile)?;
                     }
-                    c = 1;
+                    count = 1;
                     *self.unified.checked_mut(index)? |= seen;
                 }
-                if c == 1 {
+                if count == 1 {
                     *self.unified.checked_mut(index)? |= visible;
                 }
                 *self
                     .maps
                     .checked_mut(player.index())?
                     .counts
-                    .checked_mut(index)? = c.min(MOST);
+                    .checked_mut(index)? = count.min(MOST);
             }
         }
         Ok(newly)
@@ -128,19 +128,19 @@ impl Visibility {
             for tx in x0..=x1 {
                 let index = self.index(Tile::new(tx, ty));
                 let checked = *self.maps.checked(player.index())?.counts.checked(index)?;
-                let c = if checked != 0 {
+                let count = if checked != 0 {
                     checked.wrapping_sub(1)
                 } else {
                     0
                 };
-                if c == 0 {
+                if count == 0 {
                     *self.unified.checked_mut(index)? &= hidden;
                 }
                 *self
                     .maps
                     .checked_mut(player.index())?
                     .counts
-                    .checked_mut(index)? = c;
+                    .checked_mut(index)? = count;
             }
         }
         Ok(())
@@ -149,9 +149,9 @@ impl Visibility {
     /// The tiles of rectangle `rect` held on the map, None when it misses the map.
     pub(super) fn held(&self, rect: TileRect) -> Option<TileRect> {
         let [x0, y0, x1, y1] = rect.get();
-        let (w, h) = (self.size.width(), self.size.height());
-        (x0 < w && 0 <= x1 && y0 < h && 0 <= y1)
-            .then(|| TileRect::new(x0.max(0), y0.max(0), x1.min(w - 1), y1.min(h - 1)))
+        let (width, height) = (self.size.width(), self.size.height());
+        (x0 < width && 0 <= x1 && y0 < height && 0 <= y1)
+            .then(|| TileRect::new(x0.max(0), y0.max(0), x1.min(width - 1), y1.min(height - 1)))
     }
 
     /// `explore_terrain_sq` (`FUN_141284f10`): `explore_terrain` over a rectangle, without the
@@ -167,27 +167,27 @@ impl Visibility {
             for x in x0..=x1 {
                 let tile = Tile::new(x, y);
                 let index = self.index(tile);
-                let mut c = self
+                let mut count = self
                     .maps
                     .checked(player.index())?
                     .counts
                     .checked(index)?
                     .wrapping_add(1);
-                if c == 0 {
+                if count == 0 {
                     newly += TileCount::ONE;
                     self.maps.checked_mut(player.index())?.explored += TileCount::ONE;
                     self.new_tile(player, tile);
-                    c = 1;
+                    count = 1;
                     *self.unified.checked_mut(index)? |= seen;
                 }
-                if c == 1 {
+                if count == 1 {
                     *self.unified.checked_mut(index)? |= visible;
                 }
                 *self
                     .maps
                     .checked_mut(player.index())?
                     .counts
-                    .checked_mut(index)? = c.min(MOST);
+                    .checked_mut(index)? = count.min(MOST);
             }
         }
         Ok(newly)
@@ -205,19 +205,19 @@ impl Visibility {
                 let tile = Tile::new(x, y);
                 let index = self.index(tile);
                 let checked = *self.maps.checked(player.index())?.counts.checked(index)?;
-                let c = if checked != 0 {
+                let count = if checked != 0 {
                     checked.wrapping_sub(1)
                 } else {
                     0
                 };
-                if c == 0 {
+                if count == 0 {
                     *self.unified.checked_mut(index)? &= hidden;
                 }
                 *self
                     .maps
                     .checked_mut(player.index())?
                     .counts
-                    .checked_mut(index)? = c;
+                    .checked_mut(index)? = count;
             }
         }
         Ok(())

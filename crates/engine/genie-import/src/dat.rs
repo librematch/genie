@@ -94,13 +94,13 @@ type KeyedRow = ((CivId, MasterId), Row);
 ///
 /// A task or a cost slot that holds no type or attribute.
 fn dat_rows(dat: &DatFile) -> GenieResult<Vec<KeyedRow>> {
-    let units = dat.civs.iter().enumerate().flat_map(|(c, civ)| {
+    let units = dat.civs.iter().enumerate().flat_map(|(civ_index, civ)| {
         civ.units
             .iter()
             .enumerate()
             .filter_map(move |(index, unit)| {
                 Some((
-                    CivId::new(c as u8),
+                    CivId::new(civ_index as u8),
                     MasterId::of_data(index as i16)?,
                     unit.as_ref()?,
                 ))
@@ -197,17 +197,22 @@ impl TerrainTable {
             .terrain_block
             .terrains
             .iter()
-            .map(|t| terrain_class(TerrainFlags::from_bits_retain(t.is_water)).bits())
+            .map(|terrain| terrain_class(TerrainFlags::from_bits_retain(terrain.is_water)).bits())
             .collect();
         let masks = dat
             .terrain_restrictions
             .iter()
-            .map(|r| {
-                let passable = r.passable_buildable_dmg_multiplier.iter().enumerate();
+            .map(|terrain_restriction| {
+                let passable = terrain_restriction
+                    .passable_buildable_dmg_multiplier
+                    .iter()
+                    .enumerate();
                 TerrainMask::of_bits(
                     passable
-                        .filter(|&(_, &v)| 0.0 < v)
-                        .fold(0, |m, (t, _)| m | classes.get(t).copied().unwrap_or(0)),
+                        .filter(|&(_, &value)| 0.0 < value)
+                        .fold(0, |mask, (terrain, _)| {
+                            mask | classes.get(terrain).copied().unwrap_or(0)
+                        }),
                 )
             })
             .collect();
@@ -234,15 +239,15 @@ impl TerrainTable {
                     .zip(&terrain.terrain_unit_density)
                     .take(usize::try_from(terrain.number_of_terrain_units_used).unwrap_or(0))
                     .filter(|&(&id, _)| {
-                        usize::try_from(id).is_ok_and(|i| {
+                        usize::try_from(id).is_ok_and(|index| {
                             dat.civs
                                 .first()
-                                .and_then(|civ| civ.units.get(i))
+                                .and_then(|civ| civ.units.get(index))
                                 .and_then(Option::as_ref)
                                 .is_some_and(|unit| unit.class == 15)
                         })
                     })
-                    .map(|(_, &d)| i32::from(d))
+                    .map(|(_, &value)| i32::from(value))
                     .sum();
                 TerrainKind {
                     shown: terrain.enabled != 0 || 0 <= terrain.terrain_to_draw,
@@ -362,17 +367,17 @@ type TechTables = (Vec<TechDef>, Effects);
 
 /// An effect as the engine's effect table holds it: its commands, each parsed by its kind
 /// ([`genie_model::technology::EffectCommand::of_data`]).
-fn effect(e: &DatEffect) -> GenieResult<Effect> {
-    let commands = e
+fn effect(dat_effect: &DatEffect) -> GenieResult<Effect> {
+    let commands = dat_effect
         .commands
         .iter()
         .map(|effect_command| {
             EffectCommand::of_data(
                 effect_command.kind,
-                effect_command.a,
-                effect_command.b,
-                effect_command.c,
-                effect_command.d,
+                effect_command.first,
+                effect_command.second,
+                effect_command.third,
+                effect_command.amount,
             )
         })
         .collect::<Result<_, _>>()?;
@@ -388,11 +393,13 @@ impl MasterTable {
     /// A task or a cost slot that holds no type or attribute.
     pub fn from_dat(dat: &DatFile) -> GenieResult<Self> {
         let rows = dat_rows(dat)?;
-        let mut table =
-            Self::from_rows(rows.iter().map(|(key, r)| (*key, r.data, r.default_action)));
-        for (key, r) in rows {
+        let mut table = Self::from_rows(
+            rows.iter()
+                .map(|(key, row)| (*key, row.data, row.default_action)),
+        );
+        for (key, built) in rows {
             if let Some(row) = table.rows.get_mut(&key) {
-                *row = r;
+                *row = built;
             }
         }
         table.terrain = TerrainTable::from_dat(dat);
@@ -400,17 +407,20 @@ impl MasterTable {
             .graphics
             .iter()
             .enumerate()
-            .filter_map(|(id, g)| {
+            .filter_map(|(id, graphic)| {
                 let id = SpriteId::of_data(i16::try_from(id).ok()?)?;
-                Some((id, SpeedMultiplier::of_data(g.as_ref()?.speed_multiplier)))
+                Some((
+                    id,
+                    SpeedMultiplier::of_data(graphic.as_ref()?.speed_multiplier),
+                ))
             })
             .collect();
         table.graphics = dat
             .graphics
             .iter()
             .enumerate()
-            .filter_map(|(id, g)| {
-                let graphic = g.as_ref()?;
+            .filter_map(|(id, slot)| {
+                let graphic = slot.as_ref()?;
                 let id = SpriteId::of_data(i16::try_from(id).ok()?)?;
                 Some((
                     id,
@@ -779,7 +789,7 @@ mod tests {
         assert_eq!(
             linked
                 .into_iter()
-                .map(|(tech_id, k)| (tech_id.get(), k))
+                .map(|(tech_id, linked)| (tech_id.get(), linked))
                 .collect::<Vec<_>>(),
             [
                 (1131, Linked::MutuallyExclusive),

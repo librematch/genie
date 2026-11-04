@@ -16,7 +16,7 @@ use crate::world::Millis;
 use crate::world::layer::Roles;
 use crate::world::layer::Slots;
 use crate::world::layer::generated::UnitAiTuning;
-use crate::world::slots::CheckedIndex;
+use crate::world::slots::CheckedIndexExt;
 use crate::{GenieError, GenieResult};
 use std::mem::take;
 
@@ -24,30 +24,30 @@ use std::mem::take;
 /// ([`UnitAi::clear_notifies_at`], [`UnitAi::take_order_now`]; its orders' run passes it on): the
 /// roles, the slots and the unit AI's tuning values (FD-046-D45, D49).
 #[derive(Clone, Copy, Debug)]
-pub struct AiLayer<'a> {
+pub struct AiLayer<'model> {
     /// The build's roles.
-    pub(crate) roles: &'a Roles,
+    pub(crate) roles: &'model Roles,
     /// The build's slots.
     pub(crate) slots: Slots,
     /// The unit AI's tuning values.
-    pub(crate) unit_ai_tuning: &'a UnitAiTuning,
+    pub(crate) unit_ai_tuning: &'model UnitAiTuning,
 }
 
 /// A unit's notifies to itself (its slot 0x328, [`UnitAi::post`]), borrowed beside its body: its
 /// unit AI (None for a unit without one), its id and its state.
 #[derive(Debug)]
-pub struct Inbox<'a> {
+pub struct Inbox<'ai> {
     /// The unit's AI.
-    pub(crate) ai: Option<&'a mut UnitAi>,
+    pub(crate) ai: Option<&'ai mut UnitAi>,
     /// The unit's id: the notify's caller and its recipient.
     pub(crate) id: ObjectId,
     /// The unit's state, which the AI's acceptance reads ([`UnitAi::accept`]).
     pub(crate) state: ObjectState,
 }
 
-impl<'a> Inbox<'a> {
+impl<'ai> Inbox<'ai> {
     /// The inbox of the unit `id` in `state` with its AI `ai`, borrowed beside its body.
-    pub const fn of(ai: &'a mut Option<UnitAi>, id: ObjectId, state: ObjectState) -> Self {
+    pub const fn of(ai: &'ai mut Option<UnitAi>, id: ObjectId, state: ObjectState) -> Self {
         Self {
             ai: ai.as_mut(),
             id,
@@ -55,15 +55,15 @@ impl<'a> Inbox<'a> {
         }
     }
 
-    /// Posts the notify `kind` with `p` to the unit itself ([`Notify::own`]); a unit without an
-    /// AI takes none.
+    /// Posts the notify `kind` with `params` to the unit itself ([`Notify::own`]); a unit without
+    /// an AI takes none.
     ///
     /// # Errors
     ///
     /// The post's.
-    pub fn post(&mut self, kind: NotifyKind, p: [i32; 3]) -> GenieResult<()> {
+    pub fn post(&mut self, kind: NotifyKind, params: [i32; 3]) -> GenieResult<()> {
         match self.ai.as_deref_mut() {
-            Some(ai) => ai.post(Notify::own(self.id, kind, p), self.state),
+            Some(ai) => ai.post(Notify::own(self.id, kind, params), self.state),
             None => Ok(()),
         }
     }
@@ -86,9 +86,9 @@ impl UnitAi {
         let mut result = GO_ON;
         while !self.notifies.is_empty() && result == GO_ON {
             self.processing = true;
-            let mut i = 0;
-            while i < self.notifies.len() {
-                let notify = *self.notifies.checked(i)?;
+            let mut index = 0;
+            while index < self.notifies.len() {
+                let notify = *self.notifies.checked(index)?;
                 result = self.handle(notify, dt, at, player_kind, ai_rng, side)?;
                 if result == DEAD {
                     // "I'm dead, purging notifyQueue and returning FALSE.": the full update ends
@@ -100,7 +100,7 @@ impl UnitAi {
                 if result == BREAK || result == PRODUCED {
                     break;
                 }
-                i += 1;
+                index += 1;
             }
             if result == GO_ON {
                 self.end_notifies(dt, at, side, ai_rng)?;
@@ -136,7 +136,7 @@ impl UnitAi {
         self.notifies.iter().any(|notify| {
             notify.kind == NotifyKind::ACTION_COMPLETED
                 && self.current_order.is_none()
-                && AiAction::field(self.current_action) == notify.p[0]
+                && AiAction::field(self.current_action) == notify.params[0]
         })
     }
 
@@ -208,11 +208,11 @@ impl UnitAi {
         let taken = match notify.kind {
             // "That unit is not attacking me, so I'm ignoring it."
             NotifyKind::NO_LONGER_ON_ME => self.attackers.contains(notify.caller),
-            NotifyKind::ACTION_INVALIDATED => notify.p[0] == AiAction::field(action),
+            NotifyKind::ACTION_INVALIDATED => notify.params[0] == AiAction::field(action),
             NotifyKind::ACTION_COMPLETED => {
                 // ignored (and handled) for a non-movement action
                 // the game's list also holds 0x268, which no unit AI holds ([`AiAction`])
-                if notify.p[0] == AiAction::Move.value()
+                if notify.params[0] == AiAction::Move.value()
                     && !matches!(
                         action,
                         Some(AiAction::Move | AiAction::MoveAside | AiAction::GroupAside)

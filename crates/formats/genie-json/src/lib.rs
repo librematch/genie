@@ -19,7 +19,7 @@ use serde::{Deserialize, Serialize};
 ///
 /// Returns an error if `text` is not valid JSON, lacks a required key, holds an unknown key, or
 /// holds a value of the wrong type.
-pub fn from_str<'a, T: Deserialize<'a>>(text: &'a str) -> serde_json::Result<T> {
+pub fn from_str<'de, T: Deserialize<'de>>(text: &'de str) -> serde_json::Result<T> {
     serde_json::from_str(text)
 }
 

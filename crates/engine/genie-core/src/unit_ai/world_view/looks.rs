@@ -23,7 +23,7 @@ use crate::unit_ai::world_view::{UnitView, patrol_information};
 use crate::unit_ai::{Duel, NearestAttacker, PatrolPath, TargetFlags, UnitSeen};
 use crate::world::index::ObjectsRef;
 use crate::world::others::OthersRef;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 use crate::{GenieError, GenieResult};
 
 impl UnitView<'_, '_> {
@@ -33,7 +33,8 @@ impl UnitView<'_, '_> {
     ///
     /// [`SurroundingFlags::BUSY`]: crate::unit_ai::SurroundingFlags::BUSY
     pub(crate) fn busy_now(&self) -> bool {
-        self.actions.top_action_kind().is_some() || self.c.w.parts.unread.contains(self.unit.id)
+        self.actions.top_action_kind().is_some()
+            || self.step.world.parts.unread.contains(self.unit.id)
     }
 
     /// The unit's slot 0x2d0 as it stands now: its top action may be interrupted
@@ -46,14 +47,14 @@ impl UnitView<'_, '_> {
     /// [`SurroundingFlags::INTERRUPTIBLE`]: crate::unit_ai::SurroundingFlags::INTERRUPTIBLE
     pub(crate) fn interruptible_now(&self) -> GenieResult<bool> {
         self.actions
-            .interruptible(self.c.w.parts.unread.get(self.unit.id))
+            .interruptible(self.step.world.parts.unread.get(self.unit.id))
     }
 
     /// The unit's slot 0x468 (`FUN_141157c50`, `getPatrolInformation`): a copy of its top path
     /// (`FUN_140f960f0`; `FUN_140f95c00` into a new path: its points, its length, its flags) and
     /// the waypoint of its top level (`+0x24`); None without one.
     pub(crate) fn patrol_information(&self) -> Option<(PatrolPath, WaypointIndex)> {
-        patrol_information(self.c.w.parts.mover_of(self.unit.id))
+        patrol_information(self.step.world.parts.mover_of(self.unit.id))
     }
 
     /// Slot 400 (`FUN_14106d090`) as the full update's tail reads it: the target of the unit's
@@ -65,7 +66,7 @@ impl UnitView<'_, '_> {
     /// [`Action::top_target`]: crate::objects::layers::Action::top_target
     pub(crate) fn top_target_now(&self) -> Option<ObjectId> {
         let target = self.actions.top_target();
-        target.filter(|&object_id| self.c.w.spatial.get(object_id).is_some())
+        target.filter(|&object_id| self.step.world.spatial.get(object_id).is_some())
     }
 
     /// What the full update's tail tests of object `id`, the target of its unit's top action
@@ -80,18 +81,20 @@ impl UnitView<'_, '_> {
             return Ok(None);
         };
         let unit = owner_view(
-            &self.c.w.players,
-            &self.c.w.index,
-            self.c.player,
+            &self.step.world.players,
+            &self.step.world.index,
+            self.step.player,
             self.new_owner,
         )?
         .get(id)
         .ok_or_else(|| object_gone(id))?;
-        let kind = unit.master(self.c.w.master_tables(), seen.owner)?.kind;
+        let kind = unit
+            .master(self.step.world.master_tables(), seen.owner)?
+            .kind;
         Ok(Some(TargetFlags {
             owner: seen.owner,
             kind,
-            capture: self.c.w.parts.combat_of(unit.id).capture_flag,
+            capture: self.step.world.parts.combat_of(unit.id).capture_flag,
             pasture: unit.pasture,
             untargetable: unit.flags.contains(UnitFlags::UNTARGETABLE),
             attackable: unit.flags.contains(UnitFlags::ATTACKABLE),
@@ -105,14 +108,20 @@ impl UnitView<'_, '_> {
     ///
     /// An object the slice does not hold.
     pub(crate) fn seen_unit(&self, id: ObjectId) -> GenieResult<Option<UnitSeen>> {
-        let Some(placed) = self.c.w.spatial.get(id) else {
+        let Some(placed) = self.step.world.spatial.get(id) else {
             return Ok(None);
         };
-        let (owner, unit) = OthersRef::of(&self.c.w.players, &self.c.w.index, self.c.player)?
-            .find(id)
-            .ok_or(GenieError::unsupported("an object the slice does not hold"))?;
-        let master = unit.master(self.c.w.master_tables(), owner)?;
-        let me = self.unit.master(self.c.w.master_tables(), self.player)?;
+        let (owner, unit) = OthersRef::of(
+            &self.step.world.players,
+            &self.step.world.index,
+            self.step.player,
+        )?
+        .find(id)
+        .ok_or(GenieError::unsupported("an object the slice does not hold"))?;
+        let master = unit.master(self.step.world.master_tables(), owner)?;
+        let me = self
+            .unit
+            .master(self.step.world.master_tables(), self.player)?;
         Ok(Some(UnitSeen {
             id,
             class: master.class,
@@ -120,8 +129,8 @@ impl UnitView<'_, '_> {
             combat_level: master.combat_level,
             state: unit.life.state,
             target: self
-                .c
-                .w
+                .step
+                .world
                 .parts
                 .unit_ai
                 .get(unit.id)
@@ -136,9 +145,9 @@ impl UnitView<'_, '_> {
             hp: unit.life.hp,
             master: unit.life.master_id,
             kind: master.kind,
-            main: self.c.w.parts.building_of(unit.id).annex_of,
+            main: self.step.world.parts.building_of(unit.id).annex_of,
             allied: allied(
-                &self.c.w.players.player(self.player)?.relations,
+                &self.step.world.players.player(self.player)?.relations,
                 self.player,
                 owner,
                 AllyTest::WithRelation4,
@@ -150,13 +159,13 @@ impl UnitView<'_, '_> {
     /// table `+0x28`: the masters the slice holds of each player): None for a player or master
     /// the game does not hold.
     pub(crate) fn master_class(&self, player: PlayerId, master: MasterId) -> Option<ClassId> {
-        self.c
-            .w
+        self.step
+            .world
             .model
             .masters
             .get(player.index())
             .and_then(|ms| ms.get(master))
-            .map(|m| m.class)
+            .map(|master| master.class)
     }
 
     /// What a computer player's unit weighs of object `other` (its current target or its
@@ -168,13 +177,13 @@ impl UnitView<'_, '_> {
     ///
     /// [`UnitAi::damaged`]: crate::unit_ai::UnitAi::damaged
     pub(crate) fn duel(&self, other: ObjectId) -> GenieResult<Duel> {
-        let roles = &self.c.w.model.roles.clone();
+        let roles = &self.step.world.model.roles.clone();
         self.picker(None)?.duel(
-            &self.c.w.spatial,
+            &self.step.world.spatial,
             other,
             roles,
-            &self.c.w.model.tuning.damage,
-            &self.c.w.model.tuning.unit_ai,
+            &self.step.world.model.tuning.damage,
+            &self.step.world.model.tuning.unit_ai,
         )
     }
 
@@ -188,12 +197,12 @@ impl UnitView<'_, '_> {
     ///
     /// [`UnitAi::villager_damaged`]: crate::unit_ai::UnitAi::villager_damaged
     pub(crate) fn harmless(&self, attacker: ObjectId) -> GenieResult<bool> {
-        let roles = &self.c.w.model.roles.clone();
+        let roles = &self.step.world.model.roles.clone();
         self.picker(None)?.harmless(
-            &self.c.w.spatial,
+            &self.step.world.spatial,
             attacker,
             roles,
-            &self.c.w.model.tuning.unit_ai,
+            &self.step.world.model.tuning.unit_ai,
         )
     }
 
@@ -221,22 +230,22 @@ impl UnitView<'_, '_> {
     pub(crate) fn can_stand(&mut self, point: Point) -> GenieResult<bool> {
         let unit = &*self.unit;
         let mover = self
-            .c
-            .w
+            .step
+            .world
             .parts
             .mover_of(unit.id)
             .ok_or(GenieError::unsupported(
                 "a stand test of a unit without movement state",
             ))?;
         let by_id = ObjectsRef::new(
-            &self.c.w.players,
-            &self.c.w.index,
-            &self.c.w.model.masters,
-            &self.c.w.parts,
-            &self.c.w.model.roles,
-            &self.c.w.model.tuning,
+            &self.step.world.players,
+            &self.step.world.index,
+            &self.step.world.model.masters,
+            &self.step.world.parts,
+            &self.step.world.model.roles,
+            &self.step.world.model.tuning,
         );
-        self.c.w.spatial.point_clear(
+        self.step.world.spatial.point_clear(
             unit.id,
             point,
             Distance::new(mover.stats.radius.x()),
@@ -252,33 +261,33 @@ impl UnitView<'_, '_> {
     /// A unit that does not move, and what the reach test does not model.
     pub(crate) fn reaches(&mut self, target: ObjectId, range: Distance) -> GenieResult<bool> {
         let mut plan = Planning {
-            pathing: &mut self.c.w.pathing,
-            now: self.c.w.world_time,
+            pathing: &mut self.step.world.pathing,
+            now: self.step.world.world_time,
             player_kind: self.player_kind,
-            object: self.c.w.streams.get(Stream::Object),
-            groups: &self.c.w.groups,
+            object: self.step.world.streams.get_mut(Stream::Object),
+            groups: &self.step.world.groups,
         };
         let unit = &*self.unit;
         let walker = unit.me(self.actions);
         let mover = self
-            .c
-            .w
+            .step
+            .world
             .parts
             .mover_of(unit.id)
             .ok_or(GenieError::unsupported(
                 "a reach test of a unit that does not move",
             ))?;
         let by_id = ObjectsRef::new(
-            &self.c.w.players,
-            &self.c.w.index,
-            &self.c.w.model.masters,
-            &self.c.w.parts,
-            &self.c.w.model.roles,
-            &self.c.w.model.tuning,
+            &self.step.world.players,
+            &self.step.world.index,
+            &self.step.world.model.masters,
+            &self.step.world.parts,
+            &self.step.world.model.roles,
+            &self.step.world.model.tuning,
         );
         mover.reaches_object(
             (unit.position(), &walker),
-            (&mut self.c.w.spatial, by_id),
+            (&mut self.step.world.spatial, by_id),
             &mut plan,
             target,
             range,
@@ -293,8 +302,8 @@ impl UnitView<'_, '_> {
     ///
     /// What the task search does not model.
     pub(crate) fn builds(&self, foundation: FoundationId) -> GenieResult<bool> {
-        let roles = &self.c.w.model.roles.clone();
-        let slots = self.c.w.model.slots;
+        let roles = &self.step.world.model.roles.clone();
+        let slots = self.step.world.model.slots;
         self.builds_on(foundation, slots, roles)
     }
 }

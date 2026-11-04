@@ -17,7 +17,7 @@ use crate::objects::masters::MasterKind;
 use crate::objects::masters::MasterTables;
 use crate::objects::unit::{Outcome, Unit};
 use crate::world::layer::Roles;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 use crate::world::step::Step;
 use crate::{GenieError, GenieResult};
 
@@ -51,7 +51,7 @@ impl Unit {
         };
         let leaves = match self.life.update(
             step.dt.seconds(),
-            step.w.streams.get(Stream::Object),
+            step.world.streams.get_mut(Stream::Object),
             sprite,
         )? {
             ListFate::Leaves => Outcome::Leave,
@@ -74,14 +74,14 @@ impl Unit {
             return Ok(());
         }
         let master = self.master(
-            MasterTables::new(&step.w.model.masters, &step.w.parts.own_master),
+            MasterTables::new(&step.world.model.masters, &step.world.parts.own_master),
             step.player,
         )?;
         for &(attribute, amount, kind) in &master.storage {
             if let Some(attribute) = attribute
                 && matches!(kind, 2 | 16)
             {
-                step.w
+                step.world
                     .players
                     .player_mut(step.player)?
                     .add_attribute(attribute, -amount)?;
@@ -107,10 +107,10 @@ impl Unit {
         if before <= ObjectState::Alive && ObjectState::Dying <= after {
             self.died(actions, step, before, roles)?;
             if self
-                .master(step.w.master_tables(), step.player)?
+                .master(step.world.master_tables(), step.player)?
                 .ghost_on_death
                 == GhostMode::LEAVES
-                && step.w.game_state.leaves_ghosts()
+                && step.world.game_state.leaves_ghosts()
             {
                 // the ghosts of the death (FUN_14118e990), the object lent to the world
                 let (player_id, id) = (step.player, self.id);
@@ -152,11 +152,11 @@ impl Unit {
         if ObjectState::Dying < after
             && after != before
             && !(before == ObjectState::DyingSprite && after == ObjectState::Dead)
-            && self.master(step.w.master_tables(), step.player)?.kind == MasterKind::BUILDING
+            && self.master(step.world.master_tables(), step.player)?.kind == MasterKind::BUILDING
         {
-            let annexes = step.w.parts.building_of(self.id).annexes;
+            let annexes = step.world.parts.building_of(self.id).annexes;
             for annex in annexes.ids() {
-                if let Some((player_id, _)) = step.w.object(annex) {
+                if let Some((player_id, _)) = step.world.object(annex) {
                     step.lend((&mut *self, &mut *actions), |world| {
                         world.set_state(player_id, annex, after)
                     })?;
@@ -179,27 +179,32 @@ impl Unit {
             return Ok(());
         }
         if before <= ObjectState::Alive && ObjectState::Dying <= after {
-            step.w.spatial.sight_state(
+            step.world.spatial.sight_state(
                 self.id,
                 ObjectState::Dying,
-                &step.w.model.roles,
-                step.w.model.tuning.visibility,
+                &step.world.model.roles,
+                step.world.model.tuning.visibility,
             )?;
         }
         if after != ObjectState::Dying {
-            step.w.spatial.sight_state(
+            step.world.spatial.sight_state(
                 self.id,
                 after,
-                &step.w.model.roles,
-                step.w.model.tuning.visibility,
+                &step.world.model.roles,
+                step.world.model.tuning.visibility,
             )?;
         }
         if before < ObjectState::DyingSprite && ObjectState::Undead < after {
             let master = self.master(
-                MasterTables::new(&step.w.model.masters, &step.w.parts.own_master),
+                MasterTables::new(&step.world.model.masters, &step.world.parts.own_master),
                 step.player,
             )?;
-            forget_resource(&mut step.w.spatial, Some(master), self.id, self.position())?;
+            forget_resource(
+                &mut step.world.spatial,
+                Some(master),
+                self.id,
+                self.position(),
+            )?;
         }
         Ok(())
     }
@@ -213,13 +218,13 @@ impl Unit {
         actions: &mut Action,
         step: &mut Step<'_>,
     ) -> GenieResult<()> {
-        step.w.parts.set_anim_speed(self.id, Speed::ZERO);
-        let master = self.master(step.w.master_tables(), step.player)?;
+        step.world.parts.set_anim_speed(self.id, Speed::ZERO);
+        let master = self.master(step.world.master_tables(), step.player)?;
         if master.kind < MasterKind::BUILDING
             && let Some(remains) = master.death_spawns[1]
         {
             let facet = step
-                .w
+                .world
                 .parts
                 .mover_of(self.id)
                 .map(|mover| facet_of_angle(mover.angle, mover.stats.facets).0);
@@ -241,13 +246,13 @@ impl Unit {
         step: &mut Step<'_>,
     ) -> GenieResult<()> {
         let spawn = self
-            .master(step.w.master_tables(), step.player)?
+            .master(step.world.master_tables(), step.player)?
             .death_spawns[0];
         let spawn = spawn.ok_or(GenieError::missing_data(
             "a death spawn the dead object's master no longer names",
         ))?;
         let facet = step
-            .w
+            .world
             .parts
             .mover_of(self.id)
             .map(|mover| facet_of_angle(mover.angle, mover.stats.facets).0);

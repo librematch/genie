@@ -28,7 +28,7 @@ use crate::world::Seconds;
 use crate::world::World;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 use crate::{GenieError, GenieResult};
 
 /// Whether the stop keeps the unit's action list (its top action's slot 0x38,
@@ -69,8 +69,8 @@ impl World {
                 .intersects(ClassRoles::VILLAGER | ClassRoles::FISHING_SHIP)
                 || explorer
             {
-                if let Some(m) = self.parts.mover_mut(self.players.live(player_id, idx)?.id) {
-                    m.ignore_units.clear();
+                if let Some(mover) = self.parts.mover_mut(self.players.live(player_id, idx)?.id) {
+                    mover.ignore_units.clear();
                 }
                 self.object_stop(player_id, idx)?;
                 if let Some(mover) = self.parts.mover_mut(self.players.live(player_id, idx)?.id) {
@@ -242,7 +242,7 @@ impl World {
                 &mut unit.sprite,
                 self.parts.move_stats_mut(unit.id),
                 graphic,
-                self.streams.get(Stream::Sprite),
+                self.streams.get_mut(Stream::Sprite),
                 self.model.tuning.sprite,
             );
         }
@@ -285,7 +285,7 @@ impl World {
                 let halted = attack.halt(
                     self.parts.motion.layer_mut(unit.id),
                     &mut unit.sprite,
-                    self.streams.get(Stream::Sprite),
+                    self.streams.get_mut(Stream::Sprite),
                     self.model.tuning.sprite,
                 );
                 self.parts
@@ -327,7 +327,7 @@ impl World {
             Stand {
                 graphic: stand,
                 sprite: &mut unit.sprite,
-                rng: self.streams.get(Stream::Sprite),
+                rng: self.streams.get_mut(Stream::Sprite),
                 sprite_tuning: &self.model.tuning.sprite,
             },
         );

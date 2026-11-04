@@ -9,7 +9,7 @@ use crate::map::TileRect;
 use crate::vision::SightCentre;
 use crate::vision::visibility::{ANCHOR, Extent, LINKED, STEP, Visibility};
 use crate::world::layer::generated::VisibilityTuning;
-use crate::world::slots::CheckedIndex;
+use crate::world::slots::CheckedIndexExt;
 
 impl Visibility {
     // The map's building links (`RGE_Map`).
@@ -67,9 +67,14 @@ impl Visibility {
                     }
                     let [g0, g1, g2, g3, ..] =
                         self.extents.get(usize::from(byte) - 1)?.guid.to_le_bytes();
-                    let b = |v: u8| i32::from(v as i8);
+                    let signed = |byte: u8| i32::from(byte as i8);
                     let (x, y) = (tile.x(), tile.y());
-                    return Some(TileRect::new(x - b(g0), y - b(g1), x + b(g2), y + b(g3)));
+                    return Some(TileRect::new(
+                        x - signed(g0),
+                        y - signed(g1),
+                        x + signed(g2),
+                        y + signed(g3),
+                    ));
                 }
                 LINKED => {}
                 _ => return None,
@@ -100,7 +105,7 @@ impl Visibility {
         {
             return 0;
         }
-        let byte = |v: i32| v as u8;
+        let byte = |value: i32| value as u8;
         let guid = u32::from_le_bytes([
             byte(ax - lo_x),
             byte(ay - lo_y),
@@ -108,26 +113,26 @@ impl Visibility {
             byte(hi_y - ay),
         ]);
         if 0 < self.extents_capacity
-            && let Some(k) = self.extents.iter().position(|extent| extent.guid == guid)
+            && let Some(index) = self.extents.iter().position(|extent| extent.guid == guid)
         {
-            return k as i32 + 1;
+            return index as i32 + 1;
         }
         if self.extents_capacity <= self.extents.len() as i32 || self.extents_capacity == 0 {
             self.extents_capacity += 8;
         }
-        let w = hi_x - lo_x + 1;
-        let nx = match w {
+        let columns = hi_x - lo_x + 1;
+        let nx = match columns {
             1 => 1,
             2 => 2,
-            w if 2 < w => (w + 1) >> 1,
+            width if 2 < width => (width + 1) >> 1,
             _ => 0,
         };
-        let h = hi_y - lo_y + 1;
-        let (ny, slots) = match h {
+        let rows = hi_y - lo_y + 1;
+        let (ny, slots) = match rows {
             1 => (1, nx),
             2 => (2, nx * 2),
-            h if 2 < h => {
-                let ny = (h + 1) >> 1;
+            height if 2 < height => {
+                let ny = (height + 1) >> 1;
                 (ny, (nx + ny) * 2 - 4)
             }
             _ => (0, 0),
@@ -150,13 +155,13 @@ impl Visibility {
         push(&mut offsets, dx0, dy1);
         push(&mut offsets, dx1, dy1);
         if 2 < nx {
-            let (mut a, mut b) = (dx0, dx1);
+            let (mut dx0, mut dx1) = (dx0, dx1);
             for _ in 0..nx - 2 {
-                a += 2;
-                b -= 2;
-                push(&mut offsets, a, dy0);
+                dx0 += 2;
+                dx1 -= 2;
+                push(&mut offsets, dx0, dy0);
                 if 1 < ny {
-                    push(&mut offsets, b, dy1);
+                    push(&mut offsets, dx1, dy1);
                 }
             }
         }
@@ -197,7 +202,7 @@ impl Visibility {
             return Ok(0);
         };
         let [x0, y0, x1, y1] = held.get();
-        let nibble = |v: i32| (v.clamp(-8, 7) & 0xf) as u8;
+        let nibble = |value: i32| (value.clamp(-8, 7) & 0xf) as u8;
         let mut entry = 0;
         for y in y0..=y1 {
             let dy = y - ay;

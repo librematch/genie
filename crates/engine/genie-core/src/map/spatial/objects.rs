@@ -30,21 +30,21 @@ use std::mem::take;
 
 /// Which frozen objects have a say in [`Spatial::check_known`]'s check.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub(super) enum KnownScope<'a> {
+pub(super) enum KnownScope<'classes> {
     /// Every one.
     All,
     /// Only those with an obstruction record (the motion step's and the short pather's).
     Records,
     /// Only those of the classes (the registry's lists).
-    Classes(&'a [ClassId]),
+    Classes(&'classes [ClassId]),
 }
 
 impl Spatial {
     /// A map without terrain: every tile's class is 0.
     #[must_use]
     pub fn new(map: GridSize) -> Self {
-        let n = (map.width().max(0) * map.height().max(0)) as usize;
-        Self::with_tiles(map, Tiles::new(map, vec![0; n]))
+        let tiles = (map.width().max(0) * map.height().max(0)) as usize;
+        Self::with_tiles(map, Tiles::new(map, vec![0; tiles]))
     }
 
     /// A map with the given tiles.
@@ -147,15 +147,15 @@ impl Spatial {
     /// drops its record (true), false without one. The mesh shape's removal is the caller's
     /// (`Pathing::removed`).
     pub fn dropped_record(&mut self, id: ObjectId) -> bool {
-        let Some(p) = self.objects.get(id).copied() else {
+        let Some(record) = self.objects.get(id).copied() else {
             return false;
         };
-        let kind = p.obstruction_kind;
+        let kind = record.obstruction_kind;
         if !kind.recorded() {
             return false;
         }
         if kind.marks_tiles() {
-            self.unmark(&p, id);
+            self.unmark(&record, id);
             if kind == ObstructionKind::KIND_1 {
                 return true;
             }
@@ -224,7 +224,7 @@ impl Spatial {
         let Some(&unified) = visibility
             .size
             .index(tile)
-            .and_then(|i| visibility.unified.get(i))
+            .and_then(|index| visibility.unified.get(index))
         else {
             return false;
         };
@@ -244,7 +244,7 @@ impl Spatial {
     /// while it cannot have moved.
     pub fn get_known(&self, id: impl ObjectKey) -> GenieResult<Option<&Placed>> {
         match self.get(id) {
-            Some(placed) if placed.unknown.is_some_and(|u| 0.0 < u) => Err(
+            Some(placed) if placed.unknown.is_some_and(|unknown| 0.0 < unknown) => Err(
                 GenieError::unsupported("an object of a stopped player (its place is unknown)")
                     .with("object", id.key().map_or(-1, ObjectId::get))
                     .with("player", placed.player),
@@ -276,10 +276,10 @@ impl Spatial {
     /// speed (`speed` of its player and master) times dt.
     pub fn grow_unknown(&mut self, dt: Seconds, speed: impl Fn(PlayerId, MasterId) -> Speed) {
         for placed in self.objects.values_mut() {
-            if let Some(u) = placed.unknown.as_mut()
+            if let Some(unknown) = placed.unknown.as_mut()
                 && placed.moves
             {
-                *u += (speed(placed.player, placed.master) * dt).get();
+                *unknown += (speed(placed.player, placed.master) * dt).get();
             }
         }
         for seconds in self.frozen_for.values_mut() {
@@ -311,19 +311,19 @@ impl Spatial {
 
     pub(super) fn check_known_of(&self, rect: Rect, scope: KnownScope<'_>) -> GenieResult<()> {
         // only a frozen object has an unknown place, and each is in `frozen_for`
-        let near = self.frozen().find(|&(id, p)| {
-            if scope == KnownScope::Records && p.obstruction.is_none() {
+        let near = self.frozen().find(|&(id, placed)| {
+            if scope == KnownScope::Records && placed.obstruction.is_none() {
                 return false;
             }
             if let KnownScope::Classes(class_ids) = scope
-                && !class_ids.contains(&p.class)
+                && !class_ids.contains(&placed.class)
             {
                 return false;
             }
-            p.unknown.is_some_and(|u| {
-                let bounds = p.bounds();
-                rect.overlaps(bounds.grown(Distance::new(u)))
-                    && (0.0 < u || self.touchable(id, bounds))
+            placed.unknown.is_some_and(|unknown| {
+                let bounds = placed.bounds();
+                rect.overlaps(bounds.grown(Distance::new(unknown)))
+                    && (0.0 < unknown || self.touchable(id, bounds))
             })
         });
         if let Some((id, placed)) = near {
@@ -349,7 +349,7 @@ impl Spatial {
     /// Whether a stopped player's unit may have reached the frozen object `id` within `rect`.
     pub(super) fn touchable(&self, id: ObjectId, rect: Rect) -> bool {
         self.frozen().any(|(other, placed)| {
-            let Some(u) = placed.unknown.filter(|_| other != id) else {
+            let Some(unknown) = placed.unknown.filter(|_| other != id) else {
                 return false;
             };
             if placed.player == PlayerId::GAIA {
@@ -357,7 +357,7 @@ impl Spatial {
                 return false;
             }
             let moved = if placed.moves {
-                u
+                unknown
             } else {
                 self.fastest * self.frozen_for.get(other).copied().unwrap_or(Seconds::ZERO)
             };
@@ -370,7 +370,7 @@ impl Spatial {
     pub(super) fn frozen(&self) -> impl Iterator<Item = (ObjectId, &Placed)> + '_ {
         self.frozen_for
             .keys()
-            .filter_map(|id| self.objects.get(id).map(|p| (id, p)))
+            .filter_map(|id| self.objects.get(id).map(|placed| (id, placed)))
             .filter(|(_, placed)| placed.unknown.is_some())
     }
 
@@ -381,19 +381,19 @@ impl Spatial {
         if placed.unknown.is_some() && !self.frozen_for.contains_key(id) {
             let _ = self.frozen_for.insert(id, Seconds::ZERO);
         }
-        if let Some(o) = placed
+        if let Some(obstruction) = placed
             .obstruction
             .filter(|obstruction| obstruction.kind.marks_tiles())
         {
-            self.tiles.mark(&placed, o);
+            self.tiles.mark(&placed, obstruction);
             self.changed.push(self.tiles.covered_rect(&placed));
         }
         let _ = self.objects.insert(id, placed);
         self.refile(id);
-        if let Some(i) = self.tiles.tile_of(placed.position) {
+        if let Some(tile) = self.tiles.tile_of(placed.position) {
             let objects = &self.objects;
             self.tiles
-                .append(i, id, |object_id| Self::is_tall(objects, object_id));
+                .append(tile, id, |object_id| Self::is_tall(objects, object_id));
         }
     }
 
@@ -414,14 +414,17 @@ impl Spatial {
         if self.tiles.tile_of(old.position) != self.tiles.tile_of(placed.position) {
             return self.insert(id, placed);
         }
-        if old.obstruction.is_some_and(|o| o.kind.marks_tiles()) {
+        if old
+            .obstruction
+            .is_some_and(|obstruction| obstruction.kind.marks_tiles())
+        {
             self.unmark(&old, id);
         }
-        if let Some(o) = placed
+        if let Some(obstruction) = placed
             .obstruction
             .filter(|obstruction| obstruction.kind.marks_tiles())
         {
-            self.tiles.mark(&placed, o);
+            self.tiles.mark(&placed, obstruction);
             self.changed.push(self.tiles.covered_rect(&placed));
         }
         let _ = self.objects.insert(id, placed);
@@ -461,8 +464,8 @@ impl Spatial {
     /// The record of object `id` inside another ([`Spatial::go_inside`]) becomes `placed` (a master
     /// change inside, which touches no tile, list nor record); nothing for an object not inside.
     pub fn set_inside_record(&mut self, id: ObjectId, placed: Placed) {
-        if let Some(p) = self.inside.get_mut(id) {
-            *p = placed;
+        if let Some(record) = self.inside.get_mut(id) {
+            *record = placed;
         }
     }
 
@@ -485,10 +488,10 @@ impl Spatial {
         let _ = self.inside.remove(id);
         if let Some(gone) = self.objects.remove(id) {
             self.refile(id);
-            if let Some(i) = self.tiles.tile_of(gone.position) {
+            if let Some(tile) = self.tiles.tile_of(gone.position) {
                 let objects = &self.objects;
                 self.tiles
-                    .take_off(i, id, |object_id| Self::is_tall(objects, object_id));
+                    .take_off(tile, id, |object_id| Self::is_tall(objects, object_id));
             }
             if gone
                 .obstruction
@@ -499,35 +502,41 @@ impl Spatial {
         }
     }
 
-    /// Whether the straight walk from `a` to `b` (x, y) of a unit `grow` wide meets an obstruction,
-    /// as the routines that test one walk ask (`FUN_141052b90`, `FUN_141052350` with flags `0x100`,
-    /// then `FUN_1410561f0`): the temporary records of the tiles its terrain mask lacks
-    /// ([`Spatial::put_tile_records`]), tested ([`Spatial::segment_meets`]) and removed again.
-    /// The query leaves out the manager's ignore list as its caller set it last
+    /// Whether the straight walk from `from` to `point` (x, y) of a unit `grow` wide meets an
+    /// obstruction, as the routines that test one walk ask (`FUN_141052b90`, `FUN_141052350` with
+    /// flags `0x100`, then `FUN_1410561f0`): the temporary records of the tiles its terrain mask
+    /// lacks ([`Spatial::put_tile_records`]), tested ([`Spatial::segment_meets`]) and removed
+    /// again. The query leaves out the manager's ignore list as its caller set it last
     /// ([`Spatial::set_manager_ignore`]).
     pub fn segment_blocked(
         &mut self,
-        a: Point,
-        b: Point,
+        from: Point,
+        point: Point,
         grow: Distance,
         mask: TerrainMask,
     ) -> bool {
-        self.put_tile_records(a, b, grow, mask);
-        let blocked = self.segment_meets(a, b, grow, &self.manager_ignore);
+        self.put_tile_records(from, point, grow, mask);
+        let blocked = self.segment_meets(from, point, grow, &self.manager_ignore);
         self.clear_tile_records();
         blocked
     }
 
-    /// `FUN_141052350` with flags `0x100`: whether the straight walk from `a` to `b` (x, y) of a
-    /// unit `grow` wide (the manager's buffer) meets a record. A walk whose grown box leaves the
+    /// `FUN_141052350` with flags `0x100`: whether the straight walk from `from` to `to` (x, y) of
+    /// a unit `grow` wide (the manager's buffer) meets a record. A walk whose grown box leaves the
     /// map does. Else the records of the cells the query visits ([`Spatial::visits`], the walk's
     /// box grown by `grow`) whose id is not in `ignore` count when their box, grown by `grow`,
     /// meets the walk's box and segment (`FUN_141052e10`): the temporary tile records
-    /// ([`Spatial::put_tile_records`], kind 3) and the objects' static records (kinds 2, 11 and
-    /// 13; flag `0x100` passes the kinds of the mask `0x2804` and the records of no object).
+    /// ([`Spatial::put_tile_records`], kind 3) and the objects' static records (kinds 2, 11 and 13;
+    /// flag `0x100` passes the kinds of the mask `0x2804` and the records of no object).
     #[must_use]
-    pub fn segment_meets(&self, a: Point, b: Point, grow: Distance, ignore: &[RecordId]) -> bool {
-        let Some(test) = WalkTest::new(a, b, grow, self.map) else {
+    pub fn segment_meets(
+        &self,
+        from: Point,
+        to: Point,
+        grow: Distance,
+        ignore: &[RecordId],
+    ) -> bool {
+        let Some(test) = WalkTest::new(from, to, grow, self.map) else {
             return true;
         };
         self.tile_records_meet(&test, ignore)
@@ -567,34 +576,40 @@ impl Spatial {
         })
     }
 
-    /// Whether a tile its terrain `mask` lacks lies in the way of a straight walk from `a` to
-    /// `b` of a unit `grow` wide, as the walk's query asks (`FUN_14114cc60`: `FUN_141052b90`,
+    /// Whether a tile its terrain `mask` lacks lies in the way of a straight walk from `from` to
+    /// `to` of a unit `grow` wide, as the walk's query asks (`FUN_14114cc60`: `FUN_141052b90`,
     /// its query, then `FUN_1410561f0`): its temporary tile records
     /// ([`Spatial::put_tile_records`]) tested as [`Spatial::segment_meets`] tests them, and
     /// removed again. A walk whose grown box leaves the map counts as blocked.
-    pub fn tiles_block(&mut self, a: Point, b: Point, grow: Distance, mask: TerrainMask) -> bool {
-        self.put_tile_records(a, b, grow, mask);
-        let blocked = WalkTest::new(a, b, grow, self.map)
+    pub fn tiles_block(
+        &mut self,
+        from: Point,
+        to: Point,
+        grow: Distance,
+        mask: TerrainMask,
+    ) -> bool {
+        self.put_tile_records(from, to, grow, mask);
+        let blocked = WalkTest::new(from, to, grow, self.map)
             .is_none_or(|walk_test| self.tile_records_meet(&walk_test, &[]));
         self.clear_tile_records();
         blocked
     }
 
     /// `FUN_141052b90`: a temporary record (`FUN_1410510c0`) on each tile of the rectangle of
-    /// `a` and `b` (x, y), grown by `grow` (the manager's buffer) and held on the map, whose word
-    /// holds neither a terrain class of `mask` nor a temporary record (`mask & 0x7f | 0x80`), row
-    /// by row. The records stay until [`Spatial::clear_tile_records`].
-    pub fn put_tile_records(&mut self, a: Point, b: Point, grow: Distance, mask: TerrainMask) {
+    /// `from` and `to` (x, y), grown by `grow` (the manager's buffer) and held on the map, whose
+    /// word holds neither a terrain class of `mask` nor a temporary record (`mask & 0x7f | 0x80`),
+    /// row by row. The records stay until [`Spatial::clear_tile_records`].
+    pub fn put_tile_records(&mut self, from: Point, to: Point, grow: Distance, mask: TerrainMask) {
         use crate::math::conversions::cvttss2si;
         let (lo_x, hi_x) = (
-            if b.x() <= a.x() { b.x() } else { a.x() },
-            if a.x() <= b.x() { b.x() } else { a.x() },
+            if to.x() <= from.x() { to.x() } else { from.x() },
+            if from.x() <= to.x() { to.x() } else { from.x() },
         );
         let (lo_y, hi_y) = (
-            if b.y() <= a.y() { b.y() } else { a.y() },
-            if a.y() <= b.y() { b.y() } else { a.y() },
+            if to.y() <= from.y() { to.y() } else { from.y() },
+            if from.y() <= to.y() { to.y() } else { from.y() },
         );
-        let (w, h) = (self.map.width(), self.map.height());
+        let (width, height) = (self.map.width(), self.map.height());
         let (lo_x, lo_y, hi_x, hi_y) = (
             cvttss2si(lo_x - grow.get()),
             cvttss2si(lo_y - grow.get()),
@@ -602,8 +617,8 @@ impl Spatial {
             cvttss2si(hi_y + grow.get()),
         );
         let (x0, y0) = (lo_x.max(0), lo_y.max(0));
-        let x1 = if hi_x < w { hi_x } else { w - 1 };
-        let y1 = if hi_y < h { hi_y } else { h - 1 };
+        let x1 = if hi_x < width { hi_x } else { width - 1 };
+        let y1 = if hi_y < height { hi_y } else { height - 1 };
         let impassable = mask.classes();
         for y in y0..=y1 {
             for x in x0..=x1 {

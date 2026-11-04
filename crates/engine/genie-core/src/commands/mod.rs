@@ -329,7 +329,7 @@ impl World {
     #[must_use]
     pub fn most_units(&self, player: PlayerId) -> usize {
         match self.players.get(player.index()) {
-            Some(p) if p.kind.is_computer() => COMPUTER_UNITS,
+            Some(player) if player.kind.is_computer() => COMPUTER_UNITS,
             Some(_) => HUMAN_UNITS,
             None => 0,
         }

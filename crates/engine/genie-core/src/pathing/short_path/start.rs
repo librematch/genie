@@ -10,7 +10,7 @@ use crate::pathing::short_path::{
 };
 use crate::pathing::{FixedDistance, FixedDistanceSquared};
 use crate::pathing::{ShapeId, ShapeSide};
-use crate::world::slots::CheckedIndex;
+use crate::world::slots::CheckedIndexExt;
 use crate::{GenieError, GenieResult};
 
 /// The corners of a side of a shape as the start's scan walks it ([`shrunk_corner`]'s
@@ -35,11 +35,11 @@ const fn side_dir(side: ShapeSide) -> FixedPoint {
     }
 }
 
-/// The distance from `p` to `a` in fixed point, through floats as the game takes it.
-fn float_distance(p: FixedPoint, a: FixedPoint) -> FixedDistance {
-    let [px, py] = p.get();
-    let dy = (py.wrapping_sub(a.y())) as f32 * TO_FLOAT;
-    let dx = (px.wrapping_sub(a.x())) as f32 * TO_FLOAT;
+/// The distance from `from` to `to` in fixed point, through floats as the game takes it.
+fn float_distance(from: FixedPoint, to: FixedPoint) -> FixedDistance {
+    let [px, py] = from.get();
+    let dy = (py.wrapping_sub(to.y())) as f32 * TO_FLOAT;
+    let dx = (px.wrapping_sub(to.x())) as f32 * TO_FLOAT;
     FixedDistance::new((sqrt(dx * dx + dy * dy) * TO_FIXED) as i32)
 }
 
@@ -71,8 +71,8 @@ impl Search<'_> {
         // CVTTSS2SI RAX at 0x140fa4558, EAX stored: a start 512 tiles or more away wraps
         let estimate = cvttss2si_64(sqrt(fx * fx + fy * fy) * TO_FIXED) as i32;
         let start = Node {
-            g: FixedDistance::ZERO,
-            f: FixedDistance::new(estimate),
+            cost: FixedDistance::ZERO,
+            total: FixedDistance::new(estimate),
             idx: NodeIndex::next_of(&self.arena),
             parent: None,
             at: fixed_point,
@@ -90,10 +90,10 @@ impl Search<'_> {
         let keep = self.open.len() - 1;
         let _ = self.open.drain(..keep);
         let node = self.open.checked_mut(0)?;
-        let fixed_distance = self.goal.heuristic(node.at).wrapping_add(node.g);
-        node.f = fixed_distance;
+        let fixed_distance = self.goal.heuristic(node.at).wrapping_add(node.cost);
+        node.total = fixed_distance;
         let idx = node.idx;
-        self.node_mut(idx)?.f = fixed_distance;
+        self.node_mut(idx)?.total = fixed_distance;
         Ok(Started::Escaped)
     }
 
@@ -107,14 +107,15 @@ impl Search<'_> {
         root: NodeIndex,
     ) -> GenieResult<()> {
         let mesh = self.ctx.mesh;
-        let w = mesh.width as i32;
+        let width = mesh.width as i32;
         let total = mesh.width * mesh.width;
-        let rr = ((i64::from(self.goal.r.get()) << 23) >> 22) as i32;
+        let rr = ((i64::from(self.goal.radius.get()) << 23) >> 22) as i32;
         // squared in 64 bits, its low 32 kept
         let rr2 =
             FixedDistanceSquared::new(i64::from(((i64::from(rr) * i64::from(rr)) >> 22) as i32));
         let [px, py] = fixed_point.get();
-        let tile = |x: i32, y: i32| (tile_of(y).wrapping_mul(w)).wrapping_add(tile_of(x)) as u32;
+        let tile =
+            |x: i32, y: i32| (tile_of(y).wrapping_mul(width)).wrapping_add(tile_of(x)) as u32;
         let tiles = [
             tile(px - rr, py - rr),
             tile(px + rr, py - rr),
@@ -139,104 +140,112 @@ impl Search<'_> {
         Ok(())
     }
 
-    /// Side `side` of shape `id`, shrunk by the search's `d`, when its line comes within `rr2` (the
-    /// doubled radius, squared) of the start `p`: the points where that circle crosses the side,
-    /// the start's foot on it ([`Search::escape_foot`]), its first corner within the circle and
-    /// its contacts ([`Search::escape_contacts`]) become escape candidates, each in the search's
-    /// box and held by no other shape.
+    /// Side `side` of shape `id`, shrunk by the search's `clearance`, when its line comes within
+    /// `rr2` (the doubled radius, squared) of the start `point`: the points where that circle
+    /// crosses the side, the start's foot on it ([`Search::escape_foot`]), its first corner within
+    /// the circle and its contacts ([`Search::escape_contacts`]) become escape candidates, each in
+    /// the search's box and held by no other shape.
     pub(super) fn escape_side(
         &mut self,
-        p: FixedPoint,
+        point: FixedPoint,
         root: NodeIndex,
         (id, side): (ShapeId, ShapeSide),
         rr2: FixedDistanceSquared,
     ) -> GenieResult<()> {
-        let d = self.ctx.d;
+        let clearance = self.ctx.clearance;
         let checked = *self.ctx.mesh.shapes.checked(id.index())?;
-        let [px, py] = p.get();
+        let [px, py] = point.get();
         let (first, second) = side_corners(side);
-        let a = shrunk_corner(checked, first, d);
-        let e = shrunk_corner(checked, second, d);
+        let corner = shrunk_corner(checked, first, clearance);
+        let shrunk_corner = shrunk_corner(checked, second, clearance);
         let dir = side_dir(side);
-        let (t, dist2, span) = if side.along_y() {
-            let u = i64::from(dir.y());
-            let t = ((i64::from(py - a.y()) * u) >> 22) as i32;
-            let perp = i64::from((py - a.y()) - (((i64::from(t) * u) >> 22) as i32));
-            let dx = i64::from(px - a.x());
+        let (offset, dist2, span) = if side.along_y() {
+            let component = i64::from(dir.y());
+            let along = ((i64::from(py - corner.y()) * component) >> 22) as i32;
+            let perp =
+                i64::from((py - corner.y()) - (((i64::from(along) * component) >> 22) as i32));
+            let dx = i64::from(px - corner.x());
             let dist2 = FixedDistanceSquared::new(((perp * perp) >> 22) + ((dx * dx) >> 22));
-            (t, dist2, e.y() - a.y())
+            (along, dist2, shrunk_corner.y() - corner.y())
         } else {
-            let u = i64::from(dir.x());
-            let t = ((i64::from(px - a.x()) * u) >> 22) as i32;
-            let perp = i64::from((px - a.x()) - (((i64::from(t) * u) >> 22) as i32));
-            let dy = i64::from(py - a.y());
+            let component = i64::from(dir.x());
+            let along = ((i64::from(px - corner.x()) * component) >> 22) as i32;
+            let perp =
+                i64::from((px - corner.x()) - (((i64::from(along) * component) >> 22) as i32));
+            let dy = i64::from(py - corner.y());
             let dist2 = FixedDistanceSquared::new(((dy * dy) >> 22) + ((perp * perp) >> 22));
-            (t, dist2, e.x() - a.x())
+            (along, dist2, shrunk_corner.x() - corner.x())
         };
         if dist2 > rr2 {
             return Ok(());
         }
         let fixed_rect = self.bounds;
-        let h = (sqrt((rr2.get() - dist2.get()) as f32 * TO_FLOAT) * TO_FIXED) as i32;
-        for c in [t - h, h + t] {
-            if 0 < c && c < span {
+        let half_chord = (sqrt((rr2.get() - dist2.get()) as f32 * TO_FLOAT) * TO_FIXED) as i32;
+        for crossing in [offset - half_chord, half_chord + offset] {
+            if 0 < crossing && crossing < span {
                 let fixed_point = FixedPoint::new(
-                    ((i64::from(dir.x()) * i64::from(c)) >> 22) as i32 + a.x(),
-                    ((i64::from(dir.y()) * i64::from(c)) >> 22) as i32 + a.y(),
+                    ((i64::from(dir.x()) * i64::from(crossing)) >> 22) as i32 + corner.x(),
+                    ((i64::from(dir.y()) * i64::from(crossing)) >> 22) as i32 + corner.y(),
                 );
                 if in_box(fixed_point, fixed_rect)
-                    && self.ctx.holder_but(fixed_point, id, d)?.is_none()
+                    && self.ctx.holder_but(fixed_point, id, clearance)?.is_none()
                 {
-                    self.side_node(float_distance(p, fixed_point), root, id, side, fixed_point);
+                    self.side_node(
+                        float_distance(point, fixed_point),
+                        root,
+                        id,
+                        side,
+                        fixed_point,
+                    );
                 }
             }
         }
-        self.escape_foot(p, root, (id, side), (a, e))?;
+        self.escape_foot(point, root, (id, side), (corner, shrunk_corner))?;
         // the side's first corner
-        if in_box(a, fixed_rect) && self.ctx.holder_but(a, id, d)?.is_none() {
-            let dx = i64::from(px - a.x());
-            let dy = i64::from(py - a.y());
+        if in_box(corner, fixed_rect) && self.ctx.holder_but(corner, id, clearance)?.is_none() {
+            let dx = i64::from(px - corner.x());
+            let dy = i64::from(py - corner.y());
             let d2 = FixedDistanceSquared::new(((dx * dx) >> 22) + ((dy * dy) >> 22));
             if d2 < rr2 {
                 let fixed_distance =
                     FixedDistance::new((sqrt(d2.get() as f32 * TO_FLOAT) * TO_FIXED) as i32);
-                self.side_node(fixed_distance, root, id, side, a);
+                self.side_node(fixed_distance, root, id, side, corner);
             }
         }
-        self.escape_contacts(p, root, (id, side), rr2)?;
+        self.escape_contacts(point, root, (id, side), rr2)?;
         Ok(())
     }
 
-    /// The start `p`'s foot on side `side` of shape `id` (its corners `a` and `e`), strictly
-    /// between them, in the search's box and held by no shape: an escape candidate at the
+    /// The start `point`'s foot on side `side` of shape `id` (its corners `start` and `end`),
+    /// strictly between them, in the search's box and held by no shape: an escape candidate at the
     /// perpendicular distance.
     pub(super) fn escape_foot(
         &mut self,
-        p: FixedPoint,
+        point: FixedPoint,
         root: NodeIndex,
         (id, side): (ShapeId, ShapeSide),
-        (a, e): (FixedPoint, FixedPoint),
+        (start, end): (FixedPoint, FixedPoint),
     ) -> GenieResult<()> {
-        let [px, py] = p.get();
+        let [px, py] = point.get();
         let fixed_rect = self.bounds;
         if !side.along_y() {
-            if a.x() < px && px < e.x() {
-                let q = p.with_y(a.y());
-                if in_box(q, fixed_rect) && self.ctx.holder(q)?.is_none() {
+            if start.x() < px && px < end.x() {
+                let fixed_point = point.with_y(start.y());
+                if in_box(fixed_point, fixed_rect) && self.ctx.holder(fixed_point)?.is_none() {
                     self.side_node(
-                        FixedDistance::new((py - a.y()).wrapping_abs()),
+                        FixedDistance::new((py - start.y()).wrapping_abs()),
                         root,
                         id,
                         side,
-                        q,
+                        fixed_point,
                     );
                 }
             }
-        } else if a.y() < py && py < e.y() {
-            let fixed_point = p.with_x(a.x());
+        } else if start.y() < py && py < end.y() {
+            let fixed_point = point.with_x(start.x());
             if in_box(fixed_point, fixed_rect) && self.ctx.holder(fixed_point)?.is_none() {
                 self.side_node(
-                    FixedDistance::new((a.x() - px).wrapping_abs()),
+                    FixedDistance::new((start.x() - px).wrapping_abs()),
                     root,
                     id,
                     side,
@@ -247,26 +256,27 @@ impl Search<'_> {
         Ok(())
     }
 
-    /// The contacts on side `side` of shape `id`: each wider than the search's `d`, with a shape
-    /// not ignored, at a point in the search's box and held by no shape (a contact on a side of
-    /// its own number only when its other shape holds the point nudged one unit into it), within
-    /// `rr2` of the start `p`: an escape candidate, 0x32 dearer on a side of its own number.
+    /// The contacts on side `side` of shape `id`: each wider than the search's `clearance`, with a
+    /// shape not ignored, at a point in the search's box and held by no shape (a contact on a side
+    /// of its own number only when its other shape holds the point nudged one unit into it), within
+    /// `rr2` of the start `point`: an escape candidate, 0x32 dearer on a side of its own number.
     pub(super) fn escape_contacts(
         &mut self,
-        p: FixedPoint,
+        point: FixedPoint,
         root: NodeIndex,
         (id, side): (ShapeId, ShapeSide),
         rr2: FixedDistanceSquared,
     ) -> GenieResult<()> {
-        let [px, py] = p.get();
+        let [px, py] = point.get();
         let mesh = self.ctx.mesh;
-        let d = self.ctx.d;
+        let clearance = self.ctx.clearance;
         let fixed_rect = self.bounds;
         for &contact in mesh.sides.checked(id.index())?.checked(side.index())? {
-            if (d >= contact.half) || self.ctx.ignored(contact.other) {
+            if (clearance >= contact.half) || self.ctx.ignored(contact.other) {
                 continue;
             }
-            let fixed_point = contact_point(contact.at, contact.side, d, contact.at_side_start);
+            let fixed_point =
+                contact_point(contact.at, contact.side, clearance, contact.at_side_start);
             if !in_box(fixed_point, fixed_rect) {
                 continue;
             }
@@ -277,7 +287,11 @@ impl Search<'_> {
                     ShapeSide::HighY => fixed_point.with_y(fixed_point.y() - 1),
                     ShapeSide::LowX => fixed_point.with_x(fixed_point.x() - 1),
                 };
-                if !strictly_inside(*mesh.shapes.checked(contact.other.index())?, nudged, d) {
+                if !strictly_inside(
+                    *mesh.shapes.checked(contact.other.index())?,
+                    nudged,
+                    clearance,
+                ) {
                     continue;
                 }
             }
@@ -297,12 +311,19 @@ impl Search<'_> {
         Ok(())
     }
 
-    /// The point where the walk from `p` toward `to` meets the hit at fraction `frac` (`>> 22`).
-    pub(super) fn at_fraction(p: FixedPoint, to: FixedPoint, frac: RayFraction) -> FixedPoint {
-        let f = i64::from(frac.get());
+    /// The point where the walk from `fixed_point` toward `to` meets the hit at fraction `frac`
+    /// (`>> 22`).
+    pub(super) fn at_fraction(
+        fixed_point: FixedPoint,
+        to: FixedPoint,
+        frac: RayFraction,
+    ) -> FixedPoint {
+        let scale = i64::from(frac.get());
         FixedPoint::new(
-            ((i64::from(to.x().wrapping_sub(p.x())) * f) >> 22) as i32 + p.x(),
-            ((i64::from(to.y().wrapping_sub(p.y())) * f) >> 22) as i32 + p.y(),
+            ((i64::from(to.x().wrapping_sub(fixed_point.x())) * scale) >> 22) as i32
+                + fixed_point.x(),
+            ((i64::from(to.y().wrapping_sub(fixed_point.y())) * scale) >> 22) as i32
+                + fixed_point.y(),
         )
     }
 
@@ -313,7 +334,7 @@ impl Search<'_> {
     /// lower, 1 and 2 higher); no shape holds it again, and the mesh has finitely many. Returns
     /// the shape the point settled on.
     pub(super) fn settle(&self, fixed_point: &mut FixedPoint, hit: Hit) -> GenieResult<ShapeId> {
-        let fixed_distance = self.ctx.d;
+        let fixed_distance = self.ctx.clearance;
         let mut shape = hit.shape;
         snap_to_side(
             fixed_point,
@@ -333,40 +354,40 @@ impl Search<'_> {
         Ok(shape)
     }
 
-    /// `FUN_140fa2b20`: the two legs of an L toward `c` from node `node`, the first along direction
-    /// `axis_dir`, the second along `second`; each leg's cost is |Δx|, then |Δy|, of `delta`
-    /// through float.
+    /// `FUN_140fa2b20`: the two legs of an L toward `corner` from node `node`, the first along
+    /// direction `axis_dir`, the second along `second`; each leg's cost is |Δx|, then |Δy|, of
+    /// `delta` through float.
     pub(super) fn legs(
         &mut self,
         node: Node,
-        c: FixedPoint,
+        corner: FixedPoint,
         axis_dir: AxisDir,
         second: AxisDir,
         delta: FixedPoint,
     ) -> GenieResult<()> {
-        let p = node.at;
+        let node_at = node.at;
         let fixed_point = if axis_dir.along_x() {
-            FixedPoint::new(c.x(), p.y())
+            FixedPoint::new(corner.x(), node_at.y())
         } else {
-            FixedPoint::new(p.x(), c.y())
+            FixedPoint::new(node_at.x(), corner.y())
         };
-        let sw = self.ctx.sweep(p, fixed_point, axis_dir)?;
+        let sw = self.ctx.sweep(node_at, fixed_point, axis_dir)?;
         let (fixed_distance, parent, sw) = if sw.found {
             (
-                through_float(delta.x().wrapping_abs()).wrapping_add(node.g),
+                through_float(delta.x().wrapping_abs()).wrapping_add(node.cost),
                 node.idx,
                 sw,
             )
         } else {
             let mid = self.add(
-                through_float(delta.x().wrapping_abs()).wrapping_add(node.g),
+                through_float(delta.x().wrapping_abs()).wrapping_add(node.cost),
                 node.idx,
                 fixed_point,
                 Kind::Waypoint,
             );
-            let sw2 = self.ctx.sweep(fixed_point, c, second)?;
+            let sw2 = self.ctx.sweep(fixed_point, corner, second)?;
             (
-                through_float(delta.y().wrapping_abs()).wrapping_add(mid.g),
+                through_float(delta.y().wrapping_abs()).wrapping_add(mid.cost),
                 mid.idx,
                 sw2,
             )

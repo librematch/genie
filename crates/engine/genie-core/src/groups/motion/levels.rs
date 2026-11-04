@@ -12,7 +12,7 @@ use crate::movement::PathData;
 use crate::movement::WaypointIndex;
 use crate::world::Seconds;
 use crate::world::layer::generated::GroupTuning;
-use crate::world::slots::CheckedIndex;
+use crate::world::slots::CheckedIndexExt;
 
 /// What `FUN_140f9b4d0` does to the walked level's flag: its `on` argument.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -60,16 +60,18 @@ pub(super) fn reset_level(paths: &mut Vec<PathData>) -> GenieResult<()> {
 pub(super) fn point(level: &PathData, index: WaypointIndex) -> BVector {
     index
         .slot()
-        .and_then(|i| level.points.get(i))
+        .and_then(|index| level.points.get(index))
         .copied()
         .unwrap_or(BVector::ZERO)
 }
 
-/// The length on the ground from `a` to `b` (`FUN_14087e560`, the height zeroed).
-pub(super) fn ground(a: BVector, b: BVector) -> Distance {
-    let mut d = a - b;
-    d = d.with_height(0.0);
-    Distance::new(sqrt(d.x() * d.x() + 0.0 + d.y() * d.y()))
+/// The length on the ground from `from` to `to` (`FUN_14087e560`, the height zeroed).
+pub(super) fn ground(from: BVector, to: BVector) -> Distance {
+    let mut offset = from - to;
+    offset = offset.with_height(0.0);
+    Distance::new(sqrt(
+        offset.x() * offset.x() + 0.0 + offset.y() * offset.y(),
+    ))
 }
 
 /// Where a step toward a waypoint ends against it (`FUN_141046130`'s answer).
@@ -90,14 +92,24 @@ pub(in crate::groups) fn passes_waypoint(
     next: BVector,
     group_tuning: &GroupTuning,
 ) -> Passing {
-    let mut a = waypoint - at;
-    let mut b = waypoint - next;
-    let c = next - at;
-    a = a.with_height(0.0);
-    b = b.with_height(0.0);
-    let to_waypoint = sqrt(a.x() * a.x() + 0.0 + a.y() * a.y());
-    let beyond = sqrt(b.x() * b.x() + b.height() * b.height() + b.y() * b.y());
-    let step = sqrt(c.x() * c.x() + c.height() * c.height() + c.y() * c.y());
+    let mut waypoint_offset = waypoint - at;
+    let mut next_offset = waypoint - next;
+    let step_offset = next - at;
+    waypoint_offset = waypoint_offset.with_height(0.0);
+    next_offset = next_offset.with_height(0.0);
+    let to_waypoint = sqrt(
+        waypoint_offset.x() * waypoint_offset.x() + 0.0 + waypoint_offset.y() * waypoint_offset.y(),
+    );
+    let beyond = sqrt(
+        next_offset.x() * next_offset.x()
+            + next_offset.height() * next_offset.height()
+            + next_offset.y() * next_offset.y(),
+    );
+    let step = sqrt(
+        step_offset.x() * step_offset.x()
+            + step_offset.height() * step_offset.height()
+            + step_offset.y() * step_offset.y(),
+    );
     if at_most_or_unordered(step, to_waypoint) {
         Passing::Short
     } else if to_waypoint < beyond || step < group_tuning.near {
@@ -109,15 +121,15 @@ pub(in crate::groups) fn passes_waypoint(
 
 /// `FUN_1411570c0`'s ends held inside the map: below 0 at 0, from the map's size on at the size
 /// less 0.1, per axis.
-pub(in crate::groups) fn hold(p: BVector, map: GridSize, group_tuning: &GroupTuning) -> Point {
-    let axis = |v: f32, size: i32| {
-        if v < 0.0 {
+pub(in crate::groups) fn hold(point: BVector, map: GridSize, group_tuning: &GroupTuning) -> Point {
+    let axis = |value: f32, size: i32| {
+        if value < 0.0 {
             0.0
-        } else if size as f32 <= v {
+        } else if size as f32 <= value {
             size as f32 - group_tuning.near
         } else {
-            v
+            value
         }
     };
-    Point::new(axis(p.x(), map.width()), axis(p.y(), map.height()))
+    Point::new(axis(point.x(), map.width()), axis(point.y(), map.height()))
 }

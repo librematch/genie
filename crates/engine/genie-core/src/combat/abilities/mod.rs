@@ -51,7 +51,7 @@ use crate::players::PlayerId;
 use crate::players::attribute::AttributeId;
 use crate::world::Seconds;
 use crate::world::World;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 use genie_diff::Diff;
 
 mod generation;
@@ -178,15 +178,14 @@ struct Own {
 }
 
 impl World {
-    /// `FUN_1412072f0` on the object `id`, the one at `i` of player `p`'s list, as player
-    /// `owner`'s (its owner after its update: the new one when the update handed it over),
-    /// once its combat update returned `leaves`. Only its master's tasks of the four types
-    /// count ([`ACTIONS`]); an object of a master of another type than 70 or 80, or without one
-    /// the slice has, has none. On a living object ([`alive`]) they act in their order
-    /// ([`World::generate`], [`World::movement_damage`], [`World::terrain_look`]); on a dead one
-    /// that leaves, its removal reward tasks within 1e-7 of range (`COMISS`/`JBE`: a NaN is not)
-    /// issue their commands, which are returned: in a recording's replay the recording's own
-    /// commands bring them.
+    /// `FUN_1412072f0` on the object `id`, the one at `slot` of player `unit_owner`'s list, as
+    /// player `owner`'s (its owner after its update: the new one when the update handed it over),
+    /// once its combat update returned `leaves`. Only its master's tasks of the four types count
+    /// ([`ACTIONS`]); an object of a master of another type than 70 or 80, or without one the slice
+    /// has, has none. On a living object ([`alive`]) they act in their order ([`World::generate`],
+    /// [`World::movement_damage`], [`World::terrain_look`]); on a dead one that leaves, its removal
+    /// reward tasks within 1e-7 of range (`COMISS`/`JBE`: a NaN is not) issue their commands, which
+    /// are returned: in a recording's replay the recording's own commands bring them.
     ///
     /// # Errors
     ///
@@ -194,19 +193,19 @@ impl World {
     /// [`World::movement_damage`]).
     pub(crate) fn abilities(
         &mut self,
-        (id, p, i): (ObjectId, PlayerId, ListIndex),
+        (id, unit_owner, slot): (ObjectId, PlayerId, ListIndex),
         owner: PlayerId,
         leaves: bool,
     ) -> GenieResult<Vec<Reward>> {
-        let i = match self.players.player(p)?.objects.get(i) {
-            Some(u) if u.id == id => i,
+        let index = match self.players.player(unit_owner)?.objects.get(slot) {
+            Some(unit) if unit.id == id => slot,
             _ => match self.place(id) {
-                Some(Place::Live(player_id, list_index)) if player_id == p => list_index,
+                Some(Place::Live(player_id, list_index)) if player_id == unit_owner => list_index,
                 _ => return Ok(Vec::new()),
             },
         };
-        let unit = &self.players.live(p, i)?;
-        let master = unit.master(self.master_tables(), p)?;
+        let unit = &self.players.live(unit_owner, index)?;
+        let master = unit.master(self.master_tables(), unit_owner)?;
         // The object types the routine runs on: a combat unit (`'F'`) and a building (`'P'`).
         if !matches!(master.kind, MasterKind::COMBAT | MasterKind::BUILDING) {
             return Ok(Vec::new());
@@ -215,7 +214,7 @@ impl World {
             .action_part()
             .tasks
             .iter()
-            .filter(|t| ACTIONS.contains(&t.action_kind))
+            .filter(|task| ACTIONS.contains(&task.action_kind))
             .copied()
             .collect();
         if tasks.is_empty() {
@@ -238,7 +237,7 @@ impl World {
                     let multiplier = (task.attribute_kind2)
                         .and_then(|attribute_id| held.attribute(attribute_id));
                     let cost = player_master(&self.model.masters, owner, own.id)
-                        .map_or(&[][..], |m| &m.creatable_part().cost[..]);
+                        .map_or(&[][..], |master| &master.creatable_part().cost[..]);
                     rewards.push(reward(task, owner, multiplier, cost));
                 }
             }
@@ -246,10 +245,12 @@ impl World {
         }
         for task in &tasks {
             match task.action_kind {
-                GENERATE => self.generate((p, i), owner, own, task)?,
-                MOVEMENT_DAMAGE => self.movement_damage((p, i), owner, own, task)?,
+                GENERATE => self.generate((unit_owner, index), owner, own, task)?,
+                MOVEMENT_DAMAGE => self.movement_damage((unit_owner, index), owner, own, task)?,
                 // the terrain mask's throw ends the game
-                TERRAIN_LOOK if !self.terrain_look((p, i), task)? => return Ok(rewards),
+                TERRAIN_LOOK if !self.terrain_look((unit_owner, index), task)? => {
+                    return Ok(rewards);
+                }
                 _ => {}
             }
         }

@@ -77,7 +77,7 @@ impl UnitAi {
         side: &mut UnitView<'_, '_>,
     ) -> GenieResult<u32> {
         let roles = &at.roles;
-        if notify.p[1] < 1 {
+        if notify.params[1] < 1 {
             self.end_notifies(time, at, side, ai_rng)?;
             return Ok(DEAD);
         }
@@ -190,7 +190,7 @@ impl UnitAi {
         side: &mut UnitView<'_, '_>,
     ) -> GenieResult<u32> {
         alert_owner(player_kind)?;
-        if notify.p[1] < 1 {
+        if notify.params[1] < 1 {
             self.end_notifies(time, at, side, ai_rng)?;
             return Ok(DEAD);
         }
@@ -289,7 +289,7 @@ impl UnitAi {
         ai_rng: &mut Well512,
         side: &mut UnitView<'_, '_>,
     ) -> GenieResult<u32> {
-        if notify.p[1] < 1 {
+        if notify.params[1] < 1 {
             alert_owner(player_kind)?;
             self.end_notifies(time, at, side, ai_rng)?;
             return Ok(DEAD);
@@ -335,7 +335,7 @@ impl UnitAi {
         side: &mut UnitView<'_, '_>,
     ) -> GenieResult<u32> {
         alert_owner(player_kind)?;
-        if notify.p[1] < 1 {
+        if notify.params[1] < 1 {
             self.end_notifies(time, at, side, ai_rng)?;
             return Ok(DEAD);
         }
@@ -468,17 +468,17 @@ impl UnitAi {
     ) -> GenieResult<u32> {
         let new = !self.attackers.contains(notify.caller);
         alert_owner(player_kind)?;
-        if notify.p[1] >= 1 && at.flags.contains(SurroundingFlags::GUEST_COMPUTER) {
+        if notify.params[1] >= 1 && at.flags.contains(SurroundingFlags::GUEST_COMPUTER) {
             alert_owner(PlayerKind::Computer)?;
         }
-        if notify.p[1] >= 1
+        if notify.params[1] >= 1
             && new
             && self.current_target != notify.caller
             && let Some(caller) = notify.caller
         {
             self.ask_for_help(caller, at, player_kind, side)?;
         }
-        if notify.p[1] < 1 {
+        if notify.params[1] < 1 {
             self.end_notifies(time, at, side, rng)?;
             return Ok(DEAD);
         }

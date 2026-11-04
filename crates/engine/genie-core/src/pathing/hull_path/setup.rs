@@ -90,7 +90,7 @@ pub fn quick_reach_from(
     Ok(result.reaches().then(|| path.length()))
 }
 
-impl<'w> HullPather<'w> {
+impl<'world> HullPather<'world> {
     /// The pather for unit `unit` (terrain `mask`, `radius`, its player) with the ignore list slot
     /// 0x3e8 sets ([`HullPather::for_list`] with the unit and `target`): both objects (the game's
     /// −1 for no target matches no record, so it is left out), and the tile under one of one
@@ -108,7 +108,7 @@ impl<'w> HullPather<'w> {
     /// across searches holds the same state.
     #[must_use]
     pub fn new(
-        (world, by_id): (&'w mut Spatial, ObjectsRef<'w>),
+        (world, by_id): (&'world mut Spatial, ObjectsRef<'world>),
         unit: ObjectId,
         target: Option<ObjectId>,
         mask: TerrainMask,
@@ -129,7 +129,7 @@ impl<'w> HullPather<'w> {
     /// ([`HullPather::new`]).
     #[must_use]
     pub fn for_list(
-        (world, by_id): (&'w mut Spatial, ObjectsRef<'w>),
+        (world, by_id): (&'world mut Spatial, ObjectsRef<'world>),
         ids: &[ObjectId],
         mask: TerrainMask,
         radius: Distance,
@@ -174,7 +174,7 @@ impl<'w> HullPather<'w> {
     /// The pather with the gates the unit's player may pass (slot 0x678, by id): such a gate in
     /// its area stays out of the hulls.
     #[must_use]
-    pub const fn with_gates(mut self, passable: &'w BTreeSet<ObjectId>) -> Self {
+    pub const fn with_gates(mut self, passable: &'world BTreeSet<ObjectId>) -> Self {
         self.gates = Some(passable);
         self
     }

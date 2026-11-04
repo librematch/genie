@@ -184,10 +184,10 @@ impl StepPlans {
     /// None yet.
     pub const ZERO: Self = Self(0);
 
-    /// A count of `n` plans.
+    /// A count of `count` plans.
     #[must_use]
-    pub const fn new(n: u32) -> Self {
-        Self(n)
+    pub const fn new(count: u32) -> Self {
+        Self(count)
     }
 
     /// The count.

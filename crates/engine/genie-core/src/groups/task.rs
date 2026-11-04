@@ -10,7 +10,7 @@ use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::PlayersMasters;
+use crate::objects::masters::PlayersMastersExt;
 use crate::objects::masters::TaskGroup;
 use crate::objects::masters::{Master, Masters, Task};
 use crate::players::Amount;
@@ -19,7 +19,7 @@ use crate::unit_ai::task_finder::TaskTarget;
 use crate::unit_ai::task_finder::world::TaskWorld;
 use crate::unit_ai::task_finder::{Actor, find_task};
 use crate::world::World;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 use crate::{GenieError, GenieResult};
 
 /// The task whose target range is the target's owner's attribute 90 (`+0x2d0` of its attribute

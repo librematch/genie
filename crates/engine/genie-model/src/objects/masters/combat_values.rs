@@ -25,257 +25,258 @@ use crate::world::Seconds;
 
 impl CombatPart {
     /// [`crate::objects::masters::Master::set_combat`]'s values of the layer (`FUN_1410c12b0`):
-    /// what `attribute` set to `v` writes here; `world` holds the sprites.
+    /// what `attribute` set to `value` writes here; `world` holds the sprites.
     pub(super) fn set_value(
         &mut self,
         attribute: MasterAttribute,
-        v: f32,
+        value: f32,
         world: &AttributeWorld<'_>,
     ) {
         use crate::math::conversions::cvttss2si;
         use crate::objects::masters::MasterAttribute;
         match attribute {
             MasterAttribute::ATTACK_RELOAD_TIME => {
-                self.reload = Seconds::new(v);
+                self.reload = Seconds::new(value);
             }
             MasterAttribute::ACCURACY_PERCENT => {
-                self.hit_chance = HitChance::of_data(low16(v));
+                self.hit_chance = HitChance::of_data(low16(value));
             }
             MasterAttribute::MAXIMUM_RANGE => {
-                self.weapon_range = Distance::new(v);
+                self.weapon_range = Distance::new(value);
             }
             MasterAttribute::BASE_ARMOR => {
-                self.base_armor = DamageAmount::of_effect(v);
+                self.base_armor = DamageAmount::of_effect(value);
             }
             MasterAttribute::PROJECTILE_UNIT => {
-                self.missile = MasterField::of_data(low16(v));
+                self.missile = MasterField::of_data(low16(value));
             }
             MasterAttribute::TERRAIN_DEFENSE_BONUS => {
-                self.terrain_bonus = RestrictionField::of_data(low16(v));
+                self.terrain_bonus = RestrictionField::of_data(low16(value));
             }
             MasterAttribute::MINIMUM_RANGE => {
-                self.min_range = Distance::new(v);
+                self.min_range = Distance::new(value);
             }
             MasterAttribute::BLAST_WIDTH => {
-                self.area_effect = Distance::new(v);
+                self.area_effect = Distance::new(value);
             }
             MasterAttribute::BONUS_DAMAGE_RESISTANCE => {
-                self.resistance = DamageShare::new(v);
+                self.resistance = DamageShare::new(value);
             }
             MasterAttribute::FRAME_DELAY => {
-                self.fire_frame = Frame::of_data(low16(v));
+                self.fire_frame = Frame::of_data(low16(value));
             }
             MasterAttribute::BLAST_ATTACK_LEVEL => {
-                self.blast_level = BlastLevel::from_bits_retain(low8(v));
+                self.blast_level = BlastLevel::from_bits_retain(low8(value));
             }
             MasterAttribute::SHOWN_ATTACK => {
-                self.shown.attack = DamageAmount::of_effect(v);
+                self.shown.attack = DamageAmount::of_effect(value);
             }
             MasterAttribute::SHOWN_RANGE => {
-                self.shown.range = Distance::new(v);
+                self.shown.range = Distance::new(value);
             }
             MasterAttribute::SHOWN_MELEE_ARMOR => {
-                self.shown.melee_armor = DamageAmount::of_effect(v);
+                self.shown.melee_armor = DamageAmount::of_effect(value);
             }
             MasterAttribute::COMBAT_ABILITY => {
-                self.combat_ability = CombatAbility::from_bits_retain(low8(v));
+                self.combat_ability = CombatAbility::from_bits_retain(low8(value));
             }
             MasterAttribute::ATTACK_DISPERSION => {
-                self.missed_spread = MissSpread::new(v);
+                self.missed_spread = MissSpread::new(value);
             }
             MasterAttribute::ATTACK_GRAPHIC => {
-                set_sprite(&mut self.attack_sprite, cvttss2si(v), world);
+                set_sprite(&mut self.attack_sprite, cvttss2si(value), world);
             }
             MasterAttribute::AREA_DAMAGE => {
-                self.area_damage = DamageShare::new(v);
+                self.area_damage = DamageShare::new(value);
             }
             MasterAttribute::DAMAGE_REFLECTION => {
-                self.reflection = DamageShare::new(v);
+                self.reflection = DamageShare::new(value);
             }
             MasterAttribute::FRIENDLY_FIRE_DAMAGE => {
-                self.friendly_fire = DamageShare::new(v);
+                self.friendly_fire = DamageShare::new(value);
             }
             MasterAttribute::GARRISON_FIREPOWER => {
-                self.garrison_firepower = Firepower::new(v);
+                self.garrison_firepower = Firepower::new(value);
             }
             MasterAttribute::DISPLACEMENT_X => {
-                self.weapon_offset = self.weapon_offset.with_x(v);
+                self.weapon_offset = self.weapon_offset.with_x(value);
             }
             MasterAttribute::DISPLACEMENT_Y => {
-                self.weapon_offset = self.weapon_offset.with_y(v);
+                self.weapon_offset = self.weapon_offset.with_y(value);
             }
             MasterAttribute::DISPLACEMENT_Z => {
-                self.weapon_offset = self.weapon_offset.with_z(v);
+                self.weapon_offset = self.weapon_offset.with_z(value);
             }
             _ => {}
         }
     }
 
     /// [`crate::objects::masters::Master::add_combat`]'s values of the layer (`FUN_1410c16e0`):
-    /// what an add of `v` to `attribute` writes here; `world` holds the sprites.
+    /// what an add of `value` to `attribute` writes here; `world` holds the sprites.
     pub(super) fn add_value(
         &mut self,
         attribute: MasterAttribute,
-        v: f32,
+        value: f32,
         world: &AttributeWorld<'_>,
     ) {
         use crate::objects::masters::MasterAttribute;
         match attribute {
             MasterAttribute::ATTACK_RELOAD_TIME => {
-                self.reload += Seconds::new(v);
+                self.reload += Seconds::new(value);
             }
             MasterAttribute::ACCURACY_PERCENT => {
-                self.hit_chance = self.hit_chance.plus(low16(v));
+                self.hit_chance = self.hit_chance.plus(low16(value));
             }
             MasterAttribute::MAXIMUM_RANGE => {
-                self.weapon_range += Distance::new(v);
+                self.weapon_range += Distance::new(value);
             }
             MasterAttribute::BASE_ARMOR => {
-                self.base_armor = self.base_armor.plus(DamageAmount::of_effect(v));
+                self.base_armor = self.base_armor.plus(DamageAmount::of_effect(value));
             }
             MasterAttribute::PROJECTILE_UNIT => {
-                self.missile = self.missile.plus(low16(v));
+                self.missile = self.missile.plus(low16(value));
             }
             MasterAttribute::TERRAIN_DEFENSE_BONUS => {
-                self.terrain_bonus = self.terrain_bonus.plus(low16(v));
+                self.terrain_bonus = self.terrain_bonus.plus(low16(value));
             }
             MasterAttribute::MINIMUM_RANGE => {
-                self.min_range += Distance::new(v);
+                self.min_range += Distance::new(value);
             }
             MasterAttribute::BLAST_WIDTH => {
-                self.area_effect += Distance::new(v);
+                self.area_effect += Distance::new(value);
             }
             MasterAttribute::BONUS_DAMAGE_RESISTANCE => {
-                self.resistance += DamageShare::new(v);
+                self.resistance += DamageShare::new(value);
             }
             MasterAttribute::FRAME_DELAY => {
-                self.fire_frame = self.fire_frame.plus(low16(v));
+                self.fire_frame = self.fire_frame.plus(low16(value));
             }
             MasterAttribute::BLAST_ATTACK_LEVEL => {
                 self.blast_level =
-                    BlastLevel::from_bits_retain(self.blast_level.bits().wrapping_add(low8(v)));
+                    BlastLevel::from_bits_retain(self.blast_level.bits().wrapping_add(low8(value)));
             }
             MasterAttribute::SHOWN_ATTACK => {
-                self.shown.attack = self.shown.attack.plus(DamageAmount::of_effect(v));
+                self.shown.attack = self.shown.attack.plus(DamageAmount::of_effect(value));
             }
             MasterAttribute::SHOWN_RANGE => {
-                self.shown.range += Distance::new(v);
+                self.shown.range += Distance::new(value);
             }
             MasterAttribute::SHOWN_MELEE_ARMOR => {
-                self.shown.melee_armor = self.shown.melee_armor.plus(DamageAmount::of_effect(v));
+                self.shown.melee_armor =
+                    self.shown.melee_armor.plus(DamageAmount::of_effect(value));
             }
             MasterAttribute::COMBAT_ABILITY => {
                 self.combat_ability = CombatAbility::from_bits_retain(
-                    self.combat_ability.bits().wrapping_add(low8(v)),
+                    self.combat_ability.bits().wrapping_add(low8(value)),
                 );
             }
             MasterAttribute::ATTACK_DISPERSION => {
-                self.missed_spread += MissSpread::new(v);
+                self.missed_spread += MissSpread::new(value);
             }
             MasterAttribute::ATTACK_GRAPHIC => {
-                add_sprite(&mut self.attack_sprite, v, world);
+                add_sprite(&mut self.attack_sprite, value, world);
             }
             MasterAttribute::AREA_DAMAGE => {
-                self.area_damage += DamageShare::new(v);
+                self.area_damage += DamageShare::new(value);
             }
             MasterAttribute::DAMAGE_REFLECTION => {
-                self.reflection += DamageShare::new(v);
+                self.reflection += DamageShare::new(value);
             }
             MasterAttribute::FRIENDLY_FIRE_DAMAGE => {
-                self.friendly_fire += DamageShare::new(v);
+                self.friendly_fire += DamageShare::new(value);
             }
             MasterAttribute::GARRISON_FIREPOWER => {
-                self.garrison_firepower += Firepower::new(v);
+                self.garrison_firepower += Firepower::new(value);
             }
             MasterAttribute::DISPLACEMENT_X => {
-                self.weapon_offset = self.weapon_offset.with_x(self.weapon_offset.x() + v);
+                self.weapon_offset = self.weapon_offset.with_x(self.weapon_offset.x() + value);
             }
             MasterAttribute::DISPLACEMENT_Y => {
-                self.weapon_offset = self.weapon_offset.with_y(self.weapon_offset.y() + v);
+                self.weapon_offset = self.weapon_offset.with_y(self.weapon_offset.y() + value);
             }
             MasterAttribute::DISPLACEMENT_Z => {
-                self.weapon_offset = self.weapon_offset.with_z(self.weapon_offset.z() + v);
+                self.weapon_offset = self.weapon_offset.with_z(self.weapon_offset.z() + value);
             }
             _ => {}
         }
     }
 
     /// [`crate::objects::masters::Master::multiply_combat`]'s values of the layer
-    /// (`FUN_1410c1bf0`): what a scale of `attribute` by `v` writes here.
-    pub(super) fn multiply_value(&mut self, attribute: MasterAttribute, v: f32) {
+    /// (`FUN_1410c1bf0`): what a scale of `attribute` by `value` writes here.
+    pub(super) fn multiply_value(&mut self, attribute: MasterAttribute, value: f32) {
         use crate::objects::masters::MasterAttribute;
         match attribute {
             MasterAttribute::ATTACK_RELOAD_TIME => {
-                self.reload *= v;
+                self.reload *= value;
             }
             MasterAttribute::ACCURACY_PERCENT => {
                 self.hit_chance =
-                    HitChance::of_data(low16(f32::from(self.hit_chance.get()) * v + ROUND));
+                    HitChance::of_data(low16(f32::from(self.hit_chance.get()) * value + ROUND));
             }
             MasterAttribute::MAXIMUM_RANGE => {
-                self.weapon_range *= v;
+                self.weapon_range *= value;
             }
             MasterAttribute::BASE_ARMOR => {
-                self.base_armor = DamageAmount::of_effect(self.base_armor.as_f32() * v + ROUND);
+                self.base_armor = DamageAmount::of_effect(self.base_armor.as_f32() * value + ROUND);
             }
             MasterAttribute::PROJECTILE_UNIT => {
                 self.missile =
-                    MasterField::of_data(low16(f32::from(self.missile.get()) * v + ROUND));
+                    MasterField::of_data(low16(f32::from(self.missile.get()) * value + ROUND));
             }
             MasterAttribute::TERRAIN_DEFENSE_BONUS => {
                 self.terrain_bonus = RestrictionField::of_data(low16(
-                    f32::from(self.terrain_bonus.get()) * v + ROUND,
+                    f32::from(self.terrain_bonus.get()) * value + ROUND,
                 ));
             }
             MasterAttribute::MINIMUM_RANGE => {
-                self.min_range *= v;
+                self.min_range *= value;
             }
             MasterAttribute::BLAST_WIDTH => {
-                self.area_effect *= v;
+                self.area_effect *= value;
             }
             MasterAttribute::BONUS_DAMAGE_RESISTANCE => {
-                self.resistance *= v;
+                self.resistance *= value;
             }
             // integer products (`IMUL`) of the truncated amount
             MasterAttribute::FRAME_DELAY => {
-                self.fire_frame = self.fire_frame.times(low16(v));
+                self.fire_frame = self.fire_frame.times(low16(value));
             }
             MasterAttribute::BLAST_ATTACK_LEVEL => {
                 self.blast_level =
-                    BlastLevel::from_bits_retain(self.blast_level.bits().wrapping_mul(low8(v)));
+                    BlastLevel::from_bits_retain(self.blast_level.bits().wrapping_mul(low8(value)));
             }
             MasterAttribute::SHOWN_ATTACK => {
-                self.shown.attack = self.shown.attack.times(low16(v));
+                self.shown.attack = self.shown.attack.times(low16(value));
             }
             MasterAttribute::SHOWN_RANGE => {
-                self.shown.range *= v;
+                self.shown.range *= value;
             }
             MasterAttribute::SHOWN_MELEE_ARMOR => {
-                self.shown.melee_armor = self.shown.melee_armor.times(low16(v));
+                self.shown.melee_armor = self.shown.melee_armor.times(low16(value));
             }
             MasterAttribute::ATTACK_DISPERSION => {
-                self.missed_spread *= v;
+                self.missed_spread *= value;
             }
             MasterAttribute::AREA_DAMAGE => {
-                self.area_damage *= v;
+                self.area_damage *= value;
             }
             MasterAttribute::DAMAGE_REFLECTION => {
-                self.reflection *= v;
+                self.reflection *= value;
             }
             MasterAttribute::FRIENDLY_FIRE_DAMAGE => {
-                self.friendly_fire *= v;
+                self.friendly_fire *= value;
             }
             MasterAttribute::GARRISON_FIREPOWER => {
-                self.garrison_firepower *= v;
+                self.garrison_firepower *= value;
             }
             MasterAttribute::DISPLACEMENT_X => {
-                self.weapon_offset = self.weapon_offset.with_x(self.weapon_offset.x() * v);
+                self.weapon_offset = self.weapon_offset.with_x(self.weapon_offset.x() * value);
             }
             MasterAttribute::DISPLACEMENT_Y => {
-                self.weapon_offset = self.weapon_offset.with_y(self.weapon_offset.y() * v);
+                self.weapon_offset = self.weapon_offset.with_y(self.weapon_offset.y() * value);
             }
             MasterAttribute::DISPLACEMENT_Z => {
-                self.weapon_offset = self.weapon_offset.with_z(self.weapon_offset.z() * v);
+                self.weapon_offset = self.weapon_offset.with_z(self.weapon_offset.z() * value);
             }
             _ => {}
         }

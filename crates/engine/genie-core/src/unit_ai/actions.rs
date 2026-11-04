@@ -32,7 +32,7 @@ use crate::unit_ai::{
 use crate::world::Millis;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
-use crate::world::slots::CheckedIndex;
+use crate::world::slots::CheckedIndexExt;
 use crate::{GenieError, GenieResult};
 
 /// Which units [`UnitAi::can_order`] lets take orders (`FUN_140c4eea0`'s second argument).
@@ -65,7 +65,7 @@ impl UnitAi {
         ai: &mut Well512,
         side: &mut UnitView<'_, '_>,
     ) -> GenieResult<u32> {
-        let (order, action, p0) = (self.current_order, self.current_action, notify.p[0]);
+        let (order, action, p0) = (self.current_order, self.current_action, notify.params[0]);
         if order.is_some() {
             self.state_position = at.position.ground();
             if order == Some(OrderKind::Scout) {
@@ -137,9 +137,9 @@ impl UnitAi {
         ai: &mut Well512,
         side: &mut UnitView<'_, '_>,
     ) -> GenieResult<u32> {
-        let (order, action, p0) = (self.current_order, self.current_action, notify.p[0]);
+        let (order, action, p0) = (self.current_order, self.current_action, notify.params[0]);
         let attack = AiAction::Attack.value();
-        if (order == Some(OrderKind::Attack) || notify.p[2] == 0x202) && p0 == attack {
+        if (order == Some(OrderKind::Attack) || notify.params[2] == 0x202) && p0 == attack {
             if self.retarget_disabled != 0 {
                 return Err(GenieError::unsupported(
                     "an invalidated attack with retargeting off (+0x1d6)",
@@ -193,7 +193,7 @@ impl UnitAi {
         ai_rng: &mut Well512,
         side: &mut UnitView<'_, '_>,
     ) -> GenieResult<u32> {
-        let p1 = notify.p[0];
+        let p1 = notify.params[0];
         let order = self.current_order;
         let action = self.current_action;
         if order.is_some()
@@ -544,12 +544,12 @@ impl UnitAi {
     ) -> GenieResult<()> {
         let unit_ai_tuning = &at.unit_ai_tuning;
         let roles = &at.roles;
-        let mut k = 0;
-        while k < self.orders.len() {
-            if self.current_action.is_some() && self.orders.checked(k)?.priority.waits() {
+        let mut index = 0;
+        while index < self.orders.len() {
+            if self.current_action.is_some() && self.orders.checked(index)?.priority.waits() {
                 return Ok(());
             }
-            let order = *self.orders.checked(k)?;
+            let order = *self.orders.checked(index)?;
             let order_outcome = self.process_order(
                 &order,
                 Some((at, player_kind)),
@@ -563,13 +563,13 @@ impl UnitAi {
                 },
             )?;
             if order_outcome == OrderOutcome::NotReady {
-                k += 1;
+                index += 1;
                 continue;
             }
             // the game removes the order only while k is inside the queue: slot 0x230 may have
             // shrunk it (FUN_140c5de60)
-            if k < self.orders.len() {
-                let _ = self.orders.remove(k);
+            if index < self.orders.len() {
+                let _ = self.orders.remove(index);
             }
             if order_outcome == OrderOutcome::Taken {
                 return Ok(());

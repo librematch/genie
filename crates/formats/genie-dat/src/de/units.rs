@@ -10,7 +10,7 @@ use binrw::binrw;
 /// The shared task list of a unit id (DE keeps the tasks in each unit's own list as well).
 #[binrw]
 #[brw(little)]
-#[br(import(v: Version))]
+#[br(import(version: Version))]
 #[derive(Clone, Debug, PartialEq)]
 pub struct UnitHeader {
     /// Non-zero if the unit id has a task list.
@@ -19,14 +19,14 @@ pub struct UnitHeader {
     #[br(if(exists != 0))]
     pub task_count: Option<i16>,
     /// The tasks.
-    #[br(count = task_count.unwrap_or(0), args { inner: (v,) })]
+    #[br(count = task_count.unwrap_or(0), args { inner: (version,) })]
     pub tasks: Vec<Task>,
 }
 
 /// A task: an action a unit can perform, with its targets, rates, graphics and sounds.
 #[binrw]
 #[brw(little)]
-#[br(import(v: Version))]
+#[br(import(version: Version))]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Task {
     /// Task type: 0 generic, 1 tribe (the kind Age of Kings and later use).
@@ -92,14 +92,14 @@ pub struct Task {
     /// Wwise event id of the delivery sound.
     pub wwise_resource_deposit_sound_id: u32,
     /// Whether the task is enabled; from VER 8.5 (`GV_C28`).
-    #[br(if(v.at_least(28)))]
+    #[br(if(version.at_least(28)))]
     pub enabled: Option<i16>,
 }
 
 /// A civilization: its starting resources and its own copy of every unit.
 #[binrw]
 #[brw(little)]
-#[br(import(v: Version))]
+#[br(import(version: Version))]
 #[derive(Clone, Debug, PartialEq)]
 pub struct Civ {
     /// Player type; its values are not known yet.
@@ -124,15 +124,15 @@ pub struct Civ {
     #[br(count = unit_count)]
     pub unit_pointers: Vec<i32>,
     /// The civilization's units, indexed by unit id; `None` where the slot's pointer is zero.
-    #[br(parse_with = |r, e, (): ()| read_present(r, e, &unit_pointers, (v,)))]
-    #[bw(write_with = |l, w, e, (): ()| write_present(l, w, e))]
+    #[br(parse_with = |reader, endian, (): ()| read_present(reader, endian, &unit_pointers, (version,)))]
+    #[bw(write_with = |list, writer, endian, (): ()| write_present(list, writer, endian))]
     pub units: Vec<Option<Unit>>,
 }
 
 /// A unit definition: the part every unit type has, then the parts its `unit_kind` reaches.
 #[binrw]
 #[brw(little)]
-#[br(import(v: Version))]
+#[br(import(version: Version))]
 #[derive(Clone, Debug, PartialEq)]
 pub struct Unit {
     /// Unit type (see [`unit_kind`]); it decides which of the optional parts follow.
@@ -140,16 +140,16 @@ pub struct Unit {
     /// The unit's id.
     pub id: i16,
     /// Language string id of the name; from VER 7.2 (`GV_C15`).
-    #[br(if(v.at_least(15)))]
+    #[br(if(version.at_least(15)))]
     pub language_dll_name: Option<i32>,
     /// Language string id of the creation text; from VER 7.2 (`GV_C15`).
-    #[br(if(v.at_least(15)))]
+    #[br(if(version.at_least(15)))]
     pub language_dll_creation: Option<i32>,
     /// Language string id of the name as an i16; before VER 7.2 (`GV_C15`).
-    #[br(if(!v.at_least(15)))]
+    #[br(if(!version.at_least(15)))]
     pub language_dll_name_u16: Option<i16>,
     /// Language string id of the creation text as an i16; before VER 7.2 (`GV_C15`).
-    #[br(if(!v.at_least(15)))]
+    #[br(if(!version.at_least(15)))]
     pub language_dll_creation_u16: Option<i16>,
     /// Unit class (archer, infantry, building, tree, …).
     pub class: i16,
@@ -228,7 +228,7 @@ pub struct Unit {
     /// Language string id of the hotkey text.
     pub language_dll_hot_key_text: i32,
     /// Before VER 8.7 (`GV_C30`) the hotkey of the (single) train location sits here.
-    #[br(if(!v.at_least(30)))]
+    #[br(if(!version.at_least(30)))]
     pub hot_key_id: Option<i32>,
     /// Whether the unit can be recycled; its exact effect is not known yet.
     pub recyclable: u8,
@@ -294,16 +294,16 @@ pub struct Unit {
     #[br(if(unit_kind >= unit_kind::DEAD_FISH && unit_kind != unit_kind::AOE_TREES))]
     pub dead_fish: Option<DeadFish>,
     /// Action part; for unit types 40 and up, except 90.
-    #[br(if(unit_kind >= unit_kind::BIRD && unit_kind != unit_kind::AOE_TREES), args(v))]
+    #[br(if(unit_kind >= unit_kind::BIRD && unit_kind != unit_kind::AOE_TREES), args(version))]
     pub bird: Option<Bird>,
     /// Combat part; for unit types 50 and up, except 90.
-    #[br(if(unit_kind >= unit_kind::COMBATANT && unit_kind != unit_kind::AOE_TREES), args(v))]
+    #[br(if(unit_kind >= unit_kind::COMBATANT && unit_kind != unit_kind::AOE_TREES), args(version))]
     pub type50: Option<Type50>,
     /// Projectile part; for unit type 60 only.
     #[br(if(unit_kind == unit_kind::PROJECTILE))]
     pub projectile: Option<Projectile>,
     /// Creation part; for unit types 70 and up, except 90.
-    #[br(if(unit_kind >= unit_kind::CREATABLE && unit_kind != unit_kind::AOE_TREES), args(v))]
+    #[br(if(unit_kind >= unit_kind::CREATABLE && unit_kind != unit_kind::AOE_TREES), args(version))]
     pub creatable: Option<Creatable>,
     /// Building part; for unit type 80 only.
     #[br(if(unit_kind == unit_kind::BUILDING))]

@@ -19,7 +19,7 @@ use crate::objects::ObjectState;
 use crate::objects::layers::Action;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::GatherGroup;
-use crate::objects::masters::PlayersMasters;
+use crate::objects::masters::PlayersMastersExt;
 use crate::objects::masters::{MasterTables, OwnerMasters};
 use crate::objects::sprite::new_sprite;
 use crate::objects::teardown::HeadCode;
@@ -39,7 +39,7 @@ use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
 use crate::world::lets::release;
 use crate::world::others::OthersRef;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 use crate::world::step::Step;
 use crate::{GenieError, GenieResult};
 
@@ -86,7 +86,7 @@ impl Unit {
             .contains(ClassRoles::PREDATOR)
         {
             // a human player's hunt is done (set_state 2), a computer player's ends (1)
-            if step.w.players.player(step.player)?.kind.is_computer() {
+            if step.world.players.player(step.player)?.kind.is_computer() {
                 return Err(GenieError::unsupported(
                     "a computer player's hunt of class 10's search (set_state 1)",
                 ));
@@ -106,20 +106,20 @@ impl Unit {
     /// The hunter takes the sprite its hunt stands with (slot 0x68 with `FUN_140ac5210`'s, by the
     /// task and what the unit carries; [`crate::gathering::hunt::stand_sprite`]).
     pub(crate) fn hunt_stand(&mut self, step: &mut Step<'_>, task: &HuntTask) -> GenieResult<()> {
-        let master = self.master(step.w.master_tables(), step.player)?;
+        let master = self.master(step.world.master_tables(), step.player)?;
         let stand = stand_sprite(
             task,
             master.standing_sprite,
             self.life.held(),
-            &step.w.model.graphics,
+            &step.world.model.graphics,
         );
         if let Some(graphic) = stand {
             new_sprite(
                 &mut self.sprite,
-                step.w.parts.move_stats_mut(self.id),
+                step.world.parts.move_stats_mut(self.id),
                 graphic,
-                step.w.streams.get(Stream::Sprite),
-                step.w.model.tuning.sprite,
+                step.world.streams.get_mut(Stream::Sprite),
+                step.world.model.tuning.sprite,
             );
         }
         Ok(())
@@ -155,16 +155,16 @@ impl Unit {
         step: &mut Step<'_>,
     ) -> GenieResult<()> {
         let by_id = ObjectsRef::new(
-            &step.w.players,
-            &step.w.index,
-            &step.w.model.masters,
-            &step.w.parts,
-            &step.w.model.roles,
-            &step.w.model.tuning,
+            &step.world.players,
+            &step.world.index,
+            &step.world.model.masters,
+            &step.world.parts,
+            &step.world.model.roles,
+            &step.world.model.tuning,
         );
-        let others = OthersRef::of(&step.w.players, &step.w.index, step.player)?;
+        let others = OthersRef::of(&step.world.players, &step.world.index, step.player)?;
         let (carry_to, class) = (hunt.carry_to, i32::from(ClassId::field(hunt.target_class)));
-        let master = self.master(step.w.master_tables(), step.player)?;
+        let master = self.master(step.world.master_tables(), step.player)?;
         let site = if let Some(carry) = carry_to {
             carry.id().get()
         } else if master.action_part().drop_sites.is_empty() {
@@ -172,19 +172,19 @@ impl Unit {
         } else {
             let mut drop_world = DropWorld {
                 masters: OwnerMasters::new(
-                    &step.w.parts.own_master,
-                    step.w.model.masters.of(step.player),
+                    &step.world.parts.own_master,
+                    step.world.model.masters.of(step.player),
                 ),
-                spatial: &mut step.w.spatial,
-                zones: &mut step.w.zones,
-                pathing: &mut step.w.pathing,
-                object: step.w.streams.get(Stream::Object),
-                world_time: step.w.world_time,
-                player_kind: step.w.players.player(step.player)?.kind,
-                groups: &step.w.groups,
+                spatial: &mut step.world.spatial,
+                zones: &mut step.world.zones,
+                pathing: &mut step.world.pathing,
+                object: step.world.streams.get_mut(Stream::Object),
+                world_time: step.world.world_time,
+                player_kind: step.world.players.player(step.player)?.kind,
+                groups: &step.world.groups,
             };
             let (site, _) = self.drop_site(
-                (actions, step.w.parts.mover_of(self.id)),
+                (actions, step.world.parts.mover_of(self.id)),
                 &mut drop_world,
                 others,
                 None,
@@ -202,7 +202,7 @@ impl Unit {
             }
         };
         self.post_own(
-            &mut step.w.parts.unit_ai,
+            &mut step.world.parts.unit_ai,
             NotifyKind::REQUIRES_SEARCH,
             [AiAction::Hunt.value(), class, site],
         )
@@ -234,7 +234,7 @@ impl Unit {
         step: &mut Step<'_>,
         roles: &Roles,
     ) -> GenieResult<HeadCode> {
-        let _ = self.master(step.w.master_tables(), step.player)?;
+        let _ = self.master(step.world.master_tables(), step.player)?;
         if hunt.target.is_some() {
             return self
                 .hunt_back_to_target(hunt, actions, step, roles)
@@ -264,7 +264,7 @@ impl Unit {
         step: &mut Step<'_>,
         roles: &Roles,
     ) -> GenieResult<()> {
-        let master = self.master(step.w.master_tables(), step.player)?;
+        let master = self.master(step.world.master_tables(), step.player)?;
         let victim = victim(step, hunt.target, roles)?.ok_or(GenieError::unsupported(
             "a hunt's target the slice does not hold live",
         ))?;
@@ -281,32 +281,32 @@ impl Unit {
             drop_site: false,
         };
         let (me_at, them) = (
-            step.w
+            step.world
                 .spatial
                 .get_known(self.id)?
                 .ok_or(GenieError::unsupported("a hunter without a place"))?,
-            step.w
+            step.world
                 .spatial
                 .get_known(victim.id)?
                 .ok_or(GenieError::unsupported("a hunt's target without a place"))?,
         );
         let speed = step
-            .w
+            .world
             .parts
             .mover_of(self.id)
-            .map_or(Speed::ZERO, |m| m.stats.speed);
+            .map_or(Speed::ZERO, |mover| mover.stats.speed);
         let engagement = engagement(
-            step.w.parts.unit_ai.get(self.id),
+            step.world.parts.unit_ai.get(self.id),
             speed,
             master,
             me_at,
             them,
-            step.w.world_time,
+            step.world.world_time,
         )?;
         let moving = hunt.task.walk_sprite_id(self.life.held());
         let arms = arms(
             master,
-            &step.w.model.graphics,
+            &step.world.model.graphics,
             hunt.task.sprites,
             moving,
             roles,
@@ -318,16 +318,16 @@ impl Unit {
             release(step, self, site, by)?;
         }
         let walks = self.move_walks(
-            step.w.parts.mover_of(self.id),
-            MasterTables::new(&step.w.model.masters, &step.w.parts.own_master),
+            step.world.parts.mover_of(self.id),
+            MasterTables::new(&step.world.model.masters, &step.world.parts.own_master),
             step.player,
             (
-                &step.w.model.graphics,
-                step.w.parts.combat_of(self.id).abilities.look.as_ref(),
+                &step.world.model.graphics,
+                step.world.parts.combat_of(self.id).abilities.look.as_ref(),
             ),
             roles,
         )?;
-        let Some(mover) = step.w.parts.mover_mut(self.id) else {
+        let Some(mover) = step.world.parts.mover_mut(self.id) else {
             return Err(GenieError::unsupported(
                 "a hunter without its hunt or movement state",
             ));
@@ -344,10 +344,10 @@ impl Unit {
             mover,
             BeginLayer {
                 roles,
-                attack_tuning: &step.w.model.tuning.attack,
-                move_to_tuning: &step.w.model.tuning.move_to,
+                attack_tuning: &step.world.model.tuning.attack,
+                move_to_tuning: &step.world.model.tuning.move_to,
             },
-            &step.w.model.tuning.hunt,
+            &step.world.model.tuning.hunt,
         );
         actions.list.set_hunt(Some(*hunt));
         if chased? == MoveStart::Arrived {
@@ -370,14 +370,14 @@ impl Unit {
     /// lets the drop site go): its unit AI runs the queued order ([`ActionEnd::Ends`]).
     fn hunt_drop_orders(&self, step: &mut Step<'_>) -> GenieResult<ActionEnd> {
         let ai = step
-            .w
+            .world
             .parts
             .unit_ai
             .get_mut(self.id)
             .ok_or(GenieError::unsupported(
                 "a hunt without a unit AI after its drop-off",
             ))?;
-        let spatial: &Spatial = &step.w.spatial;
+        let spatial: &Spatial = &step.world.spatial;
         let gone = |id: Option<ObjectId>| {
             let Some(id) = id.filter(|&id| spatial.get(id).is_some()) else {
                 return true;
@@ -415,7 +415,7 @@ impl Unit {
         roles: &Roles,
     ) -> GenieResult<(Option<ObjectId>, Option<GatherGroup>)> {
         let ai = step
-            .w
+            .world
             .parts
             .unit_ai
             .get(self.id)
@@ -466,8 +466,8 @@ impl Unit {
                 "a hunter tending a pasture (FUN_1411c7670)",
             ));
         }
-        let master = self.master(step.w.master_tables(), step.player)?;
-        let mover = step.w.parts.mover_of(self.id).ok_or(HUNTER_UNMOVING)?;
+        let master = self.master(step.world.master_tables(), step.player)?;
+        let mover = step.world.parts.mover_of(self.id).ok_or(HUNTER_UNMOVING)?;
         let radius =
             civilian_search_radius(master.line_of_sight, master.action_part().search_radius);
         let search = Search {
@@ -495,25 +495,25 @@ impl Unit {
             ..self.me(actions)
         };
         let mut plan = Planning {
-            pathing: &mut step.w.pathing,
-            now: step.w.world_time,
-            player_kind: step.w.players.player(step.player)?.kind,
-            object: step.w.streams.get(Stream::Object),
-            groups: &step.w.groups,
+            pathing: &mut step.world.pathing,
+            now: step.world.world_time,
+            player_kind: step.world.players.player(step.player)?.kind,
+            object: step.world.streams.get_mut(Stream::Object),
+            groups: &step.world.groups,
         };
         let (master_id, at) = (self.life.master_id, self.position());
         let by_id = ObjectsRef::new(
-            &step.w.players,
-            &step.w.index,
-            &step.w.model.masters,
-            &step.w.parts,
-            &step.w.model.roles,
-            &step.w.model.tuning,
+            &step.world.players,
+            &step.world.index,
+            &step.world.model.masters,
+            &step.world.parts,
+            &step.world.model.roles,
+            &step.world.model.tuning,
         );
         let mut reach = |spatial: &mut Spatial, id: ObjectId, range: Distance| {
             mover.reaches_object((at, &me), (spatial, by_id), &mut plan, id, range, master_id)
         };
-        let result = step.w.spatial.search(
+        let result = step.world.spatial.search(
             SearchQuery {
                 searcher: self.id,
                 player: step.player,
@@ -523,13 +523,13 @@ impl Unit {
                 objects: by_id,
             },
             roles,
-            &step.w.model.tuning.best_target,
-            &step.w.model.tuning.spatial,
-            step.w.model.tuning.registry,
+            &step.world.model.tuning.best_target,
+            &step.world.model.tuning.spatial,
+            step.world.model.tuning.registry,
         )?;
         // FUN_140c63e20's alert: enemies found set the alert mode and its time again
         let ai = step
-            .w
+            .world
             .parts
             .unit_ai
             .get_mut(self.id)
@@ -553,19 +553,20 @@ impl Unit {
         kind: Option<GatherGroup>,
         roles: &Roles,
     ) -> GenieResult<()> {
-        if step.w.players.player(step.player)?.kind.is_computer() && kind != Some(GatherGroup::WOOD)
+        if step.world.players.player(step.player)?.kind.is_computer()
+            && kind != Some(GatherGroup::WOOD)
         {
             return Err(GenieError::unsupported(
                 "a computer player's hunt that found nothing after its drop-off (set_state 1)",
             ));
         }
         let walks = self.move_walks(
-            step.w.parts.mover_of(self.id),
-            MasterTables::new(&step.w.model.masters, &step.w.parts.own_master),
+            step.world.parts.mover_of(self.id),
+            MasterTables::new(&step.world.model.masters, &step.world.parts.own_master),
             step.player,
             (
-                &step.w.model.graphics,
-                step.w.parts.combat_of(self.id).abilities.look.as_ref(),
+                &step.world.model.graphics,
+                step.world.parts.combat_of(self.id).abilities.look.as_ref(),
             ),
             roles,
         )?;
@@ -574,8 +575,8 @@ impl Unit {
                 "a hunt without a point that found nothing after its drop-off (set_state 2)",
             ));
         }
-        let mover = step.w.parts.mover_mut(self.id).ok_or(HUNTER_UNMOVING)?;
-        let walked = hunt.search_walk(mover, &walks, &step.w.model.tuning.move_to);
+        let mover = step.world.parts.mover_mut(self.id).ok_or(HUNTER_UNMOVING)?;
+        let walked = hunt.search_walk(mover, &walks, &step.world.model.tuning.move_to);
         actions.list.set_hunt(Some(*hunt));
         walked
     }

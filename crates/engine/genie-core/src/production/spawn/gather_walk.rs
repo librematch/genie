@@ -17,7 +17,7 @@ use crate::orders::OrderSource;
 use crate::orders::Work;
 use crate::orders::town_bell::BellShelter;
 use crate::players::PlayerId;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 use crate::{GenieError, GenieResult};
 
 use crate::garrison::ENTER;
@@ -75,8 +75,8 @@ impl World {
             // The villager class, whose new units count in attribute 248.
             self.model.roles.of_class(self.players.live(player_id, new)?.master(self.master_tables(), player_id)?.class).contains(ClassRoles::VILLAGER);
         let unit = self.players.live_mut(player_id, new)?;
-        if let Some(m) = self.parts.mover_mut(unit.id) {
-            m.waiting = 1;
+        if let Some(mover) = self.parts.mover_mut(unit.id) {
+            mover.waiting = 1;
         }
         if self.parts.actions_of(unit.id).top_action_kind().is_some() {
             return Err(GenieError::unsupported(
@@ -107,7 +107,7 @@ impl World {
                 None,
                 point,
                 source.notifies(),
-                self.streams.get(Stream::Ai),
+                self.streams.get_mut(Stream::Ai),
             )?;
             if source == OrderSource::Direct {
                 ai.orders.clear();
@@ -173,23 +173,23 @@ impl World {
             .ok_or(GenieError::unsupported("a world without Gaia"))?;
         let closest = |list: &[Unit]| -> GenieResult<Option<ObjectId>> {
             let mut best: Option<(&Unit, f32)> = None;
-            for u in list {
-                if Some(u.master(self.master_tables(), PlayerId::GAIA)?.class) != class {
+            for unit in list {
+                if Some(unit.master(self.master_tables(), PlayerId::GAIA)?.class) != class {
                     continue;
                 }
-                let (dx, dy) = (x - u.position().x(), y - u.position().y());
-                let d = dy * dy + dx * dx;
-                if best.is_none_or(|(_, b)| d < b) {
-                    best = Some((u, d));
+                let (dx, dy) = (x - unit.position().x(), y - unit.position().y());
+                let distance = dy * dy + dx * dx;
+                if best.is_none_or(|(_, best_distance)| distance < best_distance) {
+                    best = Some((unit, distance));
                 }
             }
             let Some((unit, _)) = best else {
                 return Ok(None);
             };
             let radius = unit.master(self.master_tables(), PlayerId::GAIA)?.radius;
-            let gap = |d: f32, r: f32| {
-                let g = d.abs() - r;
-                if 0.0 <= g { g } else { 0.0 }
+            let gap = |delta: f32, radius: f32| {
+                let beyond = delta.abs() - radius;
+                if 0.0 <= beyond { beyond } else { 0.0 }
             };
             let (gx, gy) = (
                 gap(x - unit.position().x(), radius.x()),
@@ -245,7 +245,10 @@ impl World {
                 return self.enter_forced(player_id, new, ContainerId::new(building));
             }
         }
-        let target = match gather_point.target.filter(|&t| self.object(t).is_some()) {
+        let target = match gather_point
+            .target
+            .filter(|&object_id| self.object(object_id).is_some())
+        {
             Some(object_id) => object_id,
             None => match self.lost_gather_target(player_id, new, gather_point)? {
                 Some(id) => id,

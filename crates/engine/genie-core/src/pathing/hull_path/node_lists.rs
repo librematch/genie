@@ -9,7 +9,7 @@ use crate::objects::ObjectId;
 use crate::pathing::hull_path::{
     EPSILON, HullPather, LINE_HITS, Node, NodeIndex, NodeList, Point, Waypoints, walk_length,
 };
-use crate::world::slots::CheckedIndex;
+use crate::world::slots::CheckedIndexExt;
 
 /// A node `MShortPather::addNode` may refuse ([`HullPather::add_node`]'s arguments).
 #[derive(Clone, Copy, Debug)]
@@ -68,9 +68,9 @@ impl HullPather<'_> {
     /// and every closed node forgets its hull point.
     pub(super) fn close_all(&mut self, node_list: NodeList) -> GenieResult<()> {
         let mut checked = self.nodes.checked(node_list.head())?.next;
-        while let Some(i) = checked {
-            self.closed.of_mut(node_list).push(i);
-            checked = self.nodes.checked(i)?.next;
+        while let Some(node_index) = checked {
+            self.closed.of_mut(node_list).push(node_index);
+            checked = self.nodes.checked(node_index)?.next;
         }
         self.nodes.checked_mut(node_list.head())?.next = None;
         for &node_index in self.closed.of(node_list) {
@@ -86,8 +86,8 @@ impl HullPather<'_> {
             self.nodes.checked(closed)?.prev,
             self.nodes.checked(closed)?.next,
         );
-        if let Some(p) = prev {
-            self.nodes.checked_mut(p)?.next = next;
+        if let Some(node_index) = prev {
+            self.nodes.checked_mut(node_index)?.next = next;
         }
         if let Some(node_index) = next {
             self.nodes.checked_mut(node_index)?.prev = prev;
@@ -117,23 +117,23 @@ impl HullPather<'_> {
         let (cost, to_goal) = self.node_costs(parent, at, goal)?;
         let mut after: Option<NodeIndex> = None;
         if open && (by_place || (0 <= hull && 0 <= vertex)) {
-            let same = |n: &Node| {
+            let same = |node: &Node| {
                 if by_place {
-                    (at.x() - n.at.x()).abs() < EPSILON && (at.y() - n.at.y()).abs() < EPSILON
+                    (at.x() - node.at.x()).abs() < EPSILON && (at.y() - node.at.y()).abs() < EPSILON
                 } else {
-                    n.hull == hull && n.vertex == vertex
+                    node.hull == hull && node.vertex == vertex
                 }
             };
             let mut checked = self.nodes.checked(node_list.head())?.next;
             let mut replaced = false;
-            while let Some(i) = checked {
-                let node = *self.nodes.checked(i)?;
+            while let Some(node_index) = checked {
+                let node = *self.nodes.checked(node_index)?;
                 if same(&node) {
                     if node.cost <= cost {
                         return Ok(None);
                     }
                     // the worse node closes, and the closed list is not searched
-                    self.close(node_list, i)?;
+                    self.close(node_list, node_index)?;
                     replaced = true;
                     break;
                 }
@@ -244,20 +244,22 @@ impl HullPather<'_> {
             self.closed.of_mut(node_list).push(pushed);
             return Ok(pushed);
         }
-        let mut s = after.unwrap_or_else(|| node_list.head());
+        let mut scan = after.unwrap_or_else(|| node_list.head());
         if after.is_none() {
-            while let Some(n) = self.nodes.checked(s)?.next {
-                if self.nodes.checked(n)?.cost + self.nodes.checked(n)?.to_goal < to_goal + cost {
-                    s = n;
+            while let Some(node_index) = self.nodes.checked(scan)?.next {
+                if self.nodes.checked(node_index)?.cost + self.nodes.checked(node_index)?.to_goal
+                    < to_goal + cost
+                {
+                    scan = node_index;
                 } else {
                     break;
                 }
             }
         }
-        let next = self.nodes.checked(s)?.next;
+        let next = self.nodes.checked(scan)?.next;
         self.nodes.checked_mut(pushed)?.next = next;
-        self.nodes.checked_mut(s)?.next = Some(pushed);
-        self.nodes.checked_mut(pushed)?.prev = Some(s);
+        self.nodes.checked_mut(scan)?.next = Some(pushed);
+        self.nodes.checked_mut(pushed)?.prev = Some(scan);
         if let Some(node_index) = next {
             self.nodes.checked_mut(node_index)?.prev = Some(pushed);
         }
@@ -279,15 +281,15 @@ impl HullPather<'_> {
         Ok(!self.included_movers(from, to)?.is_empty())
     }
 
-    /// The records the walk `a` -> `to` meets, at most [`LINE_HITS`] (`FUN_141052b90`, then
+    /// The records the walk `point` -> `to` meets, at most [`LINE_HITS`] (`FUN_141052b90`, then
     /// `FUN_141051900` with flags 0x40), with the pather's buffer, ignore list and include list:
     /// Spatial's pather query and the included objects that move
     /// ([`HullPather::included_movers`]). The callers read how many and which, not their order.
-    pub(super) fn hits(&mut self, a: Point, to: Point) -> GenieResult<Vec<Hit>> {
+    pub(super) fn hits(&mut self, point: Point, to: Point) -> GenieResult<Vec<Hit>> {
         let mut hits =
             self.world
-                .pather_hits(a, to, self.buffer, self.mask, &self.ignore, self.by_id)?;
-        for id in self.included_movers(a, to)? {
+                .pather_hits(point, to, self.buffer, self.mask, &self.ignore, self.by_id)?;
+        for id in self.included_movers(point, to)? {
             if let Some(placed) = self.world.get(id) {
                 hits.push(Hit {
                     id: RecordId::from(id),
@@ -300,13 +302,12 @@ impl HullPather<'_> {
     }
 
     /// The included objects (`FindShortPath`'s arguments 13 and 14) that move, but the ignored
-    /// ones, whose records the walk `a` -> `to` meets: the line tests leave a moving record (its
-    /// `+3` bit 0x10) out only when the include list does not hold it (`FUN_141051e00`, before
+    /// ones, whose records the walk `point` -> `to` meets: the line tests leave a moving record
+    /// (its `+3` bit 0x10) out only when the include list does not hold it (`FUN_141051e00`, before
     /// the ignore list). Spatial's pather query leaves every moving record out; its line query
-    /// (flags 0x10) tests the same records alike, the buffer the grow, and leaves none out, at
-    /// most [`LINE_HITS`] a call: what it lists goes into its ignore list until a call lists
-    /// fewer.
-    pub(super) fn included_movers(&self, a: Point, to: Point) -> GenieResult<Vec<ObjectId>> {
+    /// (flags 0x10) tests the same records alike, the buffer the grow, and leaves none out, at most
+    /// [`LINE_HITS`] a call: what it lists goes into its ignore list until a call lists fewer.
+    pub(super) fn included_movers(&self, point: Point, to: Point) -> GenieResult<Vec<ObjectId>> {
         let movers: Vec<ObjectId> = self
             .include
             .iter()
@@ -322,7 +323,7 @@ impl HullPather<'_> {
         loop {
             let hits = self
                 .world
-                .line_hits(a, to, grow, TileRecords::Passed, &skip)?;
+                .line_hits(point, to, grow, TileRecords::Passed, &skip)?;
             let full = LINE_HITS <= hits.len();
             for id in hits {
                 if let Some(object_id) = id.object()
@@ -345,17 +346,17 @@ impl HullPather<'_> {
     /// grandparent skips its parent; then the nodes from the first into `path`.
     pub(super) fn build_path(&mut self, path: &mut Waypoints, end: NodeIndex) -> GenieResult<()> {
         let mut cur = Some(end);
-        while let Some(c) = cur {
-            let Some(p) = self.nodes.checked(c)?.parent else {
+        while let Some(node) = cur {
+            let Some(node_index) = self.nodes.checked(node)?.parent else {
                 break;
             };
-            let Some(gp) = self.nodes.checked(p)?.parent else {
+            let Some(gp) = self.nodes.checked(node_index)?.parent else {
                 break;
             };
-            if self.blocked(self.nodes.checked(c)?.at, self.nodes.checked(gp)?.at)? {
-                cur = Some(p);
+            if self.blocked(self.nodes.checked(node)?.at, self.nodes.checked(gp)?.at)? {
+                cur = Some(node_index);
             } else {
-                self.nodes.checked_mut(c)?.parent = Some(gp);
+                self.nodes.checked_mut(node)?.parent = Some(gp);
             }
         }
         let mut next = Some(end);

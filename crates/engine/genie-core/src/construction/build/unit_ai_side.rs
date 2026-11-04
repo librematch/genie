@@ -27,7 +27,7 @@ use crate::world::index::ObjectsRef;
 use crate::world::layer::Roles;
 use crate::world::layer::Slots;
 use crate::world::others::OthersRef;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 use crate::{GenieError, GenieResult};
 
 impl UnitView<'_, '_> {
@@ -42,9 +42,9 @@ impl UnitView<'_, '_> {
         roles: &Roles,
     ) -> GenieResult<bool> {
         let view = owner_view(
-            &self.c.w.players,
-            &self.c.w.index,
-            self.c.player,
+            &self.step.world.players,
+            &self.step.world.index,
+            self.step.player,
             self.new_owner,
         )?;
         if self.find_in(view, foundation.id()).is_none() {
@@ -60,7 +60,11 @@ impl UnitView<'_, '_> {
     /// Object `id` as slot 0x380 finds it (`FUN_1415417a0`): the unit, the player's live list,
     /// another player's. The owner's sleeping
     /// list holds only objects of a type below 30, never a building.
-    fn find_in<'v>(&'v self, view: OthersRef<'v>, id: ObjectId) -> Option<(PlayerId, &'v Unit)> {
+    fn find_in<'world>(
+        &'world self,
+        view: OthersRef<'world>,
+        id: ObjectId,
+    ) -> Option<(PlayerId, &'world Unit)> {
         if id == self.unit.id {
             return Some((self.player, &*self.unit));
         }
@@ -77,13 +81,13 @@ impl UnitView<'_, '_> {
         roles: &Roles,
     ) -> GenieResult<bool> {
         let view = owner_view(
-            &self.c.w.players,
-            &self.c.w.index,
-            self.c.player,
+            &self.step.world.players,
+            &self.step.world.index,
+            self.step.player,
             self.new_owner,
         )?;
         let find = |id: ObjectId| self.find_in(view, id);
-        let Some((_, f)) = find(foundation.id()) else {
+        let Some((_, foundation_unit)) = find(foundation.id()) else {
             return Ok(false);
         };
         let (Some(task_target), Some(general)) = (
@@ -91,36 +95,42 @@ impl UnitView<'_, '_> {
                 foundation.id(),
                 1,
                 &find,
-                &self.c.w.parts,
-                MasterTables::new(&self.c.w.model.masters, &self.c.w.parts.own_master),
+                &self.step.world.parts,
+                MasterTables::new(
+                    &self.step.world.model.masters,
+                    &self.step.world.parts.own_master,
+                ),
             )?,
             task_target_with(
                 foundation.id(),
                 2,
                 &find,
-                &self.c.w.parts,
-                MasterTables::new(&self.c.w.model.masters, &self.c.w.parts.own_master),
+                &self.step.world.parts,
+                MasterTables::new(
+                    &self.step.world.model.masters,
+                    &self.step.world.parts.own_master,
+                ),
             )?,
         ) else {
             return Err(FOUNDATION_GONE);
         };
         let masters = self
-            .c
-            .w
+            .step
+            .world
             .model
             .masters
             .get(self.player.index())
             .ok_or(UNIT_AI_MASTER)?;
         let unit = &*self.unit;
-        let own = unit.master(self.c.w.master_tables(), self.player)?;
+        let own = unit.master(self.step.world.master_tables(), self.player)?;
         let actor = Actor {
             id: unit.id,
             master: own,
             player: self.player,
             held: unit.life.held(),
             attribute_95: self
-                .c
-                .w
+                .step
+                .world
                 .players
                 .player(self.player)?
                 .attributes
@@ -131,18 +141,21 @@ impl UnitView<'_, '_> {
         };
         let dip = SideWorld {
             player: self.player,
-            relations: &self.c.w.players.player(self.player)?.relations,
+            relations: &self.step.world.players.player(self.player)?.relations,
             foreign: owner_view(
-                &self.c.w.players,
-                &self.c.w.index,
-                self.c.player,
+                &self.step.world.players,
+                &self.step.world.index,
+                self.step.player,
                 self.new_owner,
             )?
             .players(),
-            drop_sites: &self.c.w.model.drop_sites,
+            drop_sites: &self.step.world.model.drop_sites,
         };
         // slot 0x820's point: the foundation's place
-        let terrain = point_terrain(self.c.w.spatial.terrain.as_ref(), f.position());
+        let terrain = point_terrain(
+            self.step.world.spatial.terrain.as_ref(),
+            foundation_unit.position(),
+        );
         Ok(task_search(
             masters,
             &actor,
@@ -165,8 +178,8 @@ impl UnitView<'_, '_> {
     /// more in state 0 of the unit's player), if any.
     pub(crate) fn own_foundation_near(&self) -> GenieResult<Option<ObjectId>> {
         let unit = &*self.unit;
-        let master = unit.master(self.c.w.master_tables(), self.player)?;
-        let r = (if master.action_part().search_radius <= master.line_of_sight {
+        let master = unit.master(self.step.world.master_tables(), self.player)?;
+        let radius = (if master.action_part().search_radius <= master.line_of_sight {
             master.line_of_sight
         } else {
             master.action_part().search_radius
@@ -176,30 +189,33 @@ impl UnitView<'_, '_> {
         let (player, others, every, spatial) = (
             self.player,
             owner_view(
-                &self.c.w.players,
-                &self.c.w.index,
-                self.c.player,
+                &self.step.world.players,
+                &self.step.world.index,
+                self.step.player,
                 self.new_owner,
             )?,
-            MasterTables::new(&self.c.w.model.masters, &self.c.w.parts.own_master),
-            &self.c.w.spatial,
+            MasterTables::new(
+                &self.step.world.model.masters,
+                &self.step.world.parts.own_master,
+            ),
+            &self.step.world.spatial,
         );
         let foundation_on = |tile: Tile| -> GenieResult<Option<ObjectId>> {
             for (id, placed) in spatial.objects_on(tile) {
                 if placed.player != player {
                     continue;
                 }
-                let Some(u) = others.own(id) else {
+                let Some(unit) = others.own(id) else {
                     continue;
                 };
-                let kind = u.master(every, player)?.kind;
-                if MasterKind::BUILDING <= kind && u.life.state == ObjectState::Foundation {
+                let kind = unit.master(every, player)?.kind;
+                if MasterKind::BUILDING <= kind && unit.life.state == ObjectState::Foundation {
                     return Ok(Some(id));
                 }
             }
             Ok(None)
         };
-        flood_search(Tile::new(ux, uy), r, foundation_on)
+        flood_search(Tile::new(ux, uy), radius, foundation_on)
     }
 
     /// The base handler's case 0x216: the unit's closest spot beside the foundation `site`
@@ -213,24 +229,27 @@ impl UnitView<'_, '_> {
         radius: Footprint,
     ) -> GenieResult<OffFootprint> {
         let by_id = ObjectsRef::new(
-            &self.c.w.players,
-            &self.c.w.index,
-            &self.c.w.model.masters,
-            &self.c.w.parts,
-            &self.c.w.model.roles,
-            &self.c.w.model.tuning,
+            &self.step.world.players,
+            &self.step.world.index,
+            &self.step.world.model.masters,
+            &self.step.world.parts,
+            &self.step.world.model.roles,
+            &self.step.world.model.tuning,
         );
         let unit = &*self.unit;
         let master = unit.master(
-            MasterTables::new(&self.c.w.model.masters, &self.c.w.parts.own_master),
+            MasterTables::new(
+                &self.step.world.model.masters,
+                &self.step.world.parts.own_master,
+            ),
             self.player,
         )?;
         let (player, others) = (
             self.player,
             owner_view(
-                &self.c.w.players,
-                &self.c.w.index,
-                self.c.player,
+                &self.step.world.players,
+                &self.step.world.index,
+                self.step.player,
                 self.new_owner,
             )?,
         );
@@ -240,24 +259,24 @@ impl UnitView<'_, '_> {
             } else {
                 others.find(id)
             };
-            found.map(|(player_id, u)| Named {
+            found.map(|(player_id, unit)| Named {
                 id,
-                master: u.life.master_id,
+                master: unit.life.master_id,
                 owner: player_id,
-                vector: Point::new(u.position().x(), u.position().z()),
+                vector: Point::new(unit.position().x(), unit.position().z()),
             })
         };
-        let spot = match self.c.w.spatial.get(site) {
+        let spot = match self.step.world.spatial.get(site) {
             Some(placed) => {
-                let mover = self
-                    .c
-                    .w
-                    .parts
-                    .mover_of(unit.id)
-                    .ok_or(GenieError::unsupported(
-                        "a unit sent off without movement state",
-                    ))?;
-                self.c.w.spatial.spot_off(
+                let mover =
+                    self.step
+                        .world
+                        .parts
+                        .mover_of(unit.id)
+                        .ok_or(GenieError::unsupported(
+                            "a unit sent off without movement state",
+                        ))?;
+                self.step.world.spatial.spot_off(
                     unit.position(),
                     (unit.id, mover.stats.radius.x()),
                     mover.stats.restriction_mask,

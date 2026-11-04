@@ -23,7 +23,7 @@ use crate::vision::ghost::{Ghost, Watched};
 use crate::world::Seconds;
 use crate::world::World;
 use crate::world::layer::Slots;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 use crate::world::{LureDestination, Percent, TargetingMode, Tick, VillagerGarrison};
 use crate::{GenieError, GenieResult};
 
@@ -309,7 +309,7 @@ impl Player {
     /// checkpoint's word 1 reads them.
     #[must_use]
     pub fn resources(&self) -> [Amount; 4] {
-        [0, 1, 2, 3].map(|i| self.attributes.get(i).copied().unwrap_or(Amount::ZERO))
+        [0, 1, 2, 3].map(|index| self.attributes.get(index).copied().unwrap_or(Amount::ZERO))
     }
 
     /// Attribute 195, the construction rate modifier
@@ -347,10 +347,10 @@ impl Player {
     /// [`Player::add_attribute`]'s.
     pub fn take_at_least_zero(&mut self, kind: AttributeId, amount: Amount) -> GenieResult<()> {
         self.add_attribute(kind, -amount)?;
-        if let Some(v) = self.attributes.get_mut(kind.index())
-            && *v < Amount::ZERO
+        if let Some(amount) = self.attributes.get_mut(kind.index())
+            && *amount < Amount::ZERO
         {
-            *v = Amount::ZERO;
+            *amount = Amount::ZERO;
         }
         Ok(())
     }

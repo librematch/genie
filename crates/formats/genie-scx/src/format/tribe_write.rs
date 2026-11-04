@@ -171,7 +171,7 @@ impl TribeScen {
             Ok(())
         } else {
             // <= 1.03 did not support disabling anything
-            if self.num_disabled_techs.iter().any(|&n| n > 0) {
+            if self.num_disabled_techs.iter().any(|&count| count > 0) {
                 return Err(techs_not_disabled());
             }
             self.nothing_else_disabled()
@@ -180,10 +180,10 @@ impl TribeScen {
 
     /// No disabled units and buildings, which versions before 1.18 cannot hold.
     fn nothing_else_disabled(&self) -> GenieResult<()> {
-        if self.num_disabled_units.iter().any(|&n| n > 0) {
+        if self.num_disabled_units.iter().any(|&count| count > 0) {
             return Err(units_not_disabled());
         }
-        if self.num_disabled_buildings.iter().any(|&n| n > 0) {
+        if self.num_disabled_buildings.iter().any(|&count| count > 0) {
             return Err(buildings_not_disabled());
         }
         Ok(())
@@ -307,7 +307,7 @@ mod tests {
 
     /// Little-endian words.
     fn words(ws: &[i32]) -> Vec<u8> {
-        ws.iter().flat_map(|w| w.to_le_bytes()).collect()
+        ws.iter().flat_map(|word| word.to_le_bytes()).collect()
     }
 
     /// Scenario data with 16 players' lists, the first player's disabled ones `disabled`.
@@ -344,21 +344,24 @@ mod tests {
     /// The separator from 1.02 on.
     #[test]
     fn the_separator_is_written_from_1_02_on() {
-        assert_eq!(out(|o| write_separator(o, 1.01)), []);
-        assert_eq!(out(|o| write_separator(o, 1.02)), words(&[-99]));
+        assert_eq!(out(|output| write_separator(output, 1.01)), []);
+        assert_eq!(out(|output| write_separator(output, 1.02)), words(&[-99]));
     }
 
     /// A list's first ids, -1 past its end; the counted lists their counts first, the fixed
     /// ones too.
     #[test]
     fn the_lists_are_padded_to_their_size() {
-        assert_eq!(out(|o| write_padded(o, &[4, 5], 3)), words(&[4, 5, -1]));
         assert_eq!(
-            out(|o| write_counted(o, &[1, 0], &[vec![7, 8], vec![9]])),
+            out(|output| write_padded(output, &[4, 5], 3)),
+            words(&[4, 5, -1])
+        );
+        assert_eq!(
+            out(|output| write_counted(output, &[1, 0], &[vec![7, 8], vec![9]])),
             words(&[1, 0, 7])
         );
         assert_eq!(
-            out(|o| write_fixed(o, &[1, 0], &[vec![7], vec![]], 2)),
+            out(|output| write_fixed(output, &[1, 0], &[vec![7], vec![]], 2)),
             words(&[1, 0, 7, -1, -1, -1])
         );
     }
@@ -370,7 +373,7 @@ mod tests {
         let scen = scenario([vec![101], vec![], vec![70]]);
         let mut counts = vec![0; 16];
         counts[0] = 1;
-        let counted = out(|o| scen.write_disabled(o, 1.28));
+        let counted = out(|output| scen.write_disabled(output, 1.28));
         let mut expected = words(&counts);
         expected.extend(words(&[101]));
         expected.extend(words(&[0; 16]));
@@ -378,13 +381,16 @@ mod tests {
         expected.extend(words(&[70]));
         assert_eq!(counted, expected);
         for (version, buildings) in [(1.18, 20), (1.25, 30)] {
-            let fixed = out(|o| scen.write_disabled(o, version));
+            let fixed = out(|output| scen.write_disabled(output, version));
             assert_eq!(fixed.len(), 4 * (3 * 16 + 16 * (30 + 30 + buildings)));
         }
         let techs = scenario([vec![101], vec![], vec![]]);
-        assert_eq!(out(|o| techs.write_disabled(o, 1.04)).len(), 4 * 16 * 20);
         assert_eq!(
-            out(|o| scenario(Default::default()).write_disabled(o, 1.03)),
+            out(|output| techs.write_disabled(output, 1.04)).len(),
+            4 * 16 * 20
+        );
+        assert_eq!(
+            out(|output| scenario(Default::default()).write_disabled(output, 1.03)),
             []
         );
     }
@@ -418,13 +424,13 @@ mod tests {
             ..scenario(Default::default())
         };
         let allied = words(&[0; 16]);
-        assert_eq!(out(|o| scen.write_teams(o, 1.22)), allied);
+        assert_eq!(out(|output| scen.write_teams(output, 1.22)), allied);
         assert_eq!(
-            out(|o| scen.write_teams(o, 1.23)),
+            out(|output| scen.write_teams(output, 1.23)),
             [allied.clone(), words(&[1])].concat()
         );
         assert_eq!(
-            out(|o| scen.write_teams(o, 1.24)),
+            out(|output| scen.write_teams(output, 1.24)),
             [allied, vec![1, 0, 0, 8]].concat()
         );
     }
@@ -437,9 +443,9 @@ mod tests {
             all_techs: true,
             ..scenario(Default::default())
         };
-        assert_eq!(out(|o| scen.write_modes(o, 1.04)), []);
-        assert_eq!(out(|o| scen.write_modes(o, 1.05)), words(&[0]));
-        let modern = out(|o| scen.write_modes(o, 1.25));
+        assert_eq!(out(|output| scen.write_modes(output, 1.04)), []);
+        assert_eq!(out(|output| scen.write_modes(output, 1.05)), words(&[0]));
+        let modern = out(|output| scen.write_modes(output, 1.25));
         assert_eq!(modern, [words(&[0, 0, 1]), words(&[0; 16])].concat());
     }
 
@@ -451,9 +457,12 @@ mod tests {
             view: (10, 20),
             ..scenario(Default::default())
         };
-        assert_eq!(out(|o| scen.write_view(o, 1.18)), []);
-        assert_eq!(out(|o| scen.write_view(o, 1.21)), words(&[10, 20, -1]));
-        assert_eq!(out(|o| scen.write_view(o, 1.24)).len(), 12 + 16);
+        assert_eq!(out(|output| scen.write_view(output, 1.18)), []);
+        assert_eq!(
+            out(|output| scen.write_view(output, 1.21)),
+            words(&[10, 20, -1])
+        );
+        assert_eq!(out(|output| scen.write_view(output, 1.24)).len(), 12 + 16);
     }
 
     /// Definitive Edition's options: the trigger count and water definition from 1.28 on, the
@@ -465,10 +474,10 @@ mod tests {
             villager_force_drop: true,
             ..scenario(Default::default())
         };
-        assert_eq!(out(|o| scen.write_de_options(o, 1.27, 5)), []);
-        let water = out(|o| scen.write_de_options(o, 1.28, 5));
+        assert_eq!(out(|output| scen.write_de_options(output, 1.27, 5)), []);
+        let water = out(|output| scen.write_de_options(output, 1.28, 5));
         assert_eq!(water[..6], [5, 0, 0, 0, 0, 0]);
-        let all = out(|o| scen.write_de_options(o, 1.37, 5));
+        let all = out(|output| scen.write_de_options(output, 1.37, 5));
         assert_eq!(all[all.len() - 2..], [1, 1]);
         assert_eq!(all.len(), water.len() + 2 + (water.len() - 6) + 2);
     }

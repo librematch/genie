@@ -61,9 +61,9 @@ impl Request {
     }
 }
 
-/// `(short)(int)v`: the game's tile of a coordinate.
-pub(super) const fn tile(v: f32) -> i16 {
-    v as i32 as i16
+/// `(short)(int)coordinate`: the game's tile of a coordinate.
+pub(super) const fn tile(coordinate: f32) -> i16 {
+    coordinate as i32 as i16
 }
 
 impl Planner {
@@ -78,25 +78,25 @@ impl Planner {
         }
         let distance = range + Distance::new(HALF);
         let step = 1i16 << level.get();
-        let off = |v: f32, centre: f32| {
-            let d = (v - (centre + -HALF)).abs();
-            let d = if d <= radii { 0.0 } else { d - radii };
-            if d == radii {
-                if 0.0 <= d - distance.get() {
-                    d - distance.get()
+        let off = |coordinate: f32, centre: f32| {
+            let gap = (coordinate - (centre + -HALF)).abs();
+            let gap = if gap <= radii { 0.0 } else { gap - radii };
+            if gap == radii {
+                if 0.0 <= gap - distance.get() {
+                    gap - distance.get()
                 } else {
                     0.0
                 }
             } else {
-                d
+                gap
             }
         };
         let first = cell.corner_at(level);
         let (x0, y0) = (first.x(), first.y());
         for tx in x0..=step - 1 + x0 {
             for ty in y0..=step - 1 + y0 {
-                let c = self.cell(GridLevel::TILES, PlanTile::new(tx, ty));
-                if c.edges.is_empty() && !c.kind.contains(CellKind::LONE) {
+                let cell = self.cell(GridLevel::TILES, PlanTile::new(tx, ty));
+                if cell.edges.is_empty() && !cell.kind.contains(CellKind::LONE) {
                     continue;
                 }
                 let ex = off(f32::from(tx), x);
@@ -117,14 +117,14 @@ impl Planner {
     pub(super) fn goal_square(&mut self, goal: Goal, far: f32) {
         let Goal { at, radii, range } = goal;
         let (x, y) = (at.x(), at.y());
-        let mut r = (radii + range).get();
+        let mut reach = (radii + range).get();
         if range < Distance::new(ONE) {
-            r += ONE;
+            reach += ONE;
         }
-        let x0 = tile(x - r).max(0);
-        let y0 = tile(y - r).max(0);
-        let mut x1 = tile(r + x + far);
-        let mut y1 = tile(r + y + far);
+        let x0 = tile(x - reach).max(0);
+        let y0 = tile(y - reach).max(0);
+        let mut x1 = tile(reach + x + far);
+        let mut y1 = tile(reach + y + far);
         let last = self.last_tile();
         if last.x() < x1 {
             x1 = last.x();
@@ -166,7 +166,7 @@ impl Planner {
             self.goal_marked = true;
             return;
         }
-        let Some(i) = GridLevel::ALL.into_iter().rev().find_map(|grid_level| {
+        let Some(cell_index) = GridLevel::ALL.into_iter().rev().find_map(|grid_level| {
             let cell_index = self.index(grid_level, self.goal.at_level(grid_level));
             self.cells[cell_index]
                 .kind
@@ -175,7 +175,7 @@ impl Planner {
         }) else {
             return;
         };
-        if self.toggle_goal(i, mark) && mark.is_set() {
+        if self.toggle_goal(cell_index, mark) && mark.is_set() {
             self.goal_marked = true;
         }
     }

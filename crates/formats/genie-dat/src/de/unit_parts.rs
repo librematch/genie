@@ -41,7 +41,7 @@ pub struct DeadFish {
 /// The action part of a unit (genieutils' `Bird`).
 #[binrw]
 #[brw(little)]
-#[br(import(v: Version))]
+#[br(import(version: Version))]
 #[derive(Clone, Debug, PartialEq)]
 pub struct Bird {
     /// Id of the default task in `tasks`; -1 for none.
@@ -51,10 +51,10 @@ pub struct Bird {
     /// Work rate (e.g. gathering or building speed).
     pub work_rate: f32,
     /// From VER 7.8 (`GV_C21`) the drop sites are counted; before, there are three.
-    #[br(if(v.at_least(21)))]
+    #[br(if(version.at_least(21)))]
     pub drop_site_count: Option<i16>,
     /// Units the unit delivers resources to; -1 for none.
-    #[br(count = drop_site_count.map_or(3, |n| usize::try_from(n).unwrap_or(0)))]
+    #[br(count = drop_site_count.map_or(3, |count| usize::try_from(count).unwrap_or(0)))]
     pub drop_sites: Vec<i16>,
     /// Group of units that turn into each other with the task (e.g. villager kinds).
     pub task_swap_group: u8,
@@ -69,10 +69,10 @@ pub struct Bird {
     /// How the unit runs about (e.g. a fleeing animal).
     pub run_pattern: u8,
     /// Number of tasks; from VER 7.2 (`GV_C15`).
-    #[br(if(v.at_least(15)))]
+    #[br(if(version.at_least(15)))]
     pub task_count: Option<i16>,
     /// The unit's own tasks.
-    #[br(count = task_count.unwrap_or(0), args { inner: (v,) })]
+    #[br(count = task_count.unwrap_or(0), args { inner: (version,) })]
     pub tasks: Vec<Task>,
 }
 
@@ -89,7 +89,7 @@ impl Bird {
 /// The combat part of a unit (genieutils' `Type50`).
 #[binrw]
 #[brw(little)]
-#[br(import(v: Version))]
+#[br(import(version: Version))]
 #[derive(Clone, Debug, PartialEq)]
 pub struct Type50 {
     /// Armour against attack classes the unit has no armour entry for.
@@ -107,7 +107,7 @@ pub struct Type50 {
     /// Terrain restriction whose values multiply the damage the unit takes on each terrain.
     pub defense_terrain_bonus: i16,
     /// Resistance to bonus damage; from VER 7.3 (`GV_C16`).
-    #[br(if(v.at_least(16)))]
+    #[br(if(version.at_least(16)))]
     pub bonus_damage_resistance: Option<f32>,
     /// Maximum attack range.
     pub max_range: f32,
@@ -142,22 +142,22 @@ pub struct Type50 {
     /// Reload time the interface shows.
     pub displayed_reload_time: f32,
     /// Share of the damage the blast deals; from VER 7.7 (`GV_C20`).
-    #[br(if(v.at_least(20)))]
+    #[br(if(version.at_least(20)))]
     pub blast_damage: Option<f32>,
     /// Share of the damage taken that is reflected to the attacker; from VER 7.9 (`GV_C22`).
-    #[br(if(v.at_least(22)))]
+    #[br(if(version.at_least(22)))]
     pub damage_reflection: Option<f32>,
     /// Share of the damage dealt to friendly units; from VER 7.9 (`GV_C22`).
-    #[br(if(v.at_least(22)))]
+    #[br(if(version.at_least(22)))]
     pub friendly_fire_damage: Option<f32>,
     /// Frame from which an attack can be interrupted; from VER 8.4 (`GV_C27`).
-    #[br(if(v.at_least(27)))]
+    #[br(if(version.at_least(27)))]
     pub interrupt_frame: Option<i16>,
     /// Firepower the unit adds when garrisoned; from VER 8.4 (`GV_C27`).
-    #[br(if(v.at_least(27)))]
+    #[br(if(version.at_least(27)))]
     pub garrison_firepower: Option<f32>,
     /// Second attack graphic; from VER 8.4 (`GV_C27`).
-    #[br(if(v.at_least(27)))]
+    #[br(if(version.at_least(27)))]
     pub attack_graphic2: Option<i16>,
 }
 
@@ -207,7 +207,7 @@ pub struct ResourceCost {
 /// A unit or building that trains a unit, with the training time and button.
 #[binrw]
 #[brw(little)]
-#[br(import(v: Version))]
+#[br(import(version: Version))]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct TrainLocation {
     /// Training time.
@@ -217,7 +217,7 @@ pub struct TrainLocation {
     /// Position of the button on the command panel.
     pub button_id: u8,
     /// Hotkey id; from VER 8.7 (`GV_C30`).
-    #[br(if(v.at_least(30)))]
+    #[br(if(version.at_least(30)))]
     pub hot_key_id: Option<i32>,
 }
 
@@ -225,18 +225,18 @@ pub struct TrainLocation {
 /// projectiles, charge and conversion settings.
 #[binrw]
 #[brw(little)]
-#[br(import(v: Version))]
+#[br(import(version: Version))]
 #[derive(Clone, Debug, PartialEq)]
 pub struct Creatable {
     /// Up to three costs.
     pub resource_costs: [ResourceCost; 3],
     /// From VER 8.6 (`GV_C29`) the train locations are counted; before, there is one.
-    #[br(if(v.at_least(29)))]
+    #[br(if(version.at_least(29)))]
     pub train_location_count: Option<i16>,
     /// Where the unit is trained.
     #[br(
-        count = train_location_count.map_or(1, |n| usize::try_from(n).unwrap_or(0)),
-        args { inner: (v,) }
+        count = train_location_count.map_or(1, |count| usize::try_from(count).unwrap_or(0)),
+        args { inner: (version,) }
     )]
     pub train_locations: Vec<TrainLocation>,
     /// Damage multiplier for attacks from behind (the name of earlier games); DE's master loads
@@ -258,55 +258,55 @@ pub struct Creatable {
     /// Graphic when the unit is upgraded.
     pub upgrade_graphic: i16,
     /// Glow graphic of a hero; from VER 7.4 (`GV_C17`).
-    #[br(if(v.at_least(17)))]
+    #[br(if(version.at_least(17)))]
     pub hero_glow_graphic: Option<i16>,
     /// Idle graphic in combat; from VER 8.3 (`GV_C26`).
-    #[br(if(v.at_least(26)))]
+    #[br(if(version.at_least(26)))]
     pub idle_attack_graphic: Option<i16>,
     /// Highest charge of the unit's charge ability; from VER 7.3 (`GV_C16`).
-    #[br(if(v.at_least(16)))]
+    #[br(if(version.at_least(16)))]
     pub max_charge: Option<f32>,
     /// Charge regained over time; from VER 7.3 (`GV_C16`).
-    #[br(if(v.at_least(16)))]
+    #[br(if(version.at_least(16)))]
     pub recharge_rate: Option<f32>,
     /// Event that uses up the charge; from VER 7.3 (`GV_C16`).
-    #[br(if(v.at_least(16)))]
+    #[br(if(version.at_least(16)))]
     pub charge_event: Option<i16>,
     /// What the charge does (e.g. a charged attack); from VER 7.3 (`GV_C16`).
-    #[br(if(v.at_least(16)))]
+    #[br(if(version.at_least(16)))]
     pub charge_kind: Option<i16>,
     /// What a charged ability targets; from VER 8.0 (`GV_C23`).
-    #[br(if(v.at_least(23)))]
+    #[br(if(version.at_least(23)))]
     pub charge_target: Option<i16>,
     /// Projectile of a charged attack; from VER 8.2 (`GV_C25`).
-    #[br(if(v.at_least(25)))]
+    #[br(if(version.at_least(25)))]
     pub charge_projectile_unit: Option<i32>,
     /// Priority as an attack target; from VER 8.2 (`GV_C25`).
-    #[br(if(v.at_least(25)))]
+    #[br(if(version.at_least(25)))]
     pub attack_priority: Option<u8>,
     /// Invulnerability level; from VER 8.2 (`GV_C25`).
-    #[br(if(v.at_least(25)))]
+    #[br(if(version.at_least(25)))]
     pub invulnerability_level: Option<f32>,
     /// Icon of the unit's ability button; from VER 8.1 (`GV_C24`).
-    #[br(if(v.at_least(24)))]
+    #[br(if(version.at_least(24)))]
     pub button_icon_id: Option<i16>,
     /// Language string id of that button's short tooltip; from VER 8.1 (`GV_C24`).
-    #[br(if(v.at_least(24)))]
+    #[br(if(version.at_least(24)))]
     pub button_short_tooltip_id: Option<i32>,
     /// Language string id of that button's long tooltip; from VER 8.1 (`GV_C24`).
-    #[br(if(v.at_least(24)))]
+    #[br(if(version.at_least(24)))]
     pub button_extended_tooltip_id: Option<i32>,
     /// Hotkey action of that button; from VER 8.1 (`GV_C24`).
-    #[br(if(v.at_least(24)))]
+    #[br(if(version.at_least(24)))]
     pub button_hotkey_action: Option<i16>,
     /// Modifier on the shortest time to convert the unit; from VER 7.6 (`GV_C19`).
-    #[br(if(v.at_least(19)))]
+    #[br(if(version.at_least(19)))]
     pub min_conversion_time_mod: Option<f32>,
     /// Modifier on the longest time to convert the unit; from VER 7.6 (`GV_C19`).
-    #[br(if(v.at_least(19)))]
+    #[br(if(version.at_least(19)))]
     pub max_conversion_time_mod: Option<f32>,
     /// Modifier on the chance to convert the unit; from VER 7.6 (`GV_C19`).
-    #[br(if(v.at_least(19)))]
+    #[br(if(version.at_least(19)))]
     pub conversion_chance_mod: Option<f32>,
     /// Projectiles fired with nothing garrisoned.
     pub total_projectiles: f32,

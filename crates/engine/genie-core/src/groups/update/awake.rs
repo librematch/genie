@@ -51,8 +51,8 @@ impl World {
     ///
     /// What the update does not model.
     pub(super) fn awake_update(&mut self, group: GroupId) -> GenieResult<GroupFate> {
-        let g = self.groups.held(group)?;
-        let far = if g.command_queue.is_empty() {
+        let unit_group = self.groups.held(group)?;
+        let far = if unit_group.command_queue.is_empty() {
             self.kept_apart_leave(group)?
         } else {
             FarMembers::Stay
@@ -65,11 +65,11 @@ impl World {
         {
             self.lead_to_target(group, far)?;
         }
-        let g = self.groups.held(group)?;
-        if awake_group_ends(g) {
+        let unit_group = self.groups.held(group)?;
+        if awake_group_ends(unit_group) {
             return Ok(GroupFate::Deleted);
         }
-        if self.any_member_held(group) && g.flags.contains(GroupFlags::STATISTICS) {
+        if self.any_member_held(group) && unit_group.flags.contains(GroupFlags::STATISTICS) {
             self.group_statistics(group, far)?;
         }
         if self
@@ -122,14 +122,14 @@ impl World {
     ///
     /// What the target's test and the leaving do not model.
     pub(super) fn kept_apart_leave(&mut self, group: GroupId) -> GenieResult<FarMembers> {
-        let g = self.groups.held(group)?;
-        let patrol = top_path(&g.motion.paths)
+        let unit_group = self.groups.held(group)?;
+        let patrol = top_path(&unit_group.motion.paths)
             .is_some_and(|path_data| path_data.path_flags.contains(PathFlags::LOOPS));
         // the dword compare at 0x14103dd78: the list's size (64 bits) against the count
-        if g.objects.len() as u32 == g.members.len() as u32
+        if unit_group.objects.len() as u32 == unit_group.members.len() as u32
             && !self.target_pending(group)?
             && !patrol
-            && !g.flags.contains(GroupFlags::PATROL)
+            && !unit_group.flags.contains(GroupFlags::PATROL)
         {
             while let Some(&id) = self.groups.held(group)?.objects.first() {
                 if !self.remove_unit(group, id, None, LeavingWalk::Stands)? {
@@ -220,8 +220,10 @@ impl World {
         }
         self.groups.held_mut(group)?.flags &= !GroupFlags::STATISTICS;
         // DAT_143f15860 (0x14103e3a5..0x14103e442), which only the members' moves read
-        let g = self.groups.held(group)?;
-        let differentiators = self.groups.differentiator_units(g, DIFFERENTIATORS);
+        let unit_group = self.groups.held(group)?;
+        let differentiators = self
+            .groups
+            .differentiator_units(unit_group, DIFFERENTIATORS);
         self.line_ranges(group)?;
         let (mut relayout, refill) = self.relayout_choice(group, count)?;
         if self.command_update(group, &mut relayout)? == GroupFate::Deleted {
@@ -290,8 +292,8 @@ impl World {
     /// state.
     pub(super) fn turn_formation(&mut self, group: GroupId, forward: BVector) -> GenieResult<()> {
         if self.turns_formation(group, forward)? {
-            let g = self.groups.held(group)?;
-            let without_path = g
+            let unit_group = self.groups.held(group)?;
+            let without_path = unit_group
                 .motion
                 .paths
                 .first()
@@ -351,11 +353,15 @@ impl World {
         let held = self.groups.held(group)?;
         let mut sum = BVector::ZERO;
         for member in &held.members {
-            let v = self
+            let moved = self
                 .world_object(member.id)
                 .ok_or_else(|| member_gone(member.id))?
                 .moved_vector();
-            sum = BVector::new(sum.x() + v.x(), sum.height() + v.height(), sum.y() + v.y());
+            sum = BVector::new(
+                sum.x() + moved.x(),
+                sum.height() + moved.height(),
+                sum.y() + moved.y(),
+            );
         }
         let count = held.members.len() as i32 as f32;
         let ahead = 0.0 * held.motion.position[1];
@@ -382,21 +388,21 @@ impl World {
     /// slots' array), and a unit of a master the slice does not have.
     pub(crate) fn line_ranges(&mut self, group: GroupId) -> GenieResult<()> {
         let held = self.groups.held(group)?;
-        let Some(f) = held.current_formation.as_ref() else {
+        let Some(formation) = held.current_formation.as_ref() else {
             return Ok(());
         };
-        let lines = usize::try_from(f.number_lines).unwrap_or(0);
+        let lines = usize::try_from(formation.number_lines).unwrap_or(0);
         let mut ranges = Vec::with_capacity(lines);
-        for line in f.lines.iter().take(lines) {
+        for line in formation.lines.iter().take(lines) {
             let mut range = f32::MAX;
             for &index in &line.indices {
                 // the slots' array: those in use, then the spare ones
                 let slot = usize::try_from(index as i32)
                     .ok()
-                    .and_then(|i| {
-                        f.slots
-                            .get(i)
-                            .or_else(|| f.spare_slots.get(i.checked_sub(f.slots.len())?))
+                    .and_then(|index| {
+                        formation.slots
+                            .get(index)
+                            .or_else(|| formation.spare_slots.get(index.checked_sub(formation.slots.len())?))
                     })
                     .ok_or(GenieError::unsupported(
                         "a formation line's place without a slot (the update reads outside the slots, 0x14103e4ce)",

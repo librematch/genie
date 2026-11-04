@@ -71,7 +71,7 @@ pub struct TechTree {
 /// What a tree lookup asks: the civilisation, the building, the unit, the ages the player
 /// cannot reach (technologies 101 to 103 at state −1) and the game's options.
 #[derive(Clone, Copy, Debug)]
-pub struct TreeQuery<'a> {
+pub struct TreeQuery<'settings> {
     /// The civilisation index.
     pub civ: CivId,
     /// The building's master.
@@ -81,19 +81,19 @@ pub struct TreeQuery<'a> {
     /// The Feudal, Castle and Imperial Ages out of reach.
     pub ages_out: [bool; 3],
     /// The game's options: the full tech tree and the last age.
-    pub settings: &'a Settings,
+    pub settings: &'settings Settings,
     /// The civilisation the full tech tree falls back to (`FUN_140c7e6f0`).
     pub fallback: CivId,
 }
 
 /// What [`TechTree::find`] answers.
-pub(in crate::players::world_player) enum Found<'a> {
+pub(in crate::players::world_player) enum Found<'tree> {
     /// The table has no such civilisation (`FUN_1414f5340`'s and `FUN_1414f4c80`'s 0).
     NoCiv,
     /// The unit is out of the game's ages or of the player's (0).
     OutOfAges,
     /// The building's units, the first that is the unit, if any.
-    Unit(Option<&'a TreeUnit>),
+    Unit(Option<&'tree TreeUnit>),
     /// No such building, also in the fallback civilisation (−1).
     NoBuilding,
 }
@@ -111,12 +111,15 @@ impl TechTree {
             let Some(buildings) = self.civs.get(civ.index()) else {
                 return Found::NoCiv;
             };
-            if let Some(b) = buildings
+            if let Some(tree_building) = buildings
                 .iter()
                 .find(|tree_building| tree_building.id == tree_query.building)
             {
-                let unit = b.units.iter().find(|u| u.id == tree_query.unit);
-                let age = unit.map_or(Age::Default, |u| u.age);
+                let unit = tree_building
+                    .units
+                    .iter()
+                    .find(|tree_unit| tree_unit.id == tree_query.unit);
+                let age = unit.map_or(Age::Default, |tree_unit| tree_unit.age);
                 if tree_query.settings.last_age().before() < age {
                     return Found::OutOfAges;
                 }
@@ -166,11 +169,11 @@ impl TechTree {
     pub(in crate::players::world_player) fn field(
         &self,
         tree_query: &TreeQuery<'_>,
-        f: impl Fn(&TreeUnit) -> i32,
+        field_of: impl Fn(&TreeUnit) -> i32,
     ) -> i32 {
         match self.find(tree_query) {
             Found::NoCiv | Found::OutOfAges => 0,
-            Found::Unit(Some(tree_unit)) => f(tree_unit),
+            Found::Unit(Some(tree_unit)) => field_of(tree_unit),
             Found::Unit(None)
                 if tree_query.civ != tree_query.fallback
                     && tree_query
@@ -182,7 +185,7 @@ impl TechTree {
                     civ: tree_query.fallback,
                     ..*tree_query
                 };
-                self.field(&again, f)
+                self.field(&again, field_of)
             }
             Found::Unit(None) | Found::NoBuilding => -1,
         }

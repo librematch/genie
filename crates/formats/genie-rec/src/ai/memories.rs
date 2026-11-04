@@ -2,7 +2,7 @@
 //! resources, influence maps and quadrants.
 
 use crate::area;
-use crate::element::ReadableHeaderElement;
+use crate::element::ReadHeader;
 use crate::fits;
 use crate::reader::RecordingHeaderReader;
 use crate::{ObjectId, PlayerId};
@@ -42,7 +42,7 @@ pub struct ImportantObjectMemory {
     pub is_garrisoned: u32,
 }
 
-impl ReadableHeaderElement for ImportantObjectMemory {
+impl ReadHeader for ImportantObjectMemory {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         Ok(Self {
             id: read_opt_u32(input)?,
@@ -73,7 +73,7 @@ pub struct BuildingLot {
     pub location: (u8, u8),
 }
 
-impl ReadableHeaderElement for BuildingLot {
+impl ReadHeader for BuildingLot {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let unit_kind_id = read_opt_u32(input)?;
         let status = input.read_u8()?;
@@ -109,7 +109,7 @@ pub struct WallLine {
     pub line_end: (u32, u32),
 }
 
-impl ReadableHeaderElement for WallLine {
+impl ReadHeader for WallLine {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let mut line = Self::default();
         if input.version() >= 10.78 {
@@ -157,7 +157,7 @@ pub struct PerimeterWall {
     pub next_segment_to_refresh: u32,
 }
 
-impl ReadableHeaderElement for PerimeterWall {
+impl ReadHeader for PerimeterWall {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let mut wall = Self {
             enabled: if input.version() >= 11.22 {
@@ -223,7 +223,7 @@ pub struct AttackMemory {
     pub play: Option<i32>,
 }
 
-impl ReadableHeaderElement for AttackMemory {
+impl ReadHeader for AttackMemory {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let mut mem = Self {
             id: read_opt_u32(input)?,
@@ -278,7 +278,7 @@ pub struct ResourceMemory {
     pub attacked_time: Option<u32>,
 }
 
-impl ReadableHeaderElement for ResourceMemory {
+impl ReadHeader for ResourceMemory {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let mut mem = Self {
             id: input.read_u32::<LE>()?.into(),
@@ -315,7 +315,7 @@ pub struct InfluenceMap {
     pub values: Vec<i8>,
 }
 
-impl ReadableHeaderElement for InfluenceMap {
+impl ReadHeader for InfluenceMap {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let mut map = Self::default();
         map.width = input.read_u32::<LE>()?;
@@ -338,7 +338,7 @@ pub struct QuadrantLog {
     pub attacks_by_us: u32,
 }
 
-impl ReadableHeaderElement for QuadrantLog {
+impl ReadHeader for QuadrantLog {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let explored_tiles = input.read_u32::<LE>()?;
         let attacks_on_us = input.read_u32::<LE>()?;

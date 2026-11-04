@@ -48,9 +48,9 @@ impl Display for Difference {
 
 /// Where two object lists differ, one line per object and field ([`object_field_differences`]).
 #[must_use]
-pub fn object_differences<'a>(
-    slice: impl IntoIterator<Item = impl Into<ObjectView<'a>>>,
-    game: impl IntoIterator<Item = impl Into<ObjectView<'a>>>,
+pub fn object_differences<'world>(
+    slice: impl IntoIterator<Item = impl Into<ObjectView<'world>>>,
+    game: impl IntoIterator<Item = impl Into<ObjectView<'world>>>,
 ) -> Vec<String> {
     object_field_differences(slice, game)
         .iter()
@@ -63,9 +63,9 @@ pub fn object_differences<'a>(
 /// genie's objects ([`crate::saved_objects`]), each whole, matched by id, in the game's order,
 /// then the objects only the slice holds. Equal lists give none.
 #[must_use]
-pub fn object_field_differences<'a>(
-    slice: impl IntoIterator<Item = impl Into<ObjectView<'a>>>,
-    game: impl IntoIterator<Item = impl Into<ObjectView<'a>>>,
+pub fn object_field_differences<'world>(
+    slice: impl IntoIterator<Item = impl Into<ObjectView<'world>>>,
+    game: impl IntoIterator<Item = impl Into<ObjectView<'world>>>,
 ) -> Vec<Difference> {
     object_field_differences_in(slice, game, Scope::Saved)
 }
@@ -74,33 +74,33 @@ pub fn object_field_differences<'a>(
 /// fields genie models apart from the game (each one an entry in the workspace's `MISSING.md`),
 /// [`Scope::All`] adds the unsaved ones too.
 #[must_use]
-pub fn object_field_differences_in<'a>(
-    slice: impl IntoIterator<Item = impl Into<ObjectView<'a>>>,
-    game: impl IntoIterator<Item = impl Into<ObjectView<'a>>>,
+pub fn object_field_differences_in<'world>(
+    slice: impl IntoIterator<Item = impl Into<ObjectView<'world>>>,
+    game: impl IntoIterator<Item = impl Into<ObjectView<'world>>>,
     scope: Scope,
 ) -> Vec<Difference> {
-    let slice: Vec<ObjectView<'a>> = slice.into_iter().map(Into::into).collect();
-    let game: Vec<ObjectView<'a>> = game.into_iter().map(Into::into).collect();
+    let slice: Vec<ObjectView<'world>> = slice.into_iter().map(Into::into).collect();
+    let game: Vec<ObjectView<'world>> = game.into_iter().map(Into::into).collect();
     let mut out = Vec::new();
     // the first slice object of each id, as a search from the front finds it
     let mut by_id = HashMap::with_capacity(slice.len());
-    for s in &slice {
-        let _ = by_id.entry(s.unit.id).or_insert(s);
+    for object_view in &slice {
+        let _ = by_id.entry(object_view.unit.id).or_insert(object_view);
     }
-    for g in &game {
-        let (id, master) = (g.unit.id, g.unit.life.master_id);
-        let Some(&s) = by_id.get(&id) else {
+    for game_view in &game {
+        let (id, master) = (game_view.unit.id, game_view.unit.life.master_id);
+        let Some(&object_view) = by_id.get(&id) else {
             out.push(Difference {
                 id,
                 master,
                 field: ONLY_IN_THE_GAME.to_owned(),
                 slice: String::new(),
-                game: summary(g),
+                game: summary(game_view),
             });
             continue;
         };
         out.extend(
-            genie_diff::differences(s, g, scope)
+            genie_diff::differences(object_view, game_view, scope)
                 .into_iter()
                 .map(|difference| Difference {
                     id,
@@ -111,15 +111,16 @@ pub fn object_field_differences_in<'a>(
                 }),
         );
     }
-    for s in slice
-        .iter()
-        .filter(|s| !game.iter().any(|g| g.unit.id == s.unit.id))
-    {
+    for object_view in slice.iter().filter(|slice_view| {
+        !game
+            .iter()
+            .any(|game_view| game_view.unit.id == slice_view.unit.id)
+    }) {
         out.push(Difference {
-            id: s.unit.id,
-            master: s.unit.life.master_id,
+            id: object_view.unit.id,
+            master: object_view.unit.life.master_id,
             field: ONLY_IN_THE_SLICE.to_owned(),
-            slice: summary(s),
+            slice: summary(object_view),
             game: String::new(),
         });
     }

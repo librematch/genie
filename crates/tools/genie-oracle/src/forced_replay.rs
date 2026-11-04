@@ -77,7 +77,7 @@ pub fn old_pather_paths(
             .players
             .iter()
             .flat_map(|player| &player.objects)
-            .find(|u| u.id == id)
+            .find(|unit| unit.id == id)
         else {
             out.push(Err(GenieError::unsupported(
                 "a caller the save does not hold",
@@ -89,7 +89,10 @@ pub fn old_pather_paths(
             continue;
         };
         let (mask, radius) = (mover.stats.restriction_mask, mover.stats.radius.x());
-        let z = turns.spatial.get(id).map_or(0.0, |p| p.position.z());
+        let z = turns
+            .spatial
+            .get(id)
+            .map_or(0.0, |placed| placed.position.z());
         if let Err(error) = turns.spatial.set_position(
             id,
             from.with_height(z),
@@ -249,13 +252,14 @@ pub fn forced_run(
     // `window` ahead of it; the pool is shared by every run going on at once
     let window = window.max(1);
     let ahead = Ahead::new();
-    let parse = |i: usize| save_after(start + i + 1).map(|save| SavedStep::of(&save, masters));
+    let parse =
+        |index: usize| save_after(start + index + 1).map(|save| SavedStep::of(&save, masters));
     let mut times = Times::default();
     rayon::in_place_scope(|tasks| {
         let (ahead, parse) = (&ahead, &parse);
-        let ask = |i: usize| {
-            if i < ticks {
-                tasks.spawn(move |_| ahead.put(i, parse(i)));
+        let ask = |index: usize| {
+            if index < ticks {
+                tasks.spawn(move |_| ahead.put(index, parse(index)));
             }
         };
         (0..window).for_each(ask);
@@ -286,9 +290,9 @@ pub fn forced_run(
                 let tiles = dump_after(start + index + 1, "tiles")
                     .map(|text| tile_lists_from_dump(&text))
                     .transpose()?;
-                if let Some(t) = tiles.as_ref() {
-                    for d in tile_order_differences(&turns.spatial, t) {
-                        report.differences.push((0, d));
+                if let Some(tile_lists) = tiles.as_ref() {
+                    for text in tile_order_differences(&turns.spatial, tile_lists) {
+                        report.differences.push((0, text));
                     }
                 }
                 report
@@ -375,16 +379,17 @@ pub fn forced_run(
                 game.resync = report
                     .differences
                     .iter()
-                    .filter_map(|(_, d)| {
-                        d.split(':')
+                    .filter_map(|(_, difference)| {
+                        difference
+                            .split(':')
                             .next()
-                            .and_then(|o| o.parse::<i32>().ok().and_then(ObjectId::of_field))
+                            .and_then(|text| text.parse::<i32>().ok().and_then(ObjectId::of_field))
                     })
                     .collect();
                 if report
                     .differences
                     .iter()
-                    .any(|(_, d)| d.starts_with("player "))
+                    .any(|(_, text)| text.starts_with("player "))
                 {
                     game.sight = Some((mem_take(&mut seen.maps), mem_take(&mut seen.unified)));
                 }
@@ -421,7 +426,10 @@ pub(super) fn ghost_differences(turns: &World, game: &[Vec<Ghost>]) -> Vec<(u32,
         )
     };
     let only = |x: &Vec<_>, y: &Vec<_>| -> Vec<_> {
-        x.iter().filter(|e| !y.contains(*e)).copied().collect()
+        x.iter()
+            .filter(|entry| !y.contains(*entry))
+            .copied()
+            .collect()
     };
     let mut out = Vec::new();
     for (index, game) in game.iter().enumerate() {
@@ -429,14 +437,17 @@ pub(super) fn ghost_differences(turns: &World, game: &[Vec<Ghost>]) -> Vec<(u32,
             .players
             .get(index)
             .map_or(&[][..], |player| &player.ghosts[..]);
-        let (a, b): (Vec<_>, Vec<_>) = (
+        let (slice_ghosts, game_ghosts): (Vec<_>, Vec<_>) = (
             slice.iter().map(key).collect(),
             game.iter().map(key).collect(),
         );
-        if a != b {
-            let (sl, gm) = (only(&a, &b), only(&b, &a));
+        if slice_ghosts != game_ghosts {
+            let (sl, gm) = (
+                only(&slice_ghosts, &game_ghosts),
+                only(&game_ghosts, &slice_ghosts),
+            );
             let what = if sl.is_empty() && gm.is_empty() {
-                format!("ghosts in another order: slice {a:?}, the game {b:?}")
+                format!("ghosts in another order: slice {slice_ghosts:?}, the game {game_ghosts:?}")
             } else {
                 format!("ghosts the slice's alone {sl:?}, the game's alone {gm:?}")
             };
@@ -462,7 +473,7 @@ pub(super) fn owned_group_differences(
     };
     group_differences(&turns.groups, groups, globals.is_some())
         .into_iter()
-        .map(|d| (group_owner(turns, game, &d), d))
+        .map(|text| (group_owner(turns, game, &text), text))
         .collect()
 }
 
@@ -471,7 +482,7 @@ pub(super) fn owned_group_differences(
 pub(super) fn group_owner(turns: &World, game: &GameState, difference: &str) -> u32 {
     let id = difference
         .strip_prefix("group ")
-        .and_then(|d| d.split(':').next())
+        .and_then(|text| text.split(':').next())
         .and_then(|text| text.parse::<i32>().ok())
         .and_then(GroupId::of_field);
     let owner = id.and_then(|id| {
@@ -482,7 +493,7 @@ pub(super) fn group_owner(turns: &World, game: &GameState, difference: &str) -> 
             .and_then(|group| group.owner)
     });
     owner
-        .filter(|o| o.index() < turns.players.len())
+        .filter(|player_id| player_id.index() < turns.players.len())
         .map_or(0, |player_id| u32::from(player_id.get()))
 }
 
@@ -507,18 +518,18 @@ impl<T> Ahead<T> {
         self.parsed.lock().unwrap_or_else(PoisonError::into_inner)
     }
 
-    /// A task's parse of index `k`.
-    pub(super) fn put(&self, k: usize, value: T) {
-        let _ = self.locked().insert(k, value);
+    /// A task's parse of index `index`.
+    pub(super) fn put(&self, index: usize, value: T) {
+        let _ = self.locked().insert(index, value);
         self.ready.notify_all();
     }
 
-    /// The run takes index `k`, waiting until it is parsed.
-    pub(super) fn take(&self, k: usize) -> T {
+    /// The run takes index `index`, waiting until it is parsed.
+    pub(super) fn take(&self, index: usize) -> T {
         let mut parsed = self.locked();
         loop {
-            if let Some(v) = parsed.remove(&k) {
-                return v;
+            if let Some(value) = parsed.remove(&index) {
+                return value;
             }
             parsed = self
                 .ready
@@ -559,9 +570,9 @@ pub(super) fn game_state(header: &Header, masters: Option<&MasterTable>) -> Geni
         game.players.push(
             player_section
                 .live_objects()
-                .map(|o| {
+                .map(|saved| {
                     object(
-                        o,
+                        saved,
                         player_section.objects(),
                         &world.path,
                         civ,
@@ -573,8 +584,9 @@ pub(super) fn game_state(header: &Header, masters: Option<&MasterTable>) -> Geni
                 .collect(),
         );
         let attributes = &player_section.world_player().base.attributes;
-        let r = |i: usize| attributes.get(i).copied().unwrap_or_default();
-        game.resources.push([r(0), r(1), r(2), r(3)]);
+        let resource = |index: usize| attributes.get(index).copied().unwrap_or_default();
+        game.resources
+            .push([resource(0), resource(1), resource(2), resource(3)]);
         game.attributes.push(attributes.clone());
         game.pending_debit.push(
             player_section

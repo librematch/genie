@@ -22,7 +22,7 @@ use crate::vision::SightShape;
 use crate::vision::visibility::Seeing;
 use crate::world::Seconds;
 use crate::world::WorldTime;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 use crate::{GenieError, GenieResult};
 
 use crate::map::spatial::{Obstruction, Placed};
@@ -72,8 +72,8 @@ impl World {
             return Ok(());
         };
         self.set_part(id, Part::OwnMaster(own))?;
-        if let Some(d) = dead {
-            self.set_part(id, Part::DeadMaster(Box::new(d)))?;
+        if let Some(master) = dead {
+            self.set_part(id, Part::DeadMaster(Box::new(master)))?;
         }
         let unit = self.swap_remove_live(player_id, list_index)?;
         let handed =
@@ -224,8 +224,8 @@ impl World {
         id: ObjectId,
         placed: Option<Placed>,
     ) -> GenieResult<()> {
-        if let Some(p) = placed {
-            let _ = self.watch(new, id, p.position.tile())?;
+        if let Some(placed) = placed {
+            let _ = self.watch(new, id, placed.position.tile())?;
         }
         Ok(())
     }
@@ -450,19 +450,19 @@ impl World {
             .object(id)
             .map_or_else(Vec::new, |(_, unit)| unit.garrison.clone());
         let mut stayed = Vec::new();
-        for &g in inside.iter().rev() {
+        for &object_id in inside.iter().rev() {
             let Some(Place::Live(_, bi)) = self.place(id) else {
                 break;
             };
             if self.let_out(
                 owner,
                 bi,
-                g,
+                object_id,
                 Point::from([HANDOVER_NO_POINT; 2]),
                 (None, true),
             )? == LetOut::Stayed
             {
-                stayed.push(g);
+                stayed.push(object_id);
             }
         }
         for object_id in stayed {
@@ -592,7 +592,7 @@ pub(crate) fn change_hands(
         masters
             .own
             .get(unit.id)
-            .or_else(|| old_table.and_then(|m| m.get(unit.life.master_id)))
+            .or_else(|| old_table.and_then(|masters| masters.get(unit.life.master_id)))
             .ok_or(GenieError::unsupported(
                 "an ownership change of an object whose master the slice does not have",
             ))?

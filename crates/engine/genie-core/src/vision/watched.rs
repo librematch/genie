@@ -15,7 +15,7 @@ use crate::vision::ghost::{Cell, GhostWatch, MASKED_KIND, Original, Watched};
 use crate::world::World;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
-use crate::world::slots::{CheckedIndex, PlayerSlots};
+use crate::world::slots::{CheckedIndexExt, PlayerSlotsExt};
 use crate::{GenieError, GenieResult};
 use std::collections::HashMap;
 
@@ -77,8 +77,8 @@ impl World {
     /// takes its place).
     pub(crate) fn unwatch(&mut self, owner: PlayerId, id: ObjectId) -> GenieResult<()> {
         let list = &mut self.players.player_mut(owner)?.watched;
-        if let Some(k) = list.iter().position(|watched| watched.id == id) {
-            let _ = list.swap_remove(k);
+        if let Some(index) = list.iter().position(|watched| watched.id == id) {
+            let _ = list.swap_remove(index);
         }
         Ok(())
     }
@@ -135,71 +135,73 @@ impl World {
         // each id's object as [`World::object`] finds it (the first player in order, its live list
         // before its sleeping list), looked up once: the loop changes only the watched lists
         let mut first: HashMap<ObjectId, (PlayerId, bool, ListIndex)> = HashMap::new();
-        for (q, player) in PlayerId::each(self.players.len()).zip(&self.players) {
+        for (player_id, player) in PlayerId::each(self.players.len()).zip(&self.players) {
             for (sleeping, list) in [(false, &player.objects), (true, &player.sleeping)] {
-                for (k, u) in list.indexed() {
-                    let _ = first.entry(u.id).or_insert((q, sleeping, k));
+                for (list_index, unit) in list.indexed() {
+                    let _ = first
+                        .entry(unit.id)
+                        .or_insert((player_id, sleeping, list_index));
                 }
             }
         }
-        for p in PlayerId::each(self.players.len()) {
-            self.players.player_mut(p)?.watched.clear();
+        for watcher in PlayerId::each(self.players.len()) {
+            self.players.player_mut(watcher)?.watched.clear();
             let ids: Vec<ObjectId> = self
                 .players
-                .player(p)?
+                .player(watcher)?
                 .objects
                 .iter()
-                .chain(&self.players.player(p)?.sleeping)
-                .map(|u| u.id)
+                .chain(&self.players.player(watcher)?.sleeping)
+                .map(|unit| unit.id)
                 .collect();
             for id in ids {
                 let Some(&(player_id, sleeping, list_index)) = first.get(&id) else {
                     continue;
                 };
-                let u = if sleeping {
+                let unit = if sleeping {
                     &self.players.asleep(player_id, list_index)?
                 } else {
                     &self.players.live(player_id, list_index)?
                 };
-                let master = u.master(self.master_tables(), p)?;
+                let master = unit.master(self.master_tables(), watcher)?;
                 let (state, kind, ghosts, position) = (
-                    u.life.state,
+                    unit.life.state,
                     master.kind,
                     master.ghost_on_death,
-                    u.position(),
+                    unit.position(),
                 );
                 let tile = Self::tile_at(position);
                 // the static load's watch of a dead object (FUN_14119df60)
                 if ghosts == GhostMode::LEAVES && ObjectState::Alive < state {
-                    let _ = self.watch(p, id, tile)?;
+                    let _ = self.watch(watcher, id, tile)?;
                 }
                 // a building's load constructor (FUN_1411ac170, type 80 only): FUN_1411cc980
                 // before the rehook links its annexes
                 if kind == MasterKind::BUILDING
-                    && self.watches_building_at(p, id, AnnexLink::Pending)?
+                    && self.watches_building_at(watcher, id, AnnexLink::Pending)?
                 {
-                    let _ = self.watch(p, id, tile)?;
+                    let _ = self.watch(watcher, id, tile)?;
                 }
             }
             for list in [false, true] {
-                let held = self.players.player(p)?;
+                let held = self.players.player(watcher)?;
                 let objects = if list { &held.sleeping } else { &held.objects };
                 let mut annexes: Vec<ObjectId> = Vec::new();
-                for u in objects
+                for unit in objects
                     .iter()
                     .filter(|unit| self.parts.building_of(unit.id).annex_of.is_some())
                 {
                     if !self
                         .model
                         .roles
-                        .of_class(u.master(self.master_tables(), p)?.class)
+                        .of_class(unit.master(self.master_tables(), watcher)?.class)
                         .contains(ClassRoles::GATE)
                     {
-                        annexes.push(u.id);
+                        annexes.push(unit.id);
                     }
                 }
                 for id in annexes {
-                    self.unwatch(p, id)?;
+                    self.unwatch(watcher, id)?;
                 }
             }
         }

@@ -73,11 +73,11 @@ fn the_tiles_beside_diagonal_follow_its_quarter() {
     );
 }
 
-/// An object of `master` (class `class`, radius `r`, `buildable` on) of player 1 at `x`, `y`.
-fn on_map(x: f32, y: f32, master: MasterId, class: ClassId, r: f32, buildable: u8) -> Placed {
+/// An object of `master` (class `class`, radius `radius`, `buildable` on) of player 1 at `x`, `y`.
+fn on_map(x: f32, y: f32, master: MasterId, class: ClassId, radius: f32, buildable: u8) -> Placed {
     Placed {
         position: Position::new(x, y, 0.0),
-        radius: Footprint::new(r, r),
+        radius: Footprint::new(radius, radius),
         class,
         player: PlayerId::new(1),
         master,
@@ -170,8 +170,10 @@ fn the_footprint_clearing_takes_buildable_objects_in_the_tiles_order() {
     for (id, placed, _) in &objects {
         world.insert(object_id(*id), *placed);
     }
-    let look: BTreeMap<ObjectId, ClearLook> =
-        objects.iter().map(|o| (object_id(o.0), o.2)).collect();
+    let look: BTreeMap<ObjectId, ClearLook> = objects
+        .iter()
+        .map(|entry| (object_id(entry.0), entry.2))
+        .collect();
     let site = |class: ClassId, by: Clearer| ClearingSite {
         player: PlayerId::new(1),
         master: ids::HOUSE,
@@ -333,7 +335,7 @@ fn cleared_object_loses_its_record_by_its_kind_and_the_call() {
         footprint_clearing(&world, &clearing_site, &look, &roles(), &tuning().build)
             .unwrap()
             .iter()
-            .filter(|c| c.record_goes)
+            .filter(|cleared| cleared.record_goes)
             .map(|cleared| cleared.id)
             .collect()
     };
@@ -887,7 +889,7 @@ fn the_work_that_reaches_the_build_time_completes_the_building() {
         master_id: ids::HOUSE,
         ..Lifecycle::default()
     };
-    let c = Construction {
+    let construction = Construction {
         progress: Seconds::new(24.99),
         desolid: false,
         builders: BuilderCount::of_data(2),
@@ -900,7 +902,7 @@ fn the_work_that_reaches_the_build_time_completes_the_building() {
         snow: Snow::None,
         sprite_override: false,
     };
-    let house = foundation_at(10026, Position::new(2.0, 2.0, 0.0), life, c);
+    let house = foundation_at(10026, Position::new(2.0, 2.0, 0.0), life, construction);
     let mut site_world = site_world(world, vec![master], vec![house]);
     assert_eq!(
         site_world.work_building(FoundationId::new(object_id(10026)), Seconds::new(0.02)),
@@ -996,8 +998,8 @@ fn the_castle_the_wonder_and_the_monastery_count_their_completion() {
             .attributes
             .iter()
             .enumerate()
-            .filter(|&(_, &v)| v != Amount::ZERO)
-            .map(|(k, &amount)| (k, amount.get()))
+            .filter(|&(_, &amount)| amount != Amount::ZERO)
+            .map(|(attribute, &amount)| (attribute, amount.get()))
             .collect();
         let events = site_world.players[1]
             .history
@@ -1058,7 +1060,7 @@ fn the_first_work_starts_the_foundation_and_adds_its_share_of_hit_points() {
         master_id: ids::HOUSE,
         ..Lifecycle::default()
     };
-    let c = Construction {
+    let construction = Construction {
         progress: Seconds::ZERO,
         desolid: true,
         builders: BuilderCount::of_data(1),
@@ -1071,7 +1073,7 @@ fn the_first_work_starts_the_foundation_and_adds_its_share_of_hit_points() {
         snow: Snow::None,
         sprite_override: false,
     };
-    let site = foundation_at(10028, house().position, life, c);
+    let site = foundation_at(10028, house().position, life, construction);
     let mut site_world = site_world(
         world,
         vec![built_master(ids::HOUSE, &Vec::new())],

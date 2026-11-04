@@ -170,7 +170,9 @@ impl HuntState {
     #[must_use]
     pub const fn attack(&self) -> Option<&Attack> {
         match self {
-            Self::Attack { attack: Some(a) } => Some(a),
+            Self::Attack {
+                attack: Some(inner),
+            } => Some(inner),
             _ => None,
         }
     }
@@ -219,28 +221,31 @@ mod tests {
     fn hunt_states_read_back_from_their_bytes() {
         for index in 0..=255_u8 {
             match HuntState::of_byte(index, None, None) {
-                Ok(s) => assert_eq!(s.get(), index),
+                Ok(hunt_state) => assert_eq!(hunt_state.get(), index),
                 Err(_) => assert!(matches!(index, 5 | 9 | 14 | 16..), "{index}"),
             }
         }
         assert_eq!(HuntState::Attack { attack: None }.to_string(), "12");
         let walk = MoveToAction::sub_in(MoveTo::Moving);
-        for b in [4, 8, 11, 15] {
-            let mut walk_hunt_state = HuntState::of_byte(b, Some(walk), None).unwrap();
+        for byte in [4, 8, 11, 15] {
+            let mut walk_hunt_state = HuntState::of_byte(byte, Some(walk), None).unwrap();
             assert_eq!(
                 (
                     walk_hunt_state.get(),
                     walk_hunt_state.move_to(),
                     walk_hunt_state.attack()
                 ),
-                (b, Some(&walk), None)
+                (byte, Some(&walk), None)
             );
             assert_eq!(walk_hunt_state.bare().move_to(), None);
             assert_eq!(walk_hunt_state.take_move_to(), Some(walk));
             assert_eq!(walk_hunt_state.move_to(), None);
         }
-        for b in [2, 12] {
-            assert!(HuntState::of_byte(b, Some(walk), None).is_err(), "{b}");
+        for byte in [2, 12] {
+            assert!(
+                HuntState::of_byte(byte, Some(walk), None).is_err(),
+                "{byte}"
+            );
         }
         let attack = own_attack(5, AttackState::New, Distance::ZERO);
         let mut hunt_state = HuntState::of_byte(12, None, Some(attack)).unwrap();

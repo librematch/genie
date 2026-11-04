@@ -67,8 +67,8 @@ impl ObjectKey for GroupTarget {
 
 impl genie_diff::Diff for GroupTarget {
     /// By the two integers the save holds.
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        d.equal(&self.saved(), &other.saved());
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        differ.equal(&self.saved(), &other.saved());
     }
 }
 
@@ -107,7 +107,9 @@ mod tests {
     #[test]
     fn lookup_reads_the_integer_of_every_kind() {
         assert_eq!(
-            GroupTarget::of_saved(3, 2).group().map(|g| g.get()),
+            GroupTarget::of_saved(3, 2)
+                .group()
+                .map(|group_id| group_id.get()),
             Some(3)
         );
         assert_eq!(GroupTarget::of_saved(-1, 2).group(), None);

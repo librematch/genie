@@ -15,21 +15,21 @@ use std::io::{Read, Write};
 pub struct GraphicId(u32);
 
 impl From<u16> for GraphicId {
-    fn from(n: u16) -> Self {
-        Self(n.into())
+    fn from(number: u16) -> Self {
+        Self(number.into())
     }
 }
 
 impl From<u32> for GraphicId {
-    fn from(n: u32) -> Self {
-        Self(n)
+    fn from(number: u32) -> Self {
+        Self(number)
     }
 }
 
 impl TryFrom<i32> for GraphicId {
     type Error = GenieError;
-    fn try_from(n: i32) -> GenieResult<Self> {
-        Ok(Self(fits(n)?))
+    fn try_from(number: i32) -> GenieResult<Self> {
+        Ok(Self(fits(number)?))
     }
 }
 

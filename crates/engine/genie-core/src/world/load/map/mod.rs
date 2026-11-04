@@ -36,25 +36,29 @@ pub fn map_terrain(header: &Header, terrain: &TerrainTable) -> Terrain {
     let tiles = map
         .rows
         .iter()
-        .flat_map(|r| {
-            r.tiles
-                .iter()
-                .map(|t| TileTerrain::of_save(t.terrain_kind, t.restore_terrain_kind, t.layer))
+        .flat_map(|rge_map_row| {
+            rge_map_row.tiles.iter().map(|rge_tile| {
+                TileTerrain::of_save(
+                    rge_tile.terrain_kind,
+                    rge_tile.restore_terrain_kind,
+                    rge_tile.layer,
+                )
+            })
         })
         .collect();
-    let mut t = Terrain::new(
+    let mut terrain = Terrain::new(
         GridSize::new(map.map_width, map.map_height),
         tiles,
         terrain.kinds().to_vec(),
         terrain.passable().to_vec(),
     );
-    t.set_elevations(
+    terrain.set_elevations(
         map.rows
             .iter()
             .flat_map(|rge_map_row| rge_map_row.tiles.iter().map(|rge_tile| rge_tile.elevation))
             .collect(),
     );
-    t
+    terrain
 }
 
 /// The world's objects as movement sees them: every player's live and sleeping objects with their
@@ -99,7 +103,7 @@ pub fn spatial(
                 .base
                 .unit_diplomacy
                 .iter()
-                .map(|&k| UnitRelation::of_field(k))
+                .map(|&field| UnitRelation::of_field(field))
                 .collect()
         })
         .collect();
@@ -107,29 +111,36 @@ pub fn spatial(
     for (player, section) in PlayerId::each(header.players().len()).zip(header.players()) {
         let all = section.live_objects().chain(section.sleeping_objects());
         for object in all {
-            let Some(s) = object.static_part() else {
+            let Some(rge_static_object) = object.static_part() else {
                 continue;
             };
-            let Some(m) = placement(s, section.objects()) else {
+            let Some(placement) = placement(rge_static_object, section.objects()) else {
                 continue;
             };
-            let master = MasterId::try_from(s.master_obj)?;
-            let id = ObjectId::try_from(s.id)?;
+            let master = MasterId::try_from(rge_static_object.master_obj)?;
+            let id = ObjectId::try_from(rge_static_object.id)?;
             let building = object.tribe_building_object.as_deref();
             // a building's place links its tiles (FUN_1411e6780), an annex's does not, and a
             // foundation made desolid lost them (FUN_1411cf770); so do a combat unit's that does
             // not move and is more than a tile wide (FUN_14108c320). A building keeps its
             // footprint's UMV entry (+0x904)
-            let place = Position::new(s.tx, s.ty, s.tz);
-            let footprint = m.radius.ground();
-            let speed = moving_speed(object, s, section.objects());
+            let place = Position::new(
+                rge_static_object.tx,
+                rge_static_object.ty,
+                rge_static_object.tz,
+            );
+            let footprint = placement.radius.ground();
+            let speed = moving_speed(object, rge_static_object, section.objects());
             let links = building.map_or_else(
                 || {
                     object.combat().is_some()
                         && speed == 0.0
-                        && (0.5 < m.radius.x() || 0.5 < m.radius.y())
+                        && (0.5 < placement.radius.x() || 0.5 < placement.radius.y())
                 },
-                |b| b.mupt_linked_object_references_linked_owner_id == -1 && b.desolid_flag == 0,
+                |tribe_building_object| {
+                    tribe_building_object.mupt_linked_object_references_linked_owner_id == -1
+                        && tribe_building_object.desolid_flag == 0
+                },
             );
             let umv = match (links, building.is_some()) {
                 (true, true) => sight.link_building(place, footprint, layer.tuning.visibility)?,
@@ -145,16 +156,23 @@ pub fn spatial(
                 Seer {
                     player,
                     master,
-                    los: m.los,
-                    state: ObjectState::of_byte(s.object_state)?,
+                    los: placement.los,
+                    state: ObjectState::of_byte(rge_static_object.object_state)?,
                     // a foundation made in the game explores first when its construction starts
-                    explored: building.is_none_or(|b| b.built != 0 || b.build_pts != 0.0),
-                    building: building.map(|b| BuildingSight::of_saved(b.built, b.build_pts)),
+                    explored: building.is_none_or(|tribe_building_object| {
+                        tribe_building_object.built != 0 || tribe_building_object.build_pts != 0.0
+                    }),
+                    building: building.map(|tribe_building_object| {
+                        BuildingSight::of_saved(
+                            tribe_building_object.built,
+                            tribe_building_object.build_pts,
+                        )
+                    }),
                     umv: umv as u8,
                     // the save's +0x924 (a map's objects keep what the map gave them, as
                     // 426048706's Gaia petards their 0); the setup's rule without a combat part
                     capture: object.combat().map_or_else(
-                        || Ok(capture_kind(player, m.class, master, roles)),
+                        || Ok(capture_kind(player, placement.class, master, roles)),
                         |tribe_combat_object| {
                             CaptureKind::try_from(
                                 tribe_combat_object.rge_combat_object.capture_flag,
@@ -175,32 +193,43 @@ pub fn spatial(
                 .tribe_building_object
                 .as_deref()
                 .is_some_and(|tribe_building_object| tribe_building_object.desolid_flag != 0);
-            let solid = m.radius.sized() && !desolid;
-            let obstruction =
-                (m.obstruction_kind != ObstructionKind::NONE && solid).then_some(Obstruction {
-                    kind: m.obstruction_kind,
-                    class: m.obstruction_class,
+            let solid = placement.radius.sized() && !desolid;
+            let obstruction = (placement.obstruction_kind != ObstructionKind::NONE && solid)
+                .then_some(Obstruction {
+                    kind: placement.obstruction_kind,
+                    class: placement.obstruction_class,
                 });
             out.insert(
-                ObjectId::try_from(s.id)?,
+                ObjectId::try_from(rge_static_object.id)?,
                 Placed {
-                    position: Position::new(s.tx, s.ty, s.tz),
-                    radius: m.radius.ground(),
-                    class: m.class,
+                    position: Position::new(
+                        rge_static_object.tx,
+                        rge_static_object.ty,
+                        rge_static_object.tz,
+                    ),
+                    radius: placement.radius.ground(),
+                    class: placement.class,
                     player,
                     master,
-                    obstruction_kind: m.obstruction_kind,
-                    buildable_on: m.buildable_on,
-                    tall: 0.0 < m.radius.z(),
-                    moves: 0.0 < moving_speed(object, s, section.objects()),
+                    obstruction_kind: placement.obstruction_kind,
+                    buildable_on: placement.buildable_on,
+                    tall: 0.0 < placement.radius.z(),
+                    moves: 0.0 < moving_speed(object, rge_static_object, section.objects()),
                     unknown: None,
                     obstruction,
                 },
             );
             // an object inside another left its tile's list and the obstruction manager
             // (FUN_1411921d0)
-            if s.inside_obj != -1 {
-                out.go_inside(id, Position::new(s.tx, s.ty, s.tz));
+            if rge_static_object.inside_obj != -1 {
+                out.go_inside(
+                    id,
+                    Position::new(
+                        rge_static_object.tx,
+                        rge_static_object.ty,
+                        rge_static_object.tz,
+                    ),
+                );
             }
         }
         for ghost in section.objects().doppleganger_objects.objects() {
@@ -224,14 +253,14 @@ pub fn spatial(
 /// and which players are computers; no tile links and no objects' sight.
 pub fn saved_sight(header: &Header) -> GenieResult<Visibility> {
     let map = &header.world.base_world.map;
-    let n = (map.map_width.max(0) * map.map_height.max(0)) as usize;
+    let tiles = (map.map_width.max(0) * map.map_height.max(0)) as usize;
     let players = header.players();
     let maps = players
         .iter()
-        .map(|p| {
-            let vm = &p.objects().rge_visible_map;
+        .map(|player_section| {
+            let vm = &player_section.objects().rge_visible_map;
             VisibleMap {
-                counts: vm.visible_map.clone().unwrap_or_else(|| vec![-1; n]),
+                counts: vm.visible_map.clone().unwrap_or_else(|| vec![-1; tiles]),
                 explored: TileCount::new(vm.number_tiles_explored_value),
             }
         })
@@ -246,14 +275,14 @@ pub fn saved_sight(header: &Header) -> GenieResult<Visibility> {
             offsets: entry
                 .p
                 .iter()
-                .map(|&v| TileOffset::new(v as u32 as i32, (v >> 32) as u32 as i32))
+                .map(|&word| TileOffset::new(word as u32 as i32, (word >> 32) as u32 as i32))
                 .collect(),
             capacity: entry.n + 1,
         })
         .collect();
     let kinds = players
         .iter()
-        .map(|p| PlayerKind::try_from(p.world_player().kind))
+        .map(|player_section| PlayerKind::try_from(player_section.world_player().kind))
         .collect::<Result<_, _>>()?;
     let mut sight = Visibility::new(
         GridSize::new(map.map_width, map.map_height),
@@ -262,7 +291,7 @@ pub fn saved_sight(header: &Header) -> GenieResult<Visibility> {
             .unified_visible_map
             .as_ref()
             .map_or_else(
-                || vec![VisionBits::NONE; n],
+                || vec![VisionBits::NONE; tiles],
                 |words| {
                     words
                         .iter()

@@ -11,7 +11,7 @@ use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::MasterId;
-use crate::objects::masters::PlayersMasters;
+use crate::objects::masters::PlayersMastersExt;
 use crate::players::Amount;
 use crate::world::Seconds;
 use std::collections::BTreeMap;
@@ -36,7 +36,7 @@ use crate::unit_ai::task_finder::world::state_of;
 use crate::world::World;
 use crate::world::layer::MasterRoles;
 use crate::world::others::OthersRef;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 use crate::world::step::Step;
 use crate::{GenieError, GenieResult};
 
@@ -74,19 +74,21 @@ impl Unit {
     ) -> GenieResult<BTreeMap<ObjectId, ClearLook>> {
         let mut looks = BTreeMap::new();
         if let Some(action_unit) = Some(action)
-            .filter(|b| matches!(b.state, BuildState::Work | BuildState::Wait))
+            .filter(|build_action| {
+                matches!(build_action.state, BuildState::Work | BuildState::Wait)
+            })
             .and_then(|build_action| others.own(build_action.target))
-            .filter(|u| {
-                step.w
+            .filter(|unit| {
+                step.world
                     .parts
-                    .building_of(u.id)
+                    .building_of(unit.id)
                     .construction
                     .is_some_and(|construction| construction.desolid)
             })
         {
             let (fx, fy) = (action_unit.position().x(), action_unit.position().y());
-            let reach = step.w.model.tuning.build.clearing_reach + 1.0;
-            for (id, _) in step.w.spatial.objects_within(Rect::new(
+            let reach = step.world.model.tuning.build.clearing_reach + 1.0;
+            for (id, _) in step.world.spatial.objects_within(Rect::new(
                 fx - reach,
                 fy - reach,
                 fx + reach,
@@ -101,8 +103,11 @@ impl Unit {
                 };
                 let clear_look = clear_look_of(
                     unit,
-                    step.w.parts.building_of(id),
-                    OwnerMasters::new(&step.w.parts.own_master, step.w.model.masters.of(owner)),
+                    step.world.parts.building_of(id),
+                    OwnerMasters::new(
+                        &step.world.parts.own_master,
+                        step.world.model.masters.of(owner),
+                    ),
                 )?;
                 let _ = looks.insert(id, clear_look);
             }
@@ -116,23 +121,24 @@ impl Unit {
         step: &Step<'_>,
         action: BuildAction,
     ) -> GenieResult<BuildReads> {
-        let others = OthersRef::of(&step.w.players, &step.w.index, step.player)?;
+        let others = OthersRef::of(&step.world.players, &step.world.index, step.player)?;
         let target = action.target;
         let foundation = others.own(target);
         let site = foundation
-            .filter(|u| step.w.parts.building_of(u.id).construction.is_some())
-            .map(|u| FoundationId::new(u.id));
-        let built = foundation.map(|u| u.life.master_id);
-        let stack_made = foundation.and_then(|u| step.w.parts.building_of(u.id).stack_made);
+            .filter(|unit| step.world.parts.building_of(unit.id).construction.is_some())
+            .map(|unit| FoundationId::new(unit.id));
+        let built = foundation.map(|unit| unit.life.master_id);
+        let stack_made =
+            foundation.and_then(|unit| step.world.parts.building_of(unit.id).stack_made);
         let build_targets: Vec<(Option<ObjectId>, Option<ObjectState>)> = step
-            .w
+            .world
             .parts
             .unit_ai
             .get(self.id)
             .map_or_else(Vec::new, |ai| {
                 ai.orders
                     .iter()
-                    .filter(|o| o.order == OrderKind::Build)
+                    .filter(|queued_order| queued_order.order == OrderKind::Build)
                     .map(|queued_order| {
                         let state = others.own(queued_order.target).map(|unit| unit.life.state);
                         (queued_order.target, state)
@@ -142,14 +148,14 @@ impl Unit {
         let (deposit, gone_orders) = if matches!(action.state, BuildState::Drop { .. }) {
             (
                 self.build_deposit(step, others, action.site)?,
-                Self::gone_drop_orders(&step.w.spatial, step.w.parts.unit_ai.get(self.id)),
+                Self::gone_drop_orders(&step.world.spatial, step.world.parts.unit_ai.get(self.id)),
             )
         } else {
             (None, Vec::new())
         };
-        let master = self.master(step.w.master_tables(), step.player);
+        let master = self.master(step.world.master_tables(), step.player);
         // FUN_140aadc50 drops only a kind the player has (FUN_140efe5b0)
-        let attributes = step.w.players.player(step.player)?.attributes.len();
+        let attributes = step.world.players.player(step.player)?.attributes.len();
         let has_kind = (self.life.attribute_kind)
             .is_some_and(|attribute_id| attribute_id.index() < attributes);
         Ok(BuildReads {
@@ -159,7 +165,7 @@ impl Unit {
             deposit,
             gone_orders,
             looks: self.clearing_looks(step, others, action)?,
-            class: master.as_ref().ok().map(|m| m.class),
+            class: master.as_ref().ok().map(|master| master.class),
             drop_site: drop_site_master(step, built)? && has_kind,
             by: self.releaser(step)?,
         })
@@ -173,33 +179,33 @@ impl Unit {
         others: OthersRef<'_>,
         site: Option<DropSiteId>,
     ) -> GenieResult<Option<(ObjectState, DropOff)>> {
-        let Some(placed) = step.w.spatial.get(site).filter(|_| site.is_some()) else {
+        let Some(placed) = step.world.spatial.get(site).filter(|_| site.is_some()) else {
             return Ok(None);
         };
         let me_at = step
-            .w
+            .world
             .spatial
             .get_known(self.id)?
             .ok_or(GenieError::unsupported("a builder without a place"))?;
-        let master = self.master(step.w.master_tables(), step.player)?;
+        let master = self.master(step.world.master_tables(), step.player)?;
         let actor = Actor {
             id: self.id,
             master,
             player: step.player,
             held: self.life.held(),
             attribute_95: step
-                .w
+                .world
                 .players
                 .player(step.player)?
                 .attributes
                 .get(95)
                 .copied()
                 .unwrap_or(Amount::ZERO),
-            civ: step.w.players.player(step.player)?.civ,
+            civ: step.world.players.player(step.player)?.civ,
         };
         Ok(state_of(site.map(DropSiteId::id), others).map(|state| {
             let drop = DropOff {
-                takes: drops_at(&step.w.model.drop_sites, placed.master, &actor),
+                takes: drops_at(&step.world.model.drop_sites, placed.master, &actor),
                 gap_squared: footprint_gap_squared(
                     me_at.position,
                     me_at.radius,
@@ -214,18 +220,18 @@ impl Unit {
     /// State 8: the targets of the unit AI `ai`'s orders that a drop-off drops, gone from the
     /// world or past state 5 as the player sees them.
     fn gone_drop_orders(spatial: &Spatial, ai: Option<&UnitAi>) -> Vec<Option<ObjectId>> {
-        let gone = |t: Option<ObjectId>| match spatial.get(t) {
+        let gone = |object_id: Option<ObjectId>| match spatial.get(object_id) {
             None => true,
             Some(_) => spatial
                 .sight
                 .as_ref()
-                .and_then(|visibility| visibility.seer(t))
+                .and_then(|visibility| visibility.seer(object_id))
                 .is_some_and(|seer| ObjectState::Dead < seer.state),
         };
         ai.map_or_else(Vec::new, |ai| {
             ai.orders
                 .iter()
-                .filter(|o| DROPPED_ORDERS.contains(&o.order))
+                .filter(|queued_order| DROPPED_ORDERS.contains(&queued_order.order))
                 .map(|queued_order| queued_order.target)
                 .filter(|&object_id| gone(object_id))
                 .collect()
@@ -234,25 +240,25 @@ impl Unit {
 }
 
 impl BuildAction {
-    /// Runs `f` on the world with the builder lent back to its slot ([`Step::lend_at`]: the
-    /// world's routines that scan the objects meet it, as the game's do; `f` gets its player and
-    /// slot), its Build as this update left it so far; after `f` the Build is the one `f` left
-    /// (none when `f` replaced the builder's actions: a work command).
+    /// Runs `work` on the world with the builder lent back to its slot ([`Step::lend_at`]: the
+    /// world's routines that scan the objects meet it, as the game's do; `work` gets its player and
+    /// slot), its Build as this update left it so far; after `work` the Build is the one `work`
+    /// left (none when `work` replaced the builder's actions: a work command).
     ///
     /// # Errors
     ///
-    /// `f`'s and the lend's.
+    /// `work`'s and the lend's.
     pub(super) fn lend<R>(
         &mut self,
         step: &mut Step<'_>,
         builder: &mut Unit,
         actions: &mut Action,
-        f: impl FnOnce(&mut World, PlayerId, ListIndex) -> GenieResult<R>,
+        work: impl FnOnce(&mut World, PlayerId, ListIndex) -> GenieResult<R>,
     ) -> GenieResult<R> {
-        if let Some(b) = actions.list.build_mut() {
-            *b = *self;
+        if let Some(build_action) = actions.list.build_mut() {
+            *build_action = *self;
         }
-        let answer = step.lend_at((&mut *builder, &mut *actions), f);
+        let answer = step.lend_at((&mut *builder, &mut *actions), work);
         if let Some(build_action) = actions.list.build() {
             *self = *build_action;
         }
@@ -289,7 +295,7 @@ fn drop_site_master(step: &Step<'_>, built: Option<MasterId>) -> GenieResult<boo
         return Ok(false);
     };
     if step
-        .w
+        .world
         .model
         .roles
         .of_master(master_id)
@@ -297,8 +303,8 @@ fn drop_site_master(step: &Step<'_>, built: Option<MasterId>) -> GenieResult<boo
     {
         return Ok(true);
     }
-    let civ = step.w.players.player(step.player)?.civ;
-    Ok(step.w.model.drop_sites.iter().any(|drop_site| {
+    let civ = step.world.players.player(step.player)?.civ;
+    Ok(step.world.model.drop_sites.iter().any(|drop_site| {
         drop_site.building == master_id
             && (drop_site.civs.is_empty() || drop_site.civs.contains(&civ))
     }))

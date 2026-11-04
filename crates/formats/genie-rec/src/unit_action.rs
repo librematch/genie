@@ -1,5 +1,5 @@
 use crate::ObjectId;
-use crate::element::{ReadableHeaderElement, WritableHeaderElement};
+use crate::element::{ReadHeader, WriteHeader};
 use crate::errors::unknown_unit_action;
 use crate::reader::RecordingHeaderReader;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
@@ -37,7 +37,7 @@ pub struct UnitAction {
     pub params: ActionKind,
 }
 
-impl ReadableHeaderElement for UnitAction {
+impl ReadHeader for UnitAction {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let action_kind = input.read_u16::<LE>()?;
         Self::read_from_inner(input, action_kind)
@@ -169,14 +169,14 @@ pub struct ActionMoveTo {
     pub range: f32,
 }
 
-impl ReadableHeaderElement for ActionMoveTo {
+impl ReadHeader for ActionMoveTo {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let range = input.read_f32::<LE>()?;
         Ok(Self { range })
     }
 }
 
-impl WritableHeaderElement for ActionMoveTo {
+impl WriteHeader for ActionMoveTo {
     fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         output.write_f32::<LE>(self.range)?;
         Ok(())
@@ -190,14 +190,14 @@ pub struct ActionEnter {
     pub first_time: u32,
 }
 
-impl ReadableHeaderElement for ActionEnter {
+impl ReadHeader for ActionEnter {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let first_time = input.read_u32::<LE>()?;
         Ok(Self { first_time })
     }
 }
 
-impl WritableHeaderElement for ActionEnter {
+impl WriteHeader for ActionEnter {
     fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         output.write_u32::<LE>(self.first_time)?;
         Ok(())
@@ -221,7 +221,7 @@ pub struct ActionAttack {
     last_target_position: (f32, f32, f32),
 }
 
-impl ReadableHeaderElement for ActionAttack {
+impl ReadHeader for ActionAttack {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         Ok(Self {
             range: input.read_f32::<LE>()?,
@@ -250,14 +250,14 @@ pub struct ActionMake {
     pub work_timer: f32,
 }
 
-impl ReadableHeaderElement for ActionMake {
+impl ReadHeader for ActionMake {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let work_timer = input.read_f32::<LE>()?;
         Ok(Self { work_timer })
     }
 }
 
-impl WritableHeaderElement for ActionMake {
+impl WriteHeader for ActionMake {
     fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         output.write_f32::<LE>(self.work_timer)?;
         Ok(())

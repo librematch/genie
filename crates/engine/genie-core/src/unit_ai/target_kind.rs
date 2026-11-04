@@ -55,8 +55,8 @@ impl OrderTargetKind {
         }
         i16::try_from(value)
             .ok()
-            .filter(|v| 0 <= *v)
-            .map(|v| Some(Self(v)))
+            .filter(|value| 0 <= *value)
+            .map(|value| Some(Self(value)))
             .ok_or_else(|| {
                 GenieError::invalid_input("a target type no master or class has")
                     .with("value", value)
@@ -66,13 +66,15 @@ impl OrderTargetKind {
     /// The value of a field that holds −1 for none.
     #[must_use]
     pub fn field(kind: Option<Self>) -> i32 {
-        kind.map_or(Self::NONE, |k| i32::from(k.0))
+        kind.map_or(Self::NONE, |order_target_kind| {
+            i32::from(order_target_kind.0)
+        })
     }
 }
 
 impl genie_diff::Diff for OrderTargetKind {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        d.equal(self, other);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        differ.equal(self, other);
     }
 }
 
@@ -88,13 +90,16 @@ mod tests {
     #[test]
     fn saved_target_kind_reads_as_master_and_class() {
         assert_eq!(OrderTargetKind::of_field(-1), Ok(None));
-        let t = OrderTargetKind::of_field(42).unwrap().unwrap();
-        assert_eq!((t.master(), t.class()), (master_id(42), class::RELIC));
-        assert_eq!(OrderTargetKind::field(Some(t)), 42);
+        let order_target_kind = OrderTargetKind::of_field(42).unwrap().unwrap();
+        assert_eq!(
+            (order_target_kind.master(), order_target_kind.class()),
+            (master_id(42), class::RELIC)
+        );
+        assert_eq!(OrderTargetKind::field(Some(order_target_kind)), 42);
         assert_eq!(OrderTargetKind::field(None), -1);
         for bad in [-2, 40_000] {
             assert_eq!(
-                OrderTargetKind::of_field(bad).map_err(|e| e.kind()),
+                OrderTargetKind::of_field(bad).map_err(|error| error.kind()),
                 Err(ErrorKind::InvalidInput)
             );
         }

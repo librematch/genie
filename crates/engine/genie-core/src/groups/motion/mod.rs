@@ -23,7 +23,7 @@ use crate::players::PlayerId;
 use crate::players::PlayerKind;
 use crate::world::Seconds;
 use crate::world::World;
-use crate::world::slots::CheckedIndex;
+use crate::world::slots::CheckedIndexExt;
 
 /// Whether `BMotion`'s path step tests the player's path budget before a plan (its `param_2`;
 /// only a computer player's counts).
@@ -248,14 +248,14 @@ impl Motion {
             (self.velocity.x(), 3),
             (self.velocity.height(), 2),
         ] {
-            let d = dt.get() * speed;
-            if EPSILON < d.abs() {
-                let v = d * *self.new_position.checked(along)?;
+            let dt = dt.get() * speed;
+            if EPSILON < dt.abs() {
+                let delta = dt * *self.new_position.checked(along)?;
                 let new_position = &mut self.new_position[0];
                 *new_position = BVector::new(
-                    new_position.x() + v.x(),
-                    v.height() + new_position.height(),
-                    v.y() + new_position.y(),
+                    new_position.x() + delta.x(),
+                    delta.height() + new_position.height(),
+                    delta.y() + new_position.y(),
                 );
                 self.flags |= MotionFlags::MOVED;
             }
@@ -282,10 +282,10 @@ impl World {
             .group
             .id
             .and_then(|id| self.groups.get(id))
-            .map(|g| LeadGroup {
-                flags: g.flags,
-                members: g.members.iter().map(|member| member.id).collect(),
-                differentiator_units: self.groups.differentiator_units(g, SHORT_IGNORED),
+            .map(|group| LeadGroup {
+                flags: group.flags,
+                members: group.members.iter().map(|member| member.id).collect(),
+                differentiator_units: self.groups.differentiator_units(group, SHORT_IGNORED),
                 lowered: self.groups.group_units(unit.group.id).unwrap_or_default(),
             });
         Some(Lead {

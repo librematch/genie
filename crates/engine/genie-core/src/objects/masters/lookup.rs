@@ -27,23 +27,23 @@ pub fn player_master(every: &[Arc<Masters>], player: PlayerId, id: MasterId) -> 
 /// ([`crate::world::parts::Parts::own_master`]) when it has one, else its player's table of
 /// `players`. [`crate::world::World::master_tables`] gives the world's.
 #[derive(Clone, Copy, Debug)]
-pub struct MasterTables<'a> {
+pub struct MasterTables<'masters> {
     /// The world's masters, one table per player.
-    pub(crate) players: &'a [Arc<Masters>],
+    pub(crate) players: &'masters [Arc<Masters>],
     /// The objects' own masters by id.
-    pub(crate) own: &'a PartTable<Master>,
+    pub(crate) own: &'masters PartTable<Master>,
 }
 
-impl<'a> MasterTables<'a> {
+impl<'masters> MasterTables<'masters> {
     /// The world's players' tables `players` and the objects' own masters `own`.
     #[must_use]
-    pub const fn new(players: &'a [Arc<Masters>], own: &'a PartTable<Master>) -> Self {
+    pub const fn new(players: &'masters [Arc<Masters>], own: &'masters PartTable<Master>) -> Self {
         Self { players, own }
     }
 
     /// Player `player`'s objects' masters ([`OwnerMasters`]).
     #[must_use]
-    pub fn of(self, player: PlayerId) -> OwnerMasters<'a> {
+    pub fn of(self, player: PlayerId) -> OwnerMasters<'masters> {
         OwnerMasters {
             own: self.own,
             table: self.players.of(player),
@@ -55,24 +55,24 @@ impl<'a> MasterTables<'a> {
 /// own copy by its id first ([`crate::world::parts::Parts::own_master`]), else the owner's
 /// table (none for an owner without one).
 #[derive(Clone, Copy, Debug)]
-pub struct OwnerMasters<'a> {
+pub struct OwnerMasters<'masters> {
     /// The objects' own masters by id.
-    pub(crate) own: &'a PartTable<Master>,
+    pub(crate) own: &'masters PartTable<Master>,
     /// The owner's table.
-    pub(crate) table: Option<&'a Masters>,
+    pub(crate) table: Option<&'masters Masters>,
 }
 
-impl<'a> OwnerMasters<'a> {
+impl<'masters> OwnerMasters<'masters> {
     /// The own masters `own` and the owner's table `table`.
     #[must_use]
-    pub const fn new(own: &'a PartTable<Master>, table: Option<&'a Masters>) -> Self {
+    pub const fn new(own: &'masters PartTable<Master>, table: Option<&'masters Masters>) -> Self {
         Self { own, table }
     }
 }
 
 /// The world's masters, one table per player (the game's player holds its masters' pointers,
 /// `player+0x28`), looked up by the player.
-pub trait PlayersMasters {
+pub trait PlayersMastersExt {
     /// Player `player`'s masters, none where the world holds no table for it.
     fn of(&self, player: PlayerId) -> Option<&Masters>;
 
@@ -80,7 +80,7 @@ pub trait PlayersMasters {
     fn of_mut(&mut self, player: PlayerId) -> Option<&mut Masters>;
 }
 
-impl PlayersMasters for [Arc<Masters>] {
+impl PlayersMastersExt for [Arc<Masters>] {
     fn of(&self, player: PlayerId) -> Option<&Masters> {
         self.get(player.index()).map(|masters| &**masters)
     }
@@ -99,21 +99,21 @@ impl PlayersMasters for [Arc<Masters>] {
 /// the first such master with a task for the target's class and a work value, else the first
 /// with a task for any target: the master of the player's list (`masters`) and its task.
 /// `Ok(None)`: no task.
-pub fn work_master<'m>(
-    masters: &'m Masters,
+pub fn work_master<'masters>(
+    masters: &'masters Masters,
     actor: &Actor<'_>,
     on: &TaskOn<'_, '_>,
     filter: Option<ActionKind>,
     dip: &impl Diplomacy,
     slots: Slots,
     roles: &Roles,
-) -> GenieResult<Option<(&'m Master, &'m Task)>> {
+) -> GenieResult<Option<(&'masters Master, &'masters Task)>> {
     let own = actor.master;
     let own_list = masters.get(own.id).ok_or(GenieError::unsupported(
         "a unit of a master the player does not have",
     ))?;
     let own_task = find_task(own_list, actor, on, filter, dip, slots, roles)?;
-    if own_task.is_none_or(|t| t.action_kind == ActionKind::COMBAT)
+    if own_task.is_none_or(|task| task.action_kind == ActionKind::COMBAT)
         && own.action_part().task_by_group != TaskGroup::NONE
     {
         let (mut by_class, mut generic) = (None, None);
@@ -126,13 +126,13 @@ pub fn work_master<'m>(
             }
             let found = find_task(candidate, actor, on, filter, dip, slots, roles)?;
             let Some(task) = found else { continue };
-            if own_task.is_some_and(|t| t.action_kind == task.action_kind) {
+            if own_task.is_some_and(|own| own.action_kind == task.action_kind) {
                 continue;
             }
             // a gather task for a point has no target: the game reads none there, as the
             // finder gives a point only a task for its terrain, never a gather one
-            let listed = on.target.filter(|t| {
-                roles.of_master(t.master.id).intersects(
+            let listed = on.target.filter(|task_target| {
+                roles.of_master(task_target.master.id).intersects(
                     MasterRoles::FARM
                         | MasterRoles::DEAD_FARM
                         | MasterRoles::RICE_FARM
@@ -163,5 +163,5 @@ pub fn work_master<'m>(
             return Ok(Some(pick));
         }
     }
-    Ok(own_task.map(|t| (own_list, t)))
+    Ok(own_task.map(|task| (own_list, task)))
 }

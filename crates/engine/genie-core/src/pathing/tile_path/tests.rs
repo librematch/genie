@@ -66,7 +66,7 @@ fn plan_from_off_the_map_reads_no_start_cell() {
 fn the_last_open_point_walks_the_path_back_to_tile_with_an_edge() {
     // water (terrain 0) left of x = 10, land (1, impassable) right of it
     let terrain: Vec<TerrainId> = (0..128)
-        .map(|i| TerrainId::named(u8::from(10 <= i % 16)))
+        .map(|tile| TerrainId::named(u8::from(10 <= tile % 16)))
         .collect();
     let mut planner = Planner::new(
         GridSize::new(16, 8),
@@ -121,8 +121,8 @@ fn the_nearest_tile_with_the_edge_is_found_up_then_nearer_down() {
     );
     // the tiles at the places `with` have the edge N
     let edges = |with: &'static [i16]| {
-        move |s: i16| Cell {
-            edges: if with.contains(&s) {
+        move |coordinate: i16| Cell {
+            edges: if with.contains(&coordinate) {
                 CellEdges::N
             } else {
                 CellEdges::NONE
@@ -269,7 +269,8 @@ fn an_open_map_is_one_node_cell_per_eight_tiles() {
         Restriction::new(vec![1.0]),
         &open_map(GridSize::new(16, 8)),
     );
-    let levels = [(16, 8), (8, 4), (4, 2), (2, 1)].map(|(w, h)| GridSize::new(w, h));
+    let levels =
+        [(16, 8), (8, 4), (4, 2), (2, 1)].map(|(width, height)| GridSize::new(width, height));
     assert_eq!(
         GridLevel::ALL.map(|grid_level| planner.level_size(grid_level)),
         levels
@@ -297,7 +298,7 @@ fn padding_tiles_of_map_that_is_not_multiple_of_eight_lie_off_the_map() {
         Restriction::new(vec![1.0]),
         &open_map(GridSize::new(6, 6)),
     );
-    let levels = [8, 4, 2, 1].map(|s| GridSize::new(s, s));
+    let levels = [8, 4, 2, 1].map(|side| GridSize::new(side, side));
     assert_eq!(
         GridLevel::ALL.map(|grid_level| planner.level_size(grid_level)),
         levels
@@ -391,7 +392,7 @@ fn the_smoothing_keeps_the_points_before_blocked_walk() {
     // blocked: any walk from the start that ends beyond y = 44.5
     let mut walls = Walls::default();
     smooth(&mut path, &mut walls, &tuning().tile_path).unwrap();
-    let ends: Vec<Point> = path.points.iter().map(|p| p.ground()).collect();
+    let ends: Vec<Point> = path.points.iter().map(|point| point.ground()).collect();
     assert_eq!(
         ends,
         [
@@ -419,9 +420,9 @@ struct Walls {
 }
 
 impl SegmentTest<()> for Walls {
-    fn blocked(&mut self, a: Point, b: Point) -> Result<bool, ()> {
+    fn blocked(&mut self, from: Point, to: Point) -> Result<bool, ()> {
         self.tests += 1;
-        Ok(a == Point::new(109.5, 42.5) && 44.5 < b.y())
+        Ok(from == Point::new(109.5, 42.5) && 44.5 < to.y())
     }
 
     fn pass_ends(&mut self) {
@@ -466,24 +467,28 @@ fn closed_rectangle_closes_the_node_cells_under_it() {
     // tile (0, 0) has no passable neighbour: its level-3, 2 and 1 cells are mixed, and the
     // four tiles of the level-1 cell are nodes
     let walls = |tile: Tile| tile == Tile::new(1, 0) || tile == Tile::new(0, 1);
-    let mut p = Planner::new(
+    let mut planned = Planner::new(
         GridSize::new(16, 8),
         vec![TerrainId::named(0); 128],
         Restriction::new(vec![1.0]),
         &Tiles::with_blocked(GridSize::new(16, 8), walls),
     );
-    let open = p.clone();
+    let open = planned.clone();
     let node_or_mixed = CellKind::NODE | CellKind::MIXED;
     assert_eq!(
-        p.level(GridLevel::new(1))[0].kind & node_or_mixed,
+        planned.level(GridLevel::new(1))[0].kind & node_or_mixed,
         CellKind::MIXED
     );
-    assert!(p.level(GridLevel::new(0))[0].kind.contains(CellKind::NODE));
+    assert!(
+        planned.level(GridLevel::new(0))[0]
+            .kind
+            .contains(CellKind::NODE)
+    );
     // the corners swapped and the low y off the map
-    p.close_rect(PlanRect::new(5, 3, 1, -2), Mark::Set);
-    assert_eq!(p.region, PlanRect::new(1, 0, 5, 3));
-    let closed = |planner: &Planner, l: u8, x: usize, y: usize| {
-        let grid_level = GridLevel::new(l);
+    planned.close_rect(PlanRect::new(5, 3, 1, -2), Mark::Set);
+    assert_eq!(planned.region, PlanRect::new(1, 0, 5, 3));
+    let closed = |planner: &Planner, level: u8, x: usize, y: usize| {
+        let grid_level = GridLevel::new(level);
         let level_size = planner.level_size(grid_level).width() as usize;
         planner.level(grid_level)[y * level_size + x]
             .edges
@@ -505,42 +510,46 @@ fn closed_rectangle_closes_the_node_cells_under_it() {
         (3, 0, 0, false),
         (3, 1, 0, false),
     ];
-    for (l, x, y, c) in expected {
-        assert_eq!(closed(&p, l, x, y), c, "level {l} ({x}, {y})");
+    for (level, x, y, shut) in expected {
+        assert_eq!(
+            closed(&planned, level, x, y),
+            shut,
+            "level {level} ({x}, {y})"
+        );
     }
     // the closed bit is added once
-    let once = p.clone();
-    p.close_rect(PlanRect::new(1, 0, 5, 3), Mark::Set);
-    assert_eq!(p, once);
-    assert_eq!(p.level(GridLevel::new(0))[1].edges, CellEdges::CLOSED);
+    let once = planned.clone();
+    planned.close_rect(PlanRect::new(1, 0, 5, 3), Mark::Set);
+    assert_eq!(planned, once);
+    assert_eq!(planned.level(GridLevel::new(0))[1].edges, CellEdges::CLOSED);
     // the high corner past the map's size holds at its last tile: everything reopens
-    p.close_rect(PlanRect::new(0, 0, 20, 9), Mark::Clear);
-    assert_eq!(p.region, PlanRect::new(0, 0, 15, 7));
-    p.region = open.region;
-    assert_eq!(p, open);
+    planned.close_rect(PlanRect::new(0, 0, 20, 9), Mark::Clear);
+    assert_eq!(planned.region, PlanRect::new(0, 0, 15, 7));
+    planned.region = open.region;
+    assert_eq!(planned, open);
 }
 
 #[test]
 fn the_open_list_pops_the_cheapest_and_the_older_of_equal_costs_first() {
-    let node = |f: f32| Node {
+    let node = |cost: f32| Node {
         cell: CellIndex::new(0),
         at: PlanTile::new(0, 0),
         entry: PlanTile::new(0, 0),
-        f: Distance::new(f),
-        g: Distance::ZERO,
+        total: Distance::new(cost),
+        cost: Distance::ZERO,
         level: GridLevel::TILES,
         dir: CellEdges::NONE,
         shortcut: false,
         parent: None,
     };
     let mut nodes = Nodes::default();
-    let ids = [5.5, 5.25, 5.25, 7.0, 6.5].map(|f| nodes.push(node(f)));
+    let ids = [5.5, 5.25, 5.25, 7.0, 6.5].map(|cost| nodes.push(node(cost)));
     let mut open = OpenList::default();
     for id in ids {
         open.push(id, &nodes);
     }
     let order: Vec<NodeIndex> = from_fn(|| open.pop(&nodes).unwrap()).collect();
-    assert_eq!(order, [1, 2, 0, 4, 3].map(|i| ids[i]));
+    assert_eq!(order, [1, 2, 0, 4, 3].map(|index| ids[index]));
     assert!(open.is_empty());
 }
 

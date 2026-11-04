@@ -10,7 +10,7 @@ use crate::objects::ObjectState;
 use crate::objects::layers::Building;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObstructionKind;
-use crate::objects::masters::PlayersMasters;
+use crate::objects::masters::PlayersMastersExt;
 use crate::objects::masters::player_master;
 use crate::objects::masters::{Master, OwnerMasters};
 use crate::objects::unit::Unit;
@@ -19,7 +19,7 @@ use crate::players::PlayerId;
 use crate::world::index::ObjectsRef;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 use crate::world::{GATE_COUNT_CAP, GATE_QUERY_RECORDS, World};
 use crate::{GenieError, GenieResult};
 
@@ -45,7 +45,7 @@ pub fn lets_pass(
         && gate.life.state < ObjectState::Dying
         && roles.of_class(master.class).contains(ClassRoles::GATE)
         && transforms
-        && !layer.gate.is_some_and(|g| g.locked)
+        && !layer.gate.is_some_and(|gate| gate.locked)
         && spatial.allied_with(owner, player)
         && spatial.allied_with(player, owner)
 }
@@ -67,20 +67,20 @@ pub(crate) fn gate_units(
 ) -> GenieResult<(Vec<ObjectId>, usize)> {
     let turn_tuning = &by_id.tuning().turn;
     let roles = by_id.roles();
-    let [a, b] = annexes[..] else {
+    let [first, second] = annexes[..] else {
         return Err(GenieError::unsupported("a gate without its two annexes"));
     };
     let place = |id| {
         spatial
             .get(id)
-            .map(|p| p.position.ground())
+            .map(|placed| placed.position.ground())
             .ok_or(GenieError::unsupported("a gate's annex without a place"))
     };
-    let (from, to) = (place(a)?, place(b)?);
+    let (from, to) = (place(first)?, place(second)?);
     let rect = Rect::spanning(from, to);
     let owner = spatial
         .get(gate)
-        .map(|p| p.player)
+        .map(|placed| placed.player)
         .ok_or(GenieError::unsupported("a gate without a place"))?;
     spatial.check_known_records(rect.grown(Distance::new(turn_tuning.gate_grow)))?;
     let hits = spatial.walk_hits(WalkQuery {
@@ -90,7 +90,11 @@ pub(crate) fn gate_units(
         grow: Distance::new(turn_tuning.gate_grow),
         ally_factor: 1.0,
         player: Some(owner),
-        ignore: &[RecordId::from(gate), RecordId::from(a), RecordId::from(b)],
+        ignore: &[
+            RecordId::from(gate),
+            RecordId::from(first),
+            RecordId::from(second),
+        ],
         objects: by_id,
     })?;
     if GATE_QUERY_RECORDS < hits.len() {
@@ -235,7 +239,7 @@ impl World {
         let players = self.players.len();
         let next = PlayerId::try_from(gate_owner.index() + 1)
             .ok()
-            .filter(|n| n.index() < players);
+            .filter(|player_id| player_id.index() < players);
         for (other, is_open) in PlayerId::each(players).zip(open.iter_mut()).skip(1) {
             if !*is_open {
                 continue;
@@ -252,19 +256,19 @@ impl World {
                 }
                 let gate = &self.players.live(other, list_index)?;
                 let (id, master) = (gate.id, gate.life.master_id);
-                let Some(m) = player_master(&self.model.masters, other, master) else {
+                let Some(master) = player_master(&self.model.masters, other, master) else {
                     continue;
                 };
                 let record = Obstruction {
-                    kind: m.obstruction_kind,
-                    class: m.obstruction_class,
+                    kind: master.obstruction_kind,
+                    class: master.obstruction_class,
                 };
                 // a gate part of obstruction kind 0 (the gate's middle, master 91) gets none
                 if record.recorded()
                     && self
                         .spatial
                         .get(id)
-                        .is_some_and(|g| g.obstruction.is_none())
+                        .is_some_and(|placed| placed.obstruction.is_none())
                 {
                     self.spatial.add_record(id, record);
                     if let Some(placed) = self.spatial.get(id).copied() {

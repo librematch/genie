@@ -50,7 +50,7 @@ use crate::world::load::top_actions::gathering::{import_gather, import_hunt, imp
 use genie_save::generated::world::ActionList;
 
 /// A task slot's task of a master (the master, the slot).
-type TaskAt<'a> = &'a dyn Fn(i16, i16) -> GenieResult<Task>;
+type TaskAt<'env> = &'env dyn Fn(i16, i16) -> GenieResult<Task>;
 
 /// What `saved_actions` finds an object without actions: a state the caller rules out.
 const NO_ACTIONS: GenieError =
@@ -91,7 +91,7 @@ pub fn saved_actions(
     }
     let saved = Saved {
         object,
-        s: rge_static_object,
+        static_part: rge_static_object,
         objects,
         action,
         base,
@@ -144,19 +144,19 @@ const fn holds_second_target(kind: ActionKind) -> bool {
 
 /// What a saved top action's import reads: the object, its static part, its player's objects,
 /// the action and its base, and the sprites' table.
-struct Saved<'a> {
-    object: &'a genie_save::Object,
-    s: &'a RgeStaticObject,
-    objects: &'a PlayerObjects,
-    action: &'a Action,
-    base: &'a RgeAction,
-    graphics: Option<&'a Graphics>,
+struct Saved<'save> {
+    object: &'save genie_save::Object,
+    static_part: &'save RgeStaticObject,
+    objects: &'save PlayerObjects,
+    action: &'save Action,
+    base: &'save RgeAction,
+    graphics: Option<&'save Graphics>,
 }
 
 impl Saved<'_> {
     /// The task of the action's slot (`short_val`).
     fn task(&self, task_at: TaskAt<'_>) -> GenieResult<Task> {
-        task_at(self.s.master_obj, self.base.short_val)
+        task_at(self.static_part.master_obj, self.base.short_val)
     }
 
     /// The action's first sub-action when it is a `MoveTo`, none without one; `other` for any
@@ -229,7 +229,7 @@ fn import_artifact(
     actions.list.set_artifact(Some(Artifact {
         state: ArtifactState::of_byte(base.state)?,
         timer: Seconds::new(base.timer),
-        gaia: saved.s.owner == 0,
+        gaia: saved.static_part.owner == 0,
         sub: move_to.map(|move_to| ArtifactSub::Walk { move_to }),
         goal: if base.target_id == -1 {
             move_to.and_then(|_| target_point(base))
@@ -312,7 +312,7 @@ fn saved_move_to_sprite(
         return Ok(None);
     };
     graphics
-        .and_then(|g| g.get(id).copied())
+        .and_then(|graphics| graphics.get(id).copied())
         .map(Some)
         .ok_or_else(|| {
             GenieError::missing_data("a saved MoveTo's sprite outside the sprites' table")
@@ -343,7 +343,7 @@ fn import_missile(saved: &Saved<'_>, actions: &mut layers::Action) -> GenieResul
     // the hit mode copies the master's (`+0x80`, a miss's 1 is not saved)
     let hit_mode = saved
         .objects
-        .master(saved.s.master_obj)
+        .master(saved.static_part.master_obj)
         .and_then(|master| master.rge_master.as_deref())
         .and_then(|rge_master| rge_master.rge_master_missile_object.as_deref())
         .map_or(HitMode::TARGET_ALONE, |rge_master_missile_object| {
@@ -385,7 +385,7 @@ fn import_fly(
         state: FlyState::of_byte(base.state, move_to)?,
         timer: Seconds::new(base.timer),
         home: Point::new(base.target_x, base.target_y),
-        task: fly_task(saved.s.master_obj)?,
+        task: fly_task(saved.static_part.master_obj)?,
     }));
     Ok(())
 }
@@ -402,7 +402,7 @@ fn import_build(
         .move_to_sub(OTHER_SUB_ACTION)?
         .map(|action| saved_sub_move_to(action, saved.graphics))
         .transpose()?;
-    let task = work(saved.s.master_obj)?;
+    let task = work(saved.static_part.master_obj)?;
     actions.list.set_build(Some(BuildAction {
         target: FoundationId::of_field(base.target_id),
         state: BuildState::of_byte(base.state, move_to)?,
@@ -445,7 +445,7 @@ fn import_repair(
         task: RepairTask::of(&task),
         range: saved
             .objects
-            .master(saved.s.master_obj)
+            .master(saved.static_part.master_obj)
             .and_then(combat_master)
             .map_or(Distance::ZERO, |rge_master_combat_object| {
                 Distance::new(rge_master_combat_object.weapon_range)

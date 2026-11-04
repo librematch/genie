@@ -20,17 +20,17 @@ use crate::vision::visibility::Seeing;
 use crate::world::GameMode;
 
 fn world(players: PlayerId) -> Visibility {
-    let n = 120 * 120;
+    let tiles = 120 * 120;
     Visibility::new(
         GridSize::new(120, 120),
         vec![
             VisibleMap {
-                counts: vec![-1; n],
+                counts: vec![-1; tiles],
                 explored: TileCount::ZERO,
             };
             players.index()
         ],
-        vec![VisionBits::NONE; n],
+        vec![VisionBits::NONE; tiles],
         Vec::new(),
         0,
         vec![PlayerKind::Human; players.index()],
@@ -175,8 +175,8 @@ fn changed_mask_is_the_answer_for_an_object_taken_over_by_sight() {
     gaia.capture = CaptureKind::BySight;
     visibility.add_seer(object_id(7), gaia);
     visibility.add_seer(object_id(8), unit(PlayerId::new(0), Distance::new(2.0)));
-    let i = 10 * 120 + 10;
-    visibility.unified[i] = VisionBits::from_bits_retain(0b011);
+    let tile = 10 * 120 + 10;
+    visibility.unified[tile] = VisionBits::from_bits_retain(0b011);
     let at = Position::new(10.5, 10.5, 0.0);
     assert_eq!(
         visibility.combat_sight(
@@ -224,22 +224,24 @@ fn changed_mask_is_the_answer_for_an_object_taken_over_by_sight() {
 #[test]
 fn an_ownership_change_writes_the_new_owner_into_the_object_records() {
     let mut visibility = world(PlayerId::new(3));
-    let mut r = Registry::new(3, 65);
-    r.entries
+    let mut registry = Registry::new(3, 65);
+    registry
+        .entries
         .get_or_insert_with(object_id(7), Default::default)
         .unwrap()
         .mask = VisionBits::from_bits_retain(0b11);
-    r.update_unit(UnitUpdate {
-        id: object_id(7),
-        owner: PlayerId::new(0),
-        position: Point::new(10.5, 10.5),
-        radii: Footprint::new(0.2, 0.2),
-        class: class::CLASS_6,
-        old: VisionBits::NONE,
-        new: VisionBits::from_bits_retain(0b11),
-    })
-    .unwrap();
-    visibility.registry = Some(r);
+    registry
+        .update_unit(UnitUpdate {
+            id: object_id(7),
+            owner: PlayerId::new(0),
+            position: Point::new(10.5, 10.5),
+            radii: Footprint::new(0.2, 0.2),
+            class: class::CLASS_6,
+            old: VisionBits::NONE,
+            new: VisionBits::from_bits_retain(0b11),
+        })
+        .unwrap();
+    visibility.registry = Some(registry);
     visibility
         .records_owner(object_id(7), PlayerId::new(2))
         .unwrap();
@@ -294,8 +296,11 @@ fn an_ownership_change_moves_the_sight_of_an_object_that_sees() {
     assert_eq!(visibility.maps[0].counts[tile(12, 10)], 0);
     assert_eq!(visibility.maps[1].counts[tile(13, 10)], 1);
     assert_eq!(visibility.maps[1].counts[tile(14, 10)], -1);
-    let s = visibility.seer(object_id(7)).copied().unwrap();
-    assert_eq!((s.player, s.los), (PlayerId::new(1), Distance::new(3.0)));
+    let seer = visibility.seer(object_id(7)).copied().unwrap();
+    assert_eq!(
+        (seer.player, seer.los),
+        (PlayerId::new(1), Distance::new(3.0))
+    );
     visibility
         .owner_changed(
             object_id(7),
@@ -630,7 +635,7 @@ fn unit_sight_moves_with_its_tile_and_shrinks_to_its_footprint_when_it_dies() {
         )
         .unwrap();
     let seen: Vec<_> = (0..120 * 120)
-        .filter(|&i| 0 < visibility.maps[1].counts[i])
+        .filter(|&tile| 0 < visibility.maps[1].counts[tile])
         .collect();
     assert_eq!(
         seen,
@@ -651,7 +656,7 @@ fn unit_sight_moves_with_its_tile_and_shrinks_to_its_footprint_when_it_dies() {
             tuning().visibility,
         )
         .unwrap();
-    assert!(visibility.maps[1].counts.iter().all(|&c| c <= 0));
+    assert!(visibility.maps[1].counts.iter().all(|&count| count <= 0));
 }
 
 #[test]
@@ -852,13 +857,13 @@ fn building_sees_its_footprint_while_built_then_its_circle_from_tile_corner() {
             },
         )
         .unwrap();
-    assert!(world.maps[2].counts.iter().all(|&c| c == -1));
+    assert!(world.maps[2].counts.iter().all(|&count| count == -1));
     world
         .construction_started(object_id(9), at, footprint, &roles(), tuning().visibility)
         .unwrap();
     let seen = |visibility: &Visibility| {
         (0..120 * 120)
-            .filter(|&i| 0 < visibility.maps[2].counts[i])
+            .filter(|&tile| 0 < visibility.maps[2].counts[tile])
             .count()
     };
     assert_eq!(seen(&world), 4);

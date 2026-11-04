@@ -20,7 +20,7 @@ use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 use crate::world::settings::FarmMode;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 use crate::world::step::Step;
 use crate::{GenieError, GenieResult};
 use std::mem::take as mem_take;
@@ -78,13 +78,13 @@ impl GatherAction {
     /// sprite draws from the Sprite stream; none shows nothing new.
     pub(super) fn show(step: &mut Step<'_>, unit: &mut Unit, sprite: Option<Graphic>) {
         if let Some(graphic) = sprite {
-            let rng = step.w.streams.get(Stream::Sprite);
+            let rng = step.world.streams.get_mut(Stream::Sprite);
             new_sprite(
                 &mut unit.sprite,
-                step.w.parts.move_stats_mut(unit.id),
+                step.world.parts.move_stats_mut(unit.id),
                 graphic,
                 rng,
-                step.w.model.tuning.sprite,
+                step.world.model.tuning.sprite,
             );
         }
     }
@@ -176,7 +176,7 @@ impl GatherAction {
             && roles.of_some_attribute(unit.life.attribute_kind).contains(AttributeRoles::FARM_FOOD)
         {
             let sold = mem_take(&mut unit.life.amount);
-            step.give_load(step.w.model.slots.attribute.food, sold)?;
+            step.give_load(step.world.model.slots.attribute.food, sold)?;
             return Ok(Next::Stay);
         }
         let empty = target.amount <= Amount::ZERO
@@ -229,7 +229,7 @@ impl GatherAction {
                 self.random_wait(step, unit);
                 return Ok(Dropped::Going);
             }
-            SubCode::Done => self.tear_down(step.w.parts.mover_mut(unit.id))?,
+            SubCode::Done => self.tear_down(step.world.parts.mover_mut(unit.id))?,
         }
         // the drop site gone: set_state(8) again
         let Some(site) = site else {
@@ -239,12 +239,12 @@ impl GatherAction {
             self.set_idle(step, unit, gather_reads);
             return Ok(Dropped::Idle);
         }
-        if step.w.model.tuning.gather.drop_reach < site.gap_squared.get() {
+        if step.world.model.tuning.gather.drop_reach < site.gap_squared.get() {
             self.random_wait(step, unit);
             return Ok(Dropped::Going);
         }
-        let attributes = step.w.players.player(step.player)?.attributes.len();
-        let kind = resource_kind(unit.life.attribute_kind, attributes, step.w.model.slots);
+        let attributes = step.world.players.player(step.player)?.attributes.len();
+        let kind = resource_kind(unit.life.attribute_kind, attributes, step.world.model.slots);
         let amount = unit.life.amount;
         unit.life.attribute_kind = None;
         unit.life.amount = Amount::ZERO;
@@ -255,8 +255,9 @@ impl GatherAction {
     /// half, and the unit's animation stops at once (`FUN_141161850`: its `+0x7b8` 0).
     pub(super) fn random_wait(&mut self, step: &mut Step<'_>, unit: &Unit) {
         self.timer = Seconds::new(
-            step.w.streams.get(Stream::Action).float01() - step.w.model.tuning.gather.wait_shift,
+            step.world.streams.get_mut(Stream::Action).float01()
+                - step.world.model.tuning.gather.wait_shift,
         );
-        step.w.parts.set_anim_speed(unit.id, Speed::ZERO);
+        step.world.parts.set_anim_speed(unit.id, Speed::ZERO);
     }
 }

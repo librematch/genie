@@ -2,7 +2,7 @@
 
 use crate::objects::masters::ClassId;
 
-/// A set of classes as the game's code tests it: a 64-bit mask, bit `c` for class `c`, read
+/// A set of classes as the game's code tests it: a 64-bit mask, bit `class` for class `class`, read
 /// only for a class below `below` (the class taken as unsigned, so −1 and the other negative
 /// classes are never in it). The game's routines inline each such test with its own mask and
 /// bound.
@@ -27,8 +27,8 @@ impl ClassMask {
     /// Whether `class` is in the set: below the bound (unsigned) and its bit set.
     #[must_use]
     pub const fn contains(self, class: ClassId) -> bool {
-        let c = class.get() as u16 as u32;
-        c < self.below && (self.bits >> c) & 1 != 0
+        let bit = class.get() as u16 as u32;
+        bit < self.below && (self.bits >> bit) & 1 != 0
     }
 }
 
@@ -40,7 +40,7 @@ mod tests {
     #[test]
     fn class_is_in_the_mask_below_its_bound() {
         let set = ClassMask::new(0x0012_0000_0000_0008, 0x35);
-        let has = |c: i16| set.contains(ClassId::of_master(c));
+        let has = |class: i16| set.contains(ClassId::of_master(class));
         assert!(has(3) && has(49) && has(52));
         assert!(!has(4) && !has(-1));
         assert!(!ClassMask::new(1 << 52, 52).contains(ClassId::of_master(52)));

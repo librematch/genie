@@ -17,11 +17,11 @@ use crate::world::step::Step;
 impl HuntReads {
     /// What the `MoveTo`s the update makes read of `unit` with its mover, with the sprites'
     /// table `graphics`.
-    pub(crate) fn walks<'g>(
+    pub(crate) fn walks<'graphics>(
         &self,
-        graphics: &'g Graphics,
+        graphics: &'graphics Graphics,
         unit: (&Unit, Option<&Mover>),
-    ) -> Walks<'g> {
+    ) -> Walks<'graphics> {
         let sprites = SpriteReads {
             defaults: self.defaults,
             graphics,
@@ -112,8 +112,8 @@ impl HuntAction {
         };
         if matches!(state, Some(MoveTo::Start | MoveTo::Moving)) {
             unit.post_in_the_way(
-                step.w.parts.motion.mover_mut(unit.id),
-                &mut step.w.parts.unit_ai,
+                step.world.parts.motion.mover_mut(unit.id),
+                &mut step.world.parts.unit_ai,
             )?;
         }
         Ok(code)

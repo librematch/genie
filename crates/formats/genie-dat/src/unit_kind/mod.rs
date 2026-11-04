@@ -109,8 +109,8 @@ impl PartialOrd for UnitBaseClass {
 impl TryFrom<u8> for UnitBaseClass {
     type Error = GenieError;
 
-    fn try_from(n: u8) -> GenieResult<Self> {
-        match n {
+    fn try_from(byte: u8) -> GenieResult<Self> {
+        match byte {
             10 => Ok(Self::Static),
             20 => Ok(Self::Animated),
             25 => Ok(Self::Doppelganger),
@@ -121,9 +121,9 @@ impl TryFrom<u8> for UnitBaseClass {
             70 => Ok(Self::Combat),
             80 => Ok(Self::Building),
             90 => Ok(Self::Tree),
-            n => Err(
+            other => Err(
                 GenieError::invalid_input("a unit base class this reader does not know")
-                    .with("class", n),
+                    .with("class", other),
             ),
         }
     }

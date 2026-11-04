@@ -17,7 +17,7 @@ use crate::objects::SpriteId;
 use crate::objects::UpdateCode;
 use crate::objects::layers::Action;
 use crate::objects::masters::OwnerMasters;
-use crate::objects::masters::PlayersMasters;
+use crate::objects::masters::PlayersMastersExt;
 use crate::objects::sprite::Cargo;
 use crate::objects::sprite::standing;
 use crate::objects::teardown::HeadCode;
@@ -32,7 +32,7 @@ use crate::world::Unread;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
 use crate::world::lets::release;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 use crate::world::step::Step;
 
 impl Unit {
@@ -52,46 +52,46 @@ impl Unit {
     ) -> GenieResult<()> {
         // RGE_Moving_Object::update counts the last human order time down before its velocity
         // step
-        if step.w.parts.mover_of(self.id).is_some() {
+        if step.world.parts.mover_of(self.id).is_some() {
             self.count_down_human_order(step.dt);
         }
         // the velocity step (FUN_140f9ba80) runs for a unit with velocity data (+0x868)
         let group = match step
-            .w
+            .world
             .parts
             .mover_of(self.id)
-            .and_then(|m| m.velocity.as_ref())
+            .and_then(|mover| mover.velocity.as_ref())
         {
             Some(_) => self.group_speed(
-                (actions, step.w.parts.unread.get(self.id)),
-                &step.w.groups,
+                (actions, step.world.parts.unread.get(self.id)),
+                &step.world.groups,
                 OwnerMasters::new(
-                    &step.w.parts.own_master,
-                    step.w.model.masters.of(step.player),
+                    &step.world.parts.own_master,
+                    step.world.model.masters.of(step.player),
                 ),
-                step.w.parts.unit_ai.get(self.id),
+                step.world.parts.unit_ai.get(self.id),
                 roles,
             )?,
             None => None,
         };
-        if let Some(mover) = step.w.parts.mover_mut(self.id) {
+        if let Some(mover) = step.world.parts.mover_mut(self.id) {
             let here = self.place.position();
             let at = mover.step_velocity(
                 here,
                 step.dt.seconds(),
-                step.w.spatial.map,
-                step.w.spatial.terrain.as_ref(),
-                (step.w.world_time, group),
-                &step.w.model.tuning.movement,
+                step.world.spatial.map,
+                step.world.spatial.terrain.as_ref(),
+                (step.world.world_time, group),
+                &step.world.model.tuning.movement,
             );
             if at != here {
                 mover.new_position(
                     &mut self.place,
                     self.id,
                     at,
-                    (&mut step.w.spatial, Some(&mut step.w.pathing)),
+                    (&mut step.world.spatial, Some(&mut step.world.pathing)),
                     roles,
-                    step.w.model.tuning.visibility,
+                    step.world.model.tuning.visibility,
                 )?;
             }
             // RGE_Moving_Object::update: a unit that moves animates at its speed (+0x7b8)
@@ -99,7 +99,7 @@ impl Unit {
                 let [x, y, z] = velocity.velocity.get();
                 let speed = sqrt(x * x + y * y + z * z);
                 if SPEED_EPSILON < speed {
-                    step.w.parts.set_anim_speed(self.id, Speed::new(speed));
+                    step.world.parts.set_anim_speed(self.id, Speed::new(speed));
                 }
             }
         }
@@ -154,23 +154,27 @@ impl Unit {
     pub(crate) fn move_to_part(
         &mut self,
         actions: &mut Action,
-        c: &mut Step<'_>,
+        context: &mut Step<'_>,
         me: Me,
         roles: &Roles,
     ) -> GenieResult<HeadCode> {
-        if let Some(code) = self.own_move_held(actions, c)? {
+        if let Some(code) = self.own_move_held(actions, context)? {
             return Ok(HeadCode::of(code));
         }
-        let step = self.own_move_step(actions, c, me, roles)?;
+        let step = self.own_move_step(actions, context, me, roles)?;
         if step.gave_up {
-            self.own_move_give_up(actions, c, roles)?;
+            self.own_move_give_up(actions, context, roles)?;
         }
         if step.target_moved {
-            self.post_own(&mut c.w.parts.unit_ai, NotifyKind::TARGET_MOVED, [0, 0, 0])?;
+            self.post_own(
+                &mut context.world.parts.unit_ai,
+                NotifyKind::TARGET_MOVED,
+                [0, 0, 0],
+            )?;
         }
         let ended = step.end != StepEnd::Going;
         if ended {
-            self.own_move_end(c, step.end)?;
+            self.own_move_end(context, step.end)?;
         }
         Ok(HeadCode::ended(ended))
     }
@@ -184,18 +188,18 @@ impl Unit {
         roles: &Roles,
     ) -> GenieResult<()> {
         let villager = roles
-            .of_class(self.master(step.w.master_tables(), step.player)?.class)
+            .of_class(self.master(step.world.master_tables(), step.player)?.class)
             .contains(ClassRoles::VILLAGER);
         let stance = step
-            .w
+            .world
             .parts
             .unit_ai
             .get(self.id)
             .map_or(UnitStance::Aggressive, |ai| ai.stance);
         self.own_move_gave_up(
             actions,
-            step.w.parts.motion.layer_mut(self.id),
-            if villager && !step.w.players.player(step.player)?.kind.is_computer() {
+            step.world.parts.motion.layer_mut(self.id),
+            if villager && !step.world.players.player(step.player)?.kind.is_computer() {
                 Patience::WaitsOnce
             } else {
                 Patience::Fails
@@ -203,13 +207,13 @@ impl Unit {
             stance,
             (
                 OwnerMasters::new(
-                    &step.w.parts.own_master,
-                    step.w.model.masters.of(step.player),
+                    &step.world.parts.own_master,
+                    step.world.model.masters.of(step.player),
                 ),
-                &step.w.model.graphics,
-                step.w.streams.get(Stream::Sprite),
+                &step.world.model.graphics,
+                step.world.streams.get_mut(Stream::Sprite),
             ),
-            step.w.model.tuning.sprite,
+            step.world.model.tuning.sprite,
         )
     }
 
@@ -228,8 +232,8 @@ impl Unit {
             return Ok(None);
         };
         let target = move_to.target;
-        let state = step.w.object_state(target);
-        let mut inbox = step.w.parts.unit_ai.inbox(self.id, self.life.state);
+        let state = step.world.object_state(target);
+        let mut inbox = step.world.parts.unit_ai.inbox(self.id, self.life.state);
         let code = move_to.check_held(state, &mut inbox)?;
         let releases = code.is_some() && move_to.voice.is_loud();
         if releases && let Some(target) = target {
@@ -255,33 +259,35 @@ impl Unit {
                 let point = match move_to.target {
                     None => Some(move_to.point.ground()),
                     Some(id) => step
-                        .w
+                        .world
                         .spatial
                         .get(id)
                         .map(|placed| placed.position.ground()),
                 };
                 let ask = match point {
-                    Some(p) if move_to.state == MoveTo::Start => UnitAi::path_ask(
-                        step.w.parts.unit_ai.get_mut(self.id),
+                    Some(point) if move_to.state == MoveTo::Start => UnitAi::path_ask(
+                        step.world.parts.unit_ai.get_mut(self.id),
                         self.place.position().ground(),
-                        p,
-                        &step.w.model.tuning.unit_ai,
+                        point,
+                        &step.world.model.tuning.unit_ai,
                     ),
                     _ => PathAsk::default(),
                 };
                 // its set_state 1 and 13 show slot 0x798's sprite; slot 0x68 takes the master's
                 // standing sprite for a null one
                 let master = object_master(
-                    step.w.parts.own_master.get(self.id),
+                    step.world.parts.own_master.get(self.id),
                     (self.id, self.life.master_id),
-                    step.w.model.masters.of(step.player),
+                    step.world.model.masters.of(step.player),
                 )
                 .ok();
-                let graphic =
-                    |id: Option<SpriteId>| id.and_then(|id| step.w.model.graphics.get(id).copied());
-                let look = step.w.parts.combat_of(self.id).abilities.look.as_ref();
-                let standing = graphic(master.and_then(|m| standing(m, look, Cargo::Empty, roles)));
-                let master_standing = graphic(master.and_then(|m| m.standing_sprite));
+                let graphic = |id: Option<SpriteId>| {
+                    id.and_then(|id| step.world.model.graphics.get(id).copied())
+                };
+                let look = step.world.parts.combat_of(self.id).abilities.look.as_ref();
+                let standing =
+                    graphic(master.and_then(|master| standing(master, look, Cargo::Empty, roles)));
+                let master_standing = graphic(master.and_then(|master| master.standing_sprite));
                 let (walk, rng) = step.walk_and_sprites(&mut self.place, me)?;
                 let shows = Shows {
                     sprite: &mut self.sprite,
@@ -305,7 +311,7 @@ impl Unit {
             NotifyKind::ACTION_COMPLETED
         };
         self.post_own(
-            &mut step.w.parts.unit_ai,
+            &mut step.world.parts.unit_ai,
             notify,
             [AiAction::Move.value(), 0, 0],
         )
@@ -340,8 +346,8 @@ impl Unit {
             return Ok(());
         };
         let flown = fly.update(step, self, me);
-        if let Some(f) = actions.list.fly_mut() {
-            *f = fly;
+        if let Some(listed) = actions.list.fly_mut() {
+            *listed = fly;
         }
         flown
     }

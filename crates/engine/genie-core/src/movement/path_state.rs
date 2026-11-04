@@ -67,8 +67,8 @@ mod tests {
     /// Each state reads back from its value; the values without a state are errors.
     #[test]
     fn its_states_read_back_from_their_values() {
-        for v in [i32::MIN, -1, 1, 7, 256, i32::MAX] {
-            assert!(PathState::of_int(v).is_err(), "{v}");
+        for value in [i32::MIN, -1, 1, 7, 256, i32::MAX] {
+            assert!(PathState::of_int(value).is_err(), "{value}");
         }
         for index in 0..=6 {
             match PathState::of_int(index) {

@@ -14,13 +14,13 @@ use crate::objects::HitPoints;
 use crate::objects::lifecycle::Lifecycle;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::PlayersMasters;
+use crate::objects::masters::PlayersMastersExt;
 use crate::objects::masters::Task;
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Unit;
 use crate::objects::unit::object_master;
 use crate::players::Amount;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 use crate::world::step::Step;
 use genie_diff::Diff;
 
@@ -133,16 +133,16 @@ impl MakeAction {
         roles: &Roles,
     ) -> GenieResult<HeadCode> {
         let master = object_master(
-            step.w.parts.own_master.get(farm.id),
+            step.world.parts.own_master.get(farm.id),
             (farm.id, farm.life.master_id),
-            step.w.model.masters.of(step.player),
+            step.world.model.masters.of(step.player),
         )?;
         match self.state {
             // `+0x18`: the state whose update reports the action done (`FUN_140a99e30` returns 1).
             MakeState::Done => return Ok(HeadCode::Deletes),
             MakeState::Making if Amount::ZERO < self.remaining || self.total <= Amount::ZERO => {
                 let rate = (master.action_part().work_rate
-                    + step.w.parts.combat_of(farm.id).work_rate_powerup)
+                    + step.world.parts.combat_of(farm.id).work_rate_powerup)
                     * self.task.work_val1.get()
                     * step.dt.seconds();
                 let before = farm.life.amount;
@@ -155,7 +155,7 @@ impl MakeAction {
                     }
                 } else {
                     let attribute = self.task.attribute_kind.ok_or(NO_ATTRIBUTE)?;
-                    step.w
+                    step.world
                         .players
                         .player_mut(step.player)?
                         .add_attribute(attribute, Amount::new(rate))?;

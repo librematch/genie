@@ -42,9 +42,9 @@ use crate::{GenieError, GenieResult};
 /// What a gather's start takes besides its mover and stream ([`GatherAction::start`]'s
 /// arguments).
 #[derive(Debug)]
-pub struct GatherStart<'a> {
+pub struct GatherStart<'world> {
     /// The target.
-    pub(crate) target: &'a Resource,
+    pub(crate) target: &'world Resource,
     /// The owner.
     pub(crate) player: PlayerId,
     /// The owner's type (`player+0x10`; [`PlayerKind::is_computer`] is `FUN_141659cf0`).
@@ -52,23 +52,23 @@ pub struct GatherStart<'a> {
     /// The game settings' test `FUN_141302150`.
     pub(crate) carry_rule: bool,
     /// What the gatherer carries, its resource kind and amount.
-    pub(crate) held: &'a mut Held,
+    pub(crate) held: &'world mut Held,
     /// What its `MoveTo`s' constructors read of the gatherer; its load is `held`'s.
-    pub(crate) walks: Walks<'a>,
+    pub(crate) walks: Walks<'world>,
 }
 
 /// What a gather's retarget takes besides its mover and stream ([`GatherAction::retarget`]'s
 /// arguments).
 #[derive(Clone, Copy, Debug)]
-pub struct GatherRetarget<'a> {
+pub struct GatherRetarget<'world> {
     /// The work command's new target.
-    pub(crate) target: &'a Resource,
+    pub(crate) target: &'world Resource,
     /// The owner.
     pub(crate) player: PlayerId,
     /// The owner's type (`player+0x10`; [`PlayerKind::is_computer`] is `FUN_141659cf0`).
     pub(crate) player_kind: PlayerKind,
     /// What the gatherer carries and the sprites its `MoveTo`s take for none.
-    pub(crate) walks: Walks<'a>,
+    pub(crate) walks: Walks<'world>,
     /// The game's farm setting: walkable, a stop farm or a fish trap keeps its place as the
     /// farm's.
     pub(crate) farm_mode: FarmMode,
@@ -508,9 +508,11 @@ impl GatherAction {
         move_to_tuning: &MoveToTuning,
     ) -> GenieResult<()> {
         let held = walks.held.amount;
-        match target.filter(|t| t.player == player && t.drop_site && Amount::ZERO < held) {
-            Some(t)
-                if Some(t.id) == self.carry_to.map(DropSiteId::id)
+        match target.filter(|move_target| {
+            move_target.player == player && move_target.drop_site && Amount::ZERO < held
+        }) {
+            Some(target)
+                if Some(target.id) == self.carry_to.map(DropSiteId::id)
                     && matches!(self.state, GatherState::Drop { .. }) =>
             {
                 Ok(())
@@ -604,7 +606,7 @@ impl GatherAction {
         self.tear_down(mover.as_deref_mut())?;
         self.state = GatherState::Idle;
         self.timer = Seconds::ZERO;
-        stand.show(mover.map(|m| &mut m.stats));
+        stand.show(mover.map(|mover| &mut mover.stats));
         let released = self.targets();
         self.target = None;
         self.carry_to = None;

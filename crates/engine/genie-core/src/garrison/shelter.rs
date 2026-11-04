@@ -35,8 +35,8 @@ use crate::world::World;
 use crate::world::index::Place;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
-use crate::world::slots::CheckedIndex;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::CheckedIndexExt;
+use crate::world::slots::PlayerSlotsExt;
 use crate::{GenieError, GenieResult};
 
 /// A shelter index that the count list of the callers does not cover.
@@ -166,23 +166,23 @@ impl World {
         }
         let mut units = Vec::with_capacity(checked.len());
         for id in checked.into_iter().flatten() {
-            let Some((player_id, u)) = self.object(id) else {
+            let Some((player_id, unit)) = self.object(id) else {
                 continue;
             };
-            let m = u.master(self.master_tables(), player_id)?;
+            let master = unit.master(self.master_tables(), player_id)?;
             if self
                 .model
                 .roles
-                .of_class(m.class)
+                .of_class(master.class)
                 .contains(ClassRoles::VILLAGER)
-                && m.kind == MasterKind::COMBAT
+                && master.kind == MasterKind::COMBAT
             {
                 units.push(id);
             }
             if self
                 .model
                 .roles
-                .of_master(m.id)
+                .of_master(master.id)
                 .contains(MasterRoles::MULE_CART)
             {
                 units.push(id);
@@ -303,14 +303,14 @@ impl World {
         let mut pairs = Vec::new();
         let mut capacities = Vec::with_capacity(all.len());
         for &building in &all {
-            let (bp, b) = self
+            let (bp, unit) = self
                 .object(building)
                 .ok_or(GenieError::unsupported("a garrison's building is gone"))?;
-            let bm = b.master(self.master_tables(), bp)?;
+            let bm = unit.master(self.master_tables(), bp)?;
             capacities.push((bm.kind == MasterKind::BUILDING, bm.garrison, bm.class));
         }
         let first_transport = shelters.buildings.len();
-        for (i, &id) in units.iter().enumerate() {
+        for (unit_index, &id) in units.iter().enumerate() {
             let (player_id, unit) = self
                 .object(id)
                 .ok_or(GenieError::unsupported("a garrison's unit is gone"))?;
@@ -322,13 +322,13 @@ impl World {
                 let (sat, sr) = self.ground(shelter)?;
                 Ok(footprint_gap_squared(at, footprint, sat, sr).get())
             };
-            for (j, (&building, &(is_building, capacity, _))) in
+            for (building_index, (&building, &(is_building, capacity, _))) in
                 shelters.buildings.iter().zip(&capacities).enumerate()
             {
                 if is_building && capacity.holds() && self.takes_in(building, player, copy)? {
                     let gap = gap_to(building.id())?;
                     if gap < reach {
-                        pairs.push((i, j, gap));
+                        pairs.push((unit_index, building_index, gap));
                     }
                 }
             }
@@ -343,24 +343,24 @@ impl World {
                 if has_garrison_task(&list.action_part().tasks, GARRISON, transport_class) {
                     let gap = gap_to(transport.id())?;
                     if gap < reach {
-                        pairs.push((i, first_transport + index, gap));
+                        pairs.push((unit_index, first_transport + index, gap));
                     }
                 }
             }
         }
         sort(
             &mut pairs,
-            &|a: (usize, usize, f32), b: (usize, usize, f32)| a.2 < b.2,
+            &|left: (usize, usize, f32), right: (usize, usize, f32)| left.2 < right.2,
         )?;
         let (going, first_taken) =
             assign_shelters(&pairs, units, (&all, &capacities), shelters.counts.clone())?;
         for building in unordered_map_order(first_taken) {
             // `assign_shelters` takes its buildings from `all` alone
-            let j = all
+            let all = all
                 .iter()
                 .position(|&role_id| role_id == building)
                 .ok_or(NO_LISTED_BUILDING)?;
-            self.shelter_in(building, going.checked(j)?, dispatch)?;
+            self.shelter_in(building, going.checked(all)?, dispatch)?;
         }
         Ok(())
     }
@@ -395,18 +395,18 @@ impl World {
         going: &[ObjectId],
         dispatch: Dispatch,
     ) -> GenieResult<()> {
-        let (bp, b) = self
+        let (bp, shelter) = self
             .object(building)
             .ok_or(GenieError::unsupported("a garrison's building is gone"))?;
         // the splitter tests a unit with a unit AI only
         let keeps = |id: ObjectId| -> GenieResult<bool> {
-            let (p, u) = self.object(id).ok_or_else(|| object_gone(id))?;
-            if !self.parts.unit_ai.contains(u.id) {
+            let (player_id, unit) = self.object(id).ok_or_else(|| object_gone(id))?;
+            if !self.parts.unit_ai.contains(unit.id) {
                 return Ok(true);
             }
-            self.ai_takes(bp, b, p, u.life.master_id)
+            self.ai_takes(bp, shelter, player_id, unit.life.master_id)
         };
-        let (point, owner, master) = (b.position(), bp, b.life.master_id);
+        let (point, owner, master) = (shelter.position(), bp, shelter.life.master_id);
         let mut kept = Vec::with_capacity(going.len());
         for &id in going {
             if self.object(id).is_some() && keeps(id)? {
@@ -473,22 +473,26 @@ fn assign_shelters(
     // each shelter's units, by shelter index, and the order of the shelters' first take
     let mut going: Vec<Vec<ObjectId>> = vec![Vec::new(); all.len()];
     let mut first_taken = Vec::new();
-    for &(i, j, _) in pairs {
+    for &(unit_index, building_index, _) in pairs {
         // the count list is at least as long as the shelters: its callers push a count for
         // each shelter, and FUN_14161e370 one for each gate and annex beside
-        let count = counts.get_mut(j).ok_or(NO_COUNT)?;
-        if !*taken.checked(i)? && count.below(capacities.checked(j)?.1) {
-            going.checked_mut(j)?.push(*units.checked(i)?);
-            first_taken.push(*all.checked(j)?);
+        let count = counts.get_mut(building_index).ok_or(NO_COUNT)?;
+        if !*taken.checked(unit_index)? && count.below(capacities.checked(building_index)?.1) {
+            going
+                .checked_mut(building_index)?
+                .push(*units.checked(unit_index)?);
+            first_taken.push(*all.checked(building_index)?);
             *count = count.plus(InsideCount::ONE);
-            *taken.checked_mut(i)? = true;
+            *taken.checked_mut(unit_index)? = true;
         }
     }
-    for &(i, j, _) in pairs {
-        if !*taken.checked(i)? {
-            going.checked_mut(j)?.push(*units.checked(i)?);
-            first_taken.push(*all.checked(j)?);
-            *taken.checked_mut(i)? = true;
+    for &(unit_index, building_index, _) in pairs {
+        if !*taken.checked(unit_index)? {
+            going
+                .checked_mut(building_index)?
+                .push(*units.checked(unit_index)?);
+            first_taken.push(*all.checked(building_index)?);
+            *taken.checked_mut(unit_index)? = true;
         }
     }
     Ok((going, first_taken))

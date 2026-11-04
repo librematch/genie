@@ -366,9 +366,9 @@ impl Artifact {
     ) -> GenieResult<Option<Handover>> {
         self.walk(step, unit, me, artifact_reads)?;
         let owner = if self.state == ArtifactState::Check && artifact_reads.searches {
-            step.w
+            step.world
                 .spatial
-                .artifact_owner(unit.id, &step.w.players, roles)?
+                .artifact_owner(unit.id, &step.world.players, roles)?
         } else {
             None
         };
@@ -413,8 +413,8 @@ impl Artifact {
                 self.sub = walk.map(|move_to| ArtifactSub::Walk { move_to });
                 if state != MoveTo::Waiting {
                     unit.post_in_the_way(
-                        step.w.parts.motion.mover_mut(unit.id),
-                        &mut step.w.parts.unit_ai,
+                        step.world.parts.motion.mover_mut(unit.id),
+                        &mut step.world.parts.unit_ai,
                     )?;
                 }
                 // its target let go (5; the game's 4 too, which only a loud MoveTo gives): it
@@ -426,7 +426,7 @@ impl Artifact {
             }
         };
         let (voice, released) = self.end_walk();
-        if let Some(mover) = step.w.parts.mover_mut(unit.id) {
+        if let Some(mover) = step.world.parts.mover_mut(unit.id) {
             mover.stop()?;
         }
         if let Some(object_id) = released {
@@ -434,7 +434,7 @@ impl Artifact {
         }
         if let Some(notify) = notify.filter(|_| voice.is_loud()) {
             unit.post_own(
-                &mut step.w.parts.unit_ai,
+                &mut step.world.parts.unit_ai,
                 notify,
                 [AiAction::Move.value(), 0, 0],
             )?;
@@ -511,7 +511,7 @@ fn let_go_gone(
         release(step, unit, object_id, by)?;
     }
     if gone.stops
-        && let Some(mover) = step.w.parts.mover_mut(unit.id)
+        && let Some(mover) = step.world.parts.mover_mut(unit.id)
     {
         mover.stop()?;
     }
@@ -532,7 +532,7 @@ impl Unit {
         slots: Slots,
     ) -> GenieResult<Option<Captured>> {
         let by = self.releaser(step)?;
-        if step.w.ticks <= Tick::new(1) {
+        if step.world.ticks <= Tick::new(1) {
             return Ok(None);
         }
         self.artifact_enter_part(actions, step, me, by, roles)?;
@@ -553,11 +553,11 @@ impl Unit {
         by: Releaser,
         roles: &Roles,
     ) -> GenieResult<()> {
-        let Some(e) = actions.list.artifact_mut().and_then(Artifact::take_enter) else {
+        let Some(enter_action) = actions.list.artifact_mut().and_then(Artifact::take_enter) else {
             return Ok(());
         };
         let own = actions.list.take_enter();
-        actions.list.set_enter(Some(e));
+        actions.list.set_enter(Some(enter_action));
         let updated = self.enter_part(actions, step, me, roles);
         let mut after = actions.list.take_enter();
         actions.list.set_enter(own);
@@ -566,7 +566,7 @@ impl Unit {
         {
             // its sub-action list deletes it (FUN_140a98e20): the Enter's destructor
             Action::Enter(enter_action)
-                .tear_down(step.w.parts.motion_mut(self.id))?
+                .tear_down(step.world.parts.motion_mut(self.id))?
                 .let_go(step, self, by)?;
         }
         if let Some(art) = actions.list.artifact_mut() {
@@ -599,13 +599,14 @@ impl Unit {
             return Ok(None);
         };
         let capture = step
-            .w
+            .world
             .spatial
             .sight
             .as_ref()
             .and_then(|visibility| visibility.seer(self.id))
             .map(|seer| seer.capture);
-        let combat = MasterKind::COMBAT <= self.master(step.w.master_tables(), step.player)?.kind;
+        let combat =
+            MasterKind::COMBAT <= self.master(step.world.master_tables(), step.player)?.kind;
         let artifact_reads = ArtifactReads {
             searches: !(combat && capture == Some(CaptureKind::None)),
             by,
@@ -818,12 +819,12 @@ mod tests {
             stops: true,
             released: Some(object_id(11970)),
         };
-        let mut a = Artifact::new(PlayerId::new(1), None);
-        a.sub = Some(ArtifactSub::Enter {
+        let mut artifact = Artifact::new(PlayerId::new(1), None);
+        artifact.sub = Some(ArtifactSub::Enter {
             enter: walking_enter(),
         });
         assert_eq!(
-            a.take_point(
+            artifact.take_point(
                 Position::new(32.854_168, 120.729_164, 0.0),
                 &move_reads(&sprites()),
                 &tuning().move_to
@@ -832,9 +833,12 @@ mod tests {
         );
         assert_eq!(
             (
-                a.enter().copied(),
-                a.move_to().copied().map(|m| m.state),
-                a.goal
+                artifact.enter().copied(),
+                artifact
+                    .move_to()
+                    .copied()
+                    .map(|move_to_action| move_to_action.state),
+                artifact.goal
             ),
             (
                 None,
@@ -843,11 +847,11 @@ mod tests {
             )
         );
         // to an object: the old target goes and the new one comes first, then the Enter
-        let mut b = Artifact::new(PlayerId::new(1), None);
-        b.sub = Some(ArtifactSub::Enter {
+        let mut artifact = Artifact::new(PlayerId::new(1), None);
+        artifact.sub = Some(ArtifactSub::Enter {
             enter: walking_enter(),
         });
-        let (targets, gone) = b
+        let (targets, gone) = artifact
             .take_object(
                 object(9149, Position::new(5.0, 6.0, 0.0), true),
                 (true, false),
@@ -862,8 +866,9 @@ mod tests {
         );
         assert_eq!(
             (
-                b.enter().copied(),
-                b.move_to()
+                artifact.enter().copied(),
+                artifact
+                    .move_to()
                     .copied()
                     .map(|move_to_action| move_to_action.state)
             ),
@@ -906,8 +911,8 @@ mod tests {
             stops: true,
             released: Some(object_id(11970)),
         };
-        let mut a = Artifact::new(PlayerId::new(1), None);
-        (a.sub, a.goal, a.target, a.state) = (
+        let mut artifact = Artifact::new(PlayerId::new(1), None);
+        (artifact.sub, artifact.goal, artifact.target, artifact.state) = (
             Some(ArtifactSub::Enter {
                 enter: enter_action,
             }),
@@ -915,20 +920,25 @@ mod tests {
             Some(object_id(77)),
             ArtifactState::Wait,
         );
-        assert_eq!(a.stop(), (by_enter, Some(object_id(77))));
+        assert_eq!(artifact.stop(), (by_enter, Some(object_id(77))));
         assert_eq!(
-            (a.enter().copied(), a.goal, a.target, a.state),
+            (
+                artifact.enter().copied(),
+                artifact.goal,
+                artifact.target,
+                artifact.state
+            ),
             (None, None, None, ArtifactState::Check)
         );
-        let mut b = Artifact::new(PlayerId::new(1), None);
-        (b.sub, b.target) = (
+        let mut artifact = Artifact::new(PlayerId::new(1), None);
+        (artifact.sub, artifact.target) = (
             Some(ArtifactSub::Enter {
                 enter: enter_action,
             }),
             Some(object_id(77)),
         );
-        assert_eq!(b.tear_down(), (Some(object_id(77)), by_enter));
-        assert_eq!((b.enter().copied(), b.target), (None, None));
+        assert_eq!(artifact.tear_down(), (Some(object_id(77)), by_enter));
+        assert_eq!((artifact.enter().copied(), artifact.target), (None, None));
         // the check that finds an owner deletes it too
         let mut artifact = Artifact::new(PlayerId::new(1), None);
         artifact.sub = Some(ArtifactSub::Enter {
@@ -1028,10 +1038,12 @@ mod tests {
 
     #[test]
     fn check_that_finds_new_owner_hands_the_animal_over_and_stays_check() {
-        let mut a = Artifact::new(PlayerId::GAIA, None);
-        let found = a.step(Millis::new(50), Some(PlayerId::new(2))).unwrap();
+        let mut artifact = Artifact::new(PlayerId::GAIA, None);
+        let found = artifact
+            .step(Millis::new(50), Some(PlayerId::new(2)))
+            .unwrap();
         assert_eq!(
-            (found, a.state),
+            (found, artifact.state),
             (
                 Some(Handover::Taken {
                     new: PlayerId::new(2),
@@ -1146,7 +1158,7 @@ mod tests {
     #[test]
     fn move_to_an_object_lets_the_old_target_go_and_takes_the_new() {
         let mut artifact = Artifact::new(PlayerId::new(1), None);
-        let (t, gone) = artifact
+        let (targets, gone) = artifact
             .take_object(
                 object(9149, Position::new(10.0, 12.0, 0.0), true),
                 (true, false),
@@ -1156,7 +1168,7 @@ mod tests {
             )
             .unwrap();
         assert_eq!(
-            (t, gone),
+            (targets, gone),
             (
                 Targets {
                     released: None,
@@ -1170,7 +1182,7 @@ mod tests {
             (artifact.target, artifact.move_to().copied()),
             (Some(object_id(9149)), Some(to_object(9149, MoveTo::Start)))
         );
-        let (t, gone) = artifact
+        let (targets, gone) = artifact
             .take_object(
                 object(9149, Position::new(10.0, 12.0, 0.0), true),
                 (true, false),
@@ -1181,7 +1193,7 @@ mod tests {
             .unwrap();
         assert!(gone.stops);
         assert_eq!(
-            t,
+            targets,
             Targets {
                 released: Some(object_id(9149)),
                 taken: Some(object_id(9149))
@@ -1245,8 +1257,10 @@ mod tests {
             .unwrap();
         let mut rig = Rig::on_the_path(Victim::default());
         rig.mover_mut().stats.speed = Speed::ZERO;
-        rig.run(50, |c, u, _, _, _| artifact.walk(c, u, me(), &reads()))
-            .unwrap();
+        rig.run(50, |step, unit, _, _, _| {
+            artifact.walk(step, unit, me(), &reads())
+        })
+        .unwrap();
         assert_eq!(
             (
                 artifact
@@ -1319,7 +1333,7 @@ mod tests {
 
     /// What a new `MoveTo` reads of an animal in state 2 with speed 1, with the sprites
     /// `sprites`.
-    fn move_reads<'g>(sprites: &SpriteReads<'g>) -> MoveToReads<'g> {
+    fn move_reads<'graphics>(sprites: &SpriteReads<'graphics>) -> MoveToReads<'graphics> {
         MoveToReads {
             sprites: *sprites,
             state: ObjectState::Alive,
@@ -1370,11 +1384,12 @@ mod tests {
             },
             graphics: &graphics,
         };
-        let shown = |a: &Artifact| {
-            a.move_to()
+        let shown = |artifact: &Artifact| {
+            artifact
+                .move_to()
                 .copied()
                 .and_then(|move_to_action| move_to_action.sprite)
-                .map(|g| g.id)
+                .map(|graphic| graphic.id)
         };
         let mut artifact = Artifact::new(PlayerId::new(1), None);
         let _ = artifact
@@ -1486,15 +1501,23 @@ mod tests {
         // the top speed derives from the base and the sprite shown
         (rig.mover_mut().stats.speed, rig.mover_mut().stats.base) = (Speed::ZERO, Speed::ZERO);
         assert_eq!(
-            Arc::make_mut(&mut rig.t.model.graphics).insert(SpriteId::named(3), graphic(3)),
+            Arc::make_mut(&mut rig.world.model.graphics).insert(SpriteId::named(3), graphic(3)),
             None
         );
         rig.mover_mut().in_the_way = vec![object_id(77)];
-        rig.run(50, |c, u, _, _, _| artifact.walk(c, u, me(), &reads()))
-            .unwrap();
+        rig.run(50, |step, unit, _, _, _| {
+            artifact.walk(step, unit, me(), &reads())
+        })
+        .unwrap();
         let in_the_way = (NotifyKind::IN_THE_WAY, [77, -1, -1]);
         assert_eq!(
-            (artifact.move_to().copied().map(|m| m.state), rig.sprite()),
+            (
+                artifact
+                    .move_to()
+                    .copied()
+                    .map(|move_to_action| move_to_action.state),
+                rig.sprite()
+            ),
             (Some(MoveTo::Failed), Some(SpriteId::named(3)))
         );
         assert_eq!(rig.posted(), vec![in_the_way]);
@@ -1515,10 +1538,18 @@ mod tests {
         });
         let mut rig = Rig::on_the_path(Victim::default());
         rig.mover_mut().in_the_way = vec![object_id(77)];
-        rig.run(50, |c, u, _, _, _| walking.walk(c, u, me(), &reads()))
-            .unwrap();
+        rig.run(50, |step, unit, _, _, _| {
+            walking.walk(step, unit, me(), &reads())
+        })
+        .unwrap();
         assert_eq!(
-            (walking.move_to().copied().map(|m| m.state), rig.posted()),
+            (
+                walking
+                    .move_to()
+                    .copied()
+                    .map(|move_to_action| move_to_action.state),
+                rig.posted()
+            ),
             (Some(MoveTo::Moving), vec![in_the_way])
         );
         // a waiting MoveTo counts the update's time and posts no unit in the way; at its delay
@@ -1539,19 +1570,29 @@ mod tests {
         };
         let mut rig = Rig::on_the_path(Victim::default());
         rig.mover_mut().in_the_way = vec![object_id(77)];
-        rig.run(50, |c, u, _, _, _| waiting.walk(c, u, me(), &reads()))
-            .unwrap();
+        rig.run(50, |step, unit, _, _, _| {
+            waiting.walk(step, unit, me(), &reads())
+        })
+        .unwrap();
         assert_eq!(
             (
-                waiting.move_to().copied().map(|m| (m.state, m.wait.timer)),
+                waiting
+                    .move_to()
+                    .copied()
+                    .map(|move_to_action| (move_to_action.state, move_to_action.wait.timer)),
                 rig.posted()
             ),
             (Some((MoveTo::Waiting, Seconds::new(0.92 + 0.05))), vec![])
         );
-        rig.run(50, |c, u, _, _, _| waiting.walk(c, u, me(), &reads()))
-            .unwrap();
+        rig.run(50, |step, unit, _, _, _| {
+            waiting.walk(step, unit, me(), &reads())
+        })
+        .unwrap();
         assert_eq!(
-            waiting.move_to().copied().map(|m| (m.state, m.wait.timer)),
+            waiting
+                .move_to()
+                .copied()
+                .map(|move_to_action| (move_to_action.state, move_to_action.wait.timer)),
             Some((MoveTo::Start, Seconds::ZERO))
         );
         // a target the world lost is cleared: the MoveTo walks on to its point
@@ -1564,8 +1605,10 @@ mod tests {
             }),
             ..Artifact::new(PlayerId::new(1), None)
         };
-        rig.run(50, |c, u, _, _, _| lost.walk(c, u, me(), &reads()))
-            .unwrap();
+        rig.run(50, |step, unit, _, _, _| {
+            lost.walk(step, unit, me(), &reads())
+        })
+        .unwrap();
         assert_eq!(
             lost.move_to()
                 .copied()
@@ -1574,8 +1617,8 @@ mod tests {
         );
         // a target that died (state 7) is let go, and the walk ends at once (code 5)
         let mut rig = Rig::on_the_path(Victim::default()).holding(600, PlayerId::new(1));
-        if let Some(u) = rig.t.players[1].objects.last_mut() {
-            u.life.state = ObjectState::Removed;
+        if let Some(unit) = rig.world.players[1].objects.last_mut() {
+            unit.life.state = ObjectState::Removed;
         }
         let mut dying = Artifact {
             sub: Some(ArtifactSub::Walk {
@@ -1608,8 +1651,10 @@ mod tests {
         artifact.sub = Some(ArtifactSub::Walk {
             move_to: to_object(9149, MoveTo::Arrived),
         });
-        rig.run(50, |c, u, _, _, _| artifact.walk(c, u, me(), &reads()))
-            .unwrap();
+        rig.run(50, |step, unit, _, _, _| {
+            artifact.walk(step, unit, me(), &reads())
+        })
+        .unwrap();
         assert_eq!(
             (
                 artifact.target,
@@ -1626,8 +1671,10 @@ mod tests {
                 ..MoveToAction::sub_in(MoveTo::Failed)
             },
         });
-        rig.run(50, |c, u, _, _, _| artifact.walk(c, u, me(), &reads()))
-            .unwrap();
+        rig.run(50, |step, unit, _, _, _| {
+            artifact.walk(step, unit, me(), &reads())
+        })
+        .unwrap();
         let failed = (NotifyKind::ACTION_FAILED, [AiAction::Move.value(), 0, 0]);
         assert_eq!(
             (rig.workers(77, PlayerId::new(1)), rig.posted()),
@@ -1646,10 +1693,12 @@ mod tests {
     /// held Enter's transport is let go and the walking unit stops.
     #[test]
     fn an_update_checks_after_its_walk_and_lets_go_what_handover_drops() {
-        let mut a = Artifact::new(PlayerId::new(1), None);
+        let mut artifact = Artifact::new(PlayerId::new(1), None);
         let mut rig = Rig::on_the_path(Victim::default());
-        let found = rig.run(50, |c, u, _, _, _| a.update(c, u, me(), &reads(), &roles()));
-        assert_eq!((found, a.state), (Ok(None), ArtifactState::Wait));
+        let found = rig.run(50, |step, unit, _, _, _| {
+            artifact.update(step, unit, me(), &reads(), &roles())
+        });
+        assert_eq!((found, artifact.state), (Ok(None), ArtifactState::Wait));
         // the step's effects on a handover: the Enter's transport let go, the unit stopped
         let mut enter_action = EnterAction::new(
             ContainerId::new(object_id(11970)),

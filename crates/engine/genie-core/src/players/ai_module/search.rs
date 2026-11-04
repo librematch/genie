@@ -56,8 +56,8 @@ enum Flood {
 }
 
 /// `!=` of two floats as the game's `UCOMISS` and `JNZ`/`JP` see it: a NaN differs.
-fn differs(a: f32, b: f32) -> bool {
-    a != b
+fn differs(left: f32, right: f32) -> bool {
+    left != right
 }
 
 impl InfoModule {
@@ -169,9 +169,9 @@ impl InfoModule {
         let (first, _) = self.clamp(start.tile());
         let mut visited = vec![false; (map.width().max(0) * map.height().max(0)) as usize];
         let mut queue = vec![first];
-        let mut i = 0;
-        while let Some(&tile) = queue.get(i) {
-            i += 1;
+        let mut index = 0;
+        while let Some(&tile) = queue.get(index) {
+            index += 1;
             let cell = self.cell(tile)?;
             // a civilian takes a tile no search touched, another unit any that is not explored
             let wanted = if unit.civilian {
@@ -203,7 +203,7 @@ impl InfoModule {
     /// (`first + draw % 100 + second * 25`, a draw for each record from the first column down),
     /// and one of its corners by a draw.
     fn punt(&self, rng: &mut Well512) -> Tile {
-        let (w, h) = (self.size.width(), self.size.height());
+        let (width, height) = (self.size.width(), self.size.height());
         let mut best = -1_i32;
         let mut corner = Tile::new(0, 0);
         for (index, record) in self.quadrants.iter().enumerate() {
@@ -213,11 +213,11 @@ impl InfoModule {
                 .wrapping_add(draw)
                 .wrapping_add(record[1].wrapping_mul(0x19));
             if best == -1 || score < best {
-                corner = Tile::new(w * column / 4, row * h / 4);
+                corner = Tile::new(width * column / 4, row * height / 4);
                 best = score;
             }
         }
-        let far = Tile::new(w / 4 - 1 + corner.x(), h / 4 - 1 + corner.y());
+        let far = Tile::new(width / 4 - 1 + corner.x(), height / 4 - 1 + corner.y());
         match rng.rand15() & 3 {
             0 => corner,
             1 => Tile::new(corner.x(), far.y()),

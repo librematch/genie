@@ -52,7 +52,7 @@ mod tests {
     #[test]
     fn snow_of_saved_byte_holds_the_game_three_values() {
         assert_eq!(
-            [0, 1, 2].map(|b| Snow::of_byte(b).unwrap()),
+            [0, 1, 2].map(|byte| Snow::of_byte(byte).unwrap()),
             [Snow::None, Snow::Completed, Snow::Kept]
         );
         assert!(Snow::of_byte(3).is_err());

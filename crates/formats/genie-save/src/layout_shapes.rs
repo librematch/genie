@@ -53,7 +53,7 @@ pub struct SigString {
 pub const STRING_SIGNATURE: u16 = 0x0a60;
 
 impl BinRead for SigString {
-    type Args<'a> = ();
+    type Args<'args> = ();
 
     fn read_options<R: Read + Seek>(reader: &mut R, endian: Endian, (): ()) -> BinResult<Self> {
         let pos = reader.stream_position()?;
@@ -78,7 +78,7 @@ impl BinRead for SigString {
 }
 
 impl BinWrite for SigString {
-    type Args<'a> = ();
+    type Args<'args> = ();
 
     fn write_options<W: Write + Seek>(
         &self,
@@ -107,9 +107,9 @@ pub struct LenVec32<T>(pub Vec<T>);
 
 impl<T> BinRead for LenVec32<T>
 where
-    T: for<'a> BinRead<Args<'a> = ()> + 'static,
+    T: for<'args> BinRead<Args<'args> = ()> + 'static,
 {
-    type Args<'a> = ();
+    type Args<'args> = ();
 
     fn read_options<R: Read + Seek>(reader: &mut R, endian: Endian, (): ()) -> BinResult<Self> {
         let count = u32::read_options(reader, endian, ())?;
@@ -120,9 +120,9 @@ where
 
 impl<T> BinWrite for LenVec32<T>
 where
-    T: for<'a> BinWrite<Args<'a> = ()> + 'static,
+    T: for<'args> BinWrite<Args<'args> = ()> + 'static,
 {
-    type Args<'a> = ();
+    type Args<'args> = ();
 
     fn write_options<W: Write + Seek>(
         &self,
@@ -162,7 +162,7 @@ pub fn unsupported_in(error: &binrw::Error) -> Option<(GenieError, usize)> {
 pub struct Unsupported;
 
 impl BinRead for Unsupported {
-    type Args<'a> = (&'static str,);
+    type Args<'args> = (&'static str,);
 
     fn read_options<R: Read + Seek>(
         reader: &mut R,
@@ -177,7 +177,7 @@ impl BinRead for Unsupported {
 }
 
 impl BinWrite for Unsupported {
-    type Args<'a> = ();
+    type Args<'args> = ();
 
     fn write_options<W: Write + Seek>(&self, writer: &mut W, _: Endian, (): ()) -> BinResult<()> {
         Err(binrw::Error::Custom {
@@ -210,7 +210,7 @@ impl<T> Deref for Positioned<T> {
 }
 
 impl<T: BinRead> BinRead for Positioned<T> {
-    type Args<'a> = T::Args<'a>;
+    type Args<'args> = T::Args<'args>;
 
     fn read_options<R: Read + Seek>(
         reader: &mut R,
@@ -226,7 +226,7 @@ impl<T: BinRead> BinRead for Positioned<T> {
 }
 
 impl<T: BinWrite> BinWrite for Positioned<T> {
-    type Args<'a> = T::Args<'a>;
+    type Args<'args> = T::Args<'args>;
 
     fn write_options<W: Write + Seek>(
         &self,
@@ -285,7 +285,7 @@ mod tests {
     /// Read, then write: the same bytes.
     fn round_trip<T>(bytes: &[u8]) -> T
     where
-        T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
+        T: for<'args> BinRead<Args<'args> = ()> + for<'args> BinWrite<Args<'args> = ()>,
     {
         let value = T::read_le(&mut Cursor::new(bytes)).unwrap();
         let mut out = Cursor::new(Vec::new());
@@ -308,10 +308,11 @@ mod tests {
 
     #[test]
     fn an_unsupported_part_fails_to_read_and_names_itself() {
-        let e = Unsupported::read_le_args(&mut Cursor::new(b"\0".as_slice()), ("the AI state",))
-            .unwrap_err();
+        let failure =
+            Unsupported::read_le_args(&mut Cursor::new(b"\0".as_slice()), ("the AI state",))
+                .unwrap_err();
         assert_eq!(
-            unsupported_in(&e).map(|(error, at)| (error.kind(), error.reason(), at)),
+            unsupported_in(&failure).map(|(error, at)| (error.kind(), error.reason(), at)),
             Some((genie_error::ErrorKind::Unsupported, "the AI state", 0))
         );
     }

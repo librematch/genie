@@ -183,10 +183,10 @@ impl Seconds {
     /// The longest time, the game's `FLT_MAX`: never (a group member that never attacked).
     pub const MAX: Self = Self(f32::MAX);
 
-    /// A span of `s` seconds.
+    /// A span of `seconds` seconds.
     #[must_use]
-    pub const fn new(s: f32) -> Self {
-        Self(s)
+    pub const fn new(seconds: f32) -> Self {
+        Self(seconds)
     }
 
     /// A master's whole seconds (a build, train or research time) as the game converts them
@@ -206,25 +206,25 @@ impl Seconds {
 impl Mul<f32> for Seconds {
     type Output = Self;
 
-    /// The span scaled by `f` (one `f32` product).
-    fn mul(self, f: f32) -> Self {
-        Self(self.0 * f)
+    /// The span scaled by `factor` (one `f32` product).
+    fn mul(self, factor: f32) -> Self {
+        Self(self.0 * factor)
     }
 }
 
 impl MulAssign<f32> for Seconds {
-    /// The span scaled by `f` in place (an effect's multiplier).
-    fn mul_assign(&mut self, f: f32) {
-        self.0 *= f;
+    /// The span scaled by `factor` in place (an effect's multiplier).
+    fn mul_assign(&mut self, factor: f32) {
+        self.0 *= factor;
     }
 }
 
 impl Div<f32> for Seconds {
     type Output = Self;
 
-    /// The span divided by `f` (one `f32` quotient).
-    fn div(self, f: f32) -> Self {
-        Self(self.0 / f)
+    /// The span divided by `divisor` (one `f32` quotient).
+    fn div(self, divisor: f32) -> Self {
+        Self(self.0 / divisor)
     }
 }
 
@@ -288,9 +288,9 @@ mod tests {
 
     #[test]
     fn seconds_do_the_game_f32_operations() {
-        let (a, b) = (Seconds::new(0.1), Seconds::new(0.2));
-        assert_eq!((a + b).get().to_bits(), (0.1_f32 + 0.2).to_bits());
-        assert_eq!((b - a).get().to_bits(), (0.2_f32 - 0.1).to_bits());
+        let (first, second) = (Seconds::new(0.1), Seconds::new(0.2));
+        assert_eq!((first + second).get().to_bits(), (0.1_f32 + 0.2).to_bits());
+        assert_eq!((second - first).get().to_bits(), (0.2_f32 - 0.1).to_bits());
         let mut seconds = Seconds::new(1.0);
         seconds -= Seconds::new(0.069);
         assert_eq!(seconds.get().to_bits(), (1.0_f32 - 0.069).to_bits());
@@ -299,15 +299,15 @@ mod tests {
             seconds.get().to_bits(),
             ((1.0_f32 - 0.069) + 0.069).to_bits()
         );
-        assert_eq!((-a).get().to_bits(), (-0.1_f32).to_bits());
-        assert_eq!((a * 3.0).get().to_bits(), (0.1_f32 * 3.0).to_bits());
-        let mut scaled = a;
+        assert_eq!((-first).get().to_bits(), (-0.1_f32).to_bits());
+        assert_eq!((first * 3.0).get().to_bits(), (0.1_f32 * 3.0).to_bits());
+        let mut scaled = first;
         scaled *= 3.0;
-        assert_eq!(scaled, a * 3.0);
-        assert_eq!((a / 3.0).get().to_bits(), (0.1_f32 / 3.0).to_bits());
-        assert_eq!((b / a).to_bits(), (0.2_f32 / 0.1).to_bits());
-        assert_eq!((1.5_f32 * a).to_bits(), (1.5_f32 * 0.1).to_bits());
-        assert!(Seconds::ZERO < a && a <= a);
+        assert_eq!(scaled, first * 3.0);
+        assert_eq!((first / 3.0).get().to_bits(), (0.1_f32 / 3.0).to_bits());
+        assert_eq!((second / first).to_bits(), (0.2_f32 / 0.1).to_bits());
+        assert_eq!((1.5_f32 * first).to_bits(), (1.5_f32 * 0.1).to_bits());
+        assert!(Seconds::ZERO < first && first <= first);
         assert_eq!(Seconds::new(f32::NAN).partial_cmp(&Seconds::ZERO), None);
         assert_eq!(Seconds::new(0.5).to_string(), "0.5");
         assert_eq!(

@@ -82,7 +82,9 @@ mod tests {
     /// The bytes 0 to 8 name the states in their order, and read back; 9 is an error.
     #[test]
     fn the_bytes_0_to_8_name_the_states_in_order() {
-        let all: Vec<ObjectState> = (0..=8).map(|b| ObjectState::of_byte(b).unwrap()).collect();
+        let all: Vec<ObjectState> = (0..=8)
+            .map(|byte| ObjectState::of_byte(byte).unwrap())
+            .collect();
         assert!(
             all.windows(2)
                 .all(|object_states| object_states[0] < object_states[1])

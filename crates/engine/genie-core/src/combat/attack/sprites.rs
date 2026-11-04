@@ -27,10 +27,10 @@ use crate::{GenieError, GenieResult};
 /// master's special graphic.
 #[must_use]
 pub fn swing_sprites(look: Option<&Look>, master: &Master, graphics: &Graphics) -> SwingSprites {
-    let g = |id: Option<SpriteId>| id.and_then(|sprite_id| graphics.get(sprite_id).copied());
+    let graphic = |id: Option<SpriteId>| id.and_then(|sprite_id| graphics.get(sprite_id).copied());
     SwingSprites {
-        look: g(look.and_then(|l| l.attacking)),
-        special: g(master.creatable_part().special_sprite),
+        look: graphic(look.and_then(|look| look.attacking)),
+        special: graphic(master.creatable_part().special_sprite),
     }
 }
 

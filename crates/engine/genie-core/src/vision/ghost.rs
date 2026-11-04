@@ -27,7 +27,7 @@ use crate::players::PlayerSet;
 use crate::vision::VisionBits;
 use crate::world::World;
 use crate::world::layer::MasterRoles;
-use crate::world::slots::{CheckedIndex, PlayerSlots};
+use crate::world::slots::{CheckedIndexExt, PlayerSlotsExt};
 use crate::{GenieError, GenieResult};
 
 /// The type from which an object's entry and its ghost follow its footprint's UMV entry
@@ -130,10 +130,10 @@ impl World {
         let Some(visibility) = self.spatial.sight.as_ref() else {
             return Ok(VisionBits::NONE);
         };
-        let Some(i) = visibility.size.index(tile) else {
+        let Some(index) = visibility.size.index(tile) else {
             return Ok(VisionBits::NONE);
         };
-        Ok(*visibility.unified.checked(i)? & VisionBits::OBJECT_MASK)
+        Ok(*visibility.unified.checked(index)? & VisionBits::OBJECT_MASK)
     }
 
     /// `tile`'s index in the unified map.
@@ -144,11 +144,11 @@ impl World {
     /// What a cell shows now.
     pub(super) fn cell_bits(&self, cell: Cell) -> GenieResult<VisionBits> {
         match cell {
-            Cell::Tile(i) => Ok(self
+            Cell::Tile(index) => Ok(self
                 .spatial
                 .sight
                 .as_ref()
-                .and_then(|v| v.unified.get(i))
+                .and_then(|visibility| visibility.unified.get(index))
                 .map_or(VisionBits::NONE, |&vision_bits| {
                     vision_bits & VisionBits::OBJECT_MASK
                 })),
@@ -176,18 +176,18 @@ impl World {
     /// ([`World::make_ghost`]), in the players' order; the first bit past the players ends it.
     /// Then its owner's list watches it at its tile ([`World::watch`]).
     pub(crate) fn ghosts_at_death(&mut self, _owner: usize, id: ObjectId) -> GenieResult<()> {
-        let Some((p, unit)) = self.object(id) else {
+        let Some((owner, unit)) = self.object(id) else {
             return Ok(());
         };
         let original = Original {
             id,
-            owner: p,
+            owner,
             state: unit.life.state,
             master: unit.life.master_id,
         };
         let position = unit.position();
         if id.is_recyclable()
-            || unit.master(self.master_tables(), p)?.ghost_on_death != GhostMode::LEAVES
+            || unit.master(self.master_tables(), owner)?.ghost_on_death != GhostMode::LEAVES
         {
             return Ok(());
         }
@@ -201,7 +201,7 @@ impl World {
                 self.make_ghost(player_id, position, original)?;
             }
         }
-        let _ = self.watch(p, id, tile)?;
+        let _ = self.watch(owner, id, tile)?;
         Ok(())
     }
 
@@ -298,10 +298,14 @@ impl World {
         Ok(())
     }
 
-    /// The destroy (slot 0xd0, `FUN_14118f1e0`) of ghost `k` of player `player_id`: below state 7,
-    /// its hit points go and it goes to state 7.
-    fn destroy_ghost(&mut self, player_id: PlayerId, k: usize) -> GenieResult<()> {
-        let ghost = self.players.player_mut(player_id)?.ghosts.checked_mut(k)?;
+    /// The destroy (slot 0xd0, `FUN_14118f1e0`) of ghost `index` of player `player_id`: below state
+    /// 7, its hit points go and it goes to state 7.
+    fn destroy_ghost(&mut self, player_id: PlayerId, index: usize) -> GenieResult<()> {
+        let ghost = self
+            .players
+            .player_mut(player_id)?
+            .ghosts
+            .checked_mut(index)?;
         if ghost.state < ObjectState::Removed {
             ghost.state = ObjectState::Removed;
         }
@@ -320,10 +324,14 @@ impl World {
     /// (`RGE_Static_Object::recycle_out_of_game`), or for a master that is not recyclable it is
     /// deleted. The viewer's `+0x2b0` table is not held (empty).
     pub(crate) fn update_ghosts(&mut self, player_id: PlayerId) -> GenieResult<()> {
-        let mut k = 0;
-        while k < self.players.player(player_id)?.ghosts.len() {
-            if self.update_ghost(player_id, k)? == ListFate::Leaves {
-                let ghost = self.players.player_mut(player_id)?.ghosts.swap_remove(k);
+        let mut index = 0;
+        while index < self.players.player(player_id)?.ghosts.len() {
+            if self.update_ghost(player_id, index)? == ListFate::Leaves {
+                let ghost = self
+                    .players
+                    .player_mut(player_id)?
+                    .ghosts
+                    .swap_remove(index);
                 if ghost.original_master.is_some_and(|master_id| {
                     self.model
                         .roles
@@ -344,7 +352,7 @@ impl World {
                 }
                 continue;
             }
-            k += 1;
+            index += 1;
         }
         Ok(())
     }
@@ -353,14 +361,18 @@ impl World {
     fn forget_original(
         &mut self,
         player_id: PlayerId,
-        k: usize,
+        index: usize,
         original: Option<ObjectId>,
     ) -> GenieResult<()> {
         let live = original.is_some_and(|object_id| {
             self.object(object_id)
                 .is_some_and(|(_, unit)| unit.life.state < ObjectState::Removed)
         });
-        let ghost = self.players.player_mut(player_id)?.ghosts.checked_mut(k)?;
+        let ghost = self
+            .players
+            .player_mut(player_id)?
+            .ghosts
+            .checked_mut(index)?;
         if original.is_none() {
             ghost.original_id = None;
         } else if !live {
@@ -395,14 +407,19 @@ impl World {
 
     /// Whether the ghost is unseen by a player that sees its original's tile no more, and the
     /// players who cannot see it: those sharing the original owner's sight note themselves.
-    fn ghost_viewers(&self, p: PlayerId, ghost: &Ghost, bits: VisionBits) -> (bool, PlayerSet) {
+    fn ghost_viewers(
+        &self,
+        player: PlayerId,
+        ghost: &Ghost,
+        bits: VisionBits,
+    ) -> (bool, PlayerSet) {
         let mut unseen = false;
         let mut cant_see = ghost.cant_see;
         for player_id in PlayerId::each(self.players.len()).skip(1) {
             let mask = self.vision_mask(player_id);
             if mask.intersects(VisionBits::visible(ghost.original_owner)) {
                 cant_see |= PlayerSet::of(player_id);
-            } else if mask.intersects(VisionBits::visible(p)) && !bits.intersects(mask) {
+            } else if mask.intersects(VisionBits::visible(player)) && !bits.intersects(mask) {
                 unseen = true;
             }
         }
@@ -437,38 +454,42 @@ impl World {
         Ok((seen, destroy))
     }
 
-    fn update_ghost(&mut self, player_id: PlayerId, k: usize) -> GenieResult<ListFate> {
-        let g = *self.players.player(player_id)?.ghosts.checked(k)?;
-        let leaves = match g.state {
+    fn update_ghost(&mut self, player_id: PlayerId, index: usize) -> GenieResult<ListFate> {
+        let player_ghost = *self.players.player(player_id)?.ghosts.checked(index)?;
+        let leaves = match player_ghost.state {
             ObjectState::Removed => {
                 self.players
                     .player_mut(player_id)?
                     .ghosts
-                    .checked_mut(k)?
+                    .checked_mut(index)?
                     .state = ObjectState::Gone;
                 ListFate::Stays
             }
             ObjectState::Gone => ListFate::Leaves,
             _ => ListFate::Stays,
         };
-        if g.seen && g.state < ObjectState::Dying {
-            self.destroy_ghost(player_id, k)?;
+        if player_ghost.seen && player_ghost.state < ObjectState::Dying {
+            self.destroy_ghost(player_id, index)?;
             return Ok(leaves);
         }
-        self.forget_original(player_id, k, g.original)?;
-        let player = *self.players.player(player_id)?.ghosts.checked(k)?;
+        self.forget_original(player_id, index, player_ghost.original)?;
+        let player = *self.players.player(player_id)?.ghosts.checked(index)?;
         let bits = self.ghost_bits(&player)?;
         if bits == player.bits {
             return Ok(leaves);
         }
         let (unseen, cant_see) = self.ghost_viewers(player_id, &player, bits);
         let (seen, destroy) = self.ghost_seen(player_id, &player, bits, unseen)?;
-        let ghost = self.players.player_mut(player_id)?.ghosts.checked_mut(k)?;
+        let ghost = self
+            .players
+            .player_mut(player_id)?
+            .ghosts
+            .checked_mut(index)?;
         ghost.seen = seen;
         ghost.cant_see = cant_see;
         ghost.bits = bits;
         if destroy {
-            self.destroy_ghost(player_id, k)?;
+            self.destroy_ghost(player_id, index)?;
         }
         Ok(leaves)
     }
@@ -574,21 +595,21 @@ mod tests {
     /// and player 1's house 9 at (2.5, 1.5) (its footprint's UMV entry 1).
     fn world(recyclable: RecycleMode) -> World {
         let players = (0..3).map(|_| Player::default()).collect();
-        let mut t = World::new(
+        let mut world = World::new(
             WorldTime::ZERO,
             FrameSeed::of_data(0),
             PlayerId::new(0),
             vec![Millis::ZERO; 3],
             players,
         );
-        t.model.masters = (0..3).map(|_| masters(recyclable)).map(Arc::new).collect();
-        let _ = t
+        world.model.masters = (0..3).map(|_| masters(recyclable)).map(Arc::new).collect();
+        let _ = world
             .push_live(
                 PlayerId::new(0),
                 object(5, MINE, ObjectState::Alive, Position::new(1.5, 2.5, 0.0)),
             )
             .unwrap();
-        let _ = t
+        let _ = world
             .push_live(
                 PlayerId::new(1),
                 object(9, HOUSE, ObjectState::Alive, Position::new(2.5, 1.5, 0.0)),
@@ -616,10 +637,10 @@ mod tests {
                 kind: MasterKind::BUILDING,
             },
         );
-        t.spatial.sight = Some(sight);
-        t.recycling.next_id = object_id(-10);
-        t.next_object_id = object_id(100);
-        t
+        world.spatial.sight = Some(sight);
+        world.recycling.next_id = object_id(-10);
+        world.next_object_id = object_id(100);
+        world
     }
 
     fn set_tile(world: &mut World, x: usize, y: usize, bits: u64) {
@@ -674,15 +695,15 @@ mod tests {
     fn death_leaves_ghost_for_each_player_who_explored_its_tile_and_does_not_see_it() {
         // FUN_14118e990: player 1 explored and sees the mine's tile, player 2 explored it only;
         // Gaia gets none; the bit of a fourth player ends the walk
-        let mut t = world(RecycleMode::RECYCLED);
-        t.players[2].kind = PlayerKind::Computer;
-        set_tile(&mut t, 1, 2, 0x0000_000f_0000_0002);
-        t.recycling.ghosts = vec![object_id(-3)];
-        t.players[0].objects[ListIndex::new(0)].life.state = ObjectState::Dying;
-        assert_eq!(t.ghosts_at_death(0, object_id(5)), Ok(()));
-        assert!(t.players[0].ghosts.is_empty() && t.players[1].ghosts.is_empty());
+        let mut game = world(RecycleMode::RECYCLED);
+        game.players[2].kind = PlayerKind::Computer;
+        set_tile(&mut game, 1, 2, 0x0000_000f_0000_0002);
+        game.recycling.ghosts = vec![object_id(-3)];
+        game.players[0].objects[ListIndex::new(0)].life.state = ObjectState::Dying;
+        assert_eq!(game.ghosts_at_death(0, object_id(5)), Ok(()));
+        assert!(game.players[0].ghosts.is_empty() && game.players[1].ghosts.is_empty());
         // a computer viewer gets its ghost as any other (the notify is the watched list's)
-        let ghost = t.players[2].ghosts[0];
+        let ghost = game.players[2].ghosts[0];
         assert_eq!(
             (ghost.id, ghost.original, ghost.original_id),
             (object_id(-3), Some(object_id(5)), Some(object_id(5)))
@@ -697,7 +718,7 @@ mod tests {
         );
         // then the owner watches its tile at the tile's bits
         assert_eq!(
-            t.players[0].watched,
+            game.players[0].watched,
             [Watched {
                 id: object_id(5),
                 cell: Cell::Tile(9),
@@ -705,17 +726,17 @@ mod tests {
             }]
         );
         // a master that leaves no ghosts, or an id below 0, gives none and no watch
-        let mut t = world(RecycleMode::RECYCLED);
-        set_tile(&mut t, 1, 2, 0x0000_0004_0000_0000);
-        t.players[0].objects[ListIndex::new(0)].life.master_id = TREE;
-        assert_eq!(t.ghosts_at_death(0, object_id(5)), Ok(()));
-        assert!(t.players[2].ghosts.is_empty() && t.players[0].watched.is_empty());
-        let mut t = world(RecycleMode::RECYCLED);
-        set_tile(&mut t, 1, 2, 0x0000_0004_0000_0000);
-        t.players[0].objects[ListIndex::new(0)].id = object_id(-5);
-        t.reindex();
-        assert_eq!(t.ghosts_at_death(0, object_id(-5)), Ok(()));
-        assert!(t.players[2].ghosts.is_empty() && t.players[0].watched.is_empty());
+        let mut game = world(RecycleMode::RECYCLED);
+        set_tile(&mut game, 1, 2, 0x0000_0004_0000_0000);
+        game.players[0].objects[ListIndex::new(0)].life.master_id = TREE;
+        assert_eq!(game.ghosts_at_death(0, object_id(5)), Ok(()));
+        assert!(game.players[2].ghosts.is_empty() && game.players[0].watched.is_empty());
+        let mut world = world(RecycleMode::RECYCLED);
+        set_tile(&mut world, 1, 2, 0x0000_0004_0000_0000);
+        world.players[0].objects[ListIndex::new(0)].id = object_id(-5);
+        world.reindex();
+        assert_eq!(world.ghosts_at_death(0, object_id(-5)), Ok(()));
+        assert!(world.players[2].ghosts.is_empty() && world.players[0].watched.is_empty());
     }
 
     #[test]
@@ -727,19 +748,27 @@ mod tests {
             state: ObjectState::Alive,
             master: HOUSE,
         };
-        let mut t = world(RecycleMode::RECYCLED);
-        t.recycling.ghosts = vec![object_id(-4), object_id(-6)];
-        t.make_ghost(PlayerId::new(2), Position::new(2.5, 1.5, 0.0), original)
+        let mut game = world(RecycleMode::RECYCLED);
+        game.recycling.ghosts = vec![object_id(-4), object_id(-6)];
+        game.make_ghost(PlayerId::new(2), Position::new(2.5, 1.5, 0.0), original)
             .unwrap();
-        t.make_ghost(PlayerId::new(2), Position::new(2.5, 1.5, 0.0), original)
+        game.make_ghost(PlayerId::new(2), Position::new(2.5, 1.5, 0.0), original)
             .unwrap();
-        t.make_ghost(PlayerId::new(2), Position::new(2.5, 1.5, 0.0), original)
+        game.make_ghost(PlayerId::new(2), Position::new(2.5, 1.5, 0.0), original)
             .unwrap();
-        let ids: Vec<ObjectId> = t.players[2].ghosts.iter().map(|g| g.id).collect();
+        let ids: Vec<ObjectId> = game.players[2]
+            .ghosts
+            .iter()
+            .map(|ghost| ghost.id)
+            .collect();
         assert_eq!(ids, [object_id(-6), object_id(-4), object_id(-10)]);
-        assert_eq!(t.recycling.next_id, object_id(-11));
+        assert_eq!(game.recycling.next_id, object_id(-11));
         // each new one destroyed the viewer's twin before it
-        let states: Vec<ObjectState> = t.players[2].ghosts.iter().map(|g| g.state).collect();
+        let states: Vec<ObjectState> = game.players[2]
+            .ghosts
+            .iter()
+            .map(|ghost| ghost.state)
+            .collect();
         assert_eq!(
             states,
             [
@@ -749,22 +778,26 @@ mod tests {
             ]
         );
         // a building's ghost follows its original's UMV entry
-        assert_eq!(t.players[2].ghosts[2].footprint, 1);
-        let mut t = world(RecycleMode::KEPT);
-        t.recycling.ghosts = vec![object_id(-4)];
-        t.make_ghost(PlayerId::new(2), Position::new(2.5, 1.5, 0.0), original)
+        assert_eq!(game.players[2].ghosts[2].footprint, 1);
+        let mut game = world(RecycleMode::KEPT);
+        game.recycling.ghosts = vec![object_id(-4)];
+        game.make_ghost(PlayerId::new(2), Position::new(2.5, 1.5, 0.0), original)
             .unwrap();
-        assert_eq!(t.players[2].ghosts[0].id, object_id(100));
-        assert_eq!((t.next_object_id.get(), t.recycling.ghosts.len()), (101, 1));
+        assert_eq!(game.players[2].ghosts[0].id, object_id(100));
+        assert_eq!(
+            (game.next_object_id.get(), game.recycling.ghosts.len()),
+            (101, 1)
+        );
         // an original past state 6 is forgotten, its master kept
-        let mut t = world(RecycleMode::RECYCLED);
+        let mut world = world(RecycleMode::RECYCLED);
         let gone = Original {
             state: ObjectState::Removed,
             ..original
         };
-        t.make_ghost(PlayerId::new(2), Position::new(2.5, 1.5, 0.0), gone)
+        world
+            .make_ghost(PlayerId::new(2), Position::new(2.5, 1.5, 0.0), gone)
             .unwrap();
-        let ghost = t.players[2].ghosts[0];
+        let ghost = world.players[2].ghosts[0];
         assert_eq!(
             (ghost.original, ghost.original_id, ghost.original_master),
             (None, None, Some(HOUSE))
@@ -839,7 +872,11 @@ mod tests {
         );
         world.check_twins(PlayerId::new(2), &mut ghost).unwrap();
         // the viewer's own twins on the tile are destroyed
-        let states: Vec<ObjectState> = world.players[2].ghosts.iter().map(|g| g.state).collect();
+        let states: Vec<ObjectState> = world.players[2]
+            .ghosts
+            .iter()
+            .map(|ghost| ghost.state)
+            .collect();
         assert_eq!(
             states,
             [
@@ -860,14 +897,14 @@ mod tests {
             world.players[2]
                 .ghosts
                 .iter()
-                .all(|g| g.cant_see == PlayerSet::NONE)
+                .all(|ghost| ghost.cant_see == PlayerSet::NONE)
         );
     }
 
     #[test]
     fn ghost_without_an_original_keeps_its_master_and_one_not_recyclable_is_deleted() {
         // FUN_141090000: a null +0x7c0 sets only +0x7f8 = -1, +0x7d0 stays
-        let mut t = world(RecycleMode::KEPT);
+        let mut game = world(RecycleMode::KEPT);
         let ghost = Ghost {
             id: object_id(100),
             original: None,
@@ -882,31 +919,31 @@ mod tests {
             seen: false,
             state: ObjectState::Alive,
         };
-        t.players[2].ghosts = vec![ghost];
-        t.update_ghosts(PlayerId::new(2)).unwrap();
-        let players = t.players[2].ghosts[0];
+        game.players[2].ghosts = vec![ghost];
+        game.update_ghosts(PlayerId::new(2)).unwrap();
+        let players = game.players[2].ghosts[0];
         assert_eq!(
             (players.original_id, players.original_master),
             (None, Some(HOUSE))
         );
         // an original past state 6 takes its master with it
-        t.players[2].ghosts[0].original = Some(object_id(9));
-        t.players[1].objects[ListIndex::new(0)].life.state = ObjectState::Removed;
-        t.update_ghosts(PlayerId::new(2)).unwrap();
-        assert_eq!(t.players[2].ghosts[0].original_master, None);
+        game.players[2].ghosts[0].original = Some(object_id(9));
+        game.players[1].objects[ListIndex::new(0)].life.state = ObjectState::Removed;
+        game.update_ghosts(PlayerId::new(2)).unwrap();
+        assert_eq!(game.players[2].ghosts[0].original_master, None);
         // states 7, then 8, then it leaves; a master not recyclable gives the pool nothing
-        t.players[2].ghosts[0].state = ObjectState::Removed;
-        t.update_ghosts(PlayerId::new(2)).unwrap();
-        assert_eq!(t.players[2].ghosts[0].state, ObjectState::Gone);
-        t.update_ghosts(PlayerId::new(2)).unwrap();
-        assert!(t.players[2].ghosts.is_empty() && t.recycling.ghosts.is_empty());
-        let mut t = world(RecycleMode::RECYCLED);
-        t.players[2].ghosts = vec![Ghost {
+        game.players[2].ghosts[0].state = ObjectState::Removed;
+        game.update_ghosts(PlayerId::new(2)).unwrap();
+        assert_eq!(game.players[2].ghosts[0].state, ObjectState::Gone);
+        game.update_ghosts(PlayerId::new(2)).unwrap();
+        assert!(game.players[2].ghosts.is_empty() && game.recycling.ghosts.is_empty());
+        let mut world = world(RecycleMode::RECYCLED);
+        world.players[2].ghosts = vec![Ghost {
             state: ObjectState::Gone,
             ..ghost
         }];
-        t.update_ghosts(PlayerId::new(2)).unwrap();
-        assert_eq!(t.recycling.ghosts, [object_id(100)]);
+        world.update_ghosts(PlayerId::new(2)).unwrap();
+        assert_eq!(world.recycling.ghosts, [object_id(100)]);
     }
 
     /// Player 2's ghost of player 1's house 9 on tile (2, 1), in state 2, of footprint entry
@@ -934,11 +971,11 @@ mod tests {
     /// destroyed before any of that.
     #[test]
     fn ghost_its_viewer_sees_again_is_destroyed_and_the_owner_notes_itself() {
-        let mut t = world(RecycleMode::RECYCLED);
-        t.players[2].ghosts = vec![house_ghost(0)];
-        set_tile(&mut t, 2, 1, 1 << 1);
-        t.update_ghosts(PlayerId::new(2)).unwrap();
-        let players = t.players[2].ghosts[0];
+        let mut game = world(RecycleMode::RECYCLED);
+        game.players[2].ghosts = vec![house_ghost(0)];
+        set_tile(&mut game, 2, 1, 1 << 1);
+        game.update_ghosts(PlayerId::new(2)).unwrap();
+        let players = game.players[2].ghosts[0];
         assert_eq!(
             (players.state, players.bits, players.cant_see),
             (
@@ -947,20 +984,20 @@ mod tests {
                 PlayerSet::of(PlayerId::new(1))
             )
         );
-        t.players[2].ghosts[0].cant_see = PlayerSet::NONE;
-        t.update_ghosts(PlayerId::new(2)).unwrap();
-        assert_eq!(t.players[2].ghosts[0].cant_see, PlayerSet::NONE);
-        set_tile(&mut t, 2, 1, (1 << 1) | (1 << 2));
-        t.update_ghosts(PlayerId::new(2)).unwrap();
-        assert_eq!(t.players[2].ghosts[0].state, ObjectState::Removed);
-        let mut t = world(RecycleMode::RECYCLED);
-        t.players[2].ghosts = vec![Ghost {
+        game.players[2].ghosts[0].cant_see = PlayerSet::NONE;
+        game.update_ghosts(PlayerId::new(2)).unwrap();
+        assert_eq!(game.players[2].ghosts[0].cant_see, PlayerSet::NONE);
+        set_tile(&mut game, 2, 1, (1 << 1) | (1 << 2));
+        game.update_ghosts(PlayerId::new(2)).unwrap();
+        assert_eq!(game.players[2].ghosts[0].state, ObjectState::Removed);
+        let mut world = world(RecycleMode::RECYCLED);
+        world.players[2].ghosts = vec![Ghost {
             seen: true,
             ..house_ghost(0)
         }];
-        set_tile(&mut t, 2, 1, 1 << 1);
-        t.update_ghosts(PlayerId::new(2)).unwrap();
-        let ghost = t.players[2].ghosts[0];
+        set_tile(&mut world, 2, 1, 1 << 1);
+        world.update_ghosts(PlayerId::new(2)).unwrap();
+        let ghost = world.players[2].ghosts[0];
         assert_eq!(
             (ghost.state, ghost.bits),
             (ObjectState::Removed, VisionBits::NONE)
@@ -981,7 +1018,7 @@ mod tests {
                 .masters
                 .push(Arc::new(masters(RecycleMode::RECYCLED)));
         }
-        let own = |p| own_masks(p, GameStatus::Playing);
+        let own = |player_id| own_masks(player_id, GameStatus::Playing);
         let with = |player_id, bits: u64| {
             let mut masks = own(player_id);
             masks.visible |= VisionBits::from_bits_retain(bits);
@@ -1017,8 +1054,8 @@ mod tests {
     /// not modelled.
     #[test]
     fn building_ghost_seen_on_its_footprint_alone_is_marked_seen() {
-        let mut t = world(RecycleMode::RECYCLED);
-        let sight = t.spatial.sight.as_mut().unwrap();
+        let mut game = world(RecycleMode::RECYCLED);
+        let sight = game.spatial.sight.as_mut().unwrap();
         sight.extents = vec![Extent {
             guid: 1,
             offsets: vec![TileOffset::new(0, 0), TileOffset::new(1, 0)],
@@ -1033,11 +1070,11 @@ mod tests {
             },
         );
         sight.registry = Some(registry);
-        t.players[2].ghosts = vec![house_ghost(1)];
-        set_tile(&mut t, 2, 1, 1 << 1);
-        set_tile(&mut t, 3, 1, 1 << 2);
-        t.update_ghosts(PlayerId::new(2)).unwrap();
-        let ghost = t.players[2].ghosts[0];
+        game.players[2].ghosts = vec![house_ghost(1)];
+        set_tile(&mut game, 2, 1, 1 << 1);
+        set_tile(&mut game, 3, 1, 1 << 2);
+        game.update_ghosts(PlayerId::new(2)).unwrap();
+        let ghost = game.players[2].ghosts[0];
         assert_eq!(
             (ghost.state, ghost.seen, ghost.bits),
             (
@@ -1046,12 +1083,12 @@ mod tests {
                 VisionBits::from_bits_retain((1 << 1) | (1 << 2))
             )
         );
-        t.update_ghosts(PlayerId::new(2)).unwrap();
-        assert_eq!(t.players[2].ghosts[0].state, ObjectState::Removed);
-        let mut t = world(RecycleMode::RECYCLED);
-        t.players[2].ghosts = vec![house_ghost(1)];
+        game.update_ghosts(PlayerId::new(2)).unwrap();
+        assert_eq!(game.players[2].ghosts[0].state, ObjectState::Removed);
+        let mut world = world(RecycleMode::RECYCLED);
+        world.players[2].ghosts = vec![house_ghost(1)];
         assert_eq!(
-            t.update_ghosts(PlayerId::new(2)).unwrap_err().reason(),
+            world.update_ghosts(PlayerId::new(2)).unwrap_err().reason(),
             "a building's ghost without its UMV entry"
         );
     }
@@ -1059,44 +1096,44 @@ mod tests {
     #[test]
     fn watched_list_gives_ghosts_to_the_players_who_lost_sight_and_tells_computer() {
         // FUN_1410905e0: lost = ((old ^ new) & old) >> 1, from player 1, not the list's player
-        let mut t = world(RecycleMode::RECYCLED);
-        set_tile(&mut t, 1, 2, 0x0000_0007_0000_0007);
+        let mut game = world(RecycleMode::RECYCLED);
+        set_tile(&mut game, 1, 2, 0x0000_0007_0000_0007);
         assert_eq!(
-            t.watch(PlayerId::new(0), object_id(5), Tile::new(1, 2)),
+            game.watch(PlayerId::new(0), object_id(5), Tile::new(1, 2)),
             Ok(GhostWatch::Watched)
         );
-        set_tile(&mut t, 1, 2, 0x0000_0007_0000_0001);
-        t.watch_pass(PlayerId::new(0)).unwrap();
-        assert_eq!(t.players[1].ghosts.len(), 1);
-        assert_eq!(t.players[2].ghosts.len(), 1);
+        set_tile(&mut game, 1, 2, 0x0000_0007_0000_0001);
+        game.watch_pass(PlayerId::new(0)).unwrap();
+        assert_eq!(game.players[1].ghosts.len(), 1);
+        assert_eq!(game.players[2].ghosts.len(), 1);
         assert_eq!(
-            t.players[0].watched[0].bits,
+            game.players[0].watched[0].bits,
             VisionBits::from_bits_retain(0x0000_0007_0000_0001)
         );
         // a computer viewer gets its ghost, then its AI's notify is not modelled
-        let mut t = world(RecycleMode::RECYCLED);
-        t.players[2].kind = PlayerKind::Computer;
-        set_tile(&mut t, 1, 2, 0x0000_0007_0000_0005);
+        let mut game = world(RecycleMode::RECYCLED);
+        game.players[2].kind = PlayerKind::Computer;
+        set_tile(&mut game, 1, 2, 0x0000_0007_0000_0005);
         assert_eq!(
-            t.watch(PlayerId::new(0), object_id(5), Tile::new(1, 2)),
+            game.watch(PlayerId::new(0), object_id(5), Tile::new(1, 2)),
             Ok(GhostWatch::Watched)
         );
-        set_tile(&mut t, 1, 2, 0x0000_0007_0000_0001);
-        assert!(t.watch_pass(PlayerId::new(0)).is_err());
-        assert_eq!(t.players[2].ghosts.len(), 1);
+        set_tile(&mut game, 1, 2, 0x0000_0007_0000_0001);
+        assert!(game.watch_pass(PlayerId::new(0)).is_err());
+        assert_eq!(game.players[2].ghosts.len(), 1);
         // an entry whose object is gone leaves the list
-        let mut t = world(RecycleMode::RECYCLED);
-        set_tile(&mut t, 1, 2, 0x0000_0007_0000_0007);
+        let mut world = world(RecycleMode::RECYCLED);
+        set_tile(&mut world, 1, 2, 0x0000_0007_0000_0007);
         assert_eq!(
-            t.watch(PlayerId::new(0), object_id(5), Tile::new(1, 2)),
+            world.watch(PlayerId::new(0), object_id(5), Tile::new(1, 2)),
             Ok(GhostWatch::Watched)
         );
-        t.players[0].objects.clear();
-        t.reindex();
-        set_tile(&mut t, 1, 2, 0x0000_0007_0000_0001);
-        t.watch_pass(PlayerId::new(0)).unwrap();
-        assert_eq!(t.players[0].watched.len(), 0);
-        assert_eq!(t.players[1].ghosts.len(), 0);
+        world.players[0].objects.clear();
+        world.reindex();
+        set_tile(&mut world, 1, 2, 0x0000_0007_0000_0001);
+        world.watch_pass(PlayerId::new(0)).unwrap();
+        assert_eq!(world.players[0].watched.len(), 0);
+        assert_eq!(world.players[1].ghosts.len(), 0);
     }
 
     #[test]
@@ -1142,13 +1179,13 @@ mod tests {
         // Gaia's mine 5 dead (state 3), house 9's annexes 10 (a gate) and 11, a class-51
         // building 12, master 1808's 13, a desolid foundation 14 in the sleeping list
         world.players[0].objects[ListIndex::new(0)].life.state = ObjectState::Dying;
-        let g = object(
+        let gate = object(
             10,
             master_id(88),
             ObjectState::Alive,
             Position::new(2.5, 2.5, 0.0),
         );
-        let unit = object(
+        let annex = object(
             11,
             master_id(89),
             ObjectState::Alive,
@@ -1158,8 +1195,8 @@ mod tests {
             .extend_live(
                 PlayerId::new(1),
                 [
-                    g,
-                    unit,
+                    gate,
+                    annex,
                     object(
                         12,
                         ids::WONDER,
@@ -1199,8 +1236,8 @@ mod tests {
             sprite_override: false,
         });
         world.build_watched().unwrap();
-        let ids = |t: &World, p: usize| {
-            t.players[p]
+        let ids = |world: &World, player: usize| {
+            world.players[player]
                 .watched
                 .iter()
                 .map(|watched| watched.id)

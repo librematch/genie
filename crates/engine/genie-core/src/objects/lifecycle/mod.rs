@@ -570,8 +570,8 @@ mod tests {
             .iter()
             .copied()
             .enumerate()
-            .filter(|&(_, v)| v != Amount::ZERO)
-            .map(|(k, v)| (k, v.get()))
+            .filter(|&(_, amount)| amount != Amount::ZERO)
+            .map(|(attribute, amount)| (attribute, amount.get()))
             .collect();
         assert_eq!(gained, [(1, 2.0), (11, 5.0), (12, 3.0)]);
         assert_eq!(static_storage(&mut owner, &[]), Ok(Held::default()));

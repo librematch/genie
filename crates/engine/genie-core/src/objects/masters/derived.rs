@@ -51,8 +51,8 @@ pub fn follow_moving(
             // a restriction below 0 has no mask; the stats keep theirs
             if let Some(restriction_id) = master.terrain_restriction {
                 stats.restriction = restriction_id;
-                if let Some(t) = terrain {
-                    stats.restriction_mask = t.restriction_mask(restriction_id);
+                if let Some(terrain) = terrain {
+                    stats.restriction_mask = terrain.restriction_mask(restriction_id);
                 }
             }
         }
@@ -95,7 +95,7 @@ pub fn follow(
                 creatable_part.trained_at = creatable_part
                     .train_locations
                     .iter()
-                    .filter_map(|t| t.location)
+                    .filter_map(|train_location| train_location.location)
                     .collect();
                 creatable_part.build_time = creatable_part
                     .train_locations

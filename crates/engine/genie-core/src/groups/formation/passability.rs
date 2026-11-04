@@ -13,7 +13,7 @@ use crate::map::Distance;
 use crate::map::GridSize;
 use crate::map::spatial::RecordId;
 use crate::map::{Point, Rect, Tile};
-use crate::world::slots::CheckedIndex;
+use crate::world::slots::CheckedIndexExt;
 use crate::{GenieError, GenieResult};
 
 /// No active slot lies nearer than `f32::MAX`: the game reads the slot before the array then.
@@ -125,12 +125,12 @@ impl World {
                         .unwrap_or_else(|| position - back * forward);
                     let indices = line.indices.clone();
                     let width = indices.len() as i32;
-                    for k in indices {
+                    for index in indices {
                         transform_slot(
                             formation,
                             &rotation,
                             point,
-                            k as i32,
+                            index as i32,
                             TransformKind::ByLines,
                             world,
                             &self.model.tuning.group,
@@ -147,18 +147,18 @@ impl World {
                 } else {
                     position
                 };
-                let mut i = 0;
+                let mut index = 0;
                 loop {
                     transform_slot(
                         formation,
                         &rotation,
                         point,
-                        i,
+                        index,
                         kind,
                         world,
                         &self.model.tuning.group,
                     )?;
-                    i += 1;
+                    index += 1;
                     formation.number_transformed_slots += 1;
                     if capacity <= formation.number_transformed_slots {
                         break;
@@ -224,8 +224,8 @@ impl World {
             formation
                 .slots
                 .iter()
-                .filter(|s| s.active != 0)
-                .find_map(|s| self.world_object(s.unit_id))
+                .filter(|slot| slot.active != 0)
+                .find_map(|slot| self.world_object(slot.unit_id))
         });
         let Some(tester) = tester else {
             return Ok(());
@@ -239,7 +239,7 @@ impl World {
         let Some(_) = formation
             .slots
             .iter()
-            .position(|s| s.active != 0 && !stands(s.transform_position))
+            .position(|slot| slot.active != 0 && !stands(slot.transform_position))
         else {
             return Ok(());
         };
@@ -250,13 +250,13 @@ impl World {
             position,
             &self.model.tuning.group,
         );
-        let k = nearest.ok_or(NO_NEAREST_SLOT)?;
-        if !stands(formation.slots.checked(k)?.transform_position) {
+        let slot_index = nearest.ok_or(NO_NEAREST_SLOT)?;
+        if !stands(formation.slots.checked(slot_index)?.transform_position) {
             if !stands(position) {
                 return Ok(());
             }
-            let s = formation.slots.checked_mut(k)?;
-            s.transform_position = s
+            let slot = formation.slots.checked_mut(slot_index)?;
+            slot.transform_position = slot
                 .transform_position
                 .with_x(position.x())
                 .with_y(position.y());
@@ -282,17 +282,17 @@ impl World {
             < self.model.tuning.group.pass_share
         {
             unreachable.append(&mut reachable);
-            reachable.push(k);
-            let slot = formation.slots.checked_mut(k)?;
+            reachable.push(slot_index);
+            let slot = formation.slots.checked_mut(slot_index)?;
             slot.transform_position = slot
                 .transform_position
                 .with_x(position.x())
                 .with_y(position.y());
         }
         // CVTTSS2SI at 0x14103bedd, 0x14103bef9, 0x14103bf1c and 0x14103bf2e
-        let w = cvttss2si((max_x - min_x) + self.model.tuning.group.pass_margin + PASS_ONE);
-        let h = cvttss2si((max_z - min_z) + self.model.tuning.group.pass_margin + PASS_ONE);
-        if PASS_CELLS < w || PASS_CELLS < h {
+        let width = cvttss2si((max_x - min_x) + self.model.tuning.group.pass_margin + PASS_ONE);
+        let height = cvttss2si((max_z - min_z) + self.model.tuning.group.pass_margin + PASS_ONE);
+        if PASS_CELLS < width || PASS_CELLS < height {
             // the records go (FUN_1410561f0 at 0x14103cf9f)
             self.spatial.clear_tile_records();
             return Ok(());
@@ -301,13 +301,13 @@ impl World {
         let oz = cvttss2si(min_z - self.model.tuning.group.pass_half_margin);
         let mut grid = PassGrid {
             cells: vec![0u8; GRID_BYTES],
-            size: GridSize::new(w, h),
+            size: GridSize::new(width, height),
             origin: Tile::new(ox, oz),
         };
-        mark_reachable(&mut grid, formation, (&reachable, k))?;
+        mark_reachable(&mut grid, formation, (&reachable, slot_index))?;
         let moved = Unreachable {
             slots: &unreachable,
-            nearest: k,
+            nearest: slot_index,
             spacing: held.desired_spacing,
             grow,
         };
@@ -373,21 +373,21 @@ impl World {
         (gx, gy): (i32, i32),
         unit_mask: TerrainMask,
     ) -> Option<(Tile, usize)> {
-        let (w, h) = (grid.size.width(), grid.size.height());
+        let (width, height) = (grid.size.width(), grid.size.height());
         let (ox, oz) = (grid.origin.x(), grid.origin.y());
-        if !(0 <= gx && 0 <= gy && gx < w && gy < h) {
+        if !(0 <= gx && 0 <= gy && gx < width && gy < height) {
             return None;
         }
         let mut queue = vec![(gx, gy)];
-        *visited.get_mut((gy * w + gx) as usize)? = 1;
+        *visited.get_mut((gy * width + gx) as usize)? = 1;
         let mut qi = 0;
         while qi < queue.len() {
             let (cx, cy) = *queue.get(qi)?;
             qi += 1;
             if !(0 <= cx
-                && cx < w
+                && cx < width
                 && 0 <= cy
-                && cy < h
+                && cy < height
                 && self
                     .spatial
                     .standable(Tile::new(ox + cx, oz + cy), unit_mask))
@@ -395,27 +395,30 @@ impl World {
                 continue;
             }
             let steps = [
-                (cx + 1, cy, cx + 1 < w, 0x43u8),
+                (cx + 1, cy, cx + 1 < width, 0x43u8),
                 (cx - 1, cy, 0 < cx, 0xc3),
-                (cx, cy + 1, cy + 1 < h, 3),
+                (cx, cy + 1, cy + 1 < height, 3),
                 (cx, cy - 1, 0 < cy, 0x83),
             ];
             for (nx, ny, inside, mark) in steps {
                 if !inside {
                     continue;
                 }
-                let cell = (w * ny + nx) as usize;
+                let cell = (width * ny + nx) as usize;
                 if *visited.get(cell)? != 0 {
                     continue;
                 }
                 *visited.get_mut(cell)? = 1;
-                let b = *grid.cells.get(cell)?;
-                if b & 1 != 0 {
-                    if b & 0x3e < 10 {
-                        *grid.cells.get_mut(cell)? = count_up(b);
-                        return Some((Tile::new(ox + nx, oz + ny), usize::from(b >> 1 & 0x1f)));
+                let cell_mark = *grid.cells.get(cell)?;
+                if cell_mark & 1 != 0 {
+                    if cell_mark & 0x3e < 10 {
+                        *grid.cells.get_mut(cell)? = count_up(cell_mark);
+                        return Some((
+                            Tile::new(ox + nx, oz + ny),
+                            usize::from(cell_mark >> 1 & 0x1f),
+                        ));
                     }
-                    *grid.cells.get_mut((w * cy + cx) as usize)? = mark;
+                    *grid.cells.get_mut((width * cy + cx) as usize)? = mark;
                     return Some((Tile::new(ox + cx, oz + cy), 0));
                 }
                 queue.push((nx, ny));
@@ -442,19 +445,19 @@ impl World {
         members: &[RecordId],
     ) -> GenieResult<Option<Tile>> {
         let (fx, fy) = (found.x(), found.y());
-        let (w, h) = (grid.size.width(), grid.size.height());
+        let (width, height) = (grid.size.width(), grid.size.height());
         let (rx, ry) = (fx - grid.origin.x(), fy - grid.origin.y());
-        let (ddx, ddy) = match *grid.cells.checked((w * ry + rx) as usize)? >> 6 {
+        let (ddx, ddy) = match *grid.cells.checked((width * ry + rx) as usize)? >> 6 {
             0 => (0, 1),
             1 => (1, 0),
             2 => (0, -1),
             _ => (-1, 0),
         };
         let (nx, ny) = (ddx + rx, ddy + ry);
-        if ny < 0 || h <= ny || nx < 0 || w <= nx {
+        if ny < 0 || height <= ny || nx < 0 || width <= nx {
             return Ok(None);
         }
-        let cell = (w * ny + nx) as usize;
+        let cell = (width * ny + nx) as usize;
         let checked = *grid.cells.checked(cell)?;
         if checked & 0x3e < 0xb
             && !self.spatial.still_line_hit(
@@ -490,8 +493,8 @@ pub(super) struct PassGrid {
 
 /// `FUN_14103a1f0`'s grid cell count up: bits 1 to 5 (the slots a cell holds) count on (mod 32),
 /// the others kept.
-pub(super) const fn count_up(b: u8) -> u8 {
-    (((b & 0xfe).wrapping_add(2) ^ b) & 0x3e) ^ b
+pub(super) const fn count_up(mark: u8) -> u8 {
+    (((mark & 0xfe).wrapping_add(2) ^ mark) & 0x3e) ^ mark
 }
 
 /// The tile of a slot's place the passability tests (`FUN_141185690`'s arguments): x and y
@@ -523,19 +526,19 @@ pub(super) fn passability_box(
             continue;
         }
         let d3 = slot.transform_position - position;
-        let d = d3.x() * d3.x() + d3.height() * d3.height() + d3.y() * d3.y();
+        let distance = d3.x() * d3.x() + d3.height() * d3.height() + d3.y() * d3.y();
         let earlier = best;
-        if d < best {
-            best = d;
+        if distance < best {
+            best = distance;
         }
-        let (a, b) = (minss(at.x(), min_x), minss(at.y(), min_z));
-        let (c, e) = (maxss(at.x(), max_x), maxss(at.y(), max_z));
+        let (low_x, low_z) = (minss(at.x(), min_x), minss(at.y(), min_z));
+        let (high_x, high_z) = (maxss(at.x(), max_x), maxss(at.y(), max_z));
         let transform_position = slot.transform_position;
-        min_x = minss(transform_position.x(), a);
-        min_z = minss(transform_position.y(), b);
-        max_x = maxss(transform_position.x(), c);
-        max_z = maxss(transform_position.y(), e);
-        if d < earlier {
+        min_x = minss(transform_position.x(), low_x);
+        min_z = minss(transform_position.y(), low_z);
+        max_x = maxss(transform_position.x(), high_x);
+        max_z = maxss(transform_position.y(), high_z);
+        if distance < earlier {
             nearest = Some(index);
         }
     }
@@ -547,9 +550,9 @@ pub(super) fn passability_box(
 /// `|dx|` is at most `|dz|` (`COMISS`/`JBE`: also for a NaN), with bit 7 for a `dz` below 0
 /// (`JNC`: also NaN); else along x, bits 6 and 7 for a `dx` below 0 (`JC`: also NaN), bit 6 alone
 /// otherwise.
-pub(super) fn cell_mark(b: u8, dx: f32, dz: f32) -> u8 {
+pub(super) fn cell_mark(mark: u8, dx: f32, dz: f32) -> u8 {
     use crate::math::fmath::{at_most_or_unordered, below_or_unordered};
-    let count_up = count_up(b) | 1;
+    let count_up = count_up(mark) | 1;
     if at_most_or_unordered(dx.abs(), dz.abs()) {
         if below_or_unordered(dz, 0.0) {
             count_up & 0x3f | 0x80

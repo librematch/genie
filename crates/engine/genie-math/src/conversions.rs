@@ -37,8 +37,8 @@ mod tests {
         assert_eq!(cvttss2si_64(2_147_483_648.0) as i32, i32::MIN);
         assert_eq!(cvttss2si_64(6_442_450_944.0) as i32, i32::MIN);
         assert_eq!(cvttss2si_64(4_294_967_296.0) as i32, 0);
-        for v in [f32::NAN, f32::INFINITY, -f32::INFINITY, 1.0e19] {
-            assert_eq!(cvttss2si_64(v), i64::MIN, "{v}");
+        for value in [f32::NAN, f32::INFINITY, -f32::INFINITY, 1.0e19] {
+            assert_eq!(cvttss2si_64(value), i64::MIN, "{value}");
         }
     }
 
@@ -49,8 +49,8 @@ mod tests {
 
     #[test]
     fn cvttss2si_returns_integer_indefinite_for_nan_and_out_of_range() {
-        for v in [f32::NAN, 2_147_483_648.0, -2_147_483_904.0, f32::INFINITY] {
-            assert_eq!(cvttss2si(v), i32::MIN, "{v}");
+        for value in [f32::NAN, 2_147_483_648.0, -2_147_483_904.0, f32::INFINITY] {
+            assert_eq!(cvttss2si(value), i32::MIN, "{value}");
         }
     }
 }

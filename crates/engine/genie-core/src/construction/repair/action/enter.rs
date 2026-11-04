@@ -32,8 +32,8 @@ impl RepairAction {
             }
             RepairState::Move { .. } => self.enter_walk(step, repairer, reads, roles)?,
             RepairState::Face => {
-                if let Some(t) = reads.target {
-                    self.point = t.position;
+                if let Some(repairee) = reads.target {
+                    self.point = repairee.position;
                 }
                 show(step, repairer, self.task.moving, reads.standing)?;
             }
@@ -85,17 +85,22 @@ impl RepairAction {
         roles: &Roles,
     ) -> GenieResult<()> {
         let move_reads = repairer.move_to_reads(
-            step.w.parts.motion.mover(repairer.id),
-            step.w.master_tables(),
+            step.world.parts.motion.mover(repairer.id),
+            step.world.master_tables(),
             step.player,
             (
-                &step.w.model.graphics,
-                step.w.parts.combat_of(repairer.id).abilities.look.as_ref(),
+                &step.world.model.graphics,
+                step.world
+                    .parts
+                    .combat_of(repairer.id)
+                    .abilities
+                    .look
+                    .as_ref(),
             ),
             roles,
         )?;
         self.state = RepairState::WalkPoint {
-            move_to: self.to_point(self.point, &move_reads, &step.w.model.tuning.move_to)?,
+            move_to: self.to_point(self.point, &move_reads, &step.world.model.tuning.move_to)?,
         };
         Ok(())
     }
@@ -118,18 +123,23 @@ impl RepairAction {
             self.point = repairee.position;
         }
         let move_reads = repairer.move_to_reads(
-            step.w.parts.motion.mover(repairer.id),
-            step.w.master_tables(),
+            step.world.parts.motion.mover(repairer.id),
+            step.world.master_tables(),
             step.player,
             (
-                &step.w.model.graphics,
-                step.w.parts.combat_of(repairer.id).abilities.look.as_ref(),
+                &step.world.model.graphics,
+                step.world
+                    .parts
+                    .combat_of(repairer.id)
+                    .abilities
+                    .look
+                    .as_ref(),
             ),
             roles,
         )?;
-        let to = move_reads.walk_to(step.w, self.target.map(RepairTargetId::id))?;
+        let to = move_reads.walk_to(step.world, self.target.map(RepairTargetId::id))?;
         self.state = RepairState::Move {
-            move_to: self.walk(&move_reads, to, &step.w.model.tuning.move_to)?,
+            move_to: self.walk(&move_reads, to, &step.world.model.tuning.move_to)?,
         };
         Ok(())
     }

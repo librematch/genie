@@ -74,7 +74,7 @@ impl Roles {
     pub fn of_class(&self, class: ClassId) -> ClassRoles {
         class
             .index()
-            .and_then(|i| self.classes.get(i))
+            .and_then(|index| self.classes.get(index))
             .copied()
             .unwrap_or_default()
     }

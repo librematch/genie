@@ -10,7 +10,7 @@ use crate::players::PlayerId;
 use crate::players::TributeFee;
 use crate::players::tracker::ListKey;
 use crate::world::World;
-use crate::world::slots::{CheckedIndex, PlayerSlots};
+use crate::world::slots::{CheckedIndexExt, PlayerSlotsExt};
 use crate::{GenieError, GenieResult};
 
 /// One of a tribute's four entries: the attribute (`+0x24`..), its amount (`+0x04`..) and the
@@ -53,11 +53,11 @@ impl World {
     /// `FUN_141659d20`, else none; the count of its done list, `FUN_14104eea0`).
     #[must_use]
     pub fn pays_tribute(&self, player_id: PlayerId) -> bool {
-        let has = |m: MasterId| {
+        let has = |master_id: MasterId| {
             self.model
                 .masters
                 .get(player_id.index())
-                .is_some_and(|ms| ms.get(m).is_some())
+                .is_some_and(|ms| ms.get(master_id).is_some())
         };
         let master_slots = self.model.slots.master;
         [master_slots.market, master_slots.market_1647]
@@ -206,7 +206,7 @@ mod tests {
             attributes: attributes(600, [500.0; 4]),
             ..Player::default()
         };
-        let mut t = World::new(
+        let mut world = World::new(
             WorldTime::ZERO,
             FrameSeed::of_data(1),
             PlayerId::new(0),
@@ -219,13 +219,13 @@ mod tests {
             class: class::BUILDING,
             ..Master::default()
         }]);
-        t.model.masters = vec![
+        world.model.masters = vec![
             Arc::new(masters.clone()),
             Arc::new(masters.clone()),
             Arc::new(masters),
         ];
         if market {
-            t.players[1].tracker.add(
+            world.players[1].tracker.add(
                 object_id(7),
                 Key {
                     master: Some(ids::MARKET),
@@ -235,7 +235,7 @@ mod tests {
                 },
             );
         }
-        t
+        world
     }
 
     /// `FUN_140e7d040`: player 1's tribute of 100 wood and 200 gold at a fee of 0.3 to player 2
@@ -249,9 +249,9 @@ mod tests {
             gift(4, 50.0, 0.3),
             gift(0, 0.0, 0.3),
         ];
-        let mut t = world(true);
-        t.tribute(player_id(1), player_id(2), &gifts).unwrap();
-        let (giver, receiver) = (&t.players[1], &t.players[2]);
+        let mut game = world(true);
+        game.tribute(player_id(1), player_id(2), &gifts).unwrap();
+        let (giver, receiver) = (&game.players[1], &game.players[2]);
         assert_eq!(
             giver.resources(),
             amounts([500.0, 500.0 - 130.0, 500.0, 500.0 - 260.0])

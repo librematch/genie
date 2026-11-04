@@ -51,7 +51,7 @@ mod path_end;
 mod path_flags;
 mod path_points;
 mod path_state;
-pub(crate) use self::levels::Levels;
+pub(crate) use self::levels::LevelsExt;
 pub use self::move_algorithm::MoveAlgorithm;
 pub(crate) use self::move_start::MoveStart;
 pub use self::new_path::UnitReach;
@@ -324,10 +324,20 @@ const LONG_PATHER: bool = true;
 
 /// `FUN_1411615a0`: how deep two boxes (centre, radii on the ground) overlap, the lesser of the
 /// two axes; 0 when they do not.
-fn overlap(a: BVector, radius_a: Footprint, b: BVector, radius_b: Footprint) -> f32 {
+fn overlap(centre_a: BVector, radius_a: Footprint, centre_b: BVector, radius_b: Footprint) -> f32 {
     let (ar, ad, br, bd) = (radius_a.x(), radius_a.y(), radius_b.x(), radius_b.y());
-    let (ax1, ax0, ay0, ay1) = (a.x() + ar, a.x() - ar, a.y() - ad, a.y() + ad);
-    let (by0, by1, bx0, bx1) = (b.y() - bd, b.y() + bd, b.x() - br, b.x() + br);
+    let (ax1, ax0, ay0, ay1) = (
+        centre_a.x() + ar,
+        centre_a.x() - ar,
+        centre_a.y() - ad,
+        centre_a.y() + ad,
+    );
+    let (by0, by1, bx0, bx1) = (
+        centre_b.y() - bd,
+        centre_b.y() + bd,
+        centre_b.x() - br,
+        centre_b.x() + br,
+    );
     // COMISS/JNC at 0x1411615fd..0x141161610: only an ordered `>=` leaves, a NaN goes on
     if bx0 >= ax1 || ax0 >= bx1 || by0 >= ay1 || ay0 >= by1 {
         return 0.0;
@@ -447,7 +457,7 @@ impl PathData {
     fn point(&self, index: WaypointIndex) -> BVector {
         index
             .slot()
-            .and_then(|i| self.points.get(i))
+            .and_then(|index| self.points.get(index))
             .copied()
             .unwrap_or(OUTSIDE_PATH)
     }
@@ -532,15 +542,17 @@ fn pause_rank(
     by_id: ObjectsRef<'_>,
 ) -> Option<bool> {
     let mine = me.human_order;
-    let theirs = by_id.gait(id).map_or(WorldTime::ZERO, |g| g.human_order);
+    let theirs = by_id
+        .gait(id)
+        .map_or(WorldTime::ZERO, |gait| gait.human_order);
     Some(
         if !player_kind.is_computer() && (other.player != player || theirs != mine) {
             theirs < mine
         } else if let Some(group) = me.group
             && by_id.gait(id).and_then(|gait| gait.group) == Some(group)
         {
-            let g = groups.and_then(|gs| gs.get(group))?;
-            g.index_of(me.id) < g.index_of(id)
+            let group = groups.and_then(|gs| gs.get(group))?;
+            group.index_of(me.id) < group.index_of(id)
         } else {
             me.id < id
         },
@@ -552,10 +564,10 @@ fn pause_rank(
 /// edge of the map (`map`) goes, until one lies inside.
 fn drop_edge_waypoints(level: &mut PathData, radius: Radii, map: GridSize) {
     let (rx, ry) = (radius.x(), radius.y());
-    let (w, h) = (map.width(), map.height());
+    let (width, height) = (map.width(), map.height());
     while level.waypoint.within(level.points.len()) {
         let [x, _, y] = level.point(level.waypoint).get();
-        if rx <= x && ry <= y && x <= w as f32 - rx && y <= h as f32 - ry {
+        if rx <= x && ry <= y && x <= width as f32 - rx && y <= height as f32 - ry {
             break;
         }
         // the index is the waypoint just incremented, and no writer sets one below -1: it is
@@ -569,8 +581,8 @@ fn drop_edge_waypoints(level: &mut PathData, radius: Radii, map: GridSize) {
 /// outside the path (below 0 or past its last point) changes nothing (false).
 fn remove_point(points: &mut Vec<BVector>, waypoint_index: WaypointIndex) -> bool {
     match waypoint_index.slot() {
-        Some(k) if k < points.len() => {
-            let _ = points.remove(k);
+        Some(index) if index < points.len() => {
+            let _ = points.remove(index);
             true
         }
         _ => false,

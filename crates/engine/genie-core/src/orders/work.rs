@@ -39,8 +39,8 @@ use crate::unit_ai::task_finder::{Actor, enabled};
 use crate::unit_ai::task_finder::{TaskOn, find_task};
 use crate::world::World;
 use crate::world::layer::ClassRoles;
-use crate::world::slots::CheckedIndex;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::CheckedIndexExt;
+use crate::world::slots::PlayerSlotsExt;
 use crate::{GenieError, GenieResult};
 
 mod garrison;
@@ -96,7 +96,7 @@ impl World {
             .actions_of(unit.id)
             .list
             .attack()
-            .filter(|a| attack_on(top, a, target));
+            .filter(|attack| attack_on(top, attack, target));
         let Some(attack) = attacking.filter(|_| matches!(filter, None | Some(ATTACK))) else {
             return Ok(Answer::NotTaken);
         };
@@ -134,7 +134,7 @@ impl World {
                 Some((target, class)),
                 point,
                 notifies,
-                self.streams.get(Stream::Ai),
+                self.streams.get_mut(Stream::Ai),
             )?;
             self.remember_order(
                 player,
@@ -428,7 +428,7 @@ impl World {
                 named,
                 point,
                 notifies,
-                self.streams.get(Stream::Ai),
+                self.streams.get_mut(Stream::Ai),
             )?;
             self.remember_order(player, idx, (order, action))?;
         }
@@ -487,7 +487,7 @@ impl World {
         // slot 0x820's point: the target's place
         let at = self
             .object(target)
-            .map_or(Position::ORIGIN, |(_, u)| u.position());
+            .map_or(Position::ORIGIN, |(_, unit)| unit.position());
         let terrain = self.task_terrain(at);
         let find = |list: &Master, filter: Option<ActionKind>| {
             find_task(

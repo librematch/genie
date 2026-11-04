@@ -37,10 +37,10 @@ impl GroupCommandKind {
     #[must_use]
     pub const fn table<const N: usize>(values: [i32; N]) -> [Self; N] {
         let mut out = [Self(0); N];
-        let mut i = 0;
-        while i < N {
-            out[i] = Self(values[i]);
-            i += 1;
+        let mut index = 0;
+        while index < N {
+            out[index] = Self(values[index]);
+            index += 1;
         }
         out
     }

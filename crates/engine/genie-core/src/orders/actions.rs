@@ -40,7 +40,7 @@ use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 use crate::world::layer::generated::SpriteTuning;
 use crate::world::layer::generated::VisibilityTuning;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 use crate::{GenieError, GenieResult};
 
 impl World {
@@ -296,9 +296,9 @@ impl World {
             return Ok(());
         }
         let unit = match place {
-            Place::Live(p, i) => self.players.live_mut(p, i)?,
-            Place::Sleeping(player_id, i) => {
-                let woken = self.swap_remove_asleep(player_id, i)?;
+            Place::Live(owner, list_index) => self.players.live_mut(owner, list_index)?,
+            Place::Sleeping(player_id, slot) => {
+                let woken = self.swap_remove_asleep(player_id, slot)?;
                 let (id, master) = (woken.unit.id, woken.unit.life.master_id);
                 let list_index = self.push_live(player_id, woken)?;
                 // the wake's remove and add (slots 0x2d8, 0x2d0) file it last in the tracker
@@ -334,7 +334,7 @@ impl World {
             spatial: &mut self.spatial,
             pathing: &mut self.pathing,
             graphics: &self.model.graphics,
-            sprite: self.streams.get(Stream::Sprite),
+            sprite: self.streams.get_mut(Stream::Sprite),
         };
         let unit = self.players.live_mut(player, idx)?;
         let (combat, motion) = self.parts.combat_and_motion_mut(unit.id)?;
@@ -367,11 +367,11 @@ impl World {
 
 /// What a master change ([`switch_master`]) changes of the world besides its unit: the place and
 /// its records, the pathing, and the sprites with the Sprite stream.
-pub(crate) struct SwitchWorld<'a> {
-    pub(crate) spatial: &'a mut Spatial,
-    pub(crate) pathing: &'a mut Pathing,
-    pub(crate) graphics: &'a Graphics,
-    pub(crate) sprite: &'a mut Well512,
+pub(crate) struct SwitchWorld<'world> {
+    pub(crate) spatial: &'world mut Spatial,
+    pub(crate) pathing: &'world mut Pathing,
+    pub(crate) graphics: &'world Graphics,
+    pub(crate) sprite: &'world mut Well512,
 }
 
 /// What [`switch_master`] leaves to its owner, in the game's order: the old master's storage

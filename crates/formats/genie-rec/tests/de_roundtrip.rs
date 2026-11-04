@@ -31,7 +31,10 @@ fn written(header: &genie_save::Header) -> Vec<u8> {
 
 /// The first offset where `ours` differs from `theirs`, or where the shorter one ends.
 fn first_difference(ours: &[u8], theirs: &[u8]) -> Option<usize> {
-    let common = ours.iter().zip(theirs).position(|(a, b)| a != b);
+    let common = ours
+        .iter()
+        .zip(theirs)
+        .position(|(left, right)| left != right);
     common.or_else(|| (ours.len() != theirs.len()).then(|| ours.len().min(theirs.len())))
 }
 

@@ -80,7 +80,7 @@ mod tests {
     #[test]
     fn codes_1_and_3_delete() {
         let deleting: Vec<u8> = (0..=u8::MAX)
-            .filter(|&c| UpdateCode::of_data(c).deletes())
+            .filter(|&code| UpdateCode::of_data(code).deletes())
             .collect();
         assert_eq!(deleting, [1, 3]);
         assert_eq!(UpdateCode::Code5.get(), 5);

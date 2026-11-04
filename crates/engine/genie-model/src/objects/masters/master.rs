@@ -125,18 +125,18 @@ impl Master {
     }
 }
 
-impl<'a> IntoIterator for &'a Masters {
-    type Item = &'a Master;
-    type IntoIter = Flatten<SliceIter<'a, Option<Master>>>;
+impl<'masters> IntoIterator for &'masters Masters {
+    type Item = &'masters Master;
+    type IntoIter = Flatten<SliceIter<'masters, Option<Master>>>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
     }
 }
 
-impl<'a> IntoIterator for &'a mut Masters {
-    type Item = &'a mut Master;
-    type IntoIter = Flatten<SliceIterMut<'a, Option<Master>>>;
+impl<'masters> IntoIterator for &'masters mut Masters {
+    type Item = &'masters mut Master;
+    type IntoIter = Flatten<SliceIterMut<'masters, Option<Master>>>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter_mut()

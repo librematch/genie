@@ -34,7 +34,7 @@ use crate::vision::SightCentre;
 use crate::vision::SightLayer;
 use crate::vision::SightShape;
 use crate::world::parts::{Object, ObjectParts};
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 use crate::{GenieError, GenieResult};
 
 use crate::combat::missile::grounded;
@@ -108,8 +108,8 @@ impl World {
         let toward = match (gather, queue.first()) {
             (None, Some(first)) => Some(first.point.ground()),
             _ => gather
-                .filter(|g| g.target != Some(building.id))
-                .map(|g| g.point.ground()),
+                .filter(|gather_point| gather_point.target != Some(building.id))
+                .map(|gather_point| gather_point.point.ground()),
         };
         if made.move_stats.is_none() {
             return Err(GenieError::unsupported(
@@ -202,7 +202,7 @@ impl World {
         Ok(())
     }
 
-    /// [`World::hand_queue`]'s test of a queued order's target `o.target` for the new unit at
+    /// [`World::hand_queue`]'s test of a queued order's target `order.target` for the new unit at
     /// `new` (of master `master`): an order on a monastery (104) of a unit whose AI already queues
     /// one of the relic's target type keeps its kind; on another object the unit may enter it
     /// would become an enter order (`0x2cd`), not modelled. An order without a target, or on one
@@ -212,12 +212,12 @@ impl World {
         player_id: PlayerId,
         new: ListIndex,
         master: MasterId,
-        o: &QueuedOrder,
+        order: &QueuedOrder,
     ) -> GenieResult<()> {
-        let target = o
+        let target = order
             .target
             .is_some()
-            .then(|| self.object(o.target))
+            .then(|| self.object(order.target))
             .flatten()
             .map(|(tp, unit)| (tp, unit.life.master_id));
         let Some((tp, tm)) = target else {
@@ -248,7 +248,7 @@ impl World {
             && MasterKind::COMBAT <= target_master.kind
             && target_master.garrison.holds()
             // a queued order's target −1 is a point: it takes nothing in
-            && o.target
+            && order.target
                 .map_or(Ok(false), |object_id| self.takes_in(ContainerId::new(object_id), player_id, Some(master)))?
         {
             return Err(GenieError::unsupported(
@@ -284,7 +284,7 @@ impl World {
     }
 
     /// The master's slot 0x40 for a combat unit (type 70, `0x141266120`, the constructor
-    /// `FUN_1411eae40` with its setups) of `master` for player `p` at `position`: the setups in
+    /// `FUN_1411eae40` with its setups) of `master` for its player at `position`: the setups in
     /// order (static `FUN_1411a45a0`, animated `FUN_141072690`, moving `FUN_141161450`, combat
     /// `FUN_14121df60`) with their draws: the facet (Object stream, for a standing sprite with a
     /// random first frame and several facets), the standing sprite ([`ActiveSprite::start`],
@@ -306,11 +306,11 @@ impl World {
     /// object faces (Object stream, "setup" line 0x2c3). Its sprite, its facets and its angle.
     pub(crate) fn setup_draws(&mut self, standing: Graphic) -> (ActiveSprite, SpriteFacets, Angle) {
         if standing.flags.contains(SpriteFlags::RANDOM_FIRST_FRAME) && standing.facets.several() {
-            let _ = self.streams.get(Stream::Object).rand15();
+            let _ = self.streams.get_mut(Stream::Object).rand15();
         }
         let sprite = ActiveSprite::start(
             standing,
-            self.streams.get(Stream::Sprite),
+            self.streams.get_mut(Stream::Sprite),
             self.model.tuning.sprite,
         );
         let facets = SpriteFacets {
@@ -318,7 +318,7 @@ impl World {
             turns: standing.flags.contains(SpriteFlags::TURNS),
         };
         let angle = if draws_angle(Some(facets)) {
-            let draw = self.streams.get(Stream::Object).rand15();
+            let draw = self.streams.get_mut(Stream::Object).rand15();
             drawn_angle(draw, facets)
         } else {
             Angle::ZERO
@@ -354,13 +354,15 @@ impl World {
         // the constructor's new_position: the ground's height by the master's fly mode (slot
         // 0x60, FUN_141193a10)
         let position = self.spatial.terrain.as_ref().map_or(position, |terrain| {
-            terrain.ground(position.ground()).map_or(position, |g| {
-                Position::new(
-                    position.x(),
-                    position.y(),
-                    grounded(position.z(), g, made.fly_mode),
-                )
-            })
+            terrain
+                .ground(position.ground())
+                .map_or(position, |ground| {
+                    Position::new(
+                        position.x(),
+                        position.y(),
+                        grounded(position.z(), ground, made.fly_mode),
+                    )
+                })
         });
         let ai_kind = unit_ai_kind(made, master, &self.model.roles).ok_or(
             GenieError::unsupported("a new combat unit without a unit AI"),
@@ -377,10 +379,10 @@ impl World {
         let ai = UnitAi::constructed(
             ai_kind,
             &new_object,
-            self.streams.get(Stream::Ai),
+            self.streams.get_mut(Stream::Ai),
             &self.model.roles,
         );
-        let _ = self.streams.get(Stream::Object).rand15();
+        let _ = self.streams.get_mut(Stream::Object).rand15();
         // its place, record, mesh shape and sight (new_position, slot 0x58, and FUN_141054fe0)
         let solid = 0.0 < made.radius.x() && 0.0 < made.radius.y() && made.is_tall();
         let placed = Placed {

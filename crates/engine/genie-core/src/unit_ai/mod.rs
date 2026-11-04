@@ -153,18 +153,18 @@ pub struct Notify {
     /// The kind ([`NotifyKind`]).
     pub(crate) kind: NotifyKind,
     /// Its three parameters.
-    pub(crate) p: [i32; 3],
+    pub(crate) params: [i32; 3],
 }
 
 impl Notify {
     /// The notify an object posts to itself.
     #[must_use]
-    pub const fn own(id: ObjectId, kind: NotifyKind, p: [i32; 3]) -> Self {
+    pub const fn own(id: ObjectId, kind: NotifyKind, params: [i32; 3]) -> Self {
         Self {
             caller: Some(id),
             recipient: id,
             kind,
-            p,
+            params,
         }
     }
 
@@ -173,13 +173,13 @@ impl Notify {
     /// # Errors
     ///
     /// A record shorter than its fields, or a recipient of −1.
-    pub fn from_bytes(b: &[u8; 24]) -> GenieResult<Self> {
-        let w = |i: usize| le_word(b, i).map(i32::from_le_bytes);
+    pub fn from_bytes(bytes: &[u8; 24]) -> GenieResult<Self> {
+        let word = |offset: usize| le_word(bytes, offset).map(i32::from_le_bytes);
         Ok(Self {
-            caller: ObjectId::of_field(w(0)?),
-            recipient: ObjectId::try_from(w(4)?)?,
-            kind: NotifyKind::from(w(8)?),
-            p: [w(12)?, w(16)?, w(20)?],
+            caller: ObjectId::of_field(word(0)?),
+            recipient: ObjectId::try_from(word(4)?)?,
+            kind: NotifyKind::from(word(8)?),
+            params: [word(12)?, word(16)?, word(20)?],
         })
     }
 }
@@ -207,15 +207,15 @@ const FISHING_BUILD_FAR: WholeDistance = WholeDistance::of_data(9999);
 /// for the others), doubled until they fit.
 #[must_use]
 pub const fn notify_capacity(ai_kind: UnitAiKind, count: usize) -> usize {
-    let mut c = if matches!(ai_kind, UnitAiKind::Artifact | UnitAiKind::Livestock) {
+    let mut capacity = if matches!(ai_kind, UnitAiKind::Artifact | UnitAiKind::Livestock) {
         5
     } else {
         10
     };
-    while c < count {
-        c *= 2;
+    while capacity < count {
+        capacity *= 2;
     }
-    c
+    capacity
 }
 
 /// A queued order (the save's `temp_order`, 0x34 bytes), which the order queue (`+0x18` count,
@@ -245,17 +245,18 @@ pub struct QueuedOrder {
     pub(crate) target_kind: Option<OrderTargetKind>,
 }
 
-/// The four bytes at offset `i` of a saved record.
+/// The four bytes at offset `offset` of a saved record.
 ///
 /// # Errors
 ///
 /// A record shorter than the offset.
-fn le_word(b: &[u8], i: usize) -> GenieResult<[u8; 4]> {
-    b.get(i..)
+fn le_word(bytes: &[u8], offset: usize) -> GenieResult<[u8; 4]> {
+    bytes
+        .get(offset..)
         .and_then(<[u8]>::first_chunk::<4>)
         .copied()
         .ok_or_else(|| {
-            GenieError::unreachable("a saved record shorter than its fields").with("offset", i)
+            GenieError::unreachable("a saved record shorter than its fields").with("offset", offset)
         })
 }
 
@@ -266,20 +267,20 @@ impl QueuedOrder {
     /// # Errors
     ///
     /// An order value no order holds ([`OrderKind::try_from`]).
-    pub fn from_bytes(b: &[u8; 52], own: ObjectId, players: usize) -> GenieResult<Self> {
-        let w = |i: usize| le_word(b, i).map(i32::from_le_bytes);
-        let f = |i: usize| le_word(b, i).map(f32::from_le_bytes);
+    pub fn from_bytes(bytes: &[u8; 52], own: ObjectId, players: usize) -> GenieResult<Self> {
+        let word = |offset: usize| le_word(bytes, offset).map(i32::from_le_bytes);
+        let float = |offset: usize| le_word(bytes, offset).map(f32::from_le_bytes);
         Ok(Self {
-            issuer: Issuer::of_saved(w(0)?, own, players),
-            order: OrderKind::try_from(w(4)?)?,
-            priority: OrderPriority::of_data(w(8)?),
-            target: ObjectId::of_field(w(12)?),
-            target_owner: PlayerId::of_field(w(16)?)?,
-            point: Position::new(f(20)?, f(24)?, f(28)?),
-            range: Distance::new(f(32)?),
-            shown: Point::new(f(36)?, f(40)?),
-            ready: le_word(b, 44)?[0] != 0,
-            target_kind: OrderTargetKind::of_field(w(48)?)?,
+            issuer: Issuer::of_saved(word(0)?, own, players),
+            order: OrderKind::try_from(word(4)?)?,
+            priority: OrderPriority::of_data(word(8)?),
+            target: ObjectId::of_field(word(12)?),
+            target_owner: PlayerId::of_field(word(16)?)?,
+            point: Position::new(float(20)?, float(24)?, float(28)?),
+            range: Distance::new(float(32)?),
+            shown: Point::new(float(36)?, float(40)?),
+            ready: le_word(bytes, 44)?[0] != 0,
+            target_kind: OrderTargetKind::of_field(word(48)?)?,
         })
     }
 }

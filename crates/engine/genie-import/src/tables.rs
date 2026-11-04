@@ -24,10 +24,12 @@ pub fn linked_techs(json: &str) -> GenieResult<BTreeMap<TechId, Linked>> {
     Ok(file
         .linked_techs
         .iter()
-        .filter_map(|g| Linked::of(&g.kind).map(|k| (g, k)))
+        .filter_map(|linked_tech_group| {
+            Linked::of(&linked_tech_group.kind).map(|linked| (linked_tech_group, linked))
+        })
         .flat_map(|(linked_tech_group, linked)| {
-            linked_tech_group.techs.iter().filter_map(move |&t| {
-                i16::try_from(t)
+            linked_tech_group.techs.iter().filter_map(move |&tech| {
+                i16::try_from(tech)
                     .ok()
                     .and_then(TechId::of_data)
                     .map(|tech_id| (tech_id, linked))
@@ -66,42 +68,50 @@ pub fn unit_lines(json: &str) -> GenieResult<Vec<UnitLine>> {
     else {
         return Ok(Vec::new());
     };
-    let int = |i: usize, key: &'static str, v: &serde_json::Value| {
-        v.as_i64()
-            .and_then(|n| i32::try_from(n).ok())
-            .ok_or_else(|| unit_line_value(i, key))
+    let int = |index: usize, key: &'static str, value: &serde_json::Value| {
+        value
+            .as_i64()
+            .and_then(|number| i32::try_from(number).ok())
+            .ok_or_else(|| unit_line_value(index, key))
     };
-    let text = |i: usize, v: &serde_json::Value| {
-        v.as_str()
+    let text = |index: usize, value: &serde_json::Value| {
+        value
+            .as_str()
             .map(str::to_owned)
-            .ok_or_else(|| unit_line_value(i, "Identifier"))
+            .ok_or_else(|| unit_line_value(index, "Identifier"))
     };
     entries
         .iter()
         .enumerate()
-        .map(|(i, e)| {
-            let line = e.get("LineID").map(|v| int(i, "LineID", v)).transpose()?;
-            let chain = e
+        .map(|(index, entry)| {
+            let line = entry
+                .get("LineID")
+                .map(|value| int(index, "LineID", value))
+                .transpose()?;
+            let chain = entry
                 .get("IDChain")
-                .map(|v| {
-                    v.as_array()
-                        .ok_or_else(|| unit_line_value(i, "IDChain"))?
+                .map(|value| {
+                    value
+                        .as_array()
+                        .ok_or_else(|| unit_line_value(index, "IDChain"))?
                         .iter()
-                        .map(|id| int(i, "IDChain", id))
+                        .map(|id| int(index, "IDChain", id))
                         .collect::<Result<Vec<_>, _>>()
                 })
                 .transpose()?;
-            let building = match e.get("Building") {
+            let building = match entry.get("Building") {
                 None => false,
-                Some(b) => b.as_bool().ok_or_else(|| unit_line_value(i, "Building"))?,
+                Some(value) => value
+                    .as_bool()
+                    .ok_or_else(|| unit_line_value(index, "Building"))?,
             };
-            let identifiers = match e.get("Identifier") {
+            let identifiers = match entry.get("Identifier") {
                 None => Vec::new(),
                 Some(serde_json::Value::Array(names)) => names
                     .iter()
-                    .map(|value| text(i, value))
+                    .map(|value| text(index, value))
                     .collect::<Result<Vec<_>, _>>()?,
-                Some(name) => vec![text(i, name)?],
+                Some(name) => vec![text(index, name)?],
             };
             Ok(UnitLine {
                 line: line.map(LineId::of_data),
@@ -122,17 +132,17 @@ fn drop_site_value(reason: &'static str, entry: usize, key: &'static str) -> Gen
         .with("key", key)
 }
 
-/// A drop-site target's `object_state` (of entry `i`): none for a negative value, which the task
-/// finder reads as any state (`0 <= state`), else the state.
-fn object_state(i: usize, n: i64) -> GenieResult<Option<ObjectState>> {
-    if n < 0 {
+/// A drop-site target's `object_state` (of entry `index`): none for a negative value, which the
+/// task finder reads as any state (`0 <= state`), else the state.
+fn object_state(index: usize, number: i64) -> GenieResult<Option<ObjectState>> {
+    if number < 0 {
         return Ok(None);
     }
-    u8::try_from(n)
+    u8::try_from(number)
         .ok()
-        .and_then(|n| ObjectState::of_byte(n).ok())
+        .and_then(|byte| ObjectState::of_byte(byte).ok())
         .map(Some)
-        .ok_or_else(|| drop_site_value("a drop site's object state past 8", i, "object_state"))
+        .ok_or_else(|| drop_site_value("a drop site's object state past 8", index, "object_state"))
 }
 
 /// The game's drop-site table (`resources/_common/dat/dropsites.json`): each entry's
@@ -146,17 +156,20 @@ fn object_state(i: usize, n: i64) -> GenieResult<Option<ObjectState>> {
 pub fn drop_sites(json: &str) -> GenieResult<Vec<DropSite>> {
     use genie_model::objects::masters::{ClassId, MasterId};
     let json_value: serde_json::Value = serde_json::from_str(json).map_err(not_json)?;
-    let num = |v: &serde_json::Value| v.as_i64().unwrap_or(-1);
-    let list = |e: &serde_json::Value, key: &str| -> Vec<i64> {
-        e.get(key)
-            .and_then(|l| l.as_array())
+    let num = |value: &serde_json::Value| value.as_i64().unwrap_or(-1);
+    let list = |entry: &serde_json::Value, key: &str| -> Vec<i64> {
+        entry
+            .get(key)
+            .and_then(|value| value.as_array())
             .map_or_else(Vec::new, |values| values.iter().map(num).collect())
     };
-    let class = |i: usize, key: &'static str, n: i64| {
-        i16::try_from(n)
+    let class = |index: usize, key: &'static str, number: i64| {
+        i16::try_from(number)
             .ok()
-            .and_then(|n| ClassId::try_from(n).ok())
-            .ok_or_else(|| drop_site_value("a drop site's class that is no master class", i, key))
+            .and_then(|short| ClassId::try_from(short).ok())
+            .ok_or_else(|| {
+                drop_site_value("a drop site's class that is no master class", index, key)
+            })
     };
     let Some(entries) = json_value["drop_site_list"].as_array() else {
         return Ok(Vec::new());
@@ -164,26 +177,26 @@ pub fn drop_sites(json: &str) -> GenieResult<Vec<DropSite>> {
     entries
         .iter()
         .enumerate()
-        .map(|(i, e)| {
-            let worker_class = match e.get("worker_object_group").map_or(-1, num) {
+        .map(|(index, entry)| {
+            let worker_class = match entry.get("worker_object_group").map_or(-1, num) {
                 -1 => None,
-                n => Some(class(i, "worker_object_group", n)?),
+                number => Some(class(index, "worker_object_group", number)?),
             };
-            let targets = e["target_list"]
+            let targets = entry["target_list"]
                 .as_array()
                 .map_or_else(Vec::new, Vec::clone)
                 .iter()
-                .map(|t| {
-                    let field = |key: &str| t.get(key).map_or(-1, num);
+                .map(|value| {
+                    let field = |key: &str| value.get(key).map_or(-1, num);
                     Ok(DropTarget {
-                        class: class(i, "object_group", field("object_group"))?,
+                        class: class(index, "object_group", field("object_group"))?,
                         workers: WorkerCount::of_data(field("worker_num") as i32),
-                        state: object_state(i, field("object_state"))?,
+                        state: object_state(index, field("object_state"))?,
                         attribute: AttributeId::of_field(field("attribute_type") as i16).map_err(
                             |_| {
                                 drop_site_value(
                                     "a drop site's attribute that is no attribute",
-                                    i,
+                                    index,
                                     "attribute_type",
                                 )
                             },
@@ -192,22 +205,27 @@ pub fn drop_sites(json: &str) -> GenieResult<Vec<DropSite>> {
                 })
                 .collect::<GenieResult<Vec<_>>>()?;
             Ok(DropSite {
-                building: MasterId::try_from(num(&e["building_id"]) as i16).map_err(|_| {
-                    drop_site_value("a drop site's building that is no master", i, "building_id")
+                building: MasterId::try_from(num(&entry["building_id"]) as i16).map_err(|_| {
+                    drop_site_value(
+                        "a drop site's building that is no master",
+                        index,
+                        "building_id",
+                    )
                 })?,
                 worker_class,
-                workers: list(e, "worker_object_list")
+                workers: list(entry, "worker_object_list")
                     .into_iter()
-                    .filter_map(|w| MasterId::of_data(w as i16))
+                    .filter_map(|value| MasterId::of_data(value as i16))
                     .collect(),
-                civs: list(e, "target_civs")
+                civs: list(entry, "target_civs")
                     .into_iter()
-                    .map(|c| CivId::new(c as u8))
+                    .map(|civ| CivId::new(civ as u8))
                     .collect(),
-                auto_work: e.get("auto_work").and_then(serde_json::Value::as_bool) != Some(false),
+                auto_work: entry.get("auto_work").and_then(serde_json::Value::as_bool)
+                    != Some(false),
                 targets,
-                livestock: e.get("accepts_livestock").is_some(),
-                resource_kinds: e["update_ai_resource_types"]
+                livestock: entry.get("accepts_livestock").is_some(),
+                resource_kinds: entry["update_ai_resource_types"]
                     .as_array()
                     .map_or_else(Vec::new, Vec::clone)
                     .iter()
@@ -216,7 +234,7 @@ pub fn drop_sites(json: &str) -> GenieResult<Vec<DropSite>> {
                             .map_err(|_| {
                                 drop_site_value(
                                     "a drop site's attribute that is no attribute",
-                                    i,
+                                    index,
                                     "resource_type",
                                 )
                             })
@@ -238,12 +256,12 @@ mod tests {
     /// is not JSON keeps the parser's error as its source.
     #[test]
     fn table_errors_name_their_entry_and_key() {
-        let reason_and_context = |e: GenieError| {
-            let context: Vec<_> = e
+        let reason_and_context = |error: GenieError| {
+            let context: Vec<_> = error
                 .context()
                 .map(|(key, value)| format!("{key}: {value}"))
                 .collect();
-            (e.reason(), context.join(", "))
+            (error.reason(), context.join(", "))
         };
         let error = drop_sites("[").unwrap_err();
         assert_eq!(error.reason(), "a table that is not JSON");
@@ -278,7 +296,7 @@ mod tests {
 
     /// A table of one entry whose target has `object_state` `state` (absent for `None`).
     fn table(state: Option<i64>) -> String {
-        let state = state.map_or_else(String::new, |s| format!(r#", "object_state": {s}"#));
+        let state = state.map_or_else(String::new, |value| format!(r#", "object_state": {value}"#));
         format!(
             r#"{{"drop_site_list": [{{"building_id": 562, "target_list": [{{"object_group": 15{state}}}]}}]}}"#
         )
@@ -288,7 +306,7 @@ mod tests {
     /// (none); a value past 8 an error.
     #[test]
     fn target_object_state_reads_as_state_or_none() {
-        let state = |s| drop_sites(&table(s)).map(|sites| sites[0].targets[0].state);
+        let state = |value| drop_sites(&table(value)).map(|sites| sites[0].targets[0].state);
         assert_eq!(state(Some(5)).unwrap(), Some(ObjectState::Dead));
         assert_eq!(state(None).unwrap(), None);
         assert_eq!(state(Some(-2)).unwrap(), None);

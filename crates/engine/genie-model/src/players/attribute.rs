@@ -180,7 +180,11 @@ mod tests {
     #[test]
     fn resources_are_the_four_resource_attributes_in_order() {
         let resources = AttributeId::resources();
-        assert!(resources.iter().all(|a| a.is_resource()));
+        assert!(
+            resources
+                .iter()
+                .all(|attribute_id| attribute_id.is_resource())
+        );
         assert_eq!(
             resources.map(|attribute_id| attribute_id.get()),
             [0, 1, 2, 3]
@@ -212,11 +216,11 @@ mod tests {
     /// 9 and 56, food for 15 to 17, none for any other.
     #[test]
     fn load_resource_is_itself_food_or_none() {
-        for n in [0, 15, 16, 17] {
-            assert!(AttributeId::named(n).is_food_load(), "{n}");
+        for number in [0, 15, 16, 17] {
+            assert!(AttributeId::named(number).is_food_load(), "{number}");
         }
-        for n in [1, 2, 3, 14, 18] {
-            assert!(!AttributeId::named(n).is_food_load(), "{n}");
+        for number in [1, 2, 3, 14, 18] {
+            assert!(!AttributeId::named(number).is_food_load(), "{number}");
         }
         assert_eq!(WOOD.load_resource(), Some(WOOD));
         assert_eq!(

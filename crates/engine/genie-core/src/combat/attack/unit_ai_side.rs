@@ -16,7 +16,7 @@ use crate::movement::Speed;
 use crate::objects::ObjectId;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::FogVisibility;
-use crate::objects::masters::PlayersMasters;
+use crate::objects::masters::PlayersMastersExt;
 use crate::objects::masters::TaskGroup;
 use crate::objects::masters::TaskSprites;
 use crate::objects::masters::player_master;
@@ -32,7 +32,7 @@ use crate::unit_ai::world_view::owner_view;
 use crate::unit_ai::world_view::{NOT_HELD, UnitView};
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 use crate::world::{ATTACKER_UNPLACED, NO_STANDING_SPRITE};
 use crate::{GenieError, GenieResult};
 
@@ -63,7 +63,7 @@ impl UnitView<'_, '_> {
         // the unit's master, a copy: the attack's start changes the unit (its master's switch)
         let own = self
             .unit
-            .master(self.c.w.master_tables(), self.player)?
+            .master(self.step.world.master_tables(), self.player)?
             .clone();
         let master = &own;
         if roles
@@ -75,7 +75,7 @@ impl UnitView<'_, '_> {
             ));
         }
         let no = Attacked::default;
-        let Some(placed) = self.c.w.spatial.get_known(target)?.copied() else {
+        let Some(placed) = self.step.world.spatial.get_known(target)?.copied() else {
             return Ok(no());
         };
         if let Some(&attack) =
@@ -93,23 +93,30 @@ impl UnitView<'_, '_> {
         }
         let master = &self.swapped_master(own, roles)?;
         let me_at = *self
-            .c
-            .w
+            .step
+            .world
             .spatial
             .get(self.unit.id)
             .ok_or(ATTACKER_UNPLACED)?;
-        let target_master = player_master(&self.c.w.model.masters, placed.player, placed.master)
-            .ok_or(GenieError::unsupported(
-                "an attack's target of a master the slice does not have",
-            ))?;
+        let target_master =
+            player_master(&self.step.world.model.masters, placed.player, placed.master).ok_or(
+                GenieError::unsupported("an attack's target of a master the slice does not have"),
+            )?;
         let visible = self.target_visible(&placed, target_master)?;
         let unit = &mut *self.unit;
         // the attack command's Attack (`FUN_141081a80`) takes no MoveTo sprite: the unit's
-        let look = self.c.w.parts.combat_of(unit.id).abilities.look.as_ref();
+        let look = self
+            .step
+            .world
+            .parts
+            .combat_of(unit.id)
+            .abilities
+            .look
+            .as_ref();
         let arms = arms_looking(
             master,
             look,
-            &self.c.w.model.graphics,
+            &self.step.world.model.graphics,
             TaskSprites::NONE,
             None,
             roles,
@@ -122,26 +129,26 @@ impl UnitView<'_, '_> {
         }
         let by = self.attack_clears_actions(master.class)?;
         let unit = &mut *self.unit;
-        let speed = speed_of(self.c.w.parts.mover_of(unit.id))?;
+        let speed = speed_of(self.step.world.parts.mover_of(unit.id))?;
         let engagement = engagement(
             Some(ai),
             speed,
             master,
             &me_at,
             &placed,
-            self.c.w.world_time,
+            self.step.world.world_time,
         )?;
         // the constructor clears +0x900 for a target other than its own (none yet)
-        self.c.w.parts.combat_mut(unit.id)?.attack_count = AttackCount::ZERO;
+        self.step.world.parts.combat_mut(unit.id)?.attack_count = AttackCount::ZERO;
         if unit.life.inside.is_some() {
             return self.attack_from_inside(Attack::own(target, &engagement, arms), by, roles);
         }
         new_sprite(
             &mut unit.sprite,
-            self.c.w.parts.move_stats_mut(unit.id),
+            self.step.world.parts.move_stats_mut(unit.id),
             standing,
-            self.c.w.streams.get(Stream::Sprite),
-            self.c.w.model.tuning.sprite,
+            self.step.world.streams.get_mut(Stream::Sprite),
+            self.step.world.model.tuning.sprite,
         );
         let cmd = AttackCommand {
             target,
@@ -152,7 +159,7 @@ impl UnitView<'_, '_> {
             ready: self.ready_reads(target, master, ai, roles)?,
         };
         let unit = &mut *self.unit;
-        let (attack, posted) = Attack::command(self.c, unit, &cmd, roles)?;
+        let (attack, posted) = Attack::command(self.step, unit, &cmd, roles)?;
         self.actions.list.set_attack(Some(attack));
         self.take(target, by, roles)?;
         Ok(Attacked {
@@ -184,9 +191,9 @@ impl UnitView<'_, '_> {
         let unit = &mut *self.unit;
         attack.fail_at_start(
             &mut unit.sprite,
-            self.c.w.parts.motion_mut(unit.id),
-            self.c.w.streams.get(Stream::Sprite),
-            self.c.w.model.tuning.sprite,
+            self.step.world.parts.motion_mut(unit.id),
+            self.step.world.streams.get_mut(Stream::Sprite),
+            self.step.world.model.tuning.sprite,
         )?;
         let target = attack.target;
         self.actions.list.set_attack(Some(attack));
@@ -211,8 +218,8 @@ impl UnitView<'_, '_> {
         };
         let (mut releases, mut leaves) = (Vec::new(), Vec::new());
         self.unit.tear_down_actions(
-            (self.actions, self.c.w.parts.unread.get(self.unit.id)),
-            self.c.w.parts.motion.layer_mut(self.unit.id),
+            (self.actions, self.step.world.parts.unread.get(self.unit.id)),
+            self.step.world.parts.motion.layer_mut(self.unit.id),
             &mut releases,
             &mut leaves,
             by,
@@ -231,42 +238,43 @@ impl UnitView<'_, '_> {
     fn attack_again(
         &mut self,
         (target, mut attack): (ObjectId, Attack),
-        t: &Placed,
+        target_placed: &Placed,
         master: &Master,
         ai: &UnitAi,
         roles: &Roles,
     ) -> GenieResult<()> {
-        let mark = |id: ObjectId, p: &Placed| -> GenieResult<Mark> {
-            let u = owner_view(
-                &self.c.w.players,
-                &self.c.w.index,
-                self.c.player,
+        let mark = |id: ObjectId, placed: &Placed| -> GenieResult<Mark> {
+            let unit = owner_view(
+                &self.step.world.players,
+                &self.step.world.index,
+                self.step.player,
                 self.new_owner,
             )?
             .get(id)
             .ok_or(NOT_HELD)?;
             let player_master =
-                player_master(&self.c.w.model.masters, p.player, p.master).ok_or(NOT_HELD)?;
+                player_master(&self.step.world.model.masters, placed.player, placed.master)
+                    .ok_or(NOT_HELD)?;
             Ok(Mark {
                 id,
                 kind: player_master.kind,
                 class: player_master.class,
-                state: u.life.state,
-                position: p.position,
-                radius: p.radius,
+                state: unit.life.state,
+                position: placed.position,
+                radius: placed.radius,
             })
         };
-        let target_mark = mark(target, t)?;
+        let target_mark = mark(target, target_placed)?;
         let main = match owner_view(
-            &self.c.w.players,
-            &self.c.w.index,
-            self.c.player,
+            &self.step.world.players,
+            &self.step.world.index,
+            self.step.player,
             self.new_owner,
         )?
         .get(target)
-        .and_then(|u| self.c.w.parts.building_of(u.id).annex_of)
+        .and_then(|unit| self.step.world.parts.building_of(unit.id).annex_of)
         {
-            Some(role_id) => match self.c.w.spatial.get(role_id).copied() {
+            Some(role_id) => match self.step.world.spatial.get(role_id).copied() {
                 Some(placed) => Some(mark(role_id.id(), &placed)?),
                 None => None,
             },
@@ -276,8 +284,8 @@ impl UnitView<'_, '_> {
         let wielder = Wielder {
             area_effect: master.combat_part().area_effect,
             speed: self
-                .c
-                .w
+                .step
+                .world
                 .parts
                 .mover_of(unit.id)
                 .map_or(Speed::ZERO, |mover| mover.stats.speed),
@@ -294,7 +302,7 @@ impl UnitView<'_, '_> {
             player: self.player,
         };
         if worked.clears_count {
-            self.c.w.parts.combat_mut(unit.id)?.attack_count = AttackCount::ZERO;
+            self.step.world.parts.combat_mut(unit.id)?.attack_count = AttackCount::ZERO;
         }
         if let Some(old) = worked.lets_go {
             self.release(old, by)?;
@@ -311,42 +319,42 @@ impl UnitView<'_, '_> {
     /// it does not hold).
     fn victim_of_target(&self, id: ObjectId, roles: &Roles) -> GenieResult<Option<Victim>> {
         let view = owner_view(
-            &self.c.w.players,
-            &self.c.w.index,
-            self.c.player,
+            &self.step.world.players,
+            &self.step.world.index,
+            self.step.player,
             self.new_owner,
         )?;
         let Some((player_id, unit)) = view.find(id) else {
             return Ok(None);
         };
         let attributes = if view.own(id).is_some() {
-            &self.c.w.players.player(self.player)?.attributes
+            &self.step.world.players.player(self.player)?.attributes
         } else {
             let Some(owner) = view.players().player(player_id) else {
                 return Ok(None);
             };
             &owner.attributes[..]
         };
-        let master = unit.master(self.c.w.master_tables(), player_id)?;
+        let master = unit.master(self.step.world.master_tables(), player_id)?;
         let dip = SideWorld {
             player: self.player,
-            relations: &self.c.w.players.player(self.player)?.relations,
+            relations: &self.step.world.players.player(self.player)?.relations,
             foreign: view.players(),
-            drop_sites: &self.c.w.model.drop_sites,
+            drop_sites: &self.step.world.model.drop_sites,
         };
         Ok(Some(victim_in(
             (
                 unit,
-                self.c.w.parts.unit_ai.contains(unit.id),
-                self.c.w.parts.building_of(unit.id),
-                self.c.w.parts.combat_of(unit.id),
-                self.c.w.parts.actions.of(unit.id),
-                self.c.w.parts.unread.get(unit.id),
+                self.step.world.parts.unit_ai.contains(unit.id),
+                self.step.world.parts.building_of(unit.id),
+                self.step.world.parts.combat_of(unit.id),
+                self.step.world.parts.actions.of(unit.id),
+                self.step.world.parts.unread.get(unit.id),
             ),
             (player_id, master, attributes),
             (self.player, &dip),
-            &self.c.w.spatial,
-            self.c.w.mode_680,
+            &self.step.world.spatial,
+            self.step.world.mode_680,
             roles,
         )))
     }
@@ -370,33 +378,33 @@ impl UnitView<'_, '_> {
         let own = victim_of(
             (
                 unit,
-                self.c.w.parts.unit_ai.contains(unit.id),
-                self.c.w.parts.building_of(unit.id),
-                self.c.w.parts.combat_of(unit.id),
+                self.step.world.parts.unit_ai.contains(unit.id),
+                self.step.world.parts.building_of(unit.id),
+                self.step.world.parts.combat_of(unit.id),
                 &*self.actions,
-                self.c.w.parts.unread.get(unit.id),
+                self.step.world.parts.unread.get(unit.id),
             ),
             master,
-            &self.c.w.players.player(self.player)?.attributes,
+            &self.step.world.players.player(self.player)?.attributes,
             self.player,
-            self.c.w.spatial.terrain.as_ref(),
-            self.c.w.mode_680,
+            self.step.world.spatial.terrain.as_ref(),
+            self.step.world.mode_680,
             roles,
         );
         let reads = AttackReads::of(
-            self.c.w.parts.combat_of(unit.id),
+            self.step.world.parts.combat_of(unit.id),
             master,
             (
                 OwnerMasters::new(
-                    &self.c.w.parts.own_master,
-                    self.c.w.model.masters.of(self.player),
+                    &self.step.world.parts.own_master,
+                    self.step.world.model.masters.of(self.player),
                 ),
-                &self.c.w.model.graphics,
+                &self.step.world.model.graphics,
             ),
             Some(ai),
-            (self.player_kind, self.c.w.world_time),
+            (self.player_kind, self.step.world.world_time),
             roles,
-            &self.c.w.model.tuning.turn,
+            &self.step.world.model.tuning.turn,
         );
         Ok(Some(ReadyReads {
             reads,
@@ -412,9 +420,17 @@ impl UnitView<'_, '_> {
     /// A tile the map's sight does not hold.
     fn target_visible(&self, placed: &Placed, target_master: &Master) -> GenieResult<bool> {
         let (tx, ty) = (placed.position.x() as i32, placed.position.y() as i32);
-        Ok(self.c.w.spatial.sees_tile(self.player, Tile::new(tx, ty))
+        Ok(self
+            .step
+            .world
+            .spatial
+            .sees_tile(self.player, Tile::new(tx, ty))
             || (target_master.fog_visibility != FogVisibility::INVISIBLE
-                && self.c.w.spatial.explored(self.player, Tile::new(tx, ty))?))
+                && self
+                    .step
+                    .world
+                    .spatial
+                    .explored(self.player, Tile::new(tx, ty))?))
     }
 
     /// The attack command's villager swap: a villager (class 4) switches to its player's villager
@@ -427,10 +443,10 @@ impl UnitView<'_, '_> {
         let swap = if master.action_part().task_by_group == TaskGroup::MALE_VILLAGERS {
             // The villagers a villager's attack command switches to by its task swap group (its player's
             // master table's entries at `+0x298` and `+0x928`).
-            self.c.w.model.slots.master.villager_male
+            self.step.world.model.slots.master.villager_male
         } else {
-            self.c.w.model.slots.master.villager_female
+            self.step.world.model.slots.master.villager_female
         };
-        player_master(&self.c.w.model.masters, self.player, swap)
+        player_master(&self.step.world.model.masters, self.player, swap)
     }
 }

@@ -21,7 +21,7 @@ use crate::unit_ai::{Seeker, can_attack};
 use crate::world::index::ObjectsRef;
 use crate::world::layer::Roles;
 use crate::world::lets::{release as lets_release, take as lets_take, torn_down as lets_torn_down};
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 
 impl UnitView<'_, '_> {
     /// The world as `bestUnitToAttack` and the attack tests read it for the unit
@@ -33,36 +33,39 @@ impl UnitView<'_, '_> {
             me: self.unit.id,
             player: self.player,
             others: owner_view(
-                &self.c.w.players,
-                &self.c.w.index,
-                self.c.player,
+                &self.step.world.players,
+                &self.step.world.index,
+                self.step.player,
                 self.new_owner,
             )?,
             foreign: owner_view(
-                &self.c.w.players,
-                &self.c.w.index,
-                self.c.player,
+                &self.step.world.players,
+                &self.step.world.index,
+                self.step.player,
                 self.new_owner,
             )?
             .players(),
-            every: MasterTables::new(&self.c.w.model.masters, &self.c.w.parts.own_master),
-            parts: &self.c.w.parts,
+            every: MasterTables::new(
+                &self.step.world.model.masters,
+                &self.step.world.parts.own_master,
+            ),
+            parts: &self.step.world.parts,
             by_id: ObjectsRef::new(
-                &self.c.w.players,
-                &self.c.w.index,
-                &self.c.w.model.masters,
-                &self.c.w.parts,
-                &self.c.w.model.roles,
-                &self.c.w.model.tuning,
+                &self.step.world.players,
+                &self.step.world.index,
+                &self.step.world.model.masters,
+                &self.step.world.parts,
+                &self.step.world.model.roles,
+                &self.step.world.model.tuning,
             ),
             restriction: None,
             unit: &*self.unit,
             actions: &*self.actions,
-            attributes: &self.c.w.players.player(self.player)?.attributes,
-            relations: &self.c.w.players.player(self.player)?.relations,
+            attributes: &self.step.world.players.player(self.player)?.attributes,
+            relations: &self.step.world.players.player(self.player)?.relations,
             ai_settings: self.ai_settings,
-            now: self.c.w.world_time,
-            mode_680: self.c.w.mode_680,
+            now: self.step.world.world_time,
+            mode_680: self.step.world.mode_680,
         })
     }
 
@@ -75,62 +78,66 @@ impl UnitView<'_, '_> {
         roles: &Roles,
     ) -> GenieResult<Option<(ClassId, Position)>> {
         let picker = self.picker(Some(*seeker))?;
-        let (t, _) = picker.target(&self.c.w.spatial, target)?;
+        let (target, _) = picker.target(&self.step.world.spatial, target)?;
         Ok(can_attack(
             &self.attacker,
             seeker,
-            &t,
+            &target,
             roles,
-            &self.c.w.model.tuning.unit_ai,
+            &self.step.world.model.tuning.unit_ai,
         )?
-        .then_some((t.class, t.position)))
+        .then_some((target.class, target.position)))
     }
 
     /// Whether the unit's view of the world (live objects, owner-first) holds object `id`.
     pub(super) fn view_holds(&self, id: ObjectId) -> GenieResult<bool> {
         Ok(owner_view(
-            &self.c.w.players,
-            &self.c.w.index,
-            self.c.player,
+            &self.step.world.players,
+            &self.step.world.index,
+            self.step.player,
             self.new_owner,
         )?
         .get(id)
         .is_some())
     }
 
-    /// `AskForHelp`'s tests of a helper `u` (of player `owner`, master `m`) that passed its
-    /// class, owner and reach tests, against `attacker`, all reads (the game asks its attack
+    /// `AskForHelp`'s tests of a helper `helper` (of player `owner`, master `master`) that passed
+    /// its class, owner and reach tests, against `attacker`, all reads (the game asks its attack
     /// check before its owner's test; neither changes what the other reads): a helper in no group
     /// helps only when idle (no action value, no action, no order, an empty queue and no target:
     /// "He has a `UnitAIaction`"), one in a group only when the group patrols (`FUN_141017c30` or
-    /// `FUN_141017c40`); then its top action's target within its range (slot 400, slot 0x1e8:
-    /// the footprints' squared gap between the least and the weapon range squared) keeps it, but
-    /// a building whose master has no attack for a patrolling group's member; then its unit AI's
-    /// attack check (slot 0xa0 with 0, [`crate::unit_ai::can_attack`]) on the attacker. True for
-    /// a helper that answers.
+    /// `FUN_141017c40`); then its top action's target within its range (slot 400, slot 0x1e8: the
+    /// footprints' squared gap between the least and the weapon range squared) keeps it, but a
+    /// building whose master has no attack for a patrolling group's member; then its unit AI's
+    /// attack check (slot 0xa0 with 0, [`crate::unit_ai::can_attack`]) on the attacker. True for a
+    /// helper that answers.
     pub(crate) fn helper_free(
         &self,
         owner: PlayerId,
-        u: &Unit,
+        helper: &Unit,
         actions: &Action,
         master: &Master,
         attacker: ObjectId,
         roles: &Roles,
     ) -> GenieResult<bool> {
         let others = owner_view(
-            &self.c.w.players,
-            &self.c.w.index,
-            self.c.player,
+            &self.step.world.players,
+            &self.step.world.index,
+            self.step.player,
             self.new_owner,
         )?;
         let find = |id: ObjectId| others.find(id);
-        let Some(ai) = self.c.w.parts.unit_ai.get(u.id) else {
+        let Some(ai) = self.step.world.parts.unit_ai.get(helper.id) else {
             return Ok(false);
         };
-        let patrolling = match u.group.id.and_then(|id| self.c.w.groups.get(id)) {
+        let patrolling = match helper
+            .group
+            .id
+            .and_then(|id| self.step.world.groups.get(id))
+        {
             None => {
-                let busy =
-                    actions.top_action_kind().is_some() || self.c.w.parts.unread.contains(u.id);
+                let busy = actions.top_action_kind().is_some()
+                    || self.step.world.parts.unread.contains(helper.id);
                 if ai.current_action.is_some()
                     || busy
                     || ai.current_order.is_some()
@@ -144,9 +151,10 @@ impl UnitView<'_, '_> {
             Some(group) if group.patrols() => true,
             Some(_) => return Ok(false),
         };
-        if let Some((tq, t)) = actions.top_target().and_then(find) {
-            let tm = t.master(self.c.w.master_tables(), tq)?;
-            let gap = footprint_gap_squared(u.position(), master.radius, t.position(), tm.radius);
+        if let Some((tq, unit)) = actions.top_target().and_then(find) {
+            let tm = unit.master(self.step.world.master_tables(), tq)?;
+            let gap =
+                footprint_gap_squared(helper.position(), master.radius, unit.position(), tm.radius);
             let in_range = gap <= master.combat_part().weapon_range.squared()
                 && master.combat_part().min_range.squared() <= gap;
             let spared = patrolling
@@ -160,9 +168,9 @@ impl UnitView<'_, '_> {
             self.player_kind
         } else {
             owner_view(
-                &self.c.w.players,
-                &self.c.w.index,
-                self.c.player,
+                &self.step.world.players,
+                &self.step.world.index,
+                self.step.player,
                 self.new_owner,
             )?
             .players()
@@ -170,41 +178,44 @@ impl UnitView<'_, '_> {
             .map_or(PlayerKind::Phantom, |player| player.kind)
         };
         let capture = self
-            .c
-            .w
+            .step
+            .world
             .spatial
             .sight
             .as_ref()
-            .and_then(|visibility| visibility.seer(u.id))
+            .and_then(|visibility| visibility.seer(helper.id))
             .map_or(CaptureKind::None, |seer| seer.capture);
-        let me = u.attacker_of(
+        let me = helper.attacker_of(
             actions,
             ai.ai_kind,
             Some(master),
             (owner, player_kind),
-            self.c.w.settings.game_mode,
+            self.step.world.settings.game_mode,
             (
                 capture,
-                self.c.w.parts.combat_of(u.id).firepower,
-                self.c
-                    .w
+                self.step.world.parts.combat_of(helper.id).firepower,
+                self.step
+                    .world
                     .parts
-                    .mover_of(u.id)
+                    .mover_of(helper.id)
                     .map_or(Speed::ZERO, |mover| mover.stats.speed),
             ),
         );
         let target_master_kind = match ai.current_target.and_then(find) {
-            Some((player_id, unit)) => Some(unit.master(self.c.w.master_tables(), player_id)?.kind),
+            Some((player_id, unit)) => Some(
+                unit.master(self.step.world.master_tables(), player_id)?
+                    .kind,
+            ),
             None => None,
         };
         let picker = self.picker(None)?;
-        let (target, _) = picker.target(&self.c.w.spatial, attacker)?;
+        let (target, _) = picker.target(&self.step.world.spatial, attacker)?;
         can_attack(
             &me,
             &ai.seeker_with(target_master_kind),
             &target,
             roles,
-            &self.c.w.model.tuning.unit_ai,
+            &self.step.world.model.tuning.unit_ai,
         )
     }
 }
@@ -227,14 +238,14 @@ impl UnitView<'_, '_> {
         };
         let (mut releases, mut leaves) = (Vec::new(), Vec::new());
         self.unit.tear_down_actions(
-            (self.actions, self.c.w.parts.unread.get(self.unit.id)),
-            self.c.w.parts.motion.layer_mut(self.unit.id),
+            (self.actions, self.step.world.parts.unread.get(self.unit.id)),
+            self.step.world.parts.motion.layer_mut(self.unit.id),
             &mut releases,
             &mut leaves,
             by,
         )?;
         self.torn_down((leaves, releases))?;
-        self.c.lend_at(
+        self.step.lend_at(
             (&mut *self.unit, &mut *self.actions),
             |world, player_id, list_index| world.change_master(player_id, list_index, next),
         )
@@ -249,7 +260,7 @@ impl UnitView<'_, '_> {
     ///
     /// [`crate::world::lets::take`]'s.
     pub(crate) fn take(&mut self, id: ObjectId, by: Releaser, roles: &Roles) -> GenieResult<()> {
-        lets_take(self.c, self.unit, id, by, roles)
+        lets_take(self.step, self.unit, id, by, roles)
     }
 
     /// Slot 0x180 on object `id`, which the unit's action of `by` lets go
@@ -260,7 +271,7 @@ impl UnitView<'_, '_> {
     ///
     /// [`crate::world::lets::release`]'s.
     pub(crate) fn release(&mut self, id: ObjectId, by: Releaser) -> GenieResult<()> {
-        lets_release(self.c, self.unit, id, by)
+        lets_release(self.step, self.unit, id, by)
     }
 
     /// What the unit's action list's teardown left the world, at once
@@ -274,6 +285,6 @@ impl UnitView<'_, '_> {
         &mut self,
         (leaves, releases): (Vec<ObjectId>, Vec<(ObjectId, Releaser)>),
     ) -> GenieResult<()> {
-        lets_torn_down(self.c, self.unit, (leaves, releases))
+        lets_torn_down(self.step, self.unit, (leaves, releases))
     }
 }

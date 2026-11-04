@@ -39,7 +39,7 @@ use crate::pathing::tile_path::Path;
 use crate::players::PlayerId;
 use crate::players::PlayerKind;
 use crate::world::index::ObjectsRef;
-use crate::world::slots::CheckedIndex;
+use crate::world::slots::CheckedIndexExt;
 use crate::{GenieError, GenieResult};
 
 mod cost;
@@ -81,7 +81,7 @@ const GATE_CLASS_BITS: u64 = 0x500;
 
 /// What a search asks of an allied gate's tile: whether its gate lets the unit pass
 /// ([`gate_lets_pass`] in a world; a test answers for itself).
-pub type GateAsk<'a> = &'a dyn Fn(Tile) -> GenieResult<bool>;
+pub type GateAsk<'env> = &'env dyn Fn(Tile) -> GenieResult<bool>;
 
 /// `FUN_140f9eb70` on an allied gate's record at `tile`, for a unit of `player`: a building's
 /// tile (the map tile's `+0x19` bits 0x60, [`crate::vision::visibility::Visibility::building_tile`])
@@ -103,8 +103,8 @@ pub fn gate_lets_pass(
         return Ok(false);
     };
     let Some(anchor) = Some(tile)
-        .filter(|&t| links.building_tile(t))
-        .and_then(|t| links.anchor_of(t))
+        .filter(|&tile| links.building_tile(tile))
+        .and_then(|tile| links.anchor_of(tile))
     else {
         return Ok(false);
     };
@@ -270,7 +270,7 @@ fn trace(
     z: f32,
 ) -> Option<Path> {
     // a tile never entered reads the game's 0xff: none
-    let direction = |t: Tile| entered.get(cell(map, t)).copied().flatten();
+    let direction = |tile: Tile| entered.get(cell(map, tile)).copied().flatten();
     let centre = |tile: Tile| -> BVector {
         BVector::new(
             tile.x() as f32 + TILE_CENTRE,
@@ -305,8 +305,8 @@ fn search_refused(
     gap2: i32,
     long_path_tuning: LongPathTuning,
 ) -> Option<Searched> {
-    let (w, _) = (map.width(), map.height());
-    let held = |v: i32| 0 <= v && v <= w;
+    let (width, _) = (map.width(), map.height());
+    let held = |value: i32| 0 <= value && value <= width;
     let (x0, y0) = (req.from.x(), req.from.y());
     let (x1, y1) = (req.to.x(), req.to.y());
     if !(held(x0) && held(y0) && held(x1) && held(y1)) {
@@ -327,37 +327,39 @@ fn search_refused(
     (!req.moves).then_some(Searched::Refused)
 }
 
-/// [`search`]'s goal test of the popped tile `d` tiles from the goal: a target's gap within the
-/// range ([`EPSILON`]) or the tile within `LongPathTuning::reached`; without a target, a search to within
-/// range by `d` against the range, else `d` within `LongPathTuning::reached`.
-fn search_reached(req: &LongRequest, d: f32, long_path_tuning: LongPathTuning) -> bool {
+/// [`search`]'s goal test of the popped tile `distance` tiles from the goal: a target's gap within
+/// the range ([`EPSILON`]) or the tile within `LongPathTuning::reached`; without a target, a search
+/// to within range by `distance` against the range, else `distance` within
+/// `LongPathTuning::reached`.
+fn search_reached(req: &LongRequest, distance: f32, long_path_tuning: LongPathTuning) -> bool {
     match req.target {
         Some(long_target) => {
-            long_target.gap - req.range < Distance::new(EPSILON) || d < long_path_tuning.reached
+            long_target.gap - req.range < Distance::new(EPSILON)
+                || distance < long_path_tuning.reached
         }
-        None if req.within_range => d - req.range.get() < EPSILON,
-        None => d < long_path_tuning.reached,
+        None if req.within_range => distance - req.range.get() < EPSILON,
+        None => distance < long_path_tuning.reached,
     }
 }
 
 /// What [`search`] reads of the tiles: the obstruction words, the tall objects less those the
 /// request lowers (`lowered`, one each), and the unit's blocked terrain classes with and
 /// without [`BLOCKED`], and what an allied gate answers.
-struct Grid<'a> {
-    tiles: &'a Tiles,
-    gates: GateAsk<'a>,
+struct Grid<'tiles> {
+    tiles: &'tiles Tiles,
+    gates: GateAsk<'tiles>,
     map: GridSize,
     lowered: Vec<u8>,
     blocked_terrain: u64,
     blocked: u64,
 }
 
-impl<'a> Grid<'a> {
-    fn new(tiles: &'a Tiles, map: GridSize, req: &LongRequest, gates: GateAsk<'a>) -> Self {
+impl<'tiles> Grid<'tiles> {
+    fn new(tiles: &'tiles Tiles, map: GridSize, req: &LongRequest, gates: GateAsk<'tiles>) -> Self {
         let blocked_terrain = req.mask.blocked();
         let mut lowered = vec![0u8; (map.width().max(0) * map.height().max(0)) as usize];
         for &tile in &req.lowered {
-            if let Some(cell) = map.index(tile).and_then(|i| lowered.get_mut(i)) {
+            if let Some(cell) = map.index(tile).and_then(|index| lowered.get_mut(index)) {
                 *cell = cell.wrapping_add(1);
             }
         }
@@ -376,20 +378,20 @@ impl<'a> Grid<'a> {
     }
 
     fn tall(&self, tile: Tile) -> u8 {
-        let Some(t) = self.tiles.tall(tile) else {
+        let Some(count) = self.tiles.tall(tile) else {
             return 0;
         };
         // the tiles hold the tile, so the map does
-        t.wrapping_sub(
+        count.wrapping_sub(
             self.map
                 .index(tile)
-                .and_then(|i| self.lowered.get(i))
+                .and_then(|index| self.lowered.get(index))
                 .copied()
                 .unwrap_or(0),
         )
     }
 
-    /// The step onto `n` (with the tiles `beside` a diagonal): its terrain and the beside tiles'
+    /// The step onto `next` (with the tiles `beside` a diagonal): its terrain and the beside tiles'
     /// passable, else it is skipped; then open when the tile, the beside tiles and their tall
     /// objects are clear, or, at the goal (`at_goal`) of a target, the target's own static
     /// record; another's gate is closed.
@@ -400,23 +402,24 @@ impl<'a> Grid<'a> {
     /// (`FUN_14152f790`).
     fn step_open(
         &self,
-        n: Tile,
+        next: Tile,
         beside: Option<[Tile; 2]>,
         at_goal: bool,
         req: &LongRequest,
     ) -> GenieResult<bool> {
-        let corners =
-            |test: &dyn Fn(Tile) -> bool| beside.is_none_or(|tiles| tiles.iter().all(|&t| test(t)));
-        let clear = |test: &dyn Fn(Tile) -> bool| test(n) && corners(test);
-        if !clear(&|t| self.word(t) & self.blocked_terrain == 0) {
+        let corners = |test: &dyn Fn(Tile) -> bool| {
+            beside.is_none_or(|tiles| tiles.iter().all(|&tile| test(tile)))
+        };
+        let clear = |test: &dyn Fn(Tile) -> bool| test(next) && corners(test);
+        if !clear(&|tile| self.word(tile) & self.blocked_terrain == 0) {
             return Ok(false);
         }
         let passes = || {
-            corners(&|t| self.word(t) & self.blocked == 0)
-                && self.tall(n) == 0
+            corners(&|tile| self.word(tile) & self.blocked == 0)
+                && self.tall(next) == 0
                 && corners(&|tile| self.tall(tile) == 0)
         };
-        let word = self.word(n);
+        let word = self.word(next);
         let open = if word & self.blocked == 0 {
             passes()
         } else if word & 0x3f00 == GATE_CLASS_BITS {
@@ -424,7 +427,7 @@ impl<'a> Grid<'a> {
             // (`FUN_141663dc0` with the ally flag) asks the gate on the tile's anchor (slot
             // 0x678), which opens the tile as an unblocked one; another's gate is closed
             let owner = PlayerId::from(((word >> 16) & 0x7f) as u8);
-            req.allies.holds(owner) && (self.gates)(n)? && passes()
+            req.allies.holds(owner) && (self.gates)(next)? && passes()
         } else {
             // the target's own tiles pass their static record
             at_goal && req.target.is_some() && passes()
@@ -454,9 +457,9 @@ struct Origin {
 }
 
 /// What the search's steps share: the tiles, the request, the map's size and the goal.
-struct Relax<'a> {
-    grid: Grid<'a>,
-    req: &'a LongRequest,
+struct Relax<'tiles> {
+    grid: Grid<'tiles>,
+    req: &'tiles LongRequest,
     map: GridSize,
     goal: Tile,
     rect: TileRect,
@@ -521,7 +524,7 @@ fn search(
     gates: GateAsk<'_>,
     long_path_tuning: LongPathTuning,
 ) -> GenieResult<Searched> {
-    let (w, h) = (map.width(), map.height());
+    let (width, height) = (map.width(), map.height());
     let (x0, y0) = (req.from.x(), req.from.y());
     let (x1, y1) = (req.to.x(), req.to.y());
     let (dx, dy) = (x1 - x0, y1 - y0);
@@ -534,7 +537,7 @@ fn search(
         || (req.to, TileRect::of(req.to)),
         |long_target| (long_target.tile, long_target.rect),
     );
-    let n = (w.max(0) * h.max(0)) as usize;
+    let cells = (width.max(0) * height.max(0)) as usize;
     let relax = Relax {
         grid: Grid::new(tiles, map, req, gates),
         req,
@@ -545,8 +548,8 @@ fn search(
     // a tile's cost (`+0x38420`) and, entered this search, the direction it was entered by
     // (`+0x20`, under the search's generation `+0x2db430`: an older one reads as never entered)
     let mut front = Front {
-        cost: vec![LongCost::ZERO; n],
-        entered: vec![None; n],
+        cost: vec![LongCost::ZERO; cells],
+        entered: vec![None; cells],
         heap: Heap { slots: Vec::new() },
     };
     let start_cost = LongCost::of_gap(dx, dy);
@@ -566,32 +569,32 @@ fn search(
         if budget < expansions || MOST_EXPANSIONS < expansions {
             break;
         }
-        let (c, _) = *front.heap.slots.checked(1)?;
-        let (cx, cy) = (c.x(), c.y());
+        let (current, _) = *front.heap.slots.checked(1)?;
+        let (cx, cy) = (current.x(), current.y());
         let (gx, gy) = (x1 - cx, y1 - cy);
-        let d = sqrt(gx.wrapping_mul(gx).wrapping_add(gy.wrapping_mul(gy)) as f32);
-        if rect.holds(c) || search_reached(req, d, long_path_tuning) {
+        let distance = sqrt(gx.wrapping_mul(gx).wrapping_add(gy.wrapping_mul(gy)) as f32);
+        if rect.holds(current) || search_reached(req, distance, long_path_tuning) {
             return Ok(Searched::Ran {
                 reached: true,
-                end: c,
+                end: current,
                 entered: front.entered,
             });
         }
         let near = LongCost::of_gap(x1 - cx, y1 - cy).quartered();
         if near < nearest.1 {
-            nearest = (c, near);
+            nearest = (current, near);
         }
         front.heap.pop()?;
-        let came = *front.entered.checked(cell(map, c))?;
+        let came = *front.entered.checked(cell(map, current))?;
         let back = StepDir::behind(came);
-        let here = *front.cost.checked(cell(map, c))?;
+        let here = *front.cost.checked(cell(map, current))?;
         for (dir, step) in StepDir::ALL.into_iter().zip(STEPS) {
-            let tile = c + step;
+            let tile = current + step;
             if back.holds(dir) || !map.holds(tile) || tile == req.from {
                 continue;
             }
             let from = Origin {
-                at: c,
+                at: current,
                 cost: here,
                 came,
             };
@@ -624,28 +627,28 @@ mod tests {
     /// A map of `rows` ('#' a blocked tile, 'T' a tall object, 'G' player 4's gate record, '.'
     /// open), class 1 everywhere.
     fn tiles(rows: &[&str]) -> (Tiles, GridSize) {
-        let (w, h) = (rows[0].len() as i32, rows.len() as i32);
+        let (width, height) = (rows[0].len() as i32, rows.len() as i32);
         let mut classes = Vec::new();
-        for r in rows {
-            for c in r.chars() {
-                classes.push(if c == '#' { 2 } else { 1 });
+        for text in rows {
+            for character in text.chars() {
+                classes.push(if character == '#' { 2 } else { 1 });
             }
         }
-        let mut t = Tiles::new(GridSize::new(w, h), classes);
+        let mut tiles = Tiles::new(GridSize::new(width, height), classes);
         for (y, text) in rows.iter().enumerate() {
-            for (x, c) in text.chars().enumerate() {
-                if c == 'T' {
-                    t.add_tall_for_test(Tile::new(x as i32, y as i32));
+            for (x, character) in text.chars().enumerate() {
+                if character == 'T' {
+                    tiles.add_tall_for_test(Tile::new(x as i32, y as i32));
                 }
-                if c == 'G' {
-                    t.mark_for_test(
+                if character == 'G' {
+                    tiles.mark_for_test(
                         Tile::new(x as i32, y as i32),
                         BLOCKED | GATE_CLASS_BITS | 4 << 16,
                     );
                 }
             }
         }
-        (t, GridSize::new(w, h))
+        (tiles, GridSize::new(width, height))
     }
 
     fn request(from: [i32; 2], to: [i32; 2]) -> LongRequest {
@@ -668,7 +671,7 @@ mod tests {
     fn the_path_runs_from_the_start_over_its_turns_to_the_goal() {
         // around the wall: from (1, 2) up past its end and down to (8, 2); each point a tile's
         // centre at the unit's height, where the direction changes
-        let (t, map) = tiles(&[
+        let (grid, map) = tiles(&[
             "..........",
             ".....#....",
             ".....#....",
@@ -676,7 +679,7 @@ mod tests {
             "..........",
         ]);
         let (reached, walk) = path(
-            &t,
+            &grid,
             map,
             (&request([1, 2], [8, 2]), &|_| Ok(false)),
             0.25,
@@ -691,17 +694,17 @@ mod tests {
             (BVector::new(1.5, 0.25, 2.5), BVector::new(8.5, 0.25, 2.5))
         );
         // every stretch between two points is a straight or diagonal run of tiles
-        for w in walk.points.windows(2) {
-            let (dx, dy) = (w[1].x() - w[0].x(), w[1].y() - w[0].y());
-            assert!(dx == 0.0 || dy == 0.0 || dx.abs() == dy.abs(), "{w:?}");
+        for window in walk.points.windows(2) {
+            let (dx, dy) = (window[1].x() - window[0].x(), window[1].y() - window[0].y());
+            assert!(dx == 0.0 || dy == 0.0 || dx.abs() == dy.abs(), "{window:?}");
         }
         assert!(
             walk.points
                 .iter()
-                .all(|p| p.y() != 2.5 || p.x() < 5.0 || 6.0 < p.x())
+                .all(|point| point.y() != 2.5 || point.x() < 5.0 || 6.0 < point.x())
         );
         // behind a closed wall the search runs out: the path to the tile nearest the goal
-        let (t, map) = tiles(&[
+        let (tiles, map) = tiles(&[
             ".....#....",
             ".....#....",
             ".....#....",
@@ -709,7 +712,7 @@ mod tests {
             ".....#....",
         ]);
         let (reached, walk) = path(
-            &t,
+            &tiles,
             map,
             (&request([1, 2], [8, 2]), &|_| Ok(false)),
             0.0,
@@ -723,7 +726,7 @@ mod tests {
         let mut req = request([0, 1], [4, 1]);
         req.range = Distance::new(4.5);
         assert_eq!(
-            path(&t, map, (&req, &|_| Ok(false)), 0.0, tuning().long_path).unwrap(),
+            path(&tiles, map, (&req, &|_| Ok(false)), 0.0, tuning().long_path).unwrap(),
             (true, Path::default())
         );
     }
@@ -731,21 +734,21 @@ mod tests {
     #[test]
     fn trace_puts_point_where_the_direction_changes() {
         // entered: (1, 0) from (0, 0) by step 3 ([1, 0]), (2, 0) by 3, (3, 1) by 4 ([1, 1])
-        let w = 4;
+        let width = 4;
         let mut entered = vec![None; 8];
         entered[1] = Some(StepDir::ALL[3]);
         entered[2] = Some(StepDir::ALL[3]);
-        entered[w + 3] = Some(StepDir::ALL[4]);
-        let p = trace(
+        entered[width + 3] = Some(StepDir::ALL[4]);
+        let path = trace(
             Tile::new(0, 0),
             Tile::new(3, 1),
             &entered,
-            GridSize::new(w as i32, 2),
+            GridSize::new(width as i32, 2),
             0.0,
         )
         .unwrap();
         assert_eq!(
-            p.points,
+            path.points,
             [
                 BVector::new(0.5, 0.0, 0.5),
                 BVector::new(2.5, 0.0, 0.5),
@@ -757,7 +760,7 @@ mod tests {
             Tile::new(0, 0),
             Tile::new(0, 0),
             &entered,
-            GridSize::new(w as i32, 2),
+            GridSize::new(width as i32, 2),
             0.0,
         )
         .unwrap();
@@ -766,7 +769,7 @@ mod tests {
 
     #[test]
     fn goal_around_wall_is_reached_one_behind_closed_wall_not() {
-        let (t, map) = tiles(&[
+        let (grid, map) = tiles(&[
             "..........",
             ".....#....",
             ".....#....",
@@ -775,7 +778,7 @@ mod tests {
         ]);
         assert_eq!(
             reaches(
-                &t,
+                &grid,
                 map,
                 &request([1, 2], [8, 2]),
                 &|_| Ok(false),
@@ -783,7 +786,7 @@ mod tests {
             ),
             Ok(true)
         );
-        let (t, map) = tiles(&[
+        let (tiles, map) = tiles(&[
             ".....#....",
             ".....#....",
             ".....#....",
@@ -792,7 +795,7 @@ mod tests {
         ]);
         assert_eq!(
             reaches(
-                &t,
+                &tiles,
                 map,
                 &request([1, 2], [8, 2]),
                 &|_| Ok(false),
@@ -808,7 +811,7 @@ mod tests {
     /// as an unblocked tile, and what the gate cannot answer stops the search.
     #[test]
     fn an_allied_gate_asks_the_gate_and_an_enemy_is_closed() {
-        let (t, map) = tiles(&[
+        let (tiles, map) = tiles(&[
             ".....#....",
             ".....#....",
             ".....G....",
@@ -825,7 +828,7 @@ mod tests {
         };
         assert_eq!(
             reaches(
-                &t,
+                &tiles,
                 map,
                 &request([1, 2], [8, 2]),
                 &ask(true),
@@ -837,22 +840,22 @@ mod tests {
         let mut req = request([1, 2], [8, 2]);
         req.allies |= PlayerSet::of(PlayerId::new(4));
         assert_eq!(
-            reaches(&t, map, &req, &ask(false), tuning().long_path),
+            reaches(&tiles, map, &req, &ask(false), tuning().long_path),
             Ok(false)
         );
-        assert!(asked.borrow().iter().all(|&g| g == Tile::new(5, 2)));
+        assert!(asked.borrow().iter().all(|&tile| tile == Tile::new(5, 2)));
         assert_eq!(
-            reaches(&t, map, &req, &ask(true), tuning().long_path),
+            reaches(&tiles, map, &req, &ask(true), tuning().long_path),
             Ok(true)
         );
         let fails = |_| Err(GenieError::unreachable("the gate's master"));
-        assert!(reaches(&t, map, &req, &fails, tuning().long_path).is_err());
+        assert!(reaches(&tiles, map, &req, &fails, tuning().long_path).is_err());
     }
 
     #[test]
     fn diagonal_step_needs_both_tiles_beside_it() {
         // the only way through is a corner between two tall objects
-        let (t, map) = tiles(&[
+        let (tiles, map) = tiles(&[
             "....T....",
             "....T....",
             "....T....",
@@ -861,7 +864,7 @@ mod tests {
         ]);
         assert_eq!(
             reaches(
-                &t,
+                &tiles,
                 map,
                 &request([0, 0], [8, 4]),
                 &|_| Ok(false),
@@ -873,16 +876,16 @@ mod tests {
 
     #[test]
     fn goal_within_the_range_ends_before_the_search() {
-        let (t, map) = tiles(&["..#..", "..#..", "..#.."]);
+        let (tiles, map) = tiles(&["..#..", "..#..", "..#.."]);
         let mut req = request([0, 1], [4, 1]);
         req.moves = false;
         assert_eq!(
-            reaches(&t, map, &req, &|_| Ok(false), tuning().long_path),
+            reaches(&tiles, map, &req, &|_| Ok(false), tuning().long_path),
             Ok(false)
         );
         req.range = Distance::new(4.5);
         assert_eq!(
-            reaches(&t, map, &req, &|_| Ok(false), tuning().long_path),
+            reaches(&tiles, map, &req, &|_| Ok(false), tuning().long_path),
             Ok(true)
         );
     }

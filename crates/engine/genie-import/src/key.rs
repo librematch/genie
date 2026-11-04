@@ -15,9 +15,9 @@ impl Key {
     #[must_use]
     pub fn hex(&self) -> String {
         let mut out = String::with_capacity(64);
-        for b in self.0 {
+        for byte in self.0 {
             // writing to a `String` cannot fail
-            let _ = write!(out, "{b:02x}");
+            let _ = write!(out, "{byte:02x}");
         }
         out
     }

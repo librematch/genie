@@ -93,45 +93,80 @@ impl Action {
     #[must_use]
     pub fn top_sub_action(&self) -> Option<TopAction> {
         use crate::movement::move_to::{MOVE_TO, MoveTo};
-        let walking = |m: Option<MoveTo>| {
-            m.map(|move_to| TopAction {
+        let walking = |walk: Option<MoveTo>| {
+            walk.map(|move_to| TopAction {
                 kind: MOVE_TO,
                 state: ActionState::new(move_to.number()),
             })
         };
         match self.list.head()? {
-            actions::Action::Artifact(artifact) => walking(artifact.move_to().map(|m| m.state))
-                .or_else(|| {
-                    artifact.enter().map(|e| TopAction {
-                        kind: ENTER,
-                        state: ActionState::new(e.state.get()),
-                    })
-                }),
+            actions::Action::Artifact(artifact) => walking(
+                artifact
+                    .move_to()
+                    .map(|move_to_action| move_to_action.state),
+            )
+            .or_else(|| {
+                artifact.enter().map(|enter_action| TopAction {
+                    kind: ENTER,
+                    state: ActionState::new(enter_action.state.get()),
+                })
+            }),
             actions::Action::Hunt(hunt_action) => hunt_action
                 .state
                 .attack()
-                .map(|a| TopAction {
+                .map(|attack| TopAction {
                     kind: ATTACK,
-                    state: ActionState::new(a.state.get()),
+                    state: ActionState::new(attack.state.get()),
                 })
-                .or_else(|| walking(hunt_action.state.move_to().map(|m| m.state))),
-            actions::Action::Build(build_action) => {
-                walking(build_action.state.move_to().map(|m| m.state))
-            }
-            actions::Action::Repair(repair_action) => {
-                walking(repair_action.state.move_to().map(|m| m.state))
-            }
-            actions::Action::Fly(fly) => walking(fly.state.move_to().map(|m| m.state)),
-            actions::Action::Gather(gather_action) => {
-                walking(gather_action.state.move_to().map(|m| m.state))
-            }
-            actions::Action::Attack(attack) => walking(attack.state.move_to().map(|m| m.state)),
-            actions::Action::Explore(explore_action) => {
-                walking(explore_action.state.move_to().map(|m| m.state))
-            }
-            actions::Action::Enter(enter_action) => {
-                walking(enter_action.state.move_to().map(|m| m.state))
-            }
+                .or_else(|| {
+                    walking(
+                        hunt_action
+                            .state
+                            .move_to()
+                            .map(|move_to_action| move_to_action.state),
+                    )
+                }),
+            actions::Action::Build(build_action) => walking(
+                build_action
+                    .state
+                    .move_to()
+                    .map(|move_to_action| move_to_action.state),
+            ),
+            actions::Action::Repair(repair_action) => walking(
+                repair_action
+                    .state
+                    .move_to()
+                    .map(|move_to_action| move_to_action.state),
+            ),
+            actions::Action::Fly(fly) => walking(
+                fly.state
+                    .move_to()
+                    .map(|move_to_action| move_to_action.state),
+            ),
+            actions::Action::Gather(gather_action) => walking(
+                gather_action
+                    .state
+                    .move_to()
+                    .map(|move_to_action| move_to_action.state),
+            ),
+            actions::Action::Attack(attack) => walking(
+                attack
+                    .state
+                    .move_to()
+                    .map(|move_to_action| move_to_action.state),
+            ),
+            actions::Action::Explore(explore_action) => walking(
+                explore_action
+                    .state
+                    .move_to()
+                    .map(|move_to_action| move_to_action.state),
+            ),
+            actions::Action::Enter(enter_action) => walking(
+                enter_action
+                    .state
+                    .move_to()
+                    .map(|move_to_action| move_to_action.state),
+            ),
             actions::Action::Transport(transport_action) => walking(
                 transport_action
                     .state

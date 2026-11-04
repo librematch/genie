@@ -117,17 +117,17 @@ impl ActiveSprite {
             active_sprite.interval = Seconds::new(sprite_tuning.shortest);
         }
         if graphic.flags.contains(SpriteFlags::RANDOM_FIRST_FRAME) {
-            let d = graphic.frame_duration.get();
-            if 0.0 < d {
+            let frame_duration = graphic.frame_duration.get();
+            if 0.0 < frame_duration {
                 let draw = sprite_rng.rand15();
-                let t = (draw as i32 as f32
-                    * (graphic.frames.as_f32() * d + graphic.replay_delay.get()))
+                let elapsed = (draw as i32 as f32
+                    * (graphic.frames.as_f32() * frame_duration + graphic.replay_delay.get()))
                     / 32767.0;
-                let f = Frame::of_data((t / d) as i32 as i16);
-                active_sprite.frame = f;
-                if graphic.frames <= f {
+                let frame = Frame::of_data((elapsed / frame_duration) as i32 as i16);
+                active_sprite.frame = frame;
+                if graphic.frames <= frame {
                     active_sprite.frame = last;
-                    active_sprite.interval = Seconds::new(t - last.as_f32() * d);
+                    active_sprite.interval = Seconds::new(elapsed - last.as_f32() * frame_duration);
                 }
             } else {
                 let draw = sprite_rng.rand15() as i32;
@@ -204,18 +204,18 @@ impl ActiveSprite {
     /// The interval of one frame at `speed` (at least 0.001).
     fn interval_at(&self, speed: Speed, sprite_tuning: SpriteTuning) -> Seconds {
         let graphic = &self.graphic;
-        let mut i = graphic.frame_duration.get();
+        let mut frame_duration = graphic.frame_duration.get();
         // COMISS/JA: only an ordered 1e-7 above the multiplier skips it
         if at_most_or_unordered(EPSILON, graphic.speed_multiplier.get()) {
-            i *= graphic.speed_multiplier.get();
+            frame_duration *= graphic.speed_multiplier.get();
         }
         if Speed::ZERO < speed {
-            i /= speed.get();
+            frame_duration /= speed.get();
         }
-        Seconds::new(if i < sprite_tuning.shortest {
+        Seconds::new(if frame_duration < sprite_tuning.shortest {
             sprite_tuning.shortest
         } else {
-            i
+            frame_duration
         })
     }
 
@@ -264,9 +264,9 @@ impl ActiveSprite {
         let steps = Frame::of_data(cvttss2si(time.get() / interval.get()) as i16);
         self.last = time - Seconds::new(steps.as_f32() * interval.get());
         if Speed::ZERO < speed || graphic.speed_multiplier == SpeedMultiplier::ZERO {
-            let f = start + if forward { steps } else { -steps };
-            self.frame = f;
-            self.looped = f < Frame::ZERO || last < f;
+            let frame = start + if forward { steps } else { -steps };
+            self.frame = frame;
+            self.looped = frame < Frame::ZERO || last < frame;
         }
         self.interval = self.interval_at(speed, sprite_tuning);
         self.speed = speed;
@@ -328,10 +328,10 @@ pub fn trade_sprite(master: &Master, roles: &Roles) -> Option<SpriteId> {
         // A trade cart's class (`FUN_14106a940`, decoded 0x13).
         // The trade task whose carrying sprite a trade cart with goods shows (`FUN_1412028a0`: action
         // type 0x6f, `object_id` 0x54).
-        .find(|t| {
-            t.action_kind == ActionKind::TRADE
+        .find(|task| {
+            task.action_kind == ActionKind::TRADE
                 && roles
-                    .of_some_master(t.object_id)
+                    .of_some_master(task.object_id)
                     .contains(MasterRoles::TRADE_TARGET)
         })
         .and_then(|task| task.sprites.carrying)
@@ -369,7 +369,7 @@ pub fn standing(
     if loaded_cart(master, cargo, roles) {
         return trade_sprite(master, roles);
     }
-    look.map_or_else(|| master.standing_sprite, |l| l.standing)
+    look.map_or_else(|| master.standing_sprite, |look| look.standing)
 }
 
 /// Slot 0x7c8 of a combat object (`FUN_1412030b0`): a loaded trade cart's trade sprite, else
@@ -384,35 +384,35 @@ pub fn walking(
     if loaded_cart(master, cargo, roles) {
         return trade_sprite(master, roles);
     }
-    look.map_or_else(|| master.moving_part().move_sprite, |l| l.walking)
+    look.map_or_else(|| master.moving_part().move_sprite, |look| look.walking)
 }
 
 /// Slot 0x7d0 of a combat object (`FUN_1412034e0`): its terrain look's running sprite
 /// (`+0x978`), else its master's (`+0x750`).
 #[must_use]
 pub fn running(master: &Master, look: Option<&Look>) -> Option<SpriteId> {
-    look.map_or_else(|| master.moving_part().run_sprite, |l| l.running)
+    look.map_or_else(|| master.moving_part().run_sprite, |look| look.running)
 }
 
 /// Slot 0x898 of a combat object (`FUN_141202830`): its terrain look's attack sprite (`+0x970`),
 /// else its master's (`+0x7f8`, `fight_sprite_id`).
 #[must_use]
 pub fn attacking(master: &Master, look: Option<&Look>) -> Option<SpriteId> {
-    look.map_or_else(|| master.combat_part().attack_sprite, |l| l.attacking)
+    look.map_or_else(|| master.combat_part().attack_sprite, |look| look.attacking)
 }
 
 /// Slot 0x7a0 of a combat object (`FUN_1412027d0`): its terrain look's dying sprite (`+0x980`),
 /// else its master's (`+0x480`).
 #[must_use]
 pub fn dying(master: &Master, look: Option<&Look>) -> Option<SpriteId> {
-    look.map_or_else(|| master.death_sprite, |l| l.dying)
+    look.map_or_else(|| master.death_sprite, |look| look.dying)
 }
 
 /// Slot 0x7a8 of a combat object (`FUN_141203700`): its terrain look's undead sprite (`+0x988`),
 /// else its master's (`+0x488`).
 #[must_use]
 pub fn undead(master: &Master, look: Option<&Look>) -> Option<SpriteId> {
-    look.map_or_else(|| master.undead_sprite, |l| l.undead)
+    look.map_or_else(|| master.undead_sprite, |look| look.undead)
 }
 
 /// The sprite a building shows once dead (`RGE_Static_Object::update`, `0x14118b26d`): one
@@ -483,13 +483,13 @@ mod tests {
         active_sprite.update(Seconds::new(0.02), Speed::new(1.0), tuning().sprite);
         assert_eq!(active_sprite.frame, Frame::of_data(1));
         assert!((active_sprite.last - Seconds::new(0.015_555)).get().abs() < 1e-5);
-        let mut n = 3;
+        let mut updates = 3;
         while !active_sprite.reached(Frame::of_data(22)) {
             active_sprite.update(Seconds::new(0.02), Speed::new(1.0), tuning().sprite);
-            n += 1;
+            updates += 1;
         }
         // update 1057, the 49th
-        assert_eq!((n, active_sprite.frame), (49, Frame::of_data(22)));
+        assert_eq!((updates, active_sprite.frame), (49, Frame::of_data(22)));
     }
 
     /// Slot 0x68: a new sprite starts its instance (a random first frame draws), the one shown
@@ -516,12 +516,15 @@ mod tests {
             &mut rng,
             tuning().sprite,
         );
-        assert_eq!(sprite.map(|s| s.graphic.id), Some(SpriteId::named(1)));
+        assert_eq!(
+            sprite.map(|active_sprite| active_sprite.graphic.id),
+            Some(SpriteId::named(1))
+        );
         assert_ne!(rng, before);
         assert_eq!(stats.speed, Speed::new(1.0));
         // the sprite shown stays as it runs, and the speed is still the one it reads with it
-        if let Some(s) = sprite.as_mut() {
-            s.frame = Frame::of_data(3);
+        if let Some(active_sprite) = sprite.as_mut() {
+            active_sprite.frame = Frame::of_data(3);
         }
         stats.speed = Speed::new(0.5);
         let drawn = rng.clone();
@@ -533,7 +536,11 @@ mod tests {
             tuning().sprite,
         );
         assert_eq!(
-            (sprite.map(|s| s.frame), &rng, stats.speed),
+            (
+                sprite.map(|active_sprite| active_sprite.frame),
+                &rng,
+                stats.speed
+            ),
             (Some(Frame::of_data(3)), &drawn, Speed::new(1.0))
         );
         // a factor of 0 or NaN reads the base alone
@@ -619,12 +626,13 @@ mod tests {
             flags,
         };
         let after = |graphic: Graphic, frame: Option<i16>, dt: f32| {
-            let mut s = ActiveSprite::start(graphic, &mut Well512::default(), tuning().sprite);
-            if let Some(f) = frame {
-                s.frame = Frame::of_data(f);
+            let mut active_sprite =
+                ActiveSprite::start(graphic, &mut Well512::default(), tuning().sprite);
+            if let Some(wanted) = frame {
+                active_sprite.frame = Frame::of_data(wanted);
             }
-            s.update(Seconds::new(dt), Speed::new(1.0), tuning().sprite);
-            s
+            active_sprite.update(Seconds::new(dt), Speed::new(1.0), tuning().sprite);
+            active_sprite
         };
         assert_eq!(
             after(four(SpriteFlags::ANIMATED, Seconds::ZERO), Some(9), 0.1).frame,
@@ -634,9 +642,14 @@ mod tests {
             after(four(SpriteFlags::ANIMATED, Seconds::ZERO), Some(-2), 0.1).frame,
             Frame::of_data(0)
         );
-        let s = after(four(SpriteFlags::ANIMATED, Seconds::new(0.5)), None, 1.0);
+        let active_sprite = after(four(SpriteFlags::ANIMATED, Seconds::new(0.5)), None, 1.0);
         assert_eq!(
-            (s.frame, s.animate, s.interval, s.looped),
+            (
+                active_sprite.frame,
+                active_sprite.animate,
+                active_sprite.interval,
+                active_sprite.looped
+            ),
             (
                 Frame::of_data(1),
                 AnimateState::of_data(2),
@@ -644,7 +657,7 @@ mod tests {
                 false
             )
         );
-        let s = after(
+        let active_sprite = after(
             four(
                 SpriteFlags::ANIMATED | SpriteFlags::BACKWARDS,
                 Seconds::new(0.5),
@@ -653,14 +666,18 @@ mod tests {
             1.0,
         );
         assert_eq!(
-            (s.frame, s.animate, s.interval),
+            (
+                active_sprite.frame,
+                active_sprite.animate,
+                active_sprite.interval
+            ),
             (
                 Frame::of_data(2),
                 AnimateState::of_data(2),
                 Seconds::new(0.5)
             )
         );
-        let s = after(
+        let active_sprite = after(
             four(
                 SpriteFlags::ANIMATED | SpriteFlags::BACKWARDS,
                 Seconds::ZERO,
@@ -669,19 +686,23 @@ mod tests {
             1.25,
         );
         assert_eq!(
-            (s.frame, s.animate, s.looped),
+            (
+                active_sprite.frame,
+                active_sprite.animate,
+                active_sprite.looped
+            ),
             (Frame::of_data(2), AnimateState::of_data(1), true)
         );
-        let s = after(
+        let active_sprite = after(
             four(SpriteFlags::ANIMATED | SpriteFlags::ONCE, Seconds::ZERO),
             None,
             1.0,
         );
         assert_eq!(
-            (s.frame, s.animate),
+            (active_sprite.frame, active_sprite.animate),
             (Frame::of_data(3), AnimateState::of_data(0))
         );
-        let s = after(
+        let active_sprite = after(
             four(
                 SpriteFlags::ANIMATED | SpriteFlags::ONCE | SpriteFlags::BACKWARDS,
                 Seconds::ZERO,
@@ -690,7 +711,7 @@ mod tests {
             1.0,
         );
         assert_eq!(
-            (s.frame, s.animate),
+            (active_sprite.frame, active_sprite.animate),
             (Frame::of_data(0), AnimateState::of_data(0))
         );
         let one = Graphic {

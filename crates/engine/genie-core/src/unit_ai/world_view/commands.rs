@@ -24,7 +24,7 @@ use crate::world::layer::MasterSlots;
 use crate::world::layer::Roles;
 use crate::world::layer::Slots;
 use crate::world::others::OthersRef;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 use crate::{GenieError, GenieResult};
 
 impl UnitView<'_, '_> {
@@ -47,15 +47,15 @@ impl UnitView<'_, '_> {
         let (player, others, foreign) = (
             self.player,
             owner_view(
-                &self.c.w.players,
-                &self.c.w.index,
-                self.c.player,
+                &self.step.world.players,
+                &self.step.world.index,
+                self.step.player,
                 self.new_owner,
             )?,
             owner_view(
-                &self.c.w.players,
-                &self.c.w.index,
-                self.c.player,
+                &self.step.world.players,
+                &self.step.world.index,
+                self.step.player,
                 self.new_owner,
             )?
             .players(),
@@ -70,27 +70,30 @@ impl UnitView<'_, '_> {
             return Ok(Answer::NotTaken);
         };
         // slot 0x820's point: the target's place
-        let terrain = point_terrain(self.c.w.spatial.terrain.as_ref(), target_unit.position());
+        let terrain = point_terrain(
+            self.step.world.spatial.terrain.as_ref(),
+            target_unit.position(),
+        );
         if let Some(Action::Repair(repair)) = self.actions.list.head() {
             let order = RepairOrder::Retake {
                 target,
                 repair: *repair,
             };
-            self.c
-                .lend_at((&mut *self.unit, &mut *self.actions), |w, p, i| {
-                    w.repair_order(p, i, order)
-                })?;
+            self.step.lend_at(
+                (&mut *self.unit, &mut *self.actions),
+                |world, player_id, list_index| world.repair_order(player_id, list_index, order),
+            )?;
             return Ok(Answer::Taken);
         }
         let masters = self
-            .c
-            .w
+            .step
+            .world
             .model
             .masters
             .get(self.player.index())
             .ok_or(UNIT_AI_MASTER)?;
-        let own = unit.master(self.c.w.master_tables(), self.player)?;
-        let switch = repairers(self.c.w.model.slots.master)
+        let own = unit.master(self.step.world.master_tables(), self.player)?;
+        let switch = repairers(self.step.world.model.slots.master)
             .iter()
             .find(|&&(group, _)| group == own.action_part().task_by_group)
             .and_then(|&(_, id)| masters.get(id));
@@ -99,15 +102,21 @@ impl UnitView<'_, '_> {
                 target,
                 1,
                 &find,
-                &self.c.w.parts,
-                MasterTables::new(&self.c.w.model.masters, &self.c.w.parts.own_master),
+                &self.step.world.parts,
+                MasterTables::new(
+                    &self.step.world.model.masters,
+                    &self.step.world.parts.own_master,
+                ),
             )?,
             task_target_with(
                 target,
                 2,
                 &find,
-                &self.c.w.parts,
-                MasterTables::new(&self.c.w.model.masters, &self.c.w.parts.own_master),
+                &self.step.world.parts,
+                MasterTables::new(
+                    &self.step.world.model.masters,
+                    &self.step.world.parts.own_master,
+                ),
             )?,
         ) else {
             // the target is held and an annex's link to its main building clears as the main
@@ -122,8 +131,8 @@ impl UnitView<'_, '_> {
             player,
             held: unit.life.held(),
             attribute_95: self
-                .c
-                .w
+                .step
+                .world
                 .players
                 .player(self.player)?
                 .attributes
@@ -134,9 +143,9 @@ impl UnitView<'_, '_> {
         };
         let dip = SideWorld {
             player,
-            relations: &self.c.w.players.player(self.player)?.relations,
+            relations: &self.step.world.players.player(self.player)?.relations,
             foreign,
-            drop_sites: &self.c.w.model.drop_sites,
+            drop_sites: &self.step.world.model.drop_sites,
         };
         let found = task_search(
             masters,
@@ -157,8 +166,8 @@ impl UnitView<'_, '_> {
         let order = RepairOrder::Start {
             target,
             switches: [
-                switch.map(|m| m.id),
-                found.and_then(|(_, m)| m.map(|master| master.id)),
+                switch.map(|master| master.id),
+                found.and_then(|(_, found)| found.map(|master| master.id)),
             ],
             task: found.map(|(task, _)| task),
         };
@@ -167,7 +176,7 @@ impl UnitView<'_, '_> {
         } else {
             Answer::NotTaken
         };
-        self.c.lend_at(
+        self.step.lend_at(
             (&mut *self.unit, &mut *self.actions),
             |world, player_id, list_index| world.repair_order(player_id, list_index, order),
         )?;
@@ -191,15 +200,15 @@ impl UnitView<'_, '_> {
         let (player, others, foreign) = (
             self.player,
             owner_view(
-                &self.c.w.players,
-                &self.c.w.index,
-                self.c.player,
+                &self.step.world.players,
+                &self.step.world.index,
+                self.step.player,
                 self.new_owner,
             )?,
             owner_view(
-                &self.c.w.players,
-                &self.c.w.index,
-                self.c.player,
+                &self.step.world.players,
+                &self.step.world.index,
+                self.step.player,
                 self.new_owner,
             )?
             .players(),
@@ -215,27 +224,33 @@ impl UnitView<'_, '_> {
         };
         let slot = EnterSlot::under(self.actions.top_action_kind());
         let masters = self
-            .c
-            .w
+            .step
+            .world
             .model
             .masters
             .get(self.player.index())
             .ok_or(UNIT_AI_MASTER)?;
-        let own = unit.master(self.c.w.master_tables(), self.player)?;
+        let own = unit.master(self.step.world.master_tables(), self.player)?;
         let (Some(task_target), Some(general)) = (
             task_target_with(
                 target,
                 1,
                 &find,
-                &self.c.w.parts,
-                MasterTables::new(&self.c.w.model.masters, &self.c.w.parts.own_master),
+                &self.step.world.parts,
+                MasterTables::new(
+                    &self.step.world.model.masters,
+                    &self.step.world.parts.own_master,
+                ),
             )?,
             task_target_with(
                 target,
                 2,
                 &find,
-                &self.c.w.parts,
-                MasterTables::new(&self.c.w.model.masters, &self.c.w.parts.own_master),
+                &self.step.world.parts,
+                MasterTables::new(
+                    &self.step.world.model.masters,
+                    &self.step.world.parts.own_master,
+                ),
             )?,
         ) else {
             // the target is held and an annex's link to its main building clears as the main
@@ -250,8 +265,8 @@ impl UnitView<'_, '_> {
             player,
             held: unit.life.held(),
             attribute_95: self
-                .c
-                .w
+                .step
+                .world
                 .players
                 .player(self.player)?
                 .attributes
@@ -262,12 +277,15 @@ impl UnitView<'_, '_> {
         };
         let dip = SideWorld {
             player,
-            relations: &self.c.w.players.player(self.player)?.relations,
+            relations: &self.step.world.players.player(self.player)?.relations,
             foreign,
-            drop_sites: &self.c.w.model.drop_sites,
+            drop_sites: &self.step.world.model.drop_sites,
         };
         // slot 0x820's point: the target's place
-        let terrain = point_terrain(self.c.w.spatial.terrain.as_ref(), target_unit.position());
+        let terrain = point_terrain(
+            self.step.world.spatial.terrain.as_ref(),
+            target_unit.position(),
+        );
         let Some((task, switch)) = task_search(
             masters,
             &actor,
@@ -290,11 +308,11 @@ impl UnitView<'_, '_> {
             switch: switch.map(|master| master.id),
             slot,
         };
-        if let Some(notify) = self.c.lend_at(
+        if let Some(notify) = self.step.lend_at(
             (&mut *self.unit, &mut *self.actions),
             |world, player_id, list_index| world.enter_order(player_id, list_index, order),
         )? {
-            self.c.notify_own(self.unit, notify)?;
+            self.step.notify_own(self.unit, notify)?;
         }
         Ok(Answer::Taken)
     }
@@ -303,7 +321,13 @@ impl UnitView<'_, '_> {
     /// size and the unit's line of sight.
     pub(crate) fn scout_area(&mut self) -> GenieResult<(ScoutArea<'_>, GridSize, Distance)> {
         let me = self.unit.me(self.actions);
-        ScoutArea::of(self.c.w, self.unit, me, self.player, self.player_kind)
+        ScoutArea::of(
+            self.step.world,
+            self.unit,
+            me,
+            self.player,
+            self.player_kind,
+        )
     }
 }
 

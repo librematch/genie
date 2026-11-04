@@ -78,7 +78,7 @@ pub(crate) fn new_object(tick: Tick, player: PlayerId, object: ObjectId, master:
 fn context_of(why: &GenieError) -> Option<String> {
     let parts: Vec<String> = why
         .context()
-        .map(|(k, text)| format!("{k}: {text}"))
+        .map(|(key, text)| format!("{key}: {text}"))
         .collect();
     (!parts.is_empty()).then(|| parts.join(", "))
 }
@@ -215,8 +215,9 @@ impl Watch {
             );
         }
         if now.action != self.action {
-            let field = |a: Option<(i16, u8)>| a.map_or(-1, |(kind, _)| i32::from(kind));
-            let state = |a: Option<(i16, u8)>| a.map_or(-1, |(_, state)| i32::from(state));
+            let field = |action: Option<(i16, u8)>| action.map_or(-1, |(kind, _)| i32::from(kind));
+            let state =
+                |action: Option<(i16, u8)>| action.map_or(-1, |(_, state)| i32::from(state));
             tracing::debug!(
                 target: STATE,
                 tick = tick.get(),
@@ -377,7 +378,7 @@ mod tests {
     fn draw_tells_its_stream_value_and_the_line_that_asked() {
         let mut streams = Streams::default();
         streams.seed_all(29910);
-        let ai = streams.get(Stream::Ai);
+        let ai = streams.get_mut(Stream::Ai);
         let mut copy = ai.clone();
         let (lines, line) = (
             heard_with_draws(|| {
@@ -386,7 +387,7 @@ mod tests {
             line!() - 2,
         );
         let value = copy.raw();
-        let draws: Vec<&String> = lines.iter().filter(|l| l.contains(DRAWS)).collect();
+        let draws: Vec<&String> = lines.iter().filter(|text| text.contains(DRAWS)).collect();
         assert_eq!(draws.len(), 1, "{lines:?}");
         // the path as the compiler gives it (`file!()`, backslashes on Windows)
         let head = format!(

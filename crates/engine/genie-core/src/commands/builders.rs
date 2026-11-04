@@ -21,7 +21,7 @@ use crate::objects::lifecycle::Held;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::PlayersMasters;
+use crate::objects::masters::PlayersMastersExt;
 use crate::objects::masters::player_master;
 use crate::objects::masters::work_master;
 use crate::objects::masters::{MasterTables, OwnerMasters};
@@ -42,7 +42,7 @@ use crate::unit_ai::task_finder::{TaskOn, enabled};
 use crate::unit_ai::world_view::Wait;
 use crate::unit_ai::{Issuer, OrderPriority, OrderTargetKind, QueuedOrder};
 use crate::world::index::Place;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 use crate::world::{STATIC_KINDS_END, World};
 use crate::{GenieError, GenieResult};
 
@@ -74,14 +74,14 @@ impl World {
         self.groups.count_command();
         let site = (player, foundation, master);
         for &id in builders.iter().flatten() {
-            let Some((q, unit)) = self.object(id) else {
+            let Some((owner, unit)) = self.object(id) else {
                 continue;
             };
-            let m = unit.master(self.master_tables(), q)?;
-            let speed = m
+            let master = unit.master(self.master_tables(), owner)?;
+            let speed = master
                 .move_stats
                 .map_or(Speed::ZERO, |move_stats| move_stats.speed);
-            let kind = m.kind;
+            let kind = master.kind;
             let moves = MasterKind::MOVING <= kind && below_or_unordered(0.0, speed.get());
             if !moves && !queued {
                 continue;
@@ -334,7 +334,7 @@ impl World {
         Ok(())
     }
 
-    /// The direct path of a builder at `idx` of player `q`, slot 0x128 on `foundation` (player
+    /// The direct path of a builder at `idx` of player `player`, slot 0x128 on `foundation` (player
     /// `fp`'s) at `position` with what [`World::build_task`] found: its ignore list empties
     /// (`FUN_141197da0`), the town-bell record (slot 0x7e8 with task filter −1), then the work
     /// command (`FUN_14106ff70`): the master changes, the Build takes its foundation, the unit
@@ -370,7 +370,7 @@ impl World {
                 Some((foundation.id(), site_class)),
                 Position::new(position.x(), position.y(), 0.0),
                 Notifies::Cleared,
-                self.streams.get(Stream::Ai),
+                self.streams.get_mut(Stream::Ai),
             )?;
             self.remember_order(player, idx, (Some(OrderKind::Build), Some(AiAction::Build)))?;
         }

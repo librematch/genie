@@ -30,14 +30,16 @@ enum Tail {
     Bytes,
 }
 
-/// Whether `p` has the layout's shape: the fixed part, a size that matches, and a tail of its kind.
-fn fits(p: &[u8], fixed: usize, tail: Tail) -> bool {
-    let sized = p.len() >= 4 && usize::from(u16::from_le_bytes([p[2], p[3]])) + 4 == p.len();
+/// Whether `packet` has the layout's shape: the fixed part, a size that matches, and a tail of its
+/// kind.
+fn fits(packet: &[u8], fixed: usize, tail: Tail) -> bool {
+    let sized = packet.len() >= 4
+        && usize::from(u16::from_le_bytes([packet[2], packet[3]])) + 4 == packet.len();
     sized
-        && p.len() >= fixed
+        && packet.len() >= fixed
         && match tail {
-            Tail::None => p.len() == fixed,
-            Tail::Words => (p.len() - fixed).is_multiple_of(4),
+            Tail::None => packet.len() == fixed,
+            Tail::Words => (packet.len() - fixed).is_multiple_of(4),
             Tail::Bytes => true,
         }
 }
@@ -77,8 +79,8 @@ impl<const N: usize> Field for [u8; N] {
 }
 
 /// The field at `at`; None for a packet too short to hold it.
-fn get<T: Field>(p: &[u8], at: usize) -> Option<T> {
-    T::read(p.get(at..)?)
+fn get<T: Field>(packet: &[u8], at: usize) -> Option<T> {
+    T::read(packet.get(at..)?)
 }
 
 fn put<T: Field>(out: &mut Vec<u8>, value: T) {
@@ -86,16 +88,16 @@ fn put<T: Field>(out: &mut Vec<u8>, value: T) {
 }
 
 /// The words from `at` to the end.
-fn words(p: &[u8], at: usize) -> Option<Vec<i32>> {
-    let tail = p.get(at..)?;
+fn words(packet: &[u8], at: usize) -> Option<Vec<i32>> {
+    let tail = packet.get(at..)?;
     let (words, rest) = tail.as_chunks::<4>();
     rest.is_empty()
-        .then(|| words.iter().map(|&w| i32::from_le_bytes(w)).collect())
+        .then(|| words.iter().map(|&word| i32::from_le_bytes(word)).collect())
 }
 
 /// The bytes from `at` to the end.
-fn bytes(p: &[u8], at: usize) -> Option<Vec<u8>> {
-    p.get(at..).map(<[u8]>::to_vec)
+fn bytes(packet: &[u8], at: usize) -> Option<Vec<u8>> {
+    packet.get(at..).map(<[u8]>::to_vec)
 }
 
 /// Write the size into a packet the encoder has filled.

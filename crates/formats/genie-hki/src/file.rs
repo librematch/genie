@@ -72,12 +72,12 @@ impl HotkeyInfo {
     /// # fn main() -> anyhow::Result<()> {
     /// use std::fs::File;
     /// use genie_hki::HotkeyInfo;
-    /// let mut f = File::open("test/files/aoc1.hki")?;
-    /// let info = HotkeyInfo::read_from(&mut f)?;
+    /// let mut file = File::open("test/files/aoc1.hki")?;
+    /// let info = HotkeyInfo::read_from(&mut file)?;
     /// assert_eq!(info.version(), 1.0);
     ///
-    /// let mut f = File::open("test/files/hd0.hki")?;
-    /// let info = HotkeyInfo::read_from(&mut f)?;
+    /// let mut file = File::open("test/files/hd0.hki")?;
+    /// let info = HotkeyInfo::read_from(&mut file)?;
     /// assert_eq!(info.version(), 3.0);
     /// # Ok(()) }
     /// ```
@@ -92,8 +92,8 @@ impl HotkeyInfo {
     /// # fn main() -> anyhow::Result<()> {
     /// use std::fs::File;
     /// use genie_hki::{HotkeyInfo, HotkeyGroupId};
-    /// let mut f = File::open("test/files/aoc1.hki")?;
-    /// let info = HotkeyInfo::read_from(&mut f)?;
+    /// let mut file = File::open("test/files/aoc1.hki")?;
+    /// let info = HotkeyInfo::read_from(&mut file)?;
     /// assert!(info.group(HotkeyGroupId::Villager as usize).is_some());
     /// assert!(info.group(HotkeyGroupId::Mill as usize).is_none());
     /// # Ok(()) }
@@ -114,12 +114,12 @@ impl HotkeyInfo {
     /// use std::fs::File;
     /// use genie_hki::HotkeyInfo;
     ///
-    /// let mut f = File::open("test/files/aoc1.hki")?;
-    /// let info = HotkeyInfo::read_from(&mut f)?;
+    /// let mut file = File::open("test/files/aoc1.hki")?;
+    /// let info = HotkeyInfo::read_from(&mut file)?;
     /// assert_eq!(14, info.num_groups());
     ///
-    /// let mut f = File::open("test/files/wk.hki")?;
-    /// let info = HotkeyInfo::read_from(&mut f)?;
+    /// let mut file = File::open("test/files/wk.hki")?;
+    /// let info = HotkeyInfo::read_from(&mut file)?;
     /// assert_eq!(15, info.num_groups());
     /// # Ok(()) }
     /// ```
@@ -242,17 +242,17 @@ impl IntoIterator for HotkeyInfo {
     }
 }
 
-impl<'a> IntoIterator for &'a HotkeyInfo {
-    type Item = &'a HotkeyGroup;
-    type IntoIter = slice::Iter<'a, HotkeyGroup>;
+impl<'info> IntoIterator for &'info HotkeyInfo {
+    type Item = &'info HotkeyGroup;
+    type IntoIter = slice::Iter<'info, HotkeyGroup>;
     fn into_iter(self) -> Self::IntoIter {
         self.groups.iter()
     }
 }
 
-impl<'a> IntoIterator for &'a mut HotkeyInfo {
-    type Item = &'a mut HotkeyGroup;
-    type IntoIter = slice::IterMut<'a, HotkeyGroup>;
+impl<'info> IntoIterator for &'info mut HotkeyInfo {
+    type Item = &'info mut HotkeyGroup;
+    type IntoIter = slice::IterMut<'info, HotkeyGroup>;
     fn into_iter(self) -> Self::IntoIter {
         self.groups.iter_mut()
     }

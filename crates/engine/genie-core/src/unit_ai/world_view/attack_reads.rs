@@ -238,8 +238,8 @@ impl WorldPicker<'_> {
             .combat_part()
             .armors
             .iter()
-            .filter(|a| a.class == DamageClass::PIERCE)
-            .map(|a| a.amount)
+            .filter(|class_amount| class_amount.class == DamageClass::PIERCE)
+            .map(|class_amount| class_amount.amount)
             .max();
         let armor = class3.unwrap_or_else(|| {
             master.combat_part().armors.iter().fold(

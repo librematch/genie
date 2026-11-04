@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 /// The table of `entries`, by id: an id's later entry adds to its roles.
 pub fn table<F: Flags + Copy>(entries: &[(usize, F)]) -> Vec<F> {
-    let mut sets = vec![F::empty(); entries.iter().map(|e| e.0 + 1).max().unwrap_or(0)];
+    let mut sets = vec![F::empty(); entries.iter().map(|entry| entry.0 + 1).max().unwrap_or(0)];
     for &(id, set) in entries {
         sets[id].insert(set);
     }

@@ -40,11 +40,11 @@ pub(super) const COS_C3: f64 = f64::from_bits(0x3ef9_9342_e0ee_5069);
 /// to f32 (`CVTSD2SS`).
 pub(super) fn kernel_sin(x: f64) -> f32 {
     let z = x * x;
-    let w = z * z;
-    let r = z * SIN_S4 - SIN_S3;
-    let s = z * x;
+    let fourth_power = z * z;
+    let poly = z * SIN_S4 - SIN_S3;
+    let cube = z * x;
     narrow(sse_nan_f64(
-        w * s * r + ((z * SIN_S2 - SIN_S1) * s + x),
+        fourth_power * cube * poly + ((z * SIN_S2 - SIN_S1) * cube + x),
         &[x],
     ))
 }
@@ -53,10 +53,10 @@ pub(super) fn kernel_sin(x: f64) -> f32 {
 /// rounded to f32.
 pub(super) fn kernel_cos(x: f64) -> f32 {
     let z = x * x;
-    let w = z * z;
-    let r = z * COS_C3 - COS_C2;
+    let fourth_power = z * z;
+    let poly = z * COS_C3 - COS_C2;
     narrow(sse_nan_f64(
-        r * (w * z) + ((ONE_F64 - z * COS_C0) + w * COS_C1),
+        poly * (fourth_power * z) + ((ONE_F64 - z * COS_C0) + fourth_power * COS_C1),
         &[x],
     ))
 }
@@ -77,23 +77,27 @@ pub fn cos(x: f32) -> f32 {
         return kernel_cos(f64::from(x));
     }
     if ix <= 0x407b_53d1 {
-        let d = f64::from(x);
+        let wide = f64::from(x);
         if ix > 0x4016_cbe3 {
-            return -kernel_cos(if negative { d + PI_F64 } else { d - PI_F64 });
+            return -kernel_cos(if negative {
+                wide + PI_F64
+            } else {
+                wide - PI_F64
+            });
         }
         return if negative {
-            kernel_sin(d + FRAC_PI_2_F64)
+            kernel_sin(wide + FRAC_PI_2_F64)
         } else {
-            kernel_sin(FRAC_PI_2_F64 - d)
+            kernel_sin(FRAC_PI_2_F64 - wide)
         };
     }
     if ix <= 0x40e2_31d5 {
         if ix > 0x40af_eddf {
-            let d = f64::from(x);
+            let wide = f64::from(x);
             return kernel_cos(if negative {
-                d + TWO_PI_F64
+                wide + TWO_PI_F64
             } else {
-                d - TWO_PI_F64
+                wide - TWO_PI_F64
             });
         }
         return kernel_sin(f64::from(if negative { -x } else { x }) - THREE_FRAC_PI_2_F64);
@@ -102,8 +106,8 @@ pub fn cos(x: f32) -> f32 {
         #[allow(clippy::eq_op)]
         return sse_nan(x - x, &[x]);
     }
-    let (n, y) = rem_pio2(x);
-    match n & 3 {
+    let (quadrant, y) = rem_pio2(x);
+    match quadrant & 3 {
         0 => kernel_cos(y),
         1 => kernel_sin(-y),
         2 => -kernel_cos(y),
@@ -126,37 +130,43 @@ pub fn sin(x: f32) -> f32 {
         return kernel_sin(f64::from(x));
     }
     if ix <= 0x407b_53d1 {
-        let d = f64::from(x);
+        let wide = f64::from(x);
         if ix <= 0x4016_cbe3 {
             return if negative {
-                -kernel_cos(d + FRAC_PI_2_F64)
+                -kernel_cos(wide + FRAC_PI_2_F64)
             } else {
-                kernel_cos(d - FRAC_PI_2_F64)
+                kernel_cos(wide - FRAC_PI_2_F64)
             };
         }
-        return kernel_sin(-(if negative { d + PI_F64 } else { d - PI_F64 }));
+        return kernel_sin(
+            -(if negative {
+                wide + PI_F64
+            } else {
+                wide - PI_F64
+            }),
+        );
     }
     if ix <= 0x40e2_31d5 {
-        let d = f64::from(x);
+        let wide = f64::from(x);
         if ix <= 0x40af_eddf {
             return if negative {
-                kernel_cos(d + THREE_FRAC_PI_2_F64)
+                kernel_cos(wide + THREE_FRAC_PI_2_F64)
             } else {
-                -kernel_cos(d - THREE_FRAC_PI_2_F64)
+                -kernel_cos(wide - THREE_FRAC_PI_2_F64)
             };
         }
         return kernel_sin(if negative {
-            d + TWO_PI_F64
+            wide + TWO_PI_F64
         } else {
-            d - TWO_PI_F64
+            wide - TWO_PI_F64
         });
     }
     if ix >= 0x7f80_0000 {
         #[allow(clippy::eq_op)]
         return sse_nan(x - x, &[x]);
     }
-    let (n, y) = rem_pio2(x);
-    match n & 3 {
+    let (quadrant, y) = rem_pio2(x);
+    match quadrant & 3 {
         0 => kernel_sin(y),
         1 => kernel_cos(y),
         2 => kernel_sin(-y),

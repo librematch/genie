@@ -179,7 +179,7 @@ mod tests {
     fn gather_states_read_back_from_their_bytes() {
         for index in 0..=255_u8 {
             match GatherState::of_byte(index, None) {
-                Ok(s) => assert_eq!(s.get(), index),
+                Ok(gather_state) => assert_eq!(gather_state.get(), index),
                 Err(_) => assert!(
                     matches!(index, 5 | 9 | 10 | 12 | 14 | 16..=0xf1 | 0xf4..),
                     "{index}"
@@ -188,11 +188,11 @@ mod tests {
         }
         assert_eq!(GatherState::FarmWait.to_string(), "243");
         let walk = MoveToAction::sub_in(MoveTo::Moving);
-        for b in [4, 8, 11, 15, 0xf2] {
-            let mut gather_state = GatherState::of_byte(b, Some(walk)).unwrap();
+        for byte in [4, 8, 11, 15, 0xf2] {
+            let mut gather_state = GatherState::of_byte(byte, Some(walk)).unwrap();
             assert_eq!(
                 (gather_state.get(), gather_state.move_to()),
-                (b, Some(&walk))
+                (byte, Some(&walk))
             );
             assert_eq!(gather_state.bare().move_to(), None);
             assert_eq!(gather_state.take_move_to(), Some(walk));

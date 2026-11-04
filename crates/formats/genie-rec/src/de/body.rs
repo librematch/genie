@@ -71,13 +71,13 @@ pub struct TriggerSync {
 /// One record of a chapter's op stream.
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
-pub enum Op<'a> {
+pub enum Op<'data> {
     /// Op 5 as the first record of a recording: the recording settings.
     Pregame(Pregame),
     /// Op 1: a command packet, executed in the tick it was recorded in.
     Command {
         /// The command bytes.
-        packet: &'a [u8],
+        packet: &'data [u8],
         /// The world time (game time, in milliseconds) it was recorded at.
         world_time: u32,
     },
@@ -101,33 +101,33 @@ pub enum Op<'a> {
         /// The chat channel; -1 in the recordings seen.
         channel: i32,
         /// The text bytes.
-        text: &'a [u8],
+        text: &'data [u8],
     },
     /// Op 5 after the first record: the recorded outcome of a trigger condition.
     TriggerSync(TriggerSync),
     /// Op 6: the end of playback. The postgame trailer follows.
     End {
         /// The bytes after the end op, up to the end of the chapter.
-        trailer: &'a [u8],
+        trailer: &'data [u8],
     },
 }
 
 /// Iterator over the ops of one chapter. It stops after `End`, at the end of the body, or after the
 /// first error.
 #[derive(Debug, Clone)]
-pub struct OpReader<'a> {
-    data: &'a [u8],
+pub struct OpReader<'data> {
+    data: &'data [u8],
     base: usize,
     pos: usize,
     pregame_allowed: bool,
     done: bool,
 }
 
-impl<'a> OpReader<'a> {
+impl<'data> OpReader<'data> {
     /// `base` is the body's file offset, used in error offsets. Only the first chapter's first record
     /// may be a [`Pregame`].
     #[must_use]
-    pub const fn new(body: &'a [u8], base: usize, first_chapter: bool) -> Self {
+    pub const fn new(body: &'data [u8], base: usize, first_chapter: bool) -> Self {
         Self {
             data: body,
             base,
@@ -138,36 +138,36 @@ impl<'a> OpReader<'a> {
     }
 }
 
-impl<'a> OpReader<'a> {
+impl<'data> OpReader<'data> {
     const fn remaining(&self) -> usize {
         self.data.len() - self.pos
     }
 
-    /// The next `n` bytes, or `Truncated` at the start of the current record.
-    fn take(&mut self, n: usize, record: usize) -> GenieResult<&'a [u8]> {
-        if self.remaining() < n {
+    /// The next `count` bytes, or `Truncated` at the start of the current record.
+    fn take(&mut self, count: usize, record: usize) -> GenieResult<&'data [u8]> {
+        if self.remaining() < count {
             return Err(truncated(self.base + record));
         }
-        let bytes = &self.data[self.pos..self.pos + n];
-        self.pos += n;
+        let bytes = &self.data[self.pos..self.pos + count];
+        self.pos += count;
         Ok(bytes)
     }
 
     fn u32(&mut self, record: usize) -> GenieResult<u32> {
-        let b = self.take(4, record)?;
-        Ok(u32::from_le_bytes([b[0], b[1], b[2], b[3]]))
+        let bytes = self.take(4, record)?;
+        Ok(u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
     }
 
     /// A fixed-size binrw record of `size` bytes.
     fn fixed<T>(&mut self, size: usize, record: usize) -> GenieResult<T>
     where
-        T: for<'b> binrw::BinRead<Args<'b> = ()>,
+        T: for<'args> binrw::BinRead<Args<'args> = ()>,
     {
         let bytes = self.take(size, record)?;
         T::read_le(&mut Cursor::new(bytes)).map_err(|_| truncated(self.base + record))
     }
 
-    fn read_op(&mut self) -> GenieResult<Op<'a>> {
+    fn read_op(&mut self) -> GenieResult<Op<'data>> {
         let record = self.pos;
         let first = replace(&mut self.pregame_allowed, false);
         match self.u32(record)? {
@@ -211,8 +211,8 @@ impl<'a> OpReader<'a> {
 /// 8 lanes x 11 words + the world time.
 const CHECKPOINT_SIZE: usize = (8 * 11 + 1) * 4;
 
-impl<'a> Iterator for OpReader<'a> {
-    type Item = GenieResult<Op<'a>>;
+impl<'data> Iterator for OpReader<'data> {
+    type Item = GenieResult<Op<'data>>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.done || self.remaining() == 0 {
@@ -236,8 +236,11 @@ impl Op<'_> {
     /// A fixed-size record that does not write back.
     #[allow(clippy::cast_possible_truncation)]
     pub fn write(&self, out: &mut Vec<u8>) -> GenieResult<()> {
-        let words =
-            |out: &mut Vec<u8>, ws: &[u32]| ws.iter().for_each(|w| out.extend(w.to_le_bytes()));
+        let words = |out: &mut Vec<u8>, values: &[u32]| {
+            for word in values {
+                out.extend(word.to_le_bytes());
+            }
+        };
         match self {
             Op::Pregame(pregame) => {
                 words(out, &[5]);
@@ -277,7 +280,7 @@ impl Op<'_> {
 /// Append a fixed-size binrw record.
 fn write_fixed<T>(value: &T, out: &mut Vec<u8>) -> GenieResult<()>
 where
-    T: for<'b> binrw::BinWrite<Args<'b> = ()>,
+    T: for<'args> binrw::BinWrite<Args<'args> = ()>,
 {
     let mut cursor = Cursor::new(out);
     cursor.set_position(cursor.get_ref().len() as u64);
@@ -293,7 +296,7 @@ mod tests {
     const BASE: usize = 0x100;
 
     fn le(words: &[u32]) -> Vec<u8> {
-        words.iter().flat_map(|w| w.to_le_bytes()).collect()
+        words.iter().flat_map(|word| word.to_le_bytes()).collect()
     }
 
     fn read(body: &[u8], first_chapter: bool) -> Vec<GenieResult<Op<'_>>> {
@@ -304,7 +307,7 @@ mod tests {
         let mut lanes = [[0u32; 11]; 8];
         lanes[1] = [0, 700, 11230, 126, 150, 0, 63, 771_100, 2, 62248, 586_462];
         let mut body = le(&[2, 33, 0]);
-        body.extend(lanes.iter().flatten().flat_map(|w| w.to_le_bytes()));
+        body.extend(lanes.iter().flatten().flat_map(|word| word.to_le_bytes()));
         body.extend(le(&[11298]));
         (
             body,

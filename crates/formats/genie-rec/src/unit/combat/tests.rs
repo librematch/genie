@@ -1,4 +1,4 @@
-use crate::element::ReadableHeaderElement;
+use crate::element::ReadHeader;
 use crate::test_support::{Bytes, header_reader, read_all};
 use crate::unit::combat::{CombatUnitAttributes, MissileUnitAttributes};
 

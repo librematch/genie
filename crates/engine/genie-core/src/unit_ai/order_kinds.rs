@@ -186,7 +186,7 @@ impl UnitAi {
         rng: &mut Well512,
     ) -> GenieResult<Answer> {
         let held = match target {
-            Some(id) => Self::world_object(id, at, side)?.map(|t| (id, t)),
+            Some(id) => Self::world_object(id, at, side)?.map(|unit_seen| (id, unit_seen)),
             None => None,
         };
         let Some((target, unit_seen)) = held else {

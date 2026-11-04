@@ -27,7 +27,7 @@ use crate::objects::layers::{Action, Animated, Combat, Motion, Static};
 use crate::objects::lifecycle::static_storage;
 use crate::objects::lifecycle::{Class, Lifecycle};
 use crate::objects::masters::ObstructionKind;
-use crate::objects::masters::PlayersMasters;
+use crate::objects::masters::PlayersMastersExt;
 use crate::objects::masters::player_master;
 use crate::objects::release::Releaser;
 use crate::objects::sprite::ActiveSprite;
@@ -42,7 +42,7 @@ use crate::world::Seconds;
 use crate::world::layer::Roles;
 use crate::world::lets::take;
 use crate::world::parts::{Object, ObjectParts};
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 use crate::world::step::Step;
 use crate::{GenieError, GenieResult};
 
@@ -70,7 +70,7 @@ impl Unit {
         shot: &Shot,
         roles: &Roles,
     ) -> GenieResult<()> {
-        let made = player_master(&step.w.model.masters, step.player, shot.made).ok_or(
+        let made = player_master(&step.world.model.masters, step.player, shot.made).ok_or(
             GenieError::unsupported("a missile its player's masters do not have"),
         )?;
         let stats = made.missile_stats().ok_or(GenieError::unsupported(
@@ -84,25 +84,25 @@ impl Unit {
         let moving = made.move_stats.ok_or(GenieError::unsupported(
             "a missile master that does not move",
         ))?;
-        let (id, flying) = if let Some(pooled) = step.w.recycling.missiles.pop() {
+        let (id, flying) = if let Some(pooled) = step.world.recycling.missiles.pop() {
             pooled
         } else {
-            let id = step.w.recycling.next_id;
-            step.w.recycling.next_id = id.predecessor();
+            let id = step.world.recycling.next_id;
+            step.world.recycling.next_id = id.predecessor();
             (id, true)
         };
         // the setups' draws: static (its sprite, its facet), then moving (its angle)
         let standing = made
             .standing_sprite
-            .and_then(|sprite_id| step.w.model.graphics.get(sprite_id).copied());
-        if let Some(g) = standing {
+            .and_then(|sprite_id| step.world.model.graphics.get(sprite_id).copied());
+        if let Some(graphic) = standing {
             let _ = ActiveSprite::start(
-                g,
-                step.w.streams.get(Stream::Sprite),
-                step.w.model.tuning.sprite,
+                graphic,
+                step.world.streams.get_mut(Stream::Sprite),
+                step.world.model.tuning.sprite,
             );
-            if g.flags.contains(SpriteFlags::RANDOM_FIRST_FRAME) && g.facets.several() {
-                let _ = step.w.streams.get(Stream::Object).rand15();
+            if graphic.flags.contains(SpriteFlags::RANDOM_FIRST_FRAME) && graphic.facets.several() {
+                let _ = step.world.streams.get_mut(Stream::Object).rand15();
             }
         }
         let facets = standing.map(|graphic| SpriteFacets {
@@ -111,13 +111,13 @@ impl Unit {
         });
         let mut angle = Angle::ZERO;
         if let Some(sprite_facets) = facets.filter(|_| draws_angle(facets)) {
-            let draw = step.w.streams.get(Stream::Object).rand15();
+            let draw = step.world.streams.get_mut(Stream::Object).rand15();
             angle = drawn_angle(draw, sprite_facets);
         }
         let mut mover = Mover {
             animated: Animated::default(),
             forward: BVector::new(1.0, 0.0, 0.0),
-            right: BVector::new(0.0, 0.0, step.w.model.tuning.spawn.start_right_z),
+            right: BVector::new(0.0, 0.0, step.world.model.tuning.spawn.start_right_z),
             velocity: None,
             paths: Vec::new(),
             factor: 1.0,
@@ -125,7 +125,7 @@ impl Unit {
             waiting: 0,
             wait_delays: WaitDelays::NONE,
             attack_moving: false,
-            last_move: step.w.world_time,
+            last_move: step.world.world_time,
             moved_at: Position::ORIGIN,
             substitute_count: SubstituteCount::NONE,
             ignore_units: Vec::new(),
@@ -136,11 +136,14 @@ impl Unit {
             in_the_way: Vec::new(),
             sprite_facets: facets,
         };
-        let mut position =
-            mover.set_position(shot.at, step.w.spatial.map, &step.w.model.tuning.movement);
+        let mut position = mover.set_position(
+            shot.at,
+            step.world.spatial.map,
+            &step.world.model.tuning.movement,
+        );
         if !flying {
             let ground = step
-                .w
+                .world
                 .spatial
                 .terrain
                 .as_ref()
@@ -150,7 +153,7 @@ impl Unit {
                 .ground(position.ground())?;
             position = position.with_z(grounded(position.z(), ground, stats.fly_mode));
         }
-        mover.mark_move(position, step.w.world_time);
+        mover.mark_move(position, step.world.world_time);
         let solid = 0.0 < made.radius.x() && 0.0 < made.radius.y() && made.is_tall();
         let placed = Placed {
             position,
@@ -170,9 +173,9 @@ impl Unit {
                 },
             ),
         };
-        step.w.spatial.insert(id, placed);
-        step.w.pathing.moved(id, &placed, MoveState::Standing);
-        if let Some(visibility) = step.w.spatial.sight.as_mut() {
+        step.world.spatial.insert(id, placed);
+        step.world.pathing.moved(id, &placed, MoveState::Standing);
+        if let Some(visibility) = step.world.spatial.sight.as_mut() {
             visibility.add_seer(
                 id,
                 Seer {
@@ -195,11 +198,11 @@ impl Unit {
                 SightCentre::Tile,
                 SightLayer {
                     roles,
-                    visibility_tuning: step.w.model.tuning.visibility,
+                    visibility_tuning: step.world.model.tuning.visibility,
                 },
             )?;
         }
-        let held = static_storage(step.w.players.player_mut(step.player)?, &made.storage)?;
+        let held = static_storage(step.world.players.player_mut(step.player)?, &made.storage)?;
         // its action: the target and the shooter taken (slot 0x178), then the start
         let mut action = MissileAction {
             state: MissileState::New,
@@ -227,7 +230,7 @@ impl Unit {
             met: Vec::new(),
         };
         let point = {
-            let draws = step.w.streams.get(Stream::Action);
+            let draws = step.world.streams.get_mut(Stream::Action);
             aim(
                 AimAt {
                     point: action.point,
@@ -240,11 +243,11 @@ impl Unit {
                 },
                 &mut || draws.rand15(),
                 roles,
-                &step.w.model.tuning.missile,
+                &step.world.model.tuning.missile,
             )?
         };
-        if let Some(a) = action.launch(position, point, &stats)? {
-            mover.angle = a;
+        if let Some(angle) = action.launch(position, point, &stats)? {
+            mover.angle = angle;
         }
         let missile = Self {
             id,
@@ -270,11 +273,11 @@ impl Unit {
         };
         // it joins the end of its owner's list (slot 0x2d0, which files it in the tracker);
         // then its action takes the target and the shooter
-        step.w.players.player_mut(step.player)?.tracker.add(
+        step.world.players.player_mut(step.player)?.tracker.add(
             id,
             key(
-                step.w.model.masters.of(step.player),
-                &step.w.model.lines,
+                step.world.model.masters.of(step.player),
+                &step.world.model.lines,
                 made.id,
                 roles,
             ),
@@ -298,13 +301,13 @@ impl Unit {
                 motion: Some(Motion::Moving(mover)),
                 // its +0x900, the firing object's attack count when fired
                 combat: Combat {
-                    attack_count: step.w.parts.combat_of(self.id).attack_count,
+                    attack_count: step.world.parts.combat_of(self.id).attack_count,
                     ..Default::default()
                 },
                 ..Default::default()
             },
         };
-        let _ = step.w.push_live(step.player, missile)?;
+        let _ = step.world.push_live(step.player, missile)?;
         let missile = Releaser {
             id,
             class: Some(class),

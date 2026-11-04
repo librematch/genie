@@ -26,8 +26,8 @@ impl Planner {
         out: &mut Path,
         tile_path_tuning: &TilePathTuning,
     ) -> GenieResult<Found> {
-        for &r in &req.closed {
-            self.close_rect(r, Mark::Set);
+        for &plan_rect in &req.closed {
+            self.close_rect(plan_rect, Mark::Set);
         }
         let start = PlanTile::of_point(req.from);
         let goal = PlanTile::of_point(req.to);
@@ -43,8 +43,8 @@ impl Planner {
             if level == GridLevel::TILES || self.cell(level, cell).kind.contains(CellKind::NODE) {
                 found = match self.search_levels(level, cell, start, req.full, tile_path_tuning)? {
                     None => (self.best, Found::Nearest),
-                    Some(n) if self.goal_marked => (Some(n), Found::Goal),
-                    Some(n) => (Some(n), Found::Nearest),
+                    Some(node) if self.goal_marked => (Some(node), Found::Goal),
+                    Some(node_index) => (Some(node_index), Found::Nearest),
                 };
                 break;
             }
@@ -76,8 +76,8 @@ impl Planner {
                 result
             }
         };
-        for &p in self.points.iter().rev() {
-            let _ = out.push(p);
+        for &point in self.points.iter().rev() {
+            let _ = out.push(point);
         }
         self.mark_goal(req.goal(), Mark::Clear, tile_path_tuning);
         self.clear_nodes();
@@ -114,8 +114,8 @@ impl Planner {
         walls: Option<&mut dyn SegmentTest<E>>,
         tile_path_tuning: &TilePathTuning,
     ) -> Result<Found, E> {
-        let (w, h) = (self.size.width() as f32, self.size.height() as f32);
-        if req.to.x() < 0.0 || w <= req.to.x() || req.to.y() < 0.0 || h <= req.to.y() {
+        let (width, height) = (self.size.width() as f32, self.size.height() as f32);
+        if req.to.x() < 0.0 || width <= req.to.x() || req.to.y() < 0.0 || height <= req.to.y() {
             return Ok(Found::OffMap);
         }
         let mut levels = Path::default();
@@ -197,13 +197,13 @@ impl Planner {
             .points
             .iter()
             .rev()
-            .find(|p| {
+            .find(|point| {
                 !self
-                    .cell(GridLevel::TILES, PlanTile::of_point(p.ground()))
+                    .cell(GridLevel::TILES, PlanTile::of_point(point.ground()))
                     .edges
                     .is_empty()
             })
-            .map(|p| p.ground()))
+            .map(|point| point.ground()))
     }
 
     /// `FUN_140f7c530`'s shortcut: the last point of the path within 10 tiles of its start (past
@@ -223,30 +223,30 @@ impl Planner {
         let Some(&p0) = levels.points.first() else {
             return Ok(());
         };
-        let mut i = 1;
+        let mut index = 1;
         if count <= 1 {
             return Ok(());
         }
         loop {
-            let Some(&pi) = levels.points.get(i) else {
+            let Some(&pi) = levels.points.get(index) else {
                 return Ok(());
             };
-            let d = (p0.height() - pi.height()) * (p0.height() - pi.height())
+            let distance = (p0.height() - pi.height()) * (p0.height() - pi.height())
                 + (p0.x() - pi.x()) * (p0.x() - pi.x())
                 + (p0.y() - pi.y()) * (p0.y() - pi.y());
-            if tile_path_tuning.shortcut_reach < d {
-                i -= 1;
+            if tile_path_tuning.shortcut_reach < distance {
+                index -= 1;
                 break;
             }
-            i += 1;
-            if count <= i {
+            index += 1;
+            if count <= index {
                 break;
             }
         }
-        if i <= 1 || i == count {
+        if index <= 1 || index == count {
             return Ok(());
         }
-        let Some(&pt) = levels.points.get(i) else {
+        let Some(&pt) = levels.points.get(index) else {
             return Ok(());
         };
         let mut shortcut = Path::default();
@@ -255,8 +255,8 @@ impl Planner {
             ..req.clone()
         };
         if self.search_on_tiles(&to_point, &mut shortcut, tile_path_tuning)? == Found::Goal {
-            for &p in levels.points.iter().skip(i + 1) {
-                let _ = shortcut.push(p);
+            for &point in levels.points.iter().skip(index + 1) {
+                let _ = shortcut.push(point);
             }
             // the game empties the path before it appends the shortcut (0x140f7c940)
             levels.points.clear();
@@ -277,8 +277,8 @@ impl Planner {
         out: &mut Path,
         tile_path_tuning: &TilePathTuning,
     ) -> GenieResult<Found> {
-        for &r in &req.closed {
-            self.close_rect(r, Mark::Set);
+        for &plan_rect in &req.closed {
+            self.close_rect(plan_rect, Mark::Set);
         }
         let start = PlanTile::of_point(req.from);
         let goal = PlanTile::of_point(req.to);
@@ -289,7 +289,7 @@ impl Planner {
         self.best = None;
         let found = match self.search_tiles(start, tile_path_tuning)? {
             None => (self.best, Found::Nearest),
-            Some(n) => (Some(n), Found::Goal),
+            Some(node_index) => (Some(node_index), Found::Goal),
         };
         out.points.clear();
         self.points.clear();
@@ -312,8 +312,8 @@ impl Planner {
                 result
             }
         };
-        for &p in self.points.iter().rev() {
-            let _ = out.push(p);
+        for &point in self.points.iter().rev() {
+            let _ = out.push(point);
         }
         self.mark_goal_tiles(req.goal(), Mark::Clear);
         self.clear_nodes();

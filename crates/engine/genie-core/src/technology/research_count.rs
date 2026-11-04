@@ -20,16 +20,16 @@ impl ResearchCount {
         self.0
     }
 
-    /// The count plus `n` queued, wrapping as the game's short.
+    /// The count plus `by` queued, wrapping as the game's short.
     #[must_use]
-    pub const fn plus(self, n: i16) -> Self {
-        Self(self.0.wrapping_add(n))
+    pub const fn plus(self, by: i16) -> Self {
+        Self(self.0.wrapping_add(by))
     }
 
-    /// The count less `n` done or cancelled, wrapping as the game's short.
+    /// The count less `by` done or cancelled, wrapping as the game's short.
     #[must_use]
-    pub const fn minus(self, n: i16) -> Self {
-        Self(self.0.wrapping_sub(n))
+    pub const fn minus(self, by: i16) -> Self {
+        Self(self.0.wrapping_sub(by))
     }
 }
 

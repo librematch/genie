@@ -45,10 +45,10 @@ impl WaypointIndex {
         Self(self.0.wrapping_sub(1))
     }
 
-    /// The point `n` after it (a look ahead).
+    /// The point `count` after it (a look ahead).
     #[must_use]
-    pub const fn ahead(self, n: i32) -> Self {
-        Self(self.0.wrapping_add(n))
+    pub const fn ahead(self, count: i32) -> Self {
+        Self(self.0.wrapping_add(count))
     }
 
     /// Its place in the points, none below 0.

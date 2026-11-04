@@ -53,7 +53,13 @@ fn the_frames_hold_their_dt_checkpoint_and_commands() {
     );
     assert_eq!(all[0].commands, [&[3, 1, 0, 0][..], &[3, 2, 0, 0][..]]);
     assert!(all[0].checkpoint.is_none());
-    assert_eq!(all[1].checkpoint.as_ref().map(|c| c.world_time), Some(1000));
+    assert_eq!(
+        all[1]
+            .checkpoint
+            .as_ref()
+            .map(|checkpoint| checkpoint.world_time),
+        Some(1000)
+    );
     let two = frames(&chapter(&bytes), 2).unwrap();
     assert_eq!(two.len(), 2);
 }

@@ -19,8 +19,8 @@ const LEFT: TileOffset = TileOffset::new(-1, 0);
 /// See [`UP`].
 const RIGHT: TileOffset = TileOffset::new(1, 0);
 
-/// One spot (`FUN_1411c5b60`'s argument): its candidates `i` in `0..=count` lie at
-/// `(x + dir.x * step.x * i, y + dir.y * step.y * i)`.
+/// One spot (`FUN_1411c5b60`'s argument): its candidates `index` in `0..=count` lie at
+/// `(x + dir.x * step.x * index, y + dir.y * step.y * index)`.
 pub(super) struct Spot {
     pub(super) at: Point,
     pub(super) step: GroundOffset,

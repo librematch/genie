@@ -17,11 +17,11 @@ use crate::objects::Voice;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::FogVisibility;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::PlayersMasters;
+use crate::objects::masters::PlayersMastersExt;
 use crate::players::PlayerId;
 use crate::unit_ai::Notifies;
 use crate::world::WorldTime;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 use crate::{GenieError, GenieResult};
 
 use crate::combat::attack::{AttackCommand, ReadyReads, arms, engagement, show_arrived};
@@ -175,7 +175,7 @@ impl World {
             &mut unit.sprite,
             self.parts.move_stats_mut(unit.id),
             standing,
-            self.streams.get(Stream::Sprite),
+            self.streams.get_mut(Stream::Sprite),
             self.model.tuning.sprite,
         );
         let cmd = AttackCommand {
@@ -206,9 +206,9 @@ impl World {
         // the start's notifies go to the unit AI (the unit's slot 0x328 -> the AI's slot 0x38)
         let unit = self.players.live_mut(player, idx)?;
         let (id, state) = (unit.id, unit.life.state);
-        for (kind, p) in posted {
+        for (kind, params) in posted {
             if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
-                ai.post(Notify::own(id, kind, p), state)?;
+                ai.post(Notify::own(id, kind, params), state)?;
             }
         }
         // the attack command gives the Attack its second target
@@ -281,7 +281,7 @@ impl World {
                 Some((target, aim.class)),
                 point,
                 notifies,
-                self.streams.get(Stream::Ai),
+                self.streams.get_mut(Stream::Ai),
             )?;
             self.remember_order(
                 player,
@@ -308,7 +308,7 @@ impl World {
             .actions_of(self.players.live(player, idx)?.id)
             .list
             .hunt()
-            .map(|h| h.task)
+            .map(|hunt_action| hunt_action.task)
             .ok_or(GenieError::unsupported(
                 "a hunt's retarget without its hunt",
             ))?;
@@ -374,7 +374,7 @@ impl World {
                     &arms,
                     &mut unit.sprite,
                     self.parts.motion.layer_mut(unit.id),
-                    self.streams.get(Stream::Sprite),
+                    self.streams.get_mut(Stream::Sprite),
                     self.model.tuning.sprite,
                 )?;
             }

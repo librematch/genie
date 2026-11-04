@@ -16,10 +16,10 @@ impl ListIndex {
     /// The list's first place.
     pub const FIRST: Self = Self(0);
 
-    /// Place `i`.
+    /// Place `index`.
     #[must_use]
-    pub const fn new(i: usize) -> Self {
-        Self(i)
+    pub const fn new(index: usize) -> Self {
+        Self(index)
     }
 
     /// The place as a number.

@@ -5,7 +5,7 @@ use std::io::Error;
 use std::io::{Read, Write};
 
 /// A part of the recording header that may be absent: reading it can give `None`.
-pub trait OptionalReadableElement: Sized {
+pub trait ReadOptionalHeader: Sized {
     /// Read the element from the header, or `None` if the header does not have it here.
     ///
     /// # Errors
@@ -15,7 +15,7 @@ pub trait OptionalReadableElement: Sized {
 }
 
 /// A part of the recording header that can be read from it.
-pub trait ReadableHeaderElement: Sized {
+pub trait ReadHeader: Sized {
     /// Read the element from the header.
     ///
     /// # Errors
@@ -25,7 +25,7 @@ pub trait ReadableHeaderElement: Sized {
 }
 
 /// A part of the recording header that can be written back.
-pub trait WritableHeaderElement {
+pub trait WriteHeader {
     /// Write the element to `output` in the header's layout.
     ///
     /// # Errors
@@ -47,7 +47,7 @@ pub trait WritableHeaderElement {
 /// # Errors
 ///
 /// Returns an error if reading the count or an element fails.
-pub(crate) fn read_counted<T: ReadableHeaderElement, R: Read>(
+pub(crate) fn read_counted<T: ReadHeader, R: Read>(
     input: &mut RecordingHeaderReader<R>,
 ) -> GenieResult<Vec<T>> {
     use byteorder::{LE, ReadBytesExt};

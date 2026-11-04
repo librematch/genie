@@ -102,11 +102,11 @@ impl Object {
 /// An object as a comparison reads it: its row and its parts, the parts lent by an [`Object`]
 /// (the game's save, imported) or copied out of the world's tables ([`World::object_view`]).
 #[derive(Clone, Debug)]
-pub struct ObjectView<'a> {
+pub struct ObjectView<'world> {
     /// Its row.
-    pub unit: &'a Unit,
+    pub unit: &'world Unit,
     /// Its parts.
-    pub parts: Cow<'a, ObjectParts>,
+    pub parts: Cow<'world, ObjectParts>,
 }
 
 impl Diff for ObjectView<'_> {
@@ -117,8 +117,8 @@ impl Diff for ObjectView<'_> {
     }
 }
 
-impl<'a> From<&'a Object> for ObjectView<'a> {
-    fn from(object: &'a Object) -> Self {
+impl<'world> From<&'world Object> for ObjectView<'world> {
+    fn from(object: &'world Object) -> Self {
         ObjectView {
             unit: &object.unit,
             parts: Cow::Borrowed(&object.parts),

@@ -76,8 +76,9 @@ impl PlayerObjects {
             .iter()
             .flatten()
             .map(|player_master| &player_master.master)
-            .find(|m| {
-                m.static_part()
+            .find(|master| {
+                master
+                    .static_part()
                     .is_some_and(|rge_master_static_object| rge_master_static_object.id() == id)
             })
     }
@@ -114,7 +115,9 @@ impl Master {
                 rge_master
                     .rge_master_animated_object
                     .as_deref()
-                    .map(|a| &a.rge_master_static_object)
+                    .map(|rge_master_animated_object| {
+                        &rge_master_animated_object.rge_master_static_object
+                    })
             })
             .or_else(|| {
                 rge_master.rge_master_doppleganger_object.as_deref().map(
@@ -605,19 +608,19 @@ impl Action {
     pub fn base(&self) -> Option<&RgeAction> {
         macro_rules! first {
             ($($own:ident).+ ; $($field:ident),* ; $($plain:ident),*) => {
-                None$(.or(self.$field.as_deref().map(|a| &a.rge_action)))*
+                None$(.or(self.$field.as_deref().map(|action| &action.rge_action)))*
                     $(.or(self.$plain.as_deref()))*
-                    .or(self.$($own).+.as_deref().and_then(|b| {
-                        None.or(b.rge_action_move_to.as_deref().map(|a| &a.rge_action))
-                            .or(b.rge_action_enter.as_deref().map(|a| &a.rge_action))
-                            .or(b.rge_action_gather.as_deref().map(|a| &a.rge_action))
-                            .or(b.rge_action_missile.as_deref().map(|a| &a.rge_action))
-                            .or(b.rge_action_attack.as_deref().map(|a| &a.rge_action))
-                            .or(b.rge_action_make.as_deref().map(|a| &a.rge_action))
-                            .or(b.action_hero_power.as_deref().map(|a| &a.rge_action))
-                            .or(b.rge_action_explore.as_deref())
-                            .or(b.rge_action_bird.as_deref())
-                            .or(b.rge_action_guard.as_deref())
+                    .or(self.$($own).+.as_deref().and_then(|by_kind| {
+                        None.or(by_kind.rge_action_move_to.as_deref().map(|action| &action.rge_action))
+                            .or(by_kind.rge_action_enter.as_deref().map(|action| &action.rge_action))
+                            .or(by_kind.rge_action_gather.as_deref().map(|action| &action.rge_action))
+                            .or(by_kind.rge_action_missile.as_deref().map(|action| &action.rge_action))
+                            .or(by_kind.rge_action_attack.as_deref().map(|action| &action.rge_action))
+                            .or(by_kind.rge_action_make.as_deref().map(|action| &action.rge_action))
+                            .or(by_kind.action_hero_power.as_deref().map(|action| &action.rge_action))
+                            .or(by_kind.rge_action_explore.as_deref())
+                            .or(by_kind.rge_action_bird.as_deref())
+                            .or(by_kind.rge_action_guard.as_deref())
                     }))
             };
         }

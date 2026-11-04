@@ -32,7 +32,7 @@ use crate::unit_ai::{Memory, Pick, Search, kind_attacks_neutral, search_area};
 use crate::world::Seconds;
 use crate::world::Unread;
 use crate::world::World;
-use crate::world::slots::{CheckedIndex, PlayerSlots};
+use crate::world::slots::{CheckedIndexExt, PlayerSlotsExt};
 use crate::{GenieError, GenieResult};
 
 /// The objects of the members' searches a group keeps at most (`FUN_140c65c60`'s `0x46`).
@@ -110,13 +110,13 @@ impl World {
     pub fn statistics_only(&mut self, group: GroupId, far: FarMembers) -> GenieResult<bool> {
         let dt = self.dt_seconds;
         let (views, objects) = self.member_views(group, far)?;
-        let g = self.groups.held_mut(group)?;
-        let (held, mut slowest, under_attack) = member_totals(g, &views, objects, dt)?;
+        let unit_group = self.groups.held_mut(group)?;
+        let (held, mut slowest, under_attack) = member_totals(unit_group, &views, objects, dt)?;
         if held == 0 {
-            g.smallest_unit_radius = Distance::ZERO;
-            g.desired_spacing = Distance::ZERO;
-            g.smallest_unit_range = Distance::ZERO;
-            g.smallest_ranged_unit_range = Distance::ZERO;
+            unit_group.smallest_unit_radius = Distance::ZERO;
+            unit_group.desired_spacing = Distance::ZERO;
+            unit_group.smallest_unit_range = Distance::ZERO;
+            unit_group.smallest_ranged_unit_range = Distance::ZERO;
             return Ok(false);
         }
         // a member inside another object (`+0x2f0`) stops (slot 0x5d0), in the members' order
@@ -124,13 +124,13 @@ impl World {
             self.stop_if_inside(member_view.id)?;
         }
         let unit_group = self.groups.held_mut(group)?;
-        let n = held as f32;
+        let held_count = held as f32;
         unit_group.centroid = BVector::new(
-            unit_group.centroid.x() / n,
-            unit_group.centroid.height() / n,
-            unit_group.centroid.y() / n,
+            unit_group.centroid.x() / held_count,
+            unit_group.centroid.height() / held_count,
+            unit_group.centroid.y() / held_count,
         );
-        unit_group.desired_height /= n;
+        unit_group.desired_height /= held_count;
         let largest = unit_group.largest_unit_radius;
         unit_group.desired_spacing = largest + largest;
         unit_group.total_spacing =
@@ -155,11 +155,11 @@ impl World {
         // place counts even when the world does not hold it); its units are looked up in the
         // world's table, members or not
         self.sub_formation_stats(group, target)?;
-        let g = self.groups.held(group)?;
+        let group = self.groups.held(group)?;
         // the re-attack: an attack plan of 1 before, command 9 (attack) and a target the
         // world's table holds; a target it does not hold does nothing
         if old_plan == 1
-            && g.current_command == GroupCommandKind::ATTACK
+            && group.current_command == GroupCommandKind::ATTACK
             && self.world_object(target).is_some()
         {
             return Err(GenieError::unsupported(
@@ -167,7 +167,7 @@ impl World {
             ));
         }
         // the motion flags' (`+0xb8`, 0x14100c657), not the group flags'
-        Ok(g.motion.flags.contains(MotionFlags::NEW))
+        Ok(group.motion.flags.contains(MotionFlags::NEW))
     }
 
     /// [`World::statistics_only`]'s member loop: each member's view in the members' order with the
@@ -184,35 +184,35 @@ impl World {
         let mut objects = Vec::new();
         // `+0x154` as the loop goes, which the far test reads
         let mut largest = 0.0f32;
-        let mut i = 0;
+        let mut index = 0;
         loop {
             let held = self.groups.held(group)?;
-            let Some(member) = held.members.get(i) else {
+            let Some(member) = held.members.get(index) else {
                 break;
             };
             let id = member.id;
-            let Some((player_id, u)) = self.object(id) else {
-                i += 1;
+            let Some((player_id, object)) = self.object(id) else {
+                index += 1;
                 continue;
             };
-            let master = u.master(self.master_tables(), player_id)?;
+            let master = object.master(self.master_tables(), player_id)?;
             let unit = FormationUnit::of(master, &self.model.tuning.group);
             let ai = self
                 .parts
                 .unit_ai
-                .get(u.id)
+                .get(object.id)
                 .ok_or(GenieError::unsupported("a group member without a unit AI"))?;
             let view = MemberView {
                 id,
                 unit,
                 // the game's vector (x, height, y) of where it last moved to (x, y, height)
-                at: moved_place(u, self.parts.mover_of(u.id)),
+                at: moved_place(object, self.parts.mover_of(object.id)),
                 speed: self
                     .parts
-                    .mover_of(u.id)
-                    .map_or(Speed::ZERO, |m| m.stats.speed),
+                    .mover_of(object.id)
+                    .map_or(Speed::ZERO, |mover| mover.stats.speed),
                 range: weapon_range(master),
-                under_attack: u.flags.contains(UnitFlags::UNDER_ATTACK),
+                under_attack: object.flags.contains(UnitFlags::UNDER_ATTACK),
                 attacking: ai.current_action == Some(AiAction::Attack),
             };
             self.member_objects(id, &mut objects)?;
@@ -226,14 +226,14 @@ impl World {
                     // the index steps back: the next member takes this one's place
                     continue;
                 }
-                i += 1;
+                index += 1;
                 continue;
             }
             if largest < view.unit.radius.get() {
                 largest = view.unit.radius.get();
             }
-            views.push((i, view));
-            i += 1;
+            views.push((index, view));
+            index += 1;
         }
         Ok((views, objects))
     }
@@ -247,7 +247,7 @@ impl World {
             .iter()
             .map(|unit_kind_statistic| unit_kind_statistic.units.clone())
             .collect();
-        for (n, units) in stats.iter().enumerate() {
+        for (category, units) in stats.iter().enumerate() {
             if units.is_empty() {
                 continue;
             }
@@ -262,9 +262,9 @@ impl World {
                     range = distance;
                 }
                 let radius = match object {
-                    WorldObject::Unit(p, unit, _) => {
+                    WorldObject::Unit(owner, unit, _) => {
                         FormationUnit::of(
-                            unit.master(self.master_tables(), p)?,
+                            unit.master(self.master_tables(), owner)?,
                             &self.model.tuning.group,
                         )
                         .radius
@@ -282,8 +282,8 @@ impl World {
                 }
             }
             let unit_group = self.groups.held_mut(group)?;
-            unit_group.unit_kinds.checked_mut(n)?.attack_range = range;
-            unit_group.unit_kinds.checked_mut(n)?.desired_spacing = widest + widest;
+            unit_group.unit_kinds.checked_mut(category)?.attack_range = range;
+            unit_group.unit_kinds.checked_mut(category)?.desired_spacing = widest + widest;
         }
         Ok(())
     }
@@ -312,13 +312,13 @@ impl World {
             return Ok(());
         }
         let on_entry = objects.len();
-        let (player_id, u) = self.object(id).ok_or(GenieError::unsupported(
+        let (player_id, held) = self.object(id).ok_or(GenieError::unsupported(
             "a group member's search for a unit not held",
         ))?;
         let ai = self
             .parts
             .unit_ai
-            .get(u.id)
+            .get(held.id)
             .ok_or(GenieError::unsupported("a group member without a unit AI"))?;
         let ai_kind = ai.ai_kind;
         let player_kind = self.players.player(player_id)?.kind;
@@ -327,7 +327,7 @@ impl World {
                 "a computer player's group member's search (its cared classes)",
             ));
         }
-        let master = u.master(self.master_tables(), player_id)?;
+        let master = held.master(self.master_tables(), player_id)?;
         let attack_priority = master.creatable_part().attack_priority;
         let (classes, radius) = search_area(
             ai_kind,
@@ -338,7 +338,7 @@ impl World {
             &self.model.roles,
         );
         let search = Search {
-            at: u.position().ground(),
+            at: held.position().ground(),
             radius,
             classes,
             size: master.radius,
@@ -427,7 +427,7 @@ impl World {
             self.parts
                 .actions_of(unit.id)
                 .top_target()
-                .filter(|&t| !t.is_recyclable())
+                .filter(|&object_id| !object_id.is_recyclable())
                 .and_then(|object_id| self.world_object(object_id))
         });
         let Some(world_object) = target else {
@@ -473,11 +473,15 @@ impl World {
         let Some(formation) = held.current_formation.as_ref() else {
             return Ok(false);
         };
-        let Some(slot) = formation.slots.iter().find(|s| s.unit_id == Some(view.id)) else {
+        let Some(slot) = formation
+            .slots
+            .iter()
+            .find(|slot| slot.unit_id == Some(view.id))
+        else {
             return Ok(false);
         };
-        let mut d = view.at - slot.transform_position;
-        d = d.with_height(0.0);
+        let mut offset = view.at - slot.transform_position;
+        offset = offset.with_height(0.0);
         let limit = if formation.kind == FormationKind::Staggered
             || !below_or_unordered(largest, self.model.tuning.group.wide_radius)
         {
@@ -485,7 +489,7 @@ impl World {
         } else {
             self.model.tuning.group.far
         };
-        let gap = sqrt(d.x() * d.x() + 0.0 + d.y() * d.y());
+        let gap = sqrt(offset.x() * offset.x() + 0.0 + offset.y() * offset.y());
         Ok(!at_most_or_unordered(gap, limit))
     }
 
@@ -546,7 +550,7 @@ fn member_totals(
     let mut slowest = f32::MAX;
     let mut held = 0;
     let mut under_attack = false;
-    for &(i, ref member_view) in views {
+    for &(index, ref member_view) in views {
         held += 1;
         group.centroid = BVector::new(
             group.centroid.x() + member_view.at.x(),
@@ -580,7 +584,7 @@ fn member_totals(
             group.largest_ranged_unit_range = member_view.range;
         }
         under_attack |= member_view.under_attack;
-        let member = group.members.checked_mut(i)?;
+        let member = group.members.checked_mut(index)?;
         if member_view.attacking {
             member.seconds_since_attacking = Seconds::ZERO;
         } else {
@@ -667,8 +671,8 @@ mod tests {
     #[test]
     fn ready_charge_of_kind_6_adds_its_charge_event_to_the_range() {
         let mut searched_world = searched_world();
-        let charging = |t: &mut World, charge_kind: i16, charge_target: i16| {
-            let master = Arc::make_mut(&mut t.model.masters[1])
+        let charging = |world: &mut World, charge_kind: i16, charge_target: i16| {
+            let master = Arc::make_mut(&mut world.model.masters[1])
                 .get_mut(master_id(4))
                 .unwrap();
             let creatable_part = master.creatable.get_or_insert_with(Default::default);
@@ -723,14 +727,14 @@ mod tests {
     /// (4, 5) and 31 (class 4, a villager) at (5, 4); every one of them in player 1's sight.
     fn searched_world() -> World {
         let unit = |id: i32, master: MasterId, x: f32, y: f32| {
-            let mut u = Unit {
+            let mut unit = Unit {
                 id: object_id(id),
                 place: Static::at(Position::new(x, y, 0.0)),
                 ..Unit::default()
             };
-            u.life.master_id = master;
-            u.life.state = ObjectState::Alive;
-            u
+            unit.life.master_id = master;
+            unit.life.state = ObjectState::Alive;
+            unit
         };
         let soldier = unit(10, master_id(4), 5.0, 5.0);
         let soldier_ai = UnitAi {
@@ -978,23 +982,23 @@ mod tests {
             };
             *masters = Arc::new(Masters::new(masters.iter().cloned().chain([archer])));
         }
-        let g = world.groups.get_mut(group_id(1)).unwrap();
-        g.unit_kinds[0].units.push(object_id(50));
-        g.current_target.target = GroupTarget::of_saved(99, -1);
-        g.attack_plan_kind = 1;
-        g.current_command = GroupCommandKind::ATTACK;
-        g.objects = vec![object_id(77)];
+        let group = world.groups.get_mut(group_id(1)).unwrap();
+        group.unit_kinds[0].units.push(object_id(50));
+        group.current_target.target = GroupTarget::of_saved(99, -1);
+        group.attack_plan_kind = 1;
+        group.current_command = GroupCommandKind::ATTACK;
+        group.objects = vec![object_id(77)];
         let _ = world
             .statistics_only(group_id(1), FarMembers::Stay)
             .unwrap();
-        let g = world.groups.get(group_id(1)).unwrap();
-        assert_eq!(g.unit_kinds[0].attack_range, Distance::new(6.0));
+        let group = world.groups.get(group_id(1)).unwrap();
+        assert_eq!(group.unit_kinds[0].attack_range, Distance::new(6.0));
         // the searches fill their own list (+0x49c), not the units kept apart (+0x458)
         assert_eq!(
-            (&g.sighted[..], &g.objects[..]),
+            (&group.sighted[..], &group.objects[..]),
             (&[object_id(20), object_id(30)][..], &[object_id(77)][..])
         );
-        assert_eq!(g.attack_plan_kind, 0);
+        assert_eq!(group.attack_plan_kind, 0);
         // a target the world holds: the re-attack is not modelled
         let group = world.groups.get_mut(group_id(1)).unwrap();
         group.current_target.target = GroupTarget::of_saved(20, -1);
@@ -1041,16 +1045,16 @@ mod tests {
                 .group
                 .id = Some(group_id(1));
             let _ = searched_world.push_live(PlayerId::new(1), stray).unwrap();
-            let g = searched_world.groups.get_mut(group_id(1)).unwrap();
-            g.flags = GroupFlags::NONE;
-            g.members = order
+            let group = searched_world.groups.get_mut(group_id(1)).unwrap();
+            group.flags = GroupFlags::NONE;
+            group.members = order
                 .map(|id| Member {
                     id: object_id(id),
                     ..Member::default()
                 })
                 .to_vec();
-            g.unit_kinds[0].units = object_id_list(order);
-            g.current_formation = Some(Formation {
+            group.unit_kinds[0].units = object_id_list(order);
+            group.current_formation = Some(Formation {
                 slots: vec![
                     Slot {
                         unit_id: Some(object_id(10)),
@@ -1067,8 +1071,9 @@ mod tests {
             });
             searched_world
         };
-        let ids = |t: &World| -> Vec<ObjectId> {
-            t.groups
+        let ids = |world: &World| -> Vec<ObjectId> {
+            world
+                .groups
                 .get(group_id(1))
                 .unwrap()
                 .members
@@ -1076,48 +1081,60 @@ mod tests {
                 .map(|member| member.id)
                 .collect()
         };
-        let mut t = world(1.0, [11, 10]);
-        let _ = t.statistics_only(group_id(1), FarMembers::Leave).unwrap();
-        assert_eq!(ids(&t), [object_id(10)]);
-        let unit = t.object(object_id(11)).unwrap().1;
+        let mut game = world(1.0, [11, 10]);
+        let _ = game
+            .statistics_only(group_id(1), FarMembers::Leave)
+            .unwrap();
+        assert_eq!(ids(&game), [object_id(10)]);
+        let unit = game.object(object_id(11)).unwrap().1;
         assert_eq!(unit.group.id, None);
         assert_eq!(
-            t.parts.mover_of(object_id(11)).unwrap().animated.speed,
+            game.parts.mover_of(object_id(11)).unwrap().animated.speed,
             Speed::new(0.0)
         );
-        let group = t.groups.get(group_id(1)).unwrap();
+        let group = game.groups.get(group_id(1)).unwrap();
         assert_eq!(group.centroid, BVector::new(5.0, 0.0, 5.0));
         assert_eq!(group.largest_unit_radius, Distance::new(0.2));
         // a formation of type 7, a wide member before it: 40
-        let mut t = world(1.0, [11, 10]);
-        t.groups
+        let mut game = world(1.0, [11, 10]);
+        game.groups
             .get_mut(group_id(1))
             .unwrap()
             .current_formation
             .as_mut()
             .unwrap()
             .kind = FormationKind::Staggered;
-        let _ = t.statistics_only(group_id(1), FarMembers::Leave).unwrap();
-        assert_eq!(ids(&t), [object_id(11), object_id(10)]);
-        let mut t = world(2.5, [10, 11]);
-        let _ = t.statistics_only(group_id(1), FarMembers::Leave).unwrap();
-        assert_eq!(ids(&t), [object_id(10), object_id(11)]);
-        let mut t = world(2.5, [11, 10]);
-        let _ = t.statistics_only(group_id(1), FarMembers::Leave).unwrap();
-        assert_eq!(ids(&t), [object_id(10)]);
+        let _ = game
+            .statistics_only(group_id(1), FarMembers::Leave)
+            .unwrap();
+        assert_eq!(ids(&game), [object_id(11), object_id(10)]);
+        let mut game = world(2.5, [10, 11]);
+        let _ = game
+            .statistics_only(group_id(1), FarMembers::Leave)
+            .unwrap();
+        assert_eq!(ids(&game), [object_id(10), object_id(11)]);
+        let mut game = world(2.5, [11, 10]);
+        let _ = game
+            .statistics_only(group_id(1), FarMembers::Leave)
+            .unwrap();
+        assert_eq!(ids(&game), [object_id(10)]);
         // no far test without far, on a patrol, with [`GroupFlags::PATROL`]
-        let mut t = world(1.0, [11, 10]);
-        let _ = t.statistics_only(group_id(1), FarMembers::Stay).unwrap();
-        assert_eq!(ids(&t), [object_id(11), object_id(10)]);
-        let mut t = world(1.0, [11, 10]);
-        t.groups.get_mut(group_id(1)).unwrap().flags = GroupFlags::PATROL;
-        let _ = t.statistics_only(group_id(1), FarMembers::Leave).unwrap();
-        assert_eq!(ids(&t), [object_id(11), object_id(10)]);
-        let mut t = world(1.0, [11, 10]);
-        let paths = &mut t.groups.get_mut(group_id(1)).unwrap().motion.paths;
+        let mut game = world(1.0, [11, 10]);
+        let _ = game.statistics_only(group_id(1), FarMembers::Stay).unwrap();
+        assert_eq!(ids(&game), [object_id(11), object_id(10)]);
+        let mut game = world(1.0, [11, 10]);
+        game.groups.get_mut(group_id(1)).unwrap().flags = GroupFlags::PATROL;
+        let _ = game
+            .statistics_only(group_id(1), FarMembers::Leave)
+            .unwrap();
+        assert_eq!(ids(&game), [object_id(11), object_id(10)]);
+        let mut world = world(1.0, [11, 10]);
+        let paths = &mut world.groups.get_mut(group_id(1)).unwrap().motion.paths;
         paths[0].has_path = true;
         paths[0].path_flags = PathFlags::LOOPS;
-        let _ = t.statistics_only(group_id(1), FarMembers::Leave).unwrap();
-        assert_eq!(ids(&t), [object_id(11), object_id(10)]);
+        let _ = world
+            .statistics_only(group_id(1), FarMembers::Leave)
+            .unwrap();
+        assert_eq!(ids(&world), [object_id(11), object_id(10)]);
     }
 }

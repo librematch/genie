@@ -2,7 +2,7 @@
 //! ([`Heap`]), sifted the game's way.
 
 use crate::map::Tile;
-use crate::world::slots::CheckedIndex;
+use crate::world::slots::CheckedIndexExt;
 use crate::{GenieError, GenieResult};
 
 /// A heap pop finds the heap empty where the caller checked its top.
@@ -38,9 +38,9 @@ impl LongCost {
     }
 }
 
-/// `a` tiles in quarter tiles, squared (wrapping).
-const fn quad(a: i32) -> i32 {
-    (a * 4).wrapping_mul(a * 4)
+/// `tiles` tiles in quarter tiles, squared (wrapping).
+const fn quad(tiles: i32) -> i32 {
+    (tiles * 4).wrapping_mul(tiles * 4)
 }
 
 /// The open tiles: a binary heap from slot 1, slot 0 the sentinel (`+0x119420`, count
@@ -88,9 +88,9 @@ impl Heap {
         if half <= 1 {
             return Ok(());
         }
-        let mut i = 1usize;
+        let mut index = 1usize;
         loop {
-            let mut child = 2 * i;
+            let mut child = 2 * index;
             if (child as i32) < count
                 && self.slots.checked(child + 1)?.1 < self.slots.checked(child)?.1
             {
@@ -99,14 +99,14 @@ impl Heap {
             if last.1 < self.slots.checked(child)?.1 {
                 break;
             }
-            *self.slots.checked_mut(i)? = *self.slots.checked_mut(child)?;
-            i = child;
+            *self.slots.checked_mut(index)? = *self.slots.checked_mut(child)?;
+            index = child;
             if half <= child as i32 {
                 break;
             }
         }
-        if i != 1 {
-            *self.slots.checked_mut(i)? = last;
+        if index != 1 {
+            *self.slots.checked_mut(index)? = last;
         }
         Ok(())
     }
@@ -136,13 +136,14 @@ mod tests {
         let mut heap = Heap {
             slots: vec![(Tile::new(0, 0), SENTINEL)],
         };
-        for (index, c) in [5, 3, 8, 1, 9, 2].into_iter().enumerate() {
-            heap.push(Tile::new(index as i32, 0), LongCost(c)).unwrap();
+        for (index, cost) in [5, 3, 8, 1, 9, 2].into_iter().enumerate() {
+            heap.push(Tile::new(index as i32, 0), LongCost(cost))
+                .unwrap();
         }
         assert_eq!(heap.slots[1].1, LongCost(1));
         heap.pop().unwrap();
         // count 5, half 2: no sinking past the top's children below 2
-        let costs: Vec<i32> = heap.slots[1..].iter().map(|s| s.1.0).collect();
+        let costs: Vec<i32> = heap.slots[1..].iter().map(|slot| slot.1.0).collect();
         assert_eq!(costs, [2, 3, 8, 5, 9]);
     }
 

@@ -26,7 +26,7 @@ use crate::unit_ai::{
 };
 use crate::world::Millis;
 use crate::world::layer::ClassRoles;
-use crate::world::slots::CheckedIndex;
+use crate::world::slots::CheckedIndexExt;
 use crate::{GenieError, GenieResult};
 
 /// The order [`UnitAi::order_now`] runs at once: the order, the unit that keeps the current
@@ -207,8 +207,8 @@ impl UnitAi {
         side: &mut UnitView<'_, '_>,
     ) -> GenieResult<Answer> {
         let attacked = side.attack(target, force, self)?;
-        for (kind, p) in attacked.posted {
-            self.post(Notify::own(at.id, kind, p), at.state)?;
+        for (kind, params) in attacked.posted {
+            self.post(Notify::own(at.id, kind, params), at.state)?;
         }
         Ok(if attacked.attacks {
             Answer::Taken
@@ -232,7 +232,7 @@ impl UnitAi {
     ) -> GenieResult<Answer> {
         let roles = &at.roles;
         let target_unit_seen = match at.unit(target) {
-            Some(t) => *t,
+            Some(seen) => *seen,
             None => match side.seen_unit(target)? {
                 Some(unit_seen) => unit_seen,
                 None => return Ok(Answer::NotTaken),

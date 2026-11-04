@@ -54,7 +54,7 @@ pub mod version;
 mod test_support;
 
 use crate::actions::{Action, Meta};
-use crate::element::ReadableHeaderElement;
+use crate::element::ReadHeader;
 use crate::errors::{early_sync, missing_sync, out_of_range, unknown_action};
 use crate::reader::{RecordingHeaderReader, SmallBufReader};
 use byteorder::{LE, ReadBytesExt};
@@ -77,8 +77,8 @@ impl PlayerId {
 
 impl From<u8> for PlayerId {
     #[inline]
-    fn from(n: u8) -> Self {
-        Self(n)
+    fn from(number: u8) -> Self {
+        Self(number)
     }
 }
 
@@ -105,15 +105,15 @@ pub struct ObjectId(u32);
 
 impl From<u32> for ObjectId {
     #[inline]
-    fn from(n: u32) -> Self {
-        Self(n)
+    fn from(number: u32) -> Self {
+        Self(number)
     }
 }
 
 impl From<u16> for ObjectId {
     #[inline]
-    fn from(n: u16) -> Self {
-        Self(n.into())
+    fn from(number: u16) -> Self {
+        Self(number.into())
     }
 }
 
@@ -202,7 +202,7 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         if self.meta.use_sequence_numbers {
             let _sequence = match self.input.read_u8() {
-                Ok(s) => s,
+                Ok(byte) => byte,
                 Err(err) => return Some(Err(err.into())),
             };
         }
@@ -218,7 +218,7 @@ where
             Ok(0x01) => Some(actions::Command::read_from(&mut self.input).map(Action::Command)),
             Ok(0x02) => {
                 match self.remaining_syncs_until_checksum.checked_sub(1) {
-                    Some(n) => self.remaining_syncs_until_checksum = n,
+                    Some(syncs) => self.remaining_syncs_until_checksum = syncs,
                     None => return Some(Err(missing_sync())),
                 }
                 Some(actions::Time::read_from(&mut self.input).map(Action::Time))

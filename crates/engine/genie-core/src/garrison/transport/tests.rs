@@ -88,7 +88,7 @@ fn coast_of(of: impl Fn(Tile) -> u8) -> Coast {
         size,
         tiles
             .iter()
-            .map(|&k| TileTerrain::of_save(k, 255, -1))
+            .map(|&kind| TileTerrain::of_save(kind, 255, -1))
             .collect(),
         vec![
             kind(TerrainFlags::SHORE),
@@ -214,7 +214,7 @@ fn left((unit, motion, ais): (&Unit, &Motion, &PartTable<UnitAi>)) -> Left {
         posted: ais.get(unit.id).map_or_else(Vec::new, |ai| {
             ai.notifies
                 .iter()
-                .map(|notify| (notify.kind, notify.p))
+                .map(|notify| (notify.kind, notify.params))
                 .collect()
         }),
     }
@@ -270,8 +270,8 @@ fn run(
 }
 
 /// The owner's alert, which a computer player's AI would hear ([`run_on`]).
-fn alerts(t: &TransportAction, ship: &Ship<'_>, coast: &mut Coast) -> bool {
-    let mut transport_action = *t;
+fn alerts(transport: &TransportAction, ship: &Ship<'_>, coast: &mut Coast) -> bool {
+    let mut transport_action = *transport;
     let (mut unit, mut motion, mut ais) = hull();
     run_on(
         &mut transport_action,
@@ -418,7 +418,11 @@ fn sail_takes_the_shore_point_and_drops_its_old_move_to() {
     assert!(changed.stopped && !changed.stands);
     assert_eq!(transport_action.point, Position::new(19.5, 8.5, 0.0));
     assert_eq!(
-        transport_action.state.move_to().copied().map(|m| m.state),
+        transport_action
+            .state
+            .move_to()
+            .copied()
+            .map(|move_to_action| move_to_action.state),
         Some(MoveTo::Start)
     );
     // a unit without speed: its quiet MoveTo fails at its start
@@ -527,8 +531,8 @@ fn work_order_near_its_zone_unloads_at_once_else_sails_there() {
     // within reach of the point's zone (the water) and 2 from the footprint (squared 4, at most
     // 4)
     let mut coast = coast();
-    let mut t = TransportAction::new(ship.position);
-    let _ = t
+    let mut transport_action = TransportAction::new(ship.position);
+    let _ = transport_action
         .work(
             Position::new(15.0, 8.5, 1.0),
             TransportTarget::Ship,
@@ -539,7 +543,11 @@ fn work_order_near_its_zone_unloads_at_once_else_sails_there() {
         )
         .unwrap();
     assert_eq!(
-        (t.state.bare(), t.mode, t.point),
+        (
+            transport_action.state.bare(),
+            transport_action.mode,
+            transport_action.point
+        ),
         (
             TransportState::Unload,
             TransportMode::Work,
@@ -547,8 +555,8 @@ fn work_order_near_its_zone_unloads_at_once_else_sails_there() {
         )
     );
     // a bit further: sail there to unload, from the unit itself, else just sail
-    let mut t = TransportAction::new(ship.position);
-    let _ = t
+    let mut transport_action = TransportAction::new(ship.position);
+    let _ = transport_action
         .work(
             Position::new(15.1, 8.5, 1.0),
             TransportTarget::Ship,
@@ -559,14 +567,14 @@ fn work_order_near_its_zone_unloads_at_once_else_sails_there() {
         )
         .unwrap();
     assert_eq!(
-        (t.state.bare(), t.point),
+        (transport_action.state.bare(), transport_action.point),
         (
             TransportState::SailToUnload { move_to: None },
             Position::new(15.1, 8.5, 1.0)
         )
     );
-    let mut t = TransportAction::new(ship.position);
-    let _ = t
+    let mut transport = TransportAction::new(ship.position);
+    let _ = transport
         .work(
             Position::new(15.1, 8.5, 1.0),
             TransportTarget::Other,
@@ -576,7 +584,10 @@ fn work_order_near_its_zone_unloads_at_once_else_sails_there() {
             &tuning().move_to,
         )
         .unwrap();
-    assert_eq!(t.state.bare(), TransportState::Sail { move_to: None });
+    assert_eq!(
+        transport.state.bare(),
+        TransportState::Sail { move_to: None }
+    );
     // not near the zone: a big ship's footprint reaches within 2 of a point ashore, but the land
     // lies 4 from its tile (16, 8): it sails there to unload
     let big = Ship {
@@ -584,8 +595,8 @@ fn work_order_near_its_zone_unloads_at_once_else_sails_there() {
         radius: Footprint::new(1.5, 1.5),
         ..ship
     };
-    let mut t = TransportAction::new(big.position);
-    let _ = t
+    let mut transport = TransportAction::new(big.position);
+    let _ = transport
         .work(
             Position::new(20.0, 8.5, 0.0),
             TransportTarget::Ship,
@@ -596,7 +607,7 @@ fn work_order_near_its_zone_unloads_at_once_else_sails_there() {
         )
         .unwrap();
     assert_eq!(
-        t.state.bare(),
+        transport.state.bare(),
         TransportState::SailToUnload { move_to: None }
     );
     // a point below 0 or NaN far away changes nothing but +0x34
@@ -604,21 +615,26 @@ fn work_order_near_its_zone_unloads_at_once_else_sails_there() {
         Position::new(-1.0, 3.0, 0.0),
         Position::new(3.0, f32::NAN, 0.0),
     ] {
-        let mut t = TransportAction::new(ship.position);
+        let mut transport_action = TransportAction::new(ship.position);
         assert_eq!(
-            t.work(
-                bad,
-                TransportTarget::Ship,
-                &ship,
-                &mut coast.shore(ship.position),
-                &tuning().transport,
-                &tuning().move_to
-            )
-            .unwrap(),
+            transport_action
+                .work(
+                    bad,
+                    TransportTarget::Ship,
+                    &ship,
+                    &mut coast.shore(ship.position),
+                    &tuning().transport,
+                    &tuning().move_to
+                )
+                .unwrap(),
             Changed::default()
         );
         assert_eq!(
-            (t.state.bare(), t.mode, t.point),
+            (
+                transport_action.state.bare(),
+                transport_action.mode,
+                transport_action.point
+            ),
             (TransportState::New, TransportMode::Work, ship.position)
         );
     }
@@ -706,33 +722,39 @@ fn the_shore_search_looks_about_the_footprint_for_the_point_zone_or_land() {
 
 #[test]
 fn an_unload_out_of_reach_or_beside_no_shore_tells_the_owner_unless_over_water() {
-    let s = ship(true);
+    let sailing = ship(true);
     let unloading = |point| TransportAction {
         state: TransportState::Unload,
         point,
-        ..TransportAction::new(s.position)
+        ..TransportAction::new(sailing.position)
     };
     // not near the point's zone, the land 8 from the ship's tile: the owner hears it, +0x68
     // clears, the action idles
     let land = Position::new(25.0, 3.0, 0.0);
-    let mut t = TransportAction {
+    let mut transport_action = TransportAction {
         retarget: true,
         ..unloading(land)
     };
-    assert!(alerts(&t, &s, &mut coast()));
-    let (r, Left { stands, .. }) = run(&mut t, &s, &mut coast());
-    assert_eq!((r, stands), (Ok(Updated::Code(UpdateCode::UnderWay)), true));
-    assert_eq!((t.state, t.retarget), (TransportState::Idle, false));
+    assert!(alerts(&transport_action, &sailing, &mut coast()));
+    let (updated, Left { stands, .. }) = run(&mut transport_action, &sailing, &mut coast());
+    assert_eq!(
+        (updated, stands),
+        (Ok(Updated::Code(UpdateCode::UnderWay)), true)
+    );
+    assert_eq!(
+        (transport_action.state, transport_action.retarget),
+        (TransportState::Idle, false)
+    );
     // near, but not beside the footprint: the point's patch is zone 256, whose low byte is the
     // water's zone the ship is on; over land at the point it tells the owner, over water it
     // waits silently
     let mut dry = aliased_coast(SHOAL, LAND);
     let far = dry.tile_of(256);
-    assert!(alerts(&unloading(far), &s, &mut dry));
+    assert!(alerts(&unloading(far), &sailing, &mut dry));
     let mut wet = aliased_coast(WATER, DEEP);
     assert_eq!(wet.tile_of(256), far);
-    assert!(!alerts(&unloading(far), &s, &mut wet));
-    let (updated, Left { stands, .. }) = run(&mut unloading(far), &s, &mut wet);
+    assert!(!alerts(&unloading(far), &sailing, &mut wet));
+    let (updated, Left { stands, .. }) = run(&mut unloading(far), &sailing, &mut wet);
     assert_eq!(
         (updated, stands),
         (Ok(Updated::Code(UpdateCode::UnderWay)), true)
@@ -802,17 +824,17 @@ fn sail_ends_with_its_move_to_and_failed_one_returns_3() {
     let ship = ship(true);
     let mut coast = coast();
     // state 4 without a MoveTo: the list answers 1, so it unloads
-    let mut t = TransportAction {
+    let mut transport_action = TransportAction {
         state: TransportState::SailToUnload { move_to: None },
         ..TransportAction::new(ship.position)
     };
     assert_eq!(
-        run(&mut t, &ship, &mut coast).0,
+        run(&mut transport_action, &ship, &mut coast).0,
         Ok(Updated::Code(UpdateCode::UnderWay))
     );
-    assert_eq!(t.state, TransportState::Unload);
+    assert_eq!(transport_action.state, TransportState::Unload);
     // state 11 with an ended MoveTo: idle, the MoveTo gone (its teardown stops the unit)
-    let mut t = TransportAction {
+    let mut transport_action = TransportAction {
         state: TransportState::Sail {
             move_to: Some(MoveToAction::sub_in(MoveTo::Arrived)),
         },
@@ -823,40 +845,40 @@ fn sail_ends_with_its_move_to_and_failed_one_returns_3() {
         Left {
             stopped, stands, ..
         },
-    ) = run(&mut t, &ship, &mut coast);
-    assert_eq!(t.state, TransportState::Idle);
+    ) = run(&mut transport_action, &ship, &mut coast);
+    assert_eq!(transport_action.state, TransportState::Idle);
     assert!(stopped && stands);
     // a failed MoveTo (code 3) ends a sail to unload too
-    let mut t = TransportAction {
+    let mut transport_action = TransportAction {
         state: TransportState::SailToUnload {
             move_to: Some(MoveToAction::sub_in(MoveTo::Failed)),
         },
         ..TransportAction::new(ship.position)
     };
-    let _ = run(&mut t, &ship, &mut coast);
-    assert_eq!(t.state, TransportState::Unload);
+    let _ = run(&mut transport_action, &ship, &mut coast);
+    assert_eq!(transport_action.state, TransportState::Unload);
     // state 13: the unit's AI hears it failed, the action idles and returns 3
-    let mut t = TransportAction {
+    let mut transport_action = TransportAction {
         state: TransportState::Failed,
         ..TransportAction::new(ship.position)
     };
-    let (r, Left { stands, posted, .. }) = run(&mut t, &ship, &mut coast);
+    let (updated, Left { stands, posted, .. }) = run(&mut transport_action, &ship, &mut coast);
     let failed = (
         NotifyKind::ACTION_FAILED,
         [AiAction::Transport.value(), 0, 0],
     );
     assert_eq!(
-        (r, stands, posted),
+        (updated, stands, posted),
         (Ok(Updated::Code(UpdateCode::Failed)), true, vec![failed])
     );
-    assert_eq!(t.state, TransportState::Idle);
+    assert_eq!(transport_action.state, TransportState::Idle);
     // state 1 is done; an idle one does nothing
-    t.state = TransportState::Done;
+    transport_action.state = TransportState::Done;
     assert_eq!(
-        run(&mut t, &ship, &mut coast).0,
+        run(&mut transport_action, &ship, &mut coast).0,
         Ok(Updated::Code(UpdateCode::Done))
     );
-    t.state = TransportState::Idle;
+    transport_action.state = TransportState::Idle;
     let (
         updated,
         Left {
@@ -864,7 +886,7 @@ fn sail_ends_with_its_move_to_and_failed_one_returns_3() {
             stands,
             posted,
         },
-    ) = run(&mut t, &ship, &mut coast);
+    ) = run(&mut transport_action, &ship, &mut coast);
     assert_eq!(updated, Ok(Updated::Code(UpdateCode::UnderWay)));
     assert!(!stopped && !stands && posted.is_empty());
     // a hull showing a sprite without its standing one: not modelled
@@ -923,7 +945,7 @@ fn sail_move_to_asks_for_its_path_then_walks_on() {
     let rig = || {
         let mut rig = Rig::on_the_path(Victim::default());
         assert_eq!(
-            Arc::make_mut(&mut rig.t.model.graphics).insert(SpriteId::named(3), graphic),
+            Arc::make_mut(&mut rig.world.model.graphics).insert(SpriteId::named(3), graphic),
             None
         );
         rig.mover_mut().in_the_way = vec![object_id(77)];
@@ -932,13 +954,18 @@ fn sail_move_to_asks_for_its_path_then_walks_on() {
     let in_the_way = vec![(NotifyKind::IN_THE_WAY, [77, -1, -1])];
     let mut walker = rig();
     walker.mover_mut().paths.clear();
-    let mut t = sailing(Some(MoveTo::Start));
+    let mut transport_action = sailing(Some(MoveTo::Start));
     assert_eq!(
-        walker.run(100, |c, u, _, _, _| t.walk(c, u, me)),
+        walker.run(100, |step, unit, _, _, _| transport_action
+            .walk(step, unit, me)),
         Ok(SubCode::UnderWay)
     );
     assert_eq!(
-        t.state.move_to().copied().map(|m| m.state),
+        transport_action
+            .state
+            .move_to()
+            .copied()
+            .map(|move_to_action| move_to_action.state),
         Some(MoveTo::Moving)
     );
     assert_eq!(walker.mover().paths.len(), 2);
@@ -947,25 +974,33 @@ fn sail_move_to_asks_for_its_path_then_walks_on() {
         (Some(SpriteId::named(3)), in_the_way.clone())
     );
     let mut walker = rig();
-    let mut t = sailing(Some(MoveTo::Moving));
+    let mut transport = sailing(Some(MoveTo::Moving));
     assert_eq!(
-        walker.run(100, |c, u, _, _, _| t.walk(c, u, me)),
-        Ok(SubCode::UnderWay)
-    );
-    assert_eq!(
-        (t.state.move_to().copied().map(|m| m.state), walker.posted()),
-        (Some(MoveTo::Moving), in_the_way)
-    );
-    // a waiting MoveTo (only a human's villager waits; a saved one) runs its timer: no walk
-    let mut walker = rig();
-    let mut t = sailing(Some(MoveTo::Waiting));
-    assert_eq!(
-        walker.run(100, |c, u, _, _, _| t.walk(c, u, me)),
+        walker.run(100, |step, unit, _, _, _| transport.walk(step, unit, me)),
         Ok(SubCode::UnderWay)
     );
     assert_eq!(
         (
-            t.state
+            transport
+                .state
+                .move_to()
+                .copied()
+                .map(|move_to_action| move_to_action.state),
+            walker.posted()
+        ),
+        (Some(MoveTo::Moving), in_the_way)
+    );
+    // a waiting MoveTo (only a human's villager waits; a saved one) runs its timer: no walk
+    let mut walker = rig();
+    let mut transport = sailing(Some(MoveTo::Waiting));
+    assert_eq!(
+        walker.run(100, |step, unit, _, _, _| transport.walk(step, unit, me)),
+        Ok(SubCode::UnderWay)
+    );
+    assert_eq!(
+        (
+            transport
+                .state
                 .move_to()
                 .copied()
                 .map(|move_to_action| move_to_action.state),
@@ -1033,17 +1068,17 @@ fn transport_move_to_shows_its_task_or_its_master_sprite() {
 }
 
 fn rng() -> Well512 {
-    let mut r = Well512::default();
-    r.set_seed(7);
-    r
+    let mut rng = Well512::default();
+    rng.set_seed(7);
+    rng
 }
 
 /// A `size` by `size` map of terrain `fill` but for `tiles` (x, y and their terrain), every
 /// terrain up to 23 shown.
 fn terrain(size: i32, fill: u8, tiles: &[([i16; 2], u8)]) -> Terrain {
     let mut kinds = vec![(fill, 255, -1); (size * size) as usize];
-    for &([x, y], t) in tiles {
-        kinds[(i32::from(y) * size + i32::from(x)) as usize] = (t, 255, -1);
+    for &([x, y], kind) in tiles {
+        kinds[(i32::from(y) * size + i32::from(x)) as usize] = (kind, 255, -1);
     }
     let shown = TerrainKind {
         shown: true,
@@ -1053,19 +1088,19 @@ fn terrain(size: i32, fill: u8, tiles: &[([i16; 2], u8)]) -> Terrain {
         GridSize::new(size, size),
         kinds
             .into_iter()
-            .map(|(k, r, l)| TileTerrain::of_save(k, r, l))
+            .map(|(kind, restore, layer)| TileTerrain::of_save(kind, restore, layer))
             .collect(),
         vec![shown; 24],
         Vec::new(),
     )
 }
 
-/// The tile of the retry's `n`th draw (from 1) about (20, 20) from [`rng`]'s seed `seed`.
-fn draw_tile(seed: u32, n: usize) -> [i16; 2] {
+/// The tile of the retry's draw number `nth` (from 1) about (20, 20) from [`rng`]'s seed `seed`.
+fn draw_tile(seed: u32, nth: usize) -> [i16; 2] {
     let mut rng = Well512::default();
     rng.set_seed(seed);
     let mut at = [0; 2];
-    for _ in 0..n {
+    for _ in 0..nth {
         let x = (rng.rand15() / RETRY_STEP) as f32 + 20.0 - tuning().transport.retry_spread;
         let y = (rng.rand15() / RETRY_STEP) as f32 + 20.0 - tuning().transport.retry_spread;
         at = [x as i32 as i16, y as i32 as i16];
@@ -1079,59 +1114,59 @@ fn retry_draws_about_the_old_point_until_it_leaves_the_water() {
     let mut copy = rng();
     let draws: Vec<u32> = (0..6).map(|_| copy.rand15() / RETRY_STEP).collect();
     let point = Point::new(20.0, 20.0);
-    let at = |i: usize| {
+    let at = |index: usize| {
         Point::new(
-            draws[2 * i] as f32 + 20.0 - 5.0,
-            draws[2 * i + 1] as f32 + 20.0 - 5.0,
+            draws[2 * index] as f32 + 20.0 - 5.0,
+            draws[2 * index + 1] as f32 + 20.0 - 5.0,
         )
     };
     // land (terrain 0) everywhere: the first draw leaves the water
-    let mut r = rng();
+    let mut generator = rng();
     assert_eq!(
         retry_point(
             point,
             GridSize::new(40, 40),
             &terrain(40, 0, &[]),
-            &mut r,
+            &mut generator,
             &tuning().transport
         ),
         (at(0), true)
     );
     // water 22, 23 and 1 keep drawing: the third draw's tile is land
-    let first = [at(0), at(1)].map(|p| [p.x() as i16, p.y() as i16]);
+    let first = [at(0), at(1)].map(|point| [point.x() as i16, point.y() as i16]);
     let wet = terrain(40, 0, &[(first[0], 0x17), (first[1], 1)]);
-    let mut r = rng();
+    let mut generator = rng();
     let (found, sails) = retry_point(
         point,
         GridSize::new(40, 40),
         &wet,
-        &mut r,
+        &mut generator,
         &tuning().transport,
     );
     assert_eq!((found, sails), (at(2), true));
-    assert_eq!(r, copy);
+    assert_eq!(generator, copy);
     // off the map the last terrain stays: all water, 100 draws, the last one taken
-    let mut r = rng();
+    let mut generator = rng();
     let (_, sails) = retry_point(
         point,
         GridSize::new(40, 40),
         &terrain(40, 0x16, &[]),
-        &mut r,
+        &mut generator,
         &tuning().transport,
     );
     assert!(!sails);
-    assert_eq!(r.draws, rng().draws + 200);
+    assert_eq!(generator.draws, rng().draws + 200);
 }
 
 #[test]
 fn the_99th_draw_leaving_the_water_comes_too_late() {
     // water but the tile of the nth draw, which no draw before lands on (a seed that gives
     // one): the 99th breaks the loop with no draws to spare, the 98th with one
-    for (n, sails) in [(99, false), (98, true)] {
+    for (nth, sails) in [(99, false), (98, true)] {
         let seed = (0..1000)
-            .find(|&seed| (1..n).all(|k| draw_tile(seed, k) != draw_tile(seed, n)))
+            .find(|&seed| (1..nth).all(|earlier| draw_tile(seed, earlier) != draw_tile(seed, nth)))
             .expect("a seed whose nth draw lands on a new tile");
-        let shore = terrain(400, 0x16, &[(draw_tile(seed, n), 0)]);
+        let shore = terrain(400, 0x16, &[(draw_tile(seed, nth), 0)]);
         let mut rng = Well512::default();
         rng.set_seed(seed);
         assert_eq!(
@@ -1144,7 +1179,7 @@ fn the_99th_draw_leaving_the_water_comes_too_late() {
             )
             .1,
             sails,
-            "{n}"
+            "{nth}"
         );
     }
 }
@@ -1168,26 +1203,26 @@ fn drop_location_is_drawn_on_side_past_both_footprints() {
         _ => Point::new(along, 10.0 - gap),
     };
     let mut last = None;
-    let mut r = rng();
+    let mut generator = rng();
     let first = DropDraws::new(
         around,
         Footprint::new(0.5, 0.5),
         GridSize::new(40, 40),
         &mut last,
-        &mut r,
+        &mut generator,
     )
     .next_on_map(&tuning().transport);
     assert_eq!(first, Ok(Some(expected)));
     assert_eq!(last, Some(expected));
-    assert_eq!(r, copy);
+    assert_eq!(generator, copy);
     // 50 draws in all, the last place kept for the next call
-    let mut r = rng();
+    let mut generator = rng();
     let mut draws = DropDraws::new(
         around,
         Footprint::new(0.5, 0.5),
         GridSize::new(40, 40),
         &mut last,
-        &mut r,
+        &mut generator,
     );
     let mut tries = 0;
     while draws.next_on_map(&tuning().transport).unwrap().is_some() {
@@ -1195,7 +1230,7 @@ fn drop_location_is_drawn_on_side_past_both_footprints() {
     }
     assert_eq!(tries, 50);
     // off the map: those draws use their tries up, and none comes out
-    let mut r = rng();
+    let mut rng = rng();
     let edge = Around {
         center: Point::new(0.0, 0.0),
         radius: Footprint::new(5.0, 5.0),
@@ -1206,7 +1241,7 @@ fn drop_location_is_drawn_on_side_past_both_footprints() {
         Footprint::new(0.5, 0.5),
         GridSize::new(4, 4),
         &mut none,
-        &mut r,
+        &mut rng,
     );
     let mut on_map = 0;
     while let Some(point) = draws.next_on_map(&tuning().transport).unwrap() {

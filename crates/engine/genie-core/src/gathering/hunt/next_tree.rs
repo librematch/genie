@@ -15,7 +15,7 @@ use crate::movement::Speed;
 use crate::objects::ObjectId;
 use crate::objects::WorkerCount;
 use crate::objects::layers::Action;
-use crate::objects::masters::PlayersMasters;
+use crate::objects::masters::PlayersMastersExt;
 use crate::objects::masters::{GatherGroup, MasterTables};
 use crate::objects::unit::Unit;
 use crate::objects::unit::object_master;
@@ -49,10 +49,10 @@ impl Unit {
         roles: &Roles,
     ) -> GenieResult<TreeSearch> {
         // NaN compares false as the game's `comiss` does
-        let beyond = |a: Position, b: Position, limit: Distance| {
-            let (dx, dz, dy) = (a.x() - b.x(), a.z() - b.z(), a.y() - b.y());
-            let d = sqrt(dx * dx + dz * dz + dy * dy);
-            d.partial_cmp(&limit.get()) != Some(Ordering::Less)
+        let beyond = |from: Position, to: Position, limit: Distance| {
+            let (dx, dz, dy) = (from.x() - to.x(), from.z() - to.z(), from.y() - to.y());
+            let distance = sqrt(dx * dx + dz * dz + dy * dy);
+            distance.partial_cmp(&limit.get()) != Some(Ordering::Less)
         };
         if let Some(within) = within
             && beyond(hunt.point, self.position(), within)
@@ -70,7 +70,7 @@ impl Unit {
         else {
             return Ok(TreeSearch::NoneFound);
         };
-        let (tp, unit) = OthersRef::of(&step.w.players, &step.w.index, step.player)?
+        let (tp, unit) = OthersRef::of(&step.world.players, &step.world.index, step.player)?
             .find(found)
             .ok_or(GenieError::unsupported(
                 "a hunt's next tree the slice does not hold",
@@ -85,9 +85,9 @@ impl Unit {
                 return Ok(TreeSearch::NoneFound);
             }
         }
-        let target_master = unit.master(step.w.master_tables(), tp)?;
+        let target_master = unit.master(step.world.master_tables(), tp)?;
         let own = step
-            .w
+            .world
             .spatial
             .relations
             .get(step.player)
@@ -103,45 +103,45 @@ impl Unit {
             player: tp,
             amount: unit.life.amount,
             allied: allied(own, step.player, tp, AllyTest::WithRelation4),
-            top_action: step.w.parts.actions_of(unit.id).top_action_kind(),
+            top_action: step.world.parts.actions_of(unit.id).top_action_kind(),
             drop_site: false,
         };
         let master = object_master(
-            step.w.parts.own_master.get(self.id),
+            step.world.parts.own_master.get(self.id),
             (self.id, self.life.master_id),
-            step.w.model.masters.of(step.player),
+            step.world.model.masters.of(step.player),
         )?;
         let drops_here = master
             .action_part()
             .drop_sites
             .contains(&unit.life.master_id);
         let at = |id: ObjectId| {
-            step.w
+            step.world
                 .spatial
                 .get_known(id)?
                 .ok_or(GenieError::unsupported("a hunt's object without a place"))
         };
         let (me_at, them) = (at(self.id)?, at(found)?);
         let speed = step
-            .w
+            .world
             .parts
             .mover_of(self.id)
-            .map_or(Speed::ZERO, |m| m.stats.speed);
+            .map_or(Speed::ZERO, |mover| mover.stats.speed);
         let engagement = engagement(
-            step.w.parts.unit_ai.get(self.id),
+            step.world.parts.unit_ai.get(self.id),
             speed,
             master,
             me_at,
             them,
-            step.w.world_time,
+            step.world.world_time,
         )?;
         let walks = self.move_walks(
-            step.w.parts.mover_of(self.id),
-            MasterTables::new(&step.w.model.masters, &step.w.parts.own_master),
+            step.world.parts.mover_of(self.id),
+            MasterTables::new(&step.world.model.masters, &step.world.parts.own_master),
             step.player,
             (
-                &step.w.model.graphics,
-                step.w.parts.combat_of(self.id).abilities.look.as_ref(),
+                &step.world.model.graphics,
+                step.world.parts.combat_of(self.id).abilities.look.as_ref(),
             ),
             roles,
         )?;
@@ -149,12 +149,12 @@ impl Unit {
         let moving = hunt.task.walk_sprite_id(self.life.held());
         let arms = arms(
             master,
-            &step.w.model.graphics,
+            &step.world.model.graphics,
             hunt.task.sprites,
             moving,
             roles,
         );
-        let mover = step.w.parts.mover_mut(self.id).ok_or(HUNTER_UNMOVING)?;
+        let mover = step.world.parts.mover_mut(self.id).ok_or(HUNTER_UNMOVING)?;
         let retargeted = hunt.retarget(
             HuntRetarget {
                 target: &quarry,
@@ -167,10 +167,10 @@ impl Unit {
             mover,
             BeginLayer {
                 roles,
-                attack_tuning: &step.w.model.tuning.attack,
-                move_to_tuning: &step.w.model.tuning.move_to,
+                attack_tuning: &step.world.model.tuning.attack,
+                move_to_tuning: &step.world.model.tuning.move_to,
             },
-            &step.w.model.tuning.hunt,
+            &step.world.model.tuning.hunt,
         );
         actions.list.set_hunt(Some(*hunt));
         if let Some(move_start) = retargeted? {
@@ -178,9 +178,9 @@ impl Unit {
                 show_arrived(
                     &arms,
                     &mut self.sprite,
-                    step.w.parts.motion_mut(self.id),
-                    step.w.streams.get(Stream::Sprite),
-                    step.w.model.tuning.sprite,
+                    step.world.parts.motion_mut(self.id),
+                    step.world.streams.get_mut(Stream::Sprite),
+                    step.world.model.tuning.sprite,
                 )?;
             }
             // slot 0x68 (FUN_140a7a230): the old target goes, the new one is taken

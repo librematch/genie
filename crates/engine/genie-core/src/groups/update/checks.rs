@@ -30,7 +30,7 @@ use crate::objects::masters::FogVisibility;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::PlayersMasters;
+use crate::objects::masters::PlayersMastersExt;
 use crate::objects::sprite::Cargo;
 use crate::objects::sprite::{new_sprite, running, standing, walking};
 use crate::objects::{ObjectId, ObjectKey};
@@ -44,7 +44,7 @@ use crate::world::index::Place;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 use crate::{GenieError, GenieResult};
 
 impl World {
@@ -67,18 +67,18 @@ impl World {
     ///
     /// When the world does not hold `group`.
     pub(crate) fn keep_apart(&mut self, group: GroupId) -> GenieResult<()> {
-        let mut i = 0;
+        let mut index = 0;
         loop {
             let held = self.groups.held(group)?;
-            let Some(&id) = held.objects.get(i) else {
+            let Some(&id) = held.objects.get(index) else {
                 break;
             };
             let Some(object) = self.world_object(id) else {
-                let _ = self.groups.held_mut(group)?.objects.remove(i);
+                let _ = self.groups.held_mut(group)?.objects.remove(index);
                 continue;
             };
             if !self.may_interrupt(object)? {
-                i += 1;
+                index += 1;
                 continue;
             }
             if let WorldObject::Unit(player_id, unit, _) = object
@@ -125,7 +125,7 @@ impl World {
                     ));
                 }
             }
-            let _ = self.groups.held_mut(group)?.objects.remove(i);
+            let _ = self.groups.held_mut(group)?.objects.remove(index);
             if self.object(id).is_some()
                 && let Some(mover) = self.parts.mover_mut(id)
             {
@@ -177,13 +177,13 @@ impl World {
     /// group the world does not hold.
     #[must_use]
     pub fn at_rest(&self, group: GroupId) -> bool {
-        let Some(g) = self.groups.get(group) else {
+        let Some(group) = self.groups.get(group) else {
             return false;
         };
-        if g.current_command != NO_COMMAND || g.motion.moving() {
+        if group.current_command != NO_COMMAND || group.motion.moving() {
             return false;
         }
-        !g.members.iter().any(|member| {
+        !group.members.iter().any(|member| {
             matches!(self.world_object(member.id), Some(WorldObject::Unit(_, unit, _))
                 if self.parts.mover_of(unit.id).is_some_and(Mover::is_moving))
         })
@@ -214,53 +214,64 @@ impl World {
             .parts
             .actions_of(unit.id)
             .top_target()
-            .filter(|&t| !t.is_recyclable())
+            .filter(|&object_id| !object_id.is_recyclable())
             .and_then(|object_id| self.world_object(object_id)))
     }
 
-    /// `FUN_14118f8c0` of `a` and `b`: the squared gap of their footprints (their masters'
-    /// radii, `+0x5d8` and `+0x5dc`; [`crate::movement::footprint_gap_squared`]).
+    /// `FUN_14118f8c0` of `object` and `world_object`: the squared gap of their footprints (their
+    /// masters' radii, `+0x5d8` and `+0x5dc`; [`crate::movement::footprint_gap_squared`]).
     ///
     /// # Errors
     ///
     /// An object of a master the slice does not have.
     pub(super) fn footprint_gap_squared(
         &self,
-        a: WorldObject<'_>,
-        b: WorldObject<'_>,
+        object: WorldObject<'_>,
+        world_object: WorldObject<'_>,
     ) -> GenieResult<DistanceSquared> {
         let ra = self
-            .master(a.player(), a.master_id(self.model.slots))?
+            .master(object.player(), object.master_id(self.model.slots))?
             .radius;
         let rb = self
-            .master(b.player(), b.master_id(self.model.slots))?
+            .master(
+                world_object.player(),
+                world_object.master_id(self.model.slots),
+            )?
             .radius;
         Ok(movement_footprint_gap_squared(
-            a.position(),
+            object.position(),
             ra,
-            b.position(),
+            world_object.position(),
             rb,
         ))
     }
 
-    /// `FUN_14118f680` of `a` and `b`: [`World::footprint_gap_squared`]'s per-axis gaps, the
-    /// length of the two ([`crate::movement::footprint_gap`]).
+    /// `FUN_14118f680` of `object` and `world_object`: [`World::footprint_gap_squared`]'s per-axis
+    /// gaps, the length of the two ([`crate::movement::footprint_gap`]).
     ///
     /// # Errors
     ///
     /// An object of a master the slice does not have.
     pub(super) fn footprint_gap(
         &self,
-        a: WorldObject<'_>,
-        b: WorldObject<'_>,
+        object: WorldObject<'_>,
+        world_object: WorldObject<'_>,
     ) -> GenieResult<Distance> {
         let ra = self
-            .master(a.player(), a.master_id(self.model.slots))?
+            .master(object.player(), object.master_id(self.model.slots))?
             .radius;
         let rb = self
-            .master(b.player(), b.master_id(self.model.slots))?
+            .master(
+                world_object.player(),
+                world_object.master_id(self.model.slots),
+            )?
             .radius;
-        Ok(movement_footprint_gap(a.position(), ra, b.position(), rb))
+        Ok(movement_footprint_gap(
+            object.position(),
+            ra,
+            world_object.position(),
+            rb,
+        ))
     }
 
     /// `FUN_1410176b0` of group `group`: whether its target is still to act on. None without
@@ -276,22 +287,22 @@ impl World {
     ///
     /// An object of a master the slice does not have, or what the sight test does not hold.
     pub fn target_pending(&self, group: GroupId) -> GenieResult<bool> {
-        let Some(g) = self.groups.get(group) else {
+        let Some(group) = self.groups.get(group) else {
             return Ok(false);
         };
-        if g.members.is_empty() {
+        if group.members.is_empty() {
             return Ok(false);
         }
-        match g.current_command {
-            PICK_UP_RELIC => return self.relic_pickup_pending(g),
-            DELIVER_RELIC => return self.relic_delivery_pending(g),
+        match group.current_command {
+            PICK_UP_RELIC => return self.relic_pickup_pending(group),
+            DELIVER_RELIC => return self.relic_delivery_pending(group),
             _ => {}
         }
-        let Some(target) = self.world_object(g.current_target.target) else {
+        let Some(target) = self.world_object(group.current_target.target) else {
             return Ok(false);
         };
-        let owner = g.owner_player()?;
-        let most = if g.current_command == BUILD {
+        let owner = group.owner_player()?;
+        let most = if group.current_command == BUILD {
             ObjectState::Foundation
         } else {
             ObjectState::Alive
@@ -299,7 +310,7 @@ impl World {
         if most < target.state() || target.inside() {
             return Ok(false);
         }
-        if g.current_command != BUILD && self.spatial.allied_with(owner, target.player()) {
+        if group.current_command != BUILD && self.spatial.allied_with(owner, target.player()) {
             return Ok(false);
         }
         self.sees_object(target, owner)
@@ -396,9 +407,10 @@ impl World {
         let Some(masters) = self.model.masters.of(player) else {
             return self.master(player, master).map(|_| false);
         };
-        Ok(masters.get(master).is_some_and(|m| {
-            MasterKind::ACTION <= m.kind
-                && m.action_part()
+        Ok(masters.get(master).is_some_and(|master| {
+            MasterKind::ACTION <= master.kind
+                && master
+                    .action_part()
                     .tasks
                     .iter()
                     .any(|task| task.action_kind == action)
@@ -564,7 +576,7 @@ impl World {
         let graphic = self.model.graphics.get(sprite).copied();
         let place = self.place(id).ok_or_else(|| member_gone(id))?;
         let unit = match place {
-            Place::Live(p, i) => self.players.live_mut(p, i).ok(),
+            Place::Live(owner, slot) => self.players.live_mut(owner, slot).ok(),
             Place::Sleeping(player_id, list_index) => {
                 self.players.asleep_mut(player_id, list_index).ok()
             }
@@ -577,14 +589,14 @@ impl World {
         if unit.sprite.is_none() {
             return Ok(SpriteShow::Shown);
         }
-        let g = graphic.ok_or(GenieError::unsupported(
+        let graphic = graphic.ok_or(GenieError::unsupported(
             "a unit without its sprite's graphic",
         ))?;
-        let rng = self.streams.get(Stream::Sprite);
+        let rng = self.streams.get_mut(Stream::Sprite);
         new_sprite(
             &mut unit.sprite,
             motion.move_stats_mut(),
-            g,
+            graphic,
             rng,
             self.model.tuning.sprite,
         );
@@ -596,11 +608,11 @@ impl World {
     /// of equals; none without one.
     #[must_use]
     pub fn nearest_to_target(&self, group: GroupId) -> Option<ObjectId> {
-        let g = self.groups.get(group)?;
-        let to = g.current_target.original_position;
+        let group = self.groups.get(group)?;
+        let to = group.current_target.original_position;
         let mut best = f32::MAX;
         let mut lead = None;
-        for member in &g.members {
+        for member in &group.members {
             let Some((_, unit)) = self.object(member.id) else {
                 continue;
             };
@@ -638,8 +650,8 @@ impl Action {
         let state = if master.kind < MasterKind::ACTION {
             ActionState::NO_ACTION
         } else {
-            if let Some(e) = unread {
-                return Err(e.error());
+            if let Some(unread) = unread {
+                return Err(unread.error());
             }
             actions
                 .top_action()

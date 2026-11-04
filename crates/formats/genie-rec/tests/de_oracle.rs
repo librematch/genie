@@ -19,19 +19,19 @@ use std::io::Error;
 use std::path::{Path, PathBuf};
 
 /// A cursor that records the position and length of every read.
-struct LoggingReader<'a> {
-    inner: Cursor<&'a [u8]>,
+struct LoggingReader<'data> {
+    inner: Cursor<&'data [u8]>,
     reads: Vec<(u64, u64)>,
 }
 
 impl Read for LoggingReader<'_> {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
         let pos = self.inner.position();
-        let n = self.inner.read(buf)?;
-        if n > 0 {
-            self.reads.push((pos, n as u64));
+        let read = self.inner.read(buf)?;
+        if read > 0 {
+            self.reads.push((pos, read as u64));
         }
-        Ok(n)
+        Ok(read)
     }
 }
 
@@ -52,7 +52,9 @@ struct Trace {
 fn read_trace(path: &Path) -> Trace {
     let data = fs_read(path).unwrap();
     assert_eq!(&data[..8], b"GRTRACE3", "{}: not a trace", path.display());
-    let word_at = |b: &[u8], i: usize| u32::from_le_bytes(b[4 * i..4 * i + 4].try_into().unwrap());
+    let word_at = |bytes: &[u8], index: usize| {
+        u32::from_le_bytes(bytes[4 * index..4 * index + 4].try_into().unwrap())
+    };
     let (count, width) = (
         word_at(&data[8..], 0) as usize,
         word_at(&data[8..], 1) as usize,
@@ -69,7 +71,11 @@ fn read_trace(path: &Path) -> Trace {
         "{}: truncated",
         path.display()
     );
-    let column = |c: usize| (0..count).map(|i| word_at(&rows, i * step + c)).collect();
+    let column = |offset: usize| {
+        (0..count)
+            .map(|row| word_at(&rows, row * step + offset))
+            .collect()
+    };
     Trace {
         sizes: column(0),
         sites: if width > 0 { column(1) } else { vec![0; count] },
@@ -97,22 +103,22 @@ fn crossings(ours: &[(u64, u64)], game_sizes: &[u32]) -> Vec<Crossing> {
     let mut found = Vec::new();
     let mut starts = Vec::with_capacity(game_sizes.len() + 1);
     let mut at = 0u64;
-    for &s in game_sizes {
+    for &size in game_sizes {
         starts.push(at);
-        at += u64::from(s);
+        at += u64::from(size);
     }
     let end = at;
     starts.push(end);
     let is_boundary = |x: u64| starts.binary_search(&x).is_ok();
     for &(pos, len) in ours {
         let stop = pos + len;
-        let i = match starts.binary_search(&pos) {
-            Ok(i) => i,
-            Err(i) => i - 1,
+        let start_index = match starts.binary_search(&pos) {
+            Ok(found) => found,
+            Err(insertion) => insertion - 1,
         };
         let theirs = || {
-            let i = i.min(game_sizes.len().saturating_sub(1));
-            (starts[i], u64::from(game_sizes[i]), i)
+            let index = start_index.min(game_sizes.len().saturating_sub(1));
+            (starts[index], u64::from(game_sizes[index]), index)
         };
         if stop > end {
             found.push(Crossing {
@@ -121,8 +127,8 @@ fn crossings(ours: &[(u64, u64)], game_sizes: &[u32]) -> Vec<Crossing> {
             });
             break;
         }
-        let inside = stop <= starts[i + 1];
-        let covers = pos == starts[i] && is_boundary(stop);
+        let inside = stop <= starts[start_index + 1];
+        let covers = pos == starts[start_index] && is_boundary(stop);
         if !inside && !covers {
             found.push(Crossing {
                 ours: (pos, len),
@@ -177,7 +183,10 @@ fn context(header: &[u8], ours: &[(u64, u64)], trace: &Trace, at: u64, radius: u
     let hex = |pos: u64, len: u64| {
         let end = (pos + len).min(header.len() as u64).min(pos + 12);
         let range = usize::try_from(pos).unwrap()..usize::try_from(end).unwrap();
-        let texts: Vec<String> = header[range].iter().map(|b| format!("{b:02x}")).collect();
+        let texts: Vec<String> = header[range]
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect();
         texts.join(" ")
     };
     let mut out = String::from("  game reads (offset +size bytes, caller RVA):\n");
@@ -199,7 +208,7 @@ fn context(header: &[u8], ours: &[(u64, u64)], trace: &Trace, at: u64, radius: u
         }
     }
     out += "  our reads:\n";
-    for &(pos, len) in ours.iter().filter(|&&(p, l)| window(p, l)) {
+    for &(pos, len) in ours.iter().filter(|&&(at, length)| window(at, length)) {
         writeln!(out, "    {pos:>8} +{len:<4} {}", hex(pos, len)).unwrap();
     }
     out
@@ -228,7 +237,7 @@ fn trace_name(path: &Path, corpus: &Path) -> String {
     let rel = path.strip_prefix(corpus).unwrap();
     let parts: Vec<_> = rel
         .iter()
-        .map(|p| p.to_string_lossy().into_owned())
+        .map(|path| path.to_string_lossy().into_owned())
         .collect();
     format!("{}.trace", parts.join("__"))
 }
@@ -267,7 +276,7 @@ fn the_reader_agrees_with_the_games_reads_on_every_traced_recording() {
         if let Err(error) = parsed {
             // the reads before the failure still say where this reader left the game's
             if failures.is_empty() {
-                let at = reader.reads.last().map_or(0, |&(p, l)| p + l);
+                let at = reader.reads.last().map_or(0, |&(at, length)| at + length);
                 failures.push(format!(
                     "{}: {error:?}\n{}",
                     path.display(),
@@ -278,16 +287,18 @@ fn the_reader_agrees_with_the_games_reads_on_every_traced_recording() {
             }
         }
         checked += 1;
-        let total = trace.sizes.iter().map(|&s| u64::from(s)).sum::<u64>();
+        let total = trace.sizes.iter().map(|&size| u64::from(size)).sum::<u64>();
         read_by_us += reader.inner.position();
         read_by_game += total;
         stops.push((reader.inner.position(), total, path.clone()));
         let all = crossings(&reader.reads, &trace.sizes);
         let mut callers_here = BTreeSet::new();
-        for c in &all {
-            let entry = by_caller.entry(trace.callers[c.theirs.2]).or_default();
+        for crossing in &all {
+            let entry = by_caller
+                .entry(trace.callers[crossing.theirs.2])
+                .or_default();
             entry.0 += 1;
-            if callers_here.insert(trace.callers[c.theirs.2]) {
+            if callers_here.insert(trace.callers[crossing.theirs.2]) {
                 entry.1 += 1;
             }
         }
@@ -318,7 +329,7 @@ fn the_reader_agrees_with_the_games_reads_on_every_traced_recording() {
         eprintln!("  stops at {at:#x} of {total:#x}: {}", path.display());
     }
     let mut ranked: Vec<_> = by_caller.into_iter().collect();
-    ranked.sort_by_key(|(_, (n, _))| Reverse(*n));
+    ranked.sort_by_key(|(_, (count, _))| Reverse(*count));
     eprintln!("  crossed game reads come from {} callers", ranked.len());
     // GENIE_REC_ALL_CALLERS lists every caller, not only the first twelve
     let shown = if var_os("GENIE_REC_ALL_CALLERS").is_some() {
@@ -326,8 +337,8 @@ fn the_reader_agrees_with_the_games_reads_on_every_traced_recording() {
     } else {
         12
     };
-    for (caller, (n, recs)) in ranked.iter().take(shown) {
-        eprintln!("  {n:>6} crossings in {recs:>3} recordings at game reads from {caller:#x}");
+    for (caller, (count, recs)) in ranked.iter().take(shown) {
+        eprintln!("  {count:>6} crossings in {recs:>3} recordings at game reads from {caller:#x}");
     }
     assert!(checked > 0, "no trace in {}", traces.display());
     if !failures.is_empty() {

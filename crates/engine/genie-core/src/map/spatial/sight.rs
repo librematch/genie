@@ -58,15 +58,15 @@ impl Spatial {
         };
         // an animal inside another object (in this update, its Artifact's Enter got it in)
         // searches about its record there
-        let p =
+        let record =
             self.objects
                 .get(me)
                 .or_else(|| self.inside.get(me))
                 .ok_or(GenieError::unsupported(
                     "an owner search of an object the world does not hold",
                 ))?;
-        let reach = (p.radius.x() as i32 as i16).wrapping_add(3);
-        let (x, y) = (p.position.x(), p.position.y());
+        let reach = (record.radius.x() as i32 as i16).wrapping_add(3);
+        let (x, y) = (record.position.x(), record.position.y());
         let (x0, x1) = (
             (x as i32 as i16).wrapping_sub(reach),
             (x as i32 as i16).wrapping_add(reach),
@@ -78,26 +78,28 @@ impl Spatial {
         let (x0, y0) = (i32::from(x0.max(0)), i32::from(y0.max(0)));
         let x1 = i32::from(x1).min(self.map.width() - 1);
         let y1 = i32::from(y1).min(self.map.height() - 1);
-        let out = |o: usize| {
+        let out = |index: usize| {
             players
-                .get(o)
-                .is_some_and(|q| q.game_status != GameStatus::Playing)
+                .get(index)
+                .is_some_and(|player| player.game_status != GameStatus::Playing)
         };
         // a frozen unit that could count (of the combat type and a class that counts) may have
         // moved onto the tiles
         let area = Rect::new(x0 as f32, y0 as f32, (x1 + 1) as f32, (y1 + 1) as f32);
-        let unsure = self.frozen().any(|(id, q)| {
-            q.unknown.is_some_and(|u| {
+        let unsure = self.frozen().any(|(id, placed)| {
+            placed.unknown.is_some_and(|unknown| {
                 let counts = visibility
                     .seer(id)
-                    .is_some_and(|s| s.kind == MasterKind::COMBAT)
-                    && !out(q.player.index())
+                    .is_some_and(|seer| seer.kind == MasterKind::COMBAT)
+                    && !out(placed.player.index())
                     && !roles
-                        .of_class(q.class)
+                        .of_class(placed.class)
                         .contains(ClassRoles::CAPTURE_IGNORED);
-                // the box grown by the unknown reach (`bx1 + u`: the sum only meets a
+                // the box grown by the unknown reach (`bx1 + unknown`: the sum only meets a
                 // comparison, so its operands' order does not show)
-                counts && 0.0 < u && area.overlaps(q.bounds().grown(Distance::new(u)))
+                counts
+                    && 0.0 < unknown
+                    && area.overlaps(placed.bounds().grown(Distance::new(unknown)))
             })
         });
         if unsure {
@@ -105,13 +107,17 @@ impl Spatial {
                 "an owner search near a stopped unit that counts",
             ));
         }
-        let attribute_97 = |o: usize| players.get(o).and_then(|q| q.attributes.get(97).copied());
+        let attribute_97 = |index: usize| {
+            players
+                .get(index)
+                .and_then(|player| player.attributes.get(97).copied())
+        };
         let players = self.relations.len().max(players.len());
         let mut counts = vec![0i32; players];
         let mut nearest = vec![DistanceSquared::new(999.0); players];
         let mut own_seen = false;
         let mut taker = false;
-        let livestock = roles.of_class(p.class).contains(ClassRoles::LIVESTOCK);
+        let livestock = roles.of_class(record.class).contains(ClassRoles::LIVESTOCK);
         // the tiles' lists row by row, each in its order: an object a full tile did not file is
         // not met
         let on_tiles = (y0..=y1)
@@ -143,7 +149,7 @@ impl Spatial {
             };
             let strong = livestock
                 && attribute_97(player.index()).is_some_and(|amount| Amount::ZERO < amount);
-            if player == p.player {
+            if player == record.player {
                 if strong {
                     return Ok(None);
                 }
@@ -156,7 +162,12 @@ impl Spatial {
                     *count += 100;
                 }
             }
-            let gap = footprint_gap_squared(placed.position, placed.radius, p.position, p.radius);
+            let gap = footprint_gap_squared(
+                placed.position,
+                placed.radius,
+                record.position,
+                record.radius,
+            );
             if gap < *near {
                 *near = gap;
             }
@@ -166,8 +177,8 @@ impl Spatial {
         }
         let takers: Vec<PlayerId> = PlayerId::each(players)
             .zip(&counts)
-            .filter(|&(o, &c)| 0 < c && !out(o.index()))
-            .map(|(o, _)| o)
+            .filter(|&(player_id, &count)| 0 < count && !out(player_id.index()))
+            .map(|(player_id, _)| player_id)
             .collect();
         match takers[..] {
             [] => Ok(None),
@@ -181,13 +192,13 @@ impl Spatial {
                         best = (distance_squared, Some(nearest_player_id));
                     }
                 }
-                Ok(best.1.filter(|&o| o != PlayerId::GAIA))
+                Ok(best.1.filter(|&player_id| player_id != PlayerId::GAIA))
             }
             _ => {
                 let mut best = (0, None);
-                for (player_id, &n) in PlayerId::each(counts.len()).zip(&counts) {
-                    if best.0 < n && !out(player_id.index()) {
-                        best = (n, Some(player_id));
+                for (player_id, &count) in PlayerId::each(counts.len()).zip(&counts) {
+                    if best.0 < count && !out(player_id.index()) {
+                        best = (count, Some(player_id));
                     }
                 }
                 Ok(best.1)
@@ -510,20 +521,20 @@ impl Spatial {
     ///
     /// [`Tiles`]: crate::map::spatial::Tiles
     pub fn insert_ghost(&mut self, id: ObjectId, position: Position) {
-        if let Some(i) = self.tiles.tile_of(position) {
+        if let Some(tile) = self.tiles.tile_of(position) {
             let objects = &self.objects;
             self.tiles
-                .append(i, id, |object_id| Self::is_tall(objects, object_id));
+                .append(tile, id, |object_id| Self::is_tall(objects, object_id));
         }
     }
 
     /// A ghost leaves its tile's list (its last object takes its place) and the tile's tall count
     /// is redone (`FUN_140f5f560`).
     pub fn remove_ghost(&mut self, id: ObjectId, position: Position) {
-        if let Some(i) = self.tiles.tile_of(position) {
+        if let Some(tile) = self.tiles.tile_of(position) {
             let objects = &self.objects;
             self.tiles
-                .take_off(i, id, |object_id| Self::is_tall(objects, object_id));
+                .take_off(tile, id, |object_id| Self::is_tall(objects, object_id));
         }
     }
 
@@ -541,7 +552,7 @@ impl Spatial {
                 .tiles
                 .size
                 .index(*tile)
-                .and_then(|i| self.tiles.lists.get_mut(i))
+                .and_then(|tile| self.tiles.lists.get_mut(tile))
             else {
                 differ.push((*tile, Vec::new()));
                 continue;
@@ -565,7 +576,7 @@ impl Spatial {
     pub fn standable(&self, tile: Tile, mask: TerrainMask) -> bool {
         self.tiles
             .word(tile)
-            .is_some_and(|w| w & (mask.blocked() | BLOCKED) == 0)
+            .is_some_and(|word| word & (mask.blocked() | BLOCKED) == 0)
     }
 
     /// Whether unit `me` (its x radius `radius_x`) with terrain mask `mask` can stand on tile

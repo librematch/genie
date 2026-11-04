@@ -138,17 +138,17 @@ mod tests {
     fn repair_states_read_back_from_their_bytes() {
         for index in 0..=255_u8 {
             match RepairState::of_byte(index, None) {
-                Ok(s) => assert_eq!(s.get(), index),
+                Ok(repair_state) => assert_eq!(repair_state.get(), index),
                 Err(_) => assert!(matches!(index, 0 | 5 | 8 | 9 | 12 | 14..), "{index}"),
             }
         }
         assert_eq!(RepairState::Wait.to_string(), "10");
         let walk = MoveToAction::sub_in(MoveTo::Moving);
-        for b in [4, 11] {
-            let mut repair_state = RepairState::of_byte(b, Some(walk)).unwrap();
+        for byte in [4, 11] {
+            let mut repair_state = RepairState::of_byte(byte, Some(walk)).unwrap();
             assert_eq!(
                 (repair_state.get(), repair_state.move_to()),
-                (b, Some(&walk))
+                (byte, Some(&walk))
             );
             assert_eq!(repair_state.bare().move_to(), None);
             assert_eq!(repair_state.take_move_to(), Some(walk));

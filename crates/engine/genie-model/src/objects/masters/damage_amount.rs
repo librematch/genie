@@ -46,10 +46,10 @@ impl DamageAmount {
         Self(self.0.wrapping_sub(other.0))
     }
 
-    /// The amount an effect's float `v` sets: `CVTTSS2SI`, then its low 16 bits.
+    /// The amount an effect's float `value` sets: `CVTTSS2SI`, then its low 16 bits.
     #[must_use]
-    pub fn of_effect(v: f32) -> Self {
-        Self(cvttss2si(v) as i16)
+    pub fn of_effect(value: f32) -> Self {
+        Self(cvttss2si(value) as i16)
     }
 
     /// The product with the short `factor`, wrapping as the game's 16-bit multiply.
@@ -78,9 +78,9 @@ mod tests {
     /// The sums wrap as 16 bits; the float is exact; the order is the short's.
     #[test]
     fn damage_amounts_wrap_as_shorts() {
-        let (a, b) = (DamageAmount::new(3), DamageAmount::new(-4));
-        assert_eq!(a.plus(b), DamageAmount::new(-1));
-        assert_eq!(a.minus(b), DamageAmount::new(7));
+        let (first, second) = (DamageAmount::new(3), DamageAmount::new(-4));
+        assert_eq!(first.plus(second), DamageAmount::new(-1));
+        assert_eq!(first.minus(second), DamageAmount::new(7));
         assert_eq!(
             DamageAmount::new(i16::MAX).plus(DamageAmount::new(1)),
             DamageAmount::LEAST
@@ -89,8 +89,8 @@ mod tests {
             DamageAmount::LEAST.minus(DamageAmount::new(1)).get(),
             i16::MAX
         );
-        assert_eq!(b.as_f32(), -4.0);
-        assert_eq!(a.times(-4), DamageAmount::new(-12));
+        assert_eq!(second.as_f32(), -4.0);
+        assert_eq!(first.times(-4), DamageAmount::new(-12));
         assert_eq!(DamageAmount::new(300).times(300).get(), 24_464);
         assert_eq!(DamageAmount::of_effect(-2.9), DamageAmount::new(-2));
         assert_eq!(DamageAmount::of_effect(65_541.0), DamageAmount::new(5));

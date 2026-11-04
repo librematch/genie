@@ -47,19 +47,19 @@ use crate::{GenieError, GenieResult};
 /// (`GetVisibleUnits`, mode 0, every relation), and `pick` chooses among them. The caller answers
 /// with the object's id, −1 for none.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct Search<'a> {
+pub struct Search<'world> {
     /// Where it searches from.
     pub(crate) at: Point,
     /// How far.
     pub(crate) radius: Distance,
     /// The object classes it cares about.
-    pub(crate) classes: &'a [ClassId],
+    pub(crate) classes: &'world [ClassId],
     /// The searcher's radii.
     pub(crate) size: Footprint,
     /// What it picks of what it finds.
     pub(crate) pick: Pick,
     /// What an attack pick reads of the unit AI's memory.
-    pub(crate) memory: Memory<'a>,
+    pub(crate) memory: Memory<'world>,
 }
 
 bitflags::bitflags! {
@@ -117,11 +117,11 @@ impl AttackAsk {
 /// What `bestUnitToAttack` reads of the searching unit AI's memory: its retarget entries
 /// (`+0x1e0`) and its order history (`+0x78`'s list).
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
-pub struct Memory<'a> {
+pub struct Memory<'world> {
     /// The retarget entries.
-    pub(crate) retries: &'a [(ObjectId, WorldTime)],
+    pub(crate) retries: &'world [(ObjectId, WorldTime)],
     /// The order history, the newest first.
-    pub(crate) history: &'a [OrderRecord],
+    pub(crate) history: &'world [OrderRecord],
 }
 
 /// What a [`Search`] picks.
@@ -422,7 +422,7 @@ pub fn tower_can_attack(
 /// The squared gap between a point and an object's footprint (`FUN_140a847c0`: per axis the
 /// distance less the radius, `MAXSS 0` of it, so a gap that is not a number stays one).
 pub(super) fn point_gap_squared(point: Point, at: Position, radius: Footprint) -> DistanceSquared {
-    let gap = |d: f32, r: f32| maxss(0.0, d.abs() - r);
+    let gap = |delta: f32, radius: f32| maxss(0.0, delta.abs() - radius);
     let x = gap(point.x() - at.x(), radius.x());
     let y = gap(point.y() - at.y(), radius.y());
     DistanceSquared::new(y * y + x * x)

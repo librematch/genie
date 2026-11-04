@@ -132,7 +132,7 @@ fn the_load_takes_the_worlds_and_the_players_fields() {
         players
             .objects
             .iter()
-            .map(|u| u.id.get())
+            .map(|unit| unit.id.get())
             .collect::<Vec<_>>(),
         [7]
     );
@@ -180,7 +180,7 @@ fn technology_state_of_none_stops_every_player() {
         turns
             .players
             .iter()
-            .all(|p| p.stopped && p.unsupported.is_some())
+            .all(|player| player.stopped && player.unsupported.is_some())
     );
 }
 

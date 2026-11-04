@@ -33,9 +33,11 @@ impl RestrictionId {
     pub fn of_field(value: i16) -> GenieResult<Option<Self>> {
         match value {
             Self::NONE => Ok(None),
-            v => u16::try_from(v).map(|v| Some(Self(v))).map_err(|_| {
-                GenieError::invalid_input("a terrain restriction below −1").with("value", v)
-            }),
+            value => u16::try_from(value)
+                .map(|short| Some(Self(short)))
+                .map_err(|_| {
+                    GenieError::invalid_input("a terrain restriction below −1").with("value", value)
+                }),
         }
     }
 

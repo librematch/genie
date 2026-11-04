@@ -25,14 +25,14 @@ use crate::objects::masters::ActionKind;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::PlayersMasters;
+use crate::objects::masters::PlayersMastersExt;
 use crate::objects::unit::Unit;
 use crate::players::PlayerId;
 use crate::world::Seconds;
 use crate::world::World;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 use crate::{GenieError, GenieResult};
 
 /// The formation categories a group keeps its units by (`FUN_141007ba0`, `FUN_14100c6c0`).
@@ -111,12 +111,15 @@ impl World {
                 .original_position = at;
             return Ok(GroupMove::NotBegun);
         }
-        let g = self.groups.held_mut(group)?;
-        g.forget_target_data();
-        for member in &mut g.members {
+        let unit_group = self.groups.held_mut(group)?;
+        unit_group.forget_target_data();
+        for member in &mut unit_group.members {
             member.seconds_since_attacking = Seconds::MAX;
         }
-        let (queued, smallest) = (g.command_queue.len(), g.smallest_unit_range);
+        let (queued, smallest) = (
+            unit_group.command_queue.len(),
+            unit_group.smallest_unit_range,
+        );
         let mut range = NO_RANGE;
         if queued < 2 {
             self.reach_pass(group, main, order, &mut range)?;
@@ -493,6 +496,6 @@ fn take_into(list: &mut Vec<ObjectId>, ids: &[ObjectId], limit: usize) {
 /// game holds it (x, height, y); an object that does not move holds its own.
 pub(crate) fn moved_place(unit: &Unit, mover: Option<&Mover>) -> BVector {
     mover
-        .map_or_else(|| unit.position(), |m| m.moved_at)
+        .map_or_else(|| unit.position(), |mover| mover.moved_at)
         .vector()
 }

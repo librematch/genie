@@ -56,8 +56,8 @@ pub(super) fn hand_storage(
             continue;
         };
         if let Some(store) = store.as_deref_mut() {
-            match store.iter_mut().find(|e| e.0 == kind) {
-                Some(e) => e.1 += amount,
+            match store.iter_mut().find(|entry| entry.0 == kind) {
+                Some(entry) => entry.1 += amount,
                 None => store.push((kind, amount)),
             }
         }
@@ -270,11 +270,11 @@ impl Construction {
             world.add_record(id, construction.record);
         }
         pathing.tiles_changed(world.take_changes());
-        if let Some(p) = world.get(id) {
-            pathing.moved(id, p, MoveState::Standing);
+        if let Some(placed) = world.get(id) {
+            pathing.moved(id, placed, MoveState::Standing);
         }
-        if let Some(m) = mover {
-            m.last_move = now.after(Millis::new(1));
+        if let Some(mover) = mover {
+            mover.last_move = now.after(Millis::new(1));
         }
         Ok(ConstructionStart::Begun)
     }

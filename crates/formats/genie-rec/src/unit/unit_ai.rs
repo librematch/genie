@@ -1,6 +1,6 @@
 //! A unit's AI state ([`UnitAi`]): its orders, notifications, history, retargets and paths.
 
-use crate::element::{ReadableHeaderElement, read_counted};
+use crate::element::{ReadHeader, read_counted};
 use crate::errors::not_read;
 use crate::fits;
 use crate::reader::RecordingHeaderReader;
@@ -23,7 +23,7 @@ pub struct UnitAiOrder {
     pub(super) range: f32,
 }
 
-impl ReadableHeaderElement for UnitAiOrder {
+impl ReadHeader for UnitAiOrder {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         Ok(Self {
             issuer: input.read_u32::<LE>()?,
@@ -54,7 +54,7 @@ pub struct UnitAiNotification {
     pub params: (u32, u32, u32),
 }
 
-impl ReadableHeaderElement for UnitAiNotification {
+impl ReadHeader for UnitAiNotification {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         Ok(Self {
             caller: input.read_u32::<LE>()?,
@@ -82,7 +82,7 @@ pub struct UnitAiOrderHistory {
     pub(super) target_position: (f32, f32, f32),
 }
 
-impl ReadableHeaderElement for UnitAiOrderHistory {
+impl ReadHeader for UnitAiOrderHistory {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         Ok(Self {
             order: input.read_u32::<LE>()?,
@@ -117,7 +117,7 @@ pub struct UnitAiRetargetEntry {
     pub retarget_timeout: u32,
 }
 
-impl ReadableHeaderElement for UnitAiRetargetEntry {
+impl ReadHeader for UnitAiRetargetEntry {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let target_id = input.read_u32::<LE>()?.into();
         let retarget_timeout = input.read_u32::<LE>()?;
@@ -137,7 +137,7 @@ pub struct Waypoint {
     pub facet_to_next_waypoint: u8,
 }
 
-impl ReadableHeaderElement for Waypoint {
+impl ReadHeader for Waypoint {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let waypoint = Self {
             location: (
@@ -158,7 +158,7 @@ impl ReadableHeaderElement for Waypoint {
 #[derive(Debug, Default, Clone, Copy)]
 pub struct PatrolPath {}
 
-impl ReadableHeaderElement for PatrolPath {
+impl ReadHeader for PatrolPath {
     fn read_from<R: Read>(_: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         Err(not_read("a patrol path"))
     }
@@ -209,7 +209,7 @@ pub struct UnitAi {
     pub(super) formation_kind: u8,
 }
 
-impl ReadableHeaderElement for UnitAi {
+impl ReadHeader for UnitAi {
     // Reads the unit AI's fields in file order, section by section.
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let mut ai = Self::read_current(input)?;

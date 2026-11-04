@@ -28,7 +28,7 @@ use crate::unit_ai::world_view::RepairOrder;
 use crate::world::World;
 use crate::world::index::Place;
 use crate::world::layer::ClassRoles;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 use crate::{GenieError, GenieResult};
 
 /// A Repair's target the world does not hold where the work command starts or retargets it.
@@ -168,7 +168,7 @@ impl World {
                 Some((target, class)),
                 point,
                 notifies,
-                self.streams.get(Stream::Ai),
+                self.streams.get_mut(Stream::Ai),
             )?;
             self.remember_order(player, idx, (Some(OrderKind::Build), Some(AiAction::Build)))?;
         }
@@ -251,7 +251,7 @@ impl World {
                 Some((target, class)),
                 point,
                 notifies,
-                self.streams.get(Stream::Ai),
+                self.streams.get_mut(Stream::Ai),
             )?;
             self.remember_order(
                 player,
@@ -325,7 +325,7 @@ impl World {
                 Some((target, class)),
                 point,
                 notifies,
-                self.streams.get(Stream::Ai),
+                self.streams.get_mut(Stream::Ai),
             )?;
             self.remember_order(
                 player,
@@ -447,7 +447,7 @@ impl World {
                 Some((target, class)),
                 point,
                 notifies,
-                self.streams.get(Stream::Ai),
+                self.streams.get_mut(Stream::Ai),
             )?;
             self.remember_order(player, idx, (Some(OrderKind::Build), Some(AiAction::Build)))?;
         }
@@ -526,7 +526,7 @@ impl World {
         };
         // FUN_140aaddb0's building: an annex's main building
         let counted = match self.counted_building(Some(target))? {
-            Some(id) if id != target => self.object(id).map(|(_, b)| b.id),
+            Some(id) if id != target => self.object(id).map(|(_, unit)| unit.id),
             _ => Some(self.players.live(fp, fi)?.id),
         };
         let builders = counted

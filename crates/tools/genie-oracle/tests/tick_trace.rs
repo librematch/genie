@@ -16,13 +16,13 @@ use std::array::from_fn;
 use std::io::Write;
 
 fn encode(ticks: &[(u32, Vec<[u32; 11]>)]) -> Vec<u8> {
-    let lanes = ticks.first().map_or(0, |t| t.1.len());
+    let lanes = ticks.first().map_or(0, |tick| tick.1.len());
     let mut rows = Vec::new();
     for (time, ls) in ticks {
         rows.extend_from_slice(&time.to_le_bytes());
         for lane in ls {
-            for w in lane {
-                rows.extend_from_slice(&w.to_le_bytes());
+            for word in lane {
+                rows.extend_from_slice(&word.to_le_bytes());
             }
         }
     }
@@ -37,7 +37,7 @@ fn encode(ticks: &[(u32, Vec<[u32; 11]>)]) -> Vec<u8> {
 
 #[test]
 fn trace_gives_each_ticks_world_time_and_lanes() {
-    let lane = |b: u32| from_fn(|i| b + i as u32);
+    let lane = |base: u32| from_fn(|index| base + index as u32);
     let ticks = vec![
         (104, vec![lane(0), lane(11)]),
         (208, vec![lane(1), lane(12)]),
@@ -58,11 +58,12 @@ fn file_of_another_kind_is_refused() {
 
 #[test]
 fn the_first_difference_names_the_tick_lane_and_word() {
-    let a = TickTrace::decode(&encode(&[(104, vec![[1; 11]]), (208, vec![[2; 11]])])).unwrap();
+    let original =
+        TickTrace::decode(&encode(&[(104, vec![[1; 11]]), (208, vec![[2; 11]])])).unwrap();
     let mut changed = [2; 11];
     changed[9] = 7;
-    let tick_trace =
+    let changed_trace =
         TickTrace::decode(&encode(&[(104, vec![[1; 11]]), (208, vec![changed])])).unwrap();
-    assert_eq!(a.first_difference(&tick_trace), Some((1, 0, 9)));
-    assert_eq!(a.first_difference(&a), None);
+    assert_eq!(original.first_difference(&changed_trace), Some((1, 0, 9)));
+    assert_eq!(original.first_difference(&original), None);
 }

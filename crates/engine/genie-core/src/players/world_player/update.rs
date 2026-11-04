@@ -18,7 +18,7 @@ use crate::world::World;
 use crate::world::layer::AttributeRoles;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 
 impl World {
     /// Player `player_id`'s slot 0x100 up to `WorldPlayerBase::update`. Gaia
@@ -82,11 +82,11 @@ impl World {
             self.explored_share(player_id).map(|share| share * PERCENT)
         };
         let player = self.players.player_mut(player_id)?;
-        if let Some(e) = explored {
+        if let Some(share) = explored {
             set(
                 &mut player.attributes,
                 self.model.slots.attribute.explored,
-                Amount::new(e),
+                Amount::new(share),
             );
         }
         let amounts = &player.attributes;

@@ -71,11 +71,11 @@ use crate::unit_ai::UnitStance;
 /// What a gatherer's stand reads and writes (`FUN_140a8b6b0`'s sprite, shown with
 /// [`new_sprite`]): the standing sprite (none keeps the one shown), the unit's sprite, the Sprite
 /// stream that draws a new sprite's first frame and the sprite group's tuning values.
-pub(crate) struct Stand<'a> {
+pub(crate) struct Stand<'world> {
     pub(crate) graphic: Option<Graphic>,
-    pub(crate) sprite: &'a mut Option<ActiveSprite>,
-    pub(crate) rng: &'a mut Well512,
-    pub(crate) sprite_tuning: &'a SpriteTuning,
+    pub(crate) sprite: &'world mut Option<ActiveSprite>,
+    pub(crate) rng: &'world mut Well512,
+    pub(crate) sprite_tuning: &'world SpriteTuning,
 }
 
 impl Stand<'_> {
@@ -156,7 +156,7 @@ impl GatherAction {
     pub const fn targets(&self) -> [Option<ObjectId>; 2] {
         [
             match self.target {
-                Some(t) => Some(t.id()),
+                Some(role_id) => Some(role_id.id()),
                 None => None,
             },
             match self.carry_to {

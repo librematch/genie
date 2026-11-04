@@ -19,7 +19,7 @@ use crate::unit_ai::OrderKind;
 use crate::world::World;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 
 impl World {
     /// The work command's Transport (its task of action type 12, the factory `FUN_140aca4b0`
@@ -85,7 +85,9 @@ impl World {
         let unit = self.players.live(player_id, list_index)?;
         // the Transport on top, on the task the work found
         let on_task = match self.parts.actions_of(unit.id).list.head() {
-            Some(Action::Transport(t)) if t.task == Some(task.id) => Some(*t),
+            Some(Action::Transport(transport_action)) if transport_action.task == Some(task.id) => {
+                Some(*transport_action)
+            }
             _ => None,
         };
         let Some(mut transport_action) = on_task else {
@@ -178,7 +180,7 @@ impl World {
                 named,
                 point,
                 notifies,
-                self.streams.get(Stream::Ai),
+                self.streams.get_mut(Stream::Ai),
             )?;
             self.remember_order(
                 player_id,
@@ -189,7 +191,7 @@ impl World {
         Ok(())
     }
 
-    /// `f` on the view of the Transport on `task` of player `player_id`'s object at `list_index`
+    /// `work` on the view of the Transport on `task` of player `player_id`'s object at `list_index`
     /// ([`Ship`]) and of the map ([`MapShore`] with the unit's terrain restriction).
     ///
     /// [`World`]: crate::world::World
@@ -198,7 +200,7 @@ impl World {
         player_id: PlayerId,
         list_index: ListIndex,
         task: Option<TaskId>,
-        f: impl FnOnce(&Ship<'_>, &mut MapShore<'_>) -> GenieResult<Changed>,
+        work: impl FnOnce(&Ship<'_>, &mut MapShore<'_>) -> GenieResult<Changed>,
     ) -> GenieResult<Changed> {
         let ship = {
             let unit = self.players.live(player_id, list_index)?;
@@ -228,6 +230,6 @@ impl World {
             ship.position,
             &self.model.tuning.tile_path,
         )?;
-        f(&ship, &mut shore)
+        work(&ship, &mut shore)
     }
 }

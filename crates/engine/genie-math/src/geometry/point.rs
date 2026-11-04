@@ -72,12 +72,12 @@ impl Point {
         }
     }
 
-    /// The point with its component along `axis` `v`.
+    /// The point with its component along `axis` `value`.
     #[must_use]
-    pub const fn with_along(self, axis: Axis, v: f32) -> Self {
+    pub const fn with_along(self, axis: Axis, value: f32) -> Self {
         match axis {
-            Axis::X => self.with_x(v),
-            Axis::Y => self.with_y(v),
+            Axis::X => self.with_x(value),
+            Axis::Y => self.with_y(value),
         }
     }
 
@@ -97,8 +97,8 @@ impl Point {
 
 impl From<[f32; 2]> for Point {
     /// The point of two floats in the map's order (x, y), as a save or a packet holds them.
-    fn from(c: [f32; 2]) -> Self {
-        Self(c)
+    fn from(components: [f32; 2]) -> Self {
+        Self(components)
     }
 }
 

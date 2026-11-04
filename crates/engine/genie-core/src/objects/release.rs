@@ -19,7 +19,7 @@ use crate::unit_ai::{NotifyKind, UnitAi};
 use crate::world::Seconds;
 use crate::world::World;
 use crate::world::parts::Object;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 use crate::world::step::Step;
 
 /// The object whose action lets its target go (the target's slot 0x180 takes it): its id, its
@@ -64,12 +64,12 @@ pub(crate) fn released_fields(
 ) -> Option<Notify> {
     if listed
         && let Some(layer) = layer
-        && let Some(i) = layer
+        && let Some(index) = layer
             .attacking_units
             .iter()
             .position(|&object_id| object_id == by.id)
     {
-        let _ = layer.attacking_units.remove(i);
+        let _ = layer.attacking_units.remove(index);
     }
     if WorkerCount::ZERO < unit.workers {
         unit.workers = unit.workers.plus(-1);
@@ -87,7 +87,7 @@ pub(crate) fn released_fields(
         caller: Some(by.id),
         recipient: unit.id,
         kind: NotifyKind::NO_LONGER_ON_ME,
-        p: [i32::from(ClassId::field(by.class)), 0, 0],
+        params: [i32::from(ClassId::field(by.class)), 0, 0],
     })
 }
 
@@ -118,8 +118,8 @@ impl World {
         let recyclable = master.recyclable;
         let left = self.spatial.leave(gone.id);
         self.unwatch(player_id, gone.id)?;
-        if let Some(m) = missile.filter(|_| recyclable.recycled()) {
-            self.recycling.missiles.push((gone.id, m.flying));
+        if let Some(missile) = missile.filter(|_| recyclable.recycled()) {
+            self.recycling.missiles.push((gone.id, missile.flying));
         }
         self.pathing.removed(gone.id);
         self.pathing.tiles_changed(self.spatial.take_changes());
@@ -147,9 +147,9 @@ impl World {
             return Ok(());
         }
         let master = master.clone();
-        let u = self.players.live_mut(player_id, list_index)?;
-        u.regenerate(
-            self.parts.combat_mut(u.id)?,
+        let unit = self.players.live_mut(player_id, list_index)?;
+        unit.regenerate(
+            self.parts.combat_mut(unit.id)?,
             &master,
             dt_seconds,
             &self.model.tuning.turn,
@@ -176,8 +176,8 @@ impl World {
             MasterKind::COMBAT | MasterKind::BUILDING
         );
         if combat {
-            let u = self.players.live_mut(player_id, list_index)?;
-            u.clamp_hp_powerup(self.parts.combat_mut(u.id)?, &self.model.tuning.turn);
+            let unit = self.players.live_mut(player_id, list_index)?;
+            unit.clamp_hp_powerup(self.parts.combat_mut(unit.id)?, &self.model.tuning.turn);
         }
         Ok(())
     }
@@ -187,7 +187,7 @@ impl World {
     /// Slot 0x5f0 (`FUN_141158b90`): the unit's walked level, if it has one, pauses for `pause`
     /// seconds; the world's view of it follows.
     pub(crate) fn pause(&mut self, id: ObjectId, pause: Seconds) {
-        let Some(u) = self
+        let Some(unit) = self
             .players
             .iter_mut()
             .flat_map(|player| player.objects.iter_mut())
@@ -197,7 +197,7 @@ impl World {
         };
         if let Some(level) = self
             .parts
-            .mover_mut(u.id)
+            .mover_mut(unit.id)
             .and_then(|mover| mover.paths.first_mut())
         {
             level.pause_time = pause;
@@ -210,7 +210,7 @@ impl Unit {
     pub(crate) fn releaser(&self, step: &Step<'_>) -> GenieResult<Releaser> {
         Ok(Releaser {
             id: self.id,
-            class: Some(self.master(step.w.master_tables(), step.player)?.class),
+            class: Some(self.master(step.world.master_tables(), step.player)?.class),
             player: step.player,
         })
     }

@@ -14,12 +14,12 @@ fn load() -> (PlayerState, [Option<u32>; 11]) {
     let mut expected = [None; 11];
     for line in FIXTURE
         .lines()
-        .filter(|l| !l.starts_with('#') && !l.is_empty())
+        .filter(|text| !text.starts_with('#') && !text.is_empty())
     {
         let mut fields = line.split_whitespace();
         let tag = fields.next().unwrap();
         let texts: Vec<&str> = fields.collect();
-        let num = |i: usize| texts[i].parse::<f32>().unwrap();
+        let num = |index: usize| texts[index].parse::<f32>().unwrap();
         match tag {
             "player" => {
                 player.id = texts[0].parse().unwrap();

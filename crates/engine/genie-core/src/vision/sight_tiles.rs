@@ -69,7 +69,7 @@ mod tests {
         assert!(SightTiles::new(1).sees());
         assert!(!SightTiles::NONE.sees() && !SightTiles::new(-3).sees());
         assert_eq!(
-            [-3, 0, 7, 20, 25].map(|t| SightTiles::new(t).row()),
+            [-3, 0, 7, 20, 25].map(|tiles| SightTiles::new(tiles).row()),
             [0, 0, 7, 20, 20]
         );
         assert_eq!(SightTiles::new(7).to_string(), "7");

@@ -48,8 +48,8 @@ impl UnitList {
     /// The first `count` ids, at most `most` of them.
     #[must_use]
     pub fn first(&self, most: usize) -> &[Option<ObjectId>] {
-        let n = usize::from(self.count).min(most).min(self.ids.len());
-        self.ids.get(..n).unwrap_or_default()
+        let count = usize::from(self.count).min(most).min(self.ids.len());
+        self.ids.get(..count).unwrap_or_default()
     }
 }
 
@@ -64,7 +64,7 @@ impl TryFrom<Vec<Option<ObjectId>>> for UnitList {
     fn try_from(ids: Vec<Option<ObjectId>>) -> GenieResult<Self> {
         let count = u16::try_from(ids.len())
             .ok()
-            .filter(|&c| c != Self::LAST_COMMANDED)
+            .filter(|&count| count != Self::LAST_COMMANDED)
             .ok_or_else(|| {
                 GenieError::invalid_input("a unit list of 0xffff ids or more, which no count names")
                     .with("ids", ids.len())
@@ -81,11 +81,11 @@ impl World {
     /// [`OrderCommand`] reads as the last commanded units).
     ///
     /// [`OrderCommand`]: crate::commands::OrderCommand
-    pub(crate) fn read_units<'u>(
+    pub(crate) fn read_units<'list>(
         &self,
         player: PlayerId,
-        units: &'u UnitList,
-    ) -> Option<&'u [Option<ObjectId>]> {
+        units: &'list UnitList,
+    ) -> Option<&'list [Option<ObjectId>]> {
         (player.index() < self.players.len() && !units.overruns())
             .then(|| units.first(self.most_units(player)))
     }
@@ -238,9 +238,9 @@ mod tests {
     /// commanded units); `0xfffe` ids are a list.
     #[test]
     fn list_no_count_names_is_an_error() {
-        let ids = |n: usize| vec![None; n];
+        let ids = |count: usize| vec![None; count];
         assert_eq!(
-            UnitList::try_from(ids(0xffff)).map_err(|e| e.kind()),
+            UnitList::try_from(ids(0xffff)).map_err(|error| error.kind()),
             Err(ErrorKind::InvalidInput)
         );
         assert_eq!(

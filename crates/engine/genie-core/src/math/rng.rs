@@ -66,10 +66,10 @@ impl Well512 {
         // index − 1, the next index, its last
         let state = &mut self.state;
         let v0 = state[0];
-        let t = state[13];
-        let z1 = (((v0 << 1) ^ t) << 15) ^ t ^ v0;
-        let c = state[9];
-        let z2 = c ^ (c >> 11);
+        let word13 = state[13];
+        let z1 = (((v0 << 1) ^ word13) << 15) ^ word13 ^ v0;
+        let word9 = state[9];
+        let z2 = word9 ^ (word9 >> 11);
         let new1 = z1 ^ z2;
         state[0] = new1;
         let z0 = state[15];
@@ -107,43 +107,44 @@ impl Well512 {
         const SCALE: f64 = FLOAT_SCALE;
         /// The top (`DAT_14330eb8c`).
         const MAX: f32 = FLOAT_MAX;
-        let v = (f64::from(self.raw()) * SCALE) as f32;
-        if (0.0..=MAX).contains(&v) {
-            v
-        } else if 0.0 <= v {
+        let value = (f64::from(self.raw()) * SCALE) as f32;
+        if (0.0..=MAX).contains(&value) {
+            value
+        } else if 0.0 <= value {
             MAX
         } else {
             0.0
         }
     }
 
-    /// A step scaled to `0..n` (`FUN_140810cb0`): `step × n >> 32`; `last` stays.
+    /// A step scaled to `0..bound` (`FUN_140810cb0`): `step × bound >> 32`; `last` stays.
     #[track_caller]
-    pub fn below(&mut self, n: u32) -> u32 {
-        ((u64::from(self.raw()) * u64::from(n)) >> 32) as u32
+    pub fn below(&mut self, bound: u32) -> u32 {
+        ((u64::from(self.raw()) * u64::from(bound)) >> 32) as u32
     }
 
-    /// A step scaled to `0..n` that takes no step for `n` 0 (`FUN_140810fc0`): the draw counts
-    /// either way, then 0 for `n` 0, else [`Well512::below`]'s `step × n >> 32`; `last` stays.
+    /// A step scaled to `0..bound` that takes no step for `bound` 0 (`FUN_140810fc0`): the draw
+    /// counts either way, then 0 for `bound` 0, else [`Well512::below`]'s `step × bound >> 32`;
+    /// `last` stays.
     #[track_caller]
-    pub fn below_checked(&mut self, n: u32) -> u32 {
-        if n == 0 {
+    pub fn below_checked(&mut self, bound: u32) -> u32 {
+        if bound == 0 {
             self.draws = self.draws.wrapping_add(1);
             return 0;
         }
-        self.below(n)
+        self.below(bound)
     }
 
-    /// An index in `0..n` as the C++ library's `std::shuffle` draws it with the generator as its
-    /// engine (MSVC `_Rng_from_urng`, 32 bits a step): a step, again while it falls in the last
-    /// incomplete span of `n` (`step / n` is not below `u32::MAX / n`, unless `u32::MAX % n` is
-    /// `n − 1`), then `step % n`.
+    /// An index in `0..bound` as the C++ library's `std::shuffle` draws it with the generator as
+    /// its engine (MSVC `_Rng_from_urng`, 32 bits a step): a step, again while it falls in the last
+    /// incomplete span of `bound` (`step / bound` is not below `u32::MAX / n`, unless `u32::MAX %
+    /// n` is `bound − 1`), then `step % bound`.
     #[track_caller]
-    pub fn index(&mut self, n: u32) -> u32 {
+    pub fn index(&mut self, bound: u32) -> u32 {
         loop {
             let raw = self.raw();
-            if raw / n < u32::MAX / n || u32::MAX % n == n - 1 {
-                return raw % n;
+            if raw / bound < u32::MAX / bound || u32::MAX % bound == bound - 1 {
+                return raw % bound;
             }
         }
     }
@@ -152,23 +153,24 @@ impl Well512 {
     /// with an [`Well512::index`] up to it.
     #[track_caller]
     pub fn shuffle<T>(&mut self, items: &mut [T]) {
-        for i in 1..items.len() {
-            let index = self.index(i as u32 + 1) as usize;
-            if index != i {
-                items.swap(i, index);
+        for slot in 1..items.len() {
+            let index = self.index(slot as u32 + 1) as usize;
+            if index != slot {
+                items.swap(slot, index);
             }
         }
     }
 }
 
 /// Bob Jenkins' 32-bit integer hash, as the compiler folded it in setSeed.
-const fn jenkins(a: u32) -> u32 {
-    let a = a.wrapping_mul(0x1001).wrapping_add(0x7ed5_5d16);
-    let a = ((a >> 19) ^ a ^ 0xc761_c23c).wrapping_mul(0x21);
-    let a = (a.wrapping_add(0xe9f8_cc1d) ^ a.wrapping_add(0x1656_67b1).wrapping_mul(0x200))
-        .wrapping_mul(9)
-        .wrapping_add(0xfd70_46c5);
-    (a >> 16) ^ a ^ 0xb55a_4f09
+const fn jenkins(key: u32) -> u32 {
+    let hash = key.wrapping_mul(0x1001).wrapping_add(0x7ed5_5d16);
+    let hash = ((hash >> 19) ^ hash ^ 0xc761_c23c).wrapping_mul(0x21);
+    let hash = (hash.wrapping_add(0xe9f8_cc1d)
+        ^ hash.wrapping_add(0x1656_67b1).wrapping_mul(0x200))
+    .wrapping_mul(9)
+    .wrapping_add(0xfd70_46c5);
+    (hash >> 16) ^ hash ^ 0xb55a_4f09
 }
 
 /// The streams in registry order. The names come from the constructors' strings.
@@ -207,8 +209,8 @@ pub struct Streams {
 impl Default for Streams {
     fn default() -> Self {
         Self {
-            rngs: from_fn(|i| Well512 {
-                stream: i as u8,
+            rngs: from_fn(|stream| Well512 {
+                stream: stream as u8,
                 ..Well512::default()
             }),
         }
@@ -233,15 +235,15 @@ impl Streams {
     #[track_caller]
     pub fn set_last_randoms(&mut self) -> [u32; 4] {
         // no closure: the draw trace names the caller's line
-        let ai = self.get(Stream::Ai).rand15();
-        let action = self.get(Stream::Action).rand15();
-        let object = self.get(Stream::Object).rand15();
-        let player = self.get(Stream::Player).rand15();
+        let ai = self.get_mut(Stream::Ai).rand15();
+        let action = self.get_mut(Stream::Action).rand15();
+        let object = self.get_mut(Stream::Object).rand15();
+        let player = self.get_mut(Stream::Player).rand15();
         [ai, action, object, player]
     }
 
     /// The stream `stream`.
-    pub const fn get(&mut self, stream: Stream) -> &mut Well512 {
+    pub const fn get_mut(&mut self, stream: Stream) -> &mut Well512 {
         let [
             action,
             random_map,
@@ -284,7 +286,7 @@ mod tests {
     #[test]
     fn float01_is_the_game_get_rand_float_0_to_1() {
         // FUN_1408115a0 run in unicorn on this state (words at +0x24, index at +0x64 = 5)
-        let mut state: [u32; 16] = from_fn(|i| 0x9e37_79b9_u32.wrapping_mul(i as u32 + 1));
+        let mut state: [u32; 16] = from_fn(|index| 0x9e37_79b9_u32.wrapping_mul(index as u32 + 1));
         state.rotate_left(5);
         let mut rng = Well512 {
             state,
@@ -316,10 +318,10 @@ mod tests {
         let mut copy = streams.clone();
         let values = streams.set_last_randoms();
         let expected = [Stream::Ai, Stream::Action, Stream::Object, Stream::Player]
-            .map(|draw| copy.get(draw).rand15());
+            .map(|draw| copy.get_mut(draw).rand15());
         assert_eq!(values, expected);
         assert_eq!(streams, copy);
-        assert_eq!(streams.get(Stream::Ai).last, values[0]);
+        assert_eq!(streams.get_mut(Stream::Ai).last, values[0]);
     }
 
     #[test]
@@ -363,26 +365,26 @@ mod tests {
     /// the step as the game runs it), over two and a half turns.
     #[test]
     fn the_turned_ring_draws_as_the_game_indexed_ring() {
-        let words: [u32; 16] = from_fn(|i| 0x9e37_79b9_u32.wrapping_mul(i as u32 + 1));
-        let (mut s, mut i) = (words, 5usize);
+        let words: [u32; 16] = from_fn(|index| 0x9e37_79b9_u32.wrapping_mul(index as u32 + 1));
+        let (mut state, mut index) = (words, 5usize);
         let game: Vec<u32> = (0..40)
             .map(|_| {
-                let v0 = s[i];
-                let t = s[i.wrapping_sub(3) & 15];
-                let z1 = (((v0 << 1) ^ t) << 15) ^ t ^ v0;
-                let c = s[i.wrapping_sub(7) & 15];
-                let z2 = c ^ (c >> 11);
+                let v0 = state[index];
+                let word13 = state[index.wrapping_sub(3) & 15];
+                let z1 = (((v0 << 1) ^ word13) << 15) ^ word13 ^ v0;
+                let word9 = state[index.wrapping_sub(7) & 15];
+                let z2 = word9 ^ (word9 >> 11);
                 let new1 = z1 ^ z2;
-                s[i] = new1;
-                let j = i.wrapping_sub(1) & 15;
-                let z0 = s[j];
-                s[j] = z0
+                state[index] = new1;
+                let prior = index.wrapping_sub(1) & 15;
+                let z0 = state[prior];
+                state[prior] = z0
                     ^ ((((z2 << 10) ^ z1) << 16 ^ z0) << 2)
                     ^ ((new1 & 0xfed2_2169) << 5)
                     ^ new1
                     ^ z1;
-                i = j;
-                s[j]
+                index = prior;
+                state[prior]
             })
             .collect();
         let mut state = words;
@@ -408,9 +410,11 @@ mod tests {
         let mut streams = Streams::default();
         streams.seed_all(29910);
         let world: Vec<u32> = (0..3)
-            .map(|_| streams.get(Stream::World).rand15())
+            .map(|_| streams.get_mut(Stream::World).rand15())
             .collect();
-        let ai: Vec<u32> = (0..3).map(|_| streams.get(Stream::Ai).rand15()).collect();
+        let ai: Vec<u32> = (0..3)
+            .map(|_| streams.get_mut(Stream::Ai).rand15())
+            .collect();
         assert_eq!(world, [19550, 2220, 13198]);
         assert_eq!(ai, [16591, 22366, 24306]);
     }
@@ -418,39 +422,39 @@ mod tests {
     #[test]
     fn draw_below_bound_scales_the_step_by_the_bound() {
         // FUN_140810cb0: step × n >> 32
-        let (mut a, mut b) = (Well512::default(), Well512::default());
-        a.set_seed(0);
-        b.set_seed(0);
-        let step = b.raw();
-        assert_eq!(a.below(360), ((u64::from(step) * 360) >> 32) as u32);
-        assert_eq!(a.below(0), 0);
-        assert_eq!(a.draws, 2);
+        let (mut first, mut second) = (Well512::default(), Well512::default());
+        first.set_seed(0);
+        second.set_seed(0);
+        let step = second.raw();
+        assert_eq!(first.below(360), ((u64::from(step) * 360) >> 32) as u32);
+        assert_eq!(first.below(0), 0);
+        assert_eq!(first.draws, 2);
     }
 
     #[test]
     fn checked_draw_below_zero_counts_the_draw_but_takes_no_step() {
         // FUN_140810fc0: the draw count +1, then 0 for n 0 with the state left alone; any other
         // n is FUN_140810cb0's draw
-        let (mut a, mut b) = (Well512::default(), Well512::default());
-        a.set_seed(7);
-        b.set_seed(7);
-        assert_eq!(a.below_checked(0), 0);
-        assert_eq!(a.draws, 1);
-        assert_eq!(a.state, b.state);
-        assert_eq!(a.below_checked(360), b.below(360));
-        assert_eq!((a.draws, b.draws), (2, 1));
-        assert_eq!(a.state, b.state);
+        let (mut first, mut second) = (Well512::default(), Well512::default());
+        first.set_seed(7);
+        second.set_seed(7);
+        assert_eq!(first.below_checked(0), 0);
+        assert_eq!(first.draws, 1);
+        assert_eq!(first.state, second.state);
+        assert_eq!(first.below_checked(360), second.below(360));
+        assert_eq!((first.draws, second.draws), (2, 1));
+        assert_eq!(first.state, second.state);
     }
 
     #[test]
     fn draw_of_64_bits_is_two_steps_counted_once() {
         // FUN_140811100: the first step's word high, the second's low, the draw count +1
-        let (mut a, mut b) = (Well512::default(), Well512::default());
-        a.set_seed(7);
-        b.set_seed(7);
-        let wide = a.raw64();
-        let (hi, lo) = (b.raw(), b.raw());
+        let (mut first, mut second) = (Well512::default(), Well512::default());
+        first.set_seed(7);
+        second.set_seed(7);
+        let wide = first.raw64();
+        let (hi, lo) = (second.raw(), second.raw());
         assert_eq!(wide, (u64::from(hi) << 32) | u64::from(lo));
-        assert_eq!((a.draws, b.draws), (1, 2));
+        assert_eq!((first.draws, second.draws), (1, 2));
     }
 }

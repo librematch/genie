@@ -149,14 +149,22 @@ fn orders(packet: &Packet) -> GenieResult<Option<Command>> {
             listed(retreat.num, &retreat.ids),
             Order::Retreat(interact!(retreat)),
         ),
-        Packet::Move(c) => {
+        Packet::Move(command) => {
             let order = MoveOrder {
-                target: ObjectId::of_field(c.tid),
-                point: Point::new(c.x, c.y),
-                flags: OrderFlags::of_bytes(c.field_0x13, c.field_0x14, c.field_0x15),
-                control: ControlKey::of_byte(c.field_0x12),
+                target: ObjectId::of_field(command.tid),
+                point: Point::new(command.x, command.y),
+                flags: OrderFlags::of_bytes(
+                    command.field_0x13,
+                    command.field_0x14,
+                    command.field_0x15,
+                ),
+                control: ControlKey::of_byte(command.field_0x12),
             };
-            (c.commp_id, listed(c.num, &c.ids), Order::Move(order))
+            (
+                command.commp_id,
+                listed(command.num, &command.ids),
+                Order::Move(order),
+            )
         }
         Packet::Follow(follow) => (
             follow.commp_id,
@@ -209,8 +217,8 @@ fn listed_command(packet: &Packet) -> GenieResult<Option<Command>> {
             player: PlayerId::from(seek_shelter.commp_id),
             units: listed(seek_shelter.num, &seek_shelter.ids),
         }),
-        Packet::Patrol(c) => patrol(c),
-        Packet::AttackMove(c) => attack_move(c),
+        Packet::Patrol(packet) => patrol(packet),
+        Packet::AttackMove(command) => attack_move(command),
         Packet::Unload(unload) => Command::Unload(UnloadCommand {
             player: PlayerId::from(unload.commp_id),
             units: listed(unload.num, &unload.ids),
@@ -245,39 +253,39 @@ fn listed_command(packet: &Packet) -> GenieResult<Option<Command>> {
 
 /// PATROL (0x15): the units, the waypoints' count (`+0xb`) and slots (x from `+0xc`, each an
 /// f32's bits; y from `+0x34`) and `+0x8`.
-fn patrol(c: &packets::Patrol) -> Command {
+fn patrol(command: &packets::Patrol) -> Command {
     let xs = [
-        c.field_0x0c,
-        c.field_0x10,
-        c.field_0x14,
-        c.field_0x18,
-        c.field_0x1c,
-        c.field_0x20,
-        c.field_0x24,
-        c.field_0x28,
-        c.field_0x2c,
-        c.field_0x30,
+        command.field_0x0c,
+        command.field_0x10,
+        command.field_0x14,
+        command.field_0x18,
+        command.field_0x1c,
+        command.field_0x20,
+        command.field_0x24,
+        command.field_0x28,
+        command.field_0x2c,
+        command.field_0x30,
     ];
     let ys = [
-        c.field_0x34,
-        c.field_0x38,
-        c.field_0x3c,
-        c.field_0x40,
-        c.field_0x44,
-        c.field_0x48,
-        c.field_0x4c,
-        c.field_0x50,
-        c.field_0x54,
-        c.field_0x58,
+        command.field_0x34,
+        command.field_0x38,
+        command.field_0x3c,
+        command.field_0x40,
+        command.field_0x44,
+        command.field_0x48,
+        command.field_0x4c,
+        command.field_0x50,
+        command.field_0x54,
+        command.field_0x58,
     ];
     Command::Patrol(PatrolCommand {
-        player: PlayerId::from(c.commp_id),
-        units: listed(c.num, &c.ids),
+        player: PlayerId::from(command.commp_id),
+        units: listed(command.num, &command.ids),
         waypoints: Waypoints {
-            count: c.waypoints_count,
-            points: from_fn(|i| Point::new(f32::from_bits(xs[i]), ys[i])),
+            count: command.waypoints_count,
+            points: from_fn(|index| Point::new(f32::from_bits(xs[index]), ys[index])),
         },
-        patrols: if c.field_0x08 != 0 {
+        patrols: if command.field_0x08 != 0 {
             SavedPatrols::Dropped
         } else {
             SavedPatrols::Kept
@@ -287,29 +295,36 @@ fn patrol(c: &packets::Patrol) -> Command {
 
 /// `ATTACK_MOVE` (0x21): PATROL's layout, the first x as an f32's bits and nine more from
 /// `+0x10`, the first y at `+0x34` and nine more from `+0x38`; its flags at `+0x8`..`+0xa`.
-fn attack_move(c: &packets::AttackMove) -> Command {
-    let word = |b: &[u8; 36], i: usize| f32::from_le_bytes([b[i], b[i + 1], b[i + 2], b[i + 3]]);
-    let points = from_fn(|i| match i {
-        0 => Point::new(f32::from_bits(c.field_0x0c), c.field_0x34),
+fn attack_move(command: &packets::AttackMove) -> Command {
+    let word = |bytes: &[u8; 36], offset: usize| {
+        f32::from_le_bytes([
+            bytes[offset],
+            bytes[offset + 1],
+            bytes[offset + 2],
+            bytes[offset + 3],
+        ])
+    };
+    let points = from_fn(|index| match index {
+        0 => Point::new(f32::from_bits(command.field_0x0c), command.field_0x34),
         _ => Point::new(
-            word(&c.gap_0x10, 4 * (i - 1)),
-            word(&c.gap_0x38, 4 * (i - 1)),
+            word(&command.gap_0x10, 4 * (index - 1)),
+            word(&command.gap_0x38, 4 * (index - 1)),
         ),
     });
     Command::AttackMove(AttackMoveCommand {
-        player: PlayerId::from(c.commp_id),
-        units: listed(c.num, &c.ids),
+        player: PlayerId::from(command.commp_id),
+        units: listed(command.num, &command.ids),
         waypoints: Waypoints {
-            count: c.waypoints_count,
+            count: command.waypoints_count,
             points,
         },
-        patrols: if c.field_0x08 != 0 {
+        patrols: if command.field_0x08 != 0 {
             SavedPatrols::Dropped
         } else {
             SavedPatrols::Kept
         },
-        queued: c.field_0x09 != 0,
-        ignore_pending: c.field_0x0a != 0,
+        queued: command.field_0x09 != 0,
+        ignore_pending: command.field_0x0a != 0,
     })
 }
 
@@ -319,7 +334,7 @@ fn attack_move(c: &packets::AttackMove) -> Command {
 fn go_back_to_work_units(rest: &[u8]) -> Option<UnitList> {
     let count = u16::from_le_bytes([*rest.first()?, *rest.get(1)?]);
     let (ids, _) = rest.get(4..)?.as_chunks::<4>();
-    let ids: Vec<i32> = ids.iter().map(|b| i32::from_le_bytes(*b)).collect();
+    let ids: Vec<i32> = ids.iter().map(|bytes| i32::from_le_bytes(*bytes)).collect();
     Some(listed(count, &ids))
 }
 
@@ -447,14 +462,14 @@ fn single_command(packet: &Packet) -> GenieResult<Option<Command>> {
             shown: [flare.gap_0x11[0], flare.field_0x12, flare.field_0x13]
                 .iter()
                 .chain(&flare.rest)
-                .map(|&b| b != 0)
+                .map(|&byte| byte != 0)
                 .collect(),
         }),
         Packet::Game(game) => Command::Game(GameCommand {
             issuer: PlayerId::from(game.commp_id),
             sub: GameSub::of_data(game.field_0x04),
             player: game.field_0x08,
-            a: game.field_0x0a,
+            argument: game.field_0x0a,
             speed: game.field_0x0c,
             value: game.field_0x10,
         }),

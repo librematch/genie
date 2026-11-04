@@ -16,7 +16,7 @@ use crate::world::World;
 use crate::world::WorldTime;
 use crate::world::others::OthersRef;
 use crate::world::player::Player;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 
 mod attack_reads;
 mod calls;
@@ -49,15 +49,15 @@ use std::cmp::Ordering;
 /// What a hunt's drop-off ([`Unit::drop_off_in`]) reads besides its unit: the owner's masters,
 /// the world with its zone maps and planners, the world's time, the Object stream (the drop-site
 /// search's plans) and the owner's type.
-pub(crate) struct DropWorld<'a> {
-    pub masters: OwnerMasters<'a>,
-    pub spatial: &'a mut Spatial,
-    pub zones: &'a mut Zones,
-    pub pathing: &'a mut Pathing,
-    pub object: &'a mut Well512,
+pub(crate) struct DropWorld<'world> {
+    pub masters: OwnerMasters<'world>,
+    pub spatial: &'world mut Spatial,
+    pub zones: &'world mut Zones,
+    pub pathing: &'world mut Pathing,
+    pub object: &'world mut Well512,
     pub world_time: WorldTime,
     pub player_kind: PlayerKind,
-    pub groups: &'a UnitGroups,
+    pub groups: &'world UnitGroups,
 }
 
 /// What the unit's slot 0x388 (`FUN_141226fc0`) found while its unit AI ran
@@ -109,17 +109,17 @@ pub(crate) struct EnterOrder {
 /// The players but the owner of the unit that updates, read-only: the players before it and
 /// after it.
 #[derive(Clone, Copy)]
-pub(crate) struct Foreign<'a> {
-    pub(crate) before: &'a [Player],
-    pub(crate) after: &'a [Player],
+pub(crate) struct Foreign<'world> {
+    pub(crate) before: &'world [Player],
+    pub(crate) after: &'world [Player],
     /// The live list of the player whose list is out, once its object changed hands: that
     /// object's AI part reads it as another player's ([`OthersRef::changed_hands`]).
-    pub(crate) left: Option<(PlayerId, &'a ObjectList)>,
+    pub(crate) left: Option<(PlayerId, &'world ObjectList)>,
 }
 
-impl<'a> Foreign<'a> {
-    /// Player `q`, unless it is the one whose list is out.
-    pub(crate) fn player(&self, player_id: PlayerId) -> Option<&'a Player> {
+impl<'world> Foreign<'world> {
+    /// Player `player_id`, unless it is the one whose list is out.
+    pub(crate) fn player(&self, player_id: PlayerId) -> Option<&'world Player> {
         let index = player_id.index();
         let own = self.before.len();
         match index.cmp(&own) {
@@ -151,11 +151,11 @@ impl OwnerView {
     ///
     /// A player the world does not hold.
     pub(crate) fn of(step: &Step<'_>, new: Option<PlayerId>) -> GenieResult<Self> {
-        let taker = new.filter(|&n| n != step.player);
-        let Some((new, player)) =
-            taker.and_then(|player_id| Some((player_id, step.w.players.get(player_id.index())?)))
+        let taker = new.filter(|&player_id| player_id != step.player);
+        let Some((new, player)) = taker
+            .and_then(|player_id| Some((player_id, step.world.players.get(player_id.index())?)))
         else {
-            let owner = step.w.players.player(step.player)?;
+            let owner = step.world.players.player(step.player)?;
             return Ok(Self {
                 player: step.player,
                 new_owner: None,
@@ -184,12 +184,12 @@ impl OwnerView {
 /// The objects as the unit AI of player `player_id`'s updating unit reads them: the update's view
 /// of `players`, or for a unit player `new` took over in its update, that player's live list as its
 /// own and the old owner's among the others' ([`OthersRef::changed_hands`]).
-pub(crate) fn owner_view<'a>(
-    players: &'a [Player],
-    index: &'a ObjectIndex,
+pub(crate) fn owner_view<'world>(
+    players: &'world [Player],
+    index: &'world ObjectIndex,
     player_id: PlayerId,
     new: Option<PlayerId>,
-) -> GenieResult<OthersRef<'a>> {
+) -> GenieResult<OthersRef<'world>> {
     Ok(changed_view(OthersRef::of(players, index, player_id)?, new))
 }
 
@@ -205,26 +205,26 @@ pub(crate) fn changed_view(view: OthersRef<'_>, new: Option<PlayerId>) -> Others
 /// for that time: its searches (`searches.rs`), what it reads of the unit and the objects it
 /// names (`looks.rs`) and the unit's own calls (`calls.rs`). The world is the update's step's,
 /// the unit out of its slot.
-pub(crate) struct UnitView<'u, 's> {
-    /// The update's step: the world without the unit (its stand-in holds its slot), the
-    /// updating player and the unit's id.
-    pub(crate) c: &'u mut Step<'s>,
+pub(crate) struct UnitView<'unit, 'world> {
+    /// The update'world step: the world without the unit (its stand-in holds its slot), the
+    /// updating player and the unit'world id.
+    pub(crate) step: &'unit mut Step<'world>,
     /// The unit, without its unit AI.
-    pub(crate) unit: &'u mut Unit,
-    /// The unit's action layer, out of the table with it.
-    pub(crate) actions: &'u mut Action,
+    pub(crate) unit: &'unit mut Unit,
+    /// The unit'world action layer, out of the table with it.
+    pub(crate) actions: &'unit mut Action,
     /// What the attack check of a search reads of the unit.
     pub(crate) attacker: Attacker,
-    /// The owner, as the AI runs (a captured unit's new one): its diplomacy, attributes and
+    /// The owner, as the AI runs (a captured unit'world new one): its diplomacy, attributes and
     /// civ are what the task search reads of it.
     pub(crate) player: PlayerId,
-    /// The owner's type (`player+0x10`; [`PlayerKind::is_computer`] is `FUN_141659cf0`).
+    /// The owner'world type (`player+0x10`; [`PlayerKind::is_computer`] is `FUN_141659cf0`).
     pub(crate) player_kind: PlayerKind,
     /// The player that took the unit over in its update ([`changed_view`]).
     pub(crate) new_owner: Option<PlayerId>,
-    /// The owner's civ.
+    /// The owner'world civ.
     pub(crate) civ: CivId,
-    /// The owner's AI settings.
+    /// The owner'world AI settings.
     pub(crate) ai_settings: AiSettings,
 }
 

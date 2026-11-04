@@ -162,10 +162,11 @@ fn an_animated_object_sprite_runs_by_the_update_dt() {
 /// list (a `MoveTo`'s teardown stops the unit); an alive object with an unmodelled action fails.
 #[test]
 fn an_object_past_state_2_loses_its_actions() {
-    let mut t = forage_world();
-    let players = &mut t.players[1].objects[ListIndex::new(0)];
+    let mut world = forage_world();
+    let players = &mut world.players[1].objects[ListIndex::new(0)];
     players.life.state = ObjectState::Dying;
-    t.parts
+    world
+        .parts
         .actions
         .of_mut(players.id)
         .unwrap()
@@ -181,16 +182,19 @@ fn an_object_past_state_2_loses_its_actions() {
             wait: MoveWait::default(),
         }));
     in_update(
-        &mut t,
+        &mut world,
         (PlayerId::new(1), ListIndex::new(0)),
         50,
         Unit::actions_past_life,
     )
     .unwrap();
-    let unit = &t.players[1].objects[ListIndex::new(0)];
-    assert_eq!(t.parts.actions_of(unit.id).list.move_to().copied(), None);
+    let unit = &world.players[1].objects[ListIndex::new(0)];
     assert_eq!(
-        t.parts.mover_of(unit.id).unwrap().animated.speed,
+        world.parts.actions_of(unit.id).list.move_to().copied(),
+        None
+    );
+    assert_eq!(
+        world.parts.mover_of(unit.id).unwrap().animated.speed,
         Speed::new(0.0)
     );
     let mut world = forage_world();
@@ -198,13 +202,13 @@ fn an_object_past_state_2_loses_its_actions() {
         world.players[1].objects[ListIndex::new(0)].id,
         GenieError::unsupported("an action"),
     );
-    let r = in_update(
+    let in_update = in_update(
         &mut world,
         (PlayerId::new(1), ListIndex::new(0)),
         50,
         Unit::actions_past_life,
     );
-    assert_eq!(r.unwrap_err().reason(), "an action");
+    assert_eq!(in_update.unwrap_err().reason(), "an action");
 }
 
 /// After the actions the units the unit's walk met take their pauses at once (slot 0x5f0: the
@@ -234,22 +238,22 @@ fn after_its_actions_the_units_walk_met_take_their_pauses() {
         &mut world,
         (PlayerId::new(1), ListIndex::new(0)),
         50,
-        |u, _, c| {
-            u.after_actions(c)?;
-            let (_, bush) = OthersRef::of(&c.w.players, &c.w.index, c.player)
+        |unit, _, step| {
+            unit.after_actions(step)?;
+            let (_, bush) = OthersRef::of(&step.world.players, &step.world.index, step.player)
                 .unwrap()
                 .find(object_id(600))
                 .unwrap();
-            let level = c.w.parts.mover_of(bush.id).unwrap().paths[0].pause_time;
+            let level = step.world.parts.mover_of(bush.id).unwrap().paths[0].pause_time;
             Ok((
                 level,
                 ObjectsRef::new(
-                    &c.w.players,
-                    &c.w.index,
-                    &c.w.model.masters,
-                    &c.w.parts,
-                    &c.w.model.roles,
-                    &c.w.model.tuning,
+                    &step.world.players,
+                    &step.world.index,
+                    &step.world.model.masters,
+                    &step.world.parts,
+                    &step.world.model.roles,
+                    &step.world.model.tuning,
                 )
                 .gait(object_id(600))
                 .and_then(|gait| gait.pause),
@@ -273,14 +277,14 @@ fn after_its_actions_the_units_walk_met_take_their_pauses() {
         .mover_mut(world.players[1].objects[ListIndex::new(0)].id)
         .unwrap()
         .in_the_way = vec![object_id(600)];
-    let r = in_update(
+    let in_update = in_update(
         &mut world,
         (PlayerId::new(1), ListIndex::new(0)),
         50,
         |unit, _, step| unit.after_actions(step),
     );
     assert_eq!(
-        r.unwrap_err().reason(),
+        in_update.unwrap_err().reason(),
         "a walk's unit in the way (notify 0x215) the action does not pass on"
     );
 }
@@ -294,7 +298,7 @@ fn the_update_up_to_the_actions_ends_for_sleeper() {
         &mut world,
         (PlayerId::new(1), ListIndex::new(0)),
         50,
-        |u, a, c| Unit::update_to_actions(u, a, c, &roles()),
+        |unit, action, step| Unit::update_to_actions(unit, action, step, &roles()),
     )
     .unwrap();
     assert!(step.is_some());
@@ -305,7 +309,7 @@ fn the_update_up_to_the_actions_ends_for_sleeper() {
         &mut world,
         (PlayerId::new(0), ListIndex::new(0)),
         50,
-        |unit, action, c| Unit::update_to_actions(unit, action, c, &roles()),
+        |unit, action, step| Unit::update_to_actions(unit, action, step, &roles()),
     )
     .unwrap();
     assert_eq!(step, None);
@@ -321,7 +325,7 @@ fn the_actions_update_runs_the_action_held() {
         &mut world,
         (PlayerId::new(1), ListIndex::new(0)),
         50,
-        |u, a, c| Unit::update_actions(u, a, c, &roles(), slots()),
+        |unit, action, step| Unit::update_actions(unit, action, step, &roles(), slots()),
     )
     .unwrap();
     assert!(captured.is_none());
@@ -336,7 +340,7 @@ fn the_actions_update_runs_the_action_held() {
         &mut world,
         (PlayerId::new(1), ListIndex::new(0)),
         50,
-        |u, a, c| Unit::update_actions(u, a, c, &roles(), slots()),
+        |unit, action, step| Unit::update_actions(unit, action, step, &roles(), slots()),
     )
     .unwrap();
     assert!(captured.is_none());
@@ -412,7 +416,7 @@ fn the_list_update_stops_at_an_action_below_its_head() {
         &mut world,
         (PlayerId::new(1), ListIndex::new(0)),
         50,
-        |u, action, step| Unit::update_actions(u, action, step, &roles(), slots()),
+        |unit, action, step| Unit::update_actions(unit, action, step, &roles(), slots()),
     )
     .unwrap_err();
     assert_eq!(err.kind(), crate::ErrorKind::Unreachable);
@@ -447,7 +451,7 @@ fn an_object_inside_another_runs_its_inside_update() {
             &mut world,
             (PlayerId::new(1), ListIndex::new(0)),
             50,
-            |u, a, c| Unit::update_actions(u, a, c, &roles(), slots())
+            |unit, action, step| Unit::update_actions(unit, action, step, &roles(), slots())
         ),
         Ok(None)
     );
@@ -462,7 +466,7 @@ fn an_object_inside_another_runs_its_inside_update() {
             &mut world,
             (PlayerId::new(1), ListIndex::new(0)),
             50,
-            |u, action, step| Unit::update_actions(u, action, step, &roles(), slots())
+            |unit, action, step| Unit::update_actions(unit, action, step, &roles(), slots())
         ),
         Ok(None)
     );
@@ -664,7 +668,8 @@ fn unit_reads_its_own_master_before_its_player_s() {
     let none = PartTable::default();
     let tables = MasterTables::new(&every, &none);
     assert_eq!(
-        unit.master(tables, PlayerId::new(1)).map(|m| m.hit_points),
+        unit.master(tables, PlayerId::new(1))
+            .map(|master| master.hit_points),
         Ok(MasterHitPoints::of_data(25))
     );
     let own: PartTable<Master> = once((
@@ -679,7 +684,7 @@ fn unit_reads_its_own_master_before_its_player_s() {
     let with_own = MasterTables::new(&every, &own);
     assert_eq!(
         unit.master(with_own, PlayerId::new(1))
-            .map(|m| m.hit_points),
+            .map(|master| master.hit_points),
         Ok(MasterHitPoints::of_data(40))
     );
     assert_eq!(

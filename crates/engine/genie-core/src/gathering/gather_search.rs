@@ -43,7 +43,7 @@ use crate::world::layer::AttributeRoles;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
 use crate::world::layer::generated::GatherSearchTuning;
-use crate::world::slots::CheckedIndex;
+use crate::world::slots::CheckedIndexExt;
 use crate::{GenieError, GenieResult};
 use std::fmt::Debug;
 use std::mem::take;
@@ -113,9 +113,9 @@ impl Candidate {
 /// their order, each read from the world's objects by id; the searching unit, out of its slot
 /// while it updates, as it stands (`me`).
 #[derive(Clone, Copy, Debug)]
-pub struct Candidates<'a> {
+pub struct Candidates<'world> {
     /// The world's objects by id.
-    pub(crate) objects: ObjectsRef<'a>,
+    pub(crate) objects: ObjectsRef<'world>,
     /// The searching unit while its update holds it out of its slot.
     pub(crate) me: Option<Candidate>,
 }
@@ -193,35 +193,35 @@ pub fn more_work(
         return Ok(None);
     };
     // the box: (short)(int) of the building's place, ± the reach plus the builder's radius
-    let r = builder
+    let reach = builder
         .range
         .wrapping_add((builder.radius + Distance::new(0.5)).get() as i32 as i16);
     let (bx, by) = (
         builder.building.x() as i32 as i16,
         builder.building.y() as i32 as i16,
     );
-    let x0 = bx.wrapping_sub(r).max(0);
-    let y0 = by.wrapping_sub(r).max(0);
-    let mut x1 = bx.wrapping_add(r);
-    let mut y1 = by.wrapping_add(r);
+    let x0 = bx.wrapping_sub(reach).max(0);
+    let y0 = by.wrapping_sub(reach).max(0);
+    let mut x1 = bx.wrapping_add(reach);
+    let mut y1 = by.wrapping_add(reach);
     if map.width() <= i32::from(x1) {
         x1 = map.width() as i16 - 1;
     }
     if map.height() <= i32::from(y1) {
         y1 = map.height() as i16 - 1;
     }
-    let (w, h) = (i32::from(x1 - x0) + 1, i32::from(y1 - y0) + 1);
+    let (width, height) = (i32::from(x1 - x0) + 1, i32::from(y1 - y0) + 1);
     let corner = TileOffset::new(i32::from(x0), i32::from(y0));
     let start = Tile::new(builder.position.x() as i32, builder.position.y() as i32) - corner;
-    let grid = reached(start, GridSize::new(w, h), corner, planner)?;
+    let grid = reached(start, GridSize::new(width, height), corner, planner)?;
     // gold, stone, food, wood: (the object, its workers, the group's least distance)
     let mut groups: [Option<(Candidate, WorkerCount)>; 4] = [None; 4];
     let mut least = [90.0f32; 4];
     for x in x0..=x1 {
         for y in y0..=y1 {
             let (gx, gy) = (i32::from(x - x0), i32::from(y - y0));
-            if let Some(g) = &grid
-                && !*g.checked((gx * h + gy) as usize)?
+            if let Some(reached) = &grid
+                && !*reached.checked((gx * height + gy) as usize)?
             {
                 continue;
             }
@@ -247,7 +247,7 @@ pub fn more_work(
                 else {
                     continue;
                 };
-                let Some(g) = group_of(resource, roles) else {
+                let Some(group) = group_of(resource, roles) else {
                     continue;
                 };
                 let dx = candidate.position.x() - builder.position.x();
@@ -255,8 +255,8 @@ pub fn more_work(
                 let whole_distance = cvttss2si(sqrt(dy * dy + dx * dx)) as f32;
                 let workers = candidate.workers.plus(-1).max(WorkerCount::ZERO);
                 keep(
-                    groups.checked_mut(g)?,
-                    least.checked_mut(g)?,
+                    groups.checked_mut(group)?,
+                    least.checked_mut(group)?,
                     (candidate, workers),
                     whole_distance,
                 );
@@ -282,23 +282,23 @@ fn group_of(resource: AttributeId, roles: &Roles) -> Option<usize> {
     }
 }
 
-/// [`more_work`]'s group keeps the object `candidate` at the distance `d` (with its `workers`) when
-/// it keeps none, or `candidate` is nearer than its least distance `low`, or as near or nearer with
-/// fewer workers; the least distance falls to `d`.
+/// [`more_work`]'s group keeps the object `candidate` at the distance `distance` (with its
+/// `workers`) when it keeps none, or `candidate` is nearer than its least distance `low`, or as
+/// near or nearer with fewer workers; the least distance falls to `distance`.
 fn keep(
     group: &mut Option<(Candidate, WorkerCount)>,
     low: &mut f32,
     (candidate, workers): (Candidate, WorkerCount),
-    d: f32,
+    distance: f32,
 ) {
     let take = match *group {
-        Some((_, kept)) if *low <= d => workers < kept,
+        Some((_, kept)) if *low <= distance => workers < kept,
         _ => true,
     };
     if take {
         *group = Some((candidate, workers));
-        if d < *low {
-            *low = d;
+        if distance < *low {
+            *low = distance;
         }
     }
 }
@@ -307,10 +307,10 @@ fn keep(
 fn pick(groups: &[Option<(Candidate, WorkerCount)>; 4], least: &[f32; 4]) -> Option<Candidate> {
     let mut best: Option<(Candidate, f32)> = None;
     for (group, &low) in groups.iter().zip(least) {
-        if let Some((o, _)) = *group
-            && best.is_none_or(|(_, d)| low < d)
+        if let Some((candidate, _)) = *group
+            && best.is_none_or(|(_, distance)| low < distance)
         {
-            best = Some((o, low));
+            best = Some((candidate, low));
         }
     }
     best.map(|(candidate, _)| candidate)
@@ -335,24 +335,24 @@ pub fn reached(
         return Ok(None);
     }
     // by columns, unlike the grid's own rows
-    let cell = |t: Tile| (t.x() * size.height() + t.y()) as usize;
+    let cell = |tile: Tile| (tile.x() * size.height() + tile.y()) as usize;
     let mut seen = vec![false; (size.width() * size.height()) as usize];
-    let Some(s) = seen.get_mut(cell(start)) else {
+    let Some(start_seen) = seen.get_mut(cell(start)) else {
         return Ok(None);
     };
-    *s = true;
+    *start_seen = true;
     let mut todo = vec![start];
     let mut first = true;
-    while let Some(t) = todo.pop() {
-        if !take(&mut first) && planner.tile_closed(t + corner)? {
+    while let Some(open) = todo.pop() {
+        if !take(&mut first) && planner.tile_closed(open + corner)? {
             continue;
         }
-        for tile in t.beside() {
+        for tile in open.beside() {
             if size.holds(tile)
-                && let Some(s) = seen.get_mut(cell(tile))
-                && !*s
+                && let Some(tile_seen) = seen.get_mut(cell(tile))
+                && !*tile_seen
             {
-                *s = true;
+                *tile_seen = true;
                 todo.push(tile);
             }
         }
@@ -418,18 +418,18 @@ struct Pass {
 /// What [`closest_resource`] and [`closest_resource_at`] read of the world (`FUN_140c49760`'s
 /// arguments past the unit, the site and the kind).
 #[derive(Debug)]
-pub struct ResourceWorld<'a, 'p> {
+pub struct ResourceWorld<'world, 'plan> {
     /// The spatial index: the map's size, the searching player's explored tiles, the tiles a
     /// unit can stand on and the objects on a tile; the reach test writes the obstruction
     /// manager's scratch in it.
-    pub(crate) spatial: &'a mut Spatial,
+    pub(crate) spatial: &'world mut Spatial,
     /// The unit's terrain mask, whose tiles it can stand on ([`Spatial::standable`],
     /// `FUN_141185690`).
     pub(crate) mask: TerrainMask,
     /// The objects on a tile.
-    pub(crate) candidates: Candidates<'a>,
+    pub(crate) candidates: Candidates<'world>,
     /// Whether the unit reaches an object (slot 0x3d0 with the range 0).
-    pub(crate) reach: UnitReach<'a, 'p>,
+    pub(crate) reach: UnitReach<'world, 'plan>,
 }
 
 /// `ClosestResourceObject` (`FUN_140c49760`) with no point (`param_7`, `param_8` −1: the unit's
@@ -516,18 +516,18 @@ pub fn closest_resource_at(
     // the sort's point, and the box's side (fixed for both passes)
     let (sort_at, side) = sort_point_and_side(Point::new(ux, uy), los, site, gather_search_tuning);
     let half = side / 2;
-    let nearer = |a: Cell, b: Cell| {
-        let d = |c: Cell| {
-            let dx = sort_at.0 - (c.tile.x() as f32 + TILE_CENTRE);
-            let dy = sort_at.1 - (c.tile.y() as f32 + TILE_CENTRE);
+    let nearer = |one: Cell, other: Cell| {
+        let distance_of = |cell: Cell| {
+            let dx = sort_at.0 - (cell.tile.x() as f32 + TILE_CENTRE);
+            let dy = sort_at.1 - (cell.tile.y() as f32 + TILE_CENTRE);
             dy * dy + dx * dx
         };
-        d(a) < d(b)
+        distance_of(one) < distance_of(other)
     };
     let passes = search_passes(
         site,
         map,
-        &|t| spatial.standable(t, mask),
+        &|tile| spatial.standable(tile, mask),
         unit_tile,
         los,
         &nearer,
@@ -541,14 +541,14 @@ pub fn closest_resource_at(
     for pass in passes {
         let (ox, oy) = (half - pass.origin.x(), half - pass.origin.y());
         let mut seen = vec![false; (side * side) as usize];
-        let at = |t: Tile| ((t.y() + oy) * side + t.x() + ox) as usize;
+        let at = |tile: Tile| ((tile.y() + oy) * side + tile.x() + ox) as usize;
         for cell in &pass.seeds {
             *seen.checked_mut(at(cell.tile))? = true;
         }
         let mut queue = pass.seeds;
-        let mut i = 0;
-        while let Some(&Cell { tile, steps }) = queue.get(i) {
-            i += 1;
+        let mut index = 0;
+        while let Some(&Cell { tile, steps }) = queue.get(index) {
+            index += 1;
             if !spatial.explored(seeker.player, tile)? {
                 continue;
             }
@@ -558,7 +558,7 @@ pub fn closest_resource_at(
             }
             if spatial.standable(tile, mask) {
                 push_neighbours(&mut queue, &mut seen, &at, Cell { tile, steps }, map)?;
-                sort(queue.tail_mut(i)?, &nearer)?;
+                sort(queue.tail_mut(index)?, &nearer)?;
             }
             let on_tile = candidates.on(spatial, tile)?;
             let Some(candidate) = first_resource(&on_tile, kind)? else {
@@ -678,7 +678,7 @@ mod tests {
         (x, y, radius): (f32, f32, f32),
         workers: WorkerCount,
     ) -> SceneObject {
-        let m = Master {
+        let resource_master = Master {
             id: master_id(master),
             kind,
             class,
@@ -695,7 +695,12 @@ mod tests {
         SceneObject {
             holds: Some((attribute, Amount::new(100.0))),
             workers,
-            ..SceneObject::new(id, PlayerId::GAIA, m, Position::new(x, y, 0.0))
+            ..SceneObject::new(
+                id,
+                PlayerId::GAIA,
+                resource_master,
+                Position::new(x, y, 0.0),
+            )
         }
     }
 
@@ -778,7 +783,7 @@ mod tests {
             pathing: &mut world.pathing,
             now: world.world_time,
             player_kind: PlayerKind::default(),
-            object: world.streams.get(Stream::Object),
+            object: world.streams.get_mut(Stream::Object),
             groups: &world.groups,
         };
         closest_resource_at(
@@ -1124,25 +1129,31 @@ mod tests {
     /// villager cannot touch, the nearest to it first, and a fish of radius 0.5 at (10.5, 18.5)
     /// at the causeway's end, which it reaches.
     fn shore_of(near: usize) -> World {
-        let land = |t: Tile| {
-            (t.y() == 10 && (2..=18).contains(&t.x()))
-                || (t.x() == 10 && (10..=17).contains(&t.y()))
+        let land = |tile: Tile| {
+            (tile.y() == 10 && (2..=18).contains(&tile.x()))
+                || (tile.x() == 10 && (10..=17).contains(&tile.y()))
         };
         let tiles = (0..40).flat_map(|y| (0..40).map(move |x| Tile::new(x, y)));
-        let water: Vec<Tile> = tiles.clone().filter(|&t| !land(t)).collect();
+        let water: Vec<Tile> = tiles.clone().filter(|&tile| !land(tile)).collect();
         let shore = |land_tile: Tile| !land(land_tile) && land_tile.beside().into_iter().any(land);
-        let dist = |t: Tile| {
-            let (dx, dy) = (t.x() as f32 + 0.5 - 10.2, t.y() as f32 + 0.5 - 10.7);
+        let dist = |tile: Tile| {
+            let (dx, dy) = (tile.x() as f32 + 0.5 - 10.2, tile.y() as f32 + 0.5 - 10.7);
             dx * dx + dy * dy
         };
         let mut beside: Vec<Tile> = tiles
-            .filter(|&t| shore(t) && t != Tile::new(10, 18))
+            .filter(|&tile| shore(tile) && tile != Tile::new(10, 18))
             .collect();
-        beside.sort_by(|a, b| dist(*a).total_cmp(&dist(*b)));
+        beside.sort_by(|left, right| dist(*left).total_cmp(&dist(*right)));
         let mut objects: Vec<SceneObject> = beside[..near]
             .iter()
             .enumerate()
-            .map(|(i, tile)| fish(i as i32 + 1, tile.x() as f32 + 0.5, tile.y() as f32 + 0.5))
+            .map(|(index, tile)| {
+                fish(
+                    index as i32 + 1,
+                    tile.x() as f32 + 0.5,
+                    tile.y() as f32 + 0.5,
+                )
+            })
             .collect();
         objects.push(resource(
             (99, 53, class_id(5), MasterKind::STATIC),

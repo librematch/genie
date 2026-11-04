@@ -14,7 +14,7 @@ use crate::pathing::hull_path::{HALF, Hull, HullIndex, HullPather, Point, Shape}
 use crate::players::PlayerId;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::generated::HullPathTuning;
-use crate::world::slots::CheckedIndex;
+use crate::world::slots::CheckedIndexExt;
 use crate::{GenieError, GenieResult};
 
 impl HullPather<'_> {
@@ -82,55 +82,59 @@ impl HullPather<'_> {
             return Ok(HullIndex::new(hulls.len() - 1));
         };
         'merging: loop {
-            for j in 0..hulls.len() {
-                if j == mine.index() {
+            for index in 0..hulls.len() {
+                if index == mine.index() {
                     continue;
                 }
-                let (h, o) = (hulls.checked(mine.index())?, hulls.checked(j)?);
-                if !(h.min.x() <= o.max.x()
-                    && h.min.y() <= o.max.y()
-                    && o.min.x() <= h.max.x()
-                    && o.min.y() <= h.max.y())
+                let (own_hull, other_hull) = (hulls.checked(mine.index())?, hulls.checked(index)?);
+                if !(own_hull.min.x() <= other_hull.max.x()
+                    && own_hull.min.y() <= other_hull.max.y()
+                    && other_hull.min.x() <= own_hull.max.x()
+                    && other_hull.min.y() <= own_hull.max.y())
                 {
                     continue;
                 }
-                let count = o.points.len();
-                let overlaps = h.points.iter().any(|p| o.inside(*p))
-                    || o.points.iter().any(|p| h.inside(*p))
+                let count = other_hull.points.len();
+                let overlaps = own_hull.points.iter().any(|point| other_hull.inside(*point))
+                    || other_hull.points.iter().any(|point| own_hull.inside(*point))
                     // the other's sides k = 0..n-1 (`cmp edi, esi; jl` at 0x140f8b2c4, esi = n - 1)
-                    || (0..count.saturating_sub(1)).any(|k| {
-                        let prev = if k == 0 { count - 1 } else { k - 1 };
-                        o.points
-                            .get(k)
-                            .zip(o.points.get(prev))
-                            .is_some_and(|(a, b)| h.intersection(AtStart::Counts, *a, *b, hull_path_tuning).is_some())
+                    || (0..count.saturating_sub(1)).any(|side| {
+                        let prev = if side == 0 { count - 1 } else { side - 1 };
+                        other_hull.points
+                            .get(side)
+                            .zip(other_hull.points.get(prev))
+                            .is_some_and(|(from, to)| own_hull.intersection(AtStart::Counts, *from, *to, hull_path_tuning).is_some())
                     });
                 if !overlaps {
                     continue;
                 }
-                mine = Self::absorb(hulls, mine, j)?;
+                mine = Self::absorb(hulls, mine, index)?;
                 continue 'merging;
             }
             return Ok(mine);
         }
     }
 
-    /// Hull `j` merges into hull `mine`: its boxes the other lacks and its points join, and its
-    /// slot goes to the last hull. Returns where `mine` now is.
-    fn absorb(hulls: &mut Vec<Hull>, mine: HullIndex, j: usize) -> GenieResult<HullIndex> {
-        let other = hulls.checked(j)?.clone();
-        for s in &other.objects {
+    /// Hull `other_index` merges into hull `mine`: its boxes the other lacks and its points join,
+    /// and its slot goes to the last hull. Returns where `mine` now is.
+    fn absorb(
+        hulls: &mut Vec<Hull>,
+        mine: HullIndex,
+        other_index: usize,
+    ) -> GenieResult<HullIndex> {
+        let other = hulls.checked(other_index)?.clone();
+        for object in &other.objects {
             let mine_objects = &mut hulls.checked_mut(mine.index())?.objects;
-            if !mine_objects.iter().any(|shape| shape.id == s.id) {
-                mine_objects.push(*s);
+            if !mine_objects.iter().any(|shape| shape.id == object.id) {
+                mine_objects.push(*object);
             }
         }
         hulls.checked_mut(mine.index())?.merge(&other.points)?;
         let last = hulls.len() - 1;
-        hulls.swap(j, last);
+        hulls.swap(other_index, last);
         let _ = hulls.pop();
         Ok(if mine.index() == last {
-            HullIndex::new(j)
+            HullIndex::new(other_index)
         } else {
             mine
         })
@@ -210,7 +214,7 @@ impl HullPather<'_> {
             y + ry + distance.get(),
         );
         // `COMISS`/`JA` (0x140f8b772, 0x140f8b7a4): an unordered radius takes the given hull
-        let h = match hull {
+        let target_hull = match hull {
             Some(hull_index)
                 if at_most_or_unordered(rx, HALF) && at_most_or_unordered(ry, HALF) =>
             {
@@ -218,7 +222,7 @@ impl HullPather<'_> {
             }
             _ => Self::add_shape_to(hulls, bounds.corner0(), bounds.corner1(), hull_path_tuning)?,
         };
-        let objects = &mut hulls.checked_mut(h.index())?.objects;
+        let objects = &mut hulls.checked_mut(target_hull.index())?.objects;
         let id = RecordId::from(id);
         if !objects.iter().any(|shape| shape.id == id) {
             objects.push(Shape { bounds, id });
@@ -255,11 +259,11 @@ impl HullPather<'_> {
                     (x + 1) as f32 + distance.get(),
                     (y + 1) as f32 + distance.get(),
                 );
-                let k = match hull {
+                let target_hull = match hull {
                     Some(hull_index) => hull_index,
                     None => self.add_shape(bounds.corner0(), bounds.corner1())?,
                 };
-                let objects = &mut self.hulls.checked_mut(k.index())?.objects;
+                let objects = &mut self.hulls.checked_mut(target_hull.index())?.objects;
                 if !objects.iter().any(|shape| shape.id == id) {
                     objects.push(Shape { bounds, id });
                 }
@@ -284,9 +288,9 @@ impl HullPather<'_> {
     /// its own place. Then the cliffs about the area.
     pub(super) fn build_hulls(&mut self) -> GenieResult<()> {
         self.hulls.clear();
-        let (w, h) = (self.world.map.width(), self.world.map.height());
+        let (width, height) = (self.world.map.width(), self.world.map.height());
         let [x0, y0, x1, y1] = self.area.get();
-        self.area = TileRect::new(x0.max(0), y0.max(0), x1.min(w - 1), y1.min(h - 1));
+        self.area = TileRect::new(x0.max(0), y0.max(0), x1.min(width - 1), y1.min(height - 1));
         let distance = self.radius;
         let not_mask = self.mask.blocked();
         for y in self.area.y0()..=self.area.y1() {
@@ -333,10 +337,10 @@ impl HullPather<'_> {
     /// `MShortPather::processCliffs` (`FUN_140f8e020`): the objects of the cliff tiles (a static
     /// record of class 6) within two tiles about the area.
     pub(super) fn process_cliffs(&mut self) -> GenieResult<()> {
-        let (w, h) = (self.world.map.width(), self.world.map.height());
+        let (width, height) = (self.world.map.width(), self.world.map.height());
         let [x0, y0, x1, y1] = self.area.get();
         let (ex0, ey0) = ((x0 - 2).max(0), (y0 - 2).max(0));
-        let (ex1, ey1) = ((x1 + 2).min(w - 1), (y1 + 2).min(h - 1));
+        let (ex1, ey1) = ((x1 + 2).min(width - 1), (y1 + 2).min(height - 1));
         for y in ey0..=ey1 {
             for x in (ex0..x0).chain(x1 + 1..=ex1) {
                 self.cliff(Tile::new(x, y))?;
@@ -382,10 +386,10 @@ impl HullPather<'_> {
     /// Whether `point` lies on the map, `distance` from its edge.
     pub(super) fn on_map(&self, point: Point) -> bool {
         let distance = self.radius;
-        let (w, h) = (self.world.map.width(), self.world.map.height());
+        let (width, height) = (self.world.map.width(), self.world.map.height());
         !(point.x() < distance.get()
-            || w as f32 - distance.get() < point.x()
+            || width as f32 - distance.get() < point.x()
             || point.y() < distance.get()
-            || h as f32 - distance.get() < point.y())
+            || height as f32 - distance.get() < point.y())
     }
 }

@@ -75,7 +75,7 @@ mod tests {
     fn priority_3_limits_and_4_is_past_it() {
         assert!(AttackPriority::PRIORITY_3.limited() && !AttackPriority::PRIORITY_2.limited());
         assert_eq!(
-            [0, 3, 4, 0xff].map(|b| AttackPriority::of_byte(b).past_3()),
+            [0, 3, 4, 0xff].map(|byte| AttackPriority::of_byte(byte).past_3()),
             [false, false, true, true]
         );
         assert_eq!(AttackPriority::PRIORITY_1.get(), 1);

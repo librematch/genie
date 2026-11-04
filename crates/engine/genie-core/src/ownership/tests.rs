@@ -57,19 +57,19 @@ fn walking_forager() -> World {
 /// parts) and Gaia's bushes the stop let go in the update (each held by one worker before it,
 /// none after).
 fn stopped(mut world: World, class: ClassId) -> GenieResult<(Object, Vec<i32>)> {
-    for b in &mut world.players[0].objects {
-        b.workers = WorkerCount::of_data(1);
+    for unit in &mut world.players[0].objects {
+        unit.workers = WorkerCount::of_data(1);
     }
     let released = in_update(
         &mut world,
         (PlayerId::new(1), ListIndex::new(0)),
         50,
-        |u, actions, step| {
-            u.capture_stop(actions, step, class, &roles())?;
-            let gone = OthersRef::of(&step.w.players, &step.w.index, step.player)
+        |own_unit, actions, step| {
+            own_unit.capture_stop(actions, step, class, &roles())?;
+            let gone = OthersRef::of(&step.world.players, &step.world.index, step.player)
                 .unwrap()
                 .foreign_iter()
-                .filter(|(_, b)| b.workers == WorkerCount::of_data(0));
+                .filter(|(_, unit)| unit.workers == WorkerCount::of_data(0));
             Ok(gone.map(|(_, unit)| unit.id.get()).collect())
         },
     )?;
@@ -85,13 +85,13 @@ fn stopped(mut world: World, class: ClassId) -> GenieResult<(Object, Vec<i32>)> 
 /// unit), then the unit AI of any class but livestock ends its order and forgets its target.
 #[test]
 fn capture_stop_tears_the_actions_down_and_stops_the_unit_ai() {
-    let (o, released) = stopped(walking_forager(), class::VILLAGER).unwrap();
-    assert_eq!(o.parts.actions.list.move_to().copied(), None);
+    let (object, released) = stopped(walking_forager(), class::VILLAGER).unwrap();
+    assert_eq!(object.parts.actions.list.move_to().copied(), None);
     assert_eq!(released, [0_i32; 0]);
-    let mover = o.parts.mover().unwrap();
+    let mover = object.parts.mover().unwrap();
     assert_eq!(mover.animated.speed, Speed::new(0.0));
     assert_eq!(mover.velocity.unwrap().velocity.y(), 0.0);
-    let ai = o.parts.unit_ai.as_ref().unwrap();
+    let ai = object.parts.unit_ai.as_ref().unwrap();
     assert_eq!(
         (ai.current_order, ai.current_action, ai.current_target),
         (None, None, None)
@@ -101,11 +101,11 @@ fn capture_stop_tears_the_actions_down_and_stops_the_unit_ai() {
         (Some(OrderKind::Move), Some(AiAction::Move))
     );
     // livestock's unit AI, and one on action 0x2c2, keep their order and target
-    let (o, _) = stopped(walking_forager(), class::LIVESTOCK).unwrap();
-    assert_eq!(o.parts.actions.list.move_to().copied(), None);
+    let (object, _) = stopped(walking_forager(), class::LIVESTOCK).unwrap();
+    assert_eq!(object.parts.actions.list.move_to().copied(), None);
     let kept = |ai: &UnitAi| (ai.current_order, ai.current_target);
     assert_eq!(
-        kept(o.parts.unit_ai.as_ref().unwrap()),
+        kept(object.parts.unit_ai.as_ref().unwrap()),
         (Some(OrderKind::Move), Some(object_id(600)))
     );
     let mut world = walking_forager();
@@ -135,16 +135,22 @@ fn capture_stop_keeps_the_artifact_and_lets_its_target_go() {
         target: Some(object_id(600)),
         ..Artifact::new(PlayerId::new(1), None)
     };
-    let mut t = forage_world();
-    t.parts
-        .actions_mut(t.players[1].objects[ListIndex::new(0)].id)
+    let mut world = forage_world();
+    world
+        .parts
+        .actions_mut(world.players[1].objects[ListIndex::new(0)].id)
         .unwrap()
         .list
         .set_artifact(Some(artifact()));
-    let (object, released) = stopped(t, class::LIVESTOCK).unwrap();
-    let a = object.parts.actions.list.artifact().copied().unwrap();
+    let (object, released) = stopped(world, class::LIVESTOCK).unwrap();
+    let held_artifact = object.parts.actions.list.artifact().copied().unwrap();
     assert_eq!(
-        (a.move_to().copied(), a.goal, a.target, a.state),
+        (
+            held_artifact.move_to().copied(),
+            held_artifact.goal,
+            held_artifact.target,
+            held_artifact.state
+        ),
         (None, None, None, ArtifactState::Check)
     );
     assert_eq!(released, [600]);

@@ -14,7 +14,7 @@ use crate::pathing::hull_path::{
     EntranceIndex, GROWTHS, HullIndex, HullPather, HullQuery, ITERATION_CAP, MOST, NUDGE,
     NodeIndex, NodeList, PATHS, Point, WalkResult, Waypoints,
 };
-use crate::world::slots::CheckedIndex;
+use crate::world::slots::CheckedIndexExt;
 use std::mem::take;
 use std::slice::from_mut;
 
@@ -376,9 +376,9 @@ impl HullPather<'_> {
         let (to, distance) = (hull_query.to, self.radius);
         hull_query.target.as_ref().map_or_else(
             || {
-                let d =
+                let squared =
                     (at.y() - to.y()) * (at.y() - to.y()) + (at.x() - to.x()) * (at.x() - to.x());
-                d <= (hull_query.range + distance).squared().get() + NUDGE
+                squared <= (hull_query.range + distance).squared().get() + NUDGE
             },
             |target| self.target_gap(target, at) <= hull_query.range + Distance::new(NUDGE),
         )
@@ -402,11 +402,11 @@ impl HullPather<'_> {
         };
         for (index, hull) in self.hulls.iter().enumerate() {
             if let Some((point, edge)) = hull.intersection(start, at, to, hull_path_tuning) {
-                let d = (point.y() - at.y()) * (point.y() - at.y())
+                let distance = (point.y() - at.y()) * (point.y() - at.y())
                     + (point.x() - at.x()) * (point.x() - at.x());
-                if d < crossing_d {
+                if distance < crossing_d {
                     crossing = Some((HullIndex::new(index), point, edge));
-                    crossing_d = d;
+                    crossing_d = distance;
                 }
             }
         }
@@ -473,7 +473,7 @@ impl HullPather<'_> {
         let (mut backward, mut forward) = (Some(node), Some(node));
         for _ in 0..np / 2 {
             if let Some(x) = backward {
-                let p = *self
+                let point = *self
                     .hulls
                     .checked(hit.index())?
                     .points
@@ -482,7 +482,7 @@ impl HullPather<'_> {
                     list: NodeList::SEARCH,
                     open: true,
                     parent: Some(x),
-                    position: p,
+                    position: point,
                     goal: Some(to),
                     hull: hit.slot(),
                     vertex: back,
@@ -516,14 +516,14 @@ impl HullPather<'_> {
         Ok(())
     }
 
-    /// A hull of an odd count's last point, `back` on the back way's node `a` or `fwd` on the
-    /// forward way's `b`: on `a` when it is cheaper than `b` or `b` is gone, else on `b`; none
-    /// when both ways are gone.
+    /// A hull of an odd count's last point, `back` on the back way's node `from_node` or `fwd` on
+    /// the forward way's `node_index`: on `from_node` when it is cheaper than `node_index` or
+    /// `node_index` is gone, else on `node_index`; none when both ways are gone.
     fn odd_point(
         &mut self,
         hit: HullIndex,
-        (a, back): (Option<NodeIndex>, i32),
-        (b, fwd): (Option<NodeIndex>, usize),
+        (from_node, back): (Option<NodeIndex>, i32),
+        (node_index, fwd): (Option<NodeIndex>, usize),
         to: Point,
     ) -> GenieResult<()> {
         let (qa, qb) = (
@@ -534,7 +534,7 @@ impl HullPather<'_> {
                 .checked(back as usize)?,
             *self.hulls.checked(hit.index())?.points.checked(fwd)?,
         );
-        let on_a = match (a, b) {
+        let on_a = match (from_node, node_index) {
             (Some(x), Some(y)) => {
                 (self.nodes.checked(x)?.cost < self.nodes.checked(y)?.cost).then_some(x)
             }
@@ -553,7 +553,7 @@ impl HullPather<'_> {
                 direction: -1,
                 by_place: false,
             })?;
-        } else if let Some(y) = b {
+        } else if let Some(y) = node_index {
             let _ = self.add_node(NewNode {
                 list: NodeList::SEARCH,
                 open: true,

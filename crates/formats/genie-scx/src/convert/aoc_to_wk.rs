@@ -21,7 +21,7 @@ impl Default for AocToWk {
             (527, 1104), // Demolition Ship, Demolition Raft
         ]
         .iter()
-        .map(|(a, b)| (*a, UnitKindId::from(*b)))
+        .map(|(from, to)| (*from, UnitKindId::from(*to)))
         .collect();
 
         let terrain_ids_map = [
@@ -30,7 +30,7 @@ impl Default for AocToWk {
             (20, 19), // Oak Forest, Pine Forest
         ]
         .iter()
-        .map(|(a, b)| (*a, *b))
+        .map(|(from, to)| (*from, *to))
         .collect();
 
         Self {
@@ -57,13 +57,13 @@ impl AocToWk {
         trigger.conditions_unordered_mut().for_each(|cond| {
             if let Some(new_kind) = cond
                 .unit_kind()
-                .and_then(|t| self.object_ids_map.get(&t.into()))
+                .and_then(|unit_kind_id| self.object_ids_map.get(&unit_kind_id.into()))
             {
                 cond.set_unit_kind(*new_kind);
             }
             if let Some(new_kind) = cond
                 .object_kind()
-                .and_then(|t| self.object_ids_map.get(&t.into()))
+                .and_then(|unit_kind_id| self.object_ids_map.get(&unit_kind_id.into()))
             {
                 cond.set_object_kind(*new_kind);
             }
@@ -71,7 +71,7 @@ impl AocToWk {
         trigger.effects_unordered_mut().for_each(|effect| {
             if let Some(new_kind) = effect
                 .unit_kind()
-                .and_then(|t| self.object_ids_map.get(&t.into()))
+                .and_then(|unit_kind_id| self.object_ids_map.get(&unit_kind_id.into()))
             {
                 effect.set_unit_kind(*new_kind);
             }

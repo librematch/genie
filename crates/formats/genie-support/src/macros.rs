@@ -22,8 +22,8 @@ macro_rules! infallible_try_into {
     ($from:ident, $to:ty) => {
         impl ::std::convert::From<$from> for $to {
             #[inline]
-            fn from(n: $from) -> Self {
-                n.0.into()
+            fn from(id: $from) -> Self {
+                id.0.into()
             }
         }
     };
@@ -51,11 +51,11 @@ macro_rules! fallible_try_into {
         impl ::std::convert::TryFrom<$from> for $to {
             type Error = ::genie_error::GenieError;
             #[inline]
-            fn try_from(n: $from) -> ::genie_error::GenieResult<Self> {
+            fn try_from(id: $from) -> ::genie_error::GenieResult<Self> {
                 use ::std::convert::TryInto;
-                n.0.try_into().map_err(|_| {
+                id.0.try_into().map_err(|_| {
                     ::genie_error::GenieError::invalid_input("an id that does not fit the integer")
-                        .with("id", n.0)
+                        .with("id", id.0)
                 })
             }
         }
@@ -85,11 +85,11 @@ macro_rules! fallible_try_from {
         impl ::std::convert::TryFrom<$from> for $to {
             type Error = ::genie_error::GenieError;
             #[inline]
-            fn try_from(n: $from) -> ::genie_error::GenieResult<Self> {
+            fn try_from(id: $from) -> ::genie_error::GenieResult<Self> {
                 use ::std::convert::TryInto;
-                n.try_into().map(Self).map_err(|_| {
+                id.try_into().map(Self).map_err(|_| {
                     ::genie_error::GenieError::invalid_input("an id that does not fit the integer")
-                        .with("id", n)
+                        .with("id", id)
                 })
             }
         }

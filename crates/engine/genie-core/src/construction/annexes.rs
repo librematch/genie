@@ -97,14 +97,17 @@ mod tests {
     /// error stops it at its slot.
     #[test]
     fn building_lets_its_gone_annexes_go() {
-        let mut a = Annexes::new([
+        let mut annexes = Annexes::new([
             Some(object_id(10)),
             None,
             Some(object_id(12)),
             Some(object_id(13)),
         ]);
-        a.let_go(|id| Ok(id != object_id(12))).unwrap();
-        assert_eq!(a, Annexes::new([None, None, Some(object_id(12)), None]));
+        annexes.let_go(|id| Ok(id != object_id(12))).unwrap();
+        assert_eq!(
+            annexes,
+            Annexes::new([None, None, Some(object_id(12)), None])
+        );
         let mut annexes = Annexes::new([Some(object_id(10)), Some(object_id(11)), None, None]);
         let failed = annexes.let_go(|id| {
             if id == object_id(11) {

@@ -8,15 +8,18 @@ use genie_rec::de::Op;
 
 /// One frame of the body (FD-007's per-frame record order): the op-2 record that starts a tick, its
 /// dt and, every interval, a checkpoint, then the op-1 commands the tick runs after its `SeedAll`.
-pub(super) struct Frame<'a> {
+pub(super) struct Frame<'data> {
     pub(super) dt: Millis,
     pub(super) checkpoint: Option<Box<de::Checkpoint>>,
-    pub(super) commands: Vec<&'a [u8]>,
+    pub(super) commands: Vec<&'data [u8]>,
 }
 
 /// The chapter's first `limit` frames.
-pub(super) fn frames<'a>(chapter: &de::Chapter<'a>, limit: usize) -> GenieResult<Vec<Frame<'a>>> {
-    let mut out: Vec<Frame<'a>> = Vec::new();
+pub(super) fn frames<'data>(
+    chapter: &de::Chapter<'data>,
+    limit: usize,
+) -> GenieResult<Vec<Frame<'data>>> {
+    let mut out: Vec<Frame<'data>> = Vec::new();
     for op in chapter.ops() {
         let (dt, checkpoint) = match op? {
             Op::Sync { dt } => (dt, None),

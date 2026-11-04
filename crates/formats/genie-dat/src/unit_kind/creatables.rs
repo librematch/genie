@@ -119,8 +119,8 @@ impl CombatUnitKindAttributes {
         let _tribe_unit_kind = input.read_u8()?;
         attrs.hero_flag = input.read_u8()?;
         attrs.garrison_sprite = {
-            let n = input.read_i32::<LE>()?;
-            if n < 0 { None } else { Some(fits(n)?) }
+            let value = input.read_i32::<LE>()?;
+            if value < 0 { None } else { Some(fits(value)?) }
         };
         attrs.volley_fire_amount = input.read_f32::<LE>()?;
         attrs.max_attacks_in_volley = input.read_i8()?;

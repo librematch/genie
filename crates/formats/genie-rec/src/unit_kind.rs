@@ -1,4 +1,4 @@
-use crate::element::{ReadableHeaderElement, WritableHeaderElement};
+use crate::element::{ReadHeader, WriteHeader};
 use crate::fits;
 use crate::reader::RecordingHeaderReader;
 use arrayvec::ArrayVec;
@@ -32,7 +32,7 @@ pub struct CompactUnitKind {
     pub building: Option<BuildingUnitAttributes>,
 }
 
-impl ReadableHeaderElement for CompactUnitKind {
+impl ReadHeader for CompactUnitKind {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let unit_base_class = fits(input.read_u8()?)?;
         let static_ = StaticUnitAttributes::read_from(input)?;
@@ -101,7 +101,7 @@ pub struct StaticUnitAttributes {
     disabled: bool,
 }
 
-impl ReadableHeaderElement for StaticUnitAttributes {
+impl ReadHeader for StaticUnitAttributes {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let mut attrs = Self {
             id: input.read_u16::<LE>()?.into(),
@@ -160,14 +160,14 @@ pub struct AnimatedUnitAttributes {
     pub speed: f32,
 }
 
-impl ReadableHeaderElement for AnimatedUnitAttributes {
+impl ReadHeader for AnimatedUnitAttributes {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let speed = input.read_f32::<LE>()?;
         Ok(Self { speed })
     }
 }
 
-impl WritableHeaderElement for AnimatedUnitAttributes {
+impl WriteHeader for AnimatedUnitAttributes {
     fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         output.write_f32::<LE>(self.speed)?;
         Ok(())
@@ -181,14 +181,14 @@ pub struct MovingUnitAttributes {
     pub turn_speed: f32,
 }
 
-impl ReadableHeaderElement for MovingUnitAttributes {
+impl ReadHeader for MovingUnitAttributes {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let turn_speed = input.read_f32::<LE>()?;
         Ok(Self { turn_speed })
     }
 }
 
-impl WritableHeaderElement for MovingUnitAttributes {
+impl WriteHeader for MovingUnitAttributes {
     fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         output.write_f32::<LE>(self.turn_speed)?;
         Ok(())
@@ -204,7 +204,7 @@ pub struct ActionUnitAttributes {
     pub work_rate: f32,
 }
 
-impl ReadableHeaderElement for ActionUnitAttributes {
+impl ReadHeader for ActionUnitAttributes {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let search_radius = input.read_f32::<LE>()?;
         let work_rate = input.read_f32::<LE>()?;
@@ -215,7 +215,7 @@ impl ReadableHeaderElement for ActionUnitAttributes {
     }
 }
 
-impl WritableHeaderElement for ActionUnitAttributes {
+impl WriteHeader for ActionUnitAttributes {
     fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         output.write_f32::<LE>(self.search_radius)?;
         output.write_f32::<LE>(self.work_rate)?;
@@ -232,7 +232,7 @@ pub struct HitKind {
     pub amount: i16,
 }
 
-impl ReadableHeaderElement for HitKind {
+impl ReadHeader for HitKind {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let hit_kind = input.read_u16::<LE>()?;
         let amount = input.read_i16::<LE>()?;
@@ -268,7 +268,7 @@ pub struct BaseCombatUnitAttributes {
     pub weapon_range_min: f32,
 }
 
-impl ReadableHeaderElement for BaseCombatUnitAttributes {
+impl ReadHeader for BaseCombatUnitAttributes {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let mut attrs = Self {
             base_armor: if input.version() >= 11.52 {
@@ -311,14 +311,14 @@ pub struct MissileUnitAttributes {
     pub targeting_kind: u8,
 }
 
-impl ReadableHeaderElement for MissileUnitAttributes {
+impl ReadHeader for MissileUnitAttributes {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let targeting_kind = input.read_u8()?;
         Ok(Self { targeting_kind })
     }
 }
 
-impl WritableHeaderElement for MissileUnitAttributes {
+impl WriteHeader for MissileUnitAttributes {
     fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         output.write_u8(self.targeting_kind)?;
         Ok(())
@@ -358,7 +358,7 @@ pub struct CombatUnitAttributes {
     pub max_attacks_in_volley: u8,
 }
 
-impl ReadableHeaderElement for CombatUnitAttributes {
+impl ReadHeader for CombatUnitAttributes {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let mut attrs = Self::default();
         for _ in 0..3 {
@@ -418,7 +418,7 @@ pub struct BuildingUnitAttributes {
     pub garrison_heal_rate: Option<f32>,
 }
 
-impl ReadableHeaderElement for BuildingUnitAttributes {
+impl ReadHeader for BuildingUnitAttributes {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let mut attrs = Self::default();
         let facet = input.read_i16::<LE>()?;

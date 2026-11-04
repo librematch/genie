@@ -79,13 +79,13 @@ fn building_production_state_comes_before_its_top_action_s() {
 #[test]
 fn differences_name_the_object_its_master_and_the_field() {
     let unit = |id, master, hp| {
-        let mut u = Unit {
+        let mut unit = Unit {
             id,
             ..Unit::default()
         };
-        u.life.master_id = master;
-        u.life.hp = hp;
-        u
+        unit.life.master_id = master;
+        unit.life.hp = hp;
+        unit
     };
     let slice = [
         unit(object_id(1), VILLAGER_MALE, HitPoints::new(25.0)),

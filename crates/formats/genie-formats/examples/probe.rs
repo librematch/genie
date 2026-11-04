@@ -24,11 +24,11 @@ struct Outcome {
     error: Option<String>,
 }
 
-fn failed(e: impl Display) -> Outcome {
+fn failed(error: impl Display) -> Outcome {
     Outcome {
         read: false,
         roundtrip: None,
-        error: Some(e.to_string()),
+        error: Some(error.to_string()),
     }
 }
 
@@ -40,7 +40,7 @@ fn dat_de(bytes: &[u8]) -> Outcome {
     match DatFile::from_inflated(&data) {
         Ok(dat) => Outcome {
             read: true,
-            roundtrip: Some(dat.to_bytes().is_ok_and(|b| b == data)),
+            roundtrip: Some(dat.to_bytes().is_ok_and(|bytes| bytes == data)),
             error: None,
         },
         Err(error) => failed(error),
@@ -49,13 +49,13 @@ fn dat_de(bytes: &[u8]) -> Outcome {
 
 fn scenario(bytes: &[u8]) -> Outcome {
     match genie_scx::Scenario::read_from(Cursor::new(bytes)) {
-        Ok(s) => {
+        Ok(scenario) => {
             let mut out = Vec::new();
-            let written = s.write_to(&mut out);
+            let written = scenario.write_to(&mut out);
             Outcome {
                 read: true,
                 roundtrip: Some(written.is_ok() && out == bytes),
-                error: written.err().map(|e| format!("write: {e}")),
+                error: written.err().map(|error| format!("write: {error}")),
             }
         }
         Err(error) => failed(error),
@@ -64,13 +64,13 @@ fn scenario(bytes: &[u8]) -> Outcome {
 
 fn campaign(bytes: &[u8]) -> Outcome {
     let mut bytes_campaign = match genie_cpx::Campaign::read_from(Cursor::new(bytes)) {
-        Ok(c) => c,
-        Err(e) => return failed(e),
+        Ok(campaign) => campaign,
+        Err(error) => return failed(error),
     };
     // the archive's header and index, then every scenario in it
     for index in 0..bytes_campaign.len() {
-        if let Err(e) = bytes_campaign.by_index(index) {
-            return failed(format!("scenario {index}: {e}"));
+        if let Err(error) = bytes_campaign.by_index(index) {
+            return failed(format!("scenario {index}: {error}"));
         }
     }
     let mut out = Vec::new();
@@ -84,13 +84,13 @@ fn campaign(bytes: &[u8]) -> Outcome {
 
 fn palette(bytes: &[u8]) -> Outcome {
     match jascpal::Palette::read_from(Cursor::new(bytes)) {
-        Ok(p) => {
+        Ok(palette) => {
             let mut out = Vec::new();
-            let written = p.write_to(&mut out);
+            let written = palette.write_to(&mut out);
             Outcome {
                 read: true,
                 roundtrip: Some(written.is_ok() && out == bytes),
-                error: written.err().map(|e| format!("write: {e}")),
+                error: written.err().map(|error| format!("write: {error}")),
             }
         }
         Err(error) => failed(error),
@@ -105,7 +105,7 @@ fn strings_keyvalue(bytes: &[u8]) -> Outcome {
             Outcome {
                 read: true,
                 roundtrip: Some(written.is_ok() && out == bytes),
-                error: written.err().map(|e| format!("write: {e}")),
+                error: written.err().map(|error| format!("write: {error}")),
             }
         }
         Err(error) => failed(error),
@@ -119,11 +119,11 @@ where
     T: DeserializeOwned + serde::Serialize,
 {
     let text = match from_utf8(bytes) {
-        Ok(t) => t,
+        Ok(text) => text,
         Err(utf8_error) => return failed(utf8_error),
     };
     let table: T = match genie_json::from_str(text) {
-        Ok(t) => t,
+        Ok(table) => table,
         Err(error) => return failed(error),
     };
     let same = genie_json::to_string(&table).ok().and_then(|table_text| {
@@ -156,14 +156,14 @@ fn json(file: &str, bytes: &[u8]) -> Outcome {
 /// A JSON string literal.
 fn quote(text: &str) -> String {
     let mut out = String::from("\"");
-    for c in text.chars() {
-        match c {
+    for character in text.chars() {
+        match character {
             '"' => out.push_str("\\\""),
             '\\' => out.push_str("\\\\"),
-            c if (c as u32) < 0x20 => {
-                write!(out, "\\u{:04x}", c as u32).expect("writing to a String");
+            control if (control as u32) < 0x20 => {
+                write!(out, "\\u{:04x}", control as u32).expect("writing to a String");
             }
-            c => out.push(c),
+            other => out.push(other),
         }
     }
     out.push('"');
@@ -175,30 +175,31 @@ fn main() {
     let kind = args.next().expect("a probe kind");
     let probe: fn(&str, &[u8]) -> Outcome = match kind.as_str() {
         "json-table" => json,
-        "dat-de" => |_, b| dat_de(b),
-        "scenario" => |_, b| scenario(b),
-        "campaign" => |_, b| campaign(b),
-        "palette" => |_, b| palette(b),
-        "strings-keyvalue" => |_, b| strings_keyvalue(b),
+        "dat-de" => |_, bytes| dat_de(bytes),
+        "scenario" => |_, bytes| scenario(bytes),
+        "campaign" => |_, bytes| campaign(bytes),
+        "palette" => |_, bytes| palette(bytes),
+        "strings-keyvalue" => |_, bytes| strings_keyvalue(bytes),
         other => panic!("unknown probe kind {other}"),
     };
     for file in args {
         let outcome = match read(&file) {
             // an old reader may panic on a version it does not know; that is a failed read
-            Ok(bytes) => catch_unwind(|| probe(&file, &bytes)).unwrap_or_else(|p| {
+            Ok(bytes) => catch_unwind(|| probe(&file, &bytes)).unwrap_or_else(|panic| {
                 failed(format!(
                     "panic: {}",
-                    p.downcast_ref::<String>()
+                    panic
+                        .downcast_ref::<String>()
                         .cloned()
-                        .or_else(|| p.downcast_ref::<&str>().map(ToString::to_string))
+                        .or_else(|| panic.downcast_ref::<&str>().map(ToString::to_string))
                         .unwrap_or_default()
                 ))
             }),
-            Err(e) => failed(e),
+            Err(error) => failed(error),
         };
         let roundtrip = outcome
             .roundtrip
-            .map_or_else(|| "null".to_string(), |b| b.to_string());
+            .map_or_else(|| "null".to_string(), |flag| flag.to_string());
         let error = outcome
             .error
             .map_or_else(|| "null".to_string(), |text| quote(&text));

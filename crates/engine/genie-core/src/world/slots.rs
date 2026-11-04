@@ -23,9 +23,9 @@ const NO_SLOT: GenieError =
 /// A position the slice the caller holds does not hold.
 const NO_ELEMENT: GenieError = GenieError::unreachable("a position the list does not hold");
 
-/// Player `p`, and the objects at a position of its lists, as errors where a slice's index
+/// A player, and the objects at a position of its lists, as errors where a slice's index
 /// would panic.
-pub(crate) trait PlayerSlots {
+pub(crate) trait PlayerSlotsExt {
     /// Player `player_id`.
     ///
     /// # Errors
@@ -91,7 +91,7 @@ pub(crate) trait PlayerSlots {
     /// A player or a position the lists do not hold.
     fn at(&self, place: Place) -> GenieResult<&Unit> {
         match place {
-            Place::Live(p, i) => self.live(p, i),
+            Place::Live(owner, slot) => self.live(owner, slot),
             Place::Sleeping(player_id, list_index) => self.asleep(player_id, list_index),
         }
     }
@@ -103,42 +103,42 @@ pub(crate) trait PlayerSlots {
     /// A player or a position the lists do not hold.
     fn at_mut(&mut self, place: Place) -> GenieResult<&mut Unit> {
         match place {
-            Place::Live(p, i) => self.live_mut(p, i),
+            Place::Live(owner, slot) => self.live_mut(owner, slot),
             Place::Sleeping(player_id, list_index) => self.asleep_mut(player_id, list_index),
         }
     }
 }
 
-/// A position of a slice the caller holds, as an error where `v[i]` would panic: the index
+/// A position of a slice the caller holds, as an error where `slice[index]` would panic: the index
 /// comes from the code's own loop or search, so a miss is an invariant broken.
-pub(crate) trait CheckedIndex<T> {
-    /// The element at `i`.
+pub(crate) trait CheckedIndexExt<T> {
+    /// The element at `index`.
     ///
     /// # Errors
     ///
     /// A position the slice does not hold.
-    fn checked(&self, i: usize) -> GenieResult<&T>;
+    fn checked(&self, index: usize) -> GenieResult<&T>;
 
-    /// The element at `i`, to change.
+    /// The element at `index`, to change.
     ///
     /// # Errors
     ///
     /// A position the slice does not hold.
-    fn checked_mut(&mut self, i: usize) -> GenieResult<&mut T>;
+    fn checked_mut(&mut self, index: usize) -> GenieResult<&mut T>;
 
-    /// The first `n` elements.
+    /// The first `end` elements.
     ///
     /// # Errors
     ///
-    /// A slice shorter than `n`.
-    fn head(&self, n: usize) -> GenieResult<&[T]>;
+    /// A slice shorter than `end`.
+    fn head(&self, end: usize) -> GenieResult<&[T]>;
 
-    /// The first `n` elements, to change.
+    /// The first `end` elements, to change.
     ///
     /// # Errors
     ///
-    /// A slice shorter than `n`.
-    fn head_mut(&mut self, n: usize) -> GenieResult<&mut [T]>;
+    /// A slice shorter than `end`.
+    fn head_mut(&mut self, end: usize) -> GenieResult<&mut [T]>;
 
     /// The elements from `from` on, to change: none at the end.
     ///
@@ -148,21 +148,24 @@ pub(crate) trait CheckedIndex<T> {
     fn tail_mut(&mut self, from: usize) -> GenieResult<&mut [T]>;
 }
 
-impl<T> CheckedIndex<T> for [T] {
-    fn checked(&self, i: usize) -> GenieResult<&T> {
-        self.get(i).ok_or_else(|| NO_ELEMENT.with("index", i))
+impl<T> CheckedIndexExt<T> for [T] {
+    fn checked(&self, index: usize) -> GenieResult<&T> {
+        self.get(index)
+            .ok_or_else(|| NO_ELEMENT.with("index", index))
     }
 
-    fn checked_mut(&mut self, i: usize) -> GenieResult<&mut T> {
-        self.get_mut(i).ok_or_else(|| NO_ELEMENT.with("index", i))
+    fn checked_mut(&mut self, index: usize) -> GenieResult<&mut T> {
+        self.get_mut(index)
+            .ok_or_else(|| NO_ELEMENT.with("index", index))
     }
 
-    fn head(&self, n: usize) -> GenieResult<&[T]> {
-        self.get(..n).ok_or_else(|| NO_ELEMENT.with("end", n))
+    fn head(&self, end: usize) -> GenieResult<&[T]> {
+        self.get(..end).ok_or_else(|| NO_ELEMENT.with("end", end))
     }
 
-    fn head_mut(&mut self, n: usize) -> GenieResult<&mut [T]> {
-        self.get_mut(..n).ok_or_else(|| NO_ELEMENT.with("end", n))
+    fn head_mut(&mut self, end: usize) -> GenieResult<&mut [T]> {
+        self.get_mut(..end)
+            .ok_or_else(|| NO_ELEMENT.with("end", end))
     }
 
     fn tail_mut(&mut self, from: usize) -> GenieResult<&mut [T]> {
@@ -171,7 +174,7 @@ impl<T> CheckedIndex<T> for [T] {
     }
 }
 
-impl PlayerSlots for [Player] {
+impl PlayerSlotsExt for [Player] {
     fn player(&self, player_id: PlayerId) -> GenieResult<&Player> {
         self.get(player_id.index())
             .ok_or_else(|| NO_PLAYER.with("player", player_id))
@@ -236,19 +239,19 @@ mod tests {
     /// A position past a slice's end is an error that names it.
     #[test]
     fn position_past_the_end_is_an_error_naming_it() {
-        let mut v = [1, 2, 3];
-        assert_eq!(*v.checked(2).unwrap(), 3);
-        *v.checked_mut(0).unwrap() = 9;
-        assert_eq!(v, [9, 2, 3]);
-        let checked = v.checked(3).unwrap_err();
+        let mut values = [1, 2, 3];
+        assert_eq!(*values.checked(2).unwrap(), 3);
+        *values.checked_mut(0).unwrap() = 9;
+        assert_eq!(values, [9, 2, 3]);
+        let checked = values.checked(3).unwrap_err();
         assert_eq!(checked.context().collect::<Vec<_>>(), [("index", "3")]);
-        assert!(v.checked_mut(4).is_err());
-        assert_eq!(v.head(2).unwrap(), &[9, 2]);
-        assert!(v.head(4).is_err());
-        v.tail_mut(1).unwrap()[0] = 7;
-        assert_eq!(v, [9, 7, 3]);
-        assert_eq!(v.tail_mut(3).unwrap(), [0_i32; 0]);
-        let error = v.tail_mut(4).unwrap_err();
+        assert!(values.checked_mut(4).is_err());
+        assert_eq!(values.head(2).unwrap(), &[9, 2]);
+        assert!(values.head(4).is_err());
+        values.tail_mut(1).unwrap()[0] = 7;
+        assert_eq!(values, [9, 7, 3]);
+        assert_eq!(values.tail_mut(3).unwrap(), [0_i32; 0]);
+        let error = values.tail_mut(4).unwrap_err();
         assert_eq!(error.context().collect::<Vec<_>>(), [("start", "4")]);
     }
 
@@ -265,7 +268,7 @@ mod tests {
             .unwrap_err();
         let keys: Vec<_> = error
             .context()
-            .map(|(k, text)| (k, text.to_owned()))
+            .map(|(key, text)| (key, text.to_owned()))
             .collect();
         assert_eq!(
             keys,

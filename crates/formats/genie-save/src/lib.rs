@@ -146,7 +146,7 @@ impl Header {
 /// The bytes a value writes back: as many as it read.
 pub(crate) fn written_len<T: binrw::BinWrite>(value: &T) -> GenieResult<usize>
 where
-    for<'a> T::Args<'a>: Default,
+    for<'args> T::Args<'args>: Default,
 {
     let mut out = Cursor::new(Vec::new());
     value
@@ -171,36 +171,39 @@ pub fn parse(save: &[u8]) -> GenieResult<Header> {
 /// # Errors
 ///
 /// As [`parse`], and for a reader that fails.
-pub fn parse_reader<R: Read + Seek>(r: &mut R) -> GenieResult<Header> {
+pub fn parse_reader<R: Read + Seek>(reader: &mut R) -> GenieResult<Header> {
     // The save version (16.16) at offset 12, peeked: the file header's own gates are decided for the
     // supported versions, and it brings the version the world's gates compare.
-    let start = position(r)?;
+    let start = position(reader)?;
     let mut peek = [0u8; 16];
-    r.read_exact(&mut peek).map_err(|e| read_error(&e.into()))?;
+    reader
+        .read_exact(&mut peek)
+        .map_err(|error| read_error(&error.into()))?;
     let raw = u32::from_le_bytes([peek[12], peek[13], peek[14], peek[15]]);
-    let v = SaveVersion {
+    let version = SaveVersion {
         major: (raw >> 16) as u16,
         minor: raw as u16,
         build: 0,
     }
     .hundredths();
-    if v < MIN_HUNDREDTHS {
-        return Err(GenieError::invalid_input("a save older than 66.0").with("version", v));
+    if version < MIN_HUNDREDTHS {
+        return Err(GenieError::invalid_input("a save older than 66.0").with("version", version));
     }
-    let _ = r
+    let _ = reader
         .seek(SeekFrom::Start(start as u64))
-        .map_err(|e| read_error(&e.into()))?;
-    let file_header = SaveGameFileHeader::read_args(r, (raw,)).map_err(|e| read_error(&e))?;
-    let lobby_end = position(r)?;
+        .map_err(|error| read_error(&error.into()))?;
+    let file_header =
+        SaveGameFileHeader::read_args(reader, (raw,)).map_err(|error| read_error(&error))?;
+    let lobby_end = position(reader)?;
     let world =
-        World::read_args(r, (file_header.new_save_game_version,)).map_err(
-            |e| match unsupported_in(&e) {
+        World::read_args(reader, (file_header.new_save_game_version,)).map_err(|error| {
+            match unsupported_in(&error) {
                 Some((unsupported, at)) => unsupported.with("at", format_args!("{at:#x}")),
-                None => read_error(&e),
-            },
-        )?;
-    let here = position(r)?;
-    let end = r
+                None => read_error(&error),
+            }
+        })?;
+    let here = position(reader)?;
+    let end = reader
         .seek(SeekFrom::End(0))
         .map_err(|error| read_error(&error.into()))? as usize;
     if here != end {
@@ -210,9 +213,9 @@ pub fn parse_reader<R: Read + Seek>(r: &mut R) -> GenieResult<Header> {
                 .with("bytes after it", end - here),
         );
     }
-    for p in &world.base_world.players {
+    for positioned in &world.base_world.players {
         // the game's WorldPlayerFactory.cpp: "InvalidPlayerType: %d"
-        let _ = PlayerSection::new(p.pos as usize, &p.val)?;
+        let _ = PlayerSection::new(positioned.pos as usize, &positioned.val)?;
     }
     let map = &world.base_world.map;
     let ends = SectionEnds {
@@ -238,17 +241,18 @@ pub fn parse_reader<R: Read + Seek>(r: &mut R) -> GenieResult<Header> {
 /// # Errors
 ///
 /// [`ErrorKind::Io`] when the writer fails or a value cannot be written back.
-pub fn write<W: Write + Seek>(header: &Header, w: &mut W) -> GenieResult<()> {
+pub fn write<W: Write + Seek>(header: &Header, writer: &mut W) -> GenieResult<()> {
     use binrw::BinWrite;
     (|| {
-        header.file_header.write_le(w)?;
-        header.world.write_le(w)
+        header.file_header.write_le(writer)?;
+        header.world.write_le(writer)
     })()
     .map_err(|error| GenieError::io("a save that does not write").with("binrw", error))
 }
 
-fn position<R: Seek>(r: &mut R) -> GenieResult<usize> {
-    Ok(r.stream_position()
+fn position<R: Seek>(reader: &mut R) -> GenieResult<usize> {
+    Ok(reader
+        .stream_position()
         .map_err(|error| read_error(&error.into()))? as usize)
 }
 
@@ -365,14 +369,14 @@ mod tests {
         assert_eq!(error.context().next(), Some(("type", "4")));
     }
 
-    /// The state a version `v` AI writes: each part the version enables, zeroed.
-    fn ai_state(v: f32) -> AiExpertState {
+    /// The state a version `version` AI writes: each part the version enables, zeroed.
+    fn ai_state(version: f32) -> AiExpertState {
         use crate::generated::world::{AiExpertStateEntry1, TimerManager};
-        let zeroed = |n: usize| Some(vec![0u32; n]);
-        let nine = (v >= 0.14).then_some(0u32);
+        let zeroed = |count: usize| Some(vec![0u32; count]);
+        let nine = (version >= 0.14).then_some(0u32);
         AiExpertState {
-            ai_version: v,
-            ai_version_2: (v >= 0.13).then_some(0.0),
+            ai_version: version,
+            ai_version_2: (version >= 0.13).then_some(0.0),
             stat_0: nine,
             stat_1: nine,
             stat_2: nine,
@@ -382,11 +386,11 @@ mod tests {
             stat_6: nine,
             stat_7: nine,
             stat_8: nine,
-            timer_manager: (v >= 0.12).then(|| Box::new(TimerManager::default())),
-            table_c070: if v >= 0.09 { zeroed(256) } else { None },
-            table_b070: if v >= 0.08 { zeroed(256) } else { None },
-            table_b470: if v >= 0.08 { zeroed(256) } else { None },
-            unnamed_list_at_0x140b0eaad: (v >= 0.08)
+            timer_manager: (version >= 0.12).then(|| Box::new(TimerManager::default())),
+            table_c070: if version >= 0.09 { zeroed(256) } else { None },
+            table_b070: if version >= 0.08 { zeroed(256) } else { None },
+            table_b470: if version >= 0.08 { zeroed(256) } else { None },
+            unnamed_list_at_0x140b0eaad: (version >= 0.08)
                 .then(|| vec![AiExpertStateEntry1::default(); 8]),
         }
     }
@@ -454,9 +458,9 @@ mod tests {
     /// of the tables: the state is as long as its version says.
     #[test]
     fn the_ai_states_parts_follow_its_version() {
-        let state_len = |v: f32| {
+        let state_len = |version: f32| {
             let mut header = save_with_ai_scripts();
-            header.world.ai_state = Some(Box::new(ai_state(v)));
+            header.world.ai_state = Some(Box::new(ai_state(version)));
             let with = bytes(&header).len();
             header.world.ai_state = None;
             with - bytes(&header).len()

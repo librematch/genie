@@ -276,8 +276,8 @@ macro_rules! interact_packet {
 fn order(order_command: &OrderCommand) -> GenieResult<Packet> {
     let (player, units) = (order_command.player.get(), &order_command.units);
     Ok(match order_command.order {
-        Order::Interact(o) => interact_packet!(Interact, player, units, o),
-        Order::Work(o) => interact_packet!(Work, player, units, o),
+        Order::Interact(interact) => interact_packet!(Interact, player, units, interact),
+        Order::Work(order) => interact_packet!(Work, player, units, order),
         Order::Retreat(interact) => interact_packet!(Retreat, player, units, interact),
         Order::Move(move_order) => Packet::Move(packets::Move {
             commp_id: player,
@@ -333,9 +333,9 @@ fn build(build_command: &BuildCommand) -> GenieResult<Packet> {
 /// # Errors
 ///
 /// A coordinate outside a word.
-fn tile_word(v: i32) -> GenieResult<u16> {
-    u16::try_from(v).map_err(|_| {
-        GenieError::invalid_input("a wall tile outside the packet's word").with("coordinate", v)
+fn tile_word(value: i32) -> GenieResult<u16> {
+    u16::try_from(value).map_err(|_| {
+        GenieError::invalid_input("a wall tile outside the packet's word").with("coordinate", value)
     })
 }
 
@@ -387,8 +387,8 @@ fn research(research_command: &ResearchCommand) -> GenieResult<Packet> {
 
 /// PATROL (0x15): x as each slot's f32 bits.
 fn patrol(patrol_command: &PatrolCommand) -> GenieResult<Packet> {
-    let x = |i: usize| patrol_command.waypoints.points[i].x().to_bits();
-    let y = |i: usize| patrol_command.waypoints.points[i].y();
+    let x = |index: usize| patrol_command.waypoints.points[index].x().to_bits();
+    let y = |index: usize| patrol_command.waypoints.points[index].y();
     Ok(Packet::Patrol(packets::Patrol {
         commp_id: patrol_command.player.get(),
         num: patrol_command.units.count,
@@ -536,7 +536,11 @@ fn trade(trade_command: &TradeCommand) -> Packet {
 
 /// FLARE (0x73): the players' bytes from `+0x11`, of which the layout's fixed part holds three.
 fn flare(flare_command: &FlareCommand) -> GenieResult<Packet> {
-    let shown: Vec<u8> = flare_command.shown.iter().map(|&s| u8::from(s)).collect();
+    let shown: Vec<u8> = flare_command
+        .shown
+        .iter()
+        .map(|&shown| u8::from(shown))
+        .collect();
     let [first, second, third, rest @ ..] = shown.as_slice() else {
         return Err(GenieError::invalid_input(
             "a FLARE's packet holds three players' bytes at least",
@@ -563,7 +567,7 @@ fn game(game_command: &GameCommand) -> Packet {
         field_0x04: game_command.sub.get(),
         gap_0x06: [0; 2],
         field_0x08: game_command.player,
-        field_0x0a: game_command.a,
+        field_0x0a: game_command.argument,
         field_0x0c: game_command.speed,
         field_0x10: game_command.value,
     })

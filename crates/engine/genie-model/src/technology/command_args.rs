@@ -185,7 +185,7 @@ impl ModifyLocation {
     /// The entry it names: none below 1 (every location).
     #[must_use]
     pub fn entry(self) -> Option<usize> {
-        usize::try_from(self.0).ok().filter(|&i| 0 < i)
+        usize::try_from(self.0).ok().filter(|&entry| 0 < entry)
     }
 
     /// The short, as the `.dat` holds it.
@@ -245,7 +245,7 @@ mod tests {
         assert_eq!(ModifyMode::of_data(12), ModifyMode::State);
         assert_eq!(ModifyMode::of_data(-2).get(), -2);
         assert_eq!(
-            [0, -3, 2].map(|l| ModifyLocation::of_data(l).entry()),
+            [0, -3, 2].map(|location| ModifyLocation::of_data(location).entry()),
             [None, None, Some(2)]
         );
         let far = DisabledTech::of_data(65538);

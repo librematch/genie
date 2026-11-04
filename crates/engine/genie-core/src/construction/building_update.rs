@@ -26,7 +26,7 @@ use crate::objects::lifecycle::Lifecycle;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::PlayersMasters;
+use crate::objects::masters::PlayersMastersExt;
 use crate::objects::sprite::new_sprite;
 use crate::objects::unit::Unit;
 use crate::objects::unit::object_master;
@@ -42,7 +42,7 @@ use crate::world::layer::Roles;
 use crate::world::layer::generated::SpriteTuning;
 use crate::world::layer::generated::TurnTuning;
 use crate::world::others::OthersRef;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 use crate::world::step::Step;
 use crate::world::{BUILDING_TERRAIN, GATE_CLOSE_DELAY, GATE_EPSILON};
 use crate::{GenieError, GenieResult};
@@ -72,11 +72,11 @@ impl Unit {
         step: &mut Step<'_>,
         roles: &Roles,
     ) -> GenieResult<()> {
-        let master = self.master(step.w.master_tables(), step.player)?;
+        let master = self.master(step.world.master_tables(), step.player)?;
         if master.kind != MasterKind::BUILDING || walls_branch(master, roles) {
             return Ok(());
         }
-        let (players, index) = (&step.w.players, &step.w.index);
+        let (players, index) = (&step.world.players, &step.world.index);
         let removed = |id: ObjectId| {
             index
                 .locate(players, id)
@@ -90,12 +90,16 @@ impl Unit {
                     .with("object", id)
                 })
         };
-        if let Some(main) = step.w.parts.building_of(self.id).annex_of
+        if let Some(main) = step.world.parts.building_of(self.id).annex_of
             && removed(main.id())?
         {
-            step.w.parts.building_mut(self.id)?.annex_of = None;
+            step.world.parts.building_mut(self.id)?.annex_of = None;
         }
-        step.w.parts.building_mut(self.id)?.annexes.let_go(removed)
+        step.world
+            .parts
+            .building_mut(self.id)?
+            .annexes
+            .let_go(removed)
     }
 
     /// The gate's update (`FUN_1411e7730`, `TRIBE_Building_Object::update` for a master of class 39
@@ -114,7 +118,7 @@ impl Unit {
         step: &mut Step<'_>,
         roles: &Roles,
     ) -> GenieResult<()> {
-        let master = self.master(step.w.master_tables(), step.player)?;
+        let master = self.master(step.world.master_tables(), step.player)?;
         let transforms = master
             .building
             .as_ref()
@@ -126,7 +130,7 @@ impl Unit {
             return Ok(());
         }
         let height = master.height.get();
-        let layer = step.w.parts.building_mut(self.id)?;
+        let layer = step.world.parts.building_mut(self.id)?;
         let mut gate = layer
             .gate
             .ok_or(GenieError::unsupported("a gate without its gate state"))?;
@@ -136,21 +140,21 @@ impl Unit {
         if gate.locked && shut {
             return Ok(());
         }
-        let annexes = step.w.parts.building_of(self.id).annexes;
+        let annexes = step.world.parts.building_of(self.id).annexes;
         let by_id = ObjectsRef::new(
-            &step.w.players,
-            &step.w.index,
-            &step.w.model.masters,
-            &step.w.parts,
-            &step.w.model.roles,
-            &step.w.model.tuning,
+            &step.world.players,
+            &step.world.index,
+            &step.world.model.masters,
+            &step.world.parts,
+            &step.world.model.roles,
+            &step.world.model.tuning,
         );
         // the count only reads the parts: the layer holds `gate` still, written back before the
         // toggle
-        let (total, allied) = self.gate_count(annexes, &mut step.w.spatial, by_id)?;
+        let (total, allied) = self.gate_count(annexes, &mut step.world.spatial, by_id)?;
         let toggles = if shut && 0 < allied && !gate.locked {
             gate.close_timer = Seconds::ZERO;
-            step.w.model.tuning.turn.gate_shut_height <= height
+            step.world.model.tuning.turn.gate_shut_height <= height
         } else if height < GATE_EPSILON && total == 0 {
             if gate.close_timer <= Seconds::ZERO {
                 gate.close_timer = GATE_CLOSE_DELAY;
@@ -166,7 +170,7 @@ impl Unit {
         } else {
             false
         };
-        step.w.parts.building_mut(self.id)?.gate = Some(gate);
+        step.world.parts.building_mut(self.id)?.gate = Some(gate);
         self.toggle_own_gate(actions, step, toggles)
     }
 
@@ -218,30 +222,30 @@ impl Unit {
     /// own (`+0x2e8`'s `+10`), which the slice does not hold; the masters' foundations (7, 63,
     /// 117) never give them.
     pub(crate) fn farm_stage(&self, step: &mut Step<'_>, roles: &Roles) -> GenieResult<()> {
-        let Some(cons) = step
-            .w
-            .parts
-            .building_of(self.id)
-            .construction
-            .filter(|construction| {
-                self.life.state == ObjectState::Foundation
-                    && WholeSeconds::ZERO < construction.build_time
-            })
+        let Some(cons) =
+            step.world
+                .parts
+                .building_of(self.id)
+                .construction
+                .filter(|construction| {
+                    self.life.state == ObjectState::Foundation
+                        && WholeSeconds::ZERO < construction.build_time
+                })
         else {
             return Ok(());
         };
-        let master = self.master(step.w.master_tables(), step.player)?;
+        let master = self.master(step.world.master_tables(), step.player)?;
         let foundation = master
             .building
             .as_ref()
             .and_then(|building_master| building_master.foundation_terrain);
         let Some(terrain) = farm_stage_terrain(
             master.id,
-            (step.w.parts.building_of(self.id).rice, foundation),
+            (step.world.parts.building_of(self.id).rice, foundation),
             cons.progress,
             cons.build_time,
             roles,
-            &step.w.model.tuning.turn,
+            &step.world.model.tuning.turn,
         ) else {
             return Ok(());
         };
@@ -250,7 +254,7 @@ impl Unit {
                 "a farm's stage terrain the local player's view maps (8, 27, 64)",
             ));
         }
-        let f = Foundation {
+        let foundation = Foundation {
             position: self.position(),
             clearance: master.clearance,
             terrain,
@@ -258,16 +262,16 @@ impl Unit {
             master: master.id,
             class: master.class,
             terrain_bonus: master.combat_part().terrain_bonus,
-            mode_680: step.w.mode_680,
+            mode_680: step.world.mode_680,
         };
-        step.w
+        step.world
             .spatial
             .terrain
             .as_mut()
             .ok_or(GenieError::unsupported(
                 "a farm's foundation without the map's terrain",
             ))?
-            .cover(&f, roles, step.w.model.tuning.terrain)
+            .cover(&foundation, roles, step.world.model.tuning.terrain)
     }
 
     /// `TRIBE_Building_Object::update` (`0x1411c9000`) before its combat update: a building in
@@ -291,7 +295,7 @@ impl Unit {
         self.farm_stage(step, roles)?;
         let due = self.life.state == ObjectState::Foundation
             && step
-                .w
+                .world
                 .parts
                 .building_of(self.id)
                 .construction
@@ -299,8 +303,9 @@ impl Unit {
         if !due {
             return Ok(());
         }
-        let master = self.master(step.w.master_tables(), step.player)?;
-        if !walls_branch(master, roles) && step.w.parts.building_of(self.id).annex_of.is_some() {
+        let master = self.master(step.world.master_tables(), step.player)?;
+        if !walls_branch(master, roles) && step.world.parts.building_of(self.id).annex_of.is_some()
+        {
             return Ok(());
         }
         let (player_id, id) = (step.player, self.id);
@@ -329,9 +334,9 @@ impl Unit {
             return Ok(());
         }
         let Ok(master) = object_master(
-            step.w.parts.own_master.get(self.id),
+            step.world.parts.own_master.get(self.id),
             (self.id, self.life.master_id),
-            step.w.model.masters.of(step.player),
+            step.world.model.masters.of(step.player),
         ) else {
             return Ok(());
         };
@@ -344,7 +349,7 @@ impl Unit {
         if self.life.hp
             <= HitPoints::new(
                 HitPoints::of_master(master.hit_points).get()
-                    * step.w.model.tuning.turn.eject_share,
+                    * step.world.model.tuning.turn.eject_share,
             )
             && !self.garrison.is_empty()
         {
@@ -357,7 +362,7 @@ impl Unit {
             return Ok(());
         }
         if step
-            .w
+            .world
             .players
             .player(step.player)?
             .attributes
@@ -369,9 +374,9 @@ impl Unit {
             ));
         }
         let seconds = step
-            .w
+            .world
             .world_time
-            .since(step.w.parts.building_of(self.id).garrison_time)
+            .since(step.world.parts.building_of(self.id).garrison_time)
             .get()
             / 1000;
         if seconds == 0 {
@@ -379,25 +384,28 @@ impl Unit {
         }
         // the master's own copy lives beside the layer: what the rest reads of it, first
         let (master_id, master_hp) = (master.id, master.hit_points);
-        let layer = step.w.parts.building_mut(self.id)?;
+        let layer = step.world.parts.building_mut(self.id)?;
         layer.garrison_time = layer.garrison_time.after(Millis::new(seconds * 1000));
         if self.damaged_lately.running() {
             self.damaged_lately = self.damaged_lately.tick();
         }
         if roles.of_master(master_id).contains(MasterRoles::MONASTERY)
-            && step.w.parts.building_of(self.id).relics != Relics::NONE
+            && step.world.parts.building_of(self.id).relics != Relics::NONE
         {
             return Err(GenieError::unsupported(
                 "a monastery's relics' goods (its seconds)",
             ));
         }
         for &id in self.garrison.iter().rev() {
-            let Some(u) = OthersRef::of(&step.w.players, &step.w.index, step.player)?.own(id)
+            let Some(unit) =
+                OthersRef::of(&step.world.players, &step.world.index, step.player)?.own(id)
             else {
                 continue;
             };
-            let kind = u.master(step.w.master_tables(), step.player)?.kind;
-            if kind == MasterKind::COMBAT && step.w.parts.combat_of(u.id).raider_countdown.runs() {
+            let kind = unit.master(step.world.master_tables(), step.player)?.kind;
+            if kind == MasterKind::COMBAT
+                && step.world.parts.combat_of(unit.id).raider_countdown.runs()
+            {
                 return Err(GenieError::unsupported(
                     "a unit inside whose raider_build_countdown runs (FUN_1411e7220)",
                 ));
@@ -406,24 +414,24 @@ impl Unit {
         let rate = bm.garrison_heal_rate;
         let mut villagers = 0;
         for &id in &self.garrison {
-            let _ = step.w.players.player(step.player)?;
-            let Some(list_index) = step.w.live_index(step.player, id) else {
+            let _ = step.world.players.player(step.player)?;
+            let Some(list_index) = step.world.live_index(step.player, id) else {
                 continue;
             };
-            let unit = step.w.players.live_mut(step.player, list_index)?;
-            let m = object_master(
-                step.w.parts.own_master.get(unit.id),
+            let unit = step.world.players.live_mut(step.player, list_index)?;
+            let master = object_master(
+                step.world.parts.own_master.get(unit.id),
                 (unit.id, unit.life.master_id),
-                step.w.model.masters.of(step.player),
+                step.world.model.masters.of(step.player),
             )?;
             // The villager's class (4), which a building's repair by its garrison counts.
-            if roles.of_class(m.class).contains(ClassRoles::VILLAGER) {
+            if roles.of_class(master.class).contains(ClassRoles::VILLAGER) {
                 villagers += 1;
             }
-            let (class, hit_points) = (m.class, m.hit_points);
+            let (class, hit_points) = (master.class, master.hit_points);
             if HitPoints::ZERO < rate && unit.life.hp < HitPoints::of_master(hit_points) {
                 unit.heal(
-                    step.w.parts.combat_mut(unit.id)?,
+                    step.world.parts.combat_mut(unit.id)?,
                     class,
                     hit_points,
                     rate,
@@ -519,25 +527,25 @@ impl Unit {
         step: &mut Step<'_>,
         roles: &Roles,
     ) -> GenieResult<()> {
-        let master = self.master(step.w.master_tables(), step.player)?;
-        if !blasts_at_death(master, &self.life, roles, &step.w.model.tuning.turn) {
+        let master = self.master(step.world.master_tables(), step.player)?;
+        if !blasts_at_death(master, &self.life, roles, &step.world.model.tuning.turn) {
             return Ok(());
         }
-        let terrain = step.w.spatial.terrain.as_ref();
+        let terrain = step.world.spatial.terrain.as_ref();
         let mut own = victim_of(
             (
                 self,
-                step.w.parts.unit_ai.contains(self.id),
-                step.w.parts.building_of(self.id),
-                step.w.parts.combat_of(self.id),
+                step.world.parts.unit_ai.contains(self.id),
+                step.world.parts.building_of(self.id),
+                step.world.parts.combat_of(self.id),
                 actions,
-                step.w.parts.unread.get(self.id),
+                step.world.parts.unread.get(self.id),
             ),
             master,
-            &step.w.players.player(step.player)?.attributes,
+            &step.world.players.player(step.player)?.attributes,
             step.player,
             terrain,
-            step.w.mode_680,
+            step.world.mode_680,
             roles,
         );
         let mut targets: Vec<&mut Victim> = step.blasted.iter_mut().collect();
@@ -547,11 +555,11 @@ impl Unit {
             Some(self.id),
             None,
             &mut targets,
-            step.w.model.tuning.turn.death_blast_factor,
+            step.world.model.tuning.turn.death_blast_factor,
             HitLayer {
                 roles,
-                slots: step.w.model.slots,
-                damage_tuning: &step.w.model.tuning.damage,
+                slots: step.world.model.slots,
+                damage_tuning: &step.world.model.tuning.damage,
             },
         )?;
         let mut blasted = take(&mut step.blasted);
@@ -561,7 +569,7 @@ impl Unit {
             }
         }
         step.blasted = blasted;
-        let _ = self.hit_back(own, step.w.parts.ai_and_combat_mut(self.id)?)?;
+        let _ = self.hit_back(own, step.world.parts.ai_and_combat_mut(self.id)?)?;
         Ok(())
     }
 

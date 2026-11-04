@@ -23,7 +23,7 @@ use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 use crate::world::layer::generated::BestTargetTuning;
-use crate::world::slots::CheckedIndex;
+use crate::world::slots::CheckedIndexExt;
 use std::mem::take;
 
 /// The gap of a closest gate or wall not found yet.
@@ -236,7 +236,10 @@ fn current_target(
     };
     Ok(world
         .found_object(target)?
-        .filter(|t| t.state <= ObjectState::Alive && !t.flags.contains(FoundFlags::ALLIED))
+        .filter(|found_object| {
+            found_object.state <= ObjectState::Alive
+                && !found_object.flags.contains(FoundFlags::ALLIED)
+        })
         .map(|found_object| (target, found_object)))
 }
 
@@ -265,20 +268,20 @@ fn add_current(
     roles: &Roles,
     best_target_tuning: &BestTargetTuning,
 ) -> GenieResult<Option<AttackCategory>> {
-    let Some((target, t)) = current
+    let Some((target, found_object)) = current
         .filter(|(_, found_object)| found_object.distance <= me.range || Speed::ZERO < me.speed)
     else {
         return Ok(None);
     };
-    let attack_category = category(t.master, t.class, roles);
+    let attack_category = category(found_object.master, found_object.class, roles);
     st.add(
-        &world.candidate(target, t.distance, attack_category)?,
+        &world.candidate(target, found_object.distance, attack_category)?,
         best_target_tuning,
     );
     let narrows = !ask.idle
-        && t.distance <= ask.distance
+        && found_object.distance <= ask.distance
         && !roles
-            .of_class(t.class)
+            .of_class(found_object.class)
             .intersects(ClassRoles::BUILDING | ClassRoles::FARM);
     Ok(if narrows { attack_category } else { None })
 }
@@ -336,9 +339,9 @@ struct Listed {
 /// meet and the target search's tuning values, one argument of [`Walked::walk_lists`] and
 /// [`Walked::walk_later`].
 #[derive(Clone, Copy)]
-struct WalkLayer<'a> {
-    roles: &'a Roles,
-    best_target_tuning: &'a BestTargetTuning,
+struct WalkLayer<'model> {
+    roles: &'model Roles,
+    best_target_tuning: &'model BestTargetTuning,
 }
 
 /// The relation lists' walks (the main one and the retry walk): the category the search keeps
@@ -640,8 +643,8 @@ fn quick_pick(
     range: Distance,
     world: &mut AttackField<'_, '_, '_>,
 ) -> GenieResult<Option<ObjectId>> {
-    for &i in st.order.iter().take(3) {
-        let entry = *st.entries.checked(i)?;
+    for &index in st.order.iter().take(3) {
+        let entry = *st.entries.checked(index)?;
         if (entry.moving || st.moving < EntryCount::new(1) || !ranked)
             && world.quick_path(entry.id, range)?
         {
@@ -660,8 +663,8 @@ fn path_pick(
     world: &mut AttackField<'_, '_, '_>,
     retries: &mut Vec<(ObjectId, WorldTime)>,
 ) -> GenieResult<Option<ObjectId>> {
-    for &i in st.order.iter().take(3) {
-        let entry = *st.entries.checked(i)?;
+    for &index in st.order.iter().take(3) {
+        let entry = *st.entries.checked(index)?;
         if Some(entry.id) != tried && world.path(entry.id, me.range)? {
             return Ok(Some(entry.id));
         }

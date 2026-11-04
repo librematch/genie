@@ -97,21 +97,19 @@ where
         drs.header.directory_size = 64 + 12 * (num_tables + num_resources) as u32;
         drs.write_header()?;
 
-        // Assign table offsets
+        // the tables' resource lists follow the header (64 bytes) and the tables' entries (12 each)
         let mut table_offset = 64 + 12 * (drs.tables.len() as u32);
         let mut file_offset = drs.header.directory_size;
         for table in &mut drs.tables {
             table.offset = table_offset;
             table_offset += 12 * table.num_resources;
 
-            // Assign file offsets
             for res in &mut table.resources {
                 res.offset = file_offset;
                 file_offset += res.size;
             }
         }
 
-        // Write out all the table data
         drs.write_tables()?;
 
         for table in &drs.tables {
@@ -216,7 +214,6 @@ where
             table_offset += 12 * table.num_resources;
         }
 
-        // Write out all the table data
         drs.write_tables()?;
         let _ = drs.output.seek(SeekFrom::End(0))?;
 
@@ -342,8 +339,13 @@ where
     /// the file is 4 GiB or larger, or, with [`ReserveDirectoryStrategy`], if more files are
     /// added than were reserved.
     #[inline]
-    pub fn add(&mut self, t: impl IntoResourceKind, id: u32, data: impl Read) -> GenieResult<()> {
-        self.add_inner(t.into_resource_kind()?, id, data)
+    pub fn add(
+        &mut self,
+        kind: impl IntoResourceKind,
+        id: u32,
+        data: impl Read,
+    ) -> GenieResult<()> {
+        self.add_inner(kind.into_resource_kind()?, id, data)
     }
 
     fn add_inner(
@@ -388,7 +390,7 @@ where
     pub fn flush(mut self) -> GenieResult<W> {
         self.inner.header.num_resource_kinds = u32::try_from(self.inner.tables.len())
             .ok()
-            .filter(|&n| n < u32::MAX)
+            .filter(|&value| value < u32::MAX)
             .ok_or_else(|| GenieError::invalid_input("too many tables"))?;
 
         self.strategy.close(&mut self.inner)?;

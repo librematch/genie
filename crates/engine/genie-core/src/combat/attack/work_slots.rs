@@ -220,15 +220,15 @@ impl Attack {
     /// Attack without a target (−1), as does none.
     pub fn set_target(&mut self, target: Option<Mark>, roles: &Roles) -> Worked {
         let mut worked = Worked::default();
-        if target.is_some_and(|t| {
+        if target.is_some_and(|mark| {
             roles
-                .of_class(t.class)
+                .of_class(mark.class)
                 .contains(ClassRoles::NOT_ATTACK_TARGET)
         }) {
             return worked;
         }
         // slot 0x68 gives the Attack its target
-        let new = target.map(|t| AttackTargetId::new(t.id));
+        let new = target.map(|mark| AttackTargetId::new(mark.id));
         if new != self.target {
             worked.clears_count = true;
         }

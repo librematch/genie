@@ -31,9 +31,9 @@ pub struct PlayerComparison {
 }
 
 /// The static part of each live object, with its object.
-pub(super) fn live<'a>(
-    section: &PlayerSection<'a>,
-) -> impl Iterator<Item = (&'a genie_save::Object, &'a RgeStaticObject)> {
+pub(super) fn live<'save>(
+    section: &PlayerSection<'save>,
+) -> impl Iterator<Item = (&'save genie_save::Object, &'save RgeStaticObject)> {
     section.live_objects().filter_map(|object| {
         object
             .static_part()
@@ -86,7 +86,7 @@ pub(super) fn object_state(rge_static_object: &RgeStaticObject) -> GenieResult<C
 pub fn player_state(section: &PlayerSection<'_>, id: u32) -> GenieResult<PlayerState> {
     Ok(PlayerState {
         live: live(section)
-            .map(|(_, s)| s)
+            .map(|(_, rge_static_object)| rge_static_object)
             .filter(|rge_static_object| !dies_at_start(rge_static_object))
             .map(object_state)
             .collect::<Result<_, _>>()?,
@@ -97,7 +97,7 @@ pub fn player_state(section: &PlayerSection<'_>, id: u32) -> GenieResult<PlayerS
 /// A player section's resources and sleeping count, without its live objects.
 pub(super) fn player_totals(section: &PlayerSection<'_>, id: u32) -> PlayerState {
     let attributes = &section.world_player().base.attributes;
-    let resource = |i: usize| Amount::new(attributes.get(i).copied().unwrap_or_default());
+    let resource = |index: usize| Amount::new(attributes.get(index).copied().unwrap_or_default());
     PlayerState {
         id,
         resources: [resource(0), resource(1), resource(2), resource(3)],
@@ -123,7 +123,7 @@ pub fn compare_first_checkpoint(recording: &[u8]) -> GenieResult<Vec<PlayerCompa
     checkpoint
         .lanes
         .iter()
-        .filter(|lane| lane.iter().any(|&w| w != 0))
+        .filter(|lane| lane.iter().any(|&word| word != 0))
         .map(|lane| {
             let id = lane[8];
             let section = players.get(id as usize).ok_or_else(|| no_such_player(id))?;

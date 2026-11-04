@@ -166,7 +166,7 @@ mod tests {
     fn build_states_read_back_from_their_bytes() {
         for index in 0..=255_u8 {
             match BuildState::of_byte(index, None) {
-                Ok(s) => assert_eq!(s.get(), index),
+                Ok(build_state) => assert_eq!(build_state.get(), index),
                 Err(_) => assert!(
                     matches!(index, 0 | 5 | 9 | 10 | 12 | 14..=221 | 225..),
                     "{index}"
@@ -175,9 +175,12 @@ mod tests {
         }
         assert_eq!(BuildState::Finished.to_string(), "224");
         let walk = MoveToAction::sub_in(MoveTo::Moving);
-        for b in [4, 8, 11, 223] {
-            let mut build_state = BuildState::of_byte(b, Some(walk)).unwrap();
-            assert_eq!((build_state.get(), build_state.move_to()), (b, Some(&walk)));
+        for byte in [4, 8, 11, 223] {
+            let mut build_state = BuildState::of_byte(byte, Some(walk)).unwrap();
+            assert_eq!(
+                (build_state.get(), build_state.move_to()),
+                (byte, Some(&walk))
+            );
             assert_eq!(build_state.bare().move_to(), None);
             assert_eq!(build_state.take_move_to(), Some(walk));
             assert_eq!(build_state.move_to(), None);

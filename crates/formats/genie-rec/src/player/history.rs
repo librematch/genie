@@ -1,6 +1,6 @@
 //! A player's diplomacy offers and its history: the timeline's events and entries.
 
-use crate::element::{ReadableHeaderElement, read_counted};
+use crate::element::{ReadHeader, read_counted};
 use crate::reader::RecordingHeaderReader;
 use byteorder::{LE, ReadBytesExt};
 use genie_error::GenieResult;
@@ -27,7 +27,7 @@ pub(super) struct DiplomacyOffer {
     pub(super) status: u8,
 }
 
-impl ReadableHeaderElement for DiplomacyOffer {
+impl ReadHeader for DiplomacyOffer {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let mut offer = Self {
             sequence: input.read_u8()?,
@@ -61,7 +61,7 @@ pub struct HistoryInfo {
     pub events: Vec<HistoryEvent>,
 }
 
-impl ReadableHeaderElement for HistoryInfo {
+impl ReadHeader for HistoryInfo {
     // Reads the entries and events behind their counts, then skips the battle statistics.
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let _padding = input.read_u8()?;
@@ -140,7 +140,7 @@ pub struct HistoryEvent {
     pub params: (f32, f32, f32),
 }
 
-impl ReadableHeaderElement for HistoryEvent {
+impl ReadHeader for HistoryEvent {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         Ok(Self {
             event_kind: input.read_i8()?,
@@ -164,7 +164,7 @@ pub struct HistoryEntry {
     pub military_population: u16,
 }
 
-impl ReadableHeaderElement for HistoryEntry {
+impl ReadHeader for HistoryEntry {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let civilian_population = input.read_u16::<LE>()?;
         let military_population = input.read_u16::<LE>()?;

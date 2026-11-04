@@ -53,17 +53,17 @@ use crate::world::layer::Slots;
 
 /// The task types the general search leaves out (`FUN_14109f8c0`: 151, 152, 154, 155, 157, 160).
 const fn special_kind(action_kind: ActionKind) -> bool {
-    let d = action_kind.get().wrapping_sub(0x97) as u16;
-    d < 10 && (0x25bu32 >> d) & 1 != 0
+    let action_kind = action_kind.get().wrapping_sub(0x97) as u16;
+    action_kind < 10 && (0x25bu32 >> action_kind) & 1 != 0
 }
 
 /// What the finder reads of the unit that would do the task.
 #[derive(Clone, Copy, Debug)]
-pub struct Actor<'a> {
+pub struct Actor<'master> {
     /// The unit.
     pub id: ObjectId,
     /// Its own master (the finder's `param_3`, also when another master's list is searched).
-    pub master: &'a Master,
+    pub master: &'master Master,
     /// The owner's player id (`+0x718`).
     pub player: PlayerId,
     /// What it carries (`+0x308`, `+0x310`).
@@ -76,11 +76,11 @@ pub struct Actor<'a> {
 
 /// What the finder reads of a target object.
 #[derive(Clone, Copy, Debug)]
-pub struct TaskTarget<'a> {
+pub struct TaskTarget<'master> {
     /// The target.
     pub id: ObjectId,
     /// Its master.
-    pub master: &'a Master,
+    pub master: &'master Master,
     /// Its player.
     pub player: PlayerId,
     /// The object state (`+0x640`).
@@ -103,11 +103,11 @@ pub struct TaskTarget<'a> {
 /// general search reads (the main building's) and the terrain under the command's point
 /// (`FUN_1411a8ba0`, [`crate::map::terrain::Terrain::at_task_point`]; none off the map).
 #[derive(Clone, Copy, Debug)]
-pub struct TaskOn<'t, 'a> {
+pub struct TaskOn<'target, 'master> {
     /// The target, none for a point.
-    pub target: Option<&'t TaskTarget<'a>>,
+    pub target: Option<&'target TaskTarget<'master>>,
     /// The target the general search reads.
-    pub general: Option<&'t TaskTarget<'a>>,
+    pub general: Option<&'target TaskTarget<'master>>,
     /// The terrain under the point.
     pub terrain: Option<TerrainId>,
 }
@@ -147,10 +147,10 @@ pub fn drop_site(
     class: ClassId,
     civ: CivId,
 ) -> Option<&DropSite> {
-    table.iter().find(|e| {
-        (e.civs.is_empty() || e.civs.contains(&civ))
-            && e.building == building
-            && e.worker_class == Some(class)
+    table.iter().find(|drop_site| {
+        (drop_site.civs.is_empty() || drop_site.civs.contains(&civ))
+            && drop_site.building == building
+            && drop_site.worker_class == Some(class)
     })
 }
 
@@ -196,11 +196,11 @@ pub fn table_drop_buildings(
         .filter(|class_drop_site| {
             class.is_none_or(|class_id| class_drop_site.worker_class == Some(class_id))
         })
-        .filter(|e| !e.resource_kinds.is_empty())
+        .filter(|drop_site| !drop_site.resource_kinds.is_empty())
         .filter(|civ_drop_site| civ_drop_site.civs.is_empty() || civ_drop_site.civs.contains(&civ))
-        .filter(|e| match kind {
-            Some(basic) if basic.is_resource() => e.resource_kinds.contains(&basic),
-            _ => e
+        .filter(|drop_site| match kind {
+            Some(basic) if basic.is_resource() => drop_site.resource_kinds.contains(&basic),
+            _ => drop_site
                 .targets
                 .iter()
                 .any(|drop_target| drop_target.attribute == kind),
@@ -288,14 +288,14 @@ fn applies(task: &Task, actor: &Actor<'_>, target: &TaskTarget<'_>, dip: &impl D
 /// state below 3 whose master has one; tasks that have one and the special types left out), else
 /// for its master, else for its class, each the first whose test passes and that the filter
 /// takes; else, at a point on the map, a task for the terrain there.
-fn general<'m>(
-    list: &'m Master,
+fn general<'master>(
+    list: &'master Master,
     actor: &Actor<'_>,
     target: Option<&TaskTarget<'_>>,
     terrain: Option<TerrainId>,
     filter: Option<ActionKind>,
     dip: &impl Diplomacy,
-) -> Option<&'m Task> {
+) -> Option<&'master Task> {
     if list.action_part().tasks.is_empty() {
         return None;
     }
@@ -337,13 +337,13 @@ fn general<'m>(
 /// action is `0x7c` or `0x7d` (`FUN_1411e8630`; a computer player's production comes first,
 /// `FUN_1411d5520`), which is not modelled. Else none: the caller goes on to the rest of the
 /// finder for a target whose master has object flag 0 (a transport, [`find_task`]).
-fn garrison_task<'m>(
-    list: &'m Master,
+fn garrison_task<'master>(
+    list: &'master Master,
     actor: &Actor<'_>,
     target: Option<&TaskTarget<'_>>,
     dip: &impl Diplomacy,
     roles: &Roles,
-) -> GenieResult<Option<&'m Task>> {
+) -> GenieResult<Option<&'master Task>> {
     let Some(task_target) = target else {
         return Ok(None);
     };
@@ -370,7 +370,7 @@ fn garrison_task<'m>(
             GarrisonSwitch::TaskFinder,
             roles,
         );
-        if let Some(task) = first(list, |t| is_garrison_task(t, roles)).filter(|_| takes) {
+        if let Some(task) = first(list, |task| is_garrison_task(task, roles)).filter(|_| takes) {
             if matches!(
                 task_target.top_action,
                 Some(ActionKind::PACK | ActionKind::UNPACK)
@@ -391,15 +391,15 @@ fn garrison_task<'m>(
 /// general one the target the general search sees, which repeats that step (an annex of an annex:
 /// its main building's main building). The terrain: the terrain under the point when the map's
 /// terrain table counts it, which only a task for a terrain reads.
-pub fn find_task<'m>(
-    list: &'m Master,
+pub fn find_task<'master>(
+    list: &'master Master,
     actor: &Actor<'_>,
     on: &TaskOn<'_, '_>,
     filter: Option<ActionKind>,
     dip: &impl Diplomacy,
     slots: Slots,
     roles: &Roles,
-) -> GenieResult<Option<&'m Task>> {
+) -> GenieResult<Option<&'master Task>> {
     if let Finding::Answer(task) = finder_head(list, actor, on.target, filter, dip, roles)? {
         return Ok(task);
     }
@@ -413,9 +413,9 @@ pub fn find_task<'m>(
 
 /// A step of the task finder: it answers (a task, or none), or the finder goes on.
 #[derive(Clone, Copy, Debug, PartialEq)]
-enum Finding<'m> {
+enum Finding<'master> {
     /// The finder's answer.
-    Answer(Option<&'m Task>),
+    Answer(Option<&'master Task>),
     /// The next step decides.
     Next,
 }
@@ -424,14 +424,14 @@ enum Finding<'m> {
 /// target that is no transport has no task); no task of a master with object flag 0x10 on prey
 /// that stores something; the relic carrier's task 0x87 at its player's monastery (master
 /// 109). A monk's conversion under attribute 95 is not modelled.
-fn finder_head<'m>(
-    list: &'m Master,
+fn finder_head<'master>(
+    list: &'master Master,
     actor: &Actor<'_>,
     target: Option<&TaskTarget<'_>>,
     filter: Option<ActionKind>,
     dip: &impl Diplomacy,
     roles: &Roles,
-) -> GenieResult<Finding<'m>> {
+) -> GenieResult<Finding<'master>> {
     let own = actor.master;
     // the garrison filter (3): a building's garrison task; with none, a target whose master has
     // object flag 0 (a transport) goes on through the finder to its garrison into the target
@@ -440,17 +440,25 @@ fn finder_head<'m>(
         if let Some(task) = garrison_task(list, actor, target, dip, roles)? {
             return Ok(Finding::Answer(Some(task)));
         }
-        if target.is_none_or(|t| !t.master.object_flags.contains(ObjectFlags::GARRISON)) {
+        if target.is_none_or(|task_target| {
+            !task_target
+                .master
+                .object_flags
+                .contains(ObjectFlags::GARRISON)
+        }) {
             return Ok(Finding::Answer(None));
         }
     }
     // a master with object flag 0x10 has no task on prey whose master stores something
     // (`+0x610`, its first storage amount, above 0)
-    if let Some(t) = target
+    if let Some(task_target) = target
         && own.object_flags.contains(ObjectFlags::SCOUT)
-        && roles.of_class(t.master.class).contains(ClassRoles::PREY)
+        && roles
+            .of_class(task_target.master.class)
+            .contains(ClassRoles::PREY)
         && Amount::ZERO
-            < t.master
+            < task_target
+                .master
                 .storage
                 .first()
                 .map_or(Amount::ZERO, |&(_, amount, _)| amount)
@@ -461,11 +469,11 @@ fn finder_head<'m>(
     if roles
         .of_some_attribute(actor.held.kind)
         .contains(AttributeRoles::RELIC)
-        && target.is_some_and(|t| {
-            t.state == ObjectState::Alive
-                && t.player == actor.player
+        && target.is_some_and(|task_target| {
+            task_target.state == ObjectState::Alive
+                && task_target.player == actor.player
                 && roles
-                    .of_master(t.master.id)
+                    .of_master(task_target.master.id)
                     .contains(MasterRoles::TOWN_CENTRE)
         })
         && let Some(task) = first(list, |task| task.action_kind == ActionKind::ACTION_135)
@@ -476,9 +484,9 @@ fn finder_head<'m>(
         || roles.of_master(own.id).contains(MasterRoles::LIGHT_CAVALRY);
     if actor.attribute_95 == Amount::new(2.0)
         && monk_master
-        && target.is_some_and(|t| {
+        && target.is_some_and(|task_target| {
             roles
-                .of_class(t.master.class)
+                .of_class(task_target.master.class)
                 .contains(ClassRoles::VILLAGER)
         })
     {
@@ -506,15 +514,15 @@ fn finder_head<'m>(
 /// what is inside something, takes task 110; anything else the general search
 /// ([`general`]). Conversions, task 0x84, healing, task 0x88, class 53's conversion and master
 /// 1105 are not modelled.
-fn finder_tail<'m>(
-    list: &'m Master,
+fn finder_tail<'master>(
+    list: &'master Master,
     actor: &Actor<'_>,
     on: &TaskOn<'_, '_>,
     filter: Option<ActionKind>,
     dip: &impl Diplomacy,
     slots: Slots,
     roles: &Roles,
-) -> GenieResult<Option<&'m Task>> {
+) -> GenieResult<Option<&'master Task>> {
     let target = on.target;
     let own = actor.master;
     // the tail: conversions, task 0x84, healing, task 0x88, the siege and class-53 tasks
@@ -523,7 +531,7 @@ fn finder_tail<'m>(
         .action_part()
         .tasks
         .iter()
-        .any(|t| t.action_kind == ActionKind::CONVERT);
+        .any(|task| task.action_kind == ActionKind::CONVERT);
     if target.is_some() && (monk || (converts && filter == Some(ActionKind::CONVERT))) {
         return Err(GenieError::unsupported(
             "the task finder's conversion (0x68)",
@@ -533,8 +541,12 @@ fn finder_tail<'m>(
         .action_part()
         .tasks
         .iter()
-        .any(|t| t.action_kind == ActionKind::PICK_UP)
-        && target.is_some_and(|t| roles.of_class(t.master.class).contains(ClassRoles::RELIC))
+        .any(|task| task.action_kind == ActionKind::PICK_UP)
+        && target.is_some_and(|task_target| {
+            roles
+                .of_class(task_target.master.class)
+                .contains(ClassRoles::RELIC)
+        })
     {
         return Err(GenieError::unsupported("the task finder's task 0x84"));
     }
@@ -542,7 +554,7 @@ fn finder_tail<'m>(
         .action_part()
         .tasks
         .iter()
-        .any(|t| t.action_kind == ActionKind::HEAL)
+        .any(|task| task.action_kind == ActionKind::HEAL)
         && target.is_some()
     {
         return Err(GenieError::unsupported("the task finder's healing (0x69)"));
@@ -564,7 +576,7 @@ fn finder_tail<'m>(
         ));
     }
     let mut inside = false;
-    if let Some(t) = target {
+    if let Some(task_target) = target {
         if roles.of_class(own.class).contains(ClassRoles::SIEGE)
             && roles.of_master(own.id).contains(MasterRoles::SIEGE_TOWER)
         {
@@ -572,17 +584,17 @@ fn finder_tail<'m>(
         }
         // LAB_14127ba9e: a list with task 13 takes it, under that filter alone, for an own,
         // allied or artifact target in a state below 3
-        if t.state < ObjectState::Dying
-            && (t.player == actor.player
-                || dip.allied(actor.player, t.player, AllyTest::WithRelation4)
+        if task_target.state < ObjectState::Dying
+            && (task_target.player == actor.player
+                || dip.allied(actor.player, task_target.player, AllyTest::WithRelation4)
                 || roles
-                    .of_class(t.master.class)
+                    .of_class(task_target.master.class)
                     .contains(ClassRoles::ARTIFACT))
             && let Some(task) = first(list, |task| task.action_kind == ActionKind::GUARD)
         {
             return Ok((filter == Some(ActionKind::GUARD)).then_some(task));
         }
-        inside = t.pasture.is_some();
+        inside = task_target.pasture.is_some();
     }
     // LAB_14127bb9f: a villager on livestock (or on what is inside something) takes task 110
     // for class 58; anything else the general search
@@ -842,11 +854,11 @@ mod tests {
         assert!(!applies_to(&of(TargetOwner::OWN), &own, &itself));
     }
 
-    fn find<'m>(
-        list: &'m Master,
+    fn find<'master>(
+        list: &'master Master,
         held: Held,
         task_target: &TaskTarget<'_>,
-    ) -> GenieResult<Option<&'m Task>> {
+    ) -> GenieResult<Option<&'master Task>> {
         let on = TaskOn {
             target: Some(task_target),
             general: Some(task_target),
@@ -1128,11 +1140,11 @@ mod tests {
         }
     }
 
-    fn find_with<'m>(
-        list: &'m Master,
+    fn find_with<'master>(
+        list: &'master Master,
         task_target: &TaskTarget<'_>,
         filter: Option<ActionKind>,
-    ) -> GenieResult<Option<&'m Task>> {
+    ) -> GenieResult<Option<&'master Task>> {
         let on = TaskOn {
             target: Some(task_target),
             general: Some(task_target),
@@ -1304,16 +1316,23 @@ mod tests {
             class::VILLAGER,
             vec![task(ActionKind::ACTION_135, -1, -1, 0.0)],
         );
-        let a = actor(&villager, carrying(None, 0.0));
+        let villager_actor = actor(&villager, carrying(None, 0.0));
         let task_target = building(&house, PlayerId::new(2), ObjectState::Alive);
         assert_eq!(
-            finder_head(&villager, &a, Some(&task_target), None, &alone(), &roles()),
+            finder_head(
+                &villager,
+                &villager_actor,
+                Some(&task_target),
+                None,
+                &alone(),
+                &roles()
+            ),
             Ok(Finding::Next)
         );
         assert_eq!(
             finder_head(
                 &villager,
-                &a,
+                &villager_actor,
                 Some(&task_target),
                 Some(ENTER),
                 &alone(),
@@ -1328,7 +1347,7 @@ mod tests {
         assert_eq!(
             finder_head(
                 &villager,
-                &a,
+                &villager_actor,
                 Some(&transport(&ship, PlayerId::new(2))),
                 Some(ENTER),
                 &alone(),
@@ -1407,7 +1426,7 @@ mod tests {
                 terrain,
             };
             find_task(&ship, &actor, &on, filter, &alone(), slots(), &roles())
-                .map(|f| f.map(|k| k.action_kind))
+                .map(|found| found.map(|task| task.action_kind))
         };
         assert_eq!(
             found(None, Some(TerrainId::named(2)), None),
@@ -1445,11 +1464,11 @@ mod tests {
             class::VILLAGER,
             vec![task(ActionKind::BUILD, -1, -1, 1.0)],
         );
-        let a = actor(&builder, carrying(None, 0.0));
+        let builder_actor = actor(&builder, carrying(None, 0.0));
         assert_eq!(
             on_target(
                 &builder,
-                &a,
+                &builder_actor,
                 &building(&house, PlayerId::new(2), ObjectState::Foundation),
                 None,
                 &alone(),
@@ -1460,7 +1479,7 @@ mod tests {
         assert_eq!(
             on_target(
                 &builder,
-                &a,
+                &builder_actor,
                 &building(&house, PlayerId::new(2), ObjectState::Alive),
                 None,
                 &alone(),
@@ -1477,7 +1496,7 @@ mod tests {
         assert!(
             on_target(
                 &builder,
-                &a,
+                &builder_actor,
                 &building(&m199, PlayerId::new(2), ObjectState::Alive),
                 None,
                 &alone(),
@@ -1489,7 +1508,7 @@ mod tests {
         assert_eq!(
             on_target(
                 &builder,
-                &a,
+                &builder_actor,
                 &building(&m45, PlayerId::new(2), ObjectState::Alive),
                 None,
                 &alone(),
@@ -1576,7 +1595,11 @@ mod tests {
     /// none, an idle one goes on.
     #[test]
     fn the_drop_off_step_takes_the_task_for_the_load() {
-        fn drop<'m>(list: &'m Master, held: Held, task_target: &TaskTarget<'_>) -> Finding<'m> {
+        fn drop<'master>(
+            list: &'master Master,
+            held: Held,
+            task_target: &TaskTarget<'_>,
+        ) -> Finding<'master> {
             drop_off_finding(list, &actor(list, held), task_target, None, &alone())
         }
         let camp = master(
@@ -1621,11 +1644,11 @@ mod tests {
     /// a transport of another class.
     #[test]
     fn the_garrison_into_transport_takes_its_class_task() {
-        fn into<'m>(
-            list: &'m Master,
+        fn into<'master>(
+            list: &'master Master,
             task_target: &TaskTarget<'_>,
             filter: Option<ActionKind>,
-        ) -> (Finding<'m>, bool) {
+        ) -> (Finding<'master>, bool) {
             garrison_into(
                 list,
                 &actor(list, carrying(None, 0.0)),
@@ -1680,11 +1703,11 @@ mod tests {
     /// goes on; under the repair filter a class's task without a work value leaves none.
     #[test]
     fn the_repair_step_takes_damaged_building_task() {
-        fn repair<'m>(
-            list: &'m Master,
+        fn repair<'master>(
+            list: &'master Master,
             task_target: &TaskTarget<'_>,
             filter: Option<ActionKind>,
-        ) -> Finding<'m> {
+        ) -> Finding<'master> {
             repair_finding(
                 list,
                 &actor(list, carrying(None, 0.0)),
@@ -1732,11 +1755,11 @@ mod tests {
     /// 0x88, class 53's conversion and master 1105 are not modelled.
     #[test]
     fn the_finder_tail_takes_task_13_livestock_or_the_general_search() {
-        fn tail<'m>(
-            list: &'m Master,
+        fn tail<'master>(
+            list: &'master Master,
             task_target: &TaskTarget<'_>,
             filter: Option<ActionKind>,
-        ) -> GenieResult<Option<&'m Task>> {
+        ) -> GenieResult<Option<&'master Task>> {
             let on = TaskOn {
                 target: Some(task_target),
                 general: Some(task_target),

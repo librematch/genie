@@ -1,7 +1,7 @@
 //! The building base class's attributes: the gather point and the production queue.
 
 use crate::ObjectId;
-use crate::element::{ReadableHeaderElement, read_xyz};
+use crate::element::{ReadHeader, read_xyz};
 use crate::fits;
 use crate::reader::RecordingHeaderReader;
 use crate::unit_action::UnitAction;
@@ -42,7 +42,7 @@ pub struct ProductionQueueEntry {
     pub count: u16,
 }
 
-impl ReadableHeaderElement for ProductionQueueEntry {
+impl ReadHeader for ProductionQueueEntry {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let unit_kind_id = input.read_u16::<LE>()?.into();
         let count = input.read_u16::<LE>()?;
@@ -122,7 +122,7 @@ pub struct BuildingUnitAttributes {
     pub snow_flag: bool,
 }
 
-impl ReadableHeaderElement for BuildingUnitAttributes {
+impl ReadHeader for BuildingUnitAttributes {
     // Reads the building's fields in file order, section by section.
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let mut attrs = Self {

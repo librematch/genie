@@ -31,7 +31,7 @@ use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 use crate::world::layer::generated::TerrainTuning;
-use crate::world::slots::CheckedIndex;
+use crate::world::slots::CheckedIndexExt;
 use crate::{GenieError, GenieResult};
 use std::mem::swap;
 
@@ -127,37 +127,58 @@ pub struct Terrain {
 /// A tile's side (`DAT_14330eb8c`), which the slope shares measure against.
 const TILE: f32 = TERRAIN_TILE;
 
-/// `FUN_140f69470` (HD's `RGE_Map::get_tile_kind`): the shape of the tile of elevation `e` from
-/// its neighbours' (`n`orth is `y − 1`, `e`ast `x + 1`; a neighbour off the map counts as the
-/// tile's own): a side or corner one step up decides it, in the routine's order; 0 is flat.
+/// `FUN_140f69470` (HD's `RGE_Map::get_tile_kind`): the shape of the tile of elevation `elevation`
+/// from its neighbours' (`north`orth is `y − 1`, `elevation`ast `x + 1`; a neighbour off the map
+/// counts as the tile's own): a side or corner one step up decides it, in the routine's order; 0 is
+/// flat.
 #[allow(clippy::many_single_char_names)]
-fn tile_shape(e: u8, [n, e_, w, s]: [u8; 4], [ne, sw, nw, se]: [u8; 4]) -> u8 {
-    let (up, down) = (i32::from(e) + 1, i32::from(e) - 1);
-    let is = |v: u8, w: i32| i32::from(v) == w;
-    if is(n, up) && is(e_, up) {
+fn tile_shape(
+    elevation: u8,
+    [north, east, west, south]: [u8; 4],
+    [north_east, south_west, north_west, south_east]: [u8; 4],
+) -> u8 {
+    let (up, down) = (i32::from(elevation) + 1, i32::from(elevation) - 1);
+    let is = |value: u8, wanted: i32| i32::from(value) == wanted;
+    if is(north, up) && is(east, up) {
         14
-    } else if is(w, up) && is(s, up) {
+    } else if is(west, up) && is(south, up) {
         13
-    } else if is(n, up) && is(w, up) {
+    } else if is(north, up) && is(west, up) {
         16
-    } else if is(e_, up) && is(s, up) {
+    } else if is(east, up) && is(south, up) {
         15
-    } else if is(n, up) {
+    } else if is(north, up) {
         6
-    } else if is(e_, up) {
+    } else if is(east, up) {
         8
-    } else if is(w, up) {
+    } else if is(west, up) {
         5
-    } else if is(s, up) {
+    } else if is(south, up) {
         7
-    } else if is(ne, up) {
-        if is(w, down) && is(s, down) { 2 } else { 10 }
-    } else if is(sw, up) {
-        if is(n, down) && is(e_, down) { 1 } else { 9 }
-    } else if is(nw, up) {
-        if is(e_, down) && is(s, down) { 3 } else { 11 }
-    } else if is(se, up) {
-        if is(n, down) && is(w, down) { 4 } else { 12 }
+    } else if is(north_east, up) {
+        if is(west, down) && is(south, down) {
+            2
+        } else {
+            10
+        }
+    } else if is(south_west, up) {
+        if is(north, down) && is(east, down) {
+            1
+        } else {
+            9
+        }
+    } else if is(north_west, up) {
+        if is(east, down) && is(south, down) {
+            3
+        } else {
+            11
+        }
+    } else if is(south_east, up) {
+        if is(north, down) && is(west, down) {
+            4
+        } else {
+            12
+        }
     } else {
         0
     }
@@ -237,10 +258,10 @@ impl Terrain {
                     .values()
                     .iter()
                     .enumerate()
-                    .filter(|&(_, &v)| 0.0 < v)
-                    .map(|(t, _)| {
+                    .filter(|&(_, &value)| 0.0 < value)
+                    .map(|(terrain, _)| {
                         self.terrains
-                            .get(t)
+                            .get(terrain)
                             .map_or(TerrainMask::NONE, |terrain_kind| {
                                 terrain_class(terrain_kind.flags)
                             })
@@ -259,8 +280,11 @@ impl Terrain {
     ) -> Self {
         Self {
             size,
-            kinds: tiles.iter().map(|t| t.kind).collect(),
-            restore: tiles.iter().map(|t| t.restore).collect(),
+            kinds: tiles.iter().map(|tile_terrain| tile_terrain.kind).collect(),
+            restore: tiles
+                .iter()
+                .map(|tile_terrain| tile_terrain.restore)
+                .collect(),
             layers: tiles
                 .iter()
                 .map(|tile_terrain| tile_terrain.layer)
@@ -279,47 +303,67 @@ impl Terrain {
         let at = |x: i32, y: i32, own: u8| {
             self.size
                 .index(Tile::new(x, y))
-                .and_then(|i| self.elevations.get(i).copied())
+                .and_then(|index| self.elevations.get(index).copied())
                 .unwrap_or(own)
         };
         let mut shapes = Vec::with_capacity(self.elevations.len());
         for y in 0..self.size.height() {
             for x in 0..self.size.width() {
-                let Some(e) = self
+                let Some(elevation) = self
                     .size
                     .index(Tile::new(x, y))
-                    .and_then(|i| self.elevations.get(i).copied())
+                    .and_then(|index| self.elevations.get(index).copied())
                 else {
                     shapes.push(0);
                     continue;
                 };
                 let (last_column, last_row) = (self.size.width() - 1, self.size.height() - 1);
                 // FUN_140f69470's reads: a neighbour past the map's edge is the tile itself
-                let n = if 0 < y { at(x, y - 1, e) } else { e };
-                let east = if x < last_column { at(x + 1, y, e) } else { e };
-                let west = if 0 < x { at(x - 1, y, e) } else { e };
-                let s = if y < last_row { at(x, y + 1, e) } else { e };
-                let ne = if 0 < y && x < last_column {
-                    at(x + 1, y - 1, e)
+                let north = if 0 < y {
+                    at(x, y - 1, elevation)
                 } else {
-                    e
+                    elevation
                 };
-                let sw = if 0 < x && y < last_row {
-                    at(x - 1, y + 1, e)
+                let east = if x < last_column {
+                    at(x + 1, y, elevation)
                 } else {
-                    e
+                    elevation
                 };
-                let nw = if 0 < y && 0 < x {
-                    at(x - 1, y - 1, e)
+                let west = if 0 < x {
+                    at(x - 1, y, elevation)
                 } else {
-                    e
+                    elevation
                 };
-                let se = if y < last_row && x < last_column {
-                    at(x + 1, y + 1, e)
+                let south = if y < last_row {
+                    at(x, y + 1, elevation)
                 } else {
-                    e
+                    elevation
                 };
-                shapes.push(tile_shape(e, [n, east, west, s], [ne, sw, nw, se]));
+                let north_east = if 0 < y && x < last_column {
+                    at(x + 1, y - 1, elevation)
+                } else {
+                    elevation
+                };
+                let south_west = if 0 < x && y < last_row {
+                    at(x - 1, y + 1, elevation)
+                } else {
+                    elevation
+                };
+                let north_west = if 0 < y && 0 < x {
+                    at(x - 1, y - 1, elevation)
+                } else {
+                    elevation
+                };
+                let south_east = if y < last_row && x < last_column {
+                    at(x + 1, y + 1, elevation)
+                } else {
+                    elevation
+                };
+                shapes.push(tile_shape(
+                    elevation,
+                    [north, east, west, south],
+                    [north_east, south_west, north_west, south_east],
+                ));
             }
         }
         self.shapes = shapes;
@@ -336,7 +380,7 @@ impl Terrain {
     pub fn kind(&self, tile: Tile) -> Option<TerrainId> {
         self.size
             .index(tile)
-            .and_then(|i| self.kinds.get(i).copied())
+            .and_then(|index| self.kinds.get(index).copied())
     }
 
     /// The ground's height under (`x`, `y`) on the map (the static `new_position`'s,
@@ -345,15 +389,16 @@ impl Terrain {
     pub fn ground(&self, at: Point) -> GenieResult<f32> {
         let (x, y) = (at.x(), at.y());
         let (tx, ty) = (x as i32, y as i32);
-        let i = self
+        let index = self
             .size
             .index(Tile::new(tx, ty))
-            .filter(|&i| i < self.elevations.len() && i < self.shapes.len())
+            .filter(|&index| index < self.elevations.len() && index < self.shapes.len())
             .ok_or(GenieError::unsupported(
                 "the ground's height where the elevations are not known",
             ))?;
         let (fx, fy) = (x - tx as f32, y - ty as f32);
-        Ok(f32::from(*self.elevations.checked(i)?) + slope_share(*self.shapes.checked(i)?, fx, fy))
+        Ok(f32::from(*self.elevations.checked(index)?)
+            + slope_share(*self.shapes.checked(index)?, fx, fy))
     }
 
     /// The terrain defense of an object on `tile` whose master has `defense_terrain_bonus`
@@ -362,14 +407,14 @@ impl Terrain {
     /// object off the tiles has 1. None for a restriction or terrain the data has not got.
     #[must_use]
     pub fn defense(&self, bonus: RestrictionField, tile: Tile) -> Option<f32> {
-        let Some(i) = self.size.index(tile) else {
+        let Some(index) = self.size.index(tile) else {
             return Some(1.0);
         };
-        let t = match *self.restore.get(i)? {
-            None => *self.kinds.get(i)?,
+        let terrain = match *self.restore.get(index)? {
+            None => *self.kinds.get(index)?,
             Some(terrain_id) => terrain_id,
         };
-        let restriction = self.restriction(bonus.restriction()?)?.value(t)?;
+        let restriction = self.restriction(bonus.restriction()?)?.value(terrain)?;
         Some(if restriction == 0.0 { 1.0 } else { restriction })
     }
 
@@ -394,13 +439,13 @@ impl Terrain {
     /// land units and ships meet.
     #[must_use]
     pub fn beach(&self, tile: Tile) -> bool {
-        let t = self
+        let terrain_id = self
             .size
             .index(tile)
-            .and_then(|i| self.kinds.get(i))
+            .and_then(|index| self.kinds.get(index))
             .map_or(TerrainId::named(0), |&terrain_id| self.seen(terrain_id));
         self.terrains
-            .get(t.index())
+            .get(terrain_id.index())
             .is_some_and(|terrain_kind| terrain_kind.flags.contains(TerrainFlags::BEACH))
     }
 
@@ -428,7 +473,7 @@ impl Terrain {
         if x == -1.0 || y == -1.0 {
             return None;
         }
-        let short = |v: f32| i32::from(cvttss2si(v) as i16);
+        let short = |value: f32| i32::from(cvttss2si(value) as i16);
         let tile = Tile::new(short(x), short(y));
         self.size.holds(tile).then(|| self.read(tile))
     }
@@ -439,7 +484,7 @@ impl Terrain {
     pub fn read(&self, tile: Tile) -> TerrainId {
         self.size
             .index(tile)
-            .and_then(|i| self.kinds.get(i))
+            .and_then(|index| self.kinds.get(index))
             .map_or(TerrainId::named(0), |&terrain_id| self.seen(terrain_id))
     }
 
@@ -449,24 +494,25 @@ impl Terrain {
     /// stream between a push and a pop of its state, `FUN_140811270`/`FUN_140811210`) is not
     /// held.
     pub fn snow_under(&self, tile: Tile) -> GenieResult<bool> {
-        let i = self
+        let index = self
             .size
             .index(tile)
             .ok_or(GenieError::unsupported("a building off the map's tiles"))?;
-        let kind = self.seen(*self.kinds.checked(i)?);
+        let kind = self.seen(*self.kinds.checked(index)?);
         // a layer of none reads as its short's low byte, 255: a terrain beyond the records
-        let layer = self.seen(self.layers.checked(i)?.unwrap_or(LOW_BYTE_OF_NONE));
+        let layer = self.seen(self.layers.checked(index)?.unwrap_or(LOW_BYTE_OF_NONE));
         Ok(self.snowy(kind) || self.snowy(layer))
     }
 
-    /// [`Terrain::cover`]'s test for the foundation terrain: tile `i` of terrain `t` takes it
-    /// over a plain or farm terrain whose layer is empty, plain or a farm too.
-    fn foundation_covers(&self, i: usize, t: TerrainId) -> bool {
-        let Some(&l) = self.layers.get(i) else {
+    /// [`Terrain::cover`]'s test for the foundation terrain: tile `index` of terrain `terrain_id`
+    /// takes it over a plain or farm terrain whose layer is empty, plain or a farm too.
+    fn foundation_covers(&self, index: usize, terrain: TerrainId) -> bool {
+        let Some(&layer) = self.layers.get(index) else {
             return false;
         };
-        let farm = |t: TerrainId| t.get() < 200 && is_farm_terrain(t);
-        (plain(t) || farm(t)) && l.is_none_or(|terrain_id| plain(terrain_id) || farm(terrain_id))
+        let farm = |terrain_id: TerrainId| terrain_id.get() < 200 && is_farm_terrain(terrain_id);
+        (plain(terrain) || farm(terrain))
+            && layer.is_none_or(|terrain_id| plain(terrain_id) || farm(terrain_id))
     }
 
     /// A completed building's foundation terrain (`FUN_1411ddd90`) over its position plus and
@@ -505,11 +551,11 @@ impl Terrain {
         if y1 < y0 {
             swap(&mut y0, &mut y1);
         }
-        let (w, h) = (self.size.width() - 1, self.size.height() - 1);
-        if x0 > w || y0 > h || x1 < 0 || y1 < 0 {
+        let (width, height) = (self.size.width() - 1, self.size.height() - 1);
+        if x0 > width || y0 > height || x1 < 0 || y1 < 0 {
             return Err(GenieError::unsupported("a foundation terrain off the map"));
         }
-        let (x0, y0, x1, y1) = (x0.max(0), y0.max(0), x1.min(w), y1.min(h));
+        let (x0, y0, x1, y1) = (x0.max(0), y0.max(0), x1.min(width), y1.min(height));
         // the town centre's (109) gap: the clamped rectangle's first two columns of its third
         // and fourth rows
         let gap = |tx: i32, ty: i32| {
@@ -589,14 +635,14 @@ mod tests {
     use crate::testing::roles;
     use crate::testing::tuning;
 
-    /// Terrains of ids `k`.
-    fn ids(k: &[u8]) -> Vec<TerrainId> {
-        k.iter().copied().map(TerrainId::named).collect()
+    /// Terrains of ids `kinds`.
+    fn ids(kinds: &[u8]) -> Vec<TerrainId> {
+        kinds.iter().copied().map(TerrainId::named).collect()
     }
 
-    /// Layers of shorts `l`, −1 none.
-    fn layers_of(l: &[i16]) -> Vec<Option<TerrainId>> {
-        l.iter().copied().map(TerrainId::of_data).collect()
+    /// Layers of shorts `layers`, −1 none.
+    fn layers_of(layers: &[i16]) -> Vec<Option<TerrainId>> {
+        layers.iter().copied().map(TerrainId::of_data).collect()
     }
 
     fn map(kinds: Vec<u8>, layers: Vec<i16>) -> Terrain {
@@ -951,10 +997,12 @@ mod tests {
             mode_680: Mode680::ONE,
         };
         for master in [master_id(357), master_id(1188)] {
-            let mut t = map(vec![0, 3, 29, 47], vec![-1, -1, -1, -1]);
-            t.cover(&site(master), &roles(), tuning().terrain).unwrap();
+            let mut terrain = map(vec![0, 3, 29, 47], vec![-1, -1, -1, -1]);
+            terrain
+                .cover(&site(master), &roles(), tuning().terrain)
+                .unwrap();
             assert_eq!(
-                (t.kinds.clone(), t.layers.clone()),
+                (terrain.kinds.clone(), terrain.layers.clone()),
                 (ids(&[14, 14, 14, 47]), vec![None; 4])
             );
         }

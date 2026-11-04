@@ -30,18 +30,18 @@ impl Angle {
 impl Mul<f32> for Angle {
     type Output = Self;
 
-    /// The angle scaled by `f` (one `f32` product, the angle first).
-    fn mul(self, f: f32) -> Self {
-        Self(self.0 * f)
+    /// The angle scaled by `factor` (one `f32` product, the angle first).
+    fn mul(self, factor: f32) -> Self {
+        Self(self.0 * factor)
     }
 }
 
 impl Div<f32> for Angle {
     type Output = Self;
 
-    /// The angle divided by `f` (one `f32` quotient: a facet's share of a turn).
-    fn div(self, f: f32) -> Self {
-        Self(self.0 / f)
+    /// The angle divided by `divisor` (one `f32` quotient: a facet's share of a turn).
+    fn div(self, divisor: f32) -> Self {
+        Self(self.0 / divisor)
     }
 }
 
@@ -58,13 +58,13 @@ mod tests {
     /// Each operator is the one `f32` operation, bit for bit and in its operand order.
     #[test]
     fn angles_do_the_game_f32_operations() {
-        let (a, b) = (Angle::new(0.1), Angle::new(0.2));
-        assert_eq!((a + b).get().to_bits(), (0.1_f32 + 0.2).to_bits());
-        assert_eq!((a - b).get().to_bits(), (0.1_f32 - 0.2).to_bits());
-        assert_eq!((-a).get().to_bits(), (-0.1_f32).to_bits());
-        assert_eq!((a * 3.0).get().to_bits(), (0.1_f32 * 3.0).to_bits());
-        assert_eq!((a / 3.0).get().to_bits(), (0.1_f32 / 3.0).to_bits());
-        assert!(Angle::ZERO < a && a <= a);
+        let (first, second) = (Angle::new(0.1), Angle::new(0.2));
+        assert_eq!((first + second).get().to_bits(), (0.1_f32 + 0.2).to_bits());
+        assert_eq!((first - second).get().to_bits(), (0.1_f32 - 0.2).to_bits());
+        assert_eq!((-first).get().to_bits(), (-0.1_f32).to_bits());
+        assert_eq!((first * 3.0).get().to_bits(), (0.1_f32 * 3.0).to_bits());
+        assert_eq!((first / 3.0).get().to_bits(), (0.1_f32 / 3.0).to_bits());
+        assert!(Angle::ZERO < first && first <= first);
         assert_eq!(Angle::new(f32::NAN).partial_cmp(&Angle::ZERO), None);
         assert_eq!(Angle::new(2.5).to_string(), "2.5");
     }

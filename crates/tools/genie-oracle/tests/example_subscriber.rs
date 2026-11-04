@@ -32,10 +32,10 @@ impl Write for Lines {
     }
 }
 
-impl<'a> MakeWriter<'a> for Lines {
+impl<'writer> MakeWriter<'writer> for Lines {
     type Writer = Self;
 
-    fn make_writer(&'a self) -> Self {
+    fn make_writer(&'writer self) -> Self {
         self.clone()
     }
 }

@@ -28,11 +28,11 @@ use crate::world::step::Step;
 /// # Errors
 ///
 /// A unit that does not move.
-pub(super) fn move_reads<'g>(
+pub(super) fn move_reads<'graphics>(
     (unit, mover): (&Unit, Option<&Mover>),
     attack_reads: &AttackReads,
-    graphics: &'g Graphics,
-) -> GenieResult<MoveToReads<'g>> {
+    graphics: &'graphics Graphics,
+) -> GenieResult<MoveToReads<'graphics>> {
     let _ = speed_of(mover)?;
     let sprites = SpriteReads {
         defaults: attack_reads.move_defaults,
@@ -168,8 +168,8 @@ impl Attack {
         };
         if matches!(state, Some(MoveTo::Start | MoveTo::Moving)) {
             unit.post_in_the_way(
-                step.w.parts.motion.mover_mut(unit.id),
-                &mut step.w.parts.unit_ai,
+                step.world.parts.motion.mover_mut(unit.id),
+                &mut step.world.parts.unit_ai,
             )?;
         }
         Ok(code)

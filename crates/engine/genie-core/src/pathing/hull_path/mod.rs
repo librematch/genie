@@ -32,7 +32,7 @@ use crate::map::spatial::{RecordId, Spatial};
 use crate::math::fmath::sqrt;
 use crate::objects::ObjectId;
 use crate::players::PlayerId;
-use crate::world::slots::CheckedIndex;
+use crate::world::slots::CheckedIndexExt;
 use genie_error::GenieResult;
 use std::collections::BTreeSet;
 
@@ -290,11 +290,11 @@ impl Node {
     }
 }
 
-/// The straight walk from `a` to `b`: the root of the squares' sum, y's first, as the pather
+/// The straight walk from `from` to `to`: the root of the squares' sum, y's first, as the pather
 /// reckons every node's step, distance to the goal and straight walk.
-fn walk_length(a: Point, b: Point) -> Distance {
+fn walk_length(from: Point, to: Point) -> Distance {
     Distance::new(sqrt(
-        (a.y() - b.y()) * (a.y() - b.y()) + (a.x() - b.x()) * (a.x() - b.x()),
+        (from.y() - to.y()) * (from.y() - to.y()) + (from.x() - to.x()) * (from.x() - to.x()),
     ))
 }
 
@@ -331,10 +331,10 @@ impl Waypoints {
     pub fn length(&self) -> Distance {
         let mut total = 0.0;
         for points in self.points.windows(2) {
-            let [a, b] = points else {
+            let [from, to] = points else {
                 continue;
             };
-            let (dx, dy) = (b.x() - a.x(), b.y() - a.y());
+            let (dx, dy) = (to.x() - from.x(), to.y() - from.y());
             total += sqrt(dx * dx + 0.0 * 0.0 + dy * dy);
         }
         Distance::new(total)
@@ -411,10 +411,10 @@ impl Default for KeptHulls {
 /// The old short pather over a world, for one unit: its terrain mask, player and radius, and the
 /// ignore list.
 #[derive(Debug)]
-pub struct HullPather<'w> {
-    world: &'w mut Spatial,
+pub struct HullPather<'world> {
+    world: &'world mut Spatial,
     /// The world's objects, whose gaits the hulls and the line tests read.
-    by_id: ObjectsRef<'w>,
+    by_id: ObjectsRef<'world>,
     mask: TerrainMask,
     radius: Distance,
     /// `FindShortPath`'s player (its argument 12, the unit's player's number `+0x718`), whom slot
@@ -423,7 +423,7 @@ pub struct HullPather<'w> {
     /// The gates its player may pass (slot 0x678, `FUN_1411d4a30`, a gate's), by id, when the
     /// caller gives them ([`HullPather::with_gates`]): the world's update knows the gates'
     /// states and the players' diplomacy; the pather does not.
-    gates: Option<&'w BTreeSet<ObjectId>>,
+    gates: Option<&'world BTreeSet<ObjectId>>,
     /// The objects `FindShortPath` includes (its arguments 13 and 14): in the hulls even when
     /// ignored or moving.
     include: Vec<ObjectId>,

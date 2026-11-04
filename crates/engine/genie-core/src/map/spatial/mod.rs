@@ -74,7 +74,7 @@ use std::ops::RangeInclusive;
 /// The caller's reachability check of a found object (slot 0x3d0 within a range): it paths over
 /// the spatial index the search reads, which the check's queries write, so the search hands it
 /// over for each call.
-pub type Reach<'a> = dyn FnMut(&mut Spatial, ObjectId, Distance) -> GenieResult<bool> + 'a;
+pub type Reach<'env> = dyn FnMut(&mut Spatial, ObjectId, Distance) -> GenieResult<bool> + 'env;
 
 /// What `ClosestObject` keeps of the objects found (its arguments 2 to 6; each −1 for any): the
 /// master class, the relation (0 itself or friends, 1 neutrals, 2 enemies, 3 itself), the state,
@@ -98,11 +98,11 @@ struct Filter {
 fn players_seen(found: &ByRelation<Vec<Record>>) -> u32 {
     let mut seen = [false; 9];
     for record in found.values().iter().flatten() {
-        if let Some(s) = seen.get_mut(record.owner.index()) {
-            *s = true;
+        if let Some(slot) = seen.get_mut(record.owner.index()) {
+            *slot = true;
         }
     }
-    seen[1..].iter().map(|&s| u32::from(s)).sum()
+    seen[1..].iter().map(|&sees| u32::from(sees)).sum()
 }
 
 /// What the walk reads of a moving object it meets: whether it moves (its velocity, `+0x868`, is
@@ -206,11 +206,11 @@ const QUERY_HITS: usize = 0x19;
 /// The most objects a tile's list holds (`FUN_140f5f0a0`'s `count < 0xfa`).
 const MOST_ON_TILE: usize = 0xfa;
 
-/// The obstruction manager's grid (`FUN_141054660`): its top cell is the largest power of two up
-/// to twice the map's longer side (at most 4096 tiles), each level halves the cells' side
-/// (level `k`'s cells are `top >> k` tiles wide, its cell shift `levels - k + 2`), down to cells
-/// of 8 tiles. Records are filed in one cell each ([`Spatial::filed`]); a query visits on every
-/// level the cells its tile range covers (`FUN_141051900`, `FUN_141052350`).
+/// The obstruction manager's grid (`FUN_141054660`): its top cell is the largest power of two up to
+/// twice the map's longer side (at most 4096 tiles), each level halves the cells' side (the cells
+/// of level `level` are `top >> level` tiles wide, its cell shift `levels - level + 2`), down to
+/// cells of 8 tiles. Records are filed in one cell each ([`Spatial::filed`]); a query visits on
+/// every level the cells its tile range covers (`FUN_141051900`, `FUN_141052350`).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 struct Grid {
     /// How many levels (`+0x1ac`).
@@ -219,8 +219,8 @@ struct Grid {
 
 impl Grid {
     fn new(map: GridSize) -> Self {
-        let (w, h) = (map.width(), map.height());
-        let longer = w.max(h);
+        let (width, height) = (map.width(), map.height());
+        let longer = width.max(height);
         let mut top = 0x1000;
         while longer * 2 < top {
             top >>= 1;
@@ -234,9 +234,9 @@ impl Grid {
     }
 
     /// The level table (`+0x1bc`): the finest level whose cells hold two tiles whose coordinates
-    /// XOR, shifted right by 3, to `v` (the levels less its bit length, at least −1).
-    fn level(self, v: i32) -> i32 {
-        let bits = 32 - v.cast_unsigned().leading_zeros() as i32;
+    /// XOR, shifted right by 3, to `value` (the levels less its bit length, at least −1).
+    fn level(self, value: i32) -> i32 {
+        let bits = 32 - value.cast_unsigned().leading_zeros() as i32;
         (self.levels - 1 - bits).max(-1)
     }
 
@@ -296,14 +296,14 @@ impl Tiles {
     pub fn word(&self, tile: Tile) -> Option<u64> {
         self.size
             .index(tile)
-            .and_then(|i| self.words.get(i).copied())
+            .and_then(|index| self.words.get(index).copied())
     }
 
     /// Whether the obstruction manager marks `tile` blocked ([`BLOCKED`]); a tile off the map is
     /// not.
     #[must_use]
     pub fn blocked(&self, tile: Tile) -> bool {
-        self.word(tile).is_some_and(|w| w & BLOCKED != 0)
+        self.word(tile).is_some_and(|word| word & BLOCKED != 0)
     }
 
     /// A test's map of `size`: every tile of class 0, blocked where `blocked` says.
@@ -325,7 +325,7 @@ impl Tiles {
     pub fn tall(&self, tile: Tile) -> Option<u8> {
         self.size
             .index(tile)
-            .and_then(|i| self.tall.get(i).copied())
+            .and_then(|index| self.tall.get(index).copied())
     }
 
     /// How many objects stand on `tile`.
@@ -333,7 +333,7 @@ impl Tiles {
     pub fn objects(&self, tile: Tile) -> Option<u8> {
         self.size
             .index(tile)
-            .and_then(|i| self.lists.get(i))
+            .and_then(|index| self.lists.get(index))
             .map(|object_ids| object_ids.len() as u8)
     }
 
@@ -342,7 +342,7 @@ impl Tiles {
     pub fn list(&self, tile: Tile) -> &[ObjectId] {
         self.size
             .index(tile)
-            .and_then(|i| self.lists.get(i))
+            .and_then(|index| self.lists.get(index))
             .map_or(&[], Vec::as_slice)
     }
 
@@ -352,46 +352,46 @@ impl Tiles {
             .index(Tile::new(position.x() as i32, position.y() as i32))
     }
 
-    /// The object goes last on tile `i` (`FUN_140f5f0a0`). An empty tile's list takes it and
+    /// The object goes last on tile `tile` (`FUN_140f5f0a0`). An empty tile's list takes it and
     /// the tall count becomes 1 for a `tall` object (else it stays, 0 on an empty tile); a tile
     /// of [`MOST_ON_TILE`] objects or more takes none and keeps its count; else the object goes
     /// last and the tall count is redone over the list, each object by `tall` (its master's
     /// height radius above 0 now).
-    fn append(&mut self, i: usize, id: ObjectId, tall: impl Fn(ObjectId) -> bool) {
-        let (Some(list), Some(count)) = (self.lists.get_mut(i), self.tall.get_mut(i)) else {
+    fn append(&mut self, tile: usize, id: ObjectId, tall: impl Fn(ObjectId) -> bool) {
+        let (Some(list), Some(count)) = (self.lists.get_mut(tile), self.tall.get_mut(tile)) else {
             return;
         };
-        let n = list.len();
-        if n == 0 {
+        let length = list.len();
+        if length == 0 {
             list.push(id);
             if tall(id) {
                 *count = 1;
             }
             return;
         }
-        if MOST_ON_TILE <= n {
+        if MOST_ON_TILE <= length {
             return;
         }
         list.push(id);
-        self.recount(i, tall);
+        self.recount(tile, tall);
     }
 
-    /// The object leaves tile `i` (`FUN_140f5f560`): one not on the list changes nothing; else
+    /// The object leaves tile `tile` (`FUN_140f5f560`): one not on the list changes nothing; else
     /// the last object takes its slot and the tall count is redone over the list.
-    fn take_off(&mut self, i: usize, id: ObjectId, tall: impl Fn(ObjectId) -> bool) {
-        let Some(list) = self.lists.get_mut(i) else {
+    fn take_off(&mut self, tile: usize, id: ObjectId, tall: impl Fn(ObjectId) -> bool) {
+        let Some(list) = self.lists.get_mut(tile) else {
             return;
         };
-        let Some(k) = list.iter().position(|&object_id| object_id == id) else {
+        let Some(slot) = list.iter().position(|&object_id| object_id == id) else {
             return;
         };
-        let _ = list.swap_remove(k);
-        self.recount(i, tall);
+        let _ = list.swap_remove(slot);
+        self.recount(tile, tall);
     }
 
-    /// Tile `i`'s tall count over its list, each object by `tall` (a byte, as the game counts).
-    fn recount(&mut self, i: usize, tall: impl Fn(ObjectId) -> bool) {
-        let (Some(list), Some(count)) = (self.lists.get(i), self.tall.get_mut(i)) else {
+    /// Tile `tile`'s tall count over its list, each object by `tall` (a byte, as the game counts).
+    fn recount(&mut self, tile: usize, tall: impl Fn(ObjectId) -> bool) {
+        let (Some(list), Some(count)) = (self.lists.get(tile), self.tall.get_mut(tile)) else {
             return;
         };
         *count = list.iter().filter(|&&object_id| tall(object_id)).count() as u8;
@@ -417,10 +417,10 @@ impl Tiles {
     fn covered(&self, placed: &Placed) -> (RangeInclusive<i32>, RangeInclusive<i32>) {
         let (x, y) = (placed.position.x(), placed.position.y());
         let (rx, ry) = (placed.radius.x(), placed.radius.y());
-        let hold = |v: i32, size: i32| v.clamp(0, size - 1);
-        let (w, h) = (self.size.width(), self.size.height());
-        let xs = hold((x - rx) as i32, w)..=hold(((x + rx) - 0.001) as i32, w);
-        let ys = hold((y - ry) as i32, h)..=hold(((y + ry) - 0.001) as i32, h);
+        let hold = |value: i32, size: i32| value.clamp(0, size - 1);
+        let (width, height) = (self.size.width(), self.size.height());
+        let xs = hold((x - rx) as i32, width)..=hold(((x + rx) - 0.001) as i32, width);
+        let ys = hold((y - ry) as i32, height)..=hold(((y + ry) - 0.001) as i32, height);
         (xs, ys)
     }
 
@@ -439,7 +439,8 @@ impl Tiles {
     /// The covered tiles as a rectangle, as the manager hands it to the planners' callback.
     fn covered_rect(&self, placed: &Placed) -> PlanRect {
         let (xs, ys) = self.covered(placed);
-        let [x0, y0, x1, y1] = [*xs.start(), *ys.start(), *xs.end(), *ys.end()].map(|v| v as i16);
+        let [x0, y0, x1, y1] =
+            [*xs.start(), *ys.start(), *xs.end(), *ys.end()].map(|value| value as i16);
         PlanRect::new(x0, y0, x1, y1)
     }
 
@@ -451,8 +452,8 @@ impl Tiles {
         if obstruction.class == ObstructionClass::GATE {
             bits |= 0x8000;
         }
-        for i in self.covered_indices(placed) {
-            if let Some(word) = self.words.get_mut(i)
+        for tile in self.covered_indices(placed) {
+            if let Some(word) = self.words.get_mut(tile)
                 && *word < 0x80_0000
             {
                 *word = (*word & !0xff_ff00) | bits;
@@ -471,15 +472,15 @@ impl Tiles {
         static_record: impl Fn(ObjectId) -> bool,
     ) -> bool {
         let own = 1u64 << placed.player.get();
-        for i in self.covered_indices(placed) {
-            if self.lists.get(i).is_some_and(|object_ids| {
+        for tile in self.covered_indices(placed) {
+            if self.lists.get(tile).is_some_and(|object_ids| {
                 object_ids
                     .iter()
                     .any(|&object_id| object_id != me && static_record(object_id))
             }) {
                 return false;
             }
-            if let Some(word) = self.words.get_mut(i)
+            if let Some(word) = self.words.get_mut(tile)
                 && *word >> 23 == own
             {
                 *word &= 0xff;
@@ -599,11 +600,11 @@ impl SearchCache {
 /// the masters a class-10 searcher passes, a farm's workers and pasture), the build's roles of
 /// the classes it meets and the target search's tuning values.
 #[derive(Clone, Copy)]
-struct ClosestChecks<'a> {
-    objects: ObjectsRef<'a>,
-    roles: &'a Roles,
-    best_target_tuning: &'a BestTargetTuning,
-    spatial_tuning: &'a SpatialTuning,
+struct ClosestChecks<'world> {
+    objects: ObjectsRef<'world>,
+    roles: &'world Roles,
+    best_target_tuning: &'world BestTargetTuning,
+    spatial_tuning: &'world SpatialTuning,
 }
 
 #[cfg(test)]

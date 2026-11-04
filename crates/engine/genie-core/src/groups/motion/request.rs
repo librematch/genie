@@ -29,7 +29,7 @@ use crate::pathing::tile_path::Path;
 use crate::world::WorldTime;
 use crate::world::index::ObjectsRef;
 use crate::world::layer::generated::GroupTuning;
-use crate::world::slots::CheckedIndex;
+use crate::world::slots::CheckedIndexExt;
 
 /// What the request plans toward: the walked level's number, range and target, its waypoint,
 /// the group's place (x, height, y; `from` its ground point) and the ground distance between
@@ -162,10 +162,11 @@ fn take_turn(
     let top_loops = motion
         .paths
         .last()
-        .filter(|t| t.has_path)
+        .filter(|path_data| path_data.has_path)
         .map(|path_data| path_data.path_flags.contains(PathFlags::LOOPS));
     let lead_group = lead.group.as_ref();
-    let spends = top_loops.is_none_or(|loops| !loops && lead_group.is_some_and(|g| !g.patrols()));
+    let spends = top_loops
+        .is_none_or(|loops| !loops && lead_group.is_some_and(|lead_group| !lead_group.patrols()));
     if spends {
         let level = motion.paths.checked_mut(0)?;
         level.continue_counter = level.continue_counter.spent();

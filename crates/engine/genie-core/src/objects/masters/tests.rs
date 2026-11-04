@@ -250,183 +250,194 @@ fn each_static_attribute_sets_adds_and_multiplies_its_field() {
     let rows: &[(MasterAttribute, Read, [f32; 3])] = &[
         (
             MasterAttribute::HIT_POINTS,
-            |m| HitPoints::of_master(m.hit_points).get(),
+            |master| HitPoints::of_master(master.hit_points).get(),
             [3.0, 5.0, 10.0],
         ),
         (
             MasterAttribute::LINE_OF_SIGHT,
-            |m| m.line_of_sight.get(),
+            |master| master.line_of_sight.get(),
             [3.0, 5.0, 10.0],
         ),
         (
             MasterAttribute::GARRISON_CAPACITY,
-            |m| f32::from(m.garrison.get()),
+            |master| f32::from(master.garrison.get()),
             [3.0, 5.0, 10.0],
         ),
-        (MasterAttribute::SIZE_X, |m| m.radius.x(), [3.0, 5.0, 10.0]),
-        (MasterAttribute::SIZE_Y, |m| m.radius.y(), [3.0, 5.0, 10.0]),
+        (
+            MasterAttribute::SIZE_X,
+            |master| master.radius.x(),
+            [3.0, 5.0, 10.0],
+        ),
+        (
+            MasterAttribute::SIZE_Y,
+            |master| master.radius.y(),
+            [3.0, 5.0, 10.0],
+        ),
         (
             MasterAttribute::CARRY_CAPACITY,
-            |m| f32::from(m.capacity.get()),
+            |master| f32::from(master.capacity.get()),
             [3.0, 5.0, 10.0],
         ),
         (
             MasterAttribute::STORAGE_1,
-            |m| m.storage[0].1.get(),
+            |master| master.storage[0].1.get(),
             [3.0, 5.0, 10.0],
         ),
         (
             MasterAttribute::STORAGE_2,
-            |m| m.storage[1].1.get(),
+            |master| master.storage[1].1.get(),
             [3.0, 5.0, 10.0],
         ),
         (
             MasterAttribute::STORAGE_3,
-            |m| m.storage[2].1.get(),
+            |master| master.storage[2].1.get(),
             [3.0, 5.0, 10.0],
         ),
         (
             MasterAttribute::FOG_VISIBILITY,
-            |m| f32::from(m.fog_visibility.get()),
+            |master| f32::from(master.fog_visibility.get()),
             [3.0, 3.0, 3.0],
         ),
         (
             MasterAttribute::OCCLUSION_MODE,
-            |m| f32::from(m.occlusion.get()),
+            |master| f32::from(master.occlusion.get()),
             [3.0, 5.0, 5.0],
         ),
         (
             MasterAttribute::SIZE_Z,
-            |m| m.height.get(),
+            |master| master.height.get(),
             [3.0, 5.0, 10.0],
         ),
         (
             MasterAttribute::CAN_BE_BUILT_ON,
-            |m| f32::from(m.blast_defense.get()),
+            |master| f32::from(master.blast_defense.get()),
             [3.0, 5.0, 5.0],
         ),
         (
             MasterAttribute::BLAST_DEFENSE_LEVEL,
-            |m| f32::from(m.blast_defense.get()),
+            |master| f32::from(master.blast_defense.get()),
             [3.0, 5.0, 10.0],
         ),
         (
             MasterAttribute::TERRAIN_RESTRICTION_ID,
-            |m| f32::from(RestrictionId::field(m.terrain_restriction)),
+            |master| f32::from(RestrictionId::field(master.terrain_restriction)),
             [3.0, 3.0, 3.0],
         ),
         (
             MasterAttribute::UNIT_TRAIT,
-            |m| m.object_flags.bits() as f32,
+            |master| master.object_flags.bits() as f32,
             [3.0, 5.0, 5.0],
         ),
         (
             MasterAttribute::TRAIT_PIECE,
-            |m| (m.object_flags.bits() >> 16) as f32,
+            |master| (master.object_flags.bits() >> 16) as f32,
             [3.0, 3.0, 3.0],
         ),
         (
             MasterAttribute::DEAD_UNIT_ID,
-            |m| f32::from(MasterId::field(m.death_spawns[0])),
+            |master| f32::from(MasterId::field(master.death_spawns[0])),
             [3.0, 3.0, 3.0],
         ),
         (
             MasterAttribute::BLOOD_UNIT,
-            |m| f32::from(MasterId::field(m.death_spawns[1])),
+            |master| f32::from(MasterId::field(master.death_spawns[1])),
             [3.0, 3.0, 3.0],
         ),
         (
             MasterAttribute::STANDING_GRAPHIC,
-            |m| sprite_value(m.standing_sprite),
+            |master| sprite_value(master.standing_sprite),
             [3.0, 5.0, 5.0],
         ),
         (
             MasterAttribute::STANDING_GRAPHIC_2,
-            |m| sprite_value(m.standing_sprite_2),
+            |master| sprite_value(master.standing_sprite_2),
             [3.0, 5.0, 5.0],
         ),
         (
             MasterAttribute::DYING_GRAPHIC,
-            |m| sprite_value(m.death_sprite),
+            |master| sprite_value(master.death_sprite),
             [3.0, 5.0, 5.0],
         ),
         (
             MasterAttribute::UNDEAD_GRAPHIC,
-            |m| sprite_value(m.undead_sprite),
+            |master| sprite_value(master.undead_sprite),
             [3.0, 5.0, 5.0],
         ),
         (
             MasterAttribute::OBSTRUCTION_KIND,
-            |m| f32::from(m.obstruction_kind.get()),
+            |master| f32::from(master.obstruction_kind.get()),
             [3.0, 3.0, 3.0],
         ),
         (
             MasterAttribute::BLOCKAGE_CLASS,
-            |m| f32::from(m.obstruction_class.get()),
+            |master| f32::from(master.obstruction_class.get()),
             [3.0, 3.0, 3.0],
         ),
         (
             MasterAttribute::SELECTION_EFFECT,
-            |m| f32::from(m.selection_effect.get()),
+            |master| f32::from(master.selection_effect.get()),
             [3.0, 3.0, 3.0],
         ),
         (
             MasterAttribute::DAMAGE_GRAPHIC,
-            |m| sprite_value(m.damage_graphics[1].sprite),
+            |master| sprite_value(master.damage_graphics[1].sprite),
             [3.0, 5.0, 5.0],
         ),
         (
             MasterAttribute::AVAILABLE_UNIT_FLAG,
-            |m| f32::from(m.available.get()),
+            |master| f32::from(master.available.get()),
             // the byte the game keeps: an add wraps, a scale rounds (not a flag of 0 or 1)
             [3.0, 5.0, 10.0],
         ),
         (
             MasterAttribute::DISABLED_UNIT_FLAG,
-            |m| f32::from(m.disabled.get()),
+            |master| f32::from(master.disabled.get()),
             [3.0, 5.0, 5.0],
         ),
         (
             MasterAttribute::INTERFACE_KIND,
-            |m| f32::from(m.unit_level.get()),
+            |master| f32::from(master.unit_level.get()),
             [3.0, 5.0, 5.0],
         ),
         (
             MasterAttribute::COMBAT_LEVEL,
-            |m| f32::from(m.combat_level.get()),
+            |master| f32::from(master.combat_level.get()),
             [3.0, 5.0, 5.0],
         ),
         (
             MasterAttribute::INTERACTION_MODE,
-            |m| f32::from(m.select_level.get()),
+            |master| f32::from(master.select_level.get()),
             [3.0, 5.0, 5.0],
         ),
         (
             MasterAttribute::MINIMAP_MODE,
-            |m| f32::from(m.map_draw_level.get()),
+            |master| f32::from(master.map_draw_level.get()),
             [3.0, 5.0, 5.0],
         ),
         // the selected entry plus ten times the count: the set and the add select at most
         // the last, the multiply inserts at 2 and selects it
         (
             MasterAttribute::DAMAGE_GRAPHICS_ENTRY_MOD,
-            |m| f32::from(m.damage_graphic_entry.get()) + 10.0 * m.damage_graphics.len() as f32,
+            |master| {
+                f32::from(master.damage_graphic_entry.get())
+                    + 10.0 * master.damage_graphics.len() as f32
+            },
             [21.0, 21.0, 32.0],
         ),
         // the add's count is the selected entry (1) plus 2
         (
             MasterAttribute::DAMAGE_GRAPHICS_TOTAL_NUM,
-            |m| m.damage_graphics.len() as f32,
+            |master| master.damage_graphics.len() as f32,
             [3.0, 3.0, 6.0],
         ),
         (
             MasterAttribute::DAMAGE_GRAPHIC_PERCENT,
-            |m| f32::from(m.damage_graphics[1].percent.get()),
+            |master| f32::from(master.damage_graphics[1].percent.get()),
             [3.0, 5.0, 5.0],
         ),
         (
             MasterAttribute::DAMAGE_GRAPHIC_APPLY_MODE,
-            |m| f32::from(m.damage_graphics[1].apply_mode.get()),
+            |master| f32::from(master.damage_graphics[1].apply_mode.get()),
             [3.0, 5.0, 5.0],
         ),
     ];
@@ -513,117 +524,117 @@ fn each_combat_attribute_sets_adds_and_multiplies_its_field() {
     let rows: &[(MasterAttribute, Read, [f32; 3])] = &[
         (
             MasterAttribute::ROTATION_SPEED,
-            |m| m.moving_part().turn_speed.get(),
+            |master| master.moving_part().turn_speed.get(),
             [3.0, 5.0, 10.0],
         ),
         (
             MasterAttribute::ATTACK_RELOAD_TIME,
-            |m| m.combat_part().reload.get(),
+            |master| master.combat_part().reload.get(),
             [3.0, 5.0, 10.0],
         ),
         (
             MasterAttribute::ACCURACY_PERCENT,
-            |m| f32::from(m.combat_part().hit_chance.get()),
+            |master| f32::from(master.combat_part().hit_chance.get()),
             [3.0, 5.0, 10.0],
         ),
         (
             MasterAttribute::MAXIMUM_RANGE,
-            |m| m.combat_part().weapon_range.get(),
+            |master| master.combat_part().weapon_range.get(),
             [3.0, 5.0, 10.0],
         ),
         (
             MasterAttribute::BASE_ARMOR,
-            |m| m.combat_part().base_armor.as_f32(),
+            |master| master.combat_part().base_armor.as_f32(),
             [3.0, 5.0, 10.0],
         ),
         (
             MasterAttribute::PROJECTILE_UNIT,
-            |m| f32::from(m.combat_part().missile.get()),
+            |master| f32::from(master.combat_part().missile.get()),
             [3.0, 5.0, 10.0],
         ),
         (
             MasterAttribute::TERRAIN_DEFENSE_BONUS,
-            |m| f32::from(m.combat_part().terrain_bonus.get()),
+            |master| f32::from(master.combat_part().terrain_bonus.get()),
             [3.0, 5.0, 10.0],
         ),
         (
             MasterAttribute::MINIMUM_RANGE,
-            |m| m.combat_part().min_range.get(),
+            |master| master.combat_part().min_range.get(),
             [3.0, 5.0, 10.0],
         ),
         (
             MasterAttribute::BLAST_WIDTH,
-            |m| m.combat_part().area_effect.get(),
+            |master| master.combat_part().area_effect.get(),
             [3.0, 5.0, 10.0],
         ),
         (
             MasterAttribute::BONUS_DAMAGE_RESISTANCE,
-            |m| m.combat_part().resistance.get(),
+            |master| master.combat_part().resistance.get(),
             [3.0, 5.0, 10.0],
         ),
         (
             MasterAttribute::FRAME_DELAY,
-            |m| m.combat_part().fire_frame.as_f32(),
+            |master| master.combat_part().fire_frame.as_f32(),
             [3.0, 5.0, 10.0],
         ),
         (
             MasterAttribute::BLAST_ATTACK_LEVEL,
-            |m| f32::from(m.combat_part().blast_level.bits()),
+            |master| f32::from(master.combat_part().blast_level.bits()),
             [3.0, 5.0, 10.0],
         ),
         (
             MasterAttribute::SHOWN_ATTACK,
-            |m| m.combat_part().shown.attack.as_f32(),
+            |master| master.combat_part().shown.attack.as_f32(),
             [3.0, 5.0, 10.0],
         ),
         (
             MasterAttribute::SHOWN_RANGE,
-            |m| m.combat_part().shown.range.get(),
+            |master| master.combat_part().shown.range.get(),
             [3.0, 5.0, 10.0],
         ),
         (
             MasterAttribute::SHOWN_MELEE_ARMOR,
-            |m| m.combat_part().shown.melee_armor.as_f32(),
+            |master| master.combat_part().shown.melee_armor.as_f32(),
             [3.0, 5.0, 10.0],
         ),
         (
             MasterAttribute::COMBAT_ABILITY,
-            |m| f32::from(m.combat_part().combat_ability.bits()),
+            |master| f32::from(master.combat_part().combat_ability.bits()),
             [3.0, 5.0, 5.0],
         ),
         (
             MasterAttribute::ATTACK_DISPERSION,
-            |m| m.combat_part().missed_spread.get(),
+            |master| master.combat_part().missed_spread.get(),
             [3.0, 5.0, 10.0],
         ),
         (
             MasterAttribute::ATTACK_GRAPHIC,
-            |m| sprite_value(m.combat_part().attack_sprite),
+            |master| sprite_value(master.combat_part().attack_sprite),
             [3.0, 5.0, 5.0],
         ),
         (
             MasterAttribute::AREA_DAMAGE,
-            |m| m.combat_part().area_damage.get(),
+            |master| master.combat_part().area_damage.get(),
             [3.0, 5.0, 10.0],
         ),
         (
             MasterAttribute::DAMAGE_REFLECTION,
-            |m| m.combat_part().reflection.get(),
+            |master| master.combat_part().reflection.get(),
             [3.0, 5.0, 10.0],
         ),
         (
             MasterAttribute::FRIENDLY_FIRE_DAMAGE,
-            |m| m.combat_part().friendly_fire.get(),
+            |master| master.combat_part().friendly_fire.get(),
             [3.0, 5.0, 10.0],
         ),
         (
             MasterAttribute::GARRISON_FIREPOWER,
-            |m| m.combat_part().garrison_firepower.get(),
+            |master| master.combat_part().garrison_firepower.get(),
             [3.0, 5.0, 10.0],
         ),
         (
             MasterAttribute::DISPLACEMENT_X,
-            |m| m.combat_part().weapon_offset.x(),
+            |master| master.combat_part().weapon_offset.x(),
             [3.0, 5.0, 10.0],
         ),
         (
@@ -643,165 +654,165 @@ fn each_tribe_combat_attribute_sets_adds_and_multiplies_its_field() {
     let rows: &[(MasterAttribute, Read, [f32; 3])] = &[
         (
             MasterAttribute::HERO_STATUS,
-            |m| f32::from(m.creatable_part().hero_flag.bits()),
+            |master| f32::from(master.creatable_part().hero_flag.bits()),
             [3.0, 5.0, 5.0],
         ),
         (
             MasterAttribute::TRAIN_LOCATION,
-            |m| {
+            |master| {
                 f32::from(MasterId::field(
-                    m.creatable_part().train_locations[1].location,
+                    master.creatable_part().train_locations[1].location,
                 ))
             },
             [3.0; 3],
         ),
         (
             MasterAttribute::TRAIN_BUTTON,
-            |m| f32::from(m.creatable_part().train_locations[1].button.get()),
+            |master| f32::from(master.creatable_part().train_locations[1].button.get()),
             [3.0; 3],
         ),
         (
             MasterAttribute::SHOWN_PIERCE_ARMOR,
-            |m| m.creatable_part().pierce_armor_shown.as_f32(),
+            |master| master.creatable_part().pierce_armor_shown.as_f32(),
             [3.0, 5.0, 10.0],
         ),
         (
             MasterAttribute::HOTKEY_ID,
-            |m| m.creatable_part().train_locations[1].hotkey.get() as f32,
+            |master| master.creatable_part().train_locations[1].hotkey.get() as f32,
             [3.0; 3],
         ),
         (
             MasterAttribute::MAXIMUM_CHARGE,
-            |m| m.creatable_part().max_charge.get(),
+            |master| master.creatable_part().max_charge.get(),
             [3.0, 5.0, 10.0],
         ),
         (
             MasterAttribute::RECHARGE_RATE,
-            |m| m.creatable_part().recharge_rate.get(),
+            |master| master.creatable_part().recharge_rate.get(),
             [3.0, 5.0, 10.0],
         ),
         (
             MasterAttribute::CHARGE_EVENT,
-            |m| f32::from(m.creatable_part().charge_event.get()),
+            |master| f32::from(master.creatable_part().charge_event.get()),
             [3.0, 5.0, 5.0],
         ),
         (
             MasterAttribute::CHARGE_KIND,
-            |m| f32::from(m.creatable_part().charge_kind.get()),
+            |master| f32::from(master.creatable_part().charge_kind.get()),
             [3.0; 3],
         ),
         (
             MasterAttribute::SECONDARY_PROJECTILE_UNIT,
-            |m| f32::from(MasterId::field(m.creatable_part().volley_missile)),
+            |master| f32::from(MasterId::field(master.creatable_part().volley_missile)),
             [3.0; 3],
         ),
         (
             MasterAttribute::SPECIAL_GRAPHIC,
-            |m| sprite_value(m.creatable_part().special_sprite),
+            |master| sprite_value(master.creatable_part().special_sprite),
             [3.0, 5.0, 5.0],
         ),
         (
             MasterAttribute::SPECIAL_ABILITY,
-            |m| f32::from(m.creatable_part().special_attack.get()),
+            |master| f32::from(master.creatable_part().special_attack.get()),
             [3.0, 5.0, 5.0],
         ),
         (
             MasterAttribute::IDLE_ATTACK_GRAPHIC,
-            |m| sprite_value(m.creatable_part().idle_attack_sprite),
+            |master| sprite_value(master.creatable_part().idle_attack_sprite),
             [3.0, 5.0, 5.0],
         ),
         (
             MasterAttribute::HERO_GLOW_GRAPHIC,
-            |m| sprite_value(m.creatable_part().hero_glow_sprite),
+            |master| sprite_value(master.creatable_part().hero_glow_sprite),
             [3.0, 5.0, 5.0],
         ),
         (
             MasterAttribute::GARRISON_GRAPHIC,
-            |m| sprite_value(m.creatable_part().garrison_sprite),
+            |master| sprite_value(master.creatable_part().garrison_sprite),
             [3.0, 5.0, 5.0],
         ),
         (
             MasterAttribute::FOOD_COSTS,
-            |m| m.creatable_part().cost[0].amount.as_f32(),
+            |master| master.creatable_part().cost[0].amount.as_f32(),
             [3.0, 5.0, 10.0],
         ),
         (
             MasterAttribute::TRAIN_TIME,
-            |m| f32::from(m.creatable_part().train_locations[1].time.get()),
+            |master| f32::from(master.creatable_part().train_locations[1].time.get()),
             [3.0, 5.0, 10.0],
         ),
         (
             MasterAttribute::TOTAL_MISSILES,
-            |m| m.creatable_part().volley_fire.get(),
+            |master| master.creatable_part().volley_fire.get(),
             [3.0, 5.0, 10.0],
         ),
         (
             MasterAttribute::MAXIMUM_TOTAL_MISSILES,
-            |m| f32::from(m.creatable_part().max_volley.get()),
+            |master| f32::from(master.creatable_part().max_volley.get()),
             [3.0, 5.0, 10.0],
         ),
         (
             MasterAttribute::REGENERATION_RATE,
-            |m| m.creatable_part().regeneration.get(),
+            |master| master.creatable_part().regeneration.get(),
             [3.0, 5.0, 10.0],
         ),
         (
             MasterAttribute::MIN_CONVERSION_TIME_MODIFIER,
-            |m| m.creatable_part().conversion.min_time,
+            |master| master.creatable_part().conversion.min_time,
             [3.0, 5.0, 10.0],
         ),
         (
             MasterAttribute::CONVERSION_CHANCE_MODIFIER,
-            |m| m.creatable_part().conversion.chance,
+            |master| master.creatable_part().conversion.chance,
             [3.0, 5.0, 10.0],
         ),
         (
             MasterAttribute::FORMATION_CATEGORY,
-            |m| f32::from(m.creatable_part().formation_category.get()),
+            |master| f32::from(master.creatable_part().formation_category.get()),
             [3.0; 3],
         ),
         // 10 hit points times the amount, set then added
         (
             MasterAttribute::REGENERATION_HP_PERCENT,
-            |m| m.creatable_part().regeneration.get(),
+            |master| master.creatable_part().regeneration.get(),
             [30.0, 50.0, 50.0],
         ),
         (
             MasterAttribute::CHARGE_PROJECTILE_UNIT,
-            |m| f32::from(MasterId::field(m.creatable_part().charge_projectile)),
+            |master| f32::from(MasterId::field(master.creatable_part().charge_projectile)),
             [3.0; 3],
         ),
         (
             MasterAttribute::ATTACK_PRIORITY,
-            |m| f32::from(m.creatable_part().attack_priority.get()),
+            |master| f32::from(master.creatable_part().attack_priority.get()),
             [3.0; 3],
         ),
         (
             MasterAttribute::INVULNERABILITY_LEVEL,
-            |m| m.creatable_part().invulnerability.get(),
+            |master| master.creatable_part().invulnerability.get(),
             [3.0, 5.0, 10.0],
         ),
         (
             MasterAttribute::ATTACK_GRAPHIC_2,
-            |m| sprite_value(m.combat_part().attack_sprite2),
+            |master| sprite_value(master.combat_part().attack_sprite2),
             [3.0, 5.0, 5.0],
         ),
         (
             MasterAttribute::SPAWNING_AREA_WIDTH,
-            |m| m.creatable_part().volley_spread.x.get(),
+            |master| master.creatable_part().volley_spread.x.get(),
             [3.0, 5.0, 10.0],
         ),
         (
             MasterAttribute::SPAWNING_AREA_RANDOMNESS,
-            |m| m.creatable_part().volley_spread.start.get(),
+            |master| master.creatable_part().volley_spread.start.get(),
             [3.0, 5.0, 10.0],
         ),
         // the selected entry plus ten times the count, as the damage sprites'
         (
             MasterAttribute::TRAIN_LOCATIONS_ENTRY_MOD,
-            |m| {
-                f32::from(m.creatable_part().train_location_entry.get())
-                    + 10.0 * m.creatable_part().train_locations.len() as f32
+            |master| {
+                f32::from(master.creatable_part().train_location_entry.get())
+                    + 10.0 * master.creatable_part().train_locations.len() as f32
             },
             [21.0, 21.0, 32.0],
         ),
@@ -1336,7 +1347,10 @@ fn foundation_terrain_add_counts_none_as_minus_one() {
     master.building = Some(BuildingMaster::default());
     master.add_attribute(MasterAttribute::FOUNDATION_TERRAIN, 2.0, &world(false));
     assert_eq!(
-        master.building.as_ref().and_then(|b| b.foundation_terrain),
+        master
+            .building
+            .as_ref()
+            .and_then(|building_master| building_master.foundation_terrain),
         Some(TerrainId::named(1))
     );
     master.set_attribute(MasterAttribute::FOUNDATION_TERRAIN, -1.0, &world(false));
@@ -1423,8 +1437,11 @@ fn moving_master_derived_values_follow_its_attributes() {
         &graphics,
         None,
     );
-    let s = master.move_stats.unwrap();
-    assert_eq!((s.base, s.speed), (Speed::new(1.1), Speed::new(1.1 * 1.5)));
+    let move_stats = master.move_stats.unwrap();
+    assert_eq!(
+        (move_stats.base, move_stats.speed),
+        (Speed::new(1.1), Speed::new(1.1 * 1.5))
+    );
     master.set_attribute(MasterAttribute::SIZE_Z, 1.0, &world(false));
     follow(&mut master, MasterAttribute::SIZE_Z, &graphics, None);
     assert!(master.is_tall());
@@ -1462,17 +1479,17 @@ fn moving_master_derived_values_follow_its_attributes() {
 #[test]
 fn an_id_field_keeps_negative_value_through_an_add() {
     let attribute_world = world(false);
-    let mut m = of_kind(MasterKind::RGE_COMBAT);
-    for a in [
+    let mut master = of_kind(MasterKind::RGE_COMBAT);
+    for master_attribute in [
         MasterAttribute::PROJECTILE_UNIT,
         MasterAttribute::TERRAIN_DEFENSE_BONUS,
     ] {
-        m.set_attribute(a, -3.0, &attribute_world);
+        master.set_attribute(master_attribute, -3.0, &attribute_world);
     }
     assert_eq!(
         (
-            m.combat_part().missile.master(),
-            m.combat_part().terrain_bonus.restriction()
+            master.combat_part().missile.master(),
+            master.combat_part().terrain_bonus.restriction()
         ),
         (None, None)
     );
@@ -1480,17 +1497,17 @@ fn an_id_field_keeps_negative_value_through_an_add() {
         MasterAttribute::PROJECTILE_UNIT,
         MasterAttribute::TERRAIN_DEFENSE_BONUS,
     ] {
-        m.add_attribute(master_attribute, 5.0, &attribute_world);
+        master.add_attribute(master_attribute, 5.0, &attribute_world);
     }
-    assert_eq!(m.combat_part().missile.master(), Some(master_id(2)));
+    assert_eq!(master.combat_part().missile.master(), Some(master_id(2)));
     assert_eq!(
-        m.combat_part().terrain_bonus.restriction(),
+        master.combat_part().terrain_bonus.restriction(),
         RestrictionId::of_data(2)
     );
     // 2 × −2 + 0.5 truncates to −3, kept: plus 4 is 1
-    m.multiply_attribute(MasterAttribute::PROJECTILE_UNIT, -2.0, &attribute_world);
-    m.add_attribute(MasterAttribute::PROJECTILE_UNIT, 4.0, &attribute_world);
-    assert_eq!(m.combat_part().missile.get(), 1);
+    master.multiply_attribute(MasterAttribute::PROJECTILE_UNIT, -2.0, &attribute_world);
+    master.add_attribute(MasterAttribute::PROJECTILE_UNIT, 4.0, &attribute_world);
+    assert_eq!(master.combat_part().missile.get(), 1);
     let mut master = of_kind(MasterKind::MOVING);
     master.set_attribute(MasterAttribute::TRAILING_UNIT, -3.0, &attribute_world);
     master.add_attribute(MasterAttribute::TRAILING_UNIT, 5.0, &attribute_world);
@@ -1665,19 +1682,19 @@ fn the_combat_master_own_values_change() {
 /// type; an animated master's set (`FUN_1410a8b00`) its speed.
 #[test]
 fn the_missile_building_and_animated_setters() {
-    let mut m = of_kind(MasterKind::MISSILE);
-    m.missile = Some(MissilePart {
+    let mut master = of_kind(MasterKind::MISSILE);
+    master.missile = Some(MissilePart {
         projectile_kind: ProjectileKind::STRAIGHT,
         smart_mode: SmartMode::NONE,
         hit_mode: HitMode::of_data(1),
         vanish_mode: VanishMode::NONE,
         arc: ArcRatio::new(0.25),
     });
-    m.add_attribute(MasterAttribute::PROJECTILE_SMART_MODE, 1.0, &world(false));
-    m.add_attribute(MasterAttribute::PROJECTILE_HIT_MODE, 1.0, &world(false));
-    m.add_attribute(MasterAttribute::PROJECTILE_ARC, 0.25, &world(false));
-    m.set_attribute(MasterAttribute::MAXIMUM_RANGE, 5.0, &world(false));
-    let missile_part = m.missile.unwrap();
+    master.add_attribute(MasterAttribute::PROJECTILE_SMART_MODE, 1.0, &world(false));
+    master.add_attribute(MasterAttribute::PROJECTILE_HIT_MODE, 1.0, &world(false));
+    master.add_attribute(MasterAttribute::PROJECTILE_ARC, 0.25, &world(false));
+    master.set_attribute(MasterAttribute::MAXIMUM_RANGE, 5.0, &world(false));
+    let missile_part = master.missile.unwrap();
     assert_eq!(
         (
             missile_part.smart_mode,
@@ -1690,13 +1707,16 @@ fn the_missile_building_and_animated_setters() {
             ArcRatio::new(0.5)
         )
     );
-    assert_eq!(m.combat_part().weapon_range, Distance::new(5.0));
-    let mut b = of_kind(MasterKind::BUILDING);
-    b.building = Some(BuildingMaster::default());
-    b.add_attribute(MasterAttribute::BUILDING_ICON_OVERRIDE, 3.0, &world(false));
-    b.add_attribute(MasterAttribute::GARRISON_KIND, 2.0, &world(false));
+    assert_eq!(master.combat_part().weapon_range, Distance::new(5.0));
+    let mut building = of_kind(MasterKind::BUILDING);
+    building.building = Some(BuildingMaster::default());
+    building.add_attribute(MasterAttribute::BUILDING_ICON_OVERRIDE, 3.0, &world(false));
+    building.add_attribute(MasterAttribute::GARRISON_KIND, 2.0, &world(false));
     assert_eq!(
-        (b.building.unwrap().facet, b.building.unwrap().garrison_kind),
+        (
+            building.building.unwrap().facet,
+            building.building.unwrap().garrison_kind
+        ),
         (3, GarrisonKinds::INFANTRY)
     );
     let mut master = of_kind(MasterKind::DOPPELGANGER);
@@ -1762,10 +1782,10 @@ fn villager_on_farm_takes_its_group_farmer_for_the_farm_class() {
         all.extend(others);
         Masters::new(all)
     };
-    let pick = |m: &Masters, own: &Master| {
+    let pick = |masters: &Masters, own: &Master| {
         let site = TaskTarget {
             id: object_id(12557),
-            master: m.get(ids::FARM).unwrap(),
+            master: masters.get(ids::FARM).unwrap(),
             player: PlayerId::new(2),
             state: ObjectState::Alive,
             held: carrying(None, 0.0),
@@ -1788,29 +1808,29 @@ fn villager_on_farm_takes_its_group_farmer_for_the_farm_class() {
             general: Some(&site),
             terrain: None,
         };
-        work_master(m, &actor, &on, None, &ALONE, slots(), &roles()).map(|w| {
-            w.map(|(m, t)| {
+        work_master(masters, &actor, &on, None, &ALONE, slots(), &roles()).map(|work| {
+            work.map(|(master, task)| {
                 (
-                    m.id.get(),
-                    ClassId::field(t.object_group),
-                    MasterId::field(t.object_id),
+                    master.id.get(),
+                    ClassId::field(task.object_group),
+                    MasterId::field(task.object_id),
                 )
             })
         })
     };
-    let own = |m: &Masters| m.get(ids::VILLAGER_MALE).unwrap().clone();
+    let own = |masters: &Masters| masters.get(ids::VILLAGER_MALE).unwrap().clone();
     let generic = master(master_id(120), 1, vec![gather(-1, -1, 1.0)]);
     let by_class = master(master_id(122), 1, vec![gather(49, -1, 0.5)]);
-    let m = with(vec![], vec![generic.clone(), by_class.clone()]);
-    assert_eq!(pick(&m, &own(&m)), Ok(Some((122, 49, -1))));
-    let m = with(vec![], vec![generic]);
-    assert_eq!(pick(&m, &own(&m)), Ok(Some((120, -1, -1))));
+    let masters = with(vec![], vec![generic.clone(), by_class.clone()]);
+    assert_eq!(pick(&masters, &own(&masters)), Ok(Some((122, 49, -1))));
+    let masters = with(vec![], vec![generic]);
+    assert_eq!(pick(&masters, &own(&masters)), Ok(Some((120, -1, -1))));
     let idle = master(master_id(122), 1, vec![gather(49, -1, 0.0)]);
-    let m = with(vec![], vec![idle]);
-    assert_eq!(pick(&m, &own(&m)), Ok(None));
+    let masters = with(vec![], vec![idle]);
+    assert_eq!(pick(&masters, &own(&masters)), Ok(None));
     let named = master(master_id(120), 1, vec![gather(-1, ids::FARM.get(), 0.0)]);
-    let m = with(vec![], vec![named, by_class.clone()]);
-    assert_eq!(pick(&m, &own(&m)), Ok(Some((120, -1, 50))));
+    let masters = with(vec![], vec![named, by_class.clone()]);
+    assert_eq!(pick(&masters, &own(&masters)), Ok(Some((120, -1, 50))));
     let attacker = master(
         master_id(120),
         1,
@@ -1855,7 +1875,7 @@ fn villager_takes_the_first_master_of_its_swap_group_with_task_for_its_foundatio
             terrain: None,
         };
         work_master(&masters, &actor, &on, None, &ALONE, slots(), &roles())
-            .map(|w| w.map(|(master, task)| (master.id.get(), task.action_kind)))
+            .map(|work| work.map(|(master, task)| (master.id.get(), task.action_kind)))
     };
     assert_eq!(pick(ids::VILLAGER_MALE), Ok(Some((118, ActionKind::BUILD))));
     assert_eq!(
@@ -1934,17 +1954,17 @@ fn master_is_found_by_its_player_and_id() {
 /// The world's masters by player: a player's own table, none beyond the tables.
 #[test]
 fn the_world_masters_are_looked_up_by_player() {
-    use crate::objects::masters::PlayersMasters;
+    use crate::objects::masters::PlayersMastersExt;
     let mut every = [Masters::new([house()]), Masters::new([])].map(Arc::new);
     assert!(
         every
             .of(PlayerId::new(0))
-            .is_some_and(|m| m.get(house().id).is_some())
+            .is_some_and(|masters| masters.get(house().id).is_some())
     );
     assert!(
         every
             .of(PlayerId::new(1))
-            .is_some_and(|m| m.get(house().id).is_none())
+            .is_some_and(|masters| masters.get(house().id).is_none())
     );
     assert!(every.of(PlayerId::new(2)).is_none());
     *every.of_mut(PlayerId::new(1)).unwrap() = Masters::new([house()]);

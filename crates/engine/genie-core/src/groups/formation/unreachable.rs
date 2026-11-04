@@ -10,7 +10,7 @@ use crate::map::spatial::RecordId;
 use crate::math::conversions::cvttss2si;
 use crate::math::fmath::below_or_unordered;
 use crate::world::World;
-use crate::world::slots::CheckedIndex;
+use crate::world::slots::CheckedIndexExt;
 
 impl World {
     /// The unreachable slots' places: each one's unit searches the grid for the cell it can
@@ -21,13 +21,13 @@ impl World {
         grid: &mut PassGrid,
         (members, un): (&[RecordId], Unreachable<'_>),
     ) -> GenieResult<()> {
-        let (w, h) = (grid.size.width(), grid.size.height());
+        let (width, height) = (grid.size.width(), grid.size.height());
         let (ox, oz) = (grid.origin.x(), grid.origin.y());
-        let (k, grow) = (un.nearest, un.grow);
-        let mut visited = vec![0u8; (w * h).max(0) as usize];
-        for &u in un.slots {
+        let (nearest, grow) = (un.nearest, un.grow);
+        let mut visited = vec![0u8; (width * height).max(0) as usize];
+        for &slot_index in un.slots {
             visited.fill(0);
-            let Some(unit) = self.world_object(formation.slots.checked(u)?.unit_id) else {
+            let Some(unit) = self.world_object(formation.slots.checked(slot_index)?.unit_id) else {
                 continue;
             };
             let unit_mask = self.master_mask(unit.player(), unit.master_id(self.model.slots))?;
@@ -39,7 +39,7 @@ impl World {
                 continue;
             };
             // CVTTSS2SI at 0x14103cb6a and 0x14103cb70
-            let tile = if slot_tile(formation.slots.checked(k)?.transform_position) == found {
+            let tile = if slot_tile(formation.slots.checked(nearest)?.transform_position) == found {
                 found
             } else {
                 let Some(at) = self.step_once_more(grid, found, unit_at.ground(), grow, members)?
@@ -49,7 +49,7 @@ impl World {
                 at
             };
             let (x, y) = (tile.x(), tile.y());
-            let slot = formation.slots.checked_mut(u)?;
+            let slot = formation.slots.checked_mut(slot_index)?;
             // COMISS/JC at 0x14103cde3: a NaN spacing nudges too
             if below_or_unordered(un.spacing.get(), PASS_ONE) {
                 slot.transform_position = slot
@@ -118,31 +118,31 @@ impl World {
 /// What [`World::move_unreachable`] reads of the passability: the slots to move, the nearest
 /// slot, the group's spacing and the manager's growth.
 #[derive(Clone, Copy)]
-pub(super) struct Unreachable<'a> {
-    pub(super) slots: &'a [usize],
+pub(super) struct Unreachable<'slots> {
+    pub(super) slots: &'slots [usize],
     pub(super) nearest: usize,
     pub(super) spacing: Distance,
     pub(super) grow: Distance,
 }
 
 /// The reachable slots' marks on the grid: each of `reachable`'s places marks its cell toward
-/// the place of the nearest slot `k`.
+/// the place of the nearest slot `near_index`.
 pub(super) fn mark_reachable(
     grid: &mut PassGrid,
     formation: &Formation,
-    (reachable, k): (&[usize], usize),
+    (reachable, near_index): (&[usize], usize),
 ) -> GenieResult<()> {
-    let (w, h) = (grid.size.width(), grid.size.height());
+    let (width, height) = (grid.size.width(), grid.size.height());
     let (ox, oz) = (grid.origin.x(), grid.origin.y());
-    let near = formation.slots.checked(k)?.transform_position;
-    for &r in reachable {
-        let checked = formation.slots.checked(r)?.transform_position;
+    let near = formation.slots.checked(near_index)?.transform_position;
+    for &reached in reachable {
+        let checked = formation.slots.checked(reached)?.transform_position;
         let gx = cvttss2si(checked.x() - ox as f32);
         let gz = cvttss2si(checked.y() - oz as f32);
-        if !(0 <= gx && gx < w && 0 <= gz && gz < h) {
+        if !(0 <= gx && gx < width && 0 <= gz && gz < height) {
             continue;
         }
-        let cell = (gz * w + gx) as usize;
+        let cell = (gz * width + gx) as usize;
         *grid.cells.checked_mut(cell)? = cell_mark(
             *grid.cells.checked(cell)?,
             near.x() - checked.x(),

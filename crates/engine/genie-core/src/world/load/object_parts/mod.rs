@@ -61,8 +61,10 @@ pub fn lifecycle(
         || {
             objects
                 .master(rge_static_object.master_obj)
-                .and_then(|m| m.static_part())
-                .and_then(|m| SpriteId::of_data(m.death_sprite_id))
+                .and_then(|master| master.static_part())
+                .and_then(|rge_master_static_object| {
+                    SpriteId::of_data(rge_master_static_object.death_sprite_id)
+                })
         },
         |own| SpriteId::of_data(own.death_sprite_num),
     );
@@ -71,17 +73,21 @@ pub fn lifecycle(
     let death_facets = masters
         .zip(after)
         .and_then(|(after_master_table, after)| after_master_table.graphics.get(after))
-        .filter(|g| {
-            pure_static && g.flags.contains(SpriteFlags::RANDOM_FIRST_FRAME) && g.facets.several()
+        .filter(|graphic| {
+            pure_static
+                && graphic.flags.contains(SpriteFlags::RANDOM_FIRST_FRAME)
+                && graphic.facets.several()
         })
         .map(|graphic| graphic.facets);
     let (dying_sprite, death_spawn, master) = rge_static_object.own_master().map_or_else(
         || {
             let player = objects
                 .master(rge_static_object.master_obj)
-                .and_then(|m| m.static_part());
+                .and_then(|master| master.static_part());
             (
-                player.and_then(|m| SpriteId::of_data(m.death_sprite_id)),
+                player.and_then(|rge_master_static_object| {
+                    SpriteId::of_data(rge_master_static_object.death_sprite_id)
+                }),
                 player.map_or(-1, |rge_master_static_object| {
                     rge_master_static_object.death_spawn_obj_id
                 }),
@@ -289,7 +295,7 @@ fn building_orders(combat: &TribeCombatObject) -> &[[u8; 52]] {
 fn queue(records: &[[u8; 52]], own: ObjectId, players: usize) -> GenieResult<Vec<QueuedOrder>> {
     records
         .iter()
-        .map(|r| QueuedOrder::from_bytes(r, own, players))
+        .map(|record| QueuedOrder::from_bytes(record, own, players))
         .collect()
 }
 

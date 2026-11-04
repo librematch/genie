@@ -32,7 +32,7 @@ use crate::world::Seconds;
 use crate::world::World;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 
 /// A movement damage task's timer (`+0x9a4`, `0x141207758`): above 0 (not a NaN) it runs down by
 /// the world's dt, never below 0. The task hits once it is at most 0 (`COMISS 0, seconds` / `JC`: a
@@ -56,14 +56,14 @@ pub fn movement_damage_due(timer: &mut Seconds, dt: Seconds) -> bool {
 /// the high corner.
 #[must_use]
 pub fn reach(position: Position, range: Distance, map: GridSize) -> (Tile, Tile) {
-    let r = cvttss2si(range.get());
-    let low = |v: f32| {
-        let d = cvttss2si(v).wrapping_sub(r);
-        if d < 0 { 0 } else { d }
+    let range_tiles = cvttss2si(range.get());
+    let low = |value: f32| {
+        let tile = cvttss2si(value).wrapping_sub(range_tiles);
+        if tile < 0 { 0 } else { tile }
     };
-    let high = |v: f32, size: i32| {
-        let d = cvttss2si(v).wrapping_add(r);
-        if size < d { size } else { d }
+    let high = |value: f32, size: i32| {
+        let tile = cvttss2si(value).wrapping_add(range_tiles);
+        if size < tile { size } else { tile }
     };
     (
         Tile::new(low(position.x()), low(position.y())),
@@ -262,23 +262,24 @@ impl World {
         owner: PlayerId,
     ) -> GenieResult<Option<Bystander>> {
         let relations = &self.players.player(owner)?.relations;
-        let allied = |q: PlayerId| allied(relations, owner, q, AllyTest::WithRelation4);
-        if let Some((q, unit)) = self.object(id) {
-            let m = unit.master(self.master_tables(), q)?;
+        let allied =
+            |player_id: PlayerId| allied(relations, owner, player_id, AllyTest::WithRelation4);
+        if let Some((player_id, unit)) = self.object(id) {
+            let master = unit.master(self.master_tables(), player_id)?;
             return Ok(Some(Bystander {
                 id,
-                player: q,
-                allied: allied(q),
-                kind: m.kind,
-                class: m.class,
+                player: player_id,
+                allied: allied(player_id),
+                kind: master.kind,
+                class: master.class,
                 state: unit.life.state,
-                blast_defense: m.blast_defense,
+                blast_defense: master.blast_defense,
                 position: unit.position(),
-                radius: m.radius,
+                radius: master.radius,
             }));
         }
         for (player_id, player) in PlayerId::each(self.players.len()).zip(&self.players) {
-            if let Some(g) = player.ghosts.iter().find(|ghost| ghost.id == id) {
+            if let Some(ghost) = player.ghosts.iter().find(|ghost| ghost.id == id) {
                 let master = self.master(player_id, self.model.slots.master.doppelganger)?;
                 return Ok(Some(Bystander {
                     id,
@@ -286,9 +287,9 @@ impl World {
                     allied: allied(player_id),
                     kind: MasterKind::DOPPELGANGER,
                     class: master.class,
-                    state: g.state,
+                    state: ghost.state,
                     blast_defense: master.blast_defense,
-                    position: g.position,
+                    position: ghost.position,
                     radius: master.radius,
                 }));
             }
@@ -307,18 +308,18 @@ impl World {
         if bystander.kind == MasterKind::DOPPELGANGER {
             return Ok(());
         }
-        let Some((player_id, u)) = self.object(bystander.id) else {
+        let Some((player_id, unit)) = self.object(bystander.id) else {
             return Err(NOT_HELD);
         };
-        let master = u.master(self.master_tables(), player_id)?;
+        let master = unit.master(self.master_tables(), player_id)?;
         let mut victim = victim_of(
             (
-                u,
-                self.parts.unit_ai.contains(u.id),
-                self.parts.building_of(u.id),
-                self.parts.combat_of(u.id),
-                self.parts.actions.of(u.id),
-                self.parts.unread.get(u.id),
+                unit,
+                self.parts.unit_ai.contains(unit.id),
+                self.parts.building_of(unit.id),
+                self.parts.combat_of(unit.id),
+                self.parts.actions.of(unit.id),
+                self.parts.unread.get(unit.id),
             ),
             master,
             &self.players.player(player_id)?.attributes,

@@ -25,13 +25,13 @@ pub struct EffectCommand {
     /// Command type (set, add or multiply an attribute or resource, enable or upgrade a unit, …).
     pub kind: u8,
     /// First parameter; its meaning depends on `kind` (for an attribute command, the unit).
-    pub a: i16,
+    pub first: i16,
     /// Second parameter; its meaning depends on `kind` (for an attribute command, the class).
-    pub b: i16,
+    pub second: i16,
     /// Third parameter; its meaning depends on `kind` (for an attribute command, the attribute).
-    pub c: i16,
+    pub third: i16,
     /// The float parameter; its meaning depends on `kind` (usually the amount).
-    pub d: f32,
+    pub amount: f32,
 }
 
 /// One resource cost of a tech.
@@ -66,7 +66,7 @@ pub struct ResearchLocation {
 /// A tech (genieutils' `Tech`, `Research.cpp`).
 #[binrw]
 #[brw(little)]
-#[br(import(v: Version))]
+#[br(import(version: Version))]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Tech {
     /// Techs the tech requires; -1 for none.
@@ -80,22 +80,22 @@ pub struct Tech {
     /// Whether the tech is available with the full tech tree setting.
     pub full_tech_mode: i16,
     /// Before VER 8.8 (`GV_C31`) one research location's fields are spread over the tech.
-    #[br(if(!v.at_least(31)))]
+    #[br(if(!version.at_least(31)))]
     pub location_id: Option<i16>,
     /// Language string id of the name; from VER 7.5 (`GV_C18`).
-    #[br(if(v.at_least(18)))]
+    #[br(if(version.at_least(18)))]
     pub language_dll_name: Option<i32>,
     /// Language string id of the description; from VER 7.5 (`GV_C18`).
-    #[br(if(v.at_least(18)))]
+    #[br(if(version.at_least(18)))]
     pub language_dll_description: Option<i32>,
     /// Language string id of the name as an i16; before VER 7.5 (`GV_C18`).
-    #[br(if(!v.at_least(18)))]
+    #[br(if(!version.at_least(18)))]
     pub language_dll_name_u16: Option<i16>,
     /// Language string id of the description as an i16; before VER 7.5 (`GV_C18`).
-    #[br(if(!v.at_least(18)))]
+    #[br(if(!version.at_least(18)))]
     pub language_dll_description_u16: Option<i16>,
     /// Research time; before VER 8.8 (`GV_C31`).
-    #[br(if(!v.at_least(31)))]
+    #[br(if(!version.at_least(31)))]
     pub queue_time: Option<i16>,
     /// Effect applied when the tech is researched; -1 for none.
     pub effect_id: i16,
@@ -104,22 +104,22 @@ pub struct Tech {
     /// Frame of the tech's icon.
     pub icon_id: i16,
     /// Position of the button on the command panel; before VER 8.8 (`GV_C31`).
-    #[br(if(!v.at_least(31)))]
+    #[br(if(!version.at_least(31)))]
     pub button_id: Option<u8>,
     /// Language string id of the help text.
     pub language_dll_help: i32,
     /// Language string id of the tech tree text.
     pub language_dll_tech_tree: i32,
     /// Hotkey id; before VER 8.8 (`GV_C31`).
-    #[br(if(!v.at_least(31)))]
+    #[br(if(!version.at_least(31)))]
     pub hot_key_id: Option<i32>,
     /// Internal name.
     pub name: DebugString,
     /// Whether the tech can be researched more than once; from VER 7.2 (`GV_C15`).
-    #[br(if(v.at_least(15)))]
+    #[br(if(version.at_least(15)))]
     pub repeatable: Option<u8>,
     /// Number of research locations; from VER 8.8 (`GV_C31`).
-    #[br(if(v.at_least(31)))]
+    #[br(if(version.at_least(31)))]
     pub research_location_count: Option<i16>,
     /// Where the tech is researched.
     #[br(count = research_location_count.unwrap_or(0))]
@@ -134,7 +134,7 @@ pub(super) const AGES: usize = 5;
 /// The tech tree screen: its ages, buildings, units and researches.
 #[binrw]
 #[brw(little)]
-#[br(import(v: Version))]
+#[br(import(version: Version))]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TechTree {
     /// Number of ages.
@@ -142,10 +142,10 @@ pub struct TechTree {
     /// Number of buildings.
     pub building_count: u8,
     /// From VER 8.9 (`GV_C32`) the unit connections are counted in an i16.
-    #[br(if(v.at_least(32)))]
+    #[br(if(version.at_least(32)))]
     pub unit_count_wide: Option<i16>,
     /// Number of units as a u8; before VER 8.9 (`GV_C32`).
-    #[br(if(!v.at_least(32)))]
+    #[br(if(!version.at_least(32)))]
     pub unit_count: Option<u8>,
     /// Number of researches.
     pub research_count: u8,
@@ -160,7 +160,7 @@ pub struct TechTree {
     /// The units.
     #[br(count = unit_count_wide.map_or_else(
         || usize::from(unit_count.unwrap_or(0)),
-        |n| usize::try_from(n).unwrap_or(0),
+        |count| usize::try_from(count).unwrap_or(0),
     ))]
     pub units: Vec<UnitConnection>,
     /// The researches.

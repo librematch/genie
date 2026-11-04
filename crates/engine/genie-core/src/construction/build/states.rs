@@ -9,7 +9,7 @@ use crate::map::Position;
 use crate::math::rng::Stream;
 use crate::movement::move_to::MoveToAction;
 use crate::objects::masters::MasterId;
-use crate::objects::masters::PlayersMasters;
+use crate::objects::masters::PlayersMastersExt;
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Unit;
 use crate::orders::OrderSource;
@@ -29,21 +29,21 @@ use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 use crate::world::lets::release;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 use crate::world::step::Step;
 use std::mem::replace;
 
 impl BuildAction {
     /// The foundation as the update reads it ([`BuildReads::site`]): the builder's player's
     /// object, None once the player no longer holds it.
-    pub(super) fn site_unit<'w>(
-        step: &'w Step<'_>,
+    pub(super) fn site_unit<'world>(
+        step: &'world Step<'_>,
         reads: &BuildReads,
-    ) -> GenieResult<Option<&'w Unit>> {
-        let _ = step.w.players.player(step.player)?;
+    ) -> GenieResult<Option<&'world Unit>> {
+        let _ = step.world.players.player(step.player)?;
         Ok(reads
             .site
-            .and_then(|id| step.w.live_object(step.player, id)))
+            .and_then(|id| step.world.live_object(step.player, id)))
     }
 
     /// The builder count (`+0x9e8`) of the building `FUN_140aaddb0` gives a Build on `site`
@@ -58,10 +58,10 @@ impl BuildAction {
         site: Option<FoundationId>,
         by: i8,
     ) -> GenieResult<()> {
-        if let Some(id) = step.w.counted_building(site)?
-            && step.w.object(id).is_some()
+        if let Some(id) = step.world.counted_building(site)?
+            && step.world.object(id).is_some()
         {
-            let builder_count = step.w.parts.repairers_mut(id)?;
+            let builder_count = step.world.parts.repairers_mut(id)?;
             *builder_count = builder_count.changed_by(by);
         }
         Ok(())
@@ -78,11 +78,11 @@ impl BuildAction {
         site: Option<FoundationId>,
     ) -> GenieResult<BuilderCount> {
         Ok(step
-            .w
+            .world
             .counted_building(site)?
-            .and_then(|id| step.w.object(id))
+            .and_then(|id| step.world.object(id))
             .map_or(BuilderCount::NONE, |(_, unit)| {
-                step.w.parts.repairers_of(unit.id)
+                step.world.parts.repairers_of(unit.id)
             }))
     }
 
@@ -110,7 +110,7 @@ impl BuildAction {
     pub(super) fn leave(&mut self, step: &mut Step<'_>, builder: &Unit) -> GenieResult<()> {
         self.uncount(step)?;
         if self.state.take_move_to().is_some()
-            && let Some(mover) = step.w.parts.mover_mut(builder.id)
+            && let Some(mover) = step.world.parts.mover_mut(builder.id)
         {
             mover.stop()?;
         }
@@ -157,7 +157,7 @@ impl BuildAction {
         };
         // the foods a unit carries (15 to 17) as food
         let kind = if kind.is_food_load() {
-            step.w.model.slots.attribute.food
+            step.world.model.slots.attribute.food
         } else {
             kind
         };
@@ -185,7 +185,7 @@ impl BuildAction {
         reads: &BuildReads,
         roles: &Roles,
     ) -> GenieResult<HeadCode> {
-        if step.w.players.player(step.player)?.kind.is_computer() {
+        if step.world.players.player(step.player)?.kind.is_computer() {
             return Err(GenieError::unsupported(
                 "a computer player's builder after its work",
             ));
@@ -193,7 +193,7 @@ impl BuildAction {
         let site = Self::site_unit(step, reads)?.ok_or(GenieError::unsupported(
             "the end of a Build on a foundation the slice does not read",
         ))?;
-        let master = site.master(step.w.master_tables(), step.player)?;
+        let master = site.master(step.world.master_tables(), step.player)?;
         // LAB_140ab09af: a villager works the farm it built (FUN_141194b20, FUN_141195750), a
         // fishing ship its fish trap (FUN_141194640, FUN_1411945a0): its unit AI drops its build
         // orders (FUN_140c5e020 with 0x2be), then slot 0x7e8 on the building
@@ -225,7 +225,7 @@ impl BuildAction {
             (FoundationId::new(site.id), site.life.master_id),
         );
         let ai = step
-            .w
+            .world
             .parts
             .unit_ai
             .get_mut(builder.id)
@@ -261,7 +261,7 @@ impl BuildAction {
         builder: &mut Unit,
     ) -> GenieResult<()> {
         let point = step
-            .w
+            .world
             .spatial
             .get(self.target)
             .ok_or(GenieError::unsupported(
@@ -307,7 +307,7 @@ impl BuildAction {
         self.no_more_work()?;
         release(step, builder, site, reads.by)?;
         builder.post_own(
-            &mut step.w.parts.unit_ai,
+            &mut step.world.parts.unit_ai,
             NotifyKind::REQUIRES_SEARCH,
             [AiAction::Build.value(), 0, 0],
         )?;
@@ -322,14 +322,14 @@ impl BuildAction {
     /// [`Unit::show_standing`]'s.
     pub(super) fn stand(step: &mut Step<'_>, builder: &mut Unit) -> GenieResult<()> {
         builder.show_standing(
-            step.w.parts.motion.layer_mut(builder.id),
+            step.world.parts.motion.layer_mut(builder.id),
             OwnerMasters::new(
-                &step.w.parts.own_master,
-                step.w.model.masters.of(step.player),
+                &step.world.parts.own_master,
+                step.world.model.masters.of(step.player),
             ),
-            &step.w.model.graphics,
-            step.w.streams.get(Stream::Sprite),
-            step.w.model.tuning.sprite,
+            &step.world.model.graphics,
+            step.world.streams.get_mut(Stream::Sprite),
+            step.world.model.tuning.sprite,
         )
     }
 
@@ -384,7 +384,7 @@ impl BuildAction {
         self.leave(step, builder)?;
         self.state = BuildState::Idle;
         let mut left = 0;
-        if let Some(ai) = step.w.parts.unit_ai.get_mut(builder.id) {
+        if let Some(ai) = step.world.parts.unit_ai.get_mut(builder.id) {
             drop_done_orders(ai, built, &reads.build_targets);
             left = ai.orders.len();
             if left != 0 {
@@ -394,7 +394,7 @@ impl BuildAction {
         }
         if left == 0 {
             builder.post_own(
-                &mut step.w.parts.unit_ai,
+                &mut step.world.parts.unit_ai,
                 NotifyKind::REQUIRES_SEARCH,
                 [AiAction::Build.value(), 0, 0],
             )?;
@@ -435,9 +435,9 @@ impl BuildAction {
             *builder_count = builder_count.left();
         }
         if self.state.move_to().is_some()
-            && let Some(m) = mover
+            && let Some(mover) = mover
         {
-            m.stop()?;
+            mover.stop()?;
         }
         *self = self.restarted(self.target, at, walk);
         Ok(())
@@ -462,9 +462,9 @@ impl BuildAction {
         mover: Option<&mut Mover>,
     ) -> GenieResult<()> {
         if self.state.move_to().is_some()
-            && let Some(m) = mover
+            && let Some(mover) = mover
         {
-            m.stop()?;
+            mover.stop()?;
         }
         *self = self.restarted(Some(target), at, walk);
         Ok(())
@@ -488,9 +488,9 @@ impl BuildAction {
     ) -> GenieResult<(bool, Option<FoundationId>, Option<DropSiteId>)> {
         let counted = replace(&mut self.added, false);
         if self.state.take_move_to().is_some()
-            && let Some(m) = mover
+            && let Some(mover) = mover
         {
-            m.stop()?;
+            mover.stop()?;
         }
         self.point = Position::from([-1.0; 3]);
         self.state = BuildState::Halted;
@@ -510,7 +510,7 @@ impl BuildAction {
         builder: &mut Unit,
         reads: &BuildReads,
     ) -> GenieResult<()> {
-        let (counted, target, second) = self.halt(step.w.parts.mover_mut(builder.id))?;
+        let (counted, target, second) = self.halt(step.world.parts.mover_mut(builder.id))?;
         if counted {
             Self::count(step, target, -1)?;
         }

@@ -21,13 +21,13 @@ use crate::movement::scout_area::ScoutArea;
 use crate::objects::SpriteId;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::Master;
-use crate::objects::masters::PlayersMasters;
+use crate::objects::masters::PlayersMastersExt;
 use crate::objects::unit::{Unit, object_master};
 use crate::players::PlayerKind;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::UnitStance;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 use crate::world::step::Step;
 use crate::{GenieError, GenieResult};
 use genie_diff::Diff;
@@ -85,21 +85,21 @@ pub struct ExploreAction {
 /// the sprite its maker gives (`FUN_140aa0d30` takes the task's moving sprite, an Explore has no
 /// task: the master's walking sprite, `+0x748`; none leaves the constructor's default).
 #[derive(Clone, Copy, Debug)]
-pub struct ExploreMove<'a> {
+pub struct ExploreMove<'graphics> {
     /// What every new sub-action `MoveTo` reads of the unit.
-    pub(crate) reads: MoveToReads<'a>,
+    pub(crate) reads: MoveToReads<'graphics>,
     /// The master's walking sprite (`+0x748`).
     pub(crate) given: Option<SpriteId>,
 }
 
-impl<'a> ExploreMove<'a> {
+impl<'graphics> ExploreMove<'graphics> {
     /// What the `MoveTo` of `unit` with its mover of `master` reads, with the sprites' table
     /// and the unit's terrain look (`graphics`).
     #[must_use]
     pub fn of(
         unit: (&Unit, Option<&Mover>),
         master: &Master,
-        graphics: (&'a Graphics, Option<&Look>),
+        graphics: (&'graphics Graphics, Option<&Look>),
         roles: &Roles,
     ) -> Self {
         Self {
@@ -261,21 +261,21 @@ impl ExploreAction {
         roles: &Roles,
     ) -> GenieResult<()> {
         let master = object_master(
-            step.w.parts.own_master.get(explorer.id),
+            step.world.parts.own_master.get(explorer.id),
             (explorer.id, explorer.life.master_id),
-            step.w.model.masters.of(step.player),
+            step.world.model.masters.of(step.player),
         )
         .ok();
-        let villager =
-            master.is_some_and(|m| roles.of_class(m.class).contains(ClassRoles::VILLAGER));
+        let villager = master
+            .is_some_and(|master| roles.of_class(master.class).contains(ClassRoles::VILLAGER));
         let gives_up = GiveUp {
-            patience: if villager && !step.w.players.player(step.player)?.kind.is_computer() {
+            patience: if villager && !step.world.players.player(step.player)?.kind.is_computer() {
                 Patience::WaitsOnce
             } else {
                 Patience::Fails
             },
             stance: step
-                .w
+                .world
                 .parts
                 .unit_ai
                 .get(explorer.id)
@@ -291,7 +291,7 @@ impl ExploreAction {
         let walked = move_to.is_some();
         let owner = self.after_walk(code);
         if walked && self.state.move_to().is_none() {
-            stop_mover(step.w.parts.mover_mut(explorer.id))?;
+            stop_mover(step.world.parts.mover_mut(explorer.id))?;
         }
         explorer.explore_owner(owner, step)
     }
@@ -319,12 +319,12 @@ impl InfluenceMap {
     /// `FUN_140f4a240`: `size` wide and high, every byte `fill`, from tile (0, 0).
     #[must_use]
     pub fn new(size: GridSize, fill: u8) -> Self {
-        let n = (size.width().max(0) * size.height().max(0)) as usize;
+        let count = (size.width().max(0) * size.height().max(0)) as usize;
         Self {
             size,
             origin: Tile::new(0, 0),
             limit: 0,
-            cells: vec![fill; n],
+            cells: vec![fill; count],
         }
     }
 
@@ -339,12 +339,13 @@ impl InfluenceMap {
     /// The byte of `tile`, None off the map (`FUN_140c4b130` reads it unchecked).
     #[must_use]
     pub fn get(&self, tile: Tile) -> Option<u8> {
-        self.index(tile).and_then(|i| self.cells.get(i).copied())
+        self.index(tile)
+            .and_then(|index| self.cells.get(index).copied())
     }
 
     /// `FUN_140f4d5e0`: `tile` takes `value`; one off the map is let be.
     pub fn set(&mut self, tile: Tile, value: u8) {
-        if let Some(cell) = self.index(tile).and_then(|i| self.cells.get_mut(i)) {
+        if let Some(cell) = self.index(tile).and_then(|index| self.cells.get_mut(index)) {
             *cell = value;
         }
     }
@@ -396,12 +397,12 @@ pub(crate) fn unexplored_area(
                 continue;
             }
             let distance = area.distance(tile);
-            if best.is_none_or(|(_, b)| distance < b) {
+            if best.is_none_or(|(_, best_distance)| distance < best_distance) {
                 best = Some((tile, distance));
             }
         }
     }
-    Ok(best.map(|(p, _)| p))
+    Ok(best.map(|(tile, _)| tile))
 }
 
 /// How far past its line of sight the search looks, and about an explore's target point, in tiles.
@@ -423,16 +424,16 @@ pub struct Seeker {
     pub(crate) player_kind: PlayerKind,
 }
 
-/// `FUN_140c4bd40`, the unit AI's slot 0x90 (`closestUndiscoveredTile`, "the closest
-/// undiscovered tile"): none for a computer player's unit. Else, after one draw of the AI stream
-/// (`ai`), the tiles within the unit's line of sight and 3 more of its tile (within 7 of the target
-/// point under an explore to it, order `0x2da`), held on the map (`map`), row by row: a tile the
-/// player never saw, in the unit's zone, where the unit could stand (slot 0x278) counts by the
-/// squared distance between the tiles (plus that from the target point's, when the AI has one),
-/// and takes the place of the best when it is nearer than the best by more than the draw's slack
-/// (`d < best + draw % 3`). The best then counts only when the unit reaches it (slot 0x3d8 within
-/// its line of sight less a tile). The waypoint queue the search passes by (`+0xd8`, count
-/// `+0x158`, not saved) is empty in the slice.
+/// `FUN_140c4bd40`, the unit AI's slot 0x90 (`closestUndiscoveredTile`, "the closest undiscovered
+/// tile"): none for a computer player's unit. Else, after one draw of the AI stream (`ai`), the
+/// tiles within the unit's line of sight and 3 more of its tile (within 7 of the target point under
+/// an explore to it, order `0x2da`), held on the map (`map`), row by row: a tile the player never
+/// saw, in the unit's zone, where the unit could stand (slot 0x278) counts by the squared distance
+/// between the tiles (plus that from the target point's, when the AI has one), and takes the place
+/// of the best when it is nearer than the best by more than the draw's slack (`distance < best +
+/// draw % 3`). The best then counts only when the unit reaches it (slot 0x3d8 within its line of
+/// sight less a tile). The waypoint queue the search passes by (`+0xd8`, count `+0x158`, not saved)
+/// is empty in the slice.
 pub(crate) fn closest_undiscovered(
     area: &mut ScoutArea<'_>,
     seeker: Seeker,
@@ -469,17 +470,17 @@ pub(crate) fn closest_undiscovered(
             if area.explored(tile)? || area.zone(tile) != own || !area.clear(tile)? {
                 continue;
             }
-            let mut d = (y - ty) * (y - ty) + (x - tx) * (x - tx);
+            let mut distance = (y - ty) * (y - ty) + (x - tx) * (x - tx);
             if px != NO_POINT {
-                d += (y - py as i32) * (y - py as i32) + (x - px as i32) * (x - px as i32);
+                distance += (y - py as i32) * (y - py as i32) + (x - px as i32) * (x - px as i32);
             }
-            if best.is_none_or(|(_, b)| d < slack + b) {
-                best = Some((tile, d));
+            if best.is_none_or(|(_, best_distance)| distance < slack + best_distance) {
+                best = Some((tile, distance));
             }
         }
     }
     match best {
-        Some((t, _)) if area.reaches(t)? => Ok(Some(t)),
+        Some((tile, _)) if area.reaches(tile)? => Ok(Some(tile)),
         _ => Ok(None),
     }
 }
@@ -508,20 +509,25 @@ pub(crate) fn beyond_sight(
     ai: &mut Well512,
 ) -> GenieResult<Option<Tile>> {
     let own = area.own_zone();
-    let (w, h) = (map.width(), map.height());
-    let r = line_of_sight.get() as i32 + SQUARE_PAST_SIGHT;
+    let (width, height) = (map.width(), map.height());
+    let line_of_sight = line_of_sight.get() as i32 + SQUARE_PAST_SIGHT;
     let (ux, uy) = (at.x() as i32, at.y() as i32);
-    let (x0, x1, y0, y1) = (ux - r, ux + r, uy - r, uy + r);
-    let on_x = |x: i32| 0 <= x && x < w;
-    let on_y = |y: i32| 0 <= y && y < h;
+    let (x0, x1, y0, y1) = (
+        ux - line_of_sight,
+        ux + line_of_sight,
+        uy - line_of_sight,
+        uy + line_of_sight,
+    );
+    let on_x = |x: i32| 0 <= x && x < width;
+    let on_y = |y: i32| 0 <= y && y < height;
     let mut edge: Vec<Tile> = Vec::new();
     if 0 <= y0 {
         edge.extend((x0..x1).filter(|&x| on_x(x)).map(|x| Tile::new(x, y0)));
     }
-    if x1 < w {
+    if x1 < width {
         edge.extend((y0..y1).filter(|&y| on_y(y)).map(|y| Tile::new(x1, y)));
     }
-    if y1 < h {
+    if y1 < height {
         edge.extend((x0 + 1..=x1).filter(|&x| on_x(x)).map(|x| Tile::new(x, y1)));
     }
     if 0 <= x0 {
@@ -531,28 +537,28 @@ pub(crate) fn beyond_sight(
     let counts = |area: &mut ScoutArea<'_>, tile: Tile| -> GenieResult<bool> {
         Ok(area.zone(tile) == own && area.clear(tile)? && area.reaches(tile)?)
     };
-    for &t in &edge {
-        if !area.explored(t)? && counts(area, t)? {
-            return Ok(Some(t));
+    for &tile in &edge {
+        if !area.explored(tile)? && counts(area, tile)? {
+            return Ok(Some(tile));
         }
     }
-    let mut seen = vec![false; (w * h).max(0) as usize];
+    let mut seen = vec![false; (width * height).max(0) as usize];
     let mut queue = vec![Tile::new(ux, uy)];
-    let mut i = 0;
-    while let Some(&t) = queue.get(i) {
-        i += 1;
-        if !area.explored(t)? {
-            if counts(area, t)? {
-                return Ok(Some(t));
+    let mut index = 0;
+    while let Some(&open) = queue.get(index) {
+        index += 1;
+        if !area.explored(open)? {
+            if counts(area, open)? {
+                return Ok(Some(open));
             }
             continue;
         }
-        for n in t.beside() {
-            if let Some(s) = map.index(n).and_then(|c| seen.get_mut(c))
-                && !*s
+        for tile in open.beside() {
+            if let Some(seen_tile) = map.index(tile).and_then(|cell| seen.get_mut(cell))
+                && !*seen_tile
             {
-                *s = true;
-                queue.push(n);
+                *seen_tile = true;
+                queue.push(tile);
             }
         }
     }
@@ -575,21 +581,21 @@ impl Unit {
     ) -> GenieResult<()> {
         let at = Position::new(point.x(), point.y(), self.position().z());
         let walk = self.explore_move(step, roles);
-        let owner = if let Some(e) = actions.list.explore_mut() {
-            let walked = e.state.move_to().is_some();
-            let owner = e.take_point(at, &walk, &step.w.model.tuning.move_to)?;
+        let owner = if let Some(explore_action) = actions.list.explore_mut() {
+            let walked = explore_action.state.move_to().is_some();
+            let owner = explore_action.take_point(at, &walk, &step.world.model.tuning.move_to)?;
             if walked {
-                stop_mover(step.w.parts.mover_mut(self.id))?;
+                stop_mover(step.world.parts.mover_mut(self.id))?;
             }
             owner
         } else {
-            if actions.top_action().is_some() || step.w.parts.unread.contains(self.id) {
+            if actions.top_action().is_some() || step.world.parts.unread.contains(self.id) {
                 return Err(GenieError::unsupported(
                     "an Explore replacing another action",
                 ));
             }
             let (explore_action, owner) =
-                ExploreAction::new(at, &walk, &step.w.model.tuning.move_to)?;
+                ExploreAction::new(at, &walk, &step.world.model.tuning.move_to)?;
             actions.list.set_explore(Some(explore_action));
             owner
         };
@@ -598,30 +604,34 @@ impl Unit {
 
     /// What an Explore's `MoveTo` reads of this unit ([`ExploreMove`]); a unit whose master the world
     /// lacks reads no sprite defaults and gives none.
-    fn explore_move<'g>(&self, step: &'g Step<'_>, roles: &Roles) -> ExploreMove<'g> {
+    fn explore_move<'graphics>(
+        &self,
+        step: &'graphics Step<'_>,
+        roles: &Roles,
+    ) -> ExploreMove<'graphics> {
         let master = object_master(
-            step.w.parts.own_master.get(self.id),
+            step.world.parts.own_master.get(self.id),
             (self.id, self.life.master_id),
-            step.w.model.masters.of(step.player),
+            step.world.model.masters.of(step.player),
         );
         master.map_or_else(
             |_| ExploreMove {
                 reads: MoveToReads::with_sprites(
                     SpriteReads {
                         defaults: MoveDefaults::default(),
-                        graphics: &step.w.model.graphics,
+                        graphics: &step.world.model.graphics,
                     },
-                    (self, step.w.parts.mover_of(self.id)),
+                    (self, step.world.parts.mover_of(self.id)),
                 ),
                 given: None,
             },
             |master| {
                 ExploreMove::of(
-                    (self, step.w.parts.mover_of(self.id)),
+                    (self, step.world.parts.mover_of(self.id)),
                     master,
                     (
-                        &step.w.model.graphics,
-                        step.w.parts.combat_of(self.id).abilities.look.as_ref(),
+                        &step.world.model.graphics,
+                        step.world.parts.combat_of(self.id).abilities.look.as_ref(),
                     ),
                     roles,
                 )
@@ -643,18 +653,18 @@ impl Unit {
                 ));
             }
             Owner::WantsPoint => self.post_own(
-                &mut step.w.parts.unit_ai,
+                &mut step.world.parts.unit_ai,
                 NotifyKind::REQUIRES_SEARCH,
                 [AiAction::Explore.value(), 0, 0],
             )?,
             Owner::Standing => {}
         }
         let standing = self
-            .master(step.w.master_tables(), step.player)?
+            .master(step.world.master_tables(), step.player)?
             .standing_sprite
-            .and_then(|sprite_id| step.w.model.graphics.get(sprite_id))
+            .and_then(|sprite_id| step.world.model.graphics.get(sprite_id))
             .copied();
-        if let Some(mover) = step.w.parts.mover_mut(self.id) {
+        if let Some(mover) = step.world.parts.mover_mut(self.id) {
             mover.shows(standing.as_ref());
         }
         if self.sprite.is_some() {
@@ -663,10 +673,10 @@ impl Unit {
             ))?;
             new_sprite(
                 &mut self.sprite,
-                step.w.parts.move_stats_mut(self.id),
+                step.world.parts.move_stats_mut(self.id),
                 standing,
-                step.w.streams.get(Stream::Sprite),
-                step.w.model.tuning.sprite,
+                step.world.streams.get_mut(Stream::Sprite),
+                step.world.model.tuning.sprite,
             );
         }
         Ok(())
@@ -797,7 +807,7 @@ mod tests {
             influence_map
                 .cells
                 .iter()
-                .map(|&c| u32::from(c))
+                .map(|&cell| u32::from(cell))
                 .sum::<u32>(),
             1
         );
@@ -822,12 +832,15 @@ mod tests {
     fn an_explore_without_point_waits_for_one_then_walks() {
         let table = Graphics::from([(SpriteId::named(7), WALKING)]);
         let walk = walk_of(&table, Some(SpriteId::named(7)));
-        let (mut a, owner) =
+        let (mut explore_action, owner) =
             ExploreAction::new(Position::new(-1.0, -1.0, 0.0), &walk, &tuning().move_to).unwrap();
-        assert_eq!((a.state, owner), (ExploreState::Wait, Owner::WantsPoint));
+        assert_eq!(
+            (explore_action.state, owner),
+            (ExploreState::Wait, Owner::WantsPoint)
+        );
         let walking = WALKING;
         assert_eq!(
-            a.take_point(Position::new(19.0, 84.0, 0.0), &walk, &tuning().move_to),
+            explore_action.take_point(Position::new(19.0, 84.0, 0.0), &walk, &tuning().move_to),
             Ok(Owner::Nothing)
         );
         let made = MoveToAction {
@@ -841,25 +854,28 @@ mod tests {
             wait: MoveWait::NEW,
         };
         assert_eq!(
-            a.state,
+            explore_action.state,
             ExploreState::Walk {
                 move_to: Some(made)
             }
         );
-        assert_eq!(a.after_walk(SubCode::UnderWay), Owner::Nothing);
-        assert_eq!(a.after_walk(SubCode::Done), Owner::WantsPoint);
-        assert_eq!(a.state, ExploreState::Wait);
+        assert_eq!(explore_action.after_walk(SubCode::UnderWay), Owner::Nothing);
+        assert_eq!(explore_action.after_walk(SubCode::Done), Owner::WantsPoint);
+        assert_eq!(explore_action.state, ExploreState::Wait);
         assert_eq!(
-            a.take_point(Position::new(-1.0, 5.0, 0.0), &walk, &tuning().move_to),
+            explore_action.take_point(Position::new(-1.0, 5.0, 0.0), &walk, &tuning().move_to),
             Ok(Owner::WantsPoint)
         );
         // a unit without speed fails its MoveTo (13), one in state 3 or later adds none
         let mut stuck = walk;
         stuck.reads.speed = Speed::ZERO;
-        let (b, _) =
+        let (explore, _) =
             ExploreAction::new(Position::new(5.0, 5.0, 0.0), &stuck, &tuning().move_to).unwrap();
         assert_eq!(
-            b.state.move_to().map(|move_to_action| move_to_action.state),
+            explore
+                .state
+                .move_to()
+                .map(|move_to_action| move_to_action.state),
             Some(MoveTo::Failed)
         );
         stuck.reads.state = ObjectState::Dying;
@@ -869,9 +885,9 @@ mod tests {
     }
 
     fn rng() -> Well512 {
-        let mut r = Well512::default();
-        r.set_seed(7);
-        r
+        let mut rng = Well512::default();
+        rng.set_seed(7);
+        rng
     }
 
     /// MarvinBlue/426048731's scout near its town centre: at (20.5, 92.5) on a map of 120 by
@@ -914,11 +930,11 @@ mod tests {
             .iter()
             .copied()
             .filter(|&tile| tile != Tile::new(24, 90));
-        let mut w = scouting(
+        let mut world = scouting(
             map(TileSight::Unknown).sight_on(edge_but_one, TileSight::Explored),
             2.0,
         );
-        let (mut area, map_size, _) = scout_area(&mut w);
+        let (mut area, map_size, _) = scout_area(&mut world);
         let found = beyond_sight(
             &mut area,
             Position::new(20.5, 92.5, 0.0),
@@ -951,18 +967,18 @@ mod tests {
     fn the_closest_open_point_of_the_rings_wins() {
         let tc = Some(Tile::new(29, 94));
         let size = GridSize::new(120, 120);
-        let mut w = scouting(map(TileSight::Unknown), 4.0);
-        let (mut area, _, _) = scout_area(&mut w);
+        let mut world = scouting(map(TileSight::Unknown), 4.0);
+        let (mut area, _, _) = scout_area(&mut world);
         assert_eq!(
             unexplored_area(tc, size, &mut area),
             Ok(Some(Tile::new(19, 94)))
         );
         let explored = tiles(&[[19, 94], [19, 104]]);
-        let mut w = scouting(
+        let mut world = scouting(
             map(TileSight::Unknown).sight_on(explored.clone(), TileSight::Explored),
             4.0,
         );
-        let (mut area, _, _) = scout_area(&mut w);
+        let (mut area, _, _) = scout_area(&mut world);
         assert_eq!(
             unexplored_area(tc, size, &mut area),
             Ok(Some(Tile::new(14, 94)))
@@ -1006,8 +1022,8 @@ mod tests {
     #[test]
     fn the_rings_compare_the_zones_low_bytes() {
         let tc = Some(Tile::new(15, 30));
-        let mut w = below_the_water(Tile::new(15, 40));
-        let (mut area, map_size, _) = scout_area(&mut w);
+        let mut world = below_the_water(Tile::new(15, 40));
+        let (mut area, map_size, _) = scout_area(&mut world);
         assert_eq!(area.own_zone(), ZoneId::new(0));
         assert_eq!(area.zone(Tile::new(15, 40)), ZoneId::new(0x200));
         assert_ne!(area.zone(Tile::new(25, 30)).byte(), 0);
@@ -1047,8 +1063,8 @@ mod tests {
         // within the square: 16 and 25 tiles squared away, and one beyond
         let unexplored = tiles(&[[16, 92], [25, 92], [20, 97], [40, 92]]);
         let scene = map(TileSight::Explored).sight_on(unexplored, TileSight::Unknown);
-        let mut w = scouting(scene.clone(), 2.0);
-        let (mut area, size, _) = scout_area(&mut w);
+        let mut world = scouting(scene.clone(), 2.0);
+        let (mut area, size, _) = scout_area(&mut world);
         let mut ai = rng();
         let found = closest_undiscovered(&mut area, seeker, size, &mut ai);
         assert_eq!(found, Ok(Some(Tile::new(16, 92))));
@@ -1056,11 +1072,11 @@ mod tests {
         let _ = once.rand15();
         assert_eq!(ai.rand15(), once.rand15());
         // (16, 92) walled in beyond the reach of 1
-        let mut w = scouting(
+        let mut world = scouting(
             walled(scene.clone(), Tile::new(15, 91), Tile::new(16, 92)),
             2.0,
         );
-        let (mut area, size, _) = scout_area(&mut w);
+        let (mut area, size, _) = scout_area(&mut world);
         assert_eq!(
             closest_undiscovered(&mut area, seeker, size, &mut rng()),
             Ok(None)

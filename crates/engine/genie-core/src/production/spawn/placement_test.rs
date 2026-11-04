@@ -35,7 +35,7 @@ pub(crate) const NOT_MOVING: GenieError =
 /// the terrain checked, the player's explored tiles needed, the elevation checked by its hill
 /// mode, the objects checked).
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct Placing<'a> {
+pub struct Placing<'world> {
     /// The unit's player.
     pub(crate) player: PlayerId,
     /// Its master's radii.
@@ -45,7 +45,7 @@ pub struct Placing<'a> {
     /// Its master's class.
     pub(crate) class: ClassId,
     /// Its terrain restriction's value per terrain.
-    pub(crate) restriction: &'a Restriction,
+    pub(crate) restriction: &'world Restriction,
     /// `hill_mode` (`+0x604`).
     pub(crate) hill_mode: HillMode,
     /// The placement terrains (`+0x5f2`..`+0x5f8`, [`placement_terrains`]).
@@ -130,10 +130,10 @@ pub(crate) fn build_placement(
     }
     // FUN_14123aee0's scan
     let size = map.size();
-    let (w, h) = (size.width(), size.height());
+    let (width, height) = (size.width(), size.height());
     let ((x0, x1), (y0, y1)) = (
-        build_scan_range(point.x(), w, spawn_tuning),
-        build_scan_range(point.y(), h, spawn_tuning),
+        build_scan_range(point.x(), width, spawn_tuning),
+        build_scan_range(point.y(), height, spawn_tuning),
     );
     let player = site.player;
     for ty in y0..=y1 {
@@ -174,15 +174,16 @@ fn static_scans_find(
     if !site.tall || !(0.0 < rx || 0.0 < ry) {
         return Ok(false);
     }
-    let first = |o: &Near| {
-        let listed = !site.own.contains(&o.id)
-            && o.state < ObjectState::Removed
-            && !o.buildable_on.passed()
-            && (o.kind != MasterKind::BUILDING || !o.flags.contains(NearFlags::DESOLID));
-        let tall = o.flags.contains(NearFlags::TALL)
+    let first = |near: &Near| {
+        let listed = !site.own.contains(&near.id)
+            && near.state < ObjectState::Removed
+            && !near.buildable_on.passed()
+            && (near.kind != MasterKind::BUILDING || !near.flags.contains(NearFlags::DESOLID));
+        let tall = near.flags.contains(NearFlags::TALL)
             || (roles.of_class(site.class).contains(ClassRoles::TREE)
-                && roles.of_class(o.class).contains(ClassRoles::FARM))
-            || (o.kind == MasterKind::BUILDING && o.obstruction_kind != ObstructionKind::NONE);
+                && roles.of_class(near.class).contains(ClassRoles::FARM))
+            || (near.kind == MasterKind::BUILDING
+                && near.obstruction_kind != ObstructionKind::NONE);
         listed.then_some(tall)
     };
     if !overlapping(map, point, site.radius, &first, spawn_tuning)?.is_empty() {
@@ -221,12 +222,12 @@ pub(super) fn build_static_test(
     let (x, y) = (point.x(), point.y());
     let (rx, ry) = (site.radius.x(), site.radius.y());
     let size = map.size();
-    let (w, h) = (size.width(), size.height());
+    let (width, height) = (size.width(), size.height());
     let (far_x, far_y) = (
         (x + rx) - spawn_tuning.inside,
         (y + ry) - spawn_tuning.inside,
     );
-    if x - rx < 0.0 || w as f32 <= far_x || y - ry < 0.0 || h as f32 <= far_y {
+    if x - rx < 0.0 || width as f32 <= far_x || y - ry < 0.0 || height as f32 <= far_y {
         return Ok(Some(PlacementCode::OffMap));
     }
     let mut explored = false;
@@ -276,11 +277,15 @@ pub(super) fn build_static_test(
     Ok(None)
 }
 
-/// The tiles BUILD's scan reads along one axis about `v` (`FUN_14123aee0`): within
+/// The tiles BUILD's scan reads along one axis about `coordinate` (`FUN_14123aee0`): within
 /// `SpawnTuning::build_scan`, each end truncated into a short, from 0 to the map's last tile of `size`.
-pub(super) fn build_scan_range(v: f32, size: i32, spawn_tuning: &SpawnTuning) -> (i32, i32) {
-    let low = (v - spawn_tuning.build_scan) as i32 as i16;
-    let high = (v + spawn_tuning.build_scan) as i32 as i16;
+pub(super) fn build_scan_range(
+    coordinate: f32,
+    size: i32,
+    spawn_tuning: &SpawnTuning,
+) -> (i32, i32) {
+    let low = (coordinate - spawn_tuning.build_scan) as i32 as i16;
+    let high = (coordinate + spawn_tuning.build_scan) as i32 as i16;
     (
         i32::from(low.max(0)),
         if i32::from(high) < size {
@@ -337,7 +342,7 @@ pub(super) fn build_sees(
     Ok(true)
 }
 
-/// Whether an object BUILD's scan counts blocks the foundation at `p`: one BUILD neither
+/// Whether an object BUILD's scan counts blocks the foundation at `at`: one BUILD neither
 /// ignores ([`build_ignores`]) nor passes ([`build_passes`]), whose box with a height overlaps
 /// the site's box. Its box is its master's radii and height, for obstruction types 11 to 13 its
 /// outline's ([`Near::outline`]); a height of 0 counts as 1 for a building and for an object
@@ -466,14 +471,14 @@ pub(crate) fn placement(
     let (x, y) = (point.x(), point.y());
     let (rx, ry) = (me.radius.x(), me.radius.y());
     let size = map.size();
-    let (w, h) = (size.width(), size.height());
+    let (width, height) = (size.width(), size.height());
     let (far_x, far_y) = (
         (x + rx) - spawn_tuning.inside,
         (y + ry) - spawn_tuning.inside,
     );
     // FUN_141123f80's own result: 0 free; the objects of its scan report the blocker (6)
     let mut base_blocker = None;
-    let off_map = x - rx < 0.0 || w as f32 <= far_x || y - ry < 0.0 || h as f32 <= far_y;
+    let off_map = x - rx < 0.0 || width as f32 <= far_x || y - ry < 0.0 || height as f32 <= far_y;
     let base_free = if off_map
         || !placement_terrains(
             me.placement,
@@ -512,15 +517,16 @@ pub(crate) fn placement(
             if zones == ZoneTest::Tested {
                 return Err(GenieError::unsupported("a placement test in a zone mode"));
             }
-            let counts = |o: &Near| {
-                let listed = o.state < ObjectState::Removed
-                    && !o.buildable_on.passed()
-                    && (o.kind != MasterKind::BUILDING || !o.flags.contains(NearFlags::DESOLID));
-                let tall = o.flags.contains(NearFlags::TALL)
+            let counts = |near: &Near| {
+                let listed = near.state < ObjectState::Removed
+                    && !near.buildable_on.passed()
+                    && (near.kind != MasterKind::BUILDING
+                        || !near.flags.contains(NearFlags::DESOLID));
+                let tall = near.flags.contains(NearFlags::TALL)
                     || (roles.of_class(me.class).contains(ClassRoles::TREE)
-                        && roles.of_class(o.class).contains(ClassRoles::FARM))
-                    || (o.kind == MasterKind::BUILDING
-                        && o.obstruction_kind != ObstructionKind::NONE);
+                        && roles.of_class(near.class).contains(ClassRoles::FARM))
+                    || (near.kind == MasterKind::BUILDING
+                        && near.obstruction_kind != ObstructionKind::NONE);
                 listed.then_some(tall && me.tall)
             };
             let found = if me.tall {
@@ -535,19 +541,19 @@ pub(crate) fn placement(
         }
     };
     // slot 0x50's own scan
-    let counts = |o: &Near| {
-        let listed = o.state < ObjectState::Removed
-            && !o.buildable_on.passed()
-            && (o.kind != MasterKind::BUILDING
+    let counts = |near: &Near| {
+        let listed = near.state < ObjectState::Removed
+            && !near.buildable_on.passed()
+            && (near.kind != MasterKind::BUILDING
                 || roles
-                    .of_class(o.class)
+                    .of_class(near.class)
                     .contains(ClassRoles::PACKED_TREBUCHET)
                 || roles
-                    .of_class(o.class)
+                    .of_class(near.class)
                     .contains(ClassRoles::UNPACKED_TREBUCHET)
-                || !o.flags.contains(NearFlags::DESOLID));
-        let tall = o.flags.contains(NearFlags::TALL)
-            || (o.kind == MasterKind::BUILDING && o.obstruction_kind.recorded());
+                || !near.flags.contains(NearFlags::DESOLID));
+        let tall = near.flags.contains(NearFlags::TALL)
+            || (near.kind == MasterKind::BUILDING && near.obstruction_kind.recorded());
         listed.then_some(tall && me.tall)
     };
     let found = if me.tall && (0.0 < rx || 0.0 < ry) {

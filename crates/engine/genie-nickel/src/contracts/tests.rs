@@ -132,7 +132,7 @@ fn the_models_contracts_parse_as_one_record_and_check_values() {
     );
     let fields = fields.map(|expr| expr.as_array().map(|array| array.len()));
     assert!(
-        matches!(fields, Ok(Some(n)) if n > 100),
+        matches!(fields, Ok(Some(count)) if count > 100),
         "{:?}",
         fields.err().map(|error| error.to_string())
     );

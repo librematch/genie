@@ -1,4 +1,4 @@
-use crate::element::{ReadableHeaderElement, WritableHeaderElement};
+use crate::element::{ReadHeader, WriteHeader};
 use crate::errors::{not_utf8, out_of_range};
 use crate::fits;
 use crate::reader::RecordingHeaderReader;
@@ -52,7 +52,7 @@ impl StringTable {
     }
 }
 
-impl ReadableHeaderElement for StringTable {
+impl ReadHeader for StringTable {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let max_strings = input.read_u16::<LE>()?;
         let num_strings = input.read_u16::<LE>()?;
@@ -72,7 +72,7 @@ impl ReadableHeaderElement for StringTable {
     }
 }
 
-impl WritableHeaderElement for StringTable {
+impl WriteHeader for StringTable {
     fn write_to<W: Write>(&self, handle: &mut W) -> GenieResult<()> {
         handle.write_u16::<LE>(self.max_strings)?;
         handle.write_u16::<LE>(self.num_strings()?)?;

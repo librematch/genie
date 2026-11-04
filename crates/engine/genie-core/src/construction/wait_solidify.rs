@@ -26,7 +26,7 @@ use crate::unit_ai::task_finder::world::{SideWorld, point_terrain, task_search, 
 use crate::unit_ai::world_view::owner_view;
 use crate::unit_ai::world_view::{UnitView, Wait};
 use crate::world::Seconds;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 use genie_diff::Diff;
 
 /// The action type (`+0x8`, 0x9a).
@@ -105,15 +105,15 @@ impl UnitView<'_, '_> {
         let (player, others, foreign) = (
             self.player,
             owner_view(
-                &self.c.w.players,
-                &self.c.w.index,
-                self.c.player,
+                &self.step.world.players,
+                &self.step.world.index,
+                self.step.player,
                 self.new_owner,
             )?,
             owner_view(
-                &self.c.w.players,
-                &self.c.w.index,
-                self.c.player,
+                &self.step.world.players,
+                &self.step.world.index,
+                self.step.player,
                 self.new_owner,
             )?
             .players(),
@@ -129,35 +129,41 @@ impl UnitView<'_, '_> {
                 target,
                 1,
                 &find,
-                &self.c.w.parts,
-                MasterTables::new(&self.c.w.model.masters, &self.c.w.parts.own_master),
+                &self.step.world.parts,
+                MasterTables::new(
+                    &self.step.world.model.masters,
+                    &self.step.world.parts.own_master,
+                ),
             )?,
             task_target_with(
                 target,
                 2,
                 &find,
-                &self.c.w.parts,
-                MasterTables::new(&self.c.w.model.masters, &self.c.w.parts.own_master),
+                &self.step.world.parts,
+                MasterTables::new(
+                    &self.step.world.model.masters,
+                    &self.step.world.parts.own_master,
+                ),
             )?,
         ) else {
             return Ok(Answer::NotTaken);
         };
         let masters = self
-            .c
-            .w
+            .step
+            .world
             .model
             .masters
             .get(self.player.index())
             .ok_or(UNIT_AI_MASTER)?;
-        let own = unit.master(self.c.w.master_tables(), self.player)?;
+        let own = unit.master(self.step.world.master_tables(), self.player)?;
         let actor = Actor {
             id: unit.id,
             master: own,
             player,
             held: unit.life.held(),
             attribute_95: self
-                .c
-                .w
+                .step
+                .world
                 .players
                 .player(self.player)?
                 .attributes
@@ -168,13 +174,13 @@ impl UnitView<'_, '_> {
         };
         let dip = SideWorld {
             player,
-            relations: &self.c.w.players.player(self.player)?.relations,
+            relations: &self.step.world.players.player(self.player)?.relations,
             foreign,
-            drop_sites: &self.c.w.model.drop_sites,
+            drop_sites: &self.step.world.model.drop_sites,
         };
         // slot 0x820's point: the target's place
         let at = find(target).map_or(Position::ORIGIN, |(_, target_unit)| target_unit.position());
-        let terrain = point_terrain(self.c.w.spatial.terrain.as_ref(), at);
+        let terrain = point_terrain(self.step.world.spatial.terrain.as_ref(), at);
         let Some((task, switch)) = task_search(
             masters,
             &actor,
@@ -196,7 +202,7 @@ impl UnitView<'_, '_> {
             task,
             switch: switch.map(|master| master.id),
         };
-        self.c.lend_at(
+        self.step.lend_at(
             (&mut *self.unit, &mut *self.actions),
             |world, player_id, list_index| world.wait_for_foundation(player_id, list_index, wait),
         )?;

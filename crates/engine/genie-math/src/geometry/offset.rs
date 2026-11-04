@@ -73,8 +73,8 @@ impl Offset {
 
 impl From<[f32; 3]> for Offset {
     /// The displacement of three floats in the map's order (x, y, z), as a save holds them.
-    fn from(c: [f32; 3]) -> Self {
-        Self(c)
+    fn from(components: [f32; 3]) -> Self {
+        Self(components)
     }
 }
 
@@ -136,10 +136,10 @@ impl GroundOffset {
     #[must_use]
     pub const fn table<const N: usize>(pairs: [[f32; 2]; N]) -> [Self; N] {
         let mut out = [Self::ZERO; N];
-        let mut i = 0;
-        while i < N {
-            out[i] = Self(pairs[i]);
-            i += 1;
+        let mut index = 0;
+        while index < N {
+            out[index] = Self(pairs[index]);
+            index += 1;
         }
         out
     }
@@ -171,8 +171,8 @@ impl GroundOffset {
 
 impl From<[f32; 2]> for GroundOffset {
     /// The displacement of two floats in the map's order (x, y), as the `.dat` holds them.
-    fn from(c: [f32; 2]) -> Self {
-        Self(c)
+    fn from(components: [f32; 2]) -> Self {
+        Self(components)
     }
 }
 

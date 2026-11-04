@@ -47,40 +47,40 @@ pub struct SliceRun {
 
 /// What the tick oracle dumps of the game at a save's tick that the save does not hold.
 #[derive(Clone, Copy, Debug, Default)]
-pub struct Dumps<'a> {
+pub struct Dumps<'text> {
     /// The shape mesh with each object's shape (`load_oracle/probes/mesh.py`); without it a path
     /// request stops the slice where it needs the short pather.
-    pub mesh: Option<&'a str>,
+    pub mesh: Option<&'text str>,
     /// The objects-in-sight registry and the objects' masks (`load_oracle/probes/registry.py`);
     /// without it the slice keeps no registry, and a unit AI's search stops it.
-    pub registry: Option<&'a str>,
+    pub registry: Option<&'text str>,
     /// The map tiles' object lists in the game's order ([`tile_lists_from_dump`]); without it
     /// the slice keeps the order of its load.
-    pub tiles: Option<&'a str>,
+    pub tiles: Option<&'text str>,
     /// The world's pools of recycled objects ([`recycle_pools_from_dump`]); without it the slice
     /// starts them empty, as a game loaded from the save does.
-    pub pools: Option<&'a str>,
+    pub pools: Option<&'text str>,
     /// The objects' inside lists in the game's order ([`inside_lists_from_dump`]); without it
     /// the slice keeps the order of the objects, as a game loaded from the save does.
-    pub inside: Option<&'a str>,
+    pub inside: Option<&'text str>,
     /// The process globals the game reads and no save holds ([`groups::globals_from_dump`]);
     /// without it the slice takes what a load gives (the group command counter past the saved
     /// groups', the scratch array zero).
     ///
     /// [`groups::globals_from_dump`]: crate::groups::globals_from_dump
-    pub globals: Option<&'a str>,
+    pub globals: Option<&'text str>,
 }
 
 /// The objects' inside lists as the tick oracle dumps them (`state_dumps.inside_lists_text`):
 /// `container id...` per object with objects inside, in the list's order.
 pub fn inside_lists_from_dump(text: &str) -> GenieResult<Vec<(ObjectId, Vec<ObjectId>)>> {
     text.lines()
-        .filter(|l| !l.trim().is_empty())
-        .map(|l| {
-            let words = l
+        .filter(|text| !text.trim().is_empty())
+        .map(|line| {
+            let words = line
                 .split_whitespace()
-                .map(|w| {
-                    w.parse::<i32>()
+                .map(|text| {
+                    text.parse::<i32>()
                         .ok()
                         .and_then(ObjectId::of_field)
                         .ok_or(bad_tile_dump())
@@ -102,10 +102,10 @@ pub fn inside_lists_from_dump(text: &str) -> GenieResult<Vec<(ObjectId, Vec<Obje
 pub fn recycle_pools_from_dump(text: &str) -> GenieResult<Vec<(ObjectId, bool)>> {
     let mut missiles = Vec::new();
     let mut kind = None;
-    for line in text.lines().filter(|l| !l.trim().is_empty()) {
+    for line in text.lines().filter(|text| !text.trim().is_empty()) {
         let words: Vec<&str> = line.split_whitespace().collect();
         match words[..] {
-            ["pool", k, _] => kind = Some(k.parse::<i32>().map_err(|_| bad_pool_dump())?),
+            ["pool", text, _] => kind = Some(text.parse::<i32>().map_err(|_| bad_pool_dump())?),
             [id, flying] if kind == Some(60) => missiles.push((
                 pooled_id(id)?,
                 flying.parse::<u8>().map_err(|_| bad_pool_dump())? != 0,
@@ -130,10 +130,10 @@ fn pooled_id(text: &str) -> GenieResult<ObjectId> {
 pub fn ghost_pool_from_dump(text: &str) -> GenieResult<Vec<ObjectId>> {
     let mut ghosts = Vec::new();
     let mut kind = None;
-    for line in text.lines().filter(|l| !l.trim().is_empty()) {
+    for line in text.lines().filter(|text| !text.trim().is_empty()) {
         let words: Vec<&str> = line.split_whitespace().collect();
         match words[..] {
-            ["pool", k, _] => kind = Some(k.parse::<i32>().map_err(|_| bad_pool_dump())?),
+            ["pool", text, _] => kind = Some(text.parse::<i32>().map_err(|_| bad_pool_dump())?),
             [id, _] if kind == Some(i32::from(MasterKind::DOPPELGANGER.get())) => {
                 ghosts.push(pooled_id(id)?);
             }
@@ -149,17 +149,17 @@ pub fn ghost_pool_from_dump(text: &str) -> GenieResult<Vec<ObjectId>> {
 /// `x y id...` per tile of two objects or more, in the tile's order (an id signed, or its 32
 /// bits unsigned as the first dumps wrote a missile's).
 pub fn tile_lists_from_dump(text: &str) -> GenieResult<Vec<(Tile, Vec<ObjectId>)>> {
-    let word = |v: &str| {
-        v.parse::<i64>()
+    let word = |text: &str| {
+        text.parse::<i64>()
             .ok()
-            .filter(|&n| i64::from(i32::MIN) <= n && n <= i64::from(u32::MAX))
-            .map(|n| n as u32 as i32)
+            .filter(|&number| i64::from(i32::MIN) <= number && number <= i64::from(u32::MAX))
+            .map(|number| number as u32 as i32)
             .ok_or(bad_tile_dump())
     };
     text.lines()
-        .filter(|l| !l.trim().is_empty())
-        .map(|l| {
-            let words = l
+        .filter(|text| !text.trim().is_empty())
+        .map(|text| {
+            let words = text
                 .split_whitespace()
                 .map(word)
                 .collect::<Result<Vec<_>, _>>()?;
@@ -175,7 +175,7 @@ pub fn tile_lists_from_dump(text: &str) -> GenieResult<Vec<(Tile, Vec<ObjectId>)
 fn ids(words: &[i32]) -> GenieResult<Vec<ObjectId>> {
     words
         .iter()
-        .map(|&w| ObjectId::of_field(w).ok_or(bad_tile_dump()))
+        .map(|&word| ObjectId::of_field(word).ok_or(bad_tile_dump()))
         .collect()
 }
 
@@ -190,10 +190,10 @@ pub(super) fn tile_order_differences(
         .filter_map(|(tile, ids)| {
             let (x, y) = (tile.x(), tile.y());
             let mine = spatial.tiles().list(*tile);
-            let (mut a, mut b) = (mine.to_vec(), ids.clone());
-            a.sort_unstable();
-            b.sort_unstable();
-            (a == b && mine != &ids[..])
+            let (mut sorted_mine, mut sorted_ids) = (mine.to_vec(), ids.clone());
+            sorted_mine.sort_unstable();
+            sorted_ids.sort_unstable();
+            (sorted_mine == sorted_ids && mine != &ids[..])
                 .then(|| format!("tile ({x}, {y}) order slice {mine:?}, the game {ids:?}"))
         })
         .collect()
@@ -211,15 +211,15 @@ pub fn registry_from_dump(text: &str) -> GenieResult<Registry> {
     let [_, players, classes] = head[..] else {
         return Err(bad());
     };
-    let number = |w: &str| w.parse::<i64>().map_err(|_| bad());
-    let object = |w: &str| {
-        w.parse::<i32>()
+    let number = |text: &str| text.parse::<i64>().map_err(|_| bad());
+    let object = |text: &str| {
+        text.parse::<i32>()
             .ok()
             .and_then(ObjectId::of_field)
             .ok_or_else(bad)
     };
-    let bits = |w: &str| {
-        u32::from_str_radix(w, 16)
+    let bits = |text: &str| {
+        u32::from_str_radix(text, 16)
             .map(f32::from_bits)
             .map_err(|_| bad())
     };
@@ -229,15 +229,15 @@ pub fn registry_from_dump(text: &str) -> GenieResult<Registry> {
         let texts: Vec<&str> = line.split_whitespace().collect();
         match texts.first().copied() {
             Some("list") if texts.len() == 5 => {
-                let (p, c) = (number(texts[1])? as usize, number(texts[2])? as usize);
-                if out.players <= p || out.classes <= c {
+                let (player, class) = (number(texts[1])? as usize, number(texts[2])? as usize);
+                if out.players <= player || out.classes <= class {
                     return Err(bad());
                 }
-                list = Some((p, c));
+                list = Some((player, class));
             }
             Some("rec") if texts.len() == 8 => {
-                let (p, c) = list.ok_or_else(bad)?;
-                out.lists[p][c].push(Record {
+                let (player, class) = list.ok_or_else(bad)?;
+                out.lists[player][class].push(Record {
                     id: object(texts[1])?,
                     distance: Distance::new(bits(texts[2])?),
                     owner: PlayerId::new(number(texts[3])? as u8),
@@ -253,8 +253,8 @@ pub fn registry_from_dump(text: &str) -> GenieResult<Registry> {
                     ..Entry::default()
                 };
                 for (index, slot) in entry.slots.iter_mut().enumerate() {
-                    let v = number(texts[3 + index])?;
-                    *slot = usize::try_from(v).ok();
+                    let number = number(texts[3 + index])?;
+                    *slot = usize::try_from(number).ok();
                 }
                 let _ = out.entries.insert(object(texts[1])?, entry);
             }
@@ -287,21 +287,25 @@ pub fn objects_from_save(
         objects: player
             .objects
             .iter()
-            .filter(|u| listed(u))
-            .map(|u| turns.object_of(u))
+            .filter(|unit| listed(unit))
+            .map(|unit| turns.object_of(unit))
             .collect(),
-        unsupported: player.unsupported.clone().map(|(t, i, e)| (t.get(), i, e)),
+        unsupported: player
+            .unsupported
+            .clone()
+            .map(|(tick, list_index, error)| (tick.get(), list_index, error)),
         unsupported_id: player
             .unsupported
             .as_ref()
-            .and_then(|&(_, i, _)| player.objects.get(i).map(|u| u.id)),
+            .and_then(|&(_, list_index, _)| player.objects.get(list_index).map(|unit| unit.id)),
         stopped: turns
             .players
             .iter()
-            .map(|p| {
-                p.unsupported
+            .map(|player| {
+                player
+                    .unsupported
                     .clone()
-                    .map(|(t, list_index, e)| (t.get(), list_index, e))
+                    .map(|(tick, list_index, error)| (tick.get(), list_index, error))
             })
             .collect(),
         visibility: turns.spatial.sight.take(),
@@ -309,14 +313,20 @@ pub fn objects_from_save(
         frozen: turns
             .players
             .iter()
-            .flat_map(|p| p.objects.iter().filter(|u| p.stopped || u.stopped))
+            .flat_map(|player| {
+                player
+                    .objects
+                    .iter()
+                    .filter(|unit| player.stopped || unit.stopped)
+            })
             .map(|unit| unit.id)
             .collect(),
         freezes: turns
             .players
             .iter()
-            .map(|p| {
-                p.freezes
+            .map(|player| {
+                player
+                    .freezes
                     .iter()
                     .map(|(tick, object_id, error)| (tick.get(), *object_id, error.clone()))
                     .collect()

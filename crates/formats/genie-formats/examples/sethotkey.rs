@@ -47,8 +47,8 @@ struct SetHotkey {
 /// Executes the CLI.
 fn main() -> anyhow::Result<()> {
     let cli_input = SetHotkey::from_args();
-    let mut f = File::open(&cli_input.file_name)?;
-    let info = HotkeyInfo::read_from(&mut f)?;
+    let mut file = File::open(&cli_input.file_name)?;
+    let info = HotkeyInfo::read_from(&mut file)?;
     let info = info.bind_key(
         cli_input.group_index as usize,
         cli_input.hotkey_index as usize,

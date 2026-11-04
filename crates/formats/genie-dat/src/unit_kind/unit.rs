@@ -101,13 +101,13 @@ impl UnitKind {
 
     /// The attributes of the class `class` that the base class holds: present for a base class
     /// at or above it, absent below it.
-    fn attributes<'a, T>(
+    fn attributes<'unit, T>(
         &self,
-        attributes: Option<&'a T>,
+        attributes: Option<&'unit T>,
         class: UnitBaseClass,
-    ) -> GenieResult<Option<&'a T>> {
+    ) -> GenieResult<Option<&'unit T>> {
         match (self.unit_base_class >= class, attributes) {
-            (true, Some(a)) => Ok(Some(a)),
+            (true, Some(found)) => Ok(Some(found)),
             (false, None) => Ok(None),
             _ => Err(invalid_input(ATTRIBUTES_MISMATCH)),
         }

@@ -33,7 +33,7 @@ bitflags::bitflags! {
 
 /// What BUILD's placement test reads of the building master and the game.
 #[derive(Clone, Copy, Debug)]
-pub struct BuildSite<'a> {
+pub struct BuildSite<'world> {
     /// The player who places it.
     pub(crate) player: PlayerId,
     /// What the test runs.
@@ -48,14 +48,14 @@ pub struct BuildSite<'a> {
     /// The master's `obstruction_type` is neither 0 nor 12 (`FUN_1411205c0`).
     pub(crate) obstructs: bool,
     /// The master's terrain restriction's value per terrain.
-    pub(crate) restriction: &'a Restriction,
+    pub(crate) restriction: &'world Restriction,
     /// `hill_mode` (`+0x604`, `p7`).
     pub(crate) hill_mode: HillMode,
     /// The placement terrains (`+0x5f2`..`+0x5f8`, [`placement_terrains`]).
     pub(crate) placement: PlacementTerrains,
     /// The objects the scan passes over (`p12` and, for a building, its annexes, `FUN_14123d090`):
     /// none for BUILD, a reseeding gatherer's old target ([`crate::world::World::reseed`]).
-    pub(crate) own: &'a [ObjectId],
+    pub(crate) own: &'world [ObjectId],
 }
 
 /// The hill mode's test of a tile of the box (`FUN_141123f80`'s `p7` part, the master's
@@ -78,11 +78,11 @@ pub(super) fn hill_fails(
         HillMode::SIDE_SLOPES => !matches!(shape()?, 0 | 5..=8),
         HillMode::FLAT => shape()? != 0,
         HillMode::ONE_STEP if tile.x() == corner.x() || tile.y() == corner.y() => {
-            let e = i32::from(map.elevation(tile).ok_or(GenieError::unsupported(
+            let elevation = i32::from(map.elevation(tile).ok_or(GenieError::unsupported(
                 "a hill mode where the elevations are not known",
             ))?);
-            let b = i32::from(base.unwrap_or(0));
-            e < b - 1 || b + 1 < e
+            let base_elevation = i32::from(base.unwrap_or(0));
+            elevation < base_elevation - 1 || base_elevation + 1 < elevation
         }
         _ => false,
     })
@@ -106,13 +106,13 @@ pub(crate) fn placement_terrains(
     placement: PlacementTerrains,
     map: &WorldMap<'_>,
     point: Point,
-    b: TileRect,
+    bounds: TileRect,
 ) -> GenieResult<bool> {
     let PlacementTerrains {
         beside: [side1, side2],
         on: [t1, t2],
     } = placement;
-    let mut tile_rect = b;
+    let mut tile_rect = bounds;
     if t1.is_some() || t2.is_some() {
         let at = Tile::new(point.x() as i32, point.y() as i32);
         if !point_terrain_allows(map, [t1, t2], at)? {
@@ -140,9 +140,10 @@ pub(crate) fn placement_terrains(
 /// A terrain of −1 or beyond the terrains (its flags read past the table), not modelled.
 pub(super) fn placement_flags(
     map: &WorldMap<'_>,
-    t: Option<TerrainId>,
+    terrain: Option<TerrainId>,
 ) -> GenieResult<TerrainFlags> {
-    t.and_then(|terrain_id| map.terrain_flags(terrain_id.index()))
+    terrain
+        .and_then(|terrain_id| map.terrain_flags(terrain_id.index()))
         .ok_or(GenieError::unsupported(
             "placement terrains with one of -1 or beyond the terrains",
         ))
@@ -203,7 +204,7 @@ pub(super) fn side_terrains(
 /// the row below, the column right, the row above (right to left) and the column left (top to
 /// bottom), each where the map holds it.
 pub(super) fn tiles_beside(tile_rect: TileRect, map: GridSize) -> Vec<Tile> {
-    let (w, h) = (map.width(), map.height());
+    let (width, height) = (map.width(), map.height());
     let (x0, y0, x1, y1) = (
         tile_rect.x0(),
         tile_rect.y0(),
@@ -214,10 +215,10 @@ pub(super) fn tiles_beside(tile_rect: TileRect, map: GridSize) -> Vec<Tile> {
     if 0 < y0 {
         beside.extend((x0..=x1).map(|x| Tile::new(x, y0 - 1)));
     }
-    if x1 + 1 < w {
+    if x1 + 1 < width {
         beside.extend((y0..=y1).map(|y| Tile::new(x1 + 1, y)));
     }
-    if y1 + 1 < h {
+    if y1 + 1 < height {
         beside.extend((x0..=x1).rev().map(|x| Tile::new(x, y1 + 1)));
     }
     if 0 < x0 {

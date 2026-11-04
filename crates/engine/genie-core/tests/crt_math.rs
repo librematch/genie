@@ -22,7 +22,7 @@ fn fixture() -> Vec<(String, Vec<Vec<u32>>)> {
         }
         let call = line
             .split(' ')
-            .map(|s| u32::from_str_radix(s, 16).expect("a hex f32"))
+            .map(|text| u32::from_str_radix(text, 16).expect("a hex f32"))
             .collect();
         out.last_mut()
             .expect("a routine name before its calls")
@@ -43,7 +43,7 @@ fn mismatches(name: &str, ours: impl Fn(&[f32]) -> f32) -> Vec<String> {
         .into_iter()
         .filter_map(|call| {
             let (game, inputs) = call.split_last().expect("inputs and an output");
-            let args: Vec<f32> = inputs.iter().map(|&b| f32::from_bits(b)).collect();
+            let args: Vec<f32> = inputs.iter().map(|&bits| f32::from_bits(bits)).collect();
             let got = ours(&args).to_bits();
             // NaN payloads differ between implementations; any NaN matches any NaN
             let both_nan = f32::from_bits(got).is_nan() && f32::from_bits(*game).is_nan();
@@ -55,28 +55,40 @@ fn mismatches(name: &str, ours: impl Fn(&[f32]) -> f32) -> Vec<String> {
 
 #[test]
 fn sqrt_is_the_games_sqrtf() {
-    assert_eq!(mismatches("sqrtf", |a| sqrt(a[0])), Vec::<String>::new());
+    assert_eq!(
+        mismatches("sqrtf", |args| sqrt(args[0])),
+        Vec::<String>::new()
+    );
 }
 
 #[test]
 fn acos_is_the_games_acosf() {
-    assert_eq!(mismatches("acosf", |a| acos(a[0])), Vec::<String>::new());
+    assert_eq!(
+        mismatches("acosf", |args| acos(args[0])),
+        Vec::<String>::new()
+    );
 }
 
 #[test]
 fn cos_is_the_games_cosf() {
-    assert_eq!(mismatches("cosf", |a| cos(a[0])), Vec::<String>::new());
+    assert_eq!(
+        mismatches("cosf", |args| cos(args[0])),
+        Vec::<String>::new()
+    );
 }
 
 #[test]
 fn sin_is_the_games_sinf() {
-    assert_eq!(mismatches("sinf", |a| sin(a[0])), Vec::<String>::new());
+    assert_eq!(
+        mismatches("sinf", |args| sin(args[0])),
+        Vec::<String>::new()
+    );
 }
 
 #[test]
 fn atan2_is_the_games_atan2f() {
     assert_eq!(
-        mismatches("atan2f", |a| atan2(a[0], a[1])),
+        mismatches("atan2f", |args| atan2(args[0], args[1])),
         Vec::<String>::new()
     );
 }
@@ -87,15 +99,15 @@ fn sweep(ours: fn(f32) -> f32, oracle: fn(f32) -> f32) -> Vec<u32> {
     let threads = available_parallelism().map_or(4, NonZero::get);
     let threads = u32::try_from(threads).unwrap_or(4);
     let span = u32::MAX / threads + 1;
-    scope(|s| {
+    scope(|scope| {
         let mut workers = Vec::new();
         for index in 0..threads {
             let start = index * span;
             let end = start.saturating_add(span - 1);
-            workers.push(s.spawn(move || {
+            workers.push(scope.spawn(move || {
                 (start..=end)
-                    .filter(|&b| {
-                        let x = f32::from_bits(b);
+                    .filter(|&bits| {
+                        let x = f32::from_bits(bits);
                         ours(x).to_bits() != oracle(x).to_bits()
                     })
                     .take(16)
@@ -104,7 +116,7 @@ fn sweep(ours: fn(f32) -> f32, oracle: fn(f32) -> f32) -> Vec<u32> {
         }
         workers
             .into_iter()
-            .flat_map(|w| w.join().expect("a sweep thread"))
+            .flat_map(|worker| worker.join().expect("a sweep thread"))
             .collect()
     })
 }
@@ -130,10 +142,10 @@ fn atan2_agrees_with_libm_on_random_pairs() {
         ours.to_bits() != theirs.to_bits() && !(ours.is_nan() && theirs.is_nan())
     };
     let threads = 16u64;
-    let bad: Vec<(u32, u32)> = scope(|s| {
+    let bad: Vec<(u32, u32)> = scope(|scope| {
         let mut workers = Vec::new();
         for index in 0..threads {
-            workers.push(s.spawn(move || {
+            workers.push(scope.spawn(move || {
                 // a 64-bit LCG per thread, its high words the two arguments' bits
                 let mut state = 0x9e37_79b9_7f4a_7c15_u64 ^ index;
                 let mut bad = Vec::new();
@@ -185,14 +197,14 @@ fn fmod_is_the_exact_remainder_on_random_pairs() {
         let theirs = libm::fmodf(x, y);
         [exact, theirs]
             .iter()
-            .any(|r| r.to_bits() != ours.to_bits() && !(r.is_nan() && ours.is_nan()))
+            .any(|result| result.to_bits() != ours.to_bits() && !(result.is_nan() && ours.is_nan()))
     };
     let threads = 16u64;
-    let bad: Vec<(u32, u32)> = scope(|s| {
+    let bad: Vec<(u32, u32)> = scope(|scope| {
         let mut workers = Vec::new();
-        for t in 0..threads {
-            workers.push(s.spawn(move || {
-                let mut state = 0x2545_f491_4f6c_dd1d_u64 ^ t;
+        for thread in 0..threads {
+            workers.push(scope.spawn(move || {
+                let mut state = 0x2545_f491_4f6c_dd1d_u64 ^ thread;
                 let mut bad = Vec::new();
                 for index in 0..(1u64 << 30) / threads {
                     state = state

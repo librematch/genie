@@ -8,7 +8,7 @@ use crate::map::Rect;
 use crate::map::spatial::{Placed, Spatial, WalkQuery};
 use crate::math::fmath::BVector;
 use crate::movement::LevelFlags;
-use crate::movement::Levels;
+use crate::movement::LevelsExt;
 use crate::movement::PathFlags;
 use crate::movement::PathState;
 use crate::movement::PlanTries;
@@ -33,7 +33,7 @@ use crate::world::layer::generated::MovementTuning;
 /// What the long pather is asked for a far waypoint ([`Mover::long_plan`]'s arguments after the
 /// planning state).
 #[derive(Clone, Copy, Debug)]
-pub(super) struct LongAsk<'a> {
+pub(super) struct LongAsk<'world> {
     /// The waypoint (x, height, y).
     pub(super) waypoint: BVector,
     /// The unit's ground distance to it.
@@ -41,7 +41,7 @@ pub(super) struct LongAsk<'a> {
     /// How near the waypoint counts.
     pub(super) range: Distance,
     /// The target object, its id and record.
-    pub(super) target: Option<(ObjectId, &'a Placed)>,
+    pub(super) target: Option<(ObjectId, &'world Placed)>,
 }
 
 impl Mover {
@@ -80,7 +80,7 @@ impl Mover {
         // ([`GATE`]) too. A villager's (`-0xea8`) path crosses them.
         let class_roles = world
             .get(me.id)
-            .map_or(ClassRoles::empty(), |p| roles.of_class(p.class));
+            .map_or(ClassRoles::empty(), |placed| roles.of_class(placed.class));
         if solid && !self.plan_allowed(me, world, plan, class_roles, plans)? {
             return Ok(AfterRequest::Paused);
         }
@@ -173,7 +173,7 @@ impl Mover {
         plans: &mut StepPlans,
     ) -> GenieResult<bool> {
         let owner = world.get(me.id).map(|placed| placed.player);
-        let budget = owner.map(|o| plan.pathing.budget(o));
+        let budget = owner.map(|player_id| plan.pathing.budget(player_id));
         if !may_plan(class_roles, budget, self.wait_delays, *plans) {
             self.stop()?;
             self.wait_delays = self.wait_delays.plus_one();
@@ -327,15 +327,15 @@ impl Mover {
         let movement_tuning = &by_id.tuning().movement;
         let roles = by_id.roles();
         let me_at = world.get(me.id);
-        if me_at.is_some_and(|p| roles.of_class(p.class).contains(ClassRoles::VILLAGER)) {
+        if me_at.is_some_and(|placed| roles.of_class(placed.class).contains(ClassRoles::VILLAGER)) {
             return Ok(true);
         }
-        let player = me_at.map(|p| p.player);
+        let player = me_at.map(|placed| placed.player);
         let ignore = by_id.query_ignore(&[Some(me.id), target_id]);
         let grow = self.stats.radius.x() * movement_tuning.long_path_grow;
         let stretches = path.points.iter().zip(path.points.iter().skip(1));
-        for (index, (&a, &b)) in stretches.enumerate() {
-            let (from, to) = self.query_ends(a, b, world.map);
+        for (index, (&start, &end)) in stretches.enumerate() {
+            let (from, to) = self.query_ends(start, end, world.map);
             let rect = Rect::spanning(from, to);
             world.check_known_records(rect.grown(Distance::new(grow)))?;
             let hits = world.walk_hits(WalkQuery {

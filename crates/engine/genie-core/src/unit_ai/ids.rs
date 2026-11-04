@@ -343,7 +343,7 @@ impl NewObject {
                 .tasks
                 .iter()
                 .rev()
-                .find(|t| t.action_kind == ActionKind::HUNT_RANGE)
+                .find(|task| task.action_kind == ActionKind::HUNT_RANGE)
                 .map_or(Distance::ZERO, |task| task.work_range),
             player_kind: PlayerKind::Human,
             posture: Posture::Aggressive,

@@ -42,7 +42,7 @@ use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 use crate::world::settings::FarmMode;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 use crate::{GenieError, GenieResult};
 
 /// The gather groups the resource search tries, in order (0 to 4).
@@ -226,8 +226,8 @@ impl World {
         let mut best = (NO_DISTANCE, None);
         for kind in GROUPS {
             let (id, distance) = self.resource_search_from(player_id, list_index, kind)?;
-            if let Some(d) = distance.filter(|&d| d < best.0) {
-                best = (d, id);
+            if let Some(gap) = distance.filter(|&gap| gap < best.0) {
+                best = (gap, id);
             }
         }
         Ok(best.1)
@@ -308,7 +308,7 @@ impl World {
             pathing: &mut self.pathing,
             now: self.world_time,
             player_kind: owner.kind,
-            object: self.streams.get(Stream::Object),
+            object: self.streams.get_mut(Stream::Object),
             groups: &self.groups,
         };
         closest_resource_at(

@@ -27,10 +27,10 @@ impl Restriction {
     }
 
     /// Whether an object of the restriction may stand on terrain `terrain_id`: its value is above 0
-    /// (`0 < v`, a NaN is not); a terrain past the values is not passable.
+    /// (`0 < value`, a NaN is not); a terrain past the values is not passable.
     #[must_use]
     pub fn passes(&self, terrain_id: TerrainId) -> bool {
-        self.value(terrain_id).is_some_and(|v| 0.0 < v)
+        self.value(terrain_id).is_some_and(|value| 0.0 < value)
     }
 
     /// The values, terrain 0's first, as the data and the save hold them.
@@ -49,13 +49,13 @@ mod tests {
     #[test]
     fn terrain_passes_on_value_above_zero() {
         let restriction = Restriction::new(vec![1.0, 0.0, -1.0, f32::NAN, 0.25]);
-        let t = TerrainId::named;
+        let terrain = TerrainId::named;
         assert_eq!(
-            [0, 1, 2, 3, 4, 5].map(|k| restriction.passes(t(k))),
+            [0, 1, 2, 3, 4, 5].map(|kind| restriction.passes(terrain(kind))),
             [true, false, false, false, true, false]
         );
         assert_eq!(
-            (restriction.value(t(4)), restriction.value(t(5))),
+            (restriction.value(terrain(4)), restriction.value(terrain(5))),
             (Some(0.25), None)
         );
         assert_eq!(restriction.values().len(), 5);

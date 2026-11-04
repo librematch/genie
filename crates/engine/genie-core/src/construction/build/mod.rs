@@ -185,13 +185,13 @@ pub struct Construction {
 /// What the completion's first part ([`Completion::first_part`]) reads besides the building's
 /// construction.
 #[derive(Clone, Copy, Debug)]
-pub struct Completion<'a> {
+pub struct Completion<'masters> {
     /// The building's master.
-    pub(crate) master: Option<&'a Master>,
+    pub(crate) master: Option<&'masters Master>,
     /// The owner's farm bonus ([`FarmBonus`], attributes 237 to 239).
     pub(crate) farm_bonus: FarmBonus,
     /// The owner's masters, whose table `FUN_141659d20` reads.
-    pub(crate) masters: Option<&'a Masters>,
+    pub(crate) masters: Option<&'masters Masters>,
     /// The owner's type (`player+0x10`; [`PlayerKind::is_computer`] is `FUN_141659cf0`).
     pub(crate) player_kind: PlayerKind,
     /// The building has a unit AI (`+0x6b0`): a mule cart's.
@@ -321,11 +321,11 @@ pub(crate) fn show_built(
         .and_then(|sprite_id| graphics.get(sprite_id).copied());
     if let Some(graphic) = standing {
         new_sprite(sprite, stats, graphic, sprite_rng, sprite_tuning);
-        if let Some(s) = sprite
+        if let Some(active_sprite) = sprite
             .as_mut()
             .filter(|active_sprite| active_sprite.graphic.id == graphic.id)
         {
-            s.set_frame(frame);
+            active_sprite.set_frame(frame);
         }
     }
 }
@@ -346,7 +346,7 @@ mod built_sprite_tests {
     /// (slot 0x28, slot 9 with it); a static standing sprite takes the frame alone.
     #[test]
     fn completed_building_shows_its_standing_sprite_at_its_frame() {
-        let g = |id, flags| Graphic {
+        let graphic_of = |id, flags| Graphic {
             id,
             frames: Frame::of_data(4),
             facets: FacetCount::of_data(1),
@@ -358,11 +358,11 @@ mod built_sprite_tests {
         let graphics = Graphics::from([
             (
                 SpriteId::named(10),
-                g(SpriteId::named(10), SpriteFlags::ANIMATED),
+                graphic_of(SpriteId::named(10), SpriteFlags::ANIMATED),
             ),
             (
                 SpriteId::named(11),
-                g(SpriteId::named(11), SpriteFlags::ANIMATED),
+                graphic_of(SpriteId::named(11), SpriteFlags::ANIMATED),
             ),
         ]);
         let master = Master {
@@ -371,7 +371,7 @@ mod built_sprite_tests {
         };
         let mut rng = Well512::default();
         let mut sprite = Some(ActiveSprite::start(
-            g(SpriteId::named(10), SpriteFlags::ANIMATED),
+            graphic_of(SpriteId::named(10), SpriteFlags::ANIMATED),
             &mut rng,
             tuning().sprite,
         ));
@@ -384,14 +384,14 @@ mod built_sprite_tests {
             &mut rng,
             tuning().sprite,
         );
-        let s = sprite.unwrap();
+        let active = sprite.unwrap();
         assert_eq!(
-            (s.graphic.id, s.frame, s.last_frame),
+            (active.graphic.id, active.frame, active.last_frame),
             (SpriteId::named(11), Frame::of_data(2), Frame::of_data(2))
         );
         let statics = Graphics::from([(
             SpriteId::named(11),
-            g(SpriteId::named(11), SpriteFlags::NONE),
+            graphic_of(SpriteId::named(11), SpriteFlags::NONE),
         )]);
         let mut none = None;
         show_built(
@@ -504,26 +504,26 @@ mod stack_tests {
     use crate::world::{Player, World};
     use std::sync::Arc;
 
-    /// A building master of `id`: class 3, radius `r`, height `z`, obstruction `kind`, train
+    /// A building master of `id`: class 3, radius `radius`, height `z`, obstruction `kind`, train
     /// time `bt`, hit points `hp`, an annex of `head`, with `annexes` at their offsets.
     fn building(
         id: i16,
-        (r, z, kind): (f32, f32, ObstructionKind),
+        (radius, z, kind): (f32, f32, ObstructionKind),
         (bt, hp): (i16, i16),
         head: i16,
         annexes: &[(i16, GroundOffset)],
     ) -> Master {
         let mut slots = [None; 4];
         let mut offsets = [GroundOffset::ZERO; 4];
-        for (k, &(index, ground_offset)) in annexes.iter().enumerate() {
-            slots[k] = opt_master(index);
-            offsets[k] = ground_offset;
+        for (slot, &(index, ground_offset)) in annexes.iter().enumerate() {
+            slots[slot] = opt_master(index);
+            offsets[slot] = ground_offset;
         }
         Master {
             id: master_id(id),
             kind: MasterKind::BUILDING,
             class: class::BUILDING,
-            radius: Footprint::new(r, r),
+            radius: Footprint::new(radius, radius),
             height: Distance::new(z),
             obstruction_kind: kind,
             obstruction_class: ObstructionClass::UNIT,
@@ -658,7 +658,7 @@ mod stack_tests {
             }),
             ..Default::default()
         };
-        let mut t = World::new(
+        let mut world = World::new(
             WorldTime::ZERO,
             FrameSeed::of_data(1),
             PlayerId::new(0),
@@ -673,11 +673,11 @@ mod stack_tests {
             ],
         )
         .with_buildings([(object_id(8759), layer)]);
-        t.spatial = Spatial::with_tiles(
+        world.spatial = Spatial::with_tiles(
             GridSize::new(200, 200),
             Tiles::new(GridSize::new(200, 200), vec![0; 200 * 200]),
         );
-        t.spatial.terrain = Some(Terrain::new(
+        world.spatial.terrain = Some(Terrain::new(
             GridSize::new(200, 200),
             vec![TileTerrain::of_save(0, 255, -1); 200 * 200],
             vec![
@@ -690,7 +690,7 @@ mod stack_tests {
             ],
             vec![Restriction::new(vec![0.0; 40]); 5],
         ));
-        t.spatial.insert(
+        world.spatial.insert(
             object_id(8759),
             Placed {
                 position: Position::new(54.0, 147.0, 0.0),
@@ -709,9 +709,9 @@ mod stack_tests {
                 }),
             },
         );
-        t.next_object_id = object_id(8768);
-        t.model.masters = vec![Arc::new(ms.clone()), Arc::new(ms)];
-        t
+        world.next_object_id = object_id(8768);
+        world.model.masters = vec![Arc::new(ms.clone()), Arc::new(ms)];
+        world
     }
 
     /// A castle's completion records its event in its owner's history between its storage and
@@ -774,7 +774,7 @@ mod stack_tests {
         let ids: Vec<(i32, i16, ObjectState)> = world.players[1]
             .objects
             .iter()
-            .map(|u| (u.id.get(), u.life.master_id.get(), u.life.state))
+            .map(|unit| (unit.id.get(), unit.life.master_id.get(), unit.life.state))
             .collect();
         assert_eq!(
             ids,
@@ -804,9 +804,9 @@ mod stack_tests {
             ]
         );
         assert_eq!(
-            [8769, 8770, 8771, 8772, 8773].map(|a| world
+            [8769, 8770, 8771, 8772, 8773].map(|id| world
                 .parts
-                .building_of(object_id(a))
+                .building_of(object_id(id))
                 .annex_of
                 .map(MainBuildingId::id)),
             [
@@ -961,7 +961,11 @@ mod stack_tests {
                 .unwrap();
             let gate = world.players[1].objects.by_id(object_id(8768)).unwrap();
             assert_eq!(
-                world.parts.building_of(gate.id).gate.map(|g| g.locked),
+                world
+                    .parts
+                    .building_of(gate.id)
+                    .gate
+                    .map(|gate| gate.locked),
                 Some(locked)
             );
             let last_move = world.parts.mover_of(gate.id).map(|mover| mover.last_move);

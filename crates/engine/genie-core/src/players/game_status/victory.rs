@@ -11,14 +11,14 @@ use crate::players::game_status::{Count, DEFEAT_IDS, GameStatus, KILLS_OF, STOP_
 use crate::players::history::EventKind;
 use crate::world::Departures;
 use crate::world::World;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 use crate::world::{GameMode, PlayState};
 use crate::{GenieError, GenieResult};
 
 impl World {
     /// The relations of players `first` and `second` each way (`player+0x260`).
     pub(super) fn relations(&self, first: PlayerId, second: PlayerId) -> (Relation, Relation) {
-        let r = |x: PlayerId, y: PlayerId| {
+        let relation = |x: PlayerId, y: PlayerId| {
             self.players
                 .player(x)
                 .ok()
@@ -26,7 +26,7 @@ impl World {
                 .copied()
                 .unwrap_or(Relation::Ally)
         };
-        (r(first, second), r(second, first))
+        (relation(first, second), relation(second, first))
     }
 
     /// `FUN_14152f810`: the game is over: the world's game state is 1 or a player won; else,
@@ -55,15 +55,16 @@ impl World {
     /// world player's slot 3 (`FUN_1416610f0`): `+0x8c` takes the drop, `+0x8b` is set and the
     /// status becomes lost ([`World::set_status`]); its message is the interface's.
     pub(crate) fn resign(&mut self, player: PlayerId, departure: Departure) -> GenieResult<()> {
-        let p = self
+        let resigning = self
             .players
             .get_mut(player.index())
             .ok_or(GenieError::unsupported(
                 "RESIGN of a player the slice does not have",
             ))?;
-        p.departures
+        resigning
+            .departures
             .set(Departures::DROPPED, departure == Departure::Dropped);
-        p.departures.set(Departures::RESIGNED, true);
+        resigning.departures.set(Departures::RESIGNED, true);
         self.set_status(player, GameStatus::Lost)
     }
 
@@ -197,17 +198,17 @@ impl World {
     /// (`FUN_1416778c0`; the world's `+0x8c`, 1, is not held).
     pub(crate) fn victory_check(&mut self) -> GenieResult<()> {
         let mut count = Count::default();
-        for i in PlayerId::each(self.players.len()).skip(1) {
-            let status = match self.own_victory(i) {
+        for player_id in PlayerId::each(self.players.len()).skip(1) {
+            let status = match self.own_victory(player_id) {
                 Ok(game_status) => game_status,
-                Err(e) => {
-                    self.stop_player(i, e);
+                Err(error) => {
+                    self.stop_player(player_id, error);
                     return Ok(());
                 }
             };
-            let rel = self.relations(count.first, i);
-            let allied_victory = self.players.player(i)?.allied_victory;
-            count.add(i, status, allied_victory, rel);
+            let rel = self.relations(count.first, player_id);
+            let allied_victory = self.players.player(player_id)?.allied_victory;
+            count.add(player_id, status, allied_victory, rel);
         }
         let outcome = if 0 < count.won {
             GameStatus::Lost

@@ -62,8 +62,9 @@ pub fn saved_reload(
         .iter()
         .flatten()
         .map(|player_master| &player_master.master)
-        .find(|m| {
-            m.static_part()
+        .find(|master| {
+            master
+                .static_part()
                 .is_some_and(|ms| ms.id() == rge_static_object.master_obj)
         })?;
     let rc = &master
@@ -95,7 +96,7 @@ pub fn saved_sprite(
             .filter_map(|entry| entry.kind.as_deref())
     };
     let Some(node) = nodes()
-        .filter_map(|n| n.rge_active_animated_sprite.as_deref())
+        .filter_map(|active_sprite| active_sprite.rge_active_animated_sprite.as_deref())
         .find(|rge_active_animated_sprite| {
             rge_active_animated_sprite.rge_active_sprite.sprite_id as i16
                 == rge_static_object.sprite
@@ -143,7 +144,8 @@ pub fn saved_attack(sub: &Action, graphics: Option<&Graphics>) -> GenieResult<At
     let graphics = graphics.ok_or(GenieError::unsupported(
         "a saved Attack without the sprites' table",
     ))?;
-    let g = |id: u16| SpriteId::of_data(id as i16).and_then(|id| graphics.get(id).copied());
+    let graphic_of =
+        |id: u16| SpriteId::of_data(id as i16).and_then(|id| graphics.get(id).copied());
     // every MoveTo of the Attack is quiet (`FUN_140a7a170` with 1)
     let move_to = match first_action(&rge_action.sub_actions)? {
         None => None,
@@ -175,11 +177,11 @@ pub fn saved_attack(sub: &Action, graphics: Option<&Graphics>) -> GenieResult<At
         swing: Seconds::ZERO,
         rest: Seconds::ZERO,
         arms: Arms {
-            move_sprite: g(rge_action_attack.short_val),
-            sprite: g(rge_action_attack.short_val_2),
+            move_sprite: graphic_of(rge_action_attack.short_val),
+            sprite: graphic_of(rge_action_attack.short_val_2),
             second_sprite: None,
-            idle_sprite: g(rge_action_attack.short_val_3),
-            idle_attack_sprite: g(rge_action_attack.short_val_4),
+            idle_sprite: graphic_of(rge_action_attack.short_val_3),
+            idle_attack_sprite: graphic_of(rge_action_attack.short_val_4),
             missile: MasterId::of_data(rge_action_attack.missile_id),
             fire_frame: Frame::of_data(rge_action_attack.frame_delay),
             interrupt_frame: Frame::of_data(rge_action_attack.interrupt_animation_at_frame),
@@ -199,15 +201,15 @@ pub fn build_task(
     masters: Option<&MasterTable>,
     master: i16,
 ) -> GenieResult<BuildTask> {
-    let m = objects.master(master).ok_or(GenieError::unsupported(
+    let builder = objects.master(master).ok_or(GenieError::unsupported(
         "a builder whose master is not saved",
     ))?;
-    let work_rate = combat_master(m)
+    let work_rate = combat_master(builder)
         .map(|rge_master_combat_object| rge_master_combat_object.rge_master_action_object.work_rate)
         .ok_or(GenieError::unsupported(
             "a builder master without an action part",
         ))?;
-    let task = master_build_task(objects, civ, masters, m, master)?;
+    let task = master_build_task(objects, civ, masters, builder, master)?;
     Ok(BuildTask::of(&task, WorkRate::new(work_rate)))
 }
 
@@ -221,14 +223,14 @@ pub fn fly_task(
     let fly = FLY;
     let saved = objects
         .master(master)
-        .and_then(|m| m.rge_master.as_deref())
+        .and_then(|master| master.rge_master.as_deref())
         .and_then(|rge_master| rge_master.rge_master_action_object.as_deref())
         .and_then(|rge_master_action_object| rge_master_action_object.tasks.as_deref());
     if let Some(tasks) = saved {
         let entry = tasks
             .list
             .iter()
-            .find(|e| ActionKind::of_data(e.task.action_kind) == Some(fly))
+            .find(|entry| ActionKind::of_data(entry.task.action_kind) == Some(fly))
             .ok_or(GenieError::unsupported(
                 "a bird whose master has no Fly task",
             ))?;
@@ -236,8 +238,9 @@ pub fn fly_task(
     }
     masters
         .and_then(|master_table| master_table.work(civ, dat_id(objects, master)?))
-        .and_then(|w| {
-            w.action_part()
+        .and_then(|master| {
+            master
+                .action_part()
                 .tasks
                 .iter()
                 .find(|task| task.action_kind == fly)
@@ -253,25 +256,26 @@ pub fn master_build_task(
     objects: &PlayerObjects,
     civ: CivId,
     masters: Option<&MasterTable>,
-    m: &Master,
+    builder: &Master,
     master: i16,
 ) -> GenieResult<Task> {
-    let saved = m
-        .tribe_master_combat_object
-        .as_deref()
-        .and_then(|tribe_master_combat_object| {
-            tribe_master_combat_object
-                .rge_master_combat_object
-                .rge_master_action_object
-                .tasks
-                .as_deref()
-        });
+    let saved =
+        builder
+            .tribe_master_combat_object
+            .as_deref()
+            .and_then(|tribe_master_combat_object| {
+                tribe_master_combat_object
+                    .rge_master_combat_object
+                    .rge_master_action_object
+                    .tasks
+                    .as_deref()
+            });
     let build = ActionKind::BUILD;
     if let Some(tasks) = saved {
         let entry = tasks
             .list
             .iter()
-            .find(|e| ActionKind::of_data(e.task.action_kind) == Some(build))
+            .find(|entry| ActionKind::of_data(entry.task.action_kind) == Some(build))
             .ok_or(GenieError::unsupported(
                 "a builder whose master has no Build task",
             ))?;
@@ -279,8 +283,9 @@ pub fn master_build_task(
     }
     masters
         .and_then(|master_table| master_table.work(civ, dat_id(objects, master)?))
-        .and_then(|w| {
-            w.action_part()
+        .and_then(|master| {
+            master
+                .action_part()
                 .tasks
                 .iter()
                 .find(|task| task.action_kind == build)
@@ -309,26 +314,26 @@ pub fn production(object: &genie_save::Object) -> GenieResult<Option<Production>
         .production_queue
         .iter()
         .enumerate()
-        .map(|(k, entry)| {
+        .map(|(entry_index, entry)| {
             let production_queue_costs = &entry.production_queue_costs;
-            let word = |k: usize| {
+            let word = |offset: usize| {
                 [
-                    production_queue_costs[k],
-                    production_queue_costs[k + 1],
-                    production_queue_costs[k + 2],
-                    production_queue_costs[k + 3],
+                    production_queue_costs[offset],
+                    production_queue_costs[offset + 1],
+                    production_queue_costs[offset + 2],
+                    production_queue_costs[offset + 3],
                 ]
             };
             // an entry's attribute (an `int`, −1 for none) and amount
-            let cost = |j: usize| -> GenieResult<(Option<AttributeId>, Amount)> {
-                let kind = i32::from_le_bytes(word(8 * j));
+            let cost = |index: usize| -> GenieResult<(Option<AttributeId>, Amount)> {
+                let kind = i32::from_le_bytes(word(8 * index));
                 let kind = i16::try_from(kind).map_err(|_| {
                     GenieError::invalid_input("a queue cost's attribute past the attributes")
                         .with("attribute", kind)
                 })?;
                 Ok((
                     AttributeId::of_field(kind)?,
-                    Amount::new(f32::from_le_bytes(word(8 * j + 4))),
+                    Amount::new(f32::from_le_bytes(word(8 * index + 4))),
                 ))
             };
             Ok(Entry {
@@ -336,7 +341,7 @@ pub fn production(object: &genie_save::Object) -> GenieResult<Option<Production>
                 count: QueuedUnits::of_data(entry.production_queue_unit_count),
                 tech: TechId::of_data(entry.production_queue_tech_id),
                 costs: [cost(0)?, cost(1)?, cost(2)?],
-                serial: EntrySerial::new(k as i64),
+                serial: EntrySerial::new(entry_index as i64),
                 button: QueueButton::of_data(entry.production_queue_button_location_id),
                 train_time: WholeSeconds::of_data(entry.production_queue_train_time),
             })
@@ -421,15 +426,15 @@ pub fn production(object: &genie_save::Object) -> GenieResult<Option<Production>
         action,
         disabled_techs: disabled
             .iter()
-            .filter_map(|&t| TechId::of_data(t))
+            .filter_map(|&tech| TechId::of_data(tech))
             .collect(),
         researched_techs: researched
             .iter()
-            .filter_map(|&t| TechId::of_data(t))
+            .filter_map(|&tech| TechId::of_data(tech))
             .collect(),
         available_units: available
             .iter()
-            .filter_map(|&m| MasterId::of_data(m))
+            .filter_map(|&master| MasterId::of_data(master))
             .collect(),
     }))
 }
@@ -518,7 +523,7 @@ pub fn default_task(
         // the action list's factory (`FUN_140aca4b0`, then the RGE one `FUN_140a97e00`) makes
         // no action of the other types: the default task starts nothing (wild animals' Explore,
         // type 6)
-        DefaultAction::Kind(t) if !ACTION_FACTORY_KINDS.contains(&t) => Ok(None),
+        DefaultAction::Kind(kind) if !ACTION_FACTORY_KINDS.contains(&kind) => Ok(None),
         DefaultAction::Kind(action_kind) => Err(Unstartable::Unported(action_kind)),
         DefaultAction::NoSuchTask => Err(Unstartable::Unread(UnreadDefault::NoSuchTask)),
     }

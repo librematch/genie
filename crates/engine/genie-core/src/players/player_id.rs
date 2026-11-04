@@ -57,9 +57,11 @@ impl PlayerId {
         if value == Self::NONE {
             return Ok(None);
         }
-        u8::try_from(value).map(|n| Some(Self(n))).map_err(|_| {
-            GenieError::invalid_input("a player field no player has").with("player", value)
-        })
+        u8::try_from(value)
+            .map(|number| Some(Self(number)))
+            .map_err(|_| {
+                GenieError::invalid_input("a player field no player has").with("player", value)
+            })
     }
 
     /// The value of a field that holds −1 for none.

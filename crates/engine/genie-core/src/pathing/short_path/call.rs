@@ -20,7 +20,7 @@ use crate::pathing::short_path::{
     Ctx, FixedPoint, Goal, NodeIndex, Search, Started, TO_FIXED, TO_FLOAT, clip, tile_of,
 };
 use crate::pathing::tile_path::Path;
-use crate::world::slots::CheckedIndex;
+use crate::world::slots::CheckedIndexExt;
 
 /// The short pather's arguments (`FUN_140f9d3a0`'s block, which `FUN_140f9e540` and
 /// `FUN_140fa0110` fill): the start and the goal in fixed point (the callers truncate them), the
@@ -148,20 +148,20 @@ pub enum Entry {
 
 impl Call {
     /// `FUN_140f9e540` up to the search: the target's range test, the map test, fixed point by
-    /// truncation (`(int)(longlong)(f * 2^22)`); the listed objects' shapes are ignored, except the
-    /// target's when the goal is the target's own position, whose half sizes then count. The
-    /// target's gap (`FUN_14118faf0`) clamps each axis by `MAXSS` (an unordered one is 0) and is
-    /// in range by `COMISS`/`JC` (0x140f9e5f5: an unordered one is not); an end lies off the map
-    /// below 0 (`COMISS`/`JA`) or at the size (`JNC`), so an unordered coordinate is on it.
+    /// truncation (`(int)(longlong)(value * 2^22)`); the listed objects' shapes are ignored, except
+    /// the target's when the goal is the target's own position, whose half sizes then count. The
+    /// target's gap (`FUN_14118faf0`) clamps each axis by `MAXSS` (an unordered one is 0) and is in
+    /// range by `COMISS`/`JC` (0x140f9e5f5: an unordered one is not); an end lies off the map below
+    /// 0 (`COMISS`/`JA`) or at the size (`JNC`), so an unordered coordinate is on it.
     #[must_use]
     pub fn entry(&self) -> Entry {
-        if let Some(t) = self.target {
+        if let Some(target) = self.target {
             let fx = maxss(
-                (self.from.x() - t.position.x()).abs() - t.half_size.x(),
+                (self.from.x() - target.position.x()).abs() - target.half_size.x(),
                 0.0,
             );
             let fy = maxss(
-                (self.from.y() - t.position.y()).abs() - t.half_size.y(),
+                (self.from.y() - target.position.y()).abs() - target.half_size.y(),
                 0.0,
             );
             if sqrt(fy * fy + fx * fx) - self.radius.get() <= self.range.get() {
@@ -179,15 +179,15 @@ impl Call {
             return Entry::Invalid;
         }
         // CVTTSS2SI into a 64-bit register, its low 32 bits kept
-        let fixed = |f: f32| cvttss2si_64(f * TO_FIXED) as i32;
+        let fixed = |value: f32| cvttss2si_64(value * TO_FIXED) as i32;
         let to = FixedPoint::new(fixed(self.to.x()), fixed(self.to.y()));
-        let at_target = self
-            .target
-            .filter(|t| to == FixedPoint::new(fixed(t.position.x()), fixed(t.position.y())));
+        let at_target = self.target.filter(|target| {
+            to == FixedPoint::new(fixed(target.position.x()), fixed(target.position.y()))
+        });
         let ignore = self
             .listed
             .iter()
-            .filter(|l| at_target.is_none_or(|t| l.id != t.id))
+            .filter(|listed| at_target.is_none_or(|target| listed.id != target.id))
             .filter_map(|listed| listed.shape)
             .collect();
         let size = at_target.map_or(Footprint::ZERO, |target| target.half_size);
@@ -233,33 +233,33 @@ impl Pather {
         mesh: &mut Mesh,
         words: &dyn Fn(u32, u32) -> u64,
         blocked: u64,
-        b: FixedRect,
+        rect: FixedRect,
     ) {
-        let b = b.get();
-        let mut ty = tile_of(b[1]) as u32;
+        let bounds = rect.get();
+        let mut ty = tile_of(bounds[1]) as u32;
         let mut y1 = (ty as i32).wrapping_mul(ONE).wrapping_add(0x60_0000);
-        while ty <= tile_of(b[3]) as u32 {
+        while ty <= tile_of(bounds[3]) as u32 {
             let mut run: Option<u32> = None;
-            let mut tx = tile_of(b[0]) as u32;
-            while tx <= tile_of(b[2]) as u32 {
+            let mut tx = tile_of(bounds[0]) as u32;
+            while tx <= tile_of(bounds[2]) as u32 {
                 if words(tx, ty) & blocked == 0 {
-                    if let Some(a) = run.take() {
-                        let r = FixedRect::new(
-                            (a as i32).wrapping_mul(ONE) - 0x20_0000,
+                    if let Some(start) = run.take() {
+                        let fixed_rect = FixedRect::new(
+                            (start as i32).wrapping_mul(ONE) - 0x20_0000,
                             (ty as i32).wrapping_mul(ONE) - 0x20_0000,
                             (tx as i32).wrapping_mul(ONE) + 0x20_0000,
                             y1,
                         );
-                        self.temp.push(mesh.add(r));
+                        self.temp.push(mesh.add(fixed_rect));
                     }
                 } else if run.is_none() {
                     run = Some(tx);
                 }
                 tx += 1;
             }
-            if let Some(a) = run {
+            if let Some(start) = run {
                 let fixed_rect = FixedRect::new(
-                    (a as i32).wrapping_mul(ONE) - 0x20_0000,
+                    (start as i32).wrapping_mul(ONE) - 0x20_0000,
                     (ty as i32).wrapping_mul(ONE) - 0x20_0000,
                     (tx as i32).wrapping_mul(ONE) + 0x20_0000,
                     y1,
@@ -299,8 +299,8 @@ impl Pather {
         }
         let result = self.core(mesh, words, &query.fixed());
         for &id in ignore {
-            if let Some(f) = self.ignore.get_mut(id.index()) {
-                *f = false;
+            if let Some(ignored) = self.ignore.get_mut(id.index()) {
+                *ignored = false;
             }
         }
         self.remove_terrain(mesh);
@@ -323,21 +323,21 @@ impl Pather {
             self.ignore.resize(mesh.shapes.len(), false);
         }
         let radius = fixed.radius.get();
-        let d = 0x20_0000 - radius;
-        let w = mesh.width as i32;
-        let cap = w.wrapping_mul(ONE) - 1 - radius;
+        let clearance = 0x20_0000 - radius;
+        let width = mesh.width as i32;
+        let cap = width.wrapping_mul(ONE) - 1 - radius;
         let [sx, sy] = fixed.from.get();
         let [gx, gy] = fixed.to.get();
-        let hold_high = |v: i32| {
-            if v.wrapping_add(0x100_0000) < cap {
-                v.wrapping_add(0x100_0000)
+        let hold_high = |value: i32| {
+            if value.wrapping_add(0x100_0000) < cap {
+                value.wrapping_add(0x100_0000)
             } else {
                 cap
             }
         };
-        let hold_low = |v: i32| {
-            if radius < v.wrapping_sub(0x100_0000) {
-                v.wrapping_sub(0x100_0000)
+        let hold_low = |value: i32| {
+            if radius < value.wrapping_sub(0x100_0000) {
+                value.wrapping_sub(0x100_0000)
             } else {
                 radius
             }
@@ -356,7 +356,7 @@ impl Pather {
             ctx: Ctx {
                 mesh,
                 ignore: &ignore,
-                d: FixedDistance::new(d),
+                clearance: FixedDistance::new(clearance),
             },
             goal,
             bounds,
@@ -380,21 +380,21 @@ impl Pather {
         fixed: &Fixed,
     ) -> GenieResult<ShortPath> {
         let radius = fixed.radius.get();
-        let d = 0x20_0000 - radius;
-        let w = mesh.width as i32;
-        let cap = w.wrapping_mul(ONE) - 1 - radius;
+        let clearance = 0x20_0000 - radius;
+        let width = mesh.width as i32;
+        let cap = width.wrapping_mul(ONE) - 1 - radius;
         let [sx, sy] = fixed.from.get();
         let [mut gx, mut gy] = fixed.to.get();
-        let hold_high = |v: i32| {
-            if v.wrapping_add(0x100_0000) < cap {
-                v.wrapping_add(0x100_0000)
+        let hold_high = |value: i32| {
+            if value.wrapping_add(0x100_0000) < cap {
+                value.wrapping_add(0x100_0000)
             } else {
                 cap
             }
         };
-        let hold_low = |v: i32| {
-            if radius < v.wrapping_sub(0x100_0000) {
-                v.wrapping_sub(0x100_0000)
+        let hold_low = |value: i32| {
+            if radius < value.wrapping_sub(0x100_0000) {
+                value.wrapping_sub(0x100_0000)
             } else {
                 radius
             }
@@ -426,7 +426,7 @@ impl Pather {
             ctx: Ctx {
                 mesh,
                 ignore: &ignore,
-                d: FixedDistance::new(d),
+                clearance: FixedDistance::new(clearance),
             },
             goal,
             bounds,

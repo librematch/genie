@@ -31,7 +31,7 @@ use crate::unit_ai::{
 use crate::world::Millis;
 use crate::world::WorldTime;
 use crate::world::layer::ClassRoles;
-use crate::world::slots::CheckedIndex;
+use crate::world::slots::CheckedIndexExt;
 use crate::{GenieError, GenieResult};
 
 /// What the full update's tail takes besides the surroundings ([`UnitAi::update_tail`]'s
@@ -86,7 +86,9 @@ impl UnitAi {
         // a unit with an order, or in a group with a command (`+0x3a8`), keeps its place as its
         // state position (0x140c674c9)
         if self.current_order.is_some()
-            || at.group.is_some_and(|g| g.contains(GroupState::COMMANDED))
+            || at
+                .group
+                .is_some_and(|group_state| group_state.contains(GroupState::COMMANDED))
         {
             self.state_position = at.position.ground();
         }
@@ -401,7 +403,7 @@ impl UnitAi {
         rng: &mut Well512,
     ) -> GenieResult<u32> {
         let roles = &at.roles;
-        let class = ClassId::of_param(notify.p[1])?
+        let class = ClassId::of_param(notify.params[1])?
             .or(self.target_class)
             .or(self.last_target_class);
         let Some(class) = class else {
@@ -454,7 +456,7 @@ impl UnitAi {
                     } else {
                         WorkerCount::NO_CAP
                     },
-                    site: DropSiteId::of_field(notify.p[2]),
+                    site: DropSiteId::of_field(notify.params[2]),
                     current: self.current_target,
                     point: NO_POINT,
                     min_state: ObjectState::Alive,
@@ -496,7 +498,7 @@ impl UnitAi {
         rng: &mut Well512,
     ) -> GenieResult<u32> {
         let roles = &at.roles;
-        let noted = ClassId::of_param(notify.p[1])?;
+        let noted = ClassId::of_param(notify.params[1])?;
         let class = self.target_class.or(self.last_target_class).or(noted);
         let Some(class) = class else {
             self.remove_target();
@@ -547,7 +549,7 @@ impl UnitAi {
                 side.closest_resource(ResourceSearch {
                     kind,
                     cap,
-                    site: DropSiteId::of_field(notify.p[2]),
+                    site: DropSiteId::of_field(notify.params[2]),
                     current: self.current_target,
                     point: NO_POINT,
                     min_state: ObjectState::Alive,

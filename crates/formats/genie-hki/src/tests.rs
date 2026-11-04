@@ -271,10 +271,12 @@ fn hotkey_file_writes_back_what_it_read() -> anyhow::Result<()> {
 #[test]
 fn keycode_string_id_names_the_function_keys_and_mouse_codes() {
     let named: Vec<(i32, i32)> = (0..300)
-        .filter_map(|k| keycode_id(k).map(|id| (k, id)))
+        .filter_map(|keycode| keycode_id(keycode).map(|id| (keycode, id)))
         .collect();
-    let mut expected: Vec<(i32, i32)> = (112..=120).map(|k| (k, k + 19433)).collect();
-    expected.extend((122..=135).map(|k| (k, k + 19433)));
+    let mut expected: Vec<(i32, i32)> = (112..=120)
+        .map(|keycode| (keycode, keycode + 19433))
+        .collect();
+    expected.extend((122..=135).map(|keycode| (keycode, keycode + 19433)));
     expected.extend([(253, 19712), (254, 19711), (255, 19710)]);
     assert_eq!(named, expected);
 }

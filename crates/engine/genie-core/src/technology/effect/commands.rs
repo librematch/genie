@@ -12,7 +12,7 @@ use crate::technology::EffectId;
 use crate::technology::{EffectCommand, Party};
 use crate::world::World;
 use crate::world::layer::AttributeRoles;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 use std::sync::Arc;
 
 impl World {
@@ -20,12 +20,14 @@ impl World {
     /// (`FUN_14152fdd0`, from 1, the player itself when it counts itself so) whose and to whom
     /// the relations (`+0x260`, `FUN_141667f50`) are the party's, in order.
     pub(super) fn party(&self, from: PlayerId, party: Party) -> Vec<PlayerId> {
-        let relation =
-            |a: PlayerId, b: PlayerId| self.players.player(a).ok()?.relations.get(b).copied();
-        let mutual = |q: PlayerId, wanted: &[Relation]| {
-            wanted
-                .iter()
-                .any(|&r| relation(from, q) == Some(r) && relation(q, from) == Some(r))
+        let relation = |from: PlayerId, to: PlayerId| {
+            self.players.player(from).ok()?.relations.get(to).copied()
+        };
+        let mutual = |player_id: PlayerId, wanted: &[Relation]| {
+            wanted.iter().any(|&wanted_relation| {
+                relation(from, player_id) == Some(wanted_relation)
+                    && relation(player_id, from) == Some(wanted_relation)
+            })
         };
         let wanted: &[Relation] = match party {
             Party::Own => return vec![from],
@@ -151,8 +153,8 @@ impl World {
                 attribute,
                 amount,
             } => {
-                for q in self.party(owner, party) {
-                    self.modify_attribute(q, change, master, class, amount, attribute)?;
+                for player_id in self.party(owner, party) {
+                    self.modify_attribute(player_id, change, master, class, amount, attribute)?;
                 }
             }
             EffectCommand::Costs {
@@ -176,7 +178,7 @@ impl World {
     /// multiply of a resource 0 or above; each for the block's players.
     pub(super) fn resource_command(
         &mut self,
-        p: PlayerId,
+        source: PlayerId,
         effect_command: &EffectCommand,
         farms: &mut Option<(f32, f32)>,
     ) -> GenieResult<()> {
@@ -186,8 +188,8 @@ impl World {
                 attribute: Some(attribute),
                 amount,
             } => {
-                for q in self.party(p, party) {
-                    self.multiply_resource(q, attribute, amount)?;
+                for player_id in self.party(source, party) {
+                    self.multiply_resource(player_id, attribute, amount)?;
                 }
             }
             EffectCommand::Resource {
@@ -198,7 +200,7 @@ impl World {
                 amount,
             } => {
                 // the effect's player's attribute `scale` scales the amount
-                let amount = Amount::new(self.scaled_amount(p, scale, amount));
+                let amount = Amount::new(self.scaled_amount(source, scale, amount));
                 // a negative attribute is none: nothing changes
                 let Some(attribute) = attribute else {
                     return Ok(());
@@ -211,12 +213,12 @@ impl World {
                         .contains(AttributeRoles::FARM_FOOD_AMOUNT)
                 {
                     *farms = Some((
-                        self.attribute_of(p, self.model.slots.attribute.farm_food_amount)
+                        self.attribute_of(source, self.model.slots.attribute.farm_food_amount)
                             .get(),
                         amount.get(),
                     ));
                 }
-                for player_id in self.party(p, party) {
+                for player_id in self.party(source, party) {
                     self.modify_resource(player_id, attribute, amount, change)?;
                 }
             }
@@ -230,7 +232,7 @@ impl World {
     /// (the own block's with the effect's object), the spawn and the technology change.
     pub(super) fn master_command(
         &mut self,
-        p: PlayerId,
+        source: PlayerId,
         effect_command: &EffectCommand,
         object: Option<ObjectId>,
     ) -> GenieResult<()> {
@@ -242,9 +244,9 @@ impl World {
                 one,
             } => {
                 let own = party == Party::Own;
-                for q in self.party(p, party) {
+                for player_id in self.party(source, party) {
                     let (one, object) = if own { (one, object) } else { (false, None) };
-                    self.enable_master(q, unit, enable, one, object)?;
+                    self.enable_master(player_id, unit, enable, one, object)?;
                 }
             }
             EffectCommand::Upgrade {
@@ -253,9 +255,9 @@ impl World {
                 to,
                 mode,
             } => {
-                for q in self.party(p, party) {
+                for player_id in self.party(source, party) {
                     let object = object.filter(|_| party == Party::Own);
-                    self.upgrade_master(q, (from, to), mode, object)?;
+                    self.upgrade_master(player_id, (from, to), mode, object)?;
                 }
             }
             EffectCommand::Spawn {
@@ -264,8 +266,8 @@ impl World {
                 at,
                 count,
             } => {
-                for q in self.party(p, party) {
-                    self.spawn_at(q, (master, at), count)?;
+                for player_id in self.party(source, party) {
+                    self.spawn_at(player_id, (master, at), count)?;
                 }
             }
             EffectCommand::Tech {
@@ -278,7 +280,7 @@ impl World {
                 let Some(tech) = tech else {
                     return Ok(());
                 };
-                for player_id in self.party(p, party) {
+                for player_id in self.party(source, party) {
                     self.modify_tech(player_id, tech, mode, amount, location)?;
                 }
             }

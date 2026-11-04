@@ -99,34 +99,36 @@ pub struct Path {
 }
 
 impl Path {
-    /// Insert `p` at `index` (`FUN_140f95060`) unless it equals the point before or the point at
-    /// `index`; false when it does or `index` lies beyond the end.
-    pub fn insert(&mut self, index: usize, p: BVector) -> bool {
+    /// Insert `point` at `index` (`FUN_140f95060`) unless it equals the point before or the point
+    /// at `index`; false when it does or `index` lies beyond the end.
+    pub fn insert(&mut self, index: usize, point: BVector) -> bool {
         let count = self.points.len();
         if count < index
-            || (0 < index && self.points.get(index - 1) == Some(&p))
-            || (index < count && self.points.get(index) == Some(&p))
+            || (0 < index && self.points.get(index - 1) == Some(&point))
+            || (index < count && self.points.get(index) == Some(&point))
         {
             return false;
         }
-        self.points.insert(index, p);
+        self.points.insert(index, point);
         true
     }
 
-    /// Append `p` (`FUN_140f95a10`).
-    pub fn push(&mut self, p: BVector) -> bool {
-        self.insert(self.points.len(), p)
+    /// Append `point` (`FUN_140f95a10`).
+    pub fn push(&mut self, point: BVector) -> bool {
+        self.insert(self.points.len(), point)
     }
 
     /// The length along the points in 3D (`FUN_140f95a60`).
     pub fn measure(&mut self) {
         let mut total = 0.0;
-        for w in self.points.windows(2) {
-            let [a, b] = w else {
+        for window in self.points.windows(2) {
+            let [from, to] = window else {
                 continue;
             };
-            let d = *b - *a;
-            total += sqrt(d.x() * d.x() + d.height() * d.height() + d.y() * d.y());
+            let delta = *to - *from;
+            total += sqrt(
+                delta.x() * delta.x() + delta.height() * delta.height() + delta.y() * delta.y(),
+            );
         }
         self.length = Distance::new(total);
     }
@@ -134,8 +136,8 @@ impl Path {
     /// Append `other`'s points to these (`FUN_140f95c00`); the length is `other`'s, or measured
     /// anew when `other`'s is at most 1e-7 or unordered (`COMISS`, `JBE` at 0x140f95d66).
     pub fn append(&mut self, other: &Self) {
-        for &p in &other.points {
-            let _ = self.push(p);
+        for &point in &other.points {
+            let _ = self.push(point);
         }
         if at_most_or_unordered(other.length.get(), 1e-7) {
             self.measure();

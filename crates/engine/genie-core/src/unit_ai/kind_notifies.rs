@@ -91,7 +91,7 @@ impl UnitAi {
     ) -> GenieResult<u32> {
         match notify.kind {
             NotifyKind::ACTION_COMPLETED => {
-                if notify.p[0] == AiAction::Attack.value() {
+                if notify.params[0] == AiAction::Attack.value() {
                     // FUN_140c41bc0 with 1000: the idle timeout, then slot 0x1a8
                     self.set_idle_timeout(LION_ATTACKED_TIMEOUT, ai_rng);
                     self.remove_target();
@@ -127,7 +127,7 @@ impl UnitAi {
         let gap = at
             .target
             .filter(|_| self.current_target.is_some())
-            .map(|t| footprint_gap_squared(at.position, at.size, t.position, t.radius));
+            .map(|seen| footprint_gap_squared(at.position, at.size, seen.position, seen.radius));
         // a target within its sight whose master has no flag 0x10 (`+0x654`) it
         // attacks again (slot 0xb8: the target, forced, not any, its group) and the
         // processing breaks
@@ -195,7 +195,7 @@ impl UnitAi {
             }
             // a completion or a failure of its action (0x1fa, 0x1f9) stops it
             NotifyKind::ACTION_COMPLETED | NotifyKind::ACTION_FAILED => {
-                if AiAction::field(self.current_action) == notify.p[0] {
+                if AiAction::field(self.current_action) == notify.params[0] {
                     self.remove_target();
                     self.stop_current(StopOrder::Keep, at, side, ai_rng)?;
                 }
@@ -218,7 +218,8 @@ impl UnitAi {
             NotifyKind::OTHER_LOAD => self.drop_other_load(side, ai_rng),
             // its own cases the slice does not model; any other is the base handler's
             NotifyKind(0x217..=0x21a) => {
-                Err(VILLAGER_NOTIFY.with("notify", format!("{:#x} {:?}", notify.kind, notify.p)))
+                Err(VILLAGER_NOTIFY
+                    .with("notify", format!("{:#x} {:?}", notify.kind, notify.params)))
             }
             _ => self.base_notify(notify, time, at, player_kind, ai_rng, side),
         }
@@ -234,8 +235,9 @@ impl UnitAi {
         side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
     ) -> GenieResult<u32> {
-        if (notify.p[0] == AiAction::Build.value() || notify.p[0] == AiAction::Hunt.value())
-            && let Some(made) = Self::world_object(ObjectId::of_field(notify.p[1]), at, side)?
+        if (notify.params[0] == AiAction::Build.value()
+            || notify.params[0] == AiAction::Hunt.value())
+            && let Some(made) = Self::world_object(ObjectId::of_field(notify.params[1]), at, side)?
         {
             side.effect_now(
                 Effect::Command(AiCommand::WorkOn {
@@ -383,7 +385,7 @@ impl UnitAi {
         ai_rng: &mut Well512,
         side: &mut UnitView<'_, '_>,
     ) -> GenieResult<u32> {
-        if notify.p[1] < 1 {
+        if notify.params[1] < 1 {
             alert_owner(player_kind)?;
             self.end_notifies(time, at, side, ai_rng)?;
             return Ok(DEAD);
@@ -438,7 +440,7 @@ impl UnitAi {
             // computer player's AI hears it), the notifies end and it gives up. Alive, the
             // other owners of the units inside it hear 0x201 and the base handler's damage
             // case follows
-            NotifyKind::DAMAGED if notify.p[1] < 1 => {
+            NotifyKind::DAMAGED if notify.params[1] < 1 => {
                 alert_owner(player_kind)?;
                 self.end_notifies(time, at, side, ai_rng)?;
                 Ok(DEAD)
@@ -453,7 +455,7 @@ impl UnitAi {
             // attack order.": a target gone or dead (above state 2) is forgotten
             // (`FUN_140c5e1e0`) and the current action stops (slot 0xb0 with 1)
             NotifyKind::ACTION_COMPLETED
-                if notify.p[0] == 600 && self.current_order == Some(OrderKind::Attack) =>
+                if notify.params[0] == 600 && self.current_order == Some(OrderKind::Attack) =>
             {
                 let gone = self.current_target.is_none()
                     || at.target.is_none_or(|seen| ObjectState::Alive < seen.state);

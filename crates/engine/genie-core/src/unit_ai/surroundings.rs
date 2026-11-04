@@ -90,10 +90,10 @@ impl Found {
     };
 }
 
-/// The builder's flood of `FUN_140c1c7c0` from tile `at` with reach `r`: the start is tested
+/// The builder's flood of `FUN_140c1c7c0` from tile `at` with reach `radius`: the start is tested
 /// first; then each tile it reached, the first queued first, tries its neighbours left, right,
-/// below and above (x − 1, x + 1, y − 1, y + 1) while it lies less than `r − 1` from the start on
-/// both axes, and a neighbour not yet reached is tested and queued. The first tile `test` names
+/// below and above (x − 1, x + 1, y − 1, y + 1) while it lies less than `radius − 1` from the start
+/// on both axes, and a neighbour not yet reached is tested and queued. The first tile `test` names
 /// an object on answers it.
 ///
 /// # Errors
@@ -101,7 +101,7 @@ impl Found {
 /// The first error `test` returns.
 pub fn flood_search(
     at: Tile,
-    r: i32,
+    radius: i32,
     mut test: impl FnMut(Tile) -> GenieResult<Option<ObjectId>>,
 ) -> GenieResult<Option<ObjectId>> {
     let (ux, uy) = (at.x(), at.y());
@@ -113,7 +113,7 @@ pub fn flood_search(
     let mut next = 0;
     while let Some(&next_tile) = queue.get(next) {
         next += 1;
-        if (ux - next_tile.x()).abs() >= r - 1 || (uy - next_tile.y()).abs() >= r - 1 {
+        if (ux - next_tile.x()).abs() >= radius - 1 || (uy - next_tile.y()).abs() >= radius - 1 {
             continue;
         }
         for tile in next_tile.beside() {
@@ -478,39 +478,41 @@ impl Unit {
             position: self.position(),
             hp: self.life.hp,
             speed: step
-                .w
+                .world
                 .parts
                 .mover_of(self.id)
-                .map_or(Speed::ZERO, |m| m.stats.speed),
-            map: step.w.spatial.map,
+                .map_or(Speed::ZERO, |mover| mover.stats.speed),
+            map: step.world.spatial.map,
             dt_seconds: step.dt.seconds(),
             flags: {
                 let mut flags = SurroundingFlags::empty();
-                flags.set(SurroundingFlags::MODE_1, step.w.mode_680.is_one());
+                flags.set(SurroundingFlags::MODE_1, step.world.mode_680.is_one());
                 flags.set(SurroundingFlags::BUSY, busy);
                 flags.set(SurroundingFlags::INTERRUPTIBLE, interruptible);
                 flags.set(
                     SurroundingFlags::TASK_0X99,
-                    master.is_some_and(|m| {
-                        m.action_part()
+                    master.is_some_and(|master| {
+                        master
+                            .action_part()
                             .tasks
                             .iter()
-                            .any(|t| t.action_kind == CART_TASK)
+                            .any(|task| task.action_kind == CART_TASK)
                     }),
                 );
                 flags.set(SurroundingFlags::GARRISONED, self.life.inside.is_some());
                 flags.set(
                     SurroundingFlags::RANGED,
-                    master.is_some_and(|m| m.combat_part().missile.master().is_some()),
+                    master.is_some_and(|master| master.combat_part().missile.master().is_some()),
                 );
                 flags.set(
                     SurroundingFlags::SCENARIO,
-                    step.w.settings.game_mode.scenario(),
+                    step.world.settings.game_mode.scenario(),
                 );
                 flags.set(
                     SurroundingFlags::TASK_0X69,
-                    master.is_some_and(|m| {
-                        m.action_part()
+                    master.is_some_and(|master| {
+                        master
+                            .action_part()
                             .tasks
                             .iter()
                             .any(|task| task.action_kind == ActionKind::HEAL)
@@ -526,10 +528,10 @@ impl Unit {
                 );
                 flags.set(
                     SurroundingFlags::ATTACK_MOVING,
-                    step.w
+                    step.world
                         .parts
                         .mover_of(self.id)
-                        .is_some_and(|m| m.attack_moving),
+                        .is_some_and(|mover| mover.attack_moving),
                 );
                 flags.set(
                     SurroundingFlags::DISABLE_TOWER_PRIORITY,
@@ -540,13 +542,13 @@ impl Unit {
                 flags.set(
                     SurroundingFlags::GUEST_COMPUTER,
                     self.garrison.iter().any(|&object_id| {
-                        step.w.spatial.get(object_id).is_some_and(|placed| {
+                        step.world.spatial.get(object_id).is_some_and(|placed| {
                             placed.player != player
                                 && step
-                                    .w
+                                    .world
                                     .players
                                     .get(placed.player.index())
-                                    .is_some_and(|q| q.kind.is_computer())
+                                    .is_some_and(|player| player.kind.is_computer())
                         })
                     }),
                 );
@@ -562,24 +564,25 @@ impl Unit {
                 }
                 None => None,
             },
-            combat_level: master.map_or(CombatLevel::NONE, |m| m.combat_level),
-            attack_priority: master.map_or(AttackPriority::PRIORITY_0, |m| {
-                m.creatable_part().attack_priority
+            combat_level: master.map_or(CombatLevel::NONE, |master| master.combat_level),
+            attack_priority: master.map_or(AttackPriority::PRIORITY_0, |master| {
+                master.creatable_part().attack_priority
             }),
-            size: master.map_or(Footprint::ZERO, |m| m.radius),
-            los: master.map_or(Distance::ZERO, |m| m.line_of_sight),
-            search_radius: master.map_or(Distance::ZERO, |m| m.action_part().search_radius),
-            weapon_range: master.map_or(Distance::ZERO, |m| m.combat_part().weapon_range),
+            size: master.map_or(Footprint::ZERO, |master| master.radius),
+            los: master.map_or(Distance::ZERO, |master| master.line_of_sight),
+            search_radius: master
+                .map_or(Distance::ZERO, |master| master.action_part().search_radius),
+            weapon_range: master.map_or(Distance::ZERO, |master| master.combat_part().weapon_range),
             state: self.life.state,
-            kind: master.map_or(MasterKind::of_data(0), |m| m.kind),
-            firepower: step.w.parts.combat_of(self.id).firepower,
+            kind: master.map_or(MasterKind::of_data(0), |master| master.kind),
+            firepower: step.world.parts.combat_of(self.id).firepower,
             capture: self.capture_kind(step),
             master: self.life.master_id,
             // a new owner sees the target with its own map
             target: self.ai_target(step, view.player)?,
             id: self.id,
-            anim_speed: step.w.parts.anim_speed_of(self.id),
-            action_state: if step.w.parts.unread.contains(self.id) {
+            anim_speed: step.world.parts.anim_speed_of(self.id),
+            action_state: if step.world.parts.unread.contains(self.id) {
                 None
             } else {
                 Some(
@@ -591,14 +594,14 @@ impl Unit {
             units: self.named_units(
                 step,
                 changed_view(
-                    OthersRef::of(&step.w.players, &step.w.index, step.player)?,
+                    OthersRef::of(&step.world.players, &step.world.index, step.player)?,
                     view.new_owner,
                 ),
                 view,
                 master,
             )?,
             group: (self.group.id)
-                .and_then(|id| step.w.groups.get(id))
+                .and_then(|id| step.world.groups.get(id))
                 .map(|group| {
                     let mut flags = GroupState::empty();
                     flags.set(
@@ -610,34 +613,37 @@ impl Unit {
                     flags.set(GroupState::MOVING, group.motion.moving());
                     flags.set(
                         GroupState::MEMBER_MOVING,
-                        step.w.parts.mover_of(self.id).is_some_and(Mover::is_moving),
+                        step.world
+                            .parts
+                            .mover_of(self.id)
+                            .is_some_and(Mover::is_moving),
                     );
                     flags
                 }),
             top_target: actions.top_target_seen(
                 step,
-                OthersRef::of(&step.w.players, &step.w.index, step.player)?,
+                OthersRef::of(&step.world.players, &step.world.index, step.player)?,
             )?,
-            min_range: master.map_or(Distance::ZERO, |m| m.combat_part().min_range),
+            min_range: master.map_or(Distance::ZERO, |master| master.combat_part().min_range),
             moved_at: step
-                .w
+                .world
                 .parts
                 .mover_of(self.id)
                 .map_or_else(|| self.position(), |mover| mover.moved_at)
                 .vector(),
             dodge_chance: step
-                .w
+                .world
                 .players
                 .get(player.index())
-                .map_or(Chance::NONE, |q| q.dodge_chance),
+                .map_or(Chance::NONE, |player| player.dodge_chance),
             keep_distance_chance: step
-                .w
+                .world
                 .players
                 .get(player.index())
-                .map_or(Chance::NONE, |q| q.keep_distance_chance),
-            roles: step.w.model.roles.clone(),
-            slots: step.w.model.slots,
-            unit_ai_tuning: step.w.model.tuning.unit_ai,
+                .map_or(Chance::NONE, |player| player.keep_distance_chance),
+            roles: step.world.model.roles.clone(),
+            slots: step.world.model.slots,
+            unit_ai_tuning: step.world.model.tuning.unit_ai,
         })
     }
 }

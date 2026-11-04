@@ -138,8 +138,8 @@ pub(crate) fn footprint_clearing(
     for y in y0..=y1 {
         for x in x0..=x1 {
             for (id, placed) in world.objects_on(Tile::new(i32::from(x), i32::from(y))) {
-                if let Some(c) = clearing_takes(site, id, placed, looks, roles, build_tuning)? {
-                    cleared.push(c);
+                if let Some(taken) = clearing_takes(site, id, placed, looks, roles, build_tuning)? {
+                    cleared.push(taken);
                 }
             }
         }
@@ -178,10 +178,10 @@ pub(super) fn clearing_tiles(
     build_tuning: &BuildTuning,
 ) -> Option<([i16; 2], [i16; 2])> {
     use crate::math::conversions::cvttss2si;
-    let (w, h) = (map.width(), map.height());
-    let range = |v: f32, size: i32| {
-        let low = cvttss2si(v - build_tuning.clearing_reach) as i16;
-        let high = cvttss2si(v + build_tuning.clearing_reach) as i16;
+    let (width, height) = (map.width(), map.height());
+    let range = |coordinate: f32, size: i32| {
+        let low = cvttss2si(coordinate - build_tuning.clearing_reach) as i16;
+        let high = cvttss2si(coordinate + build_tuning.clearing_reach) as i16;
         let high = if size <= i32::from(high) {
             (size - 1) as i16
         } else {
@@ -189,8 +189,8 @@ pub(super) fn clearing_tiles(
         };
         (low.max(0), high)
     };
-    let (x0, x1) = range(at.x(), w);
-    let (y0, y1) = range(at.y(), h);
+    let (x0, x1) = range(at.x(), width);
+    let (y0, y1) = range(at.y(), height);
     (x0 <= x1 && y0 <= y1).then_some(([x0, x1], [y0, y1]))
 }
 

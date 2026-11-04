@@ -8,7 +8,7 @@ use crate::groups::UnitKind;
 use crate::groups::{Formation, UnitGroup, sub_formation};
 use crate::map::Distance;
 use crate::objects::ObjectId;
-use crate::world::slots::CheckedIndex;
+use crate::world::slots::CheckedIndexExt;
 use crate::{GenieError, GenieResult};
 
 /// A line order that lacks a place up to the list's length: the game reads past the order.
@@ -123,12 +123,12 @@ impl World {
                 continue;
             }
             let at = object.moved_vector();
-            let d = (point.height() - at.height()) * (point.height() - at.height())
+            let distance = (point.height() - at.height()) * (point.height() - at.height())
                 + (point.x() - at.x()) * (point.x() - at.x())
                 + (point.y() - at.y()) * (point.y() - at.y());
-            if d < best {
+            if distance < best {
                 closest = Some(member.id);
-                best = d;
+                best = distance;
             }
         }
         Ok(closest)
@@ -138,9 +138,11 @@ impl World {
     /// zeroed, `sqrt(x² + 0 + y²)`), None for a unit the world does not hold.
     pub(super) fn slot_distance(&self, at: BVector, id: ObjectId) -> Option<Distance> {
         let object = self.world_object(id)?;
-        let mut d = at - object.moved_vector();
-        d = d.with_height(0.0);
-        Some(Distance::new(sqrt(d.x() * d.x() + 0.0 + d.y() * d.y())))
+        let mut offset = at - object.moved_vector();
+        offset = offset.with_height(0.0);
+        Some(Distance::new(sqrt(
+            offset.x() * offset.x() + 0.0 + offset.y() * offset.y(),
+        )))
     }
 
     /// `FUN_141009760` of `formation` for group `group` without the settings' flag `DAT_143f01834`
@@ -163,11 +165,11 @@ impl World {
         let asks: Vec<(BVector, FormationCategory, UnitKind)> = formation
             .slots
             .iter()
-            .map(|s| {
+            .map(|slot| {
                 (
-                    s.transform_position,
-                    s.desired_category,
-                    s.desired_sub_category,
+                    slot.transform_position,
+                    slot.desired_category,
+                    slot.desired_sub_category,
                 )
             })
             .collect();
@@ -176,13 +178,13 @@ impl World {
             .iter()
             .enumerate()
             .filter(|(_, slot)| slot.transformed != 0 && slot.active != 0)
-            .map(|(i, _)| i)
+            .map(|(index, _)| index)
             .collect();
-        let ask = |i: usize, used: &[Option<ObjectId>]| {
-            let (at, category, sub_category) = *asks.checked(i)?;
+        let ask = |index: usize, used: &[Option<ObjectId>]| {
+            let (at, category, sub_category) = *asks.checked(index)?;
             self.closest_unit(group, at, category, sub_category, used)
         };
-        let dist = |i: usize, id: ObjectId| self.slot_distance(asks.get(i)?.0, id);
+        let dist = |index: usize, id: ObjectId| self.slot_distance(asks.get(index)?.0, id);
         let pick = Picker {
             ask: &ask,
             dist: &dist,
@@ -203,7 +205,7 @@ impl World {
     }
 
     /// The feature's assignment (`FUN_14100a0c0`, [`World::populate_slots`] with the settings'
-    /// flag) of `formation`'s slots in use to group `group`'s members, `n` of them:
+    /// flag) of `formation`'s slots in use to group `group`'s members, `count` of them:
     ///
     /// - The costs (`costs`, the process global `DAT_143f161e0` of 70 × 70 floats that only this
     ///   routine reads and writes, all 0 as the process starts; grown to that when shorter): for
@@ -211,14 +213,14 @@ impl World {
     ///   moved to (slot 0x518, as slot 0x520) to the slot's place (`+0x1c`), summed x, height,
     ///   y; [`FARTHEST`] for a slot not transformed or not active, of another sub-formation
     ///   ([`World::unit_category`]) or, before both, of another master. A member's row starts at
-    ///   its index times `n`, so with more slots than members a row runs into the next one's,
+    ///   its index times `count`, so with more slots than members a row runs into the next one's,
     ///   which overwrites it; a member the world does not hold leaves its row as it was.
     /// - The preferences: each member's slots by cost, each the cheapest not yet taken (the
     ///   first untaken one, then any strictly cheaper, `COMISS`/`JBE` at 0x14100a47e: a NaN cost
     ///   neither wins nor loses), in rows laid like the costs.
     /// - Each start member in turn takes its first preferred slot not taken, then the next
     ///   member (wrapping), until every slot is taken or a member has none left (a start that
-    ///   placed nobody counts for nothing). Its mean is the sum of the costs over `n`, its
+    ///   placed nobody counts for nothing). Its mean is the sum of the costs over `count`, its
     ///   variance the mean of the squared differences over the pairs placed; a variance below
     ///   the best so far (`COMISS`/`JBE` at 0x14100a9be, from [`FARTHEST`]) keeps the start's
     ///   pairs.
@@ -243,27 +245,32 @@ impl World {
         group: &UnitGroup,
         costs: &mut Vec<f32>,
     ) -> GenieResult<()> {
-        let n = group.members.len();
-        let count = formation.slots.len();
+        let member_count = group.members.len();
+        let slot_count = formation.slots.len();
         if costs.len() < ASSIGNMENT_CELLS {
             costs.resize(ASSIGNMENT_CELLS, 0.0);
         }
         self.member_costs(formation, group, costs)?;
-        let preferences = slot_preferences(costs, n, count)?;
-        let kept = best_assignment(&preferences, costs, (n, count))?;
-        for (&r, &c) in kept.0.head(n)?.iter().zip(kept.1.head(n)?) {
-            if r == -1 {
+        let preferences = slot_preferences(costs, member_count, slot_count)?;
+        let kept = best_assignment(&preferences, costs, (member_count, slot_count))?;
+        for (&member_index, &slot_index) in kept
+            .0
+            .head(member_count)?
+            .iter()
+            .zip(kept.1.head(member_count)?)
+        {
+            if member_index == -1 {
                 continue;
             }
-            let slot = formation.slots.checked_mut(c as usize)?;
+            let slot = formation.slots.checked_mut(slot_index as usize)?;
             slot.position_filled = 1;
-            slot.unit_id = Some(group.members.checked(r as usize)?.id);
+            slot.unit_id = Some(group.members.checked(member_index as usize)?.id);
         }
         Ok(())
     }
 
-    /// [`World::assign_slots_by_variance`]'s costs: for each member the world holds (rows of `n`
-    /// cells) the squared distance to each slot, [`FARTHEST`] for a slot not transformed or
+    /// [`World::assign_slots_by_variance`]'s costs: for each member the world holds (rows of
+    /// `count` cells) the squared distance to each slot, [`FARTHEST`] for a slot not transformed or
     /// active, of another category or of another master than the member's.
     fn member_costs(
         &self,
@@ -271,13 +278,13 @@ impl World {
         group: &UnitGroup,
         costs: &mut [f32],
     ) -> GenieResult<()> {
-        let n = group.members.len();
-        let count = formation.slots.len();
-        for (i, member) in group.members.iter().enumerate() {
+        let member_count = group.members.len();
+        let slot_count = formation.slots.len();
+        for (member_index, member) in group.members.iter().enumerate() {
             let Some(object) = self.world_object(member.id) else {
                 continue;
             };
-            if count == 0 {
+            if slot_count == 0 {
                 continue;
             }
             let category = self.unit_category(Some(object))?;
@@ -292,23 +299,25 @@ impl World {
                 }
                 let other_master =
                     !slot.desired_sub_category.is_none() && master != slot.desired_sub_category;
-                *costs.checked_mut(i * n + index)? = if other_master || skip {
+                *costs.checked_mut(member_index * member_count + index)? = if other_master || skip {
                     FARTHEST
                 } else {
-                    let d = at - slot.transform_position;
-                    d.x() * d.x() + d.height() * d.height() + d.y() * d.y()
+                    let offset = at - slot.transform_position;
+                    offset.x() * offset.x()
+                        + offset.height() * offset.height()
+                        + offset.y() * offset.y()
                 };
             }
         }
         Ok(())
     }
 
-    /// `populateSlotsWithUnits` (`FUN_14102b230`) of group `group` over the first `n` slots of
-    /// `formation` (at most the members), `order` their places in the line order: the members
-    /// whose index has a transformed active slot (and that the world holds) form a list in
-    /// member order; then, for each `k` of the list, the slot whose place in `order` holds `k`
-    /// takes the first unit of the list left that the member of the same index (as the game
-    /// reads it) matches in sub-formation and master (-1 any), filled.
+    /// `populateSlotsWithUnits` (`FUN_14102b230`) of group `group` over the first `count` slots of
+    /// `formation` (at most the members), `order` their places in the line order: the members whose
+    /// index has a transformed active slot (and that the world holds) form a list in member order;
+    /// then, for each `listed_index` of the list, the slot whose place in `order` holds
+    /// `listed_index` takes the first unit of the list left that the member of the same index (as
+    /// the game reads it) matches in sub-formation and master (-1 any), filled.
     ///
     /// # Errors
     ///
@@ -320,28 +329,30 @@ impl World {
         &self,
         formation: &mut Formation,
         group: &UnitGroup,
-        n: usize,
+        slot_count: usize,
         order: &[i32],
     ) -> GenieResult<()> {
-        let n = n.min(group.members.len());
+        let count = slot_count.min(group.members.len());
         let mut list: Vec<Option<ObjectId>> = Vec::new();
-        for i in 0..n {
-            let s = formation.slot_mut(i)?;
-            if s.transformed != 0
-                && s.active != 0
-                && self.world_object(group.members.checked(i)?.id).is_some()
+        for index in 0..count {
+            let slot = formation.slot_mut(index)?;
+            if slot.transformed != 0
+                && slot.active != 0
+                && self
+                    .world_object(group.members.checked(index)?.id)
+                    .is_some()
             {
-                list.push(Some(group.members.checked(i)?.id));
+                list.push(Some(group.members.checked(index)?.id));
             }
         }
-        for k in 0..list.len() {
+        for listed_index in 0..list.len() {
             let at = order
                 .iter()
-                .position(|&o| o == k as i32)
+                .position(|&entry| entry == listed_index as i32)
                 .ok_or(NO_PLACE_IN_ORDER)?;
             let (category, sub_category) = {
-                let s = formation.slot_mut(at)?;
-                (s.desired_category, s.desired_sub_category)
+                let slot = formation.slot_mut(at)?;
+                (slot.desired_category, slot.desired_sub_category)
             };
             for (index, taken) in list.iter_mut().enumerate() {
                 if taken.is_none() {
@@ -397,7 +408,7 @@ impl World {
         let previous_column = group
             .previous_formation
             .as_ref()
-            .is_some_and(|p| p.kind == FormationKind::Column);
+            .is_some_and(|formation| formation.kind == FormationKind::Column);
         if matches!(formation.kind, FormationKind::Column | FormationKind::Box) || !previous_column
         {
             return Ok(());
@@ -468,13 +479,13 @@ impl World {
 }
 
 /// What [`World::populate_slots`] reads: the unit nearest a slot not in `used`, and its distance.
-struct Picker<'a> {
-    ask: &'a AskUnit<'a>,
-    dist: &'a dyn Fn(usize, ObjectId) -> Option<Distance>,
+struct Picker<'env> {
+    ask: &'env AskUnit<'env>,
+    dist: &'env dyn Fn(usize, ObjectId) -> Option<Distance>,
 }
 
 /// The unit nearest a slot, not among those taken.
-type AskUnit<'a> = dyn Fn(usize, &[Option<ObjectId>]) -> GenieResult<Option<ObjectId>> + 'a;
+type AskUnit<'env> = dyn Fn(usize, &[Option<ObjectId>]) -> GenieResult<Option<ObjectId>> + 'env;
 
 impl Picker<'_> {
     /// One trial over the `wanted` slots, `used` holding the units taken (`count` of them, the
@@ -487,11 +498,11 @@ impl Picker<'_> {
         (mut count, mut leading): (usize, bool),
     ) -> GenieResult<(f32, i32, Option<ObjectId>)> {
         let (mut sum, mut found, mut first) = (0.0f32, 0, None);
-        for &i in wanted {
-            let Some(id) = (self.ask)(i, used.head(count)?)? else {
+        for &wanted_slot in wanted {
+            let Some(id) = (self.ask)(wanted_slot, used.head(count)?)? else {
                 continue;
             };
-            let Some(distance) = (self.dist)(i, id) else {
+            let Some(distance) = (self.dist)(wanted_slot, id) else {
                 continue;
             };
             sum += distance.get();
@@ -519,11 +530,11 @@ impl Picker<'_> {
         used: &mut [Option<ObjectId>],
         (mut count, mut leading): (usize, bool),
     ) -> GenieResult<()> {
-        for &i in wanted {
-            let id = (self.ask)(i, used.head(count)?)?;
-            formation.slots.checked_mut(i)?.unit_id = id;
+        for &wanted_slot in wanted {
+            let id = (self.ask)(wanted_slot, used.head(count)?)?;
+            formation.slots.checked_mut(wanted_slot)?.unit_id = id;
             if id.is_some() {
-                formation.slots.checked_mut(i)?.position_filled = 1;
+                formation.slots.checked_mut(wanted_slot)?.position_filled = 1;
                 if leading {
                     leading = false;
                     *used.checked_mut(0)? = id;
@@ -538,50 +549,60 @@ impl Picker<'_> {
 }
 
 /// [`World::assign_slots_by_variance`]'s search: from each starting member, the members in turn
-/// take their cheapest slot left (`preferences`), `s` pairs at most; the pairs of the least
+/// take their cheapest slot left (`preferences`), `preferred` pairs at most; the pairs of the least
 /// variance win.
 fn best_assignment(
     preferences: &[i32],
     costs: &[f32],
-    (n, s): (usize, usize),
+    (size, preferred): (usize, usize),
 ) -> GenieResult<Pairs> {
     let mut taken = [false; ASSIGNMENT_MARKS];
     let mut kept = ([-1i32; ASSIGNMENT_SIDE], [-1i32; ASSIGNMENT_SIDE]);
     let mut best_variance = FARTHEST;
-    for start in 0..n {
-        if s == 0 {
+    for start in 0..size {
+        if preferred == 0 {
             continue;
         }
-        taken.head_mut(s)?.fill(false);
-        let (pairs, sum, placed) = take_turns(start, (preferences, costs), (n, s), &mut taken)?;
+        taken.head_mut(preferred)?.fill(false);
+        let (pairs, sum, placed) =
+            take_turns(start, (preferences, costs), (size, preferred), &mut taken)?;
         if placed == 0 {
             continue;
         }
-        let variance =
-            pairs_variance(pairs.0.head(s)?, pairs.1.head(s)?, costs, n, sum / n as f32)?;
+        let variance = pairs_variance(
+            pairs.0.head(preferred)?,
+            pairs.1.head(preferred)?,
+            costs,
+            size,
+            sum / size as f32,
+        )?;
         if variance < best_variance {
             best_variance = variance;
-            kept.0.head_mut(s)?.copy_from_slice(pairs.0.head(s)?);
-            kept.1.head_mut(s)?.copy_from_slice(pairs.1.head(s)?);
+            kept.0
+                .head_mut(preferred)?
+                .copy_from_slice(pairs.0.head(preferred)?);
+            kept.1
+                .head_mut(preferred)?
+                .copy_from_slice(pairs.1.head(preferred)?);
         }
     }
     Ok(kept)
 }
 
 /// One start of [`best_assignment`]: from member `start` the members in turn take their cheapest
-/// slot left in `taken`, until `s` pairs are placed or a member finds none: the pairs, their
-/// costs' sum and their count.
+/// slot left in `taken`, until `preferred` pairs are placed or a member finds none: the pairs,
+/// their costs' sum and their count.
 fn take_turns(
     start: usize,
     (preferences, costs): (&[i32], &[f32]),
-    (n, s): (usize, usize),
+    (size, preferred): (usize, usize),
     taken: &mut [bool; ASSIGNMENT_MARKS],
 ) -> GenieResult<(Pairs, f32, usize)> {
     let mut pairs = ([-1i32; ASSIGNMENT_SIDE], [-1i32; ASSIGNMENT_SIDE]);
     let (mut placed, mut sum, mut member) = (0usize, 0.0f32, start);
-    while placed < s {
-        let row = member * n;
-        let slot = first_free(preferences, taken, row, s)?;
+    while placed < preferred {
+        let row = member * size;
+        let slot = first_free(preferences, taken, row, preferred)?;
         if slot == -1 {
             break;
         }
@@ -589,22 +610,28 @@ fn take_turns(
         *pairs.1.checked_mut(placed)? = slot;
         *taken.checked_mut(slot as usize)? = true;
         sum += *costs.checked(row + slot as usize)?;
-        member = if member + 1 < n { member + 1 } else { 0 };
+        member = if member + 1 < size { member + 1 } else { 0 };
         placed += 1;
     }
     Ok((pairs, sum, placed))
 }
 
-/// The first of a member's `s` preferred slots (the cells from `row`) not taken, -1 for none.
-fn first_free(preferences: &[i32], taken: &[bool], row: usize, s: usize) -> GenieResult<i32> {
-    let mut l = 0;
+/// The first of a member's `preferred` preferred slots (the cells from `row`) not taken, -1 for
+/// none.
+fn first_free(
+    preferences: &[i32],
+    taken: &[bool],
+    row: usize,
+    preferred: usize,
+) -> GenieResult<i32> {
+    let mut looked = 0;
     let mut slot = *preferences.checked(row)?;
     while slot != -1 && *taken.checked(slot as usize)? {
-        l += 1;
-        if s <= l {
+        looked += 1;
+        if preferred <= looked {
             return Ok(-1);
         }
-        slot = *preferences.checked(row + l)?;
+        slot = *preferences.checked(row + looked)?;
     }
     Ok(slot)
 }
@@ -612,20 +639,31 @@ fn first_free(preferences: &[i32], taken: &[bool], row: usize, s: usize) -> Geni
 /// A side of an assignment: the member and the slot of each pair.
 type Pairs = ([i32; ASSIGNMENT_SIDE], [i32; ASSIGNMENT_SIDE]);
 
-/// [`World::assign_slots_by_variance`]'s preferences: for each of the `n` members (rows of `n`
-/// cells in `costs`) its `s` slots from the cheapest on, the first untaken one winning a tie.
-pub(super) fn slot_preferences(costs: &[f32], n: usize, s: usize) -> GenieResult<Vec<i32>> {
+/// [`World::assign_slots_by_variance`]'s preferences: for each of the `size` members (rows of
+/// `size` cells in `costs`) its `preferred` slots from the cheapest on, the first untaken one
+/// winning a tie.
+pub(super) fn slot_preferences(
+    costs: &[f32],
+    size: usize,
+    preferred: usize,
+) -> GenieResult<Vec<i32>> {
     let mut preferences = vec![-1i32; ASSIGNMENT_CELLS];
     let mut taken = [false; ASSIGNMENT_MARKS];
-    for i in 0..n {
-        let row = i * n;
-        taken.head_mut(s)?.fill(false);
-        for index in 0..s {
-            let first = taken.head(s)?.iter().position(|&t| !t).unwrap_or(s);
+    for member in 0..size {
+        let row = member * size;
+        taken.head_mut(preferred)?.fill(false);
+        for index in 0..preferred {
+            let first = taken
+                .head(preferred)?
+                .iter()
+                .position(|&used| !used)
+                .unwrap_or(preferred);
             let mut best = first;
-            for j in first + 1..s {
-                if !*taken.checked(j)? && *costs.checked(row + j)? < *costs.checked(row + best)? {
-                    best = j;
+            for slot in first + 1..preferred {
+                if !*taken.checked(slot)?
+                    && *costs.checked(row + slot)? < *costs.checked(row + best)?
+                {
+                    best = slot;
                 }
             }
             *preferences.checked_mut(row + index)? = best as i32;
@@ -642,14 +680,14 @@ pub(super) fn pairs_variance(
     members: &[i32],
     slots: &[i32],
     costs: &[f32],
-    n: usize,
+    size: usize,
     mean: f32,
 ) -> GenieResult<f32> {
     let (mut variance, mut count) = (0.0f32, 0i32);
-    for (&r, &c) in members.iter().zip(slots) {
-        if r != -1 && c != -1 {
+    for (&member, &slot) in members.iter().zip(slots) {
+        if member != -1 && slot != -1 {
             count += 1;
-            let checked = *costs.checked(r as usize * n + c as usize)? - mean;
+            let checked = *costs.checked(member as usize * size + slot as usize)? - mean;
             variance += checked * checked;
         }
     }

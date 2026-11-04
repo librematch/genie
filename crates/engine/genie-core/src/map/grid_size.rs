@@ -57,8 +57,8 @@ impl GridSize {
 
 impl From<[i32; 2]> for GridSize {
     /// The size of two integers in their order (width, height), as a save holds them.
-    fn from(c: [i32; 2]) -> Self {
-        Self(c)
+    fn from(pair: [i32; 2]) -> Self {
+        Self(pair)
     }
 }
 

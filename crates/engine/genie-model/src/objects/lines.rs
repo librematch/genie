@@ -169,7 +169,7 @@ impl UnitLines {
     #[must_use]
     pub fn first_of(&self, line: LineId) -> Option<MasterId> {
         line.slot()
-            .and_then(|s| self.firsts.get(s))
+            .and_then(|slot| self.firsts.get(slot))
             .copied()
             .flatten()
     }
@@ -284,7 +284,7 @@ mod tests {
             ],
         );
         assert_eq!(
-            [1, 2, 3, 4].map(|m| lines.line_of(master_id(m))),
+            [1, 2, 3, 4].map(|master| lines.line_of(master_id(master))),
             [None, None, None, Some(LineId::of_data(-200))]
         );
         assert_eq!(

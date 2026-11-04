@@ -104,7 +104,7 @@ impl World {
                 .masters
                 .first()
                 .and_then(|masters| masters.get(master))
-                .and_then(|m| m.terrain_restriction)
+                .and_then(|master| master.terrain_restriction)
             {
                 self.pathing.register(restriction_id);
             }

@@ -26,8 +26,8 @@ impl Decoder {
     /// the commands' checks do not run: a list a check would have refused is left too.
     pub(super) fn prime(&mut self, frames: &[Frame<'_>]) {
         for frame in frames {
-            for p in &frame.commands {
-                let _ = self.command(p);
+            for packet in &frame.commands {
+                let _ = self.command(packet);
             }
         }
     }

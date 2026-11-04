@@ -121,12 +121,12 @@ pub(crate) const fn carrying(kind: Option<AttributeId>, amount: f32) -> Held {
     }
 }
 
-/// A player's `n` attributes (at least the four resources): food, wood, stone and gold from
+/// A player's `count` attributes (at least the four resources): food, wood, stone and gold from
 /// `resources`, the rest 0.
-pub(crate) fn attributes(n: usize, resources: [f32; 4]) -> Vec<Amount> {
-    let mut amounts = vec![Amount::ZERO; n.max(4)];
-    for (amount, r) in amounts.iter_mut().zip(resources) {
-        *amount = Amount::new(r);
+pub(crate) fn attributes(count: usize, resources: [f32; 4]) -> Vec<Amount> {
+    let mut amounts = vec![Amount::ZERO; count.max(4)];
+    for (amount, resource) in amounts.iter_mut().zip(resources) {
+        *amount = Amount::new(resource);
     }
     amounts
 }

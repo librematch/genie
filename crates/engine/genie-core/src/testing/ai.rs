@@ -12,22 +12,21 @@ use crate::players::PlayerKind;
 use crate::unit_ai::world_view::UnitView;
 use crate::unit_ai::{Surroundings, UnitAi};
 use crate::world::World;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 use crate::world::tests::in_update_filed;
 use crate::{GenieError, GenieResult};
 use std::mem::take;
 
-/// Runs `f` on object `me` of player `player` of `world` inside its update (dt 0, outside a turn),
-/// after the update's start took its sprite's facets
-/// ([`Unit::take_sprite_facets`](crate::objects::unit::Unit::take_sprite_facets)): on its unit
-/// AI, what the AI reads of the unit and the world, its side, its owner's type and the AI
-/// stream. The AI is the unit's again after it, the side's calls made on the world; a
-/// takeover they made ends the step as the unit's update ends it, and the list's loop hands the
-/// object to its new owner.
+/// Runs `work` on object `me` of player `player` of `world` inside its update (dt 0, outside a
+/// turn), after the update's start took its sprite's facets
+/// ([`Unit::take_sprite_facets`](crate::objects::unit::Unit::take_sprite_facets)): on its unit AI,
+/// what the AI reads of the unit and the world, its side, its owner's type and the AI stream. The
+/// AI is the unit's again after it, the side's calls made on the world; a takeover they made ends
+/// the step as the unit's update ends it, and the list's loop hands the object to its new owner.
 ///
 /// # Errors
 ///
-/// `f`'s, and what the unit's update and its AI's run do not model.
+/// `work`'s, and what the unit's update and its AI's run do not model.
 ///
 /// # Panics
 ///
@@ -35,7 +34,7 @@ use std::mem::take;
 pub(crate) fn run_ai<R>(
     world: &mut World,
     (player, me): (PlayerId, ObjectId),
-    f: impl FnOnce(
+    work: impl FnOnce(
         &mut UnitAi,
         &Surroundings,
         &mut UnitView<'_, '_>,
@@ -43,22 +42,22 @@ pub(crate) fn run_ai<R>(
         &mut Well512,
     ) -> GenieResult<R>,
 ) -> GenieResult<R> {
-    let i = world
+    let index = world
         .players
         .player(player)?
         .objects
         .iter()
-        .position(|u| u.id == me)
+        .position(|unit| unit.id == me)
         .expect("the unit in its player's list");
     in_update_filed(
         world,
-        (player, ListIndex::new(i)),
+        (player, ListIndex::new(index)),
         0,
         |unit, actions, step| {
-            unit.take_sprite_facets(step.w.parts.mover_mut(unit.id));
+            unit.take_sprite_facets(step.world.parts.mover_mut(unit.id));
             let mut answer = None;
             unit.run_ai(actions, step, |ai, at, side, kind, rng| {
-                answer = Some(f(ai, at, side, kind, rng)?);
+                answer = Some(work(ai, at, side, kind, rng)?);
                 Ok(())
             })?;
             let answer =

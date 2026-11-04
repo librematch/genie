@@ -60,17 +60,17 @@ pub fn not_inflating(at: usize) -> GenieError {
 
 /// One chapter: a compressed world save and the ops recorded after it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Chapter<'a> {
+pub struct Chapter<'data> {
     /// Position in the recording's chapter list; only chapter 0 starts with a [`Pregame`] record.
     pub index: usize,
     /// File offset of the chapter.
     pub offset: usize,
     /// The raw-deflate-compressed world save.
-    pub compressed_header: &'a [u8],
+    pub compressed_header: &'data [u8],
     /// File offset of the first op.
     pub body_offset: usize,
     /// The ops, up to the next chapter or the end of the file.
-    pub body: &'a [u8],
+    pub body: &'data [u8],
 }
 
 /// Split a recording into its chapters.
@@ -85,7 +85,7 @@ pub fn chapters(data: &[u8]) -> GenieResult<Vec<Chapter<'_>>> {
     loop {
         let word = |at: usize| {
             data.get(at..at + 4)
-                .map(|b| u32::from_le_bytes([b[0], b[1], b[2], b[3]]) as usize)
+                .map(|bytes| u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]) as usize)
         };
         let invalid = invalid_chapter(offset);
         let (header_end, next) = word(offset)
@@ -113,10 +113,10 @@ pub fn chapters(data: &[u8]) -> GenieResult<Vec<Chapter<'_>>> {
     }
 }
 
-impl<'a> Chapter<'a> {
+impl<'data> Chapter<'data> {
     /// The ops of this chapter.
     #[must_use]
-    pub const fn ops(&self) -> OpReader<'a> {
+    pub const fn ops(&self) -> OpReader<'data> {
         OpReader::new(self.body, self.body_offset, self.index == 0)
     }
 
@@ -180,7 +180,7 @@ mod tests {
     }
 
     fn le(words: &[u32]) -> Vec<u8> {
-        words.iter().flat_map(|w| w.to_le_bytes()).collect()
+        words.iter().flat_map(|word| word.to_le_bytes()).collect()
     }
 
     /// A recording with the given chapters, each a (compressed header, body) pair.

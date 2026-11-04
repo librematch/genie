@@ -1,7 +1,7 @@
 //! What a player sees: its visible map and the resource objects it knows of.
 
 use crate::area;
-use crate::element::ReadableHeaderElement;
+use crate::element::ReadHeader;
 use crate::fits;
 use crate::reader::RecordingHeaderReader;
 use crate::{ObjectId, PlayerId};
@@ -25,7 +25,7 @@ pub struct VisibleMap {
     pub tiles: Vec<i8>,
 }
 
-impl ReadableHeaderElement for VisibleMap {
+impl ReadHeader for VisibleMap {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let mut map = Self {
             width: input.read_u32::<LE>()?,
@@ -54,7 +54,7 @@ pub struct VisibleResource {
     pub location: (u8, u8),
 }
 
-impl ReadableHeaderElement for VisibleResource {
+impl ReadHeader for VisibleResource {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         Ok(Self {
             object_id: input.read_u32::<LE>()?.into(),
@@ -72,7 +72,7 @@ pub struct VisibleResources {
     pub(super) lists: Vec<Vec<VisibleResource>>,
 }
 
-impl ReadableHeaderElement for VisibleResources {
+impl ReadHeader for VisibleResources {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let num_lists = input.read_u32::<LE>()?;
         let sizes = read_list(fits(num_lists)?, || {

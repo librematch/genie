@@ -29,7 +29,7 @@ impl UnitView<'_, '_> {
         force: OrderForce,
         ai: &UnitAi,
     ) -> GenieResult<Attacked> {
-        let roles = &self.c.w.model.roles.clone();
+        let roles = &self.step.world.model.roles.clone();
         self.start_attack_now(target, force, ai, roles)
     }
 
@@ -56,26 +56,26 @@ impl UnitView<'_, '_> {
         ai: &mut UnitAi,
         rng: &mut Well512,
     ) -> GenieResult<()> {
-        let roles = &self.c.w.model.roles.clone();
-        let held = self.c.side_notifies.take().unwrap_or_default();
+        let roles = &self.step.world.model.roles.clone();
+        let held = self.step.side_notifies.take().unwrap_or_default();
         let posted = held
             .into_iter()
             .try_for_each(|(notify, state)| ai.post(notify, state));
-        self.c.w.return_unit_ai(self.unit.id, take(ai));
-        swap(self.c.w.streams.get(Stream::Ai), rng);
+        self.step.world.return_unit_ai(self.unit.id, take(ai));
+        swap(self.step.world.streams.get_mut(Stream::Ai), rng);
         let class = self
             .unit
-            .master(self.c.w.master_tables(), self.c.player)
+            .master(self.step.world.master_tables(), self.step.player)
             .map(|master| master.class);
         let done = class.and_then(|class| {
             posted.and_then(|()| {
                 self.unit
-                    .run_effect(self.actions, effect, Some(class), self.c, roles)
+                    .run_effect(self.actions, effect, Some(class), self.step, roles)
             })
         });
-        swap(self.c.w.streams.get(Stream::Ai), rng);
-        self.c.side_notifies = Some(Vec::new());
-        *ai = self.c.w.lend_unit_ai(self.unit.id).ok_or_else(|| {
+        swap(self.step.world.streams.get_mut(Stream::Ai), rng);
+        self.step.side_notifies = Some(Vec::new());
+        *ai = self.step.world.lend_unit_ai(self.unit.id).ok_or_else(|| {
             GenieError::unreachable("a call of the unit AI took the unit's AI")
                 .with("object", self.unit.id)
         })?;
@@ -90,7 +90,7 @@ impl UnitView<'_, '_> {
     ///
     /// What the AI's hear logic does not model.
     pub(crate) fn owner_hears(&mut self, notify: Notify) -> GenieResult<()> {
-        let roles = &self.c.w.model.roles.clone();
+        let roles = &self.step.world.model.roles.clone();
         self.hears(notify, roles)
     }
 
@@ -101,8 +101,8 @@ impl UnitView<'_, '_> {
     ///
     /// The commands the slice holds no action for.
     pub(crate) fn command(&mut self, command: UnitCommand) -> GenieResult<Answer> {
-        let roles = &self.c.w.model.roles.clone();
-        let slots = self.c.w.model.slots;
+        let roles = &self.step.world.model.roles.clone();
+        let slots = self.step.world.model.slots;
         match command {
             UnitCommand::Repair(target) => self.repair_command(target, slots, roles),
             UnitCommand::Enter(target) => self.enter_command(target, slots, roles),
@@ -111,7 +111,7 @@ impl UnitView<'_, '_> {
                 to,
                 over_wall: false,
             } => {
-                self.c.lend_at(
+                self.step.lend_at(
                     (&mut *self.unit, &mut *self.actions),
                     |world, player_id, list_index| world.transport_order(player_id, list_index, to),
                 )?;
@@ -136,8 +136,8 @@ impl UnitView<'_, '_> {
     ///
     /// What the task search does not model.
     pub(crate) fn wait_solidify(&mut self, target: ObjectId) -> GenieResult<Answer> {
-        let roles = &self.c.w.model.roles.clone();
-        let slots = self.c.w.model.slots;
+        let roles = &self.step.world.model.roles.clone();
+        let slots = self.step.world.model.slots;
         self.start_wait_now(target, slots, roles)
     }
 
@@ -150,7 +150,7 @@ impl UnitView<'_, '_> {
     ///
     /// What the stop does not model.
     pub(crate) fn group_attack_stop(&mut self) -> GenieResult<()> {
-        let Some(mover) = self.c.w.parts.mover_mut(self.unit.id) else {
+        let Some(mover) = self.step.world.parts.mover_mut(self.unit.id) else {
             return Ok(());
         };
         let speeding = mover

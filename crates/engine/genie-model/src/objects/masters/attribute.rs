@@ -503,8 +503,11 @@ mod tests {
         for index in (70..=77).chain(82..=91).chain([131]) {
             assert!(MasterAttribute::numbered(index).shows_sprite(), "{index}");
         }
-        for n in [69, 78, 81, 92, 130, 132] {
-            assert!(!MasterAttribute::numbered(n).shows_sprite(), "{n}");
+        for number in [69, 78, 81, 92, 130, 132] {
+            assert!(
+                !MasterAttribute::numbered(number).shows_sprite(),
+                "{number}"
+            );
         }
     }
 }

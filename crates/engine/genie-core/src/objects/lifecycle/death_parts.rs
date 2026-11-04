@@ -32,7 +32,12 @@ use crate::{GenieError, GenieResult};
 /// The owner's attributes 237, 238 and 239: a built farm's bonus ([`farm_bonus`]);
 /// −1 for those the player has not got.
 pub(crate) fn farm_bonus(attributes: &[Amount]) -> FarmBonus {
-    let at = |i: usize| attributes.get(i).copied().unwrap_or(Amount::new(-1.0));
+    let at = |attribute: usize| {
+        attributes
+            .get(attribute)
+            .copied()
+            .unwrap_or(Amount::new(-1.0))
+    };
     FarmBonus {
         amount: at(237),
         resource: at(238),
@@ -74,7 +79,7 @@ pub(crate) fn forget_resource(
         return Ok(());
     }
     if let (Some(visibility_master), Some(visibility)) = (
-        master.filter(|m| m.auto_gather.is_on()),
+        master.filter(|master| master.auto_gather.is_on()),
         spatial.sight.as_mut(),
     ) {
         visibility.forget_resource(id, position, visibility_master.gather_group)?;
@@ -290,9 +295,9 @@ pub(crate) fn storage_leaves(
         if let Some(kind) = kind
             && Amount::ZERO < amount
             && flag & 0x10 != 0
-            && let Some(e) = combat.store.iter_mut().find(|e| e.0 == kind)
+            && let Some(stored) = combat.store.iter_mut().find(|entry| entry.0 == kind)
         {
-            e.1 -= amount;
+            stored.1 -= amount;
         }
     }
     adds
@@ -331,8 +336,8 @@ pub(crate) fn clear_look_of(
 /// `FUN_1411ec020`, -1), the ownership change (`FUN_14120f800`, -1 then 1 for the new owner) and
 /// the master change (`FUN_141186580` through `FUN_141209d90`, -1 then 1 with the new master).
 pub(crate) fn count_class(attributes: &mut [Amount], master: &Master, by: f32, roles: &Roles) {
-    let mut add = |i: usize| {
-        if let Some(amount) = attributes.get_mut(i) {
+    let mut add = |attribute: usize| {
+        if let Some(amount) = attributes.get_mut(attribute) {
             *amount += Amount::new(by);
         }
     };

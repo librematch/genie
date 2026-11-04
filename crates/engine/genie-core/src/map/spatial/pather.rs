@@ -47,20 +47,20 @@ impl Spatial {
     /// walk's box, grown by `buffer`, that the unit's `mask` lacks ([`Spatial::put_tile_records`];
     /// they stay with those of the pather's earlier walks until `FindShortPath` removes them,
     /// [`Spatial::clear_tile_records`]): the records whose box, grown by `buffer`, meets the walk
-    /// `a` -> `b` (`FUN_1410512f0`, a circle's `FUN_141051630` alike), whose cell the query visits
-    /// ([`Spatial::visits`]) and whose id is not in `ignore` (the manager's list `+0x2c`, the
-    /// pather's). An object that moves (its record's `+3` bit 0x10, set from slot 0x5c8 at the end
-    /// of its update, [`Gait::moving`]) is left out, as is a gate the player may pass (slot 0x678,
-    /// not modelled). [`HitLimit::First`] stops at the first hit (`FUN_141052350`); else at the
-    /// 25th (`FUN_141051900`). The hits are in the tiles' row order, then by id; the game's are in
-    /// its grid's order, which its callers do not read. A walk whose grown box leaves the map is
+    /// `from` -> `point` (`FUN_1410512f0`, a circle's `FUN_141051630` alike), whose cell the query
+    /// visits ([`Spatial::visits`]) and whose id is not in `ignore` (the manager's list `+0x2c`,
+    /// the pather's). An object that moves (its record's `+3` bit 0x10, set from slot 0x5c8 at the
+    /// end of its update, [`Gait::moving`]) is left out, as is a gate the player may pass (slot
+    /// 0x678, not modelled). [`HitLimit::First`] stops at the first hit (`FUN_141052350`); else at
+    /// the 25th (`FUN_141051900`). The hits are in the tiles' row order, then by id; the game's are
+    /// in its grid's order, which its callers do not read. A walk whose grown box leaves the map is
     /// blocked (`FUN_141052350`) or meets the map's edge records first ([`Spatial::edge_records`]).
     ///
     /// [`Gait::moving`]: crate::map::spatial::Gait::moving
     pub(super) fn pather_query(
         &mut self,
-        a: Point,
-        b: Point,
+        from: Point,
+        point: Point,
         buffer: Option<Distance>,
         mask: TerrainMask,
         (ignore, by_id): (&[RecordId], ObjectsRef<'_>),
@@ -68,12 +68,28 @@ impl Spatial {
     ) -> GenieResult<Vec<Hit>> {
         const MOST_HITS: usize = 25;
         let roles = by_id.roles();
-        let lo_x = if b.x() <= a.x() { b.x() } else { a.x() };
-        let hi_x = if a.x() <= b.x() { b.x() } else { a.x() };
-        let lo_y = if b.y() <= a.y() { b.y() } else { a.y() };
-        let hi_y = if a.y() <= b.y() { b.y() } else { a.y() };
+        let lo_x = if point.x() <= from.x() {
+            point.x()
+        } else {
+            from.x()
+        };
+        let hi_x = if from.x() <= point.x() {
+            point.x()
+        } else {
+            from.x()
+        };
+        let lo_y = if point.y() <= from.y() {
+            point.y()
+        } else {
+            from.y()
+        };
+        let hi_y = if from.y() <= point.y() {
+            point.y()
+        } else {
+            from.y()
+        };
         let distance = buffer.unwrap_or(Distance::ZERO);
-        self.put_tile_records(a, b, distance, mask);
+        self.put_tile_records(from, point, distance, mask);
         let walk_box = Rect::new(lo_x, lo_y, hi_x, hi_y);
         let grown = walk_box.grown(distance);
         let mut hits = Vec::new();
@@ -84,7 +100,7 @@ impl Spatial {
             }
         }
         self.check_known_records(grown)?;
-        let walk = Segment { from: a, to: b };
+        let walk = Segment { from, to: point };
         let meets = |kind: ObstructionKind, bx: Rect| {
             walk_box.overlaps(bx.grown(distance)) && record_meets_segment(kind, bx, distance, walk)
         };
@@ -141,34 +157,34 @@ impl Spatial {
         Ok(hits)
     }
 
-    /// Whether the old short pather's walk `a` -> `b` meets a record ([`Spatial::pather_query`]:
-    /// `FUN_141052b90`, then `FUN_141052350` with flags 0x40).
+    /// Whether the old short pather's walk `from` -> `point` meets a record
+    /// ([`Spatial::pather_query`]: `FUN_141052b90`, then `FUN_141052350` with flags 0x40).
     pub fn pather_blocked(
         &mut self,
-        a: Point,
-        b: Point,
+        from: Point,
+        point: Point,
         buffer: Option<Distance>,
         mask: TerrainMask,
         ignore: &[RecordId],
         by_id: ObjectsRef<'_>,
     ) -> GenieResult<bool> {
         Ok(!self
-            .pather_query(a, b, buffer, mask, (ignore, by_id), HitLimit::First)?
+            .pather_query(from, point, buffer, mask, (ignore, by_id), HitLimit::First)?
             .is_empty())
     }
 
-    /// The records the old short pather's walk `a` -> `b` meets, at most 25
+    /// The records the old short pather's walk `from` -> `point` meets, at most 25
     /// ([`Spatial::pather_query`]: `FUN_141052b90`, then `FUN_141051900` with flags 0x40).
     pub fn pather_hits(
         &mut self,
-        a: Point,
-        b: Point,
+        from: Point,
+        point: Point,
         buffer: Option<Distance>,
         mask: TerrainMask,
         ignore: &[RecordId],
         by_id: ObjectsRef<'_>,
     ) -> GenieResult<Vec<Hit>> {
-        self.pather_query(a, b, buffer, mask, (ignore, by_id), HitLimit::Most)
+        self.pather_query(from, point, buffer, mask, (ignore, by_id), HitLimit::Most)
     }
 }
 
@@ -189,12 +205,12 @@ impl Spatial {
         use crate::math::conversions::cvttss2si;
         let (x0, y0, x1, y1) = (rect.x0(), rect.y0(), rect.x1(), rect.y1());
         // the manager's map size as floats (+0xa8, +0xac)
-        let (w, h) = (self.map.width() as f32, self.map.height() as f32);
+        let (width, height) = (self.map.width() as f32, self.map.height() as f32);
         let (dx, dy) = (x1 - x0, y1 - y0);
         let (dy0, dx0) = (y0 - 0.0, x0 - 0.0);
-        let at = |t: f32| {
-            let x = cvttss2si(dx * t + x0);
-            let y = cvttss2si(dy * t + y0);
+        let at = |fraction: f32| {
+            let x = cvttss2si(dx * fraction + x0);
+            let y = cvttss2si(dy * fraction + y0);
             Hit {
                 id: RecordId::Edge(Tile::new(x, y)),
                 bounds: Rect::new(x as f32, y as f32, x as f32 + 1.0, y as f32 + 1.0),
@@ -203,23 +219,27 @@ impl Spatial {
         let mut hits = Vec::new();
         let mut edges: [Option<f32>; 4] = [None; 4];
         if x0 < 0.0 {
-            let hh = h - 0.0;
+            let hh = height - 0.0;
             edges[0] = Some((dy0 * 0.0 - hh * dx0) / (dx * hh - dy * 0.0));
         }
         if y0 < 0.0 {
-            let hh = h - 0.0;
+            let hh = height - 0.0;
             edges[1] = Some((hh * dy0 - dx0 * 0.0) / (dx * 0.0 - hh * dy));
         }
-        if w < x1 {
-            let hh = h - 0.0;
-            edges[2] = Some(((w - w) * dy0 - (x0 - w) * hh) / (hh * dx - (w - w) * dy));
+        if width < x1 {
+            let hh = height - 0.0;
+            edges[2] = Some(
+                ((width - width) * dy0 - (x0 - width) * hh) / (hh * dx - (width - width) * dy),
+            );
         }
-        if h < y1 {
-            let ww = w - 0.0;
-            edges[3] = Some(((y0 - h) * ww - (h - h) * dx0) / ((h - h) * dx - ww * dy));
+        if height < y1 {
+            let ww = width - 0.0;
+            edges[3] = Some(
+                ((y0 - height) * ww - (height - height) * dx0) / ((height - height) * dx - ww * dy),
+            );
         }
-        for t in edges.into_iter().flatten() {
-            hits.push(at(t));
+        for fraction in edges.into_iter().flatten() {
+            hits.push(at(fraction));
             if cap <= hits.len() {
                 break;
             }
@@ -252,24 +272,24 @@ pub(super) fn ccw(p0: Point, p1: Point, p2: Point) -> i32 {
 /// ([`Spatial::segment_meets`]) against them and those of the pass's earlier walks; the pass's
 /// end removes them ([`Spatial::clear_tile_records`]).
 #[derive(Debug)]
-pub struct SmoothingWalls<'a> {
-    pub(super) world: &'a mut Spatial,
+pub struct SmoothingWalls<'world> {
+    pub(super) world: &'world mut Spatial,
     pub(super) radius: Distance,
     pub(super) mask: TerrainMask,
-    pub(super) ignore: &'a [RecordId],
+    pub(super) ignore: &'world [RecordId],
     /// Whether a walk was tested.
     pub(crate) ran: bool,
 }
 
-impl<'a> SmoothingWalls<'a> {
+impl<'world> SmoothingWalls<'world> {
     /// The test of a unit `radius` wide (the manager's buffer) whose terrain mask is `mask`,
     /// with the manager's ignore list `ignore`.
     #[must_use]
     pub const fn new(
-        world: &'a mut Spatial,
+        world: &'world mut Spatial,
         radius: Distance,
         mask: TerrainMask,
-        ignore: &'a [RecordId],
+        ignore: &'world [RecordId],
     ) -> Self {
         Self {
             world,
@@ -282,12 +302,13 @@ impl<'a> SmoothingWalls<'a> {
 }
 
 impl<E> SegmentTest<E> for SmoothingWalls<'_> {
-    fn blocked(&mut self, a: Point, b: Point) -> Result<bool, E> {
+    fn blocked(&mut self, from: Point, to: Point) -> Result<bool, E> {
         self.ran = true;
         // the pass's buffer, the unit's radius (FUN_1410562d0 with 1)
         self.world.set_manager_buffer(Some(self.radius));
-        self.world.put_tile_records(a, b, self.radius, self.mask);
-        Ok(self.world.segment_meets(a, b, self.radius, self.ignore))
+        self.world
+            .put_tile_records(from, to, self.radius, self.mask);
+        Ok(self.world.segment_meets(from, to, self.radius, self.ignore))
     }
 
     fn pass_ends(&mut self) {
@@ -307,23 +328,23 @@ pub(super) struct WalkTest {
 }
 
 impl WalkTest {
-    /// The walk from `a` to `b` of a unit `grow` wide; None when its grown box leaves a map of
+    /// The walk from `from` to `to` of a unit `grow` wide; None when its grown box leaves a map of
     /// `map` tiles (the query then counts as met).
-    pub(super) fn new(a: Point, b: Point, grow: Distance, map: GridSize) -> Option<Self> {
+    pub(super) fn new(from: Point, to: Point, grow: Distance, map: GridSize) -> Option<Self> {
         let lo = Point::new(
-            if b.x() <= a.x() { b.x() } else { a.x() },
-            if b.y() <= a.y() { b.y() } else { a.y() },
+            if to.x() <= from.x() { to.x() } else { from.x() },
+            if to.y() <= from.y() { to.y() } else { from.y() },
         );
         let hi = Point::new(
-            if a.x() <= b.x() { b.x() } else { a.x() },
-            if a.y() <= b.y() { b.y() } else { a.y() },
+            if from.x() <= to.x() { to.x() } else { from.x() },
+            if from.y() <= to.y() { to.y() } else { from.y() },
         );
         let query = Rect::between(lo, hi).grown(grow);
         if query.leaves_map(map) {
             return None;
         }
         Some(Self {
-            walk: Segment { from: a, to: b },
+            walk: Segment { from, to },
             lo,
             hi,
             grow,
@@ -370,24 +391,36 @@ pub(super) fn record_meets_segment(
     }
 }
 
-/// The four edges of box `rect` grown by `r`, each tested against the walk
+/// The four edges of box `rect` grown by `grow`, each tested against the walk
 /// (`FUN_141052ca0`: `FUN_141054ec0`), then the inside tests of the walk's ends against `inside`
-/// grown by `r`. `FUN_141052ca0` also lists each crossing (record, id, point) at the manager's
+/// grown by `grow`. `FUN_141052ca0` also lists each crossing (record, id, point) at the manager's
 /// `+0x40` while its `+0x54` is set; `FUN_141051900` sets `+0x54` only for a list at `+0x40`
 /// with a cap `+0x50` of at least 1, and nothing gives the manager one: the only stores to
 /// `+0x40`, `+0x48` and `+0x50` in its code (0x14104f000..0x141060000) are its constructor's
 /// and `FUN_1410560b0`'s zeros, and none of the routines that address it through
 /// `DAT_143f0a088` writes them. So the listing never runs, and the edges' order (the
 /// `FUN_1410512f0` tests all four, `FUN_141052e10` stops at the first crossing) does not show.
-pub(super) fn segment_meets_box(rect: Rect, r: f32, walk: Segment, inside: Rect) -> bool {
+pub(super) fn segment_meets_box(rect: Rect, grow: f32, walk: Segment, inside: Rect) -> bool {
     let (bx0, by0, bx1, by1) = (rect.x0(), rect.y0(), rect.x1(), rect.y1());
     let (lo_x, lo_y, hi_x, hi_y) = (inside.x0(), inside.y0(), inside.x1(), inside.y1());
     let (start, end) = (walk.from, walk.to);
     let edges = [
-        (Point::new(bx0 - r, by0 - r), Point::new(r + bx1, by0 - r)),
-        (Point::new(r + bx1, by0 - r), Point::new(r + bx1, r + by1)),
-        (Point::new(r + bx1, r + by1), Point::new(bx0 - r, r + by1)),
-        (Point::new(bx0 - r, r + by1), Point::new(bx0 - r, by0 - r)),
+        (
+            Point::new(bx0 - grow, by0 - grow),
+            Point::new(grow + bx1, by0 - grow),
+        ),
+        (
+            Point::new(grow + bx1, by0 - grow),
+            Point::new(grow + bx1, grow + by1),
+        ),
+        (
+            Point::new(grow + bx1, grow + by1),
+            Point::new(bx0 - grow, grow + by1),
+        ),
+        (
+            Point::new(bx0 - grow, grow + by1),
+            Point::new(bx0 - grow, by0 - grow),
+        ),
     ];
     if edges
         .iter()
@@ -398,10 +431,10 @@ pub(super) fn segment_meets_box(rect: Rect, r: f32, walk: Segment, inside: Rect)
     // COMISS/JC (0x141052fb8..0x141052ff9, 0x1410530dc..0x141053119; 0x1410514ad..0x141051620,
     // 0x14105189e..0x1410518f2): a NaN coordinate is out
     let outside = |point: Point| {
-        below_or_unordered(point.x(), lo_x - r)
-            || below_or_unordered(r + hi_x, point.x())
-            || below_or_unordered(point.y(), lo_y - r)
-            || below_or_unordered(r + hi_y, point.y())
+        below_or_unordered(point.x(), lo_x - grow)
+            || below_or_unordered(grow + hi_x, point.x())
+            || below_or_unordered(point.y(), lo_y - grow)
+            || below_or_unordered(grow + hi_y, point.y())
     };
     !(outside(start) && outside(end))
 }

@@ -20,7 +20,7 @@ pub(super) fn master_melee_armor(armored: &Armored) -> DamageAmount {
         armored
             .armors
             .iter()
-            .filter(|e| of.is_none_or(|damage_class| damage_class == e.class))
+            .filter(|class_amount| of.is_none_or(|damage_class| damage_class == class_amount.class))
             .fold(DamageAmount::LEAST, |damage_amount, class_amount| {
                 if damage_amount < class_amount.amount {
                     class_amount.amount
@@ -70,8 +70,14 @@ pub(super) fn class_armor(
         armored
             .armors
             .iter()
-            .filter(|e| e.class == damage_class)
-            .fold(from, |m, e| if m < e.amount { e.amount } else { m })
+            .filter(|class_amount| class_amount.class == damage_class)
+            .fold(from, |damage_amount, class_amount| {
+                if damage_amount < class_amount.amount {
+                    class_amount.amount
+                } else {
+                    damage_amount
+                }
+            })
     };
     let any = |from: DamageAmount| {
         armored
@@ -228,14 +234,14 @@ pub fn armor_damage(
                 && 0.0 < attack
                 && pierce_or_melee
                 && charges(attacker, own_class, kind, roles);
-            let c = if charge {
+            let charge_attack = if charge {
                 charge_damage(attacker)?
             } else {
                 0.0
             };
-            if 0.0 < c {
+            if 0.0 < charge_attack {
                 charged = true;
-                attack += c + 0.0;
+                attack += charge_attack + 0.0;
             } else {
                 attack += 0.0;
             }
@@ -254,9 +260,9 @@ pub fn armor_damage(
             armor_f = if armor_f < 0.0 { armor_f } else { 0.0 };
             below = true;
         }
-        let v = (attack - armor_f) * factor * terrain * resist;
-        if 0.0 < v || below {
-            sum += v;
+        let class_damage = (attack - armor_f) * factor * terrain * resist;
+        if 0.0 < class_damage || below {
+            sum += class_damage;
         }
     }
     let least = if attacker.mode_680.is_one() { 0.0 } else { 1.0 };

@@ -30,7 +30,7 @@ use crate::world::layer::Slots;
 use crate::world::layer::generated::MoveToTuning;
 use crate::world::lets::take;
 use crate::world::others::OthersRef;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 use crate::world::step::Step;
 use crate::{GenieError, GenieResult};
 
@@ -132,10 +132,10 @@ impl HuntAction {
             // failed or its target let go: the hunt waits and the unit's animation stops
             SubCode::Failed | SubCode::TargetGone => {
                 self.timer = DROP_WAIT;
-                set_walker_anim(step.w.parts.motion_mut(unit.id), Speed::new(0.0));
+                set_walker_anim(step.world.parts.motion_mut(unit.id), Speed::new(0.0));
                 return Ok(Dropped::Going);
             }
-            SubCode::Done => self.tear_down(step.w.parts.mover_mut(unit.id))?,
+            SubCode::Done => self.tear_down(step.world.parts.mover_mut(unit.id))?,
         }
         let site = site.ok_or(GenieError::unsupported(
             "a drop-off whose drop site is gone",
@@ -145,13 +145,13 @@ impl HuntAction {
                 "a drop site that does not take the load (set_state 2)",
             ));
         }
-        if step.w.model.tuning.hunt.drop_reach < site.gap_squared.get() {
+        if step.world.model.tuning.hunt.drop_reach < site.gap_squared.get() {
             self.timer = DROP_WAIT;
-            set_walker_anim(step.w.parts.motion_mut(unit.id), Speed::new(0.0));
+            set_walker_anim(step.world.parts.motion_mut(unit.id), Speed::new(0.0));
             return Ok(Dropped::Going);
         }
-        let attributes = step.w.players.player(step.player)?.attributes.len();
-        let kind = resource_kind(unit.life.attribute_kind, attributes, step.w.model.slots);
+        let attributes = step.world.players.player(step.player)?.attributes.len();
+        let kind = resource_kind(unit.life.attribute_kind, attributes, step.world.model.slots);
         let amount = unit.life.amount;
         unit.life.attribute_kind = None;
         unit.life.amount = Amount::ZERO;
@@ -194,9 +194,9 @@ impl HuntAction {
             attack.tear_down(mover.as_deref_mut())?;
         }
         if self.state.take_move_to().is_some()
-            && let Some(m) = mover
+            && let Some(mover) = mover
         {
-            m.stop()?;
+            mover.stop()?;
         }
         Ok(())
     }
@@ -232,27 +232,27 @@ impl Unit {
         step: &mut Step<'_>,
         roles: &Roles,
     ) -> GenieResult<()> {
-        let (mover, by_id) = step
-            .w
-            .parts
-            .lend_mover(self.id, (&step.w.players, &step.w.index, &step.w.model));
+        let (mover, by_id) = step.world.parts.lend_mover(
+            self.id,
+            (&step.world.players, &step.world.index, &step.world.model),
+        );
         let drop_world = DropWorld {
             masters: by_id.masters().of(step.player),
-            spatial: &mut step.w.spatial,
-            zones: &mut step.w.zones,
-            pathing: &mut step.w.pathing,
-            object: step.w.streams.get(Stream::Object),
-            world_time: step.w.world_time,
-            player_kind: step.w.players.player(step.player)?.kind,
-            groups: &step.w.groups,
+            spatial: &mut step.world.spatial,
+            zones: &mut step.world.zones,
+            pathing: &mut step.world.pathing,
+            object: step.world.streams.get_mut(Stream::Object),
+            world_time: step.world.world_time,
+            player_kind: step.world.players.player(step.player)?.kind,
+            groups: &step.world.groups,
         };
-        let others = OthersRef::of(&step.w.players, &step.w.index, step.player)?;
+        let others = OthersRef::of(&step.world.players, &step.world.index, step.player)?;
         if let Some(site) = self.drop_off_in(
             (hunt, actions),
             mover,
             drop_world,
             others,
-            &step.w.model.graphics,
+            &step.world.model.graphics,
             by_id,
         )? {
             let by = self.releaser(step)?;

@@ -52,67 +52,67 @@ pub struct Mesh {
     pub free: Option<ShapeId>,
 }
 
-/// Which sides of the existing shape `o` (`lo`) and the new shape `n` (`hi`) a corner of their
-/// overlap lies on, and whether it lies on both along one line (`FUN_140fdb8d0`,
+/// Which sides of the existing shape `bounds` (`lo`) and the new shape `fixed_rect` (`hi`) a corner
+/// of their overlap lies on, and whether it lies on both along one line (`FUN_140fdb8d0`,
 /// 0x140fdbcb0..0x140fdbddc, transliterated from the disassembly: each test overwrites what an
 /// earlier one set); None when the corner yields no contact.
 fn classify(
     fixed_point: FixedPoint,
-    o: FixedRect,
-    n: FixedRect,
+    bounds: FixedRect,
+    fixed_rect: FixedRect,
 ) -> Option<(ShapeSide, ShapeSide, bool)> {
     let [cx, cy] = fixed_point.get();
     let (mut lo, mut hi) = (ShapeSide::LowY, ShapeSide::LowY);
     let (mut collinear, mut found) = (false, false);
     let mut by_new_y = false;
-    if cx == o.x0() {
+    if cx == bounds.x0() {
         lo = ShapeSide::LowX;
-        if cx == n.x0() {
+        if cx == fixed_rect.x0() {
             hi = ShapeSide::LowX;
             collinear = true;
             found = true;
         } else {
             by_new_y = true;
         }
-    } else if cx == o.x1() {
+    } else if cx == bounds.x1() {
         lo = ShapeSide::HighX;
-        if cx == n.x1() {
+        if cx == fixed_rect.x1() {
             hi = ShapeSide::HighX;
             collinear = true;
             found = true;
         } else {
             by_new_y = true;
         }
-    } else if cx == n.x0() {
+    } else if cx == fixed_rect.x0() {
         hi = ShapeSide::LowX;
-        if cy == o.y0() {
+        if cy == bounds.y0() {
             lo = ShapeSide::LowY;
-            if cy == n.y0() {
+            if cy == fixed_rect.y0() {
                 hi = ShapeSide::LowY;
                 collinear = true;
             }
             found = true;
-        } else if cy == o.y1() {
+        } else if cy == bounds.y1() {
             lo = ShapeSide::HighY;
-            if cy == n.y1() {
+            if cy == fixed_rect.y1() {
                 hi = ShapeSide::HighY;
                 collinear = true;
             }
             found = true;
         }
-    } else if cx == n.x1() {
+    } else if cx == fixed_rect.x1() {
         hi = ShapeSide::HighX;
-        if cy == o.y0() {
+        if cy == bounds.y0() {
             lo = ShapeSide::LowY;
-            if cy == n.y0() {
+            if cy == fixed_rect.y0() {
                 hi = ShapeSide::LowY;
                 collinear = true;
             }
             found = true;
         }
-        if cy == o.y1() {
+        if cy == bounds.y1() {
             lo = ShapeSide::HighY;
-            if cy == n.y1() {
+            if cy == fixed_rect.y1() {
                 hi = ShapeSide::HighY;
                 collinear = true;
             }
@@ -120,16 +120,16 @@ fn classify(
         }
     }
     if by_new_y {
-        if cy == n.y0() {
+        if cy == fixed_rect.y0() {
             hi = ShapeSide::LowY;
-            if cy == o.y0() {
+            if cy == bounds.y0() {
                 lo = ShapeSide::LowY;
                 collinear = true;
             }
             found = true;
-        } else if cy == n.y1() {
+        } else if cy == fixed_rect.y1() {
             hi = ShapeSide::HighY;
-            if cy == o.y1() {
+            if cy == bounds.y1() {
                 lo = ShapeSide::HighY;
                 collinear = true;
             }
@@ -144,17 +144,17 @@ fn classify(
 /// counts as its last tile (an unsigned compare).
 fn tile_range(fixed_rect: FixedRect, width: u32) -> (u32, u32, u32, u32) {
     let last = width.wrapping_sub(1);
-    let low = |v: i32| if v < 0 { 0 } else { (v >> 22) as u32 };
-    let high = |v: i32| {
-        let v = if v < 0 {
-            v.wrapping_add(0x3f_ffff) & !0x3f_ffff
+    let low = |value: i32| if value < 0 { 0 } else { (value >> 22) as u32 };
+    let high = |raw: i32| {
+        let value = if raw < 0 {
+            raw.wrapping_add(0x3f_ffff) & !0x3f_ffff
         } else {
-            v
+            raw
         };
-        (v >> 22) as u32
+        (value >> 22) as u32
     };
-    let hold_low = |t: u32| if last < t { last } else { t };
-    let hold_high = |t: u32| if t <= last { t } else { last };
+    let hold_low = |tile: u32| if last < tile { last } else { tile };
+    let hold_high = |tile: u32| if tile <= last { tile } else { last };
     (
         hold_low(low(fixed_rect.x0())),
         hold_low(low(fixed_rect.y0())),
@@ -164,8 +164,8 @@ fn tile_range(fixed_rect: FixedRect, width: u32) -> (u32, u32, u32, u32) {
 }
 
 /// The overlap of two rectangles (`FUN_14087c550` of the larger lows and smaller highs).
-const fn overlap(a: FixedRect, b: FixedRect) -> FixedRect {
-    let ([ax0, ay0, ax1, ay1], [bx0, by0, bx1, by1]) = (a.get(), b.get());
+const fn overlap(first: FixedRect, second: FixedRect) -> FixedRect {
+    let ([ax0, ay0, ax1, ay1], [bx0, by0, bx1, by1]) = (first.get(), second.get());
     FixedRect::new(
         if ax0 < bx0 { bx0 } else { ax0 },
         if ay0 < by0 { by0 } else { ay0 },
@@ -174,9 +174,9 @@ const fn overlap(a: FixedRect, b: FixedRect) -> FixedRect {
     )
 }
 
-/// Half of `v`, truncated: the game's `(v << 22 + bias) >> 23`.
-fn half(v: i32) -> FixedDistance {
-    let wide = i64::from(v) << 22;
+/// Half of `value`, truncated: the game's `(value << 22 + bias) >> 23`.
+fn half(value: i32) -> FixedDistance {
+    let wide = i64::from(value) << 22;
     let bias = (wide >> 63) & 0x7f_ffff;
     FixedDistance::new(((wide + bias) >> 23) as i32)
 }
@@ -206,7 +206,7 @@ impl Mesh {
     /// the contacts of each corner of its overlap with every shape it overlaps, met tile by tile
     /// in the tiles' order. Returns its id.
     pub fn add(&mut self, rect: FixedRect) -> ShapeId {
-        let n = FixedRect::new(
+        let shape = FixedRect::new(
             rect.x0() & !1,
             rect.y0() & !1,
             rect.x1().wrapping_add(1) & !1,
@@ -218,27 +218,27 @@ impl Mesh {
                 .get(id.index())
                 .and_then(|fixed_rect| ShapeId::of_link(fixed_rect.x0()));
             if let Some(slot) = self.shapes.get_mut(id.index()) {
-                *slot = n;
+                *slot = shape;
             }
             id
         } else {
-            self.shapes.push(n);
+            self.shapes.push(shape);
             self.sides.push(Default::default());
             ShapeId::new((self.shapes.len() - 1) as u32)
         };
-        let (tx0, ty0, tx1, ty1) = tile_range(n, self.width);
+        let (tx0, ty0, tx1, ty1) = tile_range(shape, self.width);
         let mut visited = HashSet::new();
         for ty in ty0..=ty1 {
             for tx in tx0..=tx1 {
-                let t = (ty * self.width + tx) as usize;
-                let mut k = 0;
-                while let Some(&shape_id) = self.tiles.get(t).and_then(|list| list.get(k)) {
+                let tile = (ty * self.width + tx) as usize;
+                let mut index = 0;
+                while let Some(&shape_id) = self.tiles.get(tile).and_then(|list| list.get(index)) {
                     if visited.insert(shape_id) {
                         self.touch(shape_id, id);
                     }
-                    k += 1;
+                    index += 1;
                 }
-                if let Some(list) = self.tiles.get_mut(t) {
+                if let Some(list) = self.tiles.get_mut(tile) {
                     list.push(id);
                 }
             }
@@ -246,11 +246,13 @@ impl Mesh {
         id
     }
 
-    /// The contacts between an existing shape `o` and the new shape `n`: one per corner of their
-    /// overlap that lies on both outlines.
-    fn touch(&mut self, o: ShapeId, n: ShapeId) {
-        let (Some(&or), Some(&nr)) = (self.shapes.get(o.index()), self.shapes.get(n.index()))
-        else {
+    /// The contacts between an existing shape `old_shape` and the new shape `new_shape`: one per
+    /// corner of their overlap that lies on both outlines.
+    fn touch(&mut self, old_shape: ShapeId, new_shape: ShapeId) {
+        let (Some(&or), Some(&nr)) = (
+            self.shapes.get(old_shape.index()),
+            self.shapes.get(new_shape.index()),
+        ) else {
             return;
         };
         let overlap = overlap(nr, or);
@@ -274,11 +276,11 @@ impl Mesh {
             };
             if collinear {
                 // the owner: the shape with the junction as a corner, o before n at each corner
-                let owner = (0..4).find_map(|j| {
-                    if or.corner(j) == fixed_point {
-                        Some((o, n))
-                    } else if nr.corner(j) == fixed_point {
-                        Some((n, o))
+                let owner = (0..4).find_map(|corner| {
+                    if or.corner(corner) == fixed_point {
+                        Some((old_shape, new_shape))
+                    } else if nr.corner(corner) == fixed_point {
+                        Some((new_shape, old_shape))
                     } else {
                         None
                     }
@@ -287,17 +289,25 @@ impl Mesh {
                     // the game would index slot -1 here (0x140fdbf7a)
                     continue;
                 };
-                let (Some(&a), Some(&b)) = (
+                let (Some(&old_rect), Some(&new_rect)) = (
                     self.shapes.get(other.index()),
                     self.shapes.get(owner.index()),
                 ) else {
                     continue;
                 };
                 let flag = match lo {
-                    ShapeSide::LowY => fixed_point.x() == a.x0() || fixed_point.x() == b.x0(),
-                    ShapeSide::HighX => fixed_point.y() == a.y0() || fixed_point.y() == b.y0(),
-                    ShapeSide::HighY => fixed_point.x() == a.x1() || fixed_point.x() == b.x1(),
-                    ShapeSide::LowX => fixed_point.y() == a.y1() || fixed_point.y() == b.y1(),
+                    ShapeSide::LowY => {
+                        fixed_point.x() == old_rect.x0() || fixed_point.x() == new_rect.x0()
+                    }
+                    ShapeSide::HighX => {
+                        fixed_point.y() == old_rect.y0() || fixed_point.y() == new_rect.y0()
+                    }
+                    ShapeSide::HighY => {
+                        fixed_point.x() == old_rect.x1() || fixed_point.x() == new_rect.x1()
+                    }
+                    ShapeSide::LowX => {
+                        fixed_point.y() == old_rect.y1() || fixed_point.y() == new_rect.y1()
+                    }
                 };
                 self.contact(
                     (owner, lo),
@@ -312,9 +322,9 @@ impl Mesh {
                 );
             } else if hi.next() == lo {
                 self.contact(
-                    (o, lo),
+                    (old_shape, lo),
                     Contact {
-                        other: n,
+                        other: new_shape,
                         side: hi,
                         at: fixed_point,
                         along: along(lo),
@@ -324,9 +334,9 @@ impl Mesh {
                 );
             } else if hi.prev() == lo {
                 self.contact(
-                    (n, hi),
+                    (new_shape, hi),
                     Contact {
-                        other: o,
+                        other: old_shape,
                         side: lo,
                         at: fixed_point,
                         along: along(hi),
@@ -359,9 +369,9 @@ impl Mesh {
         let mut visited = HashSet::new();
         for ty in ty0..=ty1 {
             for tx in tx0..=tx1 {
-                let t = (ty * self.width + tx) as usize;
-                let mut k = 0;
-                while let Some(&shape_id) = self.tiles.get(t).and_then(|list| list.get(k)) {
+                let tile = (ty * self.width + tx) as usize;
+                let mut index = 0;
+                while let Some(&shape_id) = self.tiles.get(tile).and_then(|list| list.get(index)) {
                     if visited.insert(shape_id)
                         && let Some(sides) = self.sides.get_mut(shape_id.index())
                     {
@@ -369,9 +379,9 @@ impl Mesh {
                             side.retain(|contact| contact.other != id);
                         }
                     }
-                    k += 1;
+                    index += 1;
                 }
-                if let Some(list) = self.tiles.get_mut(t)
+                if let Some(list) = self.tiles.get_mut(tile)
                     && let Some(at) = list.iter().position(|&x| x == id)
                 {
                     let _ = list.remove(at);
@@ -407,8 +417,8 @@ impl Mesh {
 mod tests {
     use super::*;
 
-    fn tile_box(x: i32, y: i32, w: i32, h: i32) -> FixedRect {
-        FixedRect::new(x * ONE, y * ONE, (x + w) * ONE, (y + h) * ONE)
+    fn tile_box(x: i32, y: i32, width: i32, height: i32) -> FixedRect {
+        FixedRect::new(x * ONE, y * ONE, (x + width) * ONE, (y + height) * ONE)
     }
 
     #[test]
@@ -432,14 +442,14 @@ mod tests {
         // tile right of and below it; 63's left side crosses 61's bottom at (94.5, 44.5)
         let mut mesh = Mesh::new(120);
         let at = |x: f32, y: f32| [(x * ONE as f32) as i32, (y * ONE as f32) as i32];
-        let rect = |a: [i32; 2], b: [i32; 2]| FixedRect::new(a[0], a[1], b[0], b[1]);
-        let a = mesh.add(rect(at(93.5, 44.5), at(95.5, 46.5)));
-        let shape_id = mesh.add(rect(at(94.5, 43.5), at(96.5, 45.5)));
+        let rect = |low: [i32; 2], high: [i32; 2]| FixedRect::new(low[0], low[1], high[0], high[1]);
+        let left_shape = mesh.add(rect(at(93.5, 44.5), at(95.5, 46.5)));
+        let right_shape = mesh.add(rect(at(94.5, 43.5), at(96.5, 45.5)));
         // the game's contact on the left shape's bottom: `3f 3 17a00000 b200000 17a00000 0 200000`
         assert_eq!(
-            mesh.sides[a.index()][0],
+            mesh.sides[left_shape.index()][0],
             [Contact {
-                other: shape_id,
+                other: right_shape,
                 side: ShapeSide::LowX,
                 at: FixedPoint::new(0x17a0_0000, 0x0b20_0000),
                 along: 0x17a0_0000,
@@ -448,15 +458,23 @@ mod tests {
             }]
         );
         // removing the second shape clears every contact with it
-        mesh.remove(shape_id);
-        assert_eq!(mesh.sides[a.index()].iter().map(Vec::len).sum::<usize>(), 0);
+        mesh.remove(right_shape);
+        assert_eq!(
+            mesh.sides[left_shape.index()]
+                .iter()
+                .map(Vec::len)
+                .sum::<usize>(),
+            0
+        );
         assert_eq!(mesh.shapes.len(), 1);
     }
 
     #[test]
     fn freed_slot_is_reused_last_in_first_out() {
         let mut mesh = Mesh::new(16);
-        let ids: Vec<ShapeId> = (0..4).map(|i| mesh.add(tile_box(2 * i, 0, 1, 1))).collect();
+        let ids: Vec<ShapeId> = (0..4)
+            .map(|index| mesh.add(tile_box(2 * index, 0, 1, 1)))
+            .collect();
         mesh.remove(ids[1]);
         mesh.remove(ids[2]);
         assert_eq!(mesh.free, Some(ids[2]));

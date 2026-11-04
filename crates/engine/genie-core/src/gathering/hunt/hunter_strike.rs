@@ -25,7 +25,7 @@ use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::OwnerMasters;
-use crate::objects::masters::PlayersMasters;
+use crate::objects::masters::PlayersMastersExt;
 use crate::objects::unit::Unit;
 use crate::objects::unit::object_master;
 use crate::players::Amount;
@@ -33,7 +33,7 @@ use crate::world::HUNTER_MASTER;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
 use crate::world::others::OthersRef;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 use crate::world::step::Step;
 use crate::{GenieError, GenieResult};
 
@@ -54,15 +54,15 @@ impl Unit {
         roles: &Roles,
     ) -> GenieResult<()> {
         let master = object_master(
-            step.w.parts.own_master.get(self.id),
+            step.world.parts.own_master.get(self.id),
             (self.id, self.life.master_id),
-            step.w.model.masters.of(step.player),
+            step.world.model.masters.of(step.player),
         )?;
         let victim = hunt_victim(step, hunt, roles)?;
         let own = own.take().ok_or(HUNTER_MASTER)?;
         let herd = self.herd_for(
             step,
-            OthersRef::of(&step.w.players, &step.w.index, step.player)?,
+            OthersRef::of(&step.world.players, &step.world.index, step.player)?,
             hunt,
             master,
             &victim,
@@ -77,7 +77,9 @@ impl Unit {
         // the retaliation's kill of the unit itself, which follows its step; it changes the
         // unit's actions only by livestock's change to Gaia, and livestock hunts nothing: the
         // game goes on with the Hunt itself
-        if let Some(kill) = self.hit_back(fight.own, step.w.parts.ai_and_combat_mut(self.id)?)? {
+        if let Some(kill) =
+            self.hit_back(fight.own, step.world.parts.ai_and_combat_mut(self.id)?)?
+        {
             let own = KillLeft::own(self.id, kill);
             file_kill(step, (self, actions), own, roles)?;
         }
@@ -103,37 +105,37 @@ impl Unit {
         tree_lost: bool,
         roles: &Roles,
     ) -> GenieResult<HuntReads> {
-        let owner = step.w.players.player(step.player)?;
+        let owner = step.world.players.player(step.player)?;
         let productivity = (hunt.task.productivity)
             .and_then(|attribute_id| owner.attributes.get(attribute_id.index()))
             .copied()
             .filter(|&amount| Amount::ZERO < amount)
             .unwrap_or(Amount::new(1.0));
-        let g = |id: Option<SpriteId>| {
-            id.and_then(|sprite_id| step.w.model.graphics.get(sprite_id).copied())
+        let graphic_of = |id: Option<SpriteId>| {
+            id.and_then(|sprite_id| step.world.model.graphics.get(sprite_id).copied())
         };
         Ok(HuntReads {
             defaults: MoveDefaults::of(
                 master,
-                step.w.parts.combat_of(self.id).abilities.look.as_ref(),
+                step.world.parts.combat_of(self.id).abilities.look.as_ref(),
                 roles,
             ),
             attack: AttackReads::of(
-                step.w.parts.combat_of(self.id),
+                step.world.parts.combat_of(self.id),
                 master,
                 (
                     OwnerMasters::new(
-                        &step.w.parts.own_master,
-                        step.w.model.masters.of(step.player),
+                        &step.world.parts.own_master,
+                        step.world.model.masters.of(step.player),
                     ),
-                    &step.w.model.graphics,
+                    &step.world.model.graphics,
                 ),
-                step.w.parts.unit_ai.get(self.id),
-                (owner.kind, step.w.world_time),
+                step.world.parts.unit_ai.get(self.id),
+                (owner.kind, step.world.world_time),
                 roles,
-                &step.w.model.tuning.turn,
+                &step.world.model.tuning.turn,
             ),
-            work_rate: step.w.parts.combat_of(self.id).work_rate_powerup
+            work_rate: step.world.parts.combat_of(self.id).work_rate_powerup
                 + master.action_part().work_rate,
             capacity: Amount::of_master(master.capacity),
             productivity,
@@ -142,20 +144,20 @@ impl Unit {
             } else {
                 DecayRule::Runs
             },
-            has_ai: step.w.parts.unit_ai.contains(self.id),
+            has_ai: step.world.parts.unit_ai.contains(self.id),
             ai_class: step
-                .w
+                .world
                 .parts
                 .unit_ai
                 .get(self.id)
                 .and_then(|ai| ai.target_class),
             tree_searched: tree_lost,
-            predator_hunts_end: step.w.settings.predator_hunts_end(),
+            predator_hunts_end: step.world.settings.predator_hunts_end(),
             sprites: HuntSprites {
-                moving: g(hunt.task.sprites.moving),
-                working: g(hunt.task.sprites.working),
-                carrying: g(hunt.task.sprites.carrying),
-                standing: g(master.standing_sprite),
+                moving: graphic_of(hunt.task.sprites.moving),
+                working: graphic_of(hunt.task.sprites.working),
+                carrying: graphic_of(hunt.task.sprites.carrying),
+                standing: graphic_of(master.standing_sprite),
             },
             herd,
         })
@@ -173,7 +175,7 @@ impl Unit {
         step: &mut Step<'_>,
         roles: &Roles,
     ) -> GenieResult<()> {
-        let tree = step.w.parts.unit_ai.get(self.id).is_some_and(|ai| {
+        let tree = step.world.parts.unit_ai.get(self.id).is_some_and(|ai| {
             let class = ai.target_class.or(hunt.target_class);
             roles.of_some_class(class).contains(ClassRoles::TREE)
         });
@@ -182,13 +184,13 @@ impl Unit {
                 (hunt, actions),
                 step,
                 None,
-                Some(Distance::new(step.w.model.tuning.hunt.tree_near)),
+                Some(Distance::new(step.world.model.tuning.hunt.tree_near)),
                 roles,
             )? == TreeSearch::Found
         {
             return Ok(());
         }
-        let torn = hunt.tear_down(step.w.parts.mover_mut(self.id));
+        let torn = hunt.tear_down(step.world.parts.mover_mut(self.id));
         if torn.is_ok() {
             hunt.state = HuntState::Search;
         }
@@ -229,29 +231,29 @@ impl Unit {
             return Ok(None);
         }
         let at = |id: Option<ObjectId>| {
-            step.w
+            step.world
                 .spatial
                 .get_known(id)?
                 .ok_or(GenieError::unsupported("a hunt's object without a place"))
         };
         let (me_at, them) = (at(Some(self.id))?, at(Some(target.id()))?);
         let speed = step
-            .w
+            .world
             .parts
             .mover_of(self.id)
             .map_or(Speed::ZERO, |mover| mover.stats.speed);
         let engagement = engagement(
-            step.w.parts.unit_ai.get(self.id),
+            step.world.parts.unit_ai.get(self.id),
             speed,
             master,
             me_at,
             them,
-            step.w.world_time,
+            step.world.world_time,
         )?;
         let moving = action.task.walk_sprite_id(self.life.held());
         let arms = arms(
             master,
-            &step.w.model.graphics,
+            &step.world.model.graphics,
             action.task.sprites,
             moving,
             roles,
@@ -260,25 +262,29 @@ impl Unit {
         let drop_site = if !own {
             None
         } else if let Some(site_id) = action.drop_site {
-            let site = step.w.spatial.get(site_id);
-            site.map(|s| {
-                let distance_squared =
-                    footprint_gap_squared(them.position, them.radius, s.position, s.radius);
+            let site = step.world.spatial.get(site_id);
+            site.map(|placed| {
+                let distance_squared = footprint_gap_squared(
+                    them.position,
+                    them.radius,
+                    placed.position,
+                    placed.radius,
+                );
                 (site_id, distance_squared)
             })
         } else {
-            if step.w.players.player(step.player)?.kind.is_computer() {
+            if step.world.players.player(step.player)?.kind.is_computer() {
                 return Err(GenieError::unsupported(
                     "a computer player's hunt of its livestock (its drop-site search)",
                 ));
             }
             let sites: Vec<MasterId> = step
-                .w
+                .world
                 .model
                 .drop_sites
                 .iter()
-                .filter(|d| d.livestock)
-                .map(|d| d.building)
+                .filter(|drop_site| drop_site.livestock)
+                .map(|drop_site| drop_site.building)
                 .collect();
             nearest_drop_site(others, &sites, them.position)
                 .map(|(id, _)| -> GenieResult<(DropSiteId, DistanceSquared)> {
@@ -299,10 +305,10 @@ impl Unit {
         let animal = others.get(Some(target));
         let idle = match animal {
             Some(unit) => step
-                .w
+                .world
                 .parts
                 .actions_of(unit.id)
-                .top_action_idle(step.w.parts.unread.get(unit.id))?,
+                .top_action_idle(step.world.parts.unread.get(unit.id))?,
             None => false,
         };
         Ok(Some(Herd {
@@ -314,7 +320,7 @@ impl Unit {
             idle,
             special_graphic: match master.creatable_part().special_sprite {
                 Some(sprite_id) if master.kind == MasterKind::COMBAT => {
-                    Some(step.w.model.graphics.get(sprite_id).copied().ok_or(
+                    Some(step.world.model.graphics.get(sprite_id).copied().ok_or(
                         GenieError::unsupported("a special graphic the data file does not have"),
                     )?)
                 }

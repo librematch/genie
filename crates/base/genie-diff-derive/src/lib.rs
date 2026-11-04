@@ -86,8 +86,10 @@ fn how(field: &syn::Field) -> syn::Result<How> {
                 let named = |step: &str| {
                     step.chars()
                         .next()
-                        .is_some_and(|c| c.is_alphabetic() || c == '_')
-                        && step.chars().all(|c| c.is_alphanumeric() || c == '_')
+                        .is_some_and(|character| character.is_alphabetic() || character == '_')
+                        && step
+                            .chars()
+                            .all(|character| character.is_alphanumeric() || character == '_')
                 };
                 if !steps.split('.').all(named) {
                     return Err(
@@ -109,7 +111,7 @@ fn how(field: &syn::Field) -> syn::Result<How> {
 fn compare(how: &How, name: Option<&str>, left: &Tokens, right: &Tokens) -> Tokens {
     let name = how.path.as_deref().or(name);
     let call = match (name, how.eq) {
-        (Some(n), false) => quote! { d.field(#n, #left, #right); },
+        (Some(name), false) => quote! { d.field(#name, #left, #right); },
         (Some(text), true) => quote! { d.equal_field(#text, #left, #right); },
         (None, false) => quote! { ::genie_diff::Diff::diff(#left, #right, d); },
         (None, true) => quote! { d.equal(#left, #right); },
@@ -129,9 +131,9 @@ fn step_names(fields: &Fields) -> Vec<Option<String>> {
             .iter()
             .map(|field| field.ident.as_ref().map(|ident| ident.unraw().to_string()))
             .collect(),
-        Fields::Unnamed(f) if f.unnamed.len() == 1 => vec![None],
+        Fields::Unnamed(unnamed) if unnamed.unnamed.len() == 1 => vec![None],
         Fields::Unnamed(fields_unnamed) => (0..fields_unnamed.unnamed.len())
-            .map(|i| Some(i.to_string()))
+            .map(|index| Some(index.to_string()))
             .collect(),
         Fields::Unit => Vec::new(),
     }
@@ -139,10 +141,10 @@ fn step_names(fields: &Fields) -> Vec<Option<String>> {
 
 fn struct_body(fields: &Fields) -> syn::Result<Tokens> {
     let mut out = Vec::new();
-    for ((i, field), name) in fields.iter().enumerate().zip(step_names(fields)) {
+    for ((position, field), name) in fields.iter().enumerate().zip(step_names(fields)) {
         let member = field.ident.as_ref().map_or_else(
             || {
-                let index = Index::from(i);
+                let index = Index::from(position);
                 quote!(#index)
             },
             |ident| quote!(#ident),
@@ -163,9 +165,9 @@ fn bindings(variant: &syn::Variant, side: &str) -> (Vec<Ident>, Tokens) {
         .fields
         .iter()
         .enumerate()
-        .map(|(i, f)| {
-            f.ident.as_ref().map_or_else(
-                || format_ident!("{side}_{i}"),
+        .map(|(index, field)| {
+            field.ident.as_ref().map_or_else(
+                || format_ident!("{side}_{index}"),
                 |ident| format_ident!("{side}_{}", ident.unraw()),
             )
         })
@@ -185,10 +187,10 @@ fn enum_body(variants: &[&syn::Variant]) -> syn::Result<Tokens> {
     if variants.is_empty() {
         return Ok(quote! { let _ = (other, d); match *self {} });
     }
-    let names = variants.iter().map(|v| {
-        let ident = &v.ident;
+    let names = variants.iter().map(|variant| {
+        let ident = &variant.ident;
         let text = ident.unraw().to_string();
-        let pattern = match &v.fields {
+        let pattern = match &variant.fields {
             Fields::Named(_) => quote! { Self::#ident { .. } },
             Fields::Unnamed(_) => quote! { Self::#ident(..) },
             Fields::Unit => quote! { Self::#ident },
@@ -196,21 +198,21 @@ fn enum_body(variants: &[&syn::Variant]) -> syn::Result<Tokens> {
         quote! { #pattern => #text }
     });
     let mut arms = Vec::new();
-    for v in variants.iter().filter(|v| !v.fields.is_empty()) {
-        let (left, left_pattern) = bindings(v, "left");
-        let (right, right_pattern) = bindings(v, "right");
+    for variant in variants.iter().filter(|variant| !variant.fields.is_empty()) {
+        let (left, left_pattern) = bindings(variant, "left");
+        let (right, right_pattern) = bindings(variant, "right");
         let mut body = Vec::new();
-        for ((field, name), (l, r)) in v
+        for ((field, name), (left, right)) in variant
             .fields
             .iter()
-            .zip(step_names(&v.fields))
+            .zip(step_names(&variant.fields))
             .zip(left.iter().zip(&right))
         {
             body.push(compare(
                 &how(field)?,
                 name.as_deref(),
-                &quote!(#l),
-                &quote!(#r),
+                &quote!(#left),
+                &quote!(#right),
             ));
         }
         arms.push(quote! { (#left_pattern, #right_pattern) => { #(#body)* } });

@@ -401,16 +401,22 @@ mod tests {
 
     /// Scenario data of `version` with 16 players' lists, each named and with its files.
     fn scenario(version: f32) -> RgeScen {
-        let named = |what: &str| (0..16).map(|i| Some(format!("{what}{i}"))).collect();
+        let named = |what: &str| {
+            (0..16)
+                .map(|index| Some(format!("{what}{index}")))
+                .collect()
+        };
         RgeScen {
             version,
             player_names: named("player"),
-            player_string_table: (0..16u32).map(|i| Some(StringKey::from(i * 10))).collect(),
+            player_string_table: (0..16u32)
+                .map(|index| Some(StringKey::from(index * 10)))
+                .collect(),
             player_base_properties: (0..16)
-                .map(|i| PlayerBaseProperties {
-                    posture: i,
+                .map(|index| PlayerBaseProperties {
+                    posture: index,
                     player_kind: 2,
-                    civilization: i + 1,
+                    civilization: index + 1,
                     active: 1,
                 })
                 .collect(),
@@ -427,10 +433,10 @@ mod tests {
             player_city_plans: named("plan"),
             player_ai_rules: named("rules"),
             player_files: (0..16)
-                .map(|i| PlayerFiles {
-                    build_list: Some(format!("b{i}")),
+                .map(|index| PlayerFiles {
+                    build_list: Some(format!("b{index}")),
                     city_plan: None,
-                    ai_rules: Some(format!("(defrule {i})")),
+                    ai_rules: Some(format!("(defrule {index})")),
                 })
                 .collect(),
             ai_rules_kinds: (0..16).collect(),
@@ -464,8 +470,8 @@ mod tests {
             let scen = scenario(version);
             let back = round_trip(
                 version,
-                |o| scen.write_players(o, version),
-                |rge_scen, i| rge_scen.read_players(i),
+                |output| scen.write_players(output, version),
+                |rge_scen, input| rge_scen.read_players(input),
             );
             let named = 1.13 < version;
             assert_eq!(back.player_names[3].is_some(), named, "{version}");
@@ -509,13 +515,13 @@ mod tests {
             let scen = scenario(version);
             let back = round_trip(
                 version,
-                |o| {
-                    scen.write_string_tables(&mut *o, version)?;
-                    scen.write_texts(o, version)
+                |output| {
+                    scen.write_string_tables(&mut *output, version)?;
+                    scen.write_texts(output, version)
                 },
-                |rge_scen, i| {
-                    rge_scen.read_string_tables(&mut *i)?;
-                    rge_scen.read_texts(i)
+                |rge_scen, input| {
+                    rge_scen.read_string_tables(&mut *input)?;
+                    rge_scen.read_texts(input)
                 },
             );
             assert_eq!(back.description.as_deref(), Some("about"));
@@ -537,8 +543,8 @@ mod tests {
             assert_eq!(bytes.len(), len, "{version}");
             let back = round_trip(
                 version,
-                |o| scen.write_cinematics(o, version),
-                |rge_scen, i| rge_scen.read_cinematics(i),
+                |output| scen.write_cinematics(output, version),
+                |rge_scen, input| rge_scen.read_cinematics(input),
             );
             assert_eq!(back.pregame_cinematic.as_deref(), Some("intro"));
             assert_eq!(back.mission_bmp, None);
@@ -553,8 +559,8 @@ mod tests {
             let scen = scenario(version);
             let back = round_trip(
                 version,
-                |o| scen.write_player_files(o, version),
-                |rge_scen, i| rge_scen.read_player_files(i),
+                |output| scen.write_player_files(output, version),
+                |rge_scen, input| rge_scen.read_player_files(input),
             );
             assert_eq!(back.player_build_lists[2].as_deref(), Some("build2"));
             assert_eq!(back.player_files[2].build_list.as_deref(), Some("b2"));

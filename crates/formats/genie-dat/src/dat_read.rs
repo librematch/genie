@@ -124,7 +124,7 @@ fn read_sounds(mut input: impl Read, file_version: FileVersion) -> GenieResult<V
 fn read_sprites(mut input: impl Read) -> GenieResult<Vec<Option<Sprite>>> {
     let num_sprites = input.read_u16::<LE>()?;
     let sprites_exist = read_list(num_sprites.into(), || {
-        input.read_u32::<LE>().map(|n| n != 0)
+        input.read_u32::<LE>().map(|flag| flag != 0)
     })?;
     let mut sprites = vec![];
     for exists in sprites_exist {

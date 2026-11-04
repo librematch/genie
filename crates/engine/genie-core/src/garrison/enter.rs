@@ -22,7 +22,7 @@ use crate::objects::masters::ActionKind;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::OwnerMasters;
-use crate::objects::masters::PlayersMasters;
+use crate::objects::masters::PlayersMastersExt;
 use crate::objects::masters::Task;
 use crate::objects::unit::Unit;
 use crate::orders::GARRISON;
@@ -41,7 +41,7 @@ use crate::unit_ai::{AiMove, Notify, NotifyKind};
 use crate::world::Player;
 use crate::world::World;
 use crate::world::index::{ObjectsRef, Place};
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 use crate::{GenieError, GenieResult};
 
 /// Where a unit's new Enter goes: its own action list, or under the Artifact on top as its
@@ -90,7 +90,7 @@ impl World {
                 Some((target.id(), class)),
                 point,
                 notifies,
-                self.streams.get(Stream::Ai),
+                self.streams.get_mut(Stream::Ai),
             )?;
             self.remember_order(player, idx, (Some(OrderKind::Enter), Some(AiAction::Enter)))?;
         }
@@ -207,13 +207,13 @@ impl World {
         target: ObjectId,
         task: &Task,
     ) -> GenieResult<(EnterAction, ContainerId, ClassId)> {
-        let (tp, t) = self
+        let (tp, unit) = self
             .object(target)
             .ok_or(GenieError::unsupported("an Enter whose building is gone"))?;
         let target = ContainerId::new(
-            if t.master(self.master_tables(), tp)?.kind == MasterKind::BUILDING {
+            if unit.master(self.master_tables(), tp)?.kind == MasterKind::BUILDING {
                 self.parts
-                    .building_of(t.id)
+                    .building_of(unit.id)
                     .annex_of
                     .map_or(target, MainBuildingId::id)
             } else {
@@ -369,7 +369,7 @@ impl World {
             self.parts.motion.layer_mut(unit.id),
             masters,
             &self.model.graphics,
-            self.streams.get(Stream::Sprite),
+            self.streams.get_mut(Stream::Sprite),
             self.model.tuning.sprite,
         )?;
         Ok(Notify::own(
@@ -541,7 +541,7 @@ impl World {
             pathing: &mut self.pathing,
             now: self.world_time,
             player_kind: self.players.player(tp)?.kind,
-            object: self.streams.get(Stream::Object),
+            object: self.streams.get_mut(Stream::Object),
             groups: &self.groups,
         };
         if !ship_reaches(
@@ -587,7 +587,7 @@ impl World {
         let inside = self
             .players
             .iter()
-            .flat_map(|p| p.objects.iter().chain(&p.sleeping))
+            .flat_map(|player| player.objects.iter().chain(&player.sleeping))
             .filter(|target_unit| target_unit.life.inside == Some(target))
             .count();
         let Some(Place::Live(..)) = self.place(target) else {
@@ -641,7 +641,7 @@ impl World {
 /// [`UNPLACED`] for an object the world does not place.
 fn placed_object(players: &[Player], place: Option<Place>) -> GenieResult<&Unit> {
     match place {
-        Some(Place::Live(p, i)) => players.live(p, i),
+        Some(Place::Live(owner, slot)) => players.live(owner, slot),
         Some(Place::Sleeping(player_id, list_index)) => players.asleep(player_id, list_index),
         None => Err(UNPLACED),
     }

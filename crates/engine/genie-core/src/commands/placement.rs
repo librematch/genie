@@ -20,8 +20,8 @@ use crate::production::spawn::SiteChecks;
 use crate::production::spawn::{BuildSite, WorldMap, build_placement};
 use crate::world::World;
 use crate::world::layer::MasterRoles;
-use crate::world::slots::CheckedIndex;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::CheckedIndexExt;
+use crate::world::slots::PlayerSlotsExt;
 use crate::{GenieError, GenieResult};
 
 impl World {
@@ -58,8 +58,8 @@ impl World {
         )?;
         let mut listed = [0i16; 4];
         for (resource, amount, _) in cost_entries(&site.creatable_part().cost) {
-            if let Some(r) = resource.is_resource().then(|| resource.index()) {
-                let entry = listed.checked_mut(r)?;
+            if let Some(index) = resource.is_resource().then(|| resource.index()) {
+                let entry = listed.checked_mut(index)?;
                 *entry = entry.wrapping_add(amount.get());
             }
         }

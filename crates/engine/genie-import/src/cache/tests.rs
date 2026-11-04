@@ -28,9 +28,10 @@ fn small_table() -> MasterTable {
         MasterKind::BUILDING,
     ];
     let civ = CivId::new(1);
-    let id = |i: usize| MasterId::named(i16::try_from(i).unwrap());
+    let id = |index: usize| MasterId::named(i16::try_from(index).unwrap());
     let mut master_table = MasterTable::from_rows(
-        (0..kinds.len()).map(|i| ((civ, id(i)), MasterData::default(), DefaultAction::None)),
+        (0..kinds.len())
+            .map(|index| ((civ, id(index)), MasterData::default(), DefaultAction::None)),
     );
     for (index, &kind) in kinds.iter().enumerate() {
         let class = if index == 0 {
@@ -84,9 +85,9 @@ fn cut_off_bytes_do_not_decode() {
 fn the_cache_returns_what_it_wrote_and_nothing_for_another_key() {
     let dir = scratch("cache");
     let table = small_table();
-    let k = key(&[("a", b"1")], &[0; 32]);
-    write_cached(&dir, &k, &table).unwrap();
-    assert_eq!(read_cached(&dir, &k).unwrap(), Some(table));
+    let cache_key = key(&[("a", b"1")], &[0; 32]);
+    write_cached(&dir, &cache_key, &table).unwrap();
+    assert_eq!(read_cached(&dir, &cache_key).unwrap(), Some(table));
     let other = key(&[("a", b"2")], &[0; 32]);
     assert_eq!(read_cached(&dir, &other).unwrap(), None);
     assert!(read_dir(&dir).unwrap().all(|dir_entry| {

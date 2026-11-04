@@ -88,10 +88,10 @@ impl World {
     /// first member of the group it names (none when that has no members); None for an object
     /// or a group the world does not hold.
     fn attacked_object(&self, group: GroupId) -> Option<ObjectId> {
-        let g = self.groups.get(group)?;
-        let target = g.current_target.target;
+        let group = self.groups.get(group)?;
+        let target = group.current_target.target;
         if let GroupTarget::Object(id) = target {
-            return self.world_object(id).map(|o| o.id());
+            return self.world_object(id).map(|world_object| world_object.id());
         }
         // any other kind names a group, whose first member is the target
         let first = self.groups.get(target.group()?)?.members.first()?.id;
@@ -203,8 +203,8 @@ impl World {
                 .held(group)?
                 .unit_kinds
                 .iter()
-                .find(|s| s.formation_category == category)
-                .filter(|s| !s.units.is_empty())
+                .find(|unit_kind_statistic| unit_kind_statistic.formation_category == category)
+                .filter(|unit_kind_statistic| !unit_kind_statistic.units.is_empty())
                 .map(|unit_kind_statistic: &UnitKindStatistic| {
                     (
                         unit_kind_statistic.units.clone(),
@@ -251,7 +251,9 @@ impl World {
             world_object.master_id(self.model.slots),
         )?;
         let moves = match world_object {
-            WorldObject::Unit(_, u, _) => self.parts.mover_of(u.id).is_some_and(Mover::is_moving),
+            WorldObject::Unit(_, unit, _) => {
+                self.parts.mover_of(unit.id).is_some_and(Mover::is_moving)
+            }
             WorldObject::Ghost(..) => false,
         };
         let outranged = moves
@@ -313,9 +315,9 @@ impl World {
             .ok_or_else(|| member_gone(target))?;
         let at = world_object.moved_vector();
         let from = held.current_target.original_position;
-        let d = at - from;
+        let offset = at - from;
         if at_most_or_unordered(
-            sqrt(d.y() * d.y() + d.x() * d.x()),
+            sqrt(offset.y() * offset.y() + offset.x() * offset.x()),
             self.model.tuning.group.close,
         ) {
             return Ok(None);
@@ -418,9 +420,9 @@ impl World {
 /// `FUN_14118faf0`: the ground length of the gap from a footprint of radii `radius` at `at` to
 /// the point `to`, each axis's gap at least 0 (an unordered one stays).
 fn point_gap(at: Point, radius: Footprint, to: Point) -> f32 {
-    let gap = |d: f32, r: f32| {
-        let g = d.abs() - r;
-        if g <= 0.0 { 0.0 } else { g }
+    let gap = |delta: f32, radius: f32| {
+        let beyond = delta.abs() - radius;
+        if beyond <= 0.0 { 0.0 } else { beyond }
     };
     let gx = gap(to.x() - at.x(), radius.x());
     let gy = gap(to.y() - at.y(), radius.y());

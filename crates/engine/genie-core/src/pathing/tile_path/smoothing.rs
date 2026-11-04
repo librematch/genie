@@ -27,7 +27,7 @@ pub trait SegmentTest<E> {
 pub(super) fn point_at(path: &Path, index: i32) -> BVector {
     usize::try_from(index)
         .ok()
-        .and_then(|i| path.points.get(i))
+        .and_then(|index| path.points.get(index))
         .copied()
         .unwrap_or(BVector::ZERO)
 }
@@ -45,9 +45,9 @@ pub(super) fn straighten(
     if between < 1 {
         return 0;
     }
-    let a = point_at(path, first);
-    let d = point_at(path, last) - a;
-    let length = sqrt(d.x() * d.x() + d.height() * d.height() + d.y() * d.y());
+    let start = point_at(path, first);
+    let span = point_at(path, last) - start;
+    let length = sqrt(span.x() * span.x() + span.height() * span.height() + span.y() * span.y());
     let steps = cvttss2si(length / tile_path_tuning.smooth_step);
     let fewer = between - steps;
     let at = (first + 1) as usize;
@@ -62,15 +62,15 @@ pub(super) fn straighten(
             }
         }
     }
-    let direction = BVector::new(d.x() / length, d.height() / length, d.y() / length);
+    let direction = BVector::new(span.x() / length, span.height() / length, span.y() / length);
     for index in 1..=steps {
         let step = length / (steps + 1) as f32 * direction;
-        let p = a + index as f32 * step;
+        let point = start + index as f32 * step;
         if let Some(slot) = usize::try_from(first + index)
             .ok()
-            .and_then(|i| path.points.get_mut(i))
+            .and_then(|index| path.points.get_mut(index))
         {
-            *slot = p;
+            *slot = point;
         }
     }
     fewer
@@ -107,9 +107,9 @@ pub(super) fn smooth_pass<E>(
     let mut first: i32 = 0;
     let mut probe: i32 = 2;
     while (probe as usize) < path.points.len() {
-        let (a, b) = (point_at(path, first), point_at(path, probe));
+        let (from, to) = (point_at(path, first), point_at(path, probe));
         let next;
-        if walls.blocked(a.ground(), b.ground())? {
+        if walls.blocked(from.ground(), to.ground())? {
             let between = (probe - first) - 2;
             if between < 1 {
                 first = probe - 1;

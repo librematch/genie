@@ -20,7 +20,7 @@ use crate::objects::lifecycle::death_parts::{
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::MasterTables;
-use crate::objects::masters::PlayersMasters;
+use crate::objects::masters::PlayersMastersExt;
 use crate::objects::masters::{Master, player_master};
 use crate::objects::unit::Unit;
 use crate::orders::lock_gate;
@@ -33,7 +33,7 @@ use crate::world::Seconds;
 use crate::world::index::Place;
 use crate::world::layer::ClassRoles;
 use crate::world::parts::Part;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 use crate::world::{Player, World};
 use crate::{GenieError, GenieResult};
 
@@ -175,7 +175,7 @@ pub(crate) const NO_CONSTRUCTION: GenieError =
 /// A place its player's lists do not hold.
 pub(crate) fn held(players: &mut [Player], place: Place) -> GenieResult<&mut Unit> {
     match place {
-        Place::Live(p, i) => players.live_mut(p, i),
+        Place::Live(owner, slot) => players.live_mut(owner, slot),
         Place::Sleeping(player_id, list_index) => players.asleep_mut(player_id, list_index),
     }
 }
@@ -211,7 +211,7 @@ impl World {
                     .parts
                     .building_of(annex_unit.id)
                     .construction
-                    .is_some_and(|c| c.desolid);
+                    .is_some_and(|construction| construction.desolid);
                 if annex_unit
                     .master(self.master_tables(), annex_player_id)?
                     .kind
@@ -225,14 +225,14 @@ impl World {
             }
             let Some(main) = self
                 .object(at)
-                .and_then(|(_, u)| self.parts.building_of(u.id).annex_of)
+                .and_then(|(_, unit)| self.parts.building_of(unit.id).annex_of)
             else {
                 break;
             };
             match self.object(main) {
-                Some((_, m))
-                    if m.life.state == ObjectState::Foundation
-                        && at_most_or_unordered(1.0, m.life.hp.get()) =>
+                Some((_, unit))
+                    if unit.life.state == ObjectState::Foundation
+                        && at_most_or_unordered(1.0, unit.life.hp.get()) =>
                 {
                     at = main.id();
                 }
@@ -249,7 +249,7 @@ impl World {
             .parts
             .building_of(at_unit.id)
             .construction
-            .is_some_and(|c| c.desolid)
+            .is_some_and(|construction| construction.desolid)
         {
             self.clear_foundations_under(at)?;
             self.construction_starts(at_player_id, at)?;
@@ -264,7 +264,7 @@ impl World {
         Ok(BuildProgress::Ended)
     }
 
-    /// The stack unit (`+0x986`) of the completed building `building` of player `p`
+    /// The stack unit (`+0x986`) of the completed building `building` of player `owner`
     /// (`FUN_1411dbb70`'s block): its owner's slot 0x1c0 makes it at the building's place with
     /// its flag ([`crate::world::World::make_new_object`]); a new building takes the old one's
     /// command queue (the old unit AI's slot 0x218, its orders not empty, then slot 0x1f8: the
@@ -283,7 +283,7 @@ impl World {
     /// What the parts do not model.
     pub(crate) fn stack_unit(
         &mut self,
-        p: PlayerId,
+        owner: PlayerId,
         building: ObjectId,
         stack: StackUnit,
     ) -> GenieResult<()> {
@@ -296,7 +296,7 @@ impl World {
                 .unwrap_or_default(),
             self.parts.gather_point.get(building).copied(),
         );
-        let old_class = old.master(self.master_tables(), p)?.class;
+        let old_class = old.master(self.master_tables(), owner)?.class;
         let old_lock = self.parts.building_of(old.id).gate.map(|gate| gate.locked);
         // its attacking units (+0xce0) the world still holds each hear of the new object (their
         // slot 0x140), which is not modelled
@@ -311,7 +311,8 @@ impl World {
                 "a stack unit's completion with other players' units on it (+0xce0)",
             ));
         }
-        let Some(new) = self.make_new_object(p, stack.master, stack.at, MakeMode::Finished)? else {
+        let Some(new) = self.make_new_object(owner, stack.master, stack.at, MakeMode::Finished)?
+        else {
             return Ok(());
         };
         // the old building keeps the new object's id (`+0xcb0`, FUN_1411c5f70)
@@ -343,11 +344,11 @@ impl World {
         if building_made {
             // a gather point on the old building names the new one; one whose target the world
             // no longer holds keeps its point, none at x or y −1 (compared as floats)
-            point = gather.map(|g| {
-                let target = if g.target == Some(building) {
+            point = gather.map(|gather_point| {
+                let target = if gather_point.target == Some(building) {
                     Some(new)
                 } else {
-                    g.target
+                    gather_point.target
                 };
                 match self.object(target) {
                     Some((_, unit)) => Some(GatherPoint {
@@ -356,12 +357,17 @@ impl World {
                         target,
                         target_master: Some(unit.life.master_id),
                     }),
-                    None => (g.point.x() != -1.0 && g.point.y() != -1.0).then_some(GatherPoint {
-                        state: GatherPointState::Point,
-                        point: Position::new(g.point.x(), g.point.y(), 0.0),
-                        target: None,
-                        target_master: None,
-                    }),
+                    None => (gather_point.point.x() != -1.0 && gather_point.point.y() != -1.0)
+                        .then_some(GatherPoint {
+                            state: GatherPointState::Point,
+                            point: Position::new(
+                                gather_point.point.x(),
+                                gather_point.point.y(),
+                                0.0,
+                            ),
+                            target: None,
+                            target_master: None,
+                        }),
                 }
             });
         }

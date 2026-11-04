@@ -63,7 +63,7 @@ use crate::objects::masters::MasterKind;
 use crate::objects::masters::MovingPart;
 use crate::objects::masters::ObstructionKind;
 use crate::objects::masters::OwnerMasters;
-use crate::objects::masters::PlayersMasters;
+use crate::objects::masters::PlayersMastersExt;
 use crate::objects::masters::SpecialAttack;
 use crate::objects::masters::{Master, Masters, Task};
 use crate::objects::sprite::{ActiveSprite, Graphic};
@@ -144,7 +144,7 @@ fn world() -> World {
             ..Player::default()
         },
     ];
-    let mut t = World::new(
+    let mut world = World::new(
         WorldTime::ZERO,
         FrameSeed::of_data(0),
         PlayerId::new(0),
@@ -171,7 +171,7 @@ fn world() -> World {
         }),
         ..Master::default()
     };
-    t.model.masters = vec![Masters::new([master]); 4]
+    world.model.masters = vec![Masters::new([master]); 4]
         .into_iter()
         .map(Arc::new)
         .collect();
@@ -196,7 +196,7 @@ fn world() -> World {
         0,
         Vec::new(),
     ));
-    t.spatial = spatial;
+    world.spatial = spatial;
     let member = |id| Member {
         id,
         ..Member::default()
@@ -208,23 +208,23 @@ fn world() -> World {
         member(object_id(11)),
         member(object_id(12)),
     ];
-    for unit in &mut t.players[1].objects {
+    for unit in &mut world.players[1].objects {
         unit.group.id = Some(group_id(1));
     }
-    t.groups = UnitGroups {
+    world.groups = UnitGroups {
         groups: vec![group],
         ..UnitGroups::default()
     };
-    t
+    world
 }
 
-/// Player `p` sees tile (`x`, `y`) (`seen`) or only explored it.
-fn light(world: &mut World, p: usize, x: usize, y: usize, seen: bool) {
+/// Player `player` sees tile (`x`, `y`) (`seen`) or only explored it.
+fn light(world: &mut World, player: usize, x: usize, y: usize, seen: bool) {
     let visibility = world.spatial.sight.as_mut().unwrap();
     visibility.unified[y * 8 + x] |= if seen {
-        VisionBits::from_bits_retain(1 << p)
+        VisionBits::from_bits_retain(1 << player)
     } else {
-        VisionBits::from_bits_retain(1 << (32 + p))
+        VisionBits::from_bits_retain(1 << (32 + player))
     };
 }
 
@@ -233,30 +233,32 @@ fn light(world: &mut World, p: usize, x: usize, y: usize, seen: bool) {
 /// the held ones stop, slot 0x5d0), which sets [`GroupFlags::STATISTICS`]; 10 stays.
 #[test]
 fn lost_members_leave_the_group_and_stop() {
-    let mut t = world();
-    t.players[1].objects[ListIndex::new(1)].life.hp = HitPoints::new(0.5);
+    let mut game = world();
+    game.players[1].objects[ListIndex::new(1)].life.hp = HitPoints::new(0.5);
     let mut stray = soldier(12, 1.0, 2.0);
     stray.group.id = Some(group_id(1));
-    let _ = t.remove_live(PlayerId::new(1), ListIndex::new(2)).unwrap();
-    let _ = t
+    let _ = game
+        .remove_live(PlayerId::new(1), ListIndex::new(2))
+        .unwrap();
+    let _ = game
         .push_live(PlayerId::new(2), Object::with_ai(stray, soldier_ai()))
         .unwrap();
     let mut mute = soldier(13, 2.0, 2.0);
     mute.group.id = Some(group_id(1));
-    let _ = t.push_live(PlayerId::new(1), mute).unwrap();
-    for u in &mut t.players[1].objects {
-        t.parts.put_mover(u.id, Some(walker()));
+    let _ = game.push_live(PlayerId::new(1), mute).unwrap();
+    for unit in &mut game.players[1].objects {
+        game.parts.put_mover(unit.id, Some(walker()));
     }
-    let g = t.groups.get_mut(group_id(1)).unwrap();
+    let group = game.groups.get_mut(group_id(1)).unwrap();
     for id in [13, 99] {
-        g.members.push(Member {
+        group.members.push(Member {
             id: object_id(id),
             ..Member::default()
         });
     }
-    g.flags = GroupFlags::NONE;
-    t.drop_lost_members(group_id(1)).unwrap();
-    let group = t.groups.get(group_id(1)).unwrap();
+    group.flags = GroupFlags::NONE;
+    game.drop_lost_members(group_id(1)).unwrap();
+    let group = game.groups.get(group_id(1)).unwrap();
     assert_eq!(
         group
             .members
@@ -266,22 +268,22 @@ fn lost_members_leave_the_group_and_stop() {
         [object_id(10)]
     );
     assert_eq!(group.flags & GroupFlags::STATISTICS, GroupFlags::STATISTICS);
-    let unit = |t: &World, id: ObjectId| t.object(id).unwrap().1.clone();
-    assert_eq!(unit(&t, object_id(10)).group.id, Some(group_id(1)));
+    let unit = |world: &World, id: ObjectId| world.object(id).unwrap().1.clone();
+    assert_eq!(unit(&game, object_id(10)).group.id, Some(group_id(1)));
     for id in [11, 12, 13] {
-        assert_eq!(unit(&t, object_id(id)).group.id, None, "{id}");
+        assert_eq!(unit(&game, object_id(id)).group.id, None, "{id}");
     }
-    let stopped = unit(&t, object_id(11));
-    let stopped = t.parts.mover_of(stopped.id).unwrap();
+    let stopped = unit(&game, object_id(11));
+    let stopped = game.parts.mover_of(stopped.id).unwrap();
     assert_eq!(stopped.animated.speed, Speed::new(0.0));
     assert_eq!(stopped.velocity.unwrap().velocity.y(), 0.0);
     // a NaN's hit points stay (COMISS then JA)
-    let mut t = world();
-    t.players[1].objects[ListIndex::new(0)].life.hp = HitPoints::new(f32::NAN);
-    t.drop_lost_members(group_id(1)).unwrap();
-    assert_eq!(t.groups.get(group_id(1)).unwrap().members.len(), 3);
+    let mut world = world();
+    world.players[1].objects[ListIndex::new(0)].life.hp = HitPoints::new(f32::NAN);
+    world.drop_lost_members(group_id(1)).unwrap();
+    assert_eq!(world.groups.get(group_id(1)).unwrap().members.len(), 3);
     assert_eq!(
-        t.groups.get(group_id(1)).unwrap().flags & GroupFlags::STATISTICS,
+        world.groups.get(group_id(1)).unwrap().flags & GroupFlags::STATISTICS,
         GroupFlags::NONE
     );
 }
@@ -294,8 +296,8 @@ fn lost_members_leave_the_group_and_stop() {
 #[test]
 fn hibernating_group_waits_runs_its_queue_or_goes() {
     let mut world = world();
-    let set = |t: &mut World, command: i32, target: i32, queued: bool| {
-        let group = t.groups.get_mut(group_id(1)).unwrap();
+    let set = |world: &mut World, command: i32, target: i32, queued: bool| {
+        let group = world.groups.get_mut(group_id(1)).unwrap();
         group.current_command = GroupCommandKind::named(command);
         // the target alone: the constructor's kind −1 stays
         group.current_target.target = GroupTarget::of_saved(target, -1);
@@ -349,8 +351,8 @@ fn hibernating_group_waits_runs_its_queue_or_goes() {
 #[test]
 fn target_is_pending_while_seen_and_no_ally_s() {
     let mut world = world();
-    let target = |t: &mut World, command: i32, id: i32| {
-        let group = t.groups.get_mut(group_id(1)).unwrap();
+    let target = |world: &mut World, command: i32, id: i32| {
+        let group = world.groups.get_mut(group_id(1)).unwrap();
         group.current_command = GroupCommandKind::named(command);
         group.current_target.target = GroupTarget::of_saved(id, -1);
     };
@@ -418,32 +420,34 @@ fn relic_carriers_keep_their_command_pending() {
         }),
         ..Master::default()
     };
-    let set_masters = |t: &mut World, tasks: Vec<Task>| {
-        t.model.masters = vec![Masters::new([monk(tasks), relic.clone(), monastery.clone()]); 4]
-            .into_iter()
-            .map(Arc::new)
-            .collect();
+    let set_masters = |world: &mut World, tasks: Vec<Task>| {
+        world.model.masters =
+            vec![Masters::new([monk(tasks), relic.clone(), monastery.clone()]); 4]
+                .into_iter()
+                .map(Arc::new)
+                .collect();
     };
-    let mut r = soldier(40, 6.0, 6.0);
-    r.life.master_id = ids::RELIC;
-    let mut m = soldier(41, 7.0, 7.0);
-    m.life.master_id = ids::MONASTERY;
+    let mut relic = soldier(40, 6.0, 6.0);
+    relic.life.master_id = ids::RELIC;
+    let mut soldier = soldier(41, 7.0, 7.0);
+    soldier.life.master_id = ids::MONASTERY;
     world
         .extend_live(
             PlayerId::new(0),
-            [r, m].map(|unit| Object::with_ai(unit, soldier_ai())),
+            [relic, soldier].map(|unit| Object::with_ai(unit, soldier_ai())),
         )
         .unwrap();
-    let ai = |t: &mut World, order: Option<OrderKind>, action: Option<AiAction>, target: i32| {
-        let unit_ai = t
-            .parts
-            .unit_ai
-            .get_mut(t.players[1].objects[ListIndex::new(0)].id)
-            .unwrap();
-        unit_ai.current_order = order;
-        unit_ai.current_action = action;
-        unit_ai.current_target = ObjectId::of_field(target);
-    };
+    let ai =
+        |world: &mut World, order: Option<OrderKind>, action: Option<AiAction>, target: i32| {
+            let unit_ai = world
+                .parts
+                .unit_ai
+                .get_mut(world.players[1].objects[ListIndex::new(0)].id)
+                .unwrap();
+            unit_ai.current_order = order;
+            unit_ai.current_action = action;
+            unit_ai.current_target = ObjectId::of_field(target);
+        };
     world.groups.get_mut(group_id(1)).unwrap().current_command = GroupCommandKind::named(0x84);
     set_masters(&mut world, vec![task(ActionKind::PICK_UP)]);
     ai(&mut world, Some(OrderKind::OnTarget), None, 40);
@@ -477,11 +481,11 @@ fn member_is_free_by_its_action_and_its_unit_ai() {
     let mut world = world();
     assert!(world.member_idle(object_id(10)).unwrap());
     assert!(!world.member_idle(object_id(99)).unwrap());
-    let ai = |t: &mut World, order: Option<OrderKind>, action: Option<AiAction>| {
-        let unit_ai = t
+    let ai = |world: &mut World, order: Option<OrderKind>, action: Option<AiAction>| {
+        let unit_ai = world
             .parts
             .unit_ai
-            .get_mut(t.players[1].objects[ListIndex::new(0)].id)
+            .get_mut(world.players[1].objects[ListIndex::new(0)].id)
             .unwrap();
         unit_ai.current_order = order;
         unit_ai.current_action = action;
@@ -645,41 +649,41 @@ fn kept_apart_units_leave_unless_busy() {
 /// and shows standing, a busy one walks on. A group without members goes at its update.
 #[test]
 fn deleted_group_lets_its_members_go() {
-    let mut t = world();
-    for u in &mut t.players[1].objects {
-        t.parts.put_mover(u.id, Some(walking()));
+    let mut game = world();
+    for unit in &mut game.players[1].objects {
+        game.parts.put_mover(unit.id, Some(walking()));
     }
-    t.parts
+    game.parts
         .unit_ai
-        .get_mut(t.players[1].objects[ListIndex::new(1)].id)
+        .get_mut(game.players[1].objects[ListIndex::new(1)].id)
         .unwrap()
         .current_action = Some(AiAction::Move);
-    t.players[1].objects[ListIndex::new(2)].group.id = Some(group_id(7));
-    t.delete_group(group_id(1)).unwrap();
-    assert!(t.groups.get(group_id(1)).is_none());
-    let unit = |t: &World, id: ObjectId| t.object(id).unwrap().1.clone();
+    game.players[1].objects[ListIndex::new(2)].group.id = Some(group_id(7));
+    game.delete_group(group_id(1)).unwrap();
+    assert!(game.groups.get(group_id(1)).is_none());
+    let unit = |world: &World, id: ObjectId| world.object(id).unwrap().1.clone();
     assert_eq!(
-        [10, 11, 12].map(|id| unit(&t, object_id(id)).group.id),
+        [10, 11, 12].map(|id| unit(&game, object_id(id)).group.id),
         [None, None, Some(group_id(7))]
     );
     assert_eq!(
-        t.parts.mover_of(object_id(10)).unwrap().animated.speed,
+        game.parts.mover_of(object_id(10)).unwrap().animated.speed,
         Speed::new(0.0)
     );
     assert_ne!(
-        t.parts.mover_of(object_id(11)).unwrap().animated.speed,
+        game.parts.mover_of(object_id(11)).unwrap().animated.speed,
         Speed::ZERO
     );
     assert_ne!(
-        t.parts.mover_of(object_id(12)).unwrap().animated.speed,
+        game.parts.mover_of(object_id(12)).unwrap().animated.speed,
         Speed::ZERO
     );
     // the update of a group without members deletes it
-    let mut t = world();
-    t.groups.get_mut(group_id(1)).unwrap().members.clear();
-    assert_eq!(t.group_update(group_id(1)).unwrap(), GroupFate::Deleted);
-    t.update_groups(PlayerId::new(1)).unwrap();
-    assert!(t.groups.get(group_id(1)).is_none());
+    let mut world = world();
+    world.groups.get_mut(group_id(1)).unwrap().members.clear();
+    assert_eq!(world.group_update(group_id(1)).unwrap(), GroupFate::Deleted);
+    world.update_groups(PlayerId::new(1)).unwrap();
+    assert!(world.groups.get(group_id(1)).is_none());
 }
 
 /// Slots 0x660, 0x658 and 0x650: a unit with the sprite takes its speed (and the sprite,
@@ -693,9 +697,9 @@ fn unit_shows_its_standing_walking_or_running_sprite() {
     world
         .parts
         .put_mover(world.players[1].objects[ListIndex::new(0)].id, Some(walker));
-    let speed = |t: &World| t.parts.mover_of(object_id(10)).unwrap().stats.speed;
-    let master = |t: &mut World, class: ClassId, sprites: [i16; 3]| {
-        let m = Master {
+    let speed = |world: &World| world.parts.mover_of(object_id(10)).unwrap().stats.speed;
+    let master = |world: &mut World, class: ClassId, sprites: [i16; 3]| {
+        let master = Master {
             id: master_id(4),
             kind: MasterKind::COMBAT,
             class,
@@ -713,7 +717,7 @@ fn unit_shows_its_standing_walking_or_running_sprite() {
             }),
             ..Master::default()
         };
-        t.model.masters = vec![Masters::new([m]); 4]
+        world.model.masters = vec![Masters::new([master]); 4]
             .into_iter()
             .map(Arc::new)
             .collect();
@@ -780,10 +784,10 @@ fn unit_shows_its_standing_walking_or_running_sprite() {
 #[test]
 fn the_formation_turns_past_quarter_turn() {
     let mut world = world();
-    let g = world.groups.get_mut(group_id(1)).unwrap();
-    g.flags = GroupFlags::NONE;
-    g.motion.flags = MotionFlags::NONE;
-    g.motion.position[1] = BVector::new(1.0, 0.0, 0.0);
+    let group = world.groups.get_mut(group_id(1)).unwrap();
+    group.flags = GroupFlags::NONE;
+    group.motion.flags = MotionFlags::NONE;
+    group.motion.position[1] = BVector::new(1.0, 0.0, 0.0);
     assert!(
         !world
             .turns_formation(group_id(1), BVector::new(0.72, 0.0, 0.693_974_1))
@@ -930,10 +934,10 @@ fn each_line_takes_its_units_least_range() {
 #[test]
 fn the_relayout_follows_the_count_and_the_spacing() {
     let mut world = world();
-    let set = |t: &mut World, flags: u32, spacing: f32| {
-        let g = t.groups.get_mut(group_id(1)).unwrap();
-        g.flags = GroupFlags::from_bits_retain(flags);
-        g.total_spacing = Distance::new(spacing);
+    let set = |world: &mut World, flags: u32, spacing: f32| {
+        let group = world.groups.get_mut(group_id(1)).unwrap();
+        group.flags = GroupFlags::from_bits_retain(flags);
+        group.total_spacing = Distance::new(spacing);
     };
     set(&mut world, 0, 6.0);
     assert_eq!(
@@ -1014,20 +1018,20 @@ fn the_relayout_follows_the_count_and_the_spacing() {
 #[test]
 fn follow_moves_to_its_target_when_it_strays() {
     let mut world = world();
-    let g = world.groups.get_mut(group_id(1)).unwrap();
-    g.current_command = GroupCommandKind::FOLLOW;
-    g.current_target.target = GroupTarget::of_saved(20, -1);
-    g.current_target.original_position = BVector::new(3.5, 0.0, 4.5);
-    g.flags = GroupFlags::NONE;
+    let group = world.groups.get_mut(group_id(1)).unwrap();
+    group.current_command = GroupCommandKind::FOLLOW;
+    group.current_target.target = GroupTarget::of_saved(20, -1);
+    group.current_target.original_position = BVector::new(3.5, 0.0, 4.5);
+    group.flags = GroupFlags::NONE;
     let mut relayout = false;
     // 1 from the target: within half the lead's line of sight (2)
     assert_eq!(
         world.command_update(group_id(1), &mut relayout).unwrap(),
         GroupFate::Kept
     );
-    let g = world.groups.get(group_id(1)).unwrap();
+    let group = world.groups.get(group_id(1)).unwrap();
     assert_eq!(
-        (g.flags, g.members[0].seconds_since_attacking),
+        (group.flags, group.members[0].seconds_since_attacking),
         (GroupFlags::FOLLOWED, Seconds::ZERO)
     );
     world
@@ -1073,19 +1077,19 @@ fn follow_moves_to_its_target_when_it_strays() {
 #[test]
 fn moving_group_move_waits_or_follows() {
     let mut world = world();
-    let g = world.groups.get_mut(group_id(1)).unwrap();
-    g.current_command = GroupCommandKind::MOVE;
-    g.flags = GroupFlags::NONE;
-    g.motion.flags = MotionFlags::NEW;
+    let group = world.groups.get_mut(group_id(1)).unwrap();
+    group.current_command = GroupCommandKind::MOVE;
+    group.flags = GroupFlags::NONE;
+    group.motion.flags = MotionFlags::NEW;
     let mut relayout = false;
     assert_eq!(
         world.move_update(group_id(1), &mut relayout).unwrap(),
         Progress::Going
     );
     assert!(relayout);
-    let g = world.groups.get_mut(group_id(1)).unwrap();
-    g.motion.flags = MotionFlags::NONE;
-    g.motion.velocity = BVector::new(0.0, 0.0, 1.0);
+    let group = world.groups.get_mut(group_id(1)).unwrap();
+    group.motion.flags = MotionFlags::NONE;
+    group.motion.velocity = BVector::new(0.0, 0.0, 1.0);
     let mut relayout = false;
     assert_eq!(
         world.move_update(group_id(1), &mut relayout).unwrap(),
@@ -1093,13 +1097,13 @@ fn moving_group_move_waits_or_follows() {
     );
     assert!(relayout);
     // a follow's target 20 at (3.5, 3.5) and the top path's end at (3.5, h, 3.5): no change
-    let g = world.groups.get_mut(group_id(1)).unwrap();
-    g.flags = GroupFlags::FOLLOWED;
-    g.current_target.target = GroupTarget::of_saved(20, -1);
+    let group = world.groups.get_mut(group_id(1)).unwrap();
+    group.flags = GroupFlags::FOLLOWED;
+    group.current_target.target = GroupTarget::of_saved(20, -1);
     let mut path = PathData::without_path();
     path.has_path = true;
     path.points = vec![BVector::ZERO, BVector::new(3.5, 0.0, 3.5)];
-    g.motion.paths = vec![path];
+    group.motion.paths = vec![path];
     let mut relayout = false;
     assert_eq!(
         world.move_update(group_id(1), &mut relayout).unwrap(),
@@ -1127,9 +1131,9 @@ fn moving_group_move_waits_or_follows() {
         (false, GroupCommandKind::FOLLOW)
     );
     // standing with bit 12: a follow at once; else wait delays or a level waiting do nothing
-    let g = world.groups.get_mut(group_id(1)).unwrap();
-    g.current_command = GroupCommandKind::MOVE;
-    g.motion.velocity = BVector::ZERO;
+    let group = world.groups.get_mut(group_id(1)).unwrap();
+    group.current_command = GroupCommandKind::MOVE;
+    group.motion.velocity = BVector::ZERO;
     assert_eq!(
         world.move_update(group_id(1), &mut relayout).unwrap(),
         Progress::Going
@@ -1138,10 +1142,10 @@ fn moving_group_move_waits_or_follows() {
         world.groups.get(group_id(1)).unwrap().current_command,
         GroupCommandKind::FOLLOW
     );
-    let g = world.groups.get_mut(group_id(1)).unwrap();
-    g.current_command = GroupCommandKind::MOVE;
-    g.flags = GroupFlags::NONE;
-    g.motion.number_wait_delays = DelayCount::of_data(1);
+    let group = world.groups.get_mut(group_id(1)).unwrap();
+    group.current_command = GroupCommandKind::MOVE;
+    group.flags = GroupFlags::NONE;
+    group.motion.number_wait_delays = DelayCount::of_data(1);
     assert_eq!(
         world.move_update(group_id(1), &mut relayout).unwrap(),
         Progress::Going
@@ -1165,19 +1169,19 @@ fn moving_group_move_waits_or_follows() {
 /// their units go and ends the command; one with none in place locks to its kind.
 #[test]
 fn standing_group_move_ends_or_goes_on() {
-    let mut t = world();
-    let g = t.groups.get_mut(group_id(1)).unwrap();
-    g.current_command = GroupCommandKind::MOVE;
-    g.flags = GroupFlags::LINE;
-    g.motion.flags = MotionFlags::NONE;
+    let mut game = world();
+    let group = game.groups.get_mut(group_id(1)).unwrap();
+    group.current_command = GroupCommandKind::MOVE;
+    group.flags = GroupFlags::LINE;
+    group.motion.flags = MotionFlags::NONE;
     let mut relayout = false;
     assert_eq!(
-        t.move_update(group_id(1), &mut relayout).unwrap(),
+        game.move_update(group_id(1), &mut relayout).unwrap(),
         Progress::Finished
     );
-    let g = t.groups.get(group_id(1)).unwrap();
+    let group = game.groups.get(group_id(1)).unwrap();
     assert_eq!(
-        (g.current_command, g.flags),
+        (group.current_command, group.flags),
         (GroupCommandKind::NONE, GroupFlags::MEMBERS_SENT)
     );
     let walked = || {
@@ -1186,40 +1190,40 @@ fn standing_group_move_ends_or_goes_on() {
         path.points = vec![BVector::ZERO, BVector::new(3.5, 0.0, 3.5)];
         path
     };
-    let g = t.groups.get_mut(group_id(1)).unwrap();
-    g.current_command = GroupCommandKind::MOVE;
-    g.motion.paths = vec![walked()];
+    let group = game.groups.get_mut(group_id(1)).unwrap();
+    group.current_command = GroupCommandKind::MOVE;
+    group.motion.paths = vec![walked()];
     assert_eq!(
-        t.move_update(group_id(1), &mut relayout).unwrap(),
+        game.move_update(group_id(1), &mut relayout).unwrap(),
         Progress::Going
     );
     assert_eq!(
-        t.groups.get(group_id(1)).unwrap().current_command,
+        game.groups.get(group_id(1)).unwrap().current_command,
         GroupCommandKind::MOVE
     );
     // on a patrol ([`GroupFlags::PATROL`]) without a path walked: the command ends, unfinished
-    let g = t.groups.get_mut(group_id(1)).unwrap();
-    g.motion.paths[0].has_path = false;
-    g.flags = GroupFlags::PATROL;
+    let group = game.groups.get_mut(group_id(1)).unwrap();
+    group.motion.paths[0].has_path = false;
+    group.flags = GroupFlags::PATROL;
     assert_eq!(
-        t.move_update(group_id(1), &mut relayout).unwrap(),
+        game.move_update(group_id(1), &mut relayout).unwrap(),
         Progress::Going
     );
     assert_eq!(
-        t.groups.get(group_id(1)).unwrap().current_command,
+        game.groups.get(group_id(1)).unwrap().current_command,
         GroupCommandKind::NONE
     );
     // every slot in place: its units leave and the command ends
-    let mut t = world();
+    let mut game = world();
     let slot = |unit, state| Slot {
         unit_id: unit,
         state,
         ..Slot::default()
     };
-    let g = t.groups.get_mut(group_id(1)).unwrap();
-    g.current_command = GroupCommandKind::MOVE;
-    g.motion.flags = MotionFlags::NONE;
-    g.current_formation = Some(Formation {
+    let group = game.groups.get_mut(group_id(1)).unwrap();
+    group.current_command = GroupCommandKind::MOVE;
+    group.motion.flags = MotionFlags::NONE;
+    group.current_formation = Some(Formation {
         kind: FormationKind::Column,
         slots: vec![
             slot(Some(object_id(10)), SlotState::InPlace),
@@ -1228,21 +1232,25 @@ fn standing_group_move_ends_or_goes_on() {
         ..Formation::default()
     });
     assert_eq!(
-        t.move_update(group_id(1), &mut relayout).unwrap(),
+        game.move_update(group_id(1), &mut relayout).unwrap(),
         Progress::Finished
     );
-    let g = t.groups.get(group_id(1)).unwrap();
+    let group = game.groups.get(group_id(1)).unwrap();
     assert_eq!(
-        g.members.iter().map(|member| member.id).collect::<Vec<_>>(),
+        group
+            .members
+            .iter()
+            .map(|member| member.id)
+            .collect::<Vec<_>>(),
         [object_id(12)]
     );
-    assert_eq!(g.current_command, GroupCommandKind::NONE);
+    assert_eq!(group.current_command, GroupCommandKind::NONE);
     // none in place but no free unit: the formation locks to its kind, the command ends
-    let mut t = world();
-    for u in &mut t.players[1].objects {
-        t.parts.unit_ai.get_mut(u.id).unwrap().current_action = Some(AiAction::Move);
+    let mut world = world();
+    for unit in &mut world.players[1].objects {
+        world.parts.unit_ai.get_mut(unit.id).unwrap().current_action = Some(AiAction::Move);
     }
-    let group = t.groups.get_mut(group_id(1)).unwrap();
+    let group = world.groups.get_mut(group_id(1)).unwrap();
     group.current_command = GroupCommandKind::MOVE;
     group.motion.flags = MotionFlags::NONE;
     group.current_formation = Some(Formation {
@@ -1251,11 +1259,11 @@ fn standing_group_move_ends_or_goes_on() {
         ..Formation::default()
     });
     assert_eq!(
-        t.move_update(group_id(1), &mut relayout).unwrap(),
+        world.move_update(group_id(1), &mut relayout).unwrap(),
         Progress::Going
     );
     assert_eq!(
-        t.groups.get(group_id(1)).unwrap().current_command,
+        world.groups.get(group_id(1)).unwrap().current_command,
         GroupCommandKind::NONE
     );
 }
@@ -1330,9 +1338,9 @@ fn member_moved_aside_waits_out_its_timer() {
         timer: Seconds::new(0.75),
         ..SpecificMove::default()
     };
-    let g = world.groups.get_mut(group_id(1)).unwrap();
-    g.members[0].specific_move = aside;
-    g.members[1].specific_move = aside;
+    let group = world.groups.get_mut(group_id(1)).unwrap();
+    group.members[0].specific_move = aside;
+    group.members[1].specific_move = aside;
     world
         .parts
         .unit_ai
@@ -1340,15 +1348,15 @@ fn member_moved_aside_waits_out_its_timer() {
         .unwrap()
         .current_action = Some(AiAction::Move);
     world.specific_moves_step(group_id(1)).unwrap();
-    let g = world.groups.get(group_id(1)).unwrap();
-    assert_eq!(g.members[0].specific_move.timer, Seconds::new(0.25));
-    assert_eq!(g.members[1].specific_move, aside);
+    let group = world.groups.get(group_id(1)).unwrap();
+    assert_eq!(group.members[0].specific_move.timer, Seconds::new(0.25));
+    assert_eq!(group.members[1].specific_move, aside);
     assert_eq!(world.parts.anim_speed_of(object_id(10)), Some(Speed::ZERO));
     assert_ne!(world.parts.anim_speed_of(object_id(11)), Some(Speed::ZERO));
     world.specific_moves_step(group_id(1)).unwrap();
-    let g = world.groups.get(group_id(1)).unwrap();
+    let group = world.groups.get(group_id(1)).unwrap();
     assert_eq!(
-        g.members[0].specific_move,
+        group.members[0].specific_move,
         SpecificMove {
             path_id: MovePath::NONE,
             reason: MoveReason::None,
@@ -1491,7 +1499,7 @@ fn the_idle_timer_counts_while_idle() {
         Millis::new(3000)
     );
     let mut streams = world.streams.clone();
-    let draw = streams.get(Stream::World).rand15();
+    let draw = streams.get_mut(Stream::World).rand15();
     world.idle_timer_step(group_id(1)).unwrap();
     assert_eq!(
         world.groups.get(group_id(1)).unwrap().idle_timer,
@@ -1512,11 +1520,11 @@ fn the_idle_timer_counts_while_idle() {
 /// not hold goes; with every member kept apart and nothing pending, each leaves the group.
 #[test]
 fn an_idle_group_goes() {
-    let mut t = world();
-    let g = t.groups.get_mut(group_id(1)).unwrap();
-    g.current_command = GroupCommandKind::NONE;
-    g.flags = GroupFlags::NONE;
-    g.current_formation = Some(Formation {
+    let mut game = world();
+    let group = game.groups.get_mut(group_id(1)).unwrap();
+    group.current_command = GroupCommandKind::NONE;
+    group.flags = GroupFlags::NONE;
+    group.current_formation = Some(Formation {
         kind: FormationKind::Column,
         slots: vec![Slot {
             state: SlotState::InPlace,
@@ -1524,20 +1532,20 @@ fn an_idle_group_goes() {
         }],
         ..Formation::default()
     });
-    assert_eq!(t.group_update(group_id(1)).unwrap(), GroupFate::Deleted);
-    let mut t = world();
-    t.groups.get_mut(group_id(1)).unwrap().flags = GroupFlags::NO_PATH_UNIT;
-    assert_eq!(t.group_update(group_id(1)).unwrap(), GroupFate::Deleted);
+    assert_eq!(game.group_update(group_id(1)).unwrap(), GroupFate::Deleted);
+    let mut game = world();
+    game.groups.get_mut(group_id(1)).unwrap().flags = GroupFlags::NO_PATH_UNIT;
+    assert_eq!(game.group_update(group_id(1)).unwrap(), GroupFate::Deleted);
     // every member kept apart: each leaves, then the group has none
-    let mut t = world();
-    let group = t.groups.get_mut(group_id(1)).unwrap();
+    let mut world = world();
+    let group = world.groups.get_mut(group_id(1)).unwrap();
     group.flags = GroupFlags::NONE;
     group.objects = vec![object_id(10), object_id(11), object_id(12)];
     group.current_command = GroupCommandKind::MOVE;
-    assert_eq!(t.group_update(group_id(1)).unwrap(), GroupFate::Deleted);
-    assert_eq!(t.groups.get(group_id(1)).unwrap().members, Vec::new());
-    assert_eq!(t.groups.get(group_id(1)).unwrap().objects, Vec::new());
-    assert_eq!(t.object(object_id(11)).unwrap().1.group.id, None);
+    assert_eq!(world.group_update(group_id(1)).unwrap(), GroupFate::Deleted);
+    assert_eq!(world.groups.get(group_id(1)).unwrap().members, Vec::new());
+    assert_eq!(world.groups.get(group_id(1)).unwrap().objects, Vec::new());
+    assert_eq!(world.object(object_id(11)).unwrap().1.group.id, None);
 }
 
 /// `BaseWorld::update` runs a player's groups (`FUN_14103d910` at `0x14155179b`) before the
@@ -1548,10 +1556,10 @@ fn an_idle_group_goes() {
 fn player_groups_update_before_its_objects() {
     let mut world = world();
     let walker = walker();
-    for u in &mut world.players[1].objects {
-        world.parts.put_mover(u.id, Some(walker.clone()));
-        world.parts.mover_mut(u.id).unwrap().moved_at = u.position();
-        world.parts.set_unit_ai(u.id, None);
+    for unit in &mut world.players[1].objects {
+        world.parts.put_mover(unit.id, Some(walker.clone()));
+        world.parts.mover_mut(unit.id).unwrap().moved_at = unit.position();
+        world.parts.set_unit_ai(unit.id, None);
     }
     let before = world.object(object_id(10)).unwrap().1.position();
     world.tick(Millis::new(69));
@@ -1611,8 +1619,9 @@ fn group_steers_its_free_members_speeds_in_their_own_update() {
         .collect();
     world.tick(Millis::new(100));
     assert_eq!(world.players[1].unsupported, None);
-    let speed = |t: &World, id| {
-        t.parts
+    let speed = |world: &World, id| {
+        world
+            .parts
             .mover_of(object_id(id))
             .unwrap()
             .velocity
@@ -1850,7 +1859,7 @@ fn group_holds_members_draws_its_idle_timer_and_tells_when_it_is_idle() {
     assert!(!world.any_member_held(group_id(2)));
     // the World stream's next draw, modulo 750
     let mut streams = world.streams.clone();
-    let draw = streams.get(Stream::World).rand15();
+    let draw = streams.get_mut(Stream::World).rand15();
     world.reset_idle_timer(group_id(1));
     assert_eq!(world.groups.groups[0].idle_timer, Millis::new(draw % 750));
     assert_eq!(world.streams, streams);
@@ -1871,13 +1880,13 @@ fn group_holds_members_draws_its_idle_timer_and_tells_when_it_is_idle() {
 /// `0x4c000`, any other hibernation value wakes without them.
 #[test]
 fn emptying_the_command_queue_wakes_hibernating_group() {
-    let mut g = UnitGroup::new(group_id(1));
-    g.command_queue = vec![GroupCommand::default()];
-    g.hibernating = 1;
-    g.clear_command_queue();
-    assert_eq!(g.command_queue, Vec::new());
+    let mut group = UnitGroup::new(group_id(1));
+    group.command_queue = vec![GroupCommand::default()];
+    group.hibernating = 1;
+    group.clear_command_queue();
+    assert_eq!(group.command_queue, Vec::new());
     assert_eq!(
-        (g.hibernating, g.flags),
+        (group.hibernating, group.flags),
         (0, GroupFlags::from_bits_retain(0x100 | 0x4_c000))
     );
     let mut group = UnitGroup::new(group_id(1));
@@ -1929,12 +1938,12 @@ fn grounded() -> World {
     ));
     world.spatial.sight.as_mut().unwrap().registry = Some(Registry::new(4, 65));
     for player_id in PlayerId::each(4).skip(1) {
-        for u in &mut world.players[player_id.index()].objects {
-            world.parts.unit_ai.get_mut(u.id).unwrap().ai_kind = UnitAiKind::Soldier;
+        for unit in &mut world.players[player_id.index()].objects {
+            world.parts.unit_ai.get_mut(unit.id).unwrap().ai_kind = UnitAiKind::Soldier;
             world.parts.put_mover(
-                u.id,
+                unit.id,
                 Some(Mover {
-                    moved_at: u.position(),
+                    moved_at: unit.position(),
                     ..walker()
                 }),
             );
@@ -1973,32 +1982,35 @@ fn an_awake_group_without_command_places_itself_and_turns_its_formation() {
     let mean = BVector::new(4.0 / 3.0, 0.0, 4.0 / 3.0);
     let run = |flags, motion_flags| {
         let mut world = grounded();
-        let g = world.groups.get_mut(group_id(1)).unwrap();
-        (g.flags, g.motion.flags) = (flags, motion_flags);
+        let group = world.groups.get_mut(group_id(1)).unwrap();
+        (group.flags, group.motion.flags) = (flags, motion_flags);
         assert_eq!(world.group_update(group_id(1)), Ok(GroupFate::Kept));
-        let g = world.groups.get(group_id(1)).unwrap().clone();
-        assert_eq!((g.motion.lead, g.centroid), (Some(object_id(10)), mean));
-        g
+        let group = world.groups.get(group_id(1)).unwrap().clone();
+        assert_eq!(
+            (group.motion.lead, group.centroid),
+            (Some(object_id(10)), mean)
+        );
+        group
     };
-    let g = run(GroupFlags::TURN, MotionFlags::MOVED | MotionFlags::NEW);
-    assert_eq!(g.flags, GroupFlags::PLACED);
-    assert_eq!(g.motion.position[1], BVector::new(-1.0, 0.0, 0.0));
-    assert_eq!(g.motion.position[0], mean);
-    let g = run(GroupFlags::TURN, MotionFlags::MOVED);
-    assert_eq!(g.flags, GroupFlags::NONE);
+    let group = run(GroupFlags::TURN, MotionFlags::MOVED | MotionFlags::NEW);
+    assert_eq!(group.flags, GroupFlags::PLACED);
+    assert_eq!(group.motion.position[1], BVector::new(-1.0, 0.0, 0.0));
+    assert_eq!(group.motion.position[0], mean);
+    let group = run(GroupFlags::TURN, MotionFlags::MOVED);
+    assert_eq!(group.flags, GroupFlags::NONE);
     assert_eq!(
-        g.motion.position[..2],
+        group.motion.position[..2],
         [BVector::ZERO, BVector::new(1.0, 0.0, 0.0)]
     );
-    let g = run(
+    let group = run(
         GroupFlags::TURN | GroupFlags::RELAYOUT_AT_TURN,
         MotionFlags::MOVED,
     );
-    assert_eq!(g.flags, GroupFlags::NONE);
-    assert_eq!(g.motion.position[0], mean);
-    let g = run(GroupFlags::LEAD_TO_TARGET, MotionFlags::MOVED);
-    assert_eq!(g.flags, GroupFlags::NONE);
-    assert_eq!(g.motion.position[0], mean);
+    assert_eq!(group.flags, GroupFlags::NONE);
+    assert_eq!(group.motion.position[0], mean);
+    let group = run(GroupFlags::LEAD_TO_TARGET, MotionFlags::MOVED);
+    assert_eq!(group.flags, GroupFlags::NONE);
+    assert_eq!(group.motion.position[0], mean);
     let group = run(GroupFlags::PLACE_AGAIN, MotionFlags::MOVED);
     assert_eq!(group.flags, GroupFlags::PLACED);
     assert_eq!(group.motion.position[1], BVector::new(-1.0, 0.0, 0.0));
@@ -2036,7 +2048,7 @@ fn an_awake_group_members_walk_to_their_slots_and_its_due_orders_go() {
         world.build_mesh().unwrap();
         assert_eq!(world.group_update(group_id(1)), Ok(GroupFate::Kept));
         assert_eq!(world.groups.get(group_id(1)).unwrap().order_queue.len(), 0);
-        let f = world
+        let formation = world
             .groups
             .get(group_id(1))
             .unwrap()
@@ -2047,13 +2059,13 @@ fn an_awake_group_members_walk_to_their_slots_and_its_due_orders_go() {
             let mover = world.parts.mover_of(object_id(id)).cloned().unwrap();
             mover.paths[0].points.clone()
         });
-        (f, walks)
+        (formation, walks)
     };
-    let (f, walks) = run(GroupFlags::NONE, MotionFlags::MOVED);
-    let slots: Vec<_> = f
+    let (formation, walks) = run(GroupFlags::NONE, MotionFlags::MOVED);
+    let slots: Vec<_> = formation
         .slots
         .iter()
-        .map(|s| (s.unit_id, s.transform_position))
+        .map(|slot| (slot.unit_id, slot.transform_position))
         .collect();
     assert_eq!(
         slots,
@@ -2072,7 +2084,7 @@ fn an_awake_group_members_walk_to_their_slots_and_its_due_orders_go() {
         ]
     );
     let (formation, walks) = run(GroupFlags::TURN, MotionFlags::MOVED | MotionFlags::NEW);
-    let ids: Vec<_> = formation.slots.iter().map(|s| s.unit_id).collect();
+    let ids: Vec<_> = formation.slots.iter().map(|slot| slot.unit_id).collect();
     assert_eq!(
         ids,
         [
@@ -2084,7 +2096,7 @@ fn an_awake_group_members_walk_to_their_slots_and_its_due_orders_go() {
     let x: Vec<_> = formation
         .slots
         .iter()
-        .map(|s| s.transform_position.x())
+        .map(|slot| slot.transform_position.x())
         .collect();
     assert!(
         (x[0] - 7.0 / 3.0).abs() < 1e-6
@@ -2125,7 +2137,7 @@ fn attacking(world: &mut World) {
 fn register(world: &mut World) {
     let placed: Vec<(i32, Placed)> = PlayerId::each(world.players.len())
         .zip(&world.players)
-        .flat_map(|(p, player)| player.objects.iter().map(move |u| (p, u)))
+        .flat_map(|(player_id, player)| player.objects.iter().map(move |unit| (player_id, unit)))
         .filter_map(|(player_id, unit)| {
             let master = world
                 .model
@@ -2249,16 +2261,17 @@ fn an_attack_releases_category_in_reach_or_arrived() {
     register(&mut world);
     light(&mut world, 1, 3, 3, true);
     assert!(world.target_pending(group_id(1)).unwrap());
-    let reasons = |t: &World, reason: i32| {
-        t.groups
+    let reasons = |world: &World, reason: i32| {
+        world
+            .groups
             .get(group_id(1))
             .unwrap()
             .members
             .iter()
             .all(|reason_member| reason_member.specific_move.reason == MoveReason::of_data(reason))
     };
-    for m in &mut world.groups.get_mut(group_id(1)).unwrap().members {
-        m.specific_move.reason = MoveReason::of_data(5);
+    for member in &mut world.groups.get_mut(group_id(1)).unwrap().members {
+        member.specific_move.reason = MoveReason::of_data(5);
     }
     let mut relayout = false;
     // nothing in reach: not finished, arrived
@@ -2312,8 +2325,8 @@ fn unit_in_contact_releases_its_category() {
     world.players[1].objects[ListIndex::new(0)].place = Static::at(Position::new(3.0, 3.0, 0.0));
     register(&mut world);
     light(&mut world, 1, 3, 3, true);
-    for m in &mut world.groups.get_mut(group_id(1)).unwrap().members {
-        m.specific_move.reason = MoveReason::of_data(5);
+    for member in &mut world.groups.get_mut(group_id(1)).unwrap().members {
+        member.specific_move.reason = MoveReason::of_data(5);
     }
     let mut relayout = false;
     assert_eq!(
@@ -2444,9 +2457,9 @@ fn unit_speed_is_its_movers_unless_charge_runs() {
         world.players[1].objects[ListIndex::new(0)].id,
         Some(walker()),
     );
-    let speed = |t: &World, id| {
-        let (player_id, unit) = t.object(object_id(id)).unwrap();
-        t.unit_speed(player_id, unit)
+    let speed = |world: &World, id| {
+        let (player_id, unit) = world.object(object_id(id)).unwrap();
+        world.unit_speed(player_id, unit)
     };
     assert_eq!(speed(&world, 11).unwrap(), 0.0);
     assert_eq!(speed(&world, 10).unwrap(), 0.8);
@@ -2482,19 +2495,27 @@ fn released_special_unit_draws_its_retarget_timer() {
     let group = world.groups.get_mut(group_id(1)).unwrap();
     group.special_units = vec![object_id(11)];
     group.current_target.disable_retargeting = 1;
-    for u in &mut world.players[1].objects {
-        world.parts.unit_ai.get_mut(u.id).unwrap().orders = vec![QueuedOrder::default()];
-        world.parts.unit_ai.get_mut(u.id).unwrap().retarget_timer = Millis::new(7);
+    for unit in &mut world.players[1].objects {
+        world.parts.unit_ai.get_mut(unit.id).unwrap().orders = vec![QueuedOrder::default()];
+        world.parts.unit_ai.get_mut(unit.id).unwrap().retarget_timer = Millis::new(7);
     }
     let mut reference = world.streams.clone();
-    let draw = reference.get(Stream::Ai).rand15();
+    let draw = reference.get_mut(Stream::Ai).rand15();
     world
         .release_units(group_id(1), &[object_id(10), object_id(11)], object_id(20))
         .unwrap();
     let timers: Vec<u32> = world.players[1]
         .objects
         .iter()
-        .map(|u| world.parts.unit_ai.get(u.id).unwrap().retarget_timer.get())
+        .map(|unit| {
+            world
+                .parts
+                .unit_ai
+                .get(unit.id)
+                .unwrap()
+                .retarget_timer
+                .get()
+        })
         .collect();
     assert_eq!(timers, [7, 3000 + draw % 2000, 7]);
     assert!(

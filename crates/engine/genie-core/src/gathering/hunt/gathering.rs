@@ -132,7 +132,7 @@ impl HuntAction {
                 // once, the hunter in the world; either way `moved_sheep` and `set_state(10)`
                 if let (true, Some((site, gap_squared))) = (herd.own, herd.drop_site) {
                     self.drop_site = Some(site);
-                    if DistanceSquared::new(step.w.model.tuning.hunt.herd_reach) < gap_squared
+                    if DistanceSquared::new(step.world.model.tuning.hunt.herd_reach) < gap_squared
                         && (self.lead.moved || gap_squared < HERD_FAR)
                     {
                         if !self.lead.moved && herd.idle {
@@ -153,17 +153,17 @@ impl HuntAction {
                 return Ok(HuntNext::Stay);
             }
             let placed = step
-                .w
+                .world
                 .spatial
                 .get_known(self.target)?
                 .ok_or(GenieError::unsupported("a hunt's target without a place"))?;
             let ground = step
-                .w
+                .world
                 .parts
                 .mover_of(unit.id)
                 .map(|mover| mover.stats.radius.ground())
                 .ok_or(HUNTER_UNMOVING)?;
-            if self.task.range + Distance::new(step.w.model.tuning.hunt.gap)
+            if self.task.range + Distance::new(step.world.model.tuning.hunt.gap)
                 < footprint_gap(
                     unit.place.position(),
                     ground,
@@ -172,17 +172,17 @@ impl HuntAction {
                 )
             {
                 let walks = hunt_reads.walks(
-                    &step.w.model.graphics,
-                    (unit, step.w.parts.mover_of(unit.id)),
+                    &step.world.model.graphics,
+                    (unit, step.world.parts.mover_of(unit.id)),
                 );
                 let player = fight.own.player;
                 self.set_walk(
-                    (&step.w.spatial, unit.position()),
-                    step.w.parts.motion_mut(unit.id),
+                    (&step.world.spatial, unit.position()),
+                    step.world.parts.motion_mut(unit.id),
                     &fight.victim,
                     player,
                     &walks,
-                    &step.w.model,
+                    &step.world.model,
                 )?;
                 return Ok(HuntNext::Stay);
             }
@@ -206,18 +206,18 @@ impl HuntAction {
         let carrying = self.task.resource.is_some()
             && unit.life.attribute_kind == self.task.resource
             && 1 <= unit.life.amount.get() as i32;
-        let g = match (carrying, hunt_reads.sprites.carrying) {
-            (true, Some(g)) => Some(g),
+        let shown = match (carrying, hunt_reads.sprites.carrying) {
+            (true, Some(graphic)) => Some(graphic),
             _ => hunt_reads.sprites.moving,
         }
         .or(hunt_reads.sprites.standing);
-        if let Some(graphic) = g {
+        if let Some(graphic) = shown {
             new_sprite(
                 &mut unit.sprite,
-                step.w.parts.move_stats_mut(unit.id),
+                step.world.parts.move_stats_mut(unit.id),
                 graphic,
-                step.w.streams.get(Stream::Sprite),
-                step.w.model.tuning.sprite,
+                step.world.streams.get_mut(Stream::Sprite),
+                step.world.model.tuning.sprite,
             );
         }
     }

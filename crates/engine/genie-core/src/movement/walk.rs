@@ -11,7 +11,7 @@ use crate::math::fmath::{
     angle_between, at_most_or_unordered, cross, length, normalize, rotate, rotation, sqrt,
 };
 use crate::movement::LevelFlags;
-use crate::movement::Levels;
+use crate::movement::LevelsExt;
 use crate::movement::PathState;
 use crate::movement::Speed;
 use crate::movement::{EPSILON, Me, Motion, Mover, Next, UP, Velocity};
@@ -77,7 +77,9 @@ impl Mover {
             };
             let outranks = if player == PlayerId::GAIA || other.player != PlayerId::GAIA {
                 let mine = me.human_order;
-                let theirs = by_id.gait(id).map_or(WorldTime::ZERO, |g| g.human_order);
+                let theirs = by_id
+                    .gait(id)
+                    .map_or(WorldTime::ZERO, |gait| gait.human_order);
                 if !player_kind.is_computer() && (other.player != player || theirs != mine) {
                     theirs < mine
                 } else {
@@ -96,9 +98,9 @@ impl Mover {
             // master, notifies the walker's unit AI (0x215)
             if !allied
                 && !world.allied_with(other.player, player)
-                && let Some(t) = level.target.filter(|object_id| !object_id.is_recyclable())
+                && let Some(object_id) = level.target.filter(|object_id| !object_id.is_recyclable())
             {
-                let target = world.get(t).map(|placed| placed.master);
+                let target = world.get(object_id).map(|placed| placed.master);
                 if target.is_some_and(|master_id| master_id == other.master) {
                     self.in_the_way.push(id);
                 }
@@ -118,7 +120,7 @@ impl Mover {
     /// of the map's far edges (`FUN_141051900` orders them into its rectangle).
     pub(super) fn query_ends(&self, from: BVector, to: BVector, map: GridSize) -> (Point, Point) {
         let far = |size: i32| size as f32 - 0.1;
-        let hold = |v: f32, max: f32| if v < 0.0 { 0.0 } else { v.min(max) };
+        let hold = |value: f32, max: f32| if value < 0.0 { 0.0 } else { value.min(max) };
         (
             Point::new(
                 hold(from.x(), far(map.width())),
@@ -275,9 +277,15 @@ impl Mover {
             velocity.velocity = velocity.velocity.with_y(0.0);
             return;
         }
-        let d = waypoint - position;
-        let distance = sqrt(d.height() * d.height() + d.x() * d.x() + d.y() * d.y());
-        let toward = BVector::new(d.x() / distance, d.height() / distance, d.y() / distance);
+        let offset = waypoint - position;
+        let distance = sqrt(
+            offset.height() * offset.height() + offset.x() * offset.x() + offset.y() * offset.y(),
+        );
+        let toward = BVector::new(
+            offset.x() / distance,
+            offset.height() / distance,
+            offset.y() / distance,
+        );
         let angle = angle_between(self.forward, toward);
         let radius = ((self.stats.turn_radius * velocity.velocity.y())
             / self.stats.turn_radius_speed.get())

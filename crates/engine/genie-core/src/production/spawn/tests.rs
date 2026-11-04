@@ -151,7 +151,7 @@ fn gather_point_whose_tree_is_gone_takes_the_closest_tree_within_sight() {
 fn hill_test(mode: u8, at: [i32; 2], raised: &[([i32; 2], u8)]) -> (u8, bool) {
     let scene = raised.iter().fold(
         Scene::open(GridSize::new(10, 10)).elevation(3),
-        |scene, &(t, e)| scene.elevation_on([Tile::from(t)], e),
+        |scene, &(tile, elevation)| scene.elevation_on([Tile::from(tile)], elevation),
     );
     let world = scene.build();
     let map = WorldMap { turns: &world };
@@ -244,10 +244,10 @@ fn blocker_that_moves_lets_the_spot_try_its_next_candidate() {
         dir: TileOffset::new(1, 0),
         count: 1,
     };
-    let mut n = 0;
+    let mut calls = 0;
     let point = try_spot(&spot, &mut |_| {
-        n += 1;
-        Ok(if n == 1 {
+        calls += 1;
+        Ok(if calls == 1 {
             Tested::Blocked { stays: false }
         } else {
             Tested::Free
@@ -519,16 +519,16 @@ fn made_villager_spawns_beside_its_town_centre_and_takes_its_queue() {
         );
         forage_world
     };
-    let mut t = world();
-    let before = t.players[1].objects.len();
-    t.spawn(
+    let mut game = world();
+    let before = game.players[1].objects.len();
+    game.spawn(
         PlayerId::new(1),
         ListIndex::new(2),
         ids::VILLAGER_MALE,
         Amount::new(1.0),
     )
     .unwrap();
-    let player = &t.players[1];
+    let player = &game.players[1];
     assert_eq!(player.objects.len(), before + 1);
     let made = player.objects.last().unwrap();
     assert_eq!(made.life.master_id, ids::VILLAGER_MALE);
@@ -536,7 +536,7 @@ fn made_villager_spawns_beside_its_town_centre_and_takes_its_queue() {
         player.attributes[attribute::IN_PRODUCTION.index()],
         Amount::new(2.0)
     );
-    let completed = t
+    let completed = game
         .parts
         .unit_ai
         .get(player.objects[ListIndex::new(2)].id)
@@ -545,11 +545,11 @@ fn made_villager_spawns_beside_its_town_centre_and_takes_its_queue() {
         .iter()
         .any(|notify| {
             notify.kind == NotifyKind::ACTION_COMPLETED
-                && notify.p == [AiAction::Make.value(), 0, 0]
+                && notify.params == [AiAction::Make.value(), 0, 0]
         });
     assert!(completed);
     // the centre's command queue goes to the new unit
-    let mut t = world();
+    let mut game = world();
     let order = QueuedOrder {
         issuer: Some(Issuer::Player(player_id(1))),
         order: OrderKind::Move,
@@ -562,21 +562,21 @@ fn made_villager_spawns_beside_its_town_centre_and_takes_its_queue() {
         ready: false,
         target_kind: None,
     };
-    t.parts
+    game.parts
         .unit_ai
-        .get_mut(t.players[1].objects[ListIndex::new(2)].id)
+        .get_mut(game.players[1].objects[ListIndex::new(2)].id)
         .unwrap()
         .building_orders
         .push(order);
-    t.spawn(
+    game.spawn(
         PlayerId::new(1),
         ListIndex::new(2),
         ids::VILLAGER_MALE,
         Amount::new(1.0),
     )
     .unwrap();
-    let made = t.players[1].objects.last().unwrap();
-    let queued = t
+    let made = game.players[1].objects.last().unwrap();
+    let queued = game
         .parts
         .unit_ai
         .get(made.id)
@@ -603,9 +603,9 @@ fn made_villager_spawns_beside_its_town_centre_and_takes_its_queue() {
     );
     // an order on an object the world holds that the new unit cannot enter (the centre has no
     // room) goes to it as it is
-    let mut t = world();
-    let centre = t.players[1].objects[ListIndex::new(2)].id;
-    t.parts
+    let mut game = world();
+    let centre = game.players[1].objects[ListIndex::new(2)].id;
+    game.parts
         .unit_ai
         .get_mut(centre)
         .unwrap()
@@ -614,25 +614,25 @@ fn made_villager_spawns_beside_its_town_centre_and_takes_its_queue() {
             target: Some(centre),
             ..queued_move()
         });
-    t.spawn(
+    game.spawn(
         PlayerId::new(1),
         ListIndex::new(2),
         ids::VILLAGER_MALE,
         Amount::new(1.0),
     )
     .unwrap();
-    let made = t.players[1].objects.last().unwrap();
-    let targets: Vec<_> = t
+    let made = game.players[1].objects.last().unwrap();
+    let targets: Vec<_> = game
         .parts
         .unit_ai
         .get(made.id)
         .map(|ai| ai.orders.iter().map(|order| order.target).collect())
         .unwrap_or_default();
     assert_eq!(targets, [Some(centre)]);
-    let mut t = world();
-    t.players[1].kind = PlayerKind::Computer;
+    let mut game = world();
+    game.players[1].kind = PlayerKind::Computer;
     assert!(
-        t.spawn(
+        game.spawn(
             PlayerId::new(1),
             ListIndex::new(2),
             ids::VILLAGER_MALE,
@@ -640,10 +640,10 @@ fn made_villager_spawns_beside_its_town_centre_and_takes_its_queue() {
         )
         .is_err()
     );
-    let mut t = world();
-    t.spatial.sight = None;
+    let mut game = world();
+    game.spatial.sight = None;
     assert!(
-        t.spawn(
+        game.spawn(
             PlayerId::new(1),
             ListIndex::new(2),
             ids::VILLAGER_MALE,
@@ -651,15 +651,16 @@ fn made_villager_spawns_beside_its_town_centre_and_takes_its_queue() {
         )
         .is_err()
     );
-    let mut t = world();
+    let mut world = world();
     assert!(
-        t.spawn(
-            PlayerId::new(1),
-            ListIndex::new(2),
-            master_id(59),
-            Amount::new(1.0)
-        )
-        .is_err()
+        world
+            .spawn(
+                PlayerId::new(1),
+                ListIndex::new(2),
+                master_id(59),
+                Amount::new(1.0)
+            )
+            .is_err()
     );
 }
 
@@ -968,44 +969,45 @@ fn gather_point_without_target_walks_the_new_unit_there() {
 /// is not modelled.
 #[test]
 fn gather_point_walk_waits_without_speed_and_stops_at_the_unmodelled() {
-    let mut t = forage_world();
-    t.parts
-        .mover_mut(t.players[1].objects[ListIndex::new(0)].id)
+    let mut game = forage_world();
+    game.parts
+        .mover_mut(game.players[1].objects[ListIndex::new(0)].id)
         .unwrap()
         .stats
         .speed = Speed::ZERO;
-    t.gather_move(
+    game.gather_move(
         PlayerId::new(1),
         ListIndex::new(0),
         Position::new(40.0, 80.0, 0.0),
         OrderSource::Direct,
     )
     .unwrap();
-    let unit = &t.players[1].objects[ListIndex::new(0)];
-    assert_eq!(t.parts.mover_of(unit.id).unwrap().waiting, 1);
-    assert_eq!(t.parts.actions_of(unit.id).list.move_to().copied(), None);
-    assert_eq!(t.parts.unit_ai.get(unit.id).unwrap().current_order, None);
+    let unit = &game.players[1].objects[ListIndex::new(0)];
+    assert_eq!(game.parts.mover_of(unit.id).unwrap().waiting, 1);
+    assert_eq!(game.parts.actions_of(unit.id).list.move_to().copied(), None);
+    assert_eq!(game.parts.unit_ai.get(unit.id).unwrap().current_order, None);
     // a second walk finds the first's `MoveTo`
-    let mut t = forage_world();
-    t.gather_move(
+    let mut game = forage_world();
+    game.gather_move(
         PlayerId::new(1),
         ListIndex::new(0),
         Position::new(40.0, 80.0, 0.0),
         OrderSource::Direct,
     )
     .unwrap();
-    let reason = |t: &mut World| {
-        t.gather_move(
-            PlayerId::new(1),
-            ListIndex::new(0),
-            Position::new(41.0, 80.0, 0.0),
-            OrderSource::Direct,
-        )
-        .unwrap_err()
-        .reason()
+    let reason = |world: &mut World| {
+        world
+            .gather_move(
+                PlayerId::new(1),
+                ListIndex::new(0),
+                Position::new(41.0, 80.0, 0.0),
+                OrderSource::Direct,
+            )
+            .unwrap_err()
+            .reason()
     };
     assert_eq!(
-        reason(&mut t),
+        reason(&mut game),
         "a gather point's move of a unit with an action"
     );
     let mut world = forage_world();
@@ -1075,19 +1077,19 @@ fn remains_world() -> World {
 #[test]
 fn remains_take_their_storage_and_face_their_dead_object_facet() {
     use crate::objects::lifecycle::Class;
-    let made = |t: &World, id| t.model.masters[1].get(id).unwrap().clone();
-    let mut t = remains_world();
-    let food = t.players[1].attributes[4];
-    let i = t
+    let made = |world: &World, id| world.model.masters[1].get(id).unwrap().clone();
+    let mut game = remains_world();
+    let food = game.players[1].attributes[4];
+    let list_index = game
         .plain_object(
             PlayerId::new(1),
             master_id(800),
-            &made(&t, master_id(800)),
+            &made(&game, master_id(800)),
             Position::new(30.5, 85.5, 0.0),
             Facing::Dead(None),
         )
         .unwrap();
-    let players = &t.players[1].objects[i];
+    let players = &game.players[1].objects[list_index];
     assert_eq!(
         (
             players.life.class,
@@ -1100,34 +1102,34 @@ fn remains_take_their_storage_and_face_their_dead_object_facet() {
         (players.life.death_facets, players.sprite),
         (Some(FacetCount::of_data(8)), None)
     );
-    assert_eq!(t.players[1].attributes[4], food + Amount::new(1.0));
-    let list_index = t
+    assert_eq!(game.players[1].attributes[4], food + Amount::new(1.0));
+    let list_index = game
         .plain_object(
             PlayerId::new(1),
             master_id(801),
-            &made(&t, master_id(801)),
+            &made(&game, master_id(801)),
             Position::new(31.5, 85.5, 0.0),
             Facing::Dead(Some(Facet::of_data(2))),
         )
         .unwrap();
-    let unit = &t.players[1].objects[list_index];
+    let unit = &game.players[1].objects[list_index];
     let facets = SpriteFacets {
         count: FacetCount::of_data(8),
         turns: false,
     };
     assert_eq!(
-        t.parts.mover_of(unit.id).map(|mover| mover.angle),
+        game.parts.mover_of(unit.id).map(|mover| mover.angle),
         Some(angle_of_facet(Facet::of_data(2), facets))
     );
     let reason = |change: &dyn Fn(&mut Master), facing| {
         let mut world = remains_world();
-        let mut m = made(&world, master_id(801));
-        change(&mut m);
+        let mut master = made(&world, master_id(801));
+        change(&mut master);
         world
             .plain_object(
                 PlayerId::new(1),
-                m.id,
-                &m,
+                master.id,
+                &master,
                 Position::new(31.5, 85.5, 0.0),
                 facing,
             )
@@ -1136,21 +1138,24 @@ fn remains_take_their_storage_and_face_their_dead_object_facet() {
     };
     let unchanged = |_: &mut Master| {};
     assert_eq!(
-        reason(&|m| m.kind = MasterKind::COMBAT, Facing::Drawn),
+        reason(&|master| master.kind = MasterKind::COMBAT, Facing::Drawn),
         "remains of a type other than 10 and 20 to 39"
     );
     assert_eq!(
         reason(
-            &|m| {
-                m.kind = MasterKind::STATIC;
-                m.hit_points = MasterHitPoints::of_data(5);
+            &|master| {
+                master.kind = MasterKind::STATIC;
+                master.hit_points = MasterHitPoints::of_data(5);
             },
             Facing::Drawn
         ),
         "remains with hit points (the sleeping list)"
     );
     assert_eq!(
-        reason(&|m| m.recyclable = RecycleMode::RECYCLED, Facing::Drawn),
+        reason(
+            &|master| master.recyclable = RecycleMode::RECYCLED,
+            Facing::Drawn
+        ),
         "a new object of a recyclable master (a negative id)"
     );
     assert_eq!(
@@ -1201,38 +1206,38 @@ fn build_static_test_answers_the_map_edge_terrain_and_exploration() {
     let flat = WorldMap { turns: &seen };
     assert_eq!(
         build_static_test(&open, &flat, Point::new(50.0, 50.0), &tuning().spawn)
-            .map(|c| c.map(PlacementCode::code)),
+            .map(|placement_code| placement_code.map(PlacementCode::code)),
         Ok(None)
     );
     assert_eq!(
         build_static_test(&open, &flat, Point::new(0.5, 50.0), &tuning().spawn)
-            .map(|c| c.map(PlacementCode::code)),
+            .map(|placement_code| placement_code.map(PlacementCode::code)),
         Ok(Some(7))
     );
     assert_eq!(
         build_static_test(&open, &flat, Point::new(119.5, 50.0), &tuning().spawn)
-            .map(|c| c.map(PlacementCode::code)),
+            .map(|placement_code| placement_code.map(PlacementCode::code)),
         Ok(Some(7))
     );
     let forbidden_values = Restriction::new(vec![0.0]);
     let forbidden = house_site(&forbidden_values, true);
     assert_eq!(
         build_static_test(&forbidden, &flat, Point::new(50.0, 50.0), &tuning().spawn)
-            .map(|c| c.map(PlacementCode::code)),
+            .map(|placement_code| placement_code.map(PlacementCode::code)),
         Ok(Some(2))
     );
     let unknown = plain(TileSight::Unknown);
     let dark = WorldMap { turns: &unknown };
     assert_eq!(
         build_static_test(&open, &dark, Point::new(50.0, 50.0), &tuning().spawn)
-            .map(|c| c.map(PlacementCode::code)),
+            .map(|placement_code| placement_code.map(PlacementCode::code)),
         Ok(Some(5))
     );
     let computer_values = Restriction::new(vec![1.0]);
     let computer = house_site(&computer_values, false);
     assert_eq!(
         build_static_test(&computer, &dark, Point::new(50.0, 50.0), &tuning().spawn)
-            .map(|c| c.map(PlacementCode::code)),
+            .map(|placement_code| placement_code.map(PlacementCode::code)),
         Ok(None)
     );
     let zoned = BuildSite {
@@ -1271,7 +1276,7 @@ fn build_scan_counts_what_the_player_sees_of_tile() {
     let fogged = WorldMap { turns: &explored };
     let unknown = plain(TileSight::Unknown);
     let dark = WorldMap { turns: &unknown };
-    let o = |player, fog_visibility| Near {
+    let near_of = |player, fog_visibility| Near {
         player,
         fog_visibility,
         ..near_sheep(ObjectState::Alive)
@@ -1281,7 +1286,7 @@ fn build_scan_counts_what_the_player_sees_of_tile() {
     assert_eq!(
         sees(
             &flat,
-            o(PlayerId::new(2), FogVisibility::INVISIBLE),
+            near_of(PlayerId::new(2), FogVisibility::INVISIBLE),
             (true, true)
         ),
         Ok(true)
@@ -1289,7 +1294,7 @@ fn build_scan_counts_what_the_player_sees_of_tile() {
     assert_eq!(
         sees(
             &flat,
-            o(PlayerId::new(2), FogVisibility::ONLY_IN_FOG),
+            near_of(PlayerId::new(2), FogVisibility::ONLY_IN_FOG),
             (true, true)
         ),
         Ok(false)
@@ -1297,7 +1302,7 @@ fn build_scan_counts_what_the_player_sees_of_tile() {
     assert_eq!(
         sees(
             &fogged,
-            o(PlayerId::new(2), FogVisibility::VISIBLE),
+            near_of(PlayerId::new(2), FogVisibility::VISIBLE),
             (true, false)
         ),
         Ok(true)
@@ -1305,7 +1310,7 @@ fn build_scan_counts_what_the_player_sees_of_tile() {
     assert_eq!(
         sees(
             &fogged,
-            o(PlayerId::new(2), FogVisibility::INVISIBLE),
+            near_of(PlayerId::new(2), FogVisibility::INVISIBLE),
             (true, false)
         ),
         Ok(false)
@@ -1313,7 +1318,7 @@ fn build_scan_counts_what_the_player_sees_of_tile() {
     assert_eq!(
         sees(
             &fogged,
-            o(PlayerId::new(1), FogVisibility::INVISIBLE),
+            near_of(PlayerId::new(1), FogVisibility::INVISIBLE),
             (true, false)
         ),
         Ok(true)
@@ -1321,7 +1326,7 @@ fn build_scan_counts_what_the_player_sees_of_tile() {
     assert_eq!(
         sees(
             &dark,
-            o(PlayerId::new(2), FogVisibility::INVISIBLE),
+            near_of(PlayerId::new(2), FogVisibility::INVISIBLE),
             (false, false)
         ),
         Ok(true)
@@ -1329,7 +1334,7 @@ fn build_scan_counts_what_the_player_sees_of_tile() {
     assert_eq!(
         sees(
             &fogged,
-            o(PlayerId::new(2), FogVisibility::ONLY_IN_FOG),
+            near_of(PlayerId::new(2), FogVisibility::ONLY_IN_FOG),
             (true, false)
         )
         .unwrap_err()
@@ -1626,14 +1631,14 @@ fn the_build_static_scans_find_dying_house_build_passes_over() {
     );
 }
 
-/// A 3×3 map whose tile `i` (row by row) is of terrain `kinds[i]` and whose terrain `t` has the
-/// flags `flags[t]`, for the placement terrains' test ([`placement_terrains`]).
+/// A 3×3 map whose tile `index` (row by row) is of terrain `kinds[index]` and whose terrain `kind`
+/// has the flags `flags[kind]`, for the placement terrains' test ([`placement_terrains`]).
 fn terrains(kinds: [u8; 9], flags: Vec<TerrainFlags>) -> World {
     let scene = (0..9).fold(
         Scene::open(GridSize::new(3, 3)).terrains(flags),
-        |scene, i| {
-            let tile = Tile::new(i % 3, i / 3);
-            scene.terrain_on([tile], TerrainId::named(kinds[i as usize]))
+        |scene, index| {
+            let tile = Tile::new(index % 3, index / 3);
+            scene.terrain_on([tile], TerrainId::named(kinds[index as usize]))
         },
     );
     scene.build()
@@ -1656,14 +1661,29 @@ fn placement_terrain_takes_its_own_tile_or_one_of_shared_flag() {
         ],
     );
     let map = WorldMap { turns: &world };
-    let t = |id: u8| Some(TerrainId::named(id));
-    let at = |i: i32| Tile::new(i % 3, i / 3);
-    assert_eq!(point_terrain_allows(&map, [t(1), t(3)], at(1)), Ok(true));
-    assert_eq!(point_terrain_allows(&map, [t(1), t(3)], at(2)), Ok(true));
-    assert_eq!(point_terrain_allows(&map, [t(2), t(2)], at(3)), Ok(false));
-    assert_eq!(point_terrain_allows(&map, [t(3), t(3)], at(3)), Ok(true));
-    assert_eq!(point_terrain_allows(&map, [t(1), t(2)], at(0)), Ok(false));
-    assert!(point_terrain_allows(&map, [t(1), None], at(0)).is_err());
+    let terrain = |id: u8| Some(TerrainId::named(id));
+    let at = |index: i32| Tile::new(index % 3, index / 3);
+    assert_eq!(
+        point_terrain_allows(&map, [terrain(1), terrain(3)], at(1)),
+        Ok(true)
+    );
+    assert_eq!(
+        point_terrain_allows(&map, [terrain(1), terrain(3)], at(2)),
+        Ok(true)
+    );
+    assert_eq!(
+        point_terrain_allows(&map, [terrain(2), terrain(2)], at(3)),
+        Ok(false)
+    );
+    assert_eq!(
+        point_terrain_allows(&map, [terrain(3), terrain(3)], at(3)),
+        Ok(true)
+    );
+    assert_eq!(
+        point_terrain_allows(&map, [terrain(1), terrain(2)], at(0)),
+        Ok(false)
+    );
+    assert!(point_terrain_allows(&map, [terrain(1), None], at(0)).is_err());
 }
 
 /// The side terrains: the master's own, then every other terrain with ice (then beach) that one
@@ -1682,12 +1702,27 @@ fn side_terrains_take_the_others_of_shared_flag() {
         ],
     );
     let map = WorldMap { turns: &world };
-    let t = |id: u8| Some(TerrainId::named(id));
-    let ids = |v: &[u8]| v.iter().copied().map(TerrainId::named).collect::<Vec<_>>();
-    assert_eq!(side_terrains(&map, [t(0), t(0)]), Ok(ids(&[0, 0])));
-    assert_eq!(side_terrains(&map, [t(1), t(0)]), Ok(ids(&[1, 0, 2, 4])));
-    assert_eq!(side_terrains(&map, [t(3), t(3)]), Ok(ids(&[3, 3, 4])));
-    assert!(side_terrains(&map, [t(1), None]).is_err());
+    let terrain = |id: u8| Some(TerrainId::named(id));
+    let ids = |bytes: &[u8]| {
+        bytes
+            .iter()
+            .copied()
+            .map(TerrainId::named)
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(
+        side_terrains(&map, [terrain(0), terrain(0)]),
+        Ok(ids(&[0, 0]))
+    );
+    assert_eq!(
+        side_terrains(&map, [terrain(1), terrain(0)]),
+        Ok(ids(&[1, 0, 2, 4]))
+    );
+    assert_eq!(
+        side_terrains(&map, [terrain(3), terrain(3)]),
+        Ok(ids(&[3, 3, 4]))
+    );
+    assert!(side_terrains(&map, [terrain(1), None]).is_err());
 }
 
 /// The placement terrains of a master: with terrains the point's tile must be of one and the box
@@ -1697,34 +1732,34 @@ fn master_placement_terrains_test_the_point_and_the_tiles_beside() {
     // the centre (1, 1) of terrain 5, the tile right of it (2, 1) of terrain 6
     let world = terrains([0, 0, 0, 0, 5, 6, 0, 0, 0], vec![TerrainFlags::NONE; 8]);
     let map = WorldMap { turns: &world };
-    let t = |id: u8| Some(TerrainId::named(id));
+    let terrain = |id: u8| Some(TerrainId::named(id));
     let centre = Point::new(1.5, 1.5);
     let whole = TileRect::new(0, 0, 2, 2);
     let test = |placement| placement_terrains(placement, &map, centre, whole);
     assert_eq!(test(PlacementTerrains::NONE), Ok(true));
-    let on = |a, b| PlacementTerrains {
-        on: [a, b],
+    let on = |first, second| PlacementTerrains {
+        on: [first, second],
         ..PlacementTerrains::NONE
     };
-    assert_eq!(test(on(t(5), t(5))), Ok(true));
-    assert_eq!(test(on(t(6), t(6))), Ok(false));
-    let beside = |a, b| PlacementTerrains {
-        beside: [a, b],
+    assert_eq!(test(on(terrain(5), terrain(5))), Ok(true));
+    assert_eq!(test(on(terrain(6), terrain(6))), Ok(false));
+    let beside = |first, second| PlacementTerrains {
+        beside: [first, second],
         ..PlacementTerrains::NONE
     };
     // the whole map's box has no tile beside it; the centre's tile has 6 to its right
-    assert_eq!(test(beside(t(6), t(6))), Ok(false));
+    assert_eq!(test(beside(terrain(6), terrain(6))), Ok(false));
     assert_eq!(
         test(PlacementTerrains {
-            beside: [t(6), t(6)],
-            on: [t(5), t(5)],
+            beside: [terrain(6), terrain(6)],
+            on: [terrain(5), terrain(5)],
         }),
         Ok(true)
     );
     assert_eq!(
         test(PlacementTerrains {
-            beside: [t(7), t(7)],
-            on: [t(5), t(5)],
+            beside: [terrain(7), terrain(7)],
+            on: [terrain(5), terrain(5)],
         }),
         Ok(false)
     );

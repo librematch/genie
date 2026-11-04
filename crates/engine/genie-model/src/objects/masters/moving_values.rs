@@ -18,76 +18,77 @@ use crate::world::Seconds;
 
 impl MovingPart {
     /// [`crate::objects::masters::Master::set_moving`]'s values of the layer: what `attribute` with
-    /// `v` writes here (the attributes the setter hands over, each one of the layer's values).
+    /// `value` writes here (the attributes the setter hands over, each one of the layer's values).
     pub(super) fn set_value(
         &mut self,
         attribute: MasterAttribute,
-        v: f32,
+        value: f32,
         world: &AttributeWorld<'_>,
     ) {
         match attribute {
             MasterAttribute::ROTATION_SPEED => {
-                self.turn_speed = Seconds::new(v);
+                self.turn_speed = Seconds::new(value);
             }
             MasterAttribute::WALKING_GRAPHIC => {
-                set_sprite(&mut self.move_sprite, cvttss2si(v), world);
+                set_sprite(&mut self.move_sprite, cvttss2si(value), world);
             }
             MasterAttribute::RUNNING_GRAPHIC => {
-                set_sprite(&mut self.run_sprite, cvttss2si(v), world);
+                set_sprite(&mut self.run_sprite, cvttss2si(value), world);
             }
             MasterAttribute::TRAILING_UNIT => {
-                self.trail.unit = MasterField::of_data(low16(v));
+                self.trail.unit = MasterField::of_data(low16(value));
             }
             MasterAttribute::TRAIL_MODE => {
-                self.trail.mode = TrailMode::of_data(low8(v));
+                self.trail.mode = TrailMode::of_data(low8(value));
             }
             MasterAttribute::TRAIL_DENSITY => {
-                self.trail.density = TrailDensity::new(v);
+                self.trail.density = TrailDensity::new(value);
             }
             _ => {}
         }
     }
 
     /// [`crate::objects::masters::Master::add_moving`]'s values of the layer: what `attribute` with
-    /// `v` writes here (the attributes the setter hands over, each one of the layer's values).
+    /// `value` writes here (the attributes the setter hands over, each one of the layer's values).
     pub(super) fn add_value(
         &mut self,
         attribute: MasterAttribute,
-        v: f32,
+        value: f32,
         world: &AttributeWorld<'_>,
     ) {
         match attribute {
             MasterAttribute::ROTATION_SPEED => {
-                self.turn_speed += Seconds::new(v);
+                self.turn_speed += Seconds::new(value);
             }
             MasterAttribute::WALKING_GRAPHIC => {
-                add_sprite(&mut self.move_sprite, v, world);
+                add_sprite(&mut self.move_sprite, value, world);
             }
             MasterAttribute::RUNNING_GRAPHIC => {
-                add_sprite(&mut self.run_sprite, v, world);
+                add_sprite(&mut self.run_sprite, value, world);
             }
             MasterAttribute::TRAILING_UNIT => {
-                self.trail.unit = self.trail.unit.plus(low16(v));
+                self.trail.unit = self.trail.unit.plus(low16(value));
             }
             MasterAttribute::TRAIL_MODE => {
-                self.trail.mode = self.trail.mode.plus(low8(v));
+                self.trail.mode = self.trail.mode.plus(low8(value));
             }
             MasterAttribute::TRAIL_DENSITY => {
-                self.trail.density += TrailDensity::new(v);
+                self.trail.density += TrailDensity::new(value);
             }
             _ => {}
         }
     }
 
     /// [`crate::objects::masters::Master::multiply_moving`]'s values of the layer: what `attribute`
-    /// with `v` writes here (the attributes the setter hands over, each one of the layer's values).
-    pub(super) fn multiply_value(&mut self, attribute: MasterAttribute, v: f32) {
+    /// with `value` writes here (the attributes the setter hands over, each one of the layer's
+    /// values).
+    pub(super) fn multiply_value(&mut self, attribute: MasterAttribute, value: f32) {
         match attribute {
             MasterAttribute::ROTATION_SPEED => {
-                self.turn_speed *= v;
+                self.turn_speed *= value;
             }
             MasterAttribute::TRAIL_DENSITY => {
-                self.trail.density *= v;
+                self.trail.density *= value;
             }
             _ => {}
         }

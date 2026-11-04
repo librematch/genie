@@ -18,7 +18,7 @@ use crate::objects::ObjectState;
 use crate::objects::actions::Action;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::OwnerMasters;
-use crate::objects::masters::PlayersMasters;
+use crate::objects::masters::PlayersMastersExt;
 use crate::orders::ControlKey;
 use crate::orders::Kept;
 use crate::orders::OrderSource;
@@ -34,8 +34,8 @@ use crate::unit_ai::{OrderPriority, OrderTargetKind, QueuedOrder};
 use crate::world::World;
 use crate::world::index::Place;
 use crate::world::layer::ClassRoles;
-use crate::world::slots::CheckedIndex;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::CheckedIndexExt;
+use crate::world::slots::PlayerSlotsExt;
 use crate::{GenieError, GenieResult};
 
 impl World {
@@ -90,8 +90,8 @@ impl World {
                 }
             }
             if let Some(mean) = follow_spread(&points, &self.model.tuning.order) {
-                for i in 0..loose.len() {
-                    self.follow_offset(&loose, i, followed, mean)?;
+                for index in 0..loose.len() {
+                    self.follow_offset(&loose, index, followed, mean)?;
                 }
                 return Ok(());
             }
@@ -148,8 +148,8 @@ impl World {
                 continue;
             };
             self.leave_group_of(id, None)?;
-            let (p, idx) = match place {
-                Place::Live(p, i) => (p, i),
+            let (player, idx) = match place {
+                Place::Live(owner, slot) => (owner, slot),
                 // only slot 0x180 puts an object to sleep, one of a type below 30 without a
                 // unit AI
                 Place::Sleeping(player_id, list_index)
@@ -166,14 +166,18 @@ impl World {
                     ));
                 }
             };
-            if !self.parts.unit_ai.contains(self.players.live(p, idx)?.id) {
+            if !self
+                .parts
+                .unit_ai
+                .contains(self.players.live(player, idx)?.id)
+            {
                 continue;
             }
             let order = QueuedOrder {
-                issuer: Some(Issuer::Player(p)),
+                issuer: Some(Issuer::Player(player)),
                 ..order
             };
-            self.run_unit_ai((p, idx), |ai, at, side, player_kind, rng| {
+            self.run_unit_ai((player, idx), |ai, at, side, player_kind, rng| {
                 ai.take_order_now_with(order, (at, side, player_kind), rng)
             })?;
         }
@@ -216,9 +220,9 @@ impl World {
     pub(super) fn follower_start(
         &mut self,
         loose: &[ObjectId],
-        i: usize,
+        loose_index: usize,
     ) -> GenieResult<(PlayerId, ListIndex)> {
-        let Some(Place::Live(player_id, idx)) = self.place(*loose.checked(i)?) else {
+        let Some(Place::Live(player_id, idx)) = self.place(*loose.checked(loose_index)?) else {
             return Err(GenieError::unsupported(
                 "a FOLLOW of a sleeping object of a type of 30 or more",
             ));
@@ -232,32 +236,32 @@ impl World {
         mover.ignore_units.clear();
         mover.waiting = 1;
         for (index, &other) in loose.iter().enumerate() {
-            if index != i {
+            if index != loose_index {
                 ignore_unit(&mut mover.ignore_units, other);
             }
         }
         Ok((player_id, idx))
     }
 
-    /// FOLLOW's loose unit `loose[i]` (`FUN_14161c920`'s loop for units that do not move at
-    /// their offsets): it leaves its unit group (`FUN_14102c160` with the target's id); one that
+    /// FOLLOW's loose unit `loose[loose_index]` (`FUN_14161c920`'s loop for units that do not move
+    /// at their offsets): it leaves its unit group (`FUN_14102c160` with the target's id); one that
     /// does not move takes nothing ([`World::follower`]); else it starts
     /// ([`World::follower_start`]) and moves to the target at its place (slot 0x138,
     /// [`World::move_to_object_with`], z 0). Its unit AI takes the follow order and action
-    /// (`FUN_140c64b60` with 1, `FUN_140c64b50`) only when no action of its took the move; then
-    /// the target with its class (none without a footprint) at its place (`FUN_140c64be0`).
-    /// Slot 0x2d8's walk and show targets and `+0x888` are not held.
+    /// (`FUN_140c64b60` with 1, `FUN_140c64b50`) only when no action of its took the move; then the
+    /// target with its class (none without a footprint) at its place (`FUN_140c64be0`). Slot
+    /// 0x2d8's walk and show targets and `+0x888` are not held.
     pub(super) fn follow_unit(
         &mut self,
         loose: &[ObjectId],
-        i: usize,
+        loose_index: usize,
         followed: Followed,
     ) -> GenieResult<()> {
-        self.leave_group_of(*loose.checked(i)?, Some(followed.id))?;
-        if self.follower(*loose.checked(i)?)?.is_none() {
+        self.leave_group_of(*loose.checked(loose_index)?, Some(followed.id))?;
+        if self.follower(*loose.checked(loose_index)?)?.is_none() {
             return Ok(());
         }
-        let (player_id, idx) = self.follower_start(loose, i)?;
+        let (player_id, idx) = self.follower_start(loose, loose_index)?;
         let (x, y) = (followed.place.x(), followed.place.y());
         let taken = self.move_to_object_with(
             player_id,
@@ -266,7 +270,7 @@ impl World {
             Position::new(x, y, 0.0),
             OrderSource::Direct,
         )?;
-        let rng = self.streams.get(Stream::Ai);
+        let rng = self.streams.get_mut(Stream::Ai);
         if let Some(ai) = self
             .parts
             .unit_ai
@@ -284,25 +288,25 @@ impl World {
         Ok(())
     }
 
-    /// FOLLOW's loose unit `loose[i]` at its offset (`FUN_14161c920`'s loop after the box): one
-    /// that moves ([`World::follower`]) starts ([`World::follower_start`]) and goes to its place
-    /// less `mean` plus the target's, held on the map ([`follow_axis`]): slot 0x138 (z 0) to the
-    /// target there when its master has a footprint, else to the point
+    /// FOLLOW's loose unit `loose[loose_index]` at its offset (`FUN_14161c920`'s loop after the
+    /// box): one that moves ([`World::follower`]) starts ([`World::follower_start`]) and goes to
+    /// its place less `mean` plus the target's, held on the map ([`follow_axis`]): slot 0x138 (z 0)
+    /// to the target there when its master has a footprint, else to the point
     /// ([`World::move_point_order_with`]). Its unit AI takes the move order and action
-    /// (`FUN_140c64b60` with 1, `FUN_140c64b50`) and the target (none without a footprint) at
-    /// that place (`FUN_140c64be0`). Slot 0x2d8's walk and show targets are not held.
+    /// (`FUN_140c64b60` with 1, `FUN_140c64b50`) and the target (none without a footprint) at that
+    /// place (`FUN_140c64be0`). Slot 0x2d8's walk and show targets are not held.
     pub(super) fn follow_offset(
         &mut self,
         loose: &[ObjectId],
-        i: usize,
+        loose_index: usize,
         followed: Followed,
         mean: Point,
     ) -> GenieResult<()> {
-        let Some(follower) = self.follower(*loose.checked(i)?)? else {
+        let Some(follower) = self.follower(*loose.checked(loose_index)?)? else {
             return Ok(());
         };
         let (x, y) = (follower.x(), follower.y());
-        let (player_id, idx) = self.follower_start(loose, i)?;
+        let (player_id, idx) = self.follower_start(loose, loose_index)?;
         let map = self.spatial.map;
         let at = Position::new(
             follow_axis(
@@ -324,7 +328,7 @@ impl World {
             }
             None => self.move_point_order_with(player_id, idx, at, OrderSource::Direct)?,
         }
-        let rng = self.streams.get(Stream::Ai);
+        let rng = self.streams.get_mut(Stream::Ai);
         if let Some(ai) = self
             .parts
             .unit_ai
@@ -490,7 +494,7 @@ impl World {
                 self.parts.motion.layer_mut(unit.id),
                 OwnerMasters::new(&self.parts.own_master, self.model.masters.of(player)),
                 &self.model.graphics,
-                self.streams.get(Stream::Sprite),
+                self.streams.get_mut(Stream::Sprite),
                 self.model.tuning.sprite,
             )?;
         }
@@ -583,8 +587,8 @@ impl World {
                 return Ok(Answer::Taken);
             }
         };
-        if let Some(t) = left {
-            self.leave_builders(Some(t))?;
+        if let Some(object_id) = left {
+            self.leave_builders(Some(object_id))?;
         }
         if let Some(object_id) = released {
             self.release(object_id, by)?;

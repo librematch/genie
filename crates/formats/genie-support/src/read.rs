@@ -6,10 +6,10 @@ use std::io::{self, Read};
 
 /// An optional value that does not fit its type.
 #[track_caller]
-fn not_fitting(value: u32, e: impl StdError + Send + Sync + 'static) -> GenieError {
+fn not_fitting(value: u32, error: impl StdError + Send + Sync + 'static) -> GenieError {
     GenieError::invalid_input("an optional value that does not fit its type")
         .with("value", value)
-        .with_source(e)
+        .with_source(error)
 }
 
 /// Read a 2-byte integer that uses -1 as an "absent" value.
@@ -42,7 +42,11 @@ where
 {
     let opt = match input.read_u16::<LE>()? {
         0xFFFF => None,
-        v => Some(v.try_into().map_err(|e| not_fitting(v.into(), e))?),
+        value => Some(
+            value
+                .try_into()
+                .map_err(|error| not_fitting(value.into(), error))?,
+        ),
     };
     Ok(opt)
 }
@@ -78,7 +82,11 @@ where
     let opt = match input.read_u32::<LE>()? {
         // -1, or -2, which HD Edition uses in some places.
         0xFFFF_FFFF | 0xFFFF_FFFE => None,
-        v => Some(v.try_into().map_err(|e| not_fitting(v, e))?),
+        value => Some(
+            value
+                .try_into()
+                .map_err(|error| not_fitting(value, error))?,
+        ),
     };
     Ok(opt)
 }

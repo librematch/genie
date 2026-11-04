@@ -27,7 +27,7 @@ use crate::objects::masters::ActionKind;
 use crate::objects::masters::GarrisonKinds;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::PlayersMasters;
+use crate::objects::masters::PlayersMastersExt;
 use crate::objects::masters::{MasterTables, OwnerMasters};
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Unit;
@@ -58,7 +58,7 @@ use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 use crate::world::others::OthersRef;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 use crate::world::step::Step;
 use crate::{GenieError, GenieResult};
 
@@ -115,33 +115,33 @@ impl Unit {
         roles: &Roles,
     ) -> GenieResult<EnterReads> {
         let by_id = ObjectsRef::new(
-            &step.w.players,
-            &step.w.index,
-            &step.w.model.masters,
-            &step.w.parts,
-            &step.w.model.roles,
-            &step.w.model.tuning,
+            &step.world.players,
+            &step.world.index,
+            &step.world.model.masters,
+            &step.world.parts,
+            &step.world.model.roles,
+            &step.world.model.tuning,
         );
-        let others = OthersRef::of(&step.w.players, &step.w.index, step.player)?;
+        let others = OthersRef::of(&step.world.players, &step.world.index, step.player)?;
         let (target, start) = match others.find(enter.target) {
             Some((tp, unit)) => {
                 let master = unit.master(
-                    MasterTables::new(&step.w.model.masters, &step.w.parts.own_master),
+                    MasterTables::new(&step.world.model.masters, &step.world.parts.own_master),
                     tp,
                 )?;
                 let room = units_inside(others, unit.id) < master.garrison.units();
                 let (mut view, start) = enter_view(
-                    &mut step.w.spatial,
-                    &step.w.model.masters,
-                    (self, step.w.parts.mover_of(self.id)),
-                    ((unit, step.w.parts.mover_of(unit.id)), master, room),
+                    &mut step.world.spatial,
+                    &step.world.model.masters,
+                    (self, step.world.parts.mover_of(self.id)),
+                    ((unit, step.world.parts.mover_of(unit.id)), master, room),
                     enter.range,
                     by_id,
                 )?;
                 // FUN_141663dc0 with allies, or Gaia's
                 view.allied = tp == PlayerId::GAIA
                     || allied(
-                        &step.w.players.player(step.player)?.relations,
+                        &step.world.players.player(step.player)?.relations,
                         step.player,
                         tp,
                         AllyTest::WithRelation4,
@@ -155,25 +155,25 @@ impl Unit {
                 },
             ),
         };
-        let master = self.master(step.w.master_tables(), step.player)?;
+        let master = self.master(step.world.master_tables(), step.player)?;
         let villager = roles.of_class(master.class).contains(ClassRoles::VILLAGER);
         Ok(EnterReads {
             target,
             start,
-            patience: if villager && !step.w.players.player(step.player)?.kind.is_computer() {
+            patience: if villager && !step.world.players.player(step.player)?.kind.is_computer() {
                 Patience::WaitsOnce
             } else {
                 Patience::Fails
             },
             stance: step
-                .w
+                .world
                 .parts
                 .unit_ai
                 .get(self.id)
                 .map_or(UnitStance::Aggressive, |ai| ai.stance),
             defaults: MoveDefaults::of(
                 master,
-                step.w.parts.combat_of(self.id).abilities.look.as_ref(),
+                step.world.parts.combat_of(self.id).abilities.look.as_ref(),
                 roles,
             ),
         })
@@ -189,7 +189,7 @@ impl Unit {
         roles: &Roles,
     ) -> GenieResult<()> {
         let inside = units_inside(
-            OthersRef::of(&step.w.players, &step.w.index, step.player)?,
+            OthersRef::of(&step.world.players, &step.world.index, step.player)?,
             target.id(),
         );
         if self.enter_building(actions, step, target, inside, roles)? == EnterOutcome::NoRoom {
@@ -214,7 +214,7 @@ impl Unit {
         step: &mut Step<'_>,
     ) -> GenieResult<()> {
         self.post_own(
-            &mut step.w.parts.unit_ai,
+            &mut step.world.parts.unit_ai,
             NotifyKind::ACTION_COMPLETED,
             [AiAction::Enter.value(), 0, 0],
         )?;
@@ -238,23 +238,23 @@ impl Unit {
             .enter_mut()
             .ok_or(GenieError::unsupported("an entered unit without its Enter"))?;
         if enter.state.take_move_to().is_some()
-            && let Some(mover) = step.w.parts.mover_mut(self.id)
+            && let Some(mover) = step.world.parts.mover_mut(self.id)
         {
             mover.stop()?;
         }
         enter.state = EnterState::Done;
         self.shows_standing_sprite(
-            step.w.parts.motion.layer_mut(self.id),
+            step.world.parts.motion.layer_mut(self.id),
             OwnerMasters::new(
-                &step.w.parts.own_master,
-                step.w.model.masters.of(step.player),
+                &step.world.parts.own_master,
+                step.world.model.masters.of(step.player),
             ),
-            &step.w.model.graphics,
-            step.w.streams.get(Stream::Sprite),
-            step.w.model.tuning.sprite,
+            &step.world.model.graphics,
+            step.world.streams.get_mut(Stream::Sprite),
+            step.world.model.tuning.sprite,
         )?;
         self.post_own(
-            &mut step.w.parts.unit_ai,
+            &mut step.world.parts.unit_ai,
             NotifyKind::ACTION_FAILED,
             [AiAction::Enter.value(), 0, 0],
         )
@@ -286,23 +286,26 @@ impl Unit {
         roles: &Roles,
     ) -> GenieResult<EnterOutcome> {
         // the callers found it: the Enter's update in its reads, `World::enter_now` by its place
-        let (tp, building) = step.w.object(target).ok_or(GenieError::unreachable(
+        let (tp, building) = step.world.object(target).ok_or(GenieError::unreachable(
             "an enter into a building the world does not hold",
         ))?;
-        let own = step.w.model.masters.of(step.player);
+        let own = step.world.model.masters.of(step.player);
         let masters = own.ok_or(NO_MASTERS)?;
         // copies: going inside changes the unit and the world, which hold them
         let bm = building
             .master_in(OwnerMasters::new(
-                &step.w.parts.own_master,
-                step.w.model.masters.of(tp).or(own),
+                &step.world.parts.own_master,
+                step.world.model.masters.of(tp).or(own),
             ))?
             .clone();
         let hp = building.life.hp;
         let me = self
-            .master_in(OwnerMasters::new(&step.w.parts.own_master, Some(masters)))?
+            .master_in(OwnerMasters::new(
+                &step.world.parts.own_master,
+                Some(masters),
+            ))?
             .clone();
-        let owner = step.w.players.player(step.player)?;
+        let owner = step.world.players.player(step.player)?;
         let actor = Actor {
             id: self.id,
             master: &me,
@@ -318,7 +321,7 @@ impl Unit {
             ),
             civ: owner.civ,
         };
-        if drops_at(&step.w.model.drop_sites, bm.id, &actor)
+        if drops_at(&step.world.model.drop_sites, bm.id, &actor)
             && Amount::ZERO < self.life.amount
             && bm.kind == MasterKind::BUILDING
         {
@@ -326,7 +329,7 @@ impl Unit {
             // and the ore themselves, nothing else
             let resource = self.life.attribute_kind.and_then(|kind| {
                 if !roles.of_attribute(kind).contains(AttributeRoles::FOOD) && kind.is_food_load() {
-                    Some(step.w.model.slots.attribute.food)
+                    Some(step.world.model.slots.attribute.food)
                 } else {
                     (kind.is_resource() || roles.of_attribute(kind).contains(AttributeRoles::ORE))
                         .then_some(kind)
@@ -337,7 +340,7 @@ impl Unit {
                 let mut adds = Vec::new();
                 give_load(
                     (
-                        &step.w.spatial.relations,
+                        &step.world.spatial.relations,
                         owner.ally_sharing.contains(AllySharing::RESOURCES),
                     ),
                     step.player,
@@ -345,9 +348,9 @@ impl Unit {
                     resource,
                     self.life.amount,
                     roles,
-                    step.w.model.slots,
+                    step.world.model.slots,
                 )?;
-                step.w
+                step.world
                     .players
                     .player_mut(step.player)?
                     .add_attributes(adds)?;
@@ -359,7 +362,7 @@ impl Unit {
             && hp
                 <= HitPoints::new(
                     HitPoints::of_master(bm.hit_points).get()
-                        * step.w.model.tuning.garrison.enter_hp_share,
+                        * step.world.model.tuning.garrison.enter_hp_share,
                 )
         {
             return Err(GenieError::unsupported(
@@ -370,7 +373,7 @@ impl Unit {
             .action_part()
             .tasks
             .iter()
-            .find(|t| t.action_kind == ActionKind::DEPOSIT)
+            .find(|task| task.action_kind == ActionKind::DEPOSIT)
             .is_some_and(|task| task.object_id == Some(bm.id))
         {
             return Err(GenieError::unsupported(
@@ -382,7 +385,7 @@ impl Unit {
         }
         self.go_inside(actions, step, target, &me, &bm, roles)?;
         self.post_own(
-            &mut step.w.parts.unit_ai,
+            &mut step.world.parts.unit_ai,
             NotifyKind::ACTION_COMPLETED,
             [AiAction::Enter.value(), 0, 0],
         )?;
@@ -420,12 +423,12 @@ impl Unit {
             ));
         }
         let placed = step
-            .w
+            .world
             .spatial
             .get(id)
             .copied()
             .ok_or(GenieError::unsupported("an entering unit without a place"))?;
-        if let Some(visibility) = step.w.spatial.sight.as_mut() {
+        if let Some(visibility) = step.world.spatial.sight.as_mut() {
             visibility.sight_off(
                 id,
                 self.position(),
@@ -434,48 +437,48 @@ impl Unit {
                 SightCentre::Tile,
                 SightLayer {
                     roles,
-                    visibility_tuning: step.w.model.tuning.visibility,
+                    visibility_tuning: step.world.model.tuning.visibility,
                 },
             )?;
         }
         // the callers found it (`Unit::enter_building`, `World::enter_now`), and the sight's
         // change removes no object
-        let (bp, building) = step.w.object(target).ok_or(GenieError::unreachable(
+        let (bp, building) = step.world.object(target).ok_or(GenieError::unreachable(
             "an enter into a building the world does not hold",
         ))?;
         let (at, state, reload) = (
             building.position(),
             building.life.state,
-            step.w.parts.combat_of(building.id).reload_powerup,
+            step.world.parts.combat_of(building.id).reload_powerup,
         );
-        self.place.go_inside(id, at, &mut step.w.spatial);
-        step.w.pathing.removed(id);
+        self.place.go_inside(id, at, &mut step.world.spatial);
+        step.world.pathing.removed(id);
         // a member of a unit group (+0x6d0) leaves the group the world holds, then stands
         // (slot 0x560)
         if let Some(group) = self.group.id {
-            if step.w.groups.get(group).is_some() {
+            if step.world.groups.get(group).is_some() {
                 step.lend((&mut *self, &mut *actions), |world| {
                     world
                         .remove_unit(group, id, Some(target.id()), LeavingWalk::Stands)
                         .map(drop)
                 })?;
             }
-            if let Some(mover) = step.w.parts.mover_mut(self.id) {
+            if let Some(mover) = step.world.parts.mover_mut(self.id) {
                 mover.stand()?;
             }
         }
         let building_radius = step
-            .w
+            .world
             .spatial
             .get(target)
             .map_or(bm.radius, |target_placed| target_placed.radius);
         self.life.inside = Some(target);
         self.join_building(step, Some(target), bp, reload, me, bm)?;
         self.enter_sight(step, target, at, building_radius, placed, bm)?;
-        let mut bell = step.w.parts.town_bell_of(id);
-        let ai = step.w.parts.unit_ai.get(id);
+        let mut bell = step.world.parts.town_bell_of(id);
+        let ai = step.world.parts.unit_ai.get(id);
         self.enter_town_bell((&mut bell, ai), Some(target), at, state, (me, bm), roles)?;
-        step.w.parts.set_town_bell(id, bell);
+        step.world.parts.set_town_bell(id, bell);
         Ok(())
     }
 
@@ -491,30 +494,30 @@ impl Unit {
         me: &Master,
         bm: &Master,
     ) -> GenieResult<()> {
-        let roles = &step.w.model.roles.clone();
+        let roles = &step.world.model.roles.clone();
         let masters = step
-            .w
+            .world
             .model
             .masters
             .get(step.player.index())
             .ok_or(NO_MASTERS)?;
         let firepower = if me.kind == MasterKind::COMBAT {
-            let own = step.w.model.masters.of(bp).unwrap_or(masters);
-            let rate = attack_rate(bm, own, reload, roles, &step.w.model.tuning.garrison);
+            let own = step.world.model.masters.of(bp).unwrap_or(masters);
+            let rate = attack_rate(bm, own, reload, roles, &step.world.model.tuning.garrison);
             share(
                 me,
                 masters,
-                step.w.parts.combat_of(self.id).reload_powerup,
+                step.world.parts.combat_of(self.id).reload_powerup,
                 rate,
                 roles,
             )?
         } else {
             Firepower::ZERO
         };
-        if let Some((_, unit)) = step.w.object_mut(target) {
+        if let Some((_, unit)) = step.world.object_mut(target) {
             unit.garrison.push(self.id);
             let id = unit.id;
-            step.w.parts.combat_mut(id)?.firepower += firepower;
+            step.world.parts.combat_mut(id)?.firepower += firepower;
         }
         Ok(())
     }
@@ -532,7 +535,7 @@ impl Unit {
         bm: &Master,
     ) -> GenieResult<()> {
         let id = self.id;
-        let Some(visibility) = step.w.spatial.sight.as_mut() else {
+        let Some(visibility) = step.world.spatial.sight.as_mut() else {
             return Ok(());
         };
         if let Some(registry) = visibility.registry.as_mut().filter(|_| 0 <= id.get()) {
@@ -559,8 +562,8 @@ impl Unit {
             let _ = visibility.sight_on_los(
                 target.id(),
                 LosSight::tile_circle(at, radius, INSIDE_SIGHT),
-                &step.w.model.roles,
-                step.w.model.tuning.visibility,
+                &step.world.model.roles,
+                step.world.model.tuning.visibility,
             )?;
         }
         Ok(())
@@ -631,7 +634,7 @@ impl Unit {
         if !actions.list.is_empty() {
             return self.end_head_update(actions, step, HeadCode::Deletes);
         }
-        if step.w.parts.unread.contains(self.id) {
+        if step.world.parts.unread.contains(self.id) {
             return Err(GenieError::unsupported(
                 "the inside update of an action the slice does not hold",
             ));

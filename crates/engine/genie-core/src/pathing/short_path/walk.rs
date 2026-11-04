@@ -15,20 +15,20 @@ struct NewWalk {
 }
 
 impl Search<'_> {
-    /// `FUN_140fa7b50`: from `p` on a new polygon's closing edge, walk the outline both ways at
+    /// `FUN_140fa7b50`: from `point` on a new polygon's closing edge, walk the outline both ways at
     /// once, the cheaper side first (ties forward): each corner the goal test does not end
     /// becomes a corner node toward the goal when it emits; each edge gets its foot test.
     pub(super) fn walk_new(
         &mut self,
         pi: PolyIndex,
-        p: FixedPoint,
+        point: FixedPoint,
         g0: FixedDistance,
         parent: NodeIndex,
     ) -> GenieResult<()> {
         let poly = self.poly(pi)?.clone();
         let count = poly.count();
         let walk = NewWalk { poly: pi, parent };
-        let (mut cb, mut cf) = self.walk_new_start(&walk, &poly, p, g0)?;
+        let (mut cb, mut cf) = self.walk_new_start(&walk, &poly, point, g0)?;
         let mut bi = VertexIndex::new(count - 1);
         let mut fi = VertexIndex::FIRST;
         if bi == VertexIndex::FIRST {

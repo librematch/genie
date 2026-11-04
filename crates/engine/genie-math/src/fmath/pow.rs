@@ -5,14 +5,14 @@ use crate::fmath::{INDEFINITE, ONE, sse_nan};
 /// `checkint` (`FUN_14099e9a0`) of powf's exponent bits: 0 not an integer, 1 an odd one, 2 an
 /// even one.
 pub(super) const fn powf_checkint(iy: u32) -> u32 {
-    let e = iy >> 23 & 0xff;
-    if e < 0x7f {
+    let exponent = iy >> 23 & 0xff;
+    if exponent < 0x7f {
         return 0;
     }
-    if e > 0x7f + 23 {
+    if exponent > 0x7f + 23 {
         return 2;
     }
-    let bit = 1u32 << (0x7f + 23 - e);
+    let bit = 1u32 << (0x7f + 23 - exponent);
     if iy & (bit - 1) != 0 {
         return 0;
     }
@@ -101,8 +101,8 @@ pub(super) const POWF_SIGN_BIAS: u64 = 0x1_0000;
 /// powf's overflow and underflow (`FUN_14099cb80`, `FUN_14099cb90` through `FUN_14099cba0`):
 /// `x` (2^97, 2^-95) times itself, negated with a sign bias.
 pub(super) fn powf_xflow(sign_bias: u64, x: f32) -> f32 {
-    let s = if sign_bias == 0 { x } else { -x };
-    x * s
+    let signed = if sign_bias == 0 { x } else { -x };
+    x * signed
 }
 
 /// powf (`FUN_14099e9e0`): musl's (Arm's optimized-routines) power, its log2 and exp2 in f64 over
@@ -163,20 +163,20 @@ pub fn powf(x: f32, y: f32) -> f32 {
     }
     // log2(x) = log1p(z / c - 1) / ln 2 + log2(c) + k
     let tmp = ix.wrapping_sub(0x3f33_0000);
-    let i = (tmp >> 19 & 0xf) as usize;
+    let index = (tmp >> 19 & 0xf) as usize;
     let top = tmp & 0xff80_0000;
     let iz = ix.wrapping_sub(top);
-    let k = (top as i32) >> 23;
-    let (invc, logc) = POWF_LOG2[i];
-    let a = POWF_LOG2_POLY.map(f64::from_bits);
-    let r = f64::from(f32::from_bits(iz)) * f64::from_bits(invc) - 1.0;
-    let y0 = f64::from(k) + f64::from_bits(logc);
-    let q = y0 + r * a[4];
-    let p = r * a[2] + a[3];
-    let poly = r * a[0] + a[1];
-    let r2 = r * r;
-    let q = q + p * r2;
-    let ylogx = (q + poly * (r2 * r2)) * f64::from(y);
+    let exponent = (top as i32) >> 23;
+    let (invc, logc) = POWF_LOG2[index];
+    let poly = POWF_LOG2_POLY.map(f64::from_bits);
+    let reduced = f64::from(f32::from_bits(iz)) * f64::from_bits(invc) - 1.0;
+    let y0 = f64::from(exponent) + f64::from_bits(logc);
+    let partial = y0 + reduced * poly[4];
+    let term = reduced * poly[2] + poly[3];
+    let poly = reduced * poly[0] + poly[1];
+    let r2 = reduced * reduced;
+    let partial = partial + term * r2;
+    let ylogx = (partial + poly * (r2 * r2)) * f64::from(y);
     if (ylogx.to_bits() >> 47 & 0xffff) as u16 >= 0x80bf {
         // |y log2 x| at least 126 (`COMISD`: above 0x1.fffffffd1d571p+6, at most −150)
         if ylogx > f64::from_bits(0x405f_ffff_ffd1_d571) {
@@ -190,10 +190,10 @@ pub fn powf(x: f32, y: f32) -> f32 {
     let shift = f64::from_bits(POWF_SHIFT);
     let kd = ylogx + shift;
     let ki = kd.to_bits();
-    let r = ylogx - (kd - shift);
-    let t = POWF_EXP2[(ki & 0x1f) as usize].wrapping_add(ki.wrapping_add(sign_bias) << 47);
-    let c = POWF_EXP2_POLY.map(f64::from_bits);
-    let z = r * c[0] + c[1];
-    let rest = r * c[2] + 1.0;
-    ((z * (r * r) + rest) * f64::from_bits(t)) as f32
+    let remainder = ylogx - (kd - shift);
+    let scale_bits = POWF_EXP2[(ki & 0x1f) as usize].wrapping_add(ki.wrapping_add(sign_bias) << 47);
+    let poly = POWF_EXP2_POLY.map(f64::from_bits);
+    let z = remainder * poly[0] + poly[1];
+    let rest = remainder * poly[2] + 1.0;
+    ((z * (remainder * remainder) + rest) * f64::from_bits(scale_bits)) as f32
 }

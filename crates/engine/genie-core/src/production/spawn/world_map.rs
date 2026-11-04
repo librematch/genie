@@ -15,24 +15,24 @@ use crate::production::spawn::NearFlags;
 use crate::unit_ai::task_finder::allied as task_finder_allied;
 use crate::vision::{VisionBits, VisionMasks};
 use crate::world::World;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 use crate::{GenieError, GenieResult};
 
 /// The map as the spawn's placement test reads it: the terrain, the players' sight and the
 /// objects with what their units and masters say.
-pub(crate) struct WorldMap<'a> {
-    pub(crate) turns: &'a World,
+pub(crate) struct WorldMap<'world> {
+    pub(crate) turns: &'world World,
 }
 
 impl WorldMap<'_> {
-    /// Terrain `t`'s flags (the `.dat`'s `is_water` byte, the map's terrain record `+2`), None
+    /// Terrain `index`'s flags (the `.dat`'s `is_water` byte, the map's terrain record `+2`), None
     /// beyond the terrains.
-    pub(crate) fn terrain_flags(&self, t: usize) -> Option<TerrainFlags> {
+    pub(crate) fn terrain_flags(&self, index: usize) -> Option<TerrainFlags> {
         self.turns
             .spatial
             .terrain
             .as_ref()
-            .and_then(|terrain| terrain.terrains.get(t))
+            .and_then(|terrain| terrain.terrains.get(index))
             .map(|terrain_kind| terrain_kind.flags)
     }
 
@@ -56,7 +56,7 @@ impl WorldMap<'_> {
     ///
     /// A map without its terrain, or a tile off it.
     pub(crate) fn terrain(&self, tile: Tile) -> GenieResult<TerrainId> {
-        let t = self
+        let terrain = self
             .turns
             .spatial
             .terrain
@@ -64,7 +64,7 @@ impl WorldMap<'_> {
             .ok_or(GenieError::unsupported(
                 "a placement test without the map's terrain",
             ))?;
-        t.kind(tile).ok_or(GenieError::unsupported(
+        terrain.kind(tile).ok_or(GenieError::unsupported(
             "a placement test off the map's tiles",
         ))
     }

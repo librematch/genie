@@ -109,7 +109,7 @@ mod tests {
     /// `FUN_1416397d0`'s relations: 1, 2 an enemy's, 3 a neutral's, 4, 5 an ally's, others none.
     #[test]
     fn stance_makes_its_relation() {
-        let relation = |s: u8| Stance::from(s).relation();
+        let relation = |byte: u8| Stance::from(byte).relation();
         assert_eq!(relation(0), None);
         assert_eq!(relation(1), Some(Relation::Enemy));
         assert_eq!(relation(2), Some(Relation::Enemy));

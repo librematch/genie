@@ -111,23 +111,23 @@ impl FromStr for ResourceKind {
 /// Parse a resource type as the archive stores it: reversed, with a UTF-8 name.
 impl TryFrom<[u8; 4]> for ResourceKind {
     type Error = GenieError;
-    fn try_from(mut u: [u8; 4]) -> Result<Self, Self::Error> {
-        u.reverse();
-        let _ = str::from_utf8(&u).map_err(|_| BAD_RESOURCE_KIND)?;
-        Ok(Self(u))
+    fn try_from(mut bytes: [u8; 4]) -> Result<Self, Self::Error> {
+        bytes.reverse();
+        let _ = str::from_utf8(&bytes).map_err(|_| BAD_RESOURCE_KIND)?;
+        Ok(Self(bytes))
     }
 }
 
 /// Parse a resource type from a byte slice of at most 4 bytes of UTF-8.
 impl TryFrom<&[u8]> for ResourceKind {
     type Error = GenieError;
-    fn try_from(u: &[u8]) -> Result<Self, Self::Error> {
-        let _ = str::from_utf8(u).map_err(|_| BAD_RESOURCE_KIND)?;
+    fn try_from(raw: &[u8]) -> Result<Self, Self::Error> {
+        let _ = str::from_utf8(raw).map_err(|_| BAD_RESOURCE_KIND)?;
         let mut bytes = [b' '; 4];
         bytes
-            .get_mut(..u.len())
+            .get_mut(..raw.len())
             .ok_or(BAD_RESOURCE_KIND)?
-            .copy_from_slice(u);
+            .copy_from_slice(raw);
         Ok(Self(bytes))
     }
 }
@@ -389,9 +389,9 @@ impl DrsResource {
 }
 
 /// An iterator over DRS table metadata structs.
-pub type DrsTableIterator<'a> = slice::Iter<'a, DrsTable>;
+pub type DrsTableIterator<'archive> = slice::Iter<'archive, DrsTable>;
 /// An iterator over DRS resource metadata structs.
-pub type DrsResourceIterator<'a> = slice::Iter<'a, DrsResource>;
+pub type DrsResourceIterator<'archive> = slice::Iter<'archive, DrsResource>;
 
 #[cfg(test)]
 mod tests {

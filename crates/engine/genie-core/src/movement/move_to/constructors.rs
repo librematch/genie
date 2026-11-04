@@ -39,9 +39,9 @@ const NO_TARGET_POINT: Position = Position::ORIGIN;
 /// speed (slot 0x208: without one the `MoveTo` starts failed, `0x140aa2100`), and its place and
 /// its master's radii, from which the gap to its target is measured (`FUN_14118f680`).
 #[derive(Clone, Copy, Debug)]
-pub struct MoveToReads<'a> {
+pub struct MoveToReads<'graphics> {
     /// The sprites a `MoveTo` takes when its maker gives none.
-    pub(crate) sprites: SpriteReads<'a>,
+    pub(crate) sprites: SpriteReads<'graphics>,
     /// The unit's object state.
     pub(crate) state: ObjectState,
     /// The unit's speed.
@@ -92,7 +92,7 @@ impl WalkTo {
     }
 }
 
-impl<'g> MoveToReads<'g> {
+impl<'graphics> MoveToReads<'graphics> {
     /// What a new `MoveTo` reads of `unit` with its mover `mover` (its motion layer's) of
     /// `master` (its own, or the one its task switches it to), with the sprites' table
     /// `graphics` and the unit's terrain look `look` (its combat layer's): an object without
@@ -101,13 +101,13 @@ impl<'g> MoveToReads<'g> {
     pub fn of(
         (unit, mover): (&Unit, Option<&Mover>),
         master: &Master,
-        (graphics, look): (&'g Graphics, Option<&Look>),
+        (graphics, look): (&'graphics Graphics, Option<&Look>),
         roles: &Roles,
     ) -> Self {
         Self {
             sprites: SpriteReads::of(master, look, graphics, roles),
             state: unit.life.state,
-            speed: mover.map_or(Speed::ZERO, |m| m.stats.speed),
+            speed: mover.map_or(Speed::ZERO, |mover| mover.stats.speed),
             at: unit.position(),
             ground: master.radius,
         }
@@ -117,13 +117,16 @@ impl<'g> MoveToReads<'g> {
     /// its state and speed, its place and the radii of its movement state (none for a unit that
     /// does not move).
     #[must_use]
-    pub fn with_sprites(sprites: SpriteReads<'g>, (unit, mover): (&Unit, Option<&Mover>)) -> Self {
+    pub fn with_sprites(
+        sprites: SpriteReads<'graphics>,
+        (unit, mover): (&Unit, Option<&Mover>),
+    ) -> Self {
         Self {
             sprites,
             state: unit.life.state,
-            speed: mover.map_or(Speed::ZERO, |m| m.stats.speed),
+            speed: mover.map_or(Speed::ZERO, |mover| mover.stats.speed),
             at: unit.position(),
-            ground: mover.map_or(Footprint::ZERO, |m| m.stats.radius.ground()),
+            ground: mover.map_or(Footprint::ZERO, |mover| mover.stats.radius.ground()),
         }
     }
 
@@ -280,14 +283,14 @@ impl Unit {
     /// # Errors
     ///
     /// A unit whose master the table lacks.
-    pub(crate) fn move_to_reads<'g>(
+    pub(crate) fn move_to_reads<'graphics>(
         &self,
         mover: Option<&Mover>,
         every: MasterTables<'_>,
         player: PlayerId,
-        graphics: (&'g Graphics, Option<&Look>),
+        graphics: (&'graphics Graphics, Option<&Look>),
         roles: &Roles,
-    ) -> GenieResult<MoveToReads<'g>> {
+    ) -> GenieResult<MoveToReads<'graphics>> {
         Ok(MoveToReads::of(
             (self, mover),
             self.master(every, player)?,
@@ -363,7 +366,7 @@ mod tests {
         );
         assert_eq!(
             (
-                move_to_action.sprite.map(|g| g.id),
+                move_to_action.sprite.map(|graphic| graphic.id),
                 move_to_action.voice,
                 move_to_action.wait
             ),
@@ -372,7 +375,7 @@ mod tests {
         assert_eq!(
             to(&move_reads, house, Some(SpriteId::named(3)))
                 .sprite
-                .map(|g| g.id),
+                .map(|graphic| graphic.id),
             Some(SpriteId::named(3))
         );
         let near = WalkTo {

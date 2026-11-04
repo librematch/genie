@@ -15,12 +15,12 @@ use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::PlayersMasters;
+use crate::objects::masters::PlayersMastersExt;
 use crate::objects::unit::UnitFlags;
 use crate::players::PlayerId;
 use crate::world::WholeSeconds;
-use crate::world::slots::CheckedIndex;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::CheckedIndexExt;
+use crate::world::slots::PlayerSlotsExt;
 use std::collections::BTreeMap;
 
 use crate::construction::build::{ClearLook, clearing_objects, footprint_clearing};
@@ -72,7 +72,7 @@ impl World {
             "a footprint's foundation the slice does not hold",
         ))?;
         let radius = site.master(self.master_tables(), site_owner)?.radius;
-        let p = [
+        let params = [
             (radius.x() * self.model.tuning.unit_ai.radius_scale) as i32,
             (radius.y() * self.model.tuning.unit_ai.radius_scale) as i32,
             foundation.id().get(),
@@ -135,7 +135,7 @@ impl World {
                 .unit_ai
                 .get_mut(self.players.live(player_id, list_index)?.id)
             {
-                ai.post(Notify::own(id, NotifyKind::SENT_OFF, p), state)?;
+                ai.post(Notify::own(id, NotifyKind::SENT_OFF, params), state)?;
             }
         }
         if !together.is_empty() {
@@ -199,14 +199,18 @@ impl World {
         let listed: Vec<Option<ObjectId>> = units.iter().map(|&id| Some(id)).collect();
         let loose = self.loose_units(&listed)?;
         for id in loose {
-            let Some(Place::Live(q, i)) = self.place(id) else {
+            let Some(Place::Live(player_id, list_index)) = self.place(id) else {
                 continue;
             };
-            let z = self.players.live(q, i)?.position().z();
-            if let Some(ai) = self.parts.unit_ai.get_mut(self.players.live(q, i)?.id) {
+            let z = self.players.live(player_id, list_index)?.position().z();
+            if let Some(ai) = self
+                .parts
+                .unit_ai
+                .get_mut(self.players.live(player_id, list_index)?.id)
+            {
                 ai.set_action(Some(AiAction::MoveAside));
             }
-            self.move_point_order(q, i, Position::new(x, y, z))?;
+            self.move_point_order(player_id, list_index, Position::new(x, y, z))?;
         }
         for &id in units {
             let Some(Place::Live(player_id, list_index)) = self.place(id) else {
@@ -245,18 +249,18 @@ impl World {
         let Some(&(_, laid)) = farms.iter().find(|(master_id, _)| *master_id == master) else {
             return Ok(());
         };
-        let m = self.master(player, master)?;
-        if m.creatable_part().build_time <= WholeSeconds::ZERO {
+        let site = self.master(player, master)?;
+        if site.creatable_part().build_time <= WholeSeconds::ZERO {
             return Ok(());
         }
         let foundation = Foundation {
             position,
-            clearance: m.clearance,
+            clearance: site.clearance,
             terrain: laid,
             snow: Snow::None,
             master,
-            class: m.class,
-            terrain_bonus: m.combat_part().terrain_bonus,
+            class: site.class,
+            terrain_bonus: site.combat_part().terrain_bonus,
             mode_680: self.mode_680,
         };
         self.spatial
@@ -284,14 +288,14 @@ impl World {
         at: Point,
         by: Clearer,
     ) -> GenieResult<()> {
-        let Some(m) = player_master(&self.model.masters, player, master) else {
+        let Some(site) = player_master(&self.model.masters, player, master) else {
             return Ok(());
         };
         let site = ClearingSite {
             player,
             master,
-            class: m.class,
-            radius: m.radius,
+            class: site.class,
+            radius: site.radius,
             at,
             by,
         };

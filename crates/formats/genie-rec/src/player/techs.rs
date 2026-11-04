@@ -1,6 +1,6 @@
 //! The technologies' states, and `UserPatch`'s extra player data.
 
-use crate::element::ReadableHeaderElement;
+use crate::element::ReadHeader;
 use crate::reader::RecordingHeaderReader;
 use byteorder::{LE, ReadBytesExt};
 use genie_error::GenieResult;
@@ -20,7 +20,7 @@ pub struct TechState {
     pub time_modifier: i16,
 }
 
-impl ReadableHeaderElement for TechState {
+impl ReadHeader for TechState {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         Ok(Self {
             progress: input.read_f32::<LE>()?,
@@ -42,7 +42,7 @@ pub struct PlayerTech {
     pub tech_states: Vec<TechState>,
 }
 
-impl ReadableHeaderElement for PlayerTech {
+impl ReadHeader for PlayerTech {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let num_techs = input.read_u16::<LE>()?;
         let tech_states = read_list(usize::from(num_techs), || TechState::read_from(input))?;
@@ -54,7 +54,7 @@ impl ReadableHeaderElement for PlayerTech {
 #[derive(Debug, Clone, Copy)]
 pub struct UserPatchData {}
 
-impl ReadableHeaderElement for UserPatchData {
+impl ReadHeader for UserPatchData {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         {
             let mut bytes = vec![0; 4080];

@@ -1,6 +1,6 @@
 //! The build AI module (its build list) and the construction AI module (its lots).
 
-use crate::element::ReadableHeaderElement;
+use crate::element::ReadHeader;
 use crate::reader::RecordingHeaderReader;
 use byteorder::{LE, ReadBytesExt};
 use genie_error::GenieResult;
@@ -41,7 +41,7 @@ pub struct BuildItem {
     pub is_forward: bool,
 }
 
-impl ReadableHeaderElement for BuildItem {
+impl ReadHeader for BuildItem {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let mut item = Self {
             name: input.read_u32_length_prefixed_str()?,
@@ -102,7 +102,7 @@ pub struct BuildAi {
     pub queued_unit_count: u32,
 }
 
-impl ReadableHeaderElement for BuildAi {
+impl ReadHeader for BuildAi {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let mut ai = Self::default();
         let build_list_len = input.read_u32::<LE>()?;
@@ -157,7 +157,7 @@ pub struct ConstructionItem {
     pub built: u32,
 }
 
-impl ReadableHeaderElement for ConstructionItem {
+impl ReadHeader for ConstructionItem {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let mut item = Self {
             name: input.read_u32_length_prefixed_str()?,
@@ -196,7 +196,7 @@ pub struct ConstructionAi {
     pub random_construction_lots: Vec<ConstructionItem>,
 }
 
-impl ReadableHeaderElement for ConstructionAi {
+impl ReadHeader for ConstructionAi {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let mut ai = Self::default();
         let num_lots = input.read_u32::<LE>()?;

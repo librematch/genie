@@ -14,11 +14,11 @@ use crate::pathing::hull_path::{
     DIRECTIONS, HALF, HULL_ITERATIONS, HullIndex, HullPather, NUDGE, Node, NodeIndex, NodeList,
     ONE, Point, SIDES, SQRT_2, Target, WalkResult, Waypoints, Within, walk_length,
 };
-use crate::world::slots::CheckedIndex;
+use crate::world::slots::CheckedIndexExt;
 
 /// A walk out of a hull ([`HullPather::walk_out`]'s arguments, `FUN_140f8cf00`'s order).
 #[derive(Debug)]
-pub(super) struct WalkOut<'a> {
+pub(super) struct WalkOut<'ways> {
     /// The hull the start is inside.
     pub(super) hull: HullIndex,
     /// The start.
@@ -32,11 +32,11 @@ pub(super) struct WalkOut<'a> {
     /// Whether each way out is nudged back into the hull.
     pub(super) nudge: bool,
     /// The paths it leaves.
-    pub(super) paths: &'a mut [Waypoints],
+    pub(super) paths: &'ways mut [Waypoints],
     /// How many ways out it keeps at most.
     pub(super) most: usize,
     /// How many it kept.
-    pub(super) count: &'a mut usize,
+    pub(super) count: &'ways mut usize,
 }
 
 /// How a walk out stands at a node: on, at its goal or at its target.
@@ -98,24 +98,24 @@ impl HullPather<'_> {
         path: &mut Waypoints,
     ) -> GenieResult<bool> {
         let hits = self.hits(from, to)?;
-        let is_target = |id: RecordId| target.is_some_and(|t| id == t);
+        let is_target = |id: RecordId| target.is_some_and(|object_id| id == object_id);
         let obstacle = match hits[..] {
             [] => {
                 path.push(from);
                 path.push(to);
                 return Ok(true);
             }
-            [h] if is_target(h.id) => {
+            [only] if is_target(only.id) => {
                 path.push(from);
                 path.push(to);
                 return Ok(true);
             }
-            [h] => h,
-            [a, b] if target.is_some() => {
-                if is_target(a.id) {
-                    b
-                } else if is_target(b.id) {
-                    a
+            [hit] => hit,
+            [first, second] if target.is_some() => {
+                if is_target(first.id) {
+                    second
+                } else if is_target(second.id) {
+                    first
                 } else {
                     return Ok(false);
                 }
@@ -173,31 +173,31 @@ impl HullPather<'_> {
     // The walks within a hull.
 
     /// The points about box `rect` a walk within a hull starts from: from the sides facing the
-    /// region of `p` about the box (inside it, its nearest side and those within the radius), a
+    /// region of `from` about the box (inside it, its nearest side and those within the radius), a
     /// point every `step` of the side's length, [`NUDGE`] off the box; with `reach`, only those
-    /// within it of `p`; none inside a box of the hull. [`Steps::Made`] when one was.
+    /// within it of `from`; none inside a box of the hull. [`Steps::Made`] when one was.
     pub(super) fn side_points(
         &mut self,
         hull: HullIndex,
         root: NodeIndex,
         rect: Rect,
-        p: Point,
+        from: Point,
         step: f32,
         reach: Option<(Point, f32)>,
     ) -> GenieResult<Steps> {
         let (x0, y0, x1, y1) = (rect.x0(), rect.y0(), rect.x1(), rect.y1());
         // `COMISS`/`JA`, then `SETBE`; `JBE`, then `CMOVA` (0x140f8d1fc..0x140f8d235,
         // 0x140f893a4..0x140f893d0): an unordered coordinate counts past the box's far side
-        let col = if p.x() < x0 {
+        let col = if from.x() < x0 {
             0
-        } else if p.x() < x1 {
+        } else if from.x() < x1 {
             1
         } else {
             2
         };
-        let row = if p.y() < y0 {
+        let row = if from.y() < y0 {
             0
-        } else if p.y() < y1 {
+        } else if from.y() < y1 {
             3
         } else {
             6
@@ -208,27 +208,30 @@ impl HullPather<'_> {
             2 => [true, true, false, false],
             3 => [false, false, false, true],
             4 => {
-                let (down, right, up) = (p.y() - y0, x1 - p.x(), y1 - p.y());
-                let mut m = down;
+                let (down, right, up) = (from.y() - y0, x1 - from.x(), y1 - from.y());
+                let mut least = down;
                 let mut side = usize::from(right < down);
                 if right < down {
-                    m = right;
+                    least = right;
                 }
                 let distance = self.radius;
                 let mut sides = [
                     down < distance.get(),
                     right < distance.get(),
                     up < distance.get(),
-                    p.x() - x0 < distance.get(),
+                    from.x() - x0 < distance.get(),
                 ];
-                if up < m {
+                if up < least {
                     side = 2;
-                    m = up;
+                    least = up;
                 }
-                if p.x() - x0 < m {
+                if from.x() - x0 < least {
                     side = 3;
                 }
-                sides.get_mut(side).into_iter().for_each(|s| *s = true);
+                sides
+                    .get_mut(side)
+                    .into_iter()
+                    .for_each(|marked| *marked = true);
                 sides
             }
             5 => [false, true, false, false],
@@ -237,11 +240,12 @@ impl HullPather<'_> {
             _ => [false, true, true, false],
         };
         // a point farther than the reach is left out (`COMISS`/`JA`, 0x140f8d620)
-        let near = |q: Point| {
-            reach.is_none_or(|(c, d)| {
+        let near = |candidate: Point| {
+            reach.is_none_or(|(point, limit)| {
                 at_most_or_unordered(
-                    (c.x() - q.x()) * (c.x() - q.x()) + (c.y() - q.y()) * (c.y() - q.y()),
-                    d * d,
+                    (point.x() - candidate.x()) * (point.x() - candidate.x())
+                        + (point.y() - candidate.y()) * (point.y() - candidate.y()),
+                    limit * limit,
                 )
             })
         };
@@ -266,10 +270,10 @@ impl HullPather<'_> {
         if sides[0] {
             let y = y0 - NUDGE;
             let mut x = x0 + NUDGE;
-            let d = (x1 - x0) * step;
+            let stride = (x1 - x0) * step;
             while x < x1 {
                 add(self, Point::new(x, y))?;
-                x += d;
+                x += stride;
             }
         }
         if sides[1] {
@@ -305,7 +309,7 @@ impl HullPather<'_> {
         &mut self,
         hull: HullIndex,
         root: NodeIndex,
-        p: Point,
+        from: Point,
         goal: Option<Point>,
     ) -> GenieResult<Steps> {
         let hull_path_tuning = &self.by_id.tuning().hull_path;
@@ -313,12 +317,12 @@ impl HullPather<'_> {
         let mut made = Steps::NoneMade;
         for dir in DIRECTIONS {
             let mut point = Point::new(
-                distance.get() * dir.x() + p.x(),
-                distance.get() * dir.y() + p.y(),
+                distance.get() * dir.x() + from.x(),
+                distance.get() * dir.y() + from.y(),
             );
             if let Some((at, _)) = self.hulls.checked(hull.index())?.intersection(
                 AtStart::Ignored,
-                p,
+                from,
                 point,
                 hull_path_tuning,
             ) {
@@ -370,31 +374,31 @@ impl HullPather<'_> {
         let hull_path_tuning = &self.by_id.tuning().hull_path;
         let at = self.nodes.checked(end)?.at;
         let cost = self.nodes.checked(end)?.cost;
-        let mut k = 0;
-        while k < *count {
+        let mut index = 0;
+        while index < *count {
             let last = *paths
-                .checked(k)?
+                .checked(index)?
                 .points
                 .last()
                 .unwrap_or(&Point::new(f32::NAN, f32::NAN));
             if (at.x() - last.x()).abs() < hull_path_tuning.same_end
                 && (at.y() - last.y()).abs() < hull_path_tuning.same_end
             {
-                if paths.checked(k)?.cost < cost {
+                if paths.checked(index)?.cost < cost {
                     return Ok(None);
                 }
                 break;
             }
-            k += 1;
+            index += 1;
         }
-        if k == *count {
+        if index == *count {
             *count += 1;
         } else {
-            paths.checked_mut(k)?.points.clear();
+            paths.checked_mut(index)?.points.clear();
         }
-        self.build_path(paths.checked_mut(k)?, end)?;
-        paths.checked_mut(k)?.cost = cost;
-        Ok(Some(k))
+        self.build_path(paths.checked_mut(index)?, end)?;
+        paths.checked_mut(index)?.cost = cost;
+        Ok(Some(index))
     }
 
     /// `MShortPather::pathWithinHull` out of a hull (`FUN_140f8cf00`): from `from` inside hull
@@ -423,7 +427,7 @@ impl HullPather<'_> {
         let mut left_boxes = false;
         self.empty(NodeList::WALKS)?;
         let mut nearest: Option<NodeIndex> = None;
-        let mut best = goal.map_or(Distance::ZERO, |g| walk_length(from, g));
+        let mut best = goal.map_or(Distance::ZERO, |point| walk_length(from, point));
         let (inside, stuck) = self.begin_walk_out(hull, from, goal)?;
         if stuck {
             return Ok(Within {
@@ -516,16 +520,16 @@ impl HullPather<'_> {
         match (target, goal) {
             (None, None) => WalkEnd::Going,
             (None, Some(point)) => {
-                let d = (at.y() - point.y()) * (at.y() - point.y())
+                let distance = (at.y() - point.y()) * (at.y() - point.y())
                     + (at.x() - point.x()) * (at.x() - point.x());
-                if d <= (self.radius + range).squared().get() + NUDGE {
+                if distance <= (self.radius + range).squared().get() + NUDGE {
                     WalkEnd::Goal
                 } else {
                     WalkEnd::Going
                 }
             }
-            (Some(t), _) => {
-                if self.target_gap(t, at) <= range + Distance::new(NUDGE) {
+            (Some(target), _) => {
+                if self.target_gap(target, at) <= range + Distance::new(NUDGE) {
                     WalkEnd::Target
                 } else {
                     WalkEnd::Going
@@ -554,12 +558,17 @@ impl HullPather<'_> {
             direction: -1,
         })?;
         let inside = self.hulls.checked(hull.index())?.box_holding(from);
-        let Some(b) = inside else {
+        let Some(object) = inside else {
             return Ok((inside, false));
         };
         self.close(NodeList::WALKS, root)?;
         let mut made = self.first_steps(hull, root, from, goal)? == Steps::Made;
-        let bounds = self.hulls.checked(hull.index())?.objects.checked(b)?.bounds;
+        let bounds = self
+            .hulls
+            .checked(hull.index())?
+            .objects
+            .checked(object)?
+            .bounds;
         let distance = self.radius + self.radius;
         made |= self.side_points(
             hull,
@@ -619,18 +628,18 @@ impl HullPather<'_> {
             if !Self::may_cast(&checked, side) {
                 continue;
             }
-            if let Some((q, b, box_side)) =
-                self.hulls
-                    .checked(hull.index())?
-                    .ray_to_box(at, side, checked.hull)
+            if let Some((point, hull_index, box_side)) = self
+                .hulls
+                .checked(hull.index())?
+                .ray_to_box(at, side, checked.hull)
             {
                 let _ = self.add_node(NewNode {
                     list: NodeList::WALKS,
                     open: true,
                     parent: Some(node),
-                    position: q,
+                    position: point,
                     goal,
-                    hull: b as i32,
+                    hull: hull_index as i32,
                     vertex: box_side,
                     direction: side,
                     by_place: true,

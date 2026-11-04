@@ -99,7 +99,7 @@ mod tests {
         assert!(list.capacity() <= RESERVE_CAP);
         let mut input = Cursor::new(vec![1u8, 2, 3]);
         assert_eq!(
-            read_bytes(&mut input, usize::MAX).map_err(|e| e.reason()),
+            read_bytes(&mut input, usize::MAX).map_err(|error| error.reason()),
             Err("a list past the input's end")
         );
         let mut input = Cursor::new(vec![1u8, 2, 3]);
@@ -113,7 +113,7 @@ mod tests {
         );
         let mut input = Cursor::new(vec![0u8; 4]);
         assert_eq!(
-            read_le(&mut input, usize::MAX, f32::from_le_bytes).map_err(|e| e.reason()),
+            read_le(&mut input, usize::MAX, f32::from_le_bytes).map_err(|error| error.reason()),
             Err("a list longer than the address space")
         );
         let mut input = Cursor::new(vec![0u8; 4]);
@@ -127,11 +127,15 @@ mod tests {
             Ok::<_, &str>(next)
         });
         assert_eq!(read, Ok(vec![1, 2, 3]));
-        let mut n = 0;
+        let mut calls = 0;
         assert_eq!(
             read_list(usize::MAX, || {
-                n += 1;
-                if n < 4 { Ok(n) } else { Err("the input's end") }
+                calls += 1;
+                if calls < 4 {
+                    Ok(calls)
+                } else {
+                    Err("the input's end")
+                }
             }),
             Err("the input's end")
         );

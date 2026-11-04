@@ -57,8 +57,8 @@ mod tests {
     #[test]
     fn the_targets_hold_bit_per_group() {
         assert_eq!(ChargeTarget::EVERY.bits(), 0xffff);
-        assert!((0..16).all(|g| ChargeTarget::EVERY.holds(g)));
-        assert!(!(0..16).any(|g| ChargeTarget::ALL_BUT_BUILDINGS.holds(g)));
+        assert!((0..16).all(|group| ChargeTarget::EVERY.holds(group)));
+        assert!(!(0..16).any(|group| ChargeTarget::ALL_BUT_BUILDINGS.holds(group)));
         let charge_target = ChargeTarget::of_data(0b1010_0000);
         assert!(charge_target.holds(5) && charge_target.holds(7) && !charge_target.holds(6));
         assert_eq!(charge_target.get(), 0xa0);

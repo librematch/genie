@@ -14,7 +14,7 @@ use crate::pathing::hull_path::rounds::Rounds;
 use crate::pathing::hull_path::{
     HALF, HullPather, HullQuery, NodeIndex, NodeList, Point, Target, Waypoints, walk_length,
 };
-use crate::world::slots::CheckedIndex;
+use crate::world::slots::CheckedIndexExt;
 
 /// Whether a search keeps the area and the hulls of the pather's last one (`FindShortPath`'s
 /// argument 11, when the pather has an area) or makes a new area and builds them.
@@ -188,8 +188,13 @@ impl HullPather<'_> {
         target_id: Option<ObjectId>,
     ) -> GenieResult<bool> {
         let radius = self.radius.get();
-        let (w, h) = (self.world.map.width(), self.world.map.height());
-        self.bounds = Rect::new(radius, radius, w as f32 - radius, h as f32 - radius);
+        let (width, height) = (self.world.map.width(), self.world.map.height());
+        self.bounds = Rect::new(
+            radius,
+            radius,
+            width as f32 - radius,
+            height as f32 - radius,
+        );
         let (bx1, by1) = (self.bounds.x1(), self.bounds.y1());
         // each bound by `COMISS`/`JA` (0x140f8569f..0x140f85701): an unordered coordinate passes
         if from.x() < radius || bx1 < from.x() || from.y() < radius || by1 < from.y() {
@@ -262,11 +267,11 @@ impl HullPather<'_> {
             && !hull_query
                 .target
                 .as_ref()
-                .is_some_and(|t| t.at.x() != to.x() && t.at.y() != to.y())
+                .is_some_and(|target| target.at.x() != to.x() && target.at.y() != to.y())
         {
-            let v = [to.x() - from.x(), to.y() - from.y(), 0.0];
-            let len = sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
-            let (ux, uy) = (v[0] / len, v[1] / len);
+            let delta = [to.x() - from.x(), to.y() - from.y(), 0.0];
+            let len = sqrt(delta[0] * delta[0] + delta[1] * delta[1] + delta[2] * delta[2]);
+            let (ux, uy) = (delta[0] / len, delta[1] / len);
             return Point::new(
                 ux * hull_query.range.get() + to.x(),
                 uy * hull_query.range.get() + to.y(),
@@ -278,9 +283,9 @@ impl HullPather<'_> {
             && target.at.y() == to.y()
         {
             let (dx, dy) = (to.x() - from.x(), to.y() - from.y());
-            let d = dy * dy + dx * dx;
-            if target.moves || d <= hull_path_tuning.near_target {
-                let len = sqrt(d);
+            let squared = dy * dy + dx * dx;
+            if target.moves || squared <= hull_path_tuning.near_target {
+                let len = sqrt(squared);
                 goal = Point::new(
                     goal.x() - (dx / len) * (distance.get() + target.radius.x()),
                     goal.y() - (dy / len) * (distance.get() + target.radius.y()),
@@ -297,8 +302,8 @@ impl HullPather<'_> {
         if hulls == Hulls::Kept && self.area.x0() != NO_AREA.x0() {
             return Hulls::Kept;
         }
-        let (w, h) = (self.world.map.width(), self.world.map.height());
-        let tile = |v: f32, d: i32| cvttss2si(v).wrapping_add(d);
+        let (width, height) = (self.world.map.width(), self.world.map.height());
+        let tile = |coordinate: f32, offset: i32| cvttss2si(coordinate).wrapping_add(offset);
         let x0 = tile(minss(from.x(), to.x()), -2);
         let y0 = tile(minss(from.y(), to.y()), -2);
         let x1 = tile(maxss(from.x(), to.x()), 2);
@@ -306,8 +311,8 @@ impl HullPather<'_> {
         self.area = TileRect::new(
             x0.max(0),
             y0.max(0),
-            if w <= x1 { w - 1 } else { x1 },
-            if h <= y1 { h - 1 } else { y1 },
+            if width <= x1 { width - 1 } else { x1 },
+            if height <= y1 { height - 1 } else { y1 },
         );
         Hulls::New
     }

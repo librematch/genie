@@ -7,7 +7,7 @@ use crate::map::Position;
 use crate::map::spatial::Spatial;
 use crate::math::fmath::BVector;
 use crate::movement::LevelFlags;
-use crate::movement::Levels;
+use crate::movement::LevelsExt;
 use crate::movement::PathFlags;
 use crate::movement::PathState;
 use crate::movement::{EPSILON, Goal, Motion, Mover, Next, footprint_gap, gate_gap};
@@ -60,7 +60,7 @@ impl Mover {
             None if !level.path_flags.contains(PathFlags::LOOPS)
                 && movement_tuning.range_floor < level.range.get() =>
             {
-                if let Some(&end) = self.top_path().and_then(|p| p.last()) {
+                if let Some(&end) = self.top_path().and_then(|path| path.last()) {
                     let gap = footprint_gap(
                         at,
                         ground_radius,

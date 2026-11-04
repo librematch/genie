@@ -140,15 +140,15 @@ impl<T> ByRelation<T> {
         UnitRelation::ALL.into_iter().zip(&self.0)
     }
 
-    /// The table of `f` of each value.
-    pub fn map<U>(&self, f: impl FnMut(&T) -> U) -> ByRelation<U> {
-        ByRelation(self.0.each_ref().map(f))
+    /// The table of `transform` of each value.
+    pub fn map<U>(&self, transform: impl FnMut(&T) -> U) -> ByRelation<U> {
+        ByRelation(self.0.each_ref().map(transform))
     }
 }
 
-impl<'a, T> IntoIterator for &'a ByRelation<T> {
-    type Item = (UnitRelation, &'a T);
-    type IntoIter = Zip<ArrayIter<UnitRelation, 5>, SliceIter<'a, T>>;
+impl<'table, T> IntoIterator for &'table ByRelation<T> {
+    type Item = (UnitRelation, &'table T);
+    type IntoIter = Zip<ArrayIter<UnitRelation, 5>, SliceIter<'table, T>>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
@@ -191,7 +191,7 @@ mod tests {
             .map(|(unit_relation, _)| unit_relation.get())
             .collect();
         assert_eq!(order, [4, 3, 2, 1, 0]);
-        assert_eq!(lists.map(|v| v * 2).values(), &[0, 20, 4, 6, 8]);
+        assert_eq!(lists.map(|value| value * 2).values(), &[0, 20, 4, 6, 8]);
     }
 
     /// Each named value and one the set names nowhere go to their variant and back.

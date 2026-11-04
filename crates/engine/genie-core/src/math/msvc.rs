@@ -5,7 +5,7 @@
 //! `pred(a, b)` is the sort's comparator: true when `a` goes before `b`.
 
 use crate::GenieResult;
-use crate::world::slots::CheckedIndex;
+use crate::world::slots::CheckedIndexExt;
 use std::mem::take;
 
 /// `std::sort` (`_Sort_unchecked`, the tile pathfinder's at `0x140f9c510`): quicksort by the
@@ -24,15 +24,15 @@ pub fn sort<T: Copy>(values: &mut [T], pred: &impl Fn(T, T) -> bool) -> GenieRes
 /// `_ISORT_MAX`.
 const INSERTION_MAX: usize = 32;
 
-/// The element at `i` of `values`.
-fn at<T: Copy>(values: &[T], i: usize) -> GenieResult<T> {
-    values.checked(i).copied()
+/// The element at `index` of `values`.
+fn at<T: Copy>(values: &[T], index: usize) -> GenieResult<T> {
+    values.checked(index).copied()
 }
 
-/// `std::iter_swap` of the elements at `a` and `b` of `values`.
-fn swap<T>(values: &mut [T], a: usize, b: usize) -> GenieResult<()> {
-    let _ = (values.checked(a)?, values.checked(b)?);
-    values.swap(a, b);
+/// `std::iter_swap` of the elements at `first` and `second` of `values`.
+fn swap<T>(values: &mut [T], first: usize, second: usize) -> GenieResult<()> {
+    let _ = (values.checked(first)?, values.checked(second)?);
+    values.swap(first, second);
     Ok(())
 }
 
@@ -133,9 +133,9 @@ fn guess_median<T: Copy>(
     }
 }
 
-/// Whether neither of `a` and `b` goes before the other.
-fn equal<T: Copy>(a: T, b: T, pred: &impl Fn(T, T) -> bool) -> bool {
-    !pred(a, b) && !pred(b, a)
+/// Whether neither of `left` and `right` goes before the other.
+fn equal<T: Copy>(left: T, right: T, pred: &impl Fn(T, T) -> bool) -> bool {
+    !pred(left, right) && !pred(right, left)
 }
 
 /// `_Partition_by_median_guess_unchecked` (`0x140f9c210`): the range of elements equal to the
@@ -211,9 +211,9 @@ fn scan_up<T: Copy>(
     pred: &impl Fn(T, T) -> bool,
 ) -> GenieResult<(usize, usize)> {
     while gfirst < last {
-        let (pivot, g) = (at(values, pfirst)?, at(values, gfirst)?);
-        if pred(pivot, g) {
-        } else if pred(g, pivot) {
+        let (pivot, at) = (at(values, pfirst)?, at(values, gfirst)?);
+        if pred(pivot, at) {
+        } else if pred(at, pivot) {
             break;
         } else {
             if plast != gfirst {
@@ -236,9 +236,9 @@ fn scan_down<T: Copy>(
     pred: &impl Fn(T, T) -> bool,
 ) -> GenieResult<(usize, usize)> {
     while first < glast {
-        let (g, pivot) = (at(values, glast - 1)?, at(values, pfirst)?);
-        if pred(g, pivot) {
-        } else if pred(pivot, g) {
+        let (at, pivot) = (at(values, glast - 1)?, at(values, pfirst)?);
+        if pred(at, pivot) {
+        } else if pred(pivot, at) {
             break;
         } else {
             pfirst -= 1;
@@ -344,19 +344,20 @@ impl IntKey for i32 {
 fn bucket(key: impl IntKey, mask: u64) -> u64 {
     const OFFSET: u64 = 0xcbf2_9ce4_8422_2325;
     const PRIME: u64 = 0x0100_0000_01b3;
-    let hash = key
-        .int()
-        .to_le_bytes()
-        .iter()
-        .fold(OFFSET, |h, &b| (h ^ u64::from(b)).wrapping_mul(PRIME));
+    let hash = key.int().to_le_bytes().iter().fold(OFFSET, |hash, &byte| {
+        (hash ^ u64::from(byte)).wrapping_mul(PRIME)
+    });
     hash & mask
 }
 
 /// A new key goes in front of its bucket's elements, or at the list's end when its bucket is
 /// empty (`_Find_last`'s insertion point, then `_Insert_new_node_before`).
 fn insert_in_bucket<K: IntKey>(list: &mut Vec<K>, key: K, mask: u64) {
-    let b = bucket(key, mask);
-    match list.iter().position(|&k| bucket(k, mask) == b) {
+    let wanted = bucket(key, mask);
+    match list
+        .iter()
+        .position(|&listed| bucket(listed, mask) == wanted)
+    {
         Some(lo) => list.insert(lo, key),
         None => list.push(key),
     }
@@ -389,8 +390,8 @@ pub fn unordered_map_order<K: IntKey>(keys: impl IntoIterator<Item = K>) -> Vec<
             buckets = buckets.next_power_of_two();
             let mask = buckets as u64 - 1;
             let old = take(&mut list);
-            for k in old {
-                insert_in_bucket(&mut list, k, mask);
+            for key in old {
+                insert_in_bucket(&mut list, key, mask);
             }
         }
         insert_in_bucket(&mut list, key, buckets as u64 - 1);
@@ -403,8 +404,11 @@ mod tests {
     use super::*;
 
     /// Pairs sorted by their key, descending, as the pathfinder sorts its open nodes.
-    fn by_key(v: &mut [(u32, usize)]) {
-        sort(v, &|a: (u32, usize), b: (u32, usize)| a.0 > b.0).unwrap();
+    fn by_key(pairs: &mut [(u32, usize)]) {
+        sort(pairs, &|left: (u32, usize), right: (u32, usize)| {
+            left.0 > right.0
+        })
+        .unwrap();
     }
 
     #[test]
@@ -426,25 +430,25 @@ mod tests {
 
     #[test]
     fn short_range_sorts_by_insertion_and_keeps_equal_elements_in_order() {
-        let mut v: Vec<(u32, usize)> = [3, 1, 3, 2, 1, 3].iter().copied().zip(0..).collect();
-        by_key(&mut v);
-        assert_eq!(v, [(3, 0), (3, 2), (3, 5), (2, 3), (1, 1), (1, 4)]);
+        let mut pairs: Vec<(u32, usize)> = [3, 1, 3, 2, 1, 3].iter().copied().zip(0..).collect();
+        by_key(&mut pairs);
+        assert_eq!(pairs, [(3, 0), (3, 2), (3, 5), (2, 3), (1, 1), (1, 4)]);
     }
 
     #[test]
     fn long_range_is_sorted_and_keeps_every_element() {
         // a fixed pseudo-random sequence with many equal keys (an LCG)
         let mut x = 12345u32;
-        let mut v: Vec<(u32, usize)> = (0..500)
-            .map(|i| {
+        let mut pairs: Vec<(u32, usize)> = (0..500)
+            .map(|index| {
                 x = x.wrapping_mul(1_103_515_245).wrapping_add(12345);
-                ((x >> 16) % 37, i)
+                ((x >> 16) % 37, index)
             })
             .collect();
-        let mut expected = v.clone();
-        by_key(&mut v);
-        assert!(v.windows(2).all(|w| w[0].0 >= w[1].0));
-        let mut got = v.clone();
+        let mut expected = pairs.clone();
+        by_key(&mut pairs);
+        assert!(pairs.windows(2).all(|window| window[0].0 >= window[1].0));
+        let mut got = pairs.clone();
         got.sort_unstable();
         expected.sort_unstable();
         assert_eq!(got, expected);
@@ -452,22 +456,28 @@ mod tests {
 
     #[test]
     fn the_heap_sort_sorts_when_no_divisions_are_left() {
-        let mut v: Vec<(u32, usize)> = (0..100).map(|i| ((i * 7919 % 100) as u32, i)).collect();
-        let count = v.len();
-        sort_unchecked(&mut v, 0, count, 0, &|a: (u32, usize), b: (u32, usize)| {
-            a.0 > b.0
-        })
+        let mut pairs: Vec<(u32, usize)> = (0..100)
+            .map(|index| ((index * 7919 % 100) as u32, index))
+            .collect();
+        let count = pairs.len();
+        sort_unchecked(
+            &mut pairs,
+            0,
+            count,
+            0,
+            &|left: (u32, usize), right: (u32, usize)| left.0 > right.0,
+        )
         .unwrap();
-        assert!(v.windows(2).all(|w| w[0].0 >= w[1].0));
+        assert!(pairs.windows(2).all(|window| window[0].0 >= window[1].0));
     }
 
-    /// The keys of [`the_game_sort_orders_equal_keys_as_its_own`]: an LCG's `(x >> 16) % m`.
-    fn lcg_keys(n: usize, m: u32, seed: u32) -> Vec<(f32, usize)> {
+    /// The keys of [`the_game_sort_orders_equal_keys_as_its_own`]: an LCG's `(x >> 16) % modulus`.
+    fn lcg_keys(count: usize, modulus: u32, seed: u32) -> Vec<(f32, usize)> {
         let mut x = seed;
-        (0..n)
-            .map(|i| {
+        (0..count)
+            .map(|index| {
                 x = x.wrapping_mul(1_103_515_245).wrapping_add(12345);
-                (((x >> 16) % m) as f32, i)
+                (((x >> 16) % modulus) as f32, index)
             })
             .collect()
     }
@@ -518,20 +528,20 @@ mod tests {
                 112, 117, 113,
             ]),
         ];
-        for (n, m, seed, ideal, game) in cases {
-            let mut lcg_keys = lcg_keys(n, m, seed);
+        for (count, modulus, seed, ideal, game) in cases {
+            let mut lcg_keys = lcg_keys(count, modulus, seed);
             sort_unchecked(
                 &mut lcg_keys,
                 0,
-                n,
+                count,
                 ideal,
-                &|a: (f32, usize), b: (f32, usize)| a.0 > b.0,
+                &|left: (f32, usize), right: (f32, usize)| left.0 > right.0,
             )
             .unwrap();
-            let ours: Vec<usize> = lcg_keys.iter().map(|e| e.1).collect();
+            let ours: Vec<usize> = lcg_keys.iter().map(|entry| entry.1).collect();
             assert_eq!(
                 ours, game,
-                "{n} keys mod {m}, seed {seed}, divisions {ideal}"
+                "{count} keys mod {modulus}, seed {seed}, divisions {ideal}"
             );
         }
     }
@@ -580,20 +590,20 @@ mod tests {
                 56, 27, 37, 104,
             ]),
         ];
-        for (n, m, seed, ideal, game) in cases {
-            let mut lcg_keys = lcg_keys(n, m, seed);
+        for (count, modulus, seed, ideal, game) in cases {
+            let mut lcg_keys = lcg_keys(count, modulus, seed);
             sort_unchecked(
                 &mut lcg_keys,
                 0,
-                n,
+                count,
                 ideal,
-                &|a: (f32, usize), b: (f32, usize)| a.0 < b.0,
+                &|left: (f32, usize), right: (f32, usize)| left.0 < right.0,
             )
             .unwrap();
-            let ours: Vec<usize> = lcg_keys.iter().map(|e| e.1).collect();
+            let ours: Vec<usize> = lcg_keys.iter().map(|entry| entry.1).collect();
             assert_eq!(
                 ours, game,
-                "{n} keys mod {m}, seed {seed}, divisions {ideal}"
+                "{count} keys mod {modulus}, seed {seed}, divisions {ideal}"
             );
         }
     }

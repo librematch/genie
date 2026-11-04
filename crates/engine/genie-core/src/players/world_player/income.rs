@@ -19,7 +19,7 @@ use crate::world::AllySharing;
 use crate::world::Seconds;
 use crate::world::World;
 use crate::world::layer::AttributeRoles;
-use crate::world::slots::{CheckedIndex, PlayerSlots};
+use crate::world::slots::{CheckedIndexExt, PlayerSlotsExt};
 
 /// Whether a resource add (slot 0xf8's fifth argument) goes on to the players its player
 /// shares its gathered resources with.
@@ -152,10 +152,10 @@ impl World {
     }
 
     /// The base player's attribute add (`FUN_14165d040`) of `amount` to attribute `kind` of player
-    /// `p`, for a kind out of 0 to the attribute count nothing: the attribute takes `amount` plus
-    /// its value. A computer player's resource fills its escrow: an `amount` above 0 with a share
-    /// above 0 (`COMISS`, `JBE`) adds the share times it; an escrow above the resource (`JBE` skips
-    /// a NaN) falls to it, or to 0 when the resource is below 0. [`ResourceShare::Shared`], a
+    /// `owner`, for a kind out of 0 to the attribute count nothing: the attribute takes `amount`
+    /// plus its value. A computer player's resource fills its escrow: an `amount` above 0 with a
+    /// share above 0 (`COMISS`, `JBE`) adds the share times it; an escrow above the resource (`JBE`
+    /// skips a NaN) falls to it, or to 0 when the resource is below 0. [`ResourceShare::Shared`], a
     /// player who shares its gathered resources (`+0x1426`,
     /// [`crate::world::AllySharing::RESOURCES`]) gives each resource to the players, in order, it
     /// counts as allies and who count it as theirs ([`World::shares_with`]): their slot 0xf8 with
@@ -163,13 +163,13 @@ impl World {
     /// reaches it.
     pub(super) fn add_attribute_base(
         &mut self,
-        p: PlayerId,
+        owner: PlayerId,
         kind: AttributeId,
         amount: Amount,
         stat: ResourceStat,
         share: ResourceShare,
     ) -> GenieResult<()> {
-        let player = self.players.player_mut(p)?;
+        let player = self.players.player_mut(owner)?;
         let index = kind.index();
         if player.attributes.len() <= index {
             return Ok(());
@@ -194,7 +194,7 @@ impl World {
             && kind.is_resource()
         {
             for player_id in PlayerId::each(self.players.len()) {
-                if player_id != p && self.shares_with(p, player_id) {
+                if player_id != owner && self.shares_with(owner, player_id) {
                     self.add_resource(player_id, kind, amount, stat, ResourceShare::Unshared)?;
                 }
             }
@@ -202,32 +202,32 @@ impl World {
         Ok(())
     }
 
-    /// `FUN_14165d040`'s test of the players a sharing player `p` gives to: player `q` is not
-    /// Gaia and one of the world's, `p` counts it as an ally (relation 0 or 4), and `q` counts
-    /// `p` as one (its relation to `p` 0 or 4, `& 0xfb`). A relation 1 would count both ways
-    /// while the world's treaty holds (`FUN_1415e8e10`: `world+0x820`'s `+0x10` is 1), which the
-    /// slice does not model.
+    /// `FUN_14165d040`'s test of the players a sharing player `own` gives to: player `other` is not
+    /// Gaia and one of the world's, `own` counts it as an ally (relation 0 or 4), and `other`
+    /// counts `own` as one (its relation to `own` 0 or 4, `& 0xfb`). A relation 1 would count both
+    /// ways while the world's treaty holds (`FUN_1415e8e10`: `world+0x820`'s `+0x10` is 1), which
+    /// the slice does not model.
     #[must_use]
-    pub fn shares_with(&self, p: PlayerId, q: PlayerId) -> bool {
+    pub fn shares_with(&self, own: PlayerId, other: PlayerId) -> bool {
         let count = self.players.len();
-        if q == PlayerId::GAIA || count <= q.index() || p == q {
+        if other == PlayerId::GAIA || count <= other.index() || own == other {
             return false;
         }
         let mine = self
             .players
-            .player(p)
+            .player(own)
             .ok()
-            .and_then(|pl| pl.relations.get(q).copied());
-        if !mine.is_some_and(|r| r.allied(AllyTest::WithRelation4)) {
+            .and_then(|pl| pl.relations.get(other).copied());
+        if !mine.is_some_and(|relation| relation.allied(AllyTest::WithRelation4)) {
             return false;
         }
-        p != PlayerId::GAIA
-            && p.index() < count
+        own != PlayerId::GAIA
+            && own.index() < count
             && self
                 .players
-                .player(q)
+                .player(other)
                 .ok()
-                .and_then(|pl| pl.relations.get(p))
+                .and_then(|pl| pl.relations.get(own))
                 .is_some_and(|relation| relation.allied(AllyTest::WithRelation4))
     }
 

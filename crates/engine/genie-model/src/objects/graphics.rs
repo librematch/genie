@@ -65,7 +65,10 @@ impl Graphics {
         if self.by_id.len() <= index {
             self.by_id.resize(index + 1, None);
         }
-        let old = self.by_id.get_mut(index).and_then(|g| g.replace(graphic));
+        let old = self
+            .by_id
+            .get_mut(index)
+            .and_then(|slot| slot.replace(graphic));
         if old.is_none() {
             self.len += 1;
         }
@@ -88,17 +91,17 @@ impl Graphics {
 
 /// [`Graphics::iter`]'s walk.
 #[derive(Clone, Debug)]
-pub struct Iter<'a> {
+pub struct Iter<'graphics> {
     /// The column with its indices.
-    inner: Enumerate<SliceIter<'a, Option<Graphic>>>,
+    inner: Enumerate<SliceIter<'graphics, Option<Graphic>>>,
 }
 
-impl<'a> Iterator for Iter<'a> {
-    type Item = (SpriteId, &'a Graphic);
+impl<'graphics> Iterator for Iter<'graphics> {
+    type Item = (SpriteId, &'graphics Graphic);
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.inner.find_map(|(i, graphic)| {
-            let id = u16::try_from(i).ok()?.cast_signed();
+        self.inner.find_map(|(index, graphic)| {
+            let id = u16::try_from(index).ok()?.cast_signed();
             Some((SpriteId::named(id), graphic.as_ref()?))
         })
     }
@@ -107,11 +110,11 @@ impl<'a> Iterator for Iter<'a> {
 /// A walk past the last sprite stays at its end, as the column's walk does.
 impl FusedIterator for Iter<'_> {}
 
-impl<'a> IntoIterator for &'a Graphics {
-    type Item = (SpriteId, &'a Graphic);
-    type IntoIter = Iter<'a>;
+impl<'graphics> IntoIterator for &'graphics Graphics {
+    type Item = (SpriteId, &'graphics Graphic);
+    type IntoIter = Iter<'graphics>;
 
-    fn into_iter(self) -> Iter<'a> {
+    fn into_iter(self) -> Iter<'graphics> {
         self.iter()
     }
 }

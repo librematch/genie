@@ -13,7 +13,7 @@ use crate::math::Angle;
 use crate::math::fmath::BVector;
 use crate::math::fmath::at_most_or_unordered;
 use crate::movement::LevelFlags;
-use crate::movement::Levels;
+use crate::movement::LevelsExt;
 use crate::movement::MoveState;
 use crate::movement::PathState;
 use crate::movement::Speed;
@@ -68,27 +68,27 @@ pub enum GroupSpeed {
 /// What the walk along the level's path takes of the step ([`Mover::walk`]'s arguments after
 /// the unit).
 #[derive(Debug)]
-pub(super) struct WalkStep<'a> {
+pub(super) struct WalkStep<'world> {
     /// The step's time.
     pub(super) time_step: Seconds,
     /// The world's spatial index.
-    pub(super) world: &'a mut Spatial,
+    pub(super) world: &'world mut Spatial,
     /// The world's unit groups (none for a walk without the world's planners).
-    pub(super) groups: Option<&'a UnitGroups>,
+    pub(super) groups: Option<&'world UnitGroups>,
     /// The world's pathers (none likewise).
-    pub(super) pathing: Option<&'a mut Pathing>,
+    pub(super) pathing: Option<&'world mut Pathing>,
     /// The goal the level walks to.
-    pub(super) goal: Goal<'a>,
+    pub(super) goal: Goal<'world>,
     /// The world's time.
     pub(super) now: WorldTime,
     /// The unit's player's type.
     pub(super) player_kind: PlayerKind,
     /// The objects the old pather tests even moving.
-    pub(super) include: &'a mut Vec<ObjectId>,
+    pub(super) include: &'world mut Vec<ObjectId>,
     /// The waypoint once it is not left behind (`local_1860`).
-    pub(super) walked: &'a mut BVector,
+    pub(super) walked: &'world mut BVector,
     /// The direction the unit turns to (slot 0x610).
-    pub(super) heading: &'a mut BVector,
+    pub(super) heading: &'world mut BVector,
 }
 
 impl Mover {
@@ -142,11 +142,11 @@ impl Mover {
         (now, group): (WorldTime, Option<GroupSpeed>),
         movement_tuning: &MovementTuning,
     ) -> Position {
-        let Some(v) = self.velocity.as_ref() else {
+        let Some(velocity) = self.velocity.as_ref() else {
             return position;
         };
         let speed = self.next_speed(
-            Speed::new(v.acceleration.y() * dt + v.velocity.y()),
+            Speed::new(velocity.acceleration.y() * dt + velocity.velocity.y()),
             group,
             movement_tuning,
         );
@@ -173,7 +173,7 @@ impl Mover {
     pub fn grounded(&self, at: Position, terrain: Option<&Terrain>) -> Position {
         let height = at.z();
         let z = terrain
-            .and_then(|t| t.ground(at.ground()).ok())
+            .and_then(|terrain| terrain.ground(at.ground()).ok())
             .map_or(height, |ground| {
                 missile_grounded(at.z(), ground, self.stats.fly_mode)
             });
@@ -240,11 +240,11 @@ impl Mover {
         map: GridSize,
         movement_tuning: &MovementTuning,
     ) -> Option<Position> {
-        let d = distance * self.factor;
-        if d.get().abs() < EPSILON {
+        let distance = distance * self.factor;
+        if distance.get().abs() < EPSILON {
             return None;
         }
-        let to = self.moved_at.vector() + d.get() * self.forward;
+        let to = self.moved_at.vector() + distance.get() * self.forward;
         Some(self.set_position(to.position(), map, movement_tuning))
     }
 
@@ -279,14 +279,14 @@ impl Mover {
         movement_tuning: &MovementTuning,
     ) -> Position {
         let (x, y) = (at.x(), at.y());
-        let inside = |v: f32, radius: f32, size: i32| {
+        let inside = |coordinate: f32, radius: f32, size: i32| {
             let low = radius + movement_tuning.edge_gap;
-            if v < low {
+            if coordinate < low {
                 low
-            } else if size as f32 - low < v {
+            } else if size as f32 - low < coordinate {
                 (size as f32 - radius) - movement_tuning.edge_gap
             } else {
-                v
+                coordinate
             }
         };
         // both clamps read the map's +0x18, its width (0x14116220d for y): on a map that is not
@@ -299,12 +299,12 @@ impl Mover {
         } else {
             (x, y)
         };
-        let on_map = |v: f32, size: i32| {
-            let v = v.max(0.0);
-            if size as f32 <= v {
+        let on_map = |raw: f32, size: i32| {
+            let coordinate = raw.max(0.0);
+            if size as f32 <= coordinate {
                 size as f32 - movement_tuning.edge_position_gap
             } else {
-                v
+                coordinate
             }
         };
         Position::new(on_map(x, map.width()), on_map(y, map.height()), at.z())
@@ -358,7 +358,7 @@ impl Mover {
         // which then measures as a walk to a point (LAB_1411512df)
         let target = match target_id {
             None => None,
-            Some(id) => world.get_known(id)?.map(|&t| (id, t)),
+            Some(id) => world.get_known(id)?.map(|&placed| (id, placed)),
         };
         // the gap to the target, else to where the top level's path ends; a gate's is the
         // least over it and its first two annexes (slot 0x680), each annex's less 0.1
@@ -381,7 +381,7 @@ impl Mover {
             (None, 1) => Distance::new(FAR),
             (None, _) => {
                 self.top_path()
-                    .and_then(|p| p.last())
+                    .and_then(|path| path.last())
                     .map_or(Distance::new(FAR), |&end| {
                         footprint_gap(
                             at,
@@ -477,12 +477,14 @@ impl Mover {
                 to_end,
             };
             if self.paths.walked()?.flags.contains(LevelFlags::REACHED) {
-                let now = plan.as_deref().map_or(WorldTime::ZERO, |p| p.now);
-                let pathing = plan.as_deref_mut().map(|p| &mut *p.pathing);
+                let now = plan
+                    .as_deref()
+                    .map_or(WorldTime::ZERO, |planning| planning.now);
+                let pathing = plan.as_deref_mut().map(|planning| &mut *planning.pathing);
                 match self.reached((place, me), world, pathing, goal, now, by_id)? {
                     Reached::Pass(Next::Again) => continue,
                     Reached::Pass(Next::Dispatch) => {}
-                    Reached::Pass(Next::Done(m)) => return Ok(m),
+                    Reached::Pass(Next::Done(motion)) => return Ok(motion),
                     Reached::LoopEnd => return self.loop_end(dt, walked, heading, movement_tuning),
                 }
             }
@@ -494,17 +496,17 @@ impl Mover {
                 &mut plans,
                 &include,
             )? {
-                Next::Done(m) => return Ok(m),
+                Next::Done(motion) => return Ok(motion),
                 Next::Again => continue,
                 // a link of another type: on past the request (state 4 or 5) to the walk
                 Next::Dispatch => {}
             }
             let (now, player_kind) = plan
                 .as_deref()
-                .map_or((WorldTime::ZERO, PlayerKind::Phantom), |p| {
-                    (p.now, p.player_kind)
+                .map_or((WorldTime::ZERO, PlayerKind::Phantom), |planning| {
+                    (planning.now, planning.player_kind)
                 });
-            let groups = plan.as_deref().map(|p| p.groups);
+            let groups = plan.as_deref().map(|planning| planning.groups);
             let pathing = plan.as_deref_mut().map(|planning| &mut *planning.pathing);
             let step = self.walk(
                 place.position(),

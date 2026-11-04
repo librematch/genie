@@ -155,7 +155,9 @@ fn gather_point_takes_its_saved_state() {
     let with = |state: i32| {
         let mut barracks = building_object(11, 12);
         building_mut(&mut barracks).gather_point_exists = state;
-        gather_point(&barracks).map(|g| g.map(|barracks_gather_point| barracks_gather_point.state))
+        gather_point(&barracks).map(|gather_point| {
+            gather_point.map(|barracks_gather_point| barracks_gather_point.state)
+        })
     };
     assert_eq!(with(0), Ok(None));
     assert_eq!(with(1), Ok(Some(GatherPointState::Point)));
@@ -227,7 +229,7 @@ fn the_default_task_starts_what_the_table_names() {
     let artifact = ARTIFACT_KIND;
     assert!(matches!(
         start(&table(DefaultAction::Kind(artifact))),
-        Ok(Some(DefaultStart::Artifact(a))) if a.gaia
+        Ok(Some(DefaultStart::Artifact(started))) if started.gaia
     ));
     let make = MAKE;
     assert!(matches!(

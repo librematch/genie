@@ -9,7 +9,7 @@ use crate::objects::layers::DefaultTask;
 use crate::objects::masters::Master;
 use crate::objects::unit::Unit;
 use crate::ownership::artifact::Artifact;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 use crate::world::step::Step;
 use crate::{GenieError, GenieResult};
 
@@ -25,33 +25,35 @@ impl Unit {
     ) -> GenieResult<DefaultStart> {
         if self.life.state != ObjectState::Alive
             || actions.top_action_kind().is_some()
-            || step.w.parts.production.contains(self.id)
+            || step.world.parts.production.contains(self.id)
         {
             return Ok(DefaultStart::NotStarted);
         }
         match actions.default_task {
             DefaultTask::Nothing => Ok(DefaultStart::NotStarted),
             DefaultTask::Fly => {
-                let task = Master::default_task(self.master(step.w.master_tables(), step.player)?)
-                    .copied()
-                    .ok_or(GenieError::missing_data(
-                        "a bird's default Fly whose master has no default task",
-                    ))?;
+                let task =
+                    Master::default_task(self.master(step.world.master_tables(), step.player)?)
+                        .copied()
+                        .ok_or(GenieError::missing_data(
+                            "a bird's default Fly whose master has no default task",
+                        ))?;
                 self.start_fly(actions, step, task)?;
                 Ok(DefaultStart::Started)
             }
             DefaultTask::Make => {
                 // it starts once
                 actions.default_task = DefaultTask::Nothing;
-                let task = Master::default_task(self.master(step.w.master_tables(), step.player)?)
-                    .copied()
-                    .ok_or(GenieError::unsupported("a Make whose master has no task"))?;
+                let task =
+                    Master::default_task(self.master(step.world.master_tables(), step.player)?)
+                        .copied()
+                        .ok_or(GenieError::unsupported("a Make whose master has no task"))?;
                 actions.list.set_make(Some(MakeAction::start(
                     task,
-                    &step.w.players.player(step.player)?.attributes,
+                    &step.world.players.player(step.player)?.attributes,
                     &mut self.life,
-                    &step.w.model.roles,
-                    step.w.model.slots,
+                    &step.world.model.roles,
+                    step.world.model.slots,
                 )));
                 Ok(DefaultStart::Started)
             }
@@ -59,8 +61,8 @@ impl Unit {
                 // the factory gives the action the default task, whose moving sprite its
                 // MoveTos take
                 let moving =
-                    Master::default_task(self.master(step.w.master_tables(), step.player)?)
-                        .and_then(|t| t.sprites.moving);
+                    Master::default_task(self.master(step.world.master_tables(), step.player)?)
+                        .and_then(|task| task.sprites.moving);
                 actions
                     .list
                     .set_artifact(Some(Artifact::new(step.player, moving)));

@@ -15,7 +15,7 @@ use crate::unit_ai::task_finder::drop_site;
 use crate::world::index::ObjectsRef;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 use crate::world::step::Step;
 use crate::{GenieError, GenieResult};
 
@@ -43,36 +43,43 @@ impl Unit {
         /// The reach a line of sight below the floor takes (the Build's immediate 4.0).
         const REACH_LOW: f32 = 4.0;
         let masters =
-            step.w
+            step.world
                 .model
                 .masters
                 .get(step.player.index())
                 .ok_or(GenieError::unsupported(
                     "a builder without its player's masters",
                 ))?;
-        let master = self.master_in(OwnerMasters::new(&step.w.parts.own_master, Some(masters)))?;
+        let master = self.master_in(OwnerMasters::new(
+            &step.world.parts.own_master,
+            Some(masters),
+        ))?;
         let site = masters.get(built).ok_or(GenieError::unsupported(
             "a building of a master the slice does not have",
         ))?;
-        let at = *step.w.spatial.get(building).ok_or(GenieError::unsupported(
-            "a builder's building without a place",
-        ))?;
+        let at = *step
+            .world
+            .spatial
+            .get(building)
+            .ok_or(GenieError::unsupported(
+                "a builder's building without a place",
+            ))?;
         let entry = drop_site(
-            &step.w.model.drop_sites,
+            &step.world.model.drop_sites,
             built,
             master.class,
-            step.w.players.player(step.player)?.civ,
+            step.world.players.player(step.player)?.civ,
         );
         let los = site.line_of_sight.get();
-        let held = if step.w.model.tuning.gather_search.reach_floor <= los {
+        let held = if step.world.model.tuning.gather_search.reach_floor <= los {
             los
         } else {
             REACH_LOW
         };
-        let reach = if held <= step.w.model.tuning.gather_search.reach_cap {
+        let reach = if held <= step.world.model.tuning.gather_search.reach_cap {
             held
         } else {
-            step.w.model.tuning.gather_search.reach_cap
+            step.world.model.tuning.gather_search.reach_cap
         };
         let builder = gather_search::Builder {
             position: self.position(),
@@ -81,18 +88,18 @@ impl Unit {
             range: reach as i32 as i16,
         };
         let mover = step
-            .w
+            .world
             .parts
             .mover_of(self.id)
             .ok_or(GenieError::unsupported("a builder without movement state"))?;
         let restriction = mover.stats.restriction;
         let objects = ObjectsRef::new(
-            &step.w.players,
-            &step.w.index,
-            &step.w.model.masters,
-            &step.w.parts,
-            &step.w.model.roles,
-            &step.w.model.tuning,
+            &step.world.players,
+            &step.world.index,
+            &step.world.model.masters,
+            &step.world.parts,
+            &step.world.model.roles,
+            &step.world.model.tuning,
         );
         // the builder out of its slot while it updates, as it stands
         let me = Candidate::of(
@@ -102,11 +109,15 @@ impl Unit {
             self.master(objects.masters(), step.player)?,
             self.position(),
         );
-        let spatial: &Spatial = &step.w.spatial;
+        let spatial: &Spatial = &step.world.spatial;
         let found = {
-            let planner = step.w.pathing.planner(restriction, spatial.tiles()).ok_or(
-                GenieError::unsupported("a builder's restriction without a planner"),
-            )?;
+            let planner = step
+                .world
+                .pathing
+                .planner(restriction, spatial.tiles())
+                .ok_or(GenieError::unsupported(
+                    "a builder's restriction without a planner",
+                ))?;
             gather_search_more_work(
                 entry,
                 &builder,
@@ -128,7 +139,7 @@ impl Unit {
         }
         let (kind, cap) = gather_group(found.attribute, roles);
         let target = self.resource_search(actions, step, kind, cap)?;
-        let spatial: &Spatial = &step.w.spatial;
+        let spatial: &Spatial = &step.world.spatial;
         let target = target
             .filter(|&object_id| spatial.get(object_id).is_some())
             .unwrap_or(found.id);

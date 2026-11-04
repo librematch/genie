@@ -39,7 +39,7 @@ use crate::vision::visibility::{Seer, capture_kind};
 use crate::world::World;
 use crate::world::layer::ClassRoles;
 use crate::world::parts::{Object, ObjectParts};
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 use crate::{GenieError, GenieResult};
 
 impl World {
@@ -64,8 +64,8 @@ impl World {
             made.radius,
             &self.model.tuning.spawn,
         )) {
-            for t in &tiles {
-                let (fx, fy) = (t.x() as f32, t.y() as f32);
+            for tile in &tiles {
+                let (fx, fy) = (tile.x() as f32, tile.y() as f32);
                 self.spatial
                     .check_known(Rect::new(fx, fy, fx + 1.0, fy + 1.0))?;
             }
@@ -246,25 +246,25 @@ impl World {
             .standing_sprite
             .and_then(|sprite_id| self.model.graphics.get(sprite_id).copied());
         let mut sprite = None;
-        if let Some(g) = standing {
+        if let Some(graphic) = standing {
             sprite = Some(ActiveSprite::start(
-                g,
-                self.streams.get(Stream::Sprite),
+                graphic,
+                self.streams.get_mut(Stream::Sprite),
                 self.model.tuning.sprite,
             ));
-            if g.flags.contains(SpriteFlags::RANDOM_FIRST_FRAME) && g.facets.several() {
-                let _ = self.streams.get(Stream::Object).rand15();
+            if graphic.flags.contains(SpriteFlags::RANDOM_FIRST_FRAME) && graphic.facets.several() {
+                let _ = self.streams.get_mut(Stream::Object).rand15();
             }
         }
-        let facets = standing.map(|g| SpriteFacets {
-            count: g.facets,
-            turns: g.flags.contains(SpriteFlags::TURNS),
+        let facets = standing.map(|graphic| SpriteFacets {
+            count: graphic.facets,
+            turns: graphic.flags.contains(SpriteFlags::TURNS),
         });
         let mut angle = Angle::ZERO;
         let moving = if MasterKind::MOVING <= made.kind {
             // the moving setup's angle draw (FUN_141141640, "setup" line 0x2c3)
             let drawn = if draws_angle(facets) {
-                let draw = self.streams.get(Stream::Object).rand15();
+                let draw = self.streams.get_mut(Stream::Object).rand15();
                 facets.map(|sprite_facets| drawn_angle(draw, sprite_facets))
             } else {
                 None
@@ -325,7 +325,10 @@ impl World {
             let after = made.death_sprite.or(made.standing_sprite);
             after
                 .and_then(|after| self.model.graphics.get(after))
-                .filter(|g| g.flags.contains(SpriteFlags::RANDOM_FIRST_FRAME) && g.facets.several())
+                .filter(|graphic| {
+                    graphic.flags.contains(SpriteFlags::RANDOM_FIRST_FRAME)
+                        && graphic.facets.several()
+                })
                 .map(|graphic| graphic.facets)
         } else {
             None

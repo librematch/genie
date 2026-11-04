@@ -57,7 +57,7 @@ use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 use crate::world::parts::{Object, ObjectParts};
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 use crate::world::{Gate, World};
 use crate::{GenieError, GenieResult};
 
@@ -97,19 +97,19 @@ impl World {
         player: PlayerId,
         master: MasterId,
     ) -> GenieResult<()> {
-        if let Some(m) = player_master(&self.model.masters, player, master) {
+        if let Some(master) = player_master(&self.model.masters, player, master) {
             count_class(
                 &mut self.players.player_mut(player)?.attributes,
-                m,
+                master,
                 1.0,
                 &self.model.roles,
             );
         }
-        let _ = self.streams.get(Stream::Object).rand15();
-        if let Some(m) = player_master(&self.model.masters, player, master)
-            .filter(|m| m.kind == MasterKind::BUILDING && !m.creatable_part().trained_at.is_empty())
-        {
-            let paid: i32 = cost_entries(&m.creatable_part().cost)
+        let _ = self.streams.get_mut(Stream::Object).rand15();
+        if let Some(master) = player_master(&self.model.masters, player, master).filter(|master| {
+            master.kind == MasterKind::BUILDING && !master.creatable_part().trained_at.is_empty()
+        }) {
+            let paid: i32 = cost_entries(&master.creatable_part().cost)
                 .filter(|&(_, _, paid)| paid)
                 .map(|(_, amount, _)| i32::from(amount.get()))
                 .sum();
@@ -130,7 +130,7 @@ impl World {
         master: MasterId,
     ) -> GenieResult<Held> {
         let storage = player_master(&self.model.masters, player, master)
-            .map(|m| m.storage.clone())
+            .map(|master| master.storage.clone())
             .unwrap_or_default();
         static_storage(self.players.player_mut(player)?, &storage)
     }
@@ -183,10 +183,20 @@ impl World {
         let default_task = player_master(&self.model.masters, player, master)
             .map_or(DefaultTask::Nothing, default_start);
         let ai = unit_ai
-            .and_then(|t| Ok((t, self.new_object(player, master, &made, position)?)))
-            .map(|(t, new)| {
-                t.map(|t| {
-                    UnitAi::constructed(t, &new, self.streams.get(Stream::Ai), &self.model.roles)
+            .and_then(|unit_ai_kind| {
+                Ok((
+                    unit_ai_kind,
+                    self.new_object(player, master, &made, position)?,
+                ))
+            })
+            .map(|(unit_ai, new)| {
+                unit_ai.map(|unit_ai_kind| {
+                    UnitAi::constructed(
+                        unit_ai_kind,
+                        &new,
+                        self.streams.get_mut(Stream::Ai),
+                        &self.model.roles,
+                    )
                 })
             });
         let ai = match ai {
@@ -206,22 +216,28 @@ impl World {
         // (slot 0x798, FUN_1412029f0): their draws, the sprite and the angle it faces
         let standing = made
             .standing_sprite
-            .and_then(|s| self.model.graphics.get(s).copied());
-        let (mut sprite, angle) = standing.map_or((None, Angle::ZERO), |g| {
-            let (active_sprite, _, angle) = self.setup_draws(g);
+            .and_then(|sprite_id| self.model.graphics.get(sprite_id).copied());
+        let (mut sprite, angle) = standing.map_or((None, Angle::ZERO), |graphic| {
+            let (active_sprite, _, angle) = self.setup_draws(graphic);
             (Some(active_sprite), angle)
         });
         self.building_combat_setup(player, master)?;
         let held = self.building_storage(player, master)?;
         // what its death reads of the master: its dying sprite, death spawn and decay
-        let death = player_master(&self.model.masters, player, master)
-            .map_or((None, false, None), |m| {
-                (m.death_sprite, m.death_spawns[0].is_some(), m.life)
-            });
+        let death = player_master(&self.model.masters, player, master).map_or(
+            (None, false, None),
+            |master| {
+                (
+                    master.death_sprite,
+                    master.death_spawns[0].is_some(),
+                    master.life,
+                )
+            },
+        );
         // the moving setup (FUN_1411580a0) of every building, a moving object though it never
         // moves (a mule cart does): the walk reads its last move time
         let mut mover = player_master(&self.model.masters, player, master)
-            .and_then(|m| m.move_stats)
+            .and_then(|master| master.move_stats)
             .map(|stats| {
                 Mover::new_object(
                     stats,
@@ -239,7 +255,8 @@ impl World {
         let terrain = self.spatial.terrain.as_ref();
         let snow = constructed_snow(master, (tx, ty), terrain, &self.model.roles)?;
         // +0xcd0 (FUN_141188db0): mangrove or rice terrain under its place
-        let rice = terrain.is_some_and(|t| t.kind(Tile::new(tx, ty)).is_some_and(is_rice_terrain));
+        let rice = terrain
+            .is_some_and(|terrain| terrain.kind(Tile::new(tx, ty)).is_some_and(is_rice_terrain));
         let foundation = !self
             .model
             .roles
@@ -266,9 +283,9 @@ impl World {
             if let Some(graphic) = shown {
                 new_sprite(
                     &mut sprite,
-                    mover.as_mut().map(|m| &mut m.stats),
+                    mover.as_mut().map(|mover| &mut mover.stats),
                     graphic,
-                    self.streams.get(Stream::Sprite),
+                    self.streams.get_mut(Stream::Sprite),
                     self.model.tuning.sprite,
                 );
             }
@@ -297,7 +314,9 @@ impl World {
             attack_count: AttackCount::ZERO,
             // the TRIBE combat setup (FUN_14121df60): the master's volley fire
             firepower: player_master(&self.model.masters, player, master)
-                .map_or(Firepower::ZERO, |m| m.creatable_part().volley_fire),
+                .map_or(Firepower::ZERO, |master| {
+                    master.creatable_part().volley_fire
+                }),
             next_volley: MissileCount::ZERO,
             reload_worldtime: WorldTime::ZERO,
             raider_countdown: RaiderCountdown::NONE,
@@ -499,7 +518,7 @@ fn constructed_snow(
         && -1 < tx
         && -1 < ty
         && terrain
-            .map(|t| t.snow_under(Tile::new(tx, ty)))
+            .map(|map_terrain| map_terrain.snow_under(Tile::new(tx, ty)))
             .transpose()?
             .unwrap_or(false);
     Ok(if on_snow { Snow::Kept } else { Snow::None })

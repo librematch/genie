@@ -272,45 +272,48 @@ fn the_amount_is_dt_times_the_rate_times_the_attribute_in_that_order() {
 
 #[test]
 fn the_store_gives_what_reached_1_and_starts_again() {
-    let a = Amount::new;
+    let amount = Amount::new;
     let mut stores = vec![Amount::ZERO; 4];
-    assert_eq!(store(a(0.6), attribute::FOOD, &mut stores), None);
-    assert_eq!(stores[0], a(0.6));
+    assert_eq!(store(amount(0.6), attribute::FOOD, &mut stores), None);
+    assert_eq!(stores[0], amount(0.6));
     // ADDSS: the amount plus the store
     let sum = 0.5_f32 + 0.6;
-    assert_eq!(store(a(0.5), attribute::FOOD, &mut stores), Some(a(sum)));
+    assert_eq!(
+        store(amount(0.5), attribute::FOOD, &mut stores),
+        Some(amount(sum))
+    );
     assert_eq!(stores[0], Amount::ZERO);
     // nothing above 0 joins: the store stays, and nothing is given
-    stores[1] = a(0.9);
+    stores[1] = amount(0.9);
     assert_eq!(store(Amount::ZERO, attribute::WOOD, &mut stores), None);
-    assert_eq!(store(a(f32::NAN), attribute::WOOD, &mut stores), None);
-    assert_eq!(store(a(-2.0), attribute::WOOD, &mut stores), None);
-    assert_eq!(stores[1], a(0.9));
+    assert_eq!(store(amount(f32::NAN), attribute::WOOD, &mut stores), None);
+    assert_eq!(store(amount(-2.0), attribute::WOOD, &mut stores), None);
+    assert_eq!(stores[1], amount(0.9));
     // a NaN store gives nothing (JC)
-    stores[2] = a(f32::NAN);
-    assert_eq!(store(a(0.5), attribute::STONE, &mut stores), None);
+    stores[2] = amount(f32::NAN);
+    assert_eq!(store(amount(0.5), attribute::STONE, &mut stores), None);
     // a store the player does not have: no store and no give, however large
-    assert_eq!(store(a(5.0), AttributeId::named(9), &mut stores), None);
+    assert_eq!(store(amount(5.0), AttributeId::named(9), &mut stores), None);
 }
 
 #[test]
 fn the_movement_damage_timer_runs_down_to_0_and_then_hits() {
-    let mut t = Seconds::new(0.5);
-    assert!(!movement_damage_due(&mut t, Seconds::new(0.2)));
-    assert_eq!(t, Seconds::new(0.5) - Seconds::new(0.2));
-    assert!(movement_damage_due(&mut t, Seconds::new(0.4)));
-    assert_eq!(t, Seconds::ZERO);
+    let mut seconds = Seconds::new(0.5);
+    assert!(!movement_damage_due(&mut seconds, Seconds::new(0.2)));
+    assert_eq!(seconds, Seconds::new(0.5) - Seconds::new(0.2));
+    assert!(movement_damage_due(&mut seconds, Seconds::new(0.4)));
+    assert_eq!(seconds, Seconds::ZERO);
     // at 0 it does not run down and hits
-    assert!(movement_damage_due(&mut t, Seconds::new(0.4)));
-    assert_eq!(t, Seconds::ZERO);
+    assert!(movement_damage_due(&mut seconds, Seconds::new(0.4)));
+    assert_eq!(seconds, Seconds::ZERO);
     // to exactly 0
-    let mut t = Seconds::new(0.25);
-    assert!(movement_damage_due(&mut t, Seconds::new(0.25)));
-    assert_eq!(t, Seconds::ZERO);
+    let mut seconds = Seconds::new(0.25);
+    assert!(movement_damage_due(&mut seconds, Seconds::new(0.25)));
+    assert_eq!(seconds, Seconds::ZERO);
     // below 0 (a timer the save holds so) hits as it is
-    let mut t = Seconds::new(-1.0);
-    assert!(movement_damage_due(&mut t, Seconds::new(0.1)));
-    assert_eq!(t, Seconds::new(-1.0));
+    let mut timer = Seconds::new(-1.0);
+    assert!(movement_damage_due(&mut timer, Seconds::new(0.1)));
+    assert_eq!(timer, Seconds::new(-1.0));
     // a NaN never hits and stays
     let mut seconds = Seconds::new(f32::NAN);
     assert!(!movement_damage_due(&mut seconds, Seconds::new(0.1)));
@@ -476,30 +479,33 @@ fn movement_damage_strikes_enemies_in_reach() {
 
 #[test]
 fn hit_below_1_hit_point_leaves_0_and_holds_nothing() {
-    let mut v = Victim {
+    let mut victim = Victim {
         hp: HitPoints::new(0.5),
         amount: Amount::new(30.0),
         capacity: CarryCapacity::of_data(100),
         ..Victim::default()
     };
-    assert_eq!(finish(&mut v), HitEnd::Killed);
-    assert_eq!((v.hp, v.amount), (HitPoints::ZERO, Amount::ZERO));
+    assert_eq!(finish(&mut victim), HitEnd::Killed);
+    assert_eq!((victim.hp, victim.amount), (HitPoints::ZERO, Amount::ZERO));
     // a capacity below 0 is taken as it is
-    let mut v = Victim {
+    let mut victim = Victim {
         hp: HitPoints::new(-3.0),
         amount: Amount::new(30.0),
         capacity: CarryCapacity::of_data(-1),
         ..Victim::default()
     };
-    assert_eq!(finish(&mut v), HitEnd::Killed);
-    assert_eq!((v.hp, v.amount), (HitPoints::ZERO, Amount::new(-1.0)));
-    let mut v = Victim {
+    assert_eq!(finish(&mut victim), HitEnd::Killed);
+    assert_eq!(
+        (victim.hp, victim.amount),
+        (HitPoints::ZERO, Amount::new(-1.0))
+    );
+    let mut victim = Victim {
         hp: HitPoints::new(1.0),
         amount: Amount::new(30.0),
         ..Victim::default()
     };
-    assert_eq!(finish(&mut v), HitEnd::Survived);
-    assert_eq!(v.amount, Amount::new(30.0));
+    assert_eq!(finish(&mut victim), HitEnd::Survived);
+    assert_eq!(victim.amount, Amount::new(30.0));
     let mut victim = Victim {
         hp: HitPoints::new(f32::NAN),
         ..Victim::default()
@@ -576,9 +582,9 @@ fn terrain_look_gives_the_task_sprites_on_its_terrains() {
     );
     // a sprite the table lacks is a null one
     let some = |id: i32| id != 19600 && id != 19599;
-    let l = look(&longboat, TerrainFlags::LAND, TerrainFlags::LAND, some).unwrap();
+    let looked = look(&longboat, TerrainFlags::LAND, TerrainFlags::LAND, some).unwrap();
     assert_eq!(
-        (l.standing, l.undead, l.walking),
+        (looked.standing, looked.undead, looked.walking),
         (None, None, Some(SpriteId::named(19601)))
     );
     // an event id past the table's ids is none
@@ -586,8 +592,8 @@ fn terrain_look_gives_the_task_sprites_on_its_terrains() {
         sound_events: SoundEvents::new(0x62d4_b3ec, -5),
         ..longboat_look()
     };
-    let l = look(&task, TerrainFlags::LAND, TerrainFlags::LAND, all).unwrap();
-    assert_eq!((l.dying, l.undead), (None, None));
+    let look = look(&task, TerrainFlags::LAND, TerrainFlags::LAND, all).unwrap();
+    assert_eq!((look.dying, look.undead), (None, None));
 }
 
 /// A removal reward task: 10 gold (3) a removal, by attribute 7's rate.
@@ -700,22 +706,26 @@ fn world() -> World {
         player(vec![3, 0, 3]),
         player(vec![3, 3, 0]),
     ];
-    let mut t = World::new(
+    let mut world = World::new(
         WorldTime::ZERO,
         FrameSeed::of_data(1),
         PlayerId::new(0),
         vec![Millis::ZERO; 3],
         players,
     );
-    t.dt_seconds = Seconds::new(0.5);
-    t.spatial = Spatial::new(GridSize::new(20, 20));
-    t.spatial.relations = t.players.iter().map(|p| p.relations.clone()).collect();
-    t.model.masters = vec![
+    world.dt_seconds = Seconds::new(0.5);
+    world.spatial = Spatial::new(GridSize::new(20, 20));
+    world.spatial.relations = world
+        .players
+        .iter()
+        .map(|player| player.relations.clone())
+        .collect();
+    world.model.masters = vec![
         Arc::new(Masters::default()),
         Arc::new(Masters::default()),
         Arc::new(Masters::default()),
     ];
-    t
+    world
 }
 
 /// Master `id` of `kind` and `class` with `tasks`, given to every player.
@@ -745,8 +755,8 @@ fn give_master(
     }
 }
 
-/// Object `id` of master `m` with `hp` hit points at (`x`, `y`) in player `player_id`'s list,
-/// placed on its tile.
+/// Object `id` of master `master_id` with `hp` hit points at (`x`, `y`) in player `player_id`'s
+/// list, placed on its tile.
 fn put(
     world: &mut World,
     player_id: PlayerId,
@@ -1045,7 +1055,7 @@ fn moving_unit_movement_damage_hits_the_enemies_about_it() {
         Point::new(4.5, 5.5),
     );
     run(&mut world, PlayerId::new(1), 10);
-    let hp = |t: &World, id: ObjectId| t.object(id).unwrap().1.life.hp;
+    let hp = |world: &World, id: ObjectId| world.object(id).unwrap().1.life.hp;
     assert_eq!(hp(&world, object_id(20)), HitPoints::new(25.0));
     assert_eq!(hp(&world, object_id(21)), HitPoints::new(30.0));
     assert_eq!(hp(&world, object_id(30)), HitPoints::new(30.0));
@@ -1132,7 +1142,7 @@ fn waters(world: &mut World) {
         GridSize::new(20, 20),
         tiles
             .into_iter()
-            .map(|(k, r, l)| TileTerrain::of_save(k, r, l))
+            .map(|(kind, restore, layer)| TileTerrain::of_save(kind, restore, layer))
             .collect(),
         vec![
             kind(TerrainFlags::NONE),
@@ -1141,7 +1151,7 @@ fn waters(world: &mut World) {
         ],
         Vec::new(),
     ));
-    let g = |id| Graphic {
+    let graphic = |id| Graphic {
         id,
         frames: Frame::of_data(10),
         facets: FacetCount::of_data(8),
@@ -1152,7 +1162,7 @@ fn waters(world: &mut World) {
     };
     for id in [19598, 19599, 19600, 19601] {
         let id = SpriteId::named(id);
-        let _ = Arc::make_mut(&mut world.model.graphics).insert(id, g(id));
+        let _ = Arc::make_mut(&mut world.model.graphics).insert(id, graphic(id));
     }
 }
 

@@ -93,11 +93,15 @@ fn allied_follows_the_relation() {
 fn an_annex_stands_for_its_main_building() {
     let finder_world = world(0);
     assert_eq!(
-        finder_world.target_up(object_id(12), 0).map(|t| t.id),
+        finder_world
+            .target_up(object_id(12), 0)
+            .map(|task_target| task_target.id),
         Some(object_id(12))
     );
     assert_eq!(
-        finder_world.target(object_id(12)).map(|t| t.id),
+        finder_world
+            .target(object_id(12))
+            .map(|task_target| task_target.id),
         Some(object_id(11))
     );
     assert_eq!(

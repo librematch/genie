@@ -31,17 +31,17 @@ pub fn globals_from_dump(text: &str, groups: &mut UnitGroups) {
     for line in text.lines() {
         let mut words = line.split_whitespace();
         let name = words.next();
-        let values: Vec<i32> = words.filter_map(|w| w.parse().ok()).collect();
+        let values: Vec<i32> = words.filter_map(|text| text.parse().ok()).collect();
         match name {
             Some("group_commands") => {
-                if let Some(&v) = values.first() {
-                    groups.commands = Differentiator::of_data(v);
+                if let Some(&value) = values.first() {
+                    groups.commands = Differentiator::of_data(value);
                 }
             }
             Some("unit_types_scratch") => {
                 groups.unit_kinds_scratch = values
                     .iter()
-                    .map(|&v| UnitKind::of_word(v.cast_unsigned()))
+                    .map(|&value| UnitKind::of_word(value.cast_unsigned()))
                     .collect();
             }
             _ => {}
@@ -65,8 +65,8 @@ pub fn group_differences(slice: &UnitGroups, game: &UnitGroups, globals: bool) -
                 game.commands.get()
             ));
         }
-        let words = |g: &UnitGroups| {
-            let mut unit_kinds = g.unit_kinds_scratch.clone();
+        let words = |groups: &UnitGroups| {
+            let mut unit_kinds = groups.unit_kinds_scratch.clone();
             unit_kinds.resize(50, UnitKind::CLEARED);
             unit_kinds
         };
@@ -84,7 +84,13 @@ pub fn group_differences(slice: &UnitGroups, game: &UnitGroups, globals: bool) -
             slice.counter, game.counter
         ));
     }
-    let ids = |groups: &UnitGroups| groups.groups.iter().map(|u| u.id.get()).collect::<Vec<_>>();
+    let ids = |groups: &UnitGroups| {
+        groups
+            .groups
+            .iter()
+            .map(|group| group.id.get())
+            .collect::<Vec<_>>()
+    };
     if ids(slice) != ids(game) {
         out.push(format!(
             "unit groups slice {:?} game {:?}",
@@ -92,29 +98,43 @@ pub fn group_differences(slice: &UnitGroups, game: &UnitGroups, globals: bool) -
             ids(game)
         ));
     }
-    for g in &game.groups {
-        let Some(s) = slice.groups.iter().find(|group| group.id == g.id) else {
+    for game_group in &game.groups {
+        let Some(group) = slice.groups.iter().find(|group| group.id == game_group.id) else {
             continue;
         };
-        let (mut a, mut b) = (Vec::new(), Vec::new());
-        s.flat("", &mut a);
-        g.flat("", &mut b);
-        if a == b {
+        let (mut slice_fields, mut game_fields) = (Vec::new(), Vec::new());
+        group.flat("", &mut slice_fields);
+        game_group.flat("", &mut game_fields);
+        if slice_fields == game_fields {
             continue;
         }
-        let theirs: BTreeMap<&str, &str> =
-            b.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect();
-        let ours: BTreeMap<&str, &str> = a.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect();
-        for (k, v) in &a {
-            match theirs.get(k.as_str()) {
-                Some(w) if *w == v.as_str() => {}
-                Some(w) => out.push(format!("group {}: {k} slice {v} game {w}", g.id)),
-                None => out.push(format!("group {}: {k} slice {v} game none", g.id)),
+        let theirs: BTreeMap<&str, &str> = game_fields
+            .iter()
+            .map(|(key, value)| (key.as_str(), value.as_str()))
+            .collect();
+        let ours: BTreeMap<&str, &str> = slice_fields
+            .iter()
+            .map(|(key, value)| (key.as_str(), value.as_str()))
+            .collect();
+        for (key, value) in &slice_fields {
+            match theirs.get(key.as_str()) {
+                Some(game_value) if *game_value == value.as_str() => {}
+                Some(text) => out.push(format!(
+                    "group {}: {key} slice {value} game {text}",
+                    game_group.id
+                )),
+                None => out.push(format!(
+                    "group {}: {key} slice {value} game none",
+                    game_group.id
+                )),
             }
         }
-        for (k, w) in &b {
-            if !ours.contains_key(k.as_str()) {
-                out.push(format!("group {}: {k} slice none game {w}", g.id));
+        for (key, game_value) in &game_fields {
+            if !ours.contains_key(key.as_str()) {
+                out.push(format!(
+                    "group {}: {key} slice none game {game_value}",
+                    game_group.id
+                ));
             }
         }
     }
@@ -165,8 +185,8 @@ flat_value!(
 
 impl<T: Flat, const N: usize> Flat for [T; N] {
     fn flat(&self, path: &str, out: &mut Vec<(String, String)>) {
-        for (index, v) in self.iter().enumerate() {
-            v.flat(&format!("{path}[{index}]"), out);
+        for (index, element) in self.iter().enumerate() {
+            element.flat(&format!("{path}[{index}]"), out);
         }
     }
 }
@@ -299,8 +319,8 @@ impl Flat for MotionFlags {
 impl<T: Flat> Flat for Vec<T> {
     fn flat(&self, path: &str, out: &mut Vec<(String, String)>) {
         out.push((join(path, "len"), self.len().to_string()));
-        for (index, v) in self.iter().enumerate() {
-            v.flat(&format!("{path}[{index}]"), out);
+        for (index, element) in self.iter().enumerate() {
+            element.flat(&format!("{path}[{index}]"), out);
         }
     }
 }
@@ -309,7 +329,7 @@ impl<T: Flat> Flat for Option<T> {
     fn flat(&self, path: &str, out: &mut Vec<(String, String)>) {
         match self {
             None => out.push((path.to_owned(), "None".to_owned())),
-            Some(v) => v.flat(path, out),
+            Some(inner) => inner.flat(path, out),
         }
     }
 }

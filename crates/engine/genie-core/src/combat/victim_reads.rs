@@ -61,8 +61,8 @@ pub(crate) fn victim_in(
         .get(unit.id)
         .is_none_or(|placed| placed.unknown.is_some());
     victim.tile_place = spatial.tile_place(unit.id);
-    if let Some(b) = victim.building.as_mut() {
-        b.annexes = building.annexes.ids().collect();
+    if let Some(victim_building) = victim.building.as_mut() {
+        victim_building.annexes = building.annexes.ids().collect();
     }
     victim
 }
@@ -90,7 +90,7 @@ pub(crate) fn victim_of(
     mode_680: Mode680,
     roles: &Roles,
 ) -> Victim {
-    let at = |i: usize| attributes.get(i).copied().unwrap_or(Amount::ZERO);
+    let at = |attribute: usize| attributes.get(attribute).copied().unwrap_or(Amount::ZERO);
     let kind = master.kind;
     let attack_elevation = if 212 < attributes.len() {
         ElevationBonus {
@@ -105,8 +105,8 @@ pub(crate) fn victim_of(
     {
         Some(1.0)
     } else {
-        terrain.and_then(|t| {
-            t.defense(
+        terrain.and_then(|terrain| {
+            terrain.defense(
                 master.combat_part().terrain_bonus,
                 Tile::new(unit.position().x() as i32, unit.position().y() as i32),
             )
@@ -117,7 +117,7 @@ pub(crate) fn victim_of(
             .action_part()
             .tasks
             .iter()
-            .any(|t| t.action_kind == kind)
+            .any(|task| task.action_kind == kind)
     };
     Victim {
         id: unit.id,
@@ -132,7 +132,10 @@ pub(crate) fn victim_of(
         master_id: master.id,
         radius: master.radius,
         height: master.height,
-        storage: master.storage.first().map_or(Amount::ZERO, |s| s.1),
+        storage: master
+            .storage
+            .first()
+            .map_or(Amount::ZERO, |stored| stored.1),
         capacity: master.capacity,
         workers: unit.workers,
         blast_defense: master.blast_defense,
@@ -181,7 +184,7 @@ pub(crate) fn victim_of(
             .action_part()
             .tasks
             .iter()
-            .filter(|t| t.action_kind == BONUS_DAMAGE)
+            .filter(|task| task.action_kind == BONUS_DAMAGE)
             .copied()
             .collect(),
         // a combat object's slot 0xf0 is FUN_141082530 (types 50 and up)

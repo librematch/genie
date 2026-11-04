@@ -33,8 +33,8 @@ use crate::{GenieError, GenieResult};
 pub fn class_has_flags(class: ClassId, flags: ClassFlags) -> bool {
     usize::try_from(class.get())
         .ok()
-        .and_then(|c| CLASS_FLAGS.get(c))
-        .is_some_and(|&f| ClassFlags::from_bits_retain(f).intersects(flags))
+        .and_then(|class| CLASS_FLAGS.get(class))
+        .is_some_and(|&bits| ClassFlags::from_bits_retain(bits).intersects(flags))
 }
 
 /// Which copy of the garrison types' switch [`garrison_kind_takes`] runs.
@@ -131,7 +131,7 @@ pub fn garrison_kind_takes(
 /// class `class`, both bytes the game widens to compare with the task's ushorts (`+0xe`,
 /// `+0x10`). A building's test asks for 3 on its own class (a transport) or on buildings (3).
 pub(super) fn has_garrison_task(tasks: &[Task], action: ActionKind, class: ClassId) -> bool {
-    let byte = |v: i16| u16::from(v.to_le_bytes()[0]);
+    let byte = |value: i16| u16::from(value.to_le_bytes()[0]);
     tasks.iter().any(|task| {
         task.action_kind.get().cast_unsigned() == byte(action.get())
             && ClassId::field(task.object_group).cast_unsigned() == byte(class.get())
@@ -148,21 +148,21 @@ pub fn is_garrison_task(task: &Task, roles: &Roles) -> bool {
 }
 
 impl World {
-    /// Slot 0x198 of a building (`FUN_1412169b0`) `b` of player `bp` for `unit`: its count
+    /// Slot 0x198 of a building (`FUN_1412169b0`) `building` of player `bp` for `unit`: its count
     /// ([`World::garrisoned`]) plus the unit and what it holds (1 and its own count; 1 for no
     /// unit) within its master's capacity (`obj_max`).
     pub(crate) fn has_room(
         &self,
         bp: PlayerId,
-        b: &Unit,
+        building: &Unit,
         unit: Option<ObjectId>,
     ) -> GenieResult<bool> {
-        let capacity = b.master(self.master_tables(), bp)?.garrison;
+        let capacity = building.master(self.master_tables(), bp)?.garrison;
         let with = match unit {
             Some(object_id) => self.garrisoned(object_id)?.plus(InsideCount::ONE),
             None => InsideCount::ONE,
         };
-        Ok(self.garrisoned(b.id)?.plus(with).within(capacity))
+        Ok(self.garrisoned(building.id)?.plus(with).within(capacity))
     }
 }
 
@@ -233,17 +233,18 @@ impl World {
         if unit.kind < MasterKind::COMBAT || own.kind != MasterKind::BUILDING {
             return Ok(false);
         }
-        let (bp, b) = match self.parts.building_of(building_unit.id).annex_of {
+        let (bp, building) = match self.parts.building_of(building_unit.id).annex_of {
             Some(main) => self.object(main).ok_or(GenieError::unsupported(
                 "an annex whose main building is gone",
             ))?,
             None => (bp, building_unit),
         };
-        let bm = b.master(self.master_tables(), bp)?;
+        let bm = building.master(self.master_tables(), bp)?;
         // CVTPS2PD, CVTDQ2PD, MULSD, then COMISD with JBE: an unordered hit point count takes
         // nothing
         let max_hp = f64::from(HitPoints::of_master(bm.hit_points).get());
-        let above = f64::from(b.life.hp.get()) > max_hp * self.model.tuning.garrison.least_hp_share;
+        let above =
+            f64::from(building.life.hp.get()) > max_hp * self.model.tuning.garrison.least_hp_share;
         if !above || !bm.garrison.holds() {
             return Ok(false);
         }
@@ -266,7 +267,7 @@ impl World {
         ) {
             return Ok(false);
         }
-        Ok(unchecked || self.has_room(bp, b, None)?)
+        Ok(unchecked || self.has_room(bp, building, None)?)
     }
 
     /// Slot 0x498 of the object `id`: the objects inside it (`+0x2f8`'s count, relics too) and
@@ -277,17 +278,18 @@ impl World {
     /// building, a unit with its countdown set (`+0xc2c`, which the slice does not keep).
     pub(crate) fn garrisoned(&self, building: ObjectId) -> GenieResult<InsideCount> {
         let holds = |id: ObjectId| {
-            self.players.iter().any(|q| {
-                q.objects
+            self.players.iter().any(|player| {
+                player
+                    .objects
                     .iter()
-                    .chain(&q.sleeping)
-                    .any(|v| v.life.inside.key() == Some(id))
+                    .chain(&player.sleeping)
+                    .any(|unit| unit.life.inside.key() == Some(id))
             })
         };
         let is_building = self
             .object(building)
-            .map(|(bp, b)| {
-                b.master(self.master_tables(), bp)
+            .map(|(bp, unit)| {
+                unit.master(self.master_tables(), bp)
                     .map(|master| master.kind == MasterKind::BUILDING)
             })
             .transpose()?

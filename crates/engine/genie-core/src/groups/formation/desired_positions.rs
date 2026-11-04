@@ -22,7 +22,7 @@ use crate::objects::ObjectKey;
 use crate::world::World;
 use crate::world::WorldTime;
 use crate::world::layer::generated::GroupTuning;
-use crate::world::slots::CheckedIndex;
+use crate::world::slots::CheckedIndexExt;
 
 /// `FUN_140f96030`: the walked level's top ancestor (the paths are walked first), none for a
 /// level without a parent.
@@ -35,7 +35,7 @@ pub(super) const fn top_level(paths: &[PathData]) -> Option<&PathData> {
 #[must_use]
 pub fn on_last_high_level_waypoint(paths: &[PathData]) -> bool {
     top_level(paths)
-        .filter(|t| t.has_path)
+        .filter(|path_data| path_data.has_path)
         .is_some_and(|path_data| path_data.waypoint.at_or_past_last(path_data.points.len()))
 }
 
@@ -43,7 +43,7 @@ pub fn on_last_high_level_waypoint(paths: &[PathData]) -> bool {
 /// level's own.
 pub(crate) fn top_path(paths: &[PathData]) -> Option<&PathData> {
     top_level(paths).map_or_else(
-        || paths.first().filter(|w| w.has_path),
+        || paths.first().filter(|path_data| path_data.has_path),
         |top| Some(top).filter(|path_data| path_data.has_path),
     )
 }
@@ -54,7 +54,7 @@ pub(crate) fn top_path(paths: &[PathData]) -> Option<&PathData> {
 /// [`PathData::has_path`] stands for either.
 pub(super) fn measured_path(paths: &[PathData]) -> Option<&PathData> {
     top_level(paths)
-        .filter(|t| t.has_path)
+        .filter(|path_data| path_data.has_path)
         .or_else(|| paths.first().filter(|path_data| path_data.has_path))
 }
 
@@ -86,8 +86,8 @@ impl World {
             } else {
                 BVector::ZERO
             };
-            let mut d = end - group.motion.position[0];
-            d = d.with_height(0.0);
+            let mut offset = end - group.motion.position[0];
+            offset = offset.with_height(0.0);
             let formations = group
                 .owner
                 .and_then(|player_id| self.players.get(player_id.index()))
@@ -100,7 +100,11 @@ impl World {
                     + group.current_target.target_radius.get()
                     + group.current_target.range.get();
             }
-            let remaining = sqrt(d.x() * d.x() + d.height() * d.height() + d.y() * d.y());
+            let remaining = sqrt(
+                offset.x() * offset.x()
+                    + offset.height() * offset.height()
+                    + offset.y() * offset.y(),
+            );
             let patrol = top_path(&group.motion.paths)
                 .is_some_and(|path_data| path_data.path_flags.contains(PathFlags::LOOPS));
             if on_last_high_level_waypoint(&group.motion.paths) && !patrol {
@@ -181,13 +185,12 @@ impl World {
         let current_kind = held
             .current_formation
             .as_ref()
-            .map_or(FormationKind::Horde, |f| f.kind);
+            .map_or(FormationKind::Horde, |formation| formation.kind);
         let renew = current_kind != kind || given.is_some();
         let laid_out = !renew
-            && held
-                .current_formation
-                .as_ref()
-                .is_some_and(|f| f.kind == kind && f.slots.len() == held.members.len());
+            && held.current_formation.as_ref().is_some_and(|formation| {
+                formation.kind == kind && formation.slots.len() == held.members.len()
+            });
         let unit_group = self.groups.held_mut(group)?;
         // a group without a formation takes a new one; a renewal keeps the old as the previous
         let current = unit_group
@@ -218,13 +221,13 @@ impl World {
             FormationKind::Horde if !laid_out => self
                 .groups
                 .held(group)
-                .and_then(|g| self.create_horde(&mut formation, g))
+                .and_then(|group| self.create_horde(&mut formation, group))
                 .and_then(|_| self.formation_transform(&mut formation, group, SlotOrder::Closest))
                 .map(|_| ()),
             FormationKind::UserDefined if !laid_out => self
                 .groups
                 .held(group)
-                .and_then(|g| self.create_udf(&mut formation, g))
+                .and_then(|group| self.create_udf(&mut formation, group))
                 .and_then(|_| self.formation_transform(&mut formation, group, SlotOrder::Closest))
                 .map(|_| ()),
             // laid out already, or a type the switch does not know: the transform alone
@@ -244,24 +247,24 @@ pub(super) const RIGHT_ANGLE: f32 = GROUP_RIGHT_ANGLE;
 /// `FUN_14100b760`: a place kept on the map: below 0 it is 0, from the map's width on it is the
 /// width less `GroupTuning::map_edge`, on both axes (the y test against the height, its value the width's).
 pub(in crate::groups) fn on_map(
-    mut p: BVector,
+    mut point: BVector,
     map: GridSize,
     group_tuning: &GroupTuning,
 ) -> BVector {
-    if p.x() < 0.0 {
-        p = p.with_x(0.0);
+    if point.x() < 0.0 {
+        point = point.with_x(0.0);
     }
-    if p.y() < 0.0 {
-        p = p.with_y(0.0);
+    if point.y() < 0.0 {
+        point = point.with_y(0.0);
     }
-    let (w, h) = (map.width() as f32, map.height() as f32);
-    if w <= p.x() {
-        p = p.with_x(w - group_tuning.map_edge);
+    let (width, height) = (map.width() as f32, map.height() as f32);
+    if width <= point.x() {
+        point = point.with_x(width - group_tuning.map_edge);
     }
-    if h <= p.y() {
-        p = p.with_y(w - group_tuning.map_edge);
+    if height <= point.y() {
+        point = point.with_y(width - group_tuning.map_edge);
     }
-    p
+    point
 }
 
 /// `FUN_14103cfe0`: slot `index` of `formation` placed at `point` plus its offset (turned by
@@ -311,10 +314,10 @@ pub fn find_point_from_front(line: &PointLine, distance: Distance) -> Option<BVe
     if line.points.len() < 2 {
         return None;
     }
-    let ground = |i: usize| {
-        let mut d = line.points.get(i + 1)?.point - line.points.get(i)?.point;
-        d = d.with_height(0.0);
-        Some(d)
+    let ground = |index: usize| {
+        let mut point = line.points.get(index + 1)?.point - line.points.get(index)?.point;
+        point = point.with_height(0.0);
+        Some(point)
     };
     let mut node = 0;
     let mut diff = ground(0)?;
@@ -328,8 +331,12 @@ pub fn find_point_from_front(line: &PointLine, distance: Distance) -> Option<BVe
             if distance <= 0.0 {
                 return Some(point);
             }
-            let k = (distance - covered) / length;
-            let along = [k * diff.x(), k * diff.height(), k * diff.y()];
+            let fraction = (distance - covered) / length;
+            let along = [
+                fraction * diff.x(),
+                fraction * diff.height(),
+                fraction * diff.y(),
+            ];
             return Some(BVector::new(
                 along[0] + point.x(),
                 along[1] + point.height(),

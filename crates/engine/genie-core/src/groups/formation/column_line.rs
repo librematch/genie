@@ -19,7 +19,7 @@ use crate::math::fmath::sqrt;
 use crate::world::World;
 use crate::world::WorldTime;
 use crate::world::layer::generated::GroupTuning;
-use crate::world::slots::CheckedIndex;
+use crate::world::slots::CheckedIndexExt;
 
 /// The formation categories' count, as an array's length.
 const CATEGORY_COUNT: usize = CATEGORIES as usize;
@@ -79,9 +79,9 @@ pub(super) struct Category {
 pub(super) fn sizes(count: i32, kind: LineKind) -> (i32, i32) {
     let root = cvttss2si(sqrt(count as f32).ceil());
     let root = root.max(1);
-    let per = |a: i32| {
-        let b = count / a;
-        if 0 < count % a { b + 1 } else { b }
+    let per = |parts: i32| {
+        let each = count / parts;
+        if 0 < count % parts { each + 1 } else { each }
     };
     // `first` is the side the root sizes, `second` the other; `first` shrinks until it is at
     // most half of `second`
@@ -211,18 +211,18 @@ fn category_sizes(
     let mut widest = 0.0f32;
     let mut widest_index = FormationCategory::ANY;
     let mut valid = 0;
-    for (k, c) in FormationCategory::EACH.into_iter().enumerate() {
-        let Some(cat) = category(group, c).filter(|cat| 0 < cat.count) else {
+    for (index, formation_category) in FormationCategory::EACH.into_iter().enumerate() {
+        let Some(cat) = category(group, formation_category).filter(|cat| 0 < cat.count) else {
             continue;
         };
         valid += 1;
         let (lines, columns) = sizes(cat.count, kind);
-        *lines_of.checked_mut(k)? = lines;
-        *columns_of.checked_mut(k)? = columns;
+        *lines_of.checked_mut(index)? = lines;
+        *columns_of.checked_mut(index)? = columns;
         let width = columns as f32 * cat.spacing.get();
         if widest_index == FormationCategory::ANY || widest < width {
             widest = width;
-            widest_index = c;
+            widest_index = formation_category;
         }
     }
     if widest_index != FormationCategory::ANY && 2 <= valid {
@@ -269,11 +269,11 @@ pub(super) fn fit_to_widest(cat: &Category, widest: f32) -> (i32, i32) {
 /// How the lines are laid out: the kind of line, the formation's depth, the slots' time and the
 /// groups' tuning values.
 #[derive(Clone, Copy)]
-struct Style<'a> {
+struct Style<'tuning> {
     kind: LineKind,
     depth: i32,
     world_time: WorldTime,
-    group_tuning: &'a GroupTuning,
+    group_tuning: &'tuning GroupTuning,
 }
 
 /// What the layout carries from line to line: the next line's and slot's indices, the distance
@@ -308,13 +308,14 @@ impl SubKinds {
         self.next = next;
         if *cat.unit_kind_counts.checked(next as usize)? <= *self.used.checked(next as usize)? {
             // out of units for that sub type: the next with units left, else none
-            let mut j = if next + 1 < cat.kinds { next + 1 } else { 0 };
-            while j != next
-                && *cat.unit_kind_counts.checked(j as usize)? <= *self.used.checked(j as usize)?
+            let mut kind = if next + 1 < cat.kinds { next + 1 } else { 0 };
+            while kind != next
+                && *cat.unit_kind_counts.checked(kind as usize)?
+                    <= *self.used.checked(kind as usize)?
             {
-                j = if j + 1 < cat.kinds { j + 1 } else { 0 };
+                kind = if kind + 1 < cat.kinds { kind + 1 } else { 0 };
             }
-            self.next = if j == next { -1 } else { j };
+            self.next = if kind == next { -1 } else { kind };
         }
         Ok(())
     }
@@ -436,13 +437,13 @@ fn lay_line(
     subs: &mut SubKinds,
 ) -> GenieResult<()> {
     for col in 0..actual.max(0) {
-        let i = at.used_slots + col as usize;
+        let slot = at.used_slots + col as usize;
         let desired_sub_category = if subs.next < 0 {
             UnitKind::NONE
         } else {
             *cat.unit_kinds.checked(subs.next as usize)?
         };
-        *formation.slot_mut(i)? = Slot {
+        *formation.slot_mut(slot)? = Slot {
             unit_id: None,
             offset: flank_offset(total, at.line_index, style),
             desired_transform_position: BVector::ZERO,
@@ -454,7 +455,7 @@ fn lay_line(
             desired_category: formation_category,
             active: 1,
             desired_sub_category,
-            transformed: formation.slot_mut(i)?.transformed,
+            transformed: formation.slot_mut(slot)?.transformed,
         };
         let line = formation.lines.checked_mut(at.line_index as usize)?;
         if (col as usize) < line.indices.len() {
@@ -518,7 +519,7 @@ impl World {
         ) && held
             .previous_formation
             .as_ref()
-            .is_some_and(|p| p.kind == FormationKind::Column);
+            .is_some_and(|formation| formation.kind == FormationKind::Column);
         let order = if after_column {
             SlotOrder::PreviousColumn
         } else {

@@ -12,48 +12,49 @@ use crate::objects::masters::low8;
 
 impl ActionPart {
     /// [`crate::objects::masters::Master::set_action`]'s values of the layer: what `attribute` with
-    /// `v` writes here (the attributes the setter hands over, each one of the layer's values).
-    pub(super) fn set_value(&mut self, attribute: MasterAttribute, v: f32) {
+    /// `value` writes here (the attributes the setter hands over, each one of the layer's values).
+    pub(super) fn set_value(&mut self, attribute: MasterAttribute, value: f32) {
         match attribute {
             MasterAttribute::WORK_RATE => {
-                self.work_rate = WorkRate::new(v);
+                self.work_rate = WorkRate::new(value);
             }
             MasterAttribute::SEARCH_RADIUS => {
-                self.search_radius = Distance::new(v);
+                self.search_radius = Distance::new(value);
             }
             MasterAttribute::RUN_PATTERN => {
-                self.run_pattern = RunPattern::of_data(low8(v));
+                self.run_pattern = RunPattern::of_data(low8(value));
             }
             _ => {}
         }
     }
 
     /// [`crate::objects::masters::Master::add_action`]'s values of the layer: what `attribute` with
-    /// `v` writes here (the attributes the setter hands over, each one of the layer's values).
-    pub(super) fn add_value(&mut self, attribute: MasterAttribute, v: f32) {
+    /// `value` writes here (the attributes the setter hands over, each one of the layer's values).
+    pub(super) fn add_value(&mut self, attribute: MasterAttribute, value: f32) {
         match attribute {
             MasterAttribute::WORK_RATE => {
-                self.work_rate += WorkRate::new(v);
+                self.work_rate += WorkRate::new(value);
             }
             MasterAttribute::SEARCH_RADIUS => {
-                self.search_radius += Distance::new(v);
+                self.search_radius += Distance::new(value);
             }
             MasterAttribute::RUN_PATTERN => {
-                self.run_pattern = self.run_pattern.plus(low8(v));
+                self.run_pattern = self.run_pattern.plus(low8(value));
             }
             _ => {}
         }
     }
 
     /// [`crate::objects::masters::Master::multiply_action`]'s values of the layer: what `attribute`
-    /// with `v` writes here (the attributes the setter hands over, each one of the layer's values).
-    pub(super) fn multiply_value(&mut self, attribute: MasterAttribute, v: f32) {
+    /// with `value` writes here (the attributes the setter hands over, each one of the layer's
+    /// values).
+    pub(super) fn multiply_value(&mut self, attribute: MasterAttribute, value: f32) {
         match attribute {
             MasterAttribute::WORK_RATE => {
-                self.work_rate *= v;
+                self.work_rate *= value;
             }
             MasterAttribute::SEARCH_RADIUS => {
-                self.search_radius *= v;
+                self.search_radius *= value;
             }
             _ => {}
         }

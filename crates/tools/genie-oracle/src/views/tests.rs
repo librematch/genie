@@ -15,12 +15,12 @@ use genie_save::generated::world::{
 use std::iter::once;
 
 /// A little-endian vector of three floats, as the save holds one.
-fn vec3(v: [f32; 3]) -> [u8; 12] {
-    let mut b = [0; 12];
-    for (index, f) in v.iter().enumerate() {
-        b[4 * index..4 * index + 4].copy_from_slice(&f.to_le_bytes());
+fn vec3(vector: [f32; 3]) -> [u8; 12] {
+    let mut bytes = [0; 12];
+    for (index, float) in vector.iter().enumerate() {
+        bytes[4 * index..4 * index + 4].copy_from_slice(&float.to_le_bytes());
     }
-    b
+    bytes
 }
 
 /// An Explore action (type 4) in state `state`.
@@ -216,10 +216,10 @@ fn unit_ai_view_shows_the_ai_of_the_objects_asked_for() {
 #[test]
 fn the_checkpoint_view_names_the_differing_words() {
     let lane = |player: u32, word0: u32| {
-        let mut l = [0; 11];
-        l[0] = word0;
-        l[8] = player;
-        l
+        let mut lane = [0; 11];
+        lane[0] = word0;
+        lane[8] = player;
+        lane
     };
     let mut lanes = [[0; 11]; 8];
     lanes[0] = lane(1, 10);

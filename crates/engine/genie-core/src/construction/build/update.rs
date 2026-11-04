@@ -26,7 +26,7 @@ use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 use crate::world::layer::generated::MoveToTuning;
 use crate::world::lets::release;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 use crate::world::step::Step;
 use crate::{GenieError, GenieResult};
 
@@ -98,8 +98,8 @@ impl BuildAction {
         me: Me,
         reads: &BuildReads,
     ) -> GenieResult<HeadCode> {
-        let roles = &step.w.model.roles.clone();
-        let slots = step.w.model.slots;
+        let roles = &step.world.model.roles.clone();
+        let slots = step.world.model.slots;
         // state 3 without a target: the update does nothing (0x140ab0370's default case)
         if self.state == BuildState::Idle && self.target.is_none() {
             return Ok(HeadCode::Keeps);
@@ -110,7 +110,7 @@ impl BuildAction {
         }
         // the second target's id names no object of the world: FUN_140a7a190 with none, whose
         // release finds nothing to call
-        if self.site.is_some() && step.w.spatial.get(self.site).is_none() {
+        if self.site.is_some() && step.world.spatial.get(self.site).is_none() {
             self.site = None;
         }
         if reads.site.is_some() {
@@ -135,7 +135,7 @@ impl BuildAction {
     fn lost_foundation(&mut self, step: &Step<'_>, reads: &BuildReads) -> bool {
         if self.target.is_none()
             || reads.site.is_some()
-            || step.w.spatial.get(self.target).is_some()
+            || step.world.spatial.get(self.target).is_some()
         {
             return false;
         }
@@ -157,14 +157,14 @@ impl BuildAction {
         builder: &mut Unit,
         reads: &BuildReads,
     ) -> GenieResult<bool> {
-        let player_kind = step.w.players.player(step.player)?.kind;
+        let player_kind = step.world.players.player(step.player)?.kind;
         let site = Self::site_unit(step, reads)?;
         let pasture = match site {
-            Some(u) => step
-                .w
+            Some(unit) => step
+                .world
                 .model
                 .roles
-                .of_master(u.master(step.w.master_tables(), step.player)?.id)
+                .of_master(unit.master(step.world.master_tables(), step.player)?.id)
                 .contains(MasterRoles::PASTURE_1889),
             None => false,
         };
@@ -172,12 +172,12 @@ impl BuildAction {
         if player_kind.is_computer() || !pasture || !built {
             return Ok(false);
         }
-        let Some(ai) = step.w.parts.unit_ai.get_mut(builder.id) else {
+        let Some(ai) = step.world.parts.unit_ai.get_mut(builder.id) else {
             return Ok(false);
         };
         ai.end_order_and_action()?;
         builder.post_own(
-            &mut step.w.parts.unit_ai,
+            &mut step.world.parts.unit_ai,
             NotifyKind::PASTURE_BUILT,
             [
                 AiAction::Build.value(),
@@ -192,11 +192,11 @@ impl BuildAction {
             release(step, builder, target, reads.by)?;
         }
         let Held { kind, amount } = builder.life.held();
-        let attributes = step.w.players.player(step.player)?.attributes.len();
+        let attributes = step.world.players.player(step.player)?.attributes.len();
         if let Some(kind) = kind.filter(|attribute_id| attribute_id.index() < attributes) {
             // the foods a unit carries (15 to 17) as food
             let kind = if kind.is_food_load() {
-                step.w.model.slots.attribute.food
+                step.world.model.slots.attribute.food
             } else {
                 kind
             };
@@ -229,13 +229,13 @@ impl BuildAction {
         {
             return Ok(());
         }
-        let master = site.master(step.w.master_tables(), step.player)?;
+        let master = site.master(step.world.master_tables(), step.player)?;
         let special = roles
             .of_master(master.id)
             .contains(MasterRoles::TOWN_CENTRE_621)
             || roles.of_class(master.class).contains(ClassRoles::GATE);
         let unbuilt = step
-            .w
+            .world
             .parts
             .building_of(site.id)
             .construction
@@ -353,7 +353,7 @@ impl BuildAction {
         reads: &BuildReads,
     ) -> GenieResult<HeadCode> {
         builder.post_own(
-            &mut step.w.parts.unit_ai,
+            &mut step.world.parts.unit_ai,
             NotifyKind::ACTION_FAILED,
             [AiAction::Build.value(), 0, 0],
         )?;
@@ -391,7 +391,7 @@ impl BuildAction {
         reads: &BuildReads,
         roles: &Roles,
     ) -> GenieResult<GiveUp> {
-        let player_kind = step.w.players.player(step.player)?.kind;
+        let player_kind = step.world.players.player(step.player)?.kind;
         Ok(GiveUp {
             patience: if roles
                 .of_some_class(reads.class)
@@ -403,7 +403,7 @@ impl BuildAction {
                 Patience::Fails
             },
             stance: step
-                .w
+                .world
                 .parts
                 .unit_ai
                 .get(builder.id)
@@ -423,15 +423,19 @@ impl BuildAction {
     ) -> GenieResult<()> {
         let at = builder.position();
         let to = step
-            .w
+            .world
             .spatial
             .get_known(self.target)?
             .ok_or(GenieError::unsupported(
                 "a builder's foundation without a place",
             ))?
             .position;
-        let now = step.w.world_time;
-        let mover = step.w.parts.mover_mut(builder.id).ok_or(BUILDER_UNMOVING)?;
+        let now = step.world.world_time;
+        let mover = step
+            .world
+            .parts
+            .mover_mut(builder.id)
+            .ok_or(BUILDER_UNMOVING)?;
         if face_target(mover, at, to, now)? == Aim::Turning {
             return Err(GenieError::unsupported(
                 "a builder that turns over time to face its foundation",

@@ -77,7 +77,7 @@ impl TickTrace {
             times.push(word(base)?);
             lanes.push(
                 (0..lane_count)
-                    .map(|l| lane_words(&word, base + 4 + 4 * 11 * l))
+                    .map(|lane| lane_words(&word, base + 4 + 4 * 11 * lane))
                     .collect::<Result<_, _>>()?,
             );
         }
@@ -115,11 +115,15 @@ impl TickTrace {
             .iter()
             .zip(&other.lanes)
             .enumerate()
-            .find_map(|(t, (a, b))| {
-                a.iter()
-                    .zip(b)
+            .find_map(|(tick, (ours, theirs))| {
+                ours.iter()
+                    .zip(theirs)
                     .enumerate()
-                    .find_map(|(l, (x, y))| (0..11).find(|&w| x[w] != y[w]).map(|w| (t, l, w)))
+                    .find_map(|(lane, (x, y))| {
+                        (0..11)
+                            .find(|&word| x[word] != y[word])
+                            .map(|word| (tick, lane, word))
+                    })
             })
     }
 }

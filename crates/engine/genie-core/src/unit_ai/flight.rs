@@ -58,7 +58,7 @@ impl UnitAi {
         side: &mut UnitView<'_, '_>,
     ) -> GenieResult<u32> {
         let roles = &at.roles;
-        if notify.p[1] < 1 {
+        if notify.params[1] < 1 {
             self.end_notifies(time, at, side, ai_rng)?;
             return Ok(DEAD);
         }
@@ -153,22 +153,22 @@ impl UnitAi {
             ));
         }
         let reach = (at.speed * unit_ai_tuning.run_reach).get();
-        let mut d = sqrt(vy * vy + vx * vx);
-        if d < RUN_EPSILON {
-            let r = ai.rand15() as i32 as f32;
-            vx = (r + r) / RUN_DRAW_SCALE - RUN_ONE;
+        let mut length = sqrt(vy * vy + vx * vx);
+        if length < RUN_EPSILON {
+            let draw = ai.rand15() as i32 as f32;
+            vx = (draw + draw) / RUN_DRAW_SCALE - RUN_ONE;
             let draw = ai.rand15() as i32 as f32;
             vy = (draw + draw) / RUN_DRAW_SCALE - RUN_ONE;
-            d = sqrt(vy * vy + vx * vx);
+            length = sqrt(vy * vy + vx * vx);
         }
-        let mut ex = x - (vx / d) * reach;
-        let mut ey = y - (vy / d) * reach;
+        let mut ex = x - (vx / length) * reach;
+        let mut ey = y - (vy / length) * reach;
         if at.player != PlayerId::GAIA && self.stance == UnitStance::Defensive {
             let gx = self.state_position.x() - ex;
             let gy = self.state_position.y() - ey;
             if unit_ai_tuning.run_leash < sqrt(gy * gy + gx * gx) {
-                ex = self.state_position.x() - (vx / d) * unit_ai_tuning.run_leash;
-                ey = self.state_position.y() - (vy / d) * unit_ai_tuning.run_leash;
+                ex = self.state_position.x() - (vx / length) * unit_ai_tuning.run_leash;
+                ey = self.state_position.y() - (vy / length) * unit_ai_tuning.run_leash;
             }
         }
         self.evasive_move(
@@ -200,9 +200,9 @@ impl UnitAi {
         if force == OrderForce::Unforced && self.current_action.is_some() {
             return Ok(Answer::NotTaken);
         }
-        let near = |p: f32, own: f32| {
-            if !p.is_nan() {
-                p
+        let near = |coordinate: f32, own: f32| {
+            if !coordinate.is_nan() {
+                coordinate
             } else if at_most_or_unordered(own, unit_ai_tuning.evasive_near) {
                 // COMISS own, 5.0; JBE
                 own + RUN_ONE
@@ -210,13 +210,13 @@ impl UnitAi {
                 own - RUN_ONE
             }
         };
-        let held = |v: f32, size: i32| {
-            if v < 0.0 {
+        let held = |coordinate: f32, size: i32| {
+            if coordinate < 0.0 {
                 0.0
-            } else if size as f32 <= v {
+            } else if size as f32 <= coordinate {
                 size as f32 - unit_ai_tuning.evade_edge
             } else {
-                v
+                coordinate
             }
         };
         let mut x = held(near(point.x(), at.position.x()), at.map.width());
@@ -226,10 +226,10 @@ impl UnitAi {
                 if side.can_stand(Point::new(x, y))? {
                     break;
                 }
-                let step = |ai: &mut Well512, v: f32| {
+                let step = |ai: &mut Well512, coordinate: f32| {
                     let up = ai.rand15() & 1 != 0;
                     let by = (ai.rand15() & 3) as f32;
-                    if up { v + by } else { v - by }
+                    if up { coordinate + by } else { coordinate - by }
                 };
                 x = step(ai, x);
                 y = step(ai, y);
@@ -269,7 +269,7 @@ impl UnitAi {
         side: &mut UnitView<'_, '_>,
     ) -> GenieResult<u32> {
         let roles = &at.roles;
-        if notify.p[1] < 1 {
+        if notify.params[1] < 1 {
             self.end_notifies(time, at, side, ai_rng)?;
             return Ok(DEAD);
         }
@@ -413,11 +413,12 @@ impl UnitAi {
             Some(AiAction::Explore) => closest_undiscovered_tile()?,
             _ => {}
         }
-        if (notify.p[0] == AiAction::Gather.value() || notify.p[0] == AiAction::Hunt.value())
-            && notify.p[1] != 10
+        if (notify.params[0] == AiAction::Gather.value()
+            || notify.params[0] == AiAction::Hunt.value())
+            && notify.params[1] != 10
         {
             return Err(
-                VILLAGER_NOTIFY.with("notify", format!("{:#x} {:?}", notify.kind, notify.p))
+                VILLAGER_NOTIFY.with("notify", format!("{:#x} {:?}", notify.kind, notify.params))
             );
         }
         if notify.kind != NotifyKind::REQUIRES_SEARCH

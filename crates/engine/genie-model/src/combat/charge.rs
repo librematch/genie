@@ -52,9 +52,9 @@ impl Charge {
 }
 
 impl MulAssign<f32> for Charge {
-    /// The charge scaled by `f` in place (an effect's multiplier).
-    fn mul_assign(&mut self, f: f32) {
-        self.0 *= f;
+    /// The charge scaled by `factor` in place (an effect's multiplier).
+    fn mul_assign(&mut self, factor: f32) {
+        self.0 *= factor;
     }
 }
 
@@ -91,9 +91,9 @@ impl ChargeRate {
 }
 
 impl MulAssign<f32> for ChargeRate {
-    /// The rate scaled by `f` in place (an effect's multiplier).
-    fn mul_assign(&mut self, f: f32) {
-        self.0 *= f;
+    /// The rate scaled by `factor` in place (an effect's multiplier).
+    fn mul_assign(&mut self, factor: f32) {
+        self.0 *= factor;
     }
 }
 

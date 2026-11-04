@@ -39,33 +39,34 @@ pub fn mesh_from_dump(text: &str) -> Option<Mesh> {
                 mesh = Some(width_mesh);
             }
             Some("shape") => {
-                let m = mesh.as_mut()?;
-                let v: Vec<i32> = words
+                let mesh = mesh.as_mut()?;
+                let words: Vec<i32> = words
                     .get(2..6)?
                     .iter()
-                    .map(|w| w.parse().ok())
+                    .map(|text| text.parse().ok())
                     .collect::<Option<_>>()?;
-                m.shapes.push(FixedRect::new(v[0], v[1], v[2], v[3]));
-                m.sides.push(Default::default());
+                mesh.shapes
+                    .push(FixedRect::new(words[0], words[1], words[2], words[3]));
+                mesh.sides.push(Default::default());
             }
             Some("side") => {
-                let m = mesh.as_mut()?;
+                let mesh = mesh.as_mut()?;
                 let side: usize = words.get(1)?.parse().ok()?;
-                let w: Vec<u32> = words
+                let words: Vec<u32> = words
                     .get(2..9)?
                     .iter()
-                    .map(|w| u32::from_str_radix(w, 16).ok())
+                    .map(|text| u32::from_str_radix(text, 16).ok())
                     .collect::<Option<_>>()?;
-                m.sides.last_mut()?[side].push(contact_from_words(&w)?);
+                mesh.sides.last_mut()?[side].push(contact_from_words(&words)?);
             }
             Some("tile") => {
-                let m = mesh.as_mut()?;
+                let mesh = mesh.as_mut()?;
                 let x: u32 = words.get(1)?.parse().ok()?;
                 let y: u32 = words.get(2)?.parse().ok()?;
-                *m.tiles.get_mut((y * m.width + x) as usize)? = words
+                *mesh.tiles.get_mut((y * mesh.width + x) as usize)? = words
                     .get(3..)?
                     .iter()
-                    .map(|w| w.parse().ok().map(ShapeId::new))
+                    .map(|text| text.parse().ok().map(ShapeId::new))
                     .collect::<Option<_>>()?;
             }
             _ => {}
@@ -78,19 +79,19 @@ pub fn mesh_from_dump(text: &str) -> Option<Mesh> {
 /// the side's axis, the start flag (its byte, 0 or 1: the game writes the byte and leaves the
 /// word's upper bytes as the stack held them) and the half overlap; None for a side past 3 or
 /// another flag.
-fn contact_from_words(w: &[u32]) -> Option<Contact> {
-    let at_side_start = match w.get(5)? & 0xff {
+fn contact_from_words(words: &[u32]) -> Option<Contact> {
+    let at_side_start = match words.get(5)? & 0xff {
         0 => false,
         1 => true,
         _ => return None,
     };
     Some(Contact {
-        other: ShapeId::new(*w.first()?),
-        side: ShapeSide::of_word(*w.get(1)?).ok()?,
-        at: FixedPoint::new(*w.get(2)? as i32, *w.get(3)? as i32),
-        along: *w.get(4)? as i32,
+        other: ShapeId::new(*words.first()?),
+        side: ShapeSide::of_word(*words.get(1)?).ok()?,
+        at: FixedPoint::new(*words.get(2)? as i32, *words.get(3)? as i32),
+        along: *words.get(4)? as i32,
         at_side_start,
-        half: FixedDistance::new(*w.get(6)? as i32),
+        half: FixedDistance::new(*words.get(6)? as i32),
     })
 }
 

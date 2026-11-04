@@ -12,7 +12,7 @@ use crate::players::Amount;
 use crate::world::Seconds;
 
 impl Master {
-    /// Slot 0x18 (`set`): attribute `attribute` of this master takes `v`, by its type's setter
+    /// Slot 0x18 (`set`): attribute `attribute` of this master takes `value`, by its type's setter
     /// (`FUN_14123d310` for a building, `FUN_1412661d0` a combat master, `FUN_1410d5a20` a
     /// missile, `FUN_1410c12b0` an RGE combat master, `FUN_14109fbb0` an action master,
     /// `FUN_1410e1c00` a moving one, `FUN_1410a8b00` an animated one or a doppelganger,
@@ -23,66 +23,66 @@ impl Master {
     pub fn set_attribute(
         &mut self,
         attribute: MasterAttribute,
-        v: f32,
+        value: f32,
         world: &AttributeWorld<'_>,
     ) {
         match self.kind {
-            MasterKind::BUILDING => self.set_building(attribute, v, world),
-            MasterKind::COMBAT => self.set_tribe_combat(attribute, v, world),
-            MasterKind::MISSILE => self.set_missile(attribute, v, world),
-            MasterKind::RGE_COMBAT => self.set_combat(attribute, v, world),
-            MasterKind::ACTION => self.set_action(attribute, v, world),
-            MasterKind::MOVING => self.set_moving(attribute, v, world),
+            MasterKind::BUILDING => self.set_building(attribute, value, world),
+            MasterKind::COMBAT => self.set_tribe_combat(attribute, value, world),
+            MasterKind::MISSILE => self.set_missile(attribute, value, world),
+            MasterKind::RGE_COMBAT => self.set_combat(attribute, value, world),
+            MasterKind::ACTION => self.set_action(attribute, value, world),
+            MasterKind::MOVING => self.set_moving(attribute, value, world),
             MasterKind::ANIMATED | MasterKind::DOPPELGANGER => {
-                self.set_animated(attribute, v, world);
+                self.set_animated(attribute, value, world);
             }
-            _ => self.set_static(attribute, v, world),
+            _ => self.set_static(attribute, value, world),
         }
     }
 
-    /// Slot 0x20 (`add`): `v` adds to attribute `attribute`, by its type's setter
+    /// Slot 0x20 (`add`): `value` adds to attribute `attribute`, by its type's setter
     /// (`FUN_14123d530`, `FUN_141266a60`, `FUN_1410d5ab0`, `FUN_1410c16e0`, `FUN_14109fdb0`,
     /// `FUN_1410e1da0`, `FUN_1410a8b60`, `FUN_141126af0`), as [`Master::set_attribute`].
     pub fn add_attribute(
         &mut self,
         attribute: MasterAttribute,
-        v: f32,
+        value: f32,
         world: &AttributeWorld<'_>,
     ) {
         match self.kind {
-            MasterKind::BUILDING => self.add_building(attribute, v, world),
-            MasterKind::COMBAT => self.add_tribe_combat(attribute, v, world),
-            MasterKind::MISSILE => self.add_missile(attribute, v, world),
-            MasterKind::RGE_COMBAT => self.add_combat(attribute, v, world),
-            MasterKind::ACTION => self.add_action(attribute, v, world),
-            MasterKind::MOVING => self.add_moving(attribute, v, world),
+            MasterKind::BUILDING => self.add_building(attribute, value, world),
+            MasterKind::COMBAT => self.add_tribe_combat(attribute, value, world),
+            MasterKind::MISSILE => self.add_missile(attribute, value, world),
+            MasterKind::RGE_COMBAT => self.add_combat(attribute, value, world),
+            MasterKind::ACTION => self.add_action(attribute, value, world),
+            MasterKind::MOVING => self.add_moving(attribute, value, world),
             MasterKind::ANIMATED | MasterKind::DOPPELGANGER => {
-                self.add_animated(attribute, v, world);
+                self.add_animated(attribute, value, world);
             }
-            _ => self.add_static(attribute, v, world),
+            _ => self.add_static(attribute, value, world),
         }
     }
 
-    /// Slot 0x28 (`multiply`): attribute `attribute` is multiplied by `v`, by its type's setter
+    /// Slot 0x28 (`multiply`): attribute `attribute` is multiplied by `value`, by its type's setter
     /// (`FUN_14123d730`, `FUN_141267040`, `FUN_1410d5b50`, `FUN_1410c1bf0`, `FUN_14109fea0`,
     /// `FUN_1410e1f60`, `FUN_1410a8c00`, `FUN_1411271e0`), as [`Master::set_attribute`].
     pub fn multiply_attribute(
         &mut self,
         attribute: MasterAttribute,
-        v: f32,
+        value: f32,
         world: &AttributeWorld<'_>,
     ) {
         match self.kind {
-            MasterKind::BUILDING => self.multiply_building(attribute, v, world),
-            MasterKind::COMBAT => self.multiply_tribe_combat(attribute, v, world),
-            MasterKind::MISSILE => self.multiply_missile(attribute, v, world),
-            MasterKind::RGE_COMBAT => self.multiply_combat(attribute, v, world),
-            MasterKind::ACTION => self.multiply_action(attribute, v, world),
-            MasterKind::MOVING => self.multiply_moving(attribute, v, world),
+            MasterKind::BUILDING => self.multiply_building(attribute, value, world),
+            MasterKind::COMBAT => self.multiply_tribe_combat(attribute, value, world),
+            MasterKind::MISSILE => self.multiply_missile(attribute, value, world),
+            MasterKind::RGE_COMBAT => self.multiply_combat(attribute, value, world),
+            MasterKind::ACTION => self.multiply_action(attribute, value, world),
+            MasterKind::MOVING => self.multiply_moving(attribute, value, world),
             MasterKind::ANIMATED | MasterKind::DOPPELGANGER => {
-                self.multiply_animated(attribute, v, world);
+                self.multiply_animated(attribute, value, world);
             }
-            _ => self.multiply_static(attribute, v, world),
+            _ => self.multiply_static(attribute, value, world),
         }
     }
 
@@ -118,7 +118,7 @@ impl Master {
             | MasterAttribute::WALKING_GRAPHIC
             | MasterAttribute::RUNNING_GRAPHIC
                 if self.animated_part().max_speed == Speed::ZERO
-                    && moving.is_some_and(|m| m.speed != Speed::ZERO) =>
+                    && moving.is_some_and(|stats| stats.speed != Speed::ZERO) =>
             {
                 Some("a master's speed (+0x740) the loader did not fill")
             }
@@ -145,12 +145,12 @@ impl Master {
 
     /// The resource storage `attribute` (21, 26, 27) names: the first, second or third entry.
     pub(super) fn storage_mut(&mut self, attribute: MasterAttribute) -> Option<&mut Amount> {
-        let i = match attribute {
+        let slot = match attribute {
             MasterAttribute::STORAGE_1 => 0,
             MasterAttribute::STORAGE_2 => 1,
             _ => 2,
         };
-        self.storage.get_mut(i).map(|e| &mut e.1)
+        self.storage.get_mut(slot).map(|entry| &mut entry.1)
     }
 
     /// The selected damage sprite (`+0x731` below the count, an unsigned compare).

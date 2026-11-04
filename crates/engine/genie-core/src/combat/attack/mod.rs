@@ -190,11 +190,11 @@ pub(crate) type Posted = (NotifyKind, [i32; 3]);
 /// A unit's own Attack command ([`Attack::command`]): its target, what it engages and with
 /// which arms, the target's sight and owner, and what the start's `set_state(6)` reads.
 #[derive(Clone, Debug)]
-pub(crate) struct AttackCommand<'a> {
+pub(crate) struct AttackCommand<'world> {
     /// The target.
     pub(crate) target: ObjectId,
     /// What the Attack reads of its unit and its target as it starts.
-    pub(crate) engagement: &'a Engagement,
+    pub(crate) engagement: &'world Engagement,
     /// Its sprites, missile and frames.
     pub(crate) arms: Arms,
     /// The target is in the unit's player's sight (its slot 0x1e0 0xf, or 0x80 with its
@@ -367,7 +367,9 @@ impl AttackReads {
                 let mut flags = AttackerFlags::empty();
                 flags.set(
                     AttackerFlags::VOLLEYS,
-                    masters.table.is_some_and(|m| volleys(master, m)),
+                    masters
+                        .table
+                        .is_some_and(|masters| volleys(master, masters)),
                 );
                 flags.set(
                     AttackerFlags::ARMED,
@@ -445,46 +447,51 @@ pub(crate) struct Fight {
 /// modelled) and the list the notifies go to while the unit AI is out of the unit (the attack
 /// command's start as the AI runs: the AI posts them itself); else each goes to the unit AI at
 /// once (slot 0x328).
-pub(crate) struct Ground<'a> {
+pub(crate) struct Ground<'world> {
     /// The map.
-    pub(crate) map: &'a Spatial,
+    pub(crate) map: &'world Spatial,
     /// The Sprite stream, which a new sprite draws from.
-    pub(crate) sprite_rng: &'a mut Well512,
+    pub(crate) sprite_rng: &'world mut Well512,
     /// The Object stream, which a swing's second sprite draws from.
-    pub(crate) object_rng: Option<&'a mut Well512>,
+    pub(crate) object_rng: Option<&'world mut Well512>,
     /// Where the unit's notifies go.
-    pub(crate) posts: Posts<'a>,
+    pub(crate) posts: Posts<'world>,
     /// The sprites' table, which a `MoveTo` the Attack makes takes its sprite from.
-    pub(crate) graphics: &'a Graphics,
+    pub(crate) graphics: &'world Graphics,
     /// The objects by id: a gate's annexes, which its reach measures.
-    pub(crate) by_id: ObjectsRef<'a>,
+    pub(crate) by_id: ObjectsRef<'world>,
     /// The unit's own motion layer (its mover and animation speed), lent out of the world's
     /// table while `by_id` reads the others' (FD-045-D58).
-    pub(crate) motion: MotionMut<'a>,
+    pub(crate) motion: MotionMut<'world>,
 }
 
 /// Where [`Ground::post`] sends the unit's notifies.
-pub(crate) enum Posts<'a> {
+pub(crate) enum Posts<'world> {
     /// The list the unit AI posts itself while it is out of the world's table.
-    Held(&'a mut Vec<(NotifyKind, [i32; 3])>),
+    Held(&'world mut Vec<(NotifyKind, [i32; 3])>),
     /// The world's unit AIs: each notify goes to the unit's at once.
-    Ais(&'a mut PartTable<UnitAi>),
+    Ais(&'world mut PartTable<UnitAi>),
 }
 
 impl Ground<'_> {
-    /// The unit's notify of `kind` with `p` (slot 0x328): to the list while its unit AI is out
+    /// The unit's notify of `kind` with `params` (slot 0x328): to the list while its unit AI is out
     /// of the world's table, else to its unit AI at once.
     ///
     /// # Errors
     ///
     /// The notify's.
-    pub(crate) fn post(&mut self, unit: &Unit, kind: NotifyKind, p: [i32; 3]) -> GenieResult<()> {
+    pub(crate) fn post(
+        &mut self,
+        unit: &Unit,
+        kind: NotifyKind,
+        params: [i32; 3],
+    ) -> GenieResult<()> {
         match &mut self.posts {
             Posts::Held(list) => {
-                list.push((kind, p));
+                list.push((kind, params));
                 Ok(())
             }
-            Posts::Ais(ais) => unit.post_own(ais, kind, p),
+            Posts::Ais(ais) => unit.post_own(ais, kind, params),
         }
     }
 }

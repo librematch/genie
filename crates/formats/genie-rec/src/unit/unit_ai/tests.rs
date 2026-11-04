@@ -1,4 +1,4 @@
-use crate::element::ReadableHeaderElement;
+use crate::element::ReadHeader;
 use crate::test_support::header_reader;
 use crate::test_support::{floats, read_all, words};
 use crate::unit::unit_ai::{
@@ -178,5 +178,5 @@ fn unit_ai_of_11_05_stops_after_its_retarget_entries() {
 fn short_unit_ai_is_an_error() {
     let bytes = unit_ai_bytes();
     let mut reader = header_reader(&bytes[..bytes.len() - 1], 10.0);
-    assert!(<UnitAi as ReadableHeaderElement>::read_from(&mut reader).is_err());
+    assert!(<UnitAi as ReadHeader>::read_from(&mut reader).is_err());
 }

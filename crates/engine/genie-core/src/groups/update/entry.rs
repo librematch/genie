@@ -39,7 +39,7 @@ impl World {
             .groups
             .groups
             .iter()
-            .filter(|g| g.owner == Some(player_id))
+            .filter(|group| group.owner == Some(player_id))
             .map(|group| group.id)
             .collect();
         for id in ids {
@@ -80,7 +80,12 @@ impl World {
     ///
     /// A member the slice cannot stand or show standing.
     pub(crate) fn delete_group(&mut self, group: GroupId) -> GenieResult<()> {
-        let Some(index) = self.groups.groups.iter().position(|g| g.id == group) else {
+        let Some(index) = self
+            .groups
+            .groups
+            .iter()
+            .position(|unit_group| unit_group.id == group)
+        else {
             return Ok(());
         };
         let index_group = self.groups.groups.remove(index);
@@ -147,10 +152,10 @@ impl World {
     /// is checked at the same index.
     pub(super) fn drop_lost_members(&mut self, group: GroupId) -> GenieResult<()> {
         let mut removed = false;
-        let mut i = 0;
+        let mut index = 0;
         loop {
             let held = self.groups.held(group)?;
-            let Some(member) = held.members.get(i) else {
+            let Some(member) = held.members.get(index) else {
                 break;
             };
             let (id, owner) = (member.id, held.owner);
@@ -171,7 +176,7 @@ impl World {
                 removed = true;
                 continue;
             }
-            i += 1;
+            index += 1;
         }
         if removed {
             self.groups.held_mut(group)?.flags |= GroupFlags::STATISTICS;

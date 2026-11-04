@@ -197,8 +197,8 @@ mod tests {
     /// Every order converts back from its value; the values are 33 distinct ones.
     #[test]
     fn every_order_converts_back_from_its_value() {
-        for o in OrderKind::ALL {
-            assert_eq!(OrderKind::try_from(o.value()), Ok(o));
+        for order_kind in OrderKind::ALL {
+            assert_eq!(OrderKind::try_from(order_kind.value()), Ok(order_kind));
         }
         let mut values: Vec<i32> = OrderKind::ALL
             .iter()
@@ -220,9 +220,9 @@ mod tests {
     /// A value no case names is an error; −1 is a field's none.
     #[test]
     fn value_no_case_names_is_an_error() {
-        for v in [0, 0x2c4, 0x262, 0x269, 0x2cf, 0x2d0, 0x323] {
+        for value in [0, 0x2c4, 0x262, 0x269, 0x2cf, 0x2d0, 0x323] {
             assert_eq!(
-                OrderKind::try_from(v).map_err(|error| error.kind()),
+                OrderKind::try_from(value).map_err(|error| error.kind()),
                 Err(ErrorKind::InvalidInput)
             );
         }

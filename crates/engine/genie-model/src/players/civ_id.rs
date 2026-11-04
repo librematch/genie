@@ -44,9 +44,11 @@ impl CivId {
         if value < 1 {
             return Ok(None);
         }
-        u8::try_from(value).map(|v| Some(Self(v))).map_err(|_| {
-            GenieError::invalid_input("a technology's civilisation past 255").with("civ", value)
-        })
+        u8::try_from(value)
+            .map(|byte| Some(Self(byte)))
+            .map_err(|_| {
+                GenieError::invalid_input("a technology's civilisation past 255").with("civ", value)
+            })
     }
 
     /// Its number.

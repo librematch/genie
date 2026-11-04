@@ -40,10 +40,10 @@ impl TrailMode {
         self.0
     }
 
-    /// The mode an add effect of `n` makes of it: the byte's sum, wrapping.
+    /// The mode an add effect of `by` makes of it: the byte's sum, wrapping.
     #[must_use]
-    pub const fn plus(self, n: u8) -> Self {
-        Self(self.0.wrapping_add(n))
+    pub const fn plus(self, by: u8) -> Self {
+        Self(self.0.wrapping_add(by))
     }
 }
 
@@ -68,8 +68,8 @@ impl TrailDensity {
 
 impl MulAssign<f32> for TrailDensity {
     /// A multiply effect's product (one `f32` product).
-    fn mul_assign(&mut self, f: f32) {
-        self.0 *= f;
+    fn mul_assign(&mut self, factor: f32) {
+        self.0 *= factor;
     }
 }
 

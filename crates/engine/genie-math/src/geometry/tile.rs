@@ -127,15 +127,15 @@ impl TileRect {
 
 impl From<[i32; 4]> for TileRect {
     /// The box of four integers in their order (x0, y0, x1, y1).
-    fn from(c: [i32; 4]) -> Self {
-        Self(c)
+    fn from(corners: [i32; 4]) -> Self {
+        Self(corners)
     }
 }
 
 impl From<[i32; 2]> for Tile {
     /// The tile of two integers in the map's order (x, y), as a save holds them.
-    fn from(c: [i32; 2]) -> Self {
-        Self(c)
+    fn from(components: [i32; 2]) -> Self {
+        Self(components)
     }
 }
 
@@ -189,10 +189,10 @@ impl TileOffset {
     #[must_use]
     pub const fn table<const N: usize>(pairs: [[i32; 2]; N]) -> [Self; N] {
         let mut out = [Self([0; 2]); N];
-        let mut i = 0;
-        while i < N {
-            out[i] = Self(pairs[i]);
-            i += 1;
+        let mut index = 0;
+        while index < N {
+            out[index] = Self(pairs[index]);
+            index += 1;
         }
         out
     }

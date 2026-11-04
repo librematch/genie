@@ -162,9 +162,12 @@ impl GenieError {
 
     /// Its context, in the order the sites attached it.
     pub fn context(&self) -> impl Iterator<Item = (&'static str, &str)> {
-        self.extra
-            .iter()
-            .flat_map(|extra| extra.context.iter().map(|(k, text)| (*k, text.as_str())))
+        self.extra.iter().flat_map(|extra| {
+            extra
+                .context
+                .iter()
+                .map(|(key, text)| (*key, text.as_str()))
+        })
     }
 }
 
@@ -241,8 +244,8 @@ impl fmt::Debug for GenieError {
             if !extra.context.is_empty() {
                 let _ = debug.field("context", &extra.context);
             }
-            if let Some(s) = &extra.source {
-                let _ = debug.field("source", s);
+            if let Some(source) = &extra.source {
+                let _ = debug.field("source", source);
             }
         }
         debug.finish()
@@ -345,9 +348,9 @@ mod tests {
 
     #[test]
     fn errors_are_equal_by_kind_and_reason_alone() {
-        let a = unsupported("a").with("id", 7);
+        let with_context = unsupported("a").with("id", 7);
         let error = unsupported("a");
-        assert_eq!(a, error);
+        assert_eq!(with_context, error);
         assert_ne!(unsupported("a"), unreachable("a"));
         assert_ne!(unsupported("a"), unsupported("b"));
     }

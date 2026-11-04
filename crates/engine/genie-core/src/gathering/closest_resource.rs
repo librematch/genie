@@ -12,7 +12,7 @@ use crate::movement::Planning;
 use crate::objects::ObjectId;
 use crate::objects::layers::Action;
 use crate::objects::masters::GatherGroup;
-use crate::objects::masters::PlayersMasters;
+use crate::objects::masters::PlayersMastersExt;
 use crate::objects::masters::{MasterTables, OwnerMasters};
 use crate::objects::unit::Unit;
 use crate::objects::{ObjectState, WorkerCount};
@@ -25,19 +25,19 @@ use crate::world::index::ObjectsRef;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 use crate::world::others::OthersRef;
-use crate::world::slots::PlayerSlots;
+use crate::world::slots::PlayerSlotsExt;
 use crate::world::step::Step;
 use crate::{GenieError, GenieResult};
 
 /// What `ClosestResourceObject` reads of the world, as the unit's update or its unit AI sees it.
-pub(crate) struct ResourceWorld<'a, 'b> {
+pub(crate) struct ResourceWorld<'world, 'plan> {
     pub(crate) player: PlayerId,
-    pub(crate) spatial: &'a mut Spatial,
-    pub(crate) zones: &'a mut Zones,
-    pub(crate) foreign: Foreign<'a>,
-    pub(crate) every: MasterTables<'a>,
-    pub(crate) masters: OwnerMasters<'a>,
-    pub(crate) plan: Planning<'b>,
+    pub(crate) spatial: &'world mut Spatial,
+    pub(crate) zones: &'world mut Zones,
+    pub(crate) foreign: Foreign<'world>,
+    pub(crate) every: MasterTables<'world>,
+    pub(crate) masters: OwnerMasters<'world>,
+    pub(crate) plan: Planning<'plan>,
 }
 
 /// Where `ClosestResourceObject` (`FUN_140c49760`) searches from, the unit at `unit`: without a
@@ -78,7 +78,7 @@ pub(crate) fn closest_resource_of(
         None => None,
         Some(site) => {
             // the unit itself (a mule cart searches from its own place) or another object
-            let (sp, s) = if site.id() == unit.id {
+            let (sp, searcher) = if site.id() == unit.id {
                 Some((resource_world.player, unit))
             } else {
                 others.find(site)
@@ -86,10 +86,10 @@ pub(crate) fn closest_resource_of(
             .ok_or(GenieError::unsupported(
                 "a resource search's drop site the slice does not hold",
             ))?;
-            let m = s.master(resource_world.every, sp)?;
+            let master = searcher.master(resource_world.every, sp)?;
             let footprint =
                 roles
-                    .of_master(m.id)
+                    .of_master(master.id)
                     .contains(MasterRoles::SEARCH_FROM_FOOTPRINT)
                     || {
                         let restriction = mover
@@ -109,13 +109,15 @@ pub(crate) fn closest_resource_of(
                             &terrain.kinds,
                             values,
                         )?;
-                        let zone = |p: Position| zones.zone(Tile::new(p.x() as i32, p.y() as i32));
-                        zone(s.position()) == zone(unit.position())
+                        let zone = |position: Position| {
+                            zones.zone(Tile::new(position.x() as i32, position.y() as i32))
+                        };
+                        zone(searcher.position()) == zone(unit.position())
                     };
             Some(gather_search::SearchSite {
-                position: s.position(),
-                radius: m.radius,
-                line_of_sight: m.line_of_sight,
+                position: searcher.position(),
+                radius: master.radius,
+                line_of_sight: master.line_of_sight,
                 footprint,
             })
         }
@@ -183,69 +185,72 @@ impl UnitView<'_, '_> {
         search: ResourceSearch,
     ) -> GenieResult<Option<Gatherable>> {
         let by_id = ObjectsRef::new(
-            &self.c.w.players,
-            &self.c.w.index,
-            &self.c.w.model.masters,
-            &self.c.w.parts,
-            &self.c.w.model.roles,
-            &self.c.w.model.tuning,
+            &self.step.world.players,
+            &self.step.world.index,
+            &self.step.world.model.masters,
+            &self.step.world.parts,
+            &self.step.world.model.roles,
+            &self.step.world.model.tuning,
         );
         let mut resource_world = ResourceWorld {
             player: self.player,
-            spatial: &mut self.c.w.spatial,
-            zones: &mut self.c.w.zones,
+            spatial: &mut self.step.world.spatial,
+            zones: &mut self.step.world.zones,
             foreign: owner_view(
-                &self.c.w.players,
-                &self.c.w.index,
-                self.c.player,
+                &self.step.world.players,
+                &self.step.world.index,
+                self.step.player,
                 self.new_owner,
             )?
             .players(),
-            every: MasterTables::new(&self.c.w.model.masters, &self.c.w.parts.own_master),
+            every: MasterTables::new(
+                &self.step.world.model.masters,
+                &self.step.world.parts.own_master,
+            ),
             masters: OwnerMasters::new(
-                &self.c.w.parts.own_master,
-                self.c.w.model.masters.of(self.player),
+                &self.step.world.parts.own_master,
+                self.step.world.model.masters.of(self.player),
             ),
             plan: Planning {
-                pathing: &mut self.c.w.pathing,
-                now: self.c.w.world_time,
+                pathing: &mut self.step.world.pathing,
+                now: self.step.world.world_time,
                 player_kind: self.player_kind,
-                object: self.c.w.streams.get(Stream::Object),
-                groups: &self.c.w.groups,
+                object: self.step.world.streams.get_mut(Stream::Object),
+                groups: &self.step.world.groups,
             },
         };
         let (id, _) = closest_resource_of(
             (
                 self.unit,
                 &*self.actions,
-                self.c.w.parts.mover_of(self.unit.id),
+                self.step.world.parts.mover_of(self.unit.id),
             ),
             &mut resource_world,
             owner_view(
-                &self.c.w.players,
-                &self.c.w.index,
-                self.c.player,
+                &self.step.world.players,
+                &self.step.world.index,
+                self.step.player,
                 self.new_owner,
             )?,
             (search.kind, search.cap, search.site),
             (search.current, search.min_state, search.point),
             by_id,
-            &self.c.w.model.roles,
+            &self.step.world.model.roles,
         )?;
         let Some(id) = id else {
             return Ok(None);
         };
         let (owner, unit) = owner_view(
-            &self.c.w.players,
-            &self.c.w.index,
-            self.c.player,
+            &self.step.world.players,
+            &self.step.world.index,
+            self.step.player,
             self.new_owner,
         )?
         .find(id)
         .ok_or(GenieError::unsupported(
             "a resource found that the slice does not hold",
         ))?;
-        let class = unit.master(self.c.w.master_tables(), owner)?.class;
+        let class = unit.master(self.step.world.master_tables(), owner)?.class;
         Ok(Some(Gatherable {
             id,
             position: unit.position(),
@@ -283,16 +288,16 @@ impl Unit {
         site: Option<DropSiteId>,
     ) -> GenieResult<Option<ObjectId>> {
         let by_id = ObjectsRef::new(
-            &step.w.players,
-            &step.w.index,
-            &step.w.model.masters,
-            &step.w.parts,
-            &step.w.model.roles,
-            &step.w.model.tuning,
+            &step.world.players,
+            &step.world.index,
+            &step.world.model.masters,
+            &step.world.parts,
+            &step.world.model.roles,
+            &step.world.model.tuning,
         );
-        let others = OthersRef::of(&step.w.players, &step.w.index, step.player)?;
+        let others = OthersRef::of(&step.world.players, &step.world.index, step.player)?;
         let current = step
-            .w
+            .world
             .parts
             .unit_ai
             .get(self.id)
@@ -302,31 +307,31 @@ impl Unit {
             .current_target;
         let mut resource_world = ResourceWorld {
             player: step.player,
-            spatial: &mut step.w.spatial,
-            zones: &mut step.w.zones,
+            spatial: &mut step.world.spatial,
+            zones: &mut step.world.zones,
             foreign: others.players(),
-            every: MasterTables::new(&step.w.model.masters, &step.w.parts.own_master),
+            every: MasterTables::new(&step.world.model.masters, &step.world.parts.own_master),
             masters: OwnerMasters::new(
-                &step.w.parts.own_master,
-                step.w.model.masters.of(step.player),
+                &step.world.parts.own_master,
+                step.world.model.masters.of(step.player),
             ),
             plan: Planning {
-                pathing: &mut step.w.pathing,
-                now: step.w.world_time,
-                player_kind: step.w.players.player(step.player)?.kind,
-                object: step.w.streams.get(Stream::Object),
-                groups: &step.w.groups,
+                pathing: &mut step.world.pathing,
+                now: step.world.world_time,
+                player_kind: step.world.players.player(step.player)?.kind,
+                object: step.world.streams.get_mut(Stream::Object),
+                groups: &step.world.groups,
             },
         };
         let search = (current, ObjectState::Alive, NO_POINT);
         closest_resource_of(
-            (self, actions, step.w.parts.mover_of(self.id)),
+            (self, actions, step.world.parts.mover_of(self.id)),
             &mut resource_world,
             others,
             (kind, cap, site),
             search,
             by_id,
-            &step.w.model.roles,
+            &step.world.model.roles,
         )
         .map(|(id, _)| id)
     }

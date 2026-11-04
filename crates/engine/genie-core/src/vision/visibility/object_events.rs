@@ -48,12 +48,12 @@ pub fn sight_taker(
     PlayerId::each(players.len())
         .zip(players)
         .skip(1)
-        .filter(|&(q, player)| {
+        .filter(|&(player_id, player)| {
             mode.standard()
                 || !player.kind.is_computer()
-                || allows.get(q.index()).copied().unwrap_or(false)
+                || allows.get(player_id.index()).copied().unwrap_or(false)
         })
-        .map(|(q, _)| q)
+        .map(|(player_id, _)| player_id)
         .find(|&player_id| player_id != owner && mask.intersects(VisionBits::visible(player_id)))
 }
 
