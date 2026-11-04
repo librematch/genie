@@ -2043,6 +2043,41 @@ fn heal_to_full_holds_the_master_hit_points() {
     );
 }
 
+/// `FUN_141193b30` with the base class's slots: the amount added as it is (a loss from full
+/// too), a loss leaving at least 1 hit point, at the master's hit points exactly them; a NaN
+/// is not full.
+#[test]
+fn base_heal_adds_as_it_is_and_holds_the_master_hit_points_at_full() {
+    let most = MasterHitPoints::of_data(60);
+    let mut hp = HitPoints::new(30.0);
+    assert_eq!(
+        heal_base_hp(&mut hp, most, HitPoints::new(10.0)),
+        Heal::Partial
+    );
+    assert_eq!(hp, HitPoints::new(40.0));
+    assert_eq!(
+        heal_base_hp(&mut hp, most, HitPoints::new(25.0)),
+        Heal::Full
+    );
+    assert_eq!(hp, HitPoints::new(60.0));
+    assert_eq!(
+        heal_base_hp(&mut hp, most, HitPoints::new(-5.0)),
+        Heal::Partial
+    );
+    assert_eq!(hp, HitPoints::new(55.0));
+    let mut hp = HitPoints::new(0.5);
+    assert_eq!(
+        heal_base_hp(&mut hp, most, HitPoints::new(-3.0)),
+        Heal::Partial
+    );
+    assert_eq!(hp, HitPoints::new(1.0));
+    let mut hp = HitPoints::new(f32::NAN);
+    assert_eq!(
+        heal_base_hp(&mut hp, most, HitPoints::new(1.0)),
+        Heal::Partial
+    );
+}
+
 /// The blast's ledger (`+0xbb8`): an annex keeps its damage on its main building among the
 /// targets, another building on itself, any other object on none; an annex whose main
 /// building is not among them fails. The values read through it: an annex its main building's

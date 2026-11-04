@@ -20,6 +20,7 @@ use crate::objects::MasterHitPoints;
 use crate::objects::SpeedMultiplier;
 use crate::objects::SpriteFlags;
 use crate::objects::Voice;
+use crate::objects::masters::ClassId;
 use crate::objects::masters::CreatablePart;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::{Master, Masters};
@@ -894,6 +895,47 @@ fn repairer_works_until_the_target_is_full_or_the_player_cannot_pay() {
             0
         )
     );
+}
+
+/// A target below type 70 takes its class's slot 0x110 (`FUN_141193b30`, [`heal_base_hp`]): a
+/// heal its repairer's player does not pay for, which ends the Repair once the target holds its
+/// master's hit points. One of class 51 or 54 there is refused: its class's table has no slot
+/// 0x8c8 (`0x140adaa20` case 6).
+#[test]
+fn repair_heals_an_object_below_kind_70_free_until_it_is_full() {
+    use crate::ErrorKind;
+    let working = |r: &mut RepairAction| r.state = RepairState::Work;
+    let below_70 = |class: Option<ClassId>| {
+        let mut t = repair_at(NEAR, working);
+        let master = t.players[1].objects[ListIndex::new(1)].life.master_id;
+        for masters in &mut t.model.masters {
+            if let Some(m) = Arc::make_mut(masters).get_mut(master) {
+                m.kind = MasterKind::STATIC;
+                m.class = class.unwrap_or(m.class);
+            }
+        }
+        t.players[1].attributes.resize(300, Amount::ZERO);
+        t.players[1].attributes[BUILDING_REPAIR_COST] = Amount::new(1.0);
+        t.players[1].attributes[..4].copy_from_slice(&[Amount::ZERO; 4]);
+        t
+    };
+    let mut t = below_70(None);
+    assert_eq!(repaired(&mut t), Ok(HeadCode::Keeps));
+    assert_eq!(repair_of(&t).state.bare(), RepairState::Work);
+    let hp = the_house(&t).0;
+    assert!(300.0 < hp && hp < 550.0, "{hp}");
+    assert_eq!(t.players[1].attributes[..4], [Amount::ZERO; 4]);
+    t.players[1].objects[ListIndex::new(1)].life.hp = HitPoints::new(549.99);
+    assert_eq!(repaired(&mut t), Ok(HeadCode::Keeps));
+    assert_eq!(repair_of(&t).state.bare(), RepairState::Done);
+    assert_eq!(the_house(&t).0, 550.0);
+    for class in [class::CLASS_51, class::CLASS_54] {
+        let mut t = below_70(Some(class));
+        assert_eq!(
+            repaired(&mut t).map_err(|e| e.kind()),
+            Err(ErrorKind::InvalidInput)
+        );
+    }
 }
 
 /// State 10 waits a second (the world's dt off the timer), then faces a target within reach

@@ -20,7 +20,7 @@ use crate::movement::PathState;
 use crate::movement::Speed;
 use crate::movement::StepPlans;
 use crate::movement::{
-    AfterRequest, EPSILON, FAR, Goal, Me, Motion, MoveStats, Mover, Next, Planning, Reach,
+    AfterRequest, EPSILON, FAR, Goal, Me, Motion, MoveStats, Mover, Next, Planning, Reach, Reached,
     footprint_gap, gate_gap, ground, include_kept, moved_far, pause_holds, point_or_zero_of, reach,
 };
 use crate::movement::{SubstituteCount, WaitDelays};
@@ -479,10 +479,10 @@ impl Mover {
                 let now = plan.as_deref().map_or(WorldTime::ZERO, |p| p.now);
                 let pathing = plan.as_deref_mut().map(|p| &mut *p.pathing);
                 match self.reached((place, me), world, pathing, goal, now, by_id)? {
-                    Next::Again => continue,
-                    Next::Dispatch => {}
-                    Next::Done(m) => return Ok(m),
-                    Next::LoopEnd => return self.loop_end(dt, walked, heading, movement_tuning),
+                    Reached::Pass(Next::Again) => continue,
+                    Reached::Pass(Next::Dispatch) => {}
+                    Reached::Pass(Next::Done(m)) => return Ok(m),
+                    Reached::LoopEnd => return self.loop_end(dt, walked, heading, movement_tuning),
                 }
             }
             match self.level_state(
@@ -497,11 +497,6 @@ impl Mover {
                 Next::Again => continue,
                 // a link of another type: on past the request (state 4 or 5) to the walk
                 Next::Dispatch => {}
-                Next::LoopEnd => {
-                    return Err(GenieError::unreachable(
-                        "a loop's end outside a reached waypoint",
-                    ));
-                }
             }
             let (now, player_kind) = plan
                 .as_deref()

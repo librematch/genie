@@ -54,10 +54,6 @@ use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
 use crate::world::layer::generated::MoveToTuning;
 
-/// State 11 made without what its `MoveTo` reads of the unit.
-const WALK_WITHOUT_READS: GenieError =
-    GenieError::unreachable("an Explore's set_state(11) without the unit's reads");
-
 /// A point of −1 is no point (`DAT_14330ec20`).
 const NO_POINT: f32 = EXPLORE_NO_POINT;
 
@@ -135,22 +131,23 @@ impl ExploreAction {
         } else {
             ExploreState::Walk { move_to: None }
         };
-        let owner = a.set_state(state, Some(walk), move_to_tuning)?;
+        let owner = a.set_state(state, walk, move_to_tuning)?;
         Ok((a, owner))
     }
 
     /// `Set_state` (slot 0x80, `0x140a87e30`): its sub-actions go (`FUN_140a98620`), then by state:
     /// 3 asks its unit AI for a point, 11 makes the `MoveTo` to the point from `walk`
     /// ([`MoveToReads::to_point`]: `FUN_140aa0d30` with range 0, made quiet by `FUN_140a7a170`;
-    /// the action list starts it, `FUN_140a977e0`). The other states read nothing of the unit.
+    /// the action list starts it, `FUN_140a977e0`). The other states read nothing of the unit:
+    /// state 3 alone is [`ExploreAction::wait_for_point`].
     ///
     /// # Errors
     ///
-    /// A sprite the table lacks, and state 11 without `walk`.
+    /// A sprite the table lacks.
     pub fn set_state(
         &mut self,
         state: ExploreState,
-        walk: Option<&ExploreMove<'_>>,
+        walk: &ExploreMove<'_>,
         move_to_tuning: &MoveToTuning,
     ) -> Result<Owner, GenieError> {
         // the sub-actions go: a new state holds none until it makes its own
@@ -166,7 +163,6 @@ impl ExploreAction {
             ExploreState::Wait => Owner::WantsPoint,
             ExploreState::Done | ExploreState::Failed | ExploreState::Ended => Owner::Standing,
             ExploreState::Walk { .. } => {
-                let walk = walk.ok_or(WALK_WITHOUT_READS)?;
                 self.state = ExploreState::Walk {
                     move_to: walk.reads.to_point(
                         self.point,
@@ -179,6 +175,13 @@ impl ExploreAction {
             }
             ExploreState::New => Owner::Nothing,
         })
+    }
+
+    /// `Set_state(3)` (slot 0x80, `0x140a87e30`), which reads nothing of the unit: its sub-actions
+    /// go and it asks its unit AI for a point ([`Owner::WantsPoint`]).
+    pub const fn wait_for_point(&mut self) -> Owner {
+        self.state = ExploreState::Wait;
+        Owner::WantsPoint
     }
 
     /// The point (slot 0x48, `0x140a881a0`): one on the map's quarter (both coordinates at least
@@ -196,13 +199,9 @@ impl ExploreAction {
     ) -> Result<Owner, GenieError> {
         if 0.0 <= point.x() && 0.0 <= point.y() {
             self.point = point;
-            return self.set_state(
-                ExploreState::Walk { move_to: None },
-                Some(walk),
-                move_to_tuning,
-            );
+            return self.set_state(ExploreState::Walk { move_to: None }, walk, move_to_tuning);
         }
-        self.set_state(ExploreState::Wait, None, move_to_tuning)
+        Ok(self.wait_for_point())
     }
 
     /// What the update does after its `MoveTo`'s update returned `code` (`0x140a880c0` in state 11,
@@ -210,16 +209,10 @@ impl ExploreAction {
     /// make it wait for a new point (`set_state` 3). The game's arm for 4 (the action's slot
     /// 0x68 and the walk again, `set_state` 11) never runs: only a loud `MoveTo` gives 4
     /// ([`SubCode`]).
-    pub fn after_walk(
-        &mut self,
-        code: SubCode,
-        move_to_tuning: &MoveToTuning,
-    ) -> Result<Owner, GenieError> {
+    pub const fn after_walk(&mut self, code: SubCode) -> Owner {
         match code {
-            SubCode::Done | SubCode::Failed | SubCode::TargetGone => {
-                self.set_state(ExploreState::Wait, None, move_to_tuning)
-            }
-            SubCode::UnderWay => Ok(Owner::Nothing),
+            SubCode::Done | SubCode::Failed | SubCode::TargetGone => self.wait_for_point(),
+            SubCode::UnderWay => Owner::Nothing,
         }
     }
 }
@@ -296,7 +289,7 @@ impl ExploreAction {
         let code = update_sub_actions(&mut move_to, c, explorer, me, how)?;
         self.state = ExploreState::Walk { move_to };
         let walked = move_to.is_some();
-        let owner = self.after_walk(code, &c.w.model.tuning.move_to)?;
+        let owner = self.after_walk(code);
         if walked && self.state.move_to().is_none() {
             stop_mover(c.w.parts.mover_mut(explorer.id))?;
         }
@@ -842,14 +835,8 @@ mod tests {
                 move_to: Some(made)
             }
         );
-        assert_eq!(
-            a.after_walk(SubCode::UnderWay, &tuning().move_to),
-            Ok(Owner::Nothing)
-        );
-        assert_eq!(
-            a.after_walk(SubCode::Done, &tuning().move_to),
-            Ok(Owner::WantsPoint)
-        );
+        assert_eq!(a.after_walk(SubCode::UnderWay), Owner::Nothing);
+        assert_eq!(a.after_walk(SubCode::Done), Owner::WantsPoint);
         assert_eq!(a.state, ExploreState::Wait);
         assert_eq!(
             a.take_point(Position::new(-1.0, 5.0, 0.0), &walk, &tuning().move_to),

@@ -332,12 +332,8 @@ impl HuntAction {
         )?;
         let mover = c.w.parts.mover_mut(unit.id).ok_or(HUNTER_UNMOVING)?;
         self.state = HuntState::Attack { attack: None };
-        // the herd is read only on a live target
-        let target = self.target.ok_or(GenieError::unreachable(
-            "a hunt's Attack on its livestock without a target",
-        ))?;
         let (a, move_start) = Attack::start(
-            target.id(),
+            herd.target.id(),
             &herd.engagement,
             herd.arms,
             mover,

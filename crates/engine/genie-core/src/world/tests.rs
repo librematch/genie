@@ -1162,6 +1162,28 @@ fn completed_pasture_puts_its_livestock_on_its_edges() {
     assert_eq!(*t.streams.get(Stream::Object), e);
 }
 
+/// A livestock sprite of one facet that draws its first facet at random: the game's `IDIV` by
+/// 0 stops it, and genie refuses the data (`invalid_input`).
+#[test]
+fn pasture_livestock_sprite_of_one_facet_is_refused() {
+    use crate::ErrorKind;
+    let mut t = pasture_game(
+        Position::new(20.0, 20.0, 0.0),
+        1.0,
+        &[master_id(1899), master_id(1900)],
+    );
+    for id in [SpriteId::named(13124), SpriteId::named(13170)] {
+        let mut g = *t.model.graphics.get(id).unwrap();
+        g.facets = FacetCount::of_data(1);
+        let _ = Arc::make_mut(&mut t.model.graphics).insert(id, g);
+    }
+    assert_eq!(
+        t.setup_pasture(PlayerId::new(1), PastureId::new(object_id(50)))
+            .map_err(|e| e.kind()),
+        Err(ErrorKind::InvalidInput)
+    );
+}
+
 /// One livestock a tile: a pasture at (20, 20) has twelve tiles under its sixteen points, so
 /// sixteen asked give twelve and the points run out; at the map's left edge the points off it
 /// (x below 0 after CVTTSS2SI: −1.5, not −0.6) go too, leaving six tiles.
@@ -20272,7 +20294,7 @@ fn an_explore_walks_to_its_point_then_asks_for_the_next() {
         assert_eq!(heard, asked);
     }
     let (r, e, heard) = explored(|e| {
-        let _ = e.set_state(ExploreState::Wait, None, &tuning().move_to);
+        let _ = e.wait_for_point();
     });
     assert_eq!(
         (r, e.map(|e| e.state), heard),

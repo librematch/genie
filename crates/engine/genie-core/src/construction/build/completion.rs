@@ -196,9 +196,9 @@ impl World {
         building: &BuildingMaster,
         placed: &Placed,
     ) -> Result<(), GenieError> {
-        if building.stack_unit.is_none() {
+        let Some(stack_unit) = building.stack_unit else {
             return Ok(());
-        }
+        };
         self.pathing.removed(id);
         self.spatial.drop_record(id);
         self.pathing.tiles_changed(self.spatial.take_changes());
@@ -211,10 +211,13 @@ impl World {
             v.unlink_building(placed.position, master.radius, self.model.tuning.visibility)?;
         }
         let stack = StackUnit {
-            master: stack_master(master, building, rice, &self.model.roles, self.model.slots)
-                .ok_or(GenieError::unreachable(
-                    "a completed stack unit without a master",
-                ))?,
+            master: stack_master(
+                master,
+                stack_unit,
+                rice,
+                &self.model.roles,
+                self.model.slots,
+            ),
             at: placed.position,
             hp_lost: HitPoints::of_master(master.hit_points) - hp,
         };
@@ -253,7 +256,9 @@ impl World {
         let c = layer.construction.as_mut().ok_or(NO_CONSTRUCTION)?;
         let laid = foundation_laid(
             building,
-            stack_master(master, building, rice, &self.model.roles, self.model.slots),
+            building
+                .stack_unit
+                .map(|s| stack_master(master, s, rice, &self.model.roles, self.model.slots)),
             &self.model.roles,
         );
         lay_foundation(c, spatial, placed, master, laid, mode_680, &self.model)?;
@@ -277,16 +282,17 @@ impl World {
     }
 }
 
-/// The master a completed building's stack unit takes (`+0x986`):
+/// The master a completed building's stack unit takes, of a building whose master names
+/// `stack_unit` (`+0x986`):
 /// [`MasterSlots::pasture_mangrove`](crate::world::layer::MasterSlots::pasture_mangrove) for master
 /// 1889 on mangrove or rice terrain (`rice`, `+0xcd0`), else its own.
 fn stack_master(
     master: &Master,
-    building: &BuildingMaster,
+    stack_unit: MasterId,
     rice: bool,
     roles: &Roles,
     slots: Slots,
-) -> Option<MasterId> {
+) -> MasterId {
     // The buildings' master type (80).
     // The masters and the class the end of the work treats apart: 621 and 1889 among the
     // foundations, class 39 among the builders, 1893 and 1897 (`id - 0x765 & !4 == 0`), the fish
@@ -294,11 +300,10 @@ fn stack_master(
     if roles
         .of_master(master.id)
         .contains(MasterRoles::PASTURE_1889)
-        && building.stack_unit.is_some()
         && rice
     {
-        Some(slots.master.pasture_mangrove)
+        slots.master.pasture_mangrove
     } else {
-        building.stack_unit
+        stack_unit
     }
 }

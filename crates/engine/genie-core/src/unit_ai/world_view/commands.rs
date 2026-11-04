@@ -110,6 +110,8 @@ impl UnitView<'_, '_> {
                 MasterTables::new(&self.c.w.model.masters, &self.c.w.parts.own_master),
             )?,
         ) else {
+            // the target is held and an annex's link to its main building clears as the main
+            // building dies (`Unit::died`'s annexes)
             return Err(GenieError::unreachable(
                 "a repair command's target the world holds without its task target",
             ));
@@ -236,6 +238,8 @@ impl UnitView<'_, '_> {
                 MasterTables::new(&self.c.w.model.masters, &self.c.w.parts.own_master),
             )?,
         ) else {
+            // the target is held and an annex's link to its main building clears as the main
+            // building dies (`Unit::died`'s annexes)
             return Err(GenieError::unreachable(
                 "an enter command's target the world holds without its task target",
             ));

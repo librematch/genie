@@ -8,7 +8,6 @@ use crate::combat::attack::{arms, engagement};
 use crate::combat::damage::Victim;
 use crate::combat::victims::{KillLeft, file_kill, victim};
 use crate::gathering::DropSiteId;
-use crate::gathering::HuntTargetId;
 use crate::gathering::drop_sites::nearest_drop_site;
 use crate::gathering::hunt::DecayRule;
 use crate::gathering::hunt::HuntState;
@@ -196,7 +195,8 @@ impl Unit {
     /// What `set_state(6)` on live livestock reads (`0x140ac60e0` case 6), and the lead's update
     /// (state 10, `0x140ac7a00` case 9: whatever the target, a dead one too) ([`Herd`]): the
     /// hunter's engagement and arms, the animal's owner, its drop site with the gap to it, the
-    /// animal's idleness and the hunter's special graphic; none in the other states.
+    /// animal's idleness and the hunter's special graphic; none in the other states and none
+    /// without the hunt's target (`Herd::target`).
     fn herd_for(
         &self,
         c: &Step<'_>,
@@ -206,6 +206,11 @@ impl Unit {
         victim: &Victim,
         roles: &Roles,
     ) -> Result<Option<Herd>, GenieError> {
+        // the game reads the herd only on the hunt's target: a lead without one searched before
+        // the strike (`Unit::hunt_part`)
+        let Some(target) = action.target else {
+            return Ok(None);
+        };
         let faces = matches!(action.state, HuntState::Walk { .. })
             && action
                 .state
@@ -223,7 +228,7 @@ impl Unit {
                 .get_known(id)?
                 .ok_or(GenieError::unsupported("a hunt's object without a place"))
         };
-        let (me_at, them) = (at(Some(self.id))?, at(action.target.map(HuntTargetId::id))?);
+        let (me_at, them) = (at(Some(self.id))?, at(Some(target.id()))?);
         let speed =
             c.w.parts
                 .mover_of(self.id)
@@ -279,7 +284,7 @@ impl Unit {
                 .transpose()?
         };
         // the animal's top action without a target or a point (slots 0x190, 0x288)
-        let animal = others.get(action.target);
+        let animal = others.get(Some(target));
         let idle = match animal {
             Some(u) => {
                 c.w.parts
@@ -289,6 +294,7 @@ impl Unit {
             None => false,
         };
         Ok(Some(Herd {
+            target,
             own,
             drop_site,
             engagement,

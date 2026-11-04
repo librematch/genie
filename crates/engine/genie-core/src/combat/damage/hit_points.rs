@@ -146,3 +146,21 @@ pub fn heal_hp(
     *hp = HitPoints::of_master(master_hp);
     Heal::Full
 }
+
+/// `FUN_141193b30` on an object below type 70 or a tree, slot 0x110 of its class: its slot 0xb8
+/// (`FUN_141188ca0`) adds `amount` as it is, and its slot 200 (`FUN_1411889a0`) is its master's
+/// hit points, `master_hp`. A loss leaves at least 1 hit point; at its master's hit points
+/// (`COMISS` with `JC`: a NaN is not) it holds exactly them ([`Heal::Full`], else
+/// [`Heal::Partial`]).
+pub fn heal_base_hp(hp: &mut HitPoints, master_hp: MasterHitPoints, amount: HitPoints) -> Heal {
+    *hp += amount;
+    if amount < HitPoints::ZERO && *hp < HitPoints::new(1.0) {
+        *hp = HitPoints::new(1.0);
+    }
+    let most = HitPoints::of_master(master_hp);
+    if below_or_unordered(hp.get(), most.get()) {
+        return Heal::Partial;
+    }
+    *hp = most;
+    Heal::Full
+}

@@ -148,7 +148,6 @@ impl Unit {
         let has_kind = (self.life.attribute_kind).is_some_and(|k| k.index() < attributes);
         Ok(BuildReads {
             site,
-            built,
             stack_made,
             build_targets,
             deposit,

@@ -154,11 +154,14 @@ impl World {
                     graphic.filter(|g| g.flags.contains(SpriteFlags::RANDOM_FIRST_FRAME))
                 {
                     let d = self.streams.get(Stream::Object).rand15() as i32;
-                    let _ =
-                        d.checked_rem(g.facets.counted() - 1)
-                            .ok_or(GenieError::unreachable(
-                                "a random first facet of a sprite of one facet",
-                            ))?;
+                    // the `.dat` can give the livestock such a sprite: the game's `IDIV` by 0
+                    // stops it
+                    let _ = d.checked_rem(g.facets.counted() - 1).ok_or_else(|| {
+                        GenieError::invalid_input(
+                            "a random first facet of a livestock sprite of one facet",
+                        )
+                        .with("sprite", g.id)
+                    })?;
                 }
             }
             made += 1;

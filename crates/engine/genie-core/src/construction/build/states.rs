@@ -9,6 +9,7 @@ use crate::gathering::DropSiteId;
 use crate::map::Position;
 use crate::math::rng::Stream;
 use crate::movement::move_to::MoveToAction;
+use crate::objects::masters::MasterId;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Unit;
@@ -184,12 +185,10 @@ impl BuildAction {
                 "a computer player's builder after its work",
             ));
         }
-        let site = Self::site_unit(c, reads)?;
-        let master = site
-            .ok_or(GenieError::unsupported(
-                "the end of a Build on a foundation the slice does not read",
-            ))?
-            .master(c.w.master_tables(), c.player)?;
+        let site = Self::site_unit(c, reads)?.ok_or(GenieError::unsupported(
+            "the end of a Build on a foundation the slice does not read",
+        ))?;
+        let master = site.master(c.w.master_tables(), c.player)?;
         // LAB_140ab09af: a villager works the farm it built (FUN_141194b20, FUN_141195750), a
         // fishing ship its fish trap (FUN_141194640, FUN_1411945a0): its unit AI drops its build
         // orders (FUN_140c5e020 with 0x2be), then slot 0x7e8 on the building
@@ -215,7 +214,11 @@ impl BuildAction {
                 "the end of a Build on a pasture (its animals, slot 0x780)",
             ));
         }
-        let built = site.map(|s| (s.id, s.life.state));
+        // the search reads the building of its target (`+0x20`) and its master (`+0xa0`)
+        let (built, found) = (
+            Some((site.id, site.life.state)),
+            (FoundationId::new(site.id), site.life.master_id),
+        );
         let ai =
             c.w.parts
                 .unit_ai
@@ -231,7 +234,7 @@ impl BuildAction {
         // FUN_140c5dcd0 (the building just completed is in state 2 now)
         drop_done_orders(ai, built, &reads.build_targets);
         if ai.orders.is_empty() {
-            self.search(c, builder, actions, reads, roles)?;
+            self.search(c, builder, actions, (found, reads), roles)?;
             return Ok(HeadCode::Keeps);
         }
         ai.end_order_and_action()?;
@@ -267,10 +270,10 @@ impl BuildAction {
         self.lend(c, builder, actions, |w, p, i| w.order_work(p, i, &work))
     }
 
-    /// The Build's case 0xdf after the work: the builder's search for more work around the
-    /// building it finished ([`Unit::more_work`]: its slot 0x7e8 inside the update, the builder
-    /// lent back to its slot, [`World::order_work`]); without one the Build lets the building
-    /// go and waits ([`BuildAction::no_more_work`]; `set_state(3)` without orders: notify
+    /// The Build's case 0xdf after the work: the builder's search for more work around the building
+    /// `site` of master `built` it finished ([`Unit::more_work`]: its slot 0x7e8 inside the update,
+    /// the builder lent back to its slot, [`World::order_work`]); without one the Build lets the
+    /// building go and waits ([`BuildAction::no_more_work`]; `set_state(3)` without orders: notify
     /// 0x202, then the standing sprite).
     ///
     /// # Errors
@@ -283,20 +286,14 @@ impl BuildAction {
         c: &mut Step<'_>,
         builder: &mut Unit,
         actions: &mut Action,
-        reads: &BuildReads,
+        ((site, built), reads): ((FoundationId, MasterId), &BuildReads),
         roles: &Roles,
     ) -> Result<(), GenieError> {
-        // the caller read the foundation, so the player holds it
-        let (Some(target), Some(built)) = (self.target, reads.built) else {
-            return Err(GenieError::unreachable(
-                "a builder's search for more work without its building",
-            ));
-        };
-        if let Some(work) = builder.more_work(actions, c, target.id(), built, roles)? {
+        if let Some(work) = builder.more_work(actions, c, site.id(), built, roles)? {
             return self.lend(c, builder, actions, |w, p, i| w.order_work(p, i, &work));
         }
         self.no_more_work()?;
-        release(c, builder, target, reads.by)?;
+        release(c, builder, site, reads.by)?;
         builder.post_own(
             &mut c.w.parts.unit_ai,
             NotifyKind::REQUIRES_SEARCH,

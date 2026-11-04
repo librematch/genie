@@ -20,8 +20,8 @@ use crate::movement::Speed;
 use crate::movement::WaypointIndex;
 use crate::movement::WaypointLevel;
 use crate::movement::{
-    EPSILON, Goal, Me, Motion, Mover, Next, PathData, drop_edge_waypoints, footprint_gap, gate_gap,
-    point_or_zero_of, remove_point,
+    EPSILON, Goal, Me, Motion, Mover, Next, PathData, Reached, drop_edge_waypoints, footprint_gap,
+    gate_gap, point_or_zero_of, remove_point,
 };
 use crate::objects::ObjectId;
 use crate::objects::layers::Static;
@@ -71,7 +71,7 @@ impl Mover {
         goal: Goal<'_>,
         now: WorldTime,
         by_id: ObjectsRef<'_>,
-    ) -> Result<Next, GenieError> {
+    ) -> Result<Reached, GenieError> {
         let movement_tuning = &by_id.tuning().movement;
         let roles = by_id.roles();
         let ground_radius = self.stats.radius.ground();
@@ -87,9 +87,9 @@ impl Mover {
             level.waypoint = level.looping_next(reached);
             level.state = PathState::WantsPath;
             return Ok(if level.waypoint == WaypointIndex::FIRST {
-                Next::LoopEnd
+                Reached::LoopEnd
             } else {
-                Next::Dispatch
+                Reached::Pass(Next::Dispatch)
             });
         }
         self.drop_held_waypoint(place.position(), world, by_id)?;
@@ -101,7 +101,7 @@ impl Mover {
             && parent_is_level_1
             && self.look_ahead(me, world, by_id)? == LookAhead::MovedAhead
         {
-            return Ok(Next::Again);
+            return Ok(Reached::Pass(Next::Again));
         }
         // LAB_14115192d
         let level = self.paths.walked()?;
@@ -140,7 +140,7 @@ impl Mover {
             if level.level != WaypointLevel::Walked {
                 level.state = PathState::WantsPath;
             }
-            return Ok(Next::Dispatch);
+            return Ok(Reached::Pass(Next::Dispatch));
         }
         if EPSILON <= beyond.get()
             && (goal.target.is_some()
@@ -150,14 +150,16 @@ impl Mover {
             if EPSILON <= back.get() {
                 level.waypoint = level.waypoint.previous();
                 level.state = PathState::WantsPath;
-                return Ok(Next::Dispatch);
+                return Ok(Reached::Pass(Next::Dispatch));
             }
             if level.level == WaypointLevel::Top {
-                return self.level_2_short(me, world, goal, by_id);
+                return self
+                    .level_2_short(me, world, goal, by_id)
+                    .map(Reached::Pass);
             }
         }
         level.state = PathState::Arrived;
-        Ok(Next::Dispatch)
+        Ok(Reached::Pass(Next::Dispatch))
     }
 
     /// [`Mover::reached`]'s bit 1: the unit takes the waypoint's place (slot 0x58, the position

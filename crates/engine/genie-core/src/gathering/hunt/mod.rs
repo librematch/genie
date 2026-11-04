@@ -135,6 +135,8 @@ pub struct DropOff {
 /// What `set_state(6)` reads of a live livestock target (`0x140ac60e0` case 6).
 #[derive(Clone, Copy, Debug)]
 pub struct Herd {
+    /// The hunt's target (`+0x20`) it was read on, the Attack's that `set_state(12)` starts.
+    pub(crate) target: HuntTargetId,
     /// The target's player is the hunter's.
     pub(crate) own: bool,
     /// For its own livestock, the drop site (the hunt's, else the nearest that takes livestock,

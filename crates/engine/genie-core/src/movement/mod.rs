@@ -12,8 +12,8 @@
 
 use self::long_walk::{Reach, include_kept, may_plan, owner_number, reach};
 use self::path_points::{
-    AfterRequest, Avoided, Goal, Next, cut_path, ground, ground_line, moved_far, point_or_zero,
-    point_or_zero_of, short_range, split, too_short,
+    AfterRequest, Avoided, Goal, Next, Reached, cut_path, ground, ground_line, moved_far,
+    point_or_zero, point_or_zero_of, short_range, split, too_short,
 };
 use crate::GenieError;
 use crate::map::Distance;

@@ -35,7 +35,9 @@ pub use self::hit_factors::{
     range_charge_hit,
 };
 use self::hit_factors::{charge_damage, special_charge_ready};
-pub use self::hit_points::{Heal, HitKind, ShieldBlock, gain_hp, heal_hp, lose, shield};
+pub use self::hit_points::{
+    Heal, HitKind, ShieldBlock, gain_hp, heal_base_hp, heal_hp, lose, shield,
+};
 use self::hit_points::{effective, hp_floor};
 pub use self::shown_values::{
     BONUS_DAMAGE, Shown, bonus_damage, shown_attack, shown_melee_armor, shown_range,

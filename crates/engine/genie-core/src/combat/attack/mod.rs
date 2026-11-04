@@ -549,7 +549,10 @@ pub(crate) fn set_walker_anim(mut motion: MotionMut<'_>, speed: Speed) {
     }
 }
 
-/// An Attack in a state that walks to its target object, without one.
+/// An Attack in a state that walks to its target object, without one: genie enters
+/// `set_state(4)` only with its target found ([`Attack::start`]'s engagement, readyToAttack's
+/// follow of the victim); the game's walk without one (`0x140a820c0` case 4: to `+0x38`, else
+/// `+0xa4`, else notify 0x1f9) is MISSING.md's.
 const ATTACK_WITHOUT_TARGET: GenieError =
     GenieError::unreachable("an Attack's set_state(4) without its target");
 

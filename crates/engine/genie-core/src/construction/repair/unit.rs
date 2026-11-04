@@ -2,6 +2,7 @@
 
 use crate::GenieError;
 use crate::combat::Firepower;
+use crate::combat::damage::{Heal, heal_base_hp};
 use crate::construction::MainBuildingId;
 use crate::construction::RepairTargetId;
 use crate::construction::repair::RepairFrom;
@@ -50,6 +51,7 @@ use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
 use crate::world::layer::generated::MovementTuning;
 use crate::world::others::OthersRef;
+use crate::world::slots::CheckedIndex;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
 
@@ -251,19 +253,19 @@ fn repairee_of(
     Ok((Some(repairee), counted_in))
 }
 
-/// The repair of `target` by `amount` (a building's or a combat unit's slot 0x8c8, any other's
-/// slot 0x110) over the objects it reaches ([`reached_ids`]) as they stand, paid from what the
-/// repairer's player holds now: each object it changed takes its hit points at once, the
-/// payment joins the player's attributes. Returns the outcome ([`RepairOutcome`]: healed, full
-/// once the target holds its most hit points, unpaid when the player cannot pay) and the
-/// target's master's type.
+/// The repair of `target` by `amount` (a building's or a combat unit's slot 0x8c8, any other's slot
+/// 0x110, [`heal_base_hp`]) over the objects it reaches ([`reached_ids`]) as they stand, paid from
+/// what the repairer's player holds now: each object it changed takes its hit points at once, the
+/// payment joins the player's attributes. Returns the outcome ([`RepairOutcome`]: healed, full once
+/// the target holds its most hit points, unpaid when the player cannot pay) and the target's
+/// master's type.
 ///
 /// [`RepairOutcome`]: RepairOutcome
 ///
 /// # Errors
 ///
-/// A target the world does not hold or of a type below 70, an object of a master the slice
-/// lacks, and an attribute the player has not got.
+/// A target the world does not hold, one of class 51 or 54 below type 70, an object of a master
+/// the slice lacks, and an attribute the player has not got.
 pub(crate) fn repair_target(
     c: &mut Step<'_>,
     target: Option<RepairTargetId>,
@@ -289,12 +291,12 @@ pub(crate) fn repair_target(
         }
     }
     let original = set.clone();
-    let kind = set.first().map_or_else(MasterKind::default, |o| o.kind);
-    if set.is_empty() {
+    let Some(first) = set.first() else {
         return Err(GenieError::unreachable(
             "a Repair working on an object the world does not hold",
         ));
-    }
+    };
+    let (kind, kind_class) = (first.kind, first.class);
     let masters =
         c.w.model
             .masters
@@ -318,10 +320,25 @@ pub(crate) fn repair_target(
             c.w.model.slots,
         ),
         MasterKind::COMBAT => repair_unit(&mut set, 0, amount, &mut payer, roles, c.w.model.slots),
-        // the task finder repairs buildings and combat units of its classes alone
-        _ => Err(GenieError::unreachable(
-            "a repaired object of a type below 70 (slot 0x110)",
-        )),
+        // the packed and the unpacked trebuchet's classes take slot 0x8c8 of any type: below 70
+        // its class's table has no such slot
+        _ if roles
+            .of_class(kind_class)
+            .intersects(ClassRoles::PACKED_TREBUCHET | ClassRoles::UNPACKED_TREBUCHET) =>
+        {
+            Err(GenieError::invalid_input(
+                "a repaired object of class 51 or 54 of a type without slot 0x8c8",
+            )
+            .with("type", kind))
+        }
+        // any other type's slot 0x110, its class's heal without a payment
+        _ => {
+            let o = set.checked_mut(0)?;
+            Ok(match heal_base_hp(&mut o.hp, o.master_hp, amount) {
+                Heal::Full => RepairOutcome::Full,
+                Heal::Partial => RepairOutcome::Healed,
+            })
+        }
     }?;
     c.w.players.player_mut(player)?.add_attributes(paid.adds)?;
     repair_write_back(c.w, &set, &original)?;

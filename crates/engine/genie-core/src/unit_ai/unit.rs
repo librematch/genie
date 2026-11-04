@@ -359,9 +359,11 @@ impl Unit {
             &mut Well512,
         ) -> Result<(), GenieError>,
     ) -> Result<(), GenieError> {
+        // every caller tests the unit for its unit AI first (`World::run_ai_calls`'s and
+        // `World::run_unit_ai`'s callers, the capture's stop)
         let Some(ai_kind) = c.w.parts.unit_ai.get(self.id).map(|ai| ai.ai_kind) else {
             return Err(GenieError::unreachable(
-                "a unit AI's run of a unit without one",
+                "a unit AI's run of a unit without one (its callers test for one)",
             ));
         };
         let busy = actions.top_action_kind().is_some() || c.w.parts.unread.contains(self.id);
@@ -415,9 +417,11 @@ impl Unit {
         c: &mut Step<'_>,
         f: impl FnOnce(&mut UnitAi, &mut UnitView<'_, '_>, &mut Well512) -> Result<R, GenieError>,
     ) -> Result<R, GenieError> {
+        // every caller tests the unit for its unit AI first (`World::run_ai_calls`'s and
+        // `World::run_unit_ai`'s callers, the capture's stop)
         let Some(ai_kind) = c.w.parts.unit_ai.get(self.id).map(|ai| ai.ai_kind) else {
             return Err(GenieError::unreachable(
-                "a unit AI's run of a unit without one",
+                "a unit AI's run of a unit without one (its callers test for one)",
             ));
         };
         let master = Some(self.master(c.w.master_tables(), c.player)?);

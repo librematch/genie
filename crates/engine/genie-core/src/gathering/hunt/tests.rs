@@ -1289,6 +1289,7 @@ fn hunt_walks_to_its_target_place_within_its_range() {
 #[test]
 fn herder_slaughters_its_animal_once_it_stands_or_walks_after_it() {
     let herd = |idle| Herd {
+        target: HuntTargetId::new(object_id(10028)),
         own: true,
         drop_site: None,
         engagement: engagement(),
@@ -1683,6 +1684,7 @@ fn hunt_attack_ends_into_walk_search_or_its_point() {
 #[test]
 fn hunter_facing_livestock_leads_slaughters_or_walks_to_it() {
     let herd = |site: Option<(DropSiteId, DistanceSquared)>, idle| Herd {
+        target: HuntTargetId::new(object_id(10028)),
         own: true,
         drop_site: site,
         engagement: engagement(),

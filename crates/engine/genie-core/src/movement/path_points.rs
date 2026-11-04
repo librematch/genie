@@ -193,6 +193,15 @@ pub(super) enum Next {
     Dispatch,
     /// The step returns.
     Done(Motion),
+}
+
+/// Where the motion step goes on after the walked level reached its waypoint
+/// ([`Mover::reached`]).
+///
+/// [`Mover::reached`]: crate::movement::Mover::reached
+pub(super) enum Reached {
+    /// On as after a pass over the walked level.
+    Pass(Next),
     /// The step's end on a loop back at its first waypoint (`LAB_141155637`,
     /// [`Mover::loop_end`]).
     ///

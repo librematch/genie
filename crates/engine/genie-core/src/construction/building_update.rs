@@ -124,18 +124,16 @@ impl Unit {
             return Ok(());
         }
         let height = master.height.get();
-        let gate =
-            c.w.parts
-                .building_mut(self.id)?
-                .gate
-                .as_mut()
-                .ok_or(GenieError::unsupported("a gate without its gate state"))?;
+        let layer = c.w.parts.building_mut(self.id)?;
+        let mut gate = layer
+            .gate
+            .ok_or(GenieError::unsupported("a gate without its gate state"))?;
         gate.first_update = false;
+        layer.gate = Some(gate);
         let shut = GATE_EPSILON < height;
         if gate.locked && shut {
             return Ok(());
         }
-        let locked = gate.locked;
         let annexes = c.w.parts.building_of(self.id).annexes;
         let by_id = ObjectsRef::new(
             &c.w.players,
@@ -145,35 +143,29 @@ impl Unit {
             &c.w.model.roles,
             &c.w.model.tuning,
         );
+        // the count only reads the parts: the layer holds `gate` still, written back before the
+        // toggle
         let (total, allied) = self.gate_count(annexes, &mut c.w.spatial, by_id)?;
-        let gate =
-            c.w.parts
-                .building_mut(self.id)?
-                .gate
-                .as_mut()
-                .ok_or(GenieError::unreachable(
-                    "a gate whose state went during its update",
-                ))?;
-        if shut && 0 < allied && !locked {
+        let toggles = if shut && 0 < allied && !gate.locked {
             gate.close_timer = Seconds::ZERO;
-            return self.toggle_own_gate(
-                actions,
-                c,
-                c.w.model.tuning.turn.gate_shut_height <= height,
-            );
-        }
-        if height < GATE_EPSILON && total == 0 {
+            c.w.model.tuning.turn.gate_shut_height <= height
+        } else if height < GATE_EPSILON && total == 0 {
             if gate.close_timer <= Seconds::ZERO {
                 gate.close_timer = GATE_CLOSE_DELAY;
+                false
             } else {
                 gate.close_timer -= c.dt.seconds();
-                if gate.close_timer <= Seconds::ZERO {
+                let ends = gate.close_timer <= Seconds::ZERO;
+                if ends {
                     gate.close_timer = Seconds::ZERO;
-                    return self.toggle_own_gate(actions, c, height <= 0.0);
                 }
+                ends && height <= 0.0
             }
-        }
-        Ok(())
+        } else {
+            false
+        };
+        c.w.parts.building_mut(self.id)?.gate = Some(gate);
+        self.toggle_own_gate(actions, c, toggles)
     }
 
     /// The gate's player's toggle within the gate's update when `toggles` (slots 0x340 and 0x338,

@@ -1409,7 +1409,7 @@ fn loop_reached_waypoint_moves_on_and_its_first_ends_the_step() {
         WorldTime::ZERO,
         ObjectsRef::empty(),
     );
-    assert!(matches!(next, Ok(Next::Dispatch)));
+    assert!(matches!(next, Ok(Reached::Pass(Next::Dispatch))));
     assert_eq!(
         (m.paths[0].waypoint.get(), m.paths[0].state),
         (2, PathState::WantsPath)
@@ -1423,7 +1423,7 @@ fn loop_reached_waypoint_moves_on_and_its_first_ends_the_step() {
         WorldTime::ZERO,
         ObjectsRef::empty(),
     );
-    assert!(matches!(next, Ok(Next::LoopEnd)));
+    assert!(matches!(next, Ok(Reached::LoopEnd)));
     assert_eq!(
         (m.paths[0].waypoint.get(), m.paths[0].state),
         (0, PathState::WantsPath)
@@ -2812,31 +2812,31 @@ fn top_level_short_of_its_moved_target_arrives() {
     let mut m = walk(Distance::ZERO);
     assert!(matches!(
         run(&mut m, 150, PlayerId::new(0), 500),
-        Ok(Next::Done(Motion::Arrived))
+        Ok(Reached::Pass(Next::Done(Motion::Arrived)))
     ));
     assert_eq!(m.paths.len(), 1);
     assert_eq!(m.paths[0].created, WorldTime::ZERO);
     let mut m = walk(Distance::ZERO);
     assert!(matches!(
         run(&mut m, 50, PlayerId::new(0), 500),
-        Ok(Next::Done(Motion::Done))
+        Ok(Reached::Pass(Next::Done(Motion::Done)))
     ));
     assert_eq!(m.paths[0].state, PathState::GaveUp);
     let mut m = walk(Distance::new(2.0));
     assert!(matches!(
         run(&mut m, 150, PlayerId::new(0), 500),
-        Ok(Next::Done(Motion::Done))
+        Ok(Reached::Pass(Next::Done(Motion::Done)))
     ));
     // a tie: a target of a higher id yields, a lower one does not
     let mut m = walk(Distance::ZERO);
     assert!(matches!(
         run(&mut m, 100, PlayerId::new(0), 9500),
-        Ok(Next::Done(Motion::Arrived))
+        Ok(Reached::Pass(Next::Done(Motion::Arrived)))
     ));
     let mut m = walk(Distance::ZERO);
     assert!(matches!(
         run(&mut m, 100, PlayerId::new(0), 500),
-        Ok(Next::Done(Motion::Done))
+        Ok(Reached::Pass(Next::Done(Motion::Done)))
     ));
 }
 
