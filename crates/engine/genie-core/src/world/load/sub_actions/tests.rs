@@ -3,6 +3,7 @@ use crate::combat::attack::ATTACK;
 use crate::combat::attack::AttackState;
 use crate::garrison::ENTER;
 use crate::gathering::make::MAKE;
+use crate::map::Distance;
 use crate::movement::explore::EXPLORE;
 use crate::movement::fly::FLY;
 use crate::movement::move_to::MOVE_TO;
@@ -10,6 +11,7 @@ use crate::movement::move_to::MoveTo;
 use crate::objects::Graphics;
 use crate::objects::SpriteId;
 use crate::objects::Voice;
+use crate::objects::WorkRate;
 use crate::objects::layers::{UnreadDefault, Unstartable};
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::ActionPart;
@@ -17,6 +19,7 @@ use crate::objects::masters::FlyMode;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::Task;
+use crate::objects::masters::TaskId;
 use crate::objects::masters::TaskIndex;
 use crate::objects::masters::TaskSprites;
 use crate::ownership::artifact::ARTIFACT_KIND;
@@ -31,7 +34,8 @@ use crate::world::load::fixtures::{
     action_list, building_mut, building_object, combat_object, static_mut,
 };
 use crate::world::load::sub_actions::{
-    DefaultStart, default_task, gather_point, production, saved_attack,
+    DefaultStart, default_task, gather_point, own_build_task, own_fly_task, production,
+    saved_attack,
 };
 use genie_import::dat::{DefaultAction, MasterTable};
 use genie_save::generated::world::{
@@ -439,4 +443,46 @@ fn saved_attack_reads_its_target_range_and_move_to() {
     assert!(saved_attack(&attack(2, vec![]), None).is_err());
     assert!(saved_attack(&move_to(), Some(&graphics)).is_err());
     assert!(saved_attack(&Action::default(), Some(&graphics)).is_err());
+}
+
+/// An object of its own master reads its saved actions' Fly and Build tasks from that master
+/// (the object's master pointer, `+0xa0`): the first of the type, the Build with the master's
+/// work rate; a master without one is reported.
+#[test]
+fn own_master_gives_the_fly_and_build_tasks() {
+    let task = |id, action_kind| Task {
+        id: TaskId::of_task(id),
+        action_kind,
+        work_range: Distance::new(1.5),
+        ..Task::default()
+    };
+    let own = Master {
+        action: Some(ActionPart {
+            tasks: vec![
+                task(0, ARTIFACT_KIND),
+                task(1, FLY),
+                task(2, ActionKind::BUILD),
+            ],
+            work_rate: WorkRate::new(0.75),
+            ..ActionPart::default()
+        }),
+        ..Master::default()
+    };
+    assert_eq!(own_fly_task(&own).map(|fly| fly.id), Ok(TaskId::of_task(1)));
+    let build = own_build_task(&own).unwrap();
+    assert_eq!(
+        (build.id, build.range, build.work_rate),
+        (TaskId::of_task(2), Distance::new(1.5), WorkRate::new(0.75))
+    );
+    let none = Master::default();
+    assert_eq!(
+        own_fly_task(&none).map_err(|error| error.reason()),
+        Err("a bird whose master has no Fly task")
+    );
+    assert_eq!(
+        own_build_task(&none)
+            .map(|_| ())
+            .map_err(|error| error.reason()),
+        Err("a builder whose master has no Build task")
+    );
 }

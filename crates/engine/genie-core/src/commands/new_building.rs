@@ -224,17 +224,6 @@ impl World {
         });
         self.building_combat_setup(player, master)?;
         let held = self.building_storage(player, master)?;
-        // what its death reads of the master: its dying sprite, death spawn and decay
-        let death = player_master(&self.model.masters, player, master).map_or(
-            (None, false, None),
-            |master| {
-                (
-                    master.death_sprite,
-                    master.death_spawns[0].is_some(),
-                    master.life,
-                )
-            },
-        );
         // the moving setup (FUN_1411580a0) of every building, a moving object though it never
         // moves (a mule cart does): the walk reads its last move time
         let mut mover = player_master(&self.model.masters, player, master)
@@ -343,9 +332,6 @@ impl World {
                 master_id: master,
                 attribute_kind: held.kind,
                 amount: held.amount,
-                dying_sprite: death.0,
-                death_spawn: death.1,
-                master: death.2,
                 ..Lifecycle::default()
             },
             place: Static::at(position),

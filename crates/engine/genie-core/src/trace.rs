@@ -258,7 +258,7 @@ mod tests {
     use crate::math::rng::{Stream, Streams, Well512};
     use crate::objects::HitPoints;
     use crate::objects::ListIndex;
-    use crate::objects::lifecycle::{Class, Lifecycle, MasterData};
+    use crate::objects::lifecycle::{Class, Lifecycle};
     use crate::test_ids::object_id;
     use crate::test_ids::player_id;
     #[cfg(test)]
@@ -494,7 +494,6 @@ mod tests {
             life: Lifecycle {
                 class: Class::Animated,
                 hp: HitPoints::ZERO,
-                master: Some(MasterData::default()),
                 ..Lifecycle::default()
             },
             ..Unit::default()

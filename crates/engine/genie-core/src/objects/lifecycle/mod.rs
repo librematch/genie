@@ -90,6 +90,17 @@ pub(crate) fn static_storage(
     Ok(held)
 }
 
+/// What the dead-object steps read of the object's master (`+0xa0`, its own first) as they run:
+/// its dying sprite and its dead-object values.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct MasterLife {
+    /// Slot 0x7a0's dying sprite (`FUN_1412027d0` of a combat object: its terrain look's,
+    /// `+0x980`; else the master's, `+0x480`): an animated object with one plays it in state 4.
+    pub dying_sprite: Option<SpriteId>,
+    /// The decay and the undead flag; none for a master the data file gives none.
+    pub data: Option<MasterData>,
+}
+
 /// The fields the dead-object steps read and write, with their offsets in 158041.
 #[derive(Clone, Copy, Debug, PartialEq, Diff)]
 pub struct Lifecycle {
@@ -103,12 +114,6 @@ pub struct Lifecycle {
     pub(crate) attribute_kind: Option<AttributeId>,
     /// `+0x310`: how much it holds.
     pub amount: Amount,
-    /// The master's death sprite (`+0x480`, the slot 0x7a0's): an animated object with one plays
-    /// it in state 4.
-    #[diff(gap = "stays the import's master's after a master change (a villager's new task)")]
-    pub(crate) dying_sprite: Option<SpriteId>,
-    /// The master spawns an object when this one is gone (its death spawn `+0x5e4`, state 7).
-    pub(crate) death_spawn: bool,
     /// A static object's sprite after its death (the master's dying sprite, else its current
     /// one) starts on a random facet (sequence flag 4) of this many (more than one): its death
     /// draws the facet from the Object stream.
@@ -119,8 +124,6 @@ pub struct Lifecycle {
     pub(crate) goto_sleep: bool,
     /// The master's id.
     pub master_id: MasterId,
-    /// What the dead-object steps read of the master.
-    pub master: Option<MasterData>,
 }
 
 impl Default for Lifecycle {
@@ -132,13 +135,10 @@ impl Default for Lifecycle {
             hp: HitPoints::new(1.0),
             attribute_kind: None,
             amount: Amount::ZERO,
-            dying_sprite: None,
-            death_spawn: false,
             death_facets: None,
             inside: None,
             goto_sleep: false,
             master_id: MasterId::default(),
-            master: None,
         }
     }
 }
@@ -160,13 +160,15 @@ impl Lifecycle {
     }
 
     /// One update of `dt_seconds` ([`Millis::seconds`](crate::world::Millis::seconds)), with the
-    /// tick's Object stream and whether the object's current sprite still animates (`sprite`).
-    /// [`ListFate::Leaves`] when the object leaves its list, else [`ListFate::Stays`].
+    /// tick's Object stream, whether the object's current sprite still animates (`sprite`) and
+    /// what it reads of its master now (`master`). [`ListFate::Leaves`] when the object leaves
+    /// its list, else [`ListFate::Stays`].
     pub fn update(
         &mut self,
         dt_seconds: Seconds,
         object: &mut Well512,
         sprite: SpritePlay,
+        master: MasterLife,
     ) -> GenieResult<ListFate> {
         if self.goto_sleep {
             // the object's update moves it to the sleeping list first (`Unit::update`)
@@ -175,16 +177,16 @@ impl Lifecycle {
         match self.state {
             ObjectState::Foundation | ObjectState::Alive => {
                 if self.hp < HitPoints::new(1.0) {
-                    self.die(object)?;
+                    self.die(object, master.dying_sprite)?;
                 }
                 Ok(ListFate::Stays)
             }
             ObjectState::Dying | ObjectState::Dead => {
-                self.dead(dt_seconds)?;
+                self.dead(dt_seconds, master.data)?;
                 // RGE_Animated_Object::update after the static step: state 3 goes on to 4 with a
                 // dying sprite (slot 0x7a0), else 5 (slot 0xa0)
                 if self.state == ObjectState::Dying && self.class == Class::Animated {
-                    self.state = if self.dying_sprite.is_some() {
+                    self.state = if master.dying_sprite.is_some() {
                         ObjectState::DyingSprite
                     } else {
                         ObjectState::Dead
@@ -220,7 +222,7 @@ impl Lifecycle {
     /// it) are the caller's too ([`crate::vision::ghost`]); the statistics and the sounds are not held.
     /// The visible-resource lists (`FUN_1411980b0`) are the caller's
     /// ([`crate::objects::lifecycle::death_parts::forget_resource`]).
-    fn die(&mut self, object: &mut Well512) -> GenieResult<()> {
+    fn die(&mut self, object: &mut Well512, dying_sprite: Option<SpriteId>) -> GenieResult<()> {
         if self.inside.is_some() {
             return Err(GenieError::unsupported("an object inside another dies"));
         }
@@ -236,7 +238,7 @@ impl Lifecycle {
         // RGE_Animated_Object::update: state 4 with a dying sprite (which the static update gave
         // the object, slot 0x68: the caller's), else 5
         if self.class == Class::Animated {
-            self.state = if self.dying_sprite.is_some() {
+            self.state = if dying_sprite.is_some() {
                 ObjectState::DyingSprite
             } else {
                 ObjectState::Dead
@@ -246,11 +248,9 @@ impl Lifecycle {
     }
 
     /// States 3 and 5: once nothing is held the object moves on to state 7; until then the held
-    /// amount decays, never below 0.
-    fn dead(&mut self, dt_seconds: Seconds) -> GenieResult<()> {
-        let master = self
-            .master
-            .ok_or(GenieError::unsupported("no master data for a dead object"))?;
+    /// amount decays at its master's rate (`master`), never below 0.
+    fn dead(&mut self, dt_seconds: Seconds, master: Option<MasterData>) -> GenieResult<()> {
+        let master = master.ok_or(GenieError::unsupported("no master data for a dead object"))?;
         if self.attribute_kind.is_none() || self.amount <= Amount::ZERO {
             if master.undead {
                 return Err(GenieError::unsupported("an undead object (state 6)"));
@@ -279,12 +279,23 @@ mod tests {
     use crate::testing::attribute;
     use crate::world::Millis;
 
-    /// The states after each update until the object leaves, and the update (1-based) it leaves in.
-    fn run(mut life: Lifecycle, dt: Millis, limit: usize) -> (Vec<ObjectState>, Option<usize>) {
+    /// The states after each update with `master` until the object leaves, and the update
+    /// (1-based) it leaves in.
+    fn run(
+        mut life: Lifecycle,
+        master: MasterLife,
+        dt: Millis,
+        limit: usize,
+    ) -> (Vec<ObjectState>, Option<usize>) {
         let mut states = Vec::new();
         for index in 1..=limit {
             if life
-                .update(dt.seconds(), &mut Well512::default(), SpritePlay::Still)
+                .update(
+                    dt.seconds(),
+                    &mut Well512::default(),
+                    SpritePlay::Still,
+                    master,
+                )
                 .unwrap()
                 == ListFate::Leaves
             {
@@ -299,14 +310,29 @@ mod tests {
         Lifecycle {
             class,
             hp: HitPoints::ZERO,
-            master: Some(MasterData::default()),
             ..Lifecycle::default()
+        }
+    }
+
+    /// A master of dying sprite `dying_sprite` whose dead objects decay at `decay` a second.
+    fn master(dying_sprite: Option<SpriteId>, decay: f32) -> MasterLife {
+        MasterLife {
+            dying_sprite,
+            data: Some(MasterData {
+                decay: AmountRate::new(decay),
+                undead: false,
+            }),
         }
     }
 
     #[test]
     fn an_object_with_hit_points_stays_alive() {
-        let (states, left) = run(Lifecycle::default(), Millis::new(104), 20);
+        let (states, left) = run(
+            Lifecycle::default(),
+            MasterLife::default(),
+            Millis::new(104),
+            20,
+        );
         assert_eq!((states, left), (vec![ObjectState::Alive; 20], None));
     }
 
@@ -317,13 +343,9 @@ mod tests {
         let flare = Lifecycle {
             attribute_kind: Some(AttributeId::named(12)),
             amount: Amount::new(1.0),
-            master: Some(MasterData {
-                decay: AmountRate::new(1.0),
-                undead: false,
-            }),
             ..dead(Class::Static)
         };
-        let (states, left) = run(flare, Millis::new(104), 20);
+        let (states, left) = run(flare, master(None, 1.0), Millis::new(104), 20);
         let mut expected = vec![ObjectState::Dying; 11];
         expected.extend([ObjectState::Removed, ObjectState::Gone]);
         assert_eq!((states, left), (expected, Some(14)));
@@ -332,7 +354,12 @@ mod tests {
     #[test]
     fn dead_animated_object_without_death_sprite_leaves_in_its_fourth_update() {
         // PLACEHOLDER2 and the empty town-centre annex of the same recording
-        let (states, left) = run(dead(Class::Animated), Millis::new(104), 20);
+        let (states, left) = run(
+            dead(Class::Animated),
+            master(None, 0.0),
+            Millis::new(104),
+            20,
+        );
         assert_eq!(
             (states, left),
             (
@@ -348,10 +375,6 @@ mod tests {
             state: ObjectState::Dying,
             attribute_kind: Some(AttributeId::named(12)),
             amount: Amount::new(0.05),
-            master: Some(MasterData {
-                decay: AmountRate::new(1.0),
-                undead: false,
-            }),
             ..dead(Class::Static)
         };
         let _ = life
@@ -359,6 +382,7 @@ mod tests {
                 Millis::new(104).seconds(),
                 &mut Well512::default(),
                 SpritePlay::Still,
+                master(None, 1.0),
             )
             .unwrap();
         assert_eq!(
@@ -371,50 +395,63 @@ mod tests {
     /// amount, loaded so) goes on to state 4 with a dying sprite, else 5; a static one stays.
     #[test]
     fn an_animated_object_in_state_3_goes_on_to_4_or_5() {
-        let held = |class, dying_sprite| Lifecycle {
-            state: ObjectState::Dying,
-            attribute_kind: Some(attribute::MEAT),
-            amount: Amount::new(100.0),
-            dying_sprite,
-            ..dead(class)
-        };
-        let step = |mut lifecycle: Lifecycle| {
+        let step = |class, dying_sprite| {
+            let mut lifecycle = Lifecycle {
+                state: ObjectState::Dying,
+                attribute_kind: Some(attribute::MEAT),
+                amount: Amount::new(100.0),
+                ..dead(class)
+            };
             let _ = lifecycle
                 .update(
                     Seconds::new(0.025),
                     &mut Well512::default(),
                     SpritePlay::Animating,
+                    master(dying_sprite, 0.0),
                 )
                 .unwrap();
             lifecycle.state
         };
         assert_eq!(
-            step(held(Class::Animated, Some(SpriteId::named(8220)))),
+            step(Class::Animated, Some(SpriteId::named(8220))),
             ObjectState::DyingSprite
         );
-        assert_eq!(step(held(Class::Animated, None)), ObjectState::Dead);
-        assert_eq!(step(held(Class::Static, None)), ObjectState::Dying);
+        assert_eq!(step(Class::Animated, None), ObjectState::Dead);
+        assert_eq!(step(Class::Static, None), ObjectState::Dying);
     }
 
     /// MarvinBlue/426048731's sheep 9520 (dying sprite 8220): killed, it dies into state 4, which
     /// holds while its dying sprite animates (updates 1252 to 1333), then 5.
     #[test]
     fn dying_sprite_holds_state_4_while_it_animates() {
-        let mut sheep = Lifecycle {
-            dying_sprite: Some(SpriteId::named(8220)),
-            ..dead(Class::Animated)
-        };
+        let mut sheep = dead(Class::Animated);
+        let sheep_master = master(Some(SpriteId::named(8220)), 0.0);
         let mut rng = Well512::default();
         let _ = sheep
-            .update(Seconds::new(0.025), &mut rng, SpritePlay::Animating)
+            .update(
+                Seconds::new(0.025),
+                &mut rng,
+                SpritePlay::Animating,
+                sheep_master,
+            )
             .unwrap();
         assert_eq!(sheep.state, ObjectState::DyingSprite);
         let _ = sheep
-            .update(Seconds::new(0.025), &mut rng, SpritePlay::Animating)
+            .update(
+                Seconds::new(0.025),
+                &mut rng,
+                SpritePlay::Animating,
+                sheep_master,
+            )
             .unwrap();
         assert_eq!(sheep.state, ObjectState::DyingSprite);
         let _ = sheep
-            .update(Seconds::new(0.025), &mut rng, SpritePlay::Still)
+            .update(
+                Seconds::new(0.025),
+                &mut rng,
+                SpritePlay::Still,
+                sheep_master,
+            )
             .unwrap();
         assert_eq!(sheep.state, ObjectState::Dead);
     }
@@ -425,7 +462,6 @@ mod tests {
     fn marlin_goes_to_state_5_at_once() {
         let mut marlin = Lifecycle {
             master_id: master_id(61),
-            dying_sprite: None,
             ..dead(Class::Animated)
         };
         marlin.state = ObjectState::Alive;
@@ -434,6 +470,7 @@ mod tests {
                 Seconds::new(0.025),
                 &mut Well512::default(),
                 SpritePlay::Still,
+                master(None, 0.0),
             )
             .unwrap();
         assert_eq!(marlin.state, ObjectState::Dead);
@@ -441,35 +478,42 @@ mod tests {
 
     #[test]
     fn the_paths_not_modelled_are_unsupported() {
+        let undead = MasterLife {
+            dying_sprite: None,
+            data: Some(MasterData {
+                decay: AmountRate::ZERO,
+                undead: true,
+            }),
+        };
+        let gone = Lifecycle {
+            state: ObjectState::Dead,
+            ..dead(Class::Animated)
+        };
         let cases = [
-            Lifecycle {
-                inside: Some(ContainerId::new(object_id(1))),
-                ..dead(Class::Static)
-            },
-            Lifecycle {
-                goto_sleep: true,
-                ..Lifecycle::default()
-            },
-            Lifecycle {
-                state: ObjectState::Dead,
-                master: Some(MasterData {
-                    decay: AmountRate::ZERO,
-                    undead: true,
-                }),
-                ..dead(Class::Animated)
-            },
-            Lifecycle {
-                state: ObjectState::Dead,
-                master: None,
-                ..dead(Class::Animated)
-            },
+            (
+                Lifecycle {
+                    inside: Some(ContainerId::new(object_id(1))),
+                    ..dead(Class::Static)
+                },
+                master(None, 0.0),
+            ),
+            (
+                Lifecycle {
+                    goto_sleep: true,
+                    ..Lifecycle::default()
+                },
+                MasterLife::default(),
+            ),
+            (gone, undead),
+            (gone, MasterLife::default()),
         ];
-        for (index, mut life) in cases.into_iter().enumerate() {
+        for (index, (mut life, life_master)) in cases.into_iter().enumerate() {
             assert!(
                 life.update(
                     Seconds::new(0.104),
                     &mut Well512::default(),
-                    SpritePlay::Still
+                    SpritePlay::Still,
+                    life_master
                 )
                 .is_err(),
                 "case {index}"
@@ -486,13 +530,14 @@ mod tests {
             ..dead(Class::Animated)
         };
         let mut object = Well512::default();
+        let food = master(None, 0.0);
         assert_eq!(
-            life.update(Seconds::new(0.104), &mut object, SpritePlay::Still),
+            life.update(Seconds::new(0.104), &mut object, SpritePlay::Still, food),
             Ok(ListFate::Stays)
         );
         assert_eq!(life.state, ObjectState::Gone);
         assert_eq!(
-            life.update(Seconds::new(0.104), &mut object, SpritePlay::Still),
+            life.update(Seconds::new(0.104), &mut object, SpritePlay::Still, food),
             Ok(ListFate::Leaves)
         );
     }
@@ -504,14 +549,19 @@ mod tests {
         let mut tree = Lifecycle {
             attribute_kind: Some(attribute::WOOD),
             amount: Amount::new(100.0),
-            death_spawn: true,
             death_facets: Some(FacetCount::of_data(8)),
             ..dead(Class::Static)
         };
+        let tree_master = master(None, 0.0);
         let mut object = Well512::default();
         object.set_seed(1);
         let _ = tree
-            .update(Seconds::new(0.02), &mut object, SpritePlay::Still)
+            .update(
+                Seconds::new(0.02),
+                &mut object,
+                SpritePlay::Still,
+                tree_master,
+            )
             .unwrap();
         assert_eq!(
             (tree.state, tree.amount, object.draws),
@@ -519,7 +569,12 @@ mod tests {
         );
         // dead with its wood, it waits (no decay) and draws nothing more
         let _ = tree
-            .update(Seconds::new(0.02), &mut object, SpritePlay::Still)
+            .update(
+                Seconds::new(0.02),
+                &mut object,
+                SpritePlay::Still,
+                tree_master,
+            )
             .unwrap();
         assert_eq!((tree.state, object.draws), (ObjectState::Dying, 1));
     }
@@ -533,6 +588,7 @@ mod tests {
                 Seconds::new(0.104),
                 &mut Well512::default(),
                 SpritePlay::Still,
+                master(None, 0.0),
             )
             .unwrap();
         assert!(!life.is_alive());

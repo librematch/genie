@@ -12,13 +12,11 @@ use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
-use crate::objects::lifecycle::{Class, Lifecycle, MasterData};
+use crate::objects::lifecycle::{Class, Lifecycle};
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
 use crate::pathing::tile_path::Path;
 use crate::players::Amount;
-use crate::players::AmountRate;
-use crate::players::CivId;
 use crate::players::attribute::AttributeId;
 use crate::unit_ai::AlertMode;
 use crate::unit_ai::OrderPriority;
@@ -34,14 +32,12 @@ use crate::world::WorldTime;
 use crate::world::load::movers::vec3;
 use crate::{GenieError, GenieResult};
 use genie_import::dat::MasterTable;
-use genie_import::dat::dat_id;
 use genie_save::generated::world::{
     PlayerObjects, RgeStaticObject, TribeCombatObject, UnitAiModule,
 };
 
-/// The object's lifecycle fields. An object with its own master takes every master value from it;
-/// otherwise the death sprite and spawns come from its player's master in the save, and the decay
-/// and undead flag from the table, which the save lacks.
+/// The object's lifecycle fields. Its sprite after its death is its own master's dying sprite
+/// where it has one, else its player's master's in the save, else its current one.
 ///
 /// # Errors
 ///
@@ -50,7 +46,6 @@ pub fn lifecycle(
     object: &genie_save::Object,
     (rge_static_object, master_id): (&RgeStaticObject, MasterId),
     objects: &PlayerObjects,
-    civ: CivId,
     masters: Option<&MasterTable>,
 ) -> GenieResult<Lifecycle> {
     let pure_static = object
@@ -79,34 +74,6 @@ pub fn lifecycle(
                 && graphic.facets.several()
         })
         .map(|graphic| graphic.facets);
-    let (dying_sprite, death_spawn, master) = rge_static_object.own_master().map_or_else(
-        || {
-            let player = objects
-                .master(rge_static_object.master_obj)
-                .and_then(|master| master.static_part());
-            (
-                player.and_then(|rge_master_static_object| {
-                    SpriteId::of_data(rge_master_static_object.death_sprite_id)
-                }),
-                player.map_or(-1, |rge_master_static_object| {
-                    rge_master_static_object.death_spawn_obj_id
-                }),
-                masters.and_then(|master_table| {
-                    master_table.get(civ, dat_id(objects, rge_static_object.master_obj)?)
-                }),
-            )
-        },
-        |own| {
-            (
-                SpriteId::of_data(own.death_sprite_num),
-                own.death_spawn_obj_id,
-                Some(MasterData {
-                    decay: AmountRate::new(own.attribute_rot),
-                    undead: own.undead_flag != 0,
-                }),
-            )
-        },
-    );
     Ok(Lifecycle {
         class: if pure_static {
             Class::Static
@@ -117,13 +84,10 @@ pub fn lifecycle(
         hp: HitPoints::new(rge_static_object.hp),
         attribute_kind: AttributeId::of_data(rge_static_object.attribute_kind_held),
         amount: Amount::new(rge_static_object.attribute_amount_held),
-        dying_sprite,
-        death_spawn: death_spawn >= 0,
         death_facets,
         inside: ContainerId::of_field(rge_static_object.inside_obj),
         goto_sleep: rge_static_object.goto_sleep_flag != 0,
         master_id,
-        master,
     })
 }
 

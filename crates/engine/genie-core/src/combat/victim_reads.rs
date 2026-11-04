@@ -141,9 +141,8 @@ pub(crate) fn victim_of(
         blast_defense: master.blast_defense,
         fog_visibility: master.fog_visibility,
         goto_sleep: unit.life.goto_sleep,
-        decay: unit
+        decay: master
             .life
-            .master
             .map_or(AmountRate::ZERO, |master_data| master_data.decay),
         player: player_id,
         elevation: ElevationBonus {

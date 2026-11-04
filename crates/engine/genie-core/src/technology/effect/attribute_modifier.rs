@@ -519,9 +519,9 @@ impl World {
     }
 
     /// What player `player_id`'s objects of master `id` hold of it and the slice keeps beside the
-    /// master (the game reads the master): their movement's values ([`follow_moving`]), their dying
-    /// sprite and death spawns, their construction's hit points, build time and record, their
-    /// sight's line of sight and their tile's height test.
+    /// master (the game reads the master): their movement's values ([`follow_moving`]), their
+    /// construction's hit points, build time and record, their sight's line of sight and their
+    /// tile's height test.
     pub(super) fn master_followers(
         &mut self,
         player_id: PlayerId,
@@ -558,15 +558,6 @@ impl World {
                 {
                     mover.stats.show(Some(shown));
                 }
-            }
-            match attribute {
-                MasterAttribute::DYING_GRAPHIC => {
-                    unit.life.dying_sprite = master.death_sprite;
-                }
-                MasterAttribute::DEAD_UNIT_ID => {
-                    unit.life.death_spawn = master.death_spawns[0].is_some();
-                }
-                _ => {}
             }
             if let Some(construction) = self.parts.building_mut(unit.id)?.construction.as_mut() {
                 match attribute {

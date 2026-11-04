@@ -280,3 +280,37 @@ fn moving_record_moves_with_its_own_turning_and_the_tables_sprite() {
         })
     );
 }
+
+/// A saved action of an object of its own master takes the task at its slot in that master's
+/// list (`FUN_140a7a2f0`); a slot of −1 or past the list is reported.
+#[test]
+fn own_master_gives_the_task_at_its_slot() {
+    use crate::save::own_task_at;
+    use genie_model::objects::masters::{ActionPart, Task, TaskId};
+    let own = Master {
+        action: Some(ActionPart {
+            tasks: vec![
+                Task::default(),
+                Task {
+                    id: TaskId::of_task(1),
+                    ..Task::default()
+                },
+            ],
+            ..ActionPart::default()
+        }),
+        ..Master::default()
+    };
+    assert_eq!(
+        own_task_at(&own, 1).map(|task| task.id),
+        Ok(TaskId::of_task(1))
+    );
+    let reason = |index| own_task_at(&own, index).map_err(|error| error.reason());
+    assert_eq!(
+        reason(-1).map(|_| ()),
+        Err("a saved action without its task")
+    );
+    assert_eq!(
+        reason(2).map(|_| ()),
+        Err("a saved action's task beyond its master's list")
+    );
+}

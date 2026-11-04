@@ -8,6 +8,7 @@ use crate::map::Tile;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectKey;
+use crate::objects::lifecycle::MasterData;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterKind;
 use crate::objects::unit::Unit;
@@ -18,6 +19,7 @@ use crate::unit_ai::Notify;
 use crate::unit_ai::task_finder::world::{SideWorld, TaskWorld};
 use crate::world::World;
 use crate::world::others::OthersRef;
+use crate::world::parts::Part;
 use crate::world::slots::PlayerSlotsExt;
 use crate::world::step::Step;
 use crate::{GenieError, GenieResult};
@@ -293,14 +295,11 @@ pub(crate) fn write_back(
         }
         let _ = step.world.wake_sleeper(victim.id)?;
     }
+    decay_stopped(step, victim)?;
     let (_, unit) = step.world.object_mut(victim.id).ok_or(NOT_LOCATED)?;
     unit.life.hp = victim.hp;
     unit.life.amount = victim.amount;
     unit.life.goto_sleep = victim.goto_sleep;
-    // a hunt that stopped its decay gave it a master of its own (FUN_140ac44b0)
-    if let Some(master_data) = unit.life.master.as_mut() {
-        master_data.decay = victim.decay;
-    }
     let struck = victim.building.as_ref().filter(|building| building.struck);
     if let Some(building) = struck {
         unit.damaged_lately = building.damaged_lately;
@@ -331,6 +330,35 @@ pub(crate) fn write_back(
         }
     }
     Ok((left.kill.is_some() || !left.razed.is_empty()).then_some(left))
+}
+
+/// [`write_back`]'s decay: a hunt that stopped the victim's decay (`FUN_140ac44b0`, its sign
+/// changed) gave it a master of its own (`FUN_141186d10`: a copy of the master it reads unless
+/// it has one) whose decay is the new one. A decay the hit left as it was changes nothing.
+///
+/// # Errors
+///
+/// A victim without its master.
+fn decay_stopped(step: &mut Step<'_>, victim: &Victim) -> GenieResult<()> {
+    let Some((player, unit, _)) = step.world.locate(victim.id) else {
+        return Ok(());
+    };
+    let master = unit.master(step.world.master_tables(), player)?;
+    let Some(data) = master
+        .life
+        .filter(|data| data.decay.get().to_bits() != victim.decay.get().to_bits())
+    else {
+        return Ok(());
+    };
+    let own = Master {
+        life: Some(MasterData {
+            decay: victim.decay,
+            ..data
+        }),
+        ..master.clone()
+    };
+    step.world
+        .set_part(victim.id, Part::OwnMaster(Some(Box::new(own))))
 }
 
 /// A hit's kill and razings where the hit runs (the damage slot `FUN_1412108e0` kills and counts

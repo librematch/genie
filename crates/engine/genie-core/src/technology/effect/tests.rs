@@ -1141,9 +1141,10 @@ fn master_new_speed_reaches_its_units_top_speed_by_their_sprites() {
 }
 
 /// What the slice keeps beside a master follows its change: its objects' (live and asleep)
-/// dying sprite (none below 0), death spawn (a first spawn of 0 or more) and remains (the
-/// second), a foundation's build time and record, a placed object's height test and a
-/// seer's line of sight; another master's objects and a master the player lacks keep theirs.
+/// foundation's build time and record, a placed object's height test and a seer's line of
+/// sight; another master's objects and a master the player lacks keep theirs. A change of the
+/// dying sprite or the death spawns leaves the objects as they are: their death reads the
+/// master.
 #[test]
 fn an_object_copies_of_its_master_follow_its_change() {
     use crate::objects::masters::MasterAttribute;
@@ -1162,10 +1163,6 @@ fn an_object_copies_of_its_master_follow_its_change() {
     )
     .with_buildings([(object_id(1), built_layer())]);
     let mut master = combat(master_id(4), class::CLASS_6, 60);
-    (master.death_sprite, master.death_spawns) = (
-        Some(SpriteId::named(7)),
-        [Some(master_id(0)), Some(master_id(9))],
-    );
     master
         .creatable
         .get_or_insert_with(Default::default)
@@ -1234,17 +1231,7 @@ fn an_object_copies_of_its_master_follow_its_change() {
             .master_followers(PlayerId::new(0), master_id(99), attribute)
             .unwrap();
     }
-    let follows = |unit: &Unit| (unit.life.dying_sprite, unit.life.death_spawn);
     let players = &world.players[0];
-    assert_eq!(
-        follows(&players.objects[ListIndex::new(0)]),
-        (Some(SpriteId::named(7)), true)
-    );
-    assert_eq!(
-        follows(&players.sleeping[ListIndex::new(0)]),
-        (Some(SpriteId::named(7)), true)
-    );
-    assert_eq!(follows(&players.objects[ListIndex::new(1)]), (None, false));
     let construction = world
         .parts
         .building_of(players.objects[ListIndex::new(0)].id)
@@ -1264,24 +1251,6 @@ fn an_object_copies_of_its_master_follow_its_change() {
     assert_eq!(
         (los(object_id(1)), los(object_id(3))),
         (Distance::new(6.0), Distance::new(2.0))
-    );
-    // a dying sprite below 0 is none
-    Arc::make_mut(&mut world.model.masters[0])
-        .get_mut(master_id(4))
-        .unwrap()
-        .death_sprite = None;
-    world
-        .master_followers(
-            PlayerId::new(0),
-            master_id(4),
-            MasterAttribute::DYING_GRAPHIC,
-        )
-        .unwrap();
-    assert_eq!(
-        world.players[0].objects[ListIndex::new(0)]
-            .life
-            .dying_sprite,
-        None
     );
 }
 

@@ -116,7 +116,6 @@ impl Unit {
             // terrain look) through slot 0x68 (a moving one's `FUN_141158620` derives its facet
             // from its angle again)
             if self.life.class == Class::Animated
-                && self.life.dying_sprite.is_some()
                 && let Some(id) = dying(master, None)
             {
                 self.show_dying(step, id)?;

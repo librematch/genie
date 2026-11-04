@@ -297,7 +297,8 @@ use std::iter::{once, repeat_n};
 use std::sync::Arc;
 
 /// Gives every player a default master for each master id its units name (the table the game
-/// always has), the ones the test set already has kept.
+/// always has, every master with its dead-object values, as the `.dat` gives them), the ones the
+/// test set already has kept.
 pub(crate) fn stock_masters(world: &mut World) {
     let tables: Vec<Arc<Masters>> = world
         .players
@@ -312,6 +313,7 @@ pub(crate) fn stock_masters(world: &mut World) {
                 if !all.iter().any(|master| master.id == unit.life.master_id) {
                     all.push(Master {
                         id: unit.life.master_id,
+                        life: Some(MasterData::default()),
                         ..Master::default()
                     });
                 }
@@ -524,7 +526,6 @@ fn dead_building() -> Unit {
         life: Lifecycle {
             class: Class::Animated,
             hp: HitPoints::ZERO,
-            master: Some(MasterData::default()),
             ..Lifecycle::default()
         },
         ..Unit::default()
@@ -1822,7 +1823,6 @@ fn player_new_tiles_give_their_resources_to_its_lists() {
 /// is deleted (state 8 leaving its list, `FUN_14116b5e0`).
 #[test]
 fn resource_leaves_the_lists_when_it_runs_out_or_is_deleted() {
-    use crate::objects::lifecycle::MasterData;
     use crate::objects::masters::{Master, Masters};
     use crate::vision::visibility::VisibleResources;
     let dead = |id, class, state, master| Unit {
@@ -1833,10 +1833,6 @@ fn resource_leaves_the_lists_when_it_runs_out_or_is_deleted() {
             state,
             master_id: master,
             attribute_kind: None,
-            master: Some(MasterData {
-                decay: AmountRate::ZERO,
-                undead: false,
-            }),
             ..Lifecycle::default()
         },
         ..Unit::default()
@@ -1873,6 +1869,7 @@ fn resource_leaves_the_lists_when_it_runs_out_or_is_deleted() {
         kind: MasterKind::STATIC,
         auto_gather: AutoGatherMode::ON,
         gather_group,
+        life: Some(MasterData::default()),
         ..Master::default()
     };
     game.model.masters = vec![
@@ -9375,7 +9372,6 @@ fn an_unread_object_stops_its_player_unless_it_dies_first() {
     let dying = Lifecycle {
         class: Class::Animated,
         hp: HitPoints::ZERO,
-        master: Some(MasterData::default()),
         ..Lifecycle::default()
     };
     assert_eq!(run(with_task(dying)), None);
@@ -13189,7 +13185,6 @@ fn deaths_world() -> World {
             class: Class::Animated,
             hp: HitPoints::ZERO,
             master_id: VILLAGER_MALE,
-            master: Some(MasterData::default()),
             ..Lifecycle::default()
         },
         pasture: None,
@@ -13558,7 +13553,6 @@ fn move_to_an_object_lets_it_go_when_it_ends_or_its_unit_dies() {
                 life: Lifecycle {
                     class: Class::Animated,
                     master_id: VILLAGER_MALE,
-                    master: Some(MasterData::default()),
                     ..Lifecycle::default()
                 },
                 ..Unit::default()
@@ -13653,7 +13647,6 @@ fn move_to_of_its_own_lets_dying_target_go_and_forgets_lost_one() {
                 life: Lifecycle {
                     class: Class::Animated,
                     master_id: VILLAGER_MALE,
-                    master: Some(MasterData::default()),
                     ..Lifecycle::default()
                 },
                 ..Unit::default()
@@ -15558,6 +15551,77 @@ fn write_hit(
     .unwrap();
 }
 
+/// A hunt that stopped a deer's decay (`FUN_140ac44b0`: the victim's decay negated) gives it a
+/// master of its own (`FUN_141186d10`) whose decay is the new one; its player's master keeps
+/// its decay, and a hit that left the decay as it was gives none.
+#[test]
+fn stopped_decay_gives_the_victim_its_own_master() {
+    let unit = |id| Unit {
+        id,
+        life: Lifecycle {
+            master_id: master_id(333),
+            hp: HitPoints::new(5.0),
+            amount: Amount::new(100.0),
+            state: ObjectState::Alive,
+            ..Lifecycle::default()
+        },
+        ..Unit::default()
+    };
+    let mut world = World::new(
+        WorldTime::ZERO,
+        FrameSeed::of_data(1),
+        PlayerId::new(0),
+        vec![Millis::ZERO, Millis::ZERO],
+        vec![
+            Player {
+                objects: vec![unit(object_id(60))].into(),
+                attributes: vec![Amount::ZERO; 500],
+                ..Player::default()
+            },
+            Player {
+                objects: vec![unit(object_id(9))].into(),
+                attributes: vec![Amount::ZERO; 500],
+                ..Player::default()
+            },
+        ],
+    );
+    let deer = Master {
+        id: master_id(333),
+        kind: MasterKind::COMBAT,
+        life: Some(MasterData {
+            decay: AmountRate::new(0.25),
+            undead: false,
+        }),
+        ..Master::default()
+    };
+    world.model.masters = vec![
+        Arc::new(Masters::new([deer.clone()])),
+        Arc::new(Masters::new([deer])),
+    ];
+    let victim = world
+        .victim(object_id(60), PlayerId::new(1))
+        .unwrap()
+        .unwrap();
+    assert_eq!(victim.decay, AmountRate::new(0.25));
+    let hunter = (PlayerId::new(1), ListIndex::new(0));
+    write_hit(&mut world, hunter, victim.clone());
+    assert!(!world.parts.own_master.contains(object_id(60)));
+    let stopped = Victim {
+        decay: AmountRate::new(-0.25),
+        ..victim
+    };
+    write_hit(&mut world, hunter, stopped);
+    let decay = |master: &Master| master.life.map(|master_data| master_data.decay);
+    assert_eq!(
+        world.parts.own_master.get(object_id(60)).map(decay),
+        Some(Some(AmountRate::new(-0.25)))
+    );
+    assert_eq!(
+        world.model.masters[0].get(master_id(333)).map(decay),
+        Some(Some(AmountRate::new(0.25)))
+    );
+}
+
 /// A hit on a sleeping object (a tree a blast reached) written back where it ran: it takes
 /// its hit points and what it holds and sleeps on, still flagged, at 1 hit point or more;
 /// below 1 it wakes to the end of its player's live list and takes the rest, the hit's cleared
@@ -16410,8 +16474,6 @@ fn an_annex_follows_its_dying_main_building_into_state_4() {
                     master_id: master,
                     state: ObjectState::Alive,
                     hp,
-                    dying_sprite: Some(SpriteId::named(1751)),
-                    master: Some(MasterData::default()),
                     ..Lifecycle::default()
                 },
                 ..Unit::default()
@@ -16550,8 +16612,6 @@ fn annexes_before_their_dying_foundation_die_in_the_next_update() {
                     master_id,
                     state: ObjectState::Foundation,
                     hp,
-                    dying_sprite: Some(SpriteId::named(38)),
-                    master: Some(MasterData::default()),
                     ..Lifecycle::default()
                 },
                 ..Unit::default()
@@ -17011,8 +17071,6 @@ fn building_short_of_its_build_time_dies(state: ObjectState) {
                 state,
                 hp: HitPoints::new(0.5),
                 master_id: master_id(12),
-                master: Some(MasterData::default()),
-                dying_sprite: Some(SpriteId::named(2573)),
                 ..Lifecycle::default()
             },
             sprite: Some(ActiveSprite::at_rest(
@@ -25020,4 +25078,56 @@ fn world_sync_fills_the_relations() {
     for (player_id, row) in world.spatial.relations.iter() {
         assert_eq!(row, &world.players[player_id.index()].relations);
     }
+}
+
+/// A death reads the master the object has now (`RGE_Animated_Object::update`, slot 0x7a0):
+/// a unit whose master gives it a dying sprite plays it (state 4); one whose master gives none
+/// is dead at once (state 5), whatever master it was loaded with.
+#[test]
+fn death_reads_the_dying_sprite_of_the_master_the_object_has_now() {
+    let dying = SpriteId::named(1203);
+    let state_after_death = |death_sprite| {
+        let unit = Unit {
+            id: object_id(5),
+            life: Lifecycle {
+                class: Class::Animated,
+                hp: HitPoints::ZERO,
+                master_id: master_id(212),
+                ..Lifecycle::default()
+            },
+            ..Unit::default()
+        };
+        let mut world = World::new(
+            WorldTime::ZERO,
+            FrameSeed::of_data(1),
+            PlayerId::new(0),
+            vec![Millis::ZERO],
+            vec![Player {
+                objects: vec![unit].into(),
+                ..Player::default()
+            }],
+        );
+        world.model.masters = vec![Arc::new(Masters::new([Master {
+            id: master_id(212),
+            death_sprite,
+            life: Some(MasterData::default()),
+            ..Master::default()
+        }]))];
+        world.model.graphics = Arc::new(Graphics::from([(
+            dying,
+            Graphic {
+                id: dying,
+                frames: Frame::of_data(10),
+                facets: FacetCount::of_data(1),
+                speed_multiplier: SpeedMultiplier::ONE,
+                frame_duration: Seconds::new(0.1),
+                replay_delay: Seconds::ZERO,
+                flags: SpriteFlags::ANIMATED,
+            },
+        )]));
+        world.tick(Millis::new(10));
+        world.players[0].objects[ListIndex::new(0)].life.state
+    };
+    assert_eq!(state_after_death(None), ObjectState::Dead);
+    assert_eq!(state_after_death(Some(dying)), ObjectState::DyingSprite);
 }

@@ -64,12 +64,13 @@ use crate::world::load::sub_actions::fly_task;
 use crate::world::load::sub_actions::gather_point;
 use crate::world::load::sub_actions::production;
 use crate::world::load::sub_actions::saved_sprite;
+use crate::world::load::sub_actions::{own_build_task, own_fly_task};
 use crate::world::load::top_actions::saved_actions;
 use crate::world::parts::{Object, ObjectParts};
 use crate::{GenieError, GenieResult};
 use genie_import::dat::MasterTable;
 use genie_import::save::own_master::{own_master, successor_master};
-use genie_import::save::task_at;
+use genie_import::save::{own_task_at, task_at};
 use genie_save::generated::world::TribeCombatObject;
 use genie_save::generated::world::{Path, PlayerObjects, RgeMissileObject, RgeStaticObject};
 
@@ -229,11 +230,10 @@ fn row(
         Ok(parts) => (parts, Ok(())),
         Err(error) => ((None, TownBell::default()), Err(error)),
     };
-    let (life, life_read) =
-        match lifecycle(object, (rge_static_object, master), objects, civ, masters) {
-            Ok(life) => (life, Ok(())),
-            Err(error) => (Lifecycle::default(), Err(error)),
-        };
+    let (life, life_read) = match lifecycle(object, (rge_static_object, master), objects, masters) {
+        Ok(life) => (life, Ok(())),
+        Err(error) => (Lifecycle::default(), Err(error)),
+    };
     let (lists, lists_read) = match building_lists(object) {
         Ok(lists) => (lists, Ok(())),
         Err(error) => (BuildingLists::default(), Err(error)),
@@ -511,15 +511,23 @@ fn row(
             object,
             rge_static_object,
             objects,
-            // the Build's task with the builder's powerup (its combat layer's)
+            // each task through the object's master pointer (`+0xa0`, `FUN_140a7a2f0`): its own
+            // master's, else its player's master's; the Build's with the builder's powerup (its
+            // combat layer's)
             |master| {
-                build_task(objects, civ, masters, master).map(|mut build_task| {
-                    build_task.work_rate += combat.work_rate_powerup;
-                    build_task
-                })
+                own.map_or_else(|| build_task(objects, civ, masters, master), own_build_task)
+                    .map(|mut build_task| {
+                        build_task.work_rate += combat.work_rate_powerup;
+                        build_task
+                    })
             },
-            |master| fly_task(objects, civ, masters, master),
-            |master, index| task_at(objects, civ, masters, master, index),
+            |master| own.map_or_else(|| fly_task(objects, civ, masters, master), own_fly_task),
+            |master, index| {
+                own.map_or_else(
+                    || task_at(objects, civ, masters, master, index),
+                    |own_master| own_task_at(own_master, index),
+                )
+            },
             masters.map(|master_table| &master_table.graphics),
             &mut actions,
         )

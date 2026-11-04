@@ -192,6 +192,52 @@ pub fn saved_attack(sub: &Action, graphics: Option<&Graphics>) -> GenieResult<At
     })
 }
 
+/// A bird whose master's task list holds no Fly task.
+const NO_FLY_TASK: GenieError = GenieError::unsupported("a bird whose master has no Fly task");
+
+/// A builder whose master's task list holds no Build task.
+const NO_BUILD_TASK: GenieError =
+    GenieError::unsupported("a builder whose master has no Build task");
+
+/// The first task of type `kind` of an object's own master `own` (the action reads it through
+/// the object's master pointer, `+0xa0`), else `missing`.
+///
+/// # Errors
+///
+/// `missing`, for a master without such a task.
+fn own_task_of_kind(
+    own: &MastersMaster,
+    kind: ActionKind,
+    missing: GenieError,
+) -> GenieResult<Task> {
+    own.action_part()
+        .tasks
+        .iter()
+        .find(|task| task.action_kind == kind)
+        .copied()
+        .ok_or(missing)
+}
+
+/// [`fly_task`] of a bird of its own master `own`: that master's Fly task.
+///
+/// # Errors
+///
+/// A master without a Fly task.
+pub fn own_fly_task(own: &MastersMaster) -> GenieResult<Task> {
+    own_task_of_kind(own, FLY, NO_FLY_TASK)
+}
+
+/// [`build_task`] of a builder of its own master `own`: that master's Build task with its work
+/// rate.
+///
+/// # Errors
+///
+/// A master without a Build task.
+pub fn own_build_task(own: &MastersMaster) -> GenieResult<BuildTask> {
+    let task = own_task_of_kind(own, ActionKind::BUILD, NO_BUILD_TASK)?;
+    Ok(BuildTask::of(&task, own.action_part().work_rate))
+}
+
 /// A builder's Build task (the game's Build action keeps a pointer to it, in its master's saved
 /// task list or, for a master that saves none, in the `.dat`'s): its work range (task `+0x30`)
 /// and work value (`+0x28`), with the master's work rate (its action part's `work_rate`).
@@ -231,9 +277,7 @@ pub fn fly_task(
             .list
             .iter()
             .find(|entry| ActionKind::of_data(entry.task.action_kind) == Some(fly))
-            .ok_or(GenieError::unsupported(
-                "a bird whose master has no Fly task",
-            ))?;
+            .ok_or(NO_FLY_TASK)?;
         return core_task(&entry.task);
     }
     masters
@@ -276,9 +320,7 @@ pub fn master_build_task(
             .list
             .iter()
             .find(|entry| ActionKind::of_data(entry.task.action_kind) == Some(build))
-            .ok_or(GenieError::unsupported(
-                "a builder whose master has no Build task",
-            ))?;
+            .ok_or(NO_BUILD_TASK)?;
         return core_task(&entry.task);
     }
     masters

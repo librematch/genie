@@ -10,11 +10,13 @@ use crate::objects::ObjectState;
 use crate::objects::SpriteFlags;
 use crate::objects::facing::facet_of_angle;
 use crate::objects::layers::Action;
+use crate::objects::lifecycle::MasterLife;
 use crate::objects::lifecycle::SpritePlay;
 use crate::objects::lifecycle::death_parts::forget_resource;
 use crate::objects::masters::GhostMode;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::MasterTables;
+use crate::objects::sprite::dying;
 use crate::objects::unit::{Outcome, Unit};
 use crate::world::layer::Roles;
 use crate::world::slots::PlayerSlotsExt;
@@ -49,10 +51,24 @@ impl Unit {
         } else {
             SpritePlay::Still
         };
+        // what the steps read of its master now: slot 0x7a0's dying sprite (a combat object's
+        // terrain look's first) and its decay
+        let master = self.master(
+            MasterTables::new(&step.world.model.masters, &step.world.parts.own_master),
+            step.player,
+        )?;
+        let master_life = MasterLife {
+            dying_sprite: dying(
+                master,
+                step.world.parts.combat_of(self.id).abilities.look.as_ref(),
+            ),
+            data: master.life,
+        };
         let leaves = match self.life.update(
             step.dt.seconds(),
             step.world.streams.get_mut(Stream::Object),
             sprite,
+            master_life,
         )? {
             ListFate::Leaves => Outcome::Leave,
             ListFate::Stays => Outcome::Stay,
@@ -126,7 +142,10 @@ impl Unit {
         }
         if matches!(before, ObjectState::Dying | ObjectState::Dead)
             && after == ObjectState::Removed
-            && self.life.death_spawn
+            && self
+                .master(step.world.master_tables(), step.player)?
+                .death_spawns[0]
+                .is_some()
         {
             self.death_spawn_comes(actions, step)?;
         }

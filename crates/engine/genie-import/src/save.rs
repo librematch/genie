@@ -48,6 +48,7 @@ use genie_model::objects::masters::GarrisonKinds;
 use genie_model::objects::masters::HeroFlags;
 use genie_model::objects::masters::HitChance;
 use genie_model::objects::masters::InvulnerabilityLevel;
+use genie_model::objects::masters::Master as MastersMaster;
 use genie_model::objects::masters::MasterField;
 use genie_model::objects::masters::MissilePart;
 use genie_model::objects::masters::MovingPart;
@@ -179,6 +180,13 @@ pub fn action_part(master: &Master) -> Option<&RgeMasterActionObject> {
     })
 }
 
+/// A saved action whose task slot names none (−1).
+const NO_TASK: GenieError = GenieError::unsupported("a saved action without its task");
+
+/// A saved action whose task slot lies past its master's task list.
+const TASK_BEYOND_LIST: GenieError =
+    GenieError::unsupported("a saved action's task beyond its master's list");
+
 /// The task at `index` in a master's task list (its saved list, else the `.dat`'s): the task a
 /// saved action's base `short_val` names (the base load `FUN_140a7a2f0` resolves it to `+0x48`
 /// at `0x140a7b5e8`).
@@ -189,16 +197,13 @@ pub fn task_at(
     master: i16,
     index: i16,
 ) -> GenieResult<Task> {
-    let task_index = usize::try_from(index)
-        .map_err(|_| GenieError::unsupported("a saved action without its task"))?;
+    let task_index = usize::try_from(index).map_err(|_| NO_TASK)?;
     let saved = objects
         .master(master)
         .and_then(action_part)
         .and_then(|rge_master_action_object| rge_master_action_object.tasks.as_deref());
     if let Some(tasks) = saved {
-        let entry = tasks.list.get(task_index).ok_or(GenieError::unsupported(
-            "a saved action's task beyond its master's list",
-        ))?;
+        let entry = tasks.list.get(task_index).ok_or(TASK_BEYOND_LIST)?;
         return core_task(&entry.task);
     }
     masters
@@ -208,6 +213,21 @@ pub fn task_at(
         .ok_or(GenieError::unsupported(
             "a saved action's task the data file does not have",
         ))
+}
+
+/// [`task_at`] for an object of its own master `own`: the task at `index` in that master's list,
+/// as the base load reads it through the object's master pointer (`+0xa0`, `FUN_140a7a2f0`).
+///
+/// # Errors
+///
+/// A slot of no task (−1) or one past the list.
+pub fn own_task_at(own: &MastersMaster, index: i16) -> GenieResult<Task> {
+    let task_index = usize::try_from(index).map_err(|_| NO_TASK)?;
+    own.action_part()
+        .tasks
+        .get(task_index)
+        .copied()
+        .ok_or(TASK_BEYOND_LIST)
 }
 
 /// A saved task (`RGE_Task`) as genie-core's [`genie_model::objects::masters::Task`].
