@@ -98,10 +98,7 @@ impl UnitView<'_, '_> {
             .spatial
             .get(self.unit.id)
             .ok_or(ATTACKER_UNPLACED)?;
-        let target_master =
-            player_master(&self.step.world.model.masters, placed.player, placed.master).ok_or(
-                GenieError::unsupported("an attack's target of a master the slice does not have"),
-            )?;
+        let target_master = self.step.world.master_tables().of_placed(target, &placed)?;
         let visible = self.target_visible(&placed, target_master)?;
         let unit = &mut *self.unit;
         // the attack command's Attack (`FUN_141081a80`) takes no MoveTo sprite: the unit's
@@ -252,13 +249,11 @@ impl UnitView<'_, '_> {
             )?
             .get(id)
             .ok_or(NOT_HELD)?;
-            let player_master =
-                player_master(&self.step.world.model.masters, placed.player, placed.master)
-                    .ok_or(NOT_HELD)?;
+            let marked = self.step.world.master_tables().of_placed(id, placed)?;
             Ok(Mark {
                 id,
-                kind: player_master.kind,
-                class: player_master.class,
+                kind: marked.kind,
+                class: marked.class,
                 state: unit.life.state,
                 position: placed.position,
                 radius: placed.radius,

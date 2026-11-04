@@ -23,8 +23,8 @@ use crate::objects::ActionState;
 use crate::objects::ObjectId;
 use crate::objects::layers::Action;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::Master;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::{Master, Masters, player_master};
 use crate::objects::unit::Unit;
 use crate::pathing::zones::{NO_TERRAIN, UNKNOWN_RESTRICTION, ZoneId, Zones};
 use crate::world::Unread;
@@ -33,7 +33,6 @@ use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
 use crate::{GenieError, GenieResult};
 use std::iter::FusedIterator;
-use std::sync::Arc;
 
 /// Half a tile (`DAT_142e7f384`, 0.5): what an Enter's meeting point adds to a tile or to a
 /// place before `floorf` (`FUN_140a85f30`), and how far a target leaves its point before the
@@ -172,7 +171,6 @@ pub fn walled_off(
     me: Point,
     them: Point,
     spatial: &mut Spatial,
-    masters: &[Arc<Masters>],
     (id, stats): (ObjectId, &MoveStats),
     by_id: ObjectsRef<'_>,
 ) -> GenieResult<bool> {
@@ -201,24 +199,23 @@ pub fn walled_off(
             {
                 continue;
             }
-            count += buildings_on(spatial, masters, tile)?;
+            count += buildings_on(spatial, by_id, tile)?;
         }
     }
     Ok(count == 2)
 }
 
-/// The buildings on `tile` for [`walled_off`]: the objects of the tile's list whose
-/// master (`masters`, each player's) is of type 80.
+/// The buildings on `tile` for [`walled_off`]: the objects of the tile's list whose master
+/// (`by_id`'s, its own first: [`crate::objects::masters::MasterTables::of_placed`]) is of type
+/// 80.
 ///
 /// # Errors
 ///
-/// An object whose master the slice lacks.
-fn buildings_on(spatial: &Spatial, masters: &[Arc<Masters>], tile: Tile) -> GenieResult<usize> {
+/// An object without its master.
+fn buildings_on(spatial: &Spatial, by_id: ObjectsRef<'_>, tile: Tile) -> GenieResult<usize> {
     let mut count = 0;
-    for (_, placed) in spatial.objects_on(tile) {
-        let master = player_master(masters, placed.player, placed.master).ok_or(
-            GenieError::unsupported("an object on a tile of a master the slice lacks"),
-        )?;
+    for (id, placed) in spatial.objects_on(tile) {
+        let master = by_id.masters().of_placed(id, placed)?;
         count += usize::from(master.kind == MasterKind::BUILDING);
     }
     Ok(count)
@@ -384,8 +381,6 @@ pub struct Walls<'world> {
     pub(crate) them: Point,
     /// The map's places and tiles.
     pub(crate) spatial: &'world mut Spatial,
-    /// Each player's masters, which tell the buildings.
-    pub(crate) masters: &'world [Arc<Masters>],
     /// The unit's id.
     pub(crate) id: ObjectId,
     /// The unit's movement state.
@@ -403,7 +398,6 @@ impl Walls<'_> {
             self.me,
             self.them,
             self.spatial,
-            self.masters,
             (self.id, self.stats),
             by_id,
         )
@@ -413,11 +407,9 @@ impl Walls<'_> {
 /// [`EnterAction::in_reach`] of the unit `id` (its movement state `stats`, its place in
 /// `spatial`) for its target `target` (its top speed and where it last moved to): the squared
 /// footprints' gap of their places, and the tile test ([`walled_off`]) about where each last
-/// moved to (slot 0x520), its buildings those whose master (`masters`, each player's) is of
-/// type 80.
+/// moved to (slot 0x520), its buildings those whose master (`by_id`'s) is of type 80.
 pub(crate) fn enter_reach(
     spatial: &mut Spatial,
-    masters: &[Arc<Masters>],
     (id, stats, moved_at): (ObjectId, &MoveStats, Position),
     (target, target_mover): (ObjectId, Option<&Mover>),
     range: Distance,
@@ -436,7 +428,6 @@ pub(crate) fn enter_reach(
         me: moved_at.ground(),
         them: them_at.ground(),
         spatial,
-        masters,
         id,
         stats,
     };
@@ -454,7 +445,6 @@ pub(crate) fn enter_reach(
 /// A unit without movement state ([`NO_SPEED`]), and what the reach does not model.
 pub(crate) fn enter_view(
     spatial: &mut Spatial,
-    masters: &[Arc<Masters>],
     (unit, mover): (&Unit, Option<&Mover>),
     ((target, target_mover), tm, room): ((&Unit, Option<&Mover>), &Master, bool),
     range: Distance,
@@ -474,7 +464,6 @@ pub(crate) fn enter_view(
     };
     let in_reach = enter_reach(
         spatial,
-        masters,
         (unit.id, &stats, moved_at),
         (target.id, target_mover),
         range,

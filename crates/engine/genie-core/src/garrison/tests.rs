@@ -105,6 +105,7 @@ use crate::test_ids::unit_list;
 use crate::testing::class;
 use crate::testing::ids;
 use crate::testing::roles;
+use crate::testing::static_roles;
 use crate::testing::tuning;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::Answer;
@@ -124,9 +125,11 @@ use crate::world::Millis;
 use crate::world::Player;
 use crate::world::Seconds;
 use crate::world::WorldTime;
+use crate::world::index::ObjectIndex;
 use crate::world::index::ObjectsRef;
 use crate::world::parts::Object;
 use crate::world::parts::Part;
+use crate::world::parts::Parts;
 use crate::world::settings::OptionFlags;
 use crate::world::tests::in_update;
 use std::sync::Arc;
@@ -308,16 +311,11 @@ fn walk_again_world() -> (World, ListIndex) {
 }
 
 /// What the reach tile test reads, for unit 1 between (10.5, 10.5) and (11.5, 11.5).
-fn walls<'world>(
-    spatial: &'world mut Spatial,
-    masters: &'world [Arc<Masters>],
-    stats: &'world MoveStats,
-) -> Walls<'world> {
+fn walls<'world>(spatial: &'world mut Spatial, stats: &'world MoveStats) -> Walls<'world> {
     Walls {
         me: Point::new(10.5, 10.5),
         them: Point::new(11.5, 11.5),
         spatial,
-        masters,
         id: object_id(1),
         stats,
     }
@@ -422,8 +420,8 @@ fn an_enter_walks_to_its_building_unless_it_is_in_reach() {
             range,
             gap,
             speed,
-            &mut walls(&mut walled, &masters, &stats),
-            ObjectsRef::empty(),
+            &mut walls(&mut walled, &stats),
+            ObjectsRef::of_masters(&masters),
         )
     };
     assert_eq!(
@@ -479,8 +477,8 @@ fn an_enter_walks_to_its_building_unless_it_is_in_reach() {
             Distance::new(1.0),
             DistanceSquared::new(0.5),
             Speed::new(0.8),
-            &mut walls(&mut open, &masters, &stats),
-            ObjectsRef::empty()
+            &mut walls(&mut open, &stats),
+            ObjectsRef::of_masters(&masters)
         ),
         Ok(true)
     );
@@ -1171,9 +1169,8 @@ fn the_reach_tile_test_counts_buildings_where_the_unit_cannot_stand() {
             me,
             them,
             spatial,
-            &masters,
             (object_id(1), stats),
-            ObjectsRef::empty(),
+            ObjectsRef::of_masters(&masters),
         )
     };
     let blocked = [(10, 11), (11, 10)];
@@ -1244,11 +1241,38 @@ fn the_reach_tile_test_counts_buildings_where_the_unit_cannot_stand() {
             Point::new(10.5, 10.5),
             Point::new(11.5, 11.5),
             &mut spatial,
-            &masters,
             (object_id(1), &stats),
-            ObjectsRef::empty()
+            ObjectsRef::of_masters(&masters)
         )
         .is_err()
+    );
+    // unless the object has a master of its own: its master pointer reads that one
+    // (`MasterTables::of_placed`)
+    let town_centre = garrison_masters().get(TC).cloned().unwrap();
+    let parts = Parts {
+        own_master: [10, 11]
+            .map(|id| (object_id(id), town_centre.clone()))
+            .into_iter()
+            .collect(),
+        ..Parts::default()
+    };
+    let (mut spatial, stats) = walled_map(GridSize::new(100, 100), &blocked, &blocked, &[]);
+    assert_eq!(
+        walled_off(
+            Point::new(10.5, 10.5),
+            Point::new(11.5, 11.5),
+            &mut spatial,
+            (object_id(1), &stats),
+            ObjectsRef::new(
+                &[],
+                ObjectIndex::scanning(),
+                &masters,
+                &parts,
+                static_roles(),
+                tuning(),
+            )
+        ),
+        Ok(true)
     );
 }
 

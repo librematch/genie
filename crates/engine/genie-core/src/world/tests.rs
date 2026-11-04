@@ -20013,6 +20013,29 @@ fn ranged_swing_fires_its_missile_which_flies_to_the_target_and_hits_it() {
     assert_eq!(world.recycling.missiles, vec![]);
 }
 
+/// The missile's sweep reads each object it meets through that object's master pointer
+/// (`+0xa0`, [`crate::objects::masters::MasterTables::of_placed`]): the deer of a master of its
+/// own without height (as a desolid foundation's copy is) lets the missile pass over it in the
+/// fourth update of its flight, where its shared master's height of 1.5 meets it.
+#[test]
+fn missile_passes_over_object_whose_own_master_has_no_height() {
+    let mut world = archer_world(100, 0, 0.0);
+    let own = Master {
+        height: Distance::ZERO,
+        ..world.model.masters[0].get(master_id(65)).unwrap().clone()
+    };
+    world
+        .set_part(object_id(50), Part::OwnMaster(Some(Box::new(own))))
+        .unwrap();
+    for _ in 0..9 {
+        world.tick(Millis::new(100));
+    }
+    assert_eq!(deer_hp(&world), 5.0);
+    // the fifth step ends on the ground, the deer's height: it meets it there
+    world.tick(Millis::new(100));
+    assert_eq!(deer_hp(&world), 4.0);
+}
+
 /// The missile a swing fires joins the end of its owner's live list at its making (slot
 /// 0x2d0, which files it in the tracker), inside the archer's update: what the update does after
 /// the fire reaches it by id, as the game's table does.

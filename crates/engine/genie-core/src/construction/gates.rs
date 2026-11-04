@@ -11,7 +11,6 @@ use crate::objects::layers::Building;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObstructionKind;
 use crate::objects::masters::PlayersMastersExt;
-use crate::objects::masters::player_master;
 use crate::objects::masters::{Master, OwnerMasters};
 use crate::objects::unit::Unit;
 use crate::objects::{ObjectId, ObjectKey};
@@ -255,8 +254,9 @@ impl World {
                     continue;
                 }
                 let gate = &self.players.live(other, list_index)?;
-                let (id, master) = (gate.id, gate.life.master_id);
-                let Some(master) = player_master(&self.model.masters, other, master) else {
+                let id = gate.id;
+                // the gate's master pointer: its own master first
+                let Ok(master) = gate.master(self.master_tables(), other) else {
                     continue;
                 };
                 let record = Obstruction {

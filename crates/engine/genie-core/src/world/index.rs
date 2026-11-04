@@ -400,6 +400,20 @@ impl<'world> ObjectsRef<'world> {
         self.tuning
     }
 
+    /// No objects but the players' `masters`: a test's reader of masters through the objects'
+    /// records, which have no masters of their own.
+    #[cfg(test)]
+    pub(crate) fn of_masters(masters: &[Arc<Masters>]) -> ObjectsRef<'_> {
+        ObjectsRef::new(
+            &[],
+            ObjectIndex::scanning(),
+            masters,
+            no_parts(),
+            static_roles(),
+            tuning(),
+        )
+    }
+
     /// No objects: a test's walk that meets none by id.
     #[cfg(test)]
     pub(crate) fn empty() -> ObjectsRef<'static> {

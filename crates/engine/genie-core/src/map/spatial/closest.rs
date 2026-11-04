@@ -7,7 +7,6 @@ use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::WorkerCount;
 use crate::objects::masters::ObjectFlags;
-use crate::objects::masters::player_master;
 use crate::ownership::artifact::ARTIFACT_KIND;
 use crate::players::PlayerId;
 use crate::players::{QueryRelation, UnitRelation};
@@ -161,7 +160,7 @@ pub(super) fn closest_kept(
     {
         return Ok(false);
     }
-    if searcher.class_10 && shuns(objects, roles, placed)? {
+    if searcher.class_10 && shuns(objects, roles, (id, placed))? {
         return Ok(false);
     }
     Ok(true)
@@ -180,16 +179,19 @@ pub(crate) fn herded(by_id: ObjectsRef<'_>, id: ObjectId) -> bool {
     })
 }
 
-/// What a searcher of class 10 passes (`FUN_140c488b0`): the found object's master, read from its
-/// player's table, is the petard (master 440) or holds object flag 0x10.
+/// What a searcher of class 10 passes (`FUN_140c488b0`): the found object `id`'s master (its own
+/// first, [`crate::objects::masters::MasterTables::of_placed`]) is the petard (master 440) or
+/// holds object flag 0x10.
 ///
 /// # Errors
 ///
-/// A found object of a master its player's table does not hold.
-pub(super) fn shuns(objects: ObjectsRef<'_>, roles: &Roles, placed: &Placed) -> GenieResult<bool> {
-    let master = player_master(objects.masters().players, placed.player, placed.master).ok_or(
-        GenieError::unsupported("a found object of a master the slice does not have"),
-    )?;
+/// A found object without its master.
+pub(super) fn shuns(
+    objects: ObjectsRef<'_>,
+    roles: &Roles,
+    (id, placed): (ObjectId, &Placed),
+) -> GenieResult<bool> {
+    let master = objects.masters().of_placed(id, placed)?;
     Ok(roles.of_master(placed.master).contains(MasterRoles::PETARD)
         || master.object_flags.contains(ObjectFlags::SCOUT))
 }

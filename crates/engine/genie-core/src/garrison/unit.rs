@@ -132,7 +132,6 @@ impl Unit {
                 let room = units_inside(others, unit.id) < master.garrison.units();
                 let (mut view, start) = enter_view(
                     &mut step.world.spatial,
-                    &step.world.model.masters,
                     (self, step.world.parts.mover_of(self.id)),
                     ((unit, step.world.parts.mover_of(unit.id)), master, room),
                     enter.range,

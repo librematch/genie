@@ -408,7 +408,6 @@ impl World {
         let unit = self.players.live(player, idx)?;
         enter_view(
             &mut self.spatial,
-            &self.model.masters,
             (unit, self.parts.mover_of(unit.id)),
             (
                 (placed_object, self.parts.mover_of(placed_object.id)),

@@ -20,7 +20,6 @@ use crate::objects::ObjectKey;
 use crate::objects::ObjectState;
 use crate::objects::masters::BlastDefense;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::player_master;
 use crate::objects::unit::{Unit, missed_passes};
 use crate::players::PlayerId;
 use crate::unit_ai::NotifyKind;
@@ -302,7 +301,7 @@ impl Unit {
     ///
     /// # Errors
     ///
-    /// A frozen object the sweep may cross, and an object of a master the slice does not have.
+    /// A frozen object the sweep may cross, and an object without its master.
     pub(crate) fn missile_meets(
         &self,
         stats: &MissileStats,
@@ -356,10 +355,7 @@ impl Unit {
             let Some(placed) = step.world.spatial.get(id) else {
                 continue;
             };
-            let master = player_master(&step.world.model.masters, placed.player, placed.master)
-                .ok_or(GenieError::unsupported(
-                    "an object a missile meets of a master the slice does not have",
-                ))?;
+            let master = step.world.master_tables().of_placed(id, placed)?;
             if meets_height(
                 placed.position.z(),
                 master.height.get(),

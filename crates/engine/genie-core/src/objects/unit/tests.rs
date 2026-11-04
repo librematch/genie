@@ -702,6 +702,65 @@ fn unit_reads_its_own_master_before_its_player_s() {
     );
 }
 
+/// A reader of only the object's spatial record ([`MasterTables::of_placed`]): the object's
+/// own master first (a captured target's copy of its old owner's), else the record's player's
+/// master of the record's id; an error with neither.
+#[test]
+fn placed_object_reads_its_own_master_before_its_record_s() {
+    use crate::map::Footprint;
+    use crate::map::spatial::Placed;
+    use crate::objects::masters::BuildableOn;
+    use crate::objects::masters::ObstructionKind;
+    use crate::objects::masters::{Master, MasterTables, Masters};
+    use crate::world::parts::PartTable;
+    let shared = |hit_points| Master {
+        id: master_id(4),
+        hit_points: MasterHitPoints::of_data(hit_points),
+        ..Master::default()
+    };
+    let every = vec![
+        Arc::new(Masters::new([shared(10)])),
+        Arc::new(Masters::new([shared(25)])),
+    ];
+    let placed = Placed {
+        position: Position::new(1.0, 2.0, 0.0),
+        radius: Footprint::new(0.5, 0.5),
+        class: NO_CLASS,
+        player: PlayerId::new(1),
+        master: master_id(4),
+        obstruction_kind: ObstructionKind::NONE,
+        buildable_on: BuildableOn::NO,
+        tall: false,
+        moves: false,
+        unknown: None,
+        obstruction: None,
+    };
+    let none = PartTable::default();
+    let hit_points = |tables: MasterTables<'_>, placed: &Placed| {
+        tables
+            .of_placed(object_id(7), placed)
+            .map(|master| master.hit_points)
+    };
+    assert_eq!(
+        hit_points(MasterTables::new(&every, &none), &placed),
+        Ok(MasterHitPoints::of_data(25))
+    );
+    let own: PartTable<Master> = once((object_id(7), shared(40))).collect();
+    assert_eq!(
+        hit_points(MasterTables::new(&every, &own), &placed),
+        Ok(MasterHitPoints::of_data(40))
+    );
+    let elsewhere = Placed {
+        player: PlayerId::new(2),
+        ..placed
+    };
+    assert_eq!(
+        hit_points(MasterTables::new(&every, &none), &elsewhere)
+            .map_err(|error| error == OBJECT_MASTER),
+        Err(true)
+    );
+}
+
 /// The walk's view of the unit itself ([`Unit::me`]): its id, its top action's state (none
 /// without one), its group and its last human order's time, which ranks it against a met unit.
 #[test]

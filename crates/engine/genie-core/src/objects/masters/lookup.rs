@@ -1,9 +1,12 @@
 //! A player's masters by id ([`Masters`]) and the work command's choice of master and task.
 
 use crate::construction::repair::REPAIR;
+use crate::map::spatial::Placed;
+use crate::objects::ObjectId;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::TaskGroup;
 use crate::objects::masters::{Master, MasterId, Masters, Task};
+use crate::objects::unit::object_master;
 use crate::players::PlayerId;
 use crate::unit_ai::task_finder::{Actor, Diplomacy, TaskOn, find_task};
 use crate::world::layer::MasterRoles;
@@ -48,6 +51,23 @@ impl<'masters> MasterTables<'masters> {
             own: self.own,
             table: self.players.of(player),
         }
+    }
+
+    /// The master object `id` reads through its master pointer (`+0xa0`) for a reader that
+    /// holds only its spatial record `placed` (its player and its shared master's id): its own
+    /// when it has one (a captured object's copy), else its player's master of the record's id.
+    ///
+    /// # Errors
+    ///
+    /// No master of its own and none of the record's id in its player's table
+    /// ([`crate::world::OBJECT_MASTER`]).
+    pub fn of_placed(self, id: ObjectId, placed: &Placed) -> GenieResult<&'masters Master> {
+        object_master(
+            self.own.get(id),
+            (id, placed.master),
+            self.players.of(placed.player),
+        )
+        .map_err(|error| error.with("player", placed.player))
     }
 }
 
