@@ -90,7 +90,7 @@ impl World {
             return 0;
         };
         let mut count = 0i16;
-        for m in masters.iter() {
+        for m in masters {
             let flags = m.disabled.get();
             if MasterKind::COMBAT <= m.kind
                 && m.available.is_available()
@@ -167,7 +167,7 @@ impl World {
                 None => TreeMaster::NONE,
             });
         let mut count = 0i16;
-        for m in masters.iter() {
+        for m in masters {
             if m.kind < MasterKind::COMBAT || !self.trains_at(m, building) {
                 continue;
             }

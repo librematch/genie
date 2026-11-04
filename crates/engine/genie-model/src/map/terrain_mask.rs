@@ -53,6 +53,13 @@ impl TerrainMask {
     }
 }
 
+impl FromIterator<Self> for TerrainMask {
+    /// The union of the masks given ([`TerrainMask::with`]).
+    fn from_iter<I: IntoIterator<Item = Self>>(masks: I) -> Self {
+        masks.into_iter().fold(Self::NONE, Self::with)
+    }
+}
+
 impl Display for TerrainMask {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         write!(f, "{:#04x}", self.0)
@@ -68,6 +75,7 @@ impl genie_diff::Diff for TerrainMask {
 #[cfg(test)]
 mod tests {
     use crate::map::TerrainMask;
+    use std::iter::empty;
 
     /// A mask blocks the classes outside it; its classes leave the temporary record's bit out.
     #[test]
@@ -78,6 +86,12 @@ mod tests {
             (0x83, 0x7c, 0x03)
         );
         assert_eq!(TerrainMask::NONE.blocked(), 0xff);
+        let union: TerrainMask = [0x01, 0x80, 0x02]
+            .map(TerrainMask::of_bits)
+            .into_iter()
+            .collect();
+        assert_eq!(union.bits(), 0x83);
+        assert_eq!(empty().collect::<TerrainMask>(), TerrainMask::NONE);
         assert_eq!(TerrainMask::ALL.blocked(), 0);
     }
 }

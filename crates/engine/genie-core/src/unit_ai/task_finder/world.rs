@@ -178,7 +178,7 @@ pub(crate) fn task_search<'m>(
     if own.action_part().task_by_group == TaskGroup::NONE {
         return Ok(None);
     }
-    for candidate in masters.iter() {
+    for candidate in masters {
         if candidate.class != own.class
             || candidate.kind != own.kind
             || candidate.action_part().task_by_group != own.action_part().task_by_group

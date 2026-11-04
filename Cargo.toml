@@ -73,6 +73,10 @@ tracing-subscriber = { version = "0.3", default-features = false, features = ["e
 getset = "0.1.7"
 # the engine's bit sets (C-BITFLAG, FD-043): named bits, the bit operators and their formats
 bitflags = "2.13"
+# the derives of the std traits whose impl is the plain one (T16, the user, 2026-11-04):
+# derive_more for the newtypes and the enums' formats, strum for the enums' names and values
+derive_more = { version = "2.1", features = ["display"] }
+strum = { version = "0.28", features = ["derive"] }
 
 # see: https://nnethercote.github.io/perf-book/build-configuration.html
 [profile.dev]

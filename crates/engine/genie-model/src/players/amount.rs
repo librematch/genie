@@ -4,6 +4,7 @@ use crate::objects::masters::CarryCapacity;
 use serde::Deserialize;
 use serde::Serialize;
 use std::fmt::{Display, Error, Formatter};
+use std::iter::Sum;
 use std::ops::{Add, AddAssign, Div, Mul, Neg, Sub, SubAssign};
 
 /// An amount of a player attribute (a resource) as the game's `f32` holds it: what an object
@@ -122,6 +123,14 @@ impl Div for Amount {
     }
 }
 
+impl Sum for Amount {
+    /// The `f32` sum in the iterator's order from 0.0, as the game's loops start: `f32`'s own
+    /// `Sum` starts at −0.0, so a sum of nothing or of −0.0 alone would differ in its sign.
+    fn sum<I: Iterator<Item = Self>>(amounts: I) -> Self {
+        amounts.fold(Self::ZERO, |sum, amount| sum + amount)
+    }
+}
+
 impl Display for Amount {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         self.0.fmt(f)
@@ -138,6 +147,18 @@ impl genie_diff::Diff for Amount {
 mod tests {
     use crate::objects::masters::CarryCapacity;
     use crate::players::Amount;
+    use std::iter::{empty, once};
+
+    /// A sum folds from 0.0 in order: a sum of nothing and of −0.0 alone are 0.0, not −0.0.
+    #[test]
+    fn amounts_sum_from_zero_in_order() {
+        let none: Amount = empty().sum();
+        assert_eq!(none.get().to_bits(), 0.0_f32.to_bits());
+        let negative_zero: Amount = once(Amount::new(-0.0)).sum();
+        assert_eq!(negative_zero.get().to_bits(), 0.0_f32.to_bits());
+        let three = [0.1, 0.2, 0.3].map(Amount::new).into_iter().sum::<Amount>();
+        assert_eq!(three.get().to_bits(), (0.0_f32 + 0.1 + 0.2 + 0.3).to_bits());
+    }
 
     /// Each operator is the one `f32` operation, bit for bit and in its operand order.
     #[test]

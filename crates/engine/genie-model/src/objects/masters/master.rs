@@ -58,6 +58,8 @@ use crate::world::WholeSeconds;
 use genie_diff::Diff;
 use serde::Deserialize;
 use serde::Serialize;
+use std::iter::Flatten;
+use std::slice::{Iter as SliceIter, IterMut as SliceIterMut};
 
 impl Master {
     /// Its default task (`FUN_14109e0c0`: the task list's entry at the default task's index,
@@ -118,6 +120,24 @@ impl Master {
             });
         let first = seen.next()?;
         seen.all(|f| f == first).then_some(first)
+    }
+}
+
+impl<'a> IntoIterator for &'a Masters {
+    type Item = &'a Master;
+    type IntoIter = Flatten<SliceIter<'a, Option<Master>>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a mut Masters {
+    type Item = &'a mut Master;
+    type IntoIter = Flatten<SliceIterMut<'a, Option<Master>>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter_mut()
     }
 }
 
@@ -368,12 +388,12 @@ impl Masters {
     }
 
     /// Every master, by id.
-    pub fn iter(&self) -> impl Iterator<Item = &Master> {
+    pub fn iter(&self) -> Flatten<SliceIter<'_, Option<Master>>> {
         self.by_id.iter().flatten()
     }
 
     /// Every master, by id, to change (a technology's effect).
-    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut Master> {
+    pub fn iter_mut(&mut self) -> Flatten<SliceIterMut<'_, Option<Master>>> {
         self.by_id.iter_mut().flatten()
     }
 

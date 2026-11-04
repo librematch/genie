@@ -227,7 +227,7 @@ impl Spatial {
     pub fn allies_of(&self, from: PlayerId) -> PlayerSet {
         PlayerId::each(32)
             .filter(|&to| self.allied(from, to))
-            .fold(PlayerSet::NONE, |set, to| set | PlayerSet::of(to))
+            .collect()
     }
 
     /// `FUN_141663dc0` with the ally flag: `to` counts for `from` when it is `from`, or `from`

@@ -1,6 +1,7 @@
 //! An object's place in its player's list ([`ListIndex`]) and a list's places ([`Places`]).
 
 use std::fmt::{Display, Error, Formatter};
+use std::iter::FusedIterator;
 use std::ops::Range;
 
 /// An object's place in its player's live or sleeping list, counted from 0 (the object's
@@ -68,6 +69,8 @@ impl DoubleEndedIterator for Places {
 
 impl ExactSizeIterator for Places {}
 
+impl FusedIterator for Places {}
+
 impl Display for ListIndex {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         self.0.fmt(f)
@@ -101,5 +104,13 @@ mod tests {
         assert_eq!(back, [2, 1, 0]);
         assert_eq!(Places::of(4).len(), 4);
         assert_eq!(Places::of(0).next(), None);
+    }
+
+    /// The places stay at their end once walked, from either end.
+    #[test]
+    fn places_stay_at_their_end() {
+        let mut places = Places::of(2);
+        assert_eq!(places.by_ref().count(), 2);
+        assert_eq!((places.next(), places.next_back()), (None, None));
     }
 }

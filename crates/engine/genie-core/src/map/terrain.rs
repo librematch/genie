@@ -238,13 +238,12 @@ impl Terrain {
                     .iter()
                     .enumerate()
                     .filter(|&(_, &v)| 0.0 < v)
-                    .fold(TerrainMask::NONE, |m, (t, _)| {
-                        m.with(
-                            self.terrains
-                                .get(t)
-                                .map_or(TerrainMask::NONE, |k| terrain_class(k.flags)),
-                        )
+                    .map(|(t, _)| {
+                        self.terrains
+                            .get(t)
+                            .map_or(TerrainMask::NONE, |k| terrain_class(k.flags))
                     })
+                    .collect()
             })
     }
 

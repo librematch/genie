@@ -21,6 +21,10 @@ genie-math = { path = "../genie-math" }
 genie-model = { path = "../genie-model" }
 # the bit sets the game tests bit by bit (the vision's player bits): every bit kept (`_ = !0`)
 bitflags.workspace = true
+# the formats derived where they are the plain ones (the steps' names, T16)
+derive_more.workspace = true
+# the enums' names as static strings (the update's steps for the harness's save names)
+strum.workspace = true
 # floorf, which the game imports from the CRT (api-ms-win-crt-math): an exact operation, so libm's
 # gives its bits (src/objects/facing.rs); the image's own math routines are ported in
 # src/math/fmath/, and tests/crt_math.rs's ignored sweeps check them against libm

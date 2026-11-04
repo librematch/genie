@@ -229,11 +229,12 @@ impl TechState {
             if 0.0 < modifier {
                 v = f32::from((v * modifier) as i32 as i16);
             }
-            let before: f32 = paid
+            let before = paid
                 .iter()
                 .filter(|&&(k, _)| k == Some(attr))
-                .map(|&(_, a)| a.get())
-                .fold(0.0, |s, a| s + a);
+                .map(|&(_, a)| a)
+                .sum::<Amount>()
+                .get();
             if c.paid == CostPaid::BUILDING {
                 return Err(GenieError::unsupported(
                     "a research cost the building holds (FUN_141204310)",

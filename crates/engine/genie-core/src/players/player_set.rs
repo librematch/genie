@@ -30,6 +30,15 @@ impl PlayerSet {
     }
 }
 
+impl FromIterator<PlayerId> for PlayerSet {
+    /// The set of the players given, each its bit ([`PlayerSet::of`]).
+    fn from_iter<I: IntoIterator<Item = PlayerId>>(players: I) -> Self {
+        players
+            .into_iter()
+            .fold(Self::NONE, |set, player| set | Self::of(player))
+    }
+}
+
 impl genie_diff::Diff for PlayerSet {
     /// By equality: a set is one value.
     fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
@@ -40,6 +49,7 @@ impl genie_diff::Diff for PlayerSet {
 #[cfg(test)]
 mod tests {
     use crate::players::{PlayerId, PlayerSet};
+    use std::iter::empty;
 
     /// Player p is bit p; a set holds the players it was given, and keeps every bit.
     #[test]
@@ -52,5 +62,13 @@ mod tests {
         assert_eq!(PlayerSet::from_bits_retain(0x8000_0002).bits(), 0x8000_0002);
         assert_eq!(format!("{:b}", set | PlayerSet::of(four)), "10010");
         assert_eq!(PlayerSet::default(), PlayerSet::NONE);
+    }
+
+    /// A set collected from players holds each one's bit.
+    #[test]
+    fn players_collect_into_their_set() {
+        let set: PlayerSet = [1, 4, 1].map(PlayerId::new).into_iter().collect();
+        assert_eq!(set.bits(), 0b1_0010);
+        assert_eq!(empty::<PlayerId>().collect::<PlayerSet>(), PlayerSet::NONE);
     }
 }

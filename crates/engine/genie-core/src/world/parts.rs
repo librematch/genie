@@ -30,6 +30,7 @@ use crate::world::Unread;
 use crate::world::World;
 pub use crate::world::whole::{Object, ObjectParts, ObjectView};
 use std::borrow::Cow;
+use std::iter::{Copied, Zip};
 
 use crate::construction::BuilderCount;
 use crate::objects::ObjectState;
@@ -37,6 +38,7 @@ use crate::unit_ai::Inbox;
 #[cfg(test)]
 pub(crate) use crate::world::parts_fixtures::{no_own_masters, no_parts};
 use std::mem::replace;
+use std::slice::Iter as SliceIter;
 use std::sync::LazyLock;
 
 /// One part's table: the parts packed in a dense vector in the order they came, each id's slot
@@ -93,7 +95,7 @@ impl<T> PartTable<T> {
 
     /// The objects that hold the part and their parts, packed (in the order they came, but for
     /// the removals' moves).
-    pub fn iter(&self) -> impl Iterator<Item = (ObjectId, &T)> {
+    pub fn iter(&self) -> Zip<Copied<SliceIter<'_, ObjectId>>, SliceIter<'_, T>> {
         self.ids.iter().copied().zip(&self.parts)
     }
 
@@ -194,6 +196,15 @@ impl World {
     /// Object `id`'s lent unit AI `ai` back in the world's table.
     pub(crate) fn return_unit_ai(&mut self, id: ObjectId, ai: UnitAi) {
         let _ = self.parts.unit_ai.insert(id, ai);
+    }
+}
+
+impl<'a, T> IntoIterator for &'a PartTable<T> {
+    type Item = (ObjectId, &'a T);
+    type IntoIter = Zip<Copied<SliceIter<'a, ObjectId>>, SliceIter<'a, T>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
     }
 }
 

@@ -3,6 +3,7 @@
 //! side tables kept as `BTreeMap`s).
 
 use std::collections::{BTreeMap, btree_map};
+use std::iter::FusedIterator;
 
 use crate::GenieError;
 use crate::objects::ObjectId;
@@ -366,6 +367,9 @@ impl<'a, T> Iterator for Iter<'a, T> {
     }
 }
 
+/// A walk past its last id stays at its end: each part's walk does.
+impl<T> FusedIterator for Iter<'_, T> {}
+
 impl<'a, T> IntoIterator for &'a IdTable<T> {
     type Item = (ObjectId, &'a T);
     type IntoIter = Iter<'a, T>;
@@ -436,6 +440,9 @@ impl<'a, T> Iterator for IterMut<'a, T> {
     }
 }
 
+/// A walk past its last id stays at its end: each part's walk does.
+impl<T> FusedIterator for IterMut<'_, T> {}
+
 impl<'a, T> IntoIterator for &'a mut IdTable<T> {
     type Item = (ObjectId, &'a mut T);
     type IntoIter = IterMut<'a, T>;
@@ -475,6 +482,18 @@ mod tests {
     /// Object `value`, which the test knows is an id.
     fn id(value: i32) -> ObjectId {
         ObjectId::try_from(value).unwrap()
+    }
+
+    /// A walk past the table's last id stays at its end, by reference and to change.
+    #[test]
+    fn walks_stay_at_their_end() {
+        let mut table: IdTable<i32> = [(id(-3), 1), (id(5), 2)].into_iter().collect();
+        let mut walk = table.iter();
+        assert_eq!(walk.by_ref().count(), 2);
+        assert!(walk.next().is_none() && walk.next().is_none());
+        let mut change = table.iter_mut();
+        assert_eq!(change.by_ref().count(), 2);
+        assert!(change.next().is_none() && change.next().is_none());
     }
 
     /// The table walks its ids as a sorted map does, the most negative first, the stand-ins

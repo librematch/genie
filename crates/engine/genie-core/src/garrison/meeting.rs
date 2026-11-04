@@ -31,6 +31,7 @@ use crate::world::Unread;
 use crate::world::index::ObjectsRef;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
+use std::iter::FusedIterator;
 use std::sync::Arc;
 
 /// Half a tile (`DAT_142e7f384`, 0.5): what an Enter's meeting point adds to a tile or to a
@@ -147,6 +148,9 @@ impl Iterator for LandingWalk {
         None
     }
 }
+
+/// A walk with no step left takes none again.
+impl FusedIterator for LandingWalk {}
 
 /// `FUN_140a85c30`'s tile test for a range of at most 1 to a target with speed: about the tiles
 /// of the unit's and the target's movement places (slot 0x520, `+0x824`; `me` and `them`),
@@ -581,4 +585,19 @@ pub(crate) fn ship_reaches(
         Distance::new(garrison_tuning.enter_near),
         ship.life.master_id,
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::garrison::LandingWalk;
+    use crate::map::Tile;
+
+    /// A walk takes each tile it enters once, then none again.
+    #[test]
+    fn landing_walk_stays_at_its_end() {
+        let mut walk = LandingWalk::new(Tile::new(0, 0), Tile::new(3, 0));
+        let tiles: Vec<Tile> = walk.by_ref().map(|(tile, _)| tile).collect();
+        assert_eq!(tiles.last(), Some(&Tile::new(3, 0)));
+        assert!(walk.next().is_none() && walk.next().is_none());
+    }
 }

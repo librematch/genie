@@ -4,7 +4,7 @@ use crate::objects::SpriteId;
 use crate::objects::sprite::Graphic;
 use serde::Deserialize;
 use serde::Serialize;
-use std::iter::Enumerate;
+use std::iter::{Enumerate, FusedIterator};
 use std::slice::Iter as SliceIter;
 
 /// What the sprite clock reads of each graphic (the `.dat`'s), by sprite id: a dense column
@@ -104,6 +104,9 @@ impl<'a> Iterator for Iter<'a> {
     }
 }
 
+/// A walk past the last sprite stays at its end, as the column's walk does.
+impl FusedIterator for Iter<'_> {}
+
 impl<'a> IntoIterator for &'a Graphics {
     type Item = (SpriteId, &'a Graphic);
     type IntoIter = Iter<'a>;
@@ -153,6 +156,15 @@ mod tests {
             replay_delay: Seconds::ZERO,
             flags: SpriteFlags::ANIMATED,
         }
+    }
+
+    /// The walk stays at its end once past the last sprite.
+    #[test]
+    fn walk_stays_at_its_end() {
+        let table = Graphics::from([(SpriteId::named(2), graphic(2, 1))]);
+        let mut walk = table.iter();
+        assert_eq!(walk.next().map(|(id, _)| id), Some(SpriteId::named(2)));
+        assert!(walk.next().is_none() && walk.next().is_none());
     }
 
     /// The table finds each sprite's graphic, replaces one in place and walks the sprites in

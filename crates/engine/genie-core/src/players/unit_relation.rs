@@ -1,8 +1,11 @@
 //! What a player's queries make of another player's objects as one type, and the tables by it.
 
 use crate::players::ByPlayer;
+use std::array::IntoIter as ArrayIter;
 use std::cmp::Ordering;
+use std::iter::Zip;
 use std::ops::{Index, IndexMut};
+use std::slice::Iter as SliceIter;
 
 /// What a player's queries make of another player's objects (`player+0x278`, the save's
 /// `unit_diplomacy`, which `FUN_141676b80` writes from the relation): Gaia's, its own, an
@@ -133,13 +136,22 @@ impl<T> ByRelation<T> {
     }
 
     /// Each relation with its value, in their order.
-    pub fn iter(&self) -> impl DoubleEndedIterator<Item = (UnitRelation, &T)> {
+    pub fn iter(&self) -> Zip<ArrayIter<UnitRelation, 5>, SliceIter<'_, T>> {
         UnitRelation::ALL.into_iter().zip(&self.0)
     }
 
     /// The table of `f` of each value.
     pub fn map<U>(&self, f: impl FnMut(&T) -> U) -> ByRelation<U> {
         ByRelation(self.0.each_ref().map(f))
+    }
+}
+
+impl<'a, T> IntoIterator for &'a ByRelation<T> {
+    type Item = (UnitRelation, &'a T);
+    type IntoIter = Zip<ArrayIter<UnitRelation, 5>, SliceIter<'a, T>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
     }
 }
 

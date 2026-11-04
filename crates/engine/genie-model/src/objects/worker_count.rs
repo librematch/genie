@@ -2,6 +2,7 @@
 
 use serde::Deserialize;
 use serde::Serialize;
+use std::iter::Sum;
 
 /// A count of workers: the actions that have an object as their target (`worker_num`,
 /// `+0x644`: a farm's farmer, a resource's gatherers, a building's builders), and a cap on
@@ -54,6 +55,13 @@ impl WorkerCount {
     }
 }
 
+impl Sum for WorkerCount {
+    /// The int sum from 0, wrapping as the game's `ADD` does (`wrapping_add`).
+    fn sum<I: Iterator<Item = Self>>(counts: I) -> Self {
+        counts.fold(Self::ZERO, |sum, count| Self(sum.0.wrapping_add(count.0)))
+    }
+}
+
 impl genie_diff::Diff for WorkerCount {
     fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
         self.0.diff(&other.0, d);
@@ -63,6 +71,7 @@ impl genie_diff::Diff for WorkerCount {
 #[cfg(test)]
 mod tests {
     use crate::objects::WorkerCount;
+    use std::iter::empty;
 
     /// A cap of 0 or more holds below a count; none never does.
     #[test]
@@ -75,5 +84,16 @@ mod tests {
         assert_eq!(WorkerCount::ONE.plus(1), two);
         assert_eq!(two.as_f32(), 2.0);
         assert!(WorkerCount::ZERO < WorkerCount::ONE);
+    }
+
+    /// Counts sum from 0 and wrap past the int's range as the game's `ADD`.
+    #[test]
+    fn counts_sum_from_zero_and_wrap() {
+        let none: WorkerCount = empty().sum();
+        assert_eq!(none, WorkerCount::ZERO);
+        let five: WorkerCount = [2, 3].map(WorkerCount::of_data).into_iter().sum();
+        assert_eq!(five.get(), 5);
+        let wrapped: WorkerCount = [i32::MAX, 1].map(WorkerCount::of_data).into_iter().sum();
+        assert_eq!(wrapped.get(), i32::MIN);
     }
 }

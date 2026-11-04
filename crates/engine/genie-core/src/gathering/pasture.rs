@@ -170,15 +170,15 @@ impl World {
     /// ([`crate::objects::layers::Building::livestock`]) the world holds, summed; 0 for an object the world does
     /// not hold.
     pub(crate) fn livestock_workers(&self, pasture: PastureId) -> WorkerCount {
-        WorkerCount::of_data(self.object(pasture).map_or(0, |(_, b)| {
+        self.object(pasture).map_or(WorkerCount::ZERO, |(_, b)| {
             self.parts
                 .building_of(b.id)
                 .livestock
                 .iter()
                 .filter_map(|&id| self.object(id))
-                .map(|(_, l)| l.workers.get())
+                .map(|(_, l)| l.workers)
                 .sum()
-        }))
+        })
     }
 
     /// `FUN_1411c7670`: the livestock of pasture `pasture` that player `p`'s unit at `idx` tends,

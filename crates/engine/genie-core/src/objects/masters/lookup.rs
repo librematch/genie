@@ -116,7 +116,7 @@ pub fn work_master<'m>(
         && own.action_part().task_by_group != TaskGroup::NONE
     {
         let (mut by_class, mut generic) = (None, None);
-        for candidate in masters.iter() {
+        for candidate in masters {
             if candidate.class != own.class
                 || candidate.kind != own.kind
                 || candidate.action_part().task_by_group != own.action_part().task_by_group

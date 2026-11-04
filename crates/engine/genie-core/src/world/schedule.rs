@@ -2,7 +2,8 @@
 //! with the game routine it ports, and the update that runs them with an observer.
 
 use crate::world::Millis;
-use std::fmt;
+use derive_more::Display;
+use strum::IntoStaticStr;
 
 use crate::GenieError;
 use crate::commands::Command;
@@ -13,8 +14,9 @@ use crate::world::FrameSeed;
 use crate::world::World;
 use std::mem::take;
 
-/// A step the world update runs once, before or after the players' steps.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+/// A step the world update runs once, before or after the players' steps. It shows as its
+/// variant's name, the traces' and the harness's.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Display, IntoStaticStr)]
 pub enum WorldStep {
     /// The command phase: the update's count and the world's time go on, the streams take the
     /// frame seed and the players' commands run (`BaseWorld::update` up to
@@ -44,8 +46,8 @@ pub enum WorldStep {
 }
 
 /// A step the world update runs for each player in turn, Gaia first (`BaseWorld::update`'s
-/// player loop).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+/// player loop). It shows as its variant's name.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Display, IntoStaticStr)]
 pub enum PlayerStep {
     /// The player's time goes on by the update's milliseconds (`BaseWorld::update`,
     /// `world+0x18c`).
@@ -106,69 +108,25 @@ pub const AFTER_PLAYERS: [WorldStep; 9] = [
     WorldStep::Vision,
 ];
 
-impl WorldStep {
-    /// The step's name, its variant's.
-    #[must_use]
-    pub const fn name(self) -> &'static str {
-        match self {
-            Self::Commands => "Commands",
-            Self::Draw => "Draw",
-            Self::Ghosts => "Ghosts",
-            Self::Watched => "Watched",
-            Self::Reseed => "Reseed",
-            Self::Turn => "Turn",
-            Self::Victory => "Victory",
-            Self::FrameSeed => "FrameSeed",
-            Self::LastRandoms => "LastRandoms",
-            Self::Vision => "Vision",
-        }
-    }
-}
-
-impl PlayerStep {
-    /// The step's name, its variant's.
-    #[must_use]
-    pub const fn name(self) -> &'static str {
-        match self {
-            Self::Clock => "Clock",
-            Self::OpenGates => "OpenGates",
-            Self::StartWork => "StartWork",
-            Self::Groups => "Groups",
-            Self::WorldPlayer => "WorldPlayer",
-            Self::Objects => "Objects",
-            Self::NewTiles => "NewTiles",
-            Self::ScoutMap => "ScoutMap",
-            Self::CloseGates => "CloseGates",
-            Self::ClearTiles => "ClearTiles",
-        }
-    }
-}
-
-/// An update after one of its steps: a world step, or a player's step with the player.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+/// An update after one of its steps: a world step, or a player's step with the player. It shows
+/// as its step's name, a player's step with the player (`Objects of player 2`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Display)]
 pub enum UpdateStep {
     /// A step the update runs once.
     World(WorldStep),
     /// A step the update runs for each player, with the player whose step it was.
+    #[display("{_0} of player {_1}")]
     Player(PlayerStep, PlayerId),
 }
 
 impl UpdateStep {
-    /// The step's name, its variant's (without the player).
+    /// The step's name, its variant's (without the player): the harness names the game's save at
+    /// the end of the step by it.
     #[must_use]
-    pub const fn name(self) -> &'static str {
+    pub fn name(self) -> &'static str {
         match self {
-            Self::World(s) => s.name(),
-            Self::Player(s, _) => s.name(),
-        }
-    }
-}
-
-impl fmt::Display for UpdateStep {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::World(s) => f.write_str(s.name()),
-            Self::Player(s, p) => write!(f, "{} of player {}", s.name(), p.get()),
+            Self::World(step) => step.into(),
+            Self::Player(step, _) => step.into(),
         }
     }
 }
@@ -232,8 +190,7 @@ impl World {
             let _player =
                 tracing::debug_span!(target: UPDATE, "player", player = p.index()).entered();
             for step in EACH_PLAYER {
-                let _step =
-                    tracing::trace_span!(target: UPDATE, "step", step = %step.name()).entered();
+                let _step = tracing::trace_span!(target: UPDATE, "step", step = %step).entered();
                 if let Err(e) = self.player_step(step, &mut run, p) {
                     self.stop_player(p, e);
                 }
@@ -272,7 +229,7 @@ impl World {
 
     /// World step `step`; its error stops every player.
     fn world_step(&mut self, step: WorldStep, run: &mut UpdateRun<'_>) {
-        let _step = tracing::trace_span!(target: UPDATE, "step", step = %step.name()).entered();
+        let _step = tracing::trace_span!(target: UPDATE, "step", step = %step).entered();
         if let Err(e) = self.run_world_step(step, run) {
             for p in PlayerId::each(self.players.len()) {
                 self.stop_player(p, e.clone());
@@ -509,9 +466,14 @@ mod tests {
     /// A step's name is its variant's, for the harness's game points and the traces.
     #[test]
     fn step_is_named_by_its_variant() {
-        assert_eq!(UpdateStep::World(WorldStep::FrameSeed).name(), "FrameSeed");
+        let seed = UpdateStep::World(WorldStep::FrameSeed);
+        assert_eq!(
+            (seed.name(), seed.to_string().as_str()),
+            ("FrameSeed", "FrameSeed")
+        );
         let objects = UpdateStep::Player(PlayerStep::Objects, PlayerId::new(2));
         assert_eq!(objects.name(), "Objects");
         assert_eq!(objects.to_string(), "Objects of player 2");
+        assert_eq!(PlayerStep::ClearTiles.to_string(), "ClearTiles");
     }
 }

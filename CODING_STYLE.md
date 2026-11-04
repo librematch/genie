@@ -333,6 +333,13 @@ fn command(raw: i32) -> GenieResult<()> {
 - Implement `From`, never `Into`, and `Display`, never `ToString`. The standard library's
   blanket implementations give every `From` its `Into` and every `Display` its `ToString`
   (C-CONV-TRAITS). Clippy's `from_over_into` and `to_string_trait_impl` fail on the other way.
+- Derive a trait whose implementation would be the plain one, never write it out:
+  `derive_more` for a newtype's `Display`, `From` and operators and for an enum's formats,
+  `strum` for an enum's names (`IntoStaticStr`), its values from their number (`FromRepr`) and
+  the list of its variants (`VariantArray`). Write an implementation by hand where the game's
+  arithmetic differs from the derive's: a `Sum` folds from the game's 0.0, while
+  `derive_more`'s starts from the inner type's empty sum (−0.0 for `f32`); `BVector`'s
+  operators keep `fmath`'s operand order.
 - Give a collection type `FromIterator` and `Extend` (C-COLLECT). Then `collect` and `extend`
   fill it from any iterator of its elements, and no source needs a conversion of its own.
 - Make an iterator type an `Iterator`, never a type with a `next` method of its own. Also give
