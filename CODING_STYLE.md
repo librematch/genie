@@ -113,6 +113,8 @@ data-oriented architect makes it.
   understands a line without looking up what a letter stands for. In a geometry formula, a
   coordinate or a difference keeps its short name (`x`, `y`, `z`, `dx`, `x0`). That name is
   the word of its domain, and the reader compares it with the routine.
+  Clippy's `min_ident_chars` refuses any other name of one letter. `clippy.toml` allows
+  only the coordinates and the axes (`Axis::X`).
 - Name a value for what it is, never with a placeholder noun: `SceneObject`, `FoundObject`,
   `tree`, `lone_unit`, not `Thing`, `thing` or `tree_thing`. A type, the method that builds
   or returns one and each fixture get a name of their own, each for what it is or does

@@ -182,6 +182,9 @@ module_name_repetitions = "allow"
 upper_case_acronyms = "warn"
 # an item comes in with a `use` of its path from the crate root, never by its whole path
 absolute_paths = "deny"
+# K9: every variable, parameter, field and item has a speaking name (clippy.toml allows the
+# coordinates)
+min_ident_chars = "warn"
 
 [workspace.lints.rustdoc]
 # We run rustdoc with `--document-private-items` so we can document private items

@@ -39,20 +39,20 @@ impl Interact {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::Words).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::Words).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            tid: get(p, 0x04)?,
-            x: get(p, 0x08)?,
-            y: get(p, 0x0c)?,
-            num: get(p, 0x10)?,
-            field_0x12: get(p, 0x12)?,
-            field_0x13: get(p, 0x13)?,
-            field_0x14: get(p, 0x14)?,
-            field_0x15: get(p, 0x15)?,
-            field_0x16: get(p, 0x16)?,
-            ids: words(p, Self::FIXED)?,
+            commp_id: get(packet, 0x01)?,
+            tid: get(packet, 0x04)?,
+            x: get(packet, 0x08)?,
+            y: get(packet, 0x0c)?,
+            num: get(packet, 0x10)?,
+            field_0x12: get(packet, 0x12)?,
+            field_0x13: get(packet, 0x13)?,
+            field_0x14: get(packet, 0x14)?,
+            field_0x15: get(packet, 0x15)?,
+            field_0x16: get(packet, 0x16)?,
+            ids: words(packet, Self::FIXED)?,
         })
     }
 
@@ -72,7 +72,7 @@ impl Interact {
         put(&mut out, self.field_0x14);
         put(&mut out, self.field_0x15);
         put(&mut out, self.field_0x16);
-        self.ids.iter().for_each(|&w| put(&mut out, w));
+        self.ids.iter().for_each(|&word| put(&mut out, word));
         finish(out)
     }
 }
@@ -98,13 +98,13 @@ impl Stop {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::Words).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::Words).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            num: get(p, 0x04)?,
-            gap_0x06: get(p, 0x06)?,
-            ids: words(p, Self::FIXED)?,
+            commp_id: get(packet, 0x01)?,
+            num: get(packet, 0x04)?,
+            gap_0x06: get(packet, 0x06)?,
+            ids: words(packet, Self::FIXED)?,
         })
     }
 
@@ -117,7 +117,7 @@ impl Stop {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.num);
         put(&mut out, self.gap_0x06);
-        self.ids.iter().for_each(|&w| put(&mut out, w));
+        self.ids.iter().for_each(|&word| put(&mut out, word));
         finish(out)
     }
 }
@@ -159,20 +159,20 @@ impl Work {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::Words).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::Words).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            tid: get(p, 0x04)?,
-            x: get(p, 0x08)?,
-            y: get(p, 0x0c)?,
-            num: get(p, 0x10)?,
-            field_0x12: get(p, 0x12)?,
-            field_0x13: get(p, 0x13)?,
-            field_0x14: get(p, 0x14)?,
-            field_0x15: get(p, 0x15)?,
-            field_0x16: get(p, 0x16)?,
-            ids: words(p, Self::FIXED)?,
+            commp_id: get(packet, 0x01)?,
+            tid: get(packet, 0x04)?,
+            x: get(packet, 0x08)?,
+            y: get(packet, 0x0c)?,
+            num: get(packet, 0x10)?,
+            field_0x12: get(packet, 0x12)?,
+            field_0x13: get(packet, 0x13)?,
+            field_0x14: get(packet, 0x14)?,
+            field_0x15: get(packet, 0x15)?,
+            field_0x16: get(packet, 0x16)?,
+            ids: words(packet, Self::FIXED)?,
         })
     }
 
@@ -192,7 +192,7 @@ impl Work {
         put(&mut out, self.field_0x14);
         put(&mut out, self.field_0x15);
         put(&mut out, self.field_0x16);
-        self.ids.iter().for_each(|&w| put(&mut out, w));
+        self.ids.iter().for_each(|&word| put(&mut out, word));
         finish(out)
     }
 }
@@ -232,20 +232,20 @@ impl Move {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::Words).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::Words).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            tid: get(p, 0x04)?,
-            x: get(p, 0x08)?,
-            y: get(p, 0x0c)?,
-            num: get(p, 0x10)?,
-            field_0x12: get(p, 0x12)?,
-            field_0x13: get(p, 0x13)?,
-            field_0x14: get(p, 0x14)?,
-            field_0x15: get(p, 0x15)?,
-            gap_0x16: get(p, 0x16)?,
-            ids: words(p, Self::FIXED)?,
+            commp_id: get(packet, 0x01)?,
+            tid: get(packet, 0x04)?,
+            x: get(packet, 0x08)?,
+            y: get(packet, 0x0c)?,
+            num: get(packet, 0x10)?,
+            field_0x12: get(packet, 0x12)?,
+            field_0x13: get(packet, 0x13)?,
+            field_0x14: get(packet, 0x14)?,
+            field_0x15: get(packet, 0x15)?,
+            gap_0x16: get(packet, 0x16)?,
+            ids: words(packet, Self::FIXED)?,
         })
     }
 
@@ -265,7 +265,7 @@ impl Move {
         put(&mut out, self.field_0x14);
         put(&mut out, self.field_0x15);
         put(&mut out, self.gap_0x16);
-        self.ids.iter().for_each(|&w| put(&mut out, w));
+        self.ids.iter().for_each(|&word| put(&mut out, word));
         finish(out)
     }
 }
@@ -295,15 +295,15 @@ impl Create {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::Bytes).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::Bytes).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            loc: get(p, 0x04)?,
-            field_0x08: get(p, 0x08)?,
-            field_0x0c: get(p, 0x0c)?,
-            obj_cat: get(p, 0x10)?,
-            rest: bytes(p, Self::FIXED)?,
+            commp_id: get(packet, 0x01)?,
+            loc: get(packet, 0x04)?,
+            field_0x08: get(packet, 0x08)?,
+            field_0x0c: get(packet, 0x0c)?,
+            obj_cat: get(packet, 0x10)?,
+            rest: bytes(packet, Self::FIXED)?,
         })
     }
 
@@ -344,13 +344,13 @@ impl AddAttribute {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::Bytes).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::Bytes).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            attr_id: get(p, 0x04)?,
-            amt: get(p, 0x08)?,
-            rest: bytes(p, Self::FIXED)?,
+            commp_id: get(packet, 0x01)?,
+            attr_id: get(packet, 0x04)?,
+            amt: get(packet, 0x08)?,
+            rest: bytes(packet, Self::FIXED)?,
         })
     }
 
@@ -387,11 +387,11 @@ impl RgeGiveAttribute {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::Bytes).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::Bytes).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            rest: bytes(p, Self::FIXED)?,
+            commp_id: get(packet, 0x01)?,
+            rest: bytes(packet, Self::FIXED)?,
         })
     }
 
@@ -452,25 +452,25 @@ impl AiOrder {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::Bytes).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::Bytes).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            num: get(p, 0x04)?,
-            gap_0x06: get(p, 0x06)?,
-            recipient: get(p, 0x08)?,
-            tid: get(p, 0x0c)?,
-            gap_0x10: get(p, 0x10)?,
-            order: get(p, 0x14)?,
-            tpos: get(p, 0x18)?,
-            field_0x1c: get(p, 0x1c)?,
-            field_0x20: get(p, 0x20)?,
-            range: get(p, 0x24)?,
-            pri: get(p, 0x28)?,
-            towner: get(p, 0x29)?,
-            immediate: get(p, 0x2a)?,
-            front: get(p, 0x2b)?,
-            rest: bytes(p, Self::FIXED)?,
+            commp_id: get(packet, 0x01)?,
+            num: get(packet, 0x04)?,
+            gap_0x06: get(packet, 0x06)?,
+            recipient: get(packet, 0x08)?,
+            tid: get(packet, 0x0c)?,
+            gap_0x10: get(packet, 0x10)?,
+            order: get(packet, 0x14)?,
+            tpos: get(packet, 0x18)?,
+            field_0x1c: get(packet, 0x1c)?,
+            field_0x20: get(packet, 0x20)?,
+            range: get(packet, 0x24)?,
+            pri: get(packet, 0x28)?,
+            towner: get(packet, 0x29)?,
+            immediate: get(packet, 0x2a)?,
+            front: get(packet, 0x2b)?,
+            rest: bytes(packet, Self::FIXED)?,
         })
     }
 
@@ -517,11 +517,11 @@ impl Resign {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::None).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::None).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            dropped: get(p, 0x04)?,
+            commp_id: get(packet, 0x01)?,
+            dropped: get(packet, 0x04)?,
         })
     }
 
@@ -558,13 +558,13 @@ impl AddWaypoint {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::Bytes).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::Bytes).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            gap_0x04: get(p, 0x04)?,
-            recipient: get(p, 0x08)?,
-            rest: bytes(p, Self::FIXED)?,
+            commp_id: get(packet, 0x01)?,
+            gap_0x04: get(packet, 0x04)?,
+            recipient: get(packet, 0x08)?,
+            rest: bytes(packet, Self::FIXED)?,
         })
     }
 
@@ -605,13 +605,13 @@ impl Pause {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::Words).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::Words).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            num: get(p, 0x04)?,
-            gap_0x06: get(p, 0x06)?,
-            ids: words(p, Self::FIXED)?,
+            commp_id: get(packet, 0x01)?,
+            num: get(packet, 0x04)?,
+            gap_0x06: get(packet, 0x06)?,
+            ids: words(packet, Self::FIXED)?,
         })
     }
 
@@ -624,7 +624,7 @@ impl Pause {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.num);
         put(&mut out, self.gap_0x06);
-        self.ids.iter().for_each(|&w| put(&mut out, w));
+        self.ids.iter().for_each(|&word| put(&mut out, word));
         finish(out)
     }
 }
@@ -652,14 +652,14 @@ impl GroupWaypoint {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::Bytes).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::Bytes).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            num: get(p, 0x04)?,
-            x: get(p, 0x06)?,
-            y: get(p, 0x08)?,
-            rest: bytes(p, Self::FIXED)?,
+            commp_id: get(packet, 0x01)?,
+            num: get(packet, 0x04)?,
+            x: get(packet, 0x06)?,
+            y: get(packet, 0x08)?,
+            rest: bytes(packet, Self::FIXED)?,
         })
     }
 
@@ -721,24 +721,24 @@ impl GroupAiOrder {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::Bytes).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::Bytes).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            recipient_count: get(p, 0x04)?,
-            gap_0x06: get(p, 0x06)?,
-            tid: get(p, 0x08)?,
-            gap_0x0c: get(p, 0x0c)?,
-            order: get(p, 0x10)?,
-            tpos: get(p, 0x14)?,
-            field_0x18: get(p, 0x18)?,
-            field_0x1c: get(p, 0x1c)?,
-            range: get(p, 0x20)?,
-            pri: get(p, 0x24)?,
-            towner: get(p, 0x25)?,
-            immediate: get(p, 0x26)?,
-            front: get(p, 0x27)?,
-            rest: bytes(p, Self::FIXED)?,
+            commp_id: get(packet, 0x01)?,
+            recipient_count: get(packet, 0x04)?,
+            gap_0x06: get(packet, 0x06)?,
+            tid: get(packet, 0x08)?,
+            gap_0x0c: get(packet, 0x0c)?,
+            order: get(packet, 0x10)?,
+            tpos: get(packet, 0x14)?,
+            field_0x18: get(packet, 0x18)?,
+            field_0x1c: get(packet, 0x1c)?,
+            range: get(packet, 0x20)?,
+            pri: get(packet, 0x24)?,
+            towner: get(packet, 0x25)?,
+            immediate: get(packet, 0x26)?,
+            front: get(packet, 0x27)?,
+            rest: bytes(packet, Self::FIXED)?,
         })
     }
 
@@ -792,15 +792,15 @@ impl UnitAiState {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::Words).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::Words).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            num: get(p, 0x04)?,
-            gap_0x06: get(p, 0x06)?,
-            state: get(p, 0x08)?,
-            gap_0x09: get(p, 0x09)?,
-            ids: words(p, Self::FIXED)?,
+            commp_id: get(packet, 0x01)?,
+            num: get(packet, 0x04)?,
+            gap_0x06: get(packet, 0x06)?,
+            state: get(packet, 0x08)?,
+            gap_0x09: get(packet, 0x09)?,
+            ids: words(packet, Self::FIXED)?,
         })
     }
 
@@ -815,7 +815,7 @@ impl UnitAiState {
         put(&mut out, self.gap_0x06);
         put(&mut out, self.state);
         put(&mut out, self.gap_0x09);
-        self.ids.iter().for_each(|&w| put(&mut out, w));
+        self.ids.iter().for_each(|&word| put(&mut out, word));
         finish(out)
     }
 }
@@ -843,14 +843,14 @@ impl Guard {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::Words).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::Words).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            num: get(p, 0x04)?,
-            gap_0x06: get(p, 0x06)?,
-            target: get(p, 0x08)?,
-            ids: words(p, Self::FIXED)?,
+            commp_id: get(packet, 0x01)?,
+            num: get(packet, 0x04)?,
+            gap_0x06: get(packet, 0x06)?,
+            target: get(packet, 0x08)?,
+            ids: words(packet, Self::FIXED)?,
         })
     }
 
@@ -864,7 +864,7 @@ impl Guard {
         put(&mut out, self.num);
         put(&mut out, self.gap_0x06);
         put(&mut out, self.target);
-        self.ids.iter().for_each(|&w| put(&mut out, w));
+        self.ids.iter().for_each(|&word| put(&mut out, word));
         finish(out)
     }
 }
@@ -892,14 +892,14 @@ impl Follow {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::Words).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::Words).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            num: get(p, 0x04)?,
-            gap_0x06: get(p, 0x06)?,
-            target: get(p, 0x08)?,
-            ids: words(p, Self::FIXED)?,
+            commp_id: get(packet, 0x01)?,
+            num: get(packet, 0x04)?,
+            gap_0x06: get(packet, 0x06)?,
+            target: get(packet, 0x08)?,
+            ids: words(packet, Self::FIXED)?,
         })
     }
 
@@ -913,7 +913,7 @@ impl Follow {
         put(&mut out, self.num);
         put(&mut out, self.gap_0x06);
         put(&mut out, self.target);
-        self.ids.iter().for_each(|&w| put(&mut out, w));
+        self.ids.iter().for_each(|&word| put(&mut out, word));
         finish(out)
     }
 }
@@ -985,36 +985,36 @@ impl Patrol {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::Words).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::Words).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            num: get(p, 0x04)?,
-            gap_0x06: get(p, 0x06)?,
-            field_0x08: get(p, 0x08)?,
-            gap_0x09: get(p, 0x09)?,
-            waypoints_count: get(p, 0x0b)?,
-            field_0x0c: get(p, 0x0c)?,
-            field_0x10: get(p, 0x10)?,
-            field_0x14: get(p, 0x14)?,
-            field_0x18: get(p, 0x18)?,
-            field_0x1c: get(p, 0x1c)?,
-            field_0x20: get(p, 0x20)?,
-            field_0x24: get(p, 0x24)?,
-            field_0x28: get(p, 0x28)?,
-            field_0x2c: get(p, 0x2c)?,
-            field_0x30: get(p, 0x30)?,
-            field_0x34: get(p, 0x34)?,
-            field_0x38: get(p, 0x38)?,
-            field_0x3c: get(p, 0x3c)?,
-            field_0x40: get(p, 0x40)?,
-            field_0x44: get(p, 0x44)?,
-            field_0x48: get(p, 0x48)?,
-            field_0x4c: get(p, 0x4c)?,
-            field_0x50: get(p, 0x50)?,
-            field_0x54: get(p, 0x54)?,
-            field_0x58: get(p, 0x58)?,
-            ids: words(p, Self::FIXED)?,
+            commp_id: get(packet, 0x01)?,
+            num: get(packet, 0x04)?,
+            gap_0x06: get(packet, 0x06)?,
+            field_0x08: get(packet, 0x08)?,
+            gap_0x09: get(packet, 0x09)?,
+            waypoints_count: get(packet, 0x0b)?,
+            field_0x0c: get(packet, 0x0c)?,
+            field_0x10: get(packet, 0x10)?,
+            field_0x14: get(packet, 0x14)?,
+            field_0x18: get(packet, 0x18)?,
+            field_0x1c: get(packet, 0x1c)?,
+            field_0x20: get(packet, 0x20)?,
+            field_0x24: get(packet, 0x24)?,
+            field_0x28: get(packet, 0x28)?,
+            field_0x2c: get(packet, 0x2c)?,
+            field_0x30: get(packet, 0x30)?,
+            field_0x34: get(packet, 0x34)?,
+            field_0x38: get(packet, 0x38)?,
+            field_0x3c: get(packet, 0x3c)?,
+            field_0x40: get(packet, 0x40)?,
+            field_0x44: get(packet, 0x44)?,
+            field_0x48: get(packet, 0x48)?,
+            field_0x4c: get(packet, 0x4c)?,
+            field_0x50: get(packet, 0x50)?,
+            field_0x54: get(packet, 0x54)?,
+            field_0x58: get(packet, 0x58)?,
+            ids: words(packet, Self::FIXED)?,
         })
     }
 
@@ -1050,7 +1050,7 @@ impl Patrol {
         put(&mut out, self.field_0x50);
         put(&mut out, self.field_0x54);
         put(&mut out, self.field_0x58);
-        self.ids.iter().for_each(|&w| put(&mut out, w));
+        self.ids.iter().for_each(|&word| put(&mut out, word));
         finish(out)
     }
 }
@@ -1086,17 +1086,17 @@ impl Scout {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::Words).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::Words).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            num: get(p, 0x04)?,
-            gap_0x06: get(p, 0x06)?,
-            x: get(p, 0x08)?,
-            y: get(p, 0x0c)?,
-            gap_0x10: get(p, 0x10)?,
-            field_0x13: get(p, 0x13)?,
-            ids: words(p, Self::FIXED)?,
+            commp_id: get(packet, 0x01)?,
+            num: get(packet, 0x04)?,
+            gap_0x06: get(packet, 0x06)?,
+            x: get(packet, 0x08)?,
+            y: get(packet, 0x0c)?,
+            gap_0x10: get(packet, 0x10)?,
+            field_0x13: get(packet, 0x13)?,
+            ids: words(packet, Self::FIXED)?,
         })
     }
 
@@ -1113,7 +1113,7 @@ impl Scout {
         put(&mut out, self.y);
         put(&mut out, self.gap_0x10);
         put(&mut out, self.field_0x13);
-        self.ids.iter().for_each(|&w| put(&mut out, w));
+        self.ids.iter().for_each(|&word| put(&mut out, word));
         finish(out)
     }
 }
@@ -1141,14 +1141,14 @@ impl FormFormation {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::Words).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::Words).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            num: get(p, 0x04)?,
-            gap_0x06: get(p, 0x06)?,
-            formation: get(p, 0x08)?,
-            ids: words(p, Self::FIXED)?,
+            commp_id: get(packet, 0x01)?,
+            num: get(packet, 0x04)?,
+            gap_0x06: get(packet, 0x06)?,
+            formation: get(packet, 0x08)?,
+            ids: words(packet, Self::FIXED)?,
         })
     }
 
@@ -1162,7 +1162,7 @@ impl FormFormation {
         put(&mut out, self.num);
         put(&mut out, self.gap_0x06);
         put(&mut out, self.formation);
-        self.ids.iter().for_each(|&w| put(&mut out, w));
+        self.ids.iter().for_each(|&word| put(&mut out, word));
         finish(out)
     }
 }
@@ -1186,12 +1186,12 @@ impl BreakFormation {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::Bytes).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::Bytes).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            form_id: get(p, 0x04)?,
-            rest: bytes(p, Self::FIXED)?,
+            commp_id: get(packet, 0x01)?,
+            form_id: get(packet, 0x04)?,
+            rest: bytes(packet, Self::FIXED)?,
         })
     }
 
@@ -1229,13 +1229,13 @@ impl WheelFormation {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::Bytes).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::Bytes).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            form_id: get(p, 0x04)?,
-            angle: get(p, 0x08)?,
-            rest: bytes(p, Self::FIXED)?,
+            commp_id: get(packet, 0x01)?,
+            form_id: get(packet, 0x04)?,
+            angle: get(packet, 0x08)?,
+            rest: bytes(packet, Self::FIXED)?,
         })
     }
 
@@ -1272,12 +1272,12 @@ impl AboutFaceFormation {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::Bytes).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::Bytes).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            form_id: get(p, 0x04)?,
-            rest: bytes(p, Self::FIXED)?,
+            commp_id: get(packet, 0x01)?,
+            form_id: get(packet, 0x04)?,
+            rest: bytes(packet, Self::FIXED)?,
         })
     }
 
@@ -1313,12 +1313,12 @@ impl Save {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::Bytes).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::Bytes).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            exit_after_save: get(p, 0x04)?,
-            rest: bytes(p, Self::FIXED)?,
+            commp_id: get(packet, 0x01)?,
+            exit_after_save: get(packet, 0x04)?,
+            rest: bytes(packet, Self::FIXED)?,
         })
     }
 
@@ -1364,17 +1364,17 @@ impl FormationParameters {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::Bytes).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::Bytes).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            line_ratio: get(p, 0x04)?,
-            col_ratio: get(p, 0x08)?,
-            min_col_dist: get(p, 0x0c)?,
-            col_to_line_dist: get(p, 0x10)?,
-            form_influence_dist: get(p, 0x14)?,
-            break_auto_formations_by_speed: get(p, 0x18)?,
-            rest: bytes(p, Self::FIXED)?,
+            commp_id: get(packet, 0x01)?,
+            line_ratio: get(packet, 0x04)?,
+            col_ratio: get(packet, 0x08)?,
+            min_col_dist: get(packet, 0x0c)?,
+            col_to_line_dist: get(packet, 0x10)?,
+            form_influence_dist: get(packet, 0x14)?,
+            break_auto_formations_by_speed: get(packet, 0x18)?,
+            rest: bytes(packet, Self::FIXED)?,
         })
     }
 
@@ -1415,12 +1415,12 @@ impl AutoFormations {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::Bytes).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::Bytes).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            on: get(p, 0x04)?,
-            rest: bytes(p, Self::FIXED)?,
+            commp_id: get(packet, 0x01)?,
+            on: get(packet, 0x04)?,
+            rest: bytes(packet, Self::FIXED)?,
         })
     }
 
@@ -1458,13 +1458,13 @@ impl LockFormation {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::Bytes).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::Bytes).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            form_id: get(p, 0x04)?,
-            form_kind: get(p, 0x08)?,
-            rest: bytes(p, Self::FIXED)?,
+            commp_id: get(packet, 0x01)?,
+            form_id: get(packet, 0x04)?,
+            form_kind: get(packet, 0x08)?,
+            rest: bytes(packet, Self::FIXED)?,
         })
     }
 
@@ -1505,14 +1505,14 @@ impl GroupMultiWaypoints {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::Bytes).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::Bytes).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            num: get(p, 0x04)?,
-            gap_0x06: get(p, 0x06)?,
-            waypoints: get(p, 0x08)?,
-            rest: bytes(p, Self::FIXED)?,
+            commp_id: get(packet, 0x01)?,
+            num: get(packet, 0x04)?,
+            gap_0x06: get(packet, 0x06)?,
+            waypoints: get(packet, 0x08)?,
+            rest: bytes(packet, Self::FIXED)?,
         })
     }
 
@@ -1546,10 +1546,10 @@ impl Chapter {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::None).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::None).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
+            commp_id: get(packet, 0x01)?,
         })
     }
 
@@ -1601,21 +1601,21 @@ impl AttackMove {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::Words).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::Words).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            num: get(p, 0x04)?,
-            gap_0x06: get(p, 0x06)?,
-            field_0x08: get(p, 0x08)?,
-            field_0x09: get(p, 0x09)?,
-            field_0x0a: get(p, 0x0a)?,
-            waypoints_count: get(p, 0x0b)?,
-            field_0x0c: get(p, 0x0c)?,
-            gap_0x10: get(p, 0x10)?,
-            field_0x34: get(p, 0x34)?,
-            gap_0x38: get(p, 0x38)?,
-            ids: words(p, Self::FIXED)?,
+            commp_id: get(packet, 0x01)?,
+            num: get(packet, 0x04)?,
+            gap_0x06: get(packet, 0x06)?,
+            field_0x08: get(packet, 0x08)?,
+            field_0x09: get(packet, 0x09)?,
+            field_0x0a: get(packet, 0x0a)?,
+            waypoints_count: get(packet, 0x0b)?,
+            field_0x0c: get(packet, 0x0c)?,
+            gap_0x10: get(packet, 0x10)?,
+            field_0x34: get(packet, 0x34)?,
+            gap_0x38: get(packet, 0x38)?,
+            ids: words(packet, Self::FIXED)?,
         })
     }
 
@@ -1636,7 +1636,7 @@ impl AttackMove {
         put(&mut out, self.gap_0x10);
         put(&mut out, self.field_0x34);
         put(&mut out, self.gap_0x38);
-        self.ids.iter().for_each(|&w| put(&mut out, w));
+        self.ids.iter().for_each(|&word| put(&mut out, word));
         finish(out)
     }
 }
@@ -1668,16 +1668,16 @@ impl AttackMoveTarget {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::Bytes).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::Bytes).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            num: get(p, 0x04)?,
-            gap_0x06: get(p, 0x06)?,
-            tid: get(p, 0x08)?,
-            gap_0x0c: get(p, 0x0c)?,
-            waypoints_count: get(p, 0x0f)?,
-            rest: bytes(p, Self::FIXED)?,
+            commp_id: get(packet, 0x01)?,
+            num: get(packet, 0x04)?,
+            gap_0x06: get(packet, 0x06)?,
+            tid: get(packet, 0x08)?,
+            gap_0x0c: get(packet, 0x0c)?,
+            waypoints_count: get(packet, 0x0f)?,
+            rest: bytes(packet, Self::FIXED)?,
         })
     }
 
@@ -1735,20 +1735,20 @@ impl Retreat {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::Words).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::Words).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            tid: get(p, 0x04)?,
-            x: get(p, 0x08)?,
-            y: get(p, 0x0c)?,
-            num: get(p, 0x10)?,
-            field_0x12: get(p, 0x12)?,
-            field_0x13: get(p, 0x13)?,
-            field_0x14: get(p, 0x14)?,
-            field_0x15: get(p, 0x15)?,
-            field_0x16: get(p, 0x16)?,
-            ids: words(p, Self::FIXED)?,
+            commp_id: get(packet, 0x01)?,
+            tid: get(packet, 0x04)?,
+            x: get(packet, 0x08)?,
+            y: get(packet, 0x0c)?,
+            num: get(packet, 0x10)?,
+            field_0x12: get(packet, 0x12)?,
+            field_0x13: get(packet, 0x13)?,
+            field_0x14: get(packet, 0x14)?,
+            field_0x15: get(packet, 0x15)?,
+            field_0x16: get(packet, 0x16)?,
+            ids: words(packet, Self::FIXED)?,
         })
     }
 
@@ -1768,7 +1768,7 @@ impl Retreat {
         put(&mut out, self.field_0x14);
         put(&mut out, self.field_0x15);
         put(&mut out, self.field_0x16);
-        self.ids.iter().for_each(|&w| put(&mut out, w));
+        self.ids.iter().for_each(|&word| put(&mut out, word));
         finish(out)
     }
 }
@@ -1794,13 +1794,13 @@ impl UnitKindAiState {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::Bytes).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::Bytes).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            kind: get(p, 0x04)?,
-            state: get(p, 0x08)?,
-            rest: bytes(p, Self::FIXED)?,
+            commp_id: get(packet, 0x01)?,
+            kind: get(packet, 0x04)?,
+            state: get(packet, 0x08)?,
+            rest: bytes(packet, Self::FIXED)?,
         })
     }
 
@@ -1839,13 +1839,13 @@ impl AutoScout {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::Words).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::Words).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            field_0x04: get(p, 0x04)?,
-            gap_0x06: get(p, 0x06)?,
-            ids: words(p, Self::FIXED)?,
+            commp_id: get(packet, 0x01)?,
+            field_0x04: get(packet, 0x04)?,
+            gap_0x06: get(packet, 0x06)?,
+            ids: words(packet, Self::FIXED)?,
         })
     }
 
@@ -1858,7 +1858,7 @@ impl AutoScout {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.field_0x04);
         put(&mut out, self.gap_0x06);
-        self.ids.iter().for_each(|&w| put(&mut out, w));
+        self.ids.iter().for_each(|&word| put(&mut out, word));
         finish(out)
     }
 }
@@ -1880,11 +1880,11 @@ impl StopAll {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::Bytes).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::Bytes).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            rest: bytes(p, Self::FIXED)?,
+            commp_id: get(packet, 0x01)?,
+            rest: bytes(packet, Self::FIXED)?,
         })
     }
 
@@ -1919,12 +1919,12 @@ impl TransformObject {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::None).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::None).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            field_0x04: get(p, 0x04)?,
-            field_0x08: get(p, 0x08)?,
+            commp_id: get(packet, 0x01)?,
+            field_0x04: get(packet, 0x04)?,
+            field_0x08: get(packet, 0x08)?,
         })
     }
 
@@ -1958,11 +1958,11 @@ impl Trigger {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::Bytes).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::Bytes).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            rest: bytes(p, Self::FIXED)?,
+            commp_id: get(packet, 0x01)?,
+            rest: bytes(packet, Self::FIXED)?,
         })
     }
 
@@ -1997,12 +1997,12 @@ impl TransformObjects {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::Bytes).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::Bytes).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            gap_0x04: get(p, 0x04)?,
-            rest: bytes(p, Self::FIXED)?,
+            commp_id: get(packet, 0x01)?,
+            gap_0x04: get(packet, 0x04)?,
+            rest: bytes(packet, Self::FIXED)?,
         })
     }
 
@@ -2040,13 +2040,13 @@ impl SeekShelter {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::Words).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::Words).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            num: get(p, 0x04)?,
-            gap_0x06: get(p, 0x06)?,
-            ids: words(p, Self::FIXED)?,
+            commp_id: get(packet, 0x01)?,
+            num: get(packet, 0x04)?,
+            gap_0x06: get(packet, 0x06)?,
+            ids: words(packet, Self::FIXED)?,
         })
     }
 
@@ -2059,7 +2059,7 @@ impl SeekShelter {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.num);
         put(&mut out, self.gap_0x06);
-        self.ids.iter().for_each(|&w| put(&mut out, w));
+        self.ids.iter().for_each(|&word| put(&mut out, word));
         finish(out)
     }
 }
@@ -2091,16 +2091,16 @@ impl BuildingCommandQueue {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::Words).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::Words).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            tid: get(p, 0x04)?,
-            x: get(p, 0x08)?,
-            y: get(p, 0x0c)?,
-            num: get(p, 0x10)?,
-            gap_0x12: get(p, 0x12)?,
-            ids: words(p, Self::FIXED)?,
+            commp_id: get(packet, 0x01)?,
+            tid: get(packet, 0x04)?,
+            x: get(packet, 0x08)?,
+            y: get(packet, 0x0c)?,
+            num: get(packet, 0x10)?,
+            gap_0x12: get(packet, 0x12)?,
+            ids: words(packet, Self::FIXED)?,
         })
     }
 
@@ -2116,7 +2116,7 @@ impl BuildingCommandQueue {
         put(&mut out, self.y);
         put(&mut out, self.num);
         put(&mut out, self.gap_0x12);
-        self.ids.iter().for_each(|&w| put(&mut out, w));
+        self.ids.iter().for_each(|&word| put(&mut out, word));
         finish(out)
     }
 }
@@ -2138,11 +2138,11 @@ impl FireActiveAbility {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::Bytes).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::Bytes).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            rest: bytes(p, Self::FIXED)?,
+            commp_id: get(packet, 0x01)?,
+            rest: bytes(packet, Self::FIXED)?,
         })
     }
 
@@ -2177,11 +2177,11 @@ impl RgeGiveAttributes {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::Bytes).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::Bytes).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            rest: bytes(p, Self::FIXED)?,
+            commp_id: get(packet, 0x01)?,
+            rest: bytes(packet, Self::FIXED)?,
         })
     }
 
@@ -2220,14 +2220,14 @@ impl Make {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::Bytes).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::Bytes).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            uid: get(p, 0x04)?,
-            qid: get(p, 0x08)?,
-            oid: get(p, 0x0c)?,
-            rest: bytes(p, Self::FIXED)?,
+            commp_id: get(packet, 0x01)?,
+            uid: get(packet, 0x04)?,
+            qid: get(packet, 0x08)?,
+            oid: get(packet, 0x0c)?,
+            rest: bytes(packet, Self::FIXED)?,
         })
     }
 
@@ -2273,16 +2273,16 @@ impl Research {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::Words).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::Words).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            uid: get(p, 0x04)?,
-            field_0x08: get(p, 0x08)?,
-            tid: get(p, 0x0a)?,
-            qid: get(p, 0x0c)?,
-            field_0x10: get(p, 0x10)?,
-            ids: words(p, Self::FIXED)?,
+            commp_id: get(packet, 0x01)?,
+            uid: get(packet, 0x04)?,
+            field_0x08: get(packet, 0x08)?,
+            tid: get(packet, 0x0a)?,
+            qid: get(packet, 0x0c)?,
+            field_0x10: get(packet, 0x10)?,
+            ids: words(packet, Self::FIXED)?,
         })
     }
 
@@ -2298,7 +2298,7 @@ impl Research {
         put(&mut out, self.tid);
         put(&mut out, self.qid);
         put(&mut out, self.field_0x10);
-        self.ids.iter().for_each(|&w| put(&mut out, w));
+        self.ids.iter().for_each(|&word| put(&mut out, word));
         finish(out)
     }
 }
@@ -2342,22 +2342,22 @@ impl Build {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::Words).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::Words).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            num: get(p, 0x04)?,
-            gap_0x06: get(p, 0x06)?,
-            x: get(p, 0x08)?,
-            y: get(p, 0x0c)?,
-            oid: get(p, 0x10)?,
-            qid: get(p, 0x14)?,
-            field_0x18: get(p, 0x18)?,
-            frame: get(p, 0x1c)?,
-            gap_0x1d: get(p, 0x1d)?,
-            field_0x1e: get(p, 0x1e)?,
-            field_0x1f: get(p, 0x1f)?,
-            ids: words(p, Self::FIXED)?,
+            commp_id: get(packet, 0x01)?,
+            num: get(packet, 0x04)?,
+            gap_0x06: get(packet, 0x06)?,
+            x: get(packet, 0x08)?,
+            y: get(packet, 0x0c)?,
+            oid: get(packet, 0x10)?,
+            qid: get(packet, 0x14)?,
+            field_0x18: get(packet, 0x18)?,
+            frame: get(packet, 0x1c)?,
+            gap_0x1d: get(packet, 0x1d)?,
+            field_0x1e: get(packet, 0x1e)?,
+            field_0x1f: get(packet, 0x1f)?,
+            ids: words(packet, Self::FIXED)?,
         })
     }
 
@@ -2379,7 +2379,7 @@ impl Build {
         put(&mut out, self.gap_0x1d);
         put(&mut out, self.field_0x1e);
         put(&mut out, self.field_0x1f);
-        self.ids.iter().for_each(|&w| put(&mut out, w));
+        self.ids.iter().for_each(|&word| put(&mut out, word));
         finish(out)
     }
 }
@@ -2411,16 +2411,16 @@ impl Game {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::None).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::None).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            field_0x04: get(p, 0x04)?,
-            gap_0x06: get(p, 0x06)?,
-            field_0x08: get(p, 0x08)?,
-            field_0x0a: get(p, 0x0a)?,
-            field_0x0c: get(p, 0x0c)?,
-            field_0x10: get(p, 0x10)?,
+            commp_id: get(packet, 0x01)?,
+            field_0x04: get(packet, 0x04)?,
+            gap_0x06: get(packet, 0x06)?,
+            field_0x08: get(packet, 0x08)?,
+            field_0x0a: get(packet, 0x0a)?,
+            field_0x0c: get(packet, 0x0c)?,
+            field_0x10: get(packet, 0x10)?,
         })
     }
 
@@ -2466,15 +2466,15 @@ impl Explore {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::Bytes).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::Bytes).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            num: get(p, 0x04)?,
-            gap_0x06: get(p, 0x06)?,
-            x: get(p, 0x08)?,
-            y: get(p, 0x0c)?,
-            rest: bytes(p, Self::FIXED)?,
+            commp_id: get(packet, 0x01)?,
+            num: get(packet, 0x04)?,
+            gap_0x06: get(packet, 0x06)?,
+            x: get(packet, 0x08)?,
+            y: get(packet, 0x0c)?,
+            rest: bytes(packet, Self::FIXED)?,
         })
     }
 
@@ -2533,22 +2533,22 @@ impl BuildWall {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::Words).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::Words).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            num: get(p, 0x04)?,
-            gap_0x06: get(p, 0x06)?,
-            x1: get(p, 0x08)?,
-            y1: get(p, 0x0a)?,
-            x2: get(p, 0x0c)?,
-            y2: get(p, 0x0e)?,
-            oid: get(p, 0x10)?,
-            qid: get(p, 0x14)?,
-            gap_0x18: get(p, 0x18)?,
-            field_0x1a: get(p, 0x1a)?,
-            field_0x1b: get(p, 0x1b)?,
-            ids: words(p, Self::FIXED)?,
+            commp_id: get(packet, 0x01)?,
+            num: get(packet, 0x04)?,
+            gap_0x06: get(packet, 0x06)?,
+            x1: get(packet, 0x08)?,
+            y1: get(packet, 0x0a)?,
+            x2: get(packet, 0x0c)?,
+            y2: get(packet, 0x0e)?,
+            oid: get(packet, 0x10)?,
+            qid: get(packet, 0x14)?,
+            gap_0x18: get(packet, 0x18)?,
+            field_0x1a: get(packet, 0x1a)?,
+            field_0x1b: get(packet, 0x1b)?,
+            ids: words(packet, Self::FIXED)?,
         })
     }
 
@@ -2570,7 +2570,7 @@ impl BuildWall {
         put(&mut out, self.gap_0x18);
         put(&mut out, self.field_0x1a);
         put(&mut out, self.field_0x1b);
-        self.ids.iter().for_each(|&w| put(&mut out, w));
+        self.ids.iter().for_each(|&word| put(&mut out, word));
         finish(out)
     }
 }
@@ -2592,11 +2592,11 @@ impl CancelBuild {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::None).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::None).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            uid: get(p, 0x04)?,
+            commp_id: get(packet, 0x01)?,
+            uid: get(packet, 0x04)?,
         })
     }
 
@@ -2641,17 +2641,17 @@ impl AttackGround {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::Words).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::Words).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            num: get(p, 0x04)?,
-            gap_0x06: get(p, 0x06)?,
-            x: get(p, 0x08)?,
-            y: get(p, 0x0c)?,
-            gap_0x10: get(p, 0x10)?,
-            field_0x13: get(p, 0x13)?,
-            ids: words(p, Self::FIXED)?,
+            commp_id: get(packet, 0x01)?,
+            num: get(packet, 0x04)?,
+            gap_0x06: get(packet, 0x06)?,
+            x: get(packet, 0x08)?,
+            y: get(packet, 0x0c)?,
+            gap_0x10: get(packet, 0x10)?,
+            field_0x13: get(packet, 0x13)?,
+            ids: words(packet, Self::FIXED)?,
         })
     }
 
@@ -2668,7 +2668,7 @@ impl AttackGround {
         put(&mut out, self.y);
         put(&mut out, self.gap_0x10);
         put(&mut out, self.field_0x13);
-        self.ids.iter().for_each(|&w| put(&mut out, w));
+        self.ids.iter().for_each(|&word| put(&mut out, word));
         finish(out)
     }
 }
@@ -2696,14 +2696,14 @@ impl TribeGiveAttribute {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::None).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::None).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            amt: get(p, 0x04)?,
-            cost: get(p, 0x08)?,
-            attr: get(p, 0x0c)?,
-            to: get(p, 0x0e)?,
+            commp_id: get(packet, 0x01)?,
+            amt: get(packet, 0x04)?,
+            cost: get(packet, 0x08)?,
+            attr: get(packet, 0x0c)?,
+            to: get(packet, 0x0e)?,
         })
     }
 
@@ -2745,14 +2745,14 @@ impl TradeAttribute {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::Bytes).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::Bytes).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            num: get(p, 0x04)?,
-            gap_0x06: get(p, 0x06)?,
-            attr: get(p, 0x08)?,
-            rest: bytes(p, Self::FIXED)?,
+            commp_id: get(packet, 0x01)?,
+            num: get(packet, 0x04)?,
+            gap_0x06: get(packet, 0x06)?,
+            attr: get(packet, 0x08)?,
+            rest: bytes(packet, Self::FIXED)?,
         })
     }
 
@@ -2800,17 +2800,17 @@ impl Repair {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::Words).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::Words).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            num: get(p, 0x04)?,
-            gap_0x06: get(p, 0x06)?,
-            tid: get(p, 0x08)?,
-            gap_0x0c: get(p, 0x0c)?,
-            field_0x0e: get(p, 0x0e)?,
-            field_0x0f: get(p, 0x0f)?,
-            ids: words(p, Self::FIXED)?,
+            commp_id: get(packet, 0x01)?,
+            num: get(packet, 0x04)?,
+            gap_0x06: get(packet, 0x06)?,
+            tid: get(packet, 0x08)?,
+            gap_0x0c: get(packet, 0x0c)?,
+            field_0x0e: get(packet, 0x0e)?,
+            field_0x0f: get(packet, 0x0f)?,
+            ids: words(packet, Self::FIXED)?,
         })
     }
 
@@ -2827,7 +2827,7 @@ impl Repair {
         put(&mut out, self.gap_0x0c);
         put(&mut out, self.field_0x0e);
         put(&mut out, self.field_0x0f);
-        self.ids.iter().for_each(|&w| put(&mut out, w));
+        self.ids.iter().for_each(|&word| put(&mut out, word));
         finish(out)
     }
 }
@@ -2865,19 +2865,19 @@ impl Unload {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::Words).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::Words).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            num: get(p, 0x04)?,
-            gap_0x06: get(p, 0x06)?,
-            x: get(p, 0x08)?,
-            y: get(p, 0x0c)?,
-            unit_kind: get(p, 0x10)?,
-            flag: get(p, 0x14)?,
-            gap_0x15: get(p, 0x15)?,
-            field_0x18: get(p, 0x18)?,
-            ids: words(p, Self::FIXED)?,
+            commp_id: get(packet, 0x01)?,
+            num: get(packet, 0x04)?,
+            gap_0x06: get(packet, 0x06)?,
+            x: get(packet, 0x08)?,
+            y: get(packet, 0x0c)?,
+            unit_kind: get(packet, 0x10)?,
+            flag: get(packet, 0x14)?,
+            gap_0x15: get(packet, 0x15)?,
+            field_0x18: get(packet, 0x18)?,
+            ids: words(packet, Self::FIXED)?,
         })
     }
 
@@ -2896,7 +2896,7 @@ impl Unload {
         put(&mut out, self.flag);
         put(&mut out, self.gap_0x15);
         put(&mut out, self.field_0x18);
-        self.ids.iter().for_each(|&w| put(&mut out, w));
+        self.ids.iter().for_each(|&word| put(&mut out, word));
         finish(out)
     }
 }
@@ -2918,11 +2918,11 @@ impl Gate {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::None).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::None).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            uid: get(p, 0x04)?,
+            commp_id: get(packet, 0x01)?,
+            uid: get(packet, 0x04)?,
         })
     }
 
@@ -2971,18 +2971,18 @@ impl Flare {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::Bytes).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::Bytes).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            field_0x04: get(p, 0x04)?,
-            field_0x08: get(p, 0x08)?,
-            field_0x0c: get(p, 0x0c)?,
-            field_0x10: get(p, 0x10)?,
-            gap_0x11: get(p, 0x11)?,
-            field_0x12: get(p, 0x12)?,
-            field_0x13: get(p, 0x13)?,
-            rest: bytes(p, Self::FIXED)?,
+            commp_id: get(packet, 0x01)?,
+            field_0x04: get(packet, 0x04)?,
+            field_0x08: get(packet, 0x08)?,
+            field_0x0c: get(packet, 0x0c)?,
+            field_0x10: get(packet, 0x10)?,
+            gap_0x11: get(packet, 0x11)?,
+            field_0x12: get(packet, 0x12)?,
+            field_0x13: get(packet, 0x13)?,
+            rest: bytes(packet, Self::FIXED)?,
         })
     }
 
@@ -3030,15 +3030,15 @@ impl Special {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::Bytes).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::Bytes).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            num: get(p, 0x04)?,
-            gap_0x06: get(p, 0x06)?,
-            tid: get(p, 0x08)?,
-            action: get(p, 0x0c)?,
-            rest: bytes(p, Self::FIXED)?,
+            commp_id: get(packet, 0x01)?,
+            num: get(packet, 0x04)?,
+            gap_0x06: get(packet, 0x06)?,
+            tid: get(packet, 0x08)?,
+            action: get(packet, 0x0c)?,
+            rest: bytes(packet, Self::FIXED)?,
         })
     }
 
@@ -3099,23 +3099,23 @@ impl UnitOrder {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::Words).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::Words).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            num: get(p, 0x04)?,
-            gap_0x06: get(p, 0x06)?,
-            tid: get(p, 0x08)?,
-            x: get(p, 0x0c)?,
-            y: get(p, 0x10)?,
-            qid: get(p, 0x14)?,
-            param: get(p, 0x18)?,
-            action: get(p, 0x1c)?,
-            field_0x1d: get(p, 0x1d)?,
-            field_0x1e: get(p, 0x1e)?,
-            gap_0x1f: get(p, 0x1f)?,
-            field_0x20: get(p, 0x20)?,
-            ids: words(p, Self::FIXED)?,
+            commp_id: get(packet, 0x01)?,
+            num: get(packet, 0x04)?,
+            gap_0x06: get(packet, 0x06)?,
+            tid: get(packet, 0x08)?,
+            x: get(packet, 0x0c)?,
+            y: get(packet, 0x10)?,
+            qid: get(packet, 0x14)?,
+            param: get(packet, 0x18)?,
+            action: get(packet, 0x1c)?,
+            field_0x1d: get(packet, 0x1d)?,
+            field_0x1e: get(packet, 0x1e)?,
+            gap_0x1f: get(packet, 0x1f)?,
+            field_0x20: get(packet, 0x20)?,
+            ids: words(packet, Self::FIXED)?,
         })
     }
 
@@ -3138,7 +3138,7 @@ impl UnitOrder {
         put(&mut out, self.field_0x1e);
         put(&mut out, self.gap_0x1f);
         put(&mut out, self.field_0x20);
-        self.ids.iter().for_each(|&w| put(&mut out, w));
+        self.ids.iter().for_each(|&word| put(&mut out, word));
         finish(out)
     }
 }
@@ -3180,21 +3180,21 @@ impl Diplomacy {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::Bytes).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::Bytes).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            pid2: get(p, 0x04)?,
-            seq: get(p, 0x05)?,
-            status: get(p, 0x06)?,
-            declare: get(p, 0x07)?,
-            diplo: get(p, 0x08)?,
-            int: get(p, 0x09)?,
-            trade: get(p, 0x0a)?,
-            demand: get(p, 0x0b)?,
-            gold: get(p, 0x0c)?,
-            len: get(p, 0x0e)?,
-            rest: bytes(p, Self::FIXED)?,
+            commp_id: get(packet, 0x01)?,
+            pid2: get(packet, 0x04)?,
+            seq: get(packet, 0x05)?,
+            status: get(packet, 0x06)?,
+            declare: get(packet, 0x07)?,
+            diplo: get(packet, 0x08)?,
+            int: get(packet, 0x09)?,
+            trade: get(packet, 0x0a)?,
+            demand: get(packet, 0x0b)?,
+            gold: get(packet, 0x0c)?,
+            len: get(packet, 0x0e)?,
+            rest: bytes(packet, Self::FIXED)?,
         })
     }
 
@@ -3243,14 +3243,14 @@ impl Queue {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::Bytes).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::Bytes).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            bid: get(p, 0x04)?,
-            tid: get(p, 0x08)?,
-            count: get(p, 0x0a)?,
-            rest: bytes(p, Self::FIXED)?,
+            commp_id: get(packet, 0x01)?,
+            bid: get(packet, 0x04)?,
+            tid: get(packet, 0x08)?,
+            count: get(packet, 0x0a)?,
+            rest: bytes(packet, Self::FIXED)?,
         })
     }
 
@@ -3300,18 +3300,18 @@ impl SetGatherPoint {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::Words).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::Words).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            num: get(p, 0x04)?,
-            gap_0x06: get(p, 0x06)?,
-            x: get(p, 0x08)?,
-            y: get(p, 0x0c)?,
-            tid: get(p, 0x10)?,
-            tm_id: get(p, 0x14)?,
-            field_0x18: get(p, 0x18)?,
-            ids: words(p, Self::FIXED)?,
+            commp_id: get(packet, 0x01)?,
+            num: get(packet, 0x04)?,
+            gap_0x06: get(packet, 0x06)?,
+            x: get(packet, 0x08)?,
+            y: get(packet, 0x0c)?,
+            tid: get(packet, 0x10)?,
+            tm_id: get(packet, 0x14)?,
+            field_0x18: get(packet, 0x18)?,
+            ids: words(packet, Self::FIXED)?,
         })
     }
 
@@ -3329,7 +3329,7 @@ impl SetGatherPoint {
         put(&mut out, self.tid);
         put(&mut out, self.tm_id);
         put(&mut out, self.field_0x18);
-        self.ids.iter().for_each(|&w| put(&mut out, w));
+        self.ids.iter().for_each(|&word| put(&mut out, word));
         finish(out)
     }
 }
@@ -3353,11 +3353,11 @@ impl SetRetreatPoint {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::None).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::None).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            uid: get(p, 0x04)?,
+            commp_id: get(packet, 0x01)?,
+            uid: get(packet, 0x04)?,
         })
     }
 
@@ -3394,13 +3394,13 @@ impl SellCommodity {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::None).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::None).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            attr: get(p, 0x04)?,
-            amt: get(p, 0x06)?,
-            uid: get(p, 0x08)?,
+            commp_id: get(packet, 0x01)?,
+            attr: get(packet, 0x04)?,
+            amt: get(packet, 0x06)?,
+            uid: get(packet, 0x08)?,
         })
     }
 
@@ -3439,13 +3439,13 @@ impl BuyCommodity {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::None).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::None).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            attr: get(p, 0x04)?,
-            amt: get(p, 0x06)?,
-            uid: get(p, 0x08)?,
+            commp_id: get(packet, 0x01)?,
+            attr: get(packet, 0x04)?,
+            amt: get(packet, 0x06)?,
+            uid: get(packet, 0x08)?,
         })
     }
 
@@ -3484,13 +3484,13 @@ impl OffboardTrade {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::Bytes).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::Bytes).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            uid: get(p, 0x04)?,
-            trade_route: get(p, 0x08)?,
-            rest: bytes(p, Self::FIXED)?,
+            commp_id: get(packet, 0x01)?,
+            uid: get(packet, 0x04)?,
+            trade_route: get(packet, 0x08)?,
+            rest: bytes(packet, Self::FIXED)?,
         })
     }
 
@@ -3533,15 +3533,15 @@ impl UnitTransform {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::Bytes).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::Bytes).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            num: get(p, 0x04)?,
-            gap_0x06: get(p, 0x06)?,
-            uid: get(p, 0x08)?,
-            qid: get(p, 0x0c)?,
-            rest: bytes(p, Self::FIXED)?,
+            commp_id: get(packet, 0x01)?,
+            num: get(packet, 0x04)?,
+            gap_0x06: get(packet, 0x06)?,
+            uid: get(packet, 0x08)?,
+            qid: get(packet, 0x0c)?,
+            rest: bytes(packet, Self::FIXED)?,
         })
     }
 
@@ -3578,11 +3578,11 @@ impl DropRelic {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::None).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::None).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            uid: get(p, 0x04)?,
+            commp_id: get(packet, 0x01)?,
+            uid: get(packet, 0x04)?,
         })
     }
 
@@ -3617,12 +3617,12 @@ impl TownBell {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::None).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::None).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            uid: get(p, 0x04)?,
-            activate: get(p, 0x08)?,
+            commp_id: get(packet, 0x01)?,
+            uid: get(packet, 0x04)?,
+            activate: get(packet, 0x08)?,
         })
     }
 
@@ -3656,11 +3656,11 @@ impl GoBackToWork {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::None).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::None).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            uid: get(p, 0x04)?,
+            commp_id: get(packet, 0x01)?,
+            uid: get(packet, 0x04)?,
         })
     }
 
@@ -3705,17 +3705,17 @@ impl MultiQueue {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::Words).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::Words).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            num: get(p, 0x04)?,
-            gap_0x06: get(p, 0x06)?,
-            bid: get(p, 0x0a)?,
-            tid: get(p, 0x0c)?,
-            count: get(p, 0x0e)?,
-            button_location_id: get(p, 0x10)?,
-            ids: words(p, Self::FIXED)?,
+            commp_id: get(packet, 0x01)?,
+            num: get(packet, 0x04)?,
+            gap_0x06: get(packet, 0x06)?,
+            bid: get(packet, 0x0a)?,
+            tid: get(packet, 0x0c)?,
+            count: get(packet, 0x0e)?,
+            button_location_id: get(packet, 0x10)?,
+            ids: words(packet, Self::FIXED)?,
         })
     }
 
@@ -3732,7 +3732,7 @@ impl MultiQueue {
         put(&mut out, self.tid);
         put(&mut out, self.count);
         put(&mut out, self.button_location_id);
-        self.ids.iter().for_each(|&w| put(&mut out, w));
+        self.ids.iter().for_each(|&word| put(&mut out, word));
         finish(out)
     }
 }
@@ -3762,14 +3762,14 @@ impl SetGatherState {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::Words).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::Words).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            num: get(p, 0x04)?,
-            gap_0x06: get(p, 0x06)?,
-            field_0x08: get(p, 0x08)?,
-            ids: words(p, Self::FIXED)?,
+            commp_id: get(packet, 0x01)?,
+            num: get(packet, 0x04)?,
+            gap_0x06: get(packet, 0x06)?,
+            field_0x08: get(packet, 0x08)?,
+            ids: words(packet, Self::FIXED)?,
         })
     }
 
@@ -3783,7 +3783,7 @@ impl SetGatherState {
         put(&mut out, self.num);
         put(&mut out, self.gap_0x06);
         put(&mut out, self.field_0x08);
-        self.ids.iter().for_each(|&w| put(&mut out, w));
+        self.ids.iter().for_each(|&word| put(&mut out, word));
         finish(out)
     }
 }
@@ -3813,14 +3813,14 @@ impl DeleteObjects {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::Words).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::Words).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            num: get(p, 0x04)?,
-            gap_0x06: get(p, 0x06)?,
-            field_0x08: get(p, 0x08)?,
-            ids: words(p, Self::FIXED)?,
+            commp_id: get(packet, 0x01)?,
+            num: get(packet, 0x04)?,
+            gap_0x06: get(packet, 0x06)?,
+            field_0x08: get(packet, 0x08)?,
+            ids: words(packet, Self::FIXED)?,
         })
     }
 
@@ -3834,7 +3834,7 @@ impl DeleteObjects {
         put(&mut out, self.num);
         put(&mut out, self.gap_0x06);
         put(&mut out, self.field_0x08);
-        self.ids.iter().for_each(|&w| put(&mut out, w));
+        self.ids.iter().for_each(|&word| put(&mut out, word));
         finish(out)
     }
 }
@@ -3864,14 +3864,14 @@ impl ResetBuildings {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::Words).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::Words).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            num: get(p, 0x04)?,
-            gap_0x06: get(p, 0x06)?,
-            field_0x08: get(p, 0x08)?,
-            ids: words(p, Self::FIXED)?,
+            commp_id: get(packet, 0x01)?,
+            num: get(packet, 0x04)?,
+            gap_0x06: get(packet, 0x06)?,
+            field_0x08: get(packet, 0x08)?,
+            ids: words(packet, Self::FIXED)?,
         })
     }
 
@@ -3885,7 +3885,7 @@ impl ResetBuildings {
         put(&mut out, self.num);
         put(&mut out, self.gap_0x06);
         put(&mut out, self.field_0x08);
-        self.ids.iter().for_each(|&w| put(&mut out, w));
+        self.ids.iter().for_each(|&word| put(&mut out, word));
         finish(out)
     }
 }
@@ -3911,13 +3911,13 @@ impl MultiGate {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::Bytes).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::Bytes).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            gap_0x04: get(p, 0x04)?,
-            state: get(p, 0x08)?,
-            rest: bytes(p, Self::FIXED)?,
+            commp_id: get(packet, 0x01)?,
+            gap_0x04: get(packet, 0x04)?,
+            state: get(packet, 0x08)?,
+            rest: bytes(packet, Self::FIXED)?,
         })
     }
 
@@ -3954,11 +3954,11 @@ impl GoBackToWork2 {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::Bytes).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::Bytes).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            rest: bytes(p, Self::FIXED)?,
+            commp_id: get(packet, 0x01)?,
+            rest: bytes(packet, Self::FIXED)?,
         })
     }
 
@@ -3991,11 +3991,11 @@ impl ChangePlayerName {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::Bytes).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::Bytes).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            rest: bytes(p, Self::FIXED)?,
+            commp_id: get(packet, 0x01)?,
+            rest: bytes(packet, Self::FIXED)?,
         })
     }
 
@@ -4030,12 +4030,12 @@ impl SendAiSignal {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::Bytes).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::Bytes).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            name: get(p, 0x04)?,
-            rest: bytes(p, Self::FIXED)?,
+            commp_id: get(packet, 0x01)?,
+            name: get(packet, 0x04)?,
+            rest: bytes(packet, Self::FIXED)?,
         })
     }
 
@@ -4069,11 +4069,11 @@ impl AiEffectAmount {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::Bytes).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::Bytes).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            rest: bytes(p, Self::FIXED)?,
+            commp_id: get(packet, 0x01)?,
+            rest: bytes(packet, Self::FIXED)?,
         })
     }
 
@@ -4106,11 +4106,11 @@ impl AiEffectPercent {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::Bytes).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::Bytes).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            rest: bytes(p, Self::FIXED)?,
+            commp_id: get(packet, 0x01)?,
+            rest: bytes(packet, Self::FIXED)?,
         })
     }
 
@@ -4143,11 +4143,11 @@ impl AllBackToWork {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::None).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::None).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            uid: get(p, 0x04)?,
+            commp_id: get(packet, 0x01)?,
+            uid: get(packet, 0x04)?,
         })
     }
 
@@ -4204,23 +4204,23 @@ impl TribeGiveAttributes {
 
     /// The command in a packet, if the packet fits the layout.
     #[must_use]
-    pub fn decode(p: &[u8]) -> Option<Self> {
-        fits(p, Self::FIXED, Tail::None).then_some(())?;
+    pub fn decode(packet: &[u8]) -> Option<Self> {
+        fits(packet, Self::FIXED, Tail::None).then_some(())?;
         Some(Self {
-            commp_id: get(p, 0x01)?,
-            amt: get(p, 0x04)?,
-            field_0x08: get(p, 0x08)?,
-            field_0x0c: get(p, 0x0c)?,
-            field_0x10: get(p, 0x10)?,
-            cost: get(p, 0x14)?,
-            field_0x18: get(p, 0x18)?,
-            field_0x1c: get(p, 0x1c)?,
-            field_0x20: get(p, 0x20)?,
-            attr: get(p, 0x24)?,
-            field_0x26: get(p, 0x26)?,
-            field_0x28: get(p, 0x28)?,
-            field_0x2a: get(p, 0x2a)?,
-            to: get(p, 0x2c)?,
+            commp_id: get(packet, 0x01)?,
+            amt: get(packet, 0x04)?,
+            field_0x08: get(packet, 0x08)?,
+            field_0x0c: get(packet, 0x0c)?,
+            field_0x10: get(packet, 0x10)?,
+            cost: get(packet, 0x14)?,
+            field_0x18: get(packet, 0x18)?,
+            field_0x1c: get(packet, 0x1c)?,
+            field_0x20: get(packet, 0x20)?,
+            attr: get(packet, 0x24)?,
+            field_0x26: get(packet, 0x26)?,
+            field_0x28: get(packet, 0x28)?,
+            field_0x2a: get(packet, 0x2a)?,
+            to: get(packet, 0x2c)?,
         })
     }
 
@@ -4545,87 +4545,87 @@ impl Command {
     /// Invalid input when the packet is longer than its `u16` size holds.
     pub fn encode(&self) -> GenieResult<Vec<u8>> {
         match self {
-            Self::Interact(c) => c.encode(),
-            Self::Stop(c) => c.encode(),
-            Self::Work(c) => c.encode(),
-            Self::Move(c) => c.encode(),
-            Self::Create(c) => c.encode(),
-            Self::AddAttribute(c) => c.encode(),
-            Self::RgeGiveAttribute(c) => c.encode(),
-            Self::AiOrder(c) => c.encode(),
-            Self::Resign(c) => c.encode(),
-            Self::AddWaypoint(c) => c.encode(),
-            Self::Pause(c) => c.encode(),
-            Self::GroupWaypoint(c) => c.encode(),
-            Self::GroupAiOrder(c) => c.encode(),
-            Self::UnitAiState(c) => c.encode(),
-            Self::Guard(c) => c.encode(),
-            Self::Follow(c) => c.encode(),
-            Self::Patrol(c) => c.encode(),
-            Self::Scout(c) => c.encode(),
-            Self::FormFormation(c) => c.encode(),
-            Self::BreakFormation(c) => c.encode(),
-            Self::WheelFormation(c) => c.encode(),
-            Self::AboutFaceFormation(c) => c.encode(),
-            Self::Save(c) => c.encode(),
-            Self::FormationParameters(c) => c.encode(),
-            Self::AutoFormations(c) => c.encode(),
-            Self::LockFormation(c) => c.encode(),
-            Self::GroupMultiWaypoints(c) => c.encode(),
-            Self::Chapter(c) => c.encode(),
-            Self::AttackMove(c) => c.encode(),
-            Self::AttackMoveTarget(c) => c.encode(),
-            Self::Retreat(c) => c.encode(),
-            Self::UnitKindAiState(c) => c.encode(),
-            Self::AutoScout(c) => c.encode(),
-            Self::StopAll(c) => c.encode(),
-            Self::TransformObject(c) => c.encode(),
-            Self::Trigger(c) => c.encode(),
-            Self::TransformObjects(c) => c.encode(),
-            Self::SeekShelter(c) => c.encode(),
-            Self::BuildingCommandQueue(c) => c.encode(),
-            Self::FireActiveAbility(c) => c.encode(),
-            Self::RgeGiveAttributes(c) => c.encode(),
-            Self::Make(c) => c.encode(),
-            Self::Research(c) => c.encode(),
-            Self::Build(c) => c.encode(),
-            Self::Game(c) => c.encode(),
-            Self::Explore(c) => c.encode(),
-            Self::BuildWall(c) => c.encode(),
-            Self::CancelBuild(c) => c.encode(),
-            Self::AttackGround(c) => c.encode(),
-            Self::TribeGiveAttribute(c) => c.encode(),
-            Self::TradeAttribute(c) => c.encode(),
-            Self::Repair(c) => c.encode(),
-            Self::Unload(c) => c.encode(),
-            Self::Gate(c) => c.encode(),
-            Self::Flare(c) => c.encode(),
-            Self::Special(c) => c.encode(),
-            Self::UnitOrder(c) => c.encode(),
-            Self::Diplomacy(c) => c.encode(),
-            Self::Queue(c) => c.encode(),
-            Self::SetGatherPoint(c) => c.encode(),
-            Self::SetRetreatPoint(c) => c.encode(),
-            Self::SellCommodity(c) => c.encode(),
-            Self::BuyCommodity(c) => c.encode(),
-            Self::OffboardTrade(c) => c.encode(),
-            Self::UnitTransform(c) => c.encode(),
-            Self::DropRelic(c) => c.encode(),
-            Self::TownBell(c) => c.encode(),
-            Self::GoBackToWork(c) => c.encode(),
-            Self::MultiQueue(c) => c.encode(),
-            Self::SetGatherState(c) => c.encode(),
-            Self::DeleteObjects(c) => c.encode(),
-            Self::ResetBuildings(c) => c.encode(),
-            Self::MultiGate(c) => c.encode(),
-            Self::GoBackToWork2(c) => c.encode(),
-            Self::ChangePlayerName(c) => c.encode(),
-            Self::SendAiSignal(c) => c.encode(),
-            Self::AiEffectAmount(c) => c.encode(),
-            Self::AiEffectPercent(c) => c.encode(),
-            Self::AllBackToWork(c) => c.encode(),
-            Self::TribeGiveAttributes(c) => c.encode(),
-            Self::Unknown(p) => Ok(p.clone()),
+            Self::Interact(command) => command.encode(),
+            Self::Stop(command) => command.encode(),
+            Self::Work(command) => command.encode(),
+            Self::Move(command) => command.encode(),
+            Self::Create(command) => command.encode(),
+            Self::AddAttribute(command) => command.encode(),
+            Self::RgeGiveAttribute(command) => command.encode(),
+            Self::AiOrder(command) => command.encode(),
+            Self::Resign(command) => command.encode(),
+            Self::AddWaypoint(command) => command.encode(),
+            Self::Pause(command) => command.encode(),
+            Self::GroupWaypoint(command) => command.encode(),
+            Self::GroupAiOrder(command) => command.encode(),
+            Self::UnitAiState(command) => command.encode(),
+            Self::Guard(command) => command.encode(),
+            Self::Follow(command) => command.encode(),
+            Self::Patrol(command) => command.encode(),
+            Self::Scout(command) => command.encode(),
+            Self::FormFormation(command) => command.encode(),
+            Self::BreakFormation(command) => command.encode(),
+            Self::WheelFormation(command) => command.encode(),
+            Self::AboutFaceFormation(command) => command.encode(),
+            Self::Save(command) => command.encode(),
+            Self::FormationParameters(command) => command.encode(),
+            Self::AutoFormations(command) => command.encode(),
+            Self::LockFormation(command) => command.encode(),
+            Self::GroupMultiWaypoints(command) => command.encode(),
+            Self::Chapter(command) => command.encode(),
+            Self::AttackMove(command) => command.encode(),
+            Self::AttackMoveTarget(command) => command.encode(),
+            Self::Retreat(command) => command.encode(),
+            Self::UnitKindAiState(command) => command.encode(),
+            Self::AutoScout(command) => command.encode(),
+            Self::StopAll(command) => command.encode(),
+            Self::TransformObject(command) => command.encode(),
+            Self::Trigger(command) => command.encode(),
+            Self::TransformObjects(command) => command.encode(),
+            Self::SeekShelter(command) => command.encode(),
+            Self::BuildingCommandQueue(command) => command.encode(),
+            Self::FireActiveAbility(command) => command.encode(),
+            Self::RgeGiveAttributes(command) => command.encode(),
+            Self::Make(command) => command.encode(),
+            Self::Research(command) => command.encode(),
+            Self::Build(command) => command.encode(),
+            Self::Game(command) => command.encode(),
+            Self::Explore(command) => command.encode(),
+            Self::BuildWall(command) => command.encode(),
+            Self::CancelBuild(command) => command.encode(),
+            Self::AttackGround(command) => command.encode(),
+            Self::TribeGiveAttribute(command) => command.encode(),
+            Self::TradeAttribute(command) => command.encode(),
+            Self::Repair(command) => command.encode(),
+            Self::Unload(command) => command.encode(),
+            Self::Gate(command) => command.encode(),
+            Self::Flare(command) => command.encode(),
+            Self::Special(command) => command.encode(),
+            Self::UnitOrder(command) => command.encode(),
+            Self::Diplomacy(command) => command.encode(),
+            Self::Queue(command) => command.encode(),
+            Self::SetGatherPoint(command) => command.encode(),
+            Self::SetRetreatPoint(command) => command.encode(),
+            Self::SellCommodity(command) => command.encode(),
+            Self::BuyCommodity(command) => command.encode(),
+            Self::OffboardTrade(command) => command.encode(),
+            Self::UnitTransform(command) => command.encode(),
+            Self::DropRelic(command) => command.encode(),
+            Self::TownBell(command) => command.encode(),
+            Self::GoBackToWork(command) => command.encode(),
+            Self::MultiQueue(command) => command.encode(),
+            Self::SetGatherState(command) => command.encode(),
+            Self::DeleteObjects(command) => command.encode(),
+            Self::ResetBuildings(command) => command.encode(),
+            Self::MultiGate(command) => command.encode(),
+            Self::GoBackToWork2(command) => command.encode(),
+            Self::ChangePlayerName(command) => command.encode(),
+            Self::SendAiSignal(command) => command.encode(),
+            Self::AiEffectAmount(command) => command.encode(),
+            Self::AiEffectPercent(command) => command.encode(),
+            Self::AllBackToWork(command) => command.encode(),
+            Self::TribeGiveAttributes(command) => command.encode(),
+            Self::Unknown(packet) => Ok(packet.clone()),
         }
     }
 }

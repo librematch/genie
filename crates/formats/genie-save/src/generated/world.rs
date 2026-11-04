@@ -2408,7 +2408,7 @@ pub struct TribeInformationAiState {
     /// 16 bytes read next to the counts, not used by the loops below
     pub list_capacities: [i32; 4],
     /// the four lists of `count` entries each
-    #[br(parse_with = binrw::helpers::args_iter(list_counts.iter().copied().map(|x| (x as i32,)).collect::<Vec<_>>()))]
+    #[br(parse_with = binrw::helpers::args_iter(list_counts.iter().copied().map(|value| (value as i32,)).collect::<Vec<_>>()))]
     pub lists: Vec<InformationList>,
     /// unnamed in the binary
     /// read at 0x140b510d4 into a local (local_2b8)
@@ -2607,10 +2607,9 @@ pub struct AiStdString {
     /// game: `&stringLength`
     /// read at 0x140932838
     pub string_length: u32,
-    /// game: `&s[0]`
-    /// helper 0x14092a340
+    /// strings.cpp: the chars after the length (`&s[0]`)
     #[br(count = (string_length & 4294967295) as usize)]
-    pub s: Vec<u8>,
+    pub text: Vec<u8>,
 }
 
 /// Read by `FUN_140ba69b0` of the build.
@@ -5769,7 +5768,7 @@ pub struct VisibleResourceManager {
     #[br(if(!(num_visible_resource_lists < 1) && num_visible_resource_lists > 0), count = num_visible_resource_lists.max(0) as usize)]
     pub list_sizes: Option<Vec<VisibleResourceListSize>>,
     /// the used records per list
-    #[br(if(!(num_visible_resource_lists < 1) && num_visible_resource_lists > 0), parse_with = binrw::helpers::args_iter(list_sizes.iter().flatten().map(|e| e.vr_list_used.max(0)).map(|x| (ver, x as i32,)).collect::<Vec<_>>()))]
+    #[br(if(!(num_visible_resource_lists < 1) && num_visible_resource_lists > 0), parse_with = binrw::helpers::args_iter(list_sizes.iter().flatten().map(|sizes| sizes.vr_list_used.max(0)).map(|value| (ver, value as i32,)).collect::<Vec<_>>()))]
     pub lists: Option<Vec<VisibleResourceList>>,
 }
 
@@ -6809,7 +6808,7 @@ pub struct ActiveSpriteListEntry1 {
 pub struct ActiveSpriteList {
     /// unnamed in the binary
     /// entries until a sprite_kind of 0, that one included
-    #[br(parse_with = binrw::helpers::until(|e: &ActiveSpriteListEntry1| e.sprite_kind == 0), args(ver))]
+    #[br(parse_with = binrw::helpers::until(|entry: &ActiveSpriteListEntry1| entry.sprite_kind == 0), args(ver))]
     pub sprite_kind_list: Vec<ActiveSpriteListEntry1>,
 }
 
@@ -8076,7 +8075,7 @@ pub struct ActionListEntry1 {
 pub struct ActionList {
     /// unnamed in the binary
     /// entries until a action_kind of 0, that one included
-    #[br(parse_with = binrw::helpers::until(|e: &ActionListEntry1| e.action_kind == 0), args(ver, num_players))]
+    #[br(parse_with = binrw::helpers::until(|entry: &ActionListEntry1| entry.action_kind == 0), args(ver, num_players))]
     pub action_kind_list: Vec<ActionListEntry1>,
 }
 
@@ -9126,7 +9125,7 @@ pub struct ObjectList {
     pub grow_size: u32,
     /// unnamed in the binary
     /// entries until a object_kind of 0, that one included
-    #[br(parse_with = binrw::helpers::until(|e: &ObjectListEntry1| e.object_kind == 0), args(ver, num_players))]
+    #[br(parse_with = binrw::helpers::until(|entry: &ObjectListEntry1| entry.object_kind == 0), args(ver, num_players))]
     pub object_kind_list: Vec<ObjectListEntry1>,
 }
 
@@ -9178,7 +9177,7 @@ pub struct PlayerObjects {
     #[br(if(!(master_object_num < 1)))]
     pub marker: Option<()>,
     /// an enabled master: marker, type, the master, marker
-    #[br(if(!(master_object_num < 1) && master_object_num > 0), count = enabled.iter().filter(|&&e| e != 0).count() as usize, args { inner: (ver,) })]
+    #[br(if(!(master_object_num < 1) && master_object_num > 0), count = enabled.iter().filter(|&&flag| flag != 0).count() as usize, args { inner: (ver,) })]
     pub masters: Option<Vec<PlayerMaster>>,
     /// unnamed in the binary
     /// read by 0x141282780
@@ -9789,10 +9788,10 @@ pub struct AiExpertEngine {
     /// HD AIExpertEngine::maxLists (int16)
     pub max_lists: u16,
     /// HD AIExpertEngine::listInfo\[i\]
-    #[br(parse_with = binrw::helpers::args_iter(std::iter::repeat_n(script_debugging, usize::from(max_lists)).map(|x| (x as u8,)).collect::<Vec<_>>()))]
+    #[br(parse_with = binrw::helpers::args_iter(std::iter::repeat_n(script_debugging, usize::from(max_lists)).map(|value| (value as u8,)).collect::<Vec<_>>()))]
     pub lists: Vec<AiList>,
     /// HD AIExpertEngine::groupTable\[i\]
-    #[br(parse_with = binrw::helpers::args_iter(lists.iter().map(|l| l.in_use).map(|x| (x as i32,)).collect::<Vec<_>>()))]
+    #[br(parse_with = binrw::helpers::args_iter(lists.iter().map(|list| list.in_use).map(|value| (value as i32,)).collect::<Vec<_>>()))]
     pub group_tables: Vec<AiGroupTable>,
 }
 
@@ -9963,12 +9962,11 @@ pub struct ZoneMaps {
 #[brw(little)]
 pub struct UmvDataListEntry1 {
     /// game: `n`
-    /// read at 0x140f6a285
-    pub n: i32,
-    /// game: `(p[1])`
-    /// read at 0x140f6a344; named by the save's write in the same place (0x140f6e1d0, write at 0x140f6e803)
-    #[br(count = n.max(0) as usize)]
-    pub p: Vec<u64>,
+    /// the entry's count of words (`n`), the next read's count
+    pub word_count: i32,
+    /// the entry's `n` words (`p[1]`)
+    #[br(count = word_count.max(0) as usize)]
+    pub words: Vec<u64>,
 }
 
 /// Read by `FUN_140f69c40` of the build.
@@ -10702,21 +10700,21 @@ pub struct TribeScenario {
     #[br(count = base_scenario.max_players as usize)]
     pub num_disable_techs: Vec<i32>,
     /// one per player, counted by num_disable_techs
-    #[br(if(base_scenario.max_players != 0), parse_with = binrw::helpers::args_iter(num_disable_techs.iter().copied().map(|x| (x as i32,)).collect::<Vec<_>>()))]
+    #[br(if(base_scenario.max_players != 0), parse_with = binrw::helpers::args_iter(num_disable_techs.iter().copied().map(|value| (value as i32,)).collect::<Vec<_>>()))]
     pub disabled_technology: Option<Vec<DisabledTechnology>>,
     /// game: `num_disable_units.data()`
     /// helper 0x140c68f90
     #[br(count = base_scenario.max_players as usize)]
     pub num_disable_units: Vec<i32>,
     /// one per player, counted by num_disable_units
-    #[br(if(base_scenario.max_players != 0), parse_with = binrw::helpers::args_iter(num_disable_units.iter().copied().map(|x| (x as i32,)).collect::<Vec<_>>()))]
+    #[br(if(base_scenario.max_players != 0), parse_with = binrw::helpers::args_iter(num_disable_units.iter().copied().map(|value| (value as i32,)).collect::<Vec<_>>()))]
     pub disabled_unit: Option<Vec<DisabledUnit>>,
     /// game: `num_disable_buildings.data()`
     /// helper 0x140c68f90
     #[br(count = base_scenario.max_players as usize)]
     pub num_disable_buildings: Vec<i32>,
     /// one per player, counted by num_disable_buildings
-    #[br(if(base_scenario.max_players != 0), parse_with = binrw::helpers::args_iter(num_disable_buildings.iter().copied().map(|x| (x as i32,)).collect::<Vec<_>>()))]
+    #[br(if(base_scenario.max_players != 0), parse_with = binrw::helpers::args_iter(num_disable_buildings.iter().copied().map(|value| (value as i32,)).collect::<Vec<_>>()))]
     pub disabled_building: Option<Vec<DisabledBuilding>>,
     /// game: `&ScenarioOptions`
     /// read by 0x140ce16a0, a routine of one read
@@ -11731,7 +11729,7 @@ pub struct TriggerEffect {
     #[br(count = len_2.max(0) as usize)]
     pub audio_file: Vec<u8>,
     /// the save's `Write(objects, values[FieldSetObjects] * sizeof(int32_t))`
-    #[br(if(values.get(4).copied().unwrap_or(-1) > 0), count = values.get(4).map_or(0, |&v| v.max(0) as usize) as usize)]
+    #[br(if(values.get(4).copied().unwrap_or(-1) > 0), count = values.get(4).map_or(0, |&count| count.max(0) as usize) as usize)]
     pub objects: Option<Vec<i32>>,
     /// the save's `Write(&option1TextLength, sizeof(int32_t))`
     pub option1_text_length: i32,
@@ -11842,9 +11840,8 @@ pub struct TribeTrigger {
 #[derive(Debug, Clone, Default, PartialEq)]
 #[brw(little)]
 pub struct TriggerSystemEntry1 {
-    /// game: `i`
-    /// read at 0x14156e6bb; named by the save's write in the same place (0x141587990, write at 0x141588829)
-    pub i: u32,
+    /// a variable's index (`i`): its name `mVariableNames[i]` follows
+    pub index: u32,
     /// game: `size`
     /// read at 0x14156e763; named by the save's write in the same place (0x141587990, write at 0x1415888cf)
     pub size: u32,

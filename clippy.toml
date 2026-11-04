@@ -6,3 +6,6 @@ allow-panic-in-tests = true
 # C-CASE (CODING_STYLE.md section 3): an acronym is one word in every type and variant name,
 # not only in one that is all capitals.
 upper-case-acronyms-aggressive = true
+# K9 (CODING_STYLE.md section 3): a name of one letter only for a coordinate or an axis
+# (`Axis::X`); `min_ident_chars` (Cargo.toml) refuses every other.
+allowed-idents-below-min-chars = ["x", "y", "z", "X", "Y"]

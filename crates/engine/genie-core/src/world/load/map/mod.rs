@@ -273,11 +273,11 @@ pub fn saved_sight(header: &Header) -> GenieResult<Visibility> {
         .map(|(&guid, entry)| Extent {
             guid,
             offsets: entry
-                .p
+                .words
                 .iter()
                 .map(|&word| TileOffset::new(word as u32 as i32, (word >> 32) as u32 as i32))
                 .collect(),
-            capacity: entry.n + 1,
+            capacity: entry.word_count + 1,
         })
         .collect();
     let kinds = players
