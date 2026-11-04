@@ -33,10 +33,11 @@ use crate::unit_ai::StopOrder;
 use crate::unit_ai::SurroundingFlags;
 use crate::unit_ai::UnitAiKind;
 use crate::unit_ai::attack_orders::OrderNow;
+use crate::unit_ai::world_view::UnitView;
 use crate::unit_ai::{
     BREAK, DEAD, Effect, FISHING_BUILD_FAR, FISHING_BUILDS, FISHING_CARED, GO_ON, Memory,
-    NO_ANIM_SPEED, Notify, Pick, QueuedOrder, Search, Surroundings, UnitAi, UnitSeen, UnitSide,
-    alert_owner, civilian_search_radius, closest_undiscovered_tile, held_action_state,
+    NO_ANIM_SPEED, Notify, Pick, QueuedOrder, Search, Surroundings, UnitAi, UnitSeen, alert_owner,
+    civilian_search_radius, closest_undiscovered_tile, held_action_state,
 };
 use crate::world::Millis;
 use crate::world::layer::ClassRoles;
@@ -57,7 +58,7 @@ impl UnitAi {
     /// top action in state 12 (slot 0x2b0), a target of class 10 the world holds and a Gaia
     /// attacker; or on those orders from a class-10 attacker of combat level 1 with its top
     /// action in state 4, 8, 12 or 15 (`0x9110`). A Gaia attacker, or another player's the
-    /// villager does not fear ([`UnitSide::harmless`]), it attacks back: with an order not on
+    /// villager does not fear ([`UnitView::harmless`]), it attacks back: with an order not on
     /// the attacker, its current order goes back into the queue at once
     /// ([`UnitAi::requeue_current`]) and the order becomes the attack (700, the last order kept)
     /// at priority 100; then the civilian's `AttackObject` (slot 0xb8, `FUN_140c17370`, forced):
@@ -73,7 +74,7 @@ impl UnitAi {
         at: &Surroundings,
         player_kind: PlayerKind,
         ai_rng: &mut Well512,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
     ) -> Result<u32, GenieError> {
         let roles = &at.roles;
         if n.p[1] < 1 {
@@ -173,7 +174,7 @@ impl UnitAi {
     /// dead, I give up."): the owner's alert (slot 0x2e8 with 0x209, [`alert_owner`]), the notifies
     /// end (`FUN_140c5dc10`) and it returns 4. Else the owner's alert (0x201); a new attacker
     /// (`FUN_140bf4cb0`) that is not its target makes a human player's ship call for help
-    /// ([`UnitSide::call_for_help`]); the attacker joins the set (`FUN_140b43f30`) and the unit is
+    /// ([`UnitView::call_for_help`]); the attacker joins the set (`FUN_140b43f30`) and the unit is
     /// under attack (`FUN_14119d2d0` with 1). With an order it ignores the damage ("I have an
     /// order, I'm ignoring this damage notify.", 2); the siege tower's (`FUN_140c28400`) also when
     /// a human player's tower is in a group (`+0x6d0`) that is not idle (`FUN_141017ad0`: "I have a
@@ -186,7 +187,7 @@ impl UnitAi {
         at: &Surroundings,
         player_kind: PlayerKind,
         ai_rng: &mut Well512,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
     ) -> Result<u32, GenieError> {
         alert_owner(player_kind)?;
         if n.p[1] < 1 {
@@ -251,7 +252,7 @@ impl UnitAi {
     pub(super) fn trader_search(
         &mut self,
         at: &Surroundings,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
     ) -> Result<u32, GenieError> {
         if self.current_action == Some(AiAction::Trade) {
@@ -271,7 +272,7 @@ impl UnitAi {
     /// not dodge): at no hit points left it gives up (the owner's alert 0x209, the notifies end,
     /// 4). Else the owner's alert (0x201) only with no attackers yet or a computer owner; a new
     /// attacker that is not its target makes a human player's ship call for help
-    /// ([`UnitSide::call_for_help`]); the attacker joins the set and the unit is under attack. With
+    /// ([`UnitView::call_for_help`]); the attacker joins the set and the unit is under attack. With
     /// an order it ignores the damage (2), but for a computer player's with `+0x621` set, which
     /// cannot get here (its alert stops the handler first, [`alert_owner`]). Off the move action
     /// (`0x262`) its order goes to the queue's end (slot 0x30, not immediate: `FUN_140c55c90` takes
@@ -284,7 +285,7 @@ impl UnitAi {
         at: &Surroundings,
         player_kind: PlayerKind,
         ai_rng: &mut Well512,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
     ) -> Result<u32, GenieError> {
         if n.p[1] < 1 {
             alert_owner(player_kind)?;
@@ -329,7 +330,7 @@ impl UnitAi {
         at: &Surroundings,
         player_kind: PlayerKind,
         ai_rng: &mut Well512,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
     ) -> Result<u32, GenieError> {
         alert_owner(player_kind)?;
         if n.p[1] < 1 {
@@ -370,7 +371,7 @@ impl UnitAi {
         &mut self,
         at: &Surroundings,
         player_kind: PlayerKind,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
     ) -> Result<u32, GenieError> {
         let unit_ai_tuning = &at.unit_ai_tuning;
@@ -460,7 +461,7 @@ impl UnitAi {
         time: Millis,
         at: &Surroundings,
         player_kind: PlayerKind,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
     ) -> Result<u32, GenieError> {
         let new = !self.attackers.contains(n.caller);
@@ -531,7 +532,7 @@ impl UnitAi {
         class: ClassId,
         point: Position,
         at: &Surroundings,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
     ) -> Result<(), GenieError> {
         self.stop_current(StopOrder::Keep, at, side, rng)?;
@@ -550,7 +551,7 @@ impl UnitAi {
     pub(super) fn requeue_current(
         &mut self,
         at: &Surroundings,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
         player_kind: PlayerKind,
         ai: &mut Well512,
     ) -> Result<(), GenieError> {

@@ -217,7 +217,8 @@ pub(crate) fn herded(by_id: ObjectsRef<'_>, id: ObjectId) -> bool {
 
 impl UnitView<'_, '_> {
     /// The unit AI's `ClosestResourceObject` while it runs
-    /// ([`crate::unit_ai::UnitSide::closest_resource`]): what it found, with its place and class.
+    /// ([`crate::unit_ai::world_view::UnitView::closest_resource`]): what it found, with its place
+    /// and class.
     pub(crate) fn closest_gatherable(
         &mut self,
         search: ResourceSearch,

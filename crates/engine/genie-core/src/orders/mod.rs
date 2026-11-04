@@ -88,7 +88,8 @@ use crate::objects::layers::{Building, Combat};
 use crate::players::CivId;
 use crate::players::tracker::Tracker;
 use crate::unit_ai::task_finder::{DropSite, table_drop_buildings};
-use crate::unit_ai::{QueuedOrder, UnitAi, UnitSide, UnitStance};
+use crate::unit_ai::world_view::UnitView;
+use crate::unit_ai::{QueuedOrder, UnitAi, UnitStance};
 use crate::world::OBJECT_MASTER;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
@@ -557,7 +558,7 @@ pub(crate) fn set_stance(
     ai: &mut UnitAi,
     state: UnitStance,
     place: (Point, Option<ClassId>),
-    side: &mut dyn UnitSide,
+    side: &mut UnitView<'_, '_>,
     rng: &mut Well512,
     roles: &Roles,
 ) -> Result<(), GenieError> {

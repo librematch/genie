@@ -118,7 +118,7 @@ pub use self::queue_end::QueueEnd;
 pub(crate) use self::side::UNMODELLED_COMMAND;
 pub use self::side::{
     Gatherable, NO_POINT, Named, NearestAttacker, OffFootprint, ResourceSearch, TargetFlags,
-    UnitCommand, UnitSide,
+    UnitCommand,
 };
 pub use self::stop_order::StopOrder;
 pub use self::surroundings::{
@@ -287,7 +287,7 @@ impl QueuedOrder {
 }
 
 /// A call the unit AI makes on its unit, at once where the game's AI calls the unit's slot
-/// ([`UnitSide::effect_now`]).
+/// ([`UnitView::effect_now`](crate::unit_ai::world_view::UnitView::effect_now)).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Effect {
     /// stopAction (the unit's slot 0x3c0, `FUN_14108c160`): its action list goes
@@ -359,10 +359,11 @@ pub enum AiCommand {
         /// Its place.
         point: Position,
     },
-    /// The villager's case 0x21c ([`NotifyKind::OTHER_LOAD`]) with the drop-site table's building for its load
-    /// ([`UnitSide::table_drop_site`]): the unit's slot 0x128 on it at its place, then its unit
-    /// AI's order back to the target its top action had before (slot 0x190), if any
-    /// ([`crate::world::World::drop_elsewhere`]).
+    /// The villager's case 0x21c ([`NotifyKind::OTHER_LOAD`]) with the drop-site table's building
+    /// for its load
+    /// ([`UnitView::table_drop_site`](crate::unit_ai::world_view::UnitView::table_drop_site)): the
+    /// unit's slot 0x128 on it at its place, then its unit AI's order back to the target its top
+    /// action had before (slot 0x190), if any ([`crate::world::World::drop_elsewhere`]).
     DropElsewhere {
         /// The drop site.
         site: DropSiteId,

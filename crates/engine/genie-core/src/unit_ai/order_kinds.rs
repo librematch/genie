@@ -25,9 +25,10 @@ use crate::unit_ai::StopOrder;
 use crate::unit_ai::TakenAs;
 use crate::unit_ai::UnitAiKind;
 use crate::unit_ai::attack_orders::OrderNow;
+use crate::unit_ai::world_view::UnitView;
 use crate::unit_ai::{
     AiMove, Effect, Gatherable, QueuedOrder, ResourceSearch, Seen, Surroundings, UnitAi,
-    UnitCommand, UnitSide, civilian_kind,
+    UnitCommand, civilian_kind,
 };
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
@@ -44,7 +45,7 @@ impl UnitAi {
         range: Distance,
         force: OrderForce,
         at: &Surroundings,
-        side: &mut dyn UnitSide,
+        side: &UnitView<'_, '_>,
     ) -> Result<Answer, GenieError> {
         if force == OrderForce::Unforced && self.current_action.is_some() {
             return Ok(Answer::NotTaken);
@@ -83,7 +84,7 @@ impl UnitAi {
     /// `BuildObject` (slot 0xf0, `FUN_140c47d80`) on foundation `target`, `force`d or off the
     /// build action value (`0x25a`): the unit's build command (slot 0x380, forced as every
     /// caller passes it), which the caller runs after the update in its order
-    /// ([`AiCommand::BuildObject`]); its 0 ([`UnitSide::builds`]: the foundation gone, no task)
+    /// ([`AiCommand::BuildObject`]); its 0 ([`UnitView::builds`]: the foundation gone, no task)
     /// leaves the AI as it was. Then the build action value (the last keeping the old) and the
     /// foundation as the target at its place with its class as the world holds it, else class −1
     /// at (0, 0, 0) (the target and class before becoming the last). Taken when it builds.
@@ -97,7 +98,7 @@ impl UnitAi {
         target: FoundationId,
         force: OrderForce,
         at: &Surroundings,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
     ) -> Result<Answer, GenieError> {
         if (force == OrderForce::Unforced && self.current_action == Some(AiAction::Build))
@@ -116,7 +117,7 @@ impl UnitAi {
 
     /// The work slots on object `target` (heal 0xe0, `FUN_140c4e010`; conversion 0xd8,
     /// `FUN_140c4c9f0`; repair 0xe8, `FUN_140c5e3a0`), `force`d or off their own action value
-    /// `action` (`0x25b`, `0x25c`, `0x26a`): the unit's `command` ([`UnitSide::command`]: slots
+    /// `action` (`0x25b`, `0x25c`, `0x26a`): the unit's `command` ([`UnitView::command`]: slots
     /// 0x108, 0x370, 0x378), on its 1 the action value `action` (the last keeping the old) and the
     /// target with its class and place as the world then holds it, else class −1 at (0, 0, 0)
     /// (the target and class before becoming the last).
@@ -125,7 +126,7 @@ impl UnitAi {
         target: ObjectId,
         force: OrderForce,
         (action, command): (AiAction, UnitCommand),
-        (at, side): (&Surroundings, &mut dyn UnitSide),
+        (at, side): (&Surroundings, &mut UnitView<'_, '_>),
     ) -> Result<Answer, GenieError> {
         if force == OrderForce::Unforced && self.current_action == Some(action) {
             return Ok(Answer::NotTaken);
@@ -149,7 +150,7 @@ impl UnitAi {
         &mut self,
         target: ObjectId,
         at: &Surroundings,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
     ) -> Result<Answer, GenieError> {
         let Some(t) = Self::world_object(target, at, side)? else {
@@ -175,7 +176,7 @@ impl UnitAi {
         &mut self,
         target: Option<ObjectId>,
         at: &Surroundings,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
     ) -> Result<Answer, GenieError> {
         let held = match target {
@@ -202,7 +203,7 @@ impl UnitAi {
         range: Distance,
         force: OrderForce,
         at: &Surroundings,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
     ) -> Result<Answer, GenieError> {
         if force == OrderForce::Unforced && self.current_action.is_some() {
@@ -241,7 +242,7 @@ impl UnitAi {
         &mut self,
         target: ObjectId,
         force: OrderForce,
-        (at, side): (&Surroundings, &mut dyn UnitSide),
+        (at, side): (&Surroundings, &mut UnitView<'_, '_>),
     ) -> Result<Answer, GenieError> {
         let held = Self::world_object(target, at, side)?;
         if self.ai_kind == UnitAiKind::Civilian && held.is_none() {
@@ -270,7 +271,7 @@ impl UnitAi {
         &mut self,
         point: Position,
         force: OrderForce,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
     ) -> Result<Answer, GenieError> {
         if force == OrderForce::Unforced && self.current_action.is_some() {
             return Ok(Answer::NotTaken);
@@ -292,7 +293,7 @@ impl UnitAi {
         &mut self,
         point: Point,
         (force, over_wall): (OrderForce, bool),
-        (at, side): (&Surroundings, &mut dyn UnitSide),
+        (at, side): (&Surroundings, &mut UnitView<'_, '_>),
     ) -> Result<Answer, GenieError> {
         if force == OrderForce::Unforced && self.current_action.is_some() {
             return Ok(Answer::NotTaken);
@@ -320,7 +321,7 @@ impl UnitAi {
         tile: Tile,
         force: OrderForce,
         at: &Surroundings,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
     ) -> Result<Answer, GenieError> {
         let unit_ai_tuning = &at.unit_ai_tuning;
         if force == OrderForce::Unforced && self.current_action.is_some() {
@@ -347,7 +348,7 @@ impl UnitAi {
         &mut self,
         tile: Tile,
         force: OrderForce,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
         unit_ai_tuning: &UnitAiTuning,
     ) -> Result<Answer, GenieError> {
@@ -368,7 +369,7 @@ impl UnitAi {
     /// ([`UnitAi::ordered_on_target`]). On a gone target: without its type (`+0x30` −1), the move to
     /// the order's point within its range (slot 0x130, forced and walking) and, taken, the tail
     /// with the order on a target. With its type (the class of that master of the target's
-    /// owner `+0x10`, `FUN_14152fe40`, [`UnitSide::master_class`]; without an owner the type is
+    /// owner `+0x10`, `FUN_14152fe40`, [`UnitView::master_class`]; without an owner the type is
     /// the class), the unit AI's slot 0x1b0 gives a kind of resource
     /// ([`UnitAi::resource_kind`]) and slot 0x88 the closest object of it to the order's shown
     /// point (`+0x24`, `+0x28`), which the unit works (slot 0x7e8, [`AiCommand::WorkOn`]); either
@@ -378,7 +379,7 @@ impl UnitAi {
         o: &QueuedOrder,
         class: Option<ClassId>,
         at: &Surroundings,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
         ai: &mut Well512,
     ) -> Result<OrderOutcome, GenieError> {
         let roles = &at.roles;
@@ -391,7 +392,7 @@ impl UnitAi {
             // the class of the target's type: its owner's master's, else the type itself
             let class = match o.target_owner {
                 None => target_kind.class(),
-                Some(owner) => match side.master_class(owner, target_kind.master())? {
+                Some(owner) => match side.master_class(owner, target_kind.master()) {
                     Some(class) => class,
                     None => return Ok(OrderOutcome::NotTaken),
                 },
@@ -463,14 +464,14 @@ impl UnitAi {
     }
 
     /// Slot 0x108 (`FUN_140c68a60`), with `force` (its argument 3) or without an action value:
-    /// the unit's slot 0x388 on the foundation `target` ([`UnitSide::wait_solidify`]); on its 1
+    /// the unit's slot 0x388 on the foundation `target` ([`UnitView::wait_solidify`]); on its 1
     /// the action value becomes [`AiAction::WaitSolidify`], the old one the last. Taken when it
     /// waits.
     pub(super) fn wait_for_foundation(
         &mut self,
         target: ObjectId,
         force: OrderForce,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
     ) -> Result<Answer, GenieError> {
         if force == OrderForce::Unforced && self.current_action.is_some() {
             return Ok(Answer::NotTaken);
@@ -490,7 +491,7 @@ impl UnitAi {
         &mut self,
         tile: Tile,
         force: OrderForce,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
         unit_ai_tuning: &UnitAiTuning,
     ) -> Result<Answer, GenieError> {
@@ -512,13 +513,13 @@ impl UnitAi {
     /// # Errors
     ///
     /// An order whose slot reads the unit's surroundings, which this entry does not have.
-    pub fn take_order_now(
+    pub(crate) fn take_order_now(
         &mut self,
         unit_state: ObjectState,
         order: QueuedOrder,
         place: (Point, Option<ClassId>),
         ai: &mut Well512,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
         layer: AiLayer<'_>,
     ) -> Result<(), GenieError> {
         if ObjectState::Alive < unit_state {
@@ -541,10 +542,10 @@ impl UnitAi {
     /// # Errors
     ///
     /// What the order's run does not model.
-    pub fn take_order_now_with(
+    pub(crate) fn take_order_now_with(
         &mut self,
         order: QueuedOrder,
-        (at, side, player_kind): (&Surroundings, &mut dyn UnitSide, PlayerKind),
+        (at, side, player_kind): (&Surroundings, &mut UnitView<'_, '_>, PlayerKind),
         ai: &mut Well512,
     ) -> Result<(), GenieError> {
         let unit_ai_tuning = &at.unit_ai_tuning;

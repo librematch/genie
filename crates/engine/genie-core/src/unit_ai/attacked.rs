@@ -28,9 +28,10 @@ use crate::unit_ai::StopOrder;
 use crate::unit_ai::SurroundingFlags;
 use crate::unit_ai::TargetRules;
 use crate::unit_ai::UnitStance;
+use crate::unit_ai::world_view::UnitView;
 use crate::unit_ai::{
     AiMove, AttackAsk, BREAK, DEAD, Effect, GO_ON, Named, Notify, OrderTargetKind, Pick,
-    QueuedOrder, STILL, Search, Surroundings, UnitAi, UnitSeen, UnitSide, alert_owner,
+    QueuedOrder, STILL, Search, Surroundings, UnitAi, UnitSeen, alert_owner,
     closest_undiscovered_tile,
 };
 use crate::world::Millis;
@@ -71,7 +72,7 @@ impl UnitAi {
     /// 6. A computer player's unit ignores it (2) on a wonder target (master 276), a tower
     ///    attacked by a tower (class 52), a missile attacker (type 60), and a tower attacker
     ///    under its owner's `disableTowerPriority` but for a siege weapon, unpacked trebuchet or
-    ///    warship (classes 13, 54, 22). Then ([`UnitSide::duel`]) a target that cannot convert it
+    ///    warship (classes 13, 54, 22). Then ([`UnitView::duel`]) a target that cannot convert it
     ///    (its slot 0x1b8 with 1) but cannot harm it either (its attacks' sum, slot 0x228, or its
     ///    damage to the unit, the unit's slot 0x220, exactly 0) makes it ask for help and attack
     ///    back; and then still, as long as the target cannot convert it, an attacker that would
@@ -84,11 +85,11 @@ impl UnitAi {
         at: &Surroundings,
         player_kind: PlayerKind,
         ai_rng: &mut Well512,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
     ) -> Result<u32, GenieError> {
         let known = self.attackers.contains(n.caller);
         self.retries.clear();
-        if known && side.top_target_now()?.is_some() {
+        if known && side.top_target_now().is_some() {
             return Ok(GO_ON);
         }
         // slot 0x48's notify and the alert 0x201 reach the same owner
@@ -182,7 +183,7 @@ impl UnitAi {
         current: Option<&UnitSeen>,
         at: &Surroundings,
         player_kind: PlayerKind,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
     ) -> Result<(), GenieError> {
         let unit_ai_tuning = &at.unit_ai_tuning;
         let from = current.map_or(at.position, |t| t.position);
@@ -227,7 +228,7 @@ impl UnitAi {
         at: &Surroundings,
         player_kind: PlayerKind,
         ai_rng: &mut Well512,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
     ) -> Result<u32, GenieError> {
         let roles = &at.roles;
         let attacker_id = attacker.id;
@@ -264,7 +265,7 @@ impl UnitAi {
         target: &UnitSeen,
         at: &Surroundings,
         ai_rng: &mut Well512,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
     ) -> Result<u32, GenieError> {
         let unit_ai_tuning = &at.unit_ai_tuning;
         let roles = &at.roles;
@@ -323,7 +324,7 @@ impl UnitAi {
         attacker: ObjectId,
         at: &Surroundings,
         ai_rng: &mut Well512,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
     ) -> Result<u32, GenieError> {
         if matches!(
             self.current_order,
@@ -350,7 +351,7 @@ impl UnitAi {
         &mut self,
         n: Notify,
         at: &Surroundings,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
     ) -> Result<u32, GenieError> {
         let roles = &at.roles;
@@ -383,7 +384,7 @@ impl UnitAi {
     pub(super) fn sent_off(
         &mut self,
         n: Notify,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
         roles: &Roles,
         unit_ai_tuning: &UnitAiTuning,
@@ -447,7 +448,7 @@ impl UnitAi {
     pub(super) fn move_aside(
         &mut self,
         m: AiMove,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
     ) -> Result<Answer, GenieError> {
         if m.force == OrderForce::Unforced && self.current_action.is_some() {
@@ -475,13 +476,13 @@ impl UnitAi {
     /// The base handler's case 0x202 for an explorer ("I'm an explorer, looking for the closest
     /// undiscovered tile."): on the auto scout's action, with the player's scout map never made
     /// (`player+0x1370`), the search around the town centre (`FUN_140c65490`), else the unit AI's
-    /// slot 0x90 (`FUN_140c4bd40`), both from its unit ([`UnitSide::seek_unexplored`]); then slot
+    /// slot 0x90 (`FUN_140c4bd40`), both from its unit ([`UnitView::seek_unexplored`]); then slot
     /// 0x100 with 1 to the point ([`UnitAi::explore_at`]), the explore's action value becomes the
     /// last and the action value comes back; processing breaks. "Couldn't find any tiles.": on
-    /// the auto scout order its last search ([`UnitSide::seek_beyond_sight`]) sends the auto scout
+    /// the auto scout order its last search ([`UnitView::seek_beyond_sight`]) sends the auto scout
     /// to its point the same way (slot 0x100 with 1; the last action stays) and processing breaks;
     /// with no point left the player's scout map is made from the tiles it sees and the notify
-    /// posted to the owner (nothing for a human player), [`UnitSide::make_scout_map`]; with the
+    /// posted to the owner (nothing for a human player), [`UnitView::make_scout_map`]; with the
     /// map made the search about the town centre is skipped and the last search reads the map.
     /// On the scout order (`0x2da`) the player's slot 0x2e8
     /// with `0x211` is not modelled; on any other the unit AI forgets its target
@@ -494,7 +495,7 @@ impl UnitAi {
         at: &Surroundings,
         player_kind: PlayerKind,
         ai_rng: &mut Well512,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
     ) -> Result<u32, GenieError> {
         let unit_ai_tuning = &at.unit_ai_tuning;
         let action = self.current_action;
@@ -524,7 +525,7 @@ impl UnitAi {
                     // the AI's slot 0x40 hands the notify to the owner (slot 0x2e8 with 0x202,
                     // FUN_14162dab0: no case for it but the old short pather's hulled area, a
                     // computer player's AI would hear it); processing breaks
-                    side.make_scout_map()?;
+                    side.make_scout_map();
                     if player_kind.is_computer() && self.current_action == Some(AiAction::AutoScout)
                     {
                         return Err(GenieError::unsupported(

@@ -29,7 +29,7 @@ use crate::unit_ai::SurroundingFlags;
 use crate::unit_ai::task_finder::allied;
 use crate::unit_ai::world_view::{OwnerView, UnitView, changed_view};
 use crate::unit_ai::{AfterOrder, Surroundings, UnitAi};
-use crate::unit_ai::{Attacker, GroupState, NotifyKind, Seen, UnitSeen, UnitSide};
+use crate::unit_ai::{Attacker, GroupState, NotifyKind, Seen, UnitSeen};
 use crate::vision::visibility::sight_taker;
 use crate::world::AiSwitches;
 use crate::world::UNIT_AI_MASTER;
@@ -354,7 +354,7 @@ impl Unit {
         f: impl FnOnce(
             &mut UnitAi,
             &Surroundings,
-            &mut dyn UnitSide,
+            &mut UnitView<'_, '_>,
             PlayerKind,
             &mut Well512,
         ) -> Result<(), GenieError>,
@@ -413,7 +413,7 @@ impl Unit {
         &mut self,
         actions: &mut Action,
         c: &mut Step<'_>,
-        f: impl FnOnce(&mut UnitAi, &mut dyn UnitSide, &mut Well512) -> Result<R, GenieError>,
+        f: impl FnOnce(&mut UnitAi, &mut UnitView<'_, '_>, &mut Well512) -> Result<R, GenieError>,
     ) -> Result<R, GenieError> {
         let Some(ai_kind) = c.w.parts.unit_ai.get(self.id).map(|ai| ai.ai_kind) else {
             return Err(GenieError::unreachable(

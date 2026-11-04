@@ -13,8 +13,9 @@ use crate::unit_ai::NotifyKind;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::StopOrder;
 use crate::unit_ai::UnitAiKind;
+use crate::unit_ai::world_view::UnitView;
 use crate::unit_ai::{
-    ARTIFACT_CARED, Effect, GO_ON, Memory, Notify, Pick, Search, Surroundings, UnitAi, UnitSide,
+    ARTIFACT_CARED, Effect, GO_ON, Memory, Notify, Pick, Search, Surroundings, UnitAi,
     search_radius,
 };
 use crate::world::Millis;
@@ -29,7 +30,7 @@ impl UnitAi {
         at: &Surroundings,
         player_kind: PlayerKind,
         ai_rng: &mut Well512,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
     ) -> Result<u32, GenieError> {
         match self.ai_kind {
             UnitAiKind::Hunted => self.hunted_notify(n, time, at, player_kind, ai_rng, side),
@@ -73,7 +74,7 @@ impl UnitAi {
         at: &Surroundings,
         player_kind: PlayerKind,
         ai_rng: &mut Well512,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
     ) -> Result<u32, GenieError> {
         let stops = match n.kind {
             NotifyKind::DAMAGED
@@ -125,7 +126,7 @@ impl UnitAi {
     pub(super) fn artifact_idle(
         &mut self,
         at: &Surroundings,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
     ) -> Result<IdleOutcome, GenieError> {
         let found = side.closest(&Search {
@@ -163,7 +164,7 @@ impl UnitAi {
     pub(super) fn artifact_misc(
         &mut self,
         at: &Surroundings,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
     ) -> Result<(), GenieError> {
         if self.artifact_idle(at, side, rng)? == IdleOutcome::Acted {
@@ -185,7 +186,7 @@ impl UnitAi {
         at: &Surroundings,
         player_kind: PlayerKind,
         ai_rng: &mut Well512,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
     ) -> Result<u32, GenieError> {
         let unit_ai_tuning = &at.unit_ai_tuning;
         let roles = &at.roles;

@@ -116,6 +116,7 @@ use crate::unit_ai::attack_orders::OrderNow;
 use crate::unit_ai::flight::BadPoint;
 use crate::unit_ai::task_finder::DropSite;
 use crate::unit_ai::update::UpdateTail;
+use crate::unit_ai::world_view::UnitView;
 use crate::vision::VisionBits;
 use crate::world::AiSwitches;
 use crate::world::Mode680;
@@ -716,7 +717,7 @@ fn unit_sent_off_footprint_keeps_its_move_aside_through_the_update() {
 }
 
 /// The unit AI's calls on its unit run at once, in the order it makes them
-/// ([`UnitSide::effect_now`]): the cap on the last human order time, then the stop, reach unit
+/// ([`UnitView::effect_now`]): the cap on the last human order time, then the stop, reach unit
 /// 9 before the attack command that follows them, whose Attack the stop would have cleared.
 #[test]
 fn the_unit_ai_calls_reach_the_unit_in_their_order() {
@@ -913,11 +914,7 @@ fn the_build_order_builds_and_takes_the_order_at_once() {
 #[test]
 fn foundation_order_waits_for_the_foundation_and_ends_the_queue_turn() {
     let mut w = foundation_scene(builder_master(), sent_off_queue());
-    let r = run_ai(
-        &mut w,
-        (player_id(1), object_id(9175)),
-        |ai, at, side, kind, rng| ai.off_turn(at, side, kind, rng),
-    );
+    let r = run_ai(&mut w, (player_id(1), object_id(9175)), UnitAi::off_turn);
     assert_eq!(r, Ok(()));
     let wait = WaitSolidify::new(build_task(), FoundationId::new(object_id(10028)));
     assert_eq!(waits(&w), (Some(wait), true));
@@ -942,11 +939,7 @@ fn foundation_order_waits_for_the_foundation_and_ends_the_queue_turn() {
 #[test]
 fn foundation_order_without_wait_goes_and_the_work_runs() {
     let mut w = foundation_scene(villager_master(), sent_off_queue());
-    let r = run_ai(
-        &mut w,
-        (player_id(1), object_id(9175)),
-        |ai, at, side, kind, rng| ai.off_turn(at, side, kind, rng),
-    );
+    let r = run_ai(&mut w, (player_id(1), object_id(9175)), UnitAi::off_turn);
     assert_eq!(r, Ok(()));
     assert_eq!(waits(&w), (None, false));
     let me = object_id(9175);
@@ -2046,7 +2039,7 @@ fn foe_master() -> Master {
 }
 
 /// A villager's own copy of the villager's master 293 with object flag 0x10, an attack of 3,
-/// no melee armor and no range: the villager does not fear it ([`UnitSide::harmless`]).
+/// no melee armor and no range: the villager does not fear it ([`UnitView::harmless`]).
 fn harmless_villager() -> Master {
     Master {
         copy_id: Some(master_id(293)),
@@ -2247,7 +2240,7 @@ fn soldier_runs<R>(
     routine: impl FnOnce(
         &mut UnitAi,
         &Surroundings,
-        &mut dyn UnitSide,
+        &mut UnitView<'_, '_>,
         PlayerKind,
         &mut Well512,
     ) -> GenieResult<R>,
@@ -2556,7 +2549,7 @@ fn villager_dodges_missile_warning_or_takes_it_as_damage() {
     assert_eq!(unit_ai.attackers, Attackers::of_saved(&[30]));
 }
 
-/// A villager's harmless attacker ([`UnitSide::harmless`]: a weak villager of its own
+/// A villager's harmless attacker ([`UnitView::harmless`]: a weak villager of its own
 /// master) is attacked back, as a Gaia attacker is: without an order straight away
 /// (`AttackObject` forced: its Attack at once), and it stops after the kill.
 #[test]
@@ -2696,7 +2689,7 @@ fn guard_runs<R>(
     routine: impl FnOnce(
         &mut UnitAi,
         &Surroundings,
-        &mut dyn UnitSide,
+        &mut UnitView<'_, '_>,
         PlayerKind,
         &mut Well512,
     ) -> GenieResult<R>,
@@ -5791,11 +5784,7 @@ fn lone_scout(unit_ai: UnitAi, state: MoveTo) -> SceneThing {
 /// Player 1's lone unit 50 of `world` runs its check between turns ([`UnitAi::off_turn`]): its
 /// answer and its unit AI.
 fn lone_off_turn(world: &mut World) -> (GenieResult<()>, UnitAi) {
-    let answer = run_ai(
-        world,
-        (player_id(1), object_id(50)),
-        |ai, at, side, kind, rng| ai.off_turn(at, side, kind, rng),
-    );
+    let answer = run_ai(world, (player_id(1), object_id(50)), UnitAi::off_turn);
     (
         answer,
         world.parts.unit_ai.get(object_id(50)).unwrap().clone(),

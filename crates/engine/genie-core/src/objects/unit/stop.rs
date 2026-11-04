@@ -191,9 +191,9 @@ impl Unit {
     }
 
     /// A call its unit AI makes on it ([`Effect`]), at once where the AI makes it
-    /// ([`crate::unit_ai::UnitSide::effect_now`]: the unit holds its AI meanwhile); `class` is its
-    /// master's, which a move reads. An order on a target runs on the unit lent back to its slot
-    /// ([`World::order_on_target`]).
+    /// ([`crate::unit_ai::world_view::UnitView::effect_now`]: the unit holds its AI meanwhile);
+    /// `class` is its master's, which a move reads. An order on a target runs on the unit lent back
+    /// to its slot ([`World::order_on_target`]).
     ///
     /// # Errors
     ///

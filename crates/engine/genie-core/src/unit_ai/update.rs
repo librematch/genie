@@ -23,10 +23,11 @@ use crate::unit_ai::OrderTest;
 use crate::unit_ai::Pace;
 use crate::unit_ai::StopOrder;
 use crate::unit_ai::SurroundingFlags;
+use crate::unit_ai::world_view::UnitView;
 use crate::unit_ai::{
     AfterOrder, AiMove, BREAK, CIVILIAN_CARED, DEAD, Effect, GO_ON, Gatherable, GroupState,
     LIVE_TARGET_ACTIONS, Memory, NO_POINT, Notify, Pick, ResourceSearch, Retarget, Search,
-    Surroundings, UnitAi, UnitSide, civilian_kind, civilian_search_radius, retarget_kind,
+    Surroundings, UnitAi, civilian_kind, civilian_search_radius, retarget_kind,
 };
 use crate::world::Millis;
 use crate::world::WorldTime;
@@ -58,21 +59,21 @@ impl UnitAi {
     /// order check of a unit no longer busy, the order queue ([`UnitAi::run_orders`]), slot 73's
     /// retarget check, the idle part (slot 72 once the idle timer passes its timeout), the
     /// look-around check. What it does to the unit are calls on its side at once
-    /// ([`UnitSide::effect_now`]); an order on a target ends it, returning the rest, which the
+    /// ([`UnitView::effect_now`]); an order on a target ends it, returning the rest, which the
     /// caller runs after the order ([`UnitAi::after_order`]). A unit in a group ([`Surroundings::group`]) keeps its state position
     /// while the group has a command, runs its order queue only while the group is idle, its idle
     /// check only while the group is idle and the unit still, and takes the patrol branches while
     /// the group patrols. Its start lets the expired retarget entries go
     /// ([`UnitAi::expire_retries`]) and forgets the update's best unit to attack
     /// ([`UnitAi::best_this_update`]).
-    pub fn update(
+    pub(crate) fn update(
         &mut self,
         dt: Millis,
         world_time: WorldTime,
         player_kind: PlayerKind,
         at: &Surroundings,
         ai: &mut Well512,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
     ) -> Result<Option<AfterOrder>, GenieError> {
         let retarget = retarget_kind(self.ai_kind)?;
         self.ordered_on_target = false;
@@ -99,7 +100,7 @@ impl UnitAi {
         }
         self.end_notifies(dt, at, side, ai)?;
         // slot 0x430 again: the update's stops emptied the action list, its commands filled it
-        let busy = side.busy_now()?;
+        let busy = side.busy_now();
         if !busy {
             self.reset_ended_action(at);
             if self.current_order.is_some() {
@@ -145,14 +146,14 @@ impl UnitAi {
     /// # Errors
     ///
     /// What the tail does not model.
-    pub fn after_order(
+    pub(crate) fn after_order(
         &mut self,
         after: AfterOrder,
         world_time: WorldTime,
         player_kind: PlayerKind,
         at: &Surroundings,
         ai: &mut Well512,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
     ) -> Result<(), GenieError> {
         let retarget = retarget_kind(self.ai_kind)?;
         let tail = UpdateTail {
@@ -175,7 +176,7 @@ impl UnitAi {
         tail: UpdateTail,
         at: &Surroundings,
         ai: &mut Well512,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
     ) -> Result<(), GenieError> {
         let UpdateTail {
             retarget,
@@ -207,7 +208,7 @@ impl UnitAi {
 
     /// The full update's tail on the target of its unit's top action (slot 400 at `0x140c684fc`,
     /// after the look-around check), as the action list stands after the update's stops and
-    /// commands ([`UnitSide::top_target_now`]). A Gaia unit
+    /// commands ([`UnitView::top_target_now`]). A Gaia unit
     /// whose target is a Gaia object of type 70 or above that another player can take more than
     /// once (`+0x924` 2) lets it go ("Tasking GAIA unit to stop attacking an object which can be
     /// captured multiple times"): the target goes (`FUN_140c5e1e0`) and the action stops (slot
@@ -219,10 +220,10 @@ impl UnitAi {
     pub(super) fn top_target_tail(
         &mut self,
         at: &Surroundings,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
     ) -> Result<(), GenieError> {
-        let id = side.top_target_now()?;
+        let id = side.top_target_now();
         let Some(t) = id.map(|id| side.target_flags(id)).transpose()?.flatten() else {
             return Ok(());
         };
@@ -254,7 +255,7 @@ impl UnitAi {
     /// holds or holds in a state other than 0 (`+0x640`) leaves the queue.
     pub(super) fn drop_started_builds(
         &mut self,
-        side: &mut dyn UnitSide,
+        side: &UnitView<'_, '_>,
     ) -> Result<(), GenieError> {
         if self.current_order == Some(OrderKind::Build) {
             return Ok(());
@@ -284,7 +285,7 @@ impl UnitAi {
         at: &Surroundings,
         player_kind: PlayerKind,
         ai: &mut Well512,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
     ) -> Result<(), GenieError> {
         if let Some(home) = self.home
             && !home.furious
@@ -313,7 +314,7 @@ impl UnitAi {
         at: &Surroundings,
         player_kind: PlayerKind,
         ai: &mut Well512,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
     ) -> Result<(), GenieError> {
         if self.current_target.is_some() && at.flags.contains(SurroundingFlags::GARRISONED) {
             self.current_target = None;
@@ -387,14 +388,14 @@ impl UnitAi {
     /// with 1, [`UnitAi::hunt_object`]) and the processing breaks; finding none, a human player's
     /// villager does nothing more. A class the slot names a kind of searches by it (slot 0x80,
     /// `ClosestResourceObject` from the notify's drop site, its third parameter: kind 0 below 2
-    /// workers, the others any; [`UnitSide::closest_resource`]). A farm found (class 49) and a
+    /// workers, the others any; [`UnitView::closest_resource`]). A farm found (class 49) and a
     /// computer player's villager that found nothing are not modelled.
     pub(super) fn hunter_search(
         &mut self,
         n: Notify,
         at: &Surroundings,
         player_kind: PlayerKind,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
     ) -> Result<u32, GenieError> {
         let roles = &at.roles;
@@ -477,7 +478,7 @@ impl UnitAi {
     /// gather is the AI's target class, else its last, else the notify's (its second parameter);
     /// with none the target goes and the action stops (slot 0xb0 with 1; slot 0x48 hands the
     /// notify to the owner, not held). The civilian's slot 0x1b0 names its gather group: by it
-    /// `ClosestResourceObject` (slot 0x80, [`UnitSide::closest_resource`]) from the notify's drop
+    /// `ClosestResourceObject` (slot 0x80, [`UnitView::closest_resource`]) from the notify's drop
     /// site (its third parameter), below 4 workers for stone and gold (groups 3 and 4); a class
     /// without a group takes `ClosestObject` (every relation, any workers) over the civilian's
     /// search ([`civilian_search_radius`]). What it finds it gathers (`GatherObject`, slot 0xd0
@@ -489,7 +490,7 @@ impl UnitAi {
         n: Notify,
         at: &Surroundings,
         player_kind: PlayerKind,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
     ) -> Result<u32, GenieError> {
         let roles = &at.roles;
@@ -569,7 +570,7 @@ impl UnitAi {
     pub(super) fn gather_object(
         &mut self,
         found: Gatherable,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
     ) -> Result<(), GenieError> {
         side.effect_now(
@@ -593,7 +594,7 @@ impl UnitAi {
         at: &Surroundings,
         player_kind: PlayerKind,
         ai: &mut Well512,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
     ) -> Result<(), GenieError> {
         let produced = self.process_idle(at, player_kind, ai, side)?;
         if produced == IdleOutcome::Idle {

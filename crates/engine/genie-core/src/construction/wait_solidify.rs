@@ -89,10 +89,11 @@ impl WaitSolidify {
 }
 
 impl UnitView<'_, '_> {
-    /// The unit AI's wait for a foundation while it runs ([`crate::unit_ai::UnitSide::wait_solidify`]):
-    /// the task the unit's slot 0x820 finds on `target` (any action type, with the master switch)
-    /// gives the wait, made at once on the unit lent back to its slot
-    /// ([`crate::world::World::wait_for_foundation`]); not taken without one.
+    /// The unit AI's wait for a foundation while it runs
+    /// ([`crate::unit_ai::world_view::UnitView::wait_solidify`]): the task the unit's slot 0x820
+    /// finds on `target` (any action type, with the master switch) gives the wait, made at once on
+    /// the unit lent back to its slot ([`crate::world::World::wait_for_foundation`]); not taken
+    /// without one.
     pub(crate) fn start_wait_now(
         &mut self,
         target: ObjectId,

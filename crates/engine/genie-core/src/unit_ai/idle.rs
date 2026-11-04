@@ -22,10 +22,11 @@ use crate::unit_ai::TargetRules;
 use crate::unit_ai::UnitAiKind;
 use crate::unit_ai::UnitStance;
 use crate::unit_ai::flight::BadPoint;
+use crate::unit_ai::world_view::UnitView;
 use crate::unit_ai::{
     AttackAsk, FISHING_CARED, Found, Memory, Pick, SIEGE_CARED, SOLDIER_CARED, Search, Seeker,
-    Surroundings, TOWER_CARED, TRADE_CART_CARED, TRADE_SHIP_CARED, UnitAi, UnitSide,
-    attack_search_radius, civilian_search_radius, computer_idle_check, search_radius,
+    Surroundings, TOWER_CARED, TRADE_CART_CARED, TRADE_SHIP_CARED, UnitAi, attack_search_radius,
+    civilian_search_radius, computer_idle_check, search_radius,
 };
 use crate::world::Seconds;
 use crate::world::layer::ClassRoles;
@@ -48,7 +49,7 @@ impl UnitAi {
         at: &Surroundings,
         player_kind: PlayerKind,
         ai: &mut Well512,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
     ) -> Result<IdleOutcome, GenieError> {
         match self.ai_kind {
             UnitAiKind::Hunted => self.hunted_idle(at, player_kind, ai, side),
@@ -88,7 +89,7 @@ impl UnitAi {
         at: &Surroundings,
         player_kind: PlayerKind,
         ai: &mut Well512,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
     ) -> Result<IdleOutcome, GenieError> {
         let unit_ai_tuning = &at.unit_ai_tuning;
         let roles = &at.roles;
@@ -172,7 +173,7 @@ impl UnitAi {
         at: &Surroundings,
         player_kind: PlayerKind,
         ai: &mut Well512,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
     ) -> Result<IdleOutcome, GenieError> {
         self.cap_human_order(side, ai)?;
         let searches = !at.flags.contains(SurroundingFlags::SCENARIO)
@@ -222,7 +223,7 @@ impl UnitAi {
         target: ObjectId,
         at: &Surroundings,
         ai: &mut Well512,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
     ) -> Result<Answer, GenieError> {
         if matches!(
             self.current_order,
@@ -258,7 +259,7 @@ impl UnitAi {
         &mut self,
         at: &Surroundings,
         player_kind: PlayerKind,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
     ) -> Result<(), GenieError> {
         let unit_ai_tuning = &at.unit_ai_tuning;
@@ -290,7 +291,7 @@ impl UnitAi {
         &mut self,
         at: &Surroundings,
         player_kind: PlayerKind,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
     ) -> Result<Option<ObjectId>, GenieError> {
         let unit_ai_tuning = &at.unit_ai_tuning;
         let found = side.closest(&Search {
@@ -322,7 +323,7 @@ impl UnitAi {
         at: &Surroundings,
         player_kind: PlayerKind,
         ai: &mut Well512,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
     ) -> Result<IdleOutcome, GenieError> {
         if matches!(
             self.current_order,
@@ -363,7 +364,7 @@ impl UnitAi {
         at: &Surroundings,
         player_kind: PlayerKind,
         ai: &mut Well512,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
     ) -> Result<IdleOutcome, GenieError> {
         self.cap_human_order(side, ai)?;
         let searches = !at.flags.contains(SurroundingFlags::SCENARIO)
@@ -418,7 +419,7 @@ impl UnitAi {
         &mut self,
         at: &Surroundings,
         player_kind: PlayerKind,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
     ) -> Result<Option<ObjectId>, GenieError> {
         let unit_ai_tuning = &at.unit_ai_tuning;
         let found = side.closest(&Search {
@@ -456,7 +457,7 @@ impl UnitAi {
         target: ObjectId,
         at: &Surroundings,
         ai: &mut Well512,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
     ) -> Result<Answer, GenieError> {
         if matches!(
             self.current_order,
@@ -494,7 +495,7 @@ impl UnitAi {
         &mut self,
         at: &Surroundings,
         ai: &mut Well512,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
     ) -> Result<IdleOutcome, GenieError> {
         if matches!(
             self.current_order,
@@ -528,7 +529,7 @@ impl UnitAi {
         &mut self,
         at: &Surroundings,
         player_kind: PlayerKind,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
     ) -> Result<(), GenieError> {
         if self.current_order == Some(OrderKind::Defend) {
@@ -583,7 +584,7 @@ impl UnitAi {
         &mut self,
         at: &Surroundings,
         player_kind: PlayerKind,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
     ) -> Result<IdleOutcome, GenieError> {
         let unit_ai_tuning = &at.unit_ai_tuning;

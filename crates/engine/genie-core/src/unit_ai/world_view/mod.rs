@@ -17,8 +17,10 @@ use crate::world::others::OthersRef;
 use crate::world::player::Player;
 use crate::world::slots::PlayerSlots;
 
+mod calls;
 mod commands;
-mod side;
+mod looks;
+mod searches;
 mod unit_view;
 mod world_picker;
 
@@ -58,7 +60,7 @@ pub(crate) struct DropWorld<'a> {
 }
 
 /// What the unit's slot 0x388 (`FUN_141226fc0`) found while its unit AI ran
-/// ([`crate::unit_ai::UnitSide::wait_solidify`]): the foundation, the task its slot 0x820 found on
+/// ([`UnitView::wait_solidify`]): the foundation, the task its slot 0x820 found on
 /// it and the master the search switches the unit to (slot 0x90; None when its own master's list
 /// gave the task), which the side makes the unit's at once
 /// ([`World::wait_for_foundation`](crate::world::World::wait_for_foundation)).
@@ -191,8 +193,9 @@ pub(crate) fn changed_view(view: OthersRef<'_>, new: Option<PlayerId>) -> Others
 }
 
 /// A unit and the world as its unit AI asks them while it runs, the AI taken out of the unit
-/// for that time ([`crate::unit_ai::UnitSide`]): the searches and the unit's own commands. The
-/// world is the update's step's, the unit out of its slot.
+/// for that time: its searches (`searches.rs`), what it reads of the unit and the objects it
+/// names (`looks.rs`) and the unit's own calls (`calls.rs`). The world is the update's step's,
+/// the unit out of its slot.
 pub(crate) struct UnitView<'u, 's> {
     /// The update's step: the world without the unit (its stand-in holds its slot), the
     /// updating player and the unit's id.

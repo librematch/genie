@@ -4218,7 +4218,8 @@ fn the_empire_wars_start_puts_villager_on_its_farm_to_work() {
 }
 
 /// The forager's unit AI run outside its update making the calls `effects` on its unit
-/// ([`World::run_unit_ai`]): each at once, in order ([`crate::unit_ai::UnitSide::effect_now`]).
+/// ([`World::run_unit_ai`]): each at once, in order
+/// ([`crate::unit_ai::world_view::UnitView::effect_now`]).
 fn with_effects(t: &mut World, effects: Vec<Effect>) -> Result<(), GenieError> {
     t.run_unit_ai(
         (PlayerId::new(1), ListIndex::new(0)),
@@ -4522,12 +4523,12 @@ fn an_order_on_target_and_the_rest_after_it_run_inside_the_one_update() {
     );
 }
 
-/// The base handler's case 0x216 from the forager's side ([`UnitSide::off_footprint`],
+/// The base handler's case 0x216 from the forager's side ([`UnitView::off_footprint`],
 /// `FUN_1411566b0` with 0): with the forager's height and class, its player, the foundation by
 /// its master and the Gather's bush as the action's target; without the foundation placed no
 /// spot, placed at (30, 88) the flood's first empty tile beside its footprint, (30, 89).
 ///
-/// [`UnitSide::off_footprint`]: crate::unit_ai::UnitSide::off_footprint
+/// [`UnitView::off_footprint`]: crate::unit_ai::world_view::UnitView::off_footprint
 #[test]
 fn unit_sent_off_foundation_finds_the_spot_beside_it() {
     let mut t = forage_world();
@@ -4588,11 +4589,11 @@ fn unit_sent_off_foundation_finds_the_spot_beside_it() {
     assert_eq!(found.unwrap().spot, Some(Point::new(30.5, 89.5)));
 }
 
-/// The auto scout's search from the forager's side ([`UnitSide::seek_unexplored`]): on a map
+/// The auto scout's search from the forager's side ([`UnitView::seek_unexplored`]): on a map
 /// its player explored whole, neither the area about its town centre nor the unit AI's own
 /// search (slot 0x90) finds a tile.
 ///
-/// [`UnitSide::seek_unexplored`]: crate::unit_ai::UnitSide::seek_unexplored
+/// [`UnitView::seek_unexplored`]: crate::unit_ai::world_view::UnitView::seek_unexplored
 #[test]
 fn an_explored_map_leaves_the_auto_scout_nothing_to_seek() {
     let mut t = forage_world();
@@ -4609,11 +4610,11 @@ fn an_explored_map_leaves_the_auto_scout_nothing_to_seek() {
 }
 
 /// The unit AI's `ClosestResourceObject` from the forager's side (`FUN_140c49760`,
-/// [`UnitSide::closest_resource`]): of the bushes (gather group 2, gathering by themselves) the
+/// [`UnitView::closest_resource`]): of the bushes (gather group 2, gathering by themselves) the
 /// nearer, 600; passing over its current target the other; from its town centre as the drop
 /// site the one nearer the centre; none below the state asked for.
 ///
-/// [`UnitSide::closest_resource`]: crate::unit_ai::UnitSide::closest_resource
+/// [`UnitView::closest_resource`]: crate::unit_ai::world_view::UnitView::closest_resource
 #[test]
 fn the_unit_ai_resource_search_finds_the_nearest_bush_it_reaches() {
     use crate::unit_ai::{NO_POINT, ResourceSearch};
@@ -6951,10 +6952,10 @@ fn villager_side<R>(
 
 /// The unit AI's repair command at once (slot 0x378 while the AI runs, the villager lent back to
 /// its slot): within the run the villager is its player's repairer, holds the Repair, and its top
-/// target is the house ([`crate::unit_ai::UnitSide::top_target_now`]).
+/// target is the house ([`crate::unit_ai::world_view::UnitView::top_target_now`]).
 #[test]
 fn the_unit_ai_repair_command_is_the_unit_within_its_run() {
-    use crate::unit_ai::{UnitCommand, UnitSide};
+    use crate::unit_ai::UnitCommand;
     let mut t = repairer_world(vec![], true);
     let house = Placed {
         position: Position::new(30.0, 88.0, 0.0),
@@ -6977,7 +6978,7 @@ fn the_unit_ai_repair_command_is_the_unit_within_its_run() {
             repairs,
             side.unit.life.master_id.get(),
             r,
-            side.top_target_now()?,
+            side.top_target_now(),
         ))
     });
     assert_eq!(
@@ -7223,7 +7224,7 @@ fn an_enter_of_unit_inside_an_object_fails_at_its_start() {
 /// not hold, reaches the AI as the side returns.
 #[test]
 fn the_unit_ai_enter_from_inside_tells_its_ai_as_the_side_returns() {
-    use crate::unit_ai::{UnitCommand, UnitSide};
+    use crate::unit_ai::UnitCommand;
     let mut t = enter_world(vec![], 5);
     t.players[1].objects[ListIndex::new(0)].life.inside = Some(ContainerId::new(object_id(4242)));
     let seen = villager_side(&mut t, |side| {
@@ -7933,9 +7934,9 @@ fn world_routine_unit_ai_calls_run_on_the_unit_at_once() {
         .set_explore(Some(explore));
     let seen = t
         .run_ai_calls((PlayerId::new(1), ListIndex::new(0)), |ai, side, rng| {
-            let before = side.busy_now()?;
+            let before = side.busy_now();
             ai.stop_with(StopOrder::Keep, None, side, rng, &roles())?;
-            Ok((before, side.busy_now()?))
+            Ok((before, side.busy_now()))
         })
         .unwrap();
     assert_eq!(seen, (true, false));
@@ -7989,7 +7990,7 @@ fn the_unit_ai_reads_the_target_its_unit_update_left() {
 }
 
 /// The unit AI's view answers slot 0x380 before `BuildObject` takes the build
-/// (`UnitSide::builds`): 0 for a foundation the world does not hold or no task for it, 1 with a
+/// (`UnitView::builds`): 0 for a foundation the world does not hold or no task for it, 1 with a
 /// task or a Build on top (its slot 0x48), whatever the master's lists then hold.
 #[test]
 fn the_unit_ai_view_answers_the_build_command_before_it_runs() {
@@ -8037,9 +8038,10 @@ fn the_unit_ai_view_answers_the_build_command_before_it_runs() {
     assert!(!answers(&mut t, FoundationId::new(object_id(10028))));
 }
 
-/// The build command at once from the unit AI's run (`UnitSide::build_now`: a requeued build
-/// order's, which a following attack command replaces) does what the build command after the
-/// update does: the switch to the builder (118), the Build on the foundation, which it takes.
+/// The build command at once from the unit AI's run (`UnitView::effect_now` with
+/// `Effect::BuildObject`: a requeued build order's, which a following attack command replaces) does
+/// what the build command after the update does: the switch to the builder (118), the Build on the
+/// foundation, which it takes.
 #[test]
 fn the_build_command_at_once_matches_the_one_after_the_update() {
     let mut later = sent_off_world(vec![]);
@@ -8187,9 +8189,9 @@ fn unit_order_drop_off_takes_any_player_unit() {
     assert_eq!(t.players[1].objects[ListIndex::new(0)], before);
 }
 
-/// The unit AI's move at once (`UnitSide::ai_move_now`, ahead of a stop and an attack command
-/// in the same run) does what the move after the update does (slot 0x340: the actions go, a
-/// `MoveTo` to the point).
+/// The unit AI's move at once (`UnitView::effect_now` with `Effect::Move`, ahead of a stop and an
+/// attack command in the same run) does what the move after the update does (slot 0x340: the
+/// actions go, a `MoveTo` to the point).
 #[test]
 fn the_ai_move_at_once_matches_the_one_after_the_update() {
     let mut later = sent_off_world(vec![]);
@@ -8240,10 +8242,11 @@ fn the_ai_move_at_once_matches_the_one_after_the_update() {
     assert_eq!(now.streams, later.streams);
 }
 
-/// The hunt command at once from the unit AI's run (`UnitSide::hunt_now`: a requeued hunt
-/// order's, which a following attack command replaces) does what `HuntObject`'s unit part after
-/// the update does: the stopAction's standing sprite, the switch to the hunter (122) whose task
-/// hunts deer (class 9), the Hunt on the deer, which it takes.
+/// The hunt command at once from the unit AI's run (`UnitView::effect_now` with
+/// `Effect::HuntObject`: a requeued hunt order's, which a following attack command replaces) does
+/// what `HuntObject`'s unit part after the update does: the stopAction's standing sprite, the
+/// switch to the hunter (122) whose task hunts deer (class 9), the Hunt on the deer, which it
+/// takes.
 #[test]
 fn the_hunt_command_at_once_matches_the_one_after_the_update() {
     let mut later = sent_off_world(vec![]);
@@ -16490,9 +16493,10 @@ fn an_own_move_to_that_gives_up_fails_standing_unless_villager_waits() {
     assert_eq!(v.sprite.map(|s| s.graphic.id), Some(SpriteId::named(765)));
 }
 
-/// The unit AI's attack command ([`crate::unit_ai::UnitSide::attack`]) of the scout 123 (master
-/// 448, class 47, 426049998's) on Gaia's wolf 50 half a tile east, its attack timer `timer`, inside
-/// `inside` if any: the scout (with its parts) and what the command answered and took.
+/// The unit AI's attack command ([`crate::unit_ai::world_view::UnitView::attack`]) of the scout 123
+/// (master 448, class 47, 426049998's) on Gaia's wolf 50 half a tile east, its attack timer
+/// `timer`, inside `inside` if any: the scout (with its parts) and what the command answered and
+/// took.
 fn scout_attack(timer: f32, inside: Option<ObjectId>) -> (Object, Attacked, Vec<i32>) {
     scout_attack_on(timer, inside, None, OrderForce::Unforced)
 }
@@ -16589,7 +16593,6 @@ fn scout_attack_on(
     own: Option<&Attack>,
     force: OrderForce,
 ) -> (Object, Attacked, Vec<i32>) {
-    use crate::unit_ai::UnitSide;
     let standing = Graphic {
         id: SpriteId::named(300),
         frames: Frame::of_data(10),
@@ -16717,7 +16720,6 @@ fn scout_attack_on(
 /// [`scout_attack_on`], the unit in its owner's done tracker list of its master: the unit, the
 /// answer, its owner's attribute 4 as the command returns and its owner's tracker after it.
 fn attack_by(who: Master, also: Vec<Master>) -> (Object, Attacked, f32, Tracker) {
-    use crate::unit_ai::UnitSide;
     let (timer, inside, own, force) = (0.0, None, None, OrderForce::Forced);
     let attacker_master = who.id;
     let standing = Graphic {
@@ -23094,15 +23096,14 @@ fn the_command_phase_runs_each_building_command_by_its_handler() {
 }
 
 /// `AskForHelp`'s walk of the last search's own and friends' lists
-/// ([`UnitSide::call_for_help`] of the world's view): the asking unit passes itself; a live
+/// ([`UnitView::call_for_help`] of the world's view): the asking unit passes itself; a live
 /// helper with a unit AI within 3 tiles that is free ([`helper_free`]) answers, which is not
 /// modelled; a busy, dead, unthinking or distant one does not. Without a search before it
 /// the registry's last answer is not held.
 ///
-/// [`UnitSide::call_for_help`]: crate::unit_ai::UnitSide::call_for_help
+/// [`UnitView::call_for_help`]: crate::unit_ai::world_view::UnitView::call_for_help
 #[test]
 fn call_for_help_walks_the_lists_for_free_helper_in_reach() {
-    use crate::unit_ai::UnitSide;
     use crate::vision::registry::Record;
     let idle = UnitAi {
         ai_kind: UnitAiKind::Soldier,

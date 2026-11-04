@@ -11,7 +11,8 @@ use crate::unit_ai::AiAction;
 use crate::unit_ai::Answer;
 use crate::unit_ai::NotifyKind;
 use crate::unit_ai::StopOrder;
-use crate::unit_ai::{BREAK, DEAD, GO_ON, Notify, PRODUCED, Surroundings, UnitAi, UnitSide};
+use crate::unit_ai::world_view::UnitView;
+use crate::unit_ai::{BREAK, DEAD, GO_ON, Notify, PRODUCED, Surroundings, UnitAi};
 use crate::world::Millis;
 use crate::world::layer::Roles;
 use crate::world::layer::Slots;
@@ -80,7 +81,7 @@ impl UnitAi {
         at: &Surroundings,
         player_kind: PlayerKind,
         ai_rng: &mut Well512,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
     ) -> Result<u32, GenieError> {
         let mut result = GO_ON;
         while !self.notifies.is_empty() && result == GO_ON {
@@ -113,11 +114,11 @@ impl UnitAi {
     /// `FUN_140c5dc10`: a completion of the current action (with no order) stops it
     /// (`FUN_140c5e1e0`, slot 0xb0 with 1, [`UnitAi::completes`]); then the notifies go and
     /// `+0x15c` takes `time`.
-    pub fn end_notifies(
+    pub(crate) fn end_notifies(
         &mut self,
         time: Millis,
         at: &Surroundings,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
     ) -> Result<(), GenieError> {
         if self.completes() {
@@ -147,11 +148,11 @@ impl UnitAi {
     /// # Errors
     ///
     /// What the stop does not model.
-    pub fn clear_notifies_at(
+    pub(crate) fn clear_notifies_at(
         &mut self,
         time: Millis,
         place: (Point, Option<ClassId>),
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
         layer: AiLayer<'_>,
     ) -> Result<(), GenieError> {

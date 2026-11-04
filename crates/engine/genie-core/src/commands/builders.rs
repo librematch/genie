@@ -400,7 +400,7 @@ impl World {
     /// task, whatever its type) replaces the unit's actions. [`Answer::Taken`] when it builds (slot
     /// 0x380's 1); [`Answer::NotTaken`] for the foundation gone or no task (its 0, which the
     /// Gather's `set_state(6)` ignores and `BuildObject` reads first,
-    /// [`crate::unit_ai::UnitSide::builds`]).
+    /// [`crate::unit_ai::world_view::UnitView::builds`]).
     pub(crate) fn build_command(
         &mut self,
         player: PlayerId,

@@ -19,9 +19,10 @@ use crate::unit_ai::OrderPriority;
 use crate::unit_ai::StopOrder;
 use crate::unit_ai::TargetRules;
 use crate::unit_ai::UnitAiKind;
+use crate::unit_ai::world_view::UnitView;
 use crate::unit_ai::{
     Effect, LiveTop, OUTSIDE_ORDER, QueuedOrder, Surroundings, UnitAi, UnitCommand, UnitSeen,
-    UnitSide, order_move,
+    order_move,
 };
 use crate::world::UNIT_AI_MASTER;
 use crate::world::layer::ClassRoles;
@@ -100,7 +101,7 @@ impl UnitAi {
         world: Option<(&Surroundings, PlayerKind)>,
         place: Option<(Point, Option<ClassId>)>,
         ai: &mut Well512,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
         layer: AiLayer<'_>,
     ) -> Result<OrderOutcome, GenieError> {
         let AiLayer {
@@ -203,7 +204,7 @@ impl UnitAi {
         o: &QueuedOrder,
         world: Option<(&Surroundings, PlayerKind)>,
         ai: &mut Well512,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
         taken_as: &mut TakenAs,
         roles: &Roles,
     ) -> Result<Answer, GenieError> {
@@ -258,7 +259,7 @@ impl UnitAi {
         &mut self,
         o: &QueuedOrder,
         world: Option<(&Surroundings, PlayerKind)>,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
     ) -> Result<Answer, GenieError> {
         let (at, _) = world.ok_or(OUTSIDE_ORDER)?;
@@ -302,7 +303,7 @@ impl UnitAi {
         &mut self,
         o: &QueuedOrder,
         world: Option<(&Surroundings, PlayerKind)>,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
     ) -> Result<Answer, GenieError> {
         let (at, _) = world.ok_or(OUTSIDE_ORDER)?;
@@ -369,7 +370,7 @@ impl UnitAi {
     }
 
     /// Slot 400 as the full update stands: the target of the unit's top action now
-    /// ([`UnitSide::top_target_now`]: the update's stops and commands ran at once), its type and
+    /// ([`UnitView::top_target_now`]: the update's stops and commands ran at once), its type and
     /// the footprints' squared gap (`FUN_14118f8c0`), as the update read it at its start
     /// ([`Surroundings::top_target`]) while it is that object, else as the world holds it
     /// ([`UnitAi::world_object`]).
@@ -379,9 +380,9 @@ impl UnitAi {
     /// An object the side does not hold.
     pub(super) fn top_target_live(
         at: &Surroundings,
-        side: &mut dyn UnitSide,
+        side: &UnitView<'_, '_>,
     ) -> Result<Option<LiveTop>, GenieError> {
-        let Some(id) = side.top_target_now()? else {
+        let Some(id) = side.top_target_now() else {
             return Ok(None);
         };
         if let Some(t) = at.top_target.filter(|t| t.id == id) {
@@ -408,7 +409,7 @@ impl UnitAi {
     /// An object the side does not hold.
     pub(super) fn top_target_in_range(
         at: &Surroundings,
-        side: &mut dyn UnitSide,
+        side: &UnitView<'_, '_>,
     ) -> Result<Option<ObjectId>, GenieError> {
         let Some(t) = Self::top_target_live(at, side)? else {
             return Ok(None);
@@ -420,12 +421,12 @@ impl UnitAi {
 
     /// The object `id` as the world holds it (`FUN_1415417a0`): the unit itself (`at`, its own
     /// target of no one), among the objects the update names ([`Surroundings::unit`]), else as
-    /// the unit's side finds it ([`UnitSide::seen_unit`]); None when the world does not hold it
+    /// the unit's side finds it ([`UnitView::seen_unit`]); None when the world does not hold it
     /// (or for none, as the game's table finds nothing for −1).
     pub(super) fn world_object(
         id: impl ObjectKey,
         at: &Surroundings,
-        side: &mut dyn UnitSide,
+        side: &UnitView<'_, '_>,
     ) -> Result<Option<UnitSeen>, GenieError> {
         let Some(id) = id.key() else {
             return Ok(None);
@@ -454,7 +455,7 @@ impl UnitAi {
     /// `AttackObject` (slot 0xb8) forced, by the unit AI's type, on `target` by `rules`: the
     /// civilian's (`FUN_140c17370`, [`UnitAi::civilian_attack`]: an animal or a tree it hunts, any
     /// other it attacks by its own rules); the soldier's (`FUN_140c17550`) the base's, then a
-    /// member of a group the world holds stops moving ([`UnitSide::group_attack_stop`]); the
+    /// member of a group the world holds stops moving ([`UnitView::group_attack_stop`]); the
     /// others' the base's ([`UnitAi::attack_object`]). The priest's (`FUN_140c17490`) asks its slot
     /// 0x1b8 (`FUN_140c1af00`) whether to convert the target first: not modelled, the base's stops
     /// at the priest's slot 0xa0, which is not either.
@@ -463,7 +464,7 @@ impl UnitAi {
         target: ObjectId,
         rules: TargetRules,
         at: &Surroundings,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
     ) -> Result<Answer, GenieError> {
         match self.ai_kind {
@@ -487,7 +488,7 @@ impl UnitAi {
     /// ("I'm already attacking that target") or one the world does not hold takes nothing; then
     /// slot 0xa0 by its own rules ([`UnitAi::attack_check`]) must let it attack the target; with an
     /// action value the unit must reach the target within its range (slot 0x3d0,
-    /// [`UnitSide::reaches`]: "can't path to new target"). Then the unit's attack command, forced
+    /// [`UnitView::reaches`]: "can't path to new target"). Then the unit's attack command, forced
     /// ([`UnitAi::attack_command`]), and on success the action is the attack (600, the last action
     /// keeping the old) and the target its class and place (`FUN_140c64c10`). Unlike
     /// `AttackObject`, `+0x1d5` stays.
@@ -495,7 +496,7 @@ impl UnitAi {
         &mut self,
         target: ObjectId,
         at: &Surroundings,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
     ) -> Result<Answer, GenieError> {
         if self.current_target == Some(target) {
             return Ok(Answer::NotTaken);

@@ -10,7 +10,7 @@ use crate::objects::unit::Outcome;
 use crate::ownership::capture::Captured;
 use crate::players::PlayerId;
 use crate::players::PlayerKind;
-use crate::unit_ai::UnitSide;
+use crate::unit_ai::world_view::UnitView;
 use crate::unit_ai::{Surroundings, UnitAi};
 use crate::world::World;
 use crate::world::slots::PlayerSlots;
@@ -38,7 +38,7 @@ pub(crate) fn run_ai<R>(
     f: impl FnOnce(
         &mut UnitAi,
         &Surroundings,
-        &mut dyn UnitSide,
+        &mut UnitView<'_, '_>,
         PlayerKind,
         &mut Well512,
     ) -> Result<R, GenieError>,

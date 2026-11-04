@@ -28,9 +28,10 @@ use crate::unit_ai::SurroundingFlags;
 use crate::unit_ai::TargetRules;
 use crate::unit_ai::UnitStance;
 use crate::unit_ai::best_target::category;
+use crate::unit_ai::world_view::UnitView;
 use crate::unit_ai::{
     AiMove, AttackAsk, Effect, INVALID_POINT, Pick, RetargetSearch, Search, Surroundings, UnitAi,
-    UnitSide, held_action_state, patrol_distance, point_gap_squared, searches_on_class,
+    held_action_state, patrol_distance, point_gap_squared, searches_on_class,
 };
 use crate::world::Millis;
 use crate::world::WorldTime;
@@ -66,7 +67,7 @@ impl UnitAi {
         player_kind: PlayerKind,
         at: &Surroundings,
         ai: &mut Well512,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
     ) -> Result<RetargetCheck, GenieError> {
         let unit_ai_tuning = &at.unit_ai_tuning;
         let roles = &at.roles;
@@ -126,7 +127,7 @@ impl UnitAi {
         &mut self,
         at: &Surroundings,
         ai: &mut Well512,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
     ) -> Result<MiscEnd, GenieError> {
         let unit_ai_tuning = &at.unit_ai_tuning;
         // the leashes (unless on orders 0x2c7, 0x2dd and 0x323, which no order holds, or in a
@@ -211,7 +212,7 @@ impl UnitAi {
         search: RetargetSearch,
         player_kind: PlayerKind,
         at: &Surroundings,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
     ) -> Result<u32, GenieError> {
         let unit_ai_tuning = &at.unit_ai_tuning;
@@ -365,7 +366,7 @@ impl UnitAi {
     pub(super) fn civilian_misc(
         &mut self,
         at: &Surroundings,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
     ) -> Result<(), GenieError> {
         if self.current_order == Some(OrderKind::Attack) && self.current_target.is_none() {
@@ -389,7 +390,7 @@ impl UnitAi {
     /// `COMISS` with `JBE`: a NaN stays), the unit moves to the target (slot 0x138,
     /// [`UnitAi::move_to_object`], within the desired distance) or to the point (slot 0x130 forced,
     /// running, within the desired distance). Within it, a defend target with a unit AI names the
-    /// attacker of its nearest to it (its AI's slot 0x78, [`UnitSide::defended_attacker`]), which
+    /// attacker of its nearest to it (its AI's slot 0x78, [`UnitView::defended_attacker`]), which
     /// the unit attacks (slot 0xb8 forced, not any: [`UnitAi::attack_slot`]); with none, its
     /// processIdle (slot 0x240 with 0, [`UnitAi::process_idle`]) and an action it produced end slot
     /// 73. [`MiscEnd::Ends`] when slot 73 ends here (10, or 9 after the order ended).
@@ -398,7 +399,7 @@ impl UnitAi {
         at: &Surroundings,
         player_kind: PlayerKind,
         ai: &mut Well512,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
     ) -> Result<MiscEnd, GenieError> {
         let unit_ai_tuning = &at.unit_ai_tuning;
         let mut defended = None;
@@ -492,7 +493,7 @@ impl UnitAi {
     pub(super) fn follow(
         &mut self,
         at: &Surroundings,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
     ) -> Result<MiscEnd, GenieError> {
         let unit_ai_tuning = &at.unit_ai_tuning;
@@ -546,7 +547,7 @@ impl UnitAi {
         id: ObjectId,
         (state, class, position): (ObjectState, ClassId, Position),
         range: Distance,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
     ) -> Result<(), GenieError> {
         side.effect_now(

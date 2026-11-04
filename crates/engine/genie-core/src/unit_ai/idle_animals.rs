@@ -18,11 +18,11 @@ use crate::unit_ai::Pace;
 use crate::unit_ai::SurroundingFlags;
 use crate::unit_ai::TargetRules;
 use crate::unit_ai::flight::BadPoint;
+use crate::unit_ai::world_view::UnitView;
 use crate::unit_ai::{
     AI_MOVE_RANGE, AiMove, BOAR_HOME, BOAR_LEASH, BOAR_LEASH_DRAW, BOAR_OFFSET, BOAR_STEP,
     BOAR_WANDER, Effect, Found, HUNTED_CARED, HUNTED_HOME, HUNTED_SIGHT_GROWTH, HUNTED_STEP,
-    LION_CARED, LION_IDLE_TIMEOUT, Memory, Pick, Search, Surroundings, UnitAi, UnitSide,
-    point_gap_squared,
+    LION_CARED, LION_IDLE_TIMEOUT, Memory, Pick, Search, Surroundings, UnitAi, point_gap_squared,
 };
 use crate::world::Seconds;
 use crate::world::layer::ClassRoles;
@@ -41,7 +41,7 @@ impl UnitAi {
         &mut self,
         at: &Surroundings,
         ai: &mut Well512,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
     ) -> Result<IdleOutcome, GenieError> {
         self.cap_human_order(side, ai)?;
         let (produced, moved) = self.boar_wander(at, ai);
@@ -146,7 +146,7 @@ impl UnitAi {
         at: &Surroundings,
         other: Position,
         ai: &mut Well512,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
     ) -> Result<(), GenieError> {
         let unit_ai_tuning = &at.unit_ai_tuning;
         let (x, y, z) = (at.position.x(), at.position.y(), at.position.z());
@@ -163,7 +163,7 @@ impl UnitAi {
         at: &Surroundings,
         player_kind: PlayerKind,
         ai: &mut Well512,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
     ) -> Result<IdleOutcome, GenieError> {
         let roles = &at.roles;
         self.cap_human_order(side, ai)?;
@@ -187,7 +187,7 @@ impl UnitAi {
         &mut self,
         at: &Surroundings,
         ai: &mut Well512,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
     ) -> Result<IdleOutcome, GenieError> {
         let h = self.hunted.ok_or(GenieError::unsupported(
             "a hunted animal without its origin",
@@ -291,7 +291,7 @@ impl UnitAi {
         &mut self,
         at: &Surroundings,
         ai: &mut Well512,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
     ) -> Result<IdleOutcome, GenieError> {
         let unit_ai_tuning = &at.unit_ai_tuning;
         let slots = at.slots;

@@ -41,7 +41,7 @@ The damage of the hit is in `combat/damage/`.
 | [`states.rs`](states.rs) | The Attack's `set_state` (`0x140a820c0`): the move, the teardown and prelude, a lost target, one out of sight, the finish and the halt. |
 | [`tests.rs`](tests.rs) | Tests. |
 | [`unit.rs`](unit.rs) | The unit's own Attack in its update: a lost target's end, and the strike with what follows. |
-| [`unit_ai_side.rs`](unit_ai_side.rs) | The attack the unit AI commands while it runs (`crate::unit_ai::UnitSide::attack` through its view, `UnitView`): the new Attack, a forced attack again on the unit's own target, the target as a hit reads it, the start's readiness, the target's sight and a villager's swap. |
+| [`unit_ai_side.rs`](unit_ai_side.rs) | The attack the unit AI commands through its view while it runs (`UnitView::attack`): the new Attack, a forced attack again on the unit's own target, the target as a hit reads it, the start's readiness, the target's sight and a villager's swap. |
 | [`update.rs`](update.rs) | One update (slot 6, `0x140a82ae0`): a target gone, a disarmed building, the walks to where the target was seen. |
 | [`walk_and_swing.rs`](walk_and_swing.rs) | State 4's walk to the target and state 7's swing with its hit and its trample. |
 | [`walks.rs`](walks.rs) | The `MoveTo`s the Attack's `set_state` makes (`0x140a820c0`, cases 4, 5 and 11) and the update of its sub-action list (`FUN_140a992b0`). |

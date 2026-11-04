@@ -11,7 +11,8 @@ use crate::players::PlayerKind;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::SurroundingFlags;
-use crate::unit_ai::{GroupState, Surroundings, UnitAi, UnitSide, group_lets_idle};
+use crate::unit_ai::world_view::UnitView;
+use crate::unit_ai::{GroupState, Surroundings, UnitAi, group_lets_idle};
 use crate::world::Millis;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
@@ -30,7 +31,7 @@ impl UnitAi {
         at: &Surroundings,
         player_kind: PlayerKind,
         ai: &mut Well512,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
     ) -> Result<(), GenieError> {
         let roles = &at.roles;
         let class_20 = busy
@@ -79,7 +80,7 @@ impl UnitAi {
         at: &Surroundings,
         player_kind: PlayerKind,
         ai: &mut Well512,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
     ) -> Result<(), GenieError> {
         if self.secondary_timer != Millis::ZERO {
             return Ok(());
@@ -117,7 +118,7 @@ impl UnitAi {
         at: &Surroundings,
         player_kind: PlayerKind,
         ai: &mut Well512,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
     ) -> Result<(), GenieError> {
         let unit_ai_tuning = &at.unit_ai_tuning;
         if self.current_target.is_some()

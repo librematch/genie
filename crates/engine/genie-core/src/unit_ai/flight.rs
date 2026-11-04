@@ -21,10 +21,11 @@ use crate::unit_ai::StopOrder;
 use crate::unit_ai::TargetRules;
 use crate::unit_ai::UnitAiKind;
 use crate::unit_ai::UnitStance;
+use crate::unit_ai::world_view::UnitView;
 use crate::unit_ai::{
     AiMove, BREAK, DEAD, Effect, GO_ON, Memory, Notify, Pick, RUN_DRAW_SCALE, RUN_EPSILON, RUN_ONE,
-    Search, Surroundings, UnitAi, UnitSide, VILLAGER_NOTIFY, alert_owner,
-    closest_undiscovered_tile, search_area,
+    Search, Surroundings, UnitAi, VILLAGER_NOTIFY, alert_owner, closest_undiscovered_tile,
+    search_area,
 };
 use crate::world::Millis;
 use crate::world::layer::ClassRoles;
@@ -54,7 +55,7 @@ impl UnitAi {
         at: &Surroundings,
         player_kind: PlayerKind,
         ai_rng: &mut Well512,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
     ) -> Result<u32, GenieError> {
         let roles = &at.roles;
         if n.p[1] < 1 {
@@ -93,7 +94,7 @@ impl UnitAi {
         at: &Surroundings,
         player_kind: PlayerKind,
         ai: &mut Well512,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
     ) -> Result<Answer, GenieError> {
         let unit_ai_tuning = &at.unit_ai_tuning;
         let roles = &at.roles;
@@ -191,7 +192,7 @@ impl UnitAi {
         (force, bad): (OrderForce, BadPoint),
         at: &Surroundings,
         ai: &mut Well512,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
     ) -> Result<Answer, GenieError> {
         let unit_ai_tuning = &at.unit_ai_tuning;
         if force == OrderForce::Unforced && self.current_action.is_some() {
@@ -263,7 +264,7 @@ impl UnitAi {
         time: Millis,
         at: &Surroundings,
         ai_rng: &mut Well512,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
     ) -> Result<u32, GenieError> {
         let roles = &at.roles;
         if n.p[1] < 1 {
@@ -300,7 +301,7 @@ impl UnitAi {
     /// the world holds (`FUN_1415417a0`) nothing; else its search from its place (slot 0x50,
     /// `FUN_140c63e20` with mode 1: the classes it cares about; a search
     /// that ran sets the alert mode, [`UnitAi::attack_search_alert`]), whose lists of its own and
-    /// its friends' objects ([`UnitSide::call_for_help`]) it walks for helpers.
+    /// its friends' objects ([`UnitView::call_for_help`]) it walks for helpers.
     ///
     /// # Errors
     ///
@@ -312,7 +313,7 @@ impl UnitAi {
         attacker: ObjectId,
         at: &Surroundings,
         player_kind: PlayerKind,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
     ) -> Result<(), GenieError> {
         let unit_ai_tuning = &at.unit_ai_tuning;
         if side.seen_unit(attacker)?.is_none() {
@@ -372,7 +373,7 @@ impl UnitAi {
         n: Notify,
         at: &Surroundings,
         player_kind: PlayerKind,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
     ) -> Result<u32, GenieError> {
         let unit_ai_tuning = &at.unit_ai_tuning;

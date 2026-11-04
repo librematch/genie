@@ -21,8 +21,9 @@ use crate::unit_ai::StopOrder;
 use crate::unit_ai::SurroundingFlags;
 use crate::unit_ai::TargetRules;
 use crate::unit_ai::UnitAiKind;
+use crate::unit_ai::world_view::UnitView;
 use crate::unit_ai::{
-    Notify, QueuedOrder, Surroundings, UnitAi, UnitSide, civilian_may_attack, lion_may_attack,
+    Notify, QueuedOrder, Surroundings, UnitAi, civilian_may_attack, lion_may_attack,
 };
 use crate::world::Millis;
 use crate::world::layer::ClassRoles;
@@ -58,7 +59,7 @@ impl UnitAi {
         now: OrderNow,
         world: Option<(&Surroundings, PlayerKind)>,
         ai: &mut Well512,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
         layer: AiLayer<'_>,
     ) -> Result<(), GenieError> {
         let AiLayer { roles, .. } = layer;
@@ -124,7 +125,7 @@ impl UnitAi {
         force: OrderForce,
         rules: TargetRules,
         at: &Surroundings,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
     ) -> Result<Answer, GenieError> {
         if force == OrderForce::Unforced && self.current_action.is_some() {
             return Ok(Answer::NotTaken);
@@ -145,7 +146,7 @@ impl UnitAi {
     /// (`FUN_140c48400`: the boar's, the ranged units', the ships', the artifact's, the siege
     /// tower's and the livestock's) anything, the building's (`FUN_140c18b60`) nothing, the
     /// lion's ([`lion_may_attack`]), the civilian's ([`civilian_may_attack`]), the soldier's, the
-    /// tower's and the siege unit's ([`UnitSide::may_attack`]); the hunted animal's
+    /// tower's and the siege unit's ([`UnitView::may_attack`]); the hunted animal's
     /// (`FUN_140c18d00`) reads its action list (slot 0x538) and the priest's (`FUN_140c19020`) its
     /// conversions: not modelled. Its master's class and its place then.
     pub(super) fn attack_check(
@@ -153,7 +154,7 @@ impl UnitAi {
         target: ObjectId,
         rules: TargetRules,
         at: &Surroundings,
-        side: &mut dyn UnitSide,
+        side: &UnitView<'_, '_>,
     ) -> Result<Option<(ClassId, Position)>, GenieError> {
         let roles = &at.roles;
         if matches!(
@@ -193,7 +194,7 @@ impl UnitAi {
         Ok(may.then_some((t.class, t.position)))
     }
 
-    /// The unit's attack command (slot 0x338, [`UnitSide::attack`]) on `target`, `force`d or not,
+    /// The unit's attack command (slot 0x338, [`UnitView::attack`]) on `target`, `force`d or not,
     /// as `AttackObject`, `attackRoundupObject` and seek and destroy give it, at once. The
     /// notifies the command posts (the unit's slot 0x328 -> the AI's slot 0x38) go into the
     /// queue, or the buffer while it is full. Taken when the unit attacks.
@@ -202,7 +203,7 @@ impl UnitAi {
         target: ObjectId,
         force: OrderForce,
         at: &Surroundings,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
     ) -> Result<Answer, GenieError> {
         let attacked = side.attack(target, force, self)?;
         for (kind, p) in attacked.posted {
@@ -225,7 +226,7 @@ impl UnitAi {
         &mut self,
         target: ObjectId,
         at: &Surroundings,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
     ) -> Result<Answer, GenieError> {
         let roles = &at.roles;
@@ -250,7 +251,7 @@ impl UnitAi {
     /// no longer is (`FUN_14119d2d0` with 0); else the first attacker that the world does not
     /// hold, that has no unit AI, is dead (state above 2) or whose unit AI's target is another
     /// leaves the set (one an update).
-    pub(super) fn keep_attackers(&mut self, at: &Surroundings, side: &mut dyn UnitSide) {
+    pub(super) fn keep_attackers(&mut self, at: &Surroundings, side: &mut UnitView<'_, '_>) {
         if self.attackers.is_empty() {
             if at.flags.contains(SurroundingFlags::UNDER_ATTACK) {
                 side.set_under_attack(false);

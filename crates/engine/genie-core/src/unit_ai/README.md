@@ -20,8 +20,9 @@ show in checkpoint word 9.
   searches for.
 - `best_target/` picks the best unit to attack. `task_finder/` picks a task for a target.
   `world_view/` is the unit AI's view of the world.
-- `side.rs` defines `UnitSide`: what the unit AI asks of the world. The tests answer it with
-  small stand-ins, the engine with `world_view/`.
+- `side.rs` holds the values the unit AI's calls on its view take and answer. `world_view/`
+  answers the calls, in the engine and in the tests (on worlds the scene builder makes,
+  `testing::scene`).
 - `ai_kinds.rs` names the order and notify kinds. A script generates it.
 
 ## In the game
@@ -65,7 +66,7 @@ show in checkpoint word 9.
 | [`process_order.rs`](process_order.rs) | An order's processing: the combat and work orders, the top target and the attack slots. |
 | [`queue_end.rs`](queue_end.rs) | Where a queued order joins its unit AI's queue (`QueueEnd`). |
 | [`retarget.rs`](retarget.rs) | The retarget check and search, and the types' other checks (slot 73, processMisc). |
-| [`side.rs`](side.rs) | What the unit AI asks of the world (`UnitSide`) and the commands it gives its unit. |
+| [`side.rs`](side.rs) | The values the unit AI's calls on its unit's view (`UnitView`) take and answer: the commands it gives its unit, a resource search and its find, a target's flags, a defended unit's nearest attacker and a unit sent off a footprint. |
 | [`stop_order.rs`](stop_order.rs) | What a stop of the unit AI's current action does to its order (`StopOrder`). |
 | [`surroundings.rs`](surroundings.rs) | What the unit AI knows of its surroundings: the searches' results, its home, its targets and what it has seen. |
 | [`target_kind.rs`](target_kind.rs) | A queued order's target type: the number its writer puts there, a master id or a class, and the two ways the game reads it. |

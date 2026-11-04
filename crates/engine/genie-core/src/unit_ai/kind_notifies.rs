@@ -17,8 +17,9 @@ use crate::unit_ai::OrderKind;
 use crate::unit_ai::StopOrder;
 use crate::unit_ai::SurroundingFlags;
 use crate::unit_ai::TargetRules;
+use crate::unit_ai::world_view::UnitView;
 use crate::unit_ai::{
-    BREAK, DEAD, Effect, GO_ON, LION_ATTACKED_TIMEOUT, Notify, Surroundings, UnitAi, UnitSide,
+    BREAK, DEAD, Effect, GO_ON, LION_ATTACKED_TIMEOUT, Notify, Surroundings, UnitAi,
     VILLAGER_NOTIFY, alert_owner, back_up, dodges,
 };
 use crate::world::Millis;
@@ -35,7 +36,7 @@ impl UnitAi {
         at: &Surroundings,
         player_kind: PlayerKind,
         ai_rng: &mut Well512,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
     ) -> Result<u32, GenieError> {
         match n.kind {
             NotifyKind::DAMAGED => self.hunted_damaged(n, time, at, player_kind, ai_rng, side),
@@ -56,7 +57,7 @@ impl UnitAi {
         at: &Surroundings,
         player_kind: PlayerKind,
         ai_rng: &mut Well512,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
     ) -> Result<u32, GenieError> {
         match n.kind {
             NotifyKind::DAMAGED => self.boar_damaged(n, time, at, ai_rng, side),
@@ -86,7 +87,7 @@ impl UnitAi {
         at: &Surroundings,
         player_kind: PlayerKind,
         ai_rng: &mut Well512,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
     ) -> Result<u32, GenieError> {
         match n.kind {
             NotifyKind::ACTION_COMPLETED => {
@@ -118,7 +119,7 @@ impl UnitAi {
         at: &Surroundings,
         player_kind: PlayerKind,
         ai_rng: &mut Well512,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
     ) -> Result<u32, GenieError> {
         // "Target is still visible, tracking.": a target the world holds within the
         // lion's line of sight (FUN_14118f8c0 against its sight squared: COMISS, JC
@@ -168,7 +169,7 @@ impl UnitAi {
         at: &Surroundings,
         player_kind: PlayerKind,
         ai_rng: &mut Well512,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
     ) -> Result<u32, GenieError> {
         match n.kind {
             NotifyKind::ACTION_INVALIDATED
@@ -228,7 +229,7 @@ impl UnitAi {
         &mut self,
         n: Notify,
         at: &Surroundings,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
     ) -> Result<u32, GenieError> {
         if (n.p[0] == AiAction::Build.value() || n.p[0] == AiAction::Hunt.value())
@@ -251,10 +252,10 @@ impl UnitAi {
     /// slot 0x190 first, its top action's target, then the drop site the table names.
     pub(super) fn drop_other_load(
         &mut self,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
     ) -> Result<u32, GenieError> {
-        let back = side.top_target_now()?;
+        let back = side.top_target_now();
         if let Some(site) = side.table_drop_site()? {
             side.effect_now(
                 Effect::Command(AiCommand::DropElsewhere { site, back }),
@@ -276,7 +277,7 @@ impl UnitAi {
         at: &Surroundings,
         player_kind: PlayerKind,
         ai_rng: &mut Well512,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
     ) -> Result<u32, GenieError> {
         match n.kind {
             NotifyKind::MISSILE_WARNING if dodges(at, ai_rng) => Ok(GO_ON),
@@ -296,7 +297,7 @@ impl UnitAi {
         at: &Surroundings,
         player_kind: PlayerKind,
         ai_rng: &mut Well512,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
     ) -> Result<u32, GenieError> {
         match n.kind {
             NotifyKind::REQUIRES_SEARCH => self.trader_search(at, side, ai_rng),
@@ -317,7 +318,7 @@ impl UnitAi {
         at: &Surroundings,
         player_kind: PlayerKind,
         ai_rng: &mut Well512,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
     ) -> Result<u32, GenieError> {
         match n.kind {
             NotifyKind::REQUIRES_SEARCH if self.current_action == Some(AiAction::Build) => {
@@ -342,7 +343,7 @@ impl UnitAi {
         at: &Surroundings,
         player_kind: PlayerKind,
         ai_rng: &mut Well512,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
     ) -> Result<u32, GenieError> {
         let roles = &at.roles;
         match n.kind {
@@ -378,7 +379,7 @@ impl UnitAi {
         at: &Surroundings,
         player_kind: PlayerKind,
         ai_rng: &mut Well512,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
     ) -> Result<u32, GenieError> {
         if n.p[1] < 1 {
             alert_owner(player_kind)?;
@@ -402,7 +403,7 @@ impl UnitAi {
         at: &Surroundings,
         player_kind: PlayerKind,
         ai_rng: &mut Well512,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
     ) -> Result<u32, GenieError> {
         match n.kind {
             NotifyKind::TOO_CLOSE => back_up(),
@@ -427,7 +428,7 @@ impl UnitAi {
         at: &Surroundings,
         player_kind: PlayerKind,
         ai_rng: &mut Well512,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
     ) -> Result<u32, GenieError> {
         match n.kind {
             // "I'm dead, I give up.": the owner's alert (slot 0x2e8 with 0x209: a human
@@ -473,7 +474,7 @@ impl UnitAi {
         at: &Surroundings,
         player_kind: PlayerKind,
         ai_rng: &mut Well512,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
     ) -> Result<u32, GenieError> {
         match n.kind {
             NotifyKind::DAMAGED => self.building_damaged(n, time, at, player_kind, side, ai_rng),
@@ -505,7 +506,7 @@ impl UnitAi {
         at: &Surroundings,
         player_kind: PlayerKind,
         ai_rng: &mut Well512,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
     ) -> Result<u32, GenieError> {
         match n.kind {
             NotifyKind::SENT_OFF => self.base_notify(n, time, at, player_kind, ai_rng, side),

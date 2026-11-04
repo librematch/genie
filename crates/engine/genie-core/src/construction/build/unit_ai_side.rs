@@ -32,7 +32,7 @@ use crate::world::slots::PlayerSlots;
 
 impl UnitView<'_, '_> {
     /// Slot 0x380's answer (forced) on `foundation` without its effects, which `BuildObject`
-    /// reads before it takes the build ([`crate::unit_ai::UnitSide::builds`]): 0 for a
+    /// reads before it takes the build ([`crate::unit_ai::world_view::UnitView::builds`]): 0 for a
     /// foundation the world does not hold (`FUN_1415417a0`), 1 with a Build on top (its slot
     /// 0x48), else whether slot 0x820 finds a task ([`UnitView::build_found`]).
     pub(crate) fn builds_on(

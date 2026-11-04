@@ -10,7 +10,8 @@ use crate::objects::unit::{Outcome, Unit};
 use crate::players::PlayerId;
 use crate::players::PlayerKind;
 use crate::trace::Watch;
-use crate::unit_ai::{Surroundings, UnitAi, UnitSide};
+use crate::unit_ai::world_view::UnitView;
+use crate::unit_ai::{Surroundings, UnitAi};
 use crate::world::Millis;
 use crate::world::World;
 use crate::world::step::Step;
@@ -122,7 +123,7 @@ impl World {
     pub(crate) fn run_ai_calls<R>(
         &mut self,
         (p, i): (PlayerId, ListIndex),
-        f: impl FnOnce(&mut UnitAi, &mut dyn UnitSide, &mut Well512) -> Result<R, GenieError>,
+        f: impl FnOnce(&mut UnitAi, &mut UnitView<'_, '_>, &mut Well512) -> Result<R, GenieError>,
     ) -> Result<R, GenieError> {
         let mut answer = None;
         let _ = self.step_object((p, i), (Millis::ZERO, None, false), |unit, actions, c| {
@@ -148,7 +149,7 @@ impl World {
         f: impl FnOnce(
             &mut UnitAi,
             &Surroundings,
-            &mut dyn UnitSide,
+            &mut UnitView<'_, '_>,
             PlayerKind,
             &mut Well512,
         ) -> Result<(), GenieError>,

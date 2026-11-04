@@ -25,9 +25,10 @@ use crate::unit_ai::StopOrder;
 use crate::unit_ai::SurroundingFlags;
 use crate::unit_ai::UnitStance;
 use crate::unit_ai::WalkBack;
+use crate::unit_ai::world_view::UnitView;
 use crate::unit_ai::{
     AiMove, ENDED_ACTIONS, Effect, GO_ON, Notify, PRODUCED, QueuedOrder, Surroundings, UnitAi,
-    UnitSide, WALK_BACK, point_gap_squared,
+    WALK_BACK, point_gap_squared,
 };
 use crate::world::Millis;
 use crate::world::layer::ClassRoles;
@@ -62,7 +63,7 @@ impl UnitAi {
         at: &Surroundings,
         player_kind: PlayerKind,
         ai: &mut Well512,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
     ) -> Result<u32, GenieError> {
         let (order, action, p0) = (self.current_order, self.current_action, n.p[0]);
         if order.is_some() {
@@ -131,7 +132,7 @@ impl UnitAi {
         at: &Surroundings,
         player_kind: PlayerKind,
         ai: &mut Well512,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
     ) -> Result<u32, GenieError> {
         let (order, action, p0) = (self.current_order, self.current_action, n.p[0]);
         let attack = AiAction::Attack.value();
@@ -187,7 +188,7 @@ impl UnitAi {
         at: &Surroundings,
         player_kind: PlayerKind,
         ai_rng: &mut Well512,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
     ) -> Result<u32, GenieError> {
         let p1 = n.p[0];
         let order = self.current_order;
@@ -261,7 +262,7 @@ impl UnitAi {
         &mut self,
         order: StopOrder,
         at: &Surroundings,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
     ) -> Result<(), GenieError> {
         let roles = &at.roles;
@@ -280,7 +281,7 @@ impl UnitAi {
         &mut self,
         order: StopOrder,
         place: Option<(Point, Option<ClassId>)>,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
         roles: &Roles,
     ) -> Result<(), GenieError> {
@@ -336,7 +337,7 @@ impl UnitAi {
     pub(super) fn walk_back(
         &mut self,
         at: &Surroundings,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
     ) -> Result<WalkBack, GenieError> {
         let gap = point_gap_squared(self.state_position, at.position, at.size);
@@ -460,10 +461,10 @@ impl UnitAi {
     /// # Errors
     ///
     /// What an order's slot does not model.
-    pub fn off_turn(
+    pub(crate) fn off_turn(
         &mut self,
         at: &Surroundings,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
         player_kind: PlayerKind,
         ai: &mut Well512,
     ) -> Result<(), GenieError> {
@@ -526,10 +527,10 @@ impl UnitAi {
     /// # Errors
     ///
     /// What an order's slot does not model.
-    pub fn run_orders(
+    pub(crate) fn run_orders(
         &mut self,
         at: &Surroundings,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
         player_kind: PlayerKind,
         ai: &mut Well512,
     ) -> Result<(), GenieError> {

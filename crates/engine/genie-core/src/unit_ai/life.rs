@@ -21,11 +21,12 @@ use crate::unit_ai::OrderPriority;
 use crate::unit_ai::SurroundingFlags;
 use crate::unit_ai::UnitAiKind;
 use crate::unit_ai::UnitStance;
+use crate::unit_ai::world_view::UnitView;
 use crate::unit_ai::{
     ARTIFACT_IDLE_TIMEOUT, AiMove, COMPUTER_SOLDIER_IDLE_TIMEOUT, DESIRED_DISTANCE, Effect, Found,
     HUMAN_ORDER_CAP, HUNTED_IDLE_TIMEOUT, Home, Hunted, IDLE_TIMEOUT, LION_IDLE_TIMEOUT, Memory,
     NewObject, ORDER_HISTORY, OrderRecord, PRIEST_IDLE_TIMEOUT, SIEGE_IDLE_TIMEOUT,
-    SOLDIER_IDLE_TIMEOUT, Surroundings, TOWER_IDLE_TIMEOUT, UnitAi, UnitSeen, UnitSide,
+    SOLDIER_IDLE_TIMEOUT, Surroundings, TOWER_IDLE_TIMEOUT, UnitAi, UnitSeen,
     adjusted_idle_timeout, notify_capacity, siege_stance, soldier_stance,
 };
 use crate::world::Millis;
@@ -249,7 +250,7 @@ impl UnitAi {
     }
 
     /// The full update's start (`0x140c66b10`): its retarget entries by the world's objects
-    /// (`seen`, [`UnitSide::seen_unit`]): a target the world no longer holds or below 1 hit point
+    /// (`seen`, [`UnitView::seen_unit`]): a target the world no longer holds or below 1 hit point
     /// (`COMISS`, a NaN stays) empties them all; otherwise one whose time (`timeout`) is not past
     /// `now` stays and the others go, in order.
     ///
@@ -305,7 +306,7 @@ impl UnitAi {
 
     /// `savePatrolInformation` (`FUN_140c63d20`): the saved patrol goes; the unit's slot 0x468
     /// gives the new one and its waypoint (0 without one).
-    pub(super) fn save_patrol(&mut self, side: &dyn UnitSide) {
+    pub(super) fn save_patrol(&mut self, side: &UnitView<'_, '_>) {
         let (path, waypoint) = side.patrol_information().unzip();
         self.patrol_path = path;
         self.patrol_waypoint = waypoint.unwrap_or(WaypointIndex::FIRST);
@@ -322,7 +323,7 @@ impl UnitAi {
         &mut self,
         at: &Surroundings,
         ai: &mut Well512,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
     ) -> Result<IdleOutcome, GenieError> {
         if self.patrol_path.is_none() {
             return Ok(IdleOutcome::Idle);
@@ -562,7 +563,7 @@ impl UnitAi {
     /// orders 701, 711, 712 and 733.
     pub(super) fn cap_human_order(
         &mut self,
-        side: &mut dyn UnitSide,
+        side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
     ) -> Result<(), GenieError> {
         if !matches!(

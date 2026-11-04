@@ -1,5 +1,5 @@
-//! The attack the unit AI commands while it runs ([`crate::unit_ai::UnitSide::attack`] through
-//! its view, [`UnitView`]): the new Attack, a forced attack again on the unit's own target, the
+//! The attack the unit AI commands through its view while it runs ([`UnitView::attack`]): the
+//! new Attack, a forced attack again on the unit's own target, the
 //! target as a hit reads it, the start's readiness, the target's sight and a villager's swap.
 
 use crate::GenieError;

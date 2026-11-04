@@ -534,10 +534,11 @@ pub(super) fn civilian_may_attack(
                 .contains(ClassRoles::PRIORITY_3_TARGET))
 }
 
-/// What [`UnitSide::attack`] answers: the unit attacks the target, and the notifies the command
-/// posted to its unit AI (slot 0x328 with the kind and three parameters).
+/// What [`UnitView::attack`](crate::unit_ai::world_view::UnitView::attack) answers: the unit
+/// attacks the target, and the notifies the command posted to its unit AI (slot 0x328 with the kind
+/// and three parameters).
 ///
-/// [`UnitSide::attack`]: crate::unit_ai::UnitSide::attack
+/// [`UnitView::attack`]: crate::unit_ai::world_view::UnitView::attack
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Attacked {
     /// The unit attacks the target.
