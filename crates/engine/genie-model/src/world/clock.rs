@@ -3,15 +3,15 @@
 //! span in seconds and the timers that count it down are `f32` ([`Seconds`]).
 
 use crate::math::image::facing::MS_PER_SECOND;
+use derive_more::{Add, AddAssign, Display, Neg, Sub, SubAssign};
 use serde::Deserialize;
 use serde::Serialize;
-use std::fmt::{Display, Error, Formatter};
-use std::ops::{Add, AddAssign, Div, Mul, MulAssign, Neg, Sub, SubAssign};
+use std::ops::{Div, Mul, MulAssign};
 
 /// A moment of the world's clock in milliseconds since the game's start (`world_time`): the
 /// clock itself and the moments the objects keep (a unit AI's last retarget, a reload's end,
 /// a building's last garrison count).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Display)]
 pub struct WorldTime(u32);
 
 impl WorldTime {
@@ -65,12 +65,6 @@ impl WorldTime {
     }
 }
 
-impl Display for WorldTime {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        self.0.fmt(f)
-    }
-}
-
 impl genie_diff::Diff for WorldTime {
     fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
         self.0.diff(&other.0, d);
@@ -78,7 +72,7 @@ impl genie_diff::Diff for WorldTime {
 }
 
 /// A span of the world's clock in milliseconds: an update's `dt`, a timer, an interval.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Display)]
 pub struct Millis(u32);
 
 impl Millis {
@@ -114,12 +108,6 @@ impl Millis {
     #[must_use]
     pub fn seconds(self) -> Seconds {
         Seconds(self.0 as f32 / 1000.0)
-    }
-}
-
-impl Display for Millis {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        self.0.fmt(f)
     }
 }
 
@@ -170,7 +158,22 @@ impl genie_diff::Diff for WholeSeconds {
 /// A span in seconds as the game's `f32` holds it: an update's (`world+0x164`, the dt over
 /// 1000), the timers that count it down or up, the masters' times. Each operator is the one
 /// `f32` operation the game does; a comparison is `f32`'s (a NaN compares false).
-#[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Default,
+    PartialEq,
+    PartialOrd,
+    Serialize,
+    Deserialize,
+    Display,
+    Add,
+    Sub,
+    Neg,
+    AddAssign,
+    SubAssign,
+)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Seconds(f32);
 
@@ -197,47 +200,6 @@ impl Seconds {
     #[must_use]
     pub const fn get(self) -> f32 {
         self.0
-    }
-}
-
-impl Add for Seconds {
-    type Output = Self;
-
-    /// The `f32` sum.
-    fn add(self, other: Self) -> Self {
-        Self(self.0 + other.0)
-    }
-}
-
-impl Sub for Seconds {
-    type Output = Self;
-
-    /// The `f32` difference.
-    fn sub(self, other: Self) -> Self {
-        Self(self.0 - other.0)
-    }
-}
-
-impl AddAssign for Seconds {
-    /// The `f32` sum in place (a timer that counts up).
-    fn add_assign(&mut self, other: Self) {
-        self.0 += other.0;
-    }
-}
-
-impl SubAssign for Seconds {
-    /// The `f32` difference in place (a timer that counts down).
-    fn sub_assign(&mut self, other: Self) {
-        self.0 -= other.0;
-    }
-}
-
-impl Neg for Seconds {
-    type Output = Self;
-
-    /// The span negated (its sign bit flipped).
-    fn neg(self) -> Self {
-        Self(-self.0)
     }
 }
 
@@ -281,12 +243,6 @@ impl Mul<Seconds> for f32 {
     /// A rate per second over the span: what it adds up to (one `f32` product).
     fn mul(self, s: Seconds) -> Self {
         self * s.0
-    }
-}
-
-impl Display for Seconds {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        self.0.fmt(f)
     }
 }
 

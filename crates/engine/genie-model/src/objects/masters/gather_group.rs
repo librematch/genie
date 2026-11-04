@@ -2,9 +2,9 @@
 //! look for, the value the `.dat` names `resource_gather_group`.
 
 use crate::GenieError;
+use derive_more::Display;
 use serde::Deserialize;
 use serde::Serialize;
-use std::fmt::{Display, Error as FmtError, Formatter};
 
 /// A master's gather group (`+0x683`, the `.dat`'s `resource_gather_group`): the kind of
 /// resource an object that gathers by itself (`enable_auto_gather`) offers, by which the unit
@@ -14,7 +14,18 @@ use std::fmt::{Display, Error as FmtError, Formatter};
 /// (`genie_core::gathering::gather_search::gather_group`). The `.dat` may hold others, so the
 /// group is a newtype with named constants.
 #[derive(
-    Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+    Clone,
+    Copy,
+    Debug,
+    Default,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    Display,
 )]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct GatherGroup(u8);
@@ -64,12 +75,6 @@ impl TryFrom<i32> for GatherGroup {
         u8::try_from(value).map(Self).map_err(|_| {
             GenieError::invalid_input("a gather group outside a byte").with("group", value)
         })
-    }
-}
-
-impl Display for GatherGroup {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), FmtError> {
-        self.0.fmt(f)
     }
 }
 

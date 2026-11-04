@@ -17,6 +17,10 @@ genie-math = { path = "../genie-math" }
 # the getters of the newtypes: their values are private, so only the constructors that check
 # them set them (FD-001-D23)
 getset.workspace = true
+# the types' formats, derived where they are the plain ones (T16)
+derive_more.workspace = true
+# the enums' values from their numbers (`FromRepr`, T16)
+strum.workspace = true
 # the bit sets the game tests bit by bit (a master's flags, the layer's role sets)
 bitflags = { workspace = true, features = ["serde"] }
 # the build layer's form in Nickel and the model's in the cache (FD-046-D08, D18); `rc` for the

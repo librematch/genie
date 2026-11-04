@@ -3,8 +3,8 @@
 
 use crate::GenieError;
 use crate::movement::move_to::MoveToAction;
+use derive_more::Display;
 use genie_diff::Diff;
-use std::fmt::{Display, Error, Formatter};
 
 /// A Build's state (`+0x18`, set by `set_state`, `0x140aae200`) with the data only that state
 /// holds (FD-045-D62): every `set_state` drops the sub-actions first
@@ -12,7 +12,8 @@ use std::fmt::{Display, Error, Formatter};
 /// `MoveTo`'s update dropped it, until the next `set_state`. Its update switches on it; the
 /// update's default case takes the bytes without a state (0, 5, 9, 10, 12, 14 to 221 and above
 /// 224), which no step modelled here sets.
-#[derive(Clone, Copy, Debug, PartialEq, Diff)]
+#[derive(Clone, Copy, Debug, PartialEq, Diff, Display)]
+#[display("{}", self.get())]
 pub enum BuildState {
     /// 1: done; the list removes it.
     Done,
@@ -142,12 +143,6 @@ impl BuildState {
         let mut s = self;
         let _ = s.take_move_to();
         s
-    }
-}
-
-impl Display for BuildState {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        write!(f, "{}", self.get())
     }
 }
 

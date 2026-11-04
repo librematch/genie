@@ -2,14 +2,16 @@
 //! the world's players.
 
 use crate::GenieError;
+use derive_more::Display;
 use getset::CopyGetters;
-use std::fmt::{Display, Error as FmtError, Formatter};
 
 /// A player's number: 0 for Gaia, then the players in their order. A command's byte 1 holds
 /// the player who sent it, a comm player the game looks up whatever its value
 /// (`FUN_140e6b210`; the slice takes comm and world players as equal), so every byte is one.
 /// The world's players are in this order ([`PlayerId::index`]).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, CopyGetters)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, CopyGetters, Display,
+)]
 pub struct PlayerId(
     /// Its number, as a command's byte holds it.
     #[getset(get_copy = "pub")]
@@ -32,12 +34,6 @@ impl PlayerId {
     /// command's byte (256) keeps only the players a command can name.
     pub fn each(count: usize) -> impl Iterator<Item = Self> + Clone {
         (0..count).filter_map(|index| Self::try_from(index).ok())
-    }
-}
-
-impl Display for PlayerId {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), FmtError> {
-        self.0.fmt(f)
     }
 }
 

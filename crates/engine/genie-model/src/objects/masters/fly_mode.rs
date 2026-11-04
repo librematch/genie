@@ -1,14 +1,25 @@
 //! A master's fly mode (`+0x608`): where its objects' height goes on the ground.
 
+use derive_more::Display;
 use serde::Deserialize;
 use serde::Serialize;
-use std::fmt::{Display, Error, Formatter};
 
 /// A master's fly mode (`+0x608`, the `.dat`'s `fly_mode`): where an object's height goes against
 /// the ground's (`FUN_141193a10`, `genie_core::combat::missile::grounded`). Every byte is kept; one
 /// not named keeps its height.
 #[derive(
-    Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord,
+    Clone,
+    Copy,
+    Debug,
+    Default,
+    PartialEq,
+    Eq,
+    Hash,
+    Serialize,
+    Deserialize,
+    PartialOrd,
+    Ord,
+    Display,
 )]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct FlyMode(u8);
@@ -29,12 +40,6 @@ impl FlyMode {
     #[must_use]
     pub const fn get(self) -> u8 {
         self.0
-    }
-}
-
-impl Display for FlyMode {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        self.0.fmt(f)
     }
 }
 

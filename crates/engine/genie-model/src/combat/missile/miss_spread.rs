@@ -1,12 +1,13 @@
 //! How far a missed missile strays.
 
+use derive_more::AddAssign;
 use serde::Deserialize;
 use serde::Serialize;
-use std::ops::{AddAssign, MulAssign};
+use std::ops::MulAssign;
 
 /// How far a missed missile strays per tile of the way (a master's `missed_missile_spread`,
 /// `+0x860`, the attribute "Attack Dispersion"), which a miss multiplies its gap by.
-#[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd, Serialize, Deserialize, AddAssign)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct MissSpread(f32);
 
@@ -24,13 +25,6 @@ impl MissSpread {
     #[must_use]
     pub const fn get(self) -> f32 {
         self.0
-    }
-}
-
-impl AddAssign for MissSpread {
-    /// An add effect's sum (one `f32` add).
-    fn add_assign(&mut self, other: Self) {
-        self.0 += other.0;
     }
 }
 

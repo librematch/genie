@@ -1,12 +1,12 @@
 //! An object's place in its player's list ([`ListIndex`]) and a list's places ([`Places`]).
 
-use std::fmt::{Display, Error, Formatter};
+use derive_more::Display;
 use std::iter::FusedIterator;
 use std::ops::Range;
 
 /// An object's place in its player's live or sleeping list, counted from 0 (the object's
 /// `+0x668` follows it: `FUN_1411664a0` swap-removes, the last object taking the place).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Display)]
 pub struct ListIndex(
     /// The place.
     usize,
@@ -70,12 +70,6 @@ impl DoubleEndedIterator for Places {
 impl ExactSizeIterator for Places {}
 
 impl FusedIterator for Places {}
-
-impl Display for ListIndex {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        self.0.fmt(f)
-    }
-}
 
 impl genie_diff::Diff for ListIndex {
     fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {

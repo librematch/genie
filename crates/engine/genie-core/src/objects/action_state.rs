@@ -1,14 +1,14 @@
 //! The state of an action of any type ([`ActionState`]): its number.
 
+use derive_more::Display;
 use genie_diff::Diff;
-use std::fmt::{Display, Error, Formatter};
 
 /// An action's state by its number (`+0x18`, `RGE_Action_Object::actionState`), whatever the
 /// action's type: what the readers of any action compare (the unit AI, the movement, the
 /// drop-off search, the meeting, the checkpoint's word 9). Each action's own enum names its
 /// states ([`crate::combat::attack::AttackState`] and the others); this is the number they
 /// share.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Diff)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Diff, Display)]
 pub struct ActionState(u8);
 
 impl ActionState {
@@ -25,12 +25,6 @@ impl ActionState {
     #[must_use]
     pub const fn get(self) -> u8 {
         self.0
-    }
-}
-
-impl Display for ActionState {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        self.0.fmt(f)
     }
 }
 

@@ -1,14 +1,25 @@
 //! An effect's id (a technology's `+0x3a`, a player's effect override `+0x62`).
 
+use derive_more::Display;
 use serde::Deserialize;
 use serde::Serialize;
-use std::fmt::{Display, Error, Formatter};
 
 /// An effect's id: its place in the world's effect table (`+0x128`), as a technology (`+0x3a`) and
 /// a player's effect override (`+0x62`) hold it, −1 for none. Every short is kept.
 /// The default is 0, as a zeroed record holds it.
 #[derive(
-    Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord,
+    Clone,
+    Copy,
+    Debug,
+    Default,
+    PartialEq,
+    Eq,
+    Hash,
+    Serialize,
+    Deserialize,
+    PartialOrd,
+    Ord,
+    Display,
 )]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct EffectId(i16);
@@ -27,12 +38,6 @@ impl EffectId {
     #[must_use]
     pub const fn get(self) -> i16 {
         self.0
-    }
-}
-
-impl Display for EffectId {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        self.0.fmt(f)
     }
 }
 

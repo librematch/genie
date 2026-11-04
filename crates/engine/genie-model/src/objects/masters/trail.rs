@@ -1,10 +1,11 @@
 //! A moving master's trail: the master it leaves behind, its mode and its density.
 
 use crate::objects::masters::MasterField;
+use derive_more::AddAssign;
 use genie_diff::Diff;
 use serde::Deserialize;
 use serde::Serialize;
-use std::ops::{AddAssign, MulAssign};
+use std::ops::MulAssign;
 
 /// A moving master's trail (`obj_trail_id`, `obj_trail_options`, `obj_trail_spacing`; the
 /// `.dat`'s tracking unit, its mode and density).
@@ -47,7 +48,7 @@ impl TrailMode {
 }
 
 /// A trail's density (`obj_trail_spacing`, `+0x764`, a float), which no modelled routine reads.
-#[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd, Serialize, Deserialize, AddAssign)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct TrailDensity(f32);
 
@@ -62,13 +63,6 @@ impl TrailDensity {
     #[must_use]
     pub const fn get(self) -> f32 {
         self.0
-    }
-}
-
-impl AddAssign for TrailDensity {
-    /// An add effect's sum (one `f32` add).
-    fn add_assign(&mut self, other: Self) {
-        self.0 += other.0;
     }
 }
 

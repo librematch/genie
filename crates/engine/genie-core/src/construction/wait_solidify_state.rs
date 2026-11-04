@@ -1,12 +1,15 @@
 //! A Wait Solidify's state: waiting for its foundation to turn solid.
 
 use crate::GenieError;
-use std::fmt::{Display, Error, Formatter};
+use derive_more::Display;
+use strum::FromRepr;
 
 /// A Wait Solidify's state (`+0x18`): the constructor's 10, changed only by its `set_state` (slot
 /// 0x80, `FUN_140ae8b60`), which sets the state its caller gives: 1 and 13 every action shares, 2 a
 /// stop's. The other bytes no caller modelled here gives.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Display, FromRepr)]
+#[repr(u8)]
+#[display("{}", self.get())]
 pub enum WaitSolidifyState {
     /// 1: done; the list removes it.
     Done = 1,
@@ -25,16 +28,8 @@ impl WaitSolidifyState {
     ///
     /// A byte that names no state of a Wait Solidify.
     pub fn of_byte(value: u8) -> Result<Self, GenieError> {
-        Ok(match value {
-            1 => Self::Done,
-            2 => Self::Stopped,
-            10 => Self::Waiting,
-            13 => Self::Failed,
-            _ => {
-                return Err(
-                    GenieError::invalid_input("no state of a Wait Solidify").with("state", value)
-                );
-            }
+        Self::from_repr(value).ok_or_else(|| {
+            GenieError::invalid_input("no state of a Wait Solidify").with("state", value)
         })
     }
 
@@ -42,12 +37,6 @@ impl WaitSolidifyState {
     #[must_use]
     pub const fn get(self) -> u8 {
         self as u8
-    }
-}
-
-impl Display for WaitSolidifyState {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        write!(f, "{}", self.get())
     }
 }
 

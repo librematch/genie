@@ -4,10 +4,10 @@
 //! attribute types are a different set ([`crate::objects::masters::attribute`]).
 
 use crate::GenieError;
+use derive_more::Display;
 use getset::CopyGetters;
 use serde::Deserialize;
 use serde::Serialize;
-use std::fmt::{Display, Error as FmtError, Formatter};
 
 /// A player's attribute number (`player+0x100`'s array, the `.dat`'s attribute types, an effect's
 /// attribute argument): 0 or more. The first four are the resources (food, wood, stone, gold).
@@ -27,6 +27,7 @@ use std::fmt::{Display, Error as FmtError, Formatter};
     CopyGetters,
     Serialize,
     Deserialize,
+    Display,
 )]
 #[serde(try_from = "i16", into = "i16")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
@@ -133,12 +134,6 @@ impl AttributeId {
             Some(a) => a.0,
             None => -1,
         }
-    }
-}
-
-impl Display for AttributeId {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), FmtError> {
-        self.0.fmt(f)
     }
 }
 

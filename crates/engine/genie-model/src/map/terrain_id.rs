@@ -1,16 +1,28 @@
 //! A terrain's id ([`TerrainId`]): a map tile's terrain and the `.dat`'s terrain records' index.
 
+use derive_more::Display;
 use genie_diff::Diff;
 use serde::Deserialize;
 use serde::Serialize;
-use std::fmt::{Display, Error, Formatter};
 
 /// A terrain by its id: a map tile's terrain (`+0x9`), the terrain it restores (`+0xa`) and its
 /// layer (`+0xc`), the index of the `.dat`'s terrain records
 /// (`genie_core::map::terrain::Terrain::terrains`). A master holds its terrains as shorts, −1 for
 /// none ([`TerrainId::of_data`]).
 #[derive(
-    Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Diff, Serialize, Deserialize,
+    Clone,
+    Copy,
+    Debug,
+    Default,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Diff,
+    Serialize,
+    Deserialize,
+    Display,
 )]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct TerrainId(u8);
@@ -43,12 +55,6 @@ impl TerrainId {
     #[must_use]
     pub const fn index(self) -> usize {
         self.0 as usize
-    }
-}
-
-impl Display for TerrainId {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        self.0.fmt(f)
     }
 }
 

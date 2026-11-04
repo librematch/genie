@@ -1,11 +1,25 @@
 //! The count of farms or fish traps a queue paid for.
 
 use crate::production::CostCount;
-use std::ops::{Add, AddAssign, Sub, SubAssign};
+use derive_more::{Add, AddAssign, Sub, SubAssign};
 
 /// The farms (`farm_queue_count`, `+0x141c`) or fish traps (`fishTrapQueueCount`, `+0x1420`) a
 /// player's queue paid for (saved), and the count a GAME command buys or takes back.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Default,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Add,
+    Sub,
+    AddAssign,
+    SubAssign,
+)]
 pub struct QueueCount(i32);
 
 impl QueueCount {
@@ -36,36 +50,6 @@ impl QueueCount {
     #[must_use]
     pub const fn get(self) -> i32 {
         self.0
-    }
-}
-
-impl Add for QueueCount {
-    type Output = Self;
-
-    /// The int sum.
-    fn add(self, other: Self) -> Self {
-        Self(self.0 + other.0)
-    }
-}
-
-impl AddAssign for QueueCount {
-    fn add_assign(&mut self, other: Self) {
-        self.0 += other.0;
-    }
-}
-
-impl Sub for QueueCount {
-    type Output = Self;
-
-    /// The int difference.
-    fn sub(self, other: Self) -> Self {
-        Self(self.0 - other.0)
-    }
-}
-
-impl SubAssign for QueueCount {
-    fn sub_assign(&mut self, other: Self) {
-        self.0 -= other.0;
     }
 }
 

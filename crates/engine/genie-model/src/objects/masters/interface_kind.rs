@@ -1,14 +1,25 @@
 //! A master's interface kind (`+0x62f`): which command panel its objects show.
 
+use derive_more::Display;
 use serde::Deserialize;
 use serde::Serialize;
-use std::fmt::{Display, Error, Formatter};
 
 /// A master's interface kind (`unit_level`, `+0x62f`; the `.dat`'s `interface_kind`, openage's
 /// names): the command panel a selected object of it shows. The simulation only keeps it; every
 /// byte is kept.
 #[derive(
-    Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord,
+    Clone,
+    Copy,
+    Debug,
+    Default,
+    PartialEq,
+    Eq,
+    Hash,
+    Serialize,
+    Deserialize,
+    PartialOrd,
+    Ord,
+    Display,
 )]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct InterfaceKind(u8);
@@ -41,12 +52,6 @@ impl InterfaceKind {
     #[must_use]
     pub const fn get(self) -> u8 {
         self.0
-    }
-}
-
-impl Display for InterfaceKind {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        self.0.fmt(f)
     }
 }
 

@@ -3,15 +3,16 @@
 
 use crate::GenieError;
 use crate::movement::move_to::MoveToAction;
+use derive_more::Display;
 use genie_diff::Diff;
-use std::fmt::{Display, Error, Formatter};
 
 /// A Repair's state (`+0x18`, set by `set_state`, `0x140ad9c60`) with the data only that state
 /// holds (FD-045-D62): every `set_state` drops the sub-actions first, and the two walks make
 /// their quiet `MoveTo`, none once the `MoveTo`'s update dropped it, until the next
 /// `set_state`. Its update (`0x140adaa20`) and `set_state` switch on it. The update has no case
 /// for the other bytes (0, 5, 8, 9, 12 and above 13), and no step modelled here sets them.
-#[derive(Clone, Copy, Debug, PartialEq, Diff)]
+#[derive(Clone, Copy, Debug, PartialEq, Diff, Display)]
+#[display("{}", self.get())]
 pub enum RepairState {
     /// 1: done; the target is let go and the list removes it.
     Done,
@@ -117,12 +118,6 @@ impl RepairState {
         let mut s = self;
         let _ = s.take_move_to();
         s
-    }
-}
-
-impl Display for RepairState {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        write!(f, "{}", self.get())
     }
 }
 

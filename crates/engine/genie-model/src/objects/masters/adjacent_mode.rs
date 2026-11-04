@@ -1,13 +1,24 @@
 //! A building master's adjacent mode (`+0x980`): whether walls and gates join their neighbours.
 
+use derive_more::Display;
 use serde::Deserialize;
 use serde::Serialize;
-use std::fmt::{Display, Error, Formatter};
 
 /// A building master's adjacent mode (`+0x980`, `adjacent_mode`): walls and gates join their
 /// neighbours (`FUN_1411ce890`). Every byte is kept.
 #[derive(
-    Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord,
+    Clone,
+    Copy,
+    Debug,
+    Default,
+    PartialEq,
+    Eq,
+    Hash,
+    Serialize,
+    Deserialize,
+    PartialOrd,
+    Ord,
+    Display,
 )]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct AdjacentMode(u8);
@@ -26,12 +37,6 @@ impl AdjacentMode {
     #[must_use]
     pub const fn get(self) -> u8 {
         self.0
-    }
-}
-
-impl Display for AdjacentMode {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        self.0.fmt(f)
     }
 }
 

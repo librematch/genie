@@ -1,14 +1,15 @@
 //! A gather point's state: a point SET GATHER POINT made, or a byte SET GATHER STATE gave.
 
 use crate::GenieError;
-use std::fmt::{Display, Error, Formatter};
+use derive_more::Display;
 use std::num::NonZeroU8;
 
 /// A building's gather point's state (`+0xc30`, the save's `gather_point_exists`): 1
 /// ([`GatherPointState::Point`]) for a point SET GATHER POINT made, else the byte SET GATHER
 /// STATE's packet gave the building ([`GatherPointState::Kept`], 0xff, the one SET GATHER POINT
 /// does not move to another target). A state of 0 is no gather point: `Option` is `None`.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Display)]
+#[display("{}", self.get())]
 pub enum GatherPointState {
     /// 1: a point SET GATHER POINT made; only this state sends a new unit to it
     /// (`FUN_140ace9c0`'s `+0xc30 != 1` return).
@@ -69,12 +70,6 @@ impl GatherPointState {
     #[must_use]
     pub const fn get(self) -> u8 {
         self.raw().get()
-    }
-}
-
-impl Display for GatherPointState {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        write!(f, "{}", self.get())
     }
 }
 

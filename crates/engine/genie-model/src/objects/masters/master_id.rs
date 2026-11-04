@@ -2,10 +2,10 @@
 //! and a target's master.
 
 use crate::GenieError;
+use derive_more::Display;
 use getset::CopyGetters;
 use serde::Deserialize;
 use serde::Serialize;
-use std::fmt::{Display, Error as FmtError, Formatter};
 
 /// A master's id: the `.dat`'s unit id, the place of the master in a player's masters
 /// ([`crate::objects::masters::Master::id`]), so 0 or more. A field that holds −1 for none
@@ -23,6 +23,7 @@ use std::fmt::{Display, Error as FmtError, Formatter};
     CopyGetters,
     Serialize,
     Deserialize,
+    Display,
 )]
 #[serde(try_from = "i16", into = "i16")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
@@ -78,12 +79,6 @@ impl MasterId {
             Some(m) => m.0,
             None => Self::NONE,
         }
-    }
-}
-
-impl Display for MasterId {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), FmtError> {
-        self.0.fmt(f)
     }
 }
 

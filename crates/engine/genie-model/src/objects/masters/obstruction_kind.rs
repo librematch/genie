@@ -1,9 +1,9 @@
 //! A master's obstruction type as one type: the shape of the record its objects file in the
 //! obstruction manager, the value the `.dat` names `obstruction_type`.
 
+use derive_more::Display;
 use serde::Deserialize;
 use serde::Serialize;
-use std::fmt::{Display, Error, Formatter};
 
 /// A master's obstruction type (`+0x651`, the `.dat`'s `obstruction_type`; an obstruction
 /// record's byte `+1`): whether its objects get a record and a mesh shape, the shape the walk
@@ -11,7 +11,18 @@ use std::fmt::{Display, Error, Formatter};
 /// simulation does not tell apart, so the type is a newtype: the named ones are those its tests
 /// name.
 #[derive(
-    Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+    Clone,
+    Copy,
+    Debug,
+    Default,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    Display,
 )]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ObstructionKind(u8);
@@ -90,12 +101,6 @@ impl From<u8> for ObstructionKind {
     /// The type a master's byte holds: every value is one.
     fn from(value: u8) -> Self {
         Self(value)
-    }
-}
-
-impl Display for ObstructionKind {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        self.0.fmt(f)
     }
 }
 

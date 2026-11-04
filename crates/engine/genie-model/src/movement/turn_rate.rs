@@ -3,9 +3,9 @@
 
 use crate::math::Angle;
 use crate::world::Seconds;
+use derive_more::Display;
 use serde::Deserialize;
 use serde::Serialize;
-use std::fmt::{Display, Error, Formatter};
 use std::ops::{Div, Mul};
 
 /// The most a unit or a group turns per second, in radians, as the game's `f32` holds it: a
@@ -13,7 +13,7 @@ use std::ops::{Div, Mul};
 /// time), a group's most yaw per second moving and standing. The largest float
 /// ([`TurnRate::MAX`]) turns at once. Each operator is the one `f32` operation the game does, in
 /// its order; a comparison is `f32`'s (a NaN compares false).
-#[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd, Serialize, Deserialize, Display)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct TurnRate(f32);
 
@@ -52,12 +52,6 @@ impl Div<Seconds> for Angle {
     /// time).
     fn div(self, dt: Seconds) -> TurnRate {
         TurnRate(self.get() / dt.get())
-    }
-}
-
-impl Display for TurnRate {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        self.0.fmt(f)
     }
 }
 

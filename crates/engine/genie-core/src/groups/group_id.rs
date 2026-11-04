@@ -2,14 +2,16 @@
 //! group link, a group's differentiator groups and the lookups by id name.
 
 use crate::GenieError;
+use derive_more::Display;
 use getset::CopyGetters;
-use std::fmt::{Display, Error as FmtError, Formatter};
 
 /// A unit group's id (`mID`, `+0xd8`): the world's group counter (`mUnitGroupCounter`,
 /// `world+0x5c`) as the group was created (`FUN_14152efc0`). A unit's link (`mGroupID`, `+0x6d0`)
 /// takes −1 for no group, and the lookup by id (`FUN_14152ff40`) finds none for −1, so no
 /// group's id is −1: such a field holds `Option<GroupId>` ([`GroupId::of_field`]).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, CopyGetters)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, CopyGetters, Display,
+)]
 pub struct GroupId(
     /// Its value, as the group and the fields that name it hold it.
     #[getset(get_copy = "pub")]
@@ -45,12 +47,6 @@ impl GroupId {
             Some(id) => id.0,
             None => Self::NONE,
         }
-    }
-}
-
-impl Display for GroupId {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), FmtError> {
-        self.0.fmt(f)
     }
 }
 

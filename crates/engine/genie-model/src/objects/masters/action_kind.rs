@@ -4,10 +4,10 @@
 //! Make's 21).
 
 use crate::GenieError;
+use derive_more::Display;
 use genie_diff::{Diff, Differ};
 use serde::Deserialize;
 use serde::Serialize;
-use std::fmt::{Display, Error as FmtError, Formatter};
 
 /// An action type: a task's `action_type` (`+0x10`, the `.dat`'s) and an action's type (`+0x8`),
 /// one numbering. The `.dat` holds types the simulation does not run (the AI's, the scenario's),
@@ -15,7 +15,18 @@ use std::fmt::{Display, Error as FmtError, Formatter};
 /// holds is a type, and the named ones are values of the type. A field or a filter that holds −1
 /// for none or any is `Option<ActionKind>`.
 #[derive(
-    Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+    Clone,
+    Copy,
+    Debug,
+    Default,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    Display,
 )]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ActionKind(
@@ -142,12 +153,6 @@ impl TryFrom<i16> for ActionKind {
     fn try_from(value: i16) -> Result<Self, GenieError> {
         Self::of_data(value)
             .ok_or_else(|| GenieError::invalid_input("a negative action type").with("value", value))
-    }
-}
-
-impl Display for ActionKind {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), FmtError> {
-        self.0.fmt(f)
     }
 }
 

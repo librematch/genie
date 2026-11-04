@@ -1,14 +1,25 @@
 //! A master's fog visibility (`+0x605`): whether its objects show in the fog of war.
 
+use derive_more::Display;
 use serde::Deserialize;
 use serde::Serialize;
-use std::fmt::{Display, Error, Formatter};
 
 /// A master's fog visibility (`+0x605`, the `.dat`'s `fog_visibility`; openage's names): an Attack
 /// goes on against an object of any but [`FogVisibility::INVISIBLE`] in the fog. Every byte is
 /// kept.
 #[derive(
-    Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord,
+    Clone,
+    Copy,
+    Debug,
+    Default,
+    PartialEq,
+    Eq,
+    Hash,
+    Serialize,
+    Deserialize,
+    PartialOrd,
+    Ord,
+    Display,
 )]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct FogVisibility(u8);
@@ -35,12 +46,6 @@ impl FogVisibility {
     #[must_use]
     pub const fn get(self) -> u8 {
         self.0
-    }
-}
-
-impl Display for FogVisibility {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        self.0.fmt(f)
     }
 }
 

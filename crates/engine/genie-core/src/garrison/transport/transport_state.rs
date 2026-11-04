@@ -3,15 +3,16 @@
 
 use crate::GenieError;
 use crate::movement::move_to::MoveToAction;
+use derive_more::Display;
 use genie_diff::Diff;
-use std::fmt::{Display, Error, Formatter};
 
 /// A Transport's state (`+0x18`, set by `set_state`, slot 16 `FUN_140aa42a0`) with the data
 /// only that state holds (FD-045-D62): every `set_state` drops the sub-actions first, and the
 /// two sails make their quiet `MoveTo`, none once the `MoveTo`'s update dropped it, until the
 /// next `set_state`. Its update switches on it. The bytes without a state have no case, and no
 /// step modelled here sets them.
-#[derive(Clone, Copy, Debug, PartialEq, Diff)]
+#[derive(Clone, Copy, Debug, PartialEq, Diff, Display)]
+#[display("{}", self.get())]
 pub enum TransportState {
     /// 0: made, not started (the constructor's).
     New,
@@ -111,12 +112,6 @@ impl TransportState {
         let mut s = self;
         let _ = s.take_move_to();
         s
-    }
-}
-
-impl Display for TransportState {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        write!(f, "{}", self.get())
     }
 }
 

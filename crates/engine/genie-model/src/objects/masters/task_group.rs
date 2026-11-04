@@ -1,14 +1,25 @@
 //! A master's task swap group (`+0x7b8`): the masters a unit may switch between for a task.
 
+use derive_more::Display;
 use serde::Deserialize;
 use serde::Serialize;
-use std::fmt::{Display, Error, Formatter};
 
 /// A master's task swap group (`+0x7b8`, the `.dat`'s `TaskSwapGroup`; the save does not carry it):
 /// a unit of a master of a group switches to another master of the same group whose task list has a
 /// task for the target. 0 is none.
 #[derive(
-    Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord,
+    Clone,
+    Copy,
+    Debug,
+    Default,
+    PartialEq,
+    Eq,
+    Hash,
+    Serialize,
+    Deserialize,
+    PartialOrd,
+    Ord,
+    Display,
 )]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct TaskGroup(u8);
@@ -33,12 +44,6 @@ impl TaskGroup {
     #[must_use]
     pub const fn get(self) -> u8 {
         self.0
-    }
-}
-
-impl Display for TaskGroup {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        self.0.fmt(f)
     }
 }
 

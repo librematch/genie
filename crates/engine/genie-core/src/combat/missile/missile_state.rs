@@ -1,11 +1,14 @@
 //! A missile's state: launched, flying, ended.
 
 use crate::GenieError;
-use std::fmt::{Display, Error, Formatter};
+use derive_more::Display;
+use strum::FromRepr;
 
 /// A missile action's state (`+0x18`, set by `set_state`, `FUN_140a9de70`): its update flies in
 /// state 4. The bytes without a state have no case, and no step modelled here sets them.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Display, FromRepr)]
+#[repr(u8)]
+#[display("{}", self.get())]
 pub enum MissileState {
     /// 0: made, not started (the volley's).
     New = 0,
@@ -24,27 +27,14 @@ impl MissileState {
     ///
     /// A byte that names no state of a missile.
     pub fn of_byte(value: u8) -> Result<Self, GenieError> {
-        Ok(match value {
-            0 => Self::New,
-            1 => Self::Done,
-            3 => Self::Launch,
-            4 => Self::Flying,
-            _ => {
-                return Err(GenieError::invalid_input("no state of a missile").with("state", value));
-            }
-        })
+        Self::from_repr(value)
+            .ok_or_else(|| GenieError::invalid_input("no state of a missile").with("state", value))
     }
 
     /// Its number.
     #[must_use]
     pub const fn get(self) -> u8 {
         self as u8
-    }
-}
-
-impl Display for MissileState {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        write!(f, "{}", self.get())
     }
 }
 

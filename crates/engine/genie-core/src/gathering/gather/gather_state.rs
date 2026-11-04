@@ -3,15 +3,16 @@
 
 use crate::GenieError;
 use crate::movement::move_to::MoveToAction;
+use derive_more::Display;
 use genie_diff::Diff;
-use std::fmt::{Display, Error, Formatter};
 
 /// A Gather's state (`+0x18`, set by `set_state`, `0x140a8cd40`) with the data only that state
 /// holds (FD-045-D62): every `set_state` drops the sub-actions first (`FUN_140a98620`), and the
 /// five walks make their `MoveTo`, none once the `MoveTo`'s update dropped it, until the next
 /// `set_state`. Its update switches on it. The bytes without a state (5, 9, 10, 12, 14, 16 to
 /// 0xf1 and above 0xf3) have no case.
-#[derive(Clone, Copy, Debug, PartialEq, Diff)]
+#[derive(Clone, Copy, Debug, PartialEq, Diff, Display)]
+#[display("{}", self.get())]
 pub enum GatherState {
     /// 0: made, not started (the constructor's).
     New,
@@ -153,12 +154,6 @@ impl GatherState {
         let mut s = self;
         let _ = s.take_move_to();
         s
-    }
-}
-
-impl Display for GatherState {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        write!(f, "{}", self.get())
     }
 }
 

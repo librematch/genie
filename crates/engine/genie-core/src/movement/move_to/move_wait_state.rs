@@ -1,13 +1,16 @@
 //! A `MoveTo`'s wait state: whether it waited after the motion step gave up.
 
 use crate::GenieError;
-use std::fmt::{Display, Error, Formatter};
+use derive_more::Display;
+use strum::FromRepr;
 
 /// A `MoveTo`'s wait state (`+0x6c`, `movement_wait_state`): a `MoveTo` waits once after the motion
 /// step gave up ([`MoveWait::give_up`]). The bytes without a state have no case.
 ///
 /// [`MoveWait::give_up`]: crate::movement::move_to::MoveWait::give_up
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Display, FromRepr)]
+#[repr(u8)]
+#[display("{}", self.get())]
 pub enum MoveWaitState {
     /// 0: it never waited (the constructors').
     Never = 0,
@@ -24,15 +27,8 @@ impl MoveWaitState {
     ///
     /// A byte that names no state of a `MoveTo`'s wait.
     pub fn of_byte(value: u8) -> Result<Self, GenieError> {
-        Ok(match value {
-            0 => Self::Never,
-            1 => Self::Waiting,
-            2 => Self::AskedAgain,
-            _ => {
-                return Err(
-                    GenieError::invalid_input("no state of a MoveTo's wait").with("state", value)
-                );
-            }
+        Self::from_repr(value).ok_or_else(|| {
+            GenieError::invalid_input("no state of a MoveTo's wait").with("state", value)
         })
     }
 
@@ -40,12 +36,6 @@ impl MoveWaitState {
     #[must_use]
     pub const fn get(self) -> u8 {
         self as u8
-    }
-}
-
-impl Display for MoveWaitState {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        write!(f, "{}", self.get())
     }
 }
 

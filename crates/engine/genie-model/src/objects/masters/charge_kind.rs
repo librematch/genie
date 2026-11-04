@@ -1,13 +1,24 @@
 //! A master's charge type (`+0x922`): what its charge does.
 
+use derive_more::Display;
 use serde::Deserialize;
 use serde::Serialize;
-use std::fmt::{Display, Error, Formatter};
 
 /// A master's charge type (`charge_type`, `+0x922`): what its charge (`+0x9e0`) does. Every short
 /// the data or an effect leaves is kept; the values the game tests are named.
 #[derive(
-    Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord,
+    Clone,
+    Copy,
+    Debug,
+    Default,
+    PartialEq,
+    Eq,
+    Hash,
+    Serialize,
+    Deserialize,
+    PartialOrd,
+    Ord,
+    Display,
 )]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ChargeKind(i16);
@@ -55,12 +66,6 @@ impl ChargeKind {
     #[must_use]
     pub const fn get(self) -> i16 {
         self.0
-    }
-}
-
-impl Display for ChargeKind {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        self.0.fmt(f)
     }
 }
 

@@ -1,14 +1,25 @@
 //! A master's minimap mode (`+0x62e`): how its objects show on the minimap.
 
+use derive_more::Display;
 use serde::Deserialize;
 use serde::Serialize;
-use std::fmt::{Display, Error, Formatter};
 
 /// A master's minimap mode (`map_draw_level`, `+0x62e`; the `.dat`'s `minimap_mode`, openage's
 /// names): the dot its objects draw on the minimap. The simulation only keeps it; every byte is
 /// kept.
 #[derive(
-    Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord,
+    Clone,
+    Copy,
+    Debug,
+    Default,
+    PartialEq,
+    Eq,
+    Hash,
+    Serialize,
+    Deserialize,
+    PartialOrd,
+    Ord,
+    Display,
 )]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct MinimapMode(u8);
@@ -41,12 +52,6 @@ impl MinimapMode {
     #[must_use]
     pub const fn get(self) -> u8 {
         self.0
-    }
-}
-
-impl Display for MinimapMode {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        self.0.fmt(f)
     }
 }
 

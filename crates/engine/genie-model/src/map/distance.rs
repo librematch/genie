@@ -1,16 +1,31 @@
 //! A distance on the map in tiles ([`Distance`]) and its square ([`DistanceSquared`]), each
 //! with the game's `f32` operations.
 
+use derive_more::{Add, AddAssign, Display, Neg, Sub, SubAssign};
 use serde::Deserialize;
 use serde::Serialize;
-use std::fmt::{Display, Error, Formatter};
-use std::ops::{Add, AddAssign, Div, Mul, MulAssign, Neg, Sub, SubAssign};
+use std::ops::{Div, Mul, MulAssign};
 
 /// A distance on the map in tiles as the game's `f32` holds it: a master's range, minimum range,
 /// work range, search radius and line of sight, a reach, a gap between two footprints, a group's
 /// ranges. Each operator is the one `f32` operation the game does, in its order; a comparison is
 /// `f32`'s (a NaN compares false).
-#[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Default,
+    PartialEq,
+    PartialOrd,
+    Serialize,
+    Deserialize,
+    Display,
+    Add,
+    Sub,
+    Neg,
+    AddAssign,
+    SubAssign,
+)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Distance(f32);
 
@@ -36,47 +51,6 @@ impl Distance {
     #[must_use]
     pub fn squared(self) -> DistanceSquared {
         DistanceSquared(self.0 * self.0)
-    }
-}
-
-impl Add for Distance {
-    type Output = Self;
-
-    /// The `f32` sum.
-    fn add(self, other: Self) -> Self {
-        Self(self.0 + other.0)
-    }
-}
-
-impl Sub for Distance {
-    type Output = Self;
-
-    /// The `f32` difference.
-    fn sub(self, other: Self) -> Self {
-        Self(self.0 - other.0)
-    }
-}
-
-impl AddAssign for Distance {
-    /// The `f32` sum in place.
-    fn add_assign(&mut self, other: Self) {
-        self.0 += other.0;
-    }
-}
-
-impl SubAssign for Distance {
-    /// The `f32` difference in place.
-    fn sub_assign(&mut self, other: Self) {
-        self.0 -= other.0;
-    }
-}
-
-impl Neg for Distance {
-    type Output = Self;
-
-    /// The distance negated (its sign bit flipped).
-    fn neg(self) -> Self {
-        Self(-self.0)
     }
 }
 
@@ -124,12 +98,6 @@ impl Div for Distance {
     }
 }
 
-impl Display for Distance {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        self.0.fmt(f)
-    }
-}
-
 impl genie_diff::Diff for Distance {
     fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
         self.0.diff(&other.0, d);
@@ -169,7 +137,7 @@ impl WholeDistance {
 
 /// A distance squared, in square tiles, as the game's `f32` holds it (a `gap_squared`): the game
 /// compares squares where it saves the root. A comparison is `f32`'s (a NaN compares false).
-#[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd, Display)]
 pub struct DistanceSquared(f32);
 
 impl DistanceSquared {
@@ -188,12 +156,6 @@ impl DistanceSquared {
     #[must_use]
     pub const fn get(self) -> f32 {
         self.0
-    }
-}
-
-impl Display for DistanceSquared {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        self.0.fmt(f)
     }
 }
 

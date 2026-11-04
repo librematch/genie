@@ -2,10 +2,10 @@
 //! technologies, the `.dat`'s technology record index.
 
 use crate::GenieError;
+use derive_more::Display;
 use getset::CopyGetters;
 use serde::Deserialize;
 use serde::Serialize;
-use std::fmt::{Display, Error as FmtError, Formatter};
 
 /// A technology's id (the `.dat`'s technology index, the place in a player's technologies), 0
 /// or more. A field that holds −1 for none holds `Option<TechId>` ([`TechId::of_field`]).
@@ -22,6 +22,7 @@ use std::fmt::{Display, Error as FmtError, Formatter};
     CopyGetters,
     Serialize,
     Deserialize,
+    Display,
 )]
 #[serde(try_from = "i16", into = "i16")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
@@ -91,12 +92,6 @@ impl TechId {
             Some(t) => t.0,
             None => Self::NONE,
         }
-    }
-}
-
-impl Display for TechId {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), FmtError> {
-        self.0.fmt(f)
     }
 }
 

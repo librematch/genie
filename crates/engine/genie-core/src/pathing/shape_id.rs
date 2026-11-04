@@ -1,11 +1,11 @@
 //! A shape's id in the obstruction manager's mesh.
 
-use std::fmt::{Display, Error, Formatter};
+use derive_more::Display;
 
 /// A shape's id in the mesh ([`crate::pathing::mesh::Mesh`]): its slot, the place of its box and
 /// its sides in the mesh's tables. An object keeps its shape's id (`+0x64c`); a freed slot links
 /// the next free one through its box's first word, −1 for none ([`ShapeId::link`]).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Display)]
 pub struct ShapeId(u32);
 
 impl ShapeId {
@@ -44,12 +44,6 @@ impl ShapeId {
             -1 => None,
             w => Some(Self(w as u32)),
         }
-    }
-}
-
-impl Display for ShapeId {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        write!(f, "{}", self.0)
     }
 }
 

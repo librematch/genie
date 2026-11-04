@@ -2,12 +2,13 @@
 
 use crate::GenieError;
 use std::fmt::{Display, Error, Formatter};
+use strum::FromRepr;
 
 /// A player's type (`player+0x10`, the save's `type`): which `WorldPlayer` class the game made
 /// for it. The player factory (`WorldPlayerFactory.cpp`, the creators `FUN_141679be0`
 /// registers) makes these four; a saved byte of another type is the game's
 /// `InvalidPlayerType`.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, FromRepr)]
 #[repr(u8)]
 pub enum PlayerKind {
     /// Type 0: the scenario editor's phantom player.
@@ -44,13 +45,8 @@ impl TryFrom<u8> for PlayerKind {
     ///
     /// A byte of a type no creator handles (the game's `InvalidPlayerType`).
     fn try_from(value: u8) -> Result<Self, GenieError> {
-        match value {
-            0 => Ok(Self::Phantom),
-            1 => Ok(Self::Human),
-            2 => Ok(Self::Gaia),
-            3 => Ok(Self::Computer),
-            _ => Err(GenieError::invalid_input("InvalidPlayerType").with("type", value)),
-        }
+        Self::from_repr(value)
+            .ok_or_else(|| GenieError::invalid_input("InvalidPlayerType").with("type", value))
     }
 }
 

@@ -1,15 +1,29 @@
 //! A sprite's frame and its animation state.
 
+use derive_more::{Add, Neg, Sub};
 use serde::Deserialize;
 use serde::Serialize;
-use std::ops::{Add, Neg, Rem, Sub};
+use std::ops::Rem;
 
 /// A frame of a sprite (a short): the frame a sprite shows (`+0x24`) and showed before
 /// (`+0x30`), a graphic's frame count (`frame_count`, `+0x8`, one past its last frame), a
 /// master's fire and interrupt frames and the frame a BUILD command chose. Each operator is the
 /// game's 16-bit one; every value is kept.
 #[derive(
-    Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+    Clone,
+    Copy,
+    Debug,
+    Default,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    Add,
+    Sub,
+    Neg,
 )]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Frame(i16);
@@ -68,33 +82,6 @@ impl Frame {
     #[must_use]
     pub const fn get(self) -> i16 {
         self.0
-    }
-}
-
-impl Add for Frame {
-    type Output = Self;
-
-    /// The 16-bit sum.
-    fn add(self, other: Self) -> Self {
-        Self(self.0 + other.0)
-    }
-}
-
-impl Sub for Frame {
-    type Output = Self;
-
-    /// The 16-bit difference.
-    fn sub(self, other: Self) -> Self {
-        Self(self.0 - other.0)
-    }
-}
-
-impl Neg for Frame {
-    type Output = Self;
-
-    /// The negated frames: a backwards step.
-    fn neg(self) -> Self {
-        Self(-self.0)
     }
 }
 

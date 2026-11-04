@@ -2,17 +2,28 @@
 //! weapons, gates, farms), the value the `.dat` names `unit_class`.
 
 use crate::GenieError;
+use derive_more::Display;
 use genie_diff::{Diff, Differ};
 use serde::Deserialize;
 use serde::Serialize;
-use std::fmt::{Display, Error as FmtError, Formatter};
 
 /// A master's class (`+0x410`, the `.dat`'s `unit_class`), 0 or more, or −1 for a master that has
 /// none ([`ClassId::of_master`]). The `.dat` holds classes the engine does not tell apart, and
 /// the ones it does are roles of the build layer (`Roles::of_class`, FD-046-D03), so the class
 /// is a newtype, not an enum: any class the data holds is a class.
 #[derive(
-    Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+    Clone,
+    Copy,
+    Debug,
+    Default,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    Display,
 )]
 #[serde(try_from = "i16", into = "i16")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
@@ -124,12 +135,6 @@ pub mod master_class {
     /// The deserializer's, for a value that is no short.
     pub fn deserialize<'de, D: Deserializer<'de>>(deserializer: D) -> Result<ClassId, D::Error> {
         i16::deserialize(deserializer).map(ClassId::of_master)
-    }
-}
-
-impl Display for ClassId {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), FmtError> {
-        self.0.fmt(f)
     }
 }
 

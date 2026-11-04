@@ -3,8 +3,8 @@
 
 use crate::GenieError;
 use crate::movement::move_to::MoveToAction;
+use derive_more::Display;
 use genie_diff::Diff;
-use std::fmt::{Display, Error, Formatter};
 
 /// An Attack's state (`+0x18`, set by `set_state`, slot 16 `0x140a820c0`) with the data only
 /// that state holds (FD-045-D62): every `set_state` drops the sub-actions first
@@ -12,7 +12,8 @@ use std::fmt::{Display, Error, Formatter};
 /// `MoveTo`'s update dropped it, until the next `set_state`. The update's switch
 /// (`0x140a82ae0`) runs a step for each. The switch has no case for the other bytes (3, 8 to
 /// 10, 12 and above), and no step modelled here sets them.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Diff)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Diff, Display)]
+#[display("{}", self.get())]
 pub enum AttackState {
     /// 0: made, not started (the constructor's).
     #[default]
@@ -142,12 +143,6 @@ impl AttackState {
                 | Self::Swing
                 | Self::GotoPoint { .. }
         )
-    }
-}
-
-impl Display for AttackState {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        write!(f, "{}", self.get())
     }
 }
 

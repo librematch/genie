@@ -1,17 +1,32 @@
 //! An object's state: where it stands between its placing and its leaving.
 
 use crate::GenieError;
+use derive_more::Display;
 use serde::Deserialize;
 use serde::Serialize;
-use std::fmt::{Display, Error, Formatter};
+use strum::FromRepr;
 
 /// An object's state (`+0x640`, the save's `object_state`, `RGE_Static_Object::set_object_state`):
 /// the steps of its update (`genie_core::objects::lifecycle::Lifecycle::update`). The game compares
 /// the numbers (`state < 3` alive or not yet built, `7 <= state` on its way out), so the states
 /// keep their order.
 #[derive(
-    Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+    Clone,
+    Copy,
+    Debug,
+    Default,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    Display,
+    FromRepr,
 )]
+#[repr(u8)]
+#[display("{}", self.get())]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum ObjectState {
     /// 0: placed but not built, a foundation; it updates as an alive object does.
@@ -43,34 +58,14 @@ impl ObjectState {
     ///
     /// A byte past 8, which names no state.
     pub fn of_byte(value: u8) -> Result<Self, GenieError> {
-        Ok(match value {
-            0 => Self::Foundation,
-            1 => Self::Unfinished,
-            2 => Self::Alive,
-            3 => Self::Dying,
-            4 => Self::DyingSprite,
-            5 => Self::Dead,
-            6 => Self::Undead,
-            7 => Self::Removed,
-            8 => Self::Gone,
-            _ => {
-                return Err(
-                    GenieError::invalid_input("an object state past 8").with("state", value)
-                );
-            }
-        })
+        Self::from_repr(value)
+            .ok_or_else(|| GenieError::invalid_input("an object state past 8").with("state", value))
     }
 
     /// Its number.
     #[must_use]
     pub const fn get(self) -> u8 {
         self as u8
-    }
-}
-
-impl Display for ObjectState {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        write!(f, "{}", self.get())
     }
 }
 

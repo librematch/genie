@@ -1,16 +1,31 @@
 //! An object's hit points ([`HitPoints`]), with the game's `f32` operations, and a master's whole
 //! hit points ([`MasterHitPoints`]).
 
+use derive_more::{Add, AddAssign, Display, Neg, Sub, SubAssign};
 use serde::Deserialize;
 use serde::Serialize;
-use std::fmt::{Display, Error, Formatter};
-use std::ops::{Add, AddAssign, Div, Mul, MulAssign, Neg, Sub, SubAssign};
+use std::ops::{Div, Mul, MulAssign};
 
 /// Hit points as the game's `f32` holds them: an object's (`+0x40`), its powerup's room, what a
 /// heal, a gain or a loss moves, a building's loss while it is built. A master holds whole hit
 /// points ([`MasterHitPoints`], [`HitPoints::of_master`]). Each operator is the one `f32` operation
 /// the game does, in its order; a comparison is `f32`'s (a NaN compares false).
-#[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Default,
+    PartialEq,
+    PartialOrd,
+    Serialize,
+    Deserialize,
+    Display,
+    Add,
+    Sub,
+    Neg,
+    AddAssign,
+    SubAssign,
+)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct HitPoints(f32);
 
@@ -67,47 +82,6 @@ impl genie_diff::Diff for MasterHitPoints {
     }
 }
 
-impl Add for HitPoints {
-    type Output = Self;
-
-    /// The `f32` sum.
-    fn add(self, other: Self) -> Self {
-        Self(self.0 + other.0)
-    }
-}
-
-impl Sub for HitPoints {
-    type Output = Self;
-
-    /// The `f32` difference.
-    fn sub(self, other: Self) -> Self {
-        Self(self.0 - other.0)
-    }
-}
-
-impl AddAssign for HitPoints {
-    /// The `f32` sum in place (a heal, a gain).
-    fn add_assign(&mut self, other: Self) {
-        self.0 += other.0;
-    }
-}
-
-impl SubAssign for HitPoints {
-    /// The `f32` difference in place (a loss).
-    fn sub_assign(&mut self, other: Self) {
-        self.0 -= other.0;
-    }
-}
-
-impl Neg for HitPoints {
-    type Output = Self;
-
-    /// The points negated (their sign bit flipped).
-    fn neg(self) -> Self {
-        Self(-self.0)
-    }
-}
-
 impl Mul<f32> for HitPoints {
     type Output = Self;
 
@@ -148,12 +122,6 @@ impl Div for HitPoints {
     /// The ratio of two amounts of points (one `f32` quotient: a share of the most).
     fn div(self, other: Self) -> f32 {
         self.0 / other.0
-    }
-}
-
-impl Display for HitPoints {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        self.0.fmt(f)
     }
 }
 

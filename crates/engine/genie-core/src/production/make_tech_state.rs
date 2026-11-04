@@ -1,12 +1,15 @@
 //! A research's state: researching a technology at its building.
 
 use crate::GenieError;
-use std::fmt::{Display, Error, Formatter};
+use derive_more::Display;
+use strum::FromRepr;
 
 /// A research's state (`+0x18`, its `set_state` `FUN_140ad29a0` only stores it): its update
 /// (`FUN_140ad2a20`) is done in 1 and works in 6, and its destructor (`FUN_140ad0be0`) tells 1 from
 /// the rest. The bytes without a state have no case.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Display, FromRepr)]
+#[repr(u8)]
+#[display("{}", self.get())]
 pub enum MakeTechState {
     /// 0: made, not started (the building's update's, `FUN_140ad0700`); its update waits.
     New = 0,
@@ -24,28 +27,14 @@ impl MakeTechState {
     ///
     /// A byte that names no state of a research.
     pub fn of_byte(value: u8) -> Result<Self, GenieError> {
-        Ok(match value {
-            0 => Self::New,
-            1 => Self::Done,
-            6 => Self::Researching,
-            _ => {
-                return Err(
-                    GenieError::invalid_input("no state of a research").with("state", value)
-                );
-            }
-        })
+        Self::from_repr(value)
+            .ok_or_else(|| GenieError::invalid_input("no state of a research").with("state", value))
     }
 
     /// Its number.
     #[must_use]
     pub const fn get(self) -> u8 {
         self as u8
-    }
-}
-
-impl Display for MakeTechState {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        write!(f, "{}", self.get())
     }
 }
 

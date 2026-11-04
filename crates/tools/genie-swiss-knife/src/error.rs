@@ -1,12 +1,9 @@
 //! Error types
 
 use abscissa_core::error::{BoxError, Context};
+use derive_more::Display;
 use std::error::Error as StdError;
-use std::{
-    fmt::{self, Display},
-    io,
-    ops::Deref,
-};
+use std::{io, ops::Deref};
 use thiserror::Error;
 
 /// Kinds of errors
@@ -29,7 +26,7 @@ impl ErrorKind {
 }
 
 /// Error type
-#[derive(Debug)]
+#[derive(Debug, Display)]
 pub struct Error(Box<Context<ErrorKind>>);
 
 impl Deref for Error {
@@ -37,12 +34,6 @@ impl Deref for Error {
 
     fn deref(&self) -> &Context<ErrorKind> {
         &self.0
-    }
-}
-
-impl Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.fmt(f)
     }
 }
 

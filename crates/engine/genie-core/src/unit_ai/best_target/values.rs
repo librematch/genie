@@ -1,7 +1,8 @@
 //! The statistics' values: an entry's kill time and scores, the table's counts and the order
 //! history's weights.
 
-use std::ops::{Add, AddAssign, MulAssign};
+use derive_more::{Add, AddAssign};
+use std::ops::MulAssign;
 
 /// The time a unit takes to kill an entry (`+8`): its hit points over the unit's damage to it,
 /// over the unit's reload time; a stand-in for one it does no damage to.
@@ -24,7 +25,7 @@ impl KillTime {
 
 /// An entry's score (`+0x14`..`+0x28`): its kill-time and distance scores, its category's
 /// weight, the current target's bonus, their total and the rank the sort orders by.
-#[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd, Add)]
 pub struct TargetScore(f32);
 
 impl TargetScore {
@@ -41,15 +42,6 @@ impl TargetScore {
     #[must_use]
     pub const fn get(self) -> f32 {
         self.0
-    }
-}
-
-impl Add for TargetScore {
-    type Output = Self;
-
-    /// One `f32` add, `self` first.
-    fn add(self, other: Self) -> Self {
-        Self(self.0 + other.0)
     }
 }
 
@@ -90,7 +82,7 @@ impl EntryCount {
 /// The order history's weight of an attack category
 /// ([`crate::unit_ai::best_target::order_weights`]): each of its orders younger than a minute adds
 /// the rest of the minute over 60000.
-#[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd, AddAssign)]
 pub struct OrderWeight(f32);
 
 impl OrderWeight {
@@ -107,13 +99,6 @@ impl OrderWeight {
     #[must_use]
     pub const fn get(self) -> f32 {
         self.0
-    }
-}
-
-impl AddAssign for OrderWeight {
-    /// One `f32` add.
-    fn add_assign(&mut self, other: Self) {
-        self.0 += other.0;
     }
 }
 

@@ -4,15 +4,16 @@
 use crate::GenieError;
 use crate::combat::attack::Attack;
 use crate::movement::move_to::MoveToAction;
+use derive_more::Display;
 use genie_diff::Diff;
-use std::fmt::{Display, Error, Formatter};
 
 /// A Hunt's state (`+0x18`, set by `set_state`) with the data only that state holds
 /// (FD-045-D62): every `set_state` drops the sub-actions first (`FUN_140a98620`), the four
 /// walks make their quiet `MoveTo` and the attack its Attack, none once the sub-action's update
 /// dropped it, until the next `set_state`. Its update (`0x140ac7a00`) switches on it. The bytes
 /// without a state (5, 9, 14 and above 15) have no case.
-#[derive(Clone, Copy, Debug, PartialEq, Diff)]
+#[derive(Clone, Copy, Debug, PartialEq, Diff, Display)]
+#[display("{}", self.get())]
 pub enum HuntState {
     /// 0: made, not started (the constructor's).
     New,
@@ -197,12 +198,6 @@ impl HuntState {
         let _ = s.take_move_to();
         let _ = s.take_attack();
         s
-    }
-}
-
-impl Display for HuntState {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        write!(f, "{}", self.get())
     }
 }
 

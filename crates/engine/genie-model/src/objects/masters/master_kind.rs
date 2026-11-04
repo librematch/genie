@@ -1,10 +1,10 @@
 //! A master's type as one type: the byte at `+0x8` that tells a static object from a combat unit
 //! or a building, which the `.dat` names `unit_kind`.
 
+use derive_more::Display;
 use genie_diff::{Diff, Differ};
 use serde::Deserialize;
 use serde::Serialize;
-use std::fmt::{Display, Error, Formatter};
 
 /// A master's type (`+0x8`, the `.dat`'s `unit_kind`): 10 to 80 in steps the game names (its
 /// constants, the one definition of the type bytes: every routine that tests a type names it
@@ -15,7 +15,18 @@ use std::fmt::{Display, Error, Formatter};
 /// is a type, and the named ones are values of the type (the reasoning of
 /// [`crate::objects::masters::ClassId`]).
 #[derive(
-    Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+    Clone,
+    Copy,
+    Debug,
+    Default,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    Display,
 )]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct MasterKind(
@@ -128,12 +139,6 @@ impl MasterKind {
     /// A type the code names, in one of the constants above: only they make them.
     const fn named(value: u8) -> Self {
         Self(value)
-    }
-}
-
-impl Display for MasterKind {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        self.0.fmt(f)
     }
 }
 

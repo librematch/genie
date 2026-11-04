@@ -1,10 +1,10 @@
 //! The attributes an effect changes on a master and on its objects (the game's attribute list:
 //! string 12200 plus the number names each).
 
+use derive_more::Display;
 use getset::CopyGetters;
 use serde::Deserialize;
 use serde::Serialize;
-use std::fmt::{Display, Error, Formatter};
 
 /// An attribute an effect changes on a master (an attribute command's third argument, its low
 /// byte: `FUN_140ec2ac0` reads `c & 0xff`). The simulation names the ones it tells apart (below);
@@ -23,6 +23,7 @@ use std::fmt::{Display, Error, Formatter};
     CopyGetters,
     Serialize,
     Deserialize,
+    Display,
 )]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct MasterAttribute(
@@ -480,12 +481,6 @@ impl MasterAttribute {
     #[must_use]
     pub const fn shows_sprite(self) -> bool {
         matches!(self.0, 70..=77 | 82..=91 | 131)
-    }
-}
-
-impl Display for MasterAttribute {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        self.0.fmt(f)
     }
 }
 

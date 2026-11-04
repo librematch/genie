@@ -1,14 +1,25 @@
 //! A master's interaction mode (`+0x62d`): how a player may select and order its objects.
 
+use derive_more::Display;
 use serde::Deserialize;
 use serde::Serialize;
-use std::fmt::{Display, Error, Formatter};
 
 /// A master's interaction mode (`select_level`, `+0x62d`; the `.dat`'s `interaction_mode`,
 /// openage's names): whether a player may select its objects and give them orders. The simulation
 /// only keeps it; every byte is kept.
 #[derive(
-    Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord,
+    Clone,
+    Copy,
+    Debug,
+    Default,
+    PartialEq,
+    Eq,
+    Hash,
+    Serialize,
+    Deserialize,
+    PartialOrd,
+    Ord,
+    Display,
 )]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct InteractionMode(u8);
@@ -43,12 +54,6 @@ impl InteractionMode {
     #[must_use]
     pub const fn get(self) -> u8 {
         self.0
-    }
-}
-
-impl Display for InteractionMode {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        self.0.fmt(f)
     }
 }
 

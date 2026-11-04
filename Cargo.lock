@@ -838,6 +838,7 @@ dependencies = [
 name = "genie-math"
 version = "0.1.0"
 dependencies = [
+ "derive_more",
  "genie-diff",
  "schemars",
  "serde",
@@ -848,6 +849,7 @@ name = "genie-model"
 version = "0.1.0"
 dependencies = [
  "bitflags 2.13.2",
+ "derive_more",
  "genie-diff",
  "genie-error",
  "genie-math",
@@ -855,6 +857,7 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
+ "strum",
 ]
 
 [[package]]
@@ -950,6 +953,7 @@ version = "0.0.0"
 dependencies = [
  "abscissa_core",
  "clap 4.6.7",
+ "derive_more",
  "serde",
  "thiserror 1.0.69",
  "tracing",

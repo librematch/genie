@@ -3,14 +3,15 @@
 
 use crate::GenieError;
 use crate::movement::move_to::MoveToAction;
+use derive_more::Display;
 use genie_diff::Diff;
-use std::fmt::{Display, Error, Formatter};
 
 /// A Fly's state (`+0x18`, set by `set_state`, `0x140a84a50`) with the data only that state holds
 /// (FD-045-D62): every `set_state` but 4's drops the `MoveTo`, which state 3 makes for the flight
 /// just before it flies. Its update switches on it. The bytes without a state have no case, and
 /// no step modelled here sets them.
-#[derive(Clone, Copy, Debug, PartialEq, Diff)]
+#[derive(Clone, Copy, Debug, PartialEq, Diff, Display)]
+#[display("{}", self.get())]
 pub enum FlyState {
     /// 0: made, not started (the constructor's).
     New,
@@ -86,12 +87,6 @@ impl FlyState {
             } => Some(m),
             _ => None,
         }
-    }
-}
-
-impl Display for FlyState {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        write!(f, "{}", self.get())
     }
 }
 

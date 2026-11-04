@@ -1,13 +1,16 @@
 //! A unit's make action's state: making the unit its building trains.
 
 use crate::GenieError;
-use std::fmt::{Display, Error, Formatter};
+use derive_more::Display;
+use strum::FromRepr;
 
 /// A unit's make action's state (`+0x18`, set by `set_state`, `FUN_140acfec0`): its update
 /// (`0x140ad0490`) is done in 1, works in 6 and counts its timer down in 10, and its destructor
 /// (`FUN_140ace3f0`, `(state - 6) & 0xfb == 0`) takes the unit's population back in 6 and 10. The
 /// bytes without a state have no case.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Display, FromRepr)]
+#[repr(u8)]
+#[display("{}", self.get())]
 pub enum MakeObjState {
     /// 0: made, not started (the building's update's), or its start found no master of the player;
     /// its update waits.
@@ -29,17 +32,8 @@ impl MakeObjState {
     ///
     /// A byte that names no state of a unit's make action.
     pub fn of_byte(value: u8) -> Result<Self, GenieError> {
-        Ok(match value {
-            0 => Self::New,
-            1 => Self::Done,
-            6 => Self::Making,
-            10 => Self::NoSpot,
-            _ => {
-                return Err(
-                    GenieError::invalid_input("no state of a unit's make action")
-                        .with("state", value),
-                );
-            }
+        Self::from_repr(value).ok_or_else(|| {
+            GenieError::invalid_input("no state of a unit's make action").with("state", value)
         })
     }
 
@@ -47,12 +41,6 @@ impl MakeObjState {
     #[must_use]
     pub const fn get(self) -> u8 {
         self as u8
-    }
-}
-
-impl Display for MakeObjState {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        write!(f, "{}", self.get())
     }
 }
 

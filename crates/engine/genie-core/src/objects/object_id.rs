@@ -3,13 +3,13 @@
 
 use crate::GenieError;
 use crate::math::msvc::IntKey;
-use std::fmt::{Display, Error as FmtError, Formatter};
+use derive_more::Display;
 
 /// An object's id (`+0x8`), which names the object across ticks: a live or sleeping object's
 /// is 0 or more, a recyclable master's object (a missile, a ghost) has a negative one. Every
 /// field that names an object takes −1 for none, so no id is −1: such a field holds
 /// `Option<ObjectId>` ([`ObjectId::of_field`]).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Display)]
 pub struct ObjectId(i32);
 
 impl ObjectId {
@@ -90,12 +90,6 @@ impl genie_diff::Diff for ObjectId {
 impl IntKey for ObjectId {
     fn int(self) -> i32 {
         self.0
-    }
-}
-
-impl Display for ObjectId {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), FmtError> {
-        self.0.fmt(f)
     }
 }
 

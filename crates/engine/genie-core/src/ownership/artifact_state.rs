@@ -1,12 +1,15 @@
 //! An Artifact's state: checking for a new owner and waiting between checks.
 
 use crate::GenieError;
-use std::fmt::{Display, Error, Formatter};
+use derive_more::Display;
+use strum::FromRepr;
 
 /// An Artifact's state (`+0x18`): its step (`0x140aad250`) switches on it. Its `set_state`'s walks
 /// (4 and 5) pass on to 6 at once; the bytes without a state have no case, and no step modelled
 /// here sets them.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Display, FromRepr)]
+#[repr(u8)]
+#[display("{}", self.get())]
 pub enum ArtifactState {
     /// 6: checking for a new owner.
     Check = 6,
@@ -23,15 +26,8 @@ impl ArtifactState {
     ///
     /// A byte that names no state of an Artifact.
     pub fn of_byte(value: u8) -> Result<Self, GenieError> {
-        Ok(match value {
-            6 => Self::Check,
-            10 => Self::Wait,
-            100 => Self::ToGaia,
-            _ => {
-                return Err(
-                    GenieError::invalid_input("no state of an Artifact").with("state", value)
-                );
-            }
+        Self::from_repr(value).ok_or_else(|| {
+            GenieError::invalid_input("no state of an Artifact").with("state", value)
         })
     }
 
@@ -39,12 +35,6 @@ impl ArtifactState {
     #[must_use]
     pub const fn get(self) -> u8 {
         self as u8
-    }
-}
-
-impl Display for ArtifactState {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        write!(f, "{}", self.get())
     }
 }
 

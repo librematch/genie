@@ -1,12 +1,23 @@
 //! A master's `enabled` (`+0x5f0`, [`Availability`]).
 
+use derive_more::Display;
 use serde::Deserialize;
 use serde::Serialize;
-use std::fmt::{Display, Error, Formatter};
 
 /// A master's `enabled` (`+0x5f0`, the `.dat`'s byte): whether its player may make it. An effect's enable command and the attribute setters change it, the setters as a byte (an add wraps, a scale rounds). Every byte is kept.
 #[derive(
-    Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord,
+    Clone,
+    Copy,
+    Debug,
+    Default,
+    PartialEq,
+    Eq,
+    Hash,
+    Serialize,
+    Deserialize,
+    PartialOrd,
+    Ord,
+    Display,
 )]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Availability(u8);
@@ -39,12 +50,6 @@ impl Availability {
     #[must_use]
     pub const fn plus(self, n: u8) -> Self {
         Self(self.0.wrapping_add(n))
-    }
-}
-
-impl Display for Availability {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        self.0.fmt(f)
     }
 }
 

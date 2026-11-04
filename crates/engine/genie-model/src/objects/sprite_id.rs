@@ -1,15 +1,15 @@
 //! A sprite's id ([`SpriteId`]): the `.dat`'s graphic a master or a task shows.
 
+use derive_more::Display;
 use genie_diff::Diff;
 use serde::Deserialize;
 use serde::Serialize;
-use std::fmt::{Display, Error, Formatter};
 
 /// A sprite (a `.dat` graphic) by its id, 0 and up: what a master's and a task's sprite
 /// fields name and the world's sprite table holds ([`Model::graphics`](crate::model::Model::graphics)). The
 /// game's −1 (or any id below 0) is none, which an `Option` holds ([`SpriteId::of_data`]).
 #[derive(
-    Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Diff, Serialize, Deserialize,
+    Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Diff, Serialize, Deserialize, Display,
 )]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct SpriteId(i16);
@@ -32,12 +32,6 @@ impl SpriteId {
     #[must_use]
     pub const fn get(self) -> i16 {
         self.0
-    }
-}
-
-impl Display for SpriteId {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        self.0.fmt(f)
     }
 }
 

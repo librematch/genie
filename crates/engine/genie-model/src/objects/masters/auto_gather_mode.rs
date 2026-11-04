@@ -1,12 +1,23 @@
 //! A master's `enable_auto_gather` (`+0x681`, [`AutoGatherMode`]).
 
+use derive_more::Display;
 use serde::Deserialize;
 use serde::Serialize;
-use std::fmt::{Display, Error, Formatter};
 
 /// A master's `enable_auto_gather` (`+0x681`, the `.dat`'s byte): whether gatherers take it up by themselves; an object of it blocking a spawn point stays (`FUN_141194170`). Every byte is kept.
 #[derive(
-    Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord,
+    Clone,
+    Copy,
+    Debug,
+    Default,
+    PartialEq,
+    Eq,
+    Hash,
+    Serialize,
+    Deserialize,
+    PartialOrd,
+    Ord,
+    Display,
 )]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct AutoGatherMode(u8);
@@ -33,12 +44,6 @@ impl AutoGatherMode {
     #[must_use]
     pub const fn is_on(self) -> bool {
         self.0 != 0
-    }
-}
-
-impl Display for AutoGatherMode {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        self.0.fmt(f)
     }
 }
 

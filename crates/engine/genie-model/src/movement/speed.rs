@@ -2,17 +2,31 @@
 
 use crate::map::Distance;
 use crate::world::Seconds;
+use derive_more::{Add, AddAssign, Display, Neg, Sub};
 use serde::Deserialize;
 use serde::Serialize;
-use std::fmt::{Display, Error, Formatter};
-use std::ops::{Add, AddAssign, Div, Mul, MulAssign, Neg, Sub};
+use std::ops::{Div, Mul, MulAssign};
 
 /// A speed in tiles per second as the game's `f32` holds it: a master's speed, a unit's top
 /// speed and forward speed, a group's most forward speed, a missile's speed, the speed at which a
 /// turn radius holds. Each operator is the one `f32` operation the game does, in its order; a
 /// speed over a span of seconds is a [`Distance`]. A comparison is `f32`'s (a NaN compares
 /// false).
-#[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Default,
+    PartialEq,
+    PartialOrd,
+    Serialize,
+    Deserialize,
+    Display,
+    Add,
+    Sub,
+    Neg,
+    AddAssign,
+)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Speed(f32);
 
@@ -32,40 +46,6 @@ impl Speed {
     #[must_use]
     pub const fn get(self) -> f32 {
         self.0
-    }
-}
-
-impl Add for Speed {
-    type Output = Self;
-
-    /// The `f32` sum.
-    fn add(self, other: Self) -> Self {
-        Self(self.0 + other.0)
-    }
-}
-
-impl Sub for Speed {
-    type Output = Self;
-
-    /// The `f32` difference.
-    fn sub(self, other: Self) -> Self {
-        Self(self.0 - other.0)
-    }
-}
-
-impl AddAssign for Speed {
-    /// The `f32` sum in place (a master's speed plus a technology's).
-    fn add_assign(&mut self, other: Self) {
-        self.0 += other.0;
-    }
-}
-
-impl Neg for Speed {
-    type Output = Self;
-
-    /// The speed negated (its sign bit flipped).
-    fn neg(self) -> Self {
-        Self(-self.0)
     }
 }
 
@@ -128,12 +108,6 @@ impl Mul<Speed> for Seconds {
     /// The way `speed` covers in the span (one `f32` product, the span first).
     fn mul(self, speed: Speed) -> Distance {
         Distance::new(self.get() * speed.0)
-    }
-}
-
-impl Display for Speed {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        self.0.fmt(f)
     }
 }
 

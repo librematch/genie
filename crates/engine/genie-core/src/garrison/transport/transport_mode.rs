@@ -1,13 +1,14 @@
 //! How a Transport was last ordered ([`TransportMode`]).
 
 use crate::GenieError;
+use strum::FromRepr;
 
 /// A Transport's `+0x34`: −1 from its constructor, 1 after a work order (slot 9), 0 after a
 /// move (slot 8); the save's `target2_id`. The set is closed: the Transport's and the
 /// `TransportOverWall`'s slots store only 0 (`FUN_140aa3e40`, `FUN_140aa7b70`) and 1
 /// (`FUN_140aa4830`, `FUN_140aa83f0`) over the constructor's −1, and the save holds what they
 /// wrote.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, FromRepr)]
 #[repr(i32)]
 pub enum TransportMode {
     /// −1: as made.
@@ -36,13 +37,9 @@ impl TryFrom<i32> for TransportMode {
     ///
     /// An int no slot of the Transport writes.
     fn try_from(value: i32) -> Result<Self, GenieError> {
-        match value {
-            -1 => Ok(Self::New),
-            0 => Ok(Self::Move),
-            1 => Ok(Self::Work),
-            _ => Err(GenieError::invalid_input("a transport mode no slot writes")
-                .with("target2_id", value)),
-        }
+        Self::from_repr(value).ok_or_else(|| {
+            GenieError::invalid_input("a transport mode no slot writes").with("target2_id", value)
+        })
     }
 }
 

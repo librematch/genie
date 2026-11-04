@@ -2,10 +2,10 @@
 
 use crate::objects::masters::WorkValue;
 use crate::world::Seconds;
+use derive_more::{Add, AddAssign, Display};
 use serde::Deserialize;
 use serde::Serialize;
-use std::fmt::{Display, Error, Formatter};
-use std::ops::{Add, AddAssign, Mul, MulAssign};
+use std::ops::{Mul, MulAssign};
 
 /// The work an object does per second, as the game's `f32` holds it: a master's `work_rate`
 /// (`+0x798`) and an object's powerup of it (`mWorkRatePowerup`, `+0xa30`, slot 0x6e8), their
@@ -14,7 +14,19 @@ use std::ops::{Add, AddAssign, Mul, MulAssign};
 /// work done, in the task's own unit (an amount, build or repair points, training progress).
 /// Each operator is the one `f32` operation the game does, in its order; a comparison is
 /// `f32`'s (a NaN compares false).
-#[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Default,
+    PartialEq,
+    PartialOrd,
+    Serialize,
+    Deserialize,
+    Display,
+    Add,
+    AddAssign,
+)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct WorkRate(f32);
 
@@ -32,22 +44,6 @@ impl WorkRate {
     #[must_use]
     pub const fn get(self) -> f32 {
         self.0
-    }
-}
-
-impl Add for WorkRate {
-    type Output = Self;
-
-    /// The `f32` sum (a master's rate and an object's powerup, in the game's order).
-    fn add(self, other: Self) -> Self {
-        Self(self.0 + other.0)
-    }
-}
-
-impl AddAssign for WorkRate {
-    /// The `f32` sum in place (a powerup added).
-    fn add_assign(&mut self, other: Self) {
-        self.0 += other.0;
     }
 }
 
@@ -73,12 +69,6 @@ impl Mul<Seconds> for WorkRate {
     /// The work done in `dt` (one `f32` product, the rate first), in the task's unit.
     fn mul(self, dt: Seconds) -> f32 {
         self.0 * dt.get()
-    }
-}
-
-impl Display for WorkRate {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        self.0.fmt(f)
     }
 }
 

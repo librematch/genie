@@ -1,10 +1,10 @@
 //! An update's number.
 
-use std::fmt::{Display, Error, Formatter};
+use derive_more::Display;
 
 /// The updates the world ran (its `ticks`; the tick oracle's trace rows count them from 0): what
 /// a freeze, a stop or a report records as its update.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Display)]
 pub struct Tick(u32);
 
 impl Tick {
@@ -27,12 +27,6 @@ impl Tick {
     #[must_use]
     pub const fn next(self) -> Self {
         Self(self.0.wrapping_add(1))
-    }
-}
-
-impl Display for Tick {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        self.0.fmt(f)
     }
 }
 

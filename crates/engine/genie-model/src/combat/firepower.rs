@@ -1,15 +1,29 @@
 //! A volley's size: the firepower (missiles a volley), the missiles counted and the swings that
 //! fired.
 
+use derive_more::{Add, AddAssign, Sub, SubAssign};
 use serde::Deserialize;
 use serde::Serialize;
-use std::ops::{Add, AddAssign, MulAssign, Sub, SubAssign};
+use std::ops::MulAssign;
 
 /// A firepower: the missiles a volley fires (a float: a master's `volley_fire_amount`, `+0x8c0`,
 /// which the effects set, add to and scale; an object's `+0xa00`, its master's plus the shares
 /// of the units inside it). Each operator is the one `f32` operation the game does; every value
 /// is kept.
-#[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Default,
+    PartialEq,
+    PartialOrd,
+    Serialize,
+    Deserialize,
+    Add,
+    Sub,
+    AddAssign,
+    SubAssign,
+)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Firepower(f32);
 
@@ -27,38 +41,6 @@ impl Firepower {
     #[must_use]
     pub const fn get(self) -> f32 {
         self.0
-    }
-}
-
-impl Add for Firepower {
-    type Output = Self;
-
-    /// The `f32` sum.
-    fn add(self, other: Self) -> Self {
-        Self(self.0 + other.0)
-    }
-}
-
-impl Sub for Firepower {
-    type Output = Self;
-
-    /// The `f32` difference.
-    fn sub(self, other: Self) -> Self {
-        Self(self.0 - other.0)
-    }
-}
-
-impl AddAssign for Firepower {
-    /// A share's or an effect's add (`f32`).
-    fn add_assign(&mut self, other: Self) {
-        self.0 += other.0;
-    }
-}
-
-impl SubAssign for Firepower {
-    /// A share's removal (`f32`).
-    fn sub_assign(&mut self, other: Self) {
-        self.0 -= other.0;
     }
 }
 

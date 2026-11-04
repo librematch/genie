@@ -1,18 +1,33 @@
 //! An amount of a player attribute ([`Amount`]), with the game's `f32` operations.
 
 use crate::objects::masters::CarryCapacity;
+use derive_more::{Add, AddAssign, Display, Neg, Sub, SubAssign};
 use serde::Deserialize;
 use serde::Serialize;
-use std::fmt::{Display, Error, Formatter};
 use std::iter::Sum;
-use std::ops::{Add, AddAssign, Div, Mul, Neg, Sub, SubAssign};
+use std::ops::{Div, Mul};
 
 /// An amount of a player attribute (a resource) as the game's `f32` holds it: what an object
 /// holds of its attribute (`+0x310`), what a unit carries at most (its master's
 /// `attribute_max_amount`, [`Amount::of_master`]), what a gather, a hunt or a drop-off moves.
 /// Each operator is the one `f32` operation the game does, in its order; a comparison is
 /// `f32`'s (a NaN compares false).
-#[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Default,
+    PartialEq,
+    PartialOrd,
+    Serialize,
+    Deserialize,
+    Display,
+    Add,
+    Sub,
+    Neg,
+    AddAssign,
+    SubAssign,
+)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Amount(f32);
 
@@ -43,47 +58,6 @@ impl Amount {
     #[must_use]
     pub const fn abs(self) -> Self {
         Self(self.0.abs())
-    }
-}
-
-impl Add for Amount {
-    type Output = Self;
-
-    /// The `f32` sum.
-    fn add(self, other: Self) -> Self {
-        Self(self.0 + other.0)
-    }
-}
-
-impl Sub for Amount {
-    type Output = Self;
-
-    /// The `f32` difference.
-    fn sub(self, other: Self) -> Self {
-        Self(self.0 - other.0)
-    }
-}
-
-impl AddAssign for Amount {
-    /// The `f32` sum in place (a gather, a deposit).
-    fn add_assign(&mut self, other: Self) {
-        self.0 += other.0;
-    }
-}
-
-impl SubAssign for Amount {
-    /// The `f32` difference in place (a take, a payment).
-    fn sub_assign(&mut self, other: Self) {
-        self.0 -= other.0;
-    }
-}
-
-impl Neg for Amount {
-    type Output = Self;
-
-    /// The amount negated (its sign bit flipped).
-    fn neg(self) -> Self {
-        Self(-self.0)
     }
 }
 
@@ -128,12 +102,6 @@ impl Sum for Amount {
     /// `Sum` starts at −0.0, so a sum of nothing or of −0.0 alone would differ in its sign.
     fn sum<I: Iterator<Item = Self>>(amounts: I) -> Self {
         amounts.fold(Self::ZERO, |sum, amount| sum + amount)
-    }
-}
-
-impl Display for Amount {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        self.0.fmt(f)
     }
 }
 

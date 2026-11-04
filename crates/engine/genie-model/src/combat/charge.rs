@@ -2,16 +2,29 @@
 //! operations.
 
 use crate::world::Seconds;
+use derive_more::{AddAssign, Display, Sub, SubAssign};
 use serde::Deserialize;
 use serde::Serialize;
-use std::fmt::{Display, Error, Formatter};
-use std::ops::{AddAssign, Mul, MulAssign, Sub, SubAssign};
+use std::ops::{Mul, MulAssign};
 
 /// A charge as the game's `f32` holds it: an object's charge (`+0x9e0`) and its master's most
 /// (`max_charge`, `+0x918`). A ready charge (its most for charge types 1 and 3, else 1) adds
 /// itself to the hit's attack. Each operator is the one `f32` operation the game does, in its
 /// order; a comparison is `f32`'s (a NaN compares false).
-#[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Default,
+    PartialEq,
+    PartialOrd,
+    Serialize,
+    Deserialize,
+    Display,
+    Sub,
+    AddAssign,
+    SubAssign,
+)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Charge(f32);
 
@@ -38,39 +51,10 @@ impl Charge {
     }
 }
 
-impl Sub for Charge {
-    type Output = Self;
-
-    /// The `f32` difference (a new most less the old).
-    fn sub(self, other: Self) -> Self {
-        Self(self.0 - other.0)
-    }
-}
-
-impl SubAssign for Charge {
-    /// The `f32` difference in place (a shield's spent charge).
-    fn sub_assign(&mut self, other: Self) {
-        self.0 -= other.0;
-    }
-}
-
-impl AddAssign for Charge {
-    /// The `f32` sum in place (an effect's addition).
-    fn add_assign(&mut self, other: Self) {
-        self.0 += other.0;
-    }
-}
-
 impl MulAssign<f32> for Charge {
     /// The charge scaled by `f` in place (an effect's multiplier).
     fn mul_assign(&mut self, f: f32) {
         self.0 *= f;
-    }
-}
-
-impl Display for Charge {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        self.0.fmt(f)
     }
 }
 
@@ -84,7 +68,9 @@ impl genie_diff::Diff for Charge {
 /// `recharge_rate`); over [`Seconds`] it is a [`Charge`]. Each operator is the one `f32`
 /// operation the game does, in its order.
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-#[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, PartialOrd, Serialize, Deserialize, Display, AddAssign,
+)]
 pub struct ChargeRate(f32);
 
 impl ChargeRate {
@@ -104,13 +90,6 @@ impl ChargeRate {
     }
 }
 
-impl AddAssign for ChargeRate {
-    /// The `f32` sum in place (an effect's addition).
-    fn add_assign(&mut self, other: Self) {
-        self.0 += other.0;
-    }
-}
-
 impl MulAssign<f32> for ChargeRate {
     /// The rate scaled by `f` in place (an effect's multiplier).
     fn mul_assign(&mut self, f: f32) {
@@ -124,12 +103,6 @@ impl Mul<Seconds> for ChargeRate {
     /// The charge it fills in `dt` (one `f32` product, the rate first).
     fn mul(self, dt: Seconds) -> Charge {
         Charge(self.0 * dt.get())
-    }
-}
-
-impl Display for ChargeRate {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        self.0.fmt(f)
     }
 }
 

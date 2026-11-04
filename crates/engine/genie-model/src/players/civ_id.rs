@@ -1,14 +1,25 @@
 //! A civilisation's number.
 
 use crate::GenieError;
+use derive_more::Display;
 use serde::Deserialize;
 use serde::Serialize;
-use std::fmt::{Display, Error, Formatter};
 
 /// A civilisation (`player+0x738`, the save's `civ_id`; the data's civ lists): its number, 0
 /// Gaia's, the place of its row in the civilisations' tables.
 #[derive(
-    Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+    Clone,
+    Copy,
+    Debug,
+    Default,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    Display,
 )]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct CivId(u8);
@@ -48,12 +59,6 @@ impl CivId {
     #[must_use]
     pub const fn index(self) -> usize {
         self.0 as usize
-    }
-}
-
-impl Display for CivId {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        write!(f, "{}", self.0)
     }
 }
 

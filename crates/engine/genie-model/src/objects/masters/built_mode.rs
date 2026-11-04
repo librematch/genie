@@ -1,12 +1,23 @@
 //! A master's `disappears_when_built` (`+0x984`, [`BuiltMode`]).
 
+use derive_more::Display;
 use serde::Deserialize;
 use serde::Serialize;
-use std::fmt::{Display, Error, Formatter};
 
 /// A master's `disappears_when_built` (`+0x984`, the `.dat`'s byte): whether a building of it goes once it is built. Every byte is kept.
 #[derive(
-    Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord,
+    Clone,
+    Copy,
+    Debug,
+    Default,
+    PartialEq,
+    Eq,
+    Hash,
+    Serialize,
+    Deserialize,
+    PartialOrd,
+    Ord,
+    Display,
 )]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct BuiltMode(u8);
@@ -33,12 +44,6 @@ impl BuiltMode {
     #[must_use]
     pub const fn disappears(self) -> bool {
         self.0 != 0
-    }
-}
-
-impl Display for BuiltMode {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        self.0.fmt(f)
     }
 }
 

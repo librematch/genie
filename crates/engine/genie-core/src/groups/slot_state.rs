@@ -2,11 +2,12 @@
 
 use crate::GenieError;
 use crate::groups::motion::Passing;
-use std::fmt::{Display, Error, Formatter};
+use derive_more::Display;
 
 /// A formation slot's state (`mState`, `+0x2c`), which a member's steer to its slot
 /// (`FUN_141025fb0`) sets and switches on. The values without a state have no case.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Display)]
+#[display("{}", self.get())]
 pub enum SlotState {
     /// 0: its member steers toward it (the layout's, a detour's, a free member's of a moving
     /// group; a zeroed slot's).
@@ -56,12 +57,6 @@ impl SlotState {
             Passing::Reaches => Self::Arriving,
             Passing::Passes => Self::Stopping,
         }
-    }
-}
-
-impl Display for SlotState {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        write!(f, "{}", self.get())
     }
 }
 

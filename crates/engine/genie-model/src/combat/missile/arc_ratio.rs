@@ -1,13 +1,14 @@
 //! A missile master's arc.
 
+use derive_more::AddAssign;
 use serde::Deserialize;
 use serde::Serialize;
-use std::ops::{AddAssign, MulAssign};
+use std::ops::MulAssign;
 
 /// A missile master's arc (the `.dat`'s `projectile_arc`, `+0x888`, the save's
 /// `ballistics_ratio`): 0 flies flat; else the launch makes the arc's rise of it and the way
 /// (`−arc × way × way` for one at most 0, `−arc × way` above).
-#[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd, Serialize, Deserialize, AddAssign)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ArcRatio(f32);
 
@@ -31,13 +32,6 @@ impl ArcRatio {
     #[must_use]
     pub fn is_flat(self) -> bool {
         self.0 == 0.0
-    }
-}
-
-impl AddAssign for ArcRatio {
-    /// An add effect's sum (one `f32` add).
-    fn add_assign(&mut self, other: Self) {
-        self.0 += other.0;
     }
 }
 

@@ -3,17 +3,19 @@
 
 use crate::players::Amount;
 use crate::world::Seconds;
+use derive_more::{Display, Neg};
 use serde::Deserialize;
 use serde::Serialize;
-use std::fmt::{Display, Error, Formatter};
-use std::ops::{Mul, Neg};
+use std::ops::Mul;
 
 /// An amount of a player attribute per second, as the game's `f32` holds it: what a dead
 /// object's remains lose of their attribute a second (a master's `resource_decay`, `+0x620`),
 /// negated on the hunted target whose decay a hunt stopped. Over [`Seconds`] it is an
 /// [`Amount`]. Each operator is the one `f32` operation the game does, in its order; a
 /// comparison is `f32`'s (a NaN compares false).
-#[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, PartialOrd, Serialize, Deserialize, Display, Neg,
+)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct AmountRate(f32);
 
@@ -34,27 +36,12 @@ impl AmountRate {
     }
 }
 
-impl Neg for AmountRate {
-    type Output = Self;
-
-    /// The rate negated (its sign bit flipped, `XOR 0x80000000`: a stopped decay).
-    fn neg(self) -> Self {
-        Self(-self.0)
-    }
-}
-
 impl Mul<Seconds> for AmountRate {
     type Output = Amount;
 
     /// The amount in `dt` (one `f32` product, the rate first).
     fn mul(self, dt: Seconds) -> Amount {
         Amount::new(self.0 * dt.get())
-    }
-}
-
-impl Display for AmountRate {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        self.0.fmt(f)
     }
 }
 

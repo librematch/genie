@@ -1,13 +1,14 @@
 //! A side of a shape in the obstruction manager's mesh.
 
 use crate::GenieError;
-use std::fmt::{Display, Error, Formatter};
+use derive_more::Display;
 
 /// A side of a shape's box in the mesh and the short pather (side s runs from corner s to
 /// corner s + 1, [`crate::pathing::FixedRect::corner`]): its low y, high x, high y or low x edge,
 /// counter-clockwise. A contact names the side its outline goes on along; a node of the short
 /// pather the side it lies on.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Display)]
+#[display("{}", self.get())]
 pub enum ShapeSide {
     /// 0: the low y edge, from corner 0 (x0, y0) to corner 1 (x1, y0).
     LowY = 0,
@@ -85,12 +86,6 @@ impl ShapeSide {
     #[must_use]
     pub const fn first_corner(self) -> u32 {
         self as u32
-    }
-}
-
-impl Display for ShapeSide {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        write!(f, "{}", self.get())
     }
 }
 

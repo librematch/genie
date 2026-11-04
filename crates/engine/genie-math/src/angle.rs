@@ -1,13 +1,13 @@
 //! An angle in radians ([`Angle`]), with the game's `f32` operations.
 
-use std::fmt::{Display, Error, Formatter};
-use std::ops::{Add, Div, Mul, Neg, Sub};
+use derive_more::{Add, Display, Neg, Sub};
+use std::ops::{Div, Mul};
 
 /// An angle on the map in radians, as the game's `f32` holds it: where an object faces
 /// (`+0x7e8`, 0 to 2π, genie-core's `objects::facing`), a turn or a yaw, a missile's spawn angle,
 /// a blast's cone. Each operator is the one `f32` operation the game does, in its order; a
 /// comparison is `f32`'s (a NaN compares false).
-#[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd, Display, Add, Sub, Neg)]
 pub struct Angle(f32);
 
 impl Angle {
@@ -27,33 +27,6 @@ impl Angle {
     }
 }
 
-impl Add for Angle {
-    type Output = Self;
-
-    /// The `f32` sum (a turn added).
-    fn add(self, other: Self) -> Self {
-        Self(self.0 + other.0)
-    }
-}
-
-impl Sub for Angle {
-    type Output = Self;
-
-    /// The `f32` difference.
-    fn sub(self, other: Self) -> Self {
-        Self(self.0 - other.0)
-    }
-}
-
-impl Neg for Angle {
-    type Output = Self;
-
-    /// The angle negated (its sign bit flipped: the turn the other way).
-    fn neg(self) -> Self {
-        Self(-self.0)
-    }
-}
-
 impl Mul<f32> for Angle {
     type Output = Self;
 
@@ -69,12 +42,6 @@ impl Div<f32> for Angle {
     /// The angle divided by `f` (one `f32` quotient: a facet's share of a turn).
     fn div(self, f: f32) -> Self {
         Self(self.0 / f)
-    }
-}
-
-impl Display for Angle {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        self.0.fmt(f)
     }
 }
 

@@ -3,14 +3,15 @@
 
 use crate::GenieError;
 use crate::movement::move_to::MoveToAction;
+use derive_more::Display;
 use genie_diff::Diff;
-use std::fmt::{Display, Error, Formatter};
 
 /// An Explore's state (`+0x18`, set by `set_state`, slot 0x80 `0x140a87e30`) with the data only
 /// that state holds (FD-045-D62): every `set_state` drops the sub-actions first, and only state
 /// 11 makes one, the walk's `MoveTo`. Its update (`0x140a880c0`) and `set_state` switch on it.
 /// The bytes without a state have no case, and no step modelled here sets them.
-#[derive(Clone, Copy, Debug, PartialEq, Diff)]
+#[derive(Clone, Copy, Debug, PartialEq, Diff, Display)]
+#[display("{}", self.get())]
 pub enum ExploreState {
     /// 0: made, not started (the constructor's).
     New,
@@ -97,12 +98,6 @@ impl ExploreState {
             } => Some(m),
             _ => None,
         }
-    }
-}
-
-impl Display for ExploreState {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        write!(f, "{}", self.get())
     }
 }
 

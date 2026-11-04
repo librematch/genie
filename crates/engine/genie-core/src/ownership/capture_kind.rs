@@ -1,13 +1,14 @@
 //! How another player takes an object over.
 
 use crate::GenieError;
+use strum::FromRepr;
 
 /// An object's `capture_flag` (`+0x924`), which a combat object's setup sets
 /// ([`crate::vision::visibility::capture_kind`]): none (0), taken over by sight (1), taken more
 /// than once (2) or livestock (3). The set is closed: the game's byte stores write 0 (the
 /// constructor `FUN_141072ad0`, `FUN_14107dfb0`, `FUN_14108bf30`), 1 and 3 (the setup,
 /// `FUN_14121df60`), and the save holds what they wrote.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, FromRepr)]
 #[repr(u8)]
 pub enum CaptureKind {
     /// 0: no player takes it over.
@@ -45,14 +46,9 @@ impl TryFrom<u8> for CaptureKind {
     ///
     /// A byte no store of the game writes.
     fn try_from(value: u8) -> Result<Self, GenieError> {
-        match value {
-            0 => Ok(Self::None),
-            1 => Ok(Self::BySight),
-            2 => Ok(Self::Again),
-            3 => Ok(Self::Livestock),
-            _ => Err(GenieError::invalid_input("a capture flag no store writes")
-                .with("capture_flag", value)),
-        }
+        Self::from_repr(value).ok_or_else(|| {
+            GenieError::invalid_input("a capture flag no store writes").with("capture_flag", value)
+        })
     }
 }
 

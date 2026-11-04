@@ -1,15 +1,16 @@
 //! A master's share of a damage: resisted, reflected, dealt to its own or by its blast.
 
+use derive_more::AddAssign;
 use serde::Deserialize;
 use serde::Serialize;
-use std::ops::{AddAssign, MulAssign};
+use std::ops::MulAssign;
 
 /// A share of a damage (a float the `.dat` holds and the effects set, add to and scale): the
 /// bonus damage a master resists (`bonus_damage_resistance`, `+0x824`), the damage it reflects
 /// on its attacker (`damage_reflection`, `+0x864`), its own side takes of its blasts
 /// (`friendly_fire_damage`, `+0x868`) and its blast deals (`area_damage`, `+0x834`). Each
 /// operator is the one `f32` operation the game does; every value is kept.
-#[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd, Serialize, Deserialize, AddAssign)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct DamageShare(f32);
 
@@ -27,13 +28,6 @@ impl DamageShare {
     #[must_use]
     pub const fn get(self) -> f32 {
         self.0
-    }
-}
-
-impl AddAssign for DamageShare {
-    /// An effect's add (`f32`).
-    fn add_assign(&mut self, other: Self) {
-        self.0 += other.0;
     }
 }
 

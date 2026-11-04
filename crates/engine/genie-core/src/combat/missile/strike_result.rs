@@ -1,12 +1,13 @@
 //! What a missile's last hit did.
 
 use crate::GenieError;
+use strum::FromRepr;
 
 /// What a hit did (`+0x98` of a missile, its last hit's): none yet, a hit, or a hit a shield
 /// blocked (`FUN_141084230`). The set is closed: the missile action (`FUN_140a9e6e0`) stores the
 /// byte its target's hit (slot 0x860: `FUN_141084230`, `FUN_1412115e0`) or blast (slot 0x848,
 /// `FUN_14107f690`) answers, and those answer 0, 1 or 2; the save holds what they wrote.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, FromRepr)]
 #[repr(u8)]
 pub enum StrikeResult {
     /// No hit yet (0).
@@ -35,15 +36,9 @@ impl TryFrom<u8> for StrikeResult {
     ///
     /// A byte no hit answers.
     fn try_from(value: u8) -> Result<Self, GenieError> {
-        match value {
-            0 => Ok(Self::None),
-            1 => Ok(Self::Hit),
-            2 => Ok(Self::Shielded),
-            _ => {
-                Err(GenieError::invalid_input("a strike result no hit answers")
-                    .with("result", value))
-            }
-        }
+        Self::from_repr(value).ok_or_else(|| {
+            GenieError::invalid_input("a strike result no hit answers").with("result", value)
+        })
     }
 }
 

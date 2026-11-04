@@ -1,12 +1,13 @@
 //! A path level's state: whether it asks for a path, walks it or is done with it.
 
 use crate::GenieError;
-use std::fmt::{Display, Error, Formatter};
+use derive_more::Display;
 
 /// A path level's state (`+0x28`, the save's `state`), which the motion step (`0x141150f00`)
 /// switches on: a level that wants a path asks for one, an arrived level and one without a plan
 /// hand back to their parent level. The values without a state have no case.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Display)]
+#[display("{}", self.get())]
 pub enum PathState {
     /// 0: reset (`FUN_140f98e80`) or new, or a level that handed its walk to a new level below it.
     Idle = 0,
@@ -50,12 +51,6 @@ impl PathState {
     #[must_use]
     pub const fn get(self) -> i32 {
         self as i32
-    }
-}
-
-impl Display for PathState {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        write!(f, "{}", self.get())
     }
 }
 

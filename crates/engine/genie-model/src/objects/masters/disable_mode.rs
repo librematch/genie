@@ -1,12 +1,23 @@
 //! A master's `disabled` (`+0x5f1`, [`DisableMode`]).
 
+use derive_more::Display;
 use serde::Deserialize;
 use serde::Serialize;
-use std::fmt::{Display, Error, Formatter};
 
 /// A master's `disabled` (`+0x5f1`, the `.dat`'s byte): whether an effect's enable command leaves its availability as it is; the attribute setters change it as a byte, and the trainable count reads its bits (`FUN_141625a20`: bit 0, bits 1 and 2). Every byte is kept.
 #[derive(
-    Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord,
+    Clone,
+    Copy,
+    Debug,
+    Default,
+    PartialEq,
+    Eq,
+    Hash,
+    Serialize,
+    Deserialize,
+    PartialOrd,
+    Ord,
+    Display,
 )]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct DisableMode(u8);
@@ -39,12 +50,6 @@ impl DisableMode {
     #[must_use]
     pub const fn plus(self, n: u8) -> Self {
         Self(self.0.wrapping_add(n))
-    }
-}
-
-impl Display for DisableMode {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        self.0.fmt(f)
     }
 }
 

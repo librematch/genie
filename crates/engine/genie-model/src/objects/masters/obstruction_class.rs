@@ -1,16 +1,27 @@
 //! A master's obstruction class as one type: what its obstruction record blocks, the value the
 //! `.dat` names `obstruction_class`.
 
+use derive_more::Display;
 use serde::Deserialize;
 use serde::Serialize;
-use std::fmt::{Display, Error, Formatter};
 
 /// A master's obstruction class (`+0x652`, the `.dat`'s `obstruction_class`, the blockage
 /// class; an obstruction record's class): the kind of object its record blocks as. The game's
 /// tests name 0 (no record) and 5 (a gate, whose tile marks carry bit `0x8000`); the `.dat`'s
 /// other classes are named by the masters that hold them.
 #[derive(
-    Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord,
+    Clone,
+    Copy,
+    Debug,
+    Default,
+    PartialEq,
+    Eq,
+    Hash,
+    Serialize,
+    Deserialize,
+    PartialOrd,
+    Ord,
+    Display,
 )]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ObstructionClass(u8);
@@ -48,12 +59,6 @@ impl From<u8> for ObstructionClass {
     /// The class a master's byte holds: every value is one.
     fn from(value: u8) -> Self {
         Self(value)
-    }
-}
-
-impl Display for ObstructionClass {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        self.0.fmt(f)
     }
 }
 

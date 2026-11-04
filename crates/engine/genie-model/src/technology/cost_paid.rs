@@ -1,14 +1,25 @@
 //! How a technology's cost entry is paid (its paid flag).
 
+use derive_more::Display;
 use serde::Deserialize;
 use serde::Serialize;
-use std::fmt::{Display, Error, Formatter};
 
 /// How a technology's cost entry is paid (the `.dat`'s paid flag): 0 not at all, 1 from the
 /// player's attribute, 2 from the building (`FUN_141204310`). Every byte is kept; any but 0 is
 /// paid.
 #[derive(
-    Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord,
+    Clone,
+    Copy,
+    Debug,
+    Default,
+    PartialEq,
+    Eq,
+    Hash,
+    Serialize,
+    Deserialize,
+    PartialOrd,
+    Ord,
+    Display,
 )]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct CostPaid(u8);
@@ -37,12 +48,6 @@ impl CostPaid {
     #[must_use]
     pub const fn get(self) -> u8 {
         self.0
-    }
-}
-
-impl Display for CostPaid {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        self.0.fmt(f)
     }
 }
 
