@@ -451,8 +451,8 @@ impl UnitAi {
     /// of the units inside it (`+0x2f8`); for a human player those are the alert list and the
     /// old pather's hulled-area reset (`FUN_14162dab0`), not held, and a computer player's AI
     /// hears them (slot 0x3c8), which is not modelled. A new attacker (`FUN_140bf4cb0`) that is
-    /// not its target makes a human player's building ask for help (`AskForHelp`,
-    /// `FUN_140c42ce0`), not modelled. Then the attacker joins the set (`FUN_140b43f30`), the
+    /// not its target makes the building ask for help ([`UnitAi::ask_for_help`]). Then the
+    /// attacker joins the set (`FUN_140b43f30`), the
     /// unit is under attack (`FUN_14119d2d0` with 1) and it returns 2.
     pub(super) fn building_damaged(
         &mut self,
