@@ -38,15 +38,15 @@ use crate::world::slots::CheckedIndex;
 #[derive(Clone, Copy, Debug)]
 pub struct Converter<'a> {
     /// Its master's class.
-    pub class: ClassId,
+    pub(crate) class: ClassId,
     /// Its master's id.
-    pub master: MasterId,
+    pub(crate) master: MasterId,
     /// Its faith (`+0x310`, what it holds).
-    pub faith: Amount,
+    pub(crate) faith: Amount,
     /// Its owner's attributes (`player+0x100`, count `+0x90`).
-    pub attributes: &'a [Amount],
+    pub(crate) attributes: &'a [Amount],
     /// Its master's tasks (`+0x788`).
-    pub tasks: &'a [Task],
+    pub(crate) tasks: &'a [Task],
 }
 
 /// What the conversion test reads of the object: its owner, its master's class, id and hero
@@ -54,13 +54,13 @@ pub struct Converter<'a> {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Convertee {
     /// Its owner's id.
-    pub owner: PlayerId,
+    pub(crate) owner: PlayerId,
     /// Its master's class.
-    pub class: ClassId,
+    pub(crate) class: ClassId,
     /// Its master's id.
-    pub master: MasterId,
+    pub(crate) master: MasterId,
     /// Its master's hero flag (`hero_flag`, `+0x8d9`).
-    pub hero: HeroFlags,
+    pub(crate) hero: HeroFlags,
 }
 
 /// Which targets a unit AI's attack check (slot 0xa0) and the priest's conversion test (slot
@@ -542,7 +542,7 @@ pub(super) fn civilian_may_attack(
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Attacked {
     /// The unit attacks the target.
-    pub attacks: bool,
+    pub(crate) attacks: bool,
     /// The notifies posted, in order.
-    pub posted: Vec<(NotifyKind, [i32; 3])>,
+    pub(crate) posted: Vec<(NotifyKind, [i32; 3])>,
 }

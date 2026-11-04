@@ -50,36 +50,36 @@ pub const BUILDING_REPAIR_COST: usize = 271;
 #[derive(Clone, Debug, PartialEq)]
 pub struct Repaired {
     /// The object.
-    pub id: ObjectId,
+    pub(crate) id: ObjectId,
     /// Its master's type.
-    pub kind: MasterKind,
+    pub(crate) kind: MasterKind,
     /// Its master's class.
-    pub class: ClassId,
+    pub(crate) class: ClassId,
     /// Its master.
-    pub master: MasterId,
+    pub(crate) master: MasterId,
     /// Its master's hit points (`+0x530`).
-    pub master_hp: MasterHitPoints,
+    pub(crate) master_hp: MasterHitPoints,
     /// Its hit points (`+0x278`).
-    pub hp: HitPoints,
+    pub(crate) hp: HitPoints,
     /// Its hit point powerup (`+0xa38`, `+0xa3c`).
-    pub hp_powerup: HpPowerup,
+    pub(crate) hp_powerup: HpPowerup,
     /// An annex's main building (`+0xbb8`).
-    pub main: Option<MainBuildingId>,
+    pub(crate) main: Option<MainBuildingId>,
     /// A main building's annexes (`+0xbc0`, its four slots in their order).
-    pub annexes: Vec<ObjectId>,
+    pub(crate) annexes: Vec<ObjectId>,
     /// Its owner's attribute 270 ([`UNIT_REPAIR_COST`]): a unit's repair cost rate.
-    pub unit_repair_cost: Amount,
+    pub(crate) unit_repair_cost: Amount,
     /// Its owner's attribute 271 ([`BUILDING_REPAIR_COST`]): a building's repair cost rate.
-    pub building_repair_cost: Amount,
+    pub(crate) building_repair_cost: Amount,
 }
 
 /// What a repair pays with: the repairer's player's masters and attributes (`FUN_14162fb60`
 /// with the repairer's player).
 pub struct Payer<'a> {
     /// The repairer's player's masters.
-    pub masters: &'a Masters,
+    pub(crate) masters: &'a Masters,
     /// The repairer's player's attributes.
-    pub attributes: &'a mut dyn Attributes,
+    pub(crate) attributes: &'a mut dyn Attributes,
 }
 
 impl Debug for Payer<'_> {

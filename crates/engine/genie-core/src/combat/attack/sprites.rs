@@ -46,9 +46,9 @@ pub(super) const NO_OBJECT_STREAM: GenieError =
 pub struct SwingSprites {
     /// The unit's terrain look's attack sprite (`+0x970`, `FUN_14107cc20`) while it shows its
     /// look (`+0x8a9`).
-    pub look: Option<Graphic>,
+    pub(crate) look: Option<Graphic>,
     /// Its master's special graphic (`+0x8e8`, a `TRIBE_Master_Combat_Object`'s).
-    pub special: Option<Graphic>,
+    pub(crate) special: Option<Graphic>,
 }
 
 /// `FUN_141089820`: the attack timer of a unit's combat layer `combat` becomes `t` and its reload world time the world's

@@ -67,17 +67,17 @@ pub enum UnitCommand {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct TargetFlags {
     /// Its owner's id (`+0x138`, `player+0x718`); Gaia is 0.
-    pub owner: PlayerId,
+    pub(crate) owner: PlayerId,
     /// Its type (`+0xf`).
-    pub kind: MasterKind,
+    pub(crate) kind: MasterKind,
     /// `capture_flag` (`+0x924`, `FUN_14107cc90`).
-    pub capture: CaptureKind,
+    pub(crate) capture: CaptureKind,
     /// `+0x790`, `parent_pasture_id`: the pasture it is in.
-    pub pasture: Option<PastureId>,
+    pub(crate) pasture: Option<PastureId>,
     /// `+0x689`, `mUnitTargetingFlag`, is 0 (`FUN_141188bb0`).
-    pub untargetable: bool,
+    pub(crate) untargetable: bool,
     /// `+0x68a`, `unit_attackable_flag` (`FUN_141188b10`).
-    pub attackable: bool,
+    pub(crate) attackable: bool,
 }
 
 /// What the unit AI asks `ClosestResourceObject` (slot 0x80, `FUN_140c49760`;
@@ -85,18 +85,18 @@ pub struct TargetFlags {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ResourceSearch {
     /// The gather group (`param_2`).
-    pub kind: GatherGroup,
+    pub(crate) kind: GatherGroup,
     /// Fewer workers than this (`param_4`; −1 any).
-    pub cap: WorkerCount,
+    pub(crate) cap: WorkerCount,
     /// The drop site the search starts from (`param_3`).
-    pub site: Option<DropSiteId>,
+    pub(crate) site: Option<DropSiteId>,
     /// The unit AI's current target (`+0x48`), which the search passes over.
-    pub current: Option<ObjectId>,
+    pub(crate) current: Option<ObjectId>,
     /// The point the search starts from without a site (`param_7`, `param_8`; (−1, −1) for the
     /// unit's place).
-    pub point: Point,
+    pub(crate) point: Point,
     /// Below this state the unit finds nothing (`param_6`; its −1 is 0 here).
-    pub min_state: ObjectState,
+    pub(crate) min_state: ObjectState,
 }
 
 /// [`ResourceSearch::point`]'s (−1, −1): the unit's own place (`DAT_14330ec20`).
@@ -108,11 +108,11 @@ pub const NO_POINT: Point = Point::new(-1.0, -1.0);
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Gatherable {
     /// The object.
-    pub id: ObjectId,
+    pub(crate) id: ObjectId,
     /// Its place.
-    pub position: Position,
+    pub(crate) position: Position,
     /// Its master's class, or the class the hunter's or gatherer's search took.
-    pub class: ClassId,
+    pub(crate) class: ClassId,
 }
 
 /// An object as an order in the queue names it: its id, master, owner and the first two parts
@@ -120,14 +120,14 @@ pub struct Gatherable {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Named {
     /// The object.
-    pub id: ObjectId,
+    pub(crate) id: ObjectId,
     /// Its master.
-    pub master: MasterId,
+    pub(crate) master: MasterId,
     /// Its owner.
-    pub owner: PlayerId,
+    pub(crate) owner: PlayerId,
     /// Its slot 0x520 vector's x and second part (the height), which the game's orders read as
     /// a point's x and y.
-    pub vector: Point,
+    pub(crate) vector: Point,
 }
 
 /// What a unit sent off a footprint finds (the base handler's case 0x216).
@@ -135,17 +135,17 @@ pub struct Named {
 pub struct OffFootprint {
     /// The closest spot beside the footprint (`FUN_1411566b0` with 0), None when there is none
     /// (or no foundation).
-    pub spot: Option<Point>,
+    pub(crate) spot: Option<Point>,
     /// The unit's height.
-    pub z: f32,
+    pub(crate) z: f32,
     /// Its master's class.
-    pub class: ClassId,
+    pub(crate) class: ClassId,
     /// The owner's type (`player+0x10`; [`PlayerKind::is_computer`] is `FUN_141659cf0`).
-    pub player_kind: PlayerKind,
+    pub(crate) player_kind: PlayerKind,
     /// Its owner's id.
-    pub player: PlayerId,
+    pub(crate) player: PlayerId,
     /// The foundation, while the world holds it.
-    pub site: Option<Named>,
+    pub(crate) site: Option<Named>,
     /// The target of its current action (`FUN_140a986f0`, `FUN_140a78450`).
-    pub action_target: Option<Named>,
+    pub(crate) action_target: Option<Named>,
 }

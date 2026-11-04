@@ -134,14 +134,14 @@ pub fn gate_lets_pass(
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct LongTarget {
     /// Its tile.
-    pub tile: Tile,
+    pub(crate) tile: Tile,
     /// The tiles of its footprint (the centre less the radius, the centre plus the radius less
     /// `LongPathTuning::edge_gap`, whole).
-    pub rect: TileRect,
+    pub(crate) rect: TileRect,
     /// The unit's footprint gap to it, squared (`FUN_14118f8c0`) and not (`FUN_14118f680`).
-    pub gap_squared: DistanceSquared,
+    pub(crate) gap_squared: DistanceSquared,
     /// The gap, not squared (`FUN_14118f680`).
-    pub gap: Distance,
+    pub(crate) gap: Distance,
 }
 
 impl LongTarget {
@@ -173,31 +173,31 @@ impl LongTarget {
 #[derive(Clone, Debug, PartialEq)]
 pub struct LongRequest {
     /// The start tile.
-    pub from: Tile,
+    pub(crate) from: Tile,
     /// The goal tile.
-    pub to: Tile,
+    pub(crate) to: Tile,
     /// How near counts as there.
-    pub range: Distance,
+    pub(crate) range: Distance,
     /// The target object, None for a point.
-    pub target: Option<LongTarget>,
+    pub(crate) target: Option<LongTarget>,
     /// The unit moves: its speed (slot 0x208, `FUN_141202c70`) is not 0, or its master is 42.
-    pub moves: bool,
+    pub(crate) moves: bool,
     /// The terrain classes the unit may stand on (its restriction's mask).
-    pub mask: TerrainMask,
+    pub(crate) mask: TerrainMask,
     /// The owner's type (`player+0x10`): a computer player (`FUN_141659cf0`) has a shorter
     /// budget.
-    pub player_kind: PlayerKind,
+    pub(crate) player_kind: PlayerKind,
     /// The tiles of the ignored units the search lowers the tall count of, once each
     /// (`FUN_140f60440`: the unit itself and its moving ignored units, not inside another, whose
     /// master has a height).
-    pub lowered: Vec<Tile>,
+    pub(crate) lowered: Vec<Tile>,
     /// Argument 13: the goal counts as reached within the range (else within a tile).
-    pub within_range: bool,
+    pub(crate) within_range: bool,
     /// Argument 11 is not −1: a blocked tile with no object of the player around counts as open.
-    pub near_player: bool,
+    pub(crate) near_player: bool,
     /// The players the unit's player counts as allies (`FUN_141663dc0` with the ally flag): a
     /// gate's tile of another player is closed.
-    pub allies: PlayerSet,
+    pub(crate) allies: PlayerSet,
 }
 
 /// How a search ended ([`search`]).

@@ -19,12 +19,12 @@ pub struct Well512 {
     /// first: the step's taps sit at fixed places, and a step turns the ring by one.
     state: [u32; 16],
     /// Draws since construction; `set_seed` leaves it alone.
-    pub draws: u32,
+    pub(crate) draws: u32,
     /// The last `rand15` value; the constructor sets it to `u32::MAX`.
-    pub last: u32,
+    pub(crate) last: u32,
     /// Which of the eleven streams it is ([`Stream`] as its number, [`NO_STREAM`] for a
     /// generator outside [`Streams`]): the draw trace's only ([`crate::trace::DRAWS`]).
-    pub stream: u8,
+    pub(crate) stream: u8,
 }
 
 /// [`Well512::stream`] of a generator outside [`Streams`].

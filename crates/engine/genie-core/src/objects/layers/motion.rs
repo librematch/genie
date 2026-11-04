@@ -15,7 +15,7 @@ use genie_diff::Diff;
 #[derive(Clone, Copy, Debug, Default, PartialEq, Diff)]
 pub struct Animated {
     /// `mCurrentSpeed` (`+0x7b8`).
-    pub speed: Speed,
+    pub(crate) speed: Speed,
 }
 
 impl Animated {

@@ -81,9 +81,9 @@ pub enum Owner {
 pub struct ExploreAction {
     /// `+0x18`, with state 11's `MoveTo` to the point (quiet, range 0, the master's walking
     /// sprite, [`ExploreMove::given`]).
-    pub state: ExploreState,
+    pub(crate) state: ExploreState,
     /// The point it walks to (`+0x38`..`+0x40`), x −1 for none.
-    pub point: Position,
+    pub(crate) point: Position,
 }
 
 /// What an Explore's `MoveTo` reads of its unit as `set_state(11)` makes it: [`MoveToReads`], and
@@ -92,9 +92,9 @@ pub struct ExploreAction {
 #[derive(Clone, Copy, Debug)]
 pub struct ExploreMove<'a> {
     /// What every new sub-action `MoveTo` reads of the unit.
-    pub reads: MoveToReads<'a>,
+    pub(crate) reads: MoveToReads<'a>,
     /// The master's walking sprite (`+0x748`).
-    pub given: Option<SpriteId>,
+    pub(crate) given: Option<SpriteId>,
 }
 
 impl<'a> ExploreMove<'a> {
@@ -316,9 +316,9 @@ pub struct InfluenceMap {
     /// Its width and height.
     pub size: GridSize,
     /// The tile its first byte stands for.
-    pub origin: Tile,
+    pub(crate) origin: Tile,
     /// `unchangeableLimitValue` (`+0x18`), which the save keeps.
-    pub limit: u8,
+    pub(crate) limit: u8,
     /// The bytes, row by row.
     pub cells: Vec<u8>,
 }
@@ -420,15 +420,15 @@ const SEARCH_ABOUT_POINT: i32 = 7;
 #[derive(Clone, Copy, Debug)]
 pub struct Seeker {
     /// The unit's place.
-    pub at: Position,
+    pub(crate) at: Position,
     /// Its master's line of sight (`+0x5d0`).
-    pub line_of_sight: Distance,
+    pub(crate) line_of_sight: Distance,
     /// The unit AI's current order (`+0x3c`).
-    pub order: Option<OrderKind>,
+    pub(crate) order: Option<OrderKind>,
     /// The unit AI's target point (`+0x50`, `+0x54`; x is −1 without one).
-    pub target_point: Point,
+    pub(crate) target_point: Point,
     /// The owner's type (`player+0x10`; [`PlayerKind::is_computer`] is `FUN_141659cf0`).
-    pub player_kind: PlayerKind,
+    pub(crate) player_kind: PlayerKind,
 }
 
 /// `FUN_140c4bd40`, the unit AI's slot 0x90 (`closestUndiscoveredTile`, "the closest

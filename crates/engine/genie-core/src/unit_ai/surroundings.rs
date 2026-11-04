@@ -43,23 +43,23 @@ use std::collections::HashSet;
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Found {
     /// The object picked.
-    pub id: Option<ObjectId>,
+    pub(crate) id: Option<ObjectId>,
     /// The lists read hold enemies.
-    pub enemies: bool,
+    pub(crate) enemies: bool,
     /// The object's place (x, y, z), for the caller's use.
-    pub position: Option<Position>,
+    pub(crate) position: Option<Position>,
     /// Its query ran (else it read the last answer).
-    pub fresh: bool,
+    pub(crate) fresh: bool,
     /// `ClosestObject`'s count of the players but Gaia whose objects the lists read hold
     /// (`DAT_143e6f92c`, `numberDifferentPlayerObjectsVisible`); 0 from the other picks, which
     /// do not count.
-    pub players: u32,
+    pub(crate) players: u32,
     /// What `ClosestObject` writes to its seventh argument: the object's search distance,
     /// truncated (`CVTTSS2SI`); −1 (`DAT_14330ec20`) without one and from the other picks.
-    pub distance: WholeDistance,
+    pub(crate) distance: WholeDistance,
     /// The retarget entries `bestUnitToAttack`'s failed paths add (`FUN_140c42320`: a target and
     /// the world time until which it is ignored; at most three), the unit AI's.
-    pub retries: [Option<(ObjectId, WorldTime)>; 3],
+    pub(crate) retries: [Option<(ObjectId, WorldTime)>; 3],
 }
 
 impl Found {
@@ -119,14 +119,14 @@ pub fn flood_search(
 #[derive(Clone, Copy, Debug, Default, PartialEq, Diff)]
 pub struct Home {
     /// `+0x1f0`..`+0x1f8`, `origin`: the point it wanders around.
-    pub origin: Position,
+    pub(crate) origin: Position,
     /// `+0x1fc`, `furious`: it does not wander.
-    pub furious: bool,
+    pub(crate) furious: bool,
     /// `+0x1fd`: its next idle check sends it home; its slot 0x1f0 (`FUN_140c16d50`) sets it
     /// after a failed Attack ([`crate::combat::attack::Attack::update`]). Not saved; a loaded boar
     /// starts without it.
     #[diff(unsaved)]
-    pub go_home: bool,
+    pub(crate) homeward: bool,
 }
 
 bitflags::bitflags! {
@@ -182,99 +182,99 @@ bitflags::bitflags! {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Surroundings {
     /// The unit's position (`+0x3c8`, `+0x4c8`, `+0x5a8`).
-    pub position: Position,
+    pub(crate) position: Position,
     /// Its hit points (`+0x278`).
-    pub hp: HitPoints,
+    pub(crate) hp: HitPoints,
     /// Its top speed (slot 0x208, `FUN_141202c70`; 0 for a unit that does not move), the map's
     /// size in tiles and the world's dt in seconds (`world+0x164`).
-    pub speed: Speed,
+    pub(crate) speed: Speed,
     /// The map's size in tiles.
-    pub map: GridSize,
+    pub(crate) map: GridSize,
     /// The world's dt in seconds (`world+0x164`).
-    pub dt_seconds: Seconds,
+    pub(crate) dt_seconds: Seconds,
     /// Its yes-or-no reads.
-    pub flags: SurroundingFlags,
+    pub(crate) flags: SurroundingFlags,
     /// The owner's id (`player+0x718`); Gaia is 0.
-    pub player: PlayerId,
+    pub(crate) player: PlayerId,
     /// The unit's master's class (decoded).
-    pub class: Option<ClassId>,
+    pub(crate) class: Option<ClassId>,
     /// The master's `combat_level` (`+0x62c`).
-    pub combat_level: CombatLevel,
+    pub(crate) combat_level: CombatLevel,
     /// The master's `attack_priority` (`+0x92c`, `FUN_141202220`).
-    pub attack_priority: AttackPriority,
+    pub(crate) attack_priority: AttackPriority,
     /// The master's radii (`+0x5d8`, `+0x5dc`), line of sight (`+0x5d0`) and search radius
     /// (`+0x794`, the unit's slot 0x2c8).
-    pub size: Footprint,
+    pub(crate) size: Footprint,
     /// The master's line of sight (`+0x5d0`).
-    pub los: Distance,
+    pub(crate) los: Distance,
     /// The search radius (`+0x794`, the unit's slot 0x2c8).
-    pub search_radius: Distance,
+    pub(crate) search_radius: Distance,
     /// Slot 0x230 (`FUN_14108d960`): its master's weapon range (`+0x828`).
-    pub weapon_range: Distance,
+    pub(crate) weapon_range: Distance,
     /// The unit's state (`+0x640`), type (`+0xf`), `+0x924` and master id.
-    pub state: ObjectState,
+    pub(crate) state: ObjectState,
     /// The unit's type (`+0xf`).
-    pub kind: MasterKind,
+    pub(crate) kind: MasterKind,
     /// Its missiles per volley (`+0xa00`, `FUN_1412136d0`), 0 for a unit without volleys.
-    pub firepower: Firepower,
+    pub(crate) firepower: Firepower,
     /// The unit's `+0x924`.
-    pub capture: CaptureKind,
+    pub(crate) capture: CaptureKind,
     /// The unit's master.
-    pub master: MasterId,
+    pub(crate) master: MasterId,
     /// The unit AI's current target as the world's object table holds it (`FUN_1415417a0`),
     /// `None` when it does not exist or the unit AI has none.
-    pub target: Option<Seen>,
+    pub(crate) target: Option<Seen>,
     /// The unit's id (`+8`), which its attackers' unit AIs must target to stay attackers.
-    pub id: ObjectId,
+    pub(crate) id: ObjectId,
     /// The unit's slot 0x1f8 (`FUN_14106a6c0`): its animation speed (`+0x7b8`); None while the
     /// slice does not know it.
-    pub anim_speed: Option<Speed>,
+    pub(crate) anim_speed: Option<Speed>,
     /// The unit's slot 0x2b0 (`RGE_Action_Object::actionState`): its top action's state, 0
     /// without one; None for an action the slice does not hold.
-    pub action_state: Option<ActionState>,
+    pub(crate) action_state: Option<ActionState>,
     /// The objects the unit AI names besides its target, as the world's object table holds them:
     /// its attackers ([`UnitAi::attackers`]), the callers of its queued damage notifies and
     /// missile warnings, and the units in its way. One the table does not hold is absent.
     ///
     /// [`UnitAi::attackers`]: crate::unit_ai::UnitAi::attackers
-    pub units: Vec<UnitSeen>,
+    pub(crate) units: Vec<UnitSeen>,
     /// The unit's group (`+0x6d0`, the world's `FUN_14152ff40`), when the world holds it: what
     /// the full update reads of it ([`GroupState`]).
-    pub group: Option<GroupState>,
+    pub(crate) group: Option<GroupState>,
     /// Slot 400 (`FUN_14106d090`): its top action's target (`FUN_140a78450`) as the world holds
     /// it; None without one.
-    pub top_target: Option<TopTarget>,
+    pub(crate) top_target: Option<TopTarget>,
     /// Slot 0x240 (`FUN_1410863c0`): its master's least range (`+0x850`).
-    pub min_range: Distance,
+    pub(crate) min_range: Distance,
     /// Where the unit last moved to (slot 0x520: `+0x824`), as the game's vector (x, height,
     /// y); an object without movement state, its place.
-    pub moved_at: BVector,
+    pub(crate) moved_at: BVector,
     /// Its owner's `chance_to_dodge_missiles` (`player+0xe10`, saved): a ship's handler takes a
     /// missile's warning (`0x20f`) as damage unless a draw below it dodges.
-    pub dodge_chance: Chance,
+    pub(crate) dodge_chance: Chance,
     /// Its owner's `chance_for_archers_to_maintain_distance` (`player+0xe11`, saved): a computer
     /// player's siege unit backs up after a shot on a draw at least this.
-    pub keep_distance_chance: Chance,
+    pub(crate) keep_distance_chance: Chance,
     /// The build's roles, through which the unit AI reads the classes and masters it meets
     /// (FD-046-D45).
-    pub roles: Roles,
+    pub(crate) roles: Roles,
     /// The build's slots: the classes and masters the unit AI's code names.
-    pub slots: Slots,
+    pub(crate) slots: Slots,
     /// The build's tuning values of the unit AI (FD-046-D49).
-    pub unit_ai_tuning: UnitAiTuning,
+    pub(crate) unit_ai_tuning: UnitAiTuning,
 }
 
 /// The target of a unit's top action as its unit AI reads it ([`Surroundings::top_target`]).
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct TopTarget {
     /// `+8`.
-    pub id: ObjectId,
+    pub(crate) id: ObjectId,
     /// Its type (`+0xf`).
-    pub kind: MasterKind,
+    pub(crate) kind: MasterKind,
     /// Its place.
-    pub position: Position,
+    pub(crate) position: Position,
     /// Its master's radii.
-    pub radius: Footprint,
+    pub(crate) radius: Footprint,
 }
 
 /// The target of the unit's top action as the full update stands ([`UnitAi::top_target_live`]).
@@ -327,32 +327,32 @@ impl Surroundings {
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct UnitSeen {
     /// `+8`.
-    pub id: ObjectId,
+    pub(crate) id: ObjectId,
     /// Its master's class.
-    pub class: ClassId,
+    pub(crate) class: ClassId,
     /// Its owner's id (`+0x138`, `player+0x718`); Gaia is 0.
-    pub owner: PlayerId,
+    pub(crate) owner: PlayerId,
     /// Its master's `combat_level` (`+0x62c`).
-    pub combat_level: CombatLevel,
+    pub(crate) combat_level: CombatLevel,
     /// `+0x640`.
-    pub state: ObjectState,
+    pub(crate) state: ObjectState,
     /// Its unit AI's current target (`+0x48`); None without a unit AI or a target.
-    pub target: Option<ObjectId>,
+    pub(crate) target: Option<ObjectId>,
     /// The gap between its footprint and the unit's, squared (`FUN_14118f8c0`).
-    pub gap_squared: DistanceSquared,
+    pub(crate) gap_squared: DistanceSquared,
     /// Its place.
-    pub position: Position,
+    pub(crate) position: Position,
     /// Its hit points (`+0x278`).
-    pub hp: HitPoints,
+    pub(crate) hp: HitPoints,
     /// Its master's id and type (`+0xf`).
-    pub master: MasterId,
+    pub(crate) master: MasterId,
     /// Its type (`+0xf`).
-    pub kind: MasterKind,
+    pub(crate) kind: MasterKind,
     /// An annex's main building (`+0xbb8`).
-    pub main: Option<MainBuildingId>,
+    pub(crate) main: Option<MainBuildingId>,
     /// The unit's owner counts its owner as its own or an ally (`FUN_141663d90` with the ally
     /// flag, [`crate::unit_ai::task_finder::allied`]).
-    pub allied: bool,
+    pub(crate) allied: bool,
 }
 
 /// What a computer player's unit weighs of an object on a damage notify ([`UnitAi::damaged`]):
@@ -365,15 +365,15 @@ pub struct Duel {
     /// [`can_convert`], any other's 0).
     ///
     /// [`can_convert`]: crate::unit_ai::can_convert
-    pub converts: bool,
+    pub(crate) converts: bool,
     /// Its attacks' sum (slot 0x228, `FUN_141084070`: its master's attacks above 0).
-    pub attacks: f32,
+    pub(crate) attacks: f32,
     /// What it deals the unit per hit (the unit's slot 0x220 with it, `FUN_141083f20`).
-    pub harms: HitPoints,
+    pub(crate) harms: HitPoints,
     /// What the unit deals it per hit (its slot 0x220 with the unit).
-    pub harmed: HitPoints,
+    pub(crate) harmed: HitPoints,
     /// Its hit points (`+0x278`).
-    pub hp: HitPoints,
+    pub(crate) hp: HitPoints,
 }
 
 /// An object as a unit AI's target block reads it: its state (`+0x640`) and type (`+0xf`); as
@@ -383,24 +383,24 @@ pub struct Duel {
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Seen {
     /// The object's state.
-    pub state: ObjectState,
+    pub(crate) state: ObjectState,
     /// Its master's type.
-    pub kind: MasterKind,
+    pub(crate) kind: MasterKind,
     /// Its owner.
-    pub owner: PlayerId,
+    pub(crate) owner: PlayerId,
     /// Its master's class.
-    pub class: ClassId,
+    pub(crate) class: ClassId,
     /// Its place.
-    pub position: Position,
+    pub(crate) position: Position,
     /// Its master's radii.
-    pub radius: Footprint,
+    pub(crate) radius: Footprint,
     /// Its tile is visible to the viewer.
-    pub visible: bool,
+    pub(crate) visible: bool,
     /// Its master's `object_flags` (`+0x654`).
-    pub flags: ObjectFlags,
+    pub(crate) flags: ObjectFlags,
     /// The viewer's test of its tile (`FUN_1416635e0`, [`crate::map::spatial::Spatial::tile_sight`]):
     /// 0xf seen, 0x80 explored, else 0.
-    pub sight: TileSight,
+    pub(crate) sight: TileSight,
 }
 
 /// The game's `force` argument of a unit AI's order, its attack command and its move
@@ -419,13 +419,13 @@ pub enum OrderForce {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct AiMove {
     /// The point.
-    pub point: Position,
+    pub(crate) point: Position,
     /// The range within which it arrives.
-    pub range: Distance,
+    pub(crate) range: Distance,
     /// The sixth argument: forced, the move replaces even a `MoveTo` to the same point.
-    pub force: OrderForce,
+    pub(crate) force: OrderForce,
     /// The seventh: whether the unit walks or runs.
-    pub pace: Pace,
+    pub(crate) pace: Pace,
 }
 
 /// How an [`AiMove`]'s unit goes (its seventh argument): it walks (1, its master's walking

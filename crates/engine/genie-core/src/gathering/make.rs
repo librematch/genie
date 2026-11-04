@@ -41,14 +41,14 @@ use crate::world::layer::Slots;
 #[derive(Clone, Copy, Debug, PartialEq, Diff)]
 pub struct MakeAction {
     /// `+0x18`.
-    pub state: MakeState,
+    pub(crate) state: MakeState,
     /// `+0x44`: the food still to make.
-    pub remaining: Amount,
+    pub(crate) remaining: Amount,
     /// `+0x68`: the food made in all; the constructor's 120.0 never shows, as
     /// [`MakeAction::start`] sets it at once.
-    pub total: Amount,
+    pub(crate) total: Amount,
     /// `+0x48`: the master's default task.
-    pub task: Task,
+    pub(crate) task: Task,
 }
 
 impl MakeAction {

@@ -149,13 +149,13 @@ use genie_diff::Diff;
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Diff)]
 pub struct Notify {
     /// The object that posts it; none for a missile's hit whose shooter is gone (its sender −1).
-    pub caller: Option<ObjectId>,
+    pub(crate) caller: Option<ObjectId>,
     /// The object whose unit AI takes it.
-    pub recipient: ObjectId,
+    pub(crate) recipient: ObjectId,
     /// The kind ([`NotifyKind`]).
-    pub kind: NotifyKind,
+    pub(crate) kind: NotifyKind,
     /// Its three parameters.
-    pub p: [i32; 3],
+    pub(crate) p: [i32; 3],
 }
 
 impl Notify {
@@ -225,26 +225,26 @@ pub const fn notify_capacity(ai_kind: UnitAiKind, count: usize) -> usize {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Diff)]
 pub struct QueuedOrder {
     /// `+0x0`: the issuing player or object; none for −1 (a guard's defend order).
-    pub issuer: Option<Issuer>,
+    pub(crate) issuer: Option<Issuer>,
     /// `+0x4`: the order (a move, an order on a target, …).
-    pub order: OrderKind,
+    pub(crate) order: OrderKind,
     /// `+0x8`: below 100 it waits while the unit AI has an action.
-    pub priority: OrderPriority,
+    pub(crate) priority: OrderPriority,
     /// `+0xc`, `+0x10`: the target and its owner (−1 for none; "T", "`TOwner`" in the log line of
     /// `FUN_140c55c90`).
-    pub target: Option<ObjectId>,
+    pub(crate) target: Option<ObjectId>,
     /// The target's owner.
-    pub target_owner: Option<PlayerId>,
+    pub(crate) target_owner: Option<PlayerId>,
     /// `+0x14`..`+0x1c`: the point; `+0x20`: the range.
-    pub point: Position,
+    pub(crate) point: Position,
     /// The range.
-    pub range: Distance,
+    pub(crate) range: Distance,
     /// `+0x24`, `+0x28`: the point the unit's slot 0x2d8 shows (not held).
-    pub shown: Point,
+    pub(crate) shown: Point,
     /// `+0x2c` (a byte): 0 leaves the order in the queue.
-    pub ready: bool,
+    pub(crate) ready: bool,
     /// `+0x30`: the target's type, its master id or its class ([`OrderTargetKind`]).
-    pub target_kind: Option<OrderTargetKind>,
+    pub(crate) target_kind: Option<OrderTargetKind>,
 }
 
 /// The four bytes at offset `i` of a saved record.
@@ -379,9 +379,9 @@ pub enum AiCommand {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct AfterOrder {
     /// The unit was busy after the notifies (slot 0x430 again, the update's `busy`).
-    pub busy: bool,
+    pub(crate) busy: bool,
     /// The unit's group as the update read it ([`Surroundings::group`]).
-    pub group: Option<GroupState>,
+    pub(crate) group: Option<GroupState>,
 }
 
 /// A unit AI's saved patrol (`+0x1c0`, a `Path` of its own): a copy of its unit's top path
@@ -390,148 +390,148 @@ pub struct AfterOrder {
 #[derive(Clone, Debug, Default, PartialEq, Diff)]
 pub struct PatrolPath {
     /// The points (x, height, y) and the length.
-    pub path: Path,
+    pub(crate) path: Path,
     /// The path's flags.
-    pub flags: PathFlags,
+    pub(crate) flags: PathFlags,
 }
 
 /// The unit-AI fields the idle update reads and writes, with their offsets in 158041.
 #[derive(Clone, Debug, Default, PartialEq, Diff)]
 pub struct UnitAi {
     /// The factory's type (`has_ai` in the save), which picks the class.
-    pub ai_kind: UnitAiKind,
+    pub(crate) ai_kind: UnitAiKind,
     /// `+0x3c`, −1 for none.
-    pub current_order: Option<OrderKind>,
+    pub(crate) current_order: Option<OrderKind>,
     /// `+0x40`, the current order's priority (−1 for none): a queued order sets it.
-    pub order_priority: OrderPriority,
+    pub(crate) order_priority: OrderPriority,
     /// `+0x44`, −1 for none.
-    pub current_action: Option<AiAction>,
+    pub(crate) current_action: Option<AiAction>,
     /// `+0x48`.
-    pub current_target: Option<ObjectId>,
+    pub(crate) current_target: Option<ObjectId>,
     /// `+0x4c`, the target's class (−1 for none), and `+0x50`..`+0x58`, its point.
-    pub target_class: Option<ClassId>,
+    pub(crate) target_class: Option<ClassId>,
     /// `+0x50`..`+0x58`: the target's point.
-    pub target_point: Position,
+    pub(crate) target_point: Position,
     /// `+0x5c`, `desiredTargetDistance`: how near the follow order keeps the unit to its target
     /// (the constructor's 2).
-    pub desired_distance: Distance,
+    pub(crate) desired_distance: Distance,
     /// `+0x60`, `DefendTarget`: the object the defend order keeps the unit near.
-    pub defend_target: Option<ObjectId>,
+    pub(crate) defend_target: Option<ObjectId>,
     /// `+0x64`, `+0x68`, `+0x6c`, `+0x70`: the order, action, target and target class before the
     /// current ones.
-    pub last_order: Option<OrderKind>,
+    pub(crate) last_order: Option<OrderKind>,
     /// `+0x68`: the action before the current one.
-    pub last_action: Option<AiAction>,
+    pub(crate) last_action: Option<AiAction>,
     /// `+0x6c`: the target before the current one.
-    pub last_target: Option<ObjectId>,
+    pub(crate) last_target: Option<ObjectId>,
     /// `+0x70`: that target's class.
-    pub last_target_class: Option<ClassId>,
+    pub(crate) last_target_class: Option<ClassId>,
     /// `+0x160`.
-    pub idle_timer: Millis,
+    pub(crate) idle_timer: Millis,
     /// `+0x164`, the randomised timeout the idle timer is compared with.
-    pub adjusted_idle_timeout: Millis,
+    pub(crate) adjusted_idle_timeout: Millis,
     /// `+0x168`, the base the adjusted timeout is drawn around.
-    pub idle_timeout: Millis,
+    pub(crate) idle_timeout: Millis,
     /// `+0x16c`.
-    pub secondary_timer: Millis,
+    pub(crate) secondary_timer: Millis,
     /// `+0x170`.
-    pub look_around_timer: Millis,
+    pub(crate) look_around_timer: Millis,
     /// `+0x174`.
-    pub look_around_timeout: Millis,
+    pub(crate) look_around_timeout: Millis,
     /// `+0xbc`, the world time of the last retarget.
-    pub last_retarget_time: WorldTime,
+    pub(crate) last_retarget_time: WorldTime,
     /// `+0x1cc`, `mRandomizedRetargetTimer`: the word-9 input.
     pub retarget_timer: Millis,
     /// `+0x1a9`: defensive and stand ground add leash checks to slot 73.
-    pub stance: UnitStance,
+    pub(crate) stance: UnitStance,
     /// `+0x1d4`, `mFormationType`: the formation the unit's group last took for it, which its
     /// next group's type counts (`FUN_14100b940`).
-    pub formation_kind: FormationKind,
+    pub(crate) formation_kind: FormationKind,
     /// `+0x1ac`, `+0x1b0`, `state_position`: where a unit with an order last updated, which a
     /// stance's leash measures from.
-    pub state_position: Point,
+    pub(crate) state_position: Point,
     /// `+0x1d6`: non-zero skips the retarget check.
-    pub retarget_disabled: u8,
+    pub(crate) retarget_disabled: u8,
     /// `+0x1b8`, `alertModeValue`.
-    pub alert_mode: AlertMode,
+    pub(crate) alert_mode: AlertMode,
     /// `+0x1b4`, `time_since_enemy_sighting`: seconds since a search last found enemies; each full
     /// update adds the world's dt.
-    pub time_since_enemy: Seconds,
+    pub(crate) time_since_enemy: Seconds,
     /// `+0x1c0`, the saved patrol (the save's `hasPatrolPath` and its path): what
     /// `savePatrolInformation` (`FUN_140c63d20`) kept of the unit's patrol when an attack took it
     /// off it, which `restorePatrolInformation` (`FUN_140c5e5b0`) walks on.
-    pub patrol_path: Option<PatrolPath>,
+    pub(crate) patrol_path: Option<PatrolPath>,
     /// `+0x1c8`, `mPatrolCurrentWaypoint`: the saved patrol's waypoint the unit walked to.
-    pub patrol_waypoint: WaypointIndex,
+    pub(crate) patrol_waypoint: WaypointIndex,
     /// `+0x1a8`, `stop_after_target_killed_value`: a move does not let the current action take its
     /// point (`FUN_140c41c10`).
-    pub stop_after_kill: bool,
+    pub(crate) stop_after_kill: bool,
     /// A boar's own fields (factory type 4).
-    pub home: Option<Home>,
+    pub(crate) home: Option<Home>,
     /// A hunted animal's own fields (factory type 2). Not saved: a load makes the unit AI anew,
     /// its origin the animal's place then, so a replay takes them from the recording's start.
     #[diff(unsaved)]
-    pub hunted: Option<Hunted>,
+    pub(crate) hunted: Option<Hunted>,
     /// `+0x15c`, `last_update_time_value`: what `FUN_140c5dc10` last cleared the notifies with
     /// (the owner's time on its turn, the world time on a MOVE or an ownership change).
-    pub last_update_time: Millis,
+    pub(crate) last_update_time: Millis,
     /// The order queue, oldest first.
-    pub orders: Vec<QueuedOrder>,
+    pub(crate) orders: Vec<QueuedOrder>,
     /// A building's or tower's command queue (`+0x1f0`..`+0x1f8`, 0x34-byte orders the
     /// building command queue fills, saved as `savedOrder`), which each unit it trains takes.
-    pub building_orders: Vec<QueuedOrder>,
+    pub(crate) building_orders: Vec<QueuedOrder>,
     /// The notify queue (`+0x28` count, `+0x30` array), oldest first.
-    pub notifies: Vec<Notify>,
+    pub(crate) notifies: Vec<Notify>,
     /// Its capacity (`+0x2c`, not saved): the factory's 10 (5 for the artifact's and the
     /// livestock's, types 14 and 19), doubled by a post that finds it full outside the
     /// processing (`FUN_140c42470`).
     #[diff(unsaved)]
-    pub notify_capacity: usize,
+    pub(crate) notify_capacity: usize,
     /// `+0x38`: the notifies are being processed; a post that finds the queue full then goes to
     /// the buffer (`DAT_143e6f930`), which the processing's end flushes into the queue
     /// (`FUN_140c55270`).
-    pub processing: bool,
+    pub(crate) processing: bool,
     /// The buffered notifies (the game's buffer is global; one unit AI processes at a time).
-    pub buffered: Vec<Notify>,
+    pub(crate) buffered: Vec<Notify>,
     /// This update's order queue ran an order on a target ([`Effect::OrderOnTarget`]): the update
     /// ends there and its rest runs with what the order gave the AI ([`AfterOrder`]). Not saved:
     /// genie's flag within one update, cleared at its start.
     #[diff(unsaved)]
-    pub ordered_on_target: bool,
+    pub(crate) ordered_on_target: bool,
     /// `+0xc0`, the attackers ([`Attackers`]).
-    pub attackers: Attackers,
+    pub(crate) attackers: Attackers,
     /// The order history (`+0x78`'s list, the newest at `+0xa8` first, count `+0xb8`; the
     /// save's `ohCount` entries): the orders on a target ([`UnitAi::remember_order`]),
     /// `bestUnitToAttack`'s weights by attack category.
-    pub order_history: Vec<OrderRecord>,
+    pub(crate) order_history: Vec<OrderRecord>,
     /// The retarget entries (`+0x1d8` count, `+0x1e0` array): targets `bestUnitToAttack` could
     /// not path to, each with the world time until which it ignores them (`FUN_140c42320`); the
     /// full update lets the expired go ([`UnitAi::expire_retries`]).
-    pub retries: Vec<(ObjectId, WorldTime)>,
+    pub(crate) retries: Vec<(ObjectId, WorldTime)>,
     /// `+0x1d0`, `mBestUnitToAttackThisUpdate`: what the damage notify's `bestUnitToAttack`
     /// found this update ([`UnitAi::damaged`]), none before one ran (the constructor's −1, and
     /// the full update's start) or when it found none; the update's later damage notifies take
     /// it.
-    pub best_this_update: Option<ObjectId>,
+    pub(crate) best_this_update: Option<ObjectId>,
 }
 
 /// An order on a target in a unit AI's history (`FUN_140c42080`, a node of `+0x78`'s list).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Diff)]
 pub struct OrderRecord {
     /// The order (`mOrder`), None for the −1 of an order recorded without one.
-    pub order: Option<OrderKind>,
+    pub(crate) order: Option<OrderKind>,
     /// The action (`mAction`), None for −1.
-    pub action: Option<AiAction>,
+    pub(crate) action: Option<AiAction>,
     /// The world time it was given (`mTime`).
-    pub time: WorldTime,
+    pub(crate) time: WorldTime,
     /// The unit's slot 0x520 then (`mPosition`: where it last moved to).
-    pub position: BVector,
+    pub(crate) position: BVector,
     /// The target (`mTargetID`).
-    pub target: Option<ObjectId>,
+    pub(crate) target: Option<ObjectId>,
     /// The target's attack category ([`crate::unit_ai::best_target::category`], `mTargetAttackCategory`).
-    pub category: Option<best_target::AttackCategory>,
+    pub(crate) category: Option<best_target::AttackCategory>,
     /// The target's slot 0x520 then (`mTargetPosition`).
-    pub target_position: BVector,
+    pub(crate) target_position: BVector,
 }
 
 /// The order history's length (`FUN_140c42080`: a ninth order recycles the oldest).
@@ -543,10 +543,10 @@ pub const ORDER_HISTORY: usize = 8;
 #[derive(Clone, Copy, Debug, Default, PartialEq, Diff)]
 pub struct Hunted {
     /// `+0x1f0`..`+0x1f8`: the unit's place when its AI was made.
-    pub origin: Position,
+    pub(crate) origin: Position,
     /// `+0x1fc`: the unit's slot 0x7b0 then (`+0xb74`, the work range of its master's last task
     /// of action type 6, `FUN_141206d50`): beyond it the animal goes home.
-    pub leash: Distance,
+    pub(crate) leash: Distance,
 }
 
 /// The engine's error ([`genie_error::GenieError`]), here for the modules' imports.

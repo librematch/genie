@@ -11,8 +11,6 @@ use crate::combat::attack::{
     Posts, face_target,
 };
 use crate::map::Distance;
-use crate::map::DistanceSquared;
-use crate::map::Footprint;
 use crate::map::Point;
 use crate::map::Position;
 use crate::map::spatial::{Placed, Spatial};
@@ -22,7 +20,7 @@ use crate::movement::MoveStart;
 use crate::movement::Speed;
 use crate::movement::gate_gap;
 use crate::movement::move_to::{MoveToReads, TargetMoved};
-use crate::movement::{Mover, footprint_gap, footprint_gap_squared};
+use crate::movement::{Mover, footprint_gap};
 use crate::objects::Graphics;
 use crate::objects::ObjectId;
 use crate::objects::SpriteId;
@@ -489,10 +487,8 @@ pub fn engagement(
             "an attacker whose charge adds to its range (slot 0x2f8)",
         ));
     }
-    let (gap_squared, gap) = gaps(me.position, me.radius, them.position, them.radius);
     Ok(Engagement {
-        gap_squared,
-        gap,
+        gap: footprint_gap(me.position, me.radius, them.position, them.radius),
         position: me.position,
         target_position: them.position,
         speed,
@@ -507,16 +503,4 @@ pub fn engagement(
         target_class: them.class,
         same_owner: me.player == them.player,
     })
-}
-
-/// The gap between two footprints, for an [`Engagement`].
-#[must_use]
-pub fn gaps(
-    a: Position,
-    radius_a: Footprint,
-    b: Position,
-    radius_b: Footprint,
-) -> (DistanceSquared, Distance) {
-    let squared = footprint_gap_squared(a, radius_a, b, radius_b);
-    (squared, footprint_gap(a, radius_a, b, radius_b))
 }

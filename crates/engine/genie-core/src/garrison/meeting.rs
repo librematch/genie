@@ -48,17 +48,17 @@ pub(crate) const UNREACHED: GenieError =
 #[derive(Clone, Debug)]
 pub struct MeetingTarget {
     /// It has room for the unit (slot 0x198 with the unit).
-    pub room: bool,
+    pub(crate) room: bool,
     /// Its speed (slot 0x208).
-    pub speed: Speed,
+    pub(crate) speed: Speed,
     /// Its top action's state (slot 0x2b0, `RGE_Action_Object::actionState`; 0 without one).
-    pub state: ActionState,
+    pub(crate) state: ActionState,
     /// Its class (`+0x410`).
-    pub class: ClassId,
+    pub(crate) class: ClassId,
     /// Its place, x and y.
-    pub position: Point,
+    pub(crate) position: Point,
     /// Its top action's point (`FUN_140a7be40`, `FUN_140a7be50`), or why the slice has not got it.
-    pub action_point: Result<Point, GenieError>,
+    pub(crate) action_point: Result<Point, GenieError>,
 }
 
 /// Where `FUN_140a85f30` meets an Enter's target, by the target alone ([`meet_at`]); the
@@ -379,17 +379,17 @@ fn shore(
 #[derive(Debug)]
 pub struct Walls<'a> {
     /// Where the unit last moved to (`+0x824`), x and y.
-    pub me: Point,
+    pub(crate) me: Point,
     /// Where the target last moved to (slot 0x520), x and y.
-    pub them: Point,
+    pub(crate) them: Point,
     /// The map's places and tiles.
-    pub spatial: &'a mut Spatial,
+    pub(crate) spatial: &'a mut Spatial,
     /// Each player's masters, which tell the buildings.
-    pub masters: &'a [Arc<Masters>],
+    pub(crate) masters: &'a [Arc<Masters>],
     /// The unit's id.
-    pub id: ObjectId,
+    pub(crate) id: ObjectId,
     /// The unit's movement state.
-    pub stats: &'a MoveStats,
+    pub(crate) stats: &'a MoveStats,
 }
 
 impl Walls<'_> {

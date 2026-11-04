@@ -159,17 +159,17 @@ pub(super) struct Goal<'w> {
 #[derive(Debug)]
 pub struct Planning<'a> {
     /// The planners, the mesh and the short pather.
-    pub pathing: &'a mut Pathing,
+    pub(crate) pathing: &'a mut Pathing,
     /// The world's time this update (`FUN_1415300d0`), which a new path records.
-    pub now: WorldTime,
+    pub(crate) now: WorldTime,
     /// The owner's type (`player+0x10`): a computer player's (`FUN_141659cf0`) plans may stop
     /// near the goal.
-    pub player_kind: PlayerKind,
+    pub(crate) player_kind: PlayerKind,
     /// The Object stream (`DAT_143f07160`), which a long new path's repath time draws from.
-    pub object: &'a mut Well512,
+    pub(crate) object: &'a mut Well512,
     /// The world's unit groups as they are now, which the long pather reads for a unit in a
     /// group (its group's differentiator units, `FUN_140f9eb70`).
-    pub groups: &'a UnitGroups,
+    pub(crate) groups: &'a UnitGroups,
 }
 
 impl Planning<'_> {

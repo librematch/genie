@@ -99,24 +99,24 @@ const UNSEEN_SITE: GenieError =
 #[derive(Clone, Copy, Debug, PartialEq, Diff)]
 pub struct BuildAction {
     /// The foundation's id; none once it is gone.
-    pub target: Option<FoundationId>,
+    pub(crate) target: Option<FoundationId>,
     /// The action state (`+0x18`), which word 9 adds, with its sub-action list's `MoveTo`
     /// (`+0x50`): to the foundation (`set_state(4)`), to the drop site (8), to its point (11) or
     /// off the footprint (223).
-    pub state: BuildState,
+    pub(crate) state: BuildState,
     /// `+0x38`..`+0x40`, the action's own point: the foundation's place from the constructor
     /// (`FUN_140aad4e0`) and each `set_state(4)` with a target, −1 each from `set_state(2)`;
     /// `set_state(11)` walks there.
-    pub point: Position,
+    pub(crate) point: Position,
     /// The task it builds with.
-    pub task: BuildTask,
+    pub(crate) task: BuildTask,
     /// `+0x68`, `added_to_num_builders`: the builder counts among the foundation's builders.
-    pub added: bool,
+    pub(crate) added: bool,
     /// `+0x44`, the action's timer: state 222's wait (a second from its `set_state`).
-    pub timer: Seconds,
+    pub(crate) timer: Seconds,
     /// `+0x28` (its id at `+0x34`), the second target: the drop site of its drop-off (state 8,
     /// `set_state(8)`'s search).
-    pub site: Option<DropSiteId>,
+    pub(crate) site: Option<DropSiteId>,
 }
 
 /// What a builder's Build task gives its work: the task's work range (`+0x30`; its `MoveTo` to the
@@ -125,20 +125,20 @@ pub struct BuildAction {
 #[derive(Clone, Copy, Debug, PartialEq, Diff)]
 pub struct BuildTask {
     /// The task's work range.
-    pub range: Distance,
+    pub(crate) range: Distance,
     /// The task's work value.
-    pub work_value: WorkValue,
+    pub(crate) work_value: WorkValue,
     /// The builder's work rate: its master's `work_rate` (`+0x798`) plus its `mWorkRatePowerup`
     /// (`+0xa30`).
-    pub work_rate: WorkRate,
+    pub(crate) work_rate: WorkRate,
     /// The task's resource (`attribute_type`, `+0x20`, none for any): `UNIT_ORDER`'s drop-off
     /// (slot 0x78) asks a builder carrying another one to its unit AI instead.
-    pub resource: Option<AttributeId>,
+    pub(crate) resource: Option<AttributeId>,
     /// The task's id in its master's list (`+0xa`), which a master's upgrade finds the new
     /// master's task by (−1 for none).
-    pub id: TaskId,
+    pub(crate) id: TaskId,
     /// The task's moving sprite (`+0x40`), which it gives its `MoveTo`s; None for none.
-    pub moving: Option<SpriteId>,
+    pub(crate) moving: Option<SpriteId>,
 }
 
 impl BuildTask {
@@ -160,26 +160,26 @@ impl BuildTask {
 #[derive(Clone, Copy, Debug, PartialEq, Diff)]
 pub struct Construction {
     /// `+0xc50`, `build_pts`: the seconds of work it has had.
-    pub progress: Seconds,
+    pub(crate) progress: Seconds,
     /// `+0xc60`, `desolid_flag`: no builder has started it; it has no obstruction record.
-    pub desolid: bool,
+    pub(crate) desolid: bool,
     /// `+0x9e8`, `num_builders`.
-    pub builders: BuilderCount,
+    pub(crate) builders: BuilderCount,
     /// Its master's hit points (`+0x530`) and build time (`+0x898`, the first train location's
     /// train time; 0 without one).
-    pub hit_points: MasterHitPoints,
+    pub(crate) hit_points: MasterHitPoints,
     /// Its master's build time (the first train location's train time; 0 without one).
-    pub build_time: WholeSeconds,
+    pub(crate) build_time: WholeSeconds,
     /// The record its start adds: its master's obstruction kind and class.
-    pub record: Obstruction,
+    pub(crate) record: Obstruction,
     /// `+0xc61`, `snow_flag` ([`crate::map::Snow`]): it stands on snow, completed there or kept
     /// as a farm's or a pasture's (its decal is not held).
     #[diff(
         gap = "the death's and the teardowns' clearing (FUN_1411dbb70 at 0x1411dda85, FUN_1411d5600, FUN_1411ad250) is not ported"
     )]
-    pub snow: Snow,
+    pub(crate) snow: Snow,
     /// `+0x788`, `sprite_override_id`, is not −1.
-    pub sprite_override: bool,
+    pub(crate) sprite_override: bool,
 }
 
 /// What the completion's first part ([`Completion::first_part`]) reads besides the building's
@@ -187,15 +187,15 @@ pub struct Construction {
 #[derive(Clone, Copy, Debug)]
 pub struct Completion<'a> {
     /// The building's master.
-    pub master: Option<&'a Master>,
+    pub(crate) master: Option<&'a Master>,
     /// The owner's farm bonus ([`FarmBonus`], attributes 237 to 239).
-    pub farm_bonus: FarmBonus,
+    pub(crate) farm_bonus: FarmBonus,
     /// The owner's masters, whose table `FUN_141659d20` reads.
-    pub masters: Option<&'a Masters>,
+    pub(crate) masters: Option<&'a Masters>,
     /// The owner's type (`player+0x10`; [`PlayerKind::is_computer`] is `FUN_141659cf0`).
-    pub player_kind: PlayerKind,
+    pub(crate) player_kind: PlayerKind,
     /// The building has a unit AI (`+0x6b0`): a mule cart's.
-    pub ai: bool,
+    pub(crate) ai: bool,
 }
 
 /// What the completion's first part (`FUN_1411c6bd0`) gives its caller: the attributes its owner
@@ -203,13 +203,13 @@ pub struct Completion<'a> {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct FirstPart {
     /// The attributes its owner gains, in order.
-    pub attributes: Vec<(AttributeId, Amount)>,
+    pub(crate) attributes: Vec<(AttributeId, Amount)>,
     /// The building's master has a task of action type 0x99 and the building a unit AI: its
     /// search for resources follows ([`crate::world::World::cart_search`]).
-    pub cart: bool,
+    pub(crate) cart: bool,
     /// A pasture (1893, 1897) whose build points reached its build time: its livestock follow
     /// after the attributes (`FUN_1411c8410`, [`crate::world::World::setup_pasture`]).
-    pub pasture: bool,
+    pub(crate) pasture: bool,
 }
 
 impl Completion<'_> {
@@ -296,11 +296,11 @@ pub const CART_TASK: ActionKind = ActionKind::named(0x99);
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct StackUnit {
     /// The master (`+0x986`; master 1889 on mangrove or rice terrain, `+0xcd0`, makes 1893).
-    pub master: MasterId,
+    pub(crate) master: MasterId,
     /// The building's place.
-    pub at: Position,
+    pub(crate) at: Position,
     /// Its master's hit points (`+0x530`, a short) less its own.
-    pub hp_lost: HitPoints,
+    pub(crate) hp_lost: HitPoints,
 }
 
 /// The completion's sprite (`FUN_1411dbb70` from state 0 to 2, after its storage): slot 0x68

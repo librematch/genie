@@ -520,18 +520,18 @@ impl Spatial {
 /// callers' answers for what the search reads of the world beyond the spatial index.
 pub struct SearchQuery<'a> {
     /// The searching object.
-    pub searcher: ObjectId,
+    pub(crate) searcher: ObjectId,
     /// Its player.
-    pub player: PlayerId,
+    pub(crate) player: PlayerId,
     /// What it searches for.
-    pub search: &'a Search<'a>,
+    pub(crate) search: &'a Search<'a>,
     /// An attack pick's reads of the unit and the objects.
-    pub attack: &'a mut dyn AttackPicker,
+    pub(crate) attack: &'a mut dyn AttackPicker,
     /// The reachability of a found object (slot 0x3d0).
-    pub reach: &'a mut Reach<'a>,
+    pub(crate) reach: &'a mut Reach<'a>,
     /// The world's objects by id: whether livestock is herded ([`herded`]), the masters a
     /// class-10 searcher passes ([`shuns`]), a farm's workers and pasture ([`farm_kept`]).
-    pub objects: ObjectsRef<'a>,
+    pub(crate) objects: ObjectsRef<'a>,
 }
 
 impl Debug for SearchQuery<'_> {

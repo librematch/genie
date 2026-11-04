@@ -39,9 +39,9 @@ pub(super) const RETRY_OTHER: Millis = Millis::new(2000);
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Choice {
     /// The object, if any.
-    pub target: Option<ObjectId>,
+    pub(crate) target: Option<ObjectId>,
     /// The retarget entries to add, in order.
-    pub retries: Vec<(ObjectId, WorldTime)>,
+    pub(crate) retries: Vec<(ObjectId, WorldTime)>,
 }
 
 /// The object tests the statistics' main and retry walks share: the world's attack checks

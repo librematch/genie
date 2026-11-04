@@ -410,7 +410,7 @@ const fn keep_unsaved_ai(old: Option<&UnitAi>, forced: Option<&mut UnitAi>) {
     if let (Some(old), Some(new)) = (old, forced) {
         new.hunted = old.hunted;
         if let (Some(o), Some(n)) = (old.home, new.home.as_mut()) {
-            n.go_home = o.go_home;
+            n.homeward = o.homeward;
         }
     }
 }

@@ -27,68 +27,68 @@ use crate::world::{Percent, TargetingMode};
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Searcher {
     /// The unit.
-    pub id: ObjectId,
+    pub(crate) id: ObjectId,
     /// Its unit AI's current target (`+0x48`).
-    pub target: Option<ObjectId>,
+    pub(crate) target: Option<ObjectId>,
     /// The AI's target's class (`+0x4c`) and its last target's (`+0x70`).
-    pub target_classes: [Option<ClassId>; 2],
+    pub(crate) target_classes: [Option<ClassId>; 2],
     /// The AI's order (`+0x3c`) and action (`+0x44`).
-    pub order: Option<OrderKind>,
+    pub(crate) order: Option<OrderKind>,
     /// The AI's action (`+0x44`).
-    pub action: Option<AiAction>,
+    pub(crate) action: Option<AiAction>,
     /// The unit's master's id, class and type (`+0x5d7`, `+0x98f`, the master's `+0x8`).
-    pub master: MasterId,
+    pub(crate) master: MasterId,
     /// Its master's class.
-    pub class: Option<ClassId>,
+    pub(crate) class: Option<ClassId>,
     /// Its master's type (`'F'`, 70: the combat type).
-    pub kind: MasterKind,
+    pub(crate) kind: MasterKind,
     /// Its master's `attack_priority` (`+0x92c`, `FUN_141202220`).
-    pub attack_priority: AttackPriority,
+    pub(crate) attack_priority: AttackPriority,
     /// The owner's type (`player+0x10`; [`PlayerKind::is_computer`] is `FUN_141659cf0`).
-    pub player_kind: PlayerKind,
+    pub(crate) player_kind: PlayerKind,
     /// Its owner may attack walls (`player+0x611`, the AI's slot 0x18's player).
-    pub walls_allowed: bool,
+    pub(crate) walls_allowed: bool,
     /// The AI's slot 0x1d0 with −1: the unit may move to attack.
-    pub can_move: bool,
+    pub(crate) can_move: bool,
     /// `FUN_140c47f90`: the farthest it looks (a human player's twice its line of sight).
-    pub sight: Distance,
+    pub(crate) sight: Distance,
     /// Its weapon range against its current target (slot 0x238 with it, or with none).
-    pub range: Distance,
+    pub(crate) range: Distance,
     /// Its weapon range (slot 0x230) and least range (slot 0x240).
-    pub weapon_range: Distance,
+    pub(crate) weapon_range: Distance,
     /// Its least range (slot 0x240).
-    pub min_range: Distance,
+    pub(crate) min_range: Distance,
     /// Its top speed (slot 0x208).
-    pub speed: Speed,
+    pub(crate) speed: Speed,
     /// The game mode is a scenario's (`FUN_141302540`).
-    pub scenario: bool,
+    pub(crate) scenario: bool,
     /// Its owner's targeting mode and factor (`player+0x614`, `+0x618`).
-    pub targeting: (TargetingMode, Percent),
+    pub(crate) targeting: (TargetingMode, Percent),
     /// The order history's weights ([`order_weights`]).
     ///
     /// [`order_weights`]: crate::unit_ai::best_target::statistics::order_weights
-    pub weights: ByCategory<OrderWeight>,
+    pub(crate) weights: ByCategory<OrderWeight>,
     /// The AI's retarget entries' targets (`+0x1e0`).
-    pub retries: Vec<ObjectId>,
+    pub(crate) retries: Vec<ObjectId>,
     /// The world's time (`FUN_1415300d0`).
-    pub now: WorldTime,
+    pub(crate) now: WorldTime,
 }
 
 /// `bestUnitToAttack`'s arguments past its reference point (the search's, the caller's).
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Ask {
     /// The reference distance (0: none).
-    pub distance: Distance,
+    pub(crate) distance: Distance,
     /// An idle check: the current target narrows nothing and is no shortcut.
-    pub idle: bool,
+    pub(crate) idle: bool,
     /// The path checks: 1 on, 0 off (the shortcuts answer without a path).
-    pub paths: u8,
+    pub(crate) paths: u8,
     /// Extra objects for the statistics (`int*`, count).
-    pub extra: Vec<ObjectId>,
+    pub(crate) extra: Vec<ObjectId>,
     /// Any class: walls, gates, buildings, towers and packed units are not passed over.
-    pub any_class: bool,
+    pub(crate) any_class: bool,
     /// The unit is in an attack work state: a current target on top answers at once.
-    pub work_state: bool,
+    pub(crate) work_state: bool,
 }
 
 bitflags::bitflags! {
@@ -112,25 +112,25 @@ bitflags::bitflags! {
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct FoundObject {
     /// Its owner's id.
-    pub owner: PlayerId,
+    pub(crate) owner: PlayerId,
     /// Its alliance, unit AI, container, targeting and attackable reads.
-    pub flags: FoundFlags,
+    pub(crate) flags: FoundFlags,
     /// `+0x640`.
-    pub state: ObjectState,
+    pub(crate) state: ObjectState,
     /// Its master's id, class and type.
-    pub master: MasterId,
+    pub(crate) master: MasterId,
     /// Its master's class.
-    pub class: ClassId,
+    pub(crate) class: ClassId,
     /// Its master's type.
-    pub kind: MasterKind,
+    pub(crate) kind: MasterKind,
     /// Its `+0x924` (`FUN_14107cc90`): how others take it over.
-    pub capture: CaptureKind,
+    pub(crate) capture: CaptureKind,
     /// What it holds (`+0x310`).
-    pub held: Amount,
+    pub(crate) held: Amount,
     /// The footprints' gap to the unit (`FUN_14118f680`).
-    pub distance: Distance,
+    pub(crate) distance: Distance,
     /// Its top speed (slot 0x208).
-    pub speed: Speed,
+    pub(crate) speed: Speed,
 }
 
 /// What `bestUnitToAttack` asks of the world while its unit AI runs: the unit AI's picker for

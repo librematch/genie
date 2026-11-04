@@ -40,7 +40,7 @@ pub struct InfoModule {
     pub explorer: Option<ObjectId>,
     /// The punt search's scores (`+0x19484`, 16 records of 3 words, saved): record `4 * column +
     /// row` of the map's 4 by 4 quadrants gives its first two words ([`InfoModule::punt`]).
-    pub quadrants: [[i32; 3]; 16],
+    pub(crate) quadrants: [[i32; 3]; 16],
     /// The explorer's points still to try (`+0x19828`, a stack of tile pairs, not saved).
     pub search: Vec<Tile>,
 }
@@ -50,7 +50,7 @@ pub struct InfoModule {
 pub struct TacticalModule {
     /// The words from `+0x1f8` (saved): [`TacticalModule::slot`] gives one. The slots the save
     /// does not hold are -1 (the load's `memset`).
-    pub slot_times: Vec<i32>,
+    pub(crate) slot_times: Vec<i32>,
 }
 
 impl TacticalModule {
@@ -71,7 +71,7 @@ pub struct AiModule {
     /// The information module.
     pub info: InfoModule,
     /// The tactical module.
-    pub tactical: TacticalModule,
+    pub(crate) tactical: TacticalModule,
 }
 
 /// The players' AI modules, by player: `None` for a player without one.

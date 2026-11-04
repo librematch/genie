@@ -97,44 +97,44 @@ pub struct TransportAction {
     /// The action state (`+0x18`), which word 9 adds, with its sail's `MoveTo` sub-action to
     /// the point within `TransportTuning::move_range`: quiet, with the sprite [`Ship::given`] (`set_state` 4
     /// and 11).
-    pub state: TransportState,
+    pub(crate) state: TransportState,
     /// `+0x34` (the base's `+0x30` pair's second): how it was last ordered.
-    pub mode: TransportMode,
+    pub(crate) mode: TransportMode,
     /// `+0x38`..`+0x40`: where it sails or unloads; x [`NONE`] for nowhere.
-    pub point: Position,
+    pub(crate) point: Position,
     /// `+0x68`: the unload found no drop location and the action sails to a new point.
-    pub retarget: bool,
+    pub(crate) retarget: bool,
     /// `+0x48`: the task it works on, none from the unload command (the work command's
     /// `LAB_1410706a8` retakes only a Transport on the task it finds).
-    pub task: Option<TaskId>,
+    pub(crate) task: Option<TaskId>,
 }
 
 /// What the Transport reads of its unit.
 #[derive(Clone, Copy, Debug)]
 pub struct Ship<'a> {
     /// The unit's place.
-    pub position: Position,
+    pub(crate) position: Position,
     /// Its master's radii (x, y).
-    pub radius: Footprint,
+    pub(crate) radius: Footprint,
     /// An object is inside it (`+0x2f8` holds one).
-    pub loaded: bool,
+    pub(crate) loaded: bool,
     /// The map's size in tiles (the owner's world's map, `+0x18`, `+0x1c`).
-    pub map: GridSize,
+    pub(crate) map: GridSize,
     /// What a `MoveTo` that `set_state` makes reads of the unit ([`MoveToReads`]): its speed
     /// (slot 0x208: without one the `MoveTo` starts failed) and the sprites' defaults.
-    pub walk: MoveToReads<'a>,
+    pub(crate) walk: MoveToReads<'a>,
     /// The sprite its maker gives a `MoveTo` (`+0x58`): the task's moving one, without a task
     /// the master's walking sprite ([`TransportAction::given_sprite`]).
-    pub given: Option<SpriteId>,
+    pub(crate) given: Option<SpriteId>,
 }
 
 /// What a state change leaves to its caller.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Changed {
     /// A `MoveTo` sub-action went (`FUN_140a98620`): its teardown stops the unit (slot 0x5d0).
-    pub stopped: bool,
+    pub(crate) stopped: bool,
     /// State 2: the unit shows its master's standing sprite (slot 0x68 with `+0x470`).
-    pub stands: bool,
+    pub(crate) stands: bool,
 }
 
 /// What the Transport's update reads of its unit's master ([`TransportAction::update`]).

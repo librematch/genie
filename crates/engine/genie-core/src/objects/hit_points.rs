@@ -36,9 +36,9 @@ pub(crate) const REGENERATION_EPSILON: f32 = TURN_REGENERATION_EPSILON;
 #[derive(Clone, Copy, Debug, Default, PartialEq, Diff)]
 pub struct HpPowerup {
     /// `+0xa38`: what losses took of it.
-    pub taken: HitPoints,
+    pub(crate) taken: HitPoints,
     /// `+0xa3c`: its most.
-    pub max: HitPoints,
+    pub(crate) max: HitPoints,
 }
 
 impl HpPowerup {

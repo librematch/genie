@@ -40,11 +40,11 @@ use crate::world::step::Step;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PointWalker {
     /// The owner's type (`player+0x10`; [`PlayerKind::is_computer`] is `FUN_141659cf0`).
-    pub player_kind: PlayerKind,
+    pub(crate) player_kind: PlayerKind,
     /// The unit is a villager (class 4): its `MoveTo` waits once when the motion step gives up.
-    pub villager: bool,
+    pub(crate) villager: bool,
     /// Its unit AI's stance (`+0x1a9`), 0 without one: the wait is a second below 2, else two.
-    pub stance: UnitStance,
+    pub(crate) stance: UnitStance,
 }
 
 /// What a hunt's walk to its point did in an update ([`HuntAction::update_point_walk`]).
@@ -69,19 +69,19 @@ pub enum PointWalk {
 #[derive(Debug)]
 pub struct HuntStart<'a> {
     /// The task.
-    pub task: HuntTask,
+    pub(crate) task: HuntTask,
     /// The target.
-    pub target: &'a Quarry,
+    pub(crate) target: &'a Quarry,
     /// The owner.
-    pub player: PlayerId,
+    pub(crate) player: PlayerId,
     /// The owner's type (`player+0x10`; [`PlayerKind::is_computer`] is `FUN_141659cf0`).
-    pub player_kind: PlayerKind,
+    pub(crate) player_kind: PlayerKind,
     /// The game settings' test `FUN_141302150`.
-    pub carry_rule: bool,
+    pub(crate) carry_rule: bool,
     /// What the hunter carries, its resource kind and amount.
-    pub held: &'a mut Held,
+    pub(crate) held: &'a mut Held,
     /// What its `MoveTo`s' constructors read of the hunter; its load is `held`'s.
-    pub walks: Walks<'a>,
+    pub(crate) walks: Walks<'a>,
 }
 
 /// What a hunt's retarget takes besides its attack and its mover ([`HuntAction::retarget`]'s
@@ -89,13 +89,13 @@ pub struct HuntStart<'a> {
 #[derive(Clone, Copy, Debug)]
 pub struct HuntRetarget<'a> {
     /// The work command's new target.
-    pub target: &'a Quarry,
+    pub(crate) target: &'a Quarry,
     /// The owner.
-    pub player: PlayerId,
+    pub(crate) player: PlayerId,
     /// What the hunter carries, and what its `MoveTo`s' constructors read of it.
-    pub walks: Walks<'a>,
+    pub(crate) walks: Walks<'a>,
     /// The target is a drop site of the hunter's master.
-    pub drops_here: bool,
+    pub(crate) drops_here: bool,
 }
 
 /// What a hunt's chase of its target takes besides its attack and its mover
@@ -103,30 +103,30 @@ pub struct HuntRetarget<'a> {
 #[derive(Clone, Copy, Debug)]
 pub struct HuntChase<'a> {
     /// The target.
-    pub target: &'a Quarry,
+    pub(crate) target: &'a Quarry,
     /// The hunter's owner.
-    pub player: PlayerId,
+    pub(crate) player: PlayerId,
     /// What its `MoveTo`s' constructors read of the hunter.
-    pub walks: &'a Walks<'a>,
+    pub(crate) walks: &'a Walks<'a>,
 }
 
 /// A move a hunt may take ([`HuntAction::take_move`]'s arguments before the mover).
 #[derive(Clone, Copy, Debug)]
 pub struct HuntMove<'a> {
     /// The move's target (none for a point).
-    pub target: Option<&'a Quarry>,
+    pub(crate) target: Option<&'a Quarry>,
     /// The move's point.
-    pub point: Position,
+    pub(crate) point: Position,
     /// The owner.
-    pub player: PlayerId,
+    pub(crate) player: PlayerId,
     /// What the hunter carries, and what its `MoveTo`s' constructors read of it.
-    pub walks: Walks<'a>,
+    pub(crate) walks: Walks<'a>,
     /// The target is a drop site of the hunter's master.
-    pub drops_here: bool,
+    pub(crate) drops_here: bool,
     /// The pasture the unit is on (`mMyPastureId`).
-    pub my_pasture: Option<PastureId>,
+    pub(crate) my_pasture: Option<PastureId>,
     /// The gap to a drop site target.
-    pub gap: Distance,
+    pub(crate) gap: Distance,
 }
 
 impl HuntAction {

@@ -29,9 +29,9 @@ pub fn player_master(every: &[Arc<Masters>], player: PlayerId, id: MasterId) -> 
 #[derive(Clone, Copy, Debug)]
 pub struct MasterTables<'a> {
     /// The world's masters, one table per player.
-    pub players: &'a [Arc<Masters>],
+    pub(crate) players: &'a [Arc<Masters>],
     /// The objects' own masters by id.
-    pub own: &'a PartTable<Master>,
+    pub(crate) own: &'a PartTable<Master>,
 }
 
 impl<'a> MasterTables<'a> {
@@ -57,9 +57,9 @@ impl<'a> MasterTables<'a> {
 #[derive(Clone, Copy, Debug)]
 pub struct OwnerMasters<'a> {
     /// The objects' own masters by id.
-    pub own: &'a PartTable<Master>,
+    pub(crate) own: &'a PartTable<Master>,
     /// The owner's table.
-    pub table: Option<&'a Masters>,
+    pub(crate) table: Option<&'a Masters>,
 }
 
 impl<'a> OwnerMasters<'a> {

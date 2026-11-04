@@ -99,15 +99,15 @@ const EPSILON: f32 = ABILITIES_EPSILON;
 pub struct Abilities {
     /// `+0x9a4`, `mMovementDamageTimer` (saved): the seconds before a movement damage task hits
     /// again.
-    pub movement_damage_timer: Seconds,
+    pub(crate) movement_damage_timer: Seconds,
     /// `+0x87c`: the rate the attack timer (`+0x91c`) runs down at (`RGE_Combat_Object::update`,
     /// `0x14107e28e`). Not saved: the constructor's 1 until the first update's abilities.
     #[diff(unsaved)]
-    pub attack_rate: f32,
+    pub(crate) attack_rate: f32,
     /// `+0x8a9` set, with the sprites at `+0x960`..`+0x988`: a terrain look task's look; None
     /// while the object shows its master's (not saved: the constructor clears `+0x8a9`).
     #[diff(unsaved)]
-    pub look: Option<Look>,
+    pub(crate) look: Option<Look>,
 }
 
 impl Default for Abilities {
@@ -125,19 +125,19 @@ impl Default for Abilities {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Diff)]
 pub struct Look {
     /// `+0x960`, the task's carrying sprite (`+0x58`): slot 0x798's standing sprite.
-    pub standing: Option<SpriteId>,
+    pub(crate) standing: Option<SpriteId>,
     /// `+0x968`, the task's moving sprite (`+0x40`): slot 0x7c8's walking sprite.
-    pub walking: Option<SpriteId>,
+    pub(crate) walking: Option<SpriteId>,
     /// `+0x970`, the task's working sprite (`+0x50`): slot 0x898's attack sprite.
-    pub attacking: Option<SpriteId>,
+    pub(crate) attacking: Option<SpriteId>,
     /// `+0x978`, the task's proceeding sprite (`+0x48`): slot 0x7d0's running sprite.
-    pub running: Option<SpriteId>,
+    pub(crate) running: Option<SpriteId>,
     /// `+0x980`, the sprite the task's gathering sound event id names (`+0x60`): slot 0x7a0's
     /// dying sprite.
-    pub dying: Option<SpriteId>,
+    pub(crate) dying: Option<SpriteId>,
     /// `+0x988`, the sprite its deposit sound event id names (`+0x78`): slot 0x7a8's undead
     /// sprite.
-    pub undead: Option<SpriteId>,
+    pub(crate) undead: Option<SpriteId>,
 }
 
 /// The `ADD_ATTRIBUTE` command a removal reward task issues (`FUN_14120b5f0`: the player's slot
@@ -147,11 +147,11 @@ pub struct Look {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Reward {
     /// The player the command is for (`player+0x718`).
-    pub player: PlayerId,
+    pub(crate) player: PlayerId,
     /// The task's `attribute_type3` (`+0x24`), none for −1.
-    pub attribute: Option<AttributeId>,
+    pub(crate) attribute: Option<AttributeId>,
     /// The amount, truncated (`CVTTSS2SI`).
-    pub amount: i32,
+    pub(crate) amount: i32,
 }
 
 /// The routine's test of the object's hit points (`COMISS 1.0, hp` / `JBE`): at least 1 (or a

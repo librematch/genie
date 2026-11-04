@@ -215,7 +215,7 @@ fn home(combat: &TribeCombatObject) -> Option<Home> {
         .map(|e| Home {
             origin: Position::new(e.origin_x, e.origin_y, e.origin_z),
             furious: e.furious != 0,
-            go_home: false,
+            homeward: false,
         })
 }
 

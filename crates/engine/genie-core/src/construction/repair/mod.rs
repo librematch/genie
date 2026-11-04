@@ -79,14 +79,14 @@ pub const SHIP_REPAIR: GenieError =
 #[derive(Clone, Copy, Debug, PartialEq, Diff)]
 pub struct RepairTask {
     /// The task's id.
-    pub id: TaskId,
+    pub(crate) id: TaskId,
     /// Its work value.
-    pub work_value: WorkValue,
+    pub(crate) work_value: WorkValue,
     /// Its moving sprite (`+0x40`), which its `MoveTo`s take and its turn toward the target
     /// (state 6) shows; None for none.
-    pub moving: Option<SpriteId>,
+    pub(crate) moving: Option<SpriteId>,
     /// Its proceeding sprite (`+0x48`), which its work (state 7) shows; None for none.
-    pub proceeding: Option<SpriteId>,
+    pub(crate) proceeding: Option<SpriteId>,
 }
 
 impl RepairTask {
@@ -106,46 +106,46 @@ impl RepairTask {
 #[derive(Clone, Copy, Debug, PartialEq, Diff)]
 pub struct RepairAction {
     /// The target's id (`+0x30`).
-    pub target: Option<RepairTargetId>,
+    pub(crate) target: Option<RepairTargetId>,
     /// The action state (`+0x18`), which word 9 adds, with its quiet `MoveTo` sub-action: to
     /// the target (state 4) or to the point (state 11).
-    pub state: RepairState,
+    pub(crate) state: RepairState,
     /// `+0x38`..`+0x40`: the target's place as the action last took it (the constructor, states
     /// 4, 6 and 7), or the point the unit was sent to.
-    pub point: Position,
+    pub(crate) point: Position,
     /// `+0x44`: state 10's wait.
-    pub timer: Seconds,
+    pub(crate) timer: Seconds,
     /// The task it repairs with (`+0x48`).
-    pub task: RepairTask,
+    pub(crate) task: RepairTask,
     /// The `MoveTo`'s range toward the target: the unit's master's weapon range (`+0x828`).
-    pub range: Distance,
+    pub(crate) range: Distance,
     /// `+0x6c`: the action counts among its target's repairers (`+0x9e8` of the object
     /// `FUN_140ad9050` gives: the target, an annex's main building).
-    pub counted: bool,
+    pub(crate) counted: bool,
     /// `+0x60` ([`Voice`]): a quiet Repair's end posts no notify 0x1fa.
-    pub voice: Voice,
+    pub(crate) voice: Voice,
 }
 
 /// What a Repair's update reads of its target (the object its id names).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Repairee {
     /// Its state (`+0x640`).
-    pub state: ObjectState,
+    pub(crate) state: ObjectState,
     /// Its hit points (`+0x278`).
-    pub hp: HitPoints,
+    pub(crate) hp: HitPoints,
     /// Its owner's id (`player+0x718`).
-    pub owner: PlayerId,
+    pub(crate) owner: PlayerId,
     /// The repairer's player counts its owner as its own or an ally (`FUN_141663dc0` with the
     /// ally flag).
-    pub allied: bool,
+    pub(crate) allied: bool,
     /// Its place and its master's radii.
-    pub position: Position,
+    pub(crate) position: Position,
     /// Its master's radii.
-    pub radius: Footprint,
+    pub(crate) radius: Footprint,
     /// Its master's class.
-    pub class: ClassId,
+    pub(crate) class: ClassId,
     /// It moves (`FUN_140fdd080`: a master of type 30 and up with a speed above 0).
-    pub moves: bool,
+    pub(crate) moves: bool,
 }
 
 /// The object `FUN_140ad9050` counts a Repair's repairers in (the target, an annex's main

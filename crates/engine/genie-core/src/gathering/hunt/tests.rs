@@ -328,7 +328,6 @@ fn tree() -> Quarry {
 
 fn engagement() -> Engagement {
     Engagement {
-        gap_squared: DistanceSquared::new(3.726 * 3.726),
         gap: Distance::new(3.726),
         position: Position::new(20.774, 97.5, 0.0),
         target_position: Position::new(24.5, 97.5, 0.0),
@@ -471,7 +470,6 @@ fn hunt_retargeted_to_tree_beside_it_starts_its_attack_arrived() {
         ..tree()
     };
     let close = Engagement {
-        gap_squared: DistanceSquared::new(0.005 * 0.005),
         gap: Distance::new(0.005),
         target_position: beside.position,
         ..engagement()

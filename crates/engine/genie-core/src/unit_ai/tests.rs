@@ -5081,7 +5081,7 @@ fn new_hunted_animal_and_boar_keep_their_place_as_their_origin() {
             Some(Home {
                 origin: Position::new(5.0, 6.0, 0.5),
                 furious: false,
-                go_home: false,
+                homeward: false,
             }),
             None,
             0
@@ -5970,10 +5970,10 @@ fn failed_action_stops_like_completed_one_and_an_order_own_failure_ends_it() {
 /// and stops.
 #[test]
 fn boar_failed_attack_runs_its_idle_check() {
-    let home = |go_home, furious| Home {
+    let home = |homeward, furious| Home {
         origin: Position::new(171.5, 51.5, 0.0),
         furious,
-        go_home,
+        homeward,
     };
     let boar = |h| UnitAi {
         ai_kind: UnitAiKind::Boar,
@@ -6001,7 +6001,7 @@ fn boar_failed_attack_runs_its_idle_check() {
         (u.current_action, u.last_action),
         (Some(AiAction::Move), Some(AiAction::Attack))
     );
-    assert!(u.home.is_some_and(|h| !h.go_home));
+    assert!(u.home.is_some_and(|h| !h.homeward));
     let mut w = gaia_unit_world(29827, boar(home(false, true)), place);
     let (r, u) = gaia_failed(&mut w, 29827, attack);
     assert_eq!(r, Ok(GO_ON));
@@ -8437,7 +8437,7 @@ fn boar_whose_move_aside_completed_heads_home_next() {
         (None, Some(object_id(50)))
     );
     assert_eq!(u.current_action, None);
-    assert!(u.home.is_some_and(|h| h.go_home));
+    assert!(u.home.is_some_and(|h| h.homeward));
 }
 
 /// The lion's handler (`FUN_140c266f0`): a completed attack (0x1fa with 600) sets its idle

@@ -1,4 +1,13 @@
-//! Deterministic simulation core of the genie engine reimplementation.
+//! Deterministic simulation core of the genie engine reimplementation: build 158041's world,
+//! its load from a save ([`world::load`]) and its step ([`World::tick_with`]), system by
+//! system (`docs/ENGINE_SYSTEMS.md`).
+//!
+//! genie-core is the engine's internals, not a stable API: a frontend uses the facade crate
+//! `genie` (FD-001-D15, FD-003). Its state is plain data. A field is `pub(crate)` unless another
+//! crate of the workspace reads or writes it: the command port's records, and the fields the
+//! verification tools (genie-oracle, the harness) compare and force (FD-043-01M6JSXBE0).
+//!
+//! [`World::tick_with`]: crate::world::World::tick_with
 
 // The port's exceptions to the workspace's lints: the engine reproduces build 158041 bit for bit,
 // so it keeps the game's arithmetic and conversions as they are.

@@ -255,7 +255,7 @@ impl Attack {
                     .get_mut(unit.id)
                     .and_then(|ai| ai.home.as_mut())
         {
-            home.go_home = true;
+            home.homeward = true;
         }
         if r.flags.contains(AttackerFlags::QUEUE_EMPTY) {
             unit.post_own(

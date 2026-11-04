@@ -42,11 +42,11 @@ impl Diff for OverrideUse {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Diff)]
 pub struct CostOverride {
     /// The amount.
-    pub amount: CostAmount,
+    pub(crate) amount: CostAmount,
     /// The attribute, none for −1.
-    pub attribute: Option<AttributeId>,
+    pub(crate) attribute: Option<AttributeId>,
     /// Its use.
-    pub used: OverrideUse,
+    pub(crate) used: OverrideUse,
 }
 
 impl CostOverride {

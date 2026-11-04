@@ -8,7 +8,7 @@ use crate::world::layer::generated::VisibilityTuning;
 #[derive(Clone, Copy, Debug)]
 pub struct SightLayer<'a> {
     /// The build's roles.
-    pub roles: &'a Roles,
+    pub(crate) roles: &'a Roles,
     /// The visibility's tuning values.
-    pub visibility_tuning: VisibilityTuning,
+    pub(crate) visibility_tuning: VisibilityTuning,
 }

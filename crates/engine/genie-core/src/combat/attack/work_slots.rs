@@ -29,43 +29,43 @@ use crate::world::layer::Roles;
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Mark {
     /// The object.
-    pub id: ObjectId,
+    pub(crate) id: ObjectId,
     /// Its master's type (80 a building).
-    pub kind: MasterKind,
+    pub(crate) kind: MasterKind,
     /// Its master's class.
-    pub class: ClassId,
+    pub(crate) class: ClassId,
     /// Its state (`+0x640`).
-    pub state: ObjectState,
+    pub(crate) state: ObjectState,
     /// Its place (decoded `x`, `y`, `z`).
-    pub position: Position,
+    pub(crate) position: Position,
     /// Its master's radii on the ground, which the footprint gap (`FUN_14118f680`) reads.
-    pub radius: Footprint,
+    pub(crate) radius: Footprint,
 }
 
 /// What the Attack's slot 9 ([`Attack::work`]) reads of its unit.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Wielder {
     /// Its master's `area_effect_range` (`+0x82c`).
-    pub area_effect: Distance,
+    pub(crate) area_effect: Distance,
     /// Its top speed (slot 0x208).
-    pub speed: Speed,
+    pub(crate) speed: Speed,
     /// Its place.
-    pub position: Position,
+    pub(crate) position: Position,
     /// Its master's radii on the ground.
-    pub radius: Footprint,
+    pub(crate) radius: Footprint,
 }
 
 /// What the Attack's slot 9 or slot 0x68 leaves to its caller.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Worked {
     /// Slot 9 took the target (its answer, 1).
-    pub kept: bool,
+    pub(crate) kept: bool,
     /// Slot 0x68 took another target: the unit's attack count (`+0x900`) clears.
-    pub clears_count: bool,
+    pub(crate) clears_count: bool,
     /// The old target, whose slot 0x180 lets the unit go when the world still holds it.
-    pub lets_go: Option<ObjectId>,
+    pub(crate) lets_go: Option<ObjectId>,
     /// The new target, whose slot 0x178 takes the unit with the action's type (9).
-    pub takes: Option<ObjectId>,
+    pub(crate) takes: Option<ObjectId>,
 }
 
 impl Attack {

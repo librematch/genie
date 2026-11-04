@@ -40,9 +40,9 @@ const OFF_THE_GRID: GenieError = GenieError::unreachable("a tile the AI's path m
 #[derive(Clone, Copy, Debug)]
 pub struct SearchUnit {
     /// Its place on the ground.
-    pub position: Point,
+    pub(crate) position: Point,
     /// Its master's class is the civilian's (4).
-    pub civilian: bool,
+    pub(crate) civilian: bool,
 }
 
 /// How a flood from one tile ended.

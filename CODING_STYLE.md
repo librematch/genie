@@ -515,6 +515,12 @@ two nested lists, and that slot holds another object after the next swap-remove.
 - Put no getter, setter or wrapper between a system and its data without a reason. Two
   reasons count: a checked value (a newtype) and an invariant (a setter that keeps an index
   current).
+- Make a field of genie-core `pub(crate)`. Make it `pub` only when another crate of the
+  workspace reads or writes it: the command port's records, which genie-command-codec encodes,
+  and the fields that the verification tools (genie-oracle, the harness) compare or force. The
+  tools read the state as the systems do, so such a field has no getter. A `pub(crate)` field
+  that no code reads warns as dead code. The frontends' API is the facade crate `genie`
+  (FD-043-01M6JSXBE0).
 - Split hot and cold data, and make dense tables by id, only after a profile. A table iterates
   in id order.
 - Make no layout change that alters the order of the updates or of the random draws.

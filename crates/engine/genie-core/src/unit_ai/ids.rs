@@ -301,27 +301,27 @@ pub fn factory_kind(
 pub struct NewObject {
     /// The object's place (`+0x3c8`, `+0x4c8`, `+0x5a8`): the state position, the hunted
     /// animal's and the boar's origin.
-    pub position: Position,
+    pub(crate) position: Position,
     /// Its master's id (`+0x58`).
-    pub master: MasterId,
+    pub(crate) master: MasterId,
     /// Its master's `copy_id` (`+0x158`).
-    pub copy_id: Option<MasterId>,
+    pub(crate) copy_id: Option<MasterId>,
     /// Its master's class (`+0x410`).
-    pub class: ClassId,
+    pub(crate) class: ClassId,
     /// Its master's `object_flags` (`+0x654`).
-    pub object_flags: ObjectFlags,
+    pub(crate) object_flags: ObjectFlags,
     /// Its master's `hero_flag` (`+0x8d9`).
-    pub hero_flag: HeroFlags,
+    pub(crate) hero_flag: HeroFlags,
     /// The object's slot 0x7b0 (`+0xb74`, which the action object's constructor set before
     /// through slot 0x8a8, `FUN_141206d50`: the work range of its master's last task of action
     /// type 6, else 0): the hunted animal's leash.
-    pub hunt_range: Distance,
+    pub(crate) hunt_range: Distance,
     /// The owner's type (`player+0x10`; [`PlayerKind::is_computer`] is `FUN_141659cf0`).
-    pub player_kind: PlayerKind,
+    pub(crate) player_kind: PlayerKind,
     /// The owner's posture (`+0x71c`, its slot 0x90 `FUN_1416224f0`).
-    pub posture: Posture,
+    pub(crate) posture: Posture,
     /// The owner's attribute 6, the current age (`player+0x100` at `+0x30`).
-    pub age: Amount,
+    pub(crate) age: Amount,
 }
 
 impl NewObject {

@@ -221,49 +221,49 @@ pub struct Parts {
     /// `+0x6b8`: the copy of an old owner's death-spawn master an ownership change took
     /// ([`crate::ownership::change::change_hands`]), which the object's death spawn makes its
     /// dead object of (`FUN_1411a5090`).
-    pub dead_master: PartTable<Master>,
+    pub(crate) dead_master: PartTable<Master>,
     /// A building's gather point (`+0xc30`..`+0xc44`, the save's `gather_point_*`), which its
     /// trained units go to: SET GATHER POINT's and SET GATHER STATE's.
-    pub gather_point: PartTable<GatherPoint>,
+    pub(crate) gather_point: PartTable<GatherPoint>,
     /// A building's production lists (`+0xc48`..`+0xd48`, the save's production queue, its make
     /// action and its local lists): QUEUE's first entry makes them.
     pub production: PartTable<Production>,
     /// A missile's own fields (`+0x990`..`+0x99c`, its step `+0x7dc`): its volley makes them.
-    pub missile: PartTable<Missile>,
+    pub(crate) missile: PartTable<Missile>,
     /// `+0x6c0` (`FUN_141185010`): the master of its own an object's master pointer (`+0xa0`)
     /// reads, a copy (`FUN_141186d10`, the master's slot 0x48) of the one it read when it took
     /// it; an object without one reads its player's. An ownership change gives it one
     /// ([`crate::ownership::change::change_hands`]), an upgrade of its own masters changes it.
-    pub own_master: PartTable<Master>,
+    pub(crate) own_master: PartTable<Master>,
     /// A combat object's town-bell flag and back-to-work records (`+0x9ac`..`+0x9dc`), only
     /// where they differ from a new unit's ([`TownBell::default`]): a villager that worked or
     /// sheltered, a building that sheltered.
-    pub town_bell: PartTable<TownBell>,
+    pub(crate) town_bell: PartTable<TownBell>,
     /// A unit's AI (`+0x9e0`, `TRIBE_Unit_AI`): its orders, its notifies and its targets.
     pub unit_ai: PartTable<UnitAi>,
     /// A building's layer (`TRIBE_Building_Object`, `+0xb78`..`+0xce0`): its construction,
     /// links, gate, livestock and relics. An object the table does not hold reads
     /// [`Building::NONE`] ([`Parts::building_of`]); a write puts one in
     /// ([`Parts::building_mut`]), so the table may hold a layer equal to it.
-    pub building: PartTable<Building>,
+    pub(crate) building: PartTable<Building>,
     /// A combat object's layer (`RGE_Combat_Object` and `TRIBE_Combat_Object`, types 50 and up):
     /// its attack's timers and counts, its volleys, its charge, its powerups and stingers, its
     /// store. An object the table does not hold reads a new object's ([`Parts::combat_of`]); a
     /// write puts one in ([`Parts::combat_mut`]), so the table may hold a layer equal to it.
-    pub combat: PartTable<Combat>,
+    pub(crate) combat: PartTable<Combat>,
     /// An object's layers between its place and its action layer (types 20 and up): the
     /// animated layer, and a moving object's mover with its movement state (FD-045-D58). A
     /// static object has none.
-    pub motion: PartTable<Motion>,
+    pub(crate) motion: PartTable<Motion>,
     /// An object's action layer (`RGE_Action_Object`, types 40 and up): its action list and its
     /// master's default task (FD-045-D59). An object the table does not hold reads an empty one
     /// ([`Parts::actions_of`], a tree's); a write puts one in ([`Parts::actions_mut`]). The
     /// updating object's layer is out of the table with its row ([`Parts::take_actions`]).
-    pub actions: PartTable<Action>,
+    pub(crate) actions: PartTable<Action>,
     /// The objects the load could not read whole ([`Unread`], FD-045-D61): each one's reason,
     /// the import's gap. A routine that reaches such an object counts it busy or stops the run
     /// with the reason. The updating object's entry stays in the table.
-    pub unread: PartTable<Unread>,
+    pub(crate) unread: PartTable<Unread>,
 }
 
 /// The building layer of an object the table does not hold.

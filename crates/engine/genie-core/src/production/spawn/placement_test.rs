@@ -37,19 +37,19 @@ pub(crate) const NOT_MOVING: GenieError =
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Placing<'a> {
     /// The unit's player.
-    pub player: PlayerId,
+    pub(crate) player: PlayerId,
     /// Its master's radii.
-    pub radius: Footprint,
+    pub(crate) radius: Footprint,
     /// Its master's height radius is above 0.
-    pub tall: bool,
+    pub(crate) tall: bool,
     /// Its master's class.
-    pub class: ClassId,
+    pub(crate) class: ClassId,
     /// Its terrain restriction's value per terrain.
-    pub restriction: &'a Restriction,
+    pub(crate) restriction: &'a Restriction,
     /// `hill_mode` (`+0x604`).
-    pub hill_mode: HillMode,
+    pub(crate) hill_mode: HillMode,
     /// The placement terrains (`+0x5f2`..`+0x5f8`, [`placement_terrains`]).
-    pub placement: PlacementTerrains,
+    pub(crate) placement: PlacementTerrains,
 }
 
 /// The tiles within `SpawnTuning::reach` of a point, clamped to the map (`(int)` of each bound, then the map's

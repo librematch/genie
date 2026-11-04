@@ -10,9 +10,9 @@ use crate::objects::masters::DamageAmount;
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Diff)]
 pub struct ArmorPair {
     /// The melee armor's.
-    pub melee: DamageAmount,
+    pub(crate) melee: DamageAmount,
     /// The pierce armor's.
-    pub pierce: DamageAmount,
+    pub(crate) pierce: DamageAmount,
 }
 
 impl ArmorPair {

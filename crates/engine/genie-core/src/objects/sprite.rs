@@ -70,23 +70,23 @@ pub(crate) fn new_sprite(
 #[derive(Clone, Copy, Debug, PartialEq, Diff)]
 pub struct ActiveSprite {
     /// The graphic.
-    pub graphic: Graphic,
+    pub(crate) graphic: Graphic,
     /// `+0x24`, `frame`.
-    pub frame: Frame,
+    pub(crate) frame: Frame,
     /// `+0x28`, `animate_interval`: one frame's time at the last speed.
-    pub interval: Seconds,
+    pub(crate) interval: Seconds,
     /// `+0x2c`, `animate_last`: the time since the last frame.
-    pub last: Seconds,
+    pub(crate) last: Seconds,
     /// `+0x30`, `last_frame`: the frame before the last advance.
-    pub last_frame: Frame,
+    pub(crate) last_frame: Frame,
     /// `+0x34`, `frame_changed`; `+0x35`, `frame_looped`.
-    pub changed: bool,
+    pub(crate) changed: bool,
     /// `+0x35`, `frame_looped`.
-    pub looped: bool,
+    pub(crate) looped: bool,
     /// `+0x36`, `animate_flag`: 0 stopped, 1 playing, 2 in the replay delay.
-    pub animate: AnimateState,
+    pub(crate) animate: AnimateState,
     /// `+0x38`, `lastSpeedValue`.
-    pub speed: Speed,
+    pub(crate) speed: Speed,
 }
 
 impl ActiveSprite {

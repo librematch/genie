@@ -83,25 +83,25 @@ const LAST_BIT: f32 = HUNT_LAST_BIT;
 #[derive(Clone, Copy, Debug, PartialEq, Diff)]
 pub struct HuntAction {
     /// The target object (`+0x20`, its id at `+0x30`).
-    pub target: Option<HuntTargetId>,
+    pub(crate) target: Option<HuntTargetId>,
     /// The action state (`+0x18`), which word 9 adds, with its sub-action: the walks' quiet
     /// `MoveTo` and the attack's Attack ([`HuntState`]).
-    pub state: HuntState,
+    pub(crate) state: HuntState,
     /// `+0x38`..`+0x40`: where the target stood when the hunt took it.
-    pub point: Position,
+    pub(crate) point: Position,
     /// `+0x68`: the target's class.
-    pub target_class: Option<ClassId>,
+    pub(crate) target_class: Option<ClassId>,
     /// `+0x48`: its task.
-    pub task: HuntTask,
+    pub(crate) task: HuntTask,
     /// `+0x70`: the drop site its own livestock is led to, none yet.
-    pub drop_site: Option<DropSiteId>,
+    pub(crate) drop_site: Option<DropSiteId>,
     /// `+0x28` (its id at `+0x34`), the second target: the drop site the load goes to in state 8,
     /// −1 for none.
-    pub carry_to: Option<DropSiteId>,
+    pub(crate) carry_to: Option<DropSiteId>,
     /// `+0x44`: the state's timer (state 8 waits with it below 0 before it tries again).
-    pub timer: Seconds,
+    pub(crate) timer: Seconds,
     /// What it keeps of the livestock it leads to its drop site.
-    pub lead: Lead,
+    pub(crate) lead: Lead,
 }
 
 /// What a hunt keeps of the livestock it leads to its drop site (`TRIBE_Action_Hunt`'s
@@ -109,11 +109,11 @@ pub struct HuntAction {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Diff)]
 pub struct Lead {
     /// `moved_sheep`: the hunt sent its livestock off once.
-    pub moved: bool,
+    pub(crate) moved: bool,
     /// `sheep_still_time`, which `set_state(10)` clears.
-    pub still_time: i16,
+    pub(crate) still_time: i16,
     /// `sheep_start_x`, `_y`: where the animal stood when the hunt last looked.
-    pub start: Point,
+    pub(crate) start: Point,
 }
 
 impl Lead {
@@ -131,29 +131,29 @@ impl Lead {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct DropOff {
     /// The site takes what the unit carries (`FUN_140fdd190`).
-    pub takes: bool,
+    pub(crate) takes: bool,
     /// The gap between the two footprints squared (`FUN_14118f8c0`).
-    pub gap_squared: DistanceSquared,
+    pub(crate) gap_squared: DistanceSquared,
 }
 
 /// What `set_state(6)` reads of a live livestock target (`0x140ac60e0` case 6).
 #[derive(Clone, Copy, Debug)]
 pub struct Herd {
     /// The target's player is the hunter's.
-    pub own: bool,
+    pub(crate) own: bool,
     /// For its own livestock, the drop site (the hunt's, else the nearest that takes livestock,
     /// `FUN_1411671e0`) and the gap between it and the target squared (`FUN_14118f8c0`).
-    pub drop_site: Option<(DropSiteId, DistanceSquared)>,
+    pub(crate) drop_site: Option<(DropSiteId, DistanceSquared)>,
     /// The Attack `set_state(12)` starts.
-    pub engagement: Engagement,
+    pub(crate) engagement: Engagement,
     /// The Attack's sprites and frames.
-    pub arms: Arms,
+    pub(crate) arms: Arms,
     /// The target's top action has neither a target nor a point (its slots 0x190 and 0x288,
     /// `FUN_14106d090`, `FUN_141082dc0`): it stands where it was sent.
-    pub idle: bool,
+    pub(crate) idle: bool,
     /// The hunter is of type 70 and its master has a special graphic (`+0x8e8`): the sprite
     /// leading shows.
-    pub special_graphic: Option<Graphic>,
+    pub(crate) special_graphic: Option<Graphic>,
 }
 
 /// What the hunt reads of its task (`+0x48`): its id in the master's list (`+0xa`; the work command
@@ -162,19 +162,19 @@ pub struct Herd {
 #[derive(Clone, Copy, Debug, PartialEq, Diff)]
 pub struct HuntTask {
     /// Its id in the master's task list (`+0xa`).
-    pub id: TaskId,
+    pub(crate) id: TaskId,
     /// The work range (`+0x30`).
-    pub range: Distance,
+    pub(crate) range: Distance,
     /// The resource it gathers (`attribute_type`, `+0x20`), none for −1.
-    pub resource: Option<AttributeId>,
+    pub(crate) resource: Option<AttributeId>,
     /// Its moving, proceeding, working and carrying sprites (`+0x40`..`+0x58`).
-    pub sprites: TaskSprites,
+    pub(crate) sprites: TaskSprites,
     /// `+0x28`, `work_val1`: what one work gathers per second and work rate.
-    pub work_value: WorkValue,
+    pub(crate) work_value: WorkValue,
     /// `+0x22`, `attribute_type2`: the player's attribute that scales the gathering, -1 none.
-    pub productivity: Option<AttributeId>,
+    pub(crate) productivity: Option<AttributeId>,
     /// `+0x26`, `attribute_type4`.
-    pub kind4: Option<AttributeId>,
+    pub(crate) kind4: Option<AttributeId>,
 }
 
 /// Whether a hunter's decay task stops its target's decay (`FUN_140ac44b0`, the player's
@@ -243,27 +243,27 @@ pub(crate) enum HuntNext {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Quarry {
     /// The target.
-    pub id: ObjectId,
+    pub(crate) id: ObjectId,
     /// Its place.
-    pub position: Position,
+    pub(crate) position: Position,
     /// Its master's class and type, its state (`+0x640`) and owner.
-    pub class: ClassId,
+    pub(crate) class: ClassId,
     /// Its master's type.
-    pub kind: MasterKind,
+    pub(crate) kind: MasterKind,
     /// Its state (`+0x640`).
-    pub state: ObjectState,
+    pub(crate) state: ObjectState,
     /// Its owner.
-    pub player: PlayerId,
+    pub(crate) player: PlayerId,
     /// What it holds (`+0x310`).
-    pub amount: Amount,
+    pub(crate) amount: Amount,
     /// The hunter's player counts the target's player as its own or allied (`FUN_141663d90` with
     /// the ally flag).
-    pub allied: bool,
+    pub(crate) allied: bool,
     /// Its top action's type (a building's `+0x880` list).
-    pub top_action: Option<ActionKind>,
+    pub(crate) top_action: Option<ActionKind>,
     /// The hunter's master has its master (a building annex's main building's, `+0xbb8`) among
     /// its drop sites (`FUN_14109d4f0`), which the start reads of its own player's object.
-    pub drop_site: bool,
+    pub(crate) drop_site: bool,
 }
 
 #[cfg(test)]

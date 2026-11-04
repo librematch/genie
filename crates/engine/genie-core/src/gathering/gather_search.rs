@@ -54,31 +54,31 @@ mod passes;
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Candidate {
     /// `+8`.
-    pub id: ObjectId,
+    pub(crate) id: ObjectId,
     /// The owner.
-    pub player: PlayerId,
+    pub(crate) player: PlayerId,
     /// Its master's class (`+0x410`, decoded).
-    pub class: ClassId,
+    pub(crate) class: ClassId,
     /// Its master's id.
-    pub master: MasterId,
+    pub(crate) master: MasterId,
     /// `+0x640`.
-    pub state: ObjectState,
+    pub(crate) state: ObjectState,
     /// `+0x644`, `worker_num`.
-    pub workers: WorkerCount,
+    pub(crate) workers: WorkerCount,
     /// x, y, z.
-    pub position: Position,
+    pub(crate) position: Position,
     /// `+0x790`, `parent_pasture_id`.
-    pub pasture: Option<PastureId>,
+    pub(crate) pasture: Option<PastureId>,
     /// `+0x689` is 0 ([`crate::objects::unit::UnitFlags::UNTARGETABLE`]).
-    pub untargetable: bool,
+    pub(crate) untargetable: bool,
     /// `+0x308`, `attribute_type_held`, none for −1.
-    pub attribute: Option<AttributeId>,
+    pub(crate) attribute: Option<AttributeId>,
     /// `+0x310`, `attribute_amount_held`.
-    pub amount: Amount,
+    pub(crate) amount: Amount,
     /// Its master's `enable_auto_gather` (`+0x681`).
-    pub auto_gather: bool,
+    pub(crate) auto_gather: bool,
     /// Its master's `resource_gather_group` (`+0x683`).
-    pub gather_group: GatherGroup,
+    pub(crate) gather_group: GatherGroup,
 }
 
 impl Candidate {
@@ -115,9 +115,9 @@ impl Candidate {
 #[derive(Clone, Copy, Debug)]
 pub struct Candidates<'a> {
     /// The world's objects by id.
-    pub objects: ObjectsRef<'a>,
+    pub(crate) objects: ObjectsRef<'a>,
     /// The searching unit while its update holds it out of its slot.
-    pub me: Option<Candidate>,
+    pub(crate) me: Option<Candidate>,
 }
 
 impl Candidates<'_> {
@@ -150,14 +150,14 @@ impl Candidates<'_> {
 #[derive(Clone, Copy, Debug)]
 pub struct Builder {
     /// The builder's place.
-    pub position: Position,
+    pub(crate) position: Position,
     /// Its master's x radius (`+0x5d8`).
-    pub radius: Distance,
+    pub(crate) radius: Distance,
     /// The building's place.
-    pub building: Position,
+    pub(crate) building: Position,
     /// The search's reach in tiles: the building's line of sight held to 4 to 20 (`DAT_142eb0f48`,
     /// `DAT_142e7f38c`), truncated.
-    pub range: i16,
+    pub(crate) range: i16,
 }
 
 /// `FUN_1415cc4e0` with `param_5` and `param_6` 0: the object the builder works next, from the
@@ -364,20 +364,20 @@ pub fn reached(
 #[derive(Clone, Copy, Debug)]
 pub struct Seeker {
     /// The owner.
-    pub player: PlayerId,
+    pub(crate) player: PlayerId,
     /// The unit's place.
-    pub position: Position,
+    pub(crate) position: Position,
     /// Its master's line of sight (`+0x5d0`).
-    pub line_of_sight: Distance,
+    pub(crate) line_of_sight: Distance,
     /// `+0x640`.
-    pub state: ObjectState,
+    pub(crate) state: ObjectState,
     /// Its unit AI's current target (`+0x48`), which the search passes over.
-    pub current_target: Option<ObjectId>,
+    pub(crate) current_target: Option<ObjectId>,
     /// `+0x794`, `my_pasture_id`.
-    pub my_pasture: Option<PastureId>,
+    pub(crate) my_pasture: Option<PastureId>,
     /// `param_6`: below this state the unit finds nothing (2 for the unit AIs' searches, 0 for
     /// a mule cart's).
-    pub min_state: ObjectState,
+    pub(crate) min_state: ObjectState,
 }
 
 /// One cell of the search's queue: a tile and its steps from the start.
@@ -394,15 +394,15 @@ const TESTED: i32 = 30;
 #[derive(Clone, Copy, Debug)]
 pub struct SearchSite {
     /// The site's place.
-    pub position: Position,
+    pub(crate) position: Position,
     /// Its master's radii (`+0x5d8`, `+0x5dc`).
-    pub radius: Footprint,
+    pub(crate) radius: Footprint,
     /// Its master's line of sight (`+0x5d0`).
-    pub line_of_sight: Distance,
+    pub(crate) line_of_sight: Distance,
     /// The search starts from the site's footprint: the site's tile lies in the unit's zone (its
     /// restriction's zone of the tile, `FUN_1411958c0`, is the unit's own, `FUN_14118eea0`), or
     /// the site's master is 45 or 2172 (the docks). Else it starts from the site's tile alone.
-    pub footprint: bool,
+    pub(crate) footprint: bool,
 }
 
 /// The tiles a pass of the search starts from and how far it goes.
@@ -422,14 +422,14 @@ pub struct ResourceWorld<'a, 'p> {
     /// The spatial index: the map's size, the searching player's explored tiles, the tiles a
     /// unit can stand on and the objects on a tile; the reach test writes the obstruction
     /// manager's scratch in it.
-    pub spatial: &'a mut Spatial,
+    pub(crate) spatial: &'a mut Spatial,
     /// The unit's terrain mask, whose tiles it can stand on ([`Spatial::standable`],
     /// `FUN_141185690`).
-    pub mask: TerrainMask,
+    pub(crate) mask: TerrainMask,
     /// The objects on a tile.
-    pub candidates: Candidates<'a>,
+    pub(crate) candidates: Candidates<'a>,
     /// Whether the unit reaches an object (slot 0x3d0 with the range 0).
-    pub reach: UnitReach<'a, 'p>,
+    pub(crate) reach: UnitReach<'a, 'p>,
 }
 
 /// `ClosestResourceObject` (`FUN_140c49760`) with no point (`param_7`, `param_8` −1: the unit's

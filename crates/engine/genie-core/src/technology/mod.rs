@@ -70,13 +70,13 @@ const SCALED_BY_38: TechId = TechId::SCALED_BY_38;
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Location {
     /// The building's master, none for an entry the data leaves open (−1).
-    pub building: Option<MasterId>,
+    pub(crate) building: Option<MasterId>,
     /// The seconds it takes there (the save's `u16`, its bits kept).
-    pub time: WholeSeconds,
+    pub(crate) time: WholeSeconds,
     /// Its button.
-    pub button: LocationButton,
+    pub(crate) button: LocationButton,
     /// The seconds added (`+0xc`, `FUN_1413cec90`).
-    pub adjustment: Seconds,
+    pub(crate) adjustment: Seconds,
 }
 
 /// A player's state of one technology (`Tech_Player_Tree`, 0x80 bytes, saved).
@@ -87,28 +87,28 @@ pub struct TechState {
     /// `+0x4`: its state.
     pub state: ResearchState,
     /// `+0x6`: added to the `.dat`'s amounts.
-    pub cost_adj: [CostAmount; 3],
+    pub(crate) cost_adj: [CostAmount; 3],
     /// `+0xc`.
     pub times_researched: ResearchCount,
     /// `+0xe`.
-    pub allow_multiple: bool,
+    pub(crate) allow_multiple: bool,
     /// `+0x40`: its researches queued and done are held to its cap.
-    pub stack: bool,
+    pub(crate) stack: bool,
     /// `+0x42`, `+0x48`, `+0x4e`: the cost overrides' amounts, attributes and use (−2 the `.dat`'s
     /// entry where it is paid, 0 none, else the override).
-    pub overrides: [CostOverride; 3],
+    pub(crate) overrides: [CostOverride; 3],
     /// `+0x56`: the cap of its researches queued and done (below 0: 0x100).
-    pub research_cap: ResearchCap,
+    pub(crate) research_cap: ResearchCap,
     /// `+0x58`: its researches queued.
     pub pending: ResearchCount,
     /// `+0x60` (`mEnabledTech`): the dependents' update leaves it alone.
-    pub enabled: bool,
+    pub(crate) enabled: bool,
     /// `+0x62`: the effect it gives instead of its own (−1 none).
-    pub effect_override: EffectId,
+    pub(crate) effect_override: EffectId,
     /// `+0x64`: the master of the building it was last queued at.
     pub building_master: Option<MasterId>,
     /// `+0x68`.
-    pub locations: Vec<Location>,
+    pub(crate) locations: Vec<Location>,
 }
 
 /// The two factors of a technology's costs: the research cost modifier (attribute 85, none

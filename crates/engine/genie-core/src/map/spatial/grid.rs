@@ -22,22 +22,22 @@ use crate::world::index::ObjectsRef;
 #[derive(Clone, Copy, Debug)]
 pub struct WalkQuery<'a> {
     /// The step's start.
-    pub start: Point,
+    pub(crate) start: Point,
     /// The step's end.
-    pub end: Point,
+    pub(crate) end: Point,
     /// The step's rectangle.
-    pub rect: Rect,
+    pub(crate) rect: Rect,
     /// The walker's radius, which grows the records' boxes and the rectangle.
-    pub grow: Distance,
+    pub(crate) grow: Distance,
     /// The walker's master's `min_collision_size_multiplier`, for a moving object of `player` or
     /// an ally.
-    pub ally_factor: f32,
+    pub(crate) ally_factor: f32,
     /// The walker's player.
-    pub player: Option<PlayerId>,
+    pub(crate) player: Option<PlayerId>,
     /// The objects the query ignores.
-    pub ignore: &'a [RecordId],
+    pub(crate) ignore: &'a [RecordId],
     /// The world's objects, whose gaits the query reads ([`ObjectsRef::moving`]).
-    pub objects: ObjectsRef<'a>,
+    pub(crate) objects: ObjectsRef<'a>,
 }
 
 /// Whether a line query ([`Spatial::line_hits`]) meets the temporary tile records too.

@@ -41,9 +41,9 @@ use genie_diff::Diff;
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Targets {
     /// The old target it let go.
-    pub released: Option<ObjectId>,
+    pub(crate) released: Option<ObjectId>,
     /// The new target it took.
-    pub taken: Option<ObjectId>,
+    pub(crate) taken: Option<ObjectId>,
 }
 
 /// What the Artifact's update reads of its unit ([`Artifact::update`]).
@@ -78,9 +78,9 @@ pub enum Handover {
 pub struct SubActionsGone {
     /// A walking `MoveTo` went, the Artifact's own or the Enter's: its teardown (`0x140aa1f30`)
     /// stops the unit (slot 0x5d0).
-    pub stops: bool,
+    pub(crate) stops: bool,
     /// The building or transport the Enter's teardown let go (slot 0x180).
-    pub released: Option<ObjectId>,
+    pub(crate) released: Option<ObjectId>,
 }
 
 /// One animal's Artifact action, as the checkpoint sees it.

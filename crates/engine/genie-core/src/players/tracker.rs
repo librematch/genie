@@ -111,13 +111,13 @@ const CLASSES: i16 = 100;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Key {
     /// `+0`: the key master (−1 for none).
-    pub master: Option<MasterId>,
+    pub(crate) master: Option<MasterId>,
     /// `+4`: the key master's class (−1 for none).
-    pub class: Option<ClassId>,
+    pub(crate) class: Option<ClassId>,
     /// `+8`: the object waits in the pending lists until its completion.
-    pub pending: bool,
+    pub(crate) pending: bool,
     /// `+9`: the key master's class is a military one.
-    pub military: bool,
+    pub(crate) military: bool,
 }
 
 impl Key {
@@ -197,7 +197,7 @@ pub struct Tracker {
     lists: BTreeMap<ListKey, Vec<Option<ObjectId>>>,
     /// `+0x60` (`FUN_14104fb00`): what the production queues' writers count, units queued and
     /// spawned or cancelled (a cancel of several counts them twice, as the game does).
-    pub queued: i32,
+    pub(crate) queued: i32,
 }
 
 impl Tracker {

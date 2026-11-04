@@ -42,31 +42,31 @@ use genie_model::model::Model;
 #[derive(Clone, Copy, Debug, PartialEq, Diff)]
 pub struct MoveToAction {
     /// Its state (`+0x18`).
-    pub state: MoveTo,
+    pub(crate) state: MoveTo,
     /// `+0x38`..`+0x40`: the point it walks to without a target object; with one, the target's
     /// place when it was made or last asked for a path (its state 3), which a path's end that
     /// follows the target moves ([`TargetMoved::Follows`]). A target the world removed leaves the
     /// `MoveTo` walking to it.
-    pub point: Position,
+    pub(crate) point: Position,
     /// The target object it walks to (`+0x20`, its id at `+0x30`), None for a point (−1).
-    pub target: Option<ObjectId>,
+    pub(crate) target: Option<ObjectId>,
     /// `+0x68`.
-    pub range: Distance,
+    pub(crate) range: Distance,
     /// The sprite it shows when it turns to state 4 (`+0x58`, the save's second `short_val`):
     /// the one its maker gave, else its constructor's default ([`point_sprite`],
     /// [`object_sprite`]); None for none (null).
-    pub sprite: Option<Graphic>,
+    pub(crate) sprite: Option<Graphic>,
     /// `+0x60` ([`Voice`]). An action makes its sub-action `MoveTo` quiet (`FUN_140a7a170`
     /// with 1): its `set_state` 1, 13 and 14 show no standing sprite (`0x140aa29e0`), and its
     /// update posts no notify 0x1fa, 0x1f9 or 0x1fb (`0x140aa2a70`). A `MoveTo` of its own is
     /// loud. The save does not hold it: the import takes its maker's.
-    pub voice: Voice,
+    pub(crate) voice: Voice,
     /// `+0x61`: what it does when its target object left its point ([`TargetMoved`]); 0
     /// ([`TargetMoved::Follows`]) from its constructors (`FUN_140a73e90`), which an Enter sets
     /// to 2 and a drop-off's, a hunt's and its Attack's maker to 1.
-    pub on_target_moved: TargetMoved,
+    pub(crate) on_target_moved: TargetMoved,
     /// Its wait after the motion step gave up.
-    pub wait: MoveWait,
+    pub(crate) wait: MoveWait,
 }
 
 /// A `MoveTo` to an object the world does not hold.
@@ -101,12 +101,12 @@ pub enum StepEnd {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct MoveStep {
     /// How it ended.
-    pub end: StepEnd,
+    pub(crate) end: StepEnd,
     /// Its target left its point: it told the unit (notify 0x1fc) and turned to state 3.
-    pub target_moved: bool,
+    pub(crate) target_moved: bool,
     /// The motion step could not go on (its result 1): the caller sets state 13, or for a
     /// human's villager the wait of state 2 (`LAB_140aa320c`).
-    pub gave_up: bool,
+    pub(crate) gave_up: bool,
 }
 
 /// The range a `MoveTo` to an object (`FUN_140aa0df0`) takes for `range`: one made with none
@@ -177,9 +177,9 @@ pub fn ai_sprite(master: &Master, pace: Pace) -> Option<SpriteId> {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct MoveDefaults {
     /// `FUN_140aa0d30`'s, a `MoveTo` to a point.
-    pub point: Option<SpriteId>,
+    pub(crate) point: Option<SpriteId>,
     /// `FUN_140aa0df0`'s, a `MoveTo` to an object.
-    pub object: Option<SpriteId>,
+    pub(crate) object: Option<SpriteId>,
 }
 
 impl MoveDefaults {
@@ -219,13 +219,13 @@ impl MoveDefaults {
 #[derive(Debug)]
 pub struct Shows<'a> {
     /// The unit's sprite.
-    pub sprite: &'a mut Option<ActiveSprite>,
+    pub(crate) sprite: &'a mut Option<ActiveSprite>,
     /// The Sprite stream.
-    pub rng: &'a mut Well512,
+    pub(crate) rng: &'a mut Well512,
     /// Slot 0x798's sprite, the unit's standing one.
-    pub standing: Option<Graphic>,
+    pub(crate) standing: Option<Graphic>,
     /// The master's standing sprite (`+0x470`), which slot 0x68 shows for a null one.
-    pub master_standing: Option<Graphic>,
+    pub(crate) master_standing: Option<Graphic>,
 }
 
 impl MoveToAction {

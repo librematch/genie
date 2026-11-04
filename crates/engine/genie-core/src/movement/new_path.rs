@@ -500,17 +500,17 @@ impl Mover {
 #[derive(Debug)]
 pub struct UnitReach<'a, 'p> {
     /// The unit's movement state.
-    pub mover: &'a Mover,
+    pub(crate) mover: &'a Mover,
     /// Its place.
-    pub at: Position,
+    pub(crate) at: Position,
     /// What its walk reads of it.
-    pub walker: Me,
+    pub(crate) walker: Me,
     /// Its master.
-    pub master: MasterId,
+    pub(crate) master: MasterId,
     /// The path planners and the walk's reads beside them.
-    pub plan: &'a mut Planning<'p>,
+    pub(crate) plan: &'a mut Planning<'p>,
     /// The world's objects by id.
-    pub objects: ObjectsRef<'a>,
+    pub(crate) objects: ObjectsRef<'a>,
 }
 
 impl UnitReach<'_, '_> {

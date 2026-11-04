@@ -41,15 +41,15 @@ const NO_TARGET_POINT: Position = Position::ORIGIN;
 #[derive(Clone, Copy, Debug)]
 pub struct MoveToReads<'a> {
     /// The sprites a `MoveTo` takes when its maker gives none.
-    pub sprites: SpriteReads<'a>,
+    pub(crate) sprites: SpriteReads<'a>,
     /// The unit's object state.
-    pub state: ObjectState,
+    pub(crate) state: ObjectState,
     /// The unit's speed.
-    pub speed: Speed,
+    pub(crate) speed: Speed,
     /// The unit's place.
-    pub at: Position,
+    pub(crate) at: Position,
     /// Its master's x and y radii (`+0x5d8`, `+0x5dc`).
-    pub ground: Footprint,
+    pub(crate) ground: Footprint,
 }
 
 /// An object a `MoveTo` walks to: its id, its place, the unit's footprint gap to it
@@ -57,13 +57,13 @@ pub struct MoveToReads<'a> {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct WalkTo {
     /// Its id, none for a `MoveTo` that holds no object ([`WalkTo::unheld`]).
-    pub id: Option<ObjectId>,
+    pub(crate) id: Option<ObjectId>,
     /// Its place, the `MoveTo`'s point (`+0x38`).
-    pub at: Position,
+    pub(crate) at: Position,
     /// The unit's footprint gap to it.
-    pub gap: Distance,
+    pub(crate) gap: Distance,
     /// Its object state.
-    pub state: Option<ObjectState>,
+    pub(crate) state: Option<ObjectState>,
 }
 
 impl WalkTo {

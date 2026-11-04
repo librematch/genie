@@ -19,9 +19,9 @@ use crate::world::layer::ClassRoles;
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Hit {
     /// The record's id (`+0x18`).
-    pub id: RecordId,
+    pub(crate) id: RecordId,
     /// Its box.
-    pub bounds: Rect,
+    pub(crate) bounds: Rect,
 }
 
 /// The id of `tile`'s temporary record (`FUN_1410510c0`) and of the tile in a pather's ignore
@@ -258,7 +258,7 @@ pub struct SmoothingWalls<'a> {
     pub(super) mask: TerrainMask,
     pub(super) ignore: &'a [RecordId],
     /// Whether a walk was tested.
-    pub ran: bool,
+    pub(crate) ran: bool,
 }
 
 impl<'a> SmoothingWalls<'a> {

@@ -26,11 +26,11 @@ use std::mem::take;
 #[derive(Clone, Copy, Debug)]
 pub struct AiLayer<'a> {
     /// The build's roles.
-    pub roles: &'a Roles,
+    pub(crate) roles: &'a Roles,
     /// The build's slots.
-    pub slots: Slots,
+    pub(crate) slots: Slots,
     /// The unit AI's tuning values.
-    pub unit_ai_tuning: &'a UnitAiTuning,
+    pub(crate) unit_ai_tuning: &'a UnitAiTuning,
 }
 
 /// A unit's notifies to itself (its slot 0x328, [`UnitAi::post`]), borrowed beside its body: its
@@ -38,11 +38,11 @@ pub struct AiLayer<'a> {
 #[derive(Debug)]
 pub struct Inbox<'a> {
     /// The unit's AI.
-    pub ai: Option<&'a mut UnitAi>,
+    pub(crate) ai: Option<&'a mut UnitAi>,
     /// The unit's id: the notify's caller and its recipient.
-    pub id: ObjectId,
+    pub(crate) id: ObjectId,
     /// The unit's state, which the AI's acceptance reads ([`UnitAi::accept`]).
-    pub state: ObjectState,
+    pub(crate) state: ObjectState,
 }
 
 impl<'a> Inbox<'a> {

@@ -35,9 +35,9 @@ pub const NO_TARGET_GAP: f32 = FAR;
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct GiveUp {
     /// Whether it waits once before it asks again (a human player's villager).
-    pub patience: Patience,
+    pub(crate) patience: Patience,
     /// The unit AI's stance (`+0x1a9`), 0 without one: below 2 it waits a second, else two.
-    pub stance: UnitStance,
+    pub(crate) stance: UnitStance,
 }
 
 impl MoveToAction {

@@ -11,6 +11,7 @@ use crate::combat::missile::StrikeResult;
 use crate::construction::MainBuildingId;
 use crate::construction::build::NOT_HELD;
 use crate::gathering::hunt::tests::walker;
+use crate::map::DistanceSquared;
 use crate::map::Footprint;
 use crate::map::GridSize;
 use crate::map::Radii;
@@ -1280,7 +1281,7 @@ fn an_attack_on_target_out_of_sight_fails() {
         ai.home = Some(Home::default());
         let code = rig.run(100, |c, u, _, f, r| a.out_of_sight(c, u, f, r, &roles()));
         let ai = rig.ai().unwrap();
-        let (forgot, home) = (ai.current_target.is_none(), ai.home.unwrap().go_home);
+        let (forgot, home) = (ai.current_target.is_none(), ai.home.unwrap().homeward);
         let let_go = rig.workers(77, PlayerId::new(1)) == Some(0);
         (code, let_go, forgot, home, rig.posted())
     };
@@ -2034,7 +2035,6 @@ fn an_attack_walks_with_the_unit_running_or_walking_slot() {
 /// east of it; range 1, no least range.
 fn engaged(gap: Distance, speed: f32, can_move: bool, stance: UnitStance) -> Engagement {
     Engagement {
-        gap_squared: DistanceSquared::new(gap.squared().get()),
         gap,
         position: Position::new(10.0, 10.0, 0.0),
         target_position: Position::new(10.0 + gap.get(), 10.0, 0.0),

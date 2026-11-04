@@ -118,20 +118,20 @@ pub struct Seer {
     /// The master's `line_of_sight` (`+0x5d0`); slot 0x210 adds the object's powerup (`+0xad4`).
     pub los: Distance,
     /// `object_state` (`+0x640`): only state 2 sees from a new tile.
-    pub state: ObjectState,
+    pub(crate) state: ObjectState,
     /// `+0x684`: the object explored since it was made (unsaved; a load sets it, `FUN_14116a500`,
     /// and a foundation made in the game has it clear until its construction starts). Only a
     /// building's slot 0x1d8 reads it.
-    pub explored: bool,
+    pub(crate) explored: bool,
     /// A building's sight, which its construction changes.
-    pub building: Option<BuildingSight>,
+    pub(crate) building: Option<BuildingSight>,
     /// A building's UMV entry (`+0x904`, from 1; 0 for none): the extra tiles its mask reads.
-    pub umv: u8,
+    pub(crate) umv: u8,
     /// `+0x924` (`FUN_14121df60`): 1 for an object another player takes over by seeing it, 3
     /// for livestock.
-    pub capture: CaptureKind,
+    pub(crate) capture: CaptureKind,
     /// The object's type (`+0xf`): 70 a combat unit, 80 a building, below 70 anything else.
-    pub kind: MasterKind,
+    pub(crate) kind: MasterKind,
 }
 
 /// An entry of the map's UMV data list (map `+0x5e08`, `+0x5e10`): a building's extent around
@@ -140,11 +140,11 @@ pub struct Seer {
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Extent {
     /// The guid of its entry.
-    pub guid: u32,
+    pub(crate) guid: u32,
     /// The offsets of the tiles the visible-object updater checks for it.
-    pub offsets: Vec<TileOffset>,
+    pub(crate) offsets: Vec<TileOffset>,
     /// The offsets' capacity (the entry's second word).
-    pub capacity: i32,
+    pub(crate) capacity: i32,
 }
 
 /// A record of a player's visible-resource lists (`VISIBLE_RESOURCE_REC`, 32 bytes, saved).
@@ -256,12 +256,12 @@ pub struct Visibility {
     /// anchor's UMV entry).
     links: Vec<(u8, u8)>,
     /// The UMV list: the entries of the buildings' extents.
-    pub extents: Vec<Extent>,
+    pub(crate) extents: Vec<Extent>,
     /// The UMV list's capacity (`+0x5e04`): it grows by 8.
-    pub extents_capacity: i32,
+    pub(crate) extents_capacity: i32,
     /// Each player's type: a computer player's (type 3) map tells its AI of a newly explored
     /// tile (its slot 0x88, [`crate::players::ai_module`]).
-    pub player_kinds: Vec<PlayerKind>,
+    pub(crate) player_kinds: Vec<PlayerKind>,
     /// The tiles a computer player's map explored that its AI module has not heard of yet, in
     /// order ([`Visibility::take_ai_tiles`]).
     ai_tiles: Vec<(PlayerId, Tile)>,
@@ -272,7 +272,7 @@ pub struct Visibility {
     /// explored (`FUN_14165d500`) since its last update ended, in order, which the update's
     /// `Process_New_Tiles` reads; its count of new tiles (`+8`) only a computer player's AI
     /// reads.
-    pub new_tiles: Vec<Vec<Tile>>,
+    pub(crate) new_tiles: Vec<Vec<Tile>>,
     /// Each player's visible-resource lists.
     pub resources: Vec<VisibleResources>,
     /// The first part of the game the slice met and does not model, for its caller.

@@ -57,9 +57,9 @@ impl Diff for VisionBits {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Diff)]
 pub struct VisionMasks {
     /// The visible mask (`+0x2a8`).
-    pub visible: VisionBits,
+    pub(crate) visible: VisionBits,
     /// The explored mask (`+0x2a0`).
-    pub explored: VisionBits,
+    pub(crate) explored: VisionBits,
 }
 
 #[cfg(test)]

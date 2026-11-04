@@ -78,23 +78,23 @@ pub fn reach(position: Position, range: Distance, map: GridSize) -> (Tile, Tile)
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Bystander {
     /// The object.
-    pub id: ObjectId,
+    pub(crate) id: ObjectId,
     /// Its player (`+0x138`'s `+0x718`).
-    pub player: PlayerId,
+    pub(crate) player: PlayerId,
     /// The hitter's player counts it allied (`FUN_141663d90` with the ally flag).
-    pub allied: bool,
+    pub(crate) allied: bool,
     /// Its type (`+0xf`).
-    pub kind: MasterKind,
+    pub(crate) kind: MasterKind,
     /// Its master's class (`+0x410`).
-    pub class: ClassId,
+    pub(crate) class: ClassId,
     /// Its state (`+0x640`).
-    pub state: ObjectState,
+    pub(crate) state: ObjectState,
     /// Its master's `area_effect_object_level` (`+0x62b`).
-    pub blast_defense: BlastDefense,
+    pub(crate) blast_defense: BlastDefense,
     /// Its place (`+0x3c8`, `+0x4c8`).
-    pub position: Position,
+    pub(crate) position: Position,
     /// Its master's radii (`+0x5d8`, `+0x5dc`).
-    pub radius: Footprint,
+    pub(crate) radius: Footprint,
 }
 
 /// What a movement damage reads of its hitter: its id, its master's `area_effect_level`
@@ -102,13 +102,13 @@ pub struct Bystander {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Hitter {
     /// The object.
-    pub id: ObjectId,
+    pub(crate) id: ObjectId,
     /// Its master's `area_effect_level` (`+0x830`).
-    pub blast_level: BlastLevel,
+    pub(crate) blast_level: BlastLevel,
     /// Its place.
-    pub position: Position,
+    pub(crate) position: Position,
     /// Its master's radii.
-    pub radius: Footprint,
+    pub(crate) radius: Footprint,
 }
 
 /// Whether a movement damage of `range` hits `b` (`0x141207a29`..`0x141207c0d`): not the hitter

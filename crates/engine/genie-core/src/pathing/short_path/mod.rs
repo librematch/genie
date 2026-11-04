@@ -102,9 +102,9 @@ const fn inside(r: FixedRect, p: FixedPoint, k: FixedDistance) -> bool {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Hit {
     /// The shape hit.
-    pub shape: ShapeId,
+    pub(crate) shape: ShapeId,
     /// Its side.
-    pub side: ShapeSide,
+    pub(crate) side: ShapeSide,
 }
 
 /// A sweep that counts a shape without the point and side its counting hit writes first.
@@ -153,11 +153,11 @@ enum Callback {
 #[derive(Debug)]
 pub struct Ctx<'a> {
     /// The mesh.
-    pub mesh: &'a Mesh,
+    pub(crate) mesh: &'a Mesh,
     /// Per shape id: ignored (`pather + 0xd8`).
-    pub ignore: &'a [bool],
+    pub(crate) ignore: &'a [bool],
     /// How far the searches shrink a shape's box (`FUN_140fa8460`, `FUN_14087c650`).
-    pub d: FixedDistance,
+    pub(crate) d: FixedDistance,
 }
 
 /// `DAT_1439e60e5`: 1 in the image and at run time: the rectangle heuristic (0 is the Euclidean).

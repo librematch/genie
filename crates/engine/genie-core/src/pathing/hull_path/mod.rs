@@ -302,7 +302,7 @@ pub struct Waypoints {
     /// The waypoints.
     pub points: Vec<Point>,
     /// The cost.
-    pub cost: Distance,
+    pub(crate) cost: Distance,
 }
 
 impl Waypoints {

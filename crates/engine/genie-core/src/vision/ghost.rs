@@ -52,11 +52,11 @@ pub enum Cell {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Watched {
     /// The object (`+0x18`, and its pointer `+0`).
-    pub id: ObjectId,
+    pub(crate) id: ObjectId,
     /// What it follows (`+8`).
-    pub cell: Cell,
+    pub(crate) cell: Cell,
     /// The bits last seen (`+0x10`).
-    pub bits: VisionBits,
+    pub(crate) bits: VisionBits,
 }
 
 /// Whether a player's watched list took an object ([`World::watch`], `FUN_141090430`).

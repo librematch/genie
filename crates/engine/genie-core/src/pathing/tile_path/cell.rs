@@ -101,9 +101,9 @@ impl CellKind {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct Cell {
     /// Byte 0.
-    pub edges: CellEdges,
+    pub(crate) edges: CellEdges,
     /// Byte 1.
-    pub kind: CellKind,
+    pub(crate) kind: CellKind,
 }
 
 impl Cell {

@@ -70,15 +70,15 @@ pub enum Facing {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Site {
     /// The building's place.
-    pub position: Position,
+    pub(crate) position: Position,
     /// Its master's radii.
-    pub radius: Footprint,
+    pub(crate) radius: Footprint,
     /// Its gather point (`+0xc34`, `+0xc38`), when it has one (`+0xc30`) that is not on itself
     /// (`+0xc40`).
-    pub gather: Option<Point>,
+    pub(crate) gather: Option<Point>,
     /// A wall at its corners (both tiles beside each: left top, right top, right bottom, left
     /// bottom), which closes the sides that meet there.
-    pub walls: [bool; 4],
+    pub(crate) walls: [bool; 4],
 }
 
 /// What the placement test found at a candidate.

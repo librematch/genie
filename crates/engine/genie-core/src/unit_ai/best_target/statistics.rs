@@ -38,93 +38,93 @@ pub(super) const FIXED_CLASSES: ClassMask = ClassMask::new(0x0012_0000_0000_0008
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Entry {
     /// `+0`: its id.
-    pub id: ObjectId,
+    pub(crate) id: ObjectId,
     /// `+4`: it moves (its slot 0x208 above 0).
-    pub moving: bool,
+    pub(crate) moving: bool,
     /// `+5`: its class is one of [`FIXED_CLASSES`].
-    pub fixed: bool,
+    pub(crate) fixed: bool,
     /// `+8`: the time the unit takes to kill it (its hit points over the unit's damage to it,
     /// over the unit's reload time).
-    pub kill_time: KillTime,
+    pub(crate) kill_time: KillTime,
     /// `+0xc`: the footprints' gap.
-    pub distance: Distance,
+    pub(crate) distance: Distance,
     /// `+0x10`: its attack category ([`category`]).
     ///
     /// [`category`]: crate::unit_ai::best_target::category
-    pub category: Option<AttackCategory>,
+    pub(crate) category: Option<AttackCategory>,
     /// `+0x14`: the kill-time score.
-    pub kill_score: TargetScore,
+    pub(crate) kill_score: TargetScore,
     /// `+0x18`: the distance score.
-    pub distance_score: TargetScore,
+    pub(crate) distance_score: TargetScore,
     /// `+0x1c`: the order history's weight of its category.
-    pub weight: TargetScore,
+    pub(crate) weight: TargetScore,
     /// `+0x20`: the current target's bonus (5, else 0).
-    pub bonus: TargetScore,
+    pub(crate) bonus: TargetScore,
     /// `+0x24`: the sum of the four.
-    pub total: TargetScore,
+    pub(crate) total: TargetScore,
     /// `+0x28`: the rank the sort orders by ([`Statistics::rank`]).
-    pub rank: TargetScore,
+    pub(crate) rank: TargetScore,
 }
 
 /// What `FUN_140c66590` reads of the unit and of an object it adds.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Candidate {
     /// The object.
-    pub id: ObjectId,
+    pub(crate) id: ObjectId,
     /// Its footprints' gap to the unit (`FUN_14118f680`).
-    pub distance: Distance,
+    pub(crate) distance: Distance,
     /// Its attack category (`FUN_140c4c8e0` on it, read where the candidate is made; counted
     /// when not −1).
-    pub category: Option<AttackCategory>,
+    pub(crate) category: Option<AttackCategory>,
     /// Its master's class.
-    pub class: ClassId,
+    pub(crate) class: ClassId,
     /// Its top speed (slot 0x208).
-    pub speed: Speed,
+    pub(crate) speed: Speed,
     /// It is armed: the sum of its attacks above 0 (slot 0x228, `FUN_141084070`), or its unit AI
     /// could work on the unit (its slot 0x1b8 with 1: a priest's conversion test).
-    pub armed: bool,
+    pub(crate) armed: bool,
     /// The unit's weapon range against it (slot 0x238).
-    pub reach: Distance,
+    pub(crate) reach: Distance,
     /// The unit's damage per hit to it (its slot 0x220, `FUN_141083f20`: the unit's elevation
     /// factor and its armor against the unit's attacks).
-    pub damage: HitPoints,
+    pub(crate) damage: HitPoints,
     /// Its hit points (`+0x278`).
-    pub hp: HitPoints,
+    pub(crate) hp: HitPoints,
     /// The unit's reload time (slot 0x218).
-    pub reload: Seconds,
+    pub(crate) reload: Seconds,
     /// The unit's unit AI could work on it (its slot 0x1b8 with 0: a priest's conversion).
-    pub workable: bool,
+    pub(crate) workable: bool,
     /// It is the unit AI's current target (`+0x48`).
-    pub current: bool,
+    pub(crate) current: bool,
 }
 
 /// `bestUnitToAttack`'s statistics (the static table at `DAT_143e744d0`).
 #[derive(Clone, Debug, PartialEq)]
 pub struct Statistics {
     /// `+0`, `+4`: the least and the most distance.
-    pub distance: Bounds<Distance>,
+    pub(crate) distance: Bounds<Distance>,
     /// `+8`, `+0xc`: the least and the most kill time.
-    pub kill_time: Bounds<KillTime>,
+    pub(crate) kill_time: Bounds<KillTime>,
     /// `+0x10`, `+0x14`: the moving objects' least and most distance.
-    pub moving_distance: Bounds<Distance>,
+    pub(crate) moving_distance: Bounds<Distance>,
     /// `+0x18`, `+0x1c`: the moving objects' least and most kill time.
-    pub moving_kill_time: Bounds<KillTime>,
+    pub(crate) moving_kill_time: Bounds<KillTime>,
     /// `+0x20`: the objects other than the current target.
-    pub others: EntryCount,
+    pub(crate) others: EntryCount,
     /// `+0x24`: the moving objects.
-    pub moving: EntryCount,
+    pub(crate) moving: EntryCount,
     /// `+0x28`: the armed objects.
-    pub armed: EntryCount,
+    pub(crate) armed: EntryCount,
     /// `+0x2c`: the objects within the unit's range against them.
-    pub in_reach: EntryCount,
+    pub(crate) in_reach: EntryCount,
     /// `+0x30`..: the objects per attack category.
-    pub by_category: ByCategory<EntryCount>,
+    pub(crate) by_category: ByCategory<EntryCount>,
     /// `+0x60`, `+0x64`: the closest moving object's distance and id.
-    pub closest_moving: (Distance, Option<ObjectId>),
+    pub(crate) closest_moving: (Distance, Option<ObjectId>),
     /// `+0x68`.., count `+0x1668`.
-    pub entries: Vec<Entry>,
+    pub(crate) entries: Vec<Entry>,
     /// `+0x166c`..: the entries' order, by rank after the sort.
-    pub order: Vec<usize>,
+    pub(crate) order: Vec<usize>,
 }
 
 impl Default for Statistics {
@@ -180,9 +180,9 @@ impl Bounded for KillTime {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Bounds<T> {
     /// The least.
-    pub least: T,
+    pub(crate) least: T,
     /// The most.
-    pub most: T,
+    pub(crate) most: T,
 }
 
 impl<T: Bounded> Bounds<T> {

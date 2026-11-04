@@ -66,7 +66,7 @@ impl UnitAi {
                     self.idle_timeout = self.adjusted_idle_timeout.wrapping_add(Millis::new(1));
                     self.remove_target();
                     if let Some(home) = self.home.as_mut() {
-                        home.go_home = true;
+                        home.homeward = true;
                     }
                 }
                 self.base_notify(n, time, at, player_kind, ai_rng, side)

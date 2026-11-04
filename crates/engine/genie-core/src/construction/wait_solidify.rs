@@ -44,11 +44,11 @@ use crate::world::layer::generated::WaitSolidifyTuning;
 #[derive(Clone, Copy, Debug, PartialEq, Diff)]
 pub struct WaitSolidify {
     /// `+0x18`.
-    pub state: WaitSolidifyState,
+    pub(crate) state: WaitSolidifyState,
     /// `+0x48`: the task slot 0x820 found on the foundation, whatever its action type.
-    pub task: Task,
+    pub(crate) task: Task,
     /// `+0x68`: the foundation's id.
-    pub target: FoundationId,
+    pub(crate) target: FoundationId,
 }
 
 impl WaitSolidify {

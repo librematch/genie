@@ -1,7 +1,6 @@
 //! A unit's move, to a point or aside, a work order, its reach and a point's move order.
 
 use crate::GenieError;
-use crate::combat::attack::gaps;
 use crate::gathering::PastureId;
 use crate::map::Distance;
 use crate::map::Point;
@@ -10,6 +9,7 @@ use crate::math::rng::Stream;
 use crate::movement::Speed;
 use crate::movement::ai_moves::MoveSprites;
 use crate::movement::ai_moves::MoveWith;
+use crate::movement::footprint_gap;
 use crate::movement::move_to::{MoveToAction, point_sprite};
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
@@ -459,7 +459,7 @@ impl World {
                         .get_known(order.target)?
                         .ok_or(GenieError::unsupported("a target without a place"))?,
                 );
-                let (_, gap) = gaps(me.position, me.radius, them.position, them.radius);
+                let gap = footprint_gap(me.position, me.radius, them.position, them.radius);
                 Some(work_reach(
                     gap,
                     master.combat_part().weapon_range,

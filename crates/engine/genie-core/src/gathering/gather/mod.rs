@@ -117,38 +117,38 @@ pub(crate) const FARM_FOOD_SOLD: usize = 96;
 #[derive(Clone, Copy, Debug, PartialEq, Diff)]
 pub struct GatherAction {
     /// The target object (`+0x20`, its id at `+0x30`), −1 for none.
-    pub target: Option<GatherTargetId>,
+    pub(crate) target: Option<GatherTargetId>,
     /// `+0x28` (its id at `+0x34`), the second target: the drop site the load goes to in state 8,
     /// −1 for none.
-    pub carry_to: Option<DropSiteId>,
+    pub(crate) carry_to: Option<DropSiteId>,
     /// The action state (`+0x18`), which word 9 adds.
-    pub state: GatherState,
+    pub(crate) state: GatherState,
     /// `+0x38`..`+0x40`: where the target stood.
-    pub point: Position,
+    pub(crate) point: Position,
     /// `+0x44`: the state's timer.
-    pub timer: Seconds,
+    pub(crate) timer: Seconds,
     /// `+0x48`: its task.
-    pub task: HuntTask,
+    pub(crate) task: HuntTask,
     /// `+0x68`, `mTargetType`: the target's class.
-    pub target_class: Option<ClassId>,
+    pub(crate) target_class: Option<ClassId>,
     /// `+0x6c`, `mNumberStops`: 1, or a farm's stops.
-    pub stops: FarmStops,
+    pub(crate) stops: FarmStops,
     /// `+0x6d`, `mCurrentStop`.
-    pub current_stop: StopIndex,
+    pub(crate) current_stop: StopIndex,
     /// `+0x70`, `mTimePerStop`.
-    pub time_per_stop: Seconds,
+    pub(crate) time_per_stop: Seconds,
     /// `+0x74`, `mTimeAtCurrentStop`.
-    pub time_at_stop: Seconds,
+    pub(crate) time_at_stop: Seconds,
     /// `+0x78`, `+0x7c`: `mLastStopX`, `mLastStopY`.
-    pub last_stop: Point,
+    pub(crate) last_stop: Point,
     /// `+0x80`: the gathering started (`set_state(7)`); not saved.
     #[diff(unsaved)]
-    pub worked: bool,
+    pub(crate) worked: bool,
     /// `+0x84`, `+0x88`: `mFarmX`, `mFarmY`, a farm's place.
-    pub farm: Point,
+    pub(crate) farm: Point,
     /// `+0x8c`, `+0x90`: `mGatherX`, `mGatherY`, where the gathering started (−1 while the
     /// game's farm setting is walkable, [`GatherReads::farm_mode`]).
-    pub gather_at: Point,
+    pub(crate) gather_at: Point,
 }
 
 impl GatherAction {
@@ -173,27 +173,27 @@ impl GatherAction {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Resource {
     /// The target.
-    pub id: ObjectId,
+    pub(crate) id: ObjectId,
     /// Its place.
-    pub position: Position,
+    pub(crate) position: Position,
     /// Its master's class.
-    pub class: ClassId,
+    pub(crate) class: ClassId,
     /// Its master's id.
-    pub master: MasterId,
+    pub(crate) master: MasterId,
     /// Its owner.
-    pub player: PlayerId,
+    pub(crate) player: PlayerId,
     /// How many actions work on it (`+0x644`).
-    pub workers: WorkerCount,
+    pub(crate) workers: WorkerCount,
     /// The gatherer's master has its master (a building annex's main building's, `+0xbb8`) among
     /// its drop sites (`FUN_14109d4f0`).
-    pub drop_site: bool,
+    pub(crate) drop_site: bool,
     /// The footprint gap between the gatherer and it (`FUN_14118f680`), which the `MoveTo`'s start
     /// reads.
-    pub gap: Distance,
+    pub(crate) gap: Distance,
     /// Its object state (`+0x640`), which a `MoveTo` to it reads (`FUN_140a7a230`).
-    pub state: ObjectState,
+    pub(crate) state: ObjectState,
     /// Its master's radii (`+0x5d8`, `+0x5dc`), over which a farm's stops spread.
-    pub radius: Footprint,
+    pub(crate) radius: Footprint,
 }
 
 impl Resource {

@@ -190,7 +190,7 @@ pub struct Slot {
     /// `mDesiredSubCategory`: the unit type the slot takes, none for any.
     pub desired_sub_category: UnitKind,
     /// `+0x44` (not saved): the formation's transform took the slot.
-    pub transformed: u32,
+    pub(crate) transformed: u32,
 }
 
 /// A formation's line (`FUN_14101b290`).
@@ -231,7 +231,7 @@ pub struct Formation {
     pub transform_orientation: BVector,
     /// The slots' array past `mNumberSlots` (not saved): its capacity (`+0x8`) beyond the slots
     /// in use, which a pass over the whole array reads too.
-    pub spare_slots: Vec<Slot>,
+    pub(crate) spare_slots: Vec<Slot>,
 }
 
 /// A point of the stored positions (`mPoint`, `mForward`, `mUp`, `mRight`).

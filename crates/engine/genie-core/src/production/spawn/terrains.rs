@@ -35,27 +35,27 @@ bitflags::bitflags! {
 #[derive(Clone, Copy, Debug)]
 pub struct BuildSite<'a> {
     /// The player who places it.
-    pub player: PlayerId,
+    pub(crate) player: PlayerId,
     /// What the test runs.
-    pub checks: SiteChecks,
+    pub(crate) checks: SiteChecks,
     /// The master's radii the test measures by (`p9`): its clearance radii (`+0x5fc`, `+0x600`)
     /// for BUILD, its size radii (`+0x5d8`, `+0x5dc`) for the Build's test of its foundation.
-    pub radius: Footprint,
+    pub(crate) radius: Footprint,
     /// The master's height radius (`+0x5e0`) is above 0, which the static scans need.
-    pub tall: bool,
+    pub(crate) tall: bool,
     /// The master's class.
-    pub class: ClassId,
+    pub(crate) class: ClassId,
     /// The master's `obstruction_type` is neither 0 nor 12 (`FUN_1411205c0`).
-    pub obstructs: bool,
+    pub(crate) obstructs: bool,
     /// The master's terrain restriction's value per terrain.
-    pub restriction: &'a Restriction,
+    pub(crate) restriction: &'a Restriction,
     /// `hill_mode` (`+0x604`, `p7`).
-    pub hill_mode: HillMode,
+    pub(crate) hill_mode: HillMode,
     /// The placement terrains (`+0x5f2`..`+0x5f8`, [`placement_terrains`]).
-    pub placement: PlacementTerrains,
+    pub(crate) placement: PlacementTerrains,
     /// The objects the scan passes over (`p12` and, for a building, its annexes, `FUN_14123d090`):
     /// none for BUILD, a reseeding gatherer's old target ([`crate::world::World::reseed`]).
-    pub own: &'a [ObjectId],
+    pub(crate) own: &'a [ObjectId],
 }
 
 /// The hill mode's test of a tile of the box (`FUN_141123f80`'s `p7` part, the master's

@@ -78,10 +78,10 @@ impl UnitAi {
             force: OrderForce::Forced,
             pace: Pace::Walk,
         };
-        if home.go_home {
+        if home.homeward {
             let m = self.move_to(go_home);
             if let Some(h) = self.home.as_mut() {
-                h.go_home = false;
+                h.homeward = false;
             }
             return (true, m);
         }

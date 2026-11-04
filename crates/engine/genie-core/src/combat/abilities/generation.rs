@@ -29,22 +29,22 @@ use crate::world::slots::PlayerSlots;
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct TopWork {
     /// The action's type.
-    pub kind: ActionKind,
+    pub(crate) kind: ActionKind,
     /// The action's state.
-    pub state: ActionState,
+    pub(crate) state: ActionState,
     /// Its target.
-    pub target: Option<WorkTarget>,
+    pub(crate) target: Option<WorkTarget>,
 }
 
 /// What a generation task's test reads of the top action's target.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct WorkTarget {
     /// Its hit points (`+0x278`).
-    pub hp: HitPoints,
+    pub(crate) hp: HitPoints,
     /// Its master's first storage amount (`+0x610`).
-    pub storage: Amount,
+    pub(crate) storage: Amount,
     /// Its master's class (`+0x410`).
-    pub class: ClassId,
+    pub(crate) class: ClassId,
 }
 
 /// Whether a generation task generates this update (`0x141207d4d`..`0x141207fbe`): an object

@@ -31,17 +31,17 @@ use crate::world::{LureDestination, Percent, TargetingMode, Tick, VillagerGarris
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Formations {
     /// The splitter groups units at all (`+0x6c0` not 0).
-    pub auto: bool,
+    pub(crate) auto: bool,
     /// How near two units join (`+0x6c4`).
-    pub influence: Distance,
+    pub(crate) influence: Distance,
     /// Units whose speeds differ by more than [`crate::orders`]'s gap do not join (`+0x6c8` 1).
-    pub by_speed: bool,
+    pub(crate) by_speed: bool,
     /// `mMinColumnDistance` (`+0x6b8`): a group's move along a longer path forms a column
     /// (`commandMoveTo`).
-    pub min_column_distance: WholeDistance,
+    pub(crate) min_column_distance: WholeDistance,
     /// `mColumnToLineDistance` (`+0x6bc`): where a column on its last waypoint turns to a line
     /// (`UpdateDesiredPositions`).
-    pub column_to_line_distance: WholeDistance,
+    pub(crate) column_to_line_distance: WholeDistance,
 }
 
 bitflags::bitflags! {
@@ -73,25 +73,25 @@ bitflags::bitflags! {
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct AiSettings {
     /// `easiest_reaction_percentage` (`+0x608`, setting 3).
-    pub easiest_reaction_percentage: Percent,
+    pub(crate) easiest_reaction_percentage: Percent,
     /// `easier_reaction_percentage` (`+0x60c`, setting 4).
-    pub easier_reaction_percentage: Percent,
+    pub(crate) easier_reaction_percentage: Percent,
     /// `task_ungrouped_soldiers` (`+0x610`, setting 5).
-    pub task_ungrouped_soldiers: u8,
+    pub(crate) task_ungrouped_soldiers: u8,
     /// Settings 6, 7, 8, 0xb, 0xe, 0x10 and 0x12.
-    pub switches: AiSwitches,
+    pub(crate) switches: AiSwitches,
     /// `local_targeting_mode` (`+0x614`, setting 9).
-    pub local_targeting_mode: TargetingMode,
+    pub(crate) local_targeting_mode: TargetingMode,
     /// `targeting_factor_scalar` (`+0x618`, setting 10).
-    pub targeting_factor_scalar: Percent,
+    pub(crate) targeting_factor_scalar: Percent,
     /// `preferredTradeDistance` (`+0x61c`, setting 0xd).
-    pub preferred_trade_distance: Distance,
+    pub(crate) preferred_trade_distance: Distance,
     /// `boarLureDestination` (`+0x623`, setting 0xc).
-    pub boar_lure_destination: LureDestination,
+    pub(crate) boar_lure_destination: LureDestination,
     /// `mAttackMoveMaxDistance` (`+0x624`, setting 0xf).
-    pub attack_move_max_distance: WholeDistance,
+    pub(crate) attack_move_max_distance: WholeDistance,
     /// `mDisableVillagerGarrison` (`+0x650`, setting 0x11).
-    pub disable_villager_garrison: VillagerGarrison,
+    pub(crate) disable_villager_garrison: VillagerGarrison,
 }
 
 bitflags::bitflags! {
@@ -137,38 +137,38 @@ pub struct Player {
     pub objects: ObjectList,
     /// `player+0x10`, the player's type (the save's class byte): 1 human, 2 Gaia, 3 computer
     /// (0 the scenario editor's phantom).
-    pub kind: PlayerKind,
+    pub(crate) kind: PlayerKind,
     /// Every attribute (`player+0x100`, count `+0x90`): the first four are food, wood, stone and
     /// gold ([`Player::resources`]).
     pub attributes: Vec<Amount>,
     /// `+0x658` (saved, the save's second attribute array): per attribute what the player's
     /// generation tasks made and did not give yet ([`crate::combat::abilities::store`]).
-    pub generated: Vec<Amount>,
+    pub(crate) generated: Vec<Amount>,
     /// The civ (`player+0x738`), which drop sites read.
     pub civ: CivId,
     /// `relation[i]` (`player+0x260`): how the player stands to player i.
-    pub relations: Relations,
+    pub(crate) relations: Relations,
     /// The sleeping objects, in their list's order: they are not updated; a unit's work on one
     /// wakes it.
     pub sleeping: ObjectList,
     /// `autoFarmQueue` and `autoFishTrapQueue` (`+0x1424`, `+0x1425`, saved).
-    pub auto_queues: AutoQueues,
+    pub(crate) auto_queues: AutoQueues,
     /// `farm_queue_count` (`+0x141c`, saved): the farms and pastures the mill's queue paid for
     /// (GAME 0xd and 0x15 buy, 0xe and 0x16 take back, [`crate::gathering::farm_queue`]).
-    pub farm_queue: QueueCount,
+    pub(crate) farm_queue: QueueCount,
     /// `fishTrapQueueCount` (`+0x1420`, saved): the fish traps the dock's queue paid for (GAME
     /// 0x11 buys, 0x12 takes back).
-    pub fish_trap_queue: QueueCount,
+    pub(crate) fish_trap_queue: QueueCount,
     /// `prod_queue_on` (`+0x1358`, saved): GAME 9 sets it; nothing in the simulation reads it.
-    pub production_queue_on: u8,
+    pub(crate) production_queue_on: u8,
     /// `diplomacy[i]` (`+0xe12`, saved, 9 entries): the stance toward player i a diplomacy change
     /// set (1 or 2 enemy, 3 neutral, 4 or 5 ally; [`crate::players::diplomacy`]).
-    pub diplomacy: ByPlayer<Stance>,
+    pub(crate) diplomacy: ByPlayer<Stance>,
     /// The settings a computer player's GAME 0xb sets (`+0x608`..`+0x670`, saved).
-    pub ai_settings: AiSettings,
+    pub(crate) ai_settings: AiSettings,
     /// The order splitter's settings (`+0x6c0` `mAutoFormations`, `+0x6c4`
     /// `mFormationInfluenceDistance`, `+0x6c8` `mBreakAutoFormationsBySpeed`).
-    pub formations: Formations,
+    pub(crate) formations: Formations,
     /// `mPendingDebit` (`+0x6cc`): what the player's BUILD and RESEARCH commands listed as their
     /// costs, food, wood, stone and gold, taken off (`FUN_141630d10`); nothing modelled reads it.
     pub pending_debit: [Amount; 4],
@@ -186,44 +186,44 @@ pub struct Player {
     pub departures: Departures,
     /// `allied_victory` (`+0x2d0`, saved, a byte GAME 5 sets): its allies' victory counts as its
     /// own while it is not 0; the teams count it only at 1 ([`crate::players::diplomacy`]).
-    pub allied_victory: u8,
+    pub(crate) allied_victory: u8,
     /// Its victory conditions' state (`player+0x68`'s `+0x20`, the save's `victory`): 2 when
     /// they are met (`FUN_1414f35d0`).
-    pub victory: VictoryState,
+    pub(crate) victory: VictoryState,
     /// `fealty` (`+0x12f8`, saved): the player a defeated player's resources and units would go
     /// to.
-    pub fealty: Fealty,
+    pub(crate) fealty: Fealty,
     /// `+0x71c`, the offensive posture (0 or 1, GAME 0x14): not saved, a load sets 0; new soldiers
     /// and scorpions read it (their unit AI's constructor, [`crate::unit_ai::NewObject`]).
-    pub posture: Posture,
+    pub(crate) posture: Posture,
     /// `chance_to_dodge_missiles` (`+0xe10`, saved): a ship's unit AI dodges a missile's warning
     /// (`0x20f`) on a draw below it ([`crate::unit_ai::Surroundings::dodge_chance`]).
-    pub dodge_chance: Chance,
+    pub(crate) dodge_chance: Chance,
     /// `chance_for_archers_to_maintain_distance` (`+0xe11`, saved): a computer player's siege
     /// unit backs up from its target after a shot on a draw at least this
     /// ([`crate::unit_ai::Surroundings::keep_distance_chance`]).
-    pub keep_distance_chance: Chance,
+    pub(crate) keep_distance_chance: Chance,
     /// `allied_LOS_Enable` (`+0x2cc`) and `mSharingIsCaring` (`+0x1426`), saved.
-    pub ally_sharing: AllySharing,
+    pub(crate) ally_sharing: AllySharing,
     /// The players whose town centres the player's reveal (attribute 209) flared
     /// (`mTCFlared[i]`, saved; [`crate::vision`]).
-    pub tc_flared: Vec<bool>,
+    pub(crate) tc_flared: Vec<bool>,
     /// `commodity_volumn_delta` (`+0x140c`, saved): the lot a market trade moves (100).
-    pub commodity_volume: LotVolume,
+    pub(crate) commodity_volume: LotVolume,
     /// The objects whose ghosts the player's list follows (`+0x78`, [`crate::vision::ghost`]): not
     /// saved; the load builds it ([`World::build_watched`]).
-    pub watched: Vec<Watched>,
+    pub(crate) watched: Vec<Watched>,
     /// The player's ghosts (its doppelganger list `+0x40`), in the list's order.
     pub ghosts: Vec<Ghost>,
     /// Its history (`+0xdb8`, saved, [`crate::players::history`]).
     pub history: History,
     /// Its object tracker (`+0x18`, [`crate::players::tracker`]): not saved; the load files the objects
     /// ([`World::load_trackers`]).
-    pub tracker: Tracker,
+    pub(crate) tracker: Tracker,
     /// `+0x1378` (not saved): in game mode 16 the player has a military unit queued while its
     /// attribute 6 is at most 1 (QUEUE sets it, `FUN_141614450`; a cancel clears it,
     /// `FUN_14161e370`).
-    pub one_military_queued: bool,
+    pub(crate) one_military_queued: bool,
     /// `mUpdateTime` (`+0x7a4`, saved): the seconds the world player's update has not yet run
     /// its per-second loop for ([`crate::players::world_player`]); Gaia's stays 0.
     pub update_time: Seconds,
@@ -231,15 +231,15 @@ pub struct Player {
     pub gaia_update_time: Seconds,
     /// `escrow` (`+0x6dc`, saved): what a computer player's income set aside of food, wood,
     /// stone and gold ([`World::add_resource`]).
-    pub escrow: [Amount; 4],
+    pub(crate) escrow: [Amount; 4],
     /// `escrow_percentage` (`+0x6ec`, saved): the shares of its income a computer player sets
     /// aside.
-    pub escrow_percentage: [EscrowShare; 4],
+    pub(crate) escrow_percentage: [EscrowShare; 4],
     /// `mSuddenDeathCanBeEliminated` (`+0x1380`, saved): under the sudden death rule the player
     /// had a town centre, and loses without one.
-    pub sudden_death_eliminable: bool,
+    pub(crate) sudden_death_eliminable: bool,
     /// The victory timers that keep a defeated player in the game ([`crate::players::world_player`]).
-    pub victory_times: VictoryTimes,
+    pub(crate) victory_times: VictoryTimes,
 }
 
 /// An attribute the player does not have.

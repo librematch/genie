@@ -49,17 +49,17 @@ use crate::world::layer::generated::UnitAiTuning;
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Search<'a> {
     /// Where it searches from.
-    pub at: Point,
+    pub(crate) at: Point,
     /// How far.
-    pub radius: Distance,
+    pub(crate) radius: Distance,
     /// The object classes it cares about.
-    pub classes: &'a [ClassId],
+    pub(crate) classes: &'a [ClassId],
     /// The searcher's radii.
-    pub size: Footprint,
+    pub(crate) size: Footprint,
     /// What it picks of what it finds.
-    pub pick: Pick,
+    pub(crate) pick: Pick,
     /// What an attack pick reads of the unit AI's memory.
-    pub memory: Memory<'a>,
+    pub(crate) memory: Memory<'a>,
 }
 
 bitflags::bitflags! {
@@ -82,11 +82,11 @@ bitflags::bitflags! {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct AttackAsk {
     /// The reference distance (0: none).
-    pub distance: Distance,
+    pub(crate) distance: Distance,
     /// Its flag arguments.
-    pub checks: AttackChecks,
+    pub(crate) checks: AttackChecks,
     /// An extra object for the statistics.
-    pub extra: Option<ObjectId>,
+    pub(crate) extra: Option<ObjectId>,
 }
 
 impl AttackAsk {
@@ -119,9 +119,9 @@ impl AttackAsk {
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Memory<'a> {
     /// The retarget entries.
-    pub retries: &'a [(ObjectId, WorldTime)],
+    pub(crate) retries: &'a [(ObjectId, WorldTime)],
     /// The order history, the newest first.
-    pub history: &'a [OrderRecord],
+    pub(crate) history: &'a [OrderRecord],
 }
 
 /// What a [`Search`] picks.
@@ -175,51 +175,51 @@ pub enum Pick {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Attacker {
     /// The unit AI's type.
-    pub ai_kind: UnitAiKind,
+    pub(crate) ai_kind: UnitAiKind,
     /// The unit's player.
-    pub player: PlayerId,
+    pub(crate) player: PlayerId,
     /// The owner's type (`player+0x10`; [`PlayerKind::is_computer`] is `FUN_141659cf0`).
-    pub player_kind: PlayerKind,
+    pub(crate) player_kind: PlayerKind,
     /// The unit's state.
-    pub state: ObjectState,
+    pub(crate) state: ObjectState,
     /// The kind it holds (`attribute_type_held`, `+0x308`), none for −1.
-    pub held: Option<AttributeId>,
+    pub(crate) held: Option<AttributeId>,
     /// Its top action's type, if any.
-    pub top_action: Option<ActionKind>,
+    pub(crate) top_action: Option<ActionKind>,
     /// Its master's id.
-    pub master: MasterId,
+    pub(crate) master: MasterId,
     /// Its master's type.
-    pub kind: MasterKind,
+    pub(crate) kind: MasterKind,
     /// Its master's class.
-    pub class: Option<ClassId>,
+    pub(crate) class: Option<ClassId>,
     /// Its master's `attack_priority`.
-    pub attack_priority: AttackPriority,
+    pub(crate) attack_priority: AttackPriority,
     /// Its master's missile, −1 for none.
-    pub missile: Option<MasterId>,
+    pub(crate) missile: Option<MasterId>,
     /// Its master's weapon range (slot 0x230, `+0x828`).
-    pub range: Distance,
+    pub(crate) range: Distance,
     /// Its master's least range (slot 0x240, `+0x850`).
-    pub min_range: Distance,
+    pub(crate) min_range: Distance,
     /// Its master's charge type: 6 and 7 add to the range against a target (slot 0x2f8).
-    pub charge_kind: ChargeKind,
+    pub(crate) charge_kind: ChargeKind,
     /// Its master's `area_effect_range` (`+0x82c`).
-    pub area_effect: Distance,
+    pub(crate) area_effect: Distance,
     /// Its master's `area_effect_level` (`+0x830`).
-    pub blast_level: BlastLevel,
+    pub(crate) blast_level: BlastLevel,
     /// Its master's line of sight (`+0x5d0`).
-    pub los: Distance,
+    pub(crate) los: Distance,
     /// Its place.
-    pub position: Position,
+    pub(crate) position: Position,
     /// Its master's radii.
-    pub radius: Footprint,
+    pub(crate) radius: Footprint,
     /// Its top speed (slot 0x208).
-    pub speed: Speed,
+    pub(crate) speed: Speed,
     /// The game mode is a scenario's.
-    pub scenario: bool,
+    pub(crate) scenario: bool,
     /// Its firepower (`+0xa00`): the units inside a building add theirs.
-    pub firepower: Firepower,
+    pub(crate) firepower: Firepower,
     /// Its `+0x924` (`FUN_14107cc90`): a Gaia siege unit attacks only with 0.
-    pub capture: CaptureKind,
+    pub(crate) capture: CaptureKind,
 }
 
 bitflags::bitflags! {
@@ -246,23 +246,23 @@ bitflags::bitflags! {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Target {
     /// The object's player.
-    pub owner: PlayerId,
+    pub(crate) owner: PlayerId,
     /// Its master's class.
-    pub class: ClassId,
+    pub(crate) class: ClassId,
     /// Its master's type.
-    pub kind: MasterKind,
+    pub(crate) kind: MasterKind,
     /// Its master.
-    pub master: MasterId,
+    pub(crate) master: MasterId,
     /// Its master's `combat_level`.
-    pub combat_level: CombatLevel,
+    pub(crate) combat_level: CombatLevel,
     /// The object's `+0x924`.
-    pub capture: CaptureKind,
+    pub(crate) capture: CaptureKind,
     /// Its unit AI, container, targeting, attackable and `desolid_flag` reads.
-    pub flags: AttackTargetFlags,
+    pub(crate) flags: AttackTargetFlags,
     /// Its place.
     pub position: Position,
     /// Its master's radii.
-    pub radius: Footprint,
+    pub(crate) radius: Footprint,
 }
 
 /// What `bestUnitToAttack` reads of the unit AI that searches: its stance (`+0x1a9`), state
@@ -271,26 +271,26 @@ pub struct Target {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Seeker {
     /// `+0x1a9`.
-    pub stance: UnitStance,
+    pub(crate) stance: UnitStance,
     /// `+0x1ac`, `+0x1b0`.
-    pub state_position: Point,
+    pub(crate) state_position: Point,
     /// `+0x3c`.
-    pub order: Option<OrderKind>,
+    pub(crate) order: Option<OrderKind>,
     /// `+0x44`.
-    pub action: Option<AiAction>,
+    pub(crate) action: Option<AiAction>,
     /// `+0x48`.
-    pub target: Option<ObjectId>,
+    pub(crate) target: Option<ObjectId>,
     /// `+0x4c`: the target's class.
-    pub target_class: Option<ClassId>,
+    pub(crate) target_class: Option<ClassId>,
     /// `+0x70`: the last target's class.
-    pub last_target_class: Option<ClassId>,
+    pub(crate) last_target_class: Option<ClassId>,
     /// `+0x1c0` holds a patrol path.
-    pub patrol_path: bool,
+    pub(crate) patrol_path: bool,
     /// The master type of the current target as the world holds it ([`Surroundings::target`]),
     /// which the siege unit's attack check reads.
     ///
     /// [`Surroundings::target`]: crate::unit_ai::Surroundings::target
-    pub target_master_kind: Option<MasterKind>,
+    pub(crate) target_master_kind: Option<MasterKind>,
 }
 
 impl Seeker {

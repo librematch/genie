@@ -51,14 +51,14 @@ const NO_MOVER: GenieError = GenieError::unsupported("a bird without movement st
 #[derive(Clone, Copy, Debug, PartialEq, Diff)]
 pub struct Fly {
     /// `+0x18`, with state 4's `MoveTo` sub-action to the flight's point (not quiet).
-    pub state: FlyState,
+    pub(crate) state: FlyState,
     /// `+0x44`, in seconds: the flight's time left, or the rest's.
-    pub timer: Seconds,
+    pub(crate) timer: Seconds,
     /// `+0x38`, `+0x3c`: the point the bird keeps within its task's leash.
-    pub home: Point,
+    pub(crate) home: Point,
     /// The action's task (`+0x48`): its leash (`+0x19`, tiles), rest (`+0x1c`), distance factor
     /// (`+0x28`), avoided class and range (`+0x2c`, `+0x30`), terrain (`+0x16`) and sprites.
-    pub task: Task,
+    pub(crate) task: Task,
 }
 
 /// The sprites a flight's `MoveTo` takes (`0x140a84b40` state 3): the master's walking sprite
@@ -66,9 +66,9 @@ pub struct Fly {
 #[derive(Clone, Copy, Debug)]
 pub struct FlightSprites<'a> {
     /// The bird's master's walking sprite, None for none.
-    pub walking: Option<SpriteId>,
+    pub(crate) walking: Option<SpriteId>,
     /// The sprites' table.
-    pub graphics: &'a Graphics,
+    pub(crate) graphics: &'a Graphics,
 }
 
 impl Fly {

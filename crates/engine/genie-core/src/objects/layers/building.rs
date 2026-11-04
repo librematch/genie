@@ -19,43 +19,43 @@ use genie_diff::Diff;
 #[derive(Clone, Debug, Default, PartialEq, Diff)]
 pub struct Building {
     /// A building's construction.
-    pub construction: Option<Construction>,
+    pub(crate) construction: Option<Construction>,
     /// A building's `last_garrison_time` (`+0xbe0`): the world time of its last whole second,
     /// on which its garrison heals ([`crate::objects::unit::Unit::building_seconds`]).
-    pub garrison_time: WorldTime,
+    pub(crate) garrison_time: WorldTime,
     /// A building's `relic_count` and `specific_relic_count` (`+0xc20`, `+0xc24`).
-    pub relics: Relics,
+    pub(crate) relics: Relics,
     /// An annex's main building (`+0xbb8`, the save's linked owner).
-    pub annex_of: Option<MainBuildingId>,
+    pub(crate) annex_of: Option<MainBuildingId>,
     /// A main building's annexes (`+0xbc0`..`+0xbd8`, the save's linked objects).
-    pub annexes: Annexes,
+    pub(crate) annexes: Annexes,
     /// A building's gate lock ([`Gate`]).
-    pub gate: Option<Gate>,
+    pub(crate) gate: Option<Gate>,
     /// A building's `mLivestockSummation` (`+0xc28`, saved): the livestock inside it (their
     /// master's `+0x610`, `FUN_1411cb850`), whose food a mill makes ([`crate::players::world_player`]).
-    pub livestock_summation: Amount,
+    pub(crate) livestock_summation: Amount,
     /// A pasture's livestock (`+0xb78`, saved as `livestockId`): the objects its completion put
     /// on its edges ([`crate::world::World::setup_pasture`]), in the order it made them.
-    pub livestock: Vec<ObjectId>,
+    pub(crate) livestock: Vec<ObjectId>,
     /// A pasture's workers (`+0xcb8`, saved as `pastureWorkerId`): the units that tend it
     /// ([`crate::world::World::tend_pasture`]), in the order they came.
-    pub pasture_workers: Vec<ObjectId>,
+    pub(crate) pasture_workers: Vec<ObjectId>,
     /// `+0xce0`, `attackingUnits` (saved): the units of players its owner is not allied with
     /// that took this foundation (a building below state 2 whose master has a stack unit,
     /// `+0x986`) as their target, once per take, in order
     /// ([`crate::objects::unit::Unit::lists_taker`]); its stack unit's completion tells each of
     /// the new object.
-    pub attacking_units: Vec<ObjectId>,
+    pub(crate) attacking_units: Vec<ObjectId>,
     /// A building's `+0xcd0`: its constructor found mangrove or rice terrain at its place
     /// (`FUN_141188db0`), which master 1889's completion reads.
-    pub rice: bool,
+    pub(crate) rice: bool,
     /// A building's `+0xcb0` (`FUN_1411c5f70`): the id of the object its completion's stack unit
     /// made ([`crate::world::World::stack_unit`]); None before (the save does not hold it).
-    pub stack_made: Option<ObjectId>,
+    pub(crate) stack_made: Option<ObjectId>,
     /// A building's `+0xc54`: the frame its BUILD command chose (`FUN_140e7a400`, the packet's
     /// `+0x1c`), which its standing sprite takes once built; 0 from its constructor and the load.
     #[diff(unsaved)]
-    pub build_frame: Frame,
+    pub(crate) build_frame: Frame,
 }
 
 impl Building {

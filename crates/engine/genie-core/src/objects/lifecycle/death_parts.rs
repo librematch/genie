@@ -47,11 +47,11 @@ pub(crate) fn farm_bonus(attributes: &[Amount]) -> FarmBonus {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct FarmBonus {
     /// Attribute 237: the amount.
-    pub amount: Amount,
+    pub(crate) amount: Amount,
     /// Attribute 238: the resource (an attribute id as the player's value holds it).
-    pub resource: Amount,
+    pub(crate) resource: Amount,
     /// Attribute 239: the master near which it is given (an id as the value holds it).
-    pub near: Amount,
+    pub(crate) near: Amount,
 }
 
 /// `FUN_1411980b0`'s visible resources, from `set_state` leaving a state below 4 for one above 6

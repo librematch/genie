@@ -147,9 +147,9 @@ impl genie_diff::Diff for Rect {
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Segment {
     /// Where it starts.
-    pub from: Point,
+    pub(crate) from: Point,
     /// Where it ends.
-    pub to: Point,
+    pub(crate) to: Point,
 }
 
 #[cfg(test)]

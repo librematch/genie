@@ -94,29 +94,29 @@ pub(crate) fn static_storage(
 #[derive(Clone, Copy, Debug, PartialEq, Diff)]
 pub struct Lifecycle {
     /// The object's class: static or animated.
-    pub class: Class,
+    pub(crate) class: Class,
     /// `+0x640`, the save's `object_state`.
     pub state: ObjectState,
     /// The masked hit points (`+0x278`).
     pub hp: HitPoints,
     /// `+0x308`: the attribute of what the object holds, none for −1.
-    pub attribute_kind: Option<AttributeId>,
+    pub(crate) attribute_kind: Option<AttributeId>,
     /// `+0x310`: how much it holds.
     pub amount: Amount,
     /// The master's death sprite (`+0x480`, the slot 0x7a0's): an animated object with one plays
     /// it in state 4.
     #[diff(gap = "stays the import's master's after a master change (a villager's new task)")]
-    pub dying_sprite: Option<SpriteId>,
+    pub(crate) dying_sprite: Option<SpriteId>,
     /// The master spawns an object when this one is gone (its death spawn `+0x5e4`, state 7).
-    pub death_spawn: bool,
+    pub(crate) death_spawn: bool,
     /// A static object's sprite after its death (the master's dying sprite, else its current
     /// one) starts on a random facet (sequence flag 4) of this many (more than one): its death
     /// draws the facet from the Object stream.
-    pub death_facets: Option<FacetCount>,
+    pub(crate) death_facets: Option<FacetCount>,
     /// `+0x2f0`: the object it is inside (its `inside_obj`), whose update decides for it.
-    pub inside: Option<ContainerId>,
+    pub(crate) inside: Option<ContainerId>,
     /// `+0x643`: the next update moves the object to the sleeping list.
-    pub goto_sleep: bool,
+    pub(crate) goto_sleep: bool,
     /// The master's id.
     pub master_id: MasterId,
     /// What the dead-object steps read of the master.

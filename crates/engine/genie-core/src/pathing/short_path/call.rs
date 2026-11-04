@@ -30,17 +30,17 @@ use crate::world::slots::CheckedIndex;
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Query {
     /// The start.
-    pub from: FixedPoint,
+    pub(crate) from: FixedPoint,
     /// The goal.
-    pub to: FixedPoint,
+    pub(crate) to: FixedPoint,
     /// The unit's radius (`+0xc`).
-    pub radius: Distance,
+    pub(crate) radius: Distance,
     /// The target's half sizes, when the goal is its own position (`+0x10`, `+0x14`).
-    pub target_size: Footprint,
+    pub(crate) target_size: Footprint,
     /// The range (`+0x18`).
-    pub range: Distance,
+    pub(crate) range: Distance,
     /// The terrain classes the unit cannot cross, as a tile mask (`+0x1c`).
-    pub blocked: u64,
+    pub(crate) blocked: u64,
 }
 
 impl Query {

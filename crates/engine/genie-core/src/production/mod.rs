@@ -65,23 +65,23 @@ use crate::world::layer::Slots;
 #[derive(Clone, Copy, Debug, PartialEq, Diff)]
 pub struct Entry {
     /// `+0x0`, `mMasterUnitId`: the master it makes; −1 for a research.
-    pub master: Option<MasterId>,
+    pub(crate) master: Option<MasterId>,
     /// `+0x2`, `mUnitCount`: how many.
-    pub count: QueuedUnits,
+    pub(crate) count: QueuedUnits,
     /// `+0x4`, `mTechId`: the technology it researches; −1 for a unit.
-    pub tech: Option<TechId>,
+    pub(crate) tech: Option<TechId>,
     /// `+0x8`, `mCosts`: what each of its units or researches paid, three (attribute, amount)
     /// pairs (`FUN_1411c3190`), which a cancel gives back.
-    pub costs: [(Option<AttributeId>, Amount); 3],
+    pub(crate) costs: [(Option<AttributeId>, Amount); 3],
     /// `+0x20`: the building's serial (`+0xcd8`) when the entry came; not saved (a load numbers
     /// the slots it reads from 0).
     #[diff(unsaved)]
-    pub serial: EntrySerial,
+    pub(crate) serial: EntrySerial,
     /// `+0x28`, `mButtonLocationId`: the train button QUEUE named, −1 for none.
-    pub button: QueueButton,
+    pub(crate) button: QueueButton,
     /// `+0x2c`, `mTrainTime`: the unit's train time at the building and button
     /// ([`train_time`]); a research entry does not write it.
-    pub train_time: WholeSeconds,
+    pub(crate) train_time: WholeSeconds,
 }
 
 impl Default for Entry {
@@ -115,27 +115,27 @@ pub const ROOM: QueuedUnits = QueuedUnits::of_data(15);
 #[derive(Clone, Debug, PartialEq, Diff)]
 pub struct Queue {
     /// `+0xbe8`, its length `+0xbf0`: the buffer's slots, the entries first.
-    pub slots: Vec<Entry>,
+    pub(crate) slots: Vec<Entry>,
     /// `+0xbf2`, `mProductionQueueCount`: how many slots are entries.
-    pub count: QueueLength,
+    pub(crate) count: QueueLength,
     /// `+0xbf4`, `mProductionQueueTotalUnits`: the entries' counts summed.
-    pub total: QueuedUnits,
+    pub(crate) total: QueuedUnits,
     /// `+0xbf6`, `mProductionQueueEnabled`: the building's update works the queue; a new
     /// building's constructor sets it, and nothing in the simulation clears it.
-    pub enabled: bool,
+    pub(crate) enabled: bool,
     /// `+0xc00`: grows by one with every change of the entries (a byte, wrapping).
     /// Not saved.
     #[diff(unsaved)]
-    pub changes: QueueChanges,
+    pub(crate) changes: QueueChanges,
     /// `+0xc01`: the last update made nothing because the building's own top action is a make,
     /// a research or of types 0x7b to 0x7d (`FUN_141227a00`) for a player not of type 3.
     /// Not saved.
     #[diff(unsaved)]
-    pub waiting: bool,
+    pub(crate) waiting: bool,
     /// `+0xcd8`: the serial the next entry takes (not saved; a load leaves it at the slots it
     /// read).
     #[diff(unsaved)]
-    pub next_serial: EntrySerial,
+    pub(crate) next_serial: EntrySerial,
 }
 
 impl Default for Queue {
@@ -395,16 +395,16 @@ impl MakeObj {
 #[derive(Clone, Copy, Debug, PartialEq, Diff)]
 pub struct MakeTech {
     /// `+0x18`: its state.
-    pub state: MakeTechState,
+    pub(crate) state: MakeTechState,
     /// `+0x60`: `FUN_140ad0700`'s `param_5` flipped (the building's update passes 0): set, its
     /// destructor gives nothing back (`FUN_1413ccc00` runs only while it is clear).
-    pub paid: bool,
+    pub(crate) paid: bool,
     /// `+0x68`, `tech_id`.
-    pub tech: TechId,
+    pub(crate) tech: TechId,
     /// `+0x6c`, `unique_id`: the entry's master (−1).
-    pub master: i32,
+    pub(crate) master: i32,
     /// `+0x70`, `m_researchProgress`: the seconds of work done.
-    pub progress: Seconds,
+    pub(crate) progress: Seconds,
 }
 
 /// What a building's production list (`+0xbf8`) holds: the building's update makes at most one

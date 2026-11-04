@@ -9,9 +9,9 @@ use genie_diff::Diff;
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Diff)]
 pub struct Allied {
     /// The attacker's player counts the target's allied.
-    pub by_attacker: bool,
+    pub(crate) by_attacker: bool,
     /// The target's player counts the attacker's allied.
-    pub by_target: bool,
+    pub(crate) by_target: bool,
 }
 
 impl Allied {

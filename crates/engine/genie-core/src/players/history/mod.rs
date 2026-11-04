@@ -145,17 +145,17 @@ const RAZING_VALUE_OF: usize = 425;
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Event {
     /// `event` (`+0x0`): its kind.
-    pub kind: EventKind,
+    pub(crate) kind: EventKind,
     /// `time_slice` (`+0x4`): the number of entries when it happened.
-    pub time_slice: TimeSlice,
+    pub(crate) time_slice: TimeSlice,
     /// `world_time` (`+0x8`): the world's time then, in milliseconds.
-    pub world_time: WorldTime,
+    pub(crate) world_time: WorldTime,
     /// `data1` (`+0xc`).
-    pub data1: f32,
+    pub(crate) data1: f32,
     /// `data2` (`+0x10`).
-    pub data2: f32,
+    pub(crate) data2: f32,
     /// `data3` (`+0x14`).
-    pub data3: f32,
+    pub(crate) data3: f32,
 }
 
 /// The player's history (`TRIBE_History_Info`), every field the save holds.
@@ -163,62 +163,62 @@ pub struct Event {
 pub struct History {
     /// `history` (`+0x0`) up to `number_of_entries` (`+0x1c`): each entry's civilian and
     /// military population.
-    pub entries: Vec<HistoryEntry>,
+    pub(crate) entries: Vec<HistoryEntry>,
     /// `max_number_of_entries` (`+0x20`): the entries' buffer, grown by 60.
-    pub max_entries: TimeSlice,
+    pub(crate) max_entries: TimeSlice,
     /// `events` (`+0x8`), newest first (the list from its head).
-    pub events: Vec<Event>,
+    pub(crate) events: Vec<Event>,
     /// `number_of_events` (`+0x18`): as loaded; no writer counts it.
-    pub number_of_events: i32,
+    pub(crate) number_of_events: i32,
     /// `update_history_count` (`+0x28`): the update's runs since the last period.
     pub update_count: HistoryUpdates,
     /// `old_total_razings` (`+0x2c`): attribute 43 at the last period.
-    pub old_total_razings: Tally,
+    pub(crate) old_total_razings: Tally,
     /// `old_build_value_razings` (`+0x30`): attribute 172.
-    pub old_build_value_razings: Tally,
+    pub(crate) old_build_value_razings: Tally,
     /// `old_total_razings_other` (`+0x34`): attribute 155.
-    pub old_total_razings_other: Tally,
+    pub(crate) old_total_razings_other: Tally,
     /// `old_build_value_razings_other` (`+0x38`): attribute 153.
-    pub old_build_value_razings_other: Tally,
+    pub(crate) old_build_value_razings_other: Tally,
     /// `old_total_kills` (`+0x3c`): attribute 20.
-    pub old_total_kills: Tally,
+    pub(crate) old_total_kills: Tally,
     /// `old_build_value_kills` (`+0x40`): attribute 170.
-    pub old_build_value_kills: Tally,
+    pub(crate) old_build_value_kills: Tally,
     /// `old_total_kills_other` (`+0x44`): attribute 154.
-    pub old_total_kills_other: Tally,
+    pub(crate) old_total_kills_other: Tally,
     /// `old_build_value_kills_other` (`+0x48`): attribute 152.
-    pub old_build_value_kills_other: Tally,
+    pub(crate) old_build_value_kills_other: Tally,
     /// `razings_weight` (`+0x4c`): saved; no routine of 158041 reads it.
-    pub razings_weight: f32,
+    pub(crate) razings_weight: f32,
     /// `kills_weight` (`+0x50`): saved; no routine reads it.
-    pub kills_weight: f32,
+    pub(crate) kills_weight: f32,
     /// `razing_percent` (`+0x54`): saved; no routine reads it.
-    pub razing_percent: Share,
+    pub(crate) razing_percent: Share,
     /// `kills_perecent` (`+0x58`): saved; no routine reads it.
-    pub kills_percent: Share,
+    pub(crate) kills_percent: Share,
     /// `razings_flag` (`+0x5c`): saved; no routine reads it.
-    pub razings_flag: u32,
+    pub(crate) razings_flag: u32,
     /// `battle_flag` (`+0x60`): a battle goes on.
-    pub battle_flag: u32,
+    pub(crate) battle_flag: u32,
     /// `old_current_build_value_units` (`+0x64`): attribute 164.
-    pub old_current_build_value_units: Tally,
+    pub(crate) old_current_build_value_units: Tally,
     /// `old_current_build_value_buildings` (`+0x68`): attribute 165.
-    pub old_current_build_value_buildings: Tally,
+    pub(crate) old_current_build_value_buildings: Tally,
     /// `old_player_kill_BV` (`+0xb0`, `numMaxPlayers` of them): attribute 400 + i, outside a
     /// battle.
-    pub old_player_kill_bv: Vec<Tally>,
+    pub(crate) old_player_kill_bv: Vec<Tally>,
     /// `old_player_razing_BV` (`+0xc8`): attribute 425 + i, outside a battle.
-    pub old_player_razing_bv: Vec<Tally>,
+    pub(crate) old_player_razing_bv: Vec<Tally>,
     /// `running_ave_BV_percent` (`+0xe0`): the battle's share of the player's value so far.
-    pub running_ave_bv_percent: Share,
+    pub(crate) running_ave_bv_percent: Share,
     /// `running_total_BV_kills` (`+0xe4`).
-    pub running_total_bv_kills: Tally,
+    pub(crate) running_total_bv_kills: Tally,
     /// `running_total_BV_razings` (`+0xe8`).
-    pub running_total_bv_razings: Tally,
+    pub(crate) running_total_bv_razings: Tally,
     /// `running_total_kills` (`+0xec`; the save keeps its low 16 bits).
-    pub running_total_kills: Tally,
+    pub(crate) running_total_kills: Tally,
     /// `running_total_razings` (`+0xf0`; the save keeps its low 16 bits).
-    pub running_total_razings: Tally,
+    pub(crate) running_total_razings: Tally,
 }
 
 impl History {

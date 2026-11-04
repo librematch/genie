@@ -113,15 +113,15 @@ pub struct Terrain {
     /// Per tile: the layer (`+0xc`, the short −1 for none).
     pub layers: Vec<Option<TerrainId>>,
     /// Per terrain id, the `.dat`'s records.
-    pub terrains: Vec<TerrainKind>,
+    pub(crate) terrains: Vec<TerrainKind>,
     /// Each terrain restriction's value per terrain (`world+0x788`, the `.dat`'s
     /// `passable_buildable_dmg_multiplier`).
-    pub restrictions: Vec<Restriction>,
+    pub(crate) restrictions: Vec<Restriction>,
     /// Per tile, its elevation (`+0x14`, the save's `t->m_elevation`); empty when not known.
-    pub elevations: Vec<u8>,
+    pub(crate) elevations: Vec<u8>,
     /// Per tile, its shape (`+0x8`, not saved): what the map's load (`FUN_140f733f0` over the
     /// whole map) makes of the elevations about it ([`Terrain::set_elevations`]).
-    pub shapes: Vec<u8>,
+    pub(crate) shapes: Vec<u8>,
 }
 
 /// A tile's side (`DAT_14330eb8c`), which the slope shares measure against.
@@ -200,22 +200,22 @@ fn slope_share(shape: u8, fx: f32, fy: f32) -> f32 {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Foundation {
     /// The building's place.
-    pub position: Position,
+    pub(crate) position: Position,
     /// Its master's `clearance_size` (`+0x5fc`).
-    pub clearance: Footprint,
+    pub(crate) clearance: Footprint,
     /// The foundation terrain, the master's `+0x988` byte.
-    pub terrain: TerrainId,
+    pub(crate) terrain: TerrainId,
     /// The building's `snow_flag` (`+0xc61`).
-    pub snow: Snow,
+    pub(crate) snow: Snow,
     /// The master's id and class, its `defense_terrain_bonus` (`+0x820`).
-    pub master: MasterId,
+    pub(crate) master: MasterId,
     /// The master's class.
-    pub class: ClassId,
+    pub(crate) class: ClassId,
     /// The master's `defense_terrain_bonus` (`+0x820`).
-    pub terrain_bonus: RestrictionField,
+    pub(crate) terrain_bonus: RestrictionField,
     /// The game's setting `FUN_140ec0cd0` reads at `+0x680` ([`crate::world::World::mode_680`]):
     /// at 1 a foundation without a snow layer goes into the layer, not the terrain.
-    pub mode_680: Mode680,
+    pub(crate) mode_680: Mode680,
 }
 
 impl Terrain {

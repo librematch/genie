@@ -44,17 +44,17 @@ use crate::world::step::Step;
 #[derive(Debug)]
 pub struct GatherStart<'a> {
     /// The target.
-    pub target: &'a Resource,
+    pub(crate) target: &'a Resource,
     /// The owner.
-    pub player: PlayerId,
+    pub(crate) player: PlayerId,
     /// The owner's type (`player+0x10`; [`PlayerKind::is_computer`] is `FUN_141659cf0`).
-    pub player_kind: PlayerKind,
+    pub(crate) player_kind: PlayerKind,
     /// The game settings' test `FUN_141302150`.
-    pub carry_rule: bool,
+    pub(crate) carry_rule: bool,
     /// What the gatherer carries, its resource kind and amount.
-    pub held: &'a mut Held,
+    pub(crate) held: &'a mut Held,
     /// What its `MoveTo`s' constructors read of the gatherer; its load is `held`'s.
-    pub walks: Walks<'a>,
+    pub(crate) walks: Walks<'a>,
 }
 
 /// What a gather's retarget takes besides its mover and stream ([`GatherAction::retarget`]'s
@@ -62,18 +62,18 @@ pub struct GatherStart<'a> {
 #[derive(Clone, Copy, Debug)]
 pub struct GatherRetarget<'a> {
     /// The work command's new target.
-    pub target: &'a Resource,
+    pub(crate) target: &'a Resource,
     /// The owner.
-    pub player: PlayerId,
+    pub(crate) player: PlayerId,
     /// The owner's type (`player+0x10`; [`PlayerKind::is_computer`] is `FUN_141659cf0`).
-    pub player_kind: PlayerKind,
+    pub(crate) player_kind: PlayerKind,
     /// What the gatherer carries and the sprites its `MoveTo`s take for none.
-    pub walks: Walks<'a>,
+    pub(crate) walks: Walks<'a>,
     /// The game's farm setting: walkable, a stop farm or a fish trap keeps its place as the
     /// farm's.
-    pub farm_mode: FarmMode,
+    pub(crate) farm_mode: FarmMode,
     /// What times a farm's stops.
-    pub rate: StopRate,
+    pub(crate) rate: StopRate,
 }
 
 /// What the constructor reads to time a farm's stops: the gatherer's work rate (its master's
@@ -82,11 +82,11 @@ pub struct GatherRetarget<'a> {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct StopRate {
     /// The work rate.
-    pub work_rate: WorkRate,
+    pub(crate) work_rate: WorkRate,
     /// The capacity.
-    pub capacity: Amount,
+    pub(crate) capacity: Amount,
     /// The productivity.
-    pub productivity: Amount,
+    pub(crate) productivity: Amount,
 }
 
 impl StopRate {
@@ -105,16 +105,16 @@ impl StopRate {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct MoveTarget {
     /// The object.
-    pub id: ObjectId,
+    pub(crate) id: ObjectId,
     /// Its owner.
-    pub player: PlayerId,
+    pub(crate) player: PlayerId,
     /// The gatherer's master drops its loads there (its main building's master for an annex,
     /// `+0xbb8`; `FUN_14109d4f0`).
-    pub drop_site: bool,
+    pub(crate) drop_site: bool,
     /// Its place.
-    pub position: Position,
+    pub(crate) position: Position,
     /// The footprint gap from the gatherer to it.
-    pub gap: Distance,
+    pub(crate) gap: Distance,
 }
 
 /// The productivity the time per stop reads (the constructor's and the update's): the player's

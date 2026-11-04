@@ -75,11 +75,11 @@ pub enum MoveTo {
 #[derive(Clone, Copy, Debug, PartialEq, Diff)]
 pub struct MoveWait {
     /// `+0x6c`, `movement_wait_state`.
-    pub state: MoveWaitState,
+    pub(crate) state: MoveWaitState,
     /// `+0x70`: the time waited.
-    pub timer: Seconds,
+    pub(crate) timer: Seconds,
     /// `+0x74`: how long it waits.
-    pub delay: Seconds,
+    pub(crate) delay: Seconds,
 }
 
 /// `kDefaultWaitTime`, the wait a `MoveTo`'s constructors set (`+0x74`, `FUN_140aa0d30`,
@@ -190,20 +190,20 @@ impl TryFrom<u8> for TargetMoved {
 #[derive(Debug)]
 pub struct Walk<'a> {
     /// The unit's place, its row's static layer.
-    pub place: &'a mut Static,
+    pub(crate) place: &'a mut Static,
     /// The unit's animated and moving layers, lent out of the world's table for the walk (none
     /// for a static object).
-    pub motion: Option<&'a mut layers::Motion>,
+    pub(crate) motion: Option<&'a mut layers::Motion>,
     /// The unit.
-    pub me: Me,
+    pub(crate) me: Me,
     /// The world's dt in seconds.
-    pub dt: Seconds,
+    pub(crate) dt: Seconds,
     /// The objects' places; the motion step moves the unit onto a waypoint it reached.
-    pub world: &'a mut Spatial,
+    pub(crate) world: &'a mut Spatial,
     /// The planners and the world's time for a path request, None where the caller has none.
-    pub plan: Option<Planning<'a>>,
+    pub(crate) plan: Option<Planning<'a>>,
     /// The objects by id: what the walk reads of the units it meets ([`ObjectsRef::gait`]).
-    pub by_id: ObjectsRef<'a>,
+    pub(crate) by_id: ObjectsRef<'a>,
 }
 
 impl Walk<'_> {
@@ -361,9 +361,9 @@ pub fn graphic_of(
 #[derive(Clone, Copy, Debug)]
 pub struct SpriteReads<'a> {
     /// The constructors' defaults ([`MoveDefaults::of`]).
-    pub defaults: MoveDefaults,
+    pub(crate) defaults: MoveDefaults,
     /// The sprites' table.
-    pub graphics: &'a Graphics,
+    pub(crate) graphics: &'a Graphics,
 }
 
 impl<'a> SpriteReads<'a> {
@@ -401,11 +401,11 @@ impl<'a> SpriteReads<'a> {
 #[derive(Debug)]
 pub struct Sprites<'a> {
     /// The unit's sprite.
-    pub sprite: &'a mut Option<ActiveSprite>,
+    pub(crate) sprite: &'a mut Option<ActiveSprite>,
     /// The Sprite stream.
-    pub rng: &'a mut Well512,
+    pub(crate) rng: &'a mut Well512,
     /// The sprites' table.
-    pub graphics: &'a Graphics,
+    pub(crate) graphics: &'a Graphics,
 }
 
 impl Sprites<'_> {
@@ -429,11 +429,11 @@ impl Sprites<'_> {
 #[derive(Debug)]
 pub struct Shown<'a> {
     /// The unit's sprite.
-    pub sprite: &'a mut Option<ActiveSprite>,
+    pub(crate) sprite: &'a mut Option<ActiveSprite>,
     /// The Sprite stream.
-    pub rng: &'a mut Well512,
+    pub(crate) rng: &'a mut Well512,
     /// The `MoveTo`'s sprite.
-    pub graphic: Option<Graphic>,
+    pub(crate) graphic: Option<Graphic>,
 }
 
 impl Shown<'_> {

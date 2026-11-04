@@ -107,18 +107,18 @@ use crate::players::market::Market;
 #[derive(Clone, Copy, Debug, Default, PartialEq, Diff)]
 pub struct Gate {
     /// `mGateLocked`: the gate is locked.
-    pub locked: bool,
+    pub(crate) locked: bool,
     /// `mFirstUpdate`: a new building's is set; a gate's first update in state 2 takes its
     /// annexes' places as its endpoints (`mEndpoint1`, `mEndpoint2`, not held) and clears it.
-    pub first_update: bool,
+    pub(crate) first_update: bool,
     /// `mCloseTimer`: the seconds an open gate with nothing in it waits before it shuts.
-    pub close_timer: Seconds,
+    pub(crate) close_timer: Seconds,
     /// The building has a saved open or shut master (`+0xc58`, the save's
     /// `has_open_closed_master_object`) or its original owner's masters (`mOriginalOwner`,
     /// `+0xc88`): a gate's toggle then takes another master, not modelled. A master of its own
     /// (`+0x6c0`, which a foundation holds until its first builder starts) the slice does not
     /// hold.
-    pub other_masters: bool,
+    pub(crate) other_masters: bool,
 }
 
 /// A walk's unit in the way (notify 0x215) that the walk's owner does not pass on.
@@ -221,9 +221,9 @@ pub struct World {
     /// `world+0x7d0`.
     pub frame_seed: FrameSeed,
     /// `world+0x188`, `player_turn` in the save.
-    pub player_turn: PlayerId,
+    pub(crate) player_turn: PlayerId,
     /// `world+0x18c[p]`, the time each player accumulated since its last turn.
-    pub player_time: Vec<Millis>,
+    pub(crate) player_time: Vec<Millis>,
     /// Every player, Gaia first.
     pub players: Vec<Player>,
     /// The table by id (`FUN_1415417a0`): each object's place, written by the world's list
@@ -245,26 +245,26 @@ pub struct World {
     /// The planners and the mesh.
     pub pathing: Pathing,
     /// The game options the simulation reads ([`crate::world::settings::Settings`]), from the header.
-    pub settings: settings::Settings,
+    pub(crate) settings: settings::Settings,
     /// The game object's tagged value at `+0x680` (`DAT_143f07a58`, read through
     /// `FUN_140ec0cd0`; at 1 a boar does not wander and a hit may do no damage). `GamePC::start4`
     /// (`FUN_140f29b60`) compares it with the loaded world's `+0x6b4` and reloads the data when
     /// they differ. It is not the options' content mode: MarvinBlue/426048731 saves
     /// `mSelectedContentMode` 2 and the tick oracle reads this as 0. Its writer is not located
     /// and the save does not hold it; genie-oracle leaves it at 0.
-    pub mode_680: Mode680,
+    pub(crate) mode_680: Mode680,
     /// The Empire Wars start's pass is due ([`crate::orders::start_work`]): the world's `+0x6c6` is
     /// clear in game mode 13, which a game's start has.
-    pub start_work_due: bool,
+    pub(crate) start_work_due: bool,
     /// The world's `+0x844`: the relics (master 0x11d) an effect's spawn made (`FUN_1416136f0`),
     /// which the relic victory's countdown reads (not modelled, [`crate::players::game_status`]); not
     /// saved here, 0 at a load.
-    pub spawned_relics: RelicCount,
+    pub(crate) spawned_relics: RelicCount,
     /// The world's game state (`+0x88`, the save's `tempGameState`): 1 once the game is over.
     pub game_state: PlayState,
     /// The scenario's `victory_conquest` (`world+0x7e0`'s `+0x2c0`, `FUN_140ca4d20`): the game
     /// ends when one side is left.
-    pub victory_conquest: bool,
+    pub(crate) victory_conquest: bool,
     /// The map's zone maps (`map+0x5e28`), made when first asked for.
     pub zones: Zones,
     /// The world's ids and pools for the objects of recyclable masters ([`Recycling`]).
@@ -273,7 +273,7 @@ pub struct World {
     pub ai: AiModules,
     pub(crate) streams: Streams,
     /// The market's prices (`+0x868`.., saved).
-    pub market: Market,
+    pub(crate) market: Market,
     /// The world's unit groups ([`crate::groups`]).
     pub groups: UnitGroups,
     /// Each comm player's last commanded units (the command processor's list at
@@ -284,28 +284,28 @@ pub struct World {
     /// The current update's time in seconds (`world+0x164`, set before the commands run).
     pub dt_seconds: Seconds,
     /// The current update's time in milliseconds (`world+0x7c`, set before the commands run).
-    pub dt: Millis,
+    pub(crate) dt: Millis,
     /// The history period (`world+0x8b8`, `time_slice`): the `.dat`'s, which the world reads
     /// after its constructor's [`HISTORY_PERIOD`] ([`crate::players::history::History::update`]).
-    pub history_period: HistoryUpdates,
+    pub(crate) history_period: HistoryUpdates,
     /// Each player's `mAllowCapturingGaiaUnits` (`player+0x670`, saved; false for a player it
     /// lacks): a computer player takes Gaia's objects over by seeing them in the game modes
     /// outside the standard ones ([`crate::vision::visibility::sight_taker`]).
-    pub allow_gaia_capture: Vec<bool>,
+    pub(crate) allow_gaia_capture: Vec<bool>,
     /// `mLocalPlayerIndex` (`world+0x6b0`, saved): the player whose view the game shows, a
     /// recording's point of view. Its masters stand for a building's in a train location's test
     /// (`FUN_141263610` through `FUN_140c88440`, [`crate::players::world_player`]).
-    pub local_player: PlayerId,
+    pub(crate) local_player: PlayerId,
     /// `allianceLocked` (`world+0xc`, saved): GAME's diplomacy and allied victory change nothing
     /// while it is not 0.
-    pub alliance_locked: i32,
+    pub(crate) alliance_locked: i32,
     /// The world's teams (`+0x984`..`+0x9a0`, `playerTeams[i]`, saved as bytes): player i's
     /// team at i − 1, 1 alone ([`World::resolve_teams`]).
-    pub teams: [Team; 8],
+    pub(crate) teams: [Team; 8],
     /// The game's `+0xc14` (`FUN_140c884c0`, saved as a byte): the player of the quick-build
     /// cheat (GAME 4), 0 without; while it is not 0 every work is done at once, which the work
     /// actions do not model (they take it as 0).
-    pub instant_work: i32,
+    pub(crate) instant_work: i32,
 }
 
 /// The objects of recyclable masters (`+0x680`, the `.dat`'s `recyclable`): a new one takes the

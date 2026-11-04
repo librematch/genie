@@ -20,7 +20,7 @@ Start with these files:
 <!-- files -->
 | File | What it holds |
 | --- | --- |
-| [`lib.rs`](lib.rs) | Deterministic simulation core of the genie engine reimplementation. |
+| [`lib.rs`](lib.rs) | Deterministic simulation core of the genie engine reimplementation: build 158041's world, its load from a save (`world::load`) and its step (`World::tick_with`), system by system (`docs/ENGINE_SYSTEMS.md`). |
 | [`test_ids.rs`](test_ids.rs) | The tests' newtypes: an object id, a unit group, a player or a master of a value the test knows is one, a list of ids and an object's load, through the types' checked constructors. |
 | [`trace.rs`](trace.rs) | What the engine tells a `tracing` subscriber while it runs, for debugging. |
 | [`combat/`](combat/) | Combat: attacks, hits and missiles. |

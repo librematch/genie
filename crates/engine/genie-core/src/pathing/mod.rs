@@ -58,14 +58,14 @@ pub mod zones;
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Pathing {
     /// The map's size in tiles.
-    pub size: GridSize,
+    pub(crate) size: GridSize,
     /// Each tile's terrain, row by row.
-    pub terrain: Vec<TerrainId>,
+    pub(crate) terrain: Vec<TerrainId>,
     /// Each terrain restriction's value per terrain (above 0 passes), by restriction id.
-    pub restrictions: Vec<Restriction>,
+    pub(crate) restrictions: Vec<Restriction>,
     /// The game type (the world's `game_type`): type 12 has the escape the motion step runs for
     /// a unit on an `E` tile (`FUN_141158210` result 1), which the slice does not model.
-    pub game_kind: u8,
+    pub(crate) game_kind: u8,
     /// The restrictions the world's load gave planners (`FUN_140f7d310`, [`Pathing::register`]),
     /// in their order; None builds one for any restriction (a world made without a load).
     planned: Option<Vec<RestrictionId>>,
@@ -80,13 +80,13 @@ pub struct Pathing {
     /// The temporary shapes of the motion step under way (its `local_1688`).
     temporary: Vec<ShapeId>,
     /// The short pather.
-    pub pather: Pather,
+    pub(crate) pather: Pather,
     /// The ignore list the tile planner's smoothing hands the obstruction manager
     /// (`DAT_143f0db50`, six ids, a static the game never clears: zero at the load).
     smoothing_ignore: [ObjectId; 6],
     /// Each player's path budget (by player index): its plans this update and the caps the
     /// save holds ([`PlanBudget`]).
-    pub budgets: Vec<PlanBudget>,
+    pub(crate) budgets: Vec<PlanBudget>,
 }
 
 /// A player's path budget: `pathingAttemptCapValue` (`+0x674`), `pathingDelayCapValue`
@@ -95,11 +95,11 @@ pub struct Pathing {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct PlanBudget {
     /// `pathingAttemptCapValue`: −1 for no cap.
-    pub attempt_cap: PlanCap,
+    pub(crate) attempt_cap: PlanCap,
     /// `pathingDelayCapValue`: −1 for no cap.
-    pub delay_cap: PlanCap,
+    pub(crate) delay_cap: PlanCap,
     /// The plans since the player's last update.
-    pub plans: PlanCount,
+    pub(crate) plans: PlanCount,
 }
 
 impl PlanBudget {

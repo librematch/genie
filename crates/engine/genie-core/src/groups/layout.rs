@@ -37,11 +37,11 @@ pub const BOX_POSITIONS: usize = 60;
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct MemberPlace {
     /// The unit.
-    pub id: ObjectId,
+    pub(crate) id: ObjectId,
     /// Slot 0x520.
-    pub at: BVector,
+    pub(crate) at: BVector,
     /// `FUN_141011300(unit, 0)`.
-    pub category: FormationCategory,
+    pub(crate) category: FormationCategory,
 }
 
 /// A slot's 3D length as the layouts take it (`x² + y² + z²` in that order).

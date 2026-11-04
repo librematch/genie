@@ -105,11 +105,11 @@ pub struct VictoryTimes {
     /// The game's wonder countdown of the player (the game object's `+0x4ec[id]`,
     /// `FUN_140c88300`): the least time left of its wonders' actions (`TRIBE_Action_Wonder`,
     /// `FUN_140c91500`), −1 without one (`FUN_140c90040`).
-    pub wonder: Seconds,
+    pub(crate) wonder: Seconds,
     /// `ruin_held_time` (`+0xdb0`, saved).
-    pub ruins: Seconds,
+    pub(crate) ruins: Seconds,
     /// `artifact_held_time` (`+0xdb4`, saved).
-    pub artifacts: Seconds,
+    pub(crate) artifacts: Seconds,
 }
 
 /// A victory timer that does not run (−1).

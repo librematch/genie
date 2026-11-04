@@ -60,9 +60,9 @@ impl Population {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct HistoryEntry {
     /// The civilian population (attribute 37).
-    pub civilian: Population,
+    pub(crate) civilian: Population,
     /// The military population (attribute 40).
-    pub military: Population,
+    pub(crate) military: Population,
 }
 
 /// A time slice: the history's count of entries, as an event's `time_slice` (`+0x4`) holds it

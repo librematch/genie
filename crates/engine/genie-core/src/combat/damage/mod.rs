@@ -93,11 +93,11 @@ use crate::world::layer::generated::DamageTuning;
 #[derive(Clone, Copy, Debug)]
 pub struct HitLayer<'a> {
     /// The build layer's roles.
-    pub roles: &'a Roles,
+    pub(crate) roles: &'a Roles,
     /// The build layer's slots.
-    pub slots: Slots,
+    pub(crate) slots: Slots,
     /// The damage's tuning values.
-    pub damage_tuning: &'a DamageTuning,
+    pub(crate) damage_tuning: &'a DamageTuning,
 }
 
 /// The gap below which the game takes a distance as zero (`DAT_142eb0c60`), and the share of
@@ -109,9 +109,9 @@ const EPSILON: f32 = DAMAGE_EPSILON;
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct ElevationBonus {
     /// What a hit from higher up adds.
-    pub higher: f32,
+    pub(crate) higher: f32,
     /// What a hit from lower down adds.
-    pub lower: f32,
+    pub(crate) lower: f32,
 }
 
 /// 1 (`DAT_14330eb8c`, read into `XMM9` at `0x1411cec8e`): a building's least hit, the hit
@@ -123,83 +123,83 @@ const ONE: f32 = DAMAGE_ONE;
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Victim {
     /// The object.
-    pub id: ObjectId,
+    pub(crate) id: ObjectId,
     /// Its place in its tile's object list (the map tile's `+0x28`, in the order
     /// `FUN_140f5f0a0` and `FUN_140f5f560` keep), which a blast walks a tile by ([`blast`]).
-    pub tile_place: usize,
+    pub(crate) tile_place: usize,
     /// Its hit points (`+0x278`), what it holds (`+0x310`), its state and place.
-    pub hp: HitPoints,
+    pub(crate) hp: HitPoints,
     /// What it holds (`+0x310`).
-    pub amount: Amount,
+    pub(crate) amount: Amount,
     /// Its state (`+0x640`).
-    pub state: ObjectState,
+    pub(crate) state: ObjectState,
     /// Its place.
-    pub position: Position,
+    pub(crate) position: Position,
     /// Its master's type, class, id, radii, first storage amount (`+0x610`, which a gatherer
     /// reads), `attribute_max_amount` and `area_effect_object_level` (`+0x62b`, the blast
     /// levels that reach it).
-    pub kind: MasterKind,
+    pub(crate) kind: MasterKind,
     /// Its master's class.
-    pub class: ClassId,
+    pub(crate) class: ClassId,
     /// Its master.
-    pub master_id: MasterId,
+    pub(crate) master_id: MasterId,
     /// Its master's radii.
-    pub radius: Footprint,
+    pub(crate) radius: Footprint,
     /// Its master's `radius_z` (`+0x5e0`): a missile meets it within that height above it
     /// (`FUN_14113f740`).
-    pub height: Distance,
+    pub(crate) height: Distance,
     /// Its master's first storage amount (`+0x610`), which a gatherer reads.
-    pub storage: Amount,
+    pub(crate) storage: Amount,
     /// Its master's `attribute_max_amount`.
-    pub capacity: CarryCapacity,
+    pub(crate) capacity: CarryCapacity,
     /// `+0x644`, `worker_num`: the actions that have it as their target (a farm another farmer
     /// works).
-    pub workers: WorkerCount,
+    pub(crate) workers: WorkerCount,
     /// Its master's `area_effect_object_level` (`+0x62b`): the blast levels that reach it.
-    pub blast_defense: BlastDefense,
+    pub(crate) blast_defense: BlastDefense,
     /// Flagged to sleep (`+0x641`, `+0x643`): a killing hit wakes it (`FUN_14119deb0` with 0).
-    pub goto_sleep: bool,
+    pub(crate) goto_sleep: bool,
     /// Its master's decay (`+0x620`), which a hunt's decay stop negates (`FUN_140ac44b0`; the
     /// write-back gives it to the object's own master).
-    pub decay: AmountRate,
+    pub(crate) decay: AmountRate,
     /// Its master's `fog_visibility` (`+0x605`): an Attack goes on against it in the fog.
-    pub fog_visibility: FogVisibility,
+    pub(crate) fog_visibility: FogVisibility,
     /// Its player, and that player's attributes 272 and 273 (a higher or lower attacker's hits
     /// add them) and 211 and 212 (its own hits from higher or lower up add them).
-    pub player: PlayerId,
+    pub(crate) player: PlayerId,
     /// Its player's attributes 272 and 273: what a higher or lower attacker's hits add.
-    pub elevation: ElevationBonus,
+    pub(crate) elevation: ElevationBonus,
     /// Its player's attributes 211 and 212: what its own hits from higher or lower up add.
-    pub attack_elevation: ElevationBonus,
+    pub(crate) attack_elevation: ElevationBonus,
     /// The attacker's player counts its player as its own or allied (`FUN_141663d90` with the
     /// ally flag), and the other way round: a blast spares the first and scales its damage on
     /// the second by `friendly_fire_damage`.
-    pub allied: Allied,
+    pub(crate) allied: Allied,
     /// Its place is a guess: its player's update is not modelled.
-    pub uncertain: bool,
+    pub(crate) uncertain: bool,
     /// It is inside another object (`+0x2f0`): an Attack on it ends.
-    pub inside: bool,
+    pub(crate) inside: bool,
     /// Its master's hit points (`+0x530`).
-    pub master_hp: MasterHitPoints,
+    pub(crate) master_hp: MasterHitPoints,
     /// Its master's tasks of action type 0xa0 ([`BONUS_DAMAGE`]), in their order: the damage its
     /// hits add by hit points ([`bonus_damage`]).
-    pub bonus_tasks: Vec<Task>,
+    pub(crate) bonus_tasks: Vec<Task>,
     /// Its own attack (a retaliation's): its values as a hit's source and its master's weapons
     /// (class, amount).
-    pub source: Attacker,
+    pub(crate) source: Attacker,
     /// Its master's weapons (class, amount).
-    pub weapons: Vec<ClassAmount>,
+    pub(crate) weapons: Vec<ClassAmount>,
     /// A combat object's armor and what its damage reads (types 50 and up); None for others.
-    pub armored: Option<Armored>,
+    pub(crate) armored: Option<Armored>,
     /// The damage notifies (500, `FUN_141082e80`) its hits post to its unit AI, in order (a
     /// blast's hit on an annex and on its main building post two to the main building): the
     /// sender (a missile's shooter, none once it is gone), then the attacker, its hit points
     /// after (truncated) and its master's hit points.
-    pub damaged: Vec<(Option<ObjectId>, [i32; 3])>,
+    pub(crate) damaged: Vec<(Option<ObjectId>, [i32; 3])>,
     /// A hit killed it, for the caller's death handling.
-    pub killed: Option<Kill>,
+    pub(crate) killed: Option<Kill>,
     /// A building's (type 80) part of a hit ([`Building`]); None for other objects.
-    pub building: Option<Building>,
+    pub(crate) building: Option<Building>,
 }
 
 /// What a hit on a building (`TRIBE_Building_Object`, slot 0xe8 `FUN_1411cea90`) reads of it
@@ -207,27 +207,27 @@ pub struct Victim {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Building {
     /// `+0xbb8`: an annex's main building, whose slot 0xe8 takes a hit on the annex.
-    pub main: Option<MainBuildingId>,
+    pub(crate) main: Option<MainBuildingId>,
     /// `+0xbc0`..`+0xbd8`: its annexes, which take its hit points after each hit.
-    pub annexes: Vec<ObjectId>,
+    pub(crate) annexes: Vec<ObjectId>,
     /// `+0xb90` (not saved): the damage the blast under way has done to it ([`blast`]).
-    pub blast_taken: HitPoints,
+    pub(crate) blast_taken: HitPoints,
     /// `FUN_140fde380` on its master: of type 70 and up, of class 51 or 54, with a weapon
     /// (`+0x810` above 0): a trebuchet, whose kill counts as a unit's.
-    pub trebuchet: bool,
+    pub(crate) trebuchet: bool,
     /// Its master's paid cost (`+0x880`: each entry with a resource and the paid flag, summed as
     /// floats in their order).
-    pub cost: Amount,
+    pub(crate) cost: Amount,
     /// `damaged_lately_timer` (`+0x30d`, saved): 60 after each hit, a second off in its update.
-    pub damaged_lately: DamagedTimer,
+    pub(crate) damaged_lately: DamagedTimer,
     /// A hit got past its hit point test: the write-back gives its annexes its hit points and
     /// its `damaged_lately`.
-    pub struck: bool,
+    pub(crate) struck: bool,
     /// `relic_count` and `specific_relic_count` (`+0xc20`, `+0xc24`), which its elevation factor
     /// reads as the shooter and as the target ([`building_elevation_factor`]).
-    pub relics: Relics,
+    pub(crate) relics: Relics,
     /// What each hit that left it below 1 hit point counted, in order, for the write-back.
-    pub razed: Vec<Razed>,
+    pub(crate) razed: Vec<Razed>,
 }
 
 /// What a hit that leaves a player's building below 1 hit point counts (`FUN_1411cea90`), for
@@ -236,14 +236,14 @@ pub struct Building {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Razed {
     /// The attacker's player (`param_5`), whose history takes the event.
-    pub attacker_player: PlayerId,
+    pub(crate) attacker_player: PlayerId,
     /// The building's owner (`+0x718`), the event's `data1`.
-    pub owner: PlayerId,
+    pub(crate) owner: PlayerId,
     /// A castle's (master 82) or a wonder's (276) destruction
     /// ([`crate::players::history::EventKind::CastleDestroyed`], [`crate::players::history::EventKind::WonderDestroyed`]).
-    pub event: Option<EventKind>,
+    pub(crate) event: Option<EventKind>,
     /// The attribute adds: (player, attribute, amount).
-    pub adds: Vec<(PlayerId, AttributeId, Amount)>,
+    pub(crate) adds: Vec<(PlayerId, AttributeId, Amount)>,
 }
 
 /// What a killing hit leaves for the caller after the update
@@ -251,14 +251,14 @@ pub struct Razed {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Kill {
     /// The object that killed it.
-    pub attacker: ObjectId,
+    pub(crate) attacker: ObjectId,
     /// That object's player.
-    pub attacker_player: PlayerId,
+    pub(crate) attacker_player: PlayerId,
     /// That object's master's class as the hit saw it (`FUN_141082e80` reads it of the
     /// attacker it gets: an animal's 9 or 10 counts a villager's loss).
-    pub attacker_class: ClassId,
+    pub(crate) attacker_class: ClassId,
     /// Gaia takes it: a player's livestock (`FUN_1412108e0`).
-    pub to_gaia: bool,
+    pub(crate) to_gaia: bool,
 }
 
 /// Where an object faces (`FUN_14114eaa0`'s inputs): its angle (`+0x7e8`, which follows its
@@ -266,9 +266,9 @@ pub struct Kill {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Facing {
     /// `+0x7e8`, where it faces.
-    pub angle: Angle,
+    pub(crate) angle: Angle,
     /// Its sprite's facets, 0 without a sprite.
-    pub facets: FacetCount,
+    pub(crate) facets: FacetCount,
 }
 
 /// What a hit on a combat object reads of it (its master's and its own values) and changes.
@@ -277,101 +277,101 @@ pub struct Armored {
     /// Its master's armor classes (class, amount), base armor, `defense_terrain_bonus`,
     /// `bonus_damage_resistance`, `combat_ability`, `damage_reflection`,
     /// `invulnerability_level`, `special_attack_flag`, hit points and `friendly_fire_damage`.
-    pub armors: Vec<ClassAmount>,
+    pub(crate) armors: Vec<ClassAmount>,
     /// Its master's base armor for a class it does not list.
-    pub base_armor: DamageAmount,
+    pub(crate) base_armor: DamageAmount,
     /// Its master's `defense_terrain_bonus`.
-    pub terrain_bonus: RestrictionField,
+    pub(crate) terrain_bonus: RestrictionField,
     /// Its master's `bonus_damage_resistance`.
-    pub resistance: DamageShare,
+    pub(crate) resistance: DamageShare,
     /// Its master's `combat_ability`.
-    pub ability: CombatAbility,
+    pub(crate) ability: CombatAbility,
     /// Its master's `damage_reflection`.
-    pub reflection: DamageShare,
+    pub(crate) reflection: DamageShare,
     /// Its master's `invulnerability_level`.
-    pub invulnerability: InvulnerabilityLevel,
+    pub(crate) invulnerability: InvulnerabilityLevel,
     /// Its master's `special_attack_flag`.
-    pub special_attack: SpecialAttack,
+    pub(crate) special_attack: SpecialAttack,
     /// Its master's `friendly_fire_damage`.
-    pub friendly_fire: DamageShare,
+    pub(crate) friendly_fire: DamageShare,
     /// Its master's special graphic (`+0x8e8`), which its special attack shows; None for none.
-    pub special_sprite: Option<SpriteId>,
+    pub(crate) special_sprite: Option<SpriteId>,
     /// Its terrain defense: `defense_terrain_bonus`'s restriction's value for its tile's terrain
     /// (the terrain to restore, else the terrain; 0 counts as 1), 1 off the map; None when the
     /// slice lacks the map or the restriction.
-    pub terrain: Option<f32>,
+    pub(crate) terrain: Option<f32>,
     /// The object's armor powerups (melee, pierce).
-    pub armor_powerups: ArmorPair,
+    pub(crate) armor_powerups: ArmorPair,
     /// The melee and pierce armor taken off it.
-    pub armor_removed: ArmorPair,
+    pub(crate) armor_removed: ArmorPair,
     /// Its hit point powerup (`+0xa38`, `+0xa3c`), which absorbs damage first.
-    pub hp_powerup: HpPowerup,
+    pub(crate) hp_powerup: HpPowerup,
     /// Its master has a task of action type 0xa1 with a work value (a kill reward,
     /// `FUN_14120b5f0`).
-    pub kill_tasks: bool,
+    pub(crate) kill_tasks: bool,
     /// It has a current action (`FUN_140a98730` on its action list), a unit AI, and
     /// `FUN_140c42b30` on that AI (alert mode 1, `+0x1b8`; no attacking units, `+0xc8`; no
     /// current action): a special attack and a retaliation need it idle. The slice does not hold
     /// the alert mode and the attacking units: None.
-    pub busy: bool,
+    pub(crate) busy: bool,
     /// It has a unit AI.
-    pub unit_ai: bool,
+    pub(crate) unit_ai: bool,
     /// Its unit AI is idle in alert mode, when the slice knows it (None: it does not).
-    pub alert_idle: Option<bool>,
+    pub(crate) alert_idle: Option<bool>,
     /// Where it faces; None: the slice does not hold the facet.
-    pub facing: Option<Facing>,
+    pub(crate) facing: Option<Facing>,
 }
 
 /// What a hit reads of its attacker's attack, and the charge it changes.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Attacker {
     /// The attacking object.
-    pub id: ObjectId,
+    pub(crate) id: ObjectId,
     /// Its master's type, class, id, `combat_ability` and `missile_id`.
-    pub kind: MasterKind,
+    pub(crate) kind: MasterKind,
     /// Its master's class.
-    pub class: ClassId,
+    pub(crate) class: ClassId,
     /// Its master.
-    pub master_id: MasterId,
+    pub(crate) master_id: MasterId,
     /// Its master's `combat_ability`.
-    pub ability: CombatAbility,
+    pub(crate) ability: CombatAbility,
     /// Its master's missile, −1 for none.
-    pub missile: Option<MasterId>,
+    pub(crate) missile: Option<MasterId>,
     /// Its master's weapon range (`+0x828`), `area_effect_range` (`+0x82c`: the blast's radius),
     /// `area_effect_level` (`+0x830`, [`BlastLevel`]) and `area_damage` (`+0x834`: the share of the
     /// damage the objects besides its target take, a fixed damage below 0).
-    pub weapon_range: Distance,
+    pub(crate) weapon_range: Distance,
     /// Its master's `area_effect_range` (`+0x82c`): the blast's radius.
-    pub area_effect: Distance,
+    pub(crate) area_effect: Distance,
     /// Its master's `area_effect_level` (`+0x830`).
-    pub blast_level: BlastLevel,
+    pub(crate) blast_level: BlastLevel,
     /// Its master's `area_damage` (`+0x834`).
-    pub area_damage: DamageShare,
+    pub(crate) area_damage: DamageShare,
     /// Its master's `charge_type`, `max_charge`, `charge_target` and `special_attack_flag`; its
     /// charge (`+0x9e0`) and `mHitSomethingValidForChargeAttack` (`+0x8a8`), which its hits set.
-    pub charge_kind: ChargeKind,
+    pub(crate) charge_kind: ChargeKind,
     /// Its master's `max_charge`.
-    pub max_charge: Charge,
+    pub(crate) max_charge: Charge,
     /// Its master's `charge_target`.
-    pub charge_target: ChargeTarget,
+    pub(crate) charge_target: ChargeTarget,
     /// Its master's `special_attack_flag`.
-    pub special_attack: SpecialAttack,
+    pub(crate) special_attack: SpecialAttack,
     /// Its charge (`+0x9e0`).
-    pub charge: Charge,
+    pub(crate) charge: Charge,
     /// `mHitSomethingValidForChargeAttack` (`+0x8a8`), which its hits set.
-    pub charge_hit: bool,
+    pub(crate) charge_hit: bool,
     /// Its attack powerup (`+0xa24`) and the game's setting `+0x680`
     /// ([`crate::world::World::mode_680`]: at 1 a hit may do no damage).
-    pub attack_powerup: AttackPowerup,
+    pub(crate) attack_powerup: AttackPowerup,
     /// The game's setting `+0x680` ([`crate::world::World::mode_680`]).
-    pub mode_680: Mode680,
+    pub(crate) mode_680: Mode680,
     /// Its player and whether its master has a task of action type 0x9a (a kill bonus,
     /// `FUN_1415c6510`).
-    pub player: PlayerId,
+    pub(crate) player: PlayerId,
     /// Its master has a task of action type 0x9a (a kill bonus).
-    pub kill_bonus_tasks: bool,
+    pub(crate) kill_bonus_tasks: bool,
     /// What a missile was fired from (`+0x998`), its damage notify's sender.
-    pub fired_from: Option<ShooterId>,
+    pub(crate) fired_from: Option<ShooterId>,
 }
 
 #[cfg(test)]

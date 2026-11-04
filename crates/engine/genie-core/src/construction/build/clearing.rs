@@ -31,17 +31,17 @@ use crate::world::layer::generated::BuildTuning;
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ClearingSite {
     /// The building's owner.
-    pub player: PlayerId,
+    pub(crate) player: PlayerId,
     /// Its master's id.
-    pub master: MasterId,
+    pub(crate) master: MasterId,
     /// Its master's class (`+0x410`).
-    pub class: ClassId,
+    pub(crate) class: ClassId,
     /// Its master's radii (`+0x5d8`, `+0x5dc`).
-    pub radius: Footprint,
+    pub(crate) radius: Footprint,
     /// Its place.
-    pub at: Point,
+    pub(crate) at: Point,
     /// `param_6`: who clears.
-    pub by: Clearer,
+    pub(crate) by: Clearer,
 }
 
 /// Who calls the footprint clearing (`FUN_1415c3620`'s `param_6`).
@@ -60,17 +60,17 @@ pub enum Clearer {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ClearLook {
     /// `+0x278`.
-    pub hp: HitPoints,
+    pub(crate) hp: HitPoints,
     /// Its master's `radius_z` (`+0x5e0`).
-    pub height: Distance,
+    pub(crate) height: Distance,
     /// `+0x686`.
-    pub roo_called: bool,
+    pub(crate) roo_called: bool,
     /// Its master's type.
-    pub kind: MasterKind,
+    pub(crate) kind: MasterKind,
     /// `+0x640`.
-    pub state: ObjectState,
+    pub(crate) state: ObjectState,
     /// `+0xc60`.
-    pub desolid: bool,
+    pub(crate) desolid: bool,
 }
 
 /// An object the footprint clearing deletes, in the tiles' order: a wall (class 27) first goes
@@ -80,15 +80,15 @@ pub struct ClearLook {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Cleared {
     /// The object.
-    pub id: ObjectId,
+    pub(crate) id: ObjectId,
     /// It is a wall (class 27): `FUN_1411ccbb0` before its destroy.
-    pub wall: bool,
+    pub(crate) wall: bool,
     /// Its record goes in the clearing: its destroy's death part drops it (a unit or a tall
     /// building not desolid of type 70 and up below state 3 whose record is still there,
     /// [`crate::objects::lifecycle::death_parts::combat_dies`], which sets `+0x686`), or with `param_6` `FUN_141189670`
     /// after the destroy does (`+0x686` still clear, and its master tall, COMISS: a NaN height
     /// too, or the object holding its record).
-    pub record_goes: bool,
+    pub(crate) record_goes: bool,
 }
 
 /// `FUN_1415c3620` with `param_7` 0, its choice: the objects whose centre is on the tiles from 4

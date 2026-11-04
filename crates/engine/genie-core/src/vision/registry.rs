@@ -65,19 +65,19 @@ pub struct Entry {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct UnitUpdate {
     /// The object.
-    pub id: ObjectId,
+    pub(crate) id: ObjectId,
     /// The owner's id (`player+0x718`).
-    pub owner: PlayerId,
+    pub(crate) owner: PlayerId,
     /// Its place (x, y).
-    pub position: Point,
+    pub(crate) position: Point,
     /// Its master's radii (x, y).
-    pub radii: Footprint,
+    pub(crate) radii: Footprint,
     /// Its master's class.
-    pub class: ClassId,
+    pub(crate) class: ClassId,
     /// The mask of the players that saw it.
-    pub old: VisionBits,
+    pub(crate) old: VisionBits,
     /// The mask of the players that see it.
-    pub new: VisionBits,
+    pub(crate) new: VisionBits,
 }
 
 /// A query for the visible units of a player ([`Registry::visible_units`]'s arguments,
@@ -85,21 +85,21 @@ pub struct UnitUpdate {
 #[derive(Clone, Copy, Debug)]
 pub struct VisibleQuery<'a> {
     /// The player whose lists it reads.
-    pub player: PlayerId,
+    pub(crate) player: PlayerId,
     /// The searcher's place (x, y).
-    pub position: Point,
+    pub(crate) position: Point,
     /// How far, at most 44.
-    pub radius: Distance,
+    pub(crate) radius: Distance,
     /// 0: a rounded box, 1: a box.
-    pub mode: i32,
+    pub(crate) mode: i32,
     /// The classes it reads.
-    pub classes: &'a [ClassId],
+    pub(crate) classes: &'a [ClassId],
     /// What the owners are to the player (none for a saved value past the relations).
-    pub relations: &'a UnitRelations,
+    pub(crate) relations: &'a UnitRelations,
     /// The searcher's radii (x, y).
-    pub size: Footprint,
+    pub(crate) size: Footprint,
     /// The relations kept, one bit each.
-    pub wanted: u8,
+    pub(crate) wanted: u8,
 }
 
 /// The registry: `lists[player][class]`, and each object's [`Entry`].

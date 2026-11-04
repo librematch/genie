@@ -132,15 +132,15 @@ pub fn bonus_damage(attacker: &Victim, target: &Victim, roles: &Roles) -> f32 {
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Shown<'a> {
     /// The target of its top action when that attacks (action type 9 or 7, `FUN_14107cc30`).
-    pub target: Option<&'a Victim>,
+    pub(crate) target: Option<&'a Victim>,
     /// The weapons (class, amount) of its master's charge projectile (`+0x928`) when its player
     /// holds that master (`FUN_141659d20`).
-    pub projectile: Option<&'a [ClassAmount]>,
+    pub(crate) projectile: Option<&'a [ClassAmount]>,
     /// Its master's `charge_event` (`+0x920`), which a ready charge of type 6 or 7 adds to its
     /// range.
-    pub charge_event: ChargeEvent,
+    pub(crate) charge_event: ChargeEvent,
     /// Its max range powerup (`+0xa40`, slot 0x700).
-    pub range_powerup: Distance,
+    pub(crate) range_powerup: Distance,
 }
 
 /// Slot 0x320 of a combat unit or building (`FUN_141211440`): its charge is ready (slot 0x300,

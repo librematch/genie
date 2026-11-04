@@ -18,9 +18,9 @@ use crate::world::layer::generated::MoveToTuning;
 #[derive(Clone, Copy, Debug)]
 pub struct Walks<'a> {
     /// What every new sub-action `MoveTo` reads of the unit.
-    pub reads: MoveToReads<'a>,
+    pub(crate) reads: MoveToReads<'a>,
     /// What the unit carries: its resource kind (`+0x308`) and amount (`+0x310`).
-    pub held: Held,
+    pub(crate) held: Held,
 }
 
 impl<'a> Walks<'a> {

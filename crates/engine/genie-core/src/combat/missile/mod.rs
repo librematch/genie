@@ -80,13 +80,13 @@ const VOLLEY_HALF: f32 = MISSILE_VOLLEY_HALF;
 #[derive(Clone, Copy, Debug, PartialEq, Diff)]
 pub struct Origin {
     /// The firing object's place.
-    pub position: Position,
+    pub(crate) position: Position,
     /// The missile master's radii on the ground.
-    pub radius: Footprint,
+    pub(crate) radius: Footprint,
     /// The firing object's master (−1 without one).
-    pub master: Option<MasterId>,
+    pub(crate) master: Option<MasterId>,
     /// Its owner (−1 without one).
-    pub owner: Option<PlayerId>,
+    pub(crate) owner: Option<PlayerId>,
 }
 
 impl Origin {
@@ -122,49 +122,49 @@ impl Origin {
 #[derive(Clone, Debug, PartialEq, Diff)]
 pub struct MissileAction {
     /// `+0x18`.
-    pub state: MissileState,
+    pub(crate) state: MissileState,
     /// The target (`+0x20`, its id `+0x30`), −1 for none.
-    pub target: Option<MissileTargetId>,
+    pub(crate) target: Option<MissileTargetId>,
     /// The object it was fired from (`+0x28`, its id `+0x34`).
-    pub fired_from: Option<ShooterId>,
+    pub(crate) fired_from: Option<ShooterId>,
     /// `+0x38`..`+0x40`: the target's place when fired.
-    pub point: Position,
+    pub(crate) point: Position,
     /// `+0x44`: the way flown so far (a straight missile's).
-    pub timer: Distance,
+    pub(crate) timer: Distance,
     /// `+0x68`..`+0x70`: the direction, a unit vector for a straight missile.
-    pub direction: Offset,
+    pub(crate) direction: Offset,
     /// `+0x74`, `+0x78`: the arc's vertical speed and acceleration.
-    pub ballistic_velocity: Speed,
+    pub(crate) ballistic_velocity: Speed,
     /// `+0x78`: the arc's vertical acceleration.
-    pub ballistic_acceleration: Acceleration,
+    pub(crate) ballistic_acceleration: Acceleration,
     /// `+0x7c`: the way left to the aimed point.
-    pub distance: Distance,
+    pub(crate) distance: Distance,
     /// `+0x80`: the master's hit mode, 1 after a miss.
-    pub hit_mode: HitMode,
+    pub(crate) hit_mode: HitMode,
     /// `+0x98`: the last hit's result.
-    pub result: StrikeResult,
+    pub(crate) result: StrikeResult,
     /// `+0x9c`.
-    pub origin: Origin,
+    pub(crate) origin: Origin,
     /// `+0x88`: the objects the last step met (not saved: none after a load).
     #[diff(unsaved)]
-    pub met: Vec<ObjectId>,
+    pub(crate) met: Vec<ObjectId>,
 }
 
 /// A missile object's own part.
 #[derive(Clone, Copy, Debug, PartialEq, Diff)]
 pub struct Missile {
     /// `+0x990`: how far it flies at most (`max_range`).
-    pub max_range: Distance,
+    pub(crate) max_range: Distance,
     /// `+0x998` (`fired_from_id`) and `+0x99c` (`mIsChargeProjectile`).
-    pub fired_from: Option<ShooterId>,
+    pub(crate) fired_from: Option<ShooterId>,
     /// `+0x99c` (`mIsChargeProjectile`): a charge's projectile.
-    pub charge: bool,
+    pub(crate) charge: bool,
     /// `+0x994`: farther than `MissileTuning::landing` from its point; the ground does not stop it.
     /// Not saved: the load's constructor sets 1.
     #[diff(unsaved)]
-    pub flying: bool,
+    pub(crate) flying: bool,
     /// `+0x7dc`..`+0x7e4`: this update's step (the moving object's `velocity_x`..`_z`).
-    pub step: Offset,
+    pub(crate) step: Offset,
 }
 
 /// `FUN_141081020`'s place for a new missile: the firing object's place plus its master's weapon
@@ -262,30 +262,30 @@ pub fn volley_reach(
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Aimer {
     /// The firing object's master's `base_hit_chance` (`+0x83e`).
-    pub hit_chance: HitChance,
+    pub(crate) hit_chance: HitChance,
     /// Its `missed_missile_spread` (`+0x860`).
-    pub spread: MissSpread,
+    pub(crate) spread: MissSpread,
     /// Its class.
-    pub class: ClassId,
+    pub(crate) class: ClassId,
 }
 
 /// What a missile's aim takes besides the Action stream's draw ([`aim`]'s arguments).
 #[derive(Debug)]
 pub struct AimAt<'a> {
     /// The point it aims for.
-    pub point: Position,
+    pub(crate) point: Position,
     /// Where the missile is.
-    pub from: Position,
+    pub(crate) from: Position,
     /// The target's radii and class, none without a target.
-    pub target: Option<(Radii, ClassId)>,
+    pub(crate) target: Option<(Radii, ClassId)>,
     /// The firing object's hit chance, spread and class.
-    pub aimer: Aimer,
+    pub(crate) aimer: Aimer,
     /// The missile's master's id.
-    pub master_id: MasterId,
+    pub(crate) master_id: MasterId,
     /// The missile's attack count (`+0x900`).
-    pub attack_count: AttackCount,
+    pub(crate) attack_count: AttackCount,
     /// The hit mode, which a miss sets to 1.
-    pub hit_mode: &'a mut HitMode,
+    pub(crate) hit_mode: &'a mut HitMode,
 }
 
 /// `FUN_140a9c600`: where a missile at `from` aims for its `point`: a target's height rises by a

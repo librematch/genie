@@ -13,11 +13,11 @@ use crate::world::step::Step;
 #[derive(Clone, Copy, Debug, Default)]
 pub struct ListUpdate {
     /// The owner's answer to a motion step that gives up (the villager test and the stance).
-    pub gives_up: GiveUp,
+    pub(crate) gives_up: GiveUp,
     /// What the unit's AI asks of the path the start plans.
-    pub ask: PathAsk,
+    pub(crate) ask: PathAsk,
     /// The sprite the start shows for a `MoveTo` without one (an Attack's standing sprite).
-    pub otherwise: Option<Graphic>,
+    pub(crate) otherwise: Option<Graphic>,
 }
 
 /// The update of `list` (the owner's one quiet `MoveTo`, [`MoveToAction::sub_update`]) for

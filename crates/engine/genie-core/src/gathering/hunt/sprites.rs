@@ -66,13 +66,13 @@ pub(crate) fn resource_kind(
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct HuntSprites {
     /// The moving sprite.
-    pub moving: Option<Graphic>,
+    pub(crate) moving: Option<Graphic>,
     /// The working sprite.
-    pub working: Option<Graphic>,
+    pub(crate) working: Option<Graphic>,
     /// The carrying sprite.
-    pub carrying: Option<Graphic>,
+    pub(crate) carrying: Option<Graphic>,
     /// The master's standing sprite.
-    pub standing: Option<Graphic>,
+    pub(crate) standing: Option<Graphic>,
 }
 
 impl HuntTask {

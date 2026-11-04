@@ -50,15 +50,15 @@ pub(super) struct SightOn {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct LosSight {
     /// The seer's place (x, y, z).
-    pub position: Position,
+    pub(crate) position: Position,
     /// Its master's radii (x, y).
-    pub radius: Footprint,
+    pub(crate) radius: Footprint,
     /// What it explores: a circle of the line of sight or the footprint.
-    pub shape: SightShape,
+    pub(crate) shape: SightShape,
     /// The line of sight.
-    pub los: SightTiles,
+    pub(crate) los: SightTiles,
     /// Where the circle is centred.
-    pub centre: SightCentre,
+    pub(crate) centre: SightCentre,
 }
 
 impl LosSight {
@@ -81,13 +81,13 @@ impl LosSight {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct MasterChange {
     /// The new master.
-    pub master: MasterId,
+    pub(crate) master: MasterId,
     /// Its line of sight.
-    pub los: Distance,
+    pub(crate) los: Distance,
     /// The old master's radii (x, y).
-    pub old_radius: Footprint,
+    pub(crate) old_radius: Footprint,
     /// The new master's radii (x, y).
-    pub new_radius: Footprint,
+    pub(crate) new_radius: Footprint,
 }
 
 impl Visibility {

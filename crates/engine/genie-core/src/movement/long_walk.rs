@@ -181,13 +181,13 @@ pub(crate) fn long_path_for(
 #[derive(Clone, Copy, Debug)]
 pub struct TileAsk<'a> {
     /// The goal (x, height, y).
-    pub goal: BVector,
+    pub(crate) goal: BVector,
     /// The walker's and the target's radii added.
-    pub radii: Distance,
+    pub(crate) radii: Distance,
     /// How near the goal counts.
-    pub range: Distance,
+    pub(crate) range: Distance,
     /// The target object's record.
-    pub target: Option<&'a Placed>,
+    pub(crate) target: Option<&'a Placed>,
 }
 
 /// What the short pather is asked besides its walker ([`short_path_including`]'s goal and
@@ -195,15 +195,15 @@ pub struct TileAsk<'a> {
 #[derive(Clone, Copy, Debug)]
 pub struct ShortAsk<'a> {
     /// The goal (x, height, y).
-    pub goal: BVector,
+    pub(crate) goal: BVector,
     /// How near the goal counts.
-    pub range: Distance,
+    pub(crate) range: Distance,
     /// The target object (if any).
-    pub target: Option<ObjectId>,
+    pub(crate) target: Option<ObjectId>,
     /// The objects the pather ignores.
-    pub ignore: &'a [ObjectId],
+    pub(crate) ignore: &'a [ObjectId],
     /// The objects the old pather tests even moving.
-    pub include: &'a [ObjectId],
+    pub(crate) include: &'a [ObjectId],
 }
 
 /// The tile pathfinder (`FUN_140f7c530`) for `walker` from `from` (x, y on the map) to `to`,

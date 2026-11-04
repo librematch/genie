@@ -9,9 +9,9 @@ use genie_diff::Diff;
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Diff)]
 pub struct Relics {
     /// `relic_count`.
-    pub count: RelicCount,
+    pub(crate) count: RelicCount,
     /// `specific_relic_count`.
-    pub specific: RelicCount,
+    pub(crate) specific: RelicCount,
 }
 
 impl Relics {

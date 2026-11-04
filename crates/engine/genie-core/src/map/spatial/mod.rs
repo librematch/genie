@@ -112,23 +112,23 @@ fn players_seen(found: &ByRelation<Vec<Record>>) -> u32 {
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Gait {
     /// It moves: its velocity (`+0x868`) is not 0 (slot 0x5c8).
-    pub moving: bool,
+    pub(crate) moving: bool,
     /// Slot 0x2a8 (`FUN_141163100`): it waits to move (`+0x7f9`) and its top action is in a state
     /// other than 6 and 7.
-    pub waits: bool,
+    pub(crate) waits: bool,
     /// Its last move time (`+0x870`, slot 0x5e8).
-    pub last_move: WorldTime,
+    pub(crate) last_move: WorldTime,
     /// Its current path level's pause time (slot 0x528), none without a level.
-    pub pause: Option<Seconds>,
+    pub(crate) pause: Option<Seconds>,
     /// `+0x650`, `mLastHumanOrderTime`: a met unit's rank against a human walker.
-    pub human_order: WorldTime,
+    pub(crate) human_order: WorldTime,
     /// When its current path level's path was made (slot 0x528's `+0x18`, the path's `+8`), none
     /// without a level or a path: a drop-off walker's ignore list passes a worker whose path is
     /// this update's.
-    pub path_made: Option<WorldTime>,
+    pub(crate) path_made: Option<WorldTime>,
     /// Its unit group (`mGroupID`, `+0x6d0`), none for −1: a walker of the same group ranks it by
     /// the group's member order.
-    pub group: Option<GroupId>,
+    pub(crate) group: Option<GroupId>,
 }
 
 /// One object as movement sees it.
@@ -137,33 +137,33 @@ pub struct Placed {
     /// x, y, z on the map.
     pub position: Position,
     /// The master's radii on the ground (master `+0x5d8`, `+0x5dc`).
-    pub radius: Footprint,
+    pub(crate) radius: Footprint,
     /// The master's class (`+0x410`, decoded): the motion step treats gates (39) apart.
-    pub class: ClassId,
+    pub(crate) class: ClassId,
     /// The owning player.
-    pub player: PlayerId,
+    pub(crate) player: PlayerId,
     /// The master's id.
-    pub master: MasterId,
+    pub(crate) master: MasterId,
     /// The master's `obstruction_type` (`+0x651`), whether or not the object has its record yet.
-    pub obstruction_kind: ObstructionKind,
+    pub(crate) obstruction_kind: ObstructionKind,
     /// The master's `can_be_built_on` (`+0x5e9`): a foundation clears such objects off its
     /// footprint.
-    pub buildable_on: BuildableOn,
+    pub(crate) buildable_on: BuildableOn,
     /// The master's height radius (`+0x5e0`) is above 0: the tile counts it as tall.
-    pub tall: bool,
+    pub(crate) tall: bool,
     /// Its master moves ([`crate::objects::masters::Master::moves`]: a moving master whose speed,
     /// `+0x740`, is above 0): the footprint's occupants read it (`FUN_14123bb20`, the master's
     /// slot 0xe8), and the pather's target (`FUN_140f85580`, the object's top speed, slot
     /// 0x208, not 0 just when its master's speed is not). Its placement and a change of its
     /// master write it.
-    pub moves: bool,
+    pub(crate) moves: bool,
     /// How far from `position` the object may be, when its player's update is not modelled: it
     /// grows by its master's speed every tick ([`Spatial::grow_unknown`]). None for an object
     /// the slice updates.
-    pub unknown: Option<f32>,
+    pub(crate) unknown: Option<f32>,
     /// The obstruction record, if the object has one: a foundation gets its record only when
     /// construction starts.
-    pub obstruction: Option<Obstruction>,
+    pub(crate) obstruction: Option<Obstruction>,
 }
 
 /// An obstruction record's kind (its byte `+1`, the master's `obstruction_type`, master `+0x651`)
@@ -171,9 +171,9 @@ pub struct Placed {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Diff)]
 pub struct Obstruction {
     /// The record's kind (`obstruction_type`).
-    pub kind: ObstructionKind,
+    pub(crate) kind: ObstructionKind,
     /// The master's `obstruction_class`.
-    pub class: ObstructionClass,
+    pub(crate) class: ObstructionClass,
 }
 
 impl Obstruction {
@@ -516,28 +516,28 @@ pub struct Spatial {
     /// What a stopped player's units may have done since: the fastest any of the players' unit
     /// masters (type 70) moves and the farthest any acts beyond its footprint (its weapon or work
     /// range), for [`Spatial::check_known`]. 0 when not set.
-    pub fastest: f32,
+    pub(crate) fastest: f32,
     /// The farthest any of the players' units acts beyond its footprint.
-    pub reach: Distance,
+    pub(crate) reach: Distance,
     /// Each player's scout map (`player+0x1370`, `mIsScoutMapEnabled` `+0x1368`), once made.
     scout_maps: BTreeMap<PlayerId, InfluenceMap>,
     /// `relation[i]` of each player (`player+0x260`), for the walk's query's allies.
-    pub relations: ByPlayer<Relations>,
+    pub(crate) relations: ByPlayer<Relations>,
     /// What each player's queries make of the other players' objects (`player+0x278`, the
     /// save's `unit_diplomacy`): none for a saved value past the five relations.
     /// Loaded, not derived: the slice runs no diplomacy change (command 0x76), whose handler
     /// would write it with `relation`.
-    pub unit_diplomacy: ByPlayer<UnitRelations>,
+    pub(crate) unit_diplomacy: ByPlayer<UnitRelations>,
     /// Each player's masters with a task of action type 0x99, which a building's slot 0x4f0
     /// reads (`FUN_1411d4980` -> `FUN_1415c60b0`): a drop-off walker counts such a building
     /// among the workers near it.
-    pub task_0x99: Vec<Vec<MasterId>>,
+    pub(crate) task_0x99: Vec<Vec<MasterId>>,
     /// What the players see, when the slice holds it: the objects' sight follows their tiles
     /// ([`Spatial::set_position`]).
     pub sight: Option<Visibility>,
     /// Each player's vision masks, visible (`+0x2a8`) and explored (`+0x2a0`), as the world's
     /// rebuild sets them ([`crate::vision`]); a player without them sees with its own bits.
-    pub vision: ByPlayer<VisionMasks>,
+    pub(crate) vision: ByPlayer<VisionMasks>,
     /// The map's terrain, when the slice holds it.
     pub terrain: Option<Terrain>,
     /// The unit AIs' search cache ([`SearchCache`]).

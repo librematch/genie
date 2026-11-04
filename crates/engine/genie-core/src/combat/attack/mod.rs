@@ -14,7 +14,6 @@
 use crate::GenieError;
 use crate::combat::damage::Victim;
 use crate::map::Distance;
-use crate::map::DistanceSquared;
 use crate::map::Point;
 use crate::map::Position;
 use crate::map::spatial::Spatial;
@@ -60,7 +59,7 @@ mod work_slots;
 
 pub use self::attack_state::AttackState;
 pub(crate) use self::constructor::BeginLayer;
-pub use self::constructor::{arms, arms_looking, engagement, gaps};
+pub use self::constructor::{arms, arms_looking, engagement};
 use self::hits::{AfterHit, after_hit, blast_so_far};
 pub(crate) use self::hits::{Hit, strike};
 pub use self::ready_to_attack::AtOnce;
@@ -117,72 +116,72 @@ pub struct Arms {
     /// `+0x68`: the sprite its `MoveTo` shows (its constructor's argument: the hunt's walking
     /// sprite, the task's moving one; else the master's running one, slot 0x7d0, else its
     /// walking one, slot 0x7c8).
-    pub move_sprite: Option<Graphic>,
+    pub(crate) move_sprite: Option<Graphic>,
     /// `+0x70`: the attack sprite (the hunt's task's proceeding sprite); `+0x78`, a second one
     /// the unit picks from; `+0x80`, the sprite it stands with when done; `+0x88`, the sprite it
     /// waits with between swings (the master's idle attack sprite).
-    pub sprite: Option<Graphic>,
+    pub(crate) sprite: Option<Graphic>,
     /// `+0x78`: a second attack sprite the unit picks from.
-    pub second_sprite: Option<Graphic>,
+    pub(crate) second_sprite: Option<Graphic>,
     /// `+0x80`: the sprite it stands with when done.
-    pub idle_sprite: Option<Graphic>,
+    pub(crate) idle_sprite: Option<Graphic>,
     /// `+0x88`: the sprite it waits with between swings.
-    pub idle_attack_sprite: Option<Graphic>,
+    pub(crate) idle_attack_sprite: Option<Graphic>,
     /// `+0x98`, the master's missile (`missile_id`, -1 for a melee unit); `+0x9a`, the frame that
     /// fires (`fire_missile_at_frame`); `+0x9c`, the frame that may interrupt
     /// (`interrupt_frame`), -1 for none.
-    pub missile: Option<MasterId>,
+    pub(crate) missile: Option<MasterId>,
     /// `+0x98`: the frame it fires at (`fire_missile_at_frame`).
-    pub fire_frame: Frame,
+    pub(crate) fire_frame: Frame,
     /// `+0x9c`: the frame that may interrupt (`interrupt_frame`), −1 for none.
-    pub interrupt_frame: Frame,
+    pub(crate) interrupt_frame: Frame,
 }
 
 /// The Attack action (`RGE_Action_Attack`, type 9) as the hunt's sub-action.
 #[derive(Clone, Copy, Debug, PartialEq, Diff)]
 pub struct Attack {
     /// The target object (`+0x20`, its id at `+0x30`).
-    pub target: Option<AttackTargetId>,
+    pub(crate) target: Option<AttackTargetId>,
     /// The second target (`+0x28`, its id at `+0x34`): the work command's Attack takes its
     /// target as this too (`FUN_140a7a190`, slot 0x178), −1 for none.
-    pub target2: Option<AttackTargetId>,
+    pub(crate) target2: Option<AttackTargetId>,
     /// The action state (`+0x18`), with its walk's quiet `MoveTo` ([`AttackState`]).
-    pub state: AttackState,
+    pub(crate) state: AttackState,
     /// `+0x44`: seconds in the state, the update adds dt.
-    pub timer: Seconds,
+    pub(crate) timer: Seconds,
     /// `+0x90`: the range it attacks from; `+0x94`, the least.
-    pub range: Distance,
+    pub(crate) range: Distance,
     /// `+0x94`: the least range it attacks from.
-    pub min_range: Distance,
+    pub(crate) min_range: Distance,
     /// `+0x38`..`+0x40`: the point it attacks; -1 for none.
-    pub point: Position,
+    pub(crate) point: Position,
     /// `+0xa4`..`+0xac`: where it last saw its target.
-    pub seen: Position,
+    pub(crate) seen: Position,
     /// `+0x9e`: a hit is still to land in this swing.
-    pub pending: bool,
+    pub(crate) pending: bool,
     /// `+0xb0` and `+0xb4`: the time of a swing past its sprite's length; a melee swing counts
     /// `+0xb0` down until the hit.
     #[diff(
         gap = "differs from the save (MarvinBlue/426048731's 9181 at update 1025: genie -0.34, game 0)"
     )]
-    pub swing: Seconds,
+    pub(crate) swing: Seconds,
     /// `+0xb4`: the rest after the swing's sprite.
     #[diff(
         gap = "differs from the save (MarvinBlue/426048731's 10029 at update 1150: genie 0.5, game 0)"
     )]
-    pub rest: Seconds,
+    pub(crate) rest: Seconds,
     /// The sprites and frames from its constructor.
-    pub arms: Arms,
+    pub(crate) arms: Arms,
     /// `+0x60`, `subActionValue` ([`Voice`]): quiet as another's sub-action (the Hunt's), which
     /// posts no notifies; a unit's own Attack is loud and posts them to its unit AI (slot 0x328).
-    pub voice: Voice,
+    pub(crate) voice: Voice,
     /// `+0x61`, `mTargetMovedState`, which its `MoveTo` takes ([`TargetMoved`]): a unit's own
     /// Attack's follows, the Hunt's asks for a path at once (its `set_state` 12 sets it).
-    pub on_target_moved: TargetMoved,
+    pub(crate) on_target_moved: TargetMoved,
     /// `+0x9f`, `was_same_owner` (saved): its target was its unit's player's when the
     /// constructor (`FUN_140a7c210`) took it; the update's ally test spares such a livestock or
     /// farm target ([`Attack::update`]).
-    pub same_owner: bool,
+    pub(crate) same_owner: bool,
 }
 
 /// A notify an Attack's start posts to its unit's AI: its kind and three parameters.
@@ -259,36 +258,34 @@ impl Begun {
 /// What the Attack reads of its unit and its target when it starts.
 #[derive(Clone, Copy, Debug)]
 pub struct Engagement {
-    /// The gap between the two footprints squared (`FUN_14118f8c0`) and its root (`FUN_14118f680`).
-    pub gap_squared: DistanceSquared,
-    /// The gap's root (`FUN_14118f680`).
-    pub gap: Distance,
+    /// The gap between the two footprints (`FUN_14118f680`).
+    pub(crate) gap: Distance,
     /// The unit's and the target's positions.
-    pub position: Position,
+    pub(crate) position: Position,
     /// The target's place.
-    pub target_position: Position,
+    pub(crate) target_position: Position,
     /// The unit's top speed (slot 0x208), its master's weapon range with any bonus against the
     /// target (slot 0x238) and its least range.
-    pub speed: Speed,
+    pub(crate) speed: Speed,
     /// Its master's weapon range with any bonus against the target (slot 0x238).
-    pub range: Distance,
+    pub(crate) range: Distance,
     /// Its least range.
-    pub min_range: Distance,
+    pub(crate) min_range: Distance,
     /// The unit AI's `canMoveToAttack` (`FUN_140c48420`): it has an order, or no order but a stance
     /// below 2.
-    pub can_move: bool,
+    pub(crate) can_move: bool,
     /// The unit AI's stance (`+0x1a9`), whose 1 adds a leash test.
-    pub stance: UnitStance,
+    pub(crate) stance: UnitStance,
     /// The unit AI's `state_position` (`+0x1ac`, `+0x1b0`), the leash's centre.
-    pub state_position: Point,
+    pub(crate) state_position: Point,
     /// The world's time (`FUN_1415300d0`), which a facing over time reads.
-    pub world_time: WorldTime,
+    pub(crate) world_time: WorldTime,
     /// The unit's master, of which 1704 and 1706 do not turn to face their target.
-    pub master: MasterId,
+    pub(crate) master: MasterId,
     /// The target's master's class, whose 39 (a gate) readyToAttack measures by its parts.
-    pub target_class: ClassId,
+    pub(crate) target_class: ClassId,
     /// The target is the unit's player's (the constructor's `+0x9f`, [`Attack::same_owner`]).
-    pub same_owner: bool,
+    pub(crate) same_owner: bool,
 }
 
 bitflags::bitflags! {

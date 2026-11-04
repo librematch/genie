@@ -129,48 +129,48 @@ struct Scout {
 #[derive(Clone, Debug)]
 pub struct SceneObject {
     /// Its id.
-    pub id: ObjectId,
+    pub(crate) id: ObjectId,
     /// Its owner.
-    pub player: PlayerId,
+    pub(crate) player: PlayerId,
     /// Its master, which every player's table of the scene holds.
-    pub master: Master,
+    pub(crate) master: Master,
     /// Its place.
-    pub at: Position,
+    pub(crate) at: Position,
     /// Its state.
-    pub state: ObjectState,
+    pub(crate) state: ObjectState,
     /// Its hit points.
-    pub hp: HitPoints,
+    pub(crate) hp: HitPoints,
     /// In the sight registry, the mask its last sight update found (`RGE_Combat_Object::update`'s,
     /// [`Visibility::combat_sight`]): the players who saw its tiles then, whose lists hold it
     /// and whose bits its entry keeps after they look away; a building with its UMV entry. None
     /// for an object outside the registry.
-    pub seen_by: Option<VisionBits>,
+    pub(crate) seen_by: Option<VisionBits>,
     /// A foundation no builder has started: desolid, without its obstruction record.
-    pub desolid: bool,
+    pub(crate) desolid: bool,
     /// Its unit AI, none for an object without one.
-    pub ai: Option<UnitAi>,
+    pub(crate) ai: Option<UnitAi>,
     /// Its flag bytes (`+0x685`).
-    pub flags: UnitFlags,
+    pub(crate) flags: UnitFlags,
     /// The object it is inside.
-    pub inside: Option<ContainerId>,
+    pub(crate) inside: Option<ContainerId>,
     /// Its action layer, none for an empty one.
-    pub actions: Option<Action>,
+    pub(crate) actions: Option<Action>,
     /// Its capture flag (`+0x924`): its combat layer's and, in the sight registry, its seer's,
     /// as a save's load fills both.
-    pub capture: CaptureKind,
+    pub(crate) capture: CaptureKind,
     /// The pasture it stands in (`+0x790`).
-    pub pasture: Option<PastureId>,
+    pub(crate) pasture: Option<PastureId>,
     /// Its sprite, started on the scene's graphic of that id ([`Scene::graphic`]); none for
     /// an object without one.
-    pub sprite: Option<SpriteId>,
+    pub(crate) sprite: Option<SpriteId>,
     /// The main building it is an annex of (`+0xbb8`), none for an object that is none's; the
     /// scene links it into the main building's annexes (`+0xbc0`), as a save holds both.
-    pub annex_of: Option<MainBuildingId>,
+    pub(crate) annex_of: Option<MainBuildingId>,
     /// What it holds (`+0x308`, `+0x310`): a resource's attribute and amount, as a save holds
     /// them; none for an object that holds nothing.
-    pub holds: Option<(AttributeId, Amount)>,
+    pub(crate) holds: Option<(AttributeId, Amount)>,
     /// `+0x644`, `worker_num`: the actions that have it as their target, as a save holds them.
-    pub workers: WorkerCount,
+    pub(crate) workers: WorkerCount,
 }
 
 impl SceneObject {

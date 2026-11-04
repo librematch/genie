@@ -42,16 +42,16 @@ mod commands;
 pub struct BackToWork {
     /// `townBellTargetId` (`+0x9ac`): the top action's target (the pasture of a target in one),
     /// else the target of the unit AI's first own queued order.
-    pub target: Option<ObjectId>,
+    pub(crate) target: Option<ObjectId>,
     /// `town_bell_target_type` (`+0x9b0`): a Gather's (5) or Hunt's (`0x6e`) target class
     /// (`+0x68`), else −1.
-    pub target_class: Option<ClassId>,
+    pub(crate) target_class: Option<ClassId>,
     /// `town_bell_action` (`+0x9b4`): the unit AI's current action (`+0x44`).
-    pub action: Option<AiAction>,
+    pub(crate) action: Option<AiAction>,
     /// `townBellTargetId2` (`+0x9b8`): the top action's second target (`+0x34`).
-    pub target2: Option<ObjectId>,
+    pub(crate) target2: Option<ObjectId>,
     /// `town_bell_target_x`, `_y` (`+0x9bc`, `+0x9c0`): the target's place, else the unit's own.
-    pub point: Point,
+    pub(crate) point: Point,
 }
 
 impl BackToWork {
@@ -106,11 +106,11 @@ impl Diff for BellShelter {
 #[derive(Clone, Copy, Debug, PartialEq, Diff)]
 pub struct TownBell {
     /// The town-bell flag ([`BellShelter`]); no record is made while it is set.
-    pub flag: BellShelter,
+    pub(crate) flag: BellShelter,
     /// `mBackToWork1` (`+0x9ac`..`+0x9c0`): the work it was taken off last.
-    pub work: BackToWork,
+    pub(crate) work: BackToWork,
     /// `mBackToWork2` (`+0x9c4`..`+0x9d8`): the work before a building it was taken off.
-    pub before_building: BackToWork,
+    pub(crate) before_building: BackToWork,
 }
 
 impl Default for TownBell {
@@ -154,13 +154,13 @@ const ENDED_ON_BUILDING: [AiAction; 3] = [AiAction::Build, AiAction::Gather, AiA
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct RecordTarget {
     /// The object.
-    pub id: ObjectId,
+    pub(crate) id: ObjectId,
     /// Its master is of type 80.
-    pub building: bool,
+    pub(crate) building: bool,
     /// Its master's class.
-    pub class: ClassId,
+    pub(crate) class: ClassId,
     /// It has had its master's build time of work (`build_time <= +0xc50`).
-    pub built: bool,
+    pub(crate) built: bool,
 }
 
 impl RecordTarget {

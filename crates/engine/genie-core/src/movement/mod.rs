@@ -114,9 +114,9 @@ pub use genie_model::movement::{Turning, turn_rate, turning};
 #[derive(Clone, Copy, Debug, PartialEq, Diff)]
 pub struct Velocity {
     /// The velocity.
-    pub velocity: BVector,
+    pub(crate) velocity: BVector,
     /// The acceleration.
-    pub acceleration: BVector,
+    pub(crate) acceleration: BVector,
 }
 
 /// What a `MoveTo`'s update in state 3 (`0x140aa2a70`) reads of its unit's AI for its path
@@ -125,17 +125,17 @@ pub struct Velocity {
 pub struct PathAsk {
     /// A unit already in range ends the `MoveTo` (`set_state` 1): one with a unit AI not on a
     /// patrol order (711, 733); else the path request runs.
-    pub ends_in_range: bool,
+    pub(crate) ends_in_range: bool,
     /// `param_7` 1: the path loops (its flags' bit 0), on a patrol order.
-    pub patrol: bool,
+    pub(crate) patrol: bool,
     /// `param_8` 1: the path goes back and forth (bit 1).
-    pub back_and_forth: bool,
+    pub(crate) back_and_forth: bool,
     /// `param_9`: the waypoint of the saved patrol the unit walks on from, −1 for a new path from
     /// the unit to the goal.
-    pub resume: WaypointIndex,
+    pub(crate) resume: WaypointIndex,
     /// `param_10`: 1 (`Some(true)`) the unit attack-moves (`+0x7fb`) and the path does not loop,
     /// 0 it no longer does, 2 (`None`) it stays as it was.
-    pub attack_move: Option<bool>,
+    pub(crate) attack_move: Option<bool>,
 }
 
 impl Default for PathAsk {
@@ -154,48 +154,48 @@ impl Default for PathAsk {
 #[derive(Clone, Debug, PartialEq, Diff)]
 pub struct PathData {
     /// `+0x14`, `mWaypointLevel`: 0 is the path the unit walks.
-    pub level: WaypointLevel,
+    pub(crate) level: WaypointLevel,
     /// `+0x10`, `mLinkedPathType`: what a finished level hands its parent.
-    pub linked_kind: LinkedPathKind,
+    pub(crate) linked_kind: LinkedPathKind,
     /// The path's waypoints (`+0x18`, the path's `+0x438`..`+0x440`).
-    pub points: Vec<BVector>,
+    pub(crate) points: Vec<BVector>,
     /// The level holds a path (`+0x18`, or the one the world's table finds by its id `+0x20`): a
     /// reset level (id −1) holds none, nor does a bird's top level, and the motion step ends at
     /// it.
-    pub has_path: bool,
+    pub(crate) has_path: bool,
     /// The path's own flags (`+0xc`).
-    pub path_flags: PathFlags,
+    pub(crate) path_flags: PathFlags,
     /// `+0x24`: the index of the waypoint the unit walks to.
-    pub waypoint: WaypointIndex,
+    pub(crate) waypoint: WaypointIndex,
     /// `+0x28`: its state.
-    pub state: PathState,
+    pub(crate) state: PathState,
     /// `+0x2c`: how near the target counts as there.
-    pub range: Distance,
+    pub(crate) range: Distance,
     /// `+0x30`: the target object's id, none for a point.
-    pub target: Option<ObjectId>,
+    pub(crate) target: Option<ObjectId>,
     /// `+0x34`, in seconds.
-    pub pause_time: Seconds,
+    pub(crate) pause_time: Seconds,
     /// `+0x3c`: what the walk met on this level ([`LevelFlags`]).
-    pub flags: LevelFlags,
+    pub(crate) flags: LevelFlags,
     /// The path's length (its `+4`, `mPathLengthValue`).
-    pub length: Distance,
+    pub(crate) length: Distance,
     /// The path's creation time (its `+8`, `mCreationTimeValue`): the world's time when it was
     /// made.
-    pub created: WorldTime,
+    pub(crate) created: WorldTime,
     /// `+0x38`, `mContinueCounter`: the plans the level may still try before it gives up.
-    pub continue_counter: PlanTries,
+    pub(crate) continue_counter: PlanTries,
     /// `+0x40`, `mRepathTime`: 2 to 2.5 seconds, drawn when the path is planned.
-    pub repath_time: Seconds,
+    pub(crate) repath_time: Seconds,
     /// The path's hash set of ignored units (`+0x18`, `FUN_140f96120`), which the save writes as
     /// `numberIgnoreUnits` and the ids after it (`0x140f98f00`); empty in this game (the probe
     /// `path_sets.py`).
-    pub ignore: Vec<ObjectId>,
+    pub(crate) ignore: Vec<ObjectId>,
     /// The path's ignore units (`+0x450`, the ids from `+0x454`), which the walk's avoidance reads
     /// (`FUN_140f98d20`): a short path made in the tick its top path was made takes the unit's
     /// own (`+0x670`, `FUN_140f9b7a0`). The save does not hold them: a loaded path takes them
     /// back by that rule (the oracle's import).
     #[diff(unsaved)]
-    pub ignored: Vec<ObjectId>,
+    pub(crate) ignored: Vec<ObjectId>,
 }
 
 /// The moving object's own layer (`RGE_Moving_Object`, types 30 and up) with the animated layer
@@ -203,59 +203,59 @@ pub struct PathData {
 #[derive(Clone, Debug, PartialEq, Diff)]
 pub struct Mover {
     /// The animated layer below it (`+0x7b8`), which its stop clears ([`Mover::stop`]).
-    pub animated: Animated,
+    pub(crate) animated: Animated,
     /// `+0x830`, a unit vector on the ground.
-    pub forward: BVector,
+    pub(crate) forward: BVector,
     /// `+0x83c`.
-    pub right: BVector,
+    pub(crate) right: BVector,
     /// Its velocity data, when it has any.
-    pub velocity: Option<Velocity>,
+    pub(crate) velocity: Option<Velocity>,
     /// The path data, the level the unit walks first, each next one its parent.
-    pub paths: Vec<PathData>,
+    pub(crate) paths: Vec<PathData>,
     /// `+0x878`: moveForward's distance factor.
-    pub factor: f32,
+    pub(crate) factor: f32,
     /// What its master gives its movement.
     pub stats: MoveStats,
     /// `+0x7f9`, `waitingToMoveValue`.
-    pub waiting: u8,
+    pub(crate) waiting: u8,
     /// `+0x7fa`, `numberWaitDelays`: plans that failed for want of budget (trade carts).
-    pub wait_delays: WaitDelays,
+    pub(crate) wait_delays: WaitDelays,
     /// `+0x7fb`, `mAttackMoving`: a level spends no try, and one without a path pauses.
-    pub attack_moving: bool,
+    pub(crate) attack_moving: bool,
     /// `+0x870`, `lastMoveTimeValue`: the world's time when the unit last moved.
-    pub last_move: WorldTime,
+    pub(crate) last_move: WorldTime,
     /// `+0x824`..`+0x82c`, `positionValue`: where it last moved to (x, y, height), which the
     /// position setter compares the new place with (`FUN_141161950`).
-    pub moved_at: Position,
+    pub(crate) moved_at: Position,
     /// `+0x874`, `mConsecutiveSubstituteCount`: above 2 a walk counts its waypoint reached.
-    pub substitute_count: SubstituteCount,
+    pub(crate) substitute_count: SubstituteCount,
     /// The unit's ignore list (`+0x670`, count `+0x678`; the save's `numberUnits` and `tempInt`
     /// of the static part): the other units of an order to several (`FUN_14118c790`), which the
     /// short pather ignores for a top path made this update. A stop empties it.
-    pub ignore_units: Vec<ObjectId>,
+    pub(crate) ignore_units: Vec<ObjectId>,
     /// The unit's own waypoints (`+0x7f0`, count `+0x7fc`; the save's `userDefinedWaypoints`),
     /// in the game's layout (x, height, y): a patrol's points before its last (slot 0x448,
     /// [`Mover::add_user_waypoint`]), which the next path request walks through and empties
     /// ([`Mover::request_path_asked`]).
-    pub user_waypoints: Vec<BVector>,
+    pub(crate) user_waypoints: Vec<BVector>,
     /// `+0x7ec`, `turn_towards_time`: the world time in seconds of its last facet step toward a
     /// target (`FUN_141162db0`).
-    pub last_turn: Seconds,
+    pub(crate) last_turn: Seconds,
     /// `+0x7e8`: where the unit faces, radians 0 to 2π ([`crate::objects::facing`]).
-    pub angle: Angle,
+    pub(crate) angle: Angle,
     /// The pauses its walk gave units it met (slot 0x5f0 on each: the met unit's walked level's
     /// `+0x34`), for the caller to hand on.
-    pub pauses: Vec<(ObjectId, Seconds)>,
+    pub(crate) pauses: Vec<(ObjectId, Seconds)>,
     /// The kept hits its walk met of the walked level's target's master, of a player neither
     /// counts an ally: the motion step tells the unit AI of each (its slot 0x38 with
     /// [`crate::unit_ai::NotifyKind::IN_THE_WAY`] and the hit's id), which the caller passes on.
-    pub in_the_way: Vec<ObjectId>,
+    pub(crate) in_the_way: Vec<ObjectId>,
     /// The facets of the unit's current sprite (`+0x140` -> `+0xa`, and its sequence flag bit
     /// 1), which the yaw and the facing read: the sprite the slice holds as the unit's update
     /// starts ([`crate::objects::unit::Unit`]'s), or a new unit's standing sprite; None for neither (the
     /// master's [`MoveStats::facets`] then). Not saved: the update's copy of its sprite's.
     #[diff(unsaved)]
-    pub sprite_facets: Option<SpriteFacets>,
+    pub(crate) sprite_facets: Option<SpriteFacets>,
 }
 
 /// The moving unit, as the motion step needs it besides its [`Mover`], whose place it walks
@@ -263,17 +263,17 @@ pub struct Mover {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Me {
     /// The unit.
-    pub id: ObjectId,
+    pub(crate) id: ObjectId,
     /// Its top action's state (slot 0x2b0, `RGE_Action_Object::actionState`; 0 without one),
     /// which the short pather's ignore list reads: an action that walks after changing its state
     /// sets its own.
-    pub action_state: ActionState,
+    pub(crate) action_state: ActionState,
     /// Its group (`mGroupID`, `+0x6d0`; -1 for none), whose differentiator units the long pather
     /// lowers (`FUN_140f9eb70`).
-    pub group: Option<GroupId>,
+    pub(crate) group: Option<GroupId>,
     /// `+0x650`, `mLastHumanOrderTime`: its rank against a unit it meets (the walk's pause and
     /// the path end's keep), as the walk starts.
-    pub human_order: WorldTime,
+    pub(crate) human_order: WorldTime,
 }
 
 /// What the motion step returns to the `MoveTo` action.

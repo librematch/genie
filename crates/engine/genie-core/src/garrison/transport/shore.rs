@@ -65,9 +65,9 @@ pub(crate) fn retry_point(
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Around {
     /// The centre (x, y).
-    pub center: Point,
+    pub(crate) center: Point,
     /// The radii (x, y).
-    pub radius: Footprint,
+    pub(crate) radius: Footprint,
 }
 
 /// `FUN_141192d10`'s draws (`find_drop_location`) for a unit of master radii `unit_radius` about

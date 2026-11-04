@@ -79,9 +79,9 @@ bitflags::bitflags! {
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct MoveTo {
     /// `param_5`: the path level's range.
-    pub range: Distance,
+    pub(crate) range: Distance,
     /// `param_6` to `param_11`.
-    pub flags: MoveFlags,
+    pub(crate) flags: MoveFlags,
 }
 
 impl UnitGroup {

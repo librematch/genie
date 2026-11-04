@@ -39,30 +39,30 @@ const ROUND: f32 = MARKET_ROUND;
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Commodity {
     /// Its price in gold (wood `+0x874`, food `+0x878`, stone `+0x87c`, ore `+0x880`).
-    pub price: Price,
+    pub(crate) price: Price,
     /// The purchases less the sales (the save's `*_price_delta`: wood `+0x884`, stone `+0x88c`,
     /// food `+0x894`, ore `+0x89c`, an int).
-    pub trades: NetTrades,
+    pub(crate) trades: NetTrades,
     /// The swing (the save's `old_*_price_adj`: `+0x888`, `+0x890`, `+0x898`, `+0x8a0`), which
     /// every trade grows by 2.
-    pub swing: PriceSwing,
+    pub(crate) swing: PriceSwing,
 }
 
 /// The world's market.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Market {
     /// `world_min_price` (`+0x868`): a sale lowers no price below it.
-    pub min_price: Price,
+    pub(crate) min_price: Price,
     /// `world_max_price` (`+0x86c`): a purchase raises no price above it.
-    pub max_price: Price,
+    pub(crate) max_price: Price,
     /// Food (attribute 0).
-    pub food: Commodity,
+    pub(crate) food: Commodity,
     /// Wood (attribute 1).
-    pub wood: Commodity,
+    pub(crate) wood: Commodity,
     /// Stone (attribute 2).
-    pub stone: Commodity,
+    pub(crate) stone: Commodity,
     /// The ore (attribute 0x38).
-    pub ore: Commodity,
+    pub(crate) ore: Commodity,
 }
 
 impl Market {

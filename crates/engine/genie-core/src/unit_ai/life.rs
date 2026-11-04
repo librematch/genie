@@ -124,7 +124,7 @@ impl UnitAi {
                 made.home = Some(Home {
                     origin: new.position,
                     furious: false,
-                    go_home: false,
+                    homeward: false,
                 });
             }
             UnitAiKind::Lion => {

@@ -43,38 +43,38 @@ bitflags::bitflags! {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Near {
     /// The object.
-    pub id: ObjectId,
+    pub(crate) id: ObjectId,
     /// Its place.
-    pub position: Position,
+    pub(crate) position: Position,
     /// Its master's radii on the ground and whether its height radius is above 0.
-    pub radius: Footprint,
+    pub(crate) radius: Footprint,
     /// Its height, auto-gather, desolid, moving, holding and forest reads.
-    pub flags: NearFlags,
+    pub(crate) flags: NearFlags,
     /// Its master's type (`+0x8`), class, id, `can_be_built_on` (`+0x5e9`), `obstruction_type`
     /// (`+0x651`) and `enable_auto_gather` (`+0x681`).
-    pub kind: MasterKind,
+    pub(crate) kind: MasterKind,
     /// Its master's class.
-    pub class: ClassId,
+    pub(crate) class: ClassId,
     /// Its master.
-    pub master: MasterId,
+    pub(crate) master: MasterId,
     /// Its master's `can_be_built_on` (`+0x5e9`).
-    pub buildable_on: BuildableOn,
+    pub(crate) buildable_on: BuildableOn,
     /// Its master's `obstruction_type` (`+0x651`).
-    pub obstruction_kind: ObstructionKind,
+    pub(crate) obstruction_kind: ObstructionKind,
     /// Its state (`+0x640`) and, for a building, its `desolid_flag` (`+0xc60`).
-    pub state: ObjectState,
+    pub(crate) state: ObjectState,
     /// Its owner.
-    pub player: PlayerId,
+    pub(crate) player: PlayerId,
     /// Its master's `fog_visibility` (`+0x605`).
-    pub fog_visibility: FogVisibility,
+    pub(crate) fog_visibility: FogVisibility,
     /// A building's visibility mask (`+0x8f8`, the registry's) when its footprint has a UMV entry
     /// (`+0x904` not 0); None otherwise.
-    pub fog_mask: Option<VisionBits>,
+    pub(crate) fog_mask: Option<VisionBits>,
     /// Its hit points.
-    pub hp: HitPoints,
+    pub(crate) hp: HitPoints,
     /// Its master's outline radii and height (`+0x688`, `+0x68c`, `+0x690`), BUILD's box for
     /// obstruction types 11 to 13.
-    pub outline: Radii,
+    pub(crate) outline: Radii,
 }
 
 impl Near {

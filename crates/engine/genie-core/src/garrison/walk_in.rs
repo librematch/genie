@@ -65,28 +65,28 @@ pub(crate) const SIEGE_UNLOAD: GenieError =
 #[derive(Clone, Copy, Debug, PartialEq, Diff)]
 pub struct EnterAction {
     /// The building or transport (`+0x20`, its id `+0x30`).
-    pub target: Option<ContainerId>,
+    pub(crate) target: Option<ContainerId>,
     /// The action state (`+0x18`), with its walk's `MoveTo` sub-action to the target: quiet,
     /// within [`EnterAction::walk_range`], with the task's moving sprite ([`EnterAction::moving`])
     /// ([`EnterAction::walk_again`]).
-    pub state: EnterState,
+    pub(crate) state: EnterState,
     /// `+0x38`..`+0x40`: where it meets the target ([`meeting`]: a building's place; for a
     /// transport where the two meet, its height the target's at the constructor), which a
     /// target that moves leaves.
     ///
     /// [`meeting`]: crate::garrison::meeting::meeting_point
-    pub point: Position,
+    pub(crate) point: Position,
     /// The task's work range (`+0x30`): a building's `MoveTo` stops this near, and the enter
     /// needs it.
-    pub range: Distance,
+    pub(crate) range: Distance,
     /// `+0x44`: state 2's wait, in seconds.
-    pub timer: Seconds,
+    pub(crate) timer: Seconds,
     /// `+0x68`, 1 at first: a `MoveTo` that fails (code 3) asks once more.
-    pub retry: bool,
+    pub(crate) retry: bool,
     /// `+0x6c`: the task's class (its `+0x10`), none for any.
-    pub task_class: Option<ClassId>,
+    pub(crate) task_class: Option<ClassId>,
     /// The task's moving sprite (`+0x40`), which its `MoveTo`s take; None for none.
-    pub moving: Option<SpriteId>,
+    pub(crate) moving: Option<SpriteId>,
 }
 
 /// What an Enter goes into: a building (type 80) or a transport.
@@ -102,17 +102,17 @@ pub enum EnterKind {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct EnterTarget {
     /// Its state (`+0x640`).
-    pub state: ObjectState,
+    pub(crate) state: ObjectState,
     /// The unit's player counts its player as allied (`FUN_141663dc0`), or it is Gaia's.
-    pub allied: bool,
+    pub(crate) allied: bool,
     /// It has room for the unit (slot 0x198).
-    pub room: bool,
+    pub(crate) room: bool,
     /// Its place.
-    pub position: Position,
+    pub(crate) position: Position,
     /// The unit is in reach of it ([`EnterAction::in_reach`]).
-    pub in_reach: bool,
+    pub(crate) in_reach: bool,
     /// A building or a transport.
-    pub kind: EnterKind,
+    pub(crate) kind: EnterKind,
 }
 
 /// What a new `MoveTo` of an Enter starts by (`0x140aa2100` with 1,
@@ -120,7 +120,7 @@ pub struct EnterTarget {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct WalkStart {
     /// The footprints' gap of the unit and its target (`FUN_14118f680`).
-    pub gap: Distance,
+    pub(crate) gap: Distance,
 }
 
 /// What an Enter's update (`FUN_140a87a80`) reads as it starts.
