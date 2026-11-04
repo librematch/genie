@@ -120,6 +120,7 @@ use crate::unit_ai::test_sides::With;
 use crate::unit_ai::update::UpdateTail;
 use crate::vision::VisionBits;
 use crate::world::AiSwitches;
+use crate::world::Mode680;
 use crate::world::World;
 use std::slice::from_ref;
 use std::sync::Arc;
@@ -140,29 +141,6 @@ fn finds_nothing() -> impl FnMut(&Search<'_>) -> Result<Found, GenieError> {
 }
 
 impl UnitAi {
-    const fn is_idle(&self) -> bool {
-        self.current_order.is_none()
-            && self.current_action.is_none()
-            && self.current_target.is_none()
-    }
-
-    /// The full update of an idle unit (no order, action or target), with its move.
-    fn update_idle(
-        &mut self,
-        dt: Millis,
-        world_time: WorldTime,
-        player_kind: PlayerKind,
-        at: &Surroundings,
-        ai: &mut Well512,
-        side: &mut dyn UnitSide,
-    ) -> Result<Option<AiMove>, GenieError> {
-        if !self.is_idle() {
-            return Err(GenieError::unsupported("unit is not idle"));
-        }
-        let fx = self.update_fx(dt, world_time, player_kind, at, ai, side)?;
-        Ok(first_move(&fx))
-    }
-
     /// The full update ([`UnitAi::update`]) with the unit's calls kept ([`With::at`]), and the
     /// rest an order on a target leaves.
     fn update_after(
@@ -200,19 +178,6 @@ impl UnitAi {
             .map(|(fx, _)| fx)
     }
 
-    /// The check between turns ([`UnitAi::off_turn`]) with the unit's calls kept.
-    fn off_turn_fx(
-        &mut self,
-        at: &Surroundings,
-        side: &mut dyn UnitSide,
-        player_kind: PlayerKind,
-        ai: &mut Well512,
-    ) -> Result<Vec<Effect>, GenieError> {
-        let mut fx = Vec::new();
-        self.off_turn(at, &mut With::at(side, &mut fx, at), player_kind, ai)?;
-        Ok(fx)
-    }
-
     /// The full update's rest after an order on a target ([`UnitAi::after_order`]) with the
     /// unit's calls kept.
     fn after_order_fx(
@@ -235,14 +200,6 @@ impl UnitAi {
         )?;
         Ok(fx)
     }
-}
-
-/// The first move among the unit's calls.
-fn first_move(effects: &[Effect]) -> Option<AiMove> {
-    effects.iter().find_map(|e| match e {
-        Effect::Move(m) => Some(*m),
-        _ => None,
-    })
 }
 
 fn idle(ai_kind: UnitAiKind) -> UnitAi {
@@ -4067,11 +4024,20 @@ fn released_attacker_leaves_the_set_through_notify_699() {
     assert_eq!((r, ai.attackers.clone()), (Ok(GO_ON), Attackers::default()));
 }
 
-/// A builder on its build order (702, action 602): MarvinBlue/426048731's 9175 in update 681,
-/// whose look-around timer runs out and is redrawn from the AI stream.
+/// A builder walking to its foundation (busy: a `MoveTo` of its own) keeps its idle timer and
+/// its secondary timer at 0 and redraws its look-around timeout; its state position follows
+/// it, as it has an order. On the attack order, its target gone (the target block forgets
+/// it), the civilian's processMisc stops the action and ends the order (slot 0xb0 with 0).
 #[test]
 fn builder_idle_timer_stays_0_and_its_look_around_is_redrawn() {
-    let mut u = UnitAi {
+    let walking = Action {
+        list: ActionList::default().with_move_to(Some(MoveToAction {
+            point: Position::new(30.0, 88.0, 0.0),
+            ..MoveToAction::sub_in(MoveTo::Moving)
+        })),
+        ..Action::default()
+    };
+    let building = UnitAi {
         current_order: Some(OrderKind::Build),
         current_action: Some(AiAction::Build),
         current_target: Some(object_id(10028)),
@@ -4080,51 +4046,46 @@ fn builder_idle_timer_stays_0_and_its_look_around_is_redrawn() {
         look_around_timer: Millis::new(990),
         ..idle(UnitAiKind::Civilian)
     };
-    let mut r = rng();
-    let at = Surroundings {
-        position: Position::new(29.5, 89.5, 0.0),
-        flags: SurroundingFlags::BUSY,
-        player: PlayerId::new(2),
-        class: Some(class::VILLAGER),
-        roles: roles(),
-        slots: slots(),
-        unit_ai_tuning: tuning().unit_ai,
-        ..Surroundings::default()
+    let (house, _) = house_and_tree();
+    let foundation = SceneThing {
+        desolid: true,
+        state: ObjectState::Foundation,
+        ..SceneThing::new(10028, player_id(1), house, Position::new(30.0, 88.0, 0.0))
     };
-    let _ = u
-        .update_fx(
-            Millis::new(50),
-            WorldTime::ZERO,
-            PlayerKind::Human,
-            &at,
-            &mut r,
-            &mut no_search,
-        )
-        .unwrap();
+    let builder = (player_id(1), 9175);
+    let mut world = builder_world(building.clone(), Some(walking.clone()), Some(foundation));
+    world.streams.get(Stream::Ai).set_seed(0);
+    let (answer, unit_ai, draws) = update_of(&mut world, builder, Millis::new(50), WorldTime::ZERO);
+    assert_eq!(answer, Ok(None));
     assert_eq!(
-        (u.idle_timer, u.secondary_timer, u.look_around_timer),
+        (
+            unit_ai.idle_timer,
+            unit_ai.secondary_timer,
+            unit_ai.look_around_timer
+        ),
         (Millis::ZERO, Millis::ZERO, Millis::ZERO)
     );
-    assert_eq!(u.look_around_timeout, Millis::new(4500 + 7241 % 1000));
-    assert_eq!(r.draws, 1);
-    // the state position follows a unit with an order
-    assert_eq!(u.state_position, Point::new(29.5, 89.5));
-    // on the attack order, its target gone (the target block forgets it), the civilian's
-    // processMisc stops the action and ends the order (slot 0xb0 with 0)
-    u.current_order = Some(OrderKind::Attack);
-    let fx = u
-        .update_fx(
-            Millis::new(50),
-            WorldTime::ZERO,
-            PlayerKind::Human,
-            &at,
-            &mut r,
-            &mut no_search,
-        )
-        .unwrap();
-    assert_eq!(fx, [Effect::Stop]);
     assert_eq!(
-        (u.current_order, u.last_order, u.current_action),
+        (unit_ai.look_around_timeout, draws),
+        (Millis::new(4500 + 7241 % 1000), 1)
+    );
+    assert_eq!(unit_ai.state_position, Point::new(29.5, 89.5));
+    let attacking = UnitAi {
+        current_order: Some(OrderKind::Attack),
+        ..building
+    };
+    let mut world = builder_world(attacking, Some(walking), None);
+    let (_, unit_ai, _) = update_of(&mut world, builder, Millis::new(50), WorldTime::ZERO);
+    assert_eq!(
+        world.parts.actions.of(object_id(9175)).top_action_kind(),
+        None
+    );
+    assert_eq!(
+        (
+            unit_ai.current_order,
+            unit_ai.last_order,
+            unit_ai.current_action
+        ),
         (None, Some(OrderKind::Attack), None)
     );
 }
@@ -4243,137 +4204,206 @@ fn defending_unit_beyond_five_tiles_of_its_state_position_stops_to_walk_back() {
     assert_eq!(u.last_target, Some(object_id(4321)));
 }
 
+/// `owner`'s unit 50 at `at` of the [`lone_master`] of its unit AI `unit_ai`, on its sprite.
+fn lone_thing(owner: PlayerId, unit_ai: UnitAi, at: Position) -> SceneThing {
+    let master = Master {
+        standing_sprite: Some(STANDING.id),
+        ..lone_master(unit_ai.ai_kind)
+    };
+    SceneThing {
+        ai: Some(unit_ai),
+        sprite: Some(STANDING.id),
+        ..SceneThing::new(50, owner, master, at)
+    }
+}
+
+/// A map of 128 by 128 with the `unit` and the `others`, each seen by the unit's owner. The AI
+/// stream is seeded with 0, as [`rng`] is.
+fn lone_world(unit: SceneThing, others: &[SceneThing]) -> World {
+    let owner = unit.player;
+    let mut scene = Scene::open(GridSize::new(128, 128))
+        .players(2)
+        .graphic(STANDING)
+        .thing(unit);
+    for other in others {
+        scene = scene.thing(SceneThing {
+            seen_by: Some(VisionBits::visible(owner)),
+            ..other.clone()
+        });
+    }
+    let mut world = scene.build();
+    world.streams.get(Stream::Ai).set_seed(0);
+    world
+}
+
+/// [`lone_world`] with player 1's unit at (30, 30), its unit AI `unit_ai`.
+fn lone_unit_world(unit_ai: UnitAi) -> World {
+    lone_world(
+        lone_thing(player_id(1), unit_ai, Position::new(30.0, 30.0, 0.0)),
+        &[],
+    )
+}
+
+/// Gaia's animal 50 at `at`, its unit AI `unit_ai` ([`lone_thing`]).
+fn animal(unit_ai: UnitAi, at: Position) -> SceneThing {
+    lone_thing(PlayerId::GAIA, unit_ai, at)
+}
+
+/// [`lone_world`] with the `animal`, the `others` and the AI stream `stream`.
+fn animal_world(animal: SceneThing, others: &[SceneThing], stream: Well512) -> World {
+    let mut world = lone_world(animal, others);
+    *world.streams.get(Stream::Ai) = stream;
+    world
+}
+
+/// The master of a lone unit of `kind`: a building (a moving object of speed 0 that may not
+/// walk, master 70) for a building's or a tower's unit AI, a villager for a civilian's, a sheep
+/// (class 58) for livestock, a boar (class 11, master 48), a deer (class 9, master 65, of line
+/// of sight 2, search radius 1 and speed 1.2), a transport ship (class 20, master 545), else a
+/// walker of class 6 (master 4).
+fn lone_master(kind: UnitAiKind) -> Master {
+    match kind {
+        UnitAiKind::Building | UnitAiKind::Tower => {
+            let (house, _) = house_and_tree();
+            Master {
+                terrain_restriction: Some(RestrictionId::named(7)),
+                move_stats: Some(walking(Speed::ZERO)),
+                ..house
+            }
+        }
+        UnitAiKind::Civilian => villager_master(),
+        UnitAiKind::Livestock => walker(594, class::LIVESTOCK),
+        UnitAiKind::Boar => walker(48, class::CLASS_11),
+        UnitAiKind::Hunted => Master {
+            line_of_sight: Distance::new(2.0),
+            action: Some(ActionPart {
+                search_radius: Distance::new(1.0),
+                ..ActionPart::default()
+            }),
+            move_stats: Some(walking(Speed::new(1.2))),
+            ..walker(65, class::PREY)
+        },
+        UnitAiKind::Transport => walker(545, class::TRANSPORT),
+        _ => walker(4, class::CLASS_6),
+    }
+}
+
+/// `owner`'s unit `id` of `world` runs its full update ([`UnitAi::update`], `dt` at `now`):
+/// its answer, its unit AI and the AI stream's draws.
+fn update_of(
+    world: &mut World,
+    (owner, id): (PlayerId, i32),
+    dt: Millis,
+    now: WorldTime,
+) -> (GenieResult<Option<AfterOrder>>, UnitAi, u32) {
+    let before = world.streams.get(Stream::Ai).draws;
+    let answer = run_ai(world, (owner, object_id(id)), |ai, at, side, kind, rng| {
+        ai.update(dt, now, kind, at, rng, side)
+    });
+    let draws = world.streams.get(Stream::Ai).draws - before;
+    (
+        answer,
+        world.parts.unit_ai.get(object_id(id)).unwrap().clone(),
+        draws,
+    )
+}
+
+/// [`update_of`] player 1's lone unit 50.
+fn lone_step(
+    world: &mut World,
+    dt: Millis,
+    now: WorldTime,
+) -> (GenieResult<Option<AfterOrder>>, UnitAi, u32) {
+    update_of(world, (player_id(1), 50), dt, now)
+}
+
+/// [`update_of`] Gaia's lone animal 50, `dt` at time 0.
+fn animal_step(world: &mut World, dt: Millis) -> (GenieResult<Option<AfterOrder>>, UnitAi, u32) {
+    update_of(world, (PlayerId::GAIA, 50), dt, WorldTime::ZERO)
+}
+
+/// The point and the range of the lone unit 50's `MoveTo` in `world`, none without one.
+fn lone_walks(world: &World) -> Option<(Position, Distance)> {
+    world
+        .parts
+        .actions
+        .of(object_id(50))
+        .list
+        .move_to()
+        .map(|move_to| (move_to.point, move_to.range))
+}
+
 #[test]
 fn retarget_waits_for_the_timer() {
-    let mut u = idle(UnitAiKind::Building);
-    let mut r = rng();
-    let _ = u
-        .update_idle(
-            Millis::new(50),
-            WorldTime::from_millis(899),
-            PlayerKind::Human,
-            &no_surroundings(),
-            &mut r,
-            &mut no_search,
-        )
-        .unwrap();
-    assert_eq!((u.retarget_timer, r.draws), (Millis::new(900), 0));
-    let _ = u
-        .update_idle(
-            Millis::new(50),
-            WorldTime::from_millis(900),
-            PlayerKind::Human,
-            &no_surroundings(),
-            &mut r,
-            &mut no_search,
-        )
-        .unwrap();
+    let building = idle(UnitAiKind::Building);
+    let mut world = lone_unit_world(building);
+    let (_, unit_ai, draws) = lone_step(&mut world, Millis::new(50), WorldTime::from_millis(899));
+    assert_eq!((unit_ai.retarget_timer, draws), (Millis::new(900), 0));
+    let (_, unit_ai, _) = lone_step(&mut world, Millis::new(50), WorldTime::from_millis(900));
     // the first rand15 after seed 0 is 7241
     assert_eq!(
-        (u.last_retarget_time, u.retarget_timer),
+        (unit_ai.last_retarget_time, unit_ai.retarget_timer),
         (WorldTime::from_millis(900), Millis::new(750 + 7241 % 500))
     );
 }
 
 #[test]
 fn last_retarget_ahead_of_the_world_time_wraps_and_retargets() {
-    let mut u = UnitAi {
+    let tower = UnitAi {
         last_retarget_time: WorldTime::from_millis(400),
         ..idle(UnitAiKind::Tower)
     };
-    let mut r = rng();
-    let _ = u
-        .update_idle(
-            Millis::new(50),
-            WorldTime::from_millis(100),
-            PlayerKind::Human,
-            &no_surroundings(),
-            &mut r,
-            &mut no_search,
-        )
-        .unwrap();
+    let mut world = lone_unit_world(tower);
+    let (_, unit_ai, draws) = lone_step(&mut world, Millis::new(50), WorldTime::from_millis(100));
     assert_eq!(
-        (u.last_retarget_time, r.draws),
+        (unit_ai.last_retarget_time, draws),
         (WorldTime::from_millis(100), 1)
     );
 }
 
 #[test]
 fn villagers_and_livestock_never_retarget() {
-    for t in [UnitAiKind::Civilian, UnitAiKind::Livestock] {
-        let mut u = idle(t);
-        let mut r = rng();
-        let _ = u
-            .update_idle(
-                Millis::new(50),
-                WorldTime::from_millis(5000),
-                PlayerKind::Human,
-                &no_surroundings(),
-                &mut r,
-                &mut no_search,
-            )
-            .unwrap();
+    for kind in [UnitAiKind::Civilian, UnitAiKind::Livestock] {
+        let mut world = lone_unit_world(idle(kind));
+        let (_, unit_ai, draws) =
+            lone_step(&mut world, Millis::new(50), WorldTime::from_millis(5000));
         assert_eq!(
-            (u.retarget_timer, r.draws),
+            (unit_ai.retarget_timer, draws),
             (Millis::new(900), 0),
-            "type {t}"
+            "type {kind}"
         );
     }
 }
 
 #[test]
 fn the_look_around_timeout_is_redrawn_once_exceeded() {
-    let mut u = UnitAi {
+    let still = UnitAi {
         retarget_disabled: 1,
         ..idle(UnitAiKind::Civilian)
     };
-    let mut r = rng();
-    let _ = u
-        .update_idle(
-            Millis::new(1000),
-            WorldTime::ZERO,
-            PlayerKind::Human,
-            &no_surroundings(),
-            &mut r,
-            &mut no_search,
-        )
-        .unwrap();
-    assert_eq!((u.look_around_timer, r.draws), (Millis::new(1000), 0));
-    let _ = u
-        .update_idle(
-            Millis::new(1),
-            WorldTime::ZERO,
-            PlayerKind::Human,
-            &no_surroundings(),
-            &mut r,
-            &mut no_search,
-        )
-        .unwrap();
+    let mut world = lone_unit_world(still);
+    let (_, unit_ai, draws) = lone_step(&mut world, Millis::new(1000), WorldTime::ZERO);
+    assert_eq!((unit_ai.look_around_timer, draws), (Millis::new(1000), 0));
+    let (_, unit_ai, _) = lone_step(&mut world, Millis::new(1), WorldTime::ZERO);
     assert_eq!(
-        (u.look_around_timer, u.look_around_timeout),
+        (unit_ai.look_around_timer, unit_ai.look_around_timeout),
         (Millis::ZERO, Millis::new(4500 + 7241 % 1000))
     );
 }
 
 #[test]
 fn retarget_draws_before_look_around() {
-    let mut u = UnitAi {
+    let soldier = UnitAi {
         look_around_timer: Millis::new(1000),
         ..idle(UnitAiKind::Soldier)
     };
-    let mut r = rng();
-    let _ = u
-        .update_idle(
-            Millis::new(1),
-            WorldTime::from_millis(900),
-            PlayerKind::Human,
-            &no_surroundings(),
-            &mut r,
-            &mut no_search,
-        )
-        .unwrap();
-    assert_eq!(u.retarget_timer, Millis::new(750 + 7241 % 500));
-    assert_eq!(u.look_around_timeout, Millis::new(4500 + 25269 % 1000));
+    let mut world = lone_unit_world(soldier);
+    let (_, unit_ai, _) = lone_step(&mut world, Millis::new(1), WorldTime::from_millis(900));
+    assert_eq!(unit_ai.retarget_timer, Millis::new(750 + 7241 % 500));
+    assert_eq!(
+        unit_ai.look_around_timeout,
+        Millis::new(4500 + 25269 % 1000)
+    );
 }
 
 /// `FUN_140c64cf0`: the timer is a draw of the stream modulo half the span plus three
@@ -4394,57 +4424,28 @@ fn the_randomized_retarget_timer_draws_around_its_span() {
 
 #[test]
 fn the_idle_timer_restarts_after_its_timeout_and_the_secondary_timer_stops_at_0() {
-    let mut u = UnitAi {
+    let waiting = UnitAi {
         secondary_timer: Millis::new(750),
         ..idle(UnitAiKind::Civilian)
     };
-    let mut r = rng();
-    let _ = u
-        .update_idle(
-            Millis::new(3001),
-            WorldTime::ZERO,
-            PlayerKind::Human,
-            &no_surroundings(),
-            &mut r,
-            &mut no_search,
-        )
-        .unwrap();
+    let mut world = lone_unit_world(waiting);
+    let (_, unit_ai, _) = lone_step(&mut world, Millis::new(3001), WorldTime::ZERO);
     assert_eq!(
-        (u.idle_timer, u.secondary_timer),
+        (unit_ai.idle_timer, unit_ai.secondary_timer),
         (Millis::ZERO, Millis::ZERO)
     );
 }
 
+/// A unit AI type the slice does not model: the ranged unit's, which only a load makes. Its
+/// update stops at its retarget check, before its idle check. (The double's test for a unit
+/// that is not idle tested its own fixture.)
 #[test]
-fn non_idle_units_and_unknown_kinds_are_unsupported() {
-    let mut r = rng();
-    let mut busy = UnitAi {
-        current_action: Some(AiAction::Attack),
-        ..idle(UnitAiKind::Building)
-    };
-    assert!(
-        busy.update_idle(
-            Millis::new(1),
-            WorldTime::ZERO,
-            PlayerKind::Human,
-            &no_surroundings(),
-            &mut r,
-            &mut no_search
-        )
-        .is_err()
-    );
-    // a type the slice does not model: the ranged unit's, which only a load makes
-    assert!(
-        idle(UnitAiKind::Ranged)
-            .update_idle(
-                Millis::new(1),
-                WorldTime::ZERO,
-                PlayerKind::Human,
-                &no_surroundings(),
-                &mut r,
-                &mut no_search
-            )
-            .is_err()
+fn unknown_kinds_are_unsupported() {
+    let mut world = lone_unit_world(idle(UnitAiKind::Ranged));
+    let (answer, ..) = lone_step(&mut world, Millis::new(1), WorldTime::ZERO);
+    assert_eq!(
+        answer,
+        Err(GenieError::unsupported("unit-AI type not modelled"))
     );
 }
 
@@ -5415,17 +5416,6 @@ fn boar() -> UnitAi {
     }
 }
 
-fn at(position: Position) -> Surroundings {
-    Surroundings {
-        position,
-        class: Some(class::CLASS_11),
-        roles: roles(),
-        slots: slots(),
-        unit_ai_tuning: tuning().unit_ai,
-        ..Surroundings::default()
-    }
-}
-
 /// A seed whose idle check (a scaled draw, then rand15) wanders, or does not.
 #[allow(clippy::maybe_infinite_iter)] // the search ends at the first seed that fits
 fn seed_for(wanders: bool) -> Well512 {
@@ -5447,138 +5437,85 @@ fn seed_for(wanders: bool) -> Well512 {
 fn boar_at_home_draws_its_leash_and_mostly_stays() {
     // updates 766, 910 and 1039: processIdle draws `0..81` and a rand15, which is not a
     // multiple of 7; nothing moves
-    let mut u = boar();
-    let mut r = seed_for(false);
-    let moved = u.update_idle(
-        Millis::new(10),
-        WorldTime::ZERO,
-        PlayerKind::Human,
-        &at(Position::new(23.5, 105.5, 0.0)),
-        &mut r,
-        &mut no_search,
-    );
-    assert_eq!(moved, Ok(None));
+    let home = Position::new(23.5, 105.5, 0.0);
+    let mut world = animal_world(animal(boar(), home), &[], seed_for(false));
+    let (answer, unit_ai, draws) = animal_step(&mut world, Millis::new(10));
+    assert_eq!((answer, lone_walks(&world)), (Ok(None), None));
     assert_eq!(
-        (u.idle_timer, u.current_action, r.draws),
+        (unit_ai.idle_timer, unit_ai.current_action, draws),
         (Millis::ZERO, None, 2)
     );
 }
 
 #[test]
 fn boar_wanders_up_to_three_tiles_once_in_seven() {
-    let mut u = boar();
-    let mut r = seed_for(true);
-    let mut e = r.clone();
-    let _ = e.below(81);
-    let _ = e.rand15();
-    let (dx, dy) = (e.rand15() % 6, e.rand15() % 6);
-    let moved = u
-        .update_idle(
-            Millis::new(10),
-            WorldTime::ZERO,
-            PlayerKind::Human,
-            &at(Position::new(23.5, 105.5, 0.0)),
-            &mut r,
-            &mut no_search,
-        )
-        .unwrap()
-        .unwrap();
+    let stream = seed_for(true);
+    let mut expected = stream.clone();
+    let _ = expected.below(81);
+    let _ = expected.rand15();
+    let (dx, dy) = (expected.rand15() % 6, expected.rand15() % 6);
+    let home = Position::new(23.5, 105.5, 0.0);
+    let mut world = animal_world(animal(boar(), home), &[], stream);
+    let (_, unit_ai, draws) = animal_step(&mut world, Millis::new(10));
     let point = Position::new(dx as f32 - 3.0 + 23.5, dy as f32 - 3.0 + 105.5, 0.0);
-    assert_eq!(
-        moved,
-        AiMove {
-            point,
-            range: Distance::new(0.5),
-            force: OrderForce::Forced,
-            pace: Pace::Walk,
-        }
-    );
+    assert_eq!(lone_walks(&world), Some((point, Distance::new(0.5))));
     // slot 0x130: the move action, no target, the point; the last action is the old one
     assert_eq!(
         (
-            u.current_action,
-            u.last_action,
-            u.current_target,
-            u.target_point
+            unit_ai.current_action,
+            unit_ai.last_action,
+            unit_ai.current_target,
+            unit_ai.target_point
         ),
         (Some(AiAction::Move), None, None, point)
     );
-    assert_eq!(r.draws, 4);
+    assert_eq!(draws, 4);
 }
 
 #[test]
 fn boar_away_from_home_goes_back_and_furious_one_stays() {
     // more than 2 tiles from its origin and once in 7: home, at its own height
-    let mut u = boar();
-    let mut r = seed_for(true);
-    let moved = u
-        .update_idle(
-            Millis::new(10),
-            WorldTime::ZERO,
-            PlayerKind::Human,
-            &at(Position::new(26.0, 105.5, 0.5)),
-            &mut r,
-            &mut no_search,
-        )
-        .unwrap()
-        .unwrap();
-    assert_eq!(moved.point, Position::new(23.5, 105.5, 0.5));
-    assert_eq!(r.draws, 2);
-    // beyond the leash (more than 144 + 80, squared) it heads home unless it already does
-    let mut far = boar();
-    let mut r = seed_for(false);
-    let moved = far.update_idle(
-        Millis::new(10),
-        WorldTime::ZERO,
-        PlayerKind::Human,
-        &at(Position::new(43.5, 105.5, 0.0)),
-        &mut r,
-        &mut no_search,
+    let mut world = animal_world(
+        animal(boar(), Position::new(26.0, 105.5, 0.5)),
+        &[],
+        seed_for(true),
     );
+    let (_, _, draws) = animal_step(&mut world, Millis::new(10));
     assert_eq!(
-        moved.unwrap().map(|m| m.point),
-        Some(Position::new(23.5, 105.5, 0.0))
+        (lone_walks(&world).map(|(point, _)| point), draws),
+        (Some(Position::new(23.5, 105.5, 0.5)), 2)
     );
-    assert_eq!(r.draws, 1);
-    let mut heading = UnitAi {
+    // beyond the leash (more than 144 + 80, squared) it heads home unless it already does
+    let far = Position::new(43.5, 105.5, 0.0);
+    let mut world = animal_world(animal(boar(), far), &[], seed_for(false));
+    let (_, _, draws) = animal_step(&mut world, Millis::new(10));
+    assert_eq!(
+        (lone_walks(&world).map(|(point, _)| point), draws),
+        (Some(Position::new(23.5, 105.5, 0.0)), 1)
+    );
+    let heading = UnitAi {
         target_point: Position::new(23.5, 0.0, 0.0),
         ..boar()
     };
-    let mut r = seed_for(false);
-    let moved = heading.update_idle(
-        Millis::new(10),
-        WorldTime::ZERO,
-        PlayerKind::Human,
-        &at(Position::new(43.5, 105.5, 0.0)),
-        &mut r,
-        &mut no_search,
+    let mut world = animal_world(animal(heading, far), &[], seed_for(false));
+    let (answer, unit_ai, _) = animal_step(&mut world, Millis::new(10));
+    assert_eq!(
+        (answer, unit_ai.current_action, lone_walks(&world)),
+        (Ok(None), None, None)
     );
-    assert_eq!((moved, heading.current_action), (Ok(None), None));
     // furious, or in mode 1, it does not draw at all; without a target it calms down after
     for (furious, mode_1) in [(true, false), (false, true)] {
-        let mut u = boar();
-        u.home.as_mut().unwrap().furious = furious;
-        let mut r = rng();
-        let place = Surroundings {
-            flags: if mode_1 {
-                SurroundingFlags::MODE_1
-            } else {
-                SurroundingFlags::empty()
-            },
-            ..at(Position::new(23.5, 105.5, 0.0))
-        };
+        let mut angry = boar();
+        angry.home.as_mut().unwrap().furious = furious;
+        let mut world = animal_world(animal(angry, Position::new(23.5, 105.5, 0.0)), &[], rng());
+        if mode_1 {
+            world.mode_680 = Mode680::ONE;
+        }
+        let (answer, unit_ai, draws) = animal_step(&mut world, Millis::new(10));
         assert_eq!(
-            u.update_idle(
-                Millis::new(10),
-                WorldTime::ZERO,
-                PlayerKind::Human,
-                &place,
-                &mut r,
-                &mut no_search
-            ),
-            Ok(None)
+            (answer, draws, unit_ai.home.unwrap().furious),
+            (Ok(None), 0, false)
         );
-        assert_eq!((r.draws, u.home.unwrap().furious), (0, false));
     }
 }
 
@@ -5629,20 +5566,11 @@ fn move_forgets_the_target_and_an_order_keeps_its_history() {
 fn an_idle_transport_ship_retargets_like_soldier() {
     // type 11, TribeTransportShipUnitAIModule: base slots 4 and 73, slot 72 0x140c21d20 draws
     // nothing
-    let mut u = idle(UnitAiKind::Transport);
-    let mut r = rng();
-    let _ = u
-        .update_idle(
-            Millis::new(50),
-            WorldTime::from_millis(900),
-            PlayerKind::Human,
-            &no_surroundings(),
-            &mut r,
-            &mut no_search,
-        )
-        .unwrap();
+    let mut world = lone_unit_world(idle(UnitAiKind::Transport));
+    let (answer, unit_ai, _) = lone_step(&mut world, Millis::new(50), WorldTime::from_millis(900));
+    assert_eq!(answer, Ok(None));
     assert_eq!(
-        (u.last_retarget_time, u.retarget_timer),
+        (unit_ai.last_retarget_time, unit_ai.retarget_timer),
         (WorldTime::from_millis(900), Millis::new(750 + 7241 % 500))
     );
 }
@@ -5668,20 +5596,6 @@ fn deer() -> UnitAi {
     }
 }
 
-fn deer_at(position: Position) -> Surroundings {
-    Surroundings {
-        position,
-        class: Some(class::PREY),
-        size: Footprint::new(0.2, 0.2),
-        los: Distance::new(2.0),
-        search_radius: Distance::new(1.0),
-        roles: roles(),
-        slots: slots(),
-        unit_ai_tuning: tuning().unit_ai,
-        ..Surroundings::default()
-    }
-}
-
 /// A stream whose next rand15 is a multiple of 7 or not.
 #[allow(clippy::maybe_infinite_iter)] // the search ends at the first seed that fits
 fn wander_seed(wanders: bool) -> Well512 {
@@ -5695,98 +5609,62 @@ fn wander_seed(wanders: bool) -> Well512 {
         .unwrap()
 }
 
+/// A deer that sees nothing stays six times in seven (one draw), else wanders up to three
+/// tiles off (two more draws). Its search reaches its line of sight plus 1 (3 tiles), its search
+/// radius (1) being shorter: player 1's scout 3.5 tiles off is not seen.
 #[test]
 fn deer_that_sees_nothing_stays_six_times_in_seven_and_otherwise_wanders() {
-    let mut searched = Vec::new();
-    let mut nothing = |s: &Search<'_>| {
-        searched.push((s.at, s.radius, s.classes.len(), s.size));
-        Ok(Found::NONE)
-    };
-    let mut u = deer();
-    let mut r = wander_seed(false);
-    let place = deer_at(Position::new(31.5, 106.5, 0.0));
-    let moved = u
-        .update_idle(
-            Millis::new(10),
-            WorldTime::ZERO,
-            PlayerKind::Human,
-            &place,
-            &mut r,
-            &mut nothing,
-        )
-        .unwrap();
-    assert_eq!(moved, None);
-    // the search reaches the line of sight plus 1, the search radius being shorter
-    assert_eq!(
-        searched,
-        vec![(
-            Point::new(31.5, 106.5),
-            Distance::new(3.0),
-            28,
-            Footprint::new(0.2, 0.2)
-        )]
-    );
-    assert_eq!(r.draws, 1);
+    let home = Position::new(31.5, 106.5, 0.0);
+    let far_scout = [deer_scout(Position::new(35.0, 106.5, 0.0))];
+    let mut world = animal_world(animal(deer(), home), &far_scout, wander_seed(false));
+    let (answer, _, draws) = animal_step(&mut world, Millis::new(10));
+    assert_eq!((answer, lone_walks(&world), draws), (Ok(None), None, 1));
 
-    let mut u = deer();
-    let mut r = wander_seed(true);
-    let mut e = r.clone();
-    let _ = e.rand15();
-    let step = |n: u32| if 3 <= n { n as i32 - 6 } else { n as i32 + 1 };
-    let (dx, dy) = (step(e.rand15() % 6), step(e.rand15() % 6));
-    let moved = u
-        .update_idle(
-            Millis::new(10),
-            WorldTime::ZERO,
-            PlayerKind::Human,
-            &place,
-            &mut r,
-            &mut |_: &Search<'_>| Ok(Found::NONE),
-        )
-        .unwrap()
-        .unwrap();
+    let stream = wander_seed(true);
+    let mut expected = stream.clone();
+    let _ = expected.rand15();
+    let step = |roll: u32| {
+        if 3 <= roll {
+            roll as i32 - 6
+        } else {
+            roll as i32 + 1
+        }
+    };
+    let (dx, dy) = (step(expected.rand15() % 6), step(expected.rand15() % 6));
+    let mut world = animal_world(animal(deer(), home), &[], stream);
+    let (_, _, draws) = animal_step(&mut world, Millis::new(10));
     assert_eq!(
-        moved.point,
-        Position::new(31.5 + dx as f32, 106.5 + dy as f32, 0.0)
+        lone_walks(&world).map(|(point, _)| point),
+        Some(Position::new(31.5 + dx as f32, 106.5 + dy as f32, 0.0))
     );
     assert!(dx != 0 && dy != 0 && dx.abs() <= 3 && dy.abs() <= 3);
-    assert_eq!(r.draws, 3);
+    assert_eq!(draws, 3);
+}
+
+/// Player 1's scout 9183 at `at` (a walker of class 12, master 448), which a deer evades.
+fn deer_scout(at: Position) -> SceneThing {
+    SceneThing::new(9183, player_id(1), walker(448, class::CLASS_12), at)
 }
 
 #[test]
 fn deer_away_from_home_goes_back_and_one_beyond_its_leash_at_once() {
-    let mut u = deer();
-    let mut r = wander_seed(true);
-    let away = deer_at(Position::new(34.5, 106.5, 0.5));
-    let moved = u
-        .update_idle(
-            Millis::new(10),
-            WorldTime::ZERO,
-            PlayerKind::Human,
-            &away,
-            &mut r,
-            &mut |_: &Search<'_>| Ok(Found::NONE),
-        )
-        .unwrap()
-        .unwrap();
-    assert_eq!((moved.point, r.draws), (Position::new(31.5, 106.5, 0.5), 1));
+    let away = Position::new(34.5, 106.5, 0.5);
+    let mut world = animal_world(animal(deer(), away), &[], wander_seed(true));
+    let (_, _, draws) = animal_step(&mut world, Millis::new(10));
+    assert_eq!(
+        (lone_walks(&world).map(|(point, _)| point), draws),
+        (Some(Position::new(31.5, 106.5, 0.5)), 1)
+    );
     // a fox's leash of 2.5: 3 tiles off (2.8 from its footprint) it goes home without a
     // search or a draw
-    let mut u = deer();
-    u.hunted.as_mut().unwrap().leash = Distance::new(2.5);
-    let mut r = wander_seed(false);
-    let moved = u
-        .update_idle(
-            Millis::new(10),
-            WorldTime::ZERO,
-            PlayerKind::Human,
-            &away,
-            &mut r,
-            &mut no_search,
-        )
-        .unwrap()
-        .unwrap();
-    assert_eq!((moved.point, r.draws), (Position::new(31.5, 106.5, 0.5), 0));
+    let mut fox = deer();
+    fox.hunted.as_mut().unwrap().leash = Distance::new(2.5);
+    let mut world = animal_world(animal(fox, away), &[], wander_seed(false));
+    let (_, _, draws) = animal_step(&mut world, Millis::new(10));
+    assert_eq!(
+        (lone_walks(&world).map(|(point, _)| point), draws),
+        (Some(Position::new(31.5, 106.5, 0.5)), 0)
+    );
 }
 
 /// A deer that sees an object runs from it by three times its speed (slot 0x150), forced
@@ -5794,101 +5672,69 @@ fn deer_away_from_home_goes_back_and_one_beyond_its_leash_at_once() {
 /// alert mode and starts its sighting time again (deer 9655 at update 2626).
 #[test]
 fn deer_that_sees_an_object_evades_it() {
-    let mut u = UnitAi {
+    let startled = UnitAi {
         time_since_enemy: Seconds::new(12.0),
         ..deer()
     };
-    let mut r = wander_seed(false);
-    let place = Surroundings {
-        speed: Speed::new(1.2),
-        map: GridSize::new(120, 120),
-        ..deer_at(Position::new(31.5, 106.5, 0.0))
-    };
-    let enemy = |_: &Search<'_>| {
-        Ok(Found {
-            id: Some(object_id(9183)),
-            enemies: true,
-            position: Some(Position::new(33.5, 106.5, 0.0)),
-            fresh: true,
-            players: 0,
-            distance: WholeDistance::of_data(-1),
-            retries: [None; 3],
-        })
-    };
-    let moved = u
-        .update_idle(
-            Millis::new(10),
-            WorldTime::ZERO,
-            PlayerKind::Human,
-            &place,
-            &mut r,
-            &mut enemy.clone(),
-        )
-        .unwrap()
-        .unwrap();
+    let home = Position::new(31.5, 106.5, 0.0);
+    let scout = [deer_scout(Position::new(33.5, 106.5, 0.0))];
+    let mut world = animal_world(animal(startled, home), &scout, wander_seed(false));
+    let (_, unit_ai, _) = animal_step(&mut world, Millis::new(10));
+    let point = Position::new(31.5 - 1.2 * 3.0, 106.5, 0.0);
+    assert_eq!(lone_walks(&world), Some((point, Distance::ZERO)));
     assert_eq!(
-        (moved.point, moved.range, moved.force, moved.pace),
-        (
-            Position::new(31.5 - 1.2 * 3.0, 106.5, 0.0),
-            Distance::ZERO,
-            OrderForce::Forced,
-            Pace::Run
-        )
+        (unit_ai.current_action, unit_ai.target_point),
+        (Some(AiAction::Move), point)
     );
     assert_eq!(
-        (u.current_action, u.target_point),
-        (Some(AiAction::Move), moved.point)
-    );
-    assert_eq!(
-        (u.alert_mode, u.time_since_enemy),
+        (unit_ai.alert_mode, unit_ai.time_since_enemy),
         (AlertMode::Alert, Seconds::ZERO)
     );
 }
 
+/// An animal whose wander ended (its unit AI on the move action, no `MoveTo` left) drops the
+/// action and turns idle; its idle timer runs on. While it walks (its `MoveTo` of its own: busy),
+/// its timers run and nothing else happens.
 #[test]
 fn an_animal_whose_wander_ended_drops_its_move_action_and_turns_idle() {
-    let mut u = UnitAi {
+    let home = Position::new(31.5, 106.5, 0.0);
+    let ended = UnitAi {
         current_action: Some(AiAction::Move),
         idle_timer: Millis::new(10),
         ..deer()
     };
-    let mut r = wander_seed(false);
-    let place = deer_at(Position::new(31.5, 106.5, 0.0));
-    let moved = u
-        .update_fx(
-            Millis::new(10),
-            WorldTime::ZERO,
-            PlayerKind::Human,
-            &place,
-            &mut r,
-            &mut no_search,
-        )
-        .unwrap();
+    let mut world = animal_world(animal(ended, home), &[], wander_seed(false));
+    let (_, unit_ai, _) = animal_step(&mut world, Millis::new(10));
     assert_eq!(
-        (moved, u.current_action, u.idle_timer),
-        (vec![], None, Millis::new(20))
+        (
+            lone_walks(&world),
+            unit_ai.current_action,
+            unit_ai.idle_timer
+        ),
+        (None, None, Millis::new(20))
     );
-    // while it walks, its timers run and nothing else happens
-    let mut u = UnitAi {
+    let wandering = UnitAi {
         current_action: Some(AiAction::Move),
         ..deer()
     };
-    let walking = Surroundings {
-        flags: SurroundingFlags::BUSY,
-        ..place
+    let walking = SceneThing {
+        actions: Some(Action {
+            list: ActionList::default().with_move_to(Some(MoveToAction {
+                point: Position::new(33.5, 106.5, 0.0),
+                ..MoveToAction::sub_in(MoveTo::Moving)
+            })),
+            ..Action::default()
+        }),
+        ..animal(wandering, home)
     };
-    let _ = u
-        .update_fx(
-            Millis::new(10),
-            WorldTime::ZERO,
-            PlayerKind::Human,
-            &walking,
-            &mut r,
-            &mut no_search,
-        )
-        .unwrap();
+    let mut world = animal_world(walking, &[], wander_seed(false));
+    let (_, unit_ai, _) = animal_step(&mut world, Millis::new(10));
     assert_eq!(
-        (u.current_action, u.idle_timer, u.state_position),
+        (
+            unit_ai.current_action,
+            unit_ai.idle_timer,
+            unit_ai.state_position
+        ),
         (Some(AiAction::Move), Millis::new(5010), Point::ORIGIN)
     );
 }
@@ -5924,140 +5770,147 @@ fn scout() -> UnitAi {
     }
 }
 
-fn scout_at(interruptible: bool, busy: bool) -> Surroundings {
-    Surroundings {
-        position: Position::new(93.5, 58.25, 0.0),
-        flags: {
-            let mut flags = SurroundingFlags::empty();
-            flags.set(SurroundingFlags::BUSY, busy);
-            flags.set(SurroundingFlags::INTERRUPTIBLE, interruptible);
-            flags
-        },
-        player: PlayerId::new(1),
-        class: Some(class::CLASS_12),
-        roles: roles(),
-        slots: slots(),
-        unit_ai_tuning: tuning().unit_ai,
-        ..Surroundings::default()
-    }
-}
-
 #[test]
 fn between_turns_an_arrived_move_runs_the_next_queued_order() {
     // update 822: the MoveTo arrived (state 1, which slot 0x2d0 lets go), so FUN_140c68980
     // runs the queue: the first move becomes the AI's (order 710 at priority 100, action 610,
     // its point) and the unit's, forced and walking; the order leaves the queue
-    let mut u = scout();
-    let fx = u
-        .off_turn_fx(
-            &scout_at(true, true),
-            &mut no_search,
-            PlayerKind::Human,
-            &mut rng(),
-        )
-        .unwrap();
+    let mut world = lone_world(lone_scout(scout(), MoveTo::Arrived), &[]);
+    let (answer, unit_ai) = lone_off_turn(&mut world);
+    assert_eq!(answer, Ok(()));
     assert_eq!(
-        fx,
-        vec![Effect::Move(AiMove {
-            point: Position::new(89.09375, 60.677_082, 0.0),
-            range: Distance::ZERO,
-            force: OrderForce::Forced,
-            pace: Pace::Walk,
-        })]
+        lone_walks(&world),
+        Some((Position::new(89.09375, 60.677_082, 0.0), Distance::ZERO))
     );
     assert_eq!(
-        (u.current_order, u.order_priority.get(), u.current_action),
+        (
+            unit_ai.current_order,
+            unit_ai.order_priority.get(),
+            unit_ai.current_action
+        ),
         (Some(OrderKind::Move), 100, Some(AiAction::Move))
     );
-    assert_eq!(u.target_point, Position::new(89.09375, 60.677_082, 0.0));
-    assert_eq!(u.orders.len(), 1);
     assert_eq!(
-        u.orders[0].point,
+        unit_ai.target_point,
+        Position::new(89.09375, 60.677_082, 0.0)
+    );
+    assert_eq!(unit_ai.orders.len(), 1);
+    assert_eq!(
+        unit_ai.orders[0].point,
         Position::new(91.822_914, 52.489_582, 0.0)
     );
 }
 
+/// The scout 9183 (its unit AI `unit_ai`) as player 1's lone unit 50 at (93.5, 58.25), a
+/// walker of class 12 (master 448), its `MoveTo` to its place in `state`.
+fn lone_scout(unit_ai: UnitAi, state: MoveTo) -> SceneThing {
+    let at = Position::new(93.5, 58.25, 0.0);
+    let thing = lone_thing(player_id(1), unit_ai, at);
+    SceneThing {
+        master: Master {
+            id: master_id(448),
+            class: class::CLASS_12,
+            ..thing.master
+        },
+        actions: Some(Action {
+            list: ActionList::default().with_move_to(Some(MoveToAction {
+                point: at,
+                ..MoveToAction::sub_in(state)
+            })),
+            ..Action::default()
+        }),
+        ..thing
+    }
+}
+
+/// Player 1's lone unit 50 of `world` runs its check between turns ([`UnitAi::off_turn`]): its
+/// answer and its unit AI.
+fn lone_off_turn(world: &mut World) -> (GenieResult<()>, UnitAi) {
+    let answer = run_ai(
+        world,
+        (player_id(1), object_id(50)),
+        |ai, at, side, kind, rng| ai.off_turn(at, side, kind, rng),
+    );
+    (
+        answer,
+        world.parts.unit_ai.get(object_id(50)).unwrap().clone(),
+    )
+}
+
+/// Between turns a walking unit (its `MoveTo` moving: slot 0x2d0 holds it) or one with notifies
+/// keeps its queue and its walk; an order not ready stays and the next one runs.
 #[test]
 fn between_turns_walking_unit_or_one_with_notifies_keeps_its_queue() {
-    let mut walking = scout();
+    let at = Position::new(93.5, 58.25, 0.0);
+    let mut world = lone_world(lone_scout(scout(), MoveTo::Moving), &[]);
+    let (answer, unit_ai) = lone_off_turn(&mut world);
     assert_eq!(
-        walking.off_turn_fx(
-            &scout_at(false, true),
-            &mut no_search,
-            PlayerKind::Human,
-            &mut rng()
-        ),
-        Ok(vec![])
+        (answer, unit_ai.orders.len(), lone_walks(&world)),
+        (Ok(()), 2, Some((at, Distance::ZERO)))
     );
-    assert_eq!(walking.orders.len(), 2);
-    let mut told = UnitAi {
+    let told = UnitAi {
         notifies: vec![Notify::own(
-            object_id(9183),
+            object_id(50),
             NotifyKind::ACTION_COMPLETED,
             [AiAction::Move.value(), 0, 0],
         )],
         ..scout()
     };
+    let mut world = lone_world(lone_scout(told, MoveTo::Arrived), &[]);
+    let (answer, unit_ai) = lone_off_turn(&mut world);
     assert_eq!(
-        told.off_turn_fx(
-            &scout_at(true, true),
-            &mut no_search,
-            PlayerKind::Human,
-            &mut rng()
-        ),
-        Ok(vec![])
+        (answer, unit_ai.orders.len(), lone_walks(&world)),
+        (Ok(()), 2, Some((at, Distance::ZERO)))
     );
-    assert_eq!(told.orders.len(), 2);
     // an order not ready stays and the next one runs
-    let mut u = scout();
-    u.orders[0].ready = false;
-    let _ = u
-        .off_turn_fx(
-            &scout_at(true, true),
-            &mut no_search,
-            PlayerKind::Human,
-            &mut rng(),
-        )
-        .unwrap();
-    assert_eq!(u.orders.len(), 1);
-    assert_eq!(u.orders[0].point, Position::new(89.09375, 60.677_082, 0.0));
+    let mut waiting = scout();
+    waiting.orders[0].ready = false;
+    let mut world = lone_world(lone_scout(waiting, MoveTo::Arrived), &[]);
+    let (_, unit_ai) = lone_off_turn(&mut world);
+    assert_eq!(unit_ai.orders.len(), 1);
+    assert_eq!(
+        unit_ai.orders[0].point,
+        Position::new(89.09375, 60.677_082, 0.0)
+    );
 }
 
 #[test]
 fn completed_move_on_its_order_ends_the_order_and_stops_the_unit() {
     // the base handler's 0x1fa: 610 + 100 = 710, so slot 0xb0 ends the order too; the
     // notifies go with the owner's time; the queue then runs (the unit is no longer busy)
-    let mut u = UnitAi {
+    let arrived = UnitAi {
         orders: vec![],
         notifies: vec![Notify::own(
-            object_id(9183),
+            object_id(50),
             NotifyKind::ACTION_COMPLETED,
             [AiAction::Move.value(), 0, 0],
         )],
         ..scout()
     };
-    let mut r = rng();
-    let fx = u
-        .update_fx(
-            Millis::new(60),
-            WorldTime::from_millis(900),
-            PlayerKind::Human,
-            &scout_at(true, false),
-            &mut r,
-            &mut no_search,
-        )
-        .unwrap();
-    assert_eq!(fx, vec![Effect::Stop]);
+    let scout_unit = SceneThing {
+        actions: None,
+        ..lone_scout(arrived, MoveTo::Arrived)
+    };
+    let mut world = lone_world(scout_unit, &[]);
+    let (answer, unit_ai, _) = lone_step(&mut world, Millis::new(60), WorldTime::from_millis(900));
+    assert_eq!((answer, lone_walks(&world)), (Ok(None), None));
     assert_eq!(
-        (u.current_order, u.order_priority.get(), u.current_action),
+        (
+            unit_ai.current_order,
+            unit_ai.order_priority.get(),
+            unit_ai.current_action
+        ),
         (None, -1, None)
     );
     assert_eq!(
-        (u.last_order, u.last_action),
+        (unit_ai.last_order, unit_ai.last_action),
         (Some(OrderKind::Move), Some(AiAction::Move))
     );
-    assert_eq!(u.state_position, Point::new(93.5, 58.25));
-    assert_eq!((u.notifies.len(), u.last_update_time), (0, Millis::new(60)));
+    assert_eq!(unit_ai.state_position, Point::new(93.5, 58.25));
+    assert_eq!(
+        (unit_ai.notifies.len(), unit_ai.last_update_time),
+        (0, Millis::new(60))
+    );
 }
 
 /// A map of 200 by 200 with Gaia's unit `id` at `at` (a walker of class 11, master 4, on its
@@ -6208,31 +6061,27 @@ fn boar_failed_attack_runs_its_idle_check() {
 #[test]
 fn an_animal_completed_wander_becomes_its_last_action() {
     // the fox 9851 in 718: its MoveTo's completion through the hunted animal's handler to
-    // the base: no order, its action completed
-    let mut u = UnitAi {
+    // the base: no order, its action completed (its stop finds no action left)
+    let arrived = UnitAi {
         current_action: Some(AiAction::Move),
         idle_timer: Millis::ZERO,
         notifies: vec![Notify::own(
-            object_id(9851),
+            object_id(50),
             NotifyKind::ACTION_COMPLETED,
             [AiAction::Move.value(), 0, 0],
         )],
         ..deer()
     };
-    let mut r = wander_seed(false);
-    let fx = u
-        .update_fx(
-            Millis::new(60),
-            WorldTime::ZERO,
-            PlayerKind::Human,
-            &deer_at(Position::new(31.5, 106.5, 0.0)),
-            &mut r,
-            &mut no_search,
-        )
-        .unwrap();
-    assert_eq!(fx, vec![Effect::Stop]);
+    let home = Position::new(31.5, 106.5, 0.0);
+    let mut world = animal_world(animal(arrived, home), &[], wander_seed(false));
+    let (answer, unit_ai, _) = animal_step(&mut world, Millis::new(60));
+    assert_eq!(answer, Ok(None));
     assert_eq!(
-        (u.current_action, u.last_action),
+        world.parts.actions.of(object_id(50)).top_action_kind(),
+        None
+    );
+    assert_eq!(
+        (unit_ai.current_action, unit_ai.last_action),
         (None, Some(AiAction::Move))
     );
 }
@@ -6269,35 +6118,29 @@ fn movement_completion_reaches_only_moving_unit_ai() {
 #[test]
 fn livestock_ownership_notify_drops_its_action_value_and_breaks_off() {
     // FUN_140c26ac0: the notify ends the pass; the update's FUN_140c5dc10 clears the queue
-    let mut u = UnitAi {
+    let sheep = UnitAi {
         current_action: Some(AiAction::Move),
         notifies: vec![
-            Notify::own(object_id(9519), NotifyKind::OWNER_CHANGED, [2, 0, 0]),
+            Notify::own(object_id(50), NotifyKind::OWNER_CHANGED, [2, 0, 0]),
             Notify::own(
-                object_id(9519),
+                object_id(50),
                 NotifyKind::ACTION_COMPLETED,
                 [AiAction::Move.value(), 0, 0],
             ),
         ],
         ..idle(UnitAiKind::Livestock)
     };
-    let mut r = rng();
-    let fx = u
-        .update_fx(
-            Millis::new(60),
-            WorldTime::ZERO,
-            PlayerKind::Human,
-            &no_surroundings(),
-            &mut r,
-            &mut no_search,
-        )
-        .unwrap();
-    assert_eq!(fx, vec![]);
+    let mut world = lone_unit_world(sheep);
+    let (answer, unit_ai, _) = lone_step(&mut world, Millis::new(60), WorldTime::ZERO);
+    assert_eq!((answer, lone_walks(&world)), (Ok(None), None));
     assert_eq!(
-        (u.current_action, u.last_action),
+        (unit_ai.current_action, unit_ai.last_action),
         (None, Some(AiAction::Move))
     );
-    assert_eq!((u.notifies.len(), u.last_update_time), (0, Millis::new(60)));
+    assert_eq!(
+        (unit_ai.notifies.len(), unit_ai.last_update_time),
+        (0, Millis::new(60))
+    );
 }
 
 /// Slot 0x28: a unit past state 2 takes no order; one in front goes before the first queued
@@ -8822,70 +8665,31 @@ fn destroyed_tower_gives_up() {
     assert!(hears(&mut w, (player_id(1), 10), n).is_err());
 }
 
-/// The hunted animal's evade goes through `evasiveMoveTo` (slot 0x150 with 1 and 0,
-/// `FUN_140c4d140`): an object on its own point gives a point that is not a number, which
-/// becomes its own place minus one on each axis (above 5) before the map's hold.
+/// A deer evading an object on its own point steps off by one tile down and left, the object
+/// Gaia's wolf (no enemy); near the map's edge too.
 #[test]
 fn deer_evading_an_object_on_its_own_point_steps_off_by_one() {
-    let mut u = deer();
-    let mut r = wander_seed(false);
-    let place = Surroundings {
-        speed: Speed::new(1.2),
-        map: GridSize::new(120, 120),
-        ..deer_at(Position::new(31.5, 106.5, 0.0))
-    };
-    let on_top = |_: &Search<'_>| {
-        Ok(Found {
-            id: Some(object_id(9183)),
-            enemies: false,
-            position: Some(Position::new(31.5, 106.5, 0.0)),
-            fresh: true,
-            players: 0,
-            distance: WholeDistance::of_data(-1),
-            retries: [None; 3],
-        })
-    };
-    let moved = u
-        .update_idle(
-            Millis::new(10),
-            WorldTime::ZERO,
-            PlayerKind::Human,
-            &place,
-            &mut r,
-            &mut on_top.clone(),
-        )
-        .unwrap()
-        .unwrap();
-    assert_eq!(moved.point, Position::new(30.5, 105.5, 0.0));
-    let near_edge = Surroundings {
-        speed: Speed::new(1.2),
-        map: GridSize::new(120, 120),
-        ..deer_at(Position::new(3.5, 4.5, 0.0))
-    };
-    let mut u = deer();
-    let on_it = |_: &Search<'_>| {
-        Ok(Found {
-            id: Some(object_id(9183)),
-            enemies: false,
-            position: Some(Position::new(3.5, 4.5, 0.0)),
-            fresh: true,
-            players: 0,
-            distance: WholeDistance::of_data(-1),
-            retries: [None; 3],
-        })
-    };
-    let moved = u
-        .update_idle(
-            Millis::new(10),
-            WorldTime::ZERO,
-            PlayerKind::Human,
-            &near_edge,
-            &mut wander_seed(false),
-            &mut on_it.clone(),
-        )
-        .unwrap()
-        .unwrap();
-    assert_eq!(moved.point, Position::new(4.5, 5.5, 0.0));
+    for (at, off) in [
+        (
+            Position::new(31.5, 106.5, 0.0),
+            Position::new(30.5, 105.5, 0.0),
+        ),
+        (Position::new(3.5, 4.5, 0.0), Position::new(4.5, 5.5, 0.0)),
+    ] {
+        let wolf = [SceneThing::new(
+            9183,
+            PlayerId::GAIA,
+            walker(126, class::PREDATOR),
+            at,
+        )];
+        let mut world = animal_world(animal(deer(), at), &wolf, wander_seed(false));
+        let _ = animal_step(&mut world, Millis::new(10));
+        assert_eq!(
+            lone_walks(&world).map(|(point, _)| point),
+            Some(off),
+            "{at:?}"
+        );
+    }
 }
 
 /// A walker of radius 0.2 and speed 1 on land: master `id` of class `class`.
