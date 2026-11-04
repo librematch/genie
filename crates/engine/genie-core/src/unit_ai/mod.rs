@@ -123,7 +123,7 @@ pub use self::side::{
 pub use self::stop_order::StopOrder;
 pub use self::surroundings::{
     AiMove, Duel, Found, GroupState, Home, OrderForce, Pace, Seen, SurroundingFlags, Surroundings,
-    TopTarget, UnitSeen, flood_search, no_search,
+    TopTarget, UnitSeen, flood_search,
 };
 use self::surroundings::{LiveTop, group_lets_idle};
 pub use self::target_kind::OrderTargetKind;
@@ -560,7 +560,5 @@ use crate::objects::ObjectState;
 use crate::pathing::tile_path::Path;
 use crate::unit_ai::cared::classes;
 
-#[cfg(test)]
-mod test_sides;
 #[cfg(test)]
 mod tests;

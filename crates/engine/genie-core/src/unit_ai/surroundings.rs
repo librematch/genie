@@ -27,7 +27,6 @@ use crate::objects::{ObjectId, ObjectKey};
 use crate::ownership::CaptureKind;
 use crate::players::Chance;
 use crate::players::PlayerId;
-use crate::unit_ai::Search;
 use crate::world::Seconds;
 use crate::world::WorldTime;
 use crate::world::layer::Roles;
@@ -39,6 +38,8 @@ use std::collections::HashSet;
 /// What a [`Search`] answers: the object picked, if any, and whether the lists it read hold
 /// enemies (the fifth relation list), which sets the alert mode when its query ran (`fresh`; a
 /// search that read the last answer leaves the alert mode as it is).
+///
+/// [`Search`]: crate::unit_ai::Search
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Found {
     /// The object picked.
@@ -111,13 +112,6 @@ pub fn flood_search(
         }
     }
     Ok(None)
-}
-
-/// A search that never runs (units without a search).
-pub const fn no_search(_: &Search<'_>) -> Result<Found, GenieError> {
-    Err(GenieError::unsupported(
-        "a unit AI's search the caller does not answer",
-    ))
 }
 
 /// A boar's part of its unit AI (`TribeElephantUnitAIModule`, factory type 4), which its idle check

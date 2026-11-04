@@ -1,4 +1,5 @@
 use super::*;
+use crate::combat::attack::tests::own_attack;
 use crate::combat::attack::{ATTACK, AttackState};
 use crate::combat::{AttackTargetId, Firepower};
 use crate::commands::UnitOrderAction;
@@ -94,10 +95,12 @@ use crate::test_ids::object_id_list;
 use crate::test_ids::object_ids;
 use crate::test_ids::player_id;
 use crate::test_ids::task_id;
+use crate::testing::ai::run_ai;
 use crate::testing::attribute;
 use crate::testing::class;
 use crate::testing::ids;
 use crate::testing::roles;
+use crate::testing::scene::{Scene, Thing as SceneThing};
 use crate::testing::tuning;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::Answer;
@@ -107,7 +110,7 @@ use crate::unit_ai::NotifyKind;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::UnitAiKind;
 use crate::unit_ai::UnitStance;
-use crate::unit_ai::{Effect, Notify, OrderPriority, PatrolPath};
+use crate::unit_ai::{Notify, OrderPriority, PatrolPath};
 use crate::vision::VisionBits;
 use crate::vision::registry::Registry;
 use crate::vision::visibility::Visibility;
@@ -2258,7 +2261,8 @@ fn an_auto_scout_reaches_any_player_scout_of_its_first_60_ids() {
 
 /// `FUN_140c64d50`: the stance and its place are set; `NoAttack` on an attacking unit AI
 /// stops its action (keeping an order not of the action), asks for its stopAction and
-/// forgets its target; any other stance leaves them.
+/// forgets its target; any other stance leaves them. Player 1's soldier at (3, 4) attacks 40
+/// (its Attack waiting to swing).
 #[test]
 fn no_attack_stops_an_attacking_unit_ai_and_forgets_its_target() {
     let attacking = UnitAi {
@@ -2268,43 +2272,83 @@ fn no_attack_stops_an_attacking_unit_ai_and_forgets_its_target() {
         target_class: class_of(6),
         ..UnitAi::default()
     };
-    let mut ai = attacking;
-    let mut fx: Vec<Effect> = Vec::new();
-    set_stance(
-        &mut ai,
-        UnitStance::Defensive,
-        (Point::new(3.0, 4.0), Some(class::CLASS_6)),
-        &mut fx,
-        &mut Well512::default(),
-        &roles(),
-    )
-    .unwrap();
+    let soldier = Master {
+        id: master_id(4),
+        kind: MasterKind::COMBAT,
+        class: class::CLASS_6,
+        radius: Footprint::new(0.2, 0.2),
+        hit_points: MasterHitPoints::of_data(40),
+        ..Master::default()
+    };
+    let set = |stance| {
+        let thing = SceneThing {
+            ai: Some(attacking.clone()),
+            actions: Some(Action {
+                list: ActionList::default().with_attack(Some(own_attack(
+                    40,
+                    AttackState::Ready,
+                    Distance::new(1.0),
+                ))),
+                ..Action::default()
+            }),
+            ..SceneThing::new(
+                50,
+                player_id(1),
+                soldier.clone(),
+                Position::new(3.0, 4.0, 0.0),
+            )
+        };
+        let mut world = Scene::open(GridSize::new(32, 32))
+            .players(2)
+            .thing(thing)
+            .build();
+        let answer = run_ai(
+            &mut world,
+            (player_id(1), object_id(50)),
+            |ai, at, side, _, rng| {
+                set_stance(
+                    ai,
+                    stance,
+                    (at.position.ground(), at.class),
+                    side,
+                    rng,
+                    &at.roles,
+                )
+            },
+        );
+        assert_eq!(answer, Ok(()));
+        let unit_ai = world.parts.unit_ai.get(object_id(50)).unwrap().clone();
+        (
+            unit_ai,
+            world
+                .parts
+                .actions
+                .of(object_id(50))
+                .list
+                .attack()
+                .is_some(),
+        )
+    };
+    let (unit_ai, attacks) = set(UnitStance::Defensive);
     assert_eq!(
-        (ai.stance, ai.state_position),
+        (unit_ai.stance, unit_ai.state_position),
         (UnitStance::Defensive, Point::new(3.0, 4.0))
     );
     assert_eq!(
-        (ai.current_action, ai.current_target),
-        (Some(AiAction::Attack), Some(object_id(40)))
+        (unit_ai.current_action, unit_ai.current_target, attacks),
+        (Some(AiAction::Attack), Some(object_id(40)), true)
     );
-    assert_eq!(fx, []);
-    set_stance(
-        &mut ai,
-        UnitStance::NoAttack,
-        (Point::new(3.0, 5.0), Some(class::CLASS_6)),
-        &mut fx,
-        &mut Well512::default(),
-        &roles(),
-    )
-    .unwrap();
-    assert_eq!(ai.stance, UnitStance::NoAttack);
+    let (unit_ai, attacks) = set(UnitStance::NoAttack);
+    assert_eq!(unit_ai.stance, UnitStance::NoAttack);
     // order 700 is the action's (600 + 100): the stop ends it, the state position the place
-    assert_eq!((ai.current_order, ai.current_action), (None, None));
     assert_eq!(
-        (ai.current_target, ai.last_target),
+        (unit_ai.current_order, unit_ai.current_action, attacks),
+        (None, None, false)
+    );
+    assert_eq!(
+        (unit_ai.current_target, unit_ai.last_target),
         (None, Some(object_id(40)))
     );
-    assert_eq!(fx, [Effect::Stop]);
 }
 
 /// `FUN_140e6a7c0` after `FUN_140e55d30`: another player's unit takes the stance only while

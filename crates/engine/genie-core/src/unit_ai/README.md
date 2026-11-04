@@ -69,7 +69,6 @@ show in checkpoint word 9.
 | [`stop_order.rs`](stop_order.rs) | What a stop of the unit AI's current action does to its order (`StopOrder`). |
 | [`surroundings.rs`](surroundings.rs) | What the unit AI knows of its surroundings: the searches' results, its home, its targets and what it has seen. |
 | [`target_kind.rs`](target_kind.rs) | A queued order's target type: the number its writer puts there, a master id or a class, and the two ways the game reads it. |
-| [`test_sides.rs`](test_sides.rs) | Tests: The tests' sides that record the unit's calls (`UnitSide::effect_now`): a list of them standing for a side without a unit, and `With` around another test side. |
 | [`tests.rs`](tests.rs) | Tests. |
 | [`unit.rs`](unit.rs) | The unit AI's part of the update: its surroundings, its side and its run. |
 | [`unit_stance.rs`](unit_stance.rs) | A unit's stance: how far it goes after what it sees. |
