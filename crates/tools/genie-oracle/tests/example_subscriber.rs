@@ -49,7 +49,9 @@ fn without_rust_log_no_subscriber_is_installed() {
 
 #[test]
 fn rust_log_that_does_not_parse_is_an_error_that_names_it() {
-    let text = support::filter(Some("genie_core=loud")).unwrap_err();
+    let text = support::filter(Some("genie_core=loud"))
+        .unwrap_err()
+        .to_string();
     assert!(text.contains("RUST_LOG"), "{text}");
     assert!(text.contains("genie_core=loud"), "{text}");
 }

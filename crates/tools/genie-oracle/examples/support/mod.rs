@@ -5,6 +5,7 @@
 //! The lines carry no time and no colours: two runs of one recording give the same log, so two
 //! logs can be compared line by line, and a log attached to a bug report reads as plain text.
 
+use genie_core::{GenieError, GenieResult};
 use std::io::stderr;
 use tracing::Subscriber;
 use tracing::subscriber::set_global_default;
@@ -16,13 +17,15 @@ use tracing_subscriber::fmt::MakeWriter;
 /// # Errors
 ///
 /// When the value does not parse as a filter: the message names `RUST_LOG` and the value.
-pub fn filter(rust_log: Option<&str>) -> Result<Option<EnvFilter>, String> {
+pub fn filter(rust_log: Option<&str>) -> GenieResult<Option<EnvFilter>> {
     let Some(value) = rust_log.filter(|text| !text.trim().is_empty()) else {
         return Ok(None);
     };
-    EnvFilter::try_new(value)
-        .map(Some)
-        .map_err(|parse_error| format!("RUST_LOG `{value}`: {parse_error}"))
+    EnvFilter::try_new(value).map(Some).map_err(|source| {
+        GenieError::invalid_input("RUST_LOG does not parse as a filter")
+            .with("value", value)
+            .with_source(source)
+    })
 }
 
 /// The subscriber that writes the events and spans `filter` lets through to `writer`.
@@ -45,9 +48,11 @@ where
 /// # Errors
 ///
 /// When the filter does not parse, or a global subscriber is installed already.
-pub fn install(rust_log: Option<&str>) -> Result<(), String> {
+pub fn install(rust_log: Option<&str>) -> GenieResult<()> {
     let Some(filter) = filter(rust_log)? else {
         return Ok(());
     };
-    set_global_default(subscriber(filter, stderr)).map_err(|error| error.to_string())
+    set_global_default(subscriber(filter, stderr)).map_err(|source| {
+        GenieError::invalid_input("a global subscriber is installed already").with_source(source)
+    })
 }

@@ -19,7 +19,6 @@ nom = { version = "7.1.1", default-features = false, features = ["std"] }
 rgb.workspace = true
 
 [dev-dependencies]
-anyhow.workspace = true
 
 [lints]
 workspace = true

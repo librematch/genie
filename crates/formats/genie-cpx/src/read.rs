@@ -294,7 +294,6 @@ where
 mod tests {
     use super::*;
     use crate::{AOE_AOK, AOE1_DE, AOE2_DE};
-    use anyhow::Context;
     use std::fs::File;
 
     /// A fixed string longer than the input fails at its end, not on its allocation.
@@ -306,7 +305,7 @@ mod tests {
 
     /// A scenario the campaign does not hold, by index or by name, is missing data.
     #[test]
-    fn scenario_the_campaign_does_not_hold_is_missing() -> anyhow::Result<()> {
+    fn scenario_the_campaign_does_not_hold_is_missing() -> GenieResult<()> {
         let file = File::open("test/campaigns/Armies at War A Combat Showcase.cpn")?;
         let mut campaign = Campaign::read_from(file)?;
         for error in [
@@ -327,7 +326,7 @@ mod tests {
     /// Try to parse a file with an encoding that is not compatible with UTF-8.
     /// Source: <http://aok.heavengames.com/blacksmith/showfile.php?fileid=884>
     #[test]
-    fn detect_encoding() -> anyhow::Result<()> {
+    fn detect_encoding() -> GenieResult<()> {
         let file = File::open("./test/campaigns/DER FALL VON SACSAHUAMAN - TEIL I.cpx")?;
         let cpx = Campaign::read_from(file)?;
         assert_eq!(cpx.version(), AOE_AOK);
@@ -349,9 +348,9 @@ mod tests {
 
     /// Source: <http://aoe.heavengames.com/dl-php/showfile.php?fileid=1678>
     #[test]
-    fn aoe1_trial_cpn() -> anyhow::Result<()> {
+    fn aoe1_trial_cpn() -> GenieResult<()> {
         let file = File::open("test/campaigns/Armies at War A Combat Showcase.cpn")?;
-        let mut campaign = Campaign::read_from(file).context("could not read meta")?;
+        let mut campaign = Campaign::read_from(file)?;
 
         assert_eq!(campaign.version(), AOE_AOK);
         assert_eq!(campaign.name(), "Armies at War, A Combat Showcase");
@@ -367,20 +366,16 @@ mod tests {
             .collect();
         assert_eq!(filenames, vec!["Bronze Age Art of War.scn"]);
 
-        let by_index = campaign
-            .by_index_raw(0)
-            .context("could not read raw file")?;
-        let by_name = campaign
-            .by_name_raw("Bronze Age Art of War.scn")
-            .context("could not read raw file")?;
+        let by_index = campaign.by_index_raw(0)?;
+        let by_name = campaign.by_name_raw("Bronze Age Art of War.scn")?;
         assert_eq!(by_index, by_name);
         Ok(())
     }
 
     #[test]
-    fn aoe1_beta_cpn() -> anyhow::Result<()> {
+    fn aoe1_beta_cpn() -> GenieResult<()> {
         let file = File::open("test/campaigns/Rise of Egypt Learning Campaign.cpn")?;
-        let campaign = Campaign::read_from(file).context("could not read meta")?;
+        let campaign = Campaign::read_from(file)?;
 
         assert_eq!(campaign.version(), AOE_AOK);
         assert_eq!(campaign.name(), "Rise of Egypt Learning Campaign");
@@ -410,7 +405,7 @@ mod tests {
     }
 
     #[test]
-    fn aoe_de() -> anyhow::Result<()> {
+    fn aoe_de() -> GenieResult<()> {
         let file = File::open("test/campaigns/10 The First Punic War.aoecpn")?;
         let campaign = Campaign::read_from(file)?;
 

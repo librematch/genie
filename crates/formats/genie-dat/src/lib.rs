@@ -217,6 +217,7 @@ impl DatFile {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use genie_error::GenieResult;
     #[cfg(test)]
     use std::fs::read;
     use std::{
@@ -227,7 +228,7 @@ mod tests {
     };
 
     #[test]
-    fn aok() -> anyhow::Result<()> {
+    fn aok() -> GenieResult<()> {
         let mut file = File::open("fixtures/aok.dat")?;
         let dat = DatFile::read_from(&mut file)?;
         assert_eq!(dat.civilizations.len(), 14);
@@ -235,7 +236,7 @@ mod tests {
     }
 
     #[test]
-    fn aoc() -> anyhow::Result<()> {
+    fn aoc() -> GenieResult<()> {
         let mut file = File::open("fixtures/aoc1.0c.dat")?;
         let dat = DatFile::read_from(&mut file)?;
         assert_eq!(dat.civilizations.len(), 19);
@@ -243,7 +244,7 @@ mod tests {
     }
 
     #[test]
-    fn non_7bit_ascii_tech_name() -> anyhow::Result<()> {
+    fn non_7bit_ascii_tech_name() -> GenieResult<()> {
         let mut file = File::open("fixtures/age-of-chivalry.dat")?;
         let dat = DatFile::read_from(&mut file)?;
         assert_eq!(dat.techs[859].name(), "Székely (enable)");
@@ -251,7 +252,7 @@ mod tests {
     }
 
     #[test]
-    fn hd_edition() -> anyhow::Result<()> {
+    fn hd_edition() -> GenieResult<()> {
         let mut file = File::open("fixtures/hd.dat")?;
         let dat = DatFile::read_from(&mut file)?;
         assert_eq!(dat.civilizations.len(), 32);
@@ -259,7 +260,7 @@ mod tests {
     }
 
     #[test]
-    fn reserialize() -> anyhow::Result<()> {
+    fn reserialize() -> GenieResult<()> {
         let original = read("fixtures/aoc1.0c.dat")?;
         let mut cursor = Cursor::new(&original);
         let dat = DatFile::read_from(&mut cursor)?;

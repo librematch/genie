@@ -23,7 +23,6 @@ genie-scx = { version = "5.0.0", path = "../genie-scx" }
 genie-support = { version = "1.0.0", path = "../genie-support" }
 
 [dev-dependencies]
-anyhow.workspace = true
 
 [lints]
 workspace = true

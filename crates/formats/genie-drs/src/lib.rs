@@ -5,7 +5,7 @@
 //! ## Example
 //!
 //! ```rust
-//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! # fn main() -> genie_error::GenieResult<()> {
 //! use std::fs::File;
 //! use genie_drs::DrsReader;
 //!
@@ -15,7 +15,7 @@
 //! for table in drs.tables() {
 //!     for resource in table.resources() {
 //!         let content = drs.read_resource(&mut file, table.resource_kind, resource.id)?;
-//!         println!("{}: {:?}", resource.id, std::str::from_utf8(&content)?);
+//!         println!("{}: {:?}", resource.id, String::from_utf8_lossy(&content));
 //!     }
 //! }
 //! # Ok(())
@@ -53,7 +53,7 @@ type DrsVersion = [u8; 4];
 ///
 /// ## Examples
 /// ```rust
-/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// # fn main() -> genie_error::GenieResult<()> {
 /// use genie_drs::ResourceKind;
 /// let slp = ResourceKind::try_from(*b" pls")?;
 /// assert_eq!(&slp, "slp", "implements AsRef<str>");
@@ -399,7 +399,7 @@ mod tests {
     use std::fs::File;
 
     #[test]
-    fn it_works() -> anyhow::Result<()> {
+    fn it_works() -> GenieResult<()> {
         let mut file = File::open("test.drs")?;
         let drs = DrsReader::new(&mut file)?;
         let mut expected = vec![

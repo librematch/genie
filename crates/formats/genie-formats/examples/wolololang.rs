@@ -4,6 +4,7 @@
 //! The order in which string keys are written to the output file is currently
 //! unspecified.
 
+use genie_error::GenieResult;
 use genie_formats::lang::LangFileKind::KeyValue;
 use std::fs::File;
 use std::path::PathBuf;
@@ -26,7 +27,7 @@ struct WololoLang {
 
 /// Collects command line input and converts the specified key-value language
 /// file into an ini language file.
-fn main() -> anyhow::Result<()> {
+fn main() -> GenieResult<()> {
     let cli_input = WololoLang::from_args();
     let mut in_file = File::open(&cli_input.path_in)?;
     let lang_file = KeyValue.read_from(&mut in_file)?;

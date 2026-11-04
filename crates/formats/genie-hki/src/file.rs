@@ -69,7 +69,7 @@ impl HotkeyInfo {
     /// Gets the file version.
     ///
     /// ```rust
-    /// # fn main() -> anyhow::Result<()> {
+    /// # fn main() -> genie_error::GenieResult<()> {
     /// use std::fs::File;
     /// use genie_hki::HotkeyInfo;
     /// let mut file = File::open("test/files/aoc1.hki")?;
@@ -89,7 +89,7 @@ impl HotkeyInfo {
     /// Returns an immutable reference to a hotkey group, if that group exists.
     ///
     /// ```rust
-    /// # fn main() -> anyhow::Result<()> {
+    /// # fn main() -> genie_error::GenieResult<()> {
     /// use std::fs::File;
     /// use genie_hki::{HotkeyInfo, HotkeyGroupId};
     /// let mut file = File::open("test/files/aoc1.hki")?;
@@ -110,7 +110,7 @@ impl HotkeyInfo {
 
     /// Returns the number of hotkey groups in this info's hotkey file.
     /// ```rust
-    /// # fn main() -> anyhow::Result<()> {
+    /// # fn main() -> genie_error::GenieResult<()> {
     /// use std::fs::File;
     /// use genie_hki::HotkeyInfo;
     ///

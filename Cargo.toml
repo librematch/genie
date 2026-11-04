@@ -42,7 +42,6 @@ repository = "https://github.com/librematch/genie"
 
 [workspace.dependencies]
 structopt = "0.3.26"
-anyhow = "1.0.65"
 simplelog = "0.12.0"
 byteorder = "1.4.3"
 flate2 = { version = "1.0.24", features = [

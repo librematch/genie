@@ -144,12 +144,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "anyhow"
-version = "1.0.104"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "330a5ed07fa54e4702c9d6c4174f74427fc0ef6e214bbd677ae50a5099946470"
-
-[[package]]
 name = "arc-swap"
 version = "1.9.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -706,7 +700,6 @@ dependencies = [
 name = "genie-cpx"
 version = "0.6.0"
 dependencies = [
- "anyhow",
  "byteorder",
  "chardet",
  "encoding_rs",
@@ -719,7 +712,6 @@ dependencies = [
 name = "genie-dat"
 version = "0.2.0"
 dependencies = [
- "anyhow",
  "arrayvec 0.7.8",
  "binrw",
  "byteorder",
@@ -751,7 +743,6 @@ dependencies = [
 name = "genie-drs"
 version = "0.2.1"
 dependencies = [
- "anyhow",
  "byteorder",
  "genie-error",
  "sorted-vec",
@@ -768,11 +759,11 @@ dependencies = [
 name = "genie-formats"
 version = "0.6.0"
 dependencies = [
- "anyhow",
  "flate2",
  "genie-cpx",
  "genie-dat",
  "genie-drs",
+ "genie-error",
  "genie-hki",
  "genie-json",
  "genie-lang",
@@ -790,7 +781,6 @@ dependencies = [
 name = "genie-hki"
 version = "0.3.0"
 dependencies = [
- "anyhow",
  "byteorder",
  "flate2",
  "genie-error",
@@ -828,7 +818,6 @@ dependencies = [
 name = "genie-lang"
 version = "0.3.0"
 dependencies = [
- "anyhow",
  "byteorder",
  "encoding_rs",
  "encoding_rs_io",
@@ -902,7 +891,6 @@ dependencies = [
 name = "genie-rec"
 version = "0.2.0"
 dependencies = [
- "anyhow",
  "arrayvec 0.7.8",
  "binrw",
  "byteorder",
@@ -926,7 +914,6 @@ dependencies = [
 name = "genie-scx"
 version = "5.0.0"
 dependencies = [
- "anyhow",
  "byteorder",
  "flate2",
  "genie-error",
@@ -941,7 +928,6 @@ dependencies = [
 name = "genie-support"
 version = "1.0.0"
 dependencies = [
- "anyhow",
  "byteorder",
  "encoding_rs",
  "genie-error",
@@ -1119,7 +1105,6 @@ checksum = "8f42a60cbdf9a97f5d2305f08a87dc4e09308d1276d28c869c684d7777685682"
 name = "jascpal"
 version = "0.1.1"
 dependencies = [
- "anyhow",
  "genie-error",
  "nom",
  "rgb",

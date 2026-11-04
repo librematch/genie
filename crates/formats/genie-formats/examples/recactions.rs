@@ -1,5 +1,6 @@
 //! Prints every action (player command) in the body of a recorded game.
 
+use genie_error::GenieResult;
 use genie_formats::RecordedGame;
 use std::fs::File;
 use std::path::PathBuf;
@@ -12,7 +13,7 @@ struct Cli {
     filename: PathBuf,
 }
 
-fn main() -> anyhow::Result<()> {
+fn main() -> GenieResult<()> {
     let Cli { filename } = Cli::from_args();
 
     let file = File::open(filename)?;

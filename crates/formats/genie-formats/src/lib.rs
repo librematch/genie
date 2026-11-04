@@ -12,7 +12,7 @@
 //! exposed in the public API.
 //!
 //! ```rust
-//! # fn main() -> anyhow::Result<()> {
+//! # fn main() -> genie_error::GenieResult<()> {
 //! use genie_formats::DatFile;
 //! let mut input = std::fs::File::open("../genie-dat/fixtures/aok.dat")?;
 //!
@@ -33,7 +33,7 @@
 //! refer to terrains or units that do not exist in the different version.
 //!
 //! ```rust
-//! # fn main() -> anyhow::Result<()> {
+//! # fn main() -> genie_error::GenieResult<()> {
 //! use genie_formats::Scenario;
 //! use genie_formats::scx::VersionBundle;
 //!

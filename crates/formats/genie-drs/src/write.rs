@@ -273,7 +273,7 @@ where
 /// ```rust
 /// use std::{io::Cursor, fs::File};
 /// use genie_drs::{DrsWriter, InMemoryStrategy};
-/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// # fn main() -> genie_error::GenieResult<()> {
 /// let buf = Cursor::new(vec![]);
 /// let mut writer = DrsWriter::new(buf, InMemoryStrategy::default())?;
 /// writer.add("bina", 50500, "JASC-PAL\r\n0100\r\n...".as_bytes())?;
@@ -422,7 +422,7 @@ mod test {
 
     /// More files than a reserved directory holds fail to add.
     #[test]
-    fn reserved_directory_refuses_one_file_too_many() -> anyhow::Result<()> {
+    fn reserved_directory_refuses_one_file_too_many() -> GenieResult<()> {
         let mut drs = DrsWriter::new(Cursor::new(vec![]), ReserveDirectoryStrategy::new(2, 1))?;
         drs.add("txt", 1, &b"a"[..])?;
         assert!(invalid(&drs.add("txt", 2, &b"b"[..]).unwrap_err()));
@@ -431,7 +431,7 @@ mod test {
 
     /// More tables than a reserved directory holds fail to close.
     #[test]
-    fn reserved_directory_refuses_one_table_too_many() -> anyhow::Result<()> {
+    fn reserved_directory_refuses_one_table_too_many() -> GenieResult<()> {
         let mut drs = DrsWriter::new(Cursor::new(vec![]), ReserveDirectoryStrategy::new(1, 2))?;
         drs.add("txt", 1, &b"a"[..])?;
         drs.add("bin", 2, &b"b"[..])?;
@@ -441,7 +441,7 @@ mod test {
 
     /// A resource type of more than 4 bytes or of bytes that are no UTF-8 fails to add.
     #[test]
-    fn bad_resource_kind_fails_to_add() -> anyhow::Result<()> {
+    fn bad_resource_kind_fails_to_add() -> GenieResult<()> {
         let mut drs = DrsWriter::new(Cursor::new(vec![]), InMemoryStrategy::default())?;
         assert!(invalid(&drs.add("toolong", 1, &b"a"[..]).unwrap_err()));
         assert!(invalid(&drs.add(&[0xff_u8][..], 1, &b"a"[..]).unwrap_err()));
@@ -462,7 +462,7 @@ mod test {
     }
 
     #[test]
-    fn one_file_reserve() -> anyhow::Result<()> {
+    fn one_file_reserve() -> GenieResult<()> {
         let output = Cursor::new(vec![]);
         let mut drs = DrsWriter::new(output, ReserveDirectoryStrategy::new(1, 1))?;
         drs.add("txt", 1, &b"example test file"[..])?;
@@ -472,7 +472,7 @@ mod test {
     }
 
     #[test]
-    fn one_file_memory() -> anyhow::Result<()> {
+    fn one_file_memory() -> GenieResult<()> {
         let output = Cursor::new(vec![]);
         let mut drs = DrsWriter::new(output, InMemoryStrategy::default())?;
         drs.add("txt", 1, &b"example test file"[..])?;

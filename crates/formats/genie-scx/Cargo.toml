@@ -27,7 +27,6 @@ rgb.workspace = true
 num_enum.workspace = true
 
 [dev-dependencies]
-anyhow.workspace = true
 
 [lints]
 workspace = true

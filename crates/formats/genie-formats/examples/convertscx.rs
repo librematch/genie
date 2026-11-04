@@ -1,6 +1,7 @@
 //! Converts a scenario file to another game version, optionally applying the `WololoKingdoms`
 //! unit and terrain conversion.
 
+use genie_error::GenieResult;
 use genie_formats::Scenario;
 use genie_formats::scx::{VersionBundle, convert::AutoToWk};
 use std::{fs::File, path::PathBuf};
@@ -22,7 +23,7 @@ struct Cli {
     version: Option<String>,
 }
 
-fn main() -> anyhow::Result<()> {
+fn main() -> GenieResult<()> {
     let Cli {
         input,
         output,

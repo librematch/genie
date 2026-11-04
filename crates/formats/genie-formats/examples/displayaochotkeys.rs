@@ -6,6 +6,7 @@
 // Example language file path:
 // D:\SteamLibrary\steamapps\common\Age2HD\resources\en\strings\key-value\key-value-strings-utf8.txt
 
+use genie_error::GenieResult;
 use genie_formats::hki::HotkeyInfo;
 use genie_formats::hki::default_him;
 use genie_formats::lang::LangFileKind;
@@ -33,7 +34,7 @@ struct DisplayLang {
 }
 
 /// Displays the hotkeys from a hotkey file and language file given to `stdout`.
-fn main() -> anyhow::Result<()> {
+fn main() -> GenieResult<()> {
     let cli_input = DisplayLang::from_args();
 
     let mut lang_input = File::open(&cli_input.lang_file_name)?;

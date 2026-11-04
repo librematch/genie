@@ -1,4 +1,5 @@
 use crate::{GameVariant, GameVersion};
+use genie_error::GenieResult;
 use std::cmp::min;
 use std::io;
 use std::io::{BufRead, Read};
@@ -88,12 +89,12 @@ pub trait Peek {
     ///
     /// # Errors
     ///
-    /// Returns an error if reading from the underlying stream fails.
-    fn peek(&mut self, amount: usize) -> io::Result<&[u8]>;
+    /// The underlying stream's read error.
+    fn peek(&mut self, amount: usize) -> GenieResult<&[u8]>;
 }
 
 impl<R: Read> Peek for &mut InflatableReader<R> {
-    fn peek(&mut self, amount: usize) -> io::Result<&[u8]> {
+    fn peek(&mut self, amount: usize) -> GenieResult<&[u8]> {
         (*self).peek(amount)
     }
 }
@@ -102,7 +103,7 @@ impl<R: Read> Peek for InflatableReader<R> {
     /// Peek into inner reader, returns a slice owned by the [`InflatableReader`],
     /// if data isn't available in the buffer yet, it will read it into the inner buffer
     /// and inflate the buffer if needed.
-    fn peek(&mut self, amount: usize) -> io::Result<&[u8]> {
+    fn peek(&mut self, amount: usize) -> GenieResult<&[u8]> {
         // cache this info, since we fuck around with position_in_buffer
         let buffered_data_length = self.inflatable_buffer.len() - self.position_in_buffer;
 
@@ -277,7 +278,7 @@ impl<R: Read> Read for RecordingHeaderReader<R> {
 }
 
 impl<R: Read> Peek for RecordingHeaderReader<R> {
-    fn peek(&mut self, amount: usize) -> io::Result<&[u8]> {
+    fn peek(&mut self, amount: usize) -> GenieResult<&[u8]> {
         self.inner.peek(amount)
     }
 }

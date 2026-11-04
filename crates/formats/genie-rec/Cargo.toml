@@ -26,7 +26,6 @@ genie-support = { version = "1.0.0", path = "../genie-support", features = [
 ] }
 
 [dev-dependencies]
-anyhow.workspace = true
 
 [lints]
 workspace = true

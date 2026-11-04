@@ -10,21 +10,23 @@
 //! With `RUST_LOG` set, the engine's log goes to stderr as text lines
 //! (`RUST_LOG=genie_core::unsupported=warn` …, docs/DEBUGGING.md).
 
+mod cli;
 mod support;
 
+use crate::cli::{number, usage};
+use genie_core::GenieResult;
 use genie_oracle::census::census_run;
 use genie_oracle::install::read as install_read;
 use std::env::{args, var};
-use std::error::Error;
 use std::fs::read;
 
-fn main() -> Result<(), Box<dyn Error>> {
+fn main() -> GenieResult<()> {
     support::install(var("RUST_LOG").ok().as_deref())?;
     let args: Vec<String> = args().collect();
     let (rec, dat, limit) = match &args[1..] {
         [rec, dat] => (rec, dat, None),
-        [rec, dat, updates] => (rec, dat, Some(updates.parse()?)),
-        _ => return Err("usage: census REC DAT [UPDATES]".into()),
+        [rec, dat, updates] => (rec, dat, Some(number(updates)?)),
+        _ => return Err(usage("usage: census REC DAT [UPDATES]")),
     };
     let recording = read(rec)?;
     let masters = install_read(dat.as_ref())?;

@@ -25,7 +25,6 @@ jascpal = { version = "^0.1.0", path = "../jascpal" }
 num_enum.workspace = true
 
 [dev-dependencies]
-anyhow.workspace = true
 
 [lints]
 workspace = true

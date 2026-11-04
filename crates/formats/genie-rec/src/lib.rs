@@ -405,7 +405,7 @@ mod tests {
     }
 
     #[test]
-    fn aoc_1_0_rec() -> anyhow::Result<()> {
+    fn aoc_1_0_rec() -> GenieResult<()> {
         let file = File::open("test/missyou_finally_vs_11.mgx")?;
         let mut recorded_game = RecordedGame::new(file)?;
         let _ = recorded_game.header()?;
@@ -415,14 +415,14 @@ mod tests {
                 Err(error) if error.reason() == "a string that does not decode as WINDOWS-1252" => {
                     // Skip invalid utf8 chat for now
                 }
-                Err(err) => return Err(err.into()),
+                Err(error) => return Err(error),
             }
         }
         Ok(())
     }
 
     #[test]
-    fn aok_rec() -> anyhow::Result<()> {
+    fn aok_rec() -> GenieResult<()> {
         let file = File::open("test/aok.mgl")?;
         let mut recorded_game = RecordedGame::new(file)?;
         let _ = recorded_game.header()?;

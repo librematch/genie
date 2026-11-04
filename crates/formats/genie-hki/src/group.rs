@@ -97,7 +97,7 @@ impl HotkeyGroup {
 
     /// Returns the number of hotkeys in this `HotkeyGroup`.
     /// ```rust
-    /// # fn main() -> anyhow::Result<()> {
+    /// # fn main() -> genie_error::GenieResult<()> {
     /// use std::fs::File;
     /// use genie_hki::HotkeyInfo;
     /// let mut file = File::open("test/files/aoc1.hki")?;
@@ -105,8 +105,8 @@ impl HotkeyGroup {
     /// // Villager hotkeys are group 3 in AoC and HD Edition.
     /// let group = info
     ///     .group(3)
-    ///     .ok_or_else(|| anyhow::anyhow!("the file holds no villager hotkeys"))?;
-    /// assert_eq!(28, group.num_hotkeys());
+    /// .ok_or_else(|| genie_error::GenieError::missing_data("the file holds no villager
+    /// hotkeys"))?; assert_eq!(28, group.num_hotkeys());
     /// # Ok(()) }
     /// ```
     #[must_use]

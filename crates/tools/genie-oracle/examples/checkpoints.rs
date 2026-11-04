@@ -7,22 +7,24 @@
 //! With `RUST_LOG` set, the engine's log goes to stderr as text lines
 //! (`RUST_LOG=genie_core::unsupported=warn` …, docs/DEBUGGING.md).
 
+use crate::cli::{number, usage};
+use genie_core::GenieResult;
 use genie_oracle::install::read as install_read;
 use genie_oracle::views::checkpoints;
 use std::env::{args, var};
-use std::error::Error;
 use std::fs::read;
 
+mod cli;
 mod support;
 
-fn main() -> Result<(), Box<dyn Error>> {
+fn main() -> GenieResult<()> {
     support::install(var("RUST_LOG").ok().as_deref())?;
     let args: Vec<String> = args().collect();
     let [_, rec, dat, updates] = &args[..] else {
-        return Err("usage: checkpoints REC DAT UPDATES".into());
+        return Err(usage("usage: checkpoints REC DAT UPDATES"));
     };
     let recording = read(rec)?;
     let masters = install_read(dat.as_ref())?;
-    print!("{}", checkpoints(&recording, &masters, updates.parse()?)?);
+    print!("{}", checkpoints(&recording, &masters, number(updates)?)?);
     Ok(())
 }

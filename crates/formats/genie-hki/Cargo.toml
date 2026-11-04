@@ -22,7 +22,6 @@ genie-lang = { version = "0.3.0", path = "../genie-lang" }
 genie-support = { version = "1.0.0", path = "../genie-support" }
 
 [dev-dependencies]
-anyhow.workspace = true
 
 [lints]
 workspace = true

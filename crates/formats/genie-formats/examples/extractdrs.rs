@@ -1,6 +1,7 @@
 //! Lists, extracts or adds resources in a .drs archive.
 
 use genie_drs::{DrsReader, DrsTable, DrsWriter, ReserveDirectoryStrategy};
+use genie_error::{GenieError, GenieResult};
 use std::collections::HashSet;
 use std::fs::rename;
 use std::fs::{File, create_dir_all};
@@ -80,7 +81,7 @@ struct Add {
     file: Vec<PathBuf>,
 }
 
-fn list(args: List) -> anyhow::Result<()> {
+fn list(args: List) -> GenieResult<()> {
     let mut file = File::open(args.archive)?;
     let drs = DrsReader::new(&mut file)?;
 
@@ -93,7 +94,7 @@ fn list(args: List) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn get(args: Get) -> anyhow::Result<()> {
+fn get(args: Get) -> GenieResult<()> {
     let mut file = File::open(args.archive)?;
     let drs = DrsReader::new(&mut file)?;
 
@@ -112,7 +113,7 @@ fn get(args: Get) -> anyhow::Result<()> {
     .into())
 }
 
-fn extract(args: Extract) -> anyhow::Result<()> {
+fn extract(args: Extract) -> GenieResult<()> {
     let mut file = File::open(args.archive)?;
     let drs = DrsReader::new(&mut file)?;
 
@@ -137,7 +138,16 @@ fn extract(args: Extract) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn add(args: Add) -> anyhow::Result<()> {
+/// A count of tables or files as the archive stores it.
+fn count(len: usize) -> GenieResult<u32> {
+    u32::try_from(len).map_err(|source| {
+        GenieError::invalid_input("a .drs archive holds at most u32::MAX tables and files")
+            .with("count", len)
+            .with_source(source)
+    })
+}
+
+fn add(args: Add) -> GenieResult<()> {
     assert_eq!(
         args.file.len(),
         args.table.len(),
@@ -152,10 +162,10 @@ fn add(args: Add) -> anyhow::Result<()> {
     let mut input = File::open(&args.archive)?;
     let drs_read = DrsReader::new(&mut input)?;
 
-    let tables = u32::try_from(drs_read.tables().len())?;
-    let files = u32::try_from(drs_read.tables().map(DrsTable::len).sum::<usize>())?;
-    let new_tables = u32::try_from(args.table.iter().collect::<HashSet<_>>().len())?;
-    let new_files = u32::try_from(args.id.len())?;
+    let tables = count(drs_read.tables().len())?;
+    let files = count(drs_read.tables().map(DrsTable::len).sum::<usize>())?;
+    let new_tables = count(args.table.iter().collect::<HashSet<_>>().len())?;
+    let new_files = count(args.id.len())?;
 
     let suffix = SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
@@ -210,7 +220,7 @@ fn add(args: Add) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn main() -> anyhow::Result<()> {
+fn main() -> GenieResult<()> {
     let args = Cli::from_args();
 
     match args.command {

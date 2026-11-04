@@ -22,7 +22,6 @@ encoding_rs = { version = "0.8.31", optional = true }
 strings = ["encoding_rs"]
 
 [dev-dependencies]
-anyhow.workspace = true
 
 [lints]
 workspace = true

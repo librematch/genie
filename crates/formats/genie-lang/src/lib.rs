@@ -8,7 +8,7 @@
 //!
 //! ## DLLs
 //! ```rust
-//! # fn main() -> anyhow::Result<()> {
+//! # fn main() -> genie_error::GenieResult<()> {
 //! use genie_lang::{LangFileKind::Dll, StringKey};
 //! use std::fs::File;
 //! let file = File::open("./test/dlls/language_x1_p1.dll")?;
@@ -33,7 +33,7 @@
 //!
 //! ## INI files
 //! ```rust
-//! # fn main() -> anyhow::Result<()> {
+//! # fn main() -> genie_error::GenieResult<()> {
 //! use genie_lang::{LangFileKind::Ini, StringKey};
 //! use std::io::Cursor;
 //! let text = br#"
@@ -51,7 +51,7 @@
 //!
 //! ## HD key-value files
 //! ```rust
-//! # fn main() -> anyhow::Result<()> {
+//! # fn main() -> genie_error::GenieResult<()> {
 //! use genie_lang::{LangFileKind::KeyValue, StringKey};
 //! use std::io::Cursor;
 //! let text = br#"
@@ -73,22 +73,21 @@
 //!
 //! ## Creating a file from scratch
 //! ```rust
-//! # fn main() -> anyhow::Result<()> {
+//! # fn main() -> genie_error::GenieResult<()> {
 //! use genie_lang::{LangFile, StringKey};
-//! use std::str;
 //! let mut lang_file = LangFile::new();
 //! lang_file.insert(StringKey::from(46604u32), String::from("Kill the traitor, Kushluk.\n\n\
 //!                       Prevent the tent of Genghis Khan (Wonder) from being destroyed."));
 //! let mut out = vec![];
 //! lang_file.write_to_ini(&mut out)?;
 //! assert_eq!(
-//!     str::from_utf8(&out)?,
+//!     String::from_utf8_lossy(&out),
 //!     r"46604=Kill the traitor, Kushluk.\n\nPrevent the tent of Genghis Khan (Wonder) from being destroyed.
 //! ");
 //! lang_file.insert(StringKey::from("LOBBYBROWSER_DATMOD_TITLE_FORMAT"), String::from(r#"DatMod: "%s""#));
 //! let mut out = vec![];
 //! lang_file.write_to_keyval(&mut out)?;
-//! let result_string = str::from_utf8(&out)?;
+//! let result_string = String::from_utf8_lossy(&out);
 //! println!("{}", result_string);
 //! assert!(
 //!     result_string == r#"46604 "Kill the traitor, Kushluk.\n\nPrevent the tent of Genghis Khan (Wonder) from being destroyed."
