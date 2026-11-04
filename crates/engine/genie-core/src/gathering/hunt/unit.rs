@@ -32,9 +32,7 @@ use crate::unit_ai::OrderKind;
 use crate::unit_ai::Search;
 use crate::unit_ai::UnitAiKind;
 use crate::unit_ai::world_view::DropWorld;
-use crate::unit_ai::{
-    CIVILIAN_CARED, Memory, NoAttack, Pick, civilian_kind, civilian_search_radius,
-};
+use crate::unit_ai::{CIVILIAN_CARED, Memory, Pick, civilian_kind, civilian_search_radius};
 use crate::world::HUNTER_UNMOVING;
 use crate::world::SEARCH_AGAIN;
 use crate::world::index::ObjectsRef;
@@ -506,13 +504,12 @@ impl Unit {
         let mut reach = |spatial: &mut Spatial, id: ObjectId, range: Distance| {
             mover.reaches_object((at, &me), (spatial, by_id), &mut plan, id, range, master_id)
         };
-        let mut no_attack = NoAttack;
         let result = c.w.spatial.search(
             SearchQuery {
                 searcher: self.id,
                 player: c.player,
                 search: &search,
-                attack: &mut no_attack,
+                attack: None,
                 reach: &mut reach,
                 objects: by_id,
             },

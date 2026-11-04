@@ -2037,6 +2037,44 @@ fn unit_closes_in_along_clear_straight_line() {
     );
 }
 
+/// `FUN_14114cc60` sets the manager's ignore list to the unit and its target first
+/// (`FUN_1410562e0`) and leaves it so, also when the tiles block the close-in walk: the
+/// queries after it read the list it left.
+#[test]
+fn close_in_leaves_the_managers_ignore_list_its_query_set() {
+    let m = builder_9177();
+    let me = Me {
+        human_order: WorldTime::ZERO,
+        id: object_id(9177),
+        group: None,
+        action_state: ActionState::NO_ACTION,
+    };
+    let mut classes = vec![4; 120 * 120];
+    for x in 26..31 {
+        classes[88 * 120 + x] = 1;
+    }
+    let mut walled = tiled_world(classes);
+    walled.set_manager_ignore(&[RecordId::from(object_id(1))]);
+    let to = BVector::new(28.0, 0.0, 87.0);
+    let target = Some(object_id(9175));
+    assert_eq!(
+        m.close_in(&me, to, target, &mut walled, ObjectsRef::empty()),
+        Ok(false)
+    );
+    let set = [
+        RecordId::from(object_id(9177)),
+        RecordId::from(object_id(9175)),
+    ];
+    assert_eq!(walled.manager_ignore(), set);
+    // the straight check's query (`FUN_14114cc60` with the tiles' records) sets it alike
+    walled.set_manager_ignore(&[RecordId::from(object_id(1))]);
+    assert!(
+        m.straight(&me, to, target, &mut walled, ObjectsRef::empty())
+            .is_ok()
+    );
+    assert_eq!(walled.manager_ignore(), set);
+}
+
 /// The long path's stretches (`0x141150f00` after `FUN_140f9eb70`): one whose query meets a
 /// wall, a gate, a tower or a building that does not move ends the path before it, or, the
 /// first, empties it (false); a moving building and a clear path leave it; a villager's path

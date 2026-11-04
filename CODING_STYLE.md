@@ -351,7 +351,9 @@ fn command(raw: i32) -> GenieResult<()> {
   that names the type. Without it, the type holds any `T`, and only the operation that needs
   the trait asks for it: `#[derive(Clone)]` on `Batch<T>` makes `impl<T: Clone> Clone for
   Batch<T>`. A bound stays on a struct only where the compiler requires it: a field of an
-  associated type (`I::Item`), or a `Drop` that needs the bound.
+  associated type (`I::Item`), or a `Drop` that needs the bound. The rule moves the bound off
+  the definition only: an `impl` keeps a bound that gives the type its meaning, also where its
+  body compiles without it (`pub struct RoleId<R>`, every `impl<R: Role>`).
 - Keep `World`, the readers and `GenieError` `Send` and `Sync`. The world holds no interior
   mutability (C-SEND-SYNC).
 - Implement `Deref` only for a smart pointer. `Deref` never imitates inheritance (C-DEREF).

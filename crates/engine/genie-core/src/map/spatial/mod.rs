@@ -298,6 +298,27 @@ impl Tiles {
             .and_then(|i| self.words.get(i).copied())
     }
 
+    /// Whether the obstruction manager marks `tile` blocked ([`BLOCKED`]); a tile off the map is
+    /// not.
+    #[must_use]
+    pub fn blocked(&self, tile: Tile) -> bool {
+        self.word(tile).is_some_and(|w| w & BLOCKED != 0)
+    }
+
+    /// A test's map of `size`: every tile of class 0, blocked where `blocked` says.
+    #[cfg(test)]
+    pub(crate) fn with_blocked(size: GridSize, blocked: impl Fn(Tile) -> bool) -> Self {
+        let mut tiles = Self::new(size, vec![0; (size.width() * size.height()) as usize]);
+        for y in 0..size.height() {
+            for x in 0..size.width() {
+                if blocked(Tile::new(x, y)) {
+                    tiles.words[(y * size.width() + x) as usize] |= BLOCKED;
+                }
+            }
+        }
+        tiles
+    }
+
     /// How many tall objects stand on `tile`.
     #[must_use]
     pub fn tall(&self, tile: Tile) -> Option<u8> {

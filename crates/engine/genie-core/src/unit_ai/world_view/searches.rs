@@ -135,7 +135,7 @@ impl UnitView<'_, '_> {
                 searcher: unit.id,
                 player: self.player,
                 search,
-                attack: &mut picker,
+                attack: Some(&mut picker),
                 reach: &mut reach,
                 objects: by_id,
             },

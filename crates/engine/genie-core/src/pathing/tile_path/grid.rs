@@ -7,6 +7,7 @@ use crate::map::GridSize;
 use crate::map::Restriction;
 use crate::map::TerrainId;
 use crate::map::Tile;
+use crate::map::spatial::Tiles;
 use crate::math::fmath::BVector;
 use crate::pathing::tile_path::{
     Cell, CellEdges, CellIndex, CellKind, Cells, GridLevel, NO_COST, NodeIndex, Nodes, OpenList,
@@ -44,19 +45,6 @@ pub struct Planner {
     pub(super) points: Vec<BVector>,
 }
 
-/// What the grid reads of the map: whether the obstruction manager marks a tile blocked
-/// (`DAT_143f0a088 + 0x98`, bit `0x4000`).
-pub trait Blocked {
-    /// `tile` is blocked.
-    fn blocked(&self, tile: Tile) -> bool;
-}
-
-impl<F: Fn(Tile) -> bool> Blocked for F {
-    fn blocked(&self, tile: Tile) -> bool {
-        self(tile)
-    }
-}
-
 impl Planner {
     /// Whether two planners hold the same grid: the map's size, the levels, the cells, the
     /// restriction's passability and the terrain. What a search leaves (the region, the goal, the
@@ -76,11 +64,12 @@ impl Planner {
     /// every tile's edges and the levels above them (`FUN_140f7e4b0` over the whole map).
     /// `terrain` holds each tile's terrain row by row, `passable` the restriction's value per
     /// terrain (above 0 passes).
+    #[must_use]
     pub fn new(
         size: GridSize,
         terrain: Vec<TerrainId>,
         passable: Restriction,
-        map: &impl Blocked,
+        tiles: &Tiles,
     ) -> Self {
         let (w, h) = (size.width() as i16, size.height() as i16);
         let w0 = (w.wrapping_add(7)) & !7;
@@ -111,7 +100,7 @@ impl Planner {
                 planner.init_cell(GridLevel::TOP, PlanTile::new(x, y));
             }
         }
-        planner.update(PlanRect::new(0, 0, w, h), map);
+        planner.update(PlanRect::new(0, 0, w, h), tiles);
         planner
     }
 
@@ -191,11 +180,11 @@ impl Planner {
 
     /// `FUN_140f799b0` (through the passability lambda, `0x140f7b110`): 1 when the tile is
     /// blocked, else a bit per passable neighbour (2 left, 4 right, 8 above, 0x10 below).
-    pub(super) fn adjacency(&self, tile: Tile, map: &impl Blocked) -> u32 {
+    pub(super) fn adjacency(&self, tile: Tile, tiles: &Tiles) -> u32 {
         let (w, h) = (self.size.width(), self.size.height());
         let passes = |t: Tile| {
             let kind = self.terrain[(t.y() * w + t.x()) as usize];
-            self.passable.passes(kind) && !map.blocked(t)
+            self.passable.passes(kind) && !tiles.blocked(t)
         };
         if !passes(tile) {
             return 1;
@@ -220,7 +209,7 @@ impl Planner {
 
     /// Rebuild the cells over a changed rectangle of tiles and its border (`FUN_140f7e4b0`, which
     /// the obstruction manager calls back through `FUN_140f7d4b0` when tiles change).
-    pub fn update(&mut self, rect: PlanRect, map: &impl Blocked) {
+    pub fn update(&mut self, rect: PlanRect, tiles: &Tiles) {
         let [x0, y0, x1, y1] = rect.get();
         let (lo_x, hi_x) = (x0.min(x1), x0.max(x1).wrapping_add(1));
         let (lo_y, hi_y) = (y0.min(y1), y0.max(y1).wrapping_add(1));
@@ -232,14 +221,14 @@ impl Planner {
         self.region = PlanRect::new(rx0, ry0, rx1, ry1);
         for cx in (rx0 >> 3)..=(rx1 >> 3) {
             for cy in (ry0 >> 3)..=(ry1 >> 3) {
-                let _ = self.rebuild(GridLevel::TOP, PlanTile::new(cx, cy), map);
+                let _ = self.rebuild(GridLevel::TOP, PlanTile::new(cx, cy), tiles);
             }
         }
     }
 
     /// `FUN_140f7e5e0`: a cell's edges and kind from its tile (level 0) or its children; returns
     /// the cell.
-    pub(super) fn rebuild(&mut self, level: GridLevel, at: PlanTile, map: &impl Blocked) -> Cell {
+    pub(super) fn rebuild(&mut self, level: GridLevel, at: PlanTile, tiles: &Tiles) -> Cell {
         let i = self.index(level, at);
         let old = self.cells[i].kind;
         let mut low = old.off_map();
@@ -249,7 +238,7 @@ impl Planner {
                 self.cells[i].kind = low.plus(CellKind::LONE);
             }
             if self.region.holds_at(GridLevel::TILES, at) {
-                let a = self.adjacency(at.tile(), map);
+                let a = self.adjacency(at.tile(), tiles);
                 self.cells[i].edges = CellEdges::NONE;
                 if a & 1 == 0 {
                     let mut b = CellEdges::NONE;
@@ -280,7 +269,7 @@ impl Planner {
         let mut child = [Cell::EMPTY; 4];
         for (k, &c) in children.iter().enumerate() {
             if low.is_empty() || !self.cells[i].kind.intersects(CellKind::child_off_map(k)) {
-                child[k] = self.rebuild(l, c, map);
+                child[k] = self.rebuild(l, c, tiles);
             }
         }
         let [d0, d1, d2, d3] = child.map(|c| c.edges);

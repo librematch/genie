@@ -482,16 +482,17 @@ impl Spatial {
     /// as the routines that test one walk ask (`FUN_141052b90`, `FUN_141052350` with flags `0x100`,
     /// then `FUN_1410561f0`): the temporary records of the tiles its terrain mask lacks
     /// ([`Spatial::put_tile_records`]), tested ([`Spatial::segment_meets`]) and removed again.
+    /// The query leaves out the manager's ignore list as its caller set it last
+    /// ([`Spatial::set_manager_ignore`]).
     pub fn segment_blocked(
         &mut self,
         a: Point,
         b: Point,
         grow: Distance,
         mask: TerrainMask,
-        ignore: &[RecordId],
     ) -> bool {
         self.put_tile_records(a, b, grow, mask);
-        let blocked = self.segment_meets(a, b, grow, ignore);
+        let blocked = self.segment_meets(a, b, grow, &self.manager_ignore);
         self.clear_tile_records();
         blocked
     }

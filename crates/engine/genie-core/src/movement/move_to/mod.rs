@@ -557,10 +557,9 @@ pub fn target_left(
             a.x().max(b.x()) + grow.get(),
             a.y().max(b.y()) + grow.get(),
         ))?;
-        let ignore = walk.world.manager_ignore();
         if !walk
             .world
-            .segment_blocked(a, b, grow, mover.stats.restriction_mask, &ignore)
+            .segment_blocked(a, b, grow, mover.stats.restriction_mask)
         {
             return Ok(Follow::PathEnd(at));
         }

@@ -247,8 +247,8 @@ impl Spatial {
     /// The obstruction manager's ignore list as the last `FUN_1410562e0` left it
     /// ([`Spatial::set_manager_ignore`]).
     #[must_use]
-    pub fn manager_ignore(&self) -> Vec<RecordId> {
-        self.manager_ignore.clone()
+    pub fn manager_ignore(&self) -> &[RecordId] {
+        &self.manager_ignore
     }
 
     /// `FUN_1410562d0` on the obstruction manager: its buffer becomes `buffer` (None: not set),

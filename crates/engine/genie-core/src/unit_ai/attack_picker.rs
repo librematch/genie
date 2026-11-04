@@ -1,5 +1,5 @@
-//! What the attack search asks of the world while a unit AI runs ([`AttackPicker`]), and the
-//! picker of searches that pick no attack ([`NoAttack`]).
+//! What the attack search asks of the world while a unit AI runs ([`AttackPicker`]); a search
+//! that picks no attack has no picker ([`crate::map::spatial::SearchQuery`]).
 
 use crate::GenieError;
 use crate::map::Distance;
@@ -107,73 +107,4 @@ pub trait AttackPicker {
         id: ObjectId,
         range: Distance,
     ) -> Result<bool, GenieError>;
-}
-
-/// A search that picks no attack, asked about one ([`NoAttack`]).
-pub(super) const NO_ATTACK: GenieError =
-    GenieError::unsupported("an attack test in a search that picks no attack");
-
-/// An [`AttackPicker`] for searches that pick no attack: every read fails.
-#[derive(Clone, Copy, Debug)]
-pub struct NoAttack;
-
-impl AttackPicker for NoAttack {
-    fn searcher(&mut self, _: Memory<'_>) -> Result<Searcher, GenieError> {
-        Err(NO_ATTACK)
-    }
-
-    fn found_object(
-        &mut self,
-        _: &Spatial,
-        _: ObjectId,
-    ) -> Result<Option<FoundObject>, GenieError> {
-        Err(NO_ATTACK)
-    }
-
-    fn can_attack(&mut self, _: &Spatial, _: ObjectId) -> Result<bool, GenieError> {
-        Err(NO_ATTACK)
-    }
-
-    fn attacks_neutral(&mut self, _: ClassId) -> Result<bool, GenieError> {
-        Err(NO_ATTACK)
-    }
-
-    fn spares_friends(&mut self, _: &Spatial, _: ObjectId) -> Result<bool, GenieError> {
-        Err(NO_ATTACK)
-    }
-
-    fn shuns(&mut self, _: ObjectId) -> Result<bool, GenieError> {
-        Err(NO_ATTACK)
-    }
-
-    fn candidate(
-        &mut self,
-        _: &Spatial,
-        _: ObjectId,
-        _: Distance,
-        _: Option<AttackCategory>,
-    ) -> Result<Candidate, GenieError> {
-        Err(NO_ATTACK)
-    }
-
-    fn armored(&mut self, _: ObjectId) -> Result<bool, GenieError> {
-        Err(NO_ATTACK)
-    }
-
-    fn weapon_range(&mut self, _: ObjectId) -> Result<Distance, GenieError> {
-        Err(NO_ATTACK)
-    }
-
-    fn engages(&mut self, _: ObjectId) -> Result<bool, GenieError> {
-        Err(NO_ATTACK)
-    }
-
-    fn quick_path(
-        &mut self,
-        _: &mut Spatial,
-        _: ObjectId,
-        _: Distance,
-    ) -> Result<bool, GenieError> {
-        Err(NO_ATTACK)
-    }
 }

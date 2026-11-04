@@ -323,8 +323,8 @@ impl Spatial {
     /// The lists the last search left (`DAT_143f69178`, by relation kind; 4 the enemies), as
     /// [`Spatial::search_query`] left them.
     #[must_use]
-    pub fn searched(&self) -> Option<ByRelation<Vec<Record>>> {
-        self.search_cache.last.clone()
+    pub const fn searched(&self) -> Option<&ByRelation<Vec<Record>>> {
+        self.search_cache.last.as_ref()
     }
 
     /// The lists a last search left, as a test sets them.
@@ -339,7 +339,7 @@ impl Spatial {
         (me, player): (ObjectId, PlayerId),
         search: &Search<'_>,
         fresh: bool,
-        attack: &mut dyn AttackPicker,
+        attack: Option<&mut dyn AttackPicker>,
         reach: &mut Reach<'_>,
         checks: ClosestChecks<'_>,
     ) -> Result<Found, GenieError> {
@@ -392,7 +392,7 @@ impl Spatial {
                 let choice = self.best_unit_to_attack(
                     &ask,
                     search.memory,
-                    attack,
+                    attack.ok_or(NO_PICKER)?,
                     reach,
                     roles,
                     best_target_tuning,
@@ -516,6 +516,10 @@ impl Spatial {
     }
 }
 
+/// An attack pick in a search that has no attack picker ([`SearchQuery::attack`]).
+const NO_PICKER: GenieError =
+    GenieError::unsupported("an attack test in a search that picks no attack");
+
 /// What a unit AI's search takes ([`Spatial::search`]): the searcher, its [`Search`], and the
 /// callers' answers for what the search reads of the world beyond the spatial index.
 pub struct SearchQuery<'a> {
@@ -525,8 +529,9 @@ pub struct SearchQuery<'a> {
     pub(crate) player: PlayerId,
     /// What it searches for.
     pub(crate) search: &'a Search<'a>,
-    /// An attack pick's reads of the unit and the objects.
-    pub(crate) attack: &'a mut dyn AttackPicker,
+    /// An attack pick's reads of the unit and the objects; a search that picks no attack has
+    /// none.
+    pub(crate) attack: Option<&'a mut dyn AttackPicker>,
     /// The reachability of a found object (slot 0x3d0).
     pub(crate) reach: &'a mut Reach<'a>,
     /// The world's objects by id: whether livestock is herded ([`herded`]), the masters a

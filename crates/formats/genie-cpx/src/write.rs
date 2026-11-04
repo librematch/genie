@@ -168,7 +168,7 @@ impl CampaignEntry {
 /// This has to keep all scenario files in memory until the file is written on a call to
 /// `flush()`.
 #[derive(Debug)]
-pub struct CampaignWriter<W: Write> {
+pub struct CampaignWriter<W> {
     writer: W,
     header: CampaignHeader,
     scenarios: Vec<CampaignEntry>,

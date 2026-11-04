@@ -31,7 +31,7 @@ use crate::testing::ids::FISH_TRAP;
 use crate::testing::roles;
 use crate::testing::scene::{Scene, SceneObject};
 use crate::testing::tuning;
-use crate::unit_ai::{Memory, NoAttack};
+use crate::unit_ai::Memory;
 use crate::vision::VisionBits;
 use crate::vision::own_masks;
 use crate::vision::registry::UnitUpdate;
@@ -338,7 +338,6 @@ fn search_near_the_last_reads_its_answer_until_unit_ai_lets_it_go() {
         pick: Pick::Look,
         memory: Memory::default(),
     };
-    let mut never = NoAttack;
     let mut reach = |_: &mut Spatial, _: ObjectId, _: Distance| Ok(true);
     let mut search = |s: &mut Spatial, at| {
         let f = s
@@ -347,7 +346,7 @@ fn search_near_the_last_reads_its_answer_until_unit_ai_lets_it_go() {
                     searcher: object_id(9),
                     player: PlayerId::new(2),
                     search: &look(at),
-                    attack: &mut never,
+                    attack: None,
                     reach: &mut reach,
                     objects: ObjectsRef::empty(),
                 },
@@ -922,14 +921,13 @@ fn record_filed_in_cell_the_query_does_not_visit_is_not_found() {
     s.insert(object_id(13594), bush);
     assert_eq!(s.filed(&bush, ObstructionKind::KIND_2), (5, 3, 19));
     let (from, to) = (Point::new(32.25, 154.59375), Point::new(32.5, 151.5));
-    assert!(!s.segment_blocked(from, to, Distance::new(0.25), TerrainMask::ALL, &[]));
+    assert!(!s.segment_blocked(from, to, Distance::new(0.25), TerrainMask::ALL));
     // a start a hair to the left visits tile 31's cell: the box blocks
     assert!(s.segment_blocked(
         Point::new(32.2, 154.59375),
         to,
         Distance::new(0.25),
-        TerrainMask::ALL,
-        &[]
+        TerrainMask::ALL
     ));
     // off a half tile, the box's far edge is its tile: (31.6 ± 0.5) spans tiles 31 and 32,
     // which share only level 2's cells of 64 tiles
@@ -1726,39 +1724,36 @@ fn walk_meets_static_box_in_its_way_but_not_one_beside_it() {
         Point::new(4.0, 8.0),
         Point::new(12.0, 8.0),
         Distance::new(0.2),
-        TerrainMask::of_bits(1),
-        &[]
+        TerrainMask::of_bits(1)
     ));
     assert!(!s.segment_blocked(
         Point::new(4.0, 11.0),
         Point::new(12.0, 11.0),
         Distance::new(0.2),
-        TerrainMask::of_bits(1),
-        &[]
+        TerrainMask::of_bits(1)
     ));
     // within its radius of the box, and the box ignored
     assert!(s.segment_blocked(
         Point::new(4.0, 9.1),
         Point::new(12.0, 9.1),
         Distance::new(0.2),
-        TerrainMask::of_bits(1),
-        &[]
+        TerrainMask::of_bits(1)
     ));
+    s.set_manager_ignore(&[RecordId::from(object_id(7))]);
     assert!(!s.segment_blocked(
         Point::new(4.0, 8.0),
         Point::new(12.0, 8.0),
         Distance::new(0.2),
         TerrainMask::of_bits(1),
-        &[RecordId::from(object_id(7))]
     ));
+    s.set_manager_ignore(&[]);
     // a moving unit's record never blocks the walk
     s.insert(object_id(8), villager(6.0, 3.0));
     assert!(!s.segment_blocked(
         Point::new(4.0, 3.0),
         Point::new(12.0, 3.0),
         Distance::new(0.2),
-        TerrainMask::of_bits(1),
-        &[]
+        TerrainMask::of_bits(1)
     ));
 }
 
@@ -1774,23 +1769,20 @@ fn walk_meets_tile_whose_terrain_the_unit_cannot_cross() {
         Point::new(2.0, 5.5),
         Point::new(14.0, 5.5),
         Distance::new(0.2),
-        TerrainMask::of_bits(1),
-        &[]
+        TerrainMask::of_bits(1)
     ));
     assert!(!s.segment_blocked(
         Point::new(2.0, 5.5),
         Point::new(14.0, 5.5),
         Distance::new(0.2),
-        TerrainMask::of_bits(3),
-        &[]
+        TerrainMask::of_bits(3)
     ));
     // a walk whose grown box leaves the map
     assert!(s.segment_blocked(
         Point::new(0.1, 5.5),
         Point::new(14.0, 5.5),
         Distance::new(0.2),
-        TerrainMask::of_bits(3),
-        &[]
+        TerrainMask::of_bits(3)
     ));
 }
 
@@ -1998,8 +1990,7 @@ fn tile_record_blocks_later_walks_until_the_records_are_cleared() {
         second.0,
         second.1,
         Distance::new(0.5),
-        TerrainMask::of_bits(1),
-        &[]
+        TerrainMask::of_bits(1)
     ));
     assert_eq!(s.tile_records(), Vec::<Tile>::new());
     s.put_tile_records(

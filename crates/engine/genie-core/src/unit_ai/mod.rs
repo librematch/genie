@@ -67,7 +67,7 @@ pub use self::attack_pick::{
     AttackAsk, AttackChecks, AttackTargetFlags, Attacker, Memory, Pick, Search, Seeker, Target,
     can_attack, soldier_can_attack, tower_can_attack,
 };
-pub use self::attack_picker::{AttackPicker, NoAttack};
+pub use self::attack_picker::AttackPicker;
 pub(crate) use self::attack_rules::patrol_distance;
 pub use self::attack_rules::{
     Attacked, Convertee, Converter, TargetRules, attack_sight, attacks_neutral, can_convert,

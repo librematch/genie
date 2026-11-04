@@ -2,7 +2,6 @@
 //! terrain and the tile pathfinder's planner.
 
 use genie_core::map::GridSize;
-use genie_core::map::Tile;
 use genie_core::objects::ObjectId;
 use genie_core::pathing::{FixedDistance, FixedPoint, FixedRect};
 use genie_core::pathing::{ShapeId, ShapeSide};
@@ -142,7 +141,6 @@ pub fn planner_from_save(
     terrain: &TerrainTable,
     passable: Restriction,
 ) -> Result<Planner, Error> {
-    use genie_core::map::spatial::BLOCKED;
     let chapter = chapters(save)?[0];
     let header = chapter.header()?;
     let map = &header.world.base_world.map;
@@ -153,13 +151,11 @@ pub fn planner_from_save(
         .collect();
     let layer = layer().map_err(Error::Unmodelled)?;
     let spatial = spatial(&header, terrain, layer).map_err(Error::Unmodelled)?;
-    let tiles = spatial.tiles();
-    let blocked = |tile: Tile| tiles.word(tile).is_some_and(|w| w & BLOCKED != 0);
     Ok(Planner::new(
         GridSize::new(map.map_width, map.map_height),
         terrain_ids,
         passable,
-        &blocked,
+        spatial.tiles(),
     ))
 }
 

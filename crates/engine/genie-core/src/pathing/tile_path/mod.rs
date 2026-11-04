@@ -33,7 +33,7 @@ mod smoothing;
 pub use self::cell::{Cell, CellEdges, CellKind};
 use self::cell::{CellIndex, Cells};
 pub use self::goal_marks::Request;
-pub use self::grid::{Blocked, Planner};
+pub use self::grid::Planner;
 pub use self::grid_level::GridLevel;
 pub use self::plan_tile::{PlanRect, PlanTile};
 #[cfg(test)]

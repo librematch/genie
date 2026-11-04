@@ -17,8 +17,7 @@ use crate::map::GridSize;
 use crate::map::Position;
 use crate::map::Restriction;
 use crate::map::TerrainId;
-use crate::map::Tile;
-use crate::map::spatial::{BLOCKED, Obstruction, Placed, Tiles};
+use crate::map::spatial::{Obstruction, Placed, Tiles};
 use crate::movement::MoveState;
 use crate::objects::ObjectId;
 use crate::objects::masters::ObstructionKind;
@@ -291,10 +290,9 @@ impl Pathing {
     /// from the map on first use, `FUN_140f74f90`); the planners built before see the tiles'
     /// changes first. None for a restriction the data has not got.
     pub fn planner(&mut self, restriction: RestrictionId, tiles: &Tiles) -> Option<&mut Planner> {
-        let blocked = |tile: Tile| tiles.word(tile).is_some_and(|w| w & BLOCKED != 0);
         for rect in self.pending.drain(..) {
             for p in self.planners.values_mut() {
-                p.update(rect, &blocked);
+                p.update(rect, tiles);
             }
         }
         let _ = self.restrictions.get(restriction.index())?;
@@ -304,7 +302,7 @@ impl Pathing {
         };
         if !self.planners.contains_key(&key) {
             let passable = self.restrictions.get(key.index())?.clone();
-            let planner = Planner::new(self.size, self.terrain.clone(), passable, &blocked);
+            let planner = Planner::new(self.size, self.terrain.clone(), passable, tiles);
             let _ = self.planners.insert(key, planner);
         }
         self.planners.get_mut(&key)

@@ -24,7 +24,7 @@ pub trait Role {
 /// foundation, a missile keeps the id of a shooter that is gone), so no test makes one: the
 /// role starts where the save's field of the role is read or where the code gives the object
 /// the role ([`RoleId::new`]), and the type carries it from there.
-pub struct RoleId<R: Role>(ObjectId, PhantomData<fn() -> R>);
+pub struct RoleId<R>(ObjectId, PhantomData<fn() -> R>);
 
 impl<R: Role> RoleId<R> {
     /// Object `id` in the role: the save's field of the role, or the routine that gives the

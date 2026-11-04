@@ -5,6 +5,7 @@ use crate::map::Point;
 use crate::map::Restriction;
 use crate::map::TerrainId;
 use crate::map::Tile;
+use crate::map::spatial::Tiles;
 use crate::pathing::tile_path::goal_marks::Mark;
 use crate::testing::tuning;
 use std::iter::from_fn;
@@ -17,7 +18,7 @@ fn search_leaves_the_grid_as_it_was() {
         GridSize::new(8, 8),
         terrain.clone(),
         Restriction::new(vec![1.0]),
-        &open,
+        &Tiles::with_blocked(GridSize::new(8, 8), open),
     );
     let mut searched = built.clone();
     searched.goal = PlanTile::new(3, 4);
@@ -27,13 +28,13 @@ fn search_leaves_the_grid_as_it_was() {
         GridSize::new(8, 8),
         terrain,
         Restriction::new(vec![0.0]),
-        &open,
+        &Tiles::with_blocked(GridSize::new(8, 8), open),
     );
     assert!(!other.same_grid(&built));
 }
 
-fn open_map(_: Tile) -> bool {
-    false
+fn open_map(size: GridSize) -> Tiles {
+    Tiles::with_blocked(size, |_| false)
 }
 
 /// `FUN_140f7c530` reads the start's cell only after the search over the levels found the
@@ -44,7 +45,7 @@ fn plan_from_off_the_map_reads_no_start_cell() {
         GridSize::new(16, 8),
         vec![TerrainId::named(0); 128],
         Restriction::new(vec![1.0]),
-        &open_map,
+        &open_map(GridSize::new(16, 8)),
     );
     let req = Request {
         from: Point::new(-3.0, 2.0),
@@ -71,7 +72,7 @@ fn the_last_open_point_walks_the_path_back_to_tile_with_an_edge() {
         GridSize::new(16, 8),
         terrain,
         Restriction::new(vec![1.0, 0.0]),
-        &open_map,
+        &open_map(GridSize::new(16, 8)),
     );
     // a goal on the water: the path's end
     assert_eq!(
@@ -113,7 +114,7 @@ fn the_nearest_tile_with_the_edge_is_found_up_then_nearer_down() {
         GridSize::new(8, 8),
         vec![TerrainId::named(0); 64],
         Restriction::new(vec![1.0]),
-        &open_map,
+        &open_map(GridSize::new(8, 8)),
     );
     // the tiles at the places `with` have the edge N
     let edges = |with: &'static [i16]| {
@@ -162,7 +163,7 @@ fn the_tile_search_reaches_goal_on_an_open_map() {
         GridSize::new(16, 8),
         vec![TerrainId::named(0); 128],
         Restriction::new(vec![1.0]),
-        &open_map,
+        &open_map(GridSize::new(16, 8)),
     );
     let req = Request {
         from: Point::new(1.5, 2.5),
@@ -199,7 +200,7 @@ fn the_tile_search_ends_nearest_the_goal_behind_wall() {
         GridSize::new(8, 8),
         vec![TerrainId::named(0); 64],
         Restriction::new(vec![1.0]),
-        &wall,
+        &Tiles::with_blocked(GridSize::new(8, 8), wall),
     );
     let req = Request {
         from: Point::new(1.5, 2.5),
@@ -228,7 +229,7 @@ fn full_plan_searches_the_tiles_near_and_shortens_the_start_far() {
         GridSize::new(64, 8),
         vec![TerrainId::named(0); 512],
         Restriction::new(vec![1.0]),
-        &open_map,
+        &open_map(GridSize::new(64, 8)),
     );
     for to in [Point::new(6.5, 5.5), Point::new(60.5, 5.5)] {
         let req = Request {
@@ -256,7 +257,7 @@ fn an_open_map_is_one_node_cell_per_eight_tiles() {
         GridSize::new(16, 8),
         vec![TerrainId::named(0); 128],
         Restriction::new(vec![1.0]),
-        &open_map,
+        &open_map(GridSize::new(16, 8)),
     );
     let levels = [(16, 8), (8, 4), (4, 2), (2, 1)].map(|(w, h)| GridSize::new(w, h));
     assert_eq!(GridLevel::ALL.map(|l| p.level_size(l)), levels);
@@ -281,7 +282,7 @@ fn padding_tiles_of_map_that_is_not_multiple_of_eight_lie_off_the_map() {
         GridSize::new(6, 6),
         vec![TerrainId::named(0); 36],
         Restriction::new(vec![1.0]),
-        &open_map,
+        &open_map(GridSize::new(6, 6)),
     );
     let levels = [8, 4, 2, 1].map(|s| GridSize::new(s, s));
     assert_eq!(GridLevel::ALL.map(|l| p.level_size(l)), levels);
@@ -303,7 +304,7 @@ fn wall_splits_its_level_three_cell_into_its_children() {
         GridSize::new(8, 8),
         vec![TerrainId::named(0); 64],
         Restriction::new(vec![1.0]),
-        &wall,
+        &Tiles::with_blocked(GridSize::new(8, 8), wall),
     );
     let node_or_mixed = CellKind::NODE | CellKind::MIXED;
     assert_eq!(
@@ -453,7 +454,7 @@ fn closed_rectangle_closes_the_node_cells_under_it() {
         GridSize::new(16, 8),
         vec![TerrainId::named(0); 128],
         Restriction::new(vec![1.0]),
-        &walls,
+        &Tiles::with_blocked(GridSize::new(16, 8), walls),
     );
     let open = p.clone();
     let node_or_mixed = CellKind::NODE | CellKind::MIXED;

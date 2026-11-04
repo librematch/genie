@@ -223,11 +223,10 @@ impl Mover {
             < movement_tuning.target_short_reach
         {
             let [x, _, y] = level.points.checked(level.waypoint.get() as usize)?.get();
-            let ignore = world.manager_ignore();
             if world.object_holds(
                 Point::new(x, y),
                 world.manager_grow(),
-                &ignore,
+                world.manager_ignore(),
                 Movers::Counted,
                 by_id,
             )? {
@@ -340,7 +339,9 @@ impl Mover {
         if !(rx <= x && rz <= y && x <= w as f32 - rx && y <= h as f32 - ry) {
             return Ok(false);
         }
-        let ignore = by_id.query_ignore(&[Some(me.id), target]);
+        // FUN_14114cc60 sets the manager's ignore list to them first (FUN_1410562e0), and the
+        // queries after it read the list it left
+        world.set_manager_ignore(&by_id.query_ignore(&[Some(me.id), target]));
         // the query starts at +0x824, where the unit last moved to
         let (from, to) = self.query_ends(self.moved_at.vector(), p, world.map);
         let grow = rx * movement_tuning.straight_grow;
@@ -350,13 +351,8 @@ impl Mover {
             from.x().max(to.x()) + grow,
             from.y().max(to.y()) + grow,
         ))?;
-        let blocked = world.segment_blocked(
-            from,
-            to,
-            Distance::new(grow),
-            self.stats.restriction_mask,
-            &ignore,
-        );
+        let blocked =
+            world.segment_blocked(from, to, Distance::new(grow), self.stats.restriction_mask);
         // FUN_14114cc60 resets the buffer it set for the query (FUN_1410562d0 with 0)
         world.set_manager_buffer(None);
         Ok(!blocked)
@@ -387,6 +383,9 @@ impl Mover {
             return Ok(false);
         }
         let ignore = by_id.query_ignore(&[Some(me.id), target]);
+        // FUN_14114cc60 sets the manager's ignore list to them first (FUN_1410562e0), also when
+        // the tiles block
+        world.set_manager_ignore(&ignore);
         // the query starts at +0x824, where the unit last moved to
         let (from, to) = self.query_ends(self.moved_at.vector(), p, world.map);
         let rect = Rect::spanning(from, to);
