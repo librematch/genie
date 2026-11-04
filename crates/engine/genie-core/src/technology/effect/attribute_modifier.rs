@@ -1,7 +1,6 @@
 //! The player's attribute modifier (slot 0x148, `FUN_1416121b0`): the hooks around it, the
 //! masters' change and what their objects and an Attack follow of it.
 
-use crate::GenieError;
 use crate::combat::attack::Arms;
 use crate::garrison::{attack_rate, share};
 use crate::map::Distance;
@@ -31,6 +30,7 @@ use crate::technology::effect::{CAPPED, Change, OBJECT_GONE, has_actions, within
 use crate::world::World;
 use crate::world::index::Place;
 use crate::world::slots::{CheckedIndex, PlayerSlots};
+use crate::{GenieError, GenieResult};
 
 /// Which side of a player's change a hook runs on (`FUN_141614f40`'s flag): before it (0: the
 /// volleys lose the shares of the units inside, `FUN_141217ac0`) or after it (1: they take
@@ -57,7 +57,7 @@ impl World {
         class: Option<ClassId>,
         v: f32,
         attribute: MasterAttribute,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if let Some(why) = self.reached_masters(p, unit, class).iter().find_map(|&id| {
             self.model
                 .masters
@@ -85,7 +85,7 @@ impl World {
         unit: Option<MasterId>,
         class: Option<ClassId>,
         attribute: MasterAttribute,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let ids: Vec<ObjectId> = self
             .players
             .player(p)?
@@ -122,7 +122,7 @@ impl World {
         p: PlayerId,
         id: ObjectId,
         hook: EffectHook,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         use crate::math::fmath::at_most_or_unordered;
         let Some((_, u)) = self.object(id) else {
             return Ok(());
@@ -184,7 +184,7 @@ impl World {
         p: PlayerId,
         id: ObjectId,
         attribute: MasterAttribute,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         use crate::objects::masters::MasterAttribute;
         let Some((_, u)) = self.object(id) else {
             return Ok(());
@@ -265,7 +265,7 @@ impl World {
         class: Option<ClassId>,
         v: f32,
         attribute: MasterAttribute,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let Some(masters) = self.model.masters.of(p) else {
             return Ok(());
         };
@@ -350,7 +350,7 @@ impl World {
         unit: MasterId,
         v: f32,
         attribute: MasterAttribute,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         use crate::objects::masters::MasterAttribute;
         let master = self.master(p, unit)?.clone();
         let (done, pending) = self.tracked_master(p, &master)?;
@@ -464,7 +464,7 @@ impl World {
         change: Change,
         v: f32,
         attribute: MasterAttribute,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         {
             let world = AttributeWorld {
                 sprites: &self.model.graphics,
@@ -497,7 +497,7 @@ impl World {
         p: PlayerId,
         id: MasterId,
         attribute: MasterAttribute,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         use crate::objects::masters::MasterAttribute;
         let Some(master) = player_master(&self.model.masters, p, id).cloned() else {
             return Ok(());

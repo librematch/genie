@@ -1,7 +1,7 @@
 //! A group's members (FD-036): `AddUnit` (`FUN_1410083c0`) with its sub-formation statistics
 //! (`FUN_141008d90`, `FUN_1410116c0`) and a unit's radius in a formation (`FUN_141025920`).
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::groups::FormationCategory;
 use crate::groups::GroupFlags;
 use crate::groups::GroupId;
@@ -123,7 +123,7 @@ impl UnitGroup {
         objects: ObjectsRef<'_>,
         scratch: &mut Vec<UnitKind>,
         group_tuning: &GroupTuning,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let at = self
             .unit_kinds
             .iter()
@@ -211,7 +211,7 @@ impl World {
         id: ObjectId,
         target: Option<ObjectId>,
         walk: LeavingWalk,
-    ) -> Result<bool, GenieError> {
+    ) -> GenieResult<bool> {
         let _ = target;
         let Some(g) = self.groups.get(group) else {
             return Ok(false);
@@ -270,11 +270,7 @@ impl World {
     /// A held object of a master the slice does not have.
     ///
     /// When the world does not hold `group`: its caller (`removeUnit`) holds it.
-    pub(crate) fn leave_statistic(
-        &mut self,
-        group: GroupId,
-        id: ObjectId,
-    ) -> Result<bool, GenieError> {
+    pub(crate) fn leave_statistic(&mut self, group: GroupId, id: ObjectId) -> GenieResult<bool> {
         let category = match self.world_object(id) {
             Some(object) => Some(self.unit_category(Some(object))?),
             None => None,
@@ -359,7 +355,7 @@ impl World {
     ///
     /// When the world does not hold `group`: the game's routine gets the group itself, from a
     /// caller that holds it.
-    pub fn add_to_group(&mut self, group: GroupId, id: ObjectId) -> Result<Join, GenieError> {
+    pub fn add_to_group(&mut self, group: GroupId, id: ObjectId) -> GenieResult<Join> {
         let Some(object) = self.world_object(id) else {
             return Ok(Join::Refused);
         };

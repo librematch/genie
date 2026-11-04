@@ -1,6 +1,6 @@
 //! The walk into a hull (`pathWithinHull` into a hull, `FUN_140f88ee0`).
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::map::Rect;
 use crate::pathing::hull_path::node_lists::{NewNode, UnrefusedNode};
 use crate::pathing::hull_path::walks::Rays;
@@ -48,7 +48,7 @@ impl HullPather<'_> {
     /// a box) with paths, 2 without, 3 without a first step. `FindShortPath`, its only caller,
     /// gives it a hull, a start, paths and the sides' array (its result 6 is for none) and its
     /// argument 10 set: each way out is nudged back into the hull.
-    pub(super) fn walk_in(&mut self, walk: WalkIn<'_>) -> Result<Within, GenieError> {
+    pub(super) fn walk_in(&mut self, walk: WalkIn<'_>) -> GenieResult<Within> {
         let WalkIn {
             hull,
             goal: from,
@@ -114,7 +114,7 @@ impl HullPather<'_> {
         hull: HullIndex,
         (from, to): (Point, Point),
         target: Option<Target>,
-    ) -> Result<(Option<usize>, bool), GenieError> {
+    ) -> GenieResult<(Option<usize>, bool)> {
         let hull_path_tuning = &self.by_id.tuning().hull_path;
         let root = self.add_unrefused(UnrefusedNode {
             list: NodeList::WALKS,
@@ -164,7 +164,7 @@ impl HullPather<'_> {
         node: NodeIndex,
         to: Point,
         ways: &mut Ways<'_>,
-    ) -> Result<Rays, GenieError> {
+    ) -> GenieResult<Rays> {
         let at = self.nodes.checked(node)?.at;
         let mut left_boxes = false;
         {

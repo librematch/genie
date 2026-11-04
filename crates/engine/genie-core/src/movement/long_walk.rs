@@ -30,7 +30,7 @@ use crate::pathing::{Pathing, PlanBudget, ShortFound};
 use crate::players::PlayerSet;
 use crate::world::index::ObjectsRef;
 use crate::world::layer::generated::MovementTuning;
-use crate::{GenieError, pathing::short_path};
+use crate::{GenieError, GenieResult, pathing::short_path};
 use std::iter::once;
 
 /// How a step relates to its waypoint (slot 196, `0x14114f400`).
@@ -137,7 +137,7 @@ pub(crate) fn long_path_for(
     (to, range): (BVector, f32),
     target: Option<(ObjectId, &Placed)>,
     by_id: ObjectsRef<'_>,
-) -> Result<(bool, Path), GenieError> {
+) -> GenieResult<(bool, Path)> {
     let long_path_tuning = &by_id.tuning().long_path;
     let long_target = target.map(|(_, t)| {
         let gap2 = footprint_gap_squared(walker.position, walker.radius, t.position, t.radius);
@@ -226,7 +226,7 @@ pub(crate) fn tile_plan_for(
     plan: &mut Planning<'_>,
     ask: TileAsk<'_>,
     out: &mut Path,
-) -> Result<Option<Found>, GenieError> {
+) -> GenieResult<Option<Found>> {
     let tile_path_tuning = &by_id.tuning().tile_path;
     let TileAsk {
         goal: to,
@@ -309,7 +309,7 @@ pub(super) fn include_kept(
     pathing: Option<&mut Pathing>,
     kept: &[ObjectId],
     include: &mut Vec<ObjectId>,
-) -> Result<(), GenieError> {
+) -> GenieResult<()> {
     let pathing = pathing.ok_or(GenieError::unsupported(
         "a kept hit without the world's mesh",
     ))?;
@@ -358,7 +358,7 @@ pub(crate) fn short_path_for(
     goal: (BVector, Distance, Option<ObjectId>),
     ignore: &[ObjectId],
     out: &mut Path,
-) -> Result<ShortFound, GenieError> {
+) -> GenieResult<ShortFound> {
     let player = owner_number(world, walker.id);
     let (to, range, target) = goal;
     let ask = ShortAsk {
@@ -400,7 +400,7 @@ pub(crate) fn short_path_including(
     ask: ShortAsk<'_>,
     player: Option<PlayerId>,
     out: &mut Path,
-) -> Result<ShortFound, GenieError> {
+) -> GenieResult<ShortFound> {
     let movement_tuning = &by_id.tuning().movement;
     let ShortAsk {
         goal: to,

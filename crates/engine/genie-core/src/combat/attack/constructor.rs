@@ -1,7 +1,6 @@
 //! The Attack's constructor (`FUN_140a7c210`) and its start (slot 5): its sprites and frames
 //! and what it reads of its unit and its target.
 
-use crate::GenieError;
 use crate::combat::AttackTargetId;
 use crate::combat::abilities::Look;
 use crate::combat::attack::AttackState;
@@ -48,6 +47,7 @@ use crate::world::layer::generated::AttackTuning;
 use crate::world::layer::generated::MoveToTuning;
 use crate::world::layer::generated::SpriteTuning;
 use crate::world::step::Step;
+use crate::{GenieError, GenieResult};
 
 /// What an Attack's start reads of the build layer (FD-046-D45, D49): the roles of the unit's
 /// master, the attack's tuning values and its `MoveTo`'s, one argument of [`Attack::start`] and
@@ -109,7 +109,7 @@ impl Attack {
         mover: &mut Mover,
         reads: &MoveToReads<'_>,
         layer: BeginLayer<'_>,
-    ) -> Result<(Self, MoveStart), GenieError> {
+    ) -> GenieResult<(Self, MoveStart)> {
         let roles = layer.roles;
         let mut a = Self {
             voice: Voice::Quiet,
@@ -166,7 +166,7 @@ impl Attack {
         (world, by_id): (&Spatial, ObjectsRef<'_>),
         mover: &mut Mover,
         reads: &MoveToReads<'_>,
-    ) -> Result<(Self, Begun, Vec<Posted>), GenieError> {
+    ) -> GenieResult<(Self, Begun, Vec<Posted>)> {
         let move_to_tuning = &by_id.tuning().move_to;
         let attack_tuning = &by_id.tuning().attack;
         let roles = by_id.roles();
@@ -219,7 +219,7 @@ impl Attack {
         unit: &mut Unit,
         cmd: &AttackCommand<'_>,
         roles: &Roles,
-    ) -> Result<(Self, Vec<Posted>), GenieError> {
+    ) -> GenieResult<(Self, Vec<Posted>)> {
         let reads = unit.move_to_reads(
             c.w.parts.motion.mover(unit.id),
             MasterTables::new(&c.w.model.masters, &c.w.parts.own_master),
@@ -311,7 +311,7 @@ impl Attack {
         posted: &mut Vec<(NotifyKind, [i32; 3])>,
         reads: &MoveToReads<'_>,
         layer: BeginLayer<'_>,
-    ) -> Result<Begun, GenieError> {
+    ) -> GenieResult<Begun> {
         let BeginLayer {
             roles,
             attack_tuning,
@@ -400,7 +400,7 @@ impl Attack {
         mut motion: MotionMut<'_>,
         rng: &mut Well512,
         sprite_tuning: SpriteTuning,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         // State 13 ("Failed"): the target went out of sight.
         self.state = AttackState::Failed;
         motion.set_anim_speed(Speed::new(1.0));
@@ -423,7 +423,7 @@ impl Attack {
         g: &mut Ground<'_>,
         f: &Fight,
         r: &AttackReads,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         self.ready(unit, g, f, r)
     }
 }
@@ -481,7 +481,7 @@ pub fn engagement(
     me: &Placed,
     them: &Placed,
     world_time: WorldTime,
-) -> Result<Engagement, GenieError> {
+) -> GenieResult<Engagement> {
     if master.creatable_part().charge_kind.ranged() {
         return Err(GenieError::unsupported(
             "an attacker whose charge adds to its range (slot 0x2f8)",

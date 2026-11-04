@@ -4,7 +4,7 @@
 //!
 //! `pred(a, b)` is the sort's comparator: true when `a` goes before `b`.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::world::slots::CheckedIndex;
 use std::mem::take;
 
@@ -16,7 +16,7 @@ use std::mem::take;
 ///
 /// A position outside `v`, which the algorithm's bounds never reach (an unreachable error
 /// that names it), whatever `pred` answers.
-pub fn sort<T: Copy>(v: &mut [T], pred: &impl Fn(T, T) -> bool) -> Result<(), GenieError> {
+pub fn sort<T: Copy>(v: &mut [T], pred: &impl Fn(T, T) -> bool) -> GenieResult<()> {
     let ideal = v.len() as isize;
     sort_unchecked(v, 0, v.len(), ideal, pred)
 }
@@ -25,12 +25,12 @@ pub fn sort<T: Copy>(v: &mut [T], pred: &impl Fn(T, T) -> bool) -> Result<(), Ge
 const INSERTION_MAX: usize = 32;
 
 /// The element at `i` of `v`.
-fn at<T: Copy>(v: &[T], i: usize) -> Result<T, GenieError> {
+fn at<T: Copy>(v: &[T], i: usize) -> GenieResult<T> {
     v.checked(i).copied()
 }
 
 /// `std::iter_swap` of the elements at `a` and `b` of `v`.
-fn swap<T>(v: &mut [T], a: usize, b: usize) -> Result<(), GenieError> {
+fn swap<T>(v: &mut [T], a: usize, b: usize) -> GenieResult<()> {
     let _ = (v.checked(a)?, v.checked(b)?);
     v.swap(a, b);
     Ok(())
@@ -42,7 +42,7 @@ fn sort_unchecked<T: Copy>(
     mut last: usize,
     mut ideal: isize,
     pred: &impl Fn(T, T) -> bool,
-) -> Result<(), GenieError> {
+) -> GenieResult<()> {
     loop {
         if last - first <= INSERTION_MAX {
             return insertion_sort(v, first, last, pred);
@@ -70,7 +70,7 @@ fn insertion_sort<T: Copy>(
     first: usize,
     last: usize,
     pred: &impl Fn(T, T) -> bool,
-) -> Result<(), GenieError> {
+) -> GenieResult<()> {
     if first == last {
         return Ok(());
     }
@@ -98,7 +98,7 @@ fn med3<T: Copy>(
     mid: usize,
     last: usize,
     pred: &impl Fn(T, T) -> bool,
-) -> Result<(), GenieError> {
+) -> GenieResult<()> {
     if pred(at(v, mid)?, at(v, first)?) {
         swap(v, mid, first)?;
     }
@@ -119,7 +119,7 @@ fn guess_median<T: Copy>(
     mid: usize,
     last: usize,
     pred: &impl Fn(T, T) -> bool,
-) -> Result<(), GenieError> {
+) -> GenieResult<()> {
     let count = last - first;
     if 40 < count {
         let step = (count + 1) >> 3;
@@ -145,7 +145,7 @@ fn partition_by_median_guess<T: Copy>(
     first: usize,
     last: usize,
     pred: &impl Fn(T, T) -> bool,
-) -> Result<(usize, usize), GenieError> {
+) -> GenieResult<(usize, usize)> {
     let mid = first + ((last - first) >> 1);
     guess_median(v, first, mid, last - 1, pred)?;
     let (mut pfirst, mut plast) = pivot_run(v, first, last, mid, pred)?;
@@ -189,7 +189,7 @@ fn pivot_run<T: Copy>(
     last: usize,
     mid: usize,
     pred: &impl Fn(T, T) -> bool,
-) -> Result<(usize, usize), GenieError> {
+) -> GenieResult<(usize, usize)> {
     let mut pfirst = mid;
     let mut plast = pfirst + 1;
     while first < pfirst && equal(at(v, pfirst - 1)?, at(v, pfirst)?, pred) {
@@ -209,7 +209,7 @@ fn scan_up<T: Copy>(
     (pfirst, mut plast, mut gfirst): (usize, usize, usize),
     last: usize,
     pred: &impl Fn(T, T) -> bool,
-) -> Result<(usize, usize), GenieError> {
+) -> GenieResult<(usize, usize)> {
     while gfirst < last {
         let (pivot, g) = (at(v, pfirst)?, at(v, gfirst)?);
         if pred(pivot, g) {
@@ -234,7 +234,7 @@ fn scan_down<T: Copy>(
     (mut pfirst, mut glast): (usize, usize),
     first: usize,
     pred: &impl Fn(T, T) -> bool,
-) -> Result<(usize, usize), GenieError> {
+) -> GenieResult<(usize, usize)> {
     while first < glast {
         let (g, pivot) = (at(v, glast - 1)?, at(v, pfirst)?);
         if pred(g, pivot) {
@@ -258,7 +258,7 @@ fn push_heap_by_index<T: Copy>(
     top: usize,
     val: T,
     pred: &impl Fn(T, T) -> bool,
-) -> Result<(), GenieError> {
+) -> GenieResult<()> {
     while top < hole {
         let idx = (hole - 1) >> 1;
         let parent = at(v, idx)?;
@@ -279,7 +279,7 @@ fn pop_heap_hole_by_index<T: Copy>(
     bottom: usize,
     val: T,
     pred: &impl Fn(T, T) -> bool,
-) -> Result<(), GenieError> {
+) -> GenieResult<()> {
     let top = hole;
     let mut idx = hole;
     let max_non_leaf = (bottom.wrapping_sub(1)) >> 1;
@@ -299,7 +299,7 @@ fn pop_heap_hole_by_index<T: Copy>(
 }
 
 /// `_Make_heap_unchecked`.
-fn make_heap<T: Copy>(v: &mut [T], pred: &impl Fn(T, T) -> bool) -> Result<(), GenieError> {
+fn make_heap<T: Copy>(v: &mut [T], pred: &impl Fn(T, T) -> bool) -> GenieResult<()> {
     let bottom = v.len();
     let mut hole = bottom >> 1;
     while 0 < hole {
@@ -311,7 +311,7 @@ fn make_heap<T: Copy>(v: &mut [T], pred: &impl Fn(T, T) -> bool) -> Result<(), G
 }
 
 /// `_Sort_heap_unchecked`.
-fn sort_heap<T: Copy>(v: &mut [T], pred: &impl Fn(T, T) -> bool) -> Result<(), GenieError> {
+fn sort_heap<T: Copy>(v: &mut [T], pred: &impl Fn(T, T) -> bool) -> GenieResult<()> {
     let mut last = v.len();
     while 2 <= last {
         last -= 1;

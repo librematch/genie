@@ -1,8 +1,8 @@
 //! An object's id as one type: the id that names an object across ticks, as the commands,
 //! their unit lists and their targets hold it.
 
-use crate::GenieError;
 use crate::math::msvc::IntKey;
+use crate::{GenieError, GenieResult};
 use derive_more::Display;
 
 /// An object's id (`+0x8`), which names the object across ticks: a live or sleeping object's
@@ -120,7 +120,7 @@ impl TryFrom<i32> for ObjectId {
     /// # Errors
     ///
     /// −1, which every field takes for none.
-    fn try_from(value: i32) -> Result<Self, GenieError> {
+    fn try_from(value: i32) -> GenieResult<Self> {
         Self::of_field(value).ok_or_else(|| {
             GenieError::invalid_input("an object id of −1, which names none").with("id", value)
         })

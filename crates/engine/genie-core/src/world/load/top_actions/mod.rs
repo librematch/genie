@@ -1,6 +1,5 @@
 //! A saved object's top action as the slice models it ([`saved_actions`]).
 
-use crate::GenieError;
 use crate::combat::missile::ShooterId;
 use crate::construction::build::{BuildAction, BuildTask};
 use crate::garrison::ContainerId;
@@ -22,6 +21,7 @@ use crate::world::Seconds;
 use crate::world::load::object::OTHER_SUB_ACTION;
 use crate::world::load::object::missile_part;
 use crate::world::load::sub_actions::saved_attack;
+use crate::{GenieError, GenieResult};
 use genie_import::save::parts::combat_master;
 use genie_save::generated::world::{Action, PlayerObjects, RgeAction, RgeStaticObject};
 
@@ -50,7 +50,7 @@ use crate::world::load::top_actions::gathering::{import_gather, import_hunt, imp
 use genie_save::generated::world::ActionList;
 
 /// A task slot's task of a master (the master, the slot).
-type TaskAt<'a> = &'a dyn Fn(i16, i16) -> Result<Task, GenieError>;
+type TaskAt<'a> = &'a dyn Fn(i16, i16) -> GenieResult<Task>;
 
 /// What `saved_actions` finds an object without actions: a state the caller rules out.
 const NO_ACTIONS: GenieError =
@@ -66,12 +66,12 @@ pub fn saved_actions(
     object: &genie_save::Object,
     s: &RgeStaticObject,
     objects: &PlayerObjects,
-    work: impl Fn(i16) -> Result<BuildTask, GenieError>,
-    fly_task: impl Fn(i16) -> Result<Task, GenieError>,
-    task_at: impl Fn(i16, i16) -> Result<Task, GenieError>,
+    work: impl Fn(i16) -> GenieResult<BuildTask>,
+    fly_task: impl Fn(i16) -> GenieResult<Task>,
+    task_at: impl Fn(i16, i16) -> GenieResult<Task>,
     graphics: Option<&Graphics>,
     actions: &mut layers::Action,
-) -> Result<(), GenieError> {
+) -> GenieResult<()> {
     let mut entries = object
         .actions()
         .map(ActionList::entries)
@@ -129,7 +129,7 @@ const fn not_imported() -> GenieError {
 /// # Errors
 ///
 /// A negative action type.
-pub(crate) fn first_action(list: &ActionList) -> Result<Option<(ActionKind, &Action)>, GenieError> {
+pub(crate) fn first_action(list: &ActionList) -> GenieResult<Option<(ActionKind, &Action)>> {
     list.entries()
         .next()
         .map(|(kind, action)| Ok((ActionKind::try_from(kind)?, action)))
@@ -155,13 +155,13 @@ struct Saved<'a> {
 
 impl Saved<'_> {
     /// The task of the action's slot (`short_val`).
-    fn task(&self, task_at: TaskAt<'_>) -> Result<Task, GenieError> {
+    fn task(&self, task_at: TaskAt<'_>) -> GenieResult<Task> {
         task_at(self.s.master_obj, self.base.short_val)
     }
 
     /// The action's first sub-action when it is a `MoveTo`, none without one; `other` for any
     /// other.
-    fn move_to_sub(&self, other: GenieError) -> Result<Option<&Action>, GenieError> {
+    fn move_to_sub(&self, other: GenieError) -> GenieResult<Option<&Action>> {
         match first_action(&self.base.sub_actions)? {
             None => Ok(None),
             Some((MOVE_TO, sub)) => Ok(Some(sub)),
@@ -176,7 +176,7 @@ impl Saved<'_> {
 }
 
 /// A saved `MoveTo`'s state as the slice models it.
-const fn move_to_state(state: u8) -> Result<MoveTo, GenieError> {
+const fn move_to_state(state: u8) -> GenieResult<MoveTo> {
     match state {
         1 => Ok(MoveTo::Arrived),
         2 => Ok(MoveTo::Waiting),
@@ -190,7 +190,7 @@ const fn move_to_state(state: u8) -> Result<MoveTo, GenieError> {
 }
 
 /// A `MoveTo`'s range (`+0x68`).
-fn sub_range(sub: &Action) -> Result<f32, GenieError> {
+fn sub_range(sub: &Action) -> GenieResult<f32> {
     sub.move_to_range()
         .ok_or(GenieError::unsupported("a saved MoveTo without its range"))
 }
@@ -206,7 +206,7 @@ fn import_artifact(
     saved: &Saved<'_>,
     task_at: TaskAt<'_>,
     actions: &mut layers::Action,
-) -> Result<(), GenieError> {
+) -> GenieResult<()> {
     let base = saved.base;
     // its task (the base's `short_val`, −1 for none)
     let moving = if base.short_val < 0 {
@@ -240,7 +240,7 @@ fn import_artifact(
 }
 
 /// A `MoveTo` of its own (type 1): its state, goal, range, sprite and wait; not quiet.
-fn import_move_to(saved: &Saved<'_>, actions: &mut layers::Action) -> Result<(), GenieError> {
+fn import_move_to(saved: &Saved<'_>, actions: &mut layers::Action) -> GenieResult<()> {
     let move_to = saved_move_to(saved.action, saved.graphics)?;
     actions.list.set_move_to(Some(move_to));
     Ok(())
@@ -259,7 +259,7 @@ fn import_move_to(saved: &Saved<'_>, actions: &mut layers::Action) -> Result<(),
 pub(crate) fn saved_sub_move_to(
     action: &Action,
     graphics: Option<&Graphics>,
-) -> Result<MoveToAction, GenieError> {
+) -> GenieResult<MoveToAction> {
     let move_to = saved_move_to(action, graphics)?;
     if move_to.voice.is_loud()
         && let Some(target) = move_to.target
@@ -277,7 +277,7 @@ pub(crate) fn saved_sub_move_to(
 pub(crate) fn saved_move_to(
     action: &Action,
     graphics: Option<&Graphics>,
-) -> Result<MoveToAction, GenieError> {
+) -> GenieResult<MoveToAction> {
     let base = action.base().ok_or(MOVE_TO_BASELESS)?;
     Ok(MoveToAction {
         state: move_to_state(base.state)?,
@@ -303,7 +303,7 @@ const MOVE_TO_BASELESS: GenieError = GenieError::unsupported("a saved MoveTo wit
 fn saved_move_to_sprite(
     id: Option<SpriteId>,
     graphics: Option<&Graphics>,
-) -> Result<Option<Graphic>, GenieError> {
+) -> GenieResult<Option<Graphic>> {
     let Some(id) = id else {
         return Ok(None);
     };
@@ -317,7 +317,7 @@ fn saved_move_to_sprite(
 }
 
 /// A missile's action (8): its course and the missile object's own fields.
-fn import_missile(saved: &Saved<'_>, actions: &mut layers::Action) -> Result<(), GenieError> {
+fn import_missile(saved: &Saved<'_>, actions: &mut layers::Action) -> GenieResult<()> {
     let (base, object) = (saved.base, saved.object);
     let ma = saved
         .action
@@ -366,9 +366,9 @@ fn import_missile(saved: &Saved<'_>, actions: &mut layers::Action) -> Result<(),
 /// A bird's Fly (10): its home, its `MoveTo` and its task.
 fn import_fly(
     saved: &Saved<'_>,
-    fly_task: &dyn Fn(i16) -> Result<Task, GenieError>,
+    fly_task: &dyn Fn(i16) -> GenieResult<Task>,
     actions: &mut layers::Action,
-) -> Result<(), GenieError> {
+) -> GenieResult<()> {
     let base = saved.base;
     // its MoveTo to the flight's point is not quiet
     let move_to = saved
@@ -389,9 +389,9 @@ fn import_fly(
 /// The Build (101): its task (`work`: with the builder's powerup), its `MoveTo` and its site.
 fn import_build(
     saved: &Saved<'_>,
-    work: &dyn Fn(i16) -> Result<BuildTask, GenieError>,
+    work: &dyn Fn(i16) -> GenieResult<BuildTask>,
     actions: &mut layers::Action,
-) -> Result<(), GenieError> {
+) -> GenieResult<()> {
     let base = saved.base;
     // its quiet MoveTo (FUN_140a7a170 with 1)
     let move_to = saved
@@ -420,7 +420,7 @@ fn import_repair(
     saved: &Saved<'_>,
     task_at: TaskAt<'_>,
     actions: &mut layers::Action,
-) -> Result<(), GenieError> {
+) -> GenieResult<()> {
     let base = saved.base;
     let part = saved
         .action
@@ -455,7 +455,7 @@ fn import_enter(
     saved: &Saved<'_>,
     task_at: TaskAt<'_>,
     actions: &mut layers::Action,
-) -> Result<(), GenieError> {
+) -> GenieResult<()> {
     use crate::garrison::EnterAction;
     use crate::garrison::EnterState;
     let base = saved.base;
@@ -500,7 +500,7 @@ fn import_enter(
 /// The Transport (12): the base alone is saved (`FUN_140aa3b20`): +0x34 is its second target's
 /// word, its task the base's task id (−1 for none), and +0x68 starts clear; `set_state` makes no
 /// sub-action but a `MoveTo`.
-fn import_transport(saved: &Saved<'_>, actions: &mut layers::Action) -> Result<(), GenieError> {
+fn import_transport(saved: &Saved<'_>, actions: &mut layers::Action) -> GenieResult<()> {
     let base = saved.base;
     // `set_state` makes no other sub-action: a save that holds one is no game's
     let sub = saved.move_to_sub(GenieError::invalid_input(
@@ -523,7 +523,7 @@ fn import_transport(saved: &Saved<'_>, actions: &mut layers::Action) -> Result<(
 }
 
 /// The Explore (4): its state, its `MoveTo` and the wait.
-fn import_explore(saved: &Saved<'_>, actions: &mut layers::Action) -> Result<(), GenieError> {
+fn import_explore(saved: &Saved<'_>, actions: &mut layers::Action) -> GenieResult<()> {
     use crate::movement::explore::ExploreState;
     let base = saved.base;
     let sub = saved.move_to_sub(GenieError::unsupported(
@@ -547,7 +547,7 @@ fn import_explore(saved: &Saved<'_>, actions: &mut layers::Action) -> Result<(),
 }
 
 /// The Attack (9) of its own; it reads and changes the unit's sprite from here on.
-fn import_attack(saved: &Saved<'_>, actions: &mut layers::Action) -> Result<(), GenieError> {
+fn import_attack(saved: &Saved<'_>, actions: &mut layers::Action) -> GenieResult<()> {
     actions
         .list
         .set_attack(Some(saved_attack(saved.action, saved.graphics)?));
@@ -560,7 +560,7 @@ fn import_wait_solidify(
     saved: &Saved<'_>,
     task_at: TaskAt<'_>,
     actions: &mut layers::Action,
-) -> Result<(), GenieError> {
+) -> GenieResult<()> {
     if saved.base.sub_actions.entries().next().is_some() {
         return Err(GenieError::unsupported(
             "a saved Wait_Solidify with a sub-action",
@@ -586,7 +586,7 @@ fn import_wait_solidify(
 /// # Errors
 ///
 /// A saved wait state that names no state.
-pub fn saved_move_wait(sub: &Action) -> Result<MoveWait, GenieError> {
+pub fn saved_move_wait(sub: &Action) -> GenieResult<MoveWait> {
     use crate::movement::move_to::MoveWaitState;
     sub.rge_action_by_kind
         .as_deref()

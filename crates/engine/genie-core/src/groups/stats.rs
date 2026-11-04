@@ -2,7 +2,6 @@
 //! speed of the members, the objects their searches list, and the formation's type after a
 //! change of members (`FUN_14100b940`).
 
-use crate::GenieError;
 use crate::combat::attack::ATTACK;
 use crate::groups::FormationKind;
 use crate::groups::GroupCommandKind;
@@ -34,6 +33,7 @@ use crate::world::Seconds;
 use crate::world::Unread;
 use crate::world::World;
 use crate::world::slots::{CheckedIndex, PlayerSlots};
+use crate::{GenieError, GenieResult};
 
 /// The objects of the members' searches a group keeps at most (`FUN_140c65c60`'s `0x46`).
 const MOST_OBJECTS: usize = 70;
@@ -93,7 +93,7 @@ impl World {
     /// Not modelled: `+0x478` (a member's `+0x30c`; the group holds no such field), a charge's
     /// range against a target, and the attack plan's re-attack (`FUN_14100f7f0`) against a
     /// target the world holds.
-    pub fn group_statistics(&mut self, group: GroupId, far: FarMembers) -> Result<(), GenieError> {
+    pub fn group_statistics(&mut self, group: GroupId, far: FarMembers) -> GenieResult<()> {
         if self.statistics_only(group, far)? {
             self.calc_formation_kind(group)?;
         }
@@ -107,7 +107,7 @@ impl World {
     ///
     /// When the world does not hold `group`: the game's routine gets the group itself, from a
     /// caller that holds it.
-    pub fn statistics_only(&mut self, group: GroupId, far: FarMembers) -> Result<bool, GenieError> {
+    pub fn statistics_only(&mut self, group: GroupId, far: FarMembers) -> GenieResult<bool> {
         let dt = self.dt_seconds;
         let (views, objects) = self.member_views(group, far)?;
         let g = self.groups.held_mut(group)?;
@@ -174,7 +174,7 @@ impl World {
         &mut self,
         group: GroupId,
         far: FarMembers,
-    ) -> Result<(MemberViews, Vec<ObjectId>), GenieError> {
+    ) -> GenieResult<(MemberViews, Vec<ObjectId>)> {
         // each member's view in the members' order, its search first (FUN_140c65c60 before
         // anything else of it), then the far test; the index the member has then, which a
         // later member's leaving does not move
@@ -238,11 +238,7 @@ impl World {
 
     /// [`World::statistics_only`]'s sub-formations: each one with units gets its attack range
     /// against `target` and its spacing.
-    fn sub_formation_stats(
-        &mut self,
-        group: GroupId,
-        target: Option<ObjectId>,
-    ) -> Result<(), GenieError> {
+    fn sub_formation_stats(&mut self, group: GroupId, target: Option<ObjectId>) -> GenieResult<()> {
         let g = self.groups.held(group)?;
         let stats: Vec<Vec<ObjectId>> = g.unit_kinds.iter().map(|u| u.units.clone()).collect();
         for (n, units) in stats.iter().enumerate() {
@@ -305,11 +301,7 @@ impl World {
     ///
     /// A member without a unit AI (the game calls through its null pointer) or of a computer
     /// player (its notify), and the search's.
-    fn member_objects(
-        &mut self,
-        id: ObjectId,
-        objects: &mut Vec<ObjectId>,
-    ) -> Result<(), GenieError> {
+    fn member_objects(&mut self, id: ObjectId, objects: &mut Vec<ObjectId>) -> GenieResult<()> {
         if MOST_OBJECTS <= objects.len() {
             return Ok(());
         }
@@ -416,7 +408,7 @@ impl World {
         &self,
         object: WorldObject<'_>,
         target: Option<WorldObject<'_>>,
-    ) -> Result<Distance, GenieError> {
+    ) -> GenieResult<Distance> {
         let master = self.master(object.player(), object.master_id(self.model.slots))?;
         if !COMBAT_KINDS.contains(&master.kind) {
             return Ok(Distance::ZERO);
@@ -455,12 +447,7 @@ impl World {
     /// # Errors
     ///
     /// An action the slice does not model, and a member of a master the slice does not have.
-    fn far_from_slot(
-        &self,
-        group: GroupId,
-        view: &MemberView,
-        largest: f32,
-    ) -> Result<bool, GenieError> {
+    fn far_from_slot(&self, group: GroupId, view: &MemberView, largest: f32) -> GenieResult<bool> {
         let g = self.groups.held(group)?;
         let patrol =
             top_path(&g.motion.paths).is_some_and(|p| p.path_flags.contains(PathFlags::LOOPS));
@@ -503,7 +490,7 @@ impl World {
     /// # Errors
     ///
     /// What the stop does not model.
-    fn stop_if_inside(&mut self, id: ObjectId) -> Result<(), GenieError> {
+    fn stop_if_inside(&mut self, id: ObjectId) -> GenieResult<()> {
         let inside = self
             .players
             .iter()
@@ -538,7 +525,7 @@ fn member_totals(
     views: &[(usize, MemberView)],
     objects: Vec<ObjectId>,
     dt: Seconds,
-) -> Result<(i32, f32, bool), GenieError> {
+) -> GenieResult<(i32, f32, bool)> {
     g.centroid = BVector::ZERO;
     g.desired_height = 0.0;
     g.largest_unit_radius = Distance::ZERO;

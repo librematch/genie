@@ -63,7 +63,7 @@ pub fn old_pather_paths(
     masters: Option<&MasterTable>,
     dumps: Dumps<'_>,
     calls: &[PatherCall],
-) -> GenieResult<Vec<Result<PatherAnswer, GenieError>>> {
+) -> GenieResult<Vec<GenieResult<PatherAnswer>>> {
     let mut turns = turns_from_save(save, recording, start_tick, masters, dumps)?;
     let mut out = Vec::new();
     for &PatherCall {
@@ -535,10 +535,7 @@ pub struct Times {
 }
 
 /// The game's state in a save as the slice's units ([`genie_core::world::GameState`]).
-pub(super) fn game_state(
-    header: &Header,
-    masters: Option<&MasterTable>,
-) -> Result<GameState, GenieError> {
+pub(super) fn game_state(header: &Header, masters: Option<&MasterTable>) -> GenieResult<GameState> {
     let world = &header.world.base_world;
     let missile_tuning = &layer()?.tuning.missile;
     let mut game = GameState {

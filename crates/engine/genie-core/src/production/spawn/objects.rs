@@ -1,7 +1,6 @@
 //! A spot beside a building, the remains a death leaves, a plain object, the flares and a
 //! building a death makes.
 
-use crate::GenieError;
 use crate::map::Point;
 use crate::map::Position;
 use crate::map::Rect;
@@ -41,6 +40,7 @@ use crate::world::World;
 use crate::world::layer::ClassRoles;
 use crate::world::parts::{Object, ObjectParts};
 use crate::world::slots::PlayerSlots;
+use crate::{GenieError, GenieResult};
 
 impl World {
     /// `FUN_1411d12d0` for a unit of `made` beside the building at `i` of player `p`, `toward`
@@ -53,7 +53,7 @@ impl World {
         i: ListIndex,
         made: &Master,
         toward: Option<Point>,
-    ) -> Result<Point, GenieError> {
+    ) -> GenieResult<Point> {
         let building = &self.players.live(p, i)?;
         let site_master = building.master(self.master_tables(), p)?;
         let position = building.position();
@@ -137,7 +137,7 @@ impl World {
         master: MasterId,
         at: Position,
         facet: Option<Facet>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let made = self.master(p, master)?.clone();
         if made.kind == MasterKind::BUILDING {
             return self.new_building(p, &made, at);
@@ -178,7 +178,7 @@ impl World {
         (p, master): (PlayerId, MasterId),
         made: &Master,
         at: Position,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if let Some(v) = self.spatial.sight.as_mut() {
             v.add_seer(
                 id,
@@ -236,7 +236,7 @@ impl World {
         made: &Master,
         at: Position,
         facing: Facing,
-    ) -> Result<ListIndex, GenieError> {
+    ) -> GenieResult<ListIndex> {
         remains_supported(made)?;
         // its place (slot 0x58, the static new_position): the ground's height by its master's
         // fly mode (slot 0x60, FUN_141193a10)
@@ -393,7 +393,7 @@ impl World {
         target: Option<ObjectId>,
         point: Point,
         players: u8,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if self.players.len() < usize::from(players) {
             return Ok(());
         }
@@ -419,7 +419,7 @@ impl World {
         p: PlayerId,
         at: Position,
         doubled: bool,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let before = self.players.player(p)?.objects.next_place();
         self.remains(p, self.model.slots.master.flare, at, None)?;
         self.made_new_object(p)?;
@@ -443,7 +443,7 @@ impl World {
         p: PlayerId,
         made: &Master,
         at: Position,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if self.players.player(p)?.kind.is_computer() {
             return Err(GenieError::unsupported(
                 "a computer player's new building (its AI's slot 0x398)",
@@ -457,7 +457,7 @@ impl World {
 
 /// Remains the slice models: a static object of 10 or 20 to 39 without hit points, of a master
 /// that is not recyclable.
-fn remains_supported(made: &Master) -> Result<(), GenieError> {
+fn remains_supported(made: &Master) -> GenieResult<()> {
     if made.kind != MasterKind::STATIC
         && !(MasterKind::ANIMATED..MasterKind::ACTION).contains(&made.kind)
     {

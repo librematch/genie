@@ -1,7 +1,7 @@
 //! The A* searches over the node cells and over the tiles: the nodes, the open list, the
 //! estimates and the expansions.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::map::Distance;
 use crate::math::fmath::sqrt;
 use crate::math::msvc::sort;
@@ -141,7 +141,7 @@ impl OpenList {
     /// # Errors
     ///
     /// What the sort of the next bucket fails on.
-    pub(super) fn pop(&mut self, nodes: &Nodes) -> Result<Option<NodeIndex>, GenieError> {
+    pub(super) fn pop(&mut self, nodes: &Nodes) -> GenieResult<Option<NodeIndex>> {
         let Some(m) = self.min else {
             return Ok(None);
         };
@@ -391,7 +391,7 @@ impl Planner {
         start: PlanTile,
         full: bool,
         tile_path_tuning: &TilePathTuning,
-    ) -> Result<Option<NodeIndex>, GenieError> {
+    ) -> GenieResult<Option<NodeIndex>> {
         let start_cell = self.cell(level, cell);
         if !start_cell.kind.contains(CellKind::LONE) && start_cell.edges.is_empty() {
             return Ok(None);
@@ -452,7 +452,7 @@ impl Planner {
         &mut self,
         start: PlanTile,
         tile_path_tuning: &TilePathTuning,
-    ) -> Result<Option<NodeIndex>, GenieError> {
+    ) -> GenieResult<Option<NodeIndex>> {
         if self.cell(GridLevel::TILES, start).edges.is_empty() {
             return Ok(None);
         }

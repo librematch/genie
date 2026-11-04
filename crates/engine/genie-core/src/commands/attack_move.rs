@@ -1,6 +1,6 @@
 //! `ATTACK_MOVE` (0x21): the player's units attack-move through waypoints.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::commands::{UnitList, Waypoints};
 use crate::orders::SavedPatrols;
 use crate::orders::Sweep;
@@ -33,7 +33,7 @@ impl AttackMoveCommand {
     /// first of them ([`World::read_units`]); without 1 to 10 waypoints it does nothing
     /// ([`Waypoints::used`]), else it runs [`World::attack_move`] with the sweep of an attack
     /// move (no patrol).
-    pub(crate) fn run(&self, w: &mut World) -> Result<(), GenieError> {
+    pub(crate) fn run(&self, w: &mut World) -> GenieResult<()> {
         let Some(ids) = w.read_units(self.player, &self.units) else {
             return Ok(());
         };

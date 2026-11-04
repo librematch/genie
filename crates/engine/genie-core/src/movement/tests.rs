@@ -1,4 +1,5 @@
 use super::*;
+use crate::GenieError;
 use crate::gathering::hunt::tests::walker;
 use crate::groups::MoveReason;
 use crate::groups::{Member, SpecificMove, UnitGroup};

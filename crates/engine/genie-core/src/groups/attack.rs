@@ -2,7 +2,6 @@
 //! runs for the tasks 1, 7, 9, `0x68` and `0x7d` on a target, with the member passes it makes
 //! (`FUN_14100c6c0`, `FUN_141007ba0`, `FUN_14102bbd0`).
 
-use crate::GenieError;
 use crate::combat::Charge;
 use crate::combat::damage::charge_works;
 use crate::construction::MainBuildingId;
@@ -34,6 +33,7 @@ use crate::world::World;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::slots::PlayerSlots;
+use crate::{GenieError, GenieResult};
 
 /// The formation categories a group keeps its units by (`FUN_141007ba0`, `FUN_14100c6c0`).
 const CATEGORIES: [FormationCategory; 6] = FormationCategory::EACH;
@@ -97,7 +97,7 @@ impl World {
         group: GroupId,
         target: ObjectId,
         order: AttackOrder,
-    ) -> Result<GroupMove, GenieError> {
+    ) -> GenieResult<GroupMove> {
         let main = self.main_object(target)?;
         let at = self.moved_place_of(main)?;
         let g = self.groups.held(group)?;
@@ -157,7 +157,7 @@ impl World {
 
     /// `FUN_141189b20` of `target`: a building's main building (`+0xbb8`) when it has one, else
     /// the object itself.
-    fn main_object(&self, target: ObjectId) -> Result<ObjectId, GenieError> {
+    fn main_object(&self, target: ObjectId) -> GenieResult<ObjectId> {
         let (player, unit) = self.object(target).ok_or_else(|| member_gone(target))?;
         let building = unit.master(self.master_tables(), player)?.kind == MasterKind::BUILDING;
         Ok(self
@@ -169,13 +169,13 @@ impl World {
     }
 
     /// Slot 0x520 (`FUN_14106d530`) of object `id`: where it last moved to ([`moved_place`]).
-    pub(super) fn moved_place_of(&self, id: ObjectId) -> Result<BVector, GenieError> {
+    pub(super) fn moved_place_of(&self, id: ObjectId) -> GenieResult<BVector> {
         let (_, u) = self.object(id).ok_or_else(|| member_gone(id))?;
         Ok(moved_place(u, self.parts.mover_of(id)))
     }
 
     /// The target master's two radii as one length (`+0xb57`, `+0xb5b`: `sqrt(x² + y²)`).
-    pub(super) fn target_radius(&self, id: ObjectId) -> Result<Distance, GenieError> {
+    pub(super) fn target_radius(&self, id: ObjectId) -> GenieResult<Distance> {
         let (p, u) = self.object(id).ok_or_else(|| member_gone(id))?;
         let r = u.master(self.master_tables(), p)?.radius;
         Ok(Distance::new(sqrt(r.x() * r.x() + r.y() * r.y())))
@@ -206,7 +206,7 @@ impl World {
         target: ObjectId,
         order: AttackOrder,
         range: &mut f32,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let g = self.groups.held(group)?;
         let Some(player_kind) = g
             .owner
@@ -234,7 +234,7 @@ impl World {
         target: ObjectId,
         order: AttackOrder,
         range: &mut f32,
-    ) -> Result<bool, GenieError> {
+    ) -> GenieResult<bool> {
         let Some((p, u)) = self.object(id) else {
             return Ok(false);
         };
@@ -275,7 +275,7 @@ impl World {
         player: PlayerId,
         master: MasterId,
         filter: Option<ActionKind>,
-    ) -> Result<f32, GenieError> {
+    ) -> GenieResult<f32> {
         let Some(filter) = filter else {
             return Ok(NO_RANGE);
         };
@@ -317,7 +317,7 @@ impl World {
         &mut self,
         group: GroupId,
         target: ObjectId,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let t = self
             .world_object(target)
             .ok_or_else(|| member_gone(target))?;
@@ -397,7 +397,7 @@ impl World {
         &mut self,
         group: GroupId,
         target: ObjectId,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let t = self
             .world_object(target)
             .ok_or_else(|| member_gone(target))?;
@@ -443,7 +443,7 @@ impl World {
         u: &Unit,
         master: &Master,
         target: &WorldObject<'_>,
-    ) -> Result<bool, GenieError> {
+    ) -> GenieResult<bool> {
         if !master.creatable_part().charge_kind.ranged() {
             return Ok(false);
         }

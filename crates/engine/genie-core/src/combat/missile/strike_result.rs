@@ -1,6 +1,6 @@
 //! What a missile's last hit did.
 
-use crate::GenieError;
+use crate::{GenieError, GenieResult};
 use strum::FromRepr;
 
 /// What a hit did (`+0x98` of a missile, its last hit's): none yet, a hit, or a hit a shield
@@ -35,7 +35,7 @@ impl TryFrom<u8> for StrikeResult {
     /// # Errors
     ///
     /// A byte no hit answers.
-    fn try_from(value: u8) -> Result<Self, GenieError> {
+    fn try_from(value: u8) -> GenieResult<Self> {
         Self::from_repr(value).ok_or_else(|| {
             GenieError::invalid_input("a strike result no hit answers").with("result", value)
         })

@@ -31,7 +31,7 @@
 //! a key it lacks: `FUN_14104dd80`, `FUN_141050ae0`), a class's `FUN_14104f8f0`, the lists'
 //! erase `FUN_140a63bd0` (order kept).
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::objects::ObjectId;
 use crate::objects::lines::UnitLines;
 use crate::objects::masters::ClassId;
@@ -345,7 +345,7 @@ impl Tracker {
         new: ListKey,
         old_class: Option<ClassId>,
         objects: ObjectsRef<'_>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if let Some(ids) = self.lists.get(&old).cloned() {
             for id in ids {
                 // a queued unit's place (−1) and a negative id hold no object of a class
@@ -393,7 +393,7 @@ impl World {
     /// # Errors
     ///
     /// A player the world does not hold.
-    pub fn load_trackers(&mut self) -> Result<(), GenieError> {
+    pub fn load_trackers(&mut self) -> GenieResult<()> {
         for p in PlayerId::each(self.players.len()) {
             let mut tracker = Tracker::default();
             let player = self.players.player(p)?;
@@ -435,7 +435,7 @@ impl World {
         p: PlayerId,
         id: ObjectId,
         master: MasterId,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let k = self.tracker_key(p, master);
         self.players.player_mut(p)?.tracker.add(id, k);
         Ok(())
@@ -448,7 +448,7 @@ impl World {
         p: PlayerId,
         id: ObjectId,
         master: MasterId,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let k = self.tracker_key(p, master);
         self.players.player_mut(p)?.tracker.remove(id, k);
         Ok(())
@@ -462,7 +462,7 @@ impl World {
         p: PlayerId,
         id: ObjectId,
         master: MasterId,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let k = self.tracker_key(p, master);
         let tracker = &mut self.players.player_mut(p)?.tracker;
         tracker.remove(id, k);
@@ -476,7 +476,7 @@ impl World {
         p: PlayerId,
         id: ObjectId,
         master: MasterId,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let k = self.tracker_key(p, master);
         self.players.player_mut(p)?.tracker.complete(id, k);
         Ok(())
@@ -490,7 +490,7 @@ impl World {
         id: ObjectId,
         old: MasterId,
         new: MasterId,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let (old, new) = (self.tracker_key(p, old), self.tracker_key(p, new));
         self.players.player_mut(p)?.tracker.promote(id, old, new);
         Ok(())
@@ -504,7 +504,7 @@ impl World {
         p: PlayerId,
         from: MasterId,
         to: MasterId,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let old_class = self.tracker_key(p, from).class;
         let mut tracker = take(&mut self.players.player_mut(p)?.tracker);
         let moved = tracker.move_all(

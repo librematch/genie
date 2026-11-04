@@ -1,6 +1,5 @@
 //! A builder's and a gatherer's drop-off and a gatherer's update and search.
 
-use crate::GenieError;
 use crate::combat::abilities::Look;
 use crate::combat::victims::file_kill;
 use crate::combat::victims::{readable, victim, write_back};
@@ -53,6 +52,7 @@ use crate::world::lets::release;
 use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
+use crate::{GenieError, GenieResult};
 
 impl Unit {
     /// The Gather's update (slot 6, `0x140a8e1d0`). It first checks its targets: a target gone
@@ -71,7 +71,7 @@ impl Unit {
         c: &mut Step<'_>,
         me: Me,
         roles: &Roles,
-    ) -> Result<HeadCode, GenieError> {
+    ) -> GenieResult<HeadCode> {
         let by = self.releaser(c)?;
         let checked = self.gather_check_targets(&mut gather, c, by);
         // the check reaches no action of the unit's: the copy goes back, before an error too
@@ -92,7 +92,7 @@ impl Unit {
         gather: &mut GatherAction,
         c: &mut Step<'_>,
         by: Releaser,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let target = gather.target;
         if target.is_some() {
             let state = readable(c, target)?.map(|(_, u, _)| u.life.state);
@@ -143,7 +143,7 @@ impl Unit {
         player: PlayerId,
         (graphics, look): (&'g Graphics, Option<&Look>),
         roles: &Roles,
-    ) -> Result<Walks<'g>, GenieError> {
+    ) -> GenieResult<Walks<'g>> {
         let sprites = SpriteReads::of(self.master(every, player)?, look, graphics, roles);
         Ok(Walks::of(sprites, (self, mover)))
     }
@@ -162,7 +162,7 @@ impl Unit {
         c: &Step<'_>,
         gather: &GatherAction,
         roles: &Roles,
-    ) -> Result<GatherReads, GenieError> {
+    ) -> GenieResult<GatherReads> {
         let master = self.master(c.w.master_tables(), c.player)?;
         let g = |id: Option<SpriteId>| id.and_then(|s| c.w.model.graphics.get(s).copied());
         let task = gather.task;
@@ -221,7 +221,7 @@ impl Unit {
         mut gather: GatherAction,
         reads: &GatherReads,
         by: Releaser,
-    ) -> Result<HeadCode, GenieError> {
+    ) -> GenieResult<HeadCode> {
         let roles = &c.w.model.roles.clone();
         let (position, radius) =
             c.w.spatial
@@ -259,7 +259,7 @@ impl Unit {
         c: &Step<'_>,
         site: Option<DropSiteId>,
         (position, radius): (Position, Footprint),
-    ) -> Result<Option<DropOff>, GenieError> {
+    ) -> GenieResult<Option<DropOff>> {
         let Some(s) = c.w.spatial.get_known(site)? else {
             return Ok(None);
         };
@@ -298,7 +298,7 @@ impl Unit {
         (kind, amount): (AttributeId, Amount),
         radius: Footprint,
         roles: &Roles,
-    ) -> Result<HeadCode, GenieError> {
+    ) -> GenieResult<HeadCode> {
         c.give_load(kind, amount)?;
         if gather.target.is_none() {
             return self.gather_after_drop(gather, actions, c, roles);
@@ -319,7 +319,7 @@ impl Unit {
         c: &mut Step<'_>,
         radius: Footprint,
         roles: &Roles,
-    ) -> Result<HeadCode, GenieError> {
+    ) -> GenieResult<HeadCode> {
         // the unit's load is gone (slot 0xf8 after the drop): its walking sprite is the moving one
         let walks = self.move_walks(
             c.w.parts.mover_of(self.id),
@@ -366,7 +366,7 @@ impl Unit {
         mut gather: GatherAction,
         reads: &GatherReads,
         by: Releaser,
-    ) -> Result<HeadCode, GenieError> {
+    ) -> GenieResult<HeadCode> {
         let roles = &c.w.model.roles.clone();
         let mut victim = victim(c, gather.target, roles)?;
         let old = (gather.target, gather.carry_to);
@@ -400,7 +400,7 @@ impl Unit {
         (old_target, old_second): (Option<GatherTargetId>, Option<DropSiteId>),
         by: Releaser,
         roles: &Roles,
-    ) -> Result<HeadCode, GenieError> {
+    ) -> GenieResult<HeadCode> {
         use crate::gathering::gather::Next;
         if next == Next::Done {
             return Ok(HeadCode::Deletes);
@@ -452,7 +452,7 @@ impl Unit {
         gather: &GatherAction,
         actions: &Action,
         c: &mut Step<'_>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let by_id = ObjectsRef::new(
             &c.w.players,
             &c.w.index,
@@ -515,7 +515,7 @@ pub(crate) fn give_load(
     amount: Amount,
     roles: &Roles,
     slots: Slots,
-) -> Result<(), GenieError> {
+) -> GenieResult<()> {
     let own = relations.get(player).unwrap_or(&NO_RELATIONS);
     let allied = PlayerId::each(own.len())
         .skip(1)

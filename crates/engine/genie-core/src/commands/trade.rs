@@ -1,6 +1,6 @@
 //! `SELL_COMMODITY` (0x7a) and `BUY_COMMODITY` (0x7b): the player trades at the market.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::commands::ResourceWord;
 use crate::commands::TradeLots;
 use crate::objects::ObjectId;
@@ -30,7 +30,7 @@ impl TradeCommand {
     /// The dispatcher trades food, wood and stone only (the attribute's low byte 0 to 2,
     /// `do_command`'s 0x7a and 0x7b): the purchase ([`World::buy`]) or the sale
     /// ([`World::sell`]); a trade cannot fail.
-    pub(crate) fn run(&self, w: &mut World) -> Result<(), GenieError> {
+    pub(crate) fn run(&self, w: &mut World) -> GenieResult<()> {
         let Some(commodity) = self.attribute.traded() else {
             return Ok(());
         };

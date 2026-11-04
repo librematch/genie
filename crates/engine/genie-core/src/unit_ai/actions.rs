@@ -1,6 +1,5 @@
 //! The actions' outcomes, the stops and the order queue.
 
-use crate::GenieError;
 use crate::map::Distance;
 use crate::map::Point;
 use crate::map::Position;
@@ -34,6 +33,7 @@ use crate::world::Millis;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
 use crate::world::slots::CheckedIndex;
+use crate::{GenieError, GenieResult};
 
 /// Which units [`UnitAi::can_order`] lets take orders (`FUN_140c4eea0`'s second argument).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -64,7 +64,7 @@ impl UnitAi {
         player_kind: PlayerKind,
         ai: &mut Well512,
         side: &mut UnitView<'_, '_>,
-    ) -> Result<u32, GenieError> {
+    ) -> GenieResult<u32> {
         let (order, action, p0) = (self.current_order, self.current_action, n.p[0]);
         if order.is_some() {
             self.state_position = at.position.ground();
@@ -133,7 +133,7 @@ impl UnitAi {
         player_kind: PlayerKind,
         ai: &mut Well512,
         side: &mut UnitView<'_, '_>,
-    ) -> Result<u32, GenieError> {
+    ) -> GenieResult<u32> {
         let (order, action, p0) = (self.current_order, self.current_action, n.p[0]);
         let attack = AiAction::Attack.value();
         if (order == Some(OrderKind::Attack) || n.p[2] == 0x202) && p0 == attack {
@@ -189,7 +189,7 @@ impl UnitAi {
         player_kind: PlayerKind,
         ai_rng: &mut Well512,
         side: &mut UnitView<'_, '_>,
-    ) -> Result<u32, GenieError> {
+    ) -> GenieResult<u32> {
         let p1 = n.p[0];
         let order = self.current_order;
         let action = self.current_action;
@@ -264,7 +264,7 @@ impl UnitAi {
         at: &Surroundings,
         side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let roles = &at.roles;
         self.stop_with(
             order,
@@ -284,7 +284,7 @@ impl UnitAi {
         side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let action = self.current_action;
         let current = self.current_order;
         if self.patrol_redraws() {
@@ -339,7 +339,7 @@ impl UnitAi {
         at: &Surroundings,
         side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
-    ) -> Result<WalkBack, GenieError> {
+    ) -> GenieResult<WalkBack> {
         let gap = point_gap_squared(self.state_position, at.position, at.size);
         if !below_or_unordered(WALK_BACK, gap.get()) {
             return Ok(WalkBack::Stays);
@@ -467,7 +467,7 @@ impl UnitAi {
         side: &mut UnitView<'_, '_>,
         player_kind: PlayerKind,
         ai: &mut Well512,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if !self.notifies.is_empty() || self.orders.is_empty() {
             return Ok(());
         }
@@ -496,7 +496,7 @@ impl UnitAi {
         order: QueuedOrder,
         dispatch: Dispatch,
         end: QueueEnd,
-    ) -> Result<Answer, GenieError> {
+    ) -> GenieResult<Answer> {
         if ObjectState::Alive < unit_state {
             return Ok(Answer::NotTaken);
         }
@@ -533,7 +533,7 @@ impl UnitAi {
         side: &mut UnitView<'_, '_>,
         player_kind: PlayerKind,
         ai: &mut Well512,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let unit_ai_tuning = &at.unit_ai_tuning;
         let roles = &at.roles;
         let mut k = 0;

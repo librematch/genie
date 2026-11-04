@@ -2,7 +2,6 @@
 //! searching unit, the found objects, the attack and neutral tests, the statistics' reads and
 //! the quick path.
 
-use crate::GenieError;
 use crate::map::Distance;
 use crate::map::spatial::Spatial;
 use crate::movement::Speed;
@@ -29,6 +28,7 @@ use crate::unit_ai::{
     can_attack as unit_ai_can_attack, spares_friends as unit_ai_spares_friends,
 };
 use crate::world::AiSwitches;
+use crate::{GenieError, GenieResult};
 
 /// What `bestUnitToAttack` (`FUN_140c44680`, [`crate::unit_ai::best_target::best_unit_to_attack`])
 /// asks of the world while its unit AI runs: the searching unit ([`WorldPicker::searcher`]) and
@@ -42,7 +42,7 @@ impl WorldPicker<'_> {
     /// # Errors
     ///
     /// A unit the reads do not model (a computer player's).
-    pub(crate) fn searcher(&self, memory: Memory<'_>) -> Result<Searcher, GenieError> {
+    pub(crate) fn searcher(&self, memory: Memory<'_>) -> GenieResult<Searcher> {
         let best_target_tuning = &self.by_id.tuning().best_target;
         let seeker = self.seeker.ok_or(GenieError::unsupported(
             "an attack test outside bestUnitToAttack",
@@ -89,7 +89,7 @@ impl WorldPicker<'_> {
         &self,
         spatial: &Spatial,
         id: ObjectId,
-    ) -> Result<Option<FoundObject>, GenieError> {
+    ) -> GenieResult<Option<FoundObject>> {
         let Some((owner, t, _, m)) = self.held(id)? else {
             return Ok(None);
         };
@@ -141,7 +141,7 @@ impl WorldPicker<'_> {
     /// # Errors
     ///
     /// What the attack check does not model.
-    pub(crate) fn can_attack(&self, spatial: &Spatial, id: ObjectId) -> Result<bool, GenieError> {
+    pub(crate) fn can_attack(&self, spatial: &Spatial, id: ObjectId) -> GenieResult<bool> {
         let roles = self.by_id.roles();
         let unit_ai_tuning = &self.by_id.tuning().unit_ai;
         let seeker = self.seeker.ok_or(GenieError::unsupported(
@@ -162,11 +162,7 @@ impl WorldPicker<'_> {
     /// # Errors
     ///
     /// What the scan does not model.
-    pub(crate) fn spares_friends(
-        &self,
-        spatial: &Spatial,
-        id: ObjectId,
-    ) -> Result<bool, GenieError> {
+    pub(crate) fn spares_friends(&self, spatial: &Spatial, id: ObjectId) -> GenieResult<bool> {
         let roles = self.by_id.roles();
         let (target, _) = self.target(spatial, id)?;
         unit_ai_spares_friends(self.attacker, &target, roles)
@@ -193,7 +189,7 @@ impl WorldPicker<'_> {
         id: ObjectId,
         distance: Distance,
         category: Option<AttackCategory>,
-    ) -> Result<Candidate, GenieError> {
+    ) -> GenieResult<Candidate> {
         let damage_tuning = &self.by_id.tuning().damage;
         let unit_ai_tuning = &self.by_id.tuning().unit_ai;
         let roles = self.by_id.roles();
@@ -231,7 +227,7 @@ impl WorldPicker<'_> {
     /// # Errors
     ///
     /// What the read does not model.
-    pub(crate) fn armored(&self, id: ObjectId) -> Result<bool, GenieError> {
+    pub(crate) fn armored(&self, id: ObjectId) -> GenieResult<bool> {
         let (_, t, _, m) = self.held(id)?.ok_or(NOT_HELD)?;
         let class3 = m
             .combat_part()
@@ -256,7 +252,7 @@ impl WorldPicker<'_> {
     /// # Errors
     ///
     /// What the read does not model.
-    pub(crate) fn weapon_range(&self, id: ObjectId) -> Result<Distance, GenieError> {
+    pub(crate) fn weapon_range(&self, id: ObjectId) -> GenieResult<Distance> {
         let (_, _, _, m) = self.held(id)?.ok_or(NOT_HELD)?;
         Ok(if MasterKind::RGE_COMBAT <= m.kind {
             m.combat_part().weapon_range
@@ -271,7 +267,7 @@ impl WorldPicker<'_> {
     /// # Errors
     ///
     /// What the reads do not model.
-    pub(crate) fn engages(&self, id: ObjectId) -> Result<bool, GenieError> {
+    pub(crate) fn engages(&self, id: ObjectId) -> GenieResult<bool> {
         let roles = self.by_id.roles();
         let unit_ai_tuning = &self.by_id.tuning().unit_ai;
         let (_, _, _, m) = self.held(id)?.ok_or(NOT_HELD)?;
@@ -290,7 +286,7 @@ impl WorldPicker<'_> {
         spatial: &mut Spatial,
         id: ObjectId,
         range: Distance,
-    ) -> Result<bool, GenieError> {
+    ) -> GenieResult<bool> {
         let terrain = spatial.terrain.as_ref().ok_or(NO_TERRAIN)?;
         let restriction = self.restriction.ok_or(NO_RESTRICTION)?;
         let mask = terrain.restriction_mask(restriction);

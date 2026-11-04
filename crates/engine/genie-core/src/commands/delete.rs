@@ -6,7 +6,6 @@
 //! (`FUN_1411cd780` -> `FUN_1411ccbb0`) gives back what is left of a foundation's cost and takes
 //! its hit points too. The object dies in its next update.
 
-use crate::GenieError;
 use crate::construction::build::held;
 use crate::construction::build::{NO_CONSTRUCTION, NOT_HELD};
 use crate::map::Tile;
@@ -34,6 +33,7 @@ use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::settings::OptionFlags;
 use crate::world::slots::PlayerSlots;
+use crate::{GenieError, GenieResult};
 
 /// The first master type a delete takes (`FUN_1416257c0`: above `0x45`).
 const DELETABLE_KIND: MasterKind = MasterKind::of_data(70);
@@ -50,7 +50,7 @@ pub struct DeleteCommand {
 
 impl DeleteCommand {
     /// Its handler ([`World::delete`]).
-    pub(crate) fn run(self, w: &mut World) -> Result<(), GenieError> {
+    pub(crate) fn run(self, w: &mut World) -> GenieResult<()> {
         w.delete(self.player, self.id)
     }
 }
@@ -69,7 +69,7 @@ impl World {
     /// # Errors
     ///
     /// What the deletes do not model.
-    pub(crate) fn delete(&mut self, player: PlayerId, id: ObjectId) -> Result<(), GenieError> {
+    pub(crate) fn delete(&mut self, player: PlayerId, id: ObjectId) -> GenieResult<()> {
         let Some((owner, unit)) = self.object(id) else {
             return Ok(());
         };
@@ -114,7 +114,7 @@ impl World {
     /// and explored the tile ([`crate::map::spatial::Spatial::sees_and_explored`]) and whose box
     /// overlaps its own (on each axis the gap below the two radii summed) is removed
     /// ([`World::remove_building`]) and its `mROOAlreadyCalled` (`+0x686`) set.
-    pub(crate) fn clear_foundations_under(&mut self, id: ObjectId) -> Result<(), GenieError> {
+    pub(crate) fn clear_foundations_under(&mut self, id: ObjectId) -> GenieResult<()> {
         const AROUND: i32 = 5;
         let Some(site) = self.spatial.get(id).copied() else {
             return Ok(());
@@ -182,7 +182,7 @@ impl World {
     /// some, else `FUN_14118f580`: a sleeping unit wakes to the end of its player's live list and
     /// its hit points go to 0. Not held: the deleted mark, the killer (`+0x690`, its owner) and the
     /// special-object list (`+0x30c` bit 0).
-    fn delete_unit(&mut self, owner: PlayerId, id: ObjectId) -> Result<(), GenieError> {
+    fn delete_unit(&mut self, owner: PlayerId, id: ObjectId) -> GenieResult<()> {
         let (_, unit) = self.object(id).ok_or_else(|| object_gone(id))?;
         let class = unit.master(self.master_tables(), owner)?.class;
         if self
@@ -220,7 +220,7 @@ impl World {
     /// zones first ([`World::clear_treaty_zones`]). Not held: the deleted marks (`+0xa0c`, `+0xc`, `+0xb9c`), the
     /// semi-asleep list (`+0xc98`), the killer (`+0x690`) and a computer player's AI event (slot
     /// 0x380).
-    fn delete_building(&mut self, owner: PlayerId, id: ObjectId) -> Result<(), GenieError> {
+    fn delete_building(&mut self, owner: PlayerId, id: ObjectId) -> GenieResult<()> {
         let (_, unit) = self.object(id).ok_or_else(|| object_gone(id))?;
         let master = unit.master(self.master_tables(), owner)?;
         if self
@@ -238,11 +238,7 @@ impl World {
     /// construction start's clearing ([`World::clear_foundations_under`]): the building wakes,
     /// a foundation's paid cost comes back by the share its build time has still to go, its hit
     /// points go to 0 and a desolid foundation is destroyed at once.
-    pub(crate) fn remove_building(
-        &mut self,
-        owner: PlayerId,
-        id: ObjectId,
-    ) -> Result<(), GenieError> {
+    pub(crate) fn remove_building(&mut self, owner: PlayerId, id: ObjectId) -> GenieResult<()> {
         let (_, unit) = self.object(id).ok_or(GenieError::unsupported(
             "a removed building the slice does not hold",
         ))?;
@@ -281,7 +277,7 @@ impl World {
     }
 
     /// A foundation's destroy (slot 0xd0, [`World::destroy`]) from its delete.
-    fn destroy_foundation(&mut self, owner: PlayerId, id: ObjectId) -> Result<(), GenieError> {
+    fn destroy_foundation(&mut self, owner: PlayerId, id: ObjectId) -> GenieResult<()> {
         self.destroy(owner, id)
     }
 
@@ -299,7 +295,7 @@ impl World {
     /// # Errors
     ///
     /// An object the slice does not hold, and what the parts do not model.
-    pub(crate) fn destroy(&mut self, owner: PlayerId, id: ObjectId) -> Result<(), GenieError> {
+    pub(crate) fn destroy(&mut self, owner: PlayerId, id: ObjectId) -> GenieResult<()> {
         let (_, u) = self.object(id).ok_or(NOT_HELD)?;
         let state = u.life.state;
         let master = u.master(self.master_tables(), owner)?.clone();
@@ -338,7 +334,7 @@ impl World {
     ///
     /// A game with a treaty ([`crate::world::settings::Settings::treaty_length`]), whose zones the slice
     /// does not hold.
-    const fn clear_treaty_zones(&self) -> Result<(), GenieError> {
+    const fn clear_treaty_zones(&self) -> GenieResult<()> {
         if self.settings.treaty_length.holds() {
             return Err(GenieError::unsupported(
                 "a deleted town centre 621 during a treaty (its owner's treaty zones)",
@@ -358,7 +354,7 @@ impl World {
     /// [`World::set_state`]). An object inside another would leave it first (slot 0x1a8): not
     /// modelled. Not held: the special-object list (`+0x30c` bit 0, `FUN_141677380`) and the log
     /// line.
-    pub(crate) fn base_destroy(&mut self, owner: PlayerId, id: ObjectId) -> Result<(), GenieError> {
+    pub(crate) fn base_destroy(&mut self, owner: PlayerId, id: ObjectId) -> GenieResult<()> {
         let (_, u) = self.object(id).ok_or(NOT_HELD)?;
         if ObjectState::Removed <= u.life.state {
             return Ok(());
@@ -387,7 +383,7 @@ impl World {
         owner: PlayerId,
         id: ObjectId,
         new: ObjectState,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let (_, u) = self.object(id).ok_or(GenieError::unsupported(
             "a set_state of an object the slice does not hold",
         ))?;
@@ -412,7 +408,7 @@ impl World {
         id: ObjectId,
         new: ObjectState,
         master: &Master,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let annexes = self.objects().annexes(id);
         for annex in annexes.ids() {
             if let Some((q, a)) = self.object(annex)
@@ -454,7 +450,7 @@ impl World {
         id: ObjectId,
         new: ObjectState,
         master: &Master,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         // an object the slice does not hold fails in the base set_state
         let Some(place) = self.place(id) else {
             return self.base_set_state(owner, id, new, master);
@@ -497,7 +493,7 @@ impl World {
         id: ObjectId,
         new: ObjectState,
         master: &Master,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let (_, u) = self.object(id).ok_or(GenieError::unsupported(
             "a set_state of an object the slice does not hold",
         ))?;
@@ -537,7 +533,7 @@ impl World {
         owner: PlayerId,
         master: &Master,
         leaves: impl Fn(u8) -> bool,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         for &(kind, amount, flag) in &master.storage {
             if let Some(kind) = kind
                 && leaves(flag)
@@ -558,7 +554,7 @@ impl World {
         owner: PlayerId,
         id: ObjectId,
         master: &Master,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let player_kind = self.players.player(owner)?.kind;
         let annex_of = self.parts.building_of(id).annex_of;
         let (roles, slots) = (self.model.roles.clone(), self.model.slots);
@@ -591,7 +587,7 @@ impl World {
     /// # Errors
     ///
     /// An object the world does not hold.
-    pub(crate) fn wake(&mut self, id: ObjectId) -> Result<ListIndex, GenieError> {
+    pub(crate) fn wake(&mut self, id: ObjectId) -> GenieResult<ListIndex> {
         Ok(match self.place(id).ok_or_else(|| object_gone(id))? {
             Place::Live(p, i) => {
                 self.players.live_mut(p, i)?.life.goto_sleep = false;

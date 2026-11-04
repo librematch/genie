@@ -1,6 +1,5 @@
 //! The idle checks of ships, siege, soldiers, units that do not attack and towers.
 
-use crate::GenieError;
 use crate::map::Distance;
 use crate::map::Position;
 use crate::math::fmath::sqrt;
@@ -32,6 +31,7 @@ use crate::world::Seconds;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::generated::UnitAiTuning;
+use crate::{GenieError, GenieResult};
 
 impl UnitAi {
     /// processIdle, slot 72 (`+0x240`) of each factory type's vtable: the hunted animal's
@@ -50,7 +50,7 @@ impl UnitAi {
         player_kind: PlayerKind,
         ai: &mut Well512,
         side: &mut UnitView<'_, '_>,
-    ) -> Result<IdleOutcome, GenieError> {
+    ) -> GenieResult<IdleOutcome> {
         match self.ai_kind {
             UnitAiKind::Hunted => self.hunted_idle(at, player_kind, ai, side),
             UnitAiKind::Boar => Ok(self.boar_idle(at, ai, side)?),
@@ -90,7 +90,7 @@ impl UnitAi {
         player_kind: PlayerKind,
         ai: &mut Well512,
         side: &mut UnitView<'_, '_>,
-    ) -> Result<IdleOutcome, GenieError> {
+    ) -> GenieResult<IdleOutcome> {
         let unit_ai_tuning = &at.unit_ai_tuning;
         let roles = &at.roles;
         self.cap_human_order(side, ai)?;
@@ -174,7 +174,7 @@ impl UnitAi {
         player_kind: PlayerKind,
         ai: &mut Well512,
         side: &mut UnitView<'_, '_>,
-    ) -> Result<IdleOutcome, GenieError> {
+    ) -> GenieResult<IdleOutcome> {
         self.cap_human_order(side, ai)?;
         let searches = !at.flags.contains(SurroundingFlags::SCENARIO)
             && MasterKind::COMBAT <= at.kind
@@ -224,7 +224,7 @@ impl UnitAi {
         at: &Surroundings,
         ai: &mut Well512,
         side: &mut UnitView<'_, '_>,
-    ) -> Result<Answer, GenieError> {
+    ) -> GenieResult<Answer> {
         if matches!(
             self.current_order,
             Some(OrderKind::Patrol | OrderKind::AttackMove)
@@ -261,7 +261,7 @@ impl UnitAi {
         player_kind: PlayerKind,
         side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let unit_ai_tuning = &at.unit_ai_tuning;
         let found = side.closest(&Search {
             at: at.position.ground(),
@@ -292,7 +292,7 @@ impl UnitAi {
         at: &Surroundings,
         player_kind: PlayerKind,
         side: &mut UnitView<'_, '_>,
-    ) -> Result<Option<ObjectId>, GenieError> {
+    ) -> GenieResult<Option<ObjectId>> {
         let unit_ai_tuning = &at.unit_ai_tuning;
         let found = side.closest(&Search {
             at: at.position.ground(),
@@ -324,7 +324,7 @@ impl UnitAi {
         player_kind: PlayerKind,
         ai: &mut Well512,
         side: &mut UnitView<'_, '_>,
-    ) -> Result<IdleOutcome, GenieError> {
+    ) -> GenieResult<IdleOutcome> {
         if matches!(
             self.current_order,
             Some(OrderKind::Patrol | OrderKind::AttackMove)
@@ -365,7 +365,7 @@ impl UnitAi {
         player_kind: PlayerKind,
         ai: &mut Well512,
         side: &mut UnitView<'_, '_>,
-    ) -> Result<IdleOutcome, GenieError> {
+    ) -> GenieResult<IdleOutcome> {
         self.cap_human_order(side, ai)?;
         let searches = !at.flags.contains(SurroundingFlags::SCENARIO)
             && MasterKind::COMBAT <= at.kind
@@ -420,7 +420,7 @@ impl UnitAi {
         at: &Surroundings,
         player_kind: PlayerKind,
         side: &mut UnitView<'_, '_>,
-    ) -> Result<Option<ObjectId>, GenieError> {
+    ) -> GenieResult<Option<ObjectId>> {
         let unit_ai_tuning = &at.unit_ai_tuning;
         let found = side.closest(&Search {
             at: at.position.ground(),
@@ -458,7 +458,7 @@ impl UnitAi {
         at: &Surroundings,
         ai: &mut Well512,
         side: &mut UnitView<'_, '_>,
-    ) -> Result<Answer, GenieError> {
+    ) -> GenieResult<Answer> {
         if matches!(
             self.current_order,
             Some(OrderKind::Patrol | OrderKind::AttackMove)
@@ -496,7 +496,7 @@ impl UnitAi {
         at: &Surroundings,
         ai: &mut Well512,
         side: &mut UnitView<'_, '_>,
-    ) -> Result<IdleOutcome, GenieError> {
+    ) -> GenieResult<IdleOutcome> {
         if matches!(
             self.current_order,
             Some(OrderKind::Patrol | OrderKind::AttackMove)
@@ -531,7 +531,7 @@ impl UnitAi {
         player_kind: PlayerKind,
         side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if self.current_order == Some(OrderKind::Defend) {
             return Err(GenieError::unsupported(
                 "a defend order's search (its target's objects)",
@@ -586,7 +586,7 @@ impl UnitAi {
         player_kind: PlayerKind,
         side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
-    ) -> Result<IdleOutcome, GenieError> {
+    ) -> GenieResult<IdleOutcome> {
         let unit_ai_tuning = &at.unit_ai_tuning;
         self.cap_human_order(side, rng)?;
         if self.stance == UnitStance::NoAttack {
@@ -670,7 +670,7 @@ impl UnitAi {
         found: Found,
         player_kind: PlayerKind,
         unit_ai_tuning: &UnitAiTuning,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if !found.fresh {
             return Ok(());
         }

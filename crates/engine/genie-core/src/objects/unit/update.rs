@@ -1,6 +1,5 @@
 //! A unit's update on its owner's turn, action by action.
 
-use crate::GenieError;
 use crate::combat::attack::run_down_attack_timers;
 use crate::gathering::hunt::HuntAction;
 use crate::math::rng::Stream;
@@ -30,6 +29,7 @@ use crate::world::others::OthersRef;
 use crate::world::parts::PartTable;
 use crate::world::step::Step;
 use crate::world::{IN_THE_WAY, Unread};
+use crate::{GenieError, GenieResult};
 use std::mem::take;
 
 /// An action below the head after the head's update: its idle update (`FUN_140a78470`: a target
@@ -44,7 +44,7 @@ impl Unit {
         c: &mut Step<'_>,
         roles: &Roles,
         slots: Slots,
-    ) -> Result<Outcome, GenieError> {
+    ) -> GenieResult<Outcome> {
         let Some(leaves) = self.update_to_actions(actions, c, roles)? else {
             return Ok(Outcome::Sleep);
         };
@@ -62,7 +62,7 @@ impl Unit {
         actions: &mut LayersAction,
         c: &mut Step<'_>,
         roles: &Roles,
-    ) -> Result<Option<Outcome>, GenieError> {
+    ) -> GenieResult<Option<Outcome>> {
         self.death_blast(actions, c, roles)?;
         if self.go_to_sleep(c.w.parts.mover_of(self.id), c.w.parts.unit_ai.get(self.id))?
             == SleepCheck::FallsAsleep
@@ -96,7 +96,7 @@ impl Unit {
         c: &mut Step<'_>,
         roles: &Roles,
         slots: Slots,
-    ) -> Result<Option<Captured>, GenieError> {
+    ) -> GenieResult<Option<Captured>> {
         let started = self.start_default_task(actions, c)?;
         let captured = if started == DefaultStart::Started {
             None
@@ -119,7 +119,7 @@ impl Unit {
         c: &mut Step<'_>,
         roles: &Roles,
         slots: Slots,
-    ) -> Result<Option<Captured>, GenieError> {
+    ) -> GenieResult<Option<Captured>> {
         let me = self.me(actions);
         let mut captured = None;
         let code = self.head_part(actions, c, me, &mut captured, roles, slots)?;
@@ -137,7 +137,7 @@ impl Unit {
         captured: &mut Option<Captured>,
         roles: &Roles,
         slots: Slots,
-    ) -> Result<HeadCode, GenieError> {
+    ) -> GenieResult<HeadCode> {
         match actions.list.head() {
             None => Ok(HeadCode::Keeps),
             Some(Action::Artifact(_)) => {
@@ -191,7 +191,7 @@ impl Unit {
         actions: &mut LayersAction,
         c: &mut Step<'_>,
         code: HeadCode,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if actions.list.iter().nth(1).is_some() {
             return Err(GenieError::unreachable(BELOW_HEAD));
         }
@@ -211,7 +211,7 @@ impl Unit {
         c: &mut Step<'_>,
         me: Me,
         roles: &Roles,
-    ) -> Result<HeadCode, GenieError> {
+    ) -> GenieResult<HeadCode> {
         // the check reaches no action of the unit's: the copy goes back, before an error too
         let checked = self.hunt_targets(&mut hunt, c);
         actions.list.set_hunt(Some(hunt));
@@ -230,7 +230,7 @@ impl Unit {
         &mut self,
         mover: Option<&Mover>,
         ai: Option<&UnitAi>,
-    ) -> Result<SleepCheck, GenieError> {
+    ) -> GenieResult<SleepCheck> {
         if !self.life.goto_sleep {
             return Ok(SleepCheck::StaysAwake);
         }
@@ -286,7 +286,7 @@ impl Unit {
         &mut self,
         actions: &mut LayersAction,
         c: &mut Step<'_>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if let Some(e) =
             c.w.parts
                 .unread
@@ -314,7 +314,7 @@ impl Unit {
     /// After the actions: the units its walk met take their pauses (slot 0x5f0: their walked
     /// level's pause; the walk read them from its own list till now, `Mover::pause_of`). A unit
     /// whose walk met others in its way is not modelled.
-    pub(crate) fn after_actions(&self, c: &mut Step<'_>) -> Result<(), GenieError> {
+    pub(crate) fn after_actions(&self, c: &mut Step<'_>) -> GenieResult<()> {
         let Some(pauses) = c.w.parts.mover_mut(self.id).map(|m| take(&mut m.pauses)) else {
             return Ok(());
         };
@@ -339,7 +339,7 @@ impl Unit {
 
     /// [`Unit::ai_part`]'s first step: the pathing grid takes a unit of a master of kind 40 or
     /// more where it stands, moving or not.
-    pub(crate) fn refresh_pathing(&self, c: &mut Step<'_>) -> Result<(), GenieError> {
+    pub(crate) fn refresh_pathing(&self, c: &mut Step<'_>) -> GenieResult<()> {
         let m = self.master(c.w.master_tables(), c.player)?;
         if MasterKind::ACTION <= m.kind
             && let Some(p) = c.w.spatial.get(self.id).copied()

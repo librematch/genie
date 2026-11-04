@@ -1,7 +1,6 @@
 //! The Transport in the world: what it reads of its unit, the unload command, a move, the
 //! unload and the units put ashore.
 
-use crate::GenieError;
 use crate::garrison::SIEGE_UNLOAD;
 use crate::garrison::transport::StartCall;
 use crate::garrison::transport::TransportState;
@@ -33,6 +32,7 @@ use crate::world::parts::Parts;
 use crate::world::slots::CheckedIndex;
 use crate::world::slots::PlayerSlots;
 use crate::world::{Player, World};
+use crate::{GenieError, GenieResult};
 
 /// An unloading ship without the Transport it was lent with: the unload runs on a ship whose
 /// Transport `TransportAction::unload` wrote back to its list before the lend.
@@ -58,7 +58,7 @@ impl World {
         p: PlayerId,
         i: ListIndex,
         to: Position,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let existing = self
             .parts
             .actions_of(self.players.live(p, i)?.id)
@@ -161,7 +161,7 @@ impl World {
         (p, i): (PlayerId, ListIndex),
         t: TransportAction,
         point: Position,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let rng = self.streams.get(Stream::Sprite);
         let id = self.players.live(p, i)?.id;
         self.players.live_mut(p, i)?.transport_sail(
@@ -186,7 +186,7 @@ impl World {
         p: PlayerId,
         i: ListIndex,
         c: Changed,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let unit = self.players.live_mut(p, i)?;
         if c.stopped
             && let Some(m) = self.parts.mover_mut(unit.id)
@@ -222,7 +222,7 @@ impl World {
     /// ashore do not model.
     ///
     /// [`Updated::Unload`]: crate::garrison::transport::Updated::Unload
-    pub(crate) fn transport_unload(&mut self, p: PlayerId, i: ListIndex) -> Result<(), GenieError> {
+    pub(crate) fn transport_unload(&mut self, p: PlayerId, i: ListIndex) -> GenieResult<()> {
         let unit = self.players.live(p, i)?;
         let t = self
             .parts
@@ -333,7 +333,7 @@ impl World {
         p: PlayerId,
         i: ListIndex,
         zone: Option<ZoneId>,
-    ) -> Result<u8, GenieError> {
+    ) -> GenieResult<u8> {
         const SPOTS: usize = 0x1d;
         let ship = self.players.live(p, i)?;
         let radius = ship.master(self.master_tables(), p)?.radius;
@@ -397,7 +397,7 @@ impl World {
         around: Around,
         zone: Option<ZoneId>,
         last: &mut Option<Point>,
-    ) -> Result<Option<Point>, GenieError> {
+    ) -> GenieResult<Option<Point>> {
         let ship = self.players.live(p, i)?;
         let restriction = ship.master(self.master_tables(), p)?.terrain_restriction;
         let terrain = self.spatial.terrain.as_ref().ok_or(NO_TERRAIN)?;
@@ -500,7 +500,7 @@ impl World {
         id: ObjectId,
         made: &Master,
         spot: Point,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let ship = self.players.live(p, i)?;
         let at = ship.position();
         if self
@@ -535,7 +535,7 @@ fn transport_mut<'a>(
     parts: &'a mut Parts,
     p: PlayerId,
     i: ListIndex,
-) -> Result<&'a mut TransportAction, GenieError> {
+) -> GenieResult<&'a mut TransportAction> {
     let id = players.live(p, i)?.id;
     parts
         .actions_mut(id)?

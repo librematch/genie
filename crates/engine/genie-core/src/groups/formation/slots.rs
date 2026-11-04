@@ -1,7 +1,6 @@
 //! The slots' units: the unit categories, `ClosestUnit`, the assignment by variance, the
 //! population in order and a line after a column.
 
-use crate::GenieError;
 use crate::groups::FormationCategory;
 use crate::groups::FormationKind;
 use crate::groups::GroupId;
@@ -10,6 +9,7 @@ use crate::groups::{Formation, UnitGroup, sub_formation};
 use crate::map::Distance;
 use crate::objects::ObjectId;
 use crate::world::slots::CheckedIndex;
+use crate::{GenieError, GenieResult};
 
 /// A line order that lacks a place up to the list's length: the game reads past the order.
 const NO_PLACE_IN_ORDER: GenieError =
@@ -73,7 +73,7 @@ impl World {
     pub(crate) fn unit_category(
         &self,
         object: Option<WorldObject<'_>>,
-    ) -> Result<FormationCategory, GenieError> {
+    ) -> GenieResult<FormationCategory> {
         let Some(object) = object else {
             return Ok(FormationCategory::ANY);
         };
@@ -101,7 +101,7 @@ impl World {
         category: FormationCategory,
         sub_category: UnitKind,
         used: &[Option<ObjectId>],
-    ) -> Result<Option<ObjectId>, GenieError> {
+    ) -> GenieResult<Option<ObjectId>> {
         let mut best = FARTHEST;
         let mut closest = None;
         for m in &g.members {
@@ -158,11 +158,7 @@ impl World {
     /// # Errors
     ///
     /// A member of a master the slice does not have.
-    pub fn populate_slots(
-        &self,
-        formation: &mut Formation,
-        g: &UnitGroup,
-    ) -> Result<(), GenieError> {
+    pub fn populate_slots(&self, formation: &mut Formation, g: &UnitGroup) -> GenieResult<()> {
         // what the slots ask for (the assignments change only their units)
         let asks: Vec<(BVector, FormationCategory, UnitKind)> = formation
             .slots
@@ -246,7 +242,7 @@ impl World {
         formation: &mut Formation,
         g: &UnitGroup,
         costs: &mut Vec<f32>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let n = g.members.len();
         let s = formation.slots.len();
         if costs.len() < ASSIGNMENT_CELLS {
@@ -274,7 +270,7 @@ impl World {
         formation: &Formation,
         g: &UnitGroup,
         costs: &mut [f32],
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let n = g.members.len();
         let s = formation.slots.len();
         for (i, m) in g.members.iter().enumerate() {
@@ -326,7 +322,7 @@ impl World {
         g: &UnitGroup,
         n: usize,
         order: &[i32],
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let n = n.min(g.members.len());
         let mut list: Vec<Option<ObjectId>> = Vec::new();
         for i in 0..n {
@@ -393,7 +389,7 @@ impl World {
         &self,
         formation: &mut Formation,
         g: &UnitGroup,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let previous_column = g
             .previous_formation
             .as_ref()
@@ -450,7 +446,7 @@ impl World {
         formation: &mut Formation,
         group: GroupId,
         order: SlotOrder,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if self.formation_transform(formation, group, order)? == SlotFill::Anew {
             return Ok(());
         }
@@ -474,7 +470,7 @@ struct Picker<'a> {
 }
 
 /// The unit nearest a slot, not among those taken.
-type AskUnit<'a> = dyn Fn(usize, &[Option<ObjectId>]) -> Result<Option<ObjectId>, GenieError> + 'a;
+type AskUnit<'a> = dyn Fn(usize, &[Option<ObjectId>]) -> GenieResult<Option<ObjectId>> + 'a;
 
 impl Picker<'_> {
     /// One trial over the `wanted` slots, `used` holding the units taken (`count` of them, the
@@ -485,7 +481,7 @@ impl Picker<'_> {
         wanted: &[usize],
         used: &mut [Option<ObjectId>],
         (mut count, mut leading): (usize, bool),
-    ) -> Result<(f32, i32, Option<ObjectId>), GenieError> {
+    ) -> GenieResult<(f32, i32, Option<ObjectId>)> {
         let (mut sum, mut found, mut first) = (0.0f32, 0, None);
         for &i in wanted {
             let Some(id) = (self.ask)(i, used.head(count)?)? else {
@@ -518,7 +514,7 @@ impl Picker<'_> {
         wanted: &[usize],
         used: &mut [Option<ObjectId>],
         (mut count, mut leading): (usize, bool),
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         for &i in wanted {
             let id = (self.ask)(i, used.head(count)?)?;
             formation.slots.checked_mut(i)?.unit_id = id;
@@ -544,7 +540,7 @@ fn best_assignment(
     preferences: &[i32],
     costs: &[f32],
     (n, s): (usize, usize),
-) -> Result<Pairs, GenieError> {
+) -> GenieResult<Pairs> {
     let mut taken = [false; ASSIGNMENT_MARKS];
     let mut kept = ([-1i32; ASSIGNMENT_SIDE], [-1i32; ASSIGNMENT_SIDE]);
     let mut best_variance = FARTHEST;
@@ -576,7 +572,7 @@ fn take_turns(
     (preferences, costs): (&[i32], &[f32]),
     (n, s): (usize, usize),
     taken: &mut [bool; ASSIGNMENT_MARKS],
-) -> Result<(Pairs, f32, usize), GenieError> {
+) -> GenieResult<(Pairs, f32, usize)> {
     let mut pairs = ([-1i32; ASSIGNMENT_SIDE], [-1i32; ASSIGNMENT_SIDE]);
     let (mut placed, mut sum, mut member) = (0usize, 0.0f32, start);
     while placed < s {
@@ -596,12 +592,7 @@ fn take_turns(
 }
 
 /// The first of a member's `s` preferred slots (the cells from `row`) not taken, -1 for none.
-fn first_free(
-    preferences: &[i32],
-    taken: &[bool],
-    row: usize,
-    s: usize,
-) -> Result<i32, GenieError> {
+fn first_free(preferences: &[i32], taken: &[bool], row: usize, s: usize) -> GenieResult<i32> {
     let mut l = 0;
     let mut slot = *preferences.checked(row)?;
     while slot != -1 && *taken.checked(slot as usize)? {
@@ -619,7 +610,7 @@ type Pairs = ([i32; ASSIGNMENT_SIDE], [i32; ASSIGNMENT_SIDE]);
 
 /// [`World::assign_slots_by_variance`]'s preferences: for each of the `n` members (rows of `n`
 /// cells in `costs`) its `s` slots from the cheapest on, the first untaken one winning a tie.
-pub(super) fn slot_preferences(costs: &[f32], n: usize, s: usize) -> Result<Vec<i32>, GenieError> {
+pub(super) fn slot_preferences(costs: &[f32], n: usize, s: usize) -> GenieResult<Vec<i32>> {
     let mut preferences = vec![-1i32; ASSIGNMENT_CELLS];
     let mut taken = [false; ASSIGNMENT_MARKS];
     for i in 0..n {
@@ -649,7 +640,7 @@ pub(super) fn pairs_variance(
     costs: &[f32],
     n: usize,
     mean: f32,
-) -> Result<f32, GenieError> {
+) -> GenieResult<f32> {
     let (mut variance, mut count) = (0.0f32, 0i32);
     for (&r, &c) in members.iter().zip(slots) {
         if r != -1 && c != -1 {

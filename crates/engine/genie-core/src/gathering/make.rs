@@ -9,7 +9,7 @@
 //! still to make starts at the player's farm food (attribute 36) or fish trap food (88); once it
 //! is made and the farmers took the last of it, the farm's slot 0xd8 sets its hit points to 0.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::objects::HitPoints;
 use crate::objects::lifecycle::Lifecycle;
 use crate::objects::masters::ActionKind;
@@ -131,7 +131,7 @@ impl MakeAction {
         c: &mut Step<'_>,
         farm: &mut Unit,
         roles: &Roles,
-    ) -> Result<HeadCode, GenieError> {
+    ) -> GenieResult<HeadCode> {
         let master = object_master(
             c.w.parts.own_master.get(farm.id),
             (farm.id, farm.life.master_id),
@@ -183,7 +183,7 @@ impl Unit {
         actions: &mut Action,
         c: &mut Step<'_>,
         roles: &Roles,
-    ) -> Result<HeadCode, GenieError> {
+    ) -> GenieResult<HeadCode> {
         let Some(mut make) = actions.list.make().copied() else {
             return Ok(HeadCode::Keeps);
         };

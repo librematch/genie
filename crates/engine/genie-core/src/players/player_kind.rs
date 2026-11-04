@@ -1,6 +1,6 @@
 //! A player's type as one type: `player+0x10`, the save's class byte.
 
-use crate::GenieError;
+use crate::{GenieError, GenieResult};
 use std::fmt::{Display, Error, Formatter};
 use strum::FromRepr;
 
@@ -44,7 +44,7 @@ impl TryFrom<u8> for PlayerKind {
     /// # Errors
     ///
     /// A byte of a type no creator handles (the game's `InvalidPlayerType`).
-    fn try_from(value: u8) -> Result<Self, GenieError> {
+    fn try_from(value: u8) -> GenieResult<Self> {
         Self::from_repr(value)
             .ok_or_else(|| GenieError::invalid_input("InvalidPlayerType").with("type", value))
     }

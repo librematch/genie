@@ -1,7 +1,6 @@
 //! BUILD's builders: their task, the queue and the direct path, the wait for the foundation
 //! and the build command.
 
-use crate::GenieError;
 use crate::commands::FOUNDATION_GONE;
 use crate::construction::FoundationId;
 use crate::construction::build::{BuildAction, BuildTask};
@@ -45,6 +44,7 @@ use crate::unit_ai::{Issuer, OrderPriority, OrderTargetKind, QueuedOrder};
 use crate::world::index::Place;
 use crate::world::slots::PlayerSlots;
 use crate::world::{STATIC_KINDS_END, World};
+use crate::{GenieError, GenieResult};
 
 impl World {
     /// BUILD's builders (the cost was paid with the foundation, [`World::found`]; the pending
@@ -69,7 +69,7 @@ impl World {
         position: Position,
         builders: &[Option<ObjectId>],
         (queued, commits): (bool, bool),
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         // the builders go through the order splitter, which counts the command
         self.groups.count_command();
         let site = (player, foundation, master);
@@ -108,7 +108,7 @@ impl World {
         (id, kind): (ObjectId, MasterKind),
         (site, position): ((PlayerId, FoundationId, MasterId), Position),
         (to_queue, commits): (bool, bool),
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let (player, foundation, _) = site;
         if to_queue {
             self.queue_builder((q, idx), site, position, commits)?;
@@ -142,7 +142,7 @@ impl World {
         site: (PlayerId, FoundationId, MasterId),
         position: Position,
         commits: bool,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         self.queue_build(q, idx, site, position)?;
         if commits && let Some(ai) = self.parts.unit_ai.get_mut(self.players.live(q, idx)?.id) {
             readiness(&mut ai.orders, ReadyOrders::Keep);
@@ -159,7 +159,7 @@ impl World {
         q: PlayerId,
         idx: ListIndex,
         kind: MasterKind,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if MasterKind::COMBAT <= kind
             && let Some(ai) = self.parts.unit_ai.get_mut(self.players.live(q, idx)?.id)
         {
@@ -179,7 +179,7 @@ impl World {
         id: ObjectId,
         (fp, foundation, master): (PlayerId, FoundationId, MasterId),
         position: Position,
-    ) -> Result<(MasterId, BuildAction), GenieError> {
+    ) -> GenieResult<(MasterId, BuildAction)> {
         let masters = self.model.masters.of(q).ok_or(GenieError::unsupported(
             "BUILD tasks the builders: no master table",
         ))?;
@@ -286,7 +286,7 @@ impl World {
         idx: ListIndex,
         (fp, foundation, master): (PlayerId, FoundationId, MasterId),
         position: Position,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let unit = self.players.live_mut(q, idx)?;
         if let Some(m) = self.parts.mover_mut(unit.id) {
             m.ignore_units.clear();
@@ -327,7 +327,7 @@ impl World {
         (with, build): (MasterId, BuildAction),
         (fp, foundation, master): (PlayerId, FoundationId, MasterId),
         position: Position,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let site_class = self.master(fp, master)?.class;
         if let Some(m) = self.parts.mover_mut(self.players.live(player, idx)?.id) {
             m.ignore_units.clear();
@@ -376,7 +376,7 @@ impl World {
         player: PlayerId,
         idx: ListIndex,
         wait: Wait,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if let Some(master) = wait.switch {
             self.change_master(player, idx, master)?;
         }
@@ -402,7 +402,7 @@ impl World {
         player: PlayerId,
         idx: ListIndex,
         foundation: FoundationId,
-    ) -> Result<Answer, GenieError> {
+    ) -> GenieResult<Answer> {
         if self.object(foundation).is_none() {
             return Ok(Answer::NotTaken);
         }

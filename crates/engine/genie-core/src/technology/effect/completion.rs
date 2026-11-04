@@ -1,7 +1,6 @@
 //! A research's completion (`FUN_1413cdcd0`): its effect, the technologies that depend on
 //! it, a built building's technologies, the cost modifier and the disable and enable commands.
 
-use crate::GenieError;
 use crate::math::conversions::cvttss2si;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
@@ -32,6 +31,7 @@ use crate::world::layer::AttributeRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::settings::OptionFlags;
 use crate::world::slots::{CheckedIndex, PlayerSlots};
+use crate::{GenieError, GenieResult};
 use std::sync::Arc;
 
 /// An enable command finds the master it tested gone.
@@ -56,7 +56,7 @@ impl World {
         p: PlayerId,
         t: TechId,
         building: Option<MasterId>,
-    ) -> Result<Research, GenieError> {
+    ) -> GenieResult<Research> {
         let (tech, t) = (t, t.index());
         let def = self.model.techs.checked(t)?.clone();
         let state = &self.players.player(p)?.techs.checked(t)?;
@@ -117,7 +117,7 @@ impl World {
     /// `param_4`, which the callers do not pass yet): an effect that reaches its object (an
     /// enable for one building, an upgrade of the object, the object's kinds 203 to 206, a
     /// disable of a building's own technology) would differ without it.
-    pub(super) fn research_effect_known(&self, p: PlayerId, t: TechId) -> Result<(), GenieError> {
+    pub(super) fn research_effect_known(&self, p: PlayerId, t: TechId) -> GenieResult<()> {
         let t = t.index();
         let def = self.model.techs.checked(t)?;
         let state = &self.players.player(p)?.techs.checked(t)?;
@@ -163,7 +163,7 @@ impl World {
     /// `set_state(2)`): [`World::complete_research`] with `param_3` 0 and no building, so the
     /// technology's first location decides its statistics; a technology beyond the player's tree
     /// is not researched.
-    pub(crate) fn research_built(&mut self, p: PlayerId, t: TechId) -> Result<(), GenieError> {
+    pub(crate) fn research_built(&mut self, p: PlayerId, t: TechId) -> GenieResult<()> {
         let tree = self.players.player(p)?.techs.len();
         if tree == 0 || self.model.techs.len() != tree {
             return Err(GenieError::unsupported(
@@ -185,7 +185,7 @@ impl World {
         p: PlayerId,
         master: MasterId,
         tech: TechId,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let owner = &self.players.player(p)?;
         if owner
             .objects
@@ -214,11 +214,7 @@ impl World {
     /// work done reaching a location's time), which completes it ([`World::complete_research`]).
     /// Each such technology, and each in state 2, counts; none counted sets attribute 39 to 1 where
     /// it is 0. The game's lists hold the dependents by id, as the `.dat`'s requirements give them.
-    pub(crate) fn update_dependents(
-        &mut self,
-        p: PlayerId,
-        tech: TechId,
-    ) -> Result<(), GenieError> {
+    pub(crate) fn update_dependents(&mut self, p: PlayerId, tech: TechId) -> GenieResult<()> {
         let mut counted = 0;
         let civ = self.players.player(p)?.civ;
         for d in 0..self.model.techs.len() {
@@ -244,7 +240,7 @@ impl World {
         p: PlayerId,
         civ: CivId,
         (d, t): (usize, TechId),
-    ) -> Result<i32, GenieError> {
+    ) -> GenieResult<i32> {
         let mut counted = 0;
         let def = self.model.techs.checked(d)?;
         if !def.required.contains(&Some(t)) || def.kind == TechKind::SHARED {
@@ -294,7 +290,7 @@ impl World {
     /// Whether the technology `def` is out of reach for a player of civ `civ`: another civ's (or
     /// the civ's own under the full tech tree, unless of mode 1), or for other game modes
     /// (`FUN_1413cf2f0`).
-    fn dependent_disabled(&self, def: &TechDef, civ: CivId) -> Result<bool, GenieError> {
+    fn dependent_disabled(&self, def: &TechDef, civ: CivId) -> GenieResult<bool> {
         // another civ's: −1; the civ's own too under the full tech tree (the option +0x63)
         // unless of mode 1
         let other_civ = match def.civ {
@@ -310,7 +306,7 @@ impl World {
 
     /// The end of [`World::update_dependent`] for the technology `d` whose requirements are all
     /// met: the change to the count.
-    fn finish_dependent(&mut self, p: PlayerId, d: usize) -> Result<i32, GenieError> {
+    fn finish_dependent(&mut self, p: PlayerId, d: usize) -> GenieResult<i32> {
         let mut counted = 0;
         let state = self.players.player_mut(p)?.techs.checked_mut(d)?;
         let reached = |l: &Location| {
@@ -359,7 +355,7 @@ impl World {
         resource: Option<AttributeId>,
         amount: f32,
         mode: ChangeMode,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let tree = self
             .players
             .player(p)?
@@ -405,7 +401,7 @@ impl World {
         p: PlayerId,
         tech: DisabledTech,
         object: Option<ObjectId>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let count = self
             .players
             .player(p)?
@@ -471,7 +467,7 @@ impl World {
         enable: u8,
         one: bool,
         object: Option<ObjectId>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if player_master(&self.model.masters, p, master).is_none() {
             return Ok(());
         }

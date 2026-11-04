@@ -1,6 +1,7 @@
 //! The Build's update on the step ([`BuildAction::update`] through [`Unit::build_part`]), on
 //! World fixtures: the state of the builder, its foundation and the world after each update.
 
+use crate::GenieResult;
 use crate::construction::MainBuildingId;
 use crate::gathering::DropSiteId;
 use crate::map::GridSize;
@@ -278,7 +279,7 @@ type Top = (Option<ActionKind>, Option<ObjectId>);
 /// One update of the builder's Build of `dt` ms (its part of the unit's update,
 /// [`Unit::build_part`]), its code and the builder's top action right after it (the work it
 /// gives within the update, slot 0x7e8, replaces the Build).
-fn update(t: &mut World, dt: u32) -> Result<(HeadCode, Top), GenieError> {
+fn update(t: &mut World, dt: u32) -> GenieResult<(HeadCode, Top)> {
     in_update(
         t,
         (PlayerId::new(1), ListIndex::new(0)),
@@ -307,8 +308,8 @@ fn code(t: &mut World, dt: u32) -> HeadCode {
 /// ([`Unit::build_reads`]), then puts the Build back.
 fn on_build<R>(
     t: &mut World,
-    f: impl FnOnce(&mut BuildAction, &mut Step<'_>, &mut Unit, &BuildReads) -> Result<R, GenieError>,
-) -> Result<R, GenieError> {
+    f: impl FnOnce(&mut BuildAction, &mut Step<'_>, &mut Unit, &BuildReads) -> GenieResult<R>,
+) -> GenieResult<R> {
     in_update(
         t,
         (PlayerId::new(1), ListIndex::new(0)),

@@ -1,7 +1,6 @@
 //! The task finder's steps on a target: the drop-off, its player's foundation, the garrison into
 //! it and its repair.
 
-use crate::GenieError;
 use crate::construction::repair::REPAIR;
 use crate::garrison::ENTER;
 use crate::gathering::gather::GATHER;
@@ -25,6 +24,7 @@ use crate::unit_ai::task_finder::wanted;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
+use crate::{GenieError, GenieResult};
 
 /// The task finder's steps on a `target` (`LAB_1412795f5` to `LAB_1412796b4`): the drop-off
 /// ([`drop_off_finding`]), its player's foundation ([`build_task`]), the garrison into it
@@ -37,7 +37,7 @@ pub(super) fn on_target<'m>(
     filter: Option<ActionKind>,
     dip: &impl Diplomacy,
     roles: &Roles,
-) -> Result<Finding<'m>, GenieError> {
+) -> GenieResult<Finding<'m>> {
     if let Finding::Answer(task) = drop_off_finding(list, actor, t, filter, dip) {
         return Ok(Finding::Answer(task));
     }

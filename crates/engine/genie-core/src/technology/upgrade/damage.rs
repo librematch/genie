@@ -2,7 +2,7 @@
 //! points' change and the upgrade around the master's: the share of an object's hit points, or
 //! of its storage, that picks its master's damage sprite.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::math::conversions::cvttss2si;
 use crate::math::image::upgrade::WHOLE as UPGRADE_WHOLE;
 use crate::math::rng::Well512;
@@ -68,7 +68,7 @@ pub(crate) fn damage_sprites(
     (graphics, object, sprite): (&Graphics, &mut Well512, &mut Well512),
     roles: &Roles,
     sprite_tuning: SpriteTuning,
-) -> Result<HpPercent, GenieError> {
+) -> GenieResult<HpPercent> {
     let entries = &master.damage_graphics;
     let Some((share, hp)) = share_of(u, master, roles) else {
         return Ok(before);

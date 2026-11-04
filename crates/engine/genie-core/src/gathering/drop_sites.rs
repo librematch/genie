@@ -1,6 +1,6 @@
 //! The drop-site searches (`FUN_1411671e0`): from a unit, or from a point without one.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::gathering::DropSiteId;
 use crate::map::Distance;
 use crate::map::DistanceSquared;
@@ -108,7 +108,7 @@ impl Seeker<'_, '_> {
         squared: f32,
         last: &mut f32,
         by_id: ObjectsRef<'_>,
-    ) -> Result<Option<f32>, GenieError> {
+    ) -> GenieResult<Option<f32>> {
         let tile_path_tuning = &by_id.tuning().tile_path;
         let turn_tuning = &by_id.tuning().turn;
         let roles = by_id.roles();
@@ -161,7 +161,7 @@ impl Seeker<'_, '_> {
     /// # Errors
     ///
     /// The villager's top action is not modelled, or the farm's place is unknown.
-    fn farm_worked(&self, roles: &Roles) -> Result<Option<Point>, GenieError> {
+    fn farm_worked(&self, roles: &Roles) -> GenieResult<Option<Point>> {
         if !roles.of_class(self.class).contains(ClassRoles::VILLAGER) {
             return Ok(None);
         }
@@ -219,7 +219,7 @@ pub(crate) fn drop_site_search<'u>(
     mut seeker: Option<Seeker<'_, '_>>,
     (place, at_work): (SitePlace, Option<ActionKind>),
     by_id: ObjectsRef<'_>,
-) -> Result<Option<DropSiteId>, GenieError> {
+) -> GenieResult<Option<DropSiteId>> {
     let roles = by_id.roles();
     let (mut x, mut y) = (at.x(), at.y());
     let pointless = x <= NO_POINT || y <= NO_POINT;
@@ -319,6 +319,7 @@ pub(crate) fn nearest_drop_site(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::GenieError;
     use crate::construction::build::BuildTask;
     #[cfg(test)]
     use crate::construction::build::tests::started;
@@ -456,7 +457,7 @@ mod tests {
         class: ClassId,
         at: Position,
         spatial: &Spatial,
-    ) -> Result<Option<DropSiteId>, GenieError> {
+    ) -> GenieResult<Option<DropSiteId>> {
         let (unit, actions) = (&seeker.unit, &seeker.parts.actions);
         let mover = walker();
         // the search writes the obstruction manager's scratch: it runs on the fixture's copy

@@ -1,6 +1,6 @@
 //! A unit's make action's state: making the unit its building trains.
 
-use crate::GenieError;
+use crate::{GenieError, GenieResult};
 use derive_more::Display;
 use strum::FromRepr;
 
@@ -31,7 +31,7 @@ impl MakeObjState {
     /// # Errors
     ///
     /// A byte that names no state of a unit's make action.
-    pub fn of_byte(value: u8) -> Result<Self, GenieError> {
+    pub fn of_byte(value: u8) -> GenieResult<Self> {
         Self::from_repr(value).ok_or_else(|| {
             GenieError::invalid_input("no state of a unit's make action").with("state", value)
         })

@@ -1,7 +1,6 @@
 //! One update (slot 6, `0x140ac7a00`), a target lost on the way and the attack on live
 //! livestock (state 12).
 
-use crate::GenieError;
 use crate::combat::attack::AttackerFlags;
 use crate::combat::attack::BeginLayer;
 use crate::combat::attack::{Attack, Fight, set_walker_anim};
@@ -26,6 +25,7 @@ use crate::world::Seconds;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
 use crate::world::step::Step;
+use crate::{GenieError, GenieResult};
 
 impl HuntAction {
     /// One update (slot 6, `0x140ac7a00`) of `unit`'s hunt on the step, the hunt copied out of
@@ -48,7 +48,7 @@ impl HuntAction {
         me: Me,
         f: &mut Fight,
         r: &HuntReads,
-    ) -> Result<HuntNext, GenieError> {
+    ) -> GenieResult<HuntNext> {
         let roles = &c.w.model.roles.clone();
         if r.attack.player_kind.is_computer() {
             return Err(GenieError::unsupported(
@@ -106,7 +106,7 @@ impl HuntAction {
         me: Me,
         f: &mut Fight,
         r: &HuntReads,
-    ) -> Result<HuntNext, GenieError> {
+    ) -> GenieResult<HuntNext> {
         let roles = &c.w.model.roles.clone();
         let attack =
             self.state
@@ -178,7 +178,7 @@ impl HuntAction {
         me: Me,
         f: &mut Fight,
         r: &HuntReads,
-    ) -> Result<HuntNext, GenieError> {
+    ) -> GenieResult<HuntNext> {
         let roles = &c.w.model.roles.clone();
         let gives_up = GiveUp {
             patience: if !r.attack.player_kind.is_computer()
@@ -212,7 +212,7 @@ impl HuntAction {
         motion: MotionMut<'_>,
         r: &HuntReads,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         self.no_tree_search(r, roles)?;
         self.timer = Seconds::new(-3.0);
         set_walker_anim(motion, Speed::new(0.0));
@@ -230,7 +230,7 @@ impl HuntAction {
         f: &mut Fight,
         r: &HuntReads,
         roles: &Roles,
-    ) -> Result<HuntNext, GenieError> {
+    ) -> GenieResult<HuntNext> {
         self.tear_down(c.w.parts.mover_mut(unit.id))?;
         // a target the hunt let go (the `MoveTo`'s went from the world): `FUN_140ac44b0` does
         // nothing, and `set_state(6)` without a target only shows the walking sprite
@@ -252,7 +252,7 @@ impl HuntAction {
         unit: &mut Unit,
         f: &Fight,
         r: &HuntReads,
-    ) -> Result<HuntNext, GenieError> {
+    ) -> GenieResult<HuntNext> {
         self.face_animal(
             (unit.position(), c.w.parts.mover_mut(unit.id)),
             f.victim.position,
@@ -282,7 +282,7 @@ impl HuntAction {
         unit: &Unit,
         r: &HuntReads,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         self.no_tree_search(r, roles)?;
         self.set_target(None);
         let walks = r.walks(&c.w.model.graphics, (unit, c.w.parts.mover_of(unit.id)));
@@ -298,7 +298,7 @@ impl HuntAction {
     /// `FUN_140ac4670` with 8 and −1 for a class the unit AI's slot 0x1b0 gives 0 (trees, the
     /// role [`ClassRoles::TREE`]: the class its unit AI targets, else the hunt's): the caller's
     /// search (`Unit::hunt_tree_search`) found none; another one here is not modelled.
-    fn no_tree_search(&self, r: &HuntReads, roles: &Roles) -> Result<(), GenieError> {
+    fn no_tree_search(&self, r: &HuntReads, roles: &Roles) -> GenieResult<()> {
         if r.has_ai {
             let class = r.ai_class.or(self.target_class);
             if roles.of_some_class(class).contains(ClassRoles::TREE) && !r.tree_searched {
@@ -319,7 +319,7 @@ impl HuntAction {
         unit: &mut Unit,
         herd: &Herd,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let reads = unit.move_to_reads(
             c.w.parts.motion.mover(unit.id),
             MasterTables::new(&c.w.model.masters, &c.w.parts.own_master),
@@ -369,7 +369,7 @@ pub(super) fn write_target_back(
     actions: &mut Action,
     f: &mut Fight,
     roles: &Roles,
-) -> Result<(), GenieError> {
+) -> GenieResult<()> {
     if let Some(k) = write_back(c, &mut f.victim)? {
         file_kill(c, (hunter, actions), k, roles)?;
     }

@@ -1,7 +1,6 @@
 //! The forced replay (dev only): the game's state after a tick ([`GameState`]) and the step
 //! that forces it on the world.
 
-use crate::GenieError;
 use crate::combat::volley::same_members;
 use crate::groups::UnitGroups;
 use crate::map::Tile;
@@ -27,6 +26,7 @@ use crate::world::layer::generated::VisibilityTuning;
 use crate::world::parts::{Object, Part};
 use crate::world::slots::PlayerSlots;
 use crate::world::{FrameSeed, PlayState};
+use crate::{GenieError, GenieResult};
 
 /// The game's state after a tick, for the oracle's forced replay (dev only: the oracle reads it
 /// from the tick oracle's saves, genie-core never reads the game): the frame seed and every
@@ -191,11 +191,7 @@ impl World {
     /// # Errors
     ///
     /// A player the world does not hold.
-    fn force_player_values(
-        &mut self,
-        p: PlayerId,
-        game: &GameState,
-    ) -> Result<Restart, GenieError> {
+    fn force_player_values(&mut self, p: PlayerId, game: &GameState) -> GenieResult<Restart> {
         let player = self.players.player_mut(p)?;
         let stopped = player.stopped;
         if stopped {
@@ -236,7 +232,7 @@ impl World {
         theirs: &[Object],
         (game, restart): (&GameState, Restart),
         notes: &mut Vec<(PlayerId, Option<ObjectId>, GenieError)>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let mut i = ListIndex::FIRST;
         while self.players.player(p)?.objects.holds(i) {
             let unit = &self.players.live(p, i)?;
@@ -294,12 +290,7 @@ impl World {
     /// # Errors
     ///
     /// A player or a slot the world does not hold.
-    fn take_game_object(
-        &mut self,
-        p: PlayerId,
-        i: ListIndex,
-        g: &Object,
-    ) -> Result<(), GenieError> {
+    fn take_game_object(&mut self, p: PlayerId, i: ListIndex, g: &Object) -> GenieResult<()> {
         // the parts the import reads are the game's (the dead master, its gap, stays genie's)
         let id = self.players.live(p, i)?.id;
         self.set_part(id, Part::GatherPoint(g.parts.gather_point))?;
@@ -346,12 +337,7 @@ impl World {
     /// # Errors
     ///
     /// An object the spatial index does not hold, or a master the world does not.
-    fn follow_state(
-        &mut self,
-        p: PlayerId,
-        forced: &Unit,
-        before: ObjectState,
-    ) -> Result<(), GenieError> {
+    fn follow_state(&mut self, p: PlayerId, forced: &Unit, before: ObjectState) -> GenieResult<()> {
         let (id, state) = (forced.id, forced.life.state);
         if state == before {
             return Ok(());
@@ -386,7 +372,7 @@ fn sight_follows(
     (before, state): (ObjectState, ObjectState),
     roles: &Roles,
     visibility_tuning: VisibilityTuning,
-) -> Result<(), GenieError> {
+) -> GenieResult<()> {
     if before <= ObjectState::Alive && ObjectState::Dying <= state {
         spatial.sight_state(id, ObjectState::Dying, roles, visibility_tuning)?;
     }

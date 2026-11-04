@@ -1,7 +1,6 @@
 //! The idle part of the update (`0x140c66b10` after slot 73): slot 72's idle timer, the patrol
 //! branch, class 3's and 52's making branch and the end.
 
-use crate::GenieError;
 use crate::combat::Firepower;
 use crate::math::rng::Well512;
 use crate::objects::masters::ClassId;
@@ -16,6 +15,7 @@ use crate::unit_ai::{GroupState, Surroundings, UnitAi, group_lets_idle};
 use crate::world::Millis;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
+use crate::{GenieError, GenieResult};
 
 impl UnitAi {
     /// The idle part of the full update (`0x140c66b10` after slot 73): a unit without an action
@@ -32,7 +32,7 @@ impl UnitAi {
         player_kind: PlayerKind,
         ai: &mut Well512,
         side: &mut UnitView<'_, '_>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let roles = &at.roles;
         let class_20 = busy
             && roles
@@ -81,7 +81,7 @@ impl UnitAi {
         player_kind: PlayerKind,
         ai: &mut Well512,
         side: &mut UnitView<'_, '_>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if self.secondary_timer != Millis::ZERO {
             return Ok(());
         }
@@ -119,7 +119,7 @@ impl UnitAi {
         player_kind: PlayerKind,
         ai: &mut Well512,
         side: &mut UnitView<'_, '_>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let unit_ai_tuning = &at.unit_ai_tuning;
         if self.current_target.is_some()
             && at.kind == MasterKind::BUILDING
@@ -146,7 +146,7 @@ impl UnitAi {
         player: PlayerId,
         group: Option<GroupState>,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if self.patrols(group) {
             return Err(GenieError::unsupported("a patrol order's idle part"));
         }

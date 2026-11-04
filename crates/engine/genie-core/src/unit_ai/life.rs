@@ -1,6 +1,5 @@
 //! A unit AI's construction, its order and target, its patrol and its moves.
 
-use crate::GenieError;
 use crate::groups::FormationKind;
 use crate::map::Point;
 use crate::map::Position;
@@ -36,6 +35,7 @@ use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
 use crate::world::layer::generated::UnitAiTuning;
 use crate::world::slots::CheckedIndex;
+use crate::{GenieError, GenieResult};
 
 /// Whether the order setter ([`UnitAi::set_order_with`]) keeps the order before as the last
 /// (1) or leaves the last as it is (0).
@@ -260,8 +260,8 @@ impl UnitAi {
     pub fn expire_retries(
         &mut self,
         now: WorldTime,
-        seen: &mut dyn FnMut(ObjectId) -> Result<Option<UnitSeen>, GenieError>,
-    ) -> Result<(), GenieError> {
+        seen: &mut dyn FnMut(ObjectId) -> GenieResult<Option<UnitSeen>>,
+    ) -> GenieResult<()> {
         let mut i = 0;
         while i < self.retries.len() {
             let (target, timeout) = *self.retries.checked(i)?;
@@ -324,7 +324,7 @@ impl UnitAi {
         at: &Surroundings,
         ai: &mut Well512,
         side: &mut UnitView<'_, '_>,
-    ) -> Result<IdleOutcome, GenieError> {
+    ) -> GenieResult<IdleOutcome> {
         if self.patrol_path.is_none() {
             return Ok(IdleOutcome::Idle);
         }
@@ -437,7 +437,7 @@ impl UnitAi {
     /// action (`FUN_140c64b60` with −1 and 1, `FUN_140c64b50` with −1); leaving a patrol order
     /// caps the secondary timer ([`UnitAi::cap_patrol_secondary`]); the redraw of an adjusted
     /// idle timeout of exactly 750 (slot 0x1a8, the AI stream's) is not modelled here.
-    pub const fn end_order_and_action(&mut self) -> Result<(), GenieError> {
+    pub const fn end_order_and_action(&mut self) -> GenieResult<()> {
         if self.patrol_redraws() {
             return Err(GenieError::unsupported(
                 "the end of a Build on a patrol order",
@@ -504,7 +504,7 @@ impl UnitAi {
         point: Position,
         notifies: Notifies,
         ai: &mut Well512,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         self.set_order(order, ai);
         self.set_action(action);
         let (id, class) = target.map_or((None, None), |(id, class)| (Some(id), class.or_none()));
@@ -565,7 +565,7 @@ impl UnitAi {
         &mut self,
         side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if !matches!(
             self.current_order,
             Some(OrderKind::Defend | OrderKind::Patrol | OrderKind::Follow | OrderKind::AttackMove)

@@ -1,7 +1,7 @@
 //! What the unit AI knows of its surroundings: the searches' results, its home, its targets
 //! and what it has seen.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::combat::Firepower;
 use crate::construction::MainBuildingId;
 use crate::map::Distance;
@@ -87,8 +87,8 @@ impl Found {
 pub fn flood_search(
     at: Tile,
     r: i32,
-    mut test: impl FnMut(Tile) -> Result<Option<ObjectId>, GenieError>,
-) -> Result<Option<ObjectId>, GenieError> {
+    mut test: impl FnMut(Tile) -> GenieResult<Option<ObjectId>>,
+) -> GenieResult<Option<ObjectId>> {
     let (ux, uy) = (at.x(), at.y());
     let mut reached = HashSet::from([at]);
     if let Some(id) = test(at)? {

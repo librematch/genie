@@ -3,7 +3,7 @@
 //! attribute the engine names is a role or a slot of the build layer (FD-046-D48). A master's
 //! attribute types are a different set ([`crate::objects::masters::attribute`]).
 
-use crate::GenieError;
+use crate::{GenieError, GenieResult};
 use derive_more::Display;
 use getset::CopyGetters;
 use serde::Deserialize;
@@ -69,7 +69,7 @@ impl AttributeId {
     /// # Errors
     ///
     /// A number past the `i16` range.
-    pub fn offset(self, by: usize) -> Result<Self, GenieError> {
+    pub fn offset(self, by: usize) -> GenieResult<Self> {
         i16::try_from(by)
             .ok()
             .and_then(|by| self.0.checked_add(by))
@@ -105,7 +105,7 @@ impl AttributeId {
     /// # Errors
     ///
     /// A negative value other than −1, which no attribute is.
-    pub fn of_field(value: i16) -> Result<Option<Self>, GenieError> {
+    pub fn of_field(value: i16) -> GenieResult<Option<Self>> {
         (value != -1).then(|| Self::try_from(value)).transpose()
     }
 
@@ -151,7 +151,7 @@ impl TryFrom<i16> for AttributeId {
     /// # Errors
     ///
     /// A negative value, which no attribute is.
-    fn try_from(value: i16) -> Result<Self, GenieError> {
+    fn try_from(value: i16) -> GenieResult<Self> {
         Self::of_data(value)
             .ok_or_else(|| GenieError::unsupported("a negative attribute").with("attribute", value))
     }

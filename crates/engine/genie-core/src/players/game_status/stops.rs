@@ -1,7 +1,6 @@
 //! A defeated player's objects stop (`FUN_141613ed0`): each object's stop and its top action's
 //! halt by kind.
 
-use crate::GenieError;
 use crate::construction::FoundationId;
 use crate::construction::build::BuildAction;
 use crate::construction::repair::RepairAction;
@@ -30,6 +29,7 @@ use crate::world::World;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::slots::PlayerSlots;
+use crate::{GenieError, GenieResult};
 
 /// Whether the stop keeps the unit's action list (its top action's slot 0x38,
 /// [`World::halt_top_action`]).
@@ -50,7 +50,7 @@ impl World {
     /// `FUN_140f98e80`); a building stops but for a few masters (`FUN_1411e6290`) and gives
     /// back its queue ([`World::cancel_queue`]); every unit AI's orders go (`FUN_140c5e010`). The
     /// slice holds no unit groups (`+0x6d0`).
-    pub(super) fn stop_everything(&mut self, p: PlayerId) -> Result<(), GenieError> {
+    pub(super) fn stop_everything(&mut self, p: PlayerId) -> GenieResult<()> {
         for idx in self.players.player(p)?.objects.places() {
             let unit = &self.players.live(p, idx)?;
             let master = unit.master(self.master_tables(), p)?;
@@ -107,7 +107,7 @@ impl World {
     /// a class other than 58 whose action value is not `0x2c2` and whose top action is no trade
     /// (0x6f) with a load stops (slot 0xb0 with 0: the order ends, and stopAction, slot 0x3c0)
     /// and forgets its target and its last target (`FUN_140c4dcb0`).
-    pub(crate) fn object_stop(&mut self, p: PlayerId, idx: ListIndex) -> Result<(), GenieError> {
+    pub(crate) fn object_stop(&mut self, p: PlayerId, idx: ListIndex) -> GenieResult<()> {
         let unit = &self.players.live(p, idx)?;
         let master = unit.master(self.master_tables(), p)?;
         let class = master.class;
@@ -179,11 +179,7 @@ impl World {
     /// lets it go (`FUN_141189ca0` with −1), and the answer is [`StopList::Keeps`]. The Fly (Bird),
     /// the missile's, the Make and the wait for a foundation keep the base's too; the Gather, the
     /// Build, the Attack and the Artifact halt ([`World::halt_other`]).
-    pub(super) fn halt_top_action(
-        &mut self,
-        p: PlayerId,
-        idx: ListIndex,
-    ) -> Result<StopList, GenieError> {
+    pub(super) fn halt_top_action(&mut self, p: PlayerId, idx: ListIndex) -> GenieResult<StopList> {
         let player_kind = self.players.player(p)?.kind;
         let by = self.releaser(p, idx)?;
         let master_id = self.players.live(p, idx)?.life.master_id;
@@ -268,7 +264,7 @@ impl World {
         p: PlayerId,
         idx: ListIndex,
         head: Action,
-    ) -> Result<StopList, GenieError> {
+    ) -> GenieResult<StopList> {
         let by = self.releaser(p, idx)?;
         let master_id = self.players.live(p, idx)?.life.master_id;
         let standing = self.master(p, master_id)?.standing_sprite;
@@ -310,7 +306,7 @@ impl World {
         mut gather: GatherAction,
         standing: Option<SpriteId>,
         by: Releaser,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let unit = self.players.live_mut(p, idx)?;
         let stand = stand_sprite(
             &gather.task,
@@ -346,7 +342,7 @@ impl World {
         (p, idx): (PlayerId, ListIndex),
         mut build: BuildAction,
         by: Releaser,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let unit = self.players.live_mut(p, idx)?;
         let foundation = build.target;
         let halted = build.halt(self.parts.motion.mover_mut(unit.id));
@@ -373,7 +369,7 @@ impl World {
         &mut self,
         (p, idx): (PlayerId, ListIndex),
         mut repair: RepairAction,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let unit = self.players.live_mut(p, idx)?;
         let target = repair.target;
         let halted = repair.halt(self.parts.motion.mover_mut(unit.id));
@@ -395,7 +391,7 @@ impl World {
         (p, idx): (PlayerId, ListIndex),
         mut artifact: Artifact,
         by: Releaser,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let unit = self.players.live_mut(p, idx)?;
         let (gone, released) = artifact.stop();
         self.parts

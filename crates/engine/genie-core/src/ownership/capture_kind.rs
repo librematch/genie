@@ -1,6 +1,6 @@
 //! How another player takes an object over.
 
-use crate::GenieError;
+use crate::{GenieError, GenieResult};
 use strum::FromRepr;
 
 /// An object's `capture_flag` (`+0x924`), which a combat object's setup sets
@@ -45,7 +45,7 @@ impl TryFrom<u8> for CaptureKind {
     /// # Errors
     ///
     /// A byte no store of the game writes.
-    fn try_from(value: u8) -> Result<Self, GenieError> {
+    fn try_from(value: u8) -> GenieResult<Self> {
         Self::from_repr(value).ok_or_else(|| {
             GenieError::invalid_input("a capture flag no store writes").with("capture_flag", value)
         })

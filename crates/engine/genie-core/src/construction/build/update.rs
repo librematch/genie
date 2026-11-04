@@ -1,7 +1,6 @@
 //! The Build action's start (state 4 toward the foundation) and its update, which runs the
 //! action's state; the AI's build orders whose foundation is gone.
 
-use crate::GenieError;
 use crate::combat::attack::Aim;
 use crate::combat::attack::face_target;
 use crate::construction::FoundationId;
@@ -29,6 +28,7 @@ use crate::world::layer::generated::MoveToTuning;
 use crate::world::lets::release;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
+use crate::{GenieError, GenieResult};
 
 impl BuildAction {
     /// The action's start (slot 5, `0x140aadd80`) on the foundation `to`: state 4, whose
@@ -43,7 +43,7 @@ impl BuildAction {
         task: BuildTask,
         move_reads: &MoveToReads<'_>,
         move_to_tuning: &MoveToTuning,
-    ) -> Result<Self, GenieError> {
+    ) -> GenieResult<Self> {
         Ok(Self {
             target: to.id.map(FoundationId::new),
             state: BuildState::Move {
@@ -97,7 +97,7 @@ impl BuildAction {
         actions: &mut Action,
         me: Me,
         reads: &BuildReads,
-    ) -> Result<HeadCode, GenieError> {
+    ) -> GenieResult<HeadCode> {
         let roles = &c.w.model.roles.clone();
         let slots = c.w.model.slots;
         // state 3 without a target: the update does nothing (0x140ab0370's default case)
@@ -153,7 +153,7 @@ impl BuildAction {
         c: &mut Step<'_>,
         builder: &mut Unit,
         reads: &BuildReads,
-    ) -> Result<bool, GenieError> {
+    ) -> GenieResult<bool> {
         let player_kind = c.w.players.player(c.player)?.kind;
         let site = Self::site_unit(c, reads)?;
         let pasture = match site {
@@ -213,7 +213,7 @@ impl BuildAction {
         builder: &mut Unit,
         reads: &BuildReads,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let Some(site) = Self::site_unit(c, reads)? else {
             return Ok(());
         };
@@ -256,7 +256,7 @@ impl BuildAction {
         me: Me,
         reads: &BuildReads,
         roles: &Roles,
-    ) -> Result<HeadCode, GenieError> {
+    ) -> GenieResult<HeadCode> {
         match self.state {
             // case 0: the update returns 1, the action list removes it
             BuildState::Done => return Ok(HeadCode::Deletes),
@@ -296,7 +296,7 @@ impl BuildAction {
         me: Me,
         reads: &BuildReads,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         match self.step_walk(c, builder, me, reads, roles)? {
             SubCode::Done => self.walk_ended(c, builder, reads, roles),
             SubCode::Failed => self.walk_failed(c, builder, reads, roles),
@@ -321,7 +321,7 @@ impl BuildAction {
         me: Me,
         reads: &BuildReads,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         match self.step_walk(c, builder, me, reads, roles)? {
             SubCode::Done | SubCode::Failed | SubCode::TargetGone => self.idle(c, builder, reads),
             SubCode::UnderWay => Ok(()),
@@ -341,7 +341,7 @@ impl BuildAction {
         c: &mut Step<'_>,
         builder: &mut Unit,
         reads: &BuildReads,
-    ) -> Result<HeadCode, GenieError> {
+    ) -> GenieResult<HeadCode> {
         builder.post_own(
             &mut c.w.parts.unit_ai,
             NotifyKind::ACTION_FAILED,
@@ -364,7 +364,7 @@ impl BuildAction {
         actions: &mut Action,
         reads: &BuildReads,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         self.timer -= c.dt.seconds();
         if Seconds::ZERO < self.timer {
             return Ok(());
@@ -380,7 +380,7 @@ impl BuildAction {
         builder: &Unit,
         reads: &BuildReads,
         roles: &Roles,
-    ) -> Result<GiveUp, GenieError> {
+    ) -> GenieResult<GiveUp> {
         let player_kind = c.w.players.player(c.player)?.kind;
         Ok(GiveUp {
             patience: if roles
@@ -410,7 +410,7 @@ impl BuildAction {
         actions: &mut Action,
         reads: &BuildReads,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let at = builder.position();
         let to =
             c.w.spatial

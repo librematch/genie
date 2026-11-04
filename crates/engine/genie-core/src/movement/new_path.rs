@@ -40,7 +40,7 @@ use crate::world::layer::ClassRoles;
 use crate::world::layer::generated::MovementTuning;
 use crate::world::layer::generated::TilePathTuning;
 use crate::world::slots::CheckedIndex;
-use crate::{GenieError, pathing::short_path};
+use crate::{GenieError, GenieResult, pathing::short_path};
 
 impl Mover {
     /// The new level's path is no path (`0x141150f00` after the plans, fewer than two points or
@@ -54,7 +54,7 @@ impl Mover {
         target: Option<&Placed>,
         to_end: Distance,
         movement_tuning: &MovementTuning,
-    ) -> Result<AfterRequest, GenieError> {
+    ) -> GenieResult<AfterRequest> {
         let top_has_more = self.top_has_more();
         if target.is_some() && self.paths.walked()?.flags.contains(LevelFlags::MET_TARGET) {
             // FUN_140f9b4d0(level, 2, 0): bit 2 goes off the level and on for its parents
@@ -105,7 +105,7 @@ impl Mover {
         np: NewPath,
         solid: bool,
         movement_tuning: &MovementTuning,
-    ) -> Result<AfterRequest, GenieError> {
+    ) -> GenieResult<AfterRequest> {
         let NewPath {
             mut new,
             mut path,
@@ -194,7 +194,7 @@ impl Mover {
         target: Option<(ObjectId, &Placed)>,
         line: (Point, Point),
         by_id: ObjectsRef<'_>,
-    ) -> Result<Vec<ObjectId>, GenieError> {
+    ) -> GenieResult<Vec<ObjectId>> {
         let movement_tuning = &by_id.tuning().movement;
         let roles = by_id.roles();
         let now = plan.now;
@@ -284,7 +284,7 @@ impl Mover {
         plan: &mut Planning<'_>,
         target: &Placed,
         (from, to): (Point, Point),
-    ) -> Result<bool, GenieError> {
+    ) -> GenieResult<bool> {
         // CVTTSS2SI into a 64-bit register, its low 32 bits kept
         let fixed = |f: f32| cvttss2si_64(f * short_path::TO_FIXED) as i32;
         let query = short_path::Query {
@@ -326,7 +326,7 @@ impl Mover {
         ask: ShortAsk<'_>,
         out: &mut Path,
         by_id: ObjectsRef<'_>,
-    ) -> Result<ShortFound, GenieError> {
+    ) -> GenieResult<ShortFound> {
         let walker = self.walker(me.id);
         let owner = owner_number(world, me.id);
         // from +0x824: the motion step's `local_18c8`, the reach test's start (FUN_14114fea0)
@@ -364,7 +364,7 @@ impl Mover {
         ask: TileAsk<'_>,
         out: &mut Path,
         by_id: ObjectsRef<'_>,
-    ) -> Result<Option<Found>, GenieError> {
+    ) -> GenieResult<Option<Found>> {
         // the smoothing's ignore list: the unit and the level's target object (the planner's
         // argument 12, the object the world holds)
         let level_target = self
@@ -395,7 +395,7 @@ impl Mover {
         to: Point,
         range: Distance,
         master: MasterId,
-    ) -> Result<bool, GenieError> {
+    ) -> GenieResult<bool> {
         let ask = ReachAsk {
             goal: to,
             target: None,
@@ -416,7 +416,7 @@ impl Mover {
         target: ObjectId,
         range: Distance,
         master: MasterId,
-    ) -> Result<bool, GenieError> {
+    ) -> GenieResult<bool> {
         let Some(t) = world.get_known(target)? else {
             return Ok(false);
         };
@@ -444,7 +444,7 @@ impl Mover {
         target: ObjectId,
         range: Distance,
         by_id: ObjectsRef<'_>,
-    ) -> Result<Option<Distance>, GenieError> {
+    ) -> GenieResult<Option<Distance>> {
         let Some(t) = world.get_known(target)? else {
             return Ok(None);
         };
@@ -474,7 +474,7 @@ impl Mover {
         to: Point,
         radii: Distance,
         tile_path_tuning: &TilePathTuning,
-    ) -> Result<Option<(Found, Distance)>, GenieError> {
+    ) -> GenieResult<Option<(Found, Distance)>> {
         let full = !plan.player_kind.is_computer();
         let Some(planner) = plan.pathing.planner(self.stats.restriction, world.tiles()) else {
             return Ok(None);
@@ -524,7 +524,7 @@ impl UnitReach<'_, '_> {
         spatial: &mut Spatial,
         target: ObjectId,
         range: Distance,
-    ) -> Result<bool, GenieError> {
+    ) -> GenieResult<bool> {
         self.mover.reaches_object(
             (self.at, &self.walker),
             (spatial, self.objects),

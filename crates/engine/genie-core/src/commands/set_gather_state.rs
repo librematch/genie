@@ -1,6 +1,6 @@
 //! SET GATHER STATE (0x82): the gather point of a player's buildings is the building itself.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::commands::GatherPointState;
 use crate::commands::UnitList;
 use crate::players::PlayerId;
@@ -23,7 +23,7 @@ pub struct SetGatherStateCommand {
 impl SetGatherStateCommand {
     /// The check refuses a count past the packet's ids; the handler reads the first of them
     /// ([`World::read_units`], [`World::set_gather_state`]).
-    pub(crate) fn run(&self, w: &mut World) -> Result<(), GenieError> {
+    pub(crate) fn run(&self, w: &mut World) -> GenieResult<()> {
         let Some(ids) = w.read_units(self.player, &self.units) else {
             return Ok(());
         };

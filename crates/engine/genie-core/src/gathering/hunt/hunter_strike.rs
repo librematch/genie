@@ -1,7 +1,6 @@
 //! The hunt's strike as the hunter's update runs it: the hunter as a gatherer and an attacker,
 //! the herd it leads, the hunt's update and what follows.
 
-use crate::GenieError;
 use crate::combat::AttackTargetId;
 use crate::combat::attack::{AttackReads, Fight};
 use crate::combat::attack::{arms, engagement};
@@ -36,6 +35,7 @@ use crate::world::layer::Roles;
 use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
+use crate::{GenieError, GenieResult};
 
 impl Unit {
     /// The hunt's strike in the hunter's update (`0x140ac7a00`'s states 4, 6, 7, 10 and 12): what
@@ -52,7 +52,7 @@ impl Unit {
         me: Me,
         (own, tree_lost): (&mut Option<Victim>, bool),
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let master = object_master(
             c.w.parts.own_master.get(self.id),
             (self.id, self.life.master_id),
@@ -102,7 +102,7 @@ impl Unit {
         herd: Option<Herd>,
         tree_lost: bool,
         roles: &Roles,
-    ) -> Result<HuntReads, GenieError> {
+    ) -> GenieResult<HuntReads> {
         let owner = c.w.players.player(c.player)?;
         let productivity = (hunt.task.productivity)
             .and_then(|i| owner.attributes.get(i.index()))
@@ -167,7 +167,7 @@ impl Unit {
         actions: &mut Action,
         c: &mut Step<'_>,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let tree = c.w.parts.unit_ai.get(self.id).is_some_and(|ai| {
             let class = ai.target_class.or(hunt.target_class);
             roles.of_some_class(class).contains(ClassRoles::TREE)
@@ -205,7 +205,7 @@ impl Unit {
         master: &Master,
         victim: &Victim,
         roles: &Roles,
-    ) -> Result<Option<Herd>, GenieError> {
+    ) -> GenieResult<Option<Herd>> {
         // the game reads the herd only on the hunt's target: a lead without one searched before
         // the strike (`Unit::hunt_part`)
         let Some(target) = action.target else {
@@ -272,15 +272,13 @@ impl Unit {
                     .map(|d| d.building)
                     .collect();
             nearest_drop_site(others, &sites, them.position)
-                .map(
-                    |(id, _)| -> Result<(DropSiteId, DistanceSquared), GenieError> {
-                        let s = at(Some(id.id()))?;
-                        Ok((
-                            id,
-                            footprint_gap_squared(them.position, them.radius, s.position, s.radius),
-                        ))
-                    },
-                )
+                .map(|(id, _)| -> GenieResult<(DropSiteId, DistanceSquared)> {
+                    let s = at(Some(id.id()))?;
+                    Ok((
+                        id,
+                        footprint_gap_squared(them.position, them.radius, s.position, s.radius),
+                    ))
+                })
                 .transpose()?
         };
         // the animal's top action without a target or a point (slots 0x190, 0x288)
@@ -320,7 +318,7 @@ impl Unit {
 /// its Attack's. A hunt whose start dropped its target (gone or past state 6) and holds no
 /// Attack reads none (state 7's end without a target): a stand-in no object holds
 /// ([`ObjectId::NOBODY`]).
-fn hunt_victim(c: &Step<'_>, action: &HuntAction, roles: &Roles) -> Result<Victim, GenieError> {
+fn hunt_victim(c: &Step<'_>, action: &HuntAction, roles: &Roles) -> GenieResult<Victim> {
     let target = action.target.map_or_else(
         || {
             action

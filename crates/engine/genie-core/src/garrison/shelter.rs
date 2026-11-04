@@ -1,7 +1,6 @@
 //! The garrison order and `SEEK_SHELTER`: each unit to a building that takes it in, nearest
 //! first ([`Shelters`]).
 
-use crate::GenieError;
 use crate::garrison::ClassFlags;
 use crate::garrison::ContainerId;
 use crate::garrison::GarrisonScope;
@@ -38,6 +37,7 @@ use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::slots::CheckedIndex;
 use crate::world::slots::PlayerSlots;
+use crate::{GenieError, GenieResult};
 
 /// A shelter index that the count list of the callers does not cover.
 const NO_COUNT: GenieError = GenieError::unreachable("a shelter without a count");
@@ -84,7 +84,7 @@ impl World {
         target: Option<ObjectId>,
         dispatch: Dispatch,
         scope: GarrisonScope,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let Some((tp, t)) = self.object(target) else {
             return Ok(());
         };
@@ -150,7 +150,7 @@ impl World {
         &mut self,
         player: PlayerId,
         ids: &[Option<ObjectId>],
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let cap = if self.players.player(player)?.kind.is_computer() {
             COMPUTER_IDS
         } else {
@@ -203,7 +203,7 @@ impl World {
         let counts = buildings
             .iter()
             .map(|&b| self.garrisoned(b.id()))
-            .collect::<Result<Vec<_>, GenieError>>()?;
+            .collect::<GenieResult<Vec<_>>>()?;
         let shelters = Shelters {
             buildings,
             transports: Vec::new(),
@@ -221,7 +221,7 @@ impl World {
         tp: PlayerId,
         target: ObjectId,
         master: MasterId,
-    ) -> Result<Shelters, GenieError> {
+    ) -> GenieResult<Shelters> {
         let mut shelters = Shelters::default();
         let key = ListKey::of_master(self.model.lines.base(master));
         let (at, radius) = self.ground(target)?;
@@ -256,7 +256,7 @@ impl World {
     }
 
     /// The place and master radii of the object `id` (what `FUN_14118f8c0` reads of it).
-    pub(crate) fn ground(&self, id: ObjectId) -> Result<(Position, Footprint), GenieError> {
+    pub(crate) fn ground(&self, id: ObjectId) -> GenieResult<(Position, Footprint)> {
         self.spatial
             .get_known(id)?
             .map(|p| (p.position, p.radius))
@@ -286,7 +286,7 @@ impl World {
         shelters: &Shelters,
         reach: ShelterReach,
         dispatch: Dispatch,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let reach = match reach {
             ShelterReach::TownBell => self.model.tuning.garrison.town_bell_reach,
             ShelterReach::Far => FAR,
@@ -315,7 +315,7 @@ impl World {
             let own = u.master(self.master_tables(), p)?;
             let (copy, master, class) = (own.copy_id, own.id, own.class);
             // COMISS reach, gap; JBE: a gap at the reach or past it, or a NaN, pairs nothing
-            let gap_to = |shelter: ObjectId| -> Result<f32, GenieError> {
+            let gap_to = |shelter: ObjectId| -> GenieResult<f32> {
                 let (at, r) = self.ground(id)?;
                 let (sat, sr) = self.ground(shelter)?;
                 Ok(footprint_gap_squared(at, r, sat, sr).get())
@@ -372,7 +372,7 @@ impl World {
         b: &Unit,
         player: PlayerId,
         master: MasterId,
-    ) -> Result<bool, GenieError> {
+    ) -> GenieResult<bool> {
         if b.master(self.master_tables(), bp)?.kind < MasterKind::COMBAT {
             return Ok(false);
         }
@@ -392,12 +392,12 @@ impl World {
         building: ContainerId,
         going: &[ObjectId],
         dispatch: Dispatch,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let (bp, b) = self
             .object(building)
             .ok_or(GenieError::unsupported("a garrison's building is gone"))?;
         // the splitter tests a unit with a unit AI only
-        let keeps = |id: ObjectId| -> Result<bool, GenieError> {
+        let keeps = |id: ObjectId| -> GenieResult<bool> {
             let (p, u) = self.object(id).ok_or_else(|| object_gone(id))?;
             if !self.parts.unit_ai.contains(u.id) {
                 return Ok(true);
@@ -466,7 +466,7 @@ fn assign_shelters(
     units: &[ObjectId],
     (all, capacities): (&[ContainerId], &[(bool, GarrisonCapacity, ClassId)]),
     mut counts: Vec<InsideCount>,
-) -> Result<(Vec<Vec<ObjectId>>, Vec<ContainerId>), GenieError> {
+) -> GenieResult<(Vec<Vec<ObjectId>>, Vec<ContainerId>)> {
     let mut taken = vec![false; units.len()];
     // each shelter's units, by shelter index, and the order of the shelters' first take
     let mut going: Vec<Vec<ObjectId>> = vec![Vec::new(); all.len()];

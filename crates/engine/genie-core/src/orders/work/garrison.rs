@@ -1,6 +1,6 @@
 //! The garrison finder's view of a unit: the task finder's actor and whether its own task list holds a garrison task on a target.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::garrison::ENTER;
 use crate::map::Position;
 use crate::objects::ListIndex;
@@ -19,7 +19,7 @@ impl World {
     /// # Errors
     ///
     /// A unit or a master the world does not hold.
-    fn garrison_actor(&self, player: PlayerId, idx: ListIndex) -> Result<Actor<'_>, GenieError> {
+    fn garrison_actor(&self, player: PlayerId, idx: ListIndex) -> GenieResult<Actor<'_>> {
         let owner = self.players.player(player)?;
         let unit = owner.live(idx)?;
         Ok(Actor {
@@ -42,7 +42,7 @@ impl World {
         idx: ListIndex,
         target: ObjectId,
         point: Position,
-    ) -> Result<bool, GenieError> {
+    ) -> GenieResult<bool> {
         let actor = self.garrison_actor(player, idx)?;
         let master = actor.master;
         let world = TaskWorld {

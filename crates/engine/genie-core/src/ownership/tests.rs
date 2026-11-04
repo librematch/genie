@@ -1,4 +1,4 @@
-use crate::GenieError;
+use crate::GenieResult;
 use crate::map::Distance;
 use crate::map::Position;
 use crate::movement::Speed;
@@ -55,7 +55,7 @@ fn walking_forager() -> World {
 /// Object 0 of player 1's capture stop as master class `class`, then the object (its row and
 /// parts) and Gaia's bushes the stop let go in the update (each held by one worker before it,
 /// none after).
-fn stopped(mut t: World, class: ClassId) -> Result<(Object, Vec<i32>), GenieError> {
+fn stopped(mut t: World, class: ClassId) -> GenieResult<(Object, Vec<i32>)> {
     for b in &mut t.players[0].objects {
         b.workers = WorkerCount::of_data(1);
     }

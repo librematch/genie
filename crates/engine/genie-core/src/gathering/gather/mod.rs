@@ -56,8 +56,6 @@ pub use self::start::{
 };
 pub use self::walks::Walks;
 #[cfg(test)]
-use crate::GenieError;
-#[cfg(test)]
 use crate::combat::damage::Victim;
 #[cfg(test)]
 use crate::gathering::hunt::Dropped;

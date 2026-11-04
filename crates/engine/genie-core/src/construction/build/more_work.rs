@@ -2,7 +2,6 @@
 //! case 0xdf): a resource around the building it finished, as the unit AI's
 //! `ClosestResourceObject` names it.
 
-use crate::GenieError;
 use crate::map::Distance;
 use crate::map::spatial::Spatial;
 use crate::objects::ObjectId;
@@ -18,6 +17,7 @@ use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
+use crate::{GenieError, GenieResult};
 
 impl Unit {
     /// The Build's case 0xdf once its work ended without queued orders (`0x140ab0b43`): the
@@ -37,7 +37,7 @@ impl Unit {
         building: ObjectId,
         built: MasterId,
         roles: &Roles,
-    ) -> Result<Option<Work>, GenieError> {
+    ) -> GenieResult<Option<Work>> {
         use crate::gathering::gather_search::{self, Candidate, Candidates};
         use crate::gathering::gather_search::{gather_group, more_work as gather_search_more_work};
         /// The reach a line of sight below the floor takes (the Build's immediate 4.0).

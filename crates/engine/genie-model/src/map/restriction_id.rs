@@ -1,6 +1,6 @@
 //! A terrain restriction's id: which terrains an object may stand on.
 
-use crate::GenieError;
+use crate::{GenieError, GenieResult};
 use derive_more::Display;
 use serde::Deserialize;
 use serde::Serialize;
@@ -30,7 +30,7 @@ impl RestrictionId {
     /// # Errors
     ///
     /// A negative value other than −1, which no restriction's place is.
-    pub fn of_field(value: i16) -> Result<Option<Self>, GenieError> {
+    pub fn of_field(value: i16) -> GenieResult<Option<Self>> {
         match value {
             Self::NONE => Ok(None),
             v => u16::try_from(v).map(|v| Some(Self(v))).map_err(|_| {

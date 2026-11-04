@@ -1,7 +1,6 @@
 //! The `MoveTo` as an action's sub-action: its constructor (`FUN_140aa0d30`, made quiet) and its
 //! update through the owner's sub-action list (`FUN_140a992b0`).
 
-use crate::GenieError;
 use crate::map::Distance;
 use crate::map::Position;
 use crate::math::image::garrison::FAR;
@@ -21,6 +20,7 @@ use crate::unit_ai::UnitStance;
 use crate::unit_ai::{AiAction, Inbox};
 use crate::world::Seconds;
 use crate::world::layer::generated::MoveToTuning;
+use crate::{GenieError, GenieResult};
 
 /// A sub-action `MoveTo` that is not quiet letting its target go: its release (slot 0x180) would
 /// be its owner's. No owner makes one (`FUN_140aa0df0` with `+0x60` 1, or the quiet setter
@@ -115,7 +115,7 @@ impl MoveToAction {
         target_state: Option<ObjectState>,
         shown: Option<Shown<'_>>,
         inbox: &mut Inbox<'_>,
-    ) -> Result<SubCode, GenieError> {
+    ) -> GenieResult<SubCode> {
         let target = self.target;
         if self.check_held(target_state, inbox)?.is_some() {
             // no owner makes a sub-action MoveTo to an object that is not quiet, which would
@@ -172,7 +172,7 @@ impl MoveToAction {
 
     /// A `MoveTo` that is not quiet tells its unit's AI how it ended (`0x140aa2a70` in state 1
     /// and 13: notify `kind`, 0x1fa or 0x1f9, with the move action value and 0, 0).
-    fn post_end(&self, inbox: &mut Inbox<'_>, kind: NotifyKind) -> Result<(), GenieError> {
+    fn post_end(&self, inbox: &mut Inbox<'_>, kind: NotifyKind) -> GenieResult<()> {
         if self.voice.is_quiet() {
             return Ok(());
         }

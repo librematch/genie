@@ -1,6 +1,6 @@
 //! What the unit AI's view asks of its unit: its picker, a helper's tests and a master switch.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::map::Position;
 use crate::movement::Speed;
 use crate::movement::footprint_gap_squared;
@@ -26,7 +26,7 @@ use crate::world::slots::PlayerSlots;
 impl UnitView<'_, '_> {
     /// The world as `bestUnitToAttack` and the attack tests read it for the unit
     /// ([`WorldPicker`]), with `seeker` and without a terrain restriction.
-    pub(super) fn picker(&self, seeker: Option<Seeker>) -> Result<WorldPicker<'_>, GenieError> {
+    pub(super) fn picker(&self, seeker: Option<Seeker>) -> GenieResult<WorldPicker<'_>> {
         Ok(WorldPicker {
             attacker: &self.attacker,
             seeker,
@@ -73,7 +73,7 @@ impl UnitView<'_, '_> {
         target: ObjectId,
         seeker: &Seeker,
         roles: &Roles,
-    ) -> Result<Option<(ClassId, Position)>, GenieError> {
+    ) -> GenieResult<Option<(ClassId, Position)>> {
         let picker = self.picker(Some(*seeker))?;
         let (t, _) = picker.target(&self.c.w.spatial, target)?;
         Ok(can_attack(
@@ -87,7 +87,7 @@ impl UnitView<'_, '_> {
     }
 
     /// Whether the unit's view of the world (live objects, owner-first) holds object `id`.
-    pub(super) fn view_holds(&self, id: ObjectId) -> Result<bool, GenieError> {
+    pub(super) fn view_holds(&self, id: ObjectId) -> GenieResult<bool> {
         Ok(owner_view(
             &self.c.w.players,
             &self.c.w.index,
@@ -116,7 +116,7 @@ impl UnitView<'_, '_> {
         m: &Master,
         attacker: ObjectId,
         roles: &Roles,
-    ) -> Result<bool, GenieError> {
+    ) -> GenieResult<bool> {
         let others = owner_view(
             &self.c.w.players,
             &self.c.w.index,
@@ -219,11 +219,7 @@ impl UnitView<'_, '_> {
     /// # Errors
     ///
     /// What the teardowns and the switch do not model.
-    pub(crate) fn switch_unit_master(
-        &mut self,
-        own: &Master,
-        next: MasterId,
-    ) -> Result<(), GenieError> {
+    pub(crate) fn switch_unit_master(&mut self, own: &Master, next: MasterId) -> GenieResult<()> {
         let by = Releaser {
             id: self.unit.id,
             class: Some(own.class),
@@ -252,12 +248,7 @@ impl UnitView<'_, '_> {
     /// # Errors
     ///
     /// [`crate::world::lets::take`]'s.
-    pub(crate) fn take(
-        &mut self,
-        id: ObjectId,
-        by: Releaser,
-        roles: &Roles,
-    ) -> Result<(), GenieError> {
+    pub(crate) fn take(&mut self, id: ObjectId, by: Releaser, roles: &Roles) -> GenieResult<()> {
         lets_take(self.c, self.unit, id, by, roles)
     }
 
@@ -268,7 +259,7 @@ impl UnitView<'_, '_> {
     /// # Errors
     ///
     /// [`crate::world::lets::release`]'s.
-    pub(crate) fn release(&mut self, id: ObjectId, by: Releaser) -> Result<(), GenieError> {
+    pub(crate) fn release(&mut self, id: ObjectId, by: Releaser) -> GenieResult<()> {
         lets_release(self.c, self.unit, id, by)
     }
 
@@ -282,7 +273,7 @@ impl UnitView<'_, '_> {
     pub(crate) fn torn_down(
         &mut self,
         (leaves, releases): (Vec<ObjectId>, Vec<(ObjectId, Releaser)>),
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         lets_torn_down(self.c, self.unit, (leaves, releases))
     }
 }

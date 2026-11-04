@@ -1,6 +1,5 @@
 //! The obstruction grid's cells and visits, the scout map, alliances and the line queries.
 
-use crate::GenieError;
 use crate::map::Distance;
 use crate::map::Point;
 use crate::map::TerrainMask;
@@ -17,6 +16,7 @@ use crate::players::PlayerId;
 use crate::players::{NO_RELATIONS, PlayerSet};
 use crate::unit_ai::task_finder::allied as task_finder_allied;
 use crate::world::index::ObjectsRef;
+use crate::{GenieError, GenieResult};
 
 /// A walk's obstruction query ([`Spatial::walk_hits`]'s arguments).
 #[derive(Clone, Copy, Debug)]
@@ -285,7 +285,7 @@ impl Spatial {
     /// records first ([`Spatial::edge_records`], `FUN_141057290`). Both its callers
     /// (`FUN_14114cc60`, the gate's `FUN_1411d0570`) set the manager's ignore list to `ignore`
     /// first ([`Spatial::set_manager_ignore`]).
-    pub fn walk_hits(&mut self, walk: WalkQuery<'_>) -> Result<Vec<RecordId>, GenieError> {
+    pub fn walk_hits(&mut self, walk: WalkQuery<'_>) -> GenieResult<Vec<RecordId>> {
         let WalkQuery {
             start: from,
             end: to,
@@ -364,7 +364,7 @@ impl Spatial {
         grow: Distance,
         mask: Option<TerrainMask>,
         ignore: &[RecordId],
-    ) -> Result<Vec<RecordId>, GenieError> {
+    ) -> GenieResult<Vec<RecordId>> {
         self.set_manager_ignore(ignore);
         if let Some(mask) = mask {
             self.put_tile_records(from, to, grow, mask);
@@ -398,7 +398,7 @@ impl Spatial {
         grow: Distance,
         tiles: TileRecords,
         ignore: &[RecordId],
-    ) -> Result<Vec<RecordId>, GenieError> {
+    ) -> GenieResult<Vec<RecordId>> {
         const MOST_HITS: usize = 25;
         let rect = Rect::spanning(from, to);
         let query = rect.grown(grow);

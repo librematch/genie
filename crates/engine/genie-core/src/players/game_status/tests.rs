@@ -8,6 +8,7 @@ use crate::construction::build::tests::started_on;
 use crate::construction::repair::RepairState;
 use crate::construction::repair::{RepairAction, RepairTask};
 use crate::garrison::transport::TransportAction;
+use crate::gathering::PastureId;
 use crate::gathering::gather::GatherState;
 use crate::gathering::gather::{GatherAction, Resource, StopRate};
 use crate::gathering::hunt::HuntState;
@@ -44,6 +45,7 @@ use crate::objects::{FacetCount, Frame, WorkerCount};
 use crate::ownership::artifact::{Artifact, ArtifactState};
 use crate::players::Amount;
 use crate::players::PlayerId;
+use crate::players::PlayerKind;
 use crate::players::Relation;
 use crate::players::attribute::AttributeId;
 use crate::players::game_status::stops::StopList;
@@ -495,6 +497,14 @@ fn stopped_hunter_keeps_its_halted_hunt() {
         .push_live(PlayerId::new(1), Object::with_ai(hunter, ai))
         .unwrap();
     let idx = t.players[1].objects.last_place().unwrap();
+    // a computer player's stopped hunt (set_state 1) and a stopped hunter that tends a pasture
+    // are not modelled
+    let mut computer = t.clone();
+    computer.players[1].kind = PlayerKind::Computer;
+    assert!(computer.object_stop(PlayerId::new(1), idx).is_err());
+    let mut tending = t.clone();
+    tending.players[1].objects[idx].my_pasture = Some(PastureId::new(object_id(50)));
+    assert!(tending.object_stop(PlayerId::new(1), idx).is_err());
     let mut without_ai = t.clone();
     // the unit AI's stopAction (slot 0x3c0) then empties the list
     t.object_stop(PlayerId::new(1), idx).unwrap();

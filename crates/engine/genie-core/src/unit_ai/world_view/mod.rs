@@ -1,7 +1,7 @@
 //! The views a unit's update and its unit AI read the world through ([`UnitView`],
 //! [`Step`], [`Foreign`], [`OwnerView`], the pickers).
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::construction::repair::RepairAction;
 use crate::garrison::EnterSlot;
 use crate::map::spatial::Spatial;
@@ -150,7 +150,7 @@ impl OwnerView {
     /// # Errors
     ///
     /// A player the world does not hold.
-    pub(crate) fn of(c: &Step<'_>, new: Option<PlayerId>) -> Result<Self, GenieError> {
+    pub(crate) fn of(c: &Step<'_>, new: Option<PlayerId>) -> GenieResult<Self> {
         let taker = new.filter(|&n| n != c.player);
         let Some((new, q)) = taker.and_then(|n| Some((n, c.w.players.get(n.index())?))) else {
             let owner = c.w.players.player(c.player)?;
@@ -174,7 +174,7 @@ impl OwnerView {
     /// # Errors
     ///
     /// A player the world does not hold.
-    pub(crate) fn relations(self, w: &World) -> Result<&Relations, GenieError> {
+    pub(crate) fn relations(self, w: &World) -> GenieResult<&Relations> {
         Ok(&w.players.player(self.player)?.relations)
     }
 }
@@ -187,7 +187,7 @@ pub(crate) fn owner_view<'a>(
     index: &'a ObjectIndex,
     p: PlayerId,
     new: Option<PlayerId>,
-) -> Result<OthersRef<'a>, GenieError> {
+) -> GenieResult<OthersRef<'a>> {
     Ok(changed_view(OthersRef::of(players, index, p)?, new))
 }
 

@@ -5,7 +5,6 @@
 //! attack command in `combat/attack/unit_ai_side.rs` and the wait for a foundation in
 //! `construction/wait_solidify.rs`.
 
-use crate::GenieError;
 use crate::math::rng::{Stream, Well512};
 use crate::objects::ObjectId;
 use crate::objects::unit::UnitFlags;
@@ -13,6 +12,7 @@ use crate::unit_ai::Answer;
 use crate::unit_ai::OrderForce;
 use crate::unit_ai::world_view::UnitView;
 use crate::unit_ai::{Attacked, Effect, Notify, UNMODELLED_COMMAND, UnitAi, UnitCommand};
+use crate::{GenieError, GenieResult};
 use std::mem::{swap, take};
 
 impl UnitView<'_, '_> {
@@ -28,7 +28,7 @@ impl UnitView<'_, '_> {
         target: ObjectId,
         force: OrderForce,
         ai: &UnitAi,
-    ) -> Result<Attacked, GenieError> {
+    ) -> GenieResult<Attacked> {
         let roles = &self.c.w.model.roles.clone();
         self.start_attack_now(target, force, ai, roles)
     }
@@ -55,7 +55,7 @@ impl UnitView<'_, '_> {
         e: Effect,
         ai: &mut UnitAi,
         rng: &mut Well512,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let roles = &self.c.w.model.roles.clone();
         let held = self.c.side_notifies.take().unwrap_or_default();
         let posted = held
@@ -89,7 +89,7 @@ impl UnitView<'_, '_> {
     /// # Errors
     ///
     /// What the AI's hear logic does not model.
-    pub(crate) fn owner_hears(&mut self, n: Notify) -> Result<(), GenieError> {
+    pub(crate) fn owner_hears(&mut self, n: Notify) -> GenieResult<()> {
         let roles = &self.c.w.model.roles.clone();
         self.hears(n, roles)
     }
@@ -100,7 +100,7 @@ impl UnitView<'_, '_> {
     /// # Errors
     ///
     /// The commands the slice holds no action for.
-    pub(crate) fn command(&mut self, command: UnitCommand) -> Result<Answer, GenieError> {
+    pub(crate) fn command(&mut self, command: UnitCommand) -> GenieResult<Answer> {
         let roles = &self.c.w.model.roles.clone();
         let slots = self.c.w.model.slots;
         match command {
@@ -135,7 +135,7 @@ impl UnitView<'_, '_> {
     /// # Errors
     ///
     /// What the task search does not model.
-    pub(crate) fn wait_solidify(&mut self, target: ObjectId) -> Result<Answer, GenieError> {
+    pub(crate) fn wait_solidify(&mut self, target: ObjectId) -> GenieResult<Answer> {
         let roles = &self.c.w.model.roles.clone();
         let slots = self.c.w.model.slots;
         self.start_wait_now(target, slots, roles)
@@ -149,7 +149,7 @@ impl UnitView<'_, '_> {
     /// # Errors
     ///
     /// What the stop does not model.
-    pub(crate) fn group_attack_stop(&mut self) -> Result<(), GenieError> {
+    pub(crate) fn group_attack_stop(&mut self) -> GenieResult<()> {
         let Some(m) = self.c.w.parts.mover_mut(self.unit.id) else {
             return Ok(());
         };

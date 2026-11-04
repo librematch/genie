@@ -1,6 +1,6 @@
 //! A side of a shape in the obstruction manager's mesh.
 
-use crate::GenieError;
+use crate::{GenieError, GenieResult};
 use derive_more::Display;
 
 /// A side of a shape's box in the mesh and the short pather (side s runs from corner s to
@@ -39,7 +39,7 @@ impl ShapeSide {
     /// # Errors
     ///
     /// A word past 3, which names no side.
-    pub fn of_word(word: u32) -> Result<Self, GenieError> {
+    pub fn of_word(word: u32) -> GenieResult<Self> {
         if 3 < word {
             return Err(GenieError::invalid_input("a shape's side past 3").with("side", word));
         }

@@ -1,7 +1,6 @@
 //! The `MoveTo` as a unit's own top action ([`MoveToAction`]): its constructors, its start and
 //! its update.
 
-use crate::GenieError;
 use crate::combat::abilities::Look;
 use crate::construction::build::CART_TASK;
 use crate::map::Distance;
@@ -33,6 +32,7 @@ use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 use crate::world::layer::generated::MoveToTuning;
 use crate::world::layer::generated::OrderTuning;
+use crate::{GenieError, GenieResult};
 use genie_diff::Diff;
 use genie_model::model::Model;
 
@@ -246,7 +246,7 @@ impl MoveToAction {
         range: Distance,
         sprite: Option<Graphic>,
         move_to_tuning: &MoveToTuning,
-    ) -> Result<Self, GenieError> {
+    ) -> GenieResult<Self> {
         let t = world.get_known(target)?.ok_or(TARGET_LACKING)?;
         let ground = mover.stats.radius.ground();
         let state = if footprint_gap(me, ground, t.position, t.radius)
@@ -290,7 +290,7 @@ impl MoveToAction {
         range: Distance,
         (sprite, livestock): (Option<Graphic>, bool),
         model: &Model,
-    ) -> Result<Self, GenieError> {
+    ) -> GenieResult<Self> {
         let (roles, artifact_tuning, move_to_tuning) =
             (&model.roles, model.tuning.artifact, &model.tuning.move_to);
         let t = world.get_known(target)?.ok_or(TARGET_LACKING)?;
@@ -401,7 +401,7 @@ impl MoveToAction {
         mut walk: Walk<'_>,
         ask: PathAsk,
         mut shows: Shows<'_>,
-    ) -> Result<MoveStep, GenieError> {
+    ) -> GenieResult<MoveStep> {
         let mut step = MoveStep::default();
         match self.state {
             MoveTo::Moving => self.update_moving(&mut walk, &mut step, &mut shows)?,
@@ -433,7 +433,7 @@ impl MoveToAction {
         walk: &mut Walk<'_>,
         step: &mut MoveStep,
         shows: &mut Shows<'_>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         match self.check_target(walk)? {
             Follow::Again => return Ok(()),
             Follow::Blocked => step.target_moved = true,
@@ -464,7 +464,7 @@ impl MoveToAction {
         &mut self,
         state: Option<ObjectState>,
         inbox: &mut Inbox<'_>,
-    ) -> Result<Option<UpdateCode>, GenieError> {
+    ) -> GenieResult<Option<UpdateCode>> {
         if self.target.is_none() {
             return Ok(None);
         }
@@ -496,7 +496,7 @@ impl MoveToAction {
     /// # Errors
     ///
     /// [`target_left`]'s.
-    pub(crate) fn check_target(&mut self, walk: &mut Walk<'_>) -> Result<Follow, GenieError> {
+    pub(crate) fn check_target(&mut self, walk: &mut Walk<'_>) -> GenieResult<Follow> {
         let Some(target) = self.target else {
             return Ok(Follow::Stays);
         };
@@ -523,7 +523,7 @@ impl MoveToAction {
         ask: PathAsk,
         step: &mut MoveStep,
         shows: &mut Shows<'_>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         self.wait.ask_again();
         let goal = self.walks_to();
         self.state = MoveTo::Moving;

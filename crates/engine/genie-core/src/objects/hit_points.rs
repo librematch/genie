@@ -3,7 +3,6 @@
 //! 0xb8 and 0x260, and the update's checks). Whatever heals (a monk's heal action, a building
 //! that heals around it) calls the healed object's heal here.
 
-use crate::GenieError;
 use crate::combat::damage::ArmorPair;
 use crate::combat::damage::{gain_hp as damage_gain_hp, heal_hp};
 use crate::math::fmath::{at_most_or_unordered, maxss};
@@ -24,6 +23,7 @@ use crate::world::Seconds;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
 use crate::world::layer::generated::TurnTuning;
+use crate::{GenieError, GenieResult};
 use genie_diff::Diff;
 
 /// The regeneration's minute (`DAT_14330ebc8`).
@@ -105,7 +105,7 @@ impl Unit {
         hit_points: MasterHitPoints,
         amount: HitPoints,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if roles.of_class(class).intersects(
             ClassRoles::TRADE_BOAT
                 | ClassRoles::TRANSPORT

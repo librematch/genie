@@ -1,7 +1,7 @@
 //! readyToAttack (`FUN_140a7f9d0`): the ready state, the follow, the range and sight tests
 //! and the facing at its end.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::combat::MissileCount;
 use crate::combat::attack::Aim;
 use crate::combat::attack::AttackState;
@@ -58,7 +58,7 @@ impl Attack {
         g: &mut Ground<'_>,
         f: &Fight,
         r: &AttackReads,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let sprite_tuning = g.by_id.tuning().sprite;
         self.enter(AttackState::Ready, g.motion.reborrow())?;
         if self.target.is_none() && self.point.x() == NONE {
@@ -84,7 +84,7 @@ impl Attack {
         r: &AttackReads,
         f: &Fight,
         gap: Distance,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let move_to_tuning = &g.by_id.tuning().move_to;
         let sprite_tuning = g.by_id.tuning().sprite;
         self.enter(AttackState::Move { move_to: None }, g.motion.reborrow())?;
@@ -129,7 +129,7 @@ impl Attack {
         f: &Fight,
         r: &AttackReads,
         at_once: AtOnce,
-    ) -> Result<Readiness, GenieError> {
+    ) -> GenieResult<Readiness> {
         let move_to_tuning = &g.by_id.tuning().move_to;
         let sprite_tuning = g.by_id.tuning().sprite;
         let roles = g.by_id.roles();
@@ -221,7 +221,7 @@ impl Attack {
     /// # Errors
     ///
     /// [`TARGET_GONE`] for none or a target the map does not hold.
-    pub(super) fn held_target(&self, map: &Spatial) -> Result<(ObjectId, Placed), GenieError> {
+    pub(super) fn held_target(&self, map: &Spatial) -> GenieResult<(ObjectId, Placed)> {
         let target = self.target.ok_or(TARGET_GONE)?;
         let t = map.get_known(target)?.ok_or(TARGET_GONE)?;
         Ok((target.id(), *t))
@@ -252,7 +252,7 @@ impl Attack {
         motion: MotionMut<'_>,
         sprite_rng: &mut Well512,
         sprite_tuning: SpriteTuning,
-    ) -> Result<Readiness, GenieError> {
+    ) -> GenieResult<Readiness> {
         self.finish_in(AttackState::Failed, unit, motion, sprite_rng, sprite_tuning)?;
         Ok(Readiness::Waiting)
     }
@@ -269,7 +269,7 @@ impl Attack {
         f: &Fight,
         r: &AttackReads,
         roles: &Roles,
-    ) -> Result<Readiness, GenieError> {
+    ) -> GenieResult<Readiness> {
         let mover = mover.ok_or(ATTACKER_UNMOVING)?;
         if !roles
             .of_master(f.own.master_id)
@@ -303,7 +303,7 @@ pub(super) fn in_range(near: Distance, range: Distance, min_range: Distance) -> 
 /// # Errors
 ///
 /// A tile the map's sight does not hold.
-pub(super) fn target_unseen(world: &Spatial, f: &Fight, t: &Placed) -> Result<bool, GenieError> {
+pub(super) fn target_unseen(world: &Spatial, f: &Fight, t: &Placed) -> GenieResult<bool> {
     let (tx, ty) = (t.position.x() as i32, t.position.y() as i32);
     Ok(t.player != PlayerId::GAIA
         && !world.sees_tile(f.own.player, Tile::new(tx, ty))

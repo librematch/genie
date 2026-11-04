@@ -1,7 +1,7 @@
 //! One value per player, looked up by the player ([`ByPlayer`]).
 
-use crate::GenieError;
 use crate::players::PlayerId;
+use crate::{GenieError, GenieResult};
 
 /// A player the row does not hold, where the caller's own loop over the players named it.
 const NO_PLAYER: GenieError = GenieError::unreachable("a player the row does not hold");
@@ -35,7 +35,7 @@ impl<T> ByPlayer<T> {
     /// # Errors
     ///
     /// A player the row does not hold.
-    pub fn checked(&self, p: PlayerId) -> Result<&T, GenieError> {
+    pub fn checked(&self, p: PlayerId) -> GenieResult<&T> {
         self.get(p).ok_or_else(|| NO_PLAYER.with("player", p))
     }
 
@@ -44,7 +44,7 @@ impl<T> ByPlayer<T> {
     /// # Errors
     ///
     /// A player the row does not hold.
-    pub fn checked_mut(&mut self, p: PlayerId) -> Result<&mut T, GenieError> {
+    pub fn checked_mut(&mut self, p: PlayerId) -> GenieResult<&mut T> {
         self.get_mut(p).ok_or_else(|| NO_PLAYER.with("player", p))
     }
 

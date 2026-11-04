@@ -1,7 +1,6 @@
 //! A new building: BUILD's foundation and the building constructor, with its combat setup,
 //! its storage and its annexes.
 
-use crate::GenieError;
 use crate::combat::Charge;
 use crate::combat::abilities::Abilities;
 use crate::combat::damage::ArmorPair;
@@ -60,6 +59,7 @@ use crate::world::layer::Roles;
 use crate::world::parts::{Object, ObjectParts};
 use crate::world::slots::PlayerSlots;
 use crate::world::{Gate, World};
+use crate::{GenieError, GenieResult};
 
 impl World {
     /// The new foundation of BUILD and of `BUILD_WALL`'s tiles (the master's slot 0x108,
@@ -71,7 +71,7 @@ impl World {
         player: PlayerId,
         master: MasterId,
         position: Position,
-    ) -> Result<(FoundationId, Position), GenieError> {
+    ) -> GenieResult<(FoundationId, Position)> {
         let unit_ai = unit_ai_kind(self.master(player, master)?, master, &self.model.roles);
         let made = self.make_building(player, master, Ok(unit_ai), position)?;
         let cost = self.master(player, master)?.creatable_part().cost;
@@ -96,7 +96,7 @@ impl World {
         &mut self,
         player: PlayerId,
         master: MasterId,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if let Some(m) = player_master(&self.model.masters, player, master) {
             count_class(
                 &mut self.players.player_mut(player)?.attributes,
@@ -128,7 +128,7 @@ impl World {
         &mut self,
         player: PlayerId,
         master: MasterId,
-    ) -> Result<Held, GenieError> {
+    ) -> GenieResult<Held> {
         let storage = player_master(&self.model.masters, player, master)
             .map(|m| m.storage.clone())
             .unwrap_or_default();
@@ -168,9 +168,9 @@ impl World {
         &mut self,
         player: PlayerId,
         master: MasterId,
-        unit_ai: Result<Option<UnitAiKind>, GenieError>,
+        unit_ai: GenieResult<Option<UnitAiKind>>,
         position: Position,
-    ) -> Result<(ObjectId, Position), GenieError> {
+    ) -> GenieResult<(ObjectId, Position)> {
         let made = self.master(player, master)?.clone();
         let building = made.building.ok_or(GenieError::unsupported(
             "a building constructor of a master without its building part",
@@ -420,7 +420,7 @@ impl World {
         made: &Master,
         (position, desolid): (Position, bool),
         foundation: bool,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let master = made.id;
         self.track_add(player, id, master)?;
         self.building_place(player, id, made, position, desolid)?;
@@ -444,7 +444,7 @@ impl World {
         aid: ObjectId,
         made: &Master,
         am: &Master,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let not_held = NOT_HELD;
         if self.object(id).is_none() || self.object(aid).is_none() {
             return Err(not_held);
@@ -492,7 +492,7 @@ fn constructed_snow(
     (tx, ty): (i32, i32),
     terrain: Option<&Terrain>,
     roles: &Roles,
-) -> Result<Snow, GenieError> {
+) -> GenieResult<Snow> {
     let on_snow = roles
         .of_master(master)
         .intersects(MasterRoles::FARM | MasterRoles::PASTURE_1889)

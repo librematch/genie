@@ -5,7 +5,7 @@
 //! swing (2 a trade, truncated) in hundredths, and the price resets when the net trades come back
 //! to 0. Nothing else changes the prices.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::commands::TradeLots;
 use crate::math::conversions::cvttss2si;
 use crate::math::fmath::{at_most_or_unordered, below_or_unordered, maxss};
@@ -181,7 +181,7 @@ impl World {
         p: PlayerId,
         commodity: AttributeId,
         times: TradeLots,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         for _ in 0..times.get() {
             let volume = self.players.player(p)?.commodity_volume;
             let held = self
@@ -237,7 +237,7 @@ impl World {
         p: PlayerId,
         commodity: AttributeId,
         times: TradeLots,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         for _ in 0..times.get() {
             let volume = self.players.player(p)?.commodity_volume;
             if !volume.any() {

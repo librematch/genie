@@ -1,7 +1,7 @@
 //! The polygons' outlines: the tracer, the border walk, the edge that holds a point and the
 //! walk of a new polygon.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::pathing::FixedDistance;
 use crate::pathing::FixedRect;
 use crate::pathing::mesh::Contact;
@@ -124,7 +124,7 @@ impl Search<'_> {
         side: &mut ShapeSide,
         u: &mut i32,
         steps: i32,
-    ) -> Result<Option<ShapeId>, GenieError> {
+    ) -> GenieResult<Option<ShapeId>> {
         let b = self.bounds;
         let w = side.prev();
         let (target, dir) = match w {
@@ -163,7 +163,7 @@ impl Search<'_> {
         s0: ShapeSide,
         start: Option<FixedPoint>,
         poly: &mut Poly,
-    ) -> Result<Outline, GenieError> {
+    ) -> GenieResult<Outline> {
         let d = self.ctx.d;
         let mesh = self.ctx.mesh;
         let b = self.bounds;
@@ -493,7 +493,7 @@ impl Search<'_> {
         p: FixedPoint,
         g0: FixedDistance,
         parent: NodeIndex,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let poly = self.poly(pi)?.clone();
         let n = poly.count();
         let walk = NewWalk { poly: pi, parent };
@@ -572,7 +572,7 @@ impl Search<'_> {
         poly: &Poly,
         p: FixedPoint,
         g0: FixedDistance,
-    ) -> Result<(FixedDistance, FixedDistance), GenieError> {
+    ) -> GenieResult<(FixedDistance, FixedDistance)> {
         let last = VertexIndex::new(poly.count() - 1);
         let (vb, vf) = (poly.vertex(last)?, poly.vertex(VertexIndex::FIRST)?);
         let (dxb, dyb) = (vb.x() - p.x(), vb.y() - p.y());
@@ -625,7 +625,7 @@ impl Search<'_> {
         (at, before): (VertexIndex, VertexIndex),
         g: FixedDistance,
         (dir, lo, hi): (WalkDir, VertexIndex, VertexIndex),
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let vv = poly.vertex(at)?;
         let sp = poly.side(before)?;
         let sn = poly.side(at)?;

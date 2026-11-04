@@ -7,7 +7,7 @@
 //! action type 107. An idle animal holds this action as its top action, so checkpoint word 9 counts
 //! `107 + state` for it.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::garrison::ContainerId;
 use crate::map::Distance;
 use crate::map::Position;
@@ -256,7 +256,7 @@ impl Artifact {
         reads: &MoveToReads<'_>,
         artifact_tuning: ArtifactTuning,
         move_to_tuning: &MoveToTuning,
-    ) -> Result<(Targets, SubActionsGone), GenieError> {
+    ) -> GenieResult<(Targets, SubActionsGone)> {
         let range = if to_building { 1.0 } else { 0.0 };
         // its point (`+0x38`): the target's place, or the point below a town centre
         let held = if to_town_centre {
@@ -299,7 +299,7 @@ impl Artifact {
         point: Position,
         reads: &MoveToReads<'_>,
         move_to_tuning: &MoveToTuning,
-    ) -> Result<SubActionsGone, GenieError> {
+    ) -> GenieResult<SubActionsGone> {
         let walk = reads.to_point(point, Distance::ZERO, self.moving, move_to_tuning)?;
         self.goal = Some(point);
         let gone = self.drop_sub_actions();
@@ -361,7 +361,7 @@ impl Artifact {
         me: Me,
         r: &ArtifactReads,
         roles: &Roles,
-    ) -> Result<Option<Handover>, GenieError> {
+    ) -> GenieResult<Option<Handover>> {
         self.walk(c, unit, me, r)?;
         let owner = if self.state == ArtifactState::Check && r.searches {
             c.w.spatial.artifact_owner(unit.id, &c.w.players, roles)?
@@ -394,7 +394,7 @@ impl Artifact {
         unit: &mut Unit,
         me: Me,
         r: &ArtifactReads,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let Some(state) = self.move_to().map(|m| m.state) else {
             return Ok(());
         };
@@ -455,7 +455,7 @@ impl Artifact {
         &mut self,
         dt_ms: Millis,
         owner: Option<PlayerId>,
-    ) -> Result<Option<Handover>, GenieError> {
+    ) -> GenieResult<Option<Handover>> {
         match self.state {
             ArtifactState::Check => {
                 if let Some(new) = owner {
@@ -500,7 +500,7 @@ fn let_go_gone(
     unit: &mut Unit,
     gone: SubActionsGone,
     by: Releaser,
-) -> Result<(), GenieError> {
+) -> GenieResult<()> {
     if let Some(t) = gone.released {
         release(c, unit, t, by)?;
     }
@@ -524,7 +524,7 @@ impl Unit {
         me: Me,
         roles: &Roles,
         slots: Slots,
-    ) -> Result<Option<Captured>, GenieError> {
+    ) -> GenieResult<Option<Captured>> {
         let by = self.releaser(c)?;
         if c.w.ticks <= Tick::new(1) {
             return Ok(None);
@@ -546,7 +546,7 @@ impl Unit {
         me: Me,
         by: Releaser,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let Some(e) = actions.list.artifact_mut().and_then(Artifact::take_enter) else {
             return Ok(());
         };
@@ -588,7 +588,7 @@ impl Unit {
         me: Me,
         by: Releaser,
         roles: &Roles,
-    ) -> Result<Option<Handover>, GenieError> {
+    ) -> GenieResult<Option<Handover>> {
         let Some(mut artifact) = actions.list.artifact().copied() else {
             return Ok(None);
         };
@@ -622,7 +622,7 @@ impl Unit {
         new: Option<Handover>,
         roles: &Roles,
         slots: Slots,
-    ) -> Result<Option<Captured>, GenieError> {
+    ) -> GenieResult<Option<Captured>> {
         match new {
             Some(Handover::Taken { new, .. }) => {
                 let (main, also) = self.capture(actions, c, new, roles, slots)?;

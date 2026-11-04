@@ -7,7 +7,6 @@ use crate::dat::MasterTable;
 use crate::dat::attributes;
 use crate::dat::dat_id;
 use crate::save::parts::{animated_master, combat_master, moving_master};
-use genie_model::GenieError;
 use genie_model::combat::Charge;
 use genie_model::combat::Firepower;
 use genie_model::combat::MissileCount;
@@ -80,6 +79,7 @@ use genie_model::production::HotkeyId;
 use genie_model::production::LocationButton;
 use genie_model::world::Seconds;
 use genie_model::world::WholeSeconds;
+use genie_model::{GenieError, GenieResult};
 use genie_save::generated::world::{Master, PlayerObjects, RgeStaticObject};
 use genie_save::generated::world::{
     RgeMasterActionObject, RgeMasterStaticObject, Task as WorldTask,
@@ -162,7 +162,7 @@ pub fn task_at(
     masters: Option<&MasterTable>,
     master: i16,
     index: i16,
-) -> Result<Task, GenieError> {
+) -> GenieResult<Task> {
     let i = usize::try_from(index)
         .map_err(|_| GenieError::unsupported("a saved action without its task"))?;
     let saved = objects
@@ -189,7 +189,7 @@ pub fn task_at(
 /// # Errors
 ///
 /// A negative action type, or an attribute below −1.
-pub fn core_task(t: &WorldTask) -> Result<Task, GenieError> {
+pub fn core_task(t: &WorldTask) -> GenieResult<Task> {
     let [
         attribute_kind,
         attribute_kind2,
@@ -238,7 +238,7 @@ pub fn work_masters(
     objects: &PlayerObjects,
     civ: CivId,
     table: &MasterTable,
-) -> Result<Masters, GenieError> {
+) -> GenieResult<Masters> {
     let task = core_task;
     let saved = objects.masters.iter().flatten().map(|m| &m.master);
     let masters = saved.filter_map(|m| {
@@ -453,9 +453,7 @@ pub fn work_masters(
         work.move_stats = moving_stats(m, s, civ, table);
         Some(Ok(work))
     });
-    Ok(Masters::new(
-        masters.collect::<Result<Vec<_>, GenieError>>()?,
-    ))
+    Ok(Masters::new(masters.collect::<GenieResult<Vec<_>>>()?))
 }
 
 /// What a unit of a saved master moves with ([`genie_model::movement::MoveStats`]): the master's

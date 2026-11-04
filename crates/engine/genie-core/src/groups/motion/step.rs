@@ -1,6 +1,6 @@
 //! `BMotion`'s path step (`FUN_14104a270`): its passes and the reached waypoint.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::groups::Motion;
 use crate::groups::PathBudget;
 use crate::groups::motion::FlagChange;
@@ -72,7 +72,7 @@ pub(crate) fn path_step(
     lead: &Lead,
     world: &mut StepWorld<'_, '_>,
     budget: PathBudget,
-) -> Result<bool, GenieError> {
+) -> GenieResult<bool> {
     if motion.paths.is_empty() {
         return Ok(false);
     }
@@ -112,7 +112,7 @@ pub(super) fn pass(
     lead: &Lead,
     world: &mut StepWorld<'_, '_>,
     budget: PathBudget,
-) -> Result<Pass, GenieError> {
+) -> GenieResult<Pass> {
     let group_tuning = &world.by_id.tuning().group;
     let spatial = &mut *world.spatial;
     let level = motion.paths.checked(0)?;
@@ -192,7 +192,7 @@ pub(super) fn reached(
     motion: &mut Motion,
     target: Option<&Placed>,
     group_tuning: &GroupTuning,
-) -> Result<(), GenieError> {
+) -> GenieResult<()> {
     let level = motion.paths.checked(0)?;
     if level.flags.contains(LevelFlags::AT_WAYPOINT) {
         if level.waypoint.within(level.points.len()) {

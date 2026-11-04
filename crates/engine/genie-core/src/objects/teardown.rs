@@ -1,7 +1,6 @@
 //! The action list's deletions (`FUN_140a98620`, `FUN_140a98e20`) and each action's destructor
 //! (its slot 0): what they leave the unit's world to apply.
 
-use crate::GenieError;
 use crate::combat::missile::ShooterId;
 use crate::construction::FoundationId;
 use crate::garrison::ContainerId;
@@ -17,6 +16,7 @@ use crate::objects::release::Releaser;
 use crate::objects::unit::Unit;
 use crate::world::lets::torn_down;
 use crate::world::step::Step;
+use crate::{GenieError, GenieResult};
 
 /// What an action's destructor leaves its unit's world: the targets it lets go (slot 0x180),
 /// in order, and the buildings a counted builder or repairer leaves (`FUN_140aaddb0`).
@@ -42,12 +42,7 @@ impl TornDown {
     /// # Errors
     ///
     /// [`crate::world::lets::torn_down`]'s.
-    pub(crate) fn let_go(
-        self,
-        c: &mut Step<'_>,
-        me: &mut Unit,
-        by: Releaser,
-    ) -> Result<(), GenieError> {
+    pub(crate) fn let_go(self, c: &mut Step<'_>, me: &mut Unit, by: Releaser) -> GenieResult<()> {
         let releases = self.releases.into_iter().map(|t| (t, by)).collect();
         torn_down(c, me, (self.builder_leaves, releases))
     }
@@ -55,7 +50,7 @@ impl TornDown {
 
 /// The unit's stop (slot 0x5d0) for a torn-down action's `MoveTo`, when it had one (`moves`)
 /// and the unit moves at all.
-fn stop_if_moving(mut motion: MotionMut<'_>, moves: bool) -> Result<(), GenieError> {
+fn stop_if_moving(mut motion: MotionMut<'_>, moves: bool) -> GenieResult<()> {
     if moves && let Some(m) = motion.mover_mut() {
         m.stop()?;
     }
@@ -78,7 +73,7 @@ impl Action {
     /// # Errors
     ///
     /// The unit's stop that the motion step does not model.
-    pub(crate) fn tear_down(self, mut motion: MotionMut<'_>) -> Result<TornDown, GenieError> {
+    pub(crate) fn tear_down(self, mut motion: MotionMut<'_>) -> GenieResult<TornDown> {
         let mut torn = TornDown::default();
         match self {
             Self::WaitSolidify(_) | Self::Make(_) => {}
@@ -191,7 +186,7 @@ impl ActionList {
         &mut self,
         motion: MotionMut<'_>,
         state: ObjectState,
-    ) -> Result<TornDown, GenieError> {
+    ) -> GenieResult<TornDown> {
         let Some(head) = self.pop_head() else {
             return Ok(TornDown::default());
         };
@@ -212,7 +207,7 @@ impl ActionList {
         &mut self,
         mut motion: MotionMut<'_>,
         state: ObjectState,
-    ) -> Result<TornDown, GenieError> {
+    ) -> GenieResult<TornDown> {
         let mut all = TornDown::default();
         while !self.is_empty() {
             let torn = self.delete_head(motion.reborrow(), state)?;

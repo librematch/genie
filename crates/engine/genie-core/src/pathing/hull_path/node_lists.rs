@@ -1,7 +1,7 @@
 //! The node lists: a node added, closed, costed and linked; the manager's line tests; the path
 //! built back from its end.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::map::Distance;
 use crate::map::spatial::TileRecords;
 use crate::map::spatial::{Hit, RecordId};
@@ -58,7 +58,7 @@ impl HullPather<'_> {
     // The node lists.
 
     /// `MShortPather::emptyLists` (`FUN_140f8c300`): list `l`'s nodes go.
-    pub(super) fn empty(&mut self, l: NodeList) -> Result<(), GenieError> {
+    pub(super) fn empty(&mut self, l: NodeList) -> GenieResult<()> {
         self.nodes.checked_mut(l.head())?.next = None;
         self.closed.of_mut(l).clear();
         Ok(())
@@ -66,7 +66,7 @@ impl HullPather<'_> {
 
     /// `MShortPather::closeAllOpenNodes` (`FUN_140f8c130`): list `l`'s open nodes close, and every
     /// closed node forgets its hull point.
-    pub(super) fn close_all(&mut self, l: NodeList) -> Result<(), GenieError> {
+    pub(super) fn close_all(&mut self, l: NodeList) -> GenieResult<()> {
         let mut n = self.nodes.checked(l.head())?.next;
         while let Some(i) = n {
             self.closed.of_mut(l).push(i);
@@ -81,7 +81,7 @@ impl HullPather<'_> {
     }
 
     /// `MShortPather::moveToClosedList` (`FUN_140f8ce00`).
-    pub(super) fn close(&mut self, l: NodeList, i: NodeIndex) -> Result<(), GenieError> {
+    pub(super) fn close(&mut self, l: NodeList, i: NodeIndex) -> GenieResult<()> {
         let (prev, next) = (self.nodes.checked(i)?.prev, self.nodes.checked(i)?.next);
         if let Some(p) = prev {
             self.nodes.checked_mut(p)?.next = next;
@@ -99,7 +99,7 @@ impl HullPather<'_> {
     /// open one of the same hull point (`by_place`: within [`EPSILON`] of the same place) that
     /// costs more, which closes; it is not made when such a node costs no more, nor when a closed
     /// node does (`by_place`: of the closed list but its last).
-    pub(super) fn add_node(&mut self, new: NewNode) -> Result<Option<NodeIndex>, GenieError> {
+    pub(super) fn add_node(&mut self, new: NewNode) -> GenieResult<Option<NodeIndex>> {
         let NewNode {
             list: l,
             open,
@@ -178,7 +178,7 @@ impl HullPather<'_> {
     /// without a hull point and not by place, for which `addNode` searches no list. The game's
     /// callers test its answer for null, which then catches only a failed allocation (the roots
     /// of `FindShortPath` and `pathWithinHull`, `FindShortPath`'s crossing node).
-    pub(super) fn add_unrefused(&mut self, new: UnrefusedNode) -> Result<NodeIndex, GenieError> {
+    pub(super) fn add_unrefused(&mut self, new: UnrefusedNode) -> GenieResult<NodeIndex> {
         let UnrefusedNode {
             list: l,
             open,
@@ -214,7 +214,7 @@ impl HullPather<'_> {
         parent: Option<NodeIndex>,
         at: Point,
         goal: Option<Point>,
-    ) -> Result<(Distance, Distance), GenieError> {
+    ) -> GenieResult<(Distance, Distance)> {
         let cost = match parent {
             Some(p) => {
                 let q = *self.nodes.checked(p)?;
@@ -234,7 +234,7 @@ impl HullPather<'_> {
         open: bool,
         after: Option<NodeIndex>,
         node: Node,
-    ) -> Result<NodeIndex, GenieError> {
+    ) -> GenieResult<NodeIndex> {
         let (cost, to_goal) = (node.cost, node.to_goal);
         let i = self.nodes.push(node);
         if !open {
@@ -266,7 +266,7 @@ impl HullPather<'_> {
     /// The manager's line test (`FUN_141052b90`, then `FUN_141052350` with flags 0x40) with the
     /// pather's buffer, ignore list and include list: Spatial's pather query, which leaves every
     /// moving record out, or an included one that moves ([`HullPather::included_movers`]).
-    pub(super) fn blocked(&mut self, a: Point, b: Point) -> Result<bool, GenieError> {
+    pub(super) fn blocked(&mut self, a: Point, b: Point) -> GenieResult<bool> {
         if self
             .world
             .pather_blocked(a, b, self.buffer, self.mask, &self.ignore, self.by_id)?
@@ -280,7 +280,7 @@ impl HullPather<'_> {
     /// `FUN_141051900` with flags 0x40), with the pather's buffer, ignore list and include list:
     /// Spatial's pather query and the included objects that move
     /// ([`HullPather::included_movers`]). The callers read how many and which, not their order.
-    pub(super) fn hits(&mut self, a: Point, b: Point) -> Result<Vec<Hit>, GenieError> {
+    pub(super) fn hits(&mut self, a: Point, b: Point) -> GenieResult<Vec<Hit>> {
         let mut hits =
             self.world
                 .pather_hits(a, b, self.buffer, self.mask, &self.ignore, self.by_id)?;
@@ -303,7 +303,7 @@ impl HullPather<'_> {
     /// (flags 0x10) tests the same records alike, the buffer the grow, and leaves none out, at
     /// most [`LINE_HITS`] a call: what it lists goes into its ignore list until a call lists
     /// fewer.
-    pub(super) fn included_movers(&self, a: Point, b: Point) -> Result<Vec<ObjectId>, GenieError> {
+    pub(super) fn included_movers(&self, a: Point, b: Point) -> GenieResult<Vec<ObjectId>> {
         let movers: Vec<ObjectId> = self
             .include
             .iter()
@@ -340,11 +340,7 @@ impl HullPather<'_> {
 
     /// `MShortPather::buildPath` (`FUN_140f8bcd0`): from `end` back, a node that sees its
     /// grandparent skips its parent; then the nodes from the first into `path`.
-    pub(super) fn build_path(
-        &mut self,
-        path: &mut Waypoints,
-        end: NodeIndex,
-    ) -> Result<(), GenieError> {
+    pub(super) fn build_path(&mut self, path: &mut Waypoints, end: NodeIndex) -> GenieResult<()> {
         let mut cur = Some(end);
         while let Some(c) = cur {
             let Some(p) = self.nodes.checked(c)?.parent else {

@@ -2,7 +2,7 @@
 //! after a change of members; `LockFormation` (`FUN_141024e70`), the lock to a type; and the
 //! members' stances as the group's state (`FUN_14100d140`).
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::groups::FormationKind;
 use crate::groups::GroupId;
 use crate::groups::create::FormationUnit;
@@ -24,7 +24,7 @@ impl World {
     ///
     /// When the world does not hold `group`: the game's routine gets the group itself, from a
     /// caller that holds it.
-    pub fn calc_formation_kind(&mut self, group: GroupId) -> Result<(), GenieError> {
+    pub fn calc_formation_kind(&mut self, group: GroupId) -> GenieResult<()> {
         let ids: Vec<ObjectId> = self
             .groups
             .held(group)?
@@ -81,11 +81,7 @@ impl World {
     ///
     /// When the world does not hold `group`: the game's routine gets the group itself, from a
     /// caller that holds it.
-    pub fn lock_formation(
-        &mut self,
-        group: GroupId,
-        kind: FormationKind,
-    ) -> Result<(), GenieError> {
+    pub fn lock_formation(&mut self, group: GroupId, kind: FormationKind) -> GenieResult<()> {
         let g = self.groups.held(group)?;
         // the spacing is read again for every member held (0x14102500a): the first whose
         // radius gives one above it sets it, and every later member finds it set
@@ -124,7 +120,7 @@ impl World {
         &mut self,
         group: GroupId,
         formation_kind: FormationKind,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let Some(g) = self.groups.get(group) else {
             return Ok(());
         };

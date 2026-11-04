@@ -1,6 +1,5 @@
 //! UNLOAD and `GO_BACK_TO_WORK`: the units inside a building or a transport come out.
 
-use crate::GenieError;
 use crate::commands::unload::{UnloadCommand, UnloadPick};
 use crate::garrison::ContainerId;
 use crate::garrison::LetOut;
@@ -19,6 +18,7 @@ use crate::objects::masters::MasterKind;
 use crate::orders::object_gone;
 use crate::orders::town_bell::BellShelter;
 use crate::world::slots::PlayerSlots;
+use crate::{GenieError, GenieResult};
 
 use crate::garrison::transport::Around;
 use crate::math::image::garrison::NO_POINT as GARRISON_NO_POINT;
@@ -61,7 +61,7 @@ impl World {
         &mut self,
         u: &UnloadCommand,
         ids: &[Option<ObjectId>],
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let UnloadCommand {
             player,
             point,
@@ -141,7 +141,7 @@ impl World {
         c: ObjectId,
         id: ObjectId,
         point: Point,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         // only static objects sleep, and a building that holds units is none
         let Some(Place::Live(cp, ci)) = self.place(c) else {
             return Err(GenieError::unreachable(
@@ -182,7 +182,7 @@ impl World {
         point: Point,
         pick: UnloadPick,
         sound: bool,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let unit = self.players.live(player, idx)?;
         if self
             .parts
@@ -243,7 +243,7 @@ impl World {
         transport: Option<ContainerId>,
         named: Option<ObjectId>,
         last: &mut Option<Point>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let own = self.players.live(player, idx)?.id;
         let (inner, holder) = match (transport, named) {
             (Some(t), _) => (own, t),
@@ -310,7 +310,7 @@ impl World {
         player: PlayerId,
         idx: ListIndex,
         point: Point,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let id = self.players.live(player, idx)?.id;
         self.leave_group_of(id, None)?;
         let unit = self.players.live_mut(player, idx)?;
@@ -360,7 +360,7 @@ impl World {
         &mut self,
         player: PlayerId,
         ids: &[Option<ObjectId>],
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         for id in self.checked_units(player, ids).into_iter().flatten() {
             let Some((p, _)) = self.object(id) else {
                 continue;
@@ -421,7 +421,7 @@ impl World {
         &mut self,
         from: Option<(PlayerId, ListIndex)>,
         id: ObjectId,
-    ) -> Result<WorkReturn, GenieError> {
+    ) -> GenieResult<WorkReturn> {
         let (up, ui) = match from {
             Some(_) => self.live_inside(id)?,
             None => match self.place(id) {
@@ -474,7 +474,7 @@ impl World {
         player: PlayerId,
         unit: &Unit,
         pick: UnloadPick,
-    ) -> Result<bool, GenieError> {
+    ) -> GenieResult<bool> {
         let id = unit.id;
         let master = unit.master(self.master_tables(), player)?;
         let class = master.class;

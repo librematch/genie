@@ -1,6 +1,5 @@
 //! FOLLOW and GUARD, a move to an object and the head action's move.
 
-use crate::GenieError;
 use crate::groups::LeavingWalk;
 use crate::map::Distance;
 use crate::map::Point;
@@ -37,6 +36,7 @@ use crate::world::index::Place;
 use crate::world::layer::ClassRoles;
 use crate::world::slots::CheckedIndex;
 use crate::world::slots::PlayerSlots;
+use crate::{GenieError, GenieResult};
 
 impl World {
     /// FOLLOW (0x14): the command's check (`FUN_140e54c50`, [`World::command_check`]), then
@@ -54,7 +54,7 @@ impl World {
         player: PlayerId,
         units: &[Option<ObjectId>],
         target: ObjectId,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let Some(ids) = self.command_check(player, units)? else {
             return Ok(());
         };
@@ -116,7 +116,7 @@ impl World {
         player: PlayerId,
         units: &[Option<ObjectId>],
         target: ObjectId,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let Some((tp, t)) = self.object(target) else {
             return Ok(());
         };
@@ -179,7 +179,7 @@ impl World {
         &mut self,
         id: ObjectId,
         target: Option<ObjectId>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if let Some(link) = self.object(id).and_then(|(_, u)| u.group.id) {
             let _ = self.remove_unit(link, id, target, LeavingWalk::Stands)?;
         }
@@ -189,7 +189,7 @@ impl World {
     /// FOLLOW's test of a unit (`FUN_14161c920`): one the world holds, of a type of 30 or more
     /// whose master moves (slot 0xe8 above 0; `COMISS`, `JNC`: a NaN speed moves), gives its
     /// place on the ground.
-    pub(super) fn follower(&self, id: ObjectId) -> Result<Option<Point>, GenieError> {
+    pub(super) fn follower(&self, id: ObjectId) -> GenieResult<Option<Point>> {
         let Some((p, u)) = self.object(id) else {
             return Ok(None);
         };
@@ -207,7 +207,7 @@ impl World {
         &mut self,
         loose: &[ObjectId],
         i: usize,
-    ) -> Result<(PlayerId, ListIndex), GenieError> {
+    ) -> GenieResult<(PlayerId, ListIndex)> {
         let Some(Place::Live(p, idx)) = self.place(*loose.checked(i)?) else {
             return Err(GenieError::unsupported(
                 "a FOLLOW of a sleeping object of a type of 30 or more",
@@ -242,7 +242,7 @@ impl World {
         loose: &[ObjectId],
         i: usize,
         followed: Followed,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         self.leave_group_of(*loose.checked(i)?, Some(followed.id))?;
         if self.follower(*loose.checked(i)?)?.is_none() {
             return Ok(());
@@ -283,7 +283,7 @@ impl World {
         i: usize,
         followed: Followed,
         mean: Point,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let Some(follower) = self.follower(*loose.checked(i)?)? else {
             return Ok(());
         };
@@ -329,7 +329,7 @@ impl World {
         idx: ListIndex,
         target: ObjectId,
         point: Position,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         self.move_to_object_with(player, idx, target, point, OrderSource::Direct)
             .map(|_| ())
     }
@@ -355,7 +355,7 @@ impl World {
         target: ObjectId,
         point: Position,
         source: OrderSource,
-    ) -> Result<Answer, GenieError> {
+    ) -> GenieResult<Answer> {
         let world_time = self.world_time;
         let class = self
             .players
@@ -442,7 +442,7 @@ impl World {
         idx: ListIndex,
         (target, target_state): (ObjectId, ObjectState),
         livestock: bool,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let master = self
             .players
             .live(player, idx)?
@@ -497,7 +497,7 @@ impl World {
         idx: ListIndex,
         target: Option<ObjectId>,
         point: Position,
-    ) -> Result<Answer, GenieError> {
+    ) -> GenieResult<Answer> {
         let unit = self.players.live_mut(player, idx)?;
         let Some(target) = target else {
             return self.point_taken(player, idx, point);
@@ -539,7 +539,7 @@ impl World {
         player: PlayerId,
         idx: ListIndex,
         point: Position,
-    ) -> Result<Answer, GenieError> {
+    ) -> GenieResult<Answer> {
         let by = self.releaser(player, idx)?;
         let id = self.players.live(player, idx)?.id;
         let (released, left) = match self.players.live_mut(player, idx)?.head_takes_point(

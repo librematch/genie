@@ -1,7 +1,6 @@
 //! The drop-offs: an unasked one, the ordered drop site, the table's, one now and elsewhere,
 //! and the way back.
 
-use crate::GenieError;
 use crate::commands::UnitOrderAction;
 use crate::construction::build::BuildAction;
 use crate::gathering::DropSiteId;
@@ -43,6 +42,7 @@ use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlots;
+use crate::{GenieError, GenieResult};
 
 impl World {
     /// `UNIT_ORDER`'s drop-off of a carrying unit without a gather action on top (`FUN_14161e370`'s
@@ -59,7 +59,7 @@ impl World {
         p: PlayerId,
         idx: ListIndex,
         action: UnitOrderAction,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let unit = &self.players.live(p, idx)?;
         let master = unit.master(self.master_tables(), p)?;
         let (kind, class, at) = (master.kind, master.class, unit.position().ground());
@@ -110,7 +110,7 @@ impl World {
         &mut self,
         p: PlayerId,
         idx: ListIndex,
-    ) -> Result<Option<DropSiteId>, GenieError> {
+    ) -> GenieResult<Option<DropSiteId>> {
         let by_id = ObjectsRef::new(
             &self.players,
             &self.index,
@@ -189,7 +189,7 @@ impl World {
         at: Point,
         held: Option<AttributeId>,
         class: ClassId,
-    ) -> Result<Option<DropSiteId>, GenieError> {
+    ) -> GenieResult<Option<DropSiteId>> {
         let player = self.players.player(p)?;
         let look = |id: ObjectId| self.object(id).map(|(_, o)| (o.life.state, o.position()));
         Ok(nearest_table_site(
@@ -214,7 +214,7 @@ impl World {
         &mut self,
         (p, idx): (PlayerId, ListIndex),
         mut build: BuildAction,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         use crate::construction::build::DropSearch;
         let by = self.releaser(p, idx)?;
         let unit = &self.players.live(p, idx)?;
@@ -255,7 +255,7 @@ impl World {
     /// # Errors
     ///
     /// A unit the world does not hold at (`p`, `idx`), or a notify the AI's queue does not take.
-    pub(super) fn other_load(&mut self, p: PlayerId, idx: ListIndex) -> Result<(), GenieError> {
+    pub(super) fn other_load(&mut self, p: PlayerId, idx: ListIndex) -> GenieResult<()> {
         let unit = self.players.live_mut(p, idx)?;
         let (id, state) = (unit.id, unit.life.state);
         if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
@@ -284,7 +284,7 @@ impl World {
         idx: ListIndex,
         (site, point): (DropSiteId, Position),
         back: Option<ObjectId>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let back = back.filter(|t| !t.is_recyclable()).and_then(|t| {
             let (q, o) = self.object(t)?;
             Some((t, o.life.master_id, q, o.position()))
@@ -328,7 +328,7 @@ impl World {
     /// the target's, its place the point) or on the record's target (its target type, owner −1,
     /// its point); height 0, range 0, priority 100, shown at the point, ready. A unit without a
     /// unit AI only looks the records up.
-    pub(crate) fn queue_way_back(&mut self, p: PlayerId, idx: ListIndex) -> Result<(), GenieError> {
+    pub(crate) fn queue_way_back(&mut self, p: PlayerId, idx: ListIndex) -> GenieResult<()> {
         let mut bell = self.parts.town_bell_of(self.players.live(p, idx)?.id);
         let (found, record) = bell.back_to_work(self.objects(), &self.model.roles)?;
         let target = match found {

@@ -10,7 +10,9 @@ use crate::dat::MasterTable;
 use crate::key::{Key, key};
 use crate::tables::{drop_sites, linked_techs, unit_lines};
 use genie_dat::de::DatFile;
+#[cfg(feature = "fs")]
 use genie_model::GenieError;
+use genie_model::GenieResult;
 use schemars::schema_for;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -42,12 +44,12 @@ pub struct Beside<'a> {
 ///
 /// Bytes genie-dat does not read as a `.dat`, a value the import refuses, or a table beside it
 /// out of shape (the error names its file).
-pub fn load_bytes(dat: &[u8], beside: Beside<'_>) -> Result<MasterTable, GenieError> {
+pub fn load_bytes(dat: &[u8], beside: Beside<'_>) -> GenieResult<MasterTable> {
     with_beside(MasterTable::from_dat(&DatFile::read_from(dat)?)?, beside)
 }
 
 /// `table` with the tables `beside` the `.dat` in place of its own, each that is there.
-fn with_beside(mut table: MasterTable, beside: Beside<'_>) -> Result<MasterTable, GenieError> {
+fn with_beside(mut table: MasterTable, beside: Beside<'_>) -> GenieResult<MasterTable> {
     if let Some(json) = beside.drop_sites {
         table.drop_sites = drop_sites(json).map_err(|e| e.with("file", BESIDE[0]))?;
     }
@@ -97,7 +99,7 @@ struct Files {
 #[cfg(feature = "fs")]
 impl Files {
     /// The `.dat` at `dat` and the tables beside it.
-    fn read(dat: &Path) -> Result<Self, GenieError> {
+    fn read(dat: &Path) -> GenieResult<Self> {
         let bytes = read_file(dat).map_err(|e| {
             GenieError::io("a .dat that does not read")
                 .with("path", dat.display())
@@ -126,7 +128,7 @@ impl Files {
     }
 
     /// The import of the files ([`load_bytes`]).
-    fn import(&self) -> Result<MasterTable, GenieError> {
+    fn import(&self) -> GenieResult<MasterTable> {
         let [drop_sites, linked_techs, unit_lines] = self.beside.each_ref().map(Option::as_deref);
         load_bytes(
             &self.dat,
@@ -158,7 +160,7 @@ impl Files {
 ///
 /// A file that does not read, or the errors of [`load_bytes`].
 #[cfg(feature = "fs")]
-pub fn read(dat: &Path) -> Result<MasterTable, GenieError> {
+pub fn read(dat: &Path) -> GenieResult<MasterTable> {
     Files::read(dat)?.import()
 }
 
@@ -170,7 +172,7 @@ pub fn read(dat: &Path) -> Result<MasterTable, GenieError> {
 /// A file that does not read (the error names its path), the errors of [`load_bytes`], or a
 /// cache file that does not read, decode or write.
 #[cfg(feature = "fs")]
-pub fn load(dat: &Path, cache_dir: &Path) -> Result<MasterTable, GenieError> {
+pub fn load(dat: &Path, cache_dir: &Path) -> GenieResult<MasterTable> {
     cached(&Files::read(dat)?, cache_dir, Files::import)
 }
 
@@ -179,8 +181,8 @@ pub fn load(dat: &Path, cache_dir: &Path) -> Result<MasterTable, GenieError> {
 fn cached(
     files: &Files,
     dir: &Path,
-    import: impl FnOnce(&Files) -> Result<MasterTable, GenieError>,
-) -> Result<MasterTable, GenieError> {
+    import: impl FnOnce(&Files) -> GenieResult<MasterTable>,
+) -> GenieResult<MasterTable> {
     let k = files.key();
     if let Some(table) = read_cached(dir, &k)? {
         return Ok(table);

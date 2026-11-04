@@ -1,7 +1,7 @@
 //! `explore_terrain` and `unexplore_terrain` over a circle and a rectangle, and the reveal of
 //! a rectangle.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::map::Tile;
 use crate::map::TileRect;
 use crate::players::PlayerId;
@@ -26,7 +26,7 @@ impl Visibility {
         origin: Tile,
         los: SightTiles,
         centre: SightCentre,
-    ) -> Result<TileCount, GenieError> {
+    ) -> GenieResult<TileCount> {
         let (x, y) = (origin.x(), origin.y());
         let table = *centre.table().checked(los.row())?;
         let (visible, seen) = (VisionBits::visible(player), VisionBits::explored(player));
@@ -80,11 +80,7 @@ impl Visibility {
     /// `explore_terrain`'s case of a building's tile (`FUN_140f68f50`, `FUN_140f68e30`): when the
     /// building's anchor was never explored, the tile counts one seer and the building's tiles
     /// count as explored.
-    pub(super) fn reveal_building(
-        &mut self,
-        player: PlayerId,
-        tile: Tile,
-    ) -> Result<(), GenieError> {
+    pub(super) fn reveal_building(&mut self, player: PlayerId, tile: Tile) -> GenieResult<()> {
         let Some(anchor) = self.anchor_of(tile) else {
             return Ok(());
         };
@@ -118,7 +114,7 @@ impl Visibility {
         origin: Tile,
         los: SightTiles,
         centre: SightCentre,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let (x, y) = (origin.x(), origin.y());
         let table = *centre.table().checked(los.row())?;
         let hidden = !VisionBits::visible(player);
@@ -156,11 +152,7 @@ impl Visibility {
 
     /// `explore_terrain_sq` (`FUN_141284f10`): `explore_terrain` over a rectangle, without the
     /// buildings' case.
-    pub fn explore_rect(
-        &mut self,
-        player: PlayerId,
-        rect: TileRect,
-    ) -> Result<TileCount, GenieError> {
+    pub fn explore_rect(&mut self, player: PlayerId, rect: TileRect) -> GenieResult<TileCount> {
         let Some(held) = self.held(rect) else {
             return Ok(TileCount::ZERO);
         };
@@ -198,7 +190,7 @@ impl Visibility {
     }
 
     /// `unexplore_terrain_sq` (`FUN_141287480`): `unexplore_terrain` over a rectangle.
-    pub fn unexplore_rect(&mut self, player: PlayerId, rect: TileRect) -> Result<(), GenieError> {
+    pub fn unexplore_rect(&mut self, player: PlayerId, rect: TileRect) -> GenieResult<()> {
         let Some(held) = self.held(rect) else {
             return Ok(());
         };
@@ -225,11 +217,7 @@ impl Visibility {
 
     /// `reveal_terrain_sq` (`FUN_141285da0`): the rectangle's never explored tiles count as
     /// explored.
-    pub fn reveal_rect(
-        &mut self,
-        player: PlayerId,
-        rect: TileRect,
-    ) -> Result<TileCount, GenieError> {
+    pub fn reveal_rect(&mut self, player: PlayerId, rect: TileRect) -> GenieResult<TileCount> {
         let Some(held) = self.held(rect) else {
             return Ok(TileCount::ZERO);
         };

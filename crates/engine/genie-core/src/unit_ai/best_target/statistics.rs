@@ -1,6 +1,7 @@
 //! `bestUnitToAttack`'s statistics ([`Statistics`]): the entries, an object's add, the scores,
 //! the ranks and the sort, and the order history's weights.
 
+use crate::GenieResult;
 use crate::map::Distance;
 use crate::math::fmath::{at_most_or_unordered, below_or_unordered};
 use crate::math::image::best_target::{
@@ -292,9 +293,9 @@ impl Statistics {
         &mut self,
         weights: &ByCategory<OrderWeight>,
         (mode, factor): (TargetingMode, Percent),
-        armored: &mut dyn FnMut(ObjectId) -> Result<bool, crate::GenieError>,
+        armored: &mut dyn FnMut(ObjectId) -> GenieResult<bool>,
         best_target_tuning: &BestTargetTuning,
-    ) -> Result<(), crate::GenieError> {
+    ) -> GenieResult<()> {
         let kill_span = self.kill_time.span();
         let distance_span = self.distance.span();
         let moving_kill_span = self.moving_kill_time.span();
@@ -354,9 +355,9 @@ impl Statistics {
     /// What `tier` does not model.
     pub fn rank(
         &mut self,
-        tier: &mut dyn FnMut(&Entry) -> Result<i32, crate::GenieError>,
+        tier: &mut dyn FnMut(&Entry) -> GenieResult<i32>,
         best_target_tuning: &BestTargetTuning,
-    ) -> Result<(), crate::GenieError> {
+    ) -> GenieResult<()> {
         self.order = (0..self.entries.len()).collect();
         for e in &mut self.entries {
             e.rank = TargetScore::new(tier(e)? as f32 * best_target_tuning.tier + e.total.get());
@@ -371,7 +372,7 @@ impl Statistics {
     /// # Errors
     ///
     /// A slot or an entry the sort does not hold.
-    pub(super) fn partition(&mut self, lo: usize, hi: usize) -> Result<usize, crate::GenieError> {
+    pub(super) fn partition(&mut self, lo: usize, hi: usize) -> GenieResult<usize> {
         let pivot = *self.entries.checked(*self.order.checked(hi)?)?;
         let mut i = lo;
         for j in lo..hi {
@@ -391,7 +392,7 @@ impl Statistics {
     /// # Errors
     ///
     /// A slot or an entry the sort does not hold.
-    pub(super) fn quicksort(&mut self, mut lo: usize, hi: usize) -> Result<(), crate::GenieError> {
+    pub(super) fn quicksort(&mut self, mut lo: usize, hi: usize) -> GenieResult<()> {
         while lo < hi {
             let p = self.partition(lo, hi)?;
             if p > 0 {
@@ -409,7 +410,7 @@ impl Statistics {
     /// # Errors
     ///
     /// A slot or an entry the sort does not hold.
-    pub fn sort(&mut self) -> Result<(), crate::GenieError> {
+    pub fn sort(&mut self) -> GenieResult<()> {
         let Some(last) = self.entries.len().checked_sub(1).filter(|&l| 0 < l) else {
             return Ok(());
         };

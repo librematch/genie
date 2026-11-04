@@ -1,7 +1,6 @@
 //! The update's entry: a player's groups, a group's update and its deletion, the members'
 //! check and a hibernating group.
 
-use crate::GenieError;
 use crate::groups::GroupFate;
 use crate::groups::GroupFlags;
 use crate::groups::GroupId;
@@ -16,6 +15,7 @@ use crate::objects::ObjectState;
 use crate::objects::{ObjectId, ObjectKey};
 use crate::players::PlayerId;
 use crate::world::World;
+use crate::{GenieError, GenieResult};
 
 impl World {
     /// The groups player `p` owns update before its objects (`BaseWorld::update` calls them at
@@ -28,7 +28,7 @@ impl World {
     /// # Errors
     ///
     /// What the update does not model.
-    pub(crate) fn update_groups(&mut self, p: PlayerId) -> Result<(), GenieError> {
+    pub(crate) fn update_groups(&mut self, p: PlayerId) -> GenieResult<()> {
         if self.players.get(p.index()).is_some_and(|q| q.stopped) {
             return Ok(());
         }
@@ -57,7 +57,7 @@ impl World {
     /// When the world does not hold the group: the update loop passes only the groups it holds.
     ///
     /// [`UnitGroup::update_end`]: crate::groups::UnitGroup::update_end
-    pub(super) fn group_update_end(&mut self, group: GroupId) -> Result<(), GenieError> {
+    pub(super) fn group_update_end(&mut self, group: GroupId) -> GenieResult<()> {
         self.groups.held_mut(group)?.update_end()?;
         Ok(())
     }
@@ -76,7 +76,7 @@ impl World {
     /// # Errors
     ///
     /// A member the slice cannot stand or show standing.
-    pub(crate) fn delete_group(&mut self, group: GroupId) -> Result<(), GenieError> {
+    pub(crate) fn delete_group(&mut self, group: GroupId) -> GenieResult<()> {
         let Some(index) = self.groups.groups.iter().position(|g| g.id == group) else {
             return Ok(());
         };
@@ -118,7 +118,7 @@ impl World {
     ///
     /// When the world does not hold `group`: the game's routine gets the group itself, from a
     /// caller that holds it.
-    pub fn group_update(&mut self, group: GroupId) -> Result<GroupFate, GenieError> {
+    pub fn group_update(&mut self, group: GroupId) -> GenieResult<GroupFate> {
         self.groups.held_mut(group)?.flags &= !GroupFlags::UPDATE_CLEARED;
         self.keep_apart(group)?;
         self.drop_lost_members(group)?;
@@ -142,7 +142,7 @@ impl World {
     /// The members' check of `BUnitGroup::update` (`0x14103d9c0`..`0x14103daf7`): see
     /// [`World::group_update`]. A member that left takes its index with it, so the next member
     /// is checked at the same index.
-    pub(super) fn drop_lost_members(&mut self, group: GroupId) -> Result<(), GenieError> {
+    pub(super) fn drop_lost_members(&mut self, group: GroupId) -> GenieResult<()> {
         let mut removed = false;
         let mut i = 0;
         loop {
@@ -179,7 +179,7 @@ impl World {
     /// A hibernating group's check (`0x14103db22`..`0x14103dd5b`): deleted, the world deletes the
     /// group; else the queued commands run (`checkQueuedOrders`, [`World::check_queued_orders`])
     /// when [`World::hibernation`] asks for them.
-    pub(super) fn hibernating_update(&mut self, group: GroupId) -> Result<GroupFate, GenieError> {
+    pub(super) fn hibernating_update(&mut self, group: GroupId) -> GenieResult<GroupFate> {
         let Some(runs_queue) = self.hibernation(group)? else {
             return Ok(GroupFate::Deleted);
         };
@@ -205,7 +205,7 @@ impl World {
     /// What the target tests read that the slice does not hold.
     ///
     /// When the world does not hold `group`.
-    pub(super) fn hibernation(&self, group: GroupId) -> Result<Option<bool>, GenieError> {
+    pub(super) fn hibernation(&self, group: GroupId) -> GenieResult<Option<bool>> {
         let g = self.groups.held(group)?;
         // the readers look the target's integer up as an object, whatever its kind
         let (target, owner) = (g.current_target.target.key(), g.owner_player()?);
@@ -232,7 +232,7 @@ impl World {
         &self,
         target: Option<ObjectId>,
         owner: PlayerId,
-    ) -> Result<bool, GenieError> {
+    ) -> GenieResult<bool> {
         let Some(object) = self.world_object(target) else {
             return Ok(false);
         };

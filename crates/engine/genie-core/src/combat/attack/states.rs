@@ -1,7 +1,6 @@
 //! The Attack's `set_state` (`0x140a820c0`): the move, the teardown and prelude, a lost
 //! target, one out of sight, the finish and the halt.
 
-use crate::GenieError;
 use crate::combat::attack::AttackState;
 use crate::combat::attack::AttackerFlags;
 use crate::combat::attack::update::let_go;
@@ -31,6 +30,7 @@ use crate::world::layer::generated::MoveToTuning;
 use crate::world::layer::generated::SpriteTuning;
 use crate::world::step::Step;
 use crate::world::{ATTACKER_UNMOVING, NO_STANDING_SPRITE};
+use crate::{GenieError, GenieResult};
 
 impl Attack {
     /// A `MoveTo` of the attack that starts arrived (its `set_state` 1, not quiet): the unit shows
@@ -41,7 +41,7 @@ impl Attack {
         mut motion: MotionMut<'_>,
         sprite_rng: &mut Well512,
         sprite_tuning: SpriteTuning,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let g = self.arms.idle_sprite.ok_or(NO_STANDING_SPRITE)?;
         new_sprite(
             &mut unit.sprite,
@@ -72,7 +72,7 @@ impl Attack {
         mover: &mut Mover,
         reads: &MoveToReads<'_>,
         move_to_tuning: &MoveToTuning,
-    ) -> Result<MoveStart, GenieError> {
+    ) -> GenieResult<MoveStart> {
         if self.state.take_move_to().is_some() {
             mover.stop()?;
         }
@@ -94,14 +94,14 @@ impl Attack {
         gap: Distance,
         reads: &MoveToReads<'_>,
         move_to_tuning: &MoveToTuning,
-    ) -> Result<MoveStart, GenieError> {
+    ) -> GenieResult<MoveStart> {
         self.range = range;
         self.walk_to_target(at, gap, reads, move_to_tuning)
     }
 
     /// The teardown of the sub-actions (`FUN_140a73fc0` on the action list): a `MoveTo` stops the
     /// unit.
-    pub fn tear_down(&mut self, mover: Option<&mut Mover>) -> Result<(), GenieError> {
+    pub fn tear_down(&mut self, mover: Option<&mut Mover>) -> GenieResult<()> {
         if self.state.take_move_to().is_some()
             && let Some(m) = mover
         {
@@ -116,7 +116,7 @@ impl Attack {
         &mut self,
         state: AttackState,
         mut motion: MotionMut<'_>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if self.state.take_move_to().is_some() {
             motion.mover_mut().ok_or(ATTACKER_UNMOVING)?.stop()?;
         }
@@ -141,7 +141,7 @@ impl Attack {
         f: &Fight,
         r: &AttackReads,
         roles: &Roles,
-    ) -> Result<UpdateCode, GenieError> {
+    ) -> GenieResult<UpdateCode> {
         // The villagers' class, whose `MoveTo` waits once when the motion step gives up.
         if r.ai_order.has_ai()
             && (f.victim.player != PlayerId::new(0)
@@ -221,7 +221,7 @@ impl Attack {
         f: &Fight,
         r: &AttackReads,
         roles: &Roles,
-    ) -> Result<UpdateCode, GenieError> {
+    ) -> GenieResult<UpdateCode> {
         let target = self.target.take();
         self.finish_in(
             AttackState::Failed,
@@ -275,7 +275,7 @@ impl Attack {
         motion: MotionMut<'_>,
         sprite_rng: &mut Well512,
         sprite_tuning: SpriteTuning,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         // The states the slice models: 1 done, 2 the target died, 4 on the way, 6 waiting to swing, 7
         // swinging, 13 failed.
         self.finish_in(AttackState::Done, unit, motion, sprite_rng, sprite_tuning)
@@ -295,7 +295,7 @@ impl Attack {
         sprite: &mut Option<ActiveSprite>,
         rng: &mut Well512,
         sprite_tuning: SpriteTuning,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if self.state.take_move_to().is_some() {
             motion.mover_mut().ok_or(ATTACKER_UNMOVING)?.stop()?;
         }
@@ -316,7 +316,7 @@ impl Attack {
         mut motion: MotionMut<'_>,
         sprite_rng: &mut Well512,
         sprite_tuning: SpriteTuning,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         self.enter(state, motion.reborrow())?;
         set_walker_anim(motion.reborrow(), Speed::new(1.0));
         let idle = self.arms.idle_sprite.ok_or(GenieError::unsupported(

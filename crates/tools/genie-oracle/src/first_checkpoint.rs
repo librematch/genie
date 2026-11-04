@@ -57,7 +57,7 @@ pub(super) fn dies_at_start(s: &RgeStaticObject) -> bool {
 /// # Errors
 ///
 /// An id of −1, which names no object; a state past 8.
-pub(super) fn object_state(s: &RgeStaticObject) -> Result<CheckpointObject, GenieError> {
+pub(super) fn object_state(s: &RgeStaticObject) -> GenieResult<CheckpointObject> {
     Ok(CheckpointObject {
         id: ObjectId::try_from(s.id)?,
         main_id: MasterId::of_data(s.master_obj)
@@ -77,7 +77,7 @@ pub(super) fn object_state(s: &RgeStaticObject) -> Result<CheckpointObject, Geni
 /// # Errors
 ///
 /// A live object's id of −1, which names no object.
-pub fn player_state(section: &PlayerSection<'_>, id: u32) -> Result<PlayerState, GenieError> {
+pub fn player_state(section: &PlayerSection<'_>, id: u32) -> GenieResult<PlayerState> {
     Ok(PlayerState {
         live: live(section)
             .map(|(_, s)| s)

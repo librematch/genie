@@ -3,7 +3,6 @@
 //! build time puts its owner's livestock on points along its edges, each holding its share of the
 //! pasture's food.
 
-use crate::GenieError;
 use crate::construction::build::world_side::MakeMode;
 use crate::gathering::PastureId;
 use crate::map::Distance;
@@ -28,6 +27,7 @@ use crate::world::layer::MasterSlots;
 use crate::world::layer::generated::PastureTuning;
 use crate::world::slots::CheckedIndex;
 use crate::world::slots::PlayerSlots;
+use crate::{GenieError, GenieResult};
 
 /// The livestock a pasture holds (`DAT_143f51db0`, which the static constructor `FUN_140174900`
 /// fills), in the table's order a draw picks from: the Argali and the Ibex (Pasture), the
@@ -99,7 +99,7 @@ impl World {
     ///
     /// Its master or attributes the player has not got, a facet draw on a sprite of one facet
     /// (the game divides by zero), and what the object's making does not model.
-    pub(crate) fn setup_pasture(&mut self, p: PlayerId, id: PastureId) -> Result<(), GenieError> {
+    pub(crate) fn setup_pasture(&mut self, p: PlayerId, id: PastureId) -> GenieResult<()> {
         let (at, master) = self
             .object(id)
             .map(|(_, u)| (u.position(), u.life.master_id))
@@ -200,7 +200,7 @@ impl World {
         pasture: PastureId,
         p: PlayerId,
         idx: ListIndex,
-    ) -> Result<Option<(ObjectId, Position)>, GenieError> {
+    ) -> GenieResult<Option<(ObjectId, Position)>> {
         let Some((q, b)) = self.object(pasture) else {
             return Ok(None);
         };
@@ -250,7 +250,7 @@ impl World {
         p: PlayerId,
         idx: ListIndex,
         pasture: Option<PastureId>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let unit = &self.players.live(p, idx)?;
         let (id, named) = (unit.id, pasture.or(unit.my_pasture));
         let building = match self.object(named) {

@@ -1,6 +1,5 @@
 //! The repair part of the update and the unit's attackers and seen target.
 
-use crate::GenieError;
 use crate::combat::Firepower;
 use crate::combat::damage::{Heal, heal_base_hp};
 use crate::construction::MainBuildingId;
@@ -54,6 +53,7 @@ use crate::world::others::OthersRef;
 use crate::world::slots::CheckedIndex;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
+use crate::{GenieError, GenieResult};
 
 impl Unit {
     /// The Repair's update ([`crate::construction::repair::RepairAction::update`]) with what it
@@ -65,7 +65,7 @@ impl Unit {
         c: &mut Step<'_>,
         me: Me,
         roles: &Roles,
-    ) -> Result<HeadCode, GenieError> {
+    ) -> GenieResult<HeadCode> {
         let Some(mut repair) = actions.list.repair().copied() else {
             return Ok(HeadCode::Keeps);
         };
@@ -88,7 +88,7 @@ impl Unit {
         c: &Step<'_>,
         target: Option<RepairTargetId>,
         roles: &Roles,
-    ) -> Result<RepairReads, GenieError> {
+    ) -> GenieResult<RepairReads> {
         let own = repair_master(
             MasterTables::new(&c.w.model.masters, &c.w.parts.own_master),
             c.player,
@@ -201,7 +201,7 @@ impl Unit {
 }
 
 /// Object `u`'s master: its own (`+0x6c0`), else player `q`'s of its id.
-fn repair_master(every: MasterTables<'_>, q: PlayerId, u: &Unit) -> Result<Master, GenieError> {
+fn repair_master(every: MasterTables<'_>, q: PlayerId, u: &Unit) -> GenieResult<Master> {
     Ok(u.master(every, q)?.clone())
 }
 
@@ -212,7 +212,7 @@ fn repairee_of(
     c: &Step<'_>,
     others: OthersRef<'_>,
     target: Option<ObjectId>,
-) -> Result<(Option<Repairee>, CountedIn), GenieError> {
+) -> GenieResult<(Option<Repairee>, CountedIn)> {
     let held = |id: ObjectId| others.find(id);
     let Some((target, (q, t))) = target.and_then(|id| Some((id, held(id)?))) else {
         return Ok((None, None));
@@ -271,7 +271,7 @@ pub(crate) fn repair_target(
     target: Option<RepairTargetId>,
     amount: HitPoints,
     roles: &Roles,
-) -> Result<(RepairOutcome, MasterKind), GenieError> {
+) -> GenieResult<(RepairOutcome, MasterKind)> {
     let player = c.player;
     let mut set = Vec::new();
     let others = OthersRef::of(&c.w.players, &c.w.index, player)?;
@@ -378,7 +378,7 @@ fn repaired(
     others: OthersRef<'_>,
     (oq, o): (PlayerId, &Unit),
     id: ObjectId,
-) -> Result<Repaired, GenieError> {
+) -> GenieResult<Repaired> {
     let om = repair_master(
         MasterTables::new(&c.w.model.masters, &c.w.parts.own_master),
         oq,
@@ -426,11 +426,7 @@ fn repaired(
 /// # Errors
 ///
 /// None (an unreachable error where a table lost the part it took).
-fn repair_write_back(
-    w: &mut World,
-    set: &[Repaired],
-    original: &[Repaired],
-) -> Result<(), GenieError> {
+fn repair_write_back(w: &mut World, set: &[Repaired], original: &[Repaired]) -> GenieResult<()> {
     for (now, was) in set.iter().zip(original) {
         if now == was {
             continue;
@@ -451,7 +447,7 @@ impl Action {
         &self,
         c: &Step<'_>,
         others: OthersRef<'_>,
-    ) -> Result<Option<TopTarget>, GenieError> {
+    ) -> GenieResult<Option<TopTarget>> {
         let Some(id) = self.top_target() else {
             return Ok(None);
         };

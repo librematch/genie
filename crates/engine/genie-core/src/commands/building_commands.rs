@@ -1,6 +1,5 @@
 //! The commands of a building: SET GATHER POINT, the command queue and RESEARCH.
 
-use crate::GenieError;
 use crate::commands::GatherPoint;
 use crate::commands::GatherPointState;
 use crate::commands::gather_point::GatherPointCommand;
@@ -34,6 +33,7 @@ use crate::world::settings::OptionFlags;
 use crate::world::slots::CheckedIndex;
 use crate::world::slots::PlayerSlots;
 use crate::world::{BLOCKS_RESEARCH, World};
+use crate::{GenieError, GenieResult};
 
 impl World {
     /// The index of object `id` in player `player`'s live list; none for a cleared id or an
@@ -42,7 +42,7 @@ impl World {
         &self,
         player: PlayerId,
         id: Option<ObjectId>,
-    ) -> Result<Option<ListIndex>, GenieError> {
+    ) -> GenieResult<Option<ListIndex>> {
         let _ = self.players.player(player)?;
         Ok(id.and_then(|id| self.live_index(player, id)))
     }
@@ -50,7 +50,7 @@ impl World {
     /// Whether the player's object `i` takes a gather point: its master garrisons (`+0xb53`) or
     /// the player trains a unit there (`FUN_141625a20`'s count with no object,
     /// [`World::trainable_count`]). The test SET GATHER POINT and SET GATHER STATE make.
-    fn takes_gather_point(&self, player: PlayerId, i: ListIndex) -> Result<bool, GenieError> {
+    fn takes_gather_point(&self, player: PlayerId, i: ListIndex) -> GenieResult<bool> {
         let master = self
             .players
             .live(player, i)?
@@ -69,7 +69,7 @@ impl World {
         &mut self,
         g: &GatherPointCommand,
         ids: &[Option<ObjectId>],
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let GatherPointCommand {
             player,
             point,
@@ -142,7 +142,7 @@ impl World {
         player: PlayerId,
         state: Option<GatherPointState>,
         ids: &[Option<ObjectId>],
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         for &id in ids {
             let Some(i) = self.position_of_id(player, id)? else {
                 continue;
@@ -181,38 +181,37 @@ impl World {
         ids: &[Option<ObjectId>],
         target: Option<ObjectId>,
         point: Point,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let [x, y] = point.get();
-        let step =
-            |turns: &Self, t: Option<ObjectId>, at: Point| -> Result<QueuedOrder, GenieError> {
-                // the target's class, which the order on a gone target reads as a master of the
-                // owner (the game's)
-                let (target, owner, class) = match turns.object(t) {
-                    Some((tp, u)) => (
-                        t,
-                        Some(tp),
-                        OrderTargetKind::of_class(u.master(turns.master_tables(), tp)?.class),
-                    ),
-                    None => (None, None, None),
-                };
-                Ok(QueuedOrder {
-                    issuer: Some(Issuer::Player(player)),
-                    // the game tests the id's sign: a recyclable object's is no target
-                    order: if target.is_none_or(ObjectId::is_recyclable) {
-                        OrderKind::Move
-                    } else {
-                        OrderKind::OnTarget
-                    },
-                    priority: OrderPriority::NONE,
-                    target,
-                    target_owner: owner,
-                    point: at.with_height(-1.0),
-                    range: Distance::ZERO,
-                    shown: Point::new(-1.0, -1.0),
-                    ready: false,
-                    target_kind: class,
-                })
+        let step = |turns: &Self, t: Option<ObjectId>, at: Point| -> GenieResult<QueuedOrder> {
+            // the target's class, which the order on a gone target reads as a master of the
+            // owner (the game's)
+            let (target, owner, class) = match turns.object(t) {
+                Some((tp, u)) => (
+                    t,
+                    Some(tp),
+                    OrderTargetKind::of_class(u.master(turns.master_tables(), tp)?.class),
+                ),
+                None => (None, None, None),
             };
+            Ok(QueuedOrder {
+                issuer: Some(Issuer::Player(player)),
+                // the game tests the id's sign: a recyclable object's is no target
+                order: if target.is_none_or(ObjectId::is_recyclable) {
+                    OrderKind::Move
+                } else {
+                    OrderKind::OnTarget
+                },
+                priority: OrderPriority::NONE,
+                target,
+                target_owner: owner,
+                point: at.with_height(-1.0),
+                range: Distance::ZERO,
+                shown: Point::new(-1.0, -1.0),
+                ready: false,
+                target_kind: class,
+            })
+        };
         for &id in ids {
             let Some(Place::Live(p, i)) = self.place(id) else {
                 if self.place(id).is_some() {
@@ -268,7 +267,7 @@ impl World {
     pub(crate) fn research_check(
         &self,
         r: &ResearchCommand,
-    ) -> Result<Option<Vec<Option<ObjectId>>>, GenieError> {
+    ) -> GenieResult<Option<Vec<Option<ObjectId>>>> {
         let player = r.player;
         let listed = usize::try_from(r.count).unwrap_or(0);
         if listed == 0 {
@@ -312,7 +311,7 @@ impl World {
         &mut self,
         r: &ResearchCommand,
         buildings: &[Option<ObjectId>],
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let player = r.player;
         let owner = self.players.player(player)?;
         let Some(tech_id) = r.tech.filter(|t| t.index() < owner.techs.len()) else {
@@ -380,7 +379,7 @@ impl World {
         player: PlayerId,
         building_id: Option<ObjectId>,
         state: &TechState,
-    ) -> Result<Option<ListIndex>, GenieError> {
+    ) -> GenieResult<Option<ListIndex>> {
         let owner = self.players.player(player)?;
         let Some(i) = self.live_index(player, building_id) else {
             return if self.place(building_id).is_some() {
@@ -428,7 +427,7 @@ impl World {
         i: ListIndex,
         tech: TechId,
         shift: bool,
-    ) -> Result<QueueOutcome, GenieError> {
+    ) -> GenieResult<QueueOutcome> {
         let t = tech.index();
         let def = self.model.techs.checked(t)?;
         let state = self.players.player(player)?.techs.checked(t)?;

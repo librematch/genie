@@ -27,7 +27,6 @@
 //! beside a player's objects when the caller names one (argument 11, `FUN_14152f790`). The pather's flag at `+0x2db638` (terrain the unit
 //! may cross anyway, `FUN_1413fc2b0`) is never set in this build: no instruction writes it.
 
-use crate::GenieError;
 use crate::map::Distance;
 use crate::map::DistanceSquared;
 use crate::map::Footprint;
@@ -41,6 +40,7 @@ use crate::players::PlayerId;
 use crate::players::PlayerKind;
 use crate::world::index::ObjectsRef;
 use crate::world::slots::CheckedIndex;
+use crate::{GenieError, GenieResult};
 
 mod cost;
 mod step_dir;
@@ -81,7 +81,7 @@ const GATE_CLASS_BITS: u64 = 0x500;
 
 /// What a search asks of an allied gate's tile: whether its gate lets the unit pass
 /// ([`gate_lets_pass`] in a world; a test answers for itself).
-pub type GateAsk<'a> = &'a dyn Fn(Tile) -> Result<bool, GenieError>;
+pub type GateAsk<'a> = &'a dyn Fn(Tile) -> GenieResult<bool>;
 
 /// `FUN_140f9eb70` on an allied gate's record at `tile`, for a unit of `player`: a building's
 /// tile (the map tile's `+0x19` bits 0x60, [`crate::vision::visibility::Visibility::building_tile`])
@@ -97,7 +97,7 @@ pub fn gate_lets_pass(
     objects: ObjectsRef<'_>,
     player: PlayerId,
     tile: Tile,
-) -> Result<bool, GenieError> {
+) -> GenieResult<bool> {
     let roles = objects.roles();
     let Some(links) = spatial.sight.as_ref() else {
         return Ok(false);
@@ -222,7 +222,7 @@ pub fn reaches(
     req: &LongRequest,
     gates: GateAsk<'_>,
     long_path_tuning: LongPathTuning,
-) -> Result<bool, GenieError> {
+) -> GenieResult<bool> {
     Ok(match search(tiles, map, req, gates, long_path_tuning)? {
         Searched::Refused => false,
         Searched::InRange => true,
@@ -244,7 +244,7 @@ pub fn path(
     (req, gates): (&LongRequest, GateAsk<'_>),
     z: f32,
     long_path_tuning: LongPathTuning,
-) -> Result<(bool, Path), GenieError> {
+) -> GenieResult<(bool, Path)> {
     Ok(match search(tiles, map, req, gates, long_path_tuning)? {
         Searched::Refused => (false, Path::default()),
         Searched::InRange => (true, Path::default()),
@@ -398,7 +398,7 @@ impl<'a> Grid<'a> {
         beside: Option<[Tile; 2]>,
         at_goal: bool,
         req: &LongRequest,
-    ) -> Result<bool, GenieError> {
+    ) -> GenieResult<bool> {
         let corners =
             |test: &dyn Fn(Tile) -> bool| beside.is_none_or(|b| b.iter().all(|&t| test(t)));
         let clear = |test: &dyn Fn(Tile) -> bool| test(n) && corners(test);
@@ -465,7 +465,7 @@ impl Relax<'_> {
         front: &mut Front,
         from: &Origin,
         (to, dir): (Tile, StepDir),
-    ) -> Result<Option<Tile>, GenieError> {
+    ) -> GenieResult<Option<Tile>> {
         let i = cell(self.map, to);
         let new_cost = step_cost(from.cost, from.at, to, self.req.to);
         let seen = *front.entered.checked(i)?;
@@ -514,7 +514,7 @@ fn search(
     req: &LongRequest,
     gates: GateAsk<'_>,
     long_path_tuning: LongPathTuning,
-) -> Result<Searched, GenieError> {
+) -> GenieResult<Searched> {
     let (w, h) = (map.width(), map.height());
     let (x0, y0) = (req.from.x(), req.from.y());
     let (x1, y1) = (req.to.x(), req.to.y());

@@ -1,7 +1,6 @@
 //! The master's placement test (slot 0x50): the objects near a candidate, BUILD's placement
 //! test and the spawn's.
 
-use crate::GenieError;
 use crate::map::Footprint;
 use crate::map::GridSize;
 use crate::map::Point;
@@ -25,6 +24,7 @@ use crate::production::spawn::{Near, NearFlags};
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
 use crate::world::layer::generated::SpawnTuning;
+use crate::{GenieError, GenieResult};
 
 /// A unit to put down, beside a building or ashore, of a master that does not move (no
 /// terrain restriction to test its place by).
@@ -78,7 +78,7 @@ pub(super) fn overlapping(
     r: Footprint,
     counts: &dyn Fn(&Near) -> Option<bool>,
     spawn_tuning: &SpawnTuning,
-) -> Result<Vec<Found>, GenieError> {
+) -> GenieResult<Vec<Found>> {
     let mut out = Vec::new();
     for t in reach(map.size(), p, spawn_tuning) {
         for o in map.objects(t)? {
@@ -119,7 +119,7 @@ pub(crate) fn build_placement(
     p: Point,
     roles: &Roles,
     spawn_tuning: &SpawnTuning,
-) -> Result<PlacementCode, GenieError> {
+) -> GenieResult<PlacementCode> {
     if let Some(code) = build_static_test(site, map, p, spawn_tuning)? {
         return Ok(code);
     }
@@ -168,7 +168,7 @@ fn static_scans_find(
     p: Point,
     roles: &Roles,
     spawn_tuning: &SpawnTuning,
-) -> Result<bool, GenieError> {
+) -> GenieResult<bool> {
     let (rx, ry) = (site.radius.x(), site.radius.y());
     if !site.tall || !(0.0 < rx || 0.0 < ry) {
         return Ok(false);
@@ -216,7 +216,7 @@ pub(super) fn build_static_test(
     map: &WorldMap<'_>,
     p: Point,
     spawn_tuning: &SpawnTuning,
-) -> Result<Option<PlacementCode>, GenieError> {
+) -> GenieResult<Option<PlacementCode>> {
     let (x, y) = (p.x(), p.y());
     let (rx, ry) = (site.radius.x(), site.radius.y());
     let size = map.size();
@@ -298,7 +298,7 @@ pub(super) fn build_sees(
     o: &Near,
     (seen, visible): (bool, bool),
     roles: &Roles,
-) -> Result<bool, GenieError> {
+) -> GenieResult<bool> {
     let player = site.player;
     if !(seen && visible) {
         let fog = if seen {
@@ -455,7 +455,7 @@ pub(crate) fn placement(
     zones: ZoneTest,
     roles: &Roles,
     spawn_tuning: &SpawnTuning,
-) -> Result<Tested, GenieError> {
+) -> GenieResult<Tested> {
     let (x, y) = (p.x(), p.y());
     let (rx, ry) = (me.radius.x(), me.radius.y());
     let size = map.size();

@@ -1,4 +1,5 @@
 use super::*;
+use crate::GenieResult;
 use crate::combat::damage::Victim;
 use crate::garrison::transport::StartCall;
 use crate::garrison::transport::TransportTarget;
@@ -225,7 +226,7 @@ fn run_on(
     c: &mut Coast,
     hull: (&mut Unit, MotionMut<'_>, &mut PartTable<UnitAi>),
     player_kind: PlayerKind,
-) -> Result<Updated, GenieError> {
+) -> GenieResult<Updated> {
     let walked = match t.state.move_to().copied().map(|m| m.state) {
         Some(MoveTo::Failed) => SubCode::Failed,
         Some(MoveTo::Start | MoveTo::Moving | MoveTo::Waiting) => SubCode::UnderWay,
@@ -237,11 +238,7 @@ fn run_on(
 }
 
 /// [`run_on`] on a fresh [`hull`] of a human player: the update's answer and what it left.
-fn run(
-    t: &mut TransportAction,
-    s: &Ship<'_>,
-    c: &mut Coast,
-) -> (Result<Updated, GenieError>, Left) {
+fn run(t: &mut TransportAction, s: &Ship<'_>, c: &mut Coast) -> (GenieResult<Updated>, Left) {
     let (mut unit, mut motion, mut ais) = hull();
     let r = run_on(
         t,

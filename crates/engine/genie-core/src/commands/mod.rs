@@ -3,13 +3,13 @@
 //!
 //! [`World::run`]: crate::world::World::run
 
-use crate::GenieError;
 use crate::map::Position;
 use crate::objects::ObjectId;
 use crate::objects::masters::MasterId;
 use crate::players::PlayerId;
 use crate::world::World;
 use crate::world::settings::OptionFlags;
+use crate::{GenieError, GenieResult};
 use genie_diff::Diff;
 
 pub mod all_back_to_work;
@@ -232,7 +232,7 @@ impl Command {
     /// # Errors
     ///
     /// What the run does not model.
-    pub(crate) fn run(&self, w: &mut World) -> Result<(), GenieError> {
+    pub(crate) fn run(&self, w: &mut World) -> GenieResult<()> {
         by_kind!(
             self,
             c => c.run(w),

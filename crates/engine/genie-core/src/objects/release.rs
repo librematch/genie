@@ -1,7 +1,7 @@
 //! An object's leave of the world and its release by the action that held it (slot 0x180); the
 //! update's regeneration and hit point check, and a walk's pause.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::objects::HitPoints;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
@@ -45,7 +45,7 @@ pub(crate) fn released(
     (ai, layer): (Option<&mut UnitAi>, Option<&mut Building>),
     (kind, listed): (MasterKind, bool),
     by: Releaser,
-) -> Result<(), GenieError> {
+) -> GenieResult<()> {
     let state = u.life.state;
     match (released_fields(u, layer, (kind, listed), by), ai) {
         (Some(n), Some(ai)) => ai.post(n, state),
@@ -96,7 +96,7 @@ impl World {
     /// owner's watched list (`FUN_141091310`), a recyclable master's missile goes to the pool of
     /// type 60 (the world's `+0x1d8`), and it leaves the mesh. Every step runs; returns the
     /// world's leave of the place that the slice does not model.
-    pub(crate) fn leave_world(&mut self, p: PlayerId, gone: &Object) -> Result<(), GenieError> {
+    pub(crate) fn leave_world(&mut self, p: PlayerId, gone: &Object) -> GenieResult<()> {
         let (missile, gone) = (gone.parts.missile, &gone.unit);
         self.track_remove(p, gone.id, gone.life.master_id)?;
         let master = gone.master(
@@ -134,7 +134,7 @@ impl World {
         &mut self,
         slot: (PlayerId, ListIndex, ObjectId),
         dt_seconds: Seconds,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let Some((p, i)) = self.live_slot(slot) else {
             return Ok(());
         };
@@ -163,7 +163,7 @@ impl World {
     pub(crate) fn clamp_object_powerup(
         &mut self,
         slot: (PlayerId, ListIndex, ObjectId),
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let Some((p, i)) = self.live_slot(slot) else {
             return Ok(());
         };
@@ -200,7 +200,7 @@ impl World {
 
 impl Unit {
     /// The unit as the releaser of its actions' targets (slot 0x180's argument).
-    pub(crate) fn releaser(&self, c: &Step<'_>) -> Result<Releaser, GenieError> {
+    pub(crate) fn releaser(&self, c: &Step<'_>) -> GenieResult<Releaser> {
         Ok(Releaser {
             id: self.id,
             class: Some(self.master(c.w.master_tables(), c.player)?.class),

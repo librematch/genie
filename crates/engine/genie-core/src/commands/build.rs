@@ -1,6 +1,6 @@
 //! BUILD (0x66, `FUN_140e7a400`): a player's foundation and the builders it sends to it.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::commands::UnitList;
 use crate::commands::{QueueId, SpriteOverride};
 use crate::map::Point;
@@ -54,7 +54,7 @@ impl BuildCommand {
     /// refused BUILD places nothing. The foundation takes its sprite override
     /// ([`BuildCommand::sprite_override_of`]) and the command's frame (`+0xc54`) before its
     /// builders get their tasks.
-    pub(crate) fn run(&self, w: &mut World) -> Result<(), GenieError> {
+    pub(crate) fn run(&self, w: &mut World) -> GenieResult<()> {
         let Some(listed) = w.read_units(self.player, &self.builders) else {
             return Ok(());
         };

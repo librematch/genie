@@ -1,8 +1,8 @@
 //! A queued order's target type: the number its writer puts there, a master id or a class, and
 //! the two ways the game reads it.
 
-use crate::GenieError;
 use crate::objects::masters::{ClassId, MasterId};
+use crate::{GenieError, GenieResult};
 
 /// A queued order's target type (`+0x30`, −1 for none). The writer puts the target's master id
 /// there (an order on a target or a move, a follow, an unload, a drop site's order) or its class
@@ -49,7 +49,7 @@ impl OrderTargetKind {
     /// # Errors
     ///
     /// A negative value other than −1 or one past a master's or class's `i16`.
-    pub fn of_field(value: i32) -> Result<Option<Self>, GenieError> {
+    pub fn of_field(value: i32) -> GenieResult<Option<Self>> {
         if value == Self::NONE {
             return Ok(None);
         }

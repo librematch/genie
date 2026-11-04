@@ -1,7 +1,7 @@
 //! What `bestUnitToAttack` reads of the unit whose AI searches, of its arguments and of the
 //! world ([`AttackField`]).
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::map::Distance;
 use crate::map::spatial::{Reach, Spatial};
 use crate::movement::Speed;
@@ -150,7 +150,7 @@ impl AttackField<'_, '_, '_> {
     /// # Errors
     ///
     /// An object the slice does not hold.
-    pub(crate) fn found_object(&self, id: ObjectId) -> Result<Option<FoundObject>, GenieError> {
+    pub(crate) fn found_object(&self, id: ObjectId) -> GenieResult<Option<FoundObject>> {
         self.picker.found_object(self.world, id)
     }
 
@@ -159,7 +159,7 @@ impl AttackField<'_, '_, '_> {
     /// # Errors
     ///
     /// What the check does not model.
-    pub(crate) fn can_attack(&self, id: ObjectId) -> Result<bool, GenieError> {
+    pub(crate) fn can_attack(&self, id: ObjectId) -> GenieResult<bool> {
         self.picker.can_attack(self.world, id)
     }
 
@@ -173,7 +173,7 @@ impl AttackField<'_, '_, '_> {
     /// # Errors
     ///
     /// What the test does not model.
-    pub(crate) fn spares_friends(&self, id: ObjectId) -> Result<bool, GenieError> {
+    pub(crate) fn spares_friends(&self, id: ObjectId) -> GenieResult<bool> {
         self.picker.spares_friends(self.world, id)
     }
 
@@ -193,7 +193,7 @@ impl AttackField<'_, '_, '_> {
         id: ObjectId,
         distance: Distance,
         category: Option<AttackCategory>,
-    ) -> Result<Candidate, GenieError> {
+    ) -> GenieResult<Candidate> {
         self.picker.candidate(self.world, id, distance, category)
     }
 
@@ -202,7 +202,7 @@ impl AttackField<'_, '_, '_> {
     /// # Errors
     ///
     /// What the read does not model.
-    pub(crate) fn armored(&self, id: ObjectId) -> Result<bool, GenieError> {
+    pub(crate) fn armored(&self, id: ObjectId) -> GenieResult<bool> {
         self.picker.armored(id)
     }
 
@@ -211,7 +211,7 @@ impl AttackField<'_, '_, '_> {
     /// # Errors
     ///
     /// What the read does not model.
-    pub(crate) fn weapon_range(&self, id: ObjectId) -> Result<Distance, GenieError> {
+    pub(crate) fn weapon_range(&self, id: ObjectId) -> GenieResult<Distance> {
         self.picker.weapon_range(id)
     }
 
@@ -221,7 +221,7 @@ impl AttackField<'_, '_, '_> {
     /// # Errors
     ///
     /// What the reads do not model.
-    pub(crate) fn engages(&self, id: ObjectId) -> Result<bool, GenieError> {
+    pub(crate) fn engages(&self, id: ObjectId) -> GenieResult<bool> {
         self.picker.engages(id)
     }
 
@@ -230,7 +230,7 @@ impl AttackField<'_, '_, '_> {
     /// # Errors
     ///
     /// What the path does not model.
-    pub(crate) fn quick_path(&mut self, id: ObjectId, range: Distance) -> Result<bool, GenieError> {
+    pub(crate) fn quick_path(&mut self, id: ObjectId, range: Distance) -> GenieResult<bool> {
         self.picker.quick_path(self.world, id, range)
     }
 
@@ -239,7 +239,7 @@ impl AttackField<'_, '_, '_> {
     /// # Errors
     ///
     /// What the path does not model.
-    pub(crate) fn path(&mut self, id: ObjectId, range: Distance) -> Result<bool, GenieError> {
+    pub(crate) fn path(&mut self, id: ObjectId, range: Distance) -> GenieResult<bool> {
         (self.reach)(self.world, id, range)
     }
 }

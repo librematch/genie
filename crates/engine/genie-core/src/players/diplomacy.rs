@@ -10,7 +10,6 @@
 //! slot 0x120 of a combat object `FUN_141217120` and of a building `FUN_1411d50e0`; the teams
 //! `FUN_1415e23f0`; the revealed units `FUN_14152bcb0`; the tile list's refill `FUN_141285cb0`.
 
-use crate::GenieError;
 use crate::garrison::ContainerId;
 use crate::garrison::LetOut;
 use crate::garrison::SIEGE_UNLOAD;
@@ -34,6 +33,7 @@ use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::settings::OptionFlags;
 use crate::world::slots::PlayerSlots;
+use crate::{GenieError, GenieResult};
 
 /// The reveal of a player's units of a kind to the others (its attribute 204 not 0,
 /// `FUN_14152bcb0`): their per-player marks (`+0x798`, `+0x79c`) and flares are not modelled.
@@ -76,7 +76,7 @@ impl World {
         p: PlayerId,
         q: PlayerId,
         stance: Stance,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if self.players.len() <= q.index() {
             return Ok(());
         }
@@ -109,7 +109,7 @@ impl World {
         p: PlayerId,
         q: PlayerId,
         stance: Stance,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         self.players.player_mut(p)?.diplomacy.set(q, stance);
         stance
             .relation()
@@ -125,7 +125,7 @@ impl World {
         p: PlayerId,
         q: PlayerId,
         relation: Relation,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         self.players.player_mut(p)?.relations.set(q, relation);
         if let Some(row) = self.spatial.relations.get_mut(p) {
             row.set(q, relation);
@@ -161,7 +161,7 @@ impl World {
         id: ObjectId,
         q: PlayerId,
         relation: Relation,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let Some((_, u)) = self.object(id) else {
             return Ok(());
         };
@@ -212,7 +212,7 @@ impl World {
         id: ObjectId,
         q: PlayerId,
         inside: Option<ContainerId>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let Some(holder) = inside else {
             return Ok(());
         };
@@ -250,7 +250,7 @@ impl World {
         id: ObjectId,
         q: PlayerId,
         position: Position,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if self.players.player(p)?.kind.is_computer()
             // the game compares the other player's number with the market's id (`+0x8`,
             // FUN_1411d50e0's `param_2 != param_1[1]`): its slip, kept
@@ -277,7 +277,7 @@ impl World {
         id: ObjectId,
         q: PlayerId,
         garrison: &[ObjectId],
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let bi = self.housed_index(p, id)?;
         for &g in garrison.iter().rev() {
             if self.object(g).is_some_and(|(gp, _)| gp == q)
@@ -291,7 +291,7 @@ impl World {
     }
 
     /// The index of the unit `id` inside a building in player `p`'s live list.
-    fn housed_index(&self, p: PlayerId, id: ObjectId) -> Result<ListIndex, GenieError> {
+    fn housed_index(&self, p: PlayerId, id: ObjectId) -> GenieResult<ListIndex> {
         self.live_index(p, id).ok_or(GenieError::unsupported(
             "a unit inside a building outside the live lists",
         ))
@@ -374,7 +374,7 @@ impl World {
     /// `FUN_14152bcb0`: outside the editor's screen (mode 4, which a playback is not) each
     /// player with attribute 204 (`+0x660`, truncated, `CVTTSS2SI`) not 0 reveals its units of
     /// that kind to the others: not modelled ([`REVEAL_UNITS`]); without one nothing happens.
-    pub(crate) fn reveal_units(&self) -> Result<(), GenieError> {
+    pub(crate) fn reveal_units(&self) -> GenieResult<()> {
         let reveals = self.players.iter().any(|q| {
             q.attributes
                 .get(REVEAL_UNIT)

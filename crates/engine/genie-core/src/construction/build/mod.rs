@@ -32,10 +32,10 @@ use crate::world::Seconds;
 use crate::world::WholeSeconds;
 use std::collections::BTreeMap;
 
-use crate::GenieError;
 use crate::map::spatial::Obstruction;
 use crate::objects::masters::{Master, Task};
 use crate::unit_ai::OrderKind;
+use crate::{GenieError, GenieResult};
 use genie_diff::Diff;
 
 mod build_state;
@@ -229,7 +229,7 @@ impl Completion<'_> {
     /// # Errors
     ///
     /// What it does not model.
-    pub fn first_part(&self, c: &Construction, roles: &Roles) -> Result<FirstPart, GenieError> {
+    pub fn first_part(&self, c: &Construction, roles: &Roles) -> GenieResult<FirstPart> {
         use crate::math::conversions::cvttss2si;
         let master = self.master.ok_or(GenieError::unsupported(
             "a completion of a master the slice does not have",

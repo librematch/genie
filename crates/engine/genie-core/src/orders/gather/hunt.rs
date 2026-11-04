@@ -1,6 +1,6 @@
 //! A work command's Hunt: its start from the factory and the Hunt action's own start.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::combat::attack::BeginLayer;
 use crate::gathering::hunt::{HuntAction, HuntStart, HuntTask, Quarry};
 use crate::math::rng::Stream;
@@ -23,7 +23,7 @@ impl World {
     /// The Hunt from the factory (`FUN_140aca4b0` case 0x6e): the action takes its target (slot
     /// 0x178); the work command's unit AI notify (`FUN_14106e4e0`, `notify`) sets the hunt order;
     /// the install (`FUN_14106e990`) clears the action list and starts the hunt.
-    pub(in crate::orders) fn start_hunt(&mut self, order: HuntOrder) -> Result<(), GenieError> {
+    pub(in crate::orders) fn start_hunt(&mut self, order: HuntOrder) -> GenieResult<()> {
         let HuntOrder {
             player,
             index: idx,
@@ -64,7 +64,7 @@ impl World {
         player: PlayerId,
         idx: ListIndex,
         (task, quarry): (HuntTask, &Quarry),
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let target = quarry.id;
         let engagement = self.engagement(player, idx, target)?;
         let arms = self.arms(player, idx, &task)?;

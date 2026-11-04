@@ -14,7 +14,6 @@
 //! original `FUN_14108f9b0`, the twin check `FUN_1410928a0`, its update `FUN_141090000`, its
 //! destroy `FUN_14118f1e0` and its leaving `FUN_141090ad0`.
 
-use crate::GenieError;
 use crate::map::Position;
 use crate::map::Tile;
 use crate::objects::ListFate;
@@ -31,6 +30,7 @@ use crate::world::World;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::slots::{CheckedIndex, PlayerSlots};
+use crate::{GenieError, GenieResult};
 use std::collections::HashMap;
 
 /// The type from which an object's entry and its ghost follow its footprint's UMV entry
@@ -129,7 +129,7 @@ impl World {
 
     /// The unified map's visible and explored bits at `tile` (`map+0x5e30`, masked); 0 off the
     /// map or without the players' sight.
-    fn tile_bits(&self, tile: Tile) -> Result<VisionBits, GenieError> {
+    fn tile_bits(&self, tile: Tile) -> GenieResult<VisionBits> {
         let Some(v) = self.spatial.sight.as_ref() else {
             return Ok(VisionBits::NONE);
         };
@@ -145,7 +145,7 @@ impl World {
     }
 
     /// What a cell shows now.
-    fn cell_bits(&self, cell: Cell) -> Result<VisionBits, GenieError> {
+    fn cell_bits(&self, cell: Cell) -> GenieResult<VisionBits> {
         match cell {
             Cell::Tile(i) => Ok(self
                 .spatial
@@ -180,7 +180,7 @@ impl World {
         owner: PlayerId,
         id: ObjectId,
         at: Tile,
-    ) -> Result<GhostWatch, GenieError> {
+    ) -> GenieResult<GhostWatch> {
         let Some((p, u)) = self.object(id) else {
             return Ok(GhostWatch::Refused);
         };
@@ -226,7 +226,7 @@ impl World {
 
     /// `FUN_141091310`: the watched list of player `owner` lets object `id` go (the last entry
     /// takes its place).
-    pub(crate) fn unwatch(&mut self, owner: PlayerId, id: ObjectId) -> Result<(), GenieError> {
+    pub(crate) fn unwatch(&mut self, owner: PlayerId, id: ObjectId) -> GenieResult<()> {
         let list = &mut self.players.player_mut(owner)?.watched;
         if let Some(k) = list.iter().position(|w| w.id == id) {
             let _ = list.swap_remove(k);
@@ -236,18 +236,13 @@ impl World {
 
     /// `FUN_1411cc980`: a building its owner watches: not of class 51 or 54, not desolid
     /// (`+0xc60`), not an annex (`+0xbb8`, but a gate's), not master 1808.
-    fn watches_building(&self, p: PlayerId, id: ObjectId) -> Result<bool, GenieError> {
+    fn watches_building(&self, p: PlayerId, id: ObjectId) -> GenieResult<bool> {
         self.watches_building_at(p, id, AnnexLink::Made)
     }
 
     /// [`World::watches_building`], with the annex link made or, during a load before the rehook,
     /// not yet ([`AnnexLink`]): then an annex passes too.
-    fn watches_building_at(
-        &self,
-        p: PlayerId,
-        id: ObjectId,
-        link: AnnexLink,
-    ) -> Result<bool, GenieError> {
+    fn watches_building_at(&self, p: PlayerId, id: ObjectId, link: AnnexLink) -> GenieResult<bool> {
         let Some((_, u)) = self.object(id) else {
             return Ok(false);
         };
@@ -264,7 +259,7 @@ impl World {
 
     /// A building whose construction started (`FUN_1411e5670`): its owner watches it
     /// ([`World::watches_building`]).
-    pub(crate) fn watch_started(&mut self, p: PlayerId, id: ObjectId) -> Result<(), GenieError> {
+    pub(crate) fn watch_started(&mut self, p: PlayerId, id: ObjectId) -> GenieResult<()> {
         if !self.watches_building(p, id)? {
             return Ok(());
         }
@@ -282,7 +277,7 @@ impl World {
     /// `FUN_1411ac170`, at what it follows, an annex's link not known yet); then the rehook lets
     /// every annex but a gate's go (`TRIBE_Building_Object::rehook`). A building's mask is empty
     /// at a load.
-    pub fn build_watched(&mut self) -> Result<(), GenieError> {
+    pub fn build_watched(&mut self) -> GenieResult<()> {
         // each id's object as [`World::object`] finds it (the first player in order, its live list
         // before its sleeping list), looked up once: the loop changes only the watched lists
         let mut first: HashMap<ObjectId, (PlayerId, bool, ListIndex)> = HashMap::new();
@@ -358,11 +353,7 @@ impl World {
     /// player who explored its tile but does not see it, Gaia aside, gets a ghost of it
     /// ([`World::make_ghost`]), in the players' order; the first bit past the players ends it.
     /// Then its owner's list watches it at its tile ([`World::watch`]).
-    pub(crate) fn ghosts_at_death(
-        &mut self,
-        _owner: usize,
-        id: ObjectId,
-    ) -> Result<(), GenieError> {
+    pub(crate) fn ghosts_at_death(&mut self, _owner: usize, id: ObjectId) -> GenieResult<()> {
         let Some((p, u)) = self.object(id) else {
             return Ok(());
         };
@@ -405,7 +396,7 @@ impl World {
         viewer: PlayerId,
         at: Position,
         original: Original,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let recyclable = self
             .master(viewer, self.model.slots.master.doppelganger)?
             .recyclable;
@@ -457,7 +448,7 @@ impl World {
     /// the new ghost note each other's player as one who cannot see it (`+0x7f0`). The game walks
     /// the tile's list; the effects are ORs and destroys that change no other ghost's test, so the
     /// players' lists in their order give the same.
-    fn check_twins(&mut self, viewer: PlayerId, ghost: &mut Ghost) -> Result<(), GenieError> {
+    fn check_twins(&mut self, viewer: PlayerId, ghost: &mut Ghost) -> GenieResult<()> {
         let tile = Self::tile_at(ghost.position);
         for q in PlayerId::each(self.players.len()) {
             for k in 0..self.players.player(q)?.ghosts.len() {
@@ -483,7 +474,7 @@ impl World {
 
     /// The destroy (slot 0xd0, `FUN_14118f1e0`) of ghost `k` of player `p`: below state 7, its
     /// hit points go and it goes to state 7.
-    fn destroy_ghost(&mut self, p: PlayerId, k: usize) -> Result<(), GenieError> {
+    fn destroy_ghost(&mut self, p: PlayerId, k: usize) -> GenieResult<()> {
         let g = self.players.player_mut(p)?.ghosts.checked_mut(k)?;
         if g.state < ObjectState::Removed {
             g.state = ObjectState::Removed;
@@ -502,7 +493,7 @@ impl World {
     /// the last ghost taking its place in the list, and to the pool of type 25
     /// (`RGE_Static_Object::recycle_out_of_game`), or for a master that is not recyclable it is
     /// deleted. The viewer's `+0x2b0` table is not held (empty).
-    pub(crate) fn update_ghosts(&mut self, p: PlayerId) -> Result<(), GenieError> {
+    pub(crate) fn update_ghosts(&mut self, p: PlayerId) -> GenieResult<()> {
         let mut k = 0;
         while k < self.players.player(p)?.ghosts.len() {
             if self.update_ghost(p, k)? == ListFate::Leaves {
@@ -538,7 +529,7 @@ impl World {
         p: PlayerId,
         k: usize,
         original: Option<ObjectId>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let live = original.is_some_and(|o| {
             self.object(o)
                 .is_some_and(|(_, u)| u.life.state < ObjectState::Removed)
@@ -555,7 +546,7 @@ impl World {
     }
 
     /// The bits of the ghost's tile and, for a building's ghost, of its footprint's tiles.
-    fn ghost_bits(&self, g: &Ghost) -> Result<VisionBits, GenieError> {
+    fn ghost_bits(&self, g: &Ghost) -> GenieResult<VisionBits> {
         let (px, py) = (g.position.x(), g.position.y());
         let mut bits = self.tile_bits(g.tile)?;
         if g.footprint != 0 {
@@ -600,7 +591,7 @@ impl World {
         g: &Ghost,
         bits: VisionBits,
         unseen: bool,
-    ) -> Result<(bool, bool), GenieError> {
+    ) -> GenieResult<(bool, bool)> {
         let viewer = self.vision_mask(p);
         let mut seen = g.seen;
         let mut destroy = false;
@@ -619,7 +610,7 @@ impl World {
         Ok((seen, destroy))
     }
 
-    fn update_ghost(&mut self, p: PlayerId, k: usize) -> Result<ListFate, GenieError> {
+    fn update_ghost(&mut self, p: PlayerId, k: usize) -> GenieResult<ListFate> {
         let g = *self.players.player(p)?.ghosts.checked(k)?;
         let leaves = match g.state {
             ObjectState::Removed => {
@@ -657,7 +648,7 @@ impl World {
     /// in the players' order, and takes the new bits; the last entry whose object is gone leaves
     /// the list (the last entry taking its place). A computer player's AI then hears of its ghost
     /// (its slot 0x2e8 with notify 0x20d), which is not modelled.
-    pub(crate) fn watch_pass(&mut self, p: PlayerId) -> Result<(), GenieError> {
+    pub(crate) fn watch_pass(&mut self, p: PlayerId) -> GenieResult<()> {
         let mut gone = None;
         for k in 0..self.players.player(p)?.watched.len() {
             let w = *self.players.player(p)?.watched.checked(k)?;

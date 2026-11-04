@@ -1,7 +1,7 @@
 //! The quick path (`findQuickPath`) and the walks out of a hull and into one
 //! (`pathWithinHull`).
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::construction::MainBuildingId;
 use crate::map::Distance;
 use crate::map::Rect;
@@ -90,7 +90,7 @@ impl HullPather<'_> {
         to: Point,
         target: Option<ObjectId>,
         path: &mut Waypoints,
-    ) -> Result<bool, GenieError> {
+    ) -> GenieResult<bool> {
         let hits = self.hits(from, to)?;
         let is_target = |id: RecordId| target.is_some_and(|t| id == t);
         let obstacle = match hits[..] {
@@ -177,7 +177,7 @@ impl HullPather<'_> {
         p: Point,
         step: f32,
         reach: Option<(Point, f32)>,
-    ) -> Result<Steps, GenieError> {
+    ) -> GenieResult<Steps> {
         let (x0, y0, x1, y1) = (b.x0(), b.y0(), b.x1(), b.y1());
         // `COMISS`/`JA`, then `SETBE`; `JBE`, then `CMOVA` (0x140f8d1fc..0x140f8d235,
         // 0x140f893a4..0x140f893d0): an unordered coordinate counts past the box's far side
@@ -239,7 +239,7 @@ impl HullPather<'_> {
             })
         };
         let mut made = Steps::NoneMade;
-        let mut add = |me: &mut Self, q: Point| -> Result<(), GenieError> {
+        let mut add = |me: &mut Self, q: Point| -> GenieResult<()> {
             if near(q) && me.hulls.checked(hull.index())?.box_holding(q).is_none() {
                 let _ = me.add_node(NewNode {
                     list: NodeList::WALKS,
@@ -300,7 +300,7 @@ impl HullPather<'_> {
         root: NodeIndex,
         p: Point,
         goal: Option<Point>,
-    ) -> Result<Steps, GenieError> {
+    ) -> GenieResult<Steps> {
         let hull_path_tuning = &self.by_id.tuning().hull_path;
         let d = self.radius + self.radius;
         let mut made = Steps::NoneMade;
@@ -351,7 +351,7 @@ impl HullPather<'_> {
         paths: &mut [Waypoints],
         count: &mut usize,
         end: NodeIndex,
-    ) -> Result<Option<usize>, GenieError> {
+    ) -> GenieResult<Option<usize>> {
         let hull_path_tuning = &self.by_id.tuning().hull_path;
         let at = self.nodes.checked(end)?.at;
         let cost = self.nodes.checked(end)?.cost;
@@ -392,7 +392,7 @@ impl HullPather<'_> {
     /// [`HullPather::side_points`]). `FindShortPath`, its only caller, gives it a hull, a start and
     /// paths (its result 6 is for none) and no array for the sides the ways out leave by (its
     /// argument 13).
-    pub(super) fn walk_out(&mut self, walk: WalkOut<'_>) -> Result<Within, GenieError> {
+    pub(super) fn walk_out(&mut self, walk: WalkOut<'_>) -> GenieResult<Within> {
         let WalkOut {
             hull,
             start: from,
@@ -526,7 +526,7 @@ impl HullPather<'_> {
         hull: HullIndex,
         from: Point,
         goal: Option<Point>,
-    ) -> Result<(Option<usize>, bool), GenieError> {
+    ) -> GenieResult<(Option<usize>, bool)> {
         let hull_path_tuning = &self.by_id.tuning().hull_path;
         let root = self.add_unrefused(UnrefusedNode {
             list: NodeList::WALKS,
@@ -564,7 +564,7 @@ impl HullPather<'_> {
         end: Option<NodeIndex>,
         nearest: Option<NodeIndex>,
         left_boxes: bool,
-    ) -> Result<Within, GenieError> {
+    ) -> GenieResult<Within> {
         let Some(n) = end.or(nearest) else {
             return Ok(Within {
                 result: WalkResult::NoWay,
@@ -595,7 +595,7 @@ impl HullPather<'_> {
         nudge: bool,
         paths: &mut [Waypoints],
         (count, most): (&mut usize, usize),
-    ) -> Result<Rays, GenieError> {
+    ) -> GenieResult<Rays> {
         let at = self.nodes.checked(node)?.at;
         let mut left_boxes = false;
         for side in 0..4 {

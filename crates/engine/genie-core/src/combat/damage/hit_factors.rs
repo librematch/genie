@@ -1,6 +1,5 @@
 //! A hit's factors: the elevation, the facing offset and the charges (`FUN_1412623d0`).
 
-use crate::GenieError;
 use crate::combat::Charge;
 use crate::combat::damage::{Attacker, ElevationBonus, Facing, Victim};
 use crate::map::Position;
@@ -15,6 +14,7 @@ use crate::objects::masters::SpecialAttack;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
 use crate::world::layer::generated::DamageTuning;
+use crate::{GenieError, GenieResult};
 
 /// Slot 0x1f0 of a combat object (`FUN_14120d780`) at height `z` whose player has `own` as
 /// attributes 211 and 212: a hit from higher up gains 25% and attributes 211 and the target's
@@ -188,7 +188,7 @@ pub fn charge_hit(a: &Attacker, v: &Victim, roles: &Roles) -> bool {
 
 /// `FUN_1412161b0`: a master of special attack 3 whose charge is ready on its unit AI's (or
 /// group's) target in reach; false for other masters. Special attack 3 is not modelled.
-pub(super) const fn special_charge_ready(a: &Attacker) -> Result<bool, GenieError> {
+pub(super) const fn special_charge_ready(a: &Attacker) -> GenieResult<bool> {
     if a.special_attack.get() == SpecialAttack::CHARGE.get() {
         return Err(SPECIAL_CHARGE_GAP);
     }
@@ -202,7 +202,7 @@ pub(crate) const SPECIAL_CHARGE_GAP: GenieError =
 
 /// `FUN_141202580`: the damage a ready charge adds, the charge itself; a master of special
 /// attack 3 adds it only while [`special_charge_ready`] holds.
-pub(super) fn charge_damage(a: &Attacker) -> Result<f32, GenieError> {
+pub(super) fn charge_damage(a: &Attacker) -> GenieResult<f32> {
     if a.special_attack == SpecialAttack::CHARGE && !special_charge_ready(a)? {
         return Ok(0.0);
     }

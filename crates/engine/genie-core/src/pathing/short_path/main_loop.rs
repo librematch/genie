@@ -1,6 +1,5 @@
 //! The search's run: its main loop and a popped node's expansion by its type.
 
-use crate::GenieError;
 use crate::math::fmath::sqrt;
 use crate::pathing::short_path::axis_dir::AxisDir;
 use crate::pathing::short_path::outline::Outline;
@@ -12,6 +11,7 @@ use crate::pathing::short_path::{
 };
 use crate::pathing::{FixedDistance, ShapeId, ShapeSide, ShortFound};
 use crate::world::slots::CheckedIndex;
+use crate::{GenieError, GenieResult};
 
 /// What a polygon's re-walk keeps fixed: the node it comes from, the polygon and its vertex count.
 struct Rewalk {
@@ -29,7 +29,7 @@ impl Search<'_> {
         n: Node,
         shape: ShapeId,
         side: ShapeSide,
-    ) -> Result<Option<ShortPath>, GenieError> {
+    ) -> GenieResult<Option<ShortPath>> {
         let p = n.at;
         let d = self.ctx.d;
         for i in 0..self.polys.len() {
@@ -85,12 +85,7 @@ impl Search<'_> {
     /// The re-walk of a polygon from edge `e` (0x140fa63d4..0x140fa6639): backward from `v[e]`,
     /// forward from `v[e + 1]`, the forward side on equal costs, each while its cost stays below
     /// the vertex's; vertices no corner node reached are passed over.
-    pub(super) fn rewalk(
-        &mut self,
-        n: Node,
-        pi: PolyIndex,
-        e: VertexIndex,
-    ) -> Result<(), GenieError> {
+    pub(super) fn rewalk(&mut self, n: Node, pi: PolyIndex, e: VertexIndex) -> GenieResult<()> {
         let p = n.at;
         let poly = self.poly(pi)?;
         let m = poly.count();
@@ -134,7 +129,7 @@ impl Search<'_> {
         poly: &Poly,
         (at, g): (VertexIndex, FixedDistance),
         (dir, lo, hi): (WalkDir, VertexIndex, VertexIndex),
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let m = walk.count;
         let v = poly.vertex(at)?;
         let sp = poly.side(at.prev_in(m))?;
@@ -181,7 +176,7 @@ impl Search<'_> {
         poly: &Poly,
         (from, g): (VertexIndex, FixedDistance),
         dir: WalkDir,
-    ) -> Result<(VertexIndex, FixedDistance, bool), GenieError> {
+    ) -> GenieResult<(VertexIndex, FixedDistance, bool)> {
         let m = walk.count;
         // the costs as the search holds them, the vertices from the walk's copy
         let costs = self.poly(walk.poly)?;
@@ -206,7 +201,7 @@ impl Search<'_> {
     /// Type 3, a polygon corner: the raycast toward the goal's range point ignoring the corner's
     /// own touch (the token); a touch tries the four nudged points; then a crossing becomes a side
     /// node, a clear ray a terminal goal candidate, and a ray that still touches the axis L.
-    pub(super) fn corner_expand(&mut self, n: Node, emit: Emit) -> Result<(), GenieError> {
+    pub(super) fn corner_expand(&mut self, n: Node, emit: Emit) -> GenieResult<()> {
         let p = n.at;
         let mut t = range_point(self.goal.range, p, self.goal.at)?;
         let mut frac = RayFraction::START;
@@ -267,7 +262,7 @@ impl Search<'_> {
     /// Type 3 when every ray touches: along x toward `t`, then along y; a leg's hit becomes a
     /// side node; with both legs clear, one tile toward `t` (at most) becomes a waypoint that may
     /// be the best (by cost, not estimate).
-    pub(super) fn corner_axis(&mut self, n: Node, t: FixedPoint) -> Result<(), GenieError> {
+    pub(super) fn corner_axis(&mut self, n: Node, t: FixedPoint) -> GenieResult<()> {
         let p = n.at;
         let dx = t.x().wrapping_sub(p.x());
         let dy = t.y().wrapping_sub(p.y());
@@ -311,7 +306,7 @@ impl Search<'_> {
 
 impl Search<'_> {
     /// The search itself, after the prologue: the start, the main loop, the path.
-    pub(super) fn run(&mut self, start: FixedPoint) -> Result<ShortPath, GenieError> {
+    pub(super) fn run(&mut self, start: FixedPoint) -> GenieResult<ShortPath> {
         let started = self.start(start)?;
         match started {
             Started::InRange => {
@@ -406,11 +401,7 @@ impl Search<'_> {
     }
 
     /// One popped node of the main loop; Some when the search ends at once (the direct path).
-    pub(super) fn expand(
-        &mut self,
-        n: Node,
-        start: FixedPoint,
-    ) -> Result<Option<ShortPath>, GenieError> {
+    pub(super) fn expand(&mut self, n: Node, start: FixedPoint) -> GenieResult<Option<ShortPath>> {
         let p = n.at;
         let d = self.ctx.d;
         match n.kind {
@@ -466,7 +457,7 @@ impl Search<'_> {
         t: FixedPoint,
         hit_t: RayFraction,
         hit: Hit,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         // back from the hit a tenth of the ray (`0x66666`) at a time
         let mut frac = RayFraction::new(hit_t.get() - 0x6_6666);
         let mut base = n;
@@ -537,7 +528,7 @@ pub(super) fn range_point(
     range: FixedDistance,
     p: FixedPoint,
     goal: FixedPoint,
-) -> Result<FixedPoint, GenieError> {
+) -> GenieResult<FixedPoint> {
     let mut out = goal;
     if range != FixedDistance::ZERO {
         let range = range.get();

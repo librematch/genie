@@ -1,6 +1,7 @@
 //! The motion part's reads and writes (FD-045-D58): an object's animated layer and its mover, by
 //! id in the world's table ([`Parts::motion`]), beside the row's place.
 
+use crate::GenieResult;
 use crate::movement::MoveStats;
 use crate::movement::Mover;
 use crate::movement::Speed;
@@ -156,7 +157,7 @@ impl Parts {
     pub(crate) fn building_and_mover_mut(
         &mut self,
         id: ObjectId,
-    ) -> Result<(&mut Building, Option<&mut Mover>), crate::GenieError> {
+    ) -> GenieResult<(&mut Building, Option<&mut Mover>)> {
         let building = self.building.get_or_insert_with(id, || Building::NONE)?;
         Ok((building, self.motion.mover_mut(id)))
     }
@@ -170,7 +171,7 @@ impl Parts {
     pub(crate) fn combat_and_motion_mut(
         &mut self,
         id: ObjectId,
-    ) -> Result<(&mut Combat, MotionMut<'_>), crate::GenieError> {
+    ) -> GenieResult<(&mut Combat, MotionMut<'_>)> {
         let combat = self.combat.get_or_insert_with(id, Combat::default)?;
         Ok((combat, self.motion.layer_mut(id)))
     }

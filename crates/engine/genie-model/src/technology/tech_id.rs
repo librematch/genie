@@ -1,7 +1,7 @@
 //! A technology's id as one type: the place of a technology in the tech tree and in a player's
 //! technologies, the `.dat`'s technology record index.
 
-use crate::GenieError;
+use crate::{GenieError, GenieResult};
 use derive_more::Display;
 use getset::CopyGetters;
 use serde::Deserialize;
@@ -59,7 +59,7 @@ impl TechId {
     /// # Errors
     ///
     /// A negative value other than −1, which no technology's place is.
-    pub fn of_field(value: i16) -> Result<Option<Self>, GenieError> {
+    pub fn of_field(value: i16) -> GenieResult<Option<Self>> {
         (value != Self::NONE)
             .then(|| Self::try_from(value))
             .transpose()
@@ -77,7 +77,7 @@ impl TechId {
     /// # Errors
     ///
     /// An index past `i16`, which no table holds.
-    pub fn of_index(index: usize) -> Result<Self, GenieError> {
+    pub fn of_index(index: usize) -> GenieResult<Self> {
         i16::try_from(index)
             .map_err(|_| {
                 GenieError::invalid_input("a technology index past i16").with("index", index)
@@ -109,7 +109,7 @@ impl TryFrom<i16> for TechId {
     /// # Errors
     ///
     /// A negative value, which no technology's place is.
-    fn try_from(value: i16) -> Result<Self, GenieError> {
+    fn try_from(value: i16) -> GenieResult<Self> {
         if value < 0 {
             return Err(GenieError::invalid_input(
                 "a negative technology id, which no technology has",

@@ -1,6 +1,5 @@
 //! A unit's missile launch: the missile's making and start, which its fire and its volley share.
 
-use crate::GenieError;
 use crate::combat::missile::AimAt;
 use crate::combat::missile::ShooterId;
 use crate::combat::missile::{
@@ -45,6 +44,7 @@ use crate::world::lets::take;
 use crate::world::parts::{Object, ObjectParts};
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
+use crate::{GenieError, GenieResult};
 
 impl Unit {
     /// A missile's making and start, which [`Unit::fire`] and [`Unit::volley_missile`] share. The
@@ -69,7 +69,7 @@ impl Unit {
         aimed: &Aimed,
         shot: &Shot,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let made = player_master(&c.w.model.masters, c.player, shot.made).ok_or(
             GenieError::unsupported("a missile its player's masters do not have"),
         )?;

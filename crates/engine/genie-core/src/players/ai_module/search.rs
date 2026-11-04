@@ -12,7 +12,6 @@
 //! starts there picks a corner of a quadrant by the scores the save holds and draws from the
 //! unsynced stream.
 
-use crate::GenieError;
 use crate::map::Distance;
 use crate::map::GridSize;
 use crate::map::Point;
@@ -23,6 +22,7 @@ use crate::math::image::facing::QUARTER_PI;
 use crate::math::rng::Well512;
 use crate::movement::scout_area::ScoutArea;
 use crate::players::ai_module::InfoModule;
+use crate::{GenieError, GenieResult};
 
 /// A path map's byte of a tile no search has touched (-1).
 pub const UNEXPLORED: u8 = 0xff;
@@ -62,7 +62,7 @@ fn differs(a: f32, b: f32) -> bool {
 
 impl InfoModule {
     /// The byte of `tile` (`+0x105c8`).
-    fn cell(&self, tile: Tile) -> Result<u8, GenieError> {
+    fn cell(&self, tile: Tile) -> GenieResult<u8> {
         self.path_map.get(tile).ok_or(OFF_THE_GRID)
     }
 
@@ -72,7 +72,7 @@ impl InfoModule {
     /// # Errors
     ///
     /// A tile of the map that the path map does not hold.
-    pub fn tile_uncovered(&self, tile: Tile) -> Result<bool, GenieError> {
+    pub fn tile_uncovered(&self, tile: Tile) -> GenieResult<bool> {
         if !self.size.holds(tile) {
             return Ok(false);
         }
@@ -141,7 +141,7 @@ impl InfoModule {
         start: Point,
         area: &mut ScoutArea<'_>,
         (map, rng): (GridSize, &mut Well512),
-    ) -> Result<Option<Tile>, GenieError> {
+    ) -> GenieResult<Option<Tile>> {
         let own = area.own_zone().byte();
         let mut start = start;
         loop {
@@ -165,7 +165,7 @@ impl InfoModule {
         own: u8,
         area: &mut ScoutArea<'_>,
         (map, rng): (GridSize, &mut Well512),
-    ) -> Result<Flood, GenieError> {
+    ) -> GenieResult<Flood> {
         let (first, _) = self.clamp(start.tile());
         let mut visited = vec![false; (map.width().max(0) * map.height().max(0)) as usize];
         let mut queue = vec![first];
@@ -228,12 +228,7 @@ impl InfoModule {
 
     /// `FUN_140b71490`, after a flood that found nothing: every tile of the map that is neither
     /// unexplored nor a dead end, lies in the unit's zone and is not seen now becomes a dead end.
-    fn mark_dead_ends(
-        &mut self,
-        own: u8,
-        area: &ScoutArea<'_>,
-        map: GridSize,
-    ) -> Result<(), GenieError> {
+    fn mark_dead_ends(&mut self, own: u8, area: &ScoutArea<'_>, map: GridSize) -> GenieResult<()> {
         for y in 0..map.height() {
             for x in 0..map.width() {
                 let tile = Tile::new(x, y);

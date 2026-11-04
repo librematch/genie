@@ -1,7 +1,7 @@
 //! A unit's attack rate and firepower, and its share of a building's volleys
 //! (`FUN_141213520`).
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::combat::Firepower;
 use crate::garrison::DamageRate;
 use crate::math::conversions::cvttss2si;
@@ -156,7 +156,7 @@ pub fn share(
     reload_powerup: Seconds,
     rate: DamageRate,
     roles: &Roles,
-) -> Result<Firepower, GenieError> {
+) -> GenieResult<Firepower> {
     if rate.get() == 0.0 {
         return Ok(Firepower::ZERO);
     }

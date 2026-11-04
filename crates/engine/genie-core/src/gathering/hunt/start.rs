@@ -1,7 +1,6 @@
 //! The Hunt's start, its chase and retarget, a move's target and the walk to a point (states
 //! 11 and 15).
 
-use crate::GenieError;
 use crate::combat::attack::BeginLayer;
 use crate::combat::attack::{Arms, Attack, Engagement};
 use crate::gathering::DropSiteId;
@@ -35,6 +34,7 @@ use crate::world::layer::ClassRoles;
 use crate::world::layer::generated::HuntTuning;
 use crate::world::layer::generated::MoveToTuning;
 use crate::world::step::Step;
+use crate::{GenieError, GenieResult};
 
 /// Who walks to a hunt's point ([`HuntAction::update_point_walk`]).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -146,7 +146,7 @@ impl HuntAction {
         mover: &mut Mover,
         layer: BeginLayer<'_>,
         hunt_tuning: &HuntTuning,
-    ) -> Result<(Self, MoveStart), GenieError> {
+    ) -> GenieResult<(Self, MoveStart)> {
         let BeginLayer {
             roles,
             attack_tuning,
@@ -240,7 +240,7 @@ impl HuntAction {
         mover: &mut Mover,
         layer: BeginLayer<'_>,
         hunt_tuning: &HuntTuning,
-    ) -> Result<MoveStart, GenieError> {
+    ) -> GenieResult<MoveStart> {
         let BeginLayer {
             roles,
             attack_tuning,
@@ -317,7 +317,7 @@ impl HuntAction {
         mover: &mut Mover,
         layer: BeginLayer<'_>,
         hunt_tuning: &HuntTuning,
-    ) -> Result<Option<MoveStart>, GenieError> {
+    ) -> GenieResult<Option<MoveStart>> {
         let BeginLayer {
             roles,
             attack_tuning,
@@ -387,7 +387,7 @@ impl HuntAction {
         take: HuntMove<'_>,
         mover: &mut Mover,
         move_to_tuning: &MoveToTuning,
-    ) -> Result<Answer, GenieError> {
+    ) -> GenieResult<Answer> {
         let HuntMove {
             target,
             point,
@@ -445,7 +445,7 @@ impl HuntAction {
         mover: &mut Mover,
         walks: &Walks<'_>,
         move_to_tuning: &MoveToTuning,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         self.set_point_walk(
             |move_to| HuntState::WalkSearch { move_to },
             mover,
@@ -463,7 +463,7 @@ impl HuntAction {
         mover: &mut Mover,
         walks: &Walks<'_>,
         move_to_tuning: &MoveToTuning,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         self.tear_down(Some(mover))?;
         self.state = walk(None);
         self.timer = Seconds::ZERO;
@@ -485,7 +485,7 @@ impl HuntAction {
         mover: &mut Mover,
         walks: &Walks<'_>,
         move_to_tuning: &MoveToTuning,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         self.timer += dt;
         if self.timer < Seconds::ZERO {
             return Ok(());
@@ -520,7 +520,7 @@ impl HuntAction {
         unit: &mut Unit,
         me: Me,
         who: PointWalker,
-    ) -> Result<PointWalk, GenieError> {
+    ) -> GenieResult<PointWalk> {
         let gives_up = GiveUp {
             patience: if !who.player_kind.is_computer() && who.villager {
                 Patience::WaitsOnce

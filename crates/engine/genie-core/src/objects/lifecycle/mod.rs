@@ -7,7 +7,6 @@
 //! dead, 7 its resource going back, 8 gone. An object's death spawn (state 7) and an undead state
 //! are [`GenieError`].
 
-use crate::GenieError;
 use crate::math::rng::Well512;
 use crate::objects::HitPoints;
 use crate::objects::ListFate;
@@ -17,6 +16,7 @@ use crate::players::Amount;
 use crate::players::AmountRate;
 use crate::players::attribute::AttributeId;
 use crate::world::Seconds;
+use crate::{GenieError, GenieResult};
 use genie_diff::Diff;
 
 pub(crate) mod death_parts;
@@ -71,7 +71,7 @@ pub struct Held {
 pub(crate) fn static_storage(
     owner: &mut Player,
     storage: &[(Option<AttributeId>, Amount, u8)],
-) -> Result<Held, GenieError> {
+) -> GenieResult<Held> {
     let mut held = Held::default();
     for &(kind, amount, flag) in storage {
         let Some(kind) = kind else {
@@ -167,7 +167,7 @@ impl Lifecycle {
         dt_seconds: Seconds,
         object: &mut Well512,
         sprite: SpritePlay,
-    ) -> Result<ListFate, GenieError> {
+    ) -> GenieResult<ListFate> {
         if self.goto_sleep {
             // the object's update moves it to the sleeping list first (`Unit::update`)
             return Err(GenieError::unsupported("the object goes to sleep"));
@@ -220,7 +220,7 @@ impl Lifecycle {
     /// it) are the caller's too ([`crate::vision::ghost`]); the statistics and the sounds are not held.
     /// The visible-resource lists (`FUN_1411980b0`) are the caller's
     /// ([`crate::objects::lifecycle::death_parts::forget_resource`]).
-    fn die(&mut self, object: &mut Well512) -> Result<(), GenieError> {
+    fn die(&mut self, object: &mut Well512) -> GenieResult<()> {
         if self.inside.is_some() {
             return Err(GenieError::unsupported("an object inside another dies"));
         }
@@ -247,7 +247,7 @@ impl Lifecycle {
 
     /// States 3 and 5: once nothing is held the object moves on to state 7; until then the held
     /// amount decays, never below 0.
-    fn dead(&mut self, dt_seconds: Seconds) -> Result<(), GenieError> {
+    fn dead(&mut self, dt_seconds: Seconds) -> GenieResult<()> {
         let master = self
             .master
             .ok_or(GenieError::unsupported("no master data for a dead object"))?;

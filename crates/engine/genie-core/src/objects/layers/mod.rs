@@ -8,7 +8,7 @@
 //! The row holds the static layer ([`Static`]); the layers above it an object's type has, up to
 //! the action layer, are its [`Motion`], a part of the world's tables.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::map::Position;
 use crate::map::spatial::Spatial;
 use crate::movement::MoveState;
@@ -68,7 +68,7 @@ impl Static {
         (world, pathing): (&mut Spatial, Option<&mut Pathing>),
         roles: &Roles,
         visibility_tuning: VisibilityTuning,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         self.position = at;
         world.set_position(id, at, roles, visibility_tuning)?;
         if let (Some(pathing), Some(p)) = (pathing, world.get(id)) {

@@ -1,7 +1,6 @@
 //! The placement test's terrains (`FUN_141123f80`): the hill mode, the placement and side
 //! terrains and the tiles beside a box.
 
-use crate::GenieError;
 use crate::map::Footprint;
 use crate::map::GridSize;
 use crate::map::Point;
@@ -16,6 +15,7 @@ use crate::objects::masters::HillMode;
 use crate::objects::masters::PlacementTerrains;
 use crate::players::PlayerId;
 use crate::production::spawn::WorldMap;
+use crate::{GenieError, GenieResult};
 
 bitflags::bitflags! {
     /// What BUILD's placement test runs ([`BuildSite`]).
@@ -68,7 +68,7 @@ pub(super) fn hill_fails(
     tile: Tile,
     corner: Tile,
     base: Option<u8>,
-) -> Result<bool, GenieError> {
+) -> GenieResult<bool> {
     let shape = || {
         map.shape(tile).ok_or(GenieError::unsupported(
             "a hill mode where the tiles' shapes are not known",
@@ -107,7 +107,7 @@ pub(crate) fn placement_terrains(
     map: &WorldMap<'_>,
     p: Point,
     b: TileRect,
-) -> Result<bool, GenieError> {
+) -> GenieResult<bool> {
     let PlacementTerrains {
         beside: [side1, side2],
         on: [t1, t2],
@@ -140,7 +140,7 @@ pub(crate) fn placement_terrains(
 pub(super) fn placement_flags(
     map: &WorldMap<'_>,
     t: Option<TerrainId>,
-) -> Result<TerrainFlags, GenieError> {
+) -> GenieResult<TerrainFlags> {
     t.and_then(|t| map.terrain_flags(t.index()))
         .ok_or(GenieError::unsupported(
             "placement terrains with one of -1 or beyond the terrains",
@@ -157,7 +157,7 @@ pub(super) fn point_terrain_allows(
     map: &WorldMap<'_>,
     [t1, t2]: [Option<TerrainId>; 2],
     at: Tile,
-) -> Result<bool, GenieError> {
+) -> GenieResult<bool> {
     let tile = map.terrain(at)?;
     if Some(tile) == t1 || Some(tile) == t2 {
         return Ok(true);
@@ -181,7 +181,7 @@ pub(super) fn point_terrain_allows(
 pub(super) fn side_terrains(
     map: &WorldMap<'_>,
     [side1, side2]: [Option<TerrainId>; 2],
-) -> Result<Vec<TerrainId>, GenieError> {
+) -> GenieResult<Vec<TerrainId>> {
     let (f1, f2) = (placement_flags(map, side1)?, placement_flags(map, side2)?);
     let mut sides: Vec<TerrainId> = [side1, side2].into_iter().flatten().collect();
     for flag in [TerrainFlags::ICE, TerrainFlags::BEACH] {

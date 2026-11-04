@@ -1,7 +1,6 @@
 //! The Enter action ([`EnterAction`], `RGE_Action_Enter`): its walk to its target, its wait
 //! and its update.
 
-use crate::GenieError;
 use crate::garrison::ContainerId;
 use crate::garrison::EnterState;
 use crate::garrison::HALF_TILE;
@@ -37,6 +36,7 @@ use crate::world::index::ObjectsRef;
 use crate::world::layer::Roles;
 use crate::world::others::OthersRef;
 use crate::world::step::Step;
+use crate::{GenieError, GenieResult};
 use genie_diff::Diff;
 
 /// The Enter action's type (`RGE_Action_Enter`, vtable `0x142ed4db8`), which word 9 adds.
@@ -209,7 +209,7 @@ impl EnterAction {
         meeting: Meeting<'_>,
         reads: &MoveToReads<'_>,
         by_id: ObjectsRef<'_>,
-    ) -> Result<Walking, GenieError> {
+    ) -> GenieResult<Walking> {
         let move_to_tuning = &by_id.tuning().move_to;
         self.state = EnterState::Walk { move_to: None };
         if t.in_reach {
@@ -292,7 +292,7 @@ impl EnterAction {
     /// # Errors
     ///
     /// The sprite's.
-    pub(super) fn wait(&mut self, c: &mut Step<'_>, unit: &mut Unit) -> Result<(), GenieError> {
+    pub(super) fn wait(&mut self, c: &mut Step<'_>, unit: &mut Unit) -> GenieResult<()> {
         self.state = EnterState::Wait;
         self.timer = WAIT_SECONDS;
         unit.shows_standing_sprite(
@@ -321,7 +321,7 @@ impl EnterAction {
         target_speed: Speed,
         walls: &mut Walls<'_>,
         by_id: ObjectsRef<'_>,
-    ) -> Result<bool, GenieError> {
+    ) -> GenieResult<bool> {
         let garrison_tuning = &by_id.tuning().garrison;
         if range.squared() < gap_squared {
             return Ok(false);
@@ -350,7 +350,7 @@ impl EnterAction {
         me: Me,
         reads: &EnterReads,
         roles: &Roles,
-    ) -> Result<HeadCode, GenieError> {
+    ) -> GenieResult<HeadCode> {
         let t = Self::held_target(reads.target)?;
         match self.state {
             // state 1 returns 1, state 13 returns 3: either way the list removes the action
@@ -395,7 +395,7 @@ impl EnterAction {
         me: Me,
         t: &EnterTarget,
         reads: &EnterReads,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let roles = &c.w.model.roles.clone();
         let walked_again = self.target_moved(t);
         let entered =
@@ -432,7 +432,7 @@ impl EnterAction {
         unit: &mut Unit,
         me: Me,
         reads: &EnterReads,
-    ) -> Result<SubCode, GenieError> {
+    ) -> GenieResult<SubCode> {
         let how = ListUpdate {
             gives_up: GiveUp {
                 patience: reads.patience,
@@ -450,7 +450,7 @@ impl EnterAction {
     /// The update's test of its target first (`FUN_140a87a80`): one gone, dead (state 3 or
     /// more) or of an unallied player, or without room for the unit, makes the action let it go
     /// and turn to state 11, which is not modelled.
-    pub(super) fn held_target(target: Option<EnterTarget>) -> Result<EnterTarget, GenieError> {
+    pub(super) fn held_target(target: Option<EnterTarget>) -> GenieResult<EnterTarget> {
         let Some(t) = target else {
             return Err(GenieError::unsupported(
                 "an Enter whose building is gone (state 11)",
@@ -497,7 +497,7 @@ impl EnterAction {
         t: &EnterTarget,
         reads: &EnterReads,
         roles: &Roles,
-    ) -> Result<EnterAgain, GenieError> {
+    ) -> GenieResult<EnterAgain> {
         if self.state.move_to().is_some()
             && let Some(m) = c.w.parts.mover_mut(unit.id)
         {
@@ -576,7 +576,7 @@ impl EnterAction {
         (actions, c, unit): (&mut Action, &mut Step<'_>, &mut Unit),
         target: ContainerId,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         self.on_unit(unit, actions, |unit, actions| {
             unit.enter_in_update(actions, c, target, roles)
         })
@@ -593,8 +593,8 @@ impl EnterAction {
         &mut self,
         unit: &mut Unit,
         actions: &mut Action,
-        f: impl FnOnce(&mut Unit, &mut Action) -> Result<R, GenieError>,
-    ) -> Result<R, GenieError> {
+        f: impl FnOnce(&mut Unit, &mut Action) -> GenieResult<R>,
+    ) -> GenieResult<R> {
         actions.list.set_enter(Some(*self));
         let answer = f(unit, actions);
         // the routines run here (the enter, `entered_again`, the transport's move) change the

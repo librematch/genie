@@ -1,6 +1,5 @@
 //! What the villagers, transports, traders, fishing ships and buildings do when damaged.
 
-use crate::GenieError;
 use crate::construction::FoundationId;
 use crate::map::Distance;
 use crate::map::Position;
@@ -41,6 +40,7 @@ use crate::unit_ai::{
 };
 use crate::world::Millis;
 use crate::world::layer::ClassRoles;
+use crate::{GenieError, GenieResult};
 
 impl UnitAi {
     /// The villager's damage notify (`FUN_140c22bf0`, case 500, "I took some damage from Unit
@@ -75,7 +75,7 @@ impl UnitAi {
         player_kind: PlayerKind,
         ai_rng: &mut Well512,
         side: &mut UnitView<'_, '_>,
-    ) -> Result<u32, GenieError> {
+    ) -> GenieResult<u32> {
         let roles = &at.roles;
         if n.p[1] < 1 {
             self.end_notifies(time, at, side, ai_rng)?;
@@ -146,7 +146,7 @@ impl UnitAi {
         at: &Surroundings,
         attacker: &UnitSeen,
         fierce: bool,
-    ) -> Result<bool, GenieError> {
+    ) -> GenieResult<bool> {
         let roles = &at.roles;
         let order = self.current_order;
         let state = held_action_state(at.action_state)?.get();
@@ -188,7 +188,7 @@ impl UnitAi {
         player_kind: PlayerKind,
         ai_rng: &mut Well512,
         side: &mut UnitView<'_, '_>,
-    ) -> Result<u32, GenieError> {
+    ) -> GenieResult<u32> {
         alert_owner(player_kind)?;
         if n.p[1] < 1 {
             self.end_notifies(time, at, side, ai_rng)?;
@@ -254,7 +254,7 @@ impl UnitAi {
         at: &Surroundings,
         side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
-    ) -> Result<u32, GenieError> {
+    ) -> GenieResult<u32> {
         if self.current_action == Some(AiAction::Trade) {
             return Err(GenieError::unsupported(
                 "a trader's search for another dock or market (slot 0xf8, its Trade action)",
@@ -286,7 +286,7 @@ impl UnitAi {
         player_kind: PlayerKind,
         ai_rng: &mut Well512,
         side: &mut UnitView<'_, '_>,
-    ) -> Result<u32, GenieError> {
+    ) -> GenieResult<u32> {
         if n.p[1] < 1 {
             alert_owner(player_kind)?;
             self.end_notifies(time, at, side, ai_rng)?;
@@ -331,7 +331,7 @@ impl UnitAi {
         player_kind: PlayerKind,
         ai_rng: &mut Well512,
         side: &mut UnitView<'_, '_>,
-    ) -> Result<u32, GenieError> {
+    ) -> GenieResult<u32> {
         alert_owner(player_kind)?;
         if n.p[1] < 1 {
             self.end_notifies(time, at, side, ai_rng)?;
@@ -373,7 +373,7 @@ impl UnitAi {
         player_kind: PlayerKind,
         side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
-    ) -> Result<u32, GenieError> {
+    ) -> GenieResult<u32> {
         let unit_ai_tuning = &at.unit_ai_tuning;
         let mut best = (None, FISHING_BUILD_FAR);
         for class in FISHING_BUILDS {
@@ -425,7 +425,7 @@ impl UnitAi {
     /// owner −1, the target point, the range `+0x5c`, the priority `+0x40`, the point shown,
     /// ready): a unit above state 2 or without an order takes none; else the order goes to the
     /// queue's end ([`UnitAi::queue_order`]).
-    pub(super) fn queue_current(&mut self, at: &Surroundings) -> Result<(), GenieError> {
+    pub(super) fn queue_current(&mut self, at: &Surroundings) -> GenieResult<()> {
         // without an order the queue takes none, whatever the state
         let Some(order) = self.current_order else {
             return Ok(());
@@ -463,7 +463,7 @@ impl UnitAi {
         player_kind: PlayerKind,
         side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
-    ) -> Result<u32, GenieError> {
+    ) -> GenieResult<u32> {
         let new = !self.attackers.contains(n.caller);
         alert_owner(player_kind)?;
         if n.p[1] >= 1 && at.flags.contains(SurroundingFlags::GUEST_COMPUTER) {
@@ -534,7 +534,7 @@ impl UnitAi {
         at: &Surroundings,
         side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         self.stop_current(StopOrder::Keep, at, side, rng)?;
         side.effect_now(Effect::Command(AiCommand::HuntObject(target)), self, rng)?;
         self.set_action(Some(AiAction::Hunt));
@@ -554,7 +554,7 @@ impl UnitAi {
         side: &mut UnitView<'_, '_>,
         player_kind: PlayerKind,
         ai: &mut Well512,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let unit_ai_tuning = &at.unit_ai_tuning;
         let roles = &at.roles;
         let Some(order) = self

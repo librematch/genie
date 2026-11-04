@@ -1,7 +1,7 @@
 //! A main building's annexes (`+0xbc0`..`+0xbd8`): its four slots, each an annex or none.
 
-use crate::GenieError;
 use crate::objects::ObjectId;
+use crate::{GenieError, GenieResult};
 use genie_diff::Diff;
 
 /// A main building's annexes (`+0xbc0`..`+0xbd8`, the save's `mLinkedObjectIds`): four slots,
@@ -33,7 +33,7 @@ impl Annexes {
     /// # Errors
     ///
     /// A slot past the building's four.
-    pub fn link(&mut self, slot: usize, id: ObjectId) -> Result<(), GenieError> {
+    pub fn link(&mut self, slot: usize, id: ObjectId) -> GenieResult<()> {
         let held = self.0.get_mut(slot).ok_or_else(|| {
             GenieError::unreachable("an annex past a building's four slots").with("slot", slot)
         })?;
@@ -54,8 +54,8 @@ impl Annexes {
     /// The first error of `gone`.
     pub fn let_go(
         &mut self,
-        mut gone: impl FnMut(ObjectId) -> Result<bool, GenieError>,
-    ) -> Result<(), GenieError> {
+        mut gone: impl FnMut(ObjectId) -> GenieResult<bool>,
+    ) -> GenieResult<()> {
         for slot in &mut self.0 {
             if let Some(id) = *slot
                 && gone(id)?

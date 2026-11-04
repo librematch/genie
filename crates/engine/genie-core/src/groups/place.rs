@@ -2,7 +2,6 @@
 //! clear point of a spiral round the centroid (`FUN_141007630`), `SetInitialOrientation`
 //! (`FUN_141039680`) and the motion's orientation (`FUN_141049e10`).
 
-use crate::GenieError;
 use crate::groups::FormationKind;
 use crate::groups::GroupFlags;
 use crate::groups::GroupId;
@@ -28,6 +27,7 @@ use crate::world::World;
 use crate::world::index::ObjectsRef;
 use crate::world::layer::generated::GroupTuning;
 use crate::world::slots::CheckedIndex;
+use crate::{GenieError, GenieResult};
 
 /// The spiral's steps (`FUN_141007630`'s table from `DAT_142f49460` and `DAT_142f49480`), x and y:
 /// up y, up x, down y, down x.
@@ -63,7 +63,7 @@ impl From<Point> for Spiral {
 impl Spiral {
     /// One step in the direction; it turns when the count divides by the leg's length, and the
     /// leg grows on a turn to y (an even direction).
-    fn step(&mut self) -> Result<(), GenieError> {
+    fn step(&mut self) -> GenieResult<()> {
         self.at += *SPIRAL.checked(self.direction)?;
         if self.count % self.leg == 0 {
             self.direction = (self.direction + 1) % SPIRAL.len();
@@ -131,7 +131,7 @@ impl World {
     ///
     /// When the world does not hold `group`: the game's routine gets the group itself, and its
     /// callers pass a group they hold.
-    pub fn set_initial_position(&mut self, group: GroupId) -> Result<(), GenieError> {
+    pub fn set_initial_position(&mut self, group: GroupId) -> GenieResult<()> {
         let g = self.groups.held_mut(group)?;
         g.stored_positions.clear_points();
         let centroid = g.centroid;
@@ -166,7 +166,7 @@ impl World {
     ///
     /// When the world does not hold `group`: the game's routine gets the group itself, from a
     /// caller that holds it.
-    pub fn clear_spot(&mut self, group: GroupId, centroid: BVector) -> Result<BVector, GenieError> {
+    pub fn clear_spot(&mut self, group: GroupId, centroid: BVector) -> GenieResult<BVector> {
         let g = self.groups.held(group)?;
         let Some(first) = g.members.first() else {
             return Ok(centroid);
@@ -222,7 +222,7 @@ impl World {
     ///
     /// When the world does not hold `group`: the game's routine gets the group itself, and its
     /// caller ([`World::set_initial_position`]) holds it.
-    pub fn set_initial_orientation(&mut self, group: GroupId) -> Result<(), GenieError> {
+    pub fn set_initial_orientation(&mut self, group: GroupId) -> GenieResult<()> {
         let g = self.groups.held(group)?;
         let forwards: Vec<BVector> = g
             .members
@@ -281,11 +281,7 @@ impl World {
     ///
     /// When the world does not hold `group`: the game's routine gets the group itself, from a
     /// caller that holds it.
-    pub fn move_position_to_front(
-        &mut self,
-        group: GroupId,
-        ahead: Distance,
-    ) -> Result<(), GenieError> {
+    pub fn move_position_to_front(&mut self, group: GroupId, ahead: Distance) -> GenieResult<()> {
         let by_id = ObjectsRef::new(
             &self.players,
             &self.index,
@@ -409,11 +405,7 @@ impl World {
     ///
     /// No such master, a master without a restriction (the game indexes before the table) and a
     /// map without its terrain.
-    pub(crate) fn master_mask(
-        &self,
-        p: PlayerId,
-        master: MasterId,
-    ) -> Result<TerrainMask, GenieError> {
+    pub(crate) fn master_mask(&self, p: PlayerId, master: MasterId) -> GenieResult<TerrainMask> {
         let restriction =
             self.master(p, master)?
                 .terrain_restriction

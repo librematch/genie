@@ -13,7 +13,6 @@
 //! player that is both a computer and not (`FUN_141659cf0` decides their flags and their test),
 //! so never.
 
-use crate::GenieError;
 use crate::commands::QueueId;
 use crate::commands::UnitList;
 use crate::construction::FoundationId;
@@ -38,6 +37,7 @@ use crate::world::layer::ClassRoles;
 use crate::world::layer::generated::WallTuning;
 use crate::world::slots::CheckedIndex;
 use crate::world::slots::PlayerSlots;
+use crate::{GenieError, GenieResult};
 use std::cmp::Ordering;
 
 /// The snap's half tile and its step up (`FUN_141123ac0`).
@@ -78,7 +78,7 @@ impl BuildWallCommand {
     /// `do_command`'s case checks the builders as BUILD's (a count past the packet's ids
     /// refuses it, [`World::read_units`]), then the wall's line is placed
     /// ([`World::build_wall`]).
-    pub(crate) fn run(&self, w: &mut World) -> Result<(), GenieError> {
+    pub(crate) fn run(&self, w: &mut World) -> GenieResult<()> {
         let Some(listed) = w.read_units(self.player, &self.builders) else {
             return Ok(());
         };
@@ -129,7 +129,7 @@ pub fn segments(from: Tile, to: Tile) -> Vec<(Tile, Tile)> {
 /// # Errors
 ///
 /// For a segment neither straight nor diagonal.
-pub fn tiles(from: Tile, to: Tile) -> Result<Vec<Tile>, GenieError> {
+pub fn tiles(from: Tile, to: Tile) -> GenieResult<Vec<Tile>> {
     let (dx, dy) = (to.x() - from.x(), to.y() - from.y());
     if dx != 0 && dy != 0 && dx.abs() != dy.abs() {
         return Err(GenieError::unsupported(
@@ -230,7 +230,7 @@ impl World {
         &mut self,
         w: &BuildWallCommand,
         builders: &[Option<ObjectId>],
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let (player, master) = (w.player, w.master);
         if w.queue_id.is_queued() {
             return Ok(());
@@ -287,7 +287,7 @@ impl World {
         &mut self,
         w: &BuildWallCommand,
         radius: Footprint,
-    ) -> Result<Vec<(FoundationId, Position)>, GenieError> {
+    ) -> GenieResult<Vec<(FoundationId, Position)>> {
         let (player, master) = (w.player, w.master);
         let mut placed: Vec<(FoundationId, Position)> = Vec::new();
         for (a, b) in segments(w.from, w.to) {
@@ -321,7 +321,7 @@ impl World {
         &self,
         w: &BuildWallCommand,
         builders: &[Option<ObjectId>],
-    ) -> Result<Vec<(ObjectId, f32)>, GenieError> {
+    ) -> GenieResult<Vec<(ObjectId, f32)>> {
         let mut sorted = Vec::new();
         for id in self.checked_units(w.player, builders).into_iter().flatten() {
             let Some((owner, u)) = self.object(id) else {
@@ -361,7 +361,7 @@ impl World {
         id: ObjectId,
         placed: &[(FoundationId, Position)],
         (foundation, at): (FoundationId, Position),
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let (player, master) = (w.player, w.master);
         let Some(Place::Live(q, idx)) = self.place(id) else {
             return Err(GenieError::unsupported(
@@ -400,7 +400,7 @@ impl World {
         &self,
         (building, trained_at): (MasterId, &[MasterId]),
         id: ObjectId,
-    ) -> Result<bool, GenieError> {
+    ) -> GenieResult<bool> {
         let Some((owner, u)) = self.object(id) else {
             return Ok(false);
         };

@@ -12,13 +12,13 @@
 //! maps are saved (`FUN_141414790`, read by `FUN_1414110f0`): a game loaded from a save holds
 //! them as they were made, and a map is not made again when the terrain changes later.
 
-use crate::GenieError;
 use crate::map::Distance;
 use crate::map::Restriction;
 use crate::map::TerrainId;
 use crate::map::{GridSize, Tile, TileOffset};
 use crate::math::fmath::{at_most_or_unordered, sqrt};
 use crate::world::slots::CheckedIndex;
+use crate::{GenieError, GenieResult};
 
 /// The number after the last a patch takes; the next patch takes 0 again.
 const PATCHES: u16 = 0x200;
@@ -433,7 +433,7 @@ impl Zones {
     /// # Errors
     ///
     /// An index no zone map has.
-    pub fn map(&self, index: usize) -> Result<&ZoneMap, GenieError> {
+    pub fn map(&self, index: usize) -> GenieResult<&ZoneMap> {
         self.maps.checked(index)
     }
 
@@ -448,7 +448,7 @@ impl Zones {
         size: GridSize,
         kinds: &[TerrainId],
         values: &Restriction,
-    ) -> Result<&ZoneMap, GenieError> {
+    ) -> GenieResult<&ZoneMap> {
         let i = self.find(size, kinds, values, Relabel::Kept);
         self.maps.checked(i)
     }

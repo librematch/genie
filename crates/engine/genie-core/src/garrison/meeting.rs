@@ -1,7 +1,6 @@
 //! Where an Enter meets its target (`FUN_140a85f30`): the landing tile, the walled-off test,
 //! the meeting point and the reach.
 
-use crate::GenieError;
 use crate::garrison::ContainerId;
 use crate::garrison::EnterKind;
 use crate::garrison::transport::TRANSPORT;
@@ -32,6 +31,7 @@ use crate::world::Unread;
 use crate::world::index::ObjectsRef;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
+use crate::{GenieError, GenieResult};
 use std::iter::FusedIterator;
 use std::sync::Arc;
 
@@ -59,7 +59,7 @@ pub struct MeetingTarget {
     /// Its place, x and y.
     pub(crate) position: Point,
     /// Its top action's point (`FUN_140a7be40`, `FUN_140a7be50`), or why the slice has not got it.
-    pub(crate) action_point: Result<Point, GenieError>,
+    pub(crate) action_point: GenieResult<Point>,
 }
 
 /// Where `FUN_140a85f30` meets an Enter's target, by the target alone ([`meet_at`]); the
@@ -171,7 +171,7 @@ pub fn walled_off(
     masters: &[Arc<Masters>],
     (id, stats): (ObjectId, &MoveStats),
     by_id: ObjectsRef<'_>,
-) -> Result<bool, GenieError> {
+) -> GenieResult<bool> {
     let map = spatial.map;
     let (mx, my) = (cvttss2si(me.x()), cvttss2si(me.y()));
     let (tx, ty) = (cvttss2si(them.x()), cvttss2si(them.y()));
@@ -209,11 +209,7 @@ pub fn walled_off(
 /// # Errors
 ///
 /// An object whose master the slice lacks.
-fn buildings_on(
-    spatial: &Spatial,
-    masters: &[Arc<Masters>],
-    tile: Tile,
-) -> Result<usize, GenieError> {
+fn buildings_on(spatial: &Spatial, masters: &[Arc<Masters>], tile: Tile) -> GenieResult<usize> {
     let mut n = 0;
     for (_, o) in spatial.objects_on(tile) {
         let m = player_master(masters, o.player, o.master).ok_or(GenieError::unsupported(
@@ -240,7 +236,7 @@ pub(crate) fn meeting_target(
     ),
     tm: &Master,
     room: bool,
-) -> Result<MeetingTarget, GenieError> {
+) -> GenieResult<MeetingTarget> {
     if let Some(e) = target_unread {
         return Err(e.error());
     }
@@ -287,7 +283,7 @@ pub(crate) fn meeting_point(
     spatial: &mut Spatial,
     zones: &mut Zones,
     by_id: ObjectsRef<'_>,
-) -> Result<(Point, u8), GenieError> {
+) -> GenieResult<(Point, u8)> {
     let roles = by_id.roles();
     match meet_at(t, roles) {
         MeetAt::Place => Ok((t.position, 0)),
@@ -310,7 +306,7 @@ fn shore_or_beach(
     spatial: &mut Spatial,
     zones: &mut Zones,
     by_id: ObjectsRef<'_>,
-) -> Result<(Point, u8), GenieError> {
+) -> GenieResult<(Point, u8)> {
     let (ux, uy) = (unit.1.x(), unit.1.y());
     if let Some(tile) = shore(t, unit, spatial, zones, by_id)? {
         let (x, y) = (tile.x() as f32, tile.y() as f32);
@@ -341,7 +337,7 @@ fn shore(
     spatial: &mut Spatial,
     zones: &mut Zones,
     by_id: ObjectsRef<'_>,
-) -> Result<Option<Tile>, GenieError> {
+) -> GenieResult<Option<Tile>> {
     let (ux, uy) = (at.x(), at.y());
     let terrain = spatial.terrain.as_ref().ok_or(NO_TERRAIN)?;
     let values = terrain
@@ -399,7 +395,7 @@ impl Walls<'_> {
     /// # Errors
     ///
     /// [`walled_off`]'s.
-    pub fn walled_off(&mut self, by_id: ObjectsRef<'_>) -> Result<bool, GenieError> {
+    pub fn walled_off(&mut self, by_id: ObjectsRef<'_>) -> GenieResult<bool> {
         walled_off(
             self.me,
             self.them,
@@ -423,7 +419,7 @@ pub(crate) fn enter_reach(
     (target, target_mover): (ObjectId, Option<&Mover>),
     range: Distance,
     by_id: ObjectsRef<'_>,
-) -> Result<bool, GenieError> {
+) -> GenieResult<bool> {
     let me = spatial
         .get_known(id)?
         .ok_or(GenieError::unsupported("an entering unit without a place"))?;
@@ -460,7 +456,7 @@ pub(crate) fn enter_view(
     ((t, target_mover), tm, room): ((&Unit, Option<&Mover>), &Master, bool),
     range: Distance,
     by_id: ObjectsRef<'_>,
-) -> Result<(EnterTarget, WalkStart), GenieError> {
+) -> GenieResult<(EnterTarget, WalkStart)> {
     let kind = if tm.kind == MasterKind::BUILDING {
         EnterKind::Building
     } else {
@@ -537,7 +533,7 @@ impl Meeting<'_> {
     /// # Errors
     ///
     /// A unit without movement state ([`NO_SPEED`]), and what the meeting does not model.
-    pub(crate) fn point(self, by_id: ObjectsRef<'_>) -> Result<(Point, u8), GenieError> {
+    pub(crate) fn point(self, by_id: ObjectsRef<'_>) -> GenieResult<(Point, u8)> {
         let at = self.target.position();
         if self.master.kind == MasterKind::BUILDING {
             return Ok((at.ground(), 0));
@@ -573,7 +569,7 @@ pub(crate) fn ship_reaches(
     plan: &mut Planning<'_>,
     to: Position,
     by_id: ObjectsRef<'_>,
-) -> Result<bool, GenieError> {
+) -> GenieResult<bool> {
     let garrison_tuning = &by_id.tuning().garrison;
     let Some(m) = mover else {
         return Ok(false);

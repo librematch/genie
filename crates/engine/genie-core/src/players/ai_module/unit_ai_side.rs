@@ -6,7 +6,7 @@
 //! `FUN_14162dab0`), which runs the hear logic between a push and a pop of every stream's state
 //! (`FUN_140efe4a0`, `FUN_140efe450`): the draws of the search leave no trace but its result.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::map::Distance;
 use crate::map::Point;
 use crate::map::Tile;
@@ -49,7 +49,7 @@ impl UnitView<'_, '_> {
     /// # Errors
     ///
     /// The tasking or detasking, and what the search does not model.
-    pub(crate) fn hears(&mut self, n: Notify, roles: &Roles) -> Result<(), GenieError> {
+    pub(crate) fn hears(&mut self, n: Notify, roles: &Roles) -> GenieResult<()> {
         let player = self.player;
         if !self.player_kind.is_computer() || n.kind != NotifyKind::REQUIRES_SEARCH {
             return Ok(());
@@ -82,7 +82,7 @@ impl UnitView<'_, '_> {
         module: &mut AiModule,
         n: Notify,
         roles: &Roles,
-    ) -> Result<Heard, GenieError> {
+    ) -> GenieResult<Heard> {
         let explore = [
             AiAction::Explore.value(),
             AiAction::ExploreAndDestroy.value(),

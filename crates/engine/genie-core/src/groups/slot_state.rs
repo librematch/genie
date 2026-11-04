@@ -1,7 +1,7 @@
 //! A formation slot's state: its member steers to it, reaches it, stops at it or stands in it.
 
-use crate::GenieError;
 use crate::groups::motion::Passing;
+use crate::{GenieError, GenieResult};
 use derive_more::Display;
 
 /// A formation slot's state (`mState`, `+0x2c`), which a member's steer to its slot
@@ -29,7 +29,7 @@ impl SlotState {
     /// # Errors
     ///
     /// A value that names no state of a formation slot.
-    pub fn of_int(value: i32) -> Result<Self, GenieError> {
+    pub fn of_int(value: i32) -> GenieResult<Self> {
         Ok(match value {
             0 => Self::Steering,
             1 => Self::Arriving,

@@ -2,7 +2,6 @@
 //! follows it, the restart, the idle, a retarget, the halt and the end; the builder count and
 //! the load the work's end drops.
 
-use crate::GenieError;
 use crate::construction::build::BuildState;
 use crate::construction::build::{BuildAction, BuildReads, drop_done_orders};
 use crate::gathering::DropSiteId;
@@ -19,6 +18,7 @@ use crate::players::PlayerKind;
 use crate::players::attribute::AttributeId;
 use crate::unit_ai::NotifyKind;
 use crate::unit_ai::{AiAction, OrderKind};
+use crate::{GenieError, GenieResult};
 
 use crate::construction::{BuilderCount, FoundationId};
 use crate::movement::Mover;
@@ -39,7 +39,7 @@ impl BuildAction {
     pub(super) fn site_unit<'w>(
         c: &'w Step<'_>,
         reads: &BuildReads,
-    ) -> Result<Option<&'w Unit>, GenieError> {
+    ) -> GenieResult<Option<&'w Unit>> {
         let _ = c.w.players.player(c.player)?;
         Ok(reads.site.and_then(|id| c.w.live_object(c.player, id)))
     }
@@ -51,11 +51,7 @@ impl BuildAction {
     /// # Errors
     ///
     /// An object of a master its owner lacks.
-    pub(super) fn count(
-        c: &mut Step<'_>,
-        site: Option<FoundationId>,
-        by: i8,
-    ) -> Result<(), GenieError> {
+    pub(super) fn count(c: &mut Step<'_>, site: Option<FoundationId>, by: i8) -> GenieResult<()> {
         if let Some(id) = c.w.counted_building(site)?
             && c.w.object(id).is_some()
         {
@@ -71,10 +67,7 @@ impl BuildAction {
     /// # Errors
     ///
     /// An object of a master its owner lacks.
-    pub(super) fn builders(
-        c: &Step<'_>,
-        site: Option<FoundationId>,
-    ) -> Result<BuilderCount, GenieError> {
+    pub(super) fn builders(c: &Step<'_>, site: Option<FoundationId>) -> GenieResult<BuilderCount> {
         Ok(c.w
             .counted_building(site)?
             .and_then(|id| c.w.object(id))
@@ -87,7 +80,7 @@ impl BuildAction {
     /// # Errors
     ///
     /// [`BuildAction::count`]'s.
-    pub(super) fn uncount(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
+    pub(super) fn uncount(&mut self, c: &mut Step<'_>) -> GenieResult<()> {
         if self.added {
             Self::count(c, self.target, -1)?;
             self.added = false;
@@ -102,7 +95,7 @@ impl BuildAction {
     /// # Errors
     ///
     /// The builder count's, and the unit's stop that the motion step does not model.
-    pub(super) fn leave(&mut self, c: &mut Step<'_>, builder: &Unit) -> Result<(), GenieError> {
+    pub(super) fn leave(&mut self, c: &mut Step<'_>, builder: &Unit) -> GenieResult<()> {
         self.uncount(c)?;
         if self.state.take_move_to().is_some()
             && let Some(m) = c.w.parts.mover_mut(builder.id)
@@ -124,7 +117,7 @@ impl BuildAction {
         builder: &mut Unit,
         kind: AttributeId,
         amount: Amount,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         c.give_load(kind, amount)?;
         builder.life.attribute_kind = None;
         builder.life.amount = Amount::ZERO;
@@ -143,7 +136,7 @@ impl BuildAction {
         c: &mut Step<'_>,
         builder: &mut Unit,
         reads: &BuildReads,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         self.leave(c, builder)?;
         self.state = BuildState::Finished;
         let (amount, kind) = (builder.life.amount, builder.life.attribute_kind);
@@ -179,7 +172,7 @@ impl BuildAction {
         actions: &mut Action,
         reads: &BuildReads,
         roles: &Roles,
-    ) -> Result<HeadCode, GenieError> {
+    ) -> GenieResult<HeadCode> {
         if c.w.players.player(c.player)?.kind.is_computer() {
             return Err(GenieError::unsupported(
                 "a computer player's builder after its work",
@@ -252,7 +245,7 @@ impl BuildAction {
         actions: &mut Action,
         c: &mut Step<'_>,
         builder: &mut Unit,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let point =
             c.w.spatial
                 .get(self.target)
@@ -288,7 +281,7 @@ impl BuildAction {
         actions: &mut Action,
         ((site, built), reads): ((FoundationId, MasterId), &BuildReads),
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if let Some(work) = builder.more_work(actions, c, site.id(), built, roles)? {
             return self.lend(c, builder, actions, |w, p, i| w.order_work(p, i, &work));
         }
@@ -308,7 +301,7 @@ impl BuildAction {
     /// # Errors
     ///
     /// [`Unit::show_standing`]'s.
-    pub(super) fn stand(c: &mut Step<'_>, builder: &mut Unit) -> Result<(), GenieError> {
+    pub(super) fn stand(c: &mut Step<'_>, builder: &mut Unit) -> GenieResult<()> {
         builder.show_standing(
             c.w.parts.motion.layer_mut(builder.id),
             OwnerMasters::new(&c.w.parts.own_master, c.w.model.masters.of(c.player)),
@@ -335,7 +328,7 @@ impl BuildAction {
         c: &mut Step<'_>,
         builder: &Unit,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         self.leave(c, builder)?;
         let (to, walk) = self.walk_to_foundation(c, builder, roles)?;
         *self = self.restarted(self.target, to.map_or(self.point, |t| t.at), walk);
@@ -360,7 +353,7 @@ impl BuildAction {
         c: &mut Step<'_>,
         builder: &mut Unit,
         reads: &BuildReads,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let built = Self::site_unit(c, reads)?.map(|s| (s.id, s.life.state));
         self.leave(c, builder)?;
         self.state = BuildState::Idle;
@@ -403,7 +396,7 @@ impl BuildAction {
         mover: Option<&mut Mover>,
         builders: Option<&mut BuilderCount>,
         player_kind: PlayerKind,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if self.state == BuildState::Work
             || (matches!(self.state, BuildState::Move { .. }) && player_kind.is_computer())
         {
@@ -441,7 +434,7 @@ impl BuildAction {
         at: Position,
         walk: Option<MoveToAction>,
         mover: Option<&mut Mover>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if self.state.move_to().is_some()
             && let Some(m) = mover
         {
@@ -466,7 +459,7 @@ impl BuildAction {
     pub(crate) fn halt(
         &mut self,
         mover: Option<&mut Mover>,
-    ) -> Result<(bool, Option<FoundationId>, Option<DropSiteId>), GenieError> {
+    ) -> GenieResult<(bool, Option<FoundationId>, Option<DropSiteId>)> {
         let counted = replace(&mut self.added, false);
         if self.state.take_move_to().is_some()
             && let Some(m) = mover
@@ -490,7 +483,7 @@ impl BuildAction {
         c: &mut Step<'_>,
         builder: &mut Unit,
         reads: &BuildReads,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let (counted, target, second) = self.halt(c.w.parts.mover_mut(builder.id))?;
         if counted {
             Self::count(c, target, -1)?;
@@ -508,7 +501,7 @@ impl BuildAction {
     /// # Errors
     ///
     /// A Build with its `MoveTo` (`set_state`'s teardown is not modelled for it).
-    pub const fn no_more_work(&mut self) -> Result<(), GenieError> {
+    pub const fn no_more_work(&mut self) -> GenieResult<()> {
         if self.state.move_to().is_some() {
             return Err(GenieError::unsupported("a Build waiting with its MoveTo"));
         }
@@ -530,7 +523,7 @@ impl BuildAction {
         c: &mut Step<'_>,
         builder: &mut Unit,
         state: BuildState,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         self.leave(c, builder)?;
         self.state = state;
         Self::stand(c, builder)

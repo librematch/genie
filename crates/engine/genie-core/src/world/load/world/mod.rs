@@ -5,7 +5,6 @@
 //!
 //! [`loaded_world`]: crate::world::load::world::loaded::loaded_world
 
-use crate::GenieError;
 use crate::gathering::QueueCount;
 use crate::map::Distance;
 use crate::map::GridSize;
@@ -24,6 +23,7 @@ use crate::world::Seconds;
 use crate::world::Tick;
 use crate::world::WorldTime;
 use crate::world::{AllySharing, AutoQueues, Departures};
+use crate::{GenieError, GenieResult};
 use genie_model::layer::BuildLayer;
 use std::sync::Arc;
 
@@ -93,7 +93,7 @@ pub fn saved_world(
     header: &Header,
     masters: Option<&MasterTable>,
     build: &BuildLayer,
-) -> Result<World, GenieError> {
+) -> GenieResult<World> {
     let missile_tuning = &build.tuning.missile;
     let victory = &header.world.base_world.victory_conditions;
     // a technology state that names none stops every player once the world stands
@@ -259,7 +259,7 @@ pub fn saved_world(
                 },
             })
         })
-        .collect::<Result<Vec<_>, GenieError>>()?;
+        .collect::<GenieResult<Vec<_>>>()?;
     let world = &header.world.base_world;
     let mut turns = World::new(
         WorldTime::from_millis(world.world_time),
@@ -569,7 +569,7 @@ const fn option(flag: OptionFlags, byte: u8) -> OptionFlags {
 /// # Errors
 ///
 /// A ghost's id of −1 or a state the game does not have.
-pub fn saved_ghosts(section: &PlayerSection<'_>) -> Result<Vec<Ghost>, GenieError> {
+pub fn saved_ghosts(section: &PlayerSection<'_>) -> GenieResult<Vec<Ghost>> {
     section
         .objects()
         .doppleganger_objects
@@ -618,7 +618,7 @@ pub fn garrison_firepower(turns: &mut World) {
 
 /// A unit inside a building, the building, and the unit's share of its volleys (none for a
 /// unit that is not of type 70 or a building whose master the table lacks).
-type Entered = (ObjectId, ObjectId, Option<Result<Firepower, GenieError>>);
+type Entered = (ObjectId, ObjectId, Option<GenieResult<Firepower>>);
 
 /// Player `p`'s units inside a building of its own, in list order, each with its building and
 /// its share ([`garrison_firepower`]).

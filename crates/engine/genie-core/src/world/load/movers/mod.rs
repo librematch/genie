@@ -1,7 +1,6 @@
 //! A saved moving object's movement: its masters' animated and moving parts, its path levels,
 //! its movement state and its `MoveTo`'s point.
 
-use crate::GenieError;
 use crate::map::Distance;
 use crate::map::RestrictionId;
 use crate::map::{Position, Radii};
@@ -24,6 +23,7 @@ use crate::players::CivId;
 use crate::world::Seconds;
 use crate::world::WorldTime;
 use crate::world::load::object_ids;
+use crate::{GenieError, GenieResult};
 use genie_import::dat::MasterTable;
 use genie_import::dat::dat_id;
 use genie_import::save::master_facets;
@@ -39,7 +39,7 @@ pub fn vec3(b: &[u8; 12]) -> BVector {
 }
 
 /// One saved level of path data, with its path's waypoints from the world's path table.
-pub fn path_level(d: &PathData, paths: &[Path]) -> Result<MovementPathData, GenieError> {
+pub fn path_level(d: &PathData, paths: &[Path]) -> GenieResult<MovementPathData> {
     // a level without a path (id -1) holds none: a bird's top level
     let path = match d.path_id {
         -1 => None,
@@ -99,7 +99,7 @@ pub fn mover(
     paths: &[Path],
     civ: CivId,
     masters: Option<&MasterTable>,
-) -> Result<Option<Mover>, GenieError> {
+) -> GenieResult<Option<Mover>> {
     use crate::movement::{MoveStats, Mover, Velocity};
     let Some(m) = object.moving_part() else {
         return Ok(None);

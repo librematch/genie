@@ -1,7 +1,7 @@
 //! A convex hull ([`Hull`], `MConvexHull`): the point test, the intersection, a box's overlap,
 //! the merge and the rays to a box or out of the hull.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::map::Axis;
 use crate::math::fmath::at_most_or_unordered;
 use crate::pathing::hull_path::{
@@ -147,7 +147,7 @@ impl Hull {
     /// not compared with each other): from the highest point (the rightmost of the highest), a
     /// gift wrap by the largest pseudo-angle turned by the last step's (the farthest of equals),
     /// until no point is left or the first point turns no less.
-    pub(super) fn merge(&mut self, more: &[Point]) -> Result<(), GenieError> {
+    pub(super) fn merge(&mut self, more: &[Point]) -> GenieResult<()> {
         let mut scratch = self.points.clone();
         for p in more {
             let seen = self

@@ -1,6 +1,6 @@
 //! The generation tasks (action type 151): their test, what they make and the player's store.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::combat::abilities::{ONE, Own, WORKING, WORKING_ACTIONS};
 use crate::gathering::gather::unit::give_load;
 use crate::math::fmath::below_or_unordered;
@@ -130,7 +130,7 @@ impl World {
         owner: PlayerId,
         master: Own,
         task: &Task,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let unit = self.players.live(p, i)?;
         let flags = task.combat_level_flag;
         let short_cut = match master.kind {
@@ -209,7 +209,7 @@ impl World {
 
     /// What a generation task's test reads of the object `id` its top action works on, as the
     /// world holds it; None for an object the world does not hold.
-    pub(super) fn work_target(&self, id: ObjectId) -> Result<Option<WorkTarget>, GenieError> {
+    pub(super) fn work_target(&self, id: ObjectId) -> GenieResult<Option<WorkTarget>> {
         let Some((q, u)) = self.object(id) else {
             return Ok(None);
         };

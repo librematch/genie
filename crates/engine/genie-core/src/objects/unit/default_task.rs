@@ -1,7 +1,6 @@
 //! The master's default task, which an idle unit starts in its update: a bird's Fly, a farm's
 //! Make or the Artifact of livestock.
 
-use crate::GenieError;
 use crate::gathering::make::MakeAction;
 use crate::objects::DefaultStart;
 use crate::objects::ObjectState;
@@ -12,6 +11,7 @@ use crate::objects::unit::Unit;
 use crate::ownership::artifact::Artifact;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
+use crate::{GenieError, GenieResult};
 
 impl Unit {
     /// `RGE_Action_Object::update` (`0x14106ac90`) on a unit in state 2 without an action or a
@@ -22,7 +22,7 @@ impl Unit {
         &mut self,
         actions: &mut Action,
         c: &mut Step<'_>,
-    ) -> Result<DefaultStart, GenieError> {
+    ) -> GenieResult<DefaultStart> {
         if self.life.state != ObjectState::Alive
             || actions.top_action_kind().is_some()
             || c.w.parts.production.contains(self.id)

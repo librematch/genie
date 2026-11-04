@@ -1,12 +1,12 @@
 //! A target's slot 0xe8: a building's, a static object's and a combat unit's, with the
 //! unit's facing, its retaliation and the hit's end.
 
-use crate::GenieError;
 use crate::combat::damage::{
     Armored, Attacker, Building, EPSILON, ONE, Razed, Victim, charge_hit, damage, effective,
     elevation_factor, facing_offset, hp_floor, lose, special_charge_ready,
 };
 use crate::world::slots::CheckedIndex;
+use crate::{GenieError, GenieResult};
 
 /// One kill or razing, as the counts add it to an attribute.
 const ONE_COUNT: Amount = Amount::new(ONE);
@@ -64,7 +64,7 @@ pub fn take(
     factor: f32,
     blast_taken: HitPoints,
     layer: HitLayer<'_>,
-) -> Result<(), GenieError> {
+) -> GenieResult<()> {
     let HitLayer { roles, .. } = layer;
     match t.kind {
         MasterKind::COMBAT => take_unit(t, src, others, weapons, factor, blast_taken, layer),
@@ -97,7 +97,7 @@ fn razing_counts(
     (ap, q): (PlayerId, PlayerId),
     cost: Amount,
     slots: Slots,
-) -> Result<[(PlayerId, AttributeId, Amount); 7], GenieError> {
+) -> GenieResult<[(PlayerId, AttributeId, Amount); 7]> {
     Ok([
         (ap, slots.attribute.razings, ONE_COUNT),
         (ap, slots.attribute.kills_value, cost),
@@ -124,7 +124,7 @@ fn kill_counts(
     (ap, q): (PlayerId, PlayerId),
     cost: Amount,
     slots: Slots,
-) -> Result<[(PlayerId, AttributeId, Amount); 7], GenieError> {
+) -> GenieResult<[(PlayerId, AttributeId, Amount); 7]> {
     Ok([
         (ap, slots.attribute.kills, ONE_COUNT),
         (ap, slots.attribute.kills_value, cost),
@@ -176,7 +176,7 @@ pub(super) fn take_building(
     strike: Strike<'_>,
     route: HitRoute,
     layer: HitLayer<'_>,
-) -> Result<BuildingHit, GenieError> {
+) -> GenieResult<BuildingHit> {
     let HitLayer {
         roles,
         slots,
@@ -283,7 +283,7 @@ fn forward_to_main(
     strike: Strike<'_>,
     main: MainBuildingId,
     layer: HitLayer<'_>,
-) -> Result<(), GenieError> {
+) -> GenieResult<()> {
     let k = others
         .iter()
         .position(|v| v.id == main.id())
@@ -304,7 +304,7 @@ fn forward_to_main(
 /// `FUN_1415c6510`, the kill bonus of the attacker `src` (type 40 and up) for an object it
 /// killed: its master's tasks of action type 0x9a pay their owner's attributes, research
 /// technologies and run effects (not modelled); an attacker without one does nothing.
-pub(super) fn kill_bonus(src: &Attacker) -> Result<(), GenieError> {
+pub(super) fn kill_bonus(src: &Attacker) -> GenieResult<()> {
     if MasterKind::ACTION <= src.kind && src.kill_bonus_tasks {
         return Err(GenieError::unsupported(
             "an attacker's kill bonus task (action type 0x9a)",
@@ -317,7 +317,7 @@ pub(super) fn kill_bonus(src: &Attacker) -> Result<(), GenieError> {
 /// ability with [`CombatAbility::HIT_EFFECTS`], against a target whose player is not allied with
 /// the attacker's both ways (`FUN_141663d90` with the ally flag, [`Victim::allied`]), does anything
 /// (its master's effects on the target, not modelled).
-pub(super) const fn attack_effects(src: &Attacker, t: &Victim) -> Result<(), GenieError> {
+pub(super) const fn attack_effects(src: &Attacker, t: &Victim) -> GenieResult<()> {
     if src.ability.contains(CombatAbility::HIT_EFFECTS) && !t.allied.both() {
         return Err(GenieError::unsupported(
             "an attacker whose hits apply effects (FUN_14107bdf0)",
@@ -394,7 +394,7 @@ pub(super) fn take_unit(
     factor: f32,
     blast_taken: HitPoints,
     layer: HitLayer<'_>,
-) -> Result<(), GenieError> {
+) -> GenieResult<()> {
     let HitLayer {
         roles,
         damage_tuning,
@@ -432,7 +432,7 @@ pub(super) fn take_unit(
 /// # Errors
 ///
 /// A target without its facing (`+0x7e8`).
-pub(super) fn facing_to(a: &Armored, at: Position, src: &Victim) -> Result<f32, GenieError> {
+pub(super) fn facing_to(a: &Armored, at: Position, src: &Victim) -> GenieResult<f32> {
     let facing = a.facing.ok_or(GenieError::unsupported(
         "the facing of a target with a special attack or a retaliation (+0x7e8)",
     ))?;
@@ -453,7 +453,7 @@ pub(super) fn retaliates(
     others: &mut [&mut Victim],
     a: &Armored,
     layer: HitLayer<'_>,
-) -> Result<bool, GenieError> {
+) -> GenieResult<bool> {
     let HitLayer { damage_tuning, .. } = layer;
     let reach = src.source.weapon_range;
     let melee = reach <= Distance::new(damage_tuning.retaliation_range)
@@ -494,7 +494,7 @@ pub(super) fn after_hit(
     src: &mut Victim,
     a: &Armored,
     before: HitPoints,
-) -> Result<(), GenieError> {
+) -> GenieResult<()> {
     // a hit takes at least one hit point
     let mut lost = before - effective(t);
     let floor = hp_floor(a, t.master_hp);

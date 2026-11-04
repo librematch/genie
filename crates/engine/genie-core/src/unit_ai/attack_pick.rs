@@ -1,6 +1,5 @@
 //! Which object a unit may attack: the attack search, its picks and each type's rules.
 
-use crate::GenieError;
 use crate::combat::Firepower;
 use crate::combat::attack::ATTACK;
 use crate::map::Distance;
@@ -41,6 +40,7 @@ use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 use crate::world::layer::generated::UnitAiTuning;
+use crate::{GenieError, GenieResult};
 
 /// A unit AI's search (`FUN_140c63e20`) as the idle checks run it: it queries its player's
 /// objects in sight of `classes` within `radius` of `at` for a searcher of radii `size`
@@ -316,7 +316,7 @@ pub fn can_attack(
     t: &Target,
     roles: &Roles,
     unit_ai_tuning: &UnitAiTuning,
-) -> Result<bool, GenieError> {
+) -> GenieResult<bool> {
     match me.ai_kind {
         UnitAiKind::Hunted => Ok(matches!(me.top_action, Some(ATTACK | ActionKind::COMBAT))),
         UnitAiKind::Predator => Ok(predator_may_attack(me.attack_priority, t.class, roles)),
@@ -375,7 +375,7 @@ pub fn tower_can_attack(
     t: &Target,
     roles: &Roles,
     unit_ai_tuning: &UnitAiTuning,
-) -> Result<bool, GenieError> {
+) -> GenieResult<bool> {
     if me.player == PlayerId::GAIA
         || roles
             .of_class(t.class)
@@ -435,7 +435,7 @@ impl Attacker {
     /// # Errors
     ///
     /// A charge of type 6 or 7.
-    pub const fn range_against(&self) -> Result<Distance, GenieError> {
+    pub const fn range_against(&self) -> GenieResult<Distance> {
         if self.charge_kind.ranged() {
             return Err(GenieError::unsupported(
                 "an attacker whose charge adds to its range (slot 0x2f8)",
@@ -462,7 +462,7 @@ pub fn soldier_can_attack(
     t: &Target,
     roles: &Roles,
     unit_ai_tuning: &UnitAiTuning,
-) -> Result<bool, GenieError> {
+) -> GenieResult<bool> {
     if roles.of_class(t.class).contains(ClassRoles::LAND_MINE) {
         return Ok(false);
     }
@@ -547,7 +547,7 @@ pub(super) fn stance_reaches(
     s: &Seeker,
     t: &Target,
     unit_ai_tuning: &UnitAiTuning,
-) -> Result<bool, GenieError> {
+) -> GenieResult<bool> {
     let d2 = point_gap_squared(s.state_position, t.position, t.radius);
     let reach = me.range_against()? + Distance::new(unit_ai_tuning.stance_range_growth);
     match s.stance {
@@ -576,7 +576,7 @@ pub(super) fn stance_reaches(
 /// [`BlastLevel::SPARES_FRIENDS`] nor [`BlastLevel::SKIPS_FRIEND_CHECK`] (`FUN_1410bf160`,
 /// `FUN_1410bfcb0`) scans the tiles of the blast around the target for its own or allied objects
 /// (not modelled).
-pub(crate) fn spares_friends(me: &Attacker, t: &Target, roles: &Roles) -> Result<bool, GenieError> {
+pub(crate) fn spares_friends(me: &Attacker, t: &Target, roles: &Roles) -> GenieResult<bool> {
     if me.attack_priority == AttackPriority::PRIORITY_3
         && !roles
             .of_class(t.class)

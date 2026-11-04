@@ -1,6 +1,6 @@
 //! The terrain look tasks (action type 159) and the removal reward tasks (161).
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::combat::abilities::{Look, ONE, Reward};
 use crate::map::TerrainFlags;
 use crate::math::conversions::cvttss2si;
@@ -120,7 +120,7 @@ impl World {
         &mut self,
         (p, i): (PlayerId, ListIndex),
         task: &Task,
-    ) -> Result<bool, GenieError> {
+    ) -> GenieResult<bool> {
         let Some(mask) = terrain_mask(task.terrain) else {
             return Ok(false);
         };

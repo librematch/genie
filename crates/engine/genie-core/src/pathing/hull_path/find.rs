@@ -1,7 +1,7 @@
 //! `FindShortPath` (`FUN_140f85580`): the bounds, the query, the quick path and the area before
 //! its rounds, and the path at their end.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::map::Distance;
 use crate::map::Rect;
 use crate::map::TileRect;
@@ -53,7 +53,7 @@ impl HullPather<'_> {
         to: Point,
         target_id: Option<ObjectId>,
         range: Distance,
-    ) -> Result<(ShortFound, Waypoints), GenieError> {
+    ) -> GenieResult<(ShortFound, Waypoints)> {
         self.find_with(from, to, target_id, range, Hulls::New, QuickPath::First)
     }
 
@@ -69,7 +69,7 @@ impl HullPather<'_> {
         to: Point,
         target_id: Option<ObjectId>,
         range: Distance,
-    ) -> Result<(ShortFound, Waypoints), GenieError> {
+    ) -> GenieResult<(ShortFound, Waypoints)> {
         self.find_with(from, to, target_id, range, Hulls::Kept, QuickPath::First)
     }
 
@@ -85,7 +85,7 @@ impl HullPather<'_> {
         to: Point,
         target_id: Option<ObjectId>,
         range: Distance,
-    ) -> Result<(ShortFound, Waypoints), GenieError> {
+    ) -> GenieResult<(ShortFound, Waypoints)> {
         self.find_with(from, to, target_id, range, Hulls::New, QuickPath::Only)
     }
 
@@ -101,7 +101,7 @@ impl HullPather<'_> {
         range: Distance,
         hulls: Hulls,
         quick: QuickPath,
-    ) -> Result<(ShortFound, Waypoints), GenieError> {
+    ) -> GenieResult<(ShortFound, Waypoints)> {
         let (result, path, clears) = self.find_unclear(from, to, target_id, range, hulls, quick)?;
         if clears {
             self.world.clear_tile_records();
@@ -124,7 +124,7 @@ impl HullPather<'_> {
         range: Distance,
         hulls: Hulls,
         quick: QuickPath,
-    ) -> Result<(ShortFound, Waypoints, bool), GenieError> {
+    ) -> GenieResult<(ShortFound, Waypoints, bool)> {
         let mut path = Waypoints::default();
         if hulls == Hulls::New {
             self.area = NO_AREA;
@@ -181,7 +181,7 @@ impl HullPather<'_> {
         from: Point,
         to: Point,
         target_id: Option<ObjectId>,
-    ) -> Result<bool, GenieError> {
+    ) -> GenieResult<bool> {
         let r = self.radius.get();
         let (w, h) = (self.world.map.width(), self.world.map.height());
         self.bounds = Rect::new(r, r, w as f32 - r, h as f32 - r);
@@ -202,7 +202,7 @@ impl HullPather<'_> {
         to: Point,
         target_id: Option<ObjectId>,
         range: Distance,
-    ) -> Result<HullQuery, GenieError> {
+    ) -> GenieResult<HullQuery> {
         let mut target_id = target_id;
         // the game tests the id's sign: a recyclable object's id is no target either
         let target = match target_id {
@@ -305,7 +305,7 @@ impl HullPather<'_> {
         q: &HullQuery,
         rounds: &Rounds,
         path: &mut Waypoints,
-    ) -> Result<ShortFound, GenieError> {
+    ) -> GenieResult<ShortFound> {
         let (from, to, range) = (q.from, q.to, q.range);
         let Some(end) = rounds.best_node else {
             if !rounds.within {
@@ -327,7 +327,7 @@ impl HullPather<'_> {
     /// Whether the node `end` lies nearer the goal than the walk's end, the path's last point (a
     /// path without one is NaN). `COMISS`/`JNC` to the partway end at 0x140f86cb6: an unordered
     /// distance takes the node.
-    fn node_nearer(&self, end: NodeIndex, path: &Waypoints, to: Point) -> Result<bool, GenieError> {
+    fn node_nearer(&self, end: NodeIndex, path: &Waypoints, to: Point) -> GenieResult<bool> {
         let last = *path
             .points
             .last()
@@ -349,7 +349,7 @@ impl HullPather<'_> {
         q: &HullQuery,
         rounds: &Rounds,
         path: &mut Waypoints,
-    ) -> Result<bool, GenieError> {
+    ) -> GenieResult<bool> {
         let Some(entrance) = rounds.entrance else {
             return Ok(true);
         };

@@ -14,7 +14,7 @@
 //!
 //! ## Example
 //! ```rust
-//! # fn main() -> Result<(), genie_error::GenieError> {
+//! # fn main() -> genie_error::GenieResult<()> {
 //! use std::io::Cursor;
 //! use jascpal::{Palette, PaletteIndex, Color};
 //! let cursor = Cursor::new(b"JASC-PAL\r\n0100\r\n2\r\n0 0 0\r\n255 255 255\r\n".to_vec());

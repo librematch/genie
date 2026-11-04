@@ -1,7 +1,6 @@
 //! Each unit-AI type's notify handler (slot 0x238): the animals', the villager's, the ships',
 //! the siege's, the soldier's, the tower's and the building's.
 
-use crate::GenieError;
 use crate::math::fmath::below_or_unordered;
 use crate::math::rng::Well512;
 use crate::movement::footprint_gap_squared;
@@ -24,6 +23,7 @@ use crate::unit_ai::{
 };
 use crate::world::Millis;
 use crate::world::layer::ClassRoles;
+use crate::{GenieError, GenieResult};
 
 impl UnitAi {
     /// The hunted animal's handler (`TribeHuntedAnimalUnitAIModule`, `FUN_140c26420`): its
@@ -37,7 +37,7 @@ impl UnitAi {
         player_kind: PlayerKind,
         ai_rng: &mut Well512,
         side: &mut UnitView<'_, '_>,
-    ) -> Result<u32, GenieError> {
+    ) -> GenieResult<u32> {
         match n.kind {
             NotifyKind::DAMAGED => self.hunted_damaged(n, time, at, player_kind, ai_rng, side),
             NotifyKind::MISSILE_WARNING => Ok(GO_ON),
@@ -58,7 +58,7 @@ impl UnitAi {
         player_kind: PlayerKind,
         ai_rng: &mut Well512,
         side: &mut UnitView<'_, '_>,
-    ) -> Result<u32, GenieError> {
+    ) -> GenieResult<u32> {
         match n.kind {
             NotifyKind::DAMAGED => self.boar_damaged(n, time, at, ai_rng, side),
             NotifyKind::ACTION_COMPLETED => {
@@ -88,7 +88,7 @@ impl UnitAi {
         player_kind: PlayerKind,
         ai_rng: &mut Well512,
         side: &mut UnitView<'_, '_>,
-    ) -> Result<u32, GenieError> {
+    ) -> GenieResult<u32> {
         match n.kind {
             NotifyKind::ACTION_COMPLETED => {
                 if n.p[0] == AiAction::Attack.value() {
@@ -120,7 +120,7 @@ impl UnitAi {
         player_kind: PlayerKind,
         ai_rng: &mut Well512,
         side: &mut UnitView<'_, '_>,
-    ) -> Result<u32, GenieError> {
+    ) -> GenieResult<u32> {
         // "Target is still visible, tracking.": a target the world holds within the
         // lion's line of sight (FUN_14118f8c0 against its sight squared: COMISS, JC
         // past)
@@ -170,7 +170,7 @@ impl UnitAi {
         player_kind: PlayerKind,
         ai_rng: &mut Well512,
         side: &mut UnitView<'_, '_>,
-    ) -> Result<u32, GenieError> {
+    ) -> GenieResult<u32> {
         match n.kind {
             NotifyKind::ACTION_INVALIDATED
             | NotifyKind::TARGET_MOVED
@@ -231,7 +231,7 @@ impl UnitAi {
         at: &Surroundings,
         side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
-    ) -> Result<u32, GenieError> {
+    ) -> GenieResult<u32> {
         if (n.p[0] == AiAction::Build.value() || n.p[0] == AiAction::Hunt.value())
             && let Some(made) = Self::world_object(ObjectId::of_field(n.p[1]), at, side)?
         {
@@ -254,7 +254,7 @@ impl UnitAi {
         &mut self,
         side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
-    ) -> Result<u32, GenieError> {
+    ) -> GenieResult<u32> {
         let back = side.top_target_now();
         if let Some((site, at)) = side.table_drop_site()? {
             side.effect_now(
@@ -278,7 +278,7 @@ impl UnitAi {
         player_kind: PlayerKind,
         ai_rng: &mut Well512,
         side: &mut UnitView<'_, '_>,
-    ) -> Result<u32, GenieError> {
+    ) -> GenieResult<u32> {
         match n.kind {
             NotifyKind::MISSILE_WARNING if dodges(at, ai_rng) => Ok(GO_ON),
             NotifyKind::DAMAGED | NotifyKind::MISSILE_WARNING => {
@@ -298,7 +298,7 @@ impl UnitAi {
         player_kind: PlayerKind,
         ai_rng: &mut Well512,
         side: &mut UnitView<'_, '_>,
-    ) -> Result<u32, GenieError> {
+    ) -> GenieResult<u32> {
         match n.kind {
             NotifyKind::REQUIRES_SEARCH => self.trader_search(at, side, ai_rng),
             NotifyKind::MISSILE_WARNING if dodges(at, ai_rng) => Ok(GO_ON),
@@ -319,7 +319,7 @@ impl UnitAi {
         player_kind: PlayerKind,
         ai_rng: &mut Well512,
         side: &mut UnitView<'_, '_>,
-    ) -> Result<u32, GenieError> {
+    ) -> GenieResult<u32> {
         match n.kind {
             NotifyKind::REQUIRES_SEARCH if self.current_action == Some(AiAction::Build) => {
                 self.fishing_builder_search(at, player_kind, side, ai_rng)
@@ -344,7 +344,7 @@ impl UnitAi {
         player_kind: PlayerKind,
         ai_rng: &mut Well512,
         side: &mut UnitView<'_, '_>,
-    ) -> Result<u32, GenieError> {
+    ) -> GenieResult<u32> {
         let roles = &at.roles;
         match n.kind {
             NotifyKind::DAMAGED
@@ -380,7 +380,7 @@ impl UnitAi {
         player_kind: PlayerKind,
         ai_rng: &mut Well512,
         side: &mut UnitView<'_, '_>,
-    ) -> Result<u32, GenieError> {
+    ) -> GenieResult<u32> {
         if n.p[1] < 1 {
             alert_owner(player_kind)?;
             self.end_notifies(time, at, side, ai_rng)?;
@@ -404,7 +404,7 @@ impl UnitAi {
         player_kind: PlayerKind,
         ai_rng: &mut Well512,
         side: &mut UnitView<'_, '_>,
-    ) -> Result<u32, GenieError> {
+    ) -> GenieResult<u32> {
         match n.kind {
             NotifyKind::TOO_CLOSE => back_up(),
             NotifyKind::ACTION_EXECUTED | NotifyKind::MISSILE_WARNING
@@ -429,7 +429,7 @@ impl UnitAi {
         player_kind: PlayerKind,
         ai_rng: &mut Well512,
         side: &mut UnitView<'_, '_>,
-    ) -> Result<u32, GenieError> {
+    ) -> GenieResult<u32> {
         match n.kind {
             // "I'm dead, I give up.": the owner's alert (slot 0x2e8 with 0x209: a human
             // player's alert list and the old pather's hulled-area reset, not held; a
@@ -475,7 +475,7 @@ impl UnitAi {
         player_kind: PlayerKind,
         ai_rng: &mut Well512,
         side: &mut UnitView<'_, '_>,
-    ) -> Result<u32, GenieError> {
+    ) -> GenieResult<u32> {
         match n.kind {
             NotifyKind::DAMAGED => self.building_damaged(n, time, at, player_kind, side, ai_rng),
             // "Unit #%d is attacking me": it joins the attackers and the unit is under attack
@@ -507,7 +507,7 @@ impl UnitAi {
         player_kind: PlayerKind,
         ai_rng: &mut Well512,
         side: &mut UnitView<'_, '_>,
-    ) -> Result<u32, GenieError> {
+    ) -> GenieResult<u32> {
         match n.kind {
             NotifyKind::SENT_OFF => self.base_notify(n, time, at, player_kind, ai_rng, side),
             NotifyKind::REQUIRES_SEARCH => Err(GenieError::unsupported(

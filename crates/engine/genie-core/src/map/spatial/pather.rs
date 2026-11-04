@@ -1,6 +1,5 @@
 //! The old short pather's queries, the map's edge records and the segment tests.
 
-use crate::GenieError;
 use crate::map::Distance;
 use crate::map::GridSize;
 use crate::map::Point;
@@ -13,6 +12,7 @@ use crate::objects::masters::ObstructionKind;
 use crate::pathing::tile_path::SegmentTest;
 use crate::world::index::ObjectsRef;
 use crate::world::layer::ClassRoles;
+use crate::{GenieError, GenieResult};
 
 /// A record a pather query met (an entry of `FUN_141051900`'s list): an object's, a temporary
 /// tile record's or a map edge's ([`RecordId`]), with its box (`+0x20`..`+0x2c`).
@@ -65,7 +65,7 @@ impl Spatial {
         mask: TerrainMask,
         (ignore, by_id): (&[RecordId], ObjectsRef<'_>),
         limit: HitLimit,
-    ) -> Result<Vec<Hit>, GenieError> {
+    ) -> GenieResult<Vec<Hit>> {
         const MOST_HITS: usize = 25;
         let roles = by_id.roles();
         let lo_x = if b.x() <= a.x() { b.x() } else { a.x() };
@@ -151,7 +151,7 @@ impl Spatial {
         mask: TerrainMask,
         ignore: &[RecordId],
         by_id: ObjectsRef<'_>,
-    ) -> Result<bool, GenieError> {
+    ) -> GenieResult<bool> {
         Ok(!self
             .pather_query(a, b, buffer, mask, (ignore, by_id), HitLimit::First)?
             .is_empty())
@@ -167,7 +167,7 @@ impl Spatial {
         mask: TerrainMask,
         ignore: &[RecordId],
         by_id: ObjectsRef<'_>,
-    ) -> Result<Vec<Hit>, GenieError> {
+    ) -> GenieResult<Vec<Hit>> {
         self.pather_query(a, b, buffer, mask, (ignore, by_id), HitLimit::Most)
     }
 }

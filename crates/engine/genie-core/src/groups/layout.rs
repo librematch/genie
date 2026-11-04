@@ -3,7 +3,6 @@
 //! with `FUN_14102ab30` and `CreateLines` `FUN_1410143a0`), as `UpdateDesiredPositions`
 //! (`FUN_14103fd00`) makes them.
 
-use crate::GenieError;
 use crate::groups::FormationCategory;
 use crate::groups::FormationKind;
 use crate::groups::GroupId;
@@ -23,6 +22,7 @@ use crate::world::World;
 use crate::world::WorldTime;
 use crate::world::layer::generated::GroupTuning;
 use crate::world::slots::CheckedIndex;
+use crate::{GenieError, GenieResult};
 
 /// Half: a phalanx's even line's step, a box's first side and its middles (`DAT_142e7f384`, and
 /// the phalanx's `DAT_142e8c150` as a divisor).
@@ -78,7 +78,7 @@ pub(crate) fn slots_by_place(
     layout: PlaceLayout,
     world_time: WorldTime,
     group_tuning: &GroupTuning,
-) -> Result<Layout, GenieError> {
+) -> GenieResult<Layout> {
     let n = group.members.len();
     if n == 0 {
         return Ok(Layout::NotLaid);
@@ -209,7 +209,7 @@ pub(crate) fn phalanx_slots(
     group: &UnitGroup,
     world_time: WorldTime,
     group_tuning: &GroupTuning,
-) -> Result<Layout, GenieError> {
+) -> GenieResult<Layout> {
     let n = group.members.len() as i32;
     if n < 1 {
         return Ok(Layout::NotLaid);
@@ -299,7 +299,7 @@ pub fn place_box_perimeter(
     max: &mut BVector,
     spacing: Distance,
     group_tuning: &GroupTuning,
-) -> Result<Layout, GenieError> {
+) -> GenieResult<Layout> {
     if !(1..=BOX_POSITIONS).contains(&count) {
         return Ok(Layout::NotLaid);
     }
@@ -429,7 +429,7 @@ pub fn place_box_perimeter(
 /// a slot joining the first line whose x is within [`LINE_EPSILON`] of its own, else starting a
 /// new one at its x; the lines' array grows to them (`FUN_14102d490`), the lines in use are
 /// them, and each line (reset, [`reset_line`]) holds its slots at its index as depth.
-pub fn create_lines(formation: &mut Formation) -> Result<(), GenieError> {
+pub fn create_lines(formation: &mut Formation) -> GenieResult<()> {
     let mut xs: Vec<f32> = Vec::new();
     let mut members: Vec<Vec<u32>> = Vec::new();
     for (i, s) in formation.slots.iter().enumerate() {
@@ -477,7 +477,7 @@ pub(crate) fn box_slots(
     group: &UnitGroup,
     world_time: WorldTime,
     group_tuning: &GroupTuning,
-) -> Result<Layout, GenieError> {
+) -> GenieResult<Layout> {
     if group.members.is_empty() {
         return Ok(Layout::NotLaid);
     }
@@ -579,7 +579,7 @@ impl World {
         &self,
         formation: &mut Formation,
         g: &UnitGroup,
-    ) -> Result<Layout, GenieError> {
+    ) -> GenieResult<Layout> {
         let members = self.member_places(g)?;
         slots_by_place(
             formation,
@@ -601,7 +601,7 @@ impl World {
         &self,
         formation: &mut Formation,
         g: &UnitGroup,
-    ) -> Result<Layout, GenieError> {
+    ) -> GenieResult<Layout> {
         let members = self.member_places(g)?;
         slots_by_place(
             formation,
@@ -615,7 +615,7 @@ impl World {
 
     /// What `createHorde` and `createUDF` read of each member (`FUN_1415417a0`, slot 0x520,
     /// `FUN_141011300` with 0), None for one the world's table does not hold.
-    fn member_places(&self, g: &UnitGroup) -> Result<Vec<Option<MemberPlace>>, GenieError> {
+    fn member_places(&self, g: &UnitGroup) -> GenieResult<Vec<Option<MemberPlace>>> {
         let mut places = Vec::with_capacity(g.members.len());
         for m in &g.members {
             let place = match self.world_object(m.id) {
@@ -644,7 +644,7 @@ impl World {
         &mut self,
         formation: &mut Formation,
         group: GroupId,
-    ) -> Result<Layout, GenieError> {
+    ) -> GenieResult<Layout> {
         if phalanx_slots(
             formation,
             self.groups.held(group)?,
@@ -669,7 +669,7 @@ impl World {
         &mut self,
         formation: &mut Formation,
         group: GroupId,
-    ) -> Result<Layout, GenieError> {
+    ) -> GenieResult<Layout> {
         if box_slots(
             formation,
             self.groups.held(group)?,

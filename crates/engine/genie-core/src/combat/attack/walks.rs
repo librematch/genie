@@ -1,7 +1,7 @@
 //! The `MoveTo`s the Attack's `set_state` makes (`0x140a820c0`, cases 4, 5 and 11) and the update
 //! of its sub-action list (`FUN_140a992b0`).
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::combat::AttackTargetId;
 use crate::combat::attack::AttackState;
 use crate::combat::attack::{ATTACK_WITHOUT_TARGET, Attack, AttackReads};
@@ -32,7 +32,7 @@ pub(super) fn move_reads<'g>(
     (unit, mover): (&Unit, Option<&Mover>),
     r: &AttackReads,
     graphics: &'g Graphics,
-) -> Result<MoveToReads<'g>, GenieError> {
+) -> GenieResult<MoveToReads<'g>> {
     let _ = speed_of(mover)?;
     let sprites = SpriteReads {
         defaults: r.move_defaults,
@@ -46,7 +46,7 @@ pub(super) fn move_reads<'g>(
 /// # Errors
 ///
 /// A unit that does not move.
-pub(crate) fn speed_of(mover: Option<&Mover>) -> Result<Speed, GenieError> {
+pub(crate) fn speed_of(mover: Option<&Mover>) -> GenieResult<Speed> {
     Ok(mover.ok_or(ATTACKER_UNMOVING)?.stats.speed)
 }
 
@@ -76,7 +76,7 @@ impl Attack {
         gap: Distance,
         reads: &MoveToReads<'_>,
         move_to_tuning: &MoveToTuning,
-    ) -> Result<MoveStart, GenieError> {
+    ) -> GenieResult<MoveStart> {
         if self.target.is_none() {
             return Err(ATTACK_WITHOUT_TARGET.with("state", self.state));
         }
@@ -117,7 +117,7 @@ impl Attack {
         walk: fn(Option<MoveToAction>) -> AttackState,
         reads: &MoveToReads<'_>,
         move_to_tuning: &MoveToTuning,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let range = if matches!(walk(None), AttackState::GotoPoint { .. }) {
             Distance::ZERO
         } else {
@@ -149,7 +149,7 @@ impl Attack {
         me: Me,
         r: &AttackReads,
         gives_up: GiveUp,
-    ) -> Result<SubCode, GenieError> {
+    ) -> GenieResult<SubCode> {
         let state = self.state.move_to().map(|m| m.state);
         let how = ListUpdate {
             gives_up,
@@ -173,7 +173,7 @@ impl Attack {
     /// # Errors
     ///
     /// A unit that does not move.
-    pub(super) fn delete_move_to(&mut self, mover: Option<&mut Mover>) -> Result<(), GenieError> {
+    pub(super) fn delete_move_to(&mut self, mover: Option<&mut Mover>) -> GenieResult<()> {
         if self.state.take_move_to().is_some() {
             mover.ok_or(ATTACKER_UNMOVING)?.stop()?;
         }

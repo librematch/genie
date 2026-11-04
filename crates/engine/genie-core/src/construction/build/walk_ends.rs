@@ -1,7 +1,6 @@
 //! The ends of the builder's walk: at its end, failed, its foundation lost; the walk to a
 //! point (state 11).
 
-use crate::GenieError;
 use crate::construction::build::BuildState;
 use crate::construction::build::{
     BUILDER_UNMOVING, BuildAction, BuildReads, FOREIGN_SITE, SITE_GONE, UNSEEN_SITE,
@@ -18,6 +17,7 @@ use crate::world::layer::Roles;
 use crate::world::lets::release;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
+use crate::{GenieError, GenieResult};
 
 impl BuildAction {
     /// The update's cases 3 and 0xde with the sub-action list's 1 or 2 (its `MoveTo` at its
@@ -37,7 +37,7 @@ impl BuildAction {
         builder: &mut Unit,
         reads: &BuildReads,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if matches!(self.state, BuildState::Clear { .. }) {
             return self.restart(c, builder, roles);
         }
@@ -92,7 +92,7 @@ impl BuildAction {
         builder: &mut Unit,
         reads: &BuildReads,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if let Some(target) = self.target {
             let s = Self::site_unit(c, reads)?.ok_or(FOREIGN_SITE)?;
             let desolid =
@@ -161,7 +161,7 @@ impl BuildAction {
     /// # Errors
     ///
     /// What the removal does not model.
-    pub(super) fn remove_marked(&self, c: &mut Step<'_>) -> Result<(), GenieError> {
+    pub(super) fn remove_marked(&self, c: &mut Step<'_>) -> GenieResult<()> {
         if let Some(target) = self.target
             && let Some((q, _)) = c.w.object(target)
             && !c.w.players.player(q)?.kind.is_computer()
@@ -185,7 +185,7 @@ impl BuildAction {
         builder: &mut Unit,
         reads: &BuildReads,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         self.leave(c, builder)?;
         if self.target.is_some() {
             let target = self.target.take();
@@ -209,7 +209,7 @@ impl BuildAction {
         c: &mut Step<'_>,
         builder: &Unit,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         self.leave(c, builder)?;
         self.state = BuildState::WalkPoint { move_to: None };
         let move_reads = builder.move_to_reads(

@@ -1,6 +1,6 @@
 //! The walk's ends before its steer and the motion step's end on a loop.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::Position;
@@ -29,7 +29,7 @@ impl Mover {
         world: &Spatial,
         goal: Goal<'_>,
         by_id: ObjectsRef<'_>,
-    ) -> Result<Option<Next>, GenieError> {
+    ) -> GenieResult<Option<Next>> {
         let movement_tuning = &by_id.tuning().movement;
         let roles = by_id.roles();
         let ground_radius = self.stats.radius.ground();
@@ -84,7 +84,7 @@ impl Mover {
         walked: BVector,
         heading: BVector,
         movement_tuning: &MovementTuning,
-    ) -> Result<Motion, GenieError> {
+    ) -> GenieResult<Motion> {
         let clipped = self.steer(heading, dt, movement_tuning)?;
         self.control_speed(walked, clipped);
         if self

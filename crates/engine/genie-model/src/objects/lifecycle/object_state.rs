@@ -1,6 +1,6 @@
 //! An object's state: where it stands between its placing and its leaving.
 
-use crate::GenieError;
+use crate::{GenieError, GenieResult};
 use derive_more::Display;
 use serde::Deserialize;
 use serde::Serialize;
@@ -57,7 +57,7 @@ impl ObjectState {
     /// # Errors
     ///
     /// A byte past 8, which names no state.
-    pub fn of_byte(value: u8) -> Result<Self, GenieError> {
+    pub fn of_byte(value: u8) -> GenieResult<Self> {
         Self::from_repr(value)
             .ok_or_else(|| GenieError::invalid_input("an object state past 8").with("state", value))
     }

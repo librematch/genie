@@ -1,4 +1,5 @@
 use super::*;
+use crate::GenieResult;
 use crate::combat::attack::AttackState;
 use crate::combat::attack::AttackerFlags;
 use crate::combat::attack::BeginLayer;
@@ -1426,7 +1427,7 @@ fn hunt_update_runs_the_step_of_its_state() {
         })
     };
     let mut rig = Rig::on_the_path(Victim::default()).holding(10028, PlayerId::new(0));
-    let reason = |r: Result<HuntNext, crate::GenieError>| r.unwrap_err().reason();
+    let reason = |r: GenieResult<HuntNext>| r.unwrap_err().reason();
     let r = update(&mut hunting(10028), &mut rig, PlayerKind::Computer, 0.0);
     assert_eq!(reason(r), "a computer player's hunt (FUN_140fde4f0)");
     let mut h = HuntAction {

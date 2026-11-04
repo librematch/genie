@@ -1,6 +1,5 @@
 //! The start's node, the hits' points and the two legs of an L.
 
-use crate::GenieError;
 use crate::math::conversions::cvttss2si_64;
 use crate::math::fmath::sqrt;
 use crate::pathing::mesh::ONE;
@@ -12,6 +11,7 @@ use crate::pathing::short_path::{
 use crate::pathing::{FixedDistance, FixedDistanceSquared};
 use crate::pathing::{ShapeId, ShapeSide};
 use crate::world::slots::CheckedIndex;
+use crate::{GenieError, GenieResult};
 
 /// The corners of a side of a shape as the start's scan walks it ([`shrunk_corner`]'s
 /// numbers): side 0 from corner 0 to 1, side 1 from 1 to 2, side 2 from 3 to 2, side 3 from 0
@@ -61,7 +61,7 @@ impl Search<'_> {
     /// the start already lies within range, free when no shape holds it (the node opened), else
     /// the escape candidates (type 2) around it within twice the radius: stuck for fewer than
     /// two, else escaped with only the cheapest kept open.
-    pub(super) fn start(&mut self, p: FixedPoint) -> Result<Started, GenieError> {
+    pub(super) fn start(&mut self, p: FixedPoint) -> GenieResult<Started> {
         let g = &self.goal;
         if g.range2 >= g.rect_distance2(p) {
             return Ok(Started::InRange);
@@ -100,11 +100,7 @@ impl Search<'_> {
     /// `FUN_140fa4410`'s scan around a held start `p`: every side of every shape not ignored
     /// over the tiles under the corners of the box twice the radius out (each tile once, the map's
     /// only) gives its escape candidates ([`Search::escape_side`]), children of node `root`.
-    pub(super) fn escape_candidates(
-        &mut self,
-        p: FixedPoint,
-        root: NodeIndex,
-    ) -> Result<(), GenieError> {
+    pub(super) fn escape_candidates(&mut self, p: FixedPoint, root: NodeIndex) -> GenieResult<()> {
         let mesh = self.ctx.mesh;
         let w = mesh.width as i32;
         let total = mesh.width * mesh.width;
@@ -149,7 +145,7 @@ impl Search<'_> {
         root: NodeIndex,
         (id, side): (ShapeId, ShapeSide),
         rr2: FixedDistanceSquared,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let d = self.ctx.d;
         let r = *self.ctx.mesh.shapes.checked(id.index())?;
         let [px, py] = p.get();
@@ -212,7 +208,7 @@ impl Search<'_> {
         root: NodeIndex,
         (id, side): (ShapeId, ShapeSide),
         (a, e): (FixedPoint, FixedPoint),
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let [px, py] = p.get();
         let b = self.bounds;
         if !side.along_y() {
@@ -253,7 +249,7 @@ impl Search<'_> {
         root: NodeIndex,
         (id, side): (ShapeId, ShapeSide),
         rr2: FixedDistanceSquared,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let [px, py] = p.get();
         let mesh = self.ctx.mesh;
         let d = self.ctx.d;
@@ -307,7 +303,7 @@ impl Search<'_> {
     /// coordinate and moves this one past the holder's side, always the same way (side 0 and 3
     /// lower, 1 and 2 higher); no shape holds it again, and the mesh has finitely many. Returns
     /// the shape the point settled on.
-    pub(super) fn settle(&self, h: &mut FixedPoint, hit: Hit) -> Result<ShapeId, GenieError> {
+    pub(super) fn settle(&self, h: &mut FixedPoint, hit: Hit) -> GenieResult<ShapeId> {
         let d = self.ctx.d;
         let mut shape = hit.shape;
         snap_to_side(
@@ -332,7 +328,7 @@ impl Search<'_> {
         a: AxisDir,
         second: AxisDir,
         delta: FixedPoint,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let p = b.at;
         let m = if a.along_x() {
             FixedPoint::new(c.x(), p.y())

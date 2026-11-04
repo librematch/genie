@@ -2,7 +2,6 @@
 //! lent out with the real side ([`crate::unit_ai::world_view::UnitView`]) as the game's update
 //! lends them ([`Unit::run_ai`](crate::objects::unit::Unit::run_ai)).
 
-use crate::GenieError;
 use crate::math::rng::Well512;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
@@ -15,6 +14,7 @@ use crate::unit_ai::{Surroundings, UnitAi};
 use crate::world::World;
 use crate::world::slots::PlayerSlots;
 use crate::world::tests::in_update_filed;
+use crate::{GenieError, GenieResult};
 use std::mem::take;
 
 /// Runs `f` on object `me` of player `player` of `w` inside its update (dt 0, outside a turn),
@@ -41,8 +41,8 @@ pub(crate) fn run_ai<R>(
         &mut UnitView<'_, '_>,
         PlayerKind,
         &mut Well512,
-    ) -> Result<R, GenieError>,
-) -> Result<R, GenieError> {
+    ) -> GenieResult<R>,
+) -> GenieResult<R> {
     let i = w
         .players
         .player(player)?

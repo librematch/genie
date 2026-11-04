@@ -1,9 +1,9 @@
 //! The long pather's costs ([`LongCost`], in quarter tiles squared) and its open tiles' heap
 //! ([`Heap`]), sifted the game's way.
 
-use crate::GenieError;
 use crate::map::Tile;
 use crate::world::slots::CheckedIndex;
+use crate::{GenieError, GenieResult};
 
 /// A heap pop finds the heap empty where the caller checked its top.
 const EMPTY_HEAP: GenieError = GenieError::unreachable("a heap pop without a top");
@@ -55,7 +55,7 @@ impl Heap {
     }
 
     /// `FUN_140fa0bd0` on a slot just filled: it rises while its cost is at most its parent's.
-    pub(super) fn push(&mut self, at: Tile, cost: LongCost) -> Result<(), GenieError> {
+    pub(super) fn push(&mut self, at: Tile, cost: LongCost) -> GenieResult<()> {
         self.slots.push((at, cost));
         let mut i = self.slots.len() - 1;
         let mut parent = i >> 1;
@@ -77,7 +77,7 @@ impl Heap {
     /// The pop after the top's expansion check (`FUN_140f9eb70`): the last slot moves to the top
     /// and sinks, the game's way: only while the count's half is above 1, only to a child below
     /// that half, past a child whose cost is not above it.
-    pub(super) fn pop(&mut self) -> Result<(), GenieError> {
+    pub(super) fn pop(&mut self) -> GenieResult<()> {
         let last = self.slots.pop().ok_or(EMPTY_HEAP)?;
         let count = self.count();
         if count < 1 {

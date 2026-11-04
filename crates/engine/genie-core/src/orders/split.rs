@@ -1,6 +1,5 @@
 //! INTERACT and the order splitter: which units move loose and which form groups.
 
-use crate::GenieError;
 use crate::map::Distance;
 use crate::map::Point;
 use crate::math::fmath::{at_most_or_unordered, sqrt};
@@ -21,6 +20,7 @@ use crate::world::World;
 use crate::world::layer::generated::OrderTuning;
 use crate::world::slots::CheckedIndex;
 use crate::world::slots::PlayerSlots;
+use crate::{GenieError, GenieResult};
 use std::collections::BTreeSet;
 
 /// Which units of an order the splitter keeps after its sort ([`World::split`]).
@@ -55,7 +55,7 @@ impl World {
         player: PlayerId,
         units: &[Option<ObjectId>],
         order: &Interact,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         match units {
             [] => return Ok(()),
             &[id] if self.place(id).is_none() => return Ok(()),
@@ -92,10 +92,7 @@ impl World {
 
     /// The units of an order that move alone ([`World::split`] without Ctrl held); a group it
     /// makes is not modelled.
-    pub(crate) fn loose_units(
-        &mut self,
-        units: &[Option<ObjectId>],
-    ) -> Result<Vec<ObjectId>, GenieError> {
+    pub(crate) fn loose_units(&mut self, units: &[Option<ObjectId>]) -> GenieResult<Vec<ObjectId>> {
         self.loose_units_kept(units, Kept::All)
     }
 
@@ -105,7 +102,7 @@ impl World {
         &mut self,
         units: &[Option<ObjectId>],
         kept: Kept<'_>,
-    ) -> Result<Vec<ObjectId>, GenieError> {
+    ) -> GenieResult<Vec<ObjectId>> {
         let split = self.split(units, kept, ControlKey::Up)?;
         if !split.groups.is_empty() {
             return Err(GenieError::unsupported(
@@ -142,7 +139,7 @@ impl World {
         units: &[Option<ObjectId>],
         kept: Kept<'_>,
         control: ControlKey,
-    ) -> Result<Split, GenieError> {
+    ) -> GenieResult<Split> {
         // FUN_140fd9ae0 splits only when the list's first unit exists (its owner): else no unit
         // takes the order
         let Some((owner, _)) = units.first().and_then(|&id| self.object(id)) else {
@@ -176,7 +173,7 @@ impl World {
         run: &[Option<ObjectId>],
         control: ControlKey,
         split: &mut Split,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let left = self.splittables(run)?;
         let mut left = self.keep_world_groups(left, split)?;
         let formations = self.players.player(owner)?.formations;
@@ -195,33 +192,32 @@ impl World {
         // it to the first (FUN_140f7c530, its result and the measured path's length)
         let tiles = self.spatial.tiles();
         let pathing = &mut self.pathing;
-        let mut path =
-            |a: &Splittable, b: &Splittable| -> Result<Option<(Found, Distance)>, GenieError> {
-                let Some(restriction) = b.restriction else {
-                    return Ok(None);
-                };
-                let Some(planner) = pathing.planner(restriction, tiles) else {
-                    return Ok(None);
-                };
-                let req = Request {
-                    from: b.position.ground(),
-                    to: a.position.ground(),
-                    radii: a.radius,
-                    range: b.radius,
-                    closed: Vec::new(),
-                    full: false,
-                };
-                let mut p = Path::default();
-                let found = planner.plan::<GenieError>(
-                    &req,
-                    false,
-                    &mut p,
-                    None,
-                    &self.model.tuning.tile_path,
-                )?;
-                p.measure();
-                Ok(Some((found, p.length)))
+        let mut path = |a: &Splittable, b: &Splittable| -> GenieResult<Option<(Found, Distance)>> {
+            let Some(restriction) = b.restriction else {
+                return Ok(None);
             };
+            let Some(planner) = pathing.planner(restriction, tiles) else {
+                return Ok(None);
+            };
+            let req = Request {
+                from: b.position.ground(),
+                to: a.position.ground(),
+                radii: a.radius,
+                range: b.radius,
+                closed: Vec::new(),
+                full: false,
+            };
+            let mut p = Path::default();
+            let found = planner.plan::<GenieError>(
+                &req,
+                false,
+                &mut p,
+                None,
+                &self.model.tuning.tile_path,
+            )?;
+            p.measure();
+            Ok(Some((found, p.length)))
+        };
         // then the unit with the most others that join it, the first of equals, with them
         while !left.is_empty() {
             let mut best = (0, 0);
@@ -274,7 +270,7 @@ impl World {
 
     /// What the order splitter (`FUN_140fd76d0`) reads of each unit of a run that the world
     /// holds: a null entry and one the run's next entry repeats are left out.
-    fn splittables(&self, run: &[Option<ObjectId>]) -> Result<Vec<Splittable>, GenieError> {
+    fn splittables(&self, run: &[Option<ObjectId>]) -> GenieResult<Vec<Splittable>> {
         let mut left: Vec<Splittable> = Vec::with_capacity(run.len());
         for (i, &u) in run.iter().enumerate() {
             let Some(id) = u else {
@@ -316,7 +312,7 @@ impl World {
         &self,
         left: Vec<Splittable>,
         split: &mut Split,
-    ) -> Result<Vec<Splittable>, GenieError> {
+    ) -> GenieResult<Vec<Splittable>> {
         // the units in a group the world holds, with the order's other members of their group
         let mut taken = vec![false; left.len()];
         for (i, first) in left.iter().enumerate() {
@@ -358,7 +354,7 @@ impl World {
         player: PlayerId,
         loose: &[ObjectId],
         target: Option<ObjectId>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let target = if 1 < loose.len() && !self.players.player(player)?.kind.is_computer() {
             None
         } else {
@@ -376,7 +372,7 @@ impl World {
         &self,
         loose: &[ObjectId],
         queued: bool,
-    ) -> Result<Option<Point>, GenieError> {
+    ) -> GenieResult<Option<Point>> {
         let mut points = Vec::with_capacity(loose.len());
         for &id in loose {
             let Some((p, u)) = self.object(id) else {
@@ -427,7 +423,7 @@ pub(super) fn splits_together(
     path: &mut SplitPath<'_>,
     far: &mut BTreeSet<ObjectId>,
     order_tuning: &OrderTuning,
-) -> Result<bool, GenieError> {
+) -> GenieResult<bool> {
     if a.kind <= MAX_UNGROUPED || b.kind <= MAX_UNGROUPED {
         return Ok(false);
     }

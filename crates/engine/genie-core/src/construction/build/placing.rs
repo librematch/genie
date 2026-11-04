@@ -1,7 +1,6 @@
 //! The placement on a foundation no builder started (state 7), a builder's joining and its
 //! work, the walk off the footprint (state 223) and back.
 
-use crate::GenieError;
 use crate::commands::RecordDrop;
 use crate::construction::BuildProgress;
 use crate::construction::FootprintWaits;
@@ -31,6 +30,7 @@ use crate::world::layer::Roles;
 use crate::world::lets::release;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
+use crate::{GenieError, GenieResult};
 
 /// The radius a part of a building must pass to count as an annex the builder stands on
 /// (`0x140aae200` case 7).
@@ -63,7 +63,7 @@ impl BuildAction {
         actions: &mut Action,
         reads: &BuildReads,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let desolid =
             c.w.parts
                 .building_of(Self::site_unit(c, reads)?.ok_or(FOREIGN_SITE)?.id)
@@ -171,7 +171,7 @@ impl BuildAction {
         actions: &mut Action,
         (site, cleared): (ObjectId, &[ObjectId]),
         reads: &BuildReads,
-    ) -> Result<PartTests, GenieError> {
+    ) -> GenieResult<PartTests> {
         let mut parts = Vec::new();
         let by_id = c.w.objects();
         if let Some(main) = by_id.annex_of(site) {
@@ -224,7 +224,7 @@ impl BuildAction {
         c: &Step<'_>,
         builder: &Unit,
         radius: Footprint,
-    ) -> Result<Option<ObjectId>, GenieError> {
+    ) -> GenieResult<Option<ObjectId>> {
         let (bx, by) = (builder.position().x(), builder.position().y());
         // a Build without its foundation has no annexes
         let Some(site) = self.target else {
@@ -254,7 +254,7 @@ impl BuildAction {
         c: &mut Step<'_>,
         builder: &mut Unit,
         reads: &BuildReads,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if FootprintWaits::MOST <= builder.footprint_waits {
             builder.footprint_waits = FootprintWaits::NONE;
             return self.halt_placing(c, builder, reads);
@@ -277,7 +277,7 @@ impl BuildAction {
         c: &mut Step<'_>,
         builder: &mut Unit,
         reads: &BuildReads,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         Self::stand(c, builder)?;
         let target = self.target.take();
         release(c, builder, target, reads.by)?;
@@ -299,7 +299,7 @@ impl BuildAction {
         c: &mut Step<'_>,
         builder: &Unit,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let placed = *c.w.spatial.get(self.target).ok_or(SITE_GONE)?;
         let [bx, by] = [builder.position().x() as i32, builder.position().y() as i32];
         let [tx, mut ty] = [placed.position.x() as i32, placed.position.y() as i32];
@@ -351,7 +351,7 @@ impl BuildAction {
         builder: &mut Unit,
         actions: &mut Action,
         reads: &BuildReads,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let site = Self::site_unit(c, reads)?.ok_or(FOREIGN_SITE)?;
         let mut rate = self.task.work_rate * self.task.work_value * c.dt.seconds();
         let mut factor =
@@ -405,7 +405,7 @@ impl BuildAction {
         builder: &Unit,
         footprint: ObjectId,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let by_id = ObjectsRef::new(
             &c.w.players,
             &c.w.index,
@@ -487,7 +487,7 @@ fn site_occupants(
     placed: &Placed,
     cleared: &[ObjectId],
     reads: &BuildReads,
-) -> Result<Vec<ObjectId>, GenieError> {
+) -> GenieResult<Vec<ObjectId>> {
     Ok(c.w
         .spatial
         .footprint_occupants(site, placed, &reads.looks)?

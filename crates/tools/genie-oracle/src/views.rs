@@ -476,7 +476,7 @@ pub fn checkpoints(rec: &[u8], masters: &MasterTable, updates: usize) -> GenieRe
             u32::try_from(p)
                 .map_err(|_| GenieError::invalid_input("a save with 2^32 players or more"))
         })
-        .collect::<Result<_, GenieError>>()?;
+        .collect::<GenieResult<_>>()?;
     let blocks = crate::blocks_per_tick(rec, &ids, updates, Some(masters))?;
     checkpoint_lines(&chapter, &blocks)
 }

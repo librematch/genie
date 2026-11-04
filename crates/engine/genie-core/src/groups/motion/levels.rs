@@ -1,7 +1,7 @@
 //! The walked level's flags, its reset, a looping path's next waypoint and the waypoints'
 //! points and ground lengths.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::map::Distance;
 use crate::map::GridSize;
 use crate::map::Point;
@@ -39,7 +39,7 @@ pub(super) fn set_flag(paths: &mut [PathData], flag: LevelFlags, change: FlagCha
 
 /// `FUN_140f98e80` on the walked level: it and its parents go, the level holds the defaults
 /// (its plans back to 10, flags clear; its repath time stays).
-pub(super) fn reset_level(paths: &mut Vec<PathData>) -> Result<(), GenieError> {
+pub(super) fn reset_level(paths: &mut Vec<PathData>) -> GenieResult<()> {
     let repath_time = paths.first().map_or(Seconds::ZERO, |l| l.repath_time);
     paths.truncate(1);
     let level = PathData {

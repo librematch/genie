@@ -1,7 +1,7 @@
 //! A queue entry's costs: the test and the payment of a unit's or a technology's costs, and
 //! their refunds when an entry is cancelled (`FUN_141630530` and the cancels' calls).
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::gathering::QueueCount;
 use crate::math::fmath::at_most_or_unordered;
 use crate::objects::masters::CostAmount;
@@ -32,7 +32,7 @@ pub fn refund(
     master: &Master,
     costs: &[(Option<AttributeId>, Amount); 3],
     owner: &mut Player,
-) -> Result<(), GenieError> {
+) -> GenieResult<()> {
     if master.kind < MasterKind::COMBAT {
         return Ok(());
     }
@@ -58,7 +58,7 @@ pub fn refund_research(
     costs: &[(Option<AttributeId>, Amount); 3],
     count: QueuedUnits,
     owner: &mut Player,
-) -> Result<(), GenieError> {
+) -> GenieResult<()> {
     for &(attribute, amount) in costs {
         let Some(attribute) = attribute else {
             continue;
@@ -75,7 +75,7 @@ pub fn refund_research(
 /// `FUN_141630770` with `n` 1, the make action's destructor's refund of a unit its queue did
 /// not pay for: each cost entry of a master of type 70 and up with an attribute and a paid
 /// flag gives back its amount times `n` (an integer product), straight into the attribute.
-pub fn refund_master(master: &Master, n: QueueCount, owner: &mut Player) -> Result<(), GenieError> {
+pub fn refund_master(master: &Master, n: QueueCount, owner: &mut Player) -> GenieResult<()> {
     if master.kind < MasterKind::COMBAT {
         return Ok(());
     }
@@ -103,7 +103,7 @@ pub fn refund_tech(
     tech: TechId,
     owner: &mut Player,
     slots: Slots,
-) -> Result<Refund, GenieError> {
+) -> GenieResult<Refund> {
     use crate::math::conversions::cvttss2si;
     if !matches!(
         state.state,
@@ -196,7 +196,7 @@ pub fn cost_test(
     attributes: &dyn Attributes,
     roles: &Roles,
     slots: Slots,
-) -> Result<bool, GenieError> {
+) -> GenieResult<bool> {
     let Some(m) = masters.get(master).filter(|m| MasterKind::COMBAT <= m.kind) else {
         return Ok(false);
     };
@@ -250,7 +250,7 @@ pub fn pay(
     attributes: &mut dyn Attributes,
     roles: &Roles,
     slots: Slots,
-) -> Result<Payment, GenieError> {
+) -> GenieResult<Payment> {
     if !cost_test(
         masters,
         master,
@@ -288,7 +288,7 @@ pub fn master_costs(
     attributes: &dyn Attributes,
     roles: &Roles,
     slots: Slots,
-) -> Result<[(Option<AttributeId>, CostAmount); 3], GenieError> {
+) -> GenieResult<[(Option<AttributeId>, CostAmount); 3]> {
     use crate::math::conversions::cvttss2si;
     let mut out = [(None, 0i16); 3];
     let can = cost_test(

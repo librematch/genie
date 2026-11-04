@@ -1,7 +1,7 @@
 //! The levels of a unit's path data by their role: the walked level and its parent.
 
-use crate::GenieError;
 use crate::movement::PathData;
+use crate::{GenieError, GenieResult};
 
 /// A mover's path data without the level its caller walks.
 const NO_LEVEL: GenieError =
@@ -16,33 +16,33 @@ pub(crate) trait Levels {
     /// # Errors
     ///
     /// Path data without a level.
-    fn walked(&self) -> Result<&PathData, GenieError>;
+    fn walked(&self) -> GenieResult<&PathData>;
 
     /// The walked level, to change.
     ///
     /// # Errors
     ///
     /// Path data without a level.
-    fn walked_mut(&mut self) -> Result<&mut PathData, GenieError>;
+    fn walked_mut(&mut self) -> GenieResult<&mut PathData>;
 
     /// The walked level's parent.
     ///
     /// # Errors
     ///
     /// Path data of one level or none.
-    fn parent(&self) -> Result<&PathData, GenieError>;
+    fn parent(&self) -> GenieResult<&PathData>;
 }
 
 impl Levels for [PathData] {
-    fn walked(&self) -> Result<&PathData, GenieError> {
+    fn walked(&self) -> GenieResult<&PathData> {
         self.first().ok_or(NO_LEVEL)
     }
 
-    fn walked_mut(&mut self) -> Result<&mut PathData, GenieError> {
+    fn walked_mut(&mut self) -> GenieResult<&mut PathData> {
         self.first_mut().ok_or(NO_LEVEL)
     }
 
-    fn parent(&self) -> Result<&PathData, GenieError> {
+    fn parent(&self) -> GenieResult<&PathData> {
         self.get(1).ok_or(NO_LEVEL)
     }
 }

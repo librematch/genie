@@ -1,7 +1,7 @@
 //! A terrain restriction's planner ([`Planner`]) and its four-level grid: built, read and
 //! rebuilt over a changed rectangle.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::map::Distance;
 use crate::map::GridSize;
 use crate::map::Restriction;
@@ -130,7 +130,7 @@ impl Planner {
     /// # Errors
     ///
     /// A tile off the planner's map.
-    pub fn tile_closed(&self, tile: Tile) -> Result<bool, GenieError> {
+    pub fn tile_closed(&self, tile: Tile) -> GenieResult<bool> {
         let width = i64::from(self.level_size(GridLevel::TILES).width());
         let cell = (width * i64::from(tile.y()) + i64::from(tile.x())) as usize;
         Ok(self.level(GridLevel::TILES).checked(cell)?.edges.is_empty())

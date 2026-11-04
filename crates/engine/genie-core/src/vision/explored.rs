@@ -1,6 +1,6 @@
 //! `Process_New_Tiles` at the end of a player's update and a new object's visible resources.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::map::Point;
 use crate::map::Tile;
 use crate::players::PlayerId;
@@ -20,7 +20,7 @@ impl World {
     /// An object of a master the slice does not have.
     ///
     /// [`VisibleResources::add`]: crate::vision::visibility::VisibleResources::add
-    pub(crate) fn process_new_tiles(&mut self, p: PlayerId) -> Result<(), GenieError> {
+    pub(crate) fn process_new_tiles(&mut self, p: PlayerId) -> GenieResult<()> {
         let Some(sight) = self.spatial.sight.as_ref() else {
             return Ok(());
         };
@@ -70,7 +70,7 @@ impl World {
     /// A master the slice does not have, or no players' sight.
     ///
     /// [`Spatial::explored`]: crate::map::spatial::Spatial::explored
-    pub(crate) fn made_new_object(&mut self, p: PlayerId) -> Result<(), GenieError> {
+    pub(crate) fn made_new_object(&mut self, p: PlayerId) -> GenieResult<()> {
         let Some(u) = self.players.player(p)?.objects.last() else {
             return Ok(());
         };

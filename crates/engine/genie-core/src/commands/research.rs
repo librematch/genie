@@ -1,6 +1,6 @@
 //! RESEARCH (0x65): a technology at the player's buildings.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::commands::QueueId;
 use crate::objects::ObjectId;
 use crate::players::PlayerId;
@@ -31,7 +31,7 @@ pub struct ResearchCommand {
 impl ResearchCommand {
     /// `do_command`'s case checks the buildings first ([`World::research_check`]), then the
     /// research runs in those left ([`World::research`]).
-    pub(crate) fn run(&self, w: &mut World) -> Result<(), GenieError> {
+    pub(crate) fn run(&self, w: &mut World) -> GenieResult<()> {
         let Some(buildings) = w.research_check(self)? else {
             return Ok(());
         };

@@ -1,6 +1,5 @@
 //! A new unit's walk to its building's gather point (`FUN_140ace9c0`).
 
-use crate::GenieError;
 use crate::commands::GatherPoint;
 use crate::garrison::ContainerId;
 use crate::garrison::InsideCount;
@@ -19,6 +18,7 @@ use crate::orders::Work;
 use crate::orders::town_bell::BellShelter;
 use crate::players::PlayerId;
 use crate::world::slots::PlayerSlots;
+use crate::{GenieError, GenieResult};
 
 use crate::garrison::ENTER;
 use crate::movement::move_to::{MoveTo, MoveToAction, MoveWait, TargetMoved};
@@ -61,7 +61,7 @@ impl World {
         new: ListIndex,
         point: Position,
         source: OrderSource,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let world_time = self.world_time;
         let sprite = self.point_move_sprite(p, new)?;
         let villager =
@@ -150,7 +150,7 @@ impl World {
         p: PlayerId,
         new: ListIndex,
         g: GatherPoint,
-    ) -> Result<Option<ObjectId>, GenieError> {
+    ) -> GenieResult<Option<ObjectId>> {
         let class = self
             .model
             .masters
@@ -167,7 +167,7 @@ impl World {
             .players
             .first()
             .ok_or(GenieError::unsupported("a world without Gaia"))?;
-        let closest = |list: &[Unit]| -> Result<Option<ObjectId>, GenieError> {
+        let closest = |list: &[Unit]| -> GenieResult<Option<ObjectId>> {
             let mut best: Option<(&Unit, f32)> = None;
             for u in list {
                 if Some(u.master(self.master_tables(), PlayerId::GAIA)?.class) != class {
@@ -223,7 +223,7 @@ impl World {
         building: ObjectId,
         source: OrderSource,
         finder: FinderUse,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         // the walk's place is the point on the ground (height 0)
         let at = g.point.with_z(0.0);
         if g.target.is_none() {

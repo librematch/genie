@@ -6,7 +6,7 @@
 use crate::dat::MasterTable;
 #[cfg(feature = "fs")]
 use crate::key::Key;
-use genie_model::GenieError;
+use genie_model::{GenieError, GenieResult};
 #[cfg(feature = "fs")]
 use std::fs::{create_dir_all, read, remove_file, rename, write};
 #[cfg(feature = "fs")]
@@ -23,7 +23,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 /// # Errors
 ///
 /// A value postcard cannot write (none of the tables' types holds one).
-pub fn encode(table: &MasterTable) -> Result<Vec<u8>, GenieError> {
+pub fn encode(table: &MasterTable) -> GenieResult<Vec<u8>> {
     postcard::to_allocvec(table)
         .map_err(|e| GenieError::invalid_input("a table postcard cannot write").with_source(e))
 }
@@ -33,7 +33,7 @@ pub fn encode(table: &MasterTable) -> Result<Vec<u8>, GenieError> {
 /// # Errors
 ///
 /// Bytes that are not a table's form: cut off, of another layout, or a value a type refuses.
-pub fn decode(bytes: &[u8]) -> Result<MasterTable, GenieError> {
+pub fn decode(bytes: &[u8]) -> GenieResult<MasterTable> {
     postcard::from_bytes(bytes)
         .map_err(|e| GenieError::invalid_input("cached tables that do not read").with_source(e))
 }
@@ -44,7 +44,7 @@ pub fn decode(bytes: &[u8]) -> Result<MasterTable, GenieError> {
 ///
 /// A cache file that does not open or read, or does not decode ([`decode`]).
 #[cfg(feature = "fs")]
-pub fn read_cached(dir: &Path, key: &Key) -> Result<Option<MasterTable>, GenieError> {
+pub fn read_cached(dir: &Path, key: &Key) -> GenieResult<Option<MasterTable>> {
     let path = dir.join(key.hex());
     match read(&path) {
         Ok(bytes) => decode(&bytes)
@@ -68,7 +68,7 @@ static WRITES: AtomicU64 = AtomicU64::new(0);
 ///
 /// The tables do not encode ([`encode`]), or the directory or the file cannot be made.
 #[cfg(feature = "fs")]
-pub fn write_cached(dir: &Path, key: &Key, table: &MasterTable) -> Result<(), GenieError> {
+pub fn write_cached(dir: &Path, key: &Key, table: &MasterTable) -> GenieResult<()> {
     let bytes = encode(table)?;
     let io = |reason: &'static str, path: &Path, e: IoError| {
         GenieError::io(reason)

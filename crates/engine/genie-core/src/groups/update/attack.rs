@@ -1,7 +1,6 @@
 //! The attack command's update (FD-036): `FUN_14103f4e0`, which `BUnitGroup::update` runs while
 //! the group's current command is an attack (9).
 
-use crate::GenieError;
 use crate::groups::FormationCategory;
 use crate::groups::GroupFlags;
 use crate::groups::GroupId;
@@ -24,6 +23,7 @@ use crate::movement::Mover;
 use crate::objects::ObjectId;
 use crate::players::PlayerId;
 use crate::world::World;
+use crate::{GenieError, GenieResult};
 
 /// The formation categories a group keeps its units by, which the update walks in order.
 const CATEGORIES: [FormationCategory; 6] = FormationCategory::EACH;
@@ -50,7 +50,7 @@ impl World {
         &mut self,
         group: GroupId,
         relayout: &mut bool,
-    ) -> Result<Progress, GenieError> {
+    ) -> GenieResult<Progress> {
         let g = self.groups.held(group)?;
         let Some(owner) = g
             .members
@@ -115,7 +115,7 @@ impl World {
         group: GroupId,
         target: Option<ObjectId>,
         relayout: &mut bool,
-    ) -> Result<Progress, GenieError> {
+    ) -> GenieResult<Progress> {
         let g = self.groups.held_mut(group)?;
         if !g.command_queue.is_empty() {
             return Ok(Progress::Finished);
@@ -159,7 +159,7 @@ impl World {
         &self,
         group: GroupId,
         target: ObjectId,
-    ) -> Result<(Option<ObjectId>, f32), GenieError> {
+    ) -> GenieResult<(Option<ObjectId>, f32)> {
         let t = self
             .world_object(target)
             .ok_or_else(|| member_gone(target))?;
@@ -194,11 +194,7 @@ impl World {
     /// # Errors
     ///
     /// A master the world lacks, and what the release does not model.
-    fn release_categories(
-        &mut self,
-        group: GroupId,
-        target: ObjectId,
-    ) -> Result<Progress, GenieError> {
+    fn release_categories(&mut self, group: GroupId, target: ObjectId) -> GenieResult<Progress> {
         let mut finished = true;
         for category in CATEGORIES {
             let Some((units, range)) = self
@@ -240,7 +236,7 @@ impl World {
         units: &[ObjectId],
         listed: Distance,
         target: ObjectId,
-    ) -> Result<bool, GenieError> {
+    ) -> GenieResult<bool> {
         let t = self
             .world_object(target)
             .ok_or_else(|| member_gone(target))?;
@@ -298,7 +294,7 @@ impl World {
         group: GroupId,
         target: ObjectId,
         owner: PlayerId,
-    ) -> Result<Option<Progress>, GenieError> {
+    ) -> GenieResult<Option<Progress>> {
         let g = self.groups.held(group)?;
         if !matches!(g.current_target.target, GroupTarget::Object(_)) {
             return Ok(None);
@@ -372,7 +368,7 @@ impl World {
         target: ObjectId,
         finished: Progress,
         relayout: &mut bool,
-    ) -> Result<Progress, GenieError> {
+    ) -> GenieResult<Progress> {
         let t = self
             .world_object(target)
             .ok_or_else(|| member_gone(target))?;

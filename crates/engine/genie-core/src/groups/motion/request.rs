@@ -1,7 +1,7 @@
 //! The walked level's path request (state 2) and its end: the planners, the link of the
 //! found path, the give-up.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::groups::Motion;
 use crate::groups::PathBudget;
 use crate::groups::motion::{
@@ -72,7 +72,7 @@ pub(super) fn request(
     budget: PathBudget,
     target: Option<&Placed>,
     target_gap2: DistanceSquared,
-) -> Result<Option<Pass>, GenieError> {
+) -> GenieResult<Option<Pass>> {
     let group_tuning = &world.by_id.tuning().group;
     let by_id = world.by_id;
     if let Some(pass) = take_turn(motion, lead, world, budget)? {
@@ -145,7 +145,7 @@ fn take_turn(
     lead: &Lead,
     world: &mut StepWorld<'_, '_>,
     budget: PathBudget,
-) -> Result<Option<Pass>, GenieError> {
+) -> GenieResult<Option<Pass>> {
     if budget == PathBudget::Tested
         && !world
             .plan
@@ -188,7 +188,7 @@ fn tile_plan(
     target: Option<&Placed>,
     plan: &mut PathSoFar,
     by_id: ObjectsRef<'_>,
-) -> Result<(), GenieError> {
+) -> GenieResult<()> {
     let spatial = &mut *world.spatial;
     let radii = Distance::new(target.map_or(0.0, |t| t.radius.x()) + lead.walker.radius.get());
     let mut planning = world.plan.reborrow();
@@ -242,7 +242,7 @@ fn short_plan(
     (target, target_gap2): (Option<&Placed>, f32),
     short_range: Distance,
     plan: &mut PathSoFar,
-) -> Result<Option<Pass>, GenieError> {
+) -> GenieResult<Option<Pass>> {
     let group_tuning = &world.by_id.tuning().group;
     let by_id = world.by_id;
     let spatial = &mut *world.spatial;
@@ -302,7 +302,7 @@ fn in_range(
     reach: Distance,
     target_gap2: DistanceSquared,
     now: WorldTime,
-) -> Result<Pass, GenieError> {
+) -> GenieResult<Pass> {
     if reach < Distance::new(target_gap2.get()) {
         let level = motion.paths.checked(0)?;
         if level.waypoint == WaypointIndex::last_of(level.points.len()) && level.created == now {
@@ -326,7 +326,7 @@ fn straight_way(
     leg: &Leg,
     plan: &mut PathSoFar,
     group_tuning: &GroupTuning,
-) -> Result<(), GenieError> {
+) -> GenieResult<()> {
     let ignore: Vec<RecordId> = lead
         .group
         .as_ref()
@@ -362,7 +362,7 @@ fn long_plan(
     target: Option<&Placed>,
     plan: &mut PathSoFar,
     by_id: ObjectsRef<'_>,
-) -> Result<(), GenieError> {
+) -> GenieResult<()> {
     let walker = LongWalker {
         id: lead.walker.id,
         position: lead.position,
@@ -412,7 +412,7 @@ pub(super) fn link(
     path: Path,
     (found, planned): (bool, bool),
     now: WorldTime,
-) -> Result<Option<Pass>, GenieError> {
+) -> GenieResult<Option<Pass>> {
     let level = motion.paths.checked(0)?;
     if (level.level == WaypointLevel::Top && !found) || path.points.len() < 2 {
         if !found {
@@ -490,7 +490,7 @@ pub(super) fn link(
 
 /// `LAB_14104be63`: the walked level gives up (`FUN_140f9b4b0`, then `FUN_140f98e80`: it resets,
 /// state 0), and the group stands.
-pub(super) fn give_up(motion: &mut Motion) -> Result<(), GenieError> {
+pub(super) fn give_up(motion: &mut Motion) -> GenieResult<()> {
     reset_level(&mut motion.paths)?;
     motion.stand();
     Ok(())

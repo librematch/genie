@@ -1,7 +1,7 @@
 //! The motion step's path request: the long pather's plan, the walled-off stretches and the
 //! goal's reach.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::map::Distance;
 use crate::map::Position;
 use crate::map::Rect;
@@ -64,7 +64,7 @@ impl Mover {
         goal: Goal<'_>,
         plans: &mut StepPlans,
         include: &[ObjectId],
-    ) -> Result<AfterRequest, GenieError> {
+    ) -> GenieResult<AfterRequest> {
         let movement_tuning = &by_id.tuning().movement;
         let roles = by_id.roles();
         // the request measures and plans from +0x824 (`pfVar14`, `local_18c8`), where the unit
@@ -132,7 +132,7 @@ impl Mover {
         goal: Goal<'_>,
         position: BVector,
         movement_tuning: &MovementTuning,
-    ) -> Result<Option<AfterRequest>, GenieError> {
+    ) -> GenieResult<Option<AfterRequest>> {
         let ground_radius = self.stats.radius.ground();
         let here = at;
         let level = self.paths.walked_mut()?;
@@ -171,7 +171,7 @@ impl Mover {
         plan: &mut Planning<'_>,
         class_roles: ClassRoles,
         plans: &mut StepPlans,
-    ) -> Result<bool, GenieError> {
+    ) -> GenieResult<bool> {
         let owner = world.get(me.id).map(|p| p.player);
         let budget = owner.map(|o| plan.pathing.budget(o));
         if !may_plan(class_roles, budget, self.wait_delays, *plans) {
@@ -191,7 +191,7 @@ impl Mover {
     /// tries: a level 2 short of its last waypoint gets its tries again and goes on (flag 1); a
     /// lower level, or a top without more points, resets and gives up (`FUN_140f9b4b0`:
     /// `FUN_140f98e80`, state 6; the unit stops, slot 0x5d0); else the level takes state 5.
-    pub(super) fn spend_try(&mut self) -> Result<Option<AfterRequest>, GenieError> {
+    pub(super) fn spend_try(&mut self) -> GenieResult<Option<AfterRequest>> {
         let top_loops = self
             .paths
             .last()
@@ -224,11 +224,7 @@ impl Mover {
 
     /// A unit without a footprint: the straight way to its waypoint (to where it stands past
     /// the level's last).
-    pub(super) fn straight_way(
-        &self,
-        position: BVector,
-        np: &mut NewPath,
-    ) -> Result<(), GenieError> {
+    pub(super) fn straight_way(&self, position: BVector, np: &mut NewPath) -> GenieResult<()> {
         let level = self.paths.walked()?;
         let _ = np.path.insert(0, position);
         let to = if level.waypoint.within(level.points.len()) {
@@ -260,7 +256,7 @@ impl Mover {
         ask: LongAsk<'_>,
         path: &mut Path,
         by_id: ObjectsRef<'_>,
-    ) -> Result<Option<(bool, Option<Distance>)>, GenieError> {
+    ) -> GenieResult<Option<(bool, Option<Distance>)>> {
         let roles = by_id.roles();
         let LongAsk {
             waypoint,
@@ -328,7 +324,7 @@ impl Mover {
         target_id: Option<ObjectId>,
         path: &mut Path,
         by_id: ObjectsRef<'_>,
-    ) -> Result<bool, GenieError> {
+    ) -> GenieResult<bool> {
         let movement_tuning = &by_id.tuning().movement;
         let roles = by_id.roles();
         let me_at = world.get(me.id);
@@ -391,7 +387,7 @@ impl Mover {
         gap: Distance,
         to_end: Distance,
         movement_tuning: &MovementTuning,
-    ) -> Result<bool, GenieError> {
+    ) -> GenieResult<bool> {
         let level = self.paths.walked()?;
         let d = if level.target.is_none() { to_end } else { gap };
         if (d - level.range).get() < EPSILON {

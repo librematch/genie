@@ -1,6 +1,6 @@
 //! FLARE (0x73): a flare for the player's allies.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::map::Point;
 use crate::objects::ObjectId;
 use crate::players::PlayerId;
@@ -26,7 +26,7 @@ pub struct FlareCommand {
 
 impl FlareCommand {
     /// Its handler ([`World::flare`]).
-    pub(crate) fn run(&self, w: &mut World) -> Result<(), GenieError> {
+    pub(crate) fn run(&self, w: &mut World) -> GenieResult<()> {
         w.flare(self.target, self.point, self.players)
     }
 }

@@ -1,7 +1,7 @@
 //! The `MoveTo`s the Hunt's `set_state` makes (`0x140ac60e0`) and the update of its sub-action
 //! list (`FUN_140a992b0`).
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::gathering::gather::Walks;
 use crate::gathering::hunt::{HuntAction, HuntReads};
 use crate::map::Distance;
@@ -47,7 +47,7 @@ impl HuntAction {
         mover: &Mover,
         walks: &Walks<'_>,
         move_to_tuning: &MoveToTuning,
-    ) -> Result<Option<MoveToAction>, GenieError> {
+    ) -> GenieResult<Option<MoveToAction>> {
         let given = self.task.walk_sprite_id(walks.held);
         walks
             .live(mover)
@@ -67,7 +67,7 @@ impl HuntAction {
         mover: &Mover,
         walks: &Walks<'_>,
         move_to_tuning: &MoveToTuning,
-    ) -> Result<Option<MoveToAction>, GenieError> {
+    ) -> GenieResult<Option<MoveToAction>> {
         let given = self.task.walk_sprite_id(walks.held);
         let walk =
             walks
@@ -95,7 +95,7 @@ impl HuntAction {
         unit: &mut Unit,
         mut me: Me,
         gives_up: GiveUp,
-    ) -> Result<SubCode, GenieError> {
+    ) -> GenieResult<SubCode> {
         me.action_state = ActionState::new(self.state.get());
         let state = self.state.move_to().map(|m| m.state);
         let how = ListUpdate {

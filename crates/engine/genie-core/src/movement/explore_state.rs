@@ -1,8 +1,8 @@
 //! An Explore's state with the data only it holds: waiting for a point, or walking to it with
 //! its `MoveTo`.
 
-use crate::GenieError;
 use crate::movement::move_to::MoveToAction;
+use crate::{GenieError, GenieResult};
 use derive_more::Display;
 use genie_diff::Diff;
 
@@ -41,7 +41,7 @@ impl ExploreState {
     /// # Errors
     ///
     /// A byte that names no state of an Explore, and a `MoveTo` in another state.
-    pub fn of_byte(value: u8, walk: Option<MoveToAction>) -> Result<Self, GenieError> {
+    pub fn of_byte(value: u8, walk: Option<MoveToAction>) -> GenieResult<Self> {
         let state = match value {
             0 => Self::New,
             1 => Self::Done,

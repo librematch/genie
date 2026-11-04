@@ -1,7 +1,7 @@
 //! The movement actions in a unit's update: the velocity step, the unit's own `MoveTo`, its
 //! Explore and a bird's Fly.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::groups::MoveReason;
 use crate::groups::UnitGroups;
 use crate::math::fmath::sqrt;
@@ -49,7 +49,7 @@ impl Unit {
         actions: &Action,
         c: &mut Step<'_>,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         // RGE_Moving_Object::update counts the last human order time down before its velocity
         // step
         if c.w.parts.mover_of(self.id).is_some() {
@@ -125,7 +125,7 @@ impl Unit {
         masters: OwnerMasters<'_>,
         ai: Option<&UnitAi>,
         roles: &Roles,
-    ) -> Result<Option<GroupSpeed>, GenieError> {
+    ) -> GenieResult<Option<GroupSpeed>> {
         let Some(g) = self.group.id.and_then(|id| groups.get(id)) else {
             return Ok(None);
         };
@@ -154,7 +154,7 @@ impl Unit {
         c: &mut Step<'_>,
         me: Me,
         roles: &Roles,
-    ) -> Result<HeadCode, GenieError> {
+    ) -> GenieResult<HeadCode> {
         if let Some(code) = self.own_move_held(actions, c)? {
             return Ok(HeadCode::of(code));
         }
@@ -179,7 +179,7 @@ impl Unit {
         actions: &mut Action,
         c: &mut Step<'_>,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let villager = roles
             .of_class(self.master(c.w.master_tables(), c.player)?.class)
             .contains(ClassRoles::VILLAGER);
@@ -216,7 +216,7 @@ impl Unit {
         &mut self,
         actions: &mut Action,
         c: &mut Step<'_>,
-    ) -> Result<Option<UpdateCode>, GenieError> {
+    ) -> GenieResult<Option<UpdateCode>> {
         let Some(move_to) = actions.list.move_to_mut() else {
             return Ok(None);
         };
@@ -240,7 +240,7 @@ impl Unit {
         c: &mut Step<'_>,
         me: Me,
         roles: &Roles,
-    ) -> Result<MoveStep, GenieError> {
+    ) -> GenieResult<MoveStep> {
         Ok(match actions.list.move_to_mut() {
             Some(move_to) => {
                 // its state 3 reads the unit's AI for the path it asks (0x140aa2a70), with its
@@ -287,7 +287,7 @@ impl Unit {
     /// The own `MoveTo`'s end, done or `failed`: its update in state 1 posts its completion
     /// (0x1fa with the move action value; an own `MoveTo` is never quiet), in state 13 its
     /// failure (0x1f9) and returns 3.
-    fn own_move_end(&self, c: &mut Step<'_>, end: StepEnd) -> Result<(), GenieError> {
+    fn own_move_end(&self, c: &mut Step<'_>, end: StepEnd) -> GenieResult<()> {
         let notify = if end == StepEnd::Failed {
             NotifyKind::ACTION_FAILED
         } else {
@@ -307,7 +307,7 @@ impl Unit {
         c: &mut Step<'_>,
         me: Me,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let Some(mut explore) = actions.list.explore().copied() else {
             return Ok(());
         };
@@ -324,7 +324,7 @@ impl Unit {
         actions: &mut Action,
         c: &mut Step<'_>,
         me: Me,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let Some(mut fly) = actions.list.fly().copied() else {
             return Ok(());
         };

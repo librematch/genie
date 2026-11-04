@@ -1,7 +1,7 @@
 //! A player section: the player list's load of one player, generated from the game's load code.
 
 use super::generated::world::{Object, Player, PlayerObjects, WorldPlayer};
-use genie_error::GenieError;
+use genie_error::{GenieError, GenieResult};
 
 /// Where a player section starts and ends.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -35,7 +35,7 @@ impl<'a> PlayerSection<'a> {
     /// # Errors
     ///
     /// A player type no creator handles (the game's `InvalidPlayerType`).
-    pub fn new(start: usize, player: &'a Player) -> Result<Self, GenieError> {
+    pub fn new(start: usize, player: &'a Player) -> GenieResult<Self> {
         let (Some(world_player), Some(objects)) = (player.world_player(), player.objects()) else {
             return Err(GenieError::invalid_input("InvalidPlayerType")
                 .with("type", player.kind)
@@ -55,7 +55,7 @@ impl<'a> PlayerSection<'a> {
     /// # Errors
     ///
     /// A player that does not write back.
-    pub fn ends(&self) -> Result<PlayerEnds, GenieError> {
+    pub fn ends(&self) -> GenieResult<PlayerEnds> {
         Ok(PlayerEnds {
             start: self.start,
             end: self.start + super::written_len(self.player)?,

@@ -1,6 +1,6 @@
 //! A path level's state: whether it asks for a path, walks it or is done with it.
 
-use crate::GenieError;
+use crate::{GenieError, GenieResult};
 use derive_more::Display;
 
 /// A path level's state (`+0x28`, the save's `state`), which the motion step (`0x141150f00`)
@@ -31,7 +31,7 @@ impl PathState {
     /// # Errors
     ///
     /// A value that names no state of a path level.
-    pub fn of_int(value: i32) -> Result<Self, GenieError> {
+    pub fn of_int(value: i32) -> GenieResult<Self> {
         Ok(match value {
             0 => Self::Idle,
             2 => Self::WantsPath,

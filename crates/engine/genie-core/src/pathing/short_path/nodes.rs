@@ -1,7 +1,7 @@
 //! The search's nodes: the open list, the goal and foot tests, a polygon corner's test and
 //! the clip to the box.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::pathing::short_path::{
     FixedPoint, Kind, Node, NodeIndex, Poly, PolyIndex, RECT_HEURISTIC, Run, Search, Token,
 };
@@ -172,28 +172,28 @@ pub(super) const fn cheb(a: FixedPoint, b: FixedPoint) -> FixedDistance {
 
 impl Search<'_> {
     /// The node at `i`.
-    pub(super) fn node(&self, i: NodeIndex) -> Result<&Node, GenieError> {
+    pub(super) fn node(&self, i: NodeIndex) -> GenieResult<&Node> {
         self.arena.checked(i.get())
     }
 
     /// The node at `i`, to change.
-    pub(super) fn node_mut(&mut self, i: NodeIndex) -> Result<&mut Node, GenieError> {
+    pub(super) fn node_mut(&mut self, i: NodeIndex) -> GenieResult<&mut Node> {
         self.arena.checked_mut(i.get())
     }
 
     /// The polygon at `i`.
-    pub(super) fn poly(&self, i: PolyIndex) -> Result<&Poly, GenieError> {
+    pub(super) fn poly(&self, i: PolyIndex) -> GenieResult<&Poly> {
         self.polys.checked(i.get())
     }
 
     /// The polygon at `i`, to change.
-    pub(super) fn poly_mut(&mut self, i: PolyIndex) -> Result<&mut Poly, GenieError> {
+    pub(super) fn poly_mut(&mut self, i: PolyIndex) -> GenieResult<&mut Poly> {
         self.polys.checked_mut(i.get())
     }
 
     /// No goal node yet, or `g` cheaper than the goal node's cost: the game's
     /// `goal == -1 || g < arena[goal].g`.
-    pub(super) fn beats_goal(&self, g: FixedDistance) -> Result<bool, GenieError> {
+    pub(super) fn beats_goal(&self, g: FixedDistance) -> GenieResult<bool> {
         Ok(match self.goal_node {
             None => true,
             Some(goal) => g < self.node(goal)?.g,
@@ -246,7 +246,7 @@ impl Search<'_> {
 
     /// `FUN_140fa3860`: a node at `pt` reached with cost `g`: within range and better than the goal
     /// so far, it becomes the goal (true); else, nearer than the best so far, the best.
-    pub(super) fn goal_test(&mut self, corner: Corner) -> Result<bool, GenieError> {
+    pub(super) fn goal_test(&mut self, corner: Corner) -> GenieResult<bool> {
         let Corner {
             cost: g,
             parent,
@@ -282,7 +282,7 @@ impl Search<'_> {
 
     /// `FUN_140fa8210`: the goal's foot on an axis edge `a`–`b` (horizontal when `dx != 0`) as a
     /// goal candidate.
-    pub(super) fn foot_test(&mut self, edge: Foot) -> Result<(), GenieError> {
+    pub(super) fn foot_test(&mut self, edge: Foot) -> GenieResult<()> {
         let Foot {
             start: a,
             end: b,
@@ -317,7 +317,7 @@ impl Search<'_> {
 
     /// `FUN_140fa2740`, a popped node's test: the best (lowest estimate) so far; in range and
     /// cheaper than the goal: the new goal (true); no cheaper than the goal: pruned (true).
-    pub(super) fn pop_test(&mut self, n: &Node) -> Result<bool, GenieError> {
+    pub(super) fn pop_test(&mut self, n: &Node) -> GenieResult<bool> {
         let h = n.f.wrapping_sub(n.g);
         let b = *self.node(self.best)?;
         if h < b.f.wrapping_sub(b.g) {

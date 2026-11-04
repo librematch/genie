@@ -1,6 +1,5 @@
 //! A unit's move, to a point or aside, a work order, its reach and a point's move order.
 
-use crate::GenieError;
 use crate::gathering::PastureId;
 use crate::map::Distance;
 use crate::map::Point;
@@ -44,6 +43,7 @@ use crate::world::index::Place;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::slots::PlayerSlots;
+use crate::{GenieError, GenieResult};
 
 /// What a work order leaves of the pasture its unit tends ([`World::work_pasture`]).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -70,7 +70,7 @@ impl World {
         others: &[ObjectId],
         cell: Option<Point>,
         order: &MoveOrder,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let point2 = cell.unwrap_or(order.point);
         let Some(place) = self.place(id) else {
             return Ok(());
@@ -189,7 +189,7 @@ impl World {
         player: PlayerId,
         idx: ListIndex,
         point: Position,
-    ) -> Result<Answer, GenieError> {
+    ) -> GenieResult<Answer> {
         // a unit with a unit AI (FUN_140c5dc10 clears its notifies with the world time) lets its
         // head action's slot 0x40 take the point unless it stops after a kill (FUN_140c41c10)
         let world_time = self.world_time;
@@ -263,7 +263,7 @@ impl World {
         &self,
         player: PlayerId,
         idx: ListIndex,
-    ) -> Result<Option<Graphic>, GenieError> {
+    ) -> GenieResult<Option<Graphic>> {
         let unit = &self.players.live(player, idx)?;
         let master = unit.master(self.master_tables(), player)?;
         let look = self.parts.combat_of(unit.id).abilities.look.as_ref();
@@ -279,7 +279,7 @@ impl World {
         player: PlayerId,
         idx: ListIndex,
         m: AiMove,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let unit = &self.players.live(player, idx)?;
         let class = unit.master(self.master_tables(), player)?.class;
         let by = self.releaser(player, idx)?;
@@ -339,7 +339,7 @@ impl World {
         player: PlayerId,
         idx: ListIndex,
         order: &Work,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let unit = &self.players.live(player, idx)?;
         let master = unit.master(self.master_tables(), player)?;
         // the class-54 test of its top action comes first in the game, but either way the order
@@ -397,12 +397,7 @@ impl World {
     /// command (slot 0x3a0), and where it enters nothing the work command goes to the target's
     /// place without a target; the town bell (`FUN_1412067f0`, which reads no target), the work
     /// command and the pasture ([`World::work_pasture`]).
-    fn work_on_held(
-        &mut self,
-        player: PlayerId,
-        idx: ListIndex,
-        order: &Work,
-    ) -> Result<(), GenieError> {
+    fn work_on_held(&mut self, player: PlayerId, idx: ListIndex, order: &Work) -> GenieResult<()> {
         let master = self
             .players
             .live(player, idx)?
@@ -444,7 +439,7 @@ impl World {
         order: &Work,
         target: Option<PlayerId>,
         master: &Master,
-    ) -> Result<Option<(bool, bool)>, GenieError> {
+    ) -> GenieResult<Option<(bool, bool)>> {
         let world = TaskWorld {
             players: &self.players,
             drop_sites: &self.model.drop_sites,
@@ -479,7 +474,7 @@ impl World {
         player: PlayerId,
         idx: ListIndex,
         order: &Work,
-    ) -> Result<PastureAfter, GenieError> {
+    ) -> GenieResult<PastureAfter> {
         use crate::technology::Attributes;
         let unit = &self.players.live(player, idx)?;
         let master = unit.master(self.master_tables(), player)?;
@@ -546,7 +541,7 @@ impl World {
         player: PlayerId,
         idx: ListIndex,
         point: Position,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         self.move_point_order_with(player, idx, point, OrderSource::Direct)
     }
 
@@ -561,7 +556,7 @@ impl World {
         idx: ListIndex,
         point: Position,
         source: OrderSource,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let villager = self
             .model
             .roles

@@ -1,6 +1,5 @@
 //! The swing's and the arrival's sprites, the attack timer and the unit's turn to its target.
 
-use crate::GenieError;
 use crate::combat::abilities::Look;
 use crate::combat::attack::Arms;
 use crate::map::Position;
@@ -21,6 +20,7 @@ use crate::world::Seconds;
 use crate::world::WorldTime;
 use crate::world::layer::generated::AttackTuning;
 use crate::world::layer::generated::SpriteTuning;
+use crate::{GenieError, GenieResult};
 
 /// The sprites a swing of a unit (its terrain look `look`, its master `master`) takes before its
 /// Attack's own ([`SwingSprites`]): its look's attack sprite while it shows its look, its
@@ -84,7 +84,7 @@ pub(crate) fn show_arrived(
     mut motion: MotionMut<'_>,
     rng: &mut Well512,
     sprite_tuning: SpriteTuning,
-) -> Result<(), GenieError> {
+) -> GenieResult<()> {
     let g = arms.idle_sprite.ok_or(NO_STANDING_SPRITE)?;
     new_sprite(sprite, motion.move_stats_mut(), g, rng, sprite_tuning);
     motion.set_anim_speed(Speed::ZERO);
@@ -133,7 +133,7 @@ pub(crate) fn face_target(
     at: Position,
     to: Position,
     world_time: WorldTime,
-) -> Result<Aim, GenieError> {
+) -> GenieResult<Aim> {
     let facets = mover.facets().ok_or(GenieError::unsupported(
         "a unit facing a target whose sprites differ in their facets",
     ))?;

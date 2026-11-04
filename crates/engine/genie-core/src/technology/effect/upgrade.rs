@@ -1,7 +1,6 @@
 //! A master's upgrade (slot 0x1a0) and its objects, the objects an effect spawns, the objects'
 //! kinds and a negative cost's entries.
 
-use crate::GenieError;
 use crate::construction::build::world_side::MakeMode;
 use crate::garrison::ContainerId;
 use crate::map::Point;
@@ -32,6 +31,7 @@ use crate::world::index::Place;
 use crate::world::layer::MasterRoles;
 use crate::world::parts::Part;
 use crate::world::slots::{CheckedIndex, PlayerSlots};
+use crate::{GenieError, GenieResult};
 use std::sync::Arc;
 
 /// The masters [`World::upgrade_walk`] reads: the table's old and new ones, and the dead unit
@@ -53,7 +53,7 @@ impl World {
         (from, to): (Option<MasterId>, Option<MasterId>),
         mode: UpgradeMode,
         object: Option<ObjectId>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         self.all_garrison_volleys(p, EffectHook::Before)?;
         if let (Some(from), Some(to)) = (from, to) {
             self.upgrade_objects(p, from, to, mode, object)?;
@@ -83,7 +83,7 @@ impl World {
         to: MasterId,
         mode: UpgradeMode,
         object: Option<ObjectId>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let Some(masters) = self.model.masters.of(p) else {
             return Ok(());
         };
@@ -132,7 +132,7 @@ impl World {
     /// Mode 2's own part of [`World::upgrade_objects`]: the object `id` gets a master of its own
     /// (a copy of the one it reads) where its kind lets it, takes slot 0x98 to `new` and copies
     /// `new` into its own master.
-    fn upgrade_named(&mut self, p: PlayerId, id: ObjectId, new: &Master) -> Result<(), GenieError> {
+    fn upgrade_named(&mut self, p: PlayerId, id: ObjectId, new: &Master) -> GenieResult<()> {
         use crate::technology::upgrade::upgradable;
         if let Some(place) = self.place(id) {
             let u = self.object_at(place)?;
@@ -156,7 +156,7 @@ impl World {
         p: PlayerId,
         (from, mode, keep): (MasterId, UpgradeMode, UpgradeMaster),
         Masters { old, new, dead }: Masters<'_>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         use crate::technology::upgrade::upgradable;
         use crate::world::index::Place;
         for i in self.players.player(p)?.objects.places() {
@@ -200,7 +200,7 @@ impl World {
         p: PlayerId,
         from: MasterId,
         to: MasterId,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if self
             .model
             .roles
@@ -213,7 +213,7 @@ impl World {
     }
 
     /// The master object `u` of player `p` reads: its own, else its player's.
-    pub(super) fn master_read(&self, p: PlayerId, u: &Unit) -> Result<Master, GenieError> {
+    pub(super) fn master_read(&self, p: PlayerId, u: &Unit) -> GenieResult<Master> {
         u.master(self.master_tables(), p).cloned()
     }
 
@@ -226,7 +226,7 @@ impl World {
         p: PlayerId,
         i: ListIndex,
         old: &Master,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let dead = old.death_spawns[0]
             .and_then(|id| player_master(&self.model.masters, p, id))
             .cloned();
@@ -259,7 +259,7 @@ impl World {
         p: PlayerId,
         (master, at): (Option<MasterId>, Option<MasterId>),
         count: i16,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let has = |q: usize, id: MasterId| {
             self.model
                 .masters
@@ -356,7 +356,7 @@ impl World {
     pub(super) const fn object_effect(
         kind: ObjectsKind,
         object: Option<ObjectId>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         match (kind, object) {
             (ObjectsKind::OwnMasters(_), _) | (_, None) => Ok(()),
             (ObjectsKind::ObjectMaster, Some(_)) => Err(GenieError::unsupported(

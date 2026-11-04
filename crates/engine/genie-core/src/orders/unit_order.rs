@@ -1,6 +1,5 @@
 //! An artifact's and a herd's take, an order's cancel and a unit's order.
 
-use crate::GenieError;
 use crate::commands::UnitOrderAction;
 use crate::construction::FoundationId;
 use crate::construction::build::BuildAction;
@@ -33,6 +32,7 @@ use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlots;
+use crate::{GenieError, GenieResult};
 
 impl World {
     /// An animal's Artifact takes a move to the object `target` (its slot 8, `FUN_140aaca30`,
@@ -46,7 +46,7 @@ impl World {
         player: PlayerId,
         idx: ListIndex,
         target: ObjectId,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let by = self.releaser(player, idx)?;
         let unit = &self.players.live(player, idx)?;
         let livestock = self
@@ -128,7 +128,7 @@ impl World {
         p: PlayerId,
         sheep: ObjectId,
         site: DropSiteId,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         self.send_to_site(p, sheep, site)?;
         let mut listed = Vec::new();
         self.herd_from(p, sheep, site, &mut listed)
@@ -148,7 +148,7 @@ impl World {
         sheep: ObjectId,
         site: DropSiteId,
         listed: &mut Vec<ObjectId>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         listed.push(sheep);
         if HERD_MOST <= listed.len() {
             return Ok(());
@@ -206,7 +206,7 @@ impl World {
         p: PlayerId,
         sheep: ObjectId,
         site: DropSiteId,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let Some(Place::Live(q, idx)) = self.place(sheep) else {
             return Err(GenieError::unsupported(
                 "a led animal the slice does not hold live",
@@ -231,7 +231,7 @@ impl World {
         ids: &[Option<ObjectId>],
         index: UnitIndex,
         batch: Batch,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         for &id in ids.iter().flatten() {
             let Some(place) = self.place(id) else {
                 continue;
@@ -268,7 +268,7 @@ impl World {
         _player: PlayerId,
         ids: &[Option<ObjectId>],
         action: UnitOrderAction,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         // 8 records an unaimed action's work for the town bell and queues the way back after;
         // 6 asks no gather action (the search alone)
         let (asks, way_back) = match action {
@@ -320,7 +320,7 @@ impl World {
         p: PlayerId,
         idx: ListIndex,
         (asks, way_back): (bool, bool),
-    ) -> Result<Option<DropOffAsk>, GenieError> {
+    ) -> GenieResult<Option<DropOffAsk>> {
         let unit = self.players.live(p, idx)?;
         let top = if asks {
             self.parts.actions_of(unit.id).top_action_kind()
@@ -380,7 +380,7 @@ impl World {
         p: PlayerId,
         idx: ListIndex,
         ask: &DropOffAsk,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if !ask.asked {
             self.other_load(p, idx)?;
         }
@@ -411,7 +411,7 @@ impl World {
         p: PlayerId,
         idx: ListIndex,
         walker: &SiteWalker,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let unit = self.take_out(p, idx)?;
         // its action layer goes out of the table with it, as the updating object's
         let mut actions = self.parts.take_actions(unit.id);

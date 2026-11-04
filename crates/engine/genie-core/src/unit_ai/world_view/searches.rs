@@ -5,7 +5,6 @@
 //! foundation searches in `construction/build/unit_ai_side.rs` and the resource search in
 //! `gathering/closest_resource.rs`.
 
-use crate::GenieError;
 use crate::construction::FoundationId;
 use crate::gathering::DropSiteId;
 use crate::map::Distance;
@@ -39,6 +38,7 @@ use crate::world::index::ObjectsRef;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::slots::PlayerSlots;
+use crate::{GenieError, GenieResult};
 
 impl UnitView<'_, '_> {
     /// A search (the unit AI's `FUN_140c63e20` with its pick) over the objects-in-sight
@@ -48,7 +48,7 @@ impl UnitView<'_, '_> {
     /// # Errors
     ///
     /// What the search does not model.
-    pub(crate) fn closest(&mut self, search: &Search<'_>) -> Result<Found, GenieError> {
+    pub(crate) fn closest(&mut self, search: &Search<'_>) -> GenieResult<Found> {
         let roles = &self.c.w.model.roles.clone();
         let seeker = match search.pick {
             Pick::Attack { seeker, .. } => Some(seeker),
@@ -159,7 +159,7 @@ impl UnitView<'_, '_> {
         &self,
         target: ObjectId,
         seeker: &UnitAiSeeker,
-    ) -> Result<Option<(ClassId, Position)>, GenieError> {
+    ) -> GenieResult<Option<(ClassId, Position)>> {
         let roles = &self.c.w.model.roles.clone();
         if !self.view_holds(target)? {
             return Ok(None);
@@ -176,7 +176,7 @@ impl UnitView<'_, '_> {
     pub(crate) fn closest_resource(
         &mut self,
         search: ResourceSearch,
-    ) -> Result<Option<Gatherable>, GenieError> {
+    ) -> GenieResult<Option<Gatherable>> {
         self.closest_gatherable(search)
     }
 
@@ -185,7 +185,7 @@ impl UnitView<'_, '_> {
     /// # Errors
     ///
     /// What the search does not model.
-    pub(crate) fn foundation_search(&self) -> Result<Option<ObjectId>, GenieError> {
+    pub(crate) fn foundation_search(&self) -> GenieResult<Option<ObjectId>> {
         self.own_foundation_near()
     }
 
@@ -196,7 +196,7 @@ impl UnitView<'_, '_> {
     /// # Errors
     ///
     /// A unit or an owner the world does not hold.
-    pub(crate) fn table_drop_site(&self) -> Result<Option<(DropSiteId, Position)>, GenieError> {
+    pub(crate) fn table_drop_site(&self) -> GenieResult<Option<(DropSiteId, Position)>> {
         let class = self
             .unit
             .master(self.c.w.master_tables(), self.player)?
@@ -231,7 +231,7 @@ impl UnitView<'_, '_> {
         &mut self,
         site: FoundationId,
         radius: Footprint,
-    ) -> Result<OffFootprint, GenieError> {
+    ) -> GenieResult<OffFootprint> {
         self.spot_off_footprint(site, radius)
     }
 
@@ -248,7 +248,7 @@ impl UnitView<'_, '_> {
     /// # Errors
     ///
     /// A search that read no lists yet, and a helper that passes them ([`helper_answers`]).
-    pub(crate) fn call_for_help(&self, attacker: ObjectId) -> Result<(), GenieError> {
+    pub(crate) fn call_for_help(&self, attacker: ObjectId) -> GenieResult<()> {
         /// The classes that never help: 1 to 3, 18 to 21, 27 and 39.
         const NO_HELP_CLASSES: ClassMask = ClassMask::new(0x0080_083c_000e, 0x28);
 
@@ -324,7 +324,7 @@ impl UnitView<'_, '_> {
         &mut self,
         ai: &UnitAi,
         rng: &mut Well512,
-    ) -> Result<Option<Tile>, GenieError> {
+    ) -> GenieResult<Option<Tile>> {
         let tc = town_centre(
             owner_view(
                 &self.c.w.players,
@@ -358,10 +358,7 @@ impl UnitView<'_, '_> {
     /// # Errors
     ///
     /// What the search does not model.
-    pub(crate) fn seek_beyond_sight(
-        &mut self,
-        rng: &mut Well512,
-    ) -> Result<Option<Tile>, GenieError> {
+    pub(crate) fn seek_beyond_sight(&mut self, rng: &mut Well512) -> GenieResult<Option<Tile>> {
         let (at, player) = (self.unit.position(), self.player);
         let scouted = self.c.w.spatial.scout_map(player).is_some();
         let (mut area, map, line_of_sight) = self.scout_area()?;

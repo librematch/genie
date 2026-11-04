@@ -1,6 +1,5 @@
 //! A gatherer's walk after a drop and the drop sites it walks to.
 
-use crate::GenieError;
 use crate::gathering::ActionEnd;
 use crate::gathering::DropSiteId;
 use crate::gathering::drop_sites::DropMeasure;
@@ -41,6 +40,7 @@ use crate::world::lets::{release, take};
 use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
+use crate::{GenieError, GenieResult};
 
 impl Unit {
     /// The Gather's state 8 after the deposit without a target (`0x140a8e1d0` case 7; its drop
@@ -60,7 +60,7 @@ impl Unit {
         actions: &mut Action,
         c: &mut Step<'_>,
         roles: &Roles,
-    ) -> Result<HeadCode, GenieError> {
+    ) -> GenieResult<HeadCode> {
         let by = self.releaser(c)?;
         if self.after_drop_orders(c)? == ActionEnd::Ends {
             return Ok(HeadCode::Deletes);
@@ -76,7 +76,7 @@ impl Unit {
     /// does not hold, or one its sight sees past state 5) leave (`FUN_140c5de60`); with orders
     /// left the AI ends its order and action and the Gather is done (its deletion lets the drop
     /// site go). [`ActionEnd::Ends`] when it is.
-    fn after_drop_orders(&self, c: &mut Step<'_>) -> Result<ActionEnd, GenieError> {
+    fn after_drop_orders(&self, c: &mut Step<'_>) -> GenieResult<ActionEnd> {
         let spatial: &Spatial = &c.w.spatial;
         let gone = |id: Option<ObjectId>| match spatial.get(id) {
             None => true,
@@ -111,7 +111,7 @@ impl Unit {
         gather: &GatherAction,
         actions: &Action,
         c: &mut Step<'_>,
-    ) -> Result<Option<ObjectId>, GenieError> {
+    ) -> GenieResult<Option<ObjectId>> {
         let Some(ai) = c.w.parts.unit_ai.get(self.id) else {
             return Ok(None);
         };
@@ -138,7 +138,7 @@ impl Unit {
         c: &mut Step<'_>,
         by: Releaser,
         roles: &Roles,
-    ) -> Result<HeadCode, GenieError> {
+    ) -> GenieResult<HeadCode> {
         let farm_waits = waits_for_farm(self.life.master_id, gather.target_class, roles);
         let walks = self.move_walks(
             c.w.parts.mover_of(self.id),
@@ -199,11 +199,7 @@ impl Unit {
 
     /// The sprite an idle gatherer shows: its task's carrying sprite while it holds at least 1 of
     /// the task's resource, else its master's standing sprite (none the data file lacks).
-    fn idle_sprite(
-        &self,
-        gather: &GatherAction,
-        c: &Step<'_>,
-    ) -> Result<Option<Graphic>, GenieError> {
+    fn idle_sprite(&self, gather: &GatherAction, c: &Step<'_>) -> GenieResult<Option<Graphic>> {
         let master = self.master(c.w.master_tables(), c.player)?;
         let standing = master
             .standing_sprite
@@ -235,7 +231,7 @@ impl Unit {
         found: ObjectId,
         by: Releaser,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let (owner, resource) =
             self.found_resource(c, OthersRef::of(&c.w.players, &c.w.index, c.player)?, found)?;
         let master = self.master(c.w.master_tables(), c.player)?;
@@ -318,7 +314,7 @@ impl Unit {
         c: &Step<'_>,
         others: OthersRef<'_>,
         found: ObjectId,
-    ) -> Result<(usize, Resource), GenieError> {
+    ) -> GenieResult<(usize, Resource)> {
         let (owner, t) = others.find(found).ok_or(GenieError::unsupported(
             "a gather's new target the slice does not hold",
         ))?;
@@ -357,7 +353,7 @@ impl Unit {
         actions: &mut Action,
         c: &mut Step<'_>,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let (mover, by_id) =
             c.w.parts
                 .lend_mover(self.id, (&c.w.players, &c.w.index, &c.w.model));
@@ -398,7 +394,7 @@ impl Unit {
         others: OthersRef<'_>,
         graphics: &Graphics,
         by_id: ObjectsRef<'_>,
-    ) -> Result<Option<ObjectId>, GenieError> {
+    ) -> GenieResult<Option<ObjectId>> {
         let move_to_tuning = &by_id.tuning().move_to;
         let roles = by_id.roles();
         if self.life.amount <= Amount::ZERO {
@@ -450,7 +446,7 @@ impl Unit {
         others: OthersRef<'_>,
         graphics: &Graphics,
         by_id: ObjectsRef<'_>,
-    ) -> Result<Option<ObjectId>, GenieError> {
+    ) -> GenieResult<Option<ObjectId>> {
         let move_to_tuning = &by_id.tuning().move_to;
         let roles = by_id.roles();
         if self.life.amount <= Amount::ZERO {
@@ -508,7 +504,7 @@ impl Unit {
         carry_to: Option<DropSiteId>,
         state: ActionState,
         by_id: ObjectsRef<'_>,
-    ) -> Result<(Option<DropSiteId>, Distance), GenieError> {
+    ) -> GenieResult<(Option<DropSiteId>, Distance)> {
         let master = self.master_in(c.masters)?;
         let mover = mover.ok_or(GenieError::unsupported("a gatherer without movement state"))?;
         let mut site = carry_to;
@@ -564,7 +560,7 @@ impl Unit {
         state: ActionState,
         place: SitePlace,
         by_id: ObjectsRef<'_>,
-    ) -> Result<Option<DropSiteId>, GenieError> {
+    ) -> GenieResult<Option<DropSiteId>> {
         let nearest = if c.player_kind.is_computer() {
             DropMeasure::ByDistance
         } else {
@@ -593,7 +589,7 @@ impl Unit {
         state: ActionState,
         search: SiteSearch,
         by_id: ObjectsRef<'_>,
-    ) -> Result<Option<DropSiteId>, GenieError> {
+    ) -> GenieResult<Option<DropSiteId>> {
         let masters = c.masters.table.ok_or(GenieError::unsupported(
             "a drop-off of a player without masters",
         ))?;

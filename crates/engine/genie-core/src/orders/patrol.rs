@@ -1,6 +1,5 @@
 //! PATROL, the attack move and their sweep, and the group the splitter keeps.
 
-use crate::GenieError;
 use crate::groups::FarMembers;
 use crate::groups::GroupFlags;
 use crate::groups::GroupId;
@@ -34,6 +33,7 @@ use crate::world::Millis;
 use crate::world::World;
 use crate::world::slots::CheckedIndex;
 use crate::world::slots::PlayerSlots;
+use crate::{GenieError, GenieResult};
 
 /// What PATROL's and `ATTACK_MOVE`'s flag `+0x8` (`FUN_14161b970`'s `param_6`) does to the listed
 /// units' AIs' saved patrols (`zeroPatrolInformation`).
@@ -58,7 +58,7 @@ impl World {
         ids: &[Option<ObjectId>],
         waypoints: &[Point],
         patrols: SavedPatrols,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let Some(ids) = self.command_check(player, ids)? else {
             return Ok(());
         };
@@ -86,7 +86,7 @@ impl World {
         ids: &[Option<ObjectId>],
         waypoints: &[Point],
         sweep: Sweep,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let Some(ids) = self.command_check(player, ids)? else {
             return Ok(());
         };
@@ -117,7 +117,7 @@ impl World {
         ids: &[Option<ObjectId>],
         waypoints: &[Point],
         patrols: SavedPatrols,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let sweep = Sweep {
             patrol: true,
             patrols,
@@ -172,7 +172,7 @@ impl World {
         ids: &[Option<ObjectId>],
         waypoints: &[Point],
         sweep: Sweep,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let Sweep {
             patrol, patrols, ..
         } = sweep;
@@ -249,12 +249,7 @@ impl World {
     /// `FUN_140fd9f40`'s test of a command on a target: the squared gap between the unit and the
     /// target on the ground (`FUN_14118f8c0`) is above its master's line of sight squared (`COMISS`:
     /// a NaN is not), so the target is out of its sight.
-    fn out_of_sight(
-        &self,
-        unit: &Unit,
-        master: &Master,
-        target: ObjectId,
-    ) -> Result<bool, GenieError> {
+    fn out_of_sight(&self, unit: &Unit, master: &Master, target: ObjectId) -> GenieResult<bool> {
         let Some(t) = self.world_object(target) else {
             return Ok(true);
         };
@@ -277,7 +272,7 @@ impl World {
         split: &mut Split,
         group: GroupId,
         target: Option<ObjectId>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let mut i = 0;
         while i < split.loose.len() {
             let id = *split.loose.checked(i)?;
@@ -371,7 +366,7 @@ impl World {
         i: usize,
         waypoints: &[Point],
         sweep: Sweep,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let id = *loose.checked(i)?;
         let Some((p, u)) = self.object(id) else {
             return Ok(());

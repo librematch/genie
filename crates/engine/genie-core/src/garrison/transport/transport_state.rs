@@ -1,8 +1,8 @@
 //! A Transport's state: the steps of its update from the sail to the unload; each sail with its
 //! `MoveTo`.
 
-use crate::GenieError;
 use crate::movement::move_to::MoveToAction;
+use crate::{GenieError, GenieResult};
 use derive_more::Display;
 use genie_diff::Diff;
 
@@ -43,7 +43,7 @@ impl TransportState {
     /// # Errors
     ///
     /// A byte that names no state of a Transport, and a `MoveTo` in a state that does not sail.
-    pub fn of_byte(value: u8, sail: Option<MoveToAction>) -> Result<Self, GenieError> {
+    pub fn of_byte(value: u8, sail: Option<MoveToAction>) -> GenieResult<Self> {
         let state = match value {
             0 => Self::New,
             1 => Self::Done,

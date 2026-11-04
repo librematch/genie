@@ -1,7 +1,6 @@
 //! The hulls' building from the area's obstructions: the tiles' boxes, the runs the unit
 //! cannot cross, the cliffs; a point's hull and the area's bounds.
 
-use crate::GenieError;
 use crate::map::Distance;
 use crate::map::Rect;
 use crate::map::Tile;
@@ -16,6 +15,7 @@ use crate::players::PlayerId;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::generated::HullPathTuning;
 use crate::world::slots::CheckedIndex;
+use crate::{GenieError, GenieResult};
 
 impl HullPather<'_> {
     // The hulls.
@@ -29,7 +29,7 @@ impl HullPather<'_> {
         min: Point,
         max: Point,
         hull_path_tuning: &HullPathTuning,
-    ) -> Result<HullIndex, GenieError> {
+    ) -> GenieResult<HullIndex> {
         let mut index = 0;
         let mut hull: Option<HullIndex> = None;
         while index < hulls.len() {
@@ -117,7 +117,7 @@ impl HullPather<'_> {
 
     /// Hull `j` merges into hull `mine`: its boxes the other lacks and its points join, and its
     /// slot goes to the last hull. Returns where `mine` now is.
-    fn absorb(hulls: &mut Vec<Hull>, mine: HullIndex, j: usize) -> Result<HullIndex, GenieError> {
+    fn absorb(hulls: &mut Vec<Hull>, mine: HullIndex, j: usize) -> GenieResult<HullIndex> {
         let other = hulls.checked(j)?.clone();
         for s in &other.objects {
             let mine_objects = &mut hulls.checked_mut(mine.index())?.objects;
@@ -145,7 +145,7 @@ impl HullPather<'_> {
         tile: Tile,
         hull: Option<HullIndex>,
         player: Option<PlayerId>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let hull_path_tuning = &self.by_id.tuning().hull_path;
         let world = &*self.world;
         for &id in world.tiles().list(tile) {
@@ -174,7 +174,7 @@ impl HullPather<'_> {
         id: ObjectId,
         p: &Placed,
         player: Option<PlayerId>,
-    ) -> Result<bool, GenieError> {
+    ) -> GenieResult<bool> {
         let roles = self.by_id.roles();
         if !roles.of_class(p.class).contains(ClassRoles::GATE) || player.is_none() {
             return Ok(false);
@@ -193,7 +193,7 @@ impl HullPather<'_> {
         p: &Placed,
         hull: Option<HullIndex>,
         hull_path_tuning: &HullPathTuning,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let (x, y) = (p.position.x(), p.position.y());
         let (rx, ry) = (p.radius.x(), p.radius.y());
         let bounds = Rect::new(
@@ -216,7 +216,7 @@ impl HullPather<'_> {
     }
 
     /// [`HullPather::add_shape_to`] on the pather's hulls.
-    pub(super) fn add_shape(&mut self, min: Point, max: Point) -> Result<HullIndex, GenieError> {
+    pub(super) fn add_shape(&mut self, min: Point, max: Point) -> GenieResult<HullIndex> {
         let hull_path_tuning = &self.by_id.tuning().hull_path;
         Self::add_shape_to(&mut self.hulls, min, max, hull_path_tuning)
     }
@@ -228,7 +228,7 @@ impl HullPather<'_> {
         tile: Tile,
         area: TileRect,
         hull: Option<HullIndex>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if !self.world.map.holds(tile) {
             return Ok(());
         }
@@ -271,7 +271,7 @@ impl HullPather<'_> {
     /// the unit cannot cross (its terrain, or a static record's mark but a class 5 one) is one box
     /// whose tiles' boxes and small objects go into its hull; each other tile's objects go each to
     /// its own place. Then the cliffs about the area.
-    pub(super) fn build_hulls(&mut self) -> Result<(), GenieError> {
+    pub(super) fn build_hulls(&mut self) -> GenieResult<()> {
         self.hulls.clear();
         let (w, h) = (self.world.map.width(), self.world.map.height());
         let [x0, y0, x1, y1] = self.area.get();
@@ -303,13 +303,7 @@ impl HullPather<'_> {
     }
 
     /// A run of tiles `x0`..`x1` of row `y` the unit cannot cross: one box, then its tiles.
-    pub(super) fn add_run(
-        &mut self,
-        x0: i32,
-        x1: i32,
-        y: i32,
-        r: Distance,
-    ) -> Result<(), GenieError> {
+    pub(super) fn add_run(&mut self, x0: i32, x1: i32, y: i32, r: Distance) -> GenieResult<()> {
         let min = Point::new(x0 as f32 - r.get(), y as f32 - r.get());
         let max = Point::new(x1 as f32 + r.get(), (y + 1) as f32 + r.get());
         let hull = self.add_shape(min, max)?;
@@ -321,7 +315,7 @@ impl HullPather<'_> {
 
     /// `MShortPather::processCliffs` (`FUN_140f8e020`): the objects of the cliff tiles (a static
     /// record of class 6) within two tiles about the area.
-    pub(super) fn process_cliffs(&mut self) -> Result<(), GenieError> {
+    pub(super) fn process_cliffs(&mut self) -> GenieResult<()> {
         let (w, h) = (self.world.map.width(), self.world.map.height());
         let [x0, y0, x1, y1] = self.area.get();
         let (ex0, ey0) = ((x0 - 2).max(0), (y0 - 2).max(0));
@@ -341,7 +335,7 @@ impl HullPather<'_> {
 
     /// `FUN_140f8a890`: a cliff tile's objects (its word's static class 6), each to its own place
     /// ([`HullPather::add_tile_objects`] with no hull and no player, the game's -1: no gate passes).
-    pub(super) fn cliff(&mut self, tile: Tile) -> Result<(), GenieError> {
+    pub(super) fn cliff(&mut self, tile: Tile) -> GenieResult<()> {
         let word = self.world.tiles().word(tile).unwrap_or(0);
         if word & 0x3f00 == 0x600 {
             self.add_tile_objects(tile, None, None)?;

@@ -15,7 +15,7 @@ pub mod world;
 #[cfg(test)]
 mod fixtures;
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::objects::ObjectId;
 
 /// The ids of a saved list of objects, which names no none (−1).
@@ -23,6 +23,6 @@ use crate::objects::ObjectId;
 /// # Errors
 ///
 /// An entry of −1.
-pub fn object_ids(ids: &[i32]) -> Result<Vec<ObjectId>, GenieError> {
+pub fn object_ids(ids: &[i32]) -> GenieResult<Vec<ObjectId>> {
     ids.iter().map(|&id| ObjectId::try_from(id)).collect()
 }

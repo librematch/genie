@@ -13,7 +13,6 @@ use crate::world::WorldTime;
 use crate::world::layer::ClassRoles;
 use std::ops::ControlFlow;
 
-use crate::GenieError;
 use crate::map::spatial::Spatial;
 use crate::math::fmath::BVector;
 use crate::movement::WaypointLevel;
@@ -27,6 +26,7 @@ use crate::pathing::ShortFound;
 use crate::pathing::tile_path::{Found, Path};
 use crate::world::index::ObjectsRef;
 use crate::world::layer::generated::MovementTuning;
+use crate::{GenieError, GenieResult};
 
 bitflags::bitflags! {
     /// What the request's planners found.
@@ -94,7 +94,7 @@ impl Mover {
         w: &Way<'_>,
         np: &mut NewPath,
         by_id: ObjectsRef<'_>,
-    ) -> Result<Option<AfterRequest>, GenieError> {
+    ) -> GenieResult<Option<AfterRequest>> {
         let movement_tuning = &by_id.tuning().movement;
         // FUN_141158210 is 1 only on an `E` tile in game type 12
         if plan.pathing.game_kind == 12 {
@@ -136,7 +136,7 @@ impl Mover {
         w: &Way<'_>,
         np: &mut NewPath,
         by_id: ObjectsRef<'_>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if self.planner_exists(world, plan) {
             if !self.near_target_path(me, world, plan, w, np, by_id)? {
                 self.first_tile_plan(me, world, plan, w, np, by_id)?;
@@ -163,7 +163,7 @@ impl Mover {
         w: &Way<'_>,
         np: &mut NewPath,
         by_id: ObjectsRef<'_>,
-    ) -> Result<bool, GenieError> {
+    ) -> GenieResult<bool> {
         let movement_tuning = &by_id.tuning().movement;
         if w.goal.target.is_none()
             || movement_tuning.target_short_reach < w.distance.get()
@@ -199,7 +199,7 @@ impl Mover {
         w: &Way<'_>,
         np: &mut NewPath,
         by_id: ObjectsRef<'_>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let target_moves = w.goal.target.is_some_and(|(_, t)| t.moves);
         let target_radius = w
             .goal
@@ -253,7 +253,7 @@ impl Mover {
         w: &Way<'_>,
         near: GoalReach,
         np: &mut NewPath,
-    ) -> Result<ShortFound, GenieError> {
+    ) -> GenieResult<ShortFound> {
         let movement_tuning = &by_id.tuning().movement;
         let line = ground_line(self.moved_at, w.waypoint);
         let ignore = self.ignore_list(me, world, plan, w.goal.target, line, by_id)?;
@@ -285,7 +285,7 @@ impl Mover {
         w: &Way<'_>,
         np: &mut NewPath,
         by_id: ObjectsRef<'_>,
-    ) -> Result<ControlFlow<AfterRequest, bool>, GenieError> {
+    ) -> GenieResult<ControlFlow<AfterRequest, bool>> {
         let movement_tuning = &by_id.tuning().movement;
         let near = if self.near_goal(w.distance, w.goal.gap, w.goal.to_end, movement_tuning)? {
             GoalReach::Near
@@ -331,7 +331,7 @@ impl Mover {
         w: &Way<'_>,
         near: GoalReach,
         np: &mut NewPath,
-    ) -> Result<Option<AfterRequest>, GenieError> {
+    ) -> GenieResult<Option<AfterRequest>> {
         let movement_tuning = &by_id.tuning().movement;
         np.flags &= !PlanFlags::PLANNED;
         np.path.points.clear();
@@ -367,7 +367,7 @@ impl Mover {
         w: &Way<'_>,
         now: WorldTime,
         movement_tuning: &MovementTuning,
-    ) -> Result<AfterRequest, GenieError> {
+    ) -> GenieResult<AfterRequest> {
         let reach = if w.goal.target.is_none() || Distance::ZERO < w.range {
             w.range
         } else {
@@ -400,7 +400,7 @@ impl Mover {
         w: &Way<'_>,
         np: &mut NewPath,
         by_id: ObjectsRef<'_>,
-    ) -> Result<Option<AfterRequest>, GenieError> {
+    ) -> GenieResult<Option<AfterRequest>> {
         let movement_tuning = &by_id.tuning().movement;
         let roles = by_id.roles();
         if !(LONG_PATHER
@@ -455,7 +455,7 @@ impl Mover {
         w: &Way<'_>,
         np: &mut NewPath,
         by_id: ObjectsRef<'_>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let target_radius = w
             .goal
             .target

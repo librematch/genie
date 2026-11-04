@@ -1,4 +1,5 @@
 use super::*;
+use crate::GenieResult;
 use crate::combat::attack::tests::own_attack;
 use crate::combat::attack::{ATTACK, AttackState};
 use crate::combat::{AttackTargetId, Firepower};
@@ -2506,7 +2507,7 @@ fn switched_in_the_open(
     old: &Master,
     next: &Master,
     shown: &[i16],
-) -> Result<InTheOpen, GenieError> {
+) -> GenieResult<InTheOpen> {
     let mut spatial = Spatial::new(GridSize::new(10, 10));
     spatial.insert(
         unit.id,
@@ -2723,7 +2724,7 @@ fn master_change_unmodelled_parts_fail() {
         damage_graphics: vec![DamageGraphic::default()],
         ..old.clone()
     };
-    let reason = |r: Result<_, GenieError>| r.unwrap_err().reason();
+    let reason = |r: GenieResult<_>| r.unwrap_err().reason();
     assert_eq!(
         reason(switched_in_the_open(
             (unit.clone(), None),

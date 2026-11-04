@@ -1,8 +1,8 @@
 //! An Enter's state: walking to a building or transport, waiting, inside; each walk with its
 //! `MoveTo`.
 
-use crate::GenieError;
 use crate::movement::move_to::MoveToAction;
+use crate::{GenieError, GenieResult};
 use derive_more::Display;
 use genie_diff::Diff;
 
@@ -39,7 +39,7 @@ impl EnterState {
     /// # Errors
     ///
     /// A byte that names no state of an Enter, and a `MoveTo` in a state that does not walk.
-    pub fn of_byte(value: u8, walk: Option<MoveToAction>) -> Result<Self, GenieError> {
+    pub fn of_byte(value: u8, walk: Option<MoveToAction>) -> GenieResult<Self> {
         let state = match value {
             1 => Self::Done,
             2 => Self::Wait,

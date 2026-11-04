@@ -5,13 +5,13 @@
 //! shape shrunk by `d = 0x200000 - r` (shapes are stored grown by half a tile). The map of the
 //! search, its node types and its ties: `docs/AoE2DE_s_exe_SHORT_PATHER.md`.
 
-use crate::GenieError;
 use crate::math::fmath::sqrt;
 use crate::pathing::FixedRect;
 use crate::pathing::mesh::{Mesh, ONE};
 use crate::pathing::{FixedDistance, FixedDistanceSquared};
 use crate::pathing::{FixedPoint, ShapeId, ShapeSide};
 use crate::world::slots::CheckedIndex;
+use crate::{GenieError, GenieResult};
 
 mod axis_dir;
 mod call;
@@ -124,7 +124,7 @@ struct Sweep {
 impl Sweep {
     /// The counted shape with the last hit's side and point: a sweep that counts a shape has
     /// written a point and a side by then (the hit that counts writes them first).
-    const fn counted(&self) -> Result<Option<(ShapeId, ShapeSide, FixedPoint)>, GenieError> {
+    const fn counted(&self) -> GenieResult<Option<(ShapeId, ShapeSide, FixedPoint)>> {
         if !self.found {
             return Ok(None);
         }
@@ -398,27 +398,27 @@ impl Poly {
     }
 
     /// Vertex `i`'s point.
-    fn vertex(&self, i: VertexIndex) -> Result<FixedPoint, GenieError> {
+    fn vertex(&self, i: VertexIndex) -> GenieResult<FixedPoint> {
         self.vertices.checked(i.get()).copied()
     }
 
     /// The side from vertex `i` to the next.
-    fn side(&self, i: VertexIndex) -> Result<ShapeSide, GenieError> {
+    fn side(&self, i: VertexIndex) -> GenieResult<ShapeSide> {
         self.sides.checked(i.get()).copied()
     }
 
     /// Vertex `i`'s shape, none on the bounds' border.
-    fn shape(&self, i: VertexIndex) -> Result<Option<ShapeId>, GenieError> {
+    fn shape(&self, i: VertexIndex) -> GenieResult<Option<ShapeId>> {
         self.shapes.checked(i.get()).copied()
     }
 
     /// The best cost a corner node reached vertex `i` with, [`UNSET`] for none yet.
-    fn cost(&self, i: VertexIndex) -> Result<FixedDistance, GenieError> {
+    fn cost(&self, i: VertexIndex) -> GenieResult<FixedDistance> {
         self.costs.checked(i.get()).copied()
     }
 
     /// The best cost at vertex `i`, to change.
-    fn cost_mut(&mut self, i: VertexIndex) -> Result<&mut FixedDistance, GenieError> {
+    fn cost_mut(&mut self, i: VertexIndex) -> GenieResult<&mut FixedDistance> {
         self.costs.checked_mut(i.get())
     }
 }

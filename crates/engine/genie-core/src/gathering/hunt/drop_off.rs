@@ -1,7 +1,6 @@
 //! State 8: the drop-off at the drop site; the target let go, the teardown and a case 6
 //! without a target.
 
-use crate::GenieError;
 use crate::combat::attack::set_walker_anim;
 use crate::gathering::DropSiteId;
 use crate::gathering::HuntTargetId;
@@ -33,6 +32,7 @@ use crate::world::lets::take;
 use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
+use crate::{GenieError, GenieResult};
 
 /// What a drop-off's update did ([`HuntAction::update_drop`],
 /// [`crate::gathering::gather::GatherAction::update_drop`]).
@@ -64,7 +64,7 @@ impl HuntAction {
         mover: &mut Mover,
         walks: &Walks<'_>,
         move_to_tuning: &MoveToTuning,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         self.tear_down(Some(mover))?;
         self.state = HuntState::Drop { move_to: None };
         if self.carry_to.is_none() {
@@ -110,7 +110,7 @@ impl HuntAction {
         me: Me,
         site: Option<DropOff>,
         who: PointWalker,
-    ) -> Result<Dropped, GenieError> {
+    ) -> GenieResult<Dropped> {
         if self.timer < Seconds::ZERO {
             self.timer += c.dt.seconds();
             if self.timer < Seconds::ZERO {
@@ -189,7 +189,7 @@ impl HuntAction {
 
     /// The teardown (`FUN_140a73fc0`): the sub-actions go; the caller releases the target (slot
     /// 0x180).
-    pub fn tear_down(&mut self, mut mover: Option<&mut Mover>) -> Result<(), GenieError> {
+    pub fn tear_down(&mut self, mut mover: Option<&mut Mover>) -> GenieResult<()> {
         if let Some(mut a) = self.state.take_attack() {
             a.tear_down(mover.as_deref_mut())?;
         }
@@ -231,7 +231,7 @@ impl Unit {
         actions: &mut Action,
         c: &mut Step<'_>,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let (mover, by_id) =
             c.w.parts
                 .lend_mover(self.id, (&c.w.players, &c.w.index, &c.w.model));

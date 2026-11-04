@@ -1,7 +1,7 @@
 //! A master's id as one type: the master a command builds, trains or turns an object into,
 //! and a target's master.
 
-use crate::GenieError;
+use crate::{GenieError, GenieResult};
 use derive_more::Display;
 use getset::CopyGetters;
 use serde::Deserialize;
@@ -59,7 +59,7 @@ impl MasterId {
     /// # Errors
     ///
     /// A negative value other than −1, which no master's place is.
-    pub fn of_field(value: i16) -> Result<Option<Self>, GenieError> {
+    pub fn of_field(value: i16) -> GenieResult<Option<Self>> {
         (value != Self::NONE)
             .then(|| Self::try_from(value))
             .transpose()
@@ -96,7 +96,7 @@ impl TryFrom<i16> for MasterId {
     /// # Errors
     ///
     /// A negative value, which no master's place is.
-    fn try_from(value: i16) -> Result<Self, GenieError> {
+    fn try_from(value: i16) -> GenieResult<Self> {
         if value < 0 {
             return Err(
                 GenieError::invalid_input("a negative master id, which no master has")

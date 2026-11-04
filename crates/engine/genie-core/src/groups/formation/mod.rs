@@ -1,7 +1,7 @@
 //! A group's formation (FD-036): `BFormation`, its slots and lines, and the layouts that fill
 //! them (createColumnLine `FUN_141012280`, ...).
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::groups::FormationCategory;
 use crate::groups::UnitKind;
 use crate::groups::{Formation, FormationLine, Slot};
@@ -95,7 +95,7 @@ impl Formation {
     }
 
     /// The slot at `i` of the whole array (in use or spare).
-    pub(super) fn slot_mut(&mut self, i: usize) -> Result<&mut Slot, GenieError> {
+    pub(super) fn slot_mut(&mut self, i: usize) -> GenieResult<&mut Slot> {
         let used = self.slots.len();
         if i < used {
             self.slots.checked_mut(i)

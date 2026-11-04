@@ -1,7 +1,7 @@
 //! `FindShortPath`'s rounds (`FUN_140f85580`'s loop): the walks out of the start's hull and into
 //! the goal's, then the A* over the hulls' points, again after the area grew.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::map::Distance;
 use crate::pathing::ShortFound;
 use crate::pathing::hull_path::area::AreaGrowth;
@@ -89,7 +89,7 @@ impl HullPather<'_> {
         hulls: Hulls,
         rounds: &mut Rounds,
         path: &mut Waypoints,
-    ) -> Result<Option<ShortFound>, GenieError> {
+    ) -> GenieResult<Option<ShortFound>> {
         while rounds.iterations < ITERATION_CAP && rounds.growths < GROWTHS {
             if let Some(result) = self.round_start(q, hulls, rounds, path)? {
                 return Ok(Some(result));
@@ -115,7 +115,7 @@ impl HullPather<'_> {
         hulls: Hulls,
         rounds: &mut Rounds,
         path: &mut Waypoints,
-    ) -> Result<Option<ShortFound>, GenieError> {
+    ) -> GenieResult<Option<ShortFound>> {
         self.close_all(NodeList::SEARCH)?;
         if hulls == Hulls::New && rounds.growths == 0 {
             self.build_hulls()?;
@@ -156,7 +156,7 @@ impl HullPather<'_> {
         sh: HullIndex,
         rounds: &mut Rounds,
         path: &mut Waypoints,
-    ) -> Result<Option<ShortFound>, GenieError> {
+    ) -> GenieResult<Option<ShortFound>> {
         if Some(sh) == rounds.goal_hull {
             path.points.clear();
             let mut count = 0;
@@ -195,12 +195,7 @@ impl HullPather<'_> {
 
     /// The start hull's ways out (`walk_out` toward no goal into `exits`, at most
     /// [`PATHS`]): how many. The walk's result is not read, its paths are.
-    fn exit_paths(
-        &mut self,
-        hull: HullIndex,
-        from: Point,
-        range: Distance,
-    ) -> Result<usize, GenieError> {
+    fn exit_paths(&mut self, hull: HullIndex, from: Point, range: Distance) -> GenieResult<usize> {
         let mut exits = take(&mut self.exits);
         for e in &mut exits {
             e.points.clear();
@@ -231,7 +226,7 @@ impl HullPather<'_> {
         count: usize,
         to: Point,
         start_hull: HullIndex,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         for k in 0..count {
             let points = self.exits.checked(k)?.points.clone();
             let n = points.len();
@@ -267,11 +262,7 @@ impl HullPather<'_> {
     /// A goal inside the hull `hull`: the ways in (`walk_in` backwards from the goal into
     /// `entrances`, at most [`PATHS`]), their ends joined to the hull's points
     /// ([`HullPather::join_entrances`]). The walk's result (5 when it ended in a box).
-    fn enter_goal_hull(
-        &mut self,
-        q: &HullQuery,
-        hull: HullIndex,
-    ) -> Result<WalkResult, GenieError> {
+    fn enter_goal_hull(&mut self, q: &HullQuery, hull: HullIndex) -> GenieResult<WalkResult> {
         let mut entrances = take(&mut self.entrances);
         for e in &mut entrances {
             e.points.clear();
@@ -301,7 +292,7 @@ impl HullPather<'_> {
     /// next round) or ends the search. A best within range ends it found; else its walk to the
     /// goal crosses the nearest hull ([`HullPather::around_hull`]) or none
     /// ([`HullPather::no_crossing`]).
-    fn expand_best(&mut self, q: &HullQuery, rounds: &mut Rounds) -> Result<Expanded, GenieError> {
+    fn expand_best(&mut self, q: &HullQuery, rounds: &mut Rounds) -> GenieResult<Expanded> {
         if ITERATION_CAP <= rounds.iterations {
             return Ok(Expanded::NextRound);
         }
@@ -353,7 +344,7 @@ impl HullPather<'_> {
     }
 
     /// Whether a node of the open list from `best` on lies off the map.
-    fn open_off_map(&self, best: NodeIndex) -> Result<bool, GenieError> {
+    fn open_off_map(&self, best: NodeIndex) -> GenieResult<bool> {
         let mut n = Some(best);
         while let Some(i) = n {
             let node = self.nodes.checked(i)?;
@@ -414,7 +405,7 @@ impl HullPather<'_> {
         q: &HullQuery,
         best: NodeIndex,
         rounds: &mut Rounds,
-    ) -> Result<Expanded, GenieError> {
+    ) -> GenieResult<Expanded> {
         let (at, vertex) = (
             self.nodes.checked(best)?.at,
             self.nodes.checked(best)?.vertex,
@@ -460,7 +451,7 @@ impl HullPather<'_> {
         hit: HullIndex,
         edge: usize,
         to: Point,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let np = self.hulls.checked(hit.index())?.points.len();
         let mut back = if edge >= 1 { edge } else { np } as i32 - 1;
         let mut fwd = edge;
@@ -519,7 +510,7 @@ impl HullPather<'_> {
         (a, back): (Option<NodeIndex>, i32),
         (b, fwd): (Option<NodeIndex>, usize),
         to: Point,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let (qa, qb) = (
             *self
                 .hulls

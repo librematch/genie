@@ -1,6 +1,6 @@
 //! `ALL_BACK_TO_WORK` (0x8c): a town centre's villagers back to work.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::objects::ObjectId;
 use crate::players::PlayerId;
 use crate::world::World;
@@ -17,7 +17,7 @@ pub struct AllBackToWorkCommand {
 
 impl AllBackToWorkCommand {
     /// Its handler ([`World::all_back_to_work`]).
-    pub(crate) fn run(self, w: &mut World) -> Result<(), GenieError> {
+    pub(crate) fn run(self, w: &mut World) -> GenieResult<()> {
         w.all_back_to_work(self.player, self.id)
     }
 }

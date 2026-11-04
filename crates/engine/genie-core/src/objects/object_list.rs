@@ -8,9 +8,9 @@
 //! swap-removes, the object's `+0x668` following its slot). A stand-in is no object: a lookup
 //! by id never answers it.
 
-use crate::GenieError;
 use crate::objects::unit::{TAKEN_OUT, Unit};
 use crate::objects::{ListIndex, ObjectId, ObjectKey, Places};
+use crate::{GenieError, GenieResult};
 use std::mem::replace;
 use std::ops::{Index, IndexMut};
 use std::slice::{Iter, IterMut};
@@ -69,7 +69,7 @@ impl ObjectList {
     /// # Errors
     ///
     /// The list holds no slot `i`.
-    pub fn checked(&self, i: ListIndex) -> Result<&Unit, GenieError> {
+    pub fn checked(&self, i: ListIndex) -> GenieResult<&Unit> {
         self.get(i).ok_or_else(|| no_slot(i))
     }
 
@@ -78,7 +78,7 @@ impl ObjectList {
     /// # Errors
     ///
     /// The list holds no slot `i`.
-    pub fn checked_mut(&mut self, i: ListIndex) -> Result<&mut Unit, GenieError> {
+    pub fn checked_mut(&mut self, i: ListIndex) -> GenieResult<&mut Unit> {
         self.get_mut(i).ok_or_else(|| no_slot(i))
     }
 
@@ -181,7 +181,7 @@ impl ObjectList {
     /// # Errors
     ///
     /// The list holds no slot `i`.
-    pub fn take_out(&mut self, i: ListIndex) -> Result<Unit, GenieError> {
+    pub fn take_out(&mut self, i: ListIndex) -> GenieResult<Unit> {
         let slot = self.units.get_mut(i.get()).ok_or_else(|| no_slot(i))?;
         let unit = replace(slot, Unit::taken_out());
         self.outs.push((unit.id, i));
@@ -223,7 +223,7 @@ impl ObjectList {
     /// # Errors
     ///
     /// The list holds no slot `i`.
-    pub fn swap_remove(&mut self, i: ListIndex) -> Result<Unit, GenieError> {
+    pub fn swap_remove(&mut self, i: ListIndex) -> GenieResult<Unit> {
         if !self.holds(i) {
             return Err(no_slot(i));
         }
@@ -248,7 +248,7 @@ impl ObjectList {
     /// # Errors
     ///
     /// The list holds no slot `i`.
-    pub fn remove(&mut self, i: ListIndex) -> Result<Unit, GenieError> {
+    pub fn remove(&mut self, i: ListIndex) -> GenieResult<Unit> {
         if !self.holds(i) {
             return Err(no_slot(i));
         }

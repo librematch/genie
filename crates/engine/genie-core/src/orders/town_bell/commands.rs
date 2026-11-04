@@ -1,7 +1,7 @@
 //! The town bell's commands: `TOWN_BELL` (0x7f) rings a town centre's bell or ends it, and
 //! the back-to-work command sends the owner's villagers back without the bell's flags.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::commands::Bell;
 use crate::garrison::ContainerId;
 use crate::garrison::ShelterReach;
@@ -35,7 +35,7 @@ impl World {
         player: PlayerId,
         id: ObjectId,
         bell: Bell,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let Some((owner, _)) = self.object(id) else {
             return Ok(());
         };
@@ -57,11 +57,7 @@ impl World {
     /// count ([`crate::world::World::garrisoned`]) and its bell flag (`+0x9dc`) set (its sound,
     /// slot 0x4c0, is not simulation); then [`crate::world::World::shelter`] with the reach
     /// (`param_6` 1), no transports, not through the unit AIs.
-    pub(crate) fn ring_town_bell(
-        &mut self,
-        owner: PlayerId,
-        tc: ObjectId,
-    ) -> Result<(), GenieError> {
+    pub(crate) fn ring_town_bell(&mut self, owner: PlayerId, tc: ObjectId) -> GenieResult<()> {
         let Some((_, t)) = self.object(tc) else {
             return Ok(());
         };
@@ -94,7 +90,7 @@ impl World {
             let takes_villagers = m
                 .building
                 .is_some_and(|b| b.garrison_kind.contains(GarrisonKinds::VILLAGERS));
-            let near = |t: &Self| -> Result<bool, GenieError> {
+            let near = |t: &Self| -> GenieResult<bool> {
                 let (other_at, other_radius) = t.ground(id)?;
                 let gap = footprint_gap_squared(other_at, other_radius, at, radius);
                 // COMISS reach, gap; JC: a gap above it, or a NaN, is out
@@ -142,11 +138,7 @@ impl World {
     /// 0x4c0, is not simulation). Then every unit its owner's tracker files under class 4
     /// (`FUN_14104f8f0`) and master 1808 (`FUN_14104f960`), in that order, not inside another
     /// (`+0x2f0`) goes back to work from where it is.
-    pub(crate) fn end_town_bell(
-        &mut self,
-        owner: PlayerId,
-        tc: ObjectId,
-    ) -> Result<(), GenieError> {
+    pub(crate) fn end_town_bell(&mut self, owner: PlayerId, tc: ObjectId) -> GenieResult<()> {
         let Some((_, t)) = self.object(tc) else {
             return Ok(());
         };
@@ -198,11 +190,7 @@ impl World {
     /// back to work, from the last in; then the units its owner's tracker files under class 4 and
     /// master 1808 not inside another go back from where they are. The game screen's flag
     /// (`+0x1874`) is not simulation.
-    pub(crate) fn all_back_to_work(
-        &mut self,
-        player: PlayerId,
-        id: ObjectId,
-    ) -> Result<(), GenieError> {
+    pub(crate) fn all_back_to_work(&mut self, player: PlayerId, id: ObjectId) -> GenieResult<()> {
         let Some((owner, _)) = self.object(id) else {
             return Ok(());
         };
@@ -240,7 +228,7 @@ impl World {
     /// The building at `idx` of player `owner` lets each unit inside of type 70 or more that is a
     /// villager (class 4) or of master 1808 back to work, from the last in
     /// ([`crate::world::World::back_to_work`]; its sound, slot 0x4c0, is not simulation).
-    fn workers_out(&mut self, owner: PlayerId, idx: ListIndex) -> Result<(), GenieError> {
+    fn workers_out(&mut self, owner: PlayerId, idx: ListIndex) -> GenieResult<()> {
         let mut i = self.players.live(owner, idx)?.garrison.len();
         while 0 < i {
             i -= 1;
@@ -273,7 +261,7 @@ impl World {
     /// Every unit player `owner`'s tracker files under class 4 (`FUN_14104f8f0`) and master
     /// 1808 (`FUN_14104f960`), in that order, not inside another (`+0x2f0`) goes back to work
     /// from where it is.
-    fn workers_back(&mut self, owner: PlayerId) -> Result<(), GenieError> {
+    fn workers_back(&mut self, owner: PlayerId) -> GenieResult<()> {
         let tracker = &self.players.player(owner)?.tracker;
         let mut ids = tracker.class_list(self.model.slots.class.villager).to_vec();
         ids.extend_from_slice(tracker.list(ListKey::master(self.model.slots.master.mule_cart)));

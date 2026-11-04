@@ -1,6 +1,5 @@
 //! State 8: a builder that carries something walks to a drop site first ([`DropSearch`]).
 
-use crate::GenieError;
 use crate::construction::build::BuildState;
 use crate::construction::build::{BuildAction, BuildReads, DROP_WAIT, DROPPED_ORDERS};
 use crate::gathering::DropSiteId;
@@ -32,6 +31,7 @@ use crate::world::lets::{release, take};
 use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
+use crate::{GenieError, GenieResult};
 use std::mem::replace;
 
 /// What the drop-off's search gives `set_state(8)` ([`BuildAction::set_drop`]).
@@ -74,7 +74,7 @@ impl BuildAction {
         by: Releaser,
         slots: Slots,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let search = if Amount::ZERO < builder.life.amount {
             Self::drop_search(c, builder, self.task.range, slots, roles)?
         } else {
@@ -91,7 +91,7 @@ impl BuildAction {
         task_range: Distance,
         slots: Slots,
         roles: &Roles,
-    ) -> Result<DropSearch, GenieError> {
+    ) -> GenieResult<DropSearch> {
         let view = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
         let masters =
             c.w.model
@@ -190,7 +190,7 @@ impl BuildAction {
         search: DropSearch,
         by: Releaser,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         self.leave(c, builder)?;
         self.state = BuildState::Drop { move_to: None };
         let found = match search {
@@ -262,7 +262,7 @@ impl BuildAction {
         reads: &BuildReads,
         roles: &Roles,
         slots: Slots,
-    ) -> Result<HeadCode, GenieError> {
+    ) -> GenieResult<HeadCode> {
         if below_or_unordered(self.timer.get(), 0.0) {
             self.timer += c.dt.seconds();
             if self.timer < Seconds::ZERO {
@@ -313,7 +313,7 @@ impl BuildAction {
         builder: &mut Unit,
         reads: &BuildReads,
         roles: &Roles,
-    ) -> Result<HeadCode, GenieError> {
+    ) -> GenieResult<HeadCode> {
         if self.target.is_some() {
             let site = self.site.take();
             if site.is_some() {

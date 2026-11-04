@@ -15,7 +15,7 @@ use self::path_points::{
     AfterRequest, Avoided, Goal, Next, Reached, cut_path, ground, ground_line, moved_far,
     point_or_zero, point_or_zero_of, short_range, split, too_short,
 };
-use crate::GenieError;
+use crate::GenieResult;
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::GridSize;
@@ -581,7 +581,7 @@ fn remove_point(points: &mut Vec<BVector>, i: WaypointIndex) -> bool {
 /// # Errors
 ///
 /// A unit that does not move ([`crate::world::WALKER_UNMOVING`]), and the stop's.
-pub(crate) fn stop_mover(mover: Option<&mut Mover>) -> Result<(), GenieError> {
+pub(crate) fn stop_mover(mover: Option<&mut Mover>) -> GenieResult<()> {
     mover.ok_or(WALKER_UNMOVING)?.stop()
 }
 

@@ -1,6 +1,5 @@
 //! The orders a unit AI takes at once and its attack commands.
 
-use crate::GenieError;
 use crate::map::Point;
 use crate::map::Position;
 use crate::math::rng::Well512;
@@ -28,6 +27,7 @@ use crate::unit_ai::{
 use crate::world::Millis;
 use crate::world::layer::ClassRoles;
 use crate::world::slots::CheckedIndex;
+use crate::{GenieError, GenieResult};
 
 /// The order [`UnitAi::order_now`] runs at once: the order, the unit that keeps the current
 /// order in front of the queue (inFront 1) and the unit's place for the stop.
@@ -61,7 +61,7 @@ impl UnitAi {
         ai: &mut Well512,
         side: &mut UnitView<'_, '_>,
         layer: AiLayer<'_>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let AiLayer { roles, .. } = layer;
         let OrderNow {
             order,
@@ -126,7 +126,7 @@ impl UnitAi {
         rules: TargetRules,
         at: &Surroundings,
         side: &mut UnitView<'_, '_>,
-    ) -> Result<Answer, GenieError> {
+    ) -> GenieResult<Answer> {
         if force == OrderForce::Unforced && self.current_action.is_some() {
             return Ok(Answer::NotTaken);
         }
@@ -155,7 +155,7 @@ impl UnitAi {
         rules: TargetRules,
         at: &Surroundings,
         side: &UnitView<'_, '_>,
-    ) -> Result<Option<(ClassId, Position)>, GenieError> {
+    ) -> GenieResult<Option<(ClassId, Position)>> {
         let roles = &at.roles;
         if matches!(
             self.ai_kind,
@@ -204,7 +204,7 @@ impl UnitAi {
         force: OrderForce,
         at: &Surroundings,
         side: &mut UnitView<'_, '_>,
-    ) -> Result<Answer, GenieError> {
+    ) -> GenieResult<Answer> {
         let attacked = side.attack(target, force, self)?;
         for (kind, p) in attacked.posted {
             self.post(Notify::own(at.id, kind, p), at.state)?;
@@ -228,7 +228,7 @@ impl UnitAi {
         at: &Surroundings,
         side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
-    ) -> Result<Answer, GenieError> {
+    ) -> GenieResult<Answer> {
         let roles = &at.roles;
         let t = match at.unit(target) {
             Some(t) => *t,

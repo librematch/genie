@@ -1,4 +1,5 @@
 use super::*;
+use crate::GenieResult;
 use crate::combat::Firepower;
 use crate::combat::MissileCount;
 use crate::commands::GatherPointState;
@@ -615,7 +616,7 @@ fn ship_enter(point: Position, state: MoveTo) -> EnterAction {
 
 /// One update of `dt` ms of villager 1000's Enter (its part of the unit's update,
 /// [`Unit::enter_part`]) and its code.
-fn enter_update(t: &mut World, dt: u32) -> Result<HeadCode, GenieError> {
+fn enter_update(t: &mut World, dt: u32) -> GenieResult<HeadCode> {
     let v = villager(t);
     in_update(t, (PlayerId::new(1), v), dt, |u, actions, c| {
         let me = Me {
@@ -2155,7 +2156,7 @@ fn grouped_unit_that_enters_building_leaves_its_group() {
 /// Villager 400 (with a unit AI) beside town centre 100, in reach of its garrison task (range
 /// 1), on [`let_out_world`]; `setup` changes the world, then the villager's Enter starts
 /// ([`World::start_enter`]). The result and the world after it.
-fn enters_the_centre(setup: impl FnOnce(&mut World)) -> (Result<(), GenieError>, World) {
+fn enters_the_centre(setup: impl FnOnce(&mut World)) -> (GenieResult<()>, World) {
     let mut t = let_out_world();
     let mut v = unit(400, VILLAGER, HitPoints::new(25.0));
     v.place_for_test(Position::new(12.5, 10.0, 0.0));
@@ -4278,7 +4279,7 @@ fn let_out_beside_second_centre(
     setup: impl FnOnce(&mut World),
     point: Point,
     work_on: Option<ObjectId>,
-) -> (Result<LetOut, GenieError>, World) {
+) -> (GenieResult<LetOut>, World) {
     let mut t = let_out_world();
     inside_tc(&mut t, PlayerId::new(1), 1000, VILLAGER);
     t.parts.set_unit_ai(

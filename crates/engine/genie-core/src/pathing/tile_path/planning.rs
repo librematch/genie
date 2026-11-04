@@ -1,7 +1,6 @@
 //! The planner's entry (`FUN_140f7c530`): the search over the levels, the shortcut near the
 //! start and the search on the tiles.
 
-use crate::GenieError;
 use crate::map::Distance;
 use crate::map::Point;
 use crate::math::fmath::BVector;
@@ -11,6 +10,7 @@ use crate::pathing::tile_path::{
     CellKind, Found, GridLevel, Path, PlanTile, Planner, Request, SegmentTest, smooth,
 };
 use crate::world::layer::generated::TilePathTuning;
+use crate::{GenieError, GenieResult};
 
 impl Planner {
     /// `FUN_140f77f20`: the search over the levels: from the coarsest node cell that holds the
@@ -25,7 +25,7 @@ impl Planner {
         req: &Request,
         out: &mut Path,
         tile_path_tuning: &TilePathTuning,
-    ) -> Result<Found, GenieError> {
+    ) -> GenieResult<Found> {
         for &r in &req.closed {
             self.close_rect(r, Mark::Set);
         }
@@ -178,7 +178,7 @@ impl Planner {
         from: Point,
         to: Point,
         tile_path_tuning: &TilePathTuning,
-    ) -> Result<Option<Point>, GenieError> {
+    ) -> GenieResult<Option<Point>> {
         let req = Request {
             from,
             to,
@@ -217,7 +217,7 @@ impl Planner {
         req: &Request,
         levels: &mut Path,
         tile_path_tuning: &TilePathTuning,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let n = levels.points.len();
         let Some(&p0) = levels.points.first() else {
             return Ok(());
@@ -275,7 +275,7 @@ impl Planner {
         req: &Request,
         out: &mut Path,
         tile_path_tuning: &TilePathTuning,
-    ) -> Result<Found, GenieError> {
+    ) -> GenieResult<Found> {
         for &r in &req.closed {
             self.close_rect(r, Mark::Set);
         }

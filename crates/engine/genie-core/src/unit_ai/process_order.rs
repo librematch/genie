@@ -1,6 +1,6 @@
 //! An order's processing: the combat and work orders, the top target and the attack slots.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::construction::FoundationId;
 use crate::map::Point;
 use crate::math::rng::Well512;
@@ -103,7 +103,7 @@ impl UnitAi {
         ai: &mut Well512,
         side: &mut UnitView<'_, '_>,
         layer: AiLayer<'_>,
-    ) -> Result<OrderOutcome, GenieError> {
+    ) -> GenieResult<OrderOutcome> {
         let AiLayer {
             roles,
             unit_ai_tuning,
@@ -207,7 +207,7 @@ impl UnitAi {
         side: &mut UnitView<'_, '_>,
         taken_as: &mut TakenAs,
         roles: &Roles,
-    ) -> Result<Answer, GenieError> {
+    ) -> GenieResult<Answer> {
         let (at, player_kind) = world.ok_or(OUTSIDE_ORDER)?;
         // an order on no target (−1): each case's lookup finds nothing, so it takes no order
         Ok(match (o.order, o.target) {
@@ -261,7 +261,7 @@ impl UnitAi {
         world: Option<(&Surroundings, PlayerKind)>,
         side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
-    ) -> Result<Answer, GenieError> {
+    ) -> GenieResult<Answer> {
         let (at, _) = world.ok_or(OUTSIDE_ORDER)?;
         // an order on no target (−1): each case's lookup finds nothing, so it takes no order;
         // the hunt's stops the unit (`hunt_order`)
@@ -305,7 +305,7 @@ impl UnitAi {
         world: Option<(&Surroundings, PlayerKind)>,
         side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
-    ) -> Result<Answer, GenieError> {
+    ) -> GenieResult<Answer> {
         let (at, _) = world.ok_or(OUTSIDE_ORDER)?;
         // an order on no target (−1): its lookup finds nothing, so it takes no order
         Ok(match (o.order, o.target) {
@@ -381,7 +381,7 @@ impl UnitAi {
     pub(super) fn top_target_live(
         at: &Surroundings,
         side: &UnitView<'_, '_>,
-    ) -> Result<Option<LiveTop>, GenieError> {
+    ) -> GenieResult<Option<LiveTop>> {
         let Some(id) = side.top_target_now() else {
             return Ok(None);
         };
@@ -410,7 +410,7 @@ impl UnitAi {
     pub(super) fn top_target_in_range(
         at: &Surroundings,
         side: &UnitView<'_, '_>,
-    ) -> Result<Option<ObjectId>, GenieError> {
+    ) -> GenieResult<Option<ObjectId>> {
         let Some(t) = Self::top_target_live(at, side)? else {
             return Ok(None);
         };
@@ -427,7 +427,7 @@ impl UnitAi {
         id: impl ObjectKey,
         at: &Surroundings,
         side: &UnitView<'_, '_>,
-    ) -> Result<Option<UnitSeen>, GenieError> {
+    ) -> GenieResult<Option<UnitSeen>> {
         let Some(id) = id.key() else {
             return Ok(None);
         };
@@ -466,7 +466,7 @@ impl UnitAi {
         at: &Surroundings,
         side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
-    ) -> Result<Answer, GenieError> {
+    ) -> GenieResult<Answer> {
         match self.ai_kind {
             UnitAiKind::Civilian => self.civilian_attack(target, at, side, rng),
             UnitAiKind::Soldier => {
@@ -497,7 +497,7 @@ impl UnitAi {
         target: ObjectId,
         at: &Surroundings,
         side: &mut UnitView<'_, '_>,
-    ) -> Result<Answer, GenieError> {
+    ) -> GenieResult<Answer> {
         if self.current_target == Some(target) {
             return Ok(Answer::NotTaken);
         }

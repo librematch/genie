@@ -1,6 +1,5 @@
 //! A unit entering a building or a transport, and its update inside.
 
-use crate::GenieError;
 use crate::combat::Firepower;
 use crate::garrison::ContainerId;
 use crate::garrison::EnterOutcome;
@@ -61,6 +60,7 @@ use crate::world::layer::Roles;
 use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
+use crate::{GenieError, GenieResult};
 
 /// The units inside object `id`, any player's (its slot 0x498).
 fn units_inside(others: OthersRef<'_>, id: ObjectId) -> usize {
@@ -86,7 +86,7 @@ impl Unit {
         c: &mut Step<'_>,
         me: Me,
         roles: &Roles,
-    ) -> Result<HeadCode, GenieError> {
+    ) -> GenieResult<HeadCode> {
         let Some(mut enter) = actions.list.enter().copied() else {
             return Ok(HeadCode::Keeps);
         };
@@ -113,7 +113,7 @@ impl Unit {
         c: &mut Step<'_>,
         enter: &EnterAction,
         roles: &Roles,
-    ) -> Result<EnterReads, GenieError> {
+    ) -> GenieResult<EnterReads> {
         let by_id = ObjectsRef::new(
             &c.w.players,
             &c.w.index,
@@ -187,7 +187,7 @@ impl Unit {
         c: &mut Step<'_>,
         target: ContainerId,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let inside = units_inside(
             OthersRef::of(&c.w.players, &c.w.index, c.player)?,
             target.id(),
@@ -212,7 +212,7 @@ impl Unit {
         &mut self,
         actions: &mut Action,
         c: &mut Step<'_>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         self.post_own(
             &mut c.w.parts.unit_ai,
             NotifyKind::ACTION_COMPLETED,
@@ -232,11 +232,7 @@ impl Unit {
     /// # Errors
     ///
     /// A unit without its Enter, and the stop's, the sprite's and the notify's.
-    pub(crate) fn entered(
-        &mut self,
-        actions: &mut Action,
-        c: &mut Step<'_>,
-    ) -> Result<(), GenieError> {
+    pub(crate) fn entered(&mut self, actions: &mut Action, c: &mut Step<'_>) -> GenieResult<()> {
         let enter = actions
             .list
             .enter_mut()
@@ -285,7 +281,7 @@ impl Unit {
         target: ContainerId,
         inside: usize,
         roles: &Roles,
-    ) -> Result<EnterOutcome, GenieError> {
+    ) -> GenieResult<EnterOutcome> {
         // the callers found it: the Enter's update in its reads, `World::enter_now` by its place
         let (tp, building) = c.w.object(target).ok_or(GenieError::unreachable(
             "an enter into a building the world does not hold",
@@ -406,7 +402,7 @@ impl Unit {
         me: &Master,
         bm: &Master,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let id = self.id;
         if self.life.inside.is_some() {
             return Err(GenieError::unsupported("an enter of a unit inside another"));
@@ -482,7 +478,7 @@ impl Unit {
         reload: Seconds,
         me: &Master,
         bm: &Master,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let roles = &c.w.model.roles.clone();
         let masters = c.w.model.masters.get(c.player.index()).ok_or(NO_MASTERS)?;
         let firepower = if me.kind == MasterKind::COMBAT {
@@ -517,7 +513,7 @@ impl Unit {
         radius: Footprint,
         placed: Placed,
         bm: &Master,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let id = self.id;
         let Some(v) = c.w.spatial.sight.as_mut() else {
             return Ok(());
@@ -562,7 +558,7 @@ impl Unit {
         state: ObjectState,
         (me, bm): (&Master, &Master),
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if !roles.of_class(me.class).contains(ClassRoles::VILLAGER)
             && !roles.of_master(me.id).contains(MasterRoles::MULE_CART)
         {
@@ -607,7 +603,7 @@ impl Unit {
         &mut self,
         actions: &mut Action,
         c: &mut Step<'_>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if !actions.list.is_empty() {
             return self.end_head_update(actions, c, HeadCode::Deletes);
         }

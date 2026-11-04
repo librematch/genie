@@ -1,4 +1,5 @@
 use super::*;
+use crate::GenieResult;
 use crate::gathering::DropSiteId;
 use crate::gathering::FarmStops;
 use crate::gathering::gather::WalkEnd;
@@ -147,8 +148,8 @@ impl Rig {
         &mut self,
         state: GatherState,
         dt: u32,
-        f: impl FnOnce(&mut Step<'_>, &mut Unit, &mut Action, Me) -> Result<R, GenieError>,
-    ) -> Result<R, GenieError> {
+        f: impl FnOnce(&mut Step<'_>, &mut Unit, &mut Action, Me) -> GenieResult<R>,
+    ) -> GenieResult<R> {
         in_update(
             &mut self.t,
             (PlayerId::new(1), ListIndex::new(0)),
@@ -721,7 +722,7 @@ fn farm_update(
     target: Option<&mut Victim>,
     dt: u32,
     player_kind: PlayerKind,
-) -> Result<Next, GenieError> {
+) -> GenieResult<Next> {
     let mut rig = Rig::on_the_path();
     rig.set_load(None, 0.0);
     let r = GatherReads {

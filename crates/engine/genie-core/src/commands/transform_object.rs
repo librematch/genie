@@ -1,6 +1,6 @@
 //! `TRANSFORM_OBJECT` (0x29): an object of the player takes another master.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::objects::ObjectId;
 use crate::objects::masters::MasterId;
 use crate::players::PlayerId;
@@ -20,7 +20,7 @@ pub struct TransformObjectCommand {
 
 impl TransformObjectCommand {
     /// Its handler ([`World::transform_object`]).
-    pub(crate) fn run(self, w: &mut World) -> Result<(), GenieError> {
+    pub(crate) fn run(self, w: &mut World) -> GenieResult<()> {
         w.transform_object(self.player, self.id, self.master)
     }
 }

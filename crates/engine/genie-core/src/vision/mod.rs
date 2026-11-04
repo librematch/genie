@@ -12,7 +12,6 @@
 //!
 //! 158041: the rebuild `FUN_141552df0`; the attribute setter `FUN_141616820` (attributes 50, 183).
 
-use crate::GenieError;
 use crate::players::Amount;
 use crate::players::ByPlayer;
 use crate::players::PlayerId;
@@ -20,6 +19,7 @@ use crate::players::game_status::GameStatus;
 use crate::world::AllySharing;
 use crate::world::World;
 use crate::world::slots::{CheckedIndex, PlayerSlots};
+use crate::{GenieError, GenieResult};
 
 pub(crate) mod explored;
 pub mod ghost;
@@ -73,7 +73,7 @@ impl World {
     /// bits of each other player past Gaia it and who both count each other as allies (relation
     /// 0), and with attribute 183 not 0 the bits of every player past Gaia. The players' share
     /// flags (`+0x290`) and the third parties' table (`+0x2b0`, `+0x2b8`) are not held.
-    pub fn rebuild_vision(&mut self) -> Result<(), GenieError> {
+    pub fn rebuild_vision(&mut self) -> GenieResult<()> {
         let n = self.players.len();
         let mut masks: ByPlayer<VisionMasks> = PlayerId::each(self.players.len())
             .zip(&self.players)

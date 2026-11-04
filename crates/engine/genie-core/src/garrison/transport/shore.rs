@@ -1,7 +1,6 @@
 //! The points ashore: a new point after none went ashore, the drop location
 //! (`find_drop_location`) and the map as the Transport reads it ([`MapShore`]).
 
-use crate::GenieError;
 use crate::garrison::transport::{
     DEEP_WATER, DRAW_SCALE, DROP_TRIES, RETRIES, RETRY_STEP, STACK_PLACE, WATER,
 };
@@ -22,6 +21,7 @@ use crate::pathing::zones::ZoneId;
 use crate::pathing::zones::{NO_TERRAIN, UNKNOWN_RESTRICTION, ZoneMap, Zones};
 use crate::world::layer::generated::TilePathTuning;
 use crate::world::layer::generated::TransportTuning;
+use crate::{GenieError, GenieResult};
 
 /// `FUN_140aa3ba0`'s new point once no unit went ashore: from the old point (x, y), draws of the
 /// Action stream ("Unload": x, then y), each `r / 0xccc` tiles plus the old coordinate less
@@ -116,7 +116,7 @@ impl<'a> DropDraws<'a> {
     pub(crate) fn next_on_map(
         &mut self,
         transport_tuning: &TransportTuning,
-    ) -> Result<Option<Point>, GenieError> {
+    ) -> GenieResult<Option<Point>> {
         let (w, h) = (self.map.width() as f32, self.map.height() as f32);
         while 0 < self.left {
             self.left -= 1;
@@ -133,7 +133,7 @@ impl<'a> DropDraws<'a> {
     }
 
     /// One draw: its side, then its place along it, which `last` keeps.
-    fn draw(&mut self, transport_tuning: &TransportTuning) -> Result<Point, GenieError> {
+    fn draw(&mut self, transport_tuning: &TransportTuning) -> GenieResult<Point> {
         let (cx, cy) = (self.around.center.x(), self.around.center.y());
         let (rx, ry) = (self.around.radius.x(), self.around.radius.y());
         let off_x = rx + (self.unit_radius.x() + transport_tuning.drop_gap);
@@ -178,7 +178,7 @@ pub(crate) fn in_zone(
     at: Point,
     zone: Option<ZoneId>,
     zone_map: Option<&ZoneMap>,
-) -> Result<bool, GenieError> {
+) -> GenieResult<bool> {
     let (x, y) = (at.x(), at.y());
     let Some(zone) = zone else {
         return Ok(true);
@@ -231,7 +231,7 @@ impl<'a> MapShore<'a> {
         restriction: Option<RestrictionId>,
         position: Position,
         tile_path_tuning: &'a TilePathTuning,
-    ) -> Result<Self, GenieError> {
+    ) -> GenieResult<Self> {
         let terrain = spatial.terrain.as_ref().ok_or(NO_TERRAIN)?;
         Ok(Self {
             terrain,
@@ -246,7 +246,7 @@ impl<'a> MapShore<'a> {
     }
 
     /// The unit's zone map (`FUN_1411931c0`: the map's for its restriction, `FUN_1414138d0`).
-    pub(super) fn zone_map(&mut self) -> Result<Option<&ZoneMap>, GenieError> {
+    pub(super) fn zone_map(&mut self) -> GenieResult<Option<&ZoneMap>> {
         let Some(r) = self.restriction else {
             return Ok(None);
         };
@@ -265,7 +265,7 @@ impl<'a> MapShore<'a> {
     /// # Errors
     ///
     /// A map the caller cannot read.
-    pub(crate) fn zone(&mut self, tile: Tile) -> Result<ZoneId, GenieError> {
+    pub(crate) fn zone(&mut self, tile: Tile) -> GenieResult<ZoneId> {
         if tile.x() < 0 || tile.y() < 0 {
             return Ok(ZoneId::OFF_MAP);
         }
@@ -278,7 +278,7 @@ impl<'a> MapShore<'a> {
     /// # Errors
     ///
     /// A map the caller cannot read.
-    pub(crate) fn near(&mut self, zone: ZoneId, reach: Distance) -> Result<bool, GenieError> {
+    pub(crate) fn near(&mut self, zone: ZoneId, reach: Distance) -> GenieResult<bool> {
         let tile = self.tile;
         // the game passes the zone's low byte
         let zone = ZoneId::new(u16::from(zone.byte()));
@@ -302,11 +302,7 @@ impl<'a> MapShore<'a> {
     /// # Errors
     ///
     /// What the planner's searches fail on.
-    pub(crate) fn shore_point(
-        &mut self,
-        from: Point,
-        to: Point,
-    ) -> Result<Option<Point>, GenieError> {
+    pub(crate) fn shore_point(&mut self, from: Point, to: Point) -> GenieResult<Option<Point>> {
         let Some(planner) = self
             .restriction
             .and_then(|r| self.pathing.planner(r, self.tiles))

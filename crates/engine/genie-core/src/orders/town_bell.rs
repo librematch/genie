@@ -3,7 +3,6 @@
 //! to, and the flag a garrison order sets (`FUN_1412067f0`). Saved as `mTownBellFlag`,
 //! `mBackToWork1` and `mBackToWork2`.
 
-use crate::GenieError;
 use crate::garrison::WorkReturn;
 use crate::gathering::gather::GATHER;
 use crate::gathering::hunt::HUNT;
@@ -33,6 +32,7 @@ use crate::world::index::ObjectsRef;
 use crate::world::index::Place;
 use crate::world::layer::{ClassRoles, MasterRoles, Roles};
 use crate::world::slots::PlayerSlots;
+use crate::{GenieError, GenieResult};
 use genie_diff::Diff;
 
 mod commands;
@@ -170,7 +170,7 @@ impl RecordTarget {
     /// # Errors
     ///
     /// An object whose master its owner's table does not hold.
-    pub fn of(objects: ObjectsRef<'_>, id: ObjectId) -> Result<Option<Self>, GenieError> {
+    pub fn of(objects: ObjectsRef<'_>, id: ObjectId) -> GenieResult<Option<Self>> {
         let Some((_, _, m)) = objects.with_master(id)? else {
             return Ok(None);
         };
@@ -195,7 +195,7 @@ fn record_object(
     record: BackToWork,
     objects: ObjectsRef<'_>,
     roles: &Roles,
-) -> Result<(Option<RecordTarget>, BackToWork), GenieError> {
+) -> GenieResult<(Option<RecordTarget>, BackToWork)> {
     let mut out = record;
     let named = |id: Option<ObjectId>| id.filter(|id| !id.is_recyclable());
     let mut found = match named(record.target) {
@@ -238,7 +238,7 @@ impl TownBell {
         &mut self,
         objects: ObjectsRef<'_>,
         roles: &Roles,
-    ) -> Result<(Option<RecordTarget>, BackToWork), GenieError> {
+    ) -> GenieResult<(Option<RecordTarget>, BackToWork)> {
         let (found, out) = record_object(self.work, objects, roles)?;
         if found.is_some() {
             return Ok((found, out));
@@ -275,7 +275,7 @@ impl World {
         id: ObjectId,
         work_on: Option<ObjectId>,
         point: Point,
-    ) -> Result<WorkReturn, GenieError> {
+    ) -> GenieResult<WorkReturn> {
         let Some(Place::Live(up, ui)) = self.place(id) else {
             return Ok(WorkReturn::Stayed);
         };
@@ -327,7 +327,7 @@ impl World {
         idx: ListIndex,
         target: ObjectId,
         filter: Option<ActionKind>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let unit = &self.players.live(player, idx)?;
         let master = unit.master(self.master_tables(), player)?;
         if !(self
@@ -377,11 +377,7 @@ impl World {
     /// place. Then a Gather's or Hunt's target class (`+0x68`), its unit AI's current action
     /// (`+0x44`) and the top action's second target (`FUN_140a78430`). The targets count only
     /// where the world holds them.
-    pub(crate) fn record_town_bell(
-        &mut self,
-        player: PlayerId,
-        idx: ListIndex,
-    ) -> Result<(), GenieError> {
+    pub(crate) fn record_town_bell(&mut self, player: PlayerId, idx: ListIndex) -> GenieResult<()> {
         use crate::orders::town_bell::BackToWork;
         let unit = &self.players.live(player, idx)?;
         if self.parts.town_bell_of(unit.id).flag.is_sheltered() {

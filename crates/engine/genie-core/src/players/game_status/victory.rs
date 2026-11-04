@@ -1,7 +1,6 @@
 //! The game's end and the players' status: RESIGN, the status setter with its defeat event
 //! and the world's victory check.
 
-use crate::GenieError;
 use crate::commands::Departure;
 use crate::math::conversions::cvttss2si;
 use crate::players::Amount;
@@ -14,6 +13,7 @@ use crate::world::Departures;
 use crate::world::World;
 use crate::world::slots::PlayerSlots;
 use crate::world::{GameMode, PlayState};
+use crate::{GenieError, GenieResult};
 
 impl World {
     /// The relations of players `a` and `b` each way (`player+0x260`).
@@ -54,11 +54,7 @@ impl World {
     /// once every comm player of its world player has (one each in the slice's games), the
     /// world player's slot 3 (`FUN_1416610f0`): `+0x8c` takes the drop, `+0x8b` is set and the
     /// status becomes lost ([`World::set_status`]); its message is the interface's.
-    pub(crate) fn resign(
-        &mut self,
-        player: PlayerId,
-        departure: Departure,
-    ) -> Result<(), GenieError> {
+    pub(crate) fn resign(&mut self, player: PlayerId, departure: Departure) -> GenieResult<()> {
         let p = self
             .players
             .get_mut(player.index())
@@ -85,7 +81,7 @@ impl World {
     /// once the game is a minute old; its fealty (`+0x12f8`) would give its resources and units
     /// away while the game goes on, which is not modelled. A newly lost player's history takes its
     /// defeat ([`World::defeat_event`]).
-    pub(crate) fn set_status(&mut self, p: PlayerId, status: GameStatus) -> Result<(), GenieError> {
+    pub(crate) fn set_status(&mut self, p: PlayerId, status: GameStatus) -> GenieResult<()> {
         let old = self.players.player(p)?.game_status;
         if status != old
             && (!self
@@ -133,7 +129,7 @@ impl World {
     /// their attribute 300 + their own id (the game reads each one's own, not the defeated
     /// player's); the first strictly above the best so far (`COMISS` with `JBE`, from 0) is the
     /// event's `data1`, its value through `CVTTSS2SI` its `data2`; none gives player 1 and 0.
-    pub(crate) fn defeat_event(&mut self, p: PlayerId) -> Result<(), GenieError> {
+    pub(crate) fn defeat_event(&mut self, p: PlayerId) -> GenieResult<()> {
         if self
             .players
             .player(p)?
@@ -173,7 +169,7 @@ impl World {
     /// `FUN_14165d720`: player `i`'s status for the victory check. A player still playing whose
     /// victory conditions are met (`FUN_1414f35d0`) wins (slot 1 with won; the world's `+0x8c`,
     /// 2, is not held); one counting its allies' victory as its own is not modelled.
-    pub(super) fn own_victory(&mut self, i: PlayerId) -> Result<GameStatus, GenieError> {
+    pub(super) fn own_victory(&mut self, i: PlayerId) -> GenieResult<GameStatus> {
         let p = &self.players.player(i)?;
         if p.game_status == GameStatus::Lost || p.victory != VictoryState::MET {
             return Ok(p.game_status);
@@ -194,7 +190,7 @@ impl World {
     /// playing lose (`FUN_141666590`). Else under the conquest victory, one side left with
     /// someone lost, or nobody playing: the game is over and those still playing win
     /// (`FUN_1416778c0`; the world's `+0x8c`, 1, is not held).
-    pub(crate) fn victory_check(&mut self) -> Result<(), GenieError> {
+    pub(crate) fn victory_check(&mut self) -> GenieResult<()> {
         let mut count = Count::default();
         for i in PlayerId::each(self.players.len()).skip(1) {
             let status = match self.own_victory(i) {

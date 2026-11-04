@@ -1,6 +1,6 @@
 //! `bestUnitToAttack`'s attack categories and the tables it keeps by category.
 
-use crate::GenieError;
+use crate::{GenieError, GenieResult};
 use std::ops::{Index, IndexMut};
 
 /// An attack category (`FUN_140c4c8e0`, [`crate::unit_ai::best_target::category`]): the group of
@@ -38,7 +38,7 @@ impl AttackCategory {
     /// # Errors
     ///
     /// Any other value outside 0 to 11.
-    pub fn of_field(value: i32) -> Result<Option<Self>, GenieError> {
+    pub fn of_field(value: i32) -> GenieResult<Option<Self>> {
         if value == Self::NONE {
             return Ok(None);
         }

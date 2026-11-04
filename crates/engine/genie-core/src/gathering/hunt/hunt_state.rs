@@ -1,9 +1,9 @@
 //! A Hunt's state: the steps of its update from the attack to the drop, each walk with its
 //! `MoveTo` and the attack with its Attack.
 
-use crate::GenieError;
 use crate::combat::attack::Attack;
 use crate::movement::move_to::MoveToAction;
+use crate::{GenieError, GenieResult};
 use derive_more::Display;
 use genie_diff::Diff;
 
@@ -73,7 +73,7 @@ impl HuntState {
         value: u8,
         walk: Option<MoveToAction>,
         attack: Option<Attack>,
-    ) -> Result<Self, GenieError> {
+    ) -> GenieResult<Self> {
         let state = match value {
             0 => Self::New,
             1 => Self::Done,

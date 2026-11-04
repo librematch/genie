@@ -1,4 +1,5 @@
 use super::*;
+use crate::GenieResult;
 use crate::commands::GatherPoint;
 use crate::commands::GatherPointState;
 use crate::gathering::hunt::tests::walker;
@@ -728,7 +729,7 @@ fn only_gather_point_of_state_1_sends_the_new_unit() {
 /// Every candidate of `site`'s search for a unit of radius 0.5 (a step of 0.5, no gap), all
 /// blocked by objects that stay: each spot's first candidate in turn, and the error of the
 /// later rings.
-fn all_blocked(site: &Site) -> (Vec<Point>, Result<Point, GenieError>) {
+fn all_blocked(site: &Site) -> (Vec<Point>, GenieResult<Point>) {
     let mut tried = Vec::new();
     let r = spawn_point(
         site,

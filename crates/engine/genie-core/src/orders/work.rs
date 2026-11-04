@@ -1,6 +1,5 @@
 //! A kept attack, the garrison task and the work command and its task.
 
-use crate::GenieError;
 use crate::combat::AttackTargetId;
 use crate::combat::attack::{ATTACK, Attack};
 use crate::construction::build::CART_TASK;
@@ -44,6 +43,7 @@ use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::slots::CheckedIndex;
 use crate::world::slots::PlayerSlots;
+use crate::{GenieError, GenieResult};
 
 mod garrison;
 
@@ -89,7 +89,7 @@ impl World {
         filter: Option<ActionKind>,
         point: Position,
         notifies: Notifies,
-    ) -> Result<Answer, GenieError> {
+    ) -> GenieResult<Answer> {
         let unit = &self.players.live(player, idx)?;
         let top = self.parts.actions_of(unit.id).top_action_kind();
         let attacking = self
@@ -119,7 +119,7 @@ impl World {
         idx: ListIndex,
         (target, point): (Option<ObjectId>, Position),
         notifies: Notifies,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let (tp, t) = self.object(target).ok_or(GenieError::unsupported(
             "an attack's target the slice does not hold",
         ))?;
@@ -157,7 +157,7 @@ impl World {
         player: PlayerId,
         idx: ListIndex,
         task: &Task,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let class = self
             .players
             .live(player, idx)?
@@ -193,7 +193,7 @@ impl World {
         player: PlayerId,
         idx: ListIndex,
         order: &Work,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let Work {
             target,
             point,
@@ -271,7 +271,7 @@ impl World {
         idx: ListIndex,
         (target, point): (Option<ObjectId>, Position),
         filter: Option<ActionKind>,
-    ) -> Result<Option<(MasterId, Task)>, GenieError> {
+    ) -> GenieResult<Option<(MasterId, Task)>> {
         let unit = &self.players.live(player, idx)?;
         let masters = self
             .model
@@ -334,7 +334,7 @@ impl World {
         (target, point, notifies): (Option<ObjectId>, Position, Notifies),
         task: &Task,
         master: MasterSwap,
-    ) -> Result<Answer, GenieError> {
+    ) -> GenieResult<Answer> {
         let unit = &self.players.live(player, idx)?;
         let head = self.parts.actions_of(unit.id).list.head().cloned();
         let top = head.as_ref().map(Action::kind);
@@ -402,7 +402,7 @@ impl World {
         player: PlayerId,
         idx: ListIndex,
         (target, point, notifies): (ObjectId, Position, Notifies),
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let t = self.task_target(target, 0)?;
         if self
             .model
@@ -440,7 +440,7 @@ impl World {
         player: PlayerId,
         idx: ListIndex,
         (target, point, notifies): (ObjectId, Position, Notifies),
-    ) -> Result<Answer, GenieError> {
+    ) -> GenieResult<Answer> {
         let t = self.task_target(target, 0)?;
         if self
             .model
@@ -486,7 +486,7 @@ impl World {
         (target, point): (Option<ObjectId>, Position),
         task: &Task,
         (notifies, source): (Notifies, OrderSource),
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         match task.action_kind {
             // the factory makes no action of a mule cart's task: the move without one
             CART_TASK => self.work_move(player, idx, target, point, (notifies, source)),
@@ -508,7 +508,7 @@ impl World {
         (target, point): (ObjectId, Position),
         task: &Task,
         notifies: Notifies,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         match task.action_kind {
             ENTER => self.start_enter(player, idx, target, task, point, notifies),
             ATTACK_TASK => self.start_attack(player, idx, target, task, point, notifies),
@@ -549,7 +549,7 @@ impl World {
         target: Option<ObjectId>,
         point: Position,
         (notifies, source): (Notifies, OrderSource),
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let unit = &self.players.live(player, idx)?;
         let master = unit.master(self.master_tables(), player)?;
         if !master.move_stats.is_some_and(|m| Speed::ZERO < m.speed) {
@@ -619,7 +619,7 @@ impl World {
         target: ObjectId,
         filter: Option<ActionKind>,
         swap: MasterSwap,
-    ) -> Result<Option<Task>, GenieError> {
+    ) -> GenieResult<Option<Task>> {
         let unit = &self.players.live(player, idx)?;
         let own = unit.master(self.master_tables(), player)?;
         let owner = &self.players.player(player)?;

@@ -5,7 +5,6 @@
 //! 158041: the switch `FUN_140e7c330`; the world player's lookup `FUN_14152fe40`; the cases'
 //! handlers are named at each.
 
-use crate::GenieError;
 use crate::commands::GameSub;
 use crate::gathering::QueueCount;
 use crate::map::Distance;
@@ -21,6 +20,7 @@ use crate::world::settings::OptionFlags;
 use crate::world::slots::CheckedIndex;
 use crate::world::slots::PlayerSlots;
 use crate::world::{LureDestination, Percent, TargetingMode, VillagerGarrison};
+use crate::{GenieError, GenieResult};
 
 /// GAME's packet as `FUN_140e7c330` reads it: the sub-command at `+4` and its arguments.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -46,7 +46,7 @@ pub(crate) const CHEAT: GenieError = GenieError::unsupported("a cheat code (FUN_
 
 impl GameCommand {
     /// `do_command`'s case and its switch ([`World::game`]).
-    pub(crate) fn run(&self, w: &mut World) -> Result<(), GenieError> {
+    pub(crate) fn run(&self, w: &mut World) -> GenieResult<()> {
         w.game(self)
     }
 
@@ -113,7 +113,7 @@ impl World {
     ///   ([`World::queue_fish_traps`], [`World::unqueue_fish_traps`]).
     /// - 0x14: the offensive posture (`+0x71c`, slot 0xa0 `FUN_14163a630`, Gaia's too) flips
     ///   between 0 and 1.
-    pub(crate) fn game(&mut self, g: &GameCommand) -> Result<(), GenieError> {
+    pub(crate) fn game(&mut self, g: &GameCommand) -> GenieResult<()> {
         if !self.game_allowed(g) {
             return Ok(());
         }
@@ -187,7 +187,7 @@ impl World {
 
     /// Treason (`FUN_141620400`) of player `p`, when it has a treason building: the pending debit's
     /// entry of gold (`FUN_141630ef0` with 3) takes its cost.
-    fn game_treason(&mut self, p: PlayerId) -> Result<(), GenieError> {
+    fn game_treason(&mut self, p: PlayerId) -> GenieResult<()> {
         if self.has_treason_building(p) {
             *self
                 .players
@@ -201,7 +201,7 @@ impl World {
     }
 
     /// A computer player's AI setting.
-    fn game_ai_setting(&mut self, p: PlayerId, g: &GameCommand) -> Result<(), GenieError> {
+    fn game_ai_setting(&mut self, p: PlayerId, g: &GameCommand) -> GenieResult<()> {
         if self.players.player(p)?.kind.is_computer() {
             self.set_ai_setting(p, g.a, g.value)?;
         }
@@ -217,7 +217,7 @@ impl World {
     /// # Errors
     ///
     /// What the purchase and the refund do not model.
-    fn game_queue(&mut self, p: PlayerId, g: &GameCommand) -> Result<(), GenieError> {
+    fn game_queue(&mut self, p: PlayerId, g: &GameCommand) -> GenieResult<()> {
         let count = QueueCount::of_data(i32::from(g.a));
         match g.sub {
             GameSub::FarmQueue => {
@@ -268,7 +268,7 @@ impl World {
         p: PlayerId,
         setting: i16,
         value: u32,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let byte = value as u8;
         if setting == 0x13 {
             if self.allow_gaia_capture.len() <= p.index() {

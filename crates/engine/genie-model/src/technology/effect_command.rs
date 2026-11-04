@@ -2,7 +2,7 @@
 //! `TRIBE_Effects::do_effect` (`FUN_141462440`) and its base (`FUN_140ec2ac0`) read them, parsed
 //! once where the `.dat` is read.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::math::conversions::cvttss2si;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterAttribute;
@@ -294,7 +294,7 @@ impl EffectCommand {
     ///
     /// A class (an attribute command's second argument) or a cost's resource (`'e'`'s second)
     /// below −1.
-    pub fn of_data(kind: u8, a: i16, b: i16, c: i16, d: f32) -> Result<Self, GenieError> {
+    pub fn of_data(kind: u8, a: i16, b: i16, c: i16, d: f32) -> GenieResult<Self> {
         // the third argument's low byte, the mode of the technology and resource commands
         let low = |v: i16| v.to_le_bytes()[0];
         Ok(match kind {
@@ -325,7 +325,7 @@ impl EffectCommand {
     }
 
     /// The base's kinds of a block (0 to 48, the units 0 to 8).
-    fn of_block(kind: u8, a: i16, b: i16, c: i16, d: f32) -> Result<Self, GenieError> {
+    fn of_block(kind: u8, a: i16, b: i16, c: i16, d: f32) -> GenieResult<Self> {
         let party = Party::of_block(kind / 10);
         Ok(match kind % 10 {
             kind::SET | kind::ADD | kind::MULTIPLY => {

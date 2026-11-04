@@ -23,7 +23,6 @@ use crate::world::slots::CheckedIndex;
 use crate::world::slots::PlayerSlots;
 use std::collections::BTreeMap;
 
-use crate::GenieError;
 use crate::construction::build::{ClearLook, clearing_objects, footprint_clearing};
 use crate::construction::build::{Cleared, ClearingSite};
 use crate::map::Snow;
@@ -41,6 +40,7 @@ use crate::vision::visibility::{BuildingSight, Seer, capture_kind};
 use crate::world::World;
 use crate::world::index::{ObjectsRef, Place};
 use crate::world::layer::ClassRoles;
+use crate::{GenieError, GenieResult};
 
 /// Whether a footprint clearing's object lost its record already: the builder's clearing in the
 /// Build's update drops it (`FUN_141189670`), and the object then has `+0x686` set.
@@ -67,7 +67,7 @@ impl World {
         &mut self,
         foundation: FoundationId,
         units: &[ObjectId],
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let (site_owner, site) = self.object(foundation).ok_or(GenieError::unsupported(
             "a footprint's foundation the slice does not hold",
         ))?;
@@ -152,7 +152,7 @@ impl World {
         foundation: FoundationId,
         radius: Footprint,
         units: &[ObjectId],
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let by_id = ObjectsRef::new(
             &self.players,
             &self.index,
@@ -229,7 +229,7 @@ impl World {
         player: PlayerId,
         master: MasterId,
         position: Position,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let s = self.model.slots.master;
         // the farms and the terrain their foundations lay (`0x1d`, `0x41`)
         let farms = [
@@ -277,7 +277,7 @@ impl World {
         master: MasterId,
         at: Point,
         by: Clearer,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let Some(m) = player_master(&self.model.masters, player, master) else {
             return Ok(());
         };
@@ -329,7 +329,7 @@ impl World {
     }
 
     /// What the footprint clearing reads of object `id` ([`crate::construction::build::ClearLook`]).
-    pub(crate) fn clear_look(&self, id: ObjectId) -> Result<Option<ClearLook>, GenieError> {
+    pub(crate) fn clear_look(&self, id: ObjectId) -> GenieResult<Option<ClearLook>> {
         let Some((p, u)) = self.object(id) else {
             return Ok(None);
         };
@@ -349,11 +349,7 @@ impl World {
     /// # Errors
     ///
     /// An object the slice does not hold, and what the deletes do not model.
-    pub(crate) fn clear_object(
-        &mut self,
-        cl: Cleared,
-        record: RecordDrop,
-    ) -> Result<(), GenieError> {
+    pub(crate) fn clear_object(&mut self, cl: Cleared, record: RecordDrop) -> GenieResult<()> {
         let (owner, _) = self.object(cl.id).ok_or(GenieError::unsupported(
             "a footprint clearing of an object the slice does not hold",
         ))?;
@@ -383,7 +379,7 @@ impl World {
         made: &Master,
         position: Position,
         desolid: bool,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let record = Obstruction {
             kind: made.obstruction_kind,
             class: made.obstruction_class,

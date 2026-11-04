@@ -1,7 +1,6 @@
 //! What the update asks of the world: the units kept apart, an interruption, rest, a target
 //! still to act on, the relics, a member's idleness, the sprites shown and the lead.
 
-use crate::GenieError;
 use crate::combat::attack::ATTACK;
 use crate::groups::GroupId;
 use crate::groups::SpriteShow;
@@ -46,6 +45,7 @@ use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 use crate::world::slots::PlayerSlots;
+use crate::{GenieError, GenieResult};
 
 impl World {
     /// `FUN_141007ca0`: the units the group keeps apart (`+0x458`, the save's `objId`, size
@@ -66,7 +66,7 @@ impl World {
     /// the slice does not hold.
     ///
     /// When the world does not hold `group`.
-    pub(crate) fn keep_apart(&mut self, group: GroupId) -> Result<(), GenieError> {
+    pub(crate) fn keep_apart(&mut self, group: GroupId) -> GenieResult<()> {
         let mut i = 0;
         loop {
             let g = self.groups.held(group)?;
@@ -145,7 +145,7 @@ impl World {
     ///
     /// An object of a master the slice does not have, and what
     /// [`Action::interruptible`](crate::objects::layers::Action::interruptible) does not model.
-    pub(super) fn may_interrupt(&self, object: WorldObject<'_>) -> Result<bool, GenieError> {
+    pub(super) fn may_interrupt(&self, object: WorldObject<'_>) -> GenieResult<bool> {
         let WorldObject::Unit(p, u, _) = object else {
             return Ok(false);
         };
@@ -200,7 +200,7 @@ impl World {
     pub(super) fn action_target(
         &self,
         object: WorldObject<'_>,
-    ) -> Result<Option<WorldObject<'_>>, GenieError> {
+    ) -> GenieResult<Option<WorldObject<'_>>> {
         let WorldObject::Unit(p, u, _) = object else {
             return Ok(None);
         };
@@ -228,7 +228,7 @@ impl World {
         &self,
         a: WorldObject<'_>,
         b: WorldObject<'_>,
-    ) -> Result<DistanceSquared, GenieError> {
+    ) -> GenieResult<DistanceSquared> {
         let ra = self
             .master(a.player(), a.master_id(self.model.slots))?
             .radius;
@@ -253,7 +253,7 @@ impl World {
         &self,
         a: WorldObject<'_>,
         b: WorldObject<'_>,
-    ) -> Result<Distance, GenieError> {
+    ) -> GenieResult<Distance> {
         let ra = self
             .master(a.player(), a.master_id(self.model.slots))?
             .radius;
@@ -275,7 +275,7 @@ impl World {
     /// # Errors
     ///
     /// An object of a master the slice does not have, or what the sight test does not hold.
-    pub fn target_pending(&self, group: GroupId) -> Result<bool, GenieError> {
+    pub fn target_pending(&self, group: GroupId) -> GenieResult<bool> {
         let Some(g) = self.groups.get(group) else {
             return Ok(false);
         };
@@ -310,7 +310,7 @@ impl World {
     /// ([`World::has_task`]) pick up relics (132) and its target (the unit AI's, `+0x48`) is a
     /// relic (its master's class `0x2a`), or deliver them (136) and its target is a relic or
     /// none the world holds.
-    pub(super) fn relic_pickup_pending(&self, g: &UnitGroup) -> Result<bool, GenieError> {
+    pub(super) fn relic_pickup_pending(&self, g: &UnitGroup) -> GenieResult<bool> {
         let owner = g.owner_player()?;
         for m in &g.members {
             let Some(WorldObject::Unit(_, u, _)) = self.world_object(m.id) else {
@@ -347,7 +347,7 @@ impl World {
     /// `FUN_141017850`: as [`World::relic_pickup_pending`], on a group still delivering a relic
     /// (136): the target is a monastery (master 104) and the member's master's tasks deliver or
     /// pick up relics.
-    pub(super) fn relic_delivery_pending(&self, g: &UnitGroup) -> Result<bool, GenieError> {
+    pub(super) fn relic_delivery_pending(&self, g: &UnitGroup) -> GenieResult<bool> {
         let owner = g.owner_player()?;
         for m in &g.members {
             let Some(WorldObject::Unit(_, u, _)) = self.world_object(m.id) else {
@@ -387,7 +387,7 @@ impl World {
         player: PlayerId,
         master: MasterId,
         action: ActionKind,
-    ) -> Result<bool, GenieError> {
+    ) -> GenieResult<bool> {
         let Some(masters) = self.model.masters.of(player) else {
             return self.master(player, master).map(|_| false);
         };
@@ -413,7 +413,7 @@ impl World {
         &self,
         object: WorldObject<'_>,
         player: PlayerId,
-    ) -> Result<bool, GenieError> {
+    ) -> GenieResult<bool> {
         let master = self.master(object.player(), object.master_id(self.model.slots))?;
         let (x, y) = (object.position().x(), object.position().y());
         let (x, y) = (cvttss2si(x), cvttss2si(y));
@@ -436,7 +436,7 @@ impl World {
     ///
     /// An object of a master the slice does not have, or with an action the slice does not
     /// model.
-    pub fn member_idle(&self, id: impl ObjectKey) -> Result<bool, GenieError> {
+    pub fn member_idle(&self, id: impl ObjectKey) -> GenieResult<bool> {
         let Some(object) = self.world_object(id) else {
             return Ok(false);
         };
@@ -466,7 +466,7 @@ impl World {
     /// An object of a master the slice does not have, with an action the slice does not model,
     /// a trade cart (whose goods the slice does not hold), and a standing sprite the slice's
     /// graphics lack.
-    pub(crate) fn show_standing(&mut self, id: ObjectId) -> Result<(), GenieError> {
+    pub(crate) fn show_standing(&mut self, id: ObjectId) -> GenieResult<()> {
         self.show_sprite(id, Shown::Standing).map(|_| ())
     }
 
@@ -482,7 +482,7 @@ impl World {
     /// # Errors
     ///
     /// As [`World::show_standing`].
-    pub(crate) fn show_walking(&mut self, id: ObjectId) -> Result<SpriteShow, GenieError> {
+    pub(crate) fn show_walking(&mut self, id: ObjectId) -> GenieResult<SpriteShow> {
         self.show_sprite(id, Shown::Walking)
     }
 
@@ -495,7 +495,7 @@ impl World {
     /// # Errors
     ///
     /// As [`World::show_standing`], a trade cart aside.
-    pub(crate) fn show_running(&mut self, id: ObjectId) -> Result<SpriteShow, GenieError> {
+    pub(crate) fn show_running(&mut self, id: ObjectId) -> GenieResult<SpriteShow> {
         self.show_sprite(id, Shown::Running)
     }
 
@@ -505,7 +505,7 @@ impl World {
     /// # Errors
     ///
     /// A trade cart, or an action the slice does not model ([`World::show_sprite`]).
-    fn sprite_to_show(&self, id: ObjectId, shown: Shown) -> Result<Option<SpriteId>, GenieError> {
+    fn sprite_to_show(&self, id: ObjectId, shown: Shown) -> GenieResult<Option<SpriteId>> {
         let Some((p, u)) = self.object(id) else {
             return Ok(None);
         };
@@ -552,11 +552,7 @@ impl World {
     }
 
     /// Slots 0x660, 0x658 and 0x650 of object `id` ([`Shown`]): whether it shows the sprite.
-    pub(super) fn show_sprite(
-        &mut self,
-        id: ObjectId,
-        shown: Shown,
-    ) -> Result<SpriteShow, GenieError> {
+    pub(super) fn show_sprite(&mut self, id: ObjectId, shown: Shown) -> GenieResult<SpriteShow> {
         let Some(sprite) = self.sprite_to_show(id, shown)? else {
             return Ok(SpriteShow::NoSprite);
         };
@@ -628,7 +624,7 @@ impl Action {
         master: &Master,
         ai: Option<&UnitAi>,
         roles: &Roles,
-    ) -> Result<bool, GenieError> {
+    ) -> GenieResult<bool> {
         let actions = self;
         let state = if master.kind < MasterKind::ACTION {
             ActionState::NO_ACTION

@@ -1,6 +1,6 @@
 //! `TOWN_BELL` (0x7f): a town centre's bell.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::objects::ObjectId;
 use crate::players::PlayerId;
 use crate::world::World;
@@ -45,7 +45,7 @@ impl Bell {
 
 impl TownBellCommand {
     /// Its handler ([`World::town_bell`]).
-    pub(crate) fn run(self, w: &mut World) -> Result<(), GenieError> {
+    pub(crate) fn run(self, w: &mut World) -> GenieResult<()> {
         w.town_bell(self.player, self.id, self.bell)
     }
 }

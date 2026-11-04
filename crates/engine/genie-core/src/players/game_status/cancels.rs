@@ -1,7 +1,6 @@
 //! A building's queue cancelled: the whole queue, its units and researches refunded, and
 //! `UNIT_ORDER`'s cancel of one, five or some.
 
-use crate::GenieError;
 use crate::math::fmath::below_or_unordered;
 use crate::objects::ListIndex;
 use crate::objects::masters::MasterId;
@@ -25,6 +24,7 @@ use crate::world::World;
 use crate::world::layer::MasterRoles;
 use crate::world::slots::{CheckedIndex, PlayerSlots};
 use crate::world::{GameMode, NO_ATTRIBUTE};
+use crate::{GenieError, GenieResult};
 
 /// A cancel finds the building without the production it cancels from.
 const NO_PRODUCTION: GenieError =
@@ -39,7 +39,7 @@ impl World {
     /// ([`World::refund_researches`]). Then the interface's `+0xc02` (the local player's event
     /// 0x7d) is left; the entries go, the production list's action goes
     /// ([`World::end_production_action`]), the change counter grows and the total is 0.
-    pub(crate) fn cancel_queue(&mut self, p: PlayerId, idx: ListIndex) -> Result<(), GenieError> {
+    pub(crate) fn cancel_queue(&mut self, p: PlayerId, idx: ListIndex) -> GenieResult<()> {
         let Some(production) = self.parts.production.get(self.players.live(p, idx)?.id) else {
             return Ok(());
         };
@@ -75,7 +75,7 @@ impl World {
         p: PlayerId,
         e: &Entry,
         count: QueuedUnits,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         use crate::production::population;
         let class = e.master.map_or(Key::NONE, |m| self.tracker_key(p, m)).class;
         let master = e
@@ -112,7 +112,7 @@ impl World {
         idx: ListIndex,
         e: &Entry,
         count: QueuedUnits,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         // the entry's technology is one of the tree: RESEARCH queued it, the load read it
         let tree = self.players.player(p)?.techs.len();
         let Some(t) = e.tech.map(TechId::index).filter(|&t| t < tree) else {
@@ -172,7 +172,7 @@ impl World {
         idx: ListIndex,
         index: UnitIndex,
         batch: Batch,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let Some(production) = self.parts.production.get(self.players.live(p, idx)?.id) else {
             return Ok(());
         };
@@ -228,7 +228,7 @@ impl World {
     /// `FUN_1411d66b0`'s one unit of entry `entry` given back to player `p`: its refund
     /// ([`refund`]), the tracker's counter one less and its place back, attribute 80 lower by
     /// its population (slot 0xf8).
-    pub(super) fn give_back_one(&mut self, p: PlayerId, entry: &Entry) -> Result<(), GenieError> {
+    pub(super) fn give_back_one(&mut self, p: PlayerId, entry: &Entry) -> GenieResult<()> {
         let class = entry
             .master
             .map_or(Key::NONE, |m| self.tracker_key(p, m))
@@ -264,8 +264,8 @@ impl World {
         idx: ListIndex,
         index: UnitIndex,
         e: usize,
-    ) -> Result<(), GenieError> {
-        fn queue(t: &World, p: PlayerId, idx: ListIndex) -> Result<&Queue, GenieError> {
+    ) -> GenieResult<()> {
+        fn queue(t: &World, p: PlayerId, idx: ListIndex) -> GenieResult<&Queue> {
             Ok(&t
                 .parts
                 .production
@@ -355,7 +355,7 @@ impl World {
         (master, count): (Option<MasterId>, QueuedUnits),
         from: i32,
         tech: Option<TechId>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let Some(production) = self.parts.production.get(self.players.live(p, idx)?.id) else {
             return Ok(());
         };
@@ -447,7 +447,7 @@ impl World {
         p: PlayerId,
         idx: ListIndex,
         index: UnitIndex,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if self.settings.game_mode != GameMode::OneUnit {
             return Ok(());
         }

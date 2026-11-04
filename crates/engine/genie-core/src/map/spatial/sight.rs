@@ -1,7 +1,6 @@
 //! The artifact's owner search, an ownership change, vision and sight, ghosts and the standable
 //! spots.
 
-use crate::GenieError;
 use crate::construction::MainBuildingId;
 use crate::map::Distance;
 use crate::map::DistanceSquared;
@@ -34,6 +33,7 @@ use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
 use crate::world::layer::generated::VisibilityTuning;
 use crate::world::player::Player;
+use crate::{GenieError, GenieResult};
 impl Spatial {
     /// The Artifact action's owner search (`FUN_140aabc40`) for the animal `me`: the objects on
     /// the lists of the tiles within the animal's radius (whole) plus 3 tiles of its own tile
@@ -51,7 +51,7 @@ impl Spatial {
         me: ObjectId,
         players: &[Player],
         roles: &Roles,
-    ) -> Result<Option<PlayerId>, GenieError> {
+    ) -> GenieResult<Option<PlayerId>> {
         // a world without the players' sight (the unit tests') holds nobody near
         let Some(v) = self.sight.as_ref() else {
             return Ok(None);
@@ -186,7 +186,7 @@ impl Spatial {
     }
 
     /// An ownership change's records ([`Visibility::records_owner`]), which come first.
-    pub fn records_owner(&mut self, id: ObjectId, new: PlayerId) -> Result<(), GenieError> {
+    pub fn records_owner(&mut self, id: ObjectId, new: PlayerId) -> GenieResult<()> {
         self.sight
             .as_mut()
             .map_or(Ok(()), |v| v.records_owner(id, new))
@@ -203,7 +203,7 @@ impl Spatial {
         sees: Seeing,
         roles: &Roles,
         visibility_tuning: VisibilityTuning,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let Some(p) = self.objects.get_mut(id) else {
             return Err(GenieError::unsupported(
                 "an ownership change of an object the world does not hold",
@@ -389,7 +389,7 @@ impl Spatial {
 
     /// [`Spatial::tile_sight`] is not 0: player `player` sees `tile` or explored it. Unknown
     /// without the players' sight.
-    pub fn explored(&self, player: PlayerId, tile: Tile) -> Result<bool, GenieError> {
+    pub fn explored(&self, player: PlayerId, tile: Tile) -> GenieResult<bool> {
         let answer = self
             .tile_sight(player, tile)
             .ok_or(GenieError::unsupported(
@@ -412,7 +412,7 @@ impl Spatial {
         &mut self,
         id: ObjectId,
         annex_of: Option<MainBuildingId>,
-    ) -> Result<Option<VisionBits>, GenieError> {
+    ) -> GenieResult<Option<VisionBits>> {
         let (Some(v), Some(p)) = (self.sight.as_mut(), self.objects.get(id)) else {
             return Ok(None);
         };
@@ -430,7 +430,7 @@ impl Spatial {
         state: ObjectState,
         roles: &Roles,
         visibility_tuning: VisibilityTuning,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if let (Some(v), Some(p)) = (self.sight.as_mut(), self.objects.get(id)) {
             v.state_changed(id, p.position, p.radius, state, roles, visibility_tuning)?;
         }
@@ -449,7 +449,7 @@ impl Spatial {
         master: MasterId,
         los: Distance,
         sight: SightLayer<'_>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let SightLayer {
             roles,
             visibility_tuning,
@@ -559,7 +559,7 @@ impl Spatial {
         me: ObjectId,
         radius_x: Distance,
         by_id: ObjectsRef<'_>,
-    ) -> Result<bool, GenieError> {
+    ) -> GenieResult<bool> {
         let (Some(word), Some(tall)) = (self.tiles.word(tile), self.tiles.tall(tile)) else {
             return Ok(false);
         };
@@ -585,7 +585,7 @@ impl Spatial {
         mask: TerrainMask,
         site: (Position, Footprint),
         by_id: ObjectsRef<'_>,
-    ) -> Result<Option<Point>, GenieError> {
+    ) -> GenieResult<Option<Point>> {
         self.spot_off(from, me, mask, site, SpotPick::Nearest, by_id)
     }
 }

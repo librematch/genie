@@ -1,7 +1,7 @@
 //! A command's run in the command phase ([`World::run`]), a human player's order and the
 //! order units' reset.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::commands::Command;
 use crate::math::rng::Stream;
 use crate::objects::ObjectId;
@@ -43,10 +43,7 @@ impl World {
     /// ([`UnitAi::reset_for_order`]), in list order.
     ///
     /// [`UnitAi::reset_for_order`]: crate::unit_ai::UnitAi::reset_for_order
-    pub(crate) fn reset_order_units(
-        &mut self,
-        units: &[Option<ObjectId>],
-    ) -> Result<(), GenieError> {
+    pub(crate) fn reset_order_units(&mut self, units: &[Option<ObjectId>]) -> GenieResult<()> {
         for &id in units {
             let Some(place) = self.place(id) else {
                 continue;

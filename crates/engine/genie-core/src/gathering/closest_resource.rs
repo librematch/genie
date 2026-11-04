@@ -1,7 +1,6 @@
 //! `ClosestResourceObject` (`FUN_140c49760`): where it searches from and what it finds; a
 //! herded sheep.
 
-use crate::GenieError;
 use crate::gathering::DropSiteId;
 use crate::map::Point;
 use crate::map::Position;
@@ -28,6 +27,7 @@ use crate::world::layer::Roles;
 use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
+use crate::{GenieError, GenieResult};
 
 /// What `ClosestResourceObject` reads of the world, as the unit's update or its unit AI sees it.
 pub(crate) struct ResourceWorld<'a, 'b> {
@@ -68,7 +68,7 @@ pub(crate) fn closest_resource_of(
     (current, min_state, point): (Option<ObjectId>, ObjectState, Point),
     by_id: ObjectsRef<'_>,
     roles: &Roles,
-) -> Result<(Option<ObjectId>, Option<i32>), GenieError> {
+) -> GenieResult<(Option<ObjectId>, Option<i32>)> {
     use crate::gathering::gather_search::closest_resource_at;
     use crate::gathering::gather_search::{self, Candidate, Candidates, ResourceWorld};
     use crate::movement::UnitReach;
@@ -176,7 +176,7 @@ impl UnitView<'_, '_> {
     pub(crate) fn closest_gatherable(
         &mut self,
         search: ResourceSearch,
-    ) -> Result<Option<Gatherable>, GenieError> {
+    ) -> GenieResult<Option<Gatherable>> {
         let by_id = ObjectsRef::new(
             &self.c.w.players,
             &self.c.w.index,
@@ -261,7 +261,7 @@ impl Unit {
         c: &mut Step<'_>,
         kind: GatherGroup,
         cap: WorkerCount,
-    ) -> Result<Option<ObjectId>, GenieError> {
+    ) -> GenieResult<Option<ObjectId>> {
         self.resource_search_from(actions, c, kind, cap, None)
     }
 
@@ -276,7 +276,7 @@ impl Unit {
         kind: GatherGroup,
         cap: WorkerCount,
         site: Option<DropSiteId>,
-    ) -> Result<Option<ObjectId>, GenieError> {
+    ) -> GenieResult<Option<ObjectId>> {
         let by_id = ObjectsRef::new(
             &c.w.players,
             &c.w.index,

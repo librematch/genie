@@ -2,7 +2,6 @@
 //! `FUN_140e7d040`). A player with a market gives up to four of its resources to another, and
 //! pays the market's fee on top; what it lacks lowers both alike.
 
-use crate::GenieError;
 use crate::commands::ResourceWord;
 use crate::math::fmath::maxss;
 use crate::objects::masters::MasterId;
@@ -12,6 +11,7 @@ use crate::players::TributeFee;
 use crate::players::tracker::ListKey;
 use crate::world::World;
 use crate::world::slots::{CheckedIndex, PlayerSlots};
+use crate::{GenieError, GenieResult};
 
 /// One of a tribute's four entries: the attribute (`+0x24`..), its amount (`+0x04`..) and the
 /// fee (`+0x14`..), a share of the amount.
@@ -88,7 +88,7 @@ impl World {
         from: PlayerId,
         to: PlayerId,
         gifts: &[Gift; 4],
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if from == to || !self.pays_tribute(from) {
             return Ok(());
         }

@@ -1,6 +1,6 @@
 //! A gather point's state: a point SET GATHER POINT made, or a byte SET GATHER STATE gave.
 
-use crate::GenieError;
+use crate::{GenieError, GenieResult};
 use derive_more::Display;
 use std::num::NonZeroU8;
 
@@ -59,7 +59,7 @@ impl GatherPointState {
     /// # Errors
     ///
     /// A value past a byte: no command gives one.
-    pub fn of_saved(value: i32) -> Result<Option<Self>, GenieError> {
+    pub fn of_saved(value: i32) -> GenieResult<Option<Self>> {
         let byte = u8::try_from(value).map_err(|_| {
             GenieError::invalid_input("a gather point state past a byte").with("state", value)
         })?;

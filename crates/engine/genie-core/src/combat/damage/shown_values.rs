@@ -1,7 +1,6 @@
 //! The bonus damage tasks (`FUN_14107ce60`) and the attack, armor and range a combat object
 //! shows.
 
-use crate::GenieError;
 use crate::combat::damage::{
     EPSILON, ONE, Victim, charge_hit, charged, master_melee_armor, melee_armor, range_charge_hit,
 };
@@ -17,6 +16,7 @@ use crate::objects::masters::{ClassAmount, DamageClass};
 use crate::players::attribute::AttributeId;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
+use crate::{GenieError, GenieResult};
 
 /// The action type of a bonus damage task (`FUN_14107ce60`).
 pub const BONUS_DAMAGE: ActionKind = ActionKind::named(0xa0);
@@ -233,7 +233,7 @@ pub fn shown_attack(v: &Victim, s: &Shown<'_>, roles: &Roles) -> DamageAmount {
 /// An object without combat values (a type below 50): the villager's harmless test, its one
 /// caller, reads an attacker, which is a combat object (below type 50 the class's table has no
 /// slot 0x868).
-pub fn shown_melee_armor(v: &Victim, roles: &Roles) -> Result<DamageAmount, GenieError> {
+pub fn shown_melee_armor(v: &Victim, roles: &Roles) -> GenieResult<DamageAmount> {
     let a = v.armored.as_ref().ok_or(GenieError::unreachable(
         "the melee armor of an object without combat values",
     ))?;

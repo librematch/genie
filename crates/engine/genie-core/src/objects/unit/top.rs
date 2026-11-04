@@ -1,7 +1,6 @@
 //! What a unit and its action layer answer: their taker, its context, its gait, whether its top
 //! action may be interrupted and the target it attacks.
 
-use crate::GenieError;
 use crate::math::fmath::BVector;
 use crate::movement::Mover;
 use crate::objects::ActionState;
@@ -11,6 +10,7 @@ use crate::objects::masters::ActionKind;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterKind;
 use crate::objects::unit::{TAKEN_OUT, Unit};
+use crate::{GenieError, GenieResult};
 
 use crate::combat::AttackTargetId;
 use crate::combat::attack::ATTACK;
@@ -147,7 +147,7 @@ impl Action {
     /// without a target or a point (`+0x30`, `+0x38` = −1). A trade (`0x6f`) in state 4 is not
     /// modelled, nor is an action the slice does not hold (`unread`: the load could not read the
     /// object whole, [`Unread`]).
-    pub(crate) fn interruptible(&self, unread: Option<&Unread>) -> Result<bool, GenieError> {
+    pub(crate) fn interruptible(&self, unread: Option<&Unread>) -> GenieResult<bool> {
         if unread.is_some() {
             return Err(GenieError::unsupported(
                 "slot 0x2d0 of an action the slice does not model",

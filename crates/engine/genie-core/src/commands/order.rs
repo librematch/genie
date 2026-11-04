@@ -1,7 +1,6 @@
 //! The orders of units (INTERACT, WORK, MOVE, RETREAT, FOLLOW, GUARD): their units, the check,
 //! the reset and the order's run.
 
-use crate::GenieError;
 use crate::commands::UnitList;
 use crate::objects::ObjectId;
 use crate::orders::OrderFlags;
@@ -9,6 +8,7 @@ use crate::orders::{Interact, MoveOrder};
 use crate::players::PlayerId;
 use crate::world::World;
 use crate::world::slots::PlayerSlots;
+use crate::{GenieError, GenieResult};
 
 /// WORK's and RETREAT's runs (`FUN_140e6a9f0`, `FUN_140e69f00`).
 const ORDER_UNMODELLED: GenieError = GenieError::unsupported("an order moves its units");
@@ -55,7 +55,7 @@ impl OrderCommand {
     /// the order (WORK's not), a human's take the world time as their last human order time
     /// (`+0x15`, `FUN_140e5e780`; FOLLOW's when a unit the world holds belongs to a player who
     /// is not a computer, `FUN_141659cf0`), then the order runs.
-    pub(crate) fn run(&self, w: &mut World) -> Result<(), GenieError> {
+    pub(crate) fn run(&self, w: &mut World) -> GenieResult<()> {
         let (player, order) = (self.player, self.order);
         let Some(units) = self.units(w)? else {
             return Ok(());
@@ -88,7 +88,7 @@ impl OrderCommand {
     }
 
     /// Whether a unit of `units` the world holds belongs to a player who is not a computer.
-    fn any_human_unit(w: &World, units: &[Option<ObjectId>]) -> Result<bool, GenieError> {
+    fn any_human_unit(w: &World, units: &[Option<ObjectId>]) -> GenieResult<bool> {
         for &id in units {
             if let Some((p, _)) = w.object(id)
                 && !w.players.player(p)?.kind.is_computer()
@@ -115,7 +115,7 @@ impl OrderCommand {
     /// # Errors
     ///
     /// A player the world does not hold.
-    fn units(&self, w: &mut World) -> Result<Option<Vec<Option<ObjectId>>>, GenieError> {
+    fn units(&self, w: &mut World) -> GenieResult<Option<Vec<Option<ObjectId>>>> {
         let (source, order) = (&self.units, self.order);
         if let Order::Follow(_) | Order::Guard(_) = order {
             let Some(read) = w.read_units(self.player, source) else {

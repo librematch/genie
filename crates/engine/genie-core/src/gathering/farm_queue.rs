@@ -8,7 +8,7 @@
 //! ([`crate::production::pay`]) and the refund `FUN_141630770`
 //! ([`crate::production::refund_master`]).
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::construction::FoundationId;
 use crate::gathering::QueueCount;
 use crate::gathering::gather::Stand;
@@ -75,7 +75,7 @@ impl World {
         p: PlayerId,
         count: QueueCount,
         master: MasterId,
-    ) -> Result<QueueOutcome, GenieError> {
+    ) -> GenieResult<QueueOutcome> {
         self.buy_ahead(p, count, master, Queue::Farms)
     }
 
@@ -85,7 +85,7 @@ impl World {
         &mut self,
         p: PlayerId,
         count: QueueCount,
-    ) -> Result<QueueOutcome, GenieError> {
+    ) -> GenieResult<QueueOutcome> {
         // The fish trap (master 199, its master table's `+0x638`).
         // The farm a mill's queue buys (`0x32`, GAME 0xd and 0xe).
         self.buy_ahead(
@@ -103,7 +103,7 @@ impl World {
         p: PlayerId,
         count: QueueCount,
         master: MasterId,
-    ) -> Result<Refund, GenieError> {
+    ) -> GenieResult<Refund> {
         self.give_back(p, count, master, Queue::Farms)
     }
 
@@ -113,7 +113,7 @@ impl World {
         &mut self,
         p: PlayerId,
         count: QueueCount,
-    ) -> Result<Refund, GenieError> {
+    ) -> GenieResult<Refund> {
         self.give_back(
             p,
             count,
@@ -134,7 +134,7 @@ impl World {
         count: QueueCount,
         master: MasterId,
         queue: Queue,
-    ) -> Result<QueueOutcome, GenieError> {
+    ) -> GenieResult<QueueOutcome> {
         if !count.any() || QUEUE_LIMIT <= self.queued(p, queue)? {
             return Ok(QueueOutcome::NoneQueued);
         }
@@ -187,7 +187,7 @@ impl World {
         count: QueueCount,
         master: MasterId,
         queue: Queue,
-    ) -> Result<Refund, GenieError> {
+    ) -> GenieResult<Refund> {
         let n = count.min(self.queued(p, queue)?);
         if !n.any() {
             return Ok(Refund::NoneQueued);
@@ -211,7 +211,7 @@ impl World {
     /// town centres standing ([`World::town_centre_count`]) are fewer than attribute 218
     /// (`CVTSI2SS`, `COMISS`). A base id the player lacks makes none (the game reads its table's
     /// slot unchecked; the `.dat`'s masters name their own).
-    pub fn can_make(&self, p: PlayerId, master: MasterId) -> Result<bool, GenieError> {
+    pub fn can_make(&self, p: PlayerId, master: MasterId) -> GenieResult<bool> {
         let Some(ms) = self.model.masters.of(p) else {
             return Ok(false);
         };
@@ -263,7 +263,7 @@ impl World {
     /// # Errors
     ///
     /// A player the world does not hold.
-    pub fn reseed_master(&self, p: PlayerId) -> Result<Option<MasterId>, GenieError> {
+    pub fn reseed_master(&self, p: PlayerId) -> GenieResult<Option<MasterId>> {
         for m in [
             self.model.slots.master.farm,
             self.model.slots.master.pasture_1889,
@@ -302,7 +302,7 @@ impl World {
     /// modelled) would build it too; then the gatherer's ignore list empties (`FUN_141197da0`)
     /// and its slot 0x128 sends it to build the foundation at the spot ([`World::build_task`],
     /// [`World::build_directly`]). [`Reseed::Made`] when the foundation was made.
-    pub(crate) fn reseed(&mut self, p: PlayerId, idx: ListIndex) -> Result<Reseed, GenieError> {
+    pub(crate) fn reseed(&mut self, p: PlayerId, idx: ListIndex) -> GenieResult<Reseed> {
         let unit = &self.players.live(p, idx)?;
         let Some(gather) = self.parts.actions_of(unit.id).list.gather().copied() else {
             return Ok(Reseed::NotMade);
@@ -370,7 +370,7 @@ impl World {
         &self,
         p: PlayerId,
         class: ClassId,
-    ) -> Result<Option<(MasterId, bool, Queue)>, GenieError> {
+    ) -> GenieResult<Option<(MasterId, bool, Queue)>> {
         let owner = self.players.player(p)?;
         let choice = if (!owner.auto_queues.contains(AutoQueues::FARMS) && !owner.farm_queue.any())
             || !self
@@ -415,7 +415,7 @@ impl World {
         &mut self,
         p: PlayerId,
         (master, auto, queue): (MasterId, bool, Queue),
-    ) -> Result<Option<bool>, GenieError> {
+    ) -> GenieResult<Option<bool>> {
         let mut from_queue = !auto;
         if auto {
             let Some(masters) = self.model.masters.of(p) else {
@@ -462,7 +462,7 @@ impl World {
         p: PlayerId,
         idx: ListIndex,
         end: WalkEnd,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if self.reseed(p, idx)? == Reseed::Made {
             return Ok(());
         }
@@ -498,7 +498,7 @@ impl World {
     }
 
     /// Player `p`'s queue `queue`.
-    fn queued(&self, p: PlayerId, queue: Queue) -> Result<QueueCount, GenieError> {
+    fn queued(&self, p: PlayerId, queue: Queue) -> GenieResult<QueueCount> {
         let owner = self.players.player(p)?;
         Ok(match queue {
             Queue::Farms => owner.farm_queue,

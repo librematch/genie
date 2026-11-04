@@ -1,7 +1,6 @@
 //! BUILD's tests before its foundation: a farm on rice terrain, the pending debit, the
 //! builders, the placement test and the payment.
 
-use crate::GenieError;
 use crate::map::Point;
 use crate::map::Position;
 use crate::map::Restriction;
@@ -23,6 +22,7 @@ use crate::world::World;
 use crate::world::layer::MasterRoles;
 use crate::world::slots::CheckedIndex;
 use crate::world::slots::PlayerSlots;
+use crate::{GenieError, GenieResult};
 
 impl World {
     /// BUILD's first step (`FUN_140e7a400`): a farm (master 50) whose point's tile (truncated) is
@@ -48,11 +48,7 @@ impl World {
 
     /// BUILD's pending debit (`FUN_141630d10` with 0, before its placement test): every cost
     /// entry of the master, paid or not, by resource, comes off the player's pending debit.
-    pub(crate) fn debit_listed(
-        &mut self,
-        player: PlayerId,
-        master: MasterId,
-    ) -> Result<(), GenieError> {
+    pub(crate) fn debit_listed(&mut self, player: PlayerId, master: MasterId) -> GenieResult<()> {
         let site = player_master(&self.model.masters, player, master).ok_or(
             GenieError::unsupported("BUILD of a master the player does not have"),
         )?;
@@ -83,7 +79,7 @@ impl World {
         player: PlayerId,
         master: MasterId,
         builders: &[Option<ObjectId>],
-    ) -> Result<bool, GenieError> {
+    ) -> GenieResult<bool> {
         if self.players.player(player)?.kind.is_computer() {
             return Ok(true);
         }
@@ -110,7 +106,7 @@ impl World {
         player: PlayerId,
         master: MasterId,
         at: Point,
-    ) -> Result<bool, GenieError> {
+    ) -> GenieResult<bool> {
         let human = !self.players.player(player)?.kind.is_computer();
         if !self.placement_code(player, master, at, human)?.is_allowed() {
             return Ok(false);
@@ -127,7 +123,7 @@ impl World {
         master: MasterId,
         at: Point,
         human: bool,
-    ) -> Result<PlacementCode, GenieError> {
+    ) -> GenieResult<PlacementCode> {
         self.placement_code_beside(player, master, at, human, &[])
     }
 
@@ -140,7 +136,7 @@ impl World {
         at: Point,
         human: bool,
         own: &[ObjectId],
-    ) -> Result<PlacementCode, GenieError> {
+    ) -> GenieResult<PlacementCode> {
         let site = self.master(player, master)?;
         let build = BuildSite {
             player,
@@ -186,7 +182,7 @@ impl World {
         placed: &Placed,
         desolid: bool,
         own: &[ObjectId],
-    ) -> Result<PlacementCode, GenieError> {
+    ) -> GenieResult<PlacementCode> {
         let player = placed.player;
         let site = self.master(player, placed.master)?;
         let test = BuildSite {
@@ -211,7 +207,7 @@ impl World {
     /// # Errors
     ///
     /// A world without the players' sight, and a restriction the data file does not have.
-    fn site_restriction(&self, site: &Master) -> Result<&Restriction, GenieError> {
+    fn site_restriction(&self, site: &Master) -> GenieResult<&Restriction> {
         if self.spatial.sight.is_none() {
             return Err(GenieError::unsupported(
                 "BUILD's placement test without the players' sight",
@@ -229,7 +225,7 @@ impl World {
     /// The payment's test of a foundation of `master` for `player` (`FUN_14162fb60` ->
     /// `FUN_141618db0`): every cost entry of a resource, paid or not, at most what the player
     /// holds. A cost in population (attribute 4) is not modelled.
-    pub(crate) fn affords(&self, player: PlayerId, master: MasterId) -> Result<bool, GenieError> {
+    pub(crate) fn affords(&self, player: PlayerId, master: MasterId) -> GenieResult<bool> {
         let site = self.master(player, master)?;
         let owner = self.players.player(player)?;
         for (resource, amount, _) in cost_entries(&site.creatable_part().cost) {

@@ -1,7 +1,7 @@
 //! A master's class as one type: the group of masters the game treats alike (villagers, siege
 //! weapons, gates, farms), the value the `.dat` names `unit_class`.
 
-use crate::GenieError;
+use crate::{GenieError, GenieResult};
 use derive_more::Display;
 use genie_diff::{Diff, Differ};
 use serde::Deserialize;
@@ -70,7 +70,7 @@ impl ClassId {
     /// # Errors
     ///
     /// A negative value other than −1, which no class is.
-    pub fn of_field(value: i16) -> Result<Option<Self>, GenieError> {
+    pub fn of_field(value: i16) -> GenieResult<Option<Self>> {
         (value != Self::NONE)
             .then(|| Self::try_from(value))
             .transpose()
@@ -92,7 +92,7 @@ impl ClassId {
     /// # Errors
     ///
     /// A negative value other than −1 or one past a class's `i16`.
-    pub fn of_param(value: i32) -> Result<Option<Self>, GenieError> {
+    pub fn of_param(value: i32) -> GenieResult<Option<Self>> {
         let short = i16::try_from(value)
             .map_err(|_| GenieError::invalid_input("a class past an i16").with("class", value))?;
         Self::of_field(short)
@@ -152,7 +152,7 @@ impl TryFrom<i16> for ClassId {
     /// # Errors
     ///
     /// A negative value, which no class is.
-    fn try_from(value: i16) -> Result<Self, GenieError> {
+    fn try_from(value: i16) -> GenieResult<Self> {
         if value < 0 {
             return Err(
                 GenieError::invalid_input("a negative class, which no master has")

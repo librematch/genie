@@ -1,7 +1,6 @@
 //! An object's step and what follows it ([`World::step_object`]): what its `Step` gathered,
 //! applied to the world in the order the game's update makes them.
 
-use crate::GenieError;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::layers::Action;
@@ -11,6 +10,7 @@ use crate::world::Millis;
 use crate::world::World;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
+use crate::{GenieError, GenieResult};
 
 /// What an object's step left for its list's loop ([`World::step_object`]).
 pub(super) struct Stepped {
@@ -37,8 +37,8 @@ impl World {
         &mut self,
         at: (PlayerId, ListIndex),
         timing: (Millis, Option<Millis>, bool),
-        f: impl FnOnce(&mut Unit, &mut Action, &mut Step<'_>) -> Result<Outcome, GenieError>,
-    ) -> Result<Stepped, GenieError> {
+        f: impl FnOnce(&mut Unit, &mut Action, &mut Step<'_>) -> GenieResult<Outcome>,
+    ) -> GenieResult<Stepped> {
         self.step_answering(at, timing, |unit, actions, c| {
             f(unit, actions, c).map(|outcome| (outcome, ()))
         })
@@ -55,8 +55,8 @@ impl World {
         &mut self,
         (p, i): (PlayerId, ListIndex),
         (dt, turn, full): (Millis, Option<Millis>, bool),
-        f: impl FnOnce(&mut Unit, &mut Action, &mut Step<'_>) -> Result<(Outcome, R), GenieError>,
-    ) -> Result<(Stepped, R), GenieError> {
+        f: impl FnOnce(&mut Unit, &mut Action, &mut Step<'_>) -> GenieResult<(Outcome, R)>,
+    ) -> GenieResult<(Stepped, R)> {
         let id = self.players.live(p, i)?.id;
         let (outcome, answer) = self.run_object((p, i), (dt, turn), f)?;
         let at = (p, self.slot_of(p, id)?, id);
@@ -74,7 +74,7 @@ impl World {
     /// # Errors
     ///
     /// The object left the list in its own step.
-    fn slot_of(&self, p: PlayerId, id: ObjectId) -> Result<ListIndex, GenieError> {
+    fn slot_of(&self, p: PlayerId, id: ObjectId) -> GenieResult<ListIndex> {
         let _ = self.players.player(p)?;
         // the step can move the object (another's removal), and its own removal waits for
         // `World::file_step`
@@ -92,7 +92,7 @@ impl World {
         (p, i, id): (PlayerId, ListIndex, ObjectId),
         (dt, own_update): (Millis, bool),
         outcome: &Outcome,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         // TRIBE_Combat_Object::update's regeneration after RGE_Combat_Object::update
         if own_update {
             self.regenerate_object((p, i, id), dt.seconds())?;

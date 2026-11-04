@@ -1,7 +1,6 @@
 //! The objects on the map: their tiles and records, their freezing and the known checks, their
 //! moves inside and out, and the segment tests.
 
-use crate::GenieError;
 use crate::map::Distance;
 use crate::map::GridSize;
 use crate::map::Point;
@@ -24,6 +23,7 @@ use crate::players::ByPlayer;
 use crate::players::PlayerId;
 use crate::vision::VisionBits;
 use crate::world::Seconds;
+use crate::{GenieError, GenieResult};
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::mem::take;
@@ -234,7 +234,7 @@ impl Spatial {
 
     /// An object whose place the slice knows: an object of a player the slice stopped is known
     /// while it cannot have moved.
-    pub fn get_known(&self, id: impl ObjectKey) -> Result<Option<&Placed>, GenieError> {
+    pub fn get_known(&self, id: impl ObjectKey) -> GenieResult<Option<&Placed>> {
         match self.get(id) {
             Some(p) if p.unknown.is_some_and(|u| 0.0 < u) => Err(GenieError::unsupported(
                 "an object of a stopped player (its place is unknown)",
@@ -285,27 +285,23 @@ impl Spatial {
     /// player's unit (Gaia's animals do not work on objects) may have reached it: a frozen unit
     /// within what it may have moved, or a unit a stopped player's building may have made since,
     /// at the fastest speed of the players' units, each plus the farthest reach.
-    pub fn check_known(&self, rect: Rect) -> Result<(), GenieError> {
+    pub fn check_known(&self, rect: Rect) -> GenieResult<()> {
         self.check_known_of(rect, KnownScope::All)
     }
 
     /// [`Spatial::check_known`] for a query over obstruction records and the mesh (the motion
     /// step's and the short pather's): a frozen object without a record (a bird) has no say.
-    pub fn check_known_records(&self, rect: Rect) -> Result<(), GenieError> {
+    pub fn check_known_records(&self, rect: Rect) -> GenieResult<()> {
         self.check_known_of(rect, KnownScope::Records)
     }
 
     /// [`Spatial::check_known`] for a query over the registry's lists of `classes`: a frozen
     /// object of another class has no say.
-    pub fn check_known_classes(&self, rect: Rect, classes: &[ClassId]) -> Result<(), GenieError> {
+    pub fn check_known_classes(&self, rect: Rect, classes: &[ClassId]) -> GenieResult<()> {
         self.check_known_of(rect, KnownScope::Classes(classes))
     }
 
-    pub(super) fn check_known_of(
-        &self,
-        rect: Rect,
-        scope: KnownScope<'_>,
-    ) -> Result<(), GenieError> {
+    pub(super) fn check_known_of(&self, rect: Rect, scope: KnownScope<'_>) -> GenieResult<()> {
         // only a frozen object has an unknown place, and each is in `frozen_for`
         let near = self.frozen().find(|&(id, p)| {
             if scope == KnownScope::Records && p.obstruction.is_none() {
@@ -419,7 +415,7 @@ impl Spatial {
 
     /// The object leaves the world: its place, its sight's state and its records in the registry
     /// (its destructor, `FUN_141073060`) go.
-    pub fn leave(&mut self, id: ObjectId) -> Result<(), GenieError> {
+    pub fn leave(&mut self, id: ObjectId) -> GenieResult<()> {
         if let (Some(v), Some(p)) = (self.sight.as_mut(), self.objects.get(id)) {
             v.registry_leave(id, p.player, p.position, p.radius, p.class)?;
             v.remove_seer(id);

@@ -1,6 +1,5 @@
 //! A missile's flight: where it ends, what it hits and where it lands.
 
-use crate::GenieError;
 use crate::combat::damage::HitKind;
 use crate::combat::damage::HitLayer;
 use crate::combat::missile::MissileState;
@@ -27,6 +26,7 @@ use crate::objects::masters::player_master;
 use crate::objects::unit::{Unit, missed_passes};
 use crate::players::PlayerId;
 use crate::unit_ai::NotifyKind;
+use crate::{GenieError, GenieResult};
 use genie_model::model::Model;
 
 use crate::combat::attack::{Hit, strike};
@@ -62,7 +62,7 @@ impl Unit {
         actions: &mut Action,
         c: &mut Step<'_>,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let Some(mut missile) = c.w.parts.missile.get(self.id).copied() else {
             return Ok(());
         };
@@ -86,7 +86,7 @@ impl Unit {
         &mut self,
         action: &mut MissileAction,
         c: &mut Step<'_>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let dead = |state: ObjectState| ObjectState::Alive < state && state != ObjectState::Undead;
         let target_state = readable(c, action.target)?.map(|(_, u, _)| u.life.state);
         let shooter_state = OthersRef::of(&c.w.players, &c.w.index, c.player)?
@@ -130,7 +130,7 @@ impl Unit {
         slot: &mut Option<MissileAction>,
         c: &mut Step<'_>,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let master = self.master(c.w.master_tables(), c.player)?;
         let stats = master.missile_stats().ok_or(GenieError::unsupported(
             "a missile whose master has no flight",
@@ -226,7 +226,7 @@ impl Unit {
         fired: Fired,
         old: Position,
         c: &mut Step<'_>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let roles = &c.w.model.roles.clone();
         if !(0.0 < stats.radius.x() && 0.0 < stats.radius.y()) {
             return Ok(());
@@ -302,7 +302,7 @@ impl Unit {
         stats: &MissileStats,
         old: Position,
         c: &mut Step<'_>,
-    ) -> Result<Vec<(ObjectId, PlayerId, MasterKind, BlastDefense)>, GenieError> {
+    ) -> GenieResult<Vec<(ObjectId, PlayerId, MasterKind, BlastDefense)>> {
         let (w, h) = (c.w.spatial.map.width(), c.w.spatial.map.height());
         let hold = |v: f32, size: i32| {
             if v < 0.0 {
@@ -380,7 +380,7 @@ impl Unit {
         fired: Fired,
         c: &mut Step<'_>,
         roles: &Roles,
-    ) -> Result<StrikeResult, GenieError> {
+    ) -> GenieResult<StrikeResult> {
         let damage_tuning = c.w.model.tuning.damage;
         if fired.charge {
             return Err(GenieError::unsupported("a charge projectile's own hit"));
@@ -489,7 +489,7 @@ impl Unit {
         fired_from: Option<ShooterId>,
         c: &mut Step<'_>,
         roles: &Roles,
-    ) -> Result<StrikeResult, GenieError> {
+    ) -> GenieResult<StrikeResult> {
         if action.origin.owner.is_some() {
             return Err(GenieError::unsupported(
                 "a shooterless missile with an origin (its elevation, FUN_14113e550)",
@@ -571,7 +571,7 @@ impl Unit {
         stats: &MissileStats,
         c: &mut Step<'_>,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let fired = Fired {
             charge: missile.charge,
             by: missile.fired_from,
@@ -620,7 +620,7 @@ impl Unit {
         stats: &MissileStats,
         c: &mut Step<'_>,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let Some(target) = action.target else {
             return Ok(());
         };
@@ -655,7 +655,7 @@ impl Unit {
         &mut self,
         slot: &mut Option<MissileAction>,
         c: &mut Step<'_>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if let Some(a) = slot.take() {
             let by = self.releaser(c)?;
             for t in [

@@ -1,7 +1,7 @@
 //! A player's number as one type: the player a command comes from or names, and the index of
 //! the world's players.
 
-use crate::GenieError;
+use crate::{GenieError, GenieResult};
 use derive_more::Display;
 use getset::CopyGetters;
 
@@ -53,7 +53,7 @@ impl PlayerId {
     /// # Errors
     ///
     /// A negative value other than −1 or one past a command's byte.
-    pub fn of_field(value: i32) -> Result<Option<Self>, GenieError> {
+    pub fn of_field(value: i32) -> GenieResult<Option<Self>> {
         if value == Self::NONE {
             return Ok(None);
         }
@@ -90,7 +90,7 @@ impl TryFrom<usize> for PlayerId {
     /// # Errors
     ///
     /// An index past a byte, which no command names.
-    fn try_from(index: usize) -> Result<Self, GenieError> {
+    fn try_from(index: usize) -> GenieResult<Self> {
         u8::try_from(index).map(Self::from).map_err(|_| {
             GenieError::invalid_input("a player past a command's byte").with("player", index)
         })

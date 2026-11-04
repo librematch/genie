@@ -22,7 +22,6 @@
 //! cheat that reveals the map (`DAT_143f68a30`, probed 0), shared sight (`+0x798`, `+0x79c`, 0 in
 //! every object probed) and the line-of-sight powerup (`+0xad4`, unsaved, 0 after a load).
 
-use crate::GenieError;
 use crate::map::Distance;
 use crate::map::GridSize;
 use crate::map::Point;
@@ -41,6 +40,7 @@ use crate::vision::TileCount;
 use crate::vision::VisionBits;
 use crate::vision::registry::Registry;
 use crate::world::slots::CheckedIndex;
+use crate::{GenieError, GenieResult};
 
 mod building_links;
 mod explore;
@@ -399,7 +399,7 @@ impl Visibility {
         id: ObjectId,
         position: Position,
         group: GatherGroup,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let tile = Tile::new(position.x() as i32, position.y() as i32);
         if !self.size.holds(tile) {
             return Ok(());
@@ -435,7 +435,7 @@ impl Visibility {
     }
 
     /// The link bits and byte of `tile`.
-    pub fn link(&self, tile: Tile) -> Result<(u8, u8), GenieError> {
+    pub fn link(&self, tile: Tile) -> GenieResult<(u8, u8)> {
         Ok(*self.links.checked(self.index(tile))?)
     }
 }

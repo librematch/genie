@@ -1,7 +1,6 @@
 //! The members' moves to their slots, a free member's stop, the line test and a member's
 //! steering toward its slot (`FUN_141025fb0`).
 
-use crate::GenieError;
 use crate::groups::GroupFlags;
 use crate::groups::GroupId;
 use crate::groups::MovePath;
@@ -24,6 +23,7 @@ use crate::objects::unit::Unit;
 use crate::players::PlayerId;
 use crate::world::World;
 use crate::world::slots::CheckedIndex;
+use crate::{GenieError, GenieResult};
 
 impl World {
     /// The members' moves to their slots (`0x14103e8e8`..`0x14103efba`) of group `group`, whose
@@ -60,7 +60,7 @@ impl World {
         &mut self,
         group: GroupId,
         differentiators: &[ObjectId],
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let mut i = 0;
         loop {
             let g = self.groups.held(group)?;
@@ -133,7 +133,7 @@ impl World {
     /// A member in no slot (`0x14103ef2e`): it stops (slot 0x5d0) when its action list holds no
     /// `MoveTo` (slot 0x538 with 1), its top action is not in state 4, 5 or 11 (slot 0x2b0) and
     /// it moves (slot 0x5c8).
-    pub(super) fn stop_free_member(&mut self, id: ObjectId) -> Result<(), GenieError> {
+    pub(super) fn stop_free_member(&mut self, id: ObjectId) -> GenieResult<()> {
         let Some((p, u)) = self.object(id) else {
             return Ok(());
         };
@@ -162,7 +162,7 @@ impl World {
         p: PlayerId,
         u: &Unit,
         actions: &Action,
-    ) -> Result<(bool, ActionState), GenieError> {
+    ) -> GenieResult<(bool, ActionState)> {
         if u.master(self.master_tables(), p)?.kind < MasterKind::ACTION {
             return Ok((false, ActionState::NO_ACTION));
         }
@@ -192,7 +192,7 @@ impl World {
         to: BVector,
         grow: Distance,
         ignore: &[ObjectId],
-    ) -> Result<bool, GenieError> {
+    ) -> GenieResult<bool> {
         // the steer tests each member before it walks its line (`World::members_to_slots`)
         let (_, u) = self.object(id).ok_or(GenieError::unreachable(
             "a steered member the world does not hold",
@@ -278,7 +278,7 @@ impl World {
         index: usize,
         (slot, s): (usize, Slot),
         differentiators: &[ObjectId],
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let g = self.groups.held(group)?;
         let id = g.members.checked(index)?.id;
         let Some((_, u)) = self.object(id) else {
@@ -365,7 +365,7 @@ impl World {
         group: GroupId,
         (index, slot, state): (usize, usize, SlotState),
         id: ObjectId,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let (p, u) = self.object(id).ok_or_else(|| member_gone(id))?;
         let (keeps_moving, _) = self.action_list(p, u, self.parts.actions_of(u.id))?;
         if !keeps_moving && self.parts.mover_of(u.id).is_some_and(Mover::is_moving) {

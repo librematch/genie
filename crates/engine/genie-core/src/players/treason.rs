@@ -5,7 +5,7 @@
 //! 158041: the castle test `FUN_14160ffb0`; the treason `FUN_141620400`; the flare is the
 //! player's slot 0x1c0 with master 697 ([`World::remains`]).
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::players::AllyTest;
 use crate::players::Amount;
 use crate::players::PlayerId;
@@ -46,7 +46,7 @@ impl World {
     /// player from 1 the player counts as its own or allied a flare at its place (that player's
     /// slot 0x1c0 with master 697, [`World::remains`]); the sound and the minimap's mark
     /// (`FUN_140c7d6c0`, the game's `+0xa78`) are the interface's, as the local player's message.
-    pub(crate) fn treason(&mut self, p: PlayerId) -> Result<(), GenieError> {
+    pub(crate) fn treason(&mut self, p: PlayerId) -> GenieResult<()> {
         let discount = self
             .players
             .player(p)?

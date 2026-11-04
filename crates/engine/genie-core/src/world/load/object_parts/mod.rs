@@ -1,6 +1,5 @@
 //! A saved object's lifecycle fields and its unit AI.
 
-use crate::GenieError;
 use crate::garrison::ContainerId;
 use crate::groups::FormationKind;
 use crate::map::Distance;
@@ -33,6 +32,7 @@ use crate::world::Millis;
 use crate::world::Seconds;
 use crate::world::WorldTime;
 use crate::world::load::movers::vec3;
+use crate::{GenieError, GenieResult};
 use genie_import::dat::MasterTable;
 use genie_import::dat::dat_id;
 use genie_save::generated::world::{
@@ -52,7 +52,7 @@ pub fn lifecycle(
     objects: &PlayerObjects,
     civ: CivId,
     masters: Option<&MasterTable>,
-) -> Result<Lifecycle, GenieError> {
+) -> GenieResult<Lifecycle> {
     let pure_static = object
         .rge_object
         .as_deref()
@@ -125,7 +125,7 @@ pub fn unit_ai(
     object: &genie_save::Object,
     own: ObjectId,
     players: usize,
-) -> Result<Option<UnitAi>, GenieError> {
+) -> GenieResult<Option<UnitAi>> {
     let Some((combat, ai)) = object.combat().and_then(|c| Some((c, c.unit_ai()?))) else {
         return Ok(None);
     };
@@ -179,7 +179,7 @@ pub fn unit_ai(
                     WorldTime::from_millis(e.timeout),
                 ))
             })
-            .collect::<Result<_, GenieError>>()?,
+            .collect::<GenieResult<_>>()?,
         best_this_update: ObjectId::of_field(ai.best_unit_to_attack_this_update),
         orders: queue(&ai.temp_order, own, players)?,
         building_orders: queue(building_orders(combat), own, players)?,
@@ -202,7 +202,7 @@ pub fn unit_ai(
 ///
 /// A patrol without points (`invalid_input`): the patrol's leash (`FUN_140f95e10`) runs its
 /// loop past an empty path's end.
-fn patrol_path(ai: &UnitAiModule) -> Result<Option<PatrolPath>, GenieError> {
+fn patrol_path(ai: &UnitAiModule) -> GenieResult<Option<PatrolPath>> {
     let Some(p) = ai.patrol_path.as_deref() else {
         return Ok(None);
     };
@@ -236,7 +236,7 @@ fn home(combat: &TribeCombatObject) -> Option<Home> {
 /// # Errors
 ///
 /// A record's order or action value no order or action holds, or a category past 0 to 11.
-fn order_history(ai: &UnitAiModule) -> Result<Vec<OrderRecord>, GenieError> {
+fn order_history(ai: &UnitAiModule) -> GenieResult<Vec<OrderRecord>> {
     ai.oh
         .iter()
         .map(|e| {
@@ -274,11 +274,7 @@ fn building_orders(combat: &TribeCombatObject) -> &[[u8; 52]] {
 /// # Errors
 ///
 /// A record's order value no order holds.
-fn queue(
-    records: &[[u8; 52]],
-    own: ObjectId,
-    players: usize,
-) -> Result<Vec<QueuedOrder>, GenieError> {
+fn queue(records: &[[u8; 52]], own: ObjectId, players: usize) -> GenieResult<Vec<QueuedOrder>> {
     records
         .iter()
         .map(|r| QueuedOrder::from_bytes(r, own, players))

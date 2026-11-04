@@ -3,6 +3,7 @@
 //! option's member and offset as the load reads it (`&mWalkableFarms` into `+0x69`, …); the
 //! recording's header holds them all (genie-save's `GameOptions`).
 
+use crate::GenieResult;
 use crate::technology::TechMode;
 use crate::world::{
     Age, ContentMode, GameMode, ResourceLevel, SubModeFlags, TreatyLength, Visibility,
@@ -115,7 +116,7 @@ impl Settings {
     /// # Errors
     ///
     /// Modes 15 and −15 (the root's `+0x560` entry, not held).
-    pub fn tech_mode_allows(&self, mode: TechMode) -> Result<bool, crate::GenieError> {
+    pub fn tech_mode_allows(&self, mode: TechMode) -> GenieResult<bool> {
         let mode = mode.get();
         let positive = match mode.unsigned_abs() {
             n @ 2..=18 => self.rule_mode(n)?,
@@ -134,7 +135,7 @@ impl Settings {
     /// # Errors
     ///
     /// Mode 15 (the root's `+0x560` entry, not held).
-    fn rule_mode(&self, n: u16) -> Result<bool, crate::GenieError> {
+    fn rule_mode(&self, n: u16) -> GenieResult<bool> {
         let (m, flags) = (self.game_mode.get(), self.sub_game_mode_flag);
         Ok(match n {
             2 => m == 0,
@@ -160,7 +161,7 @@ impl Settings {
 
     /// [`Settings::tech_mode_allows`]'s modes 27 to 34 (`n`), by the starting age, its default 0
     /// by the game mode.
-    fn age_mode(&self, n: u16) -> Result<bool, crate::GenieError> {
+    fn age_mode(&self, n: u16) -> GenieResult<bool> {
         let (m, age) = (self.game_mode.get(), self.starting_age.get());
         let below = |n: u32| (age as u32) < n;
         let default_in = |modes: &[i32]| age == 0 && modes.contains(&m);

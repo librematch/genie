@@ -2,7 +2,6 @@
 //! points, with the completion's storage, ground and counts
 //! ([`crate::world::World::complete_building`]).
 
-use crate::GenieError;
 use crate::construction::BuildProgress;
 use crate::construction::ConstructionStart;
 use crate::construction::build::{Construction, SITE_GONE, STARTED};
@@ -32,6 +31,7 @@ use crate::world::WorldTime;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 use crate::world::layer::Slots;
+use crate::{GenieError, GenieResult};
 use genie_model::model::Model;
 
 /// The completion's storage ([`crate::world::World::complete_building`]): its master's entries of modes 4, 8 and 64 go to its
@@ -102,7 +102,7 @@ pub(super) fn lay_foundation(
     laid: Option<TerrainId>,
     mode_680: Mode680,
     model: &Model,
-) -> Result<(), GenieError> {
+) -> GenieResult<()> {
     let terrain = world.terrain.as_mut().ok_or(GenieError::unsupported(
         "a completion without the map's terrain",
     ))?;
@@ -245,7 +245,7 @@ impl Construction {
         pathing: &mut Pathing,
         now: WorldTime,
         sight: SightLayer<'_>,
-    ) -> Result<ConstructionStart, GenieError> {
+    ) -> GenieResult<ConstructionStart> {
         let SightLayer {
             roles,
             visibility_tuning,

@@ -5,7 +5,6 @@
 //! `0x140aa29e0`. A `MoveTo` in state 3 asks for a path (`FUN_14114e410`) and turns to state 4; in
 //! state 4 each update runs the motion step (object slot 193, [`Mover::motion`]).
 
-use crate::GenieError;
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::Position;
@@ -25,6 +24,7 @@ use crate::unit_ai::UnitStance;
 use crate::world::Seconds;
 use crate::world::WorldTime;
 use crate::world::index::ObjectsRef;
+use crate::{GenieError, GenieResult};
 use genie_diff::Diff;
 
 mod action;
@@ -173,7 +173,7 @@ impl TryFrom<u8> for TargetMoved {
     type Error = GenieError;
 
     /// `+0x61` as the save holds it.
-    fn try_from(value: u8) -> Result<Self, GenieError> {
+    fn try_from(value: u8) -> GenieResult<Self> {
         match value {
             0 => Ok(Self::Follows),
             1 => Ok(Self::AsksAgain),
@@ -303,7 +303,7 @@ pub fn ask_walk(
     (goal, range): (Goal, f32),
     ask: PathAsk,
     shown: Option<Shown<'_>>,
-) -> Result<(Option<MoveTo>, Option<Position>), GenieError> {
+) -> GenieResult<(Option<MoveTo>, Option<Position>)> {
     let sprite_tuning = walk.by_id.tuning().sprite;
     let (point, target, radius) = match goal {
         Goal::Target(id) => {
@@ -345,10 +345,7 @@ const SPRITE_LACKING: GenieError =
 /// # Errors
 ///
 /// A sprite the table lacks.
-pub fn graphic_of(
-    graphics: &Graphics,
-    id: Option<SpriteId>,
-) -> Result<Option<Graphic>, GenieError> {
+pub fn graphic_of(graphics: &Graphics, id: Option<SpriteId>) -> GenieResult<Option<Graphic>> {
     id.map(|id| {
         graphics
             .get(id)
@@ -384,7 +381,7 @@ impl<'a> SpriteReads<'a> {
     /// # Errors
     ///
     /// A sprite the table lacks.
-    pub fn to_point(&self, given: Option<SpriteId>) -> Result<Option<Graphic>, GenieError> {
+    pub fn to_point(&self, given: Option<SpriteId>) -> GenieResult<Option<Graphic>> {
         graphic_of(self.graphics, self.defaults.to_point(given))
     }
 
@@ -393,7 +390,7 @@ impl<'a> SpriteReads<'a> {
     /// # Errors
     ///
     /// A sprite the table lacks.
-    pub fn to_object(&self, given: Option<SpriteId>) -> Result<Option<Graphic>, GenieError> {
+    pub fn to_object(&self, given: Option<SpriteId>) -> GenieResult<Option<Graphic>> {
         graphic_of(self.graphics, self.defaults.to_object(given))
     }
 }
@@ -416,7 +413,7 @@ impl Sprites<'_> {
     /// # Errors
     ///
     /// A sprite the table lacks.
-    pub fn shown(&mut self, id: Option<SpriteId>) -> Result<Shown<'_>, GenieError> {
+    pub fn shown(&mut self, id: Option<SpriteId>) -> GenieResult<Shown<'_>> {
         let graphic = graphic_of(self.graphics, id)?;
         Ok(Shown {
             sprite: &mut *self.sprite,
@@ -455,7 +452,7 @@ impl Shown<'_> {
 /// (`set_state` 1, `0x140aa29e0`, which also sets the unit's idle sprite and clears its `+0x7b8`,
 /// and `FUN_14114d810` its facet; the slice holds neither). A `MoveTo` without its path is not
 /// modelled.
-pub fn walk_or_give_up(walk: Walk<'_>) -> Result<Option<MoveTo>, GenieError> {
+pub fn walk_or_give_up(walk: Walk<'_>) -> GenieResult<Option<MoveTo>> {
     let Walk {
         place,
         motion,
@@ -527,7 +524,7 @@ pub fn target_left(
     target: ObjectId,
     point: Position,
     mode: TargetMoved,
-) -> Result<Follow, GenieError> {
+) -> GenieResult<Follow> {
     let move_to_tuning = &walk.by_id.tuning().move_to;
     if mode == TargetMoved::Ignores {
         return Ok(Follow::Stays);

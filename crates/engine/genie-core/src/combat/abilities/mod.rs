@@ -32,7 +32,7 @@
 //! Poles' stone miners' gold, the Shu lumberjacks' food. The routine runs whatever the masters
 //! hold.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::math::fmath::at_most_or_unordered;
@@ -197,7 +197,7 @@ impl World {
         (id, p, i): (ObjectId, PlayerId, ListIndex),
         owner: PlayerId,
         leaves: bool,
-    ) -> Result<Vec<Reward>, GenieError> {
+    ) -> GenieResult<Vec<Reward>> {
         let i = match self.players.player(p)?.objects.get(i) {
             Some(u) if u.id == id => i,
             _ => match self.place(id) {

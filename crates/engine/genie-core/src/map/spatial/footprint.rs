@@ -13,7 +13,7 @@ use crate::objects::ObjectState;
 use crate::world::slots::CheckedIndex;
 use std::collections::BTreeMap;
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::construction::FoundationId;
 use crate::construction::build::ClearLook;
 use crate::map::TerrainMask;
@@ -61,7 +61,7 @@ impl Spatial {
         (at, radius): (Position, Footprint),
         pick: SpotPick,
         by_id: ObjectsRef<'_>,
-    ) -> Result<Option<Point>, GenieError> {
+    ) -> GenieResult<Option<Point>> {
         /// A tile's centre (`DAT_142e7f384`).
         const CENTRE: f32 = TILE_CENTRE;
         /// The closest search's first best (`DAT_14330ebf4`).
@@ -159,7 +159,7 @@ impl Spatial {
         site_id: FoundationId,
         site: &Placed,
         looks: &BTreeMap<ObjectId, ClearLook>,
-    ) -> Result<Vec<ObjectId>, GenieError> {
+    ) -> GenieResult<Vec<ObjectId>> {
         use crate::objects::masters::MasterKind;
         let obstructs = site.obstruction_kind.recorded();
         let (sx, sy) = (site.position.x(), site.position.y());
@@ -231,7 +231,7 @@ impl Spatial {
         grow: Distance,
         mask: TerrainMask,
         by_id: ObjectsRef<'_>,
-    ) -> Result<bool, GenieError> {
+    ) -> GenieResult<bool> {
         let (x, y) = (point.x(), point.y());
         let (tx, ty) = (x as i32, y as i32);
         let Some(word) = self.tiles.word(Tile::new(tx, ty)) else {
@@ -266,7 +266,7 @@ impl Spatial {
         mask: TerrainMask,
         ignore: &[ObjectId],
         by_id: ObjectsRef<'_>,
-    ) -> Result<bool, GenieError> {
+    ) -> GenieResult<bool> {
         // CVTTSS2SI: a NaN or huge coordinate is i32::MIN, off the map
         let Some(word) = self.tiles.word(point.tile()) else {
             return Ok(false);
@@ -307,7 +307,7 @@ impl Spatial {
         ignore: &[RecordId],
         movers: Movers,
         by_id: ObjectsRef<'_>,
-    ) -> Result<bool, GenieError> {
+    ) -> GenieResult<bool> {
         let rect = Rect::between(point, point).grown(grow);
         if rect.leaves_map(self.map) && !self.edge_records(rect, QUERY_HITS).is_empty() {
             return Ok(true);
@@ -341,7 +341,7 @@ impl Spatial {
         ignore: &[RecordId],
         movers: Movers,
         by_id: ObjectsRef<'_>,
-    ) -> Result<bool, GenieError> {
+    ) -> GenieResult<bool> {
         let rect = Rect::between(point, point).grown(grow);
         self.check_known_records(rect)?;
         Ok(self.records_in(rect).any(|(id, p)| {

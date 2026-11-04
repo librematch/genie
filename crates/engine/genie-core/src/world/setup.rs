@@ -1,7 +1,7 @@
 //! The world as the header save holds it ([`World::new`]): the next object id, the
 //! planners and the shape mesh the game's load builds.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::groups::UnitGroups;
 use crate::map::spatial::Spatial;
 use crate::math::rng::Streams;
@@ -125,7 +125,7 @@ impl World {
     /// # Errors
     ///
     /// An object of a master its owner lacks.
-    pub fn build_mesh(&mut self) -> Result<(), GenieError> {
+    pub fn build_mesh(&mut self) -> GenieResult<()> {
         let width = u32::try_from(self.spatial.map.width()).unwrap_or(0);
         self.pathing.start_mesh(width);
         for (q, p) in PlayerId::each(self.players.len()).zip(&self.players) {

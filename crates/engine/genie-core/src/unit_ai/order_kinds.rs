@@ -1,7 +1,7 @@
 //! The orders by kind: defend, build, work, gather, hunt, follow, enter, transport, unload,
 //! seek and explore; an order on a target and one taken at once.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::construction::FoundationId;
 use crate::map::Distance;
 use crate::map::Point;
@@ -46,7 +46,7 @@ impl UnitAi {
         force: OrderForce,
         at: &Surroundings,
         side: &UnitView<'_, '_>,
-    ) -> Result<Answer, GenieError> {
+    ) -> GenieResult<Answer> {
         if force == OrderForce::Unforced && self.current_action.is_some() {
             return Ok(Answer::NotTaken);
         }
@@ -100,7 +100,7 @@ impl UnitAi {
         at: &Surroundings,
         side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
-    ) -> Result<Answer, GenieError> {
+    ) -> GenieResult<Answer> {
         if (force == OrderForce::Unforced && self.current_action == Some(AiAction::Build))
             || !side.builds(target)?
         {
@@ -127,7 +127,7 @@ impl UnitAi {
         force: OrderForce,
         (action, command): (AiAction, UnitCommand),
         (at, side): (&Surroundings, &mut UnitView<'_, '_>),
-    ) -> Result<Answer, GenieError> {
+    ) -> GenieResult<Answer> {
         if force == OrderForce::Unforced && self.current_action == Some(action) {
             return Ok(Answer::NotTaken);
         }
@@ -152,7 +152,7 @@ impl UnitAi {
         at: &Surroundings,
         side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
-    ) -> Result<Answer, GenieError> {
+    ) -> GenieResult<Answer> {
         let Some(t) = Self::world_object(target, at, side)? else {
             return Ok(Answer::NotTaken);
         };
@@ -178,7 +178,7 @@ impl UnitAi {
         at: &Surroundings,
         side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
-    ) -> Result<Answer, GenieError> {
+    ) -> GenieResult<Answer> {
         let held = match target {
             Some(id) => Self::world_object(id, at, side)?.map(|t| (id, t)),
             None => None,
@@ -205,7 +205,7 @@ impl UnitAi {
         at: &Surroundings,
         side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
-    ) -> Result<Answer, GenieError> {
+    ) -> GenieResult<Answer> {
         if force == OrderForce::Unforced && self.current_action.is_some() {
             return Ok(Answer::NotTaken);
         }
@@ -243,7 +243,7 @@ impl UnitAi {
         target: ObjectId,
         force: OrderForce,
         (at, side): (&Surroundings, &mut UnitView<'_, '_>),
-    ) -> Result<Answer, GenieError> {
+    ) -> GenieResult<Answer> {
         let held = Self::world_object(target, at, side)?;
         if self.ai_kind == UnitAiKind::Civilian && held.is_none() {
             return Ok(Answer::NotTaken);
@@ -272,7 +272,7 @@ impl UnitAi {
         point: Position,
         force: OrderForce,
         side: &mut UnitView<'_, '_>,
-    ) -> Result<Answer, GenieError> {
+    ) -> GenieResult<Answer> {
         if force == OrderForce::Unforced && self.current_action.is_some() {
             return Ok(Answer::NotTaken);
         }
@@ -294,7 +294,7 @@ impl UnitAi {
         point: Point,
         (force, over_wall): (OrderForce, bool),
         (at, side): (&Surroundings, &mut UnitView<'_, '_>),
-    ) -> Result<Answer, GenieError> {
+    ) -> GenieResult<Answer> {
         if force == OrderForce::Unforced && self.current_action.is_some() {
             return Ok(Answer::NotTaken);
         }
@@ -322,7 +322,7 @@ impl UnitAi {
         force: OrderForce,
         at: &Surroundings,
         side: &mut UnitView<'_, '_>,
-    ) -> Result<Answer, GenieError> {
+    ) -> GenieResult<Answer> {
         let unit_ai_tuning = &at.unit_ai_tuning;
         if force == OrderForce::Unforced && self.current_action.is_some() {
             return Ok(Answer::NotTaken);
@@ -351,7 +351,7 @@ impl UnitAi {
         side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
         unit_ai_tuning: &UnitAiTuning,
-    ) -> Result<Answer, GenieError> {
+    ) -> GenieResult<Answer> {
         if force == OrderForce::Unforced && self.current_action.is_some() {
             return Ok(Answer::NotTaken);
         }
@@ -381,7 +381,7 @@ impl UnitAi {
         at: &Surroundings,
         side: &mut UnitView<'_, '_>,
         ai: &mut Well512,
-    ) -> Result<OrderOutcome, GenieError> {
+    ) -> GenieResult<OrderOutcome> {
         let roles = &at.roles;
         if Self::world_object(o.target, at, side)?.is_some() {
             side.effect_now(Effect::OrderOnTarget(*o), self, ai)?;
@@ -472,7 +472,7 @@ impl UnitAi {
         target: ObjectId,
         force: OrderForce,
         side: &mut UnitView<'_, '_>,
-    ) -> Result<Answer, GenieError> {
+    ) -> GenieResult<Answer> {
         if force == OrderForce::Unforced && self.current_action.is_some() {
             return Ok(Answer::NotTaken);
         }
@@ -494,7 +494,7 @@ impl UnitAi {
         side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
         unit_ai_tuning: &UnitAiTuning,
-    ) -> Result<Answer, GenieError> {
+    ) -> GenieResult<Answer> {
         if force == OrderForce::Unforced && self.current_action.is_some() {
             return Ok(Answer::NotTaken);
         }
@@ -521,7 +521,7 @@ impl UnitAi {
         ai: &mut Well512,
         side: &mut UnitView<'_, '_>,
         layer: AiLayer<'_>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if ObjectState::Alive < unit_state {
             return Ok(());
         }
@@ -547,7 +547,7 @@ impl UnitAi {
         order: QueuedOrder,
         (at, side, player_kind): (&Surroundings, &mut UnitView<'_, '_>, PlayerKind),
         ai: &mut Well512,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let unit_ai_tuning = &at.unit_ai_tuning;
         let roles = &at.roles;
         if ObjectState::Alive < at.state {

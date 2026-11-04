@@ -2,7 +2,6 @@
 //! builder's update: a building's work and completion, its storage's leave, the built object's
 //! stacking and its new objects.
 
-use crate::GenieError;
 use crate::commands::GatherPoint;
 use crate::commands::GatherPointState;
 use crate::construction::BuildProgress;
@@ -36,6 +35,7 @@ use crate::world::layer::ClassRoles;
 use crate::world::parts::Part;
 use crate::world::slots::PlayerSlots;
 use crate::world::{Player, World};
+use crate::{GenieError, GenieResult};
 
 /// How the player's slot 0x1c0 (`FUN_14162ce00`) makes an object: finished (its flag: the
 /// footprint cleared, a building worked at once) or plain.
@@ -59,7 +59,7 @@ impl World {
         owner: PlayerId,
         id: ObjectId,
         master: &Master,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let (roles, slots) = (self.model.roles.clone(), self.model.slots);
         let held = self.object_and_combat_mut(id)?.ok_or(NOT_HELD)?;
         for (kind, amount) in death_parts_storage_leaves(held, master, &roles, slots) {
@@ -83,7 +83,7 @@ impl World {
         owner: PlayerId,
         id: ObjectId,
         master: &Master,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let (_, u) = self.object(id).ok_or(NOT_HELD)?;
         let construction = self
             .parts
@@ -122,11 +122,7 @@ impl World {
     /// # Errors
     ///
     /// What the start does not model.
-    pub(crate) fn construction_starts(
-        &mut self,
-        owner: PlayerId,
-        id: ObjectId,
-    ) -> Result<(), GenieError> {
+    pub(crate) fn construction_starts(&mut self, owner: PlayerId, id: ObjectId) -> GenieResult<()> {
         let place = self.place(id).ok_or(NOT_HELD)?;
         let (Place::Live(p, _) | Place::Sleeping(p, _)) = place;
         let volley = held(&mut self.players, place)?
@@ -177,7 +173,7 @@ pub(crate) const NO_CONSTRUCTION: GenieError =
 /// # Errors
 ///
 /// A place its player's lists do not hold.
-pub(crate) fn held(players: &mut [Player], place: Place) -> Result<&mut Unit, GenieError> {
+pub(crate) fn held(players: &mut [Player], place: Place) -> GenieResult<&mut Unit> {
     match place {
         Place::Live(p, i) => players.live_mut(p, i),
         Place::Sleeping(p, i) => players.asleep_mut(p, i),
@@ -204,7 +200,7 @@ impl World {
         &mut self,
         id: FoundationId,
         amount: Seconds,
-    ) -> Result<BuildProgress, GenieError> {
+    ) -> GenieResult<BuildProgress> {
         let mut at = id.id();
         loop {
             for annex in self.objects().annexes(at).ids() {
@@ -283,7 +279,7 @@ impl World {
         p: PlayerId,
         building: ObjectId,
         stack: StackUnit,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let (_, old) = self.object(building).ok_or(NOT_HELD)?;
         let (orders, gather) = (
             self.parts
@@ -384,7 +380,7 @@ impl World {
         new: ObjectId,
         building_made: bool,
         (orders, gate_lock): (Vec<QueuedOrder>, Option<bool>),
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let now = self.world_time;
         if building_made
             && let Some(ai) = self
@@ -425,7 +421,7 @@ impl World {
         master: MasterId,
         at: Position,
         mode: MakeMode,
-    ) -> Result<Option<ObjectId>, GenieError> {
+    ) -> GenieResult<Option<ObjectId>> {
         let Some(made) = player_master(&self.model.masters, p, master).cloned() else {
             return Ok(None);
         };

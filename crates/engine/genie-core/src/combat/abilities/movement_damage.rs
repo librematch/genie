@@ -1,7 +1,7 @@
 //! The movement damage tasks (action type 152): their timer and reach, the bystanders they
 //! strike and the hit.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::combat::abilities::{ALWAYS_REACHED, ONE, Own};
 use crate::combat::damage::Victim;
 use crate::combat::damage::lose;
@@ -189,7 +189,7 @@ impl World {
         owner: PlayerId,
         master: Own,
         task: &Task,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let dt = self.dt_seconds;
         let unit = self.players.live_mut(p, i)?;
         if !movement_damage_due(
@@ -253,7 +253,7 @@ impl World {
         &self,
         id: ObjectId,
         owner: PlayerId,
-    ) -> Result<Option<Bystander>, GenieError> {
+    ) -> GenieResult<Option<Bystander>> {
         let relations = &self.players.player(owner)?.relations;
         let allied = |q: PlayerId| allied(relations, owner, q, AllyTest::WithRelation4);
         if let Some((q, u)) = self.object(id) {
@@ -296,7 +296,7 @@ impl World {
         b: Bystander,
         owner: PlayerId,
         damage: HitPoints,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if b.kind == MasterKind::DOPPELGANGER {
             return Ok(());
         }

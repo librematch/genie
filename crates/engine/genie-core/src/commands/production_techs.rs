@@ -1,7 +1,6 @@
 //! QUEUE's technologies: a building's researches, paid and queued, joining its last entry or a
 //! new one.
 
-use crate::GenieError;
 use crate::objects::ListIndex;
 use crate::objects::masters::MasterId;
 use crate::players::Amount;
@@ -22,6 +21,7 @@ use crate::world::layer::Slots;
 use crate::world::player::Player;
 use crate::world::slots::CheckedIndex;
 use crate::world::slots::PlayerSlots;
+use crate::{GenieError, GenieResult};
 use std::mem::take;
 
 impl World {
@@ -40,7 +40,7 @@ impl World {
         (master, tech): (Option<MasterId>, TechId),
         count: QueuedUnits,
         button: QueueButton,
-    ) -> Result<QueueOutcome, GenieError> {
+    ) -> GenieResult<QueueOutcome> {
         let t = tech.index();
         let def = self.model.techs.get(t).ok_or(GenieError::unsupported(
             "a technology the data file has not got",
@@ -108,7 +108,7 @@ fn pay_researches(
     building: MasterId,
     n: i16,
     slots: Slots,
-) -> Result<i16, GenieError> {
+) -> GenieResult<i16> {
     let t = tech.index();
     let mut paid = 0i16;
     while paid < n {
@@ -132,7 +132,7 @@ fn join_last(
     tech: TechId,
     costs: &[(Option<AttributeId>, Amount); 3],
     n: i16,
-) -> Result<EntryJoin, GenieError> {
+) -> GenieResult<EntryJoin> {
     let Some(last) = queue.last() else {
         return Ok(EntryJoin::NewEntry);
     };

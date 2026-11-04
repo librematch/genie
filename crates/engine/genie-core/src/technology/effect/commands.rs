@@ -1,7 +1,7 @@
 //! The effects' `do_effect` (`FUN_141462440`, then the base `FUN_140ec2ac0`): each command by
 //! its kind for every party ([`Party`]).
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::objects::ObjectId;
 use crate::players::Amount;
 use crate::players::PlayerId;
@@ -49,7 +49,7 @@ impl World {
         p: PlayerId,
         id: EffectId,
         object: Option<ObjectId>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let effects = Arc::clone(&self.model.effects);
         effects
             .get(id)
@@ -68,7 +68,7 @@ impl World {
         p: PlayerId,
         effect: &[EffectCommand],
         object: Option<ObjectId>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         for c in effect {
             match *c {
                 EffectCommand::TechCost {
@@ -103,7 +103,7 @@ impl World {
         p: PlayerId,
         effect: &[EffectCommand],
         object: Option<ObjectId>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let mut farms: Option<(f32, f32)> = None;
         for c in effect {
             match *c {
@@ -135,11 +135,7 @@ impl World {
     /// slot 0x148 ([`World::modify_attribute`]) for each player of the block; multiply too, but
     /// a cost attribute by a negative amount changes the cost entries instead, except in Gaia's
     /// block ([`EffectCommand::Costs`], `FUN_141666ee0`).
-    pub(super) fn attribute_command(
-        &mut self,
-        p: PlayerId,
-        c: &EffectCommand,
-    ) -> Result<(), GenieError> {
+    pub(super) fn attribute_command(&mut self, p: PlayerId, c: &EffectCommand) -> GenieResult<()> {
         match *c {
             EffectCommand::Attribute {
                 party,
@@ -177,7 +173,7 @@ impl World {
         p: PlayerId,
         c: &EffectCommand,
         farms: &mut Option<(f32, f32)>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         match *c {
             EffectCommand::ResourceMultiply {
                 party,
@@ -231,7 +227,7 @@ impl World {
         p: PlayerId,
         c: &EffectCommand,
         object: Option<ObjectId>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         match *c {
             EffectCommand::Enable {
                 party,

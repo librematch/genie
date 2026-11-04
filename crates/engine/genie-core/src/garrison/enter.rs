@@ -1,7 +1,6 @@
 //! The enter command and the Enter's construction, install and start, at once or with the
 //! transport's move.
 
-use crate::GenieError;
 use crate::construction::MainBuildingId;
 use crate::garrison::ContainerId;
 use crate::garrison::EnterOutcome;
@@ -43,6 +42,7 @@ use crate::world::Player;
 use crate::world::World;
 use crate::world::index::{ObjectsRef, Place};
 use crate::world::slots::PlayerSlots;
+use crate::{GenieError, GenieResult};
 
 /// Where a unit's new Enter goes: its own action list, or under the Artifact on top as its
 /// sub-action (`FUN_1410847e0`; the top action read before the task search).
@@ -77,7 +77,7 @@ impl World {
         task: &Task,
         point: Position,
         notifies: Notifies,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let (action, target, class) = self.new_enter(player, idx, target, task)?;
         if let Some(ai) = self
             .parts
@@ -114,7 +114,7 @@ impl World {
         idx: ListIndex,
         target: ObjectId,
         force: OrderForce,
-    ) -> Result<Answer, GenieError> {
+    ) -> GenieResult<Answer> {
         if self.object(target).is_none() {
             return Ok(Answer::NotTaken);
         }
@@ -144,7 +144,7 @@ impl World {
         player: PlayerId,
         idx: ListIndex,
         failed: Option<Notify>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let unit = self.players.live_mut(player, idx)?;
         let state = unit.life.state;
         match (failed, self.parts.unit_ai.get_mut(unit.id)) {
@@ -166,7 +166,7 @@ impl World {
         player: PlayerId,
         idx: ListIndex,
         order: EnterOrder,
-    ) -> Result<Option<Notify>, GenieError> {
+    ) -> GenieResult<Option<Notify>> {
         if let Some(master) = order.switch {
             self.change_master(player, idx, master)?;
         }
@@ -189,7 +189,7 @@ impl World {
         target: ObjectId,
         task: &Task,
         slot: EnterSlot,
-    ) -> Result<Option<Notify>, GenieError> {
+    ) -> GenieResult<Option<Notify>> {
         let (action, target, _) = self.new_enter(player, idx, target, task)?;
         self.install_enter_as(player, idx, target, action, task, slot)
     }
@@ -206,7 +206,7 @@ impl World {
         idx: ListIndex,
         target: ObjectId,
         task: &Task,
-    ) -> Result<(EnterAction, ContainerId, ClassId), GenieError> {
+    ) -> GenieResult<(EnterAction, ContainerId, ClassId)> {
         let (tp, t) = self
             .object(target)
             .ok_or(GenieError::unsupported("an Enter whose building is gone"))?;
@@ -242,7 +242,7 @@ impl World {
         target: ContainerId,
         action: EnterAction,
         task: &Task,
-    ) -> Result<Option<Notify>, GenieError> {
+    ) -> GenieResult<Option<Notify>> {
         self.install_enter_as(player, idx, target, action, task, EnterSlot::Own)
     }
 
@@ -262,7 +262,7 @@ impl World {
         mut action: EnterAction,
         task: &Task,
         slot: EnterSlot,
-    ) -> Result<Option<Notify>, GenieError> {
+    ) -> GenieResult<Option<Notify>> {
         let id = self.players.live(player, idx)?.id;
         if slot == EnterSlot::UnderArtifact {
             self.enter_under_artifact(player, idx, id, action)?;
@@ -316,7 +316,7 @@ impl World {
         idx: ListIndex,
         id: ObjectId,
         action: EnterAction,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let by = self.releaser(player, idx)?;
         // `EnterSlot::under` read the Artifact on top before the task search, which takes no
         // action of the unit
@@ -353,7 +353,7 @@ impl World {
         idx: ListIndex,
         mut action: EnterAction,
         slot: EnterSlot,
-    ) -> Result<Notify, GenieError> {
+    ) -> GenieResult<Notify> {
         action.state = EnterState::Failed;
         let masters = OwnerMasters::new(&self.parts.own_master, self.model.masters.of(player));
         let unit = self.players.live_mut(player, idx)?;
@@ -387,7 +387,7 @@ impl World {
         idx: ListIndex,
         target: ContainerId,
         range: Distance,
-    ) -> Result<(EnterTarget, WalkStart), GenieError> {
+    ) -> GenieResult<(EnterTarget, WalkStart)> {
         let by_id = ObjectsRef::new(
             &self.players,
             &self.index,
@@ -427,7 +427,7 @@ impl World {
         action: &mut EnterAction,
         t: &EnterTarget,
         start: WalkStart,
-    ) -> Result<Walking, GenieError> {
+    ) -> GenieResult<Walking> {
         let by_id = ObjectsRef::new(
             &self.players,
             &self.index,
@@ -477,7 +477,7 @@ impl World {
         player: PlayerId,
         idx: ListIndex,
         target: ContainerId,
-    ) -> Result<(Point, u8), GenieError> {
+    ) -> GenieResult<(Point, u8)> {
         let by_id = ObjectsRef::new(
             &self.players,
             &self.index,
@@ -516,7 +516,7 @@ impl World {
         &mut self,
         transport: Option<ContainerId>,
         to: Position,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let by_id = ObjectsRef::new(
             &self.players,
             &self.index,
@@ -554,11 +554,7 @@ impl World {
 
     /// The transport's slot 0x340 (`FUN_141216c50`, [`World::move_aside`]: range 0, forced,
     /// running) to `to`, where it meets an entering unit.
-    pub(crate) fn ship_move(
-        &mut self,
-        ship: Option<ContainerId>,
-        to: Position,
-    ) -> Result<(), GenieError> {
+    pub(crate) fn ship_move(&mut self, ship: Option<ContainerId>, to: Position) -> GenieResult<()> {
         let Some(Place::Live(p, i)) = self.place(ship) else {
             return Err(UNREACHED);
         };
@@ -579,7 +575,7 @@ impl World {
         player: PlayerId,
         idx: ListIndex,
         target: ContainerId,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let inside = self
             .players
             .iter()
@@ -609,7 +605,7 @@ impl World {
         player: PlayerId,
         idx: ListIndex,
         target: ContainerId,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let Some(Place::Live(tp, ti)) = self.place(target) else {
             return Err(ENTER_SLEEPING);
         };
@@ -635,7 +631,7 @@ impl World {
 /// # Errors
 ///
 /// [`UNPLACED`] for an object the world does not place.
-fn placed_object(players: &[Player], place: Option<Place>) -> Result<&Unit, GenieError> {
+fn placed_object(players: &[Player], place: Option<Place>) -> GenieResult<&Unit> {
     match place {
         Some(Place::Live(p, i)) => players.live(p, i),
         Some(Place::Sleeping(p, i)) => players.asleep(p, i),

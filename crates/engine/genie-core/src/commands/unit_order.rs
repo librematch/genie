@@ -1,6 +1,6 @@
 //! `UNIT_ORDER` (0x75): an order of the player's units by its action.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::commands::QueueId;
 use crate::commands::Shift;
 use crate::commands::UnitList;
@@ -104,7 +104,7 @@ impl UnitOrderCommand {
     /// units' last human order time first ([`World::human_order`]); then the action: the
     /// garrison ([`World::garrison_order`]), a cancel ([`World::cancel_order`]) or the others
     /// ([`World::unit_order`]).
-    pub(crate) fn run(&self, w: &mut World) -> Result<(), GenieError> {
+    pub(crate) fn run(&self, w: &mut World) -> GenieResult<()> {
         let Some(ids) = w.read_units(self.player, &self.units) else {
             return Ok(());
         };

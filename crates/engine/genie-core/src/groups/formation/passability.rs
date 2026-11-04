@@ -1,7 +1,6 @@
 //! `FormationTransform` (`FUN_14103a1f0`) and its passability: the grid over the box, the
 //! slots' reach and the search for an unreachable slot's unit.
 
-use crate::GenieError;
 use crate::groups::GroupId;
 use crate::groups::TransformKind;
 use crate::groups::formation::SlotFill;
@@ -14,6 +13,7 @@ use crate::map::GridSize;
 use crate::map::spatial::RecordId;
 use crate::map::{GroundOffset, Point, Rect, Tile};
 use crate::world::slots::CheckedIndex;
+use crate::{GenieError, GenieResult};
 
 /// No active slot lies nearer than `f32::MAX`: the game reads the slot before the array then.
 const NO_NEAREST_SLOT: GenieError =
@@ -64,7 +64,7 @@ impl World {
         formation: &mut Formation,
         group: GroupId,
         order: SlotOrder,
-    ) -> Result<SlotFill, GenieError> {
+    ) -> GenieResult<SlotFill> {
         if formation.slots.is_empty() {
             return Ok(SlotFill::Kept);
         }
@@ -186,7 +186,7 @@ impl World {
         formation: &mut Formation,
         grid: &mut PassGrid,
         (members, un): (&[RecordId], Unreachable<'_>),
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let (w, h) = (grid.size.width(), grid.size.height());
         let (ox, oz) = (grid.origin.x(), grid.origin.y());
         let (k, grow) = (un.nearest, un.grow);
@@ -317,7 +317,7 @@ impl World {
         &mut self,
         formation: &mut Formation,
         group: GroupId,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let g = self.groups.held(group)?;
         let tester = self.lead_object(&g.motion).or_else(|| {
             formation
@@ -425,7 +425,7 @@ impl World {
         position: BVector,
         grow: Distance,
         members: &[RecordId],
-    ) -> Result<(Vec<usize>, Vec<usize>), GenieError> {
+    ) -> GenieResult<(Vec<usize>, Vec<usize>)> {
         let mut reachable = Vec::new();
         let mut unreachable = Vec::new();
         for (j, t) in formation.slots.iter().enumerate() {
@@ -535,7 +535,7 @@ impl World {
         unit_at: Point,
         grow: Distance,
         members: &[RecordId],
-    ) -> Result<Option<Tile>, GenieError> {
+    ) -> GenieResult<Option<Tile>> {
         let (fx, fy) = (found.x(), found.y());
         let (w, h) = (grid.size.width(), grid.size.height());
         let (rx, ry) = (fx - grid.origin.x(), fy - grid.origin.y());
@@ -674,7 +674,7 @@ fn mark_reachable(
     grid: &mut PassGrid,
     formation: &Formation,
     (reachable, k): (&[usize], usize),
-) -> Result<(), GenieError> {
+) -> GenieResult<()> {
     let (w, h) = (grid.size.width(), grid.size.height());
     let (ox, oz) = (grid.origin.x(), grid.origin.y());
     let near = formation.slots.checked(k)?.transform_position;

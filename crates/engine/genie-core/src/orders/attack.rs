@@ -1,6 +1,5 @@
 //! An attack's start, a hunt's and an action's retarget.
 
-use crate::GenieError;
 use crate::combat::attack::BeginLayer;
 use crate::combat::attack::{Attack, AttackReads, Fight};
 use crate::construction::MainBuildingId;
@@ -23,6 +22,7 @@ use crate::players::PlayerId;
 use crate::unit_ai::Notifies;
 use crate::world::WorldTime;
 use crate::world::slots::PlayerSlots;
+use crate::{GenieError, GenieResult};
 
 use crate::combat::attack::{AttackCommand, ReadyReads, arms, engagement, show_arrived};
 use crate::combat::victims::victim_of;
@@ -59,7 +59,7 @@ impl World {
         idx: ListIndex,
         target: ObjectId,
         (master, world_time): (&Master, WorldTime),
-    ) -> Result<Option<ReadyReads>, GenieError> {
+    ) -> GenieResult<Option<ReadyReads>> {
         let u = self.players.live(player, idx)?;
         let held = self.players.player(player)?;
         let reads = AttackReads::of(
@@ -117,7 +117,7 @@ impl World {
         task: &Task,
         point: Position,
         notifies: Notifies,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if task.work_range != Distance::ZERO {
             return Err(GenieError::unsupported(
                 "an attack task with a range of its own",
@@ -198,7 +198,7 @@ impl World {
         idx: ListIndex,
         target: ObjectId,
         cmd: &AttackCommand<'_>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let roles = self.model.roles.clone();
         let (mut attack, posted) = self.run_on_step(player, idx, |unit, _, c| {
             Attack::command(c, unit, cmd, &roles)
@@ -225,7 +225,7 @@ impl World {
     /// Where an attack task on `target` aims (`FUN_141189b20`): a building annex at its main
     /// building, anything else at itself; with the target's owner, its master's class and fog
     /// visibility, and the aimed object's place and class.
-    pub(super) fn attack_aim(&self, target: ObjectId) -> Result<Aim, GenieError> {
+    pub(super) fn attack_aim(&self, target: ObjectId) -> GenieResult<Aim> {
         let (owner, t) = self.object(target).ok_or(GenieError::unsupported(
             "an attack task's target the slice does not hold",
         ))?;
@@ -264,7 +264,7 @@ impl World {
         (target, aim): (ObjectId, &Aim),
         point: Position,
         notifies: Notifies,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let world_time = self.world_time;
         let unit = self.players.live_mut(player, idx)?;
         if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
@@ -300,7 +300,7 @@ impl World {
         player: PlayerId,
         idx: ListIndex,
         target: ObjectId,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let quarry = self.quarry(player, target)?;
         let engagement = self.engagement(player, idx, target)?;
         let task = self
@@ -397,7 +397,7 @@ impl World {
         old: Option<ObjectId>,
         new: ObjectId,
         voice: Voice,
-    ) -> Result<Option<ObjectId>, GenieError> {
+    ) -> GenieResult<Option<ObjectId>> {
         if old == Some(new) {
             return Ok(old);
         }

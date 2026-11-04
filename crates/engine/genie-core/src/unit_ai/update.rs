@@ -1,7 +1,6 @@
 //! The full update: its order's tail, its target's block and the hunters' and gatherers'
 //! searches.
 
-use crate::GenieError;
 use crate::gathering::DropSiteId;
 use crate::math::rng::Well512;
 use crate::objects::ObjectState;
@@ -33,6 +32,7 @@ use crate::world::Millis;
 use crate::world::WorldTime;
 use crate::world::layer::ClassRoles;
 use crate::world::slots::CheckedIndex;
+use crate::{GenieError, GenieResult};
 
 /// What the full update's tail takes besides the surroundings ([`UnitAi::update_tail`]'s
 /// arguments, `0x140c66b10` from its slot 73 call on).
@@ -74,7 +74,7 @@ impl UnitAi {
         at: &Surroundings,
         ai: &mut Well512,
         side: &mut UnitView<'_, '_>,
-    ) -> Result<Option<AfterOrder>, GenieError> {
+    ) -> GenieResult<Option<AfterOrder>> {
         let retarget = retarget_kind(self.ai_kind)?;
         self.ordered_on_target = false;
         self.best_this_update = None;
@@ -154,7 +154,7 @@ impl UnitAi {
         at: &Surroundings,
         ai: &mut Well512,
         side: &mut UnitView<'_, '_>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let retarget = retarget_kind(self.ai_kind)?;
         let tail = UpdateTail {
             retarget,
@@ -177,7 +177,7 @@ impl UnitAi {
         at: &Surroundings,
         ai: &mut Well512,
         side: &mut UnitView<'_, '_>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let UpdateTail {
             retarget,
             world_time,
@@ -222,7 +222,7 @@ impl UnitAi {
         at: &Surroundings,
         side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let id = side.top_target_now();
         let Some(t) = id.map(|id| side.target_flags(id)).transpose()?.flatten() else {
             return Ok(());
@@ -253,10 +253,7 @@ impl UnitAi {
     /// The end of the full update (`0x140c686e0`): unless the AI's order is the build order
     /// (`0x2be`), each queued build order, the last first, whose foundation the world no longer
     /// holds or holds in a state other than 0 (`+0x640`) leaves the queue.
-    pub(super) fn drop_started_builds(
-        &mut self,
-        side: &UnitView<'_, '_>,
-    ) -> Result<(), GenieError> {
+    pub(super) fn drop_started_builds(&mut self, side: &UnitView<'_, '_>) -> GenieResult<()> {
         if self.current_order == Some(OrderKind::Build) {
             return Ok(());
         }
@@ -286,7 +283,7 @@ impl UnitAi {
         player_kind: PlayerKind,
         ai: &mut Well512,
         side: &mut UnitView<'_, '_>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if let Some(home) = self.home
             && !home.furious
             && self.adjusted_idle_timeout < self.idle_timer
@@ -315,7 +312,7 @@ impl UnitAi {
         player_kind: PlayerKind,
         ai: &mut Well512,
         side: &mut UnitView<'_, '_>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if self.current_target.is_some() && at.flags.contains(SurroundingFlags::GARRISONED) {
             self.current_target = None;
         }
@@ -397,7 +394,7 @@ impl UnitAi {
         player_kind: PlayerKind,
         side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
-    ) -> Result<u32, GenieError> {
+    ) -> GenieResult<u32> {
         let roles = &at.roles;
         let class = ClassId::of_param(n.p[1])?
             .or(self.target_class)
@@ -492,7 +489,7 @@ impl UnitAi {
         player_kind: PlayerKind,
         side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
-    ) -> Result<u32, GenieError> {
+    ) -> GenieResult<u32> {
         let roles = &at.roles;
         let noted = ClassId::of_param(n.p[1])?;
         let class = self.target_class.or(self.last_target_class).or(noted);
@@ -572,7 +569,7 @@ impl UnitAi {
         found: Gatherable,
         side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         side.effect_now(
             Effect::Command(AiCommand::GatherObject(found.id)),
             self,
@@ -595,7 +592,7 @@ impl UnitAi {
         player_kind: PlayerKind,
         ai: &mut Well512,
         side: &mut UnitView<'_, '_>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let produced = self.process_idle(at, player_kind, ai, side)?;
         if produced == IdleOutcome::Idle {
             let m = self.move_to(AiMove {

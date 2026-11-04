@@ -1,7 +1,7 @@
 //! `UpdateDesiredPositions` (`FUN_14103fd00`): the formation type, the walked path it measures
 //! along, a slot's place and the point back from the front.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::groups::FormationKind;
 use crate::groups::GroupFlags;
 use crate::groups::GroupId;
@@ -74,7 +74,7 @@ impl World {
     /// # Errors
     ///
     /// A member of a master the slice does not have.
-    pub fn own_formation_kind(&self, g: &UnitGroup) -> Result<FormationKind, GenieError> {
+    pub fn own_formation_kind(&self, g: &UnitGroup) -> GenieResult<FormationKind> {
         let current = g
             .current_formation
             .as_ref()
@@ -136,7 +136,7 @@ impl World {
         &self,
         g: &UnitGroup,
         given: Option<FormationKind>,
-    ) -> Result<FormationKind, GenieError> {
+    ) -> GenieResult<FormationKind> {
         Ok(match (given, g.formation_locked_kind) {
             (Some(given), _) => given,
             (None, None | Some(FormationKind::Horde)) => self.own_formation_kind(g)?,
@@ -172,7 +172,7 @@ impl World {
         &mut self,
         group: GroupId,
         given: Option<FormationKind>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let g = self.groups.held(group)?;
         if g.members.is_empty() {
             return Ok(());
@@ -270,7 +270,7 @@ pub(super) fn transform_slot(
     transform_kind: TransformKind,
     (world_time, map): (WorldTime, GridSize),
     group_tuning: &GroupTuning,
-) -> Result<(), GenieError> {
+) -> GenieResult<()> {
     if index < 0 || formation.slots.len() as i32 <= index {
         return Ok(());
     }

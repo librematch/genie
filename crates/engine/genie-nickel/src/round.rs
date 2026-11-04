@@ -4,7 +4,7 @@
 //! compiler gives the same decimal, where rounding an f32 through f64 first would differ in rare
 //! halfway cases.
 
-use genie_error::GenieError;
+use genie_error::{GenieError, GenieResult};
 use num_bigint::BigInt;
 use num_bigint::BigUint;
 use num_bigint::Sign;
@@ -40,7 +40,7 @@ const F64: Format = Format {
 ///
 /// A [`GenieError`] when a string is no integer, the denominator is not positive or the value
 /// lies beyond the largest f32.
-pub fn round_to_f32(numerator: &str, denominator: &str) -> Result<f32, GenieError> {
+pub fn round_to_f32(numerator: &str, denominator: &str) -> GenieResult<f32> {
     let (negative, significand, exponent) = round(numerator, denominator, &F32)?;
     let bits = (u32::from(negative) << 31)
         | (u32::try_from(exponent).unwrap_or(0) << 23)
@@ -54,7 +54,7 @@ pub fn round_to_f32(numerator: &str, denominator: &str) -> Result<f32, GenieErro
 /// # Errors
 ///
 /// As [`round_to_f32`], beyond the largest f64.
-pub fn round_to_f64(numerator: &str, denominator: &str) -> Result<f64, GenieError> {
+pub fn round_to_f64(numerator: &str, denominator: &str) -> GenieResult<f64> {
     let (negative, significand, exponent) = round(numerator, denominator, &F64)?;
     let bits = (u64::from(negative) << 63) | (exponent << 52) | (significand & 0xf_ffff_ffff_ffff);
     Ok(f64::from_bits(bits))
@@ -62,11 +62,7 @@ pub fn round_to_f64(numerator: &str, denominator: &str) -> Result<f64, GenieErro
 
 /// The rational's sign, significand (its hidden bit included) and biased exponent field in
 /// `format`, rounded once to nearest, ties to even.
-fn round(
-    numerator: &str,
-    denominator: &str,
-    format: &Format,
-) -> Result<(bool, u64, u64), GenieError> {
+fn round(numerator: &str, denominator: &str, format: &Format) -> GenieResult<(bool, u64, u64)> {
     let (Ok(n), Ok(d)) = (numerator.parse::<BigInt>(), denominator.parse::<BigUint>()) else {
         return Err(invalid_rational(numerator, denominator));
     };

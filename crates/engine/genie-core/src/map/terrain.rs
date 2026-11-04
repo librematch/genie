@@ -11,7 +11,6 @@ use genie_model::map::terrain::terrain_kind;
 
 pub use self::terrain_kind::TerrainKind;
 pub use self::terrain_kind::terrain_class;
-use crate::GenieError;
 use crate::map::Footprint;
 use crate::map::GridSize;
 use crate::map::Point;
@@ -33,6 +32,7 @@ use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 use crate::world::layer::generated::TerrainTuning;
 use crate::world::slots::CheckedIndex;
+use crate::{GenieError, GenieResult};
 use std::mem::swap;
 
 /// A foundation's tile off the map after the clamp to it.
@@ -337,7 +337,7 @@ impl Terrain {
     /// The ground's height under (`x`, `y`) on the map (the static `new_position`'s,
     /// `0x1411a58b0`, which slot 0x60 takes): the tile's elevation plus its slope's share by the
     /// tile's shape ([`slope_share`] of the place within the tile).
-    pub fn ground(&self, at: Point) -> Result<f32, GenieError> {
+    pub fn ground(&self, at: Point) -> GenieResult<f32> {
         let (x, y) = (at.x(), at.y());
         let (tx, ty) = (x as i32, y as i32);
         let i = self
@@ -443,7 +443,7 @@ impl Terrain {
     /// layer's low byte) is snow. Its decal (`FUN_1413b7bf0`, which may draw from the Object
     /// stream between a push and a pop of its state, `FUN_140811270`/`FUN_140811210`) is not
     /// held.
-    pub fn snow_under(&self, tile: Tile) -> Result<bool, GenieError> {
+    pub fn snow_under(&self, tile: Tile) -> GenieResult<bool> {
         let i = self
             .size
             .index(tile)
@@ -486,7 +486,7 @@ impl Terrain {
         f: &Foundation,
         roles: &Roles,
         terrain_tuning: TerrainTuning,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let (x, y) = (f.position.x(), f.position.y());
         let (cx, cy) = (f.clearance.x(), f.clearance.y());
         let (mut x0, mut y0) = ((x - cx) as i32, (y - cy) as i32);

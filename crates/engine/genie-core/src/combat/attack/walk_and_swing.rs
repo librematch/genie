@@ -34,7 +34,6 @@ use crate::objects::unit::Unit;
 use crate::unit_ai::NotifyKind;
 use crate::world::Seconds;
 
-use crate::GenieError;
 use crate::combat::AttackTargetId;
 use crate::combat::damage::HitLayer;
 use crate::combat::damage::{blast, charge_hit, elevation_factor, shield, take};
@@ -43,6 +42,7 @@ use crate::world::ATTACKER_UNMOVING;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::step::Step;
+use crate::{GenieError, GenieResult};
 
 impl Attack {
     /// States 4, 5 and 11 (cases 3, 4, 10): the sub-action list's update (`FUN_140a992b0`,
@@ -65,7 +65,7 @@ impl Attack {
         f: &Fight,
         r: &AttackReads,
         (target, radius): (Position, Footprint),
-    ) -> Result<UpdateCode, GenieError> {
+    ) -> GenieResult<UpdateCode> {
         let roles = &c.w.model.roles.clone();
         let gives_up = GiveUp {
             patience: if !r.player_kind.is_computer()
@@ -101,7 +101,7 @@ impl Attack {
         f: &Fight,
         r: &AttackReads,
         (target, radius): (Position, Footprint),
-    ) -> Result<UpdateCode, GenieError> {
+    ) -> GenieResult<UpdateCode> {
         let ground =
             c.w.parts
                 .mover_of(unit.id)
@@ -124,7 +124,7 @@ impl Attack {
         &mut self,
         c: &mut Step<'_>,
         unit: &mut Unit,
-    ) -> Result<UpdateCode, GenieError> {
+    ) -> GenieResult<UpdateCode> {
         // the list deleted the MoveTo: no stop
         self.state = self.state.bare();
         self.finish_in(
@@ -157,7 +157,7 @@ impl Attack {
         actions: &mut Action,
         f: &mut Fight,
         r: &AttackReads,
-    ) -> Result<UpdateCode, GenieError> {
+    ) -> GenieResult<UpdateCode> {
         let Some(sprite) = unit.sprite else {
             return Err(GenieError::unsupported("a swing without the unit's sprite"));
         };
@@ -181,7 +181,7 @@ impl Attack {
         f: &mut Fight,
         r: &AttackReads,
         sprite: ActiveSprite,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let roles = &c.w.model.roles.clone();
         let ranged = self.arms.missile.is_some();
         if roles
@@ -230,7 +230,7 @@ impl Attack {
         f: &mut Fight,
         r: &AttackReads,
         sprite: ActiveSprite,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let roles = &c.w.model.roles.clone();
         let ranged = self.arms.missile.is_some();
         let frame = if self.arms.fire_frame == Frame::ZERO && !ranged {
@@ -314,7 +314,7 @@ impl Attack {
         f: &Fight,
         r: &AttackReads,
         sprite: ActiveSprite,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let sprite_tuning = c.w.model.tuning.sprite;
         let timer = c.w.parts.combat_of(unit.id).attack_timer;
         let mut g = c.w.attack_ground(unit.id);
@@ -389,7 +389,7 @@ impl Attack {
         chance: HitChance,
         object_rng: &mut Well512,
         layer: HitLayer<'_>,
-    ) -> Result<Option<ObjectId>, GenieError> {
+    ) -> GenieResult<Option<ObjectId>> {
         let HitLayer {
             roles,
             damage_tuning,
@@ -412,7 +412,7 @@ impl Attack {
         chance: HitChance,
         object_rng: &mut Well512,
         layer: HitLayer<'_>,
-    ) -> Result<Option<ObjectId>, GenieError> {
+    ) -> GenieResult<Option<ObjectId>> {
         let hit = Hit {
             at: f.own.position,
             from_z: Some(f.own.position.z()),
@@ -437,7 +437,7 @@ impl Attack {
         chance: HitChance,
         object_rng: &mut Well512,
         layer: HitLayer<'_>,
-    ) -> Result<Option<ObjectId>, GenieError> {
+    ) -> GenieResult<Option<ObjectId>> {
         let HitLayer { damage_tuning, .. } = layer;
         let (center, target) = (f.own.position, f.victim.id);
         let mut targets: Vec<&mut Victim> = blasted.iter_mut().collect();

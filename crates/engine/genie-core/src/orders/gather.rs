@@ -1,6 +1,5 @@
 //! A gather's retarget and take, the quarry, a gather's and a hunt's start.
 
-use crate::GenieError;
 use crate::combat::attack::{Arms, Engagement};
 use crate::combat::attack::{arms as attack_arms, engagement as attack_engagement};
 use crate::construction::MainBuildingId;
@@ -37,6 +36,7 @@ use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::slots::PlayerSlots;
 use crate::world::{ATTACKER_UNPLACED, TARGET_UNPLACED};
+use crate::{GenieError, GenieResult};
 
 mod hunt;
 
@@ -71,7 +71,7 @@ impl World {
         player: PlayerId,
         idx: ListIndex,
         target: ObjectId,
-    ) -> Result<Answer, GenieError> {
+    ) -> GenieResult<Answer> {
         let (tp, t) = self.object(target).ok_or(GenieError::unsupported(
             "a gather's target the slice does not hold",
         ))?;
@@ -168,7 +168,7 @@ impl World {
         old: [Option<ObjectId>; 2],
         new: [Option<ObjectId>; 2],
         by: Releaser,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         for (old, new) in old.into_iter().zip(new) {
             if old != new {
                 if let Some(old) = old {
@@ -192,7 +192,7 @@ impl World {
         idx: ListIndex,
         target: ObjectId,
         point: Position,
-    ) -> Result<Answer, GenieError> {
+    ) -> GenieResult<Answer> {
         let (tp, o) = self.object(target).ok_or(GenieError::unsupported(
             "a move to an object the slice does not hold",
         ))?;
@@ -248,7 +248,7 @@ impl World {
         player: PlayerId,
         idx: ListIndex,
         target: ObjectId,
-    ) -> Result<bool, GenieError> {
+    ) -> GenieResult<bool> {
         let (tp, t) = self.object(target).ok_or(GenieError::unsupported(
             "a hunt's target the slice does not hold",
         ))?;
@@ -285,7 +285,7 @@ impl World {
         idx: ListIndex,
         target: ObjectId,
         point: Position,
-    ) -> Result<Answer, GenieError> {
+    ) -> GenieResult<Answer> {
         let mut q = self.quarry(player, target)?;
         q.drop_site = self.drops_at_main(player, idx, target)?;
         let quarry = Some(q);
@@ -346,7 +346,7 @@ impl World {
     }
 
     /// What a hunt reads of its target.
-    pub(super) fn quarry(&self, player: PlayerId, target: ObjectId) -> Result<Quarry, GenieError> {
+    pub(super) fn quarry(&self, player: PlayerId, target: ObjectId) -> GenieResult<Quarry> {
         let (tp, t) = self.object(target).ok_or(GenieError::unsupported(
             "a hunt's target the slice does not hold",
         ))?;
@@ -383,7 +383,7 @@ impl World {
         target: ObjectId,
         task: &Task,
         notify: Option<(Position, Notifies)>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let (tp, t) = self.object(target).ok_or(GenieError::unsupported(
             "a gather's target the slice does not hold",
         ))?;
@@ -497,7 +497,7 @@ impl World {
         idx: ListIndex,
         target: (ObjectId, ClassId),
         (point, notifies): (Position, Notifies),
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let id = self.players.live(player, idx)?.id;
         let Some(ai) = self.parts.unit_ai.get_mut(id) else {
             return Ok(());
@@ -524,7 +524,7 @@ impl World {
         player: PlayerId,
         idx: ListIndex,
         task: &HuntTask,
-    ) -> Result<Arms, GenieError> {
+    ) -> GenieResult<Arms> {
         let unit = &self.players.live(player, idx)?;
         let master = unit.master(self.master_tables(), player)?;
         let moving = task.walk_sprite_id(unit.life.held());
@@ -543,7 +543,7 @@ impl World {
         player: PlayerId,
         idx: ListIndex,
         target: ObjectId,
-    ) -> Result<Engagement, GenieError> {
+    ) -> GenieResult<Engagement> {
         let unit = &self.players.live(player, idx)?;
         let master = unit.master(self.master_tables(), player)?;
         let me = self.spatial.get(unit.id).ok_or(ATTACKER_UNPLACED)?;
@@ -574,7 +574,7 @@ impl World {
         player: PlayerId,
         (tp, t): (PlayerId, &Unit),
         tm: &Master,
-    ) -> Result<bool, GenieError> {
+    ) -> GenieResult<bool> {
         if tm.kind == MasterKind::BUILDING {
             // The action type of a packed siege unit unpacking (an Unpack, 125, `0x7d`), whose target a gather drops
             // (`FUN_140a903a0`).

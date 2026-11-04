@@ -1,6 +1,6 @@
 //! createColumnLine (`FUN_141012280`): the sizes and the slots of its sub-formations.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::groups::FormationCategory;
 use crate::groups::FormationKind;
 use crate::groups::GroupId;
@@ -142,7 +142,7 @@ pub(crate) fn column_line_slots(
     kind: LineKind,
     world_time: WorldTime,
     group_tuning: &GroupTuning,
-) -> Result<Layout, GenieError> {
+) -> GenieResult<Layout> {
     if group.members.is_empty() {
         return Ok(Layout::NotLaid);
     }
@@ -204,7 +204,7 @@ fn category(group: &UnitGroup, c: FormationCategory) -> Option<Category> {
 fn category_sizes(
     group: &UnitGroup,
     kind: LineKind,
-) -> Result<([i32; CATEGORY_COUNT], [i32; CATEGORY_COUNT]), GenieError> {
+) -> GenieResult<([i32; CATEGORY_COUNT], [i32; CATEGORY_COUNT])> {
     let mut lines_of = [0i32; CATEGORY_COUNT];
     let mut columns_of = [0i32; CATEGORY_COUNT];
     let mut widest = 0.0f32;
@@ -294,7 +294,7 @@ impl SubKinds {
     /// The type after a slot of type `next` at column `col` of a line of `actual`: the next type
     /// round robin (with two types the last slot of a line keeps it for the next line); one whose
     /// units the slots used up passes to the next with units left, else to none.
-    fn advance(&mut self, cat: &Category, col: i32, actual: i32) -> Result<(), GenieError> {
+    fn advance(&mut self, cat: &Category, col: i32, actual: i32) -> GenieResult<()> {
         *self.used.checked_mut(self.next as usize)? += 1;
         let mut sub_kind = self.next;
         if cat.kinds != 2 || col < actual - 1 {
@@ -328,7 +328,7 @@ fn lay_category(
     (lines, columns): (i32, i32),
     style: Style<'_>,
     at: &mut Cursor,
-) -> Result<(), GenieError> {
+) -> GenieResult<()> {
     let group_tuning = style.group_tuning;
     let mut subs = SubKinds {
         next: if cat.kinds == 1 { -1 } else { 0 },
@@ -430,7 +430,7 @@ fn lay_line(
     style: Style<'_>,
     at: &mut Cursor,
     subs: &mut SubKinds,
-) -> Result<(), GenieError> {
+) -> GenieResult<()> {
     for col in 0..actual.max(0) {
         let i = at.used_slots + col as usize;
         let desired_sub_category = if subs.next < 0 {
@@ -496,7 +496,7 @@ impl World {
         formation: &mut Formation,
         group: GroupId,
         kind: LineKind,
-    ) -> Result<Layout, GenieError> {
+    ) -> GenieResult<Layout> {
         let g = self.groups.held(group)?;
         if column_line_slots(
             formation,

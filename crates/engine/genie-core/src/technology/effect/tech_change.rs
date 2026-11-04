@@ -1,6 +1,6 @@
 //! A technology's change (kind 8): its state, a forced research and its research time.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::math::conversions::cvttss2si;
 use crate::math::fmath::below_or_unordered;
 use crate::math::image::effect::{
@@ -79,7 +79,7 @@ impl World {
         mode: ModifyMode,
         v: f32,
         location: ModifyLocation,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let tree = self.players.player(p)?.techs.len();
         let Some(tech_id) = Some(tech).filter(|t| t.index() < tree) else {
             return Ok(());
@@ -106,7 +106,7 @@ impl World {
         p: PlayerId,
         t: TechId,
         location: ModifyLocation,
-    ) -> Result<Option<LocationAt>, GenieError> {
+    ) -> GenieResult<Option<LocationAt>> {
         let t = t.index();
         let (mut at, mut building) = (None, None);
         if let Some(i) = location.entry() {
@@ -140,7 +140,7 @@ impl World {
         t: TechId,
         (mode, v): (ModifyMode, f32),
         at: Option<usize>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let (tech, t) = (t, t.index());
         let short = cvttss2si(v) as i16;
         match mode {
@@ -187,7 +187,7 @@ impl World {
         t: TechId,
         v: f32,
         at: Option<usize>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let t = t.index();
         let short = MasterId::of_data(cvttss2si(v) as i16);
         if let Some(short) = short
@@ -209,7 +209,7 @@ impl World {
 
     /// Mode 12: the state of player `p`'s technology `t` (`v` 0 none, then unavailable,
     /// available, or researched, which researches it).
-    fn set_tech_state(&mut self, p: PlayerId, t: TechId, v: f32) -> Result<(), GenieError> {
+    fn set_tech_state(&mut self, p: PlayerId, t: TechId, v: f32) -> GenieResult<()> {
         let (tech, t) = (t, t.index());
         let state = self.players.player_mut(p)?.techs.checked_mut(t)?;
         if v == 0.0 {
@@ -229,11 +229,7 @@ impl World {
     /// state 0 to 2 completes as [`World::complete_research`] (the civ's disabled technologies are
     /// not asked); any other gives its effect again and counts in attributes 0x15 and 0x63 (its
     /// listed costs) whatever its location, its state left.
-    pub(super) fn force_research(
-        &mut self,
-        p: PlayerId,
-        t: TechId,
-    ) -> Result<Research, GenieError> {
+    pub(super) fn force_research(&mut self, p: PlayerId, t: TechId) -> GenieResult<Research> {
         let (tech, t) = (t, t.index());
         if (ResearchState::Unavailable..=ResearchState::Researching)
             .contains(&self.players.player(p)?.techs.checked(t)?.state)
@@ -275,7 +271,7 @@ impl World {
         v: f32,
         mode: ChangeMode,
         location: Option<MasterId>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let tree = self.players.player(p)?.techs.len();
         let Some(tech_id) = Some(tech).filter(|t| t.index() < tree) else {
             return Ok(());

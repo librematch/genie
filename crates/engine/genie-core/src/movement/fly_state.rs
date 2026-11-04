@@ -1,8 +1,8 @@
 //! A Fly's state with the data only it holds: a bird resting, choosing its flight and flying
 //! with its `MoveTo`.
 
-use crate::GenieError;
 use crate::movement::move_to::MoveToAction;
+use crate::{GenieError, GenieResult};
 use derive_more::Display;
 use genie_diff::Diff;
 
@@ -36,7 +36,7 @@ impl FlyState {
     /// # Errors
     ///
     /// A byte that names no state of a Fly, and a `MoveTo` in another state.
-    pub fn of_byte(value: u8, flight: Option<MoveToAction>) -> Result<Self, GenieError> {
+    pub fn of_byte(value: u8, flight: Option<MoveToAction>) -> GenieResult<Self> {
         let state = match value {
             0 => Self::New,
             1 => Self::Done,

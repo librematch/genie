@@ -1,7 +1,6 @@
 //! A saved object as the slice's object ([`object`]: its row, [`unit`], and its parts): its
 //! town bell, a building's gate and its construction.
 
-use crate::GenieError;
 use crate::combat::AttackCount;
 use crate::combat::AttackPowerup;
 use crate::combat::Charge;
@@ -68,6 +67,7 @@ use crate::world::load::sub_actions::saved_sprite;
 use crate::world::load::top_actions::saved_actions;
 use crate::world::parts::{Object, ObjectParts};
 use crate::world::{Gate, Unread};
+use crate::{GenieError, GenieResult};
 use genie_import::dat::MasterTable;
 use genie_import::save::task_at;
 use genie_save::generated::world::TribeCombatObject;
@@ -495,7 +495,7 @@ fn annexes(ids: &[i32]) -> Annexes {
 /// # Errors
 ///
 /// An entry of −1, which names no object.
-fn building_lists(object: &genie_save::Object) -> Result<BuildingLists, GenieError> {
+fn building_lists(object: &genie_save::Object) -> GenieResult<BuildingLists> {
     let Some(b) = object.tribe_building_object.as_deref() else {
         return Ok(BuildingLists::default());
     };
@@ -517,7 +517,7 @@ fn ai_parts(
     object: &genie_save::Object,
     own: ObjectId,
     players: usize,
-) -> Result<(Option<UnitAi>, TownBell), GenieError> {
+) -> GenieResult<(Option<UnitAi>, TownBell)> {
     let bell = object.combat().map(town_bell).transpose()?;
     Ok((unit_ai(object, own, players)?, bell.unwrap_or_default()))
 }
@@ -527,7 +527,7 @@ fn ai_parts(
 /// # Errors
 ///
 /// A record's action value no action holds ([`AiAction::try_from`]).
-pub fn town_bell(c: &TribeCombatObject) -> Result<TownBell, GenieError> {
+pub fn town_bell(c: &TribeCombatObject) -> GenieResult<TownBell> {
     use crate::orders::town_bell::BackToWork;
     Ok(TownBell {
         flag: BellShelter::of_byte(c.town_bell_flag),
@@ -583,7 +583,7 @@ pub fn construction(
     object: &genie_save::Object,
     s: &RgeStaticObject,
     objects: &PlayerObjects,
-) -> Result<Option<Construction>, GenieError> {
+) -> GenieResult<Option<Construction>> {
     let Some(b) = object.tribe_building_object.as_deref() else {
         return Ok(None);
     };

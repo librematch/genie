@@ -1,4 +1,5 @@
 use super::*;
+use crate::GenieResult;
 use crate::combat::damage::ArmorPair;
 use crate::construction::MainBuildingId;
 use crate::construction::repair::RepairFrom;
@@ -424,7 +425,7 @@ fn passable(t: &mut World) {
 }
 
 /// The repairer's Repair part of 50 ms through its step (`Unit::repair_part`): its code.
-fn repaired(t: &mut World) -> Result<HeadCode, GenieError> {
+fn repaired(t: &mut World) -> GenieResult<HeadCode> {
     in_update(
         t,
         (PlayerId::new(1), ListIndex::new(0)),

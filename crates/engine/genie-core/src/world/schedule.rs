@@ -5,13 +5,13 @@ use crate::world::Millis;
 use derive_more::Display;
 use strum::IntoStaticStr;
 
-use crate::GenieError;
 use crate::commands::Command;
 use crate::math::rng::Stream;
 use crate::players::PlayerId;
 use crate::trace::UPDATE;
 use crate::world::FrameSeed;
 use crate::world::World;
+use crate::{GenieError, GenieResult};
 use std::mem::take;
 
 /// A step the world update runs once, before or after the players' steps. It shows as its
@@ -215,7 +215,7 @@ impl World {
     /// # Errors
     ///
     /// A player without a slot.
-    fn clock_mut(&mut self, p: PlayerId) -> Result<&mut Millis, GenieError> {
+    fn clock_mut(&mut self, p: PlayerId) -> GenieResult<&mut Millis> {
         self.player_time
             .get_mut(p.index())
             .ok_or_else(|| NO_CLOCK.with("player", p))
@@ -238,11 +238,7 @@ impl World {
     }
 
     /// World step `step`'s work.
-    fn run_world_step(
-        &mut self,
-        step: WorldStep,
-        run: &mut UpdateRun<'_>,
-    ) -> Result<(), GenieError> {
+    fn run_world_step(&mut self, step: WorldStep, run: &mut UpdateRun<'_>) -> GenieResult<()> {
         match step {
             WorldStep::Commands => {
                 self.command_phase(run.dt, run.commands);
@@ -298,7 +294,7 @@ impl World {
         step: PlayerStep,
         run: &mut UpdateRun<'_>,
         p: PlayerId,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         match step {
             PlayerStep::Clock => {
                 let time = self.clock_mut(p)?;

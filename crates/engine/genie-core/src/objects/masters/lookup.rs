@@ -1,6 +1,5 @@
 //! A player's masters by id ([`Masters`]) and the work command's choice of master and task.
 
-use crate::GenieError;
 use crate::construction::repair::REPAIR;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::TaskGroup;
@@ -11,6 +10,7 @@ use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 use crate::world::layer::Slots;
 use crate::world::parts::PartTable;
+use crate::{GenieError, GenieResult};
 use std::sync::Arc;
 
 /// Player `player`'s master `id` in `every`, the world's masters: one table per player, as the
@@ -107,7 +107,7 @@ pub fn work_master<'m>(
     dip: &impl Diplomacy,
     slots: Slots,
     roles: &Roles,
-) -> Result<Option<(&'m Master, &'m Task)>, GenieError> {
+) -> GenieResult<Option<(&'m Master, &'m Task)>> {
     let own = actor.master;
     let own_list = masters.get(own.id).ok_or(GenieError::unsupported(
         "a unit of a master the player does not have",

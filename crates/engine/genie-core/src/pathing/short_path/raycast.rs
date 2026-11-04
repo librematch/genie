@@ -1,7 +1,7 @@
 //! The searches' walks over the mesh's tiles ([`Ctx`]): a point's holder, the raycast, the
 //! axis sweeps and the sight test.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::map::Tile;
 use crate::pathing::FixedDistance;
 use crate::pathing::FixedRect;
@@ -35,7 +35,7 @@ impl Ctx<'_> {
     }
 
     /// The shapes listed on `tile` (its index wraps as the game's does).
-    pub(super) fn tile(&self, tile: Tile) -> Result<&[ShapeId], GenieError> {
+    pub(super) fn tile(&self, tile: Tile) -> GenieResult<&[ShapeId]> {
         let i = (tile
             .y()
             .wrapping_mul(self.mesh.width as i32)
@@ -44,7 +44,7 @@ impl Ctx<'_> {
     }
 
     /// `FUN_140fa3dc0`: the first shape of `p`'s tile, not ignored, strictly holding `p` (shrunk).
-    pub(super) fn holder(&self, p: FixedPoint) -> Result<Option<ShapeId>, GenieError> {
+    pub(super) fn holder(&self, p: FixedPoint) -> GenieResult<Option<ShapeId>> {
         for &id in self.tile(Tile::new(tile_of(p.x()), tile_of(p.y())))? {
             if !self.ignored(id)
                 && strictly_inside(*self.mesh.shapes.checked(id.index())?, p, self.d)
@@ -62,7 +62,7 @@ impl Ctx<'_> {
         p: FixedPoint,
         excl: ShapeId,
         d: FixedDistance,
-    ) -> Result<Option<ShapeId>, GenieError> {
+    ) -> GenieResult<Option<ShapeId>> {
         for &id in self.tile(Tile::new(tile_of(p.x()), tile_of(p.y())))? {
             if id != excl
                 && !self.ignored(id)
@@ -76,7 +76,7 @@ impl Ctx<'_> {
 
     /// One tile of the raycast: the callback over the tile's shapes; its last hit (each nearer
     /// than the one before) and the callback's result for it, none without one.
-    pub(super) fn ray_tile(&self, tile: RayTile<'_>) -> Result<Option<(Meet, Hit)>, GenieError> {
+    pub(super) fn ray_tile(&self, tile: RayTile<'_>) -> GenieResult<Option<(Meet, Hit)>> {
         let RayTile {
             callback: cb,
             list,
@@ -180,7 +180,7 @@ impl Ctx<'_> {
         b: FixedPoint,
         t: &mut RayFraction,
         mut cb: Callback,
-    ) -> Result<Option<(Meet, Hit)>, GenieError> {
+    ) -> GenieResult<Option<(Meet, Hit)>> {
         let (x0, y0, x1, y1) = (a.x(), a.y(), b.x(), b.y());
         let dx = x1.wrapping_sub(x0);
         let adx = dx.wrapping_abs();
@@ -303,34 +303,33 @@ impl Ctx<'_> {
         from: FixedPoint,
         to: FixedPoint,
         dir: AxisDir,
-    ) -> Result<Sweep, GenieError> {
+    ) -> GenieResult<Sweep> {
         let d = self.d;
         let mut end = to;
         let mut out = Sweep::default();
-        let visit =
-            |list: &[ShapeId], end: &mut FixedPoint, out: &mut Sweep| -> Result<(), GenieError> {
-                for &id in list {
-                    if self.ignored(id) {
-                        continue;
-                    }
-                    let r = *self.mesh.shapes.checked(id.index())?;
-                    let Some((hp, side)) = Self::axis_hit(from, *end, r, d, dir) else {
-                        continue;
-                    };
-                    out.point = Some(hp);
-                    out.side = Some(side);
-                    if from == hp && *end == to {
-                        let back = Self::axis_hit(*end, from, r, d, dir.reverse());
-                        if back.is_some_and(|(bp, _)| bp == from) {
-                            continue;
-                        }
-                    }
-                    *end = hp;
-                    out.shape = Some(id);
-                    out.found = true;
+        let visit = |list: &[ShapeId], end: &mut FixedPoint, out: &mut Sweep| -> GenieResult<()> {
+            for &id in list {
+                if self.ignored(id) {
+                    continue;
                 }
-                Ok(())
-            };
+                let r = *self.mesh.shapes.checked(id.index())?;
+                let Some((hp, side)) = Self::axis_hit(from, *end, r, d, dir) else {
+                    continue;
+                };
+                out.point = Some(hp);
+                out.side = Some(side);
+                if from == hp && *end == to {
+                    let back = Self::axis_hit(*end, from, r, d, dir.reverse());
+                    if back.is_some_and(|(bp, _)| bp == from) {
+                        continue;
+                    }
+                }
+                *end = hp;
+                out.shape = Some(id);
+                out.found = true;
+            }
+            Ok(())
+        };
         match dir {
             AxisDir::PlusX => {
                 let row = tile_of(from.y());
@@ -370,7 +369,7 @@ impl Ctx<'_> {
 
     /// `FUN_140fa8e60`: whether the straight walk from `a` to `b` is blocked (the smoothing's line of
     /// sight): an axis sweep along an axis, else the raycast with callback C.
-    pub(super) fn sight_blocked(&self, a: FixedPoint, b: FixedPoint) -> Result<bool, GenieError> {
+    pub(super) fn sight_blocked(&self, a: FixedPoint, b: FixedPoint) -> GenieResult<bool> {
         if a.x() == b.x() {
             return Ok(self.sweep(a, b, AxisDir::of_dy(b.y() - a.y()))?.found);
         }

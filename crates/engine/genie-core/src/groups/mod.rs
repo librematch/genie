@@ -12,7 +12,6 @@
 //! it and the forced replay compares every field. The behaviour is ported routine by routine
 //! from build 158041, whose addresses each port cites.
 
-use crate::GenieError;
 use crate::map::Distance;
 use crate::math::fmath::BVector;
 use crate::movement::PathData;
@@ -28,6 +27,7 @@ use crate::world::Millis;
 use crate::world::Seconds;
 use crate::world::WorldTime;
 use crate::world::slots::CheckedIndex;
+use crate::{GenieError, GenieResult};
 
 mod command_kind;
 mod differentiator;
@@ -268,7 +268,7 @@ impl PointLine {
     /// the first point's length is 0, any other adds its distance to the point after it. A line
     /// of two points or more longer than its desired length then drops its oldest points while
     /// it stays longer without the last stretch.
-    pub fn add_at_front(&mut self, mut p: LinePoint) -> Result<(), GenieError> {
+    pub fn add_at_front(&mut self, mut p: LinePoint) -> GenieResult<()> {
         p.point = p.point.with_height(0.0);
         self.points.insert(0, p);
         if self.points.len() == 1 {
@@ -504,7 +504,7 @@ impl UnitGroup {
     /// # Errors
     ///
     /// A group no player owns yet (the constructor's −1).
-    pub(crate) fn owner_player(&self) -> Result<PlayerId, GenieError> {
+    pub(crate) fn owner_player(&self) -> GenieResult<PlayerId> {
         self.owner.ok_or_else(|| {
             GenieError::unreachable("a group no player owns (the constructor's -1)")
                 .with("group", self.id)

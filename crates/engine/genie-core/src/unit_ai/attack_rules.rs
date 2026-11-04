@@ -1,7 +1,6 @@
 //! Conversion, neutral targets, patrol reaches and siege: the attack rules of the unit-AI
 //! types.
 
-use crate::GenieError;
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::Point;
@@ -31,6 +30,7 @@ use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 use crate::world::layer::generated::UnitAiTuning;
 use crate::world::slots::CheckedIndex;
+use crate::{GenieError, GenieResult};
 
 /// What a priest's conversion test (`FUN_140c1af00`, the priest's slot 0x1b8) reads of the
 /// priest: its master's class and id, its faith (`+0x310`), its owner's attributes and its
@@ -168,7 +168,7 @@ pub fn can_convert(
 /// # Errors
 ///
 /// A computer player's unit.
-pub fn attack_sight(me: &Attacker) -> Result<Distance, GenieError> {
+pub fn attack_sight(me: &Attacker) -> GenieResult<Distance> {
     if me.player_kind.is_computer() {
         return Err(GenieError::unsupported(
             "a computer player's bestUnitToAttack",
@@ -271,7 +271,7 @@ pub fn soldier_attacks_neutral(
 
 /// A computer player's soldier's or siege unit's idle check past its target: its target test
 /// (`FUN_140c41690`) and its saved patrol's leash (`player+0x624`); not modelled.
-pub(super) const fn computer_idle_check() -> Result<(), GenieError> {
+pub(super) const fn computer_idle_check() -> GenieResult<()> {
     Err(GenieError::unsupported(
         "a computer player's soldier's idle check",
     ))
@@ -279,7 +279,7 @@ pub(super) const fn computer_idle_check() -> Result<(), GenieError> {
 
 /// A unit's back-up from a target under its least range (`FUN_140c43de0`, the soldier's and the
 /// siege unit's case 0x1fe); not modelled.
-pub(super) const fn back_up() -> Result<u32, GenieError> {
+pub(super) const fn back_up() -> GenieResult<u32> {
     Err(GenieError::unsupported(
         "a soldier's target under its least range",
     ))
@@ -287,7 +287,7 @@ pub(super) const fn back_up() -> Result<u32, GenieError> {
 
 /// A defending unit's range on a patrol order or with a patrol path (slot 0x470, `FUN_140f95e10`),
 /// which the soldier's and the siege unit's attack checks read; not modelled.
-pub(super) const fn defend_patrol_range() -> Result<(), GenieError> {
+pub(super) const fn defend_patrol_range() -> GenieResult<()> {
     Err(GenieError::unsupported(
         "a defending soldier's patrol range (slot 0x470, FUN_140f95e10)",
     ))
@@ -340,7 +340,7 @@ pub(super) fn line_distance(p: BVector, a: BVector, b: BVector) -> Distance {
 /// # Errors
 ///
 /// An empty path, whose loop the game runs past its end.
-pub(crate) fn patrol_distance(points: &[BVector], point: BVector) -> Result<Distance, GenieError> {
+pub(crate) fn patrol_distance(points: &[BVector], point: BVector) -> GenieResult<Distance> {
     if points.is_empty() {
         return Err(GenieError::unreachable("a saved patrol without points"));
     }
@@ -388,7 +388,7 @@ pub fn siege_can_attack(
     rules: TargetRules,
     roles: &Roles,
     unit_ai_tuning: &UnitAiTuning,
-) -> Result<bool, GenieError> {
+) -> GenieResult<bool> {
     if roles
         .of_class(t.class)
         .intersects(ClassRoles::ARTIFACT | ClassRoles::RELIC)
@@ -432,7 +432,7 @@ pub(super) fn siege_in_reach(
     s: &Seeker,
     t: &Target,
     unit_ai_tuning: &UnitAiTuning,
-) -> Result<bool, GenieError> {
+) -> GenieResult<bool> {
     // `powf` with 2 (`DAT_142e8c150`), y's first
     let diagonal = sqrt(powf(me.radius.y(), 2.0) + powf(me.radius.x(), 2.0));
     let gap = footprint_point_gap(t.position, t.radius, s.state_position) - Distance::new(diagonal);

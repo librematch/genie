@@ -1,7 +1,6 @@
 //! One object's step with its [`Step`] ([`World::run_object`]) and a unit AI run outside its
 //! update.
 
-use crate::GenieError;
 use crate::construction::building_update::blasts_at_death;
 use crate::math::rng::Well512;
 use crate::objects::ListIndex;
@@ -15,6 +14,7 @@ use crate::unit_ai::{Surroundings, UnitAi};
 use crate::world::Millis;
 use crate::world::World;
 use crate::world::step::Step;
+use crate::{GenieError, GenieResult};
 
 impl World {
     /// One object's step with its `Step` (`f`: the unit's update, or one part of its unit AI
@@ -31,8 +31,8 @@ impl World {
         &mut self,
         (p, i): (PlayerId, ListIndex),
         (dt, turn): (Millis, Option<Millis>),
-        f: impl FnOnce(&mut Unit, &mut Action, &mut Step<'_>) -> Result<(Outcome, R), GenieError>,
-    ) -> Result<(Outcome, R), GenieError> {
+        f: impl FnOnce(&mut Unit, &mut Action, &mut Step<'_>) -> GenieResult<(Outcome, R)>,
+    ) -> GenieResult<(Outcome, R)> {
         let mut unit = self.take_out(p, i)?;
         let mut actions = self.parts.take_actions(unit.id);
         let watch = Watch::of(&unit, &actions, self.parts.unit_ai.get(unit.id));
@@ -99,8 +99,8 @@ impl World {
         &mut self,
         p: PlayerId,
         i: ListIndex,
-        f: impl FnOnce(&mut Unit, &mut Action, &mut Step<'_>) -> Result<R, GenieError>,
-    ) -> Result<R, GenieError> {
+        f: impl FnOnce(&mut Unit, &mut Action, &mut Step<'_>) -> GenieResult<R>,
+    ) -> GenieResult<R> {
         self.step_answering((p, i), (Millis::ZERO, None, false), |unit, actions, c| {
             Ok((Outcome::Stay, f(unit, actions, c)?))
         })
@@ -119,8 +119,8 @@ impl World {
     pub(crate) fn run_ai_calls<R>(
         &mut self,
         (p, i): (PlayerId, ListIndex),
-        f: impl FnOnce(&mut UnitAi, &mut UnitView<'_, '_>, &mut Well512) -> Result<R, GenieError>,
-    ) -> Result<R, GenieError> {
+        f: impl FnOnce(&mut UnitAi, &mut UnitView<'_, '_>, &mut Well512) -> GenieResult<R>,
+    ) -> GenieResult<R> {
         self.step_answering((p, i), (Millis::ZERO, None, false), |unit, actions, c| {
             Ok((Outcome::Stay, unit.run_calls(actions, c, f)?))
         })
@@ -144,8 +144,8 @@ impl World {
             &mut UnitView<'_, '_>,
             PlayerKind,
             &mut Well512,
-        ) -> Result<(), GenieError>,
-    ) -> Result<(), GenieError> {
+        ) -> GenieResult<()>,
+    ) -> GenieResult<()> {
         let stepped =
             self.step_object((p, i), (Millis::ZERO, None, false), |unit, actions, c| {
                 unit.run_ai(actions, c, f).map(|()| Outcome::Stay)

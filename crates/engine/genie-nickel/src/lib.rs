@@ -9,7 +9,7 @@ pub mod de;
 pub mod layer;
 pub mod round;
 
-use genie_error::GenieError;
+use genie_error::{GenieError, GenieResult};
 use nickel_lang::Context;
 use nickel_lang::ErrorFormat;
 use nickel_lang::Expr;
@@ -21,7 +21,7 @@ pub use self::de::from_expr;
 /// # Errors
 ///
 /// A [`GenieError`] with Nickel's message when the source does not evaluate.
-pub fn evaluate(source: &str, name: &str) -> Result<Expr, GenieError> {
+pub fn evaluate(source: &str, name: &str) -> GenieResult<Expr> {
     let mut context = Context::new().with_source_name(name.to_owned());
     context.eval_deep(source).map_err(|error| {
         let mut text = Vec::new();

@@ -1,6 +1,6 @@
 //! An Artifact's state: checking for a new owner and waiting between checks.
 
-use crate::GenieError;
+use crate::{GenieError, GenieResult};
 use derive_more::Display;
 use strum::FromRepr;
 
@@ -25,7 +25,7 @@ impl ArtifactState {
     /// # Errors
     ///
     /// A byte that names no state of an Artifact.
-    pub fn of_byte(value: u8) -> Result<Self, GenieError> {
+    pub fn of_byte(value: u8) -> GenieResult<Self> {
         Self::from_repr(value).ok_or_else(|| {
             GenieError::invalid_input("no state of an Artifact").with("state", value)
         })

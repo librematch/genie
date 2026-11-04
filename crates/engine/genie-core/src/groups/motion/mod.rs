@@ -3,7 +3,7 @@
 //! group's lead from the group's place, the walk toward the walked level's waypoint with its turn
 //! (`FUN_141046270`, `FUN_14104c150`), then the velocity along the vectors.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::groups::Motion;
 use crate::groups::MotionFlags;
 use crate::map::Footprint;
@@ -160,7 +160,7 @@ impl Motion {
     /// 2 go (`FUN_140f98e80`, each alone); that level walks again from waypoint 1 in state 2 with
     /// 10 tries; the top reached without one is reset ([`reset_level`]). A lone walked level
     /// stays as it is.
-    pub fn drop_to_high_level(&mut self) -> Result<(), GenieError> {
+    pub fn drop_to_high_level(&mut self) -> GenieResult<()> {
         if self.paths.len() < 2 {
             return Ok(());
         }
@@ -186,7 +186,7 @@ impl Motion {
 
     /// `FUN_14104a050`: the motion stops ([`Motion::stand`]) and its walked level resets
     /// (`FUN_140f98e80`, its path and its parents gone, its repath time kept).
-    pub(in crate::groups) fn stop_walk(&mut self) -> Result<(), GenieError> {
+    pub(in crate::groups) fn stop_walk(&mut self) -> GenieResult<()> {
         self.stand();
         reset_level(&mut self.paths)
     }
@@ -235,7 +235,7 @@ impl Motion {
     /// speed grows by `dt` times its acceleration; the new position moves by `dt` times each
     /// speed along its vector (forward, right, up) when that is above 1e-7 in size (motion flags
     /// bit 0); then the position is the new position, all four vectors.
-    pub fn integrate(&mut self, dt: Seconds) -> Result<(), GenieError> {
+    pub fn integrate(&mut self, dt: Seconds) -> GenieResult<()> {
         self.velocity = self
             .velocity
             .with_y(self.velocity.y() + dt.get() * self.acceleration.y());

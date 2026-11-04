@@ -2,7 +2,6 @@
 //! new Attack, a forced attack again on the unit's own target, the
 //! target as a hit reads it, the start's readiness, the target's sight and a villager's swap.
 
-use crate::GenieError;
 use crate::combat::attack::{
     Attack, AttackCommand, Mark, ReadyReads, Wielder, arms_looking, engagement, speed_of,
 };
@@ -35,6 +34,7 @@ use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
 use crate::world::slots::PlayerSlots;
 use crate::world::{ATTACKER_UNPLACED, NO_STANDING_SPRITE};
+use crate::{GenieError, GenieResult};
 
 impl UnitView<'_, '_> {
     /// The attack command (slot 0x338, `FUN_14120cea0`; classes 51 and 54 are not modelled) ->
@@ -59,7 +59,7 @@ impl UnitView<'_, '_> {
         force: OrderForce,
         ai: &UnitAi,
         roles: &Roles,
-    ) -> Result<Attacked, GenieError> {
+    ) -> GenieResult<Attacked> {
         // the unit's master, a copy: the attack's start changes the unit (its master's switch)
         let own = self
             .unit
@@ -157,7 +157,7 @@ impl UnitView<'_, '_> {
     /// The attack command's master: a villager switches to its player's villager of its task
     /// swap group first ([`UnitView::villager_swap`]; slot 0x90 with 0: the action list clears,
     /// then the master change at once, [`UnitView::switch_unit_master`]), else it keeps `own`.
-    fn swapped_master(&mut self, own: Master, roles: &Roles) -> Result<Master, GenieError> {
+    fn swapped_master(&mut self, own: Master, roles: &Roles) -> GenieResult<Master> {
         let Some(next) = self.villager_swap(&own, roles).cloned() else {
             return Ok(own);
         };
@@ -173,7 +173,7 @@ impl UnitView<'_, '_> {
         mut attack: Attack,
         by: Releaser,
         roles: &Roles,
-    ) -> Result<Attacked, GenieError> {
+    ) -> GenieResult<Attacked> {
         let unit = &mut *self.unit;
         attack.fail_at_start(
             &mut unit.sprite,
@@ -196,7 +196,7 @@ impl UnitView<'_, '_> {
     /// Attack on another target tears down (its `MoveTo`'s stops the unit) and lets its targets
     /// go (slot 0x180) through the view, as do the others. The releaser, the unit as master
     /// class `class`.
-    fn attack_clears_actions(&mut self, class: ClassId) -> Result<Releaser, GenieError> {
+    fn attack_clears_actions(&mut self, class: ClassId) -> GenieResult<Releaser> {
         let by = Releaser {
             id: self.unit.id,
             class: Some(class),
@@ -228,8 +228,8 @@ impl UnitView<'_, '_> {
         master: &Master,
         ai: &UnitAi,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
-        let mark = |id: ObjectId, p: &Placed| -> Result<Mark, GenieError> {
+    ) -> GenieResult<()> {
+        let mark = |id: ObjectId, p: &Placed| -> GenieResult<Mark> {
             let u = owner_view(
                 &self.c.w.players,
                 &self.c.w.index,
@@ -301,7 +301,7 @@ impl UnitView<'_, '_> {
     /// objects or another player's; None for an object the view does not hold (the owner's
     /// sleeping objects, or the old owner's of a unit taken over in its update, whose attributes
     /// it does not hold).
-    fn victim_of_target(&self, id: ObjectId, roles: &Roles) -> Result<Option<Victim>, GenieError> {
+    fn victim_of_target(&self, id: ObjectId, roles: &Roles) -> GenieResult<Option<Victim>> {
         let view = owner_view(
             &self.c.w.players,
             &self.c.w.index,
@@ -354,7 +354,7 @@ impl UnitView<'_, '_> {
         master: &Master,
         ai: &UnitAi,
         roles: &Roles,
-    ) -> Result<Option<ReadyReads>, GenieError> {
+    ) -> GenieResult<Option<ReadyReads>> {
         let Some(victim) = self.victim_of_target(target, roles)? else {
             return Ok(None);
         };
@@ -402,7 +402,7 @@ impl UnitView<'_, '_> {
     /// # Errors
     ///
     /// A tile the map's sight does not hold.
-    fn target_visible(&self, t: &Placed, target_master: &Master) -> Result<bool, GenieError> {
+    fn target_visible(&self, t: &Placed, target_master: &Master) -> GenieResult<bool> {
         let (tx, ty) = (t.position.x() as i32, t.position.y() as i32);
         Ok(self.c.w.spatial.sees_tile(self.player, Tile::new(tx, ty))
             || (target_master.fog_visibility != FogVisibility::INVISIBLE

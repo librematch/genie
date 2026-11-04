@@ -1,6 +1,5 @@
 //! The repair and enter commands of the unit AI and the auto scout's area.
 
-use crate::GenieError;
 use crate::construction::repair::{REPAIR, repairers};
 use crate::garrison::EnterSlot;
 use crate::map::Distance;
@@ -26,6 +25,7 @@ use crate::world::layer::Roles;
 use crate::world::layer::Slots;
 use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlots;
+use crate::{GenieError, GenieResult};
 
 impl UnitView<'_, '_> {
     /// The unit's repair command (slot 0x378, `FUN_141217c00`, forced) on `target`: an object the
@@ -42,7 +42,7 @@ impl UnitView<'_, '_> {
         target: ObjectId,
         slots: Slots,
         roles: &Roles,
-    ) -> Result<Answer, GenieError> {
+    ) -> GenieResult<Answer> {
         let unit = &*self.unit;
         let (player, others, foreign) = (
             self.player,
@@ -186,7 +186,7 @@ impl UnitView<'_, '_> {
         target: ObjectId,
         slots: Slots,
         roles: &Roles,
-    ) -> Result<Answer, GenieError> {
+    ) -> GenieResult<Answer> {
         let unit = &*self.unit;
         let (player, others, foreign) = (
             self.player,
@@ -303,7 +303,7 @@ impl UnitView<'_, '_> {
 
     /// What an explorer's searches ask of the world ([`ScoutArea::of`] for the unit), the map's
     /// size and the unit's line of sight.
-    pub(crate) fn scout_area(&mut self) -> Result<(ScoutArea<'_>, GridSize, Distance), GenieError> {
+    pub(crate) fn scout_area(&mut self) -> GenieResult<(ScoutArea<'_>, GridSize, Distance)> {
         let me = self.unit.me(self.actions);
         ScoutArea::of(self.c.w, self.unit, me, self.player, self.player_kind)
     }
@@ -313,10 +313,7 @@ impl UnitView<'_, '_> {
 /// master (`player+0x18`, `FUN_14104f560`: those of master 109, then 444, [`town_centres`]), as
 /// its tile. The index's order within a master is not held: two objects of the first master
 /// found are not modelled.
-pub(crate) fn town_centre(
-    units: OthersRef<'_>,
-    masters: MasterSlots,
-) -> Result<Option<Tile>, GenieError> {
+pub(crate) fn town_centre(units: OthersRef<'_>, masters: MasterSlots) -> GenieResult<Option<Tile>> {
     Ok(town_centre_unit(units, masters)?
         .map(|u| Tile::new(u.position().x() as i32, u.position().y() as i32)))
 }
@@ -325,7 +322,7 @@ pub(crate) fn town_centre(
 pub(crate) fn town_centre_unit(
     units: OthersRef<'_>,
     masters: MasterSlots,
-) -> Result<Option<&Unit>, GenieError> {
+) -> GenieResult<Option<&Unit>> {
     for master in town_centres(masters) {
         let mut found = units.own_iter().filter(|u| u.life.master_id == master);
         let Some(first) = found.next() else { continue };

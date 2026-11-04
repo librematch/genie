@@ -1,7 +1,6 @@
 //! The gathering actions of a saved object's top action: the Hunt, the Gather and a farm's
 //! Make ([`crate::world::load::top_actions::saved_actions`]).
 
-use crate::GenieError;
 use crate::combat::attack::{ATTACK, Attack, AttackState};
 use crate::gathering::DropSiteId;
 use crate::gathering::hunt::{HuntTask, Lead};
@@ -16,6 +15,7 @@ use crate::world::Seconds;
 use crate::world::load::sub_actions::saved_attack;
 use crate::world::load::sub_actions::saved_reload;
 use crate::world::load::top_actions::{Saved, TaskAt, first_action, saved_sub_move_to};
+use crate::{GenieError, GenieResult};
 use genie_save::generated::world::Action;
 
 /// A farm's Make (21): its timers and task; it makes no sub-action.
@@ -23,7 +23,7 @@ pub fn import_make(
     saved: &Saved<'_>,
     task_at: TaskAt<'_>,
     actions: &mut layers::Action,
-) -> Result<(), GenieError> {
+) -> GenieResult<()> {
     let base = saved.base;
     let make = saved
         .action
@@ -62,7 +62,7 @@ pub fn import_hunt(
     saved: &Saved<'_>,
     task_at: TaskAt<'_>,
     actions: &mut layers::Action,
-) -> Result<(), GenieError> {
+) -> GenieResult<()> {
     use crate::gathering::hunt::{HuntAction, HuntState};
     let base = saved.base;
     let part = saved
@@ -127,7 +127,7 @@ pub fn import_hunt(
 
 /// A Hunt's Attack. A swing past its hit: the swing's times (`+0xb0`, `+0xb4`, unsaved) are
 /// what the hit left, the reload less the attack sprite's length.
-fn hunt_attack(saved: &Saved<'_>, sub: &Action) -> Result<Attack, GenieError> {
+fn hunt_attack(saved: &Saved<'_>, sub: &Action) -> GenieResult<Attack> {
     let mut attack = saved_attack(sub, saved.graphics)?;
     if attack.state == AttackState::Swing && !attack.pending {
         let reload = saved_reload(saved.object, saved.s, saved.objects).ok_or(
@@ -148,7 +148,7 @@ pub fn import_gather(
     saved: &Saved<'_>,
     task_at: TaskAt<'_>,
     actions: &mut layers::Action,
-) -> Result<(), GenieError> {
+) -> GenieResult<()> {
     use crate::gathering::gather::{GatherAction, GatherState};
     let base = saved.base;
     let part = saved

@@ -1,7 +1,6 @@
 //! The life cycle's step in a unit's update: the hit points, the states, and what each new
 //! state sets off.
 
-use crate::GenieError;
 use crate::math::rng::Stream;
 use crate::movement::Speed;
 use crate::objects::AnimateState;
@@ -20,6 +19,7 @@ use crate::objects::unit::{Outcome, Unit};
 use crate::world::layer::Roles;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
+use crate::{GenieError, GenieResult};
 
 impl Unit {
     /// The life cycle's part of the update: the storage that a dying object's player loses
@@ -32,7 +32,7 @@ impl Unit {
         actions: &mut Action,
         c: &mut Step<'_>,
         roles: &Roles,
-    ) -> Result<Outcome, GenieError> {
+    ) -> GenieResult<Outcome> {
         self.dying_storage_leaves(c)?;
         let before = self.life.state;
         if before == ObjectState::DyingSprite && self.sprite.is_none() {
@@ -67,7 +67,7 @@ impl Unit {
     /// # Errors
     ///
     /// An attribute the player does not have.
-    pub(crate) fn dying_storage_leaves(&self, c: &mut Step<'_>) -> Result<(), GenieError> {
+    pub(crate) fn dying_storage_leaves(&self, c: &mut Step<'_>) -> GenieResult<()> {
         // a NaN hit point is not below one
         if !(self.life.is_alive() && self.life.hp < HitPoints::new(1.0)) {
             return Ok(());
@@ -100,7 +100,7 @@ impl Unit {
         c: &mut Step<'_>,
         before: ObjectState,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let after = self.life.state;
         if before <= ObjectState::Alive && ObjectState::Dying <= after {
             self.died(actions, c, before, roles)?;
@@ -143,7 +143,7 @@ impl Unit {
         c: &mut Step<'_>,
         before: ObjectState,
         after: ObjectState,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if ObjectState::Dying < after
             && after != before
             && !(before == ObjectState::DyingSprite && after == ObjectState::Dead)
@@ -169,7 +169,7 @@ impl Unit {
         c: &mut Step<'_>,
         before: ObjectState,
         after: ObjectState,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if after == before {
             return Ok(());
         }
@@ -207,7 +207,7 @@ impl Unit {
         &mut self,
         actions: &mut Action,
         c: &mut Step<'_>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         c.w.parts.set_anim_speed(self.id, Speed::ZERO);
         let master = self.master(c.w.master_tables(), c.player)?;
         if master.kind < MasterKind::BUILDING
@@ -233,7 +233,7 @@ impl Unit {
         &mut self,
         actions: &mut Action,
         c: &mut Step<'_>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let spawn = self.master(c.w.master_tables(), c.player)?.death_spawns[0];
         let spawn = spawn.ok_or(GenieError::missing_data(
             "a death spawn the dead object's master no longer names",

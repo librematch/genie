@@ -1,6 +1,5 @@
 //! The notifies' processing: their queue, their acceptance and their buffer.
 
-use crate::GenieError;
 use crate::map::Point;
 use crate::math::rng::Well512;
 use crate::objects::ObjectId;
@@ -18,6 +17,7 @@ use crate::world::layer::Roles;
 use crate::world::layer::Slots;
 use crate::world::layer::generated::UnitAiTuning;
 use crate::world::slots::CheckedIndex;
+use crate::{GenieError, GenieResult};
 use std::mem::take;
 
 /// What a unit AI's call from outside its full update reads of the build layer
@@ -61,7 +61,7 @@ impl<'a> Inbox<'a> {
     /// # Errors
     ///
     /// The post's.
-    pub fn post(&mut self, kind: NotifyKind, p: [i32; 3]) -> Result<(), GenieError> {
+    pub fn post(&mut self, kind: NotifyKind, p: [i32; 3]) -> GenieResult<()> {
         match self.ai.as_deref_mut() {
             Some(ai) => ai.post(Notify::own(self.id, kind, p), self.state),
             None => Ok(()),
@@ -82,7 +82,7 @@ impl UnitAi {
         player_kind: PlayerKind,
         ai_rng: &mut Well512,
         side: &mut UnitView<'_, '_>,
-    ) -> Result<u32, GenieError> {
+    ) -> GenieResult<u32> {
         let mut result = GO_ON;
         while !self.notifies.is_empty() && result == GO_ON {
             self.processing = true;
@@ -120,7 +120,7 @@ impl UnitAi {
         at: &Surroundings,
         side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if self.completes() {
             self.remove_target();
             self.stop_current(StopOrder::Keep, at, side, rng)?;
@@ -155,7 +155,7 @@ impl UnitAi {
         side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
         layer: AiLayer<'_>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let at = Surroundings {
             position: place.0.with_height(0.0),
             class: place.1,
@@ -173,7 +173,7 @@ impl UnitAi {
     /// # Errors
     ///
     /// A completion that would stop the action.
-    pub fn clear_notifies(&mut self, time: Millis) -> Result<(), GenieError> {
+    pub fn clear_notifies(&mut self, time: Millis) -> GenieResult<()> {
         if self.completes() {
             return Err(GenieError::unsupported(
                 "a completion stopping the action outside the full update",
@@ -189,7 +189,7 @@ impl UnitAi {
     /// 0x38 ([`UnitAi::accept`]). A notify the AI does not take (any but 699) goes to the
     /// owner's slot 0x2e8 (`FUN_14162dab0`, the human player's alerts), which the slice does not
     /// hold.
-    pub fn post(&mut self, n: Notify, unit_state: ObjectState) -> Result<(), GenieError> {
+    pub fn post(&mut self, n: Notify, unit_state: ObjectState) -> GenieResult<()> {
         let _ = self.accept(n, unit_state);
         Ok(())
     }

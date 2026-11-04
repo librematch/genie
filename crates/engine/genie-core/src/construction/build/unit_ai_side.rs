@@ -2,7 +2,6 @@
 //! build command takes a foundation, the builder's search for another foundation, and a unit's
 //! spot off a foundation's footprint.
 
-use crate::GenieError;
 use crate::commands::FOUNDATION_GONE;
 use crate::construction::FoundationId;
 use crate::map::Footprint;
@@ -29,6 +28,7 @@ use crate::world::layer::Roles;
 use crate::world::layer::Slots;
 use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlots;
+use crate::{GenieError, GenieResult};
 
 impl UnitView<'_, '_> {
     /// Slot 0x380's answer (forced) on `foundation` without its effects, which `BuildObject`
@@ -40,7 +40,7 @@ impl UnitView<'_, '_> {
         foundation: FoundationId,
         slots: Slots,
         roles: &Roles,
-    ) -> Result<bool, GenieError> {
+    ) -> GenieResult<bool> {
         let view = owner_view(
             &self.c.w.players,
             &self.c.w.index,
@@ -75,7 +75,7 @@ impl UnitView<'_, '_> {
         foundation: FoundationId,
         slots: Slots,
         roles: &Roles,
-    ) -> Result<bool, GenieError> {
+    ) -> GenieResult<bool> {
         let view = owner_view(
             &self.c.w.players,
             &self.c.w.index,
@@ -163,7 +163,7 @@ impl UnitView<'_, '_> {
     /// larger of its search radius (slot 0x2c8) and its line of sight, truncated, testing each tile
     /// it reaches (`FUN_140c2b950`: the first object of its tile's list, in order, of type 80 or
     /// more in state 0 of the unit's player), if any.
-    pub(crate) fn own_foundation_near(&self) -> Result<Option<ObjectId>, GenieError> {
+    pub(crate) fn own_foundation_near(&self) -> GenieResult<Option<ObjectId>> {
         let unit = &*self.unit;
         let master = unit.master(self.c.w.master_tables(), self.player)?;
         let r = (if master.action_part().search_radius <= master.line_of_sight {
@@ -184,7 +184,7 @@ impl UnitView<'_, '_> {
             MasterTables::new(&self.c.w.model.masters, &self.c.w.parts.own_master),
             &self.c.w.spatial,
         );
-        let foundation_on = |tile: Tile| -> Result<Option<ObjectId>, GenieError> {
+        let foundation_on = |tile: Tile| -> GenieResult<Option<ObjectId>> {
             for (id, p) in spatial.objects_on(tile) {
                 if p.player != player {
                     continue;
@@ -211,7 +211,7 @@ impl UnitView<'_, '_> {
         &mut self,
         site: FoundationId,
         radius: Footprint,
-    ) -> Result<OffFootprint, GenieError> {
+    ) -> GenieResult<OffFootprint> {
         let by_id = ObjectsRef::new(
             &self.c.w.players,
             &self.c.w.index,

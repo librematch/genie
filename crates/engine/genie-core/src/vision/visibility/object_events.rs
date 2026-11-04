@@ -1,7 +1,6 @@
 //! The sight of a combat object's update and its registry, an ownership change and a
 //! construction's start and completion.
 
-use crate::GenieError;
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::Point;
@@ -23,6 +22,7 @@ use crate::world::GameMode;
 use crate::world::layer::Roles;
 use crate::world::layer::generated::VisibilityTuning;
 use crate::world::player::Player;
+use crate::{GenieError, GenieResult};
 
 /// An object update past the registry check finds the registry gone.
 const NO_REGISTRY: GenieError =
@@ -86,7 +86,7 @@ impl Visibility {
         radius: Footprint,
         class: ClassId,
         main: Option<(Position, u8)>,
-    ) -> Result<Option<VisionBits>, GenieError> {
+    ) -> GenieResult<Option<VisionBits>> {
         let Some(s) = self.seers.get(id).copied() else {
             return Ok(None);
         };
@@ -160,7 +160,7 @@ impl Visibility {
         at: Position,
         old: (Footprint, ClassId),
         new: (Footprint, ClassId),
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let Some(r) = self.registry.as_mut().filter(|_| !id.is_recyclable()) else {
             return Ok(());
         };
@@ -194,7 +194,7 @@ impl Visibility {
         at: Position,
         radius: Footprint,
         class: ClassId,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let Some(r) = self.registry.as_mut().filter(|_| !id.is_recyclable()) else {
             return Ok(());
         };
@@ -215,7 +215,7 @@ impl Visibility {
     /// An ownership change's records (`FUN_14120f800`, first of all and whatever the new owner's
     /// masters): an object with an id (`+0x8` not below 0) writes the new owner's id into each of
     /// its records (`+0x8b0`..`+0x8f0`), which keep their place in every list.
-    pub fn records_owner(&mut self, id: ObjectId, new: PlayerId) -> Result<(), GenieError> {
+    pub fn records_owner(&mut self, id: ObjectId, new: PlayerId) -> GenieResult<()> {
         match self.registry.as_mut() {
             Some(r) if !id.is_recyclable() => r.owner_changed(id, new),
             _ => Ok(()),
@@ -235,7 +235,7 @@ impl Visibility {
         (new, los): (PlayerId, f32),
         sees: Seeing,
         sight: SightLayer<'_>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let SightLayer {
             roles,
             visibility_tuning,
@@ -286,7 +286,7 @@ impl Visibility {
         radius: Footprint,
         roles: &Roles,
         visibility_tuning: VisibilityTuning,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let Some(b) = self.seers.get_mut(id).and_then(|s| s.building.as_mut()) else {
             return Ok(());
         };
@@ -328,7 +328,7 @@ impl Visibility {
         radius: Footprint,
         roles: &Roles,
         visibility_tuning: VisibilityTuning,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if let Some(b) = self.seers.get_mut(id).and_then(|s| s.building.as_mut())
             && *b == BuildingSight::Unstarted
         {

@@ -2,7 +2,7 @@
 //! world's table ([`Parts::actions`]), an empty one where the table holds none, and the
 //! updating object's layer out of the table with its row ([`Parts::take_actions`]).
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::objects::ObjectId;
 use crate::objects::layers::Action;
 use crate::world::parts::{PartTable, Parts};
@@ -26,7 +26,7 @@ impl PartTable<Action> {
     /// # Errors
     ///
     /// None (an unreachable error where the table lost the layer it took).
-    pub(crate) fn of_mut(&mut self, id: ObjectId) -> Result<&mut Action, GenieError> {
+    pub(crate) fn of_mut(&mut self, id: ObjectId) -> GenieResult<&mut Action> {
         self.get_or_insert_with(id, Action::default)
     }
 }
@@ -46,7 +46,7 @@ impl Parts {
     /// # Errors
     ///
     /// None (an unreachable error where the table lost the layer it took).
-    pub(crate) fn actions_mut(&mut self, id: ObjectId) -> Result<&mut Action, GenieError> {
+    pub(crate) fn actions_mut(&mut self, id: ObjectId) -> GenieResult<&mut Action> {
         self.actions.of_mut(id)
     }
 

@@ -1,7 +1,7 @@
 //! The `MoveTo`s the Gather's `set_state` makes (`0x140a8cd40`): what their constructors read of
 //! the unit, and the two the Gather uses, one to an object and one to a point.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::gathering::gather::{GatherAction, GatherReads};
 use crate::map::Distance;
 use crate::map::Position;
@@ -79,7 +79,7 @@ impl GatherAction {
         mover: &Mover,
         walks: &Walks<'_>,
         move_to_tuning: &MoveToTuning,
-    ) -> Result<Option<MoveToAction>, GenieError> {
+    ) -> GenieResult<Option<MoveToAction>> {
         let given = self.task.walk_sprite_id(walks.held);
         walks.live(mover).to_object(
             to,
@@ -107,7 +107,7 @@ impl GatherAction {
         mover: &Mover,
         walks: &Walks<'_>,
         move_to_tuning: &MoveToTuning,
-    ) -> Result<Option<MoveToAction>, GenieError> {
+    ) -> GenieResult<Option<MoveToAction>> {
         let given = self.task.walk_sprite_id(walks.held);
         let walk = walks
             .live(mover)

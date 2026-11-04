@@ -1,7 +1,6 @@
 //! The player's resources and attributes: the modify and multiply slots, the store, the
 //! setters and the side effects of allied vision and the farms' food.
 
-use crate::GenieError;
 use crate::math::fmath::below_or_unordered;
 use crate::objects::ObjectId;
 use crate::objects::masters::MasterKind;
@@ -15,6 +14,7 @@ use crate::world::AllySharing;
 use crate::world::World;
 use crate::world::layer::AttributeRoles;
 use crate::world::slots::{CheckedIndex, PlayerSlots};
+use crate::{GenieError, GenieResult};
 
 impl World {
     /// Slot 0x1b0 (`FUN_141620c70`) of player `p` on resource `attribute` with `amount`: every
@@ -30,7 +30,7 @@ impl World {
         attribute: AttributeId,
         amount: Amount,
         change: ResourceChange,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         self.all_garrison_volleys(p, EffectHook::Before)?;
         match change {
             ResourceChange::Set => self.set_player_attribute(p, attribute, amount)?,
@@ -46,7 +46,7 @@ impl World {
         p: PlayerId,
         attribute: AttributeId,
         v: f32,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         self.all_garrison_volleys(p, EffectHook::Before)?;
         let value = self.attribute_of(p, attribute) * v;
         self.set_player_attribute(p, attribute, value)?;
@@ -59,7 +59,7 @@ impl World {
         &mut self,
         p: PlayerId,
         hook: EffectHook,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let ids: Vec<ObjectId> = self
             .players
             .player(p)?
@@ -88,7 +88,7 @@ impl World {
         p: PlayerId,
         attribute: AttributeId,
         v: Amount,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let player = self.players.player_mut(p)?;
         let i = attribute.index();
         if player.attributes.len() <= i {
@@ -108,7 +108,7 @@ impl World {
         p: PlayerId,
         attribute: AttributeId,
         v: Amount,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         {
             let held = self.model.roles.of_attribute(attribute);
             if held.contains(AttributeRoles::ALLIED_VISION) {
@@ -155,7 +155,7 @@ impl World {
         p: PlayerId,
         attribute: AttributeId,
         v: Amount,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         {
             let held = self.model.roles.of_attribute(attribute);
             if held.contains(AttributeRoles::ALLIED_VISION) {
@@ -190,7 +190,7 @@ impl World {
     /// Attribute 0x32's side effect: player `p`'s allied vision (`+0x2cc`) on, the masks rebuilt
     /// (the world's slot 0x78, `FUN_1415e92b0`) and its tile list refilled
     /// ([`World::refill_tiles`], `FUN_141285cb0`).
-    pub(super) fn allied_vision_on(&mut self, p: PlayerId) -> Result<(), GenieError> {
+    pub(super) fn allied_vision_on(&mut self, p: PlayerId) -> GenieResult<()> {
         self.players
             .player_mut(p)?
             .ally_sharing
@@ -207,12 +207,7 @@ impl World {
     /// order, [`World::tracked_key`]) from type 40 on with an action (its Make) has the food still to make (`+0x44`) grow: with `held` its food
     /// (`+0x310`) and `f = held + still to make`, it takes `(f / before)^exponent × amount + f −
     /// held` (`powf`, here libm's).
-    pub(super) fn farm_food(
-        &mut self,
-        p: PlayerId,
-        before: f32,
-        amount: f32,
-    ) -> Result<(), GenieError> {
+    pub(super) fn farm_food(&mut self, p: PlayerId, before: f32, amount: f32) -> GenieResult<()> {
         let exponent = self
             .attribute_of(p, self.model.slots.attribute.farm_exponent)
             .get();

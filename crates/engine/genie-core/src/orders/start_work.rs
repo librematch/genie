@@ -16,7 +16,6 @@
 //! mule cart), may be interrupted as above and has a unit AI runs that AI's slot 0x1e8, the
 //! cart's own search for resources ([`World::cart_work_search`]).
 
-use crate::GenieError;
 use crate::construction::build::CART_TASK;
 use crate::gathering::gather_search::closest_resource_at;
 use crate::gathering::gather_search::{self, Candidates, ResourceWorld};
@@ -44,6 +43,7 @@ use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 use crate::world::settings::FarmMode;
 use crate::world::slots::PlayerSlots;
+use crate::{GenieError, GenieResult};
 
 /// The gather groups the resource search tries, in order (0 to 4).
 const GROUPS: [GatherGroup; 5] = [
@@ -100,7 +100,7 @@ impl World {
     ///
     /// The pass without the game's farm setting (the player's nearest unworked farm), a fishing
     /// ship's own search (its unit AI's slot 0x80), and what the work command does not model.
-    pub(crate) fn start_work(&mut self, p: PlayerId) -> Result<(), GenieError> {
+    pub(crate) fn start_work(&mut self, p: PlayerId) -> GenieResult<()> {
         let mut i = ListIndex::FIRST;
         while self.players.player(p)?.objects.holds(i) {
             let unit = &self.players.live(p, i)?;
@@ -184,7 +184,7 @@ impl World {
         p: PlayerId,
         i: ListIndex,
         class: ClassId,
-    ) -> Result<Option<ObjectId>, GenieError> {
+    ) -> GenieResult<Option<ObjectId>> {
         let at = self.players.live(p, i)?.position();
         let (x, y) = (at.x() as i32, at.y() as i32);
         self.spatial
@@ -218,11 +218,7 @@ impl World {
 
     /// The unit AI's `ClosestResourceObject` for each gather group (no drop site, any workers,
     /// `param_6` 2, no point): the answer at the least distance, the first group at a tie.
-    fn closest_of_groups(
-        &mut self,
-        p: PlayerId,
-        i: ListIndex,
-    ) -> Result<Option<ObjectId>, GenieError> {
+    fn closest_of_groups(&mut self, p: PlayerId, i: ListIndex) -> GenieResult<Option<ObjectId>> {
         let mut best = (NO_DISTANCE, None);
         for kind in GROUPS {
             let (id, distance) = self.resource_search_from(p, i, kind)?;
@@ -239,11 +235,7 @@ impl World {
     /// # Errors
     ///
     /// A master the world does not hold, or a unit without a unit AI.
-    fn search_seeker(
-        &self,
-        p: PlayerId,
-        unit: &Unit,
-    ) -> Result<(gather_search::Seeker, Me), GenieError> {
+    fn search_seeker(&self, p: PlayerId, unit: &Unit) -> GenieResult<(gather_search::Seeker, Me)> {
         let master = unit.master(self.master_tables(), p)?;
         let ai = self
             .parts
@@ -273,7 +265,7 @@ impl World {
         p: PlayerId,
         i: ListIndex,
         kind: GatherGroup,
-    ) -> Result<(Option<ObjectId>, Option<i32>), GenieError> {
+    ) -> GenieResult<(Option<ObjectId>, Option<i32>)> {
         let owner = self.players.player(p)?;
         let unit = owner.live(i)?;
         let mover = self.parts.mover_of(unit.id).ok_or(GenieError::unsupported(

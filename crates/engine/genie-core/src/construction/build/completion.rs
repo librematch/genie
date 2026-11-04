@@ -1,7 +1,6 @@
 //! A foundation's completion on the world (`FUN_1411dbb70` from state 0 to 2): each of its parts
 //! is the call the game makes, where the game makes it.
 
-use crate::GenieError;
 use crate::construction::build::construction::{
     completion_counts, foundation_laid, hand_storage, lay_foundation,
 };
@@ -24,6 +23,7 @@ use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 use crate::world::layer::Slots;
 use crate::world::slots::PlayerSlots;
+use crate::{GenieError, GenieResult};
 use genie_model::model::Model;
 
 impl World {
@@ -50,7 +50,7 @@ impl World {
     /// # Errors
     ///
     /// What the completion does not model, and a building without its master or place.
-    pub(crate) fn complete_building(&mut self, id: ObjectId) -> Result<(), GenieError> {
+    pub(crate) fn complete_building(&mut self, id: ObjectId) -> GenieResult<()> {
         if self.attribute_204() {
             return Err(REVEAL_UNITS);
         }
@@ -114,7 +114,7 @@ impl World {
         p: PlayerId,
         id: ObjectId,
         master: &Master,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let (_, layer) = self.object_and_layer_mut(id)?.ok_or(NOT_HELD)?;
         let c = layer.construction.as_mut().ok_or(NO_CONSTRUCTION)?;
         c.progress = Seconds::of_master(c.build_time);
@@ -140,7 +140,7 @@ impl World {
         id: ObjectId,
         master: &Master,
         placed: &Placed,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if !self
             .model
             .roles
@@ -195,7 +195,7 @@ impl World {
         master: &Master,
         building: &BuildingMaster,
         placed: &Placed,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let Some(stack_unit) = building.stack_unit else {
             return Ok(());
         };
@@ -241,7 +241,7 @@ impl World {
         master: &Master,
         building: &BuildingMaster,
         placed: &Placed,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let mode_680 = self.mode_680;
         let place = self.place(id).ok_or(NOT_HELD)?;
         let Self {

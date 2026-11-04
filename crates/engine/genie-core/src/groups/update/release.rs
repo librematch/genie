@@ -2,7 +2,6 @@
 //! "`UnlockedAttackWithoutPlan`"), which the attack update ([`World::attack_update`]) runs for the
 //! units of a category in reach.
 
-use crate::GenieError;
 use crate::groups::GroupId;
 use crate::groups::LeavingWalk;
 use crate::groups::MovePath;
@@ -15,6 +14,7 @@ use crate::orders::OrderSource;
 use crate::orders::Work;
 use crate::world::World;
 use crate::world::index::Place;
+use crate::{GenieError, GenieResult};
 
 impl World {
     /// `FUN_14103d460` of group `group` for the units `units` (the ids a category lists) and
@@ -40,7 +40,7 @@ impl World {
         group: GroupId,
         units: &[ObjectId],
         target: ObjectId,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if self.world_object(target).is_none() {
             return Ok(());
         }
@@ -51,12 +51,7 @@ impl World {
     }
 
     /// [`World::release_units`]' step for the unit `id`.
-    fn release_unit(
-        &mut self,
-        group: GroupId,
-        id: ObjectId,
-        target: ObjectId,
-    ) -> Result<(), GenieError> {
+    fn release_unit(&mut self, group: GroupId, id: ObjectId, target: ObjectId) -> GenieResult<()> {
         let Some(Place::Live(..)) = self.place(id) else {
             return Ok(());
         };
@@ -111,7 +106,7 @@ impl World {
     /// # Errors
     ///
     /// A unit that is no member: the game writes the record before the array.
-    fn clear_own_move(&mut self, group: GroupId, id: ObjectId) -> Result<(), GenieError> {
+    fn clear_own_move(&mut self, group: GroupId, id: ObjectId) -> GenieResult<()> {
         let record = self
             .groups
             .held_mut(group)?

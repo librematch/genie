@@ -1,7 +1,6 @@
 //! The mule cart: the resources a finished cart searches (its completion, `FUN_1411c6bd0`'s
 //! tail) and its unit AI's own search (slot 0x1e8), then the work command toward the one it found.
 
-use crate::GenieError;
 use crate::construction::build::CART_TASK;
 use crate::gathering::DropSiteId;
 use crate::gathering::closest_resource::{ResourceWorld, closest_resource_of};
@@ -26,6 +25,7 @@ use crate::world::index::ObjectsRef;
 use crate::world::layer::ClassRoles;
 use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlots;
+use crate::{GenieError, GenieResult};
 use std::mem::replace;
 
 impl World {
@@ -40,7 +40,7 @@ impl World {
         p: PlayerId,
         id: ObjectId,
         state: ObjectState,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let _ = self.players.player(p)?;
         let Some(idx) = self.live_index(p, id) else {
             return Ok(());
@@ -86,11 +86,7 @@ impl World {
     /// the cart at `idx` of player `p`: [`World::cart_find`], then [`World::cart_work`]. The
     /// completion runs it ([`World::cart_search`]), and so does the Empire Wars start
     /// ([`crate::orders::start_work`]).
-    pub(crate) fn cart_work_search(
-        &mut self,
-        p: PlayerId,
-        idx: ListIndex,
-    ) -> Result<(), GenieError> {
+    pub(crate) fn cart_work_search(&mut self, p: PlayerId, idx: ListIndex) -> GenieResult<()> {
         let found = self.cart_find(p, idx)?;
         self.cart_work(p, idx, found)
     }
@@ -105,7 +101,7 @@ impl World {
         &mut self,
         p: PlayerId,
         idx: ListIndex,
-    ) -> Result<(Option<ObjectId>, Position), GenieError> {
+    ) -> GenieResult<(Option<ObjectId>, Position)> {
         let id = self.players.live(p, idx)?.id;
         let current = self
             .parts
@@ -222,7 +218,7 @@ impl World {
         p: PlayerId,
         idx: ListIndex,
         (target, point): (Option<ObjectId>, Position),
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let work = Work {
             target,
             point,

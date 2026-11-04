@@ -1,6 +1,5 @@
 //! A player ([`Player`]): its objects, attributes and formations, and the stop of its update.
 
-use crate::GenieError;
 use crate::gathering::QueueCount;
 use crate::map::Distance;
 use crate::map::WholeDistance;
@@ -26,6 +25,7 @@ use crate::world::World;
 use crate::world::layer::Slots;
 use crate::world::slots::PlayerSlots;
 use crate::world::{LureDestination, Percent, TargetingMode, Tick, VillagerGarrison};
+use crate::{GenieError, GenieResult};
 
 /// A player's settings for the groups an order's splitter forms ([`Player::formations`]).
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -248,12 +248,12 @@ pub(crate) const NO_ATTRIBUTE: GenieError =
 
 impl Attributes for Player {
     /// An attribute's value.
-    fn get(&self, i: AttributeId) -> Result<Amount, GenieError> {
+    fn get(&self, i: AttributeId) -> GenieResult<Amount> {
         self.attribute(i).ok_or(NO_ATTRIBUTE)
     }
 
     /// An attribute less `amount`, as a payment takes it (no side effects).
-    fn subtract(&mut self, i: AttributeId, amount: Amount) -> Result<(), GenieError> {
+    fn subtract(&mut self, i: AttributeId, amount: Amount) -> GenieResult<()> {
         *self.attributes.get_mut(i.index()).ok_or(NO_ATTRIBUTE)? -= amount;
         Ok(())
     }
@@ -294,7 +294,7 @@ impl Player {
     /// # Errors
     ///
     /// An attribute the player does not have.
-    pub fn set_attribute(&mut self, attribute: AttributeId, v: Amount) -> Result<(), GenieError> {
+    pub fn set_attribute(&mut self, attribute: AttributeId, v: Amount) -> GenieResult<()> {
         *self
             .attributes
             .get_mut(attribute.index())
@@ -322,7 +322,7 @@ impl Player {
     /// by `amount` (`FUN_14165d040`; the peak of attribute 11, `+0x6fc`, and the resource events of
     /// `FUN_140c898a0` are not held). The attributes whose change has side effects (50, 183, 196)
     /// are not modelled.
-    pub fn add_attribute(&mut self, kind: AttributeId, amount: Amount) -> Result<(), GenieError> {
+    pub fn add_attribute(&mut self, kind: AttributeId, amount: Amount) -> GenieResult<()> {
         let i = kind.index();
         match i {
             50 | 183 | 196 => Err(GenieError::unsupported(
@@ -342,11 +342,7 @@ impl Player {
     /// # Errors
     ///
     /// [`Player::add_attribute`]'s.
-    pub fn take_at_least_zero(
-        &mut self,
-        kind: AttributeId,
-        amount: Amount,
-    ) -> Result<(), GenieError> {
+    pub fn take_at_least_zero(&mut self, kind: AttributeId, amount: Amount) -> GenieResult<()> {
         self.add_attribute(kind, -amount)?;
         if let Some(v) = self.attributes.get_mut(kind.index())
             && *v < Amount::ZERO
@@ -364,7 +360,7 @@ impl Player {
     pub fn add_attributes(
         &mut self,
         adds: impl IntoIterator<Item = (AttributeId, Amount)>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         for (kind, amount) in adds {
             self.add_attribute(kind, amount)?;
         }

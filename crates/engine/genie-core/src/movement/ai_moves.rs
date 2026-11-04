@@ -2,7 +2,6 @@
 //! the point) and to an object (slot 0x348), a move that gave up, and the standing sprite of a
 //! `MoveTo` that ends at its start.
 
-use crate::GenieError;
 use crate::map::Distance;
 use crate::map::Position;
 use crate::movement::Mover;
@@ -17,6 +16,7 @@ use crate::players::PlayerId;
 use crate::unit_ai::Answer;
 use crate::unit_ai::OrderForce;
 use crate::unit_ai::Pace;
+use crate::{GenieError, GenieResult};
 
 use crate::gathering::gather::Walks;
 use crate::gathering::hunt::HuntMove;
@@ -77,7 +77,7 @@ impl Unit {
         class: ClassId,
         c: &mut Step<'_>,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let by = self.releaser(c)?;
         let sprite_rng = c.w.streams.get(Stream::Sprite);
         let (mut releases, mut leaves) = (Vec::new(), Vec::new());
@@ -153,7 +153,7 @@ impl Unit {
             Releaser,
         ),
         (sprites, sprite_rng): (MoveSprites<'_>, &mut Well512),
-    ) -> Result<MoveWith, GenieError> {
+    ) -> GenieResult<MoveWith> {
         let MoveSprites {
             masters,
             graphics,
@@ -234,7 +234,7 @@ impl Unit {
         point: Position,
         player: PlayerId,
         sprites: MoveSprites<'_>,
-    ) -> Result<PointMove, GenieError> {
+    ) -> GenieResult<PointMove> {
         let MoveSprites {
             masters,
             graphics,
@@ -316,7 +316,7 @@ impl Unit {
 
     /// The sprites a `MoveTo` to a point that the unit's head action makes takes for none
     /// (`FUN_140aa0d30`'s default from the unit's master and terrain look).
-    fn point_sprites<'g>(&self, sprites: MoveSprites<'g>) -> Result<SpriteReads<'g>, GenieError> {
+    fn point_sprites<'g>(&self, sprites: MoveSprites<'g>) -> GenieResult<SpriteReads<'g>> {
         Ok(SpriteReads::of(
             self.master_in(sprites.masters)?,
             sprites.look,
@@ -337,7 +337,7 @@ impl Unit {
         point: Position,
         sprites: &SpriteReads<'_>,
         move_to_tuning: &MoveToTuning,
-    ) -> Result<PointMove, GenieError> {
+    ) -> GenieResult<PointMove> {
         let reads = MoveToReads::with_sprites(*sprites, (self, mover.as_deref()));
         let gone = match actions.list.artifact_mut() {
             Some(a) => a.take_point(point, &reads, move_to_tuning)?,
@@ -361,7 +361,7 @@ impl Unit {
         player: PlayerId,
         sprites: SpriteReads<'_>,
         move_to_tuning: &MoveToTuning,
-    ) -> Result<PointMove, GenieError> {
+    ) -> GenieResult<PointMove> {
         let my_pasture = self.my_pasture;
         let walks = Walks::of(sprites, (self, mover.as_deref()));
         let (Some(hunt), Some(mover)) = (actions.list.hunt_mut(), mover) else {
@@ -399,7 +399,7 @@ impl Unit {
         player: PlayerId,
         sprites: SpriteReads<'_>,
         move_to_tuning: &MoveToTuning,
-    ) -> Result<PointMove, GenieError> {
+    ) -> GenieResult<PointMove> {
         let walks = Walks::of(sprites, (self, mover.as_deref()));
         let (Some(gather), Some(mover)) = (actions.list.gather_mut(), mover) else {
             return Err(GenieError::unsupported(
@@ -425,7 +425,7 @@ impl Unit {
         range: Distance,
         c: &mut Step<'_>,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if c.w.parts.unread.contains(self.id) {
             return Err(GenieError::unsupported(
                 "an AI move to an object of a unit with an action",
@@ -502,7 +502,7 @@ impl Unit {
         stance: UnitStance,
         (masters, graphics, sprite_rng): (OwnerMasters<'_>, &Graphics, &mut Well512),
         sprite_tuning: SpriteTuning,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let Some(m) = actions.list.move_to_mut() else {
             return Ok(());
         };
@@ -523,7 +523,7 @@ impl Unit {
         graphics: &Graphics,
         sprite_rng: &mut Well512,
         sprite_tuning: SpriteTuning,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let standing = self
             .master_in(masters)?
             .standing_sprite
@@ -562,7 +562,7 @@ fn repair_takes_point(
     point: Position,
     move_reads: &MoveToReads<'_>,
     move_to_tuning: &MoveToTuning,
-) -> Result<PointMove, GenieError> {
+) -> GenieResult<PointMove> {
     let (old, counted) = repair.take_point(point, mover, move_reads, move_to_tuning)?;
     Ok(PointMove::Repairs(old, old.filter(|_| counted)))
 }

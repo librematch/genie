@@ -6,7 +6,6 @@
 
 mod damage;
 
-use crate::GenieError;
 use crate::combat::Charge;
 use crate::construction::build::BuildTask;
 use crate::construction::repair::RepairTask;
@@ -44,6 +43,7 @@ use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
 use crate::world::parts::Part;
 use crate::world::slots::PlayerSlots;
+use crate::{GenieError, GenieResult};
 use std::mem::take;
 
 /// A master's hit points this near 0 give no share (`ABS(x) <= 1.1920929e-07`).
@@ -135,7 +135,7 @@ impl World {
         place: Place,
         (old, new): (&Master, &Master),
         keep: UpgradeMaster,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let kind = old.kind;
         if MasterKind::BUILDING <= kind {
             let (from, to) = (
@@ -199,7 +199,7 @@ impl World {
         place: Place,
         (old, new): (&Master, &Master),
         keep: UpgradeMaster,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         self.actions_take_master(place, old, new)?;
         if keep == UpgradeMaster::Replaced
             && let Some(top) = self
@@ -221,7 +221,7 @@ impl World {
         &mut self,
         place: Place,
         (old, new): (&Master, &Master),
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let shows = |s: Option<SpriteId>| {
             self.object_at(place)
                 .ok()
@@ -244,7 +244,7 @@ impl World {
     /// (`FUN_141186580`): a combat object leaves its class counters
     /// ([`crate::objects::lifecycle::death_parts::count_class`] with −1) and a villager's load
     /// goes to its player (slot 0xf8 with 1 and 1, the foods as food).
-    fn hand_in_load(&mut self, p: PlayerId, place: Place, old: &Master) -> Result<(), GenieError> {
+    fn hand_in_load(&mut self, p: PlayerId, place: Place, old: &Master) -> GenieResult<()> {
         let kind = old.kind;
         if MasterKind::COMBAT <= kind {
             count_class(
@@ -302,7 +302,7 @@ impl World {
         place: Place,
         (old, new): (&Master, &Master),
         keep: UpgradeMaster,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let id = self.object_at(place)?.id;
         let u = self.object_at(place)?;
         if u.life.state == ObjectState::Alive
@@ -348,7 +348,7 @@ impl World {
         &mut self,
         place: Place,
         (old, new): (&Master, &Master),
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let kind = old.kind;
         let u = self.object_at(place)?;
         let most = HitPoints::of_master(old.hit_points).get();
@@ -406,7 +406,7 @@ impl World {
         place: Place,
         master: &Master,
         before: HpPercent,
-    ) -> Result<HpPercent, GenieError> {
+    ) -> GenieResult<HpPercent> {
         let graphics = take(&mut self.model.graphics);
         let mut object = take(self.streams.get(Stream::Object));
         let mut sprite = take(self.streams.get(Stream::Sprite));
@@ -432,7 +432,7 @@ impl World {
         place: Place,
         from: Option<SpriteId>,
         to: Option<SpriteId>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let shows = self
             .object_at(place)?
             .sprite
@@ -446,7 +446,7 @@ impl World {
     /// Slot 0x68 on the object at `place` with sprite `id`: a new instance unless it shows it
     /// already ([`crate::objects::sprite::new_sprite`] on the Sprite stream). Without the graphics (no
     /// data file) the Sprite stream is not modelled.
-    fn show(&mut self, place: Place, id: SpriteId) -> Result<(), GenieError> {
+    fn show(&mut self, place: Place, id: SpriteId) -> GenieResult<()> {
         if self.model.graphics.is_empty() {
             return Ok(());
         }
@@ -469,7 +469,7 @@ impl World {
     /// `FUN_141215a90` on the object at `place`, whose master became `new`: its unit AI goes and
     /// the factory's type for `new` makes another ([`crate::unit_ai::factory_kind`],
     /// [`crate::unit_ai::UnitAi::constructed`] on the AI stream), none for a class without.
-    fn new_unit_ai(&mut self, p: PlayerId, place: Place, new: &Master) -> Result<(), GenieError> {
+    fn new_unit_ai(&mut self, p: PlayerId, place: Place, new: &Master) -> GenieResult<()> {
         let position = self.object_at(place)?.position();
         let made = self.new_object(p, new.id, new, position)?;
         let ai = unit_ai_kind(new, new.id, &self.model.roles).map(|t| {
@@ -490,7 +490,7 @@ impl World {
         place: Place,
         old: &Master,
         new: &Master,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let find = |task: &Task| {
             new.action_part()
                 .tasks
@@ -569,7 +569,7 @@ impl World {
     /// # Errors
     ///
     /// A place the world does not hold.
-    pub(crate) fn object_at(&self, place: Place) -> Result<&Unit, GenieError> {
+    pub(crate) fn object_at(&self, place: Place) -> GenieResult<&Unit> {
         match place {
             Place::Live(q, i) => self.players.live(q, i),
             Place::Sleeping(q, i) => self.players.asleep(q, i),
@@ -581,7 +581,7 @@ impl World {
     /// # Errors
     ///
     /// A place the world does not hold.
-    pub(crate) fn object_at_mut(&mut self, place: Place) -> Result<&mut Unit, GenieError> {
+    pub(crate) fn object_at_mut(&mut self, place: Place) -> GenieResult<&mut Unit> {
         match place {
             Place::Live(q, i) => self.players.live_mut(q, i),
             Place::Sleeping(q, i) => self.players.asleep_mut(q, i),

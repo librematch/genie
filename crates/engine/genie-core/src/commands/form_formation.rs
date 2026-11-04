@@ -1,6 +1,6 @@
 //! `FORM_FORMATION` (0x17): the player's units form a formation.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::commands::UnitList;
 use crate::groups::FormationKind;
 use crate::players::PlayerId;
@@ -22,7 +22,7 @@ pub struct FormFormationCommand {
 impl FormFormationCommand {
     /// The check (`FUN_140e54dd0`, STOP's twin) refuses a count past the packet's ids; the
     /// handler reads the first of them ([`World::read_units`], [`World::form_formation`]).
-    pub(crate) fn run(&self, w: &mut World) -> Result<(), GenieError> {
+    pub(crate) fn run(&self, w: &mut World) -> GenieResult<()> {
         let Some(ids) = w.read_units(self.player, &self.units) else {
             return Ok(());
         };

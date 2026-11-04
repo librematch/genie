@@ -1,7 +1,6 @@
 //! A unit's answers to damage and attackers, to a unit in its way and to being sent off;
 //! the explorers' search.
 
-use crate::GenieError;
 use crate::construction::FoundationId;
 use crate::map::Distance;
 use crate::map::Footprint;
@@ -39,6 +38,7 @@ use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 use crate::world::layer::generated::UnitAiTuning;
+use crate::{GenieError, GenieResult};
 
 impl UnitAi {
     /// The base handler's damage case (`FUN_140c589c0`, cases 500 and a missile's warning, 0x20f:
@@ -86,7 +86,7 @@ impl UnitAi {
         player_kind: PlayerKind,
         ai_rng: &mut Well512,
         side: &mut UnitView<'_, '_>,
-    ) -> Result<u32, GenieError> {
+    ) -> GenieResult<u32> {
         let known = self.attackers.contains(n.caller);
         self.retries.clear();
         if known && side.top_target_now().is_some() {
@@ -184,7 +184,7 @@ impl UnitAi {
         at: &Surroundings,
         player_kind: PlayerKind,
         side: &mut UnitView<'_, '_>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let unit_ai_tuning = &at.unit_ai_tuning;
         let from = current.map_or(at.position, |t| t.position);
         let (classes, radius) = self.search_area(at, player_kind);
@@ -229,7 +229,7 @@ impl UnitAi {
         player_kind: PlayerKind,
         ai_rng: &mut Well512,
         side: &mut UnitView<'_, '_>,
-    ) -> Result<u32, GenieError> {
+    ) -> GenieResult<u32> {
         let roles = &at.roles;
         let attacker_id = attacker.id;
         let reaches = side.reaches(attacker_id, at.weapon_range)?;
@@ -266,7 +266,7 @@ impl UnitAi {
         at: &Surroundings,
         ai_rng: &mut Well512,
         side: &mut UnitView<'_, '_>,
-    ) -> Result<u32, GenieError> {
+    ) -> GenieResult<u32> {
         let unit_ai_tuning = &at.unit_ai_tuning;
         let roles = &at.roles;
         let attacker_id = attacker.id;
@@ -325,7 +325,7 @@ impl UnitAi {
         at: &Surroundings,
         ai_rng: &mut Well512,
         side: &mut UnitView<'_, '_>,
-    ) -> Result<u32, GenieError> {
+    ) -> GenieResult<u32> {
         if matches!(
             self.current_order,
             Some(OrderKind::Patrol | OrderKind::AttackMove)
@@ -353,7 +353,7 @@ impl UnitAi {
         at: &Surroundings,
         side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
-    ) -> Result<u32, GenieError> {
+    ) -> GenieResult<u32> {
         let roles = &at.roles;
         let boar = roles.of_some_class(at.class).contains(ClassRoles::PREDATOR)
             && at.combat_level == CombatLevel::ANIMAL;
@@ -388,7 +388,7 @@ impl UnitAi {
         rng: &mut Well512,
         roles: &Roles,
         unit_ai_tuning: &UnitAiTuning,
-    ) -> Result<u32, GenieError> {
+    ) -> GenieResult<u32> {
         let radius = Footprint::new(
             n.p[0] as f32 / unit_ai_tuning.radius_scale,
             n.p[1] as f32 / unit_ai_tuning.radius_scale,
@@ -450,7 +450,7 @@ impl UnitAi {
         m: AiMove,
         side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
-    ) -> Result<Answer, GenieError> {
+    ) -> GenieResult<Answer> {
         if m.force == OrderForce::Unforced && self.current_action.is_some() {
             return Ok(Answer::NotTaken);
         }
@@ -496,7 +496,7 @@ impl UnitAi {
         player_kind: PlayerKind,
         ai_rng: &mut Well512,
         side: &mut UnitView<'_, '_>,
-    ) -> Result<u32, GenieError> {
+    ) -> GenieResult<u32> {
         let unit_ai_tuning = &at.unit_ai_tuning;
         let action = self.current_action;
         let auto = action == Some(AiAction::AutoScout);

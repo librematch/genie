@@ -1,6 +1,5 @@
 //! The unit AI's state, gates, the auto scout and the STOP, EXPLORE and standing commands.
 
-use crate::GenieError;
 use crate::commands::UnloadPick;
 use crate::groups::LeavingWalk;
 use crate::groups::common_group;
@@ -27,6 +26,7 @@ use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::settings::OptionFlags;
 use crate::world::slots::PlayerSlots;
+use crate::{GenieError, GenieResult};
 
 impl World {
     /// `UNIT_AI_STATE` (`do_command` case 0x12): the check ([`World::command_check`]), then
@@ -39,7 +39,7 @@ impl World {
         player: PlayerId,
         ids: &[Option<ObjectId>],
         state: UnitStance,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let Some(ids) = self.command_check(player, ids)? else {
             return Ok(());
         };
@@ -104,7 +104,7 @@ impl World {
     /// cheat is not held). The object, live or sleeping (`FUN_1415417a0`), of a master of type 80
     /// toggles its gate lock: slot 0x670 ([`lock_gate`]) with slot 0x668's value negated. Its sound
     /// (slot 0x4c0) and the UI's flag are not held.
-    pub(crate) fn gate(&mut self, player: PlayerId, id: ObjectId) -> Result<(), GenieError> {
+    pub(crate) fn gate(&mut self, player: PlayerId, id: ObjectId) -> GenieResult<()> {
         let Some((p, unit)) = self.object(id) else {
             return Ok(());
         };
@@ -135,7 +135,7 @@ impl World {
         &mut self,
         player: PlayerId,
         ids: &[Option<ObjectId>],
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         use crate::unit_ai::QueuedOrder;
         let cap = if self.players.player(player)?.kind.is_computer() {
             500
@@ -241,7 +241,7 @@ impl World {
         &mut self,
         player: PlayerId,
         ids: &[Option<ObjectId>],
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let Some(ids) = self.command_check(player, ids)? else {
             return Ok(());
         };
@@ -316,7 +316,7 @@ impl World {
         &self,
         player: PlayerId,
         ids: &[Option<ObjectId>],
-    ) -> Result<Option<Vec<Option<ObjectId>>>, GenieError> {
+    ) -> GenieResult<Option<Vec<Option<ObjectId>>>> {
         let player_kind = self.players.player(player)?.kind;
         let checked = ids
             .len()
@@ -356,7 +356,7 @@ impl World {
         player: PlayerId,
         ids: &[Option<ObjectId>],
         pick: UnloadPick,
-    ) -> Result<Option<Vec<Option<ObjectId>>>, GenieError> {
+    ) -> GenieResult<Option<Vec<Option<ObjectId>>>> {
         let player_kind = self.players.player(player)?.kind;
         let mut ids: Vec<Option<ObjectId>> = ids
             .iter()
@@ -415,11 +415,7 @@ impl World {
     /// Slot 0x68 with the master's standing sprite (`+0x470`): the unit's top speed is the sprite's
     /// ([`crate::movement::move_to::MoveToAction::shows_standing`]), and the sprite itself where
     /// the slice holds it.
-    pub(crate) fn standing_sprite(
-        &mut self,
-        p: PlayerId,
-        idx: ListIndex,
-    ) -> Result<(), GenieError> {
+    pub(crate) fn standing_sprite(&mut self, p: PlayerId, idx: ListIndex) -> GenieResult<()> {
         let master = self.players.live(p, idx)?.life.master_id;
         let standing = self.master(p, master)?.standing_sprite;
         let shown = standing.and_then(|s| self.model.graphics.get(s)).copied();

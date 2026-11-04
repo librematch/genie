@@ -1,6 +1,5 @@
 //! The idle checks of the boar, the hunted animals and the lions.
 
-use crate::GenieError;
 use crate::map::Distance;
 use crate::map::DistanceSquared;
 use crate::map::Point;
@@ -27,6 +26,7 @@ use crate::unit_ai::{
 use crate::world::Seconds;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
+use crate::{GenieError, GenieResult};
 use std::cmp::Ordering;
 
 impl UnitAi {
@@ -42,7 +42,7 @@ impl UnitAi {
         at: &Surroundings,
         ai: &mut Well512,
         side: &mut UnitView<'_, '_>,
-    ) -> Result<IdleOutcome, GenieError> {
+    ) -> GenieResult<IdleOutcome> {
         self.cap_human_order(side, ai)?;
         let (produced, moved) = self.boar_wander(at, ai);
         if let Some(m) = moved {
@@ -147,7 +147,7 @@ impl UnitAi {
         other: Position,
         ai: &mut Well512,
         side: &mut UnitView<'_, '_>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let unit_ai_tuning = &at.unit_ai_tuning;
         let (x, y, z) = (at.position.x(), at.position.y(), at.position.z());
         let reach = (at.speed * unit_ai_tuning.evade_reach).get();
@@ -164,7 +164,7 @@ impl UnitAi {
         player_kind: PlayerKind,
         ai: &mut Well512,
         side: &mut UnitView<'_, '_>,
-    ) -> Result<IdleOutcome, GenieError> {
+    ) -> GenieResult<IdleOutcome> {
         let roles = &at.roles;
         self.cap_human_order(side, ai)?;
         if roles.of_some_class(at.class).contains(ClassRoles::KING) {
@@ -188,7 +188,7 @@ impl UnitAi {
         at: &Surroundings,
         ai: &mut Well512,
         side: &mut UnitView<'_, '_>,
-    ) -> Result<IdleOutcome, GenieError> {
+    ) -> GenieResult<IdleOutcome> {
         let h = self.hunted.ok_or(GenieError::unsupported(
             "a hunted animal without its origin",
         ))?;
@@ -292,7 +292,7 @@ impl UnitAi {
         at: &Surroundings,
         ai: &mut Well512,
         side: &mut UnitView<'_, '_>,
-    ) -> Result<IdleOutcome, GenieError> {
+    ) -> GenieResult<IdleOutcome> {
         let unit_ai_tuning = &at.unit_ai_tuning;
         let slots = at.slots;
         self.cap_human_order(side, ai)?;

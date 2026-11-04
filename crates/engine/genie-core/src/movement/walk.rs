@@ -1,7 +1,6 @@
 //! The walk: its kept hits, the obstruction query's ends, the facets, the steering and the speed
 //! control.
 
-use crate::GenieError;
 use crate::construction::MainBuildingId;
 use crate::map::GridSize;
 use crate::map::Point;
@@ -24,6 +23,7 @@ use crate::world::Seconds;
 use crate::world::WorldTime;
 use crate::world::index::ObjectsRef;
 use crate::world::layer::generated::MovementTuning;
+use crate::{GenieError, GenieResult};
 
 /// Whether slot 195's turn ([`Mover::turn_toward`]) took the whole angle or fell short of it (the
 /// angle above the most, clipped), which brakes the unit ([`Mover::control_speed`]).
@@ -54,7 +54,7 @@ impl Mover {
         hits: &[RecordId],
         player_kind: PlayerKind,
         by_id: ObjectsRef<'_>,
-    ) -> Result<Next, GenieError> {
+    ) -> GenieResult<Next> {
         let movement_tuning = &by_id.tuning().movement;
         let level = self.paths.walked()?;
         let player = world
@@ -147,7 +147,7 @@ impl Mover {
         direction: BVector,
         dt: Seconds,
         movement_tuning: &MovementTuning,
-    ) -> Result<Turn, GenieError> {
+    ) -> GenieResult<Turn> {
         let mut flat = self.forward;
         flat = flat.with_height(0.0);
         let flat = normalize(flat);
@@ -208,11 +208,7 @@ impl Mover {
     /// # Errors
     ///
     /// Without the current sprite's facets: a unit whose sprites differ in their facets.
-    pub(crate) fn yaw(
-        &mut self,
-        turn: Angle,
-        facets: Option<SpriteFacets>,
-    ) -> Result<(), GenieError> {
+    pub(crate) fn yaw(&mut self, turn: Angle, facets: Option<SpriteFacets>) -> GenieResult<()> {
         let m = rotation(turn.get(), UP);
         let forward = normalize(rotate(&m, self.forward));
         self.set_orientation(forward, UP);

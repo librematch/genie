@@ -7,7 +7,6 @@
 //! caller asks for the owner's own object ([`OthersRef::own`]), another player's
 //! ([`OthersRef::foreign`]) or anyone's ([`OthersRef::find`]), never for a list position.
 
-use crate::GenieError;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectKey;
@@ -25,6 +24,7 @@ use crate::world::index::ListKind;
 use crate::world::index::{ObjectIndex, Place};
 use crate::world::layer::Roles;
 use crate::world::player::Player;
+use crate::{GenieError, GenieResult};
 use std::cmp::Ordering;
 use std::ptr::eq;
 use std::sync::Arc;
@@ -80,7 +80,7 @@ impl<'a> OthersRef<'a> {
         players: &'a [Player],
         index: &'a ObjectIndex,
         p: PlayerId,
-    ) -> Result<Self, GenieError> {
+    ) -> GenieResult<Self> {
         let no_player = || {
             GenieError::unreachable("a view of a player the world does not hold").with("player", p)
         };
@@ -458,7 +458,7 @@ impl World {
     /// list for the end of the live one, no longer flagged to sleep, and the remove and add
     /// (slots 0x2d8, 0x2d0) file it last in its player's tracker. [`Wake::NotAsleep`] when no
     /// sleeping list holds it.
-    pub(crate) fn wake_sleeper(&mut self, id: ObjectId) -> Result<Wake, GenieError> {
+    pub(crate) fn wake_sleeper(&mut self, id: ObjectId) -> GenieResult<Wake> {
         let Some(Place::Sleeping(p, i)) = self.place(id) else {
             return Ok(Wake::NotAsleep);
         };
@@ -477,11 +477,7 @@ impl World {
     /// # Errors
     ///
     /// A player the world does not hold.
-    pub(crate) fn take_out_own(
-        &mut self,
-        p: PlayerId,
-        id: ObjectId,
-    ) -> Result<Option<Unit>, GenieError> {
+    pub(crate) fn take_out_own(&mut self, p: PlayerId, id: ObjectId) -> GenieResult<Option<Unit>> {
         self.live_index(p, id)
             .map(|i| self.take_out(p, i))
             .transpose()
@@ -494,11 +490,7 @@ impl World {
     ///
     /// Its stand-in left the list: the unit goes to the list's end; a stand-in itself (its
     /// object lost in a lend, [`crate::world::step::Step::lend`]) goes nowhere.
-    pub(crate) fn put_back_own(
-        &mut self,
-        p: PlayerId,
-        unit: Unit,
-    ) -> Result<ListIndex, GenieError> {
+    pub(crate) fn put_back_own(&mut self, p: PlayerId, unit: Unit) -> GenieResult<ListIndex> {
         if unit.id == TAKEN_OUT {
             return Err(GenieError::unreachable(
                 "a stand-in put back for its object",

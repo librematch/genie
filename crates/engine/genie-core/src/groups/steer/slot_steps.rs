@@ -1,7 +1,7 @@
 //! A due slot's try, the steering on a clear line, and the setters of a member's state,
 //! speed, facing, place and own move.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::groups::GroupFlags;
 use crate::groups::GroupId;
 use crate::groups::MemberMove;
@@ -41,7 +41,7 @@ impl World {
         group: GroupId,
         index: usize,
         (slot, to, state): (usize, BVector, SlotState),
-    ) -> Result<bool, GenieError> {
+    ) -> GenieResult<bool> {
         let id = self.groups.held(group)?.members.checked(index)?.id;
         let mut state = state;
         if state == SlotState::Arriving {
@@ -86,7 +86,7 @@ impl World {
         group: GroupId,
         id: ObjectId,
         to: BVector,
-    ) -> Result<SlotTry, GenieError> {
+    ) -> GenieResult<SlotTry> {
         let (p, u) = self.object(id).ok_or_else(|| member_gone(id))?;
         let mover = self.parts.mover_of(u.id).ok_or(NO_MOVER)?;
         let g = self.groups.held(group)?;
@@ -179,7 +179,7 @@ impl World {
         (slot, to): (usize, BVector),
         id: ObjectId,
         gap: Distance,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let dt = self.dt_seconds;
         let (_, u) = self.object(id).ok_or_else(|| member_gone(id))?;
         let facets = u.sprite.map(|s| SpriteFacets {
@@ -221,7 +221,7 @@ impl World {
 
     /// A member that passed its slot's waypoint (state 2) stops, and stands when it is paused
     /// or the group's walk has no path to go on.
-    fn stop_at_slot(&mut self, group: GroupId, id: ObjectId) -> Result<(), GenieError> {
+    fn stop_at_slot(&mut self, group: GroupId, id: ObjectId) -> GenieResult<()> {
         self.stop_member(id)?;
         let (_, u) = self.object(id).ok_or_else(|| member_gone(id))?;
         let paused = self.parts.mover_of(u.id).is_some_and(Mover::paused);
@@ -247,7 +247,7 @@ impl World {
         group: GroupId,
         id: ObjectId,
         (gap, speed): (f32, f32),
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         self.groups.held_mut(group)?.flags |= GroupFlags::CATCHING_UP;
         if at_most_or_unordered(self.model.tuning.group.slot_reach, gap) {
             self.set_member_speed(id, Speed::new(speed));
@@ -284,7 +284,7 @@ impl World {
         group: GroupId,
         slot: usize,
         state: SlotState,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let g = self.groups.held_mut(group)?;
         let formation = g.current_formation.as_mut().ok_or(NO_FORMATION)?;
         let held = formation
@@ -296,7 +296,7 @@ impl World {
     }
 
     /// Slot 0x5d0 of member `id`: it stops ([`crate::movement::Mover::stop`]).
-    pub(super) fn stop_member(&mut self, id: ObjectId) -> Result<(), GenieError> {
+    pub(super) fn stop_member(&mut self, id: ObjectId) -> GenieResult<()> {
         if self.object(id).is_some()
             && let Some(mover) = self.parts.mover_mut(id)
         {
@@ -316,7 +316,7 @@ impl World {
 
     /// Slot 0x568 of member `id` with group `group`'s forward and up vectors (`+0x14`,
     /// `+0x20`, [`crate::movement::Mover::set_orientation`]).
-    pub(super) fn face_group(&mut self, group: GroupId, id: ObjectId) -> Result<(), GenieError> {
+    pub(super) fn face_group(&mut self, group: GroupId, id: ObjectId) -> GenieResult<()> {
         let g = self.groups.held(group)?;
         let [_, forward, up, _] = g.motion.position;
         if self.object(id).is_some()
@@ -341,7 +341,7 @@ impl World {
     /// # Errors
     ///
     /// An object of a master the slice does not have.
-    pub(super) fn place_member(&mut self, id: ObjectId, to: BVector) -> Result<(), GenieError> {
+    pub(super) fn place_member(&mut self, id: ObjectId, to: BVector) -> GenieResult<()> {
         let Some(place) = self.place(id) else {
             return Ok(());
         };
@@ -393,7 +393,7 @@ impl World {
         id: ObjectId,
         (path, reason): (MovePath, MoveReason),
         (goal, timer, distance): (BVector, f32, f32),
-    ) -> Result<MemberMove, GenieError> {
+    ) -> GenieResult<MemberMove> {
         let Some(index) = self
             .groups
             .get(group)

@@ -1,7 +1,6 @@
 //! A saved unit's reload, sprite and Attack, its Build and Fly tasks, a building's production
 //! and gather point, and the default task an object's first update starts.
 
-use crate::GenieError;
 use crate::combat::AttackTargetId;
 use crate::combat::attack::{Arms, Attack, AttackState};
 use crate::commands::{GatherPoint, GatherPointState};
@@ -41,6 +40,7 @@ use crate::technology::TechId;
 use crate::world::Seconds;
 use crate::world::WholeSeconds;
 use crate::world::load::top_actions::{first_action, saved_sub_move_to};
+use crate::{GenieError, GenieResult};
 use genie_import::dat::dat_id;
 use genie_import::dat::{DefaultAction, MasterTable};
 use genie_import::save::core_task;
@@ -114,7 +114,7 @@ pub fn saved_sprite(s: &RgeStaticObject, graphics: &Graphics) -> Option<ActiveSp
 /// and frames. The load restores the sprites at `+0x70`, `+0x80` and `+0x88` from the second to
 /// fourth saved ids (the first goes to `+0x68`); the second attack sprite (`+0x78`) and the
 /// swing's times (`+0xb0`, `+0xb4`) are not saved, and a loaded Attack starts without them.
-pub fn saved_attack(sub: &Action, graphics: Option<&Graphics>) -> Result<Attack, GenieError> {
+pub fn saved_attack(sub: &Action, graphics: Option<&Graphics>) -> GenieResult<Attack> {
     use crate::movement::move_to::MOVE_TO;
     let b = sub
         .base()
@@ -180,7 +180,7 @@ pub fn build_task(
     civ: CivId,
     masters: Option<&MasterTable>,
     master: i16,
-) -> Result<BuildTask, GenieError> {
+) -> GenieResult<BuildTask> {
     let m = objects.master(master).ok_or(GenieError::unsupported(
         "a builder whose master is not saved",
     ))?;
@@ -199,7 +199,7 @@ pub fn fly_task(
     civ: CivId,
     masters: Option<&MasterTable>,
     master: i16,
-) -> Result<Task, GenieError> {
+) -> GenieResult<Task> {
     let fly = FLY;
     let saved = objects
         .master(master)
@@ -232,7 +232,7 @@ pub fn master_build_task(
     masters: Option<&MasterTable>,
     m: &Master,
     master: i16,
-) -> Result<Task, GenieError> {
+) -> GenieResult<Task> {
     let saved = m.tribe_master_combat_object.as_deref().and_then(|c| {
         c.rge_master_combat_object
             .rge_master_action_object
@@ -271,7 +271,7 @@ pub fn master_build_task(
 /// change counter (`+0xc00`) and `+0xc01` start at 0. The action: a unit's make action or a
 /// research, each with its state and `+0x60` (the base's `subActionValue`). `Ok(None)`: a building
 /// without slots, action or local lists.
-pub fn production(object: &genie_save::Object) -> Result<Option<Production>, GenieError> {
+pub fn production(object: &genie_save::Object) -> GenieResult<Option<Production>> {
     use crate::production::{
         Entry, MakeObj, MakeObjState, MakeTech, MakeTechState, Making, Production, Queue,
     };
@@ -286,7 +286,7 @@ pub fn production(object: &genie_save::Object) -> Result<Option<Production>, Gen
             let c = &e.production_queue_costs;
             let word = |k: usize| [c[k], c[k + 1], c[k + 2], c[k + 3]];
             // an entry's attribute (an `int`, −1 for none) and amount
-            let cost = |j: usize| -> Result<(Option<AttributeId>, Amount), GenieError> {
+            let cost = |j: usize| -> GenieResult<(Option<AttributeId>, Amount)> {
                 let kind = i32::from_le_bytes(word(8 * j));
                 let kind = i16::try_from(kind).map_err(|_| {
                     GenieError::invalid_input("a queue cost's attribute past the attributes")
@@ -307,7 +307,7 @@ pub fn production(object: &genie_save::Object) -> Result<Option<Production>, Gen
                 train_time: WholeSeconds::of_data(e.production_queue_train_time),
             })
         })
-        .collect::<Result<Vec<Entry>, GenieError>>()?;
+        .collect::<GenieResult<Vec<Entry>>>()?;
     let action = match first_action(&building.production_queue_actions)? {
         None => None,
         Some((ActionKind::MAKE_OBJECT, action)) => {
@@ -405,7 +405,7 @@ pub fn production(object: &genie_save::Object) -> Result<Option<Production>, Gen
 /// # Errors
 ///
 /// A saved state past a byte.
-pub fn gather_point(object: &genie_save::Object) -> Result<Option<GatherPoint>, GenieError> {
+pub fn gather_point(object: &genie_save::Object) -> GenieResult<Option<GatherPoint>> {
     let Some(b) = object.tribe_building_object.as_deref() else {
         return Ok(None);
     };

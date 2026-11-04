@@ -1,6 +1,5 @@
 //! The velocity step, a new object's setup, the position setter and the motion step's loop.
 
-use crate::GenieError;
 use crate::combat::missile::grounded as missile_grounded;
 use crate::groups::UnitGroups;
 use crate::map::Distance;
@@ -38,6 +37,7 @@ use crate::world::layer::Roles;
 use crate::world::layer::generated::MovementTuning;
 use crate::world::layer::generated::SpawnTuning;
 use crate::world::layer::generated::VisibilityTuning;
+use crate::{GenieError, GenieResult};
 
 mod ends;
 
@@ -258,7 +258,7 @@ impl Mover {
         places: (&mut Spatial, Option<&mut Pathing>),
         roles: &Roles,
         visibility_tuning: VisibilityTuning,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         place.new_position(
             id,
             at,
@@ -326,7 +326,7 @@ impl Mover {
         world: &mut Spatial,
         mut plan: Option<&mut Planning<'_>>,
         by_id: ObjectsRef<'_>,
-    ) -> Result<Motion, GenieError> {
+    ) -> GenieResult<Motion> {
         let result = self.motion_passes(place, me, dt, world, plan.as_deref_mut(), by_id);
         // every exit of the step removes the kept hits' temporary shapes (FUN_141055970)
         if let Some(p) = plan {
@@ -350,7 +350,7 @@ impl Mover {
         target_id: Option<ObjectId>,
         ground_radius: Footprint,
         by_id: ObjectsRef<'_>,
-    ) -> Result<LevelGaps, GenieError> {
+    ) -> GenieResult<LevelGaps> {
         let movement_tuning = &by_id.tuning().movement;
         let roles = by_id.roles();
         // FUN_1415417a0 on the level's target: none for -1 and for an object that is gone,
@@ -411,7 +411,7 @@ impl Mover {
         goal: Goal<'_>,
         plans: &mut StepPlans,
         include: &[ObjectId],
-    ) -> Result<Next, GenieError> {
+    ) -> GenieResult<Next> {
         match self.paths.walked()?.state {
             PathState::Arrived | PathState::Unplanned => self.arrived(goal),
             PathState::WantsPath => {
@@ -440,7 +440,7 @@ impl Mover {
         world: &mut Spatial,
         mut plan: Option<&mut Planning<'_>>,
         by_id: ObjectsRef<'_>,
-    ) -> Result<Motion, GenieError> {
+    ) -> GenieResult<Motion> {
         let movement_tuning = &by_id.tuning().movement;
         if self.stats.speed == Speed::ZERO {
             return Ok(Motion::Done);
@@ -542,7 +542,7 @@ impl Mover {
         me: &Me,
         step: WalkStep<'_>,
         by_id: ObjectsRef<'_>,
-    ) -> Result<Next, GenieError> {
+    ) -> GenieResult<Next> {
         let movement_tuning = &by_id.tuning().movement;
         let WalkStep {
             time_step: dt,

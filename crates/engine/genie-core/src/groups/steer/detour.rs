@@ -1,7 +1,6 @@
 //! The way round a record on the line to the slot: the short pather, the long pather and the
 //! tile planner.
 
-use crate::GenieError;
 use crate::groups::GroupId;
 use crate::groups::MovePath;
 use crate::groups::MoveReason;
@@ -31,6 +30,7 @@ use crate::world::World;
 use crate::world::index::ObjectsRef;
 use crate::world::layer::MasterRoles;
 use crate::world::slots::CheckedIndex;
+use crate::{GenieError, GenieResult};
 
 impl World {
     /// The way round a record on the line to the slot (`0x141026867`..`0x1410277e5`), for member
@@ -81,7 +81,7 @@ impl World {
         (slot, to): (usize, BVector),
         gap: Distance,
         differentiators: &[ObjectId],
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let g = self.groups.held(group)?;
         let id = g.members.checked(index)?.id;
         let [place, forward, _, _] = g.motion.position;
@@ -113,11 +113,7 @@ impl World {
     }
 
     /// The member `index` of group `group`'s record of its specific move.
-    fn move_record(
-        &mut self,
-        group: GroupId,
-        index: usize,
-    ) -> Result<&mut SpecificMove, GenieError> {
+    fn move_record(&mut self, group: GroupId, index: usize) -> GenieResult<&mut SpecificMove> {
         Ok(&mut self
             .groups
             .held_mut(group)?
@@ -133,7 +129,7 @@ impl World {
         &mut self,
         r: &Rounder<'_>,
         (to, forward, place): (BVector, BVector, BVector),
-    ) -> Result<(Way, bool), GenieError> {
+    ) -> GenieResult<(Way, bool)> {
         let mut way = Way {
             record: Path::default(),
             result: ShortFound::Blocked,
@@ -163,7 +159,7 @@ impl World {
         &self,
         id: ObjectId,
         differentiators: &'d [ObjectId],
-    ) -> Result<Rounder<'d>, GenieError> {
+    ) -> GenieResult<Rounder<'d>> {
         let (p, u) = self.object(id).ok_or_else(|| member_gone(id))?;
         let master = u.master(self.master_tables(), p)?;
         let mover = self.parts.mover_of(u.id).ok_or(NO_MOVER)?;
@@ -194,7 +190,7 @@ impl World {
     /// records grown by the short pather's radius, the differentiators ignored).
     ///
     /// [`Spatial::point_clear_among`]: crate::map::spatial::Spatial::point_clear_among
-    fn round_clear(&mut self, r: &Rounder<'_>, p: BVector) -> Result<bool, GenieError> {
+    fn round_clear(&mut self, r: &Rounder<'_>, p: BVector) -> GenieResult<bool> {
         let by_id = ObjectsRef::new(
             &self.players,
             &self.index,
@@ -211,12 +207,7 @@ impl World {
     /// could stand there, by the short pather when its footprint is near (a path of fewer than
     /// 2 points or no longer than [`EPSILON`] keeps no points and its result is not taken; a
     /// result but blocked or off the map serves), else by the tile planner (planned).
-    fn round_to_slot(
-        &mut self,
-        r: &Rounder<'_>,
-        to: BVector,
-        way: &mut Way,
-    ) -> Result<(), GenieError> {
+    fn round_to_slot(&mut self, r: &Rounder<'_>, to: BVector, way: &mut Way) -> GenieResult<()> {
         if !self.round_clear(r, to)? {
             return Ok(());
         }
@@ -260,7 +251,7 @@ impl World {
         to: BVector,
         forward: BVector,
         way: &mut Way,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let step = one_step_toward(r, to, forward, self.spatial.map);
         way.goal = step;
         if !self.round_clear(r, step)? {
@@ -310,7 +301,7 @@ impl World {
         r: &Rounder<'_>,
         place: BVector,
         way: &mut Way,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         way.goal = place;
         if !self.round_clear(r, place)? {
             return Ok(());
@@ -343,12 +334,7 @@ impl World {
     /// The way round's last try ([`World::way_round`]'s 4, blocked or off the map): the long
     /// pather from where the member last moved to toward the slot's tile; a path of more than 2
     /// points serves, its last point the goal. Whether it serves.
-    fn round_long_way(
-        &self,
-        r: &Rounder<'_>,
-        to: BVector,
-        way: &mut Way,
-    ) -> Result<bool, GenieError> {
+    fn round_long_way(&self, r: &Rounder<'_>, to: BVector, way: &mut Way) -> GenieResult<bool> {
         way.record.points.clear();
         let (_, path) = self.round_long(r.id, r.at.ground(), to)?;
         way.record.points = path.points;
@@ -372,7 +358,7 @@ impl World {
         to: BVector,
         ignore: &[ObjectId],
         record: &mut Path,
-    ) -> Result<ShortFound, GenieError> {
+    ) -> GenieResult<ShortFound> {
         let by_id = ObjectsRef::new(
             &self.players,
             &self.index,
@@ -409,7 +395,7 @@ impl World {
         id: ObjectId,
         from: Point,
         to: BVector,
-    ) -> Result<(bool, Path), GenieError> {
+    ) -> GenieResult<(bool, Path)> {
         let (p, u) = self.object(id).ok_or_else(|| member_gone(id))?;
         let mover = self.parts.mover_of(u.id).ok_or(NO_MOVER)?;
         let player_kind = self
@@ -457,7 +443,7 @@ impl World {
         from: Point,
         to: BVector,
         record: &mut Path,
-    ) -> Result<Option<Found>, GenieError> {
+    ) -> GenieResult<Option<Found>> {
         let tiles = self.spatial.tiles();
         let Some(planner) = self.pathing.planner(restriction, tiles) else {
             return Ok(None);

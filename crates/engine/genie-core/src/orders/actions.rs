@@ -1,7 +1,6 @@
 //! Taking and releasing targets, the order record, actions cleared, transformations, gates
 //! and master switches.
 
-use crate::GenieError;
 use crate::construction::gates::gate_units;
 use crate::map::Distance;
 use crate::map::spatial::Spatial;
@@ -42,6 +41,7 @@ use crate::world::layer::Roles;
 use crate::world::layer::generated::SpriteTuning;
 use crate::world::layer::generated::VisibilityTuning;
 use crate::world::slots::PlayerSlots;
+use crate::{GenieError, GenieResult};
 
 impl World {
     /// Slot 0x178 on the object an action of `by` takes as its target, outside an update
@@ -55,7 +55,7 @@ impl World {
     /// # Errors
     ///
     /// [`crate::world::lets::Lets::take`]'s.
-    pub(crate) fn take(&mut self, id: ObjectId, by: Releaser) -> Result<(), GenieError> {
+    pub(crate) fn take(&mut self, id: ObjectId, by: Releaser) -> GenieResult<()> {
         let roles = self.model.roles.clone();
         self.with_lets(by.player, |lets, others| {
             lets.take(others, None, id, by, &roles)
@@ -75,16 +75,12 @@ impl World {
     /// # Errors
     ///
     /// [`crate::world::lets::Lets::release`]'s.
-    pub(crate) fn release(&mut self, id: ObjectId, by: Releaser) -> Result<(), GenieError> {
+    pub(crate) fn release(&mut self, id: ObjectId, by: Releaser) -> GenieResult<()> {
         self.with_lets(by.player, |lets, others| lets.release(others, None, id, by))?
     }
 
     /// Object `idx` of player `player` as the releaser of its actions' targets.
-    pub(crate) fn releaser(
-        &self,
-        player: PlayerId,
-        idx: ListIndex,
-    ) -> Result<Releaser, GenieError> {
+    pub(crate) fn releaser(&self, player: PlayerId, idx: ListIndex) -> GenieResult<Releaser> {
         let u = self.players.live(player, idx)?;
         Ok(Releaser {
             id: u.id,
@@ -106,7 +102,7 @@ impl World {
         player: PlayerId,
         idx: ListIndex,
         (order, action): (Option<OrderKind>, Option<AiAction>),
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let u = &self.players.live(player, idx)?;
         let Some(target) = self
             .parts
@@ -146,11 +142,7 @@ impl World {
     /// counted builder leaves its building (`FUN_140aadbf0` before its base teardown,
     /// [`World::leave_builders`]), then the targets go (slot 0x180, [`World::release`]). A
     /// building's production is a list of its own, which stays.
-    pub(crate) fn clear_actions(
-        &mut self,
-        player: PlayerId,
-        idx: ListIndex,
-    ) -> Result<(), GenieError> {
+    pub(crate) fn clear_actions(&mut self, player: PlayerId, idx: ListIndex) -> GenieResult<()> {
         let by = self.releaser(player, idx)?;
         let (mut releases, mut builder_leaves) = (Vec::new(), Vec::new());
         let unit = self.players.live_mut(player, idx)?;
@@ -179,7 +171,7 @@ impl World {
         player: PlayerId,
         id: ObjectId,
         master: MasterId,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let Some(Place::Live(p, idx)) = self.place(id) else {
             return Ok(());
         };
@@ -208,7 +200,7 @@ impl World {
         player: PlayerId,
         idx: ListIndex,
         new: MasterId,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         self.change_master(player, idx, new)?;
         let build_time = self.master(player, new)?.creatable_part().build_time;
         let unit = self.players.live_mut(player, idx)?;
@@ -226,11 +218,7 @@ impl World {
     /// gate that shut (the new master's height above 0) kills the units in it (slot 0xd8 on
     /// those its count finds, [`World::shut_in_gate`]) and takes the world time plus 1 as its
     /// last move time (`+0x870`).
-    pub(crate) fn toggle_gate(
-        &mut self,
-        player: PlayerId,
-        idx: ListIndex,
-    ) -> Result<(), GenieError> {
+    pub(crate) fn toggle_gate(&mut self, player: PlayerId, idx: ListIndex) -> GenieResult<()> {
         let unit = &self.players.live(player, idx)?;
         if self
             .parts
@@ -288,7 +276,7 @@ impl World {
     /// object asleep wakes to the end of its player's live list (slots 0x2d8, 0x2d0), one flagged
     /// to sleep drops the flag, and its hit points go to 0. Its place in its player's
     /// special-object list (`+0x30c` bit 0, `FUN_141677380`) is not held.
-    pub(super) fn shut_in_gate(&mut self, id: ObjectId) -> Result<(), GenieError> {
+    pub(super) fn shut_in_gate(&mut self, id: ObjectId) -> GenieResult<()> {
         /// The first master type whose slot 0xd8 is `FUN_141211340` (`TRIBE_Combat_Object`).
         const TRIBE_COMBAT: MasterKind = MasterKind::COMBAT;
 
@@ -337,7 +325,7 @@ impl World {
         player: PlayerId,
         idx: ListIndex,
         new: MasterId,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         self.clear_actions(player, idx)?;
         let unit = &self.players.live(player, idx)?;
         let old = unit.master(self.master_tables(), player)?.clone();
@@ -419,7 +407,7 @@ pub(crate) fn switch_master(
     roles: &Roles,
     sprite_tuning: SpriteTuning,
     visibility_tuning: VisibilityTuning,
-) -> Result<Switched, GenieError> {
+) -> GenieResult<Switched> {
     let mut switched = Switched::default();
     let new = next.id;
     if unit.life.state < ObjectState::Dying {

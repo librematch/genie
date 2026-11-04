@@ -3,7 +3,7 @@
 //! here; the ones only one routine names stay beside it (the Gather's 5, the Attack's 9, the
 //! Make's 21).
 
-use crate::GenieError;
+use crate::{GenieError, GenieResult};
 use derive_more::Display;
 use genie_diff::{Diff, Differ};
 use serde::Deserialize;
@@ -150,7 +150,7 @@ pub const fn kinds<const N: usize>(values: [i16; N]) -> [ActionKind; N] {
 impl TryFrom<i16> for ActionKind {
     type Error = GenieError;
 
-    fn try_from(value: i16) -> Result<Self, GenieError> {
+    fn try_from(value: i16) -> GenieResult<Self> {
         Self::of_data(value)
             .ok_or_else(|| GenieError::invalid_input("a negative action type").with("value", value))
     }

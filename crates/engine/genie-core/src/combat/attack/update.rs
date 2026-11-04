@@ -1,7 +1,6 @@
 //! One update (slot 6, `0x140a82ae0`): a target gone, a disarmed building, the walks to where
 //! the target was seen.
 
-use crate::GenieError;
 use crate::combat::AttackTargetId;
 use crate::combat::attack::AtOnce;
 use crate::combat::attack::AttackState;
@@ -45,6 +44,7 @@ use crate::world::layer::generated::MoveToTuning;
 use crate::world::layer::generated::SpriteTuning;
 use crate::world::lets::release;
 use crate::world::step::Step;
+use crate::{GenieError, GenieResult};
 
 /// Whether a unit can attack (`FUN_14120ea30`): a building without it ends its Attack.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -67,7 +67,7 @@ impl Attack {
         dt: Seconds,
         armed: Armament,
         mut motion: MotionMut<'_>,
-    ) -> Result<(UpdateCode, bool), GenieError> {
+    ) -> GenieResult<(UpdateCode, bool)> {
         self.timer += dt;
         if armed == Armament::Unarmed {
             self.state = AttackState::Done;
@@ -101,7 +101,7 @@ impl Attack {
         r: &AttackReads,
         master_class: ClassId,
         roles: &Roles,
-    ) -> Result<UpdateCode, GenieError> {
+    ) -> GenieResult<UpdateCode> {
         self.timer += c.dt.seconds();
         let gives_up = GiveUp {
             patience: if !r.player_kind.is_computer()
@@ -145,7 +145,7 @@ impl Attack {
         mut motion: MotionMut<'_>,
         rng: &mut Well512,
         sprite_tuning: SpriteTuning,
-    ) -> Result<Option<(NotifyKind, [i32; 3])>, GenieError> {
+    ) -> GenieResult<Option<(NotifyKind, [i32; 3])>> {
         if self.state.move_to().is_some() {
             return Err(GenieError::unsupported("a building's Attack with a MoveTo"));
         }
@@ -176,7 +176,7 @@ impl Attack {
         me: Me,
         f: &mut Fight,
         r: &AttackReads,
-    ) -> Result<UpdateCode, GenieError> {
+    ) -> GenieResult<UpdateCode> {
         let roles = &c.w.model.roles.clone();
         self.timer += c.dt.seconds();
         // a dead tree (class 15) up to state 5 keeps a non-villager's attack going: its update
@@ -240,7 +240,7 @@ impl Attack {
         f: &Fight,
         r: &AttackReads,
         roles: &Roles,
-    ) -> Result<UpdateCode, GenieError> {
+    ) -> GenieResult<UpdateCode> {
         // the target died before the attack ended (the update's start): one of stance 0 that
         // moves would wait (set_state 5), not modelled; a villager's unit AI keeps a dead
         // target of Gaia's (another's FUN_140c5e1e0 forgets, not modelled). The attack lets
@@ -281,7 +281,7 @@ impl Attack {
         r: &AttackReads,
         t: &Placed,
         roles: &Roles,
-    ) -> Result<Option<UpdateCode>, GenieError> {
+    ) -> GenieResult<Option<UpdateCode>> {
         // the target moved: where it was seen follows (`+0xa4`..`+0xac`); one the unit's
         // player sees (the target's slot 0x1e0, `FUN_1416635e0` at its tile: 0xf), or only
         // explored (0x80) with its master's fog flag (`+0x605`), keeps the attack going, but
@@ -347,7 +347,7 @@ impl Attack {
         r: &AttackReads,
         target_state: ObjectState,
         roles: &Roles,
-    ) -> Result<Option<UpdateCode>, GenieError> {
+    ) -> GenieResult<Option<UpdateCode>> {
         // LAB_140a834ab: a live target (state 0 to 2) of a player's unit (+0x718 not 0) that
         // its player counts as itself or an ally (FUN_141663dc0 with 1) ends the attack
         // (set_state 1; its own Attack, not quiet, posts 0x1fb with 600 and the target) and
@@ -428,7 +428,7 @@ impl Attack {
         f: &Fight,
         r: &AttackReads,
         target_state: ObjectState,
-    ) -> Result<UpdateCode, GenieError> {
+    ) -> GenieResult<UpdateCode> {
         let sprite_tuning = c.w.model.tuning.sprite;
         let mut g = c.w.attack_ground(unit.id);
         match self.ready_to_attack(unit, &mut g, f, r, AtOnce::Tested)? {
@@ -452,7 +452,7 @@ impl Attack {
         &mut self,
         c: &mut Step<'_>,
         unit: &mut Unit,
-    ) -> Result<UpdateCode, GenieError> {
+    ) -> GenieResult<UpdateCode> {
         // case 1: once the swing's sprite looped (or there is none, or it does not
         // animate) the attack lets its target go and ends; the hunt reads code 5
         let done = unit
@@ -509,7 +509,7 @@ impl Attack {
         r: &AttackReads,
         graphics: &Graphics,
         move_to_tuning: &MoveToTuning,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         self.enter(AttackState::GotoSeen { move_to: None }, motion.reborrow())?;
         self.range = f.own.source.weapon_range;
         self.goto_point(
@@ -536,7 +536,7 @@ impl Attack {
         r: &AttackReads,
         graphics: &Graphics,
         move_to_tuning: &MoveToTuning,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         self.walk_to_seen(walk, &move_reads(unit, r, graphics)?, move_to_tuning)
     }
 
@@ -554,7 +554,7 @@ impl Attack {
         f: &Fight,
         r: &AttackReads,
         target: Position,
-    ) -> Result<UpdateCode, GenieError> {
+    ) -> GenieResult<UpdateCode> {
         if sees(&c.w.spatial, f, target)? {
             self.ready(unit, &mut c.w.attack_ground(unit.id), f, r)?;
             return Ok(UpdateCode::UnderWay);
@@ -606,7 +606,7 @@ impl Attack {
 /// # Errors
 ///
 /// A tile the map's sight does not hold.
-pub(super) fn sees(map: &Spatial, f: &Fight, at: Position) -> Result<bool, GenieError> {
+pub(super) fn sees(map: &Spatial, f: &Fight, at: Position) -> GenieResult<bool> {
     let (tx, ty) = (at.x() as i32, at.y() as i32);
     Ok(map.sees_tile(f.own.player, Tile::new(tx, ty))
         || (f.victim.fog_visibility != FogVisibility::INVISIBLE
@@ -623,7 +623,7 @@ pub(super) fn let_go(
     c: &mut Step<'_>,
     unit: &mut Unit,
     target: Option<AttackTargetId>,
-) -> Result<(), GenieError> {
+) -> GenieResult<()> {
     let Some(target) = target else {
         return Ok(());
     };

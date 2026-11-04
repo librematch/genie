@@ -1,5 +1,4 @@
 use super::*;
-use crate::GenieError;
 use crate::combat::Firepower;
 use crate::combat::abilities::Abilities;
 use crate::combat::attack::AttackState;
@@ -291,6 +290,7 @@ use crate::world::player::Player;
 use crate::world::settings::FarmMode;
 use crate::world::settings::OptionFlags;
 use crate::world::world_update::ListCount;
+use crate::{GenieError, GenieResult};
 use ids::FISH_TRAP;
 use std::iter::{once, repeat_n};
 use std::sync::Arc;
@@ -4247,7 +4247,7 @@ fn the_empire_wars_start_puts_villager_on_its_farm_to_work() {
 /// The forager's unit AI run outside its update making the calls `effects` on its unit
 /// ([`World::run_unit_ai`]): each at once, in order
 /// ([`crate::unit_ai::world_view::UnitView::effect_now`]).
-fn with_effects(t: &mut World, effects: Vec<Effect>) -> Result<(), GenieError> {
+fn with_effects(t: &mut World, effects: Vec<Effect>) -> GenieResult<()> {
     t.run_unit_ai(
         (PlayerId::new(1), ListIndex::new(0)),
         move |ai, _, side, _, rng| {
@@ -5409,8 +5409,8 @@ pub(crate) fn in_update<R>(
     t: &mut World,
     (p, i): (PlayerId, ListIndex),
     dt: u32,
-    f: impl FnOnce(&mut Unit, &mut Action, &mut step::Step<'_>) -> Result<R, GenieError>,
-) -> Result<R, GenieError> {
+    f: impl FnOnce(&mut Unit, &mut Action, &mut step::Step<'_>) -> GenieResult<R>,
+) -> GenieResult<R> {
     let mut answer = None;
     let _ = t.step_object((p, i), (Millis::new(dt), None, false), |u, actions, c| {
         answer = Some(f(u, actions, c)?);
@@ -5425,8 +5425,8 @@ pub(crate) fn in_update_filed<R>(
     t: &mut World,
     (p, i): (PlayerId, ListIndex),
     dt: u32,
-    f: impl FnOnce(&mut Unit, &mut Action, &mut step::Step<'_>) -> Result<(R, Outcome), GenieError>,
-) -> Result<R, GenieError> {
+    f: impl FnOnce(&mut Unit, &mut Action, &mut step::Step<'_>) -> GenieResult<(R, Outcome)>,
+) -> GenieResult<R> {
     let mut answer = None;
     let stepped = t.step_object((p, i), (Millis::new(dt), None, false), |u, actions, c| {
         let (r, outcome) = f(u, actions, c)?;
@@ -5468,7 +5468,7 @@ fn notified(t: &World, kind: NotifyKind) -> Vec<[i32; 3]> {
 
 /// The hunter's part of the update in its hunt's state ([`Unit::hunt_part`]) with `dt`, the
 /// hunter as a combat object and its lost tree as the update reads them.
-fn hunt_part_of(t: &mut World, dt: u32) -> Result<(), GenieError> {
+fn hunt_part_of(t: &mut World, dt: u32) -> GenieResult<()> {
     in_update(
         t,
         (PlayerId::new(1), ListIndex::new(0)),
@@ -6951,8 +6951,8 @@ fn the_unit_ai_repair_order_switches_villager_to_the_repairer() {
 /// what `f` gives and the villager's unit AI as the side returns.
 fn villager_side<R>(
     t: &mut World,
-    f: impl FnOnce(&mut UnitView<'_, '_>) -> Result<R, GenieError>,
-) -> Result<(R, Option<UnitAi>), GenieError> {
+    f: impl FnOnce(&mut UnitView<'_, '_>) -> GenieResult<R>,
+) -> GenieResult<(R, Option<UnitAi>)> {
     use crate::unit_ai::world_view::OwnerView;
     in_update(
         t,
@@ -8697,8 +8697,8 @@ fn livestock_without_actions_starts_its_artifact_again() {
 /// Step, the attribute changes and the remains.
 fn life_part(
     set: impl FnOnce(&mut Master, &mut Unit),
-    part: impl FnOnce(&mut Unit, &mut Action, &mut step::Step<'_>) -> Result<(), GenieError>,
-) -> Result<LifeLeft, GenieError> {
+    part: impl FnOnce(&mut Unit, &mut Action, &mut step::Step<'_>) -> GenieResult<()>,
+) -> GenieResult<LifeLeft> {
     let mut t = forage_world();
     let mut master = t.model.masters[1].get(master_id(120)).unwrap().clone();
     set(&mut master, &mut t.players[1].objects[ListIndex::new(0)]);
@@ -9810,7 +9810,7 @@ fn gate_update_of(
     master: MasterId,
     gate: Option<Gate>,
     setup: impl FnOnce(&mut World),
-) -> Result<(MasterId, Option<Gate>), GenieError> {
+) -> GenieResult<(MasterId, Option<Gate>)> {
     let mut t = gate_world();
     let g = &mut t.players[1].objects[ListIndex::new(0)];
     g.life.master_id = master;
@@ -11101,7 +11101,7 @@ fn hands(
     (masters, own): (&[Arc<Masters>], &mut PartTable<Master>),
     s: &mut Spatial,
     now: WorldTime,
-) -> Result<bool, GenieError> {
+) -> GenieResult<bool> {
     // none of these objects holds an action: an empty layer
     let mut actions = Action::default();
     let answer = change_hands(
@@ -16026,7 +16026,7 @@ fn ai_move_of(
     (u, actions, motion): (&mut Unit, &mut Action, &mut Motion),
     m: AiMove,
     class: ClassId,
-) -> Result<Vec<ObjectId>, GenieError> {
+) -> GenieResult<Vec<ObjectId>> {
     let by = Releaser {
         id: u.id,
         class: Some(class),
@@ -17719,7 +17719,7 @@ fn without_farm_to_make_the_farmer_idles() {
 
 /// [`reseed_world`] with one farm queued, `setup` run on it, then the reseed itself
 /// ([`World::reseed`]): its answer and the count of player 1's objects after it.
-fn reseeded(setup: impl FnOnce(&mut World)) -> (Result<Reseed, GenieError>, usize) {
+fn reseeded(setup: impl FnOnce(&mut World)) -> (GenieResult<Reseed>, usize) {
     let mut t = reseed_world();
     t.players[1].farm_queue = QueueCount::of_data(1);
     setup(&mut t);
@@ -19445,7 +19445,7 @@ fn forager_with_nothing_found_after_the_drop_idles_or_is_done() {
 }
 
 /// The forager's Gather update alone (`gather_update`, 50 ms).
-fn gather_step(t: &mut World) -> Result<(), GenieError> {
+fn gather_step(t: &mut World) -> GenieResult<()> {
     in_update(
         t,
         (PlayerId::new(1), ListIndex::new(0)),
@@ -19476,7 +19476,7 @@ fn gather_step(t: &mut World) -> Result<(), GenieError> {
 fn what_follows_the_gather_update_lets_go_builds_or_reseeds() {
     use crate::gathering::gather::Next;
     type Followed = (
-        Result<(), GenieError>,
+        GenieResult<()>,
         Vec<i32>,
         Option<(Option<ObjectId>, GatherState)>,
     );
@@ -19772,7 +19772,7 @@ fn loaded_builder_drop_off_finds_its_town_centre() {
 fn drop_site_sought(
     setup: impl FnOnce(&mut World),
     args: SiteSearch,
-) -> Result<Option<DropSiteId>, GenieError> {
+) -> GenieResult<Option<DropSiteId>> {
     let mut t = forage_world();
     let mut far = t.object_of(&t.players[1].objects[ListIndex::new(2)]);
     far.unit.id = object_id(701);
@@ -19963,7 +19963,7 @@ fn own_move_world(m: MoveToAction) -> World {
 /// What [`own_move`] gives: the part's result, the `MoveTo` after it, what the unit AI heard
 /// and bush 600's workers after the step's releases.
 type OwnMoved = (
-    Result<(), GenieError>,
+    GenieResult<()>,
     Option<MoveToAction>,
     Vec<(NotifyKind, [i32; 3])>,
     i32,
@@ -20067,11 +20067,7 @@ fn unit_own_move_to_walks_tells_its_end_and_lets_its_target_go() {
 }
 
 /// The result of a bird's Fly part, its Fly after it and what its unit AI heard.
-type Flown = (
-    Result<(), GenieError>,
-    Option<Fly>,
-    Vec<(NotifyKind, [i32; 3])>,
-);
+type Flown = (GenieResult<()>, Option<Fly>, Vec<(NotifyKind, [i32; 3])>);
 
 /// [`forage_world`]'s villager 9175 as a bird flying (state 4) toward (40.5, 89.5) with its
 /// `MoveTo` in `move_to`, two seconds of flight left and a rest of two seconds; `setup`
@@ -20259,7 +20255,7 @@ fn an_explore_move_to_shows_the_master_walking_sprite_as_it_starts() {
 
 /// What [`explored`] gives: the part's result, the Explore after it and the notifies heard.
 type Explored = (
-    Result<(), GenieError>,
+    GenieResult<()>,
     Option<ExploreAction>,
     Vec<(NotifyKind, [i32; 3])>,
 );
@@ -20574,7 +20570,7 @@ fn building_own_completion_completes_its_annexes_first() {
 fn links_after_update(
     t: &mut World,
     id: ObjectId,
-) -> Result<(Vec<ObjectId>, Option<MainBuildingId>), GenieError> {
+) -> GenieResult<(Vec<ObjectId>, Option<MainBuildingId>)> {
     let i = t.players[1].objects.position_of(id).unwrap();
     in_update(t, (PlayerId::new(1), i), 50, |unit, _, c| {
         unit.let_removed_links_go(c, &roles())?;
@@ -20714,7 +20710,7 @@ fn built_the_centre(setup: impl FnOnce(&mut World)) -> (World, BuildSearched) {
 
 /// What [`built_the_centre`]'s search left within the update: the builder's top action (its
 /// type and target) and the notifies' kinds.
-type BuildSearched = Result<((Option<ActionKind>, Option<ObjectId>), Vec<NotifyKind>), GenieError>;
+type BuildSearched = GenieResult<((Option<ActionKind>, Option<ObjectId>), Vec<NotifyKind>)>;
 
 /// The search for more work around the town centre a builder finished (`0x140ab0b43`,
 /// [`Unit::more_work`], within the Build's update): the table's entry for the centre (auto
@@ -20771,7 +20767,7 @@ fn builder_finds_more_work_around_the_building_it_finished() {
 /// [`house_builder`]'s forager at work on foundation `site` (the Build's state 7, counted among
 /// its builders, with a task of rate and value 1), the house counting one builder, `setup` run
 /// first: one update of `dt` milliseconds.
-fn worked(t: &mut World, site: i32, dt: u32) -> Result<(), GenieError> {
+fn worked(t: &mut World, site: i32, dt: u32) -> GenieResult<()> {
     let b = t
         .parts
         .actions
@@ -21086,7 +21082,7 @@ fn dying_desolid_foundation_owner_watches_it_within_its_update() {
 /// at world time 3000 with the forager (master 120: 25 hit points, at 10) inside, changed by
 /// `setup`, after the centre's whole seconds ([`Unit::building_seconds`]): the forager's hit
 /// points and the centre's garrison time.
-fn centre_seconds(setup: impl FnOnce(&mut World)) -> Result<(f32, u32), GenieError> {
+fn centre_seconds(setup: impl FnOnce(&mut World)) -> GenieResult<(f32, u32)> {
     use crate::objects::masters::BuildingMaster;
     let mut t = house_builder();
     for masters in &mut t.model.masters {
@@ -21129,7 +21125,7 @@ fn centre_seconds(setup: impl FnOnce(&mut World)) -> Result<(f32, u32), GenieErr
 /// building.
 #[test]
 fn building_heals_its_garrison_each_whole_second() {
-    let reason = |r: Result<(f32, u32), GenieError>| r.unwrap_err().reason();
+    let reason = |r: GenieResult<(f32, u32)>| r.unwrap_err().reason();
     assert_eq!(centre_seconds(|_| ()), Ok((12.0, 3000)));
     assert_eq!(
         centre_seconds(|t| t.world_time = WorldTime::from_millis(999)),
@@ -21980,8 +21976,8 @@ fn loaded_builder_drops_its_food_at_the_centre_and_builds_on() {
 fn finished_with(
     t: &mut World,
     (p, i): (PlayerId, ListIndex),
-    step: impl FnOnce(&mut step::Step<'_>) -> Result<Outcome, GenieError>,
-) -> Result<Outcome, GenieError> {
+    step: impl FnOnce(&mut step::Step<'_>) -> GenieResult<Outcome>,
+) -> GenieResult<Outcome> {
     t.step_object((p, i), (Millis::new(50), None, false), |_, _, c| step(c))
         .map(|s| s.outcome)
 }
@@ -22571,7 +22567,7 @@ fn routes(
     t: &World,
     command: &Command,
     player: PlayerId,
-    by_hand: impl FnOnce(&mut World) -> Result<(), GenieError>,
+    by_hand: impl FnOnce(&mut World) -> GenieResult<()>,
 ) -> bool {
     let mut ran = t.clone();
     ran.run(command);
@@ -23208,7 +23204,7 @@ fn call_for_help_walks_the_lists_for_free_helper_in_reach() {
 }
 
 /// RESEARCH's handler on its listed buildings, every one kept by its check.
-fn research_listed(t: &mut World, r: &ResearchCommand) -> Result<(), GenieError> {
+fn research_listed(t: &mut World, r: &ResearchCommand) -> GenieResult<()> {
     t.research(r, &r.buildings)
 }
 

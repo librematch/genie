@@ -1,6 +1,5 @@
 //! Leading own livestock to its drop site (state 10), facing an animal and the decay check.
 
-use crate::GenieError;
 use crate::combat::attack::Aim;
 use crate::combat::attack::Fight;
 use crate::combat::attack::face_target;
@@ -23,6 +22,7 @@ use crate::world::WorldTime;
 use crate::world::layer::AttributeRoles;
 use crate::world::layer::Roles;
 use crate::world::step::Step;
+use crate::{GenieError, GenieResult};
 
 impl HuntAction {
     /// `set_state(10)` (`0x140ac60e0` case 10): `sheep_still_time` clears, the animal's place
@@ -36,7 +36,7 @@ impl HuntAction {
         f: &Fight,
         r: &HuntReads,
         herd: &Herd,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         self.tear_down(c.w.parts.mover_mut(unit.id))?;
         self.state = HuntState::Lead;
         self.lead.still_time = 0;
@@ -67,7 +67,7 @@ impl HuntAction {
         (at, mover): (Position, Option<&mut Mover>),
         to: Position,
         now: WorldTime,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let mover = mover.ok_or(HUNTER_UNMOVING)?;
         if face_target(mover, at, to, now)? == Aim::Turning {
             return Err(GenieError::unsupported(
@@ -90,7 +90,7 @@ impl HuntAction {
         f: &Fight,
         r: &HuntReads,
         roles: &Roles,
-    ) -> Result<HuntNext, GenieError> {
+    ) -> GenieResult<HuntNext> {
         if self.target.is_none() {
             self.state = HuntState::Search;
             return Ok(HuntNext::Search);
@@ -152,7 +152,7 @@ impl HuntAction {
         decay: DecayRule,
         f: &mut Fight,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if self.stops_decay_of(decay, &mut f.victim, roles) {
             write_target_back(c, hunter, actions, f, roles)?;
         }

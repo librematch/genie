@@ -5,8 +5,8 @@
 use std::collections::{BTreeMap, btree_map};
 use std::iter::FusedIterator;
 
-use crate::GenieError;
 use crate::objects::ObjectId;
+use crate::{GenieError, GenieResult};
 use std::mem::take as mem_take;
 
 /// The most ids on either side of 0 a column holds; an id beyond (a stand-in such as
@@ -260,7 +260,7 @@ impl<T> IdTable<T> {
         &mut self,
         id: ObjectId,
         make: impl FnOnce() -> T,
-    ) -> Result<&mut T, GenieError> {
+    ) -> GenieResult<&mut T> {
         if !self.contains_key(id) {
             let _ = self.insert(id, make());
         }

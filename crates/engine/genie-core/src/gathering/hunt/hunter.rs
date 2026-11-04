@@ -2,7 +2,6 @@
 //! hunt is in (the drop-off's wait and walk, the failure, the walks to a point, the search, the
 //! idle, the lead).
 
-use crate::GenieError;
 use crate::combat::damage::Victim;
 use crate::combat::victims::readable;
 use crate::gathering::DropSiteId;
@@ -38,6 +37,7 @@ use crate::world::lets::release;
 use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
+use crate::{GenieError, GenieResult};
 
 impl Unit {
     /// The Hunt's update (`0x140ac7a00`) first checks its targets: one gone from the world's
@@ -47,7 +47,7 @@ impl Unit {
         &mut self,
         hunt: &mut HuntAction,
         c: &mut Step<'_>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let target = hunt.target;
         if target.is_some() {
             let state = readable(c, target)?.map(|(_, u, _)| u.life.state);
@@ -123,7 +123,7 @@ impl Unit {
         me: Me,
         (own, tree_lost): (&mut Option<Victim>, bool),
         roles: &Roles,
-    ) -> Result<HeadCode, GenieError> {
+    ) -> GenieResult<HeadCode> {
         let (state, timer, target) = (hunt.state, hunt.timer, hunt.target);
         match state {
             HuntState::Drop { .. } if timer < Seconds::ZERO => {
@@ -171,7 +171,7 @@ impl Unit {
         actions: &mut Action,
         c: &mut Step<'_>,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         hunt.timer += c.dt.seconds();
         if Seconds::ZERO <= hunt.timer {
             hunt.timer = Seconds::ZERO;
@@ -196,7 +196,7 @@ impl Unit {
         c: &mut Step<'_>,
         me: Me,
         roles: &Roles,
-    ) -> Result<HeadCode, GenieError> {
+    ) -> GenieResult<HeadCode> {
         let master = object_master(
             c.w.parts.own_master.get(self.id),
             (self.id, self.life.master_id),
@@ -278,7 +278,7 @@ impl Unit {
     /// State 13 (`0x140ac7a00` case 0xc): notify 0x1f9 with the hunt's action value, and the
     /// update returns 3, whose deletion lets its target, then its second target go. The failed
     /// state holds no sub-action (its `set_state` dropped them).
-    pub(crate) fn hunt_failed(&self, c: &mut Step<'_>) -> Result<HeadCode, GenieError> {
+    pub(crate) fn hunt_failed(&self, c: &mut Step<'_>) -> GenieResult<HeadCode> {
         self.post_own(
             &mut c.w.parts.unit_ai,
             NotifyKind::ACTION_FAILED,
@@ -299,7 +299,7 @@ impl Unit {
         c: &mut Step<'_>,
         me: Me,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let master = object_master(
             c.w.parts.own_master.get(self.id),
             (self.id, self.life.master_id),
@@ -337,7 +337,7 @@ impl Unit {
         hunt: &mut HuntAction,
         actions: &mut Action,
         c: &mut Step<'_>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if hunt.timer < Seconds::ZERO {
             hunt.timer += c.dt.seconds();
             if Seconds::ZERO <= hunt.timer {
@@ -358,7 +358,7 @@ impl Unit {
         actions: &mut Action,
         c: &mut Step<'_>,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let walks = self.move_walks(
             c.w.parts.mover_of(self.id),
             MasterTables::new(&c.w.model.masters, &c.w.parts.own_master),
@@ -379,7 +379,7 @@ impl Unit {
 impl Action {
     /// State 2 (case 1): a done hunt waits; one of a tree's target class would search again
     /// (`set_state` 3), which is not modelled.
-    pub(crate) fn hunt_idle(&self, roles: &Roles) -> Result<(), GenieError> {
+    pub(crate) fn hunt_idle(&self, roles: &Roles) -> GenieResult<()> {
         if self.list.hunt().is_some_and(|h| {
             roles
                 .of_some_class(h.target_class)

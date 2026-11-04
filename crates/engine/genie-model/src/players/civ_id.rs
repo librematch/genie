@@ -1,6 +1,6 @@
 //! A civilisation's number.
 
-use crate::GenieError;
+use crate::{GenieError, GenieResult};
 use derive_more::Display;
 use serde::Deserialize;
 use serde::Serialize;
@@ -40,7 +40,7 @@ impl CivId {
     /// # Errors
     ///
     /// A number past the byte the players hold theirs in.
-    pub fn of_tech(value: i16) -> Result<Option<Self>, GenieError> {
+    pub fn of_tech(value: i16) -> GenieResult<Option<Self>> {
         if value < 1 {
             return Ok(None);
         }

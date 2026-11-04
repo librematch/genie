@@ -1,6 +1,6 @@
 //! An object's death (`set_state(3)` and the static part of it) and a foundation's death.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::construction::ConstructionStart;
 use crate::construction::build::NO_CONSTRUCTION;
 use crate::construction::build::{Completion, Construction};
@@ -37,7 +37,7 @@ impl Unit {
         &mut self,
         c: &mut Step<'_>,
         master: &Master,
-    ) -> Result<Option<(MasterId, TechId)>, GenieError> {
+    ) -> GenieResult<Option<(MasterId, TechId)>> {
         // FUN_1411dbb70 to state 3 from 2: the storage leaves (FUN_1411e63f0), the owner's
         // watched list lets it go (FUN_141091310), the tiles unlink (FUN_140f65580), and
         // a monastery's, wonder's or castle's count leaves, at least 0 left
@@ -82,7 +82,7 @@ impl Unit {
         c: &mut Step<'_>,
         before: ObjectState,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         // its master as the death starts: the world's calls below change other objects
         let master = &self.master(c.w.master_tables(), c.player)?.clone();
         // the last building of a master with a technology withdraws it, after the combat part
@@ -169,7 +169,7 @@ impl Unit {
     /// ([`crate::objects::sprite::top_speed`]: the deer 9655 of MarvinBlue/426048731, running at
     /// 1.4003 when the spears kill it in update 3147, moves at its master's 0.737 with its
     /// dying sprite).
-    fn show_dying(&mut self, c: &mut Step<'_>, id: SpriteId) -> Result<(), GenieError> {
+    fn show_dying(&mut self, c: &mut Step<'_>, id: SpriteId) -> GenieResult<()> {
         let g = c.w.model.graphics.get(id).copied().ok_or(NO_DYING_SPRITE)?;
         new_sprite(
             &mut self.sprite,
@@ -195,7 +195,7 @@ impl Unit {
         c: &mut Step<'_>,
         master: &Master,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let ai = c.w.parts.unit_ai.contains(self.id);
         let construction =
             c.w.parts

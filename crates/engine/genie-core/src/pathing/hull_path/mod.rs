@@ -33,7 +33,7 @@ use crate::math::fmath::sqrt;
 use crate::objects::ObjectId;
 use crate::players::PlayerId;
 use crate::world::slots::CheckedIndex;
-use genie_error::GenieError;
+use genie_error::GenieResult;
 use std::collections::BTreeSet;
 
 mod area;
@@ -205,7 +205,7 @@ impl Nodes {
     }
 
     /// Node `i`.
-    fn checked(&self, i: NodeIndex) -> Result<&Node, GenieError> {
+    fn checked(&self, i: NodeIndex) -> GenieResult<&Node> {
         self.0.checked(i.0)
     }
 
@@ -215,7 +215,7 @@ impl Nodes {
     }
 
     /// Node `i`, to change.
-    fn checked_mut(&mut self, i: NodeIndex) -> Result<&mut Node, GenieError> {
+    fn checked_mut(&mut self, i: NodeIndex) -> GenieResult<&mut Node> {
         self.0.checked_mut(i.0)
     }
 

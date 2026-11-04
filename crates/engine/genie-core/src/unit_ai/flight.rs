@@ -1,6 +1,5 @@
 //! The flight of the hunted animals, the boar and the villagers, and their calls for help.
 
-use crate::GenieError;
 use crate::construction::FoundationId;
 use crate::map::Distance;
 use crate::map::Point;
@@ -29,6 +28,7 @@ use crate::unit_ai::{
 };
 use crate::world::Millis;
 use crate::world::layer::ClassRoles;
+use crate::{GenieError, GenieResult};
 
 /// What `evasiveMoveTo` (`FUN_140c4d140`'s `tries`) does with a point the unit could not stand at.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -56,7 +56,7 @@ impl UnitAi {
         player_kind: PlayerKind,
         ai_rng: &mut Well512,
         side: &mut UnitView<'_, '_>,
-    ) -> Result<u32, GenieError> {
+    ) -> GenieResult<u32> {
         let roles = &at.roles;
         if n.p[1] < 1 {
             self.end_notifies(time, at, side, ai_rng)?;
@@ -95,7 +95,7 @@ impl UnitAi {
         player_kind: PlayerKind,
         ai: &mut Well512,
         side: &mut UnitView<'_, '_>,
-    ) -> Result<Answer, GenieError> {
+    ) -> GenieResult<Answer> {
         let unit_ai_tuning = &at.unit_ai_tuning;
         let roles = &at.roles;
         // the siege unit's slot 0x160 (FUN_140c2a8f0): with a top action's target or of class 54
@@ -193,7 +193,7 @@ impl UnitAi {
         at: &Surroundings,
         ai: &mut Well512,
         side: &mut UnitView<'_, '_>,
-    ) -> Result<Answer, GenieError> {
+    ) -> GenieResult<Answer> {
         let unit_ai_tuning = &at.unit_ai_tuning;
         if force == OrderForce::Unforced && self.current_action.is_some() {
             return Ok(Answer::NotTaken);
@@ -265,7 +265,7 @@ impl UnitAi {
         at: &Surroundings,
         ai_rng: &mut Well512,
         side: &mut UnitView<'_, '_>,
-    ) -> Result<u32, GenieError> {
+    ) -> GenieResult<u32> {
         let roles = &at.roles;
         if n.p[1] < 1 {
             self.end_notifies(time, at, side, ai_rng)?;
@@ -314,7 +314,7 @@ impl UnitAi {
         at: &Surroundings,
         player_kind: PlayerKind,
         side: &mut UnitView<'_, '_>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let unit_ai_tuning = &at.unit_ai_tuning;
         if side.seen_unit(attacker)?.is_none() {
             return Ok(());
@@ -375,7 +375,7 @@ impl UnitAi {
         player_kind: PlayerKind,
         side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
-    ) -> Result<u32, GenieError> {
+    ) -> GenieResult<u32> {
         let unit_ai_tuning = &at.unit_ai_tuning;
         match self.current_action {
             Some(AiAction::Hunt) => {

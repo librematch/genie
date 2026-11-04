@@ -2,7 +2,7 @@
 //! constructors read of the unit ([`MoveToReads`]) and the object one walks to ([`WalkTo`]); to an
 //! object (`FUN_140aa0df0`), to a point (`FUN_140aa0d30`) and to none.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::combat::abilities::Look;
 use crate::map::Distance;
 use crate::map::Footprint;
@@ -134,7 +134,7 @@ impl<'g> MoveToReads<'g> {
     /// # Errors
     ///
     /// An object whose master its player's table lacks.
-    pub fn walk_to(&self, w: &World, id: Option<ObjectId>) -> Result<Option<WalkTo>, GenieError> {
+    pub fn walk_to(&self, w: &World, id: Option<ObjectId>) -> GenieResult<Option<WalkTo>> {
         let Some(found) = w.object(id) else {
             return Ok(None);
         };
@@ -146,11 +146,7 @@ impl<'g> MoveToReads<'g> {
     /// # Errors
     ///
     /// A master the player has not got.
-    pub fn walk_to_found(
-        &self,
-        w: &World,
-        (player, t): (PlayerId, &Unit),
-    ) -> Result<WalkTo, GenieError> {
+    pub fn walk_to_found(&self, w: &World, (player, t): (PlayerId, &Unit)) -> GenieResult<WalkTo> {
         let at = t.position();
         let radius = t.master(w.master_tables(), player)?.radius;
         Ok(WalkTo {
@@ -178,7 +174,7 @@ impl<'g> MoveToReads<'g> {
         given: Option<SpriteId>,
         on_target_moved: TargetMoved,
         move_to_tuning: &MoveToTuning,
-    ) -> Result<Option<MoveToAction>, GenieError> {
+    ) -> GenieResult<Option<MoveToAction>> {
         let (target, gap) = to.held();
         let walk = MoveToAction {
             state: MoveTo::Start,
@@ -208,7 +204,7 @@ impl<'g> MoveToReads<'g> {
         given: Option<SpriteId>,
         on_target_moved: TargetMoved,
         move_to_tuning: &MoveToTuning,
-    ) -> Result<Option<MoveToAction>, GenieError> {
+    ) -> GenieResult<Option<MoveToAction>> {
         let (target, gap) = to.held();
         let walk = MoveToAction {
             target,
@@ -229,7 +225,7 @@ impl<'g> MoveToReads<'g> {
         range: Distance,
         given: Option<SpriteId>,
         move_to_tuning: &MoveToTuning,
-    ) -> Result<Option<MoveToAction>, GenieError> {
+    ) -> GenieResult<Option<MoveToAction>> {
         let walk = MoveToAction {
             state: MoveTo::Start,
             point: NO_TARGET_POINT,
@@ -261,7 +257,7 @@ impl<'g> MoveToReads<'g> {
         range: Distance,
         given: Option<SpriteId>,
         move_to_tuning: &MoveToTuning,
-    ) -> Result<Option<MoveToAction>, GenieError> {
+    ) -> GenieResult<Option<MoveToAction>> {
         let walk = MoveToAction::sub_to_point(point, range, self.sprites.to_point(given)?);
         Ok(walk.added(
             self.state,
@@ -287,7 +283,7 @@ impl Unit {
         player: PlayerId,
         graphics: (&'g Graphics, Option<&Look>),
         roles: &Roles,
-    ) -> Result<MoveToReads<'g>, GenieError> {
+    ) -> GenieResult<MoveToReads<'g>> {
         Ok(MoveToReads::of(
             (self, mover),
             self.master(every, player)?,

@@ -2,7 +2,6 @@
 //! player explored and sees, the zones of its restriction, its stand and reach tests and its gap
 //! to a tile.
 
-use crate::GenieError;
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::GridSize;
@@ -21,6 +20,7 @@ use crate::players::PlayerId;
 use crate::players::PlayerKind;
 use crate::world::World;
 use crate::world::index::ObjectsRef;
+use crate::{GenieError, GenieResult};
 
 /// What the auto scout's searches ([`crate::movement::explore`]) and the AI's explorer
 /// ([`crate::players::ai_module::InfoModule::closest_unexplored_tile`]) read of the world for
@@ -61,7 +61,7 @@ impl<'a> ScoutArea<'a> {
         me: Me,
         player: PlayerId,
         player_kind: PlayerKind,
-    ) -> Result<(Self, GridSize, Distance), GenieError> {
+    ) -> GenieResult<(Self, GridSize, Distance)> {
         let master = unit.master(
             MasterTables::new(&w.model.masters, &w.parts.own_master),
             player,
@@ -113,7 +113,7 @@ impl<'a> ScoutArea<'a> {
     /// # Errors
     ///
     /// A tile off the scout map, or a test without the players' sight.
-    pub(crate) fn explored(&self, tile: Tile) -> Result<bool, GenieError> {
+    pub(crate) fn explored(&self, tile: Tile) -> GenieResult<bool> {
         if self.scouted {
             return self
                 .spatial
@@ -149,7 +149,7 @@ impl<'a> ScoutArea<'a> {
     /// # Errors
     ///
     /// What the point query does not model.
-    pub(crate) fn clear(&mut self, tile: Tile) -> Result<bool, GenieError> {
+    pub(crate) fn clear(&mut self, tile: Tile) -> GenieResult<bool> {
         let mask = self.mover.stats.restriction_mask;
         self.spatial.point_clear(
             self.me.id,
@@ -166,7 +166,7 @@ impl<'a> ScoutArea<'a> {
     /// # Errors
     ///
     /// What the reach test does not model.
-    pub(crate) fn reaches(&mut self, tile: Tile) -> Result<bool, GenieError> {
+    pub(crate) fn reaches(&mut self, tile: Tile) -> GenieResult<bool> {
         self.mover.reaches(
             (self.at, &self.me),
             (self.spatial, self.by_id),

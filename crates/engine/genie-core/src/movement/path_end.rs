@@ -15,7 +15,6 @@ use crate::world::Millis;
 use crate::world::Seconds;
 use crate::world::WorldTime;
 
-use crate::GenieError;
 use crate::construction::MainBuildingId;
 use crate::groups::UnitGroups;
 use crate::map::DistanceSquared;
@@ -39,6 +38,7 @@ use crate::world::index::ObjectsRef;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::generated::MovementTuning;
+use crate::{GenieError, GenieResult};
 
 /// What a reach test asks of the unit ([`Mover::reach_test`]'s arguments after the world).
 #[derive(Clone, Copy, Debug)]
@@ -76,7 +76,7 @@ impl Mover {
         plan: &mut Planning<'_>,
         ask: ReachAsk,
         by_id: ObjectsRef<'_>,
-    ) -> Result<bool, GenieError> {
+    ) -> GenieResult<bool> {
         let long_path_tuning = &by_id.tuning().long_path;
         let tile_path_tuning = &by_id.tuning().tile_path;
         let movement_tuning = &by_id.tuning().movement;
@@ -227,7 +227,7 @@ impl Mover {
     /// level 0, are both held, and the level's current waypoint (`FUN_140f9bcd0`) is the top
     /// path's last point (`FUN_140f95fb0`, compared x, y, z). A top path of one point, where the
     /// game compares with its static point, is not modelled.
-    pub fn walks_to_path_end(&self) -> Result<bool, GenieError> {
+    pub fn walks_to_path_end(&self) -> GenieResult<bool> {
         let Some(level) = self
             .paths
             .first()
@@ -469,7 +469,7 @@ impl Mover {
         projected: BVector,
         now: WorldTime,
         by_id: ObjectsRef<'_>,
-    ) -> Result<bool, GenieError> {
+    ) -> GenieResult<bool> {
         let movement_tuning = &by_id.tuning().movement;
         let level = self.paths.walked()?;
         let top = self.paths.last().filter(|l| !l.points.is_empty());
@@ -525,7 +525,7 @@ impl Mover {
         projected: BVector,
         dt: Seconds,
         (now, player_kind): (WorldTime, PlayerKind),
-    ) -> Result<Avoided, GenieError> {
+    ) -> GenieResult<Avoided> {
         let roles = by_id.roles();
         let level = self.paths.walked()?;
         let player = world
@@ -533,7 +533,7 @@ impl Mover {
             .ok_or(GenieError::unsupported("a walker without a place"))?
             .player;
         // a hit the world holds no object of (a map edge's record) is passed over
-        let met = |hit: RecordId| -> Result<Option<(ObjectId, &Placed)>, GenieError> {
+        let met = |hit: RecordId| -> GenieResult<Option<(ObjectId, &Placed)>> {
             let Some(id) = by_id
                 .annex_of(hit)
                 .map(MainBuildingId::id)
@@ -631,7 +631,7 @@ impl Mover {
 
 /// The place of a reach test's target in the spatial index, None without a target. The caller
 /// found the target there, so a missing one is a broken invariant.
-fn target_placed(world: &Spatial, target: Option<ObjectId>) -> Result<Option<&Placed>, GenieError> {
+fn target_placed(world: &Spatial, target: Option<ObjectId>) -> GenieResult<Option<&Placed>> {
     target
         .map(|id| {
             world.get(id).ok_or_else(|| {

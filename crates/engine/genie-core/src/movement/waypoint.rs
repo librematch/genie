@@ -1,6 +1,5 @@
 //! A reached waypoint and what follows it: the next waypoint, a level's end and the moving state.
 
-use crate::GenieError;
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::Point;
@@ -31,6 +30,7 @@ use crate::vision::SightLayer;
 use crate::world::WorldTime;
 use crate::world::index::ObjectsRef;
 use crate::world::slots::CheckedIndex;
+use crate::{GenieError, GenieResult};
 
 /// Where and when a unit moved inside the motion step ([`Mover::moved_to`]).
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -71,7 +71,7 @@ impl Mover {
         goal: Goal<'_>,
         now: WorldTime,
         by_id: ObjectsRef<'_>,
-    ) -> Result<Reached, GenieError> {
+    ) -> GenieResult<Reached> {
         let movement_tuning = &by_id.tuning().movement;
         let roles = by_id.roles();
         let ground_radius = self.stats.radius.ground();
@@ -172,7 +172,7 @@ impl Mover {
         pathing: Option<&mut Pathing>,
         now: WorldTime,
         by_id: ObjectsRef<'_>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let visibility_tuning = &by_id.tuning().visibility;
         let movement_tuning = &by_id.tuning().movement;
         let roles = by_id.roles();
@@ -212,7 +212,7 @@ impl Mover {
         at: Position,
         world: &Spatial,
         by_id: ObjectsRef<'_>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let movement_tuning = &by_id.tuning().movement;
         let level = self.paths.walked()?;
         let next = level.waypoint.next();
@@ -256,7 +256,7 @@ impl Mover {
         world: &Spatial,
         goal: Goal<'_>,
         by_id: ObjectsRef<'_>,
-    ) -> Result<Next, GenieError> {
+    ) -> GenieResult<Next> {
         let level = self.paths.walked()?;
         let created = level.created;
         let own = world.get(me.id).map(|p| p.player);
@@ -286,7 +286,7 @@ impl Mover {
         me: &Me,
         world: &mut Spatial,
         by_id: ObjectsRef<'_>,
-    ) -> Result<LookAhead, GenieError> {
+    ) -> GenieResult<LookAhead> {
         let movement_tuning = &by_id.tuning().movement;
         let target = self.paths.walked()?.target;
         let parent = self.paths.parent()?;
@@ -329,7 +329,7 @@ impl Mover {
         target: Option<ObjectId>,
         world: &mut Spatial,
         by_id: ObjectsRef<'_>,
-    ) -> Result<bool, GenieError> {
+    ) -> GenieResult<bool> {
         let movement_tuning = &by_id.tuning().movement;
         let (rx, ry, rz) = (
             self.stats.radius.x(),
@@ -373,7 +373,7 @@ impl Mover {
         target: Option<ObjectId>,
         world: &mut Spatial,
         by_id: ObjectsRef<'_>,
-    ) -> Result<bool, GenieError> {
+    ) -> GenieResult<bool> {
         let (rx, ry, rz) = (
             self.stats.radius.x(),
             self.stats.radius.y(),
@@ -416,7 +416,7 @@ impl Mover {
     /// other hands over to its parent by its link (`mLinkedPathType`): 1 marks the parent's
     /// waypoint reached, 2 has the parent ask again (a looping parent moves on first), 3 has it
     /// ask again; the step starts again with the parent.
-    pub(super) fn arrived(&mut self, goal: Goal<'_>) -> Result<Next, GenieError> {
+    pub(super) fn arrived(&mut self, goal: Goal<'_>) -> GenieResult<Next> {
         let level = self.paths.walked()?;
         if self.paths.len() == 1 || goal.gap <= level.range {
             self.reset_level()?;
@@ -450,7 +450,7 @@ impl Mover {
 
     /// `FUN_140f98e80` on the walked level: its path goes, its parents with it, and it holds the
     /// defaults (its tries back to 10, flags clear; its repath time stays).
-    pub(crate) fn reset_level(&mut self) -> Result<(), GenieError> {
+    pub(crate) fn reset_level(&mut self) -> GenieResult<()> {
         self.paths.truncate(1);
         let level = self.paths.walked_mut()?;
         *level = PathData {
@@ -472,7 +472,7 @@ impl Mover {
     }
 
     /// `FUN_140f9b4d0(level, 2, 0)`: bit 2 goes off the walked level and on for its parents.
-    pub(super) fn clear_bit_2(&mut self) -> Result<(), GenieError> {
+    pub(super) fn clear_bit_2(&mut self) -> GenieResult<()> {
         self.paths.walked_mut()?.flags &= !LevelFlags::MET_TARGET;
         for parent in self.paths.iter_mut().skip(1) {
             parent.flags |= LevelFlags::MET_TARGET;
@@ -486,7 +486,7 @@ impl Mover {
     /// # Errors
     ///
     /// As [`Mover::stop`].
-    pub(crate) fn stand(&mut self) -> Result<(), GenieError> {
+    pub(crate) fn stand(&mut self) -> GenieResult<()> {
         self.stop()?;
         if !self.paths.is_empty() {
             self.reset_level()?;
@@ -500,7 +500,7 @@ impl Mover {
     /// empties and its animated layer's speed (`+0x7b8`) is 0 at once. A master whose move
     /// algorithm has bit 0 also resets the unit's sprite (`+0x78c`, `+0x958`), which is not
     /// modelled.
-    pub(crate) fn stop(&mut self) -> Result<(), GenieError> {
+    pub(crate) fn stop(&mut self) -> GenieResult<()> {
         if self
             .stats
             .move_algorithm
@@ -531,7 +531,7 @@ impl Mover {
         world: &mut Spatial,
         pathing: Option<&mut Pathing>,
         sight: SightLayer<'_>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let SightLayer {
             roles,
             visibility_tuning,

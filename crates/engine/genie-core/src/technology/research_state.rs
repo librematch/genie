@@ -1,7 +1,7 @@
 //! A player's technology's state: whether it may be researched, is being researched or is
 //! researched.
 
-use crate::GenieError;
+use crate::{GenieError, GenieResult};
 use derive_more::Display;
 
 /// A player's technology's state (`Tech_Player_Tree` `+0x4`, the save's `state`). The states order
@@ -33,7 +33,7 @@ impl ResearchState {
     /// # Errors
     ///
     /// A value that names no state of a technology.
-    pub fn of_int(value: i16) -> Result<Self, GenieError> {
+    pub fn of_int(value: i16) -> GenieResult<Self> {
         Ok(match value {
             -1 => Self::Disabled,
             0 => Self::Unavailable,

@@ -10,7 +10,6 @@
 //! an id the world does not. A comparison reads an object whole too ([`ObjectView`]), so no
 //! part escapes the comparison with the game's save.
 
-use crate::GenieError;
 use crate::combat::missile::Missile;
 use crate::commands::GatherPoint;
 use crate::objects::IdTable;
@@ -29,6 +28,7 @@ use crate::unit_ai::UnitAi;
 use crate::world::Unread;
 use crate::world::World;
 pub use crate::world::whole::{Object, ObjectParts, ObjectView};
+use crate::{GenieError, GenieResult};
 use std::borrow::Cow;
 use std::iter::{Copied, Zip};
 
@@ -121,7 +121,7 @@ impl<T> PartTable<T> {
         &mut self,
         id: ObjectId,
         make: impl FnOnce() -> T,
-    ) -> Result<&mut T, GenieError> {
+    ) -> GenieResult<&mut T> {
         if !self.contains(id) {
             let _ = self.insert(id, make());
         }
@@ -280,7 +280,7 @@ pub(in crate::world) fn repairers_in<'a>(
     buildings: &'a mut PartTable<Building>,
     combats: &'a mut PartTable<Combat>,
     id: ObjectId,
-) -> Result<&'a mut BuilderCount, GenieError> {
+) -> GenieResult<&'a mut BuilderCount> {
     if let Some(k) = buildings.get_mut(id).and_then(|b| b.construction.as_mut()) {
         return Ok(&mut k.builders);
     }
@@ -395,7 +395,7 @@ impl Parts {
     /// # Errors
     ///
     /// None (an unreachable error where the table lost the layer it took).
-    pub(crate) fn building_mut(&mut self, id: ObjectId) -> Result<&mut Building, GenieError> {
+    pub(crate) fn building_mut(&mut self, id: ObjectId) -> GenieResult<&mut Building> {
         self.building.get_or_insert_with(id, || Building::NONE)
     }
 
@@ -413,7 +413,7 @@ impl Parts {
     /// # Errors
     ///
     /// None (an unreachable error where the table lost the layer it took).
-    pub(crate) fn combat_mut(&mut self, id: ObjectId) -> Result<&mut Combat, GenieError> {
+    pub(crate) fn combat_mut(&mut self, id: ObjectId) -> GenieResult<&mut Combat> {
         self.combat.get_or_insert_with(id, Combat::default)
     }
 
@@ -431,7 +431,7 @@ impl Parts {
     /// # Errors
     ///
     /// None (an unreachable error where a table lost the part it took).
-    pub(crate) fn repairers_mut(&mut self, id: ObjectId) -> Result<&mut BuilderCount, GenieError> {
+    pub(crate) fn repairers_mut(&mut self, id: ObjectId) -> GenieResult<&mut BuilderCount> {
         repairers_in(&mut self.building, &mut self.combat, id)
     }
 
@@ -444,7 +444,7 @@ impl Parts {
     pub(crate) fn ai_and_combat_mut(
         &mut self,
         id: ObjectId,
-    ) -> Result<(Option<&mut UnitAi>, &mut Combat), GenieError> {
+    ) -> GenieResult<(Option<&mut UnitAi>, &mut Combat)> {
         let combat = self.combat.get_or_insert_with(id, Combat::default)?;
         Ok((self.unit_ai.get_mut(id), combat))
     }
@@ -530,7 +530,7 @@ impl World {
     /// # Errors
     ///
     /// An object the world does not hold.
-    pub fn set_part(&mut self, id: ObjectId, part: Part) -> Result<(), GenieError> {
+    pub fn set_part(&mut self, id: ObjectId, part: Part) -> GenieResult<()> {
         if self.index.filed(id).is_none() && !self.index.scans() {
             return Err(
                 GenieError::unreachable("a part of an object the world does not hold")
@@ -614,7 +614,7 @@ impl World {
     /// # Errors
     ///
     /// An object the world does not hold.
-    pub fn production_or_new(&mut self, id: ObjectId) -> Result<&mut Production, GenieError> {
+    pub fn production_or_new(&mut self, id: ObjectId) -> GenieResult<&mut Production> {
         if !self.parts.production.contains(id) {
             self.set_part(id, Part::Production(Some(Box::default())))?;
         }
@@ -629,7 +629,7 @@ impl World {
     /// # Errors
     ///
     /// An object the world does not hold.
-    pub fn load_parts(&mut self, id: ObjectId, parts: ObjectParts) -> Result<(), GenieError> {
+    pub fn load_parts(&mut self, id: ObjectId, parts: ObjectParts) -> GenieResult<()> {
         if self.index.filed(id).is_none() && !self.index.scans() {
             return Err(GenieError::unreachable(
                 "a loaded part of an object the world does not hold",
@@ -666,7 +666,7 @@ impl World {
     /// # Errors
     ///
     /// The first id a table holds that the world does not.
-    pub fn check_parts(&self) -> Result<(), GenieError> {
+    pub fn check_parts(&self) -> GenieResult<()> {
         if self.index.scans() {
             return Ok(());
         }

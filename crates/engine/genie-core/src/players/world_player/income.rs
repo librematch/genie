@@ -1,7 +1,7 @@
 //! The income: the trickles, the mills' food, the attribute adds and their sharing, and the
 //! update's tail.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::map::Tile;
 use crate::map::spatial::TileSight;
 use crate::math::fmath::at_most_or_unordered;
@@ -35,7 +35,7 @@ impl World {
     /// The trickles of player `p`: each of attributes 230 to 233 above 0 (`COMISS` with 0,
     /// `JBE` skips a NaN) adds its sixtieth to food, wood, stone and gold in turn, through the
     /// attribute add with its statistic and its sharing ([`World::add_resource`] with 1 and 1).
-    pub fn trickles(&mut self, p: PlayerId) -> Result<(), GenieError> {
+    pub fn trickles(&mut self, p: PlayerId) -> GenieResult<()> {
         for kind in AttributeId::resources() {
             let rate = get(
                 &self.players.player(p)?.attributes,
@@ -61,7 +61,7 @@ impl World {
     /// 0); food grows by attribute 254 over 60 times (`time` times logf(sum / 200 + 1))
     /// ([`crate::math::fmath::log`]), with its statistic and its sharing ([`World::add_resource`]),
     /// also when that is 0. `time` is the update time before the loop's step.
-    pub fn mill_food(&mut self, p: PlayerId, time: Seconds) -> Result<(), GenieError> {
+    pub fn mill_food(&mut self, p: PlayerId, time: Seconds) -> GenieResult<()> {
         let mut sum = 0.0;
         for &id in self
             .players
@@ -111,7 +111,7 @@ impl World {
         amount: Amount,
         stat: ResourceStat,
         share: ResourceShare,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if self
             .model
             .roles
@@ -162,7 +162,7 @@ impl World {
         amount: Amount,
         stat: ResourceStat,
         share: ResourceShare,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let player = self.players.player_mut(p)?;
         let k = kind.index();
         if player.attributes.len() <= k {
@@ -232,7 +232,7 @@ impl World {
     /// clears, is the list's length: only the AI's `FUN_140b90b90`, which a playback does not
     /// run, reads it too, and the player's update ends with the list emptied (`FUN_141661030`).
     /// Gaia's update has no tail.
-    pub fn world_player_tail(&mut self, p: PlayerId) -> Result<(), GenieError> {
+    pub fn world_player_tail(&mut self, p: PlayerId) -> GenieResult<()> {
         if self.players.player(p)?.kind == PlayerKind::Gaia || self.spatial.scout_map(p).is_none() {
             return Ok(());
         }

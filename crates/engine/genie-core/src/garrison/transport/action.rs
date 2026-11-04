@@ -1,7 +1,6 @@
 //! The Transport action's slots ([`TransportAction`]): its start, state, move, stop, work and
 //! update, its walk and its test beside the shore.
 
-use crate::GenieError;
 use crate::combat::abilities::Look;
 use crate::garrison::transport::StartCall;
 use crate::garrison::transport::TransportMode;
@@ -45,6 +44,7 @@ use crate::world::layer::generated::Tuning;
 use crate::world::parts::PartTable;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
+use crate::{GenieError, GenieResult};
 use genie_model::model::Model;
 
 impl TransportAction {
@@ -83,7 +83,7 @@ impl TransportAction {
         shore: &mut MapShore<'_>,
         transport_tuning: &TransportTuning,
         move_to_tuning: &MoveToTuning,
-    ) -> Result<Changed, GenieError> {
+    ) -> GenieResult<Changed> {
         let (x, y) = (self.point.x(), self.point.y());
         let sails = call == StartCall::Added
             && at_most_or_unordered(0.0, x)
@@ -121,7 +121,7 @@ impl TransportAction {
         shore: &mut MapShore<'_>,
         transport_tuning: &TransportTuning,
         move_to_tuning: &MoveToTuning,
-    ) -> Result<Changed, GenieError> {
+    ) -> GenieResult<Changed> {
         let mut changed = Changed {
             stopped: self.state.take_move_to().is_some(),
             stands: false,
@@ -165,7 +165,7 @@ impl TransportAction {
         shore: &mut MapShore<'_>,
         transport_tuning: &TransportTuning,
         move_to_tuning: &MoveToTuning,
-    ) -> Result<Changed, GenieError> {
+    ) -> GenieResult<Changed> {
         self.point = point;
         self.mode = TransportMode::Move;
         self.set_state(
@@ -188,7 +188,7 @@ impl TransportAction {
         shore: &mut MapShore<'_>,
         transport_tuning: &TransportTuning,
         move_to_tuning: &MoveToTuning,
-    ) -> Result<Changed, GenieError> {
+    ) -> GenieResult<Changed> {
         self.set_state(
             TransportState::Idle,
             ship,
@@ -220,7 +220,7 @@ impl TransportAction {
         shore: &mut MapShore<'_>,
         transport_tuning: &TransportTuning,
         move_to_tuning: &MoveToTuning,
-    ) -> Result<Changed, GenieError> {
+    ) -> GenieResult<Changed> {
         self.mode = TransportMode::Work;
         let (x, y) = (point.x(), point.y());
         let zone = shore.zone(point.tile())?;
@@ -259,7 +259,7 @@ impl TransportAction {
         actions: &mut Action,
         me: Me,
         r: &TransportReads,
-    ) -> Result<UpdateCode, GenieError> {
+    ) -> GenieResult<UpdateCode> {
         let walked = self.walk(c, unit, me)?;
         let player_kind = c.w.players.player(c.player)?.kind;
         let World {
@@ -318,7 +318,7 @@ impl TransportAction {
         c: &mut Step<'_>,
         unit: &mut Unit,
         actions: &mut Action,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if let Some(own) = actions.list.transport_mut() {
             *own = *self;
         }
@@ -357,7 +357,7 @@ impl TransportAction {
         look: (Option<Graphic>, &mut Well512),
         player_kind: PlayerKind,
         tuning: &Tuning,
-    ) -> Result<Updated, GenieError> {
+    ) -> GenieResult<Updated> {
         let (transport_tuning, move_to_tuning, sprite_tuning) =
             (&tuning.transport, &tuning.move_to, tuning.sprite);
         let (changed, code) = match self.state {
@@ -438,7 +438,7 @@ impl TransportAction {
         shore: &mut MapShore<'_>,
         transport_tuning: &TransportTuning,
         move_to_tuning: &MoveToTuning,
-    ) -> Result<Changed, GenieError> {
+    ) -> GenieResult<Changed> {
         if self.retarget {
             return Ok(Changed::default());
         }
@@ -459,10 +459,7 @@ impl TransportAction {
     /// # Errors
     ///
     /// A task the unit's master (`master`) lacks.
-    pub fn given_sprite(
-        task: Option<TaskId>,
-        master: &Master,
-    ) -> Result<Option<SpriteId>, GenieError> {
+    pub fn given_sprite(task: Option<TaskId>, master: &Master) -> GenieResult<Option<SpriteId>> {
         Ok(match task {
             Some(id) => {
                 let task = master
@@ -497,7 +494,7 @@ impl TransportAction {
         c: &mut Step<'_>,
         unit: &mut Unit,
         me: Me,
-    ) -> Result<SubCode, GenieError> {
+    ) -> GenieResult<SubCode> {
         let Some(state) = self.state.move_to().map(|m| m.state) else {
             return Ok(SubCode::Done);
         };
@@ -543,7 +540,7 @@ impl TransportAction {
         ship: &Ship<'_>,
         shore: &mut MapShore<'_>,
         transport_tuning: &TransportTuning,
-    ) -> Result<bool, GenieError> {
+    ) -> GenieResult<bool> {
         let (ux, uy) = (ship.position.x(), ship.position.y());
         let (rx, ry) = (ship.radius.x(), ship.radius.y());
         let (w, h) = (ship.map.width(), ship.map.height());
@@ -587,7 +584,7 @@ pub(crate) fn stand(
     changed: Changed,
     (standing, rng): (Option<Graphic>, &mut Well512),
     sprite_tuning: SpriteTuning,
-) -> Result<(), GenieError> {
+) -> GenieResult<()> {
     if changed.stopped
         && let Some(m) = motion.mover_mut()
     {
@@ -628,7 +625,7 @@ impl<'a> Ship<'a> {
         graphics: (&'a Graphics, Option<&Look>),
         task: Option<TaskId>,
         roles: &Roles,
-    ) -> Result<Self, GenieError> {
+    ) -> GenieResult<Self> {
         let walk = MoveToReads::of((unit, mover), master, graphics, roles);
         let given = TransportAction::given_sprite(task, master)?;
         Ok(Self::of(unit, master.radius, map, walk, given))

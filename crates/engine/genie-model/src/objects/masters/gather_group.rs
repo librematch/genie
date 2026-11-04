@@ -1,7 +1,7 @@
 //! A master's gather group as one type: the kind of resource the unit AI's resource searches
 //! look for, the value the `.dat` names `resource_gather_group`.
 
-use crate::GenieError;
+use crate::{GenieError, GenieResult};
 use derive_more::Display;
 use serde::Deserialize;
 use serde::Serialize;
@@ -71,7 +71,7 @@ impl TryFrom<i32> for GatherGroup {
     /// # Errors
     ///
     /// A value outside a byte.
-    fn try_from(value: i32) -> Result<Self, GenieError> {
+    fn try_from(value: i32) -> GenieResult<Self> {
         u8::try_from(value).map(Self).map_err(|_| {
             GenieError::invalid_input("a gather group outside a byte").with("group", value)
         })

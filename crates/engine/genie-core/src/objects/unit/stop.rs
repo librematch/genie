@@ -1,7 +1,6 @@
 //! A unit's stops: its actions torn down or cleared, its standing sprite, an action's effects
 //! applied.
 
-use crate::GenieError;
 use crate::math::rng::{Stream, Well512};
 use crate::objects::Graphics;
 use crate::objects::ObjectId;
@@ -22,6 +21,7 @@ use crate::world::layer::Roles;
 use crate::world::layer::generated::SpriteTuning;
 use crate::world::lets::torn_down;
 use crate::world::step::Step;
+use crate::{GenieError, GenieResult};
 use genie_model::model::Model;
 
 impl Unit {
@@ -32,7 +32,7 @@ impl Unit {
         &mut self,
         actions: &mut Action,
         c: &mut Step<'_>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let by = self.releaser(c)?;
         let sprite = c.w.streams.get(Stream::Sprite);
         let (mut releases, mut leaves) = (Vec::new(), Vec::new());
@@ -64,7 +64,7 @@ impl Unit {
         masters: OwnerMasters<'_>,
         model: &Model,
         sprite: &mut Well512,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         self.tear_down_actions(
             (actions, unread),
             motion.reborrow(),
@@ -95,7 +95,7 @@ impl Unit {
         releases: &mut Vec<(ObjectId, Releaser)>,
         builder_leaves: &mut Vec<ObjectId>,
         by: Releaser,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if unread.is_some() {
             return Err(GenieError::unsupported(
                 "a unit AI's stop of an action list the slice does not model",
@@ -118,7 +118,7 @@ impl Unit {
         graphics: &Graphics,
         sprite: &mut Well512,
         sprite_tuning: SpriteTuning,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let standing = self
             .master_in(masters)?
             .standing_sprite
@@ -162,7 +162,7 @@ impl Unit {
         releases: &mut Vec<(ObjectId, Releaser)>,
         builder_leaves: &mut Vec<ObjectId>,
         by: Releaser,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let torn = actions.list.delete_all(motion, self.life.state)?;
         releases.extend(torn.releases.into_iter().map(|t| (t, by)));
         builder_leaves.extend(torn.builder_leaves);
@@ -182,7 +182,7 @@ impl Unit {
         &mut self,
         actions: &mut Action,
         c: &mut Step<'_>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let by = self.releaser(c)?;
         let torn = actions
             .list
@@ -207,7 +207,7 @@ impl Unit {
         class: Option<ClassId>,
         c: &mut Step<'_>,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         match e {
             Effect::Stop => self.stop_action(actions, c),
             Effect::CapHumanOrder(cap) => {
@@ -255,7 +255,7 @@ impl Unit {
         actions: &mut Action,
         command: AiCommand,
         c: &mut Step<'_>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         match command {
             AiCommand::MoveAside(m) => {
                 c.lend_at((&mut *self, &mut *actions), |w, p, i| w.move_aside(p, i, m))

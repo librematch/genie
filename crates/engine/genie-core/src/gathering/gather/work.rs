@@ -1,6 +1,5 @@
 //! The face (state 6), the work (7), the drop-off's update (8) and a random wait.
 
-use crate::GenieError;
 use crate::combat::damage::Victim;
 use crate::gathering::both_food;
 use crate::gathering::gather::GatherState;
@@ -23,6 +22,7 @@ use crate::world::layer::Roles;
 use crate::world::settings::FarmMode;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
+use crate::{GenieError, GenieResult};
 use std::mem::take as mem_take;
 
 impl GatherAction {
@@ -37,7 +37,7 @@ impl GatherAction {
         target: &Victim,
         r: &GatherReads,
         roles: &Roles,
-    ) -> Result<Next, GenieError> {
+    ) -> GenieResult<Next> {
         self.state = GatherState::Face;
         // another player's farm is the gatherer's to take (FUN_141185360, FUN_1411858f0)
         if roles.of_class(target.class).contains(ClassRoles::FARM) && target.player != c.player {
@@ -126,7 +126,7 @@ impl GatherAction {
         target: &mut Victim,
         r: &GatherReads,
         roles: &Roles,
-    ) -> Result<Next, GenieError> {
+    ) -> GenieResult<Next> {
         let held = &mut unit.life.amount;
         let work = Amount::new((r.work_rate * self.task.work_value) * c.dt.seconds());
         let take = if work <= target.amount {
@@ -195,7 +195,7 @@ impl GatherAction {
         r: &GatherReads,
         site: Option<DropOff>,
         roles: &Roles,
-    ) -> Result<Dropped, GenieError> {
+    ) -> GenieResult<Dropped> {
         if self.timer < Seconds::ZERO {
             self.timer += c.dt.seconds();
             if self.timer < Seconds::ZERO {

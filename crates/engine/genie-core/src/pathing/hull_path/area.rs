@@ -1,7 +1,6 @@
 //! The search's goal and area: the goal's query, a goal at the map's edge, an end partway,
 //! the area's growth and the entrances' join.
 
-use crate::GenieError;
 use crate::map::Distance;
 use crate::map::Rect;
 use crate::map::Tile;
@@ -15,6 +14,7 @@ use crate::pathing::hull_path::{
     EPSILON, EntranceIndex, HullIndex, HullPather, MOST_AREA, PATHS, Point, Target, Waypoints,
 };
 use crate::world::slots::CheckedIndex;
+use crate::{GenieError, GenieResult};
 
 /// Whether the hull search's area grew ([`HullPather::grow_area`]).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -36,7 +36,7 @@ impl HullPather<'_> {
     /// have no object. The records come in the grid's order and each cell's list in the order
     /// the records joined it, which the slice does not hold: the answer is exact for one object
     /// holding the goal or none.
-    pub(super) fn goal_record(&self, to: Point) -> Result<Option<Target>, GenieError> {
+    pub(super) fn goal_record(&self, to: Point) -> GenieResult<Option<Target>> {
         let grow = self.buffer.unwrap_or(Distance::ZERO);
         if !self
             .world
@@ -95,7 +95,7 @@ impl HullPather<'_> {
         &mut self,
         to: Point,
         target_id: Option<ObjectId>,
-    ) -> Result<bool, GenieError> {
+    ) -> GenieResult<bool> {
         if target_id.is_none() {
             return Ok(false);
         }
@@ -159,7 +159,7 @@ impl HullPather<'_> {
     /// The area grows by two tiles each way on the map (its new tiles' obstructions, then the
     /// cliffs about it); [`AreaGrowth::TooLarge`] when it would hold more than [`MOST_AREA`]
     /// tiles.
-    pub(super) fn grow_area(&mut self) -> Result<AreaGrowth, GenieError> {
+    pub(super) fn grow_area(&mut self) -> GenieResult<AreaGrowth> {
         let (w, h) = (self.world.map.width(), self.world.map.height());
         let x0 = (self.area.x0() - 2).max(0);
         let y0 = (self.area.y0() - 2).max(0);
@@ -187,7 +187,7 @@ impl HullPather<'_> {
         hull: HullIndex,
         count: usize,
         sides: &[usize; PATHS],
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if count == 0 {
             return Ok(());
         }
@@ -211,7 +211,7 @@ impl HullPather<'_> {
                 Ok((last.y() - p.y()) * (last.y() - p.y())
                     + (last.x() - p.x()) * (last.x() - p.x()))
             })
-            .collect::<Result<_, GenieError>>()?;
+            .collect::<GenieResult<_>>()?;
         for a in 0..count {
             for b in a + 1..count {
                 if *by.checked(b)? < *by.checked(a)?

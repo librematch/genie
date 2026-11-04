@@ -1,6 +1,6 @@
 //! A Wait Solidify's state: waiting for its foundation to turn solid.
 
-use crate::GenieError;
+use crate::{GenieError, GenieResult};
 use derive_more::Display;
 use strum::FromRepr;
 
@@ -27,7 +27,7 @@ impl WaitSolidifyState {
     /// # Errors
     ///
     /// A byte that names no state of a Wait Solidify.
-    pub fn of_byte(value: u8) -> Result<Self, GenieError> {
+    pub fn of_byte(value: u8) -> GenieResult<Self> {
         Self::from_repr(value).ok_or_else(|| {
             GenieError::invalid_input("no state of a Wait Solidify").with("state", value)
         })

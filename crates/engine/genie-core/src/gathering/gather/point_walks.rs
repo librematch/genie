@@ -1,7 +1,7 @@
 //! The walks to a point and the waits: back to search (state 11), back to reseed (0xf2), for
 //! a farm (0xf3), the search (3) and a move's walk (15).
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::combat::damage::Victim;
 use crate::gathering::gather::GatherState;
 use crate::gathering::gather::Stand;
@@ -57,7 +57,7 @@ impl GatherAction {
         mover: &mut Mover,
         walks: &Walks<'_>,
         move_to_tuning: &MoveToTuning,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         self.walk_back(radius, mover, walks, move_to_tuning)
     }
 
@@ -73,7 +73,7 @@ impl GatherAction {
         mover: &mut Mover,
         walks: &Walks<'_>,
         move_to_tuning: &MoveToTuning,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         self.walk_to_point(
             |move_to| GatherState::WalkBack { move_to },
             radius,
@@ -96,7 +96,7 @@ impl GatherAction {
         mover: &mut Mover,
         walks: &Walks<'_>,
         move_to_tuning: &MoveToTuning,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let (x, y) = (self.gather_at.x(), self.gather_at.y());
         if x != NO_GATHER_POINT {
             self.point = self.point.with_x(x).with_y(y);
@@ -120,7 +120,7 @@ impl GatherAction {
         mover: &mut Mover,
         walks: &Walks<'_>,
         move_to_tuning: &MoveToTuning,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         self.tear_down(Some(mover))?;
         self.state = walk(None);
         self.timer = Seconds::ZERO;
@@ -148,7 +148,7 @@ impl GatherAction {
         me: Me,
         r: &GatherReads,
         roles: &Roles,
-    ) -> Result<Next, GenieError> {
+    ) -> GenieResult<Next> {
         match self.update_list(c, unit, me, r, roles)? {
             SubCode::UnderWay => Ok(Next::Stay),
             SubCode::Done | SubCode::Failed | SubCode::TargetGone => self.begin_search(c, unit, r),
@@ -162,7 +162,7 @@ impl GatherAction {
         c: &mut Step<'_>,
         unit: &mut Unit,
         r: &GatherReads,
-    ) -> Result<Next, GenieError> {
+    ) -> GenieResult<Next> {
         self.tear_down(c.w.parts.mover_mut(unit.id))?;
         self.state = GatherState::FarmWait;
         self.timer = FARM_WAIT_TIME;
@@ -184,7 +184,7 @@ impl GatherAction {
         target: Option<&Victim>,
         r: &GatherReads,
         roles: &Roles,
-    ) -> Result<Next, GenieError> {
+    ) -> GenieResult<Next> {
         if Seconds::ZERO <= self.timer {
             return Ok(Next::Stay);
         }
@@ -247,7 +247,7 @@ impl GatherAction {
         target: Option<&Victim>,
         r: &GatherReads,
         roles: &Roles,
-    ) -> Result<Next, GenieError> {
+    ) -> GenieResult<Next> {
         match self.update_list(c, unit, me, r, roles)? {
             SubCode::UnderWay => Ok(Next::Stay),
             SubCode::Done | SubCode::TargetGone => {
@@ -282,7 +282,7 @@ impl GatherAction {
         player_kind: PlayerKind,
         mover: Option<&mut Mover>,
         stand: Stand<'_>,
-    ) -> Result<[Option<ObjectId>; 2], GenieError> {
+    ) -> GenieResult<[Option<ObjectId>; 2]> {
         let mut mover = mover;
         self.tear_down(mover.as_deref_mut())?;
         self.timer = Seconds::ZERO;
@@ -308,7 +308,7 @@ impl GatherAction {
         c: &mut Step<'_>,
         unit: &mut Unit,
         r: &GatherReads,
-    ) -> Result<Next, GenieError> {
+    ) -> GenieResult<Next> {
         self.tear_down(c.w.parts.mover_mut(unit.id))?;
         self.state = GatherState::Search;
         self.timer = SEARCH_WAIT;
@@ -347,7 +347,7 @@ impl GatherAction {
         me: Me,
         r: &GatherReads,
         roles: &Roles,
-    ) -> Result<Next, GenieError> {
+    ) -> GenieResult<Next> {
         match self.update_list(c, unit, me, r, roles)? {
             SubCode::UnderWay => Ok(Next::Stay),
             code @ (SubCode::Done | SubCode::Failed | SubCode::TargetGone) => {

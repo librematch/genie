@@ -1,6 +1,5 @@
 //! The notifies' handling, the artifact's and the base's.
 
-use crate::GenieError;
 use crate::math::rng::Well512;
 use crate::movement::Speed;
 use crate::objects::ObjectId;
@@ -19,6 +18,7 @@ use crate::unit_ai::{
     search_radius,
 };
 use crate::world::Millis;
+use crate::{GenieError, GenieResult};
 
 impl UnitAi {
     /// Slot 0x238 per factory type: each type's handler (`kind_notifies.rs`), most of which pass
@@ -31,7 +31,7 @@ impl UnitAi {
         player_kind: PlayerKind,
         ai_rng: &mut Well512,
         side: &mut UnitView<'_, '_>,
-    ) -> Result<u32, GenieError> {
+    ) -> GenieResult<u32> {
         match self.ai_kind {
             UnitAiKind::Hunted => self.hunted_notify(n, time, at, player_kind, ai_rng, side),
             UnitAiKind::Boar => self.boar_notify(n, time, at, player_kind, ai_rng, side),
@@ -75,7 +75,7 @@ impl UnitAi {
         player_kind: PlayerKind,
         ai_rng: &mut Well512,
         side: &mut UnitView<'_, '_>,
-    ) -> Result<u32, GenieError> {
+    ) -> GenieResult<u32> {
         let stops = match n.kind {
             NotifyKind::DAMAGED
             | NotifyKind(
@@ -128,7 +128,7 @@ impl UnitAi {
         at: &Surroundings,
         side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
-    ) -> Result<IdleOutcome, GenieError> {
+    ) -> GenieResult<IdleOutcome> {
         let found = side.closest(&Search {
             at: at.position.ground(),
             radius: search_radius(at.los, at.search_radius),
@@ -166,7 +166,7 @@ impl UnitAi {
         at: &Surroundings,
         side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if self.artifact_idle(at, side, rng)? == IdleOutcome::Acted {
             self.remove_target();
             self.stop_current(StopOrder::Keep, at, side, rng)?;
@@ -187,7 +187,7 @@ impl UnitAi {
         player_kind: PlayerKind,
         ai_rng: &mut Well512,
         side: &mut UnitView<'_, '_>,
-    ) -> Result<u32, GenieError> {
+    ) -> GenieResult<u32> {
         let unit_ai_tuning = &at.unit_ai_tuning;
         let roles = &at.roles;
         match n.kind {

@@ -173,7 +173,7 @@ impl Notify {
     /// # Errors
     ///
     /// A record shorter than its fields, or a recipient of −1.
-    pub fn from_bytes(b: &[u8; 24]) -> Result<Self, GenieError> {
+    pub fn from_bytes(b: &[u8; 24]) -> GenieResult<Self> {
         let w = |i: usize| le_word(b, i).map(i32::from_le_bytes);
         Ok(Self {
             caller: ObjectId::of_field(w(0)?),
@@ -250,7 +250,7 @@ pub struct QueuedOrder {
 /// # Errors
 ///
 /// A record shorter than the offset.
-fn le_word(b: &[u8], i: usize) -> Result<[u8; 4], GenieError> {
+fn le_word(b: &[u8], i: usize) -> GenieResult<[u8; 4]> {
     b.get(i..)
         .and_then(<[u8]>::first_chunk::<4>)
         .copied()
@@ -266,7 +266,7 @@ impl QueuedOrder {
     /// # Errors
     ///
     /// An order value no order holds ([`OrderKind::try_from`]).
-    pub fn from_bytes(b: &[u8; 52], own: ObjectId, players: usize) -> Result<Self, GenieError> {
+    pub fn from_bytes(b: &[u8; 52], own: ObjectId, players: usize) -> GenieResult<Self> {
         let w = |i: usize| le_word(b, i).map(i32::from_le_bytes);
         let f = |i: usize| le_word(b, i).map(f32::from_le_bytes);
         Ok(Self {
@@ -549,8 +549,6 @@ pub struct Hunted {
     pub(crate) leash: Distance,
 }
 
-/// The engine's error ([`genie_error::GenieError`]), here for the modules' imports.
-use crate::GenieError;
 use crate::construction::FoundationId;
 use crate::gathering::DropSiteId;
 use crate::map::WholeDistance;
@@ -560,6 +558,8 @@ use crate::movement::{PathFlags, WaypointIndex};
 use crate::objects::ObjectState;
 use crate::pathing::tile_path::Path;
 use crate::unit_ai::cared::classes;
+/// The engine's error ([`genie_error::GenieError`]), here for the modules' imports.
+use crate::{GenieError, GenieResult};
 
 #[cfg(test)]
 mod tests;

@@ -4,7 +4,7 @@
 //! from the `.dat` of the recording's game, never from constants.
 
 use genie_dat::de::DatFile;
-use genie_model::GenieError;
+use genie_model::GenieResult;
 use genie_model::combat::missile::ProjectileKind;
 use genie_model::map::TerrainFlags;
 use genie_model::movement::MoveAlgorithm;
@@ -93,7 +93,7 @@ type KeyedRow = ((CivId, MasterId), Row);
 /// # Errors
 ///
 /// A task or a cost slot that holds no type or attribute.
-fn dat_rows(dat: &DatFile) -> Result<Vec<KeyedRow>, GenieError> {
+fn dat_rows(dat: &DatFile) -> GenieResult<Vec<KeyedRow>> {
     let units = dat.civs.iter().enumerate().flat_map(|(c, civ)| {
         civ.units.iter().enumerate().filter_map(move |(m, unit)| {
             Some((
@@ -114,7 +114,7 @@ fn dat_rows(dat: &DatFile) -> Result<Vec<KeyedRow>, GenieError> {
 /// # Errors
 ///
 /// A task or a cost slot that holds no type or attribute.
-fn dat_row(id: MasterId, unit: &Unit, sounds: &[Sound]) -> Result<Row, GenieError> {
+fn dat_row(id: MasterId, unit: &Unit, sounds: &[Sound]) -> GenieResult<Row> {
     let default_action = match unit.bird.as_ref() {
         None => DefaultAction::None,
         Some(b) => {
@@ -122,7 +122,7 @@ fn dat_row(id: MasterId, unit: &Unit, sounds: &[Sound]) -> Result<Row, GenieErro
                 .tasks
                 .iter()
                 .map(|t| Ok((t.id, ActionKind::try_from(t.action_kind)?)))
-                .collect::<Result<Vec<_>, GenieError>>()?;
+                .collect::<GenieResult<Vec<_>>>()?;
             default_action(b.default_task_id, tasks.into_iter())
         }
     };
@@ -304,7 +304,7 @@ pub struct MasterTable {
 
 /// A technology of the `.dat` as the tech tree holds it: its costs, its type and its effect's
 /// id, which names the effect table's entry ([`tech_tables`]).
-fn tech_def(t: &Tech) -> Result<TechDef, GenieError> {
+fn tech_def(t: &Tech) -> GenieResult<TechDef> {
     Ok(TechDef {
         costs: tech_costs(t)?,
         kind: TechKind::from(t.kind),
@@ -327,9 +327,9 @@ fn tech_def(t: &Tech) -> Result<TechDef, GenieError> {
 }
 
 /// A technology's three costs: each its resource, amount and whether it is paid.
-fn tech_costs(t: &Tech) -> Result<[Cost; 3], GenieError> {
+fn tech_costs(t: &Tech) -> GenieResult<[Cost; 3]> {
     let [c0, c1, c2] = t.resource_costs.each_ref();
-    let cost = |c: &ResearchResourceCost| -> Result<_, GenieError> {
+    let cost = |c: &ResearchResourceCost| -> GenieResult<_> {
         Ok(Cost {
             attribute: AttributeId::of_field(c.kind)?,
             amount: CostAmount::of_data(c.amount),
@@ -340,7 +340,7 @@ fn tech_costs(t: &Tech) -> Result<[Cost; 3], GenieError> {
 }
 
 /// The technologies ([`tech_def`]) and the effect table ([`effect`]), by id.
-fn tech_tables(dat: &DatFile) -> Result<TechTables, GenieError> {
+fn tech_tables(dat: &DatFile) -> GenieResult<TechTables> {
     let techs = dat.techs.iter().map(tech_def).collect::<Result<_, _>>()?;
     let effects = dat.effects.iter().map(effect).collect::<Result<_, _>>()?;
     Ok((techs, Effects::new(effects)))
@@ -351,7 +351,7 @@ type TechTables = (Vec<TechDef>, Effects);
 
 /// An effect as the engine's effect table holds it: its commands, each parsed by its kind
 /// ([`genie_model::technology::EffectCommand::of_data`]).
-fn effect(e: &DatEffect) -> Result<Effect, GenieError> {
+fn effect(e: &DatEffect) -> GenieResult<Effect> {
     let commands = e
         .commands
         .iter()
@@ -367,7 +367,7 @@ impl MasterTable {
     /// # Errors
     ///
     /// A task or a cost slot that holds no type or attribute.
-    pub fn from_dat(dat: &DatFile) -> Result<Self, GenieError> {
+    pub fn from_dat(dat: &DatFile) -> GenieResult<Self> {
         let rows = dat_rows(dat)?;
         let mut table =
             Self::from_rows(rows.iter().map(|(key, r)| (*key, r.data, r.default_action)));

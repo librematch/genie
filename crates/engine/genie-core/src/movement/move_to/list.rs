@@ -1,7 +1,7 @@
 //! The sub-action list's update (`FUN_140a992b0`) for an owner action whose list holds a quiet
 //! `MoveTo`: its first action's update, 1 for an empty list ("There is no list.").
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::movement::move_to::{GiveUp, MoveTo, MoveToAction, Shown, SubCode};
 use crate::movement::{Me, PathAsk};
 use crate::objects::sprite::Graphic;
@@ -33,7 +33,7 @@ pub(crate) fn update_sub_actions(
     unit: &mut Unit,
     me: Me,
     how: ListUpdate,
-) -> Result<SubCode, GenieError> {
+) -> GenieResult<SubCode> {
     let Some(move_to) = list else {
         return Ok(SubCode::Done);
     };

@@ -3,7 +3,7 @@
 //! (`FUN_14100dbe0`), the unit's speed (slot 0x208, `FUN_141202c70`) and its weapon reach (slot
 //! 0x1e8, `FUN_141086330`).
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::combat::Charge;
 use crate::combat::damage::SPECIAL_CHARGE_GAP;
 use crate::groups::GroupId;
@@ -66,7 +66,7 @@ impl World {
         id: ObjectId,
         target: ObjectId,
         (order, player_kind): (AttackOrder, PlayerKind),
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let part = self.gate_part(id, target)?;
         self.stand_unit(id)?;
         let at = self
@@ -109,7 +109,7 @@ impl World {
     /// # Errors
     ///
     /// What the stop does not model.
-    pub(super) fn stand_unit(&mut self, id: ObjectId) -> Result<(), GenieError> {
+    pub(super) fn stand_unit(&mut self, id: ObjectId) -> GenieResult<()> {
         if self.object(id).is_some()
             && let Some(mover) = self.parts.mover_mut(id)
         {
@@ -132,7 +132,7 @@ impl World {
         id: ObjectId,
         part: ObjectId,
         rule: Travel,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let (unit, part) = self
             .world_object(id)
             .zip(self.world_object(part))
@@ -174,7 +174,7 @@ impl World {
         &self,
         id: ObjectId,
         target: ObjectId,
-    ) -> Result<ObjectId, GenieError> {
+    ) -> GenieResult<ObjectId> {
         let (unit, t) = self
             .world_object(id)
             .zip(self.world_object(target))
@@ -216,7 +216,7 @@ impl World {
         &self,
         unit: WorldObject<'_>,
         target: WorldObject<'_>,
-    ) -> Result<bool, GenieError> {
+    ) -> GenieResult<bool> {
         let master = self.master(unit.player(), unit.master_id(self.model.slots))?;
         if !COMBAT_KINDS.contains(&master.kind) {
             return Ok(false);
@@ -235,7 +235,7 @@ impl World {
     /// # Errors
     ///
     /// A master the world lacks and a charge of special attack 3.
-    pub(super) fn unit_speed(&self, player: PlayerId, unit: &Unit) -> Result<f32, GenieError> {
+    pub(super) fn unit_speed(&self, player: PlayerId, unit: &Unit) -> GenieResult<f32> {
         let Some(mover) = self.parts.mover_of(unit.id) else {
             return Ok(0.0);
         };

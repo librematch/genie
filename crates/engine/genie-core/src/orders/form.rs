@@ -1,7 +1,7 @@
 //! `FORM_FORMATION`'s handler (`FUN_14161dba0`): the listed units are split into groups, which
 //! lock to the formation the command names.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::groups::FarMembers;
 use crate::groups::FormationKind;
 use crate::groups::GroupId;
@@ -45,7 +45,7 @@ impl World {
         player: PlayerId,
         ids: &[Option<ObjectId>],
         formation: FormationKind,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let Some(units) = self.command_check(player, ids)? else {
             return Ok(());
         };
@@ -105,7 +105,7 @@ impl World {
         split: &Split,
         units: &[ObjectId],
         number: usize,
-    ) -> Result<GroupId, GenieError> {
+    ) -> GenieResult<GroupId> {
         let owner = split.owner;
         let id = self.groups.create(owner);
         for &unit in units {
@@ -126,7 +126,7 @@ impl World {
     /// # Errors
     ///
     /// What the stop does not model.
-    fn stop_marcher(&mut self, id: ObjectId) -> Result<(), GenieError> {
+    fn stop_marcher(&mut self, id: ObjectId) -> GenieResult<()> {
         let Some(Place::Live(p, idx)) = self.place(id) else {
             return Ok(());
         };

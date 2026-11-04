@@ -1,7 +1,6 @@
 //! An ownership change (slot 0x70, `FUN_14120f800`): to Gaia, a building's with its
 //! foundation, annexes and garrison, and the attributes and storage it moves.
 
-use crate::GenieError;
 use crate::garrison::LetOut;
 use crate::map::Point;
 use crate::map::Position;
@@ -24,6 +23,7 @@ use crate::vision::visibility::Seeing;
 use crate::world::Seconds;
 use crate::world::WorldTime;
 use crate::world::slots::PlayerSlots;
+use crate::{GenieError, GenieResult};
 
 use crate::map::spatial::{Obstruction, Placed};
 use crate::math::image::turn::HANDOVER_NO_POINT as TURN_HANDOVER_NO_POINT;
@@ -48,7 +48,7 @@ impl World {
     /// attributes ([`World::hand_over_attributes`]). Its only callers give livestock, which
     /// Gaia's add does not take into its list of class 10 of combat level 4 (`+0x14a0`, a draw
     /// on the Player stream).
-    pub(crate) fn give_gaia(&mut self, q: PlayerId, j: ListIndex) -> Result<(), GenieError> {
+    pub(crate) fn give_gaia(&mut self, q: PlayerId, j: ListIndex) -> GenieResult<()> {
         let mut unit = self.take_out(q, j)?;
         let held = self.parts.dead_master.get(unit.id);
         let tables = MasterTables::new(&self.model.masters, &self.parts.own_master);
@@ -142,7 +142,7 @@ impl World {
         id: ObjectId,
         new: PlayerId,
         watched: bool,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         self.annexes_change_hands(old, id, new)?;
         let Some(Place::Live(_, idx)) = self.place(id) else {
             return Err(HANDS_LEFT);
@@ -218,7 +218,7 @@ impl World {
         new: PlayerId,
         id: ObjectId,
         placed: Option<Placed>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if let Some(p) = placed {
             let _ = self.watch(new, id, p.position.tile())?;
         }
@@ -232,7 +232,7 @@ impl World {
         old: PlayerId,
         (idx, id): (ListIndex, ObjectId),
         watched: bool,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         self.clear_actions(old, idx)?;
         self.end_production_action(old, idx)?;
         self.cancel_queue(old, idx)?;
@@ -248,7 +248,7 @@ impl World {
         &mut self,
         id: ObjectId,
         placed: Option<Placed>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if let (Some(p), Some(v)) = (placed, self.spatial.sight.as_mut()) {
             v.sight_off(
                 id,
@@ -271,7 +271,7 @@ impl World {
         &mut self,
         id: ObjectId,
         placed: Option<Placed>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if let (Some(p), Some(v)) = (placed, self.spatial.sight.as_mut()) {
             let _ = v.sight_on(
                 id,
@@ -315,7 +315,7 @@ impl World {
         old: PlayerId,
         id: ObjectId,
         new: PlayerId,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         for annex in self.objects().annexes(id).ids() {
             let Some((q, a)) = self.object(annex) else {
                 continue;
@@ -351,7 +351,7 @@ impl World {
         idx: ListIndex,
         new: PlayerId,
         id: ObjectId,
-    ) -> Result<PlayerId, GenieError> {
+    ) -> GenieResult<PlayerId> {
         let mut unit = self.take_out(old, idx)?;
         let held = self.parts.dead_master.get(unit.id);
         let tables = MasterTables::new(&self.model.masters, &self.parts.own_master);
@@ -406,7 +406,7 @@ impl World {
         id: ObjectId,
         master: &Master,
         rice: bool,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let building = master.building.as_ref();
         if let Some(stack) = building.and_then(|b| b.stack_unit) {
             let stack = if self
@@ -438,11 +438,7 @@ impl World {
     /// # Errors
     ///
     /// What the leaving and the destruction do not model.
-    pub(crate) fn garrison_leaves(
-        &mut self,
-        owner: PlayerId,
-        id: ObjectId,
-    ) -> Result<(), GenieError> {
+    pub(crate) fn garrison_leaves(&mut self, owner: PlayerId, id: ObjectId) -> GenieResult<()> {
         let inside = self
             .object(id)
             .map_or_else(Vec::new, |(_, u)| u.garrison.clone());
@@ -482,7 +478,7 @@ impl World {
         old: PlayerId,
         new: PlayerId,
         own: Option<&Master>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let Some(m) = own else {
             return Ok(());
         };
@@ -579,7 +575,7 @@ pub(crate) fn change_hands(
     world_time: WorldTime,
     roles: &Roles,
     visibility_tuning: VisibilityTuning,
-) -> Result<Option<Box<Master>>, GenieError> {
+) -> GenieResult<Option<Box<Master>>> {
     spatial.records_owner(u.id, new)?;
     let Some(to) = player_master(masters.players, new, u.life.master_id) else {
         return Ok(None);
@@ -635,7 +631,7 @@ pub(crate) fn lose_built_storage(
     amount: Amount,
     roles: &Roles,
     slots: Slots,
-) -> Result<(), GenieError> {
+) -> GenieResult<()> {
     for &(kind, amount, flag) in &master.storage {
         if let Some(kind) = kind
             && flag == STORAGE_WHILE_BUILT
@@ -666,7 +662,7 @@ pub(crate) fn gain_built_storage(
     amount: Amount,
     roles: &Roles,
     slots: Slots,
-) -> Result<(), GenieError> {
+) -> GenieResult<()> {
     for &(kind, amount, flag) in &master.storage {
         if let Some(kind) = kind
             && matches!(flag, STORAGE_WHILE_BUILT | STORAGE_8)

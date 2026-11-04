@@ -1,7 +1,6 @@
 //! A death's parts: a farm's bonus, the visible resources forgotten, the combat object's death
 //! and refund, a built building's death and storage, and the military and civilian counts.
 
-use crate::GenieError;
 use crate::construction::MainBuildingId;
 use crate::construction::build::ClearLook;
 use crate::map::Distance;
@@ -28,6 +27,7 @@ use crate::world::layer::Roles;
 use crate::world::layer::Slots;
 use crate::world::layer::generated::VisibilityTuning;
 use crate::world::{BuildingDeath, RESTORED_FOUNDATION};
+use crate::{GenieError, GenieResult};
 
 /// The owner's attributes 237, 238 and 239: a built farm's bonus ([`farm_bonus`]);
 /// −1 for those the player has not got.
@@ -68,7 +68,7 @@ pub(crate) fn forget_resource(
     master: Option<&Master>,
     id: ObjectId,
     position: Position,
-) -> Result<(), GenieError> {
+) -> GenieResult<()> {
     // a recyclable object (a negative id) is in no resource list
     if id.is_recyclable() {
         return Ok(());
@@ -104,7 +104,7 @@ pub(crate) fn combat_dies(
     pathing: &mut Pathing,
     roles: &Roles,
     visibility_tuning: VisibilityTuning,
-) -> Result<(), GenieError> {
+) -> GenieResult<()> {
     if u.pasture.is_some() || u.my_pasture.is_some() {
         return Err(GenieError::unsupported(
             "a dying unit in a pasture (FUN_141189ca0)",
@@ -214,7 +214,7 @@ pub(crate) fn built_death(
     player_kind: PlayerKind,
     roles: &Roles,
     slots: Slots,
-) -> Result<BuiltDeath, GenieError> {
+) -> GenieResult<BuiltDeath> {
     let building = master.building.ok_or(GenieError::unsupported(
         "a dying building of a master without its building part",
     ))?;
@@ -306,7 +306,7 @@ pub(crate) fn clear_look_of(
     u: &Unit,
     layer: &Building,
     masters: OwnerMasters<'_>,
-) -> Result<ClearLook, GenieError> {
+) -> GenieResult<ClearLook> {
     let m = u.master_in(masters)?;
     Ok(ClearLook {
         hp: u.life.hp,

@@ -1,7 +1,6 @@
 //! QUEUE: a building's production queue, its load, its units and technologies, and a new
 //! entry's costs.
 
-use crate::GenieError;
 use crate::commands::ONE_UNIT_AGE;
 use crate::commands::queue::QueueCommand;
 use crate::commands::research::ResearchCommand;
@@ -38,6 +37,7 @@ use crate::world::player::Player;
 use crate::world::slots::CheckedIndex;
 use crate::world::slots::PlayerSlots;
 use crate::world::{COMPUTER_QUEUE_LIMIT, QUEUE_LIMIT, World, villager};
+use crate::{GenieError, GenieResult};
 
 impl World {
     /// QUEUE, the player's part (`FUN_141614450`) after the packet's check of its buildings
@@ -72,7 +72,7 @@ impl World {
         &mut self,
         q: &QueueCommand,
         buildings: &[Option<ObjectId>],
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let (player, unit_id) = (q.player, q.unit);
         let Some(ids) = self.command_check(player, buildings)? else {
             return Ok(());
@@ -142,7 +142,7 @@ impl World {
         ids: &[Option<ObjectId>],
         unit: &Master,
         unit_id: MasterId,
-    ) -> Result<Vec<Place>, GenieError> {
+    ) -> GenieResult<Vec<Place>> {
         let mut found = Vec::new();
         for place in self.lookup(ids).into_iter().flatten() {
             let (_, building) = self.at(place)?;
@@ -170,7 +170,7 @@ impl World {
         unit: &Master,
         button: QueueButton,
         mut amount: i32,
-    ) -> Result<Option<Vec<u16>>, GenieError> {
+    ) -> GenieResult<Option<Vec<u16>>> {
         let mut counts = vec![0u16; found.len()];
         let mut pick: Option<usize> = None;
         while 0 < amount {
@@ -189,7 +189,7 @@ impl World {
     }
 
     /// The object at `place`, with its player.
-    fn at(&self, place: Place) -> Result<(PlayerId, &Unit), GenieError> {
+    fn at(&self, place: Place) -> GenieResult<(PlayerId, &Unit)> {
         Ok(match place {
             Place::Live(p, i) => (p, self.players.live(p, i)?),
             Place::Sleeping(p, i) => (p, self.players.asleep(p, i)?),
@@ -204,7 +204,7 @@ impl World {
         found: &[Place],
         unit: &Master,
         per: i32,
-    ) -> Result<(Vec<i32>, Vec<Seconds>, i32), GenieError> {
+    ) -> GenieResult<(Vec<i32>, Vec<Seconds>, i32)> {
         let mut rooms = Vec::with_capacity(found.len());
         let mut loads = Vec::with_capacity(found.len());
         let mut total_room = 0i32;
@@ -239,12 +239,12 @@ impl World {
         &self,
         r: &ResearchCommand,
         buildings: &[Option<ObjectId>],
-    ) -> Result<Option<ObjectId>, GenieError> {
-        let load = |id: ObjectId| -> Result<Seconds, GenieError> {
+    ) -> GenieResult<Option<ObjectId>> {
+        let load = |id: ObjectId| -> GenieResult<Seconds> {
             self.object(id)
                 .map_or(Ok(Seconds::ZERO), |(q, u)| self.production_load(q, u))
         };
-        let is_building = |id: Option<ObjectId>| -> Result<bool, GenieError> {
+        let is_building = |id: Option<ObjectId>| -> GenieResult<bool> {
             match self.object(id) {
                 Some((q, u)) => Ok(u.master(self.master_tables(), q)?.kind == MasterKind::BUILDING),
                 None => Ok(false),
@@ -283,11 +283,7 @@ impl World {
     /// integers; a research's location at the building, `FUN_1413cbd20`, its time plus its
     /// adjustment, as floats), less the work done of its production list's action (a make's
     /// `+0x6c`, a research's `+0x70`).
-    pub(crate) fn production_load(
-        &self,
-        p: PlayerId,
-        building: &Unit,
-    ) -> Result<Seconds, GenieError> {
+    pub(crate) fn production_load(&self, p: PlayerId, building: &Unit) -> GenieResult<Seconds> {
         let owner = self.players.player(p)?;
         let Some(production) = self.parts.production.get(building.id) else {
             return Ok(Seconds::ZERO);
@@ -339,7 +335,7 @@ impl World {
         count: u16,
         tech: Option<TechId>,
         button: QueueButton,
-    ) -> Result<QueueOutcome, GenieError> {
+    ) -> GenieResult<QueueOutcome> {
         let mut master = if self
             .model
             .roles
@@ -413,7 +409,7 @@ impl World {
         master: MasterId,
         count: QueuedUnits,
         button: QueueButton,
-    ) -> Result<QueueOutcome, GenieError> {
+    ) -> GenieResult<QueueOutcome> {
         use crate::production::{as_entry_costs, master_costs, pay, population};
         let empty = Masters::default();
         let mut n = count.get();
@@ -498,7 +494,7 @@ impl World {
         n: QueuedUnits,
         button: QueueButton,
         time: Option<WholeSeconds>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let id = self.players.live(player, i)?.id;
         let queue = &self.parts.production.get(id).ok_or(NO_QUEUE)?.queue;
         let refill = if queue.full() {
@@ -538,7 +534,7 @@ impl World {
         player: PlayerId,
         tech: Option<TechId>,
         master: Option<MasterId>,
-    ) -> Result<[(Option<AttributeId>, Amount); 3], GenieError> {
+    ) -> GenieResult<[(Option<AttributeId>, Amount); 3]> {
         use crate::production::{NO_COSTS, as_entry_costs, master_costs};
         let owner = self.players.player(player)?;
         if let Some(master) = master {
@@ -599,9 +595,9 @@ fn affordable(
     unit: &Master,
     mut amount: i32,
     roles: &Roles,
-) -> Result<Option<i32>, GenieError> {
+) -> GenieResult<Option<i32>> {
     let (costed, annex) = costed(masters, unit);
-    let short = |count: i32| -> Result<bool, GenieError> {
+    let short = |count: i32| -> GenieResult<bool> {
         for (attribute, each, paid) in cost_entries(&costed.creatable_part().cost) {
             if (annex && !paid)
                 || roles

@@ -2,7 +2,7 @@
 
 use genie_diff::Diff;
 
-use crate::GenieError;
+use crate::{GenieError, GenieResult};
 
 /// `+0xc61`, `snow_flag`: how a building stands on snow. The terrain cover lays the snow
 /// foundation under any snow (`FUN_1411ddd90` tests the byte against 0); the death and the
@@ -27,7 +27,7 @@ impl Snow {
     /// # Errors
     ///
     /// Any other byte, which no routine of the game writes.
-    pub fn of_byte(byte: u8) -> Result<Self, GenieError> {
+    pub fn of_byte(byte: u8) -> GenieResult<Self> {
         match byte {
             0 => Ok(Self::None),
             1 => Ok(Self::Completed),

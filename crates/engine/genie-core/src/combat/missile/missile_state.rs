@@ -1,6 +1,6 @@
 //! A missile's state: launched, flying, ended.
 
-use crate::GenieError;
+use crate::{GenieError, GenieResult};
 use derive_more::Display;
 use strum::FromRepr;
 
@@ -26,7 +26,7 @@ impl MissileState {
     /// # Errors
     ///
     /// A byte that names no state of a missile.
-    pub fn of_byte(value: u8) -> Result<Self, GenieError> {
+    pub fn of_byte(value: u8) -> GenieResult<Self> {
         Self::from_repr(value)
             .ok_or_else(|| GenieError::invalid_input("no state of a missile").with("state", value))
     }

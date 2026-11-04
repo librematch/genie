@@ -2,7 +2,6 @@
 
 use crate::encode::encode;
 use crate::names::unmodelled_command;
-use genie_core::GenieError;
 use genie_core::commands::Bell;
 use genie_core::commands::Departure;
 use genie_core::commands::GameSub;
@@ -38,6 +37,7 @@ use genie_core::players::tribute::Gift;
 use genie_core::production::{QueueButton, QueuedUnits, UnitIndex};
 use genie_core::technology::TechId;
 use genie_core::unit_ai::UnitStance;
+use genie_core::{GenieError, GenieResult};
 use genie_rec::de::command::{self as packets, Command as Packet};
 use std::array::from_fn;
 
@@ -51,7 +51,7 @@ use std::array::from_fn;
 /// # Errors
 ///
 /// A packet too short for its player byte (byte 1).
-pub fn decode(packet: &[u8]) -> Result<Command, GenieError> {
+pub fn decode(packet: &[u8]) -> GenieResult<Command> {
     let player = PlayerId::from(*packet.get(1).ok_or(GenieError::invalid_input(
         "a command packet without its player byte",
     ))?);
@@ -108,7 +108,7 @@ fn object_ids(ids: &[i32]) -> Vec<Option<ObjectId>> {
 }
 
 /// The command of a packet the engine runs, None for any other.
-fn typed(packet: &Packet) -> Result<Option<Command>, GenieError> {
+fn typed(packet: &Packet) -> GenieResult<Option<Command>> {
     for kind in [orders, listed_command, building_command, single_command] {
         if let Some(command) = kind(packet)? {
             return Ok(Some(command));
@@ -132,7 +132,7 @@ macro_rules! interact {
 
 /// INTERACT, WORK, MOVE and RETREAT, whose units the orders' reader reads (`FUN_140e6b290`),
 /// and FOLLOW and GUARD, which list theirs.
-fn orders(packet: &Packet) -> Result<Option<Command>, GenieError> {
+fn orders(packet: &Packet) -> GenieResult<Option<Command>> {
     let (player, units, order) = match packet {
         Packet::Interact(c) => (
             c.commp_id,
@@ -174,7 +174,7 @@ fn orders(packet: &Packet) -> Result<Option<Command>, GenieError> {
 }
 
 /// The commands to the objects listed that do not go through the orders' reader.
-fn listed_command(packet: &Packet) -> Result<Option<Command>, GenieError> {
+fn listed_command(packet: &Packet) -> GenieResult<Option<Command>> {
     Ok(Some(match packet {
         Packet::Stop(c) => Command::Stop(StopCommand {
             player: PlayerId::from(c.commp_id),
@@ -319,7 +319,7 @@ fn go_back_to_work_units(rest: &[u8]) -> Option<UnitList> {
 
 /// The commands that place or queue at buildings: BUILD, `BUILD_WALL`, QUEUE, RESEARCH, SET
 /// GATHER POINT and `BUILDING_COMMAND_QUEUE`.
-fn building_command(packet: &Packet) -> Result<Option<Command>, GenieError> {
+fn building_command(packet: &Packet) -> GenieResult<Option<Command>> {
     Ok(Some(match packet {
         Packet::Build(c) => Command::Build(BuildCommand {
             player: PlayerId::from(c.commp_id),
@@ -378,7 +378,7 @@ fn building_command(packet: &Packet) -> Result<Option<Command>, GenieError> {
 }
 
 /// The commands of one object, one player or the game.
-fn single_command(packet: &Packet) -> Result<Option<Command>, GenieError> {
+fn single_command(packet: &Packet) -> GenieResult<Option<Command>> {
     Ok(Some(match packet {
         Packet::Resign(c) => Command::Resign(ResignCommand {
             player: PlayerId::from(c.commp_id),

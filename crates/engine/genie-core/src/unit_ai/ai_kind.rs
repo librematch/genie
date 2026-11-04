@@ -1,7 +1,7 @@
 //! A unit AI's factory type as one type: which `Tribe…UnitAIModule` a master's unit AI is
 //! ([`crate::unit_ai::unit_ai_kind`]), the value the module's constructor takes.
 
-use crate::GenieError;
+use crate::{GenieError, GenieResult};
 use genie_diff::{Diff, Differ};
 use std::fmt::{Display, Error, Formatter};
 
@@ -73,7 +73,7 @@ impl TryFrom<u32> for UnitAiKind {
     /// # Errors
     ///
     /// A value the switch constructs no module for.
-    fn try_from(value: u32) -> Result<Self, GenieError> {
+    fn try_from(value: u32) -> GenieResult<Self> {
         Ok(match value {
             2 => Self::Hunted,
             3 => Self::Predator,

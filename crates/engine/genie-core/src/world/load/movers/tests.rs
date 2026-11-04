@@ -1,3 +1,4 @@
+use crate::GenieResult;
 use crate::map::{RestrictionId, TerrainMask};
 use crate::movement::MoveAlgorithm;
 use crate::movement::Mover;
@@ -76,7 +77,7 @@ fn run(
     object: &genie_save::Object,
     objects: &PlayerObjects,
     table: Option<&MasterTable>,
-) -> Result<Option<Mover>, crate::GenieError> {
+) -> GenieResult<Option<Mover>> {
     let s = object.static_part().unwrap().clone();
     mover(object, &s, objects, &[], CivId::GAIA, table)
 }

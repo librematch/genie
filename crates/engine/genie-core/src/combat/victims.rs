@@ -1,7 +1,6 @@
 //! A hit's victim: what the hit reads of it, the objects it may reach, the hit written back,
 //! the kill and its counts.
 
-use crate::GenieError;
 use crate::combat::damage::{Kill, Razed, Victim};
 use crate::map::Distance;
 use crate::map::Rect;
@@ -21,6 +20,7 @@ use crate::world::World;
 use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
+use crate::{GenieError, GenieResult};
 
 pub(crate) use crate::combat::victim_reads::{victim_in, victim_of};
 use crate::construction::MainBuildingId;
@@ -45,7 +45,7 @@ impl World {
         &self,
         id: impl ObjectKey,
         attacker: PlayerId,
-    ) -> Result<Option<Victim>, GenieError> {
+    ) -> GenieResult<Option<Victim>> {
         let Some((p, u, _)) = self.locate(id) else {
             return Ok(None);
         };
@@ -75,11 +75,7 @@ impl World {
     /// table (`FUN_1415417a0`, [`crate::unit_ai::Seen`]), `None` when no list holds it. An object
     /// the slice holds as a place alone cannot be read. Without the players' sight its tile
     /// counts as unseen.
-    pub(crate) fn seen(
-        &self,
-        id: impl ObjectKey,
-        viewer: PlayerId,
-    ) -> Result<Option<Seen>, GenieError> {
+    pub(crate) fn seen(&self, id: impl ObjectKey, viewer: PlayerId) -> GenieResult<Option<Seen>> {
         if let Some((p, u, _)) = self.locate(id) {
             return self.seen_of(u, p, viewer).map(Some);
         }
@@ -93,12 +89,7 @@ impl World {
 
     /// Player `p`'s object `u` as the unit AI of a unit of player `viewer` reads it
     /// ([`World::seen`]), wherever it is held (a unit out of its slot for its step too).
-    pub(crate) fn seen_of(
-        &self,
-        u: &Unit,
-        p: PlayerId,
-        viewer: PlayerId,
-    ) -> Result<Seen, GenieError> {
+    pub(crate) fn seen_of(&self, u: &Unit, p: PlayerId, viewer: PlayerId) -> GenieResult<Seen> {
         let master = u.master(self.master_tables(), p)?;
         let (x, y) = (u.position().x(), u.position().y());
         Ok(Seen {
@@ -128,7 +119,7 @@ impl World {
         unit: &Unit,
         p: PlayerId,
         target: Option<ObjectId>,
-    ) -> Result<Vec<Victim>, GenieError> {
+    ) -> GenieResult<Vec<Victim>> {
         let reach = Some(
             unit.master(self.master_tables(), p)?
                 .combat_part()
@@ -205,7 +196,7 @@ impl KillLeft {
 pub(crate) fn readable<'o>(
     c: &'o Step<'_>,
     id: impl ObjectKey,
-) -> Result<Option<(PlayerId, &'o Unit, &'o Master)>, GenieError> {
+) -> GenieResult<Option<(PlayerId, &'o Unit, &'o Master)>> {
     let Some((p, u, _)) = c.w.locate(id) else {
         return Ok(None);
     };
@@ -219,7 +210,7 @@ pub(crate) fn victim(
     c: &Step<'_>,
     id: impl ObjectKey,
     roles: &Roles,
-) -> Result<Option<Victim>, GenieError> {
+) -> GenieResult<Option<Victim>> {
     let Some((p, u, master)) = readable(c, id)? else {
         return Ok(None);
     };
@@ -266,7 +257,7 @@ pub(crate) fn victim(
 /// # Errors
 ///
 /// A notify its unit AI's queue does not take.
-pub(crate) fn write_back(c: &mut Step<'_>, v: &mut Victim) -> Result<Option<KillLeft>, GenieError> {
+pub(crate) fn write_back(c: &mut Step<'_>, v: &mut Victim) -> GenieResult<Option<KillLeft>> {
     let damaged = take(&mut v.damaged);
     let left = KillLeft {
         id: v.id,
@@ -344,7 +335,7 @@ pub(crate) fn file_kill(
     (me, actions): (&mut Unit, &mut Action),
     k: KillLeft,
     roles: &Roles,
-) -> Result<(), GenieError> {
+) -> GenieResult<()> {
     if k.id != c.me {
         return c.w.kill_left(&k);
     }
@@ -372,7 +363,7 @@ pub(crate) fn write_struck(
     mut blasted: Vec<Victim>,
     v: &mut Victim,
     roles: &Roles,
-) -> Result<(), GenieError> {
+) -> GenieResult<()> {
     for b in &mut blasted {
         if let Some(k) = write_back(c, b)? {
             file_kill(c, (me, actions), k, roles)?;
@@ -397,7 +388,7 @@ pub(crate) fn write_strike_back(
     actions: &mut Action,
     v: &mut Victim,
     roles: &Roles,
-) -> Result<(), GenieError> {
+) -> GenieResult<()> {
     let blasted = take(&mut c.blasted);
     write_struck(c, me, actions, blasted, v, roles)
 }
@@ -409,7 +400,7 @@ impl World {
     /// # Errors
     ///
     /// What the kill does not model, or an attribute a player lacks.
-    pub(crate) fn kill_left(&mut self, k: &KillLeft) -> Result<(), GenieError> {
+    pub(crate) fn kill_left(&mut self, k: &KillLeft) -> GenieResult<()> {
         let Some(Place::Live(q, j)) = self.place(k.id) else {
             return Ok(());
         };
@@ -425,7 +416,7 @@ impl World {
     /// # Errors
     ///
     /// An attribute a player lacks.
-    pub(crate) fn count_razed(&mut self, razed: &[Razed]) -> Result<(), GenieError> {
+    pub(crate) fn count_razed(&mut self, razed: &[Razed]) -> GenieResult<()> {
         for r in razed {
             if let Some(kind) = r.event {
                 let now = self.world_time;
@@ -456,12 +447,7 @@ impl World {
     /// 16 and 32, Gaia gains 1, 2 and 32) and its list (the old owner's last object takes its
     /// place). Not held: the killer (`+0x690`, `+0x694`), `+0x954`, the statistics of the local
     /// player and the particles (`FUN_141158bb0`).
-    pub(crate) fn killed(
-        &mut self,
-        q: PlayerId,
-        j: ListIndex,
-        kill: Kill,
-    ) -> Result<(), GenieError> {
+    pub(crate) fn killed(&mut self, q: PlayerId, j: ListIndex, kill: Kill) -> GenieResult<()> {
         let u = &self.players.live(q, j)?;
         let master = u.master(self.master_tables(), q)?.clone();
         self.count_killed(q, &master, kill)?;
@@ -483,7 +469,7 @@ impl World {
         q: PlayerId,
         master: &Master,
         kill: Kill,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if self.players.player(q)?.kind.is_computer() {
             return Err(GenieError::unsupported(
                 "a computer player's killed object (its AI's slot 0x2f0)",
@@ -531,7 +517,7 @@ impl World {
     ///
     /// An object the slice does not hold, and an attribute whose change the slice does not
     /// model.
-    pub(crate) fn count_kill(&mut self, id: ObjectId, killer: PlayerId) -> Result<(), GenieError> {
+    pub(crate) fn count_kill(&mut self, id: ObjectId, killer: PlayerId) -> GenieResult<()> {
         let (q, u) = self.object(id).ok_or(NOT_HELD)?;
         let master = u.master(self.master_tables(), q)?.clone();
         self.count_kill_of(q, &master, killer)
@@ -546,7 +532,7 @@ impl World {
         q: PlayerId,
         master: &Master,
         ap: PlayerId,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if !self
             .model
             .roles

@@ -1,6 +1,6 @@
 //! GATE (0x72): a player's gate lock.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::objects::ObjectId;
 use crate::players::PlayerId;
 use crate::world::World;
@@ -17,7 +17,7 @@ pub struct GateCommand {
 
 impl GateCommand {
     /// Its handler ([`World::gate`]).
-    pub(crate) fn run(self, w: &mut World) -> Result<(), GenieError> {
+    pub(crate) fn run(self, w: &mut World) -> GenieResult<()> {
         w.gate(self.player, self.id)
     }
 }

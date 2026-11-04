@@ -1,6 +1,5 @@
 //! A building's production list and its make action (`TRIBE_Action_Make_Obj`).
 
-use crate::GenieError;
 use crate::gathering::QueueCount;
 use crate::math::fmath::below_or_unordered;
 use crate::objects::ListIndex;
@@ -26,6 +25,7 @@ use crate::world::Seconds;
 use crate::world::World;
 use crate::world::slots::CheckedIndex;
 use crate::world::slots::PlayerSlots;
+use crate::{GenieError, GenieResult};
 
 /// A queue that is enabled and counts an entry, but holds none.
 const EMPTY_QUEUE: GenieError =
@@ -47,7 +47,7 @@ impl World {
         p: PlayerId,
         i: ListIndex,
         dt_seconds: Seconds,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if ObjectState::Alive < self.players.live(p, i)?.life.state {
             return self.cancel_queue(p, i);
         }
@@ -79,7 +79,7 @@ impl World {
         p: PlayerId,
         i: ListIndex,
         dt_seconds: Seconds,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let unit = &self.players.live(p, i)?;
         let Some(production) = self.parts.production.get(unit.id) else {
             return Ok(());
@@ -134,7 +134,7 @@ impl World {
     /// After its action ends the first queue entry of the building at `i` of player `p` lets one
     /// go ([`World::produce`]): a unit's population leaves the queued attribute (80, the slot
     /// `queued`), then the entry ([`crate::production::Queue::release_first`]).
-    fn release_first_entry(&mut self, p: PlayerId, i: ListIndex) -> Result<(), GenieError> {
+    fn release_first_entry(&mut self, p: PlayerId, i: ListIndex) -> GenieResult<()> {
         let Some(first) = self
             .parts
             .production
@@ -166,7 +166,7 @@ impl World {
         p: PlayerId,
         i: ListIndex,
         first: Entry,
-    ) -> Result<ProductionStart, GenieError> {
+    ) -> GenieResult<ProductionStart> {
         let making = if first.tech.is_none() {
             let pop = first
                 .master
@@ -192,7 +192,7 @@ impl World {
 
     /// A finished shared-kind research of the building at `i` of player `p` is noted on its
     /// production list (`FUN_141616a40`'s shared technology), when the tree holds it.
-    fn note_shared_research(&mut self, p: PlayerId, i: ListIndex) -> Result<(), GenieError> {
+    fn note_shared_research(&mut self, p: PlayerId, i: ListIndex) -> GenieResult<()> {
         if let Some(tech) = self
             .parts
             .production
@@ -227,7 +227,7 @@ impl World {
         p: PlayerId,
         i: ListIndex,
         making: Making,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if ObjectState::Dying <= self.players.live(p, i)?.life.state {
             return self.destroy_action(p, i, making);
         }
@@ -254,12 +254,7 @@ impl World {
     }
 
     /// A research action's start (`0x140ad1d80`): see [`World::start_production_action`].
-    fn start_research(
-        &mut self,
-        p: PlayerId,
-        i: ListIndex,
-        r: &mut MakeTech,
-    ) -> Result<(), GenieError> {
+    fn start_research(&mut self, p: PlayerId, i: ListIndex, r: &mut MakeTech) -> GenieResult<()> {
         let (t, def) = self.research_tech(p, r.tech)?;
         let owner = self.players.player(p)?;
         let factors = factors(r.tech, owner, self.model.slots)?;
@@ -294,7 +289,7 @@ impl World {
         p: PlayerId,
         i: ListIndex,
         dt_seconds: Seconds,
-    ) -> Result<UpdateCode, GenieError> {
+    ) -> GenieResult<UpdateCode> {
         let action = self
             .parts
             .production
@@ -321,7 +316,7 @@ impl World {
         (p, i): (PlayerId, ListIndex),
         make: MakeObj,
         dt_seconds: Seconds,
-    ) -> Result<UpdateCode, GenieError> {
+    ) -> GenieResult<UpdateCode> {
         let building = &self.players.live(p, i)?;
         match make.state {
             MakeObjState::Done => return Ok(UpdateCode::Done),
@@ -370,11 +365,7 @@ impl World {
     /// The production list's first action goes (`FUN_140a98e20`, and `FUN_140a98620` for the
     /// list of one the building's update makes) at the building at `i` of player `p`: its
     /// destructor ([`World::destroy_action`]).
-    pub(crate) fn end_production_action(
-        &mut self,
-        p: PlayerId,
-        i: ListIndex,
-    ) -> Result<(), GenieError> {
+    pub(crate) fn end_production_action(&mut self, p: PlayerId, i: ListIndex) -> GenieResult<()> {
         let Some(making) = self
             .parts
             .production
@@ -397,7 +388,7 @@ impl World {
         p: PlayerId,
         i: ListIndex,
         making: Making,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let make = match making {
             Making::Unit(make) => make,
             Making::Research(r) => return self.research_destroyed(p, i, &r),

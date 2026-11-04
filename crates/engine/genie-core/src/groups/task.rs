@@ -2,7 +2,6 @@
 //! (`RGE_Action_Object::slot38`, `FUN_14106b8b0`), which `BUnitGroup::command` asks of its
 //! first member that can act to choose the command a group's order runs.
 
-use crate::GenieError;
 use crate::groups::CommandArgs;
 use crate::groups::GroupId;
 use crate::map::Distance;
@@ -21,6 +20,7 @@ use crate::unit_ai::task_finder::world::TaskWorld;
 use crate::unit_ai::task_finder::{Actor, find_task};
 use crate::world::World;
 use crate::world::slots::PlayerSlots;
+use crate::{GenieError, GenieResult};
 
 /// The task whose target range is the target's owner's attribute 90 (`+0x2d0` of its attribute
 /// table), `TRIBE_Action_Repair`'s neighbour 0x69 in the command table.
@@ -80,7 +80,7 @@ impl World {
         target: ObjectId,
         point: Point,
         order: CommandArgs,
-    ) -> Result<Option<TargetTask>, GenieError> {
+    ) -> GenieResult<Option<TargetTask>> {
         let query = TaskQuery {
             target,
             point,
@@ -120,7 +120,7 @@ impl World {
         &self,
         member: ObjectId,
         query: &TaskQuery,
-    ) -> Result<Option<TargetTask>, GenieError> {
+    ) -> GenieResult<Option<TargetTask>> {
         if member == query.target {
             return Ok(None);
         }
@@ -193,7 +193,7 @@ impl World {
         &self,
         task: &Task,
         target: &TaskTarget<'_>,
-    ) -> Result<TargetTask, GenieError> {
+    ) -> GenieResult<TargetTask> {
         let range = match task.action_kind {
             OWN_RANGE_TASK => None,
             OWNER_RANGE_TASK => Some(Distance::new(

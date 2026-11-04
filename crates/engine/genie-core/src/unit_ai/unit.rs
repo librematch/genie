@@ -1,6 +1,5 @@
 //! The unit AI's part of the update: its surroundings, its side and its run.
 
-use crate::GenieError;
 use crate::construction::build::CART_TASK;
 use crate::groups::GroupCommandKind;
 use crate::map::Distance;
@@ -38,6 +37,7 @@ use crate::world::others::OthersRef;
 use crate::world::parts::PartTable;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
+use crate::{GenieError, GenieResult};
 use std::mem::{replace, take};
 
 /// A unit that runs its unit AI's side where it has none.
@@ -57,7 +57,7 @@ impl Unit {
         c: &mut Step<'_>,
         (captured, leaves): (Option<Captured>, Outcome),
         roles: &Roles,
-    ) -> Result<Outcome, GenieError> {
+    ) -> GenieResult<Outcome> {
         self.refresh_pathing(c)?;
         // RGE_Combat_Object::update after the actions: the object's sight mask; a changed mask of
         // an object others take over by seeing it (`+0x924` 1) gives it to the first player that
@@ -124,7 +124,7 @@ impl Unit {
         view: &OwnerView,
         (master, class): (Option<&Master>, Option<ClassId>),
         (player, busy, interruptible): (PlayerId, bool, bool),
-    ) -> Result<Surroundings, GenieError> {
+    ) -> GenieResult<Surroundings> {
         Ok(Surroundings {
             position: self.position(),
             hp: self.life.hp,
@@ -304,8 +304,8 @@ impl Unit {
         view: &OwnerView,
         attacker: Attacker,
         (player, player_kind): (PlayerId, PlayerKind),
-        f: impl FnOnce(&mut UnitAi, &mut UnitView<'_, '_>, &mut Well512) -> Result<R, GenieError>,
-    ) -> Result<R, GenieError> {
+        f: impl FnOnce(&mut UnitAi, &mut UnitView<'_, '_>, &mut Well512) -> GenieResult<R>,
+    ) -> GenieResult<R> {
         let mut ai = c.w.lend_unit_ai(self.id).ok_or(NO_UNIT_AI)?;
         // the AI stream is the AI's while it runs: no world routine the side calls draws from it
         let held = c.w.streams.get(Stream::Ai).clone();
@@ -357,8 +357,8 @@ impl Unit {
             &mut UnitView<'_, '_>,
             PlayerKind,
             &mut Well512,
-        ) -> Result<(), GenieError>,
-    ) -> Result<(), GenieError> {
+        ) -> GenieResult<()>,
+    ) -> GenieResult<()> {
         // every caller tests the unit for its unit AI first (`World::run_ai_calls`'s and
         // `World::run_unit_ai`'s callers, the capture's stop)
         let Some(ai_kind) = c.w.parts.unit_ai.get(self.id).map(|ai| ai.ai_kind) else {
@@ -415,8 +415,8 @@ impl Unit {
         &mut self,
         actions: &mut Action,
         c: &mut Step<'_>,
-        f: impl FnOnce(&mut UnitAi, &mut UnitView<'_, '_>, &mut Well512) -> Result<R, GenieError>,
-    ) -> Result<R, GenieError> {
+        f: impl FnOnce(&mut UnitAi, &mut UnitView<'_, '_>, &mut Well512) -> GenieResult<R>,
+    ) -> GenieResult<R> {
         // every caller tests the unit for its unit AI first (`World::run_ai_calls`'s and
         // `World::run_unit_ai`'s callers, the capture's stop)
         let Some(ai_kind) = c.w.parts.unit_ai.get(self.id).map(|ai| ai.ai_kind) else {
@@ -475,7 +475,7 @@ impl Unit {
         c: &mut Step<'_>,
         captured: Option<&Captured>,
         after: Option<AfterOrder>,
-    ) -> Result<Option<AfterOrder>, GenieError> {
+    ) -> GenieResult<Option<AfterOrder>> {
         let busy = actions.top_action_kind().is_some() || c.w.parts.unread.contains(self.id);
         // the unit's master: its own (a captured unit's copy), else its owner's
         let master = object_master(
@@ -580,7 +580,7 @@ impl Unit {
     /// player `viewer`'s map ([`crate::world::World::seen`]): none without one, the unit itself
     /// (out of its slot) when it is its own target (an unload's). The unit's update may have
     /// changed the target before (the Build's work order on a resource).
-    fn ai_target(&self, c: &Step<'_>, viewer: PlayerId) -> Result<Option<Seen>, GenieError> {
+    fn ai_target(&self, c: &Step<'_>, viewer: PlayerId) -> GenieResult<Option<Seen>> {
         match c
             .w
             .parts
@@ -606,7 +606,7 @@ impl Unit {
         others: OthersRef<'_>,
         view: &OwnerView,
         master: Option<&Master>,
-    ) -> Result<Vec<UnitSeen>, GenieError> {
+    ) -> GenieResult<Vec<UnitSeen>> {
         let Some(ai) = c.w.parts.unit_ai.get(self.id) else {
             return Ok(Vec::new());
         };
@@ -674,7 +674,7 @@ impl Unit {
         ais: &mut PartTable<UnitAi>,
         kind: NotifyKind,
         p: [i32; 3],
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         ais.inbox(self.id, self.life.state).post(kind, p)
     }
 
@@ -689,7 +689,7 @@ impl Unit {
         &self,
         mover: Option<&mut Mover>,
         ais: &mut PartTable<UnitAi>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let in_the_way = mover.map(|m| take(&mut m.in_the_way)).unwrap_or_default();
         for id in in_the_way {
             self.post_own(ais, NotifyKind::IN_THE_WAY, [id.get(), -1, -1])?;

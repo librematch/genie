@@ -1,7 +1,6 @@
 //! A made unit's spawn, the command queue it takes, its unit AI and the combat unit's
 //! constructor.
 
-use crate::GenieError;
 use crate::commands::GatherPointState;
 use crate::garrison::ContainerId;
 use crate::map::Distance;
@@ -36,6 +35,7 @@ use crate::vision::SightLayer;
 use crate::vision::SightShape;
 use crate::world::parts::{Object, ObjectParts};
 use crate::world::slots::PlayerSlots;
+use crate::{GenieError, GenieResult};
 
 use crate::combat::missile::grounded;
 use crate::objects::facing::{SpriteFacets, drawn_angle, draws_angle};
@@ -77,7 +77,7 @@ impl World {
         i: ListIndex,
         master: MasterId,
         pop: Amount,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if self.players.player(p)?.kind.is_computer() {
             return Err(GenieError::unsupported(
                 "a computer player's new unit (its AI's slot 0x398)",
@@ -180,7 +180,7 @@ impl World {
         new: ListIndex,
         queue: &[QueuedOrder],
         z: f32,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let master = self.players.live(p, new)?.life.master_id;
         for o in queue {
             self.queued_target(p, new, master, o)?;
@@ -211,7 +211,7 @@ impl World {
         new: ListIndex,
         master: MasterId,
         o: &QueuedOrder,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let target = o
             .target
             .is_some()
@@ -266,7 +266,7 @@ impl World {
         master: MasterId,
         made: &Master,
         position: Position,
-    ) -> Result<NewObject, GenieError> {
+    ) -> GenieResult<NewObject> {
         let owner = self.players.player(p)?;
         Ok(NewObject {
             player_kind: owner.kind,
@@ -327,7 +327,7 @@ impl World {
         master: MasterId,
         made: &Master,
         position: Position,
-    ) -> Result<ListIndex, GenieError> {
+    ) -> GenieResult<ListIndex> {
         if self.players.player(p)?.kind.is_computer() {
             return Err(GenieError::unsupported(
                 "a computer player's new unit (its AI's slot 0x398)",

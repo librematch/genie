@@ -1,7 +1,6 @@
 //! The Repair action's start, update and states ([`RepairAction`]): the walk, the face, the
 //! wait, the work, a new target, a move and the halt.
 
-use crate::GenieError;
 use crate::combat::attack::Aim;
 use crate::combat::attack::face_target;
 use crate::combat::damage::ArmorPair;
@@ -40,6 +39,7 @@ use crate::world::layer::generated::MoveToTuning;
 use crate::world::layer::generated::RepairTuning;
 use crate::world::lets::release;
 use crate::world::step::Step;
+use crate::{GenieError, GenieResult};
 use std::mem::replace;
 
 mod enter;
@@ -67,7 +67,7 @@ pub fn work_amount(
 
 /// The repairer's slot 0x328: notify `kind` with the repair's action value to its unit AI
 /// (the world's).
-fn notify(c: &mut Step<'_>, repairer: &Unit, kind: NotifyKind) -> Result<(), GenieError> {
+fn notify(c: &mut Step<'_>, repairer: &Unit, kind: NotifyKind) -> GenieResult<()> {
     repairer.post_own(
         &mut c.w.parts.unit_ai,
         kind,
@@ -76,7 +76,7 @@ fn notify(c: &mut Step<'_>, repairer: &Unit, kind: NotifyKind) -> Result<(), Gen
 }
 
 /// The repairer shows its master's standing sprite ([`Unit::show_standing`]).
-fn standing(c: &mut Step<'_>, repairer: &mut Unit) -> Result<(), GenieError> {
+fn standing(c: &mut Step<'_>, repairer: &mut Unit) -> GenieResult<()> {
     repairer.show_standing(
         c.w.parts.motion.layer_mut(repairer.id),
         OwnerMasters::new(&c.w.parts.own_master, c.w.model.masters.of(c.player)),
@@ -93,7 +93,7 @@ fn show(
     repairer: &mut Unit,
     id: Option<SpriteId>,
     standing: Option<SpriteId>,
-) -> Result<(), GenieError> {
+) -> GenieResult<()> {
     let mut sprites = Sprites {
         sprite: &mut repairer.sprite,
         rng: c.w.streams.get(Stream::Sprite),
@@ -132,7 +132,7 @@ impl RepairAction {
         range: Distance,
         move_reads: &MoveToReads<'_>,
         move_to_tuning: &MoveToTuning,
-    ) -> Result<Self, GenieError> {
+    ) -> GenieResult<Self> {
         let mut repair = Self {
             target: to.id.map(RepairTargetId::new),
             state: RepairState::Move { move_to: None },
@@ -161,7 +161,7 @@ impl RepairAction {
         move_reads: &MoveToReads<'_>,
         to: Option<WalkTo>,
         move_to_tuning: &MoveToTuning,
-    ) -> Result<Option<MoveToAction>, GenieError> {
+    ) -> GenieResult<Option<MoveToAction>> {
         to.map_or_else(
             || move_reads.to_nothing(self.range, self.task.moving, move_to_tuning),
             |to| {
@@ -187,7 +187,7 @@ impl RepairAction {
         point: Position,
         move_reads: &MoveToReads<'_>,
         move_to_tuning: &MoveToTuning,
-    ) -> Result<Option<MoveToAction>, GenieError> {
+    ) -> GenieResult<Option<MoveToAction>> {
         move_reads.to_point(point, Distance::ZERO, self.task.moving, move_to_tuning)
     }
 
@@ -211,7 +211,7 @@ impl RepairAction {
         me: Me,
         reads: &RepairReads,
         roles: &Roles,
-    ) -> Result<HeadCode, GenieError> {
+    ) -> GenieResult<HeadCode> {
         if self.target.is_some() && reads.target.is_none() {
             // the target is gone: FUN_140ad9050 finds no object to leave the repairers of
             self.counted = false;
@@ -259,7 +259,7 @@ impl RepairAction {
         repairer: &mut Unit,
         reads: &RepairReads,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let Some(t) = reads.target else {
             return self.set_state(c, repairer, RepairState::Done, reads, roles);
         };
@@ -285,7 +285,7 @@ impl RepairAction {
         repairer: &mut Unit,
         reads: &RepairReads,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         // a Repair that holds no target waits as it is (case 9's test of `+0x20`)
         if reads.target.is_none() {
             return Ok(());
@@ -313,7 +313,7 @@ impl RepairAction {
         me: Me,
         reads: &RepairReads,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         match self.step_walk(c, repairer, me, reads)? {
             SubCode::UnderWay => Ok(()),
             SubCode::Done | SubCode::Failed | SubCode::TargetGone => {
@@ -336,7 +336,7 @@ impl RepairAction {
         me: Me,
         reads: &RepairReads,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         match self.step_walk(c, repairer, me, reads)? {
             SubCode::UnderWay => return Ok(()),
             SubCode::TargetGone => {
@@ -364,7 +364,7 @@ impl RepairAction {
         c: &mut Step<'_>,
         repairer: &Unit,
         reads: &RepairReads,
-    ) -> Result<bool, GenieError> {
+    ) -> GenieResult<bool> {
         let by_id = ObjectsRef::new(
             &c.w.players,
             &c.w.index,
@@ -397,7 +397,7 @@ impl RepairAction {
         repairer: &mut Unit,
         me: Me,
         reads: &RepairReads,
-    ) -> Result<SubCode, GenieError> {
+    ) -> GenieResult<SubCode> {
         let how = ListUpdate {
             gives_up: GiveUp {
                 patience: reads.patience,
@@ -458,7 +458,7 @@ impl RepairAction {
         repairer: &mut Unit,
         reads: &RepairReads,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let Some(t) = reads.target else {
             return self.set_state(c, repairer, RepairState::Done, reads, roles);
         };
@@ -508,7 +508,7 @@ impl RepairAction {
     /// # Errors
     ///
     /// None (an unreachable error where a table lost the part it took).
-    fn count(c: &mut Step<'_>, reads: &RepairReads, by: i8) -> Result<(), GenieError> {
+    fn count(c: &mut Step<'_>, reads: &RepairReads, by: i8) -> GenieResult<()> {
         if let Some((id, _)) = reads.counted_in
             && c.w.object(id).is_some()
         {
@@ -526,7 +526,7 @@ impl RepairAction {
         c: &mut Step<'_>,
         repairer: &mut Unit,
         reads: &RepairReads,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if self.counted {
             Self::count(c, reads, -1)?;
             self.counted = false;
@@ -555,7 +555,7 @@ impl RepairAction {
         state: RepairState,
         reads: &RepairReads,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if self.counted {
             Self::count(c, reads, -1)?;
             self.counted = false;
@@ -582,7 +582,7 @@ impl RepairAction {
         mover: Option<&mut Mover>,
         move_reads: &MoveToReads<'_>,
         move_to_tuning: &MoveToTuning,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let walk = self.walk(move_reads, Some(to), move_to_tuning)?;
         if self.state.take_move_to().is_some()
             && let Some(m) = mover
@@ -609,7 +609,7 @@ impl RepairAction {
         mover: Option<&mut Mover>,
         move_reads: &MoveToReads<'_>,
         move_to_tuning: &MoveToTuning,
-    ) -> Result<(Option<ObjectId>, bool), GenieError> {
+    ) -> GenieResult<(Option<ObjectId>, bool)> {
         let walk = self.to_point(point, move_reads, move_to_tuning)?;
         self.point = point;
         let counted = replace(&mut self.counted, false);
@@ -630,7 +630,7 @@ impl RepairAction {
     /// # Errors
     ///
     /// The unit's stop that the motion step does not model.
-    pub fn halt(&mut self, mover: Option<&mut Mover>) -> Result<RepairerCount, GenieError> {
+    pub fn halt(&mut self, mover: Option<&mut Mover>) -> GenieResult<RepairerCount> {
         let counted = replace(&mut self.counted, false);
         if self.state.take_move_to().is_some()
             && let Some(m) = mover

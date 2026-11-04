@@ -1,7 +1,6 @@
 //! A group's command (FD-036): `BUnitGroup::command` (`FUN_14100efd0`), which chooses by the
 //! task a member has on the target how the group's order runs.
 
-use crate::GenieError;
 use crate::groups::GroupCommand;
 use crate::groups::GroupCommandKind;
 use crate::groups::GroupFlags;
@@ -20,6 +19,7 @@ use crate::objects::ObjectId;
 use crate::objects::masters::ActionKind;
 use crate::world::Seconds;
 use crate::world::World;
+use crate::{GenieError, GenieResult};
 
 /// The tasks `BUnitGroup::command` runs through the general command (`FUN_14100fc50`): the cases
 /// of its switch besides the attack path's.
@@ -65,7 +65,7 @@ impl World {
         target: Option<ObjectId>,
         point: Point,
         order: CommandArgs,
-    ) -> Result<GroupMove, GenieError> {
+    ) -> GenieResult<GroupMove> {
         let g = self.groups.held_mut(group)?;
         g.flags &= !GroupFlags::MEMBERS_SENT;
         let target = target.filter(|&t| self.world_object(t).is_some());
@@ -141,7 +141,7 @@ impl World {
         point: Point,
         range: Distance,
         order: CommandArgs,
-    ) -> Result<GroupMove, GenieError> {
+    ) -> GenieResult<GroupMove> {
         let g = self.groups.held_mut(group)?;
         let entry = |approved: u8| GroupCommand {
             command,
@@ -214,7 +214,7 @@ impl World {
         point: Point,
         (task, order): (TargetTask, CommandArgs),
         moved: GroupMove,
-    ) -> Result<GroupMove, GenieError> {
+    ) -> GenieResult<GroupMove> {
         let g = self.groups.held_mut(group)?;
         let entry = |approved: u8| GroupCommand {
             command: GroupCommandKind::of_action(task.command),

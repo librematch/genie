@@ -1,7 +1,7 @@
 //! An object's sight on and off (slots 0x1d0 and 0x1d8), and after its move, its state's and
 //! its master's change.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::Point;
@@ -102,7 +102,7 @@ impl Visibility {
         shape: SightShape,
         centre: SightCentre,
         sight: SightLayer<'_>,
-    ) -> Result<TileCount, GenieError> {
+    ) -> GenieResult<TileCount> {
         let SightLayer {
             roles,
             visibility_tuning,
@@ -132,7 +132,7 @@ impl Visibility {
         sight: LosSight,
         roles: &Roles,
         visibility_tuning: VisibilityTuning,
-    ) -> Result<TileCount, GenieError> {
+    ) -> GenieResult<TileCount> {
         let LosSight {
             position,
             radius,
@@ -191,7 +191,7 @@ impl Visibility {
         on: SightOn,
         roles: &Roles,
         visibility_tuning: VisibilityTuning,
-    ) -> Result<TileCount, GenieError> {
+    ) -> GenieResult<TileCount> {
         let SightOn {
             id,
             seer: s,
@@ -246,7 +246,7 @@ impl Visibility {
         shape: SightShape,
         centre: SightCentre,
         sight: SightLayer<'_>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let SightLayer {
             roles,
             visibility_tuning,
@@ -277,7 +277,7 @@ impl Visibility {
         sight: LosSight,
         roles: &Roles,
         visibility_tuning: VisibilityTuning,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let LosSight {
             position,
             radius,
@@ -341,7 +341,7 @@ impl Visibility {
         radius: Footprint,
         roles: &Roles,
         visibility_tuning: VisibilityTuning,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let tile = |p: Position| {
             [
                 tile_of(p.x(), self.size.width()),
@@ -392,7 +392,7 @@ impl Visibility {
         new: ObjectState,
         roles: &Roles,
         visibility_tuning: VisibilityTuning,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let Some(old) = self.seers.get(id).map(|s| s.state) else {
             return Ok(());
         };
@@ -455,7 +455,7 @@ impl Visibility {
         change: MasterChange,
         roles: &Roles,
         visibility_tuning: VisibilityTuning,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let MasterChange {
             master,
             los,
@@ -502,7 +502,7 @@ impl Visibility {
 
     /// The unified map's word at the tile of point `at` (its x and y truncated), masked
     /// ([`VisionBits::OBJECT_MASK`]).
-    pub(super) fn word_at(&self, at: Point) -> Result<VisionBits, GenieError> {
+    pub(super) fn word_at(&self, at: Point) -> GenieResult<VisionBits> {
         let tile = Tile::new(at.x() as i32, at.y() as i32);
         Ok(*self.unified.checked(self.index(tile))? & VisionBits::OBJECT_MASK)
     }

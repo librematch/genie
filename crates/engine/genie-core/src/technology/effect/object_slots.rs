@@ -1,7 +1,7 @@
 //! An object's change by an attribute (its slots 0x78, 0x80 and 0x88): the static object's,
 //! the combat unit's and the building's.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::combat::Charge;
 use crate::combat::Firepower;
 use crate::combat::missile::Missile;
@@ -52,7 +52,7 @@ impl World {
         &self,
         p: PlayerId,
         class: ClassId,
-    ) -> Result<(Vec<ObjectId>, Vec<ObjectId>), GenieError> {
+    ) -> GenieResult<(Vec<ObjectId>, Vec<ObjectId>)> {
         let t = &self.players.player(p)?.tracker;
         let key = ListKey::class(class);
         Ok((tracked_ids(t.list(key)), tracked_ids(t.list(key.pending()))))
@@ -60,11 +60,7 @@ impl World {
 
     /// The ids player `p`'s tracker files as done under key master `key` (`FUN_14104f560`'s list
     /// of one key, whatever the objects' masters), in the tracker's order.
-    pub(super) fn tracked_key(
-        &self,
-        p: PlayerId,
-        key: MasterId,
-    ) -> Result<Vec<ObjectId>, GenieError> {
+    pub(super) fn tracked_key(&self, p: PlayerId, key: MasterId) -> GenieResult<Vec<ObjectId>> {
         Ok(tracked_ids(
             self.players.player(p)?.tracker.list(ListKey::master(key)),
         ))
@@ -78,7 +74,7 @@ impl World {
         &self,
         p: PlayerId,
         master: &Master,
-    ) -> Result<(Vec<ObjectId>, Vec<ObjectId>), GenieError> {
+    ) -> GenieResult<(Vec<ObjectId>, Vec<ObjectId>)> {
         let player = self.players.player(p)?;
         let of_master = |id: &ObjectId| {
             player
@@ -135,7 +131,7 @@ impl World {
         change: Change,
         v: f32,
         attribute: MasterAttribute,
-    ) -> Result<ObjectChange, GenieError> {
+    ) -> GenieResult<ObjectChange> {
         let Some((owner, u)) = self.object(id) else {
             return Ok(ObjectChange::NotHeld);
         };
@@ -165,7 +161,7 @@ impl World {
         change: Change,
         v: f32,
         attribute: MasterAttribute,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         use crate::objects::masters::MasterAttribute;
         match attribute {
             MasterAttribute::HIT_POINTS => {
@@ -219,7 +215,7 @@ impl World {
     /// The line of sight's change on object `id` (`FUN_141195a50`'s attribute 1): an object on
     /// the map (its tile `+0x2e8`, which one inside another has not) in state 2 lets its circle go
     /// (slot 0x1d8, its master's line of sight) and takes one of `los` (slot 0x1d0).
-    pub(super) fn sight_again(&mut self, id: ObjectId, los: SightTiles) -> Result<(), GenieError> {
+    pub(super) fn sight_again(&mut self, id: ObjectId, los: SightTiles) -> GenieResult<()> {
         let Some((_, u)) = self.object(id) else {
             return Ok(());
         };
@@ -265,7 +261,7 @@ impl World {
         change: Change,
         v: f32,
         attribute: MasterAttribute,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         use crate::objects::masters::MasterAttribute;
         match (attribute, change) {
             (MasterAttribute::HERO_STATUS, Change::Set | Change::Add) => Ok(()),
@@ -284,7 +280,7 @@ impl World {
 
     /// [`World::change_combat`]'s volleys (`+0xa00`) of object `id`: a set takes `v`, an add
     /// adds it, a multiply scales them.
-    fn change_firepower(&mut self, id: ObjectId, change: Change, v: f32) -> Result<(), GenieError> {
+    fn change_firepower(&mut self, id: ObjectId, change: Change, v: f32) -> GenieResult<()> {
         let _ = self.object(id).ok_or(OBJECT_GONE)?;
         let combat = self.parts.combat_mut(id)?;
         combat.firepower = match change {
@@ -304,7 +300,7 @@ impl World {
         p: PlayerId,
         master: &Master,
         v: f32,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let owner = self.players.player_mut(p)?;
         for &(kind, amount, _) in master.storage.iter().take(3) {
             // The resources the population attribute (110) moves an object's storage of
@@ -337,7 +333,7 @@ impl World {
         change: Change,
         v: f32,
         attribute: MasterAttribute,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         use crate::objects::masters::MasterAttribute;
         match (attribute, change) {
             (MasterAttribute::BUILDING_ICON_OVERRIDE, Change::Set) => Ok(()),

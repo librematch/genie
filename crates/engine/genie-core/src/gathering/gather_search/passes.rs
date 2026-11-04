@@ -1,6 +1,5 @@
 //! The resource search's passes: the tiles it starts from, the flood's next tiles and its order, and the first resource a tile holds.
 
-use crate::GenieError;
 use crate::gathering::gather_search::Candidate;
 use crate::gathering::gather_search::Cell;
 use crate::gathering::gather_search::Pass;
@@ -15,6 +14,7 @@ use crate::players::Amount;
 use crate::vision::SightTiles;
 use crate::world::layer::generated::GatherSearchTuning;
 use crate::world::slots::CheckedIndex;
+use crate::{GenieError, GenieResult};
 
 /// [`closest_resource`](crate::gathering::gather_search::closest_resource)'s passes: from a
 /// footprint site its footprint's tiles the unit can stand on ([`footprint_seeds`], sorted by
@@ -32,7 +32,7 @@ pub(super) fn search_passes(
     unit_tile: Tile,
     los: SightTiles,
     nearer: &impl Fn(Cell, Cell) -> bool,
-) -> Result<Vec<Pass>, GenieError> {
+) -> GenieResult<Vec<Pass>> {
     let single = |at: Tile| Pass {
         origin: at,
         max_steps: los.get().wrapping_add(5),
@@ -72,7 +72,7 @@ pub(super) fn push_neighbours(
     at: &impl Fn(Tile) -> usize,
     Cell { tile, steps }: Cell,
     map: GridSize,
-) -> Result<(), GenieError> {
+) -> GenieResult<()> {
     for n in tile.beside() {
         let c = seen.checked_mut(at(n))?;
         if !*c {
@@ -176,7 +176,7 @@ pub(super) fn pass_distance(
 pub(super) fn first_resource(
     on_tile: &[Candidate],
     kind: GatherGroup,
-) -> Result<Option<Candidate>, GenieError> {
+) -> GenieResult<Option<Candidate>> {
     let open = |o: &Candidate| o.pasture.is_some() || !o.untargetable;
     let found: Vec<&Candidate> = on_tile
         .iter()

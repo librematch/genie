@@ -1,9 +1,9 @@
 //! The units a command's packet lists: its count and the ids after the packet's fixed part.
 
-use crate::GenieError;
 use crate::objects::ObjectId;
 use crate::players::PlayerId;
 use crate::world::World;
+use crate::{GenieError, GenieResult};
 
 /// The units a command's packet lists: its count (a `u16`, `+0x4` in most packets) and the
 /// ids that follow the packet's fixed part, −1 for none (a computer's BUILD without builders,
@@ -61,7 +61,7 @@ impl TryFrom<Vec<Option<ObjectId>>> for UnitList {
     /// # Errors
     ///
     /// `0xffff` ids or more, which no packet's count names.
-    fn try_from(ids: Vec<Option<ObjectId>>) -> Result<Self, GenieError> {
+    fn try_from(ids: Vec<Option<ObjectId>>) -> GenieResult<Self> {
         let count = u16::try_from(ids.len())
             .ok()
             .filter(|&c| c != Self::LAST_COMMANDED)

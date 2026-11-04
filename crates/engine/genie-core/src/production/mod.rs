@@ -16,7 +16,7 @@
 //! cleared: a field a new entry does not write (a research's train time) keeps an old entry's
 //! value, and the buffer's regrowth by ten copies them with the rest.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::objects::ActionState;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
@@ -224,7 +224,7 @@ impl Queue {
     /// # Errors
     ///
     /// A slot the buffer does not hold (the count past the buffer).
-    pub fn close(&mut self, i: usize, entry: QueueEntry) -> Result<(), GenieError> {
+    pub fn close(&mut self, i: usize, entry: QueueEntry) -> GenieResult<()> {
         self.count = self.count.shrunk();
         let mut j = i;
         while (j as i32) < i32::from(self.count.get()) {
@@ -276,7 +276,7 @@ impl Queue {
         count: QueuedUnits,
         tech: Option<TechId>,
         button: QueueButton,
-    ) -> Result<usize, GenieError> {
+    ) -> GenieResult<usize> {
         let i = self.count.slots();
         let slot = self.slots.checked_mut(i)?;
         let serial = self.next_serial;
@@ -297,7 +297,7 @@ impl Queue {
     /// # Errors
     ///
     /// A count past the buffer.
-    pub fn release_first(&mut self) -> Result<(), GenieError> {
+    pub fn release_first(&mut self) -> GenieResult<()> {
         if self.count == QueueLength::ZERO {
             return Ok(());
         }
@@ -488,7 +488,7 @@ pub fn population(storage: &[(Option<AttributeId>, Amount, u8)], roles: &Roles) 
 /// `FUN_1411e7dc0`'s test before it makes a unit's make action: the population with the units in
 /// production and this one stays within the cap (`COMISS`, `JBE`: a NaN passes), and the
 /// headroom covers them. A building that fails it waits (housed).
-pub fn housed(attributes: &[Amount], pop: Amount, slots: Slots) -> Result<bool, GenieError> {
+pub fn housed(attributes: &[Amount], pop: Amount, slots: Slots) -> GenieResult<bool> {
     let a = |i: AttributeId| attributes.get(i.index()).copied().ok_or(NO_ATTRIBUTE);
     let in_production = a(slots.attribute.in_production)?;
     Ok(

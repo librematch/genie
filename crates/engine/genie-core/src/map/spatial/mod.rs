@@ -11,7 +11,7 @@
 //! [`Tiles`] holds what the game keeps per tile: the obstruction manager's word (terrain class,
 //! static records' marks) and the counts of records and objects whose centre is on the tile.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::GridSize;
@@ -73,7 +73,7 @@ use std::ops::RangeInclusive;
 /// The caller's reachability check of a found object (slot 0x3d0 within a range): it paths over
 /// the spatial index the search reads, which the check's queries write, so the search hands it
 /// over for each call.
-pub type Reach<'a> = dyn FnMut(&mut Spatial, ObjectId, Distance) -> Result<bool, GenieError> + 'a;
+pub type Reach<'a> = dyn FnMut(&mut Spatial, ObjectId, Distance) -> GenieResult<bool> + 'a;
 
 /// What `ClosestObject` keeps of the objects found (its arguments 2 to 6; each −1 for any): the
 /// master class, the relation (0 itself or friends, 1 neutrals, 2 enemies, 3 itself), the state,

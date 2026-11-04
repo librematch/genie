@@ -2,7 +2,7 @@
 //! sound events, its costs in their slots and the rest the work command reads.
 
 use genie_dat::de::{Bird, Creatable, DeadFish, Projectile, Sound, Task, Type50, Unit};
-use genie_model::GenieError;
+use genie_model::GenieResult;
 use genie_model::combat::Firepower;
 use genie_model::combat::MissileCount;
 use genie_model::combat::missile::{ArcRatio, HitMode, ProjectileKind, SmartMode, VanishMode};
@@ -82,7 +82,7 @@ pub(super) fn sound_event(event: u32, sound: i16, sounds: &[Sound]) -> i32 {
 /// # Errors
 ///
 /// A negative action type, or an attribute below −1.
-fn dat_task(t: &Task, sounds: &[Sound]) -> Result<work::Task, GenieError> {
+fn dat_task(t: &Task, sounds: &[Sound]) -> GenieResult<work::Task> {
     let [
         attribute_kind,
         attribute_kind2,
@@ -150,11 +150,7 @@ const fn base_id(id: i16) -> i16 {
 /// # Errors
 ///
 /// A task or a cost slot that holds no type or attribute ([`dat_task`]).
-pub(super) fn dat_work(
-    id: MasterId,
-    unit: &Unit,
-    sounds: &[Sound],
-) -> Result<work::Master, GenieError> {
+pub(super) fn dat_work(id: MasterId, unit: &Unit, sounds: &[Sound]) -> GenieResult<work::Master> {
     Ok(work::Master {
         id,
         kind: MasterKind::of_data(unit.unit_kind),
@@ -271,7 +267,7 @@ fn dat_combat(t: &Type50) -> work::CombatPart {
 /// # Errors
 ///
 /// A cost slot that holds no attribute ([`dat_cost`]).
-fn dat_creatable(c: &Creatable) -> Result<work::CreatablePart, GenieError> {
+fn dat_creatable(c: &Creatable) -> GenieResult<work::CreatablePart> {
     Ok(work::CreatablePart {
         cost: dat_cost(c)?,
         build_time: c
@@ -329,7 +325,7 @@ fn dat_creatable(c: &Creatable) -> Result<work::CreatablePart, GenieError> {
 /// # Errors
 ///
 /// A task that holds no type or attribute.
-fn dat_action(b: &Bird, sounds: &[Sound]) -> Result<work::ActionPart, GenieError> {
+fn dat_action(b: &Bird, sounds: &[Sound]) -> GenieResult<work::ActionPart> {
     Ok(work::ActionPart {
         task_by_group: TaskGroup::of_data(b.task_swap_group),
         tasks: b
@@ -354,7 +350,7 @@ fn dat_action(b: &Bird, sounds: &[Sound]) -> Result<work::ActionPart, GenieError
 /// # Errors
 ///
 /// A slot whose attribute is below −1.
-fn dat_cost(c: &Creatable) -> Result<[CostSlot; COST_SLOTS], GenieError> {
+fn dat_cost(c: &Creatable) -> GenieResult<[CostSlot; COST_SLOTS]> {
     let mut cost = [CostSlot::default(); COST_SLOTS];
     for (slot, r) in cost.iter_mut().zip(&c.resource_costs) {
         *slot = CostSlot {
@@ -372,9 +368,7 @@ fn dat_cost(c: &Creatable) -> Result<[CostSlot; COST_SLOTS], GenieError> {
 /// # Errors
 ///
 /// A value below −1, which no attribute is.
-pub fn attributes<const N: usize>(
-    values: [i16; N],
-) -> Result<[Option<AttributeId>; N], GenieError> {
+pub fn attributes<const N: usize>(values: [i16; N]) -> GenieResult<[Option<AttributeId>; N]> {
     let mut out = [None; N];
     for (slot, value) in out.iter_mut().zip(values) {
         *slot = AttributeId::of_field(value)?;

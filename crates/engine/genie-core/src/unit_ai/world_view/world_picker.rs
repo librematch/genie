@@ -1,6 +1,5 @@
 //! The world as `bestUnitToAttack` and the attack tests read it ([`WorldPicker`]).
 
-use crate::GenieError;
 use crate::combat::attack::ATTACK;
 use crate::combat::damage::{
     Shown, armor_damage, bonus_damage, building_elevation_factor, elevation_factor, shown_attack,
@@ -44,6 +43,7 @@ use crate::world::layer::generated::UnitAiTuning;
 use crate::world::others::OthersRef;
 use crate::world::parts::Parts;
 use crate::world::player::AiSettings;
+use crate::{GenieError, GenieResult};
 
 /// Slot 0x228 (`FUN_141084070`): the sum of master `m`'s attacks above 0 (`COMISS`), from +0.
 pub(super) fn attacks(m: &Master) -> f32 {
@@ -115,7 +115,7 @@ impl WorldPicker<'_> {
 
     /// The object `id` (another player's, the owner's others or the unit itself) with its owner,
     /// its owner's attributes and its master (its own, else its owner's).
-    pub(super) fn held(&self, id: ObjectId) -> Result<Option<Held<'_>>, GenieError> {
+    pub(super) fn held(&self, id: ObjectId) -> GenieResult<Option<Held<'_>>> {
         let (q, u, attributes) = if id == self.me {
             (self.player, self.unit, self.attributes)
         } else if let Some(u) = self.others.own(id) {
@@ -143,7 +143,7 @@ impl WorldPicker<'_> {
         rules: TargetRules,
         roles: &Roles,
         unit_ai_tuning: &UnitAiTuning,
-    ) -> Result<bool, GenieError> {
+    ) -> GenieResult<bool> {
         let (_, p, attributes, pm) = self.held(who)?.ok_or(GenieError::unsupported(
             "a priest's conversion test of an object the slice does not hold",
         ))?;
@@ -189,7 +189,7 @@ impl WorldPicker<'_> {
         to: ObjectId,
         roles: &Roles,
         damage_tuning: &DamageTuning,
-    ) -> Result<HitPoints, GenieError> {
+    ) -> GenieResult<HitPoints> {
         let (fq, f, fa, fm) = self.held(from)?.ok_or(NOT_HELD)?;
         let (tq, t, ta, tm) = self.held(to)?.ok_or(NOT_HELD)?;
         let terrain = spatial.terrain.as_ref();
@@ -253,7 +253,7 @@ impl WorldPicker<'_> {
         roles: &Roles,
         damage_tuning: &DamageTuning,
         unit_ai_tuning: &UnitAiTuning,
-    ) -> Result<Duel, GenieError> {
+    ) -> GenieResult<Duel> {
         let (_, o, _, om) = self.held(other)?.ok_or(NOT_HELD)?;
         Ok(Duel {
             converts: self.converts(other, self.me, TargetRules::Any, roles, unit_ai_tuning)?,
@@ -277,7 +277,7 @@ impl WorldPicker<'_> {
         other: ObjectId,
         roles: &Roles,
         unit_ai_tuning: &UnitAiTuning,
-    ) -> Result<bool, GenieError> {
+    ) -> GenieResult<bool> {
         let (q, o, attributes, om) = self.held(other)?.ok_or(NOT_HELD)?;
         if !om.object_flags.contains(ObjectFlags::SCOUT) || om.copy_id != Some(om.id) {
             return Ok(false);
@@ -351,10 +351,7 @@ impl WorldPicker<'_> {
     /// those the world holds, the one with the least footprint gap to it (`FUN_14118f680`,
     /// [`crate::movement::footprint_gap`]; the first of a tie, `COMISS`: a NaN gap takes none
     /// over; [`NearestAttacker`]).
-    pub(crate) fn nearest_attacker_of(
-        &self,
-        target: ObjectId,
-    ) -> Result<NearestAttacker, GenieError> {
+    pub(crate) fn nearest_attacker_of(&self, target: ObjectId) -> GenieResult<NearestAttacker> {
         let Some((_, t, _, tm)) = self.held(target)? else {
             return Ok(NearestAttacker::NoUnitAi);
         };
@@ -378,11 +375,7 @@ impl WorldPicker<'_> {
     }
 
     /// The object `id` as the attack tests read it, and whether it moves (slot 0x208 above 0).
-    pub(crate) fn target(
-        &self,
-        spatial: &Spatial,
-        id: ObjectId,
-    ) -> Result<(Target, bool), GenieError> {
+    pub(crate) fn target(&self, spatial: &Spatial, id: ObjectId) -> GenieResult<(Target, bool)> {
         let (owner, t) = self.others.find(id).ok_or(NOT_HELD)?;
         let m = t.master(self.every, owner)?;
         let placed = spatial

@@ -9,7 +9,7 @@
 //! none, as the list's own lookup did. A list changed in place (a test's, the import's) indexes
 //! again with [`World::reindex`].
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::construction::{Annexes, MainBuildingId};
 use crate::map::spatial::{Gait, RecordId};
 use crate::movement::Mover;
@@ -200,11 +200,7 @@ impl ObjectIndex {
     /// # Errors
     ///
     /// The list holds no such slot.
-    pub(crate) fn swap_remove(
-        &mut self,
-        list: &mut ObjectList,
-        place: Place,
-    ) -> Result<Unit, GenieError> {
+    pub(crate) fn swap_remove(&mut self, list: &mut ObjectList, place: Place) -> GenieResult<Unit> {
         let i = place.slot();
         let out = list.out_at(i);
         let gone = list.swap_remove(i)?;
@@ -220,11 +216,7 @@ impl ObjectIndex {
     /// # Errors
     ///
     /// The list holds no such slot.
-    pub(crate) fn remove(
-        &mut self,
-        list: &mut ObjectList,
-        place: Place,
-    ) -> Result<Unit, GenieError> {
+    pub(crate) fn remove(&mut self, list: &mut ObjectList, place: Place) -> GenieResult<Unit> {
         let i = place.slot();
         let out = list.out_at(i);
         let gone = list.remove(i)?;
@@ -436,7 +428,7 @@ impl<'a> ObjectsRef<'a> {
     pub fn with_master(
         &self,
         id: impl ObjectKey,
-    ) -> Result<Option<(PlayerId, &'a Unit, &'a Master)>, GenieError> {
+    ) -> GenieResult<Option<(PlayerId, &'a Unit, &'a Master)>> {
         let Some((p, u, _)) = self.index.locate(self.players, id) else {
             return Ok(None);
         };
@@ -690,11 +682,7 @@ impl World {
     /// # Errors
     ///
     /// A player the world does not hold.
-    pub fn push_live(
-        &mut self,
-        p: PlayerId,
-        object: impl Into<Object>,
-    ) -> Result<ListIndex, GenieError> {
+    pub fn push_live(&mut self, p: PlayerId, object: impl Into<Object>) -> GenieResult<ListIndex> {
         let Object { unit, parts } = object.into();
         let list = &mut self.players.player_mut(p)?.objects;
         self.parts.file(unit.id, parts);
@@ -713,7 +701,7 @@ impl World {
         &mut self,
         p: PlayerId,
         object: impl Into<Object>,
-    ) -> Result<ListIndex, GenieError> {
+    ) -> GenieResult<ListIndex> {
         let Object { unit, parts } = object.into();
         let list = &mut self.players.player_mut(p)?.sleeping;
         self.parts.file(unit.id, parts);
@@ -731,7 +719,7 @@ impl World {
         &mut self,
         p: PlayerId,
         objects: impl IntoIterator<Item = O>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         for object in objects {
             let _ = self.push_live(p, object)?;
         }
@@ -743,7 +731,7 @@ impl World {
     /// # Errors
     ///
     /// A player or a slot the world does not hold.
-    pub fn swap_remove_live(&mut self, p: PlayerId, i: ListIndex) -> Result<Object, GenieError> {
+    pub fn swap_remove_live(&mut self, p: PlayerId, i: ListIndex) -> GenieResult<Object> {
         let list = &mut self.players.player_mut(p)?.objects;
         let unit = self.index.swap_remove(list, Place::Live(p, i))?;
         Ok(self.whole_from(unit))
@@ -755,7 +743,7 @@ impl World {
     /// # Errors
     ///
     /// A player or a slot the world does not hold.
-    pub fn swap_remove_asleep(&mut self, p: PlayerId, i: ListIndex) -> Result<Object, GenieError> {
+    pub fn swap_remove_asleep(&mut self, p: PlayerId, i: ListIndex) -> GenieResult<Object> {
         let list = &mut self.players.player_mut(p)?.sleeping;
         let unit = self.index.swap_remove(list, Place::Sleeping(p, i))?;
         Ok(self.whole_from(unit))
@@ -766,7 +754,7 @@ impl World {
     /// # Errors
     ///
     /// A player or a slot the world does not hold.
-    pub fn remove_live(&mut self, p: PlayerId, i: ListIndex) -> Result<Object, GenieError> {
+    pub fn remove_live(&mut self, p: PlayerId, i: ListIndex) -> GenieResult<Object> {
         let list = &mut self.players.player_mut(p)?.objects;
         let unit = self.index.remove(list, Place::Live(p, i))?;
         Ok(self.whole_from(unit))
@@ -785,7 +773,7 @@ impl World {
     /// # Errors
     ///
     /// A player or a slot the world does not hold.
-    pub fn take_out(&mut self, p: PlayerId, i: ListIndex) -> Result<Unit, GenieError> {
+    pub fn take_out(&mut self, p: PlayerId, i: ListIndex) -> GenieResult<Unit> {
         self.players.player_mut(p)?.objects.take_out(i)
     }
 

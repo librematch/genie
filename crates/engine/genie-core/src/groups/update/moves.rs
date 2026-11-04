@@ -1,7 +1,6 @@
 //! The current command's update: a move, the members' moves and steps, the order queue's
 //! due orders and the idle timer.
 
-use crate::GenieError;
 use crate::groups::GroupCommandKind;
 use crate::groups::GroupFate;
 use crate::groups::GroupFlags;
@@ -31,6 +30,7 @@ use crate::world::World;
 use crate::world::index::Place;
 use crate::world::slots::{CheckedIndex, PlayerSlots};
 use crate::world::{IN_THE_WAY, WALKER_UNMOVING};
+use crate::{GenieError, GenieResult};
 use std::mem::take;
 
 impl World {
@@ -50,7 +50,7 @@ impl World {
         &mut self,
         group: GroupId,
         relayout: &mut bool,
-    ) -> Result<GroupFate, GenieError> {
+    ) -> GenieResult<GroupFate> {
         let g = self.groups.held(group)?;
         let finished = match g.current_command {
             NO_COMMAND => Progress::Going,
@@ -141,11 +141,7 @@ impl World {
     /// What the leaves, the lock and the members' moves do not model.
     ///
     /// When the world does not hold `group`: the group update passes its own.
-    pub fn move_update(
-        &mut self,
-        group: GroupId,
-        relayout: &mut bool,
-    ) -> Result<Progress, GenieError> {
+    pub fn move_update(&mut self, group: GroupId, relayout: &mut bool) -> GenieResult<Progress> {
         let g = self.groups.held(group)?;
         if g.motion.flags.contains(MotionFlags::NEW) {
             *relayout = true;
@@ -229,7 +225,7 @@ impl World {
         group: GroupId,
         follows: bool,
         relayout: &mut bool,
-    ) -> Result<Progress, GenieError> {
+    ) -> GenieResult<Progress> {
         let g = self.groups.held(group)?;
         if follows {
             let Some(target) = self.world_object(g.current_target.target) else {
@@ -262,7 +258,7 @@ impl World {
         group: GroupId,
         walks: bool,
         patrolling: bool,
-    ) -> Result<Progress, GenieError> {
+    ) -> GenieResult<Progress> {
         let g = self.groups.held_mut(group)?;
         g.flags = (g.flags & !GroupFlags::LINE) | GroupFlags::MEMBERS_SENT;
         self.move_to_desired_positions(group, MOVE_COMMAND, None)?;
@@ -294,7 +290,7 @@ impl World {
         group: GroupId,
         command: GroupCommandKind,
         target: Option<ObjectId>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let g = self.groups.held(group)?;
         let Some(f) = g
             .current_formation
@@ -340,7 +336,7 @@ impl World {
     ///
     /// What the motion step, the stop, the stand and the walking and standing sprites do not
     /// model.
-    pub(super) fn specific_moves_step(&mut self, group: GroupId) -> Result<(), GenieError> {
+    pub(super) fn specific_moves_step(&mut self, group: GroupId) -> GenieResult<()> {
         let mut i = 0;
         loop {
             let g = self.groups.held(group)?;
@@ -421,7 +417,7 @@ impl World {
     /// # Errors
     ///
     /// What the motion step does not model, and a walk's unit in the way (notify 0x215).
-    pub(crate) fn member_step(&mut self, id: ObjectId) -> Result<Progress, GenieError> {
+    pub(crate) fn member_step(&mut self, id: ObjectId) -> GenieResult<Progress> {
         use crate::movement::{Motion, Planning};
         let Some(place) = self.place(id) else {
             return Ok(Progress::Finished);
@@ -489,7 +485,7 @@ impl World {
     /// the update's milliseconds (`world+0x7c`) to its timer (`+0x3e4`, wrapping), and past
     /// [`IDLE_LIMIT`] (unsigned) draws it anew ([`World::reset_idle_timer`]); a group that is not
     /// idle draws it anew.
-    pub(super) fn idle_timer_step(&mut self, group: GroupId) -> Result<(), GenieError> {
+    pub(super) fn idle_timer_step(&mut self, group: GroupId) -> GenieResult<()> {
         if self.is_idle(group) {
             let dt = self.dt_ms();
             let g = self.groups.held_mut(group)?;

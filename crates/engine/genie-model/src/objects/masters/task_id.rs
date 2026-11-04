@@ -1,7 +1,7 @@
 //! A task's id as one type: the place of a task in its master's task list, which an action
 //! keeps to name the task it works on.
 
-use crate::GenieError;
+use crate::{GenieError, GenieResult};
 use genie_diff::Diff;
 use getset::CopyGetters;
 use serde::Deserialize;
@@ -41,7 +41,7 @@ impl TaskId {
     /// # Errors
     ///
     /// A negative value other than −1, which no task's id is.
-    pub fn of_field(value: i16) -> Result<Option<Self>, GenieError> {
+    pub fn of_field(value: i16) -> GenieResult<Option<Self>> {
         (value != Self::NONE)
             .then(|| Self::try_from(value))
             .transpose()
@@ -69,7 +69,7 @@ impl TryFrom<i16> for TaskId {
     /// # Errors
     ///
     /// A negative value, which no task's id is.
-    fn try_from(value: i16) -> Result<Self, GenieError> {
+    fn try_from(value: i16) -> GenieResult<Self> {
         if value < 0 {
             return Err(
                 GenieError::invalid_input("a negative task id, which no task has")

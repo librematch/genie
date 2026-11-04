@@ -1,8 +1,8 @@
 //! The unit AI's action values as one type: every value its action field (`+0x44`) can hold,
 //! each by the order it serves, and the fallible conversion from a raw value.
 
-use crate::GenieError;
 use crate::unit_ai::OrderKind;
+use crate::{GenieError, GenieResult};
 use genie_diff::Diff;
 
 /// An action value a unit AI holds (`+0x44`, the last one `+0x68`). Where an order serves it,
@@ -129,7 +129,7 @@ impl AiAction {
     /// # Errors
     ///
     /// A value no action value names.
-    pub fn of_field(value: i32) -> Result<Option<Self>, GenieError> {
+    pub fn of_field(value: i32) -> GenieResult<Option<Self>> {
         (value != -1).then(|| Self::try_from(value)).transpose()
     }
 
@@ -147,7 +147,7 @@ impl TryFrom<i32> for AiAction {
     type Error = GenieError;
 
     /// The action of value `value`.
-    fn try_from(value: i32) -> Result<Self, GenieError> {
+    fn try_from(value: i32) -> GenieResult<Self> {
         Self::ALL
             .into_iter()
             .find(|a| a.value() == value)

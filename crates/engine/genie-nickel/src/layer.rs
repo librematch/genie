@@ -3,7 +3,7 @@
 
 use crate::de::from_expr;
 use crate::evaluate;
-use genie_error::GenieError;
+use genie_error::{GenieError, GenieResult};
 use genie_model::layer::BuildLayer;
 
 /// Build 158041's layer source.
@@ -15,7 +15,7 @@ const BUILD_158041: &str = include_str!("../../../../builds/158041.ncl");
 ///
 /// A [`GenieError`] for a build genie has no layer of, or a source that does not evaluate into a
 /// layer.
-pub fn build_layer(build: u32) -> Result<BuildLayer, GenieError> {
+pub fn build_layer(build: u32) -> GenieResult<BuildLayer> {
     let (source, name) = match build {
         158_041 => (BUILD_158041, "builds/158041.ncl"),
         _ => {

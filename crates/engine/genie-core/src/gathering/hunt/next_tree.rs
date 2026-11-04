@@ -1,7 +1,6 @@
 //! The hunt's search for another target when its class is one the unit AI does not attack
 //! (trees): the closest tree from the hunt's drop site, which the hunt then takes.
 
-use crate::GenieError;
 use crate::combat::attack::BeginLayer;
 use crate::combat::attack::{arms, engagement, show_arrived};
 use crate::gathering::hunt::HuntRetarget;
@@ -27,6 +26,7 @@ use crate::world::layer::Roles;
 use crate::world::lets::take;
 use crate::world::others::OthersRef;
 use crate::world::step::Step;
+use crate::{GenieError, GenieResult};
 use std::cmp::Ordering;
 
 impl Unit {
@@ -47,7 +47,7 @@ impl Unit {
         within: Option<Distance>,
         near: Option<Distance>,
         roles: &Roles,
-    ) -> Result<TreeSearch, GenieError> {
+    ) -> GenieResult<TreeSearch> {
         // NaN compares false as the game's `comiss` does
         let beyond = |a: Position, b: Position, limit: Distance| {
             let (dx, dz, dy) = (a.x() - b.x(), a.z() - b.z(), a.y() - b.y());

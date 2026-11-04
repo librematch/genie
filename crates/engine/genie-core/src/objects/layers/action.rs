@@ -3,7 +3,6 @@
 //! (`RGE_Action_Object::update`, `0x14106ac90`), and the reads of its top action. An object
 //! that has one holds it in the world's table (`Parts::actions`, FD-045-D59).
 
-use crate::GenieError;
 use crate::combat::attack::ATTACK;
 use crate::garrison::ENTER;
 use crate::gathering::make::MAKE;
@@ -17,6 +16,7 @@ use crate::objects::masters::ActionKind;
 use crate::ownership::artifact::{ARTIFACT_KIND, Artifact};
 use crate::world::Unread;
 use crate::world::checkpoint::TopAction;
+use crate::{GenieError, GenieResult};
 use genie_diff::Diff;
 
 /// The action layer of an object: its action list and its master's default task.
@@ -38,10 +38,7 @@ impl Action {
     /// # Errors
     ///
     /// A top action the slice does not model.
-    pub fn top_action_object(
-        &self,
-        unread: Option<&Unread>,
-    ) -> Result<Option<ObjectId>, GenieError> {
+    pub fn top_action_object(&self, unread: Option<&Unread>) -> GenieResult<Option<ObjectId>> {
         if unread.is_some() {
             return Err(GenieError::unsupported(
                 "slot 0x190 of an action the slice does not model",
@@ -58,7 +55,7 @@ impl Action {
     /// # Errors
     ///
     /// A top action the slice does not model.
-    pub fn top_action_idle(&self, unread: Option<&Unread>) -> Result<bool, GenieError> {
+    pub fn top_action_idle(&self, unread: Option<&Unread>) -> GenieResult<bool> {
         if unread.is_some() {
             return Err(GenieError::unsupported(
                 "slots 0x190 and 0x288 of an action the slice does not model",

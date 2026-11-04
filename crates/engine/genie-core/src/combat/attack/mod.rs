@@ -11,7 +11,6 @@
 //! `FUN_1412115e0` -> `FUN_141084230` -> the target's slot 0xe8, whose damage is
 //! [`crate::combat::damage`]'s).
 
-use crate::GenieError;
 use crate::combat::damage::Victim;
 use crate::map::Distance;
 use crate::map::Point;
@@ -40,6 +39,7 @@ use crate::world::Seconds;
 use crate::world::World;
 use crate::world::WorldTime;
 use crate::world::parts::PartTable;
+use crate::{GenieError, GenieResult};
 use genie_diff::Diff;
 use genie_model::model::Model;
 
@@ -478,12 +478,7 @@ impl Ground<'_> {
     /// # Errors
     ///
     /// The notify's.
-    pub(crate) fn post(
-        &mut self,
-        unit: &Unit,
-        kind: NotifyKind,
-        p: [i32; 3],
-    ) -> Result<(), GenieError> {
+    pub(crate) fn post(&mut self, unit: &Unit, kind: NotifyKind, p: [i32; 3]) -> GenieResult<()> {
         match &mut self.posts {
             Posts::Held(list) => {
                 list.push((kind, p));

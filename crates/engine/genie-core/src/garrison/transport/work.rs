@@ -1,7 +1,7 @@
 //! The work command's Transport: a transport's task of type 12 (a beach, the only terrain task
 //! in the game's data) makes or retakes it.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::garrison::transport::StartCall;
 use crate::garrison::transport::TransportTarget;
 use crate::garrison::transport::{Changed, MapShore, Ship, TransportAction};
@@ -37,7 +37,7 @@ impl World {
         (target, point): (Option<ObjectId>, Position),
         task: &Task,
         notifies: Notifies,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         self.notify_transport((p, i), (target, point), notifies)?;
         self.clear_actions(p, i)?;
         let mut t = TransportAction::on_task(Some(task.id), point);
@@ -76,7 +76,7 @@ impl World {
         (target, point): (Option<ObjectId>, Position),
         task: &Task,
         notifies: Notifies,
-    ) -> Result<Answer, GenieError> {
+    ) -> GenieResult<Answer> {
         let unit = self.players.live(p, i)?;
         // the Transport on top, on the task the work found
         let on_task = match self.parts.actions_of(unit.id).list.head() {
@@ -121,7 +121,7 @@ impl World {
         &self,
         (p, i): (PlayerId, ListIndex),
         target: Option<ObjectId>,
-    ) -> Result<bool, GenieError> {
+    ) -> GenieResult<bool> {
         let Some((tp, t)) = self.object(target) else {
             return Ok(false);
         };
@@ -153,7 +153,7 @@ impl World {
         (p, i): (PlayerId, ListIndex),
         (target, point): (Option<ObjectId>, Position),
         notifies: Notifies,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let named = match target.and_then(|id| Some((id, self.object(id)?))) {
             Some((target, (tp, t))) => Some((target, t.master(self.master_tables(), tp)?.class)),
             None => None,
@@ -186,8 +186,8 @@ impl World {
         p: PlayerId,
         i: ListIndex,
         task: Option<TaskId>,
-        f: impl FnOnce(&Ship<'_>, &mut MapShore<'_>) -> Result<Changed, GenieError>,
-    ) -> Result<Changed, GenieError> {
+        f: impl FnOnce(&Ship<'_>, &mut MapShore<'_>) -> GenieResult<Changed>,
+    ) -> GenieResult<Changed> {
         let ship = {
             let unit = self.players.live(p, i)?;
             let master = unit.master(self.master_tables(), p)?;

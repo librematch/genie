@@ -1,6 +1,5 @@
 //! A command into its packet: genie-rec's layout of the command's kind, filled from the command.
 
-use genie_core::GenieError;
 use genie_core::commands::Departure;
 use genie_core::commands::GatherPointState;
 use genie_core::commands::{
@@ -14,6 +13,7 @@ use genie_core::objects::masters::{ActionKind, MasterId};
 use genie_core::orders::OrderFlags;
 use genie_core::orders::SavedPatrols;
 use genie_core::technology::TechId;
+use genie_core::{GenieError, GenieResult};
 use genie_rec::de::command::{self as packets, Command as Packet};
 
 /// The bytes the client writes at `BUILDING_COMMAND_QUEUE`'s `+0x12..+0x18`, which no code
@@ -30,7 +30,7 @@ const UNIT_ORDER_GAP: [u8; 1] = [1];
 ///
 /// A value its packet's field cannot hold: a unit list or a FLARE's players too long for the
 /// packet.
-pub fn encode(command: &Command) -> Result<Vec<u8>, GenieError> {
+pub fn encode(command: &Command) -> GenieResult<Vec<u8>> {
     match command {
         Command::Unmodelled(c) => Ok(c.packet.clone()),
         other => Ok(packet(other)?.encode()?),
@@ -41,7 +41,7 @@ pub fn encode(command: &Command) -> Result<Vec<u8>, GenieError> {
 const MOST_BYTES: usize = 4 + u16::MAX as usize;
 
 /// A tail of `fixed` bytes' layout, if its packet's size holds it.
-fn within<T>(tail: &[T], fixed: usize) -> Result<&[T], GenieError> {
+fn within<T>(tail: &[T], fixed: usize) -> GenieResult<&[T]> {
     if fixed + size_of_val(tail) <= MOST_BYTES {
         Ok(tail)
     } else {
@@ -54,14 +54,14 @@ fn within<T>(tail: &[T], fixed: usize) -> Result<&[T], GenieError> {
 
 /// The ids after a fixed part of `fixed` bytes, if the packet's size holds them: the packet's
 /// values, −1 for none.
-fn ids(ids: &[Option<ObjectId>], fixed: usize) -> Result<Vec<i32>, GenieError> {
+fn ids(ids: &[Option<ObjectId>], fixed: usize) -> GenieResult<Vec<i32>> {
     let raw: Vec<i32> = ids.iter().map(|&id| ObjectId::field(id)).collect();
     let _ = within(&raw, fixed)?;
     Ok(raw)
 }
 
 /// A command's layout in genie-rec.
-fn packet(command: &Command) -> Result<Packet, GenieError> {
+fn packet(command: &Command) -> GenieResult<Packet> {
     match command {
         Command::Order(c) => order(c),
         Command::Build(_)
@@ -87,7 +87,7 @@ fn packet(command: &Command) -> Result<Packet, GenieError> {
 
 /// The commands that place or queue at buildings: BUILD, `BUILD_WALL`, QUEUE, RESEARCH, SET
 /// GATHER POINT and `BUILDING_COMMAND_QUEUE`.
-fn building(command: &Command) -> Result<Packet, GenieError> {
+fn building(command: &Command) -> GenieResult<Packet> {
     Ok(match command {
         Command::Build(c) => build(c)?,
         Command::BuildWall(c) => build_wall(c)?,
@@ -118,7 +118,7 @@ fn building(command: &Command) -> Result<Packet, GenieError> {
 }
 
 /// The commands to the objects listed that do not go through the orders' reader.
-fn listed(command: &Command) -> Result<Packet, GenieError> {
+fn listed(command: &Command) -> GenieResult<Packet> {
     Ok(match command {
         Command::Stop(c) => Packet::Stop(packets::Stop {
             commp_id: c.player.get(),
@@ -174,13 +174,13 @@ fn listed(command: &Command) -> Result<Packet, GenieError> {
 
 /// A command another group's function writes, or an unmodelled one, which keeps its own bytes
 /// ([`encode`]): [`packet`] never passes either here.
-fn elsewhere(command: &Command) -> Result<Packet, GenieError> {
+fn elsewhere(command: &Command) -> GenieResult<Packet> {
     Err(GenieError::unreachable("a command another arm writes")
         .with("command", format!("{command:?}")))
 }
 
 /// The commands of one object, one player or the game.
-fn single(command: &Command) -> Result<Packet, GenieError> {
+fn single(command: &Command) -> GenieResult<Packet> {
     Ok(match command {
         Command::Resign(c) => Packet::Resign(packets::Resign {
             commp_id: c.player.get(),
@@ -240,7 +240,7 @@ macro_rules! interact_packet {
 }
 
 /// INTERACT, WORK, MOVE, RETREAT, FOLLOW and GUARD.
-fn order(c: &OrderCommand) -> Result<Packet, GenieError> {
+fn order(c: &OrderCommand) -> GenieResult<Packet> {
     let (player, units) = (c.player.get(), &c.units);
     Ok(match c.order {
         Order::Interact(o) => interact_packet!(Interact, player, units, o),
@@ -277,7 +277,7 @@ fn order(c: &OrderCommand) -> Result<Packet, GenieError> {
 }
 
 /// BUILD (0x66).
-fn build(c: &BuildCommand) -> Result<Packet, GenieError> {
+fn build(c: &BuildCommand) -> GenieResult<Packet> {
     Ok(Packet::Build(packets::Build {
         commp_id: c.player.get(),
         num: c.builders.count,
@@ -300,14 +300,14 @@ fn build(c: &BuildCommand) -> Result<Packet, GenieError> {
 /// # Errors
 ///
 /// A coordinate outside a word.
-fn tile_word(v: i32) -> Result<u16, GenieError> {
+fn tile_word(v: i32) -> GenieResult<u16> {
     u16::try_from(v).map_err(|_| {
         GenieError::invalid_input("a wall tile outside the packet's word").with("coordinate", v)
     })
 }
 
 /// `BUILD_WALL` (0x69).
-fn build_wall(c: &BuildWallCommand) -> Result<Packet, GenieError> {
+fn build_wall(c: &BuildWallCommand) -> GenieResult<Packet> {
     Ok(Packet::BuildWall(packets::BuildWall {
         commp_id: c.player.get(),
         num: c.builders.count,
@@ -326,7 +326,7 @@ fn build_wall(c: &BuildWallCommand) -> Result<Packet, GenieError> {
 }
 
 /// QUEUE (0x81, `MULTI_QUEUE`).
-fn queue(c: &QueueCommand) -> Result<Packet, GenieError> {
+fn queue(c: &QueueCommand) -> GenieResult<Packet> {
     Ok(Packet::MultiQueue(packets::MultiQueue {
         commp_id: c.player.get(),
         num: c.buildings.count,
@@ -340,7 +340,7 @@ fn queue(c: &QueueCommand) -> Result<Packet, GenieError> {
 }
 
 /// RESEARCH (0x65).
-fn research(c: &ResearchCommand) -> Result<Packet, GenieError> {
+fn research(c: &ResearchCommand) -> GenieResult<Packet> {
     Ok(Packet::Research(packets::Research {
         commp_id: c.player.get(),
         uid: ObjectId::field(c.building),
@@ -353,7 +353,7 @@ fn research(c: &ResearchCommand) -> Result<Packet, GenieError> {
 }
 
 /// PATROL (0x15): x as each slot's f32 bits.
-fn patrol(c: &PatrolCommand) -> Result<Packet, GenieError> {
+fn patrol(c: &PatrolCommand) -> GenieResult<Packet> {
     let x = |i: usize| c.waypoints.points[i].x().to_bits();
     let y = |i: usize| c.waypoints.points[i].y();
     Ok(Packet::Patrol(packets::Patrol {
@@ -388,7 +388,7 @@ fn patrol(c: &PatrolCommand) -> Result<Packet, GenieError> {
 }
 
 /// `ATTACK_MOVE` (0x21): the first x as its f32 bits, the other slots' x and y as bytes.
-fn attack_move(c: &AttackMoveCommand) -> Result<Packet, GenieError> {
+fn attack_move(c: &AttackMoveCommand) -> GenieResult<Packet> {
     let points = &c.waypoints.points;
     let tail = |axis: Axis| -> [u8; 36] {
         let mut out = [0; 36];
@@ -414,7 +414,7 @@ fn attack_move(c: &AttackMoveCommand) -> Result<Packet, GenieError> {
 }
 
 /// UNLOAD (0x6f).
-fn unload(c: &UnloadCommand) -> Result<Packet, GenieError> {
+fn unload(c: &UnloadCommand) -> GenieResult<Packet> {
     let (flag, unit_kind) = c.pick.packet();
     Ok(Packet::Unload(packets::Unload {
         commp_id: c.player.get(),
@@ -431,7 +431,7 @@ fn unload(c: &UnloadCommand) -> Result<Packet, GenieError> {
 }
 
 /// `UNIT_ORDER` (0x75).
-fn unit_order(c: &UnitOrderCommand) -> Result<Packet, GenieError> {
+fn unit_order(c: &UnitOrderCommand) -> GenieResult<Packet> {
     Ok(Packet::UnitOrder(packets::UnitOrder {
         commp_id: c.player.get(),
         num: c.units.count,
@@ -451,7 +451,7 @@ fn unit_order(c: &UnitOrderCommand) -> Result<Packet, GenieError> {
 }
 
 /// `GO_BACK_TO_WORK2`'s tail: the count (+4), two bytes no code reads, the ids from +8.
-fn go_back_to_work_rest(units: &UnitList) -> Result<Vec<u8>, GenieError> {
+fn go_back_to_work_rest(units: &UnitList) -> GenieResult<Vec<u8>> {
     let mut rest = units.count.to_le_bytes().to_vec();
     rest.extend([0; 2]);
     ids(&units.ids, packets::GoBackToWork2::FIXED + 4)?
@@ -502,7 +502,7 @@ fn trade(c: &TradeCommand) -> Packet {
 }
 
 /// FLARE (0x73): the players' bytes from `+0x11`, of which the layout's fixed part holds three.
-fn flare(c: &FlareCommand) -> Result<Packet, GenieError> {
+fn flare(c: &FlareCommand) -> GenieResult<Packet> {
     let shown: Vec<u8> = c.shown.iter().map(|&s| u8::from(s)).collect();
     let [first, second, third, rest @ ..] = shown.as_slice() else {
         return Err(GenieError::invalid_input(

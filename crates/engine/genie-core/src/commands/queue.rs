@@ -1,6 +1,6 @@
 //! QUEUE (0x81): units of one master at the player's buildings.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::commands::UnitList;
 use crate::objects::masters::MasterId;
 use crate::players::PlayerId;
@@ -29,7 +29,7 @@ pub struct QueueCommand {
 impl QueueCommand {
     /// `do_command`'s check refuses a player the world lacks and a count past the packet's ids
     /// ([`World::read_units`]); then the queue at the buildings ([`World::queue`]).
-    pub(crate) fn run(&self, w: &mut World) -> Result<(), GenieError> {
+    pub(crate) fn run(&self, w: &mut World) -> GenieResult<()> {
         let Some(listed) = w.read_units(self.player, &self.buildings) else {
             return Ok(());
         };

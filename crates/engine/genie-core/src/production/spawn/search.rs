@@ -1,7 +1,6 @@
 //! The spawn point search (`FUN_1411d12d0`): the building's sides in segments, each spot's
 //! candidates (`FUN_1411c5b60`) and the corners' wall checks.
 
-use crate::GenieError;
 use crate::map::Footprint;
 use crate::map::GroundOffset;
 use crate::map::Point;
@@ -9,6 +8,7 @@ use crate::map::Position;
 use crate::map::{Tile, TileOffset};
 use crate::production::spawn::{NONE, Site, Tested};
 use crate::world::layer::generated::SpawnTuning;
+use crate::{GenieError, GenieResult};
 
 /// The ways a spot tries its next point: up, down, left and right.
 const UP: TileOffset = TileOffset::new(0, 1);
@@ -32,8 +32,8 @@ pub(super) struct Spot {
 /// the spot.
 pub(super) fn try_spot(
     spot: &Spot,
-    test: &mut dyn FnMut(Point) -> Result<Tested, GenieError>,
-) -> Result<Option<Point>, GenieError> {
+    test: &mut dyn FnMut(Point) -> GenieResult<Tested>,
+) -> GenieResult<Option<Point>> {
     for i in 0..=spot.count {
         let x = spot.dir.dx() as f32 * spot.step.x() * i as f32 + spot.at.x();
         let y = spot.dir.dy() as f32 * spot.step.y() * i as f32 + spot.at.y();
@@ -56,9 +56,9 @@ pub(super) fn try_spot(
 pub fn spawn_point(
     site: &Site,
     unit: Footprint,
-    test: &mut dyn FnMut(Point) -> Result<Tested, GenieError>,
+    test: &mut dyn FnMut(Point) -> GenieResult<Tested>,
     spawn_tuning: &SpawnTuning,
-) -> Result<Point, GenieError> {
+) -> GenieResult<Point> {
     let frame = Frame::new(site, unit, spawn_tuning);
     for pass in [SearchPass::First, SearchPass::Second] {
         for segment in frame.segments(pass, spawn_tuning) {

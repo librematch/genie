@@ -1,6 +1,6 @@
 //! How a Transport was last ordered ([`TransportMode`]).
 
-use crate::GenieError;
+use crate::{GenieError, GenieResult};
 use strum::FromRepr;
 
 /// A Transport's `+0x34`: −1 from its constructor, 1 after a work order (slot 9), 0 after a
@@ -36,7 +36,7 @@ impl TryFrom<i32> for TransportMode {
     /// # Errors
     ///
     /// An int no slot of the Transport writes.
-    fn try_from(value: i32) -> Result<Self, GenieError> {
+    fn try_from(value: i32) -> GenieResult<Self> {
         Self::from_repr(value).ok_or_else(|| {
             GenieError::invalid_input("a transport mode no slot writes").with("target2_id", value)
         })

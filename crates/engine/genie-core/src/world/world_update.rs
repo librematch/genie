@@ -1,7 +1,6 @@
 //! The world update's parts ([`crate::world::schedule`] runs them): the command phase, the
 //! moving objects, the players' relations and each player's objects' updates.
 
-use crate::GenieError;
 use crate::commands::Command;
 use crate::construction::build::CART_TASK;
 use crate::movement::Speed;
@@ -19,6 +18,7 @@ use crate::world::Millis;
 use crate::world::Seconds;
 use crate::world::World;
 use crate::world::slots::PlayerSlots;
+use crate::{GenieError, GenieResult};
 
 /// Whether the object list's loop counts on past the object it filed ([`World::file_step`]).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -130,7 +130,7 @@ impl World {
         &mut self,
         p: PlayerId,
         (dt, turn): (Millis, Option<Millis>),
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         // the loop's count, which goes on past each object but one that leaves
         let mut i = ListIndex::FIRST;
         while self.players.player(p)?.objects.holds(i) {
@@ -179,7 +179,7 @@ impl World {
         p: PlayerId,
         i: ListIndex,
         outcome: Outcome,
-    ) -> Result<ListCount, GenieError> {
+    ) -> GenieResult<ListCount> {
         match outcome {
             Outcome::Leave => {
                 let gone = self.swap_remove_live(p, i)?;
@@ -246,12 +246,7 @@ impl World {
     /// # Errors
     ///
     /// A player the world does not hold.
-    fn hand_over_units(
-        &mut self,
-        p: PlayerId,
-        i: ListIndex,
-        taken: Captured,
-    ) -> Result<(), GenieError> {
+    fn hand_over_units(&mut self, p: PlayerId, i: ListIndex, taken: Captured) -> GenieResult<()> {
         let Captured {
             new, main, also, ..
         } = taken;
@@ -312,7 +307,7 @@ impl World {
         p: PlayerId,
         (i, id): (ListIndex, ObjectId),
         e: GenieError,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let slot = self.live_index(p, id);
         let player = self.players.player_mut(p)?;
         let e = match slot {

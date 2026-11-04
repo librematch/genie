@@ -1,6 +1,5 @@
 //! The retarget check and search, and the types' other checks (slot 73, processMisc).
 
-use crate::GenieError;
 use crate::map::Distance;
 use crate::map::Position;
 use crate::math::rng::Well512;
@@ -36,6 +35,7 @@ use crate::unit_ai::{
 use crate::world::Millis;
 use crate::world::WorldTime;
 use crate::world::layer::ClassRoles;
+use crate::{GenieError, GenieResult};
 
 /// The least span [`UnitAi::set_randomized_retarget_timer`] draws around (`999 < span`: the
 /// immediate `1000`).
@@ -68,7 +68,7 @@ impl UnitAi {
         at: &Surroundings,
         ai: &mut Well512,
         side: &mut UnitView<'_, '_>,
-    ) -> Result<RetargetCheck, GenieError> {
+    ) -> GenieResult<RetargetCheck> {
         let unit_ai_tuning = &at.unit_ai_tuning;
         let roles = &at.roles;
         // without an order, the order whose own action the current one is (`action + 100`)
@@ -128,7 +128,7 @@ impl UnitAi {
         at: &Surroundings,
         ai: &mut Well512,
         side: &mut UnitView<'_, '_>,
-    ) -> Result<MiscEnd, GenieError> {
+    ) -> GenieResult<MiscEnd> {
         let unit_ai_tuning = &at.unit_ai_tuning;
         // the leashes (unless on orders 0x2c7, 0x2dd and 0x323, which no order holds, or in a
         // group that patrols: FUN_141017c30, FUN_141017c40), measured from the unit's footprint
@@ -214,7 +214,7 @@ impl UnitAi {
         at: &Surroundings,
         side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
-    ) -> Result<u32, GenieError> {
+    ) -> GenieResult<u32> {
         let unit_ai_tuning = &at.unit_ai_tuning;
         let roles = &at.roles;
         let current = Self::world_object(self.current_target, at, side)?;
@@ -308,7 +308,7 @@ impl UnitAi {
         action_state: Option<ActionState>,
         attack_listed: Option<bool>,
         layer: AiLayer<'_>,
-    ) -> Result<Option<RetargetSearch>, GenieError> {
+    ) -> GenieResult<Option<RetargetSearch>> {
         let AiLayer {
             roles,
             unit_ai_tuning,
@@ -368,7 +368,7 @@ impl UnitAi {
         at: &Surroundings,
         side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if self.current_order == Some(OrderKind::Attack) && self.current_target.is_none() {
             self.stop_current(StopOrder::End, at, side, rng)?;
         }
@@ -400,7 +400,7 @@ impl UnitAi {
         player_kind: PlayerKind,
         ai: &mut Well512,
         side: &mut UnitView<'_, '_>,
-    ) -> Result<MiscEnd, GenieError> {
+    ) -> GenieResult<MiscEnd> {
         let unit_ai_tuning = &at.unit_ai_tuning;
         let mut defended = None;
         if let Some(target) = self.defend_target {
@@ -495,7 +495,7 @@ impl UnitAi {
         at: &Surroundings,
         side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
-    ) -> Result<MiscEnd, GenieError> {
+    ) -> GenieResult<MiscEnd> {
         let unit_ai_tuning = &at.unit_ai_tuning;
         // the world holds the current target (`at.target`) only when the AI has one
         let (Some(id), Some(target)) = (
@@ -549,7 +549,7 @@ impl UnitAi {
         range: Distance,
         side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         side.effect_now(
             Effect::MoveToObject {
                 target: id,
@@ -587,7 +587,7 @@ impl UnitAi {
         &mut self,
         player_kind: PlayerKind,
         ai: &mut Well512,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if self.look_around_timer > self.look_around_timeout {
             // the human branch; `FUN_14152b470` sends players allied with a computer elsewhere
             if player_kind.is_computer() {

@@ -1,5 +1,6 @@
 //! `bestUnitToAttack` itself (`FUN_140c44680`): the object tests, the ranges and the choice.
 
+use crate::GenieResult;
 use crate::map::Distance;
 use crate::math::image::best_target::ONE as BEST_TARGET_ONE;
 use crate::movement::Speed;
@@ -55,7 +56,7 @@ pub(super) fn tested(
     relation: UnitRelation,
     world: &AttackField<'_, '_, '_>,
     roles: &Roles,
-) -> Result<Option<FoundObject>, crate::GenieError> {
+) -> GenieResult<Option<FoundObject>> {
     let Some(t) = world.found_object(id)? else {
         return Ok(None);
     };
@@ -83,7 +84,7 @@ pub(super) fn may_attack(
     (id, t): (ObjectId, &FoundObject),
     relation: UnitRelation,
     world: &AttackField<'_, '_, '_>,
-) -> Result<bool, crate::GenieError> {
+) -> GenieResult<bool> {
     if !t.flags.contains(FoundFlags::HAS_AI)
         || ObjectState::Dying <= t.state
         || t.flags.contains(FoundFlags::ALLIED)
@@ -184,7 +185,7 @@ pub(crate) fn best_unit_to_attack(
     world: &mut AttackField<'_, '_, '_>,
     roles: &Roles,
     best_target_tuning: &BestTargetTuning,
-) -> Result<Choice, crate::GenieError> {
+) -> GenieResult<Choice> {
     let current = current_target(me, world)?;
     let walls = attacks_walls(me, roles);
     let mut st = Statistics::default();
@@ -220,7 +221,7 @@ pub(crate) fn best_unit_to_attack(
 fn current_target(
     me: &Searcher,
     world: &AttackField<'_, '_, '_>,
-) -> Result<Option<(ObjectId, FoundObject)>, crate::GenieError> {
+) -> GenieResult<Option<(ObjectId, FoundObject)>> {
     let Some(target) = me.target else {
         return Ok(None);
     };
@@ -254,7 +255,7 @@ fn add_current(
     world: &AttackField<'_, '_, '_>,
     roles: &Roles,
     best_target_tuning: &BestTargetTuning,
-) -> Result<Option<AttackCategory>, crate::GenieError> {
+) -> GenieResult<Option<AttackCategory>> {
     let Some((target, t)) =
         current.filter(|(_, t)| t.distance <= me.range || Speed::ZERO < me.speed)
     else {
@@ -280,7 +281,7 @@ pub(super) fn add_extra(
     world: &AttackField<'_, '_, '_>,
     roles: &Roles,
     best_target_tuning: &BestTargetTuning,
-) -> Result<(), crate::GenieError> {
+) -> GenieResult<()> {
     for &id in &ask.extra {
         if Some(id) == me.target {
             continue;
@@ -362,7 +363,7 @@ impl Walked {
         st: &mut Statistics,
         world: &AttackField<'_, '_, '_>,
         layer: WalkLayer<'_>,
-    ) -> Result<(), crate::GenieError> {
+    ) -> GenieResult<()> {
         let WalkLayer {
             roles,
             best_target_tuning,
@@ -426,7 +427,7 @@ impl Walked {
         st: &mut Statistics,
         world: &AttackField<'_, '_, '_>,
         layer: WalkLayer<'_>,
-    ) -> Result<(), crate::GenieError> {
+    ) -> GenieResult<()> {
         let WalkLayer {
             roles,
             best_target_tuning,
@@ -464,7 +465,7 @@ impl Walked {
         near: Distance,
         world: &AttackField<'_, '_, '_>,
         roles: &Roles,
-    ) -> Result<Option<(FoundObject, Distance, Option<AttackCategory>)>, crate::GenieError> {
+    ) -> GenieResult<Option<(FoundObject, Distance, Option<AttackCategory>)>> {
         let Some(t) = tested(me, ask, id, relation, world, roles)? else {
             return Ok(None);
         };
@@ -502,7 +503,7 @@ fn rank_entries(
     world: &AttackField<'_, '_, '_>,
     roles: &Roles,
     best_target_tuning: &BestTargetTuning,
-) -> Result<bool, crate::GenieError> {
+) -> GenieResult<bool> {
     st.score(
         &me.weights,
         me.targeting,
@@ -547,7 +548,7 @@ fn choose(
     ranked: bool,
     world: &mut AttackField<'_, '_, '_>,
     last_resort: Option<ObjectId>,
-) -> Result<Choice, crate::GenieError> {
+) -> GenieResult<Choice> {
     let range = me.range;
     let mut choice = Choice::default();
     choice.target = if let Some(target) = current_holds(me, ask, current, st, world)? {
@@ -586,7 +587,7 @@ fn current_holds(
     current: Option<(ObjectId, FoundObject)>,
     st: &Statistics,
     world: &mut AttackField<'_, '_, '_>,
-) -> Result<Option<ObjectId>, crate::GenieError> {
+) -> GenieResult<Option<ObjectId>> {
     let Some((target, t)) = current else {
         return Ok(None);
     };
@@ -606,7 +607,7 @@ fn quick_pick(
     ranked: bool,
     range: Distance,
     world: &mut AttackField<'_, '_, '_>,
-) -> Result<Option<ObjectId>, crate::GenieError> {
+) -> GenieResult<Option<ObjectId>> {
     for &i in st.order.iter().take(3) {
         let e = *st.entries.checked(i)?;
         if (e.moving || st.moving < EntryCount::new(1) || !ranked)
@@ -626,7 +627,7 @@ fn path_pick(
     tried: Option<ObjectId>,
     world: &mut AttackField<'_, '_, '_>,
     retries: &mut Vec<(ObjectId, WorldTime)>,
-) -> Result<Option<ObjectId>, crate::GenieError> {
+) -> GenieResult<Option<ObjectId>> {
     for &i in st.order.iter().take(3) {
         let e = *st.entries.checked(i)?;
         if Some(e.id) != tried && world.path(e.id, me.range)? {

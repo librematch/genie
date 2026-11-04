@@ -1,7 +1,7 @@
 //! The walk toward the walked level's waypoint, and `BMotion`'s update with what it reads of
 //! the world.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::groups::GroupId;
 use crate::groups::Motion;
 use crate::groups::PathBudget;
@@ -45,7 +45,7 @@ pub(super) fn steer(
     lead: &Lead,
     world: &mut StepWorld<'_, '_>,
     target: Option<&Placed>,
-) -> Result<Pass, GenieError> {
+) -> GenieResult<Pass> {
     let group_tuning = &world.by_id.tuning().group;
     let by_id = world.by_id;
     let dt = world.dt;
@@ -101,7 +101,7 @@ fn way_blocked(
     at: BVector,
     next: BVector,
     by_id: ObjectsRef<'_>,
-) -> Result<Option<Pass>, GenieError> {
+) -> GenieResult<Option<Pass>> {
     let group_tuning = &by_id.tuning().group;
     let ignore: Vec<RecordId> = match lead.group.as_ref() {
         Some(g) if !g.differentiator_units.is_empty() => g.differentiator_units.clone(),
@@ -140,7 +140,7 @@ fn weigh_hits(
     spatial: &Spatial,
     hits: &[RecordId],
     by_id: ObjectsRef<'_>,
-) -> Result<(bool, u32), GenieError> {
+) -> GenieResult<(bool, u32)> {
     let level = motion.paths.checked(0)?;
     let top_ignore = motion
         .paths
@@ -170,7 +170,7 @@ fn weigh_hits(
 /// The walk goes back to the parent level (it asks again, state 2), and past one whose waypoint
 /// the lead cannot stand on to that one's parent; a level without a parent resets and the group
 /// stands (the step ends with 1).
-fn back_to_parent(motion: &mut Motion, lead: &Lead, spatial: &Spatial) -> Result<Pass, GenieError> {
+fn back_to_parent(motion: &mut Motion, lead: &Lead, spatial: &Spatial) -> GenieResult<Pass> {
     for _ in 0..2 {
         if motion.paths.len() < 2 {
             reset_level(&mut motion.paths)?;
@@ -201,7 +201,7 @@ fn walk_ends(
     at: BVector,
     target: Option<&Placed>,
     group_tuning: &GroupTuning,
-) -> Result<Option<Pass>, GenieError> {
+) -> GenieResult<Option<Pass>> {
     let level = motion.paths.checked(0)?;
     match target {
         None => {
@@ -291,7 +291,7 @@ impl World {
     ///
     /// When the world does not hold `group`: the game's routine gets the group itself, from a
     /// caller that holds it.
-    pub fn motion_update(&mut self, group: GroupId, budget: PathBudget) -> Result<(), GenieError> {
+    pub fn motion_update(&mut self, group: GroupId, budget: PathBudget) -> GenieResult<()> {
         let Some(g) = self.groups.get(group) else {
             return Ok(());
         };

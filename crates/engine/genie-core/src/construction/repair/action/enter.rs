@@ -1,6 +1,6 @@
 //! A repair's entry into its new state: the part of its `set_state` by the state.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::construction::RepairTargetId;
 use crate::construction::repair::RepairState;
 use crate::construction::repair::action::notify;
@@ -22,7 +22,7 @@ impl RepairAction {
         repairer: &mut Unit,
         reads: &RepairReads,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         match self.state {
             RepairState::Done => self.enter_done(c, repairer, reads)?,
             RepairState::Halted => standing(c, repairer)?,
@@ -69,7 +69,7 @@ impl RepairAction {
         c: &mut Step<'_>,
         repairer: &mut Unit,
         reads: &RepairReads,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         self.drop_target(c, repairer, reads)?;
         if self.voice.is_loud() {
             notify(c, repairer, NotifyKind::ACTION_COMPLETED)?;
@@ -83,7 +83,7 @@ impl RepairAction {
         c: &Step<'_>,
         repairer: &Unit,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let move_reads = repairer.move_to_reads(
             c.w.parts.motion.mover(repairer.id),
             c.w.master_tables(),
@@ -113,7 +113,7 @@ impl RepairAction {
         repairer: &Unit,
         reads: &RepairReads,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if let Some(t) = reads.target {
             self.point = t.position;
         }

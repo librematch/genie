@@ -1,11 +1,11 @@
 //! The world's unit groups ([`UnitGroups`]), an object's link to its group and the group
 //! every listed unit is in.
 
-use crate::GenieError;
 use crate::groups::{Differentiator, UnitKind};
 use crate::groups::{GroupId, UnitGroup};
 use crate::objects::{ObjectId, ObjectKey};
 use crate::players::PlayerId;
+use crate::{GenieError, GenieResult};
 use genie_diff::Diff;
 
 /// An object's link to its group: `mGroupID` (`+0x6d0`) and `mGroupFlag` (`+0x6d4`), -1 and -2
@@ -99,7 +99,7 @@ impl UnitGroups {
     /// # Errors
     ///
     /// A group the table does not hold.
-    pub fn held(&self, id: GroupId) -> Result<&UnitGroup, GenieError> {
+    pub fn held(&self, id: GroupId) -> GenieResult<&UnitGroup> {
         self.get(id).ok_or_else(|| group_gone(id))
     }
 
@@ -108,7 +108,7 @@ impl UnitGroups {
     /// # Errors
     ///
     /// A group the table does not hold.
-    pub fn held_mut(&mut self, id: GroupId) -> Result<&mut UnitGroup, GenieError> {
+    pub fn held_mut(&mut self, id: GroupId) -> GenieResult<&mut UnitGroup> {
         self.get_mut(id).ok_or_else(|| group_gone(id))
     }
 

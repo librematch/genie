@@ -1,7 +1,6 @@
 //! One update (slot 6, `0x140a8e1d0`) in states 4, 6 and 7: the walk's `MoveTo`, the units
 //! in the way and the teardown.
 
-use crate::GenieError;
 use crate::combat::attack::Aim;
 use crate::combat::attack::face_target;
 use crate::combat::damage::Victim;
@@ -33,6 +32,7 @@ use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 use crate::world::layer::Slots;
 use crate::world::step::Step;
+use crate::{GenieError, GenieResult};
 
 /// A gatherer without movement state, which the Gather's walks and turns need.
 pub(super) const UNMOVING: GenieError =
@@ -69,7 +69,7 @@ impl GatherAction {
     /// # Errors
     ///
     /// The unit's stop that the motion step does not model.
-    pub fn tear_down(&mut self, mover: Option<&mut Mover>) -> Result<(), GenieError> {
+    pub fn tear_down(&mut self, mover: Option<&mut Mover>) -> GenieResult<()> {
         if self.state.take_move_to().is_some()
             && let Some(m) = mover
         {
@@ -102,7 +102,7 @@ impl GatherAction {
         target: Option<&mut Victim>,
         r: &GatherReads,
         roles: &Roles,
-    ) -> Result<Next, GenieError> {
+    ) -> GenieResult<Next> {
         // a farm's time per stop follows the gatherer's work rate, every update
         if target.as_deref().is_some_and(|t| {
             roles
@@ -169,7 +169,7 @@ impl GatherAction {
         unit: &mut Unit,
         r: &GatherReads,
         roles: &Roles,
-    ) -> Result<Next, GenieError> {
+    ) -> GenieResult<Next> {
         if !matches!(
             self.state,
             GatherState::Walk { .. } | GatherState::Face | GatherState::Work
@@ -197,7 +197,7 @@ impl GatherAction {
         target: &Victim,
         dt: Seconds,
         r: &GatherReads,
-    ) -> Result<Next, GenieError> {
+    ) -> GenieResult<Next> {
         self.timer += dt;
         if self.timer < Seconds::ZERO {
             return Ok(Next::Stay);
@@ -243,7 +243,7 @@ impl GatherAction {
         target: &Victim,
         r: &GatherReads,
         roles: &Roles,
-    ) -> Result<Next, GenieError> {
+    ) -> GenieResult<Next> {
         if roles.of_class(target.class).contains(ClassRoles::FARM) {
             if target.state < ObjectState::Alive {
                 return self.begin_search(c, unit, r);
@@ -290,7 +290,7 @@ impl GatherAction {
         target: &mut Victim,
         r: &GatherReads,
         roles: &Roles,
-    ) -> Result<Next, GenieError> {
+    ) -> GenieResult<Next> {
         let dt = c.dt.seconds();
         if self.stops.several() {
             self.time_at_stop += dt;
@@ -324,7 +324,7 @@ impl GatherAction {
         target: &Victim,
         r: &GatherReads,
         roles: &Roles,
-    ) -> Result<Next, GenieError> {
+    ) -> GenieResult<Next> {
         match self.update_list(c, unit, me, r, roles)? {
             SubCode::UnderWay => Ok(Next::Stay),
             SubCode::Done => {
@@ -379,7 +379,7 @@ impl GatherAction {
         mut me: Me,
         r: &GatherReads,
         roles: &Roles,
-    ) -> Result<SubCode, GenieError> {
+    ) -> GenieResult<SubCode> {
         me.action_state = ActionState::new(self.state.get());
         let state = self.state.move_to().map(|m| m.state);
         // the computer player's test is not held: its villagers would fail at once

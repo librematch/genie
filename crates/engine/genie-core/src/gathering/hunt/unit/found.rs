@@ -1,6 +1,5 @@
 //! A hunter's object found: it becomes the hunt's target, and the sprite of a hunt that fails at once.
 
-use crate::GenieError;
 use crate::combat::attack::BeginLayer;
 use crate::combat::attack::{arms, engagement, show_arrived};
 use crate::gathering::hunt::HuntState;
@@ -22,6 +21,7 @@ use crate::world::layer::Roles;
 use crate::world::lets::take;
 use crate::world::others::OthersRef;
 use crate::world::step::Step;
+use crate::{GenieError, GenieResult};
 
 impl Unit {
     /// The object `found` becomes the hunt's target (slot 0x48,
@@ -36,7 +36,7 @@ impl Unit {
         c: &mut Step<'_>,
         found: ObjectId,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let master = self.master(c.w.master_tables(), c.player)?;
         let (owner, t) = OthersRef::of(&c.w.players, &c.w.index, c.player)?
             .find(found)
@@ -145,11 +145,7 @@ impl Unit {
 
     /// A hunt that failed at once after its retarget: the unit shows standing, and a unit with
     /// a sprite takes its master's standing sprite (none in the data file is not modelled).
-    fn hunt_failed_sprite(
-        &mut self,
-        hunt: &HuntAction,
-        c: &mut Step<'_>,
-    ) -> Result<(), GenieError> {
+    fn hunt_failed_sprite(&mut self, hunt: &HuntAction, c: &mut Step<'_>) -> GenieResult<()> {
         if hunt.state != HuntState::Failed {
             return Ok(());
         }

@@ -1,7 +1,7 @@
 //! A unit group's id as one type: the id the world gives each group it creates, which a unit's
 //! group link, a group's differentiator groups and the lookups by id name.
 
-use crate::GenieError;
+use crate::{GenieError, GenieResult};
 use derive_more::Display;
 use getset::CopyGetters;
 
@@ -64,7 +64,7 @@ impl TryFrom<i32> for GroupId {
     /// # Errors
     ///
     /// −1, which every field that names a group takes for none.
-    fn try_from(value: i32) -> Result<Self, GenieError> {
+    fn try_from(value: i32) -> GenieResult<Self> {
         Self::of_field(value).ok_or_else(|| {
             GenieError::invalid_input("a group id of −1, which names none").with("group", value)
         })
@@ -80,7 +80,7 @@ impl TryFrom<u32> for GroupId {
     /// # Errors
     ///
     /// The word of −1, which names no group.
-    fn try_from(value: u32) -> Result<Self, GenieError> {
+    fn try_from(value: u32) -> GenieResult<Self> {
         Self::try_from(i32::from_ne_bytes(value.to_ne_bytes()))
     }
 }

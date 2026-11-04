@@ -1,7 +1,7 @@
 //! A hit: where it comes from ([`Hit`]), what the swing does after it, the strike
 //! (`FUN_141084230`) and the blast so far.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::combat::AttackTargetId;
 use crate::combat::Charge;
 use crate::combat::attack::DRAW_SCALE;
@@ -119,7 +119,7 @@ pub(crate) fn strike(
     hit: Hit,
     object_rng: &mut Well512,
     layer: HitLayer<'_>,
-) -> Result<Struck, GenieError> {
+) -> GenieResult<Struck> {
     let HitLayer {
         roles,
         damage_tuning,
@@ -190,7 +190,7 @@ pub(crate) fn strike(
 /// The blast's damage so far that a trample's hit on `victim` leaves out (`0x141211933`): a
 /// building's `+0xb90`, its main building's (`+0xbb8`, among `blasted`) for an annex; 0 for
 /// another object.
-pub(super) fn blast_so_far(victim: &Victim, blasted: &[Victim]) -> Result<HitPoints, GenieError> {
+pub(super) fn blast_so_far(victim: &Victim, blasted: &[Victim]) -> GenieResult<HitPoints> {
     // The livestock (58, `0x3a`) and farm (49, `0x31`) classes: the ally test spares an Attack on
     // one that was its unit's player's when the Attack took it ([`Attack::same_owner`]).
     // A building's master type (`'P'`), whose main building (`+0xbb8`) an area effect attacks.

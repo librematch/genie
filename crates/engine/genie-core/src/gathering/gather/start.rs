@@ -1,7 +1,6 @@
 //! The Gather's constructor and start, its retarget, the walk, the drop and a move's target,
 //! the idle and the halt; a farm's stops and their productivity.
 
-use crate::GenieError;
 use crate::gathering::DropSiteId;
 use crate::gathering::FarmStops;
 use crate::gathering::StopIndex;
@@ -38,6 +37,7 @@ use crate::world::layer::generated::MoveToTuning;
 use crate::world::layer::generated::Tuning;
 use crate::world::settings::FarmMode;
 use crate::world::step::Step;
+use crate::{GenieError, GenieResult};
 
 /// What a gather's start takes besides its mover and stream ([`GatherAction::start`]'s
 /// arguments).
@@ -183,7 +183,7 @@ impl GatherAction {
         farm_mode: FarmMode,
         rate: StopRate,
         roles: &Roles,
-    ) -> Result<Self, GenieError> {
+    ) -> GenieResult<Self> {
         let farm = if roles.of_class(target.class).contains(ClassRoles::FARM)
             || roles
                 .of_master(target.master)
@@ -241,7 +241,7 @@ impl GatherAction {
         rng: &mut Well512,
         roles: &Roles,
         tuning: &Tuning,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let move_to_tuning = &tuning.move_to;
         let GatherStart {
             target,
@@ -323,7 +323,7 @@ impl GatherAction {
         rng: &mut Well512,
         roles: &Roles,
         tuning: &Tuning,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let move_to_tuning = &tuning.move_to;
         let GatherRetarget {
             target,
@@ -418,7 +418,7 @@ impl GatherAction {
         rng: &mut Well512,
         walks: &Walks<'_>,
         tuning: &Tuning,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let (gather_tuning, move_to_tuning) = (&tuning.gather, &tuning.move_to);
         let position = to.at;
         self.tear_down(Some(mover))?;
@@ -467,7 +467,7 @@ impl GatherAction {
         mover: &mut Mover,
         walks: &Walks<'_>,
         move_to_tuning: &MoveToTuning,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         self.tear_down(Some(mover))?;
         self.state = GatherState::Drop { move_to: None };
         self.current_stop = StopIndex::FIRST;
@@ -506,7 +506,7 @@ impl GatherAction {
         mover: &mut Mover,
         walks: &Walks<'_>,
         move_to_tuning: &MoveToTuning,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let held = walks.held.amount;
         match target.filter(|t| t.player == player && t.drop_site && Amount::ZERO < held) {
             Some(t)
@@ -541,7 +541,7 @@ impl GatherAction {
         mover: &mut Mover,
         walks: &Walks<'_>,
         move_to_tuning: &MoveToTuning,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         self.tear_down(Some(mover))?;
         self.state = GatherState::Moved { move_to: None };
         self.timer = Seconds::ZERO;
@@ -588,7 +588,7 @@ impl GatherAction {
         &mut self,
         mover: Option<&mut Mover>,
         stand: Stand<'_>,
-    ) -> Result<[Option<ObjectId>; 2], GenieError> {
+    ) -> GenieResult<[Option<ObjectId>; 2]> {
         let mut mover = mover;
         self.tear_down(mover.as_deref_mut())?;
         self.state = GatherState::Idle;

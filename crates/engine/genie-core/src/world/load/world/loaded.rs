@@ -1,7 +1,7 @@
 //! The world as a recording's header load leaves it ([`loaded_world`]): what the game's load
 //! builds that the save does not hold.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::map::Distance;
 use crate::map::Position;
 use crate::objects::masters::ActionKind;
@@ -26,7 +26,7 @@ pub fn loaded_world(
     header: &Header,
     masters: Option<&MasterTable>,
     build: &BuildLayer,
-) -> Result<World, GenieError> {
+) -> GenieResult<World> {
     let mut turns = saved_world(header, masters, build)?;
     if let Some(sight) = turns.spatial.sight.as_mut() {
         sight.registry = Some(Registry::new(header.players().len(), CLASSES));

@@ -16,7 +16,6 @@ use crate::players::Amount;
 use crate::world::Seconds;
 use std::collections::BTreeMap;
 
-use crate::GenieError;
 use crate::construction::FoundationId;
 use crate::construction::build::world_side::NOT_HELD;
 use crate::construction::build::{BuildAction, BuildReads, ClearLook, DROPPED_ORDERS};
@@ -39,6 +38,7 @@ use crate::world::layer::MasterRoles;
 use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
+use crate::{GenieError, GenieResult};
 
 impl Unit {
     /// The Build's update ([`BuildAction::update`]) with what it reads as it starts
@@ -49,7 +49,7 @@ impl Unit {
         actions: &mut Action,
         c: &mut Step<'_>,
         me: Me,
-    ) -> Result<HeadCode, GenieError> {
+    ) -> GenieResult<HeadCode> {
         let Some(mut build) = actions.list.build().copied() else {
             return Ok(HeadCode::Keeps);
         };
@@ -71,7 +71,7 @@ impl Unit {
         c: &Step<'_>,
         others: OthersRef<'_>,
         action: BuildAction,
-    ) -> Result<BTreeMap<ObjectId, ClearLook>, GenieError> {
+    ) -> GenieResult<BTreeMap<ObjectId, ClearLook>> {
         let mut looks = BTreeMap::new();
         if let Some(f) = Some(action)
             .filter(|b| matches!(b.state, BuildState::Work | BuildState::Wait))
@@ -110,11 +110,7 @@ impl Unit {
     }
 
     /// What the Build's update reads of the world as it starts ([`BuildReads`]).
-    pub(super) fn build_reads(
-        &self,
-        c: &Step<'_>,
-        action: BuildAction,
-    ) -> Result<BuildReads, GenieError> {
+    pub(super) fn build_reads(&self, c: &Step<'_>, action: BuildAction) -> GenieResult<BuildReads> {
         let others = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
         let target = action.target;
         let foundation = others.own(target);
@@ -166,7 +162,7 @@ impl Unit {
         c: &Step<'_>,
         others: OthersRef<'_>,
         site: Option<DropSiteId>,
-    ) -> Result<Option<(ObjectState, DropOff)>, GenieError> {
+    ) -> GenieResult<Option<(ObjectState, DropOff)>> {
         let Some(s) = c.w.spatial.get(site).filter(|_| site.is_some()) else {
             return Ok(None);
         };
@@ -240,8 +236,8 @@ impl BuildAction {
         c: &mut Step<'_>,
         builder: &mut Unit,
         actions: &mut Action,
-        f: impl FnOnce(&mut World, PlayerId, ListIndex) -> Result<R, GenieError>,
-    ) -> Result<R, GenieError> {
+        f: impl FnOnce(&mut World, PlayerId, ListIndex) -> GenieResult<R>,
+    ) -> GenieResult<R> {
         if let Some(b) = actions.list.build_mut() {
             *b = *self;
         }
@@ -267,7 +263,7 @@ impl BuildAction {
         builder: &mut Unit,
         actions: &mut Action,
         rate: Seconds,
-    ) -> Result<BuildProgress, GenieError> {
+    ) -> GenieResult<BuildProgress> {
         let target = self.target.ok_or(NOT_HELD)?;
         self.lend(c, builder, actions, |w, _, _| w.work_building(target, rate))
     }
@@ -275,7 +271,7 @@ impl BuildAction {
 
 /// `FUN_140fde180`: the foundation's master `built` is a drop site (the masters 562, 584, 621,
 /// 68, 1808, 50, 1187 and 199, or one the drop-site table has for every civ or the builder's).
-fn drop_site_master(c: &Step<'_>, built: Option<MasterId>) -> Result<bool, GenieError> {
+fn drop_site_master(c: &Step<'_>, built: Option<MasterId>) -> GenieResult<bool> {
     let Some(m) = built else {
         return Ok(false);
     };

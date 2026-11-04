@@ -1,7 +1,6 @@
 //! The unit's own Attack in its update: a lost target's end, and the strike with what
 //! follows.
 
-use crate::GenieError;
 use crate::combat::MissileCount;
 use crate::combat::attack::Armament;
 use crate::combat::attack::{Attack, AttackState};
@@ -26,6 +25,7 @@ use crate::world::WorldTime;
 use crate::world::layer::Roles;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
+use crate::{GenieError, GenieResult};
 
 impl Unit {
     /// The unit's own Attack in its update, `attack` the head's copy: after its target went
@@ -43,7 +43,7 @@ impl Unit {
         me: Me,
         own: Option<Victim>,
         roles: &Roles,
-    ) -> Result<HeadCode, GenieError> {
+    ) -> GenieResult<HeadCode> {
         if attack.target.is_some() {
             return self.attack_strike_part(attack, actions, c, me, own, roles);
         }
@@ -63,7 +63,7 @@ impl Unit {
         c: &mut Step<'_>,
         me: Me,
         roles: &Roles,
-    ) -> Result<HeadCode, GenieError> {
+    ) -> GenieResult<HeadCode> {
         let master = self.master(c.w.master_tables(), c.player)?;
         let armed = armed(
             master,
@@ -111,7 +111,7 @@ impl Unit {
         me: Me,
         master_class: ClassId,
         roles: &Roles,
-    ) -> Result<HeadCode, GenieError> {
+    ) -> GenieResult<HeadCode> {
         let master = self.master(c.w.master_tables(), c.player)?;
         let player_kind =
             c.w.players
@@ -146,7 +146,7 @@ impl Unit {
         me: Me,
         own: Option<Victim>,
         roles: &Roles,
-    ) -> Result<HeadCode, GenieError> {
+    ) -> GenieResult<HeadCode> {
         let master = object_master(
             c.w.parts.own_master.get(self.id),
             (self.id, self.life.master_id),
@@ -215,7 +215,7 @@ impl Unit {
         actions: &Action,
         c: &Step<'_>,
         roles: &Roles,
-    ) -> Result<Option<Victim>, GenieError> {
+    ) -> GenieResult<Option<Victim>> {
         if actions.list.hunt().is_none() && actions.list.attack().is_none() {
             return Ok(None);
         }

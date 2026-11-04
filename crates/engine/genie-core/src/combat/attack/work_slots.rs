@@ -1,7 +1,6 @@
 //! The swing's state (7), slot 9 (`RGE_Action_Attack::work`) and slot 0x68
 //! (`set_target_obj`).
 
-use crate::GenieError;
 use crate::combat::AttackTargetId;
 use crate::combat::attack::AttackState;
 use crate::combat::attack::{
@@ -23,6 +22,7 @@ use crate::objects::unit::Unit;
 use crate::world::Seconds;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
+use crate::{GenieError, GenieResult};
 
 /// An object as the Attack's slot 9 ([`Attack::work`]) and slot 0x68 ([`Attack::set_target`])
 /// read it.
@@ -89,7 +89,7 @@ impl Attack {
         g: &mut Ground<'_>,
         f: &Fight,
         r: &AttackReads,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let sprite_tuning = g.by_id.tuning().sprite;
         let roles = g.by_id.roles();
         self.enter(AttackState::Swing, g.motion.reborrow())?;
@@ -153,7 +153,7 @@ impl Attack {
     /// states 4 to 7 or 11 keeps it as it is. The rest of the slot (the main building of an area
     /// effect's building target, the range test, the new target) is [`Attack::work`]'s, which
     /// needs the unit's and the target's values.
-    pub fn keeps(&self, target: Option<ObjectId>) -> Result<bool, GenieError> {
+    pub fn keeps(&self, target: Option<ObjectId>) -> GenieResult<bool> {
         if target == self.target.map(AttackTargetId::id) && self.state.keeps_target() {
             return Ok(true);
         }

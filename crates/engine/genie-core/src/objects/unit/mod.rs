@@ -12,7 +12,6 @@ use crate::players::PlayerId;
 use crate::world::WorldTime;
 use genie_diff::Diff;
 
-use crate::GenieError;
 use crate::construction::FootprintWaits;
 use crate::gathering::{DropSiteId, PastureId};
 use crate::groups::GroupLink;
@@ -29,6 +28,7 @@ use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 use crate::world::layer::generated::VisibilityTuning;
 use crate::world::step::Step;
+use crate::{GenieError, GenieResult};
 
 mod death;
 mod default_task;
@@ -135,7 +135,7 @@ impl Unit {
         &self,
         tables: MasterTables<'a>,
         player: PlayerId,
-    ) -> Result<&'a Master, GenieError> {
+    ) -> GenieResult<&'a Master> {
         self.master_in(tables.of(player))
             .map_err(|e| e.with("player", player))
     }
@@ -146,10 +146,7 @@ impl Unit {
     /// # Errors
     ///
     /// No master of its own and none of its id in the owner's table.
-    pub(crate) fn master_in<'a>(
-        &self,
-        masters: OwnerMasters<'a>,
-    ) -> Result<&'a Master, GenieError> {
+    pub(crate) fn master_in<'a>(&self, masters: OwnerMasters<'a>) -> GenieResult<&'a Master> {
         object_master(
             masters.own.get(self.id),
             (self.id, self.life.master_id),
@@ -174,7 +171,7 @@ impl Unit {
         places: (&mut Spatial, Option<&mut Pathing>),
         roles: &Roles,
         visibility_tuning: VisibilityTuning,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         self.place
             .new_position(self.id, at, moving, places, roles, visibility_tuning)
     }
@@ -241,7 +238,7 @@ pub(crate) fn object_master<'a>(
     own: Option<&'a Master>,
     (id, master_id): (ObjectId, MasterId),
     table: Option<&'a Masters>,
-) -> Result<&'a Master, GenieError> {
+) -> GenieResult<&'a Master> {
     own.or_else(|| table?.get(master_id))
         .ok_or_else(|| OBJECT_MASTER.with("object", id).with("master", master_id))
 }

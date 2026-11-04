@@ -8,7 +8,6 @@
 //! slot 0x7e8 `FUN_141227190`): the unit takes the master and the task the task finder picks for
 //! the target ([`crate::unit_ai::task_finder`]), and the task's action replaces its action list.
 
-use crate::GenieError;
 use crate::combat::damage::ArmorPair;
 use crate::groups::GroupId;
 use crate::map::Distance;
@@ -45,6 +44,7 @@ use crate::world::World;
 use crate::world::WorldTime;
 use crate::world::index::Place;
 use crate::world::slots::PlayerSlots;
+use crate::{GenieError, GenieResult};
 
 mod actions;
 mod attack;
@@ -296,7 +296,7 @@ struct Followed {
 /// The splitter's path from one unit to another (`FUN_140f7cb30` -> `FUN_140f7c530`): the
 /// planner's result and the path's length; None without a planner for the restriction.
 type SplitPath<'a> =
-    dyn FnMut(&Splittable, &Splittable) -> Result<Option<(Found, Distance)>, GenieError> + 'a;
+    dyn FnMut(&Splittable, &Splittable) -> GenieResult<Option<(Found, Distance)>> + 'a;
 
 /// The action's point on neither axis (`DAT_14330ec20`).
 const NO_POINT: f32 = GARRISON_NO_POINT;
@@ -374,7 +374,7 @@ impl World {
     pub(crate) fn object_and_combat_mut(
         &mut self,
         id: impl ObjectKey,
-    ) -> Result<Option<(&mut Unit, &mut Combat)>, GenieError> {
+    ) -> GenieResult<Option<(&mut Unit, &mut Combat)>> {
         let Some(place) = self.place(id) else {
             return Ok(None);
         };
@@ -392,7 +392,7 @@ impl World {
     pub(crate) fn object_and_layer_mut(
         &mut self,
         id: impl ObjectKey,
-    ) -> Result<Option<(&mut Unit, &mut Building)>, GenieError> {
+    ) -> GenieResult<Option<(&mut Unit, &mut Building)>> {
         let Some(place) = self.place(id) else {
             return Ok(None);
         };
@@ -408,18 +408,14 @@ impl World {
     ///
     /// A player without a table or a table without the master ([`crate::world::OBJECT_MASTER`],
     /// with the player and the master).
-    pub(crate) fn master(&self, player: PlayerId, master: MasterId) -> Result<&Master, GenieError> {
+    pub(crate) fn master(&self, player: PlayerId, master: MasterId) -> GenieResult<&Master> {
         player_master(&self.model.masters, player, master)
             .ok_or_else(|| OBJECT_MASTER.with("player", player).with("master", master))
     }
 
     /// What the task finder reads of object `id`; an annex stands for its main building (`+0xbb8`),
     /// `steps` times.
-    pub(crate) fn task_target(
-        &self,
-        id: ObjectId,
-        steps: usize,
-    ) -> Result<TaskTarget<'_>, GenieError> {
+    pub(crate) fn task_target(&self, id: ObjectId, steps: usize) -> GenieResult<TaskTarget<'_>> {
         let mut id = id;
         for _ in 0..steps {
             match self
@@ -562,7 +558,7 @@ pub(crate) fn set_stance(
     side: &mut UnitView<'_, '_>,
     rng: &mut Well512,
     roles: &Roles,
-) -> Result<(), GenieError> {
+) -> GenieResult<()> {
     ai.stance = state;
     ai.state_position = place.0;
     if state == UnitStance::NoAttack
@@ -583,7 +579,7 @@ pub(crate) fn lock_gate(
     (mover, layer): (Option<&mut Mover>, &mut Building),
     locked: bool,
     now: WorldTime,
-) -> Result<(), GenieError> {
+) -> GenieResult<()> {
     let gate = layer.gate.as_mut().ok_or(GenieError::unsupported(
         "a GATE of a building without its gate state",
     ))?;
@@ -633,7 +629,7 @@ fn damage_share(
     hit_points: MasterHitPoints,
     class: ClassId,
     roles: &Roles,
-) -> Result<u8, GenieError> {
+) -> GenieResult<u8> {
     if roles.of_class(class).intersects(
         ClassRoles::OCEAN_FISH
             | ClassRoles::FORAGE_BUSH

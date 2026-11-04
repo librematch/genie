@@ -1,6 +1,5 @@
 //! The map as the placement test reads it from the world ([`WorldMap`]).
 
-use crate::GenieError;
 use crate::map::GridSize;
 use crate::map::TerrainFlags;
 use crate::map::TerrainId;
@@ -17,6 +16,7 @@ use crate::unit_ai::task_finder::allied as task_finder_allied;
 use crate::vision::{VisionBits, VisionMasks};
 use crate::world::World;
 use crate::world::slots::PlayerSlots;
+use crate::{GenieError, GenieResult};
 
 /// The map as the spawn's placement test reads it: the terrain, the players' sight and the
 /// objects with what their units and masters say.
@@ -55,7 +55,7 @@ impl WorldMap<'_> {
     /// # Errors
     ///
     /// A map without its terrain, or a tile off it.
-    pub(crate) fn terrain(&self, tile: Tile) -> Result<TerrainId, GenieError> {
+    pub(crate) fn terrain(&self, tile: Tile) -> GenieResult<TerrainId> {
         let t = self
             .turns
             .spatial
@@ -116,7 +116,7 @@ impl WorldMap<'_> {
     /// # Errors
     ///
     /// An object the slice does not update, or one without its master.
-    pub(crate) fn objects(&self, tile: Tile) -> Result<Vec<Near>, GenieError> {
+    pub(crate) fn objects(&self, tile: Tile) -> GenieResult<Vec<Near>> {
         let t = self.turns;
         t.spatial
             .objects_on(tile)

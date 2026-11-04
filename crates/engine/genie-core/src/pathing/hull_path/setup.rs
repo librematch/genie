@@ -9,7 +9,6 @@ use crate::pathing::hull_path::NO_AREA;
 use crate::players::PlayerId;
 use std::collections::BTreeSet;
 
-use crate::GenieError;
 use crate::map::TerrainMask;
 use crate::map::spatial::{RecordId, Spatial, tile_record_id};
 use crate::math::conversions::cvttss2si;
@@ -17,6 +16,7 @@ use crate::pathing::hull_path::{
     ClosedLists, HALF, HullPather, KeptHulls, Nodes, ONE, PATHS, Point, Waypoints,
 };
 use crate::world::index::ObjectsRef;
+use crate::{GenieError, GenieResult};
 
 /// A quick path without the map's terrain.
 pub(crate) const NO_TERRAIN: GenieError =
@@ -39,7 +39,7 @@ pub fn quick_reach(
     mask: TerrainMask,
     radius: Distance,
     range: Distance,
-) -> Result<bool, GenieError> {
+) -> GenieResult<bool> {
     let from = world
         .get(me)
         .ok_or(GenieError::unsupported(
@@ -77,7 +77,7 @@ pub fn quick_reach_from(
     mask: TerrainMask,
     radius: Distance,
     range: Distance,
-) -> Result<Option<Distance>, GenieError> {
+) -> GenieResult<Option<Distance>> {
     let Some(t) = world.get_known(target)? else {
         return Ok(None);
     };

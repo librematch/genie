@@ -1,6 +1,5 @@
 //! Each saved top action the slice imports, and the saved actions it refuses.
 
-use crate::GenieError;
 use crate::combat::attack::ATTACK;
 use crate::combat::missile::ShooterId;
 use crate::combat::missile::{HitMode, MISSILE, MissileState};
@@ -47,6 +46,7 @@ use crate::world::load::object::OTHER_SUB_ACTION;
 use crate::world::load::object::saved_missile;
 use crate::world::load::top_actions::saved_actions;
 use crate::world::load::top_actions::{saved_move_to, saved_sub_move_to};
+use crate::{GenieError, GenieResult};
 use genie_save::generated::world::{
     Action, PlayerObjects, RgeAction, RgeActionAttack, RgeActionByKind, RgeActionEnter,
     RgeActionGather, RgeActionMake, RgeActionMissile, RgeActionMoveTo, RgeMissileObject, RgeObject,
@@ -157,10 +157,7 @@ fn acting(kind: ActionKind, action: Action) -> genie_save::Object {
 
 /// `object`'s top action imported into an action layer: each task slot's task of range 2, the
 /// fly task 8, the build task 7 (range 1, work rate 2, moving sprite 9), no sprites' table.
-fn import(
-    object: &genie_save::Object,
-    objects: &PlayerObjects,
-) -> Result<layers::Action, GenieError> {
+fn import(object: &genie_save::Object, objects: &PlayerObjects) -> GenieResult<layers::Action> {
     import_drawn(object, objects, None)
 }
 
@@ -169,7 +166,7 @@ fn import_drawn(
     object: &genie_save::Object,
     objects: &PlayerObjects,
     graphics: Option<&Graphics>,
-) -> Result<layers::Action, GenieError> {
+) -> GenieResult<layers::Action> {
     let mut actions = layers::Action::default();
     let s = object.static_part().expect("a test object's static part");
     saved_actions(
@@ -195,7 +192,7 @@ fn import_drawn(
 }
 
 /// Unit 5's top action `action` of type `kind` imported, its player without masters.
-fn imported(kind: ActionKind, action: Action) -> Result<layers::Action, GenieError> {
+fn imported(kind: ActionKind, action: Action) -> GenieResult<layers::Action> {
     import(&acting(kind, action), &PlayerObjects::default())
 }
 

@@ -1,6 +1,6 @@
 //! A building's tile links (the map tile's `+0x19` bits) and its UMV extent entry.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::map::Footprint;
 use crate::map::Position;
 use crate::map::Tile;
@@ -178,7 +178,7 @@ impl Visibility {
     /// `FUN_140f73900`: a building's tiles, `x0`..=`x1` by `y0`..=`y1` (held on the map), link
     /// to its anchor (`ax`, `ay`), which takes the building's UMV entry. A building of one tile
     /// links nothing; nor does an anchor outside the rectangle. Returns the anchor's entry.
-    pub fn link_tiles(&mut self, anchor: Tile, rect: TileRect) -> Result<i32, GenieError> {
+    pub fn link_tiles(&mut self, anchor: Tile, rect: TileRect) -> GenieResult<i32> {
         let (ax, ay) = (anchor.x(), anchor.y());
         let (x0, y0, x1, y1) = (rect.x0(), rect.y0(), rect.x1(), rect.y1());
         if x0 == x1 && y0 == y1 {
@@ -218,7 +218,7 @@ impl Visibility {
     }
 
     /// `FUN_140f65580`: the rectangle's tiles lose their links.
-    pub fn unlink_tiles(&mut self, rect: TileRect) -> Result<(), GenieError> {
+    pub fn unlink_tiles(&mut self, rect: TileRect) -> GenieResult<()> {
         let (x0, y0, x1, y1) = (rect.x0(), rect.y0(), rect.x1(), rect.y1());
         if x0 == x1 && y0 == y1 {
             return Ok(());
@@ -266,7 +266,7 @@ impl Visibility {
         position: Position,
         radius: Footprint,
         visibility_tuning: VisibilityTuning,
-    ) -> Result<i32, GenieError> {
+    ) -> GenieResult<i32> {
         let (anchor, rect) = Self::footprint(position, radius, visibility_tuning);
         self.link_tiles(anchor, rect)
     }
@@ -289,7 +289,7 @@ impl Visibility {
         position: Position,
         radius: Footprint,
         visibility_tuning: VisibilityTuning,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let (_, rect) = Self::footprint(position, radius, visibility_tuning);
         self.unlink_tiles(rect)
     }

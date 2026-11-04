@@ -1,6 +1,6 @@
 //! RESIGN (0x0b): a player resigns or drops.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::players::PlayerId;
 use crate::world::World;
 
@@ -25,7 +25,7 @@ pub struct ResignCommand {
 
 impl ResignCommand {
     /// Its handler ([`World::resign`]).
-    pub(crate) fn run(self, w: &mut World) -> Result<(), GenieError> {
+    pub(crate) fn run(self, w: &mut World) -> GenieResult<()> {
         w.resign(self.player, self.departure)
     }
 }

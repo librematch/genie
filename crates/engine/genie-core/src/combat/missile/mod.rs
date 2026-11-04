@@ -8,7 +8,6 @@
 //! `0x140a9e6e0`, `set_state` slot 16 `0x140a9de70`); `RGE_Missile_Object` vtable `0x142f57fe8`
 //! (update `0x14113e520`).
 
-use crate::GenieError;
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::Point;
@@ -25,6 +24,7 @@ use crate::objects::masters::HitChance;
 use crate::objects::masters::MasterId;
 use crate::players::PlayerId;
 use crate::world::Seconds;
+use crate::{GenieError, GenieResult};
 use genie_diff::Diff;
 
 use genie_model::combat::missile::arc_ratio;
@@ -301,7 +301,7 @@ pub fn aim(
     draw: &mut dyn FnMut() -> u32,
     roles: &Roles,
     missile_tuning: &MissileTuning,
-) -> Result<Position, GenieError> {
+) -> GenieResult<Position> {
     let AimAt {
         point,
         from,
@@ -368,7 +368,7 @@ impl MissileAction {
         from: Position,
         aimed: Position,
         stats: &MissileStats,
-    ) -> Result<Option<Angle>, GenieError> {
+    ) -> GenieResult<Option<Angle>> {
         let dx = aimed.x() - from.x();
         let dy = aimed.y() - from.y();
         let dz = aimed.z() - from.z();
@@ -435,7 +435,7 @@ impl MissileAction {
         max_range: Distance,
         stats: &MissileStats,
         missile_tuning: &MissileTuning,
-    ) -> Result<(Offset, bool), GenieError> {
+    ) -> GenieResult<(Offset, bool)> {
         let mut step = match stats.projectile_kind {
             ProjectileKind::STRAIGHT => {
                 let way = stats.speed * dt;

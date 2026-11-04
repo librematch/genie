@@ -1,7 +1,7 @@
 //! The short pather's call ([`Call`], [`Query`]) and its state between searches
 //! ([`Pather`]): the terrain's shapes, the start test and the core.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::GridSize;
@@ -290,7 +290,7 @@ impl Pather {
         words: &dyn Fn(u32, u32) -> u64,
         q: &Query,
         ignore: &[ShapeId],
-    ) -> Result<ShortPath, GenieError> {
+    ) -> GenieResult<ShortPath> {
         if self.ignore.len() < mesh.shapes.len() {
             self.ignore.resize(mesh.shapes.len(), false);
         }
@@ -317,7 +317,7 @@ impl Pather {
         mesh: &mut Mesh,
         words: &dyn Fn(u32, u32) -> u64,
         q: &Query,
-    ) -> Result<bool, GenieError> {
+    ) -> GenieResult<bool> {
         let q = &q.fixed();
         if self.ignore.len() < mesh.shapes.len() {
             self.ignore.resize(mesh.shapes.len(), false);
@@ -378,7 +378,7 @@ impl Pather {
         mesh: &mut Mesh,
         words: &dyn Fn(u32, u32) -> u64,
         q: &Fixed,
-    ) -> Result<ShortPath, GenieError> {
+    ) -> GenieResult<ShortPath> {
         let r = q.radius.get();
         let d = 0x20_0000 - r;
         let w = mesh.width as i32;

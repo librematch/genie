@@ -3,7 +3,6 @@
 //! (state 3) and flies there with a `MoveTo` sub-action (state 4) until its flight time runs out or
 //! the `MoveTo` ends; then it rests for its task's wait time, or picks the next flight at once.
 
-use crate::GenieError;
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::GridSize;
@@ -25,6 +24,7 @@ use crate::objects::unit::Unit;
 use crate::players::PlayerId;
 use crate::world::Seconds;
 use crate::world::step::Step;
+use crate::{GenieError, GenieResult};
 use genie_diff::Diff;
 
 /// The Fly action's type, which word 9 adds.
@@ -119,12 +119,7 @@ impl Fly {
     /// # Errors
     ///
     /// A bird without movement state, and the states and tasks the slice does not model.
-    pub(crate) fn update(
-        &mut self,
-        c: &mut Step<'_>,
-        bird: &mut Unit,
-        me: Me,
-    ) -> Result<(), GenieError> {
+    pub(crate) fn update(&mut self, c: &mut Step<'_>, bird: &mut Unit, me: Me) -> GenieResult<()> {
         let _ = c.w.parts.mover_of(bird.id).ok_or(NO_MOVER)?;
         if Seconds::ZERO < self.timer {
             self.timer -= c.dt.seconds();
@@ -185,12 +180,7 @@ impl Fly {
 
     /// [`Fly::set_state`] of `bird`'s Fly with the step's Action stream; a dropped `MoveTo` stops
     /// the bird at once ([`stop_if`]).
-    fn set_state_of(
-        &mut self,
-        bird: &Unit,
-        state: FlyState,
-        c: &mut Step<'_>,
-    ) -> Result<(), GenieError> {
+    fn set_state_of(&mut self, bird: &Unit, state: FlyState, c: &mut Step<'_>) -> GenieResult<()> {
         let dropped = self.set_state(state, c.w.streams.get(Stream::Action));
         stop_if(c.w.parts.mover_mut(bird.id), dropped)
     }
@@ -212,7 +202,7 @@ impl Fly {
         map: GridSize,
         action: &mut Well512,
         sprites: &FlightSprites<'_>,
-    ) -> Result<MoveToDrop, GenieError> {
+    ) -> GenieResult<MoveToDrop> {
         let t = self.task;
         let (speed, position) = (mover.stats.speed, at);
         let radius = mover.stats.radius.ground();
@@ -296,7 +286,7 @@ impl Fly {
         t: Task,
         action: &mut Well512,
         sprites: &FlightSprites<'_>,
-    ) -> Result<Option<SpriteId>, GenieError> {
+    ) -> GenieResult<Option<SpriteId>> {
         let TaskSprites {
             moving,
             proceeding,
@@ -355,7 +345,7 @@ enum MoveToDrop {
 /// # Errors
 ///
 /// What the stop does not model.
-fn stop_if(mover: Option<&mut Mover>, dropped: MoveToDrop) -> Result<(), GenieError> {
+fn stop_if(mover: Option<&mut Mover>, dropped: MoveToDrop) -> GenieResult<()> {
     match mover {
         Some(mover) if dropped == MoveToDrop::Dropped => mover.stop(),
         _ => Ok(()),
@@ -371,7 +361,7 @@ impl Unit {
         actions: &mut Action,
         c: &mut Step<'_>,
         task: Task,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if c.player != PlayerId::GAIA {
             return Err(GenieError::unsupported(
                 "a player's bird's default Fly (its task's +0x15)",
@@ -391,7 +381,7 @@ impl Unit {
 
     /// The bird goes to the fly height on its tile (slot 0x58, the position setter), which marks
     /// the move (`+0x824`, `+0x870`).
-    fn lift_to_fly_height(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
+    fn lift_to_fly_height(&mut self, c: &mut Step<'_>) -> GenieResult<()> {
         let (x, y) = (self.position().x(), self.position().y());
         let at = Position::new(x, y, c.w.model.tuning.fly.height);
         let moving = MoveState::of_mover(c.w.parts.mover_of(self.id));
@@ -550,7 +540,7 @@ mod tests {
     }
 
     /// The hawk's update of 21 ms through its step: its Fly after it.
-    fn flown(t: &mut World) -> Result<Fly, GenieError> {
+    fn flown(t: &mut World) -> GenieResult<Fly> {
         let me = Me {
             human_order: WorldTime::ZERO,
             id: object_id(9925),

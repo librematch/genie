@@ -2,7 +2,6 @@
 //! ownership change, a takeover by sight, a unit's ownership change, and the scan for more
 //! livestock after a capture.
 
-use crate::GenieError;
 use crate::map::Position;
 use crate::map::Tile;
 use crate::math::fmath::below_or_unordered;
@@ -30,6 +29,7 @@ use crate::world::lets::{release, torn_down};
 use crate::world::others::OthersRef;
 use crate::world::parts::Part;
 use crate::world::step::Step;
+use crate::{GenieError, GenieResult};
 
 /// Whether a unit changed hands ([`Unit::change_owner`]).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -58,7 +58,7 @@ impl Unit {
         new: PlayerId,
         roles: &Roles,
         slots: Slots,
-    ) -> Result<(bool, Vec<ObjectId>), GenieError> {
+    ) -> GenieResult<(bool, Vec<ObjectId>)> {
         let class = self.placed_class(c)?;
         self.capture_stop(actions, c, class, roles)?;
         let changed = self.change_owner(actions, c, new, roles)? == OwnerChange::Changed;
@@ -76,7 +76,7 @@ impl Unit {
     }
 
     /// The master class the world files the captured object under.
-    pub(crate) fn placed_class(&self, c: &Step<'_>) -> Result<ClassId, GenieError> {
+    pub(crate) fn placed_class(&self, c: &Step<'_>) -> GenieResult<ClassId> {
         c.w.spatial
             .get(self.id)
             .map(|p| p.class)
@@ -103,7 +103,7 @@ impl Unit {
         c: &mut Step<'_>,
         class: ClassId,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let by = self.releaser(c)?;
         if let Some(artifact) = actions.list.artifact_mut() {
             let (gone, released) = artifact.stop();
@@ -176,7 +176,7 @@ impl Unit {
         new: PlayerId,
         c: &mut Step<'_>,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let changed = self.change_owner(actions, c, new, roles)? == OwnerChange::Changed;
         if changed || c.building_handover {
             c.taken_over = Some((new, changed));
@@ -195,7 +195,7 @@ impl Unit {
         c: &mut Step<'_>,
         new: PlayerId,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let master = self.master(c.w.master_tables(), c.player)?;
         if roles.of_class(master.class).contains(ClassRoles::SIEGE) && !self.garrison.is_empty() {
             return Err(HANDS_LEFT);
@@ -218,7 +218,7 @@ impl Unit {
         c: &mut Step<'_>,
         new: PlayerId,
         roles: &Roles,
-    ) -> Result<OwnerChange, GenieError> {
+    ) -> GenieResult<OwnerChange> {
         let master = self.master(c.w.master_tables(), c.player);
         if master.is_ok_and(|m| m.kind == MasterKind::BUILDING) {
             c.building_handover = true;
@@ -281,7 +281,7 @@ pub(crate) fn scan_livestock(
     taken: &mut Vec<ObjectId>,
     roles: &Roles,
     slots: Slots,
-) -> Result<(), GenieError> {
+) -> GenieResult<()> {
     let (tx, ty) = (at.x() as i32, at.y() as i32);
     let (w, h) = (c.w.spatial.map.width(), c.w.spatial.map.height());
     for x in (tx - 3).max(0)..=(tx + 3).min(w - 1) {
@@ -315,7 +315,7 @@ fn livestock_on(
     tile: Tile,
     taken: &[ObjectId],
     roles: &Roles,
-) -> Result<Vec<ObjectId>, GenieError> {
+) -> GenieResult<Vec<ObjectId>> {
     let (x, y) = (tile.x(), tile.y());
     Ok(OthersRef::of(&c.w.players, &c.w.index, c.player)?
         .own_iter()
@@ -343,7 +343,7 @@ fn take_livestock(
     new: PlayerId,
     slots: Slots,
     roles: &Roles,
-) -> Result<Option<Position>, GenieError> {
+) -> GenieResult<Option<Position>> {
     let mut unit =
         c.w.take_out_own(c.player, id)?
             .ok_or_else(|| object_gone(id))?;

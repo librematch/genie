@@ -7,7 +7,6 @@
 //! `FUN_1413d4a00`, the research test `FUN_1413cd600`, the payment `FUN_1413d4370` (from
 //! `FUN_14162fd90`), the repeat test `FUN_1413d1050`.
 
-use crate::GenieError;
 use crate::objects::masters::CostAmount;
 use crate::objects::masters::MasterId;
 use crate::players::Amount;
@@ -16,6 +15,7 @@ use crate::production::Payment;
 use crate::world::Seconds;
 use crate::world::player::Player;
 use crate::world::slots::CheckedIndex;
+use crate::{GenieError, GenieResult};
 
 use genie_model::technology::command_args;
 mod cost_override;
@@ -115,11 +115,7 @@ pub struct TechState {
 /// The two factors of a technology's costs: the research cost modifier (attribute 85, none
 /// for the age technologies), which scales the costs above 0, and the scale of the cost
 /// adjustments (1; attribute 38 for 0x2f3). Spies is not modelled.
-pub fn factors(
-    tech: TechId,
-    attributes: &dyn Attributes,
-    slots: Slots,
-) -> Result<(f32, i16), GenieError> {
+pub fn factors(tech: TechId, attributes: &dyn Attributes, slots: Slots) -> GenieResult<(f32, i16)> {
     if tech == SPIES {
         return Err(GenieError::unsupported("the cost of Spies (FUN_1413cbd80)"));
     }
@@ -169,7 +165,7 @@ impl TechState {
         &self,
         def: &TechDef,
         (modifier, scale): (f32, i16),
-    ) -> Result<[(Option<AttributeId>, Amount); 3], GenieError> {
+    ) -> GenieResult<[(Option<AttributeId>, Amount); 3]> {
         let mut out = [(None, Amount::ZERO); 3];
         if !matches!(
             self.state,
@@ -208,7 +204,7 @@ impl TechState {
         factors: (f32, i16),
         paid: &[(Option<AttributeId>, Amount); 3],
         attributes: &dyn Attributes,
-    ) -> Result<bool, GenieError> {
+    ) -> GenieResult<bool> {
         let (modifier, scale) = factors;
         for j in 0..3 {
             let o = *self.overrides.checked(j)?;
@@ -262,7 +258,7 @@ impl TechState {
         &self,
         def: &TechDef,
         (modifier, scale): (f32, i16),
-    ) -> Result<[(Option<AttributeId>, CostAmount); 3], GenieError> {
+    ) -> GenieResult<[(Option<AttributeId>, CostAmount); 3]> {
         let mut out = [(None, 0i16); 3];
         for (j, slot) in out.iter_mut().enumerate() {
             let o = *self.overrides.checked(j)?;
@@ -335,7 +331,7 @@ impl TechState {
         factors: (f32, i16),
         repeat: Repeat,
         attributes: &dyn Attributes,
-    ) -> Result<bool, GenieError> {
+    ) -> GenieResult<bool> {
         let shared = def.kind == TechKind::SHARED;
         if self.state != ResearchState::Available
             && (repeat == Repeat::Denied
@@ -376,7 +372,7 @@ impl TechState {
         building: MasterId,
         owner: &mut Player,
         slots: Slots,
-    ) -> Result<Payment, GenieError> {
+    ) -> GenieResult<Payment> {
         if !self.can_research(def, factors, repeat, &*owner)? {
             return Ok(Payment::Unpaid);
         }
@@ -455,13 +451,13 @@ pub trait Attributes {
     /// # Errors
     ///
     /// An attribute the player does not have.
-    fn get(&self, i: AttributeId) -> Result<Amount, GenieError>;
+    fn get(&self, i: AttributeId) -> GenieResult<Amount>;
     /// Attribute `i` less `amount` (a payment's `SUBSS`).
     ///
     /// # Errors
     ///
     /// An attribute the player does not have.
-    fn subtract(&mut self, i: AttributeId, amount: Amount) -> Result<(), GenieError>;
+    fn subtract(&mut self, i: AttributeId, amount: Amount) -> GenieResult<()>;
 }
 
 #[cfg(test)]

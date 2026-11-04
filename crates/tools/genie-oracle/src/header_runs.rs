@@ -297,10 +297,7 @@ pub fn blocks_per_tick(
 /// # Errors
 ///
 /// The build layer does not evaluate.
-pub fn slice_from_header(
-    header: &Header,
-    masters: Option<&MasterTable>,
-) -> Result<World, GenieError> {
+pub fn slice_from_header(header: &Header, masters: Option<&MasterTable>) -> GenieResult<World> {
     slice(header, masters)
 }
 

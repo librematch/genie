@@ -12,7 +12,6 @@
 //! are engine constants; the game stores them encoded (a class as its value − 0xeac, a master id as
 //! its id + 0x609c), the port compares the decoded values and names the encoded ones.
 
-use crate::GenieError;
 use crate::combat::attack::ATTACK;
 use crate::construction::repair::REPAIR;
 use crate::garrison::GarrisonSwitch;
@@ -38,6 +37,7 @@ use crate::players::PlayerId;
 use crate::players::attribute::AttributeId;
 use crate::players::{CivId, Relations};
 use crate::unit_ai::task_finder::target_steps::on_target;
+use crate::{GenieError, GenieResult};
 
 use genie_model::unit_ai::task_finder::drop_site;
 mod target_steps;
@@ -323,7 +323,7 @@ fn garrison_task<'m>(
     target: Option<&TaskTarget<'_>>,
     dip: &impl Diplomacy,
     roles: &Roles,
-) -> Result<Option<&'m Task>, GenieError> {
+) -> GenieResult<Option<&'m Task>> {
     let Some(t) = target else {
         return Ok(None);
     };
@@ -374,7 +374,7 @@ pub fn find_task<'m>(
     dip: &impl Diplomacy,
     slots: Slots,
     roles: &Roles,
-) -> Result<Option<&'m Task>, GenieError> {
+) -> GenieResult<Option<&'m Task>> {
     if let Finding::Answer(task) = finder_head(list, actor, on.target, filter, dip, roles)? {
         return Ok(task);
     }
@@ -406,7 +406,7 @@ fn finder_head<'m>(
     filter: Option<ActionKind>,
     dip: &impl Diplomacy,
     roles: &Roles,
-) -> Result<Finding<'m>, GenieError> {
+) -> GenieResult<Finding<'m>> {
     let own = actor.master;
     // the garrison filter (3): a building's garrison task; with none, a target whose master has
     // object flag 0 (a transport) goes on through the finder to its garrison into the target
@@ -489,7 +489,7 @@ fn finder_tail<'m>(
     dip: &impl Diplomacy,
     slots: Slots,
     roles: &Roles,
-) -> Result<Option<&'m Task>, GenieError> {
+) -> GenieResult<Option<&'m Task>> {
     let target = on.target;
     let own = actor.master;
     // the tail: conversions, task 0x84, healing, task 0x88, the siege and class-53 tasks
@@ -817,11 +817,7 @@ mod tests {
         assert!(!applies_to(&of(TargetOwner::OWN), &own, &itself));
     }
 
-    fn find<'m>(
-        list: &'m Master,
-        held: Held,
-        t: &TaskTarget<'_>,
-    ) -> Result<Option<&'m Task>, GenieError> {
+    fn find<'m>(list: &'m Master, held: Held, t: &TaskTarget<'_>) -> GenieResult<Option<&'m Task>> {
         let on = TaskOn {
             target: Some(t),
             general: Some(t),
@@ -1107,7 +1103,7 @@ mod tests {
         list: &'m Master,
         t: &TaskTarget<'_>,
         filter: Option<ActionKind>,
-    ) -> Result<Option<&'m Task>, GenieError> {
+    ) -> GenieResult<Option<&'m Task>> {
         let on = TaskOn {
             target: Some(t),
             general: Some(t),
@@ -1701,7 +1697,7 @@ mod tests {
             list: &'m Master,
             t: &TaskTarget<'_>,
             filter: Option<ActionKind>,
-        ) -> Result<Option<&'m Task>, GenieError> {
+        ) -> GenieResult<Option<&'m Task>> {
             let on = TaskOn {
                 target: Some(t),
                 general: Some(t),

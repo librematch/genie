@@ -11,7 +11,7 @@
 //! base one (`FUN_140a73fc0`), which lets no target go: the constructor leaves the base's target
 //! (`+0x20`, `+0x30`) unset and keeps the foundation's id at `+0x68` instead.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::construction::FoundationId;
 use crate::map::Position;
 use crate::objects::ObjectId;
@@ -99,7 +99,7 @@ impl UnitView<'_, '_> {
         target: ObjectId,
         slots: Slots,
         roles: &Roles,
-    ) -> Result<Answer, GenieError> {
+    ) -> GenieResult<Answer> {
         let unit = &*self.unit;
         let (player, others, foreign) = (
             self.player,

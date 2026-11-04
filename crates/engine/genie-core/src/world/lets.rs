@@ -8,7 +8,6 @@
 //! finds it: a call on it runs on the unit its caller holds (`me`), at once, its unit AI's
 //! notifies held while the AI's side runs ([`Step::side_notifies`]).
 
-use crate::GenieError;
 use crate::construction::MainBuildingId;
 use crate::objects::layers::{Building, Combat};
 use crate::objects::lines::UnitLines;
@@ -31,6 +30,7 @@ use crate::world::others::{Others, OthersRef};
 use crate::world::parts::{PartTable, repairers_in};
 use crate::world::step::Step;
 use crate::world::{Player, World};
+use crate::{GenieError, GenieResult};
 
 /// What the calls on the objects let go and taken reach besides the view: the updating player
 /// and its relations (whether a taker or releaser is allied), every player's masters and the
@@ -62,7 +62,7 @@ fn leave_site(
     buildings: &mut PartTable<Building>,
     combats: &mut PartTable<Combat>,
     site: ObjectId,
-) -> Result<(), GenieError> {
+) -> GenieResult<()> {
     let n = repairers_in(buildings, combats, site)?;
     *n = n.left();
     Ok(())
@@ -77,7 +77,7 @@ impl World {
         &mut self,
         player: PlayerId,
         f: impl FnOnce(&mut Lets<'_>, &mut Others<'_>) -> R,
-    ) -> Result<R, GenieError> {
+    ) -> GenieResult<R> {
         // no unit AI's side runs here: an updating unit holds its AI (one without has none to
         // tell), so nothing waits for a side's return
         self.with_lets_for(player, &mut Vec::new(), f)
@@ -90,7 +90,7 @@ impl World {
         player: PlayerId,
         own_notifies: &mut Vec<(Notify, ObjectState)>,
         f: impl FnOnce(&mut Lets<'_>, &mut Others<'_>) -> R,
-    ) -> Result<R, GenieError> {
+    ) -> GenieResult<R> {
         let no_player = || {
             GenieError::unreachable("lets for a player the world does not hold")
                 .with("player", player)
@@ -133,7 +133,7 @@ impl World {
 fn own_lets<R>(
     c: &mut Step<'_>,
     f: impl FnOnce(&mut Lets<'_>, &mut Others<'_>) -> R,
-) -> Result<R, GenieError> {
+) -> GenieResult<R> {
     match c.side_notifies.as_mut() {
         Some(own) => c.w.with_lets_for(c.player, own, f),
         None => c.w.with_lets(c.player, f),
@@ -153,7 +153,7 @@ pub(crate) fn take(
     id: impl ObjectKey,
     by: Releaser,
     roles: &Roles,
-) -> Result<(), GenieError> {
+) -> GenieResult<()> {
     let Some(id) = id.key() else {
         return Ok(());
     };
@@ -176,7 +176,7 @@ pub(crate) fn release(
     me: &mut Unit,
     id: impl ObjectKey,
     by: Releaser,
-) -> Result<(), GenieError> {
+) -> GenieResult<()> {
     let Some(id) = id.key() else {
         return Ok(());
     };
@@ -198,7 +198,7 @@ pub(crate) fn leave_builders(
     c: &mut Step<'_>,
     me: &mut Unit,
     id: impl ObjectKey,
-) -> Result<(), GenieError> {
+) -> GenieResult<()> {
     let Some(id) = id.key() else {
         return Ok(());
     };
@@ -217,7 +217,7 @@ pub(crate) fn torn_down(
     c: &mut Step<'_>,
     me: &mut Unit,
     (builder_leaves, releases): (Vec<ObjectId>, Vec<(ObjectId, Releaser)>),
-) -> Result<(), GenieError> {
+) -> GenieResult<()> {
     for id in builder_leaves {
         leave_builders(c, me, id)?;
     }
@@ -248,7 +248,7 @@ impl Lets<'_> {
         id: ObjectId,
         by: Releaser,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if let Some(u) = me.filter(|u| u.id == id) {
             let allied = self.allied(others.view(), by.player, self.player);
             self.taken_live(u, (self.player, allied), by)?;
@@ -278,7 +278,7 @@ impl Lets<'_> {
         u: &mut Unit,
         (p, allied): (PlayerId, bool),
         by: Releaser,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let listed = if u.lists_taker(u.master(self.masters, p)?, allied) {
             Some(self.buildings.get_or_insert_with(u.id, || Building::NONE)?)
         } else {
@@ -306,7 +306,7 @@ impl Lets<'_> {
         me: Option<&mut Unit>,
         id: ObjectId,
         by: Releaser,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if let Some(u) = me.filter(|u| u.id == id) {
             return self.release_own(others, u, by);
         }
@@ -341,12 +341,7 @@ impl Lets<'_> {
     /// # Errors
     ///
     /// An object of a master its owner lacks, and a notify its unit AI's queue does not take.
-    fn release_own(
-        &mut self,
-        others: &Others<'_>,
-        me: &mut Unit,
-        by: Releaser,
-    ) -> Result<(), GenieError> {
+    fn release_own(&mut self, others: &Others<'_>, me: &mut Unit, by: Releaser) -> GenieResult<()> {
         let owner = self.player;
         let allied = self.allied(others.view(), by.player, owner);
         let m = me.master(self.masters, owner)?;
@@ -378,7 +373,7 @@ impl Lets<'_> {
         others: &mut Others<'_>,
         me: Option<&mut Unit>,
         id: ObjectId,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let site = if let Some(u) = me.as_deref().filter(|u| u.id == id) {
             self.site_of(u, self.player, id)?
         } else {
@@ -396,7 +391,7 @@ impl Lets<'_> {
 
     /// The building whose builders object `f` (`id`, of player `p`) counts in: an annex's main
     /// building, else the object itself.
-    fn site_of(&self, f: &Unit, p: PlayerId, id: ObjectId) -> Result<ObjectId, GenieError> {
+    fn site_of(&self, f: &Unit, p: PlayerId, id: ObjectId) -> GenieResult<ObjectId> {
         // The building master type RESEARCH asks for (`'P'`, 80).
         Ok(if f.master(self.masters, p)?.kind == MasterKind::BUILDING {
             self.buildings

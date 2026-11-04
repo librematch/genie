@@ -1,6 +1,5 @@
 //! What a tick's update of one object reads and writes ([`Step`]) and its walks.
 
-use crate::GenieError;
 use crate::combat::damage::Victim;
 use crate::gathering::gather::unit::give_load as unit_give_load;
 use crate::math::rng::Well512;
@@ -27,6 +26,7 @@ use crate::world::WorldTime;
 use crate::world::index::ObjectsRef;
 use crate::world::parts::PartTable;
 use crate::world::slots::PlayerSlots;
+use crate::{GenieError, GenieResult};
 use genie_model::model::Model;
 use std::mem::{replace, take};
 
@@ -159,8 +159,8 @@ impl Step<'_> {
     pub(crate) fn lend<R>(
         &mut self,
         me: (&mut Unit, &mut Action),
-        f: impl FnOnce(&mut World) -> Result<R, GenieError>,
-    ) -> Result<R, GenieError> {
+        f: impl FnOnce(&mut World) -> GenieResult<R>,
+    ) -> GenieResult<R> {
         self.lend_to(me, |w, _| f(w))
     }
 
@@ -172,8 +172,8 @@ impl Step<'_> {
     fn lend_to<R>(
         &mut self,
         (me, actions): (&mut Unit, &mut Action),
-        f: impl FnOnce(&mut World, ListIndex) -> Result<R, GenieError>,
-    ) -> Result<R, GenieError> {
+        f: impl FnOnce(&mut World, ListIndex) -> GenieResult<R>,
+    ) -> GenieResult<R> {
         let p = self.player;
         // while the unit AI's side runs, its AI is out of the unit: a stand-in holds its place,
         // which no routine on the lent unit may reach
@@ -215,8 +215,8 @@ impl Step<'_> {
     pub(crate) fn lend_at<R>(
         &mut self,
         me: (&mut Unit, &mut Action),
-        f: impl FnOnce(&mut World, PlayerId, ListIndex) -> Result<R, GenieError>,
-    ) -> Result<R, GenieError> {
+        f: impl FnOnce(&mut World, PlayerId, ListIndex) -> GenieResult<R>,
+    ) -> GenieResult<R> {
         let p = self.player;
         self.lend_to(me, |w, i| f(w, p, i))
     }
@@ -228,7 +228,7 @@ impl Step<'_> {
     /// # Errors
     ///
     /// A notify the unit AI's queue does not take.
-    pub(crate) fn notify_own(&mut self, me: &Unit, n: Notify) -> Result<(), GenieError> {
+    pub(crate) fn notify_own(&mut self, me: &Unit, n: Notify) -> GenieResult<()> {
         let state = me.life.state;
         if let Some(ai) = self.w.parts.unit_ai.get_mut(me.id) {
             return ai.post(n, state);
@@ -247,11 +247,7 @@ impl Step<'_> {
     /// # Errors
     ///
     /// [`give_load`]'s, or an attribute the owner does not have.
-    pub(crate) fn give_load(
-        &mut self,
-        kind: AttributeId,
-        amount: Amount,
-    ) -> Result<(), GenieError> {
+    pub(crate) fn give_load(&mut self, kind: AttributeId, amount: Amount) -> GenieResult<()> {
         let mut adds = Vec::new();
         unit_give_load(
             (
@@ -277,7 +273,7 @@ impl Step<'_> {
     /// # Errors
     ///
     /// An updating player the world has not got.
-    pub(crate) fn pace(&self) -> Result<Pace, GenieError> {
+    pub(crate) fn pace(&self) -> GenieResult<Pace> {
         Ok(Pace {
             dt: self.dt.seconds(),
             now: self.w.world_time,
@@ -296,7 +292,7 @@ impl Step<'_> {
         &'b mut self,
         place: &'b mut Static,
         me: Me,
-    ) -> Result<(Walk<'b>, &'b mut Well512), GenieError> {
+    ) -> GenieResult<(Walk<'b>, &'b mut Well512)> {
         let player_kind = self.w.players.player(self.player)?.kind;
         let (object, sprite) = self.w.streams.object_and_sprite();
         let parts = &mut self.w.parts;

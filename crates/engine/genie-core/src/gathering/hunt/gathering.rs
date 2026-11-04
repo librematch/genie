@@ -1,6 +1,5 @@
 //! The walk to a dead target (state 4), the face (6) and the gathering (7).
 
-use crate::GenieError;
 use crate::combat::attack::Fight;
 use crate::combat::damage::Victim;
 use crate::gathering::gather::Walks;
@@ -29,6 +28,7 @@ use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
 use crate::world::layer::generated::SpriteTuning;
 use crate::world::step::Step;
+use crate::{GenieError, GenieResult};
 use genie_model::model::Model;
 use std::cmp::Ordering;
 
@@ -47,7 +47,7 @@ impl HuntAction {
         player: PlayerId,
         walks: &Walks<'_>,
         model: &Model,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let (roles, hunt_tuning, move_to_tuning) =
             (&model.roles, &model.tuning.hunt, &model.tuning.move_to);
         self.tear_down(motion.mover_mut())?;
@@ -105,7 +105,7 @@ impl HuntAction {
         f: &Fight,
         r: &HuntReads,
         roles: &Roles,
-    ) -> Result<HuntNext, GenieError> {
+    ) -> GenieResult<HuntNext> {
         // another player's target of class 49 (a farm's or a pasture's livestock): only a building
         // changes hands (FUN_141185360, FUN_1411858f0), any other ends the hunt (set_state 1);
         // the hunter's own goes on to its sprite
@@ -252,7 +252,7 @@ impl HuntAction {
         victim: &mut Victim,
         r: &HuntReads,
         roles: &Roles,
-    ) -> Result<HuntGather, GenieError> {
+    ) -> GenieResult<HuntGather> {
         let held = &mut unit.life.amount;
         let work = Amount::new((r.work_rate * self.task.work_value) * dt);
         let take = if work <= victim.amount {

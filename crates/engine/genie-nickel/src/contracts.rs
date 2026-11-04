@@ -4,7 +4,7 @@
 //! record of contracts, one per definition in name order, which a mod's values and an editor's
 //! language server check against. [`schema_hash`] keys the model cache by them (D18).
 
-use genie_error::GenieError;
+use genie_error::{GenieError, GenieResult};
 use schemars::Schema;
 use serde_json::Map;
 use serde_json::Value;
@@ -51,7 +51,7 @@ const KEYWORDS: [&str; 22] = [
 /// # Errors
 ///
 /// A [`GenieError`] for a schema shape the contracts have no form for.
-pub fn contracts(schema: &Schema) -> Result<String, GenieError> {
+pub fn contracts(schema: &Schema) -> GenieResult<String> {
     let root = schema
         .as_object()
         .ok_or_else(|| GenieError::invalid_input("a JSON Schema that is no object"))?;
@@ -98,7 +98,7 @@ pub enum Outcome {
 /// # Errors
 ///
 /// A [`GenieError`] when the file or its folder cannot be written.
-pub fn write_or_check(path: &Path, text: &str, check: bool) -> Result<Outcome, GenieError> {
+pub fn write_or_check(path: &Path, text: &str, check: bool) -> GenieResult<Outcome> {
     if check {
         let current = fs::read_to_string(path).ok().as_deref() == Some(text);
         return Ok(if current {
@@ -120,7 +120,7 @@ pub fn write_or_check(path: &Path, text: &str, check: bool) -> Result<Outcome, G
 }
 
 /// The contract of one schema, at `depth` levels of indentation.
-fn contract(schema: &Value, depth: usize) -> Result<String, GenieError> {
+fn contract(schema: &Value, depth: usize) -> GenieResult<String> {
     let Value::Object(object) = schema else {
         return match schema {
             Value::Bool(true) => Ok("Dyn".to_owned()),
@@ -153,7 +153,7 @@ fn contract(schema: &Value, depth: usize) -> Result<String, GenieError> {
 }
 
 /// The schema's type, the non-null one of a nullable type.
-fn kind(object: &Map<String, Value>) -> Result<&str, GenieError> {
+fn kind(object: &Map<String, Value>) -> GenieResult<&str> {
     match object.get("type") {
         Some(Value::String(kind)) => Ok(kind),
         Some(Value::Array(kinds)) => {
@@ -186,7 +186,7 @@ fn integer(object: &Map<String, Value>) -> String {
 }
 
 /// An array of its items' contract; a tuple's items are one array of any value.
-fn array(object: &Map<String, Value>, depth: usize) -> Result<String, GenieError> {
+fn array(object: &Map<String, Value>, depth: usize) -> GenieResult<String> {
     match object.get("items") {
         Some(items) => Ok(format!("Array ({})", contract(items, depth)?)),
         None => Ok("Array Dyn".to_owned()),
@@ -194,7 +194,7 @@ fn array(object: &Map<String, Value>, depth: usize) -> Result<String, GenieError
 }
 
 /// A record contract of the schema's properties, or a dictionary of its additional ones.
-fn record(object: &Map<String, Value>, depth: usize) -> Result<String, GenieError> {
+fn record(object: &Map<String, Value>, depth: usize) -> GenieResult<String> {
     let Some(Value::Object(properties)) = object.get("properties") else {
         return match object.get("additionalProperties") {
             Some(Value::Bool(false)) | None => Ok("{}".to_owned()),
@@ -228,7 +228,7 @@ fn record(object: &Map<String, Value>, depth: usize) -> Result<String, GenieErro
 /// The alternatives of a `oneOf` or `anyOf`: a nullable one is its non-null alternative, and an
 /// enum's variants (names, and single-property objects for variants that hold a value) are one
 /// enum contract.
-fn alternatives(variants: &[Value], depth: usize) -> Result<String, GenieError> {
+fn alternatives(variants: &[Value], depth: usize) -> GenieResult<String> {
     let present: Vec<&Value> = variants
         .iter()
         .filter(|v| v.get("type").and_then(Value::as_str) != Some("null"))
@@ -260,9 +260,7 @@ fn alternatives(variants: &[Value], depth: usize) -> Result<String, GenieError> 
 }
 
 /// An enum contract of tags, each with the contract of the value it holds, if any.
-fn tags<'a>(
-    names: impl Iterator<Item = (&'a Value, Option<String>)>,
-) -> Result<String, GenieError> {
+fn tags<'a>(names: impl Iterator<Item = (&'a Value, Option<String>)>) -> GenieResult<String> {
     let mut rows = Vec::new();
     for (name, payload) in names {
         let Value::String(name) = name else {

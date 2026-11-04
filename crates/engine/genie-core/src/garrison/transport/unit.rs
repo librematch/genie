@@ -1,6 +1,6 @@
 //! The unit's Transport: the action's update on the step and a sail to a point.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::combat::abilities::Look;
 use crate::garrison::transport::{MapShore, Ship, TransportAction, TransportReads};
 use crate::map::Position;
@@ -33,7 +33,7 @@ impl Unit {
         c: &mut Step<'_>,
         me: Me,
         roles: &Roles,
-    ) -> Result<HeadCode, GenieError> {
+    ) -> GenieResult<HeadCode> {
         let master = object_master(
             c.w.parts.own_master.get(self.id),
             (self.id, self.life.master_id),
@@ -74,7 +74,7 @@ impl Unit {
         (spatial, zones, pathing): (&Spatial, &mut Zones, &mut Pathing),
         model: &Model,
         (masters, look, sprite_rng): (OwnerMasters<'_>, Option<&Look>, &mut Well512),
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let master = self.master_in(masters)?;
         let ship = Ship::of_unit(
             (self, motion.mover()),

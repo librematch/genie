@@ -2,8 +2,8 @@
 //! slot 0x230) and the three orders set without a case, each by its name, and the fallible
 //! conversion from a raw value.
 
-use crate::GenieError;
 use crate::unit_ai::{AiAction, ai_kinds};
+use crate::{GenieError, GenieResult};
 use genie_diff::Diff;
 
 /// An order a unit AI holds: a case of its order handler (`FUN_140c5c170`, slot 0x230), named
@@ -151,7 +151,7 @@ impl OrderKind {
     /// # Errors
     ///
     /// A value no case of the order handler names.
-    pub fn of_field(value: i32) -> Result<Option<Self>, GenieError> {
+    pub fn of_field(value: i32) -> GenieResult<Option<Self>> {
         (value != -1).then(|| Self::try_from(value)).transpose()
     }
 
@@ -169,7 +169,7 @@ impl TryFrom<i32> for OrderKind {
     type Error = GenieError;
 
     /// The order of value `value`.
-    fn try_from(value: i32) -> Result<Self, GenieError> {
+    fn try_from(value: i32) -> GenieResult<Self> {
         Self::ALL
             .into_iter()
             .find(|o| o.value() == value)

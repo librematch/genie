@@ -1,7 +1,7 @@
 //! The Build's `MoveTo`s (`0x140aae200` cases 4, 8, 11 and 223) through [`MoveToReads`]: the one to
 //! its foundation, and the sub-action list's update.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::construction::FoundationId;
 use crate::construction::build::{BuildAction, BuildReads, BuildTask, SITE_GONE};
 use crate::movement::Me;
@@ -26,7 +26,7 @@ impl BuildTask {
         move_reads: &MoveToReads<'_>,
         to: Option<WalkTo>,
         move_to_tuning: &MoveToTuning,
-    ) -> Result<Option<MoveToAction>, GenieError> {
+    ) -> GenieResult<Option<MoveToAction>> {
         to.map_or_else(
             || move_reads.to_nothing(self.range, self.moving, move_to_tuning),
             |to| {
@@ -56,7 +56,7 @@ impl BuildAction {
         c: &Step<'_>,
         builder: &Unit,
         roles: &Roles,
-    ) -> Result<(Option<WalkTo>, Option<MoveToAction>), GenieError> {
+    ) -> GenieResult<(Option<WalkTo>, Option<MoveToAction>)> {
         let move_reads = builder.move_to_reads(
             c.w.parts.motion.mover(builder.id),
             MasterTables::new(&c.w.model.masters, &c.w.parts.own_master),
@@ -97,7 +97,7 @@ impl BuildAction {
         me: Me,
         reads: &BuildReads,
         roles: &Roles,
-    ) -> Result<SubCode, GenieError> {
+    ) -> GenieResult<SubCode> {
         let how = ListUpdate {
             gives_up: Self::gives_up(c, builder, reads, roles)?,
             ..ListUpdate::default()

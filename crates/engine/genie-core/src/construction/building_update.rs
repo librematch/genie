@@ -1,7 +1,6 @@
 //! A gate's and a farm's update, a building's completion and seconds, the idle swap and the
 //! death blast.
 
-use crate::GenieError;
 use crate::combat::damage::HitLayer;
 use crate::combat::damage::Victim;
 use crate::combat::damage::blast;
@@ -46,6 +45,7 @@ use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
 use crate::world::{BUILDING_TERRAIN, GATE_CLOSE_DELAY, GATE_EPSILON};
+use crate::{GenieError, GenieResult};
 use std::mem::take;
 
 /// `TRIBE_Building_Object::update`'s walls' branch (`0x1411c9000`): a master of class 27 (a
@@ -67,11 +67,7 @@ impl Unit {
     /// # Errors
     ///
     /// A link to an object the world does not file.
-    pub(crate) fn let_removed_links_go(
-        &self,
-        c: &mut Step<'_>,
-        roles: &Roles,
-    ) -> Result<(), GenieError> {
+    pub(crate) fn let_removed_links_go(&self, c: &mut Step<'_>, roles: &Roles) -> GenieResult<()> {
         let master = self.master(c.w.master_tables(), c.player)?;
         if master.kind != MasterKind::BUILDING || walls_branch(master, roles) {
             return Ok(());
@@ -113,7 +109,7 @@ impl Unit {
         actions: &mut Action,
         c: &mut Step<'_>,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let master = self.master(c.w.master_tables(), c.player)?;
         let transforms = master
             .building
@@ -181,7 +177,7 @@ impl Unit {
         actions: &mut Action,
         c: &mut Step<'_>,
         toggles: bool,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if !toggles {
             return Ok(());
         }
@@ -202,7 +198,7 @@ impl Unit {
         annexes: Annexes,
         spatial: &mut Spatial,
         by_id: ObjectsRef<'_>,
-    ) -> Result<(usize, usize), GenieError> {
+    ) -> GenieResult<(usize, usize)> {
         let annexes: Vec<ObjectId> = annexes.ids().collect();
         let (units, allied) = gate_units(spatial, self.id, &annexes, by_id)?;
         Ok((units.len(), allied))
@@ -217,7 +213,7 @@ impl Unit {
     /// `FUN_1411ce250` maps the terrains 8, 27 and 64 by the local player's view and the tile's
     /// own (`+0x2e8`'s `+10`), which the slice does not hold; the masters' foundations (7, 63,
     /// 117) never give them.
-    pub(crate) fn farm_stage(&self, c: &mut Step<'_>, roles: &Roles) -> Result<(), GenieError> {
+    pub(crate) fn farm_stage(&self, c: &mut Step<'_>, roles: &Roles) -> GenieResult<()> {
         let Some(cons) = c.w.parts.building_of(self.id).construction.filter(|k| {
             self.life.state == ObjectState::Foundation && WholeSeconds::ZERO < k.build_time
         }) else {
@@ -276,7 +272,7 @@ impl Unit {
         actions: &mut Action,
         c: &mut Step<'_>,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         self.farm_stage(c, roles)?;
         let due = self.life.state == ObjectState::Foundation
             && c.w
@@ -308,11 +304,7 @@ impl Unit {
     /// master's hit points (slot 0x110, [`Unit::heal`]); with villagers inside, a damaged
     /// building with a `garrison_repair_rate` repairs itself at a cost (`FUN_1411d33e0`, not
     /// modelled). Its `damaged_lately_timer` (`+0x30d`) loses one when whole seconds passed.
-    pub(crate) fn building_seconds(
-        &mut self,
-        c: &mut Step<'_>,
-        roles: &Roles,
-    ) -> Result<(), GenieError> {
+    pub(crate) fn building_seconds(&mut self, c: &mut Step<'_>, roles: &Roles) -> GenieResult<()> {
         if self.life.state != ObjectState::Alive {
             return Ok(());
         }
@@ -495,7 +487,7 @@ impl Unit {
         actions: &mut Action,
         c: &mut Step<'_>,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let master = self.master(c.w.master_tables(), c.player)?;
         if !blasts_at_death(master, &self.life, roles, &c.w.model.tuning.turn) {
             return Ok(());

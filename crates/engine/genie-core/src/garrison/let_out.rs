@@ -1,7 +1,6 @@
 //! A unit's leave of the building or the transport it is inside (`FUN_1411e7220`), or its
 //! place on the map.
 
-use crate::GenieError;
 use crate::combat::Firepower;
 use crate::commands::GatherPoint;
 use crate::commands::GatherPointState;
@@ -33,11 +32,12 @@ use crate::world::World;
 use crate::world::index::Place;
 use crate::world::layer::ClassRoles;
 use crate::world::slots::PlayerSlots;
+use crate::{GenieError, GenieResult};
 
 impl World {
     /// The player and live index of the unit `id` inside a building or a transport, whoever's
     /// it is.
-    pub(crate) fn live_inside(&self, id: ObjectId) -> Result<(PlayerId, ListIndex), GenieError> {
+    pub(crate) fn live_inside(&self, id: ObjectId) -> GenieResult<(PlayerId, ListIndex)> {
         match self.place(id) {
             Some(Place::Live(p, i)) => Ok((p, i)),
             _ => Err(GenieError::unsupported(
@@ -74,7 +74,7 @@ impl World {
         id: ObjectId,
         point: Point,
         (work_on, _sound): (Option<ObjectId>, bool),
-    ) -> Result<LetOut, GenieError> {
+    ) -> GenieResult<LetOut> {
         let b = self.players.live(player, building)?;
         let bid = b.id;
         let bm = b.master(self.master_tables(), player)?.clone();
@@ -170,7 +170,7 @@ impl World {
         (up, ui): (PlayerId, ListIndex),
         made: &Master,
         at: Position,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let b = self.players.live(player, container)?;
         let (bid, id) = (b.id, self.players.live(up, ui)?.id);
         let bm = b.master(self.master_tables(), player)?.clone();
@@ -262,7 +262,7 @@ impl World {
         (up, ui): (PlayerId, ListIndex),
         made: &Master,
         bm: &Master,
-    ) -> Result<Option<Firepower>, GenieError> {
+    ) -> GenieResult<Option<Firepower>> {
         if made.kind != MasterKind::COMBAT {
             return Ok(None);
         }
@@ -300,7 +300,7 @@ impl World {
         ui: ListIndex,
         class: ClassId,
         (point, gather, bid, work_on): (Point, Option<GatherPoint>, ObjectId, Option<ObjectId>),
-    ) -> Result<LetOut, GenieError> {
+    ) -> GenieResult<LetOut> {
         // an object to work on (GO_BACK_TO_WORK's): slot 0x128 on it at the point, the unit's
         // `+0xa14` 0 (its unit AI keeps its notifies)
         if let Some(target) = work_on {
@@ -371,7 +371,7 @@ impl World {
         ui: ListIndex,
         (made, at): (&Master, Position),
         rest: (Point, Option<GatherPoint>, ObjectId, Option<ObjectId>),
-    ) -> Result<LetOut, GenieError> {
+    ) -> GenieResult<LetOut> {
         let id = self.players.live(up, ui)?.id;
         let mut placed = *self
             .spatial

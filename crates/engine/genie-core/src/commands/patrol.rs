@@ -1,11 +1,11 @@
 //! PATROL (0x15): the player's units patrol through waypoints.
 
-use crate::GenieError;
 use crate::commands::UnitList;
 use crate::map::Point;
 use crate::orders::SavedPatrols;
 use crate::players::PlayerId;
 use crate::world::World;
+use crate::{GenieError, GenieResult};
 
 /// The waypoints of PATROL and `ATTACK_MOVE`: their count (`+0xb`) and the packet's ten slots
 /// (x from `+0xc`, y from `+0x34`; the slots past the count are 0 in every recording).
@@ -23,7 +23,7 @@ impl Waypoints {
     /// # Errors
     ///
     /// More than ten points.
-    pub fn of(points: &[Point]) -> Result<Self, GenieError> {
+    pub fn of(points: &[Point]) -> GenieResult<Self> {
         let mut slots = [Point::default(); 10];
         let too_many =
             || GenieError::invalid_input("more than ten waypoints").with("count", points.len());
@@ -69,7 +69,7 @@ impl PatrolCommand {
     /// The check (`FUN_140e55590`) refuses a count past the packet's ids; the handler reads the
     /// first of them ([`World::read_units`]) and does nothing without 1 to 10 waypoints
     /// ([`Waypoints::used`], [`World::patrol`]).
-    pub(crate) fn run(&self, w: &mut World) -> Result<(), GenieError> {
+    pub(crate) fn run(&self, w: &mut World) -> GenieResult<()> {
         let Some(ids) = w.read_units(self.player, &self.units) else {
             return Ok(());
         };

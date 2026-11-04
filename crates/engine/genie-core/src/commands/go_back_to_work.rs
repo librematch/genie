@@ -1,7 +1,7 @@
 //! `GO_BACK_TO_WORK` (0x80) and `GO_BACK_TO_WORK2` (0x86): the player's buildings let their
 //! villagers back out.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::commands::UnitList;
 use crate::objects::ObjectId;
 use crate::players::PlayerId;
@@ -20,7 +20,7 @@ pub struct GoBackToWorkCommand {
 impl GoBackToWorkCommand {
     /// `do_command`'s check leaves only the player's own building (or any with the setting
     /// `+0x1074`); the handler (`FUN_141625590`) runs on it ([`World::go_back_to_work`]).
-    pub(crate) fn run(self, w: &mut World) -> Result<(), GenieError> {
+    pub(crate) fn run(self, w: &mut World) -> GenieResult<()> {
         if w.players.get(self.player.index()).is_none() {
             return Ok(());
         }
@@ -41,7 +41,7 @@ pub struct GoBackToWork2Command {
 impl GoBackToWork2Command {
     /// `do_command`'s check refuses a count past the packet's ids; the handler reads the first
     /// of them ([`World::read_units`], [`World::go_back_to_work`]).
-    pub(crate) fn run(&self, w: &mut World) -> Result<(), GenieError> {
+    pub(crate) fn run(&self, w: &mut World) -> GenieResult<()> {
         let Some(ids) = w.read_units(self.player, &self.units) else {
             return Ok(());
         };

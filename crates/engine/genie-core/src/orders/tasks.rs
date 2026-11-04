@@ -1,6 +1,5 @@
 //! The hunt and gather commands, a build's and a repair's start, retake and target.
 
-use crate::GenieError;
 use crate::construction::MainBuildingId;
 use crate::construction::build::{BuildAction, BuildTask};
 use crate::construction::repair::RepairState;
@@ -30,6 +29,7 @@ use crate::world::World;
 use crate::world::index::Place;
 use crate::world::layer::ClassRoles;
 use crate::world::slots::PlayerSlots;
+use crate::{GenieError, GenieResult};
 
 /// A Repair's target the world does not hold where the work command starts or retargets it.
 const REPAIR_TARGET_GONE: GenieError =
@@ -49,7 +49,7 @@ impl World {
         player: PlayerId,
         idx: ListIndex,
         target: ObjectId,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let (_, t) = self.object(target).ok_or(HUNT_TARGET_GONE)?;
         let point = t.position();
         let task = self
@@ -89,7 +89,7 @@ impl World {
         player: PlayerId,
         idx: ListIndex,
         target: ObjectId,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if self.object(target).is_none() {
             return Err(GenieError::unsupported(
                 "a gather command on an object the world does not hold",
@@ -129,7 +129,7 @@ impl World {
         task: &Task,
         point: Position,
         notifies: Notifies,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let (tp, t) = self.object(target).ok_or(GenieError::unsupported(
             "a Build's foundation the slice does not hold",
         ))?;
@@ -192,7 +192,7 @@ impl World {
         idx: ListIndex,
         target: ObjectId,
         task: &Task,
-    ) -> Result<(RepairAction, ClassId), GenieError> {
+    ) -> GenieResult<(RepairAction, ClassId)> {
         let (tp, t) = self.object(target).ok_or(REPAIR_TARGET_GONE)?;
         let tm = t.master(self.master_tables(), tp)?;
         if self
@@ -240,7 +240,7 @@ impl World {
         task: &Task,
         point: Position,
         notifies: Notifies,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         // the task finder found the task on the target, which the world holds
         let (repair, class) = self.new_repair(player, idx, target, task)?;
         let unit = self.players.live_mut(player, idx)?;
@@ -280,7 +280,7 @@ impl World {
         player: PlayerId,
         idx: ListIndex,
         order: RepairOrder,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         match order {
             RepairOrder::Retake { target, repair } => {
                 self.repair_retarget((player, idx), repair, target)
@@ -315,7 +315,7 @@ impl World {
         (player, idx): (PlayerId, ListIndex),
         repair: RepairAction,
         (target, point, notifies): (ObjectId, Position, Notifies),
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let class = self.repair_retarget((player, idx), repair, target)?;
         let unit = self.players.live_mut(player, idx)?;
         if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
@@ -349,7 +349,7 @@ impl World {
         (player, idx): (PlayerId, ListIndex),
         repair: RepairAction,
         target: ObjectId,
-    ) -> Result<ClassId, GenieError> {
+    ) -> GenieResult<ClassId> {
         let (tp, t) = self.object(target).ok_or(REPAIR_TARGET_GONE)?;
         let tm = t.master(self.master_tables(), tp)?;
         let (class, ship) = (
@@ -433,7 +433,7 @@ impl World {
         (player, idx): (PlayerId, ListIndex),
         build: BuildAction,
         (target, point, notifies): (ObjectId, Position, Notifies),
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let class = self.build_take((player, idx), build, target)?;
         let unit = self.players.live_mut(player, idx)?;
         if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
@@ -458,7 +458,7 @@ impl World {
         (player, idx): (PlayerId, ListIndex),
         old: BuildAction,
         target: ObjectId,
-    ) -> Result<ClassId, GenieError> {
+    ) -> GenieResult<ClassId> {
         let (tp, t) = self.object(target).ok_or(GenieError::unsupported(
             "a Build's foundation the slice does not hold",
         ))?;
@@ -552,7 +552,7 @@ impl World {
         idx: ListIndex,
         (old, added): (Option<FoundationId>, bool),
         new: FoundationId,
-    ) -> Result<Option<FoundationId>, GenieError> {
+    ) -> GenieResult<Option<FoundationId>> {
         let leaves = old != Some(new) && added;
         if leaves {
             self.leave_builders(old)?;
@@ -581,10 +581,7 @@ impl World {
     /// `FUN_140aaddb0`: the building a Build on `id` counts its builder in, when the world holds
     /// `id` (live or sleeping, `FUN_1415417a0`): the object itself, or for a building (type 80)
     /// that is an annex (`+0xbb8`) its main building.
-    pub(crate) fn counted_building(
-        &self,
-        id: impl ObjectKey,
-    ) -> Result<Option<ObjectId>, GenieError> {
+    pub(crate) fn counted_building(&self, id: impl ObjectKey) -> GenieResult<Option<ObjectId>> {
         let Some((id, (p, f))) = id.key().and_then(|id| Some((id, self.object(id)?))) else {
             return Ok(None);
         };
@@ -604,7 +601,7 @@ impl World {
     /// `FUN_140ad9050`) counts one less (`+0x9e8`: a building's in its construction record, a
     /// unit's its own); none once the world no longer holds `id`. Outside an update
     /// ([`crate::world::lets::Lets::leave_builders`] on the whole world).
-    pub(crate) fn leave_builders(&mut self, id: impl ObjectKey) -> Result<(), GenieError> {
+    pub(crate) fn leave_builders(&mut self, id: impl ObjectKey) -> GenieResult<()> {
         let Some(id) = id.key() else {
             return Ok(());
         };

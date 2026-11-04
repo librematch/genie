@@ -1,6 +1,5 @@
 //! A building's test whether it takes a unit in (`FUN_14120eb10`), its room and what it holds.
 
-use crate::GenieError;
 use crate::garrison::ContainerId;
 use crate::garrison::InsideCount;
 use crate::garrison::{CLASS_FLAGS, ClassFlags};
@@ -25,6 +24,7 @@ use crate::world::World;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
+use crate::{GenieError, GenieResult};
 
 /// `FUN_1411205e0`: whether a master's class (`+0x410`, the short `MOVSX` widens) has one of
 /// `flags` in the class-flags table: a class below 0 or not below the table's count
@@ -156,7 +156,7 @@ impl World {
         bp: PlayerId,
         b: &Unit,
         unit: Option<ObjectId>,
-    ) -> Result<bool, GenieError> {
+    ) -> GenieResult<bool> {
         let capacity = b.master(self.master_tables(), bp)?.garrison;
         let with = match unit {
             Some(u) => self.garrisoned(u)?.plus(InsideCount::ONE),
@@ -173,7 +173,7 @@ impl World {
         building: ContainerId,
         player: PlayerId,
         master: Option<MasterId>,
-    ) -> Result<bool, GenieError> {
+    ) -> GenieResult<bool> {
         self.takes_in_as(building, player, master, true, true)
     }
 
@@ -196,7 +196,7 @@ impl World {
         master: Option<MasterId>,
         others: bool,
         unchecked: bool,
-    ) -> Result<bool, GenieError> {
+    ) -> GenieResult<bool> {
         let Some(unit) =
             master.and_then(|master| player_master(&self.model.masters, player, master))
         else {
@@ -273,7 +273,7 @@ impl World {
     /// running `raider_build_countdown` (`+0x9a0`, `FUN_1411cb850`/`FUN_1411d6ad0`). Not
     /// modelled: an object inside that holds others (the slice reads no `+0x9a8`) and, in a
     /// building, a unit with its countdown set (`+0xc2c`, which the slice does not keep).
-    pub(crate) fn garrisoned(&self, building: ObjectId) -> Result<InsideCount, GenieError> {
+    pub(crate) fn garrisoned(&self, building: ObjectId) -> GenieResult<InsideCount> {
         let holds = |id: ObjectId| {
             self.players.iter().any(|q| {
                 q.objects

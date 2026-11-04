@@ -1,6 +1,6 @@
 //! `AUTO_SCOUT` (0x26): the player's units scout by themselves.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::commands::UnitList;
 use crate::players::PlayerId;
 use crate::world::World;
@@ -19,7 +19,7 @@ pub struct AutoScoutCommand {
 impl AutoScoutCommand {
     /// The check (`FUN_140e54790`) refuses a count past the packet's ids; the handler reads
     /// the first of them ([`World::read_units`], [`World::auto_scout`]).
-    pub(crate) fn run(&self, w: &mut World) -> Result<(), GenieError> {
+    pub(crate) fn run(&self, w: &mut World) -> GenieResult<()> {
         let Some(ids) = w.read_units(self.player, &self.units) else {
             return Ok(());
         };

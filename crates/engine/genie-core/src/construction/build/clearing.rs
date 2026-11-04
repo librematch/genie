@@ -15,7 +15,7 @@ use crate::objects::masters::MasterKind;
 use crate::players::PlayerId;
 use std::collections::BTreeMap;
 
-use crate::GenieError;
+use crate::{GenieError, GenieResult};
 
 use crate::map::spatial::Placed;
 use crate::map::spatial::Spatial;
@@ -114,7 +114,7 @@ pub(crate) fn footprint_clearing(
     looks: &BTreeMap<ObjectId, ClearLook>,
     roles: &Roles,
     build_tuning: &BuildTuning,
-) -> Result<Vec<Cleared>, GenieError> {
+) -> GenieResult<Vec<Cleared>> {
     use crate::math::fmath::below_or_unordered;
     let (rx, ry) = (site.radius.x(), site.radius.y());
     if !below_or_unordered(0.0, rx) && !below_or_unordered(0.0, ry) {
@@ -209,7 +209,7 @@ pub(super) fn clearing_takes(
     looks: &BTreeMap<ObjectId, ClearLook>,
     roles: &Roles,
     build_tuning: &BuildTuning,
-) -> Result<Option<Cleared>, GenieError> {
+) -> GenieResult<Option<Cleared>> {
     use crate::math::fmath::below_or_unordered;
     if o.master == site.master {
         return Ok(None);

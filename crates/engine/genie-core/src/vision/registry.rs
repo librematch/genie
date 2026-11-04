@@ -7,7 +7,6 @@
 //! (`load_oracle/probes/registry.py`). A list's order is its history's: records join at its end and
 //! leave by a swap with its last.
 
-use crate::GenieError;
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::Point;
@@ -22,6 +21,7 @@ use crate::players::UnitRelations;
 use crate::vision::VisionBits;
 use crate::world::layer::generated::RegistryTuning;
 use crate::world::slots::CheckedIndex;
+use crate::{GenieError, GenieResult};
 
 /// The players a mask has room for in `Update_Unit_Info`'s loop: the object's record pointers
 /// (`+0x8b0`) are nine.
@@ -136,7 +136,7 @@ impl Registry {
     /// `Update_Unit_Info` (`FUN_14128a1d0`): for each player whose bit (of the low 16) differs
     /// between `old` and `new`, the object joins the end of that player's list of its class, or
     /// leaves it (the list's last record takes its place).
-    pub fn update_unit(&mut self, unit: UnitUpdate) -> Result<(), GenieError> {
+    pub fn update_unit(&mut self, unit: UnitUpdate) -> GenieResult<()> {
         let UnitUpdate {
             id,
             owner,
@@ -210,7 +210,7 @@ impl Registry {
     }
 
     /// An ownership change (`FUN_14120f800`): the object's records take the new owner's id.
-    pub fn owner_changed(&mut self, id: ObjectId, owner: PlayerId) -> Result<(), GenieError> {
+    pub fn owner_changed(&mut self, id: ObjectId, owner: PlayerId) -> GenieResult<()> {
         let Some(e) = self.entries.get(id).copied() else {
             return Ok(());
         };
@@ -256,7 +256,7 @@ impl Registry {
         &self,
         query: VisibleQuery<'_>,
         registry_tuning: RegistryTuning,
-    ) -> Result<Option<ByRelation<Vec<Record>>>, GenieError> {
+    ) -> GenieResult<Option<ByRelation<Vec<Record>>>> {
         let VisibleQuery {
             player,
             position,

@@ -1,7 +1,7 @@
 //! What the task finder reads of the world: the relations, the drop sites, a wait's progress,
 //! a target's state and the search of slot 0x820.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::construction::FoundationId;
 use crate::map::Position;
 use crate::map::TerrainId;
@@ -122,7 +122,7 @@ pub(crate) fn task_target_with<'a>(
     find: &impl Fn(ObjectId) -> Option<(PlayerId, &'a Unit)>,
     parts: &Parts,
     every: MasterTables<'a>,
-) -> Result<Option<TaskTarget<'a>>, GenieError> {
+) -> GenieResult<Option<TaskTarget<'a>>> {
     let mut id = id;
     for _ in 0..steps {
         match find(id).and_then(|(_, u)| parts.building_of(u.id).annex_of) {
@@ -167,7 +167,7 @@ pub(crate) fn task_search<'m>(
     dip: &impl Diplomacy,
     slots: Slots,
     roles: &Roles,
-) -> Result<Option<(Task, Option<&'m Master>)>, GenieError> {
+) -> GenieResult<Option<(Task, Option<&'m Master>)>> {
     let own = actor.master;
     let find = |list: &Master, filter: Option<ActionKind>| {
         find_task(list, actor, on, filter, dip, slots, roles).map(Option::<&Task>::copied)

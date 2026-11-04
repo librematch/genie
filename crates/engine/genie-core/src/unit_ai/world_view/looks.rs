@@ -3,7 +3,6 @@
 //! an object's look and its target flags, a master's class, and what a damage notify weighs
 //! (the duel, a harmless attacker, a defended unit's nearest attacker).
 
-use crate::GenieError;
 use crate::construction::FoundationId;
 use crate::map::Distance;
 use crate::map::Point;
@@ -25,6 +24,7 @@ use crate::unit_ai::{Duel, NearestAttacker, PatrolPath, TargetFlags, UnitSeen};
 use crate::world::index::ObjectsRef;
 use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlots;
+use crate::{GenieError, GenieResult};
 
 impl UnitView<'_, '_> {
     /// The unit's slot 0x430 as it stands now (`FUN_14106d0e0`; its slot 0x818, `FUN_14106d100`,
@@ -44,7 +44,7 @@ impl UnitView<'_, '_> {
     /// An action whose slot 0x2d0 the slice does not model.
     ///
     /// [`SurroundingFlags::INTERRUPTIBLE`]: crate::unit_ai::SurroundingFlags::INTERRUPTIBLE
-    pub(crate) fn interruptible_now(&self) -> Result<bool, GenieError> {
+    pub(crate) fn interruptible_now(&self) -> GenieResult<bool> {
         self.actions
             .interruptible(self.c.w.parts.unread.get(self.unit.id))
     }
@@ -75,7 +75,7 @@ impl UnitView<'_, '_> {
     /// # Errors
     ///
     /// An object the slice does not hold.
-    pub(crate) fn target_flags(&self, id: ObjectId) -> Result<Option<TargetFlags>, GenieError> {
+    pub(crate) fn target_flags(&self, id: ObjectId) -> GenieResult<Option<TargetFlags>> {
         let Some(seen) = self.seen_unit(id)? else {
             return Ok(None);
         };
@@ -104,7 +104,7 @@ impl UnitView<'_, '_> {
     /// # Errors
     ///
     /// An object the slice does not hold.
-    pub(crate) fn seen_unit(&self, id: ObjectId) -> Result<Option<UnitSeen>, GenieError> {
+    pub(crate) fn seen_unit(&self, id: ObjectId) -> GenieResult<Option<UnitSeen>> {
         let Some(p) = self.c.w.spatial.get(id) else {
             return Ok(None);
         };
@@ -167,7 +167,7 @@ impl UnitView<'_, '_> {
     /// An object the world does not hold.
     ///
     /// [`UnitAi::damaged`]: crate::unit_ai::UnitAi::damaged
-    pub(crate) fn duel(&self, other: ObjectId) -> Result<Duel, GenieError> {
+    pub(crate) fn duel(&self, other: ObjectId) -> GenieResult<Duel> {
         let roles = &self.c.w.model.roles.clone();
         self.picker(None)?.duel(
             &self.c.w.spatial,
@@ -187,7 +187,7 @@ impl UnitView<'_, '_> {
     /// An object the world does not hold.
     ///
     /// [`UnitAi::villager_damaged`]: crate::unit_ai::UnitAi::villager_damaged
-    pub(crate) fn harmless(&self, attacker: ObjectId) -> Result<bool, GenieError> {
+    pub(crate) fn harmless(&self, attacker: ObjectId) -> GenieResult<bool> {
         let roles = &self.c.w.model.roles.clone();
         self.picker(None)?.harmless(
             &self.c.w.spatial,
@@ -206,10 +206,7 @@ impl UnitView<'_, '_> {
     /// An object the world does not hold.
     ///
     /// [`UnitAi::defend_misc`]: crate::unit_ai::UnitAi::defend_misc
-    pub(crate) fn defended_attacker(
-        &self,
-        target: ObjectId,
-    ) -> Result<NearestAttacker, GenieError> {
+    pub(crate) fn defended_attacker(&self, target: ObjectId) -> GenieResult<NearestAttacker> {
         self.picker(None)?.nearest_attacker_of(target)
     }
 
@@ -221,7 +218,7 @@ impl UnitView<'_, '_> {
     /// A unit without movement state, and what the test does not model.
     ///
     /// [`Spatial::point_clear`]: crate::map::spatial::Spatial::point_clear
-    pub(crate) fn can_stand(&mut self, point: Point) -> Result<bool, GenieError> {
+    pub(crate) fn can_stand(&mut self, point: Point) -> GenieResult<bool> {
         let unit = &*self.unit;
         let mover = self
             .c
@@ -253,11 +250,7 @@ impl UnitView<'_, '_> {
     /// # Errors
     ///
     /// A unit that does not move, and what the reach test does not model.
-    pub(crate) fn reaches(
-        &mut self,
-        target: ObjectId,
-        range: Distance,
-    ) -> Result<bool, GenieError> {
+    pub(crate) fn reaches(&mut self, target: ObjectId, range: Distance) -> GenieResult<bool> {
         let mut plan = Planning {
             pathing: &mut self.c.w.pathing,
             now: self.c.w.world_time,
@@ -299,7 +292,7 @@ impl UnitView<'_, '_> {
     /// # Errors
     ///
     /// What the task search does not model.
-    pub(crate) fn builds(&self, foundation: FoundationId) -> Result<bool, GenieError> {
+    pub(crate) fn builds(&self, foundation: FoundationId) -> GenieResult<bool> {
         let roles = &self.c.w.model.roles.clone();
         let slots = self.c.w.model.slots;
         self.builds_on(foundation, slots, roles)

@@ -1,6 +1,6 @@
 //! SET GATHER POINT (0x78): the gather point of the player's buildings.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::commands::UnitList;
 use crate::map::Point;
 use crate::objects::ObjectId;
@@ -35,7 +35,7 @@ pub struct GatherPointCommand {
 impl GatherPointCommand {
     /// `do_command`'s check refuses a count past the packet's ids; the handler reads the first
     /// of them ([`World::read_units`], [`World::gather_point`]).
-    pub(crate) fn run(&self, w: &mut World) -> Result<(), GenieError> {
+    pub(crate) fn run(&self, w: &mut World) -> GenieResult<()> {
         let Some(ids) = w.read_units(self.player, &self.units) else {
             return Ok(());
         };

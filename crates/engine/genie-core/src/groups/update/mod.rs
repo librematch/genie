@@ -2,7 +2,6 @@
 //! the groups a player owns before the player's objects, and the deletion of a group whose update
 //! returns 0 (the world list's unlink, then `BUnitGroup`'s destructor, `FUN_140fe1920`).
 
-use crate::GenieError;
 use crate::groups::GroupCommandKind;
 use crate::groups::GroupFlags;
 use crate::groups::MotionFlags;
@@ -10,6 +9,7 @@ use crate::groups::UnitGroup;
 use crate::movement::PathFlags;
 use crate::objects::masters::ActionKind;
 use crate::world::Millis;
+use crate::{GenieError, GenieResult};
 
 mod attack;
 mod awake;
@@ -100,7 +100,7 @@ impl UnitGroup {
     /// stored positions ([`crate::groups::PointLine::add_at_front`]); the motion's flags lose
     /// [`MotionFlags::MOVED`], and [`MotionFlags::NEW`] with it when set, which sets the group's
     /// [`GroupFlags::RELAYOUT`] (`FUN_14104a240`).
-    pub fn update_end(&mut self) -> Result<(), GenieError> {
+    pub fn update_end(&mut self) -> GenieResult<()> {
         let g = self;
         if g.motion.flags.contains(MotionFlags::MOVED) {
             let [point, forward, up, right] = g.motion.new_position;

@@ -1,7 +1,6 @@
 //! The research action (`TRIBE_Action_Make_Tech`): its technology, its update, its end and
 //! its destructor.
 
-use crate::GenieError;
 use crate::math::conversions::cvttss2si;
 use crate::objects::ListIndex;
 use crate::objects::UpdateCode;
@@ -25,6 +24,7 @@ use crate::world::Seconds;
 use crate::world::World;
 use crate::world::slots::CheckedIndex;
 use crate::world::slots::PlayerSlots;
+use crate::{GenieError, GenieResult};
 use std::mem::take;
 
 impl World {
@@ -35,7 +35,7 @@ impl World {
     /// readers, the object search `FUN_1411650e0` and the masters' slot 0xc0, are not
     /// modelled); the human player's sound is the interface's. Not held: the start time
     /// (`+0x74`).
-    pub(super) fn make_research(first: &Entry) -> Result<Making, GenieError> {
+    pub(super) fn make_research(first: &Entry) -> GenieResult<Making> {
         let tech = first.tech.ok_or(GenieError::missing_data(
             "a research entry without a technology",
         ))?;
@@ -54,7 +54,7 @@ impl World {
         &self,
         p: PlayerId,
         tech: TechId,
-    ) -> Result<(usize, &TechDef), GenieError> {
+    ) -> GenieResult<(usize, &TechDef)> {
         let tree = self.players.player(p)?.techs.len();
         let t = Some(tech.index())
             .filter(|&t| t < tree)
@@ -81,7 +81,7 @@ impl World {
         (p, i): (PlayerId, ListIndex),
         r: MakeTech,
         dt_seconds: Seconds,
-    ) -> Result<UpdateCode, GenieError> {
+    ) -> GenieResult<UpdateCode> {
         use crate::technology::Attributes;
         if self.players.player(p)?.kind.is_computer() {
             return Err(GenieError::unsupported(
@@ -159,7 +159,7 @@ impl World {
         t: TechId,
         master: MasterId,
         repeat: Repeat,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         use crate::technology::Attributes;
         let (tech, t) = (t, t.index());
         let owner = self.players.player(p)?;
@@ -225,7 +225,7 @@ impl World {
         i: ListIndex,
         r: &MakeTech,
         t: usize,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if !r.paid {
             let def = self.model.techs.checked(t)?;
             let owner = self.players.player_mut(p)?;
@@ -266,7 +266,7 @@ impl World {
         p: PlayerId,
         i: ListIndex,
         r: &MakeTech,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         use crate::technology::Attributes;
         let (t, _) = self.research_tech(p, r.tech)?;
         if r.state != MakeTechState::Done && self.game_state == PlayState::Playing {

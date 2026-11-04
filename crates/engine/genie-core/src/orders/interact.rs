@@ -1,6 +1,5 @@
 //! An interact order's unit, an order on a target, MOVE and its groups.
 
-use crate::GenieError;
 use crate::groups::FarMembers;
 use crate::groups::FormationKind;
 use crate::groups::common_group;
@@ -31,6 +30,7 @@ use crate::unit_ai::{Issuer, OrderPriority, OrderTargetKind, QueuedOrder};
 use crate::world::World;
 use crate::world::layer::ClassRoles;
 use crate::world::slots::PlayerSlots;
+use crate::{GenieError, GenieResult};
 
 /// What the loop over the splitter's groups takes of its order ([`World::order_groups`]).
 struct GroupsOrder {
@@ -72,7 +72,7 @@ impl World {
         others: &[ObjectId],
         centroid: Option<Point>,
         order: &Interact,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let Some(place) = self.place(id) else {
             return Ok(());
         };
@@ -206,7 +206,7 @@ impl World {
         idx: ListIndex,
         target: Option<ObjectId>,
         point: Point,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let unit = self.players.live_mut(player, idx)?;
         if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
             ai.orders.clear();
@@ -233,7 +233,7 @@ impl World {
     /// # Errors
     ///
     /// What the work command does not model.
-    pub(crate) fn give_work(&mut self, id: ObjectId, work: &Work) -> Result<(), GenieError> {
+    pub(crate) fn give_work(&mut self, id: ObjectId, work: &Work) -> GenieResult<()> {
         let Some(Place::Live(player, idx)) = self.place(id) else {
             return Ok(());
         };
@@ -261,7 +261,7 @@ impl World {
         player: PlayerId,
         idx: ListIndex,
         order: QueuedOrder,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let (_, t) = self.object(order.target).ok_or(GenieError::unsupported(
             "a queued order on a target that is gone",
         ))?;
@@ -313,7 +313,7 @@ impl World {
         player: PlayerId,
         units: &[Option<ObjectId>],
         order: &MoveOrder,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         // the groups take the command count, which then counts up whatever the units do
         let loose = match units {
             [] => {
@@ -366,11 +366,7 @@ impl World {
 
     /// MOVE's groups (`FUN_140e67800`'s loop over the splitter's groups): see
     /// [`World::order_groups`], with Ctrl's formation lock and no task filter.
-    pub(super) fn move_groups(
-        &mut self,
-        split: &mut Split,
-        order: &MoveOrder,
-    ) -> Result<(), GenieError> {
+    pub(super) fn move_groups(&mut self, split: &mut Split, order: &MoveOrder) -> GenieResult<()> {
         let groups = GroupsOrder {
             target: order.target,
             point: order.point,
@@ -396,7 +392,7 @@ impl World {
         &mut self,
         split: &mut Split,
         order: &Interact,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let groups = GroupsOrder {
             target: order.target,
             point: order.point,
@@ -427,7 +423,7 @@ impl World {
     /// first unit's target ([`World::first_unit_target`]), not queued and direct. Then every
     /// listed group lists them all as its differentiator groups (`setDifferentiatorGroups`,
     /// `FUN_1410395a0`).
-    fn order_groups(&mut self, split: &mut Split, order: &GroupsOrder) -> Result<(), GenieError> {
+    fn order_groups(&mut self, split: &mut Split, order: &GroupsOrder) -> GenieResult<()> {
         let mut listed: Vec<GroupId> = Vec::new();
         for units in split.groups.clone() {
             let units = &units[..];

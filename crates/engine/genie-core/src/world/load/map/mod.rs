@@ -1,7 +1,7 @@
 //! The map and the players' sight from a save: the terrain, the objects as movement sees them,
 //! the visible maps and resources.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::map::Distance;
 use crate::map::Point;
 use crate::map::Position;
@@ -71,7 +71,7 @@ pub fn spatial(
     header: &Header,
     terrain: &TerrainTable,
     layer: &BuildLayer,
-) -> Result<Spatial, GenieError> {
+) -> GenieResult<Spatial> {
     use crate::map::spatial::{Obstruction, Placed, Spatial, Tiles};
     let roles = &layer.roles;
     let map = &header.world.base_world.map;
@@ -203,7 +203,7 @@ pub fn spatial(
 
 /// What the players see in a save: each player's visible map, the map's unified map and UMV list
 /// and which players are computers; no tile links and no objects' sight.
-pub fn saved_sight(header: &Header) -> Result<Visibility, GenieError> {
+pub fn saved_sight(header: &Header) -> GenieResult<Visibility> {
     let map = &header.world.base_world.map;
     let n = (map.map_width.max(0) * map.map_height.max(0)) as usize;
     let players = header.players();
@@ -264,7 +264,7 @@ pub fn saved_sight(header: &Header) -> Result<Visibility, GenieError> {
 }
 
 /// A player's saved `Visible_Resource_Manager` as [`VisibleResources`] holds it.
-pub fn saved_resources(m: &VisibleResourceManager) -> Result<VisibleResources, GenieError> {
+pub fn saved_resources(m: &VisibleResourceManager) -> GenieResult<VisibleResources> {
     Ok(VisibleResources {
         capacities: m
             .list_sizes
@@ -287,7 +287,7 @@ pub fn saved_resources(m: &VisibleResourceManager) -> Result<VisibleResources, G
                             at: Point::new(r.pos_x, r.pos_y),
                         })
                     })
-                    .collect::<Result<Vec<_>, GenieError>>()
+                    .collect::<GenieResult<Vec<_>>>()
             })
             .collect::<Result<_, _>>()?,
     })

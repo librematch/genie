@@ -1,7 +1,6 @@
 //! A position's change, the sight check and the unit AI's searches: the closest object and the
 //! best unit to attack.
 
-use crate::GenieError;
 use crate::map::Distance;
 use crate::map::Point;
 use crate::map::Position;
@@ -40,6 +39,7 @@ use crate::world::layer::generated::BestTargetTuning;
 use crate::world::layer::generated::RegistryTuning;
 use crate::world::layer::generated::SpatialTuning;
 use crate::world::layer::generated::VisibilityTuning;
+use crate::{GenieError, GenieResult};
 use std::fmt::{Debug, Error, Formatter};
 
 /// Whether a unit AI's search queried afresh or read the cache's last answer
@@ -78,7 +78,7 @@ impl Spatial {
         grow: Distance,
         ignore: &[RecordId],
         by_id: ObjectsRef<'_>,
-    ) -> Result<bool, GenieError> {
+    ) -> GenieResult<bool> {
         let rect = Rect::new(
             if to.x() <= from.x() { to.x() } else { from.x() },
             if to.y() <= from.y() { to.y() } else { from.y() },
@@ -131,7 +131,7 @@ impl Spatial {
         position: Position,
         roles: &Roles,
         visibility_tuning: VisibilityTuning,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if let Some(p) = self.objects.get_mut(id) {
             let from = p.position;
             p.position = position;
@@ -160,7 +160,7 @@ impl Spatial {
     /// Fails when a frozen object of `player` that may have moved sees, or saw, near `rect`: the
     /// player's visible map there, and the registry's records the objects' masks keep, may differ
     /// from the game's (its sight, plus a tile, beyond what it may have moved).
-    pub fn check_sight(&self, player: PlayerId, rect: Rect) -> Result<(), GenieError> {
+    pub fn check_sight(&self, player: PlayerId, rect: Rect) -> GenieResult<()> {
         let Some(v) = self.sight.as_ref() else {
             return Ok(());
         };
@@ -200,7 +200,7 @@ impl Spatial {
         best_target_tuning: &BestTargetTuning,
         spatial_tuning: &SpatialTuning,
         registry_tuning: RegistryTuning,
-    ) -> Result<Found, GenieError> {
+    ) -> GenieResult<Found> {
         let SearchQuery {
             searcher: me,
             player,
@@ -232,7 +232,7 @@ impl Spatial {
 
     /// The lists the last search left, as the cache holds them, or the error of a search that
     /// reads the registry's last answer before any query.
-    fn last_found(&self) -> Result<&ByRelation<Vec<Record>>, GenieError> {
+    fn last_found(&self) -> GenieResult<&ByRelation<Vec<Record>>> {
         self.search_cache
             .last
             .as_ref()
@@ -247,11 +247,7 @@ impl Spatial {
     /// # Errors
     ///
     /// A player whose kinds the slice did not load.
-    pub fn query_kinds(
-        &self,
-        player: PlayerId,
-        players: usize,
-    ) -> Result<UnitRelations, GenieError> {
+    pub fn query_kinds(&self, player: PlayerId, players: usize) -> GenieResult<UnitRelations> {
         let kinds = self
             .unit_diplomacy
             .get(player)
@@ -273,7 +269,7 @@ impl Spatial {
         search: &Search<'_>,
         spatial_tuning: &SpatialTuning,
         registry_tuning: RegistryTuning,
-    ) -> Result<SearchLists, GenieError> {
+    ) -> GenieResult<SearchLists> {
         let v = self.sight.as_ref().ok_or(GenieError::unsupported(
             "a search without the players' sight",
         ))?;
@@ -343,7 +339,7 @@ impl Spatial {
         attack: Option<&WorldPicker<'_>>,
         reach: &mut Reach<'_>,
         checks: ClosestChecks<'_>,
-    ) -> Result<Found, GenieError> {
+    ) -> GenieResult<Found> {
         let roles = checks.roles;
         let best_target_tuning = checks.best_target_tuning;
         match search.pick {
@@ -435,7 +431,7 @@ impl Spatial {
         filter: Filter,
         reach: &mut Reach<'_>,
         checks: ClosestChecks<'_>,
-    ) -> Result<(Option<ObjectId>, f32), GenieError> {
+    ) -> GenieResult<(Option<ObjectId>, f32)> {
         let (roles, spatial_tuning) = (checks.roles, checks.spatial_tuning);
         let at = self.objects.get(me);
         let searcher = Searcher {
@@ -497,7 +493,7 @@ impl Spatial {
         reach: &mut Reach<'_>,
         roles: &Roles,
         best_target_tuning: &BestTargetTuning,
-    ) -> Result<Choice, GenieError> {
+    ) -> GenieResult<Choice> {
         let me = attack.searcher(memory)?;
         let found = self.last_found()?;
         let lists: ByRelation<Vec<ObjectId>> = found.map(|v| v.iter().map(|r| r.id).collect());
@@ -570,7 +566,7 @@ pub(super) fn closest_kept(
     filter: Filter,
     (player, searcher): (PlayerId, Searcher),
     ClosestChecks { objects, roles, .. }: ClosestChecks<'_>,
-) -> Result<bool, GenieError> {
+) -> GenieResult<bool> {
     if filter.group.is_some_and(|g| p.class != g) {
         return Ok(false);
     }
@@ -626,11 +622,7 @@ pub(crate) fn herded(by_id: ObjectsRef<'_>, id: ObjectId) -> bool {
 /// # Errors
 ///
 /// A found object of a master its player's table does not hold.
-pub(super) fn shuns(
-    objects: ObjectsRef<'_>,
-    roles: &Roles,
-    p: &Placed,
-) -> Result<bool, GenieError> {
+pub(super) fn shuns(objects: ObjectsRef<'_>, roles: &Roles, p: &Placed) -> GenieResult<bool> {
     let m = player_master(objects.masters().players, p.player, p.master).ok_or(
         GenieError::unsupported("a found object of a master the slice does not have"),
     )?;
@@ -649,7 +641,7 @@ pub(super) fn farm_kept(
     searcher: Searcher,
     objects: ObjectsRef<'_>,
     roles: &Roles,
-) -> Result<bool, GenieError> {
+) -> GenieResult<bool> {
     let (workers, parent) =
         objects
             .get(id)

@@ -1,6 +1,6 @@
 //! GIVE ATTRIBUTES (0xc4): the player's tribute to another.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::players::PlayerId;
 use crate::players::tribute::Gift;
 use crate::world::World;
@@ -19,7 +19,7 @@ pub struct TributeCommand {
 
 impl TributeCommand {
     /// Its handler ([`World::tribute`]).
-    pub(crate) fn run(&self, w: &mut World) -> Result<(), GenieError> {
+    pub(crate) fn run(&self, w: &mut World) -> GenieResult<()> {
         w.tribute(self.player, self.to, &self.gifts)
     }
 }

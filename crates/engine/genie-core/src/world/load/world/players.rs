@@ -1,7 +1,7 @@
 //! A player's saved parts the world's load reads: its AI settings, its history, its AI module
 //! and its technologies' state.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::map::Distance;
 use crate::map::GridSize;
 use crate::map::Tile;
@@ -183,7 +183,7 @@ pub fn ai_module(m: &TribeMainDecisionAi) -> AiModule {
 /// # Errors
 ///
 /// A saved state that names none.
-pub fn tech_state(t: &TechPlayerTree) -> Result<TechState, GenieError> {
+pub fn tech_state(t: &TechPlayerTree) -> GenieResult<TechState> {
     let o = |j: usize| {
         t.cost_override
             .get(j)

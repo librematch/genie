@@ -25,7 +25,7 @@ mod values;
 pub use self::history_updates::{HISTORY_PERIOD, HistoryUpdates};
 pub use values::{EntryKind, HistoryEntry, Population, Share, Tally, TimeSlice};
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::math::conversions::cvttss2si;
 use crate::players::Amount;
 use crate::players::PlayerId;
@@ -375,7 +375,7 @@ impl History {
         period: HistoryUpdates,
         slots: Slots,
         history_tuning: &HistoryTuning,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         self.update_count = self.update_count.next();
         if self.update_count < period {
             return Ok(());
@@ -487,7 +487,7 @@ impl History {
         attributes: &[Amount],
         value: Tally,
         world_time: WorldTime,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let a = |i: usize| attributes.get(i).copied().unwrap_or(Amount::ZERO);
         let players = self.old_player_kill_bv.len();
         let kills: Vec<Tally> = self

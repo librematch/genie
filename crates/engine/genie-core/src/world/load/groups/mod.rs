@@ -4,7 +4,6 @@
 //! The mapping is the only place that knows the build's save layout of a group: a later build
 //! with another layout maps into the same state here.
 
-use crate::GenieError;
 use crate::groups::GroupFlags;
 use crate::groups::MotionFlags;
 use crate::groups::{
@@ -23,6 +22,7 @@ use crate::unit_ai::UnitStance;
 use crate::world::Millis;
 use crate::world::Seconds;
 use crate::world::WorldTime;
+use crate::{GenieError, GenieResult};
 use genie_save::generated::world as saved;
 
 use crate::objects::masters::ActionKind;
@@ -55,7 +55,7 @@ fn unit_kinds(b: &[u8; 200]) -> Vec<UnitKind> {
     words(b).into_iter().map(UnitKind::of_word).collect()
 }
 
-fn motion(m: &saved::Motion, paths: &[saved::Path]) -> Result<Motion, GenieError> {
+fn motion(m: &saved::Motion, paths: &[saved::Path]) -> GenieResult<Motion> {
     Ok(Motion {
         position: frame(&m.position),
         new_position: frame(&m.new_position),
@@ -84,7 +84,7 @@ fn motion(m: &saved::Motion, paths: &[saved::Path]) -> Result<Motion, GenieError
     })
 }
 
-fn formation(f: &saved::Formation) -> Result<Formation, GenieError> {
+fn formation(f: &saved::Formation) -> GenieResult<Formation> {
     Ok(Formation {
         kind: FormationKind::from(f.kind),
         slots: f
@@ -108,7 +108,7 @@ fn formation(f: &saved::Formation) -> Result<Formation, GenieError> {
                     transformed: 0,
                 })
             })
-            .collect::<Result<_, GenieError>>()?,
+            .collect::<GenieResult<_>>()?,
         number_transformed_slots: f.number_transformed_slots,
         maximum_width: f.maximum_width,
         maximum_depth: f.maximum_depth,
@@ -131,7 +131,7 @@ fn formation(f: &saved::Formation) -> Result<Formation, GenieError> {
     })
 }
 
-fn group(g: &saved::UnitGroup, paths: &[saved::Path]) -> Result<UnitGroup, GenieError> {
+fn group(g: &saved::UnitGroup, paths: &[saved::Path]) -> GenieResult<UnitGroup> {
     let t = &g.current_target;
     Ok(UnitGroup {
         motion: motion(&g.motion, paths)?,
@@ -169,7 +169,7 @@ fn group(g: &saved::UnitGroup, paths: &[saved::Path]) -> Result<UnitGroup, Genie
                     seconds_since_attacking: Seconds::new(u.seconds_since_attacking),
                 })
             })
-            .collect::<Result<_, GenieError>>()?,
+            .collect::<GenieResult<_>>()?,
         previous_formation: g.previous_formation.as_deref().map(formation).transpose()?,
         current_formation: g.current_formation.as_deref().map(formation).transpose()?,
         garbage: g.garbage,
@@ -215,7 +215,7 @@ fn group(g: &saved::UnitGroup, paths: &[saved::Path]) -> Result<UnitGroup, Genie
                     unit_kind_counts: words(&u.unit_kind_counts),
                 })
             })
-            .collect::<Result<_, GenieError>>()?,
+            .collect::<GenieResult<_>>()?,
         waypoints: g.waypoints.iter().map(vec3).collect(),
         current_command: GroupCommandKind::named(g.current_command),
         current_target: TargetData {
@@ -282,7 +282,7 @@ fn group(g: &saved::UnitGroup, paths: &[saved::Path]) -> Result<UnitGroup, Genie
 /// # Errors
 ///
 /// When a group's path data names a path the world's table does not hold.
-pub fn unit_groups(world: &saved::BaseWorld) -> Result<UnitGroups, GenieError> {
+pub fn unit_groups(world: &saved::BaseWorld) -> GenieResult<UnitGroups> {
     let g = &world.unit_groups;
     let groups: Vec<UnitGroup> = g
         .unit_group

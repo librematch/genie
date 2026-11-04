@@ -1,7 +1,6 @@
 //! The damage beyond what a blast has done (`FUN_141082e80`) and the blast itself (slot
 //! 0x848).
 
-use crate::GenieError;
 use crate::combat::Charge;
 use crate::combat::damage::HitKind;
 use crate::combat::damage::HitLayer;
@@ -31,6 +30,7 @@ use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 use crate::world::layer::generated::DamageTuning;
 use crate::world::slots::CheckedIndex;
+use crate::{GenieError, GenieResult};
 use std::mem::replace;
 
 /// `FUN_141082e80`: the damage ([`armor_damage`]) beyond what a blast has done: an attacker of
@@ -50,7 +50,7 @@ pub(super) fn damage(
     factor: f32,
     blast_taken: HitPoints,
     roles: &Roles,
-) -> Result<(), GenieError> {
+) -> GenieResult<()> {
     let d = armor_damage(
         t,
         weapons,
@@ -166,7 +166,7 @@ pub fn blast(
     targets: &mut [&mut Victim],
     factor: f32,
     layer: HitLayer<'_>,
-) -> Result<(), GenieError> {
+) -> GenieResult<()> {
     let a = attacker.source;
     let r = a.area_effect;
     if !below_or_unordered(0.0, r.get()) {
@@ -244,7 +244,7 @@ pub(super) fn blast_one(
     i: usize,
     (b, weapons): (&Blast, &[ClassAmount]),
     layer: HitLayer<'_>,
-) -> Result<(), GenieError> {
+) -> GenieResult<()> {
     let HitLayer {
         roles,
         damage_tuning,
@@ -320,7 +320,7 @@ pub(super) fn blast_one(
 /// The object a building's blast damage so far is kept on (`+0xbb8`): its main building's
 /// place among `targets` for an annex, its own for another building; None for an object that
 /// is not a building.
-pub(super) fn blast_ledger(targets: &[&mut Victim], i: usize) -> Result<Option<usize>, GenieError> {
+pub(super) fn blast_ledger(targets: &[&mut Victim], i: usize) -> GenieResult<Option<usize>> {
     let t = &**targets.checked(i)?;
     if t.kind != MasterKind::BUILDING {
         return Ok(None);
@@ -344,7 +344,7 @@ pub(super) fn ledger_values(
     i: usize,
     ledger: Option<usize>,
     a: &Attacker,
-) -> Result<(f32, BlastDefense, HitPoints), GenieError> {
+) -> GenieResult<(f32, BlastDefense, HitPoints)> {
     let taken = |v: &Victim| {
         v.building
             .as_ref()
@@ -443,7 +443,7 @@ pub(super) fn outside_cone(
     t: &Victim,
     (d2, wide): (f32, f32),
     damage_tuning: &DamageTuning,
-) -> Result<bool, GenieError> {
+) -> GenieResult<bool> {
     if !a.blast_level.contains(BlastLevel::CONE) {
         return Ok(false);
     }
@@ -474,7 +474,7 @@ pub(super) fn fixed_blast(
     a: &Attacker,
     t: &mut Victim,
     share: f32,
-) -> Result<(), GenieError> {
+) -> GenieResult<()> {
     let before = t.hp;
     lose(t, HitPoints::new(share.abs()));
     if t.hp < HitPoints::new(1.0) {
@@ -510,7 +510,7 @@ pub(super) fn blast_hit(
     (weapons, factor): (&[ClassAmount], f32),
     (ledger, blast_taken): (Option<usize>, HitPoints),
     layer: HitLayer<'_>,
-) -> Result<(), GenieError> {
+) -> GenieResult<()> {
     let HitLayer { roles, .. } = layer;
     let before = targets.checked(i)?.hp;
     let mut t = replace(&mut **targets.checked_mut(i)?, Victim::placeholder());

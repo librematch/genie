@@ -1,7 +1,7 @@
 //! The world player's update: the loop's seconds, the explored share, the defeat check and
 //! what keeps a player in the game.
 
-use crate::GenieError;
+use crate::GenieResult;
 use crate::math::fmath::{at_most_or_unordered, below_or_unordered};
 use crate::objects::ObjectState;
 use crate::objects::unit::Unit;
@@ -30,7 +30,7 @@ impl World {
     /// # Errors
     ///
     /// The second's work met a part of the game the slice does not model.
-    pub fn update_world_player(&mut self, p: PlayerId) -> Result<(), GenieError> {
+    pub fn update_world_player(&mut self, p: PlayerId) -> GenieResult<()> {
         let dt = self.dt_seconds;
         let player = self.players.player_mut(p)?;
         if player.kind == PlayerKind::Gaia {
@@ -62,11 +62,7 @@ impl World {
     /// # Errors
     ///
     /// The defeat check's ([`World::defeat_check`]).
-    pub(super) fn world_player_second(
-        &mut self,
-        p: PlayerId,
-        time: Seconds,
-    ) -> Result<(), GenieError> {
+    pub(super) fn world_player_second(&mut self, p: PlayerId, time: Seconds) -> GenieResult<()> {
         let (world_time, period) = (self.world_time, self.history_period);
         let player = self.players.player_mut(p)?;
         player.history.update(
@@ -146,7 +142,7 @@ impl World {
     /// An object of a master the slice does not have; the status setter's.
     ///
     /// [`VictoryTimes::running`]: crate::players::world_player::VictoryTimes::running
-    pub fn defeat_check(&mut self, p: PlayerId) -> Result<(), GenieError> {
+    pub fn defeat_check(&mut self, p: PlayerId) -> GenieResult<()> {
         let mut stays = self.players.player(p)?.victory_times.running();
         if !stays {
             for unit in &self.players.player(p)?.objects {
@@ -204,7 +200,7 @@ impl World {
     /// # Errors
     ///
     /// An object of a master the slice does not have.
-    pub fn keeps_alive(&self, p: PlayerId, unit: &Unit) -> Result<bool, GenieError> {
+    pub fn keeps_alive(&self, p: PlayerId, unit: &Unit) -> GenieResult<bool> {
         let master = unit.master(self.master_tables(), p)?;
         let state = unit.life.state;
         if (ObjectState::Unfinished..=ObjectState::DyingSprite).contains(&state)

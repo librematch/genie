@@ -1,7 +1,6 @@
 //! The armor against melee and against each weapon class, and the damage per weapon
 //! (`FUN_141082530`).
 
-use crate::GenieError;
 use crate::combat::damage::{Armored, Attacker, Victim, charge_damage, charge_works};
 use crate::objects::HitPoints;
 use crate::objects::ObjectState;
@@ -12,6 +11,7 @@ use crate::objects::masters::MasterKind;
 use crate::objects::masters::{ClassAmount, DamageAmount, DamageClass};
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
+use crate::{GenieError, GenieResult};
 
 /// `FUN_141085450`, a combat object's melee armor as its master holds it: its best armor of
 /// class 4 above −32768, else its best of any, else its base armor.
@@ -187,7 +187,7 @@ pub fn armor_damage(
     attacker: &Attacker,
     bonus: f32,
     roles: &Roles,
-) -> Result<HitPoints, GenieError> {
+) -> GenieResult<HitPoints> {
     let a = v.armored.as_ref().ok_or(GenieError::unsupported(
         "the armor of an object without combat values",
     ))?;

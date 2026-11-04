@@ -1,6 +1,5 @@
 //! The orders, actions, timers and reaches the unit AI names, its factory types and stances.
 
-use crate::GenieError;
 use crate::map::Distance;
 use crate::map::Position;
 use crate::math::image::unit_ai::{INVALID_POINT as UNIT_AI_INVALID_POINT, RUN_ONE};
@@ -26,6 +25,7 @@ use crate::world::WorldTime;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
+use crate::{GenieError, GenieResult};
 
 /// What slot 73 does for a factory type.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -49,7 +49,7 @@ pub(super) enum Retarget {
     Priest,
 }
 
-pub(super) const fn retarget_kind(ai_kind: UnitAiKind) -> Result<Retarget, GenieError> {
+pub(super) const fn retarget_kind(ai_kind: UnitAiKind) -> GenieResult<Retarget> {
     match ai_kind {
         // villagers (0x140c21da0) and livestock (0x140c21f20) return 9 from slot 73
         UnitAiKind::Civilian => Ok(Retarget::Civilian),
@@ -429,7 +429,7 @@ pub(super) fn dodges(at: &Surroundings, ai: &mut Well512) -> bool {
 /// and 0x207 from a transport, units left inside or no unload there; `FUN_14162dab0`): a human
 /// player's alert list or interface message and the old pather's hulled-area reset, not held;
 /// a computer player's AI hears it (slot 0x3c8), which is not modelled.
-pub(crate) const fn alert_owner(player_kind: PlayerKind) -> Result<(), GenieError> {
+pub(crate) const fn alert_owner(player_kind: PlayerKind) -> GenieResult<()> {
     if player_kind.is_computer() {
         return Err(GenieError::unsupported(
             "a computer player's AI hearing its unit's alert (slot 0x2e8, then slot 0x3c8)",
@@ -442,7 +442,7 @@ pub(crate) const fn alert_owner(player_kind: PlayerKind) -> Result<(), GenieErro
 /// its reach to the attacker (`FUN_14104c220` within its weapon range), its own
 /// `bestUnitToAttack` (`FUN_140c44680` from its place) and its `AttackObject` (slot 0xb8, any)
 /// on the nearer of that and the attacker, which run as the helper's, are not modelled.
-pub(crate) const fn helper_answers() -> Result<(), GenieError> {
+pub(crate) const fn helper_answers() -> GenieResult<()> {
     Err(GenieError::unsupported(
         "a helper that answers a call for help (its reach, bestUnitToAttack and AttackObject)",
     ))
@@ -450,7 +450,7 @@ pub(crate) const fn helper_answers() -> Result<(), GenieError> {
 
 /// The unit AI's slot 0x90 (`closestUndiscoveredTile`, `FUN_140c4bd40`) for an explorer other
 /// than the auto scout, then its explore there (slot 0x100); not modelled.
-pub(super) const fn closest_undiscovered_tile() -> Result<(), GenieError> {
+pub(super) const fn closest_undiscovered_tile() -> GenieResult<()> {
     Err(GenieError::unsupported(
         "an explorer's search for the closest undiscovered tile (slot 0x90)",
     ))
@@ -458,9 +458,7 @@ pub(super) const fn closest_undiscovered_tile() -> Result<(), GenieError> {
 
 /// The state of the unit's top action (slot 0x2b0) as [`Surroundings::action_state`] holds it,
 /// for an action the slice holds.
-pub(super) const fn held_action_state(
-    state: Option<ActionState>,
-) -> Result<ActionState, GenieError> {
+pub(super) const fn held_action_state(state: Option<ActionState>) -> GenieResult<ActionState> {
     match state {
         Some(s) => Ok(s),
         None => Err(GenieError::unsupported(

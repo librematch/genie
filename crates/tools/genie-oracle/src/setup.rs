@@ -2,7 +2,7 @@
 //! with that layer ([`saved_world`], [`loaded_world`]).
 
 use crate::masters::MasterTable;
-use genie_core::GenieError;
+use genie_core::GenieResult;
 use genie_core::world::World;
 use genie_core::world::load::world::loaded::loaded_world;
 use genie_core::world::load::world::saved_world;
@@ -15,14 +15,14 @@ use std::sync::LazyLock;
 const LAYER_BUILD: u32 = 158_041;
 
 /// The build layer, evaluated once from its Nickel source (FD-046-D08, D09's step 2).
-static LAYER: LazyLock<Result<BuildLayer, GenieError>> = LazyLock::new(|| build_layer(LAYER_BUILD));
+static LAYER: LazyLock<GenieResult<BuildLayer>> = LazyLock::new(|| build_layer(LAYER_BUILD));
 
 /// The build layer genie-oracle's import reads: build 158041's, from `builds/158041.ncl`.
 ///
 /// # Errors
 ///
 /// Its Nickel source does not evaluate or breaks its contracts.
-pub fn layer() -> Result<&'static BuildLayer, GenieError> {
+pub fn layer() -> GenieResult<&'static BuildLayer> {
     LAYER.as_ref().map_err(Clone::clone)
 }
 
@@ -33,7 +33,7 @@ pub fn layer() -> Result<&'static BuildLayer, GenieError> {
 /// # Errors
 ///
 /// The build layer does not evaluate ([`layer`]).
-pub(super) fn slice(header: &Header, masters: Option<&MasterTable>) -> Result<World, GenieError> {
+pub(super) fn slice(header: &Header, masters: Option<&MasterTable>) -> GenieResult<World> {
     saved_world(header, masters, layer()?)
 }
 
@@ -43,9 +43,6 @@ pub(super) fn slice(header: &Header, masters: Option<&MasterTable>) -> Result<Wo
 /// # Errors
 ///
 /// The build layer does not evaluate ([`layer`]).
-pub(super) fn header_slice(
-    header: &Header,
-    masters: Option<&MasterTable>,
-) -> Result<World, GenieError> {
+pub(super) fn header_slice(header: &Header, masters: Option<&MasterTable>) -> GenieResult<World> {
     loaded_world(header, masters, layer()?)
 }

@@ -3,7 +3,6 @@
 //! `ClosestResourceObject` (`FUN_140c49760`, slot 0x80), which the builder's Build asks next
 //! (`0x140ab0370` case 0xdf).
 
-use crate::GenieError;
 use crate::gathering::PastureId;
 use crate::gathering::gather_search::passes::first_resource;
 use crate::gathering::gather_search::passes::pass_distance;
@@ -45,6 +44,7 @@ use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
 use crate::world::layer::generated::GatherSearchTuning;
 use crate::world::slots::CheckedIndex;
+use crate::{GenieError, GenieResult};
 use std::fmt::Debug;
 use std::mem::take;
 
@@ -127,7 +127,7 @@ impl Candidates<'_> {
     ///
     /// An object on the tile the world does not hold, or of a master its owner's table does not
     /// hold.
-    pub fn on(&self, spatial: &Spatial, tile: Tile) -> Result<Vec<Candidate>, GenieError> {
+    pub fn on(&self, spatial: &Spatial, tile: Tile) -> GenieResult<Vec<Candidate>> {
         spatial
             .objects_on(tile)
             .map(|(id, p)| {
@@ -187,7 +187,7 @@ pub fn more_work(
     (spatial, planner): (&Spatial, &Planner),
     candidates: &Candidates<'_>,
     roles: &Roles,
-) -> Result<Option<Candidate>, GenieError> {
+) -> GenieResult<Option<Candidate>> {
     let map = spatial.map;
     let Some(entry) = entry.filter(|e| e.auto_work) else {
         return Ok(None);
@@ -330,7 +330,7 @@ pub fn reached(
     size: GridSize,
     corner: TileOffset,
     planner: &Planner,
-) -> Result<Option<Vec<bool>>, GenieError> {
+) -> GenieResult<Option<Vec<bool>>> {
     if !size.holds(start) {
         return Ok(None);
     }
@@ -460,7 +460,7 @@ pub fn closest_resource(
     max_workers: WorkerCount,
     reads: ResourceWorld<'_, '_>,
     gather_search_tuning: &GatherSearchTuning,
-) -> Result<Option<ObjectId>, GenieError> {
+) -> GenieResult<Option<ObjectId>> {
     closest_resource_at(seeker, None, kind, max_workers, reads, gather_search_tuning)
         .map(|(id, _)| id)
 }
@@ -491,7 +491,7 @@ pub fn closest_resource_at(
     max_workers: WorkerCount,
     reads: ResourceWorld<'_, '_>,
     gather_search_tuning: &GatherSearchTuning,
-) -> Result<(Option<ObjectId>, Option<i32>), GenieError> {
+) -> GenieResult<(Option<ObjectId>, Option<i32>)> {
     /// The fallback's steps before it has one (`1000000`).
     const NO_STEPS: i32 = 1_000_000;
     const TILE_CENTRE: f32 = GATHER_SEARCH_TILE_CENTRE;
@@ -754,7 +754,7 @@ mod tests {
         seeker: &Seeker,
         site: Option<&SearchSite>,
         (kind, cap): (GatherGroup, WorkerCount),
-    ) -> Result<(Option<ObjectId>, Option<i32>), GenieError> {
+    ) -> GenieResult<(Option<ObjectId>, Option<i32>)> {
         let id = object_id(SEEKER_ID);
         let objects = ObjectsRef::new(
             &w.players,
@@ -843,7 +843,7 @@ mod tests {
         entry: &DropSite,
         b: &Builder,
         objects: Vec<SceneObject>,
-    ) -> Result<Option<ObjectId>, GenieError> {
+    ) -> GenieResult<Option<ObjectId>> {
         let mut w = resource_scene(objects).build();
         let objects = ObjectsRef::new(
             &w.players,

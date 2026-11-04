@@ -1,4 +1,5 @@
 use super::*;
+use crate::GenieResult;
 use crate::combat::AttackTargetId;
 use crate::combat::MissileCount;
 use crate::combat::abilities::Look;
@@ -762,8 +763,8 @@ impl Rig {
             &mut Action,
             &mut Fight,
             &AttackReads,
-        ) -> Result<R, GenieError>,
-    ) -> Result<R, GenieError> {
+        ) -> GenieResult<R>,
+    ) -> GenieResult<R> {
         let (fight, r) = (&mut self.f, &self.r);
         in_update(
             &mut self.t,
@@ -2075,7 +2076,7 @@ fn own_start(
     visible: bool,
     owner: PlayerId,
     mover: &mut Mover,
-) -> Result<Started, GenieError> {
+) -> GenieResult<Started> {
     let none = ObjectsRef::empty();
     own_start_among((world, none), e, arms, visible, owner, mover)
 }
@@ -2088,7 +2089,7 @@ fn own_start_among(
     visible: bool,
     owner: PlayerId,
     mover: &mut Mover,
-) -> Result<Started, GenieError> {
+) -> GenieResult<Started> {
     let cmd = AttackCommand {
         target: object_id(7),
         engagement: e,

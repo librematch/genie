@@ -1,7 +1,6 @@
 //! The gates: the units in a gate, a player's gate list and passes, and the gates opened before
 //! and closed after a player's update.
 
-use crate::GenieError;
 use crate::map::Distance;
 use crate::map::Rect;
 use crate::map::spatial::Obstruction;
@@ -22,6 +21,7 @@ use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
 use crate::world::slots::PlayerSlots;
 use crate::world::{GATE_COUNT_CAP, GATE_QUERY_RECORDS, World};
+use crate::{GenieError, GenieResult};
 
 /// `FUN_1411d4a30`, a building's slot 0x678 (any other object's answers no): whether the gate
 /// `gate` (its building layer `layer`, master `master`, of player `owner`) lets a unit of
@@ -64,7 +64,7 @@ pub(crate) fn gate_units(
     gate: ObjectId,
     annexes: &[ObjectId],
     by_id: ObjectsRef<'_>,
-) -> Result<(Vec<ObjectId>, usize), GenieError> {
+) -> GenieResult<(Vec<ObjectId>, usize)> {
     let turn_tuning = &by_id.tuning().turn;
     let roles = by_id.roles();
     let [a, b] = annexes[..] else {
@@ -125,7 +125,7 @@ impl World {
     /// Player `q`'s gate list (`+0x1360`, `FUN_141616200` adds to its front): its live objects
     /// of class 39 whose master transforms ([`crate::objects::masters::BuildingMaster::transform_unit`]),
     /// newest first.
-    pub(crate) fn gate_list(&self, q: PlayerId) -> Result<Vec<ListIndex>, GenieError> {
+    pub(crate) fn gate_list(&self, q: PlayerId) -> GenieResult<Vec<ListIndex>> {
         let masters = self.model.masters.of(q);
         let owner = self.players.player(q)?;
         let mut gates = Vec::new();
@@ -150,12 +150,7 @@ impl World {
     }
 
     /// A gate's slot 0x678 ([`lets_pass`]) for object `i` of player `q` and a unit of player `p`.
-    pub(crate) fn gate_passes(
-        &self,
-        q: PlayerId,
-        i: ListIndex,
-        p: PlayerId,
-    ) -> Result<bool, GenieError> {
+    pub(crate) fn gate_passes(&self, q: PlayerId, i: ListIndex, p: PlayerId) -> GenieResult<bool> {
         let gate = self.players.live(q, i)?;
         let m = gate.master(self.master_tables(), q)?;
         let layer = self.parts.building_of(gate.id);
@@ -173,7 +168,7 @@ impl World {
     /// (`open`, the update's flags), open for `p` (`q`'s slot 0x318, `FUN_14162faf0`): each gate
     /// `p` may pass ([`World::gate_passes`]) loses its record, its tiles' marks and its mesh shape
     /// (`FUN_141055b40`), so `p`'s units walk and plan through it.
-    pub(crate) fn open_gates(&mut self, p: PlayerId, open: &mut [bool]) -> Result<(), GenieError> {
+    pub(crate) fn open_gates(&mut self, p: PlayerId, open: &mut [bool]) -> GenieResult<()> {
         if p == PlayerId::GAIA {
             return Ok(());
         }
@@ -211,7 +206,7 @@ impl World {
     /// counted one by it (they stay open for it): each gate `p` may pass gets its record, its
     /// tiles' marks and its mesh shape again (`FUN_141056460`), but for a part of obstruction
     /// kind 0 or 12 or of class 0 ([`crate::map::spatial::Obstruction::recorded`]).
-    pub(crate) fn close_gates(&mut self, p: PlayerId, open: &mut [bool]) -> Result<(), GenieError> {
+    pub(crate) fn close_gates(&mut self, p: PlayerId, open: &mut [bool]) -> GenieResult<()> {
         if p == PlayerId::GAIA {
             return Ok(());
         }

@@ -6,12 +6,12 @@
 //! The trait is implemented for the slice, not for [`crate::world::World`], so a caller keeps
 //! the borrow of the one field (`self.players`) and still reads the others.
 
-use crate::GenieError;
 use crate::objects::ListIndex;
 use crate::objects::unit::Unit;
 use crate::players::PlayerId;
 use crate::world::index::Place;
 use crate::world::player::Player;
+use crate::{GenieError, GenieResult};
 
 /// A player the world does not hold.
 const NO_PLAYER: GenieError = GenieError::unreachable("a player the world does not hold");
@@ -31,21 +31,21 @@ pub(crate) trait PlayerSlots {
     /// # Errors
     ///
     /// A player the table does not hold.
-    fn player(&self, p: PlayerId) -> Result<&Player, GenieError>;
+    fn player(&self, p: PlayerId) -> GenieResult<&Player>;
 
     /// Player `p`, to change.
     ///
     /// # Errors
     ///
     /// A player the table does not hold.
-    fn player_mut(&mut self, p: PlayerId) -> Result<&mut Player, GenieError>;
+    fn player_mut(&mut self, p: PlayerId) -> GenieResult<&mut Player>;
 
     /// The object at position `i` of player `p`'s live list.
     ///
     /// # Errors
     ///
     /// A player or a position the lists do not hold.
-    fn live(&self, p: PlayerId, i: ListIndex) -> Result<&Unit, GenieError> {
+    fn live(&self, p: PlayerId, i: ListIndex) -> GenieResult<&Unit> {
         self.player(p)?.live(i).map_err(|e| e.with("player", p))
     }
 
@@ -54,7 +54,7 @@ pub(crate) trait PlayerSlots {
     /// # Errors
     ///
     /// A player or a position the lists do not hold.
-    fn live_mut(&mut self, p: PlayerId, i: ListIndex) -> Result<&mut Unit, GenieError> {
+    fn live_mut(&mut self, p: PlayerId, i: ListIndex) -> GenieResult<&mut Unit> {
         self.player_mut(p)?
             .live_mut(i)
             .map_err(|e| e.with("player", p))
@@ -65,7 +65,7 @@ pub(crate) trait PlayerSlots {
     /// # Errors
     ///
     /// A player or a position the lists do not hold.
-    fn asleep(&self, p: PlayerId, i: ListIndex) -> Result<&Unit, GenieError> {
+    fn asleep(&self, p: PlayerId, i: ListIndex) -> GenieResult<&Unit> {
         self.player(p)?.asleep(i).map_err(|e| e.with("player", p))
     }
 
@@ -74,7 +74,7 @@ pub(crate) trait PlayerSlots {
     /// # Errors
     ///
     /// A player or a position the lists do not hold.
-    fn asleep_mut(&mut self, p: PlayerId, i: ListIndex) -> Result<&mut Unit, GenieError> {
+    fn asleep_mut(&mut self, p: PlayerId, i: ListIndex) -> GenieResult<&mut Unit> {
         self.player_mut(p)?
             .asleep_mut(i)
             .map_err(|e| e.with("player", p))
@@ -85,7 +85,7 @@ pub(crate) trait PlayerSlots {
     /// # Errors
     ///
     /// A player or a position the lists do not hold.
-    fn at(&self, place: Place) -> Result<&Unit, GenieError> {
+    fn at(&self, place: Place) -> GenieResult<&Unit> {
         match place {
             Place::Live(p, i) => self.live(p, i),
             Place::Sleeping(p, i) => self.asleep(p, i),
@@ -97,7 +97,7 @@ pub(crate) trait PlayerSlots {
     /// # Errors
     ///
     /// A player or a position the lists do not hold.
-    fn at_mut(&mut self, place: Place) -> Result<&mut Unit, GenieError> {
+    fn at_mut(&mut self, place: Place) -> GenieResult<&mut Unit> {
         match place {
             Place::Live(p, i) => self.live_mut(p, i),
             Place::Sleeping(p, i) => self.asleep_mut(p, i),
@@ -113,67 +113,67 @@ pub(crate) trait CheckedIndex<T> {
     /// # Errors
     ///
     /// A position the slice does not hold.
-    fn checked(&self, i: usize) -> Result<&T, GenieError>;
+    fn checked(&self, i: usize) -> GenieResult<&T>;
 
     /// The element at `i`, to change.
     ///
     /// # Errors
     ///
     /// A position the slice does not hold.
-    fn checked_mut(&mut self, i: usize) -> Result<&mut T, GenieError>;
+    fn checked_mut(&mut self, i: usize) -> GenieResult<&mut T>;
 
     /// The first `n` elements.
     ///
     /// # Errors
     ///
     /// A slice shorter than `n`.
-    fn head(&self, n: usize) -> Result<&[T], GenieError>;
+    fn head(&self, n: usize) -> GenieResult<&[T]>;
 
     /// The first `n` elements, to change.
     ///
     /// # Errors
     ///
     /// A slice shorter than `n`.
-    fn head_mut(&mut self, n: usize) -> Result<&mut [T], GenieError>;
+    fn head_mut(&mut self, n: usize) -> GenieResult<&mut [T]>;
 
     /// The elements from `from` on, to change: none at the end.
     ///
     /// # Errors
     ///
     /// A slice shorter than `from`.
-    fn tail_mut(&mut self, from: usize) -> Result<&mut [T], GenieError>;
+    fn tail_mut(&mut self, from: usize) -> GenieResult<&mut [T]>;
 }
 
 impl<T> CheckedIndex<T> for [T] {
-    fn checked(&self, i: usize) -> Result<&T, GenieError> {
+    fn checked(&self, i: usize) -> GenieResult<&T> {
         self.get(i).ok_or_else(|| NO_ELEMENT.with("index", i))
     }
 
-    fn checked_mut(&mut self, i: usize) -> Result<&mut T, GenieError> {
+    fn checked_mut(&mut self, i: usize) -> GenieResult<&mut T> {
         self.get_mut(i).ok_or_else(|| NO_ELEMENT.with("index", i))
     }
 
-    fn head(&self, n: usize) -> Result<&[T], GenieError> {
+    fn head(&self, n: usize) -> GenieResult<&[T]> {
         self.get(..n).ok_or_else(|| NO_ELEMENT.with("end", n))
     }
 
-    fn head_mut(&mut self, n: usize) -> Result<&mut [T], GenieError> {
+    fn head_mut(&mut self, n: usize) -> GenieResult<&mut [T]> {
         self.get_mut(..n).ok_or_else(|| NO_ELEMENT.with("end", n))
     }
 
-    fn tail_mut(&mut self, from: usize) -> Result<&mut [T], GenieError> {
+    fn tail_mut(&mut self, from: usize) -> GenieResult<&mut [T]> {
         self.get_mut(from..)
             .ok_or_else(|| NO_ELEMENT.with("start", from))
     }
 }
 
 impl PlayerSlots for [Player] {
-    fn player(&self, p: PlayerId) -> Result<&Player, GenieError> {
+    fn player(&self, p: PlayerId) -> GenieResult<&Player> {
         self.get(p.index())
             .ok_or_else(|| NO_PLAYER.with("player", p))
     }
 
-    fn player_mut(&mut self, p: PlayerId) -> Result<&mut Player, GenieError> {
+    fn player_mut(&mut self, p: PlayerId) -> GenieResult<&mut Player> {
         self.get_mut(p.index())
             .ok_or_else(|| NO_PLAYER.with("player", p))
     }
@@ -185,7 +185,7 @@ impl Player {
     /// # Errors
     ///
     /// A position the list does not hold.
-    pub(crate) fn live(&self, i: ListIndex) -> Result<&Unit, GenieError> {
+    pub(crate) fn live(&self, i: ListIndex) -> GenieResult<&Unit> {
         self.objects.get(i).ok_or_else(|| NO_SLOT.with("index", i))
     }
 
@@ -194,7 +194,7 @@ impl Player {
     /// # Errors
     ///
     /// A position the list does not hold.
-    pub(crate) fn live_mut(&mut self, i: ListIndex) -> Result<&mut Unit, GenieError> {
+    pub(crate) fn live_mut(&mut self, i: ListIndex) -> GenieResult<&mut Unit> {
         self.objects
             .get_mut(i)
             .ok_or_else(|| NO_SLOT.with("index", i))
@@ -205,7 +205,7 @@ impl Player {
     /// # Errors
     ///
     /// A position the list does not hold.
-    pub(crate) fn asleep(&self, i: ListIndex) -> Result<&Unit, GenieError> {
+    pub(crate) fn asleep(&self, i: ListIndex) -> GenieResult<&Unit> {
         self.sleeping.get(i).ok_or_else(|| NO_SLOT.with("index", i))
     }
 
@@ -214,7 +214,7 @@ impl Player {
     /// # Errors
     ///
     /// A position the list does not hold.
-    pub(crate) fn asleep_mut(&mut self, i: ListIndex) -> Result<&mut Unit, GenieError> {
+    pub(crate) fn asleep_mut(&mut self, i: ListIndex) -> GenieResult<&mut Unit> {
         self.sleeping
             .get_mut(i)
             .ok_or_else(|| NO_SLOT.with("index", i))

@@ -1,7 +1,6 @@
 //! What a repair reaches and pays: a building's and a combat unit's slot 0x8c8 by the
 //! repairer's player.
 
-use crate::GenieError;
 use crate::combat::damage::Heal;
 use crate::combat::damage::heal_hp;
 use crate::construction::MainBuildingId;
@@ -26,6 +25,7 @@ use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
 use crate::world::layer::Slots;
 use crate::world::slots::CheckedIndex;
+use crate::{GenieError, GenieResult};
 use std::fmt::{Debug, Error, Formatter};
 
 /// What a repair's slot 0x8c8 answers (the game's 0, 1 and 2).
@@ -89,7 +89,7 @@ impl Debug for Payer<'_> {
 }
 
 /// The object of `set` with id `id`.
-pub(super) fn find(set: &[Repaired], id: ObjectId) -> Result<usize, GenieError> {
+pub(super) fn find(set: &[Repaired], id: ObjectId) -> GenieResult<usize> {
     set.iter()
         .position(|o| o.id == id)
         .ok_or(GenieError::unreachable("a repair's object outside its set"))
@@ -125,7 +125,7 @@ pub fn repair_building(
     payer: &mut Payer<'_>,
     roles: &Roles,
     slots: Slots,
-) -> Result<RepairOutcome, GenieError> {
+) -> GenieResult<RepairOutcome> {
     let o = set.checked(idx)?;
     if roles
         .of_class(o.class)
@@ -200,7 +200,7 @@ pub fn repair_unit(
     payer: &mut Payer<'_>,
     roles: &Roles,
     slots: Slots,
-) -> Result<RepairOutcome, GenieError> {
+) -> GenieResult<RepairOutcome> {
     let o = set.checked_mut(idx)?;
     let mut amount = amount;
     if roles.of_class(o.class).contains(ClassRoles::REPAIR_COSTED) {
@@ -249,11 +249,11 @@ impl PaidAttributes {
 }
 
 impl Attributes for PaidAttributes {
-    fn get(&self, i: AttributeId) -> Result<Amount, GenieError> {
+    fn get(&self, i: AttributeId) -> GenieResult<Amount> {
         self.values.get(i.index()).copied().ok_or(NO_ATTRIBUTE)
     }
 
-    fn subtract(&mut self, i: AttributeId, amount: Amount) -> Result<(), GenieError> {
+    fn subtract(&mut self, i: AttributeId, amount: Amount) -> GenieResult<()> {
         let v = self.values.get_mut(i.index()).ok_or(NO_ATTRIBUTE)?;
         *v -= amount;
         self.adds.push((i, -amount));

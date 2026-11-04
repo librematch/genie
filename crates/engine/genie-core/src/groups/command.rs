@@ -1,7 +1,6 @@
 //! A group's orders (FD-036): `BUnitGroup::command` (`FUN_14100efd0`), `commandMoveTo`
 //! (`FUN_141010a80`) and `stopAllUnits` (`FUN_14103a0d0`), the HD PDB's names.
 
-use crate::GenieError;
 use crate::groups::CommandArgs;
 use crate::groups::FormationKind;
 use crate::groups::GroupCommandKind;
@@ -38,6 +37,7 @@ use crate::world::WorldTime;
 use crate::world::index::Place;
 use crate::world::layer::generated::GroupTuning;
 use crate::world::slots::{CheckedIndex, PlayerSlots};
+use crate::{GenieError, GenieResult};
 
 /// A group whose top speed is below this does not move (`commandMoveTo`, `DAT_142eb0c60`); nor is
 /// a path shorter than it one.
@@ -143,7 +143,7 @@ impl World {
     ///
     /// When the world does not hold `group`: the game's routine gets the group itself, from a
     /// caller that holds it.
-    pub fn all_horde_units(&self, group: GroupId) -> Result<bool, GenieError> {
+    pub fn all_horde_units(&self, group: GroupId) -> GenieResult<bool> {
         let g = self.groups.held(group)?;
         self.horde_units_only(g)
     }
@@ -153,7 +153,7 @@ impl World {
     /// # Errors
     ///
     /// A member of a master the slice does not have.
-    pub fn horde_units_only(&self, g: &UnitGroup) -> Result<bool, GenieError> {
+    pub fn horde_units_only(&self, g: &UnitGroup) -> GenieResult<bool> {
         for m in &g.members {
             if let Some((p, u)) = self.object(m.id) {
                 let master = u.master(self.master_tables(), p)?;
@@ -182,7 +182,7 @@ impl World {
         group: GroupId,
         point: Point,
         how: MoveTo,
-    ) -> Result<Option<GroupMove>, GenieError> {
+    ) -> GenieResult<Option<GroupMove>> {
         let g = self.groups.held_mut(group)?;
         let at = BVector::new(point.x(), 0.0, point.y());
         if how.flags.contains(MoveFlags::QUEUED) {
@@ -269,7 +269,7 @@ impl World {
         target: Option<ObjectId>,
         point: Point,
         how: MoveTo,
-    ) -> Result<GroupMove, GenieError> {
+    ) -> GenieResult<GroupMove> {
         let world_time = self.world_time;
         let g = self.groups.held_mut(group)?;
         g.flags &= !(GroupFlags::MEMBERS_SENT | GroupFlags::FOLLOWED);
@@ -354,7 +354,7 @@ impl World {
         point: Point,
         how: MoveTo,
         (target, changed): (Option<ObjectId>, bool),
-    ) -> Result<Option<(bool, Option<Distance>)>, GenieError> {
+    ) -> GenieResult<Option<(bool, Option<Distance>)>> {
         let world_time = self.world_time;
         let g = self.groups.held_mut(group)?;
         // FUN_141046500: the top ancestor's path, else the walked level's
@@ -435,7 +435,7 @@ impl World {
     ///
     /// When the world does not hold `group`: the game's routine gets the group itself, from a
     /// caller that holds it.
-    pub fn check_queued_orders(&mut self, group: GroupId) -> Result<(), GenieError> {
+    pub fn check_queued_orders(&mut self, group: GroupId) -> GenieResult<()> {
         let g = self.groups.held_mut(group)?;
         if !g.command_queue.is_empty() {
             g.replaces_queue = 0;
@@ -455,7 +455,7 @@ impl World {
 
     /// [`World::check_queued_orders`]' run over the queue and its move to the run's last command
     /// (`bVar2`: a command on a held target ends the run without the move).
-    fn run_queued_commands(&mut self, group: GroupId) -> Result<(), GenieError> {
+    fn run_queued_commands(&mut self, group: GroupId) -> GenieResult<()> {
         let (mut first, mut kept, mut ran, mut running) =
             (GroupCommandKind::NONE, None, false, true);
         let mut i = 0;
@@ -518,7 +518,7 @@ impl World {
         group: GroupId,
         node: GroupCommand,
         count: usize,
-    ) -> Result<QueueRun, GenieError> {
+    ) -> GenieResult<QueueRun> {
         // the target with its place, when the world holds it
         let held = node
             .target_id
@@ -569,7 +569,7 @@ impl World {
     ///
     /// When the world does not hold `group`: the game's routine gets the group itself, from a
     /// caller that holds it.
-    pub fn stop_all_units(&mut self, group: GroupId, scope: StopScope) -> Result<(), GenieError> {
+    pub fn stop_all_units(&mut self, group: GroupId, scope: StopScope) -> GenieResult<()> {
         let ids: Vec<ObjectId> = self
             .groups
             .held(group)?
@@ -586,7 +586,7 @@ impl World {
     /// Whether [`World::stop_all_units`] stops the member at `place`: one with an action takes
     /// the stop, one without only with [`StopScope::All`] (slot 0x530: the top action's type, -1
     /// without one).
-    fn stop_applies(&self, place: Place, scope: StopScope) -> Result<bool, GenieError> {
+    fn stop_applies(&self, place: Place, scope: StopScope) -> GenieResult<bool> {
         let u = match place {
             Place::Live(p, i) => self.players.live(p, i)?,
             Place::Sleeping(p, i) => self.players.asleep(p, i)?,
@@ -605,7 +605,7 @@ impl World {
         group: GroupId,
         (k, id): (usize, ObjectId),
         scope: StopScope,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         // FUN_1415417a0: a sleeping member too
         let Some(place) = self.place(id) else {
             return Ok(());

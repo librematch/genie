@@ -1,6 +1,5 @@
 //! A hunter's search and its walk after a drop.
 
-use crate::GenieError;
 use crate::combat::attack::BeginLayer;
 use crate::combat::attack::{arms, engagement};
 use crate::combat::victims::victim;
@@ -42,6 +41,7 @@ use crate::world::lets::release;
 use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
+use crate::{GenieError, GenieResult};
 
 mod found;
 
@@ -57,7 +57,7 @@ impl Unit {
         actions: &mut Action,
         c: &mut Step<'_>,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if !roles
             .of_some_class(hunt.target_class)
             .contains(ClassRoles::PREDATOR)
@@ -79,7 +79,7 @@ impl Unit {
         actions: &mut Action,
         c: &mut Step<'_>,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let task = hunt.task;
         if roles
             .of_some_class(hunt.target_class)
@@ -105,11 +105,7 @@ impl Unit {
 
     /// The hunter takes the sprite its hunt stands with (slot 0x68 with `FUN_140ac5210`'s, by the
     /// task and what the unit carries; [`crate::gathering::hunt::stand_sprite`]).
-    pub(crate) fn hunt_stand(
-        &mut self,
-        c: &mut Step<'_>,
-        task: &HuntTask,
-    ) -> Result<(), GenieError> {
+    pub(crate) fn hunt_stand(&mut self, c: &mut Step<'_>, task: &HuntTask) -> GenieResult<()> {
         let master = self.master(c.w.master_tables(), c.player)?;
         let stand = stand_sprite(
             task,
@@ -139,7 +135,7 @@ impl Unit {
         &mut self,
         c: &mut Step<'_>,
         ids: [K; N],
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let by = self.releaser(c)?;
         for id in ids.into_iter().filter_map(ObjectKey::key) {
             release(c, self, id, by)?;
@@ -157,7 +153,7 @@ impl Unit {
         hunt: &mut HuntAction,
         actions: &mut Action,
         c: &mut Step<'_>,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let by_id = ObjectsRef::new(
             &c.w.players,
             &c.w.index,
@@ -234,7 +230,7 @@ impl Unit {
         actions: &mut Action,
         c: &mut Step<'_>,
         roles: &Roles,
-    ) -> Result<HeadCode, GenieError> {
+    ) -> GenieResult<HeadCode> {
         let _ = self.master(c.w.master_tables(), c.player)?;
         if hunt.target.is_some() {
             return self
@@ -264,7 +260,7 @@ impl Unit {
         actions: &mut Action,
         c: &mut Step<'_>,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let master = self.master(c.w.master_tables(), c.player)?;
         let v = victim(c, hunt.target, roles)?.ok_or(GenieError::unsupported(
             "a hunt's target the slice does not hold live",
@@ -366,7 +362,7 @@ impl Unit {
     /// (`FUN_140c5de60`); with orders left the AI's order and action clear (`FUN_140c64b60`,
     /// `FUN_140c64b50`) and the hunt ends (`set_state(1)`; its update returns 1, whose deletion
     /// lets the drop site go): its unit AI runs the queued order ([`ActionEnd::Ends`]).
-    fn hunt_drop_orders(&self, c: &mut Step<'_>) -> Result<ActionEnd, GenieError> {
+    fn hunt_drop_orders(&self, c: &mut Step<'_>) -> GenieResult<ActionEnd> {
         let ai =
             c.w.parts
                 .unit_ai
@@ -410,7 +406,7 @@ impl Unit {
         actions: &Action,
         c: &mut Step<'_>,
         roles: &Roles,
-    ) -> Result<(Option<ObjectId>, Option<GatherGroup>), GenieError> {
+    ) -> GenieResult<(Option<ObjectId>, Option<GatherGroup>)> {
         let ai =
             c.w.parts
                 .unit_ai
@@ -456,7 +452,7 @@ impl Unit {
         c: &mut Step<'_>,
         class: Option<ClassId>,
         roles: &Roles,
-    ) -> Result<Option<ObjectId>, GenieError> {
+    ) -> GenieResult<Option<ObjectId>> {
         if self.my_pasture.is_some() {
             return Err(GenieError::unsupported(
                 "a hunter tending a pasture (FUN_1411c7670)",
@@ -547,7 +543,7 @@ impl Unit {
         c: &mut Step<'_>,
         kind: Option<GatherGroup>,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         if c.w.players.player(c.player)?.kind.is_computer() && kind != Some(GatherGroup::WOOD) {
             return Err(GenieError::unsupported(
                 "a computer player's hunt that found nothing after its drop-off (set_state 1)",

@@ -1208,7 +1208,7 @@ fn gatherer_state(
 
 /// Villager 31237's search of `w` on notify `n` by its action (`hunt`: [`UnitAi::hunter_search`],
 /// else [`UnitAi::gatherer_search`]).
-fn gatherer_searches(w: &mut World, n: Notify, hunt: bool) -> Result<u32, GenieError> {
+fn gatherer_searches(w: &mut World, n: Notify, hunt: bool) -> GenieResult<u32> {
     run_ai(
         w,
         (player_id(1), object_id(31237)),
@@ -1706,7 +1706,7 @@ fn gaia_attacks(w: &World, id: i32) -> Option<ObjectId> {
 }
 
 /// Gaia's unit `id` in `w` handles `n` after its unit AI queued it ([`UnitAi::handle`]).
-fn gaia_hears(w: &mut World, id: i32, n: Notify) -> Result<u32, GenieError> {
+fn gaia_hears(w: &mut World, id: i32, n: Notify) -> GenieResult<u32> {
     w.parts
         .unit_ai
         .get_mut(object_id(id))
@@ -5899,7 +5899,7 @@ fn gaia_unit_world_with(id: i32, ai: UnitAi, at: Position, others: &[SceneObject
 
 /// Gaia's unit `id` in `w` hears `n` through its action-failed handler
 /// ([`UnitAi::action_failed`]): its answer and its unit AI.
-fn gaia_failed(w: &mut World, id: i32, n: Notify) -> (Result<u32, GenieError>, UnitAi) {
+fn gaia_failed(w: &mut World, id: i32, n: Notify) -> (GenieResult<u32>, UnitAi) {
     let r = run_ai(
         w,
         (PlayerId::GAIA, object_id(id)),
@@ -6356,7 +6356,7 @@ fn update_busy(
     mut w: World,
     player: PlayerId,
     now: WorldTime,
-) -> (Result<Option<AfterOrder>, GenieError>, World) {
+) -> (GenieResult<Option<AfterOrder>>, World) {
     let r = run_ai(&mut w, (player, object_id(9)), |ai, at, side, kind, rng| {
         ai.update(Millis::new(10), now, kind, at, rng, side)
     });
@@ -6498,7 +6498,7 @@ fn dying_walker() -> SceneObject {
 
 /// Builder 9175 of `w` runs its target block ([`UnitAi::target_block`]): its answer and its
 /// unit AI.
-fn builder_target_block(w: &mut World) -> (Result<(), GenieError>, UnitAi) {
+fn builder_target_block(w: &mut World) -> (GenieResult<()>, UnitAi) {
     let r = run_ai(
         w,
         (player_id(1), object_id(9175)),
@@ -8403,7 +8403,7 @@ fn ship_or_livestock_may_attack_anything_and_building_nothing() {
 
 /// Unit `id` of `player` in `w` handles `n` through its type's handler (slot 0x238,
 /// [`UnitAi::handle`]).
-fn hears(w: &mut World, (player, id): (PlayerId, i32), n: Notify) -> Result<u32, GenieError> {
+fn hears(w: &mut World, (player, id): (PlayerId, i32), n: Notify) -> GenieResult<u32> {
     run_ai(w, (player, object_id(id)), |ai, at, side, kind, rng| {
         ai.handle(n, Millis::ZERO, at, kind, rng, side)
     })
@@ -9605,7 +9605,7 @@ fn attacks_500(w: &World) -> Option<ObjectId> {
 }
 
 /// Unit 500's full update in `w` ([`UnitAi::update`], 28 ms at time 0).
-fn update_500(w: &mut World) -> Result<Option<AfterOrder>, GenieError> {
+fn update_500(w: &mut World) -> GenieResult<Option<AfterOrder>> {
     run_ai(
         w,
         (player_id(1), object_id(500)),
@@ -9614,7 +9614,7 @@ fn update_500(w: &mut World) -> Result<Option<AfterOrder>, GenieError> {
 }
 
 /// Unit 500's idle check in `w` ([`UnitAi::soldier_idle`]).
-fn soldier_idle_500(w: &mut World) -> Result<IdleOutcome, GenieError> {
+fn soldier_idle_500(w: &mut World) -> GenieResult<IdleOutcome> {
     run_ai(
         w,
         (player_id(1), object_id(500)),
@@ -10256,7 +10256,7 @@ fn ship_hears(
     mut ai: UnitAi,
     actions: Option<Action>,
     kind: PlayerKind,
-) -> (Result<u32, GenieError>, World) {
+) -> (GenieResult<u32>, World) {
     ai.post(n, ObjectState::Alive).unwrap();
     let mut w = transport_world(ai, actions, kind);
     let r = run_ai(
@@ -11960,7 +11960,7 @@ fn order_tree() -> SceneObject {
 }
 
 /// Unit 9's slot 0x230 on order `o` in `w` ([`UnitAi::process_order`] inside its update).
-fn orders(w: &mut World, o: &QueuedOrder) -> Result<OrderOutcome, GenieError> {
+fn orders(w: &mut World, o: &QueuedOrder) -> GenieResult<OrderOutcome> {
     run_ai(
         w,
         (player_id(1), object_id(9)),
@@ -13643,7 +13643,7 @@ fn building_master(id: i16, class: ClassId) -> Master {
 fn retargets(
     w: &mut World,
     search: RetargetSearch,
-) -> (Result<u32, GenieError>, Option<ObjectId>, Vec<ObjectId>) {
+) -> (GenieResult<u32>, Option<ObjectId>, Vec<ObjectId>) {
     let r = run_ai(
         w,
         (player_id(1), object_id(500)),

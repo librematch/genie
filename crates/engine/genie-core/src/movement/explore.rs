@@ -7,7 +7,6 @@
 //! player's turn); with a point it walks there in state 11 with a quiet `MoveTo`, and when the `MoveTo`
 //! is done it goes back to state 3.
 
-use crate::GenieError;
 use crate::map::Distance;
 use crate::map::GridSize;
 use crate::map::Point;
@@ -30,6 +29,7 @@ use crate::unit_ai::OrderKind;
 use crate::unit_ai::UnitStance;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
+use crate::{GenieError, GenieResult};
 use genie_diff::Diff;
 
 /// The Explore action's type.
@@ -121,7 +121,7 @@ impl ExploreAction {
         point: Position,
         walk: &ExploreMove<'_>,
         move_to_tuning: &MoveToTuning,
-    ) -> Result<(Self, Owner), GenieError> {
+    ) -> GenieResult<(Self, Owner)> {
         let mut a = Self {
             state: ExploreState::New,
             point,
@@ -149,7 +149,7 @@ impl ExploreAction {
         state: ExploreState,
         walk: &ExploreMove<'_>,
         move_to_tuning: &MoveToTuning,
-    ) -> Result<Owner, GenieError> {
+    ) -> GenieResult<Owner> {
         // the sub-actions go: a new state holds none until it makes its own
         self.state = match state {
             ExploreState::Walk { .. } => ExploreState::Walk { move_to: None },
@@ -196,7 +196,7 @@ impl ExploreAction {
         point: Position,
         walk: &ExploreMove<'_>,
         move_to_tuning: &MoveToTuning,
-    ) -> Result<Owner, GenieError> {
+    ) -> GenieResult<Owner> {
         if 0.0 <= point.x() && 0.0 <= point.y() {
             self.point = point;
             return self.set_state(ExploreState::Walk { move_to: None }, walk, move_to_tuning);
@@ -235,7 +235,7 @@ impl ExploreAction {
         explorer: &mut Unit,
         me: Me,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         // 0x140a880c0: state 1 is done (the action list removes it, the default task's restart
         // is not modelled), 11 walks, 13 fails; the others wait
         match self.state {
@@ -259,7 +259,7 @@ impl ExploreAction {
         explorer: &mut Unit,
         me: Me,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let master = object_master(
             c.w.parts.own_master.get(explorer.id),
             (explorer.id, explorer.life.master_id),
@@ -378,7 +378,7 @@ pub(crate) fn unexplored_area(
     tc: Option<Tile>,
     map: GridSize,
     area: &mut ScoutArea<'_>,
-) -> Result<Option<Tile>, GenieError> {
+) -> GenieResult<Option<Tile>> {
     let Some(tc) = tc else {
         return Ok(None);
     };
@@ -438,7 +438,7 @@ pub(crate) fn closest_undiscovered(
     seeker: Seeker,
     map: GridSize,
     ai: &mut Well512,
-) -> Result<Option<Tile>, GenieError> {
+) -> GenieResult<Option<Tile>> {
     if seeker.player_kind.is_computer() {
         return Ok(None);
     }
@@ -506,7 +506,7 @@ pub(crate) fn beyond_sight(
     line_of_sight: Distance,
     map: GridSize,
     ai: &mut Well512,
-) -> Result<Option<Tile>, GenieError> {
+) -> GenieResult<Option<Tile>> {
     let own = area.own_zone();
     let (w, h) = (map.width(), map.height());
     let r = line_of_sight.get() as i32 + SQUARE_PAST_SIGHT;
@@ -528,7 +528,7 @@ pub(crate) fn beyond_sight(
         edge.extend((y0 + 1..=y1).filter(|&y| on_y(y)).map(|y| Tile::new(x0, y)));
     }
     ai.shuffle(&mut edge);
-    let counts = |area: &mut ScoutArea<'_>, tile: Tile| -> Result<bool, GenieError> {
+    let counts = |area: &mut ScoutArea<'_>, tile: Tile| -> GenieResult<bool> {
         Ok(area.zone(tile) == own && area.clear(tile)? && area.reaches(tile)?)
     };
     for &t in &edge {
@@ -572,7 +572,7 @@ impl Unit {
         point: Point,
         c: &mut Step<'_>,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let at = Position::new(point.x(), point.y(), self.position().z());
         let walk = self.explore_move(c, roles);
         let owner = if let Some(e) = actions.list.explore_mut() {
@@ -632,11 +632,7 @@ impl Unit {
     /// with the explore's action value to the unit AI, and the standing sprite (slot 0x68 with
     /// the master's `+0x470`) where the slice holds the unit's sprite. `Set_state` 2's slots are
     /// not modelled.
-    pub(crate) fn explore_owner(
-        &mut self,
-        owner: Owner,
-        c: &mut Step<'_>,
-    ) -> Result<(), GenieError> {
+    pub(crate) fn explore_owner(&mut self, owner: Owner, c: &mut Step<'_>) -> GenieResult<()> {
         use crate::movement::explore::Owner;
         match owner {
             Owner::Nothing => return Ok(()),

@@ -1,6 +1,5 @@
 //! A unit's strikes back and its volleys: the missiles it fires and launches.
 
-use crate::GenieError;
 use crate::combat::MissileCount;
 use crate::combat::damage::Kill;
 use crate::combat::damage::Victim;
@@ -36,6 +35,7 @@ use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 use crate::world::layer::generated::TurnTuning;
 use crate::world::step::Step;
+use crate::{GenieError, GenieResult};
 
 mod launch;
 
@@ -48,7 +48,7 @@ impl Unit {
         &mut self,
         own: Victim,
         (ai, combat): (Option<&mut UnitAi>, &mut Combat),
-    ) -> Result<Option<Kill>, GenieError> {
+    ) -> GenieResult<Option<Kill>> {
         self.life.hp = own.hp;
         if let Some(a) = own.armored.as_ref() {
             combat.hp_powerup = a.hp_powerup;
@@ -95,7 +95,7 @@ impl Unit {
         c: &mut Step<'_>,
         aimed: Aimed,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let master = object_master(
             c.w.parts.own_master.get(self.id),
             (self.id, self.life.master_id),
@@ -198,7 +198,7 @@ impl Unit {
         c: &mut Step<'_>,
         (max_volley, spread, full): (MissileCount, VolleySpread, bool),
         notifies: bool,
-    ) -> Result<(bool, i32), GenieError> {
+    ) -> GenieResult<(bool, i32)> {
         let count = volley_count(c.w.parts.combat_of(self.id).firepower, max_volley);
         let old = c.w.parts.combat_of(self.id).next_volley;
         let mut n = count - old.counted();
@@ -254,7 +254,7 @@ impl Unit {
         c: &mut Step<'_>,
         aimed: &Aimed,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let combat = c.w.parts.combat_mut(self.id)?;
         combat.attack_count = combat.attack_count.next();
         let master = self.master(c.w.master_tables(), c.player)?;
@@ -335,7 +335,7 @@ impl Unit {
         aimed: &Aimed,
         scatter: GroundOffset,
         roles: &Roles,
-    ) -> Result<(), GenieError> {
+    ) -> GenieResult<()> {
         let masters =
             c.w.model
                 .masters
