@@ -8,9 +8,9 @@ use crate::objects::ObjectState;
 use crate::objects::UpdateCode;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::player_master;
-use crate::orders::NO_QUEUE;
 use crate::players::Amount;
 use crate::players::PlayerId;
+use crate::production::Entry;
 use crate::production::ProductionStart;
 use crate::production::{
     MakeObj, MakeObjState, MakeTech, MakeTechState, Making, housed, population,
@@ -30,10 +30,6 @@ use crate::world::slots::PlayerSlots;
 /// A queue that is enabled and counts an entry, but holds none.
 const EMPTY_QUEUE: GenieError =
     GenieError::unreachable("a production queue that counts an entry but holds none");
-
-/// A building the make step runs for, whose action is no unit's Make.
-const NO_MAKE_ACTION: GenieError =
-    GenieError::unreachable("a make step of a building without a make action");
 
 impl World {
     /// `TRIBE_Building_Object::update`'s part after its combat update (`0x1411ca3e2`) for the
@@ -91,6 +87,11 @@ impl World {
         if !production.queue.enabled || production.queue.count == QueueLength::ZERO {
             return Ok(());
         }
+        // the first entry's action starts when the list has none
+        let unstarted = production
+            .action
+            .is_none()
+            .then(|| production.queue.first().copied());
         let busy = !self.players.player(p)?.kind.is_computer()
             && self
                 .parts
@@ -112,7 +113,11 @@ impl World {
         if busy {
             return Ok(());
         }
-        if self.begin_production(p, i)? == ProductionStart::Stops {
+        if let Some(first) = unstarted
+            // the count says an entry, and the load and the queue's writers keep it within the
+            // slots (`Queue::entries`)
+            && self.begin_production(p, i, first.ok_or(EMPTY_QUEUE)?)? == ProductionStart::Stops
+        {
             return Ok(());
         }
         let code = self.update_production_action(p, i, dt_seconds)?;
@@ -153,42 +158,35 @@ impl World {
         Ok(())
     }
 
-    /// The first queue entry's action starts when the list has none ([`World::produce`]): a unit
-    /// waits housed (a computer player's entry is cancelled), else it starts. Stops when the
-    /// production stops for this update.
+    /// The first queue entry `first`'s action starts, the list holding none ([`World::produce`]):
+    /// a unit waits housed (a computer player's entry is cancelled), else it starts. Stops when
+    /// the production stops for this update.
     fn begin_production(
         &mut self,
         p: PlayerId,
         i: ListIndex,
+        first: Entry,
     ) -> Result<ProductionStart, GenieError> {
-        let production = self
-            .parts
-            .production
-            .get(self.players.live(p, i)?.id)
-            .ok_or(NO_QUEUE)?;
-        if production.action.is_none() {
-            let first = *production.queue.first().ok_or(EMPTY_QUEUE)?;
-            let making = if first.tech.is_none() {
-                let pop = first
-                    .master
-                    .and_then(|m| player_master(&self.model.masters, p, m))
-                    .map_or(Amount::ZERO, |m| population(&m.storage, &self.model.roles));
-                if housed(&self.players.player(p)?.attributes, pop, self.model.slots)? {
-                    if self.players.player(p)?.kind.is_computer() {
-                        self.cancel_queue(p, i)?;
-                        return Ok(ProductionStart::Stops);
-                    }
+        let making = if first.tech.is_none() {
+            let pop = first
+                .master
+                .and_then(|m| player_master(&self.model.masters, p, m))
+                .map_or(Amount::ZERO, |m| population(&m.storage, &self.model.roles));
+            if housed(&self.players.player(p)?.attributes, pop, self.model.slots)? {
+                if self.players.player(p)?.kind.is_computer() {
+                    self.cancel_queue(p, i)?;
                     return Ok(ProductionStart::Stops);
                 }
-                if let Some(ai) = self.parts.unit_ai.get_mut(self.players.live(p, i)?.id) {
-                    ai.set_action(Some(AiAction::Make));
-                }
-                Making::Unit(MakeObj::for_entry(&first))
-            } else {
-                Self::make_research(&first)?
-            };
-            self.start_production_action(p, i, making)?;
-        }
+                return Ok(ProductionStart::Stops);
+            }
+            if let Some(ai) = self.parts.unit_ai.get_mut(self.players.live(p, i)?.id) {
+                ai.set_action(Some(AiAction::Make));
+            }
+            Making::Unit(MakeObj::for_entry(&first))
+        } else {
+            Self::make_research(&first)?
+        };
+        self.start_production_action(p, i, making)?;
         Ok(ProductionStart::Goes)
     }
 
@@ -304,8 +302,8 @@ impl World {
             .and_then(|q| q.action);
         match action {
             None => Ok(UpdateCode::Done),
-            Some(Making::Unit(_)) => self.make_step(p, i, dt_seconds),
-            Some(Making::Research(_)) => self.research_step(p, i, dt_seconds),
+            Some(Making::Unit(make)) => self.make_step((p, i), make, dt_seconds),
+            Some(Making::Research(r)) => self.research_step((p, i), r, dt_seconds),
         }
     }
 
@@ -320,16 +318,11 @@ impl World {
     /// timer, `FUN_140ace630`).
     pub(super) fn make_step(
         &mut self,
-        p: PlayerId,
-        i: ListIndex,
+        (p, i): (PlayerId, ListIndex),
+        make: MakeObj,
         dt_seconds: Seconds,
     ) -> Result<UpdateCode, GenieError> {
         let building = &self.players.live(p, i)?;
-        let Some(Some(Making::Unit(make))) =
-            self.parts.production.get(building.id).map(|q| q.action)
-        else {
-            return Err(NO_MAKE_ACTION);
-        };
         match make.state {
             MakeObjState::Done => return Ok(UpdateCode::Done),
             MakeObjState::Making => {}

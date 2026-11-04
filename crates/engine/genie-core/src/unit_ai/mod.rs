@@ -365,6 +365,8 @@ pub enum AiCommand {
     DropElsewhere {
         /// The drop site.
         site: DropSiteId,
+        /// Its place, where the table's search found it.
+        at: Position,
         /// The top action's target before the work.
         back: Option<ObjectId>,
     },

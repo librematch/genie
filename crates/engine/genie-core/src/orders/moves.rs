@@ -509,13 +509,9 @@ impl World {
         let workers = self.livestock_workers(on).as_f32();
         // COMISS room with the workers, JBE: a NaN is full
         if room > Amount::new(workers) {
-            let Some(pick) = self.pasture_pick(on, player, idx)? else {
+            let Some((pick, point)) = self.pasture_pick(on, player, idx)? else {
                 return Ok(PastureAfter::Ends);
             };
-            let point = self
-                .object(pick)
-                .map(|(_, l)| l.position())
-                .ok_or(GenieError::unreachable("the livestock picked"))?;
             let on_it = Work {
                 target: Some(pick),
                 point,

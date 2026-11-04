@@ -387,6 +387,7 @@ impl World {
         }
         let kind = u.master(self.master_tables(), p)?.kind;
         self.leave_group_of(id, None)?;
+        // the group's leave moves its member's slot at most (`World::leave_group_of`)
         let (_, u) = self.object(id).ok_or_else(|| object_gone(id))?;
         let at = u.position();
         if let Some(m) = self.parts.mover_mut(id) {

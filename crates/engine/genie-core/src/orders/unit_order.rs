@@ -3,6 +3,7 @@
 use crate::GenieError;
 use crate::commands::UnitOrderAction;
 use crate::construction::FoundationId;
+use crate::construction::build::BuildAction;
 use crate::construction::build::NOT_HELD;
 use crate::gathering::gather::GATHER;
 use crate::gathering::hunt::HUNT;
@@ -337,7 +338,7 @@ impl World {
             }),
             Some(ActionKind::BUILD) => self.parts.actions_of(unit.id).list.build().map(|b| {
                 (
-                    DropOffBy::Build,
+                    DropOffBy::Build(*b),
                     b.target.map(FoundationId::id),
                     b.point,
                     b.task.resource,
@@ -388,7 +389,7 @@ impl World {
         }
         if ask.asked {
             match ask.by {
-                DropOffBy::Build => self.build_drop_off_now(p, idx)?,
+                DropOffBy::Build(build) => self.build_drop_off_now((p, idx), build)?,
                 DropOffBy::Gather | DropOffBy::Hunt => self.drop_off_at_site(p, idx, ask.by)?,
             }
         }
@@ -426,7 +427,7 @@ impl World {
             groups: &self.groups,
         };
         let others = OthersRef::of(&self.players, &self.index, p)?;
-        let result = if by == DropOffBy::Hunt {
+        let result = if matches!(by, DropOffBy::Hunt) {
             unit.drop_off_in(
                 &mut actions,
                 mover,
@@ -455,18 +456,18 @@ impl World {
 }
 
 /// The top action a drop-off order asks ([`World::drop_off_ask`]).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub(super) enum DropOffBy {
     /// A Gather (5).
     Gather,
-    /// A Build (101).
-    Build,
+    /// A Build (101), the one the ask found.
+    Build(BuildAction),
     /// A Hunt (110).
     Hunt,
 }
 
 /// A drop-off order's ask of a unit's top action ([`World::drop_off_ask`]).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub(super) struct DropOffAsk {
     /// The action asked.
     pub(super) by: DropOffBy,

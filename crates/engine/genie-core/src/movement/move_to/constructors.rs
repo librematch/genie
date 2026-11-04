@@ -135,17 +135,30 @@ impl<'g> MoveToReads<'g> {
     ///
     /// An object whose master its player's table lacks.
     pub fn walk_to(&self, w: &World, id: Option<ObjectId>) -> Result<Option<WalkTo>, GenieError> {
-        let Some((player, t)) = w.object(id) else {
+        let Some(found) = w.object(id) else {
             return Ok(None);
         };
+        self.walk_to_found(w, found).map(Some)
+    }
+
+    /// [`MoveToReads::walk_to`] to the object `t` of `player` that the caller found.
+    ///
+    /// # Errors
+    ///
+    /// A master the player has not got.
+    pub fn walk_to_found(
+        &self,
+        w: &World,
+        (player, t): (PlayerId, &Unit),
+    ) -> Result<WalkTo, GenieError> {
         let at = t.position();
         let radius = t.master(w.master_tables(), player)?.radius;
-        Ok(Some(WalkTo {
-            id,
+        Ok(WalkTo {
+            id: Some(t.id),
             at,
             gap: footprint_gap(self.at, self.ground, at, radius),
             state: Some(t.life.state),
-        }))
+        })
     }
 
     /// A quiet `MoveTo` to the object `to` within `range` (`FUN_140aa0df0` with 1 and 1, then

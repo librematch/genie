@@ -256,9 +256,9 @@ impl UnitAi {
         rng: &mut Well512,
     ) -> Result<u32, GenieError> {
         let back = side.top_target_now();
-        if let Some(site) = side.table_drop_site()? {
+        if let Some((site, at)) = side.table_drop_site()? {
             side.effect_now(
-                Effect::Command(AiCommand::DropElsewhere { site, back }),
+                Effect::Command(AiCommand::DropElsewhere { site, at, back }),
                 self,
                 rng,
             )?;

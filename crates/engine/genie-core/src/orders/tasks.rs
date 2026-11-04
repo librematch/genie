@@ -31,15 +31,9 @@ use crate::world::index::Place;
 use crate::world::layer::ClassRoles;
 use crate::world::slots::PlayerSlots;
 
-/// A repairer whose top action is no Repair where the order retargets it.
-const NO_REPAIR: GenieError = GenieError::unreachable("a repair retarget without a Repair on top");
-
 /// A Repair's target the world does not hold where the work command starts or retargets it.
 const REPAIR_TARGET_GONE: GenieError =
     GenieError::unreachable("a Repair's target the world does not hold");
-
-/// A builder whose Build the retake found gone right after it checked.
-const NO_BUILD: GenieError = GenieError::unreachable("a Build taken from a builder that has none");
 
 impl World {
     /// `HuntObject`'s unit part (`FUN_140c4e220`, [`crate::unit_ai::AiCommand::HuntObject`], after
@@ -221,9 +215,7 @@ impl World {
             ),
             &self.model.roles,
         );
-        let to = move_reads
-            .walk_to(self, Some(target))?
-            .ok_or(REPAIR_TARGET_GONE)?;
+        let to = move_reads.walk_to_found(self, (tp, t))?;
         let repair_task = RepairTask::of(task);
         let repair = RepairAction::start(
             to,
@@ -290,8 +282,9 @@ impl World {
         order: RepairOrder,
     ) -> Result<(), GenieError> {
         match order {
-            RepairOrder::Retake(target) => {
-                self.repair_retarget(player, idx, target).map(|_class| ())?;
+            RepairOrder::Retake { target, repair } => {
+                self.repair_retarget((player, idx), repair, target)
+                    .map(|_class| ())?;
             }
             RepairOrder::Start {
                 target,
@@ -314,18 +307,16 @@ impl World {
         Ok(())
     }
 
-    /// The work command's target for the Repair the unit runs ([`World::repair_retarget`]); the
-    /// work command then tells the unit AI (slot 0x828: order 0x2ce, action 0x26a, the target
-    /// with its class, the work's point).
+    /// The work command's target for the Repair the unit runs (`repair`, the one on top that the
+    /// caller found; [`World::repair_retarget`]); the work command then tells the unit AI (slot
+    /// 0x828: order 0x2ce, action 0x26a, the target with its class, the work's point).
     pub(super) fn retake_repair(
         &mut self,
-        player: PlayerId,
-        idx: ListIndex,
-        target: ObjectId,
-        point: Position,
-        notifies: Notifies,
+        (player, idx): (PlayerId, ListIndex),
+        repair: RepairAction,
+        (target, point, notifies): (ObjectId, Position, Notifies),
     ) -> Result<(), GenieError> {
-        let class = self.repair_retarget(player, idx, target)?;
+        let class = self.repair_retarget((player, idx), repair, target)?;
         let unit = self.players.live_mut(player, idx)?;
         if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
             ai.notify_work(
@@ -355,8 +346,8 @@ impl World {
     /// With the target's class.
     pub(super) fn repair_retarget(
         &mut self,
-        player: PlayerId,
-        idx: ListIndex,
+        (player, idx): (PlayerId, ListIndex),
+        repair: RepairAction,
         target: ObjectId,
     ) -> Result<ClassId, GenieError> {
         let (tp, t) = self.object(target).ok_or(REPAIR_TARGET_GONE)?;
@@ -369,13 +360,6 @@ impl World {
                 .contains(ClassRoles::REPAIRED_AT_SHORE),
         );
         let player_kind = self.players.player(player)?.kind;
-        let repair = self
-            .parts
-            .actions_of(self.players.live(player, idx)?.id)
-            .list
-            .repair()
-            .copied()
-            .ok_or(NO_REPAIR)?;
         // the work command gives the Repair its target
         let same = repair.target == Some(RepairTargetId::new(target));
         let stays = same
@@ -407,28 +391,27 @@ impl World {
                 ),
                 &self.model.roles,
             );
+            // the retarget's release and take leave the target in the world
             let to = move_reads
                 .walk_to(self, Some(target))?
                 .ok_or(REPAIR_TARGET_GONE)?;
             let unit = self.players.live_mut(player, idx)?;
-            let r = self
-                .parts
-                .actions
-                .of_mut(unit.id)?
-                .list
-                .repair_mut()
-                .ok_or(NO_REPAIR)?;
+            // the retarget's release and take changed other objects only: `repair` is still the
+            // Repair on top, which goes back changed
+            let mut r = repair;
             // slot 0x68 dropped the count on another target; set_state(4)'s prelude makes a
             // repairer still counted leave its repairers
             let counted = same && r.counted;
             r.counted = false;
             r.target = taken;
-            r.walk_again(
+            let walked = r.walk_again(
                 to,
                 self.parts.motion.mover_mut(unit.id),
                 &move_reads,
                 &self.model.tuning.move_to,
-            )?;
+            );
+            self.parts.actions.of_mut(unit.id)?.list.set_repair(Some(r));
+            walked?;
             if counted {
                 self.leave_builders(Some(target))?;
             }
@@ -444,16 +427,14 @@ impl World {
     /// `FUN_140aaddb0`, an annex's main building's; `FUN_140a7a230` lets the old one go, slot
     /// 0x180, and takes the new, slot 0x178) starts over in `set_state(4)`
     /// ([`crate::construction::build::BuildAction::retarget`]). Another player's object (`set_state(11)`) is
-    /// not modelled.
+    /// not modelled. `build` is the Build on top that the caller found.
     pub(super) fn retake_build(
         &mut self,
-        player: PlayerId,
-        idx: ListIndex,
-        target: ObjectId,
-        point: Position,
-        notifies: Notifies,
+        (player, idx): (PlayerId, ListIndex),
+        build: BuildAction,
+        (target, point, notifies): (ObjectId, Position, Notifies),
     ) -> Result<(), GenieError> {
-        let class = self.build_take(player, idx, target)?;
+        let class = self.build_take((player, idx), build, target)?;
         let unit = self.players.live_mut(player, idx)?;
         if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
             ai.notify_work(
@@ -470,11 +451,12 @@ impl World {
     }
 
     /// The Build's slot 0x48 (`FUN_140ab1b30`) on `target` ([`World::retake_build`]'s part
-    /// before the notify): returns the target's master class.
+    /// before the notify), `old` the Build on top that the caller found: returns the target's
+    /// master class.
     pub(crate) fn build_take(
         &mut self,
-        player: PlayerId,
-        idx: ListIndex,
+        (player, idx): (PlayerId, ListIndex),
+        old: BuildAction,
         target: ObjectId,
     ) -> Result<ClassId, GenieError> {
         let (tp, t) = self.object(target).ok_or(GenieError::unsupported(
@@ -489,15 +471,6 @@ impl World {
         let (target_at, target_radius, class) = (t.position(), tm.radius, tm.class);
         let target_state = Some(t.life.state);
         let unit = &self.players.live(player, idx)?;
-        let old =
-            self.parts
-                .actions_of(unit.id)
-                .list
-                .build()
-                .copied()
-                .ok_or(GenieError::unsupported(
-                    "a Build's retarget without its Build",
-                ))?;
         let builder = unit.master(self.master_tables(), player)?;
         let to = WalkTo {
             id: Some(target),
@@ -524,12 +497,13 @@ impl World {
             // the task finder took the new target below state 3, which slot 0x68 keeps
             let _ = self.build_set_target(player, idx, (old.target, old.added), foundation)?;
             let unit = self.players.live_mut(player, idx)?;
+            // the new target went into the Build on top (`World::build_set_target` keeps it)
             let (Some(build), mover) = (
                 self.parts.actions.of_mut(unit.id)?.list.build_mut(),
                 self.parts.motion.mover_mut(unit.id),
             ) else {
-                return Err(GenieError::unsupported(
-                    "a Build's retarget without its Build",
+                return Err(GenieError::unreachable(
+                    "a Build that its own retarget took",
                 ));
             };
             build.retarget(foundation, target_at, walk, mover)?;
@@ -539,12 +513,12 @@ impl World {
         let Some(Place::Live(fp, fi)) = self.place(target) else {
             return Err(GenieError::unsupported("a Build's foundation that sleeps"));
         };
-        let (mut build, mut mover) = {
+        // the Build on top as the caller found it: no call since changed it, and it goes back
+        // after its retake
+        let mut build = old;
+        let mut mover = {
             let unit = self.players.live_mut(player, idx)?;
-            (
-                self.parts.actions.of_mut(unit.id)?.list.take_build(),
-                self.parts.take_mover(unit.id),
-            )
+            self.parts.take_mover(unit.id)
         };
         // FUN_140aaddb0's building: an annex's main building
         let counted = match self.counted_building(Some(target))? {
@@ -555,15 +529,13 @@ impl World {
             .and_then(|id| self.parts.building.get_mut(id))
             .and_then(|b| b.construction.as_mut())
             .map(|k| &mut k.builders);
-        let r = build.as_mut().ok_or(NO_BUILD)?.retake(
-            target_at,
-            walk,
-            mover.as_mut(),
-            builders,
-            player_kind,
-        );
+        let r = build.retake(target_at, walk, mover.as_mut(), builders, player_kind);
         let unit = self.players.live_mut(player, idx)?;
-        self.parts.actions.of_mut(unit.id)?.list.set_build(build);
+        self.parts
+            .actions
+            .of_mut(unit.id)?
+            .list
+            .set_build(Some(build));
         self.parts.put_mover(unit.id, mover);
         r?;
         Ok(class)

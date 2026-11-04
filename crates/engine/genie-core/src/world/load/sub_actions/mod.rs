@@ -364,10 +364,20 @@ pub fn production(object: &genie_save::Object) -> Result<Option<Production>, Gen
         return Ok(None);
     }
     let next_serial = EntrySerial::new(slots.len() as i64);
+    // the queue's entries are its first `count` slots (`Queue::entries`), which the game reads
+    // unchecked
+    let count = QueueLength::of_data(building.production_queue_count);
+    if slots.len() < count.slots() {
+        return Err(GenieError::invalid_input(
+            "a saved production queue that counts more entries than its slots",
+        )
+        .with("count", count.slots())
+        .with("slots", slots.len()));
+    }
     Ok(Some(Production {
         queue: Queue {
             slots,
-            count: QueueLength::of_data(building.production_queue_count),
+            count,
             total: QueuedUnits::of_data(building.production_queue_total_units),
             enabled: building.production_queue_enabled != 0,
             changes: QueueChanges::NONE,

@@ -27,10 +27,6 @@ use crate::world::slots::CheckedIndex;
 use crate::world::slots::PlayerSlots;
 use std::mem::take;
 
-/// A building the research step runs for, whose action is no Research.
-const NO_RESEARCH_ACTION: GenieError =
-    GenieError::unreachable("a research step of a building without a research action");
-
 impl World {
     /// The research's action (`TRIBE_Action_Make_Tech`, constructor `FUN_140ad0700` with the
     /// first entry's technology and master and 0, so paid; state 0, nothing done) for player
@@ -82,8 +78,8 @@ impl World {
     /// 0 as the tick oracle holds it).
     pub(super) fn research_step(
         &mut self,
-        p: PlayerId,
-        i: ListIndex,
+        (p, i): (PlayerId, ListIndex),
+        r: MakeTech,
         dt_seconds: Seconds,
     ) -> Result<UpdateCode, GenieError> {
         use crate::technology::Attributes;
@@ -94,11 +90,6 @@ impl World {
         }
         let owner = self.players.player(p)?;
         let building = owner.objects.checked(i)?;
-        let Some(Some(Making::Research(r))) =
-            self.parts.production.get(building.id).map(|q| q.action)
-        else {
-            return Err(NO_RESEARCH_ACTION);
-        };
         match r.state {
             MakeTechState::Done => return Ok(UpdateCode::Done),
             MakeTechState::Researching => {}

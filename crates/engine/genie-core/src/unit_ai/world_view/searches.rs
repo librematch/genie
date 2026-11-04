@@ -190,12 +190,13 @@ impl UnitView<'_, '_> {
     }
 
     /// `FUN_141658e20` from the unit's place: the drop-site table's nearest building of the
-    /// owner for what the unit carries (`+0x308`) from its class; None without one.
+    /// owner for what the unit carries (`+0x308`) from its class, with its place; None without
+    /// one.
     ///
     /// # Errors
     ///
     /// A unit or an owner the world does not hold.
-    pub(crate) fn table_drop_site(&self) -> Result<Option<DropSiteId>, GenieError> {
+    pub(crate) fn table_drop_site(&self) -> Result<Option<(DropSiteId, Position)>, GenieError> {
         let class = self
             .unit
             .master(self.c.w.master_tables(), self.player)?

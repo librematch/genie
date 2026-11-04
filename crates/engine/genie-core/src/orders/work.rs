@@ -3,25 +3,21 @@
 use crate::GenieError;
 use crate::combat::AttackTargetId;
 use crate::combat::attack::{ATTACK, Attack};
-use crate::combat::missile::MISSILE;
 use crate::construction::build::CART_TASK;
 use crate::construction::repair::REPAIR;
-use crate::construction::wait_solidify::WAIT_SOLIDIFY;
 use crate::garrison::ENTER;
 use crate::garrison::transport::TRANSPORT;
 use crate::gathering::both_food;
 use crate::gathering::gather::GATHER;
 use crate::gathering::hunt::{HUNT, HuntTask};
-use crate::gathering::make::MAKE;
 use crate::map::Position;
 use crate::map::TerrainId;
 use crate::math::rng::Stream;
 use crate::movement::Speed;
-use crate::movement::fly::FLY;
-use crate::movement::move_to::MOVE_TO;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::actions::Action;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
@@ -340,9 +336,10 @@ impl World {
         master: MasterSwap,
     ) -> Result<Answer, GenieError> {
         let unit = &self.players.live(player, idx)?;
-        let top = self.parts.actions_of(unit.id).top_action_kind();
-        Ok(match self.parts.actions_of(unit.id).list.hunt().copied() {
-            Some(h) if task.action_kind == HUNT && h.task.id == task.id => {
+        let head = self.parts.actions_of(unit.id).list.head().cloned();
+        let top = head.as_ref().map(Action::kind);
+        Ok(match head {
+            Some(Action::Hunt(h)) if task.action_kind == HUNT && h.task.id == task.id => {
                 self.retarget_hunt_work(
                     player,
                     idx,
@@ -350,42 +347,40 @@ impl World {
                 )?;
                 Answer::Taken
             }
-            _ if top == Some(task.action_kind) && task.action_kind == ActionKind::BUILD => {
+            Some(Action::Build(build)) if task.action_kind == ActionKind::BUILD => {
                 if master == MasterSwap::Change {
                     return Err(GenieError::unsupported(
                         "a work command on the Build task of the unit's former master",
                     ));
                 }
-                self.retake_build(player, idx, target.ok_or(TERRAIN_TASK)?, point, notifies)?;
+                let target = target.ok_or(TERRAIN_TASK)?;
+                self.retake_build((player, idx), build, (target, point, notifies))?;
                 Answer::Taken
             }
-            _ if top == Some(task.action_kind) && task.action_kind == REPAIR => {
-                self.retake_repair(player, idx, target.ok_or(TERRAIN_TASK)?, point, notifies)?;
+            Some(Action::Repair(repair)) if task.action_kind == REPAIR => {
+                let target = target.ok_or(TERRAIN_TASK)?;
+                self.retake_repair((player, idx), repair, (target, point, notifies))?;
                 Answer::Taken
             }
-            _ if top == Some(GATHER)
-                && task.action_kind == GATHER
-                && self
-                    .parts
-                    .actions_of(unit.id)
-                    .list
-                    .gather()
-                    .is_some_and(|g| g.task.id == task.id) =>
-            {
-                self.retarget_gather_work(
-                    player,
-                    idx,
-                    (target.ok_or(TERRAIN_TASK)?, point, notifies),
-                )?
-            }
-            _ if top == Some(TRANSPORT) && task.action_kind == TRANSPORT => {
+            Some(Action::Gather(g)) if task.action_kind == GATHER && g.task.id == task.id => self
+                .retarget_gather_work(
+                player,
+                idx,
+                (target.ok_or(TERRAIN_TASK)?, point, notifies),
+            )?,
+            Some(Action::Transport(_)) if task.action_kind == TRANSPORT => {
                 self.retake_transport((player, idx), (target, point), task, notifies)?
             }
             // the top action's slot 0x48 (FUN_140a977a0) on the same task: the base's
             // (FUN_140a7bf40: the MoveTo's, the Enter's, the missile's, the Fly's, the Make's, the
             // wait for a foundation's) answers 0, and the work goes on to the factory
-            _ if top == Some(task.action_kind) && top != Some(HUNT) => match top {
-                Some(MOVE_TO | ENTER | MISSILE | FLY | MAKE | WAIT_SOLIDIFY) => Answer::NotTaken,
+            Some(other) if top == Some(task.action_kind) && top != Some(HUNT) => match other {
+                Action::MoveTo(_)
+                | Action::Enter(_)
+                | Action::Missile(_)
+                | Action::Fly(_)
+                | Action::Make(_)
+                | Action::WaitSolidify(_) => Answer::NotTaken,
                 _ => {
                     return Err(GenieError::unsupported(
                         "a work command on the unit's current task",

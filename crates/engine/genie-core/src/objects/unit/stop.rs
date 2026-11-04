@@ -281,9 +281,9 @@ impl Unit {
             AiCommand::BuildObject(target) => c.lend_at((&mut *self, &mut *actions), |w, p, i| {
                 w.build_command(p, i, target).map(drop)
             }),
-            AiCommand::DropElsewhere { site, back } => c
+            AiCommand::DropElsewhere { site, at, back } => c
                 .lend_at((&mut *self, &mut *actions), |w, p, i| {
-                    w.drop_elsewhere(p, i, site, back)
+                    w.drop_elsewhere(p, i, (site, at), back)
                 }),
         }
     }

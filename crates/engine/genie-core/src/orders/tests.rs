@@ -5223,21 +5223,22 @@ fn drop_off_order_asks_the_top_gather_build_or_hunt() {
         moving: None,
     };
     let v = &mut t.players[1].objects[ListIndex::new(0)];
+    let build = started(
+        object_id(10028),
+        Position::new(10.5, 10.5, 0.0),
+        Distance::new(5.0),
+        task,
+    );
     t.parts
         .actions
         .of_mut(v.id)
         .unwrap()
         .list
-        .set_build(Some(started(
-            object_id(10028),
-            Position::new(10.5, 10.5, 0.0),
-            Distance::new(5.0),
-            task,
-        )));
+        .set_build(Some(build));
     assert_eq!(
         t.drop_off_ask(PlayerId::new(1), ListIndex::new(0), (true, true))
             .unwrap(),
-        ask(DropOffBy::Build, true, false)
+        ask(DropOffBy::Build(build), true, false)
     );
     let v = &mut t.players[1].objects[ListIndex::new(0)];
     t.parts.actions.of_mut(v.id).unwrap().list.set_build(None);

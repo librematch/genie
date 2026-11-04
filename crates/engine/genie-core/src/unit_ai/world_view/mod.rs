@@ -2,6 +2,7 @@
 //! [`Step`], [`Foreign`], [`OwnerView`], the pickers).
 
 use crate::GenieError;
+use crate::construction::repair::RepairAction;
 use crate::garrison::EnterSlot;
 use crate::map::spatial::Spatial;
 use crate::math::rng::Well512;
@@ -75,8 +76,14 @@ pub(crate) struct Wait {
 /// ([`UnitView::repair_command`]), which the side makes at once ([`World::repair_order`]).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) enum RepairOrder {
-    /// The Repair on top takes the target (its slot 0x48, `FUN_140adb480`).
-    Retake(ObjectId),
+    /// The Repair on top, `repair`, takes `target` (its slot 0x48, `FUN_140adb480`, on the head
+    /// slot 0x378 found).
+    Retake {
+        /// The repair command's target.
+        target: ObjectId,
+        /// The Repair on top.
+        repair: RepairAction,
+    },
     /// The masters the unit switches to (slot 0x90 with 0): the repairer of its task swap group,
     /// then the one the task search's swap group gave; then a Repair on the task found, if any.
     Start {

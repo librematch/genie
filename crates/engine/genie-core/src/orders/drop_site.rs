@@ -3,6 +3,7 @@
 
 use crate::GenieError;
 use crate::commands::UnitOrderAction;
+use crate::construction::build::BuildAction;
 use crate::gathering::DropSiteId;
 use crate::gathering::drop_sites::DropMeasure;
 use crate::gathering::drop_sites::SitePlace;
@@ -196,7 +197,8 @@ impl World {
             (at, held, class),
             look,
             &self.model.tuning.order,
-        ))
+        )
+        .map(|(id, _)| id))
     }
 
     /// The Build's `set_state(8)` as `UNIT_ORDER`'s drop-off (slot 0x78) gives it to the builder
@@ -206,25 +208,17 @@ impl World {
     /// [`World::find_work_task`]: its range, else the Build task's); then
     /// [`crate::construction::build::BuildAction::set_drop`]: a counted builder leaves its
     /// foundation's builders, the second targets go and come at once, notify 0x203 goes to the
-    /// unit AI.
+    /// unit AI. `build` is the Build on top that the order's ask found ([`World::drop_off_ask`]):
+    /// nothing between the ask and the step changes it.
     pub(crate) fn build_drop_off_now(
         &mut self,
-        p: PlayerId,
-        idx: ListIndex,
+        (p, idx): (PlayerId, ListIndex),
+        mut build: BuildAction,
     ) -> Result<(), GenieError> {
         use crate::construction::build::DropSearch;
         let by = self.releaser(p, idx)?;
         let unit = &self.players.live(p, idx)?;
-        let task_range = self
-            .parts
-            .actions_of(unit.id)
-            .list
-            .build()
-            .ok_or(GenieError::unreachable(
-                "a drop-off order without its Build",
-            ))?
-            .task
-            .range;
+        let task_range = build.task.range;
         let (amount, held, at) = (
             unit.life.amount,
             unit.life.attribute_kind,
@@ -248,13 +242,8 @@ impl World {
         // second targets and its notify go to the world and the unit AI at once
         let roles = self.model.roles.clone();
         self.run_on_step(p, idx, |unit, actions, c| {
-            let mut build = *actions.list.build().ok_or(GenieError::unreachable(
-                "a drop-off order without its Build",
-            ))?;
             let dropped = build.set_drop(c, unit, search, by, &roles);
-            if let Some(b) = actions.list.build_mut() {
-                *b = build;
-            }
+            actions.list.set_build(Some(build));
             dropped
         })
     }
@@ -277,7 +266,8 @@ impl World {
     }
 
     /// The villager's case 0x21c ([`crate::unit_ai::AiCommand::DropElsewhere`]) for the unit at
-    /// (`p`, `idx`) with the drop-site table's building `site` (`FUN_141658e20`) and the target
+    /// (`p`, `idx`) with the drop-site table's building `site` at `point`, its place where the
+    /// table's search found it (`FUN_141658e20`), and the target
     /// its top action had (`back`, slot 0x190: the action's target id, `+0x30`, that the world
     /// holds): it works on the site at its place (slot 0x128: the carried-resource test, any task,
     /// `+0xa14` 0, [`World::order_work`]); with a target its unit AI then queues the order on it
@@ -292,17 +282,13 @@ impl World {
         &mut self,
         p: PlayerId,
         idx: ListIndex,
-        site: DropSiteId,
+        (site, point): (DropSiteId, Position),
         back: Option<ObjectId>,
     ) -> Result<(), GenieError> {
         let back = back.filter(|t| !t.is_recyclable()).and_then(|t| {
             let (q, o) = self.object(t)?;
             Some((t, o.life.master_id, q, o.position()))
         });
-        let point = self
-            .object(site)
-            .map(|(_, o)| o.position())
-            .ok_or(GenieError::unreachable("the drop site found"))?;
         let work = Work {
             target: Some(site.id()),
             point,

@@ -17,6 +17,7 @@ use crate::objects::HitPoints;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::actions::Action;
 use crate::objects::lifecycle::Held;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::MasterId;
@@ -410,13 +411,13 @@ impl World {
         if self.object(foundation).is_none() {
             return Ok(Answer::NotTaken);
         }
-        if self
+        if let Some(Action::Build(build)) = self
             .parts
             .actions_of(self.players.live(player, idx)?.id)
-            .top_action_kind()
-            == Some(ActionKind::BUILD)
+            .list
+            .head()
         {
-            let _ = self.build_take(player, idx, foundation.id())?;
+            let _ = self.build_take((player, idx), *build, foundation.id())?;
             return Ok(Answer::Taken);
         }
         let gone = FOUNDATION_GONE;

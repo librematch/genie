@@ -8,6 +8,7 @@ use crate::map::GridSize;
 use crate::map::Tile;
 use crate::movement::scout_area::ScoutArea;
 use crate::objects::ObjectId;
+use crate::objects::actions::Action;
 use crate::objects::masters::MasterTables;
 use crate::objects::unit::Unit;
 use crate::orders::GARRISON;
@@ -70,8 +71,11 @@ impl UnitView<'_, '_> {
         };
         // slot 0x820's point: the target's place
         let terrain = point_terrain(self.c.w.spatial.terrain.as_ref(), target_unit.position());
-        if self.actions.top_action_kind() == Some(REPAIR) {
-            let order = RepairOrder::Retake(target);
+        if let Some(Action::Repair(repair)) = self.actions.list.head() {
+            let order = RepairOrder::Retake {
+                target,
+                repair: *repair,
+            };
             self.c
                 .lend_at((&mut *self.unit, &mut *self.actions), |w, p, i| {
                     w.repair_order(p, i, order)

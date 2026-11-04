@@ -2,31 +2,25 @@
 //! halt by kind.
 
 use crate::GenieError;
-use crate::combat::attack::ATTACK;
-use crate::combat::missile::MISSILE;
 use crate::construction::FoundationId;
-use crate::construction::repair::REPAIR;
+use crate::construction::build::BuildAction;
+use crate::construction::repair::RepairAction;
 use crate::construction::repair::RepairerCount;
-use crate::construction::wait_solidify::WAIT_SOLIDIFY;
-use crate::garrison::ENTER;
 use crate::gathering::DropSiteId;
 use crate::gathering::HuntTargetId;
-use crate::gathering::gather::GATHER;
+use crate::gathering::gather::GatherAction;
 use crate::gathering::gather::Stand;
-use crate::gathering::hunt::{HUNT, HuntState, stand_sprite};
-use crate::gathering::make::MAKE;
+use crate::gathering::hunt::{HuntState, stand_sprite};
 use crate::map::Position;
 use crate::math::fmath::below_or_unordered;
 use crate::math::rng::Stream;
-use crate::movement::explore::EXPLORE;
-use crate::movement::fly::FLY;
-use crate::movement::move_to::MOVE_TO;
 use crate::objects::ListIndex;
 use crate::objects::SpriteId;
+use crate::objects::actions::Action;
 use crate::objects::masters::ActionKind;
 use crate::objects::release::Releaser;
 use crate::objects::sprite::new_sprite;
-use crate::ownership::artifact::ARTIFACT_KIND;
+use crate::ownership::artifact::Artifact;
 use crate::players::PlayerId;
 use crate::players::game_status::KEEPING_KINDS;
 use crate::unit_ai::AiAction;
@@ -36,10 +30,6 @@ use crate::world::World;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::slots::PlayerSlots;
-
-/// A halt of a top action finds the unit without that action.
-const NO_TOP_ACTION: GenieError =
-    GenieError::unreachable("a halted unit without the top action it halts");
 
 /// Whether the stop keeps the unit's action list (its top action's slot 0x38,
 /// [`World::halt_top_action`]).
@@ -199,29 +189,34 @@ impl World {
         let master_id = self.players.live(p, idx)?.life.master_id;
         let standing = self.master(p, master_id)?.standing_sprite;
         let unit = self.players.live_mut(p, idx)?;
-        let Some(kind) = self.parts.actions_of(unit.id).top_action_kind() else {
+        let Some(head) = self.parts.actions_of(unit.id).list.head().cloned() else {
             return Ok(StopList::Clears);
         };
-        match kind {
-            MOVE_TO | EXPLORE | ENTER | FLY | MISSILE | MAKE | WAIT_SOLIDIFY => {
-                return Ok(StopList::Clears);
-            }
-            HUNT => {}
-            _ => return self.halt_other(p, idx, kind),
-        }
+        // each halt changes the head's copy and writes it back before it calls the world
+        let mut hunt = match head {
+            Action::MoveTo(_)
+            | Action::Explore(_)
+            | Action::Enter(_)
+            | Action::Fly(_)
+            | Action::Missile(_)
+            | Action::Make(_)
+            | Action::WaitSolidify(_) => return Ok(StopList::Clears),
+            Action::Hunt(hunt) => hunt,
+            other => return self.halt_other(p, idx, other),
+        };
         if player_kind.is_computer() {
             return Err(GenieError::unsupported(
                 "a computer player's hunt stopped (set_state 1)",
             ));
         }
-        let hunt = self
-            .parts
-            .actions
-            .of_mut(unit.id)?
-            .list
-            .hunt_mut()
-            .ok_or(NO_TOP_ACTION)?;
-        hunt.tear_down(self.parts.motion.mover_mut(unit.id))?;
+        if let Err(e) = hunt.tear_down(self.parts.motion.mover_mut(unit.id)) {
+            self.parts
+                .actions
+                .of_mut(unit.id)?
+                .list
+                .set_hunt(Some(hunt));
+            return Err(e);
+        }
         hunt.state = HuntState::Idle;
         let sprite = stand_sprite(&hunt.task, standing, unit.life.held(), &self.model.graphics);
         // the target, then the second target
@@ -233,6 +228,11 @@ impl World {
         hunt.carry_to = None;
         hunt.point = Position::from([-1.0; 3]);
         hunt.timer = Seconds::ZERO;
+        self.parts
+            .actions
+            .of_mut(unit.id)?
+            .list
+            .set_hunt(Some(hunt));
         if let Some(g) = sprite {
             new_sprite(
                 &mut unit.sprite,
@@ -267,32 +267,31 @@ impl World {
         &mut self,
         p: PlayerId,
         idx: ListIndex,
-        kind: ActionKind,
+        head: Action,
     ) -> Result<StopList, GenieError> {
         let by = self.releaser(p, idx)?;
         let master_id = self.players.live(p, idx)?.life.master_id;
         let standing = self.master(p, master_id)?.standing_sprite;
-        match kind {
-            GATHER => self.halt_gather(p, idx, standing, by)?,
-            ActionKind::BUILD => self.halt_build(p, idx, by)?,
-            REPAIR => self.halt_repair(p, idx)?,
-            ATTACK => {
+        match head {
+            Action::Gather(gather) => self.halt_gather((p, idx), gather, standing, by)?,
+            Action::Build(build) => self.halt_build((p, idx), build, by)?,
+            Action::Repair(repair) => self.halt_repair((p, idx), repair)?,
+            Action::Attack(mut attack) => {
                 let unit = self.players.live_mut(p, idx)?;
-                let attack = self
-                    .parts
-                    .actions
-                    .of_mut(unit.id)?
-                    .list
-                    .attack_mut()
-                    .ok_or(NO_TOP_ACTION)?;
-                attack.halt(
+                let halted = attack.halt(
                     self.parts.motion.layer_mut(unit.id),
                     &mut unit.sprite,
                     self.streams.get(Stream::Sprite),
                     self.model.tuning.sprite,
-                )?;
+                );
+                self.parts
+                    .actions
+                    .of_mut(unit.id)?
+                    .list
+                    .set_attack(Some(attack));
+                halted?;
             }
-            ARTIFACT_KIND => self.halt_artifact(p, idx, by)?,
+            Action::Artifact(artifact) => self.halt_artifact((p, idx), artifact, by)?,
             _ => {
                 return Err(GenieError::unsupported(
                     "a stop of an action whose slot 0x38 is not modelled",
@@ -307,26 +306,19 @@ impl World {
     /// target go, released by `by`. `standing` is the master's standing sprite.
     pub(super) fn halt_gather(
         &mut self,
-        p: PlayerId,
-        idx: ListIndex,
+        (p, idx): (PlayerId, ListIndex),
+        mut gather: GatherAction,
         standing: Option<SpriteId>,
         by: Releaser,
     ) -> Result<(), GenieError> {
         let unit = self.players.live_mut(p, idx)?;
-        let gather = self
-            .parts
-            .actions
-            .of_mut(unit.id)?
-            .list
-            .gather_mut()
-            .ok_or(NO_TOP_ACTION)?;
         let stand = stand_sprite(
             &gather.task,
             standing,
             unit.life.held(),
             &self.model.graphics,
         );
-        let released = gather.halt(
+        let halted = gather.halt(
             self.parts.motion.mover_mut(unit.id),
             Stand {
                 graphic: stand,
@@ -334,7 +326,13 @@ impl World {
                 rng: self.streams.get(Stream::Sprite),
                 sprite_tuning: &self.model.tuning.sprite,
             },
-        )?;
+        );
+        self.parts
+            .actions
+            .of_mut(unit.id)?
+            .list
+            .set_gather(Some(gather));
+        let released = halted?;
         for t in released.into_iter().flatten() {
             self.release(t, by)?;
         }
@@ -345,20 +343,19 @@ impl World {
     /// unit stands, and the foundation and the second target go, released by `by`.
     pub(super) fn halt_build(
         &mut self,
-        p: PlayerId,
-        idx: ListIndex,
+        (p, idx): (PlayerId, ListIndex),
+        mut build: BuildAction,
         by: Releaser,
     ) -> Result<(), GenieError> {
         let unit = self.players.live_mut(p, idx)?;
-        let build = self
-            .parts
+        let foundation = build.target;
+        let halted = build.halt(self.parts.motion.mover_mut(unit.id));
+        self.parts
             .actions
             .of_mut(unit.id)?
             .list
-            .build_mut()
-            .ok_or(NO_TOP_ACTION)?;
-        let foundation = build.target;
-        let (counted, target, site) = build.halt(self.parts.motion.mover_mut(unit.id))?;
+            .set_build(Some(build));
+        let (counted, target, site) = halted?;
         if counted {
             self.leave_builders(foundation)?;
         }
@@ -372,17 +369,20 @@ impl World {
 
     /// [`World::halt_other`] of a Repair (`FUN_140adaa00`): `set_state(2)`, a counted repairer
     /// out of its target's repairers, the standing sprite; the target stays.
-    pub(super) fn halt_repair(&mut self, p: PlayerId, idx: ListIndex) -> Result<(), GenieError> {
+    pub(super) fn halt_repair(
+        &mut self,
+        (p, idx): (PlayerId, ListIndex),
+        mut repair: RepairAction,
+    ) -> Result<(), GenieError> {
         let unit = self.players.live_mut(p, idx)?;
-        let repair = self
-            .parts
+        let target = repair.target;
+        let halted = repair.halt(self.parts.motion.mover_mut(unit.id));
+        self.parts
             .actions
             .of_mut(unit.id)?
             .list
-            .repair_mut()
-            .ok_or(NO_TOP_ACTION)?;
-        let target = repair.target;
-        if repair.halt(self.parts.motion.mover_mut(unit.id))? == RepairerCount::Counted {
+            .set_repair(Some(repair));
+        if halted? == RepairerCount::Counted {
             self.leave_builders(target)?;
         }
         self.standing_sprite(p, idx)
@@ -392,18 +392,16 @@ impl World {
     /// `by`, the Enter's first), a walking animal stops, and it stands.
     pub(super) fn halt_artifact(
         &mut self,
-        p: PlayerId,
-        idx: ListIndex,
+        (p, idx): (PlayerId, ListIndex),
+        mut artifact: Artifact,
         by: Releaser,
     ) -> Result<(), GenieError> {
         let unit = self.players.live_mut(p, idx)?;
-        let artifact = self
-            .parts
+        let (gone, released) = artifact.stop();
+        self.parts
             .actions_mut(unit.id)?
             .list
-            .artifact_mut()
-            .ok_or(NO_TOP_ACTION)?;
-        let (gone, released) = artifact.stop();
+            .set_artifact(Some(artifact));
         if gone.stops {
             self.parts
                 .mover_mut(unit.id)

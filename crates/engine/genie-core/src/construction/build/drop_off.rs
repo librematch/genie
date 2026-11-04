@@ -111,7 +111,7 @@ impl BuildAction {
             look,
             &c.w.model.tuning.order,
         );
-        let Some(id) = found else {
+        let Some((id, _)) = found else {
             return Ok(DropSearch::Nothing);
         };
         let (player, foreign) = (c.player, view.players());

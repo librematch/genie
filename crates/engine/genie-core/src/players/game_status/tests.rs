@@ -1,5 +1,4 @@
 use super::*;
-use crate::combat::attack::ATTACK;
 use crate::combat::attack::AttackState;
 use crate::combat::attack::tests::own_attack;
 use crate::commands::Departure;
@@ -7,9 +6,10 @@ use crate::construction::build::BuildState;
 use crate::construction::build::BuildTask;
 use crate::construction::build::tests::started_on;
 use crate::construction::repair::RepairState;
-use crate::construction::repair::{REPAIR, RepairAction, RepairTask};
+use crate::construction::repair::{RepairAction, RepairTask};
+use crate::garrison::transport::TransportAction;
 use crate::gathering::gather::GatherState;
-use crate::gathering::gather::{GATHER, GatherAction, Resource, StopRate};
+use crate::gathering::gather::{GatherAction, Resource, StopRate};
 use crate::gathering::hunt::HuntState;
 use crate::gathering::hunt::HuntTask;
 use crate::gathering::hunt::tests::walker;
@@ -27,9 +27,9 @@ use crate::objects::SpeedMultiplier;
 use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
 use crate::objects::WorkRate;
+use crate::objects::actions::Action as ActionsAction;
 use crate::objects::actions::ActionList;
 use crate::objects::layers::{Action, Motion};
-use crate::objects::masters::ActionKind;
 use crate::objects::masters::CostAmount;
 use crate::objects::masters::CreatablePart;
 use crate::objects::masters::MasterId;
@@ -41,7 +41,7 @@ use crate::objects::masters::{Master, Masters};
 use crate::objects::sprite::Graphic;
 use crate::objects::unit::Unit;
 use crate::objects::{FacetCount, Frame, WorkerCount};
-use crate::ownership::artifact::{ARTIFACT_KIND, Artifact, ArtifactState};
+use crate::ownership::artifact::{Artifact, ArtifactState};
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::Relation;
@@ -389,27 +389,18 @@ fn each_action_with_its_own_stop_halts_and_answers_true() {
         },
     ));
     t.set_motion(object_id(33), Some(Motion::Moving(walker())));
-    assert_eq!(
-        t.halt_other(PlayerId::new(1), gather, GATHER),
-        Ok(StopList::Keeps)
-    );
-    assert_eq!(
-        t.halt_other(PlayerId::new(1), build, ActionKind::BUILD),
-        Ok(StopList::Keeps)
-    );
-    assert_eq!(
-        t.halt_other(PlayerId::new(1), repair, REPAIR),
-        Ok(StopList::Keeps)
-    );
-    assert_eq!(
-        t.halt_other(PlayerId::new(1), attack, ATTACK),
-        Ok(StopList::Keeps)
-    );
-    let kind = ARTIFACT_KIND;
-    assert_eq!(
-        t.halt_other(PlayerId::new(1), artifact, kind),
-        Ok(StopList::Keeps)
-    );
+    let head = |t: &World, i: ListIndex| {
+        t.parts
+            .actions_of(t.players[1].objects[i].id)
+            .list
+            .head()
+            .cloned()
+            .unwrap()
+    };
+    for i in [gather, build, repair, attack, artifact] {
+        let top = head(&t, i);
+        assert_eq!(t.halt_other(PlayerId::new(1), i, top), Ok(StopList::Keeps));
+    }
     let objects = &t.players[1].objects;
     assert_eq!(
         t.parts
@@ -450,10 +441,8 @@ fn each_action_with_its_own_stop_halts_and_answers_true() {
             .map(|a| a.state),
         Some(ArtifactState::Check)
     );
-    assert!(
-        t.halt_other(PlayerId::new(1), gather, ActionKind::named(99))
-            .is_err()
-    );
+    let sail = ActionsAction::Transport(TransportAction::new(Position::new(1.0, 1.0, 0.0)));
+    assert!(t.halt_other(PlayerId::new(1), gather, sail).is_err());
 }
 
 #[test]

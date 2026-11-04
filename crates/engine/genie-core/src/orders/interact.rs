@@ -26,6 +26,7 @@ use crate::players::PlayerId;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::QueueEnd;
 use crate::unit_ai::TakenAs;
+use crate::unit_ai::UnitAi;
 use crate::unit_ai::{Issuer, OrderPriority, OrderTargetKind, QueuedOrder};
 use crate::world::World;
 use crate::world::layer::ClassRoles;
@@ -141,58 +142,58 @@ impl World {
                 )
             },
         );
-        let takes_it = self.parts.unit_ai.get(unit.id).is_none_or(|ai| {
-            !order.flags.contains(OrderFlags::QUEUED)
-                && (order.flags.contains(OrderFlags::DIRECT) || !ai.has_unready_order())
-        });
-        if takes_it {
-            // slot 0x128 with 1 (FUN_141211b80): `+0xa14` is 1 and a unit AI's order queue
-            // empties (FUN_140c5e010); FUN_14106c590 passes the order on unless the target is the
-            // unit itself (and counts `+0x888`, not held)
-            if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
-                ai.orders.clear();
-            }
-            if order.target == Some(id) {
-                return Ok(());
-            }
-            let at = point.with_height(0.0);
-            let work = Work {
-                target: order.target,
-                point: at,
-                carry_test: order.carry_test,
-                filter: order.filter,
-                source: OrderSource::Direct,
-            };
-            return self.order_work(player, idx, &work);
-        }
-        let (target_kind, target_owner) = target.map_or((None, None), |(m, o)| {
-            (Some(OrderTargetKind::of_master(m)), Some(o))
-        });
-        let queued = QueuedOrder {
-            issuer: Some(Issuer::Player(issuer)),
-            order: OrderKind::OnTarget,
-            priority: OrderPriority::COMMAND,
-            target: if target.is_some() { order.target } else { None },
-            target_owner,
-            point: point.with_height(0.0),
-            range: Distance::ZERO,
-            shown: order.point,
-            ready: order.flags.contains(OrderFlags::DIRECT),
-            target_kind,
+        // an AI with the order queued or unready orders queues it; without one, the unit takes it
+        let flags = order.flags;
+        let queues = |ai: &UnitAi| {
+            flags.contains(OrderFlags::QUEUED)
+                || (!flags.contains(OrderFlags::DIRECT) && ai.has_unready_order())
         };
         let state = unit.life.state;
-        let ai = self
-            .parts
-            .unit_ai
-            .get_mut(unit.id)
-            .ok_or(GenieError::unreachable("unreachable: no unit AI"))?;
-        let _ = ai.queue_order(state, queued, Dispatch::Queued, QueueEnd::Back)?;
-        if !order.flags.contains(OrderFlags::QUEUED) && !order.flags.contains(OrderFlags::DIRECT) {
-            readiness(&mut ai.orders, ReadyOrders::Drop);
-            // the pass's tail: the unit's stop (its slot 0x148)
-            self.object_stop(player, idx)?;
+        match self.parts.unit_ai.get_mut(unit.id) {
+            Some(ai) if queues(ai) => {
+                let (target_kind, target_owner) = target.map_or((None, None), |(m, o)| {
+                    (Some(OrderTargetKind::of_master(m)), Some(o))
+                });
+                let queued = QueuedOrder {
+                    issuer: Some(Issuer::Player(issuer)),
+                    order: OrderKind::OnTarget,
+                    priority: OrderPriority::COMMAND,
+                    target: if target.is_some() { order.target } else { None },
+                    target_owner,
+                    point: point.with_height(0.0),
+                    range: Distance::ZERO,
+                    shown: order.point,
+                    ready: flags.contains(OrderFlags::DIRECT),
+                    target_kind,
+                };
+                let _ = ai.queue_order(state, queued, Dispatch::Queued, QueueEnd::Back)?;
+                if !flags.contains(OrderFlags::QUEUED) && !flags.contains(OrderFlags::DIRECT) {
+                    readiness(&mut ai.orders, ReadyOrders::Drop);
+                    // the pass's tail: the unit's stop (its slot 0x148)
+                    self.object_stop(player, idx)?;
+                }
+                Ok(())
+            }
+            ai => {
+                // slot 0x128 with 1 (FUN_141211b80): `+0xa14` is 1 and a unit AI's order queue
+                // empties (FUN_140c5e010); FUN_14106c590 passes the order on unless the target is
+                // the unit itself (and counts `+0x888`, not held)
+                if let Some(ai) = ai {
+                    ai.orders.clear();
+                }
+                if order.target == Some(id) {
+                    return Ok(());
+                }
+                let work = Work {
+                    target: order.target,
+                    point: point.with_height(0.0),
+                    carry_test: order.carry_test,
+                    filter: order.filter,
+                    source: OrderSource::Direct,
+                };
+                self.order_work(player, idx, &work)
+            }
         }
-        Ok(())
     }
 
     /// Slot 0x128 with 1 (`FUN_141211b80`) on `target` at `point` (z 0), no carried-resource test

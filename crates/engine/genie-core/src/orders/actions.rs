@@ -21,7 +21,6 @@ use crate::objects::masters::MasterKind;
 use crate::objects::release::Releaser;
 use crate::objects::sprite::{ActiveSprite, new_sprite};
 use crate::objects::unit::Unit;
-use crate::orders::object_gone;
 use crate::orders::{TROPHIES, clear_powerups, damage_share};
 use crate::pathing::Pathing;
 use crate::players::Amount;
@@ -293,9 +292,10 @@ impl World {
         /// The first master type whose slot 0xd8 is `FUN_141211340` (`TRIBE_Combat_Object`).
         const TRIBE_COMBAT: MasterKind = MasterKind::COMBAT;
 
-        let Some((p, u)) = self.object(id) else {
+        let Some(place) = self.place(id) else {
             return Ok(());
         };
+        let (p, u) = (place.player(), self.players.at(place)?);
         let master = u.master(self.master_tables(), p)?;
         let spared = TRIBE_COMBAT <= master.kind
             && (self.model.roles.of_class(master.class).contains(ClassRoles::ALWAYS_SPARED)
@@ -307,7 +307,7 @@ impl World {
         if spared {
             return Ok(());
         }
-        let unit = match self.place(id).ok_or_else(|| object_gone(id))? {
+        let unit = match place {
             Place::Live(p, i) => self.players.live_mut(p, i)?,
             Place::Sleeping(p, i) => {
                 let woken = self.swap_remove_asleep(p, i)?;

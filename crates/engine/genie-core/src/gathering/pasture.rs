@@ -182,10 +182,10 @@ impl World {
     }
 
     /// `FUN_1411c7670`: the livestock of pasture `pasture` that player `p`'s unit at `idx` tends,
-    /// −1 for none (a unit of another player, too): its livestock the world holds with their
-    /// workers and their footprints' squared gap to the unit (`FUN_14118f8c0`), sorted by the gap
-    /// (`std::sort`, [`crate::math::msvc::sort`]); the first without workers, else the first whose
-    /// workers are below the owner's
+    /// with its place, −1 for none (a unit of another player, too): its livestock the world holds
+    /// with their workers and their footprints' squared gap to the unit (`FUN_14118f8c0`), sorted
+    /// by the gap (`std::sort`, [`crate::math::msvc::sort`]); the first without workers, else the
+    /// first whose workers are below the owner's
     /// [`AttributeSlots::pasture_workers`](crate::world::layer::AttributeSlots::pasture_workers).
     ///
     /// # Errors
@@ -196,7 +196,7 @@ impl World {
         pasture: PastureId,
         p: PlayerId,
         idx: ListIndex,
-    ) -> Result<Option<ObjectId>, GenieError> {
+    ) -> Result<Option<(ObjectId, Position)>, GenieError> {
         let Some((q, b)) = self.object(pasture) else {
             return Ok(None);
         };
@@ -212,7 +212,7 @@ impl World {
             };
             let radius = l.master(self.master_tables(), r)?.radius;
             let gap = footprint_gap_squared(l.position(), radius, unit.position(), reach);
-            tended.push((id, l.workers, gap));
+            tended.push((id, l.workers, gap, l.position()));
         }
         sort(&mut tended, &|a, b| a.2 < b.2)?;
         let room = Attributes::get(
@@ -220,12 +220,12 @@ impl World {
             self.model.slots.attribute.pasture_workers,
         )?;
         let mut pick = None;
-        for (id, workers, _) in tended {
+        for (id, workers, _, at) in tended {
             if workers == WorkerCount::ZERO {
-                return Ok(Some(id));
+                return Ok(Some((id, at)));
             }
             if pick.is_none() && workers.as_f32() < room.get() {
-                pick = Some(id);
+                pick = Some((id, at));
             }
         }
         Ok(pick)

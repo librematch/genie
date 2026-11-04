@@ -1391,7 +1391,8 @@ fn villager_tends_the_nearest_livestock_with_room() {
     let mut t = tended_pasture(near.with_z(0.0), 2.0);
     let villager = t.players[1].objects.last_place().unwrap();
     assert_eq!(
-        t.pasture_pick(PastureId::new(object_id(50)), PlayerId::new(1), villager),
+        t.pasture_pick(PastureId::new(object_id(50)), PlayerId::new(1), villager)
+            .map(|o| o.map(|(id, _)| id)),
         Ok(Some(ids[0]))
     );
     let mut gaps: Vec<(f32, ObjectId)> = ids
@@ -1410,7 +1411,8 @@ fn villager_tends_the_nearest_livestock_with_room() {
     };
     worked(&mut t, by_gap[0], 1);
     assert_eq!(
-        t.pasture_pick(PastureId::new(object_id(50)), PlayerId::new(1), villager),
+        t.pasture_pick(PastureId::new(object_id(50)), PlayerId::new(1), villager)
+            .map(|o| o.map(|(id, _)| id)),
         Ok(Some(by_gap[1]))
     );
     worked(&mut t, by_gap[1], 1);
@@ -1421,19 +1423,22 @@ fn villager_tends_the_nearest_livestock_with_room() {
     );
     // all worked: the nearest below the room
     assert_eq!(
-        t.pasture_pick(PastureId::new(object_id(50)), PlayerId::new(1), villager),
+        t.pasture_pick(PastureId::new(object_id(50)), PlayerId::new(1), villager)
+            .map(|o| o.map(|(id, _)| id)),
         Ok(Some(by_gap[0]))
     );
     worked(&mut t, by_gap[0], 2);
     assert_eq!(
-        t.pasture_pick(PastureId::new(object_id(50)), PlayerId::new(1), villager),
+        t.pasture_pick(PastureId::new(object_id(50)), PlayerId::new(1), villager)
+            .map(|o| o.map(|(id, _)| id)),
         Ok(Some(by_gap[1]))
     );
     for &id in &by_gap {
         worked(&mut t, id, 2);
     }
     assert_eq!(
-        t.pasture_pick(PastureId::new(object_id(50)), PlayerId::new(1), villager),
+        t.pasture_pick(PastureId::new(object_id(50)), PlayerId::new(1), villager)
+            .map(|o| o.map(|(id, _)| id)),
         Ok(None)
     );
     let mut other = tended_pasture(near, 2.0);
@@ -22121,8 +22126,10 @@ fn the_unit_ai_orders_reach_the_unit_and_the_units_they_name() {
     );
 
     let mut t = house_builder();
+    let at = t.object(object_id(700)).map(|(_, o)| o.position()).unwrap();
     let drop = Effect::Command(AiCommand::DropElsewhere {
         site: DropSiteId::new(object_id(700)),
+        at,
         back: Some(object_id(600)),
     });
     assert!(applied(&mut t, vec![drop]).is_ok());

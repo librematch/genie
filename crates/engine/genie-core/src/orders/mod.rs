@@ -673,7 +673,7 @@ pub(crate) fn nearest_table_site(
     (at, held, class): (Point, Option<AttributeId>, ClassId),
     look: impl Fn(ObjectId) -> Option<(ObjectState, Position)>,
     order_tuning: &OrderTuning,
-) -> Option<DropSiteId> {
+) -> Option<(DropSiteId, Position)> {
     let buildings = table_drop_buildings(table, held, Some(class), civ);
     let mut best = (None, order_tuning.table_drop_far);
     for m in buildings {
@@ -688,7 +688,7 @@ pub(crate) fn nearest_table_site(
             let (dx, dy) = (at.x() - position.x(), at.y() - position.y());
             let d = dy * dy + dx * dx;
             if d < best.1 {
-                best = (Some(DropSiteId::new(id)), d);
+                best = (Some((DropSiteId::new(id), position)), d);
             }
         }
     }
