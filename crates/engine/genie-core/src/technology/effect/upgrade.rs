@@ -144,7 +144,7 @@ impl World {
             let unit = self.object_at(place)?;
             let reads = self.master_read(player_id, unit)?;
             if upgradable(reads.kind, unit.life.state) {
-                self.set_part(id, Part::OwnMaster(Box::new(reads.clone())))?;
+                self.set_part(id, Part::OwnMaster(Some(Box::new(reads.clone()))))?;
                 self.upgrade_object(player_id, place, (&reads, new), UpgradeMaster::Kept)?;
                 if let Some(own) = self.parts.own_master.get_mut(id) {
                     own.copy_from(new);
@@ -179,7 +179,7 @@ impl World {
                     self.own_and_dead_master(player_id, list_index, old)?;
                 }
             } else if table && let Some(master) = dead.filter(|master| master.id == master_id) {
-                self.set_part(id, Part::OwnMaster(Box::new(master.clone())))?;
+                self.set_part(id, Part::OwnMaster(Some(Box::new(master.clone()))))?;
             } else if mode.own_masters()
                 && let Some(own) = self
                     .parts
@@ -247,7 +247,7 @@ impl World {
             .cloned();
         let id = self.players.live(player_id, list_index)?.id;
         if !self.parts.own_master.contains(id) {
-            self.set_part(id, Part::OwnMaster(Box::new(old.clone())))?;
+            self.set_part(id, Part::OwnMaster(Some(Box::new(old.clone()))))?;
         }
         if !self.parts.dead_master.contains(id)
             && old.death_spawns[0].is_some()

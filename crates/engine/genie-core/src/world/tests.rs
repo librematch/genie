@@ -129,6 +129,7 @@ use crate::objects::masters::AnimatedPart;
 use crate::objects::masters::AttackPriority;
 use crate::objects::masters::AutoGatherMode;
 use crate::objects::masters::Availability;
+use crate::objects::masters::BlastDefense;
 use crate::objects::masters::BlastLevel;
 use crate::objects::masters::BuildableOn;
 use crate::objects::masters::BuiltMode;
@@ -3387,7 +3388,7 @@ fn builder_with_master_of_its_own_walks_with_its_own_master_sprite() {
     };
     let id = sent_off_world.players[1].objects[ListIndex::new(0)].id;
     sent_off_world
-        .set_part(id, Part::OwnMaster(Box::new(own)))
+        .set_part(id, Part::OwnMaster(Some(Box::new(own))))
         .unwrap();
     sent_off_world
         .order_work(PlayerId::new(1), ListIndex::new(0), &work)
@@ -18483,12 +18484,9 @@ const fn house_moves() -> MoveStats {
     }
 }
 
-/// BUILD's foundation is a moving object (type 80): the moving setup (`FUN_1411580a0`) gives it
-/// its movement state, though it never moves (speed 0), and the position setter makes its place
-/// a move at the world time (`+0x870`), which the walk reads of a building it meets (slot 0x5e8,
-/// `FUN_14106d2d0`): a foundation made after a unit's path was can be kept as a hit.
-#[test]
-fn build_command_foundation_holds_its_movement_state() {
+/// A world after BUILD of a house (master 70) at (30, 88) by villager 9175 of player 1, the
+/// house's master moving.
+fn house_build_world() -> World {
     let mut masters = builder_masters();
     let house = masters.get_mut(ids::HOUSE).unwrap();
     house.move_stats = Some(house_moves());
@@ -18543,6 +18541,16 @@ fn build_command_foundation_holds_its_movement_state() {
         commits: false,
         frame: Frame::of_data(0),
     }));
+    world
+}
+
+/// BUILD's foundation is a moving object (type 80): the moving setup (`FUN_1411580a0`) gives it
+/// its movement state, though it never moves (speed 0), and the position setter makes its place
+/// a move at the world time (`+0x870`), which the walk reads of a building it meets (slot 0x5e8,
+/// `FUN_14106d2d0`): a foundation made after a unit's path was can be kept as a hit.
+#[test]
+fn build_command_foundation_holds_its_movement_state() {
+    let mut world = house_build_world();
     assert_eq!(world.players[1].unsupported, None);
     let foundation = world.players[1].objects.last().unwrap();
     assert_eq!(foundation.id, object_id(10028));
@@ -18574,6 +18582,24 @@ fn build_command_foundation_holds_its_movement_state() {
     assert_eq!(
         (gait.moving, gait.last_move, gait.pause),
         (false, WorldTime::from_millis(72890), None)
+    );
+}
+
+/// BUILD's foundation is desolid: `FUN_1411cf770` makes a copy of its master its own (slot
+/// 0x48, `+0x6c0`), without a height (`+0x5e0`) or a blast defense (`+0x62b`).
+#[test]
+fn build_command_foundation_owns_master_copy_without_height() {
+    let world = house_build_world();
+    assert_eq!(world.players[1].unsupported, None);
+    let house = world.master(player_id(1), master_id(70)).unwrap().clone();
+    assert!(Distance::ZERO < house.height);
+    assert_eq!(
+        world.parts.own_master.get(object_id(10028)),
+        Some(&Master {
+            height: Distance::ZERO,
+            blast_defense: BlastDefense::new(0),
+            ..house
+        })
     );
 }
 

@@ -509,8 +509,9 @@ pub enum Part {
     Production(Option<Box<Production>>),
     /// The missile's own fields ([`Parts::missile`]), none clearing them.
     Missile(Option<Missile>),
-    /// The own master ([`Parts::own_master`]), boxed: a master is about 700 bytes.
-    OwnMaster(Box<Master>),
+    /// The own master ([`Parts::own_master`]), boxed: a master is about 700 bytes; none
+    /// clearing it (the object's master its player's again).
+    OwnMaster(Option<Box<Master>>),
     /// The town bell ([`Parts::town_bell`]); a new unit's leaves the table.
     TownBell(TownBell),
     /// The unit AI ([`Parts::unit_ai`]), boxed, none clearing it.
@@ -563,8 +564,11 @@ impl World {
             Part::Missile(None) => {
                 let _ = self.parts.missile.remove(id);
             }
-            Part::OwnMaster(master) => {
+            Part::OwnMaster(Some(master)) => {
                 let _ = self.parts.own_master.insert(id, *master);
+            }
+            Part::OwnMaster(None) => {
+                let _ = self.parts.own_master.remove(id);
             }
             Part::TownBell(town_bell) => self.parts.set_town_bell(id, town_bell),
             Part::UnitAi(Some(ai)) => {
@@ -1068,7 +1072,7 @@ mod tests {
             ..Master::default()
         };
         game.model.masters = vec![Arc::new(Masters::new([master(25)]))];
-        game.set_part(id, Part::OwnMaster(Box::new(master(40))))
+        game.set_part(id, Part::OwnMaster(Some(Box::new(master(40)))))
             .unwrap();
         let hp = |world: &World, index: usize| {
             let players = &world.players[0].objects[ListIndex::new(index)];
@@ -1141,6 +1145,7 @@ mod tests {
             paths(Scope::Saved),
             [
                 "life.hp",
+                "dead_master",
                 "building.gather_point",
                 "building.production",
                 "missile",

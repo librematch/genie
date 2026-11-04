@@ -3,6 +3,7 @@ use crate::construction::BuildProgress;
 use crate::construction::ConstructionStart;
 use crate::construction::MainBuildingId;
 use crate::construction::build::Clearer;
+use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::GridSize;
 use crate::map::GroundOffset;
@@ -26,6 +27,7 @@ use crate::objects::masters::BuildableOn;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::CreatablePart;
 use crate::objects::masters::GarrisonKinds;
+use crate::objects::masters::Master;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObstructionClass;
 use crate::objects::masters::ObstructionKind;
@@ -43,6 +45,7 @@ use crate::vision::SightLayer;
 use crate::world::Millis;
 use crate::world::WorldTime;
 use crate::world::parts::Object;
+use crate::world::parts::Part;
 use crate::world::{Player, World};
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -1043,9 +1046,9 @@ fn the_castle_the_wonder_and_the_monastery_count_their_completion() {
     );
 }
 
-/// MarvinBlue/426048731's house 10028 in update 731: 9177's first work starts it (its record
-/// marks its tiles) and adds 0.021 s of work: 550 hit points over 25 s, so 1.462 hit points.
-/// Its construction goes on.
+/// MarvinBlue/426048731's house 10028 in update 731: 9177's first work starts it (its record marks
+/// its tiles, its own master copy goes) and adds 0.021 s of work: 550 hit points over 25 s, so
+/// 1.462 hit points. Its construction goes on.
 #[test]
 fn the_first_work_starts_the_foundation_and_adds_its_share_of_hit_points() {
     use crate::map::spatial::Tiles;
@@ -1079,11 +1082,20 @@ fn the_first_work_starts_the_foundation_and_adds_its_share_of_hit_points() {
         vec![built_master(ids::HOUSE, &Vec::new())],
         vec![site],
     );
+    // the desolid copy its constructor made its own (FUN_1411cf770), which the start drops
+    let copy = Master {
+        height: Distance::ZERO,
+        ..built_master(ids::HOUSE, &Vec::new())
+    };
+    site_world
+        .set_part(object_id(10028), Part::OwnMaster(Some(Box::new(copy))))
+        .unwrap();
     let rate = 1.0f32 * 1.0 * 0.021;
     assert_eq!(
         site_world.work_building(FoundationId::new(object_id(10028)), Seconds::new(rate)),
         Ok(BuildProgress::Ongoing)
     );
+    assert_eq!(site_world.parts.own_master.get(object_id(10028)), None);
     let unit = site_world.players[1]
         .objects
         .by_id(object_id(10028))

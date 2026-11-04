@@ -71,7 +71,7 @@ impl World {
         let Some(own) = changed? else {
             return Ok(());
         };
-        self.set_part(id, Part::OwnMaster(own))?;
+        self.set_part(id, Part::OwnMaster(Some(own)))?;
         if let Some(master) = dead {
             self.set_part(id, Part::DeadMaster(Box::new(master)))?;
         }
@@ -378,7 +378,7 @@ impl World {
         let own = changed?;
         let changed = own.is_some();
         if let Some(own) = own {
-            self.set_part(id, Part::OwnMaster(own))?;
+            self.set_part(id, Part::OwnMaster(Some(own)))?;
             if let Some(master) = dead {
                 self.set_part(id, Part::DeadMaster(Box::new(master)))?;
             }

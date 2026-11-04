@@ -224,8 +224,9 @@ impl Construction {
 
     /// The construction starts (`FUN_1411e5670`) on a desolid foundation (one not desolid, or
     /// without its own master copy `+0x6c0`, which a desolid one always holds, returns at once,
-    /// [`ConstructionStart::NotDesolid`]): its master is its owner's again (the same in the slice),
-    /// its missiles per volley its master's (`+0xa00`, the caller's: [`ConstructionStart::Begun`]);
+    /// [`ConstructionStart::NotDesolid`]): its master is its owner's again, its own copy gone, and
+    /// its missiles per volley its master's (`+0xa00`; both the caller's on
+    /// [`ConstructionStart::Begun`]);
     /// it is no longer desolid, holds a sliver of progress, and gets its obstruction record
     /// (`FUN_141056460`: the tiles it marks, which the planners see, and its shape in the mesh);
     /// its footprint comes into its player's sight and its tiles link to its anchor again

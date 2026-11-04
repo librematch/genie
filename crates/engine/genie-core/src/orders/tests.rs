@@ -2883,8 +2883,8 @@ fn master_change_unmodelled_parts_fail() {
     );
 }
 
-/// `FUN_1412066b0`: the attack, reload, work rate, most hit points and armor powerups go, the
-/// hit points powerup and the reload stinger stay.
+/// `FUN_1412066b0`: the attack, reload, work rate, regeneration, most hit points and armor
+/// powerups go, the hit points powerup and the reload stinger stay.
 #[test]
 fn master_change_clears_the_powerups_but_the_hit_points_one() {
     let mut combat = Combat {
@@ -2892,6 +2892,7 @@ fn master_change_clears_the_powerups_but_the_hit_points_one() {
         reload_powerup: Seconds::new(0.5),
         reload_stinger: Seconds::new(0.25),
         work_rate_powerup: WorkRate::new(0.15),
+        regen_powerup: Regeneration::new(5.0),
         hp_powerup: HpPowerup {
             taken: HitPoints::new(10.0),
             max: HitPoints::new(20.0),
@@ -2904,9 +2905,15 @@ fn master_change_clears_the_powerups_but_the_hit_points_one() {
         (
             combat.attack_powerup,
             combat.reload_powerup,
-            combat.work_rate_powerup
+            combat.work_rate_powerup,
+            combat.regen_powerup
         ),
-        (AttackPowerup::ZERO, Seconds::ZERO, WorkRate::ZERO)
+        (
+            AttackPowerup::ZERO,
+            Seconds::ZERO,
+            WorkRate::ZERO,
+            Regeneration::ZERO
+        )
     );
     assert_eq!(
         (combat.hp_powerup, combat.armor_powerups),

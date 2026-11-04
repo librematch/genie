@@ -13,7 +13,7 @@ use crate::technology::TechId;
 use crate::test_ids::object_id;
 use crate::world::load::fixtures::{
     action_list, building_mut, building_object, combat_master, combat_mut, combat_object,
-    missile_tuning, with_masters,
+    missile_tuning, static_mut, with_masters,
 };
 use crate::world::load::object::building::annexes;
 use crate::world::load::object::object as saved_unit_object;
@@ -44,7 +44,7 @@ fn an_object_without_its_static_part_is_unmodelled() {
 
 /// A saved building's gather point and production lists are its object's parts, not its
 /// row's; a gather state the import cannot read leaves the part out and is the row's
-/// unmodelled part. The dead master is the import's gap.
+/// unmodelled part. A building without a successor master record has no dead master.
 #[test]
 fn saved_building_parts_are_its_object_s() {
     use crate::commands::GatherPointState;
@@ -87,7 +87,7 @@ fn saved_building_parts_are_its_object_s() {
 }
 
 /// A save from the start: livestock's default task is the Artifact, which exists from the
-/// load on and starts again when its action list empties.
+/// load on and starts again when its action list empties; a dead sheep (state 5) holds none.
 #[test]
 fn livestock_starts_with_its_artifact() {
     let table = MasterTable::of_master(
@@ -102,7 +102,8 @@ fn livestock_starts_with_its_artifact() {
         DefaultAction::Kind(ARTIFACT_KIND),
     )
     .unwrap();
-    let sheep = combat_object(5, 83);
+    let mut sheep = combat_object(5, 83);
+    static_mut(&mut sheep).object_state = 2;
     let object = object(
         &sheep,
         &PlayerObjects::default(),
@@ -117,6 +118,19 @@ fn livestock_starts_with_its_artifact() {
     assert_eq!(object.parts.actions.default_task, DefaultTask::Artifact);
     // a combat object's mover needs its master, which this save does not hold
     assert!(object.parts.unread.is_some());
+    let mut dead = combat_object(6, 83);
+    static_mut(&mut dead).object_state = 5;
+    let object = saved_unit_object(
+        &dead,
+        &PlayerObjects::default(),
+        &[],
+        CivId::GAIA,
+        Some(&table),
+        PLAYERS,
+        &missile_tuning(),
+    );
+    assert!(object.parts.actions.list.artifact().is_none());
+    assert_eq!(object.parts.actions.default_task, DefaultTask::Artifact);
 }
 
 /// Without a table the default task is unknown: reported, as the object's.

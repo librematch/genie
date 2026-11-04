@@ -1,6 +1,7 @@
 //! A player's saved masters as the engine reads them: the facets, the action part and
 //! tasks, the work command's masters, the movement and the placement.
 
+pub mod own_master;
 pub mod parts;
 
 use crate::dat::MasterTable;
@@ -404,17 +405,9 @@ pub fn work_masters(
             combat_part.interrupt_frame = Frame::of_data(rc.interrupt_frame);
             combat_part.hit_chance = HitChance::of_data(rc.base_hit_chance);
             combat_part.reload = Seconds::new(rc.speed_of_attack);
-            combat_part.weapons = rc
-                .weapon
-                .iter()
-                .map(|&word| ClassAmount::new((word & 0xffff) as i16, (word >> 16) as i16))
-                .collect();
+            combat_part.weapons = class_amounts(&rc.weapon);
             combat_part.base_armor = DamageAmount::new(rc.base_armor);
-            combat_part.armors = rc
-                .armor
-                .iter()
-                .map(|&word| ClassAmount::new((word & 0xffff) as i16, (word >> 16) as i16))
-                .collect();
+            combat_part.armors = class_amounts(&rc.armor);
             combat_part.resistance = DamageShare::new(rc.bonus_damage_resistance);
             combat_part.combat_ability = CombatAbility::from_bits_retain(rc.combat_ability);
             combat_part.reflection = DamageShare::new(rc.damage_reflection);
@@ -579,6 +572,16 @@ pub fn build_cost(inventory: &[[u8; 6]]) -> [CostSlot; COST_SLOTS] {
         };
     }
     slots
+}
+
+/// A combat master's weapons or armors from their words: the class in the low short, the amount
+/// in the high one.
+#[must_use]
+pub fn class_amounts(words: &[u32]) -> Vec<ClassAmount> {
+    words
+        .iter()
+        .map(|&word| ClassAmount::new((word & 0xffff) as i16, (word >> 16) as i16))
+        .collect()
 }
 
 /// A combat master's `build_inventory` entries `(resource, amount, paid)`, the empty ones

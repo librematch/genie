@@ -8,11 +8,17 @@ use crate::movement::fly::FLY;
 use crate::movement::move_to::MOVE_TO;
 use crate::movement::move_to::MoveTo;
 use crate::objects::Graphics;
+use crate::objects::SpriteId;
 use crate::objects::Voice;
 use crate::objects::layers::{UnreadDefault, Unstartable};
 use crate::objects::masters::ActionKind;
+use crate::objects::masters::ActionPart;
 use crate::objects::masters::FlyMode;
+use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
+use crate::objects::masters::Task;
+use crate::objects::masters::TaskIndex;
+use crate::objects::masters::TaskSprites;
 use crate::ownership::artifact::ARTIFACT_KIND;
 use crate::players::Amount;
 use crate::players::CivId;
@@ -209,6 +215,7 @@ fn start(table: &MasterTable) -> Result<Option<DefaultStart>, Unstartable> {
         &PlayerObjects::default(),
         CivId::GAIA,
         Some(table),
+        None,
     )
 }
 
@@ -276,14 +283,70 @@ fn static_object_has_no_default_task() {
     let static_part = tree.static_part().unwrap().clone();
     let objects = PlayerObjects::default();
     assert!(matches!(
-        default_task(&tree, &static_part, &objects, CivId::GAIA, None),
+        default_task(&tree, &static_part, &objects, CivId::GAIA, None, None),
         Ok(None)
     ));
     let object = livestock();
     let rge_static_object = object.static_part().unwrap().clone();
     assert!(matches!(
-        default_task(&object, &rge_static_object, &objects, CivId::GAIA, None),
+        default_task(
+            &object,
+            &rge_static_object,
+            &objects,
+            CivId::GAIA,
+            None,
+            None
+        ),
         Err(Unstartable::Unread(UnreadDefault::NoMasterTable))
+    ));
+}
+
+/// An object of its own master starts that master's default task, the task at its index, with
+/// no table; with the record unread, the start fails.
+#[test]
+fn own_master_default_task_is_its_own() {
+    let mut object = livestock();
+    static_mut(&mut object).rge_master_static_object = Some(Box::default());
+    let rge_static_object = static_mut(&mut object).clone();
+    let objects = PlayerObjects::default();
+    let sprite = SpriteId::named(1200);
+    let own = |default_task| Master {
+        action: Some(ActionPart {
+            default_task,
+            tasks: vec![Task {
+                action_kind: ARTIFACT_KIND,
+                sprites: TaskSprites {
+                    moving: Some(sprite),
+                    ..TaskSprites::default()
+                },
+                ..Task::default()
+            }],
+            ..ActionPart::default()
+        }),
+        ..Master::default()
+    };
+    let start = |own: Option<&Master>| {
+        default_task(
+            &object,
+            &rge_static_object,
+            &objects,
+            CivId::GAIA,
+            None,
+            own,
+        )
+    };
+    assert!(matches!(
+        start(Some(&own(TaskIndex::of_data(0)))),
+        Ok(Some(DefaultStart::Artifact(started))) if started.moving == Some(sprite)
+    ));
+    assert!(matches!(start(Some(&own(None))), Ok(None)));
+    assert!(matches!(
+        start(Some(&own(TaskIndex::of_data(1)))),
+        Err(Unstartable::Unread(UnreadDefault::NoSuchTask))
+    ));
+    assert!(matches!(
+        start(None),
+        Err(Unstartable::Unread(UnreadDefault::OwnMaster))
     ));
 }
 

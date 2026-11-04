@@ -24,6 +24,7 @@ use crate::objects::DamagedTimer;
 use crate::objects::HitPoints;
 use crate::objects::HpPowerup;
 use crate::objects::ObjectId;
+use crate::objects::ObjectState;
 use crate::objects::Regeneration;
 use crate::objects::RelicCount;
 use crate::objects::Relics;
@@ -34,6 +35,7 @@ use crate::objects::layers::{Action, Animated, Combat, DefaultTask, Motion, Stat
 use crate::objects::lifecycle::Lifecycle;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
 use crate::objects::unit::Unit;
 use crate::objects::unit::UnitFlags;
@@ -66,6 +68,7 @@ use crate::world::load::top_actions::saved_actions;
 use crate::world::parts::{Object, ObjectParts};
 use crate::{GenieError, GenieResult};
 use genie_import::dat::MasterTable;
+use genie_import::save::own_master::{own_master, successor_master};
 use genie_import::save::task_at;
 use genie_save::generated::world::TribeCombatObject;
 use genie_save::generated::world::{Path, PlayerObjects, RgeMissileObject, RgeStaticObject};
@@ -73,8 +76,9 @@ use genie_save::generated::world::{Path, PlayerObjects, RgeMissileObject, RgeSta
 pub mod building;
 
 /// The slice's view of one saved object, whole: its row ([`unit`]) and its parts (the gather
-/// point, the production lists, the missile's own fields, the town bell, the unit AI; the dead
-/// and own masters are the import's gaps, MISSING.md).
+/// point, the production lists, the missile's own fields, the town bell, the unit AI, its own and
+/// its successor master). A master record the import cannot read leaves the master out and
+/// makes the object's unread entry, if the row left none.
 #[must_use]
 pub fn object(
     object: &genie_save::Object,
@@ -85,17 +89,44 @@ pub fn object(
     players: usize,
     missile_tuning: &MissileTuning,
 ) -> Object {
-    let (unit, parts) = row(object, objects, paths, civ, masters, players);
+    let saved = object.static_part();
+    let (own_master, own_read) =
+        split_read(saved.map(|rge_static_object| own_master(rge_static_object, civ, masters)));
+    let (unit, parts) = row(
+        object,
+        objects,
+        paths,
+        civ,
+        masters,
+        own_master.as_ref(),
+        players,
+    );
+    let (dead_master, dead_read) = split_read(
+        saved.map(|rge_static_object| successor_master(rge_static_object, civ, masters)),
+    );
+    let unread = parts
+        .unread
+        .or_else(|| own_read.and(dead_read).err().map(Unread::new));
     Object {
         unit,
         parts: ObjectParts {
-            dead_master: None,
+            dead_master,
             gather_point: gather_point(object).ok().flatten(),
             production: production(object).ok().flatten(),
             missile: saved_missile(object, missile_tuning),
-            own_master: None,
+            own_master,
+            unread,
             ..parts
         },
+    }
+}
+
+/// A master record's read (`read`, none for an object without a static part) as its master and
+/// its error.
+fn split_read(read: Option<GenieResult<Option<Master>>>) -> (Option<Master>, GenieResult<()>) {
+    match read.transpose() {
+        Ok(master) => (master.flatten(), Ok(())),
+        Err(error) => (None, Err(error)),
     }
 }
 
@@ -165,6 +196,7 @@ fn row(
     paths: &[Path],
     civ: CivId,
     masters: Option<&MasterTable>,
+    own: Option<&Master>,
     players: usize,
 ) -> (Unit, ObjectParts) {
     let saved = object.static_part();
@@ -473,7 +505,7 @@ fn row(
         ..Unit::default()
     };
     let mut actions = Action::default();
-    let default = default_task(object, rge_static_object, objects, civ, masters);
+    let default = default_task(object, rge_static_object, objects, civ, masters, own);
     let imported = if saved {
         saved_actions(
             object,
@@ -492,10 +524,11 @@ fn row(
             &mut actions,
         )
     } else {
-        // an object without actions in a save: its default task's action (an Artifact exists
-        // from the load on; a Fly starts in its first update)
+        // an object without actions in a save: its default task's action, which the game starts
+        // in state 2 only (`RGE_Action_Object::update`: an Artifact exists from the load on, a
+        // Fly starts in its first update); a dead object's list stays empty
         match &default {
-            Ok(Some(DefaultStart::Artifact(artifact))) => {
+            Ok(Some(DefaultStart::Artifact(artifact))) if life.state == ObjectState::Alive => {
                 actions.list.set_artifact(Some(**artifact));
                 Ok(())
             }

@@ -42,7 +42,7 @@ pub enum Unstartable {
 /// Why the load could not read an object's default task.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum UnreadDefault {
-    /// The object's own master holds a default task: the load reads no own master's tasks.
+    /// The object's own master record, which the import could not read.
     OwnMaster,
     /// The load has no master table.
     NoMasterTable,
@@ -57,7 +57,7 @@ impl UnreadDefault {
     #[must_use]
     pub const fn reason(self) -> &'static str {
         match self {
-            Self::OwnMaster => "the default task of an object's own master",
+            Self::OwnMaster => "the default task of an own master the import could not read",
             Self::NoMasterTable => "no master table: the default task is unknown",
             Self::NotInTable => "a master the table does not have",
             Self::NoSuchTask => "a default task id that names no task",
@@ -149,7 +149,10 @@ mod tests {
         let error = Unstartable::Unported(ActionKind::named(6)).error();
         assert_eq!(error.reason(), "a default task the slice does not model");
         let error = Unstartable::Unread(UnreadDefault::OwnMaster).error();
-        assert_eq!(error.reason(), "the default task of an object's own master");
+        assert_eq!(
+            error.reason(),
+            "the default task of an own master the import could not read"
+        );
     }
 
     #[test]

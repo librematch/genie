@@ -22,6 +22,7 @@ use crate::players::tracker::key;
 use crate::technology::TechId;
 use crate::vision::SightLayer;
 use crate::world::layer::Roles;
+use crate::world::parts::Part;
 use crate::world::slots::PlayerSlotsExt;
 use crate::world::step::Step;
 
@@ -270,6 +271,8 @@ impl Unit {
             },
         )?;
         if started == ConstructionStart::Begun {
+            // its master is its owner's again: the desolid copy goes
+            step.world.set_part(self.id, Part::OwnMaster(None))?;
             step.world.parts.combat_mut(self.id)?.firepower = master.creatable_part().volley_fire;
             let (player_id, id) = (step.player, self.id);
             step.lend((&mut *self, &mut *actions), |world| {

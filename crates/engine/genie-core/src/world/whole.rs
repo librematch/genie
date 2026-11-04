@@ -24,7 +24,6 @@ use std::borrow::Cow;
 #[derive(Clone, Debug, Default, PartialEq, Diff)]
 pub struct ObjectParts {
     /// Its dead master ([`Parts::dead_master`]).
-    #[diff(gap = "the import does not read a saved dead master")]
     pub dead_master: Option<Master>,
     /// Its gather point ([`Parts::gather_point`]).
     #[diff(path = "building.gather_point")]
@@ -36,9 +35,7 @@ pub struct ObjectParts {
     #[diff(path = "missile")]
     pub missile: Option<Missile>,
     /// Its own master ([`Parts::own_master`]).
-    #[diff(
-        gap = "the import does not read a saved own master; genie makes none for a foundation or a dying annex"
-    )]
+    #[diff(gap = "genie makes none for a dying annex (the empty town centre's, master 890)")]
     pub own_master: Option<Master>,
     /// Its town bell ([`Parts::town_bell`]), a new unit's where the table holds none.
     #[diff(path = "combat.town_bell")]

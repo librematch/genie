@@ -34,6 +34,7 @@ use crate::objects::lifecycle::Held;
 use crate::objects::lifecycle::death_parts::count_class;
 use crate::objects::lifecycle::static_storage;
 use crate::objects::lifecycle::{Class, Lifecycle};
+use crate::objects::masters::BlastDefense;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::cost_entries;
@@ -56,7 +57,7 @@ use crate::world::WorldTime;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
-use crate::world::parts::{Object, ObjectParts};
+use crate::world::parts::{Object, ObjectParts, Part};
 use crate::world::slots::PlayerSlotsExt;
 use crate::world::{Gate, World};
 use crate::{GenieError, GenieResult};
@@ -404,6 +405,9 @@ impl World {
             ..ObjectParts::default()
         };
         let _ = self.push_live(player, Object { unit, parts })?;
+        if desolid {
+            self.set_part(id, Part::OwnMaster(Some(Box::new(desolid_copy(&made)))))?;
+        }
         self.settle_building(player, id, &made, (position, desolid), foundation)?;
         for (slot, (&annex, &off)) in building
             .annexes
@@ -478,7 +482,8 @@ impl World {
         {
             self.unwatch(player, aid)?;
         }
-        if Distance::ZERO < am.height {
+        // FUN_1411cf770 only for an annex without its own master copy (`+0x6c0`)
+        if Distance::ZERO < am.height && !self.parts.own_master.contains(aid) {
             let construction = self
                 .parts
                 .building_mut(aid)?
@@ -487,6 +492,7 @@ impl World {
                 .ok_or(NO_CONSTRUCTION)?;
             if !construction.desolid {
                 construction.desolid = true;
+                self.set_part(aid, Part::OwnMaster(Some(Box::new(desolid_copy(am)))))?;
                 self.pathing.removed(aid);
                 self.spatial.drop_record(aid);
                 self.spatial.set_tall(aid, false);
@@ -495,6 +501,17 @@ impl World {
             }
         }
         Ok(())
+    }
+}
+
+/// The copy of a building's master that `FUN_1411cf770` makes the desolid building's own (slot
+/// 0x48 of its master, `+0x6c0` holding it): without a height (`+0x5e0`) or a blast defense
+/// (`+0x62b`). The construction's start drops it ([`crate::world::World::construction_starts`]).
+fn desolid_copy(master: &Master) -> Master {
+    Master {
+        height: Distance::ZERO,
+        blast_defense: BlastDefense::new(0),
+        ..master.clone()
     }
 }
 

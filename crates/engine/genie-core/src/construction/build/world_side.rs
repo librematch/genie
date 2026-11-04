@@ -115,9 +115,9 @@ impl World {
     }
 
     /// The construction's start (`FUN_1411e5670`, [`Construction::begin`]) of the foundation
-    /// `id` of `owner`: a desolid one starts, its missiles per volley are its master's (its own
-    /// first, `+0xa0`), and its owner watches it at once (`FUN_141090430`,
-    /// [`crate::world::World::watch_started`]).
+    /// `id` of `owner`: a desolid one starts, its own master copy goes (`+0x6c0`, the master its
+    /// player's again), its missiles per volley are its master's then, and its owner watches it
+    /// at once (`FUN_141090430`, [`crate::world::World::watch_started`]).
     ///
     /// # Errors
     ///
@@ -125,13 +125,6 @@ impl World {
     pub(crate) fn construction_starts(&mut self, owner: PlayerId, id: ObjectId) -> GenieResult<()> {
         let place = self.place(id).ok_or(NOT_HELD)?;
         let (Place::Live(player_id, _) | Place::Sleeping(player_id, _)) = place;
-        let volley = held(&mut self.players, place)?
-            .master(
-                MasterTables::new(&self.model.masters, &self.parts.own_master),
-                player_id,
-            )?
-            .creatable_part()
-            .volley_fire;
         let now = self.world_time;
         let unit = held(&mut self.players, place)?;
         let (layer, mover) = self.parts.building_and_mover_mut(unit.id)?;
@@ -151,7 +144,16 @@ impl World {
             },
         )? == ConstructionStart::Begun
         {
-            self.parts.combat_mut(unit.id)?.firepower = volley;
+            // its master is its owner's again: the desolid copy goes
+            self.set_part(id, Part::OwnMaster(None))?;
+            let volley = held(&mut self.players, place)?
+                .master(
+                    MasterTables::new(&self.model.masters, &self.parts.own_master),
+                    player_id,
+                )?
+                .creatable_part()
+                .volley_fire;
+            self.parts.combat_mut(id)?.firepower = volley;
             self.watch_started(owner, id)?;
         }
         Ok(())

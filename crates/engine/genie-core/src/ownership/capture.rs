@@ -262,7 +262,7 @@ impl Unit {
         let Some(own) = changed else {
             return Ok(OwnerChange::Kept);
         };
-        step.world.set_part(self.id, Part::OwnMaster(own))?;
+        step.world.set_part(self.id, Part::OwnMaster(Some(own)))?;
         if let Some(master) = dead {
             step.world
                 .set_part(self.id, Part::DeadMaster(Box::new(master)))?;

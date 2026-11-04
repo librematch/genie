@@ -1388,10 +1388,10 @@ mod tests {
         world
             .set_part(
                 object_id(11),
-                Part::OwnMaster(Box::new(soldier(
+                Part::OwnMaster(Some(Box::new(soldier(
                     master_id(4),
                     MasterHitPoints::of_data(40),
-                ))),
+                )))),
             )
             .unwrap();
         world

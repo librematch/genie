@@ -236,7 +236,7 @@ impl LangFile {
     }
 
     /// An iterator visiting all key-value pairs in an arbitrary order.
-    /// The iterator element type is `(&'a StringKey, &'a String)`.
+    /// Each element borrows the file: `(&StringKey, &String)`.
     ///
     /// # Examples
     ///
@@ -258,7 +258,7 @@ impl LangFile {
 
     /// Returns an iterator that visits all key-values pairs in an arbitrary
     /// order, with mutable references to the values.
-    /// The iterator element type is `(&'a StringKey, &'a mut String)`.
+    /// Each element borrows the file: `(&StringKey, &mut String)`.
     ///
     /// # Examples
     ///
@@ -279,7 +279,7 @@ impl LangFile {
     }
 
     /// Returns an iterator that visits all keys in arbitrary order.
-    /// The iterator element type is `&'a StringKey`.
+    /// Each element borrows the file: `&StringKey`.
     ///
     /// # Examples
     ///
@@ -300,7 +300,7 @@ impl LangFile {
     }
 
     /// Returns an iterator that visits all values in arbitrary order.
-    /// The iterator element type is `&'a String`.
+    /// Each element borrows the file: `&String`.
     ///
     /// # Examples
     ///
@@ -321,7 +321,7 @@ impl LangFile {
     }
 
     /// Returns an iterator visiting all values mutable in arbitrary order.
-    /// The iterator element type is `&'a mut String`.
+    /// Each element borrows the file: `&mut String`.
     ///
     /// # Examples
     ///

@@ -45,7 +45,7 @@ use genie_import::dat::dat_id;
 use genie_import::dat::{DefaultAction, MasterTable};
 use genie_import::save::core_task;
 use genie_import::save::parts::combat_master;
-use genie_save::generated::world::{Action, OwnTribeMasterCombatObject};
+use genie_save::generated::world::Action;
 use genie_save::generated::world::{Master, PlayerObjects, RgeStaticObject};
 
 /// A saved unit's reload (the Strike's): its `mReloadStinger` plus its master's
@@ -476,26 +476,26 @@ pub enum DefaultStart {
 
 /// What an object's first update starts of its master's default task (`RGE_Action_Object::update`,
 /// 0x14106ac90): only action objects (types 40 and up) have one. The default task is game data:
-/// the table's, from the `.dat`, or the object's own master's. The slice models the Artifact action
-/// (type 107, the default task of livestock) and a bird's Fly (type 10); any other default task is
-/// a start the slice cannot make ([`Unstartable`]).
+/// the table's, from the `.dat`, or the object's own master's (`own`, as the import read the
+/// record the object holds; none for a record it could not read). The slice models the Artifact
+/// action (type 107, the default task of livestock) and a bird's Fly (type 10); any other default
+/// task is a start the slice cannot make ([`Unstartable`]).
 pub fn default_task(
     object: &genie_save::Object,
     rge_static_object: &RgeStaticObject,
     objects: &PlayerObjects,
     civ: CivId,
     masters: Option<&MasterTable>,
+    own: Option<&MastersMaster>,
 ) -> Result<Option<DefaultStart>, Unstartable> {
     if !is_action_object(object) {
         return Ok(None);
     }
     let not_in_table = Unstartable::Unread(UnreadDefault::NotInTable);
-    let action = match rge_static_object.own_master() {
-        Some(_) => match own_default_task(rge_static_object) {
-            Some(-1) | None => DefaultAction::None,
-            Some(_) => return Err(Unstartable::Unread(UnreadDefault::OwnMaster)),
-        },
-        None => masters
+    let action = match (rge_static_object.own_master(), own) {
+        (Some(_), Some(own_master)) => own_default_action(own_master),
+        (Some(_), None) => return Err(Unstartable::Unread(UnreadDefault::OwnMaster)),
+        (None, _) => masters
             .ok_or(Unstartable::Unread(UnreadDefault::NoMasterTable))?
             .default_action(
                 civ,
@@ -507,9 +507,11 @@ pub fn default_task(
         DefaultAction::None => Ok(None),
         DefaultAction::Kind(ARTIFACT_KIND) => {
             // the factory gives the action the default task, whose moving sprite its MoveTos take
-            let moving = masters
-                .and_then(|master_table| {
-                    master_table.work(civ, dat_id(objects, rge_static_object.master_obj)?)
+            let moving = own
+                .or_else(|| {
+                    masters.and_then(|master_table| {
+                        master_table.work(civ, dat_id(objects, rge_static_object.master_obj)?)
+                    })
                 })
                 .and_then(MastersMaster::default_task)
                 .and_then(|task| task.sprites.moving);
@@ -529,6 +531,16 @@ pub fn default_task(
     }
 }
 
+/// The default action of an object's own master, as the table holds a shared master's: none
+/// without a default task, else the type of the task at its index (`FUN_14109e0c0`).
+fn own_default_action(own: &MastersMaster) -> DefaultAction {
+    match (own.action_part().default_task, own.default_task()) {
+        (None, _) => DefaultAction::None,
+        (Some(_), None) => DefaultAction::NoSuchTask,
+        (Some(_), Some(task)) => DefaultAction::Kind(task.action_kind),
+    }
+}
+
 /// Whether the object runs `RGE_Action_Object::update`: types 40 (action), 50 (combat), 60
 /// (missile), 70 (tribe combat) and 80 (building).
 #[must_use]
@@ -539,47 +551,6 @@ pub fn is_action_object(object: &genie_save::Object) -> bool {
                 || rge_object.rge_combat_object.is_some()
                 || rge_object.rge_missile_object.is_some()
         })
-}
-
-/// The default task id of an object's own action master, if it has one.
-#[must_use]
-pub fn own_default_task(rge_static_object: &RgeStaticObject) -> Option<i16> {
-    let tribe = |own_tribe_master_combat_object: &OwnTribeMasterCombatObject| {
-        own_tribe_master_combat_object
-            .own_rge_master_combat_object
-            .own_rge_master_action_object
-            .default_task
-    };
-    None.or_else(|| {
-        rge_static_object
-            .rge_master_action_object
-            .as_deref()
-            .map(|own_rge_master_action_object| own_rge_master_action_object.default_task)
-    })
-    .or_else(|| {
-        rge_static_object.rge_master_missile_object.as_deref().map(
-            |own_rge_master_missile_object| {
-                own_rge_master_missile_object
-                    .own_rge_master_combat_object
-                    .own_rge_master_action_object
-                    .default_task
-            },
-        )
-    })
-    .or_else(|| {
-        rge_static_object
-            .tribe_master_combat_object
-            .as_deref()
-            .map(tribe)
-    })
-    .or_else(|| {
-        rge_static_object
-            .tribe_master_building_object
-            .as_deref()
-            .map(|own_tribe_master_building_object| {
-                tribe(&own_tribe_master_building_object.own_tribe_master_combat_object)
-            })
-    })
 }
 
 #[cfg(test)]
