@@ -34,8 +34,10 @@ use crate::unit_ai::AttackTargetFlags;
 use crate::unit_ai::NearestAttacker;
 use crate::unit_ai::TargetRules;
 use crate::unit_ai::UnitAiKind;
-use crate::unit_ai::best_target::ThingFlags;
-use crate::unit_ai::best_target::{AttackCategory, Candidate, Searcher, Thing, order_weights};
+use crate::unit_ai::best_target::FoundFlags;
+use crate::unit_ai::best_target::{
+    AttackCategory, Candidate, FoundObject, Searcher, order_weights,
+};
 use crate::unit_ai::task_finder::allied;
 use crate::unit_ai::world_view::Foreign;
 use crate::unit_ai::{
@@ -487,7 +489,11 @@ impl AttackPicker for WorldPicker<'_> {
         })
     }
 
-    fn thing(&mut self, spatial: &Spatial, id: ObjectId) -> Result<Option<Thing>, GenieError> {
+    fn found_object(
+        &mut self,
+        spatial: &Spatial,
+        id: ObjectId,
+    ) -> Result<Option<FoundObject>, GenieError> {
         let Some((owner, t, _, m)) = self.held(id)? else {
             return Ok(None);
         };
@@ -500,22 +506,22 @@ impl AttackPicker for WorldPicker<'_> {
             .and_then(|v| v.seer(id))
             .map_or(CaptureKind::None, |s| s.capture);
         let a = self.attacker;
-        Ok(Some(Thing {
+        Ok(Some(FoundObject {
             owner,
             flags: {
-                let mut flags = ThingFlags::empty();
+                let mut flags = FoundFlags::empty();
                 flags.set(
-                    ThingFlags::ALLIED,
+                    FoundFlags::ALLIED,
                     allied(self.relations, self.player, owner, AllyTest::WithRelation4),
                 );
-                flags.set(ThingFlags::HAS_AI, self.parts.unit_ai.contains(t.id));
-                flags.set(ThingFlags::INSIDE, t.life.inside.is_some());
+                flags.set(FoundFlags::HAS_AI, self.parts.unit_ai.contains(t.id));
+                flags.set(FoundFlags::INSIDE, t.life.inside.is_some());
                 flags.set(
-                    ThingFlags::TARGETABLE,
+                    FoundFlags::TARGETABLE,
                     !t.flags.contains(UnitFlags::UNTARGETABLE),
                 );
                 flags.set(
-                    ThingFlags::ATTACKABLE,
+                    FoundFlags::ATTACKABLE,
                     t.flags.contains(UnitFlags::ATTACKABLE),
                 );
                 flags

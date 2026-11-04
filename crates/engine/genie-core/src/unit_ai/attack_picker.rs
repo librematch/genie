@@ -8,7 +8,7 @@ use crate::objects::ObjectId;
 use crate::objects::masters::ClassId;
 use crate::unit_ai::Memory;
 use crate::unit_ai::best_target::AttackCategory;
-use crate::unit_ai::best_target::{Candidate, Searcher, Thing};
+use crate::unit_ai::best_target::{Candidate, FoundObject, Searcher};
 
 /// What `bestUnitToAttack` (`FUN_140c44680`, [`crate::unit_ai::best_target::best_unit_to_attack`]) asks
 /// of the world while its unit AI runs: the searching unit ([`AttackPicker::searcher`]) and its
@@ -26,7 +26,11 @@ pub trait AttackPicker {
     /// # Errors
     ///
     /// An object the slice does not hold.
-    fn thing(&mut self, world: &Spatial, id: ObjectId) -> Result<Option<Thing>, GenieError>;
+    fn found_object(
+        &mut self,
+        world: &Spatial,
+        id: ObjectId,
+    ) -> Result<Option<FoundObject>, GenieError>;
 
     /// The unit AI's attack check (slot 0xa0 with 0) on object `id`.
     ///
@@ -118,7 +122,11 @@ impl AttackPicker for NoAttack {
         Err(NO_ATTACK)
     }
 
-    fn thing(&mut self, _: &Spatial, _: ObjectId) -> Result<Option<Thing>, GenieError> {
+    fn found_object(
+        &mut self,
+        _: &Spatial,
+        _: ObjectId,
+    ) -> Result<Option<FoundObject>, GenieError> {
         Err(NO_ATTACK)
     }
 

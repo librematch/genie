@@ -639,7 +639,7 @@ mod tests {
     use crate::testing::ids;
     use crate::testing::roles;
     use crate::testing::scene::walking;
-    use crate::testing::scene::{Scene, Thing as SceneThing};
+    use crate::testing::scene::{Scene, SceneObject};
     use crate::unit_ai::task_finder::DropTarget;
     use crate::world::World;
 
@@ -647,7 +647,7 @@ mod tests {
     const SEEKER_ID: i32 = 500;
 
     /// The villager [`SEEKER_ID`] of player 1 at (10.2, 10.7), with its movement state.
-    fn seeker_thing() -> SceneThing {
+    fn seeker() -> SceneObject {
         let villager = Master {
             id: ids::VILLAGER_MALE,
             kind: MasterKind::COMBAT,
@@ -659,7 +659,7 @@ mod tests {
             move_stats: Some(walking(Speed::new(0.8))),
             ..Master::default()
         };
-        SceneThing::new(
+        SceneObject::new(
             SEEKER_ID,
             PlayerId::new(1),
             villager,
@@ -669,13 +669,13 @@ mod tests {
 
     /// Gaia's resource `id` of master `master` and class `class` at (x, y), of radius `radius`,
     /// gathered by itself as `group`, holding 100 of `attribute` with `workers` at work on it.
-    fn resource_thing(
+    fn resource(
         (id, master, class, kind): (i32, i16, ClassId, MasterKind),
         obstruction_kind: ObstructionKind,
         (group, attribute): (GatherGroup, AttributeId),
         (x, y, radius): (f32, f32, f32),
         workers: WorkerCount,
-    ) -> SceneThing {
+    ) -> SceneObject {
         let m = Master {
             id: master_id(master),
             kind,
@@ -690,16 +690,16 @@ mod tests {
             obstruction_class: ObstructionClass::RESOURCE,
             ..Master::default()
         };
-        SceneThing {
+        SceneObject {
             holds: Some((attribute, Amount::new(100.0))),
             workers,
-            ..SceneThing::new(id, PlayerId::GAIA, m, Position::new(x, y, 0.0))
+            ..SceneObject::new(id, PlayerId::GAIA, m, Position::new(x, y, 0.0))
         }
     }
 
     /// Gaia's tree `id` (master 349, class 15, radius 0.5) at (x, y): 100 wood, nobody at work.
-    fn tree_thing(id: i32, x: f32, y: f32) -> SceneThing {
-        resource_thing(
+    fn tree(id: i32, x: f32, y: f32) -> SceneObject {
+        resource(
             (id, 349, class::TREE, MasterKind::TREE),
             ObstructionKind::KIND_2,
             (GatherGroup::WOOD, attribute::WOOD),
@@ -709,8 +709,8 @@ mod tests {
     }
 
     /// Gaia's fish `id` (master 53, class 5, radius 0.25) at (x, y): 100 food, nobody fishing.
-    fn fish_thing(id: i32, x: f32, y: f32) -> SceneThing {
-        resource_thing(
+    fn fish(id: i32, x: f32, y: f32) -> SceneObject {
+        resource(
             (id, 53, class_id(5), MasterKind::STATIC),
             ObstructionKind::NONE,
             (GatherGroup::FISH, attribute::FOOD),
@@ -738,12 +738,12 @@ mod tests {
         }
     }
 
-    /// A map of 40 by 40 with the seeking villager and `things`, for the test to change before
+    /// A map of 40 by 40 with the seeking villager and `objects`, for the test to change before
     /// it builds the world.
-    fn resource_scene(things: Vec<SceneThing>) -> Scene {
-        things.into_iter().fold(
-            Scene::open(GridSize::new(40, 40)).thing(seeker_thing()),
-            Scene::thing,
+    fn resource_scene(objects: Vec<SceneObject>) -> Scene {
+        objects.into_iter().fold(
+            Scene::open(GridSize::new(40, 40)).object(seeker()),
+            Scene::object,
         )
     }
 
@@ -802,11 +802,8 @@ mod tests {
     }
 
     /// The trees `ids` at the places `at`.
-    fn trees(ids_at: &[(i32, (f32, f32))]) -> Vec<SceneThing> {
-        ids_at
-            .iter()
-            .map(|&(id, (x, y))| tree_thing(id, x, y))
-            .collect()
+    fn trees(ids_at: &[(i32, (f32, f32))]) -> Vec<SceneObject> {
+        ids_at.iter().map(|&(id, (x, y))| tree(id, x, y)).collect()
     }
 
     /// `FUN_1415cc1a0`'s flood over a box of 5 by 3 at the map's corner, with rocks on its column
@@ -840,14 +837,14 @@ mod tests {
         );
     }
 
-    /// [`more_work`] of the builder `b` among `things` on its restriction's planner, as the
+    /// [`more_work`] of the builder `b` among `objects` on its restriction's planner, as the
     /// world holds them.
     fn more_work_among(
         entry: &DropSite,
         b: &Builder,
-        things: Vec<SceneThing>,
+        objects: Vec<SceneObject>,
     ) -> Result<Option<ObjectId>, GenieError> {
-        let mut w = resource_scene(things).build();
+        let mut w = resource_scene(objects).build();
         let objects = ObjectsRef::new(
             &w.players,
             &w.index,
@@ -881,18 +878,18 @@ mod tests {
         let b = builder_at(Position::new(12.0, 10.0, 0.0));
         // 3 and 4 both 3 tiles away (truncated): x outer, so 3 (x 7) comes first; 4 is as far
         // with fewer workers than 3's kept 1 and takes over
-        let worked = SceneThing {
+        let worked = SceneObject {
             workers: WorkerCount::of_data(2),
-            ..tree_thing(3, 7.5, 10.5)
+            ..tree(3, 7.5, 10.5)
         };
-        let things = || vec![worked.clone(), tree_thing(4, 13.5, 10.5)];
+        let objects = || vec![worked.clone(), tree(4, 13.5, 10.5)];
         assert_eq!(
-            more_work_among(&lumber_camp(), &b, things()),
+            more_work_among(&lumber_camp(), &b, objects()),
             Ok(Some(object_id(4)))
         );
         let mut off = lumber_camp();
         off.auto_work = false;
-        assert_eq!(more_work_among(&off, &b, things()), Ok(None));
+        assert_eq!(more_work_among(&off, &b, objects()), Ok(None));
     }
 
     #[test]
@@ -905,7 +902,7 @@ mod tests {
             attribute: Some(attribute::GOLD),
         });
         let b = builder_at(Position::new(10.0, 10.0, 0.0));
-        let gold = resource_thing(
+        let gold = resource(
             (7, 66, class::CLASS_32, MasterKind::STATIC),
             ObstructionKind::KIND_2,
             (GatherGroup::GOLD, attribute::GOLD),
@@ -914,7 +911,7 @@ mod tests {
         );
         // the wood (2 tiles) is nearer than the gold (4 tiles): it takes over
         assert_eq!(
-            more_work_among(&entry, &b, vec![gold, tree_thing(8, 12.5, 10.5)]),
+            more_work_among(&entry, &b, vec![gold, tree(8, 12.5, 10.5)]),
             Ok(Some(object_id(8)))
         );
     }
@@ -959,7 +956,7 @@ mod tests {
     #[test]
     fn search_from_drop_site_starts_from_its_footprint_then_from_the_unit() {
         // player 1's lumber camp of 2 by 2 at (14, 10), whose record blocks its tiles
-        let camp = Master {
+        let camp_master = Master {
             id: master_id(562),
             kind: MasterKind::BUILDING,
             class: class::BUILDING,
@@ -970,8 +967,12 @@ mod tests {
             obstruction_class: ObstructionClass::BUILDING,
             ..Master::default()
         };
-        let camp_thing =
-            SceneThing::new(600, PlayerId::new(1), camp, Position::new(14.0, 10.0, 0.0));
+        let camp = SceneObject::new(
+            600,
+            PlayerId::new(1),
+            camp_master,
+            Position::new(14.0, 10.0, 0.0),
+        );
         let site = SearchSite {
             position: Position::new(14.0, 10.0, 0.0),
             radius: Footprint::new(1.0, 1.0),
@@ -979,9 +980,9 @@ mod tests {
             footprint: true,
         };
         let search = |trees_at: &[(i32, (f32, f32))], site: Option<&SearchSite>| {
-            let mut things = trees(trees_at);
-            things.push(camp_thing.clone());
-            let mut w = resource_scene(things).build();
+            let mut objects = trees(trees_at);
+            objects.push(camp.clone());
+            let mut w = resource_scene(objects).build();
             search_world(
                 &mut w,
                 &SEEKER,
@@ -1052,11 +1053,11 @@ mod tests {
     #[test]
     fn full_resource_is_the_fallback_and_minus_1_workers_has_no_cap() {
         // a full tree (3 workers) 2 east, a free one 5 east
-        let full = SceneThing {
+        let full = SceneObject {
             workers: WorkerCount::of_data(3),
-            ..tree_thing(1, 12.5, 10.5)
+            ..tree(1, 12.5, 10.5)
         };
-        let both = || resource_scene(vec![full.clone(), tree_thing(2, 15.5, 10.5)]).build();
+        let both = || resource_scene(vec![full.clone(), tree(2, 15.5, 10.5)]).build();
         let wood = |cap| (GatherGroup::WOOD, WorkerCount::of_data(cap));
         // at most 2 workers: past the full one to the free one
         assert_eq!(
@@ -1076,11 +1077,13 @@ mod tests {
         );
         // a fallback must be reachable: a full fish off the shore beside the villager, which it
         // cannot touch from the land
-        let fish = SceneThing {
+        let full_fish = SceneObject {
             workers: WorkerCount::of_data(3),
-            ..fish_thing(3, 10.5, 9.5)
+            ..fish(3, 10.5, 9.5)
         };
-        let mut shore = resource_scene(vec![fish]).water([Tile::new(10, 9)]).build();
+        let mut shore = resource_scene(vec![full_fish])
+            .water([Tile::new(10, 9)])
+            .build();
         assert_eq!(
             search_world(
                 &mut shore,
@@ -1128,19 +1131,19 @@ mod tests {
             .filter(|&t| shore(t) && t != Tile::new(10, 18))
             .collect();
         beside.sort_by(|a, b| dist(*a).total_cmp(&dist(*b)));
-        let mut things: Vec<SceneThing> = beside[..near]
+        let mut objects: Vec<SceneObject> = beside[..near]
             .iter()
             .enumerate()
-            .map(|(i, t)| fish_thing(i as i32 + 1, t.x() as f32 + 0.5, t.y() as f32 + 0.5))
+            .map(|(i, t)| fish(i as i32 + 1, t.x() as f32 + 0.5, t.y() as f32 + 0.5))
             .collect();
-        things.push(resource_thing(
+        objects.push(resource(
             (99, 53, class_id(5), MasterKind::STATIC),
             ObstructionKind::NONE,
             (GatherGroup::FISH, attribute::FOOD),
             (10.5, 18.5, 0.5),
             WorkerCount::ZERO,
         ));
-        resource_scene(things).water(water).build()
+        resource_scene(objects).water(water).build()
     }
 
     #[test]

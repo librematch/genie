@@ -6,7 +6,7 @@ use serde::Serialize;
 use std::fmt::{Display, Error, Formatter};
 
 /// A master's obstruction class (`+0x652`, the `.dat`'s `obstruction_class`, the blockage
-/// class; an obstruction record's class): the kind of thing its record blocks as. The game's
+/// class; an obstruction record's class): the kind of object its record blocks as. The game's
 /// tests name 0 (no record) and 5 (a gate, whose tile marks carry bit `0x8000`); the `.dat`'s
 /// other classes are named by the masters that hold them.
 #[derive(

@@ -101,7 +101,7 @@ use crate::testing::attribute;
 use crate::testing::class;
 use crate::testing::ids;
 use crate::testing::roles;
-use crate::testing::scene::{Scene, Thing as SceneThing};
+use crate::testing::scene::{Scene, SceneObject};
 use crate::testing::tuning;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::Answer;
@@ -2282,7 +2282,7 @@ fn no_attack_stops_an_attacking_unit_ai_and_forgets_its_target() {
         ..Master::default()
     };
     let set = |stance| {
-        let thing = SceneThing {
+        let soldier_unit = SceneObject {
             ai: Some(attacking.clone()),
             actions: Some(Action {
                 list: ActionList::default().with_attack(Some(own_attack(
@@ -2292,7 +2292,7 @@ fn no_attack_stops_an_attacking_unit_ai_and_forgets_its_target() {
                 ))),
                 ..Action::default()
             }),
-            ..SceneThing::new(
+            ..SceneObject::new(
                 50,
                 player_id(1),
                 soldier.clone(),
@@ -2301,7 +2301,7 @@ fn no_attack_stops_an_attacking_unit_ai_and_forgets_its_target() {
         };
         let mut world = Scene::open(GridSize::new(32, 32))
             .players(2)
-            .thing(thing)
+            .object(soldier_unit)
             .build();
         let answer = run_ai(
             &mut world,

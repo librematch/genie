@@ -84,8 +84,7 @@ pub struct TechTreeTech {
     pub(super) level_no: i32,
 }
 
-/// Read a list of dependent "Thing" IDs for a tech tree node entry. The "Thing"
-/// may be unit, building, tech IDs.
+/// Read the ids of a tech tree node's dependents: units, buildings or techs.
 pub(super) fn read_dependents<R, T>(input: &mut R) -> Result<Vec<T>>
 where
     R: Read,

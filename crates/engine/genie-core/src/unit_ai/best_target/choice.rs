@@ -10,10 +10,10 @@ use crate::objects::masters::MasterKind;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::{ByRelation, UnitRelation};
-use crate::unit_ai::best_target::ThingFlags;
+use crate::unit_ai::best_target::FoundFlags;
 use crate::unit_ai::best_target::{
-    Ask, AttackCategory, AttackField, EPSILON, EntryCount, STATISTICS, Searcher, Statistics, Thing,
-    category,
+    Ask, AttackCategory, AttackField, EPSILON, EntryCount, FoundObject, STATISTICS, Searcher,
+    Statistics, category,
 };
 use crate::unit_ai::{AiAction, OrderKind};
 use crate::world::Millis;
@@ -55,8 +55,8 @@ pub(super) fn tested(
     relation: UnitRelation,
     world: &mut AttackField<'_, '_>,
     roles: &Roles,
-) -> Result<Option<Thing>, crate::GenieError> {
-    let Some(t) = world.thing(id)? else {
+) -> Result<Option<FoundObject>, crate::GenieError> {
+    let Some(t) = world.found_object(id)? else {
         return Ok(None);
     };
     if !may_attack(me, (id, &t), relation, world)? {
@@ -66,8 +66,8 @@ pub(super) fn tested(
     if gaia_taken && t.capture.any() {
         return Ok(None);
     }
-    if !t.flags.contains(ThingFlags::TARGETABLE)
-        || (!t.flags.contains(ThingFlags::ATTACKABLE) && me.action == Some(AiAction::Attack))
+    if !t.flags.contains(FoundFlags::TARGETABLE)
+        || (!t.flags.contains(FoundFlags::ATTACKABLE) && me.action == Some(AiAction::Attack))
         || world.shuns(id)?
     {
         return Ok(None);
@@ -80,14 +80,14 @@ pub(super) fn tested(
 /// combat unit's friends' scan; a neutral object's (list 3) test.
 pub(super) fn may_attack(
     me: &Searcher,
-    (id, t): (ObjectId, &Thing),
+    (id, t): (ObjectId, &FoundObject),
     relation: UnitRelation,
     world: &mut AttackField<'_, '_>,
 ) -> Result<bool, crate::GenieError> {
-    if !t.flags.contains(ThingFlags::HAS_AI)
+    if !t.flags.contains(FoundFlags::HAS_AI)
         || ObjectState::Dying <= t.state
-        || t.flags.contains(ThingFlags::ALLIED)
-        || t.flags.contains(ThingFlags::INSIDE)
+        || t.flags.contains(FoundFlags::ALLIED)
+        || t.flags.contains(FoundFlags::INSIDE)
         || !world.can_attack(id)?
     {
         return Ok(false);
@@ -105,7 +105,12 @@ pub(super) fn may_attack(
 /// towers, gates and packed units are passed over; a computer player's unit passes over Gaia's
 /// objects that hold something or that others take by sight, and boats unless it is a boat, of
 /// class 52 or of [`MasterRoles::BOAT_HUNTER`].
-pub(super) fn kept_by_owner_and_class(me: &Searcher, ask: &Ask, t: &Thing, roles: &Roles) -> bool {
+pub(super) fn kept_by_owner_and_class(
+    me: &Searcher,
+    ask: &Ask,
+    t: &FoundObject,
+    roles: &Roles,
+) -> bool {
     if !ask.any_class && roles.of_class(t.class).contains(ClassRoles::NOT_ANY) {
         return false;
     }
@@ -215,13 +220,13 @@ pub(crate) fn best_unit_to_attack(
 fn current_target(
     me: &Searcher,
     world: &mut AttackField<'_, '_>,
-) -> Result<Option<(ObjectId, Thing)>, crate::GenieError> {
+) -> Result<Option<(ObjectId, FoundObject)>, crate::GenieError> {
     let Some(target) = me.target else {
         return Ok(None);
     };
     Ok(world
-        .thing(target)?
-        .filter(|t| t.state <= ObjectState::Alive && !t.flags.contains(ThingFlags::ALLIED))
+        .found_object(target)?
+        .filter(|t| t.state <= ObjectState::Alive && !t.flags.contains(FoundFlags::ALLIED))
         .map(|t| (target, t)))
 }
 
@@ -244,7 +249,7 @@ fn attacks_walls(me: &Searcher, roles: &Roles) -> bool {
 fn add_current(
     me: &Searcher,
     ask: &Ask,
-    current: Option<(ObjectId, Thing)>,
+    current: Option<(ObjectId, FoundObject)>,
     st: &mut Statistics,
     world: &mut AttackField<'_, '_>,
     roles: &Roles,
@@ -280,7 +285,7 @@ pub(super) fn add_extra(
         if Some(id) == me.target {
             continue;
         }
-        let Some(t) = world.thing(id)? else {
+        let Some(t) = world.found_object(id)? else {
             continue;
         };
         if !world.can_attack(id)? {
@@ -459,7 +464,7 @@ impl Walked {
         near: Distance,
         world: &mut AttackField<'_, '_>,
         roles: &Roles,
-    ) -> Result<Option<(Thing, Distance, Option<AttackCategory>)>, crate::GenieError> {
+    ) -> Result<Option<(FoundObject, Distance, Option<AttackCategory>)>, crate::GenieError> {
         let Some(t) = tested(me, ask, id, relation, world, roles)? else {
             return Ok(None);
         };
@@ -518,7 +523,7 @@ fn rank_entries(
                 return Ok(3);
             }
             let farm = world
-                .thing(e.id)?
+                .found_object(e.id)?
                 .is_some_and(|t| roles.of_class(t.class).contains(ClassRoles::FARM));
             Ok(if farm { 1 } else { 2 })
         },
@@ -537,7 +542,7 @@ fn rank_entries(
 fn choose(
     me: &Searcher,
     ask: &Ask,
-    current: Option<(ObjectId, Thing)>,
+    current: Option<(ObjectId, FoundObject)>,
     st: &Statistics,
     ranked: bool,
     world: &mut AttackField<'_, '_>,
@@ -578,7 +583,7 @@ fn choose(
 fn current_holds(
     me: &Searcher,
     ask: &Ask,
-    current: Option<(ObjectId, Thing)>,
+    current: Option<(ObjectId, FoundObject)>,
     st: &Statistics,
     world: &mut AttackField<'_, '_>,
 ) -> Result<Option<ObjectId>, crate::GenieError> {

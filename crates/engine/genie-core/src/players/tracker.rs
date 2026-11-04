@@ -546,7 +546,7 @@ mod tests {
     use crate::testing::class;
     use crate::testing::ids;
     use crate::testing::roles;
-    use crate::testing::scene::{Scene, Thing as SceneThing};
+    use crate::testing::scene::{Scene, SceneObject};
     #[cfg(test)]
     use crate::world::FrameSeed;
     use crate::world::Millis;
@@ -1072,7 +1072,7 @@ mod tests {
         let w = [(1, 1.5), (3, 3.5), (4, 4.5)]
             .into_iter()
             .fold(Scene::open(GridSize::new(8, 8)), |scene, (id, x)| {
-                scene.thing(SceneThing::new(
+                scene.object(SceneObject::new(
                     id,
                     PlayerId::new(1),
                     class_6.clone(),

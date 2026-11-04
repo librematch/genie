@@ -29,7 +29,7 @@ use crate::testing::class;
 use crate::testing::ids;
 use crate::testing::ids::FISH_TRAP;
 use crate::testing::roles;
-use crate::testing::scene::{Scene, Thing as SceneThing};
+use crate::testing::scene::{Scene, SceneObject};
 use crate::testing::tuning;
 use crate::unit_ai::{Memory, NoAttack};
 use crate::vision::VisionBits;
@@ -2303,13 +2303,13 @@ fn closest_object_keeps_what_its_filter_and_its_searcher_take() {
         class: p.class,
         ..Master::default()
     };
-    let plain_world = found_world(vec![found_thing(&p, found.clone(), None)]);
-    let herded_world = found_world(vec![found_thing(&p, found.clone(), Some(herding()))]);
+    let plain_world = found_world(vec![placed_object(&p, found.clone(), None)]);
+    let herded_world = found_world(vec![placed_object(&p, found.clone(), Some(herding()))]);
     let scout = Master {
         object_flags: ObjectFlags::SCOUT,
         ..found
     };
-    let scout_world = found_world(vec![found_thing(&p, scout, None)]);
+    let scout_world = found_world(vec![placed_object(&p, scout, None)]);
     let empty_world = found_world(Vec::new());
     let roles = roles();
     let checks = ClosestChecks {
@@ -2487,10 +2487,10 @@ fn closest_object_takes_free_farm_its_searcher_gathers_from() {
         class: class::FARM,
         ..Master::default()
     };
-    let farm_thing = |id, workers, pasture, x| SceneThing {
+    let farm = |id, workers, pasture, x| SceneObject {
         pasture,
         workers,
-        ..SceneThing::new(
+        ..SceneObject::new(
             id,
             PlayerId::new(2),
             farm_master.clone(),
@@ -2498,9 +2498,9 @@ fn closest_object_takes_free_farm_its_searcher_gathers_from() {
         )
     };
     let farms = found_world(vec![
-        farm_thing(1, WorkerCount::ZERO, None, 1.5),
-        farm_thing(2, WorkerCount::ONE, None, 3.5),
-        farm_thing(
+        farm(1, WorkerCount::ZERO, None, 1.5),
+        farm(2, WorkerCount::ONE, None, 3.5),
+        farm(
             3,
             WorkerCount::ZERO,
             Some(PastureId::new(object_id(9))),
@@ -2588,20 +2588,20 @@ fn closest_object_takes_free_farm_its_searcher_gathers_from() {
     );
 }
 
-/// A scene world of two players holding `things`: the objects `ClosestObject`'s checks read by
+/// A scene world of two players holding `objects`: the objects `ClosestObject`'s checks read by
 /// id.
-fn found_world(things: Vec<SceneThing>) -> World {
-    things
+fn found_world(objects: Vec<SceneObject>) -> World {
+    objects
         .into_iter()
-        .fold(Scene::open(GridSize::new(8, 8)).players(2), Scene::thing)
+        .fold(Scene::open(GridSize::new(8, 8)).players(2), Scene::object)
         .build()
 }
 
 /// The object 7 that `p` places, of `master`, with the action layer `actions`.
-fn found_thing(p: &Placed, master: Master, actions: Option<Action>) -> SceneThing {
-    SceneThing {
+fn placed_object(p: &Placed, master: Master, actions: Option<Action>) -> SceneObject {
+    SceneObject {
         actions,
-        ..SceneThing::new(7, p.player, master, p.position)
+        ..SceneObject::new(7, p.player, master, p.position)
     }
 }
 

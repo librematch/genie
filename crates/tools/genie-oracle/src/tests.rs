@@ -153,7 +153,7 @@ fn each_error_says_why() {
     for (error, text) in texts {
         assert_eq!(error.to_string(), text);
     }
-    let unmodelled = Error::Unmodelled(GenieError::unsupported("a thing"));
+    let unmodelled = Error::Unmodelled(GenieError::unsupported("an unmodelled case"));
     assert!(unmodelled.to_string().starts_with("not modelled: "));
     let truncated = de::truncated(4);
     let text = truncated.to_string();

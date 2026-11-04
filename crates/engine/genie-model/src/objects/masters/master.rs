@@ -386,8 +386,54 @@ impl Masters {
 #[cfg(test)]
 mod tests {
     use crate::map::Distance;
+    use crate::objects::graphics::Graphics;
     use crate::objects::masters::DamageGraphic;
     use crate::objects::masters::Master;
+    use crate::objects::masters::MasterKind;
+    use crate::objects::masters::{ActionPart, CombatPart, MovingPart, Task};
+    use crate::objects::sprite::Graphic;
+    use crate::objects::{FacetCount, Frame, SpeedMultiplier, SpriteFlags, SpriteId};
+    use crate::world::Seconds;
+
+    /// The default master and its parts name no sprite, so a test's master shows only the
+    /// sprites it names: with sprite 0 in the graphics, a combat master of default parts has no
+    /// facets, and one that names sprite 0 has its facets.
+    #[test]
+    fn the_default_master_names_no_sprite() {
+        let zero = SpriteId::named(0);
+        let graphics = Graphics::from([(
+            zero,
+            Graphic {
+                id: zero,
+                frames: Frame::of_data(1),
+                facets: FacetCount::of_data(8),
+                speed_multiplier: SpeedMultiplier::ONE,
+                frame_duration: Seconds::new(0.1),
+                replay_delay: Seconds::ZERO,
+                flags: SpriteFlags::TURNS,
+            },
+        )]);
+        let combat = Master {
+            kind: MasterKind::COMBAT,
+            moving: Some(MovingPart::default()),
+            combat: Some(CombatPart::default()),
+            action: Some(ActionPart {
+                tasks: vec![Task::default()],
+                ..ActionPart::default()
+            }),
+            ..Master::default()
+        };
+        assert_eq!(combat.sprite_facets(&graphics), None);
+        let named = Master {
+            standing_sprite: Some(zero),
+            ..combat.clone()
+        };
+        assert!(named.sprite_facets(&graphics).is_some());
+        assert_eq!(
+            (combat.standing_sprite, combat.standing_sprite_2),
+            (None, None)
+        );
+    }
 
     /// A master is tall while its height is above 0, so an effect on the height (`SIZE_Z`)
     /// changes it with no flag to update; a NaN height is not tall (the import's `0 < z`).

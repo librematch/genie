@@ -1,10 +1,10 @@
-//! A test's world drawn as text (FD-043-D47): the map's tiles, their terrains and elevations,
-//! what the scene's player sees of them, the scout and the other objects on it, built into a
-//! [`World`] whose layers agree. A tile's terrain is its class in the obstruction manager's
-//! words, its kind for the zones and the path planners and its restrictions' value; an
-//! elevation makes the tiles' shapes as the map's load does; a rock is a static record on its
-//! tile; the sight is the unified map's words; an object ([`Thing`]) is filed as the game files
-//! a new one. Tests build their world here instead of standing in for its reads.
+//! A test's world drawn as text (FD-043-D47): the map's tiles, their terrains and elevations, what
+//! the scene's player sees of them, the scout and the other objects on it, built into a [`World`]
+//! whose layers agree. A tile's terrain is its class in the obstruction manager's words, its kind
+//! for the zones and the path planners and its restrictions' value; an elevation makes the tiles'
+//! shapes as the map's load does; a rock is a static record on its tile; the sight is the unified
+//! map's words; an object ([`SceneObject`]) is filed as the game files a new one. Tests build their
+//! world here instead of standing in for its reads.
 
 use crate::construction::BuilderCount;
 use crate::construction::MainBuildingId;
@@ -125,9 +125,9 @@ struct Scout {
 }
 
 /// An object of a scene beside its scout: of any master and player, at its place
-/// ([`Scene::thing`]).
+/// ([`Scene::object`]).
 #[derive(Clone, Debug)]
-pub struct Thing {
+pub struct SceneObject {
     /// Its id.
     pub id: ObjectId,
     /// Its owner.
@@ -173,7 +173,7 @@ pub struct Thing {
     pub workers: WorkerCount,
 }
 
-impl Thing {
+impl SceneObject {
     /// Object `id` of `player` and `master` at `at`: alive, with its master's hit points, outside
     /// the sight registry, not a foundation, attackable (the flag a spawn gives a new object),
     /// without a unit AI, other flags, actions, capture flag, pasture, main building, resource
@@ -230,7 +230,7 @@ pub struct Scene {
     kinds: Vec<(PlayerId, PlayerKind)>,
     /// The graphics' table [`Scene::graphic`] fills.
     graphics: Vec<Graphic>,
-    things: Vec<Thing>,
+    objects: Vec<SceneObject>,
 }
 
 impl Scene {
@@ -251,7 +251,7 @@ impl Scene {
             relations: Vec::new(),
             kinds: Vec::new(),
             graphics: Vec::new(),
-            things: Vec::new(),
+            objects: Vec::new(),
         }
     }
 
@@ -379,17 +379,17 @@ impl Scene {
     }
 
     /// The graphics' table holds `graphic`: a master's sprite and an object's
-    /// ([`Thing::sprite`]).
+    /// ([`SceneObject::sprite`]).
     #[must_use]
     pub fn graphic(mut self, graphic: Graphic) -> Self {
         self.graphics.push(graphic);
         self
     }
 
-    /// The object `thing` stands on the map, after the objects placed before it on its tile.
+    /// `object` stands on the map, after the objects placed before it on its tile.
     #[must_use]
-    pub fn thing(mut self, thing: Thing) -> Self {
-        self.things.push(thing);
+    pub fn object(mut self, object: SceneObject) -> Self {
+        self.objects.push(object);
         self
     }
 
@@ -466,7 +466,7 @@ impl Scene {
         if !self.graphics.is_empty() {
             w.model.graphics = Arc::new(self.graphics.iter().map(|g| (g.id, *g)).collect());
         }
-        if self.scout.is_some() || !self.things.is_empty() {
+        if self.scout.is_some() || !self.objects.is_empty() {
             let masters = self.masters();
             w.model.masters = (0..players).map(|_| Arc::new(masters.clone())).collect();
         }
@@ -474,12 +474,12 @@ impl Scene {
             place_scout(&mut w, scout);
         }
         let annexes: Vec<(ObjectId, MainBuildingId)> = self
-            .things
+            .objects
             .iter()
             .filter_map(|t| Some((t.id, t.annex_of?)))
             .collect();
-        for thing in self.things {
-            place_thing(&mut w, thing);
+        for object in self.objects {
+            place_object(&mut w, object);
         }
         link_annexes(&mut w, &annexes);
         w.reindex();
@@ -492,7 +492,7 @@ impl Scene {
         Masters::new(
             scout
                 .into_iter()
-                .chain(self.things.iter().map(|t| t.master.clone())),
+                .chain(self.objects.iter().map(|t| t.master.clone())),
         )
     }
 
@@ -695,8 +695,8 @@ fn standing(stats: MoveStats, at: Position) -> Mover {
 /// owner's list, a foundation's construction, its record on its tile (one with radii and a
 /// height whose master obstructs, a desolid foundation none), the path planners' standing
 /// object, and in the sight registry its seer, its UMV entry and its entry.
-fn place_thing(w: &mut World, thing: Thing) {
-    let Thing {
+fn place_object(w: &mut World, scene_object: SceneObject) {
+    let SceneObject {
         id,
         player,
         ref master,
@@ -715,7 +715,7 @@ fn place_thing(w: &mut World, thing: Thing) {
         annex_of: _,
         holds,
         workers,
-    } = thing;
+    } = scene_object;
     let sprite = sprite.map(|id| {
         let graphic = *w.model.graphics.get(id).expect("the scene's graphic");
         ActiveSprite::start(graphic, &mut Well512::default(), w.model.tuning.sprite)
@@ -783,7 +783,7 @@ fn place_thing(w: &mut World, thing: Thing) {
     w.pathing.moved(id, &placed, MoveState::Standing);
     w.pathing.tiles_changed(w.spatial.take_changes());
     if let Some(mask) = seen_by {
-        register(w, &thing, mask);
+        register(w, &scene_object, mask);
     }
 }
 
@@ -829,8 +829,8 @@ fn foundation(master: &Master) -> Building {
 /// entry ([`Visibility::link_building`]), then what its sight update writes when it finds `mask`
 /// ([`Visibility::combat_sight`]): the entry's mask and the records in the lists of the players of
 /// `mask` ([`Registry::update_unit`]).
-fn register(w: &mut World, thing: &Thing, mask: VisionBits) {
-    let Thing {
+fn register(w: &mut World, object: &SceneObject, mask: VisionBits) {
+    let SceneObject {
         id,
         player,
         ref master,
@@ -839,7 +839,7 @@ fn register(w: &mut World, thing: &Thing, mask: VisionBits) {
         desolid,
         capture,
         ..
-    } = *thing;
+    } = *object;
     let building = master.kind == MasterKind::BUILDING;
     let players = w.players.len();
     let tuning = w.model.tuning.visibility;

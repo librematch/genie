@@ -32,13 +32,13 @@ use crate::testing::class;
 use crate::testing::ids;
 use crate::testing::picker::with_picker;
 use crate::testing::roles;
-use crate::testing::scene::Thing as SceneThing;
+use crate::testing::scene::SceneObject;
 use crate::testing::scene::{Scene, walking};
 use crate::testing::tuning;
 use crate::unit_ai::OrderRecord;
 use crate::unit_ai::UnitAi;
 use crate::unit_ai::UnitAiKind;
-use crate::unit_ai::best_target::ThingFlags;
+use crate::unit_ai::best_target::FoundFlags;
 use crate::unit_ai::best_target::choice::{add_extra, kept_by_owner_and_class, may_attack};
 use crate::world::Seconds;
 use crate::world::World;
@@ -283,11 +283,11 @@ fn beside(side: Side, gap: f32) -> Position {
 
 /// Enemy `id` of player 2 and `master`, attackable and with a unit AI, `gap` from the soldier
 /// toward `side`.
-fn enemy(id: i32, master: Master, (side, gap): (Side, f32)) -> SceneThing {
-    SceneThing {
+fn enemy(id: i32, master: Master, (side, gap): (Side, f32)) -> SceneObject {
+    SceneObject {
         ai: Some(UnitAi::default()),
         flags: UnitFlags::ATTACKABLE,
-        ..SceneThing::new(id, PlayerId::new(2), master, beside(side, gap))
+        ..SceneObject::new(id, PlayerId::new(2), master, beside(side, gap))
     }
 }
 
@@ -297,21 +297,21 @@ fn enemy(id: i32, master: Master, (side, gap): (Side, f32)) -> SceneThing {
 /// ally.
 fn battle(
     (master, target): (Master, Option<i32>),
-    enemies: Vec<SceneThing>,
+    enemies: Vec<SceneObject>,
     walled: &[i32],
 ) -> World {
-    let soldier = SceneThing {
+    let soldier = SceneObject {
         ai: Some(UnitAi {
             ai_kind: UnitAiKind::Soldier,
             current_target: target.map(object_id),
             ..UnitAi::default()
         }),
-        ..SceneThing::new(1, PlayerId::new(1), master, Position::new(20.5, 20.5, 0.0))
+        ..SceneObject::new(1, PlayerId::new(1), master, Position::new(20.5, 20.5, 0.0))
     };
     let mut scene = Scene::open(GridSize::new(40, 40))
         .players(3)
         .relation(PlayerId::new(1), PlayerId::new(3), Relation::Ally)
-        .thing(soldier);
+        .object(soldier);
     for e in enemies {
         if walled.contains(&e.id.get()) {
             let tile = e.at.tile();
@@ -321,7 +321,7 @@ fn battle(
                 .map(|(dx, dy)| Tile::new(tile.x() + dx, tile.y() + dy));
             scene = scene.rocks(ring);
         }
-        scene = scene.thing(e);
+        scene = scene.object(e);
     }
     scene.build()
 }
@@ -409,11 +409,11 @@ fn melee(target: Option<i32>) -> (Master, Option<i32>) {
 }
 
 /// Three walking enemies 3 (7, east), 9 (8, west) and 5 (9, north, of 10 hit points) away.
-fn three_enemies() -> Vec<SceneThing> {
+fn three_enemies() -> Vec<SceneObject> {
     vec![
         enemy(7, walker(), (Side::East, 3.0)),
         enemy(8, walker(), (Side::West, 9.0)),
-        SceneThing {
+        SceneObject {
             hp: HitPoints::new(10.0),
             ..enemy(9, walker(), (Side::North, 5.0))
         },
@@ -446,7 +446,7 @@ fn the_best_unit_to_attack_ranks_then_takes_the_first_quick_path() {
 /// other statistics.
 #[test]
 fn failed_paths_become_retarget_entries() {
-    let still = SceneThing {
+    let still = SceneObject {
         hp: HitPoints::new(10.0),
         ..enemy(
             9,
@@ -492,19 +492,19 @@ fn failed_paths_become_retarget_entries() {
 #[test]
 fn the_lists_pass_over_what_the_unit_may_not_attack() {
     let enemies = vec![
-        SceneThing {
+        SceneObject {
             ai: None,
             ..enemy(30, walker(), (Side::West, 3.0))
         },
-        SceneThing {
+        SceneObject {
             inside: Some(ContainerId::new(object_id(36))),
             ..enemy(31, walker(), (Side::North, 3.0))
         },
-        SceneThing {
+        SceneObject {
             state: ObjectState::Dying,
             ..enemy(32, walker(), (Side::South, 3.0))
         },
-        SceneThing {
+        SceneObject {
             player: PlayerId::new(3),
             ..enemy(33, walker(), (Side::South, 6.0))
         },
@@ -523,8 +523,8 @@ fn the_lists_pass_over_what_the_unit_may_not_attack() {
 }
 
 /// Walls (class 27) and gates (class 39): still objects of 100 hit points.
-fn wall(id: i32, master: i16, class: ClassId, (side, gap): (Side, f32)) -> SceneThing {
-    SceneThing {
+fn wall(id: i32, master: i16, class: ClassId, (side, gap): (Side, f32)) -> SceneObject {
+    SceneObject {
         hp: HitPoints::new(100.0),
         ..enemy(id, enemy_master(master, class, false), (side, gap))
     }
@@ -723,24 +723,24 @@ fn candidate_passes_the_attack_check_the_friends_scan_and_the_neutral_test_in_or
     let enemies = || {
         vec![
             enemy(7, walker(), (Side::East, 3.0)),
-            SceneThing {
+            SceneObject {
                 flags: UnitFlags::ATTACKABLE | UnitFlags::UNTARGETABLE,
                 ..enemy(8, walker(), (Side::West, 3.0))
             },
             wall(10, 27, class::WALL, (Side::North, 3.0)),
-            SceneThing {
+            SceneObject {
                 ai: None,
                 ..enemy(11, walker(), (Side::South, 3.0))
             },
-            SceneThing {
+            SceneObject {
                 state: ObjectState::Dying,
                 ..enemy(12, walker(), (Side::South, 5.0))
             },
-            SceneThing {
+            SceneObject {
                 player: PlayerId::new(3),
                 ..enemy(13, walker(), (Side::South, 7.0))
             },
-            SceneThing {
+            SceneObject {
                 inside: Some(ContainerId::new(object_id(7))),
                 ..enemy(14, walker(), (Side::South, 9.0))
             },
@@ -748,7 +748,7 @@ fn candidate_passes_the_attack_check_the_friends_scan_and_the_neutral_test_in_or
     };
     let checked = |w: &mut World, me: &Searcher, id: i32, relation| {
         fielded(w, &[], |field| {
-            let t = field.thing(object_id(id))?.expect("a held object");
+            let t = field.found_object(object_id(id))?.expect("a held object");
             may_attack(me, (object_id(id), &t), relation, field)
         })
         .0
@@ -791,17 +791,17 @@ fn candidate_passes_the_attack_check_the_friends_scan_and_the_neutral_test_in_or
 
 /// An enemy as the owner and class rules read it: player 2's armed walking unit of class 0,
 /// 3 away.
-fn seen_enemy() -> Thing {
-    Thing {
+fn seen_enemy() -> FoundObject {
+    FoundObject {
         owner: PlayerId::new(2),
         state: ObjectState::Alive,
-        flags: ThingFlags::HAS_AI | ThingFlags::TARGETABLE | ThingFlags::ATTACKABLE,
+        flags: FoundFlags::HAS_AI | FoundFlags::TARGETABLE | FoundFlags::ATTACKABLE,
         master: master_id(4),
         class: class::CLASS_0,
         kind: MasterKind::COMBAT,
         distance: Distance::new(3.0),
         speed: Speed::new(1.0),
-        ..Thing::default()
+        ..FoundObject::default()
     }
 }
 
@@ -811,7 +811,7 @@ fn seen_enemy() -> Thing {
 /// castle); a human player's unit keeps them all.
 #[test]
 fn computer_unit_passes_over_gaia_holdings_and_boats() {
-    let thing = seen_enemy();
+    let seen = seen_enemy();
     let any = Ask {
         any_class: true,
         ..Ask::default()
@@ -821,9 +821,9 @@ fn computer_unit_passes_over_gaia_holdings_and_boats() {
         player_kind: PlayerKind::Computer,
         ..soldier()
     };
-    let house = Thing {
+    let house = FoundObject {
         class: class::BUILDING,
-        ..thing
+        ..seen
     };
     assert!(!kept_by_owner_and_class(
         &human,
@@ -832,21 +832,21 @@ fn computer_unit_passes_over_gaia_holdings_and_boats() {
         &roles()
     ));
     assert!(kept_by_owner_and_class(&human, &any, &house, &roles()));
-    let gaia = Thing {
+    let gaia = FoundObject {
         owner: PlayerId::new(0),
-        ..thing
+        ..seen
     };
-    let holding = Thing {
+    let holding = FoundObject {
         held: Amount::new(5.0),
         ..gaia
     };
-    let taken = Thing {
+    let taken = FoundObject {
         capture: CaptureKind::BySight,
         ..gaia
     };
     assert!(kept_by_owner_and_class(&computer, &any, &gaia, &roles()));
     // a held amount that is not a number counts as held (`+0x310 <= 0` fails)
-    let unordered = Thing {
+    let unordered = FoundObject {
         held: Amount::new(f32::NAN),
         ..gaia
     };
@@ -854,9 +854,9 @@ fn computer_unit_passes_over_gaia_holdings_and_boats() {
         assert!(!kept_by_owner_and_class(&computer, &any, &t, &roles()));
         assert!(kept_by_owner_and_class(&human, &any, &t, &roles()));
     }
-    let boat = Thing {
+    let boat = FoundObject {
         class: class::WARSHIP,
-        ..thing
+        ..seen
     };
     assert!(!kept_by_owner_and_class(&computer, &any, &boat, &roles()));
     assert!(kept_by_owner_and_class(&human, &any, &boat, &roles()));

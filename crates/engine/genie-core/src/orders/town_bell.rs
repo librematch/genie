@@ -467,7 +467,7 @@ mod tests {
     use crate::test_ids::{class_of, object_id};
     use crate::testing::class;
     use crate::testing::roles;
-    use crate::testing::scene::{Scene, Thing as SceneThing};
+    use crate::testing::scene::{Scene, SceneObject};
     use crate::world::WholeSeconds;
     use crate::world::World;
 
@@ -560,25 +560,25 @@ mod tests {
             ..Master::default()
         };
         let mut w = Scene::open(GridSize::new(16, 16))
-            .thing(SceneThing::new(
+            .object(SceneObject::new(
                 7,
                 PlayerId::GAIA,
                 building(70, class::BUILDING),
                 Position::new(2.0, 2.0, 0.0),
             ))
-            .thing(SceneThing::new(
+            .object(SceneObject::new(
                 8,
                 PlayerId::GAIA,
                 building(70, class::BUILDING),
                 Position::new(6.0, 2.0, 0.0),
             ))
-            .thing(SceneThing::new(
+            .object(SceneObject::new(
                 9,
                 PlayerId::GAIA,
                 building(50, class::FARM),
                 Position::new(10.0, 2.0, 0.0),
             ))
-            .thing(SceneThing::new(
+            .object(SceneObject::new(
                 10,
                 PlayerId::GAIA,
                 sheep,

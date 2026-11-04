@@ -94,7 +94,7 @@ use crate::testing::class;
 use crate::testing::ids;
 use crate::testing::ids::WONDER;
 use crate::testing::roles;
-use crate::testing::scene::Thing as SceneThing;
+use crate::testing::scene::SceneObject;
 use crate::testing::scene::{Scene, walking};
 use crate::testing::slots;
 use crate::testing::tuning;
@@ -457,9 +457,9 @@ fn call_for_help_searches_what_the_unit_cares_about_then_walks_the_lists() {
     let ask = |attacker: bool, helper: bool| {
         let mut scene = Scene::open(GridSize::new(200, 200))
             .players(2)
-            .thing(SceneThing {
+            .object(SceneObject {
                 ai: Some(idle(UnitAiKind::Building)),
-                ..SceneThing::new(
+                ..SceneObject::new(
                     7558,
                     player_id(1),
                     gate.clone(),
@@ -467,9 +467,9 @@ fn call_for_help_searches_what_the_unit_cares_about_then_walks_the_lists() {
                 )
             });
         if attacker {
-            scene = scene.thing(SceneThing {
+            scene = scene.object(SceneObject {
                 seen_by: seen,
-                ..SceneThing::new(
+                ..SceneObject::new(
                     7955,
                     player_id(2),
                     walker(5, class::CLASS_6),
@@ -478,10 +478,10 @@ fn call_for_help_searches_what_the_unit_cares_about_then_walks_the_lists() {
             });
         }
         if helper {
-            scene = scene.thing(SceneThing {
+            scene = scene.object(SceneObject {
                 ai: Some(idle(UnitAiKind::Soldier)),
                 seen_by: seen,
-                ..SceneThing::new(
+                ..SceneObject::new(
                     7960,
                     player_id(1),
                     walker(6, class::CLASS_6),
@@ -563,7 +563,7 @@ fn unit_sent_off_footprint_walks_to_the_spot_and_comes_back_to_its_work() {
         point: Position::new(33.5, 95.5, 0.0),
         ..MoveToAction::sub_in(MoveTo::Moving)
     };
-    let villager = SceneThing {
+    let villager = SceneObject {
         ai: Some(UnitAi {
             ai_kind: UnitAiKind::Civilian,
             current_action: Some(AiAction::Gather),
@@ -577,7 +577,7 @@ fn unit_sent_off_footprint_walks_to_the_spot_and_comes_back_to_its_work() {
             list: ActionList::default().with_move_to(Some(to_tree)),
             ..Action::default()
         }),
-        ..SceneThing::new(
+        ..SceneObject::new(
             9175,
             player_id(1),
             villager_master(),
@@ -585,13 +585,13 @@ fn unit_sent_off_footprint_walks_to_the_spot_and_comes_back_to_its_work() {
         )
     };
     let mut w = Scene::open(GridSize::new(120, 120))
-        .thing(villager)
-        .thing(SceneThing {
+        .object(villager)
+        .object(SceneObject {
             desolid: true,
             state: ObjectState::Foundation,
-            ..SceneThing::new(10028, player_id(1), house, Position::new(30.0, 90.0, 0.0))
+            ..SceneObject::new(10028, player_id(1), house, Position::new(30.0, 90.0, 0.0))
         })
-        .thing(SceneThing::new(
+        .object(SceneObject::new(
             600,
             player_id(0),
             tree,
@@ -676,14 +676,14 @@ fn unit_sent_off_footprint_keeps_its_move_aside_through_the_update() {
         ..house_and_tree().0
     };
     let mut w = Scene::open(GridSize::new(200, 100))
-        .thing(SceneThing {
+        .object(SceneObject {
             ai: Some(u),
-            ..SceneThing::new(14054, player_id(0), deer, Position::new(164.5, 50.5, 0.0))
+            ..SceneObject::new(14054, player_id(0), deer, Position::new(164.5, 50.5, 0.0))
         })
-        .thing(SceneThing {
+        .object(SceneObject {
             desolid: true,
             state: ObjectState::Foundation,
-            ..SceneThing::new(
+            ..SceneObject::new(
                 14100,
                 player_id(1),
                 town_centre,
@@ -772,16 +772,16 @@ fn build_task() -> Task {
 fn foundation_scene(villager: Master, ai: UnitAi) -> World {
     let (house, tree) = house_and_tree();
     Scene::open(GridSize::new(120, 120))
-        .thing(SceneThing {
+        .object(SceneObject {
             ai: Some(ai),
-            ..SceneThing::new(9175, player_id(1), villager, Position::new(29.5, 89.5, 0.0))
+            ..SceneObject::new(9175, player_id(1), villager, Position::new(29.5, 89.5, 0.0))
         })
-        .thing(SceneThing {
+        .object(SceneObject {
             desolid: true,
             state: ObjectState::Foundation,
-            ..SceneThing::new(10028, player_id(1), house, Position::new(30.0, 88.0, 0.0))
+            ..SceneObject::new(10028, player_id(1), house, Position::new(30.0, 88.0, 0.0))
         })
-        .thing(SceneThing::new(
+        .object(SceneObject::new(
             600,
             player_id(0),
             tree,
@@ -1055,7 +1055,7 @@ fn gatherer_master() -> Master {
 
 /// Player 1's villager 31237 of master `villager` at (20, 20) on a map of 64 by 64, its unit
 /// AI `ai`, and its town centre 31247 at (26, 26); the `others`, each in player 1's lists.
-fn gather_world((villager, ai): (Master, UnitAi), others: &[SceneThing]) -> World {
+fn gather_world((villager, ai): (Master, UnitAi), others: &[SceneObject]) -> World {
     gather_world_on(&[], (villager, ai), others)
 }
 
@@ -1063,7 +1063,7 @@ fn gather_world((villager, ai): (Master, UnitAi), others: &[SceneThing]) -> Worl
 fn gather_world_on(
     water: &[Tile],
     (villager, ai): (Master, UnitAi),
-    others: &[SceneThing],
+    others: &[SceneObject],
 ) -> World {
     let centre = Master {
         id: ids::TOWN_CENTRE,
@@ -1079,23 +1079,23 @@ fn gather_world_on(
     let mut scene = Scene::open(GridSize::new(64, 64))
         .players(2)
         .water(water.iter().copied())
-        .thing(SceneThing {
+        .object(SceneObject {
             ai: Some(ai),
-            ..SceneThing::new(
+            ..SceneObject::new(
                 31237,
                 player_id(1),
                 villager,
                 Position::new(20.0, 20.0, 0.0),
             )
         })
-        .thing(SceneThing {
+        .object(SceneObject {
             seen_by: Some(VisionBits::visible(player_id(1))),
-            ..SceneThing::new(31247, player_id(1), centre, Position::new(26.0, 26.0, 0.0))
+            ..SceneObject::new(31247, player_id(1), centre, Position::new(26.0, 26.0, 0.0))
         });
-    for thing in others {
-        scene = scene.thing(SceneThing {
+    for other in others {
+        scene = scene.object(SceneObject {
             seen_by: Some(VisionBits::visible(player_id(1))),
-            ..thing.clone()
+            ..other.clone()
         });
     }
     scene.build()
@@ -1108,7 +1108,7 @@ fn resource(
     (kind, group): (MasterKind, GatherGroup),
     (x, y): (f32, f32),
     (attribute, amount): (AttributeId, f32),
-) -> SceneThing {
+) -> SceneObject {
     let m = Master {
         id: master_id(master),
         kind,
@@ -1121,14 +1121,14 @@ fn resource(
         gather_group: group,
         ..Master::default()
     };
-    SceneThing {
+    SceneObject {
         holds: Some((attribute, Amount::new(amount))),
-        ..SceneThing::new(id, PlayerId::GAIA, m, Position::new(x, y, 0.0))
+        ..SceneObject::new(id, PlayerId::GAIA, m, Position::new(x, y, 0.0))
     }
 }
 
 /// Gaia's deer `id` (master 65, class 9) at (x, y), holding 100 food, its unit AI idle.
-fn gaia_deer(id: i32, (x, y): (f32, f32)) -> SceneThing {
+fn gaia_deer(id: i32, (x, y): (f32, f32)) -> SceneObject {
     let m = Master {
         id: master_id(65),
         kind: MasterKind::COMBAT,
@@ -1140,15 +1140,15 @@ fn gaia_deer(id: i32, (x, y): (f32, f32)) -> SceneThing {
         move_stats: Some(walking(Speed::new(1.0))),
         ..Master::default()
     };
-    SceneThing {
+    SceneObject {
         ai: Some(idle(UnitAiKind::Hunted)),
         holds: Some((attribute::FOOD, Amount::new(100.0))),
-        ..SceneThing::new(id, PlayerId::GAIA, m, Position::new(x, y, 0.0))
+        ..SceneObject::new(id, PlayerId::GAIA, m, Position::new(x, y, 0.0))
     }
 }
 
 /// Player 1's farm 12557 at (17, 24), holding 175 food.
-fn own_farm() -> SceneThing {
+fn own_farm() -> SceneObject {
     let m = Master {
         id: ids::FARM,
         kind: MasterKind::BUILDING,
@@ -1158,9 +1158,9 @@ fn own_farm() -> SceneThing {
         move_stats: Some(walking(Speed::ZERO)),
         ..Master::default()
     };
-    SceneThing {
+    SceneObject {
         holds: Some((attribute::FOOD, Amount::new(175.0))),
-        ..SceneThing::new(12557, player_id(1), m, Position::new(17.0, 24.0, 0.0))
+        ..SceneObject::new(12557, player_id(1), m, Position::new(17.0, 24.0, 0.0))
     }
 }
 
@@ -1233,7 +1233,7 @@ fn gatherer_searches(w: &mut World, n: Notify, hunt: bool) -> Result<u32, GenieE
 #[test]
 fn hunter_asked_for_another_target_hunts_what_its_search_finds() {
     let hunt = AiAction::Hunt.value();
-    let run = |ai: UnitAi, others: &[SceneThing], class: i32, kind: PlayerKind| {
+    let run = |ai: UnitAi, others: &[SceneObject], class: i32, kind: PlayerKind| {
         let mut w = gather_world((gatherer_master(), ai), others);
         w.players[1].kind = kind;
         let r = gatherer_searches(&mut w, search_notify(hunt, class, 31247), true);
@@ -1316,7 +1316,7 @@ fn hunter_asked_for_another_target_hunts_what_its_search_finds() {
 #[test]
 fn gatherer_without_class_stops_and_one_on_farm_searches_for_another() {
     let gather = AiAction::Gather.value();
-    let run = |ai: UnitAi, others: &[SceneThing], class: i32, kind: PlayerKind| {
+    let run = |ai: UnitAi, others: &[SceneObject], class: i32, kind: PlayerKind| {
         let mut w = gather_world((gatherer_master(), ai), others);
         w.players[1].kind = kind;
         let r = gatherer_searches(&mut w, search_notify(gather, class, 31247), false);
@@ -1338,7 +1338,7 @@ fn gatherer_without_class_stops_and_one_on_farm_searches_for_another() {
     let (_, (target, ..)) = run(
         civilian(AiAction::Gather, -1, 8),
         &[
-            SceneThing {
+            SceneObject {
                 workers: WorkerCount::of_data(4),
                 ..mine(28400, (22.0, 22.0))
             },
@@ -1379,12 +1379,12 @@ fn gatherer_without_class_stops_and_one_on_farm_searches_for_another() {
 }
 
 /// Player 1's house foundation 10028 at `at` (desolid, no build points).
-fn house_foundation((x, y): (f32, f32)) -> SceneThing {
+fn house_foundation((x, y): (f32, f32)) -> SceneObject {
     let (house, _) = house_and_tree();
-    SceneThing {
+    SceneObject {
         desolid: true,
         state: ObjectState::Foundation,
-        ..SceneThing::new(10028, player_id(1), house, Position::new(x, y, 0.0))
+        ..SceneObject::new(10028, player_id(1), house, Position::new(x, y, 0.0))
     }
 }
 
@@ -1404,7 +1404,7 @@ fn villager_searches_by_its_action() {
         ..UnitAi::default()
     };
     let n = search_notify(0, -1, -1);
-    let run = |ai: UnitAi, others: &[SceneThing], water: &[Tile], kind: PlayerKind| {
+    let run = |ai: UnitAi, others: &[SceneObject], water: &[Tile], kind: PlayerKind| {
         let mut w = gather_world_on(water, (gatherer_master(), ai), others);
         w.players[1].kind = kind;
         let r = run_ai(
@@ -1587,7 +1587,7 @@ fn hunter_of_kind_searches_by_it_from_its_drop_site() {
         ..civilian(AiAction::Hunt, 15, -1)
     };
     let trees = [
-        SceneThing {
+        SceneObject {
             workers: WorkerCount::of_data(2),
             ..tree(28300, (23.5, 23.5))
         },
@@ -1642,7 +1642,7 @@ fn attacker(id: i32, class: ClassId, gap_squared: DistanceSquared) -> UnitSeen {
 /// Gaia's boar `id` (master 48, a predator of combat level `level` on [`STANDING`]) at
 /// (20, 20), its unit AI `ai`, and player 1's villagers (id, x) ([`boar_villager`]).
 fn boar_world(id: i32, (level, ai): (CombatLevel, UnitAi), villagers: &[(i32, f32)]) -> World {
-    let villagers: Vec<SceneThing> = villagers
+    let villagers: Vec<SceneObject> = villagers
         .iter()
         .map(|&(villager, x)| boar_villager(villager, x, id))
         .collect();
@@ -1651,13 +1651,13 @@ fn boar_world(id: i32, (level, ai): (CombatLevel, UnitAi), villagers: &[(i32, f3
 
 /// Player 1's villager `id` at (x, 20), a walker whose unit AI targets the boar `boar`. Its
 /// radius and the boar's are 0.2: the gap is the centres' distance less 0.4.
-fn boar_villager(id: i32, x: f32, boar: i32) -> SceneThing {
-    SceneThing {
+fn boar_villager(id: i32, x: f32, boar: i32) -> SceneObject {
+    SceneObject {
         ai: Some(UnitAi {
             current_target: Some(object_id(boar)),
             ..idle(UnitAiKind::Civilian)
         }),
-        ..SceneThing::new(
+        ..SceneObject::new(
             id,
             player_id(1),
             walker(83, class::VILLAGER),
@@ -1668,7 +1668,7 @@ fn boar_villager(id: i32, x: f32, boar: i32) -> SceneThing {
 
 /// [`boar_world`] with the `others`, each in Gaia's lists. The AI stream is seeded with 0, as
 /// [`rng`] is.
-fn boar_world_with(id: i32, (level, ai): (CombatLevel, UnitAi), others: &[SceneThing]) -> World {
+fn boar_world_with(id: i32, (level, ai): (CombatLevel, UnitAi), others: &[SceneObject]) -> World {
     let boar = Master {
         line_of_sight: Distance::new(4.0),
         standing_sprite: Some(STANDING.id),
@@ -1678,15 +1678,15 @@ fn boar_world_with(id: i32, (level, ai): (CombatLevel, UnitAi), others: &[SceneT
     let mut scene = Scene::open(GridSize::new(64, 64))
         .players(1)
         .graphic(STANDING)
-        .thing(SceneThing {
+        .object(SceneObject {
             ai: Some(ai),
             sprite: Some(STANDING.id),
-            ..SceneThing::new(id, PlayerId::GAIA, boar, Position::new(20.0, 20.0, 0.0))
+            ..SceneObject::new(id, PlayerId::GAIA, boar, Position::new(20.0, 20.0, 0.0))
         });
-    for thing in others {
-        scene = scene.thing(SceneThing {
+    for other in others {
+        scene = scene.object(SceneObject {
             seen_by: Some(VisionBits::visible(PlayerId::GAIA)),
-            ..thing.clone()
+            ..other.clone()
         });
     }
     let mut w = scene.build();
@@ -1907,15 +1907,15 @@ fn wolf_world(ai: UnitAi, prey: &[(i32, ClassId, f32)]) -> World {
     };
     let mut scene = Scene::open(GridSize::new(64, 64))
         .graphic(STANDING)
-        .thing(SceneThing {
+        .object(SceneObject {
             ai: Some(ai),
             sprite: Some(STANDING.id),
-            ..SceneThing::new(20, PlayerId::GAIA, wolf, Position::new(20.0, 20.0, 0.0))
+            ..SceneObject::new(20, PlayerId::GAIA, wolf, Position::new(20.0, 20.0, 0.0))
         });
     for &(id, class, x) in prey {
-        scene = scene.thing(SceneThing {
+        scene = scene.object(SceneObject {
             seen_by: Some(VisionBits::visible(PlayerId::GAIA)),
-            ..SceneThing::new(
+            ..SceneObject::new(
                 id,
                 player_id(1),
                 walker(i16::try_from(id).expect("a master's id"), class),
@@ -2005,26 +2005,26 @@ fn hit_villager_world(ai: UnitAi, actions: Option<Action>, foe: Master) -> World
         (5.0, 10.0),
         (attribute::WOOD, 100.0),
     );
-    let foe = SceneThing {
+    let foe = SceneObject {
         ai: Some(UnitAi {
             current_target: Some(object_id(20)),
             ..idle(UnitAiKind::Soldier)
         }),
-        ..SceneThing::new(30, player_id(2), foe, Position::new(12.0, 10.0, 0.0))
+        ..SceneObject::new(30, player_id(2), foe, Position::new(12.0, 10.0, 0.0))
     };
     let mut scene = Scene::open(GridSize::new(100, 100))
         .players(2)
         .graphic(STANDING)
-        .thing(SceneThing {
+        .object(SceneObject {
             ai: Some(ai),
             actions,
             sprite: Some(STANDING.id),
-            ..SceneThing::new(20, player_id(1), villager, Position::new(10.0, 10.0, 0.0))
+            ..SceneObject::new(20, player_id(1), villager, Position::new(10.0, 10.0, 0.0))
         });
-    for thing in [tree, foe] {
-        scene = scene.thing(SceneThing {
+    for object in [tree, foe] {
+        scene = scene.object(SceneObject {
             seen_by: Some(VisionBits::visible(player_id(1))),
-            ..thing
+            ..object
         });
     }
     let mut world = scene.build();
@@ -2222,10 +2222,10 @@ fn lone_soldier(ai: UnitAi, at: Position, (kind, player_kind): (MasterKind, Play
         .players(2)
         .kind(player_id(1), player_kind)
         .graphic(STANDING)
-        .thing(SceneThing {
+        .object(SceneObject {
             ai: Some(ai),
             sprite: Some(STANDING.id),
-            ..SceneThing::new(20, player_id(1), soldier, at)
+            ..SceneObject::new(20, player_id(1), soldier, at)
         })
         .build();
     world.streams.get(Stream::Ai).set_seed(0);
@@ -2612,7 +2612,7 @@ fn moving_villager_keeps_its_way() {
 fn guard_world(
     (master, ai): (Master, UnitAi),
     player_kind: PlayerKind,
-    others: &[SceneThing],
+    others: &[SceneObject],
 ) -> World {
     let mut world = guard_scene((master, ai), player_kind, others).build();
     world.streams.get(Stream::Ai).set_seed(0);
@@ -2623,21 +2623,21 @@ fn guard_world(
 fn guard_scene(
     (master, ai): (Master, UnitAi),
     player_kind: PlayerKind,
-    others: &[SceneThing],
+    others: &[SceneObject],
 ) -> Scene {
     let mut scene = Scene::open(GridSize::new(100, 100))
         .players(2)
         .kind(player_id(1), player_kind)
         .graphic(STANDING)
-        .thing(SceneThing {
+        .object(SceneObject {
             ai: Some(ai),
             sprite: Some(STANDING.id),
-            ..SceneThing::new(1, player_id(1), master, Position::new(10.0, 10.0, 0.0))
+            ..SceneObject::new(1, player_id(1), master, Position::new(10.0, 10.0, 0.0))
         });
-    for thing in others {
-        scene = scene.thing(SceneThing {
+    for other in others {
+        scene = scene.object(SceneObject {
             seen_by: Some(VisionBits::visible(player_id(1))),
-            ..thing.clone()
+            ..other.clone()
         });
     }
     scene
@@ -2661,7 +2661,7 @@ fn guard_master() -> Master {
 /// Player 2's unit `id` (master `id`, a walker of class `class`, 30 hit points) at (x, 10):
 /// its attacks are 2 melee and 3 pierce (5; the guard takes the 2), its melee armor 0; its
 /// unit AI targets the guard soldier 1.
-fn foe_thing(id: i32, class: ClassId, x: f32) -> SceneThing {
+fn foe_unit(id: i32, class: ClassId, x: f32) -> SceneObject {
     let master = Master {
         standing_sprite: Some(STANDING.id),
         combat: Some(CombatPart {
@@ -2671,13 +2671,13 @@ fn foe_thing(id: i32, class: ClassId, x: f32) -> SceneThing {
         }),
         ..walker(i16::try_from(id).expect("a master's id"), class)
     };
-    SceneThing {
+    SceneObject {
         hp: HitPoints::new(30.0),
         ai: Some(UnitAi {
             current_target: Some(object_id(1)),
             ..idle(UnitAiKind::Soldier)
         }),
-        ..SceneThing::new(id, player_id(2), master, Position::new(x, 10.0, 0.0))
+        ..SceneObject::new(id, player_id(2), master, Position::new(x, 10.0, 0.0))
     }
 }
 
@@ -2744,11 +2744,11 @@ fn guard_walk() -> Action {
 }
 
 /// The ward 20 of `owner` (a walker of class 6, master 6) at (x, 10), in state `state`.
-fn ward_thing(owner: PlayerId, x: f32, state: ObjectState) -> SceneThing {
-    SceneThing {
+fn ward_unit(owner: PlayerId, x: f32, state: ObjectState) -> SceneObject {
+    SceneObject {
         state,
         ai: Some(idle(UnitAiKind::Soldier)),
-        ..SceneThing::new(
+        ..SceneObject::new(
             20,
             owner,
             walker(6, class::CLASS_6),
@@ -2787,8 +2787,8 @@ fn defend_order_ends_with_its_ward_gone_foreign_or_dead() {
     let alive = ObjectState::Alive;
     for ward in [
         None,
-        Some(ward_thing(player_id(2), 11.0, alive)),
-        Some(ward_thing(player_id(1), 11.0, ObjectState::Dying)),
+        Some(ward_unit(player_id(2), 11.0, alive)),
+        Some(ward_unit(player_id(1), 11.0, ObjectState::Dying)),
     ] {
         let mut world = guard_world(
             (guard_master(), guarding(20)),
@@ -2809,7 +2809,7 @@ fn defend_order_ends_with_its_ward_gone_foreign_or_dead() {
         assert_eq!(world.parts.actions.of(object_id(1)).top_action_kind(), None);
     }
     // Gaia's dead ward ends it too: no ally test counts Gaia (MISSING.md)
-    let gaia = ward_thing(PlayerId::GAIA, 11.0, ObjectState::Dying);
+    let gaia = ward_unit(PlayerId::GAIA, 11.0, ObjectState::Dying);
     let mut world = guard_scene((guard_master(), guarding(20)), PlayerKind::Human, &[gaia])
         .relation(player_id(1), PlayerId::GAIA, Relation::Ally)
         .build();
@@ -2821,7 +2821,7 @@ fn defend_order_ends_with_its_ward_gone_foreign_or_dead() {
         target_point: Position::new(-1.0, -1.0, 3.0),
         ..guarding(20)
     };
-    let ward = ward_thing(player_id(1), 11.0, alive);
+    let ward = ward_unit(player_id(1), 11.0, alive);
     let mut world = guard_world((guard_master(), attacking), PlayerKind::Human, &[ward]);
     let (answer, unit_ai) = defends(&mut world);
     assert_eq!(
@@ -2838,7 +2838,7 @@ fn defend_order_ends_with_its_ward_gone_foreign_or_dead() {
 #[test]
 fn defend_order_follows_its_ward_and_attacks_its_attackers() {
     let alive = ObjectState::Alive;
-    let far = ward_thing(player_id(1), 20.4, alive);
+    let far = ward_unit(player_id(1), 20.4, alive);
     let mut world = guard_world((guard_master(), guarding(20)), PlayerKind::Human, &[far]);
     let (answer, unit_ai) = defends(&mut world);
     assert_eq!(answer, Ok(MiscEnd::Ends));
@@ -2855,14 +2855,14 @@ fn defend_order_follows_its_ward_and_attacks_its_attackers() {
         (Some(AiAction::Move), Some(object_id(20)))
     );
     // (2.5 + 1)^2 is 12.25: within it (a gap of 3.5) the ward's nearest attacker is attacked
-    let near = SceneThing {
+    let near = SceneObject {
         ai: Some(UnitAi {
             attackers: Attackers::of_saved(&[40]),
             ..idle(UnitAiKind::Soldier)
         }),
-        ..ward_thing(player_id(1), 13.9, alive)
+        ..ward_unit(player_id(1), 13.9, alive)
     };
-    let others = [near, foe_thing(40, class::CLASS_6, 15.0)];
+    let others = [near, foe_unit(40, class::CLASS_6, 15.0)];
     let mut world = guard_world((guard_master(), guarding(20)), PlayerKind::Human, &others);
     let (answer, _) = defends(&mut world);
     assert_eq!(
@@ -2929,8 +2929,8 @@ fn the_damage_case_lets_known_dead_allied_and_ordered_ones_be() {
         ..idle(UnitAiKind::Soldier)
     };
     let foes = [
-        foe_thing(7, class::CLASS_6, 12.0),
-        foe_thing(9, class::CLASS_6, 13.0),
+        foe_unit(7, class::CLASS_6, 12.0),
+        foe_unit(9, class::CLASS_6, 13.0),
     ];
     let mut world = guard_world((guard_master(), known), PlayerKind::Human, &foes);
     *world.parts.actions.of_mut(object_id(1)).unwrap() = Action {
@@ -2958,9 +2958,9 @@ fn the_damage_case_lets_known_dead_allied_and_ordered_ones_be() {
     );
     assert!(guard_under_attack(&world));
     // an allied attacker: its own player's
-    let own = SceneThing {
+    let own = SceneObject {
         player: player_id(1),
-        ..foe_thing(7, class::CLASS_6, 12.0)
+        ..foe_unit(7, class::CLASS_6, 12.0)
     };
     let mut world = guard_world(
         (guard_master(), idle(UnitAiKind::Soldier)),
@@ -3171,8 +3171,8 @@ fn each_unit_ai_kind_tests_neutral_object_by_its_module() {
 #[test]
 fn an_idle_soldier_attacks_back_what_best_unit_to_attack_names() {
     let foes = [
-        foe_thing(7, class::CLASS_6, 12.0),
-        foe_thing(8, class::CLASS_6, 17.0),
+        foe_unit(7, class::CLASS_6, 12.0),
+        foe_unit(8, class::CLASS_6, 17.0),
     ];
     let soldier = |ai| (guard_master(), ai);
     let mut world = guard_world(soldier(idle(UnitAiKind::Soldier)), PlayerKind::Human, &foes);
@@ -3212,7 +3212,7 @@ fn an_idle_soldier_attacks_back_what_best_unit_to_attack_names() {
         .flat_map(|x| [Tile::new(x, 8), Tile::new(x, 12)])
         .chain((9..=11).flat_map(|y| [Tile::new(13, y), Tile::new(17, y)]))
         .collect();
-    let island = [foe_thing(7, class::CLASS_6, 15.0)];
+    let island = [foe_unit(7, class::CLASS_6, 15.0)];
     let mut world = guard_scene(
         soldier(idle(UnitAiKind::Soldier)),
         PlayerKind::Human,
@@ -3238,7 +3238,7 @@ fn an_idle_soldier_attacks_back_what_best_unit_to_attack_names() {
         move_stats: Some(walking(Speed::ZERO)),
         ..guard_master()
     };
-    let unseen = foe_thing(7, class::RELIC, 12.0);
+    let unseen = foe_unit(7, class::RELIC, 12.0);
     let mut world = guard_world(
         (still, idle(UnitAiKind::Soldier)),
         PlayerKind::Human,
@@ -3266,12 +3266,12 @@ fn soldier_with_target_attacks_back_from_buildings_only() {
             ..idle(UnitAiKind::Soldier)
         };
         let target = if class == class::CLASS_6 {
-            foe_thing(9, class, 13.0)
+            foe_unit(9, class, 13.0)
         } else {
             let (house, _) = house_and_tree();
-            SceneThing {
+            SceneObject {
                 ai: Some(idle(UnitAiKind::Building)),
-                ..SceneThing::new(
+                ..SceneObject::new(
                     9,
                     player_id(2),
                     Master { class, ..house },
@@ -3279,7 +3279,7 @@ fn soldier_with_target_attacks_back_from_buildings_only() {
                 )
             }
         };
-        let others = [foe_thing(7, class::CLASS_6, 12.0), target];
+        let others = [foe_unit(7, class::CLASS_6, 12.0), target];
         let mut world = guard_world((guard_master(), unit_ai), PlayerKind::Human, &others);
         world.parts.mover_mut(object_id(1)).unwrap().paths = vec![PathData {
             points: vec![BVector::new(10.0, 0.0, 10.0), BVector::new(20.0, 0.0, 10.0)],
@@ -3324,12 +3324,12 @@ fn computer_unit_weighs_its_target_against_its_attacker() {
         current_target: Some(object_id(9)),
         ..idle(UnitAiKind::Soldier)
     };
-    let hp = |thing: SceneThing, hp: f32| SceneThing {
+    let hp = |object: SceneObject, hp: f32| SceneObject {
         hp: HitPoints::new(hp),
-        ..thing
+        ..object
     };
-    let weighs = |guard: Master, pair: (SceneThing, SceneThing), shy: bool| {
-        let others = <[SceneThing; 2]>::from(pair);
+    let weighs = |guard: Master, pair: (SceneObject, SceneObject), shy: bool| {
+        let others = <[SceneObject; 2]>::from(pair);
         let mut world = guard_world((guard, attacking.clone()), PlayerKind::Computer, &others);
         if shy {
             world.players[1]
@@ -3346,7 +3346,7 @@ fn computer_unit_weighs_its_target_against_its_attacker() {
     };
     let foe = |id, class| {
         hp(
-            foe_thing(id, class, if id == 7 { 12.0 } else { 13.0 }),
+            foe_unit(id, class, if id == 7 { 12.0 } else { 13.0 }),
             if id == 7 { 50.0 } else { 100.0 },
         )
     };
@@ -3359,7 +3359,7 @@ fn computer_unit_weighs_its_target_against_its_attacker() {
         None,
     );
     let guard = guard_master;
-    let wonder = SceneThing {
+    let wonder = SceneObject {
         master: Master {
             id: WONDER,
             kind: MasterKind::BUILDING,
@@ -3375,7 +3375,7 @@ fn computer_unit_weighs_its_target_against_its_attacker() {
         weighs(guard(), (foe(7, class::TOWER), foe(9, class::TOWER)), false),
         (Ok(GO_ON), None)
     );
-    let missile = SceneThing {
+    let missile = SceneObject {
         master: Master {
             kind: MasterKind::MISSILE,
             ..foe(7, class::CLASS_6).master
@@ -3407,7 +3407,7 @@ fn computer_unit_weighs_its_target_against_its_attacker() {
     let slow = (hp(foe(7, class::CLASS_6), 200.0), foe(9, class::CLASS_6));
     assert_eq!(weighs(guard(), slow, false), let_be);
     // a converting attacker (a priest of player 2 that converts any class)
-    let priest = |thing: SceneThing| SceneThing {
+    let priest = |object: SceneObject| SceneObject {
         ai: Some(UnitAi {
             current_target: Some(object_id(1)),
             ..idle(UnitAiKind::Priest)
@@ -3420,9 +3420,9 @@ fn computer_unit_weighs_its_target_against_its_attacker() {
                 }],
                 ..ActionPart::default()
             }),
-            ..thing.master.clone()
+            ..object.master.clone()
         },
-        ..thing
+        ..object
     };
     let converting = (
         priest(hp(foe(7, class::CLASS_6), 200.0)),
@@ -3431,7 +3431,7 @@ fn computer_unit_weighs_its_target_against_its_attacker() {
     assert_eq!(weighs(guard(), converting, false), strikes);
     // a target that cannot harm it: the attack back, then the kill times (the attacker
     // never dies against 10 hits)
-    let harmless = SceneThing {
+    let harmless = SceneObject {
         master: Master {
             combat: Some(CombatPart {
                 armors: vec![ClassAmount::new(4, 0)],
@@ -3484,16 +3484,16 @@ fn scout_whose_sheep_died_attacks_the_next_or_walks_to_its_point() {
         combat: Some(CombatPart::default()),
         ..walker(448, class::CLASS_47)
     };
-    let villager = SceneThing {
+    let villager = SceneObject {
         ai: Some(idle(UnitAiKind::Civilian)),
-        ..SceneThing::new(
+        ..SceneObject::new(
             26000,
             player_id(2),
             villager_master(),
             Position::new(20.3, 20.0, 0.0),
         )
     };
-    let run = |others: &[SceneThing]| {
+    let run = |others: &[SceneObject]| {
         let mut w = soldier_world((master.clone(), scout.clone()), None, others);
         let r = run_ai(
             &mut w,
@@ -3706,7 +3706,7 @@ fn lion_attacks_by_its_priority_or_its_classes() {
 /// Player 1's hunter 10041 (a villager that hunts predators) at (20, 20) on its Hunt of Gaia's
 /// boar 9731 at (20.9, 20), which targets it (the hunt order's Hunt at once, attacking: state
 /// 12), and the `others`, each in player 1's lists. The AI stream is seeded with 0.
-fn hunter_world(others: &[SceneThing]) -> World {
+fn hunter_world(others: &[SceneObject]) -> World {
     let hunter = Master {
         standing_sprite: Some(STANDING.id),
         action: Some(ActionPart {
@@ -3730,24 +3730,24 @@ fn hunter_world(others: &[SceneThing]) -> World {
     let mut scene = Scene::open(GridSize::new(64, 64))
         .players(2)
         .graphic(STANDING)
-        .thing(SceneThing {
+        .object(SceneObject {
             ai: Some(idle(UnitAiKind::Civilian)),
             sprite: Some(STANDING.id),
-            ..SceneThing::new(10041, player_id(1), hunter, Position::new(20.0, 20.0, 0.0))
+            ..SceneObject::new(10041, player_id(1), hunter, Position::new(20.0, 20.0, 0.0))
         })
-        .thing(SceneThing {
+        .object(SceneObject {
             ai: Some(UnitAi {
                 current_target: Some(object_id(10041)),
                 ..hit_boar()
             }),
             sprite: Some(STANDING.id),
             seen_by: Some(VisionBits::visible(player_id(1))),
-            ..SceneThing::new(9731, PlayerId::GAIA, boar, Position::new(20.9, 20.0, 0.0))
+            ..SceneObject::new(9731, PlayerId::GAIA, boar, Position::new(20.9, 20.0, 0.0))
         });
-    for thing in others {
-        scene = scene.thing(SceneThing {
+    for other in others {
+        scene = scene.object(SceneObject {
             seen_by: Some(VisionBits::visible(player_id(1))),
-            ..thing.clone()
+            ..other.clone()
         });
     }
     let mut w = scene.build();
@@ -3789,12 +3789,12 @@ fn hunter_hit_by_its_boar_ignores_the_damage() {
         kind: NotifyKind::DAMAGED,
         p: [caller, 34, 40],
     };
-    let enemy = SceneThing {
+    let enemy = SceneObject {
         ai: Some(UnitAi {
             current_target: Some(object_id(10041)),
             ..idle(UnitAiKind::Civilian)
         }),
-        ..SceneThing::new(
+        ..SceneObject::new(
             9800,
             player_id(2),
             walker(293, class::VILLAGER),
@@ -3868,11 +3868,11 @@ fn closest_valid_attacker_skips_classes_and_flips_coin_on_tie() {
 /// still under attack, no longer is on the next.
 #[test]
 fn an_attacker_that_no_longer_targets_the_unit_leaves_one_an_update() {
-    let walked_off = SceneThing {
+    let walked_off = SceneObject {
         ai: Some(idle(UnitAiKind::Civilian)),
         ..boar_villager(10049, 21.0, 9729)
     };
-    let dead = SceneThing {
+    let dead = SceneObject {
         state: ObjectState::Dying,
         ..boar_villager(10050, 21.0, 9729)
     };
@@ -3971,10 +3971,10 @@ fn builder_idle_timer_stays_0_and_its_look_around_is_redrawn() {
         ..idle(UnitAiKind::Civilian)
     };
     let (house, _) = house_and_tree();
-    let foundation = SceneThing {
+    let foundation = SceneObject {
         desolid: true,
         state: ObjectState::Foundation,
-        ..SceneThing::new(10028, player_id(1), house, Position::new(30.0, 88.0, 0.0))
+        ..SceneObject::new(10028, player_id(1), house, Position::new(30.0, 88.0, 0.0))
     };
     let builder = (player_id(1), 9175);
     let mut world = builder_world(building.clone(), Some(walking.clone()), Some(foundation));
@@ -4074,12 +4074,12 @@ fn defending_unit_beyond_five_tiles_of_its_state_position_stops_to_walk_back() {
             retarget_timer: Millis::new(u32::MAX),
             ..idle(UnitAiKind::Soldier)
         };
-        let unit = lone_thing(player_id(1), unit_ai, Position::new(x, 10.0, 0.0));
+        let unit = lone_unit(player_id(1), unit_ai, Position::new(x, 10.0, 0.0));
         let master = Master {
             radius: Footprint::new(0.5, 0.5),
             ..unit.master
         };
-        lone_world(SceneThing { master, ..unit }, &[])
+        lone_world(SceneObject { master, ..unit }, &[])
     };
     let mut world = defender(15.4);
     let (answer, _) = lone_retarget_check(&mut world);
@@ -4129,28 +4129,28 @@ fn lone_attacks(world: &World) -> Option<ObjectId> {
 }
 
 /// `owner`'s unit 50 at `at` of the [`lone_master`] of its unit AI `unit_ai`, on its sprite.
-fn lone_thing(owner: PlayerId, unit_ai: UnitAi, at: Position) -> SceneThing {
+fn lone_unit(owner: PlayerId, unit_ai: UnitAi, at: Position) -> SceneObject {
     let master = Master {
         standing_sprite: Some(STANDING.id),
         ..lone_master(unit_ai.ai_kind)
     };
-    SceneThing {
+    SceneObject {
         ai: Some(unit_ai),
         sprite: Some(STANDING.id),
-        ..SceneThing::new(50, owner, master, at)
+        ..SceneObject::new(50, owner, master, at)
     }
 }
 
 /// A map of 128 by 128 with the `unit` and the `others`, each seen by the unit's owner
 /// ([`finish`] builds it).
-fn lone_scene(unit: SceneThing, others: &[SceneThing]) -> Scene {
+fn lone_scene(unit: SceneObject, others: &[SceneObject]) -> Scene {
     let owner = unit.player;
     let mut scene = Scene::open(GridSize::new(128, 128))
         .players(2)
         .graphic(STANDING)
-        .thing(unit);
+        .object(unit);
     for other in others {
-        scene = scene.thing(SceneThing {
+        scene = scene.object(SceneObject {
             seen_by: Some(VisionBits::visible(owner)),
             ..other.clone()
         });
@@ -4166,13 +4166,13 @@ fn finish(scene: Scene) -> World {
 }
 
 /// [`lone_scene`]'s world.
-fn lone_world(unit: SceneThing, others: &[SceneThing]) -> World {
+fn lone_world(unit: SceneObject, others: &[SceneObject]) -> World {
     finish(lone_scene(unit, others))
 }
 
 /// The `unit` on its way to `to` (its own `MoveTo`), so that a stop shows.
-fn on_its_way(unit: SceneThing, to: Position) -> SceneThing {
-    SceneThing {
+fn on_its_way(unit: SceneObject, to: Position) -> SceneObject {
+    SceneObject {
         actions: Some(Action {
             list: ActionList::default().with_move_to(Some(MoveToAction {
                 point: to,
@@ -4197,18 +4197,18 @@ fn lone_stopped(world: &World) -> bool {
 /// [`lone_world`] with player 1's unit at (30, 30), its unit AI `unit_ai`.
 fn lone_unit_world(unit_ai: UnitAi) -> World {
     lone_world(
-        lone_thing(player_id(1), unit_ai, Position::new(30.0, 30.0, 0.0)),
+        lone_unit(player_id(1), unit_ai, Position::new(30.0, 30.0, 0.0)),
         &[],
     )
 }
 
-/// Gaia's animal 50 at `at`, its unit AI `unit_ai` ([`lone_thing`]).
-fn animal(unit_ai: UnitAi, at: Position) -> SceneThing {
-    lone_thing(PlayerId::GAIA, unit_ai, at)
+/// Gaia's animal 50 at `at`, its unit AI `unit_ai` ([`lone_unit`]).
+fn animal(unit_ai: UnitAi, at: Position) -> SceneObject {
+    lone_unit(PlayerId::GAIA, unit_ai, at)
 }
 
 /// [`lone_world`] with the `animal`, the `others` and the AI stream `stream`.
-fn animal_world(animal: SceneThing, others: &[SceneThing], stream: Well512) -> World {
+fn animal_world(animal: SceneObject, others: &[SceneObject], stream: Well512) -> World {
     let mut world = lone_world(animal, others);
     *world.streams.get(Stream::Ai) = stream;
     world
@@ -4535,9 +4535,9 @@ fn scouting(ai: UnitAi, kind: PlayerKind, unexplored: &[Tile]) -> World {
         .sight(TileSight::Explored)
         .sight_on(unexplored.iter().copied(), TileSight::Unknown)
         .kind(player_id(1), kind)
-        .thing(SceneThing {
+        .object(SceneObject {
             ai: Some(ai),
-            ..SceneThing::new(30, player_id(1), scout, Position::new(20.5, 92.5, 0.0))
+            ..SceneObject::new(30, player_id(1), scout, Position::new(20.5, 92.5, 0.0))
         })
         .build()
 }
@@ -4699,15 +4699,15 @@ fn church_world(
         .players(3)
         .rocks(rocks.iter().copied())
         .sight_on(fogged.iter().copied(), TileSight::Explored)
-        .thing(SceneThing {
+        .object(SceneObject {
             ai: Some(ai),
             actions: Some(artifact),
-            ..SceneThing::new(7108, owner, church, Position::new(136.0, 100.0, 0.0))
+            ..SceneObject::new(7108, owner, church, Position::new(136.0, 100.0, 0.0))
         });
     for &(id, player, x, y) in others {
-        scene = scene.thing(SceneThing {
+        scene = scene.object(SceneObject {
             seen_by: Some(VisionBits::visible(PlayerId::GAIA) | VisionBits::visible(player_id(1))),
-            ..SceneThing::new(
+            ..SceneObject::new(
                 id,
                 player,
                 walker(5, class::CLASS_6),
@@ -5600,8 +5600,8 @@ fn deer_that_sees_nothing_stays_six_times_in_seven_and_otherwise_wanders() {
 }
 
 /// Player 1's scout 9183 at `at` (a walker of class 12, master 448), which a deer evades.
-fn deer_scout(at: Position) -> SceneThing {
-    SceneThing::new(9183, player_id(1), walker(448, class::CLASS_12), at)
+fn deer_scout(at: Position) -> SceneObject {
+    SceneObject::new(9183, player_id(1), walker(448, class::CLASS_12), at)
 }
 
 #[test]
@@ -5675,7 +5675,7 @@ fn an_animal_whose_wander_ended_drops_its_move_action_and_turns_idle() {
         current_action: Some(AiAction::Move),
         ..deer()
     };
-    let walking = SceneThing {
+    let walking = SceneObject {
         actions: Some(Action {
             list: ActionList::default().with_move_to(Some(MoveToAction {
                 point: Position::new(33.5, 106.5, 0.0),
@@ -5761,14 +5761,14 @@ fn between_turns_an_arrived_move_runs_the_next_queued_order() {
 
 /// The scout 9183 (its unit AI `unit_ai`) as player 1's lone unit 50 at (93.5, 58.25), a
 /// walker of class 12 (master 448), its `MoveTo` to its place in `state`.
-fn lone_scout(unit_ai: UnitAi, state: MoveTo) -> SceneThing {
+fn lone_scout(unit_ai: UnitAi, state: MoveTo) -> SceneObject {
     let at = Position::new(93.5, 58.25, 0.0);
-    let thing = lone_thing(player_id(1), unit_ai, at);
-    SceneThing {
+    let lone = lone_unit(player_id(1), unit_ai, at);
+    SceneObject {
         master: Master {
             id: master_id(448),
             class: class::CLASS_12,
-            ..thing.master
+            ..lone.master
         },
         actions: Some(Action {
             list: ActionList::default().with_move_to(Some(MoveToAction {
@@ -5777,7 +5777,7 @@ fn lone_scout(unit_ai: UnitAi, state: MoveTo) -> SceneThing {
             })),
             ..Action::default()
         }),
-        ..thing
+        ..lone
     }
 }
 
@@ -5841,7 +5841,7 @@ fn completed_move_on_its_order_ends_the_order_and_stops_the_unit() {
         )],
         ..scout()
     };
-    let scout_unit = SceneThing {
+    let scout_unit = SceneObject {
         actions: None,
         ..lone_scout(arrived, MoveTo::Arrived)
     };
@@ -5874,22 +5874,22 @@ fn gaia_unit_world(id: i32, ai: UnitAi, at: Position) -> World {
 }
 
 /// [`gaia_unit_world`] with the `others`, each in Gaia's lists.
-fn gaia_unit_world_with(id: i32, ai: UnitAi, at: Position, others: &[SceneThing]) -> World {
+fn gaia_unit_world_with(id: i32, ai: UnitAi, at: Position, others: &[SceneObject]) -> World {
     let animal = Master {
         standing_sprite: Some(STANDING.id),
         ..walker(4, class::CLASS_11)
     };
     let mut scene = Scene::open(GridSize::new(200, 200))
         .graphic(STANDING)
-        .thing(SceneThing {
+        .object(SceneObject {
             ai: Some(ai),
             sprite: Some(STANDING.id),
-            ..SceneThing::new(id, PlayerId::GAIA, animal, at)
+            ..SceneObject::new(id, PlayerId::GAIA, animal, at)
         });
-    for thing in others {
-        scene = scene.thing(SceneThing {
+    for other in others {
+        scene = scene.object(SceneObject {
             seen_by: Some(VisionBits::visible(PlayerId::GAIA)),
-            ..thing.clone()
+            ..other.clone()
         });
     }
     let mut w = scene.build();
@@ -6254,10 +6254,10 @@ fn making_world(ai: UnitAi, missile: i16, firepower: f32) -> World {
     let mut w = Scene::open(GridSize::new(64, 64))
         .players(2)
         .graphic(STANDING)
-        .thing(SceneThing {
+        .object(SceneObject {
             ai: Some(ai),
             sprite: Some(STANDING.id),
-            ..SceneThing::new(500, player_id(1), centre, Position::new(30.0, 30.0, 0.0))
+            ..SceneObject::new(500, player_id(1), centre, Position::new(30.0, 30.0, 0.0))
         })
         .build();
     w.parts.combat_mut(object_id(500)).unwrap().firepower = Firepower::new(firepower);
@@ -6333,15 +6333,15 @@ fn busy_on_target(
         })),
         ..Action::default()
     };
-    let unit = SceneThing {
+    let unit = SceneObject {
         ai: Some(ai),
         actions: Some(follow),
-        ..SceneThing::new(9, player, walker(4, class), Position::new(20.0, 20.0, 0.0))
+        ..SceneObject::new(9, player, walker(4, class), Position::new(20.0, 20.0, 0.0))
     };
     Scene::open(GridSize::new(64, 64))
         .players(players)
-        .thing(unit)
-        .thing(SceneThing::new(
+        .object(unit)
+        .object(SceneObject::new(
             target,
             owner,
             walker(5, target_class),
@@ -6448,7 +6448,7 @@ fn unit_ai_with_target_runs_its_update_on_any_order() {
 /// MarvinBlue/426048731's builder 9175 of player 1 at (29.5, 89.5) on its sprite, its unit AI
 /// `ai` and its actions `actions`, and the `target` 10028 at (30, 88), each in player 1's lists.
 /// Its last human order time is past the cap.
-fn builder_world(ai: UnitAi, actions: Option<Action>, target: Option<SceneThing>) -> World {
+fn builder_world(ai: UnitAi, actions: Option<Action>, target: Option<SceneObject>) -> World {
     let villager = Master {
         standing_sprite: Some(STANDING.id),
         ..villager_master()
@@ -6456,14 +6456,14 @@ fn builder_world(ai: UnitAi, actions: Option<Action>, target: Option<SceneThing>
     let mut scene = Scene::open(GridSize::new(120, 120))
         .players(2)
         .graphic(STANDING)
-        .thing(SceneThing {
+        .object(SceneObject {
             ai: Some(ai),
             actions,
             sprite: Some(STANDING.id),
-            ..SceneThing::new(9175, player_id(1), villager, Position::new(29.5, 89.5, 0.0))
+            ..SceneObject::new(9175, player_id(1), villager, Position::new(29.5, 89.5, 0.0))
         });
     if let Some(t) = target {
-        scene = scene.thing(SceneThing {
+        scene = scene.object(SceneObject {
             seen_by: Some(VisionBits::visible(player_id(1))),
             ..t
         });
@@ -6478,16 +6478,16 @@ fn builder_world(ai: UnitAi, actions: Option<Action>, target: Option<SceneThing>
 }
 
 /// Player 1's house 10028 at (30, 88), standing.
-fn standing_house() -> SceneThing {
+fn standing_house() -> SceneObject {
     let (house, _) = house_and_tree();
-    SceneThing::new(10028, player_id(1), house, Position::new(30.0, 88.0, 0.0))
+    SceneObject::new(10028, player_id(1), house, Position::new(30.0, 88.0, 0.0))
 }
 
 /// Player 2's walker 10028 (class 6, master 5) at (30, 88), dying.
-fn dying_walker() -> SceneThing {
-    SceneThing {
+fn dying_walker() -> SceneObject {
+    SceneObject {
         state: ObjectState::Dying,
-        ..SceneThing::new(
+        ..SceneObject::new(
             10028,
             player_id(2),
             walker(5, class::CLASS_6),
@@ -6639,13 +6639,13 @@ fn follower() -> UnitAi {
 /// [`follower`] as player 1's lone scout 50 at (110, 40) (a walker of class 12) on its way to
 /// Gaia's deer 9655 (class 9, master 65) at `deer`, whose tile player 1 sees with `visible`.
 fn follow_world(deer: Position, visible: bool) -> World {
-    let scout = lone_thing(player_id(1), follower(), Position::new(110.0, 40.0, 0.0));
+    let scout = lone_unit(player_id(1), follower(), Position::new(110.0, 40.0, 0.0));
     let master = Master {
         class: class::CLASS_12,
         ..scout.master.clone()
     };
-    let scout = on_its_way(SceneThing { master, ..scout }, deer);
-    let prey = SceneThing::new(9655, PlayerId::GAIA, walker(65, class::PREY), deer);
+    let scout = on_its_way(SceneObject { master, ..scout }, deer);
+    let prey = SceneObject::new(9655, PlayerId::GAIA, walker(65, class::PREY), deer);
     let mut scene = lone_scene(scout, &[prey]);
     if !visible {
         let tile = Tile::new(deer.x() as i32, deer.y() as i32);
@@ -6742,7 +6742,7 @@ fn the_follow_order_ends_on_target_out_of_sight() {
 #[test]
 fn moved_target_notify_runs_process_idle_with_saved_patrol() {
     let unit_ai = follower();
-    let deer = SceneThing::new(
+    let deer = SceneObject::new(
         9655,
         PlayerId::GAIA,
         walker(65, class_id(9)),
@@ -6798,8 +6798,8 @@ const SCOUT_AT: Position = Position::new(21.947_916, 92.489_586, 0.0);
 
 /// The scout 9185 (its unit AI `unit_ai`) as `owner`'s lone unit 50 at [`SCOUT_AT`]: a walker
 /// of class 12 (master 448) of line of sight and search radius 4 and weapon range 1.
-fn idle_scout_thing(owner: PlayerId, unit_ai: UnitAi) -> SceneThing {
-    let scout = lone_thing(owner, unit_ai, SCOUT_AT);
+fn idle_scout_unit(owner: PlayerId, unit_ai: UnitAi) -> SceneObject {
+    let scout = lone_unit(owner, unit_ai, SCOUT_AT);
     let master = Master {
         id: master_id(448),
         class: class::CLASS_12,
@@ -6814,11 +6814,11 @@ fn idle_scout_thing(owner: PlayerId, unit_ai: UnitAi) -> SceneThing {
         }),
         ..scout.master
     };
-    SceneThing { master, ..scout }
+    SceneObject { master, ..scout }
 }
 
 /// [`lone_world`] with the `scout` and the `others`, the scout's last human order past the cap.
-fn idle_scout_world(scout: SceneThing, others: &[SceneThing]) -> World {
+fn idle_scout_world(scout: SceneObject, others: &[SceneObject]) -> World {
     let owner = scout.player;
     let mut world = lone_world(scout, others);
     lone_past_cap(&mut world, owner);
@@ -6837,10 +6837,10 @@ fn lone_past_cap(world: &mut World, owner: PlayerId) {
 
 /// `owner`'s idle walker `id` (class 6, master 5) `dx` tiles east of [`SCOUT_AT`], which a
 /// scout's search may find.
-fn scout_foe(id: i32, owner: PlayerId, dx: f32) -> SceneThing {
-    SceneThing {
+fn scout_foe(id: i32, owner: PlayerId, dx: f32) -> SceneObject {
+    SceneObject {
         ai: Some(idle(UnitAiKind::Soldier)),
-        ..walker_thing(id, owner, Point::new(SCOUT_AT.x() + dx, SCOUT_AT.y()))
+        ..walker_unit(id, owner, Point::new(SCOUT_AT.x() + dx, SCOUT_AT.y()))
     }
 }
 
@@ -6863,8 +6863,8 @@ fn lone_human_order(world: &World, owner: PlayerId) -> WorldTime {
 #[test]
 fn an_idle_soldier_caps_its_human_order_time_and_searches_for_something_to_attack() {
     let scout = (player_id(2), 50);
-    let run = |others: &[SceneThing]| {
-        let mut world = idle_scout_world(idle_scout_thing(player_id(2), idle_scout()), others);
+    let run = |others: &[SceneObject]| {
+        let mut world = idle_scout_world(idle_scout_unit(player_id(2), idle_scout()), others);
         let (answer, unit_ai, _) = update_of(&mut world, scout, Millis::new(28), WorldTime::ZERO);
         assert_eq!(answer, Ok(None));
         (world, unit_ai)
@@ -6893,7 +6893,7 @@ fn an_idle_soldier_caps_its_human_order_time_and_searches_for_something_to_attac
         state_position: Point::new(25.0, 92.5),
         ..idle_scout()
     };
-    let mut world = idle_scout_world(idle_scout_thing(player_id(2), away), &[]);
+    let mut world = idle_scout_world(idle_scout_unit(player_id(2), away), &[]);
     let (_, unit_ai, _) = update_of(&mut world, scout, Millis::new(28), WorldTime::ZERO);
     assert_eq!(
         lone_walks(&world),
@@ -6910,10 +6910,10 @@ fn an_idle_soldier_caps_its_human_order_time_and_searches_for_something_to_attac
 /// is the sight registry's (`Seer::capture`), so the soldier is in the registry.
 #[test]
 fn gaia_soldier_that_takes_owners_by_sight_does_not_search() {
-    let scout = SceneThing {
+    let scout = SceneObject {
         capture: CaptureKind::BySight,
         seen_by: Some(VisionBits::visible(PlayerId::GAIA)),
-        ..idle_scout_thing(PlayerId::GAIA, idle_scout())
+        ..idle_scout_unit(PlayerId::GAIA, idle_scout())
     };
     let near = [scout_foe(77, player_id(1), 4.5)];
     let mut world = idle_scout_world(scout, &near);
@@ -7230,9 +7230,9 @@ fn soldier_standing_its_ground_attacks_within_its_range_of_its_state_position() 
 /// villager alone.
 #[test]
 fn an_idle_tower_searches_with_its_classes() {
-    let sheep = SceneThing {
+    let sheep = SceneObject {
         ai: Some(idle(UnitAiKind::Livestock)),
-        ..SceneThing::new(
+        ..SceneObject::new(
             78,
             PlayerId::GAIA,
             walker(594, class::LIVESTOCK),
@@ -7268,7 +7268,7 @@ fn idle_tower(stance: UnitStance) -> UnitAi {
 /// `unit_ai`, and the `others`, each seen by player 2; the tower is armed (its missile 363,
 /// weapon range 8, line of sight 8) and a moving object of speed 0, as a building's master is.
 /// Its last human order time is past the cap.
-fn tower_world(unit_ai: UnitAi, others: &[SceneThing]) -> World {
+fn tower_world(unit_ai: UnitAi, others: &[SceneObject]) -> World {
     let tower = Master {
         id: master_id(79),
         kind: MasterKind::BUILDING,
@@ -7290,13 +7290,13 @@ fn tower_world(unit_ai: UnitAi, others: &[SceneThing]) -> World {
     let mut scene = Scene::open(GridSize::new(64, 64))
         .players(2)
         .graphic(STANDING)
-        .thing(SceneThing {
+        .object(SceneObject {
             ai: Some(unit_ai),
             sprite: Some(STANDING.id),
-            ..SceneThing::new(500, player_id(2), tower, Position::new(30.0, 30.0, 0.0))
+            ..SceneObject::new(500, player_id(2), tower, Position::new(30.0, 30.0, 0.0))
         });
     for other in others {
-        scene = scene.thing(SceneThing {
+        scene = scene.object(SceneObject {
             seen_by: Some(VisionBits::visible(player_id(2))),
             ..other.clone()
         });
@@ -7311,10 +7311,10 @@ fn tower_world(unit_ai: UnitAi, others: &[SceneThing]) -> World {
 }
 
 /// Player 1's idle villager `id` `dx` tiles east of [`tower_world`]'s tower.
-fn tower_villager(id: i32, dx: f32) -> SceneThing {
-    SceneThing {
+fn tower_villager(id: i32, dx: f32) -> SceneObject {
+    SceneObject {
         ai: Some(idle(UnitAiKind::Civilian)),
-        ..SceneThing::new(
+        ..SceneObject::new(
             id,
             player_id(1),
             villager_master(),
@@ -7563,7 +7563,7 @@ fn an_immediate_order_in_front_keeps_the_current_order_behind_it() {
         ready: true,
         target_kind: None,
     };
-    let builder = lone_thing(player_id(1), building, Position::new(5.0, 6.0, 0.0));
+    let builder = lone_unit(player_id(1), building, Position::new(5.0, 6.0, 0.0));
     let mut world = lone_world(on_its_way(builder, Position::new(20.0, 21.0, 0.0)), &[]);
     let answer = run_ai(
         &mut world,
@@ -7732,12 +7732,12 @@ fn unit_off_its_state_position_walks_back_and_keeps_its_target() {
         ..idle(UnitAiKind::Soldier)
     };
     let walk_back = |unit_ai: UnitAi, x: f32| {
-        let unit = lone_thing(player_id(1), unit_ai, Position::new(x, 10.0, 2.5));
+        let unit = lone_unit(player_id(1), unit_ai, Position::new(x, 10.0, 2.5));
         let master = Master {
             radius: Footprint::new(0.5, 0.5),
             ..unit.master
         };
-        let mut world = lone_world(SceneThing { master, ..unit }, &[]);
+        let mut world = lone_world(SceneObject { master, ..unit }, &[]);
         let answer = run_ai(
             &mut world,
             (player_id(1), object_id(50)),
@@ -7806,7 +7806,7 @@ fn no_attack_soldier_searches_then_walks_back_to_its_state_position() {
         ..idle_scout()
     };
     let scout = (player_id(2), 50);
-    let mut world = idle_scout_world(idle_scout_thing(player_id(2), peaceful.clone()), &[]);
+    let mut world = idle_scout_world(idle_scout_unit(player_id(2), peaceful.clone()), &[]);
     let (answer, ..) = update_of(&mut world, scout, Millis::new(28), WorldTime::ZERO);
     assert_eq!(answer, Ok(None));
     assert!(world.spatial.searched().is_some());
@@ -7816,7 +7816,7 @@ fn no_attack_soldier_searches_then_walks_back_to_its_state_position() {
     );
     assert_eq!(lone_human_order(&world, player_id(2)), HUMAN_ORDER_CAP);
     let near = [scout_foe(77, player_id(1), 4.5)];
-    let mut world = idle_scout_world(idle_scout_thing(player_id(2), peaceful.clone()), &near);
+    let mut world = idle_scout_world(idle_scout_unit(player_id(2), peaceful.clone()), &near);
     let (answer, ..) = update_of(&mut world, scout, Millis::new(28), WorldTime::ZERO);
     assert_eq!(
         answer,
@@ -7828,7 +7828,7 @@ fn no_attack_soldier_searches_then_walks_back_to_its_state_position() {
         current_order: Some(OrderKind::Patrol),
         ..peaceful
     };
-    let mut world = idle_scout_world(idle_scout_thing(player_id(2), patrolling), &[]);
+    let mut world = idle_scout_world(idle_scout_unit(player_id(2), patrolling), &[]);
     let answer = run_ai(
         &mut world,
         (player_id(2), object_id(50)),
@@ -7930,7 +7930,7 @@ fn grouped_unit_full_update_reads_its_group() {
             )),
         ),
     ] {
-        let target = [walker_thing(5, player_id(2), Point::new(32.0, 31.0))];
+        let target = [walker_unit(5, player_id(2), Point::new(32.0, 31.0))];
         let mut world = grouped_ship_world(targeting.clone(), idle_patrol, (false, &target));
         world.players[1].kind = kind;
         let blocked = run_ai(
@@ -7970,9 +7970,9 @@ fn grouped_unit_full_update_reads_its_group() {
 fn grouped_ship_world(
     unit_ai: UnitAi,
     group: Option<(GroupCommandKind, BVector, GroupFlags)>,
-    (member_moving, others): (bool, &[SceneThing]),
+    (member_moving, others): (bool, &[SceneObject]),
 ) -> World {
-    let ship = lone_thing(player_id(1), unit_ai, Position::new(30.0, 30.0, 0.0));
+    let ship = lone_unit(player_id(1), unit_ai, Position::new(30.0, 30.0, 0.0));
     let mut world = lone_world(ship, others);
     lone_past_cap(&mut world, player_id(1));
     if let Some(group) = group {
@@ -8071,7 +8071,7 @@ fn villager_whose_attack_target_died_walks_to_its_point() {
         target_point: Position::new(5.0, 6.0, 0.0),
         ..idle(UnitAiKind::Civilian)
     };
-    let villager = lone_thing(player_id(1), attacking, Position::new(30.0, 30.0, 0.0));
+    let villager = lone_unit(player_id(1), attacking, Position::new(30.0, 30.0, 0.0));
     let master = Master {
         combat: Some(CombatPart {
             weapon_range: Distance::new(0.25),
@@ -8079,7 +8079,7 @@ fn villager_whose_attack_target_died_walks_to_its_point() {
         }),
         ..villager.master
     };
-    let mut world = lone_world(SceneThing { master, ..villager }, &[]);
+    let mut world = lone_world(SceneObject { master, ..villager }, &[]);
     lone_past_cap(&mut world, player_id(1));
     let answer = run_ai(
         &mut world,
@@ -8222,13 +8222,13 @@ fn human_player_king_idle_check_only_caps() {
 /// Player 1's king 50 (its unit AI `unit_ai`, class 59, master `master`) at (31.5, 106.5),
 /// player 1 of type `kind`, the king's last human order past the cap.
 fn king_world(unit_ai: UnitAi, master: MasterId, kind: PlayerKind) -> World {
-    let king = lone_thing(player_id(1), unit_ai, Position::new(31.5, 106.5, 0.0));
+    let king = lone_unit(player_id(1), unit_ai, Position::new(31.5, 106.5, 0.0));
     let master = Master {
         id: master,
         class: class::KING,
         ..king.master
     };
-    let mut world = lone_world(SceneThing { master, ..king }, &[]);
+    let mut world = lone_world(SceneObject { master, ..king }, &[]);
     world.players[1].kind = kind;
     lone_past_cap(&mut world, player_id(1));
     world
@@ -8258,54 +8258,54 @@ fn civilian_world(priority: u8) -> World {
         ..villager_master()
     };
     let (house, _) = house_and_tree();
-    let seen = |ai, thing: SceneThing| SceneThing {
+    let seen = |ai, object: SceneObject| SceneObject {
         ai: Some(ai),
         seen_by: Some(VisionBits::visible(player_id(1))),
-        ..thing
+        ..object
     };
     Scene::open(GridSize::new(64, 64))
         .players(2)
         .graphic(STANDING)
-        .thing(SceneThing {
+        .object(SceneObject {
             ai: Some(idle(UnitAiKind::Civilian)),
             sprite: Some(STANDING.id),
-            ..SceneThing::new(
+            ..SceneObject::new(
                 10041,
                 player_id(1),
                 villager,
                 Position::new(20.0, 20.0, 0.0),
             )
         })
-        .thing(seen(
+        .object(seen(
             hit_boar(),
-            SceneThing::new(
+            SceneObject::new(
                 9731,
                 PlayerId::GAIA,
                 walker(48, class::PREDATOR),
                 Position::new(20.9, 20.0, 0.0),
             ),
         ))
-        .thing(seen(
+        .object(seen(
             idle(UnitAiKind::Soldier),
-            SceneThing::new(
+            SceneObject::new(
                 9800,
                 player_id(2),
                 walker(5, class::CLASS_6),
                 Position::new(21.0, 21.0, 0.0),
             ),
         ))
-        .thing(seen(
+        .object(seen(
             idle(UnitAiKind::Artifact),
-            SceneThing::new(
+            SceneObject::new(
                 9801,
                 PlayerId::GAIA,
                 walker(285, class::RELIC),
                 Position::new(19.0, 19.0, 0.0),
             ),
         ))
-        .thing(seen(
+        .object(seen(
             idle(UnitAiKind::Building),
-            SceneThing::new(9802, player_id(2), house, Position::new(24.0, 20.0, 0.0)),
+            SceneObject::new(9802, player_id(2), house, Position::new(24.0, 20.0, 0.0)),
         ))
         .build()
 }
@@ -8482,9 +8482,9 @@ fn lion_world(ai: UnitAi, villager: Option<(f32, ObjectFlags)>) -> World {
         line_of_sight: Distance::new(4.0),
         ..walker(126, class::PREDATOR)
     };
-    let prey = villager.map(|(x, flags)| SceneThing {
+    let prey = villager.map(|(x, flags)| SceneObject {
         ai: Some(idle(UnitAiKind::Civilian)),
-        ..SceneThing::new(
+        ..SceneObject::new(
             700,
             player_id(1),
             Master {
@@ -8497,10 +8497,10 @@ fn lion_world(ai: UnitAi, villager: Option<(f32, ObjectFlags)>) -> World {
     });
     let mut w = Scene::open(GridSize::new(64, 64))
         .graphic(STANDING)
-        .thing(SceneThing {
+        .object(SceneObject {
             ai: Some(ai),
             sprite: Some(STANDING.id),
-            ..SceneThing::new(
+            ..SceneObject::new(
                 800,
                 PlayerId::GAIA,
                 Master {
@@ -8511,7 +8511,7 @@ fn lion_world(ai: UnitAi, villager: Option<(f32, ObjectFlags)>) -> World {
             )
         });
     if let Some(p) = prey {
-        w = w.thing(SceneThing {
+        w = w.object(SceneObject {
             seen_by: Some(VisionBits::visible(PlayerId::GAIA)),
             ..p
         });
@@ -8570,15 +8570,15 @@ fn building_world(ai: UnitAi, kind: PlayerKind) -> World {
     let mut scene = Scene::open(GridSize::new(64, 64))
         .players(2)
         .kind(player_id(1), kind)
-        .thing(SceneThing {
+        .object(SceneObject {
             ai: Some(ai),
-            ..SceneThing::new(10, player_id(1), house, Position::new(30.0, 30.0, 0.0))
+            ..SceneObject::new(10, player_id(1), house, Position::new(30.0, 30.0, 0.0))
         });
     for (id, x) in [(60, 33.0), (61, 34.0), (62, 35.0), (70, 36.0)] {
-        scene = scene.thing(SceneThing {
+        scene = scene.object(SceneObject {
             seen_by: Some(VisionBits::visible(player_id(1))),
             ai: Some(idle(UnitAiKind::Soldier)),
-            ..SceneThing::new(
+            ..SceneObject::new(
                 id,
                 player_id(2),
                 walker(5, class::CLASS_6),
@@ -8689,7 +8689,7 @@ fn deer_evading_an_object_on_its_own_point_steps_off_by_one() {
         ),
         (Position::new(3.5, 4.5, 0.0), Position::new(4.5, 5.5, 0.0)),
     ] {
-        let wolf = [SceneThing::new(
+        let wolf = [SceneObject::new(
             9183,
             PlayerId::GAIA,
             walker(126, class::PREDATOR),
@@ -8721,10 +8721,10 @@ fn walker(id: i16, class: ClassId) -> Master {
 }
 
 /// Unit 500 of `owner` at `at`, a walker of class `class` (master 4), its unit AI `ai`.
-fn runner_thing(owner: PlayerId, class: ClassId, ai: UnitAi, at: Position) -> SceneThing {
-    SceneThing {
+fn runner_unit(owner: PlayerId, class: ClassId, ai: UnitAi, at: Position) -> SceneObject {
+    SceneObject {
         ai: Some(ai),
-        ..SceneThing::new(500, owner, walker(4, class), at)
+        ..SceneObject::new(500, owner, walker(4, class), at)
     }
 }
 
@@ -8733,7 +8733,7 @@ fn runner_thing(owner: PlayerId, class: ClassId, ai: UnitAi, at: Position) -> Sc
 /// walker (of the master of its id) whose unit AI targets unit 500. The AI stream is seeded
 /// with 0, as [`rng`] is.
 fn chased(
-    runner: SceneThing,
+    runner: SceneObject,
     kind: PlayerKind,
     rocks: &[Tile],
     attackers: &[(i32, ClassId, f32)],
@@ -8742,14 +8742,14 @@ fn chased(
         .players(2)
         .kind(runner.player, kind)
         .rocks(rocks.iter().copied())
-        .thing(runner);
+        .object(runner);
     for &(id, class, x) in attackers {
-        scene = scene.thing(SceneThing {
+        scene = scene.object(SceneObject {
             ai: Some(UnitAi {
                 current_target: Some(object_id(500)),
                 ..UnitAi::default()
             }),
-            ..SceneThing::new(
+            ..SceneObject::new(
                 id,
                 player_id(2),
                 walker(i16::try_from(id).expect("a master's id"), class),
@@ -8782,7 +8782,7 @@ fn an_evasive_move_steps_off_point_the_unit_cannot_stand_at() {
     let evade = |ai: UnitAi, point: Position, flags: (OrderForce, BadPoint), rocks: &[Tile]| {
         let at = Position::new(10.0, 20.0, 0.0);
         let mut w = chased(
-            runner_thing(player_id(1), class::CLASS_6, ai, at),
+            runner_unit(player_id(1), class::CLASS_6, ai, at),
             PlayerKind::Human,
             rocks,
             &[],
@@ -8967,7 +8967,7 @@ fn the_order_setter_caps_by_signed_compare_and_may_keep_the_last_order() {
 #[test]
 fn villager_on_the_attack_order_without_target_gives_it_up() {
     let misc = |unit_ai: UnitAi| {
-        let villager = lone_thing(player_id(1), unit_ai, Position::new(12.0, 13.0, 0.0));
+        let villager = lone_unit(player_id(1), unit_ai, Position::new(12.0, 13.0, 0.0));
         let mut world = lone_world(on_its_way(villager, Position::new(20.0, 13.0, 0.0)), &[]);
         let answer = run_ai(
             &mut world,
@@ -9156,7 +9156,7 @@ fn human_player_king_runs_from_its_attacker() {
         u.post(n, ObjectState::Alive).unwrap();
         let at = Position::new(20.0, 30.0, 0.0);
         let mut w = chased(
-            runner_thing(player_id(1), class::KING, u, at),
+            runner_unit(player_id(1), class::KING, u, at),
             kind,
             &[],
             &[(77, class::CLASS_6, 22.0)],
@@ -9191,7 +9191,7 @@ fn unit_runs_from_its_attackers_within_its_leash() {
     ];
     let run = |u: UnitAi, (owner, kind): (PlayerId, PlayerKind), class: ClassId, uncon| {
         let at = Position::new(20.0, 30.0, 0.0);
-        let mut w = chased(runner_thing(owner, class, u, at), kind, &[], &attackers);
+        let mut w = chased(runner_unit(owner, class, u, at), kind, &[], &attackers);
         let r = run_ai(
             &mut w,
             (owner, object_id(500)),
@@ -9534,7 +9534,7 @@ fn patroller(secondary: u32) -> UnitAi {
 fn soldier_world(
     (soldier, ai): (Master, UnitAi),
     walk: Option<(Point, Option<i32>)>,
-    others: &[SceneThing],
+    others: &[SceneObject],
 ) -> World {
     let actions = walk.map(|(to, target)| Action {
         list: ActionList::default().with_move_to(Some(MoveToAction {
@@ -9547,16 +9547,16 @@ fn soldier_world(
     let mut scene = Scene::open(GridSize::new(64, 64))
         .players(2)
         .graphic(STANDING)
-        .thing(SceneThing {
+        .object(SceneObject {
             ai: Some(ai),
             actions,
             sprite: Some(STANDING.id),
-            ..SceneThing::new(500, player_id(1), soldier, Position::new(20.0, 20.0, 0.0))
+            ..SceneObject::new(500, player_id(1), soldier, Position::new(20.0, 20.0, 0.0))
         });
-    for thing in others {
-        scene = scene.thing(SceneThing {
+    for other in others {
+        scene = scene.object(SceneObject {
             seen_by: Some(VisionBits::visible(player_id(1))),
-            ..thing.clone()
+            ..other.clone()
         });
     }
     let mut w = scene.build();
@@ -9565,10 +9565,10 @@ fn soldier_world(
 }
 
 /// Player 2's villager 77 at `at`, idle, for [`soldier_world`]'s others.
-fn enemy_villager(at: Point) -> SceneThing {
-    SceneThing {
+fn enemy_villager(at: Point) -> SceneObject {
+    SceneObject {
         ai: Some(idle(UnitAiKind::Civilian)),
-        ..SceneThing::new(
+        ..SceneObject::new(
             77,
             player_id(2),
             villager_master(),
@@ -9579,8 +9579,8 @@ fn enemy_villager(at: Point) -> SceneThing {
 
 /// Object `id` of `owner` at `at`, a walker of master 5 and class 6, for [`soldier_world`]'s
 /// others.
-fn walker_thing(id: i32, owner: PlayerId, at: Point) -> SceneThing {
-    SceneThing::new(
+fn walker_unit(id: i32, owner: PlayerId, at: Point) -> SceneObject {
+    SceneObject::new(
         id,
         owner,
         walker(5, class::CLASS_6),
@@ -9704,7 +9704,7 @@ fn patrol_attacking_building_keeps_at_it() {
         (soldier_master(), patroller(0)),
         Some((Point::new(30.0, 30.0), Some(50))),
         &[
-            SceneThing::new(50, player_id(2), house, Position::new(30.0, 30.0, 0.0)),
+            SceneObject::new(50, player_id(2), house, Position::new(30.0, 30.0, 0.0)),
             enemy_villager(Point::new(22.0, 20.0)),
         ],
     );
@@ -9727,7 +9727,7 @@ fn soldier_idle_check_attacks_its_top_action_target_in_range() {
             (soldier, u.clone()),
             Some((Point::new(x, 20.0), Some(50))),
             &[
-                walker_thing(50, player_id(2), Point::new(x, 20.0)),
+                walker_unit(50, player_id(2), Point::new(x, 20.0)),
                 enemy_villager(Point::new(20.0, 22.0)),
             ],
         )
@@ -9781,7 +9781,7 @@ fn soldier_idle_check_holds_its_target_with_retargeting_off() {
         current_target: Some(object_id(target)),
         ..patroller(0)
     };
-    let sixty = walker_thing(60, player_id(2), Point::new(23.0, 20.0));
+    let sixty = walker_unit(60, player_id(2), Point::new(23.0, 20.0));
     let mut w = soldier_world(
         (soldier_master(), holding(60)),
         walk,
@@ -9796,9 +9796,9 @@ fn soldier_idle_check_holds_its_target_with_retargeting_off() {
     w.players[1].kind = PlayerKind::Computer;
     assert!(soldier_idle_500(&mut w).is_err());
     // the untargetable 61 held: refused, the patrol saved from its path goes
-    let own = SceneThing {
+    let own = SceneObject {
         flags: UnitFlags::ATTACKABLE | UnitFlags::UNTARGETABLE,
-        ..walker_thing(61, player_id(2), Point::new(21.0, 20.0))
+        ..walker_unit(61, player_id(2), Point::new(21.0, 20.0))
     };
     let refused = UnitAi {
         current_order: Some(OrderKind::Patrol),
@@ -9846,7 +9846,7 @@ fn soldier_stopped_in_the_update_finds_no_top_action_target() {
     let mut w = soldier_world(
         (soldier_master(), u),
         Some((Point::new(21.0, 20.0), Some(50))),
-        &[walker_thing(50, player_id(2), Point::new(21.0, 20.0))],
+        &[walker_unit(50, player_id(2), Point::new(21.0, 20.0))],
     );
     let read = run_ai(
         &mut w,
@@ -9940,7 +9940,7 @@ fn an_attack_move_not_busy_ends_and_patrol_stays() {
 #[test]
 fn stop_ends_patrol_order_with_its_secondary_timer_capped() {
     let stop = |unit_ai: UnitAi, place: Option<(Point, Option<ClassId>)>| {
-        let soldier = lone_thing(player_id(1), unit_ai, Position::new(30.0, 30.0, 0.0));
+        let soldier = lone_unit(player_id(1), unit_ai, Position::new(30.0, 30.0, 0.0));
         let mut world = lone_world(on_its_way(soldier, Position::new(40.0, 30.0, 0.0)), &[]);
         let answer = run_ai(
             &mut world,
@@ -10047,7 +10047,7 @@ fn ordered(ai_kind: UnitAiKind) -> UnitAi {
 /// not run (no draw, the timers as they grew).
 #[test]
 fn full_update_stops_at_its_order_on_target() {
-    let soldier = lone_thing(
+    let soldier = lone_unit(
         player_id(1),
         ordered(UnitAiKind::Soldier),
         Position::new(30.0, 30.0, 0.0),
@@ -10075,10 +10075,10 @@ fn full_update_stops_at_its_order_on_target() {
 }
 
 /// Player 2's idle walker 77 (class 6, master 5) at (32, 30), [`ordered`]'s target.
-fn order_foe() -> SceneThing {
-    SceneThing {
+fn order_foe() -> SceneObject {
+    SceneObject {
         ai: Some(idle(UnitAiKind::Soldier)),
-        ..walker_thing(77, player_id(2), Point::new(32.0, 30.0))
+        ..walker_unit(77, player_id(2), Point::new(32.0, 30.0))
     }
 }
 
@@ -10112,7 +10112,7 @@ fn the_rest_after_an_order_that_gave_an_action_reads_it() {
         current_target: Some(object_id(77)),
         ..ordered(UnitAiKind::Soldier)
     };
-    let soldier = SceneThing {
+    let soldier = SceneObject {
         actions: Some(Action {
             list: ActionList::default().with_attack(Some(own_attack(
                 77,
@@ -10121,7 +10121,7 @@ fn the_rest_after_an_order_that_gave_an_action_reads_it() {
             ))),
             ..Action::default()
         }),
-        ..lone_thing(player_id(1), attacking, Position::new(30.0, 30.0, 0.0))
+        ..lone_unit(player_id(1), attacking, Position::new(30.0, 30.0, 0.0))
     };
     let mut world = lone_world(soldier, &[order_foe()]);
     let (answer, unit_ai, draws) =
@@ -10164,7 +10164,7 @@ fn the_rest_after_an_order_that_gave_no_action_runs_the_idle_check() {
         ..ordered(UnitAiKind::Civilian)
     };
     let at = Position::new(30.0, 30.0, 0.0);
-    let mut world = lone_world(lone_thing(player_id(1), unordered.clone(), at), &[]);
+    let mut world = lone_world(lone_unit(player_id(1), unordered.clone(), at), &[]);
     lone_past_cap(&mut world, player_id(1));
     let (answer, unit_ai, draws) =
         lone_after_order(&mut world, player_id(1), AfterOrder::default());
@@ -10183,7 +10183,7 @@ fn the_rest_after_an_order_that_gave_no_action_runs_the_idle_check() {
         (player_id(1), Millis::ZERO),
         (PlayerId::GAIA, Millis::new(5000)),
     ] {
-        let mut world = lone_world(lone_thing(owner, targeting.clone(), at), &[order_foe()]);
+        let mut world = lone_world(lone_unit(owner, targeting.clone(), at), &[order_foe()]);
         lone_past_cap(&mut world, owner);
         let (answer, unit_ai, _) = lone_after_order(&mut world, owner, busy);
         assert_eq!((answer, unit_ai.idle_timer), (Ok(()), timer), "{owner:?}");
@@ -10229,9 +10229,9 @@ fn the_transport_ship_passes_other_notifies_to_the_base_handler() {
 /// (which names its attacker) and actions `actions`, its owner of type `kind`: player 2's
 /// warship 77 at (22, 30) targets it.
 fn transport_world(ai: UnitAi, actions: Option<Action>, kind: PlayerKind) -> World {
-    let ship = SceneThing {
+    let ship = SceneObject {
         actions,
-        ..runner_thing(
+        ..runner_unit(
             player_id(1),
             class::TRANSPORT,
             ai,
@@ -10481,14 +10481,14 @@ fn ship_world(
     let mut scene = Scene::open(GridSize::new(64, 64))
         .players(2)
         .kind(player_id(1), kind)
-        .thing(SceneThing {
+        .object(SceneObject {
             ai: Some(ai),
-            ..SceneThing::new(500, player_id(1), ship, Position::new(20.0, 30.0, 0.0))
+            ..SceneObject::new(500, player_id(1), ship, Position::new(20.0, 30.0, 0.0))
         });
     for &(id, owner, class, x) in others {
-        scene = scene.thing(SceneThing {
+        scene = scene.object(SceneObject {
             seen_by: Some(VisionBits::visible(player_id(1))),
-            ..SceneThing::new(
+            ..SceneObject::new(
                 id,
                 owner,
                 walker(i16::try_from(id).expect("a master's id"), class),
@@ -10668,11 +10668,11 @@ fn fishing_ship_builds_the_nearest_foundation_it_reaches() {
         NotifyKind::REQUIRES_SEARCH,
         [AiAction::Build.value(), 0, 0],
     );
-    let site = |id: i32, class, at| SceneThing {
+    let site = |id: i32, class, at| SceneObject {
         desolid: true,
         state: ObjectState::Foundation,
         seen_by: Some(VisionBits::visible(player_id(1))),
-        ..SceneThing::new(
+        ..SceneObject::new(
             id,
             player_id(1),
             Master {
@@ -10691,12 +10691,12 @@ fn fishing_ship_builds_the_nearest_foundation_it_reaches() {
         }),
         ..walker(4, class::FISHING_SHIP)
     };
-    let hear = |kind, sites: Vec<SceneThing>| {
+    let hear = |kind, sites: Vec<SceneObject>| {
         let mut scene = Scene::open(GridSize::new(64, 64))
             .kind(player_id(1), kind)
-            .thing(SceneThing {
+            .object(SceneObject {
                 ai: Some(builder.clone()),
-                ..SceneThing::new(
+                ..SceneObject::new(
                     500,
                     player_id(1),
                     ship.clone(),
@@ -10704,7 +10704,7 @@ fn fishing_ship_builds_the_nearest_foundation_it_reaches() {
                 )
             });
         for s in sites {
-            scene = scene.thing(s);
+            scene = scene.object(s);
         }
         let mut w = scene.build();
         let r = run_ai(
@@ -11042,28 +11042,28 @@ fn mangonel() -> Master {
 }
 
 /// Mangonel 500 of `owner` at (20, 20) ([`mangonel`]) on its sprite, its unit AI `ai`.
-fn mangonel_thing(owner: PlayerId, ai: UnitAi) -> SceneThing {
-    SceneThing {
+fn mangonel_unit(owner: PlayerId, ai: UnitAi) -> SceneObject {
+    SceneObject {
         ai: Some(ai),
         sprite: Some(STANDING.id),
-        ..SceneThing::new(500, owner, mangonel(), Position::new(20.0, 20.0, 0.0))
+        ..SceneObject::new(500, owner, mangonel(), Position::new(20.0, 20.0, 0.0))
     }
 }
 
-/// A map of 64 by 64 with the mangonel `siege` on it ([`mangonel_thing`]) and player 2's
+/// A map of 64 by 64 with the mangonel `siege` on it ([`mangonel_unit`]) and player 2's
 /// villagers `targets` (id, place), each in the mangonel's owner's lists; water on `water`.
-fn siege_world(siege: SceneThing, targets: &[(i32, Point)], water: &[Tile]) -> World {
+fn siege_world(siege: SceneObject, targets: &[(i32, Point)], water: &[Tile]) -> World {
     let owner = siege.player;
     let mut scene = Scene::open(GridSize::new(64, 64))
         .players(2)
         .graphic(STANDING)
         .water(water.iter().copied())
-        .thing(siege);
+        .object(siege);
     for &(id, at) in targets {
-        scene = scene.thing(SceneThing {
+        scene = scene.object(SceneObject {
             seen_by: Some(VisionBits::visible(owner)),
             ai: Some(idle(UnitAiKind::Civilian)),
-            ..SceneThing::new(
+            ..SceneObject::new(
                 id,
                 player_id(2),
                 villager_master(),
@@ -11102,7 +11102,7 @@ fn siege_unit_attacks_what_its_idle_search_finds() {
         current_order: Some(OrderKind::Move),
         ..idle(UnitAiKind::Siege)
     };
-    let mut w = siege_world(mangonel_thing(one, u), &[(77, Point::new(25.0, 20.0))], &[]);
+    let mut w = siege_world(mangonel_unit(one, u), &[(77, Point::new(25.0, 20.0))], &[]);
     assert_eq!(idle_of(&mut w, one), Ok(IdleOutcome::Acted));
     assert_eq!(siege_attacks(&w), Some(object_id(77)));
     let u = w.parts.unit_ai.get(object_id(500)).unwrap();
@@ -11116,7 +11116,7 @@ fn siege_unit_attacks_what_its_idle_search_finds() {
         state_position: Point::new(10.0, 20.0),
         ..idle(UnitAiKind::Siege)
     };
-    let mut w = siege_world(mangonel_thing(one, defending.clone()), &[], &[]);
+    let mut w = siege_world(mangonel_unit(one, defending.clone()), &[], &[]);
     w.groups.groups.push(UnitGroup {
         id: group_id(7),
         owner: Some(player_id(1)),
@@ -11134,14 +11134,14 @@ fn siege_unit_attacks_what_its_idle_search_finds() {
         .id = Some(group_id(7));
     assert_eq!(idle_of(&mut w, one), Ok(IdleOutcome::Idle));
     assert_eq!(walks_to(&w), None);
-    let mut w = siege_world(mangonel_thing(one, defending), &[], &[]);
+    let mut w = siege_world(mangonel_unit(one, defending), &[], &[]);
     assert_eq!(idle_of(&mut w, one), Ok(IdleOutcome::Idle));
     assert!(walks_to(&w).is_some_and(|p| p.x() < 20.0));
     // Gaia's that does not take owners by sight (its seer's flag)
-    let gaia = SceneThing {
+    let gaia = SceneObject {
         capture: CaptureKind::BySight,
         seen_by: Some(VisionBits::empty()),
-        ..mangonel_thing(PlayerId::GAIA, idle(UnitAiKind::Siege))
+        ..mangonel_unit(PlayerId::GAIA, idle(UnitAiKind::Siege))
     };
     let mut w = siege_world(gaia, &[(77, Point::new(25.0, 20.0))], &[]);
     assert_eq!(idle_of(&mut w, PlayerId::GAIA), Ok(IdleOutcome::Idle));
@@ -11170,9 +11170,9 @@ fn siege_unit_with_retargeting_off_keeps_reachable_top_target() {
         ..Action::default()
     };
     let check = |water: &[Tile]| {
-        let siege = SceneThing {
+        let siege = SceneObject {
             actions: Some(walk.clone()),
-            ..mangonel_thing(player_id(1), u.clone())
+            ..mangonel_unit(player_id(1), u.clone())
         };
         let mut w = siege_world(siege, &[(88, Point::new(14.3, 14.3))], water);
         let r = run_ai(
@@ -11207,7 +11207,7 @@ fn siege_unit_with_retargeting_off_keeps_reachable_top_target() {
 fn siege_unit_hands_its_notifies_to_the_base_handler() {
     let hear = |ai: UnitAi, n: Notify, kind: PlayerKind| {
         let mut w = siege_world(
-            mangonel_thing(player_id(1), ai),
+            mangonel_unit(player_id(1), ai),
             &[(77, Point::new(25.0, 20.0))],
             &[],
         );
@@ -11247,9 +11247,9 @@ fn siege_unit_hands_its_notifies_to_the_base_handler() {
         })),
         ..Action::default()
     };
-    let pinned = SceneThing {
+    let pinned = SceneObject {
         actions: Some(walk),
-        ..mangonel_thing(player_id(1), u)
+        ..mangonel_unit(player_id(1), u)
     };
     let mut w = siege_world(pinned, &[(77, Point::new(25.0, 20.0))], &[]);
     let r = run_ai(
@@ -11338,7 +11338,7 @@ fn on_target(action: Option<AiAction>) -> UnitAi {
 
 /// Object `id` at `at` as `flags` make it: their owner, its master's kind (master `id`, a
 /// walker of class 6), its flag bytes, its capture flag and its pasture.
-fn target_thing(id: i32, flags: TargetFlags, at: Position) -> SceneThing {
+fn target_object(id: i32, flags: TargetFlags, at: Position) -> SceneObject {
     let mut bits = UnitFlags::empty();
     bits.set(UnitFlags::UNTARGETABLE, flags.untargetable);
     bits.set(UnitFlags::ATTACKABLE, flags.attackable);
@@ -11346,17 +11346,17 @@ fn target_thing(id: i32, flags: TargetFlags, at: Position) -> SceneThing {
         kind: flags.kind,
         ..walker(i16::try_from(id).expect("a master's id"), class::CLASS_6)
     };
-    SceneThing {
+    SceneObject {
         flags: bits,
         capture: flags.capture,
         pasture: flags.pasture,
-        ..SceneThing::new(id, flags.owner, master, at)
+        ..SceneObject::new(id, flags.owner, master, at)
     }
 }
 
 /// Unit 40 of `player` at (14, 10), a walker of class 6 (master 4) whose `MoveTo` follows
 /// object `follows` (none: no action), its unit AI [`on_target`]'s with `action`; object 500
-/// at (10, 10) as `flags` make it ([`target_thing`]).
+/// at (10, 10) as `flags` make it ([`target_object`]).
 fn tail_scene(
     player: PlayerId,
     action: Option<AiAction>,
@@ -11371,10 +11371,10 @@ fn tail_scene(
         })),
         ..Action::default()
     };
-    let unit = SceneThing {
+    let unit = SceneObject {
         ai: Some(on_target(action)),
         actions: follows.map(follow),
-        ..SceneThing::new(
+        ..SceneObject::new(
             40,
             player,
             walker(4, class::CLASS_6),
@@ -11383,8 +11383,8 @@ fn tail_scene(
     };
     Scene::open(GridSize::new(64, 64))
         .players(2)
-        .thing(unit)
-        .thing(target_thing(500, flags, Position::new(10.0, 10.0, 0.0)))
+        .object(unit)
+        .object(target_object(500, flags, Position::new(10.0, 10.0, 0.0)))
 }
 
 /// The tail's checks of the top action's target ([`UnitAi::top_target_tail`]) on
@@ -11529,7 +11529,7 @@ fn the_tail_reads_the_top_target_the_update_commands_left() {
     let player = PlayerId::new(1);
     let after = |action, follows: Option<i32>, pending: Option<Effect>| {
         let mut w = tail_scene(player, action, untargetable, follows)
-            .thing(target_thing(
+            .object(target_object(
                 600,
                 untargetable,
                 Position::new(12.0, 10.0, 0.0),
@@ -11601,20 +11601,20 @@ fn queued_builds_on_started_or_gone_foundations_leave_the_queue() {
     let left = |ai: UnitAi| {
         let (house, _) = house_and_tree();
         let at = |x| Position::new(x, 20.0, 0.0);
-        let site = |id, x| SceneThing {
+        let site = |id, x| SceneObject {
             desolid: true,
             state: ObjectState::Foundation,
-            ..SceneThing::new(id, player_id(1), house.clone(), at(x))
+            ..SceneObject::new(id, player_id(1), house.clone(), at(x))
         };
         let mut w = Scene::open(GridSize::new(64, 64))
-            .thing(SceneThing {
+            .object(SceneObject {
                 ai: Some(ai),
-                ..SceneThing::new(40, player_id(1), villager_master(), at(30.0))
+                ..SceneObject::new(40, player_id(1), villager_master(), at(30.0))
             })
-            .thing(site(1, 10.0))
-            .thing(SceneThing::new(2, player_id(1), house.clone(), at(14.0)))
-            .thing(SceneThing::new(3, player_id(1), house.clone(), at(18.0)))
-            .thing(site(5, 22.0))
+            .object(site(1, 10.0))
+            .object(SceneObject::new(2, player_id(1), house.clone(), at(14.0)))
+            .object(SceneObject::new(3, player_id(1), house.clone(), at(18.0)))
+            .object(site(5, 22.0))
             .build();
         run_ai(
             &mut w,
@@ -11658,7 +11658,7 @@ fn unit_standing_its_ground_that_strayed_with_an_action_stops_and_walks_back() {
         ..idle(UnitAiKind::Soldier)
     };
     let world_of = |unit_ai: UnitAi, range: f32| {
-        let soldier = lone_thing(player_id(1), unit_ai, Position::new(14.2, 10.0, 0.0));
+        let soldier = lone_unit(player_id(1), unit_ai, Position::new(14.2, 10.0, 0.0));
         let master = Master {
             combat: Some(CombatPart {
                 weapon_range: Distance::new(range),
@@ -11666,7 +11666,7 @@ fn unit_standing_its_ground_that_strayed_with_an_action_stops_and_walks_back() {
             }),
             ..soldier.master
         };
-        lone_world(SceneThing { master, ..soldier }, &[])
+        lone_world(SceneObject { master, ..soldier }, &[])
     };
     let mut world = world_of(standing(Some(AiAction::Attack)), 15.0);
     let (answer, unit_ai) = lone_retarget_check(&mut world);
@@ -11795,7 +11795,7 @@ fn unit_with_patrol_information_leashes_to_its_patrol_path() {
     };
     // where the unit last moved to: its place, on the path's line, 1 or 6 off it
     let run = |stance, y: f32| {
-        let soldier = lone_thing(player_id(1), unit(stance), Position::new(14.0, y, 0.0));
+        let soldier = lone_unit(player_id(1), unit(stance), Position::new(14.0, y, 0.0));
         let master = Master {
             combat: Some(CombatPart {
                 weapon_range: Distance::new(15.0),
@@ -11803,7 +11803,7 @@ fn unit_with_patrol_information_leashes_to_its_patrol_path() {
             }),
             ..soldier.master
         };
-        let mut world = lone_world(SceneThing { master, ..soldier }, &[]);
+        let mut world = lone_world(SceneObject { master, ..soldier }, &[]);
         let answer = run_ai(
             &mut world,
             (player_id(1), object_id(50)),
@@ -11898,31 +11898,31 @@ fn queued(order: OrderKind, target: i32) -> QueuedOrder {
 }
 
 /// Player 1's unit 9 of master `master` at (5, 6), on its sprite, its unit AI `ai`.
-fn order_unit(master: Master, ai: UnitAi) -> SceneThing {
-    SceneThing {
+fn order_unit(master: Master, ai: UnitAi) -> SceneObject {
+    SceneObject {
         ai: Some(ai),
         sprite: Some(STANDING.id),
-        ..SceneThing::new(9, player_id(1), master, Position::new(5.0, 6.0, 0.0))
+        ..SceneObject::new(9, player_id(1), master, Position::new(5.0, 6.0, 0.0))
     }
 }
 
 /// A map of 100 by 100 with unit 9 (`unit`, [`order_unit`]) on it and the `others`, each in
 /// player 1's lists. The AI stream is seeded with 0, as [`rng`] is.
-fn order_world(unit: SceneThing, others: &[SceneThing]) -> World {
+fn order_world(unit: SceneObject, others: &[SceneObject]) -> World {
     order_world_on(&[], unit, others)
 }
 
 /// [`order_world`] with water on each of `water`.
-fn order_world_on(water: &[Tile], unit: SceneThing, others: &[SceneThing]) -> World {
+fn order_world_on(water: &[Tile], unit: SceneObject, others: &[SceneObject]) -> World {
     let mut scene = Scene::open(GridSize::new(100, 100))
         .players(2)
         .graphic(STANDING)
         .water(water.iter().copied())
-        .thing(unit);
-    for thing in others {
-        scene = scene.thing(SceneThing {
+        .object(unit);
+    for other in others {
+        scene = scene.object(SceneObject {
             seen_by: Some(VisionBits::visible(player_id(1))),
-            ..thing.clone()
+            ..other.clone()
         });
     }
     let mut w = scene.build();
@@ -11950,7 +11950,7 @@ fn order_gatherer() -> Master {
 }
 
 /// Gaia's tree 70 (master 349) at (10, 20), holding 100 wood.
-fn order_tree() -> SceneThing {
+fn order_tree() -> SceneObject {
     resource(
         (70, 349, class::TREE),
         (MasterKind::TREE, GatherGroup::WOOD),
@@ -12015,10 +12015,10 @@ fn order_soldier() -> Master {
 }
 
 /// Object `id` of `owner` and class `class` (master 5 of its class) at (10, 20), idle.
-fn order_target(id: i32, owner: PlayerId, class: ClassId) -> SceneThing {
-    SceneThing {
+fn order_target(id: i32, owner: PlayerId, class: ClassId) -> SceneObject {
+    SceneObject {
         ai: Some(idle(UnitAiKind::Civilian)),
-        ..SceneThing::new(id, owner, walker(5, class), Position::new(10.0, 20.0, 0.0))
+        ..SceneObject::new(id, owner, walker(5, class), Position::new(10.0, 20.0, 0.0))
     }
 }
 
@@ -12131,7 +12131,7 @@ fn the_attack_order_attacks_by_the_unit_ai_kind_and_becomes_the_ai_s() {
         standing_sprite: Some(STANDING.id),
         ..gatherer_master()
     };
-    let deer = SceneThing {
+    let deer = SceneObject {
         at: Position::new(10.0, 20.0, 0.0),
         ..gaia_deer(71, (10.0, 20.0))
     };
@@ -12275,9 +12275,9 @@ fn the_defend_order_keeps_near_its_target_or_its_point() {
 #[test]
 fn the_heal_conversion_and_repair_orders_give_the_unit_commands() {
     let (house, _) = house_and_tree();
-    let target = |hp| SceneThing {
+    let target = |hp| SceneObject {
         hp: HitPoints::new(hp),
-        ..SceneThing::new(
+        ..SceneObject::new(
             70,
             player_id(1),
             house.clone(),
@@ -12426,7 +12426,7 @@ fn the_stop_order_stops_and_ends_the_order() {
         })),
         ..Action::default()
     };
-    let unit = SceneThing {
+    let unit = SceneObject {
         actions: Some(walk),
         ..order_unit(order_soldier(), u)
     };
@@ -12598,7 +12598,7 @@ fn the_move_orders_move_to_their_point_within_their_range() {
 #[test]
 fn the_follow_order_follows_and_moves_to_target_beyond_its_range() {
     let follow = queued(OrderKind::Follow, 70);
-    let near = SceneThing {
+    let near = SceneObject {
         at: Position::new(6.0, 7.0, 0.0),
         ..order_target(70, player_id(1), class::CLASS_6)
     };
@@ -12696,7 +12696,7 @@ fn the_transport_enter_and_unload_orders_give_the_unit_commands() {
         }),
         ..villager_master()
     };
-    let target = SceneThing::new(70, player_id(1), house, Position::new(10.0, 20.0, 0.0));
+    let target = SceneObject::new(70, player_id(1), house, Position::new(10.0, 20.0, 0.0));
     let enter = OrderKind::Enter;
     let mut w = order_world(
         order_unit(villager.clone(), idle(UnitAiKind::Soldier)),
@@ -13062,9 +13062,9 @@ fn slot_0x1b0_gives_the_kind_of_resource_by_the_unit_ai_kind() {
 #[test]
 fn the_attack_move_attacks_with_trebuchet_and_moves_otherwise() {
     let (house, _) = house_and_tree();
-    let enemy = SceneThing {
+    let enemy = SceneObject {
         ai: Some(idle(UnitAiKind::Building)),
-        ..SceneThing::new(70, player_id(2), house, Position::new(10.0, 20.0, 0.0))
+        ..SceneObject::new(70, player_id(2), house, Position::new(10.0, 20.0, 0.0))
     };
     let unit = |class, ai| {
         let master = Master {
@@ -13201,14 +13201,14 @@ fn the_order_tail_takes_the_order_and_leaves_patrol_order() {
 /// Player 1's unit `id` at (20, 20) on its sprite (master `master`), its unit AI `ai`, on a
 /// map of 200 by 200 with the `others`, each in player 1's lists. The AI stream is seeded with
 /// 0, as [`rng`] is.
-fn player_unit_world(id: i32, (master, ai): (Master, UnitAi), others: &[SceneThing]) -> World {
+fn player_unit_world(id: i32, (master, ai): (Master, UnitAi), others: &[SceneObject]) -> World {
     let mut scene = Scene::open(GridSize::new(200, 200))
         .players(2)
         .graphic(STANDING)
-        .thing(SceneThing {
+        .object(SceneObject {
             ai: Some(ai),
             sprite: Some(STANDING.id),
-            ..SceneThing::new(
+            ..SceneObject::new(
                 id,
                 player_id(1),
                 Master {
@@ -13218,10 +13218,10 @@ fn player_unit_world(id: i32, (master, ai): (Master, UnitAi), others: &[SceneThi
                 Position::new(20.0, 20.0, 0.0),
             )
         });
-    for thing in others {
-        scene = scene.thing(SceneThing {
+    for other in others {
+        scene = scene.object(SceneObject {
             seen_by: Some(VisionBits::visible(player_id(1))),
-            ..thing.clone()
+            ..other.clone()
         });
     }
     let mut w = scene.build();
@@ -13306,20 +13306,20 @@ fn other_load_world(with_camp: bool) -> World {
     let mut scene = Scene::open(GridSize::new(64, 64))
         .players(2)
         .graphic(STANDING)
-        .thing(SceneThing {
+        .object(SceneObject {
             ai: Some(idle(UnitAiKind::Civilian)),
             sprite: Some(STANDING.id),
             holds: Some((attribute::WOOD, Amount::new(10.0))),
-            ..SceneThing::new(20, player_id(1), villager, Position::new(20.0, 20.0, 0.0))
+            ..SceneObject::new(20, player_id(1), villager, Position::new(20.0, 20.0, 0.0))
         })
-        .thing(SceneThing {
+        .object(SceneObject {
             seen_by: Some(VisionBits::visible(player_id(1))),
             ..stone
         });
     if with_camp {
-        scene = scene.thing(SceneThing {
+        scene = scene.object(SceneObject {
             seen_by: Some(VisionBits::visible(player_id(1))),
-            ..SceneThing::new(45, player_id(1), camp, Position::new(26.0, 20.0, 0.0))
+            ..SceneObject::new(45, player_id(1), camp, Position::new(26.0, 20.0, 0.0))
         });
     }
     let mut w = scene.build();
@@ -13401,7 +13401,7 @@ fn villager_drops_another_resource_at_the_table_building() {
 /// nothing. The processing goes on.
 #[test]
 fn villager_works_the_pasture_it_built() {
-    let farm = SceneThing {
+    let farm = SceneObject {
         id: object_id(15342),
         at: Position::new(24.0, 20.0, 0.0),
         ..own_farm()
@@ -13545,20 +13545,20 @@ fn packed_siege_world() -> World {
         .players(2)
         .kind(player_id(1), PlayerKind::Computer)
         .graphic(STANDING)
-        .thing(SceneThing {
+        .object(SceneObject {
             ai: Some(packed),
             actions: Some(attacking),
             sprite: Some(STANDING.id),
-            ..SceneThing::new(500, player_id(1), siege, Position::new(20.0, 30.0, 0.0))
+            ..SceneObject::new(500, player_id(1), siege, Position::new(20.0, 30.0, 0.0))
         });
     for (id, class, x) in [(77, class::WARSHIP, 22.0), (90, class::CLASS_6, 25.0)] {
-        scene = scene.thing(SceneThing {
+        scene = scene.object(SceneObject {
             seen_by: Some(VisionBits::visible(player_id(1))),
             ai: Some(UnitAi {
                 current_target: Some(object_id(500)),
                 ..idle(UnitAiKind::Soldier)
             }),
-            ..SceneThing::new(
+            ..SceneObject::new(
                 id,
                 player_id(2),
                 walker(i16::try_from(id).expect("a master's id"), class),
@@ -13616,10 +13616,10 @@ fn retargeter(target: i32) -> (Master, UnitAi) {
 }
 
 /// Player 2's object `id` of master `master` at (x, y), its unit AI of `kind`.
-fn enemy_thing(id: i32, master: Master, (x, y): (f32, f32), kind: UnitAiKind) -> SceneThing {
-    SceneThing {
+fn enemy_unit(id: i32, master: Master, (x, y): (f32, f32), kind: UnitAiKind) -> SceneObject {
+    SceneObject {
         ai: Some(idle(kind)),
-        ..SceneThing::new(id, player_id(2), master, Position::new(x, y, 0.0))
+        ..SceneObject::new(id, player_id(2), master, Position::new(x, y, 0.0))
     }
 }
 
@@ -13669,16 +13669,16 @@ fn retarget_search_ends_on_another_category_or_without_building_target() {
         building: false,
         work_state: true,
     };
-    let sheep = SceneThing {
+    let sheep = SceneObject {
         capture: CaptureKind::Livestock,
-        ..enemy_thing(
+        ..enemy_unit(
             25954,
             walker(594, class::LIVESTOCK),
             (30.0, 20.0),
             UnitAiKind::Livestock,
         )
     };
-    let archer = |id: i32, at| enemy_thing(id, walker(7, class::CLASS_0), at, UnitAiKind::Ranged);
+    let archer = |id: i32, at| enemy_unit(id, walker(7, class::CLASS_0), at, UnitAiKind::Ranged);
     let mut w = soldier_world(
         retargeter(25954),
         None,
@@ -13716,7 +13716,7 @@ fn retarget_search_with_building_target_attacks_what_it_finds() {
         work_state: false,
     };
     let archer = || {
-        enemy_thing(
+        enemy_unit(
             30,
             walker(7, class::CLASS_0),
             (22.0, 21.0),
@@ -13724,35 +13724,35 @@ fn retarget_search_with_building_target_attacks_what_it_finds() {
         )
     };
     let house = |at| {
-        enemy_thing(
+        enemy_unit(
             40,
             building_master(70, class::BUILDING),
             at,
             UnitAiKind::Building,
         )
     };
-    let annex = |at| SceneThing {
+    let annex = |at| SceneObject {
         annex_of: Some(MainBuildingId::new(object_id(40))),
-        ..enemy_thing(
+        ..enemy_unit(
             41,
             building_master(71, class::BUILDING),
             at,
             UnitAiKind::Building,
         )
     };
-    let trebuchet = enemy_thing(
+    let trebuchet = enemy_unit(
         42,
         building_master(42, class::CLASS_54),
         (23.0, 23.0),
         UnitAiKind::Siege,
     );
-    let farm = enemy_thing(
+    let farm = enemy_unit(
         43,
         building_master(50, class::FARM),
         (23.0, 20.0),
         UnitAiKind::Building,
     );
-    let attacked = |target: i32, others: &[SceneThing]| {
+    let attacked = |target: i32, others: &[SceneObject]| {
         let (soldier, mut u) = retargeter(target);
         u.current_order = None;
         let mut w = soldier_world((soldier, u), None, others);

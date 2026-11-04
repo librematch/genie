@@ -584,7 +584,7 @@ impl UnitAi {
     }
 
     /// The target block's attack whose target died (`0x140c66b10`): processIdle (slot 0x240 with
-    /// 0, [`UnitAi::process_idle`]) may find the next thing to do (6); with nothing (5) the AI
+    /// 0, [`UnitAi::process_idle`]) may find what to do next (6); with nothing (5) the AI
     /// moves to its old target's point within the unit's weapon range (slot 0x130, forced,
     /// running: it always takes it). Then the order ends: it becomes the last order, the order and
     /// its priority −1, a patrol order (711, 733) resetting its timers

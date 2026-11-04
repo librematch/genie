@@ -16,7 +16,7 @@ pub use self::statistics::{
 };
 pub use self::values::{EntryCount, KillTime, OrderWeight, TargetScore};
 pub(crate) use self::world_view::AttackField;
-pub use self::world_view::{Ask, Searcher, Thing, ThingFlags};
+pub use self::world_view::{Ask, FoundFlags, FoundObject, Searcher};
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
 use crate::world::layer::ClassRoles;

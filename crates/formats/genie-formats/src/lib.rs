@@ -8,8 +8,8 @@
 //! version is detected automatically, based on the amount of terrains included in the file (since
 //! that is hardcoded in each game executable).
 //!
-//! Writing data files is not yet supported, and many of the things that the library reads are not
-//! yet exposed in the public API.
+//! Writing data files is not yet supported, and much of what the library reads is not yet
+//! exposed in the public API.
 //!
 //! ```rust
 //! # fn main() -> anyhow::Result<()> {

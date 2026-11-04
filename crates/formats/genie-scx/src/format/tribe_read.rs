@@ -22,7 +22,7 @@ pub struct TribeScen {
     ///
     /// This distinction doesn't make much sense as a user of this library, but
     /// it exists internally in `AoC` and affects the storage format (eg.  some
-    /// things are duplicate).
+    /// fields are stored twice).
     pub(crate) base: RgeScen,
     /// Starting resources for players.
     pub(super) player_start_resources: Vec<PlayerStartResources>,

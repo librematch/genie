@@ -92,9 +92,9 @@ pub struct Ask {
 }
 
 bitflags::bitflags! {
-    /// What `bestUnitToAttack` reads of an object as yes or no ([`Thing`]).
+    /// What `bestUnitToAttack` reads of an object as yes or no ([`FoundObject`]).
     #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-    pub struct ThingFlags: u8 {
+    pub struct FoundFlags: u8 {
         /// The unit's owner counts its owner an ally (`FUN_141663d90` with the ally flag).
         const ALLIED = 1;
         /// It has a unit AI (`+0x6b0`).
@@ -110,11 +110,11 @@ bitflags::bitflags! {
 
 /// What `bestUnitToAttack` reads of an object of the world (`FUN_1415417a0`).
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
-pub struct Thing {
+pub struct FoundObject {
     /// Its owner's id.
     pub owner: PlayerId,
     /// Its alliance, unit AI, container, targeting and attackable reads.
-    pub flags: ThingFlags,
+    pub flags: FoundFlags,
     /// `+0x640`.
     pub state: ObjectState,
     /// Its master's id, class and type.
@@ -150,8 +150,8 @@ impl AttackField<'_, '_> {
     /// # Errors
     ///
     /// An object the slice does not hold.
-    pub(crate) fn thing(&mut self, id: ObjectId) -> Result<Option<Thing>, GenieError> {
-        self.picker.thing(self.world, id)
+    pub(crate) fn found_object(&mut self, id: ObjectId) -> Result<Option<FoundObject>, GenieError> {
+        self.picker.found_object(self.world, id)
     }
 
     /// The unit AI's attack check (slot 0xa0 with 0) on object `id`.

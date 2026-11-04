@@ -51,7 +51,7 @@ use crate::testing::attribute;
 use crate::testing::class;
 use crate::testing::ids;
 use crate::testing::roles;
-use crate::testing::scene::{Scene, Thing, walking};
+use crate::testing::scene::{Scene, SceneObject, walking};
 use crate::testing::tuning;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::Issuer;
@@ -254,7 +254,7 @@ fn blocker_that_moves_lets_the_spot_try_its_next_candidate() {
     assert_eq!(p, Some(Point::new(1.5, 1.0)));
 }
 
-fn sheep(state: ObjectState) -> Near {
+fn near_sheep(state: ObjectState) -> Near {
     Near {
         id: object_id(9520),
         position: Position::new(106.68481, 47.14652, 0.0),
@@ -276,12 +276,12 @@ fn sheep(state: ObjectState) -> Near {
 
 #[test]
 fn livestock_stays_alive_tree_only_once_dead() {
-    assert!(sheep(ObjectState::Alive).stays(&roles()));
-    assert!(!sheep(ObjectState::Unfinished).stays(&roles()));
+    assert!(near_sheep(ObjectState::Alive).stays(&roles()));
+    assert!(!near_sheep(ObjectState::Unfinished).stays(&roles()));
     let tree = Near {
         class: class::TREE,
         kind: MasterKind::STATIC,
-        ..sheep(ObjectState::Alive)
+        ..near_sheep(ObjectState::Alive)
     };
     assert!(!tree.stays(&roles()));
     assert!(
@@ -310,9 +310,9 @@ fn sheep_master() -> Master {
 }
 
 /// Gaia's sheep 9520 at (106.68, 47.15), alive: the world's object that reads as
-/// [`sheep`].
-fn sheep_thing() -> Thing {
-    Thing::new(
+/// [`near_sheep`].
+fn sheep() -> SceneObject {
+    SceneObject::new(
         9520,
         PlayerId::GAIA,
         sheep_master(),
@@ -355,14 +355,14 @@ fn fogged_building_blocks_build_by_its_visibility_mask() {
         own: &[],
     };
     let test = |owner, seen_by| {
-        let house = Thing {
+        let house = SceneObject {
             seen_by,
-            ..Thing::new(500, owner, house_master(), Position::new(20.5, 20.5, 0.0))
+            ..SceneObject::new(500, owner, house_master(), Position::new(20.5, 20.5, 0.0))
         };
         let w = Scene::open(GridSize::new(120, 120))
             .sight(TileSight::Explored)
             .players(2)
-            .thing(house)
+            .object(house)
             .build();
         build_placement(
             &site,
@@ -397,7 +397,7 @@ fn fogged_building_blocks_build_by_its_visibility_mask() {
     assert_eq!(test(one, None), 6);
 }
 
-/// The world's sheep reads as [`sheep`] on its tile; it blocks a villager (radius 0.2) at the
+/// The world's sheep reads as [`near_sheep`] on its tile; it blocks a villager (radius 0.2) at the
 /// points whose box overlaps its own.
 #[test]
 fn the_sheep_blocks_the_villager_where_their_boxes_overlap() {
@@ -410,13 +410,11 @@ fn the_sheep_blocks_the_villager_where_their_boxes_overlap() {
         hill_mode: HillMode::ANY,
         placement: PlacementTerrains::NONE,
     };
-    let w = Scene::open(GridSize::new(120, 120))
-        .thing(sheep_thing())
-        .build();
+    let w = Scene::open(GridSize::new(120, 120)).object(sheep()).build();
     let map = WorldMap { turns: &w };
     assert_eq!(
         map.objects(Tile::new(106, 47)),
-        Ok(vec![sheep(ObjectState::Alive)])
+        Ok(vec![near_sheep(ObjectState::Alive)])
     );
     let at = |x, y| {
         placement(
@@ -454,12 +452,12 @@ fn the_first_object_of_tile_list_reports_the_block() {
             class: class::CLASS_6,
             ..sheep_master()
         };
-        Thing::new(9521, PlayerId::GAIA, master, sheep_thing().at)
+        SceneObject::new(9521, PlayerId::GAIA, master, sheep().at)
     };
-    let at = |first: Thing, second: Thing| {
+    let at = |first: SceneObject, second: SceneObject| {
         let w = Scene::open(GridSize::new(120, 120))
-            .thing(first)
-            .thing(second)
+            .object(first)
+            .object(second)
             .build();
         placement(
             &villager,
@@ -471,14 +469,8 @@ fn the_first_object_of_tile_list_reports_the_block() {
         )
         .unwrap()
     };
-    assert_eq!(
-        at(sheep_thing(), soldier()),
-        Tested::Blocked { stays: true }
-    );
-    assert_eq!(
-        at(soldier(), sheep_thing()),
-        Tested::Blocked { stays: false }
-    );
+    assert_eq!(at(sheep(), soldier()), Tested::Blocked { stays: true });
+    assert_eq!(at(soldier(), sheep()), Tested::Blocked { stays: false });
 }
 
 /// `FUN_140ad0240` at the forage world's town centre 700: a villager (master 83) spawns beside
@@ -1230,7 +1222,7 @@ fn build_scan_counts_what_the_player_sees_of_tile() {
     let o = |player, fog_visibility| Near {
         player,
         fog_visibility,
-        ..sheep(ObjectState::Alive)
+        ..near_sheep(ObjectState::Alive)
     };
     let sees = |map: &WorldMap<'_>, o: Near, sight| build_sees(&site, map, &o, sight, &roles());
     assert_eq!(
@@ -1309,7 +1301,7 @@ fn build_scan_ignores_the_dead_the_moving_own_walls_and_foreign_foundations() {
         flags: NearFlags::empty(),
         player: PlayerId::new(2),
         state: ObjectState::Alive,
-        ..sheep(ObjectState::Alive)
+        ..near_sheep(ObjectState::Alive)
     };
     let ignores = |site: &BuildSite<'_>, o: Near| build_ignores(site, &flat, &o, &roles());
     assert!(!ignores(&site, house));
@@ -1389,7 +1381,7 @@ fn build_scan_passes_over_moving_friends_buildable_ground_and_felled_trees() {
         flags: NearFlags::MOVING,
         player: PlayerId::new(1),
         state: ObjectState::Alive,
-        ..sheep(ObjectState::Unfinished)
+        ..near_sheep(ObjectState::Unfinished)
     };
     let passes = |o: Near| build_passes(&site, &flat, &o, &roles());
     assert!(passes(walker));
@@ -1456,7 +1448,7 @@ fn build_blockers_are_the_standing_objects_whose_box_overlaps() {
         flags: NearFlags::empty(),
         player: PlayerId::new(2),
         state: ObjectState::Alive,
-        ..sheep(ObjectState::Alive)
+        ..near_sheep(ObjectState::Alive)
     };
     let blocks = |site: &BuildSite<'_>, o: Near| {
         blocks_build(site, &flat, &o, Point::new(21.0, 21.0), &roles())
@@ -1524,10 +1516,10 @@ fn build_blockers_are_the_standing_objects_whose_box_overlaps() {
 /// but not one of the site's own, a desolid foundation, or anything for a site without a height.
 #[test]
 fn the_build_static_scans_find_dying_house_build_passes_over() {
-    let house = |desolid| Thing {
+    let house = |desolid| SceneObject {
         state: ObjectState::DyingSprite,
         desolid,
-        ..Thing::new(
+        ..SceneObject::new(
             600,
             PlayerId::new(2),
             house_master(),
@@ -1536,10 +1528,10 @@ fn the_build_static_scans_find_dying_house_build_passes_over() {
     };
     let build_values = Restriction::new(vec![1.0, 0.0]);
     let build = house_site(&build_values, false);
-    let test = |site: &BuildSite<'_>, house: Thing| {
+    let test = |site: &BuildSite<'_>, house: SceneObject| {
         let w = Scene::open(GridSize::new(120, 120))
             .players(2)
-            .thing(house)
+            .object(house)
             .build();
         build_placement(
             site,
