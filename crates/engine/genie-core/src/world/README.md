@@ -60,7 +60,7 @@ moves it on. The behaviours that a tick runs live in their systems. Many of them
 | [`unread.rs`](unread.rs) | The objects the load could not read whole (FD-045-D61): the import's gap, not game data. |
 | [`whole.rs`](whole.rs) | An object as one value (FD-045-D51): its row and its parts, as the world takes it in and gives it back whole, and the view a comparison reads (`ObjectView`). |
 | [`world_update.rs`](world_update.rs) | The world update's parts (`crate::world::schedule` runs them): the command phase, the moving objects, the players' relations and each player's objects' updates. |
-| [`load/`](load/) | The world's load from a save (FD-043-01M6JPBEDA, the review's ORA-01): each saved object's row, its parts, its movement, its actions and sub-actions, as genie-save reads them from a recording's header or a per-tick save. |
+| [`load/`](load/) | The world's load from a save (FD-043-01M6JPBEDA, the review's ORA-01): the world, its players, map, sight and groups, and each saved object's row, its parts, its movement, its actions and sub-actions, as genie-save reads them from a recording's header or a per-tick save. |
 <!-- /files -->
 
 ## How it connects

@@ -5,11 +5,16 @@
 use crate::objects::masters::ActionKind;
 use crate::testing::tuning;
 use crate::world::layer::generated::MissileTuning;
+use genie_save::Header;
+use genie_save::Positioned;
 use genie_save::generated::world::{
     Action, ActionList, ActionListEntry1, Master, PlayerMaster, PlayerObjects,
     RgeMasterMovingObject, RgeMasterStaticObject, TribeBuildingObject,
 };
-use genie_save::generated::world::{Object, RgeMovingObject, RgeStaticObject, TribeCombatObject};
+use genie_save::generated::world::{
+    GaiaPlayer, HumanOrCoopPlayer, Object, ObjectListEntry1, Player, RgeMovingObject,
+    RgeStaticObject, RgeVictoryConditions, TribeCombatObject, WorldPlayer,
+};
 use std::iter::once;
 
 /// A combat object (type 70), its id `id` and master `master`; its town bell holds no
@@ -158,4 +163,99 @@ pub(crate) fn with_masters(masters: Vec<Master>) -> PlayerObjects {
 /// Build 158041's missile tuning, which the import reads from the build layer.
 pub(crate) fn missile_tuning() -> MissileTuning {
     tuning().missile
+}
+
+/// Gaia, its live objects `objects`.
+pub(crate) fn gaia(objects: Vec<Object>) -> Player {
+    let mut gaia = GaiaPlayer::default();
+    gaia.player_objects.objects.object_kind_list = object_list(objects);
+    Player {
+        kind: 2,
+        gaia_player: Some(Box::new(gaia)),
+        ..Player::default()
+    }
+}
+
+/// A human player (type 1), its live objects `objects`.
+pub(crate) fn human(objects: Vec<Object>) -> Player {
+    let mut human = HumanOrCoopPlayer::default();
+    human.player_objects.objects.object_kind_list = object_list(objects);
+    Player {
+        kind: 1,
+        human_or_coop_player: Some(Box::new(human)),
+        ..Player::default()
+    }
+}
+
+/// The world part of a player of [`human`].
+///
+/// # Panics
+///
+/// For a player of another type.
+pub(crate) fn human_mut(player: &mut Player) -> &mut WorldPlayer {
+    &mut player
+        .human_or_coop_player
+        .as_deref_mut()
+        .expect("a human player")
+        .world_player_human_or_coop
+}
+
+/// An object list of `objects`, each its class's type, its end after them.
+pub(crate) fn object_list(objects: Vec<Object>) -> Vec<ObjectListEntry1> {
+    objects
+        .into_iter()
+        .map(|object| ObjectListEntry1 {
+            object_kind: if object.tribe_building_object.is_some() {
+                80
+            } else {
+                70
+            },
+            object: Some(Box::new(object)),
+        })
+        .chain(once(ObjectListEntry1::default()))
+        .collect()
+}
+
+/// Save 66.6, build 158041's own version: its fraction in sixteen bits.
+const SAVE_66_6: u32 = 0x0042_9999;
+
+/// A save of `players`, Gaia first, of the build's own version: the lists of one entry per
+/// player as long as the players, so [`save_bytes`] writes a save that reads back.
+pub(crate) fn header(players: Vec<Player>) -> Header {
+    let n = players.len();
+    let mut header = Header::default();
+    header.file_header.new_save_game_version = SAVE_66_6;
+    let world = &mut header.world.base_world;
+    world.num_players = i16::try_from(n).expect("a test's few players");
+    world.player_time_delta = vec![0; n];
+    world.victory_conditions = vec![RgeVictoryConditions::default(); n];
+    world.players = players
+        .into_iter()
+        .map(|mut val| {
+            if let Some(wp) = world_player_mut(&mut val) {
+                wp.base.relation.resize(n, 0);
+                wp.base.unit_diplomacy.resize(n, 0);
+                wp.tc_flared.resize(n, 0);
+            }
+            Positioned { pos: 0, val }
+        })
+        .collect();
+    header
+}
+
+/// A player's world part, of any player type.
+fn world_player_mut(player: &mut Player) -> Option<&mut WorldPlayer> {
+    if let Some(g) = player.gaia_player.as_deref_mut() {
+        return Some(&mut g.world_player_gaia.world_player);
+    }
+    if let Some(h) = player.human_or_coop_player.as_deref_mut() {
+        return Some(&mut h.world_player_human_or_coop);
+    }
+    if let Some(c) = player.computer_player.as_deref_mut() {
+        return Some(&mut c.world_player_computer);
+    }
+    player
+        .scenario_editor_phantom_player
+        .as_deref_mut()
+        .map(|p| &mut p.world_player_scenario_editor_phantom)
 }

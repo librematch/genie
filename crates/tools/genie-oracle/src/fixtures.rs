@@ -2,17 +2,16 @@
 //! saves (FD-044), so a test builds the few fields its routine reads and leaves the rest zero.
 
 use flate2::write::DeflateEncoder;
-use genie_core::objects::masters::ActionKind;
 use genie_rec::de::Op;
 use genie_save::Header;
 use genie_save::Positioned;
 use genie_save::generated::world::{
-    Action, ActionList, ActionListEntry1, HumanOrCoopPlayer, Master, PlayerMaster, PlayerObjects,
-    RgeMasterMovingObject, RgeMasterStaticObject, TribeBuildingObject,
-};
-use genie_save::generated::world::{
     GaiaPlayer, Object, ObjectListEntry1, Player, RgeMovingObject, RgeStaticObject,
     RgeVictoryConditions, TribeCombatObject, WorldPlayer,
+};
+use genie_save::generated::world::{
+    HumanOrCoopPlayer, Master, PlayerMaster, PlayerObjects, RgeMasterMovingObject,
+    RgeMasterStaticObject,
 };
 use std::io::Cursor;
 use std::iter::once;
@@ -79,19 +78,6 @@ pub(crate) fn human(objects: Vec<Object>) -> Player {
         human_or_coop_player: Some(Box::new(human)),
         ..Player::default()
     }
-}
-
-/// The world part of a player of [`human`].
-///
-/// # Panics
-///
-/// For a player of another type.
-pub(crate) fn human_mut(player: &mut Player) -> &mut WorldPlayer {
-    &mut player
-        .human_or_coop_player
-        .as_deref_mut()
-        .expect("a human player")
-        .world_player_human_or_coop
 }
 
 /// An object list of `objects`, each its class's type, its end after them.
@@ -246,50 +232,6 @@ pub(crate) fn master_static_mut(master: &mut Master) -> &mut RgeMasterStaticObje
     &mut master_moving_mut(master)
         .rge_master_animated_object
         .rge_master_static_object
-}
-
-/// A building (type 80), its id `id` and master `master`.
-pub(crate) fn building_object(id: i32, master: i16) -> Object {
-    let mut object = Object {
-        tribe_building_object: Some(Box::default()),
-        ..Object::default()
-    };
-    let s = &mut building_mut(&mut object)
-        .tribe_combat_object
-        .rge_combat_object
-        .rge_action_object
-        .rge_moving_object
-        .rge_animated_object
-        .rge_static_object;
-    s.id = id;
-    s.master_obj = master;
-    object
-}
-
-/// The building part of an object of [`building_object`].
-///
-/// # Panics
-///
-/// For an object without one.
-pub(crate) fn building_mut(object: &mut Object) -> &mut TribeBuildingObject {
-    object
-        .tribe_building_object
-        .as_deref_mut()
-        .expect("a building")
-}
-
-/// An action list of `actions` (type, action), its end after them.
-pub(crate) fn action_list(actions: Vec<(ActionKind, Action)>) -> ActionList {
-    ActionList {
-        action_kind_list: actions
-            .into_iter()
-            .map(|(action_kind, action)| ActionListEntry1 {
-                action_kind: action_kind.get(),
-                action: Some(Box::new(action)),
-            })
-            .chain(once(ActionListEntry1::default()))
-            .collect(),
-    }
 }
 
 /// A player's saved objects with the masters `masters` (each of type 70).

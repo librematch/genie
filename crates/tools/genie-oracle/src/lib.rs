@@ -58,7 +58,6 @@ pub mod views;
 pub use masters::{DefaultAction, MasterTable, TerrainTable};
 
 use genie_core::GenieError;
-use genie_core::world::load::object_ids;
 use genie_rec::de;
 
 mod command_args;
@@ -85,7 +84,7 @@ mod test_ids;
 #[cfg(test)]
 mod fixtures;
 
-use self::command_args::{Frame, frames, market};
+use self::command_args::{Frame, frames};
 use self::compared_objects::header_objects;
 pub use self::compared_objects::{object_rows, saved_objects};
 use self::decoder::Decoder;
@@ -109,8 +108,8 @@ pub use self::header_runs::{
     GROUP_COMMANDS, GroupCommand, Word9, Word9Terms, blocks_per_tick, header_run, simulate_word9,
     slice_from_header, trace_commands, word9_terms,
 };
-use self::header_runs::{header_slice, lane_block, run, top_action, watch_at_load};
-use self::map_and_sight::{SavedStep, spatial, tile_differences};
+use self::header_runs::{lane_block, run, top_action};
+use self::map_and_sight::{SavedStep, tile_differences};
 pub use self::map_and_sight::{saved_visibility, terrain_differences, visibility_differences};
 pub use self::pathing_inputs::{
     mesh_from_dump, mesh_owners_from_dump, planner_from_save, unit_terrain,
@@ -123,20 +122,21 @@ pub use self::save_objects::{
 pub use self::save_runs::{
     command_phase_from_save, run_from_save, saved_groups, spatial_from_save, spatial_with_tiles,
 };
-use self::save_runs::{
-    compare_players, hunted_origins, loaded_slice, played_frames, primed, save_header,
-};
-use self::saved_masters::{moving_speed, placement, work_masters};
-pub use self::setup::{history, layer, settings};
-use self::setup::{saved_ghosts, slice, tech_state};
+use self::save_runs::{compare_players, loaded_slice, played_frames, primed, save_header};
+use self::saved_masters::work_masters;
+pub use self::setup::layer;
+use self::setup::{header_slice, slice};
 pub use self::step_runs::{StepSave, steps_from_save};
 pub use self::task_finder::{FinderObject, FinderWorld, finder_world};
 #[cfg(test)]
 use genie_core::objects::unit::Unit;
 #[cfg(test)]
 use genie_core::ownership::artifact::ARTIFACT_KIND;
-use genie_core::world::load::movers::{path_level, vec3};
 use genie_core::world::load::object::object;
+pub use genie_core::world::load::world::players::history;
+use genie_core::world::load::world::players::tech_state;
+use genie_core::world::load::world::saved_ghosts;
+pub use genie_core::world::load::world::settings;
 /// The fields a comparison covers ([`object_field_differences_in`]).
 pub use genie_diff::Scope;
 use std::error::Error as StdError;

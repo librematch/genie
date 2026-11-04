@@ -15,6 +15,7 @@ use crate::testing::build_158041::build_158041;
 use crate::world::layer::Roles;
 use crate::world::layer::Slots;
 use crate::world::layer::generated::Tuning;
+use genie_model::layer::BuildLayer;
 use genie_model::model::Model;
 use std::sync::LazyLock;
 
@@ -30,12 +31,17 @@ pub fn slots() -> Slots {
     build_158041().slots
 }
 
-/// Build 158041's tuning values, which a test passes where the engine reads the model's (built
-/// once).
+/// Build 158041's layer (built once), which a test passes where the engine reads a build's.
+#[must_use]
+pub fn layer() -> &'static BuildLayer {
+    static LAYER: LazyLock<BuildLayer> = LazyLock::new(build_158041);
+    &LAYER
+}
+
+/// Build 158041's tuning values, which a test passes where the engine reads the model's.
 #[must_use]
 pub fn tuning() -> &'static Tuning {
-    static TUNING: LazyLock<Tuning> = LazyLock::new(|| build_158041().tuning);
-    &TUNING
+    &layer().tuning
 }
 
 /// A model of no tables with build 158041's roles, slots and tuning values (built once), which a

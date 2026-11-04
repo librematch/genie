@@ -9,10 +9,11 @@ use genie_core::pathing::{ShapeId, ShapeSide};
 
 use crate::masters::TerrainTable;
 use crate::setup::layer;
-use crate::{Error, live, spatial};
+use crate::{Error, live};
 use genie_core::map::{Restriction, RestrictionId, TerrainId};
 use genie_core::pathing::mesh::{Contact, Mesh};
 use genie_core::pathing::tile_path::Planner;
+use genie_core::world::load::map::spatial;
 use genie_rec::de::chapters;
 
 /// The obstruction manager's shape mesh as the tick oracle dumps it (`load_oracle/probes/mesh.py`):

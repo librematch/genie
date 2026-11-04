@@ -2,7 +2,6 @@
 
 use genie_core::groups::GroupId;
 use genie_core::objects::ObjectId;
-use genie_core::objects::masters::ActionKind;
 use genie_core::objects::masters::MasterId;
 
 /// The object id `value` (not −1).
@@ -18,14 +17,6 @@ pub(crate) const fn group_id(value: i32) -> GroupId {
     match GroupId::of_field(value) {
         Some(id) => id,
         None => panic!("a test's group id is not −1"),
-    }
-}
-
-/// The action type `value` (0 or more).
-pub(crate) const fn action_kind(value: i16) -> ActionKind {
-    match ActionKind::of_data(value) {
-        Some(kind) => kind,
-        None => panic!("a test's action type is 0 or more"),
     }
 }
 

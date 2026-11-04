@@ -1,6 +1,7 @@
 use crate::Error;
 use crate::fixtures::{gaia, header, human, recording};
-use crate::header_runs::{blocks_per_tick, header_slice, lane_block};
+use crate::header_runs::{blocks_per_tick, lane_block};
+use crate::setup::header_slice;
 use genie_rec::de::Op;
 
 /// Each tick's blocks of the players asked for, in their order; a player the save does not hold

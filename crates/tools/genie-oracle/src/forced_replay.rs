@@ -1,7 +1,7 @@
 //! The forced replay (FD-008): its steps, its continuous run, the old pather's answers and the
 //! game's state in a save.
 
-use crate::groups::{globals_from_dump, group_differences, unit_groups};
+use crate::groups::{globals_from_dump, group_differences};
 use crate::masters::MasterTable;
 use crate::{
     Dumps, Error, SavedStep, command_phase_from_save, compare_players, ghost_pool_from_dump, layer,
@@ -24,6 +24,7 @@ use genie_core::world::GameState;
 use genie_core::world::PlayState;
 use genie_core::world::World;
 use genie_core::world::index::ObjectsRef;
+use genie_core::world::load::groups::unit_groups;
 use genie_save::Header;
 use std::collections::BTreeMap;
 use std::mem::take as mem_take;

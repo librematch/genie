@@ -3,11 +3,11 @@
 
 use std::fmt::Write;
 
-use crate::groups::unit_groups;
 use crate::{Error, MasterTable};
 use genie_core::GenieError;
 use genie_core::objects::ObjectId;
 use genie_core::unit_ai::QueuedOrder;
+use genie_core::world::load::groups::unit_groups;
 use genie_rec::de::chapters;
 use genie_rec::de::{self, Op};
 use genie_save::generated::world::RgeActionObject;

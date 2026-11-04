@@ -2,33 +2,31 @@
 //! sight and technologies, the unit groups, the hunted animals' origins.
 
 use crate::command_args::Frame;
-use crate::groups::{globals_from_dump, unit_groups};
+use crate::groups::globals_from_dump;
 use crate::masters::{MasterTable, TerrainTable};
 use crate::setup::layer;
 use crate::{
     Decoder, Dumps, Error, SavedStep, TickReport, frames, ghost_pool_from_dump,
     inside_lists_from_dump, mesh_from_dump, mesh_owners_from_dump, object_differences,
-    recycle_pools_from_dump, registry_from_dump, run, slice, spatial, tile_differences,
-    tile_lists_from_dump, visibility_differences, watch_at_load,
+    recycle_pools_from_dump, registry_from_dump, run, slice, tile_differences,
+    tile_lists_from_dump, visibility_differences,
 };
 use genie_core::commands::Command;
 use genie_core::groups::UnitGroups;
-use genie_core::map::Distance;
-use genie_core::map::Position;
 use genie_core::map::spatial::Spatial;
 use genie_core::objects::ObjectId;
-use genie_core::objects::masters::ActionKind;
 use genie_core::players::Amount;
 use genie_core::players::PlayerId;
 use genie_core::technology::TechState;
-use genie_core::unit_ai::{Hunted, UnitAiKind};
 use genie_core::world::Departures;
 use genie_core::world::GameState;
 use genie_core::world::Tick;
+use genie_core::world::load::groups::unit_groups;
+use genie_core::world::load::map::spatial;
+use genie_core::world::load::world::loaded::{hunted_origins, watch_at_load};
 use genie_core::world::{Player, World};
 use genie_rec::de::chapters;
 use genie_save::Header;
-use std::collections::BTreeMap;
 
 /// Every player's objects and sight after a run against the game's save `after`; with `tick`,
 /// only the freezes of that update count, else all. A frozen object's differences are left out.
@@ -362,53 +360,6 @@ pub(super) fn frame_commands(turns: &mut World, decoder: &mut Decoder, frame: Op
             .filter_map(|p| decoder.command(p))
             .collect();
         turns.command_phase(frame.dt, &commands);
-    }
-}
-
-/// The hunted animals' unit AI fields the save does not hold (`TribeHuntedAnimalUnitAIModule`,
-/// made with the unit: `FUN_140c11920`): the origin is the animal's place at the recording's
-/// start (`start`, the recording's header save, whose load made the AI), the leash its master's
-/// last task of action type 6's work range (the unit's `+0xb74`, `FUN_141206d50`).
-pub(super) fn hunted_origins(turns: &mut World, start: &Header) {
-    let places: BTreeMap<i32, Position> = start
-        .players()
-        .iter()
-        .flat_map(|p| {
-            p.live_objects()
-                .chain(p.sleeping_objects())
-                .collect::<Vec<_>>()
-        })
-        .filter_map(|o| {
-            o.static_part()
-                .map(|s| (s.id, Position::new(s.tx, s.ty, s.tz)))
-        })
-        .collect();
-    for (p, player) in turns.players.iter().enumerate() {
-        let masters = turns.model.masters.get(p);
-        for unit in player.objects.iter().chain(player.sleeping.iter()) {
-            let Some(ai) = turns
-                .parts
-                .unit_ai
-                .get_mut(unit.id)
-                .filter(|ai| ai.ai_kind == UnitAiKind::Hunted)
-            else {
-                continue;
-            };
-            let Some(&origin) = places.get(&unit.id.get()) else {
-                continue;
-            };
-            let leash = masters
-                .and_then(|m| m.get(unit.life.master_id))
-                .and_then(|m| {
-                    m.action_part()
-                        .tasks
-                        .iter()
-                        .rev()
-                        .find(|t| t.action_kind == ActionKind::HUNT_RANGE)
-                })
-                .map_or(Distance::ZERO, |t| t.work_range);
-            ai.hunted = Some(Hunted { origin, leash });
-        }
     }
 }
 

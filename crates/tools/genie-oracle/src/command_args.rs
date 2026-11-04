@@ -1,13 +1,9 @@
-//! The body's frames, and from the save: a `MoveTo`'s wait, the world's market and a master's
-//! combat part.
+//! The body's frames.
 
 use crate::Error;
-use genie_core::players::market::{Commodity, Market};
-use genie_core::players::{NetTrades, Price, PriceSwing};
 use genie_core::world::Millis;
 use genie_rec::de;
 use genie_rec::de::Op;
-use genie_save::generated::world::World;
 
 /// One frame of the body (FD-007's per-frame record order): the op-2 record that starts a tick, its
 /// dt and, every interval, a checkpoint, then the op-1 commands the tick runs after its `SeedAll`.
@@ -43,28 +39,6 @@ pub(super) fn frames<'a>(chapter: &de::Chapter<'a>, limit: usize) -> Result<Vec<
         });
     }
     Ok(out)
-}
-
-/// The world's market as the save holds it: the save names the int net trades `*_price_delta`
-/// (their bits) and the swings `old_*_price_adj`.
-pub(super) fn market(w: &World) -> Market {
-    let commodity = |price: f32, trades: f32, swing: f32| Commodity {
-        price: Price::new(price),
-        trades: NetTrades::new(trades.to_bits().cast_signed()),
-        swing: PriceSwing::new(swing),
-    };
-    Market {
-        min_price: Price::new(w.world_min_price),
-        max_price: Price::new(w.world_max_price),
-        food: commodity(w.world_food_price, w.food_price_delta, w.old_food_price_adj),
-        wood: commodity(w.world_wood_price, w.wood_price_delta, w.old_wood_price_adj),
-        stone: commodity(
-            w.world_stone_price,
-            w.stone_price_delta,
-            w.old_stone_price_adj,
-        ),
-        ore: commodity(w.world_ore_price, w.ore_price_delta, w.old_ore_price_adj),
-    }
 }
 
 #[cfg(test)]

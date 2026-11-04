@@ -1,7 +1,7 @@
 use crate::command_args::Frame;
 use crate::fixtures::recording;
 use crate::fixtures::{combat_object, gaia, header, human};
-use crate::map_and_sight::{SavedStep, saved_sight};
+use crate::map_and_sight::SavedStep;
 use crate::save_runs::{
     compare_players, frame_commands, from_save, load_dumps, played_frames, primed, save_header,
     stock_differences, stops, world_differences,
@@ -17,6 +17,7 @@ use genie_core::players::Amount;
 use genie_core::players::game_status::GameStatus;
 use genie_core::world::Millis;
 use genie_core::world::WorldTime;
+use genie_core::world::load::map::saved_sight;
 use genie_core::world::{GameState, World};
 use genie_core::world::{PlayState, Tick};
 use genie_rec::de::Op;

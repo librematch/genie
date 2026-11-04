@@ -2,15 +2,13 @@
 //! blocks after each tick and the header's slice.
 
 use crate::masters::MasterTable;
-use crate::{Decoder, Error, Frame, frames, hunted_origins, listed, player_totals, slice};
+use crate::{Decoder, Error, Frame, frames, header_slice, listed, player_totals, slice};
 use genie_core::GenieError;
 use genie_core::commands::Command;
 use genie_core::objects::ListIndex;
 use genie_core::objects::layers::Action;
 use genie_core::ownership::artifact::ARTIFACT_KIND;
 use genie_core::production::Production;
-use genie_core::vision::registry::{CLASSES, Registry};
-use genie_core::world::Tick;
 use genie_core::world::checkpoint::{ActionTerm, CheckpointObject, TopAction, player_block};
 use genie_core::world::parts::Parts;
 use genie_core::world::{Player, World};
@@ -305,27 +303,6 @@ pub fn slice_from_header(
     slice(header, masters)
 }
 
-/// The slice as the recording's header load leaves it: [`slice()`] with the objects-in-sight
-/// registry empty, every object's mask 0, as the game's load makes it, and the hunted animals'
-/// unit AI fields their load made.
-///
-/// # Errors
-///
-/// The build layer does not evaluate.
-pub(super) fn header_slice(
-    header: &Header,
-    masters: Option<&MasterTable>,
-) -> Result<World, GenieError> {
-    let mut turns = slice(header, masters)?;
-    if let Some(sight) = turns.spatial.sight.as_mut() {
-        sight.registry = Some(Registry::new(header.players().len(), CLASSES));
-    }
-    // the hunted animals' origins are their places in this very save
-    hunted_origins(&mut turns, header);
-    watch_at_load(&mut turns);
-    Ok(turns)
-}
-
 /// A recording opened for a run from its header: its first chapter, the chapter's header save
 /// and the slice from it as the header's load leaves it ([`header_slice`]).
 pub(super) struct Opened<'r> {
@@ -354,19 +331,6 @@ pub(super) fn open<'r>(
         header,
         turns,
     })
-}
-
-/// The ghosts' watched lists as the game's load builds them ([`World::build_watched`]), once the
-/// slice holds its registry; what it cannot build stops every player.
-pub(super) fn watch_at_load(turns: &mut World) {
-    if let Err(e) = turns.build_watched() {
-        for p in &mut turns.players {
-            let _ = p
-                .unsupported
-                .get_or_insert_with(|| (Tick::ZERO, ListIndex::new(0), e.clone()));
-            p.stopped = true;
-        }
-    }
 }
 
 /// The slice from the recording's header ([`header_slice`]) after its first `ticks` updates,

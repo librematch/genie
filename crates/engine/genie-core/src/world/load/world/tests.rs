@@ -1,21 +1,22 @@
-use crate::fixtures::static_mut;
-use crate::fixtures::{
-    action_list, building_mut, building_object, combat_object, gaia, header, human, human_mut,
-};
-use crate::masters::MasterTable;
-use crate::setup::{slice, wonder_time};
+use crate::combat::Firepower;
+use crate::objects::masters::FlyMode;
+use crate::objects::masters::MasterId;
+use crate::players::CivId;
+use crate::players::PlayerId;
+use crate::players::PlayerKind;
+use crate::players::history::HistoryUpdates;
+use crate::technology::ResearchState;
 use crate::test_ids::action_kind;
 use crate::test_ids::object_id;
-use genie_core::combat::Firepower;
-use genie_core::objects::masters::FlyMode;
-use genie_core::objects::masters::MasterId;
-use genie_core::players::CivId;
-use genie_core::players::PlayerId;
-use genie_core::players::PlayerKind;
-use genie_core::players::history::HistoryUpdates;
-use genie_core::technology::ResearchState;
-use genie_core::world::Departures;
-use genie_core::world::WorldTime;
+use crate::testing::layer;
+use crate::world::Departures;
+use crate::world::WorldTime;
+use crate::world::load::fixtures::static_mut;
+use crate::world::load::fixtures::{
+    action_list, building_mut, building_object, combat_object, gaia, header, human, human_mut,
+};
+use crate::world::load::world::{saved_world, wonder_time};
+use genie_import::dat::MasterTable;
 use genie_save::generated::world::{Action, Object, RgeAction, TechPlayerTree, TribeActionWonder};
 
 /// A wonder whose action is in state `state` with the timer `timer`.
@@ -71,9 +72,9 @@ fn the_countdown_is_the_least_standing_wonders_timer() {
     );
 }
 
-/// A save's world and players as the slice sets them up, without the master table.
+/// A save's world and players as the load sets them up, without the master table.
 #[test]
-fn the_slice_takes_the_worlds_and_the_players_fields() {
+fn the_load_takes_the_worlds_and_the_players_fields() {
     let mut player = human(vec![combat_object(7, 83)]);
     let wp = human_mut(&mut player);
     wp.base.civ_id = 3;
@@ -89,7 +90,7 @@ fn the_slice_takes_the_worlds_and_the_players_fields() {
     world.next_reusable_object_id = -5;
     world.local_player_index = 1;
     save.world.player_teams = vec![0, 2];
-    let turns = slice(&save, None).unwrap();
+    let turns = saved_world(&save, None, layer()).unwrap();
     assert_eq!(
         (
             turns.world_time,
@@ -135,7 +136,7 @@ fn the_slice_takes_the_worlds_and_the_players_fields() {
 fn resign_is_not_drop() {
     let mut player = human(Vec::new());
     human_mut(&mut player).base.resigned = 1;
-    let turns = slice(&header(vec![gaia(Vec::new()), player]), None).unwrap();
+    let turns = saved_world(&header(vec![gaia(Vec::new()), player]), None, layer()).unwrap();
     assert!(
         turns.players[1].departures.contains(Departures::RESIGNED)
             && !turns.players[1].departures.contains(Departures::DROPPED)
@@ -152,7 +153,7 @@ fn technology_state_of_none_stops_every_player() {
             state,
             ..TechPlayerTree::default()
         }];
-        slice(&header(vec![gaia(Vec::new()), player]), None).unwrap()
+        saved_world(&header(vec![gaia(Vec::new()), player]), None, layer()).unwrap()
     };
     let turns = with(4);
     assert_eq!(turns.players[1].techs[0].state, ResearchState::Queued);
@@ -166,9 +167,9 @@ fn technology_state_of_none_stops_every_player() {
     );
 }
 
-/// With the master table, the slice takes its tables and builds every player's masters.
+/// With the master table, the load takes its tables and builds every player's masters.
 #[test]
-fn the_slice_takes_the_master_tables() {
+fn the_load_takes_the_master_tables() {
     let mut table = MasterTable::of_master(
         CivId::GAIA,
         MasterId::of_data(83).unwrap(),
@@ -177,7 +178,7 @@ fn the_slice_takes_the_master_tables() {
     );
     table.time_slice = HistoryUpdates::of_data(9);
     let save = header(vec![gaia(Vec::new()), human(Vec::new())]);
-    let turns = slice(&save, Some(&table)).unwrap();
+    let turns = saved_world(&save, Some(&table), layer()).unwrap();
     assert_eq!(turns.history_period, HistoryUpdates::of_data(9));
     assert_eq!(turns.model.masters.len(), 2);
     assert_eq!(turns.spatial.fastest.to_bits(), 0.0_f32.to_bits());
@@ -199,7 +200,7 @@ fn unit_inside_building_is_in_its_garrison() {
         gaia(Vec::new()),
         human(vec![building_object(10, 12), inside]),
     ]);
-    let turns = slice(&save, Some(&table)).unwrap();
+    let turns = saved_world(&save, Some(&table), layer()).unwrap();
     let building = turns.players[1]
         .objects
         .iter()

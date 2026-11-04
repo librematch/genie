@@ -1,41 +1,43 @@
-//! A player's saved parts the setup imports: its AI settings, its history and its AI module.
+//! A player's saved parts the world's load reads: its AI settings, its history, its AI module
+//! and its technologies' state.
 
-use genie_core::GenieError;
-use genie_core::map::Distance;
-use genie_core::map::GridSize;
-use genie_core::map::Tile;
-use genie_core::map::WholeDistance;
-use genie_core::movement::explore::InfluenceMap;
-use genie_core::objects::masters::CostAmount;
-use genie_core::objects::masters::MasterId;
-use genie_core::players::ai_module::AiModule;
-use genie_core::players::attribute::AttributeId;
-use genie_core::players::history::HistoryEntry;
-use genie_core::players::history::HistoryUpdates;
-use genie_core::players::history::Population;
-use genie_core::players::history::Share;
-use genie_core::players::history::Tally;
-use genie_core::players::history::TimeSlice;
-use genie_core::players::history::{Event, EventKind, History};
-use genie_core::production::LocationButton;
-use genie_core::technology::CostOverride;
-use genie_core::technology::EffectId;
-use genie_core::technology::OverrideUse;
-use genie_core::technology::ResearchCap;
-use genie_core::technology::ResearchCount;
-use genie_core::technology::{Location, ResearchState, TechState};
-use genie_core::world::AiSettings;
-use genie_core::world::AiSwitches;
-use genie_core::world::Seconds;
-use genie_core::world::WholeSeconds;
-use genie_core::world::WorldTime;
-use genie_core::world::{LureDestination, Percent, TargetingMode, VillagerGarrison};
+use crate::GenieError;
+use crate::map::Distance;
+use crate::map::GridSize;
+use crate::map::Tile;
+use crate::map::WholeDistance;
+use crate::movement::explore::InfluenceMap;
+use crate::objects::masters::CostAmount;
+use crate::objects::masters::MasterId;
+use crate::players::ai_module::AiModule;
+use crate::players::attribute::AttributeId;
+use crate::players::history::HistoryEntry;
+use crate::players::history::HistoryUpdates;
+use crate::players::history::Population;
+use crate::players::history::Share;
+use crate::players::history::Tally;
+use crate::players::history::TimeSlice;
+use crate::players::history::{Event, EventKind, History};
+use crate::production::LocationButton;
+use crate::technology::CostOverride;
+use crate::technology::EffectId;
+use crate::technology::OverrideUse;
+use crate::technology::ResearchCap;
+use crate::technology::ResearchCount;
+use crate::technology::{Location, ResearchState, TechState};
+use crate::world::AiSettings;
+use crate::world::AiSwitches;
+use crate::world::Seconds;
+use crate::world::WholeSeconds;
+use crate::world::WorldTime;
+use crate::world::{LureDestination, Percent, TargetingMode, VillagerGarrison};
 use genie_save::generated::world::TechPlayerTree;
 use genie_save::generated::world::{History as WorldHistory, TribeMainDecisionAi, WorldPlayerBase};
 
 /// A player's AI settings as saved (`WorldPlayerBase::save`, `FUN_14166b820`), which GAME's
 /// sub-command 0xb sets.
-pub(super) fn ai_settings(b: &WorldPlayerBase) -> AiSettings {
+#[must_use]
+pub fn ai_settings(b: &WorldPlayerBase) -> AiSettings {
     AiSettings {
         easiest_reaction_percentage: Percent::new(b.easiest_reaction_percentage),
         easier_reaction_percentage: Percent::new(b.easier_reaction_percentage),
@@ -141,10 +143,11 @@ pub fn history(h: &WorldHistory) -> History {
 }
 
 /// A player's AI module as saved: the parts the simulation reads
-/// ([`genie_core::players::ai_module`]). The explorer and its search points are not saved; the
+/// ([`crate::players::ai_module`]). The explorer and its search points are not saved; the
 /// load makes them none and empty.
+#[must_use]
 pub fn ai_module(m: &TribeMainDecisionAi) -> AiModule {
-    use genie_core::players::ai_module::{AiModule, InfoModule, TacticalModule};
+    use crate::players::ai_module::{AiModule, InfoModule, TacticalModule};
     let info = &m.tribe_information_ai_module;
     let grid = &info.tribe_information_ai_module;
     let width = grid.xsize_value.max(0) as usize;
@@ -180,7 +183,7 @@ pub fn ai_module(m: &TribeMainDecisionAi) -> AiModule {
 /// # Errors
 ///
 /// A saved state that names none.
-pub(crate) fn tech_state(t: &TechPlayerTree) -> Result<TechState, GenieError> {
+pub fn tech_state(t: &TechPlayerTree) -> Result<TechState, GenieError> {
     let o = |j: usize| {
         t.cost_override
             .get(j)
