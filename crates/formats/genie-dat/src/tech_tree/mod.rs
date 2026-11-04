@@ -1,13 +1,13 @@
 //! Types related to the tech tree data.
 
 use crate::civ::CivilizationId;
-use crate::conv::invalid_data;
+use crate::conv::fits;
 use crate::unit_kind::UnitKindId;
 use arrayvec::ArrayVec;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
+use genie_error::{GenieResult, invalid_input};
 use genie_support::TechId;
-use std::convert::TryInto;
-use std::io::{Read, Result, Write};
+use std::io::{Read, Write};
 
 mod nodes;
 
@@ -187,7 +187,7 @@ impl TechTree {
     ///
     /// Also fails if an age node has more than 10 building levels or is not of type
     /// [`TechTreeKind::Age`].
-    pub fn read_from(mut input: impl Read) -> Result<Self> {
+    pub fn read_from(mut input: impl Read) -> GenieResult<Self> {
         let num_ages = input.read_u8()?;
         let num_buildings = input.read_u8()?;
         let num_units = input.read_u8()?;
@@ -230,7 +230,7 @@ impl TechTree {
     /// Returns an error if writing to `output` fails.
     // The format stores the node counts as u8 (truncated, as before).
     #[allow(clippy::cast_possible_truncation)]
-    pub fn write_to(&self, mut output: impl Write) -> Result<()> {
+    pub fn write_to(&self, mut output: impl Write) -> GenieResult<()> {
         output.write_u8(self.ages.len() as u8)?;
         output.write_u8(self.buildings.len() as u8)?;
         output.write_u8(self.units.len() as u8)?;
@@ -260,7 +260,7 @@ impl TechTreeDependencies {
     /// # Errors
     ///
     /// Returns an error if reading from `input` fails, or if a value is not valid for its field.
-    pub fn read_from<R: Read>(input: &mut R) -> Result<Self> {
+    pub fn read_from<R: Read>(input: &mut R) -> GenieResult<Self> {
         let mut deps = Self::default();
         let num = input.read_u8()?;
         let _padding = input.read_u8()?;
@@ -279,15 +279,9 @@ impl TechTreeDependencies {
         for (&id, &ty) in ids.iter().zip(kinds.iter()).take(num as usize) {
             deps.0.push(match TechTreeDependencyKind::from(ty) {
                 TechTreeDependencyKind::Age => TechTreeDependency::Age(id),
-                TechTreeDependencyKind::Building => {
-                    TechTreeDependency::Building(id.try_into().map_err(invalid_data)?)
-                }
-                TechTreeDependencyKind::Unit => {
-                    TechTreeDependency::Unit(id.try_into().map_err(invalid_data)?)
-                }
-                TechTreeDependencyKind::Research => {
-                    TechTreeDependency::Research(id.try_into().map_err(invalid_data)?)
-                }
+                TechTreeDependencyKind::Building => TechTreeDependency::Building(fits(id)?),
+                TechTreeDependencyKind::Unit => TechTreeDependency::Unit(fits(id)?),
+                TechTreeDependencyKind::Research => TechTreeDependency::Research(fits(id)?),
                 TechTreeDependencyKind::Other(kind) => TechTreeDependency::Other { kind, id },
             });
         }
@@ -304,9 +298,9 @@ impl TechTreeDependencies {
     /// Also fails if there are more than 10 prerequisites, which the list's capacity rules out.
     // At most 10 (checked), so the count fits the format's u8.
     #[allow(clippy::cast_possible_truncation)]
-    pub fn write_to<W: Write>(&self, output: &mut W) -> Result<()> {
+    pub fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         if 10 < self.len() {
-            return Err(invalid_data("more than 10 prerequisites"));
+            return Err(invalid_input("more than 10 prerequisites"));
         }
         output.write_u8(self.len() as u8)?;
         output.write_all(&[0, 0, 0])?;

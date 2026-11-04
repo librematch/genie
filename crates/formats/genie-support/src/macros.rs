@@ -38,7 +38,7 @@ macro_rules! infallible_try_into {
 /// use genie_support::fallible_try_into;
 /// use std::convert::{TryFrom, TryInto};
 /// struct Container(u16);
-/// # fn main() -> Result<(), std::num::TryFromIntError> {
+/// # fn main() -> genie_error::GenieResult<()> {
 /// fallible_try_into!(Container, i16);
 /// let num: i16 = Container(12).try_into()?;
 /// assert_eq!(num, 12i16);
@@ -49,11 +49,14 @@ macro_rules! infallible_try_into {
 macro_rules! fallible_try_into {
     ($from:ident, $to:ty) => {
         impl ::std::convert::TryFrom<$from> for $to {
-            type Error = ::std::num::TryFromIntError;
+            type Error = ::genie_error::GenieError;
             #[inline]
-            fn try_from(n: $from) -> ::std::result::Result<Self, Self::Error> {
+            fn try_from(n: $from) -> ::genie_error::GenieResult<Self> {
                 use ::std::convert::TryInto;
-                n.0.try_into()
+                n.0.try_into().map_err(|_| {
+                    ::genie_error::GenieError::invalid_input("an id that does not fit the integer")
+                        .with("id", n.0)
+                })
             }
         }
     };
@@ -70,7 +73,7 @@ macro_rules! fallible_try_into {
 /// use std::convert::{TryFrom, TryInto};
 /// #[derive(Debug, PartialEq, Eq)]
 /// struct Container(u16);
-/// # fn main() -> Result<(), std::num::TryFromIntError> {
+/// # fn main() -> genie_error::GenieResult<()> {
 /// fallible_try_from!(Container, i16);
 /// assert_eq!(Container::try_from(1i16)?, Container(1));
 /// assert!(Container::try_from(-1i16).is_err());
@@ -80,11 +83,14 @@ macro_rules! fallible_try_into {
 macro_rules! fallible_try_from {
     ($to:ty, $from:ident) => {
         impl ::std::convert::TryFrom<$from> for $to {
-            type Error = ::std::num::TryFromIntError;
+            type Error = ::genie_error::GenieError;
             #[inline]
-            fn try_from(n: $from) -> ::std::result::Result<Self, Self::Error> {
+            fn try_from(n: $from) -> ::genie_error::GenieResult<Self> {
                 use ::std::convert::TryInto;
-                n.try_into().map(Self)
+                n.try_into().map(Self).map_err(|_| {
+                    ::genie_error::GenieError::invalid_input("an id that does not fit the integer")
+                        .with("id", n)
+                })
             }
         }
     };

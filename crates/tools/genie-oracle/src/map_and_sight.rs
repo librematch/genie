@@ -2,7 +2,8 @@
 //! replay's saved step, the visible maps and resources.
 
 use crate::masters::MasterTable;
-use crate::{Error, game_state, header_objects, saved_ghosts};
+use crate::{game_state, header_objects, saved_ghosts};
+use genie_core::GenieResult;
 use genie_core::map::terrain::Terrain;
 use genie_core::map::terrain::TileTerrain;
 use genie_core::players::PlayerId;
@@ -16,7 +17,7 @@ use genie_rec::de::chapters;
 use genie_save::Header;
 
 /// The differences between the slice's map terrain and a save's, tile by tile.
-pub fn terrain_differences(slice: &Terrain, save: &[u8]) -> Result<Vec<String>, Error> {
+pub fn terrain_differences(slice: &Terrain, save: &[u8]) -> GenieResult<Vec<String>> {
     let chapter = chapters(save)?[0];
     Ok(header_terrain_differences(slice, &chapter.header()?))
 }
@@ -83,7 +84,7 @@ pub(super) struct SavedStep {
 }
 
 impl SavedStep {
-    pub(super) fn of(save: &[u8], masters: Option<&MasterTable>) -> Result<Self, Error> {
+    pub(super) fn of(save: &[u8], masters: Option<&MasterTable>) -> GenieResult<Self> {
         let chapter = chapters(save)?[0];
         let header = chapter.header()?;
         let objects = (0..header.players().len() as u32)
@@ -96,9 +97,8 @@ impl SavedStep {
                 .players()
                 .iter()
                 .map(saved_ghosts)
-                .collect::<Result<_, _>>()
-                .map_err(Error::Unmodelled)?,
-            seen: saved_sight(&header).map_err(Error::Unmodelled)?,
+                .collect::<Result<_, _>>()?,
+            seen: saved_sight(&header)?,
             width,
             terrain,
             game: game_state(&header, masters)?,
@@ -107,10 +107,10 @@ impl SavedStep {
 }
 
 /// The players' visible maps and the unified map of a save, as [`Visibility`] holds them.
-pub fn saved_visibility(save: &[u8]) -> Result<Visibility, Error> {
+pub fn saved_visibility(save: &[u8]) -> GenieResult<Visibility> {
     let chapter = chapters(save)?[0];
     let header = chapter.header()?;
-    saved_sight(&header).map_err(Error::Unmodelled)
+    saved_sight(&header)
 }
 
 /// Where player `player`'s sight in `slice` differs from `game`'s: its explored count, each tile's

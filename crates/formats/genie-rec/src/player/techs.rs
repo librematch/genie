@@ -1,9 +1,9 @@
 //! The technologies' states, and `UserPatch`'s extra player data.
 
-use crate::Result;
 use crate::element::ReadableHeaderElement;
 use crate::reader::RecordingHeaderReader;
 use byteorder::{LE, ReadBytesExt};
+use genie_error::GenieResult;
 use genie_support::read_list;
 use std::io::Read;
 
@@ -21,7 +21,7 @@ pub struct TechState {
 }
 
 impl ReadableHeaderElement for TechState {
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         Ok(Self {
             progress: input.read_f32::<LE>()?,
             state: input.read_i16::<LE>()?,
@@ -43,7 +43,7 @@ pub struct PlayerTech {
 }
 
 impl ReadableHeaderElement for PlayerTech {
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let num_techs = input.read_u16::<LE>()?;
         let tech_states = read_list(usize::from(num_techs), || TechState::read_from(input))?;
         Ok(Self { tech_states })
@@ -55,7 +55,7 @@ impl ReadableHeaderElement for PlayerTech {
 pub struct UserPatchData {}
 
 impl ReadableHeaderElement for UserPatchData {
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         {
             let mut bytes = vec![0; 4080];
             input.read_exact(&mut bytes)?;

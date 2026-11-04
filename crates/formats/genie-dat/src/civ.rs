@@ -1,13 +1,14 @@
 //! Types related to civilizations.
 
 use crate::GameVersion;
-use crate::conv::{fits, invalid_data};
+use crate::conv::fits;
 use crate::unit_kind::{UnitKind, UnitKindId};
 use arrayvec::ArrayString;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
 use encoding_rs::WINDOWS_1252;
+use genie_error::{GenieResult, invalid_input};
 use genie_support::{fallible_try_from, infallible_try_into, read_le, read_opt_u16};
-use std::io::{Read, Result, Write};
+use std::io::{Read, Write};
 
 /// An ID identifying a civilization
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -81,13 +82,13 @@ impl Civilization {
     /// Returns an error if reading from `input` fails.
     ///
     /// Also fails if the name, decoded from WINDOWS-1252, takes more than 20 bytes as UTF-8.
-    pub fn read_from(mut input: impl Read, version: GameVersion) -> Result<Self> {
+    pub fn read_from(mut input: impl Read, version: GameVersion) -> GenieResult<Self> {
         let mut civ = Self::default();
         let mut bytes = [0; 20];
         input.read_exact(&mut bytes)?;
         let bytes = &bytes[..bytes.iter().position(|&c| c == 0).unwrap_or(bytes.len())];
         let (name, _encoding, _failed) = WINDOWS_1252.decode(bytes);
-        civ.name = CivName::from(&name).map_err(|_| invalid_data(NAME_TOO_LONG))?;
+        civ.name = CivName::from(&name).map_err(|_| invalid_input(NAME_TOO_LONG))?;
         let num_attributes = input.read_u16::<LE>()?;
         civ.civ_effect = input.read_u16::<LE>()?;
         civ.bonus_effect = read_opt_u16(&mut input)?;
@@ -123,7 +124,7 @@ impl Civilization {
     /// Returns an error if writing to `output` fails.
     ///
     /// Also fails if there are more than `u16::MAX` attributes or unit types.
-    pub fn write_to(&self, mut output: impl Write, version: GameVersion) -> Result<()> {
+    pub fn write_to(&self, mut output: impl Write, version: GameVersion) -> GenieResult<()> {
         let mut name = [0; 20];
         (name[..self.name.len()]).copy_from_slice(self.name.as_bytes());
         output.write_all(&name)?;

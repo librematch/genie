@@ -1,9 +1,10 @@
 use crate::FileVersion;
-use crate::conv::{fits, invalid_data};
+use crate::conv::fits;
 use arrayvec::ArrayString;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
+use genie_error::{GenieResult, invalid_input};
 use genie_support::{fallible_try_from, fallible_try_into, infallible_try_into};
-use std::io::{Read, Result, Write};
+use std::io::{Read, Write};
 
 /// An ID identifying a sound.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -70,7 +71,7 @@ impl SoundItem {
     /// # Errors
     ///
     /// Returns an error if reading from `input` fails.
-    pub fn read_from<R: Read>(input: &mut R, _version: FileVersion) -> Result<Self> {
+    pub fn read_from<R: Read>(input: &mut R, _version: FileVersion) -> GenieResult<Self> {
         let mut item = Self::default();
         // TODO actually use this
         let mut filename = [0u8; 13];
@@ -91,13 +92,13 @@ impl SoundItem {
     /// Returns an error if writing to `output` fails.
     ///
     /// Also fails if `civilization` or `icon_set` is `None`: the format always stores both.
-    pub fn write_to<W: Write>(&self, output: &mut W, _version: FileVersion) -> Result<()> {
+    pub fn write_to<W: Write>(&self, output: &mut W, _version: FileVersion) -> GenieResult<()> {
         output.write_all(&[0; 13])?;
         output.write_i32::<LE>(self.resource_id)?;
         output.write_i16::<LE>(self.probability)?;
         // AoK only, must both be set
         let (Some(civilization), Some(icon_set)) = (self.civilization, self.icon_set) else {
-            return Err(invalid_data(
+            return Err(invalid_input(
                 "a sound item without its civilization or icon set",
             ));
         };
@@ -113,7 +114,7 @@ impl Sound {
     /// # Errors
     ///
     /// Returns an error if reading from `input` fails.
-    pub fn read_from<R: Read>(input: &mut R, version: FileVersion) -> Result<Self> {
+    pub fn read_from<R: Read>(input: &mut R, version: FileVersion) -> GenieResult<Self> {
         let mut sound = Self {
             id: input.read_u16::<LE>()?.into(),
             play_delay: input.read_i16::<LE>()?,
@@ -138,7 +139,7 @@ impl Sound {
     ///
     /// Also fails if there are more than `u16::MAX` sound files, or if a sound file lacks its
     /// `civilization` or `icon_set` (see [`SoundItem::write_to`]).
-    pub fn write_to<W: Write>(&self, output: &mut W, version: FileVersion) -> Result<()> {
+    pub fn write_to<W: Write>(&self, output: &mut W, version: FileVersion) -> GenieResult<()> {
         output.write_u16::<LE>(self.id.into())?;
         output.write_i16::<LE>(self.play_delay)?;
         output.write_u16::<LE>(fits(self.len())?)?;

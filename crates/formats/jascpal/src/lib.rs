@@ -14,7 +14,7 @@
 //!
 //! ## Example
 //! ```rust
-//! # fn main() -> Result<(), jascpal::ReadPaletteError> {
+//! # fn main() -> Result<(), genie_error::GenieError> {
 //! use std::io::Cursor;
 //! use jascpal::{Palette, PaletteIndex, Color};
 //! let cursor = Cursor::new(b"JASC-PAL\r\n0100\r\n2\r\n0 0 0\r\n255 255 255\r\n".to_vec());
@@ -38,6 +38,7 @@
 #![deny(unsafe_code)]
 #![warn(unused)]
 
+use genie_error::{GenieError, GenieResult};
 use nom::Err as NomErr;
 use nom::IResult;
 use nom::bytes::complete::tag;
@@ -49,10 +50,7 @@ use rgb::RGB;
 use std::convert::{TryFrom, TryInto};
 
 use std::fmt::{Display, Error as FmtError, Formatter};
-use std::io::Error as IoError;
 use std::io::{Read, Write};
-use std::num::ParseIntError;
-use std::num::TryFromIntError;
 use std::ops::{Index, IndexMut};
 use std::slice::Iter;
 use std::str::{self, FromStr};
@@ -79,10 +77,14 @@ impl From<u8> for PaletteIndex {
 }
 
 impl TryFrom<i32> for PaletteIndex {
-    type Error = TryFromIntError;
+    type Error = GenieError;
     #[inline]
-    fn try_from(n: i32) -> Result<Self, Self::Error> {
-        n.try_into().map(Self)
+    fn try_from(n: i32) -> GenieResult<Self> {
+        n.try_into().map(Self).map_err(|e| {
+            GenieError::invalid_input("a palette index past a byte")
+                .with("index", n)
+                .with_source(e)
+        })
     }
 }
 
@@ -108,10 +110,12 @@ impl From<PaletteIndex> for usize {
 }
 
 impl FromStr for PaletteIndex {
-    type Err = ParseIntError;
+    type Err = GenieError;
     #[inline]
-    fn from_str(input: &str) -> Result<Self, Self::Err> {
-        input.parse().map(Self)
+    fn from_str(input: &str) -> GenieResult<Self> {
+        input.parse().map(Self).map_err(|e| {
+            GenieError::invalid_input("a palette index that is not a byte").with_source(e)
+        })
     }
 }
 
@@ -174,16 +178,8 @@ fn parse(input: &[u8]) -> IResult<&[u8], Vec<Color>> {
     Ok((input, colors))
 }
 
-/// An error occurred during reading.
-#[derive(Debug, thiserror::Error)]
-pub enum ReadPaletteError {
-    /// An I/O error occurred.
-    #[error(transparent)]
-    IoError(#[from] IoError),
-    /// The palette could not be parsed.
-    #[error("parse error")]
-    ParseError,
-}
+/// A palette that does not parse.
+const BAD_PALETTE: GenieError = GenieError::invalid_input("a palette that does not parse");
 
 /// A Palette.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -219,14 +215,14 @@ impl Palette {
     ///
     /// # Errors
     ///
-    /// Returns [`ReadPaletteError::IoError`] if reading fails, and
-    /// [`ReadPaletteError::ParseError`] if the input is not a JASC palette.
+    /// An `Io` error if reading fails, and an `InvalidInput` one if the input is not a JASC
+    /// palette.
     #[inline]
-    pub fn read_from(mut input: impl Read) -> Result<Self, ReadPaletteError> {
+    pub fn read_from(mut input: impl Read) -> GenieResult<Self> {
         let mut buffer = vec![];
         // The byte count is `buffer.len()`.
         let _ = input.read_to_end(&mut buffer)?;
-        let (_remaining, pal) = parse(&buffer).map_err(|_| ReadPaletteError::ParseError)?;
+        let (_remaining, pal) = parse(&buffer).map_err(|_| BAD_PALETTE)?;
         Ok(Self::from(pal))
     }
 
@@ -236,8 +232,8 @@ impl Palette {
     ///
     /// Returns an error if writing to `output` fails.
     #[inline]
-    pub fn write_to(&self, mut output: impl Write) -> Result<(), IoError> {
-        write!(output, "{self}")
+    pub fn write_to(&self, mut output: impl Write) -> GenieResult<()> {
+        Ok(write!(output, "{self}")?)
     }
 
     /// Return the colours in a Vec so it can be manipulated.
@@ -316,10 +312,10 @@ impl IndexMut<PaletteIndex> for Palette {
 }
 
 impl FromStr for Palette {
-    type Err = ReadPaletteError;
+    type Err = GenieError;
     /// Parse a palette from a UTF-8 string.
     #[inline]
-    fn from_str(input: &str) -> Result<Self, Self::Err> {
+    fn from_str(input: &str) -> GenieResult<Self> {
         Self::read_from(input.as_bytes())
     }
 }
@@ -353,19 +349,6 @@ impl Display for Palette {
             write!(f, "{} {} {}\r\n", c.r, c.g, c.b)?;
         }
         Ok(())
-    }
-}
-
-impl From<ReadPaletteError> for genie_error::GenieError {
-    /// The error as a [`genie_error::GenieError`]: its kind and reason, the original as the
-    /// source.
-    #[track_caller]
-    fn from(e: ReadPaletteError) -> Self {
-        let to = match &e {
-            ReadPaletteError::IoError(_) => Self::io("a read or write that failed"),
-            ReadPaletteError::ParseError => Self::invalid_input("a palette that does not parse"),
-        };
-        to.with_source(e)
     }
 }
 
@@ -449,27 +432,5 @@ mod tests {
             pal.to_string(),
             "JASC-PAL\r\n0100\r\n2\r\n0 0 0\r\n255 255 255\r\n".to_string()
         );
-    }
-}
-
-#[cfg(test)]
-mod genie_error_tests {
-    use super::*;
-    #[cfg(test)]
-    use std::error::Error as StdError;
-
-    /// The errors convert into `GenieError`s with their kinds and reasons, the original as
-    /// source.
-    #[test]
-    fn palette_errors_convert_into_genie_errors() {
-        let e: genie_error::GenieError = ReadPaletteError::ParseError.into();
-        assert_eq!(
-            (e.kind(), e.reason()),
-            (
-                genie_error::ErrorKind::InvalidInput,
-                "a palette that does not parse"
-            )
-        );
-        assert!(StdError::source(&e).is_some());
     }
 }

@@ -1,9 +1,10 @@
 use super::ScxFormat;
-use crate::{Result, VersionBundle};
+use crate::VersionBundle;
+use genie_error::GenieResult;
 use std::fs::File;
 use std::io::{Cursor, ErrorKind, Read};
 
-fn save_and_load(format: &ScxFormat, as_version: VersionBundle) -> Result<ScxFormat> {
+fn save_and_load(format: &ScxFormat, as_version: VersionBundle) -> GenieResult<ScxFormat> {
     let mut out = vec![];
     format.write_to(&mut out, &as_version)?;
 
@@ -118,7 +119,7 @@ fn aoe1_ror_scx() {
 }
 
 #[test]
-fn aoe1_ror_to_aoc() -> Result<()> {
+fn aoe1_ror_to_aoc() -> GenieResult<()> {
     let mut f = File::open("test/scenarios/El advenimiento de los hunos_.scx")?;
     let format = ScxFormat::load_scenario(&mut f)?;
     assert_consumed(f);

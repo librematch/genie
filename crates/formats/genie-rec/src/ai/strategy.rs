@@ -1,11 +1,13 @@
 //! The diplomacy, emotional, resource, strategy and tactical AI modules.
 
+use crate::ObjectId;
 use crate::ai::read_id_list;
 use crate::element::{ReadableHeaderElement, WritableHeaderElement};
+use crate::errors::not_read;
 use crate::reader::RecordingHeaderReader;
 use crate::unit::Waypoint;
-use crate::{ObjectId, Result};
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
+use genie_error::GenieResult;
 use genie_support::ReadStringsExt;
 use std::io::{Read, Write};
 
@@ -21,7 +23,7 @@ pub struct DiplomacyAi {
 }
 
 impl ReadableHeaderElement for DiplomacyAi {
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let mut ai = Self::default();
         for i in 0..10 {
             ai.dislike[i] = input.read_u32::<LE>()?;
@@ -40,7 +42,7 @@ pub struct EmotionalAi {
 }
 
 impl ReadableHeaderElement for EmotionalAi {
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let mut ai = Self::default();
         input.read_u32_into::<LE>(&mut ai.state)?;
         Ok(ai)
@@ -55,14 +57,14 @@ pub struct ResourceAi {
 }
 
 impl ReadableHeaderElement for ResourceAi {
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let num_resources = input.read_u32::<LE>()?;
         Ok(Self { num_resources })
     }
 }
 
 impl WritableHeaderElement for ResourceAi {
-    fn write_to<W: Write>(&self, output: &mut W) -> Result<()> {
+    fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         output.write_u32::<LE>(self.num_resources)?;
         Ok(())
     }
@@ -102,7 +104,7 @@ pub struct StrategyAi {
 }
 
 impl ReadableHeaderElement for StrategyAi {
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         Ok(Self {
             current_victory_condition: input.read_u32::<LE>()?,
             target_id: input.read_u32::<LE>()?,
@@ -177,7 +179,7 @@ pub struct TacticalAi {
 }
 
 impl ReadableHeaderElement for TacticalAi {
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let mut ai = Self {
             civilians: read_id_list(input)?,
             civilian_explorers: read_id_list(input)?,
@@ -199,6 +201,6 @@ impl ReadableHeaderElement for TacticalAi {
         ai.artifacts = read_id_list(input)?;
         ai.trade_carts = read_id_list(input)?;
 
-        Err(crate::Error::NotRead("the rest of the strategy AI"))
+        Err(not_read("the rest of the strategy AI"))
     }
 }

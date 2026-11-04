@@ -1,7 +1,7 @@
-use crate::Result;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
+use genie_error::{GenieError, GenieResult};
 use genie_support::read_opt_u16;
-use std::io::{self, Read, Write};
+use std::io::{Read, Write};
 
 /// A map tile.
 #[derive(Debug, Default, Clone, Copy)]
@@ -24,7 +24,7 @@ impl Tile {
     /// # Errors
     ///
     /// Returns an error if reading fails.
-    pub fn read_from(mut input: impl Read, version: u32) -> Result<Self> {
+    pub fn read_from(mut input: impl Read, version: u32) -> GenieResult<Self> {
         let mut tile = Self {
             terrain: input.read_u8()?,
             layered_terrain: None,
@@ -44,7 +44,7 @@ impl Tile {
     /// # Errors
     ///
     /// Returns an error if writing fails.
-    pub fn write_to(&self, mut output: impl Write, version: u32) -> Result<()> {
+    pub fn write_to(&self, mut output: impl Write, version: u32) -> GenieResult<()> {
         output.write_u8(self.terrain)?;
         output.write_i8(self.elevation)?;
         output.write_i8(self.zone)?;
@@ -99,7 +99,7 @@ impl Map {
     ///
     /// Returns an error if reading fails, or if the map is wider or taller than 500 tiles (most
     /// likely a misread).
-    pub fn read_from(mut input: impl Read) -> Result<Self> {
+    pub fn read_from(mut input: impl Read) -> GenieResult<Self> {
         let mut map = match input.read_u32::<LE>()? {
             0xDEAD_F00D => {
                 let version = input.read_u32::<LE>()?;
@@ -138,11 +138,11 @@ impl Map {
         log::debug!("Map size: {}×{}", map.width, map.height);
 
         if map.width > 500 || map.height > 500 {
-            return Err(io::Error::other(format!(
-                "Unexpected map size {}×{}, this is likely a genie-scx bug.",
-                map.width, map.height
-            ))
-            .into());
+            return Err(
+                GenieError::invalid_input("a map larger than 500 tiles a side")
+                    .with("width", map.width)
+                    .with("height", map.height),
+            );
         }
 
         map.tiles.reserve((map.width * map.height) as usize);
@@ -164,7 +164,7 @@ impl Map {
     /// # Panics
     ///
     /// Panics if the number of tiles is not width × height.
-    pub fn write_to(&self, mut output: impl Write, version: u32) -> Result<()> {
+    pub fn write_to(&self, mut output: impl Write, version: u32) -> GenieResult<()> {
         if version != 0 {
             output.write_u32::<LE>(0xDEAD_F00D)?;
             output.write_u32::<LE>(version)?;

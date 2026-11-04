@@ -1,11 +1,13 @@
 //! A group of hotkeys ([`HotkeyGroup`]): read, written, bound and unbound.
 
-use crate::{Hotkey, HotkeyIndexError};
+use crate::Hotkey;
+use crate::errors::no_hotkey;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
+use genie_error::GenieResult;
 use genie_lang::{LangFile, StringKey};
 use genie_support::read_list;
 use std::io::{Read, Write};
-use std::{fmt, io, slice, vec};
+use std::{fmt, slice, vec};
 
 /// Represents a group of `Hotkey`s.
 ///
@@ -19,7 +21,7 @@ pub struct HotkeyGroup {
 
 impl HotkeyGroup {
     /// Reads a hotkey group from an input stream.
-    pub(crate) fn read_from<R: Read>(input: &mut R) -> io::Result<Self> {
+    pub(crate) fn read_from<R: Read>(input: &mut R) -> GenieResult<Self> {
         let num_hotkeys = input.read_u32::<LE>()?;
         let hotkeys = read_list(num_hotkeys as usize, || Hotkey::read_from(input))?;
 
@@ -29,7 +31,7 @@ impl HotkeyGroup {
     /// Writes a hotkey group to an output stream.
     // The format stores the hotkey count as a u32.
     #[allow(clippy::cast_possible_truncation)]
-    pub(crate) fn write_to<W: Write>(&self, output: &mut W) -> io::Result<()> {
+    pub(crate) fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         output.write_u32::<LE>(self.hotkeys.len() as u32)?;
         for hotkey in &self.hotkeys {
             hotkey.write_to(output)?;
@@ -56,8 +58,8 @@ impl HotkeyGroup {
     ///
     /// # Errors
     ///
-    /// Returns a `HotkeyIndexError` if the group has no hotkey at `index`.
-    pub fn unbind(&self, index: usize) -> Result<Self, HotkeyIndexError> {
+    /// An `InvalidInput` error if the group has no hotkey at `index`.
+    pub fn unbind(&self, index: usize) -> GenieResult<Self> {
         self.bind(index, 0, false, false, false)
     }
 
@@ -66,7 +68,7 @@ impl HotkeyGroup {
     ///
     /// # Errors
     ///
-    /// Returns a `HotkeyIndexError` if the group has no hotkey at `index`.
+    /// An `InvalidInput` error if the group has no hotkey at `index`.
     pub fn bind(
         &self,
         index: usize,
@@ -74,9 +76,9 @@ impl HotkeyGroup {
         ctrl: bool,
         alt: bool,
         shift: bool,
-    ) -> Result<Self, HotkeyIndexError> {
+    ) -> GenieResult<Self> {
         if index >= self.num_hotkeys() {
-            return Err(HotkeyIndexError::new(index, self.num_hotkeys()));
+            return Err(no_hotkey(index, self.num_hotkeys()));
         }
         let hotkeys = self
             .hotkeys

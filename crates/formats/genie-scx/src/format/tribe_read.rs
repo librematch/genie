@@ -1,13 +1,13 @@
 //! The embeddable scenario data ([`TribeScen`]) and its reader.
 
-use crate::Result;
 use crate::format::RgeScen;
 use crate::player::PlayerStartResources;
 use crate::values::{DiplomaticStance, StartingAge};
 use crate::victory::{LegacyVictoryInfo, VictoryInfo};
 use byteorder::{LE, ReadBytesExt};
+use genie_error::{GenieError, GenieResult};
 use genie_support::{ReadStringsExt, f32_eq, read_le};
-use std::io::{self, Read};
+use std::io::Read;
 
 /// Embeddable scenario data. This includes all scenario settings, but not map data, triggers, and
 /// placed objects.
@@ -105,7 +105,7 @@ impl TribeScen {
     /// # Errors
     ///
     /// Returns an error if reading fails, or if a string cannot be decoded.
-    pub fn read_from(mut input: impl Read) -> Result<Self> {
+    pub fn read_from(mut input: impl Read) -> GenieResult<Self> {
         let mut base = RgeScen::read_from(&mut input)?;
         let version = base.version;
         let player_start_resources = read_players(&mut input, &mut base)?;
@@ -169,7 +169,7 @@ impl TribeScen {
 }
 
 /// The separator -99 the versions from 1.02 on put between sections.
-pub(super) fn read_separator(mut input: impl Read, version: f32) -> Result<()> {
+pub(super) fn read_separator(mut input: impl Read, version: f32) -> GenieResult<()> {
     if version >= 1.02 {
         let sep = input.read_i32::<LE>()?;
         debug_assert_eq!(sep, -99);
@@ -179,7 +179,10 @@ pub(super) fn read_separator(mut input: impl Read, version: f32) -> Result<()> {
 
 /// The players' starting resources; up to 1.13 (before the base held them) each player's name,
 /// then its activity, resources, type, civilization and posture, into `base`.
-fn read_players(mut input: impl Read, base: &mut RgeScen) -> Result<Vec<PlayerStartResources>> {
+fn read_players(
+    mut input: impl Read,
+    base: &mut RgeScen,
+) -> GenieResult<Vec<PlayerStartResources>> {
     let version = base.version;
     let mut player_start_resources = vec![PlayerStartResources::default(); 16];
     // Moved to RGEScen in 1.13
@@ -207,7 +210,7 @@ fn read_players(mut input: impl Read, base: &mut RgeScen) -> Result<Vec<PlayerSt
 }
 
 /// The multiplayer victory's type, score and time from 1.13 on; before, 4, 900 and 9000.
-fn read_mp_victory(mut input: impl Read, version: f32) -> Result<(i32, i32, i32)> {
+fn read_mp_victory(mut input: impl Read, version: f32) -> GenieResult<(i32, i32, i32)> {
     if version >= 1.13 {
         Ok((
             input.read_i32::<LE>()?,
@@ -220,7 +223,7 @@ fn read_mp_victory(mut input: impl Read, version: f32) -> Result<(i32, i32, i32)
 }
 
 /// Each player's stance toward each player, 16 by 16.
-fn read_diplomacy(mut input: impl Read) -> Result<Vec<Vec<DiplomaticStance>>> {
+fn read_diplomacy(mut input: impl Read) -> GenieResult<Vec<Vec<DiplomaticStance>>> {
     let mut diplomacy = vec![vec![DiplomaticStance::Neutral; 16]; 16];
     for player_diplomacy in &mut diplomacy {
         for stance in player_diplomacy.iter_mut() {
@@ -231,7 +234,7 @@ fn read_diplomacy(mut input: impl Read) -> Result<Vec<Vec<DiplomaticStance>>> {
 }
 
 /// Each player's 12 legacy victory entries.
-fn read_legacy_victory_info(mut input: impl Read) -> Result<Vec<Vec<LegacyVictoryInfo>>> {
+fn read_legacy_victory_info(mut input: impl Read) -> GenieResult<Vec<Vec<LegacyVictoryInfo>>> {
     let mut legacy_victory_info = vec![vec![LegacyVictoryInfo::default(); 12]; 16];
     for list in &mut legacy_victory_info {
         for victory_info in list.iter_mut() {
@@ -243,7 +246,7 @@ fn read_legacy_victory_info(mut input: impl Read) -> Result<Vec<Vec<LegacyVictor
 
 /// The teams' settings: locked, changeable, random start locations and the most teams from
 /// 1.24 on; 1.23 stores only the lock; before, unlocked, changeable, random and 4.
-fn read_teams(mut input: impl Read, version: f32) -> Result<(bool, bool, bool, u8)> {
+fn read_teams(mut input: impl Read, version: f32) -> GenieResult<(bool, bool, bool, u8)> {
     if version >= 1.24 {
         Ok((
             input.read_i8()? != 0,
@@ -259,7 +262,7 @@ fn read_teams(mut input: impl Read, version: f32) -> Result<(bool, bool, bool, u
 }
 
 /// The combat mode after 1.04, the naval mode and "All Techs" from 1.12 on; else 0, 0, off.
-fn read_modes(mut input: impl Read, version: f32) -> Result<(i32, i32, bool)> {
+fn read_modes(mut input: impl Read, version: f32) -> GenieResult<(i32, i32, bool)> {
     let combat_mode = if version > 1.04 {
         input.read_i32::<LE>()?
     } else {
@@ -274,7 +277,7 @@ fn read_modes(mut input: impl Read, version: f32) -> Result<(i32, i32, bool)> {
 }
 
 /// Each player's starting age after 1.05; before, the game's default.
-fn read_start_ages(mut input: impl Read, version: f32) -> Result<Vec<StartingAge>> {
+fn read_start_ages(mut input: impl Read, version: f32) -> GenieResult<Vec<StartingAge>> {
     let mut player_start_ages = vec![StartingAge::Default; 16];
     if version > 1.05 {
         for start_age in &mut player_start_ages {
@@ -285,7 +288,7 @@ fn read_start_ages(mut input: impl Read, version: f32) -> Result<Vec<StartingAge
 }
 
 /// The initial view from 1.19 on; (-1, -1) before.
-fn read_view(mut input: impl Read, version: f32) -> Result<(i32, i32)> {
+fn read_view(mut input: impl Read, version: f32) -> GenieResult<(i32, i32)> {
     if version >= 1.19 {
         Ok((input.read_i32::<LE>()?, input.read_i32::<LE>()?))
     } else {
@@ -294,7 +297,7 @@ fn read_view(mut input: impl Read, version: f32) -> Result<(i32, i32)> {
 }
 
 /// The map type from 1.21 on, -1 and -2 none.
-fn read_map_kind(mut input: impl Read, version: f32) -> Result<Option<i32>> {
+fn read_map_kind(mut input: impl Read, version: f32) -> GenieResult<Option<i32>> {
     if version >= 1.21 {
         match input.read_i32::<LE>()? {
             // HD Edition uses -2 instead of -1?
@@ -307,7 +310,7 @@ fn read_map_kind(mut input: impl Read, version: f32) -> Result<Option<i32>> {
 }
 
 /// The players' base priorities from 1.24 on; 0 before.
-fn read_base_priorities(mut input: impl Read, version: f32) -> Result<Vec<i8>> {
+fn read_base_priorities(mut input: impl Read, version: f32) -> GenieResult<Vec<i8>> {
     let mut base_priorities = vec![0; 16];
     if version >= 1.24 {
         input.read_i8_into(&mut base_priorities)?;
@@ -328,7 +331,7 @@ impl DeOptions {
     /// The options as `version` stores them: the water definition from 1.30 on, the colour
     /// mood from 1.32 on, collide-and-correct from 1.36 on and the villagers' force drop from
     /// 1.37 on.
-    fn read_from(mut input: impl Read, version: f32) -> Result<Self> {
+    fn read_from(mut input: impl Read, version: f32) -> GenieResult<Self> {
         let mut options = Self::default();
         if version >= 1.35 {
             // Duplicated here from TriggerSystem … we can discard it because the TriggerSystem
@@ -367,7 +370,7 @@ impl DisabledLists {
     /// The lists as `version` stores them: from 1.28 on each count and that many ids; from 1.18
     /// on the counts and 30 ids each (buildings 20 before 1.25); after 1.03 20 technologies
     /// without a count (guessed); before, none.
-    fn read_from(mut input: impl Read, version: f32) -> Result<Self> {
+    fn read_from(mut input: impl Read, version: f32) -> GenieResult<Self> {
         let mut lists = Self {
             num_techs: vec![0; 16],
             techs: vec![vec![]; 16],
@@ -402,12 +405,12 @@ impl DisabledLists {
 }
 
 /// The counts, then each list of its count's ids, read as they come.
-fn read_counted(mut input: impl Read, nums: &mut [i32], lists: &mut [Vec<i32>]) -> Result<()> {
+fn read_counted(mut input: impl Read, nums: &mut [i32], lists: &mut [Vec<i32>]) -> GenieResult<()> {
     input.read_i32_into::<LE>(nums)?;
     for (list, &num) in lists.iter_mut().zip(nums.iter()) {
         // the format stores the counts as i32, never negative in valid files
         let count = usize::try_from(num)
-            .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "a negative count of ids"))?;
+            .map_err(|_| GenieError::invalid_input("a negative count of ids").with("count", num))?;
         *list = read_le(&mut input, count, i32::from_le_bytes)?;
     }
     Ok(())
@@ -419,7 +422,7 @@ fn read_fixed(
     nums: &mut [i32],
     lists: &mut [Vec<i32>],
     size: usize,
-) -> Result<()> {
+) -> GenieResult<()> {
     input.read_i32_into::<LE>(nums)?;
     for list in lists {
         *list = read_le(&mut input, size, i32::from_le_bytes)?;
@@ -435,7 +438,7 @@ fn read_guessed_techs(
     mut input: impl Read,
     nums: &mut [i32],
     lists: &mut [Vec<i32>],
-) -> Result<()> {
+) -> GenieResult<()> {
     // Old scenarios only allowed disabling up to 20 techs per player.
     for (num, list) in nums.iter_mut().zip(lists.iter_mut()) {
         *list = vec![0; 20];

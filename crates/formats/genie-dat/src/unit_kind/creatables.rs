@@ -6,8 +6,9 @@ use crate::sprite::SpriteId;
 use crate::terrain::TerrainId;
 use arrayvec::ArrayVec;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
+use genie_error::GenieResult;
 use genie_support::{MapInto, TechId, UnitKindId, read_opt_u16, read_opt_u32};
-use std::io::{Read, Result, Write};
+use std::io::{Read, Write};
 
 /// Resource cost for a unit.
 #[derive(Debug, Default, Clone, Copy)]
@@ -28,7 +29,7 @@ impl AttributeCost {
     /// # Errors
     ///
     /// Returns an error if reading from `input` fails.
-    pub fn read_from(mut input: impl Read) -> Result<Self> {
+    pub fn read_from(mut input: impl Read) -> GenieResult<Self> {
         let cost = Self {
             attribute_kind: input.read_i16::<LE>()?,
             amount: input.read_i16::<LE>()?,
@@ -43,7 +44,7 @@ impl AttributeCost {
     /// # Errors
     ///
     /// Returns an error if writing to `output` fails.
-    pub fn write_to(self, mut output: impl Write) -> Result<()> {
+    pub fn write_to(self, mut output: impl Write) -> GenieResult<()> {
         output.write_i16::<LE>(self.attribute_kind)?;
         output.write_i16::<LE>(self.amount)?;
         output.write_u8(self.flag)?;
@@ -102,7 +103,7 @@ impl CombatUnitKindAttributes {
     /// Returns an error if reading from `input` fails, or if an ID is out of range.
     ///
     /// Also fails if the garrison sprite ID does not fit a [`SpriteId`].
-    pub fn read_from(mut input: impl Read, _version: f32) -> Result<Self> {
+    pub fn read_from(mut input: impl Read, _version: f32) -> GenieResult<Self> {
         let mut attrs = Self::default();
         for _ in 0..3 {
             let attr = AttributeCost::read_from(&mut input)?;
@@ -137,7 +138,7 @@ impl CombatUnitKindAttributes {
     /// # Errors
     ///
     /// Returns an error if writing to `output` fails.
-    pub fn write_to(&self, mut output: impl Write, _version: f32) -> Result<()> {
+    pub fn write_to(&self, mut output: impl Write, _version: f32) -> GenieResult<()> {
         for i in 0..3 {
             match self.costs.get(i) {
                 Some(cost) => cost.write_to(&mut output)?,
@@ -189,7 +190,7 @@ impl LinkedBuilding {
     /// # Errors
     ///
     /// Returns an error if reading from `input` fails.
-    pub fn read_from(mut input: impl Read) -> Result<Self> {
+    pub fn read_from(mut input: impl Read) -> GenieResult<Self> {
         Ok(Self {
             unit_id: input.read_u16::<LE>()?.into(),
             offset_x: input.read_f32::<LE>()?,
@@ -202,13 +203,13 @@ impl LinkedBuilding {
     /// # Errors
     ///
     /// Returns an error if writing to `output` fails.
-    pub fn write_to(&self, mut output: impl Write) -> Result<()> {
+    pub fn write_to(&self, mut output: impl Write) -> GenieResult<()> {
         output.write_u16::<LE>(self.unit_id.into())?;
         output.write_f32::<LE>(self.offset_x)?;
         output.write_f32::<LE>(self.offset_y)?;
         Ok(())
     }
-    pub(super) fn write_empty(mut output: impl Write) -> Result<()> {
+    pub(super) fn write_empty(mut output: impl Write) -> GenieResult<()> {
         output.write_u16::<LE>(0xFFFF)?;
         output.write_f32::<LE>(0.0)?;
         output.write_f32::<LE>(0.0)?;
@@ -270,7 +271,7 @@ impl BuildingUnitKindAttributes {
     /// # Errors
     ///
     /// Returns an error if reading from `input` fails, or if an ID is out of range.
-    pub fn read_from(mut input: impl Read, version: f32) -> Result<Self> {
+    pub fn read_from(mut input: impl Read, version: f32) -> GenieResult<Self> {
         let mut attrs = Self {
             construction_sprite: read_opt_u16(&mut input)?,
             snow_sprite: if version < 11.53 {
@@ -315,7 +316,7 @@ impl BuildingUnitKindAttributes {
     /// # Errors
     ///
     /// Returns an error if writing to `output` fails.
-    pub fn write_to(&self, mut output: impl Write, version: f32) -> Result<()> {
+    pub fn write_to(&self, mut output: impl Write, version: f32) -> GenieResult<()> {
         output.write_u16::<LE>(self.construction_sprite.map_into().unwrap_or(0xFFFF))?;
         if version >= 11.53 {
             output.write_u16::<LE>(self.snow_sprite.map_into().unwrap_or(0xFFFF))?;

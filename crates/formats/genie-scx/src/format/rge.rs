@@ -1,11 +1,11 @@
 //! The RGE part of the scenario data ([`RgeScen`]), read and written.
 
-use crate::Result;
 use crate::bitmap::Bitmap;
 use crate::format::tribe_read::read_separator;
 use crate::format::write_opt_string_key;
 use crate::player::{PlayerBaseProperties, PlayerFiles};
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
+use genie_error::GenieResult;
 use genie_support::{ReadStringsExt, StringKey, read_opt_u32, write_opt_str, write_str};
 use std::io::{Read, Write};
 
@@ -46,7 +46,7 @@ pub(crate) struct RgeScen {
 }
 
 impl RgeScen {
-    pub fn read_from(mut input: impl Read) -> Result<Self> {
+    pub fn read_from(mut input: impl Read) -> GenieResult<Self> {
         let version = input.read_f32::<LE>()?;
         log::debug!("RGEScen version {version}");
         let mut scen = Self {
@@ -67,7 +67,7 @@ impl RgeScen {
 
     /// The players' names after 1.13, string ids after 1.16 and base properties after 1.13;
     /// 16 of each, none or defaults before.
-    fn read_players(&mut self, mut input: impl Read) -> Result<()> {
+    fn read_players(&mut self, mut input: impl Read) -> GenieResult<()> {
         let version = self.version;
         self.player_names = vec![None; 16];
         if version > 1.13 {
@@ -95,7 +95,7 @@ impl RgeScen {
 
     /// The string ids of the description, hints, win and loss messages and history from 1.16
     /// on, of the scout from 1.22 on.
-    fn read_string_tables(&mut self, mut input: impl Read) -> Result<()> {
+    fn read_string_tables(&mut self, mut input: impl Read) -> GenieResult<()> {
         if self.version >= 1.16 {
             self.description_string_table = read_opt_u32(&mut input)?;
             self.hints_string_table = read_opt_u32(&mut input)?;
@@ -111,7 +111,7 @@ impl RgeScen {
 
     /// The description; the hints, win and loss messages and history from 1.11 on; the scout
     /// from 1.22 on.
-    fn read_texts(&mut self, mut input: impl Read) -> Result<()> {
+    fn read_texts(&mut self, mut input: impl Read) -> GenieResult<()> {
         self.description = input.read_u16_length_prefixed_str()?;
         if self.version >= 1.11 {
             self.hints = input.read_u16_length_prefixed_str()?;
@@ -127,7 +127,7 @@ impl RgeScen {
 
     /// The pregame, victory and loss cinematics, the mission bitmap's name from 1.09 on and the
     /// mission picture from 1.10 on (read past).
-    fn read_cinematics(&mut self, mut input: impl Read) -> Result<()> {
+    fn read_cinematics(&mut self, mut input: impl Read) -> GenieResult<()> {
         self.pregame_cinematic = input.read_u16_length_prefixed_str()?;
         self.victory_cinematic = input.read_u16_length_prefixed_str()?;
         self.loss_cinematic = input.read_u16_length_prefixed_str()?;
@@ -144,7 +144,7 @@ impl RgeScen {
     /// files and the AI rules types from 1.20 on.
     // The format stores the embedded file lengths as i32; valid files never make them negative.
     #[allow(clippy::cast_sign_loss)]
-    fn read_player_files(&mut self, mut input: impl Read) -> Result<()> {
+    fn read_player_files(&mut self, mut input: impl Read) -> GenieResult<()> {
         let version = self.version;
         self.player_build_lists = vec![None; 16];
         for build_list in &mut self.player_build_lists {
@@ -182,7 +182,7 @@ impl RgeScen {
         Ok(())
     }
 
-    pub fn write_to(&self, mut output: impl Write, version: f32) -> Result<()> {
+    pub fn write_to(&self, mut output: impl Write, version: f32) -> GenieResult<()> {
         output.write_f32::<LE>(version)?;
         self.write_players(&mut output, version)?;
         self.write_timeline(&mut output, version)?;
@@ -197,7 +197,7 @@ impl RgeScen {
 
     /// The players' names padded to 256 bytes after 1.13, string ids after 1.16 and base
     /// properties after 1.13.
-    fn write_players(&self, mut output: impl Write, version: f32) -> Result<()> {
+    fn write_players(&self, mut output: impl Write, version: f32) -> GenieResult<()> {
         if version > 1.13 {
             assert_eq!(self.player_names.len(), 16);
             for name in &self.player_names {
@@ -230,7 +230,7 @@ impl RgeScen {
 
     /// The conquest victory from 1.07 on, an empty timeline, the civilization locks (none) from
     /// 1.28 on.
-    fn write_timeline(&self, mut output: impl Write, version: f32) -> Result<()> {
+    fn write_timeline(&self, mut output: impl Write, version: f32) -> GenieResult<()> {
         if version >= 1.07 {
             output.write_u8(u8::from(self.victory_conquest))?;
         }
@@ -248,7 +248,7 @@ impl RgeScen {
     }
 
     /// The texts' string ids from 1.16 on, the scout's from 1.22 on.
-    fn write_string_tables(&self, mut output: impl Write, version: f32) -> Result<()> {
+    fn write_string_tables(&self, mut output: impl Write, version: f32) -> GenieResult<()> {
         if version >= 1.16 {
             write_opt_string_key(&mut output, self.description_string_table.as_ref())?;
             write_opt_string_key(&mut output, self.hints_string_table.as_ref())?;
@@ -264,7 +264,7 @@ impl RgeScen {
 
     /// The description; the hints, win and loss messages and history from 1.11 on; the scout
     /// from 1.22 on.
-    fn write_texts(&self, mut output: impl Write, version: f32) -> Result<()> {
+    fn write_texts(&self, mut output: impl Write, version: f32) -> GenieResult<()> {
         write_opt_str(&mut output, &self.description)?;
         if version >= 1.11 {
             write_opt_str(&mut output, &self.hints)?;
@@ -279,7 +279,7 @@ impl RgeScen {
     }
 
     /// The cinematics, no mission bitmap from 1.09 on and an empty mission picture from 1.10 on.
-    fn write_cinematics(&self, mut output: impl Write, version: f32) -> Result<()> {
+    fn write_cinematics(&self, mut output: impl Write, version: f32) -> GenieResult<()> {
         write_opt_str(&mut output, &self.pregame_cinematic)?;
         write_opt_str(&mut output, &self.victory_cinematic)?;
         write_opt_str(&mut output, &self.loss_cinematic)?;
@@ -299,7 +299,7 @@ impl RgeScen {
 
     /// Each player's build list, city plan and AI rules (from 1.08 on) names, the embedded
     /// files ([`write_files`]) and the AI rules types from 1.20 on.
-    fn write_player_files(&self, mut output: impl Write, version: f32) -> Result<()> {
+    fn write_player_files(&self, mut output: impl Write, version: f32) -> GenieResult<()> {
         assert_eq!(self.player_build_lists.len(), 16);
         for build_list in &self.player_build_lists {
             write_opt_str(&mut output, build_list)?;
@@ -334,7 +334,7 @@ impl RgeScen {
 /// # Panics
 ///
 /// Panics on a timeline with entries.
-fn read_timeline(mut input: impl Read, version: f32) -> Result<bool> {
+fn read_timeline(mut input: impl Read, version: f32) -> GenieResult<bool> {
     let victory_conquest = if version >= 1.07 {
         input.read_u8()? != 0
     } else {
@@ -363,7 +363,7 @@ fn read_timeline(mut input: impl Read, version: f32) -> Result<bool> {
 /// 1.08 on), then their bytes.
 // The format stores the embedded file lengths as u32.
 #[allow(clippy::cast_possible_truncation)]
-fn write_files(mut output: impl Write, files: &PlayerFiles, version: f32) -> Result<()> {
+fn write_files(mut output: impl Write, files: &PlayerFiles, version: f32) -> GenieResult<()> {
     if let Some(build_list) = &files.build_list {
         output.write_u32::<LE>(build_list.len() as u32)?;
     } else {
@@ -441,8 +441,8 @@ mod tests {
     /// What `write` puts out, read back by `read` into a scenario of `version`.
     fn round_trip(
         version: f32,
-        write: impl FnOnce(&mut Vec<u8>) -> Result<()>,
-        read: impl FnOnce(&mut RgeScen, &mut &[u8]) -> Result<()>,
+        write: impl FnOnce(&mut Vec<u8>) -> GenieResult<()>,
+        read: impl FnOnce(&mut RgeScen, &mut &[u8]) -> GenieResult<()>,
     ) -> RgeScen {
         let mut bytes = vec![];
         write(&mut bytes).unwrap();

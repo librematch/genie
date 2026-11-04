@@ -1,13 +1,14 @@
 //! The tech tree's nodes: ages, buildings, units and techs, read and written.
 
-use crate::conv::invalid_data;
+use crate::conv::fits;
 use crate::tech_tree::{TechTreeDependencies, TechTreeKind, TechTreeStatus};
 use crate::unit_kind::UnitKindId;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
+use genie_error::{GenieResult, invalid_input};
 use genie_support::{TechId, read_opt_u32};
-use std::convert::{TryFrom, TryInto};
+use std::convert::TryFrom;
 use std::error::Error;
-use std::io::{Read, Result, Write};
+use std::io::{Read, Write};
 
 /// An age node of the tech tree.
 #[derive(Debug, Default, Clone)]
@@ -85,7 +86,7 @@ pub struct TechTreeTech {
 }
 
 /// Read the ids of a tech tree node's dependents: units, buildings or techs.
-pub(super) fn read_dependents<R, T>(input: &mut R) -> Result<Vec<T>>
+pub(super) fn read_dependents<R, T>(input: &mut R) -> GenieResult<Vec<T>>
 where
     R: Read,
     T: TryFrom<i32>,
@@ -95,7 +96,7 @@ where
     let num = input.read_u8()?;
     let mut list = vec![];
     for _ in 0..num {
-        list.push(input.read_i32::<LE>()?.try_into().map_err(invalid_data)?);
+        list.push(fits(input.read_i32::<LE>()?)?);
     }
     Ok(list)
 }
@@ -109,7 +110,7 @@ impl TechTreeAge {
     ///
     /// Also fails if the node has more than 10 building levels or is not of type
     /// [`TechTreeKind::Age`].
-    pub fn read_from<R: Read>(input: &mut R) -> Result<Self> {
+    pub fn read_from<R: Read>(input: &mut R) -> GenieResult<Self> {
         let mut age = Self {
             age_id: input.read_i32::<LE>()?,
             status: input.read_u8()?.into(),
@@ -121,7 +122,7 @@ impl TechTreeAge {
             ..Default::default()
         };
         if 10 < age.building_levels {
-            return Err(invalid_data("an age with more than 10 building levels"));
+            return Err(invalid_input("an age with more than 10 building levels"));
         }
         for building in &mut age.buildings_per_zone {
             *building = input.read_u8()?;
@@ -132,7 +133,7 @@ impl TechTreeAge {
         age.max_age_length = input.read_u8()?;
         age.node_kind = input.read_i32::<LE>()?.into();
         if age.node_kind != TechTreeKind::Age {
-            return Err(invalid_data("an age node of another node type"));
+            return Err(invalid_input("an age node of another node type"));
         }
         Ok(age)
     }
@@ -144,7 +145,7 @@ impl TechTreeAge {
     /// Returns an error if writing to `output` fails.
     // The format stores each list's length as a u8 (truncated, as before).
     #[allow(clippy::cast_possible_truncation)]
-    pub fn write_to(&self, mut output: impl Write) -> Result<()> {
+    pub fn write_to(&self, mut output: impl Write) -> GenieResult<()> {
         output.write_i32::<LE>(self.age_id)?;
         output.write_u8(self.status.into())?;
         output.write_u8(self.dependent_buildings.len() as u8)?;
@@ -175,9 +176,9 @@ impl TechTreeBuilding {
     /// # Errors
     ///
     /// Returns an error if reading from `input` fails, or if a value is not valid for its field.
-    pub fn read_from(mut input: impl Read) -> Result<Self> {
+    pub fn read_from(mut input: impl Read) -> GenieResult<Self> {
         let mut building = Self {
-            building_id: input.read_i32::<LE>()?.try_into().map_err(invalid_data)?,
+            building_id: fits(input.read_i32::<LE>()?)?,
             status: input.read_u8()?.into(),
             dependent_buildings: read_dependents(&mut input)?,
             dependent_units: read_dependents(&mut input)?,
@@ -204,7 +205,7 @@ impl TechTreeBuilding {
     /// Returns an error if writing to `output` fails.
     // The format stores each list's length as a u8 (truncated, as before).
     #[allow(clippy::cast_possible_truncation)]
-    pub fn write_to(&self, mut output: impl Write) -> Result<()> {
+    pub fn write_to(&self, mut output: impl Write) -> GenieResult<()> {
         output.write_u32::<LE>(self.building_id.into())?;
         output.write_u8(self.status.into())?;
         output.write_u8(self.dependent_buildings.len() as u8)?;
@@ -238,11 +239,11 @@ impl TechTreeUnit {
     /// # Errors
     ///
     /// Returns an error if reading from `input` fails, or if a value is not valid for its field.
-    pub fn read_from(mut input: impl Read) -> Result<Self> {
+    pub fn read_from(mut input: impl Read) -> GenieResult<Self> {
         Ok(Self {
-            unit_id: input.read_i32::<LE>()?.try_into().map_err(invalid_data)?,
+            unit_id: fits(input.read_i32::<LE>()?)?,
             status: input.read_u8()?.into(),
-            building: input.read_i32::<LE>()?.try_into().map_err(invalid_data)?,
+            building: fits(input.read_i32::<LE>()?)?,
             prerequisites: TechTreeDependencies::read_from(&mut input)?,
             group_id: input.read_i32::<LE>()?,
             dependent_units: read_dependents(&mut input)?,
@@ -260,7 +261,7 @@ impl TechTreeUnit {
     /// Returns an error if writing to `output` fails.
     // The format stores each list's length as a u8 (truncated, as before).
     #[allow(clippy::cast_possible_truncation)]
-    pub fn write_to(&self, mut output: impl Write) -> Result<()> {
+    pub fn write_to(&self, mut output: impl Write) -> GenieResult<()> {
         output.write_u32::<LE>(u16::from(self.unit_id).into())?;
         output.write_u8(self.status.into())?;
         output.write_u32::<LE>(self.building.into())?;
@@ -290,11 +291,11 @@ impl TechTreeTech {
     /// # Errors
     ///
     /// Returns an error if reading from `input` fails, or if a value is not valid for its field.
-    pub fn read_from<R: Read>(input: &mut R) -> Result<Self> {
+    pub fn read_from<R: Read>(input: &mut R) -> GenieResult<Self> {
         Ok(Self {
-            tech_id: input.read_i32::<LE>()?.try_into().map_err(invalid_data)?,
+            tech_id: fits(input.read_i32::<LE>()?)?,
             status: input.read_u8()?.into(),
-            building: input.read_i32::<LE>()?.try_into().map_err(invalid_data)?,
+            building: fits(input.read_i32::<LE>()?)?,
             dependent_buildings: read_dependents(input)?,
             dependent_units: read_dependents(input)?,
             dependent_techs: read_dependents(input)?,
@@ -312,7 +313,7 @@ impl TechTreeTech {
     /// Returns an error if writing to `output` fails.
     // The format stores each list's length as a u8 (truncated, as before).
     #[allow(clippy::cast_possible_truncation)]
-    pub fn write_to(&self, mut output: impl Write) -> Result<()> {
+    pub fn write_to(&self, mut output: impl Write) -> GenieResult<()> {
         output.write_u32::<LE>(u16::from(self.tech_id).into())?;
         output.write_u8(self.status.into())?;
         output.write_u32::<LE>(self.building.into())?;

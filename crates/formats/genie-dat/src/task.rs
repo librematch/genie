@@ -1,10 +1,11 @@
-use crate::conv::{fits, invalid_data, opt_fits};
+use crate::conv::{fits, opt_fits};
 use crate::sound::SoundId;
 use crate::sprite::SpriteId;
 use crate::unit_kind::UnitKindId;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
+use genie_error::{GenieResult, invalid_input};
 use genie_support::read_opt_u16;
-use std::io::{Read, Result, Write};
+use std::io::{Read, Write};
 use std::ops::Deref;
 
 /// The list of tasks a unit type can perform, in file order.
@@ -55,13 +56,13 @@ impl TaskList {
     /// Returns an error if reading from `input` fails.
     ///
     /// Also fails if a task's type is not 1.
-    pub fn read_from(mut input: impl Read) -> Result<Self> {
+    pub fn read_from(mut input: impl Read) -> GenieResult<Self> {
         let num_tasks = input.read_u16::<LE>()?;
         let mut tasks = vec![];
         for _ in 0..num_tasks {
             let task_kind = input.read_u16::<LE>()?;
             if task_kind != 1 {
-                return Err(invalid_data("a task whose type is not 1"));
+                return Err(invalid_input("a task whose type is not 1"));
             }
             tasks.push(Task::read_from(&mut input)?);
         }
@@ -77,7 +78,7 @@ impl TaskList {
     ///
     /// Also fails if there are more than `u16::MAX` tasks, or if a task's IDs do not fit the format
     /// (see [`Task::write_to`]).
-    pub fn write_to<W: Write>(&self, output: &mut W) -> Result<()> {
+    pub fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         output.write_u16::<LE>(fits(self.len())?)?;
         for task in self.iter() {
             output.write_u16::<LE>(1)?;
@@ -93,7 +94,7 @@ impl Task {
     /// # Errors
     ///
     /// Returns an error if reading from `input` fails, or if an ID is out of range.
-    pub fn read_from(mut input: impl Read) -> Result<Self> {
+    pub fn read_from(mut input: impl Read) -> GenieResult<Self> {
         Ok(Self {
             id: input.read_u16::<LE>()?,
             is_default: input.read_u8()? != 0,
@@ -133,7 +134,7 @@ impl Task {
     /// Returns an error if writing to `output` fails.
     ///
     /// Also fails if the target unit type, a sprite or a sound ID does not fit the format's `i16`.
-    pub fn write_to<W: Write>(&self, output: &mut W) -> Result<()> {
+    pub fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         output.write_u16::<LE>(self.id)?;
         output.write_u8(u8::from(self.is_default))?;
         output.write_u16::<LE>(self.action_kind)?;

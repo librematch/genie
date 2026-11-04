@@ -3,8 +3,9 @@
 use crate::conv::fits;
 use crate::unit_kind::UnitKindId;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
+use genie_error::GenieResult;
 use genie_support::{ReadSkipExt, read_list};
-use std::io::{Read, Result, Write};
+use std::io::{Read, Write};
 
 /// A random map: its basic layout, and the lands, terrains, objects and elevations placed on it.
 #[derive(Debug, Default, Clone)]
@@ -55,7 +56,7 @@ impl RandomMapInfo {
     /// Returns an error if reading from `input` fails.
     ///
     /// Also fails if a count does not fit a `usize` (on targets with 16-bit pointers).
-    pub fn read_from<R: Read>(input: &mut R) -> Result<(Self, RandomMapCounts)> {
+    pub fn read_from<R: Read>(input: &mut R) -> GenieResult<(Self, RandomMapCounts)> {
         let info = Self {
             id: input.read_i32::<LE>()?,
             borders: (
@@ -97,7 +98,7 @@ impl RandomMapInfo {
     /// # Errors
     ///
     /// Returns an error if reading from `input` fails.
-    pub fn finish<R: Read>(&mut self, counts: RandomMapCounts, input: &mut R) -> Result<()> {
+    pub fn finish<R: Read>(&mut self, counts: RandomMapCounts, input: &mut R) -> GenieResult<()> {
         // duplicate data
         input.skip(44)?;
         self.lands = read_list(counts.lands, || RandomMapLand::read_from(input))?;
@@ -123,7 +124,7 @@ impl RandomMapInfo {
     /// Returns an error if writing to `output` fails.
     ///
     /// Also fails if a list has more than `u32::MAX` entries.
-    pub fn write_to<W: Write>(&self, output: &mut W) -> Result<()> {
+    pub fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         output.write_i32::<LE>(self.id)?;
         output.write_i32::<LE>(self.borders.0)?;
         output.write_i32::<LE>(self.borders.1)?;
@@ -155,7 +156,7 @@ impl RandomMapInfo {
     /// Returns an error if writing to `output` fails.
     ///
     /// Also fails if a list has more than `u32::MAX` entries.
-    pub fn write_commands_to<W: Write>(&self, output: &mut W) -> Result<()> {
+    pub fn write_commands_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         output.write_i32::<LE>(self.borders.0)?;
         output.write_i32::<LE>(self.borders.1)?;
         output.write_i32::<LE>(self.borders.2)?;
@@ -177,8 +178,8 @@ impl RandomMapInfo {
 fn write_counted<W: Write, T>(
     output: &mut W,
     list: &[T],
-    write: impl Fn(&T, &mut W) -> Result<()>,
-) -> Result<()> {
+    write: impl Fn(&T, &mut W) -> GenieResult<()>,
+) -> GenieResult<()> {
     output.write_u32::<LE>(fits(list.len())?)?;
     output.write_u32::<LE>(0)?; // pointer
     for item in list {
@@ -224,7 +225,7 @@ impl RandomMapLand {
     /// # Errors
     ///
     /// Returns an error if reading from `input` fails.
-    pub fn read_from<R: Read>(input: &mut R) -> Result<Self> {
+    pub fn read_from<R: Read>(input: &mut R) -> GenieResult<Self> {
         let mut land = Self {
             id: input.read_i32::<LE>()?,
             terrain_kind: input.read_u8()?,
@@ -253,7 +254,7 @@ impl RandomMapLand {
     /// # Errors
     ///
     /// Returns an error if writing to `output` fails.
-    pub fn write_to<W: Write>(&self, output: &mut W) -> Result<()> {
+    pub fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         output.write_i32::<LE>(self.id)?;
         output.write_u8(self.terrain_kind)?;
         output.write_u16::<LE>(0)?;
@@ -298,7 +299,7 @@ impl RandomMapTerrain {
     /// # Errors
     ///
     /// Returns an error if reading from `input` fails.
-    pub fn read_from<R: Read>(input: &mut R) -> Result<Self> {
+    pub fn read_from<R: Read>(input: &mut R) -> GenieResult<Self> {
         Ok(Self {
             percent: input.read_i32::<LE>()?,
             terrain_kind: input.read_i32::<LE>()?,
@@ -314,7 +315,7 @@ impl RandomMapTerrain {
     /// # Errors
     ///
     /// Returns an error if writing to `output` fails.
-    pub fn write_to<W: Write>(&self, output: &mut W) -> Result<()> {
+    pub fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         output.write_i32::<LE>(self.percent)?;
         output.write_i32::<LE>(self.terrain_kind)?;
         output.write_i32::<LE>(self.clumps)?;
@@ -362,7 +363,7 @@ impl RandomMapObject {
     /// Returns an error if reading from `input` fails.
     ///
     /// Also fails if the unit type ID does not fit a [`UnitKindId`].
-    pub fn read_from<R: Read>(input: &mut R) -> Result<Self> {
+    pub fn read_from<R: Read>(input: &mut R) -> GenieResult<Self> {
         let mut object = Self {
             unit_kind: fits(input.read_u32::<LE>()?)?,
             terrain_kind: input.read_i32::<LE>()?,
@@ -387,7 +388,7 @@ impl RandomMapObject {
     /// # Errors
     ///
     /// Returns an error if writing to `output` fails.
-    pub fn write_to<W: Write>(&self, output: &mut W) -> Result<()> {
+    pub fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         output.write_u32::<LE>(self.unit_kind.into())?;
         output.write_i32::<LE>(self.terrain_kind)?;
         output.write_i8(self.group_flag)?;
@@ -433,7 +434,7 @@ impl RandomMapElevation {
     /// Returns an error if reading from `input` fails.
     ///
     /// Also fails if the stored percentage, read as a u32, is above `i32::MAX`.
-    pub fn read_from<R: Read>(input: &mut R) -> Result<Self> {
+    pub fn read_from<R: Read>(input: &mut R) -> GenieResult<Self> {
         Ok(Self {
             percent: fits(input.read_u32::<LE>()?)?,
             height: input.read_i32::<LE>()?,
@@ -449,7 +450,7 @@ impl RandomMapElevation {
     /// # Errors
     ///
     /// Returns an error if writing to `output` fails.
-    pub fn write_to<W: Write>(&self, output: &mut W) -> Result<()> {
+    pub fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         output.write_i32::<LE>(self.percent)?;
         output.write_i32::<LE>(self.height)?;
         output.write_i32::<LE>(self.clumps)?;

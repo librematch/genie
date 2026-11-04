@@ -1,8 +1,8 @@
 //! A trigger ([`Trigger`]) and the trigger system that orders them ([`TriggerSystem`]).
 
-use crate::Result;
 use crate::triggers::{TriggerCondition, TriggerEffect, write_opt_string_key};
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
+use genie_error::{GenieError, GenieResult};
 use genie_support::{
     ReadStringsExt, StringKey, read_le, read_opt_u32, write_i32_str, write_opt_i32_str,
 };
@@ -40,7 +40,7 @@ impl Trigger {
     /// # Errors
     ///
     /// Returns an error if reading fails or a string cannot be decoded.
-    pub fn read_from(mut input: impl Read, version: f64) -> Result<Self> {
+    pub fn read_from(mut input: impl Read, version: f64) -> GenieResult<Self> {
         let enabled = input.read_i32::<LE>()? != 0;
         let looping = input.read_i8()? != 0;
         let name_id = input.read_i32::<LE>()?;
@@ -122,7 +122,7 @@ impl Trigger {
     /// key is a name or does not fit a u32.
     // The format stores the effect and condition counts as u32.
     #[allow(clippy::cast_possible_truncation)]
-    pub fn write_to(&self, mut output: impl Write, version: f64) -> Result<()> {
+    pub fn write_to(&self, mut output: impl Write, version: f64) -> GenieResult<()> {
         output.write_i32::<LE>(i32::from(self.enabled))?;
         output.write_i8(i8::from(self.looping))?;
         output.write_i32::<LE>(self.name_id)?;
@@ -229,7 +229,7 @@ impl TriggerSystem {
     /// # Panics
     ///
     /// Panics if a variable name has a variable number of 256 or more.
-    pub fn read_from(mut input: impl Read) -> Result<Self> {
+    pub fn read_from(mut input: impl Read) -> GenieResult<Self> {
         let version = input.read_f64::<LE>()?;
         log::debug!("Trigger system version {version}");
         let objectives_state = if version >= 1.5 { input.read_i8()? } else { 0 };
@@ -301,14 +301,15 @@ impl TriggerSystem {
     /// Fails if there are more than `u32::MAX` triggers.
     // The format stores the technology and variable name counts and the variable numbers as u32.
     #[allow(clippy::cast_possible_truncation)]
-    pub fn write_to(&self, mut output: impl Write, version: f64) -> Result<()> {
+    pub fn write_to(&self, mut output: impl Write, version: f64) -> GenieResult<()> {
         output.write_f64::<LE>(version)?;
         if version >= 1.5 {
             output.write_i8(self.objectives_state)?;
         }
-        output.write_u32::<LE>(
-            u32::try_from(self.triggers.len()).map_err(|_| crate::Error::TooManyTriggersError)?,
-        )?;
+        output.write_u32::<LE>(u32::try_from(self.triggers.len()).map_err(|_| {
+            GenieError::invalid_input("more triggers than the format can count")
+                .with("triggers", self.triggers.len())
+        })?)?;
         for trigger in &self.triggers {
             trigger.write_to(&mut output, version)?;
         }

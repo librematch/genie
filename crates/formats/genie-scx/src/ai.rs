@@ -1,8 +1,7 @@
-use crate::Result;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
-use genie_support::{DecodeStringError, ReadStringError, ReadStringsExt, write_i32_str};
+use genie_error::{GenieError, GenieResult};
+use genie_support::{ReadStringsExt, write_i32_str};
 use std::io::{Read, Write};
-use std::result::Result as StdResult;
 
 /// The error code of an AI script that failed to compile, as the game's AI rule parser reports it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, num_enum::IntoPrimitive, num_enum::FromPrimitive)]
@@ -77,7 +76,7 @@ pub struct AiErrorInfo {
     error_code: AiErrorCode,
 }
 
-fn parse_bytes(bytes: &[u8]) -> StdResult<String, ReadStringError> {
+fn parse_bytes(bytes: &[u8]) -> GenieResult<String> {
     let mut bytes = bytes.to_vec();
     if let Some(end) = bytes.iter().position(|&byte| byte == 0) {
         bytes.truncate(end);
@@ -85,13 +84,15 @@ fn parse_bytes(bytes: &[u8]) -> StdResult<String, ReadStringError> {
     if bytes.is_empty() {
         Ok("<empty>".to_string())
     } else {
-        String::from_utf8(bytes).map_err(|_| ReadStringError::DecodeStringError(DecodeStringError))
+        String::from_utf8(bytes).map_err(|e| {
+            GenieError::invalid_input("an AI error text that is not valid UTF-8").with_source(e)
+        })
     }
 }
 
 impl AiErrorInfo {
     /// Read AI error information from an input stream.
-    pub fn read_from(mut input: impl Read) -> Result<Self> {
+    pub fn read_from(mut input: impl Read) -> GenieResult<Self> {
         // TODO support non UTF8 encoding
         let mut filename_bytes = [0; 257];
         input.read_exact(&mut filename_bytes)?;
@@ -112,7 +113,7 @@ impl AiErrorInfo {
     }
 
     /// Write AI error information to an output stream.
-    pub fn write_to(&self, mut output: impl Write) -> Result<()> {
+    pub fn write_to(&self, mut output: impl Write) -> GenieResult<()> {
         // TODO support non UTF8 encoding
         let mut filename_bytes = [0; 257];
         filename_bytes[..self.filename.len()].copy_from_slice(self.filename.as_bytes());
@@ -139,19 +140,23 @@ pub struct AiFile {
 
 impl AiFile {
     /// Read an embedded AI file from an input stream.
-    pub fn read_from(mut input: impl Read) -> Result<Self> {
+    pub fn read_from(mut input: impl Read) -> GenieResult<Self> {
         let filename = input
             .read_u32_length_prefixed_str()?
-            .ok_or(crate::Error::MissingAiFileNameError)?;
+            .ok_or(GenieError::invalid_input(
+                "an embedded AI file without a file name",
+            ))?;
         let content = input
             .read_u32_length_prefixed_str()?
-            .ok_or(crate::Error::EmptyAiFileError)?;
+            .ok_or(GenieError::invalid_input(
+                "an embedded AI file without content",
+            ))?;
 
         Ok(Self { filename, content })
     }
 
     /// Write this embedded AI file to an output stream.
-    pub fn write_to(&self, mut output: impl Write) -> Result<()> {
+    pub fn write_to(&self, mut output: impl Write) -> GenieResult<()> {
         write_i32_str(&mut output, &self.filename)?;
         write_i32_str(&mut output, &self.content)?;
         Ok(())
@@ -167,7 +172,7 @@ pub struct AiInfo {
 
 impl AiInfo {
     /// Read the AI scripts block; `None` if it holds neither scripts nor an error.
-    pub fn read_from(mut input: impl Read) -> Result<Option<Self>> {
+    pub fn read_from(mut input: impl Read) -> GenieResult<Option<Self>> {
         let has_ai_files = input.read_u32::<LE>()? != 0;
         let has_error = input.read_u32::<LE>()? != 0;
 
@@ -193,7 +198,7 @@ impl AiInfo {
     /// Write the AI scripts block.
     // The format stores the number of AI files as a u32.
     #[allow(clippy::cast_possible_truncation)]
-    pub fn write_to(&self, mut output: impl Write) -> Result<()> {
+    pub fn write_to(&self, mut output: impl Write) -> GenieResult<()> {
         output.write_u32::<LE>(u32::from(!self.files.is_empty()))?;
 
         if let Some(error) = &self.error {

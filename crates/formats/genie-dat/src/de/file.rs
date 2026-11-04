@@ -7,7 +7,7 @@ use crate::de::{
 };
 use binrw::{BinRead, BinResult, BinWrite, Endian, binrw};
 use flate2::read::DeflateDecoder;
-use genie_error::GenieError;
+use genie_error::{GenieError, GenieResult};
 use std::borrow::Cow;
 use std::io::Seek as IoSeek;
 use std::io::{Cursor, Read, Write};
@@ -38,17 +38,6 @@ impl Version {
         self.0 >= n
     }
 }
-
-/// The errors of reading and writing a data file: [`GenieError`]s.
-///
-/// Reading, inflating or writing that fails underneath is [`ErrorKind::Io`]; a file version other than `VER 7.1` to `VER 8.9`
-/// [`ErrorKind::Unsupported`]; data that does not follow the format
-/// [`ErrorKind::InvalidInput`].
-///
-/// [`ErrorKind::InvalidInput`]: genie_error::ErrorKind::InvalidInput
-/// [`ErrorKind::Io`]: genie_error::ErrorKind::Io
-/// [`ErrorKind::Unsupported`]: genie_error::ErrorKind::Unsupported
-pub type Error = GenieError;
 
 /// A string as DE stores it (`serializeDebugString`): the marker 0x0A60, a u16 length, the bytes.
 #[binrw]
@@ -202,7 +191,7 @@ impl DatFile {
     /// of [`Self::from_inflated`].
     ///
     /// [`ErrorKind::Io`]: genie_error::ErrorKind::Io
-    pub fn read_from(input: impl Read) -> Result<Self, Error> {
+    pub fn read_from(input: impl Read) -> GenieResult<Self> {
         let mut data = Vec::new();
         // The byte count is `data.len()`.
         let _ = DeflateDecoder::new(input)
@@ -222,7 +211,7 @@ impl DatFile {
     ///
     /// [`ErrorKind::InvalidInput`]: genie_error::ErrorKind::InvalidInput
     /// [`ErrorKind::Unsupported`]: genie_error::ErrorKind::Unsupported
-    pub fn from_inflated(data: &[u8]) -> Result<Self, Error> {
+    pub fn from_inflated(data: &[u8]) -> GenieResult<Self> {
         let version = |v: &[u8]| {
             GenieError::unsupported("a data file version other than VER 7.1 to VER 8.9")
                 .with("version", String::from_utf8_lossy(v))
@@ -243,7 +232,7 @@ impl DatFile {
     /// Returns an [`ErrorKind::Io`] error if a field cannot be written.
     ///
     /// [`ErrorKind::Io`]: genie_error::ErrorKind::Io
-    pub fn to_bytes(&self) -> Result<Vec<u8>, Error> {
+    pub fn to_bytes(&self) -> GenieResult<Vec<u8>> {
         let mut out = Cursor::new(Vec::new());
         self.write_le(&mut out)
             .map_err(|e| GenieError::io("a data file that does not write").with("binrw", e))?;
@@ -258,7 +247,7 @@ impl DatFile {
     /// `VER 7.1` to `VER 8.9`; a file this module read always has a valid one.
     ///
     /// [`ErrorKind::InvalidInput`]: genie_error::ErrorKind::InvalidInput
-    pub fn version(&self) -> Result<Version, Error> {
+    pub fn version(&self) -> GenieResult<Version> {
         Version::of(&self.file_version).ok_or_else(|| {
             GenieError::invalid_input("a file_version set outside VER 7.1 to VER 8.9")
                 .with("version", String::from_utf8_lossy(&self.file_version))

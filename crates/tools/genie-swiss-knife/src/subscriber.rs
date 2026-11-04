@@ -6,6 +6,7 @@
 //! `RUST_LOG=genie_core=trace` …) or the command runs with `--verbose` (`debug`). Else none is
 //! installed, and the engine's spans and events cost one comparison each.
 
+use genie_error::{GenieError, GenieResult};
 use std::env::var;
 use std::io::stderr;
 use tracing::subscriber::set_global_default;
@@ -31,17 +32,23 @@ pub fn filter(rust_log: Option<&str>, verbose: bool) -> Option<String> {
 /// # Errors
 ///
 /// When the filter does not parse or a global subscriber is installed already.
-pub fn install(verbose: bool) -> Result<(), String> {
+pub fn install(verbose: bool) -> GenieResult<()> {
     let rust_log = var("RUST_LOG").ok();
     let Some(filter) = filter(rust_log.as_deref(), verbose) else {
         return Ok(());
     };
-    let filter = EnvFilter::try_new(&filter).map_err(|e| format!("RUST_LOG `{filter}`: {e}"))?;
+    let filter = EnvFilter::try_new(&filter).map_err(|e| {
+        GenieError::invalid_input("a RUST_LOG filter that does not parse")
+            .with("filter", &filter)
+            .with_source(e)
+    })?;
     let subscriber = Registry::default()
         .with(filter)
         .with(JsonStorageLayer)
         .with(BunyanFormattingLayer::new("gsk".to_owned(), stderr));
-    set_global_default(subscriber).map_err(|e| e.to_string())
+    set_global_default(subscriber).map_err(|e| {
+        GenieError::unreachable("a second global subscriber: gsk installs one, once").with_source(e)
+    })
 }
 
 #[cfg(test)]

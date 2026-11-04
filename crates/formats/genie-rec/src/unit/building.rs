@@ -1,13 +1,14 @@
 //! The building base class's attributes: the gather point and the production queue.
 
+use crate::ObjectId;
 use crate::element::{ReadableHeaderElement, read_xyz};
 use crate::fits;
 use crate::reader::RecordingHeaderReader;
 use crate::unit_action::UnitAction;
-use crate::{ObjectId, Result};
 use arrayvec::ArrayVec;
 use byteorder::{LE, ReadBytesExt};
 use genie_dat::terrain::TerrainId;
+use genie_error::GenieResult;
 use genie_support::{UnitKindId, read_opt_u32};
 use std::io::Read;
 
@@ -42,7 +43,7 @@ pub struct ProductionQueueEntry {
 }
 
 impl ReadableHeaderElement for ProductionQueueEntry {
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let unit_kind_id = input.read_u16::<LE>()?.into();
         let count = input.read_u16::<LE>()?;
         Ok(Self {
@@ -123,7 +124,7 @@ pub struct BuildingUnitAttributes {
 
 impl ReadableHeaderElement for BuildingUnitAttributes {
     // Reads the building's fields in file order, section by section.
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let mut attrs = Self {
             built: input.read_u8()? != 0,
             build_points: input.read_f32::<LE>()?,
@@ -148,7 +149,7 @@ impl ReadableHeaderElement for BuildingUnitAttributes {
 impl GatherPoint {
     /// The gather point: a flag, a location, then an object and its type (both -1 for the
     /// location). Without the flag there is none.
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Option<Self>> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Option<Self>> {
         let exists = input.read_u32::<LE>()? != 0;
         let location = Self::Location {
             x: input.read_f32::<LE>()?,
@@ -171,7 +172,7 @@ impl GatherPoint {
 impl BuildingUnitAttributes {
     /// The pending order (10.54), the linked owner, up to four linked children (-1 is none)
     /// and the count of captured units.
-    fn read_links<R: Read>(&mut self, input: &mut RecordingHeaderReader<R>) -> Result<()> {
+    fn read_links<R: Read>(&mut self, input: &mut RecordingHeaderReader<R>) -> GenieResult<()> {
         if input.version() >= 10.54 {
             self.pending_order = input.read_u32::<LE>()?;
         }
@@ -188,13 +189,13 @@ impl BuildingUnitAttributes {
 
     /// The extra and research actions, the production queue (its capacity, the entries and
     /// a size the reader skips), the queue's total and flag and its actions.
-    fn read_queues<R: Read>(&mut self, input: &mut RecordingHeaderReader<R>) -> Result<()> {
+    fn read_queues<R: Read>(&mut self, input: &mut RecordingHeaderReader<R>) -> GenieResult<()> {
         self.extra_actions = UnitAction::read_list_from(input)?;
         self.research_actions = UnitAction::read_list_from(input)?;
         let capacity = input.read_u16::<LE>()?;
         self.production_queue = (0..capacity)
             .map(|_| ProductionQueueEntry::read_from(input))
-            .collect::<Result<_>>()?;
+            .collect::<GenieResult<_>>()?;
         let _size = input.read_u16::<LE>()?;
         self.production_queue_total_units = input.read_u16::<LE>()?;
         self.production_queue_enabled = input.read_u8()? != 0;
@@ -204,7 +205,10 @@ impl BuildingUnitAttributes {
 
     /// The gate's fields (10.65), the terrain type (10.67), the semi-asleep flag (11.43) and
     /// the snow flag (11.54).
-    fn read_later_versions<R: Read>(&mut self, input: &mut RecordingHeaderReader<R>) -> Result<()> {
+    fn read_later_versions<R: Read>(
+        &mut self,
+        input: &mut RecordingHeaderReader<R>,
+    ) -> GenieResult<()> {
         if input.version() >= 10.65 {
             // game reads into the same value twice, while there are two separate fields of this
             // type. likely a bug, but it doesn't appear to cause issues? is this unused?

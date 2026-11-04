@@ -20,10 +20,8 @@ path = "src/bin/gsk/main.rs"
 [dependencies]
 abscissa_core = "0.9.0"
 clap = "4"
-# the error's format, derived (T16)
-derive_more.workspace = true
+genie-error = { path = "../../base/genie-error" }
 serde.workspace = true
-thiserror.workspace = true
 # the subscriber for the engine's spans and events (src/subscriber.rs): bunyan JSON lines, with
 # RUST_LOG set
 tracing.workspace = true

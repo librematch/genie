@@ -1,10 +1,10 @@
 //! The sprites drawn for an object: their nodes and animations.
 
-use crate::Result;
 use crate::element::{OptionalReadableElement, ReadableHeaderElement, WritableHeaderElement};
 use crate::reader::RecordingHeaderReader;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
 use genie_dat::sprite::SpriteId;
+use genie_error::GenieResult;
 use std::io::{Read, Write};
 
 /// The animation state of a sprite node.
@@ -27,7 +27,7 @@ pub struct SpriteNodeAnimation {
 }
 
 impl ReadableHeaderElement for SpriteNodeAnimation {
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         Ok(Self {
             animate_interval: input.read_u32::<LE>()?,
             animate_last: input.read_u32::<LE>()?,
@@ -41,7 +41,7 @@ impl ReadableHeaderElement for SpriteNodeAnimation {
 }
 
 impl WritableHeaderElement for SpriteNodeAnimation {
-    fn write_to<W: Write>(&self, output: &mut W) -> Result<()> {
+    fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         output.write_u32::<LE>(self.animate_interval)?;
         output.write_u32::<LE>(self.animate_last)?;
         output.write_u16::<LE>(self.last_frame)?;
@@ -78,7 +78,7 @@ pub struct SpriteNode {
 }
 
 impl OptionalReadableElement for SpriteNode {
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Option<Self>> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Option<Self>> {
         let ty = input.read_u8()?;
         if ty == 0 {
             return Ok(None);
@@ -103,7 +103,7 @@ impl OptionalReadableElement for SpriteNode {
 }
 
 impl WritableHeaderElement for SpriteNode {
-    fn write_to<W: Write>(&self, output: &mut W) -> Result<()> {
+    fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         let ty = if self.animation.is_some() { 2 } else { 1 };
         output.write_u8(ty)?;
         output.write_u16::<LE>(self.id.into())?;
@@ -129,7 +129,7 @@ pub struct SpriteList {
 }
 
 impl ReadableHeaderElement for SpriteList {
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let mut sprites = vec![];
         while let Some(node) = SpriteNode::read_from(input)? {
             sprites.push(node);
@@ -139,7 +139,7 @@ impl ReadableHeaderElement for SpriteList {
 }
 
 impl WritableHeaderElement for SpriteList {
-    fn write_to<W: Write>(&self, output: &mut W) -> Result<()> {
+    fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         for sprite in &self.sprites {
             sprite.write_to(output)?;
         }

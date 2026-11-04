@@ -1,9 +1,11 @@
 //! The slice's runs from the recording's header: the commands' trace, word 9's simulation, the
 //! blocks after each tick and the header's slice.
 
+use crate::errors::{no_checkpoint, no_such_player};
 use crate::masters::MasterTable;
-use crate::{Decoder, Error, Frame, frames, header_slice, listed, player_totals, slice};
+use crate::{Decoder, Frame, frames, header_slice, listed, player_totals, slice};
 use genie_core::GenieError;
+use genie_core::GenieResult;
 use genie_core::commands::Command;
 use genie_core::objects::ListIndex;
 use genie_core::objects::layers::Action;
@@ -90,10 +92,7 @@ pub(super) fn run(turns: &mut World, decoder: &mut Decoder, frames: &[Frame<'_>]
 /// # Panics
 ///
 /// Never: the first checkpoint it reads is the one it found.
-pub fn simulate_word9(
-    recording: &[u8],
-    masters: Option<&MasterTable>,
-) -> Result<Vec<Word9>, Error> {
+pub fn simulate_word9(recording: &[u8], masters: Option<&MasterTable>) -> GenieResult<Vec<Word9>> {
     let Opened {
         chapter,
         header,
@@ -104,7 +103,7 @@ pub fn simulate_word9(
         .iter()
         .enumerate()
         .find_map(|(i, f)| f.checkpoint.as_ref().map(|c| (i, c)))
-        .ok_or(Error::NoCheckpoint)?;
+        .ok_or(no_checkpoint())?;
     let group_command = all[..first].iter().enumerate().find_map(|(i, f)| {
         let packet = f.commands.iter().find(|p| GROUP_COMMANDS.contains(&p[0]))?;
         Some(GroupCommand {
@@ -121,7 +120,9 @@ pub fn simulate_word9(
         .filter(|lane| lane.iter().any(|&w| w != 0))
         .map(|lane| {
             let id = lane[8];
-            let section = sections.get(id as usize).ok_or(Error::NoSuchPlayer(id))?;
+            let section = sections
+                .get(id as usize)
+                .ok_or_else(|| no_such_player(id))?;
             let simulated = &turns.players[id as usize];
             Ok(Word9 {
                 id,
@@ -211,14 +212,14 @@ pub fn word9_terms(
     id: u32,
     ticks: usize,
     masters: Option<&MasterTable>,
-) -> Result<Vec<Word9Terms>, Error> {
+) -> GenieResult<Vec<Word9Terms>> {
     let Opened {
         chapter,
         header,
         mut turns,
     } = open(recording, masters)?;
     if header.players().len() <= id as usize {
-        return Err(Error::NoSuchPlayer(id));
+        return Err(no_such_player(id));
     }
     run(
         &mut turns,
@@ -260,14 +261,14 @@ pub fn blocks_per_tick(
     ids: &[u32],
     ticks: usize,
     masters: Option<&MasterTable>,
-) -> Result<Vec<Vec<[u32; 11]>>, Error> {
+) -> GenieResult<Vec<Vec<[u32; 11]>>> {
     let chapter = chapters(recording)?[0];
     let header = chapter.header()?;
     let sections = header.players();
     if let Some(&id) = ids.iter().find(|&&id| sections.len() <= id as usize) {
-        return Err(Error::NoSuchPlayer(id));
+        return Err(no_such_player(id));
     }
-    let mut turns = header_slice(&header, masters).map_err(Error::Unmodelled)?;
+    let mut turns = header_slice(&header, masters)?;
     let mut out = Vec::with_capacity(ticks);
     let mut decoder = Decoder::default();
     for frame in frames(&chapter, ticks)? {
@@ -322,10 +323,10 @@ pub(super) struct Opened<'r> {
 pub(super) fn open<'r>(
     recording: &'r [u8],
     masters: Option<&MasterTable>,
-) -> Result<Opened<'r>, Error> {
+) -> GenieResult<Opened<'r>> {
     let chapter = chapters(recording)?[0];
     let header = chapter.header()?;
-    let turns = header_slice(&header, masters).map_err(Error::Unmodelled)?;
+    let turns = header_slice(&header, masters)?;
     Ok(Opened {
         chapter,
         header,
@@ -339,10 +340,10 @@ pub fn header_run(
     recording: &[u8],
     ticks: usize,
     masters: Option<&MasterTable>,
-) -> Result<World, Error> {
+) -> GenieResult<World> {
     let chapter = chapters(recording)?[0];
     let header = chapter.header()?;
-    let mut turns = header_slice(&header, masters).map_err(Error::Unmodelled)?;
+    let mut turns = header_slice(&header, masters)?;
     let mut decoder = Decoder::default();
     run(&mut turns, &mut decoder, &frames(&chapter, ticks)?);
     Ok(turns)

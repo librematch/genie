@@ -1,4 +1,4 @@
-use crate::Error;
+use crate::errors::{bad_pool_dump, bad_registry_dump};
 use crate::save_objects::{ghost_pool_from_dump, recycle_pools_from_dump, registry_from_dump};
 use crate::test_ids::object_id;
 use genie_core::players::PlayerId;
@@ -32,7 +32,7 @@ fn pool_dump_out_of_shape_is_an_error() {
         "pool 60 1\n101 one\n",
     ] {
         assert!(
-            matches!(recycle_pools_from_dump(text), Err(Error::BadPoolDump)),
+            recycle_pools_from_dump(text).is_err_and(|e| e == bad_pool_dump()),
             "{text:?}"
         );
     }
@@ -43,7 +43,7 @@ fn pool_dump_out_of_shape_is_an_error() {
         "pool 25 1\n1\n",
     ] {
         assert!(
-            matches!(ghost_pool_from_dump(text), Err(Error::BadPoolDump)),
+            ghost_pool_from_dump(text).is_err_and(|e| e == bad_pool_dump()),
             "{text:?}"
         );
     }
@@ -97,7 +97,7 @@ fn registry_dump_out_of_shape_is_an_error() {
         "registry 2 3\nwhat\n".to_owned(),
     ] {
         assert!(
-            matches!(registry_from_dump(&text), Err(Error::BadRegistryDump)),
+            registry_from_dump(&text).is_err_and(|e| e == bad_registry_dump()),
             "{text:?}"
         );
     }

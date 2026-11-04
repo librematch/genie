@@ -1,10 +1,10 @@
-use crate::Result;
 use crate::element::{ReadableHeaderElement, WritableHeaderElement};
 use crate::fits;
 use crate::reader::RecordingHeaderReader;
 use arrayvec::ArrayVec;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
-pub use genie_dat::unit_kind::{AttributeCost, ParseUnitBaseClassError, UnitBaseClass};
+pub use genie_dat::unit_kind::{AttributeCost, UnitBaseClass};
+use genie_error::GenieResult;
 pub use genie_support::{StringKey, UnitKindId};
 use std::io::{Read, Write};
 
@@ -33,7 +33,7 @@ pub struct CompactUnitKind {
 }
 
 impl ReadableHeaderElement for CompactUnitKind {
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let unit_base_class = fits(input.read_u8()?)?;
         let static_ = StaticUnitAttributes::read_from(input)?;
         let mut unit = Self {
@@ -102,7 +102,7 @@ pub struct StaticUnitAttributes {
 }
 
 impl ReadableHeaderElement for StaticUnitAttributes {
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let mut attrs = Self {
             id: input.read_u16::<LE>()?.into(),
             copy_id: input.read_u16::<LE>()?.into(),
@@ -136,7 +136,10 @@ impl ReadableHeaderElement for StaticUnitAttributes {
 impl StaticUnitAttributes {
     /// `UserPatch`'s fields behind a hidden flag of -16: the death object, the strings, the
     /// flags and the terrain restriction. Gives the hidden flags that follow them.
-    fn read_user_patch<R: Read>(&mut self, input: &mut RecordingHeaderReader<R>) -> Result<i8> {
+    fn read_user_patch<R: Read>(
+        &mut self,
+        input: &mut RecordingHeaderReader<R>,
+    ) -> GenieResult<i8> {
         self.death_object_id = match input.read_i16::<LE>()? {
             -1 => None,
             id => Some(fits(id)?),
@@ -158,14 +161,14 @@ pub struct AnimatedUnitAttributes {
 }
 
 impl ReadableHeaderElement for AnimatedUnitAttributes {
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let speed = input.read_f32::<LE>()?;
         Ok(Self { speed })
     }
 }
 
 impl WritableHeaderElement for AnimatedUnitAttributes {
-    fn write_to<W: Write>(&self, output: &mut W) -> Result<()> {
+    fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         output.write_f32::<LE>(self.speed)?;
         Ok(())
     }
@@ -179,14 +182,14 @@ pub struct MovingUnitAttributes {
 }
 
 impl ReadableHeaderElement for MovingUnitAttributes {
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let turn_speed = input.read_f32::<LE>()?;
         Ok(Self { turn_speed })
     }
 }
 
 impl WritableHeaderElement for MovingUnitAttributes {
-    fn write_to<W: Write>(&self, output: &mut W) -> Result<()> {
+    fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         output.write_f32::<LE>(self.turn_speed)?;
         Ok(())
     }
@@ -202,7 +205,7 @@ pub struct ActionUnitAttributes {
 }
 
 impl ReadableHeaderElement for ActionUnitAttributes {
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let search_radius = input.read_f32::<LE>()?;
         let work_rate = input.read_f32::<LE>()?;
         Ok(Self {
@@ -213,7 +216,7 @@ impl ReadableHeaderElement for ActionUnitAttributes {
 }
 
 impl WritableHeaderElement for ActionUnitAttributes {
-    fn write_to<W: Write>(&self, output: &mut W) -> Result<()> {
+    fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         output.write_f32::<LE>(self.search_radius)?;
         output.write_f32::<LE>(self.work_rate)?;
         Ok(())
@@ -230,7 +233,7 @@ pub struct HitKind {
 }
 
 impl ReadableHeaderElement for HitKind {
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let hit_kind = input.read_u16::<LE>()?;
         let amount = input.read_i16::<LE>()?;
         Ok(Self { hit_kind, amount })
@@ -266,7 +269,7 @@ pub struct BaseCombatUnitAttributes {
 }
 
 impl ReadableHeaderElement for BaseCombatUnitAttributes {
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let mut attrs = Self {
             base_armor: if input.version() >= 11.52 {
                 input.read_u16::<LE>()?
@@ -309,14 +312,14 @@ pub struct MissileUnitAttributes {
 }
 
 impl ReadableHeaderElement for MissileUnitAttributes {
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let targeting_kind = input.read_u8()?;
         Ok(Self { targeting_kind })
     }
 }
 
 impl WritableHeaderElement for MissileUnitAttributes {
-    fn write_to<W: Write>(&self, output: &mut W) -> Result<()> {
+    fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         output.write_u8(self.targeting_kind)?;
         Ok(())
     }
@@ -356,7 +359,7 @@ pub struct CombatUnitAttributes {
 }
 
 impl ReadableHeaderElement for CombatUnitAttributes {
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let mut attrs = Self::default();
         for _ in 0..3 {
             let attr = AttributeCost::read_from(&mut *input)?;
@@ -381,7 +384,10 @@ impl CombatUnitAttributes {
     /// `UserPatch`'s fields behind a create time of 65520: the original armours and weapon,
     /// the area effect, the delay, the building and button, the rear attack and the hero
     /// flag. Gives the create time that follows them.
-    fn read_user_patch<R: Read>(&mut self, input: &mut RecordingHeaderReader<R>) -> Result<u16> {
+    fn read_user_patch<R: Read>(
+        &mut self,
+        input: &mut RecordingHeaderReader<R>,
+    ) -> GenieResult<u16> {
         self.original_pierce_armor = Some(input.read_u16::<LE>()?);
         self.original_armor = Some(input.read_u16::<LE>()?);
         self.original_weapon = Some(input.read_u16::<LE>()?);
@@ -413,7 +419,7 @@ pub struct BuildingUnitAttributes {
 }
 
 impl ReadableHeaderElement for BuildingUnitAttributes {
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let mut attrs = Self::default();
         let facet = input.read_i16::<LE>()?;
         // UserPatch data

@@ -1,9 +1,10 @@
 //! Gaia's extra state: its creatures' growth and its wolves.
 
+use crate::ObjectId;
 use crate::element::{ReadableHeaderElement, WritableHeaderElement};
 use crate::reader::RecordingHeaderReader;
-use crate::{ObjectId, Result};
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
+use genie_error::GenieResult;
 use genie_support::read_opt_u32;
 use std::io::{Read, Write};
 
@@ -30,7 +31,7 @@ pub struct GaiaData {
 }
 
 impl ReadableHeaderElement for GaiaData {
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let mut gaia = Self {
             update_time: input.read_u32::<LE>()?,
             update_nature: input.read_u32::<LE>()?,
@@ -76,7 +77,7 @@ pub struct GaiaCreature {
 }
 
 impl ReadableHeaderElement for GaiaCreature {
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         Ok(Self {
             growth_rate: input.read_f32::<LE>()?,
             remainder: input.read_f32::<LE>()?,
@@ -86,7 +87,7 @@ impl ReadableHeaderElement for GaiaCreature {
 }
 
 impl WritableHeaderElement for GaiaCreature {
-    fn write_to<W: Write>(&self, output: &mut W) -> Result<()> {
+    fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         output.write_f32::<LE>(self.growth_rate)?;
         output.write_f32::<LE>(self.remainder)?;
         output.write_u32::<LE>(self.max)?;
@@ -104,7 +105,7 @@ pub struct GaiaWolfInfo {
 }
 
 impl ReadableHeaderElement for GaiaWolfInfo {
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         Ok(Self {
             id: input.read_u32::<LE>()?,
             distance: input.read_f32::<LE>()?,
@@ -113,7 +114,7 @@ impl ReadableHeaderElement for GaiaWolfInfo {
 }
 
 impl WritableHeaderElement for GaiaWolfInfo {
-    fn write_to<W: Write>(&self, output: &mut W) -> Result<()> {
+    fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         output.write_u32::<LE>(self.id)?;
         output.write_f32::<LE>(self.distance)?;
         Ok(())

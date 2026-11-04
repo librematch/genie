@@ -1,5 +1,6 @@
 //! The reader of a player's state ([`Player`]) in the recording header.
 
+use crate::ObjectId;
 use crate::ai::PlayerAi;
 use crate::element::{OptionalReadableElement, ReadableHeaderElement};
 use crate::fits;
@@ -10,16 +11,16 @@ use crate::player::{
 use crate::reader::RecordingHeaderReader;
 use crate::unit::Unit;
 use crate::unit_kind::CompactUnitKind;
-use crate::{ObjectId, Result};
 use byteorder::{LE, ReadBytesExt};
 use genie_dat::tech_tree::TechTree;
+use genie_error::GenieResult;
 use genie_support::{ReadStringsExt, read_bytes, read_le};
 use std::io::Read;
 
 impl ReadableHeaderElement for Player {
     // Reads the player's fields in file order, section by section; the sections it does not
     // keep it skips.
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let mut player = Self::read_diplomacy_and_name(input)?;
         player.read_attributes_and_views(input)?;
         player.read_civilization_and_status(input)?;
@@ -44,7 +45,7 @@ impl ReadableHeaderElement for Player {
 /// # Errors
 ///
 /// Fails if the byte read is not `value`.
-fn expect_marker<R: Read>(input: &mut RecordingHeaderReader<R>, value: u8) -> Result<()> {
+fn expect_marker<R: Read>(input: &mut RecordingHeaderReader<R>, value: u8) -> GenieResult<()> {
     if input.version() >= 10.55 {
         assert_eq!(input.read_u8()?, value);
     }
@@ -54,7 +55,7 @@ fn expect_marker<R: Read>(input: &mut RecordingHeaderReader<R>, value: u8) -> Re
 impl Player {
     /// The kind, the relations to each player, the diplomacy, the allied flags and the name:
     /// the first fields.
-    fn read_diplomacy_and_name<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_diplomacy_and_name<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let mut player = Self {
             kind: input.read_u8()?,
             ..Default::default()
@@ -75,7 +76,7 @@ impl Player {
     fn read_attributes_and_views<R: Read>(
         &mut self,
         input: &mut RecordingHeaderReader<R>,
-    ) -> Result<()> {
+    ) -> GenieResult<()> {
         expect_marker(input, 22)?;
         let num_attributes = input.read_u32::<LE>()?;
         expect_marker(input, 33)?;
@@ -87,7 +88,7 @@ impl Player {
             // saved view count can be negative
             self.saved_views = (0..num_saved_views.max(0))
                 .map(|_| Ok((input.read_f32::<LE>()?, input.read_f32::<LE>()?)))
-                .collect::<Result<_>>()?;
+                .collect::<GenieResult<_>>()?;
         }
         Ok(())
     }
@@ -97,7 +98,7 @@ impl Player {
     fn read_civilization_and_status<R: Read>(
         &mut self,
         input: &mut RecordingHeaderReader<R>,
-    ) -> Result<()> {
+    ) -> GenieResult<()> {
         self.spawn_location = (input.read_u16::<LE>()?, input.read_u16::<LE>()?);
         self.culture_id = input.read_u8()?;
         self.civilization_id = input.read_u8()?.into();
@@ -116,7 +117,7 @@ impl Player {
     fn read_techs_and_history<R: Read>(
         &mut self,
         input: &mut RecordingHeaderReader<R>,
-    ) -> Result<()> {
+    ) -> GenieResult<()> {
         // if is userpatch
         if genie_support::f32_eq!(input.version(), 11.97) {
             self.userpatch_data = Some(UserPatchData::read_from(input)?);
@@ -136,7 +137,7 @@ impl Player {
     fn read_tech_tree_ai_and_gaia<R: Read>(
         &mut self,
         input: &mut RecordingHeaderReader<R>,
-    ) -> Result<()> {
+    ) -> GenieResult<()> {
         if input.version() >= 9.38 {
             self.tech_tree = Some(TechTree::read_from(&mut *input)?);
         }
@@ -153,22 +154,28 @@ impl Player {
 
     /// The unit types: a flag for each, then the available ones (from 10.55 between the check
     /// bytes 22 and 33).
-    fn read_unit_kinds<R: Read>(&mut self, input: &mut RecordingHeaderReader<R>) -> Result<()> {
+    fn read_unit_kinds<R: Read>(
+        &mut self,
+        input: &mut RecordingHeaderReader<R>,
+    ) -> GenieResult<()> {
         let num_unit_kinds = input.read_u32::<LE>()?;
         let available_unit_kinds = (0..num_unit_kinds)
             .map(|_| Ok(input.read_u32::<LE>()? != 0))
-            .collect::<Result<Vec<_>>>()?;
+            .collect::<GenieResult<Vec<_>>>()?;
         expect_marker(input, 11)?;
         self.unit_kinds = available_unit_kinds
             .into_iter()
             .map(|available| available.then(|| read_unit_kind(input)).transpose())
-            .collect::<Result<_>>()?;
+            .collect::<GenieResult<_>>()?;
         expect_marker(input, 11)
     }
 
     /// The visible map and resources, then the units, the sleeping units and the
     /// doppelgangers.
-    fn read_maps_and_units<R: Read>(&mut self, input: &mut RecordingHeaderReader<R>) -> Result<()> {
+    fn read_maps_and_units<R: Read>(
+        &mut self,
+        input: &mut RecordingHeaderReader<R>,
+    ) -> GenieResult<()> {
         self.visible_map = VisibleMap::read_from(input)?;
         self.visible_resources = VisibleResources::read_from(input)?;
         expect_marker(input, 11)?;
@@ -182,7 +189,7 @@ impl Player {
 }
 
 /// An available unit type between its check bytes.
-fn read_unit_kind<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<CompactUnitKind> {
+fn read_unit_kind<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<CompactUnitKind> {
     expect_marker(input, 22)?;
     let ty = CompactUnitKind::read_from(input)?;
     expect_marker(input, 33)?;
@@ -190,7 +197,7 @@ fn read_unit_kind<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Compa
 }
 
 /// A unit list: its size and growth, then units up to one of class 0.
-fn read_unit_list<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Vec<Unit>> {
+fn read_unit_list<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Vec<Unit>> {
     let _list_size = input.read_u32::<LE>()?;
     let _grow_size = input.read_u32::<LE>()?;
     let mut units = vec![];
@@ -202,7 +209,7 @@ fn read_unit_list<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Vec<U
 
 /// The counts of objects and built objects per category and group (900 categories from
 /// 11.65, 850 from 11.51, 750 before) and their totals: skipped.
-fn skip_object_counts<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<()> {
+fn skip_object_counts<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<()> {
     let categories = if input.version() >= 11.65 {
         900
     } else if input.version() >= 11.51 {
@@ -229,7 +236,7 @@ fn skip_object_counts<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<(
 
 /// The formation ratios and distances (the break by speed from 10.81) and the escrow's
 /// debits, amounts and percents: skipped.
-fn skip_formations_and_escrow<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<()> {
+fn skip_formations_and_escrow<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<()> {
     let _line_ratio = input.read_u32::<LE>()?;
     let _column_ratio = input.read_u32::<LE>()?;
     let _min_column_distance = input.read_u32::<LE>()?;
@@ -250,7 +257,7 @@ fn skip_formations_and_escrow<R: Read>(input: &mut RecordingHeaderReader<R>) -> 
 
 /// The view scrolling (10.51), the AI's reaction percents (11.45) and the selection
 /// (11.72): skipped.
-fn skip_view_ai_and_selection<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<()> {
+fn skip_view_ai_and_selection<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<()> {
     if input.version() >= 10.51 {
         let _scroll_vector = (input.read_f32::<LE>()?, input.read_f32::<LE>()?);
         let _scroll_end = (input.read_f32::<LE>()?, input.read_f32::<LE>()?);
@@ -273,7 +280,7 @@ fn skip_view_ai_and_selection<R: Read>(input: &mut RecordingHeaderReader<R>) -> 
 /// selected ids.
 fn read_selection<R: Read>(
     input: &mut RecordingHeaderReader<R>,
-) -> Result<Option<(ObjectId, u32, Vec<ObjectId>)>> {
+) -> GenieResult<Option<(ObjectId, u32, Vec<ObjectId>)>> {
     let num_selections = input.read_u32::<LE>()?;
     if num_selections == 0 {
         return Ok(None);
@@ -282,13 +289,13 @@ fn read_selection<R: Read>(
     let object_properties = input.read_u32::<LE>()?;
     let selected_ids = (0..num_selections)
         .map(|_| Ok(input.read_u32::<LE>()?.into()))
-        .collect::<Result<_>>()?;
+        .collect::<GenieResult<_>>()?;
     Ok(Some((object_id, object_properties, selected_ids)))
 }
 
 /// The type and update counts, the AI's attack data (10.02), the fog update and the update
 /// time: skipped.
-fn skip_updates_and_attacks<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<()> {
+fn skip_updates_and_attacks<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<()> {
     expect_marker(input, 11)?;
     expect_marker(input, 11)?;
     let _ty = input.read_u8()?;
@@ -311,7 +318,9 @@ fn skip_updates_and_attacks<R: Read>(input: &mut RecordingHeaderReader<R>) -> Re
 /// The diplomacy, intelligence and trade towards each of nine players with their offers
 /// and the fealty (9.13), then the off-map trade routes explored (9.17) and being explored
 /// (9.18): skipped.
-fn skip_diplomacy_and_trade_routes<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<()> {
+fn skip_diplomacy_and_trade_routes<R: Read>(
+    input: &mut RecordingHeaderReader<R>,
+) -> GenieResult<()> {
     if input.version() >= 9.13 {
         for _ in 0..9 {
             let mut diplomacy_intelligence_trade = [0; 3];
@@ -333,7 +342,7 @@ fn skip_diplomacy_and_trade_routes<R: Read>(input: &mut RecordingHeaderReader<R>
 }
 
 /// The market's limits and rates (9.22): skipped.
-fn skip_market<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<()> {
+fn skip_market<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<()> {
     if input.version() < 9.22 {
         return Ok(());
     }
@@ -353,7 +362,7 @@ fn skip_market<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<()> {
 
 /// The production queue flag (9.67), the AI's dodging (9.90), the gates opened for pathing
 /// (11.42), the farm queue (11.57) and the nomad build lock (11.75): skipped.
-fn skip_queues_and_dodging<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<()> {
+fn skip_queues_and_dodging<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<()> {
     if input.version() >= 9.67 {
         let _prod_queue_enabled = input.read_u8()?;
     }
@@ -375,7 +384,7 @@ fn skip_queues_and_dodging<R: Read>(input: &mut RecordingHeaderReader<R>) -> Res
 
 /// The old kills, razings and modes (9.30), the hit points (9.31) and the old kills per
 /// player (9.32): skipped.
-fn skip_old_battle_stats<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<()> {
+fn skip_old_battle_stats<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<()> {
     if input.version() >= 9.30 {
         let _old_kills = input.read_u32::<LE>()?;
         let _old_razings = input.read_u32::<LE>()?;

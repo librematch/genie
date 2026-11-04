@@ -1,14 +1,14 @@
 //! A unit type ([`UnitKind`]): its base class and the parts it has, read and written.
 
-use crate::conv::invalid_data;
 use crate::unit_kind::{
     ActionUnitKindAttributes, AnimatedUnitKindAttributes, BaseCombatUnitKindAttributes,
     BuildingUnitKindAttributes, CombatUnitKindAttributes, MissileUnitKindAttributes,
     MovingUnitKindAttributes, StaticUnitKindAttributes, UnitBaseClass,
 };
 use byteorder::{ReadBytesExt, WriteBytesExt};
+use genie_error::{GenieResult, invalid_input};
 use std::convert::TryInto;
-use std::io::{Read, Result, Write};
+use std::io::{Read, Write};
 
 /// Data for a unit type.
 ///
@@ -59,8 +59,8 @@ impl UnitKind {
     /// UTF-8, or if the garrison sprite ID does not fit a [`SpriteId`].
     ///
     /// [`SpriteId`]: crate::sprite::SpriteId
-    pub fn read_from(mut input: impl Read, version: f32) -> Result<Self> {
-        let unit_base_class = input.read_u8()?.try_into().map_err(invalid_data)?;
+    pub fn read_from(mut input: impl Read, version: f32) -> GenieResult<Self> {
+        let unit_base_class = input.read_u8()?.try_into()?;
         let static_ = StaticUnitKindAttributes::read_from(&mut input, version)?;
         let mut unit = Self {
             unit_base_class,
@@ -105,11 +105,11 @@ impl UnitKind {
         &self,
         attributes: Option<&'a T>,
         class: UnitBaseClass,
-    ) -> Result<Option<&'a T>> {
+    ) -> GenieResult<Option<&'a T>> {
         match (self.unit_base_class >= class, attributes) {
             (true, Some(a)) => Ok(Some(a)),
             (false, None) => Ok(None),
-            _ => Err(invalid_data(ATTRIBUTES_MISMATCH)),
+            _ => Err(invalid_input(ATTRIBUTES_MISMATCH)),
         }
     }
 
@@ -122,7 +122,7 @@ impl UnitKind {
     /// Also fails when the unit type's `unit_base_class` property does not match the available
     /// data attributes. For example, when `self.unit_base_class` is `UnitBaseClass::Animated`,
     /// but `self.animated` is `None`.
-    pub fn write_to(&self, mut output: impl Write, version: f32) -> Result<()> {
+    pub fn write_to(&self, mut output: impl Write, version: f32) -> GenieResult<()> {
         output.write_u8(self.unit_base_class.into())?;
 
         self.static_.write_to(&mut output, version)?;

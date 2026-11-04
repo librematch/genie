@@ -3,13 +3,15 @@
 //! claims more than the file holds fails at the file's end instead of aborting the process on
 //! its allocation, in a browser too.
 
-use std::io::{self, ErrorKind, Read};
+use genie_error::{GenieError, GenieResult};
+use std::io::Read;
 
 /// The most elements a list reserves room for before they are read.
 pub const RESERVE_CAP: usize = 4096;
 
 /// A list too long for the address space.
-const PAST_ADDRESSES: &str = "a list longer than the address space";
+const PAST_ADDRESSES: GenieError =
+    GenieError::invalid_input("a list longer than the address space");
 
 /// An empty list with room for `count` elements, at most [`RESERVE_CAP`]: it grows as they
 /// come.
@@ -35,17 +37,15 @@ pub fn read_list<T, E>(count: usize, mut read: impl FnMut() -> Result<T, E>) -> 
 ///
 /// # Errors
 ///
-/// `UnexpectedEof` when `input` ends before `len` bytes, and `input`'s errors.
-pub fn read_bytes<R: Read + ?Sized>(input: &mut R, len: usize) -> io::Result<Vec<u8>> {
+/// Invalid input when `input` ends before `len` bytes, and `input`'s errors.
+pub fn read_bytes<R: Read + ?Sized>(input: &mut R, len: usize) -> GenieResult<Vec<u8>> {
     let mut bytes = reserved(len);
-    let limit =
-        u64::try_from(len).map_err(|_| io::Error::new(ErrorKind::InvalidData, PAST_ADDRESSES))?;
+    let limit = u64::try_from(len).map_err(|_| PAST_ADDRESSES.with("length", len))?;
     let _ = Read::take(&mut *input, limit).read_to_end(&mut bytes)?;
     if bytes.len() < len {
-        return Err(io::Error::new(
-            ErrorKind::UnexpectedEof,
-            "a list of bytes past the input's end",
-        ));
+        return Err(GenieError::invalid_input("a list past the input's end")
+            .with("length", len)
+            .with("read", bytes.len()));
     }
     Ok(bytes)
 }
@@ -55,16 +55,16 @@ pub fn read_bytes<R: Read + ?Sized>(input: &mut R, len: usize) -> io::Result<Vec
 ///
 /// # Errors
 ///
-/// `UnexpectedEof` when `input` ends before them, `InvalidData` for a `count` whose bytes no
-/// address reaches, and `input`'s errors.
+/// Invalid input when `input` ends before them or for a `count` whose bytes no address
+/// reaches, and `input`'s errors.
 pub fn read_le<const N: usize, T, R: Read + ?Sized>(
     input: &mut R,
     count: usize,
     from: fn([u8; N]) -> T,
-) -> io::Result<Vec<T>> {
+) -> GenieResult<Vec<T>> {
     let len = count
         .checked_mul(N)
-        .ok_or_else(|| io::Error::new(ErrorKind::InvalidData, PAST_ADDRESSES))?;
+        .ok_or_else(|| PAST_ADDRESSES.with("count", count))?;
     let bytes = read_bytes(input, len)?;
     Ok(bytes
         .as_chunks::<N>()
@@ -78,8 +78,8 @@ pub fn read_le<const N: usize, T, R: Read + ?Sized>(
 ///
 /// # Errors
 ///
-/// `UnexpectedEof` when `input` ends before them, and `input`'s errors.
-pub fn read_i8s<R: Read + ?Sized>(input: &mut R, count: usize) -> io::Result<Vec<i8>> {
+/// Invalid input when `input` ends before them, and `input`'s errors.
+pub fn read_i8s<R: Read + ?Sized>(input: &mut R, count: usize) -> GenieResult<Vec<i8>> {
     Ok(read_bytes(input, count)?
         .into_iter()
         .map(u8::cast_signed)
@@ -99,8 +99,8 @@ mod tests {
         assert!(list.capacity() <= RESERVE_CAP);
         let mut input = Cursor::new(vec![1u8, 2, 3]);
         assert_eq!(
-            read_bytes(&mut input, usize::MAX).map_err(|e| e.kind()),
-            Err(ErrorKind::UnexpectedEof)
+            read_bytes(&mut input, usize::MAX).map_err(|e| e.reason()),
+            Err("a list past the input's end")
         );
         let mut input = Cursor::new(vec![1u8, 2, 3]);
         assert_eq!(read_bytes(&mut input, 2).unwrap(), [1, 2]);
@@ -113,13 +113,13 @@ mod tests {
         );
         let mut input = Cursor::new(vec![0u8; 4]);
         assert_eq!(
-            read_le(&mut input, usize::MAX, f32::from_le_bytes).map_err(|e| e.kind()),
-            Err(ErrorKind::InvalidData)
+            read_le(&mut input, usize::MAX, f32::from_le_bytes).map_err(|e| e.reason()),
+            Err("a list longer than the address space")
         );
         let mut input = Cursor::new(vec![0u8; 4]);
         assert_eq!(
-            read_le(&mut input, 2, f32::from_le_bytes).map_err(|e| e.kind()),
-            Err(ErrorKind::UnexpectedEof)
+            read_le(&mut input, 2, f32::from_le_bytes).map_err(|e| e.reason()),
+            Err("a list past the input's end")
         );
         let mut next = 0;
         let read = read_list(3, || {

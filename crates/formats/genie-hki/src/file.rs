@@ -1,15 +1,17 @@
 //! A hotkey file ([`HotkeyInfo`]): its version and groups, compressed or not.
 
-use crate::{GroupIndexError, Hotkey, HotkeyGroup, HotkeyInfoMetadata, IndexError};
+use crate::errors::no_group;
+use crate::{Hotkey, HotkeyGroup, HotkeyInfoMetadata};
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
 use flate2::Compression;
 use flate2::read::DeflateDecoder;
 use flate2::write::DeflateEncoder;
+use genie_error::GenieResult;
 use genie_lang::LangFile;
 use genie_support::read_list;
 use std::collections::HashMap;
 use std::io::{Read, Write};
-use std::{fmt, io, slice, vec};
+use std::{fmt, slice, vec};
 
 /// Represents a HKI file containing hotkey settings.
 #[derive(Debug, Clone, PartialEq)]
@@ -23,7 +25,7 @@ pub struct HotkeyInfo {
 
 impl HotkeyInfo {
     /// Read a hotkey info structure from an uncompressed stream.
-    pub(super) fn read_uncompressed<R: Read>(input: &mut R) -> io::Result<Self> {
+    pub(super) fn read_uncompressed<R: Read>(input: &mut R) -> GenieResult<Self> {
         let version = input.read_f32::<LE>()?;
         let num_groups = input.read_u32::<LE>()?;
         let groups = read_list(num_groups as usize, || HotkeyGroup::read_from(input))?;
@@ -37,7 +39,7 @@ impl HotkeyInfo {
     ///
     /// Returns an error if reading from `input` fails, including when the data is not valid
     /// DEFLATE or ends early.
-    pub fn read_from(input: impl Read) -> io::Result<Self> {
+    pub fn read_from(input: impl Read) -> GenieResult<Self> {
         let mut input = DeflateDecoder::new(input);
         Self::read_uncompressed(&mut input)
     }
@@ -45,7 +47,7 @@ impl HotkeyInfo {
     /// Writes a hotkey info structure to an uncompressed stream.
     // The format stores the group count as a u32.
     #[allow(clippy::cast_possible_truncation)]
-    pub(super) fn write_to_uncompressed<W: Write>(&self, output: &mut W) -> io::Result<()> {
+    pub(super) fn write_to_uncompressed<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         output.write_f32::<LE>(self.version)?;
         output.write_u32::<LE>(self.groups.len() as u32)?;
         for group in &self.groups {
@@ -59,7 +61,7 @@ impl HotkeyInfo {
     /// # Errors
     ///
     /// Returns an error if writing to `output` fails.
-    pub fn write_to<W: Write>(&self, output: &mut W) -> io::Result<()> {
+    pub fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         let mut output = DeflateEncoder::new(output, Compression::default());
         self.write_to_uncompressed(&mut output)
     }
@@ -144,9 +146,9 @@ impl HotkeyInfo {
     ///
     /// # Errors
     ///
-    /// Returns an `IndexError` if there is no group at `group_index` or no hotkey at
+    /// An `InvalidInput` error if there is no group at `group_index` or no hotkey at
     /// `key_index` in it.
-    pub fn unbind_key(&self, group_index: usize, key_index: usize) -> Result<Self, IndexError> {
+    pub fn unbind_key(&self, group_index: usize, key_index: usize) -> GenieResult<Self> {
         self.bind_key(group_index, key_index, 0, false, false, false)
     }
 
@@ -156,7 +158,7 @@ impl HotkeyInfo {
     ///
     /// # Errors
     ///
-    /// Returns an `IndexError` if there is no group at `group_index` or no hotkey at
+    /// An `InvalidInput` error if there is no group at `group_index` or no hotkey at
     /// `key_index` in it.
     pub fn bind_key(
         &self,
@@ -166,12 +168,9 @@ impl HotkeyInfo {
         ctrl: bool,
         alt: bool,
         shift: bool,
-    ) -> Result<Self, IndexError> {
+    ) -> GenieResult<Self> {
         if group_index >= self.num_groups() {
-            return Err(IndexError::GroupIndex(GroupIndexError::new(
-                group_index,
-                self.num_groups(),
-            )));
+            return Err(no_group(group_index, self.num_groups()));
         }
         let mut groups = Vec::with_capacity(self.num_groups());
         for (i, grp) in self.groups.iter().enumerate() {

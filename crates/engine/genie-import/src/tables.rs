@@ -9,15 +9,18 @@ use genie_model::players::attribute::AttributeId;
 use genie_model::technology::Linked;
 use genie_model::technology::TechId;
 use genie_model::unit_ai::task_finder::{DropSite, DropTarget};
+use genie_model::{GenieError, GenieResult};
 use std::collections::BTreeMap;
-use std::error::Error;
-use std::fmt::{Display, Error as FmtError, Formatter};
 
 /// The game's linked technologies (`resources/_common/dat/linkedTechs.json`): each group's
 /// technologies with the group's kind. A technology of a kind the game does not know, or out of
 /// the ids' range, is left out.
-pub fn linked_techs(json: &str) -> Result<BTreeMap<TechId, Linked>, serde_json::Error> {
-    let file: genie_json::LinkedTechs = serde_json::from_str(json)?;
+///
+/// # Errors
+///
+/// A file that is not JSON, or not the table's shape.
+pub fn linked_techs(json: &str) -> GenieResult<BTreeMap<TechId, Linked>> {
+    let file: genie_json::LinkedTechs = serde_json::from_str(json).map_err(not_json)?;
     Ok(file
         .linked_techs
         .iter()
@@ -33,25 +36,18 @@ pub fn linked_techs(json: &str) -> Result<BTreeMap<TechId, Linked>, serde_json::
         .collect())
 }
 
-/// What makes `unitlines.json` out of shape for [`unit_lines`].
-#[derive(Debug)]
-pub enum UnitLinesError {
-    /// The file is not JSON.
-    Json(serde_json::Error),
-    /// A value of a kind the builder does not read: the entry's index and the key.
-    Value(usize, &'static str),
+/// A table that is not JSON.
+fn not_json(e: serde_json::Error) -> GenieError {
+    GenieError::invalid_input("a table that is not JSON").with_source(e)
 }
 
-impl Display for UnitLinesError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), FmtError> {
-        match self {
-            Self::Json(e) => write!(f, "{e}"),
-            Self::Value(i, key) => write!(f, "UnitLines[{i}]: {key} is not what the game reads"),
-        }
-    }
+/// A unit line's value of another kind than the game reads: the entry's index and the key.
+#[track_caller]
+fn unit_line_value(entry: usize, key: &'static str) -> GenieError {
+    GenieError::invalid_input("a unit line value of another kind than the game reads")
+        .with("entry", entry)
+        .with("key", key)
 }
-
-impl Error for UnitLinesError {}
 
 /// The game's unit lines (`resources/_common/dat/unitlines.json`) as `FUN_140fde680` reads each
 /// entry of `UnitLines`: `LineID` (an int), `IDChain` (an array of ints), `Building` (a bool,
@@ -62,20 +58,20 @@ impl Error for UnitLinesError {}
 /// # Errors
 ///
 /// A file that is not JSON, or a value of another kind than the game reads.
-pub fn unit_lines(json: &str) -> Result<Vec<UnitLine>, UnitLinesError> {
-    let v: serde_json::Value = serde_json::from_str(json).map_err(UnitLinesError::Json)?;
+pub fn unit_lines(json: &str) -> GenieResult<Vec<UnitLine>> {
+    let v: serde_json::Value = serde_json::from_str(json).map_err(not_json)?;
     let Some(entries) = v.get("UnitLines").and_then(serde_json::Value::as_array) else {
         return Ok(Vec::new());
     };
     let int = |i: usize, key: &'static str, v: &serde_json::Value| {
         v.as_i64()
             .and_then(|n| i32::try_from(n).ok())
-            .ok_or(UnitLinesError::Value(i, key))
+            .ok_or_else(|| unit_line_value(i, key))
     };
     let text = |i: usize, v: &serde_json::Value| {
         v.as_str()
             .map(str::to_owned)
-            .ok_or(UnitLinesError::Value(i, "Identifier"))
+            .ok_or_else(|| unit_line_value(i, "Identifier"))
     };
     entries
         .iter()
@@ -86,7 +82,7 @@ pub fn unit_lines(json: &str) -> Result<Vec<UnitLine>, UnitLinesError> {
                 .get("IDChain")
                 .map(|v| {
                     v.as_array()
-                        .ok_or(UnitLinesError::Value(i, "IDChain"))?
+                        .ok_or_else(|| unit_line_value(i, "IDChain"))?
                         .iter()
                         .map(|id| int(i, "IDChain", id))
                         .collect::<Result<Vec<_>, _>>()
@@ -94,7 +90,7 @@ pub fn unit_lines(json: &str) -> Result<Vec<UnitLine>, UnitLinesError> {
                 .transpose()?;
             let building = match e.get("Building") {
                 None => false,
-                Some(b) => b.as_bool().ok_or(UnitLinesError::Value(i, "Building"))?,
+                Some(b) => b.as_bool().ok_or_else(|| unit_line_value(i, "Building"))?,
             };
             let identifiers = match e.get("Identifier") {
                 None => Vec::new(),
@@ -114,38 +110,18 @@ pub fn unit_lines(json: &str) -> Result<Vec<UnitLine>, UnitLinesError> {
         .collect()
 }
 
-/// What makes `dropsites.json` out of shape for [`drop_sites`].
-#[derive(Debug)]
-pub enum DropSitesError {
-    /// The file is not JSON.
-    Json(serde_json::Error),
-    /// A class value that is no master class: the entry's index and the key.
-    Class(usize, &'static str),
-    /// A `building_id` that is no master: the entry's index.
-    Building(usize),
-    /// An attribute value that is no attribute: the entry's index and the key.
-    Attribute(usize, &'static str),
-    /// An `object_state` past 8: the entry's index.
-    State(usize),
+/// A drop site's value that is not what its key names (a class, a master, an attribute, an
+/// object state): `reason`, the entry's index and the key.
+#[track_caller]
+fn drop_site_value(reason: &'static str, entry: usize, key: &'static str) -> GenieError {
+    GenieError::invalid_input(reason)
+        .with("entry", entry)
+        .with("key", key)
 }
-
-impl Display for DropSitesError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), FmtError> {
-        match self {
-            Self::Json(e) => write!(f, "{e}"),
-            Self::Class(i, key) => write!(f, "drop_site_list[{i}]: {key} is no master class"),
-            Self::Building(i) => write!(f, "drop_site_list[{i}]: building_id is no master"),
-            Self::Attribute(i, key) => write!(f, "drop_site_list[{i}]: {key} is no attribute"),
-            Self::State(i) => write!(f, "drop_site_list[{i}]: object_state is no object state"),
-        }
-    }
-}
-
-impl Error for DropSitesError {}
 
 /// A drop-site target's `object_state` (of entry `i`): none for a negative value, which the task
 /// finder reads as any state (`0 <= state`), else the state.
-fn object_state(i: usize, n: i64) -> Result<Option<ObjectState>, DropSitesError> {
+fn object_state(i: usize, n: i64) -> GenieResult<Option<ObjectState>> {
     if n < 0 {
         return Ok(None);
     }
@@ -153,7 +129,7 @@ fn object_state(i: usize, n: i64) -> Result<Option<ObjectState>, DropSitesError>
         .ok()
         .and_then(|n| ObjectState::of_byte(n).ok())
         .map(Some)
-        .ok_or(DropSitesError::State(i))
+        .ok_or_else(|| drop_site_value("a drop site's object state past 8", i, "object_state"))
 }
 
 /// The game's drop-site table (`resources/_common/dat/dropsites.json`): each entry's
@@ -164,9 +140,9 @@ fn object_state(i: usize, n: i64) -> Result<Option<ObjectState>, DropSitesError>
 ///
 /// A file that is not JSON, a target's `object_group` or an entry's `worker_object_group`
 /// that is neither a class nor (the worker group only) -1, or a target's `object_state` past 8.
-pub fn drop_sites(json: &str) -> Result<Vec<DropSite>, DropSitesError> {
+pub fn drop_sites(json: &str) -> GenieResult<Vec<DropSite>> {
     use genie_model::objects::masters::{ClassId, MasterId};
-    let v: serde_json::Value = serde_json::from_str(json).map_err(DropSitesError::Json)?;
+    let v: serde_json::Value = serde_json::from_str(json).map_err(not_json)?;
     let num = |v: &serde_json::Value| v.as_i64().unwrap_or(-1);
     let list = |e: &serde_json::Value, key: &str| -> Vec<i64> {
         e.get(key)
@@ -177,7 +153,7 @@ pub fn drop_sites(json: &str) -> Result<Vec<DropSite>, DropSitesError> {
         i16::try_from(n)
             .ok()
             .and_then(|n| ClassId::try_from(n).ok())
-            .ok_or(DropSitesError::Class(i, key))
+            .ok_or_else(|| drop_site_value("a drop site's class that is no master class", i, key))
     };
     let Some(entries) = v["drop_site_list"].as_array() else {
         return Ok(Vec::new());
@@ -200,14 +176,22 @@ pub fn drop_sites(json: &str) -> Result<Vec<DropSite>, DropSitesError> {
                         class: class(i, "object_group", field("object_group"))?,
                         workers: WorkerCount::of_data(field("worker_num") as i32),
                         state: object_state(i, field("object_state"))?,
-                        attribute: AttributeId::of_field(field("attribute_type") as i16)
-                            .map_err(|_| DropSitesError::Attribute(i, "attribute_type"))?,
+                        attribute: AttributeId::of_field(field("attribute_type") as i16).map_err(
+                            |_| {
+                                drop_site_value(
+                                    "a drop site's attribute that is no attribute",
+                                    i,
+                                    "attribute_type",
+                                )
+                            },
+                        )?,
                     })
                 })
-                .collect::<Result<Vec<_>, DropSitesError>>()?;
+                .collect::<GenieResult<Vec<_>>>()?;
             Ok(DropSite {
-                building: MasterId::try_from(num(&e["building_id"]) as i16)
-                    .map_err(|_| DropSitesError::Building(i))?,
+                building: MasterId::try_from(num(&e["building_id"]) as i16).map_err(|_| {
+                    drop_site_value("a drop site's building that is no master", i, "building_id")
+                })?,
                 worker_class,
                 workers: list(e, "worker_object_list")
                     .into_iter()
@@ -226,9 +210,15 @@ pub fn drop_sites(json: &str) -> Result<Vec<DropSite>, DropSitesError> {
                     .iter()
                     .map(|t| {
                         AttributeId::try_from(t.get("resource_type").map_or(-1, num) as i16)
-                            .map_err(|_| DropSitesError::Attribute(i, "resource_type"))
+                            .map_err(|_| {
+                                drop_site_value(
+                                    "a drop site's attribute that is no attribute",
+                                    i,
+                                    "resource_type",
+                                )
+                            })
                     })
-                    .collect::<Result<Vec<_>, DropSitesError>>()?,
+                    .collect::<GenieResult<Vec<_>>>()?,
             })
         })
         .collect()
@@ -236,44 +226,50 @@ pub fn drop_sites(json: &str) -> Result<Vec<DropSite>, DropSitesError> {
 
 #[cfg(test)]
 mod tests {
-    use crate::tables::{DropSitesError, UnitLinesError, drop_sites};
+    use crate::tables::{drop_sites, unit_lines};
+    use genie_model::GenieError;
     use genie_model::objects::ObjectState;
+    use std::error::Error as StdError;
 
-    /// Each error names the entry and the key it found out of shape; a file that is not JSON
-    /// gives the parser's message.
+    /// Each error names its reason, the entry and the key it found out of shape; a file that
+    /// is not JSON keeps the parser's error as its source.
     #[test]
     fn table_errors_name_their_entry_and_key() {
-        let json = || serde_json::from_str::<serde_json::Value>("[").unwrap_err();
-        let drop_sites = [
-            (DropSitesError::Json(json()), "EOF while parsing"),
+        let reason_and_context = |e: GenieError| {
+            let context: Vec<_> = e
+                .context()
+                .map(|(key, value)| format!("{key}: {value}"))
+                .collect();
+            (e.reason(), context.join(", "))
+        };
+        let e = drop_sites("[").unwrap_err();
+        assert_eq!(e.reason(), "a table that is not JSON");
+        assert!(StdError::source(&e).is_some());
+        let site = |target: &str| {
+            format!(r#"{{"drop_site_list": [{{"building_id": 562, "target_list": [{target}]}}]}}"#)
+        };
+        assert_eq!(
+            reason_and_context(drop_sites(&site(r#"{"object_group": -5}"#)).unwrap_err()),
             (
-                DropSitesError::Class(2, "object_group"),
-                "drop_site_list[2]: object_group is no master class",
-            ),
-            (
-                DropSitesError::Building(3),
-                "drop_site_list[3]: building_id is no master",
-            ),
-            (
-                DropSitesError::Attribute(4, "attribute_type"),
-                "drop_site_list[4]: attribute_type is no attribute",
-            ),
-            (
-                DropSitesError::State(5),
-                "drop_site_list[5]: object_state is no object state",
-            ),
-        ];
-        for (error, text) in drop_sites {
-            assert!(error.to_string().starts_with(text), "{error}");
-        }
-        assert!(
-            UnitLinesError::Json(json())
-                .to_string()
-                .starts_with("EOF while parsing")
+                "a drop site's class that is no master class",
+                "entry: 0, key: object_group".to_owned()
+            )
         );
         assert_eq!(
-            UnitLinesError::Value(1, "LineID").to_string(),
-            "UnitLines[1]: LineID is not what the game reads"
+            reason_and_context(
+                drop_sites(&site(r#"{"object_group": 15, "attribute_type": -5}"#)).unwrap_err()
+            ),
+            (
+                "a drop site's attribute that is no attribute",
+                "entry: 0, key: attribute_type".to_owned()
+            )
+        );
+        assert_eq!(
+            reason_and_context(unit_lines(r#"{"UnitLines": [{}, {"LineID": "x"}]}"#).unwrap_err()),
+            (
+                "a unit line value of another kind than the game reads",
+                "entry: 1, key: LineID".to_owned()
+            )
         );
     }
 
@@ -293,6 +289,9 @@ mod tests {
         assert_eq!(state(Some(5)).unwrap(), Some(ObjectState::Dead));
         assert_eq!(state(None).unwrap(), None);
         assert_eq!(state(Some(-2)).unwrap(), None);
-        assert!(matches!(state(Some(9)), Err(DropSitesError::State(0))));
+        assert_eq!(
+            state(Some(9)).map_err(|e| e.reason()),
+            Err("a drop site's object state past 8")
+        );
     }
 }

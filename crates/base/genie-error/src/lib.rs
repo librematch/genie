@@ -12,6 +12,8 @@
 //!
 //! The crate depends on no other crate of the workspace: every one may depend on it.
 
+#[cfg(feature = "serde")]
+use serde::de::Error as SerdeError;
 use std::error::Error;
 use std::fmt;
 use std::hash::{Hash, Hasher};
@@ -202,6 +204,16 @@ impl From<IoError> for GenieError {
     }
 }
 
+#[cfg(feature = "serde")]
+impl SerdeError for GenieError {
+    /// A value that does not deserialize into its field ([`ErrorKind::InvalidInput`]), `why` in
+    /// its context.
+    #[track_caller]
+    fn custom<T: fmt::Display>(why: T) -> Self {
+        Self::invalid_input("a value that does not deserialize into its field").with("why", why)
+    }
+}
+
 impl PartialEq for GenieError {
     /// Equal kinds and reasons: the place and the context do not make another error.
     fn eq(&self, other: &Self) -> bool {
@@ -271,6 +283,21 @@ impl Error for GenieError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// serde's custom error is invalid input with its why.
+    #[cfg(feature = "serde")]
+    #[test]
+    fn serde_custom_error_is_invalid_input() {
+        let e = GenieError::custom("not a number");
+        assert_eq!(
+            (e.kind(), e.reason()),
+            (
+                ErrorKind::InvalidInput,
+                "a value that does not deserialize into its field"
+            )
+        );
+        assert_eq!(e.context().collect::<Vec<_>>(), [("why", "not a number")]);
+    }
 
     /// A constant error, whose place is its definition's.
     const SHARED: GenieError = unsupported("a shared reason");

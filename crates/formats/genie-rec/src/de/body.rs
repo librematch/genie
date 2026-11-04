@@ -4,10 +4,11 @@
 //! sequence byte after it. The reader dispatches on the op id by hand: binrw's enum derive would try
 //! the variants in order and allocate an error for every mismatch.
 
-use crate::de::{Error, GenieError};
+use crate::de::GenieError;
 use crate::de::{truncated, unknown_op};
 use binrw::binrw;
 use binrw::io::Cursor;
+use genie_error::GenieResult;
 use std::mem::replace;
 
 /// Op 5 as the first record of a recording.
@@ -143,7 +144,7 @@ impl<'a> OpReader<'a> {
     }
 
     /// The next `n` bytes, or `Truncated` at the start of the current record.
-    fn take(&mut self, n: usize, record: usize) -> Result<&'a [u8], Error> {
+    fn take(&mut self, n: usize, record: usize) -> GenieResult<&'a [u8]> {
         if self.remaining() < n {
             return Err(truncated(self.base + record));
         }
@@ -152,13 +153,13 @@ impl<'a> OpReader<'a> {
         Ok(bytes)
     }
 
-    fn u32(&mut self, record: usize) -> Result<u32, Error> {
+    fn u32(&mut self, record: usize) -> GenieResult<u32> {
         let b = self.take(4, record)?;
         Ok(u32::from_le_bytes([b[0], b[1], b[2], b[3]]))
     }
 
     /// A fixed-size binrw record of `size` bytes.
-    fn fixed<T>(&mut self, size: usize, record: usize) -> Result<T, Error>
+    fn fixed<T>(&mut self, size: usize, record: usize) -> GenieResult<T>
     where
         T: for<'b> binrw::BinRead<Args<'b> = ()>,
     {
@@ -166,7 +167,7 @@ impl<'a> OpReader<'a> {
         T::read_le(&mut Cursor::new(bytes)).map_err(|_| truncated(self.base + record))
     }
 
-    fn read_op(&mut self) -> Result<Op<'a>, Error> {
+    fn read_op(&mut self) -> GenieResult<Op<'a>> {
         let record = self.pos;
         let first = replace(&mut self.pregame_allowed, false);
         match self.u32(record)? {
@@ -211,7 +212,7 @@ impl<'a> OpReader<'a> {
 const CHECKPOINT_SIZE: usize = (8 * 11 + 1) * 4;
 
 impl<'a> Iterator for OpReader<'a> {
-    type Item = Result<Op<'a>, Error>;
+    type Item = GenieResult<Op<'a>>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.done || self.remaining() == 0 {
@@ -234,7 +235,7 @@ impl Op<'_> {
     ///
     /// A fixed-size record that does not write back.
     #[allow(clippy::cast_possible_truncation)]
-    pub fn write(&self, out: &mut Vec<u8>) -> Result<(), Error> {
+    pub fn write(&self, out: &mut Vec<u8>) -> GenieResult<()> {
         let words =
             |out: &mut Vec<u8>, ws: &[u32]| ws.iter().for_each(|w| out.extend(w.to_le_bytes()));
         match self {
@@ -274,7 +275,7 @@ impl Op<'_> {
 }
 
 /// Append a fixed-size binrw record.
-fn write_fixed<T>(value: &T, out: &mut Vec<u8>) -> Result<(), Error>
+fn write_fixed<T>(value: &T, out: &mut Vec<u8>) -> GenieResult<()>
 where
     T: for<'b> binrw::BinWrite<Args<'b> = ()>,
 {
@@ -295,7 +296,7 @@ mod tests {
         words.iter().flat_map(|w| w.to_le_bytes()).collect()
     }
 
-    fn read(body: &[u8], first_chapter: bool) -> Vec<Result<Op<'_>, Error>> {
+    fn read(body: &[u8], first_chapter: bool) -> Vec<GenieResult<Op<'_>>> {
         OpReader::new(body, BASE, first_chapter).collect()
     }
 

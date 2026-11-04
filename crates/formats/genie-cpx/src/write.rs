@@ -1,27 +1,16 @@
 use crate::{AOE_AOK, AOE1_DE, AOE2_DE, CampaignHeader, CpxVersion, ScenarioMeta};
 use byteorder::{LE, WriteBytesExt};
-use genie_scx::{DlcPackage, Result as ScxResult, Scenario};
-use std::io::{self, Write};
-
-/// Type for errors that could occur during writing.
-#[derive(Debug, thiserror::Error)]
-pub enum WriteCampaignError {
-    /// An I/O error occurred during writing.
-    #[error("{}", .0)]
-    IoError(#[from] io::Error),
-    /// A scenario could not be found, either because the original campaign file was corrupt, or
-    /// the scenario file exists but could not be parsed.
-    #[error("missing scenario data for index {}", .0)]
-    NotFoundError(usize),
-}
+use genie_error::{GenieError, GenieResult};
+use genie_scx::{DlcPackage, Scenario};
+use std::io::Write;
 
 /// `value` as a `T` when it is below `limit`, else an error naming `what`.
-fn below<T: TryFrom<usize>>(value: usize, limit: usize, what: &str) -> io::Result<T> {
+fn below<T: TryFrom<usize>>(value: usize, limit: usize, what: &'static str) -> GenieResult<T> {
     let too_large = || {
-        io::Error::new(
-            io::ErrorKind::InvalidData,
-            format!("{what} {value} is not below {limit}"),
-        )
+        GenieError::invalid_input("a value the campaign's field does not hold")
+            .with("field", what)
+            .with("value", value)
+            .with("limit", limit)
     };
     if limit <= value {
         return Err(too_large());
@@ -30,14 +19,14 @@ fn below<T: TryFrom<usize>>(value: usize, limit: usize, what: &str) -> io::Resul
 }
 
 /// The padded `bytes` of a name of at most `width - 1` bytes.
-fn padded(bytes: &[u8], width: usize, what: &str) -> io::Result<Vec<u8>> {
+fn padded(bytes: &[u8], width: usize, what: &'static str) -> GenieResult<Vec<u8>> {
     let _ = below::<usize>(bytes.len(), width, what)?;
     let mut out = bytes.to_vec();
     out.resize(width, 0);
     Ok(out)
 }
 
-fn write_variable_str<W: Write>(output: &mut W, value: &str) -> io::Result<()> {
+fn write_variable_str<W: Write>(output: &mut W, value: &str) -> GenieResult<()> {
     output.write_u16::<LE>(0x0A60)?;
     let len: u16 = below(value.len(), usize::from(u16::MAX), "a string's length")?;
     output.write_u16::<LE>(len)?;
@@ -46,7 +35,7 @@ fn write_variable_str<W: Write>(output: &mut W, value: &str) -> io::Result<()> {
 }
 
 /// Write the campaign header to the `output` stream.
-fn write_campaign_header<W: Write>(header: &CampaignHeader, output: &mut W) -> io::Result<()> {
+fn write_campaign_header<W: Write>(header: &CampaignHeader, output: &mut W) -> GenieResult<()> {
     let num_scenarios: u32 = below(
         header.num_scenarios,
         i32::MAX as usize,
@@ -89,7 +78,7 @@ fn write_campaign_header<W: Write>(header: &CampaignHeader, output: &mut W) -> i
 }
 
 /// Write metadata for a single scenario into the `output` stream in the classic AoE/AoK format.
-fn write_scenario_meta<W: Write>(meta: &ScenarioMeta, output: &mut W) -> io::Result<()> {
+fn write_scenario_meta<W: Write>(meta: &ScenarioMeta, output: &mut W) -> GenieResult<()> {
     output.write_i32::<LE>(below(meta.size, i32::MAX as usize, "a scenario's size")?)?;
     output.write_i32::<LE>(below(
         meta.offset,
@@ -111,7 +100,7 @@ fn write_scenario_meta<W: Write>(meta: &ScenarioMeta, output: &mut W) -> io::Res
 }
 
 /// Write metadata for a single scenario into the `output` stream, in the `AoE1`: DE format.
-fn write_scenario_meta_de<W: Write>(meta: &ScenarioMeta, output: &mut W) -> io::Result<()> {
+fn write_scenario_meta_de<W: Write>(meta: &ScenarioMeta, output: &mut W) -> GenieResult<()> {
     // `u64::MAX as usize` is `usize::MAX` on every target.
     output.write_u64::<LE>(below(meta.size, usize::MAX, "a scenario's size")?)?;
     output.write_u64::<LE>(below(meta.offset, usize::MAX, "a scenario's offset")?)?;
@@ -121,7 +110,7 @@ fn write_scenario_meta_de<W: Write>(meta: &ScenarioMeta, output: &mut W) -> io::
 }
 
 /// Write metadata for a single scenario into the `output` stream, in the `AoE2`: DE format.
-fn write_scenario_meta_de2<W: Write>(meta: &ScenarioMeta, output: &mut W) -> io::Result<()> {
+fn write_scenario_meta_de2<W: Write>(meta: &ScenarioMeta, output: &mut W) -> GenieResult<()> {
     output.write_u32::<LE>(below(meta.size, u32::MAX as usize, "a scenario's size")?)?;
     output.write_u32::<LE>(below(
         meta.offset,
@@ -212,7 +201,7 @@ impl<W: Write> CampaignWriter<W> {
     /// # Errors
     ///
     /// Returns an error if the scenario cannot be serialized.
-    pub fn add(&mut self, name: &str, scx: &Scenario) -> ScxResult<()> {
+    pub fn add(&mut self, name: &str, scx: &Scenario) -> GenieResult<()> {
         let mut bytes = vec![];
         scx.write_to(&mut bytes)?;
         self.scenarios.push(CampaignEntry {
@@ -229,7 +218,7 @@ impl<W: Write> CampaignWriter<W> {
     }
 
     /// Write the campaign header.
-    fn write_header(&mut self) -> io::Result<()> {
+    fn write_header(&mut self) -> GenieResult<()> {
         self.header.num_scenarios = self.scenarios.len();
         write_campaign_header(&self.header, &mut self.writer)
     }
@@ -273,7 +262,7 @@ impl<W: Write> CampaignWriter<W> {
     }
 
     /// Write the scenario metadata block.
-    fn write_metas(&mut self) -> io::Result<()> {
+    fn write_metas(&mut self) -> GenieResult<()> {
         let write_meta = if self.header.version == AOE2_DE {
             write_scenario_meta_de2
         } else if self.header.version == AOE1_DE {
@@ -306,7 +295,7 @@ impl<W: Write> CampaignWriter<W> {
     }
 
     /// Write the scenario data.
-    fn write_scenarios(&mut self) -> io::Result<()> {
+    fn write_scenarios(&mut self) -> GenieResult<()> {
         for scen in &self.scenarios {
             self.writer.write_all(scen.bytes())?;
         }
@@ -319,15 +308,12 @@ impl<W: Write> CampaignWriter<W> {
     ///
     /// # Errors
     ///
-    /// Returns an error if writing to the output stream fails.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the campaign has `i32::MAX` scenarios or more, or if a name does not fit the
-    /// version's fields: 255 bytes or more for the campaign name (classic and `AoE2`: DE) or a
-    /// scenario's name or file name (classic), `u16::MAX` bytes or more for a variable-length
-    /// string, or a scenario size or offset too large for the version's integer width.
-    pub fn flush(mut self) -> io::Result<W> {
+    /// Returns an error if writing to the output stream fails, if the campaign has `i32::MAX`
+    /// scenarios or more, or if a name does not fit the version's fields: 255 bytes or more for
+    /// the campaign name (classic and `AoE2`: DE) or a scenario's name or file name (classic),
+    /// `u16::MAX` bytes or more for a variable-length string, or a scenario size or offset too
+    /// large for the version's integer width.
+    pub fn flush(mut self) -> GenieResult<W> {
         self.write_header()?;
         self.write_metas()?;
         self.write_scenarios()?;
@@ -336,49 +322,12 @@ impl<W: Write> CampaignWriter<W> {
     }
 }
 
-impl From<WriteCampaignError> for genie_error::GenieError {
-    /// The error as a [`genie_error::GenieError`]: its kind and reason, the original as the
-    /// source.
-    #[track_caller]
-    fn from(e: WriteCampaignError) -> Self {
-        let to = match &e {
-            WriteCampaignError::IoError(_) => Self::io("a read or write that failed"),
-            WriteCampaignError::NotFoundError(_) => {
-                Self::invalid_input("a campaign scenario without its data")
-            }
-        };
-        to.with_source(e)
-    }
-}
-
-#[cfg(test)]
-mod genie_error_tests {
-    use super::*;
-    #[cfg(test)]
-    use std::error::Error;
-
-    /// The errors convert into `GenieError`s with their kinds and reasons, the original as
-    /// source.
-    #[test]
-    fn campaign_write_errors_convert_into_genie_errors() {
-        let e: genie_error::GenieError = WriteCampaignError::NotFoundError(2).into();
-        assert_eq!(
-            (e.kind(), e.reason()),
-            (
-                genie_error::ErrorKind::InvalidInput,
-                "a campaign scenario without its data"
-            )
-        );
-        assert!(Error::source(&e).is_some());
-    }
-}
-
 #[cfg(test)]
 mod limit_tests {
     use super::*;
 
-    fn invalid(e: &io::Error) -> bool {
-        e.kind() == io::ErrorKind::InvalidData
+    fn invalid(e: &GenieError) -> bool {
+        e.kind() == genie_error::ErrorKind::InvalidInput
     }
 
     /// A value at its limit is an error, one below it converts.

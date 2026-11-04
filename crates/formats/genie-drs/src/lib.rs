@@ -29,8 +29,9 @@
 #![warn(unused)]
 
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
+use genie_error::{GenieError, GenieResult};
 use sorted_vec::SortedVec;
-use std::io::{Error, Read, Write};
+use std::io::{Read, Write};
 use std::slice;
 use std::str;
 
@@ -40,7 +41,6 @@ mod write;
 use core::str::FromStr;
 pub use read::DrsReader;
 use std::fmt::{Debug, Display, Error as FmtError, Formatter};
-use std::io::ErrorKind;
 pub use write::{DrsWriter, InMemoryStrategy, ReserveDirectoryStrategy, Strategy as WriteStrategy};
 
 /// A DRS version string.
@@ -67,7 +67,7 @@ type DrsVersion = [u8; 4];
 pub struct ResourceKind([u8; 4]);
 impl ResourceKind {
     #[inline]
-    fn write_to<W: Write>(self, output: &mut W) -> Result<(), Error> {
+    fn write_to<W: Write>(self, output: &mut W) -> GenieResult<()> {
         let mut bytes = [0; 4];
         bytes.copy_from_slice(&self.0);
         bytes.reverse();
@@ -96,23 +96,12 @@ impl Display for ResourceKind {
     }
 }
 
-/// An error occurred while parsing a resource type.
-///
-/// This may be caused by:
-///   - The input not being 4 bytes or fewer long
-///   - The input not being valid UTF-8
-#[derive(Debug, Clone, Copy, thiserror::Error)]
-#[error("invalid resource type, must be 4 bytes of UTF-8 at most")]
-pub struct ParseResourceKindError;
-
-impl From<ParseResourceKindError> for Error {
-    fn from(e: ParseResourceKindError) -> Self {
-        Self::new(ErrorKind::InvalidData, e)
-    }
-}
+/// A resource type that is not at most 4 bytes of UTF-8.
+const BAD_RESOURCE_KIND: GenieError =
+    GenieError::invalid_input("a resource type that is not at most 4 bytes of UTF-8");
 
 impl FromStr for ResourceKind {
-    type Err = ParseResourceKindError;
+    type Err = GenieError;
     /// Parse a resource type from a string, with error handling.
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         s.as_bytes().try_into()
@@ -121,23 +110,23 @@ impl FromStr for ResourceKind {
 
 /// Parse a resource type as the archive stores it: reversed, with a UTF-8 name.
 impl TryFrom<[u8; 4]> for ResourceKind {
-    type Error = ParseResourceKindError;
+    type Error = GenieError;
     fn try_from(mut u: [u8; 4]) -> Result<Self, Self::Error> {
         u.reverse();
-        let _ = str::from_utf8(&u).map_err(|_| ParseResourceKindError)?;
+        let _ = str::from_utf8(&u).map_err(|_| BAD_RESOURCE_KIND)?;
         Ok(Self(u))
     }
 }
 
 /// Parse a resource type from a byte slice of at most 4 bytes of UTF-8.
 impl TryFrom<&[u8]> for ResourceKind {
-    type Error = ParseResourceKindError;
+    type Error = GenieError;
     fn try_from(u: &[u8]) -> Result<Self, Self::Error> {
-        let _ = str::from_utf8(u).map_err(|_| ParseResourceKindError)?;
+        let _ = str::from_utf8(u).map_err(|_| BAD_RESOURCE_KIND)?;
         let mut bytes = [b' '; 4];
         bytes
             .get_mut(..u.len())
-            .ok_or(ParseResourceKindError)?
+            .ok_or(BAD_RESOURCE_KIND)?
             .copy_from_slice(u);
         Ok(Self(bytes))
     }
@@ -145,7 +134,7 @@ impl TryFrom<&[u8]> for ResourceKind {
 
 /// Parse a resource type from a string of at most 4 bytes.
 impl TryFrom<&str> for ResourceKind {
-    type Error = ParseResourceKindError;
+    type Error = GenieError;
     fn try_from(s: &str) -> Result<Self, Self::Error> {
         s.as_bytes().try_into()
     }
@@ -159,24 +148,24 @@ pub trait IntoResourceKind {
     /// # Errors
     ///
     /// An `InvalidData` error for a name of more than 4 bytes or one that is not UTF-8.
-    fn into_resource_kind(self) -> Result<ResourceKind, Error>;
+    fn into_resource_kind(self) -> GenieResult<ResourceKind>;
 }
 
 impl IntoResourceKind for ResourceKind {
-    fn into_resource_kind(self) -> Result<ResourceKind, Error> {
+    fn into_resource_kind(self) -> GenieResult<ResourceKind> {
         Ok(self)
     }
 }
 
 impl IntoResourceKind for &str {
-    fn into_resource_kind(self) -> Result<ResourceKind, Error> {
-        Ok(ResourceKind::try_from(self)?)
+    fn into_resource_kind(self) -> GenieResult<ResourceKind> {
+        ResourceKind::try_from(self)
     }
 }
 
 impl IntoResourceKind for &[u8] {
-    fn into_resource_kind(self) -> Result<ResourceKind, Error> {
-        Ok(ResourceKind::try_from(self)?)
+    fn into_resource_kind(self) -> GenieResult<ResourceKind> {
+        ResourceKind::try_from(self)
     }
 }
 
@@ -210,7 +199,7 @@ impl Default for DrsHeader {
 impl DrsHeader {
     #[inline]
     /// Read a DRS archive header from a `Read`able handle.
-    fn from<R: Read>(source: &mut R) -> Result<Self, Error> {
+    fn from<R: Read>(source: &mut R) -> GenieResult<Self> {
         let mut banner_msg = [0_u8; 40];
         let mut version = [0_u8; 4];
         let mut password = [0_u8; 12];
@@ -229,7 +218,7 @@ impl DrsHeader {
     }
 
     #[inline]
-    fn write_to<W: Write>(&self, output: &mut W) -> Result<(), Error> {
+    fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         output.write_all(&self.banner_msg)?;
         output.write_all(&self.version)?;
         output.write_all(&self.password)?;
@@ -280,7 +269,7 @@ impl DrsTable {
 
     /// Read a DRS table header from a `Read`able handle.
     #[inline]
-    fn from<R: Read>(source: &mut R) -> Result<Self, Error> {
+    fn from<R: Read>(source: &mut R) -> GenieResult<Self> {
         let mut resource_kind = [0_u8; 4];
         source.read_exact(&mut resource_kind)?;
         let offset = source.read_u32::<LE>()?;
@@ -289,7 +278,7 @@ impl DrsTable {
     }
 
     #[inline]
-    fn write_to<W: Write>(&self, output: &mut W) -> Result<(), Error> {
+    fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         self.resource_kind.write_to(output)?;
         output.write_u32::<LE>(self.offset)?;
         output.write_u32::<LE>(self.num_resources)?;
@@ -298,7 +287,7 @@ impl DrsTable {
 
     /// Read the table itself.
     #[inline]
-    fn read_resources<R: Read>(&mut self, source: &mut R) -> Result<(), Error> {
+    fn read_resources<R: Read>(&mut self, source: &mut R) -> GenieResult<()> {
         for _ in 0..self.num_resources {
             let resource = DrsResource::from(source)?;
             let _discard = self.resource_ids.insert(resource.id);
@@ -383,7 +372,7 @@ pub struct DrsResource {
 impl DrsResource {
     /// Read DRS resource metadata from a `Read`able handle.
     #[inline]
-    fn from<R: Read>(source: &mut R) -> Result<Self, Error> {
+    fn from<R: Read>(source: &mut R) -> GenieResult<Self> {
         let id = source.read_u32::<LE>()?;
         let offset = source.read_u32::<LE>()?;
         let size = source.read_u32::<LE>()?;
@@ -391,7 +380,7 @@ impl DrsResource {
     }
 
     #[inline]
-    fn write_to<W: Write>(&self, output: &mut W) -> Result<(), Error> {
+    fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         output.write_u32::<LE>(self.id)?;
         output.write_u32::<LE>(self.offset)?;
         output.write_u32::<LE>(self.size)?;
@@ -403,15 +392,6 @@ impl DrsResource {
 pub type DrsTableIterator<'a> = slice::Iter<'a, DrsTable>;
 /// An iterator over DRS resource metadata structs.
 pub type DrsResourceIterator<'a> = slice::Iter<'a, DrsResource>;
-
-impl From<ParseResourceKindError> for genie_error::GenieError {
-    /// The error as a [`genie_error::GenieError`]: its kind and reason, the original as the
-    /// source.
-    #[track_caller]
-    fn from(e: ParseResourceKindError) -> Self {
-        Self::invalid_input("a resource type that is no 4 characters").with_source(e)
-    }
-}
 
 #[cfg(test)]
 mod tests {
@@ -441,27 +421,5 @@ mod tests {
         }
 
         Ok(())
-    }
-}
-
-#[cfg(test)]
-mod genie_error_tests {
-    use super::*;
-    #[cfg(test)]
-    use std::error::Error as StdError;
-
-    /// The errors convert into `GenieError`s with their kinds and reasons, the original as
-    /// source.
-    #[test]
-    fn resource_kind_error_converts_into_genie_error() {
-        let e: genie_error::GenieError = ParseResourceKindError.into();
-        assert_eq!(
-            (e.kind(), e.reason()),
-            (
-                genie_error::ErrorKind::InvalidInput,
-                "a resource type that is no 4 characters"
-            )
-        );
-        assert!(StdError::source(&e).is_some());
     }
 }

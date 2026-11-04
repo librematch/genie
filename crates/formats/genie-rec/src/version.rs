@@ -1,3 +1,4 @@
+use genie_error::GenieResult;
 use std::cmp::Ordering;
 use std::fmt;
 use std::fmt::{Debug, Display};
@@ -175,7 +176,7 @@ impl GameVersion {
     /// # Errors
     ///
     /// Returns an error if the 8 bytes cannot be read.
-    pub fn read_from<R: Read>(input: &mut R) -> crate::Result<Self> {
+    pub fn read_from<R: Read>(input: &mut R) -> GenieResult<Self> {
         let mut game_version = [0; 8];
         input.read_exact(&mut game_version)?;
         Ok(Self(game_version))

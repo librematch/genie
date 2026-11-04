@@ -1,11 +1,12 @@
 //! The base combat, missile and combat base classes' attributes.
 
+use crate::ObjectId;
 use crate::element::{ReadableHeaderElement, WritableHeaderElement};
 use crate::reader::RecordingHeaderReader;
 use crate::unit::UnitAi;
-use crate::{ObjectId, Result};
 use byteorder::{LE, ReadBytesExt};
 use genie_dat::unit_kind::UnitKind;
+use genie_error::GenieResult;
 use genie_support::read_opt_u32;
 use std::io::Read;
 
@@ -31,7 +32,7 @@ pub struct BaseCombatUnitAttributes {
 }
 
 impl ReadableHeaderElement for BaseCombatUnitAttributes {
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let mut attrs = Self::default();
         if input.version() >= 9.05 {
             attrs.formation_id = input.read_u8()?;
@@ -67,7 +68,7 @@ pub struct MissileUnitAttributes {
 }
 
 impl ReadableHeaderElement for MissileUnitAttributes {
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         Ok(Self {
             max_range: input.read_f32::<LE>()?,
             fired_from_id: input.read_u32::<LE>()?.into(),
@@ -78,7 +79,7 @@ impl ReadableHeaderElement for MissileUnitAttributes {
 
 /// The unit's own copy of its type, behind a flag: a unit whose type a technology changed
 /// for it alone.
-fn read_own_base<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Option<UnitKind>> {
+fn read_own_base<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Option<UnitKind>> {
     if input.read_u8()? == 0 {
         return Ok(None);
     }
@@ -132,7 +133,7 @@ pub struct CombatUnitAttributes {
 
 impl ReadableHeaderElement for CombatUnitAttributes {
     // Reads the combat unit's fields in file order, section by section.
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let mut attrs = Self {
             next_volley: input.read_u8()?,
             using_special_attack_animation: input.read_u8()?,
@@ -156,7 +157,7 @@ impl CombatUnitAttributes {
     fn read_amounts_and_counters<R: Read>(
         &mut self,
         input: &mut RecordingHeaderReader<R>,
-    ) -> Result<()> {
+    ) -> GenieResult<()> {
         for amount in &mut self.attribute_amounts {
             *amount = input.read_u16::<LE>()?;
         }
@@ -177,7 +178,7 @@ impl CombatUnitAttributes {
 
     /// The town bell: its flag, target and location (10.30; a negative x is no location),
     /// the second target and its type (11.71) and the action (11.74).
-    fn read_town_bell<R: Read>(&mut self, input: &mut RecordingHeaderReader<R>) -> Result<()> {
+    fn read_town_bell<R: Read>(&mut self, input: &mut RecordingHeaderReader<R>) -> GenieResult<()> {
         if input.version() >= 10.30 {
             self.town_bell_flag = input.read_i8()?;
             self.town_bell_target_id = read_opt_u32(input)?;
@@ -195,7 +196,10 @@ impl CombatUnitAttributes {
     }
 
     /// The berserker's timer (10.42), the builders (10.46) and the healers (11.69).
-    fn read_last_counters<R: Read>(&mut self, input: &mut RecordingHeaderReader<R>) -> Result<()> {
+    fn read_last_counters<R: Read>(
+        &mut self,
+        input: &mut RecordingHeaderReader<R>,
+    ) -> GenieResult<()> {
         if input.version() >= 10.42 {
             self.berserker_timer = input.read_f32::<LE>()?;
         }

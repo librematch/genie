@@ -2,7 +2,7 @@
 // tick oracle's command field map; do not edit by hand (`just command-decoders`).
 
 use super::{Tail, bytes, finish, fits, get, put, words};
-use crate::Error;
+use genie_error::GenieResult;
 
 /// `0x00` `RGE_COMMAND_INTERACT` (`GameCommand<RGE_Command_Interact>`, formatter `0x140e5ff90`: `Interact(num=%d, x=%.10f, y=%.10f, tId=%d, commId=%d )`).
 #[derive(Debug, Clone, PartialEq)]
@@ -60,8 +60,8 @@ impl Interact {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.tid);
         put(&mut out, self.x);
@@ -112,8 +112,8 @@ impl Stop {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.num);
         put(&mut out, self.gap_0x06);
@@ -180,8 +180,8 @@ impl Work {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.tid);
         put(&mut out, self.x);
@@ -253,8 +253,8 @@ impl Move {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.tid);
         put(&mut out, self.x);
@@ -311,8 +311,8 @@ impl Create {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.loc);
         put(&mut out, self.field_0x08);
@@ -358,8 +358,8 @@ impl AddAttribute {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.attr_id);
         put(&mut out, self.amt);
@@ -399,8 +399,8 @@ impl RgeGiveAttribute {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         out.extend_from_slice(&self.rest);
         finish(out)
@@ -478,8 +478,8 @@ impl AiOrder {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.num);
         put(&mut out, self.gap_0x06);
@@ -529,8 +529,8 @@ impl Resign {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.dropped);
         finish(out)
@@ -572,8 +572,8 @@ impl AddWaypoint {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.gap_0x04);
         put(&mut out, self.recipient);
@@ -619,8 +619,8 @@ impl Pause {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.num);
         put(&mut out, self.gap_0x06);
@@ -667,8 +667,8 @@ impl GroupWaypoint {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.num);
         put(&mut out, self.x);
@@ -746,8 +746,8 @@ impl GroupAiOrder {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.recipient_count);
         put(&mut out, self.gap_0x06);
@@ -808,8 +808,8 @@ impl UnitAiState {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.num);
         put(&mut out, self.gap_0x06);
@@ -858,8 +858,8 @@ impl Guard {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.num);
         put(&mut out, self.gap_0x06);
@@ -907,8 +907,8 @@ impl Follow {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.num);
         put(&mut out, self.gap_0x06);
@@ -1022,8 +1022,8 @@ impl Patrol {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.num);
         put(&mut out, self.gap_0x06);
@@ -1104,8 +1104,8 @@ impl Scout {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.num);
         put(&mut out, self.gap_0x06);
@@ -1156,8 +1156,8 @@ impl FormFormation {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.num);
         put(&mut out, self.gap_0x06);
@@ -1199,8 +1199,8 @@ impl BreakFormation {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.form_id);
         out.extend_from_slice(&self.rest);
@@ -1243,8 +1243,8 @@ impl WheelFormation {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.form_id);
         put(&mut out, self.angle);
@@ -1285,8 +1285,8 @@ impl AboutFaceFormation {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.form_id);
         out.extend_from_slice(&self.rest);
@@ -1326,8 +1326,8 @@ impl Save {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.exit_after_save);
         out.extend_from_slice(&self.rest);
@@ -1382,8 +1382,8 @@ impl FormationParameters {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.line_ratio);
         put(&mut out, self.col_ratio);
@@ -1428,8 +1428,8 @@ impl AutoFormations {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.on);
         out.extend_from_slice(&self.rest);
@@ -1472,8 +1472,8 @@ impl LockFormation {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.form_id);
         put(&mut out, self.form_kind);
@@ -1520,8 +1520,8 @@ impl GroupMultiWaypoints {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.num);
         put(&mut out, self.gap_0x06);
@@ -1557,8 +1557,8 @@ impl Chapter {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let out = vec![Self::BYTE, self.commp_id, 0, 0];
         finish(out)
     }
@@ -1623,8 +1623,8 @@ impl AttackMove {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.num);
         put(&mut out, self.gap_0x06);
@@ -1685,8 +1685,8 @@ impl AttackMoveTarget {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.num);
         put(&mut out, self.gap_0x06);
@@ -1756,8 +1756,8 @@ impl Retreat {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.tid);
         put(&mut out, self.x);
@@ -1808,8 +1808,8 @@ impl UnitKindAiState {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.kind);
         put(&mut out, self.state);
@@ -1853,8 +1853,8 @@ impl AutoScout {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.field_0x04);
         put(&mut out, self.gap_0x06);
@@ -1892,8 +1892,8 @@ impl StopAll {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         out.extend_from_slice(&self.rest);
         finish(out)
@@ -1932,8 +1932,8 @@ impl TransformObject {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.field_0x04);
         put(&mut out, self.field_0x08);
@@ -1970,8 +1970,8 @@ impl Trigger {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         out.extend_from_slice(&self.rest);
         finish(out)
@@ -2010,8 +2010,8 @@ impl TransformObjects {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.gap_0x04);
         out.extend_from_slice(&self.rest);
@@ -2054,8 +2054,8 @@ impl SeekShelter {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.num);
         put(&mut out, self.gap_0x06);
@@ -2108,8 +2108,8 @@ impl BuildingCommandQueue {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.tid);
         put(&mut out, self.x);
@@ -2150,8 +2150,8 @@ impl FireActiveAbility {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         out.extend_from_slice(&self.rest);
         finish(out)
@@ -2189,8 +2189,8 @@ impl RgeGiveAttributes {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         out.extend_from_slice(&self.rest);
         finish(out)
@@ -2235,8 +2235,8 @@ impl Make {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.uid);
         put(&mut out, self.qid);
@@ -2290,8 +2290,8 @@ impl Research {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.uid);
         put(&mut out, self.field_0x08);
@@ -2365,8 +2365,8 @@ impl Build {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.num);
         put(&mut out, self.gap_0x06);
@@ -2428,8 +2428,8 @@ impl Game {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.field_0x04);
         put(&mut out, self.gap_0x06);
@@ -2482,8 +2482,8 @@ impl Explore {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.num);
         put(&mut out, self.gap_0x06);
@@ -2556,8 +2556,8 @@ impl BuildWall {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.num);
         put(&mut out, self.gap_0x06);
@@ -2604,8 +2604,8 @@ impl CancelBuild {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.uid);
         finish(out)
@@ -2659,8 +2659,8 @@ impl AttackGround {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.num);
         put(&mut out, self.gap_0x06);
@@ -2711,8 +2711,8 @@ impl TribeGiveAttribute {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.amt);
         put(&mut out, self.cost);
@@ -2760,8 +2760,8 @@ impl TradeAttribute {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.num);
         put(&mut out, self.gap_0x06);
@@ -2818,8 +2818,8 @@ impl Repair {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.num);
         put(&mut out, self.gap_0x06);
@@ -2885,8 +2885,8 @@ impl Unload {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.num);
         put(&mut out, self.gap_0x06);
@@ -2930,8 +2930,8 @@ impl Gate {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.uid);
         finish(out)
@@ -2990,8 +2990,8 @@ impl Flare {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.field_0x04);
         put(&mut out, self.field_0x08);
@@ -3046,8 +3046,8 @@ impl Special {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.num);
         put(&mut out, self.gap_0x06);
@@ -3123,8 +3123,8 @@ impl UnitOrder {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.num);
         put(&mut out, self.gap_0x06);
@@ -3202,8 +3202,8 @@ impl Diplomacy {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.pid2);
         put(&mut out, self.seq);
@@ -3258,8 +3258,8 @@ impl Queue {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.bid);
         put(&mut out, self.tid);
@@ -3319,8 +3319,8 @@ impl SetGatherPoint {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.num);
         put(&mut out, self.gap_0x06);
@@ -3365,8 +3365,8 @@ impl SetRetreatPoint {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.uid);
         finish(out)
@@ -3408,8 +3408,8 @@ impl SellCommodity {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.attr);
         put(&mut out, self.amt);
@@ -3453,8 +3453,8 @@ impl BuyCommodity {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.attr);
         put(&mut out, self.amt);
@@ -3498,8 +3498,8 @@ impl OffboardTrade {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.uid);
         put(&mut out, self.trade_route);
@@ -3549,8 +3549,8 @@ impl UnitTransform {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.num);
         put(&mut out, self.gap_0x06);
@@ -3590,8 +3590,8 @@ impl DropRelic {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.uid);
         finish(out)
@@ -3630,8 +3630,8 @@ impl TownBell {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.uid);
         put(&mut out, self.activate);
@@ -3668,8 +3668,8 @@ impl GoBackToWork {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.uid);
         finish(out)
@@ -3723,8 +3723,8 @@ impl MultiQueue {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.num);
         put(&mut out, self.gap_0x06);
@@ -3777,8 +3777,8 @@ impl SetGatherState {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.num);
         put(&mut out, self.gap_0x06);
@@ -3828,8 +3828,8 @@ impl DeleteObjects {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.num);
         put(&mut out, self.gap_0x06);
@@ -3879,8 +3879,8 @@ impl ResetBuildings {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.num);
         put(&mut out, self.gap_0x06);
@@ -3925,8 +3925,8 @@ impl MultiGate {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.gap_0x04);
         put(&mut out, self.state);
@@ -3966,8 +3966,8 @@ impl GoBackToWork2 {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         out.extend_from_slice(&self.rest);
         finish(out)
@@ -4003,8 +4003,8 @@ impl ChangePlayerName {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         out.extend_from_slice(&self.rest);
         finish(out)
@@ -4043,8 +4043,8 @@ impl SendAiSignal {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.name);
         out.extend_from_slice(&self.rest);
@@ -4081,8 +4081,8 @@ impl AiEffectAmount {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         out.extend_from_slice(&self.rest);
         finish(out)
@@ -4118,8 +4118,8 @@ impl AiEffectPercent {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         out.extend_from_slice(&self.rest);
         finish(out)
@@ -4155,8 +4155,8 @@ impl AllBackToWork {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.uid);
         finish(out)
@@ -4228,8 +4228,8 @@ impl TribeGiveAttributes {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.amt);
         put(&mut out, self.field_0x08);
@@ -4542,8 +4542,8 @@ impl Command {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    /// Invalid input when the packet is longer than its `u16` size holds.
+    pub fn encode(&self) -> GenieResult<Vec<u8>> {
         match self {
             Self::Interact(c) => c.encode(),
             Self::Stop(c) => c.encode(),

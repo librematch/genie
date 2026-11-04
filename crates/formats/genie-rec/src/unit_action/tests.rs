@@ -1,4 +1,5 @@
 use crate::element::ReadableHeaderElement;
+use crate::errors::unknown_unit_action;
 use crate::test_support::{Bytes, header_reader, read_all};
 use crate::unit_action::{ActionAttack, ActionKind, UnitAction};
 
@@ -120,5 +121,5 @@ fn an_action_after_11_76_has_word_state() {
 #[test]
 fn an_unknown_action_kind_is_an_error() {
     let e = UnitAction::read_from(&mut header_reader(&head(2).0, 11.76)).unwrap_err();
-    assert!(matches!(e, crate::Error::UnsupportedUnitAction(2)));
+    assert_eq!(e, unknown_unit_action(2));
 }

@@ -144,10 +144,7 @@ fn the_finder_objects_are_every_player_by_id() {
     );
     assert_eq!(villager.player, PlayerId::new(1));
     let none = header(vec![gaia(Vec::new()), human(vec![combat_object(-1, 83)])]);
-    assert!(matches!(
-        finder_objects(&none.players()),
-        Err(crate::Error::Unmodelled(_))
-    ));
+    assert!(finder_objects(&none.players()).is_err());
 }
 
 /// A save's finder world: each player's masters, objects, relations and civ, with the build's

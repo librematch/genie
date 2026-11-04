@@ -1,4 +1,6 @@
+use crate::errors::not_written;
 use crate::reader::RecordingHeaderReader;
+use genie_error::GenieResult;
 use std::io::Error;
 use std::io::{Read, Write};
 
@@ -9,7 +11,7 @@ pub trait OptionalReadableElement: Sized {
     /// # Errors
     ///
     /// Returns an error if reading or decoding fails.
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> crate::Result<Option<Self>>;
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Option<Self>>;
 }
 
 /// A part of the recording header that can be read from it.
@@ -19,7 +21,7 @@ pub trait ReadableHeaderElement: Sized {
     /// # Errors
     ///
     /// Returns an error if reading or decoding fails.
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> crate::Result<Self>;
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self>;
 }
 
 /// A part of the recording header that can be written back.
@@ -30,13 +32,13 @@ pub trait WritableHeaderElement {
     ///
     /// Returns an error if writing fails.
     ///
-    /// The default implementation is a placeholder that always fails with
-    /// [`crate::Error::NotWritten`].
-    fn write_to<W: Write>(&self, output: &mut W) -> crate::Result<()> {
+    /// The default implementation is a placeholder that always fails with missing data (a
+    /// header element without a writer).
+    fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         // we need to use `output` otherwise we'll get warnings that it's not used
         // prefixing it would make any traits auto completed also be prefixed with _ and that's annoying
         let _ = output;
-        Err(crate::Error::NotWritten)
+        Err(not_written())
     }
 }
 
@@ -47,7 +49,7 @@ pub trait WritableHeaderElement {
 /// Returns an error if reading the count or an element fails.
 pub(crate) fn read_counted<T: ReadableHeaderElement, R: Read>(
     input: &mut RecordingHeaderReader<R>,
-) -> crate::Result<Vec<T>> {
+) -> GenieResult<Vec<T>> {
     use byteorder::{LE, ReadBytesExt};
     let count = input.read_u32::<LE>()?;
     (0..count).map(|_| T::read_from(input)).collect()

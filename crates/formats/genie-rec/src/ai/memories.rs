@@ -5,8 +5,9 @@ use crate::area;
 use crate::element::ReadableHeaderElement;
 use crate::fits;
 use crate::reader::RecordingHeaderReader;
-use crate::{ObjectId, PlayerId, Result};
+use crate::{ObjectId, PlayerId};
 use byteorder::{LE, ReadBytesExt};
+use genie_error::GenieResult;
 use genie_support::{ReadSkipExt, UnitKindId, read_i8s, read_opt_u16, read_opt_u32};
 use std::io::Read;
 
@@ -42,7 +43,7 @@ pub struct ImportantObjectMemory {
 }
 
 impl ReadableHeaderElement for ImportantObjectMemory {
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         Ok(Self {
             id: read_opt_u32(input)?,
             unit_kind_id: read_opt_u16(input)?,
@@ -73,7 +74,7 @@ pub struct BuildingLot {
 }
 
 impl ReadableHeaderElement for BuildingLot {
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let unit_kind_id = read_opt_u32(input)?;
         let status = input.read_u8()?;
         let x = input.read_u8()?;
@@ -109,7 +110,7 @@ pub struct WallLine {
 }
 
 impl ReadableHeaderElement for WallLine {
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let mut line = Self::default();
         if input.version() >= 10.78 {
             line.line_kind = input.read_u32::<LE>()?;
@@ -157,7 +158,7 @@ pub struct PerimeterWall {
 }
 
 impl ReadableHeaderElement for PerimeterWall {
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let mut wall = Self {
             enabled: if input.version() >= 11.22 {
                 input.read_u32::<LE>()? != 0
@@ -223,7 +224,7 @@ pub struct AttackMemory {
 }
 
 impl ReadableHeaderElement for AttackMemory {
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let mut mem = Self {
             id: read_opt_u32(input)?,
             typ: input.read_u8()?,
@@ -278,7 +279,7 @@ pub struct ResourceMemory {
 }
 
 impl ReadableHeaderElement for ResourceMemory {
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let mut mem = Self {
             id: input.read_u32::<LE>()?.into(),
             location: (input.read_u8()?, input.read_u8()?),
@@ -315,7 +316,7 @@ pub struct InfluenceMap {
 }
 
 impl ReadableHeaderElement for InfluenceMap {
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let mut map = Self::default();
         map.width = input.read_u32::<LE>()?;
         map.height = input.read_u32::<LE>()?;
@@ -338,7 +339,7 @@ pub struct QuadrantLog {
 }
 
 impl ReadableHeaderElement for QuadrantLog {
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let explored_tiles = input.read_u32::<LE>()?;
         let attacks_on_us = input.read_u32::<LE>()?;
         let attacks_by_us = input.read_u32::<LE>()?;

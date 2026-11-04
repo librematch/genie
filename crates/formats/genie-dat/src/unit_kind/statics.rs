@@ -1,14 +1,15 @@
 //! The attributes every unit type has: the resource storage, the damage sprites and the static
 //! part ([`StaticUnitKindAttributes`]).
 
-use crate::conv::{fits, invalid_data, opt_fits};
+use crate::conv::{fits, name_to_nul, opt_fits};
 use crate::sound::SoundId;
 use crate::sprite::{GraphicId, SpriteId};
 use crate::unit_kind::{UnitClass, write_opt_string_key};
 use arrayvec::ArrayVec;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
+use genie_error::GenieResult;
 use genie_support::{StringKey, UnitKindId, read_bytes, read_opt_u16};
-use std::io::{Read, Result, Write};
+use std::io::{Read, Write};
 
 /// A resource a unit stores (e.g. the food in a sheep), with how it is stored.
 #[derive(Debug, Default, Clone, Copy)]
@@ -27,7 +28,7 @@ impl UnitAttribute {
     /// # Errors
     ///
     /// Returns an error if reading from `input` fails.
-    pub fn read_from(mut input: impl Read) -> Result<Self> {
+    pub fn read_from(mut input: impl Read) -> GenieResult<Self> {
         Ok(Self {
             attribute_kind: input.read_u16::<LE>()?,
             amount: input.read_f32::<LE>()?,
@@ -40,14 +41,14 @@ impl UnitAttribute {
     /// # Errors
     ///
     /// Returns an error if writing to `output` fails.
-    pub fn write_to(self, mut output: impl Write) -> Result<()> {
+    pub fn write_to(self, mut output: impl Write) -> GenieResult<()> {
         output.write_u16::<LE>(self.attribute_kind)?;
         output.write_f32::<LE>(self.amount)?;
         output.write_u8(self.flag)?;
         Ok(())
     }
 
-    pub(super) fn write_empty(mut output: impl Write) -> Result<()> {
+    pub(super) fn write_empty(mut output: impl Write) -> GenieResult<()> {
         output.write_u16::<LE>(0xFFFF)?;
         output.write_f32::<LE>(0.0)?;
         output.write_u8(0)?;
@@ -72,7 +73,7 @@ impl DamageSprite {
     /// # Errors
     ///
     /// Returns an error if reading from `input` fails.
-    pub fn read_from(mut input: impl Read) -> Result<Self> {
+    pub fn read_from(mut input: impl Read) -> GenieResult<Self> {
         Ok(Self {
             sprite: input.read_u16::<LE>()?.into(),
             damage_percent: input.read_u16::<LE>()?,
@@ -85,7 +86,7 @@ impl DamageSprite {
     /// # Errors
     ///
     /// Returns an error if writing to `output` fails.
-    pub fn write_to(&self, mut output: impl Write) -> Result<()> {
+    pub fn write_to(&self, mut output: impl Write) -> GenieResult<()> {
         output.write_u16::<LE>(self.sprite.into())?;
         output.write_u16::<LE>(self.damage_percent)?;
         output.write_u8(self.flag)?;
@@ -239,7 +240,7 @@ impl StaticUnitKindAttributes {
     /// Returns an error if reading from `input` fails, or if an ID is out of range.
     ///
     /// Also fails if the name is not valid UTF-8.
-    pub fn read_from(mut input: impl Read, version: f32) -> Result<Self> {
+    pub fn read_from(mut input: impl Read, version: f32) -> GenieResult<Self> {
         let mut unit_kind = Self::default();
         let name_len = input.read_u16::<LE>()?;
         unit_kind.read_identity(&mut input)?;
@@ -249,9 +250,7 @@ impl StaticUnitKindAttributes {
         unit_kind.read_attributes(&mut input)?;
         unit_kind.name = {
             // TODO use not-UTF8 for the name
-            let bytes = read_bytes(&mut input, usize::from(name_len))?;
-            String::from_utf8(bytes.iter().copied().take_while(|b| *b != 0).collect())
-                .map_err(invalid_data)?
+            name_to_nul(&read_bytes(&mut input, usize::from(name_len))?)?
         };
         unit_kind.copy_id = input.read_u16::<LE>()?;
         unit_kind.unit_group = input.read_u16::<LE>()?;
@@ -260,7 +259,7 @@ impl StaticUnitKindAttributes {
 
     /// The ids, the class, the sprites, the hit points, the line of sight, the garrison and the
     /// radius.
-    fn read_identity(&mut self, mut input: impl Read) -> Result<()> {
+    fn read_identity(&mut self, mut input: impl Read) -> GenieResult<()> {
         self.id = input.read_u16::<LE>()?.into();
         self.string_id = input.read_u16::<LE>()?.into();
         self.string_id2 = read_opt_u16(&mut input)?;
@@ -283,7 +282,7 @@ impl StaticUnitKindAttributes {
 
     /// The sounds, the death spawn, the buttons, the editor flags, the tile and construction
     /// sizes and the terrain and movement types.
-    fn read_sounds_and_placement(&mut self, mut input: impl Read) -> Result<()> {
+    fn read_sounds_and_placement(&mut self, mut input: impl Read) -> GenieResult<()> {
         self.train_sound = read_opt_u16(&mut input)?;
         self.damage_sound = read_opt_u16(&mut input)?;
         self.death_spawn = read_opt_u16(&mut input)?;
@@ -305,7 +304,7 @@ impl StaticUnitKindAttributes {
     }
 
     /// The attribute's amount and decay, the levels, the map colour and the help ids.
-    fn read_levels(&mut self, mut input: impl Read) -> Result<()> {
+    fn read_levels(&mut self, mut input: impl Read) -> GenieResult<()> {
         self.attribute_max_amount = input.read_u16::<LE>()?;
         self.attribute_rot = input.read_f32::<LE>()?;
         self.area_effect_level = input.read_u8()?;
@@ -323,7 +322,7 @@ impl StaticUnitKindAttributes {
 
     /// The resource flags, the occlusion, obstruction and selection, the object flags from
     /// 11.55 on, the civilization and the outline.
-    fn read_resource_flags(&mut self, mut input: impl Read, version: f32) -> Result<()> {
+    fn read_resource_flags(&mut self, mut input: impl Read, version: f32) -> GenieResult<()> {
         self.recyclable = input.read_u8()? != 0;
         self.track_as_resource = input.read_u8()? != 0;
         self.create_doppleganger = input.read_u8()? != 0;
@@ -348,7 +347,7 @@ impl StaticUnitKindAttributes {
 
     /// The three attributes (type 0xFFFF none), the damage sprites, the selected and death
     /// sounds, the attack reaction and the terrain conversion.
-    fn read_attributes(&mut self, mut input: impl Read) -> Result<()> {
+    fn read_attributes(&mut self, mut input: impl Read) -> GenieResult<()> {
         for _ in 0..3 {
             let attr = UnitAttribute::read_from(&mut input)?;
             if attr.attribute_kind != 0xFFFF {
@@ -382,7 +381,7 @@ impl StaticUnitKindAttributes {
     /// than 255 damage sprites.
     // The format stores the name length as a u16 (truncated, as before).
     #[allow(clippy::cast_possible_truncation)]
-    pub fn write_to(&self, mut output: impl Write, _version: f32) -> Result<()> {
+    pub fn write_to(&self, mut output: impl Write, _version: f32) -> GenieResult<()> {
         // TODO use not-UTF8 for the name
         output.write_u16::<LE>(self.name.len() as u16)?;
         self.write_identity(&mut output)?;
@@ -398,7 +397,7 @@ impl StaticUnitKindAttributes {
 
     /// The ids, the class, the sprites, the hit points, the line of sight, the garrison and the
     /// radius.
-    fn write_identity(&self, mut output: impl Write) -> Result<()> {
+    fn write_identity(&self, mut output: impl Write) -> GenieResult<()> {
         output.write_u16::<LE>(self.id.into())?;
         output.write_i16::<LE>(fits(&self.string_id)?)?;
         write_opt_string_key(&mut output, self.string_id2.as_ref())?;
@@ -419,7 +418,7 @@ impl StaticUnitKindAttributes {
 
     /// The sounds, the death spawn, the buttons, the editor flags, the tile and construction
     /// sizes and the terrain and movement types.
-    fn write_sounds_and_placement(&self, mut output: impl Write) -> Result<()> {
+    fn write_sounds_and_placement(&self, mut output: impl Write) -> GenieResult<()> {
         output.write_i16::<LE>(opt_fits(self.train_sound, -1)?)?;
         output.write_i16::<LE>(opt_fits(self.damage_sound, -1)?)?;
         output.write_i16::<LE>(opt_fits(self.death_spawn, -1)?)?;
@@ -444,7 +443,7 @@ impl StaticUnitKindAttributes {
     }
 
     /// The attribute's amount and decay, the levels, the map colour and the help ids.
-    fn write_levels(&self, mut output: impl Write) -> Result<()> {
+    fn write_levels(&self, mut output: impl Write) -> GenieResult<()> {
         output.write_u16::<LE>(self.attribute_max_amount)?;
         output.write_f32::<LE>(self.attribute_rot)?;
         output.write_u8(self.area_effect_level)?;
@@ -462,7 +461,7 @@ impl StaticUnitKindAttributes {
 
     /// The resource flags, the occlusion, obstruction and selection, the object flags, the
     /// civilization and the outline.
-    fn write_resource_flags(&self, mut output: impl Write) -> Result<()> {
+    fn write_resource_flags(&self, mut output: impl Write) -> GenieResult<()> {
         output.write_u8(u8::from(self.recyclable))?;
         output.write_u8(u8::from(self.track_as_resource))?;
         output.write_u8(u8::from(self.create_doppleganger))?;
@@ -481,7 +480,7 @@ impl StaticUnitKindAttributes {
 
     /// The three attribute slots, the damage sprites and their count, the selected and death
     /// sounds, the attack reaction and the terrain conversion.
-    fn write_attributes(&self, mut output: impl Write) -> Result<()> {
+    fn write_attributes(&self, mut output: impl Write) -> GenieResult<()> {
         for index in 0..self.attributes.capacity() {
             match self.attributes.get(index) {
                 Some(attr) => attr.write_to(&mut output)?,

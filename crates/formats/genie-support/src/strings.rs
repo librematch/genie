@@ -1,47 +1,20 @@
 use crate::read_bytes;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
 use encoding_rs::WINDOWS_1252;
-use std::io::{self, Read, Write};
+use genie_error::{GenieError, GenieResult};
+use std::io::{Read, Write};
 
-/// Failed to decode a string as WINDOWS-1252.
-///
-/// This means that the scenario file contained a string that could not be decoded using the
-/// WINDOWS-1252 code page. In the future, genie-scx will support other encodings.
-#[derive(Debug, Clone, Copy, thiserror::Error)]
-#[error("could not decode string as WINDOWS-1252")]
-pub struct DecodeStringError;
+/// A string that does not decode as WINDOWS-1252.
+const NOT_DECODED: GenieError =
+    GenieError::invalid_input("a string that does not decode as WINDOWS-1252");
+/// A string that does not encode as WINDOWS-1252.
+const NOT_ENCODED: GenieError =
+    GenieError::invalid_input("a string that does not encode as WINDOWS-1252");
 
-/// Failed to encode a string as WINDOWS-1252.
-///
-/// This means that a string could not be encoded using the WINDOWS-1252 code page. In the future, genie-scx will support other encodings.
-#[derive(Debug, Clone, Copy, thiserror::Error)]
-#[error("could not encode string as WINDOWS-1252")]
-pub struct EncodeStringError;
-
-/// Failed to read a string.
-#[derive(Debug, thiserror::Error)]
-pub enum ReadStringError {
-    /// Failed to read a string because the bytes could not be decoded.
-    #[error(transparent)]
-    DecodeStringError(#[from] DecodeStringError),
-    /// Failed to read a string because the underlying I/O failed.
-    #[error(transparent)]
-    IoError(#[from] io::Error),
-}
-
-/// Failed to write a string.
-#[derive(Debug, thiserror::Error)]
-pub enum WriteStringError {
-    /// Failed to read a string because it could not be encoded.
-    #[error(transparent)]
-    EncodeStringError(#[from] EncodeStringError),
-    /// Failed to write a string because its length with the NULL terminator does not fit the
-    /// length prefix.
-    #[error("string too long for its length prefix")]
-    TooLong,
-    /// Failed to write a string because the underlying I/O failed.
-    #[error(transparent)]
-    IoError(#[from] io::Error),
+/// A string whose length with its NULL terminator does not fit the length prefix.
+#[track_caller]
+fn too_long(len: usize) -> GenieError {
+    GenieError::invalid_input("a string too long for its length prefix").with("length", len)
 }
 
 /// Write a string to an output stream, using code page 1252, using a `u16` for the length prefix.
@@ -55,12 +28,12 @@ pub enum WriteStringError {
 ///
 /// Also fails if the encoded string is `i16::MAX` bytes or longer, so that its length with the
 /// NULL terminator does not fit the prefix.
-pub fn write_str<W: Write>(output: &mut W, string: &str) -> Result<(), WriteStringError> {
+pub fn write_str<W: Write>(output: &mut W, string: &str) -> GenieResult<()> {
     let (bytes, _enc, failed) = WINDOWS_1252.encode(string);
     if failed {
-        return Err(WriteStringError::EncodeStringError(EncodeStringError));
+        return Err(NOT_ENCODED);
     }
-    let len = i16::try_from(bytes.len() + 1).map_err(|_| WriteStringError::TooLong)?;
+    let len = i16::try_from(bytes.len() + 1).map_err(|_| too_long(bytes.len()))?;
     output.write_i16::<LE>(len)?;
     output.write_all(&bytes)?;
     output.write_u8(0)?;
@@ -78,12 +51,12 @@ pub fn write_str<W: Write>(output: &mut W, string: &str) -> Result<(), WriteStri
 ///
 /// Also fails if the encoded string is `i32::MAX` bytes or longer, so that its length with the
 /// NULL terminator does not fit the prefix.
-pub fn write_i32_str<W: Write>(output: &mut W, string: &str) -> Result<(), WriteStringError> {
+pub fn write_i32_str<W: Write>(output: &mut W, string: &str) -> GenieResult<()> {
     let (bytes, _enc, failed) = WINDOWS_1252.encode(string);
     if failed {
-        return Err(WriteStringError::EncodeStringError(EncodeStringError));
+        return Err(NOT_ENCODED);
     }
-    let len = i32::try_from(bytes.len() + 1).map_err(|_| WriteStringError::TooLong)?;
+    let len = i32::try_from(bytes.len() + 1).map_err(|_| too_long(bytes.len()))?;
     output.write_i32::<LE>(len)?;
     output.write_all(&bytes)?;
     output.write_u8(0)?;
@@ -99,10 +72,7 @@ pub fn write_i32_str<W: Write>(output: &mut W, string: &str) -> Result<(), Write
 /// Returns an error if the string cannot be encoded as WINDOWS-1252, or if writing fails.
 ///
 /// Also fails if the encoded string is too long for the `i16` prefix (see `write_str`).
-pub fn write_opt_str<W: Write>(
-    output: &mut W,
-    option: &Option<String>,
-) -> Result<(), WriteStringError> {
+pub fn write_opt_str<W: Write>(output: &mut W, option: &Option<String>) -> GenieResult<()> {
     if let Some(string) = option {
         write_str(output, string)
     } else {
@@ -120,10 +90,7 @@ pub fn write_opt_str<W: Write>(
 /// Returns an error if the string cannot be encoded as WINDOWS-1252, or if writing fails.
 ///
 /// Also fails if the encoded string is too long for the `i32` prefix (see `write_i32_str`).
-pub fn write_opt_i32_str<W: Write>(
-    output: &mut W,
-    option: &Option<String>,
-) -> Result<(), WriteStringError> {
+pub fn write_opt_i32_str<W: Write>(output: &mut W, option: &Option<String>) -> GenieResult<()> {
     if let Some(string) = option {
         write_i32_str(output, string)
     } else {
@@ -133,14 +100,14 @@ pub fn write_opt_i32_str<W: Write>(
 }
 
 /// Decode a string using the WINDOWS-1252 code page.
-fn decode_str(bytes: &[u8]) -> Result<String, DecodeStringError> {
+fn decode_str(bytes: &[u8]) -> GenieResult<String> {
     if bytes.is_empty() {
         return Ok(String::new());
     }
 
     let (decoded, _enc, failed) = WINDOWS_1252.decode(bytes);
     if failed {
-        Err(DecodeStringError)
+        Err(NOT_DECODED)
     } else {
         Ok(decoded.to_string())
     }
@@ -156,7 +123,7 @@ pub trait ReadStringsExt: Read {
     /// # Errors
     ///
     /// Returns an error if reading fails or the bytes are not valid WINDOWS-1252.
-    fn read_str(&mut self, length: usize) -> Result<Option<String>, ReadStringError> {
+    fn read_str(&mut self, length: usize) -> GenieResult<Option<String>> {
         if length > 0 {
             let mut bytes = read_bytes(self, length)?;
             if let Some(end) = bytes.iter().position(|&byte| byte == 0) {
@@ -178,7 +145,7 @@ pub trait ReadStringsExt: Read {
     /// # Errors
     ///
     /// Returns an error if reading fails or the bytes are not valid WINDOWS-1252.
-    fn read_u16_length_prefixed_str(&mut self) -> Result<Option<String>, ReadStringError> {
+    fn read_u16_length_prefixed_str(&mut self) -> GenieResult<Option<String>> {
         match self.read_u16::<LE>()? {
             0xFFFF => Ok(None),
             len => self.read_str(len as usize),
@@ -191,7 +158,7 @@ pub trait ReadStringsExt: Read {
     /// # Errors
     ///
     /// Returns an error if reading fails or the bytes are not valid WINDOWS-1252.
-    fn read_u32_length_prefixed_str(&mut self) -> Result<Option<String>, ReadStringError> {
+    fn read_u32_length_prefixed_str(&mut self) -> GenieResult<Option<String>> {
         match self.read_u32::<LE>()? {
             0xFFFF_FFFF => Ok(None),
             len => self.read_str(len as usize),
@@ -207,11 +174,11 @@ pub trait ReadStringsExt: Read {
     ///
     /// Returns an error if reading fails, if the signature is not 0x0A60, or if the bytes are not
     /// valid WINDOWS-1252.
-    fn read_hd_style_str(&mut self) -> Result<Option<String>, ReadStringError> {
+    fn read_hd_style_str(&mut self) -> GenieResult<Option<String>> {
         let open = self.read_u16::<LE>()?;
         // Check that this actually is the start of a string
         if open != 0x0A60 {
-            return Err(DecodeStringError.into());
+            return Err(NOT_DECODED.with("signature", open));
         }
         let len = self.read_u16::<LE>()? as usize;
         let bytes = read_bytes(self, len)?;
@@ -221,102 +188,9 @@ pub trait ReadStringsExt: Read {
 
 impl<T> ReadStringsExt for T where T: Read {}
 
-impl From<DecodeStringError> for genie_error::GenieError {
-    /// The error as a [`genie_error::GenieError`]: its kind and reason, the original as the
-    /// source.
-    #[track_caller]
-    fn from(e: DecodeStringError) -> Self {
-        Self::invalid_input("a string that does not decode as WINDOWS-1252").with_source(e)
-    }
-}
-
-impl From<EncodeStringError> for genie_error::GenieError {
-    /// The error as a [`genie_error::GenieError`]: its kind and reason, the original as the
-    /// source.
-    #[track_caller]
-    fn from(e: EncodeStringError) -> Self {
-        Self::invalid_input("a string that does not encode as WINDOWS-1252").with_source(e)
-    }
-}
-
-impl From<ReadStringError> for genie_error::GenieError {
-    /// The error as a [`genie_error::GenieError`]: its kind and reason, the original as the
-    /// source.
-    #[track_caller]
-    fn from(e: ReadStringError) -> Self {
-        let to = match &e {
-            ReadStringError::DecodeStringError(_) => {
-                Self::invalid_input("a string that does not decode as WINDOWS-1252")
-            }
-            ReadStringError::IoError(_) => Self::io("a read or write that failed"),
-        };
-        to.with_source(e)
-    }
-}
-
-impl From<WriteStringError> for genie_error::GenieError {
-    /// The error as a [`genie_error::GenieError`]: its kind and reason, the original as the
-    /// source.
-    #[track_caller]
-    fn from(e: WriteStringError) -> Self {
-        let to = match &e {
-            WriteStringError::EncodeStringError(_) => {
-                Self::invalid_input("a string that does not encode as WINDOWS-1252")
-            }
-            WriteStringError::TooLong => {
-                Self::invalid_input("a string too long for its length prefix")
-            }
-            WriteStringError::IoError(_) => Self::io("a read or write that failed"),
-        };
-        to.with_source(e)
-    }
-}
-
 #[cfg(test)]
-mod genie_error_tests {
+mod tests {
     use super::*;
-    #[cfg(test)]
-    use std::error::Error;
-
-    /// The errors convert into `GenieError`s with their kinds and reasons, the original as
-    /// source.
-    #[test]
-    fn string_errors_convert_into_genie_errors() {
-        let e: genie_error::GenieError = DecodeStringError.into();
-        assert_eq!(
-            (e.kind(), e.reason()),
-            (
-                genie_error::ErrorKind::InvalidInput,
-                "a string that does not decode as WINDOWS-1252"
-            )
-        );
-        assert!(Error::source(&e).is_some());
-        let e: genie_error::GenieError = EncodeStringError.into();
-        assert_eq!(
-            (e.kind(), e.reason()),
-            (
-                genie_error::ErrorKind::InvalidInput,
-                "a string that does not encode as WINDOWS-1252"
-            )
-        );
-        assert!(Error::source(&e).is_some());
-        let e: genie_error::GenieError = ReadStringError::IoError(io::Error::other("x")).into();
-        assert_eq!(
-            (e.kind(), e.reason()),
-            (genie_error::ErrorKind::Io, "a read or write that failed")
-        );
-        assert!(Error::source(&e).is_some());
-        let e: genie_error::GenieError =
-            WriteStringError::EncodeStringError(EncodeStringError).into();
-        assert_eq!(
-            (e.kind(), e.reason()),
-            (
-                genie_error::ErrorKind::InvalidInput,
-                "a string that does not encode as WINDOWS-1252"
-            )
-        );
-        assert!(Error::source(&e).is_some());
-    }
 
     /// An HD Edition string: the signature 0x0A60, the length and that many bytes; another
     /// signature does not decode, a short one fails to read.
@@ -328,13 +202,10 @@ mod genie_error_tests {
             Some("ab".to_owned())
         );
         let other = [0x61, 0x0a, 1, 0, b'a'];
-        assert!(matches!(
-            (&other[..]).read_hd_style_str(),
-            Err(ReadStringError::DecodeStringError(_))
-        ));
-        assert!(matches!(
-            (&bytes[..5]).read_hd_style_str(),
-            Err(ReadStringError::IoError(_))
-        ));
+        assert_eq!((&other[..]).read_hd_style_str(), Err(NOT_DECODED));
+        assert_eq!(
+            (&bytes[..5]).read_hd_style_str().map_err(|e| e.reason()),
+            Err("a list past the input's end")
+        );
     }
 }

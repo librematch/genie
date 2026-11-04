@@ -1,4 +1,8 @@
 use super::*;
+use crate::errors::{
+    bad_mesh_dump, bad_pool_dump, bad_registry_dump, bad_tile_dump, command_before_first_sync,
+    no_chapter, no_checkpoint, no_player, no_such_player,
+};
 use crate::test_ids::object_id;
 use crate::test_ids::{VILLAGER_FEMALE, VILLAGER_MALE};
 use genie_core::objects::ActionState;
@@ -131,33 +135,23 @@ fn differences_name_the_object_its_master_and_the_field() {
 #[test]
 fn each_error_says_why() {
     let texts = [
-        (Error::NoCheckpoint, "the recording has no checkpoint"),
+        (no_checkpoint(), "a recording without a checkpoint"),
         (
-            Error::NoSuchPlayer(9),
-            "a checkpoint names player 9, not in the save",
+            no_such_player(9),
+            "a checkpoint lane naming a player the save does not have (player: 9)",
         ),
         (
-            Error::CommandBeforeFirstSync,
-            "a command comes before the first sync",
+            command_before_first_sync(),
+            "a command before the body's first sync",
         ),
-        (Error::BadMeshDump, "the mesh dump has no mesh line"),
-        (Error::BadRegistryDump, "the registry dump is out of shape"),
-        (Error::BadTileDump, "the tile list dump is out of shape"),
-        (
-            Error::BadPoolDump,
-            "the recycled pools dump is out of shape",
-        ),
-        (Error::NoChapter, "the recording has no chapter"),
-        (Error::NoPlayer(3), "no player 3 in the save"),
+        (bad_mesh_dump(), "a mesh dump without its mesh line"),
+        (bad_registry_dump(), "a registry dump out of shape"),
+        (bad_tile_dump(), "a tile list dump out of shape"),
+        (bad_pool_dump(), "a recycled pools dump out of shape"),
+        (no_chapter(), "a recording without a chapter"),
+        (no_player(3), "a player the save does not have (player: 3)"),
     ];
     for (error, text) in texts {
-        assert_eq!(error.to_string(), text);
+        assert!(error.to_string().starts_with(text), "{error}");
     }
-    let unmodelled = Error::Unmodelled(GenieError::unsupported("an unmodelled case"));
-    assert!(unmodelled.to_string().starts_with("not modelled: "));
-    let truncated = de::truncated(4);
-    let text = truncated.to_string();
-    let rec = Error::from(truncated);
-    assert!(matches!(rec, Error::Rec(_)));
-    assert_eq!(rec.to_string(), text);
 }

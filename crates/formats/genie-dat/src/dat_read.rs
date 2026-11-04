@@ -2,7 +2,6 @@
 
 use crate::civ::Civilization;
 use crate::color_table::ColorTable;
-use crate::conv::invalid_data;
 use crate::random_map::RandomMapInfo;
 use crate::sound::Sound;
 use crate::sprite::Sprite;
@@ -13,8 +12,9 @@ use crate::terrain::{Terrain, TerrainBorder, TerrainRestriction, TileSize};
 use crate::{DatFile, FileVersion, GameVersion};
 use byteorder::{LE, ReadBytesExt};
 use flate2::read::DeflateDecoder;
+use genie_error::{GenieResult, invalid_input};
 use genie_support::{ReadSkipExt, read_list};
-use std::io::{Read, Result};
+use std::io::Read;
 
 impl DatFile {
     /// Read a data file from a compressed byte stream.
@@ -25,7 +25,7 @@ impl DatFile {
     ///
     /// Also fails if a civilization's player type is not 1, or if a name does not fit its fixed-size
     /// buffer after decoding (see [`Civilization::read_from`] and [`TechEffect::read_from`]).
-    pub fn read_from(input: impl Read) -> Result<Self> {
+    pub fn read_from(input: impl Read) -> GenieResult<Self> {
         let mut input = DeflateDecoder::new(input);
 
         let mut file_version = [0u8; 8];
@@ -105,7 +105,7 @@ fn game_version(file_version: FileVersion, num_terrains: u16) -> GameVersion {
 }
 
 /// The colour tables and their count.
-fn read_color_tables(mut input: impl Read) -> Result<Vec<ColorTable>> {
+fn read_color_tables(mut input: impl Read) -> GenieResult<Vec<ColorTable>> {
     let num_color_tables = input.read_u16::<LE>()?;
     read_list(num_color_tables.into(), || {
         ColorTable::read_from(&mut input)
@@ -113,7 +113,7 @@ fn read_color_tables(mut input: impl Read) -> Result<Vec<ColorTable>> {
 }
 
 /// The sounds and their count.
-fn read_sounds(mut input: impl Read, file_version: FileVersion) -> Result<Vec<Sound>> {
+fn read_sounds(mut input: impl Read, file_version: FileVersion) -> GenieResult<Vec<Sound>> {
     let num_sounds = input.read_u16::<LE>()?;
     read_list(num_sounds.into(), || {
         Sound::read_from(&mut input, file_version)
@@ -121,7 +121,7 @@ fn read_sounds(mut input: impl Read, file_version: FileVersion) -> Result<Vec<So
 }
 
 /// The sprites: their count, whether each exists, then those that do.
-fn read_sprites(mut input: impl Read) -> Result<Vec<Option<Sprite>>> {
+fn read_sprites(mut input: impl Read) -> GenieResult<Vec<Option<Sprite>>> {
     let num_sprites = input.read_u16::<LE>()?;
     let sprites_exist = read_list(num_sprites.into(), || {
         input.read_u32::<LE>().map(|n| n != 0)
@@ -138,7 +138,7 @@ fn read_sprites(mut input: impl Read) -> Result<Vec<Option<Sprite>>> {
 }
 
 /// The map's raw pointers and its bogus sizes, read past.
-pub(super) fn skip_map_header(mut input: impl Read) -> Result<()> {
+pub(super) fn skip_map_header(mut input: impl Read) -> GenieResult<()> {
     // Some raw pointer values
     let _map_vtable_pointer = input.read_i32::<LE>()?;
     let _tiles_pointer = input.read_i32::<LE>()?;
@@ -152,7 +152,7 @@ pub(super) fn skip_map_header(mut input: impl Read) -> Result<()> {
 }
 
 /// The 19 tile sizes and the padding after them.
-fn read_tile_sizes(mut input: impl Read) -> Result<Vec<TileSize>> {
+fn read_tile_sizes(mut input: impl Read) -> GenieResult<Vec<TileSize>> {
     let mut tile_sizes = vec![TileSize::default(); 19];
     for val in &mut tile_sizes {
         *val = TileSize::read_from(&mut input)?;
@@ -162,7 +162,7 @@ fn read_tile_sizes(mut input: impl Read) -> Result<Vec<TileSize>> {
 }
 
 /// The map's bounds and its tile and block sizes, read past.
-pub(super) fn skip_map_bounds(mut input: impl Read) -> Result<()> {
+pub(super) fn skip_map_bounds(mut input: impl Read) -> GenieResult<()> {
     // Should just skip all this shit probably
     let _map_row_offset = input.read_i32::<LE>()?;
     let _map_min_x = input.read_f32::<LE>()?;
@@ -189,7 +189,7 @@ pub(super) fn skip_map_bounds(mut input: impl Read) -> Result<()> {
 }
 
 /// The map's search pointers and flags and the pointers after them, read past.
-pub(super) fn skip_map_search(mut input: impl Read) -> Result<()> {
+pub(super) fn skip_map_search(mut input: impl Read) -> GenieResult<()> {
     let _seach_map_pointer = input.read_i32::<LE>()?;
     let _seach_map_rows_pointer = input.read_i32::<LE>()?;
     let _any_frame_change = input.read_u8()?;
@@ -202,7 +202,7 @@ pub(super) fn skip_map_search(mut input: impl Read) -> Result<()> {
 }
 
 /// The random maps: their count and pointer, each map's head, then each map's lists.
-fn read_random_maps(mut input: impl Read) -> Result<Vec<RandomMapInfo>> {
+fn read_random_maps(mut input: impl Read) -> GenieResult<Vec<RandomMapInfo>> {
     let num_random_maps = input.read_u32::<LE>()? as usize;
     let _random_maps_pointer = input.read_u32::<LE>()?;
 
@@ -216,7 +216,7 @@ fn read_random_maps(mut input: impl Read) -> Result<Vec<RandomMapInfo>> {
 }
 
 /// The task lists: their count, then each behind its flag.
-fn read_task_lists(mut input: impl Read) -> Result<Vec<Option<TaskList>>> {
+fn read_task_lists(mut input: impl Read) -> GenieResult<Vec<Option<TaskList>>> {
     let num_task_lists = input.read_u32::<LE>()? as usize;
     read_list(num_task_lists, || {
         if input.read_u8()? != 0 {
@@ -231,19 +231,19 @@ fn read_task_lists(mut input: impl Read) -> Result<Vec<Option<TaskList>>> {
 fn read_civilizations(
     mut input: impl Read,
     game_version: GameVersion,
-) -> Result<Vec<Civilization>> {
+) -> GenieResult<Vec<Civilization>> {
     let num_civilizations = input.read_u16::<LE>()?;
     read_list(num_civilizations.into(), || {
         let player_kind = input.read_i8()?;
         if player_kind != 1 {
-            return Err(invalid_data("a civilization whose player type is not 1"));
+            return Err(invalid_input("a civilization whose player type is not 1"));
         }
         Civilization::read_from(&mut input, game_version)
     })
 }
 
 /// The kill and hit point rates and totals, read past.
-pub(super) fn skip_kill_rates(mut input: impl Read) -> Result<()> {
+pub(super) fn skip_kill_rates(mut input: impl Read) -> GenieResult<()> {
     let _time_slice = input.read_u32::<LE>()?;
     let _unit_kill_rate = input.read_u32::<LE>()?;
     let _unit_kill_total = input.read_u32::<LE>()?;

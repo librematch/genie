@@ -45,6 +45,7 @@
 )]
 
 pub mod census;
+pub mod errors;
 pub mod groups;
 pub use genie_import::dat as masters;
 // the `.dat`'s tables in the cache's form (FD-046-D18, D59)
@@ -56,9 +57,6 @@ pub mod tick_trace;
 pub mod views;
 
 pub use masters::{DefaultAction, MasterTable, TerrainTable};
-
-use genie_core::GenieError;
-use genie_rec::de;
 
 mod command_args;
 mod compared_objects;
@@ -101,7 +99,7 @@ pub use self::forced_replay::{
     PatherAnswer, PatherCall, TickReport, Times, command_phase, forced_run, forced_ticks,
     old_pather_paths,
 };
-pub use self::game_tables::{DropSitesError, UnitLinesError, drop_sites, linked_techs, unit_lines};
+pub use self::game_tables::{drop_sites, linked_techs, unit_lines};
 #[cfg(test)]
 use self::header_runs::checkpoint_action;
 pub use self::header_runs::{
@@ -139,61 +137,6 @@ use genie_core::world::load::world::saved_ghosts;
 pub use genie_core::world::load::world::settings;
 /// The fields a comparison covers ([`object_field_differences_in`]).
 pub use genie_diff::Scope;
-use std::error::Error as StdError;
-use std::fmt::{Display, Error as FmtError, Formatter};
-
-/// Why a recording could not be compared.
-#[derive(Debug)]
-pub enum Error {
-    /// The recording could not be read.
-    Rec(de::Error),
-    /// The recording has no checkpoint (it ends within the first interval).
-    NoCheckpoint,
-    /// A checkpoint lane names a player the header save does not have.
-    NoSuchPlayer(u32),
-    /// A command comes before the body's first sync, so no tick runs it.
-    CommandBeforeFirstSync,
-    /// A mesh dump without its header line.
-    BadMeshDump,
-    /// A registry dump without its header line, or a line out of shape.
-    BadRegistryDump,
-    /// A tile list dump's line out of shape.
-    BadTileDump,
-    /// A recycled pools dump's line out of shape.
-    BadPoolDump,
-    /// A recording without a chapter.
-    NoChapter,
-    /// A player the save does not have.
-    NoPlayer(usize),
-    /// What the slice does not model of the save.
-    Unmodelled(GenieError),
-}
-
-impl From<de::Error> for Error {
-    fn from(e: de::Error) -> Self {
-        Self::Rec(e)
-    }
-}
-
-impl Display for Error {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), FmtError> {
-        match self {
-            Self::Rec(e) => write!(f, "{e}"),
-            Self::NoCheckpoint => write!(f, "the recording has no checkpoint"),
-            Self::NoSuchPlayer(id) => write!(f, "a checkpoint names player {id}, not in the save"),
-            Self::CommandBeforeFirstSync => write!(f, "a command comes before the first sync"),
-            Self::BadMeshDump => write!(f, "the mesh dump has no mesh line"),
-            Self::BadRegistryDump => write!(f, "the registry dump is out of shape"),
-            Self::BadTileDump => write!(f, "the tile list dump is out of shape"),
-            Self::BadPoolDump => write!(f, "the recycled pools dump is out of shape"),
-            Self::NoChapter => write!(f, "the recording has no chapter"),
-            Self::Unmodelled(u) => write!(f, "not modelled: {u}"),
-            Self::NoPlayer(p) => write!(f, "no player {p} in the save"),
-        }
-    }
-}
-
-impl StdError for Error {}
 
 #[cfg(test)]
 mod tests;

@@ -4,8 +4,9 @@ use crate::area;
 use crate::element::ReadableHeaderElement;
 use crate::fits;
 use crate::reader::RecordingHeaderReader;
-use crate::{ObjectId, PlayerId, Result};
+use crate::{ObjectId, PlayerId};
 use byteorder::{LE, ReadBytesExt};
+use genie_error::GenieResult;
 use genie_support::{read_i8s, read_list, reserved};
 use std::io::Read;
 
@@ -25,7 +26,7 @@ pub struct VisibleMap {
 }
 
 impl ReadableHeaderElement for VisibleMap {
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let mut map = Self {
             width: input.read_u32::<LE>()?,
             height: input.read_u32::<LE>()?,
@@ -54,7 +55,7 @@ pub struct VisibleResource {
 }
 
 impl ReadableHeaderElement for VisibleResource {
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         Ok(Self {
             object_id: input.read_u32::<LE>()?.into(),
             distance: input.read_u8()?,
@@ -72,7 +73,7 @@ pub struct VisibleResources {
 }
 
 impl ReadableHeaderElement for VisibleResources {
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let num_lists = input.read_u32::<LE>()?;
         let sizes = read_list(fits(num_lists)?, || {
             let _capacity = input.read_u32::<LE>()?;

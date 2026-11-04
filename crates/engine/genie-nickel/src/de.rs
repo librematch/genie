@@ -5,7 +5,7 @@
 
 use crate::round::round_to_f32;
 use crate::round::round_to_f64;
-use genie_error::GenieError;
+use genie_error::{GenieError, GenieResult};
 use nickel_lang::Expr;
 use serde::Deserializer;
 use serde::de::DeserializeOwned;
@@ -19,10 +19,7 @@ use serde::de::VariantAccess;
 use serde::de::Visitor;
 use serde::de::value::StrDeserializer;
 use serde::forward_to_deserialize_any;
-use std::error::Error as StdError;
 use std::fmt::Display;
-use std::fmt::Error as FmtError;
-use std::fmt::Formatter;
 
 /// `T` read from the evaluated value `expr`.
 ///
@@ -30,50 +27,24 @@ use std::fmt::Formatter;
 ///
 /// A [`GenieError`] naming the field's path when the value does not fit `T`'s shape or a number
 /// does not fit its field.
-pub fn from_expr<T: DeserializeOwned>(expr: &Expr) -> Result<T, GenieError> {
+pub fn from_expr<T: DeserializeOwned>(expr: &Expr) -> GenieResult<T> {
     T::deserialize(ExprDeserializer {
         expr: expr.clone(),
         path: Vec::new(),
     })
     .map_err(|e| {
-        GenieError::invalid_input("a Nickel value that does not fit its field")
-            .with(
-                "path",
-                if e.path.is_empty() {
-                    "(root)".to_owned()
-                } else {
-                    e.path.clone()
-                },
-            )
-            .with("why", &e.message)
+        if has_path(&e) {
+            e
+        } else {
+            e.with("path", "(root)")
+        }
     })
 }
 
-/// Why a value does not fit, and where.
-#[derive(Debug)]
-struct DeError {
-    /// The field's path, dot-separated.
-    path: String,
-    /// What does not fit.
-    message: String,
+/// Whether `e` names its field's path.
+fn has_path(e: &GenieError) -> bool {
+    e.context().any(|(key, _)| key == "path")
 }
-
-impl SerdeError for DeError {
-    fn custom<T: Display>(message: T) -> Self {
-        Self {
-            path: String::new(),
-            message: message.to_string(),
-        }
-    }
-}
-
-impl Display for DeError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), FmtError> {
-        write!(f, "{}: {}", self.path, self.message)
-    }
-}
-
-impl StdError for DeError {}
 
 /// A value and its path from the root.
 struct ExprDeserializer {
@@ -82,24 +53,22 @@ struct ExprDeserializer {
 }
 
 impl ExprDeserializer {
-    /// The error `message` at this value's path.
-    fn error(&self, message: impl Display) -> DeError {
-        DeError {
-            path: self.path.join("."),
-            message: message.to_string(),
-        }
+    /// The error `why` at this value's path.
+    fn error(&self, why: impl Display) -> GenieError {
+        self.at(GenieError::custom(why))
     }
 
-    /// An error from below that names no path yet takes this one.
-    fn at(&self, mut e: DeError) -> DeError {
-        if e.path.is_empty() {
-            e.path = self.path.join(".");
+    /// An error from below that names no path yet takes this one; the root names none.
+    fn at(&self, e: GenieError) -> GenieError {
+        if self.path.is_empty() || has_path(&e) {
+            e
+        } else {
+            e.with("path", self.path.join("."))
         }
-        e
     }
 
     /// The number's rational, the numerator signed (nickel-lang's `as_rational` drops the sign).
-    fn rational(&self) -> Result<(String, String), DeError> {
+    fn rational(&self) -> GenieResult<(String, String)> {
         let number = self
             .expr
             .as_number()
@@ -114,7 +83,7 @@ impl ExprDeserializer {
     }
 
     /// The number as an integer, if it is one (beyond i64 too).
-    fn integer(&self) -> Result<i128, DeError> {
+    fn integer(&self) -> GenieResult<i128> {
         let (numerator, denominator) = self.rational()?;
         if denominator != "1" {
             return Err(self.error(format!("{numerator}/{denominator} is no integer")));
@@ -125,7 +94,7 @@ impl ExprDeserializer {
     }
 
     /// A number of a field of any type: an integer as i64, any other through its f64 rounding.
-    fn visit_number<'de, V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, DeError> {
+    fn visit_number<'de, V: Visitor<'de>>(self, visitor: V) -> GenieResult<V::Value> {
         if let Some(i) = self.expr.as_i64() {
             return visitor.visit_i64(i).map_err(|x| self.at(x));
         }
@@ -135,7 +104,7 @@ impl ExprDeserializer {
     }
 
     /// A bool, a string or an enum tag (as its name) of a field of any type.
-    fn visit_scalar<'de, V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, DeError> {
+    fn visit_scalar<'de, V: Visitor<'de>>(self, visitor: V) -> GenieResult<V::Value> {
         if let Some(b) = self.expr.as_bool() {
             return visitor.visit_bool(b).map_err(|x| self.at(x));
         }
@@ -159,7 +128,7 @@ impl ExprDeserializer {
 /// An integer field: the number checked against the type.
 macro_rules! integer {
     ($method:ident, $visit:ident, $ty:ty) => {
-        fn $method<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, DeError> {
+        fn $method<V: Visitor<'de>>(self, visitor: V) -> GenieResult<V::Value> {
             let value = self.integer()?;
             let fits = <$ty>::try_from(value)
                 .map_err(|_| self.error(format!("{value} does not fit {}", stringify!($ty))))?;
@@ -169,9 +138,9 @@ macro_rules! integer {
 }
 
 impl<'de> Deserializer<'de> for ExprDeserializer {
-    type Error = DeError;
+    type Error = GenieError;
 
-    fn deserialize_any<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, DeError> {
+    fn deserialize_any<V: Visitor<'de>>(self, visitor: V) -> GenieResult<V::Value> {
         if self.expr.is_null() {
             visitor.visit_none().map_err(|x| self.at(x))
         } else if self.expr.is_record() {
@@ -185,13 +154,13 @@ impl<'de> Deserializer<'de> for ExprDeserializer {
         }
     }
 
-    fn deserialize_f32<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, DeError> {
+    fn deserialize_f32<V: Visitor<'de>>(self, visitor: V) -> GenieResult<V::Value> {
         let (n, d) = self.rational()?;
         let f = round_to_f32(&n, &d).map_err(|x| self.error(x))?;
         visitor.visit_f32(f).map_err(|x| self.at(x))
     }
 
-    fn deserialize_f64<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, DeError> {
+    fn deserialize_f64<V: Visitor<'de>>(self, visitor: V) -> GenieResult<V::Value> {
         let (n, d) = self.rational()?;
         let f = round_to_f64(&n, &d).map_err(|x| self.error(x))?;
         visitor.visit_f64(f).map_err(|x| self.at(x))
@@ -206,7 +175,7 @@ impl<'de> Deserializer<'de> for ExprDeserializer {
     integer!(deserialize_u32, visit_u32, u32);
     integer!(deserialize_u64, visit_u64, u64);
 
-    fn deserialize_option<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, DeError> {
+    fn deserialize_option<V: Visitor<'de>>(self, visitor: V) -> GenieResult<V::Value> {
         if self.expr.is_null() {
             visitor.visit_none().map_err(|x| self.at(x))
         } else {
@@ -218,11 +187,11 @@ impl<'de> Deserializer<'de> for ExprDeserializer {
         self,
         _name: &'static str,
         visitor: V,
-    ) -> Result<V::Value, DeError> {
+    ) -> GenieResult<V::Value> {
         visitor.visit_newtype_struct(self)
     }
 
-    fn deserialize_seq<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, DeError> {
+    fn deserialize_seq<V: Visitor<'de>>(self, visitor: V) -> GenieResult<V::Value> {
         let items: Vec<Expr> = match self.expr.as_array() {
             Some(array) => array.iter().collect(),
             None => return Err(self.error("not an array")),
@@ -234,11 +203,7 @@ impl<'de> Deserializer<'de> for ExprDeserializer {
         visitor.visit_seq(access).map_err(|x| self.at(x))
     }
 
-    fn deserialize_tuple<V: Visitor<'de>>(
-        self,
-        _len: usize,
-        visitor: V,
-    ) -> Result<V::Value, DeError> {
+    fn deserialize_tuple<V: Visitor<'de>>(self, _len: usize, visitor: V) -> GenieResult<V::Value> {
         self.deserialize_seq(visitor)
     }
 
@@ -247,11 +212,11 @@ impl<'de> Deserializer<'de> for ExprDeserializer {
         _name: &'static str,
         _len: usize,
         visitor: V,
-    ) -> Result<V::Value, DeError> {
+    ) -> GenieResult<V::Value> {
         self.deserialize_seq(visitor)
     }
 
-    fn deserialize_map<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, DeError> {
+    fn deserialize_map<V: Visitor<'de>>(self, visitor: V) -> GenieResult<V::Value> {
         let fields: Vec<(String, Expr)> = match self.expr.as_record() {
             Some(record) => record
                 .iter()
@@ -272,7 +237,7 @@ impl<'de> Deserializer<'de> for ExprDeserializer {
         _name: &'static str,
         _fields: &'static [&'static str],
         visitor: V,
-    ) -> Result<V::Value, DeError> {
+    ) -> GenieResult<V::Value> {
         self.deserialize_map(visitor)
     }
 
@@ -281,7 +246,7 @@ impl<'de> Deserializer<'de> for ExprDeserializer {
         _name: &'static str,
         _variants: &'static [&'static str],
         visitor: V,
-    ) -> Result<V::Value, DeError> {
+    ) -> GenieResult<V::Value> {
         if let Some(tag) = self.expr.as_enum_tag() {
             let tag = tag.to_owned();
             return visitor.visit_enum(Variant {
@@ -310,7 +275,7 @@ impl<'de> Deserializer<'de> for ExprDeserializer {
         Err(self.error("not an enum tag"))
     }
 
-    fn deserialize_ignored_any<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, DeError> {
+    fn deserialize_ignored_any<V: Visitor<'de>>(self, visitor: V) -> GenieResult<V::Value> {
         visitor.visit_unit()
     }
 
@@ -326,12 +291,12 @@ struct Items<'p, I> {
 }
 
 impl<'de, I: Iterator<Item = (usize, Expr)>> SeqAccess<'de> for Items<'_, I> {
-    type Error = DeError;
+    type Error = GenieError;
 
     fn next_element_seed<T: DeserializeSeed<'de>>(
         &mut self,
         seed: T,
-    ) -> Result<Option<T::Value>, DeError> {
+    ) -> GenieResult<Option<T::Value>> {
         match self.items.next() {
             Some((i, expr)) => seed
                 .deserialize(self.parent.child(expr, i.to_string()))
@@ -349,15 +314,12 @@ struct Record<'p, I> {
 }
 
 impl<'de, I: Iterator<Item = (String, Expr)>> MapAccess<'de> for Record<'_, I> {
-    type Error = DeError;
+    type Error = GenieError;
 
-    fn next_key_seed<K: DeserializeSeed<'de>>(
-        &mut self,
-        seed: K,
-    ) -> Result<Option<K::Value>, DeError> {
+    fn next_key_seed<K: DeserializeSeed<'de>>(&mut self, seed: K) -> GenieResult<Option<K::Value>> {
         match self.fields.next() {
             Some((key, expr)) => {
-                let k: StrDeserializer<'_, DeError> = key.as_str().into_deserializer();
+                let k: StrDeserializer<'_, GenieError> = key.as_str().into_deserializer();
                 let out = seed.deserialize(k)?;
                 self.value = Some((key, expr));
                 Ok(Some(out))
@@ -366,7 +328,7 @@ impl<'de, I: Iterator<Item = (String, Expr)>> MapAccess<'de> for Record<'_, I> {
         }
     }
 
-    fn next_value_seed<T: DeserializeSeed<'de>>(&mut self, seed: T) -> Result<T::Value, DeError> {
+    fn next_value_seed<T: DeserializeSeed<'de>>(&mut self, seed: T) -> GenieResult<T::Value> {
         let (key, expr) = self
             .value
             .take()
@@ -383,34 +345,34 @@ struct Variant<'p> {
 }
 
 impl<'de> EnumAccess<'de> for Variant<'_> {
-    type Error = DeError;
+    type Error = GenieError;
     type Variant = Self;
 
-    fn variant_seed<T: DeserializeSeed<'de>>(self, seed: T) -> Result<(T::Value, Self), DeError> {
-        let k: StrDeserializer<'_, DeError> = self.tag.as_str().into_deserializer();
+    fn variant_seed<T: DeserializeSeed<'de>>(self, seed: T) -> GenieResult<(T::Value, Self)> {
+        let k: StrDeserializer<'_, GenieError> = self.tag.as_str().into_deserializer();
         let v = seed.deserialize(k).map_err(|e| self.parent.at(e))?;
         Ok((v, self))
     }
 }
 
 impl<'de> VariantAccess<'de> for Variant<'_> {
-    type Error = DeError;
+    type Error = GenieError;
 
-    fn unit_variant(self) -> Result<(), DeError> {
+    fn unit_variant(self) -> GenieResult<()> {
         match self.payload {
             None => Ok(()),
             Some(_) => Err(self.parent.error(format!("'{} holds a value", self.tag))),
         }
     }
 
-    fn newtype_variant_seed<T: DeserializeSeed<'de>>(self, seed: T) -> Result<T::Value, DeError> {
+    fn newtype_variant_seed<T: DeserializeSeed<'de>>(self, seed: T) -> GenieResult<T::Value> {
         match self.payload {
             Some(expr) => seed.deserialize(self.parent.child(expr, self.tag.clone())),
             None => Err(self.parent.error(format!("'{} holds no value", self.tag))),
         }
     }
 
-    fn tuple_variant<V: Visitor<'de>>(self, _len: usize, visitor: V) -> Result<V::Value, DeError> {
+    fn tuple_variant<V: Visitor<'de>>(self, _len: usize, visitor: V) -> GenieResult<V::Value> {
         match self.payload {
             Some(expr) => self
                 .parent
@@ -424,7 +386,7 @@ impl<'de> VariantAccess<'de> for Variant<'_> {
         self,
         _fields: &'static [&'static str],
         visitor: V,
-    ) -> Result<V::Value, DeError> {
+    ) -> GenieResult<V::Value> {
         match self.payload {
             Some(expr) => self
                 .parent

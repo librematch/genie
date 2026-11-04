@@ -1,18 +1,18 @@
 //! Types related to terrains.
 
 use crate::FileVersion;
-use crate::conv::invalid_data;
 use crate::conv::opt_fits;
 use crate::sound::SoundId;
 use crate::sprite::{GraphicId, SpriteId};
 use crate::unit_kind::UnitKindId;
 use arrayvec::ArrayString;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
+use genie_error::{GenieResult, invalid_input};
 use genie_support::{
     MapInto, fallible_try_from, fallible_try_into, infallible_try_into, read_le, read_list,
     read_opt_u16, read_opt_u32,
 };
-use std::io::{Read, Result, Write};
+use std::io::{Read, Write};
 
 /// An ID identifying a terrain.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -196,7 +196,7 @@ impl TerrainPassGraphic {
     /// # Errors
     ///
     /// Returns an error if reading from `input` fails, or if a sprite ID is out of range.
-    pub fn read_from(mut input: impl Read, version: FileVersion) -> Result<Self> {
+    pub fn read_from(mut input: impl Read, version: FileVersion) -> GenieResult<Self> {
         let mut pass = Self {
             exit_tile_sprite: read_opt_u32(&mut input)?,
             enter_tile_sprite: read_opt_u32(&mut input)?,
@@ -216,7 +216,7 @@ impl TerrainPassGraphic {
     /// # Errors
     ///
     /// Returns an error if writing to `output` fails.
-    pub fn write_to(&self, mut output: impl Write, version: FileVersion) -> Result<()> {
+    pub fn write_to(&self, mut output: impl Write, version: FileVersion) -> GenieResult<()> {
         output.write_i32::<LE>(self.exit_tile_sprite.map_into().unwrap_or(-1))?;
         output.write_i32::<LE>(self.enter_tile_sprite.map_into().unwrap_or(-1))?;
         output.write_i32::<LE>(self.walk_tile_sprite.map_into().unwrap_or(-1))?;
@@ -240,7 +240,7 @@ impl TerrainRestriction {
         mut input: impl Read,
         version: FileVersion,
         num_terrains: u16,
-    ) -> Result<Self> {
+    ) -> GenieResult<Self> {
         let passability = read_le(&mut input, usize::from(num_terrains), f32::from_le_bytes)?;
 
         // Apparently AoK+ only
@@ -266,11 +266,11 @@ impl TerrainRestriction {
         mut output: impl Write,
         version: FileVersion,
         num_terrains: u16,
-    ) -> Result<()> {
+    ) -> GenieResult<()> {
         if self.passability.len() != usize::from(num_terrains)
             || self.pass_graphics.len() != usize::from(num_terrains)
         {
-            return Err(invalid_data(
+            return Err(invalid_input(
                 "a terrain table that does not match the terrain count",
             ));
         }
@@ -290,7 +290,7 @@ impl TileSize {
     /// # Errors
     ///
     /// Returns an error if reading from `input` fails.
-    pub fn read_from<R: Read>(input: &mut R) -> Result<Self> {
+    pub fn read_from<R: Read>(input: &mut R) -> GenieResult<Self> {
         let width = input.read_i16::<LE>()?;
         let height = input.read_i16::<LE>()?;
         let delta_z = input.read_i16::<LE>()?;
@@ -306,7 +306,7 @@ impl TileSize {
     /// # Errors
     ///
     /// Returns an error if writing to `output` fails.
-    pub fn write_to<W: Write>(&self, output: &mut W) -> Result<()> {
+    pub fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         output.write_i16::<LE>(self.width)?;
         output.write_i16::<LE>(self.height)?;
         output.write_i16::<LE>(self.delta_z)?;
@@ -320,7 +320,7 @@ impl TerrainAnimation {
     /// # Errors
     ///
     /// Returns an error if reading from `input` fails.
-    pub fn read_from<R: Read>(input: &mut R) -> Result<Self> {
+    pub fn read_from<R: Read>(input: &mut R) -> GenieResult<Self> {
         Ok(Self {
             enabled: input.read_u8()? != 0,
             num_frames: input.read_i16::<LE>()?,
@@ -340,7 +340,7 @@ impl TerrainAnimation {
     /// # Errors
     ///
     /// Returns an error if writing to `output` fails.
-    pub fn write_to<W: Write>(&self, output: &mut W) -> Result<()> {
+    pub fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         output.write_u8(u8::from(self.enabled))?;
         output.write_i16::<LE>(self.num_frames)?;
         output.write_i16::<LE>(self.num_pause_frames)?;
@@ -361,7 +361,7 @@ impl TerrainSpriteFrame {
     /// # Errors
     ///
     /// Returns an error if reading from `input` fails.
-    pub fn read_from<R: Read>(input: &mut R) -> Result<Self> {
+    pub fn read_from<R: Read>(input: &mut R) -> GenieResult<Self> {
         let num_frames = input.read_i16::<LE>()?;
         let num_facets = input.read_i16::<LE>()?;
         let frame_id = input.read_i16::<LE>()?;
@@ -377,7 +377,7 @@ impl TerrainSpriteFrame {
     /// # Errors
     ///
     /// Returns an error if writing to `output` fails.
-    pub fn write_to<W: Write>(&self, output: &mut W) -> Result<()> {
+    pub fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         output.write_i16::<LE>(self.num_frames)?;
         output.write_i16::<LE>(self.num_facets)?;
         output.write_i16::<LE>(self.frame_id)?;
@@ -401,7 +401,7 @@ impl Terrain {
         mut input: impl Read,
         version: FileVersion,
         num_terrains: u16,
-    ) -> Result<Self> {
+    ) -> GenieResult<Self> {
         let mut terrain = Self {
             enabled: input.read_u8()? != 0,
             random: input.read_u8()?,
@@ -441,7 +441,7 @@ impl Terrain {
     }
 
     /// The minimap's five colours and the passable and impassable terrains (0xFF none).
-    fn read_minimap(&mut self, mut input: impl Read) -> Result<()> {
+    fn read_minimap(&mut self, mut input: impl Read) -> GenieResult<()> {
         self.minimap_color_high = input.read_u8()?;
         self.minimap_color_medium = input.read_u8()?;
         self.minimap_color_low = input.read_u8()?;
@@ -459,7 +459,7 @@ impl Terrain {
     }
 
     /// The minimap's five colours and the passable and impassable terrains (0xFF none).
-    fn write_minimap<W: Write>(&self, output: &mut W) -> Result<()> {
+    fn write_minimap<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         output.write_u8(self.minimap_color_high)?;
         output.write_u8(self.minimap_color_medium)?;
         output.write_u8(self.minimap_color_low)?;
@@ -483,9 +483,9 @@ impl Terrain {
         output: &mut W,
         _version: FileVersion,
         num_terrains: u16,
-    ) -> Result<()> {
+    ) -> GenieResult<()> {
         if self.borders.len() != usize::from(num_terrains) {
-            return Err(invalid_data(
+            return Err(invalid_input(
                 "a terrain border list that does not match the terrain count",
             ));
         }
@@ -519,7 +519,7 @@ impl Terrain {
 
 /// A terrain's 30 objects: their ids, densities and placement flags, each in a block, then a
 /// count the files hold as 0 (read past).
-fn read_terrain_objects(mut input: impl Read) -> Result<Vec<TerrainObject>> {
+fn read_terrain_objects(mut input: impl Read) -> GenieResult<Vec<TerrainObject>> {
     let mut terrain_objects = vec![TerrainObject::default(); 30];
     for object in &mut terrain_objects {
         object.object_id = input.read_u16::<LE>()?.into();
@@ -539,7 +539,7 @@ fn read_terrain_objects(mut input: impl Read) -> Result<Vec<TerrainObject>> {
 /// A terrain's 30 object slots (0 past its objects) in three blocks, then their count.
 // The format stores the count of terrain objects as a u16 (truncated, as before).
 #[allow(clippy::cast_possible_truncation)]
-fn write_terrain_objects<W: Write>(output: &mut W, objects: &[TerrainObject]) -> Result<()> {
+fn write_terrain_objects<W: Write>(output: &mut W, objects: &[TerrainObject]) -> GenieResult<()> {
     for index in 0..30 {
         if let Some(object) = objects.get(index) {
             output.write_u16::<LE>(object.object_id.into())?;
@@ -561,7 +561,8 @@ fn write_terrain_objects<W: Write>(output: &mut W, objects: &[TerrainObject]) ->
             output.write_i8(0)?;
         }
     }
-    output.write_u16::<LE>(objects.len() as u16)
+    output.write_u16::<LE>(objects.len() as u16)?;
+    Ok(())
 }
 
 impl TerrainBorder {
@@ -570,7 +571,7 @@ impl TerrainBorder {
     /// # Errors
     ///
     /// Returns an error if reading from `input` fails, or if an ID is out of range.
-    pub fn read_from(mut input: impl Read) -> Result<Self> {
+    pub fn read_from(mut input: impl Read) -> GenieResult<Self> {
         let mut border = Self {
             enabled: input.read_u8()? != 0,
             random: input.read_u8()?,
@@ -606,7 +607,7 @@ impl TerrainBorder {
     /// Returns an error if writing to `output` fails.
     ///
     /// Also fails if the SLP ID does not fit the format's `i32`.
-    pub fn write_to<W: Write>(&self, output: &mut W) -> Result<()> {
+    pub fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         output.write_u8(u8::from(self.enabled))?;
         output.write_u8(self.random)?;
         write_terrain_name(output, &self.name)?;
@@ -631,7 +632,7 @@ impl TerrainBorder {
     }
 }
 
-fn read_terrain_name<R: Read>(input: &mut R, output: &mut TerrainName) -> Result<()> {
+fn read_terrain_name<R: Read>(input: &mut R, output: &mut TerrainName) -> GenieResult<()> {
     let bytes = &mut [0; 13];
     input.read_exact(bytes)?;
     bytes
@@ -643,7 +644,7 @@ fn read_terrain_name<R: Read>(input: &mut R, output: &mut TerrainName) -> Result
     Ok(())
 }
 
-fn write_terrain_name<W: Write>(output: &mut W, name: &TerrainName) -> Result<()> {
+fn write_terrain_name<W: Write>(output: &mut W, name: &TerrainName) -> GenieResult<()> {
     let bytes = &mut [0; 13];
     bytes[..name.len()].copy_from_slice(name.as_bytes());
     output.write_all(bytes)?;

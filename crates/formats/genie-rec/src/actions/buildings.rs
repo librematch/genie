@@ -1,9 +1,10 @@
 //! The buildings' commands: make, research, build, build wall and cancel build.
 
 use crate::actions::{Location2, ObjectsList};
-use crate::{ObjectId, PlayerId, Result};
+use crate::{ObjectId, PlayerId};
 use crate::{fits, opt_fits};
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
+use genie_error::GenieResult;
 use genie_support::{ReadSkipExt, TechId, UnitKindId, read_le, read_opt_u32};
 use std::io::{Read, Write};
 
@@ -26,7 +27,7 @@ impl MakeCommand {
     /// # Errors
     ///
     /// Returns an error if reading from `input` fails.
-    pub fn read_from(mut input: impl Read) -> Result<Self> {
+    pub fn read_from(mut input: impl Read) -> GenieResult<Self> {
         input.skip(3)?;
         let building_id = input.read_u32::<LE>()?.into();
         let player_id = input.read_u8()?.into();
@@ -48,7 +49,7 @@ impl MakeCommand {
     /// Returns an error if writing to `output` fails.
     ///
     /// Also fails if the target ID is above `i32::MAX`.
-    pub fn write_to<W: Write>(&self, output: &mut W) -> Result<()> {
+    pub fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         output.write_all(&[0, 0, 0])?;
         output.write_u32::<LE>(self.building_id.into())?;
         output.write_u8(self.player_id.into())?;
@@ -78,7 +79,7 @@ impl ResearchCommand {
     /// # Errors
     ///
     /// Returns an error if reading from `input` fails.
-    pub fn read_from(mut input: impl Read) -> Result<Self> {
+    pub fn read_from(mut input: impl Read) -> GenieResult<Self> {
         input.skip(3)?;
         let building_id = input.read_u32::<LE>()?.into();
         let player_id = input.read_u8()?.into();
@@ -100,7 +101,7 @@ impl ResearchCommand {
     /// Returns an error if writing to `output` fails.
     ///
     /// Also fails if the target ID is above `i32::MAX`.
-    pub fn write_to<W: Write>(&self, output: &mut W) -> Result<()> {
+    pub fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         output.write_all(&[0, 0, 0])?;
         output.write_u32::<LE>(self.building_id.into())?;
         output.write_u8(self.player_id.into())?;
@@ -134,7 +135,7 @@ impl BuildCommand {
     /// # Errors
     ///
     /// Returns an error if reading from `input` fails.
-    pub fn read_from(mut input: impl Read) -> Result<Self> {
+    pub fn read_from(mut input: impl Read) -> GenieResult<Self> {
         let mut command = Self::default();
         let selected_count = input.read_i8()?;
         command.player_id = input.read_u8()?.into();
@@ -168,7 +169,7 @@ pub struct BuildWallCommand {
 }
 
 impl BuildWallCommand {
-    pub(super) fn read_from(mut input: impl Read) -> Result<Self> {
+    pub(super) fn read_from(mut input: impl Read) -> GenieResult<Self> {
         let selected_count = input.read_i8()?;
         let player_id = input.read_u8()?.into();
         let start = (input.read_u8()?, input.read_u8()?);
@@ -188,7 +189,7 @@ impl BuildWallCommand {
             if selected_count == 1 && list[0] == -1 {
                 list.clear();
             }
-            ObjectsList::List(list.into_iter().map(fits).collect::<Result<_>>()?)
+            ObjectsList::List(list.into_iter().map(fits).collect::<GenieResult<_>>()?)
         };
         Ok(Self {
             player_id,
@@ -217,7 +218,7 @@ impl CancelBuildCommand {
     /// Returns an error if reading from `input` fails.
     ///
     /// Also fails if the stored player ID is above 255.
-    pub fn read_from(mut input: impl Read) -> Result<Self> {
+    pub fn read_from(mut input: impl Read) -> GenieResult<Self> {
         input.skip(3)?;
         let building_id = input.read_u32::<LE>()?.into();
         let player_id = fits(input.read_u32::<LE>()?)?;
@@ -232,7 +233,7 @@ impl CancelBuildCommand {
     /// # Errors
     ///
     /// Returns an error if writing to `output` fails.
-    pub fn write_to<W: Write>(&self, output: &mut W) -> Result<()> {
+    pub fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         output.write_all(&[0, 0, 0])?;
         output.write_u32::<LE>(self.building_id.into())?;
         output.write_u32::<LE>(u32::from(self.player_id))?;

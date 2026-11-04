@@ -18,7 +18,6 @@ categories = ["parser-implementations", "game-development"]
 genie-error = { path = "../../base/genie-error" }
 byteorder.workspace = true
 sorted-vec = "0.8.0"
-thiserror.workspace = true
 
 [dev-dependencies]
 anyhow.workspace = true

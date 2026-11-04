@@ -1,8 +1,9 @@
 //! The game commands (`0x67`), one variant per sub-command.
 
+use crate::PlayerId;
 use crate::fits;
-use crate::{PlayerId, Result};
 use byteorder::{LE, ReadBytesExt};
+use genie_error::GenieResult;
 use std::io::Read;
 
 /// Commands affecting the game (command `0x67`), one variant per sub-command.
@@ -119,7 +120,7 @@ pub(super) struct RawGameCommand {
 }
 
 impl RawGameCommand {
-    pub fn read_from(mut input: impl Read) -> Result<Self> {
+    pub fn read_from(mut input: impl Read) -> GenieResult<Self> {
         let game_command = input.read_u8()?;
         let var1 = input.read_i16::<LE>()?;
         let var2 = input.read_i16::<LE>()?;
@@ -146,7 +147,7 @@ impl GameCommand {
     /// Also fails if the player ID of a named sub-command is negative or above 255, or if a
     /// strategic number's value is above `i32::MAX`; a sub-command no variant names reads as
     /// [`GameCommand::Other`].
-    pub fn read_from(input: impl Read) -> Result<Self> {
+    pub fn read_from(input: impl Read) -> GenieResult<Self> {
         use GameCommand::{
             AddFarmReseedQueue, AlliedVictory, Cheat, FarmReseedAutoQueue, Inventory, QuickBuild,
             RemoveFarmReseedQueue, SetGameSpeed, SetStrategicNumber, SharedLos, Spies, Unknown0x0c,

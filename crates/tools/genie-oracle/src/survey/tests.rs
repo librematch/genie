@@ -1,3 +1,4 @@
+use crate::errors::no_such_player;
 use crate::test_ids::object_id;
 use std::num::NonZeroUsize;
 
@@ -8,7 +9,7 @@ use genie_rec::de::Op;
 
 use crate::fixtures::{combat_object, gaia, header, human, recording};
 use crate::survey::{field_key, header_survey};
-use crate::{Error, ONLY_IN_THE_GAME, object_field_differences_in};
+use crate::{ONLY_IN_THE_GAME, object_field_differences_in};
 use genie_core::combat::AttackCount;
 use genie_core::objects::layers::Combat;
 use genie_core::world::parts::ObjectParts;
@@ -57,7 +58,7 @@ fn survey_counts_each_field_over_the_window_saves() {
         (3, 3, 1)
     );
     let missing = header_survey(&rec, None, &[2], (1, 5), every(1), Scope::Saved, &mut games);
-    assert!(matches!(missing, Err(Error::NoSuchPlayer(2))));
+    assert!(missing.is_err_and(|e| e == no_such_player(2)));
 }
 
 /// A player that stops is listed with its stop and compared no more; the survey ends once

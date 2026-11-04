@@ -1,10 +1,10 @@
 //! Handles bitmap files embedded in the scenario file.
 
-use crate::Result;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
+use genie_error::{GenieError, GenieResult};
 use genie_support::read_bytes;
 use rgb::RGBA8;
-use std::io::{self, Read, Write};
+use std::io::{Read, Write};
 
 /// Bitmap header info.
 #[derive(Debug, Default, Clone)]
@@ -25,7 +25,7 @@ pub struct BitmapInfo {
 
 impl BitmapInfo {
     /// Read a bitmap header info structure from a byte stream.
-    pub fn read_from(mut input: impl Read) -> Result<Self> {
+    pub fn read_from(mut input: impl Read) -> GenieResult<Self> {
         let mut bitmap = Self {
             size: input.read_u32::<LE>()?,
             width: input.read_i32::<LE>()?,
@@ -53,7 +53,7 @@ impl BitmapInfo {
     }
 
     #[allow(unused)]
-    pub fn write_to(&self, mut output: impl Write) -> Result<()> {
+    pub fn write_to(&self, mut output: impl Write) -> GenieResult<()> {
         assert_eq!(self.colors.len(), 256);
 
         output.write_u32::<LE>(self.size)?;
@@ -90,7 +90,7 @@ pub struct Bitmap {
 }
 
 impl Bitmap {
-    pub fn read_from(mut input: impl Read) -> Result<Option<Self>> {
+    pub fn read_from(mut input: impl Read) -> GenieResult<Option<Self>> {
         let own_memory = input.read_u32::<LE>()?;
         let width = input.read_u32::<LE>()?;
         let height = input.read_u32::<LE>()?;
@@ -101,10 +101,7 @@ impl Bitmap {
             // the rows are padded to four bytes
             let size = u64::from(height) * ((u64::from(width) + 3) & !3);
             let size = usize::try_from(size).map_err(|_| {
-                io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    "a bitmap past the address space",
-                )
+                GenieError::invalid_input("a bitmap past the address space").with("size", size)
             })?;
             let pixels = read_bytes(&mut input, size)?;
             Ok(Some(Self {
@@ -121,7 +118,7 @@ impl Bitmap {
     }
 
     #[allow(unused)]
-    pub fn write_to(&self, mut output: impl Write) -> Result<()> {
+    pub fn write_to(&self, mut output: impl Write) -> GenieResult<()> {
         output.write_u32::<LE>(self.own_memory)?;
         output.write_u32::<LE>(self.width)?;
         output.write_u32::<LE>(self.height)?;
@@ -132,7 +129,7 @@ impl Bitmap {
     }
 
     #[allow(unused)]
-    pub fn write_empty(mut output: impl Write) -> Result<()> {
+    pub fn write_empty(mut output: impl Write) -> GenieResult<()> {
         output.write_u32::<LE>(0)?;
         output.write_u32::<LE>(0)?;
         output.write_u32::<LE>(0)?;

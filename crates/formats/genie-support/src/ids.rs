@@ -1,7 +1,7 @@
 use crate::{fallible_try_from, fallible_try_into, infallible_try_into};
+use genie_error::{GenieError, GenieResult};
 use std::convert::{TryFrom, TryInto};
 use std::fmt;
-use std::num::TryFromIntError;
 
 /// An ID identifying a unit type.
 #[derive(Debug, Hash, Default, Clone, Copy, PartialEq, Eq)]
@@ -198,18 +198,22 @@ impl From<u16> for StringKey {
 }
 
 impl TryFrom<i32> for StringKey {
-    type Error = TryFromIntError;
+    type Error = GenieError;
     #[inline]
-    fn try_from(n: i32) -> Result<Self, Self::Error> {
-        u32::try_from(n).map(Self::Num)
+    fn try_from(n: i32) -> GenieResult<Self> {
+        u32::try_from(n)
+            .map(Self::Num)
+            .map_err(|_| GenieError::invalid_input("a negative string key").with("key", n))
     }
 }
 
 impl TryFrom<i16> for StringKey {
-    type Error = TryFromIntError;
+    type Error = GenieError;
     #[inline]
-    fn try_from(n: i16) -> Result<Self, Self::Error> {
-        u32::try_from(n).map(Self::Num)
+    fn try_from(n: i16) -> GenieResult<Self> {
+        u32::try_from(n)
+            .map(Self::Num)
+            .map_err(|_| GenieError::invalid_input("a negative string key").with("key", n))
     }
 }
 
@@ -228,28 +232,22 @@ impl From<String> for StringKey {
     }
 }
 
-/// Error that may occur when converting a `StringKey` to some other Rust value, such as an integer
-/// or a string.
-///
-/// When converting to an integer, this means that the `StringKey` is a named key, or it has a
-/// numeric value that is out of range for the target type.
-///
-/// When converting to a string, this does not happen, as numeric keys will be converted to
-/// strings.
-#[derive(Debug, Clone, Copy, thiserror::Error)]
-#[error("could not convert StringKey to the wanted integer size")]
-pub struct TryFromStringKeyError;
+/// A string key that is named, or whose number does not fit the integer.
+#[track_caller]
+fn not_fitting(key: &StringKey) -> GenieError {
+    GenieError::invalid_input("a string key that does not fit the integer").with("key", key)
+}
 
 // Implement TryFrom<&StringKey> conversions for a bunch of stuff
 macro_rules! try_from_string_key {
     ($type:ty) => {
         impl TryFrom<&StringKey> for $type {
-            type Error = TryFromStringKeyError;
+            type Error = GenieError;
             #[inline]
-            fn try_from(key: &StringKey) -> Result<Self, Self::Error> {
+            fn try_from(key: &StringKey) -> GenieResult<Self> {
                 match key {
-                    StringKey::Num(n) => (*n).try_into().map_err(|_| TryFromStringKeyError),
-                    _ => Err(TryFromStringKeyError),
+                    StringKey::Num(n) => (*n).try_into().map_err(|_| not_fitting(key)),
+                    _ => Err(not_fitting(key)),
                 }
             }
         }
@@ -260,15 +258,6 @@ try_from_string_key!(u32);
 try_from_string_key!(i32);
 try_from_string_key!(u16);
 try_from_string_key!(i16);
-
-impl From<TryFromStringKeyError> for genie_error::GenieError {
-    /// The error as a [`genie_error::GenieError`]: its kind and reason, the original as the
-    /// source.
-    #[track_caller]
-    fn from(e: TryFromStringKeyError) -> Self {
-        Self::invalid_input("a string key that does not fit the integer").with_source(e)
-    }
-}
 
 #[cfg(test)]
 mod tests {
@@ -308,23 +297,22 @@ mod tests {
 }
 
 #[cfg(test)]
-mod genie_error_tests {
+mod error_tests {
     use super::*;
-    #[cfg(test)]
-    use std::error::Error as StdError;
 
-    /// The errors convert into `GenieError`s with their kinds and reasons, the original as
-    /// source.
+    /// A named key and a number past the integer's range do not convert.
     #[test]
-    fn string_key_error_converts_into_genie_error() {
-        let e: genie_error::GenieError = TryFromStringKeyError.into();
-        assert_eq!(
-            (e.kind(), e.reason()),
-            (
-                genie_error::ErrorKind::InvalidInput,
-                "a string key that does not fit the integer"
-            )
-        );
-        assert!(StdError::source(&e).is_some());
+    fn named_or_too_large_key_does_not_fit() {
+        for key in [StringKey::from("grassDaut"), StringKey::from(70_000u32)] {
+            let e = u16::try_from(&key).unwrap_err();
+            assert_eq!(
+                (e.kind(), e.reason()),
+                (
+                    genie_error::ErrorKind::InvalidInput,
+                    "a string key that does not fit the integer"
+                )
+            );
+        }
+        assert_eq!(u16::try_from(&StringKey::from(7u32)), Ok(7));
     }
 }

@@ -2,7 +2,8 @@
 
 use crate::masters::MasterTable;
 use crate::setup::layer;
-use crate::{Error, work_masters};
+use crate::work_masters;
+use genie_core::GenieResult;
 use genie_core::gathering::PastureId;
 use genie_core::map::Position;
 use genie_core::objects::HitPoints;
@@ -153,7 +154,7 @@ impl FinderWorld {
 /// and the table's drop sites (`dropsites.json`, [`drop_sites`]).
 ///
 /// [`drop_sites`]: crate::game_tables::drop_sites
-pub fn finder_world(save: &[u8], table: &MasterTable) -> Result<FinderWorld, Error> {
+pub fn finder_world(save: &[u8], table: &MasterTable) -> GenieResult<FinderWorld> {
     let chapter = chapters(save)?[0];
     let header = chapter.header()?;
     let sections = header.players();
@@ -164,7 +165,7 @@ pub fn finder_world(save: &[u8], table: &MasterTable) -> Result<FinderWorld, Err
         })
         .collect::<Result<_, _>>()?;
     let objects = finder_objects(&sections)?;
-    let layer = layer().map_err(Error::Unmodelled)?;
+    let layer = layer()?;
     Ok(FinderWorld {
         masters,
         objects,
@@ -196,12 +197,12 @@ pub fn finder_world(save: &[u8], table: &MasterTable) -> Result<FinderWorld, Err
 /// The finder's view of every live and sleeping object of the players' `sections`, by id.
 fn finder_objects(
     sections: &[genie_save::PlayerSection<'_>],
-) -> Result<HashMap<ObjectId, FinderObject>, Error> {
+) -> GenieResult<HashMap<ObjectId, FinderObject>> {
     let mut objects = HashMap::new();
     for (player, section) in PlayerId::each(sections.len()).zip(sections) {
         for o in section.live_objects().chain(section.sleeping_objects()) {
             if let Some(s) = o.static_part() {
-                let id = ObjectId::try_from(s.id).map_err(Error::Unmodelled)?;
+                let id = ObjectId::try_from(s.id)?;
                 let _ = objects.insert(id, finder_object(player, section, (o, s))?);
             }
         }
@@ -214,7 +215,7 @@ fn finder_object(
     player: PlayerId,
     section: &genie_save::PlayerSection<'_>,
     (o, s): (&genie_save::Object, &RgeStaticObject),
-) -> Result<FinderObject, Error> {
+) -> GenieResult<FinderObject> {
     let combat = o.combat();
     let powerup = |f: fn(&TribeCombatObject) -> f32| combat.map_or(0.0, f);
     let master_hp = section

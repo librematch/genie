@@ -1,12 +1,12 @@
 use crate::civ::CivilizationId;
-use crate::conv::invalid_data;
 use crate::unit_kind::UnitKindId;
 use arrayvec::{ArrayString, ArrayVec};
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
 use encoding_rs::WINDOWS_1252;
+use genie_error::{GenieResult, invalid_input};
 pub use genie_support::TechId;
 use genie_support::{MapInto, StringKey, read_bytes, read_opt_u16, read_opt_u32};
-use std::io::{Read, Result, Write};
+use std::io::{Read, Write};
 
 /// An effect command specifies an attribute change when a tech effect is triggered.
 #[derive(Debug, Default, Clone, Copy)]
@@ -72,7 +72,7 @@ impl EffectCommand {
     /// # Errors
     ///
     /// Returns an error if reading from `input` fails.
-    pub fn read_from<R: Read>(input: &mut R) -> Result<Self> {
+    pub fn read_from<R: Read>(input: &mut R) -> GenieResult<Self> {
         let command_kind = input.read_u8()?;
         let params = (
             input.read_i16::<LE>()?,
@@ -91,7 +91,7 @@ impl EffectCommand {
     /// # Errors
     ///
     /// Returns an error if writing to `output` fails.
-    pub fn write_to<W: Write>(&self, output: &mut W) -> Result<()> {
+    pub fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         output.write_u8(self.command_kind)?;
         output.write_i16::<LE>(self.params.0)?;
         output.write_i16::<LE>(self.params.1)?;
@@ -113,8 +113,8 @@ impl TechEffect {
     /// # Errors
     ///
     /// Returns an error if `name` requires more than 31 bytes of storage.
-    pub fn set_name(&mut self, name: &str) -> Result<()> {
-        self.name = TechEffectName::from(name).map_err(|_| invalid_data(NAME_TOO_LONG))?;
+    pub fn set_name(&mut self, name: &str) -> GenieResult<()> {
+        self.name = TechEffectName::from(name).map_err(|_| invalid_input(NAME_TOO_LONG))?;
         Ok(())
     }
 
@@ -125,13 +125,13 @@ impl TechEffect {
     /// Returns an error if reading from `input` fails.
     ///
     /// Also fails if the name, decoded from WINDOWS-1252, takes more than 31 bytes as UTF-8.
-    pub fn read_from<R: Read>(input: &mut R) -> Result<Self> {
+    pub fn read_from<R: Read>(input: &mut R) -> GenieResult<Self> {
         let mut effect = Self::default();
         let mut bytes = [0; 31];
         input.read_exact(&mut bytes)?;
         let bytes = &bytes[..bytes.iter().position(|&c| c == 0).unwrap_or(bytes.len())];
         let (name, _encoding, _failed) = WINDOWS_1252.decode(bytes);
-        effect.name = TechEffectName::from(&name).map_err(|_| invalid_data(NAME_TOO_LONG))?;
+        effect.name = TechEffectName::from(&name).map_err(|_| invalid_input(NAME_TOO_LONG))?;
 
         let num_commands = input.read_u16::<LE>()?;
         for _ in 0..num_commands {
@@ -148,7 +148,7 @@ impl TechEffect {
     /// Returns an error if writing to `output` fails.
     // The format stores the command count as a u16; longer lists are truncated, as before.
     #[allow(clippy::cast_possible_truncation)]
-    pub fn write_to<W: Write>(&self, output: &mut W) -> Result<()> {
+    pub fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         let mut buffer = [0; 31];
         buffer[..self.name.len()].copy_from_slice(self.name.as_bytes());
         output.write_all(&buffer)?;
@@ -167,7 +167,7 @@ impl TechEffectRef {
     /// # Errors
     ///
     /// Returns an error if reading from `input` fails.
-    pub fn read_from<R: Read>(input: &mut R) -> Result<Self> {
+    pub fn read_from<R: Read>(input: &mut R) -> GenieResult<Self> {
         Ok(Self {
             effect_kind: input.read_u16::<LE>()?,
             amount: input.read_u16::<LE>()?,
@@ -180,7 +180,7 @@ impl TechEffectRef {
     /// # Errors
     ///
     /// Returns an error if writing to `output` fails.
-    pub fn write_to<W: Write>(self, output: &mut W) -> Result<()> {
+    pub fn write_to<W: Write>(self, output: &mut W) -> GenieResult<()> {
         output.write_u16::<LE>(self.effect_kind)?;
         output.write_u16::<LE>(self.amount)?;
         output.write_u8(u8::from(self.enabled))?;
@@ -200,7 +200,7 @@ impl Tech {
     /// # Errors
     ///
     /// Returns an error if reading from `input` fails, or if an ID is out of range.
-    pub fn read_from(mut input: impl Read) -> Result<Self> {
+    pub fn read_from(mut input: impl Read) -> GenieResult<Self> {
         let mut tech = Self::default();
         for _ in 0..6 {
             // 4 on some versions
@@ -247,7 +247,7 @@ impl Tech {
     /// Also fails if a string key is a name rather than a number.
     // The format stores the name length as u16 (truncated, as before).
     #[allow(clippy::cast_possible_truncation)]
-    pub fn write_to(&self, mut output: impl Write) -> Result<()> {
+    pub fn write_to(&self, mut output: impl Write) -> GenieResult<()> {
         self.write_requirements(&mut output)?;
         output.write_u16::<LE>(self.civilization_id.map_into().unwrap_or(0xFFFF))?;
         output.write_u16::<LE>(self.full_tech_mode)?;
@@ -261,7 +261,7 @@ impl Tech {
         output.write_u8(self.button_id)?;
         output.write_u32::<LE>(match self.language_dll_help {
             Some(StringKey::Num(id)) => id,
-            Some(_) => return Err(invalid_data(NAMED_STRING_KEY)),
+            Some(_) => return Err(invalid_input(NAMED_STRING_KEY)),
             None => 0xFFFF_FFFF,
         })?;
         output.write_u32::<LE>(self.help_page_id)?;
@@ -276,7 +276,7 @@ impl Tech {
     /// and the count of required techs.
     // The count of required techs is at most 6.
     #[allow(clippy::cast_possible_truncation)]
-    fn write_requirements(&self, mut output: impl Write) -> Result<()> {
+    fn write_requirements(&self, mut output: impl Write) -> GenieResult<()> {
         for i in 0..6 {
             match self.required_techs.get(i) {
                 Some(&id) => output.write_u16::<LE>(id.into())?,
@@ -294,7 +294,8 @@ impl Tech {
                 .write_to(&mut output)?,
             }
         }
-        output.write_u16::<LE>(self.required_techs.len() as u16)
+        output.write_u16::<LE>(self.required_techs.len() as u16)?;
+        Ok(())
     }
 }
 
@@ -308,10 +309,10 @@ const NAMED_STRING_KEY: &str = "a named string key in a data file";
 /// A named string key, which a data file cannot hold.
 // The format stores the string IDs as u16 (truncated, as before).
 #[allow(clippy::cast_possible_truncation)]
-fn dll_id_u16(key: Option<&StringKey>) -> Result<u16> {
+const fn dll_id_u16(key: Option<&StringKey>) -> GenieResult<u16> {
     match key {
         Some(StringKey::Num(id)) => Ok(*id as u16),
-        Some(_) => Err(invalid_data(NAMED_STRING_KEY)),
+        Some(_) => Err(invalid_input(NAMED_STRING_KEY)),
         None => Ok(0xFFFF),
     }
 }
@@ -319,8 +320,6 @@ fn dll_id_u16(key: Option<&StringKey>) -> Result<u16> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[cfg(test)]
-    use std::io::ErrorKind;
 
     /// A language string's id fits the format's u16, none is 0xFFFF.
     #[test]
@@ -333,7 +332,7 @@ mod tests {
     #[test]
     fn named_string_key_cannot_be_written() {
         let e = dll_id_u16(Some(&StringKey::from("NAME"))).unwrap_err();
-        assert_eq!(e.kind(), ErrorKind::InvalidData);
+        assert_eq!(e.kind(), genie_error::ErrorKind::InvalidInput);
     }
 
     /// The requirements: six tech slots (-1 for none), three effect slots (type 0xFFFF for

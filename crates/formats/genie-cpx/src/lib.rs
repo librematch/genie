@@ -9,13 +9,14 @@
 #![deny(unsafe_code)]
 #![warn(unused)]
 
+use genie_error::GenieResult;
 use std::io::{Read, Seek, Write};
 
 mod read;
 mod write;
 
-pub use read::{Campaign, ReadCampaignError};
-pub use write::{CampaignWriter, WriteCampaignError};
+pub use read::Campaign;
+pub use write::CampaignWriter;
 
 /// Version identifier for the campaign file format.
 ///
@@ -71,14 +72,10 @@ where
     ///
     /// # Errors
     ///
-    /// Returns an error if a scenario cannot be read back from the source campaign, or if writing
-    /// to `output` fails.
-    ///
-    /// # Panics
-    ///
-    /// Panics if a name or the scenario count does not fit the target version's fields (see
-    /// [`CampaignWriter::flush`]).
-    pub fn write_to<W: Write>(&mut self, output: &mut W) -> Result<(), WriteCampaignError> {
+    /// Returns an error if a scenario cannot be read back from the source campaign, if writing
+    /// to `output` fails, or if a name or the scenario count does not fit the target version's
+    /// fields (see [`CampaignWriter::flush`]).
+    pub fn write_to<W: Write>(&mut self, output: &mut W) -> GenieResult<()> {
         self.write_to_version(output, self.version())
     }
 
@@ -86,30 +83,22 @@ where
     ///
     /// # Errors
     ///
-    /// Returns an error if a scenario cannot be read back from the source campaign, or if writing
-    /// to `output` fails.
-    ///
-    /// # Panics
-    ///
-    /// Panics if a name or the scenario count does not fit the target version's fields (see
-    /// [`CampaignWriter::flush`]).
+    /// Returns an error if a scenario cannot be read back from the source campaign, if writing
+    /// to `output` fails, or if a name or the scenario count does not fit the target version's
+    /// fields (see [`CampaignWriter::flush`]).
     pub fn write_to_version<W: Write>(
         &mut self,
         output: &mut W,
         version: CpxVersion,
-    ) -> Result<(), WriteCampaignError> {
+    ) -> GenieResult<()> {
         let mut writer = CampaignWriter::new(self.name(), output).version(version);
 
-        for i in 0..self.len() {
-            let bytes = self
-                .by_index_raw(i)
-                .map_err(|_| WriteCampaignError::NotFoundError(i))?;
-            match (self.scenario_name(i), self.scenario_filename(i)) {
-                (Some(name), Some(filename)) => {
-                    writer.add_raw(name, filename, bytes);
-                }
-                _ => return Err(WriteCampaignError::NotFoundError(i)),
-            }
+        let names: Vec<(String, String)> = self
+            .entries()
+            .map(|entry| (entry.name.clone(), entry.filename.clone()))
+            .collect();
+        for (i, (name, filename)) in names.iter().enumerate() {
+            writer.add_raw(name, filename, self.by_index_raw(i)?);
         }
 
         let _output = writer.flush()?;

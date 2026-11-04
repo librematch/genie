@@ -5,9 +5,11 @@ use crate::ai::{
     ResourceMemory, read_id_list,
 };
 use crate::element::ReadableHeaderElement;
+use crate::errors::not_read;
 use crate::reader::RecordingHeaderReader;
-use crate::{ObjectId, Result, fits};
+use crate::{ObjectId, fits};
 use byteorder::{LE, ReadBytesExt};
+use genie_error::GenieResult;
 use genie_support::{ReadSkipExt, ReadStringsExt, read_list};
 use std::io::Read;
 
@@ -55,7 +57,7 @@ pub struct InformationAi {
 }
 
 impl ReadableHeaderElement for InformationAi {
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let mut ai = Self::default();
         ai.read_goals_and_resources(input)?;
         let _last_update_row = input.read_u32::<LE>()?;
@@ -75,7 +77,7 @@ impl ReadableHeaderElement for InformationAi {
         skip_seen(input)?;
         skip_unit_counts(input)?;
 
-        Err(crate::Error::NotRead("the rest of the AI information"))
+        Err(not_read("the rest of the AI information"))
     }
 }
 
@@ -85,7 +87,7 @@ impl InformationAi {
     fn read_goals_and_resources<R: Read>(
         &mut self,
         input: &mut RecordingHeaderReader<R>,
-    ) -> Result<()> {
+    ) -> GenieResult<()> {
         let ai = self;
         for _ in 0..4096 {
             let _garbage = input.read_u32::<LE>()?;
@@ -124,7 +126,7 @@ impl InformationAi {
 
     /// The important objects', units' and others' ids, the items to defend and the player's
     /// buildings and objects, each behind its count.
-    fn read_id_lists<R: Read>(&mut self, input: &mut RecordingHeaderReader<R>) -> Result<()> {
+    fn read_id_lists<R: Read>(&mut self, input: &mut RecordingHeaderReader<R>) -> GenieResult<()> {
         let ai = self;
         ai.important_object_ids = read_id_list(input)?;
         ai.important_unit_ids = read_id_list(input)?;
@@ -138,7 +140,7 @@ impl InformationAi {
 
     /// The building count (read past), the path map, the last wall positions, the learning
     /// file and the quadrant logs; the blocks old versions have between them, read past.
-    fn read_paths<R: Read>(&mut self, input: &mut RecordingHeaderReader<R>) -> Result<()> {
+    fn read_paths<R: Read>(&mut self, input: &mut RecordingHeaderReader<R>) -> GenieResult<()> {
         let ai = self;
         let _building_count = input.read_u32::<LE>()?;
 
@@ -171,7 +173,7 @@ impl InformationAi {
 /// The important objects behind their count; one without an id is left out.
 fn read_important_objects<R: Read>(
     input: &mut RecordingHeaderReader<R>,
-) -> Result<Vec<ImportantObjectMemory>> {
+) -> GenieResult<Vec<ImportantObjectMemory>> {
     let max_important_object_memory = input.read_u32::<LE>()?;
     let mut important_objects = vec![];
     for _ in 0..max_important_object_memory {
@@ -185,7 +187,9 @@ fn read_important_objects<R: Read>(
 }
 
 /// The building lots behind their count; one without a unit type is left out.
-fn read_building_lots<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Vec<BuildingLot>> {
+fn read_building_lots<R: Read>(
+    input: &mut RecordingHeaderReader<R>,
+) -> GenieResult<Vec<BuildingLot>> {
     let len = input.read_u32::<LE>()?;
     let mut lots = vec![];
     for _ in 0..len {
@@ -201,7 +205,7 @@ fn read_building_lots<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<V
 /// The attack memories behind their count.
 fn read_attack_memories<R: Read>(
     input: &mut RecordingHeaderReader<R>,
-) -> Result<Vec<AttackMemory>> {
+) -> GenieResult<Vec<AttackMemory>> {
     let len = input.read_u32::<LE>()?;
     let mut attacks = vec![];
     for _ in 0..len {
@@ -215,7 +219,7 @@ fn read_attack_memories<R: Read>(
 }
 
 /// The object counts: 750 before 11.51, 850 before 11.65, then 900.
-fn read_object_counts<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Vec<u32>> {
+fn read_object_counts<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Vec<u32>> {
     let num_counts = if input.version() < 11.51 {
         750
     } else if input.version() < 11.65 {
@@ -233,7 +237,7 @@ fn read_object_counts<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<V
 /// resource's memories.
 fn read_resource_memories<R: Read>(
     input: &mut RecordingHeaderReader<R>,
-) -> Result<[Vec<ResourceMemory>; 4]> {
+) -> GenieResult<[Vec<ResourceMemory>; 4]> {
     let _max_resources = [
         input.read_u32::<LE>()?,
         input.read_u32::<LE>()?,
@@ -256,7 +260,7 @@ fn read_resource_memories<R: Read>(
 
 /// The drop sites by age and the closest ones, the forest tiles found, the block old
 /// versions have after them and the relic and wonder victories from 10.90 on, read past.
-fn skip_dropsites<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<()> {
+fn skip_dropsites<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<()> {
     let _dropsites_by_age = {
         let mut outer = vec![];
         for _ in 0..4 {
@@ -296,7 +300,7 @@ fn skip_dropsites<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<()> {
 
 /// What the AI has seen (from 10.94 and 10.95 on) and its last player count refresh (after
 /// 10.99), read past.
-fn skip_seen<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<()> {
+fn skip_seen<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<()> {
     if input.version() >= 10.94 {
         let should_farm = input.read_u32::<LE>()?;
         let have_seen_forage = input.read_u32::<LE>()?;
@@ -324,7 +328,7 @@ fn skip_seen<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<()> {
 
 /// The players' unit counts (120 each from 11.51 on, else 102) and their building and unit
 /// totals from 11.09 on, read past.
-fn skip_unit_counts<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<()> {
+fn skip_unit_counts<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<()> {
     let player_unit_counts_size: usize = if input.version() >= 11.51 { 120 } else { 102 };
     let mut player_unit_counts = vec![vec![0; player_unit_counts_size]; 8];
     for unit_counts in &mut player_unit_counts {

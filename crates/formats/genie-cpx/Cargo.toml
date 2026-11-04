@@ -21,7 +21,6 @@ chardet = "0.2.4"
 encoding_rs.workspace = true
 genie-scx = { version = "5.0.0", path = "../genie-scx" }
 genie-support = { version = "1.0.0", path = "../genie-support" }
-thiserror.workspace = true
 
 [dev-dependencies]
 anyhow.workspace = true

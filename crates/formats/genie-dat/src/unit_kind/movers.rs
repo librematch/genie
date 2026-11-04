@@ -5,8 +5,9 @@ use crate::sound::SoundId;
 use crate::sprite::SpriteId;
 use crate::task::TaskList;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
+use genie_error::GenieResult;
 use genie_support::{UnitKindId, read_opt_u16};
-use std::io::{Read, Result, Write};
+use std::io::{Read, Write};
 
 /// The attribute of animated unit types.
 #[derive(Debug, Default, Clone, Copy)]
@@ -21,7 +22,7 @@ impl AnimatedUnitKindAttributes {
     /// # Errors
     ///
     /// Returns an error if reading from `input` fails.
-    pub fn read_from(mut input: impl Read, _version: f32) -> Result<Self> {
+    pub fn read_from(mut input: impl Read, _version: f32) -> GenieResult<Self> {
         Ok(Self {
             speed: input.read_f32::<LE>()?,
         })
@@ -32,7 +33,7 @@ impl AnimatedUnitKindAttributes {
     /// # Errors
     ///
     /// Returns an error if writing to `output` fails.
-    pub fn write_to(&self, mut output: impl Write, _version: f32) -> Result<()> {
+    pub fn write_to(&self, mut output: impl Write, _version: f32) -> GenieResult<()> {
         output.write_f32::<LE>(self.speed)?;
         Ok(())
     }
@@ -76,7 +77,7 @@ impl MovingUnitKindAttributes {
     /// # Errors
     ///
     /// Returns an error if reading from `input` fails, or if an ID is out of range.
-    pub fn read_from(mut input: impl Read, _version: f32) -> Result<Self> {
+    pub fn read_from(mut input: impl Read, _version: f32) -> GenieResult<Self> {
         Ok(Self {
             move_sprite: read_opt_u16(&mut input)?,
             run_sprite: read_opt_u16(&mut input)?,
@@ -101,7 +102,7 @@ impl MovingUnitKindAttributes {
     /// Returns an error if writing to `output` fails.
     ///
     /// Also fails if a sprite or unit ID does not fit the format's `i16`.
-    pub fn write_to(&self, mut output: impl Write, _version: f32) -> Result<()> {
+    pub fn write_to(&self, mut output: impl Write, _version: f32) -> GenieResult<()> {
         output.write_i16::<LE>(opt_fits(self.move_sprite, -1)?)?;
         output.write_i16::<LE>(opt_fits(self.run_sprite, -1)?)?;
         output.write_f32::<LE>(self.turn_speed)?;
@@ -152,7 +153,7 @@ impl ActionUnitKindAttributes {
     /// # Errors
     ///
     /// Returns an error if reading from `input` fails, or if an ID is out of range.
-    pub fn read_from(mut input: impl Read, _version: f32) -> Result<Self> {
+    pub fn read_from(mut input: impl Read, _version: f32) -> GenieResult<Self> {
         Ok(Self {
             default_task: read_opt_u16(&mut input)?,
             search_radius: input.read_f32::<LE>()?,
@@ -174,7 +175,7 @@ impl ActionUnitKindAttributes {
     /// Returns an error if writing to `output` fails.
     ///
     /// Also fails if the default task, a unit or a sound ID does not fit the format's `i16`.
-    pub fn write_to(&self, mut output: impl Write, _version: f32) -> Result<()> {
+    pub fn write_to(&self, mut output: impl Write, _version: f32) -> GenieResult<()> {
         output.write_i16::<LE>(opt_fits(self.default_task, -1)?)?;
         output.write_f32::<LE>(self.search_radius)?;
         output.write_f32::<LE>(self.work_rate)?;

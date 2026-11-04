@@ -1,14 +1,15 @@
 //! What the pathing reads of a save and its dumps: the shape mesh and its owners, a unit's
 //! terrain and the tile pathfinder's planner.
 
+use genie_core::GenieResult;
 use genie_core::map::GridSize;
 use genie_core::objects::ObjectId;
 use genie_core::pathing::{FixedDistance, FixedPoint, FixedRect};
 use genie_core::pathing::{ShapeId, ShapeSide};
 
+use crate::live;
 use crate::masters::TerrainTable;
 use crate::setup::layer;
-use crate::{Error, live};
 use genie_core::map::{Restriction, RestrictionId, TerrainId};
 use genie_core::pathing::mesh::{Contact, Mesh};
 use genie_core::pathing::tile_path::Planner;
@@ -110,7 +111,7 @@ pub fn mesh_owners_from_dump(text: &str) -> Vec<(ObjectId, ShapeId)> {
 
 /// What the tile pathfinder reads of object `id` in a save: its master's x radius and terrain
 /// restriction (master `+0x5d8`, `+0x606`). None for an object the save does not hold.
-pub fn unit_terrain(save: &[u8], id: i32) -> Result<Option<(f32, RestrictionId)>, Error> {
+pub fn unit_terrain(save: &[u8], id: i32) -> GenieResult<Option<(f32, RestrictionId)>> {
     let chapter = chapters(save)?[0];
     let header = chapter.header()?;
     for section in header.players() {
@@ -140,7 +141,7 @@ pub fn planner_from_save(
     save: &[u8],
     terrain: &TerrainTable,
     passable: Restriction,
-) -> Result<Planner, Error> {
+) -> GenieResult<Planner> {
     let chapter = chapters(save)?[0];
     let header = chapter.header()?;
     let map = &header.world.base_world.map;
@@ -149,8 +150,8 @@ pub fn planner_from_save(
         .iter()
         .flat_map(|r| r.tiles.iter().map(|t| TerrainId::named(t.terrain_kind)))
         .collect();
-    let layer = layer().map_err(Error::Unmodelled)?;
-    let spatial = spatial(&header, terrain, layer).map_err(Error::Unmodelled)?;
+    let layer = layer()?;
+    let spatial = spatial(&header, terrain, layer)?;
     Ok(Planner::new(
         GridSize::new(map.map_width, map.map_height),
         terrain_ids,

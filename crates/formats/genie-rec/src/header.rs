@@ -1,11 +1,12 @@
+use crate::GameVersion;
 use crate::element::{ReadableHeaderElement, read_counted};
 use crate::fits;
 use crate::map::Map;
 use crate::player::Player;
 use crate::reader::RecordingHeaderReader;
 use crate::string_table::StringTable;
-use crate::{GameVersion, Result};
 use byteorder::{LE, ReadBytesExt};
+use genie_error::GenieResult;
 use genie_scx::TribeScen;
 pub use genie_support::SpriteId;
 use genie_support::{ReadSkipExt, read_bytes};
@@ -24,7 +25,7 @@ pub struct AiCommand {
 }
 
 impl ReadableHeaderElement for AiCommand {
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let mut cmd = Self {
             command_kind: input.read_i32::<LE>()?,
             id: input.read_u16::<LE>()?,
@@ -50,7 +51,7 @@ pub struct AiListRule {
 }
 
 impl ReadableHeaderElement for AiListRule {
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let mut rule = Self {
             in_use: input.read_u32::<LE>()? != 0,
             enable: input.read_u32::<LE>()? != 0,
@@ -84,7 +85,7 @@ pub struct AiList {
 }
 
 impl ReadableHeaderElement for AiList {
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let mut list = Self {
             in_use: input.read_u32::<LE>()? != 0,
             id: input.read_i32::<LE>()?,
@@ -110,7 +111,7 @@ pub struct AiGroupTable {
 }
 
 impl ReadableHeaderElement for AiGroupTable {
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let mut table = Self {
             max_groups: input.read_u16::<LE>()?,
             ..Default::default()
@@ -184,7 +185,7 @@ impl Debug for AiFactState {
 }
 
 impl ReadableHeaderElement for AiFactState {
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let save_version = input.read_f32::<LE>()?;
         let version = input.read_f32::<LE>()?;
         let death_match = input.read_u32::<LE>()? != 0;
@@ -244,7 +245,7 @@ pub struct AiScripts {
 }
 
 impl ReadableHeaderElement for AiScripts {
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let string_table = StringTable::read_from(input)?;
         let _max_facts = input.read_u16::<LE>()?;
         let _max_actions = input.read_u16::<LE>()?;
@@ -293,7 +294,7 @@ impl Header {
 
 impl ReadableHeaderElement for Header {
     // Reads the header's parts in file order; the parts it does not keep it skips.
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let mut header = Self {
             game_version: GameVersion::read_from(input)?,
             save_version: input.read_f32::<LE>()?,
@@ -325,7 +326,7 @@ impl ReadableHeaderElement for Header {
 
         header.players = (0..num_players)
             .map(|_| Player::read_from(input))
-            .collect::<Result<_>>()?;
+            .collect::<GenieResult<_>>()?;
         for player in &mut header.players {
             player.read_info(input)?;
         }
@@ -345,7 +346,7 @@ impl ReadableHeaderElement for Header {
 
 /// The world's clock and speed, the next object ids, the random seeds and the current
 /// player: skipped.
-fn skip_world_clock<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<()> {
+fn skip_world_clock<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<()> {
     let _old_time = input.read_u32::<LE>()?;
     let _world_time = input.read_u32::<LE>()?;
     let _old_world_time = input.read_u32::<LE>()?;
@@ -364,7 +365,7 @@ fn skip_world_clock<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<()>
 
 /// The aegis and cheats flags (11.76), the game mode, the campaign (the king campaign from
 /// 10.13), the player turn and each player's time delta: skipped.
-fn skip_game_mode_and_campaign<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<()> {
+fn skip_game_mode_and_campaign<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<()> {
     if input.version() >= 11.76 {
         let _aegis_enabled = input.read_u8()?;
         let _cheats_enabled = input.read_u8()?;
@@ -386,7 +387,7 @@ fn skip_game_mode_and_campaign<R: Read>(input: &mut RecordingHeaderReader<R>) ->
 
 /// The difficulty (7.16), the team lock (10.23), each of nine players' id, humanity and
 /// name (11.32), their resignations (11.35) and the player count (11.36): skipped.
-fn skip_lobby_players<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<()> {
+fn skip_lobby_players<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<()> {
     if input.version() >= 7.16 {
         let _difficulty = input.read_u32::<LE>()?;
     }
@@ -413,7 +414,7 @@ fn skip_lobby_players<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<(
 
 /// The units sent as commanded (11.38; the valid count from 11.39) and each of nine
 /// players' selection: skipped.
-fn skip_sent_commanded_units<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<()> {
+fn skip_sent_commanded_units<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<()> {
     if input.version() < 11.38 {
         return Ok(());
     }
@@ -443,7 +444,7 @@ struct Particle {
 }
 
 impl ReadableHeaderElement for Particle {
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         Ok(Self {
             start: input.read_u32::<LE>()?,
             facet: input.read_u32::<LE>()?,
@@ -467,7 +468,7 @@ struct ParticleSystem {
 }
 
 impl ReadableHeaderElement for ParticleSystem {
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let world_time = input.read_u32::<LE>()?;
         let particles = read_counted(input)?;
         Ok(Self {

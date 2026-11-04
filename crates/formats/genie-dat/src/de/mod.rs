@@ -9,6 +9,11 @@
 //! Counts are kept as the file stores them, so a file reads and writes back byte for byte; a
 //! caller that changes a list's length updates its count. The file on disk is raw-deflate
 //! compressed: [`DatFile::read_from`] inflates, [`DatFile::to_bytes`] gives the inflated bytes.
+//!
+//! The errors are [`GenieError`](genie_error::GenieError)s: reading, inflating or writing that
+//! fails underneath is [`Io`](genie_error::ErrorKind::Io), a file version other than `VER 7.1`
+//! to `VER 8.9` [`Unsupported`](genie_error::ErrorKind::Unsupported), data that does not
+//! follow the format [`InvalidInput`](genie_error::ErrorKind::InvalidInput).
 
 // `Seek` stays unimported: binrw's `count` expansion calls `binrw::io::Seek::stream_position`,
 // which an imported `Seek` would make an unnecessary qualification.
@@ -21,7 +26,7 @@ mod terrain;
 mod unit_parts;
 mod units;
 
-pub use self::file::{DatFile, DebugString, Error, Version};
+pub use self::file::{DatFile, DebugString, Version};
 use self::file::{read_present, write_present};
 pub use self::graphics::{
     Graphic, GraphicAngleSound, GraphicDelta, PlayerColour, Sound, SoundItem,

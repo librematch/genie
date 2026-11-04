@@ -1,7 +1,8 @@
 //! A trigger condition ([`TriggerCondition`]): when a trigger can fire.
 
-use crate::{Result, UnitKindId};
+use crate::UnitKindId;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
+use genie_error::GenieResult;
 use genie_support::reserved;
 use std::convert::TryInto;
 use std::io::{Read, Write};
@@ -21,7 +22,7 @@ impl TriggerCondition {
     /// Returns an error if reading fails.
     // The format stores the property count as an i32; valid files never make it negative.
     #[allow(clippy::cast_sign_loss)]
-    pub fn read_from(mut input: impl Read, version: f64) -> Result<Self> {
+    pub fn read_from(mut input: impl Read, version: f64) -> GenieResult<Self> {
         let condition_kind = input.read_i32::<LE>()?;
         let num_properties = if version > 1.0 {
             input.read_i32::<LE>()?
@@ -50,7 +51,7 @@ impl TriggerCondition {
     /// Returns an error if writing fails.
     // The format stores the property count as an i32.
     #[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
-    pub fn write_to(&self, mut output: impl Write, version: f64) -> Result<()> {
+    pub fn write_to(&self, mut output: impl Write, version: f64) -> GenieResult<()> {
         output.write_i32::<LE>(self.condition_kind)?;
         if version > 1.0 {
             output.write_i32::<LE>(self.properties.len() as i32)?;

@@ -1,4 +1,4 @@
-use crate::Error;
+use crate::errors::no_player;
 use crate::fixtures::{combat_mut, combat_object, gaia, header, moving_mut, static_mut};
 use crate::fixtures::{human, recording};
 use crate::masters::MasterTable;
@@ -141,10 +141,7 @@ fn an_object_view_has_row_per_live_object() {
     assert_eq!(rows[2], "6\t4\t0\t0\t0\t0\t0\t0\t\t\t0 -");
     let with_list = objects_of(&save, 0, Some(5)).unwrap();
     assert!(with_list.contains("action_kind_list"), "{with_list}");
-    assert!(matches!(
-        objects_of(&save, 1, None),
-        Err(Error::NoPlayer(1))
-    ));
+    assert!(objects_of(&save, 1, None).is_err_and(|e| e == no_player(1)));
 }
 
 /// The objects asked for, with their velocity, orientation and path data; each level's path
@@ -177,10 +174,7 @@ fn movement_view_shows_the_paths_of_the_objects_asked_for() {
         "{text}"
     );
     assert!(!text.contains("6 master"), "{text}");
-    assert!(matches!(
-        movement_of(&save, 2, &[5]),
-        Err(Error::NoPlayer(2))
-    ));
+    assert!(movement_of(&save, 2, &[5]).is_err_and(|e| e == no_player(2)));
 }
 
 /// The objects asked for that have a unit AI: its order, action and target, the timers, an
@@ -214,10 +208,7 @@ fn unit_ai_view_shows_the_ai_of_the_objects_asked_for() {
     );
     assert!(lines[5].starts_with("    order "), "{text}");
     assert_eq!(lines.len(), 6);
-    assert!(matches!(
-        unit_ais_of(&save, 1, &[5]),
-        Err(Error::NoPlayer(1))
-    ));
+    assert!(unit_ais_of(&save, 1, &[5]).is_err_and(|e| e == no_player(1)));
 }
 
 /// Each checkpoint the run reaches: per recorded player (lane word 8) the differing words as

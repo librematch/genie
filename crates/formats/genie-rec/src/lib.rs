@@ -30,6 +30,7 @@ pub mod ai;
 pub mod de;
 /// The trait shared by the header's parts.
 pub mod element;
+mod errors;
 /// The recorded-game header (pre-DE layout).
 pub mod header;
 /// The map: tiles, zones, visibility and obstruction data.
@@ -54,14 +55,15 @@ mod test_support;
 
 use crate::actions::{Action, Meta};
 use crate::element::ReadableHeaderElement;
+use crate::errors::{early_sync, missing_sync, out_of_range, unknown_action};
 use crate::reader::{RecordingHeaderReader, SmallBufReader};
 use byteorder::{LE, ReadBytesExt};
 use flate2::bufread::DeflateDecoder;
+use genie_error::GenieResult;
 use genie_support::{fallible_try_from, fallible_try_into, infallible_try_into};
 pub use header::Header;
 use std::fmt::Debug;
 use std::io::{self, BufRead, BufReader, Read, Seek, SeekFrom};
-use std::result::Result as StdResult;
 pub use version::*;
 
 /// ID identifying a player (0-8).
@@ -127,72 +129,21 @@ fallible_try_from!(ObjectId, i32);
 fallible_try_into!(ObjectId, i16);
 fallible_try_into!(ObjectId, i32);
 
-/// The body's sync (checksum) actions did not arrive at the interval the body's meta action set.
-#[derive(Debug, Clone, Copy, thiserror::Error)]
-pub enum SyncError {
-    /// A sync action arrived this many time actions too early.
-    #[error(
-        "Got a sync message, but the log header said there would be a sync message {0} ticks later. The recorded game file may be corrupt"
-    )]
-    UnexpectedSync(u32),
-    /// A time action arrived where a sync action was due.
-    #[error("Expected a sync message at this point, the recorded game file may be corrupt")]
-    ExpectedSync,
-}
-
-/// Errors that may occur while reading a recorded game file.
-#[derive(Debug, thiserror::Error)]
-pub enum Error {
-    /// Reading the file failed.
-    #[error(transparent)]
-    IoError(#[from] io::Error),
-    /// The body's sync actions are out of step.
-    #[error(transparent)]
-    SyncError(#[from] SyncError),
-    /// A string could not be decoded.
-    #[error(transparent)]
-    DecodeStringError(#[from] genie_support::DecodeStringError),
-    /// The scenario embedded in the header could not be read.
-    #[error("Could not read embedded scenario data: {0}")]
-    ReadScenarioError(#[from] genie_scx::Error),
-    /// A count or an id does not fit the field it is read from or written to.
-    #[error("a value that does not fit its field")]
-    ValueOutOfRange,
-    /// A string is not valid UTF-8.
-    #[error("a string that is not valid UTF-8")]
-    InvalidString,
-    /// A body action of a type the reader does not know.
-    #[error("unsupported action type {0:#x}")]
-    UnsupportedAction(i32),
-    /// A unit action of a type the reader does not know.
-    #[error("unsupported unit action type {0}")]
-    UnsupportedUnitAction(u16),
-    /// A value the format rules out: the message says which.
-    #[error("{0}")]
-    InvalidData(&'static str),
-    /// A part of the header the crate does not read yet.
-    #[error("{0} is not read yet")]
-    NotRead(&'static str),
-    /// A part of the header the crate does not write yet.
-    #[error("this header element has no writer")]
-    NotWritten,
-}
-
 /// `value` as the type of the field it is read from or written to.
 ///
 /// # Errors
 ///
-/// [`Error::ValueOutOfRange`] when it does not fit.
-pub(crate) fn fits<T, U: TryInto<T>>(value: U) -> Result<T> {
-    value.try_into().map_err(|_| Error::ValueOutOfRange)
+/// Invalid input when it does not fit.
+pub(crate) fn fits<T, U: TryInto<T>>(value: U) -> GenieResult<T> {
+    value.try_into().map_err(|_| out_of_range())
 }
 
 /// The tiles of a map `width` by `height`.
 ///
 /// # Errors
 ///
-/// [`Error::ValueOutOfRange`] when they do not fit the address space.
-pub(crate) fn area(width: u32, height: u32) -> Result<usize> {
+/// Invalid input when they do not fit the address space.
+pub(crate) fn area(width: u32, height: u32) -> GenieResult<usize> {
     fits(u64::from(width) * u64::from(height))
 }
 
@@ -200,22 +151,10 @@ pub(crate) fn area(width: u32, height: u32) -> Result<usize> {
 ///
 /// # Errors
 ///
-/// [`Error::ValueOutOfRange`] when the id does not fit.
-pub(crate) fn opt_fits<T, U: TryInto<T>>(value: Option<U>, none: T) -> Result<T> {
+/// Invalid input when the id does not fit.
+pub(crate) fn opt_fits<T, U: TryInto<T>>(value: Option<U>, none: T) -> GenieResult<T> {
     value.map_or(Ok(none), fits)
 }
-
-impl From<genie_support::ReadStringError> for Error {
-    fn from(err: genie_support::ReadStringError) -> Self {
-        match err {
-            genie_support::ReadStringError::DecodeStringError(inner) => inner.into(),
-            genie_support::ReadStringError::IoError(inner) => inner.into(),
-        }
-    }
-}
-
-/// Result type alias with `genie_rec::Error` as the error type.
-pub type Result<T> = StdResult<T, Error>;
 
 /// Iterator over body actions.
 #[derive(Debug)]
@@ -240,7 +179,7 @@ where
     /// # Errors
     ///
     /// Returns an error if the meta action cannot be read.
-    pub fn new(mut input: R, data_version: f32) -> Result<Self> {
+    pub fn new(mut input: R, data_version: f32) -> GenieResult<Self> {
         let meta = if data_version >= 11.76 {
             Meta::read_from_mgx(&mut input)?
         } else {
@@ -259,7 +198,7 @@ impl<R> Iterator for BodyActions<R>
 where
     R: BufRead,
 {
-    type Item = Result<Action>;
+    type Item = GenieResult<Action>;
     fn next(&mut self) -> Option<Self::Item> {
         if self.meta.use_sequence_numbers {
             let _sequence = match self.input.read_u8() {
@@ -273,23 +212,20 @@ where
                     self.remaining_syncs_until_checksum = self.meta.checksum_interval;
                     Some(actions::Sync::read_from(&mut self.input).map(Action::Sync))
                 } else {
-                    Some(Err(SyncError::UnexpectedSync(
-                        self.remaining_syncs_until_checksum,
-                    )
-                    .into()))
+                    Some(Err(early_sync(self.remaining_syncs_until_checksum)))
                 }
             }
             Ok(0x01) => Some(actions::Command::read_from(&mut self.input).map(Action::Command)),
             Ok(0x02) => {
                 match self.remaining_syncs_until_checksum.checked_sub(1) {
                     Some(n) => self.remaining_syncs_until_checksum = n,
-                    None => return Some(Err(SyncError::ExpectedSync.into())),
+                    None => return Some(Err(missing_sync())),
                 }
                 Some(actions::Time::read_from(&mut self.input).map(Action::Time))
             }
             Ok(0x03) => Some(actions::ViewLock::read_from(&mut self.input).map(Action::ViewLock)),
             Ok(0x04) => Some(actions::Chat::read_from(&mut self.input).map(Action::Chat)),
-            Ok(id) => Some(Err(Error::UnsupportedAction(id))),
+            Ok(id) => Some(Err(unknown_action(id))),
             Err(err) if err.kind() == io::ErrorKind::UnexpectedEof => None,
             Err(err) => Some(Err(err.into())),
         }
@@ -324,7 +260,7 @@ where
     /// # Errors
     ///
     /// Returns an error if seeking or reading the first bytes fails.
-    pub fn new(mut input: R) -> Result<Self> {
+    pub fn new(mut input: R) -> GenieResult<Self> {
         let file_size = {
             let size = input.seek(SeekFrom::End(0))?;
             // Rewinding to the start: the new position is known.
@@ -362,13 +298,13 @@ where
         })
     }
 
-    fn seek_to_first_header(&mut self) -> Result<()> {
+    fn seek_to_first_header(&mut self) -> GenieResult<()> {
         let _ = self.inner.seek(SeekFrom::Start(self.header_start))?;
 
         Ok(())
     }
 
-    fn seek_to_body(&mut self) -> Result<()> {
+    fn seek_to_body(&mut self) -> GenieResult<()> {
         let _ = self.inner.seek(SeekFrom::Start(self.header_end))?;
 
         Ok(())
@@ -379,7 +315,7 @@ where
     /// # Errors
     ///
     /// Returns an error if the header cannot be read or decoded.
-    pub fn header(&mut self) -> Result<Header> {
+    pub fn header(&mut self) -> GenieResult<Header> {
         self.seek_to_first_header()?;
         let reader = BufReader::new(&mut self.inner).take(self.header_end - self.header_start);
         let deflate = DeflateDecoder::new(reader);
@@ -392,7 +328,7 @@ where
     /// # Errors
     ///
     /// Returns an error if seeking to the body or reading its meta action fails.
-    pub fn actions(&mut self) -> Result<BodyActions<BufReader<&mut R>>> {
+    pub fn actions(&mut self) -> GenieResult<BodyActions<BufReader<&mut R>>> {
         self.seek_to_body()?;
         BodyActions::new(BufReader::new(&mut self.inner), self.save_version)
     }
@@ -403,81 +339,55 @@ where
     }
 }
 
-impl From<SyncError> for genie_error::GenieError {
-    /// The error as a [`genie_error::GenieError`]: its kind and reason, the original as the
-    /// source.
-    #[track_caller]
-    fn from(e: SyncError) -> Self {
-        let to = match &e {
-            SyncError::UnexpectedSync(_) => {
-                Self::invalid_input("a sync message earlier than the log header said")
-            }
-            SyncError::ExpectedSync => Self::invalid_input("a time message where a sync was due"),
-        };
-        to.with_source(e)
-    }
-}
-
-impl From<Error> for genie_error::GenieError {
-    /// The error as a [`genie_error::GenieError`]: its kind and reason, the original as the
-    /// source.
-    #[track_caller]
-    fn from(e: Error) -> Self {
-        let to = match &e {
-            Error::IoError(_) => Self::io("a read or write that failed"),
-            Error::SyncError(_) => Self::invalid_input("sync messages out of step"),
-            Error::DecodeStringError(_) => Self::invalid_input("a string that does not decode"),
-            Error::ReadScenarioError(_) => {
-                Self::invalid_input("an embedded scenario that does not read")
-            }
-            Error::ValueOutOfRange => Self::invalid_input("a value that does not fit its field"),
-            Error::InvalidString => Self::invalid_input("a string that is not valid UTF-8"),
-            Error::UnsupportedAction(_) => {
-                Self::invalid_input("an action type this reader does not know")
-            }
-            Error::UnsupportedUnitAction(_) => {
-                Self::invalid_input("a unit action type this reader does not know")
-            }
-            Error::InvalidData(_) => Self::invalid_input("a value the format rules out"),
-            Error::NotRead(_) => {
-                Self::missing_data("a part of the header this reader does not read")
-            }
-            Error::NotWritten => Self::missing_data("a header element without a writer"),
-        };
-        to.with_source(e)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::fs::File;
+    use std::io::Cursor;
 
-    /// Every error converts into a `GenieError` with the kind of its reason; the original stays as
-    /// its source.
+    /// A body of the mgx layout whose meta action announces a sync every `interval` time
+    /// steps, then `ops`.
+    fn body(interval: u32, ops: &[u32]) -> Vec<u8> {
+        [4, interval, 0, 1, 0, 0, 0]
+            .iter()
+            .chain(ops)
+            .flat_map(|word| word.to_le_bytes())
+            .collect()
+    }
+
+    /// A sync before its interval, a time step where a sync is due and an action type the
+    /// reader does not know end the actions with their errors; the input's end ends them.
     #[test]
-    fn the_errors_convert_into_genie_errors_of_their_kinds() {
-        use genie_error::ErrorKind::{InvalidInput, Io, MissingData};
-        let kinds: [(Error, genie_error::ErrorKind); 11] = [
-            (io::Error::other("x").into(), Io),
-            (SyncError::ExpectedSync.into(), InvalidInput),
-            (genie_support::DecodeStringError.into(), InvalidInput),
-            (Error::ValueOutOfRange, InvalidInput),
-            (Error::InvalidString, InvalidInput),
-            (Error::InvalidData("x"), InvalidInput),
-            (Error::UnsupportedAction(9), InvalidInput),
-            (Error::UnsupportedUnitAction(9), InvalidInput),
-            (Error::NotRead("x"), MissingData),
-            (Error::NotWritten, MissingData),
-            (
-                Error::ReadScenarioError(genie_scx::Error::MissingFileNameError),
-                InvalidInput,
-            ),
-        ];
-        for (error, kind) in kinds {
-            let converted = genie_error::GenieError::from(error);
-            assert_eq!(converted.kind(), kind, "{converted}");
-        }
+    fn body_actions_out_of_step_fail() {
+        let reasons = |interval, ops: &[u32]| -> Vec<Result<(), &'static str>> {
+            BodyActions::new(Cursor::new(body(interval, ops)), 12.0)
+                .unwrap()
+                .map(|action| action.map(|_| ()).map_err(|e| e.reason()))
+                .collect()
+        };
+        assert_eq!(
+            reasons(2, &[2, 100, 0]),
+            [
+                Ok(()),
+                Err("a sync message earlier than the log header said")
+            ]
+        );
+        assert_eq!(
+            reasons(0, &[2]),
+            [Err("a time message where a sync was due")]
+        );
+        assert_eq!(
+            reasons(2, &[9]),
+            [Err("an action type this reader does not know")]
+        );
+        assert_eq!(
+            early_sync(1).context().collect::<Vec<_>>(),
+            [("ticks", "1")]
+        );
+        assert_eq!(
+            unknown_action(9).context().collect::<Vec<_>>(),
+            [("action", "0x9")]
+        );
     }
 
     #[test]
@@ -500,7 +410,7 @@ mod tests {
         for act in r.actions()? {
             match act {
                 Ok(act) => println!("{act:?}"),
-                Err(Error::DecodeStringError(_)) => {
+                Err(e) if e.reason() == "a string that does not decode as WINDOWS-1252" => {
                     // Skip invalid utf8 chat for now
                 }
                 Err(err) => return Err(err.into()),
@@ -518,33 +428,5 @@ mod tests {
             println!("{:?}", act?);
         }
         Ok(())
-    }
-}
-
-#[cfg(test)]
-mod genie_error_tests {
-    use super::*;
-    #[cfg(test)]
-    use std::error::Error as StdError;
-
-    /// The errors convert into `GenieError`s with their kinds and reasons, the original as
-    /// source.
-    #[test]
-    fn recording_errors_convert_into_genie_errors() {
-        let e: genie_error::GenieError = SyncError::ExpectedSync.into();
-        assert_eq!(
-            (e.kind(), e.reason()),
-            (
-                genie_error::ErrorKind::InvalidInput,
-                "a time message where a sync was due"
-            )
-        );
-        assert!(StdError::source(&e).is_some());
-        let e: genie_error::GenieError = Error::IoError(io::Error::other("x")).into();
-        assert_eq!(
-            (e.kind(), e.reason()),
-            (genie_error::ErrorKind::Io, "a read or write that failed")
-        );
-        assert!(StdError::source(&e).is_some());
     }
 }

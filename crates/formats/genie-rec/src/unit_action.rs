@@ -1,9 +1,10 @@
 use crate::ObjectId;
-use crate::Result;
 use crate::element::{ReadableHeaderElement, WritableHeaderElement};
+use crate::errors::unknown_unit_action;
 use crate::reader::RecordingHeaderReader;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
 pub use genie_dat::sprite::SpriteId;
+use genie_error::GenieResult;
 pub use genie_support::UnitKindId;
 use genie_support::{read_opt_u16, read_opt_u32};
 use std::io::{Read, Write};
@@ -37,7 +38,7 @@ pub struct UnitAction {
 }
 
 impl ReadableHeaderElement for UnitAction {
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let action_kind = input.read_u16::<LE>()?;
         Self::read_from_inner(input, action_kind)
     }
@@ -47,7 +48,7 @@ impl UnitAction {
     fn read_from_inner<R: Read>(
         input: &mut RecordingHeaderReader<R>,
         action_kind: u16,
-    ) -> Result<Self> {
+    ) -> GenieResult<Self> {
         // TODO this is different between AoC 1.0 and AoC 1.0c. This version check is a guess
         // and may not actually be when it changed. May have to become more specific in the
         // future!
@@ -95,7 +96,7 @@ impl UnitAction {
     /// Returns an error if reading fails.
     ///
     /// Also fails on an action type the reader does not know yet (see [`ActionKind::read_from`]).
-    pub fn read_list_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Vec<Self>> {
+    pub fn read_list_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Vec<Self>> {
         let mut list = vec![];
         loop {
             let action_kind = input.read_u16::<LE>()?;
@@ -140,11 +141,11 @@ impl ActionKind {
     /// Returns an error if reading fails.
     ///
     /// Also fails on an action type the reader does not know yet
-    /// ([`crate::Error::UnsupportedUnitAction`]).
+    /// (invalid input).
     pub fn read_from<R: Read>(
         input: &mut RecordingHeaderReader<R>,
         action_kind: u16,
-    ) -> Result<Self> {
+    ) -> GenieResult<Self> {
         let data = match action_kind {
             1 => Self::MoveTo(ActionMoveTo::read_from(input)?),
             3 => Self::Enter(ActionEnter::read_from(input)?),
@@ -155,7 +156,7 @@ impl ActionKind {
             13 => Self::Guard,
             21 => Self::Make(ActionMake::read_from(input)?),
             107 => Self::Artifact,
-            _ => return Err(crate::Error::UnsupportedUnitAction(action_kind)),
+            _ => return Err(unknown_unit_action(action_kind)),
         };
         Ok(data)
     }
@@ -169,14 +170,14 @@ pub struct ActionMoveTo {
 }
 
 impl ReadableHeaderElement for ActionMoveTo {
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let range = input.read_f32::<LE>()?;
         Ok(Self { range })
     }
 }
 
 impl WritableHeaderElement for ActionMoveTo {
-    fn write_to<W: Write>(&self, output: &mut W) -> Result<()> {
+    fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         output.write_f32::<LE>(self.range)?;
         Ok(())
     }
@@ -190,14 +191,14 @@ pub struct ActionEnter {
 }
 
 impl ReadableHeaderElement for ActionEnter {
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let first_time = input.read_u32::<LE>()?;
         Ok(Self { first_time })
     }
 }
 
 impl WritableHeaderElement for ActionEnter {
-    fn write_to<W: Write>(&self, output: &mut W) -> Result<()> {
+    fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         output.write_u32::<LE>(self.first_time)?;
         Ok(())
     }
@@ -221,7 +222,7 @@ pub struct ActionAttack {
 }
 
 impl ReadableHeaderElement for ActionAttack {
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         Ok(Self {
             range: input.read_f32::<LE>()?,
             min_range: input.read_f32::<LE>()?,
@@ -250,14 +251,14 @@ pub struct ActionMake {
 }
 
 impl ReadableHeaderElement for ActionMake {
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let work_timer = input.read_f32::<LE>()?;
         Ok(Self { work_timer })
     }
 }
 
 impl WritableHeaderElement for ActionMake {
-    fn write_to<W: Write>(&self, output: &mut W) -> Result<()> {
+    fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         output.write_f32::<LE>(self.work_timer)?;
         Ok(())
     }

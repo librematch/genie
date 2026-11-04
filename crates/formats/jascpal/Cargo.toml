@@ -17,7 +17,6 @@ categories = ["parser-implementations", "multimedia::images"]
 genie-error = { path = "../../base/genie-error" }
 nom = { version = "7.1.1", default-features = false, features = ["std"] }
 rgb.workspace = true
-thiserror.workspace = true
 
 [dev-dependencies]
 anyhow.workspace = true

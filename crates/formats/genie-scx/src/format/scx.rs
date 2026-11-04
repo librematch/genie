@@ -1,17 +1,19 @@
 //! A whole scenario file ([`ScxFormat`]): its version, its load, its write and its hash.
 
+use crate::VersionBundle;
 use crate::ai::AiInfo;
+use crate::errors::unknown_version;
 use crate::format::{ScenarioObject, TribeScen};
 use crate::header::ScxHeader;
 use crate::map::Map;
 use crate::player::{ScenarioPlayerData, WorldPlayerData};
 use crate::triggers::TriggerSystem;
 use crate::values::ScxVersion;
-use crate::{Error, Result, VersionBundle};
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
 use flate2::Compression;
 use flate2::read::DeflateDecoder;
 use flate2::write::DeflateEncoder;
+use genie_error::GenieResult;
 use genie_support::reserved;
 use std::io::{Read, Write};
 
@@ -56,11 +58,11 @@ impl ScxFormat {
         version: ScxVersion,
         player_version: f32,
         mut input: impl Read,
-    ) -> Result<Self> {
+    ) -> GenieResult<Self> {
         fn read_scenario_players(
             mut input: impl Read,
             player_version: f32,
-        ) -> Result<Vec<ScenarioPlayerData>> {
+        ) -> GenieResult<Vec<ScenarioPlayerData>> {
             let num = input.read_u32::<LE>()?;
             let mut players = reserved(num as usize);
             log::debug!("number of scenario players: {num}");
@@ -74,7 +76,7 @@ impl ScxFormat {
             mut input: impl Read,
             num_players: u32,
             version: ScxVersion,
-        ) -> Result<Vec<Vec<ScenarioObject>>> {
+        ) -> GenieResult<Vec<Vec<ScenarioObject>>> {
             let mut player_objects = reserved(num_players as usize);
             for _ in 0..num_players {
                 let num_objects = input.read_u32::<LE>()?;
@@ -141,12 +143,12 @@ impl ScxFormat {
         })
     }
 
-    pub fn load_scenario(mut input: impl Read) -> Result<Self> {
+    pub fn load_scenario(mut input: impl Read) -> GenieResult<Self> {
         let mut format_version = [0; 4];
         input.read_exact(&mut format_version)?;
         let format_version = ScxVersion(format_version);
         let Some(player_version) = format_version.to_player_version() else {
-            return Err(Error::UnsupportedFormatVersionError(format_version));
+            return Err(unknown_version(format_version));
         };
         Self::load_inner(format_version, player_version, input)
     }
@@ -157,7 +159,7 @@ impl ScxFormat {
         &self,
         mut output: impl Write,
         format_version: ScxVersion,
-    ) -> Result<()> {
+    ) -> GenieResult<()> {
         for objects in &self.player_objects {
             output.write_i32::<LE>(objects.len() as i32)?;
             for object in objects {
@@ -174,7 +176,7 @@ impl ScxFormat {
         mut output: impl Write,
         player_version: f32,
         victory_version: f32,
-    ) -> Result<()> {
+    ) -> GenieResult<()> {
         output.write_i32::<LE>(self.scenario_players.len() as i32 + 1)?;
         for player in &self.scenario_players {
             player.write_to(&mut output, player_version, victory_version)?;
@@ -184,9 +186,9 @@ impl ScxFormat {
 
     // The format stores the player count as an i32.
     #[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
-    pub fn write_to(&self, mut output: impl Write, version: &VersionBundle) -> Result<()> {
+    pub fn write_to(&self, mut output: impl Write, version: &VersionBundle) -> GenieResult<()> {
         let Some(player_version) = version.format.to_player_version() else {
-            return Err(Error::UnsupportedFormatVersionError(version.format));
+            return Err(unknown_version(version.format));
         };
 
         output.write_all(version.format.as_bytes())?;

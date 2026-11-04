@@ -1,8 +1,9 @@
 //! The first checkpoint from the start-of-game save: each player's block against the
 //! recording's ([`compare_first_checkpoint`]).
 
-use crate::Error;
+use crate::errors::{no_checkpoint, no_such_player};
 use genie_core::GenieError;
+use genie_core::GenieResult;
 use genie_core::map::Position;
 use genie_core::objects::ObjectId;
 use genie_core::objects::ObjectState;
@@ -101,7 +102,7 @@ pub(super) fn player_totals(section: &PlayerSection<'_>, id: u32) -> PlayerState
 
 /// Compare every player of the first chapter's save with the recording's first checkpoint, in the
 /// order of the checkpoint's lanes. Lanes that are all zero hold no player.
-pub fn compare_first_checkpoint(recording: &[u8]) -> Result<Vec<PlayerComparison>, Error> {
+pub fn compare_first_checkpoint(recording: &[u8]) -> GenieResult<Vec<PlayerComparison>> {
     let chapter = chapters(recording)?[0];
     let header = chapter.header()?;
     let checkpoint = chapter
@@ -111,7 +112,7 @@ pub fn compare_first_checkpoint(recording: &[u8]) -> Result<Vec<PlayerComparison
             Ok(_) => None,
             Err(e) => Some(Err(e)),
         })
-        .ok_or(Error::NoCheckpoint)??;
+        .ok_or(no_checkpoint())??;
     let players = header.players();
     checkpoint
         .lanes
@@ -119,10 +120,10 @@ pub fn compare_first_checkpoint(recording: &[u8]) -> Result<Vec<PlayerComparison
         .filter(|lane| lane.iter().any(|&w| w != 0))
         .map(|lane| {
             let id = lane[8];
-            let section = players.get(id as usize).ok_or(Error::NoSuchPlayer(id))?;
+            let section = players.get(id as usize).ok_or_else(|| no_such_player(id))?;
             Ok(PlayerComparison {
                 id,
-                from_save: player_block(&player_state(section, id).map_err(Error::Unmodelled)?),
+                from_save: player_block(&player_state(section, id)?),
                 checkpoint: *lane,
             })
         })

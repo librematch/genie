@@ -11,7 +11,7 @@
 )]
 
 use flate2::{Compression, write::ZlibEncoder};
-use genie_oracle::tick_trace::{TickTrace, TraceError};
+use genie_oracle::tick_trace::{TickTrace, bad_trace};
 use std::array::from_fn;
 use std::io::Write;
 
@@ -50,10 +50,10 @@ fn trace_gives_each_ticks_world_time_and_lanes() {
 
 #[test]
 fn file_of_another_kind_is_refused() {
-    assert!(matches!(
-        TickTrace::decode(b"GRTRACE3\0\0\0\0"),
-        Err(TraceError::NotTrace)
-    ));
+    assert_eq!(
+        TickTrace::decode(b"GRTRACE3\0\0\0\0").map_err(|e| e.reason()),
+        Err(bad_trace().reason())
+    );
 }
 
 #[test]

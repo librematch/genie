@@ -20,6 +20,7 @@
 mod ai;
 mod bitmap;
 pub mod convert;
+mod errors;
 mod format;
 mod header;
 mod map;
@@ -29,100 +30,17 @@ mod values;
 mod victory;
 
 use format::ScxFormat;
-use genie_support::{ReadStringError, WriteStringError};
-use std::io::{self, Read, Write};
+use genie_error::GenieResult;
+use std::io::{Read, Write};
 
 pub use format::{ScenarioObject, TribeScen};
-pub use genie_support::{DecodeStringError, EncodeStringError};
 pub use genie_support::{StringKey, UnitKindId};
 pub use header::{DlcOptions, ScxHeader};
 pub use map::{Map, Tile};
 pub use player::{ScenarioPlayerData, WorldPlayerData};
-use std::result::Result as StdResult;
 pub use triggers::{Trigger, TriggerCondition, TriggerEffect, TriggerSystem};
 pub use values::*;
 pub use victory::{VictoryConditions, VictoryEntry, VictoryPointEntry, VictoryState};
-
-/// Error type for SCX methods, containing all types of errors that may occur while reading or
-/// writing scenario files.
-#[derive(Debug, thiserror::Error)]
-pub enum Error {
-    /// The scenario that's attempted to be read does not contain a file name.
-    #[error("must have a file name")]
-    MissingFileNameError,
-    /// Attempted to read a scenario with an unsupported format version identifier.
-    #[error("unsupported format version {:?}", .0)]
-    UnsupportedFormatVersionError(ScxVersion),
-    /// Attempted to write a scenario with disabled technologies, to a version that doesn't support
-    /// this many disabled technologies.
-    #[error("too many disabled techs: got {}, but requested version supports up to 20", .0)]
-    TooManyDisabledTechsError(i32),
-    /// Attempted to write a scenario with disabled technologies, to a version that doesn't support
-    /// disabling technologies.
-    #[error("requested version does not support disabling techs")]
-    CannotDisableTechsError,
-    /// Attempted to write a scenario with disabled units, to a version that doesn't support
-    /// disabling units.
-    #[error("requested version does not support disabling units")]
-    CannotDisableUnitsError,
-    /// Attempted to write a scenario with disabled buildings, to a version that doesn't support
-    /// this many disabled buildings.
-    #[error("too many disabled buildings: got {}, but requested version supports up to {}", .0, .1)]
-    TooManyDisabledBuildingsError(i32, i32),
-    /// Attempted to write a scenario with disabled buildings, to a version that doesn't support
-    /// disabling buildings.
-    #[error("requested version does not support disabling buildings")]
-    CannotDisableBuildingsError,
-    /// Failed to decode a string from the scenario file, probably because of a wrong encoding.
-    #[error(transparent)]
-    DecodeStringError(#[from] DecodeStringError),
-    /// Failed to encode a string into the scenario file, probably because of a wrong encoding.
-    #[error(transparent)]
-    EncodeStringError(#[from] EncodeStringError),
-    /// A string is too long for the length prefix it is written with.
-    #[error("string too long for its length prefix")]
-    StringTooLongError,
-    /// An embedded AI file lacks its file name.
-    #[error("an embedded AI file has no file name")]
-    MissingAiFileNameError,
-    /// An embedded AI file has no content.
-    #[error("an embedded AI file is empty")]
-    EmptyAiFileError,
-    /// The scenario's description is longer than its length prefix allows.
-    #[error("description too long for its length prefix")]
-    DescriptionTooLongError,
-    /// The scenario has more triggers than the format counts.
-    #[error("more triggers than the format can count")]
-    TooManyTriggersError,
-    /// The version bundle for the requested game is not modelled.
-    #[error("no version bundle for this game is modelled")]
-    UnsupportedGameError,
-    /// An error occurred while reading or writing.
-    #[error(transparent)]
-    IoError(#[from] io::Error),
-}
-
-impl From<ReadStringError> for Error {
-    fn from(err: ReadStringError) -> Self {
-        match err {
-            ReadStringError::IoError(err) => Self::IoError(err),
-            ReadStringError::DecodeStringError(err) => Self::DecodeStringError(err),
-        }
-    }
-}
-
-impl From<WriteStringError> for Error {
-    fn from(err: WriteStringError) -> Self {
-        match err {
-            WriteStringError::IoError(err) => Self::IoError(err),
-            WriteStringError::EncodeStringError(err) => Self::EncodeStringError(err),
-            WriteStringError::TooLong => Self::StringTooLongError,
-        }
-    }
-}
-
-/// Result type for SCX methods.
-pub type Result<T> = StdResult<T, Error>;
 
 /// A Scenario file.
 #[derive(Debug, Clone)]
@@ -138,7 +56,7 @@ impl Scenario {
     ///
     /// Returns an error if reading or decompressing fails, if the format version is not
     /// supported, or if the data is malformed (unknown IDs, strings that cannot be decoded).
-    pub fn read_from(input: impl Read) -> Result<Self> {
+    pub fn read_from(input: impl Read) -> GenieResult<Self> {
         let format = ScxFormat::load_scenario(input)?;
         let version = format.version();
 
@@ -152,7 +70,7 @@ impl Scenario {
     /// # Errors
     ///
     /// The same as [`Scenario::write_to_version`].
-    pub fn write_to(&self, output: impl Write) -> Result<()> {
+    pub fn write_to(&self, output: impl Write) -> GenieResult<()> {
         self.format.write_to(output, self.version())
     }
 
@@ -162,7 +80,7 @@ impl Scenario {
     ///
     /// Returns an error if writing or compressing fails, if a string cannot be encoded, or if
     /// the target version cannot hold the scenario's disabled technologies, units or buildings.
-    pub fn write_to_version(&self, output: impl Write, version: &VersionBundle) -> Result<()> {
+    pub fn write_to_version(&self, output: impl Write, version: &VersionBundle) -> GenieResult<()> {
         self.format.write_to(output, version)
     }
 
@@ -288,143 +206,5 @@ impl Scenario {
     #[inline]
     pub const fn triggers_mut(&mut self) -> Option<&mut TriggerSystem> {
         self.format.triggers.as_mut()
-    }
-}
-
-impl From<Error> for genie_error::GenieError {
-    /// The error as a [`genie_error::GenieError`]: its kind and reason, the original as the
-    /// source.
-    #[track_caller]
-    fn from(e: Error) -> Self {
-        let to = match &e {
-            Error::MissingFileNameError => Self::invalid_input("a scenario without a file name"),
-            Error::UnsupportedFormatVersionError(_) => {
-                Self::unsupported("a scenario format version this reader does not take")
-            }
-            Error::TooManyDisabledTechsError(_) => {
-                Self::invalid_input("more disabled technologies than the version takes")
-            }
-            Error::CannotDisableTechsError => {
-                Self::unsupported("disabled technologies in a version without them")
-            }
-            Error::CannotDisableUnitsError => {
-                Self::unsupported("disabled units in a version without them")
-            }
-            Error::TooManyDisabledBuildingsError(..) => {
-                Self::invalid_input("more disabled buildings than the version takes")
-            }
-            Error::CannotDisableBuildingsError => {
-                Self::unsupported("disabled buildings in a version without them")
-            }
-            Error::DecodeStringError(_) => Self::invalid_input("a string that does not decode"),
-            Error::EncodeStringError(_) => Self::invalid_input("a string that does not encode"),
-            Error::StringTooLongError => {
-                Self::invalid_input("a string too long for its length prefix")
-            }
-            Error::MissingAiFileNameError => {
-                Self::invalid_input("an embedded AI file without a file name")
-            }
-            Error::EmptyAiFileError => Self::invalid_input("an embedded AI file without content"),
-            Error::DescriptionTooLongError => {
-                Self::invalid_input("a description too long for its length prefix")
-            }
-            Error::TooManyTriggersError => {
-                Self::invalid_input("more triggers than the format can count")
-            }
-            Error::UnsupportedGameError => {
-                Self::missing_data("a version bundle this crate does not hold")
-            }
-            Error::IoError(_) => Self::io("a read or write that failed"),
-        };
-        to.with_source(e)
-    }
-}
-
-#[cfg(test)]
-mod genie_error_tests {
-    use super::*;
-    #[cfg(test)]
-    use std::error::Error as StdError;
-
-    /// The errors convert into `GenieError`s with their kinds and reasons, the original as
-    /// source.
-    #[test]
-    fn scenario_errors_convert_into_genie_errors() {
-        let e: genie_error::GenieError = Error::MissingFileNameError.into();
-        assert_eq!(
-            (e.kind(), e.reason()),
-            (
-                genie_error::ErrorKind::InvalidInput,
-                "a scenario without a file name"
-            )
-        );
-        assert!(StdError::source(&e).is_some());
-        let e: genie_error::GenieError = Error::CannotDisableTechsError.into();
-        assert_eq!(
-            (e.kind(), e.reason()),
-            (
-                genie_error::ErrorKind::Unsupported,
-                "disabled technologies in a version without them"
-            )
-        );
-        assert!(StdError::source(&e).is_some());
-        let e: genie_error::GenieError = Error::IoError(io::Error::other("x")).into();
-        assert_eq!(
-            (e.kind(), e.reason()),
-            (genie_error::ErrorKind::Io, "a read or write that failed")
-        );
-        assert!(StdError::source(&e).is_some());
-    }
-
-    /// Each scenario error's kind and reason.
-    #[test]
-    fn each_scenario_error_has_its_kind_and_reason() {
-        use genie_error::ErrorKind::{InvalidInput, Io, Unsupported};
-        let cases: Vec<(Error, genie_error::ErrorKind, &str)> = vec![
-            (
-                Error::UnsupportedFormatVersionError(ScxVersion(*b"9.99")),
-                Unsupported,
-                "a scenario format version this reader does not take",
-            ),
-            (
-                Error::TooManyDisabledTechsError(21),
-                InvalidInput,
-                "more disabled technologies than the version takes",
-            ),
-            (
-                Error::CannotDisableUnitsError,
-                Unsupported,
-                "disabled units in a version without them",
-            ),
-            (
-                Error::TooManyDisabledBuildingsError(31, 30),
-                InvalidInput,
-                "more disabled buildings than the version takes",
-            ),
-            (
-                Error::CannotDisableBuildingsError,
-                Unsupported,
-                "disabled buildings in a version without them",
-            ),
-            (
-                DecodeStringError.into(),
-                InvalidInput,
-                "a string that does not decode",
-            ),
-            (
-                EncodeStringError.into(),
-                InvalidInput,
-                "a string that does not encode",
-            ),
-            (
-                Error::IoError(io::Error::other("x")),
-                Io,
-                "a read or write that failed",
-            ),
-        ];
-        for (error, kind, reason) in cases {
-            let e: genie_error::GenieError = error.into();
-            assert_eq!((e.kind(), e.reason()), (kind, reason));
-        }
     }
 }

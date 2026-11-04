@@ -24,7 +24,6 @@ genie-scx = { version = "5.0.0", path = "../genie-scx" }
 genie-support = { version = "1.0.0", path = "../genie-support", features = [
     "strings",
 ] }
-thiserror.workspace = true
 
 [dev-dependencies]
 anyhow.workspace = true

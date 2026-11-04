@@ -2,9 +2,10 @@
 //! market's buy and sell, the town bell and back to work.
 
 use crate::actions::{Location2, ObjectsList};
-use crate::{ObjectId, PlayerId, Result};
+use crate::{ObjectId, PlayerId};
 use crate::{fits, opt_fits};
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
+use genie_error::{GenieError, GenieResult};
 use genie_support::{ReadSkipExt, UnitKindId, f32_neq, read_opt_u32};
 use std::io::{Read, Write};
 
@@ -23,7 +24,7 @@ impl AttackGroundCommand {
     /// # Errors
     ///
     /// Returns an error if reading from `input` fails.
-    pub fn read_from(mut input: impl Read) -> Result<Self> {
+    pub fn read_from(mut input: impl Read) -> GenieResult<Self> {
         let mut command = Self::default();
         let selected_count = i32::from(input.read_i8()?);
         input.skip(2)?;
@@ -39,7 +40,7 @@ impl AttackGroundCommand {
     /// Returns an error if writing to `output` fails.
     ///
     /// Also fails if there are more than 127 objects, the most the format's `i8` count holds.
-    pub fn write_to<W: Write>(&self, output: &mut W) -> Result<()> {
+    pub fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         output.write_i8(fits(self.objects.len())?)?;
         output.write_all(&[0, 0])?;
         output.write_f32::<LE>(self.location.0)?;
@@ -64,7 +65,7 @@ impl RepairCommand {
     /// # Errors
     ///
     /// Returns an error if reading from `input` fails.
-    pub fn read_from(mut input: impl Read) -> Result<Self> {
+    pub fn read_from(mut input: impl Read) -> GenieResult<Self> {
         let mut command = Self::default();
         let selected_count = i32::from(input.read_u8()?);
         input.skip(2)?;
@@ -81,7 +82,7 @@ impl RepairCommand {
     ///
     /// Also fails if there are more than 255 repairers (the format's `u8` count), or if the target
     /// ID is above `i32::MAX`.
-    pub fn write_to<W: Write>(&self, output: &mut W) -> Result<()> {
+    pub fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         output.write_u8(fits(self.repairers.len())?)?;
         output.write_all(&[0, 0])?;
         output.write_i32::<LE>(opt_fits(self.target_id, -1)?)?;
@@ -107,7 +108,7 @@ pub struct UngarrisonCommand {
 }
 
 impl UngarrisonCommand {
-    pub(super) fn read_from(mut input: impl Read) -> Result<Self> {
+    pub(super) fn read_from(mut input: impl Read) -> GenieResult<Self> {
         let mut command = Self::default();
         let selected_count = input.read_i8()?;
         let _padding = input.read_u16::<LE>()?;
@@ -147,11 +148,11 @@ impl FlareCommand {
     /// Returns an error if reading from `input` fails.
     ///
     /// Also fails if the unit ID stored before the recipients is not -1.
-    pub fn read_from(mut input: impl Read) -> Result<Self> {
+    pub fn read_from(mut input: impl Read) -> GenieResult<Self> {
         let mut command = Self::default();
         input.skip(3)?;
         if input.read_i32::<LE>()? != -1 {
-            return Err(crate::Error::InvalidData("a flare with a unit id"));
+            return Err(GenieError::invalid_input("a flare with a unit id"));
         }
         for receive in &mut command.recipients {
             *receive = input.read_u8()? != 0;
@@ -185,7 +186,7 @@ pub struct UnitOrderCommand {
 }
 
 impl UnitOrderCommand {
-    pub(super) fn read_from(mut input: impl Read) -> Result<Self> {
+    pub(super) fn read_from(mut input: impl Read) -> GenieResult<Self> {
         let mut command = Self::default();
         let selected_count = input.read_i8()?;
         let _padding = input.read_u16::<LE>()?;
@@ -226,7 +227,7 @@ impl QueueCommand {
     /// # Errors
     ///
     /// Returns an error if reading from `input` fails.
-    pub fn read_from(mut input: impl Read) -> Result<Self> {
+    pub fn read_from(mut input: impl Read) -> GenieResult<Self> {
         let mut command = Self::default();
         input.skip(3)?;
         command.building_id = input.read_u32::<LE>()?.into();
@@ -240,7 +241,7 @@ impl QueueCommand {
     /// # Errors
     ///
     /// Returns an error if writing to `output` fails.
-    pub fn write_to<W: Write>(&self, output: &mut W) -> Result<()> {
+    pub fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         output.write_all(&[0, 0, 0])?;
         output.write_u32::<LE>(self.building_id.into())?;
         output.write_u16::<LE>(self.unit_kind_id.into())?;
@@ -268,7 +269,7 @@ impl SetGatherPointCommand {
     /// # Errors
     ///
     /// Returns an error if reading from `input` fails.
-    pub fn read_from(mut input: impl Read) -> Result<Self> {
+    pub fn read_from(mut input: impl Read) -> GenieResult<Self> {
         let mut command = Self::default();
         let selected_count = i32::from(input.read_i8()?);
         input.skip(2)?;
@@ -290,7 +291,7 @@ impl SetGatherPointCommand {
     /// Returns an error if writing to `output` fails.
     ///
     /// Also fails if there are more than 255 buildings, the most the format's `u8` count holds.
-    pub fn write_to<W: Write>(&self, output: &mut W) -> Result<()> {
+    pub fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         output.write_u8(fits(self.buildings.len())?)?;
         output.write_all(&[0, 0])?;
         output.write_u32::<LE>(self.target_id.map_or(0xFFFF_FFFF, Into::into))?;
@@ -318,7 +319,7 @@ macro_rules! buy_sell_impl {
             /// # Errors
             ///
             /// Returns an error if reading from `input` fails.
-            pub fn read_from(mut input: impl Read) -> Result<Self> {
+            pub fn read_from(mut input: impl Read) -> GenieResult<Self> {
                 Ok(Self {
                     player_id: input.read_u8()?.into(),
                     resource: input.read_u8()?,
@@ -332,7 +333,7 @@ macro_rules! buy_sell_impl {
             /// # Errors
             ///
             /// Returns an error if writing to `output` fails.
-            pub fn write_to<W: Write>(&self, output: &mut W) -> Result<()> {
+            pub fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
                 output.write_u8(self.player_id.into())?;
                 output.write_u8(self.resource)?;
                 output.write_i8(self.amount)?;
@@ -391,7 +392,7 @@ impl Unknown7fCommand {
     /// # Errors
     ///
     /// Returns an error if reading from `input` fails.
-    pub fn read_from(mut input: impl Read) -> Result<Self> {
+    pub fn read_from(mut input: impl Read) -> GenieResult<Self> {
         input.skip(3)?;
         let object_id = input.read_u32::<LE>()?.into();
         let value = input.read_u32::<LE>()?;
@@ -412,7 +413,7 @@ impl BackToWorkCommand {
     /// # Errors
     ///
     /// Returns an error if reading from `input` fails.
-    pub fn read_from(mut input: impl Read) -> Result<Self> {
+    pub fn read_from(mut input: impl Read) -> GenieResult<Self> {
         input.skip(3)?;
         let building_id = input.read_u32::<LE>()?.into();
         Ok(Self { building_id })

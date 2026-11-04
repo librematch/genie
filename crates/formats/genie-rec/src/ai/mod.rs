@@ -4,10 +4,11 @@
 //! diplomacy, emotional, information, resource, strategy). The field names follow the genie-rs
 //! reader and the AI's own terms; values whose meaning is not known say so.
 
+use crate::ObjectId;
 use crate::element::ReadableHeaderElement;
 use crate::reader::RecordingHeaderReader;
-use crate::{ObjectId, Result};
 use byteorder::{LE, ReadBytesExt};
+use genie_error::GenieResult;
 use std::io::Read;
 
 mod build;
@@ -31,7 +32,7 @@ pub struct MainAi {
 }
 
 impl ReadableHeaderElement for MainAi {
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let num_objects = input.read_u32::<LE>()?;
         let mut objects = vec![];
         for _ in 0..num_objects {
@@ -63,7 +64,7 @@ pub struct PlayerAi {
 }
 
 impl ReadableHeaderElement for PlayerAi {
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let main_ai = MainAi::read_from(input)?;
         let build_ai = BuildAi::read_from(input)?;
         let construction_ai = ConstructionAi::read_from(input)?;
@@ -86,7 +87,7 @@ impl ReadableHeaderElement for PlayerAi {
     }
 }
 
-fn read_id_list<T: From<u32>, R: Read>(input: &mut R) -> Result<Vec<T>> {
+fn read_id_list<T: From<u32>, R: Read>(input: &mut R) -> GenieResult<Vec<T>> {
     let len = input.read_u32::<LE>()?;
     let mut ids = vec![];
     for _ in 0..len {

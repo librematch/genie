@@ -7,3 +7,6 @@ of the constructor's caller) and its context (key and value pairs the raising si
 
 It sits below every other crate of the workspace and depends on none of them, so the format
 crates (GPL-3.0) and the engine and tool crates (AGPL-3.0) can all use it.
+
+`GenieResult<T>` is its one `Result` alias. The `serde` feature implements serde's `de::Error`
+for it, so a deserializer's errors are `GenieError`s too (genie-nickel's).

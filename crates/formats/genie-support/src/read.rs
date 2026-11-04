@@ -1,14 +1,23 @@
 use byteorder::{LE, ReadBytesExt};
+use genie_error::{GenieError, GenieResult};
 use std::convert::{TryFrom, TryInto};
 use std::error::Error as StdError;
-use std::io::{self, Error, ErrorKind, Read, Result};
+use std::io::{self, Read};
+
+/// An optional value that does not fit its type.
+#[track_caller]
+fn not_fitting(value: u32, e: impl StdError + Send + Sync + 'static) -> GenieError {
+    GenieError::invalid_input("an optional value that does not fit its type")
+        .with("value", value)
+        .with_source(e)
+}
 
 /// Read a 2-byte integer that uses -1 as an "absent" value.
 ///
 /// ## Example
 ///
 /// ```rust
-/// # fn main() -> std::io::Result<()> {
+/// # fn main() -> genie_error::GenieResult<()> {
 /// use genie_support::read_opt_u16;
 ///
 /// let mut minus_one = std::io::Cursor::new(vec![0xFF, 0xFF]);
@@ -23,9 +32,9 @@ use std::io::{self, Error, ErrorKind, Read, Result};
 /// # Errors
 ///
 /// Returns an error if reading from `input` fails, or if the value does not fit in `T`
-/// (`ErrorKind::InvalidData`).
+/// (invalid input).
 #[inline]
-pub fn read_opt_u16<T, R>(input: &mut R) -> Result<Option<T>>
+pub fn read_opt_u16<T, R>(input: &mut R) -> GenieResult<Option<T>>
 where
     T: TryFrom<u16>,
     T::Error: StdError + Send + Sync + 'static,
@@ -33,10 +42,7 @@ where
 {
     let opt = match input.read_u16::<LE>()? {
         0xFFFF => None,
-        v => Some(
-            v.try_into()
-                .map_err(|e| Error::new(ErrorKind::InvalidData, e))?,
-        ),
+        v => Some(v.try_into().map_err(|e| not_fitting(v.into(), e))?),
     };
     Ok(opt)
 }
@@ -46,7 +52,7 @@ where
 /// ## Example
 ///
 /// ```rust
-/// # fn main() -> std::io::Result<()> {
+/// # fn main() -> genie_error::GenieResult<()> {
 /// use genie_support::read_opt_u32;
 ///
 /// let mut minus_one = std::io::Cursor::new(vec![0xFF, 0xFF, 0xFF, 0xFF]);
@@ -61,9 +67,9 @@ where
 /// # Errors
 ///
 /// Returns an error if reading from `input` fails, or if the value does not fit in `T`
-/// (`ErrorKind::InvalidData`).
+/// (invalid input).
 #[inline]
-pub fn read_opt_u32<T, R>(input: &mut R) -> Result<Option<T>>
+pub fn read_opt_u32<T, R>(input: &mut R) -> GenieResult<Option<T>>
 where
     T: TryFrom<u32>,
     T::Error: StdError + Send + Sync + 'static,
@@ -72,10 +78,7 @@ where
     let opt = match input.read_u32::<LE>()? {
         // -1, or -2, which HD Edition uses in some places.
         0xFFFF_FFFF | 0xFFFF_FFFE => None,
-        v => Some(
-            v.try_into()
-                .map_err(|e| Error::new(ErrorKind::InvalidData, e))?,
-        ),
+        v => Some(v.try_into().map_err(|e| not_fitting(v, e))?),
     };
     Ok(opt)
 }
@@ -90,11 +93,11 @@ pub trait ReadSkipExt {
     /// # Errors
     ///
     /// Returns an error if reading fails.
-    fn skip(&mut self, dist: u64) -> Result<()>;
+    fn skip(&mut self, dist: u64) -> GenieResult<()>;
 }
 
 impl<T: Read> ReadSkipExt for T {
-    fn skip(&mut self, dist: u64) -> Result<()> {
+    fn skip(&mut self, dist: u64) -> GenieResult<()> {
         // The count may fall short of `dist` at the end of the input; that is not checked.
         let _ = io::copy(&mut self.by_ref().take(dist), &mut io::sink())?;
         Ok(())

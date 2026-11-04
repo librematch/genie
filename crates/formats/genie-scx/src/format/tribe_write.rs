@@ -1,8 +1,12 @@
 //! The writer of the embeddable scenario data ([`TribeScen::write_to`]).
 
+use crate::errors::{
+    buildings_not_disabled, techs_not_disabled, too_many_disabled_buildings,
+    too_many_disabled_techs, units_not_disabled,
+};
 use crate::format::TribeScen;
-use crate::{Error, Result};
 use byteorder::{LE, WriteBytesExt};
+use genie_error::GenieResult;
 use genie_support::{f32_eq, write_opt_str};
 use std::io::Write;
 
@@ -18,7 +22,12 @@ impl TribeScen {
     ///
     /// Panics if a per-player list does not have 16 entries, or if a player name is longer than
     /// 256 bytes.
-    pub fn write_to(&self, mut output: impl Write, version: f32, num_triggers: u32) -> Result<()> {
+    pub fn write_to(
+        &self,
+        mut output: impl Write,
+        version: f32,
+        num_triggers: u32,
+    ) -> GenieResult<()> {
         self.base.write_to(&mut output, version)?;
         self.write_players(&mut output, version)?;
         write_separator(&mut output, version)?;
@@ -36,7 +45,7 @@ impl TribeScen {
 
     /// The players' starting resources; up to 1.13 each player's name padded to 256 bytes, then
     /// its activity, resources, type, civilization and posture.
-    fn write_players(&self, mut output: impl Write, version: f32) -> Result<()> {
+    fn write_players(&self, mut output: impl Write, version: f32) -> GenieResult<()> {
         if version <= 1.13 {
             assert_eq!(self.base.player_names.len(), 16);
             for name in &self.base.player_names {
@@ -73,7 +82,7 @@ impl TribeScen {
 
     /// The multiplayer victory's type, score and time from 1.13 on, the 16 by 16 stances and
     /// each player's legacy victory entries.
-    fn write_victory_settings(&self, mut output: impl Write, version: f32) -> Result<()> {
+    fn write_victory_settings(&self, mut output: impl Write, version: f32) -> GenieResult<()> {
         if version >= 1.13 {
             output.write_i32::<LE>(self.mp_victory_kind)?;
             output.write_i32::<LE>(self.victory_score)?;
@@ -97,7 +106,7 @@ impl TribeScen {
 
     /// The allied victories, then the teams' settings: four from 1.24 on, the lock alone in
     /// 1.23.
-    fn write_teams(&self, mut output: impl Write, version: f32) -> Result<()> {
+    fn write_teams(&self, mut output: impl Write, version: f32) -> GenieResult<()> {
         for value in &self.allied_victory {
             output.write_i32::<LE>(*value)?;
         }
@@ -116,7 +125,7 @@ impl TribeScen {
     /// each count and that many ids; from 1.18 on the counts and 30 ids each (buildings 20
     /// before 1.25); after 1.03 20 technologies without a count; before, none. A version that
     /// cannot hold them is an error.
-    fn write_disabled(&self, mut output: impl Write, version: f32) -> Result<()> {
+    fn write_disabled(&self, mut output: impl Write, version: f32) -> GenieResult<()> {
         if version >= 1.28 {
             write_counted(&mut output, &self.num_disabled_techs, &self.disabled_techs)?;
             write_counted(&mut output, &self.num_disabled_units, &self.disabled_units)?;
@@ -129,10 +138,7 @@ impl TribeScen {
             let max_disabled_buildings = if version >= 1.25 { 30 } else { 20 };
             let most = *self.num_disabled_buildings.iter().max().unwrap_or(&0);
             if most > max_disabled_buildings {
-                return Err(Error::TooManyDisabledBuildingsError(
-                    most,
-                    max_disabled_buildings,
-                ));
+                return Err(too_many_disabled_buildings(most, max_disabled_buildings));
             }
             write_fixed(
                 &mut output,
@@ -155,7 +161,7 @@ impl TribeScen {
         } else if version > 1.03 {
             let most = *self.num_disabled_techs.iter().max().unwrap_or(&0);
             if most > 20 {
-                return Err(Error::TooManyDisabledTechsError(most));
+                return Err(too_many_disabled_techs(most));
             }
             self.nothing_else_disabled()?;
             // Old scenarios only allowed disabling up to 20 techs per player.
@@ -166,26 +172,26 @@ impl TribeScen {
         } else {
             // <= 1.03 did not support disabling anything
             if self.num_disabled_techs.iter().any(|&n| n > 0) {
-                return Err(Error::CannotDisableTechsError);
+                return Err(techs_not_disabled());
             }
             self.nothing_else_disabled()
         }
     }
 
     /// No disabled units and buildings, which versions before 1.18 cannot hold.
-    fn nothing_else_disabled(&self) -> Result<()> {
+    fn nothing_else_disabled(&self) -> GenieResult<()> {
         if self.num_disabled_units.iter().any(|&n| n > 0) {
-            return Err(Error::CannotDisableUnitsError);
+            return Err(units_not_disabled());
         }
         if self.num_disabled_buildings.iter().any(|&n| n > 0) {
-            return Err(Error::CannotDisableBuildingsError);
+            return Err(buildings_not_disabled());
         }
         Ok(())
     }
 
     /// The combat mode after 1.04, the naval mode and "All Techs" from 1.12 on, each player's
     /// starting age after 1.05.
-    fn write_modes(&self, mut output: impl Write, version: f32) -> Result<()> {
+    fn write_modes(&self, mut output: impl Write, version: f32) -> GenieResult<()> {
         if version > 1.04 {
             output.write_i32::<LE>(0)?;
         }
@@ -203,7 +209,7 @@ impl TribeScen {
 
     /// The initial view from 1.19 on, the map type from 1.21 on (none as -1) and the players'
     /// base priorities from 1.24 on.
-    fn write_view(&self, mut output: impl Write, version: f32) -> Result<()> {
+    fn write_view(&self, mut output: impl Write, version: f32) -> GenieResult<()> {
         if version >= 1.19 {
             output.write_i32::<LE>(self.view.0)?;
             output.write_i32::<LE>(self.view.1)?;
@@ -228,7 +234,7 @@ impl TribeScen {
         mut output: impl Write,
         version: f32,
         num_triggers: u32,
-    ) -> Result<()> {
+    ) -> GenieResult<()> {
         if version >= 1.28 {
             output.write_u32::<LE>(num_triggers)?;
             output.write_u16::<LE>(0)?;
@@ -248,7 +254,7 @@ impl TribeScen {
 }
 
 /// The separator -99 the versions from 1.02 on put between sections.
-fn write_separator(mut output: impl Write, version: f32) -> Result<()> {
+fn write_separator(mut output: impl Write, version: f32) -> GenieResult<()> {
     if version >= 1.02 {
         output.write_i32::<LE>(-99)?;
     }
@@ -258,7 +264,7 @@ fn write_separator(mut output: impl Write, version: f32) -> Result<()> {
 /// The counts, then each list's first count ids (-1 past its end).
 // The disabled counts are never negative in valid data.
 #[allow(clippy::cast_sign_loss)]
-fn write_counted(mut output: impl Write, nums: &[i32], lists: &[Vec<i32>]) -> Result<()> {
+fn write_counted(mut output: impl Write, nums: &[i32], lists: &[Vec<i32>]) -> GenieResult<()> {
     for num in nums {
         output.write_i32::<LE>(*num)?;
     }
@@ -271,7 +277,12 @@ fn write_counted(mut output: impl Write, nums: &[i32], lists: &[Vec<i32>]) -> Re
 /// The counts, then each list's first `size` ids (-1 past its end).
 // The most disabled buildings, 20 or 30, are not negative.
 #[allow(clippy::cast_sign_loss)]
-fn write_fixed(mut output: impl Write, nums: &[i32], lists: &[Vec<i32>], size: i32) -> Result<()> {
+fn write_fixed(
+    mut output: impl Write,
+    nums: &[i32],
+    lists: &[Vec<i32>],
+    size: i32,
+) -> GenieResult<()> {
     for num in nums {
         output.write_i32::<LE>(*num)?;
     }
@@ -282,7 +293,7 @@ fn write_fixed(mut output: impl Write, nums: &[i32], lists: &[Vec<i32>], size: i
 }
 
 /// A list's first `size` ids, -1 past its end.
-fn write_padded(mut output: impl Write, list: &[i32], size: usize) -> Result<()> {
+fn write_padded(mut output: impl Write, list: &[i32], size: usize) -> GenieResult<()> {
     for i in 0..size {
         output.write_i32::<LE>(*list.get(i).unwrap_or(&-1))?;
     }
@@ -324,7 +335,7 @@ mod tests {
     }
 
     /// What `write` puts out.
-    fn out(write: impl FnOnce(&mut Vec<u8>) -> Result<()>) -> Vec<u8> {
+    fn out(write: impl FnOnce(&mut Vec<u8>) -> GenieResult<()>) -> Vec<u8> {
         let mut bytes = vec![];
         write(&mut bytes).unwrap();
         bytes
@@ -385,29 +396,17 @@ mod tests {
     fn version_that_cannot_hold_the_disabled_lists_fails() {
         let fails = |scen: &TribeScen, version| scen.write_disabled(&mut vec![], version);
         let buildings = scenario([vec![], vec![], vec![70; 21]]);
-        assert!(matches!(
+        assert_eq!(
             fails(&buildings, 1.24),
-            Err(Error::TooManyDisabledBuildingsError(21, 20))
-        ));
+            Err(too_many_disabled_buildings(21, 20))
+        );
         assert!(fails(&buildings, 1.25).is_ok());
         let techs = scenario([vec![101; 21], vec![], vec![]]);
-        assert!(matches!(
-            fails(&techs, 1.04),
-            Err(Error::TooManyDisabledTechsError(21))
-        ));
+        assert_eq!(fails(&techs, 1.04), Err(too_many_disabled_techs(21)));
         let units = scenario([vec![], vec![4], vec![]]);
-        assert!(matches!(
-            fails(&units, 1.04),
-            Err(Error::CannotDisableUnitsError)
-        ));
-        assert!(matches!(
-            fails(&buildings, 1.03),
-            Err(Error::CannotDisableBuildingsError)
-        ));
-        assert!(matches!(
-            fails(&techs, 1.03),
-            Err(Error::CannotDisableTechsError)
-        ));
+        assert_eq!(fails(&units, 1.04), Err(units_not_disabled()));
+        assert_eq!(fails(&buildings, 1.03), Err(buildings_not_disabled()));
+        assert_eq!(fails(&techs, 1.03), Err(techs_not_disabled()));
     }
 
     /// The allied victories, then four team bytes from 1.24 on, the lock's word in 1.23.

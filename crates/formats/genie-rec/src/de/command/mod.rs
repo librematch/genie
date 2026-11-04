@@ -13,11 +13,11 @@
 //! tail: the object ids most commands carry, or raw bytes. Bytes that no code reads stay as `gap_*`
 //! arrays, so a decoded packet writes back byte for byte.
 
-use crate::Error;
-
 mod generated;
 
+use crate::errors::out_of_range;
 pub use generated::*;
+use genie_error::GenieResult;
 
 /// What follows the fixed part of a layout.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -102,12 +102,12 @@ fn bytes(p: &[u8], at: usize) -> Option<Vec<u8>> {
 ///
 /// # Errors
 ///
-/// [`Error::ValueOutOfRange`] for a packet whose size does not fit its `u16`, or one without
+/// Invalid input for a packet whose size does not fit its `u16`, or one without
 /// the size's two bytes.
-fn finish(mut out: Vec<u8>) -> Result<Vec<u8>, Error> {
-    let size = u16::try_from(out.len().saturating_sub(4)).map_err(|_| Error::ValueOutOfRange)?;
+fn finish(mut out: Vec<u8>) -> GenieResult<Vec<u8>> {
+    let size = u16::try_from(out.len().saturating_sub(4)).map_err(|_| out_of_range())?;
     out.get_mut(2..4)
-        .ok_or(Error::ValueOutOfRange)?
+        .ok_or(out_of_range())?
         .copy_from_slice(&size.to_le_bytes());
     Ok(out)
 }

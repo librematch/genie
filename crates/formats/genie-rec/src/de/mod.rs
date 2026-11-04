@@ -7,29 +7,28 @@
 //! A recording is a list of chapters. Each chapter is a compressed world save (the "header", read
 //! by genie-save) and the ops recorded after it, up to the next chapter or the end of the file.
 //! Everything here borrows from the recording's bytes.
+//!
+//! The errors are [`GenieError`]s, each with its place in the context (`at`, a byte offset into
+//! the recording file). A recording that breaks the format is [`ErrorKind::InvalidInput`]: it
+//! ends inside a record ([`truncated`]), has an op this reader does not know ([`unknown_op`]),
+//! a chapter that points outside it ([`invalid_chapter`]) or a header that does not inflate
+//! ([`not_inflating`]); a header that is no world save gives genie-save's error with the
+//! chapter's place.
 
 pub mod body;
 pub mod command;
 
 pub use body::{Checkpoint, Op, OpReader, Pregame, TriggerSync, View};
+use genie_error::GenieResult;
 pub use genie_save::SaveVersion;
 
 use flate2::read::DeflateDecoder;
 pub use genie_error::{ErrorKind, GenieError};
 
-/// The errors of reading a DE recording: [`GenieError`]s.
-///
-/// Each has its place in the context (`at`, a byte offset into the recording file). A recording that breaks the format is
-/// [`ErrorKind::InvalidInput`]: it ends inside a record ([`truncated`]), has an op this reader
-/// does not know ([`unknown_op`]), a chapter that points outside it ([`invalid_chapter`]) or a
-/// header that does not inflate ([`not_inflating`]); a header that is no world save gives
-/// genie-save's error with the chapter's place.
-pub type Error = GenieError;
-
 /// The recording ends inside the record at `at`.
 #[must_use]
 #[track_caller]
-pub fn truncated(at: usize) -> Error {
+pub fn truncated(at: usize) -> GenieError {
     GenieError::invalid_input("a recording that ends inside a record")
         .with("at", format_args!("{at:#x}"))
 }
@@ -37,7 +36,7 @@ pub fn truncated(at: usize) -> Error {
 /// The op at `at` has a type `op` this reader does not know.
 #[must_use]
 #[track_caller]
-pub fn unknown_op(op: u32, at: usize) -> Error {
+pub fn unknown_op(op: u32, at: usize) -> GenieError {
     GenieError::invalid_input("an op this reader does not know")
         .with("op", op)
         .with("at", format_args!("{at:#x}"))
@@ -46,7 +45,7 @@ pub fn unknown_op(op: u32, at: usize) -> Error {
 /// The chapter at `at` points outside the recording or backwards.
 #[must_use]
 #[track_caller]
-pub fn invalid_chapter(at: usize) -> Error {
+pub fn invalid_chapter(at: usize) -> GenieError {
     GenieError::invalid_input("a chapter that points outside the recording")
         .with("at", format_args!("{at:#x}"))
 }
@@ -54,7 +53,7 @@ pub fn invalid_chapter(at: usize) -> Error {
 /// The header of the chapter at `at` is not valid raw deflate data.
 #[must_use]
 #[track_caller]
-pub fn not_inflating(at: usize) -> Error {
+pub fn not_inflating(at: usize) -> GenieError {
     GenieError::invalid_input("a chapter header that does not inflate")
         .with("at", format_args!("{at:#x}"))
 }
@@ -80,7 +79,7 @@ pub struct Chapter<'a> {
 ///
 /// Returns [`invalid_chapter`] if a chapter's offsets point outside the recording, inside its own
 /// 8 offset bytes, or back to an earlier chapter.
-pub fn chapters(data: &[u8]) -> Result<Vec<Chapter<'_>>, Error> {
+pub fn chapters(data: &[u8]) -> GenieResult<Vec<Chapter<'_>>> {
     let mut out = Vec::new();
     let mut offset = 0;
     loop {
@@ -126,7 +125,7 @@ impl<'a> Chapter<'a> {
     /// # Errors
     ///
     /// Returns [`not_inflating`] if the header is not valid raw deflate data.
-    pub fn inflate_header(&self) -> Result<Vec<u8>, Error> {
+    pub fn inflate_header(&self) -> GenieResult<Vec<u8>> {
         use std::io::Read;
         let mut out = Vec::new();
         // The byte count is `out.len()`.
@@ -142,7 +141,7 @@ impl<'a> Chapter<'a> {
     ///
     /// Returns [`not_inflating`] if the header does not inflate, and genie-save's error with the
     /// chapter's place (`chapter`) if it cannot be read as a world save.
-    pub fn header(&self) -> Result<genie_save::Header, Error> {
+    pub fn header(&self) -> GenieResult<genie_save::Header> {
         genie_save::parse(&self.inflate_header()?)
             .map_err(|e| e.with("chapter", format_args!("{:#x}", self.offset)))
     }
@@ -152,7 +151,7 @@ impl<'a> Chapter<'a> {
     /// # Errors
     ///
     /// Returns [`not_inflating`] if the first 20 bytes of the header do not inflate.
-    pub fn save_version(&self) -> Result<SaveVersion, Error> {
+    pub fn save_version(&self) -> GenieResult<SaveVersion> {
         use std::io::Read;
         // "VER 9.4\0", the old f32 save version, minor, major, build
         let mut start = [0u8; 20];

@@ -1,8 +1,9 @@
 use crate::element::{ReadableHeaderElement, WritableHeaderElement};
+use crate::errors::{not_utf8, out_of_range};
 use crate::fits;
 use crate::reader::RecordingHeaderReader;
-use crate::{Error, Result};
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
+use genie_error::GenieResult;
 use genie_support::{read_bytes, reserved};
 use std::io::{Read, Write};
 use std::vec::IntoIter as VecIntoIter;
@@ -34,13 +35,13 @@ impl StringTable {
     ///
     /// # Errors
     ///
-    /// [`Error::ValueOutOfRange`] if the table holds 65535 (`u16::MAX`) strings or more.
-    pub fn num_strings(&self) -> Result<u16> {
+    /// Invalid input if the table holds 65535 (`u16::MAX`) strings or more.
+    pub fn num_strings(&self) -> GenieResult<u16> {
         let len = self.strings.len();
         if len < usize::from(u16::MAX) {
             fits(len)
         } else {
-            Err(Error::ValueOutOfRange)
+            Err(out_of_range())
         }
     }
 
@@ -52,7 +53,7 @@ impl StringTable {
 }
 
 impl ReadableHeaderElement for StringTable {
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let max_strings = input.read_u16::<LE>()?;
         let num_strings = input.read_u16::<LE>()?;
         let _ptr = input.read_u32::<LE>()?;
@@ -61,7 +62,7 @@ impl ReadableHeaderElement for StringTable {
         for _ in 0..num_strings {
             let length = input.read_u32::<LE>()?;
             let bytes = read_bytes(input, fits(length)?)?;
-            strings.push(String::from_utf8(bytes).map_err(|_| Error::InvalidString)?);
+            strings.push(String::from_utf8(bytes).map_err(|_| not_utf8())?);
         }
 
         Ok(Self {
@@ -72,7 +73,7 @@ impl ReadableHeaderElement for StringTable {
 }
 
 impl WritableHeaderElement for StringTable {
-    fn write_to<W: Write>(&self, handle: &mut W) -> Result<()> {
+    fn write_to<W: Write>(&self, handle: &mut W) -> GenieResult<()> {
         handle.write_u16::<LE>(self.max_strings)?;
         handle.write_u16::<LE>(self.num_strings()?)?;
         handle.write_u32::<LE>(0)?;
@@ -80,7 +81,7 @@ impl WritableHeaderElement for StringTable {
         for string in &self.strings {
             let len = string.len();
             if u32::MAX as usize <= len {
-                return Err(Error::ValueOutOfRange);
+                return Err(out_of_range());
             }
             handle.write_u32::<LE>(fits(len)?)?;
             handle.write_all(string.as_bytes())?;

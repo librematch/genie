@@ -1,9 +1,11 @@
 //! Views of a save's state (a recording's header save, or a save of the game after some updates)
 //! and of a recording's checkpoints against the run from its header, as text.
 
+use crate::errors::{no_chapter, no_player};
+use genie_core::GenieResult;
 use std::fmt::Write;
 
-use crate::{Error, MasterTable};
+use crate::MasterTable;
 use genie_core::GenieError;
 use genie_core::objects::ObjectId;
 use genie_core::unit_ai::QueuedOrder;
@@ -15,8 +17,8 @@ use genie_save::generated::world::{Formation, UnitGroup};
 use genie_save::generated::world::{Path, RgeMovingObject, RgeStaticObject};
 use genie_save::{Header, Object};
 
-fn chapter(data: &[u8]) -> Result<de::Chapter<'_>, Error> {
-    chapters(data)?.first().copied().ok_or(Error::NoChapter)
+fn chapter(data: &[u8]) -> GenieResult<de::Chapter<'_>> {
+    chapters(data)?.first().copied().ok_or(no_chapter())
 }
 
 /// Three little-endian f32s of a saved vector (`[u8; 12]`).
@@ -33,7 +35,7 @@ fn vec3(b: &[u8; 12]) -> [f32; 3] {
 /// # Errors
 ///
 /// When the save cannot be read.
-pub fn groups(data: &[u8], full: bool) -> Result<String, Error> {
+pub fn groups(data: &[u8], full: bool) -> GenieResult<String> {
     Ok(groups_of(&chapter(data)?.header()?, full))
 }
 
@@ -157,14 +159,14 @@ fn formation_lines(out: &mut String, name: &str, f: &Formation) {
 /// # Errors
 ///
 /// When the save or the player cannot be read.
-pub fn objects(data: &[u8], player: usize, actions_of: Option<i32>) -> Result<String, Error> {
+pub fn objects(data: &[u8], player: usize, actions_of: Option<i32>) -> GenieResult<String> {
     objects_of(&chapter(data)?.header()?, player, actions_of)
 }
 
 /// [`objects`] of a save read.
-fn objects_of(header: &Header, player: usize, actions_of: Option<i32>) -> Result<String, Error> {
+fn objects_of(header: &Header, player: usize, actions_of: Option<i32>) -> GenieResult<String> {
     let players = header.players();
-    let section = players.get(player).ok_or(Error::NoPlayer(player))?;
+    let section = players.get(player).ok_or_else(|| no_player(player))?;
     let mut out =
         String::from("id\tmaster\tstate\thp\tx\ty\tz\taction\taction_state\tretarget\tsprite\n");
     for object in section.live_objects() {
@@ -252,15 +254,15 @@ fn f3(b: &[u8; 12]) -> [f32; 3] {
 /// # Errors
 ///
 /// When the save or the player cannot be read.
-pub fn movement(data: &[u8], player: usize, ids: &[i32]) -> Result<String, Error> {
+pub fn movement(data: &[u8], player: usize, ids: &[i32]) -> GenieResult<String> {
     movement_of(&chapter(data)?.header()?, player, ids)
 }
 
 /// [`movement`] of a save read.
-fn movement_of(header: &Header, player: usize, ids: &[i32]) -> Result<String, Error> {
+fn movement_of(header: &Header, player: usize, ids: &[i32]) -> GenieResult<String> {
     let paths = &header.world.base_world.path;
     let players = header.players();
-    let section = players.get(player).ok_or(Error::NoPlayer(player))?;
+    let section = players.get(player).ok_or_else(|| no_player(player))?;
     let mut out = String::new();
     for object in section.live_objects() {
         let (Some(s), Some(m)) = (object.static_part(), object.moving_part()) else {
@@ -334,14 +336,14 @@ fn moving_lines(out: &mut String, s: &RgeStaticObject, m: &RgeMovingObject, path
 /// # Errors
 ///
 /// When the save or the player cannot be read.
-pub fn unit_ais(data: &[u8], player: usize, ids: &[i32]) -> Result<String, Error> {
+pub fn unit_ais(data: &[u8], player: usize, ids: &[i32]) -> GenieResult<String> {
     unit_ais_of(&chapter(data)?.header()?, player, ids)
 }
 
 /// [`unit_ais`] of a save read.
-fn unit_ais_of(header: &Header, player: usize, ids: &[i32]) -> Result<String, Error> {
+fn unit_ais_of(header: &Header, player: usize, ids: &[i32]) -> GenieResult<String> {
     let players = header.players();
-    let section = players.get(player).ok_or(Error::NoPlayer(player))?;
+    let section = players.get(player).ok_or_else(|| no_player(player))?;
     let mut out = String::new();
     for object in section.live_objects() {
         let Some(s) = object.static_part() else {
@@ -356,7 +358,7 @@ fn unit_ais_of(header: &Header, player: usize, ids: &[i32]) -> Result<String, Er
         let Some(ai) = combat.unit_ai() else {
             continue;
         };
-        let own = ObjectId::try_from(s.id).map_err(Error::Unmodelled)?;
+        let own = ObjectId::try_from(s.id)?;
         let _ = writeln!(
             out,
             "{} master {} at ({}, {}) state {} unit-AI type {}",
@@ -427,7 +429,7 @@ fn unit_ais_of(header: &Header, player: usize, ids: &[i32]) -> Result<String, Er
 /// # Errors
 ///
 /// When the save cannot be read.
-pub fn tiles(data: &[u8], x: (usize, usize), y: (usize, usize)) -> Result<String, Error> {
+pub fn tiles(data: &[u8], x: (usize, usize), y: (usize, usize)) -> GenieResult<String> {
     let chapter = chapter(data)?;
     let header = chapter.header()?;
     let map = &header.world.base_world.map;
@@ -466,7 +468,7 @@ pub fn tiles(data: &[u8], x: (usize, usize), y: (usize, usize)) -> Result<String
 /// # Panics
 ///
 /// When a checkpoint names a player the run does not have.
-pub fn checkpoints(rec: &[u8], masters: &MasterTable, updates: usize) -> Result<String, Error> {
+pub fn checkpoints(rec: &[u8], masters: &MasterTable, updates: usize) -> GenieResult<String> {
     let chapter = chapter(rec)?;
     let players = chapter.header()?.players().len();
     let ids: Vec<u32> = (0..players)
@@ -481,7 +483,7 @@ pub fn checkpoints(rec: &[u8], masters: &MasterTable, updates: usize) -> Result<
 
 /// One line per checkpoint of `chapter` that `blocks` (the run's 11-word blocks per tick and
 /// player) reaches: each recorded player's differing words, or `ok`.
-fn checkpoint_lines(chapter: &de::Chapter<'_>, blocks: &[Vec<[u32; 11]>]) -> Result<String, Error> {
+fn checkpoint_lines(chapter: &de::Chapter<'_>, blocks: &[Vec<[u32; 11]>]) -> GenieResult<String> {
     let mut out = String::new();
     let mut tick = 0usize;
     for op in chapter.ops() {

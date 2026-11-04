@@ -1,8 +1,8 @@
 //! An object placed in the scenario ([`ScenarioObject`]).
 
-use crate::Result;
 use crate::values::ScxVersion;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
+use genie_error::GenieResult;
 use genie_support::UnitKindId;
 use std::io::{Read, Write};
 
@@ -39,7 +39,7 @@ impl ScenarioObject {
     /// # Errors
     ///
     /// Returns an error if reading fails.
-    pub fn read_from(mut input: impl Read, version: ScxVersion) -> Result<Self> {
+    pub fn read_from(mut input: impl Read, version: ScxVersion) -> GenieResult<Self> {
         let position = (
             input.read_f32::<LE>()?,
             input.read_f32::<LE>()?,
@@ -85,7 +85,7 @@ impl ScenarioObject {
     /// # Errors
     ///
     /// Returns an error if writing fails.
-    pub fn write_to(&self, mut output: impl Write, version: ScxVersion) -> Result<()> {
+    pub fn write_to(&self, mut output: impl Write, version: ScxVersion) -> GenieResult<()> {
         output.write_f32::<LE>(self.position.0)?;
         output.write_f32::<LE>(self.position.1)?;
         output.write_f32::<LE>(self.position.2)?;

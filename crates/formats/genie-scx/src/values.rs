@@ -1,6 +1,7 @@
 //! Contains pure types, no IO.
 //!
 //! Most of these are more descriptive wrappers around integers.
+use genie_error::{GenieError, GenieResult};
 use std::cmp::Ordering;
 use std::fmt::{self, Debug, Display};
 
@@ -309,8 +310,10 @@ impl VersionBundle {
     /// # Errors
     ///
     /// Always: the `AoE1` bundle is not modelled yet.
-    pub const fn aoe() -> Result<Self, crate::Error> {
-        Err(crate::Error::UnsupportedGameError)
+    pub const fn aoe() -> GenieResult<Self> {
+        Err(GenieError::missing_data(
+            "a version bundle this crate does not hold",
+        ))
     }
 
     /// A version bundle with the parameters `AoE1`: Rise of Rome uses by default.

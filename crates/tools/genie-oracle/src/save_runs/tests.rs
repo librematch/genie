@@ -1,4 +1,5 @@
 use crate::command_args::Frame;
+use crate::errors::{bad_mesh_dump, bad_pool_dump, bad_tile_dump, no_such_player};
 use crate::fixtures::recording;
 use crate::fixtures::{combat_object, gaia, header, human};
 use crate::map_and_sight::SavedStep;
@@ -8,7 +9,7 @@ use crate::save_runs::{
 };
 use crate::setup::slice;
 use crate::test_ids::object_id;
-use crate::{Decoder, Dumps, Error, TickReport, listed};
+use crate::{Decoder, Dumps, TickReport, listed};
 use genie_core::GenieError;
 use genie_core::groups::Differentiator;
 use genie_core::objects::HitPoints;
@@ -69,7 +70,7 @@ fn player_the_game_does_not_hold_is_an_error() {
     let _ = after.objects.pop();
     let mut report = TickReport::default();
     let result = compare_players(&turns, &after, None, &mut report);
-    assert!(matches!(result, Err(Error::NoSuchPlayer(1))));
+    assert!(result.is_err_and(|e| e == no_such_player(1)));
 }
 
 /// The game state and a player's status, each where it differs; a frozen object's own
@@ -272,34 +273,34 @@ fn the_dumps_go_into_the_slice() {
 fn dump_out_of_shape_is_an_error() {
     let mut turns = slice(&save(), None).unwrap();
     let bad = |dumps: Dumps<'_>| load_dumps(&mut slice(&save(), None).unwrap(), dumps);
-    assert!(matches!(
+    assert!(
         bad(Dumps {
             mesh: Some("tile 0 0 1\n"),
             ..Dumps::default()
-        }),
-        Err(Error::BadMeshDump)
-    ));
-    assert!(matches!(
+        })
+        .is_err_and(|e| e == bad_mesh_dump())
+    );
+    assert!(
         bad(Dumps {
             tiles: Some("x\n"),
             ..Dumps::default()
-        }),
-        Err(Error::BadTileDump)
-    ));
-    assert!(matches!(
+        })
+        .is_err_and(|e| e == bad_tile_dump())
+    );
+    assert!(
         bad(Dumps {
             inside: Some("x\n"),
             ..Dumps::default()
-        }),
-        Err(Error::BadTileDump)
-    ));
-    assert!(matches!(
+        })
+        .is_err_and(|e| e == bad_tile_dump())
+    );
+    assert!(
         bad(Dumps {
             pools: Some("101 1\n"),
             ..Dumps::default()
-        }),
-        Err(Error::BadPoolDump)
-    ));
+        })
+        .is_err_and(|e| e == bad_pool_dump())
+    );
     // no dump: nothing changes
     load_dumps(&mut turns, Dumps::default()).unwrap();
     assert!(turns.pathing.mesh().is_none());

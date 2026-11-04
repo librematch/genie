@@ -24,7 +24,6 @@ genie-support = { version = "^1.0.0", path = "../genie-support", features = [
 log = "0.4.17"
 nohash-hasher = "0.2.0"
 rgb.workspace = true
-thiserror.workspace = true
 num_enum.workspace = true
 
 [dev-dependencies]

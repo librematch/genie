@@ -12,7 +12,7 @@ keywords = ["aoe2", "nickel", "configuration", "genie"]
 categories = ["game-engines", "config"]
 
 [dependencies]
-genie-error = { path = "../../base/genie-error" }
+genie-error = { path = "../../base/genie-error", features = ["serde"] }
 # the model's types, whose JSON Schema the contracts are written from (FD-046-D15)
 genie-model = { path = "../genie-model", features = ["schema"] }
 # the Nickel evaluator's stable interface (MIT, FD-046-D13)

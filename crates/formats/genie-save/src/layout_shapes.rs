@@ -7,8 +7,7 @@
 
 use binrw::io::{Read, Seek, Write};
 use binrw::{BinRead, BinResult, BinWrite, Endian, binrw};
-use std::error::Error;
-use std::fmt::{Display, Error as FmtError, Formatter};
+use genie_error::GenieError;
 use std::ops::Deref;
 
 /// A u16 length, then that many bytes (158041: `0x140933990`, `SRead<short> &requiredBufSize`).
@@ -139,32 +138,23 @@ where
     }
 }
 
-/// Marks a part this reader does not read yet, so callers can tell it from a parse error.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct UnsupportedFeature(pub &'static str);
-
-impl Display for UnsupportedFeature {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), FmtError> {
-        write!(f, "unsupported: {}", self.0)
-    }
-}
-
-impl Error for UnsupportedFeature {}
-
-/// The part named by an [`UnsupportedFeature`] anywhere in a read error, with its position.
+/// The part a read error names as not read yet ([`Unsupported`]) anywhere in it, with its
+/// position.
 #[must_use]
-pub fn unsupported_in(e: &binrw::Error) -> Option<(&'static str, usize)> {
+pub fn unsupported_in(e: &binrw::Error) -> Option<(GenieError, usize)> {
     let root = e.root_cause();
-    let what = root.custom_err::<UnsupportedFeature>()?.0;
+    let unsupported = root.custom_err::<GenieError>()?.clone();
     let at = match root {
         binrw::Error::Custom { pos, .. } => *pos as usize,
         _ => 0,
     };
-    Some((what, at))
+    Some((unsupported, at))
 }
 
 /// A part of the layout the generator does not derive yet (aoe2de-exe-re `layout`, helper kind
-/// `unsupported`): reading it fails with an [`UnsupportedFeature`] naming the part; it is never
+/// `unsupported`).
+///
+/// Reading it fails with an unsupported [`GenieError`] whose reason names the part; it is never
 /// written.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct Unsupported;
@@ -179,7 +169,7 @@ impl BinRead for Unsupported {
     ) -> BinResult<Self> {
         Err(binrw::Error::Custom {
             pos: reader.stream_position()?,
-            err: Box::new(UnsupportedFeature(what)),
+            err: Box::new(GenieError::unsupported(what)),
         })
     }
 }
@@ -190,7 +180,7 @@ impl BinWrite for Unsupported {
     fn write_options<W: Write + Seek>(&self, writer: &mut W, _: Endian, (): ()) -> BinResult<()> {
         Err(binrw::Error::Custom {
             pos: writer.stream_position()?,
-            err: Box::new(UnsupportedFeature("a part this reader never reads")),
+            err: Box::new(GenieError::invalid_input("a part this reader never reads")),
         })
     }
 }
@@ -318,7 +308,10 @@ mod tests {
     fn an_unsupported_part_fails_to_read_and_names_itself() {
         let e = Unsupported::read_le_args(&mut Cursor::new(b"\0".as_slice()), ("the AI state",))
             .unwrap_err();
-        assert_eq!(unsupported_in(&e), Some(("the AI state", 0)));
+        assert_eq!(
+            unsupported_in(&e).map(|(e, at)| (e.kind(), e.reason(), at)),
+            Some((genie_error::ErrorKind::Unsupported, "the AI state", 0))
+        );
     }
 
     #[test]

@@ -1,6 +1,7 @@
-use crate::Result;
+use crate::errors::too_long_description;
 use crate::values::{DataSet, DlcPackage, ScxVersion};
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
+use genie_error::GenieResult;
 use genie_support::{ReadStringsExt, read_list, write_opt_i32_str};
 use std::convert::TryFrom;
 use std::io::{Read, Write};
@@ -34,7 +35,7 @@ impl DlcOptions {
     /// # Errors
     ///
     /// Returns an error if reading fails.
-    pub fn read_from(mut input: impl Read) -> Result<Self> {
+    pub fn read_from(mut input: impl Read) -> GenieResult<Self> {
         // If version is 0 or 1, it's actually the dataset identifier from
         // before DLCOptions was versioned.
         let version_or_data_set = input.read_i32::<LE>()?;
@@ -71,7 +72,7 @@ impl DlcOptions {
     /// Returns an error if writing fails.
     // The format stores the number of dependencies as a u32.
     #[allow(clippy::cast_possible_truncation)]
-    pub fn write_to(&self, mut output: impl Write) -> Result<()> {
+    pub fn write_to(&self, mut output: impl Write) -> GenieResult<()> {
         output.write_u32::<LE>(1000)?;
         output.write_i32::<LE>(self.game_data_set.into())?;
         output.write_u32::<LE>(self.dependencies.len() as u32)?;
@@ -111,7 +112,7 @@ impl ScxHeader {
     ///
     /// Returns an error if reading fails, if a string cannot be decoded, or if the DLC options
     /// hold an unknown ID.
-    pub fn read_from(mut input: impl Read, format_version: ScxVersion) -> Result<Self> {
+    pub fn read_from(mut input: impl Read, format_version: ScxVersion) -> GenieResult<Self> {
         let _header_size = input.read_u32::<LE>()?;
         let version = input.read_u32::<LE>()?;
         log::debug!("Header version {version}");
@@ -172,7 +173,7 @@ impl ScxHeader {
         output: impl Write,
         format_version: ScxVersion,
         version: u32,
-    ) -> Result<()> {
+    ) -> GenieResult<()> {
         let mut intermediate = vec![];
 
         intermediate.write_u32::<LE>(version)?;
@@ -187,12 +188,10 @@ impl ScxHeader {
         }
         description_bytes.push(0);
         if format_version == *b"3.13" {
-            let len = u16::try_from(description_bytes.len())
-                .map_err(|_| crate::Error::DescriptionTooLongError)?;
+            let len = u16::try_from(description_bytes.len()).map_err(|_| too_long_description())?;
             intermediate.write_u16::<LE>(len)?;
         } else {
-            let len = u32::try_from(description_bytes.len())
-                .map_err(|_| crate::Error::DescriptionTooLongError)?;
+            let len = u32::try_from(description_bytes.len()).map_err(|_| too_long_description())?;
             intermediate.write_u32::<LE>(len)?;
         }
         intermediate.write_all(&description_bytes)?;

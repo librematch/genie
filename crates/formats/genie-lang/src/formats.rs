@@ -1,35 +1,40 @@
 //! The three file formats: DLLs, INI files and HD Edition's key-value files, read and
 //! written, with the escapes of the text formats.
 
-use crate::{LangFile, LoadError};
+use crate::LangFile;
 use byteorder::{LE, ReadBytesExt};
 use encoding_rs::{UTF_16LE, WINDOWS_1252};
 use encoding_rs_io::DecodeReaderBytesBuilder;
+use genie_error::{GenieError, GenieResult};
 use genie_support::StringKey;
 use pelite::pe32::{Pe, PeFile};
 use pelite::resources::Directory;
 use pelite::resources::Name;
-use std::io;
 use std::io::{BufRead, BufReader, Read, Write};
+
+/// A DLL whose strings do not read.
+fn unreadable_dll(e: pelite::Error) -> GenieError {
+    GenieError::invalid_input("a language DLL that does not read").with_source(e)
+}
 
 impl LangFile {
     /// Reads a language file from a .DLL.
     /// This function eagerly loads all the strings into memory.
     ///
-    /// Returns `Err(e)` where `e` is a `LoadError` if an error occurs while
-    /// loading the file.
-    pub(super) fn read_dll(&mut self, mut input: impl Read) -> Result<(), LoadError> {
+    /// Returns an error if the file does not read.
+    pub(super) fn read_dll(&mut self, mut input: impl Read) -> GenieResult<()> {
         let mut bytes = vec![];
         let _ = input.read_to_end(&mut bytes)?;
-        let pe = PeFile::from_bytes(&bytes)?;
+        let pe = PeFile::from_bytes(&bytes).map_err(unreadable_dll)?;
         self.load_pe_file(pe)
     }
 
     /// TODO specify
-    pub(super) fn load_pe_file(&mut self, pe: PeFile<'_>) -> Result<(), LoadError> {
-        for root_dir_entry in pe.resources()?.root()?.entries() {
+    pub(super) fn load_pe_file(&mut self, pe: PeFile<'_>) -> GenieResult<()> {
+        let resources = pe.resources().map_err(unreadable_dll)?;
+        for root_dir_entry in resources.root().map_err(unreadable_dll)?.entries() {
             if root_dir_entry.name() == Ok(Name::Id(6))
-                && let Some(directory) = root_dir_entry.entry()?.dir()
+                && let Some(directory) = root_dir_entry.entry().map_err(unreadable_dll)?.dir()
             {
                 self.load_pe_directory(directory)?;
             }
@@ -38,17 +43,17 @@ impl LangFile {
     }
 
     /// TODO specify
-    pub(super) fn load_pe_directory(&mut self, directory: Directory<'_>) -> Result<(), LoadError> {
+    pub(super) fn load_pe_directory(&mut self, directory: Directory<'_>) -> GenieResult<()> {
         for entry in directory.entries() {
-            let base_index = if let Name::Id(n) = entry.name()? {
+            let base_index = if let Name::Id(n) = entry.name().map_err(unreadable_dll)? {
                 (n - 1) * 16
             } else {
                 continue;
             };
-            if let Some(subdir) = entry.entry()?.dir() {
+            if let Some(subdir) = entry.entry().map_err(unreadable_dll)?.dir() {
                 for data_entry in subdir.entries() {
-                    if let Some(data) = data_entry.entry()?.data() {
-                        self.load_pe_data(base_index, data.bytes()?)?;
+                    if let Some(data) = data_entry.entry().map_err(unreadable_dll)?.data() {
+                        self.load_pe_data(base_index, data.bytes().map_err(unreadable_dll)?)?;
                     }
                 }
             }
@@ -60,7 +65,7 @@ impl LangFile {
     // The cursor runs over the in-memory `data` slice and never past its end (the slice index
     // below would panic first), so its u64 position fits in a usize.
     #[allow(clippy::cast_possible_truncation)]
-    pub(super) fn load_pe_data(&mut self, mut index: u32, data: &[u8]) -> Result<(), LoadError> {
+    pub(super) fn load_pe_data(&mut self, mut index: u32, data: &[u8]) -> GenieResult<()> {
         use std::io::{Cursor, Seek, SeekFrom};
         let mut cursor = Cursor::new(data);
         while (cursor.position() as usize) < data.len() {
@@ -90,9 +95,8 @@ impl LangFile {
     /// At this time, the encoding of the language.ini file is assumed to be
     /// Windows codepage 1252.
     ///
-    /// Returns `Err(e)` where `e` is a `LoadError` if an error occurs while
-    /// loading the file.
-    pub(super) fn read_ini(&mut self, input: impl Read) -> Result<(), LoadError> {
+    /// Returns an error if the file does not read.
+    pub(super) fn read_ini(&mut self, input: impl Read) -> GenieResult<()> {
         let input = DecodeReaderBytesBuilder::new()
             .encoding(Some(WINDOWS_1252))
             .build(input);
@@ -107,10 +111,8 @@ impl LangFile {
     ///
     /// The key value pair stored in the line is inserted to `self`, if parsed
     /// successfully.
-    /// A `LoadError` is returned if an error occurs while parsing.
-    ///
-    /// Returns a `LoadError` if an error occurs while reading the line.
-    pub(super) fn load_ini_line(&mut self, line: &str) -> Result<(), LoadError> {
+    /// Returns an error if the line's string ID is not a number.
+    pub(super) fn load_ini_line(&mut self, line: &str) -> GenieResult<()> {
         if line.starts_with(';') {
             return Ok(());
         }
@@ -123,7 +125,11 @@ impl LangFile {
             return Ok(());
         };
 
-        let id: u32 = id.parse()?;
+        let id: u32 = id.parse().map_err(|e| {
+            GenieError::invalid_input("a string id that is no number")
+                .with("id", id)
+                .with_source(e)
+        })?;
         let value = unescape(value.chars(), false);
         // A later line with the same ID replaces the earlier one.
         let _ = self.0.insert(StringKey::from(id), value);
@@ -133,7 +139,7 @@ impl LangFile {
     /// Reads a language file from an HD Edition-style key-value file.
     ///
     /// This function loads eagerly all the strings into memory.
-    pub(super) fn read_keyval(&mut self, input: impl Read) -> Result<(), LoadError> {
+    pub(super) fn read_keyval(&mut self, input: impl Read) -> GenieResult<()> {
         let input = BufReader::new(input);
         for line in input.lines() {
             self.load_keyval_line(&line?);
@@ -178,7 +184,7 @@ impl LangFile {
     /// # Errors
     ///
     /// Returns an error if writing to `output` fails.
-    pub fn write_to_ini<W: Write>(&self, output: &mut W) -> io::Result<()> {
+    pub fn write_to_ini<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         // TODO warning if there are string ids
         for (id, string) in self.iter().filter(|(id, _)| id.is_numeric()) {
             output.write_all(format!("{}={}\n", id, escape(string, false)).as_bytes())?;
@@ -192,7 +198,7 @@ impl LangFile {
     /// # Errors
     ///
     /// Returns an error if writing to `output` fails.
-    pub fn write_to_keyval<W: Write>(&self, output: &mut W) -> io::Result<()> {
+    pub fn write_to_keyval<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         for (id, string) in self {
             output.write_all(format!("{} \"{}\"\n", id, escape(string, true)).as_bytes())?;
         }

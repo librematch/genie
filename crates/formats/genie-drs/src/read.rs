@@ -1,5 +1,6 @@
 use super::{DrsHeader, DrsResource, DrsTable, DrsTableIterator, ResourceKind};
-use std::io::{Error, ErrorKind, Read, Seek, SeekFrom};
+use genie_error::{GenieError, GenieResult};
+use std::io::{Read, Seek, SeekFrom};
 
 /// A DRS archive reader.
 #[derive(Debug)]
@@ -15,7 +16,7 @@ impl DrsReader {
     /// # Errors
     ///
     /// Returns an error if reading the header, the table list or the resource directory fails.
-    pub fn new<R>(handle: &mut R) -> Result<Self, Error>
+    pub fn new<R>(handle: &mut R) -> GenieResult<Self>
     where
         R: Read + Seek,
     {
@@ -30,7 +31,7 @@ impl DrsReader {
     }
 
     /// Read the list of tables the header counts.
-    fn read_tables<R: Read + Seek>(&mut self, handle: &mut R) -> Result<(), Error> {
+    fn read_tables<R: Read + Seek>(&mut self, handle: &mut R) -> GenieResult<()> {
         for _ in 0..self.header.num_resource_kinds {
             let table = DrsTable::from(handle)?;
             self.tables.push(table);
@@ -39,7 +40,7 @@ impl DrsReader {
     }
 
     /// Read the list of resources.
-    fn read_dictionary<R: Read + Seek>(&mut self, handle: &mut R) -> Result<(), Error> {
+    fn read_dictionary<R: Read + Seek>(&mut self, handle: &mut R) -> GenieResult<()> {
         for table in &mut self.tables {
             table.read_resources(handle)?;
         }
@@ -77,17 +78,20 @@ impl DrsReader {
     ///
     /// # Errors
     ///
-    /// Returns an `ErrorKind::NotFound` error if the archive has no such resource, and an error
+    /// A `MissingData` error if the archive has no such resource, and an error
     /// if seeking to it fails.
     pub fn get_resource_reader<R: Read + Seek>(
         &self,
         mut handle: R,
         resource_kind: ResourceKind,
         id: u32,
-    ) -> Result<impl Read, Error> {
-        let &DrsResource { size, offset, .. } = self
-            .get_resource(resource_kind, id)
-            .ok_or_else(|| Error::new(ErrorKind::NotFound, "Resource not found in this archive"))?;
+    ) -> GenieResult<impl Read> {
+        let &DrsResource { size, offset, .. } =
+            self.get_resource(resource_kind, id).ok_or_else(|| {
+                GenieError::missing_data("a resource the archive does not hold")
+                    .with("kind", resource_kind)
+                    .with("id", id)
+            })?;
 
         let _ = handle.seek(SeekFrom::Start(u64::from(offset)))?;
 
@@ -98,14 +102,14 @@ impl DrsReader {
     ///
     /// # Errors
     ///
-    /// Returns an `ErrorKind::NotFound` error if the archive has no such resource, and an error
+    /// A `MissingData` error if the archive has no such resource, and an error
     /// if seeking to or reading it fails.
     pub fn read_resource<R: Read + Seek>(
         &self,
         handle: &mut R,
         resource_kind: ResourceKind,
         id: u32,
-    ) -> Result<Box<[u8]>, Error> {
+    ) -> GenieResult<Box<[u8]>> {
         let mut buf = vec![];
 
         // The byte count is `buf.len()`.

@@ -3,7 +3,9 @@
 //! and the first recorded checkpoint whose 11-word block differs; together over many recordings
 //! they rank what blocks the replays. Dev only.
 
+use crate::errors::no_such_player;
 use crate::header_runs::{Opened, open};
+use genie_core::GenieResult;
 use genie_core::objects::ListIndex;
 use genie_rec::de::chapters;
 use genie_rec::de::{self, Op};
@@ -11,7 +13,7 @@ use genie_rec::de::{self, Op};
 use genie_core::world::World;
 use genie_save::PlayerSection;
 
-use crate::{Decoder, Error, MasterTable, frames, header_slice, lane_block, run};
+use crate::{Decoder, MasterTable, frames, header_slice, lane_block, run};
 use std::slice::from_ref;
 
 /// Why a census run ended.
@@ -110,13 +112,13 @@ pub fn census_run(
     recording: &[u8],
     masters: Option<&MasterTable>,
     limit: Option<usize>,
-) -> Result<CensusRun, Error> {
+) -> GenieResult<CensusRun> {
     let chapter = chapters(recording)?[0];
     let header = chapter.header()?;
     let sections = header.players();
     let (syncs, checkpoints) = recorded_checkpoints(&chapter)?;
     let total = limit.map_or(syncs, |l| l.min(syncs));
-    let mut turns = header_slice(&header, masters).map_err(Error::Unmodelled)?;
+    let mut turns = header_slice(&header, masters)?;
     let mut decoder = Decoder::default();
     let mut census = Census::new(sections.len(), checkpoints);
     let mut end = if total < syncs {
@@ -143,7 +145,7 @@ pub fn census_run(
 
 /// The recording's syncs (a checkpoint's included) and its checkpoints, each with the syncs
 /// before it: it holds the state after that many updates.
-fn recorded_checkpoints(chapter: &de::Chapter<'_>) -> Result<(usize, Vec<(usize, Lanes)>), Error> {
+fn recorded_checkpoints(chapter: &de::Chapter<'_>) -> GenieResult<(usize, Vec<(usize, Lanes)>)> {
     let mut checkpoints = Vec::new();
     let mut syncs = 0;
     for op in chapter.ops() {
@@ -276,13 +278,13 @@ pub fn header_divergences(
     players: &[u32],
     (first, last): (usize, usize),
     save: &mut dyn FnMut(usize) -> Option<Vec<u8>>,
-) -> Result<Vec<Followed>, Error> {
+) -> GenieResult<Vec<Followed>> {
     let chapter = chapters(recording)?[0];
     let header = chapter.header()?;
-    let mut turns = header_slice(&header, masters).map_err(Error::Unmodelled)?;
+    let mut turns = header_slice(&header, masters)?;
     let mut decoder = Decoder::default();
     if let Some(&p) = players.iter().find(|&&p| turns.players.len() <= p as usize) {
-        return Err(Error::NoSuchPlayer(p));
+        return Err(no_such_player(p));
     }
     let mut out: Vec<Followed> = vec![Followed::Follows; players.len()];
     let mut done = vec![false; players.len()];
@@ -347,10 +349,10 @@ pub fn next_id_divergence(
     masters: Option<&MasterTable>,
     (first, last): (usize, usize),
     save: &mut dyn FnMut(usize) -> Option<Vec<u8>>,
-) -> Result<Option<(usize, i32, i32)>, Error> {
+) -> GenieResult<Option<(usize, i32, i32)>> {
     let chapter = chapters(recording)?[0];
     let header = chapter.header()?;
-    let mut turns = header_slice(&header, masters).map_err(Error::Unmodelled)?;
+    let mut turns = header_slice(&header, masters)?;
     let mut decoder = Decoder::default();
     for (i, frame) in frames(&chapter, last)?.iter().enumerate() {
         run(&mut turns, &mut decoder, from_ref(frame));
@@ -385,7 +387,7 @@ pub fn header_run(
     masters: Option<&MasterTable>,
     last: usize,
     before: &mut dyn FnMut(usize),
-) -> Result<World, Error> {
+) -> GenieResult<World> {
     let Opened {
         chapter, mut turns, ..
     } = open(recording, masters)?;
@@ -408,7 +410,7 @@ pub fn header_divergence(
     player: u32,
     window: (usize, usize),
     save: &mut dyn FnMut(usize) -> Option<Vec<u8>>,
-) -> Result<Followed, Error> {
+) -> GenieResult<Followed> {
     Ok(
         header_divergences(recording, masters, &[player], window, save)?
             .pop()

@@ -1,9 +1,9 @@
-use crate::Result;
 use crate::area;
 use crate::element::{ReadableHeaderElement, WritableHeaderElement};
 use crate::fits;
 use crate::reader::RecordingHeaderReader;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
+use genie_error::GenieResult;
 use genie_support::{ReadSkipExt, read_i8s, read_le, read_list};
 use std::io::{Read, Write};
 
@@ -21,7 +21,7 @@ pub struct Tile {
 
 impl ReadableHeaderElement for Tile {
     /// Read a tile from an input stream.
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let terrain = input.read_u8()?;
         let (terrain, elevation, original_terrain) = if terrain == 0xFF {
             (input.read_u8()?, input.read_u8()?, Some(input.read_u8()?))
@@ -38,7 +38,7 @@ impl ReadableHeaderElement for Tile {
 
 impl WritableHeaderElement for Tile {
     /// Write a tile to an output stream.
-    fn write_to<W: Write>(&self, output: &mut W) -> Result<()> {
+    fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         if let Some(t) = self.original_terrain {
             output.write_u8(0xFF)?;
             output.write_u8(self.terrain)?;
@@ -125,7 +125,7 @@ impl MapZone {
 }
 
 impl ReadableHeaderElement for MapZone {
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let mut zone = Self::default();
         input.read_i8_into(&mut zone.info)?;
         input.read_i32_into::<LE>(&mut zone.tiles)?;
@@ -141,7 +141,7 @@ impl ReadableHeaderElement for MapZone {
 }
 
 impl WritableHeaderElement for MapZone {
-    fn write_to<W: Write>(&self, output: &mut W) -> Result<()> {
+    fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         for val in &self.info {
             output.write_i8(*val)?;
         }
@@ -172,7 +172,7 @@ pub struct VisibilityMap {
 }
 
 impl ReadableHeaderElement for VisibilityMap {
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let width = input.read_u32::<LE>()?;
         let height = input.read_u32::<LE>()?;
         let visibility = read_le(input, area(width, height)?, u32::from_le_bytes)?;
@@ -185,7 +185,7 @@ impl ReadableHeaderElement for VisibilityMap {
 }
 
 impl WritableHeaderElement for VisibilityMap {
-    fn write_to<W: Write>(&self, output: &mut W) -> Result<()> {
+    fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         output.write_u32::<LE>(self.width)?;
         output.write_u32::<LE>(self.height)?;
         for value in &self.visibility {
@@ -216,7 +216,7 @@ pub struct Map {
 
 impl ReadableHeaderElement for Map {
     /// Read map data from an input stream.
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let mut map = Self {
             width: input.read_u32::<LE>()?,
             height: input.read_u32::<LE>()?,

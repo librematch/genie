@@ -3,8 +3,9 @@
 use crate::conv::fits;
 use crate::sprite::SpriteId;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
+use genie_error::GenieResult;
 use genie_support::{MapInto, UnitKindId, read_opt_u16};
-use std::io::{Read, Result, Write};
+use std::io::{Read, Write};
 
 /// One attack or armour value: a class and the amount for it.
 #[derive(Debug, Default, Clone, Copy)]
@@ -21,7 +22,7 @@ impl WeaponInfo {
     /// # Errors
     ///
     /// Returns an error if reading from `input` fails.
-    pub fn read_from(mut input: impl Read) -> Result<Self> {
+    pub fn read_from(mut input: impl Read) -> GenieResult<Self> {
         Ok(Self {
             weapon_kind: input.read_i16::<LE>()?,
             value: input.read_i16::<LE>()?,
@@ -33,7 +34,7 @@ impl WeaponInfo {
     /// # Errors
     ///
     /// Returns an error if writing to `output` fails.
-    pub fn write_to(self, mut output: impl Write) -> Result<()> {
+    pub fn write_to(self, mut output: impl Write) -> GenieResult<()> {
         output.write_i16::<LE>(self.weapon_kind)?;
         output.write_i16::<LE>(self.value)?;
         Ok(())
@@ -92,7 +93,7 @@ impl BaseCombatUnitKindAttributes {
     /// # Errors
     ///
     /// Returns an error if reading from `input` fails, or if an ID is out of range.
-    pub fn read_from(mut input: impl Read, version: f32) -> Result<Self> {
+    pub fn read_from(mut input: impl Read, version: f32) -> GenieResult<Self> {
         let mut attrs = Self {
             base_armor: if version < 11.52 {
                 input.read_u8()?.into()
@@ -143,7 +144,7 @@ impl BaseCombatUnitKindAttributes {
     /// store it in.
     // The format stores the attack and armour counts as u16 (truncated, as before).
     #[allow(clippy::cast_possible_truncation)]
-    pub fn write_to(&self, mut output: impl Write, version: f32) -> Result<()> {
+    pub fn write_to(&self, mut output: impl Write, version: f32) -> GenieResult<()> {
         if version < 11.52 {
             output.write_u8(fits(self.base_armor)?)?;
         } else {
@@ -161,7 +162,7 @@ impl BaseCombatUnitKindAttributes {
     }
 
     /// The fields after the weapon and armour lists.
-    fn write_ranges(&self, mut output: impl Write) -> Result<()> {
+    fn write_ranges(&self, mut output: impl Write) -> GenieResult<()> {
         output.write_u16::<LE>(self.defense_terrain_bonus.unwrap_or(0xFFFF))?;
         output.write_f32::<LE>(self.weapon_range_max)?;
         output.write_f32::<LE>(self.area_effect_range)?;
@@ -208,7 +209,7 @@ impl MissileUnitKindAttributes {
     /// # Errors
     ///
     /// Returns an error if reading from `input` fails.
-    pub fn read_from(mut input: impl Read, _version: f32) -> Result<Self> {
+    pub fn read_from(mut input: impl Read, _version: f32) -> GenieResult<Self> {
         Ok(Self {
             missile_kind: input.read_u8()?,
             targetting_kind: input.read_u8()?,
@@ -224,7 +225,7 @@ impl MissileUnitKindAttributes {
     /// # Errors
     ///
     /// Returns an error if writing to `output` fails.
-    pub fn write_to(&self, mut output: impl Write, _version: f32) -> Result<()> {
+    pub fn write_to(&self, mut output: impl Write, _version: f32) -> GenieResult<()> {
         output.write_u8(self.missile_kind)?;
         output.write_u8(self.targetting_kind)?;
         output.write_u8(self.missile_hit_info)?;

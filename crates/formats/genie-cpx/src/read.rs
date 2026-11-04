@@ -2,52 +2,36 @@ use crate::{AOE1_DE, AOE2_DE, CampaignHeader, CpxVersion, ScenarioMeta};
 use byteorder::{LE, ReadBytesExt};
 use chardet::detect as detect_encoding;
 use encoding_rs::Encoding;
-use genie_scx::{self as scx, DlcPackage, Scenario};
+use genie_error::{GenieError, GenieResult};
+use genie_scx::{DlcPackage, Scenario};
 use genie_support::{read_bytes, read_list};
-use std::io::{self, Cursor, Read, Seek, SeekFrom};
-use std::result::Result as StdResult;
+use std::io::{Cursor, Read, Seek, SeekFrom};
 
-/// Type for errrors that could occur while reading/parsing a campaign file.
-#[derive(Debug, thiserror::Error)]
-pub enum ReadCampaignError {
-    /// A string could not be decoded, its encoding may be unknown or it may be binary nonsense.
-    #[error("invalid string")]
-    DecodeStringError,
-    /// An I/O error occurred.
-    #[error("{}", .0)]
-    IoError(#[from] io::Error),
-    /// The campaign file or a scenario inside it is missing a user-facing name value.
-    #[error("campaign or scenario must have a name")]
-    MissingNameError,
-    /// The requested scenario file does not exist in this campaign file.
-    #[error("scenario not fonud in campaign")]
-    NotFoundError,
-    /// A scenario file could not be parsed.
-    #[error("{}", .0)]
-    ParseScxError(#[from] scx::Error),
-}
-
-type Result<T> = StdResult<T, ReadCampaignError>;
+/// A string of the campaign that does not decode.
+const UNDECODED_STRING: GenieError =
+    GenieError::invalid_input("a campaign string that does not decode");
+/// A campaign or a scenario without its name.
+const NO_NAME: GenieError = GenieError::invalid_input("a campaign or scenario without a name");
 
 /// Decode a string with unknown encoding.
-fn decode_str(bytes: &[u8]) -> Result<String> {
+fn decode_str(bytes: &[u8]) -> GenieResult<String> {
     if bytes.is_empty() {
         return Ok(String::new());
     }
 
     let (encoding_name, _confidence, _language) = detect_encoding(bytes);
     Encoding::for_label(encoding_name.as_bytes())
-        .ok_or(ReadCampaignError::DecodeStringError)
+        .ok_or(UNDECODED_STRING)
         .and_then(|encoding| {
             let (decoded, _enc, failed) = encoding.decode(bytes);
             if failed {
-                return Err(ReadCampaignError::DecodeStringError);
+                return Err(UNDECODED_STRING);
             }
             Ok(decoded.to_string())
         })
 }
 
-pub fn read_fixed_str<R: Read>(input: &mut R, len: usize) -> Result<Option<String>> {
+pub fn read_fixed_str<R: Read>(input: &mut R, len: usize) -> GenieResult<Option<String>> {
     let mut bytes = read_bytes(input, len)?;
 
     if let Some(end) = bytes.iter().position(|&byte| byte == 0) {
@@ -60,18 +44,18 @@ pub fn read_fixed_str<R: Read>(input: &mut R, len: usize) -> Result<Option<Strin
     }
 }
 
-fn read_hd_or_later_string<R: Read>(input: &mut R) -> Result<Option<String>> {
+fn read_hd_or_later_string<R: Read>(input: &mut R) -> GenieResult<Option<String>> {
     let open = input.read_u16::<LE>()?;
     // Check that this actually is the start of a string
     if open != 0x0A60 {
-        return Err(ReadCampaignError::DecodeStringError);
+        return Err(UNDECODED_STRING);
     }
     let len = input.read_u16::<LE>()? as usize;
     let bytes = read_bytes(input, len)?;
     decode_str(&bytes).map(Some)
 }
 
-fn read_campaign_header<R: Read>(input: &mut R) -> Result<CampaignHeader> {
+fn read_campaign_header<R: Read>(input: &mut R) -> GenieResult<CampaignHeader> {
     let mut version = [0; 4];
     input.read_exact(&mut version)?;
 
@@ -80,7 +64,7 @@ fn read_campaign_header<R: Read>(input: &mut R) -> Result<CampaignHeader> {
 
     if version == AOE1_DE {
         num_scenarios = input.read_u32::<LE>()? as usize;
-        name = read_hd_or_later_string(input)?.ok_or(ReadCampaignError::MissingNameError)?;
+        name = read_hd_or_later_string(input)?.ok_or(NO_NAME)?;
     } else {
         // DE2 added package dependency data. We don't store that right now, because DE always
         // supports all packages.[citation needed]
@@ -91,7 +75,7 @@ fn read_campaign_header<R: Read>(input: &mut R) -> Result<CampaignHeader> {
             })?;
         }
 
-        name = read_fixed_str(input, 256)?.ok_or(ReadCampaignError::MissingNameError)?;
+        name = read_fixed_str(input, 256)?.ok_or(NO_NAME)?;
         num_scenarios = input.read_u32::<LE>()? as usize;
     }
 
@@ -102,11 +86,11 @@ fn read_campaign_header<R: Read>(input: &mut R) -> Result<CampaignHeader> {
     })
 }
 
-fn read_scenario_meta_de2<R: Read>(input: &mut R) -> Result<ScenarioMeta> {
+fn read_scenario_meta_de2<R: Read>(input: &mut R) -> GenieResult<ScenarioMeta> {
     let size = input.read_u32::<LE>()? as usize;
     let offset = input.read_u32::<LE>()? as usize;
-    let name = read_hd_or_later_string(input)?.ok_or(ReadCampaignError::MissingNameError)?;
-    let filename = read_hd_or_later_string(input)?.ok_or(ReadCampaignError::MissingNameError)?;
+    let name = read_hd_or_later_string(input)?.ok_or(NO_NAME)?;
+    let filename = read_hd_or_later_string(input)?.ok_or(NO_NAME)?;
 
     Ok(ScenarioMeta {
         size,
@@ -118,11 +102,11 @@ fn read_scenario_meta_de2<R: Read>(input: &mut R) -> Result<ScenarioMeta> {
 
 // `usize` is 64 bits wide on the usual targets; a 32-bit target truncates the u64 values.
 #[allow(clippy::cast_possible_truncation)]
-fn read_scenario_meta_de<R: Read>(input: &mut R) -> Result<ScenarioMeta> {
+fn read_scenario_meta_de<R: Read>(input: &mut R) -> GenieResult<ScenarioMeta> {
     let size = input.read_u64::<LE>()? as usize;
     let offset = input.read_u64::<LE>()? as usize;
-    let name = read_hd_or_later_string(input)?.ok_or(ReadCampaignError::MissingNameError)?;
-    let filename = read_hd_or_later_string(input)?.ok_or(ReadCampaignError::MissingNameError)?;
+    let name = read_hd_or_later_string(input)?.ok_or(NO_NAME)?;
+    let filename = read_hd_or_later_string(input)?.ok_or(NO_NAME)?;
 
     Ok(ScenarioMeta {
         size,
@@ -134,11 +118,11 @@ fn read_scenario_meta_de<R: Read>(input: &mut R) -> Result<ScenarioMeta> {
 
 // The classic format stores size and offset as i32; a negative value is not expected.
 #[allow(clippy::cast_sign_loss)]
-fn read_scenario_meta<R: Read>(input: &mut R) -> Result<ScenarioMeta> {
+fn read_scenario_meta<R: Read>(input: &mut R) -> GenieResult<ScenarioMeta> {
     let size = input.read_i32::<LE>()? as usize;
     let offset = input.read_i32::<LE>()? as usize;
-    let name = read_fixed_str(input, 255)?.ok_or(ReadCampaignError::MissingNameError)?;
-    let filename = read_fixed_str(input, 255)?.ok_or(ReadCampaignError::MissingNameError)?;
+    let name = read_fixed_str(input, 255)?.ok_or(NO_NAME)?;
+    let filename = read_fixed_str(input, 255)?.ok_or(NO_NAME)?;
     let mut padding = [0; 2];
     input.read_exact(&mut padding)?;
 
@@ -174,7 +158,7 @@ where
     ///
     /// Returns an error if reading fails, if a string cannot be decoded, or if the campaign or a
     /// scenario has no name.
-    pub fn read_from(mut input: R) -> Result<Self> {
+    pub fn read_from(mut input: R) -> GenieResult<Self> {
         let header = read_campaign_header(&mut input)?;
         let mut entries = vec![];
         let read_entry = if header.version == *b"2.00" {
@@ -248,10 +232,9 @@ where
     ///
     /// Returns an error if no scenario has that file name, if reading fails, or if the scenario
     /// cannot be parsed.
-    pub fn by_name(&mut self, filename: &str) -> Result<Scenario> {
-        self.by_name_raw(filename)
-            .map(Cursor::new)
-            .and_then(|buf| Scenario::read_from(buf).map_err(ReadCampaignError::ParseScxError))
+    pub fn by_name(&mut self, filename: &str) -> GenieResult<Scenario> {
+        let bytes = self.by_name_raw(filename)?;
+        Scenario::read_from(Cursor::new(bytes)).map_err(|e| e.with("scenario", filename))
     }
 
     /// Get a scenario by its campaign index.
@@ -260,10 +243,9 @@ where
     ///
     /// Returns an error if the index is out of range, if reading fails, or if the scenario cannot
     /// be parsed.
-    pub fn by_index(&mut self, index: usize) -> Result<Scenario> {
-        self.by_index_raw(index)
-            .map(Cursor::new)
-            .and_then(|buf| Scenario::read_from(buf).map_err(ReadCampaignError::ParseScxError))
+    pub fn by_index(&mut self, index: usize) -> GenieResult<Scenario> {
+        let bytes = self.by_index_raw(index)?;
+        Scenario::read_from(Cursor::new(bytes)).map_err(|e| e.with("index", index))
     }
 
     /// Get a scenario file buffer by its file name.
@@ -271,10 +253,12 @@ where
     /// # Errors
     ///
     /// Returns an error if no scenario has that file name, or if reading fails.
-    pub fn by_name_raw(&mut self, filename: &str) -> Result<Vec<u8>> {
-        self.index_of(filename)
-            .ok_or(ReadCampaignError::NotFoundError)
-            .and_then(|index| self.by_index_raw(index))
+    pub fn by_name_raw(&mut self, filename: &str) -> GenieResult<Vec<u8>> {
+        let index = self.index_of(filename).ok_or_else(|| {
+            GenieError::missing_data("a scenario the campaign does not hold")
+                .with("scenario", filename)
+        })?;
+        self.by_index_raw(index)
     }
 
     /// Get a scenario file buffer by its campaign index.
@@ -284,9 +268,12 @@ where
     /// # Errors
     ///
     /// Returns an error if the index is out of range, or if seeking or reading fails.
-    pub fn by_index_raw(&mut self, index: usize) -> Result<Vec<u8>> {
+    pub fn by_index_raw(&mut self, index: usize) -> GenieResult<Vec<u8>> {
         let Some(entry) = self.entries.get(index) else {
-            return Err(ReadCampaignError::NotFoundError);
+            return Err(
+                GenieError::missing_data("a scenario the campaign does not hold")
+                    .with("index", index),
+            );
         };
 
         let mut result = vec![];
@@ -303,30 +290,6 @@ where
     }
 }
 
-impl From<ReadCampaignError> for genie_error::GenieError {
-    /// The error as a [`genie_error::GenieError`]: its kind and reason, the original as the
-    /// source.
-    #[track_caller]
-    fn from(e: ReadCampaignError) -> Self {
-        let to = match &e {
-            ReadCampaignError::DecodeStringError => {
-                Self::invalid_input("a campaign string that does not decode")
-            }
-            ReadCampaignError::IoError(_) => Self::io("a read or write that failed"),
-            ReadCampaignError::MissingNameError => {
-                Self::invalid_input("a campaign or scenario without a name")
-            }
-            ReadCampaignError::NotFoundError => {
-                Self::invalid_input("a scenario the campaign does not hold")
-            }
-            ReadCampaignError::ParseScxError(_) => {
-                Self::invalid_input("a campaign scenario that does not read")
-            }
-        };
-        to.with_source(e)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -339,6 +302,26 @@ mod tests {
     fn fixed_string_past_the_input_fails_at_its_end() {
         let mut input: &[u8] = b"short";
         assert!(read_fixed_str(&mut input, usize::MAX).is_err());
+    }
+
+    /// A scenario the campaign does not hold, by index or by name, is missing data.
+    #[test]
+    fn scenario_the_campaign_does_not_hold_is_missing() -> anyhow::Result<()> {
+        let f = File::open("test/campaigns/Armies at War A Combat Showcase.cpn")?;
+        let mut c = Campaign::read_from(f)?;
+        for e in [
+            c.by_index_raw(1).unwrap_err(),
+            c.by_name_raw("none.scn").unwrap_err(),
+        ] {
+            assert_eq!(
+                (e.kind(), e.reason()),
+                (
+                    genie_error::ErrorKind::MissingData,
+                    "a scenario the campaign does not hold"
+                )
+            );
+        }
+        Ok(())
     }
 
     /// Try to parse a file with an encoding that is not compatible with UTF-8.
@@ -438,7 +421,7 @@ mod tests {
     }
 
     #[test]
-    fn aoe_de2() -> Result<()> {
+    fn aoe_de2() -> GenieResult<()> {
         let f = File::open("test/campaigns/acam1.aoe2campaign")?;
         let c = Campaign::read_from(f)?;
 
@@ -483,33 +466,5 @@ mod tests {
         */
 
         Ok(())
-    }
-}
-
-#[cfg(test)]
-mod genie_error_tests {
-    use super::*;
-    #[cfg(test)]
-    use std::error::Error;
-
-    /// The errors convert into `GenieError`s with their kinds and reasons, the original as
-    /// source.
-    #[test]
-    fn campaign_read_errors_convert_into_genie_errors() {
-        let e: genie_error::GenieError = ReadCampaignError::NotFoundError.into();
-        assert_eq!(
-            (e.kind(), e.reason()),
-            (
-                genie_error::ErrorKind::InvalidInput,
-                "a scenario the campaign does not hold"
-            )
-        );
-        assert!(Error::source(&e).is_some());
-        let e: genie_error::GenieError = ReadCampaignError::IoError(io::Error::other("x")).into();
-        assert_eq!(
-            (e.kind(), e.reason()),
-            (genie_error::ErrorKind::Io, "a read or write that failed")
-        );
-        assert!(Error::source(&e).is_some());
     }
 }

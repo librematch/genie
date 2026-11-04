@@ -4,35 +4,24 @@
 //! (`aoe2de-exe-re/load_oracle/playback.py --trace`); a row holds the state after its tick.
 
 use flate2::read::ZlibDecoder;
-use std::error::Error;
-use std::fmt::{Display, Error as FmtError, Formatter};
-use std::io::Error as IoError;
+use genie_core::{GenieError, GenieResult};
 use std::io::Read;
 
 const MAGIC: &[u8; 8] = b"GRTICK1\0";
 
-/// Why a trace could not be read.
-#[derive(Debug)]
-pub enum TraceError {
-    /// The bytes are not a trace (no magic).
-    NotTrace,
-    /// The rows would not inflate.
-    Inflate(IoError),
-    /// The rows hold fewer bytes than the header announces.
-    Truncated,
+/// Bytes that are not a trace (no magic, or a header cut short).
+#[must_use]
+#[track_caller]
+pub const fn bad_trace() -> GenieError {
+    GenieError::invalid_input("bytes that are not a GRTICK1 trace")
 }
 
-impl Display for TraceError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), FmtError> {
-        match self {
-            Self::NotTrace => write!(f, "not a GRTICK1 trace"),
-            Self::Inflate(e) => write!(f, "the rows do not inflate: {e}"),
-            Self::Truncated => write!(f, "the rows end before the last tick"),
-        }
-    }
+/// Rows that end before the last tick the header announces.
+#[must_use]
+#[track_caller]
+pub const fn truncated_trace() -> GenieError {
+    GenieError::invalid_input("a trace whose rows end before the last tick")
 }
-
-impl Error for TraceError {}
 
 /// Every tick's world time and checkpoint lanes.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -48,10 +37,7 @@ fn word_at(bytes: &[u8], at: usize) -> Option<u32> {
 }
 
 /// The eleven words of a lane from `at`.
-fn lane_words(
-    word: &impl Fn(usize) -> Result<u32, TraceError>,
-    at: usize,
-) -> Result<[u32; 11], TraceError> {
+fn lane_words(word: &impl Fn(usize) -> GenieResult<u32>, at: usize) -> GenieResult<[u32; 11]> {
     let mut lane = [0; 11];
     for (w, slot) in lane.iter_mut().enumerate() {
         *slot = word(at + 4 * w)?;
@@ -65,22 +51,23 @@ impl TickTrace {
     ///
     /// # Errors
     ///
-    /// [`TraceError`] when the bytes are not a trace, do not inflate or end early.
-    pub fn decode(data: &[u8]) -> Result<Self, TraceError> {
+    /// Invalid input when the bytes are not a trace or end early, an input or output error when
+    /// the rows do not inflate.
+    pub fn decode(data: &[u8]) -> GenieResult<Self> {
         if data.get(..8) != Some(MAGIC.as_slice()) {
-            return Err(TraceError::NotTrace);
+            return Err(bad_trace());
         }
-        let ticks = word_at(data, 8).ok_or(TraceError::NotTrace)? as usize;
-        let lane_count = word_at(data, 12).ok_or(TraceError::NotTrace)? as usize;
+        let ticks = word_at(data, 8).ok_or(bad_trace())? as usize;
+        let lane_count = word_at(data, 12).ok_or(bad_trace())? as usize;
         let mut rows = Vec::new();
-        let _ = ZlibDecoder::new(data.get(16..).ok_or(TraceError::NotTrace)?)
+        let _ = ZlibDecoder::new(data.get(16..).ok_or(bad_trace())?)
             .read_to_end(&mut rows)
-            .map_err(TraceError::Inflate)?;
+            .map_err(|e| GenieError::io("a trace whose rows do not inflate").with_source(e))?;
         let row = 4 * (1 + 11 * lane_count);
         if rows.len() < ticks * row {
-            return Err(TraceError::Truncated);
+            return Err(truncated_trace());
         }
-        let word = |at: usize| word_at(&rows, at).ok_or(TraceError::Truncated);
+        let word = |at: usize| word_at(&rows, at).ok_or(truncated_trace());
         let mut times = Vec::with_capacity(ticks);
         let mut lanes = Vec::with_capacity(ticks);
         for t in 0..ticks {

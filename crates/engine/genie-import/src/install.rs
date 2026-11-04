@@ -14,7 +14,6 @@ use genie_model::GenieError;
 use schemars::schema_for;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
-use std::error::Error;
 #[cfg(feature = "fs")]
 use std::fs::read as read_file;
 #[cfg(feature = "fs")]
@@ -50,22 +49,15 @@ pub fn load_bytes(dat: &[u8], beside: Beside<'_>) -> Result<MasterTable, GenieEr
 /// `table` with the tables `beside` the `.dat` in place of its own, each that is there.
 fn with_beside(mut table: MasterTable, beside: Beside<'_>) -> Result<MasterTable, GenieError> {
     if let Some(json) = beside.drop_sites {
-        table.drop_sites = drop_sites(json).map_err(|e| out_of_shape(BESIDE[0], e))?;
+        table.drop_sites = drop_sites(json).map_err(|e| e.with("file", BESIDE[0]))?;
     }
     if let Some(json) = beside.linked_techs {
-        table.linked_techs = linked_techs(json).map_err(|e| out_of_shape(BESIDE[1], e))?;
+        table.linked_techs = linked_techs(json).map_err(|e| e.with("file", BESIDE[1]))?;
     }
     if let Some(json) = beside.unit_lines {
-        table.unit_lines = unit_lines(json).map_err(|e| out_of_shape(BESIDE[2], e))?;
+        table.unit_lines = unit_lines(json).map_err(|e| e.with("file", BESIDE[2]))?;
     }
     Ok(table)
-}
-
-/// The error of the table beside the `.dat` named `file`, which does not parse.
-fn out_of_shape(file: &str, e: impl Error + Send + Sync + 'static) -> GenieError {
-    GenieError::invalid_input("a table beside the .dat out of shape")
-        .with("file", file)
-        .with_source(e)
 }
 
 /// The SHA-256 of the tables' layout: [`MasterTable`]'s JSON Schema without its descriptions,
@@ -116,7 +108,11 @@ impl Files {
             let path = dat.with_file_name(name);
             match read_file(&path) {
                 Ok(b) => {
-                    *text = Some(String::from_utf8(b).map_err(|e| out_of_shape(name, e))?);
+                    *text = Some(String::from_utf8(b).map_err(|e| {
+                        GenieError::invalid_input("a table beside the .dat that is not UTF-8")
+                            .with("file", name)
+                            .with_source(e)
+                    })?);
                 }
                 Err(e) if e.kind() == ErrorKind::NotFound => {}
                 Err(e) => {

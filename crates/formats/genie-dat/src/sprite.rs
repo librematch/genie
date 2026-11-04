@@ -1,15 +1,14 @@
 //! Types related to sprites and graphics.
 
-use crate::conv::{fits, invalid_data, opt_fits};
+use crate::conv::{fits, name_to_nul, opt_fits};
 use crate::sound::SoundId;
 use arrayvec::ArrayVec;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
+use genie_error::{GenieError, GenieResult, invalid_input};
 pub use genie_support::SpriteId;
 use genie_support::{MapInto, fallible_try_into, infallible_try_into, read_opt_u16};
-use std::convert::{TryFrom, TryInto};
-use std::io::{Read, Result, Write};
-use std::num::TryFromIntError;
-use std::result::Result as StdResult;
+use std::convert::TryFrom;
+use std::io::{Read, Write};
 
 /// An ID identifying a string resource.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -28,9 +27,9 @@ impl From<u32> for GraphicId {
 }
 
 impl TryFrom<i32> for GraphicId {
-    type Error = TryFromIntError;
-    fn try_from(n: i32) -> StdResult<Self, Self::Error> {
-        Ok(Self(n.try_into()?))
+    type Error = GenieError;
+    fn try_from(n: i32) -> GenieResult<Self> {
+        Ok(Self(fits(n)?))
     }
 }
 
@@ -145,7 +144,7 @@ impl SpriteDelta {
     /// # Errors
     ///
     /// Returns an error if reading from `input` fails.
-    pub fn read_from(mut input: impl Read) -> Result<Self> {
+    pub fn read_from(mut input: impl Read) -> GenieResult<Self> {
         let mut delta = Self {
             sprite_id: read_opt_u16(&mut input)?,
             ..Default::default()
@@ -165,7 +164,7 @@ impl SpriteDelta {
     /// # Errors
     ///
     /// Returns an error if writing to `output` fails.
-    pub fn write_to<W: Write>(&self, output: &mut W) -> Result<()> {
+    pub fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         output.write_u16::<LE>(self.sprite_id.map_into().unwrap_or(0xFFFF))?;
         // padding
         output.write_i16::<LE>(0)?;
@@ -187,7 +186,7 @@ impl SoundProp {
     /// # Errors
     ///
     /// Returns an error if reading from `input` fails.
-    pub fn read_from<R: Read>(input: &mut R) -> Result<Self> {
+    pub fn read_from<R: Read>(input: &mut R) -> GenieResult<Self> {
         let sound_delay = input.read_i16::<LE>()?;
         let sound_id = input.read_u16::<LE>()?.into();
         Ok(Self {
@@ -202,7 +201,7 @@ impl SoundProp {
     /// # Errors
     ///
     /// Returns an error if writing to `output` fails.
-    pub fn write_to<W: Write>(self, output: &mut W) -> Result<()> {
+    pub fn write_to<W: Write>(self, output: &mut W) -> GenieResult<()> {
         output.write_i16::<LE>(self.sound_delay)?;
         output.write_u16::<LE>(self.sound_id.into())?;
         Ok(())
@@ -213,7 +212,7 @@ impl SoundProp {
     /// # Errors
     ///
     /// Returns an error if writing to `output` fails.
-    pub fn write_empty<W: Write>(output: &mut W) -> Result<()> {
+    pub fn write_empty<W: Write>(output: &mut W) -> GenieResult<()> {
         output.write_u16::<LE>(0)?;
         output.write_u16::<LE>(0xFFFF)?;
         Ok(())
@@ -226,7 +225,7 @@ impl SpriteAttackSound {
     /// # Errors
     ///
     /// Returns an error if reading from `input` fails.
-    pub fn read_from<R: Read>(input: &mut R) -> Result<Self> {
+    pub fn read_from<R: Read>(input: &mut R) -> GenieResult<Self> {
         let mut val = Self::default();
         for _ in 0..val.sound_props.capacity() {
             let prop = SoundProp::read_from(input)?;
@@ -242,7 +241,7 @@ impl SpriteAttackSound {
     /// # Errors
     ///
     /// Returns an error if writing to `output` fails.
-    pub fn write_to<W: Write>(&self, output: &mut W) -> Result<()> {
+    pub fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         for index in 0..self.sound_props.capacity() {
             match self.sound_props.get(index) {
                 Some(prop) => prop.write_to(output)?,
@@ -265,7 +264,7 @@ impl Sprite {
     ///
     /// Also fails if the name or file name is not valid UTF-8, or if the SLP ID is negative but not
     /// -1.
-    pub fn read_from(mut input: impl Read) -> Result<Self> {
+    pub fn read_from(mut input: impl Read) -> GenieResult<Self> {
         let mut sprite = Self::default();
         sprite.read_names(&mut input)?;
         sprite.read_display(&mut input)?;
@@ -305,11 +304,11 @@ impl Sprite {
     ///
     /// Also fails if there are attack sounds but not one per angle, if there are more than
     /// `u16::MAX` deltas, or if the SLP or sound ID does not fit the format's signed field.
-    pub fn write_to<W: Write>(&self, output: &mut W) -> Result<()> {
+    pub fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         if !self.attack_sounds.is_empty()
             && self.attack_sounds.len() != usize::from(self.num_angles)
         {
-            return Err(invalid_data(COUNT_MISMATCH));
+            return Err(invalid_input(COUNT_MISMATCH));
         }
         self.write_names(output)?;
         self.write_display(output)?;
@@ -338,16 +337,13 @@ impl Sprite {
 
     /// The name and file name in their fixed fields (to the first NUL) and the SLP id (-1
     /// none).
-    fn read_names(&mut self, mut input: impl Read) -> Result<()> {
+    fn read_names(&mut self, mut input: impl Read) -> GenieResult<()> {
         let mut name = [0u8; 21];
         input.read_exact(&mut name)?;
-        self.name = String::from_utf8(name.iter().copied().take_while(|b| *b != 0).collect())
-            .map_err(invalid_data)?;
+        self.name = name_to_nul(&name)?;
         let mut filename = [0u8; 13];
         input.read_exact(&mut filename)?;
-        self.filename =
-            String::from_utf8(filename.iter().copied().take_while(|b| *b != 0).collect())
-                .map_err(invalid_data)?;
+        self.filename = name_to_nul(&filename)?;
         self.slp_id = {
             let num = input.read_i32::<LE>()?;
             if num == -1 { None } else { Some(fits(num)?) }
@@ -357,7 +353,7 @@ impl Sprite {
 
     /// Whether it is loaded, the player colour it forces (0xFF none), the layer, the colour
     /// table, the transparent selection and the bounding box.
-    fn read_display(&mut self, mut input: impl Read) -> Result<()> {
+    fn read_display(&mut self, mut input: impl Read) -> GenieResult<()> {
         self.is_loaded = input.read_u8()? != 0;
         self.force_player_color = match input.read_u8()? {
             0xFF => None,
@@ -376,7 +372,7 @@ impl Sprite {
     }
 
     /// The name and file name in their fixed fields and the SLP id (-1 none).
-    fn write_names<W: Write>(&self, output: &mut W) -> Result<()> {
+    fn write_names<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         let mut name = [0u8; 21];
         (&mut name[..]).write_all(self.name.as_bytes())?;
         let mut filename = [0u8; 13];
@@ -389,7 +385,7 @@ impl Sprite {
 
     /// Whether it is loaded, the forced player colour (0xFF none), the layer, the colour table,
     /// the transparent selection and the bounding box.
-    fn write_display<W: Write>(&self, output: &mut W) -> Result<()> {
+    fn write_display<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         output.write_u8(u8::from(self.is_loaded))?;
         output.write_u8(self.force_player_color.unwrap_or(0xFF))?;
         output.write_u8(self.layer)?;

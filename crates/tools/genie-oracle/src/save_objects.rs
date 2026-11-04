@@ -1,9 +1,11 @@
 //! A save's live objects and the tick oracle's dumps beside it; the slice started from them
 //! ([`objects_from_save`]).
 
+use crate::errors::{bad_pool_dump, bad_registry_dump, bad_tile_dump, no_such_player};
 use crate::masters::MasterTable;
-use crate::{Error, listed, run_from_save};
+use crate::{listed, run_from_save};
 use genie_core::GenieError;
+use genie_core::GenieResult;
 use genie_core::map::Distance;
 use genie_core::map::Tile;
 use genie_core::map::spatial::Spatial;
@@ -71,7 +73,7 @@ pub struct Dumps<'a> {
 
 /// The objects' inside lists as the tick oracle dumps them (`state_dumps.inside_lists_text`):
 /// `container id...` per object with objects inside, in the list's order.
-pub fn inside_lists_from_dump(text: &str) -> Result<Vec<(ObjectId, Vec<ObjectId>)>, Error> {
+pub fn inside_lists_from_dump(text: &str) -> GenieResult<Vec<(ObjectId, Vec<ObjectId>)>> {
     text.lines()
         .filter(|l| !l.trim().is_empty())
         .map(|l| {
@@ -81,12 +83,12 @@ pub fn inside_lists_from_dump(text: &str) -> Result<Vec<(ObjectId, Vec<ObjectId>
                     w.parse::<i32>()
                         .ok()
                         .and_then(ObjectId::of_field)
-                        .ok_or(Error::BadTileDump)
+                        .ok_or(bad_tile_dump())
                 })
                 .collect::<Result<Vec<_>, _>>()?;
             match words[..] {
                 [c, ..] => Ok((c, words[1..].to_vec())),
-                [] => Err(Error::BadTileDump),
+                [] => Err(bad_tile_dump()),
             }
         })
         .collect()
@@ -97,19 +99,19 @@ pub fn inside_lists_from_dump(text: &str) -> Result<Vec<(ObjectId, Vec<ObjectId>
 /// object from the list's first, the next to come back), in the slice's order
 /// ([`genie_core::world::Recycling::missiles`]: the next to come back last). The slice recycles no
 /// object of another type; their pools are not read.
-pub fn recycle_pools_from_dump(text: &str) -> Result<Vec<(ObjectId, bool)>, Error> {
+pub fn recycle_pools_from_dump(text: &str) -> GenieResult<Vec<(ObjectId, bool)>> {
     let mut missiles = Vec::new();
     let mut kind = None;
     for line in text.lines().filter(|l| !l.trim().is_empty()) {
         let words: Vec<&str> = line.split_whitespace().collect();
         match words[..] {
-            ["pool", k, _] => kind = Some(k.parse::<i32>().map_err(|_| Error::BadPoolDump)?),
+            ["pool", k, _] => kind = Some(k.parse::<i32>().map_err(|_| bad_pool_dump())?),
             [id, flying] if kind == Some(60) => missiles.push((
                 pooled_id(id)?,
-                flying.parse::<u8>().map_err(|_| Error::BadPoolDump)? != 0,
+                flying.parse::<u8>().map_err(|_| bad_pool_dump())? != 0,
             )),
             [_, _] if kind.is_some() => {}
-            _ => return Err(Error::BadPoolDump),
+            _ => return Err(bad_pool_dump()),
         }
     }
     missiles.reverse();
@@ -117,26 +119,26 @@ pub fn recycle_pools_from_dump(text: &str) -> Result<Vec<(ObjectId, bool)>, Erro
 }
 
 /// The id a pool dump line names.
-fn pooled_id(text: &str) -> Result<ObjectId, Error> {
-    let value = text.parse::<i32>().map_err(|_| Error::BadPoolDump)?;
-    ObjectId::try_from(value).map_err(|_| Error::BadPoolDump)
+fn pooled_id(text: &str) -> GenieResult<ObjectId> {
+    let value = text.parse::<i32>().map_err(|_| bad_pool_dump())?;
+    ObjectId::try_from(value).map_err(|_| bad_pool_dump())
 }
 
 /// The world's pool of recycled ghosts (type 25) as the tick oracle dumps it
 /// (`state_dumps.recycle_pools_text`): their ids, the last to come back first in the slice's
 /// order ([`genie_core::world::Recycling::ghosts`]).
-pub fn ghost_pool_from_dump(text: &str) -> Result<Vec<ObjectId>, Error> {
+pub fn ghost_pool_from_dump(text: &str) -> GenieResult<Vec<ObjectId>> {
     let mut ghosts = Vec::new();
     let mut kind = None;
     for line in text.lines().filter(|l| !l.trim().is_empty()) {
         let words: Vec<&str> = line.split_whitespace().collect();
         match words[..] {
-            ["pool", k, _] => kind = Some(k.parse::<i32>().map_err(|_| Error::BadPoolDump)?),
+            ["pool", k, _] => kind = Some(k.parse::<i32>().map_err(|_| bad_pool_dump())?),
             [id, _] if kind == Some(i32::from(MasterKind::DOPPELGANGER.get())) => {
                 ghosts.push(pooled_id(id)?);
             }
             [_, _] if kind.is_some() => {}
-            _ => return Err(Error::BadPoolDump),
+            _ => return Err(bad_pool_dump()),
         }
     }
     ghosts.reverse();
@@ -146,13 +148,13 @@ pub fn ghost_pool_from_dump(text: &str) -> Result<Vec<ObjectId>, Error> {
 /// The map tiles' object lists as the tick oracle dumps them (`state_dumps.tile_lists_text`):
 /// `x y id...` per tile of two objects or more, in the tile's order (an id signed, or its 32
 /// bits unsigned as the first dumps wrote a missile's).
-pub fn tile_lists_from_dump(text: &str) -> Result<Vec<(Tile, Vec<ObjectId>)>, Error> {
+pub fn tile_lists_from_dump(text: &str) -> GenieResult<Vec<(Tile, Vec<ObjectId>)>> {
     let word = |v: &str| {
         v.parse::<i64>()
             .ok()
             .filter(|&n| i64::from(i32::MIN) <= n && n <= i64::from(u32::MAX))
             .map(|n| n as u32 as i32)
-            .ok_or(Error::BadTileDump)
+            .ok_or(bad_tile_dump())
     };
     text.lines()
         .filter(|l| !l.trim().is_empty())
@@ -163,17 +165,17 @@ pub fn tile_lists_from_dump(text: &str) -> Result<Vec<(Tile, Vec<ObjectId>)>, Er
                 .collect::<Result<Vec<_>, _>>()?;
             match words[..] {
                 [x, y, ..] => Ok((Tile::new(x, y), ids(&words[2..])?)),
-                _ => Err(Error::BadTileDump),
+                _ => Err(bad_tile_dump()),
             }
         })
         .collect()
 }
 
 /// A tile list dump's ids, which name no none (−1).
-fn ids(words: &[i32]) -> Result<Vec<ObjectId>, Error> {
+fn ids(words: &[i32]) -> GenieResult<Vec<ObjectId>> {
     words
         .iter()
-        .map(|&w| ObjectId::of_field(w).ok_or(Error::BadTileDump))
+        .map(|&w| ObjectId::of_field(w).ok_or(bad_tile_dump()))
         .collect()
 }
 
@@ -201,9 +203,9 @@ pub(super) fn tile_order_differences(
 /// a `registry PLAYERS CLASSES` line, a `list PLAYER CLASS COUNT CAPACITY` line before each list's
 /// `rec ID DIST OWNER X Y RX RY` lines (the floats as hex bits), then `mask ID HEX SLOTS...` per
 /// combat object (its record's index in each player's list of its class, -1 for none).
-pub fn registry_from_dump(text: &str) -> Result<Registry, Error> {
+pub fn registry_from_dump(text: &str) -> GenieResult<Registry> {
     use genie_core::vision::registry::{Entry, Record, Registry};
-    let bad = || Error::BadRegistryDump;
+    let bad = || bad_registry_dump();
     let mut lines = text.lines();
     let head: Vec<&str> = lines.next().ok_or_else(bad)?.split_whitespace().collect();
     let [_, players, classes] = head[..] else {
@@ -275,10 +277,10 @@ pub fn objects_from_save(
     id: u32,
     masters: Option<&MasterTable>,
     dumps: Dumps<'_>,
-) -> Result<SliceRun, Error> {
+) -> GenieResult<SliceRun> {
     let mut turns = run_from_save(save, recording, start_tick, ticks, masters, dumps)?;
     if turns.players.len() <= id as usize {
-        return Err(Error::NoSuchPlayer(id));
+        return Err(no_such_player(id));
     }
     let player = &turns.players[id as usize];
     Ok(SliceRun {
@@ -327,7 +329,7 @@ pub fn turns_from_save(
     start_tick: usize,
     masters: Option<&MasterTable>,
     dumps: Dumps<'_>,
-) -> Result<World, Error> {
+) -> GenieResult<World> {
     let mut turns = run_from_save(save, recording, start_tick, 0, masters, dumps)?;
     turns.sync_world();
     Ok(turns)

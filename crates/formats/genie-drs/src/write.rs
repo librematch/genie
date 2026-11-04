@@ -1,12 +1,8 @@
 use crate::{DrsHeader, DrsResource, DrsTable, IntoResourceKind, ResourceKind};
 use byteorder::{LE, WriteBytesExt};
+use genie_error::{GenieError, GenieResult};
 use std::fmt::{Debug, Error, Formatter};
 use std::io::{self, Read, Seek, SeekFrom, Write};
-
-/// The error of a count or a size the format cannot hold.
-fn invalid(reason: &str) -> io::Error {
-    io::Error::new(io::ErrorKind::InvalidData, reason.to_owned())
-}
 
 /// Strategy to use when writing files to the archive.
 ///
@@ -28,7 +24,7 @@ where
     /// # Errors
     ///
     /// Returns an error if writing to the output fails.
-    fn open(&mut self, drs: &mut InnerDrsWriter<W>) -> Result<(), io::Error>;
+    fn open(&mut self, drs: &mut InnerDrsWriter<W>) -> GenieResult<()>;
     /// Take in the data of one resource of type `table`, and return `resource` with its size
     /// (and its offset, if the strategy already knows it) filled in.
     ///
@@ -41,14 +37,14 @@ where
         table: ResourceKind,
         resource: DrsResource,
         data: &mut dyn Read,
-    ) -> Result<DrsResource, io::Error>;
+    ) -> GenieResult<DrsResource>;
     /// Finish the archive; called once by [`DrsWriter::flush`]. Writes the header, the table
     /// directory and whatever resource data is still pending.
     ///
     /// # Errors
     ///
     /// Returns an error if writing to or seeking in the output fails.
-    fn close(&mut self, drs: &mut InnerDrsWriter<W>) -> Result<(), io::Error>;
+    fn close(&mut self, drs: &mut InnerDrsWriter<W>) -> GenieResult<()>;
 }
 
 /// Create the entire DRS file in memory first, then flush it to the output.
@@ -63,7 +59,7 @@ impl<W> Strategy<W> for InMemoryStrategy
 where
     W: Write + Seek,
 {
-    fn open(&mut self, _drs: &mut InnerDrsWriter<W>) -> Result<(), io::Error> {
+    fn open(&mut self, _drs: &mut InnerDrsWriter<W>) -> GenieResult<()> {
         Ok(())
     }
 
@@ -73,14 +69,14 @@ where
         table: ResourceKind,
         mut resource: DrsResource,
         data: &mut dyn Read,
-    ) -> Result<DrsResource, io::Error> {
+    ) -> GenieResult<DrsResource> {
         let mut bytes = vec![];
         // The byte count is `bytes.len()`.
         let _ = data.read_to_end(&mut bytes)?;
         resource.size = u32::try_from(bytes.len())
             .ok()
             .filter(|&size| size < u32::MAX)
-            .ok_or_else(|| invalid("file too large"))?;
+            .ok_or_else(|| GenieError::invalid_input("file too large"))?;
         self.resources.push((table, bytes));
         Ok(resource)
     }
@@ -88,9 +84,9 @@ where
     // The format stores the directory size and offsets as u32; the counts are not checked
     // against that beyond the assert, so the casts keep their truncating behaviour.
     #[allow(clippy::cast_possible_truncation)]
-    fn close(&mut self, drs: &mut InnerDrsWriter<W>) -> Result<(), io::Error> {
+    fn close(&mut self, drs: &mut InnerDrsWriter<W>) -> GenieResult<()> {
         if u32::MAX as usize <= self.resources.len() {
-            return Err(invalid("too many resources"));
+            return Err(GenieError::invalid_input("too many resources"));
         }
 
         let num_tables = drs.tables.len();
@@ -125,7 +121,9 @@ where
             });
             for _ in &table.resources {
                 let bytes = data.next().ok_or_else(|| {
-                    invalid("mismatch between InMemoryStrategy resources and DRSWriter table data")
+                    GenieError::invalid_input(
+                        "mismatch between InMemoryStrategy resources and DRSWriter table data",
+                    )
                 })?;
                 drs.output.write_all(bytes)?;
             }
@@ -164,7 +162,7 @@ impl<W> Strategy<W> for ReserveDirectoryStrategy
 where
     W: Write + Seek,
 {
-    fn open(&mut self, drs: &mut InnerDrsWriter<W>) -> Result<(), io::Error> {
+    fn open(&mut self, drs: &mut InnerDrsWriter<W>) -> GenieResult<()> {
         drs.header.directory_size = self.write_offset;
         drs.write_header()?;
 
@@ -180,25 +178,25 @@ where
         _table: ResourceKind,
         mut resource: DrsResource,
         data: &mut dyn Read,
-    ) -> Result<DrsResource, io::Error> {
+    ) -> GenieResult<DrsResource> {
         self.file_space_left = self
             .file_space_left
             .checked_sub(1)
-            .ok_or_else(|| invalid("too many files"))?;
+            .ok_or_else(|| GenieError::invalid_input("too many files"))?;
 
         let len = io::copy(data, &mut drs.output)?;
         resource.offset = self.write_offset;
         resource.size = u32::try_from(len)
             .ok()
             .filter(|&size| size < u32::MAX)
-            .ok_or_else(|| invalid("file too large"))?;
+            .ok_or_else(|| GenieError::invalid_input("file too large"))?;
         self.write_offset += resource.size;
         Ok(resource)
     }
 
-    fn close(&mut self, drs: &mut InnerDrsWriter<W>) -> Result<(), io::Error> {
+    fn close(&mut self, drs: &mut InnerDrsWriter<W>) -> GenieResult<()> {
         if drs.tables.len() > self.reserved_tables as usize {
-            return Err(invalid("too many tables"));
+            return Err(GenieError::invalid_input("too many tables"));
         }
 
         // Update the resource type count
@@ -207,7 +205,8 @@ where
         let _ = drs.output.seek(SeekFrom::Current(4))?;
 
         // Assign table offsets
-        let num_tables = u32::try_from(drs.tables.len()).map_err(|_| invalid("too many tables"))?;
+        let num_tables = u32::try_from(drs.tables.len())
+            .map_err(|_| GenieError::invalid_input("too many tables"))?;
         let mut table_offset = 64 + 12 * num_tables;
         for table in &mut drs.tables {
             table.offset = table_offset;
@@ -246,12 +245,12 @@ where
     W: Write + Seek,
 {
     /// Write the .drs archive header.
-    fn write_header(&mut self) -> io::Result<()> {
+    fn write_header(&mut self) -> GenieResult<()> {
         self.header.write_to(&mut self.output)
     }
 
     /// Write the table and resource data.
-    fn write_tables(&mut self) -> io::Result<()> {
+    fn write_tables(&mut self) -> GenieResult<()> {
         for table in &self.tables {
             table.write_to(&mut self.output)?;
         }
@@ -312,7 +311,7 @@ where
     /// # Errors
     ///
     /// Returns an error if the strategy fails to start the archive (writing to `output`).
-    pub fn new(output: W, strategy: impl Strategy<W> + 'static) -> io::Result<Self> {
+    pub fn new(output: W, strategy: impl Strategy<W> + 'static) -> GenieResult<Self> {
         let header = DrsHeader::default();
 
         let mut writer = Self {
@@ -339,11 +338,11 @@ where
     /// the file is 4 GiB or larger, or, with [`ReserveDirectoryStrategy`], if more files are
     /// added than were reserved.
     #[inline]
-    pub fn add(&mut self, t: impl IntoResourceKind, id: u32, data: impl Read) -> io::Result<()> {
+    pub fn add(&mut self, t: impl IntoResourceKind, id: u32, data: impl Read) -> GenieResult<()> {
         self.add_inner(t.into_resource_kind()?, id, data)
     }
 
-    fn add_inner(&mut self, t: ResourceKind, id: u32, mut data: impl Read) -> io::Result<()> {
+    fn add_inner(&mut self, t: ResourceKind, id: u32, mut data: impl Read) -> GenieResult<()> {
         let res = DrsResource {
             id,
             offset: 0, // TBD
@@ -377,11 +376,11 @@ where
     /// Returns an error if writing to or seeking in the output fails, and an `InvalidData` error
     /// if there are `u32::MAX` or more tables or resources, or, with
     /// [`ReserveDirectoryStrategy`], more tables than were reserved.
-    pub fn flush(mut self) -> io::Result<W> {
+    pub fn flush(mut self) -> GenieResult<W> {
         self.inner.header.num_resource_kinds = u32::try_from(self.inner.tables.len())
             .ok()
             .filter(|&n| n < u32::MAX)
-            .ok_or_else(|| invalid("too many tables"))?;
+            .ok_or_else(|| GenieError::invalid_input("too many tables"))?;
 
         self.strategy.close(&mut self.inner)?;
 
@@ -392,6 +391,7 @@ where
 #[cfg(test)]
 mod test {
     use super::*;
+    use genie_error::ErrorKind;
     use std::io::Cursor;
 
     /// A drs archive with a single text file containing the ASCII text "example test file".
@@ -405,8 +405,8 @@ mod test {
     /// File 1, offset 88, size 17
     static ONE_FILE: &[u8] = b"Copyright (c) 1997 Ensemble Studios.\x1a\x00\x00\x001.00tribe\x00\x00\x00\x00\x00\x00\x00\x01\x00\x00\x00\x58\x00\x00\x00 txt\x4C\x00\x00\x00\x01\x00\x00\x00\x01\x00\x00\x00\x58\x00\x00\x00\x11\x00\x00\x00example test file";
 
-    fn invalid(e: &io::Error) -> bool {
-        e.kind() == io::ErrorKind::InvalidData
+    fn invalid(e: &GenieError) -> bool {
+        e.kind() == ErrorKind::InvalidInput
     }
 
     /// More files than a reserved directory holds fail to add.

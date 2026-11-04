@@ -1,7 +1,8 @@
 //! A trigger effect ([`TriggerEffect`]): the response when a trigger fires.
 
-use crate::{Result, UnitKindId};
+use crate::UnitKindId;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
+use genie_error::GenieResult;
 use genie_support::{ReadStringsExt, reserved, write_opt_i32_str};
 use std::convert::TryInto;
 use std::io::{Read, Write};
@@ -24,7 +25,7 @@ impl TriggerEffect {
     /// Returns an error if reading fails or a string cannot be decoded.
     // The format stores the property count as an i32; valid files never make it negative.
     #[allow(clippy::cast_sign_loss)]
-    pub fn read_from(mut input: impl Read, version: f64) -> Result<Self> {
+    pub fn read_from(mut input: impl Read, version: f64) -> GenieResult<Self> {
         let effect_kind = input.read_i32::<LE>()?;
         let num_properties = if version > 1.0 {
             input.read_i32::<LE>()?
@@ -74,7 +75,7 @@ impl TriggerEffect {
         clippy::cast_possible_wrap,
         clippy::cast_sign_loss
     )]
-    pub fn write_to(&self, mut output: impl Write, version: f64) -> Result<()> {
+    pub fn write_to(&self, mut output: impl Write, version: f64) -> GenieResult<()> {
         output.write_i32::<LE>(self.effect_kind)?;
         output.write_i32::<LE>(self.properties.len() as i32)?;
         for value in &self.properties {

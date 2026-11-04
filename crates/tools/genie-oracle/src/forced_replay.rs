@@ -4,11 +4,12 @@
 use crate::groups::{globals_from_dump, group_differences};
 use crate::masters::MasterTable;
 use crate::{
-    Dumps, Error, SavedStep, command_phase_from_save, compare_players, ghost_pool_from_dump, layer,
+    Dumps, SavedStep, command_phase_from_save, compare_players, ghost_pool_from_dump, layer,
     loaded_slice, object, played_frames, primed, recycle_pools_from_dump, run, run_from_save,
     save_header, tech_state, tile_lists_from_dump, tile_order_differences, turns_from_save,
 };
 use genie_core::GenieError;
+use genie_core::GenieResult;
 use genie_core::groups::GroupId;
 use genie_core::map::Distance;
 use genie_core::map::Point;
@@ -62,7 +63,7 @@ pub fn old_pather_paths(
     masters: Option<&MasterTable>,
     dumps: Dumps<'_>,
     calls: &[PatherCall],
-) -> Result<Vec<Result<PatherAnswer, GenieError>>, Error> {
+) -> GenieResult<Vec<Result<PatherAnswer, GenieError>>> {
     let mut turns = turns_from_save(save, recording, start_tick, masters, dumps)?;
     let mut out = Vec::new();
     for &PatherCall {
@@ -165,7 +166,7 @@ pub fn forced_ticks(
     ticks: usize,
     masters: Option<&MasterTable>,
     dumps: Dumps<'_>,
-) -> Result<TickReport, Error> {
+) -> GenieResult<TickReport> {
     let turns = run_from_save(save, recording, start, ticks, masters, dumps)?;
     let mut report = TickReport {
         start,
@@ -195,7 +196,7 @@ pub fn command_phase(
     start: usize,
     masters: Option<&MasterTable>,
     dumps: Dumps<'_>,
-) -> Result<TickReport, Error> {
+) -> GenieResult<TickReport> {
     let turns = command_phase_from_save(save, recording, start, masters, dumps)?;
     let mut report = TickReport {
         start,
@@ -233,7 +234,7 @@ pub fn forced_run(
     save_after: &(dyn Fn(usize) -> Option<Vec<u8>> + Sync),
     dump_after: &dyn Fn(usize, &str) -> Option<String>,
     window: usize,
-) -> Result<(Vec<TickReport>, Times), Error> {
+) -> GenieResult<(Vec<TickReport>, Times)> {
     let header = save_header(start_save)?;
     let mut turns = loaded_slice(&header, masters, dumps)?;
     let updates = start + 1;
@@ -254,7 +255,7 @@ pub fn forced_run(
             }
         };
         (0..window).for_each(ask);
-        let mut run_all = || -> Result<(), Error> {
+        let mut run_all = || -> GenieResult<()> {
             for k in 0..ticks {
                 let Some(frame) = all.get(updates + k) else {
                     break;

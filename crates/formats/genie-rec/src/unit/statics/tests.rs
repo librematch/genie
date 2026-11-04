@@ -1,4 +1,5 @@
 use crate::element::{OptionalReadableElement, WritableHeaderElement};
+use crate::errors::not_written;
 use crate::test_support::{Bytes, header_reader, read_all};
 use crate::unit::Unit;
 use crate::unit::statics::StaticUnitAttributes;
@@ -112,5 +113,5 @@ fn the_old_format_units_are_read_only() {
         .unwrap()
         .unwrap();
     let e = unit.write_to(&mut vec![]).unwrap_err();
-    assert!(matches!(e, crate::Error::NotWritten));
+    assert_eq!(e, not_written());
 }

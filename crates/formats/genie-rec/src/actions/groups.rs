@@ -2,10 +2,12 @@
 //! `UserPatch`'s AI commands.
 
 use crate::actions::{Location2, ObjectsList};
-use crate::{ObjectId, PlayerId, Result};
+use crate::errors::out_of_range;
+use crate::{ObjectId, PlayerId};
 use crate::{fits, opt_fits};
 use arrayvec::ArrayVec;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
+use genie_error::{GenieError, GenieResult};
 use genie_support::{ReadSkipExt, read_opt_u32};
 use std::io::{Read, Write};
 
@@ -26,7 +28,7 @@ impl ResignCommand {
     /// # Errors
     ///
     /// Returns an error if reading from `input` fails.
-    pub fn read_from(mut input: impl Read) -> Result<Self> {
+    pub fn read_from(mut input: impl Read) -> GenieResult<Self> {
         let player_id = input.read_u8()?.into();
         let comm_player_id = input.read_u8()?.into();
         let dropped = input.read_u8()? != 0;
@@ -42,7 +44,7 @@ impl ResignCommand {
     /// # Errors
     ///
     /// Returns an error if writing to `output` fails.
-    pub fn write_to<W: Write>(&self, output: &mut W) -> Result<()> {
+    pub fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         output.write_u8(self.player_id.into())?;
         output.write_u8(self.comm_player_id.into())?;
         output.write_u8(u8::from(self.dropped))?;
@@ -67,7 +69,7 @@ impl GroupWaypointCommand {
     /// # Errors
     ///
     /// Returns an error if reading from `input` fails.
-    pub fn read_from(mut input: impl Read) -> Result<Self> {
+    pub fn read_from(mut input: impl Read) -> GenieResult<Self> {
         let player_id = input.read_u8()?.into();
         let num_units = input.read_u8()?;
         let x = input.read_u8()?;
@@ -86,7 +88,7 @@ impl GroupWaypointCommand {
     /// Returns an error if writing to `output` fails.
     ///
     /// Also fails if there are more than 255 objects, the most the format's `u8` count holds.
-    pub fn write_to(&self, mut output: impl Write) -> Result<()> {
+    pub fn write_to(&self, mut output: impl Write) -> GenieResult<()> {
         output.write_u8(self.player_id.into())?;
         output.write_u8(fits(self.objects.len())?)?;
         output.write_u8(self.location.0)?;
@@ -111,7 +113,7 @@ impl UnitAiStateCommand {
     /// # Errors
     ///
     /// Returns an error if reading from `input` fails.
-    pub fn read_from(mut input: impl Read) -> Result<Self> {
+    pub fn read_from(mut input: impl Read) -> GenieResult<Self> {
         let selected_count = input.read_u8()?;
         let state = input.read_i8()?;
         let objects = ObjectsList::read_from(input, i32::from(selected_count))?;
@@ -125,7 +127,7 @@ impl UnitAiStateCommand {
     /// Returns an error if writing to `output` fails.
     ///
     /// Also fails if there are more than 255 objects, the most the format's `u8` count holds.
-    pub fn write_to<W: Write>(&self, output: &mut W) -> Result<()> {
+    pub fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         output.write_u8(fits(self.objects.len())?)?;
         output.write_i8(self.state)?;
         self.objects.write_to(output)?;
@@ -148,7 +150,7 @@ impl GuardCommand {
     /// # Errors
     ///
     /// Returns an error if reading from `input` fails.
-    pub fn read_from(mut input: impl Read) -> Result<Self> {
+    pub fn read_from(mut input: impl Read) -> GenieResult<Self> {
         let mut command = Self::default();
         let selected_count = i32::from(input.read_u8()?);
         input.skip(2)?;
@@ -165,7 +167,7 @@ impl GuardCommand {
     ///
     /// Also fails if there are more than 255 objects (the format's `u8` count), or if the target ID
     /// is above `i32::MAX`.
-    pub fn write_to<W: Write>(&self, output: &mut W) -> Result<()> {
+    pub fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         output.write_u8(fits(self.objects.len())?)?;
         output.write_all(&[0, 0])?;
         output.write_i32::<LE>(opt_fits(self.target_id, -1)?)?;
@@ -189,7 +191,7 @@ impl FollowCommand {
     /// # Errors
     ///
     /// Returns an error if reading from `input` fails.
-    pub fn read_from(mut input: impl Read) -> Result<Self> {
+    pub fn read_from(mut input: impl Read) -> GenieResult<Self> {
         let mut command = Self::default();
         let selected_count = i32::from(input.read_u8()?);
         input.skip(2)?;
@@ -206,7 +208,7 @@ impl FollowCommand {
     ///
     /// Also fails if there are more than 255 objects (the format's `u8` count), or if the target ID
     /// is above `i32::MAX`.
-    pub fn write_to<W: Write>(&self, output: &mut W) -> Result<()> {
+    pub fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         output.write_u8(fits(self.objects.len())?)?;
         output.write_all(&[0, 0])?;
         output.write_i32::<LE>(opt_fits(self.target_id, -1)?)?;
@@ -235,7 +237,7 @@ impl PatrolCommand {
     /// Returns an error if reading from `input` fails.
     ///
     /// Also fails if the command says it has more than 10 waypoints.
-    pub fn read_from(mut input: impl Read) -> Result<Self> {
+    pub fn read_from(mut input: impl Read) -> GenieResult<Self> {
         let mut command = Self::default();
         let selected_count = input.read_i8()?;
         let waypoint_count = input.read_u8()?;
@@ -250,7 +252,7 @@ impl PatrolCommand {
         command
             .waypoints
             .try_extend_from_slice(&raw_waypoints[0..usize::from(waypoint_count)])
-            .map_err(|_| crate::Error::ValueOutOfRange)?;
+            .map_err(|_| out_of_range())?;
         command.objects = ObjectsList::read_from(input, i32::from(selected_count))?;
         Ok(command)
     }
@@ -264,7 +266,7 @@ impl PatrolCommand {
     /// Returns an error if writing to `output` fails.
     ///
     /// Also fails if there are more than 127 objects, the most the format's `i8` count holds.
-    pub fn write_to<W: Write>(&self, output: &mut W) -> Result<()> {
+    pub fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         output.write_i8(fits(self.objects.len())?)?;
         output.write_u8(fits(self.waypoints.len())?)?;
         output.write_u8(0)?;
@@ -296,7 +298,7 @@ impl FormFormationCommand {
     /// # Errors
     ///
     /// Returns an error if reading from `input` fails.
-    pub fn read_from(mut input: impl Read) -> Result<Self> {
+    pub fn read_from(mut input: impl Read) -> GenieResult<Self> {
         let mut command = Self::default();
         let selected_count = input.read_i8()?;
         command.player_id = input.read_u8()?.into();
@@ -313,7 +315,7 @@ impl FormFormationCommand {
     /// Returns an error if writing to `output` fails.
     ///
     /// Also fails if there are more than 127 objects, the most the format's `i8` count holds.
-    pub fn write_to<W: Write>(&self, output: &mut W) -> Result<()> {
+    pub fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         output.write_i8(fits(self.objects.len())?)?;
         output.write_u8(self.player_id.into())?;
         output.write_u8(0)?;
@@ -359,10 +361,10 @@ impl UserPatchAiCommand {
     ///
     /// Also fails if `size` is below 4, or if it leaves room for more than 3 parameters (20 or
     /// more).
-    pub fn read_from(mut input: impl Read, size: u32) -> Result<Self> {
-        let num_params = size.checked_sub(4).ok_or(crate::Error::ValueOutOfRange)? / 4;
+    pub fn read_from(mut input: impl Read, size: u32) -> GenieResult<Self> {
+        let num_params = size.checked_sub(4).ok_or(out_of_range())? / 4;
         if 4 <= num_params {
-            return Err(crate::Error::InvalidData(
+            return Err(GenieError::invalid_input(
                 "a user patch AI command with more than 3 parameters",
             ));
         }
@@ -385,7 +387,7 @@ impl UserPatchAiCommand {
     /// # Errors
     ///
     /// Returns an error if writing to `output` fails.
-    pub fn write_to<W: Write>(&self, output: &mut W) -> Result<()> {
+    pub fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         output.write_u8(self.ai_action)?;
         output.write_u8(self.player_id.into())?;
         output.write_u8(0)?;

@@ -1,8 +1,9 @@
 use crate::census::{
     CensusEnd, Followed, census_run, header_divergence, header_divergences, next_id_divergence,
 };
+use crate::errors::no_such_player;
 use crate::fixtures::{combat_object, gaia, header, human, recording};
-use crate::{Error, header_slice, lane_block};
+use crate::{header_slice, lane_block};
 use genie_rec::de::{Checkpoint, Op};
 use genie_save::Header;
 
@@ -132,7 +133,7 @@ fn player_leaves_where_its_objects_first_differ() {
     assert_eq!(d.update, 3);
     assert_ne!(d.differences.len(), 0);
     let missing = header_divergences(&rec, None, &[2], (1, 3), &mut same(&save));
-    assert!(matches!(missing, Err(Error::NoSuchPlayer(2))));
+    assert!(missing.is_err_and(|e| e == no_such_player(2)));
 }
 
 /// A player that stops says nothing more: the run ends once every player has.

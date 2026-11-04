@@ -1,5 +1,5 @@
-use super::ConvertError;
 use crate::{Scenario, ScenarioObject, Tile, Trigger, UnitKindId};
+use genie_error::GenieResult;
 use nohash_hasher::IntMap;
 
 /// Convert an `AoC` scenario to a WololoKingdoms-compatible one.
@@ -96,7 +96,7 @@ impl AocToWk {
     /// # Errors
     ///
     /// Never fails at present; the `Result` matches the other converters.
-    pub fn convert(&self, scen: &mut Scenario) -> Result<(), ConvertError> {
+    pub fn convert(&self, scen: &mut Scenario) -> GenieResult<()> {
         for object in scen.objects_mut() {
             self.convert_object(object);
         }

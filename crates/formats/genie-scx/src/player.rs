@@ -1,6 +1,6 @@
-use crate::Result;
 use crate::victory::VictoryConditions;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
+use genie_error::GenieResult;
 use genie_support::{ReadStringsExt, reserved, write_opt_str};
 use std::io::{Read, Write};
 
@@ -48,7 +48,7 @@ impl Default for PlayerStartResources {
 }
 
 impl PlayerStartResources {
-    pub fn read_from(mut input: impl Read, version: f32) -> Result<Self> {
+    pub fn read_from(mut input: impl Read, version: f32) -> GenieResult<Self> {
         Ok(Self {
             gold: input.read_i32::<LE>()?,
             wood: input.read_i32::<LE>()?,
@@ -72,7 +72,7 @@ impl PlayerStartResources {
         })
     }
 
-    pub fn write_to(&self, mut output: impl Write, version: f32) -> Result<()> {
+    pub fn write_to(&self, mut output: impl Write, version: f32) -> GenieResult<()> {
         output.write_i32::<LE>(self.gold)?;
         output.write_i32::<LE>(self.wood)?;
         output.write_i32::<LE>(self.food)?;
@@ -129,7 +129,7 @@ impl ScenarioPlayerData {
     /// Returns an error if reading fails or the name cannot be decoded.
     // The format stores the diplomacy count as an i16; valid files never make it negative.
     #[allow(clippy::cast_sign_loss)]
-    pub fn read_from(mut input: impl Read, version: f32) -> Result<Self> {
+    pub fn read_from(mut input: impl Read, version: f32) -> GenieResult<Self> {
         let name = input.read_u16_length_prefixed_str()?;
 
         let view = (input.read_f32::<LE>()?, input.read_f32::<LE>()?);
@@ -196,7 +196,7 @@ impl ScenarioPlayerData {
         mut output: impl Write,
         version: f32,
         victory_version: f32,
-    ) -> Result<()> {
+    ) -> GenieResult<()> {
         write_opt_str(&mut output, &self.name)?;
 
         output.write_f32::<LE>(self.view.0)?;
@@ -282,7 +282,7 @@ impl WorldPlayerData {
     /// # Errors
     ///
     /// Returns an error if reading fails.
-    pub fn read_from(mut input: impl Read, version: f32) -> Result<Self> {
+    pub fn read_from(mut input: impl Read, version: f32) -> GenieResult<Self> {
         Ok(Self {
             food: if version > 1.06 {
                 input.read_f32::<LE>()?
@@ -327,7 +327,7 @@ impl WorldPlayerData {
     /// # Errors
     ///
     /// Returns an error if writing fails.
-    pub fn write_to(&self, mut output: impl Write, version: f32) -> Result<()> {
+    pub fn write_to(&self, mut output: impl Write, version: f32) -> GenieResult<()> {
         if version > 1.06 {
             output.write_f32::<LE>(self.food)?;
             output.write_f32::<LE>(self.wood)?;

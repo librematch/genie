@@ -2,12 +2,13 @@
 //! update schedule against the game's save at the end of the same step (the tick oracle's probe
 //! `step_saves`), for the first step where they part. Dev only.
 
+use genie_core::GenieResult;
 use genie_core::world::World;
 use genie_core::world::schedule::UpdateStep;
 
 use crate::forced_replay::owned_group_differences;
 use crate::{
-    Dumps, Error, MasterTable, SavedStep, TickReport, compare_players, loaded_slice, played_frames,
+    Dumps, MasterTable, SavedStep, TickReport, compare_players, loaded_slice, played_frames,
     primed, save_header,
 };
 
@@ -31,7 +32,7 @@ pub fn steps_from_save(
     masters: Option<&MasterTable>,
     dumps: Dumps<'_>,
     game_at: &dyn Fn(UpdateStep) -> StepSave,
-) -> Result<Vec<(UpdateStep, Option<TickReport>)>, Error> {
+) -> GenieResult<Vec<(UpdateStep, Option<TickReport>)>> {
     let header = save_header(save)?;
     let mut turns = loaded_slice(&header, masters, dumps)?;
     let updates = start + 1;
@@ -68,7 +69,7 @@ fn step_report(
     start: usize,
     (after, globals): (&[u8], Option<&str>),
     masters: Option<&MasterTable>,
-) -> Result<TickReport, Error> {
+) -> GenieResult<TickReport> {
     let mut saved = SavedStep::of(after, masters)?;
     let mut report = TickReport {
         start,

@@ -1,7 +1,8 @@
 use crate::conv::fits;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
+use genie_error::GenieResult;
 pub use jascpal::PaletteIndex;
-use std::io::{Read, Result, Write};
+use std::io::{Read, Write};
 
 /// Player colour data.
 #[derive(Debug, Clone, Copy)]
@@ -28,7 +29,7 @@ impl ColorTable {
     /// Returns an error if reading from `input` fails.
     ///
     /// Also fails if a palette index is outside 0 to 255.
-    pub fn read_from<R: Read>(input: &mut R) -> Result<Self> {
+    pub fn read_from<R: Read>(input: &mut R) -> GenieResult<Self> {
         let id = input.read_i32::<LE>()?;
         let base = fits(input.read_i32::<LE>()?)?;
         let unit_outline_color = fits(input.read_i32::<LE>()?)?;
@@ -58,7 +59,7 @@ impl ColorTable {
     /// # Errors
     ///
     /// Returns an error if writing to `output` fails.
-    pub fn write_to<W: Write>(&self, output: &mut W) -> Result<()> {
+    pub fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         output.write_i32::<LE>(self.id)?;
         output.write_i32::<LE>(self.base.into())?;
         output.write_i32::<LE>(self.unit_outline_color.into())?;

@@ -1,10 +1,10 @@
 //! The moving and action base classes' attributes: paths, movement and the action stack.
 
-use crate::Result;
 use crate::element::{ReadableHeaderElement, WritableHeaderElement, read_counted, read_xyz};
 use crate::reader::RecordingHeaderReader;
 use crate::unit_action::UnitAction;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
+use genie_error::GenieResult;
 use genie_support::read_opt_u32;
 use std::io::Result as IoResult;
 use std::io::{Read, Write};
@@ -41,7 +41,7 @@ pub struct PathData {
 }
 
 impl ReadableHeaderElement for PathData {
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let mut path = Self {
             id: input.read_u32::<LE>()?,
             linked_path_kind: input.read_u32::<LE>()?,
@@ -76,7 +76,7 @@ pub struct MovementData {
 }
 
 impl MovementData {
-    pub(super) fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    pub(super) fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let velocity = (
             input.read_f32::<LE>()?,
             input.read_f32::<LE>()?,
@@ -98,7 +98,7 @@ impl MovementData {
     /// # Errors
     ///
     /// Returns an error if writing fails.
-    pub fn write_to(&self, mut output: impl Write) -> Result<()> {
+    pub fn write_to(&self, mut output: impl Write) -> GenieResult<()> {
         output.write_f32::<LE>(self.velocity.0)?;
         output.write_f32::<LE>(self.velocity.1)?;
         output.write_f32::<LE>(self.velocity.2)?;
@@ -156,7 +156,7 @@ pub struct MovingUnitAttributes {
 
 impl ReadableHeaderElement for MovingUnitAttributes {
     // Reads the moving unit's fields in file order, section by section.
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let mut attrs = Self::read_motion(input)?;
         attrs.read_future_path_and_movement(input)?;
         attrs.read_placement(input)?;
@@ -168,7 +168,7 @@ impl ReadableHeaderElement for MovingUnitAttributes {
 impl MovingUnitAttributes {
     /// The trail, the velocity and turning, the terrain exception, the waiting flags and the
     /// paths: the first fields.
-    fn read_motion<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_motion<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         Ok(Self {
             trail_remainder: input.read_u32::<LE>()?,
             velocity: read_xyz(input)?,
@@ -189,7 +189,7 @@ impl MovingUnitAttributes {
     fn read_future_path_and_movement<R: Read>(
         &mut self,
         input: &mut RecordingHeaderReader<R>,
-    ) -> Result<()> {
+    ) -> GenieResult<()> {
         if input.read_u32::<LE>()? != 0 {
             self.future_path_data = Some(PathData::read_from(input)?);
         }
@@ -200,7 +200,7 @@ impl MovingUnitAttributes {
     }
 
     /// The position, the forward and right orientation and the last move's time.
-    fn read_placement<R: Read>(&mut self, input: &mut RecordingHeaderReader<R>) -> Result<()> {
+    fn read_placement<R: Read>(&mut self, input: &mut RecordingHeaderReader<R>) -> GenieResult<()> {
         self.position = read_xyz(input)?;
         self.orientation_forward = read_xyz(input)?;
         self.orientation_right = read_xyz(input)?;
@@ -213,7 +213,7 @@ impl MovingUnitAttributes {
     fn read_waypoints_and_substitute<R: Read>(
         &mut self,
         input: &mut RecordingHeaderReader<R>,
-    ) -> Result<()> {
+    ) -> GenieResult<()> {
         let num_waypoints = input.read_i32::<LE>()?.max(0);
         self.user_defined_waypoints = (0..num_waypoints)
             .map(|_| read_xyz(input))
@@ -242,7 +242,7 @@ pub struct ActionUnitAttributes {
 }
 
 impl ReadableHeaderElement for ActionUnitAttributes {
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let mut attrs = Self {
             waiting: input.read_u8()? != 0,
             ..Default::default()

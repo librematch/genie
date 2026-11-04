@@ -1,12 +1,12 @@
 //! Types related to unit types.
 
 use byteorder::{LE, WriteBytesExt};
+use genie_error::{GenieError, GenieResult};
 use genie_support::StringKey;
 pub use genie_support::UnitKindId;
 use std::cmp::{Ordering, PartialOrd};
 use std::convert::{TryFrom, TryInto};
-use std::io;
-use std::io::{Result, Write};
+use std::io::Write;
 
 mod combat;
 mod creatables;
@@ -23,7 +23,6 @@ pub use self::movers::{
 };
 pub use self::statics::{DamageSprite, StaticUnitKindAttributes, UnitAttribute};
 pub use self::unit::UnitKind;
-use std::result::Result as StdResult;
 
 /// The base class of a unit indicates which data is available for that unit type.
 ///
@@ -107,15 +106,10 @@ impl PartialOrd for UnitBaseClass {
     }
 }
 
-/// An unexpected unit base class was found.
-#[derive(Debug, Clone, Copy, thiserror::Error)]
-#[error("unknown unit base class: {}", .0)]
-pub struct ParseUnitBaseClassError(u8);
-
 impl TryFrom<u8> for UnitBaseClass {
-    type Error = ParseUnitBaseClassError;
+    type Error = GenieError;
 
-    fn try_from(n: u8) -> StdResult<Self, Self::Error> {
+    fn try_from(n: u8) -> GenieResult<Self> {
         match n {
             10 => Ok(Self::Static),
             20 => Ok(Self::Animated),
@@ -127,7 +121,10 @@ impl TryFrom<u8> for UnitBaseClass {
             70 => Ok(Self::Combat),
             80 => Ok(Self::Building),
             90 => Ok(Self::Tree),
-            n => Err(ParseUnitBaseClassError(n)),
+            n => Err(
+                GenieError::invalid_input("a unit base class this reader does not know")
+                    .with("class", n),
+            ),
         }
     }
 }
@@ -141,35 +138,23 @@ impl From<UnitBaseClass> for u8 {
 /// A unit class, a group identifier for runtime behaviours.
 pub type UnitClass = u16;
 
-fn write_opt_string_key(mut output: impl Write, opt_key: Option<&StringKey>) -> Result<()> {
+fn write_opt_string_key(mut output: impl Write, opt_key: Option<&StringKey>) -> GenieResult<()> {
     output.write_i16::<LE>(if let Some(key) = opt_key {
-        key.try_into().map_err(io::Error::other)?
+        key.try_into()?
     } else {
         -1
     })?;
     Ok(())
 }
 
-impl From<ParseUnitBaseClassError> for genie_error::GenieError {
-    /// The error as a [`genie_error::GenieError`]: its kind and reason, the original as the
-    /// source.
-    #[track_caller]
-    fn from(e: ParseUnitBaseClassError) -> Self {
-        Self::invalid_input("a unit base class this reader does not know").with_source(e)
-    }
-}
-
 #[cfg(test)]
-mod genie_error_tests {
+mod tests {
     use super::*;
-    #[cfg(test)]
-    use std::error::Error as StdError;
 
-    /// The errors convert into `GenieError`s with their kinds and reasons, the original as
-    /// source.
+    /// A base class the format does not know is invalid input; a known one converts.
     #[test]
-    fn unit_base_class_error_converts_into_genie_error() {
-        let e: genie_error::GenieError = ParseUnitBaseClassError(9).into();
+    fn unknown_unit_base_class_is_invalid_input() {
+        let e = UnitBaseClass::try_from(9).unwrap_err();
         assert_eq!(
             (e.kind(), e.reason()),
             (
@@ -177,6 +162,9 @@ mod genie_error_tests {
                 "a unit base class this reader does not know"
             )
         );
-        assert!(StdError::source(&e).is_some());
+        assert_eq!(
+            UnitBaseClass::try_from(80).unwrap(),
+            UnitBaseClass::Building
+        );
     }
 }

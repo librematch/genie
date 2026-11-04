@@ -1,6 +1,6 @@
-use crate::Result;
 use crate::values::VictoryCondition;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
+use genie_error::GenieResult;
 use genie_support::reserved;
 use num_enum::{FromPrimitive, IntoPrimitive};
 use std::io::{Read, Write};
@@ -24,7 +24,7 @@ pub struct LegacyVictoryInfo {
 
 impl LegacyVictoryInfo {
     /// Read old-tyle victory settings from an input stream.
-    pub fn read_from(mut input: impl Read) -> Result<Self> {
+    pub fn read_from(mut input: impl Read) -> GenieResult<Self> {
         let object_kind = input.read_i32::<LE>()?;
         let all_flag = input.read_i32::<LE>()? != 0;
         let player_id = input.read_i32::<LE>()?;
@@ -59,7 +59,7 @@ impl LegacyVictoryInfo {
     }
 
     /// Write old-tyle victory settings to an output stream.
-    pub fn write_to(&self, mut output: impl Write) -> Result<()> {
+    pub fn write_to(&self, mut output: impl Write) -> GenieResult<()> {
         output.write_i32::<LE>(self.object_kind)?;
         output.write_i32::<LE>(i32::from(self.all_flag))?;
         output.write_i32::<LE>(self.player_id)?;
@@ -105,7 +105,7 @@ impl VictoryEntry {
     /// # Errors
     ///
     /// Returns an error if reading fails.
-    pub fn read_from(mut input: impl Read) -> Result<Self> {
+    pub fn read_from(mut input: impl Read) -> GenieResult<Self> {
         let command = input.read_u8()?.into();
         let object_kind = input.read_i32::<LE>()?;
         let player_id = input.read_i32::<LE>()?;
@@ -144,7 +144,7 @@ impl VictoryEntry {
     /// # Errors
     ///
     /// Returns an error if writing fails.
-    pub fn write_to(&self, mut output: impl Write) -> Result<()> {
+    pub fn write_to(&self, mut output: impl Write) -> GenieResult<()> {
         output.write_u8(self.command.into())?;
         output.write_i32::<LE>(self.object_kind)?;
         output.write_i32::<LE>(self.player_id)?;
@@ -186,7 +186,7 @@ impl VictoryPointEntry {
     /// # Errors
     ///
     /// Returns an error if reading fails.
-    pub fn read_from(mut input: impl Read, version: f32) -> Result<Self> {
+    pub fn read_from(mut input: impl Read, version: f32) -> GenieResult<Self> {
         let command = input.read_i8()?;
         let state = input.read_i8()?;
         let attribute = input.read_i32::<LE>()?;
@@ -222,7 +222,7 @@ impl VictoryPointEntry {
     /// # Errors
     ///
     /// Returns an error if writing fails.
-    pub fn write_to(&self, mut output: impl Write, version: f32) -> Result<()> {
+    pub fn write_to(&self, mut output: impl Write, version: f32) -> GenieResult<()> {
         output.write_i8(self.command)?;
         output.write_i8(self.state)?;
         output.write_i32::<LE>(self.attribute)?;
@@ -298,7 +298,7 @@ impl VictoryConditions {
     /// Returns an error if reading fails.
     // The format stores the condition count as an i32; valid files never make it negative.
     #[allow(clippy::cast_sign_loss)]
-    pub fn read_from(mut input: impl Read, has_version: bool) -> Result<Self> {
+    pub fn read_from(mut input: impl Read, has_version: bool) -> GenieResult<Self> {
         let version = if has_version {
             input.read_f32::<LE>()?
         } else {
@@ -350,7 +350,7 @@ impl VictoryConditions {
     /// Returns an error if writing fails.
     // The format stores the entry counts as i32.
     #[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
-    pub fn write_to(&self, mut output: impl Write, version: Option<f32>) -> Result<()> {
+    pub fn write_to(&self, mut output: impl Write, version: Option<f32>) -> GenieResult<()> {
         if let Some(v) = version {
             output.write_f32::<LE>(v)?;
         }
@@ -398,7 +398,7 @@ pub struct VictoryInfo {
 }
 
 impl VictoryInfo {
-    pub fn read_from(mut input: impl Read) -> Result<Self> {
+    pub fn read_from(mut input: impl Read) -> GenieResult<Self> {
         Ok(Self {
             conquest: input.read_i32::<LE>()? != 0,
             ruins: input.read_i32::<LE>()?,
@@ -409,7 +409,7 @@ impl VictoryInfo {
         })
     }
 
-    pub fn write_to(&self, mut output: impl Write) -> Result<()> {
+    pub fn write_to(&self, mut output: impl Write) -> GenieResult<()> {
         output.write_i32::<LE>(i32::from(self.conquest))?;
         output.write_i32::<LE>(self.ruins)?;
         output.write_i32::<LE>(self.relics)?;

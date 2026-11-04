@@ -1,4 +1,3 @@
-use crate::Result;
 use crate::element::{OptionalReadableElement, ReadableHeaderElement, WritableHeaderElement};
 use crate::fits;
 use crate::reader::RecordingHeaderReader;
@@ -7,6 +6,7 @@ use byteorder::ReadBytesExt;
 pub use genie_dat::sprite::SpriteId;
 pub use genie_dat::terrain::TerrainId;
 pub use genie_dat::unit_kind::AttributeCost;
+use genie_error::GenieResult;
 pub use genie_support::{StringKey, UnitKindId};
 use std::io::Read;
 
@@ -52,7 +52,7 @@ pub struct Unit {
 }
 
 impl OptionalReadableElement for Unit {
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Option<Self>> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Option<Self>> {
         let raw_class = input.read_u8()?;
         if raw_class == 0 {
             return Ok(None);

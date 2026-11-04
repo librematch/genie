@@ -107,44 +107,14 @@
 #![deny(unsafe_code)]
 #![warn(unused)]
 
-pub use genie_support::{StringKey, TryFromStringKeyError};
+use genie_error::{GenieError, GenieResult};
+pub use genie_support::StringKey;
 use std::collections::HashMap;
-use std::io::{Error as IoError, Read};
-use std::num::ParseIntError;
+use std::io::Read;
 use std::str::FromStr;
 
 mod formats;
 mod map;
-
-#[cfg(test)]
-use std::io;
-
-/// Errors that may occur when loading a language file.
-///
-/// For DLL files, `PeError` and `IoError` can occur.
-/// For INI and HD Edition files, `ParseIntError` and `IoError` can occur.
-/// Both the INI and HD Edition parsers silently ignore invalid lines.
-#[derive(Debug, thiserror::Error)]
-pub enum LoadError {
-    /// An error occurred while reading strings from the DLL.
-    /// It probably does not contain any or is malformed.
-    #[error(transparent)]
-    PeError(#[from] pelite::Error),
-    /// An error occurred while reading data from the file.
-    #[error(transparent)]
-    IoError(#[from] IoError),
-    /// An error occurred while parsing a numeric string ID into an integer
-    /// value.
-    #[error(transparent)]
-    ParseIntError(#[from] ParseIntError),
-}
-
-/// An error when parsing a string to a language file.
-///
-/// The field contains the string that could not be parsed.
-#[derive(Debug, thiserror::Error)]
-#[error("{}", self.0)]
-pub struct ParseLangFileKindError(String);
 
 /// The kinds of language files the games use.
 #[derive(Debug, Clone, Copy)]
@@ -163,9 +133,9 @@ impl LangFileKind {
     ///
     /// # Errors
     ///
-    /// Returns a `LoadError` if reading fails, if a DLL is not a valid PE file with string
-    /// resources, or if an INI line has a non-numeric string ID.
-    pub fn read_from(&self, r: impl Read) -> Result<LangFile, LoadError> {
+    /// Returns an error if reading fails, if a DLL is not a valid PE file with string resources,
+    /// or if an INI line has a non-numeric string ID.
+    pub fn read_from(&self, r: impl Read) -> GenieResult<LangFile> {
         use LangFileKind::{Dll, Ini, KeyValue};
         let mut lang_file = LangFile::new();
         let from_method = match self {
@@ -179,14 +149,17 @@ impl LangFileKind {
 }
 
 impl FromStr for LangFileKind {
-    type Err = ParseLangFileKindError;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+    type Err = GenieError;
+    fn from_str(s: &str) -> GenieResult<Self> {
         use LangFileKind::{Dll, Ini, KeyValue};
         match &s.to_lowercase()[..] {
             "dll" => Ok(Dll),
             "ini" => Ok(Ini),
             "key-value" => Ok(KeyValue),
-            _ => Err(ParseLangFileKindError(String::from(s))),
+            _ => Err(
+                GenieError::invalid_input("a language file type this reader does not know")
+                    .with("kind", s),
+            ),
         }
     }
 }
@@ -198,53 +171,32 @@ impl FromStr for LangFileKind {
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct LangFile(HashMap<StringKey, String>);
 
-impl From<LoadError> for genie_error::GenieError {
-    /// The error as a [`genie_error::GenieError`]: its kind and reason, the original as the
-    /// source.
-    #[track_caller]
-    fn from(e: LoadError) -> Self {
-        let to = match &e {
-            LoadError::PeError(_) => Self::invalid_input("a language DLL that does not read"),
-            LoadError::IoError(_) => Self::io("a read or write that failed"),
-            LoadError::ParseIntError(_) => Self::invalid_input("a string id that is no number"),
-        };
-        to.with_source(e)
-    }
-}
-
-impl From<ParseLangFileKindError> for genie_error::GenieError {
-    /// The error as a [`genie_error::GenieError`]: its kind and reason, the original as the
-    /// source.
-    #[track_caller]
-    fn from(e: ParseLangFileKindError) -> Self {
-        Self::invalid_input("a language file type this reader does not know").with_source(e)
-    }
-}
-
 #[cfg(test)]
-mod genie_error_tests {
+mod error_tests {
     use super::*;
-    #[cfg(test)]
-    use std::error::Error;
+    use genie_error::ErrorKind;
 
-    /// The errors convert into `GenieError`s with their kinds and reasons, the original as
-    /// source.
+    /// An unknown file kind, an INI string id that is no number and a DLL that is no PE file
+    /// fail as invalid input, each with its reason.
     #[test]
-    fn language_errors_convert_into_genie_errors() {
-        let e: genie_error::GenieError = LoadError::IoError(io::Error::other("x")).into();
-        assert_eq!(
-            (e.kind(), e.reason()),
-            (genie_error::ErrorKind::Io, "a read or write that failed")
-        );
-        assert!(Error::source(&e).is_some());
-        let e: genie_error::GenieError = ParseLangFileKindError("x".to_owned()).into();
+    fn unknown_kind_bad_id_and_bad_dll_are_invalid_input() {
+        let e = "xml".parse::<LangFileKind>().unwrap_err();
         assert_eq!(
             (e.kind(), e.reason()),
             (
-                genie_error::ErrorKind::InvalidInput,
+                ErrorKind::InvalidInput,
                 "a language file type this reader does not know"
             )
         );
-        assert!(Error::source(&e).is_some());
+        let e = LangFileKind::Ini.read_from(&b"x=y\n"[..]).unwrap_err();
+        assert_eq!(
+            (e.kind(), e.reason()),
+            (ErrorKind::InvalidInput, "a string id that is no number")
+        );
+        let e = LangFileKind::Dll.read_from(&b"MZ"[..]).unwrap_err();
+        assert_eq!(
+            (e.kind(), e.reason()),
+            (ErrorKind::InvalidInput, "a language DLL that does not read")
+        );
     }
 }

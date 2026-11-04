@@ -1,6 +1,7 @@
 //! The body's frames.
 
-use crate::Error;
+use crate::errors::command_before_first_sync;
+use genie_core::GenieResult;
 use genie_core::world::Millis;
 use genie_rec::de;
 use genie_rec::de::Op;
@@ -14,7 +15,7 @@ pub(super) struct Frame<'a> {
 }
 
 /// The chapter's first `limit` frames.
-pub(super) fn frames<'a>(chapter: &de::Chapter<'a>, limit: usize) -> Result<Vec<Frame<'a>>, Error> {
+pub(super) fn frames<'a>(chapter: &de::Chapter<'a>, limit: usize) -> GenieResult<Vec<Frame<'a>>> {
     let mut out: Vec<Frame<'a>> = Vec::new();
     for op in chapter.ops() {
         let (dt, checkpoint) = match op? {
@@ -22,7 +23,7 @@ pub(super) fn frames<'a>(chapter: &de::Chapter<'a>, limit: usize) -> Result<Vec<
             Op::Checkpoint { dt, checkpoint } => (dt, Some(checkpoint)),
             Op::Command { packet, .. } => {
                 out.last_mut()
-                    .ok_or(Error::CommandBeforeFirstSync)?
+                    .ok_or(command_before_first_sync())?
                     .commands
                     .push(packet);
                 continue;

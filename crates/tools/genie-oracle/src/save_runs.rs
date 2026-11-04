@@ -2,15 +2,16 @@
 //! sight and technologies, the unit groups, the hunted animals' origins.
 
 use crate::command_args::Frame;
+use crate::errors::{bad_mesh_dump, no_such_player};
 use crate::groups::globals_from_dump;
 use crate::masters::{MasterTable, TerrainTable};
 use crate::setup::layer;
 use crate::{
-    Decoder, Dumps, Error, SavedStep, TickReport, frames, ghost_pool_from_dump,
-    inside_lists_from_dump, mesh_from_dump, mesh_owners_from_dump, object_differences,
-    recycle_pools_from_dump, registry_from_dump, run, slice, tile_differences,
-    tile_lists_from_dump, visibility_differences,
+    Decoder, Dumps, SavedStep, TickReport, frames, ghost_pool_from_dump, inside_lists_from_dump,
+    mesh_from_dump, mesh_owners_from_dump, object_differences, recycle_pools_from_dump,
+    registry_from_dump, run, slice, tile_differences, tile_lists_from_dump, visibility_differences,
 };
+use genie_core::GenieResult;
 use genie_core::commands::Command;
 use genie_core::groups::UnitGroups;
 use genie_core::map::spatial::Spatial;
@@ -35,7 +36,7 @@ pub(super) fn compare_players(
     after: &SavedStep,
     tick: Option<u32>,
     report: &mut TickReport,
-) -> Result<(), Error> {
+) -> GenieResult<()> {
     world_differences(turns, after, report);
     for p in 0..turns.players.len() {
         player_differences(turns, after, tick, p, report)?;
@@ -67,11 +68,11 @@ fn player_differences(
     tick: Option<u32>,
     p: usize,
     report: &mut TickReport,
-) -> Result<(), Error> {
+) -> GenieResult<()> {
     let player = &turns.players[p];
     let id = p as u32;
     let frozen = stops(player, id, tick, report);
-    let game = after.objects.get(p).ok_or(Error::NoSuchPlayer(id))?;
+    let game = after.objects.get(p).ok_or_else(|| no_such_player(id))?;
     if !player.stopped {
         stock_differences(player, &after.game, p, report);
     }
@@ -218,7 +219,7 @@ pub fn run_from_save(
     ticks: usize,
     masters: Option<&MasterTable>,
     dumps: Dumps<'_>,
-) -> Result<World, Error> {
+) -> GenieResult<World> {
     from_save(save, recording, start_tick, ticks, masters, dumps, false)
 }
 
@@ -227,10 +228,10 @@ pub fn run_from_save(
 /// # Errors
 ///
 /// When the save does not parse or its groups do not import.
-pub fn saved_groups(save: &[u8], globals: Option<&str>) -> Result<UnitGroups, Error> {
+pub fn saved_groups(save: &[u8], globals: Option<&str>) -> GenieResult<UnitGroups> {
     let chapter = chapters(save)?[0];
     let header = chapter.header()?;
-    let mut g = unit_groups(&header.world.base_world).map_err(Error::Unmodelled)?;
+    let mut g = unit_groups(&header.world.base_world)?;
     if let Some(text) = globals {
         globals_from_dump(text, &mut g);
     }
@@ -250,7 +251,7 @@ pub fn command_phase_from_save(
     start_tick: usize,
     masters: Option<&MasterTable>,
     dumps: Dumps<'_>,
-) -> Result<World, Error> {
+) -> GenieResult<World> {
     from_save(save, recording, start_tick, 1, masters, dumps, true)
 }
 
@@ -263,7 +264,7 @@ pub(super) fn from_save(
     masters: Option<&MasterTable>,
     dumps: Dumps<'_>,
     commands_only: bool,
-) -> Result<World, Error> {
+) -> GenieResult<World> {
     let header = save_header(save)?;
     let mut turns = loaded_slice(&header, masters, dumps)?;
     let updates = start_tick + 1;
@@ -279,8 +280,8 @@ pub(super) fn from_save(
 }
 
 /// A save's world: its first chapter's header.
-pub(super) fn save_header(save: &[u8]) -> Result<Header, Error> {
-    Ok(chapters(save)?[0].header()?)
+pub(super) fn save_header(save: &[u8]) -> GenieResult<Header> {
+    chapters(save)?[0].header()
 }
 
 /// The slice from a save as the game's load leaves it: the tick oracle's dumps beside the save
@@ -289,8 +290,8 @@ pub(super) fn loaded_slice(
     header: &Header,
     masters: Option<&MasterTable>,
     dumps: Dumps<'_>,
-) -> Result<World, Error> {
-    let mut turns = slice(header, masters).map_err(Error::Unmodelled)?;
+) -> GenieResult<World> {
+    let mut turns = slice(header, masters)?;
     load_dumps(&mut turns, dumps)?;
     watch_at_load(&mut turns);
     Ok(turns)
@@ -299,9 +300,9 @@ pub(super) fn loaded_slice(
 /// The tick oracle's dumps beside a save, put into its slice: the shape mesh and its owners, the
 /// objects-in-sight registry, the tiles' object lists, the recycled missiles and ghosts, the
 /// garrisons and the process globals.
-pub(super) fn load_dumps(turns: &mut World, dumps: Dumps<'_>) -> Result<(), Error> {
+pub(super) fn load_dumps(turns: &mut World, dumps: Dumps<'_>) -> GenieResult<()> {
     if let Some(text) = dumps.mesh {
-        let m = mesh_from_dump(text).ok_or(Error::BadMeshDump)?;
+        let m = mesh_from_dump(text).ok_or(bad_mesh_dump())?;
         turns.pathing.set_mesh(m, mesh_owners_from_dump(text));
     }
     if let (Some(text), Some(sight)) = (dumps.registry, turns.spatial.sight.as_mut()) {
@@ -329,7 +330,7 @@ pub(super) fn played_frames<'a>(
     turns: &mut World,
     recording: &'a [u8],
     limit: usize,
-) -> Result<Vec<Frame<'a>>, Error> {
+) -> GenieResult<Vec<Frame<'a>>> {
     let played = chapters(recording)?[0];
     hunted_origins(turns, &played.header()?);
     frames(&played, limit)
@@ -364,16 +365,16 @@ pub(super) fn frame_commands(turns: &mut World, decoder: &mut Decoder, frame: Op
 }
 
 /// The world's objects as movement sees them, from a save ([`spatial`]), on a map without terrain.
-pub fn spatial_from_save(save: &[u8]) -> Result<Spatial, Error> {
+pub fn spatial_from_save(save: &[u8]) -> GenieResult<Spatial> {
     spatial_with_tiles(save, &TerrainTable::default())
 }
 
 /// The world's objects as movement sees them, from a save, with each tile's terrain class.
-pub fn spatial_with_tiles(save: &[u8], terrain: &TerrainTable) -> Result<Spatial, Error> {
+pub fn spatial_with_tiles(save: &[u8], terrain: &TerrainTable) -> GenieResult<Spatial> {
     let chapter = chapters(save)?[0];
     let header = chapter.header()?;
-    let layer = layer().map_err(Error::Unmodelled)?;
-    spatial(&header, terrain, layer).map_err(Error::Unmodelled)
+    let layer = layer()?;
+    spatial(&header, terrain, layer)
 }
 
 #[cfg(test)]

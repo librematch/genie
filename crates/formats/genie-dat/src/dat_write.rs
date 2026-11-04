@@ -4,7 +4,8 @@ use crate::conv::fits;
 use crate::{DatFile, GameVersion};
 use byteorder::{LE, WriteBytesExt};
 use flate2::{Compression, write::DeflateEncoder};
-use std::io::{Result, Write};
+use genie_error::GenieResult;
+use std::io::Write;
 
 impl DatFile {
     /// Serialize this data file to an output stream. Compression is applied by this function.
@@ -15,7 +16,7 @@ impl DatFile {
     ///
     /// Also fails if a list is too long for its count field, or if a member cannot be written (see
     /// the `write_to` methods of the member types).
-    pub fn write_to<W: Write>(&self, output: &mut W) -> Result<()> {
+    pub fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         let num_terrains = if self.game_version == GameVersion::Aoc && self.terrains.len() == 42 {
             41
         } else {
@@ -54,7 +55,7 @@ impl DatFile {
 
     /// The colour tables, the sounds and the sprites, each with its count; the sprites' flags
     /// whether each exists come before those that do.
-    fn write_graphics(&self, mut output: impl Write) -> Result<()> {
+    fn write_graphics(&self, mut output: impl Write) -> GenieResult<()> {
         output.write_u16::<LE>(fits(self.color_tables.len())?)?;
         for table in &self.color_tables {
             table.write_to(&mut output)?;
@@ -81,7 +82,7 @@ impl DatFile {
     /// The tile sizes, the padding, the terrains and their borders.
     // The terrain count is truncated to the format's u16, as before.
     #[allow(clippy::cast_possible_truncation)]
-    fn write_terrains(&self, mut output: impl Write) -> Result<()> {
+    fn write_terrains(&self, mut output: impl Write) -> GenieResult<()> {
         for size in &self.tile_sizes {
             size.write_to(&mut output)?;
         }
@@ -101,7 +102,7 @@ impl DatFile {
     /// The random maps: their count, a null pointer, each map's head, then each map's lists.
     // The count is truncated to the format's u32, as before.
     #[allow(clippy::cast_possible_truncation)]
-    fn write_random_maps(&self, mut output: impl Write) -> Result<()> {
+    fn write_random_maps(&self, mut output: impl Write) -> GenieResult<()> {
         output.write_u32::<LE>(self.random_maps.len() as u32)?;
         output.write_u32::<LE>(0)?; // pointer
 
@@ -117,7 +118,7 @@ impl DatFile {
     /// The effects and the task lists (each behind its flag), each with its count.
     // The counts are truncated to the format's u32, as before.
     #[allow(clippy::cast_possible_truncation)]
-    fn write_tasks(&self, mut output: impl Write) -> Result<()> {
+    fn write_tasks(&self, mut output: impl Write) -> GenieResult<()> {
         output.write_u32::<LE>(self.effects.len() as u32)?;
         for effect in &self.effects {
             effect.write_to(&mut output)?;
@@ -138,7 +139,7 @@ impl DatFile {
     /// The civilizations (each behind its player type 1) and the techs, each with its count.
     // The counts are truncated to the format's u16, as before.
     #[allow(clippy::cast_possible_truncation)]
-    fn write_civilizations(&self, mut output: impl Write) -> Result<()> {
+    fn write_civilizations(&self, mut output: impl Write) -> GenieResult<()> {
         output.write_u16::<LE>(self.civilizations.len() as u16)?;
         for civilization in &self.civilizations {
             output.write_i8(1)?; // player type
@@ -154,7 +155,7 @@ impl DatFile {
 }
 
 /// The map's pointers and sizes, all 0.
-fn write_map_header(mut output: impl Write) -> Result<()> {
+fn write_map_header(mut output: impl Write) -> GenieResult<()> {
     output.write_u32::<LE>(0)?; // map vtable pointer
     output.write_u32::<LE>(0)?; // map tiles pointer
     output.write_u32::<LE>(0)?; // map width
@@ -165,7 +166,7 @@ fn write_map_header(mut output: impl Write) -> Result<()> {
 }
 
 /// The map's bounds and its tile and block sizes, all 0.
-fn write_map_bounds(mut output: impl Write) -> Result<()> {
+fn write_map_bounds(mut output: impl Write) -> GenieResult<()> {
     // TODO put correct values in
     output.write_i32::<LE>(0)?;
     for _ in 0..6 {
@@ -178,7 +179,7 @@ fn write_map_bounds(mut output: impl Write) -> Result<()> {
 }
 
 /// The map's search pointers and flags and the pointers after them, all 0.
-fn write_map_search(mut output: impl Write) -> Result<()> {
+fn write_map_search(mut output: impl Write) -> GenieResult<()> {
     output.write_i32::<LE>(0)?;
     output.write_i32::<LE>(0)?;
     output.write_u8(0)?;
@@ -192,7 +193,7 @@ fn write_map_search(mut output: impl Write) -> Result<()> {
 }
 
 /// The kill and hit point rates and totals, all 0.
-fn write_kill_rates(mut output: impl Write) -> Result<()> {
+fn write_kill_rates(mut output: impl Write) -> GenieResult<()> {
     for _ in 0..7 {
         output.write_u32::<LE>(0)?;
     }
@@ -209,8 +210,8 @@ mod tests {
     #[test]
     fn each_zeroed_block_is_as_long_as_the_reader_skips() {
         type Block = (
-            fn(&mut Vec<u8>) -> Result<()>,
-            fn(&mut &[u8]) -> Result<()>,
+            fn(&mut Vec<u8>) -> GenieResult<()>,
+            fn(&mut &[u8]) -> GenieResult<()>,
             usize,
         );
         let blocks: [Block; 4] = [

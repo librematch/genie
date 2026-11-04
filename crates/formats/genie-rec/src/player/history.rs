@@ -1,9 +1,9 @@
 //! A player's diplomacy offers and its history: the timeline's events and entries.
 
-use crate::Result;
 use crate::element::{ReadableHeaderElement, read_counted};
 use crate::reader::RecordingHeaderReader;
 use byteorder::{LE, ReadBytesExt};
+use genie_error::GenieResult;
 use genie_support::ReadStringsExt;
 use std::io::Read;
 
@@ -28,7 +28,7 @@ pub(super) struct DiplomacyOffer {
 }
 
 impl ReadableHeaderElement for DiplomacyOffer {
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let mut offer = Self {
             sequence: input.read_u8()?,
             started_by: input.read_u8()?,
@@ -63,14 +63,14 @@ pub struct HistoryInfo {
 
 impl ReadableHeaderElement for HistoryInfo {
     // Reads the entries and events behind their counts, then skips the battle statistics.
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let _padding = input.read_u8()?;
         let num_entries = input.read_u32::<LE>()?;
         let _num_events = input.read_u32::<LE>()?;
         let _entries_capacity = input.read_u32::<LE>()?;
         let entries = (0..num_entries)
             .map(|_| HistoryEntry::read_from(input))
-            .collect::<Result<_>>()?;
+            .collect::<GenieResult<_>>()?;
 
         let _padding = input.read_u8()?;
 
@@ -87,7 +87,7 @@ impl ReadableHeaderElement for HistoryInfo {
 
 /// The battle totals the reader skips: razings and kills with their hit points and weights,
 /// the modes and the old counts of units and buildings.
-fn skip_battle_totals<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<()> {
+fn skip_battle_totals<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<()> {
     let _razings = input.read_i32::<LE>()?;
     let _hit_points_razed = input.read_i32::<LE>()?;
     let _razed_by_others = input.read_i32::<LE>()?;
@@ -110,7 +110,7 @@ fn skip_battle_totals<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<(
 
 /// The old kills and razings per player with their battle values, and the running totals:
 /// skipped too.
-fn skip_old_battle_values<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<()> {
+fn skip_old_battle_values<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<()> {
     let mut old_kills = [0; 8];
     input.read_u16_into::<LE>(&mut old_kills[..])?;
     let mut old_kill_bvs = [0; 8];
@@ -141,7 +141,7 @@ pub struct HistoryEvent {
 }
 
 impl ReadableHeaderElement for HistoryEvent {
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         Ok(Self {
             event_kind: input.read_i8()?,
             time_slice: input.read_u32::<LE>()?,
@@ -165,7 +165,7 @@ pub struct HistoryEntry {
 }
 
 impl ReadableHeaderElement for HistoryEntry {
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let civilian_population = input.read_u16::<LE>()?;
         let military_population = input.read_u16::<LE>()?;
         Ok(Self {

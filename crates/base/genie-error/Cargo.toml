@@ -14,6 +14,11 @@ keywords = ["error", "context", "genie"]
 categories = ["rust-patterns"]
 
 [dependencies]
+# serde's `de::Error` for a deserializer whose errors are genie's (genie-nickel's)
+serde = { workspace = true, optional = true }
+
+[features]
+serde = ["dep:serde"]
 
 [lints]
 workspace = true

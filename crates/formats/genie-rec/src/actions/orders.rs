@@ -1,9 +1,10 @@
 //! The orders: order, stop, work, move, create, add resource and the AI's order (`0x0a`).
 
 use crate::actions::{Location2, Location3, ObjectsList};
-use crate::{ObjectId, PlayerId, Result};
+use crate::{ObjectId, PlayerId};
 use crate::{fits, opt_fits};
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
+use genie_error::GenieResult;
 use genie_support::{ReadSkipExt, UnitKindId, read_opt_u32};
 use std::io::{Read, Write};
 
@@ -26,7 +27,7 @@ impl OrderCommand {
     /// # Errors
     ///
     /// Returns an error if reading from `input` fails.
-    pub fn read_from(mut input: impl Read) -> Result<Self> {
+    pub fn read_from(mut input: impl Read) -> GenieResult<Self> {
         let mut command = Self {
             player_id: input.read_u8()?.into(),
             ..Default::default()
@@ -46,7 +47,7 @@ impl OrderCommand {
     /// Returns an error if writing to `output` fails.
     ///
     /// Also fails if the target ID is above `i32::MAX`, or if there are more than `u32::MAX` objects.
-    pub fn write_to<W: Write>(&self, output: &mut W) -> Result<()> {
+    pub fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         output.write_u8(self.player_id.into())?;
         output.write_all(&[0, 0])?;
         output.write_i32::<LE>(opt_fits(self.target_id, -1)?)?;
@@ -71,7 +72,7 @@ impl StopCommand {
     /// # Errors
     ///
     /// Returns an error if reading from `input` fails.
-    pub fn read_from(mut input: impl Read) -> Result<Self> {
+    pub fn read_from(mut input: impl Read) -> GenieResult<Self> {
         let mut command = Self::default();
         let selected_count = input.read_i8()?;
         command.objects = ObjectsList::read_from(input, i32::from(selected_count))?;
@@ -85,7 +86,7 @@ impl StopCommand {
     /// Returns an error if writing to `output` fails.
     ///
     /// Also fails if there are more than 127 objects, the most the format's `i8` count holds.
-    pub fn write_to<W: Write>(&self, output: &mut W) -> Result<()> {
+    pub fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         output.write_i8(fits(self.objects.len())?)?;
         self.objects.write_to(output)?;
         Ok(())
@@ -109,7 +110,7 @@ impl WorkCommand {
     /// # Errors
     ///
     /// Returns an error if reading from `input` fails.
-    pub fn read_from(mut input: impl Read) -> Result<Self> {
+    pub fn read_from(mut input: impl Read) -> GenieResult<Self> {
         let mut command = Self::default();
         input.skip(3)?;
         command.target_id = read_opt_u32(&mut input)?;
@@ -127,7 +128,7 @@ impl WorkCommand {
     /// Returns an error if writing to `output` fails.
     ///
     /// Also fails if there are more than 127 objects, the most the format's `i8` count holds.
-    pub fn write_to<W: Write>(&self, output: &mut W) -> Result<()> {
+    pub fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         output.write_all(&[0, 0, 0])?;
         output.write_i32::<LE>(self.target_id.map_or(-1, |u| u32::from(u).cast_signed()))?;
         output.write_i8(fits(self.objects.len())?)?;
@@ -158,7 +159,7 @@ impl MoveCommand {
     /// # Errors
     ///
     /// Returns an error if reading from `input` fails.
-    pub fn read_from(mut input: impl Read) -> Result<Self> {
+    pub fn read_from(mut input: impl Read) -> GenieResult<Self> {
         let mut command = Self {
             player_id: input.read_u8()?.into(),
             ..Default::default()
@@ -179,7 +180,7 @@ impl MoveCommand {
     /// Returns an error if writing to `output` fails.
     ///
     /// Also fails if there are more than 127 objects, the most the format's `i8` count holds.
-    pub fn write_to<W: Write>(&self, output: &mut W) -> Result<()> {
+    pub fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         output.write_u8(self.player_id.into())?;
         output.write_all(&[0, 0])?;
         output.write_i32::<LE>(self.target_id.map_or(-1, |u| u32::from(u).cast_signed()))?;
@@ -210,7 +211,7 @@ impl CreateCommand {
     /// # Errors
     ///
     /// Returns an error if reading from `input` fails.
-    pub fn read_from(mut input: impl Read) -> Result<Self> {
+    pub fn read_from(mut input: impl Read) -> GenieResult<Self> {
         let mut command = Self::default();
         let _padding = input.read_u8()?;
         command.unit_kind_id = input.read_u16::<LE>()?.into();
@@ -229,7 +230,7 @@ impl CreateCommand {
     /// # Errors
     ///
     /// Returns an error if writing to `output` fails.
-    pub fn write_to<W: Write>(&self, output: &mut W) -> Result<()> {
+    pub fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         output.write_u8(0)?;
         output.write_u16::<LE>(self.unit_kind_id.into())?;
         output.write_u8(self.player_id.into())?;
@@ -260,7 +261,7 @@ impl AddResourceCommand {
     /// # Errors
     ///
     /// Returns an error if reading from `input` fails.
-    pub fn read_from(mut input: impl Read) -> Result<Self> {
+    pub fn read_from(mut input: impl Read) -> GenieResult<Self> {
         let player_id = input.read_u8()?.into();
         let resource = input.read_u8()?;
         let _padding = input.read_u8()?;
@@ -277,7 +278,7 @@ impl AddResourceCommand {
     /// # Errors
     ///
     /// Returns an error if writing to `output` fails.
-    pub fn write_to<W: Write>(&self, output: &mut W) -> Result<()> {
+    pub fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         output.write_u8(self.player_id.into())?;
         output.write_u8(self.resource)?;
         output.write_u8(0)?;
@@ -322,7 +323,7 @@ impl AiOrderCommand {
     /// Returns an error if reading from `input` fails.
     ///
     /// Also fails if the target's owner is stored as a negative number other than -1.
-    pub fn read_from(mut input: impl Read) -> Result<Self> {
+    pub fn read_from(mut input: impl Read) -> GenieResult<Self> {
         let mut command = Self::default();
         let selected_count = i32::from(input.read_i8()?);
         command.player_id = input.read_u8()?.into();
@@ -362,7 +363,7 @@ impl AiOrderCommand {
     ///
     /// Also fails if there are more than 127 objects (the format's `i8` count), or if the target ID
     /// is above `i32::MAX`.
-    pub fn write_to<W: Write>(&self, output: &mut W) -> Result<()> {
+    pub fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         output.write_i8(fits(self.objects.len())?)?;
         output.write_u8(self.player_id.into())?;
         output.write_u8(self.issuer.into())?;

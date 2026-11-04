@@ -1,9 +1,10 @@
 //! One hotkey ([`Hotkey`]): its key, its string and its modifiers, read and written.
 
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
+use genie_error::GenieResult;
 use genie_lang::{LangFile, StringKey};
+use std::fmt;
 use std::io::{Read, Write};
-use std::{fmt, io};
 
 /// The information about a single hotkey.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -164,7 +165,7 @@ impl Hotkey {
     }
 
     /// Reads a hotkey from an input stream.
-    pub(crate) fn read_from<R: Read>(input: &mut R) -> io::Result<Self> {
+    pub(crate) fn read_from<R: Read>(input: &mut R) -> GenieResult<Self> {
         let key = input.read_i32::<LE>()?;
         let string_id = input.read_i32::<LE>()?;
         let ctrl = input.read_u8()? != 0;
@@ -183,7 +184,7 @@ impl Hotkey {
     }
 
     /// Writes a hotkey to an output stream.
-    pub(crate) fn write_to<W: Write>(&self, output: &mut W) -> io::Result<()> {
+    pub(crate) fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         output.write_i32::<LE>(self.key)?;
         output.write_i32::<LE>(self.string_id)?;
         output.write_u8(u8::from(self.ctrl))?;

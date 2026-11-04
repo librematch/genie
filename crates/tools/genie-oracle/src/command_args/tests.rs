@@ -1,5 +1,5 @@
-use crate::Error;
 use crate::command_args::frames;
+use crate::errors::command_before_first_sync;
 use genie_rec::de::{Chapter, Checkpoint, Op};
 
 /// A chapter after the first (no pregame record) of the ops `ops`.
@@ -64,15 +64,15 @@ fn command_before_the_first_sync_is_an_error() {
         packet: &[3, 1],
         world_time: 0,
     }]);
-    assert!(matches!(
-        frames(&chapter(&bytes), 10),
-        Err(Error::CommandBeforeFirstSync)
-    ));
+    assert!(frames(&chapter(&bytes), 10).is_err_and(|e| e == command_before_first_sync()));
 }
 
 /// An op the body cannot read ends the frames with its error.
 #[test]
 fn an_unreadable_op_is_an_error() {
     let bytes = [9, 0, 0, 0];
-    assert!(matches!(frames(&chapter(&bytes), 10), Err(Error::Rec(_))));
+    assert_eq!(
+        frames(&chapter(&bytes), 10).err().map(|e| e.reason()),
+        Some("an op this reader does not know")
+    );
 }

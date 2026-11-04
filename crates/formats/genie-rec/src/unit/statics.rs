@@ -4,9 +4,10 @@ use crate::element::{ReadableHeaderElement, WritableHeaderElement, read_xyz};
 use crate::fits;
 use crate::reader::RecordingHeaderReader;
 use crate::unit::SpriteList;
-use crate::{ObjectId, PlayerId, Result};
+use crate::{ObjectId, PlayerId};
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
 use genie_dat::sprite::SpriteId;
+use genie_error::GenieResult;
 use genie_support::{UnitKindId, read_opt_u32};
 use std::io::{Read, Write};
 
@@ -70,7 +71,7 @@ pub struct StaticUnitAttributes {
 
 impl ReadableHeaderElement for StaticUnitAttributes {
     // Reads the object's fields in file order, section by section.
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let mut attrs = Self::read_identity(input)?;
         attrs.read_held_and_damage(input)?;
         attrs.read_group_and_sprites(input)?;
@@ -81,7 +82,7 @@ impl ReadableHeaderElement for StaticUnitAttributes {
 impl StaticUnitAttributes {
     /// The owner, type, sprite and container, the hit points, the state and its flags, the
     /// id, facet, position and offsets: the first fields.
-    fn read_identity<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_identity<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         Ok(Self {
             owner_id: input.read_u8()?.into(),
             unit_kind_id: input.read_u16::<LE>()?.into(),
@@ -106,7 +107,7 @@ impl StaticUnitAttributes {
     fn read_held_and_damage<R: Read>(
         &mut self,
         input: &mut RecordingHeaderReader<R>,
-    ) -> Result<()> {
+    ) -> GenieResult<()> {
         if input.version() < 11.58 {
             self.selected_group = match input.read_i8()? {
                 -1 => None,
@@ -127,11 +128,11 @@ impl StaticUnitAttributes {
     fn read_group_and_sprites<R: Read>(
         &mut self,
         input: &mut RecordingHeaderReader<R>,
-    ) -> Result<()> {
+    ) -> GenieResult<()> {
         let num_members = input.read_u32::<LE>()?;
         self.pathing_group_members = (0..num_members)
             .map(|_| Ok(input.read_u32::<LE>()?.into()))
-            .collect::<Result<_>>()?;
+            .collect::<GenieResult<_>>()?;
         self.group_id = read_opt_u32(input)?;
         self.roo_already_called = input.read_u8()?;
         if input.read_u8()? != 0 {
@@ -153,14 +154,14 @@ pub struct AnimatedUnitAttributes {
 }
 
 impl ReadableHeaderElement for AnimatedUnitAttributes {
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let speed = input.read_f32::<LE>()?;
         Ok(Self { speed })
     }
 }
 
 impl WritableHeaderElement for AnimatedUnitAttributes {
-    fn write_to<W: Write>(&self, output: &mut W) -> Result<()> {
+    fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         output.write_f32::<LE>(self.speed)?;
         Ok(())
     }

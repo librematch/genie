@@ -5,8 +5,9 @@
 //! not known, its docs say so.
 
 use crate::fits;
-use crate::{ObjectId, PlayerId, Result};
+use crate::{ObjectId, PlayerId};
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
+use genie_error::{GenieError, GenieResult};
 use genie_support::{ReadSkipExt, ReadStringsExt};
 use std::io::{Read, Write};
 
@@ -63,7 +64,7 @@ impl ViewLock {
     /// Returns an error if reading from `input` fails.
     ///
     /// Also fails if the stored player ID is negative or above 255.
-    pub fn read_from(mut input: impl Read) -> Result<Self> {
+    pub fn read_from(mut input: impl Read) -> GenieResult<Self> {
         let x = input.read_f32::<LE>()?;
         let y = input.read_f32::<LE>()?;
         let player = fits(input.read_i32::<LE>()?)?;
@@ -75,7 +76,7 @@ impl ViewLock {
     /// # Errors
     ///
     /// Returns an error if writing to `output` fails.
-    pub fn write_to<W: Write>(&self, output: &mut W) -> Result<()> {
+    pub fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         output.write_f32::<LE>(self.x)?;
         output.write_f32::<LE>(self.y)?;
         output.write_i32::<LE>(i32::from(self.player))?;
@@ -112,7 +113,7 @@ impl ObjectsList {
     /// Returns an error if reading from `input` fails.
     ///
     /// Also fails if an object ID in the list is negative.
-    pub fn read_from(mut input: impl Read, count: i32) -> Result<Self> {
+    pub fn read_from(mut input: impl Read, count: i32) -> GenieResult<Self> {
         if count < 0xFF {
             let mut list = vec![];
             for _ in 0..count {
@@ -131,7 +132,7 @@ impl ObjectsList {
     /// # Errors
     ///
     /// Returns an error if writing to `output` fails.
-    pub fn write_to<W: Write>(&self, output: &mut W) -> Result<()> {
+    pub fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         if let Self::List(list) = self {
             for entry in list.iter().copied() {
                 output.write_u32::<LE>(entry.into())?;
@@ -247,7 +248,7 @@ impl Command {
     ///
     /// Also fails if the command type is not one listed in [`Command`], or if the command's own
     /// reader panics.
-    pub fn read_from<R: Read>(input: &mut R) -> Result<Self> {
+    pub fn read_from<R: Read>(input: &mut R) -> GenieResult<Self> {
         let len = input.read_u32::<LE>()?;
 
         let mut cursor = input.by_ref().take(len.into());
@@ -272,7 +273,7 @@ impl Command {
 ///
 /// Returns an error if the command's reader fails; an id no command has reads as
 /// [`Command::Unknown`].
-fn read_unit_command(id: u8, cursor: &mut impl Read, len: u32) -> Result<Command> {
+fn read_unit_command(id: u8, cursor: &mut impl Read, len: u32) -> GenieResult<Command> {
     match id {
         0x00 => OrderCommand::read_from(&mut *cursor).map(Command::Order),
         0x01 => StopCommand::read_from(&mut *cursor).map(Command::Stop),
@@ -299,7 +300,7 @@ fn read_unit_command(id: u8, cursor: &mut impl Read, len: u32) -> Result<Command
 ///
 /// Returns an error if the command's reader fails; an id no command has reads as
 /// [`Command::Unknown`].
-fn read_building_command(id: u8, cursor: &mut impl Read) -> Result<Command> {
+fn read_building_command(id: u8, cursor: &mut impl Read) -> GenieResult<Command> {
     match id {
         0x64 => MakeCommand::read_from(&mut *cursor).map(Command::Make),
         0x65 => ResearchCommand::read_from(&mut *cursor).map(Command::Research),
@@ -327,7 +328,7 @@ fn read_building_command(id: u8, cursor: &mut impl Read) -> Result<Command> {
 /// # Errors
 ///
 /// Returns an error if reading from `cursor` fails.
-fn unknown(id: u8, cursor: &mut impl Read) -> Result<Command> {
+fn unknown(id: u8, cursor: &mut impl Read) -> GenieResult<Command> {
     let mut bytes = Vec::new();
     let _ = cursor.read_to_end(&mut bytes)?;
     Ok(Command::Unknown { id, bytes })
@@ -350,7 +351,7 @@ impl Time {
     /// # Errors
     ///
     /// Returns an error if reading from `input` fails.
-    pub fn read_from<R: Read>(input: &mut R) -> Result<Self> {
+    pub fn read_from<R: Read>(input: &mut R) -> GenieResult<Self> {
         let mut time = Self {
             time: input.read_u32::<LE>()?,
             ..Default::default()
@@ -385,7 +386,7 @@ impl Sync {
     /// # Errors
     ///
     /// Returns an error if reading from `input` fails.
-    pub fn read_from<R: Read>(input: &mut R) -> Result<Self> {
+    pub fn read_from<R: Read>(input: &mut R) -> GenieResult<Self> {
         let mut sync = Self::default();
         let _always_zero = input.read_u32::<LE>()?;
         sync.checksum = input.read_u32::<LE>()?;
@@ -428,7 +429,7 @@ pub struct Meta {
 
 impl Meta {
     /// Read the chunk of recorded game body metadata that's the same across all versions.
-    fn read_from_inner(mut input: impl Read) -> Result<Self> {
+    fn read_from_inner(mut input: impl Read) -> GenieResult<Self> {
         let checksum_interval = input.read_u32::<LE>()?;
         let is_multiplayer = input.read_u32::<LE>()? != 0;
         let local_player_id = fits(input.read_u32::<LE>()?)?;
@@ -452,7 +453,7 @@ impl Meta {
     /// Returns an error if reading from `input` fails.
     ///
     /// Also fails if the stored local player ID is above 255.
-    pub fn read_from_mgl(mut input: impl Read) -> Result<Self> {
+    pub fn read_from_mgl(mut input: impl Read) -> GenieResult<Self> {
         let meta = Self::read_from_inner(&mut input)?;
         let _exe_file_size = input.read_u64::<LE>()?;
         let _unknown = input.read_f32::<LE>()?;
@@ -472,10 +473,10 @@ impl Meta {
     /// Returns an error if reading from `input` fails.
     ///
     /// Also fails if the log version is not 3, 4 or 5, or if the stored local player ID is above 255.
-    pub fn read_from_mgx(mut input: impl Read) -> Result<Self> {
+    pub fn read_from_mgx(mut input: impl Read) -> GenieResult<Self> {
         let log_version = input.read_u32::<LE>()?;
         if !matches!(log_version, 3..=5) {
-            return Err(crate::Error::InvalidData(
+            return Err(GenieError::invalid_input(
                 "a log version other than 3, 4 or 5",
             ));
         }
@@ -507,9 +508,9 @@ impl Chat {
     /// Returns an error if reading from `input` fails or the text is not valid WINDOWS-1252.
     ///
     /// Also fails if the `i32` stored before the text is not -1.
-    pub fn read_from<R: Read>(input: &mut R) -> Result<Self> {
+    pub fn read_from<R: Read>(input: &mut R) -> GenieResult<Self> {
         if input.read_i32::<LE>()? != -1 {
-            return Err(crate::Error::InvalidData(
+            return Err(GenieError::invalid_input(
                 "a chat message without its -1 marker",
             ));
         }

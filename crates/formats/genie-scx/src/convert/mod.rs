@@ -5,17 +5,10 @@ mod aoc_to_wk;
 mod hd_to_wk;
 
 use crate::{Scenario, ScenarioObject};
+use genie_error::{GenieError, GenieResult};
 
 pub use aoc_to_wk::AocToWk;
 pub use hd_to_wk::HdToWk;
-
-/// Error indicating scenario conversion failure.
-#[derive(Debug, Clone, Copy, thiserror::Error)]
-pub enum ConvertError {
-    /// The input scenario version is not supported by the converter.
-    #[error("invalid version")]
-    InvalidVersion,
-}
 
 /// Convert an `AoC` or HD Edition scenario file to a `WololoKingdoms` one.
 ///
@@ -33,6 +26,12 @@ pub enum ConvertError {
 #[derive(Debug, Default, Clone, Copy)]
 pub struct AutoToWk {}
 
+/// A scenario of a version the converters do not take.
+#[track_caller]
+const fn not_convertible() -> GenieError {
+    GenieError::unsupported("a scenario version the converter does not take")
+}
+
 /// Check if a scenario object is likely a `WololoKingdoms` one.
 const fn is_wk_object(object: &ScenarioObject) -> bool {
     // Stormy Dog is the highest ID in AoC 1.0c.
@@ -45,9 +44,9 @@ impl AutoToWk {
     ///
     /// # Errors
     ///
-    /// Returns [`ConvertError::InvalidVersion`] if the scenario is neither an HD Edition nor an
-    /// `AoK`/`AoC` scenario.
-    pub fn convert(&self, scen: &mut Scenario) -> Result<(), ConvertError> {
+    /// Returns an unsupported error if the scenario is neither an HD Edition nor an `AoK`/`AoC`
+    /// scenario.
+    pub fn convert(&self, scen: &mut Scenario) -> GenieResult<()> {
         if scen.version().is_hd_edition() {
             HdToWk::default().convert(scen)
         } else if scen.version().is_aok() || scen.version().is_aoc() {
@@ -58,36 +57,19 @@ impl AutoToWk {
                 AocToWk::default().convert(scen)
             }
         } else {
-            Err(ConvertError::InvalidVersion)
+            Err(not_convertible())
         }
     }
 }
 
-impl From<ConvertError> for genie_error::GenieError {
-    /// The error as a [`genie_error::GenieError`]: its kind and reason, the original as the
-    /// source.
-    #[track_caller]
-    fn from(e: ConvertError) -> Self {
-        let to = match &e {
-            ConvertError::InvalidVersion => {
-                Self::unsupported("a scenario version the converter does not take")
-            }
-        };
-        to.with_source(e)
-    }
-}
-
 #[cfg(test)]
-mod genie_error_tests {
+mod tests {
     use super::*;
-    #[cfg(test)]
-    use std::error::Error;
 
-    /// The errors convert into `GenieError`s with their kinds and reasons, the original as
-    /// source.
+    /// A scenario of a version the converters do not take is a gap.
     #[test]
-    fn convert_error_converts_into_genie_error() {
-        let e: genie_error::GenieError = ConvertError::InvalidVersion.into();
+    fn unknown_version_does_not_convert() {
+        let e = not_convertible();
         assert_eq!(
             (e.kind(), e.reason()),
             (
@@ -95,6 +77,5 @@ mod genie_error_tests {
                 "a scenario version the converter does not take"
             )
         );
-        assert!(Error::source(&e).is_some());
     }
 }

@@ -2,6 +2,8 @@
 //! whole window, every differing field counted, not only the first divergence. It shows which
 //! fields the port gets wrong and the update where each first does.
 
+use crate::errors::no_such_player;
+use genie_core::GenieResult;
 use std::collections::BTreeMap;
 use std::num::NonZeroUsize;
 
@@ -10,7 +12,7 @@ use genie_rec::de::chapters;
 
 use crate::census::{CensusStop, stop_of};
 use crate::{
-    Decoder, Difference, Error, MasterTable, frames, header_objects, header_slice,
+    Decoder, Difference, MasterTable, frames, header_objects, header_slice,
     object_field_differences_in, object_rows, run,
 };
 use std::slice::from_ref;
@@ -59,13 +61,13 @@ pub fn header_survey(
     every: NonZeroUsize,
     scope: Scope,
     save: &mut dyn FnMut(usize) -> Option<Vec<u8>>,
-) -> Result<Survey, Error> {
+) -> GenieResult<Survey> {
     let chapter = chapters(recording)?[0];
     let header = chapter.header()?;
-    let mut turns = header_slice(&header, masters).map_err(Error::Unmodelled)?;
+    let mut turns = header_slice(&header, masters)?;
     let mut decoder = Decoder::default();
     if let Some(&p) = players.iter().find(|&&p| turns.players.len() <= p as usize) {
-        return Err(Error::NoSuchPlayer(p));
+        return Err(no_such_player(p));
     }
     let mut survey = Survey::default();
     let mut rows: BTreeMap<String, SurveyRow> = BTreeMap::new();

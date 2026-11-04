@@ -3,6 +3,7 @@
 //! where the format is not known (`todo!`).
 
 use super::*;
+use crate::errors::not_read;
 use crate::test_support::{header_reader, read_all};
 
 /// How many bytes reading `T` from zeros at `version` takes.
@@ -88,7 +89,7 @@ fn the_main_module_reads_its_objects() {
 fn the_information_module_of_10_5_ends_at_its_unknown_part() {
     let zeros = vec![0u8; 1 << 18];
     let e = InformationAi::read_from(&mut header_reader(&zeros, 10.5)).unwrap_err();
-    assert!(matches!(e, crate::Error::NotRead(_)));
+    assert_eq!(e, not_read(""));
 }
 
 /// From 10.94 on it reads what the AI has seen; from 11.09 on the players' building counts.
@@ -96,7 +97,7 @@ fn the_information_module_of_10_5_ends_at_its_unknown_part() {
 fn the_information_module_of_11_97_ends_at_its_unknown_part() {
     let zeros = vec![0u8; 1 << 18];
     let e = InformationAi::read_from(&mut header_reader(&zeros, 11.97)).unwrap_err();
-    assert!(matches!(e, crate::Error::NotRead(_)));
+    assert_eq!(e, not_read(""));
 }
 
 /// The tactical module ends after its unit lists.
@@ -104,7 +105,7 @@ fn the_information_module_of_11_97_ends_at_its_unknown_part() {
 fn the_tactical_module_ends_after_its_unit_lists() {
     let zeros = vec![0u8; 1 << 10];
     let e = TacticalAi::read_from(&mut header_reader(&zeros, 11.97)).unwrap_err();
-    assert!(matches!(e, crate::Error::NotRead(_)));
+    assert_eq!(e, not_read(""));
 }
 
 /// A player's AI reads its modules in order and stops in the information module.
@@ -112,5 +113,5 @@ fn the_tactical_module_ends_after_its_unit_lists() {
 fn player_ai_stops_in_the_information_module() {
     let zeros = vec![0u8; 1 << 18];
     let e = PlayerAi::read_from(&mut header_reader(&zeros, 11.97)).unwrap_err();
-    assert!(matches!(e, crate::Error::NotRead(_)));
+    assert_eq!(e, not_read(""));
 }

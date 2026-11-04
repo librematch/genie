@@ -2,10 +2,11 @@
 
 use crate::element::{ReadableHeaderElement, WritableHeaderElement};
 use crate::reader::RecordingHeaderReader;
+use genie_error::GenieResult;
 use std::io::Read;
 
 /// A section of the header a reader skips, at its version.
-pub type Section = fn(&mut RecordingHeaderReader<&'static [u8]>) -> crate::Result<()>;
+pub type Section = fn(&mut RecordingHeaderReader<&'static [u8]>) -> GenieResult<()>;
 
 /// What a skipped section reads from.
 static ZEROS: [u8; 8192] = [0; 8192];

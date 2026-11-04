@@ -1,10 +1,12 @@
 //! A unit's AI state ([`UnitAi`]): its orders, notifications, history, retargets and paths.
 
 use crate::element::{ReadableHeaderElement, read_counted};
+use crate::errors::not_read;
 use crate::fits;
 use crate::reader::RecordingHeaderReader;
-use crate::{ObjectId, PlayerId, Result};
+use crate::{ObjectId, PlayerId};
 use byteorder::{LE, ReadBytesExt};
+use genie_error::GenieResult;
 use genie_support::{ReadSkipExt, read_opt_u32};
 use std::io::Read;
 
@@ -22,7 +24,7 @@ pub struct UnitAiOrder {
 }
 
 impl ReadableHeaderElement for UnitAiOrder {
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         Ok(Self {
             issuer: input.read_u32::<LE>()?,
             order_kind: input.read_u32::<LE>()?,
@@ -53,7 +55,7 @@ pub struct UnitAiNotification {
 }
 
 impl ReadableHeaderElement for UnitAiNotification {
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         Ok(Self {
             caller: input.read_u32::<LE>()?,
             recipient: input.read_u32::<LE>()?,
@@ -81,7 +83,7 @@ pub struct UnitAiOrderHistory {
 }
 
 impl ReadableHeaderElement for UnitAiOrderHistory {
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         Ok(Self {
             order: input.read_u32::<LE>()?,
             action: input.read_u32::<LE>()?,
@@ -116,7 +118,7 @@ pub struct UnitAiRetargetEntry {
 }
 
 impl ReadableHeaderElement for UnitAiRetargetEntry {
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let target_id = input.read_u32::<LE>()?.into();
         let retarget_timeout = input.read_u32::<LE>()?;
         Ok(Self {
@@ -136,7 +138,7 @@ pub struct Waypoint {
 }
 
 impl ReadableHeaderElement for Waypoint {
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let waypoint = Self {
             location: (
                 input.read_f32::<LE>()?,
@@ -157,8 +159,8 @@ impl ReadableHeaderElement for Waypoint {
 pub struct PatrolPath {}
 
 impl ReadableHeaderElement for PatrolPath {
-    fn read_from<R: Read>(_: &mut RecordingHeaderReader<R>) -> Result<Self> {
-        Err(crate::Error::NotRead("a patrol path"))
+    fn read_from<R: Read>(_: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
+        Err(not_read("a patrol path"))
     }
 }
 
@@ -209,7 +211,7 @@ pub struct UnitAi {
 
 impl ReadableHeaderElement for UnitAi {
     // Reads the unit AI's fields in file order, section by section.
-    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let mut ai = Self::read_current(input)?;
         ai.read_last_and_timers(input)?;
         ai.read_lists(input)?;
@@ -221,7 +223,7 @@ impl ReadableHeaderElement for UnitAi {
 
 impl UnitAi {
     /// The mood and the current order, action and target: the AI's first fields.
-    fn read_current<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
+    fn read_current<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let mut ai = Self {
             mood: read_opt_u32(input)?,
             current_order: read_opt_u32(input)?,
@@ -249,7 +251,7 @@ impl UnitAi {
     fn read_last_and_timers<R: Read>(
         &mut self,
         input: &mut RecordingHeaderReader<R>,
-    ) -> Result<()> {
+    ) -> GenieResult<()> {
         self.last_action = read_opt_u32(input)?;
         self.last_order = read_opt_u32(input)?;
         self.last_target = read_opt_u32(input)?;
@@ -269,13 +271,13 @@ impl UnitAi {
 
     /// The queued orders, the notifications and the units attacking this one, each behind
     /// its count.
-    fn read_lists<R: Read>(&mut self, input: &mut RecordingHeaderReader<R>) -> Result<()> {
+    fn read_lists<R: Read>(&mut self, input: &mut RecordingHeaderReader<R>) -> GenieResult<()> {
         self.orders = read_counted(input)?;
         self.notifications = read_counted(input)?;
         let num_units = input.read_u32::<LE>()?;
         self.attacking_units = (0..num_units)
             .map(|_| Ok(input.read_u32::<LE>()?.into()))
-            .collect::<Result<_>>()?;
+            .collect::<GenieResult<_>>()?;
         Ok(())
     }
 
@@ -283,7 +285,7 @@ impl UnitAi {
     fn read_state_and_patrol<R: Read>(
         &mut self,
         input: &mut RecordingHeaderReader<R>,
-    ) -> Result<()> {
+    ) -> GenieResult<()> {
         self.stop_after_target_killed = input.read_u8()? != 0;
         self.state = input.read_u8()?;
         self.state_position = (input.read_f32::<LE>()?, input.read_f32::<LE>()?);
@@ -302,7 +304,10 @@ impl UnitAi {
 
     /// The fields later versions added: the order history (10.48), the retargeting (10.50,
     /// 11.04, 11.05), the best unit to attack (11.14) and the formation (11.44).
-    fn read_later_versions<R: Read>(&mut self, input: &mut RecordingHeaderReader<R>) -> Result<()> {
+    fn read_later_versions<R: Read>(
+        &mut self,
+        input: &mut RecordingHeaderReader<R>,
+    ) -> GenieResult<()> {
         if input.version() >= 10.48 {
             self.order_history = read_counted(input)?;
         }
