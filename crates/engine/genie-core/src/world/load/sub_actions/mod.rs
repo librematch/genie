@@ -1,55 +1,57 @@
 //! A saved unit's reload, sprite and Attack, its Build and Fly tasks, a building's production
 //! and gather point, and the default task an object's first update starts.
 
-use crate::masters::dat_id;
-use crate::masters::{DefaultAction, MasterTable};
-use crate::top_actions::{first_action, saved_move_to};
-use crate::{combat_master, core_task};
-use genie_core::GenieError;
-use genie_core::combat::AttackTargetId;
-use genie_core::combat::attack::{Arms, Attack, AttackState};
-use genie_core::commands::{GatherPoint, GatherPointState};
-use genie_core::construction::build::BuildTask;
-use genie_core::gathering::make::MAKE;
-use genie_core::map::Distance;
-use genie_core::map::Position;
-use genie_core::movement::Speed;
-use genie_core::movement::fly::FLY;
-use genie_core::movement::move_to::TargetMoved;
-use genie_core::objects::AnimateState;
-use genie_core::objects::Frame;
-use genie_core::objects::Graphics;
-use genie_core::objects::ObjectId;
-use genie_core::objects::SpriteId;
-use genie_core::objects::Voice;
-use genie_core::objects::WorkRate;
-use genie_core::objects::layers::{UnreadDefault, Unstartable};
-use genie_core::objects::masters::ACTION_FACTORY_KINDS;
-use genie_core::objects::masters::ActionKind;
-use genie_core::objects::masters::MasterId;
-use genie_core::objects::masters::{Master as MastersMaster, Task};
-use genie_core::objects::sprite::ActiveSprite;
-use genie_core::ownership::artifact::ARTIFACT_KIND;
-use genie_core::ownership::artifact::Artifact;
-use genie_core::players::Amount;
-use genie_core::players::CivId;
-use genie_core::players::PlayerId;
-use genie_core::players::attribute::AttributeId;
-use genie_core::production::EntrySerial;
-use genie_core::production::Production;
-use genie_core::production::QueueButton;
-use genie_core::production::QueueChanges;
-use genie_core::production::QueueLength;
-use genie_core::production::QueuedUnits;
-use genie_core::technology::TechId;
-use genie_core::world::Seconds;
-use genie_core::world::WholeSeconds;
+use crate::GenieError;
+use crate::combat::AttackTargetId;
+use crate::combat::attack::{Arms, Attack, AttackState};
+use crate::commands::{GatherPoint, GatherPointState};
+use crate::construction::build::BuildTask;
+use crate::gathering::make::MAKE;
+use crate::map::Distance;
+use crate::map::Position;
+use crate::movement::Speed;
+use crate::movement::fly::FLY;
+use crate::movement::move_to::TargetMoved;
+use crate::objects::AnimateState;
+use crate::objects::Frame;
+use crate::objects::Graphics;
+use crate::objects::ObjectId;
+use crate::objects::SpriteId;
+use crate::objects::Voice;
+use crate::objects::WorkRate;
+use crate::objects::layers::{UnreadDefault, Unstartable};
+use crate::objects::masters::ACTION_FACTORY_KINDS;
+use crate::objects::masters::ActionKind;
+use crate::objects::masters::MasterId;
+use crate::objects::masters::{Master as MastersMaster, Task};
+use crate::objects::sprite::ActiveSprite;
+use crate::ownership::artifact::ARTIFACT_KIND;
+use crate::ownership::artifact::Artifact;
+use crate::players::Amount;
+use crate::players::CivId;
+use crate::players::PlayerId;
+use crate::players::attribute::AttributeId;
+use crate::production::EntrySerial;
+use crate::production::Production;
+use crate::production::QueueButton;
+use crate::production::QueueChanges;
+use crate::production::QueueLength;
+use crate::production::QueuedUnits;
+use crate::technology::TechId;
+use crate::world::Seconds;
+use crate::world::WholeSeconds;
+use crate::world::load::top_actions::{first_action, saved_move_to};
+use genie_import::dat::dat_id;
+use genie_import::dat::{DefaultAction, MasterTable};
+use genie_import::save::core_task;
+use genie_import::save::parts::combat_master;
 use genie_save::generated::world::{Action, OwnTribeMasterCombatObject};
 use genie_save::generated::world::{Master, PlayerObjects, RgeStaticObject};
 
 /// A saved unit's reload (the Strike's): its `mReloadStinger` plus its master's
 /// `speed_of_attack` less its `mReloadPowerup`; None without a combat master.
-pub(super) fn saved_reload(
+#[must_use]
+pub fn saved_reload(
     object: &genie_save::Object,
     s: &RgeStaticObject,
     objects: &PlayerObjects,
@@ -72,7 +74,8 @@ pub(super) fn saved_reload(
 /// (`temp_load_sprite_list`, `FUN_1413b87c0`) that shows its sprite (`+0x18`), an animated one
 /// (type 2) with its frame and clock, a static one (type 1) with its frame; None without one or
 /// for a graphic the table lacks.
-pub(super) fn saved_sprite(s: &RgeStaticObject, graphics: &Graphics) -> Option<ActiveSprite> {
+#[must_use]
+pub fn saved_sprite(s: &RgeStaticObject, graphics: &Graphics) -> Option<ActiveSprite> {
     let list = s.active_sprite_list.as_deref()?;
     let graphic = SpriteId::of_data(s.sprite)
         .and_then(|id| graphics.get(id))
@@ -111,11 +114,8 @@ pub(super) fn saved_sprite(s: &RgeStaticObject, graphics: &Graphics) -> Option<A
 /// and frames. The load restores the sprites at `+0x70`, `+0x80` and `+0x88` from the second to
 /// fourth saved ids (the first goes to `+0x68`); the second attack sprite (`+0x78`) and the
 /// swing's times (`+0xb0`, `+0xb4`) are not saved, and a loaded Attack starts without them.
-pub(super) fn saved_attack(
-    sub: &Action,
-    graphics: Option<&Graphics>,
-) -> Result<Attack, GenieError> {
-    use genie_core::movement::move_to::MOVE_TO;
+pub fn saved_attack(sub: &Action, graphics: Option<&Graphics>) -> Result<Attack, GenieError> {
+    use crate::movement::move_to::MOVE_TO;
     let b = sub
         .base()
         .ok_or(GenieError::unsupported("a saved Attack without its base"))?;
@@ -175,7 +175,7 @@ pub(super) fn saved_attack(
 /// A builder's Build task (the game's Build action keeps a pointer to it, in its master's saved
 /// task list or, for a master that saves none, in the `.dat`'s): its work range (task `+0x30`)
 /// and work value (`+0x28`), with the master's work rate (its action part's `work_rate`).
-pub(super) fn build_task(
+pub fn build_task(
     objects: &PlayerObjects,
     civ: CivId,
     masters: Option<&MasterTable>,
@@ -194,7 +194,7 @@ pub(super) fn build_task(
 }
 
 /// A bird master's Fly task: its saved task list's, else the `.dat`'s.
-pub(super) fn fly_task(
+pub fn fly_task(
     objects: &PlayerObjects,
     civ: CivId,
     masters: Option<&MasterTable>,
@@ -226,7 +226,7 @@ pub(super) fn fly_task(
 }
 
 /// A builder master's Build task: its saved task list's, else the `.dat`'s.
-pub(super) fn master_build_task(
+pub fn master_build_task(
     objects: &PlayerObjects,
     civ: CivId,
     masters: Option<&MasterTable>,
@@ -271,8 +271,8 @@ pub(super) fn master_build_task(
 /// change counter (`+0xc00`) and `+0xc01` start at 0. The action: a unit's make action or a
 /// research, each with its state and `+0x60` (the base's `subActionValue`). `Ok(None)`: a building
 /// without slots, action or local lists.
-pub(super) fn production(object: &genie_save::Object) -> Result<Option<Production>, GenieError> {
-    use genie_core::production::{
+pub fn production(object: &genie_save::Object) -> Result<Option<Production>, GenieError> {
+    use crate::production::{
         Entry, MakeObj, MakeObjState, MakeTech, MakeTechState, Making, Production, Queue,
     };
     let Some(building) = object.tribe_building_object.as_deref() else {
@@ -395,7 +395,7 @@ pub(super) fn production(object: &genie_save::Object) -> Result<Option<Productio
 /// # Errors
 ///
 /// A saved state past a byte.
-pub(super) fn gather_point(object: &genie_save::Object) -> Result<Option<GatherPoint>, GenieError> {
+pub fn gather_point(object: &genie_save::Object) -> Result<Option<GatherPoint>, GenieError> {
     let Some(b) = object.tribe_building_object.as_deref() else {
         return Ok(None);
     };
@@ -411,7 +411,8 @@ pub(super) fn gather_point(object: &genie_save::Object) -> Result<Option<GatherP
 }
 
 /// A default task's action the slice models.
-pub(super) enum DefaultStart {
+#[derive(Debug)]
+pub enum DefaultStart {
     /// The Artifact action (type 107, livestock's).
     Artifact(Box<Artifact>),
     /// A bird's Fly (type 10), with its master's default task as it starts.
@@ -425,7 +426,7 @@ pub(super) enum DefaultStart {
 /// the table's, from the `.dat`, or the object's own master's. The slice models the Artifact action
 /// (type 107, the default task of livestock) and a bird's Fly (type 10); any other default task is
 /// a start the slice cannot make ([`Unstartable`]).
-pub(super) fn default_task(
+pub fn default_task(
     object: &genie_save::Object,
     s: &RgeStaticObject,
     objects: &PlayerObjects,
@@ -472,7 +473,8 @@ pub(super) fn default_task(
 
 /// Whether the object runs `RGE_Action_Object::update`: types 40 (action), 50 (combat), 60
 /// (missile), 70 (tribe combat) and 80 (building).
-pub(super) fn is_action_object(object: &genie_save::Object) -> bool {
+#[must_use]
+pub fn is_action_object(object: &genie_save::Object) -> bool {
     object.combat().is_some()
         || object.rge_object.as_deref().is_some_and(|r| {
             r.rge_action_object.is_some()
@@ -482,7 +484,8 @@ pub(super) fn is_action_object(object: &genie_save::Object) -> bool {
 }
 
 /// The default task id of an object's own action master, if it has one.
-pub(super) fn own_default_task(s: &RgeStaticObject) -> Option<i16> {
+#[must_use]
+pub fn own_default_task(s: &RgeStaticObject) -> Option<i16> {
     let tribe = |c: &OwnTribeMasterCombatObject| {
         c.own_rge_master_combat_object
             .own_rge_master_action_object

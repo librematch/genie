@@ -1,19 +1,19 @@
-use crate::fixtures::{
+use crate::map::{RestrictionId, TerrainMask};
+use crate::movement::MoveAlgorithm;
+use crate::movement::Mover;
+use crate::objects::FacetCount;
+use crate::objects::SpeedMultiplier;
+use crate::objects::SpriteFlags;
+use crate::objects::SpriteId;
+use crate::objects::masters::FlyMode;
+use crate::objects::masters::MasterId;
+use crate::players::CivId;
+use crate::world::load::fixtures::{
     combat_master, combat_object, master_moving_mut, master_static_mut, moving_mut, static_mut,
     with_masters,
 };
-use crate::masters::{MasterTable, Turning};
-use crate::movers::mover;
-use genie_core::map::{RestrictionId, TerrainMask};
-use genie_core::movement::MoveAlgorithm;
-use genie_core::movement::Mover;
-use genie_core::objects::FacetCount;
-use genie_core::objects::SpeedMultiplier;
-use genie_core::objects::SpriteFlags;
-use genie_core::objects::SpriteId;
-use genie_core::objects::masters::FlyMode;
-use genie_core::objects::masters::MasterId;
-use genie_core::players::CivId;
+use crate::world::load::movers::mover;
+use genie_import::dat::{MasterTable, Turning};
 use genie_save::generated::world::RgeObject;
 use genie_save::generated::world::{Master, PathData, PlayerObjects};
 
@@ -76,7 +76,7 @@ fn run(
     object: &genie_save::Object,
     objects: &PlayerObjects,
     table: Option<&MasterTable>,
-) -> Result<Option<Mover>, genie_core::GenieError> {
+) -> Result<Option<Mover>, crate::GenieError> {
     let s = object.static_part().unwrap().clone();
     mover(object, &s, objects, &[], CivId::GAIA, table)
 }

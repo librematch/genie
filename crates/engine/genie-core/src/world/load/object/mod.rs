@@ -1,74 +1,83 @@
 //! A saved object as the slice's object ([`object`]: its row, [`unit`], and its parts): its
 //! town bell, a building's gate and its construction.
 
-use crate::masters::MasterTable;
-use crate::{
-    DefaultStart, build_task, default_task, fly_task, gather_point, group_link, lifecycle, mover,
-    object_ids, production, saved_actions, saved_sprite, task_at, unit_ai,
-};
-use genie_core::GenieError;
-use genie_core::combat::AttackCount;
-use genie_core::combat::AttackPowerup;
-use genie_core::combat::Charge;
-use genie_core::combat::Firepower;
-use genie_core::combat::MissileCount;
-use genie_core::combat::abilities::Abilities;
-use genie_core::combat::damage::ArmorPair;
-use genie_core::combat::missile::ShooterId;
-use genie_core::combat::missile::{MISSILE, Missile};
-use genie_core::construction::Annexes;
-use genie_core::construction::BuilderCount;
-use genie_core::construction::MainBuildingId;
-use genie_core::construction::build::Construction;
-use genie_core::garrison::RaiderCountdown;
-use genie_core::gathering::PastureId;
-use genie_core::map::Distance;
-use genie_core::map::Point;
-use genie_core::map::Snow;
-use genie_core::map::spatial::Obstruction;
-use genie_core::map::{Offset, Position};
-use genie_core::movement::Speed;
-use genie_core::objects::DamagedTimer;
-use genie_core::objects::HitPoints;
-use genie_core::objects::HpPowerup;
-use genie_core::objects::MasterHitPoints;
-use genie_core::objects::ObjectId;
-use genie_core::objects::Regeneration;
-use genie_core::objects::RelicCount;
-use genie_core::objects::Relics;
-use genie_core::objects::WorkRate;
-use genie_core::objects::WorkerCount;
-use genie_core::objects::layers::Building;
-use genie_core::objects::layers::{
-    Action, Animated, Combat, DefaultTask, Motion, Static, Unstartable,
-};
-use genie_core::objects::lifecycle::Lifecycle;
-use genie_core::objects::masters::ActionKind;
-use genie_core::objects::masters::ClassId;
-use genie_core::objects::masters::MasterId;
-use genie_core::objects::masters::ObstructionClass;
-use genie_core::objects::masters::ObstructionKind;
-use genie_core::objects::unit::Unit;
-use genie_core::objects::unit::UnitFlags;
-use genie_core::orders::town_bell::{BellShelter, TownBell};
-use genie_core::ownership::CaptureKind;
-use genie_core::players::Amount;
-use genie_core::players::CivId;
-use genie_core::players::attribute::AttributeId;
-use genie_core::unit_ai::{AiAction, UnitAi};
-use genie_core::world::Seconds;
-use genie_core::world::WholeSeconds;
-use genie_core::world::WorldTime;
-use genie_core::world::layer::generated::MissileTuning;
-use genie_core::world::parts::{Object, ObjectParts};
-use genie_core::world::{Gate, Unread};
+use crate::GenieError;
+use crate::combat::AttackCount;
+use crate::combat::AttackPowerup;
+use crate::combat::Charge;
+use crate::combat::Firepower;
+use crate::combat::MissileCount;
+use crate::combat::abilities::Abilities;
+use crate::combat::damage::ArmorPair;
+use crate::combat::missile::ShooterId;
+use crate::combat::missile::{MISSILE, Missile};
+use crate::construction::Annexes;
+use crate::construction::BuilderCount;
+use crate::construction::MainBuildingId;
+use crate::construction::build::Construction;
+use crate::garrison::RaiderCountdown;
+use crate::gathering::PastureId;
+use crate::groups::{GroupId, GroupLink};
+use crate::map::Distance;
+use crate::map::Point;
+use crate::map::Snow;
+use crate::map::spatial::Obstruction;
+use crate::map::{Offset, Position};
+use crate::movement::Speed;
+use crate::objects::DamagedTimer;
+use crate::objects::HitPoints;
+use crate::objects::HpPowerup;
+use crate::objects::MasterHitPoints;
+use crate::objects::ObjectId;
+use crate::objects::Regeneration;
+use crate::objects::RelicCount;
+use crate::objects::Relics;
+use crate::objects::WorkRate;
+use crate::objects::WorkerCount;
+use crate::objects::layers::Building;
+use crate::objects::layers::{Action, Animated, Combat, DefaultTask, Motion, Static, Unstartable};
+use crate::objects::lifecycle::Lifecycle;
+use crate::objects::masters::ActionKind;
+use crate::objects::masters::ClassId;
+use crate::objects::masters::MasterId;
+use crate::objects::masters::ObstructionClass;
+use crate::objects::masters::ObstructionKind;
+use crate::objects::unit::Unit;
+use crate::objects::unit::UnitFlags;
+use crate::orders::town_bell::{BellShelter, TownBell};
+use crate::ownership::CaptureKind;
+use crate::players::Amount;
+use crate::players::CivId;
+use crate::players::attribute::AttributeId;
+use crate::unit_ai::{AiAction, UnitAi};
+use crate::world::Seconds;
+use crate::world::WholeSeconds;
+use crate::world::WorldTime;
+use crate::world::layer::generated::MissileTuning;
+use crate::world::load::movers::mover;
+use crate::world::load::object_ids;
+use crate::world::load::object_parts::lifecycle;
+use crate::world::load::object_parts::unit_ai;
+use crate::world::load::sub_actions::DefaultStart;
+use crate::world::load::sub_actions::build_task;
+use crate::world::load::sub_actions::default_task;
+use crate::world::load::sub_actions::fly_task;
+use crate::world::load::sub_actions::gather_point;
+use crate::world::load::sub_actions::production;
+use crate::world::load::sub_actions::saved_sprite;
+use crate::world::load::top_actions::saved_actions;
+use crate::world::parts::{Object, ObjectParts};
+use crate::world::{Gate, Unread};
+use genie_import::dat::MasterTable;
+use genie_import::save::task_at;
 use genie_save::generated::world::TribeCombatObject;
 use genie_save::generated::world::{Path, PlayerObjects, RgeMissileObject, RgeStaticObject};
 
 /// The slice's view of one saved object, whole: its row ([`unit`]) and its parts (the gather
 /// point, the production lists, the missile's own fields, the town bell, the unit AI; the dead
 /// and own masters are the import's gaps, MISSING.md).
-pub(super) fn object(
+#[must_use]
+pub fn object(
     object: &genie_save::Object,
     objects: &PlayerObjects,
     paths: &[Path],
@@ -92,7 +101,8 @@ pub(super) fn object(
 }
 
 /// A saved object's missile part (`RGE_Missile_Object`): None for an object that is no missile.
-pub(super) fn missile_part(object: &genie_save::Object) -> Option<&RgeMissileObject> {
+#[must_use]
+pub fn missile_part(object: &genie_save::Object) -> Option<&RgeMissileObject> {
     object
         .rge_object
         .as_deref()
@@ -104,7 +114,7 @@ pub(super) fn missile_part(object: &genie_save::Object) -> Option<&RgeMissileObj
 /// the build's landing distance (`missile` tuning's `landing`); a missile without its action (one
 /// that met its target, dying) takes the 1 the load's constructor sets. None for an object that
 /// is no missile.
-pub(super) fn saved_missile(
+pub fn saved_missile(
     object: &genie_save::Object,
     missile_tuning: &MissileTuning,
 ) -> Option<Missile> {
@@ -129,7 +139,7 @@ pub(super) fn saved_missile(
 }
 
 /// The parts of an object the slice cannot read at all: none, the load's reason `why` its only
-/// entry ([`genie_core::world::Unread`]).
+/// entry ([`crate::world::Unread`]).
 fn unmodelled(why: GenieError) -> ObjectParts {
     ObjectParts {
         unread: Some(Unread::new(why)),
@@ -448,7 +458,7 @@ fn row(
 /// again, or a start the slice cannot make. A saved object's Fly is its saved action's: none
 /// starts again (it never ends); a saved Make started.
 fn default_start(default: Result<Option<DefaultStart>, Unstartable>, saved: bool) -> DefaultTask {
-    use genie_core::objects::layers::DefaultTask;
+    use crate::objects::layers::DefaultTask;
     match default {
         Ok(None) => DefaultTask::Nothing,
         Ok(Some(DefaultStart::Fly | DefaultStart::Make)) if saved => DefaultTask::Nothing,
@@ -517,8 +527,8 @@ fn ai_parts(
 /// # Errors
 ///
 /// A record's action value no action holds ([`AiAction::try_from`]).
-pub(super) fn town_bell(c: &TribeCombatObject) -> Result<TownBell, GenieError> {
-    use genie_core::orders::town_bell::BackToWork;
+pub fn town_bell(c: &TribeCombatObject) -> Result<TownBell, GenieError> {
+    use crate::orders::town_bell::BackToWork;
     Ok(TownBell {
         flag: BellShelter::of_byte(c.town_bell_flag),
         work: BackToWork {
@@ -544,10 +554,11 @@ pub(super) fn town_bell(c: &TribeCombatObject) -> Result<TownBell, GenieError> {
     })
 }
 
-/// A saved building's gate state ([`genie_core::world::Gate`]): its lock, first update and close
+/// A saved building's gate state ([`crate::world::Gate`]): its lock, first update and close
 /// timer, and whether a saved open or shut master or its original owner's would take part in a
 /// toggle.
-pub(super) fn saved_gate(object: &genie_save::Object) -> Option<Gate> {
+#[must_use]
+pub fn saved_gate(object: &genie_save::Object) -> Option<Gate> {
     let b = object.tribe_building_object.as_deref()?;
     Some(Gate {
         locked: b.gate_locked != 0,
@@ -558,7 +569,7 @@ pub(super) fn saved_gate(object: &genie_save::Object) -> Option<Gate> {
 }
 
 /// A saved Build's or Repair's sub-action other than a `MoveTo`.
-pub(super) const OTHER_SUB_ACTION: GenieError =
+pub const OTHER_SUB_ACTION: GenieError =
     GenieError::unsupported("a saved Build or Repair action with another sub-action");
 
 /// A saved building's construction: its `build_pts`, `desolid_flag` and `num_builders`, its
@@ -568,7 +579,7 @@ pub(super) const OTHER_SUB_ACTION: GenieError =
 /// # Errors
 ///
 /// A snow flag that is not the game's (above 2).
-pub(super) fn construction(
+pub fn construction(
     object: &genie_save::Object,
     s: &RgeStaticObject,
     objects: &PlayerObjects,
@@ -602,6 +613,15 @@ pub(super) fn construction(
         snow: Snow::of_byte(b.snow_flag)?,
         sprite_override: s.sprite_override_id != -1,
     }))
+}
+
+/// An object's unit group link as saved (`mGroupID`, `mGroupFlag`).
+#[must_use]
+pub const fn group_link(s: &RgeStaticObject) -> GroupLink {
+    GroupLink {
+        id: GroupId::of_field(s.group_id),
+        flag: s.group_flag,
+    }
 }
 
 #[cfg(test)]

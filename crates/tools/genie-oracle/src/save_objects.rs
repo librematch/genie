@@ -4,7 +4,6 @@
 use crate::masters::MasterTable;
 use crate::{Error, listed, run_from_save};
 use genie_core::GenieError;
-use genie_core::groups::{GroupId, GroupLink};
 use genie_core::map::Distance;
 use genie_core::map::Tile;
 use genie_core::map::spatial::Spatial;
@@ -19,7 +18,6 @@ use genie_core::vision::registry::{Registry, SLOTS};
 use genie_core::vision::visibility::Visibility;
 use genie_core::world::World;
 use genie_core::world::parts::Object;
-use genie_save::generated::world::RgeStaticObject;
 
 /// A slice run from a save ([`objects_from_save`]): one player's objects after it, and the first
 /// update the slice could not model, if any.
@@ -43,14 +41,6 @@ pub struct SliceRun {
     pub frozen: Vec<ObjectId>,
     /// Every object's freeze, by player: the tick, the object and why.
     pub freezes: Vec<Vec<(u32, ObjectId, GenieError)>>,
-}
-
-/// An object's unit group link as saved (`mGroupID`, `mGroupFlag`).
-pub(super) const fn group_link(s: &RgeStaticObject) -> GroupLink {
-    GroupLink {
-        id: GroupId::of_field(s.group_id),
-        flag: s.group_flag,
-    }
 }
 
 /// What the tick oracle dumps of the game at a save's tick that the save does not hold.

@@ -6,6 +6,8 @@ moves it on. The behaviours that a tick runs live in their systems. Many of them
 `World` in their own folders.
 
 - `setup.rs` builds the world from the save in a recording's header.
+- `load/` reads each saved object into the world: its row, its parts, its movement, its
+  actions and sub-actions.
 - `schedule.rs` is one tick as a declared schedule: the command phase, each player's steps and
   the steps after them, each with the game routine it ports. Read it first: it calls every
   system in the game's order.
@@ -58,11 +60,12 @@ moves it on. The behaviours that a tick runs live in their systems. Many of them
 | [`unread.rs`](unread.rs) | The objects the load could not read whole (FD-045-D61): the import's gap, not game data. |
 | [`whole.rs`](whole.rs) | An object as one value (FD-045-D51): its row and its parts, as the world takes it in and gives it back whole, and the view a comparison reads (`ObjectView`). |
 | [`world_update.rs`](world_update.rs) | The world update's parts (`crate::world::schedule` runs them): the command phase, the moving objects, the players' relations and each player's objects' updates. |
+| [`load/`](load/) | The world's load from a save (FD-043-01M6JPBEDA, the review's ORA-01): each saved object's row, its parts, its movement, its actions and sub-actions, as genie-save reads them from a recording's header or a per-tick save. |
 <!-- /files -->
 
 ## How it connects
 
 <!-- uses -->
-- Uses: [`combat`](../combat/), [`commands`](../commands/), [`construction`](../construction/), [`gathering`](../gathering/), [`groups`](../groups/), [`map`](../map/), [`math`](../math/), [`movement`](../movement/), [`objects`](../objects/), [`orders`](../orders/), [`ownership`](../ownership/), [`pathing`](../pathing/), [`players`](../players/), [`production`](../production/), [`technology`](../technology/), [`testing`](../testing/), [`unit_ai`](../unit_ai/), [`vision`](../vision/).
+- Uses: [`combat`](../combat/), [`commands`](../commands/), [`construction`](../construction/), [`garrison`](../garrison/), [`gathering`](../gathering/), [`groups`](../groups/), [`map`](../map/), [`math`](../math/), [`movement`](../movement/), [`objects`](../objects/), [`orders`](../orders/), [`ownership`](../ownership/), [`pathing`](../pathing/), [`players`](../players/), [`production`](../production/), [`technology`](../technology/), [`testing`](../testing/), [`unit_ai`](../unit_ai/), [`vision`](../vision/).
 - Used by: [`combat`](../combat/), [`commands`](../commands/), [`construction`](../construction/), [`garrison`](../garrison/), [`gathering`](../gathering/), [`groups`](../groups/), [`map`](../map/), [`math`](../math/), [`movement`](../movement/), [`objects`](../objects/), [`orders`](../orders/), [`ownership`](../ownership/), [`pathing`](../pathing/), [`players`](../players/), [`production`](../production/), [`technology`](../technology/), [`testing`](../testing/), [`unit_ai`](../unit_ai/), [`vision`](../vision/).
 <!-- /uses -->

@@ -1,29 +1,33 @@
-use crate::fixtures::{action_list, building_mut, building_object, combat_object, static_mut};
-use crate::masters::{DefaultAction, MasterTable};
-use crate::sub_actions::{DefaultStart, default_task, gather_point, production, saved_attack};
-use crate::test_ids::VILLAGER_MALE;
-use crate::test_ids::attribute;
+use crate::combat::AttackTargetId;
+use crate::combat::attack::ATTACK;
+use crate::combat::attack::AttackState;
+use crate::garrison::ENTER;
+use crate::gathering::make::MAKE;
+use crate::movement::explore::EXPLORE;
+use crate::movement::fly::FLY;
+use crate::movement::move_to::MOVE_TO;
+use crate::movement::move_to::MoveTo;
+use crate::objects::Graphics;
+use crate::objects::Voice;
+use crate::objects::layers::{UnreadDefault, Unstartable};
+use crate::objects::masters::ActionKind;
+use crate::objects::masters::FlyMode;
+use crate::objects::masters::MasterId;
+use crate::ownership::artifact::ARTIFACT_KIND;
+use crate::players::Amount;
+use crate::players::CivId;
+use crate::production::{MakeObjState, MakeTechState, Making};
+use crate::technology::TechId;
 use crate::test_ids::object_id;
-use genie_core::combat::AttackTargetId;
-use genie_core::combat::attack::ATTACK;
-use genie_core::combat::attack::AttackState;
-use genie_core::garrison::ENTER;
-use genie_core::gathering::make::MAKE;
-use genie_core::movement::explore::EXPLORE;
-use genie_core::movement::fly::FLY;
-use genie_core::movement::move_to::MOVE_TO;
-use genie_core::movement::move_to::MoveTo;
-use genie_core::objects::Graphics;
-use genie_core::objects::Voice;
-use genie_core::objects::layers::{UnreadDefault, Unstartable};
-use genie_core::objects::masters::ActionKind;
-use genie_core::objects::masters::FlyMode;
-use genie_core::objects::masters::MasterId;
-use genie_core::ownership::artifact::ARTIFACT_KIND;
-use genie_core::players::Amount;
-use genie_core::players::CivId;
-use genie_core::production::{MakeObjState, MakeTechState, Making};
-use genie_core::technology::TechId;
+use crate::testing::attribute;
+use crate::testing::ids::VILLAGER_MALE;
+use crate::world::load::fixtures::{
+    action_list, building_mut, building_object, combat_object, static_mut,
+};
+use crate::world::load::sub_actions::{
+    DefaultStart, default_task, gather_point, production, saved_attack,
+};
+use genie_import::dat::{DefaultAction, MasterTable};
 use genie_save::generated::world::{
     Action, PlayerObjects, RgeAction, RgeActionAttack, RgeActionByKind, RgeActionMoveTo, RgeObject,
     TribeActionMakeObj, TribeActionMakeTech, TribeBuildingObjectEntry1,
@@ -140,7 +144,7 @@ fn research_in_state_of_none_fails() {
 /// value past a byte fails the read.
 #[test]
 fn gather_point_takes_its_saved_state() {
-    use genie_core::commands::GatherPointState;
+    use crate::commands::GatherPointState;
     let with = |state: i32| {
         let mut barracks = building_object(11, 12);
         building_mut(&mut barracks).gather_point_exists = state;
@@ -338,7 +342,7 @@ fn saved_attack_reads_its_target_range_and_move_to() {
     assert_eq!(
         (stray.kind(), stray.reason()),
         (
-            genie_core::ErrorKind::InvalidInput,
+            crate::ErrorKind::InvalidInput,
             "a MoveTo of an Attack that does not walk"
         )
     );

@@ -19,6 +19,10 @@ getset.workspace = true
 genie-math = { path = "../genie-math" }
 # the game data the systems read (FD-046)
 genie-model = { path = "../genie-model" }
+# the save the world loads from (src/world/load.rs, FD-043-01M6JPBEDA): its records as genie-save
+# reads them, and the importers that fill the masters' values the save does not hold
+genie-save = { path = "../../formats/genie-save" }
+genie-import = { path = "../genie-import", default-features = false }
 # the bit sets the game tests bit by bit (the vision's player bits): every bit kept (`_ = !0`)
 bitflags.workspace = true
 # the formats derived where they are the plain ones (the steps' names, T16)

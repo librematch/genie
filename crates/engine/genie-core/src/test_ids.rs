@@ -5,6 +5,7 @@ use crate::commands::UnitList;
 use crate::groups::GroupId;
 use crate::objects::ObjectId;
 use crate::objects::lifecycle::Held;
+use crate::objects::masters::ActionKind;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::CostAmount;
 use crate::objects::masters::MasterId;
@@ -22,6 +23,14 @@ pub(crate) const fn object_id(value: i32) -> ObjectId {
     match ObjectId::of_field(value) {
         Some(id) => id,
         None => panic!("a test's object id is not −1"),
+    }
+}
+
+/// The action type `value` (0 or more).
+pub(crate) const fn action_kind(value: i16) -> ActionKind {
+    match ActionKind::of_data(value) {
+        Some(kind) => kind,
+        None => panic!("a test's action type is 0 or more"),
     }
 }
 

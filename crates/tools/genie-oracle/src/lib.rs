@@ -58,7 +58,7 @@ pub mod views;
 pub use masters::{DefaultAction, MasterTable, TerrainTable};
 
 use genie_core::GenieError;
-use genie_core::objects::ObjectId;
+use genie_core::world::load::object_ids;
 use genie_rec::de;
 
 mod command_args;
@@ -70,27 +70,22 @@ mod forced_replay;
 use genie_import::tables as game_tables;
 mod header_runs;
 mod map_and_sight;
-mod movers;
-mod object_parts;
 mod pathing_inputs;
 mod save_objects;
 mod save_runs;
 #[cfg(test)]
 mod save_tests;
 use genie_import::save as saved_masters;
-mod saved_unit;
 mod setup;
 mod step_runs;
-mod sub_actions;
 mod task_finder;
 #[cfg(test)]
 mod test_ids;
-mod top_actions;
 
 #[cfg(test)]
 mod fixtures;
 
-use self::command_args::{Frame, frames, market, saved_move_wait};
+use self::command_args::{Frame, frames, market};
 use self::compared_objects::header_objects;
 pub use self::compared_objects::{object_rows, saved_objects};
 use self::decoder::Decoder;
@@ -117,42 +112,33 @@ pub use self::header_runs::{
 use self::header_runs::{header_slice, lane_block, run, top_action, watch_at_load};
 use self::map_and_sight::{SavedStep, spatial, tile_differences};
 pub use self::map_and_sight::{saved_visibility, terrain_differences, visibility_differences};
-use self::movers::{mover, path_level, vec3};
-use self::object_parts::{lifecycle, unit_ai};
 pub use self::pathing_inputs::{
     mesh_from_dump, mesh_owners_from_dump, planner_from_save, unit_terrain,
 };
+use self::save_objects::tile_order_differences;
 pub use self::save_objects::{
     Dumps, SliceRun, ghost_pool_from_dump, inside_lists_from_dump, objects_from_save,
     recycle_pools_from_dump, registry_from_dump, tile_lists_from_dump, turns_from_save,
 };
-use self::save_objects::{group_link, tile_order_differences};
 pub use self::save_runs::{
     command_phase_from_save, run_from_save, saved_groups, spatial_from_save, spatial_with_tiles,
 };
 use self::save_runs::{
     compare_players, hunted_origins, loaded_slice, played_frames, primed, save_header,
 };
-use self::saved_masters::{
-    core_task, master_facets, moving_speed, placement, task_at, work_masters,
-};
-use self::saved_unit::{OTHER_SUB_ACTION, object};
+use self::saved_masters::{moving_speed, placement, work_masters};
 pub use self::setup::{history, layer, settings};
 use self::setup::{saved_ghosts, slice, tech_state};
 pub use self::step_runs::{StepSave, steps_from_save};
-use self::sub_actions::{
-    DefaultStart, build_task, default_task, fly_task, gather_point, production, saved_attack,
-    saved_reload, saved_sprite,
-};
 pub use self::task_finder::{FinderObject, FinderWorld, finder_world};
-use self::top_actions::saved_actions;
 #[cfg(test)]
 use genie_core::objects::unit::Unit;
 #[cfg(test)]
 use genie_core::ownership::artifact::ARTIFACT_KIND;
+use genie_core::world::load::movers::{path_level, vec3};
+use genie_core::world::load::object::object;
 /// The fields a comparison covers ([`object_field_differences_in`]).
 pub use genie_diff::Scope;
-use genie_import::save::parts::combat_master;
 use std::error::Error as StdError;
 use std::fmt::{Display, Error as FmtError, Formatter};
 
@@ -208,15 +194,6 @@ impl Display for Error {
 }
 
 impl StdError for Error {}
-
-/// The ids of a saved list of objects, which names no none (−1).
-///
-/// # Errors
-///
-/// An entry of −1.
-pub(crate) fn object_ids(ids: &[i32]) -> Result<Vec<ObjectId>, GenieError> {
-    ids.iter().map(|&id| ObjectId::try_from(id)).collect()
-}
 
 #[cfg(test)]
 mod tests;

@@ -2,14 +2,12 @@
 //! combat part.
 
 use crate::Error;
-use genie_core::movement::move_to::MoveWait;
 use genie_core::players::market::{Commodity, Market};
 use genie_core::players::{NetTrades, Price, PriceSwing};
 use genie_core::world::Millis;
-use genie_core::world::Seconds;
 use genie_rec::de;
 use genie_rec::de::Op;
-use genie_save::generated::world::{Action, World};
+use genie_save::generated::world::World;
 
 /// One frame of the body (FD-007's per-frame record order): the op-2 record that starts a tick, its
 /// dt and, every interval, a checkpoint, then the op-1 commands the tick runs after its `SeedAll`.
@@ -45,28 +43,6 @@ pub(super) fn frames<'a>(chapter: &de::Chapter<'a>, limit: usize) -> Result<Vec<
         });
     }
     Ok(out)
-}
-
-/// A saved `MoveTo`'s wait (`+0x6c`, `+0x70`, `+0x74`); none for another sub-action.
-///
-/// # Errors
-///
-/// A saved wait state that names no state.
-pub(super) fn saved_move_wait(sub: &Action) -> Result<MoveWait, genie_core::GenieError> {
-    use genie_core::movement::move_to::{MoveWait, MoveWaitState};
-    sub.rge_action_by_kind
-        .as_deref()
-        .and_then(|t| t.rge_action_move_to.as_deref())
-        .map_or_else(
-            || Ok(MoveWait::default()),
-            |m| {
-                Ok(MoveWait {
-                    state: MoveWaitState::of_byte(m.movement_wait_state)?,
-                    timer: Seconds::new(m.timer),
-                    delay: Seconds::new(f32::from_bits(m.default_wait_time)),
-                })
-            },
-        )
 }
 
 /// The world's market as the save holds it: the save names the int net trades `*_price_delta`

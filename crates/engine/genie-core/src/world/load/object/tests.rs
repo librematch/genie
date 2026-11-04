@@ -1,23 +1,23 @@
-use crate::fixtures::{
+use crate::combat::AttackCount;
+use crate::combat::missile::ShooterId;
+use crate::construction::Annexes;
+use crate::movement::explore::EXPLORE;
+use crate::objects::ObjectId;
+use crate::objects::layers::{DefaultTask, UnreadDefault, Unstartable};
+use crate::objects::masters::FlyMode;
+use crate::objects::masters::MasterId;
+use crate::orders::town_bell::TownBell;
+use crate::ownership::artifact::ARTIFACT_KIND;
+use crate::players::CivId;
+use crate::technology::TechId;
+use crate::test_ids::object_id;
+use crate::world::load::fixtures::{
     action_list, building_mut, building_object, combat_master, combat_mut, combat_object,
     missile_tuning, with_masters,
 };
-use crate::masters::{DefaultAction, MasterTable};
-use crate::saved_unit::object as saved_unit_object;
-use crate::saved_unit::{annexes, object};
-use crate::test_ids::object_id;
-use genie_core::combat::AttackCount;
-use genie_core::combat::missile::ShooterId;
-use genie_core::construction::Annexes;
-use genie_core::movement::explore::EXPLORE;
-use genie_core::objects::ObjectId;
-use genie_core::objects::layers::{DefaultTask, UnreadDefault, Unstartable};
-use genie_core::objects::masters::FlyMode;
-use genie_core::objects::masters::MasterId;
-use genie_core::orders::town_bell::TownBell;
-use genie_core::ownership::artifact::ARTIFACT_KIND;
-use genie_core::players::CivId;
-use genie_core::technology::TechId;
+use crate::world::load::object::object as saved_unit_object;
+use crate::world::load::object::{annexes, object};
+use genie_import::dat::{DefaultAction, MasterTable};
 use genie_save::generated::world::{
     Action, PlayerObjects, RgeAction, RgeActionByKind, RgeMissileObject, RgeObject,
 };
@@ -46,7 +46,7 @@ fn an_object_without_its_static_part_is_unmodelled() {
 /// unmodelled part. The dead master is the import's gap.
 #[test]
 fn saved_building_parts_are_its_object_s() {
-    use genie_core::commands::GatherPointState;
+    use crate::commands::GatherPointState;
     let whole = |state: i32| {
         let mut barracks = building_object(11, 12);
         let b = building_mut(&mut barracks);
@@ -207,7 +207,7 @@ fn missile_without_its_action_keeps_flying() {
 /// combat layer's) added to the master's work rate.
 #[test]
 fn build_work_rate_takes_the_builder_powerup() {
-    use genie_core::objects::masters::ActionKind;
+    use crate::objects::masters::ActionKind;
     use genie_save::generated::world::{Task, TaskList, TaskListEntry1, TribeActionBuild};
     let mut master = combat_master(83);
     let acting = &mut master
@@ -266,7 +266,7 @@ fn build_work_rate_takes_the_builder_powerup() {
 /// unit's.
 #[test]
 fn the_back_to_work_actions_import_as_their_kinds() {
-    use genie_core::unit_ai::AiAction;
+    use crate::unit_ai::AiAction;
     let mut object = combat_object(5, 4);
     let c = combat_mut(&mut object);
     c.town_bell_flag = 1;
@@ -292,7 +292,7 @@ fn the_back_to_work_actions_import_as_their_kinds() {
     let o = whole(&object);
     assert_eq!(
         o.parts.unread.map(|e| e.error().kind()),
-        Some(genie_core::ErrorKind::InvalidInput)
+        Some(crate::ErrorKind::InvalidInput)
     );
     assert_eq!(o.parts.town_bell, TownBell::default());
 }

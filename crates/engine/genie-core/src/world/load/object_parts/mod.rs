@@ -1,40 +1,40 @@
 //! A saved object's lifecycle fields and its unit AI.
 
-use crate::masters::MasterTable;
-use crate::masters::dat_id;
-use crate::vec3;
-use genie_core::GenieError;
-use genie_core::garrison::ContainerId;
-use genie_core::groups::FormationKind;
-use genie_core::map::Distance;
-use genie_core::map::Point;
-use genie_core::map::Position;
-use genie_core::movement::PathFlags;
-use genie_core::movement::WaypointIndex;
-use genie_core::objects::HitPoints;
-use genie_core::objects::ObjectId;
-use genie_core::objects::ObjectState;
-use genie_core::objects::SpriteFlags;
-use genie_core::objects::SpriteId;
-use genie_core::objects::lifecycle::{Class, Lifecycle, MasterData};
-use genie_core::objects::masters::ClassId;
-use genie_core::objects::masters::MasterId;
-use genie_core::pathing::tile_path::Path;
-use genie_core::players::Amount;
-use genie_core::players::AmountRate;
-use genie_core::players::CivId;
-use genie_core::players::attribute::AttributeId;
-use genie_core::unit_ai::AlertMode;
-use genie_core::unit_ai::OrderPriority;
-use genie_core::unit_ai::best_target::AttackCategory;
-use genie_core::unit_ai::{AiAction, OrderKind};
-use genie_core::unit_ai::{
+use crate::GenieError;
+use crate::garrison::ContainerId;
+use crate::groups::FormationKind;
+use crate::map::Distance;
+use crate::map::Point;
+use crate::map::Position;
+use crate::movement::PathFlags;
+use crate::movement::WaypointIndex;
+use crate::objects::HitPoints;
+use crate::objects::ObjectId;
+use crate::objects::ObjectState;
+use crate::objects::SpriteFlags;
+use crate::objects::SpriteId;
+use crate::objects::lifecycle::{Class, Lifecycle, MasterData};
+use crate::objects::masters::ClassId;
+use crate::objects::masters::MasterId;
+use crate::pathing::tile_path::Path;
+use crate::players::Amount;
+use crate::players::AmountRate;
+use crate::players::CivId;
+use crate::players::attribute::AttributeId;
+use crate::unit_ai::AlertMode;
+use crate::unit_ai::OrderPriority;
+use crate::unit_ai::best_target::AttackCategory;
+use crate::unit_ai::{AiAction, OrderKind};
+use crate::unit_ai::{
     Attackers, Home, Notify, OrderRecord, PatrolPath, QueuedOrder, UnitAi, UnitAiKind, UnitStance,
     notify_capacity,
 };
-use genie_core::world::Millis;
-use genie_core::world::Seconds;
-use genie_core::world::WorldTime;
+use crate::world::Millis;
+use crate::world::Seconds;
+use crate::world::WorldTime;
+use crate::world::load::movers::vec3;
+use genie_import::dat::MasterTable;
+use genie_import::dat::dat_id;
 use genie_save::generated::world::{
     PlayerObjects, RgeStaticObject, TribeCombatObject, UnitAiModule,
 };
@@ -46,7 +46,7 @@ use genie_save::generated::world::{
 /// # Errors
 ///
 /// A saved state past 8.
-pub(super) fn lifecycle(
+pub fn lifecycle(
     object: &genie_save::Object,
     (s, master_id): (&RgeStaticObject, MasterId),
     objects: &PlayerObjects,
@@ -121,7 +121,7 @@ pub(super) fn lifecycle(
 ///
 /// An order or action value no order or action holds ([`OrderKind::try_from`],
 /// [`AiAction::try_from`]), in the current or last one, the history or a queue.
-pub(super) fn unit_ai(
+pub fn unit_ai(
     object: &genie_save::Object,
     own: ObjectId,
     players: usize,

@@ -88,10 +88,6 @@
   "crates/engine/genie-core/src/map/terrain.rs": 1,
   "crates/tools/genie-oracle/src/lib.rs": 1
  },
- "clippy::fn_params_excessive_bools": {
-  "crates/engine/genie-core/src/lib.rs": 1,
-  "crates/tools/genie-oracle/src/lib.rs": 1
- },
  "clippy::imprecise_flops": {
   "crates/engine/genie-core/src/lib.rs": 1,
   "crates/tools/genie-oracle/src/lib.rs": 1
@@ -141,16 +137,13 @@
   "crates/tools/genie-oracle/src/lib.rs": 1
  },
  "clippy::struct_excessive_bools": {
-  "crates/engine/genie-core/src/lib.rs": 1,
-  "crates/engine/genie-model/src/lib.rs": 1,
   "crates/formats/genie-dat/src/unit_kind/statics.rs": 1,
   "crates/formats/genie-rec/src/lib.rs": 1,
   "crates/formats/genie-rec/src/unit/building.rs": 1,
   "crates/formats/genie-rec/src/unit/statics.rs": 1,
   "crates/formats/genie-rec/src/unit_kind.rs": 1,
   "crates/formats/genie-scx/src/format/tribe_read.rs": 1,
-  "crates/formats/genie-scx/src/triggers/trigger.rs": 1,
-  "crates/tools/genie-oracle/src/lib.rs": 1
+  "crates/formats/genie-scx/src/triggers/trigger.rs": 1
  },
  "clippy::struct_field_names": {
   "crates/formats/genie-rec/src/actions/mod.rs": 1
@@ -173,8 +166,8 @@
   "crates/tools/genie-oracle/src/lib.rs": 1
  },
  "clippy::too_many_arguments": {
-  "crates/tools/genie-oracle/src/forced_replay.rs": 1,
-  "crates/tools/genie-oracle/src/top_actions.rs": 1
+  "crates/engine/genie-core/src/world/load/top_actions/mod.rs": 1,
+  "crates/tools/genie-oracle/src/forced_replay.rs": 1
  },
  "clippy::too_many_lines": {
   "crates/engine/genie-core/src/groups/formation/passability.rs": 1,

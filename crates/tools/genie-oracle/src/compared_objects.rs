@@ -10,8 +10,8 @@ use genie_rec::de::chapters;
 use genie_save::Header;
 
 use crate::masters::MasterTable;
-use crate::saved_unit::object;
 use crate::{Error, layer, listed};
+use genie_core::world::load::object::object;
 
 /// A player's listed objects in genie's world, in its list's order, each with its parts from the
 /// world's tables ([`World::object_view`]); none for a player it lacks.

@@ -1,51 +1,51 @@
 //! Each saved top action the slice imports, and the saved actions it refuses.
 
-use crate::OTHER_SUB_ACTION;
-use crate::fixtures::{
-    action_list, combat_master, combat_mut, combat_object, missile_tuning, with_masters,
-};
-use crate::saved_unit::saved_missile;
+use crate::GenieError;
+use crate::combat::attack::ATTACK;
+use crate::combat::missile::ShooterId;
+use crate::combat::missile::{HitMode, MISSILE, MissileState};
+use crate::construction::FoundationId;
+use crate::construction::build::BuildState;
+use crate::construction::build::BuildTask;
+use crate::garrison::transport::TransportMode;
+use crate::gathering::DropSiteId;
+use crate::gathering::FarmStops;
+use crate::map::Distance;
+use crate::map::Position;
+use crate::movement::explore::EXPLORE;
+use crate::movement::move_to::MoveWaitState;
+use crate::movement::move_to::{Goal, MOVE_TO, MoveTo};
+use crate::objects::FacetCount;
+use crate::objects::Frame;
+use crate::objects::SpriteFlags;
+use crate::objects::SpriteId;
+use crate::objects::Voice;
+use crate::objects::WorkRate;
+use crate::objects::layers;
+use crate::objects::masters::ActionKind;
+use crate::objects::masters::ClassId;
+use crate::objects::masters::SoundEvents;
+use crate::objects::masters::TargetOwner;
+use crate::objects::masters::Task;
+use crate::objects::masters::TaskFlags;
+use crate::objects::masters::TaskId;
+use crate::objects::masters::TaskSprites;
+use crate::objects::masters::TaskTerrain;
+use crate::objects::masters::WorkValue;
+use crate::objects::sprite::Graphic;
+use crate::objects::{Graphics, SpeedMultiplier};
+use crate::ownership::artifact::{ARTIFACT_KIND, ArtifactState};
 use crate::test_ids::action_kind;
-use crate::test_ids::attribute;
 use crate::test_ids::class_id;
 use crate::test_ids::object_id;
-use crate::top_actions::saved_actions;
-use genie_core::GenieError;
-use genie_core::combat::attack::ATTACK;
-use genie_core::combat::missile::ShooterId;
-use genie_core::combat::missile::{HitMode, MISSILE, MissileState};
-use genie_core::construction::FoundationId;
-use genie_core::construction::build::BuildState;
-use genie_core::construction::build::BuildTask;
-use genie_core::garrison::transport::TransportMode;
-use genie_core::gathering::DropSiteId;
-use genie_core::gathering::FarmStops;
-use genie_core::map::Distance;
-use genie_core::map::Position;
-use genie_core::movement::explore::EXPLORE;
-use genie_core::movement::move_to::MoveWaitState;
-use genie_core::movement::move_to::{Goal, MOVE_TO, MoveTo};
-use genie_core::objects::FacetCount;
-use genie_core::objects::Frame;
-use genie_core::objects::SpriteFlags;
-use genie_core::objects::SpriteId;
-use genie_core::objects::Voice;
-use genie_core::objects::WorkRate;
-use genie_core::objects::layers;
-use genie_core::objects::masters::ActionKind;
-use genie_core::objects::masters::ClassId;
-use genie_core::objects::masters::SoundEvents;
-use genie_core::objects::masters::TargetOwner;
-use genie_core::objects::masters::Task;
-use genie_core::objects::masters::TaskFlags;
-use genie_core::objects::masters::TaskId;
-use genie_core::objects::masters::TaskSprites;
-use genie_core::objects::masters::TaskTerrain;
-use genie_core::objects::masters::WorkValue;
-use genie_core::objects::sprite::Graphic;
-use genie_core::objects::{Graphics, SpeedMultiplier};
-use genie_core::ownership::artifact::{ARTIFACT_KIND, ArtifactState};
-use genie_core::world::Seconds;
+use crate::testing::attribute;
+use crate::world::Seconds;
+use crate::world::load::fixtures::{
+    action_list, combat_master, combat_mut, combat_object, missile_tuning, with_masters,
+};
+use crate::world::load::object::OTHER_SUB_ACTION;
+use crate::world::load::object::saved_missile;
+use crate::world::load::top_actions::saved_actions;
 use genie_save::generated::world::{
     Action, PlayerObjects, RgeAction, RgeActionAttack, RgeActionByKind, RgeActionEnter,
     RgeActionGather, RgeActionMake, RgeActionMissile, RgeActionMoveTo, RgeMissileObject, RgeObject,
@@ -338,7 +338,7 @@ fn move_to_takes_its_sprite_from_the_sprites_table() {
     assert_eq!(
         (lacking.kind(), lacking.reason()),
         (
-            genie_core::ErrorKind::MissingData,
+            crate::ErrorKind::MissingData,
             "a saved MoveTo's sprite outside the sprites' table"
         )
     );
@@ -549,7 +549,7 @@ fn missile_flies_with_its_actions_course() {
 
 #[test]
 fn farms_make_takes_its_timers_and_task() {
-    use genie_core::gathering::make::{MAKE, MakeState};
+    use crate::gathering::make::{MAKE, MakeState};
     let make = |b: RgeAction| {
         by_kind(|t| {
             t.rge_action_make = Some(Box::new(RgeActionMake {
@@ -583,7 +583,7 @@ fn farms_make_takes_its_timers_and_task() {
 
 #[test]
 fn birds_fly_takes_its_home_and_move_to() {
-    use genie_core::movement::fly::{FLY, FlyState};
+    use crate::movement::fly::{FLY, FlyState};
     let bird = |b: RgeAction| by_kind(|t| t.rge_action_bird = Some(Box::new(b)));
     let f = imported(FLY, bird(base(3)))
         .unwrap()
@@ -735,7 +735,7 @@ fn repair(b: RgeAction) -> Action {
 
 #[test]
 fn repair_takes_its_task_and_counts_its_builder() {
-    use genie_core::construction::repair::REPAIR;
+    use crate::construction::repair::REPAIR;
     let mut b = base(4);
     b.short_val = 2;
     b.sub_action_value = 1;
@@ -795,7 +795,7 @@ fn hunt(b: RgeAction) -> Action {
 /// the sprites' table; a state or sub-action the slice does not model is refused.
 #[test]
 fn hunt_takes_its_task_lead_and_move_to() {
-    use genie_core::gathering::hunt::{HUNT, HuntState};
+    use crate::gathering::hunt::{HUNT, HuntState};
     let h = imported(HUNT, hunt(base(HuntState::Idle.get())))
         .unwrap()
         .list
@@ -886,7 +886,7 @@ fn hunt_takes_its_task_lead_and_move_to() {
     assert_eq!(
         (stray.kind(), stray.reason()),
         (
-            genie_core::ErrorKind::InvalidInput,
+            crate::ErrorKind::InvalidInput,
             "a MoveTo of a Hunt that does not walk"
         )
     );
@@ -911,7 +911,7 @@ fn gather(b: RgeAction) -> Action {
 /// A Gather takes its stops and task; a `MoveTo` without a target walks to its point.
 #[test]
 fn gather_takes_its_stops_and_move_to() {
-    use genie_core::gathering::gather::{GATHER, GatherState};
+    use crate::gathering::gather::{GATHER, GatherState};
     let g = imported(GATHER, gather(base(GatherState::Work.get())))
         .unwrap()
         .list
@@ -974,7 +974,7 @@ fn gather_takes_its_stops_and_move_to() {
     assert_eq!(
         (stray.kind(), stray.reason()),
         (
-            genie_core::ErrorKind::InvalidInput,
+            crate::ErrorKind::InvalidInput,
             "a MoveTo of a Gather that does not walk"
         )
     );
@@ -996,7 +996,7 @@ fn enter(b: RgeAction) -> Action {
 
 #[test]
 fn an_enter_takes_its_task_and_retry() {
-    use genie_core::garrison::{ENTER, EnterState};
+    use crate::garrison::{ENTER, EnterState};
     let walking = EnterState::Walk { move_to: None };
     let mut b = base(walking.get());
     b.short_val = 1;
@@ -1030,7 +1030,7 @@ fn an_enter_takes_its_task_and_retry() {
     assert_eq!(
         (stray.kind(), stray.reason()),
         (
-            genie_core::ErrorKind::InvalidInput,
+            crate::ErrorKind::InvalidInput,
             "a MoveTo of an Enter that does not walk"
         )
     );
@@ -1042,7 +1042,7 @@ fn an_enter_takes_its_task_and_retry() {
 
 #[test]
 fn transport_takes_its_base_alone() {
-    use genie_core::garrison::transport::{TRANSPORT, TransportState};
+    use crate::garrison::transport::{TRANSPORT, TransportState};
     let transport = |b: RgeAction| Action {
         rge_action_transport: Some(Box::new(b)),
         ..Action::default()
@@ -1080,7 +1080,7 @@ fn transport_takes_its_base_alone() {
     assert_eq!(
         (idle.kind(), idle.reason()),
         (
-            genie_core::ErrorKind::InvalidInput,
+            crate::ErrorKind::InvalidInput,
             "a MoveTo of a Transport that does not sail"
         )
     );
@@ -1088,7 +1088,7 @@ fn transport_takes_its_base_alone() {
 
 #[test]
 fn an_explore_takes_its_quiet_move_to_with_its_wait() {
-    use genie_core::movement::explore::{EXPLORE, ExploreState};
+    use crate::movement::explore::{EXPLORE, ExploreState};
     let e = imported(EXPLORE, explore(base(ExploreState::Wait.get())))
         .unwrap()
         .list
@@ -1163,7 +1163,7 @@ fn an_attack_needs_the_sprites_table() {
 
 #[test]
 fn wait_solidify_waits_for_its_foundation() {
-    use genie_core::construction::wait_solidify::{WAIT_SOLIDIFY, WaitSolidifyState};
+    use crate::construction::wait_solidify::{WAIT_SOLIDIFY, WaitSolidifyState};
     let wait = |b: RgeAction| Action {
         tribe_action_wait_solidify: Some(Box::new(TribeActionWaitSolidify {
             rge_action: b,
@@ -1235,8 +1235,8 @@ fn attack(state: u8, walk: u16, pending: bool) -> Action {
 /// in a state that does not attack is the import's error.
 #[test]
 fn hunts_swing_past_its_hit_rests_the_reload_less_the_swing() {
-    use genie_core::combat::attack::{ATTACK, AttackState};
-    use genie_core::gathering::hunt::{HUNT, HuntState};
+    use crate::combat::attack::{ATTACK, AttackState};
+    use crate::gathering::hunt::{HUNT, HuntState};
     let master = |reload: f32| {
         let mut m = combat_master(83);
         m.tribe_master_combat_object
@@ -1303,7 +1303,7 @@ fn hunts_swing_past_its_hit_rests_the_reload_less_the_swing() {
     assert_eq!(
         (stray.kind(), stray.reason()),
         (
-            genie_core::ErrorKind::InvalidInput,
+            crate::ErrorKind::InvalidInput,
             "an Attack of a Hunt that does not attack"
         )
     );

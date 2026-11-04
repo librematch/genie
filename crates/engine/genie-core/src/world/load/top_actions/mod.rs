@@ -1,49 +1,52 @@
 //! A saved object's top action as the slice models it ([`saved_actions`]).
 
-use crate::saved_unit::missile_part;
-use crate::{OTHER_SUB_ACTION, combat_master, saved_attack, saved_move_wait};
-use genie_core::GenieError;
-use genie_core::combat::missile::ShooterId;
-use genie_core::construction::build::{BuildAction, BuildTask};
-use genie_core::garrison::ContainerId;
-use genie_core::gathering::DropSiteId;
-use genie_core::map::Distance;
-use genie_core::map::Point;
-use genie_core::map::{Offset, Position};
-use genie_core::movement::fly::{FLY, Fly};
-use genie_core::movement::move_to::{MOVE_TO, MoveTo, MoveToAction, TargetMoved};
-use genie_core::objects::ObjectId;
-use genie_core::objects::SpriteId;
-use genie_core::objects::Voice;
-use genie_core::objects::layers;
-use genie_core::objects::masters::{ActionKind, Task};
-use genie_core::objects::sprite::Graphic;
-use genie_core::ownership::artifact::ARTIFACT_KIND;
-use genie_core::world::Seconds;
+use crate::GenieError;
+use crate::combat::missile::ShooterId;
+use crate::construction::build::{BuildAction, BuildTask};
+use crate::garrison::ContainerId;
+use crate::gathering::DropSiteId;
+use crate::map::Distance;
+use crate::map::Point;
+use crate::map::{Offset, Position};
+use crate::movement::fly::{FLY, Fly};
+use crate::movement::move_to::MoveWait;
+use crate::movement::move_to::{MOVE_TO, MoveTo, MoveToAction, TargetMoved};
+use crate::objects::ObjectId;
+use crate::objects::SpriteId;
+use crate::objects::Voice;
+use crate::objects::layers;
+use crate::objects::masters::{ActionKind, Task};
+use crate::objects::sprite::Graphic;
+use crate::ownership::artifact::ARTIFACT_KIND;
+use crate::world::Seconds;
+use crate::world::load::object::OTHER_SUB_ACTION;
+use crate::world::load::object::missile_part;
+use crate::world::load::sub_actions::saved_attack;
+use genie_import::save::parts::combat_master;
 use genie_save::generated::world::{Action, PlayerObjects, RgeAction, RgeStaticObject};
 
 mod gathering;
 
-use crate::top_actions::gathering::{import_gather, import_hunt, import_make};
-use genie_core::combat::attack::ATTACK;
-use genie_core::combat::missile::{
+use crate::combat::attack::ATTACK;
+use crate::combat::missile::{
     HitMode, MISSILE, MissileAction, MissileState, MissileTargetId, Origin, StrikeResult,
 };
-use genie_core::construction::build::BuildState;
-use genie_core::construction::repair::{REPAIR, RepairAction, RepairState, RepairTask};
-use genie_core::construction::wait_solidify::{WAIT_SOLIDIFY, WaitSolidify, WaitSolidifyState};
-use genie_core::construction::{FoundationId, RepairTargetId};
-use genie_core::garrison::ENTER;
-use genie_core::garrison::transport::{TRANSPORT, TransportAction, TransportMode, TransportState};
-use genie_core::gathering::gather::GATHER;
-use genie_core::gathering::hunt::HUNT;
-use genie_core::gathering::make::MAKE;
-use genie_core::movement::explore::{EXPLORE, ExploreAction};
-use genie_core::movement::fly::FlyState;
-use genie_core::movement::{Acceleration, Speed};
-use genie_core::objects::Graphics;
-use genie_core::objects::masters::TaskId;
-use genie_core::ownership::artifact::{Artifact, ArtifactState, ArtifactSub};
+use crate::construction::build::BuildState;
+use crate::construction::repair::{REPAIR, RepairAction, RepairState, RepairTask};
+use crate::construction::wait_solidify::{WAIT_SOLIDIFY, WaitSolidify, WaitSolidifyState};
+use crate::construction::{FoundationId, RepairTargetId};
+use crate::garrison::ENTER;
+use crate::garrison::transport::{TRANSPORT, TransportAction, TransportMode, TransportState};
+use crate::gathering::gather::GATHER;
+use crate::gathering::hunt::HUNT;
+use crate::gathering::make::MAKE;
+use crate::movement::explore::{EXPLORE, ExploreAction};
+use crate::movement::fly::FlyState;
+use crate::movement::{Acceleration, Speed};
+use crate::objects::Graphics;
+use crate::objects::masters::TaskId;
+use crate::ownership::artifact::{Artifact, ArtifactState, ArtifactSub};
+use crate::world::load::top_actions::gathering::{import_gather, import_hunt, import_make};
 use genie_save::generated::world::ActionList;
 
 /// A task slot's task of a master (the master, the slot).
@@ -59,7 +62,7 @@ const NO_ACTIONS: GenieError =
 /// target, the drop site) and a farm's Make (21). Any other saved action, and a second one
 /// below the head ([`not_imported`]), stops the object's player.
 #[allow(clippy::too_many_arguments)]
-pub(super) fn saved_actions(
+pub fn saved_actions(
     object: &genie_save::Object,
     s: &RgeStaticObject,
     objects: &PlayerObjects,
@@ -432,8 +435,8 @@ fn import_enter(
     task_at: TaskAt<'_>,
     actions: &mut layers::Action,
 ) -> Result<(), GenieError> {
-    use genie_core::garrison::EnterAction;
-    use genie_core::garrison::EnterState;
+    use crate::garrison::EnterAction;
+    use crate::garrison::EnterState;
     let base = saved.base;
     let first_time = saved
         .action
@@ -499,7 +502,7 @@ fn import_transport(saved: &Saved<'_>, actions: &mut layers::Action) -> Result<(
 
 /// The Explore (4): its state, its `MoveTo` and the wait.
 fn import_explore(saved: &Saved<'_>, actions: &mut layers::Action) -> Result<(), GenieError> {
-    use genie_core::movement::explore::ExploreState;
+    use crate::movement::explore::ExploreState;
     let base = saved.base;
     let sub = saved.move_to_sub(GenieError::unsupported(
         "a saved Explore with another sub-action",
@@ -554,6 +557,28 @@ fn import_wait_solidify(
     wait.set_state(WaitSolidifyState::of_byte(saved.base.state)?);
     actions.list.set_wait_solidify(Some(wait));
     Ok(())
+}
+
+/// A saved `MoveTo`'s wait (`+0x6c`, `+0x70`, `+0x74`); none for another sub-action.
+///
+/// # Errors
+///
+/// A saved wait state that names no state.
+pub fn saved_move_wait(sub: &Action) -> Result<MoveWait, GenieError> {
+    use crate::movement::move_to::MoveWaitState;
+    sub.rge_action_by_kind
+        .as_deref()
+        .and_then(|t| t.rge_action_move_to.as_deref())
+        .map_or_else(
+            || Ok(MoveWait::default()),
+            |m| {
+                Ok(MoveWait {
+                    state: MoveWaitState::of_byte(m.movement_wait_state)?,
+                    timer: Seconds::new(m.timer),
+                    delay: Seconds::new(f32::from_bits(m.default_wait_time)),
+                })
+            },
+        )
 }
 
 #[cfg(test)]

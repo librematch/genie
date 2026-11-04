@@ -27,6 +27,7 @@ mod action_parts;
 pub mod checkpoint;
 pub mod index;
 pub(crate) mod lets;
+pub mod load;
 pub mod motions;
 pub(crate) mod others;
 pub mod parts;

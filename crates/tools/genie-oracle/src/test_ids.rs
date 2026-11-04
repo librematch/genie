@@ -3,7 +3,6 @@
 use genie_core::groups::GroupId;
 use genie_core::objects::ObjectId;
 use genie_core::objects::masters::ActionKind;
-use genie_core::objects::masters::ClassId;
 use genie_core::objects::masters::MasterId;
 
 /// The object id `value` (not −1).
@@ -30,11 +29,6 @@ pub(crate) const fn action_kind(value: i16) -> ActionKind {
     }
 }
 
-/// The class `value` (0 or more).
-pub(crate) fn class_id(value: i16) -> ClassId {
-    ClassId::try_from(value).expect("a test's class is 0 or more")
-}
-
 /// Build 158041's male villager (master 83), the tests' unit.
 pub(crate) const VILLAGER_MALE: MasterId = MasterId::named(83);
 /// Build 158041's female villager (master 293).
@@ -47,12 +41,4 @@ pub(crate) mod attribute {
 
     /// Food.
     pub(crate) const FOOD: AttributeId = AttributeId::named(0);
-    /// Wood.
-    pub(crate) const WOOD: AttributeId = AttributeId::named(1);
-    /// Stone.
-    pub(crate) const STONE: AttributeId = AttributeId::named(2);
-    /// Gold.
-    pub(crate) const GOLD: AttributeId = AttributeId::named(3);
-    /// The population headroom.
-    pub(crate) const HEADROOM: AttributeId = AttributeId::named(4);
 }

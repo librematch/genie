@@ -1,9 +1,9 @@
-use crate::fixtures::{combat_mut, combat_object, missile_tuning};
-use crate::object_parts::unit_ai;
-use crate::saved_unit::object as saved_unit_object;
+use crate::ErrorKind;
 use crate::test_ids::object_id;
-use genie_core::ErrorKind;
-use genie_core::unit_ai::{AiAction, OrderKind};
+use crate::unit_ai::{AiAction, OrderKind};
+use crate::world::load::fixtures::{combat_mut, combat_object, missile_tuning};
+use crate::world::load::object::object as saved_unit_object;
+use crate::world::load::object_parts::unit_ai;
 use genie_save::generated::world::{TribeTowerUnitAiModule, UnitAiModule, UnitAiModuleEntry1};
 
 /// A two-player game's players with Gaia.
@@ -167,7 +167,7 @@ fn value_none_names_fails_the_import() {
 /// object without one, and the row holds the failure as its unmodelled part.
 #[test]
 fn the_saved_unit_ai_is_the_object_part() {
-    use genie_core::players::CivId;
+    use crate::players::CivId;
     use genie_save::generated::world::PlayerObjects;
     let whole = |object: &genie_save::Object| {
         saved_unit_object(

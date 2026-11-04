@@ -1,44 +1,45 @@
 //! A saved moving object's movement: its masters' animated and moving parts, its path levels,
 //! its movement state and its `MoveTo`'s point.
 
-use crate::masters::MasterTable;
-use crate::masters::dat_id;
-use crate::object_ids;
-use crate::{combat_master, master_facets};
-use genie_core::GenieError;
-use genie_core::map::Distance;
-use genie_core::map::RestrictionId;
-use genie_core::map::{Position, Radii};
-use genie_core::math::Angle;
-use genie_core::math::fmath::BVector;
-use genie_core::movement::LevelFlags;
-use genie_core::movement::LinkedPathKind;
-use genie_core::movement::PathFlags;
-use genie_core::movement::PlanTries;
-use genie_core::movement::Speed;
-use genie_core::movement::SubstituteCount;
-use genie_core::movement::WaitDelays;
-use genie_core::movement::WaypointIndex;
-use genie_core::movement::{
-    Mover, PathData as MovementPathData, PathState, WaypointLevel, turn_rate,
-};
-use genie_core::objects::ObjectId;
-use genie_core::objects::SpeedMultiplier;
-use genie_core::objects::SpriteId;
-use genie_core::objects::layers::Animated;
-use genie_core::players::CivId;
-use genie_core::world::Seconds;
-use genie_core::world::WorldTime;
+use crate::GenieError;
+use crate::map::Distance;
+use crate::map::RestrictionId;
+use crate::map::{Position, Radii};
+use crate::math::Angle;
+use crate::math::fmath::BVector;
+use crate::movement::LevelFlags;
+use crate::movement::LinkedPathKind;
+use crate::movement::PathFlags;
+use crate::movement::PlanTries;
+use crate::movement::Speed;
+use crate::movement::SubstituteCount;
+use crate::movement::WaitDelays;
+use crate::movement::WaypointIndex;
+use crate::movement::{Mover, PathData as MovementPathData, PathState, WaypointLevel, turn_rate};
+use crate::objects::ObjectId;
+use crate::objects::SpeedMultiplier;
+use crate::objects::SpriteId;
+use crate::objects::layers::Animated;
+use crate::players::CivId;
+use crate::world::Seconds;
+use crate::world::WorldTime;
+use crate::world::load::object_ids;
+use genie_import::dat::MasterTable;
+use genie_import::dat::dat_id;
+use genie_import::save::master_facets;
+use genie_import::save::parts::combat_master;
 use genie_import::save::parts::{animated_master, moving_master};
 use genie_save::generated::world::{Path, PathData, PlayerObjects, RgeStaticObject};
 
-pub(super) fn vec3(b: &[u8; 12]) -> BVector {
+/// A saved vector's three `f32`s, as the save holds them (little-endian).
+#[must_use]
+pub fn vec3(b: &[u8; 12]) -> BVector {
     let f = |i: usize| f32::from_le_bytes([b[i], b[i + 1], b[i + 2], b[i + 3]]);
     BVector::new(f(0), f(4), f(8))
 }
 
 /// One saved level of path data, with its path's waypoints from the world's path table.
-pub(super) fn path_level(d: &PathData, paths: &[Path]) -> Result<MovementPathData, GenieError> {
+pub fn path_level(d: &PathData, paths: &[Path]) -> Result<MovementPathData, GenieError> {
     // a level without a path (id -1) holds none: a bird's top level
     let path = match d.path_id {
         -1 => None,
@@ -91,7 +92,7 @@ pub(super) fn path_level(d: &PathData, paths: &[Path]) -> Result<MovementPathDat
 /// (`FUN_14114d1d0`); slot 65's other terms (`+0xa08`, `+0xa2c`, `+0xb38`, a followed object) are
 /// not read yet. moveForward's factor `+0x878` is not in the save; every moving object of
 /// MarvinBlue/426048731 holds 1.0 at tick 680 (the tick oracle).
-pub(super) fn mover(
+pub fn mover(
     object: &genie_save::Object,
     s: &RgeStaticObject,
     objects: &PlayerObjects,
@@ -99,7 +100,7 @@ pub(super) fn mover(
     civ: CivId,
     masters: Option<&MasterTable>,
 ) -> Result<Option<Mover>, GenieError> {
-    use genie_core::movement::{MoveStats, Mover, Velocity};
+    use crate::movement::{MoveStats, Mover, Velocity};
     let Some(m) = object.moving_part() else {
         return Ok(None);
     };
@@ -249,7 +250,7 @@ pub(super) fn mover(
 /// A loaded unit's paths' ignore units (`+0x450`), which the save does not hold: a level below
 /// the top whose path was made in the top path's tick took the unit's own (`+0x670`,
 /// `FUN_140f9b7a0` after the short pather).
-pub(super) fn loaded_ignored(levels: &mut [MovementPathData], units: &[ObjectId]) {
+pub fn loaded_ignored(levels: &mut [MovementPathData], units: &[ObjectId]) {
     let Some((top, below)) = levels.split_last_mut() else {
         return;
     };
