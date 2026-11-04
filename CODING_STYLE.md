@@ -207,17 +207,39 @@ King, "Parse, don't validate", 2019.)
 - Convert back to a raw number only at an outgoing boundary (a writer, a format that the game
   reads) or inside the type's own arithmetic. Two genie functions never pass a value as a raw
   number and parse it again.
-- Migrate a type in one sweep, from the boundary inward: first the reader or the codec that
-  makes the value, then every field and every function down the call chain. Leave no raw
-  value behind for a later step to convert.
+- Migrate a type in one sweep, from either end. From the boundary inward: first the reader or
+  the codec that makes the value, then every field and every function down the call chain.
+  From the use outward: give the precise type to the function that needs it. Then follow the
+  compile errors up the call chain to the place that makes the value, and parse there.
+  Leave no raw value behind for a later step to convert.
 - `ObjectId::field` gives the game's integer back, −1 for none. Call it only at an outgoing
   boundary. These are the codec's encoder, a notify's parameters, a report line in the game's
   terms, and a sort key or sum of the game's integers.
-- Write no `is_valid` function that returns a `bool` for later code to trust. Write a
-  constructor that returns the type or an error (`TryFrom`, `of_field`).
+- Write no `is_valid` function that returns a `bool` for later code to trust. Write no
+  `check_…` either that returns `Result<(), GenieError>` for an input and drops what it
+  learnt. Write a constructor that returns the type or an error (`TryFrom`, `of_field`). A
+  routine of the game's whose effect is its point, and a guard on genie's own state
+  (`World::check_parts`), can return `()`.
 - Put the check into the shape of the type. A required value is `T`, not `Option<T>`. A closed
   set is an enum. A list that is never empty holds its first element on its own.
+- Make a state that the game cannot reach unrepresentable, and keep every state that it can
+  reach. A list that the game keeps with duplicates or with null entries keeps them in genie:
+  a set or a map changes its walks, its length and its order.
+- Make a function total through its parameter. If it cannot answer for some inputs, it takes a
+  type that excludes them, instead of returning an `Option` or an error for them. The weak
+  form follows from the strong one (a parse, then the call), but the strong form never
+  follows from the weak one. Where the game's routine itself tests the case (a −1, a null
+  pointer), that test is the game's behaviour: port it as a branch.
 - Check a value once. A function that receives the parsed type does not check it again.
+- Finish a parse before anything acts on its data. A command is decoded whole, every field in
+  its type, before its run changes the world, so a bad field leaves no half-run command. A
+  parse checks the form of the input, not the world: a command that names a dead object is
+  valid input, and its run does what the game does with it. A failure during the run is then
+  never the input's: it is a gap (`unsupported`) or a broken invariant (`unreachable`). Checks
+  spread through the code that acts on the input ("shotgun parsing") are a defect.
+- Parse in several passes where the input needs it: read one part to choose how to parse the
+  next (the save's version, a command's kind). Parse a value that only one branch needs where
+  that branch is chosen, into the enum variant that carries it.
 
 ```rust
 // Validate: the raw id travels on, and every reader must remember the check.
@@ -398,6 +420,19 @@ raising `file:line` (`#[track_caller]`) and key-value context.
 - Never panic on what a recording, a save or a `.dat` can cause. On those paths, write no
   `unwrap`, `expect`, `unreachable!` or panicking index. For a state that the code holds
   impossible, return `GenieError::unreachable("…")`. Panics belong in tests only.
+- An `unreachable` behind a check that a caller already made is the same check twice, and a
+  hole in the types: if the caller's check changes, nothing fails to compile. Pass what the
+  check found (the part, the variant, the parsed value), not the id to look it up again (section
+  5, "Parse, don't validate"). Where section 9 forces a second lookup (a call on another object
+  between the two), keep the `unreachable`. Its reason then names the invariant, and its doc or
+  a comment names the code that holds it.
+- Bound what a count from the input can claim before you allocate for it. A reader over a
+  buffer checks the count against the bytes that are left: the count times the smallest
+  record's size. It returns an error for a count that they cannot hold. A reader over
+  `R: Read` cannot know the bytes that are left: it reserves at most a fixed cap and grows the
+  list as it reads. A `Vec::with_capacity(n)` or a
+  `vec![x; n]` with an unchecked `n` from a file is a defect: a hostile recording makes the
+  process panic or abort, in a browser and in a server instance too.
 - Do not add a `GenieError::unsupported`. Port every branch of a routine, the branches that no
   recording reaches included, and test them with unit tests. The existing sites are the gaps
   that are left. Their number only decreases.
@@ -439,6 +474,8 @@ two nested lists, and that slot holds another object after the next swap-remove.
   inputs, is a defect.
 - Do not copy state to sync it afterwards. A mirror of a value that the game reads live is
   wrong unless every write keeps it current by construction.
+- Keep a copy that must exist (an index by id, the spatial lists) private to one module. Only
+  that module's setters write it, and each setter keeps it current with its source.
 - Put no getter, setter or wrapper between a system and its data without a reason. Two
   reasons count: a checked value (a newtype) and an invariant (a setter that keeps an index
   current).
@@ -520,6 +557,8 @@ WebAssembly use the same code without assumptions. This section does not apply t
 - Parse from a buffer that the caller filled (`&[u8]`). If the bytes do not hold a whole
   record yet, return how many more the parser needs instead of reading them. Write by returning
   the bytes, or into a buffer that the caller owns.
+- Check a count from the input against the bytes that are left before you allocate for it
+  (section 7). A parse is finished before anything acts on its data (section 5).
 - Put the I/O into thin drivers beside the logic. A blocking driver works over `std::io::Read`
   and `Write`. An async driver sits behind a Cargo feature named after its runtime (`tokio`,
   not `with-tokio`, C-FEATURE). A driver holds no format or protocol logic: it moves bytes and
