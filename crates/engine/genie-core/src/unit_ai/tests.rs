@@ -1,4 +1,5 @@
 use super::*;
+use crate::GenieResult;
 use crate::combat::AttackTargetId;
 use crate::combat::Firepower;
 use crate::combat::attack::ATTACK;
@@ -48,6 +49,7 @@ use crate::objects::masters::AutoGatherMode;
 use crate::objects::masters::BlastLevel;
 use crate::objects::masters::BuildingMaster;
 use crate::objects::masters::ChargeKind;
+use crate::objects::masters::ClassAmount;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::CombatLevel;
 use crate::objects::masters::CombatPart;
@@ -73,6 +75,7 @@ use crate::players::Amount;
 use crate::players::Chance;
 use crate::players::PlayerKind;
 use crate::players::Posture;
+use crate::players::Relation;
 use crate::players::UnitRelation;
 use crate::players::attribute::AttributeId;
 use crate::players::tracker::Key;
@@ -116,6 +119,7 @@ use crate::unit_ai::task_finder::DropSite;
 use crate::unit_ai::test_sides::With;
 use crate::unit_ai::update::UpdateTail;
 use crate::vision::VisionBits;
+use crate::world::AiSwitches;
 use crate::world::World;
 use std::slice::from_ref;
 use std::sync::Arc;
@@ -2105,175 +2109,141 @@ fn an_idle_lion_attacks_what_it_finds_within_its_reach() {
     );
 }
 
-/// A side for the base handler's damage case: the objects it holds, the attack search's
-/// answer, the reach, the duels, and what the case asked of it.
-#[derive(Default)]
-struct DamageSide {
-    units: Vec<UnitSeen>,
-    found: i32,
-    reaches: bool,
-    top: Option<ObjectId>,
-    duels: Vec<(ObjectId, Duel)>,
-    attack_searches: usize,
-    attacks: Vec<ObjectId>,
-    helps: Vec<ObjectId>,
-    under_attack: Vec<bool>,
-    patrol: Option<(PatrolPath, WaypointIndex)>,
-    harmless: Vec<ObjectId>,
-    defended: Option<NearestAttacker>,
+/// Player 1's villager 20 at (10, 10) on its sprite, its unit AI `ai` and its actions
+/// `actions`, animating at speed 1; Gaia's tree 40 at (5, 10); and player 2's unit 30 of
+/// master `foe` at (12, 10), whose unit AI targets the villager; each in player 1's lists, on
+/// a map of 100 by 100.
+fn hit_villager_world(ai: UnitAi, actions: Option<Action>, foe: Master) -> World {
+    let villager = Master {
+        standing_sprite: Some(STANDING.id),
+        ..villager_master()
+    };
+    let tree = resource(
+        (40, 349, class::TREE),
+        (MasterKind::TREE, GatherGroup::WOOD),
+        (5.0, 10.0),
+        (attribute::WOOD, 100.0),
+    );
+    let foe = SceneThing {
+        ai: Some(UnitAi {
+            current_target: Some(object_id(20)),
+            ..idle(UnitAiKind::Soldier)
+        }),
+        ..SceneThing::new(30, player_id(2), foe, Position::new(12.0, 10.0, 0.0))
+    };
+    let mut scene = Scene::open(GridSize::new(100, 100))
+        .players(2)
+        .graphic(STANDING)
+        .thing(SceneThing {
+            ai: Some(ai),
+            actions,
+            sprite: Some(STANDING.id),
+            ..SceneThing::new(20, player_id(1), villager, Position::new(10.0, 10.0, 0.0))
+        });
+    for thing in [tree, foe] {
+        scene = scene.thing(SceneThing {
+            seen_by: Some(VisionBits::visible(player_id(1))),
+            ..thing
+        });
+    }
+    let mut world = scene.build();
+    world.parts.set_anim_speed(object_id(20), Speed::new(1.0));
+    world.streams.get(Stream::Ai).set_seed(0);
+    world
 }
 
-impl UnitSide for DamageSide {
-    fn closest(&mut self, search: &Search<'_>) -> Result<Found, GenieError> {
-        let id = if matches!(search.pick, Pick::Attack { .. }) {
-            self.attack_searches += 1;
-            self.found
-        } else {
-            -1
-        };
-        Ok(Found {
-            id: ObjectId::of_field(id),
-            enemies: id != -1,
-            position: None,
-            fresh: true,
-            players: 0,
-            distance: WholeDistance::of_data(-1),
-            retries: [None; 3],
-        })
-    }
-    fn attack(
-        &mut self,
-        target: ObjectId,
-        _: OrderForce,
-        _: &UnitAi,
-    ) -> Result<Attacked, GenieError> {
-        self.attacks.push(target);
-        Ok(Attacked {
-            attacks: true,
-            posted: Vec::new(),
-        })
-    }
-    fn set_under_attack(&mut self, value: bool) {
-        self.under_attack.push(value);
-    }
-    fn may_attack(
-        &mut self,
-        target: ObjectId,
-        _: &Seeker,
-    ) -> Result<Option<(ClassId, Position)>, GenieError> {
-        Ok(self
-            .units
-            .iter()
-            .find(|u| u.id == target)
-            .map(|u| (u.class, u.position)))
-    }
-    fn seek_unexplored(&mut self, _: &UnitAi, _: &mut Well512) -> Result<Option<Tile>, GenieError> {
-        Err(GenieError::unsupported("no search here"))
-    }
-    fn seek_beyond_sight(&mut self, _: &mut Well512) -> Result<Option<Tile>, GenieError> {
-        Err(GenieError::unsupported("no search here"))
-    }
-    fn make_scout_map(&mut self) -> Result<(), GenieError> {
-        Err(GenieError::unsupported("no world here"))
-    }
-    fn patrol_information(&self) -> Option<(PatrolPath, WaypointIndex)> {
-        self.patrol.clone()
-    }
-    fn reaches(&mut self, _: ObjectId, _: Distance) -> Result<bool, GenieError> {
-        Ok(self.reaches)
-    }
-    fn call_for_help(&mut self, attacker: ObjectId) -> Result<(), GenieError> {
-        self.helps.push(attacker);
-        Ok(())
-    }
-    fn seen_unit(&mut self, id: ObjectId) -> Result<Option<UnitSeen>, GenieError> {
-        Ok(self.units.iter().find(|u| u.id == id).copied())
-    }
-    fn duel(&mut self, other: ObjectId) -> Result<Duel, GenieError> {
-        self.duels
-            .iter()
-            .find(|d| d.0 == other)
-            .map(|d| d.1)
-            .ok_or(GenieError::unsupported("no duel here"))
-    }
-    fn top_target_now(&mut self) -> Result<Option<ObjectId>, GenieError> {
-        Ok(self.top)
-    }
-    fn harmless(&mut self, attacker: ObjectId) -> Result<bool, GenieError> {
-        Ok(self.harmless.contains(&attacker))
-    }
-    fn defended_attacker(&mut self, _: ObjectId) -> Result<NearestAttacker, GenieError> {
-        Ok(self.defended.unwrap_or(NearestAttacker::NoUnitAi))
-    }
-    fn can_stand(&mut self, _: Point) -> Result<bool, GenieError> {
-        Ok(true)
+/// Player 2's soldier master 5 (a walker of class 6).
+fn foe_master() -> Master {
+    walker(5, class::CLASS_6)
+}
+
+/// A villager's own copy of the villager's master 293 with object flag 0x10, an attack of 3,
+/// no melee armor and no range: the villager does not fear it ([`UnitSide::harmless`]).
+fn harmless_villager() -> Master {
+    Master {
+        copy_id: Some(master_id(293)),
+        standing_sprite: Some(STANDING.id),
+        object_flags: ObjectFlags::SCOUT,
+        hit_points: MasterHitPoints::of_data(25),
+        combat: Some(CombatPart {
+            weapons: vec![ClassAmount::new(4, 3), ClassAmount::new(21, 6)],
+            armors: vec![ClassAmount::new(4, 0), ClassAmount::new(3, 0)],
+            weapon_range: Distance::ZERO,
+            ..CombatPart::default()
+        }),
+        ..walker(293, class::VILLAGER)
     }
 }
 
-/// A human player's villager at (10, 10) on its way to gather (order `0x2c5`, its Gather in
-/// state 5, animating) and its unit AI, hit by `foe(30, 6)`'s 4 damage.
-fn hit_villager() -> (UnitAi, Surroundings, Notify) {
-    let ai = UnitAi {
+/// The villager 20 on the gather order on tree 40 (`0x2c5`, priority 3).
+fn gathering_villager() -> UnitAi {
+    UnitAi {
         current_order: Some(OrderKind::Gather),
         current_action: Some(AiAction::Gather),
         current_target: Some(object_id(40)),
         order_priority: OrderPriority::of_data(3),
         ..idle(UnitAiKind::Civilian)
-    };
-    let at = Surroundings {
-        id: object_id(20),
-        position: Position::new(10.0, 10.0, 0.0),
-        speed: Speed::new(1.0),
-        class: Some(class::VILLAGER),
-        player: PlayerId::new(1),
-        state: ObjectState::Alive,
-        map: GridSize::new(100, 100),
-        anim_speed: Some(Speed::new(1.0)),
-        action_state: Some(ActionState::new(5)),
-        units: vec![foe(30, class::CLASS_6)],
-        roles: roles(),
-        slots: slots(),
-        unit_ai_tuning: tuning().unit_ai,
-        ..Surroundings::default()
-    };
-    let hit = Notify {
+    }
+}
+
+/// Unit 30's hit on the villager 20 (21 hit points left).
+fn villager_hit() -> Notify {
+    Notify {
         caller: Some(object_id(30)),
         recipient: object_id(20),
         kind: NotifyKind::DAMAGED,
         p: [30, 21, 25],
-    };
-    (ai, at, hit)
+    }
+}
+
+/// The villager 20 of `world` takes `notify` through its damage notify
+/// ([`UnitAi::villager_damaged`]) after its unit AI queued it: its answer and its unit AI.
+fn villager_takes(world: &mut World, notify: Notify) -> (GenieResult<u32>, UnitAi) {
+    world
+        .parts
+        .unit_ai
+        .get_mut(object_id(20))
+        .unwrap()
+        .post(notify, ObjectState::Alive)
+        .unwrap();
+    let answer = run_ai(
+        world,
+        (player_id(1), object_id(20)),
+        |ai, at, side, kind, rng| ai.villager_damaged(notify, Millis::ZERO, at, kind, rng, side),
+    );
+    (
+        answer,
+        world.parts.unit_ai.get(object_id(20)).unwrap().clone(),
+    )
+}
+
+/// The point the villager 20 of `world` walks to, none without a `MoveTo`.
+fn villager_walks(world: &World) -> Option<Position> {
+    world
+        .parts
+        .actions
+        .of(object_id(20))
+        .list
+        .move_to()
+        .map(|move_to| move_to.point)
 }
 
 /// A villager hit by another player's unit it fears ("I have %d attackers, evading them.")
 /// calls for help, sends its order to the queue's end, stops its action and runs from the
-/// attacker (to its west, the attacker being east of it); the call keeps the attacker.
+/// attacker (its `MoveTo` at once, to its west, the attacker being east of it); the call keeps
+/// the attacker.
 #[test]
 fn villager_evades_another_player_attacker() {
-    let (mut u, at, hit) = hit_villager();
-    let mut side = DamageSide {
-        units: vec![foe(30, class::CLASS_6)],
-        ..DamageSide::default()
-    };
-    let mut fx = Vec::new();
-    let r = u.villager_damaged(
-        hit,
-        Millis::ZERO,
-        &at,
-        PlayerKind::Human,
-        &mut rng(),
-        &mut With::new(&mut side, &mut fx),
-    );
-    assert_eq!(r, Ok(BREAK));
-    assert_eq!(
-        (side.helps, side.under_attack),
-        (vec![object_id(30)], vec![true])
-    );
-    assert_eq!(u.attackers, Attackers::of_saved(&[30]));
-    let queued: Vec<_> = u
+    let mut world = hit_villager_world(gathering_villager(), None, foe_master());
+    let (answer, unit_ai) = villager_takes(&mut world, villager_hit());
+    assert_eq!(answer, Ok(BREAK));
+    assert_eq!(unit_ai.attackers, Attackers::of_saved(&[30]));
+    let villager = world.players[1].objects.by_id(object_id(20)).unwrap();
+    assert!(villager.flags.contains(UnitFlags::UNDER_ATTACK));
+    let queued: Vec<_> = unit_ai
         .orders
         .iter()
-        .map(|o| (o.order, o.target, o.issuer))
+        .map(|order| (order.order, order.target, order.issuer))
         .collect();
     assert_eq!(
         queued,
@@ -2283,110 +2253,131 @@ fn villager_evades_another_player_attacker() {
             Some(Issuer::Object(object_id(20)))
         )]
     );
-    assert_eq!(fx.first(), Some(&Effect::Stop));
-    let Some(Effect::Move(m)) = fx.last() else {
-        panic!("no move: {fx:?}");
-    };
-    assert!(m.point.x() < 10.0 && m.point.y() == 10.0, "{m:?}");
-    assert_eq!(side.attacks, Vec::new());
-    assert_eq!(u.current_action, Some(AiAction::Move));
+    let to = villager_walks(&world).expect("its run");
+    assert!(to.x() < 10.0 && to.y() == 10.0, "{to:?}");
+    assert_eq!(world.parts.actions.of(object_id(20)).list.attack(), None);
+    assert_eq!(unit_ai.current_action, Some(AiAction::Move));
 }
 
 /// The villager's cases 0x1fb, 0x1fc and 0x202 off its searching actions: on the move
-/// action an invalidated Attack (600) makes the target go and the action stop (records
-/// 426339330's villager 34028 in update 5296, running from its attackers); a search (0x202)
-/// or the action `0x26a` changes nothing; an invalidated gather or hunt of a class other
-/// than 10 would search for another of that class (not modelled).
+/// action an invalidated Attack (600) makes the target go and the action stop (its `MoveTo`
+/// too; records 426339330's villager 34028 in update 5296, running from its attackers); a
+/// search (0x202) or the action `0x26a` changes nothing; an invalidated gather or hunt of a
+/// class other than 10 would search for another of that class (not modelled).
 #[test]
 fn villager_invalidated_action_off_its_searches_stops_it() {
-    let moving = || UnitAi {
-        current_action: Some(AiAction::Move),
+    let moving = |action| UnitAi {
+        current_action: Some(action),
         current_target: Some(object_id(30)),
         ..idle(UnitAiKind::Civilian)
     };
-    let at = Surroundings {
-        id: object_id(20),
-        state: ObjectState::Alive,
-        roles: roles(),
-        slots: slots(),
-        unit_ai_tuning: tuning().unit_ai,
-        ..Surroundings::default()
+    let walk = Action {
+        list: ActionList::default().with_move_to(Some(MoveToAction {
+            point: Position::new(30.0, 20.0, 0.0),
+            ..MoveToAction::sub_in(MoveTo::Moving)
+        })),
+        ..Action::default()
     };
-    let n = Notify::own(
+    let search = |ai, notify: Notify| {
+        let mut world = player_unit_world(20, (villager_master(), ai), &[]);
+        *world.parts.actions.of_mut(object_id(20)).unwrap() = walk.clone();
+        let answer = run_ai(
+            &mut world,
+            (player_id(1), object_id(20)),
+            |ai, at, side, kind, rng| ai.villager_search(notify, at, kind, side, rng),
+        );
+        let unit_ai = world.parts.unit_ai.get(object_id(20)).unwrap();
+        (
+            answer,
+            unit_ai.current_target,
+            world.parts.actions.of(object_id(20)).top_action_kind(),
+        )
+    };
+    let notify = Notify::own(
         object_id(20),
         NotifyKind::ACTION_INVALIDATED,
         [AiAction::Attack.value(), 0, 514],
     );
-    let mut side = DamageSide::default();
-    let mut u = moving();
-    let mut fx = Vec::new();
     assert_eq!(
-        u.villager_search(
-            n,
-            &at,
-            PlayerKind::Human,
-            &mut With::new(&mut side, &mut fx),
-            &mut rng()
-        ),
-        Ok(GO_ON)
+        search(moving(AiAction::Move), notify),
+        (Ok(GO_ON), None, None)
     );
-    assert_eq!((fx, u.current_target), (vec![Effect::Stop], None));
     for (kind, action) in [
         (NotifyKind::REQUIRES_SEARCH, AiAction::Move),
         (NotifyKind::TARGET_MOVED, AiAction::Repair),
     ] {
-        let mut u = UnitAi {
-            current_action: Some(action),
-            ..moving()
-        };
-        let mut fx = Vec::new();
-        let n = Notify { kind, ..n };
         assert_eq!(
-            u.villager_search(
-                n,
-                &at,
-                PlayerKind::Human,
-                &mut With::new(&mut side, &mut fx),
-                &mut rng()
-            ),
-            Ok(GO_ON)
+            search(moving(action), Notify { kind, ..notify }),
+            (Ok(GO_ON), Some(object_id(30)), Some(MOVE_TO))
         );
-        assert_eq!((fx, u.current_target), (Vec::new(), Some(object_id(30))));
     }
     let gather = Notify::own(
         object_id(20),
         NotifyKind::ACTION_INVALIDATED,
         [AiAction::Gather.value(), 5, -1],
     );
-    assert!(
-        moving()
-            .villager_search(
-                gather,
-                &at,
-                PlayerKind::Human,
-                &mut With::new(&mut side, &mut Vec::new()),
-                &mut rng()
-            )
-            .is_err()
-    );
-    let mut fx = Vec::new();
+    assert!(search(moving(AiAction::Move), gather).0.is_err());
     let tree = Notify::own(
         object_id(20),
         NotifyKind::ACTION_INVALIDATED,
         [AiAction::Gather.value(), 10, -1],
     );
     assert_eq!(
-        moving().villager_search(
-            tree,
-            &at,
-            PlayerKind::Human,
-            &mut With::new(&mut side, &mut fx),
-            &mut rng()
-        ),
-        Ok(GO_ON)
+        search(moving(AiAction::Move), tree),
+        (Ok(GO_ON), None, None)
     );
-    assert_eq!(fx, vec![Effect::Stop]);
 }
+
+/// Player 1's soldier 20 (master 4, a walker of class 6, `kind` its master's kind) at `at` on
+/// its sprite, its unit AI `ai`, its owner of type `player_kind`, alone on a map of 100 by 100
+/// (the attack search finds nothing). The AI stream is seeded with 0, as [`rng`] is.
+fn lone_soldier(ai: UnitAi, at: Position, (kind, player_kind): (MasterKind, PlayerKind)) -> World {
+    let soldier = Master {
+        kind,
+        standing_sprite: Some(STANDING.id),
+        ..walker(4, class::CLASS_6)
+    };
+    let mut world = Scene::open(GridSize::new(100, 100))
+        .players(2)
+        .kind(player_id(1), player_kind)
+        .graphic(STANDING)
+        .thing(SceneThing {
+            ai: Some(ai),
+            sprite: Some(STANDING.id),
+            ..SceneThing::new(20, player_id(1), soldier, at)
+        })
+        .build();
+    world.streams.get(Stream::Ai).set_seed(0);
+    world
+}
+
+/// [`lone_soldier`] at (12, 13), a combat object of a human player, takes `routine` (its unit AI's
+/// routine inside its update): its answer and its unit AI.
+fn soldier_runs<R>(
+    ai: UnitAi,
+    kind: (MasterKind, PlayerKind),
+    routine: impl FnOnce(
+        &mut UnitAi,
+        &Surroundings,
+        &mut dyn UnitSide,
+        PlayerKind,
+        &mut Well512,
+    ) -> GenieResult<R>,
+) -> (GenieResult<R>, UnitAi) {
+    let mut world = lone_soldier(ai, Position::new(12.0, 13.0, 0.0), kind);
+    let answer = run_ai(
+        &mut world,
+        (player_id(1), object_id(20)),
+        |ai, at, side, kind, rng| routine(ai, at, side, kind, rng),
+    );
+    (
+        answer,
+        world.parts.unit_ai.get(object_id(20)).unwrap().clone(),
+    )
+}
+
+/// A human player's combat object.
+const HUMAN_COMBAT: (MasterKind, PlayerKind) = (MasterKind::COMBAT, PlayerKind::Human);
 
 /// The base handler's case `0x1fb` ([`UnitAi::action_invalidated`]): an attack invalidated on
 /// the attack order, or on a search (`0x202`), runs processIdle, and with nothing produced a
@@ -2396,16 +2387,6 @@ fn villager_invalidated_action_off_its_searches_stops_it() {
 /// attack's; orders `0x2d4` and `0x2bd` on action `0x262` are not modelled; the rest go on.
 #[test]
 fn an_invalidated_action_of_the_order_or_an_attack_stops_the_unit() {
-    let at = Surroundings {
-        id: object_id(20),
-        player: PlayerId::new(1),
-        kind: MasterKind::COMBAT,
-        state: ObjectState::Alive,
-        roles: roles(),
-        slots: slots(),
-        unit_ai_tuning: tuning().unit_ai,
-        ..Surroundings::default()
-    };
     let unit = |order, action| UnitAi {
         current_order: order,
         current_action: action,
@@ -2413,120 +2394,84 @@ fn an_invalidated_action_of_the_order_or_an_attack_stops_the_unit() {
         ..idle(UnitAiKind::Soldier)
     };
     let invalid = |p0, p2| Notify::own(object_id(20), NotifyKind::ACTION_INVALIDATED, [p0, 0, p2]);
-    let run = |u: &mut UnitAi, n, computer| {
-        let mut side = DamageSide {
-            found: -1,
-            ..DamageSide::default()
-        };
-        let r = u.action_invalidated(
-            n,
-            &at,
-            computer,
-            &mut rng(),
-            &mut With::new(&mut side, &mut Vec::new()),
-        );
-        (r, u.current_target)
-    };
-    let gone = (Ok(GO_ON), None);
-    let kept = (Ok(GO_ON), Some(object_id(30)));
-    let mut u = unit(Some(OrderKind::Attack), Some(AiAction::Attack));
-    assert_eq!(
-        run(
-            &mut u,
-            invalid(AiAction::Attack.value(), 0),
-            PlayerKind::Human
-        ),
-        gone
-    );
-    assert_eq!(u.current_order, None);
-    let mut u = unit(None, None);
-    assert_eq!(
-        run(
-            &mut u,
-            invalid(AiAction::Attack.value(), 0x202),
-            PlayerKind::Human
-        ),
-        gone
-    );
-    let mut u = unit(Some(OrderKind::Attack), Some(AiAction::Attack));
-    assert!(
-        run(
-            &mut u,
-            invalid(AiAction::Attack.value(), 0),
-            PlayerKind::Computer
+    let run = |unit_ai: UnitAi, notify, player_kind| {
+        soldier_runs(
+            unit_ai,
+            (MasterKind::COMBAT, player_kind),
+            |ai, at, side, kind, rng| ai.action_invalidated(notify, at, kind, rng, side),
         )
-        .0
-        .is_err()
+    };
+    let human = PlayerKind::Human;
+    let attack = AiAction::Attack.value();
+    let (answer, unit_ai) = run(
+        unit(Some(OrderKind::Attack), Some(AiAction::Attack)),
+        invalid(attack, 0),
+        human,
     );
-    let mut u = UnitAi {
+    assert_eq!(
+        (answer, unit_ai.current_target, unit_ai.current_order),
+        (Ok(GO_ON), None, None)
+    );
+    let (answer, unit_ai) = run(unit(None, None), invalid(attack, 0x202), human);
+    assert_eq!((answer, unit_ai.current_target), (Ok(GO_ON), None));
+    let (answer, _) = run(
+        unit(Some(OrderKind::Attack), Some(AiAction::Attack)),
+        invalid(attack, 0),
+        PlayerKind::Computer,
+    );
+    assert!(answer.is_err());
+    let off = UnitAi {
         retarget_disabled: 1,
         ..unit(Some(OrderKind::Attack), Some(AiAction::Attack))
     };
-    assert!(
-        run(
-            &mut u,
-            invalid(AiAction::Attack.value(), 0),
-            PlayerKind::Human
-        )
-        .0
-        .is_err()
-    );
-    let mut u = unit(None, Some(AiAction::Move));
+    assert!(run(off, invalid(attack, 0), human).0.is_err());
+    let target = |(answer, unit_ai): (GenieResult<u32>, UnitAi)| (answer, unit_ai.current_target);
+    let gone = (Ok(GO_ON), None);
+    let kept = (Ok(GO_ON), Some(object_id(30)));
+    let mv = AiAction::Move.value();
     assert_eq!(
-        run(
-            &mut u,
-            invalid(AiAction::Move.value(), 0),
-            PlayerKind::Human
-        ),
+        target(run(unit(None, Some(AiAction::Move)), invalid(mv, 0), human)),
         gone
     );
-    let mut u = unit(None, Some(AiAction::Move));
     assert_eq!(
-        run(
-            &mut u,
+        target(run(
+            unit(None, Some(AiAction::Move)),
             invalid(AiAction::Gather.value(), 0),
-            PlayerKind::Human
-        ),
+            human
+        )),
         kept
     );
-    let mut u = unit(Some(OrderKind::Move), Some(AiAction::Move));
     assert_eq!(
-        run(
-            &mut u,
-            invalid(AiAction::Move.value(), 0),
-            PlayerKind::Human
-        ),
+        target(run(
+            unit(Some(OrderKind::Move), Some(AiAction::Move)),
+            invalid(mv, 0),
+            human
+        )),
         gone
     );
-    let mut u = unit(Some(OrderKind::Follow), Some(AiAction::Move));
     assert_eq!(
-        run(
-            &mut u,
-            invalid(AiAction::Move.value(), 0),
-            PlayerKind::Human
-        ),
+        target(run(
+            unit(Some(OrderKind::Follow), Some(AiAction::Move)),
+            invalid(mv, 0),
+            human
+        )),
         kept
     );
-    let mut u = unit(Some(OrderKind::Follow), Some(AiAction::Move));
     assert_eq!(
-        run(
-            &mut u,
-            invalid(AiAction::Attack.value(), 0),
-            PlayerKind::Human
-        ),
+        target(run(
+            unit(Some(OrderKind::Follow), Some(AiAction::Move)),
+            invalid(attack, 0),
+            human
+        )),
         gone
     );
     for order in [OrderKind::GroupGather, OrderKind::Defend] {
-        let mut u = unit(Some(order), Some(AiAction::Move));
-        assert!(
-            run(
-                &mut u,
-                invalid(AiAction::Move.value(), 0),
-                PlayerKind::Human
-            )
-            .0
-            .is_err()
+        let (answer, _) = run(
+            unit(Some(order), Some(AiAction::Move)),
+            invalid(mv, 0),
+            human,
         );
+        assert!(answer.is_err(), "{order:?}");
     }
 }
 
@@ -2539,17 +2484,6 @@ fn an_invalidated_action_of_the_order_or_an_attack_stops_the_unit() {
 /// completion stops; the rest go on.
 #[test]
 fn completed_action_of_the_order_or_an_attack_stops_the_unit() {
-    let at = Surroundings {
-        id: object_id(20),
-        position: Position::new(12.0, 13.0, 0.0),
-        player: PlayerId::new(1),
-        kind: MasterKind::COMBAT,
-        state: ObjectState::Alive,
-        roles: roles(),
-        slots: slots(),
-        unit_ai_tuning: tuning().unit_ai,
-        ..Surroundings::default()
-    };
     let unit = |order, action| UnitAi {
         current_order: order,
         current_action: action,
@@ -2557,73 +2491,73 @@ fn completed_action_of_the_order_or_an_attack_stops_the_unit() {
         ..idle(UnitAiKind::Soldier)
     };
     let done = |p0| Notify::own(object_id(20), NotifyKind::ACTION_COMPLETED, [p0, 0, 0]);
-    let run = |u: &mut UnitAi, p0| {
-        let mut side = DamageSide {
-            found: -1,
-            ..DamageSide::default()
-        };
-        let r = u.action_completed(
-            done(p0),
-            &at,
-            PlayerKind::Human,
-            &mut rng(),
-            &mut With::new(&mut side, &mut Vec::new()),
-        );
-        (r, u.current_target, u.current_action)
+    let run = |unit_ai: UnitAi, p0| {
+        soldier_runs(unit_ai, HUMAN_COMBAT, |ai, at, side, kind, rng| {
+            ai.action_completed(done(p0), at, kind, rng, side)
+        })
     };
+    let state = |(answer, unit_ai): (GenieResult<u32>, UnitAi)| {
+        (answer, unit_ai.current_target, unit_ai.current_action)
+    };
+    let (mv, attack) = (AiAction::Move.value(), AiAction::Attack.value());
     assert_eq!(
-        run(
-            &mut unit(None, Some(AiAction::Move)),
-            AiAction::Move.value()
-        ),
+        state(run(unit(None, Some(AiAction::Move)), mv)),
         (Ok(GO_ON), None, None)
     );
     assert_eq!(
-        run(
-            &mut unit(None, Some(AiAction::Move)),
-            AiAction::Attack.value()
-        ),
+        state(run(unit(None, Some(AiAction::Move)), attack)),
         (Ok(GO_ON), None, None)
     );
-    let mut u = unit(None, Some(AiAction::Move));
+    let (answer, unit_ai) = run(unit(None, Some(AiAction::Move)), AiAction::Gather.value());
     assert_eq!(
-        run(&mut u, AiAction::Gather.value()),
+        (answer, unit_ai.current_target, unit_ai.current_action),
         (Ok(GO_ON), Some(object_id(30)), Some(AiAction::Move))
     );
-    assert_eq!(u.state_position, Point::ORIGIN);
-    let mut u = unit(Some(OrderKind::Attack), Some(AiAction::Attack));
+    assert_eq!(unit_ai.state_position, Point::ORIGIN);
+    let (answer, unit_ai) = run(
+        unit(Some(OrderKind::Attack), Some(AiAction::Attack)),
+        attack,
+    );
     assert_eq!(
-        run(&mut u, AiAction::Attack.value()),
+        (answer, unit_ai.current_target, unit_ai.current_action),
         (Ok(GO_ON), None, None)
     );
     assert_eq!(
-        (u.current_order, u.state_position),
+        (unit_ai.current_order, unit_ai.state_position),
         (None, Point::new(12.0, 13.0))
     );
-    let mut u = unit(Some(OrderKind::Move), Some(AiAction::Move));
-    assert_eq!(run(&mut u, AiAction::Move.value()), (Ok(GO_ON), None, None));
-    let mut u = unit(Some(OrderKind::GroupGather), Some(AiAction::Move));
-    assert_eq!(run(&mut u, AiAction::Move.value()), (Ok(GO_ON), None, None));
-    assert_eq!(u.current_order, None);
-    let mut u = unit(Some(OrderKind::Defend), Some(AiAction::Move));
     assert_eq!(
-        run(&mut u, AiAction::Move.value()),
+        state(run(unit(Some(OrderKind::Move), Some(AiAction::Move)), mv)),
+        (Ok(GO_ON), None, None)
+    );
+    let (answer, unit_ai) = run(unit(Some(OrderKind::GroupGather), Some(AiAction::Move)), mv);
+    assert_eq!(
+        (answer, unit_ai.current_target, unit_ai.current_action),
+        (Ok(GO_ON), None, None)
+    );
+    assert_eq!(unit_ai.current_order, None);
+    let (answer, unit_ai) = run(unit(Some(OrderKind::Defend), Some(AiAction::Move)), mv);
+    assert_eq!(
+        (answer, unit_ai.current_target, unit_ai.current_action),
         (Ok(GO_ON), Some(object_id(30)), None)
     );
-    assert_eq!(u.current_order, Some(OrderKind::Defend));
-    let mut u = unit(Some(OrderKind::Follow), Some(AiAction::MoveAside));
+    assert_eq!(unit_ai.current_order, Some(OrderKind::Defend));
     assert_eq!(
-        run(&mut u, AiAction::Move.value()),
+        state(run(
+            unit(Some(OrderKind::Follow), Some(AiAction::MoveAside)),
+            mv
+        )),
         (Ok(GO_ON), Some(object_id(30)), None)
     );
-    let mut u = unit(Some(OrderKind::Follow), Some(AiAction::Move));
     assert_eq!(
-        run(&mut u, AiAction::Move.value()),
+        state(run(unit(Some(OrderKind::Follow), Some(AiAction::Move)), mv)),
         (Ok(GO_ON), Some(object_id(30)), Some(AiAction::Move))
     );
-    let mut u = unit(Some(OrderKind::Follow), Some(AiAction::Move));
     assert_eq!(
-        run(&mut u, AiAction::Attack.value()),
+        state(run(
+            unit(Some(OrderKind::Follow), Some(AiAction::Move)),
+            attack
+        )),
         (Ok(GO_ON), None, None)
     );
 }
@@ -2636,17 +2570,6 @@ fn completed_action_of_the_order_or_an_attack_stops_the_unit() {
 /// attacker no longer on the unit leaves its set; another kind is not modelled.
 #[test]
 fn the_base_handler_takes_each_kind_it_models() {
-    let at = Surroundings {
-        id: object_id(20),
-        player: PlayerId::new(1),
-        kind: MasterKind::COMBAT,
-        speed: Speed::new(1.0),
-        state: ObjectState::Alive,
-        roles: roles(),
-        slots: slots(),
-        unit_ai_tuning: tuning().unit_ai,
-        ..Surroundings::default()
-    };
     let unit = || UnitAi {
         current_order: Some(OrderKind::Attack),
         current_action: Some(AiAction::Attack),
@@ -2655,27 +2578,22 @@ fn the_base_handler_takes_each_kind_it_models() {
         orders: vec![QueuedOrder::default()],
         ..idle(UnitAiKind::Soldier)
     };
-    let run = |u: &mut UnitAi, kind, caller, at: &Surroundings| {
-        let mut side = DamageSide {
-            found: -1,
-            ..DamageSide::default()
-        };
-        let mut fx = Vec::new();
-        let n = Notify::own(caller, kind, [0, 0, 0]);
-        let r = u.base_notify(
-            n,
-            Millis::ZERO,
-            at,
-            PlayerKind::Human,
-            &mut rng(),
-            &mut With::new(&mut side, &mut fx),
-        );
-        (r, fx)
+    let run = |unit_ai: UnitAi, kind, caller: i32, master_kind| {
+        soldier_runs(
+            unit_ai,
+            (master_kind, PlayerKind::Human),
+            |ai, at, side, player_kind, rng| {
+                let notify = Notify::own(object_id(caller), kind, [0, 0, 0]);
+                ai.base_notify(notify, Millis::ZERO, at, player_kind, rng, side)
+            },
+        )
     };
-    let mut u = unit();
-    let (r, fx) = run(&mut u, NotifyKind::OWNER_CHANGED, object_id(20), &at);
-    assert_eq!((r, fx.first()), (Ok(GO_ON), Some(&Effect::Stop)));
-    assert_eq!((u.current_target, u.orders.len()), (None, 0));
+    let combat = MasterKind::COMBAT;
+    let (answer, unit_ai) = run(unit(), NotifyKind::OWNER_CHANGED, 20, combat);
+    assert_eq!(
+        (answer, unit_ai.current_target, unit_ai.orders.len()),
+        (Ok(GO_ON), None, 0)
+    );
     for kind in [
         NotifyKind::TARGET_MOVED,
         NotifyKind::from(0x1f6),
@@ -2686,208 +2604,275 @@ fn the_base_handler_takes_each_kind_it_models() {
         NotifyKind::from(0x266),
         NotifyKind::from(0x2be),
     ] {
-        let mut u = unit();
-        assert_eq!(
-            run(&mut u, kind, object_id(20), &at),
-            (Ok(GO_ON), vec![]),
-            "{kind:#x}"
-        );
-        assert_eq!(u, unit(), "{kind:#x}");
+        let (answer, unit_ai) = run(unit(), kind, 20, combat);
+        assert_eq!(answer, Ok(GO_ON), "{kind:#x}");
+        assert_eq!(unit_ai, unit(), "{kind:#x}");
     }
-    let mut u = unit();
+    let (answer, unit_ai) = run(unit(), NotifyKind::OUT_OF_REACH, 20, combat);
     assert_eq!(
-        run(&mut u, NotifyKind::OUT_OF_REACH, object_id(20), &at).0,
-        Ok(GO_ON)
+        (answer, unit_ai.current_order),
+        (Ok(GO_ON), Some(OrderKind::Attack))
     );
-    assert_eq!(u.current_order, Some(OrderKind::Attack));
-    let fixed = Surroundings {
-        kind: MasterKind::ANIMATED,
-        ..at.clone()
-    };
+    let (answer, unit_ai) = run(unit(), NotifyKind::OUT_OF_REACH, 20, MasterKind::ANIMATED);
+    assert_eq!((answer, unit_ai.current_order), (Ok(GO_ON), None));
+    let (answer, unit_ai) = run(unit(), NotifyKind::SENT_OFF_GROUP, 20, combat);
     assert_eq!(
-        run(&mut u, NotifyKind::OUT_OF_REACH, object_id(20), &fixed).0,
-        Ok(GO_ON)
+        (answer, unit_ai.current_action),
+        (Ok(GO_ON), Some(AiAction::GroupAside))
     );
-    assert_eq!(u.current_order, None);
-    let mut u = unit();
+    let (answer, unit_ai) = run(unit(), NotifyKind::NO_LONGER_ON_ME, 30, combat);
     assert_eq!(
-        run(&mut u, NotifyKind::SENT_OFF_GROUP, object_id(20), &at).0,
-        Ok(GO_ON)
+        (answer, unit_ai.attackers),
+        (Ok(GO_ON), Attackers::of_saved(&[31]))
     );
-    assert_eq!(u.current_action, Some(AiAction::GroupAside));
-    let mut u = unit();
+    let (answer, unit_ai) = run(unit(), NotifyKind::NO_LONGER_ON_ME, 77, combat);
     assert_eq!(
-        run(&mut u, NotifyKind::NO_LONGER_ON_ME, object_id(30), &at).0,
-        Ok(GO_ON)
+        (answer, unit_ai.attackers),
+        (Ok(GO_ON), Attackers::of_saved(&[30, 31]))
     );
-    assert_eq!(u.attackers, Attackers::of_saved(&[31]));
-    assert_eq!(
-        run(&mut u, NotifyKind::NO_LONGER_ON_ME, object_id(77), &at).0,
-        Ok(GO_ON)
-    );
-    assert_eq!(u.attackers, Attackers::of_saved(&[31]));
-    assert!(
-        run(&mut unit(), NotifyKind::from(0x999), object_id(20), &at)
-            .0
-            .is_err()
-    );
+    assert!(run(unit(), NotifyKind::from(0x999), 20, combat).0.is_err());
 }
 
 /// A villager dodges a missile's warning by its owner's chance (one AI draw); one it does
 /// not dodge is its damage.
 #[test]
 fn villager_dodges_missile_warning_or_takes_it_as_damage() {
-    let r = rng().rand15() as i32 * 100 / 0x7fff;
-    let (mut u, mut at, hit) = hit_villager();
+    let roll = rng().rand15() as i32 * 100 / 0x7fff;
     let warning = Notify {
         kind: NotifyKind::MISSILE_WARNING,
-        ..hit
+        ..villager_hit()
     };
-    at.dodge_chance = Chance::of_data(u8::try_from(r + 1).unwrap());
-    let mut side = DamageSide {
-        units: vec![foe(30, class::CLASS_6)],
-        ..DamageSide::default()
+    let warned = |chance: i32| {
+        let mut world = hit_villager_world(gathering_villager(), None, foe_master());
+        world.players[1].dodge_chance = Chance::of_data(u8::try_from(chance).unwrap());
+        world
+            .parts
+            .unit_ai
+            .get_mut(object_id(20))
+            .unwrap()
+            .post(warning, ObjectState::Alive)
+            .unwrap();
+        let before = world.streams.get(Stream::Ai).draws;
+        let answer = hears(&mut world, (player_id(1), 20), warning);
+        let draws = world.streams.get(Stream::Ai).draws - before;
+        (answer, draws, world)
     };
-    let mut ai = rng();
-    let mut fx = Vec::new();
-    assert_eq!(
-        u.handle(
-            warning,
-            Millis::ZERO,
-            &at,
-            PlayerKind::Human,
-            &mut ai,
-            &mut With::new(&mut side, &mut fx)
-        ),
-        Ok(GO_ON)
-    );
-    assert_eq!((ai.draws, fx.len(), u.attackers.iter().count()), (1, 0, 0));
-    at.dodge_chance = Chance::of_data(u8::try_from(r).unwrap());
-    assert_eq!(
-        u.handle(
-            warning,
-            Millis::ZERO,
-            &at,
-            PlayerKind::Human,
-            &mut rng(),
-            &mut With::new(&mut side, &mut fx)
-        ),
-        Ok(BREAK)
-    );
-    assert_eq!(u.attackers, Attackers::of_saved(&[30]));
+    let (answer, draws, world) = warned(roll + 1);
+    assert_eq!((answer, draws), (Ok(GO_ON), 1));
+    let unit_ai = world.parts.unit_ai.get(object_id(20)).unwrap();
+    assert_eq!(unit_ai.attackers.iter().count(), 0);
+    assert_eq!(villager_walks(&world), None);
+    let (answer, _, world) = warned(roll);
+    assert_eq!(answer, Ok(BREAK));
+    let unit_ai = world.parts.unit_ai.get(object_id(20)).unwrap();
+    assert_eq!(unit_ai.attackers, Attackers::of_saved(&[30]));
 }
 
-/// A villager's harmless attacker ([`UnitSide::harmless`]) is attacked back, as a Gaia
-/// attacker is: without an order straight away (`AttackObject` forced), and it stops after
-/// the kill.
+/// A villager's harmless attacker ([`UnitSide::harmless`]: a weak villager of its own
+/// master) is attacked back, as a Gaia attacker is: without an order straight away
+/// (`AttackObject` forced: its Attack at once), and it stops after the kill.
 #[test]
 fn villager_attacks_harmless_attacker_back() {
-    let (mut u, at, hit) = hit_villager();
-    u.current_order = None;
-    u.current_action = None;
-    u.current_target = None;
-    let mut side = DamageSide {
-        units: vec![foe(30, class::CLASS_6)],
-        harmless: vec![object_id(30)],
-        ..DamageSide::default()
+    let resting = UnitAi {
+        current_order: None,
+        current_action: None,
+        current_target: None,
+        ..gathering_villager()
     };
-    let mut fx = Vec::new();
-    let r = u.villager_damaged(
-        hit,
-        Millis::ZERO,
-        &at,
-        PlayerKind::Human,
-        &mut rng(),
-        &mut With::new(&mut side, &mut fx),
-    );
-    assert_eq!(r, Ok(BREAK));
-    assert_eq!(side.attacks, vec![object_id(30)]);
-    assert!(u.stop_after_kill && u.orders.is_empty());
+    let mut world = hit_villager_world(resting, None, harmless_villager());
+    let (answer, unit_ai) = villager_takes(&mut world, villager_hit());
+    assert_eq!(answer, Ok(BREAK));
+    let attacks = world
+        .parts
+        .actions
+        .of(object_id(20))
+        .list
+        .attack()
+        .and_then(|attack| attack.target)
+        .map(AttackTargetId::id);
+    assert_eq!(attacks, Some(object_id(30)));
+    assert!(unit_ai.stop_after_kill && unit_ai.orders.is_empty());
 }
 
-/// On the move action (`0x262`) a villager at a speed keeps moving (and returns 3); at a
-/// standstill it evades; without its animation speed the slice stops.
+/// On the move action (`0x262`) a villager at a speed keeps moving (and returns 3), a speed
+/// that is not a number too (`UCOMISS`); at a standstill it evades (its order queued, its run
+/// at once). (The slice's stop for a villager without its animation speed is a case no world
+/// reaches: every unit that moves animates.)
 #[test]
 fn moving_villager_keeps_its_way() {
-    let (mut u, at, hit) = hit_villager();
-    u.current_action = Some(AiAction::Move);
-    let mut side = DamageSide {
-        units: vec![foe(30, class::CLASS_6)],
-        ..DamageSide::default()
+    let walking = UnitAi {
+        current_action: Some(AiAction::Move),
+        ..gathering_villager()
     };
-    let mut fx = Vec::new();
-    let walking = u.clone();
-    let r = u.villager_damaged(
-        hit,
-        Millis::ZERO,
-        &at,
-        PlayerKind::Human,
-        &mut rng(),
-        &mut With::new(&mut side, &mut fx),
-    );
-    assert_eq!(r, Ok(BREAK));
-    assert!(fx.is_empty() && u.orders.is_empty());
-    let nan = Surroundings {
-        anim_speed: Some(Speed::new(f32::NAN)),
-        ..at.clone()
+    let walk = Action {
+        list: ActionList::default().with_move_to(Some(MoveToAction {
+            point: Position::new(30.0, 10.0, 0.0),
+            ..MoveToAction::sub_in(MoveTo::Moving)
+        })),
+        ..Action::default()
     };
-    let mut u = walking.clone();
-    let r = u.villager_damaged(
-        hit,
-        Millis::ZERO,
-        &nan,
-        PlayerKind::Human,
-        &mut rng(),
-        &mut With::new(&mut side, &mut fx),
-    );
-    assert_eq!(r, Ok(BREAK));
-    assert!(fx.is_empty() && u.orders.is_empty());
-    let still = Surroundings {
-        anim_speed: Some(Speed::ZERO),
-        ..at.clone()
+    let run = |speed: f32| {
+        let mut world = hit_villager_world(walking.clone(), Some(walk.clone()), foe_master());
+        world.parts.set_anim_speed(object_id(20), Speed::new(speed));
+        let (answer, unit_ai) = villager_takes(&mut world, villager_hit());
+        (answer, unit_ai.orders.len(), villager_walks(&world))
     };
-    let mut u = walking.clone();
-    let r = u.villager_damaged(
-        hit,
-        Millis::ZERO,
-        &still,
-        PlayerKind::Human,
-        &mut rng(),
-        &mut With::new(&mut side, &mut fx),
-    );
-    assert_eq!(r, Ok(BREAK));
-    assert_eq!(u.orders.len(), 1);
-    assert!(matches!(fx.last(), Some(Effect::Move(_))));
-    let unknown = Surroundings {
-        anim_speed: None,
-        ..at
-    };
-    let mut u = walking;
-    assert!(
-        u.villager_damaged(
-            hit,
-            Millis::ZERO,
-            &unknown,
-            PlayerKind::Human,
-            &mut rng(),
-            &mut With::new(&mut side, &mut Vec::new())
-        )
-        .is_err()
-    );
+    let on = Some(Position::new(30.0, 10.0, 0.0));
+    assert_eq!(run(1.0), (Ok(BREAK), 0, on));
+    assert_eq!(run(f32::NAN), (Ok(BREAK), 0, on));
+    let (answer, queued, to) = run(0.0);
+    assert_eq!((answer, queued), (Ok(BREAK), 1));
+    assert!(to.is_some_and(|point| point.x() < 10.0), "{to:?}");
 }
 
-/// A friend (player 1, allied) at (11, 10) the soldier guards, `gap_squared` from it.
-fn ward(gap_squared: DistanceSquared) -> UnitSeen {
-    UnitSeen {
-        id: object_id(20),
-        class: class::CLASS_6,
-        owner: PlayerId::new(1),
-        state: ObjectState::Alive,
-        position: Position::new(11.0, 10.0, 0.0),
-        gap_squared,
-        kind: MasterKind::COMBAT,
-        allied: true,
-        ..UnitSeen::default()
+/// Player 1's soldier 1 at (10, 10) (master `master`: [`guard_master`]'s), its unit AI `ai`,
+/// its owner of type `player_kind`, and the `others`, each in player 1's lists, on a map of
+/// 100 by 100. The AI stream is seeded with 0, as [`rng`] is.
+fn guard_world(
+    (master, ai): (Master, UnitAi),
+    player_kind: PlayerKind,
+    others: &[SceneThing],
+) -> World {
+    let mut world = guard_scene((master, ai), player_kind, others).build();
+    world.streams.get(Stream::Ai).set_seed(0);
+    world
+}
+
+/// [`guard_world`]'s scene, before its build.
+fn guard_scene(
+    (master, ai): (Master, UnitAi),
+    player_kind: PlayerKind,
+    others: &[SceneThing],
+) -> Scene {
+    let mut scene = Scene::open(GridSize::new(100, 100))
+        .players(2)
+        .kind(player_id(1), player_kind)
+        .graphic(STANDING)
+        .thing(SceneThing {
+            ai: Some(ai),
+            sprite: Some(STANDING.id),
+            ..SceneThing::new(1, player_id(1), master, Position::new(10.0, 10.0, 0.0))
+        });
+    for thing in others {
+        scene = scene.thing(SceneThing {
+            seen_by: Some(VisionBits::visible(player_id(1))),
+            ..thing.clone()
+        });
+    }
+    scene
+}
+
+/// The guard soldier's master 4: a walker of class 6, line of sight 4, on [`STANDING`], that
+/// deals 10 a hit to a melee armor of 0 and takes a melee attack whole.
+fn guard_master() -> Master {
+    Master {
+        line_of_sight: Distance::new(4.0),
+        standing_sprite: Some(STANDING.id),
+        combat: Some(CombatPart {
+            weapons: vec![ClassAmount::new(4, 10)],
+            armors: vec![ClassAmount::new(4, 0)],
+            ..CombatPart::default()
+        }),
+        ..walker(4, class::CLASS_6)
+    }
+}
+
+/// Player 2's unit `id` (master `id`, a walker of class `class`, 30 hit points) at (x, 10):
+/// its attacks are 2 melee and 3 pierce (5; the guard takes the 2), its melee armor 0; its
+/// unit AI targets the guard soldier 1.
+fn foe_thing(id: i32, class: ClassId, x: f32) -> SceneThing {
+    let master = Master {
+        standing_sprite: Some(STANDING.id),
+        combat: Some(CombatPart {
+            weapons: vec![ClassAmount::new(4, 2), ClassAmount::new(3, 3)],
+            armors: vec![ClassAmount::new(4, 0)],
+            ..CombatPart::default()
+        }),
+        ..walker(i16::try_from(id).expect("a master's id"), class)
+    };
+    SceneThing {
+        hp: HitPoints::new(30.0),
+        ai: Some(UnitAi {
+            current_target: Some(object_id(1)),
+            ..idle(UnitAiKind::Soldier)
+        }),
+        ..SceneThing::new(id, player_id(2), master, Position::new(x, 10.0, 0.0))
+    }
+}
+
+/// The guard soldier 1 of `world` runs `routine`, its unit AI's routine inside its update, after
+/// its unit AI queued `heard`: its answer and its unit AI.
+fn guard_runs<R>(
+    world: &mut World,
+    heard: &[Notify],
+    routine: impl FnOnce(
+        &mut UnitAi,
+        &Surroundings,
+        &mut dyn UnitSide,
+        PlayerKind,
+        &mut Well512,
+    ) -> GenieResult<R>,
+) -> (GenieResult<R>, UnitAi) {
+    for &notify in heard {
+        world
+            .parts
+            .unit_ai
+            .get_mut(object_id(1))
+            .unwrap()
+            .post(notify, ObjectState::Alive)
+            .unwrap();
+    }
+    let answer = run_ai(
+        world,
+        (player_id(1), object_id(1)),
+        |ai, at, side, kind, rng| routine(ai, at, side, kind, rng),
+    );
+    (
+        answer,
+        world.parts.unit_ai.get(object_id(1)).unwrap().clone(),
+    )
+}
+
+/// The target of the guard soldier 1's Attack in `world`, none without one.
+fn guard_attacks(world: &World) -> Option<ObjectId> {
+    world
+        .parts
+        .actions
+        .of(object_id(1))
+        .list
+        .attack()
+        .and_then(|attack| attack.target)
+        .map(AttackTargetId::id)
+}
+
+/// The guard soldier 1 of `world` is under attack.
+fn guard_under_attack(world: &World) -> bool {
+    let guard = world.players[1].objects.by_id(object_id(1)).unwrap();
+    guard.flags.contains(UnitFlags::UNDER_ATTACK)
+}
+
+/// A walk of the guard soldier to (30, 10).
+fn guard_walk() -> Action {
+    Action {
+        list: ActionList::default().with_move_to(Some(MoveToAction {
+            point: Position::new(30.0, 10.0, 0.0),
+            ..MoveToAction::sub_in(MoveTo::Moving)
+        })),
+        ..Action::default()
+    }
+}
+
+/// The ward 20 of `owner` (a walker of class 6, master 6) at (x, 10), in state `state`.
+fn ward_thing(owner: PlayerId, x: f32, state: ObjectState) -> SceneThing {
+    SceneThing {
+        state,
+        ai: Some(idle(UnitAiKind::Soldier)),
+        ..SceneThing::new(
+            20,
+            owner,
+            walker(6, class::CLASS_6),
+            Position::new(x, 10.0, 0.0),
+        )
     }
 }
 
@@ -2904,211 +2889,136 @@ fn guarding(defend_target: i32) -> UnitAi {
     }
 }
 
+/// The guard soldier of `world`, walking, runs processMisc's defend order
+/// ([`UnitAi::defend_misc`]): its answer and its unit AI.
+fn defends(world: &mut World) -> (GenieResult<MiscEnd>, UnitAi) {
+    guard_runs(world, &[], |ai, at, side, kind, rng| {
+        ai.defend_misc(at, kind, rng, side)
+    })
+}
+
 /// processMisc's defend order: a ward the world does not hold, another player's or a dead
-/// player's ward ends it (the target goes, the action stops, the order is −1); Gaia's dead
-/// ward does not; an unset target point takes the ward's place.
+/// ward ends it (the target goes, the action stops: its walk too, the order is −1); the
+/// routine lets Gaia's dead ward be, but Gaia is no one's ally, so its ward ends it first; an
+/// unset target point takes the ward's place.
 #[test]
 fn defend_order_ends_with_its_ward_gone_foreign_or_dead() {
-    let at = soldier_at();
-    let foreign = UnitSeen {
-        allied: false,
-        ..ward(DistanceSquared::new(1.0))
-    };
-    let dead = UnitSeen {
-        state: ObjectState::Dying,
-        ..ward(DistanceSquared::new(1.0))
-    };
-    for units in [vec![], vec![foreign], vec![dead]] {
-        let mut u = guarding(20);
-        let mut side = DamageSide {
-            units,
-            ..DamageSide::default()
-        };
-        let mut fx = Vec::new();
-        assert_eq!(
-            u.defend_misc(
-                &at,
-                PlayerKind::Human,
-                &mut rng(),
-                &mut With::new(&mut side, &mut fx)
-            ),
-            Ok(MiscEnd::Ends)
+    let alive = ObjectState::Alive;
+    for ward in [
+        None,
+        Some(ward_thing(player_id(2), 11.0, alive)),
+        Some(ward_thing(player_id(1), 11.0, ObjectState::Dying)),
+    ] {
+        let mut world = guard_world(
+            (guard_master(), guarding(20)),
+            PlayerKind::Human,
+            ward.as_slice(),
         );
+        *world.parts.actions.of_mut(object_id(1)).unwrap() = guard_walk();
+        let (answer, unit_ai) = defends(&mut world);
+        assert_eq!(answer, Ok(MiscEnd::Ends));
         assert_eq!(
-            (u.defend_target, u.current_target, u.current_order),
+            (
+                unit_ai.defend_target,
+                unit_ai.current_target,
+                unit_ai.current_order
+            ),
             (None, None, None)
         );
-        assert!(fx.contains(&Effect::Stop), "{fx:?}");
+        assert_eq!(world.parts.actions.of(object_id(1)).top_action_kind(), None);
     }
-    let gaia = UnitSeen {
-        owner: PlayerId::new(0),
-        ..dead
-    };
-    let mut u = guarding(20);
-    let mut side = DamageSide {
-        units: vec![gaia],
-        ..DamageSide::default()
-    };
-    assert_eq!(
-        u.defend_misc(
-            &at,
-            PlayerKind::Human,
-            &mut rng(),
-            &mut With::new(&mut side, &mut Vec::new())
-        ),
-        Ok(MiscEnd::GoesOn)
-    );
-    assert_eq!(u.defend_target, Some(object_id(20)));
+    // Gaia's dead ward ends it too: no ally test counts Gaia (MISSING.md)
+    let gaia = ward_thing(PlayerId::GAIA, 11.0, ObjectState::Dying);
+    let mut world = guard_scene((guard_master(), guarding(20)), PlayerKind::Human, &[gaia])
+        .relation(player_id(1), PlayerId::GAIA, Relation::Ally)
+        .build();
+    let (answer, unit_ai) = defends(&mut world);
+    assert_eq!((answer, unit_ai.defend_target), (Ok(MiscEnd::Ends), None));
     // on the attack action only the unset point takes the ward's place
-    let mut u = UnitAi {
+    let attacking = UnitAi {
         current_action: Some(AiAction::Attack),
         target_point: Position::new(-1.0, -1.0, 3.0),
         ..guarding(20)
     };
-    let mut side = DamageSide {
-        units: vec![ward(DistanceSquared::new(1.0))],
-        ..DamageSide::default()
-    };
-    let mut fx = Vec::new();
+    let ward = ward_thing(player_id(1), 11.0, alive);
+    let mut world = guard_world((guard_master(), attacking), PlayerKind::Human, &[ward]);
+    let (answer, unit_ai) = defends(&mut world);
     assert_eq!(
-        u.defend_misc(
-            &at,
-            PlayerKind::Human,
-            &mut rng(),
-            &mut With::new(&mut side, &mut fx)
-        ),
-        Ok(MiscEnd::GoesOn)
+        (answer, unit_ai.target_point),
+        (Ok(MiscEnd::GoesOn), Position::new(11.0, 10.0, 3.0))
     );
-    assert_eq!(
-        (u.target_point, fx),
-        (Position::new(11.0, 10.0, 3.0), Vec::new())
-    );
+    assert_eq!(world.parts.actions.of(object_id(1)).top_action_kind(), None);
 }
 
 /// processMisc's defend order beyond the desired distance plus 1: the soldier walks to its
-/// ward (slot 0x138) or runs to the point it defends (slot 0x130, forced); within it, it
-/// attacks the ward's nearest attacker (slot 0xb8, forced), or with none its processIdle runs.
+/// ward (slot 0x138: its `MoveTo` at once) or runs to the point it defends (slot 0x130,
+/// forced); within it, it attacks the ward's nearest attacker (slot 0xb8, forced), or with
+/// none its processIdle runs. Both radii are 0.2: the gap is the centres' distance less 0.4.
 #[test]
 fn defend_order_follows_its_ward_and_attacks_its_attackers() {
-    let at = soldier_at();
-    let mut u = guarding(20);
-    let mut side = DamageSide {
-        units: vec![ward(DistanceSquared::new(100.0))],
-        ..DamageSide::default()
-    };
-    let mut fx = Vec::new();
+    let alive = ObjectState::Alive;
+    let far = ward_thing(player_id(1), 20.4, alive);
+    let mut world = guard_world((guard_master(), guarding(20)), PlayerKind::Human, &[far]);
+    let (answer, unit_ai) = defends(&mut world);
+    assert_eq!(answer, Ok(MiscEnd::Ends));
+    let walk = world
+        .parts
+        .actions
+        .of(object_id(1))
+        .list
+        .move_to()
+        .map(|move_to| (move_to.target, move_to.range));
+    assert_eq!(walk, Some((Some(object_id(20)), Distance::new(2.5))));
     assert_eq!(
-        u.defend_misc(
-            &at,
-            PlayerKind::Human,
-            &mut rng(),
-            &mut With::new(&mut side, &mut fx)
-        ),
-        Ok(MiscEnd::Ends)
-    );
-    assert_eq!(
-        fx,
-        vec![Effect::MoveToObject {
-            target: object_id(20),
-            state: ObjectState::Alive,
-            range: Distance::new(2.5)
-        }]
-    );
-    assert_eq!(
-        (u.current_action, u.current_target),
+        (unit_ai.current_action, unit_ai.current_target),
         (Some(AiAction::Move), Some(object_id(20)))
     );
-    // (2.5 + 1)^2 is 12.25: within it the ward's nearest attacker is attacked
-    let mut u = guarding(20);
-    let mut side = DamageSide {
-        units: vec![ward(DistanceSquared::new(12.25)), foe(40, class::CLASS_6)],
-        defended: Some(NearestAttacker::Attacker(object_id(40))),
-        ..DamageSide::default()
+    // (2.5 + 1)^2 is 12.25: within it (a gap of 3.5) the ward's nearest attacker is attacked
+    let near = SceneThing {
+        ai: Some(UnitAi {
+            attackers: Attackers::of_saved(&[40]),
+            ..idle(UnitAiKind::Soldier)
+        }),
+        ..ward_thing(player_id(1), 13.9, alive)
     };
-    let mut fx = Vec::new();
+    let others = [near, foe_thing(40, class::CLASS_6, 15.0)];
+    let mut world = guard_world((guard_master(), guarding(20)), PlayerKind::Human, &others);
+    let (answer, _) = defends(&mut world);
     assert_eq!(
-        u.defend_misc(
-            &at,
-            PlayerKind::Human,
-            &mut rng(),
-            &mut With::new(&mut side, &mut fx)
-        ),
-        Ok(MiscEnd::Ends)
+        (answer, guard_attacks(&world)),
+        (Ok(MiscEnd::Ends), Some(object_id(40)))
     );
-    assert_eq!(side.attacks, vec![object_id(40)]);
     // a point to defend, beyond reach: the forced run to it
-    let mut u = UnitAi {
+    let point = UnitAi {
         target_point: Position::new(20.0, 10.0, 0.0),
         ..guarding(-1)
     };
-    let mut fx = Vec::new();
+    let mut world = guard_world((guard_master(), point), PlayerKind::Human, &[]);
+    let (answer, _) = defends(&mut world);
+    assert_eq!(answer, Ok(MiscEnd::Ends));
+    let run = world
+        .parts
+        .actions
+        .of(object_id(1))
+        .list
+        .move_to()
+        .map(|move_to| (move_to.point, move_to.range));
     assert_eq!(
-        u.defend_misc(
-            &at,
-            PlayerKind::Human,
-            &mut rng(),
-            &mut With::new(&mut DamageSide::default(), &mut fx)
-        ),
-        Ok(MiscEnd::Ends)
-    );
-    assert_eq!(
-        fx,
-        vec![Effect::Move(AiMove {
-            point: Position::new(20.0, 10.0, 0.0),
-            range: Distance::new(2.5),
-            force: OrderForce::Forced,
-            pace: Pace::Run
-        })]
+        run,
+        Some((Position::new(20.0, 10.0, 0.0), Distance::new(2.5)))
     );
     // within reach of its point, nothing
-    let mut u = UnitAi {
+    let close = UnitAi {
         target_point: Position::new(12.0, 10.0, 0.0),
         ..guarding(-1)
     };
-    assert_eq!(
-        u.defend_misc(
-            &at,
-            PlayerKind::Human,
-            &mut rng(),
-            &mut With::new(&mut DamageSide::default(), &mut Vec::new())
-        ),
-        Ok(MiscEnd::GoesOn)
-    );
+    let mut world = guard_world((guard_master(), close), PlayerKind::Human, &[]);
+    let (answer, _) = defends(&mut world);
+    assert_eq!(answer, Ok(MiscEnd::GoesOn));
+    assert_eq!(world.parts.actions.of(object_id(1)).top_action_kind(), None);
 }
 
-/// An enemy (player 2) of `class` the damage case's side holds.
-fn foe(id: i32, class: ClassId) -> UnitSeen {
-    UnitSeen {
-        id: object_id(id),
-        class,
-        owner: PlayerId::new(2),
-        state: ObjectState::Alive,
-        position: Position::new(12.0, 10.0, 0.0),
-        hp: HitPoints::new(30.0),
-        kind: MasterKind::COMBAT,
-        ..UnitSeen::default()
-    }
-}
-
-/// A human player's soldier at (10, 10) that moves.
-fn soldier_at() -> Surroundings {
-    Surroundings {
-        id: object_id(1),
-        player: PlayerId::new(1),
-        kind: MasterKind::COMBAT,
-        class: Some(class::CLASS_6),
-        speed: Speed::new(1.0),
-        los: Distance::new(4.0),
-        weapon_range: Distance::ZERO,
-        action_state: Some(ActionState::NO_ACTION),
-        position: Position::new(10.0, 10.0, 0.0),
-        roles: roles(),
-        slots: slots(),
-        unit_ai_tuning: tuning().unit_ai,
-        ..Surroundings::default()
-    }
-}
-
+/// Unit `caller`'s hit on the guard soldier 1 that leaves it `hp` hit points.
 fn damage(caller: i32, hp: i32) -> Notify {
     Notify {
         caller: ObjectId::of_field(caller),
@@ -3118,101 +3028,79 @@ fn damage(caller: i32, hp: i32) -> Notify {
     }
 }
 
+/// The guard soldier 1 of `world` takes its damage case ([`UnitAi::damaged`]) on `notify`, which
+/// its unit AI queued.
+fn guard_damaged(world: &mut World, notify: Notify) -> (GenieResult<u32>, UnitAi) {
+    guard_runs(world, &[notify], |ai, at, side, kind, rng| {
+        ai.damaged(notify, Millis::ZERO, at, kind, rng, side)
+    })
+}
+
 /// `FUN_140c589c0`'s case 500 up to its attack search: a known attacker of a unit whose top
-/// action has a target changes nothing but the retarget entries; the dead give up; an allied
-/// attacker is let be once it joined the set; a human player's unit on an order other than
-/// a patrol ignores it.
+/// action has a target (its Attack on 9) changes nothing but the retarget entries; the dead
+/// give up; an allied attacker (its own player's) is let be once it joined the set; a human
+/// player's unit on an order other than a patrol ignores it. None of them searches.
 #[test]
 fn the_damage_case_lets_known_dead_allied_and_ordered_ones_be() {
-    let at = soldier_at();
-    let mut fx = Vec::new();
-    let mut u = UnitAi {
+    let known = UnitAi {
         attackers: Attackers::of_saved(&[7]),
         retries: vec![(object_id(3), WorldTime::from_millis(900))],
         ..idle(UnitAiKind::Soldier)
     };
-    let mut side = DamageSide {
-        units: vec![foe(7, class::CLASS_6)],
-        top: Some(object_id(9)),
-        found: 7,
-        ..DamageSide::default()
+    let foes = [
+        foe_thing(7, class::CLASS_6, 12.0),
+        foe_thing(9, class::CLASS_6, 13.0),
+    ];
+    let mut world = guard_world((guard_master(), known), PlayerKind::Human, &foes);
+    *world.parts.actions.of_mut(object_id(1)).unwrap() = Action {
+        list: ActionList::default().with_attack(Some(own_attack(
+            9,
+            AttackState::Ready,
+            Distance::new(1.0),
+        ))),
+        ..Action::default()
     };
-    let r = u.damaged(
-        damage(7, 20),
-        Millis::ZERO,
-        &at,
+    let (answer, unit_ai) = guard_damaged(&mut world, damage(7, 20));
+    assert_eq!((answer, unit_ai.retries), (Ok(GO_ON), vec![]));
+    assert!(!guard_under_attack(&world));
+    assert!(world.spatial.searched().is_none());
+    // the dead
+    let mut world = guard_world(
+        (guard_master(), idle(UnitAiKind::Soldier)),
         PlayerKind::Human,
-        &mut rng(),
-        &mut With::new(&mut side, &mut fx),
+        &foes,
     );
-    assert_eq!(r.unwrap(), GO_ON);
-    assert_eq!(u.retries, vec![]);
-    assert_eq!(side.under_attack, Vec::<bool>::new());
-    assert_eq!(side.attack_searches, 0);
-
-    let mut u = idle(UnitAiKind::Soldier);
-    let mut side = DamageSide {
-        units: vec![foe(7, class::CLASS_6)],
-        ..DamageSide::default()
-    };
-    let r = u.damaged(
-        damage(7, 0),
-        Millis::ZERO,
-        &at,
-        PlayerKind::Human,
-        &mut rng(),
-        &mut With::new(&mut side, &mut fx),
-    );
-    assert_eq!(r.unwrap(), DEAD);
+    let (answer, unit_ai) = guard_damaged(&mut world, damage(7, 0));
     assert_eq!(
-        (u.attackers.clone(), side.under_attack),
-        (Attackers::of_saved(&[7]), vec![true])
+        (answer, unit_ai.attackers),
+        (Ok(DEAD), Attackers::of_saved(&[7]))
     );
-
-    let mut u = idle(UnitAiKind::Soldier);
-    let mut side = DamageSide {
-        units: vec![UnitSeen {
-            allied: true,
-            ..foe(7, class::CLASS_6)
-        }],
-        found: 7,
-        ..DamageSide::default()
+    assert!(guard_under_attack(&world));
+    // an allied attacker: its own player's
+    let own = SceneThing {
+        player: player_id(1),
+        ..foe_thing(7, class::CLASS_6, 12.0)
     };
-    let r = u.damaged(
-        damage(7, 20),
-        Millis::ZERO,
-        &at,
+    let mut world = guard_world(
+        (guard_master(), idle(UnitAiKind::Soldier)),
         PlayerKind::Human,
-        &mut rng(),
-        &mut With::new(&mut side, &mut fx),
+        &[own],
     );
-    assert_eq!(r.unwrap(), GO_ON);
-    assert_eq!(u.attackers, Attackers::of_saved(&[7]));
-    assert_eq!((side.attack_searches, side.helps.len()), (0, 0));
-
-    let mut u = UnitAi {
+    let (answer, unit_ai) = guard_damaged(&mut world, damage(7, 20));
+    assert_eq!(
+        (answer, unit_ai.attackers),
+        (Ok(GO_ON), Attackers::of_saved(&[7]))
+    );
+    assert!(world.spatial.searched().is_none());
+    // on an order: the new attacker makes it ask for help first, nothing more
+    let ordered = UnitAi {
         current_order: Some(OrderKind::Attack),
         ..idle(UnitAiKind::Soldier)
     };
-    let mut side = DamageSide {
-        units: vec![foe(7, class::CLASS_6)],
-        found: 7,
-        ..DamageSide::default()
-    };
-    let r = u.damaged(
-        damage(7, 20),
-        Millis::ZERO,
-        &at,
-        PlayerKind::Human,
-        &mut rng(),
-        &mut With::new(&mut side, &mut fx),
-    );
-    assert_eq!(r.unwrap(), GO_ON);
-    // the new attacker made it ask for help first
-    assert_eq!(
-        (side.attack_searches, side.helps.clone()),
-        (0, vec![object_id(7)])
-    );
+    let mut world = guard_world((guard_master(), ordered), PlayerKind::Human, &foes);
+    let (answer, unit_ai) = guard_damaged(&mut world, damage(7, 20));
+    assert_eq!((answer, unit_ai.best_this_update), (Ok(GO_ON), None));
+    assert_eq!(guard_attacks(&world), None);
 }
 
 /// The unit AIs' class lists by factory type (their constructors' `+0x190`): the animals',
@@ -3393,100 +3281,101 @@ fn each_unit_ai_kind_tests_neutral_object_by_its_module() {
     );
 }
 
-/// An idle human player's soldier without a target: `bestUnitToAttack` names the attacker,
-/// which it reaches and attacks back (3); a second attacker in the same update takes the
-/// first search's answer and is ignored. Unreached, it runs (its stance keeps it: 3);
-/// nothing found and too slow to run, it lets it be.
+/// An idle human player's soldier without a target: `bestUnitToAttack` names the attacker 7,
+/// which it reaches and attacks back (3, its Attack at once); a second attacker in the same
+/// update (beyond the search's reach) takes the first search's answer and is ignored (it asks
+/// for help and joins the set). In its no-attack stance its search finds nothing it may attack
+/// and it lets it be (2). Named but not reached, it runs (3). Nothing found (an attacker of
+/// class 42, which a soldier never attacks) and too slow to run, it lets it be.
 #[test]
 fn an_idle_soldier_attacks_back_what_best_unit_to_attack_names() {
-    let at = soldier_at();
-    let mut fx = Vec::new();
-    let mut u = idle(UnitAiKind::Soldier);
-    let mut side = DamageSide {
-        units: vec![foe(7, class::CLASS_6), foe(8, class::CLASS_6)],
-        found: 7,
-        reaches: true,
-        ..DamageSide::default()
-    };
-    let r = u.damaged(
-        damage(7, 20),
-        Millis::ZERO,
-        &at,
-        PlayerKind::Human,
-        &mut rng(),
-        &mut With::new(&mut side, &mut fx),
-    );
-    assert_eq!(r.unwrap(), BREAK);
-    assert_eq!(u.best_this_update, Some(object_id(7)));
-    assert_eq!(side.attacks, vec![object_id(7)]);
+    let foes = [
+        foe_thing(7, class::CLASS_6, 12.0),
+        foe_thing(8, class::CLASS_6, 17.0),
+    ];
+    let soldier = |ai| (guard_master(), ai);
+    let mut world = guard_world(soldier(idle(UnitAiKind::Soldier)), PlayerKind::Human, &foes);
+    let (seven, eight) = (damage(7, 20), damage(8, 20));
+    let (answer, unit_ai) = guard_runs(&mut world, &[seven, eight], |ai, at, side, kind, rng| {
+        let first = ai.damaged(seven, Millis::ZERO, at, kind, rng, side)?;
+        let best = ai.best_this_update;
+        let second = ai.damaged(eight, Millis::ZERO, at, kind, rng, side)?;
+        Ok((first, best, second))
+    });
+    assert_eq!(answer, Ok((BREAK, Some(object_id(7)), GO_ON)));
+    assert_eq!(guard_attacks(&world), Some(object_id(7)));
     assert_eq!(
-        (u.current_action, u.current_target),
-        (Some(AiAction::Attack), Some(object_id(7)))
+        (
+            unit_ai.current_action,
+            unit_ai.current_target,
+            unit_ai.attackers
+        ),
+        (
+            Some(AiAction::Attack),
+            Some(object_id(7)),
+            Attackers::of_saved(&[7, 8])
+        )
     );
-    let r = u.damaged(
-        damage(8, 20),
-        Millis::ZERO,
-        &at,
-        PlayerKind::Human,
-        &mut rng(),
-        &mut With::new(&mut side, &mut fx),
-    );
-    assert_eq!(r.unwrap(), GO_ON);
-    assert_eq!(side.attack_searches, 1);
-    assert_eq!(side.helps, vec![object_id(7), object_id(8)]);
-    assert_eq!(u.attackers, Attackers::of_saved(&[7, 8]));
-
-    let mut u = UnitAi {
+    let passive = UnitAi {
         stance: UnitStance::NoAttack,
         ..idle(UnitAiKind::Soldier)
     };
-    let mut side = DamageSide {
-        units: vec![foe(7, class::CLASS_6)],
-        found: 7,
-        ..DamageSide::default()
-    };
-    let r = u.damaged(
-        damage(7, 20),
-        Millis::ZERO,
-        &at,
-        PlayerKind::Human,
-        &mut rng(),
-        &mut With::new(&mut side, &mut fx),
+    let mut world = guard_world(soldier(passive), PlayerKind::Human, &foes);
+    let (answer, unit_ai) = guard_damaged(&mut world, seven);
+    assert_eq!(
+        (answer, unit_ai.best_this_update, guard_attacks(&world)),
+        (Ok(GO_ON), None, None)
     );
-    assert_eq!(r.unwrap(), BREAK);
-    assert_eq!(side.attacks, Vec::new());
-
-    let still = Surroundings {
-        speed: Speed::ZERO,
-        ..soldier_at()
-    };
-    let mut u = idle(UnitAiKind::Soldier);
-    let mut side = DamageSide {
-        units: vec![foe(7, class::CLASS_6)],
-        found: -1,
-        ..DamageSide::default()
-    };
-    let r = u.damaged(
-        damage(7, 20),
-        Millis::ZERO,
-        &still,
+    // named but not reached (a lake around it): it runs (3)
+    let lake: Vec<Tile> = (13..=17)
+        .flat_map(|x| [Tile::new(x, 8), Tile::new(x, 12)])
+        .chain((9..=11).flat_map(|y| [Tile::new(13, y), Tile::new(17, y)]))
+        .collect();
+    let island = [foe_thing(7, class::CLASS_6, 15.0)];
+    let mut world = guard_scene(
+        soldier(idle(UnitAiKind::Soldier)),
         PlayerKind::Human,
-        &mut rng(),
-        &mut With::new(&mut side, &mut fx),
+        &island,
+    )
+    .water(lake)
+    .build();
+    let (answer, unit_ai) = guard_damaged(&mut world, seven);
+    assert_eq!(
+        (answer, unit_ai.best_this_update),
+        (Ok(BREAK), Some(object_id(7)))
     );
-    assert_eq!(r.unwrap(), GO_ON);
-    assert_eq!(u.best_this_update, None);
+    assert_eq!(guard_attacks(&world), None);
+    let run = world
+        .parts
+        .actions
+        .of(object_id(1))
+        .list
+        .move_to()
+        .map(|move_to| move_to.point);
+    assert!(run.is_some_and(|point| point.x() < 10.0), "{run:?}");
+    let still = Master {
+        move_stats: Some(walking(Speed::ZERO)),
+        ..guard_master()
+    };
+    let unseen = foe_thing(7, class::RELIC, 12.0);
+    let mut world = guard_world(
+        (still, idle(UnitAiKind::Soldier)),
+        PlayerKind::Human,
+        &[unseen],
+    );
+    let (answer, unit_ai) = guard_damaged(&mut world, seven);
+    assert_eq!((answer, unit_ai.best_this_update), (Ok(GO_ON), None));
 }
 
-/// A human player's soldier with a live target attacks back only from a building, wall or
-/// tower target; on a patrol its patrol is saved and, the attack taken, the order ends with
-/// its timers (an adjusted idle timeout of 750 redrawn, the secondary timer capped).
+/// A human player's soldier with a live target 9 attacks back only from a building, wall or tower
+/// target (player 2's house of class 3, 27 or 52: the search from it names the attacker; from a
+/// soldier it names the soldier); on a patrol its patrol is saved (its top path level, waypoint 2)
+/// and, the attack taken, the order ends with its timers (an adjusted idle timeout of 750 redrawn,
+/// the secondary timer capped).
 #[test]
 fn soldier_with_target_attacks_back_from_buildings_only() {
-    let at = soldier_at();
     let run = |class: ClassId, order: Option<OrderKind>| {
-        let mut fx = Vec::new();
-        let mut u = UnitAi {
+        let unit_ai = UnitAi {
             current_order: order,
             current_action: Some(AiAction::Attack),
             current_target: Some(object_id(9)),
@@ -3495,185 +3384,200 @@ fn soldier_with_target_attacks_back_from_buildings_only() {
             secondary_timer: Millis::new(900),
             ..idle(UnitAiKind::Soldier)
         };
-        let mut side = DamageSide {
-            units: vec![foe(7, class::CLASS_6), foe(9, class)],
-            found: 7,
-            reaches: true,
-            patrol: Some((PatrolPath::default(), WaypointIndex::of_data(2))),
-            ..DamageSide::default()
+        let target = if class == class::CLASS_6 {
+            foe_thing(9, class, 13.0)
+        } else {
+            let (house, _) = house_and_tree();
+            SceneThing {
+                ai: Some(idle(UnitAiKind::Building)),
+                ..SceneThing::new(
+                    9,
+                    player_id(2),
+                    Master { class, ..house },
+                    Position::new(14.0, 10.0, 0.0),
+                )
+            }
         };
-        let r = u
-            .damaged(
-                damage(7, 20),
-                Millis::ZERO,
-                &at,
-                PlayerKind::Human,
-                &mut rng(),
-                &mut With::new(&mut side, &mut fx),
-            )
-            .unwrap();
-        (r, u, side.attacks)
+        let others = [foe_thing(7, class::CLASS_6, 12.0), target];
+        let mut world = guard_world((guard_master(), unit_ai), PlayerKind::Human, &others);
+        world.parts.mover_mut(object_id(1)).unwrap().paths = vec![PathData {
+            points: vec![BVector::new(10.0, 0.0, 10.0), BVector::new(20.0, 0.0, 10.0)],
+            has_path: true,
+            waypoint: WaypointIndex::of_data(2),
+            ..PathData::without_path()
+        }];
+        let (answer, unit_ai) = guard_damaged(&mut world, damage(7, 20));
+        (answer, unit_ai, guard_attacks(&world))
     };
-    let (r, _, attacks) = run(class::CLASS_6, None);
-    assert_eq!((r, attacks), (GO_ON, vec![]));
+    let (answer, _, attacks) = run(class::CLASS_6, None);
+    assert_eq!((answer, attacks), (Ok(GO_ON), None));
     for class in [3, 27, 52].map(ClassId::of_master) {
-        let (r, u, attacks) = run(class, None);
+        let (answer, unit_ai, attacks) = run(class, None);
         assert_eq!(
-            (r, attacks, u.current_target),
-            (BREAK, vec![object_id(7)], Some(object_id(7)))
+            (answer, attacks, unit_ai.current_target),
+            (Ok(BREAK), Some(object_id(7)), Some(object_id(7))),
+            "{class:?}"
         );
     }
-    let (r, u, attacks) = run(class::BUILDING, Some(OrderKind::Patrol));
-    assert_eq!((r, attacks), (BREAK, vec![object_id(7)]));
-    assert_eq!(u.current_order, None);
-    assert_eq!(u.patrol_waypoint.get(), 2);
-    assert!(u.patrol_path.is_some());
-    assert_eq!(u.secondary_timer, Millis::new(750));
-    assert_ne!(u.adjusted_idle_timeout, Millis::new(750));
+    let (answer, unit_ai, attacks) = run(class::BUILDING, Some(OrderKind::Patrol));
+    assert_eq!((answer, attacks), (Ok(BREAK), Some(object_id(7))));
+    assert_eq!(unit_ai.current_order, None);
+    assert_eq!(unit_ai.patrol_waypoint.get(), 2);
+    assert!(unit_ai.patrol_path.is_some());
+    assert_eq!(unit_ai.secondary_timer, Millis::new(750));
+    assert_ne!(unit_ai.adjusted_idle_timeout, Millis::new(750));
 }
 
-/// The computer player's end of the damage case: a wonder target, a tower against a tower,
-/// a missile, and a tower under `disableTowerPriority` (but for a siege weapon) are let be;
-/// a harmless target makes it ask for help and attack back, then the kill times decide again
-/// (the attacker's sooner, or its conversion, but never against a converting target).
+/// The computer player's end of the damage case on the guard soldier 1 attacking player 2's
+/// 9 while player 2's 7 attacks it (the duels from their masters: each attacks 5 and harms
+/// the guard by 2, the guard harms each by 10). A wonder target, a tower against a tower, a
+/// missile, and a tower under `disableTowerPriority` (but for a siege weapon) are let be. A
+/// target that cannot harm it makes it ask for help and attack back, then the kill times
+/// decide again: the attacker's sooner (50 hit points against 100: 5 hits against 10), or its
+/// conversion, but never against a converting target. Each attack back meets the computer
+/// soldier's attack check, which is not modelled (MISSING.md).
 #[test]
 fn computer_unit_weighs_its_target_against_its_attacker() {
-    let duel = |converts: bool, attacks: f32, harmed: f32, hp: HitPoints| Duel {
-        converts,
-        attacks,
-        harms: HitPoints::new(2.0),
-        harmed: HitPoints::new(harmed),
-        hp,
+    let attacking = UnitAi {
+        current_action: Some(AiAction::Attack),
+        current_target: Some(object_id(9)),
+        ..idle(UnitAiKind::Soldier)
     };
-    let run = |at: &Surroundings, attacker: UnitSeen, target: UnitSeen, duels| {
-        let mut fx = Vec::new();
-        let mut u = UnitAi {
-            current_action: Some(AiAction::Attack),
-            current_target: Some(target.id),
-            ..idle(UnitAiKind::Soldier)
-        };
-        let mut side = DamageSide {
-            units: vec![attacker, target],
-            duels,
-            ..DamageSide::default()
-        };
-        let r = u
-            .computer_weighs(
-                &attacker,
-                &target,
-                at,
-                &mut rng(),
-                &mut With::new(&mut side, &mut fx),
-            )
-            .unwrap();
-        (r, side.attacks, side.helps)
+    let hp = |thing: SceneThing, hp: f32| SceneThing {
+        hp: HitPoints::new(hp),
+        ..thing
     };
-    let at = soldier_at();
-    let fair = vec![
-        (object_id(9), duel(false, 5.0, 10.0, HitPoints::new(100.0))),
-        (object_id(7), duel(false, 5.0, 10.0, HitPoints::new(50.0))),
-    ];
-    let wonder = UnitSeen {
-        master: WONDER,
+    let weighs = |guard: Master, pair: (SceneThing, SceneThing), shy: bool| {
+        let others = <[SceneThing; 2]>::from(pair);
+        let mut world = guard_world((guard, attacking.clone()), PlayerKind::Computer, &others);
+        if shy {
+            world.players[1]
+                .ai_settings
+                .switches
+                .insert(AiSwitches::DISABLE_TOWER_PRIORITY);
+        }
+        let (answer, _) = guard_runs(&mut world, &[], |ai, at, side, _, rng| {
+            let attacker = side.seen_unit(object_id(7))?.expect("the attacker");
+            let target = side.seen_unit(object_id(9))?.expect("the target");
+            ai.computer_weighs(&attacker, &target, at, rng, side)
+        });
+        (answer, guard_attacks(&world))
+    };
+    let foe = |id, class| {
+        hp(
+            foe_thing(id, class, if id == 7 { 12.0 } else { 13.0 }),
+            if id == 7 { 50.0 } else { 100.0 },
+        )
+    };
+    let fair = || (foe(7, class::CLASS_6), foe(9, class::CLASS_6));
+    let let_be = (Ok(GO_ON), None);
+    let strikes = (
+        Err(GenieError::unsupported(
+            "a computer player's soldier's attack check",
+        )),
+        None,
+    );
+    let guard = guard_master;
+    let wonder = SceneThing {
+        master: Master {
+            id: WONDER,
+            kind: MasterKind::BUILDING,
+            ..foe(9, class::BUILDING).master
+        },
         ..foe(9, class::BUILDING)
     };
     assert_eq!(
-        run(&at, foe(7, class::CLASS_6), wonder, fair.clone()).0,
-        GO_ON
+        weighs(guard(), (foe(7, class::CLASS_6), wonder), false),
+        (Ok(GO_ON), None)
     );
-    let tower = UnitSeen {
-        class: class::TOWER,
-        ..foe(9, class::TOWER)
-    };
     assert_eq!(
-        run(&at, foe(7, class::TOWER), tower, fair.clone()),
-        (GO_ON, vec![], vec![])
+        weighs(guard(), (foe(7, class::TOWER), foe(9, class::TOWER)), false),
+        (Ok(GO_ON), None)
     );
-    let missile = UnitSeen {
-        kind: MasterKind::MISSILE,
+    let missile = SceneThing {
+        master: Master {
+            kind: MasterKind::MISSILE,
+            ..foe(7, class::CLASS_6).master
+        },
         ..foe(7, class::CLASS_6)
     };
     assert_eq!(
-        run(&at, missile, foe(9, class::CLASS_6), fair.clone()).1,
-        vec![]
+        weighs(guard(), (missile, foe(9, class::CLASS_6)), false),
+        let_be
     );
-    let shy = Surroundings {
-        flags: SurroundingFlags::DISABLE_TOWER_PRIORITY,
-        ..soldier_at()
-    };
     assert_eq!(
-        run(
-            &shy,
-            foe(7, class::TOWER),
-            foe(9, class::CLASS_6),
-            fair.clone()
-        )
-        .1,
-        vec![]
+        weighs(
+            guard(),
+            (foe(7, class::TOWER), foe(9, class::CLASS_6)),
+            true
+        ),
+        let_be
     );
-    let siege = Surroundings {
-        class: Some(class::SIEGE),
-        ..shy
+    let siege = Master {
+        class: class::SIEGE,
+        ..guard_master()
     };
     // the attacker dies in 5 hits, the target in 10
     assert_eq!(
-        run(
-            &siege,
-            foe(7, class::TOWER),
-            foe(9, class::CLASS_6),
-            fair.clone()
-        )
-        .1,
-        vec![object_id(7)]
+        weighs(siege, (foe(7, class::TOWER), foe(9, class::CLASS_6)), true),
+        strikes
     );
+    assert_eq!(weighs(guard(), fair(), false), strikes);
+    let slow = (hp(foe(7, class::CLASS_6), 200.0), foe(9, class::CLASS_6));
+    assert_eq!(weighs(guard(), slow, false), let_be);
+    // a converting attacker (a priest of player 2 that converts any class)
+    let priest = |thing: SceneThing| SceneThing {
+        ai: Some(UnitAi {
+            current_target: Some(object_id(1)),
+            ..idle(UnitAiKind::Priest)
+        }),
+        master: Master {
+            action: Some(ActionPart {
+                tasks: vec![Task {
+                    action_kind: ActionKind::CONVERT,
+                    ..Task::default()
+                }],
+                ..ActionPart::default()
+            }),
+            ..thing.master.clone()
+        },
+        ..thing
+    };
+    let converting = (
+        priest(hp(foe(7, class::CLASS_6), 200.0)),
+        foe(9, class::CLASS_6),
+    );
+    assert_eq!(weighs(guard(), converting, false), strikes);
+    // a target that cannot harm it: the attack back, then the kill times (the attacker
+    // never dies against 10 hits)
+    let harmless = SceneThing {
+        master: Master {
+            combat: Some(CombatPart {
+                armors: vec![ClassAmount::new(4, 0)],
+                ..CombatPart::default()
+            }),
+            ..foe(9, class::CLASS_6).master
+        },
+        ..foe(9, class::CLASS_6)
+    };
+    let unharmed = Master {
+        combat: Some(CombatPart {
+            weapons: vec![ClassAmount::new(4, 10)],
+            armors: vec![ClassAmount::new(4, 0)],
+            ..CombatPart::default()
+        }),
+        ..guard_master()
+    };
     assert_eq!(
-        run(&at, foe(7, class::CLASS_6), foe(9, class::CLASS_6), fair).1,
-        vec![object_id(7)]
+        weighs(unharmed, (foe(7, class::CLASS_6), harmless), false),
+        strikes
     );
-    let slow = vec![
-        (object_id(9), duel(false, 5.0, 10.0, HitPoints::new(100.0))),
-        (object_id(7), duel(false, 5.0, 10.0, HitPoints::new(200.0))),
-    ];
-    assert_eq!(
-        run(&at, foe(7, class::CLASS_6), foe(9, class::CLASS_6), slow).1,
-        vec![]
+    // a converting target, and an attacker converting too: never
+    let both = (
+        priest(hp(foe(7, class::CLASS_6), 1.0)),
+        priest(foe(9, class::CLASS_6)),
     );
-    let converting = vec![
-        (object_id(9), duel(false, 5.0, 10.0, HitPoints::new(100.0))),
-        (object_id(7), duel(true, 5.0, 10.0, HitPoints::new(200.0))),
-    ];
-    assert_eq!(
-        run(
-            &at,
-            foe(7, class::CLASS_6),
-            foe(9, class::CLASS_6),
-            converting
-        )
-        .1,
-        vec![object_id(7)]
-    );
-    let harmless = vec![
-        (object_id(9), duel(false, 0.0, 10.0, HitPoints::new(100.0))),
-        (object_id(7), duel(false, 5.0, 0.0, HitPoints::new(50.0))),
-    ];
-    // the attack back, then the kill times: the attacker never dies (25000) against 10
-    assert_eq!(
-        run(
-            &at,
-            foe(7, class::CLASS_6),
-            foe(9, class::CLASS_6),
-            harmless
-        ),
-        (GO_ON, vec![object_id(7)], vec![object_id(7)])
-    );
-    let priest = vec![
-        (object_id(9), duel(true, 0.0, 10.0, HitPoints::new(100.0))),
-        (object_id(7), duel(true, 5.0, 10.0, HitPoints::new(1.0))),
-    ];
-    assert_eq!(
-        run(&at, foe(7, class::CLASS_6), foe(9, class::CLASS_6), priest).1,
-        vec![]
-    );
+    assert_eq!(weighs(guard(), both, false), let_be);
 }
 
 /// A scout (master 448) in stand ground whose sheep died (census v4's blocker): its

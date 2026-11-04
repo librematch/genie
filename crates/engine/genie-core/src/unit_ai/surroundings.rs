@@ -239,8 +239,8 @@ pub struct Surroundings {
     /// without one; None for an action the slice does not hold.
     pub action_state: Option<ActionState>,
     /// The objects the unit AI names besides its target, as the world's object table holds them:
-    /// its attackers ([`UnitAi::attackers`]) and the callers of its queued damage notifies. One
-    /// the table does not hold is absent.
+    /// its attackers ([`UnitAi::attackers`]), the callers of its queued damage notifies and
+    /// missile warnings, and the units in its way. One the table does not hold is absent.
     ///
     /// [`UnitAi::attackers`]: crate::unit_ai::UnitAi::attackers
     pub units: Vec<UnitSeen>,

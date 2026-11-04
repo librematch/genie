@@ -591,8 +591,10 @@ impl Unit {
     }
 
     /// The objects its unit AI names besides its target, as the world's table holds them
-    /// ([`crate::unit_ai::Surroundings::units`]): its attackers and the callers of its damage
-    /// notifies, from its own list or another player's, each with its master's class, state, its
+    /// ([`crate::unit_ai::Surroundings::units`]): its attackers, the callers of its damage
+    /// notifies and missile warnings (a warning not dodged is the damage, whose handler looks its
+    /// caller up), the units in its way, from its own list or another player's, each with its
+    /// master's class, state, its
     /// unit AI's target and its footprint's squared gap to the unit's (`FUN_14118f8c0`).
     pub(crate) fn named_units(
         &self,
@@ -607,7 +609,7 @@ impl Unit {
         let damaged = ai
             .notifies
             .iter()
-            .filter(|n| n.kind == NotifyKind::DAMAGED)
+            .filter(|n| matches!(n.kind, NotifyKind::DAMAGED | NotifyKind::MISSILE_WARNING))
             .map(|n| n.caller);
         let in_the_way = ai
             .notifies
