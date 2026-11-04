@@ -14,7 +14,8 @@ The files hold the orders by kind:
 - Work: `tasks.rs` (hunt, gather, build, repair), `gather.rs`, `attack.rs`, `drop_site.rs`.
 - The unit's state and its stops: `commands.rs` (STOP, EXPLORE, the auto scout),
   `unit_order.rs`, `actions.rs`.
-- `town_bell.rs`: what a villager worked on before an order took it away, for the way back.
+- `town_bell.rs`: what a villager worked on before an order took it away, for the way back;
+  `town_bell/` rings the town bell and ends it.
 - `start_work.rs`: the Empire Wars start, which puts every idle villager to work in the first tick.
 
 ## In the game
@@ -49,6 +50,7 @@ The files hold the orders by kind:
 | [`unit_order.rs`](unit_order.rs) | An artifact's and a herd's take, an order's cancel and a unit's order. |
 | [`work.rs`](work.rs) | A kept attack, the garrison task and the work command and its task. |
 | [`gather/`](gather/) | The work command's Hunt. |
+| [`town_bell/`](town_bell/) | The town bell's commands. |
 | [`work/`](work/) | The garrison finder's view. |
 <!-- /files -->
 

@@ -22,7 +22,7 @@ use crate::technology::Effect;
 use crate::technology::RepeatLimit;
 use crate::technology::ResearchState;
 use crate::technology::TechId;
-use crate::technology::{Attributes, TechKind, TechState, factors};
+use crate::technology::{TechKind, TechState, factors};
 use crate::unit_ai::AiAction;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::{Issuer, OrderPriority, OrderTargetKind, QueuedOrder};
@@ -325,8 +325,7 @@ impl World {
         let def = self.model.techs.get(tech).ok_or(GenieError::unsupported(
             "a technology the data file has not got",
         ))?;
-        let get = |i: AttributeId| Attributes::get(owner, i);
-        let factors = factors(tech_id, &get, self.model.slots)?;
+        let factors = factors(tech_id, owner, self.model.slots)?;
         let listed = owner.techs.checked(tech)?.listed_costs(def, factors)?;
         debit_listed(self.players.player_mut(player)?, listed);
         let owner = self.players.player(player)?;

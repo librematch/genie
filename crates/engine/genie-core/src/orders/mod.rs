@@ -62,6 +62,7 @@ mod patrol;
 pub use self::patrol::SavedPatrols;
 mod points;
 mod split;
+pub(crate) use self::split::Kept;
 pub mod start_work;
 mod tasks;
 pub mod town_bell;

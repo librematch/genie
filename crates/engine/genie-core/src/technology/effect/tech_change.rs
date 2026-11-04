@@ -20,7 +20,7 @@ use crate::technology::ModifyMode;
 use crate::technology::ResearchState;
 use crate::technology::TechId;
 use crate::technology::effect::{ONE, ROUND};
-use crate::technology::{Attributes, Location, ResearchCap, factors};
+use crate::technology::{Location, ResearchCap, factors};
 use crate::world::Seconds;
 use crate::world::World;
 use crate::world::slots::{CheckedIndex, PlayerSlots};
@@ -245,8 +245,7 @@ impl World {
         let effect = self.players.player(p)?.techs.checked(t)?.effect(&def);
         self.do_table_effect(p, effect, None)?;
         let owner = self.players.player(p)?;
-        let get = |k: AttributeId| Attributes::get(owner, k);
-        let factors = factors(tech, &get, self.model.slots)?;
+        let factors = factors(tech, owner, self.model.slots)?;
         let listed = owner.techs.checked(t)?.listed_costs(&def, factors)?;
         let spent = listed.iter().map(|&(_, a)| i32::from(a.get())).sum::<i32>() as f32;
         let owner = self.players.player_mut(p)?;

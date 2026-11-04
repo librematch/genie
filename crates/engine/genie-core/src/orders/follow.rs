@@ -32,6 +32,7 @@ use crate::objects::masters::MasterKind;
 use crate::objects::masters::OwnerMasters;
 use crate::objects::masters::PlayersMasters;
 use crate::orders::ControlKey;
+use crate::orders::Kept;
 use crate::orders::OrderSource;
 use crate::orders::town_bell::BellShelter;
 use crate::orders::{Followed, follow_axis, follow_spread, ignore_unit};
@@ -84,7 +85,7 @@ impl World {
             60
         };
         let ids = ids.split_at(ids.len().min(cap)).0;
-        let split = self.split(ids, &|_| true, ControlKey::Up)?;
+        let split = self.split(ids, Kept::All, ControlKey::Up)?;
         if !split.groups.is_empty() {
             return Err(GenieError::unsupported(
                 "a FOLLOW whose units the splitter groups (FUN_141007320, FUN_140fd9f40)",

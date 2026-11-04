@@ -57,7 +57,6 @@ impl World {
         t: TechId,
         building: Option<MasterId>,
     ) -> Result<Research, GenieError> {
-        use crate::technology::Attributes;
         let (tech, t) = (t, t.index());
         let def = self.model.techs.checked(t)?.clone();
         let state = &self.players.player(p)?.techs.checked(t)?;
@@ -83,8 +82,7 @@ impl World {
         let state = owner.techs.checked(t)?;
         let location = building.map_or_else(|| state.locations.first(), |b| state.location(b));
         if location.is_some_and(|l| l.building.is_some() && l.button != LocationButton::NONE) {
-            let get = |k: AttributeId| owner.get(k);
-            let factors = factors(tech, &get, self.model.slots)?;
+            let factors = factors(tech, *owner, self.model.slots)?;
             let listed = state.listed_costs(&def, factors)?;
             let spent = listed.iter().map(|&(_, a)| i32::from(a.get())).sum::<i32>() as f32;
             let owner = self.players.player_mut(p)?;

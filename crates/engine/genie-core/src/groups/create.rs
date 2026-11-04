@@ -26,6 +26,7 @@ use crate::unit_ai::AiAction;
 use crate::unit_ai::OrderKind;
 use crate::world::Seconds;
 use crate::world::World;
+use crate::world::index::ObjectsRef;
 use crate::world::index::Place;
 use crate::world::layer::generated::GroupTuning;
 use crate::world::slots::{CheckedIndex, PlayerSlots};
@@ -119,7 +120,7 @@ impl UnitGroup {
         sub: FormationCategory,
         id: ObjectId,
         unit: FormationUnit,
-        masters_of: &dyn Fn(ObjectId) -> Option<MasterId>,
+        objects: ObjectsRef<'_>,
         scratch: &mut Vec<UnitKind>,
         group_tuning: &GroupTuning,
     ) -> Result<(), GenieError> {
@@ -140,7 +141,7 @@ impl UnitGroup {
             stat.desired_spacing = spacing;
         }
         stat.units.push(id);
-        count_unit_kinds(stat, masters_of, scratch);
+        count_unit_kinds(stat, objects, scratch);
         Ok(())
     }
 }
@@ -155,7 +156,7 @@ impl UnitGroup {
         &mut self,
         id: ObjectId,
         category: Option<FormationCategory>,
-        masters_of: &dyn Fn(ObjectId) -> Option<MasterId>,
+        objects: ObjectsRef<'_>,
         scratch: &mut Vec<UnitKind>,
     ) -> bool {
         let leave = |stat: &mut UnitKindStatistic, scratch: &mut Vec<UnitKind>| {
@@ -163,7 +164,7 @@ impl UnitGroup {
                 return false;
             };
             let _ = stat.units.remove(i);
-            count_unit_kinds(stat, masters_of, scratch);
+            count_unit_kinds(stat, objects, scratch);
             true
         };
         match category {
@@ -278,20 +279,19 @@ impl World {
             Some(object) => Some(self.unit_category(Some(object))?),
             None => None,
         };
-        let masters: Vec<(ObjectId, MasterId)> = self
-            .players
-            .iter()
-            .flat_map(|q| q.objects.iter().chain(&q.sleeping))
-            .map(|u| (u.id, u.life.master_id))
-            .collect();
-        let masters_of = |id: ObjectId| masters.iter().find(|(u, _)| *u == id).map(|&(_, m)| m);
-        let mut scratch = take(&mut self.groups.unit_kinds_scratch);
-        let left = self.groups.held_mut(group)?.drop_from_statistic(
-            id,
-            category,
-            &masters_of,
-            &mut scratch,
+        let objects = ObjectsRef::new(
+            &self.players,
+            &self.index,
+            &self.model.masters,
+            &self.parts,
+            &self.model.roles,
+            &self.model.tuning,
         );
+        let mut scratch = take(&mut self.groups.unit_kinds_scratch);
+        let left =
+            self.groups
+                .held_mut(group)?
+                .drop_from_statistic(id, category, objects, &mut scratch);
         self.groups.unit_kinds_scratch = scratch;
         Ok(left)
     }
@@ -303,14 +303,14 @@ impl World {
 /// world does not hold is passed over; past 51 types the count stops.
 pub(crate) fn count_unit_kinds(
     stat: &mut UnitKindStatistic,
-    masters_of: &dyn Fn(ObjectId) -> Option<MasterId>,
+    objects: ObjectsRef<'_>,
     scratch: &mut Vec<UnitKind>,
 ) {
     scratch.resize(50, UnitKind::CLEARED);
     let mut counts = vec![0u32; 50];
     let mut n = 0usize;
     for &id in &stat.units {
-        let Some(master) = masters_of(id) else {
+        let Some(master) = objects.get(id).map(|u| u.life.master_id) else {
             continue;
         };
         let master = UnitKind::of(master);
@@ -405,13 +405,14 @@ impl World {
             }
             ai.orders.clear();
         }
-        let masters: Vec<(ObjectId, MasterId)> = self
-            .players
-            .iter()
-            .flat_map(|q| q.objects.iter().chain(&q.sleeping))
-            .map(|u| (u.id, u.life.master_id))
-            .collect();
-        let masters_of = |id: ObjectId| masters.iter().find(|(u, _)| *u == id).map(|&(_, m)| m);
+        let objects = ObjectsRef::new(
+            &self.players,
+            &self.index,
+            &self.model.masters,
+            &self.parts,
+            &self.model.roles,
+            &self.model.tuning,
+        );
         let mut scratch = take(&mut self.groups.unit_kinds_scratch);
         let g = self.groups.held_mut(group)?;
         let seconds = g.next_seconds();
@@ -428,7 +429,7 @@ impl World {
             sub,
             id,
             unit,
-            &masters_of,
+            objects,
             &mut scratch,
             &self.model.tuning.group,
         )?;

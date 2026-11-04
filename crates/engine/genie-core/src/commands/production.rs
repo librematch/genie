@@ -561,11 +561,10 @@ impl World {
         let Some(def) = self.model.techs.get(t) else {
             return Ok(NO_COSTS);
         };
-        let get = |k: AttributeId| Attributes::get(owner, k);
         owner
             .techs
             .checked(t)?
-            .entry_costs(def, factors(tech, &get, self.model.slots)?)
+            .entry_costs(def, factors(tech, owner, self.model.slots)?)
     }
 }
 

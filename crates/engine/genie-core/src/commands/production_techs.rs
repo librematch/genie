@@ -16,7 +16,7 @@ use crate::production::{Queue, as_entry_costs, same_costs};
 use crate::technology::Repeat;
 use crate::technology::RepeatLimit;
 use crate::technology::TechId;
-use crate::technology::{Attributes, TechDef, factors};
+use crate::technology::{TechDef, factors};
 use crate::world::World;
 use crate::world::layer::Slots;
 use crate::world::player::Player;
@@ -67,11 +67,10 @@ impl World {
         if n <= 0 {
             return Ok(QueueOutcome::NoneQueued);
         }
-        let get = |k: AttributeId| Attributes::get(&*owner, k);
         let listed = owner
             .techs
             .checked(t)?
-            .listed_costs(def, factors(tech, &get, self.model.slots)?)?;
+            .listed_costs(def, factors(tech, &*owner, self.model.slots)?)?;
         let costs = as_entry_costs(listed);
         let id = owner.objects.checked(i)?.id;
         let production = self.production_or_new(id)?;
@@ -113,8 +112,7 @@ fn pay_researches(
     let t = tech.index();
     let mut paid = 0i16;
     while paid < n {
-        let get = |k: AttributeId| Attributes::get(&*owner, k);
-        let factors = factors(tech, &get, slots)?;
+        let factors = factors(tech, &*owner, slots)?;
         let mut state = take(owner.techs.checked_mut(t)?);
         let ok = state.pay(def, factors, repeat, building, owner, slots);
         *owner.techs.checked_mut(t)? = state;

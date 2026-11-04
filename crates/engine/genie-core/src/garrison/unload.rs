@@ -18,7 +18,6 @@ use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterKind;
 use crate::orders::object_gone;
 use crate::orders::town_bell::BellShelter;
-use crate::world::Seconds;
 use crate::world::slots::PlayerSlots;
 
 use crate::garrison::transport::Around;
@@ -419,7 +418,6 @@ impl World {
         from: Option<(PlayerId, ListIndex)>,
         id: ObjectId,
     ) -> Result<WorkReturn, GenieError> {
-        use crate::orders::town_bell::RecordTarget;
         let (up, ui) = match from {
             Some(_) => self.live_inside(id)?,
             None => match self.place(id) {
@@ -430,21 +428,7 @@ impl World {
             },
         };
         let mut bell = self.parts.town_bell_of(id);
-        let lookup = |t: ObjectId| -> Result<Option<RecordTarget>, GenieError> {
-            let Some((op, o)) = self.object(t) else {
-                return Ok(None);
-            };
-            let m = o.master(self.master_tables(), op)?;
-            Ok(Some(RecordTarget {
-                id: t,
-                building: m.kind == MasterKind::BUILDING,
-                class: m.class,
-                built: self.parts.building_of(o.id).construction.is_some_and(|c| {
-                    Seconds::of_master(m.creatable_part().build_time) <= c.progress
-                }),
-            }))
-        };
-        let (found, record) = bell.back_to_work(&lookup, &self.model.roles)?;
+        let (found, record) = bell.back_to_work(self.objects(), &self.model.roles)?;
         self.parts.set_town_bell(id, bell);
         if found.is_none() && record.target_class.is_some() && record.action.is_some() {
             let unit = self.players.live_mut(up, ui)?;

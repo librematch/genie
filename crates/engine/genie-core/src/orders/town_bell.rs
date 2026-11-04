@@ -4,19 +4,13 @@
 //! `mBackToWork1` and `mBackToWork2`.
 
 use crate::GenieError;
-use crate::commands::Bell;
-use crate::garrison::ContainerId;
-use crate::garrison::ShelterReach;
-use crate::garrison::Shelters;
 use crate::garrison::WorkReturn;
 use crate::gathering::gather::GATHER;
 use crate::gathering::hunt::HUNT;
 use crate::map::Distance;
 use crate::map::Point;
 use crate::map::Position;
-use crate::math::fmath::below_or_unordered;
 use crate::math::image::garrison::NO_POINT as GARRISON_NO_POINT;
-use crate::movement::footprint_gap_squared;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
@@ -24,23 +18,24 @@ use crate::objects::masters::ActionKind;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::GarrisonKinds;
 use crate::objects::masters::MasterKind;
-use crate::orders::Dispatch;
 use crate::orders::OrderSource;
 use crate::orders::Work;
 use crate::orders::{GARRISON, own_order_target};
 use crate::players::AllyTest;
 use crate::players::PlayerId;
-use crate::players::tracker::ListKey;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::task_finder::Diplomacy;
 use crate::unit_ai::task_finder::world::TaskWorld;
 use crate::unit_ai::{AiMove, OrderForce, Pace};
+use crate::world::Seconds;
 use crate::world::World;
+use crate::world::index::ObjectsRef;
 use crate::world::index::Place;
 use crate::world::layer::{ClassRoles, MasterRoles, Roles};
-use crate::world::settings::OptionFlags;
 use crate::world::slots::PlayerSlots;
 use genie_diff::Diff;
+
+mod commands;
 
 /// One back-to-work record.
 #[derive(Clone, Copy, Debug, PartialEq, Diff)]
@@ -168,26 +163,50 @@ pub struct RecordTarget {
     pub built: bool,
 }
 
-/// `FUN_1411f8fa0`: the object a record names, its target, else its second target, the world
-/// holds (`lookup`); for the actions of [`ENDED_ON_BUILDING`] a building other than a farm
-/// that is built ends the record (no object, no targets in the copy returned). A negative id
-/// names none (`JL`), as −1 does.
+impl RecordTarget {
+    /// Object `id` as a record names it, while `objects` holds it (`FUN_1415417a0`): its
+    /// master's type and class, and whether it has had its master's build time of work.
+    ///
+    /// # Errors
+    ///
+    /// An object whose master its owner's table does not hold.
+    pub fn of(objects: ObjectsRef<'_>, id: ObjectId) -> Result<Option<Self>, GenieError> {
+        let Some((_, _, m)) = objects.with_master(id)? else {
+            return Ok(None);
+        };
+        let build_time = Seconds::of_master(m.creatable_part().build_time);
+        Ok(Some(Self {
+            id,
+            building: m.kind == MasterKind::BUILDING,
+            class: m.class,
+            built: objects
+                .building(id)
+                .and_then(|b| b.construction.as_ref())
+                .is_some_and(|c| build_time <= c.progress),
+        }))
+    }
+}
+
+/// `FUN_1411f8fa0`: the object a record names, its target, else its second target, the world holds
+/// ([`RecordTarget::of`]); for the actions of [`ENDED_ON_BUILDING`] a building other than a farm
+/// that is built ends the record (no object, no targets in the copy returned). A negative id names
+/// none (`JL`), as −1 does.
 fn record_object(
     record: BackToWork,
-    lookup: &dyn Fn(ObjectId) -> Result<Option<RecordTarget>, GenieError>,
+    objects: ObjectsRef<'_>,
     roles: &Roles,
 ) -> Result<(Option<RecordTarget>, BackToWork), GenieError> {
     let mut out = record;
     let named = |id: Option<ObjectId>| id.filter(|id| !id.is_recyclable());
     let mut found = match named(record.target) {
-        Some(t) => lookup(t)?,
+        Some(t) => RecordTarget::of(objects, t)?,
         None => None,
     };
     if found.is_none() {
         let Some(t2) = named(record.target2) else {
             return Ok((None, out));
         };
-        found = lookup(t2)?;
+        found = RecordTarget::of(objects, t2)?;
     }
     if let Some(o) = found
         && record
@@ -214,18 +233,18 @@ impl TownBell {
     ///
     /// # Errors
     ///
-    /// The lookup's: an object whose master the world lacks.
+    /// An object of a record whose master the world lacks.
     pub fn back_to_work(
         &mut self,
-        lookup: &dyn Fn(ObjectId) -> Result<Option<RecordTarget>, GenieError>,
+        objects: ObjectsRef<'_>,
         roles: &Roles,
     ) -> Result<(Option<RecordTarget>, BackToWork), GenieError> {
-        let (found, out) = record_object(self.work, lookup, roles)?;
+        let (found, out) = record_object(self.work, objects, roles)?;
         if found.is_some() {
             return Ok((found, out));
         }
         let before = self.before_building;
-        let (found, out) = record_object(before, lookup, roles)?;
+        let (found, out) = record_object(before, objects, roles)?;
         if found.is_some() {
             self.work = before;
             self.before_building = BackToWork::NONE;
@@ -244,274 +263,6 @@ impl TownBell {
 const NO_POINT: f32 = GARRISON_NO_POINT;
 
 impl World {
-    /// `TOWN_BELL` (0x7f, `do_command`): the object `id` (none for −1, `FUN_140e6bad0`) of the
-    /// commanding `player`, or of any player while players may order each other's
-    /// ([`crate::world::settings::OptionFlags::CHEATS_ENABLED`], `FUN_1412ffe00`; the cheat
-    /// `+0xb12` is not held), rings its owner's bell ([`Bell::Ring`],
-    /// [`crate::world::World::ring_town_bell`]) or ends it
-    /// ([`crate::world::World::end_town_bell`]). A special object's (`+0x30c` bit 0) UI flag is not
-    /// simulation.
-    pub(crate) fn town_bell(
-        &mut self,
-        player: PlayerId,
-        id: ObjectId,
-        bell: Bell,
-    ) -> Result<(), GenieError> {
-        let Some((owner, _)) = self.object(id) else {
-            return Ok(());
-        };
-        if owner != player && !self.settings.flags.contains(OptionFlags::CHEATS_ENABLED) {
-            return Ok(());
-        }
-        match bell {
-            Bell::Ring => self.ring_town_bell(owner, id),
-            Bell::End => self.end_town_bell(owner, id),
-        }
-    }
-
-    /// `FUN_14163a650`: player `owner`'s town centre `tc` (master 109; any other object does
-    /// nothing) rings: of its owner's live objects, in the list's order, those in state 2 not
-    /// inside another (`FUN_141188da0`) within `GarrisonTuning::town_bell_reach` of it (`FUN_14118f8c0`; `COMISS`/`JC`: a
-    /// NaN gap is out) are the units, a villager (class 4 of type 70) or master 1808, else the
-    /// buildings (type 80) that take villagers
-    /// ([`crate::objects::masters::GarrisonKinds::VILLAGERS`], `FUN_1411ccb60`), each with its
-    /// count ([`crate::world::World::garrisoned`]) and its bell flag (`+0x9dc`) set (its sound,
-    /// slot 0x4c0, is not simulation); then [`crate::world::World::shelter`] with the reach
-    /// (`param_6` 1), no transports, not through the unit AIs.
-    pub(crate) fn ring_town_bell(
-        &mut self,
-        owner: PlayerId,
-        tc: ObjectId,
-    ) -> Result<(), GenieError> {
-        let Some((_, t)) = self.object(tc) else {
-            return Ok(());
-        };
-        // The town centre, whose bell the command rings (`0x6109` raw).
-        // The master that answers the bell besides the villagers (`0x710`).
-        // The villagers' class.
-        // The units' least type (`0x46`) and the buildings' (`'P'`).
-        if !self
-            .model
-            .roles
-            .of_master(t.life.master_id)
-            .contains(MasterRoles::TOWN_CENTRE)
-        {
-            return Ok(());
-        }
-        let (at, radius) = self.ground(tc)?;
-        let mut units = Vec::new();
-        let mut shelters = Shelters::default();
-        let mut k = ListIndex::FIRST;
-        while self.players.player(owner)?.objects.holds(k) {
-            let here = k;
-            let o = &self.players.live(owner, here)?;
-            k = k.next();
-            if o.life.state != ObjectState::Alive || o.life.inside.is_some() {
-                continue;
-            }
-            let id = o.id;
-            let m = o.master(self.master_tables(), owner)?;
-            let (kind, class, master) = (m.kind, m.class, m.id);
-            let takes_villagers = m
-                .building
-                .is_some_and(|b| b.garrison_kind.contains(GarrisonKinds::VILLAGERS));
-            let near = |t: &Self| -> Result<bool, GenieError> {
-                let (other_at, other_radius) = t.ground(id)?;
-                let gap = footprint_gap_squared(other_at, other_radius, at, radius);
-                // COMISS reach, gap; JC: a gap above it, or a NaN, is out
-                Ok(!below_or_unordered(
-                    t.model.tuning.garrison.town_bell_reach,
-                    gap.get(),
-                ))
-            };
-            if (self
-                .model
-                .roles
-                .of_class(class)
-                .contains(ClassRoles::VILLAGER)
-                && kind == MasterKind::COMBAT
-                && near(self)?)
-                || (self
-                    .model
-                    .roles
-                    .of_master(master)
-                    .contains(MasterRoles::MULE_CART)
-                    && near(self)?)
-            {
-                units.push(id);
-            } else if kind == MasterKind::BUILDING && takes_villagers && near(self)? {
-                shelters.buildings.push(ContainerId::new(id));
-                shelters.counts.push(self.garrisoned(id)?);
-                self.parts.set_town_bell_flag(id, BellShelter::Sheltered);
-            }
-        }
-        self.shelter(
-            owner,
-            &units,
-            &shelters,
-            ShelterReach::TownBell,
-            Dispatch::Now,
-        )
-    }
-
-    /// `FUN_14163ab80`: player `owner`'s town centre `tc` (master 109; any other object does
-    /// nothing) ends its bell. Each of its owner's live objects, in the list's order, of type 80
-    /// in a state below 3 that takes villagers (`FUN_1411ccb60` with 1) and holds its bell flag
-    /// (`+0x9dc`) drops the flag; within `GarrisonTuning::town_bell_reach` of the centre (`COMISS`/`JC`: a NaN gap is
-    /// out) it lets each unit inside of type 70 or more that is a villager (class 4) or of master
-    /// 1808 back to work, from the last in ([`crate::world::World::back_to_work`]; its sound, slot
-    /// 0x4c0, is not simulation). Then every unit its owner's tracker files under class 4
-    /// (`FUN_14104f8f0`) and master 1808 (`FUN_14104f960`), in that order, not inside another
-    /// (`+0x2f0`) goes back to work from where it is.
-    pub(crate) fn end_town_bell(
-        &mut self,
-        owner: PlayerId,
-        tc: ObjectId,
-    ) -> Result<(), GenieError> {
-        let Some((_, t)) = self.object(tc) else {
-            return Ok(());
-        };
-        if !self
-            .model
-            .roles
-            .of_master(t.life.master_id)
-            .contains(MasterRoles::TOWN_CENTRE)
-        {
-            return Ok(());
-        }
-        let (at, radius) = self.ground(tc)?;
-        let mut k = ListIndex::FIRST;
-        while self.players.player(owner)?.objects.holds(k) {
-            let idx = k;
-            k = k.next();
-            let b = &self.players.live(owner, idx)?;
-            let m = b.master(self.master_tables(), owner)?;
-            let takes_villagers = m
-                .building
-                .is_some_and(|x| x.garrison_kind.contains(GarrisonKinds::VILLAGERS));
-            if m.kind != MasterKind::BUILDING
-                || ObjectState::Dying <= b.life.state
-                || !takes_villagers
-                || !self.parts.town_bell_of(b.id).flag.is_sheltered()
-            {
-                continue;
-            }
-            let id = b.id;
-            self.parts.set_town_bell_flag(id, BellShelter::Free);
-            let (building_at, building_radius) = self.ground(id)?;
-            // COMISS reach, gap; JC: a gap above it, or a NaN, lets none out
-            let gap = footprint_gap_squared(building_at, building_radius, at, radius);
-            if below_or_unordered(self.model.tuning.garrison.town_bell_reach, gap.get()) {
-                continue;
-            }
-            self.workers_out(owner, idx)?;
-        }
-        self.workers_back(owner)
-    }
-
-    /// `ALL_BACK_TO_WORK` (`do_command` 0x8c; another player's object only while players may order
-    /// each other's, [`crate::world::settings::OptionFlags::CHEATS_ENABLED`]; the cheat `+0xb12` is
-    /// not held): `FUN_141617420` for the owner of object `id`, as the bell's end
-    /// ([`crate::world::World::end_town_bell`]) without its flags: each of the owner's live
-    /// objects, in the list's order, in state 2, not inside another (`+0x2f0`), of type 80, that
-    /// takes villagers (`FUN_1411ccb60` with 1) and is within `GarrisonTuning::town_bell_reach` of
-    /// the object (`COMISS`/`JC`: a NaN gap is out) lets its villagers and units of master 1808 out
-    /// back to work, from the last in; then the units its owner's tracker files under class 4 and
-    /// master 1808 not inside another go back from where they are. The game screen's flag
-    /// (`+0x1874`) is not simulation.
-    pub(crate) fn all_back_to_work(
-        &mut self,
-        player: PlayerId,
-        id: ObjectId,
-    ) -> Result<(), GenieError> {
-        let Some((owner, _)) = self.object(id) else {
-            return Ok(());
-        };
-        if owner != player && !self.settings.flags.contains(OptionFlags::CHEATS_ENABLED) {
-            return Ok(());
-        }
-        let (at, radius) = self.ground(id)?;
-        let mut k = ListIndex::FIRST;
-        while self.players.player(owner)?.objects.holds(k) {
-            let idx = k;
-            k = k.next();
-            let b = &self.players.live(owner, idx)?;
-            let m = b.master(self.master_tables(), owner)?;
-            let takes_villagers = m
-                .building
-                .is_some_and(|x| x.garrison_kind.contains(GarrisonKinds::VILLAGERS));
-            if b.life.state != ObjectState::Alive
-                || b.life.inside.is_some()
-                || m.kind != MasterKind::BUILDING
-                || !takes_villagers
-            {
-                continue;
-            }
-            let (building_at, building_radius) = self.ground(b.id)?;
-            // COMISS reach, gap; JC: a gap above it, or a NaN, lets none out
-            let gap = footprint_gap_squared(building_at, building_radius, at, radius);
-            if below_or_unordered(self.model.tuning.garrison.town_bell_reach, gap.get()) {
-                continue;
-            }
-            self.workers_out(owner, idx)?;
-        }
-        self.workers_back(owner)
-    }
-
-    /// The building at `idx` of player `owner` lets each unit inside of type 70 or more that is a
-    /// villager (class 4) or of master 1808 back to work, from the last in
-    /// ([`crate::world::World::back_to_work`]; its sound, slot 0x4c0, is not simulation).
-    fn workers_out(&mut self, owner: PlayerId, idx: ListIndex) -> Result<(), GenieError> {
-        let mut i = self.players.live(owner, idx)?.garrison.len();
-        while 0 < i {
-            i -= 1;
-            let Some(&inside) = self.players.live(owner, idx)?.garrison.get(i) else {
-                continue;
-            };
-            // any player's unit; an id the world no longer holds is a null entry
-            let Some((up, u)) = self.object(inside) else {
-                continue;
-            };
-            let um = u.master(self.master_tables(), up)?;
-            if MasterKind::COMBAT <= um.kind
-                && (self
-                    .model
-                    .roles
-                    .of_class(um.class)
-                    .contains(ClassRoles::VILLAGER)
-                    || self
-                        .model
-                        .roles
-                        .of_master(um.id)
-                        .contains(MasterRoles::MULE_CART))
-            {
-                let _ = self.back_to_work(Some((owner, idx)), inside)?;
-            }
-        }
-        Ok(())
-    }
-
-    /// Every unit player `owner`'s tracker files under class 4 (`FUN_14104f8f0`) and master
-    /// 1808 (`FUN_14104f960`), in that order, not inside another (`+0x2f0`) goes back to work
-    /// from where it is.
-    fn workers_back(&mut self, owner: PlayerId) -> Result<(), GenieError> {
-        let tracker = &self.players.player(owner)?.tracker;
-        let mut ids = tracker.class_list(self.model.slots.class.villager).to_vec();
-        ids.extend_from_slice(tracker.list(ListKey::master(self.model.slots.master.mule_cart)));
-        // a queued unit's place (−1) names no object
-        for id in ids.into_iter().flatten() {
-            // the tracker's keepers follow every object its player gains and loses: the world
-            // holds each (the game reads it without a test)
-            let Some((_, u)) = self.object(id) else {
-                continue;
-            };
-            if u.life.inside.is_none() {
-                let _ = self.back_to_work(None, id)?;
-            }
-        }
-        Ok(())
-    }
-
     /// `FUN_1412081e0`'s part for a unit outside a building (its `param_2` null), after the
     /// records' lookup: with its bell flag (`+0x9dc`) and the record's point not −1 on either
     /// axis (`UCOMISS`/`JP`/`JZ`: only an exact −1 stops it, a NaN goes on), it goes there: with
@@ -700,11 +451,25 @@ impl World {
 
 #[cfg(test)]
 mod tests {
+    use crate::construction::BuilderCount;
+    use crate::construction::build::Construction;
+    use crate::map::Footprint;
+    use crate::map::GridSize;
     use crate::map::Point;
+    use crate::map::Snow;
+    use crate::map::spatial::Obstruction;
+    use crate::objects::MasterHitPoints;
     use crate::objects::ObjectId;
+    use crate::objects::masters::ObstructionClass;
+    use crate::objects::masters::ObstructionKind;
+    use crate::objects::masters::{CreatablePart, Master};
+    use crate::test_ids::master_id;
     use crate::test_ids::{class_of, object_id};
     use crate::testing::class;
     use crate::testing::roles;
+    use crate::testing::scene::{Scene, Thing as SceneThing};
+    use crate::world::WholeSeconds;
+    use crate::world::World;
 
     use super::*;
 
@@ -774,6 +539,83 @@ mod tests {
 
     /// The objects of a test world: a house 7 that is built, a house 8 that is not, a farm 9
     /// that is built, a sheep 10.
+    /// The world of the records' objects ([`object`]): Gaia's house 7 built (its 25 seconds of
+    /// work), house 8 not (10 seconds), farm 9 built and sheep 10.
+    fn records_world() -> World {
+        let building = |id, class| Master {
+            id: master_id(id),
+            kind: MasterKind::BUILDING,
+            class,
+            radius: Footprint::new(1.0, 1.0),
+            creatable: Some(CreatablePart {
+                build_time: WholeSeconds::of_data(25),
+                ..CreatablePart::default()
+            }),
+            ..Master::default()
+        };
+        let sheep = Master {
+            id: master_id(594),
+            kind: MasterKind::COMBAT,
+            class: class::LIVESTOCK,
+            ..Master::default()
+        };
+        let mut w = Scene::open(GridSize::new(16, 16))
+            .thing(SceneThing::new(
+                7,
+                PlayerId::GAIA,
+                building(70, class::BUILDING),
+                Position::new(2.0, 2.0, 0.0),
+            ))
+            .thing(SceneThing::new(
+                8,
+                PlayerId::GAIA,
+                building(70, class::BUILDING),
+                Position::new(6.0, 2.0, 0.0),
+            ))
+            .thing(SceneThing::new(
+                9,
+                PlayerId::GAIA,
+                building(50, class::FARM),
+                Position::new(10.0, 2.0, 0.0),
+            ))
+            .thing(SceneThing::new(
+                10,
+                PlayerId::GAIA,
+                sheep,
+                Position::new(2.5, 8.5, 0.0),
+            ))
+            .build();
+        for (id, progress) in [(7, 25.0), (8, 10.0), (9, 25.0)] {
+            w.parts.building_mut(object_id(id)).unwrap().construction = Some(Construction {
+                progress: Seconds::new(progress),
+                desolid: false,
+                builders: BuilderCount::of_data(0),
+                hit_points: MasterHitPoints::of_data(550),
+                build_time: WholeSeconds::of_data(25),
+                record: Obstruction {
+                    kind: ObstructionKind::KIND_2,
+                    class: ObstructionClass::BUILDING,
+                },
+                snow: Snow::None,
+                sprite_override: false,
+            });
+        }
+        w
+    }
+
+    /// The records' objects as the world holds them, each what [`object`] names.
+    #[test]
+    fn record_target_reads_master_kind_class_and_build_progress() {
+        let records = records_world();
+        for id in 7..=12 {
+            assert_eq!(
+                RecordTarget::of(records.objects(), object_id(id)),
+                Ok(object(object_id(id))),
+                "object {id}"
+            );
+        }
+    }
+
     fn object(id: ObjectId) -> Option<RecordTarget> {
         let (building, class, built) = match id.get() {
             7 => (true, class::BUILDING, true),
@@ -792,6 +634,7 @@ mod tests {
 
     #[test]
     fn record_names_its_target_else_its_second_target_unless_built_building_ended_it() {
+        let records = records_world();
         // FUN_1411f8fa0: the target the world holds
         let shepherd = BackToWork {
             target2: Some(object_id(7)),
@@ -802,7 +645,7 @@ mod tests {
             )
         };
         assert_eq!(
-            record_object(shepherd, &|id| Ok(object(id)), &roles()).unwrap(),
+            record_object(shepherd, records.objects(), &roles()).unwrap(),
             (object(object_id(10)), shepherd)
         );
         // a target the world no longer holds: the second target, unless it is below 0
@@ -815,7 +658,7 @@ mod tests {
             )
         };
         assert_eq!(
-            record_object(gone, &|id| Ok(object(id)), &roles()).unwrap(),
+            record_object(gone, records.objects(), &roles()).unwrap(),
             (object(object_id(10)), gone)
         );
         let none = BackToWork {
@@ -823,7 +666,7 @@ mod tests {
             ..gone
         };
         assert_eq!(
-            record_object(none, &|id| Ok(object(id)), &roles()).unwrap(),
+            record_object(none, records.objects(), &roles()).unwrap(),
             (None, none)
         );
         let lost = BackToWork {
@@ -831,7 +674,7 @@ mod tests {
             ..gone
         };
         assert_eq!(
-            record_object(lost, &|id| Ok(object(id)), &roles()).unwrap(),
+            record_object(lost, records.objects(), &roles()).unwrap(),
             (None, lost)
         );
         // a target below 0 is not looked up: the second target is
@@ -840,7 +683,7 @@ mod tests {
             ..work(None, Some(AiAction::Build), Point::new(5.0, 6.0))
         };
         assert_eq!(
-            record_object(second, &|id| Ok(object(id)), &roles()).unwrap(),
+            record_object(second, records.objects(), &roles()).unwrap(),
             (object(object_id(10)), second)
         );
         // building, gathering and hunting (mask 0x881 over 0x25a..0x265) on a built building
@@ -856,7 +699,7 @@ mod tests {
                 ..on_house
             };
             assert_eq!(
-                record_object(on_house, &|id| Ok(object(id)), &roles()).unwrap(),
+                record_object(on_house, records.objects(), &roles()).unwrap(),
                 (None, ended)
             );
             // reached through the second target, too
@@ -870,14 +713,14 @@ mod tests {
                 ..through_second
             };
             assert_eq!(
-                record_object(through_second, &|id| Ok(object(id)), &roles()).unwrap(),
+                record_object(through_second, records.objects(), &roles()).unwrap(),
                 (None, ended)
             );
             // a house not built yet and a built farm stay
             for kept in [8, 9] {
                 let r = work(Some(object_id(kept)), action, Point::new(5.0, 6.0));
                 assert_eq!(
-                    record_object(r, &|id| Ok(object(id)), &roles()).unwrap(),
+                    record_object(r, records.objects(), &roles()).unwrap(),
                     (object(object_id(kept)), r)
                 );
             }
@@ -893,7 +736,7 @@ mod tests {
         ] {
             let r = work(Some(object_id(7)), action, Point::new(5.0, 6.0));
             assert_eq!(
-                record_object(r, &|id| Ok(object(id)), &roles()).unwrap(),
+                record_object(r, records.objects(), &roles()).unwrap(),
                 (object(object_id(7)), r)
             );
         }
@@ -1147,6 +990,7 @@ mod tests {
 
     #[test]
     fn back_to_work_takes_the_first_record_else_the_second_which_moves_up() {
+        let records = records_world();
         // FUN_1412035a0: the first record's object wins; the records stay
         let first = work(
             Some(object_id(10)),
@@ -1164,7 +1008,7 @@ mod tests {
             before_building: second,
         };
         assert_eq!(
-            bell.back_to_work(&|id| Ok(object(id)), &roles()).unwrap(),
+            bell.back_to_work(records.objects(), &roles()).unwrap(),
             (object(object_id(10)), first)
         );
         assert_eq!((bell.work, bell.before_building), (first, second));
@@ -1176,7 +1020,7 @@ mod tests {
         );
         bell.work = gone;
         assert_eq!(
-            bell.back_to_work(&|id| Ok(object(id)), &roles()).unwrap(),
+            bell.back_to_work(records.objects(), &roles()).unwrap(),
             (object(object_id(8)), second)
         );
         assert_eq!(
@@ -1200,7 +1044,7 @@ mod tests {
             ),
         };
         assert_eq!(
-            bell.back_to_work(&|id| Ok(object(id)), &roles()).unwrap(),
+            bell.back_to_work(records.objects(), &roles()).unwrap(),
             (None, ended)
         );
         assert_eq!(bell.work, ended);
@@ -1221,7 +1065,7 @@ mod tests {
             before_building: before,
         };
         assert_eq!(
-            bell.back_to_work(&|id| Ok(object(id)), &roles()).unwrap(),
+            bell.back_to_work(records.objects(), &roles()).unwrap(),
             (None, before)
         );
         // one axis at −1 is a point
@@ -1232,7 +1076,7 @@ mod tests {
         );
         bell.work = half;
         assert_eq!(
-            bell.back_to_work(&|id| Ok(object(id)), &roles()).unwrap(),
+            bell.back_to_work(records.objects(), &roles()).unwrap(),
             (None, half)
         );
         assert_eq!((bell.work, bell.before_building), (half, before));

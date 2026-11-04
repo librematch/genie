@@ -23,6 +23,25 @@ use crate::world::slots::CheckedIndex;
 use crate::world::slots::PlayerSlots;
 use std::collections::BTreeSet;
 
+/// Which units of an order the splitter keeps after its sort ([`World::split`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Kept<'a> {
+    /// Every unit.
+    All,
+    /// The units listed: the garrison command's test (`FUN_140fd9ae0` for command `0x2713`).
+    Listed(&'a [ObjectId]),
+}
+
+impl Kept<'_> {
+    /// Whether the splitter keeps unit `id`.
+    fn keeps(self, id: ObjectId) -> bool {
+        match self {
+            Self::All => true,
+            Self::Listed(ids) => ids.contains(&id),
+        }
+    }
+}
+
 impl World {
     /// INTERACT (`0x140e68b90`) to its units, after their unit AIs reset. The splitter
     /// ([`World::split`]) forms groups ([`World::interact_groups`]) and leaves the others loose;
@@ -43,7 +62,7 @@ impl World {
             _ => {}
         }
         let loose = self
-            .split(units, &|_| true, ControlKey::Up)
+            .split(units, Kept::All, ControlKey::Up)
             .and_then(|mut s| self.interact_groups(&mut s, order).map(|()| s.loose));
         self.groups.count_command();
         let loose = loose?;
@@ -77,7 +96,7 @@ impl World {
         &mut self,
         units: &[Option<ObjectId>],
     ) -> Result<Vec<ObjectId>, GenieError> {
-        self.loose_units_kept(units, &|_| true)
+        self.loose_units_kept(units, Kept::All)
     }
 
     /// [`World::loose_units`] where, after the sort, `kept` drops units (the garrison command's
@@ -85,7 +104,7 @@ impl World {
     pub(crate) fn loose_units_kept(
         &mut self,
         units: &[Option<ObjectId>],
-        kept: &dyn Fn(ObjectId) -> bool,
+        kept: Kept<'_>,
     ) -> Result<Vec<ObjectId>, GenieError> {
         let split = self.split(units, kept, ControlKey::Up)?;
         if !split.groups.is_empty() {
@@ -121,7 +140,7 @@ impl World {
     pub(crate) fn split(
         &mut self,
         units: &[Option<ObjectId>],
-        kept: &dyn Fn(ObjectId) -> bool,
+        kept: Kept<'_>,
         control: ControlKey,
     ) -> Result<Split, GenieError> {
         // FUN_140fd9ae0 splits only when the list's first unit exists (its owner): else no unit
@@ -135,7 +154,7 @@ impl World {
             units.iter().map(|&id| self.object(id).and(id)).collect();
         sorted.sort_unstable_by_key(|u| u.map_or(-1, ObjectId::get));
         for u in &mut sorted {
-            if u.is_some_and(|id| !kept(id)) {
+            if u.is_some_and(|id| !kept.keeps(id)) {
                 *u = None;
             }
         }

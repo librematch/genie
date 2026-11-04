@@ -43,6 +43,7 @@ use crate::players::PlayerId;
 use crate::production::QueuedUnits;
 use crate::world::Seconds;
 use crate::world::World;
+use crate::world::index::ObjectsRef;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
 use crate::world::slots::PlayerSlots;
@@ -331,7 +332,7 @@ impl Tracker {
         }
     }
 
-    /// `FUN_14104fd10`: every id of list `old` the world holds (`class_of` gives its master's
+    /// `FUN_14104fd10`: every id of list `old` the world holds (`objects` gives its master's
     /// class) goes, in order, to the end of list `new`, out of the done list of `old_class` (the
     /// class of [`key`] of master `old`, −1 for none: key 899) and to the end of its own class's;
     /// list `old` then empties. Below the pending keys the same runs for the pending keys of
@@ -343,7 +344,7 @@ impl Tracker {
         old: ListKey,
         new: ListKey,
         old_class: Option<ClassId>,
-        class_of: &dyn Fn(ObjectId) -> Result<Option<ClassId>, GenieError>,
+        objects: ObjectsRef<'_>,
     ) -> Result<(), GenieError> {
         if let Some(ids) = self.lists.get(&old).cloned() {
             for id in ids {
@@ -351,7 +352,7 @@ impl Tracker {
                 let Some(id) = id.filter(|id| 0 <= id.get()) else {
                     continue;
                 };
-                let Some(class) = class_of(id)? else {
+                let Some(class) = objects.with_master(id)?.map(|(_, _, m)| m.class) else {
                     continue;
                 };
                 self.push(new, Some(id));
@@ -365,7 +366,7 @@ impl Tracker {
             }
         }
         if !old.is_pending() {
-            self.move_all(old.pending(), new.pending(), Key::NONE.class, class_of)?;
+            self.move_all(old.pending(), new.pending(), Key::NONE.class, objects)?;
         }
         Ok(())
     }
@@ -506,17 +507,11 @@ impl World {
     ) -> Result<(), GenieError> {
         let old_class = self.tracker_key(p, from).class;
         let mut tracker = take(&mut self.players.player_mut(p)?.tracker);
-        let class_of = |id: ObjectId| -> Result<Option<ClassId>, GenieError> {
-            let Some((q, u)) = self.object(id) else {
-                return Ok(None);
-            };
-            Ok(Some(u.master(self.master_tables(), q)?.class))
-        };
         let moved = tracker.move_all(
             ListKey::master(from),
             ListKey::master(to),
             old_class,
-            &class_of,
+            self.objects(),
         );
         self.players.player_mut(p)?.tracker = tracker;
         moved
@@ -531,6 +526,8 @@ mod tests {
     #[cfg(test)]
     use crate::construction::build::Construction;
     #[cfg(test)]
+    use crate::map::GridSize;
+    use crate::map::Position;
     use crate::map::Snow;
     #[cfg(test)]
     use crate::map::spatial::Obstruction;
@@ -549,6 +546,7 @@ mod tests {
     use crate::testing::class;
     use crate::testing::ids;
     use crate::testing::roles;
+    use crate::testing::scene::{Scene, Thing as SceneThing};
     #[cfg(test)]
     use crate::world::FrameSeed;
     use crate::world::Millis;
@@ -1066,9 +1064,29 @@ mod tests {
         t.push(list_of(500).pending(), Some(object_id(4)));
         t.push(list_of(500).pending(), None);
         // 2 is gone from the world; the objects are of class 6 now
-        let class_of = |id: ObjectId| Ok((id != object_id(2)).then_some(class::CLASS_6));
-        t.move_all(list_of(500), list_of(600), Some(class::CLASS_5), &class_of)
-            .unwrap();
+        let class_6 = Master {
+            id: master_id(600),
+            class: class::CLASS_6,
+            ..Master::default()
+        };
+        let w = [(1, 1.5), (3, 3.5), (4, 4.5)]
+            .into_iter()
+            .fold(Scene::open(GridSize::new(8, 8)), |scene, (id, x)| {
+                scene.thing(SceneThing::new(
+                    id,
+                    PlayerId::new(1),
+                    class_6.clone(),
+                    Position::new(x, 0.5, 0.0),
+                ))
+            })
+            .build();
+        t.move_all(
+            list_of(500),
+            list_of(600),
+            Some(class::CLASS_5),
+            w.objects(),
+        )
+        .unwrap();
         assert_eq!(
             (t.list(list_of(500)), t.list(list_of(500).pending())),
             (&[][..], &[][..])

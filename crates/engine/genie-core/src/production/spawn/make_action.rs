@@ -11,7 +11,6 @@ use crate::objects::masters::player_master;
 use crate::orders::NO_QUEUE;
 use crate::players::Amount;
 use crate::players::PlayerId;
-use crate::players::attribute::AttributeId;
 use crate::production::ProductionStart;
 use crate::production::{
     MakeObj, MakeObjState, MakeTech, MakeTechState, Making, housed, population,
@@ -263,11 +262,9 @@ impl World {
         i: ListIndex,
         r: &mut MakeTech,
     ) -> Result<(), GenieError> {
-        use crate::technology::Attributes;
         let (t, def) = self.research_tech(p, r.tech)?;
         let owner = self.players.player(p)?;
-        let get = |k: AttributeId| owner.get(k);
-        let factors = factors(r.tech, &get, self.model.slots)?;
+        let factors = factors(r.tech, owner, self.model.slots)?;
         let paid = self
             .parts
             .production
@@ -277,7 +274,7 @@ impl World {
         if !owner
             .techs
             .checked(t)?
-            .start_test(def, factors, &paid, &get)?
+            .start_test(def, factors, &paid, owner)?
         {
             return Err(GenieError::unsupported(
                 "a research whose start test fails (its refund)",

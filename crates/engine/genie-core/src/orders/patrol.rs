@@ -17,6 +17,7 @@ use crate::objects::masters::Master;
 use crate::objects::masters::MasterKind;
 use crate::objects::unit::Unit;
 use crate::orders::ControlKey;
+use crate::orders::Kept;
 use crate::orders::object_gone;
 use crate::orders::{
     ATTACK_MOVE_QUEUED, LISTED, Place, Split, Sweep, ignore_unit, patrol_timeout,
@@ -179,7 +180,7 @@ impl World {
             self.reset_for_attack_move(ids);
         }
         self.start_patrol_timers(ids, patrols);
-        let mut split = self.split(ids, &|_| true, ControlKey::Up)?;
+        let mut split = self.split(ids, Kept::All, ControlKey::Up)?;
         let mut listed: Vec<GroupId> = Vec::new();
         for units in split.groups.clone() {
             let common = common_group(&units, |id| self.object(id).map(|(_, u)| u.group));

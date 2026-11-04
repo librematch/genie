@@ -35,7 +35,6 @@ use crate::unit_ai::OrderTargetKind;
 use crate::unit_ai::QueueEnd;
 use crate::unit_ai::world_view::DropWorld;
 use crate::unit_ai::{Notify, NotifyKind, OrderPriority, QueuedOrder};
-use crate::world::Seconds;
 use crate::world::World;
 use crate::world::index::ObjectsRef;
 use crate::world::layer::AttributeRoles;
@@ -344,23 +343,8 @@ impl World {
     /// its point); height 0, range 0, priority 100, shown at the point, ready. A unit without a
     /// unit AI only looks the records up.
     pub(crate) fn queue_way_back(&mut self, p: PlayerId, idx: ListIndex) -> Result<(), GenieError> {
-        use crate::orders::town_bell::RecordTarget;
         let mut bell = self.parts.town_bell_of(self.players.live(p, idx)?.id);
-        let lookup = |t: ObjectId| -> Result<Option<RecordTarget>, GenieError> {
-            let Some((op, o)) = self.object(t) else {
-                return Ok(None);
-            };
-            let m = o.master(self.master_tables(), op)?;
-            Ok(Some(RecordTarget {
-                id: t,
-                building: m.kind == MasterKind::BUILDING,
-                class: m.class,
-                built: self.parts.building_of(o.id).construction.is_some_and(|c| {
-                    Seconds::of_master(m.creatable_part().build_time) <= c.progress
-                }),
-            }))
-        };
-        let (found, record) = bell.back_to_work(&lookup, &self.model.roles)?;
+        let (found, record) = bell.back_to_work(self.objects(), &self.model.roles)?;
         let target = match found {
             Some(f) => {
                 let (op, o) = self.object(f.id).ok_or_else(|| object_gone(f.id))?;

@@ -14,6 +14,7 @@ use crate::objects::ObjectId;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::MasterKind;
 use crate::orders::Dispatch;
+use crate::orders::Kept;
 use crate::orders::OrderFlags;
 use crate::orders::OrderSource;
 use crate::orders::ReadyOrders;
@@ -329,7 +330,7 @@ impl World {
             }
             _ => {
                 let loose = self
-                    .split(units, &|_| true, order.control)
+                    .split(units, Kept::All, order.control)
                     .and_then(|mut s| self.move_groups(&mut s, order).map(|()| s.loose));
                 self.groups.count_command();
                 let loose = loose?;

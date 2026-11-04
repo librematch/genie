@@ -116,7 +116,7 @@ pub struct TechState {
 /// adjustments (1; attribute 38 for 0x2f3). Spies is not modelled.
 pub fn factors(
     tech: TechId,
-    attribute: &dyn Fn(AttributeId) -> Result<Amount, GenieError>,
+    attributes: &dyn Attributes,
     slots: Slots,
 ) -> Result<(f32, i16), GenieError> {
     if tech == SPIES {
@@ -126,10 +126,12 @@ pub fn factors(
         0.0
     } else {
         // The attribute that scales research costs above 0 (`+0x2a8`: 85).
-        attribute(slots.attribute.research_cost_modifier)?.get()
+        attributes
+            .get(slots.attribute.research_cost_modifier)?
+            .get()
     };
     let scale = if tech == SCALED_BY_38 {
-        attribute(slots.attribute.attribute_38)?.get() as i32 as i16
+        attributes.get(slots.attribute.attribute_38)?.get() as i32 as i16
     } else {
         1
     };
@@ -204,7 +206,7 @@ impl TechState {
         def: &TechDef,
         factors: (f32, i16),
         paid: &[(Option<AttributeId>, Amount); 3],
-        attribute: &dyn Fn(AttributeId) -> Result<Amount, GenieError>,
+        attributes: &dyn Attributes,
     ) -> Result<bool, GenieError> {
         let (modifier, scale) = factors;
         for j in 0..3 {
@@ -237,7 +239,7 @@ impl TechState {
                     "a research cost the building holds (FUN_141204310)",
                 ));
             }
-            if attribute(attr)?.get() + before < v {
+            if attributes.get(attr)?.get() + before < v {
                 return Ok(false);
             }
             if 0.0 < v - before {
@@ -330,7 +332,7 @@ impl TechState {
         def: &TechDef,
         factors: (f32, i16),
         repeat: Repeat,
-        attribute: &dyn Fn(AttributeId) -> Result<Amount, GenieError>,
+        attributes: &dyn Attributes,
     ) -> Result<bool, GenieError> {
         let shared = def.kind == TechKind::SHARED;
         if self.state != ResearchState::Available
@@ -351,7 +353,7 @@ impl TechState {
                     "a research cost the building holds (FUN_141204310)",
                 ));
             }
-            if attribute(attr)?.get() < amount {
+            if attributes.get(attr)?.get() < amount {
                 return Ok(false);
             }
         }
@@ -373,7 +375,7 @@ impl TechState {
         attributes: &mut dyn Attributes,
         slots: Slots,
     ) -> Result<Payment, GenieError> {
-        if !self.can_research(def, factors, repeat, &|i| attributes.get(i))? {
+        if !self.can_research(def, factors, repeat, attributes)? {
             return Ok(Payment::Unpaid);
         }
         for j in 0..3 {
@@ -568,12 +570,11 @@ mod tests {
             paid.map(|(a, n)| (a, n.get())),
             [(Some(attribute::GOLD), 50.0), (None, 0.0), (None, 0.0)]
         );
-        let get = |i: AttributeId| held.get(i);
-        assert_eq!(s.start_test(&d, (0.0, 1), &paid, &get), Ok(true));
+        assert_eq!(s.start_test(&d, (0.0, 1), &paid, &held), Ok(true));
         // without the entry's payment the 50 gold left would do too, but that difference is
         // the game's FUN_1411c68b0
         assert!(
-            s.start_test(&d, (0.0, 1), &[(None, Amount::new(0.0)); 3], &get)
+            s.start_test(&d, (0.0, 1), &[(None, Amount::new(0.0)); 3], &held)
                 .is_err()
         );
         assert_eq!(

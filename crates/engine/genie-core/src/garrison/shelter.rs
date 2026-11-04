@@ -23,6 +23,7 @@ use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::unit::Unit;
 use crate::orders::Dispatch;
+use crate::orders::Kept;
 use crate::orders::OrderSource;
 use crate::orders::object_gone;
 use crate::orders::{GARRISON, Work};
@@ -413,7 +414,7 @@ impl World {
             }
         }
         let going: Vec<Option<ObjectId>> = going.iter().copied().map(Some).collect();
-        let loose = self.loose_units_kept(&going, &|id| kept.contains(&id))?;
+        let loose = self.loose_units_kept(&going, Kept::Listed(&kept))?;
         for id in loose {
             let Some(Place::Live(p, idx)) = self.place(id) else {
                 return Err(GenieError::unsupported(
