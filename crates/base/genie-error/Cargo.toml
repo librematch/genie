@@ -10,6 +10,8 @@ homepage = "https://github.com/librematch/genie/tree/main/crates/base/genie-erro
 documentation = "https://docs.rs/genie-error"
 repository.workspace = true
 readme = "./README.md"
+keywords = ["error", "context", "genie"]
+categories = ["rust-patterns"]
 
 [dependencies]
 

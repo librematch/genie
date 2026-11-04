@@ -5,6 +5,11 @@ description = "Nickel into the genie engine's model: the build layer's evaluatio
 edition = "2024"
 license = "AGPL-3.0-only"
 repository.workspace = true
+homepage = "https://github.com/librematch/genie/tree/main/crates/engine/genie-nickel"
+documentation = "https://docs.rs/genie-nickel"
+readme = "./README.md"
+keywords = ["aoe2", "nickel", "configuration", "genie"]
+categories = ["game-engines", "config"]
 
 [dependencies]
 genie-error = { path = "../../base/genie-error" }

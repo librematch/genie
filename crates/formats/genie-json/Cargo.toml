@@ -9,6 +9,9 @@ description = "Read and write the JSON data tables of Age of Empires II: Definit
 homepage = "https://github.com/librematch/genie/tree/main/crates/formats/genie-json"
 repository.workspace = true
 readme = "./README.md"
+documentation = "https://docs.rs/genie-json"
+keywords = ["aoe2", "age-of-empires", "genie", "json"]
+categories = ["parser-implementations", "game-development"]
 
 [dependencies]
 indexmap.workspace = true

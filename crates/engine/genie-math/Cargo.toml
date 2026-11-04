@@ -5,6 +5,11 @@ description = "The f32 operations of Age of Empires II: Definitive Edition as it
 edition = "2024"
 license = "AGPL-3.0-only"
 repository.workspace = true
+homepage = "https://github.com/librematch/genie/tree/main/crates/engine/genie-math"
+documentation = "https://docs.rs/genie-math"
+readme = "./README.md"
+keywords = ["aoe2", "float", "deterministic", "genie"]
+categories = ["game-engines", "mathematics"]
 
 [dependencies]
 # the geometry's and the angle's field differences (genie-core's per-object diff, FD-045-D14)

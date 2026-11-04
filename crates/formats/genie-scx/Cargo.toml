@@ -11,6 +11,8 @@ documentation = "https://docs.rs/genie-scx"
 repository.workspace = true
 readme = "./README.md"
 exclude = ["test/scenarios"]
+keywords = ["aoe2", "age-of-empires", "genie", "scenario"]
+categories = ["parser-implementations", "game-development"]
 
 [dependencies]
 genie-error = { path = "../../base/genie-error" }

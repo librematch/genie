@@ -10,6 +10,8 @@ homepage = "https://github.com/librematch/genie/tree/main/crates/formats/genie-d
 documentation = "https://docs.rs/genie-dat"
 repository.workspace = true
 readme = "./README.md"
+keywords = ["aoe2", "age-of-empires", "genie", "dat"]
+categories = ["parser-implementations", "game-development"]
 
 [dependencies]
 arrayvec.workspace = true

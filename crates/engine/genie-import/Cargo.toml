@@ -5,6 +5,11 @@ description = "The game's files as the genie engine's model: the .dat's masters,
 edition = "2024"
 license = "AGPL-3.0-only"
 repository.workspace = true
+homepage = "https://github.com/librematch/genie/tree/main/crates/engine/genie-import"
+documentation = "https://docs.rs/genie-import"
+readme = "./README.md"
+keywords = ["aoe2", "age-of-empires", "genie", "game-data"]
+categories = ["game-engines", "parser-implementations"]
 
 [dependencies]
 # the game data the importers fill (FD-046); its JSON Schema is the cache's layout hash (D60)

@@ -10,6 +10,8 @@ repository.workspace = true
 readme = "README.md"
 keywords = ["aoe2", "age-of-empires", "genie", "cli"]
 categories = ["command-line-utilities", "parser-implementations"]
+homepage = "https://github.com/librematch/genie/tree/main/crates/tools/genie-swiss-knife"
+documentation = "https://docs.rs/genie-swiss-knife"
 
 [[bin]]
 name = "gsk"

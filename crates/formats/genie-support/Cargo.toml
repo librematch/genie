@@ -10,6 +10,8 @@ homepage = "https://github.com/librematch/genie/tree/main/crates/formats/genie-s
 documentation = "https://docs.rs/genie-support"
 repository.workspace = true
 readme = "./README.md"
+keywords = ["aoe2", "age-of-empires", "genie"]
+categories = ["parser-implementations"]
 
 [dependencies]
 genie-error = { path = "../../base/genie-error" }

@@ -11,6 +11,8 @@ documentation = "https://docs.rs/genie-lang"
 repository.workspace = true
 readme = "./README.md"
 exclude = ["test/dlls"]
+keywords = ["aoe2", "age-of-empires", "genie", "localization"]
+categories = ["parser-implementations", "game-development", "localization"]
 
 [dependencies]
 genie-error = { path = "../../base/genie-error" }

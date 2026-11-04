@@ -10,7 +10,8 @@ homepage = "https://github.com/librematch/genie/tree/main/crates/formats/jascpal
 documentation = "https://docs.rs/jascpal"
 repository.workspace = true
 readme = "./README.md"
-
+keywords = ["palette", "jasc", "paint-shop-pro", "color"]
+categories = ["parser-implementations", "multimedia::images"]
 
 [dependencies]
 genie-error = { path = "../../base/genie-error" }

@@ -10,6 +10,8 @@ homepage = "https://github.com/librematch/genie/tree/main/crates/base/genie-diff
 documentation = "https://docs.rs/genie-diff-derive"
 repository.workspace = true
 readme = "./README.md"
+keywords = ["diff", "derive", "compare", "genie"]
+categories = ["development-tools::procedural-macro-helpers"]
 
 [lib]
 proc-macro = true

@@ -9,6 +9,8 @@ homepage = "https://github.com/librematch/genie/tree/main/crates/formats/genie-r
 documentation = "https://docs.rs/genie-rec"
 repository.workspace = true
 readme = "./README.md"
+keywords = ["aoe2", "age-of-empires", "genie", "recorded-game", "replay"]
+categories = ["parser-implementations", "game-development"]
 
 [dependencies]
 arrayvec.workspace = true

@@ -11,6 +11,8 @@ documentation = "https://docs.rs/genie-hki"
 repository.workspace = true
 readme = "./README.md"
 exclude = ["test/files"]
+keywords = ["aoe2", "age-of-empires", "genie", "hotkeys"]
+categories = ["parser-implementations", "game-development"]
 
 [dependencies]
 genie-error = { path = "../../base/genie-error" }

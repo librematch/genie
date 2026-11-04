@@ -10,6 +10,8 @@ homepage = "https://github.com/librematch/genie/tree/main/crates/base/genie-diff
 documentation = "https://docs.rs/genie-diff"
 repository.workspace = true
 readme = "./README.md"
+keywords = ["diff", "compare", "fields", "genie"]
+categories = ["development-tools::testing", "data-structures"]
 
 [dependencies]
 # the derive, which `genie_diff::Diff` re-exports

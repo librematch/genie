@@ -5,6 +5,11 @@ description = "The command packets of Age of Empires II: Definitive Edition reco
 edition = "2024"
 license = "AGPL-3.0-only"
 repository.workspace = true
+homepage = "https://github.com/librematch/genie/tree/main/crates/engine/genie-command-codec"
+documentation = "https://docs.rs/genie-command-codec"
+readme = "./README.md"
+keywords = ["aoe2", "age-of-empires", "genie", "commands", "replay"]
+categories = ["parser-implementations", "game-development"]
 
 [dependencies]
 genie-core = { path = "../genie-core" }

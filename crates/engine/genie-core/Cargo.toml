@@ -5,6 +5,11 @@ description = "Deterministic simulation core of the genie Age of Empires II: Def
 edition = "2024"
 license = "AGPL-3.0-only"
 repository.workspace = true
+homepage = "https://github.com/librematch/genie/tree/main/crates/engine/genie-core"
+documentation = "https://docs.rs/genie-core"
+readme = "./README.md"
+keywords = ["aoe2", "age-of-empires", "genie", "simulation", "deterministic"]
+categories = ["game-engines", "simulation"]
 
 [dependencies]
 # the error every crate returns: its kind, reason, place and context
