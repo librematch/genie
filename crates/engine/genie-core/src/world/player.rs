@@ -252,9 +252,9 @@ impl Attributes for Player {
         self.attribute(i).ok_or(NO_ATTRIBUTE)
     }
 
-    /// An attribute set to `v`, as a technology's payment writes it (no side effects).
-    fn set(&mut self, i: AttributeId, v: Amount) -> Result<(), GenieError> {
-        *self.attributes.get_mut(i.index()).ok_or(NO_ATTRIBUTE)? = v;
+    /// An attribute less `amount`, as a payment takes it (no side effects).
+    fn subtract(&mut self, i: AttributeId, amount: Amount) -> Result<(), GenieError> {
+        *self.attributes.get_mut(i.index()).ok_or(NO_ATTRIBUTE)? -= amount;
         Ok(())
     }
 }
@@ -286,6 +286,20 @@ impl Player {
     #[must_use]
     pub fn attribute(&self, attribute: AttributeId) -> Option<Amount> {
         self.attributes.get(attribute.index()).copied()
+    }
+
+    /// Attribute `attribute` set to `v`, as a refund and a technology's payment write it (no
+    /// side effects).
+    ///
+    /// # Errors
+    ///
+    /// An attribute the player does not have.
+    pub fn set_attribute(&mut self, attribute: AttributeId, v: Amount) -> Result<(), GenieError> {
+        *self
+            .attributes
+            .get_mut(attribute.index())
+            .ok_or(NO_ATTRIBUTE)? = v;
+        Ok(())
     }
 
     /// Food, wood, stone and gold (attributes 0 to 3; 0 for one past the count), as the

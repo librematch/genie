@@ -14,6 +14,7 @@ use crate::players::Amount;
 use crate::players::attribute::AttributeId;
 use crate::production::Payment;
 use crate::world::Seconds;
+use crate::world::player::Player;
 use crate::world::slots::CheckedIndex;
 
 use genie_model::technology::command_args;
@@ -373,10 +374,10 @@ impl TechState {
         factors: (f32, i16),
         repeat: Repeat,
         building: MasterId,
-        attributes: &mut dyn Attributes,
+        owner: &mut Player,
         slots: Slots,
     ) -> Result<Payment, GenieError> {
-        if !self.can_research(def, factors, repeat, attributes)? {
+        if !self.can_research(def, factors, repeat, &*owner)? {
             return Ok(Payment::Unpaid);
         }
         for j in 0..3 {
@@ -388,16 +389,16 @@ impl TechState {
                     "a research cost the building pays (FUN_1411c7470)",
                 ));
             }
-            let have = attributes.get(attr)?;
+            let have = owner.get(attr)?;
             if amount <= have.get() {
-                attributes.set(attr, have - Amount::new(amount))?;
+                owner.set_attribute(attr, have - Amount::new(amount))?;
             } else {
-                let gold = attributes.get(slots.attribute.gold)?;
-                attributes.set(
+                let gold = owner.get(slots.attribute.gold)?;
+                owner.set_attribute(
                     slots.attribute.gold,
                     gold - Amount::new(amount - have.get()),
                 )?;
-                attributes.set(attr, Amount::ZERO)?;
+                owner.set_attribute(attr, Amount::ZERO)?;
             }
         }
         if def.kind == TechKind::SHARED {
@@ -445,22 +446,22 @@ pub enum RepeatLimit {
     Raised,
 }
 
-/// The player's attributes as a technology's costs read and write them.
+/// The attributes a cost test reads and a payment takes its costs from: a player's
+/// ([`Player`]) or what a repair's payer holds (`PaidAttributes`). A refund and a technology's
+/// payment write a player's attributes ([`Player::set_attribute`]).
 pub trait Attributes {
     /// Attribute `i`.
-    fn get(&self, i: AttributeId) -> Result<Amount, GenieError>;
-    /// Attribute `i` set to `v`.
-    fn set(&mut self, i: AttributeId, v: Amount) -> Result<(), GenieError>;
-    /// Attribute `i` less `amount` (a payment's `SUBSS`), by default through [`Attributes::get`]
-    /// and [`Attributes::set`].
     ///
     /// # Errors
     ///
     /// An attribute the player does not have.
-    fn subtract(&mut self, i: AttributeId, amount: Amount) -> Result<(), GenieError> {
-        let v = self.get(i)?;
-        self.set(i, v - amount)
-    }
+    fn get(&self, i: AttributeId) -> Result<Amount, GenieError>;
+    /// Attribute `i` less `amount` (a payment's `SUBSS`).
+    ///
+    /// # Errors
+    ///
+    /// An attribute the player does not have.
+    fn subtract(&mut self, i: AttributeId, amount: Amount) -> Result<(), GenieError>;
 }
 
 #[cfg(test)]
@@ -472,6 +473,7 @@ mod tests {
     use crate::test_ids::master_id;
     use crate::testing::attribute;
     use crate::testing::ids;
+    use crate::testing::player_holding;
     use crate::testing::slots;
     use crate::world::WholeSeconds;
 
@@ -508,18 +510,6 @@ mod tests {
         (state, def)
     }
 
-    struct Held([Amount; 4]);
-
-    impl Attributes for Held {
-        fn get(&self, i: AttributeId) -> Result<Amount, GenieError> {
-            Ok(self.0[i.index()])
-        }
-        fn set(&mut self, i: AttributeId, v: Amount) -> Result<(), GenieError> {
-            self.0[i.index()] = v;
-            Ok(())
-        }
-    }
-
     #[test]
     fn loom_lists_its_gold_and_pays_it_once_queued() {
         let (mut s, d) = loom();
@@ -531,7 +521,7 @@ mod tests {
         );
         assert!(!s.repeatable(&d, RepeatLimit::Own));
         // the game's attributes in 3842 (80 food, 157 wood, 200 stone, 100 gold) and after it
-        let mut held = Held([
+        let mut held = player_holding(vec![
             Amount::new(79.956_116),
             Amount::new(157.05705),
             Amount::new(200.0),
@@ -548,7 +538,10 @@ mod tests {
             ),
             Ok(Payment::Paid)
         );
-        assert_eq!(held.0, amounts([79.956_116, 157.05705, 200.0, 50.0]));
+        assert_eq!(
+            held.attributes,
+            amounts([79.956_116, 157.05705, 200.0, 50.0])
+        );
         assert_eq!(
             (s.state, s.building_master),
             (ResearchState::Queued, Some(master_id(109)))
@@ -588,7 +581,7 @@ mod tests {
     fn cost_beyond_the_attribute_takes_the_rest_from_gold() {
         let (mut s, mut d) = loom();
         d.costs[0].attribute = Some(attribute::WOOD);
-        let mut held = Held([
+        let mut held = player_holding(vec![
             Amount::ZERO,
             Amount::new(30.0),
             Amount::ZERO,
@@ -618,7 +611,7 @@ mod tests {
             ),
             Ok(Payment::Paid)
         );
-        assert_eq!(held.0, amounts([0.0, 5.0, 0.0, 100.0]));
+        assert_eq!(held.attributes, amounts([0.0, 5.0, 0.0, 100.0]));
         assert_eq!(
             s.listed_costs(&d, (0.5, 1))
                 .unwrap()

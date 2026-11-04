@@ -11,13 +11,25 @@ pub mod picker;
 pub mod scene;
 
 use crate::combat::damage::HitLayer;
+use crate::players::Amount;
 use crate::testing::build_158041::build_158041;
 use crate::world::layer::Roles;
 use crate::world::layer::Slots;
 use crate::world::layer::generated::Tuning;
+use crate::world::player::Player;
 use genie_model::layer::BuildLayer;
 use genie_model::model::Model;
 use std::sync::LazyLock;
+
+/// A player that holds `attributes` and nothing else, whose attributes a test's costs read and
+/// write.
+#[must_use]
+pub fn player_holding(attributes: Vec<Amount>) -> Player {
+    Player {
+        attributes,
+        ..Player::default()
+    }
+}
 
 /// Build 158041's roles, which a test passes where the engine reads the layer's.
 #[must_use]

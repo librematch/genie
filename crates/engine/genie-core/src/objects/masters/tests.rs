@@ -38,7 +38,6 @@ use crate::objects::facing::SpriteFacets;
 use crate::objects::masters::Availability;
 use crate::objects::masters::DisableMode;
 use crate::objects::sprite::Graphic;
-use crate::players::AllyTest;
 use crate::players::Amount;
 use crate::players::CivId;
 use crate::players::PlayerId;
@@ -161,18 +160,11 @@ fn villagers() -> Masters {
     ])
 }
 
-/// Every player on its own, no drop sites.
-struct Alone;
-
-impl Diplomacy for Alone {
-    fn allied(&self, from: PlayerId, to: PlayerId, _: AllyTest) -> bool {
-        from == to
-    }
-
-    fn drops_at(&self, _: MasterId, _: &Actor<'_>) -> bool {
-        false
-    }
-}
+/// Every player on its own (the world holds no player, so none has an ally), no drop sites.
+const ALONE: TaskWorld<'static> = TaskWorld {
+    players: &[],
+    drop_sites: &[],
+};
 
 /// A sprite table holding the ids 1 to 99.
 static SPRITES: LazyLock<Graphics> = LazyLock::new(|| {
@@ -1715,7 +1707,7 @@ fn villager_on_farm_takes_its_group_farmer_for_the_farm_class() {
             general: Some(&site),
             terrain: None,
         };
-        work_master(m, &actor, &on, None, &Alone, slots(), &roles()).map(|w| {
+        work_master(m, &actor, &on, None, &ALONE, slots(), &roles()).map(|w| {
             w.map(|(id, t)| {
                 (
                     id.get(),
@@ -1781,7 +1773,7 @@ fn villager_takes_the_first_master_of_its_swap_group_with_task_for_its_foundatio
             general: Some(&site),
             terrain: None,
         };
-        work_master(&m, &actor, &on, None, &Alone, slots(), &roles())
+        work_master(&m, &actor, &on, None, &ALONE, slots(), &roles())
             .map(|w| w.map(|(id, t)| (id.get(), t.action_kind)))
     };
     assert_eq!(pick(ids::VILLAGER_MALE), Ok(Some((118, ActionKind::BUILD))));

@@ -22,6 +22,7 @@ use crate::world::Seconds;
 use crate::world::layer::AttributeRoles;
 use crate::world::layer::Roles;
 use crate::world::layer::Slots;
+use crate::world::player::Player;
 
 /// `FUN_141630530`: a queued unit's refund. For a master of type 70 and up each of its cost
 /// entries with an attribute and a paid flag gives back what the queue entry's `costs` paid
@@ -30,7 +31,7 @@ use crate::world::layer::Slots;
 pub fn refund(
     master: &Master,
     costs: &[(Option<AttributeId>, Amount); 3],
-    attributes: &mut dyn Attributes,
+    owner: &mut Player,
 ) -> Result<(), GenieError> {
     if master.kind < MasterKind::COMBAT {
         return Ok(());
@@ -44,8 +45,8 @@ pub fn refund(
             .rev()
             .find(|c| c.0 == Some(attribute))
             .map_or(Amount::ZERO, |c| c.1);
-        let held = attributes.get(attribute)?;
-        attributes.set(attribute, held + back)?;
+        let held = owner.get(attribute)?;
+        owner.set_attribute(attribute, held + back)?;
     }
     Ok(())
 }
@@ -56,14 +57,14 @@ pub fn refund(
 pub fn refund_research(
     costs: &[(Option<AttributeId>, Amount); 3],
     count: QueuedUnits,
-    attributes: &mut dyn Attributes,
+    owner: &mut Player,
 ) -> Result<(), GenieError> {
     for &(attribute, amount) in costs {
         let Some(attribute) = attribute else {
             continue;
         };
-        let held = attributes.get(attribute)?;
-        attributes.set(
+        let held = owner.get(attribute)?;
+        owner.set_attribute(
             attribute,
             held + Amount::new(f32::from(count.get()) * amount.get()),
         )?;
@@ -74,11 +75,7 @@ pub fn refund_research(
 /// `FUN_141630770` with `n` 1, the make action's destructor's refund of a unit its queue did
 /// not pay for: each cost entry of a master of type 70 and up with an attribute and a paid
 /// flag gives back its amount times `n` (an integer product), straight into the attribute.
-pub fn refund_master(
-    master: &Master,
-    n: QueueCount,
-    attributes: &mut dyn Attributes,
-) -> Result<(), GenieError> {
+pub fn refund_master(master: &Master, n: QueueCount, owner: &mut Player) -> Result<(), GenieError> {
     if master.kind < MasterKind::COMBAT {
         return Ok(());
     }
@@ -86,8 +83,8 @@ pub fn refund_master(
         if !paid {
             continue;
         }
-        let held = attributes.get(attribute)?;
-        attributes.set(
+        let held = owner.get(attribute)?;
+        owner.set_attribute(
             attribute,
             Amount::new((i32::from(amount.get()) * n.get()) as f32 + held.get()),
         )?;
@@ -104,7 +101,7 @@ pub fn refund_tech(
     state: &mut TechState,
     def: &TechDef,
     tech: TechId,
-    attributes: &mut dyn Attributes,
+    owner: &mut Player,
     slots: Slots,
 ) -> Result<Refund, GenieError> {
     use crate::math::conversions::cvttss2si;
@@ -119,9 +116,7 @@ pub fn refund_tech(
     } else {
         // The research cost modifier (attribute 85, `+0x2a8`), which scales a refunded technology's
         // costs above 0.
-        attributes
-            .get(slots.attribute.research_cost_modifier)?
-            .get()
+        owner.get(slots.attribute.research_cost_modifier)?.get()
     };
     for (c, adj) in def.costs.iter().zip(&state.cost_adj) {
         let Some(attribute) = c.attribute.filter(|_| c.paid.is_paid()) else {
@@ -131,8 +126,8 @@ pub fn refund_tech(
         if 0.0 < modifier {
             v = f32::from(cvttss2si(v * modifier) as i16);
         }
-        let held = attributes.get(attribute)?;
-        attributes.set(attribute, held + Amount::new(v))?;
+        let held = owner.get(attribute)?;
+        owner.set_attribute(attribute, held + Amount::new(v))?;
     }
     state.state = ResearchState::Available;
     state.research_done = Seconds::ZERO;

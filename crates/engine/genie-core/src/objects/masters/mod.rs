@@ -39,7 +39,9 @@ pub use self::trail::{Trail, TrailDensity, TrailMode};
 pub use self::values::AttributeWorld;
 pub(crate) use self::values::cost_resource;
 #[cfg(test)]
-use crate::unit_ai::task_finder::{Actor, Diplomacy, TaskTarget};
+use crate::unit_ai::task_finder::world::TaskWorld;
+#[cfg(test)]
+use crate::unit_ai::task_finder::{Actor, TaskTarget};
 
 /// The task types the action list's factory makes an action of: the TRIBE factory's
 /// (`FUN_140aca4b0`) and the RGE factory's it falls back on (`FUN_140a97e00`). A default task of

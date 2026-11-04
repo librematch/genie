@@ -3,6 +3,7 @@ use crate::combat::damage::ArmorPair;
 use crate::construction::MainBuildingId;
 use crate::construction::repair::RepairFrom;
 use crate::construction::repair::RepairerCount;
+use crate::construction::repair::payment::PaidAttributes;
 use crate::gathering::hunt::tests::walker;
 use crate::map::TerrainFlags;
 use crate::math::rng::Well512;
@@ -29,9 +30,7 @@ use crate::objects::{FacetCount, Frame, Graphics};
 use crate::orders::OrderSource;
 use crate::orders::Work;
 use crate::players::Amount;
-use crate::players::attribute::AttributeId;
 use crate::players::relation_row;
-use crate::technology::Attributes;
 use crate::test_ids::costs;
 use crate::test_ids::object_id;
 use crate::test_ids::task_id;
@@ -157,19 +156,6 @@ fn the_work_counts_half_for_each_repairer_past_the_first() {
     );
 }
 
-/// The repairer's player's attributes as a list (food, wood, stone, gold at 0 to 3).
-struct Held(Vec<Amount>);
-
-impl Attributes for Held {
-    fn get(&self, i: AttributeId) -> Result<Amount, GenieError> {
-        Ok(self.0[i.index()])
-    }
-    fn set(&mut self, i: AttributeId, v: Amount) -> Result<(), GenieError> {
-        self.0[i.index()] = v;
-        Ok(())
-    }
-}
-
 /// A house (70, class 3, 550 hit points, 25 wood) and a ram (35, class 13, 175 hit points,
 /// 160 wood, 75 gold) of the repairer's player.
 fn masters() -> Masters {
@@ -223,12 +209,8 @@ fn house(id: i32, hp: HitPoints) -> Repaired {
 #[test]
 fn building_repair_pays_its_share_of_the_cost_and_heals() {
     let masters = masters();
-    let mut wood = Held(vec![
-        Amount::ZERO,
-        Amount::new(100.0),
-        Amount::ZERO,
-        Amount::ZERO,
-    ]);
+    let mut wood =
+        PaidAttributes::new(&[Amount::ZERO, Amount::new(100.0), Amount::ZERO, Amount::ZERO]);
     let mut set = vec![house(1, HitPoints::new(500.0))];
     let mut payer = Payer {
         masters: &masters,
@@ -248,7 +230,7 @@ fn building_repair_pays_its_share_of_the_cost_and_heals() {
     );
     assert_eq!(set[0].hp, HitPoints::new(510.0));
     let share = 0.15f32 * 10.0 / 550.0;
-    assert_eq!(wood.0[1], Amount::new(100.0 - 25.0 * share));
+    assert_eq!(wood.values[1], Amount::new(100.0 - 25.0 * share));
     let mut payer = Payer {
         masters: &masters,
         attributes: &mut wood,
@@ -266,7 +248,7 @@ fn building_repair_pays_its_share_of_the_cost_and_heals() {
         Ok(RepairOutcome::Full)
     );
     assert_eq!(set[0].hp, HitPoints::new(550.0));
-    let mut broke = Held(vec![Amount::ZERO; 4]);
+    let mut broke = PaidAttributes::new(&[Amount::ZERO; 4]);
     let mut set = vec![house(1, HitPoints::new(500.0))];
     let mut payer = Payer {
         masters: &masters,
@@ -305,12 +287,8 @@ fn building_repair_pays_its_share_of_the_cost_and_heals() {
 #[test]
 fn an_annex_repair_goes_to_its_main_building_and_its_annexes() {
     let masters = masters();
-    let mut wood = Held(vec![
-        Amount::ZERO,
-        Amount::new(100.0),
-        Amount::ZERO,
-        Amount::ZERO,
-    ]);
+    let mut wood =
+        PaidAttributes::new(&[Amount::ZERO, Amount::new(100.0), Amount::ZERO, Amount::ZERO]);
     let mut set = vec![
         Repaired {
             main: Some(MainBuildingId::new(object_id(2))),
@@ -348,7 +326,7 @@ fn an_annex_repair_goes_to_its_main_building_and_its_annexes() {
 #[test]
 fn siege_unit_repair_pays_its_unit_share() {
     let masters = masters();
-    let mut held = Held(vec![
+    let mut held = PaidAttributes::new(&[
         Amount::ZERO,
         Amount::new(1000.0),
         Amount::ZERO,
@@ -379,7 +357,7 @@ fn siege_unit_repair_pays_its_unit_share() {
     let share = 0.5f32 * 10.0 / 175.0;
     assert_eq!(set[0].hp, HitPoints::new(110.0));
     assert_eq!(
-        (held.0[1], held.0[3]),
+        (held.values[1], held.values[3]),
         (
             Amount::new(1000.0 - 160.0 * share),
             Amount::new(1000.0 - 75.0 * share)

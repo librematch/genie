@@ -596,6 +596,7 @@ mod tests {
     use crate::orders::GARRISON;
     use crate::players::CivId;
     use crate::players::attribute::AttributeId;
+    use crate::players::relation_row;
     use crate::test_ids::carrying;
     use crate::test_ids::master_id;
     use crate::test_ids::object_id;
@@ -609,17 +610,30 @@ mod tests {
     use crate::unit_ai::task_finder::target_steps::{
         drop_off_finding, garrison_into, repair_finding,
     };
+    use crate::unit_ai::task_finder::world::TaskWorld;
+    use crate::world::player::Player;
+    use std::sync::LazyLock;
 
-    /// Every player on its own; the drop sites take wood (0) at master 562.
-    struct Alone;
+    /// The tests' drop site: a building of master 562 takes food from any worker.
+    static FOOD_AT_562: LazyLock<[DropSite; 1]> = LazyLock::new(|| {
+        [DropSite {
+            building: master_id(562),
+            targets: vec![DropTarget {
+                class: ClassId::named(99),
+                workers: WorkerCount::of_data(0),
+                state: None,
+                attribute: Some(attribute::FOOD),
+            }],
+            ..DropSite::default()
+        }]
+    });
 
-    impl Diplomacy for Alone {
-        fn allied(&self, from: PlayerId, to: PlayerId, _: AllyTest) -> bool {
-            from == to
-        }
-
-        fn drops_at(&self, building: MasterId, actor: &Actor<'_>) -> bool {
-            building == master_id(562) && actor.held.kind == Some(attribute::FOOD)
+    /// Every player on its own (the world holds no player, so none has an ally); a building of
+    /// master 562 takes food ([`FOOD_AT_562`]).
+    fn alone() -> TaskWorld<'static> {
+        TaskWorld {
+            players: &[],
+            drop_sites: &*FOOD_AT_562,
         }
     }
 
@@ -672,16 +686,28 @@ mod tests {
         }
     }
 
-    /// Players 1 and 3 are allies both ways; player 1 counts 4 an ally, 4 does not count 1.
-    struct Teams;
+    /// Players 0 to 4, of whom 1 and 3 are allies both ways and player 1 counts 4 an ally, 4
+    /// does not count 1: their relation rows (0 an ally, 3 an enemy).
+    static TEAMS: LazyLock<Vec<Player>> = LazyLock::new(|| {
+        [
+            [0, 3, 3, 3, 3],
+            [3, 0, 3, 0, 0],
+            [3, 3, 0, 3, 3],
+            [3, 0, 3, 0, 3],
+            [3, 3, 3, 3, 0],
+        ]
+        .map(|row| Player {
+            relations: relation_row(row),
+            ..Player::default()
+        })
+        .into()
+    });
 
-    impl Diplomacy for Teams {
-        fn allied(&self, from: PlayerId, to: PlayerId, _: AllyTest) -> bool {
-            from == to || matches!((from.get(), to.get()), (1 | 3, 3 | 1) | (1, 4))
-        }
-
-        fn drops_at(&self, _: MasterId, _: &Actor<'_>) -> bool {
-            false
+    /// The players of [`TEAMS`], no drop sites.
+    fn teams() -> TaskWorld<'static> {
+        TaskWorld {
+            players: &TEAMS,
+            drop_sites: &[],
         }
     }
 
@@ -713,7 +739,7 @@ mod tests {
             ..building(&own, player, ObjectState::Alive)
         };
         let applies_to = |task: &Task, master, target: &TaskTarget<'_>| {
-            applies(task, &me(master), target, &Teams)
+            applies(task, &me(master), target, &teams())
         };
         // the holder's test (−1 for no attribute)
         let kind = AttributeId::of_data;
@@ -806,7 +832,7 @@ mod tests {
             &actor(list, held),
             &on,
             None,
-            &Alone,
+            &alone(),
             slots(),
             &roles(),
         )
@@ -1092,7 +1118,7 @@ mod tests {
             &actor(list, carrying(None, 0.0)),
             &on,
             filter,
-            &Alone,
+            &alone(),
             slots(),
             &roles(),
         )
@@ -1256,11 +1282,11 @@ mod tests {
         let a = actor(&villager, carrying(None, 0.0));
         let t = building(&house, PlayerId::new(2), ObjectState::Alive);
         assert_eq!(
-            finder_head(&villager, &a, Some(&t), None, &Alone, &roles()),
+            finder_head(&villager, &a, Some(&t), None, &alone(), &roles()),
             Ok(Finding::Next)
         );
         assert_eq!(
-            finder_head(&villager, &a, Some(&t), Some(ENTER), &Alone, &roles()),
+            finder_head(&villager, &a, Some(&t), Some(ENTER), &alone(), &roles()),
             Ok(Finding::Answer(None))
         );
         let ship = Master {
@@ -1273,7 +1299,7 @@ mod tests {
                 &a,
                 Some(&transport(&ship, PlayerId::new(2))),
                 Some(ENTER),
-                &Alone,
+                &alone(),
                 &roles()
             ),
             Ok(Finding::Next)
@@ -1293,7 +1319,7 @@ mod tests {
                 &actor(&wolf, carrying(None, 0.0)),
                 Some(&prey),
                 None,
-                &Alone,
+                &alone(),
                 &roles()
             ),
             Ok(Finding::Answer(None))
@@ -1311,7 +1337,7 @@ mod tests {
                 &carrier,
                 Some(&building(&monastery, PlayerId::new(2), ObjectState::Alive)),
                 None,
-                &Alone,
+                &alone(),
                 &roles()
             ),
             Ok(Finding::Answer(Some(&villager.action_part().tasks[0])))
@@ -1322,7 +1348,7 @@ mod tests {
             ..actor(&monk, carrying(None, 0.0))
         };
         let peasant = building(&villager, PlayerId::new(3), ObjectState::Alive);
-        assert!(finder_head(&monk, &converting, Some(&peasant), None, &Alone, &roles()).is_err());
+        assert!(finder_head(&monk, &converting, Some(&peasant), None, &alone(), &roles()).is_err());
     }
 
     /// The general search's last step (`FUN_1411a8ba0`): without a task for the target, or
@@ -1348,7 +1374,7 @@ mod tests {
                 general: t,
                 terrain,
             };
-            find_task(&ship, &a, &on, filter, &Alone, slots(), &roles())
+            find_task(&ship, &a, &on, filter, &alone(), slots(), &roles())
                 .map(|f| f.map(|k| k.action_kind))
         };
         assert_eq!(
@@ -1394,7 +1420,7 @@ mod tests {
                 &a,
                 &building(&house, PlayerId::new(2), ObjectState::Foundation),
                 None,
-                &Alone,
+                &alone(),
                 &roles()
             ),
             Ok(Finding::Answer(Some(&builder.action_part().tasks[0])))
@@ -1405,7 +1431,7 @@ mod tests {
                 &a,
                 &building(&house, PlayerId::new(2), ObjectState::Alive),
                 None,
-                &Alone,
+                &alone(),
                 &roles()
             ),
             Ok(Finding::Next)
@@ -1422,7 +1448,7 @@ mod tests {
                 &a,
                 &building(&m199, PlayerId::new(2), ObjectState::Alive),
                 None,
-                &Alone,
+                &alone(),
                 &roles()
             )
             .is_err()
@@ -1434,7 +1460,7 @@ mod tests {
                 &a,
                 &building(&m45, PlayerId::new(2), ObjectState::Alive),
                 None,
-                &Alone,
+                &alone(),
                 &roles()
             ),
             Ok(Finding::Next)
@@ -1452,7 +1478,7 @@ mod tests {
         let cart = actor(&trader, carrying(None, 0.0));
         let dock = building(&m45, PlayerId::new(2), ObjectState::Alive);
         assert_eq!(
-            on_target(&trader, &cart, &dock, None, &Alone, &roles()),
+            on_target(&trader, &cart, &dock, None, &alone(), &roles()),
             Ok(Finding::Answer(Some(&trader.action_part().tasks[2])))
         );
         assert_eq!(
@@ -1461,13 +1487,13 @@ mod tests {
                 &cart,
                 &dock,
                 Some(ActionKind::TRADE),
-                &Alone,
+                &alone(),
                 &roles()
             ),
             Ok(Finding::Answer(Some(&trader.action_part().tasks[2])))
         );
         assert_eq!(
-            on_target(&trader, &cart, &dock, Some(GATHER), &Alone, &roles()),
+            on_target(&trader, &cart, &dock, Some(GATHER), &alone(), &roles()),
             Ok(Finding::Next)
         );
         let market = master(ids::MARKET, MasterKind::BUILDING, class::CLASS_7, vec![]);
@@ -1477,7 +1503,7 @@ mod tests {
                 &cart,
                 &building(&market, PlayerId::new(2), ObjectState::Alive),
                 None,
-                &Alone,
+                &alone(),
                 &roles()
             ),
             Ok(Finding::Answer(Some(&trader.action_part().tasks[0])))
@@ -1489,7 +1515,7 @@ mod tests {
                 &cart,
                 &building(&m45, PlayerId::new(2), ObjectState::Dying),
                 None,
-                &Alone,
+                &alone(),
                 &roles()
             ),
             Ok(Finding::Next)
@@ -1506,7 +1532,7 @@ mod tests {
                 &sailor,
                 &transport(&ship, PlayerId::new(2)),
                 None,
-                &Alone,
+                &alone(),
                 &roles()
             ),
             Ok(Finding::Answer(None))
@@ -1519,7 +1545,7 @@ mod tests {
     #[test]
     fn the_drop_off_step_takes_the_task_for_the_load() {
         fn drop<'m>(list: &'m Master, held: Held, t: &TaskTarget<'_>) -> Finding<'m> {
-            drop_off_finding(list, &actor(list, held), t, None, &Alone)
+            drop_off_finding(list, &actor(list, held), t, None, &alone())
         }
         let camp = master(
             master_id(562),
@@ -1573,7 +1599,7 @@ mod tests {
                 &actor(list, carrying(None, 0.0)),
                 t,
                 filter,
-                &Alone,
+                &alone(),
                 &roles(),
             )
         }
@@ -1629,7 +1655,7 @@ mod tests {
                 &actor(list, carrying(None, 0.0)),
                 t,
                 filter,
-                &Alone,
+                &alone(),
                 &roles(),
             )
         }
@@ -1686,7 +1712,7 @@ mod tests {
                 &actor(list, carrying(None, 0.0)),
                 &on,
                 filter,
-                &Alone,
+                &alone(),
                 slots(),
                 &roles(),
             )

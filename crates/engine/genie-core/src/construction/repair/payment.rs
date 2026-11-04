@@ -253,12 +253,6 @@ impl Attributes for PaidAttributes {
         self.values.get(i.index()).copied().ok_or(NO_ATTRIBUTE)
     }
 
-    fn set(&mut self, _: AttributeId, _: Amount) -> Result<(), GenieError> {
-        Err(GenieError::unreachable(
-            "a repair's payment that sets an attribute",
-        ))
-    }
-
     fn subtract(&mut self, i: AttributeId, amount: Amount) -> Result<(), GenieError> {
         let v = self.values.get_mut(i.index()).ok_or(NO_ATTRIBUTE)?;
         *v -= amount;
