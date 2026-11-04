@@ -493,3 +493,45 @@ impl Mover {
         Ok(Some((found, path.length)))
     }
 }
+
+/// A unit's reach test of an object (slot 0x3d0, [`Mover::reaches_object`]) as a search asks it:
+/// the unit's movement state, place, walker and master, the path planners and the world's objects;
+/// the spatial index comes with each test, which writes its scratch.
+#[derive(Debug)]
+pub struct UnitReach<'a, 'p> {
+    /// The unit's movement state.
+    pub mover: &'a Mover,
+    /// Its place.
+    pub at: Position,
+    /// What its walk reads of it.
+    pub walker: Me,
+    /// Its master.
+    pub master: MasterId,
+    /// The path planners and the walk's reads beside them.
+    pub plan: &'a mut Planning<'p>,
+    /// The world's objects by id.
+    pub objects: ObjectsRef<'a>,
+}
+
+impl UnitReach<'_, '_> {
+    /// Whether the unit reaches object `target` within `range`.
+    ///
+    /// # Errors
+    ///
+    /// What the reach test does not model.
+    pub fn reaches(
+        &mut self,
+        spatial: &mut Spatial,
+        target: ObjectId,
+        range: Distance,
+    ) -> Result<bool, GenieError> {
+        self.mover.reaches_object(
+            (self.at, &self.walker),
+            (spatial, self.objects),
+            self.plan,
+            target,
+            range,
+            self.master,
+        )
+    }
+}

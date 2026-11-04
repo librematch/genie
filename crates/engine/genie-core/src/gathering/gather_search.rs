@@ -15,29 +15,37 @@ use crate::map::Footprint;
 use crate::map::GridSize;
 use crate::map::Point;
 use crate::map::Position;
+use crate::map::TerrainMask;
 use crate::map::Tile;
 use crate::map::TileOffset;
+use crate::map::spatial::Spatial;
 use crate::math::conversions::cvttss2si;
 use crate::math::fmath::sqrt;
 use crate::math::image::gather_search::TILE_CENTRE as GATHER_SEARCH_TILE_CENTRE;
 use crate::math::msvc::sort;
+use crate::movement::UnitReach;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::WorkerCount;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::GatherGroup;
+use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
+use crate::objects::unit::Unit;
+use crate::objects::unit::UnitFlags;
+use crate::pathing::tile_path::Planner;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute::AttributeId;
 use crate::unit_ai::task_finder::DropSite;
 use crate::vision::SightTiles;
+use crate::world::index::ObjectsRef;
 use crate::world::layer::AttributeRoles;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
 use crate::world::layer::generated::GatherSearchTuning;
 use crate::world::slots::CheckedIndex;
-use std::fmt::{Debug, Error, Formatter};
+use std::fmt::Debug;
 use std::mem::take;
 
 mod passes;
@@ -73,6 +81,71 @@ pub struct Candidate {
     pub gather_group: GatherGroup,
 }
 
+impl Candidate {
+    /// Object `id` of `owner` as a search reads it: `unit` of `master` at `position`.
+    #[must_use]
+    pub const fn of(
+        id: ObjectId,
+        owner: PlayerId,
+        unit: &Unit,
+        master: &Master,
+        position: Position,
+    ) -> Self {
+        Self {
+            id,
+            player: owner,
+            class: master.class,
+            master: master.id,
+            state: unit.life.state,
+            workers: unit.workers,
+            position,
+            pasture: unit.pasture,
+            untargetable: unit.flags.contains(UnitFlags::UNTARGETABLE),
+            attribute: unit.life.attribute_kind,
+            amount: unit.life.amount,
+            auto_gather: master.auto_gather.is_on(),
+            gather_group: master.gather_group,
+        }
+    }
+}
+
+/// The objects a search finds on a tile ([`Candidate`]): the spatial index's objects on it in
+/// their order, each read from the world's objects by id; the searching unit, out of its slot
+/// while it updates, as it stands (`me`).
+#[derive(Clone, Copy, Debug)]
+pub struct Candidates<'a> {
+    /// The world's objects by id.
+    pub objects: ObjectsRef<'a>,
+    /// The searching unit while its update holds it out of its slot.
+    pub me: Option<Candidate>,
+}
+
+impl Candidates<'_> {
+    /// The objects of `spatial` on `tile`, in their order.
+    ///
+    /// # Errors
+    ///
+    /// An object on the tile the world does not hold, or of a master its owner's table does not
+    /// hold.
+    pub fn on(&self, spatial: &Spatial, tile: Tile) -> Result<Vec<Candidate>, GenieError> {
+        spatial
+            .objects_on(tile)
+            .map(|(id, p)| {
+                if let Some(me) = self.me.filter(|me| me.id == id) {
+                    return Ok(me);
+                }
+                let (owner, u, m) =
+                    self.objects
+                        .with_master(id)?
+                        .ok_or(GenieError::unsupported(
+                            "an object on a tile the slice does not hold",
+                        ))?;
+                Ok(Candidate::of(id, owner, u, m, p.position))
+            })
+            .collect()
+    }
+}
+
 /// What a builder's search reads of the builder and the building it completed.
 #[derive(Clone, Copy, Debug)]
 pub struct Builder {
@@ -91,9 +164,9 @@ pub struct Builder {
 /// drop site's entry for the building, the builder's class and its owner's civ (`entry`,
 /// [`crate::unit_ai::task_finder::drop_site`]; none, or one without `auto_work`, finds nothing). The search
 /// covers the tiles within the reach plus the builder's radius (rounded) of the building's tile,
-/// cut to the map; of those only the tiles the builder reaches count ([`reached`], with
-/// `blocked` the builder's restriction's planner, `FUN_140f7d470`; None without a planner, when
-/// every tile counts). `objects` lists a tile's objects in the tile's order.
+/// cut to the map; of those only the tiles the builder reaches count ([`reached`] on its
+/// restriction's `planner`, `FUN_140f7d470`). `candidates` reads a tile's objects in the tile's
+/// order from `spatial`.
 ///
 /// The tiles go by columns (x outer, y inner), a tile's objects in its list's order. An object
 /// below state 6 whose class the entry takes ([`DropSite::resource_of`]) joins its resource's
@@ -106,15 +179,16 @@ pub struct Builder {
 ///
 /// # Errors
 ///
-/// A farm on a tile for an entry with a farm target, and what `blocked` fails on.
+/// A farm on a tile for an entry with a farm target, a tile off the planner's map, and an object
+/// `candidates` cannot read.
 pub fn more_work(
     entry: Option<&DropSite>,
     builder: &Builder,
-    map: GridSize,
-    blocked: Option<&dyn Fn(Tile) -> Result<bool, GenieError>>,
-    objects: &dyn Fn(Tile) -> Result<Vec<Candidate>, GenieError>,
+    (spatial, planner): (&Spatial, &Planner),
+    candidates: &Candidates<'_>,
     roles: &Roles,
 ) -> Result<Option<Candidate>, GenieError> {
+    let map = spatial.map;
     let Some(entry) = entry.filter(|e| e.auto_work) else {
         return Ok(None);
     };
@@ -139,10 +213,7 @@ pub fn more_work(
     let (w, h) = (i32::from(x1 - x0) + 1, i32::from(y1 - y0) + 1);
     let corner = TileOffset::new(i32::from(x0), i32::from(y0));
     let start = Tile::new(builder.position.x() as i32, builder.position.y() as i32) - corner;
-    let grid = match blocked {
-        Some(b) => reached(start, GridSize::new(w, h), &|t| b(t + corner))?,
-        None => None,
-    };
+    let grid = reached(start, GridSize::new(w, h), corner, planner)?;
     // gold, stone, food, wood: (the object, its workers, the group's least distance)
     let mut groups: [Option<(Candidate, WorkerCount)>; 4] = [None; 4];
     let mut least = [90.0f32; 4];
@@ -154,7 +225,7 @@ pub fn more_work(
             {
                 continue;
             }
-            for o in objects(Tile::new(i32::from(x), i32::from(y)))? {
+            for o in candidates.on(spatial, Tile::new(i32::from(x), i32::from(y)))? {
                 // The farm class (49), which both searches treat apart.
                 if roles.of_class(o.class).contains(ClassRoles::FARM) {
                     // its own tests (owner, pasture, the targeting flag, masters 1893 and 1897)
@@ -245,18 +316,20 @@ fn pick(groups: &[Option<(Candidate, WorkerCount)>; 4], least: &[f32; 4]) -> Opt
     best.map(|(o, _)| o)
 }
 
-/// `FUN_1415cc1a0`: the cells of a box of `size` a flood from `start` reaches, by
-/// columns (`[x * height + y]`): every cell next to (left, right, above, below) a cell it
-/// entered and not `blocked`, `start` entered whatever it holds. None when `start` lies outside
+/// `FUN_1415cc1a0`: the cells of a box of `size` whose corner is the map's tile `corner` a flood
+/// from `start` reaches, by columns (`[x * height + y]`): every cell next to (left, right,
+/// above, below) a cell it entered whose tile's cell in `planner`'s tile level has edges
+/// ([`Planner::tile_closed`]), `start` entered whatever it holds. None when `start` lies outside
 /// the box.
 ///
 /// # Errors
 ///
-/// What `blocked` fails on.
+/// A tile off the planner's map.
 pub fn reached(
     start: Tile,
     size: GridSize,
-    blocked: &dyn Fn(Tile) -> Result<bool, GenieError>,
+    corner: TileOffset,
+    planner: &Planner,
 ) -> Result<Option<Vec<bool>>, GenieError> {
     if !size.holds(start) {
         return Ok(None);
@@ -271,7 +344,7 @@ pub fn reached(
     let mut todo = vec![start];
     let mut first = true;
     while let Some(t) = todo.pop() {
-        if !take(&mut first) && blocked(t)? {
+        if !take(&mut first) && planner.tile_closed(t + corner)? {
             continue;
         }
         for n in t.beside() {
@@ -342,68 +415,50 @@ struct Pass {
     seeds: Vec<Cell>,
 }
 
-/// The search's reads of its world `W` (the spatial index): a tile the player has explored, a tile
-/// the unit can stand on, the candidates on a tile, and the check whether the unit reaches an
-/// object, which writes the obstruction manager's scratch in `W` and so takes it by `&mut`.
-pub type Explored<'a, W> = dyn Fn(&W, Tile) -> Result<bool, GenieError> + 'a;
-/// See [`Explored`].
-pub type Passable<'a, W> = dyn Fn(&W, Tile) -> bool + 'a;
-/// See [`Explored`].
-pub type ObjectsOn<'a, W> = dyn Fn(&W, Tile) -> Result<Vec<Candidate>, GenieError> + 'a;
-/// See [`Explored`].
-pub type Reaches<'a, W> = dyn FnMut(&mut W, ObjectId) -> Result<bool, GenieError> + 'a;
-
-/// What [`closest_resource`] and [`closest_resource_at`] read of the world `W` (`FUN_140c49760`'s
+/// What [`closest_resource`] and [`closest_resource_at`] read of the world (`FUN_140c49760`'s
 /// arguments past the unit, the site and the kind).
-pub struct ResourceWorld<'a, W> {
-    /// The map's size.
-    pub map: GridSize,
-    /// The spatial index the reads take, which the reachability check writes scratch in.
-    pub world: &'a mut W,
-    /// Whether the player has explored a tile.
-    pub explored: &'a Explored<'a, W>,
-    /// Whether the unit can stand on a tile (`FUN_141185690`).
-    pub passable: &'a Passable<'a, W>,
+#[derive(Debug)]
+pub struct ResourceWorld<'a, 'p> {
+    /// The spatial index: the map's size, the searching player's explored tiles, the tiles a
+    /// unit can stand on and the objects on a tile; the reach test writes the obstruction
+    /// manager's scratch in it.
+    pub spatial: &'a mut Spatial,
+    /// The unit's terrain mask, whose tiles it can stand on ([`Spatial::standable`],
+    /// `FUN_141185690`).
+    pub mask: TerrainMask,
     /// The objects on a tile.
-    pub objects: &'a ObjectsOn<'a, W>,
+    pub candidates: Candidates<'a>,
     /// Whether the unit reaches an object (slot 0x3d0 with the range 0).
-    pub reach: &'a mut Reaches<'a, W>,
-}
-
-impl<W> Debug for ResourceWorld<'_, W> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        f.debug_struct("ResourceWorld")
-            .field("map", &self.map)
-            .finish_non_exhaustive()
-    }
+    pub reach: UnitReach<'a, 'p>,
 }
 
 /// `ClosestResourceObject` (`FUN_140c49760`) with no point (`param_7`, `param_8` −1: the unit's
 /// place), no drop site (`param_3` −1) and `param_6` 2: the closest object of gather group `kind`
-/// that the unit reaches (`reach`, slot 0x3d0 with the range 0: `FUN_14152b6e0` holds in the
+/// that the unit reaches ([`UnitReach`], slot 0x3d0 with the range 0: `FUN_14152b6e0` holds in the
 /// games the slice runs), −1 for none. A unit below state 2 is not modelled.
 ///
 /// A breadth-first walk over the tiles from the unit's tile, its queue after the tile in hand kept
 /// sorted by the distance of the tiles' centres from the unit
-/// ([`msvc::sort`](crate::math::msvc::sort)): a tile the player has explored (`explored`), within
-/// the line of sight plus 5 of the unit (`1.4` per diagonal step, `+ 0.61`, truncated) and that the
-/// unit can stand on (`passable`, `FUN_141185690`) adds its four neighbours not seen yet that lie
-/// on the map. On each such tile the first object in a pasture or targetable whose master gathers
-/// by itself (`enable_auto_gather` 1) as `kind`, with some amount held, and that is not the unit
-/// AI's current target, is tested: with fewer workers than `max_workers` (−1 for any) a reach makes
-/// it the answer; else a reach makes it the fallback when it is fewer steps away than the last.
-/// After 30 tests, or the queue's end, the fallback is the answer. A tile whose last object fails
-/// the first test counts it as found (the game's loop leaves it in hand).
+/// ([`msvc::sort`](crate::math::msvc::sort)): a tile the player has explored
+/// ([`Spatial::explored`]), within the line of sight plus 5 of the unit (`1.4` per diagonal step,
+/// `+ 0.61`, truncated) and that the unit can stand on ([`Spatial::standable`], `FUN_141185690`)
+/// adds its four neighbours not seen yet that lie on the map. On each such tile the first object in
+/// a pasture or targetable whose master gathers by itself (`enable_auto_gather` 1) as `kind`, with
+/// some amount held, and that is not the unit AI's current target, is tested: with fewer workers
+/// than `max_workers` (−1 for any) a reach makes it the answer; else a reach makes it the fallback
+/// when it is fewer steps away than the last. After 30 tests, or the queue's end, the fallback is
+/// the answer. A tile whose last object fails the first test counts it as found (the game's loop
+/// leaves it in hand).
 ///
 /// # Errors
 ///
 /// A unit with a pasture of its own, or a tile whose order of objects decides (two candidates,
 /// or another object beside one that fails the first test).
-pub fn closest_resource<W>(
+pub fn closest_resource(
     seeker: &Seeker,
     kind: GatherGroup,
     max_workers: WorkerCount,
-    reads: ResourceWorld<'_, W>,
+    reads: ResourceWorld<'_, '_>,
     gather_search_tuning: &GatherSearchTuning,
 ) -> Result<Option<ObjectId>, GenieError> {
     closest_resource_at(seeker, None, kind, max_workers, reads, gather_search_tuning)
@@ -429,25 +484,24 @@ pub fn closest_resource<W>(
 /// # Errors
 ///
 /// As [`closest_resource`].
-pub fn closest_resource_at<W>(
+pub fn closest_resource_at(
     seeker: &Seeker,
     site: Option<&SearchSite>,
     kind: GatherGroup,
     max_workers: WorkerCount,
-    reads: ResourceWorld<'_, W>,
+    reads: ResourceWorld<'_, '_>,
     gather_search_tuning: &GatherSearchTuning,
 ) -> Result<(Option<ObjectId>, Option<i32>), GenieError> {
     /// The fallback's steps before it has one (`1000000`).
     const NO_STEPS: i32 = 1_000_000;
     const TILE_CENTRE: f32 = GATHER_SEARCH_TILE_CENTRE;
     let ResourceWorld {
-        map,
-        world,
-        explored,
-        passable,
-        objects,
-        reach,
+        spatial,
+        mask,
+        candidates,
+        mut reach,
     } = reads;
+    let map = spatial.map;
     if seeker.state < seeker.min_state {
         return Ok((None, None));
     }
@@ -470,7 +524,14 @@ pub fn closest_resource_at<W>(
         };
         d(a) < d(b)
     };
-    let passes = search_passes(site, map, &|t| passable(world, t), unit_tile, los, &nearer)?;
+    let passes = search_passes(
+        site,
+        map,
+        &|t| spatial.standable(t, mask),
+        unit_tile,
+        los,
+        &nearer,
+    )?;
     let cap = if max_workers == WorkerCount::NO_CAP {
         WorkerCount::of_data(i32::MAX)
     } else {
@@ -488,18 +549,18 @@ pub fn closest_resource_at<W>(
         let mut i = 0;
         while let Some(&Cell { tile, steps }) = queue.get(i) {
             i += 1;
-            if !explored(world, tile)? {
+            if !spatial.explored(seeker.player, tile)? {
                 continue;
             }
             let d = pass_distance(pass.origin, tile, gather_search_tuning);
             if pass.max_steps < d || !map.holds(tile) {
                 continue;
             }
-            if passable(world, tile) {
+            if spatial.standable(tile, mask) {
                 push_neighbours(&mut queue, &mut seen, &at, Cell { tile, steps }, map)?;
                 sort(queue.tail_mut(i)?, &nearer)?;
             }
-            let on_tile = objects(world, tile)?;
+            let on_tile = candidates.on(spatial, tile)?;
             let Some(o) = first_resource(&on_tile, kind)? else {
                 continue;
             };
@@ -508,10 +569,10 @@ pub fn closest_resource_at<W>(
                 continue;
             }
             if o.workers < cap {
-                if reach(world, o.id)? {
+                if reach.reaches(spatial, o.id, Distance::ZERO)? {
                     return Ok((Some(o.id), Some(d)));
                 }
-            } else if steps < fallback_steps && reach(world, o.id)? {
+            } else if steps < fallback_steps && reach.reaches(spatial, o.id, Distance::ZERO)? {
                 fallback = Some(o.id);
                 fallback_steps = steps;
                 fallback_d = d;
@@ -559,32 +620,106 @@ pub fn gather_group(attribute: Option<AttributeId>, roles: &Roles) -> (GatherGro
 mod tests {
     use super::*;
     use crate::gathering::PastureId;
+    use crate::map::RestrictionId;
+    use crate::map::spatial::TileSight;
+    use crate::math::rng::Stream;
+    use crate::movement::Planning;
+    use crate::movement::Speed;
+    use crate::objects::MasterHitPoints;
+    use crate::objects::masters::AutoGatherMode;
+    use crate::objects::masters::MasterKind;
+    use crate::objects::masters::ObstructionClass;
+    use crate::objects::masters::ObstructionKind;
+    use crate::players::PlayerKind;
+    use crate::test_ids::class_id;
     use crate::test_ids::master_id;
     use crate::test_ids::object_id;
     use crate::testing::attribute;
     use crate::testing::class;
+    use crate::testing::ids;
     use crate::testing::roles;
-    use crate::testing::tuning;
+    use crate::testing::scene::walking;
+    use crate::testing::scene::{Scene, Thing as SceneThing};
     use crate::unit_ai::task_finder::DropTarget;
+    use crate::world::World;
 
-    fn tree(id: i32, x: f32, y: f32) -> Candidate {
-        Candidate {
-            id: object_id(id),
-            player: PlayerId::new(0),
-            class: class::TREE,
-            master: master_id(349),
-            state: ObjectState::Alive,
-            workers: WorkerCount::of_data(0),
-            position: Position::new(x, y, 0.0),
-            pasture: None,
-            untargetable: false,
-            attribute: Some(attribute::WOOD),
-            amount: Amount::new(100.0),
-            auto_gather: true,
-            gather_group: GatherGroup::WOOD,
+    /// The searching villager's id in the resource search's worlds.
+    const SEEKER_ID: i32 = 500;
+
+    /// The villager [`SEEKER_ID`] of player 1 at (10.2, 10.7), with its movement state.
+    fn seeker_thing() -> SceneThing {
+        let villager = Master {
+            id: ids::VILLAGER_MALE,
+            kind: MasterKind::COMBAT,
+            class: class::VILLAGER,
+            radius: Footprint::new(0.2, 0.2),
+            height: Distance::new(1.0),
+            hit_points: MasterHitPoints::of_data(25),
+            terrain_restriction: Some(RestrictionId::named(7)),
+            move_stats: Some(walking(Speed::new(0.8))),
+            ..Master::default()
+        };
+        SceneThing::new(
+            SEEKER_ID,
+            PlayerId::new(1),
+            villager,
+            Position::new(10.2, 10.7, 0.0),
+        )
+    }
+
+    /// Gaia's resource `id` of master `master` and class `class` at (x, y), of radius `radius`,
+    /// gathered by itself as `group`, holding 100 of `attribute` with `workers` at work on it.
+    fn resource_thing(
+        (id, master, class, kind): (i32, i16, ClassId, MasterKind),
+        obstruction_kind: ObstructionKind,
+        (group, attribute): (GatherGroup, AttributeId),
+        (x, y, radius): (f32, f32, f32),
+        workers: WorkerCount,
+    ) -> SceneThing {
+        let m = Master {
+            id: master_id(master),
+            kind,
+            class,
+            radius: Footprint::new(radius, radius),
+            height: Distance::new(1.0),
+            hit_points: MasterHitPoints::of_data(10),
+            terrain_restriction: Some(RestrictionId::named(7)),
+            auto_gather: AutoGatherMode::ON,
+            gather_group: group,
+            obstruction_kind,
+            obstruction_class: ObstructionClass::RESOURCE,
+            ..Master::default()
+        };
+        SceneThing {
+            holds: Some((attribute, Amount::new(100.0))),
+            workers,
+            ..SceneThing::new(id, PlayerId::GAIA, m, Position::new(x, y, 0.0))
         }
     }
 
+    /// Gaia's tree `id` (master 349, class 15, radius 0.5) at (x, y): 100 wood, nobody at work.
+    fn tree_thing(id: i32, x: f32, y: f32) -> SceneThing {
+        resource_thing(
+            (id, 349, class::TREE, MasterKind::TREE),
+            ObstructionKind::KIND_2,
+            (GatherGroup::WOOD, attribute::WOOD),
+            (x, y, 0.5),
+            WorkerCount::ZERO,
+        )
+    }
+
+    /// Gaia's fish `id` (master 53, class 5, radius 0.25) at (x, y): 100 food, nobody fishing.
+    fn fish_thing(id: i32, x: f32, y: f32) -> SceneThing {
+        resource_thing(
+            (id, 53, class_id(5), MasterKind::STATIC),
+            ObstructionKind::NONE,
+            (GatherGroup::FISH, attribute::FOOD),
+            (x, y, 0.25),
+            WorkerCount::ZERO,
+        )
+    }
+
+    /// The lumber camp's drop-site entry: villagers bring wood, the camp works trees by itself.
     fn lumber_camp() -> DropSite {
         DropSite {
             building: master_id(562),
@@ -603,11 +738,91 @@ mod tests {
         }
     }
 
+    /// A map of 40 by 40 with the seeking villager and `things`, for the test to change before
+    /// it builds the world.
+    fn resource_scene(things: Vec<SceneThing>) -> Scene {
+        things.into_iter().fold(
+            Scene::open(GridSize::new(40, 40)).thing(seeker_thing()),
+            Scene::thing,
+        )
+    }
+
+    /// [`closest_resource_at`] for the villager [`SEEKER_ID`] of `w` as `seeker` (its place as
+    /// the world holds it) from `site`, of group `kind` with fewer than `cap` workers.
+    fn search_world(
+        w: &mut World,
+        seeker: &Seeker,
+        site: Option<&SearchSite>,
+        (kind, cap): (GatherGroup, WorkerCount),
+    ) -> Result<(Option<ObjectId>, Option<i32>), GenieError> {
+        let id = object_id(SEEKER_ID);
+        let objects = ObjectsRef::new(
+            &w.players,
+            &w.index,
+            &w.model.masters,
+            &w.parts,
+            &w.model.roles,
+            &w.model.tuning,
+        );
+        let (_, unit, _) = objects
+            .with_master(id)?
+            .ok_or(GenieError::missing_data("the seeking villager"))?;
+        let mover = w
+            .parts
+            .mover_of(id)
+            .ok_or(GenieError::missing_data("the villager's movement state"))?;
+        let walker = unit.me(w.parts.actions_of(id));
+        let mut plan = Planning {
+            pathing: &mut w.pathing,
+            now: w.world_time,
+            player_kind: PlayerKind::default(),
+            object: w.streams.get(Stream::Object),
+            groups: &w.groups,
+        };
+        closest_resource_at(
+            seeker,
+            site,
+            kind,
+            cap,
+            ResourceWorld {
+                spatial: &mut w.spatial,
+                mask: mover.stats.restriction_mask,
+                candidates: Candidates { objects, me: None },
+                reach: UnitReach {
+                    mover,
+                    at: unit.position(),
+                    walker,
+                    master: unit.life.master_id,
+                    plan: &mut plan,
+                    objects,
+                },
+            },
+            &w.model.tuning.gather_search,
+        )
+    }
+
+    /// The trees `ids` at the places `at`.
+    fn trees(ids_at: &[(i32, (f32, f32))]) -> Vec<SceneThing> {
+        ids_at
+            .iter()
+            .map(|&(id, (x, y))| tree_thing(id, x, y))
+            .collect()
+    }
+
+    /// `FUN_1415cc1a0`'s flood over a box of 5 by 3 at the map's corner, with rocks on its column
+    /// 2: from (0, 1) it reaches the columns 0 and 1 and enters the rocks' cells, which the
+    /// planner closes, never the columns 3 and 4. A start outside the box floods nothing.
     #[test]
     fn flood_enters_the_blocked_cells_next_to_what_it_reaches_but_not_past_them() {
-        // a wall at x = 2 in a 5 x 3 box: the flood from (0, 1) reaches x 0..=1 and enters the
-        // wall's cells, never x 3 or 4
-        let seen = reached(Tile::new(0, 1), GridSize::new(5, 3), &|t| Ok(t.x() == 2))
+        let mut w = Scene::open(GridSize::new(40, 40))
+            .rocks((0..3).map(|y| Tile::new(2, y)))
+            .build();
+        let planner = &*w
+            .pathing
+            .planner(RestrictionId::named(7), w.spatial.tiles())
+            .unwrap();
+        let corner = TileOffset::new(0, 0);
+        let seen = reached(Tile::new(0, 1), GridSize::new(5, 3), corner, planner)
             .unwrap()
             .unwrap();
         let col = |x: i32| {
@@ -619,56 +834,65 @@ mod tests {
         assert_eq!(col(2), [true; 3]);
         assert_eq!(col(3), [false; 3]);
         assert!(
-            reached(Tile::new(5, 0), GridSize::new(5, 3), &|_| Ok(false))
+            reached(Tile::new(5, 0), GridSize::new(5, 3), corner, planner)
                 .unwrap()
                 .is_none()
         );
     }
 
-    #[test]
-    fn more_work_takes_the_first_nearest_tree_then_fewer_workers_at_no_lesser_distance() {
-        let entry = lumber_camp();
-        let b = Builder {
+    /// [`more_work`] of the builder `b` among `things` on its restriction's planner, as the
+    /// world holds them.
+    fn more_work_among(
+        entry: &DropSite,
+        b: &Builder,
+        things: Vec<SceneThing>,
+    ) -> Result<Option<ObjectId>, GenieError> {
+        let mut w = resource_scene(things).build();
+        let objects = ObjectsRef::new(
+            &w.players,
+            &w.index,
+            &w.model.masters,
+            &w.parts,
+            &w.model.roles,
+            &w.model.tuning,
+        );
+        let planner = w
+            .pathing
+            .planner(RestrictionId::named(7), w.spatial.tiles())
+            .ok_or(GenieError::missing_data("the villagers' planner"))?;
+        let candidates = Candidates { objects, me: None };
+        let found = more_work(Some(entry), b, (&w.spatial, planner), &candidates, &roles())?;
+        Ok(found.map(|o| o.id))
+    }
+
+    /// The builder of the more-work tests at (10.5, 10.5), its building at `building`, reaching
+    /// 6 tiles.
+    const fn builder_at(building: Position) -> Builder {
+        Builder {
             position: Position::new(10.5, 10.5, 0.0),
             radius: Distance::new(0.2),
-            building: Position::new(12.0, 10.0, 0.0),
+            building,
             range: 6,
-        };
+        }
+    }
+
+    #[test]
+    fn more_work_takes_the_first_nearest_tree_then_fewer_workers_at_no_lesser_distance() {
+        let b = builder_at(Position::new(12.0, 10.0, 0.0));
         // 3 and 4 both 3 tiles away (truncated): x outer, so 3 (x 7) comes first; 4 is as far
         // with fewer workers than 3's kept 1 and takes over
-        let mut trees = [tree(3, 7.5, 10.5), tree(4, 13.5, 10.5)];
-        trees[0].workers = WorkerCount::of_data(2);
-        let objects = |tile: Tile| {
-            Ok(trees
-                .iter()
-                .filter(|t| t.position.tile() == tile)
-                .copied()
-                .collect())
+        let worked = SceneThing {
+            workers: WorkerCount::of_data(2),
+            ..tree_thing(3, 7.5, 10.5)
         };
-        let found = more_work(
-            Some(&entry),
-            &b,
-            GridSize::new(40, 40),
-            None,
-            &objects,
-            &roles(),
-        )
-        .unwrap();
-        assert_eq!(found.map(|o| o.id), Some(object_id(4)));
+        let things = || vec![worked.clone(), tree_thing(4, 13.5, 10.5)];
+        assert_eq!(
+            more_work_among(&lumber_camp(), &b, things()),
+            Ok(Some(object_id(4)))
+        );
         let mut off = lumber_camp();
         off.auto_work = false;
-        assert_eq!(
-            more_work(
-                Some(&off),
-                &b,
-                GridSize::new(40, 40),
-                None,
-                &objects,
-                &roles()
-            )
-            .unwrap(),
-            None
-        );
+        assert_eq!(more_work_among(&off, &b, things()), Ok(None));
     }
 
     #[test]
@@ -680,34 +904,19 @@ mod tests {
             state: None,
             attribute: Some(attribute::GOLD),
         });
-        let b = Builder {
-            position: Position::new(10.5, 10.5, 0.0),
-            radius: Distance::new(0.2),
-            building: Position::new(10.0, 10.0, 0.0),
-            range: 6,
-        };
-        let mut gold = tree(7, 14.5, 10.5);
-        gold.class = class::CLASS_32;
-        let wood = tree(8, 12.5, 10.5);
-        let all = [gold, wood];
-        let objects = |tile: Tile| {
-            Ok(all
-                .iter()
-                .filter(|t| t.position.tile() == tile)
-                .copied()
-                .collect())
-        };
+        let b = builder_at(Position::new(10.0, 10.0, 0.0));
+        let gold = resource_thing(
+            (7, 66, class::CLASS_32, MasterKind::STATIC),
+            ObstructionKind::KIND_2,
+            (GatherGroup::GOLD, attribute::GOLD),
+            (14.5, 10.5, 0.5),
+            WorkerCount::ZERO,
+        );
         // the wood (2 tiles) is nearer than the gold (4 tiles): it takes over
-        let found = more_work(
-            Some(&entry),
-            &b,
-            GridSize::new(40, 40),
-            None,
-            &objects,
-            &roles(),
-        )
-        .unwrap();
-        assert_eq!(found.map(|o| o.id), Some(object_id(8)));
+        assert_eq!(
+            more_work_among(&entry, &b, vec![gold, tree_thing(8, 12.5, 10.5)]),
+            Ok(Some(object_id(8)))
+        );
     }
 
     /// `FUN_1415cc4e0` walks a tile's objects in its list's order (`+0x28` up to the count
@@ -715,160 +924,86 @@ mod tests {
     /// stays the group's.
     #[test]
     fn more_work_takes_the_first_listed_of_two_trees_on_one_tile() {
-        let entry = lumber_camp();
-        let b = Builder {
-            position: Position::new(10.5, 10.5, 0.0),
-            radius: Distance::new(0.2),
-            building: Position::new(12.0, 10.0, 0.0),
-            range: 6,
-        };
+        let b = builder_at(Position::new(12.0, 10.0, 0.0));
         let listed = |first: i32, second: i32| {
-            let trees = [tree(first, 13.2, 10.5), tree(second, 13.6, 10.5)];
-            let objects = |tile: Tile| {
-                Ok(trees
-                    .iter()
-                    .filter(|t| t.position.tile() == tile)
-                    .copied()
-                    .collect())
-            };
-            more_work(
-                Some(&entry),
+            more_work_among(
+                &lumber_camp(),
                 &b,
-                GridSize::new(40, 40),
-                None,
-                &objects,
-                &roles(),
+                trees(&[(first, (13.2, 10.5)), (second, (13.6, 10.5))]),
             )
-            .unwrap()
-            .map(|o| o.id)
         };
-        assert_eq!(listed(9, 3), Some(object_id(9)));
-        assert_eq!(listed(3, 9), Some(object_id(3)));
+        assert_eq!(listed(9, 3), Ok(Some(object_id(9))));
+        assert_eq!(listed(3, 9), Ok(Some(object_id(3))));
     }
 
     #[test]
     fn the_resource_search_walks_out_from_the_unit_and_takes_the_first_it_reaches() {
-        let seeker = Seeker {
-            player: PlayerId::new(1),
-            position: Position::new(10.2, 10.7, 0.0),
-            line_of_sight: Distance::new(4.0),
-            state: ObjectState::Alive,
-            current_target: None,
-            my_pasture: None,
-            min_state: ObjectState::Alive,
-        };
         // trees at (12, 10) and (8, 11): the second is nearer the unit's place
-        let trees = [tree(1, 12.5, 10.5), tree(2, 8.5, 11.5)];
-        let objects = |(): &(), tile: Tile| {
-            Ok(trees
-                .iter()
-                .filter(|t| t.position.tile() == tile)
-                .copied()
-                .collect())
-        };
-        let tree_at = |tile: Tile| trees.iter().any(|t| t.position.tile() == tile);
-        let mut asked = Vec::new();
-        let found = closest_resource(
-            &seeker,
-            GatherGroup::WOOD,
-            WorkerCount::of_data(2),
-            ResourceWorld {
-                map: GridSize::new(40, 40),
-                world: &mut (),
-                explored: &|&(), _| Ok(true),
-                passable: &|&(), t| !tree_at(t),
-                objects: &objects,
-                reach: &mut |&mut (), id| {
-                    asked.push(id);
-                    Ok(true)
-                },
-            },
-            &tuning().gather_search,
-        )
-        .unwrap();
-        assert_eq!((found, asked), (Some(object_id(2)), vec![object_id(2)]));
+        let mut w = resource_scene(trees(&[(1, (12.5, 10.5)), (2, (8.5, 11.5))])).build();
+        let wood = (GatherGroup::WOOD, WorkerCount::of_data(2));
+        assert_eq!(
+            search_world(&mut w, &SEEKER, None, wood),
+            Ok((Some(object_id(2)), Some(3)))
+        );
         // with the tree as the unit AI's target, the other one
         let busy = Seeker {
             current_target: Some(object_id(2)),
-            ..seeker
+            ..SEEKER
         };
-        let found = closest_resource(
-            &busy,
-            GatherGroup::WOOD,
-            WorkerCount::of_data(2),
-            ResourceWorld {
-                map: GridSize::new(40, 40),
-                world: &mut (),
-                explored: &|&(), _| Ok(true),
-                passable: &|&(), t| !tree_at(t),
-                objects: &objects,
-                reach: &mut |&mut (), _| Ok(true),
-            },
-            &tuning().gather_search,
-        )
-        .unwrap();
-        assert_eq!(found, Some(object_id(1)));
+        assert_eq!(
+            search_world(&mut w, &busy, None, wood),
+            Ok((Some(object_id(1)), Some(2)))
+        );
     }
 
     #[test]
     fn search_from_drop_site_starts_from_its_footprint_then_from_the_unit() {
-        let seeker = Seeker {
-            player: PlayerId::new(1),
-            position: Position::new(10.2, 10.7, 0.0),
-            line_of_sight: Distance::new(4.0),
-            state: ObjectState::Alive,
-            current_target: None,
-            my_pasture: None,
-            min_state: ObjectState::Alive,
+        // player 1's lumber camp of 2 by 2 at (14, 10), whose record blocks its tiles
+        let camp = Master {
+            id: master_id(562),
+            kind: MasterKind::BUILDING,
+            class: class::BUILDING,
+            radius: Footprint::new(1.0, 1.0),
+            height: Distance::new(2.0),
+            hit_points: MasterHitPoints::of_data(600),
+            obstruction_kind: ObstructionKind::KIND_2,
+            obstruction_class: ObstructionClass::BUILDING,
+            ..Master::default()
         };
-        // a 2x2 site at (14, 10): its own tiles are blocked
+        let camp_thing =
+            SceneThing::new(600, PlayerId::new(1), camp, Position::new(14.0, 10.0, 0.0));
         let site = SearchSite {
             position: Position::new(14.0, 10.0, 0.0),
             radius: Footprint::new(1.0, 1.0),
             line_of_sight: Distance::new(6.0),
             footprint: true,
         };
-        let search = |trees: &[Candidate], site: Option<&SearchSite>| {
-            let objects = |(): &(), tile: Tile| {
-                Ok(trees
-                    .iter()
-                    .filter(|t| t.position.tile() == tile)
-                    .copied()
-                    .collect())
-            };
-            let blocked = |tile: Tile| {
-                (13..=14).contains(&tile.x()) && (9..=10).contains(&tile.y())
-                    || trees.iter().any(|t| t.position.tile() == tile)
-            };
-            closest_resource_at(
-                &seeker,
+        let search = |trees_at: &[(i32, (f32, f32))], site: Option<&SearchSite>| {
+            let mut things = trees(trees_at);
+            things.push(camp_thing.clone());
+            let mut w = resource_scene(things).build();
+            search_world(
+                &mut w,
+                &SEEKER,
                 site,
-                GatherGroup::WOOD,
-                WorkerCount::of_data(2),
-                ResourceWorld {
-                    map: GridSize::new(40, 40),
-                    world: &mut (),
-                    explored: &|&(), _| Ok(true),
-                    passable: &|&(), t| !blocked(t),
-                    objects: &objects,
-                    reach: &mut |&mut (), _| Ok(true),
-                },
-                &tuning().gather_search,
+                (GatherGroup::WOOD, WorkerCount::of_data(2)),
             )
-            .unwrap()
         };
         // a tree by the unit and one by the site: without the site the unit's, with it the site's
         // (3 from the site's tile)
-        let trees = [tree(1, 8.5, 11.5), tree(2, 17.5, 10.5)];
-        assert_eq!(search(&trees, None).0, Some(object_id(1)));
-        assert_eq!(search(&trees, Some(&site)), (Some(object_id(2)), Some(3)));
+        let both = [(1, (8.5, 11.5)), (2, (17.5, 10.5))];
+        assert_eq!(search(&both, None).unwrap().0, Some(object_id(1)));
+        assert_eq!(
+            search(&both, Some(&site)),
+            Ok((Some(object_id(2)), Some(3)))
+        );
         // the site's tile outside the unit's zone: one pass from the site's tile alone, which is
         // blocked, so nothing
         let apart = SearchSite {
             footprint: false,
             ..site
         };
-        assert_eq!(search(&trees, Some(&apart)), (None, None));
+        assert_eq!(search(&both, Some(&apart)), Ok((None, None)));
         // nothing within the site's line of sight plus 10 of it: the second pass from the unit
         // finds the tree 8 columns and a row off (its distance from the unit's tile)
         let blind = SearchSite {
@@ -876,13 +1011,13 @@ mod tests {
             ..site
         };
         assert_eq!(
-            search(&[tree(3, 2.5, 11.5)], Some(&blind)),
-            (Some(object_id(3)), Some(9))
+            search(&[(3, (2.5, 11.5))], Some(&blind)),
+            Ok((Some(object_id(3)), Some(9)))
         );
     }
 
-    /// The searching unit of `closest_resource_at`'s tests: at (10.2, 10.7), line of sight 4
-    /// (its distance at most 9), in state 2.
+    /// The searching unit of `closest_resource_at`'s tests: the villager [`SEEKER_ID`] at (10.2,
+    /// 10.7), line of sight 4 (its distance at most 9), in state 2.
     const SEEKER: Seeker = Seeker {
         player: PlayerId::new(1),
         position: Position::new(10.2, 10.7, 0.0),
@@ -893,69 +1028,21 @@ mod tests {
         min_state: ObjectState::Alive,
     };
 
-    /// `closest_resource_at` from [`SEEKER`] over a 40-tile map without a site: the tiles
-    /// `explored` gives, every tile passable, `trees` on their tiles, and `reach` true for the
-    /// ids it lists.
-    fn search_trees(
-        seeker: &Seeker,
-        trees: &[Candidate],
-        max_workers: WorkerCount,
-        explored: &Explored<'_, ()>,
-        reach: &[ObjectId],
-    ) -> Result<(Option<ObjectId>, Option<i32>), GenieError> {
-        let objects = |(): &(), tile: Tile| {
-            Ok(trees
-                .iter()
-                .filter(|t| t.position.tile() == tile)
-                .copied()
-                .collect())
-        };
-        closest_resource_at(
-            seeker,
-            None,
-            GatherGroup::WOOD,
-            max_workers,
-            ResourceWorld {
-                map: GridSize::new(40, 40),
-                world: &mut (),
-                explored,
-                passable: &|&(), _| true,
-                objects: &objects,
-                reach: &mut |&mut (), id| Ok(reach.contains(&id)),
-            },
-            &tuning().gather_search,
-        )
-    }
-
     #[test]
     fn unit_below_its_least_state_finds_nothing_and_one_with_pasture_stops() {
-        let trees = [tree(1, 12.5, 10.5)];
+        let mut w = resource_scene(trees(&[(1, (12.5, 10.5))])).build();
+        let wood = (GatherGroup::WOOD, WorkerCount::of_data(2));
         let low = Seeker {
             state: ObjectState::Unfinished,
             ..SEEKER
         };
-        assert_eq!(
-            search_trees(
-                &low,
-                &trees,
-                WorkerCount::of_data(2),
-                &|&(), _| Ok(true),
-                &[object_id(1)]
-            ),
-            Ok((None, None))
-        );
+        assert_eq!(search_world(&mut w, &low, None, wood), Ok((None, None)));
         let tending = Seeker {
             my_pasture: Some(PastureId::new(object_id(50))),
             ..SEEKER
         };
         assert_eq!(
-            search_trees(
-                &tending,
-                &trees,
-                WorkerCount::of_data(2),
-                &|&(), _| Ok(true),
-                &[object_id(1)]
-            ),
+            search_world(&mut w, &tending, None, wood),
             Err(GenieError::unsupported(
                 "a resource search by a unit with a pasture of its own"
             ))
@@ -965,92 +1052,110 @@ mod tests {
     #[test]
     fn full_resource_is_the_fallback_and_minus_1_workers_has_no_cap() {
         // a full tree (3 workers) 2 east, a free one 5 east
-        let full = Candidate {
+        let full = SceneThing {
             workers: WorkerCount::of_data(3),
-            ..tree(1, 12.5, 10.5)
+            ..tree_thing(1, 12.5, 10.5)
         };
-        let both = [full, tree(2, 15.5, 10.5)];
-        let all = |&(): &(), _| Ok(true);
+        let both = || resource_scene(vec![full.clone(), tree_thing(2, 15.5, 10.5)]).build();
+        let wood = |cap| (GatherGroup::WOOD, WorkerCount::of_data(cap));
         // at most 2 workers: past the full one to the free one
         assert_eq!(
-            search_trees(
-                &SEEKER,
-                &both,
-                WorkerCount::of_data(2),
-                &all,
-                &[object_id(1), object_id(2)]
-            ),
+            search_world(&mut both(), &SEEKER, None, wood(2)),
             Ok((Some(object_id(2)), Some(5)))
         );
         // no cap: the full one first
         assert_eq!(
-            search_trees(
-                &SEEKER,
-                &both,
-                WorkerCount::of_data(-1),
-                &all,
-                &[object_id(1), object_id(2)]
-            ),
+            search_world(&mut both(), &SEEKER, None, wood(-1)),
             Ok((Some(object_id(1)), Some(2)))
         );
         // only the full one: the pass ends with it as the fallback
+        let mut alone = resource_scene(vec![full.clone()]).build();
         assert_eq!(
-            search_trees(
-                &SEEKER,
-                &[full],
-                WorkerCount::of_data(2),
-                &all,
-                &[object_id(1)]
-            ),
+            search_world(&mut alone, &SEEKER, None, wood(2)),
             Ok((Some(object_id(1)), Some(2)))
         );
-        // a fallback must be reachable
+        // a fallback must be reachable: a full fish off the shore beside the villager, which it
+        // cannot touch from the land
+        let fish = SceneThing {
+            workers: WorkerCount::of_data(3),
+            ..fish_thing(3, 10.5, 9.5)
+        };
+        let mut shore = resource_scene(vec![fish]).water([Tile::new(10, 9)]).build();
         assert_eq!(
-            search_trees(&SEEKER, &[full], WorkerCount::of_data(2), &all, &[]),
+            search_world(
+                &mut shore,
+                &SEEKER,
+                None,
+                (GatherGroup::FISH, WorkerCount::of_data(2))
+            ),
             Ok((None, None))
         );
     }
 
     #[test]
     fn an_unexplored_tile_resource_is_not_tested() {
-        let both = [tree(1, 12.5, 10.5), tree(2, 15.5, 10.5)];
-        let dark = |&(): &(), t: Tile| Ok(t != Tile::new(12, 10));
+        let mut w = resource_scene(trees(&[(1, (12.5, 10.5)), (2, (15.5, 10.5))]))
+            .sight_on([Tile::new(12, 10)], TileSight::Unknown)
+            .build();
         assert_eq!(
-            search_trees(
+            search_world(
+                &mut w,
                 &SEEKER,
-                &both,
-                WorkerCount::of_data(2),
-                &dark,
-                &[object_id(1), object_id(2)]
+                None,
+                (GatherGroup::WOOD, WorkerCount::of_data(2))
             ),
             Ok((Some(object_id(2)), Some(5)))
         );
     }
 
+    /// The fish of the 30 tests' shore: the land is the villager's row 10 (x 2 to 18) and a
+    /// causeway north from it (x 10, up to y 17); the water beside the land holds `near` fish the
+    /// villager cannot touch, the nearest to it first, and a fish of radius 0.5 at (10.5, 18.5)
+    /// at the causeway's end, which it reaches.
+    fn shore_of(near: usize) -> World {
+        let land = |t: Tile| {
+            (t.y() == 10 && (2..=18).contains(&t.x()))
+                || (t.x() == 10 && (10..=17).contains(&t.y()))
+        };
+        let tiles = (0..40).flat_map(|y| (0..40).map(move |x| Tile::new(x, y)));
+        let water: Vec<Tile> = tiles.clone().filter(|&t| !land(t)).collect();
+        let shore = |t: Tile| !land(t) && t.beside().into_iter().any(land);
+        let dist = |t: Tile| {
+            let (dx, dy) = (t.x() as f32 + 0.5 - 10.2, t.y() as f32 + 0.5 - 10.7);
+            dx * dx + dy * dy
+        };
+        let mut beside: Vec<Tile> = tiles
+            .filter(|&t| shore(t) && t != Tile::new(10, 18))
+            .collect();
+        beside.sort_by(|a, b| dist(*a).total_cmp(&dist(*b)));
+        let mut things: Vec<SceneThing> = beside[..near]
+            .iter()
+            .enumerate()
+            .map(|(i, t)| fish_thing(i as i32 + 1, t.x() as f32 + 0.5, t.y() as f32 + 0.5))
+            .collect();
+        things.push(resource_thing(
+            (99, 53, class_id(5), MasterKind::STATIC),
+            ObstructionKind::NONE,
+            (GatherGroup::FISH, attribute::FOOD),
+            (10.5, 18.5, 0.5),
+            WorkerCount::ZERO,
+        ));
+        resource_scene(things).water(water).build()
+    }
+
     #[test]
     fn the_search_settles_after_30_resources_tested() {
-        // unreachable trees on the tiles nearest the unit, a reachable one 8 north of it
-        let near: Vec<Candidate> = (7..=13)
-            .flat_map(|x| (8..=12).map(move |y| (x, y)))
-            .enumerate()
-            .map(|(i, (x, y))| tree(i as i32 + 1, x as f32 + 0.5, y as f32 + 0.5))
-            .collect();
-        let far = tree(99, 10.5, 18.5);
-        let with = |n: usize| {
-            let mut trees: Vec<Candidate> = near[..n].to_vec();
-            trees.push(far);
-            search_trees(
-                &SEEKER,
-                &trees,
-                WorkerCount::of_data(2),
-                &|&(), _| Ok(true),
-                &[object_id(99)],
-            )
-        };
+        let fish = (GatherGroup::FISH, WorkerCount::of_data(2));
         // 30 tested: the 31st is the far one, taken
-        assert_eq!(with(30), Ok((Some(object_id(99)), Some(8))));
+        assert_eq!(
+            search_world(&mut shore_of(30), &SEEKER, None, fish),
+            Ok((Some(object_id(99)), Some(8)))
+        );
         // 31 tested: the pass ends without one
-        assert_eq!(with(31), Ok((None, None)));
+        assert_eq!(
+            search_world(&mut shore_of(31), &SEEKER, None, fish),
+            Ok((None, None))
+        );
     }
 
     #[test]

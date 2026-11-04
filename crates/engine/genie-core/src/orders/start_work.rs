@@ -19,12 +19,11 @@
 use crate::GenieError;
 use crate::construction::build::CART_TASK;
 use crate::gathering::gather_search::closest_resource_at;
-use crate::gathering::gather_search::{self, Candidate, ResourceWorld};
-use crate::map::Distance;
+use crate::gathering::gather_search::{self, Candidates, ResourceWorld};
 use crate::map::Rect;
 use crate::map::Tile;
-use crate::map::spatial::{BLOCKED, Spatial};
 use crate::math::rng::Stream;
+use crate::movement::UnitReach;
 use crate::movement::{Me, Planning};
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
@@ -35,7 +34,6 @@ use crate::objects::masters::GatherGroup;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::MasterTables;
 use crate::objects::unit::Unit;
-use crate::objects::unit::UnitFlags;
 use crate::orders::OrderSource;
 use crate::orders::Work;
 use crate::players::PlayerId;
@@ -306,34 +304,6 @@ impl World {
             &self.model.roles,
             &self.model.tuning,
         );
-        let candidate = |spatial: &Spatial, id: ObjectId| -> Result<Candidate, GenieError> {
-            let (owner, u, _) = index.locate(players, id).ok_or(GenieError::unsupported(
-                "an object on a tile the slice does not hold",
-            ))?;
-            let m = u.master(masters, owner)?;
-            let position = spatial.get(id).map_or_else(|| u.position(), |o| o.position);
-            Ok(Candidate {
-                id,
-                player: owner,
-                class: m.class,
-                master: m.id,
-                state: u.life.state,
-                workers: u.workers,
-                position,
-                pasture: u.pasture,
-                untargetable: u.flags.contains(UnitFlags::UNTARGETABLE),
-                attribute: u.life.attribute_kind,
-                amount: u.life.amount,
-                auto_gather: m.auto_gather.is_on(),
-                gather_group: m.gather_group,
-            })
-        };
-        let objects = |spatial: &Spatial, tile: Tile| -> Result<Vec<Candidate>, GenieError> {
-            spatial
-                .objects_on(tile)
-                .map(|(id, _)| candidate(spatial, id))
-                .collect()
-        };
         let mut plan = Planning {
             pathing: &mut self.pathing,
             now: self.world_time,
@@ -341,29 +311,25 @@ impl World {
             object: self.streams.get(Stream::Object),
             groups: &self.groups,
         };
-        let blocked = mask.blocked() | BLOCKED;
         closest_resource_at(
             &seeker,
             None,
             kind,
             WorkerCount::NO_CAP,
             ResourceWorld {
-                map: self.spatial.map,
-                world: &mut self.spatial,
-                explored: &|spatial, tile| spatial.explored(p, tile),
-                passable: &|spatial, tile| {
-                    spatial.tiles().word(tile).is_some_and(|w| w & blocked == 0)
+                spatial: &mut self.spatial,
+                mask,
+                candidates: Candidates {
+                    objects: by_id,
+                    me: None,
                 },
-                objects: &objects,
-                reach: &mut |spatial, id| {
-                    mover.reaches_object(
-                        (at, &me_walk),
-                        (spatial, by_id),
-                        &mut plan,
-                        id,
-                        Distance::ZERO,
-                        master_id,
-                    )
+                reach: UnitReach {
+                    mover,
+                    at,
+                    walker: me_walk,
+                    master: master_id,
+                    plan: &mut plan,
+                    objects: by_id,
                 },
             },
             &self.model.tuning.gather_search,

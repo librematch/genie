@@ -54,6 +54,7 @@ mod path_state;
 pub(crate) use self::levels::Levels;
 pub use self::move_algorithm::MoveAlgorithm;
 pub(crate) use self::move_start::MoveStart;
+pub use self::new_path::UnitReach;
 pub use self::path_counts::{LinkedPathKind, PlanTries, StepPlans, SubstituteCount, WaitDelays};
 pub use self::path_flags::{LevelFlags, PathFlags};
 pub use self::path_state::PathState;

@@ -3,11 +3,9 @@
 
 use crate::GenieError;
 use crate::gathering::DropSiteId;
-use crate::map::Distance;
 use crate::map::Point;
 use crate::map::Position;
 use crate::map::Tile;
-use crate::map::spatial::BLOCKED;
 use crate::map::spatial::Spatial;
 use crate::math::rng::Stream;
 use crate::movement::Mover;
@@ -18,7 +16,6 @@ use crate::objects::masters::GatherGroup;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::{MasterTables, OwnerMasters};
 use crate::objects::unit::Unit;
-use crate::objects::unit::UnitFlags;
 use crate::objects::{ObjectState, WorkerCount};
 use crate::pathing::zones::{UNKNOWN_RESTRICTION, Zones};
 use crate::players::PlayerId;
@@ -73,7 +70,8 @@ pub(crate) fn closest_resource_of(
     roles: &Roles,
 ) -> Result<(Option<ObjectId>, Option<i32>), GenieError> {
     use crate::gathering::gather_search::closest_resource_at;
-    use crate::gathering::gather_search::{self, Candidate, ResourceWorld};
+    use crate::gathering::gather_search::{self, Candidate, Candidates, ResourceWorld};
+    use crate::movement::UnitReach;
     let gather_search_tuning = &by_id.tuning().gather_search;
 
     let site = match site.filter(|&s| c.spatial.get(s).is_some()) {
@@ -127,40 +125,15 @@ pub(crate) fn closest_resource_of(
         "a resource search without movement state",
     ))?;
     let mask = mover.stats.restriction_mask;
-    let (player, me_id, every) = (c.player, unit.id, c.every);
-    let candidate = |id: ObjectId, owner: PlayerId, u: &Unit, position: Position| {
-        let m = u.master(every, owner)?;
-        Ok(Candidate {
-            id,
-            player: owner,
-            class: m.class,
-            master: m.id,
-            state: u.life.state,
-            workers: u.workers,
-            position,
-            pasture: u.pasture,
-            untargetable: u.flags.contains(UnitFlags::UNTARGETABLE),
-            attribute: u.life.attribute_kind,
-            amount: u.life.amount,
-            auto_gather: m.auto_gather.is_on(),
-            gather_group: m.gather_group,
-        })
-    };
-    let me = candidate(me_id, player, unit, unit.position())?;
-    let objects = |spatial: &Spatial, tile: Tile| -> Result<Vec<Candidate>, GenieError> {
-        spatial
-            .objects_on(tile)
-            .map(|(id, p)| {
-                if id == me_id {
-                    return Ok(me);
-                }
-                let (owner, u) = others.find(id).ok_or(GenieError::unsupported(
-                    "an object on a tile the slice does not hold",
-                ))?;
-                candidate(id, owner, u, p.position)
-            })
-            .collect()
-    };
+    let player = c.player;
+    // the unit out of its slot while it updates, as it stands
+    let me = Candidate::of(
+        unit.id,
+        player,
+        unit,
+        unit.master(c.every, player)?,
+        unit.position(),
+    );
     let position = search_origin(point, site, unit.position());
     let seeker = gather_search::Seeker {
         player,
@@ -171,31 +144,25 @@ pub(crate) fn closest_resource_of(
         my_pasture: unit.my_pasture,
         min_state,
     };
-    let me_walk = unit.me(actions);
-    let me_at = unit.position();
-    let master_id = unit.life.master_id;
-    let plan = &mut c.plan;
-    let blocked = mask.blocked() | BLOCKED;
     closest_resource_at(
         &seeker,
         site.as_ref(),
         kind,
         cap,
         ResourceWorld {
-            map: c.spatial.map,
-            world: c.spatial,
-            explored: &|spatial, tile| spatial.explored(player, tile),
-            passable: &|spatial, tile| spatial.tiles().word(tile).is_some_and(|w| w & blocked == 0),
-            objects: &objects,
-            reach: &mut |spatial, id| {
-                mover.reaches_object(
-                    (me_at, &me_walk),
-                    (spatial, by_id),
-                    plan,
-                    id,
-                    Distance::ZERO,
-                    master_id,
-                )
+            spatial: c.spatial,
+            mask,
+            candidates: Candidates {
+                objects: by_id,
+                me: Some(me),
+            },
+            reach: UnitReach {
+                mover,
+                at: unit.position(),
+                walker: unit.me(actions),
+                master: unit.life.master_id,
+                plan: &mut c.plan,
+                objects: by_id,
             },
         },
         gather_search_tuning,

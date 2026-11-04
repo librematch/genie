@@ -1,6 +1,7 @@
 //! A terrain restriction's planner ([`Planner`]) and its four-level grid: built, read and
 //! rebuilt over a changed rectangle.
 
+use crate::GenieError;
 use crate::map::Distance;
 use crate::map::GridSize;
 use crate::map::Restriction;
@@ -11,6 +12,7 @@ use crate::pathing::tile_path::{
     Cell, CellEdges, CellIndex, CellKind, Cells, GridLevel, NO_COST, NodeIndex, Nodes, OpenList,
     PlanRect, PlanTile,
 };
+use crate::world::slots::CheckedIndex;
 
 /// A terrain restriction's planner (`0x4a8` bytes, built by `FUN_140f74f90`).
 #[derive(Clone, Debug, PartialEq)]
@@ -131,6 +133,18 @@ impl Planner {
         let size = self.levels[level.index()];
         let n = (size.width() * size.height()) as usize;
         self.cells.run(start, n)
+    }
+
+    /// Whether the tile level's cell of `tile` has no edges, so no tile path leaves it (the
+    /// builder's flood for more work, [`crate::gathering::gather_search::reached`]).
+    ///
+    /// # Errors
+    ///
+    /// A tile off the planner's map.
+    pub fn tile_closed(&self, tile: Tile) -> Result<bool, GenieError> {
+        let width = i64::from(self.level_size(GridLevel::TILES).width());
+        let cell = (width * i64::from(tile.y()) + i64::from(tile.x())) as usize;
+        Ok(self.level(GridLevel::TILES).checked(cell)?.edges.is_empty())
     }
 
     /// The size of `level`'s grid in cells.

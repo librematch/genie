@@ -4,24 +4,18 @@
 
 use crate::GenieError;
 use crate::map::Distance;
-use crate::map::Position;
-use crate::map::Tile;
 use crate::map::spatial::Spatial;
 use crate::objects::ObjectId;
 use crate::objects::layers::Action;
 use crate::objects::masters::MasterId;
-use crate::objects::masters::{MasterTables, OwnerMasters};
+use crate::objects::masters::OwnerMasters;
 use crate::objects::unit::Unit;
-use crate::objects::unit::UnitFlags;
 use crate::orders::OrderSource;
 use crate::orders::Work;
-use crate::pathing::tile_path::GridLevel;
-use crate::players::PlayerId;
 use crate::unit_ai::task_finder::drop_site;
+use crate::world::index::ObjectsRef;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
-use crate::world::others::OthersRef;
-use crate::world::slots::CheckedIndex;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
 
@@ -44,11 +38,10 @@ impl Unit {
         built: MasterId,
         roles: &Roles,
     ) -> Result<Option<Work>, GenieError> {
-        use crate::gathering::gather_search::{self, Candidate};
+        use crate::gathering::gather_search::{self, Candidate, Candidates};
         use crate::gathering::gather_search::{gather_group, more_work as gather_search_more_work};
         /// The reach a line of sight below the floor takes (the Build's immediate 4.0).
         const REACH_LOW: f32 = 4.0;
-        let others = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
         let masters =
             c.w.model
                 .masters
@@ -91,62 +84,35 @@ impl Unit {
                 .mover_of(self.id)
                 .ok_or(GenieError::unsupported("a builder without movement state"))?;
         let restriction = mover.stats.restriction;
-        let (player, me_id, every) = (
-            c.player,
-            self.id,
-            MasterTables::new(&c.w.model.masters, &c.w.parts.own_master),
+        let objects = ObjectsRef::new(
+            &c.w.players,
+            &c.w.index,
+            &c.w.model.masters,
+            &c.w.parts,
+            &c.w.model.roles,
+            &c.w.model.tuning,
         );
-        let candidate = |id: ObjectId, owner: PlayerId, u: &Self, position: Position| {
-            let m = u.master(every, owner)?;
-            Ok(Candidate {
-                id,
-                player: owner,
-                class: m.class,
-                master: m.id,
-                state: u.life.state,
-                workers: u.workers,
-                position,
-                pasture: u.pasture,
-                untargetable: u.flags.contains(UnitFlags::UNTARGETABLE),
-                attribute: u.life.attribute_kind,
-                amount: u.life.amount,
-                auto_gather: m.auto_gather.is_on(),
-                gather_group: m.gather_group,
-            })
-        };
-        let me = candidate(me_id, player, self, self.position())?;
+        // the builder out of its slot while it updates, as it stands
+        let me = Candidate::of(
+            self.id,
+            c.player,
+            self,
+            self.master(objects.masters(), c.player)?,
+            self.position(),
+        );
         let spatial: &Spatial = &c.w.spatial;
-        let objects = |tile: Tile| -> Result<Vec<Candidate>, GenieError> {
-            spatial
-                .objects_on(tile)
-                .map(|(id, p)| {
-                    if id == me_id {
-                        return Ok(me);
-                    }
-                    let (owner, u) = others.find(id).ok_or(GenieError::unsupported(
-                        "an object on a tile the slice does not hold",
-                    ))?;
-                    candidate(id, owner, u, p.position)
-                })
-                .collect()
-        };
         let found = {
             let planner = c.w.pathing.planner(restriction, spatial.tiles()).ok_or(
                 GenieError::unsupported("a builder's restriction without a planner"),
             )?;
-            let tiles = GridLevel::TILES;
-            let width = i64::from(planner.level_size(tiles).width());
-            let cells = planner.level(tiles);
-            let blocked = move |t: Tile| -> Result<bool, GenieError> {
-                let cell = (width * i64::from(t.y()) + i64::from(t.x())) as usize;
-                Ok(cells.checked(cell)?.edges.is_empty())
-            };
             gather_search_more_work(
                 entry,
                 &builder,
-                spatial.map,
-                Some(&blocked),
-                &objects,
+                (spatial, planner),
+                &Candidates {
+                    objects,
+                    me: Some(me),
+                },
                 roles,
             )?
         };
