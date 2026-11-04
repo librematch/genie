@@ -34,38 +34,27 @@ use crate::world::slots::{CheckedIndex, PlayerSlots};
 
 impl World {
     /// `FUN_141025fb0` for a slot whose time is past (`0x1410263e4`..`0x1410267c5`): true when
-    /// it ends the routine (slot state 2 or 3). See [`World::steer_to_slot`].
+    /// it ends the routine (slot state 2 or 3). See [`World::steer_to_slot`]. `to` is the slot's
+    /// place and `state` its state as the steer left it.
     pub(super) fn slot_due(
         &mut self,
         group: GroupId,
         index: usize,
-        slot: usize,
+        (slot, to, state): (usize, BVector, SlotState),
     ) -> Result<bool, GenieError> {
-        let g = self.groups.held(group)?;
-        let id = g.members.checked(index)?.id;
-        let s = *g
-            .current_formation
-            .as_ref()
-            .ok_or(NO_FORMATION)?
-            .slots
-            .checked(slot)?;
-        if s.state == SlotState::Arriving {
-            self.set_slot_state(group, slot, SlotState::Stopping)?;
+        let id = self.groups.held(group)?.members.checked(index)?.id;
+        let mut state = state;
+        if state == SlotState::Arriving {
+            state = SlotState::Stopping;
+            self.set_slot_state(group, slot, state)?;
             self.stop_member(id)?;
         }
         let g = self.groups.held(group)?;
-        let state = g
-            .current_formation
-            .as_ref()
-            .ok_or(NO_FORMATION)?
-            .slots
-            .checked(slot)?
-            .state;
         let mut placed = SlotTry::NoWay;
         match state {
             SlotState::Stopping => {
                 if !g.motion.moving() {
-                    placed = self.try_slot(group, id, s.transform_position)?;
+                    placed = self.try_slot(group, id, to)?;
                 }
                 self.set_slot_state(group, slot, SlotState::InPlace)?;
             }
@@ -187,18 +176,10 @@ impl World {
     pub(super) fn steer_member(
         &mut self,
         group: GroupId,
-        slot: usize,
+        (slot, to): (usize, BVector),
         id: ObjectId,
         gap: Distance,
     ) -> Result<(), GenieError> {
-        let g = self.groups.held(group)?;
-        let to = g
-            .current_formation
-            .as_ref()
-            .ok_or(NO_FORMATION)?
-            .slots
-            .checked(slot)?
-            .transform_position;
         let dt = self.dt_seconds;
         let (_, u) = self.object(id).ok_or_else(|| member_gone(id))?;
         let facets = u.sprite.map(|s| SpriteFacets {
@@ -296,7 +277,8 @@ impl World {
         }
     }
 
-    /// Slot `slot` of group `group`'s formation takes state `state`.
+    /// Slot `slot` of group `group`'s formation takes state `state`. The steer runs while the
+    /// group holds the formation its update tested, and no routine of the steer replaces it.
     pub(super) fn set_slot_state(
         &mut self,
         group: GroupId,

@@ -1137,7 +1137,7 @@ fn transport_takes_its_base_alone() {
             transport(with_sub(base(2), EXPLORE, explore(base(3))))
         )
         .unwrap_err(),
-        GenieError::unreachable("a saved Transport with another sub-action")
+        GenieError::invalid_input("a saved Transport with another sub-action")
     );
     // a MoveTo belongs to a sail: an idle Transport's is no state of the game
     let idle = imported(

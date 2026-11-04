@@ -162,7 +162,7 @@ pub fn unit_ai(
         retarget_disabled: ai.disable_retargeting,
         alert_mode: AlertMode::of_data(ai.alert_mode_value),
         time_since_enemy: Seconds::new(ai.time_since_enemy_sighting),
-        patrol_path: patrol_path(ai),
+        patrol_path: patrol_path(ai)?,
         patrol_waypoint: WaypointIndex::of_data(ai.patrol_current_waypoint),
         stop_after_kill: ai.stop_after_target_killed_value != 0,
         home: home(combat),
@@ -197,14 +197,25 @@ pub fn unit_ai(
 }
 
 /// The saved patrol: its path's points in the game's layout, its length and flags.
-fn patrol_path(ai: &UnitAiModule) -> Option<PatrolPath> {
-    ai.patrol_path.as_deref().map(|p| PatrolPath {
+///
+/// # Errors
+///
+/// A patrol without points (`invalid_input`): the patrol's leash (`FUN_140f95e10`) runs its
+/// loop past an empty path's end.
+fn patrol_path(ai: &UnitAiModule) -> Result<Option<PatrolPath>, GenieError> {
+    let Some(p) = ai.patrol_path.as_deref() else {
+        return Ok(None);
+    };
+    if p.waypoints.is_empty() {
+        return Err(GenieError::invalid_input("a saved patrol without points"));
+    }
+    Ok(Some(PatrolPath {
         path: Path {
             points: p.waypoints.iter().map(vec3).collect(),
             length: Distance::new(p.path_length_value),
         },
         flags: PathFlags::from_bits_retain(p.flags_bits),
-    })
+    }))
 }
 
 /// An animal's home: its origin and fury (the elephant unit AI's).

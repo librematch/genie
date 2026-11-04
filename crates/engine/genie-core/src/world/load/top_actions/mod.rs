@@ -502,7 +502,8 @@ fn import_enter(
 /// sub-action but a `MoveTo`.
 fn import_transport(saved: &Saved<'_>, actions: &mut layers::Action) -> Result<(), GenieError> {
     let base = saved.base;
-    let sub = saved.move_to_sub(GenieError::unreachable(
+    // `set_state` makes no other sub-action: a save that holds one is no game's
+    let sub = saved.move_to_sub(GenieError::invalid_input(
         "a saved Transport with another sub-action",
     ))?;
     actions.list.set_transport(Some(TransportAction {

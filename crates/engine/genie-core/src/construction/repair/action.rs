@@ -250,7 +250,7 @@ impl RepairAction {
     }
 
     /// State 6 (`0x140adaa20` case 5): the unit turns toward the target ([`face_target`] with its
-    /// sprites' facets), then works (7).
+    /// sprites' facets), then works (7). A Repair that holds no target ends (`set_state(1)`).
     ///
     /// [`face_target`]: crate::combat::attack::face_target
     pub(super) fn facing(
@@ -260,9 +260,9 @@ impl RepairAction {
         reads: &RepairReads,
         roles: &Roles,
     ) -> Result<(), GenieError> {
-        let t = reads.target.ok_or(GenieError::unreachable(
-            "a Repair facing its target without one",
-        ))?;
+        let Some(t) = reads.target else {
+            return self.set_state(c, repairer, RepairState::Done, reads, roles);
+        };
         let at = repairer.place.position();
         let mover =
             c.w.parts
@@ -278,7 +278,7 @@ impl RepairAction {
 
     /// State 10 (`0x140adaa20` case 9): the timer counts down by the update's seconds; once it
     /// is out (`COMISS` 0 with `JC`: a NaN is out) a unit within reach faces the target (6), any
-    /// other waits a second more.
+    /// other waits a second more. A Repair that holds no target waits as it is: its timer stays.
     pub(super) fn waiting(
         &mut self,
         c: &mut Step<'_>,
@@ -286,6 +286,10 @@ impl RepairAction {
         reads: &RepairReads,
         roles: &Roles,
     ) -> Result<(), GenieError> {
+        // a Repair that holds no target waits as it is (case 9's test of `+0x20`)
+        if reads.target.is_none() {
+            return Ok(());
+        }
         self.timer -= c.dt.seconds();
         if below_or_unordered(0.0, self.timer.get()) {
             return Ok(());
@@ -446,7 +450,8 @@ impl RepairAction {
     /// done (1) a target of a type above 69 has the armor its charge's hits took back
     /// (`FUN_1412066a0`: `+0x9e4` zeroed) and the action ends (`set_state(1)`); the player short
     /// of resources (2) posts notify 0x1fb (the game's event 0x6b to its interface,
-    /// `FUN_140c898a0`, is not held) and ends it too.
+    /// `FUN_140c898a0`, is not held) and ends it too. A Repair that holds no target ends
+    /// (`set_state(1)`).
     pub(super) fn work(
         &mut self,
         c: &mut Step<'_>,
@@ -454,9 +459,9 @@ impl RepairAction {
         reads: &RepairReads,
         roles: &Roles,
     ) -> Result<(), GenieError> {
-        let t = reads.target.ok_or(GenieError::unreachable(
-            "a Repair working without its target",
-        ))?;
+        let Some(t) = reads.target else {
+            return self.set_state(c, repairer, RepairState::Done, reads, roles);
+        };
         let moved = t.position.x() != self.point.x() || t.position.y() != self.point.y();
         if moved {
             let gap = Self::gap(repairer, reads, t, &c.w.model.tuning.repair);

@@ -4,7 +4,9 @@ use crate::unit_ai::{AiAction, OrderKind};
 use crate::world::load::fixtures::{combat_mut, combat_object, missile_tuning};
 use crate::world::load::object::object as saved_unit_object;
 use crate::world::load::object_parts::unit_ai;
-use genie_save::generated::world::{TribeTowerUnitAiModule, UnitAiModule, UnitAiModuleEntry1};
+use genie_save::generated::world::{
+    Path, TribeTowerUnitAiModule, UnitAiModule, UnitAiModuleEntry1,
+};
 
 /// A two-player game's players with Gaia.
 const PLAYERS: usize = 3;
@@ -198,5 +200,36 @@ fn the_saved_unit_ai_is_the_object_part() {
     assert_eq!(
         odd.parts.unread.map(|e| e.error().kind()),
         Some(ErrorKind::InvalidInput)
+    );
+}
+
+/// A saved patrol imports its points; one without points fails the import: the patrol's leash
+/// (`FUN_140f95e10`) runs its loop past an empty path's end.
+#[test]
+fn saved_patrol_without_points_fails_the_import() {
+    let patrol = |waypoints: Vec<[u8; 12]>| {
+        with_ai(UnitAiModule {
+            has_patrol_path: 1,
+            patrol_path: Some(Box::new(Path {
+                nwv: i32::try_from(waypoints.len()).unwrap(),
+                waypoints,
+                ..Path::default()
+            })),
+            ..idle()
+        })
+    };
+    let point = [1.0_f32, 2.0, 0.0].map(f32::to_le_bytes).concat();
+    let held = unit_ai(
+        &patrol(vec![point.try_into().unwrap()]),
+        object_id(5),
+        PLAYERS,
+    )
+    .unwrap()
+    .unwrap();
+    assert_eq!(held.patrol_path.map(|p| p.path.points.len()), Some(1));
+    let empty = unit_ai(&patrol(Vec::new()), object_id(5), PLAYERS).unwrap_err();
+    assert_eq!(
+        (empty.kind(), empty.reason()),
+        (ErrorKind::InvalidInput, "a saved patrol without points")
     );
 }

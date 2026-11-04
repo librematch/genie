@@ -7,7 +7,7 @@ use crate::groups::MovePath;
 use crate::groups::MoveReason;
 use crate::groups::SlotState;
 use crate::groups::SpecificMove;
-use crate::groups::group_list::{NO_FORMATION, NO_MOVER, member_gone};
+use crate::groups::group_list::{NO_MOVER, member_gone};
 use crate::groups::steer::{
     EPSILON, ROUND_LENGTH, ROUND_RADIUS, ROUND_REACH, ROUND_STILL, ROUND_TIMER,
 };
@@ -78,19 +78,12 @@ impl World {
         &mut self,
         group: GroupId,
         index: usize,
-        slot: usize,
+        (slot, to): (usize, BVector),
         gap: Distance,
         differentiators: &[ObjectId],
     ) -> Result<(), GenieError> {
         let g = self.groups.held(group)?;
         let id = g.members.checked(index)?.id;
-        let to = g
-            .current_formation
-            .as_ref()
-            .ok_or(NO_FORMATION)?
-            .slots
-            .checked(slot)?
-            .transform_position;
         let [place, forward, _, _] = g.motion.position;
         let (moving, waits) = (g.motion.moving(), g.motion.waits_to_move());
         let r = self.rounder(id, differentiators)?;

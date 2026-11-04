@@ -6,11 +6,11 @@ use crate::groups::GroupFlags;
 use crate::groups::GroupId;
 use crate::groups::MovePath;
 use crate::groups::MoveReason;
-use crate::groups::SlotState;
 use crate::groups::SpecificMove;
-use crate::groups::group_list::{NO_FORMATION, NO_MOVER, member_gone};
+use crate::groups::group_list::{NO_MOVER, member_gone};
 use crate::groups::motion::hold;
 use crate::groups::steer::{EPSILON, KEEPS_MOVING, MOST_FAILURES, MOVE_TO};
+use crate::groups::{Slot, SlotState};
 use crate::map::Distance;
 use crate::map::spatial::RecordId;
 use crate::math::fmath::sqrt;
@@ -73,22 +73,21 @@ impl World {
             let Some((_, u)) = self.object(m.id) else {
                 continue;
             };
-            let slot = g
-                .current_formation
-                .as_ref()
-                .and_then(|f| f.slots.iter().position(|s| s.unit_id == Some(m.id)));
-            let Some(slot) = slot else {
+            // the member's slot, by its unit's id (the first); no routine of the steer changes
+            // the formation, so the slot found is the one each step reads
+            let found = g.current_formation.as_ref().and_then(|f| {
+                f.slots
+                    .iter()
+                    .enumerate()
+                    .find(|(_, s)| s.unit_id == Some(m.id))
+                    .map(|(i, s)| (i, *s))
+            });
+            let Some(slot) = found else {
                 self.stop_free_member(m.id)?;
                 continue;
             };
             if m.specific_move.active == 1 {
-                let to = g
-                    .current_formation
-                    .as_ref()
-                    .ok_or(NO_FORMATION)?
-                    .slots
-                    .checked(slot)?
-                    .transform_position;
+                let to = slot.1.transform_position;
                 let members: Vec<ObjectId> = g.members.iter().map(|m| m.id).collect();
                 let from = u.moved_vector(self.parts.mover_of(u.id));
                 let clear = self.line_clear(
@@ -267,15 +266,16 @@ impl World {
     ///
     /// What the steps and the way round do not model.
     ///
-    /// When the world does not hold `group`, or `index` or `slot` is outside it: the members'
-    /// moves pass their own.
+    /// When the world does not hold `group`, or `index` is outside it: the members' moves pass
+    /// their own, and the member's slot with its copy (`slot`, the formation's as the moves
+    /// found it).
     ///
     /// [`passes_waypoint`]: crate::groups::motion::passes_waypoint
     pub fn steer_to_slot(
         &mut self,
         group: GroupId,
         index: usize,
-        slot: usize,
+        (slot, s): (usize, Slot),
         differentiators: &[ObjectId],
     ) -> Result<(), GenieError> {
         let g = self.groups.held(group)?;
@@ -286,12 +286,6 @@ impl World {
         if !self.parts.unit_ai.contains(u.id) {
             return Ok(());
         }
-        let s = g
-            .current_formation
-            .as_ref()
-            .ok_or(NO_FORMATION)?
-            .slots
-            .checked(slot)?;
         let to = s.transform_position;
         let late = s.time < self.world_time;
         let at = u.moved_vector(self.parts.mover_of(u.id));
@@ -326,22 +320,16 @@ impl World {
             return Ok(());
         }
         if !self.member_idle(id)? {
-            return self.steer_busy_member(group, (index, slot), id);
+            return self.steer_busy_member(group, (index, slot, s.state), id);
         }
-        let g = self.groups.held_mut(group)?;
-        let moving = g.motion.moving();
-        let waits = g.motion.waits_to_move();
-        let state = &mut g
-            .current_formation
-            .as_mut()
-            .ok_or(NO_FORMATION)?
-            .slots
-            .checked_mut(slot)?
-            .state;
-        if *state == SlotState::InPlace && (moving || waits) {
-            *state = SlotState::Steering;
+        let g = self.groups.held(group)?;
+        let (moving, waits) = (g.motion.moving(), g.motion.waits_to_move());
+        let mut state = s.state;
+        if state == SlotState::InPlace && (moving || waits) {
+            state = SlotState::Steering;
+            self.set_slot_state(group, slot, state)?;
         }
-        if late && self.slot_due(group, index, slot)? {
+        if late && self.slot_due(group, index, (slot, to, state))? {
             return Ok(());
         }
         let Some((_, u)) = self.object(id) else {
@@ -355,19 +343,26 @@ impl World {
             Distance::new(self.model.tuning.group.clearance),
             differentiators,
         )? {
-            return self.way_round(group, index, slot, Distance::new(gap), differentiators);
+            return self.way_round(
+                group,
+                index,
+                (slot, to),
+                Distance::new(gap),
+                differentiators,
+            );
         }
-        self.steer_member(group, slot, id, Distance::new(gap))?;
+        self.steer_member(group, (slot, to), id, Distance::new(gap))?;
         self.set_state_position(id, to);
         Ok(())
     }
 
     /// [`World::steer_to_slot`] of a member that is not idle: it stops unless its action keeps
-    /// it moving, its failures reset and a slot in state 1 or 2 takes state 3.
+    /// it moving, its failures reset and a slot in state 1 or 2 (`state`, as the steer read
+    /// it) takes state 3.
     fn steer_busy_member(
         &mut self,
         group: GroupId,
-        (index, slot): (usize, usize),
+        (index, slot, state): (usize, usize, SlotState),
         id: ObjectId,
     ) -> Result<(), GenieError> {
         let (p, u) = self.object(id).ok_or_else(|| member_gone(id))?;
@@ -375,20 +370,14 @@ impl World {
         if !keeps_moving && self.parts.mover_of(u.id).is_some_and(Mover::is_moving) {
             self.stop_member(id)?;
         }
-        let g = self.groups.held_mut(group)?;
-        g.members
+        self.groups
+            .held_mut(group)?
+            .members
             .checked_mut(index)?
             .specific_move
             .consecutive_move_failures = 0;
-        let state = &mut g
-            .current_formation
-            .as_mut()
-            .ok_or(NO_FORMATION)?
-            .slots
-            .checked_mut(slot)?
-            .state;
-        if matches!(*state, SlotState::Arriving | SlotState::Stopping) {
-            *state = SlotState::InPlace;
+        if matches!(state, SlotState::Arriving | SlotState::Stopping) {
+            self.set_slot_state(group, slot, SlotState::InPlace)?;
         }
         Ok(())
     }

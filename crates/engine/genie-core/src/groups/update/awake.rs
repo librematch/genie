@@ -420,6 +420,7 @@ impl World {
             }
             ranges.push(range);
         }
+        // the reads above change no group: the formation tested first is still the group's
         let f = self
             .groups
             .held_mut(group)?

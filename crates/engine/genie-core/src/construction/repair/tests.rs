@@ -922,6 +922,30 @@ fn waiting_repairer_looks_again_each_second() {
     assert_eq!(repair_of(&t).state, RepairState::Face);
 }
 
+/// A Repair that holds no target (`+0x30` −1, as a save can hold it): the update
+/// (`0x140adaa20`) tests the target in states 6, 7 and 10. Facing (case 5) and working (case
+/// 6) without one end the Repair (`set_state(1)`), waiting (case 9) returns before its timer
+/// runs.
+#[test]
+fn repair_without_its_target_ends_or_waits_as_it_is() {
+    for state in [RepairState::Face, RepairState::Work] {
+        let mut t = repair_at(NEAR, |r| {
+            (r.state, r.target, r.counted) = (state, None, false);
+        });
+        assert_eq!(repaired(&mut t), Ok(HeadCode::Keeps));
+        assert_eq!(repair_of(&t).state, RepairState::Done, "{state:?}");
+    }
+    let mut t = repair_at(NEAR, |r| {
+        (r.state, r.target, r.counted, r.timer) =
+            (RepairState::Wait, None, false, Seconds::new(0.1));
+    });
+    assert_eq!(repaired(&mut t), Ok(HeadCode::Keeps));
+    assert_eq!(
+        (repair_of(&t).state, repair_of(&t).timer),
+        (RepairState::Wait, Seconds::new(0.1))
+    );
+}
+
 /// Slot 8 (`FUN_140ad9700`): the point, the target let go (a counted repairer leaving its
 /// repairers), the walk there; its end ends the Repair.
 #[test]
