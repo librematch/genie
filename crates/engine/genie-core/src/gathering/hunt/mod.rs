@@ -28,10 +28,6 @@ use crate::players::attribute::AttributeId;
 use crate::world::Seconds;
 use genie_diff::Diff;
 
-/// A hunter's update without its Hunt: the caller's test.
-pub(crate) const NO_HUNT: crate::GenieError =
-    crate::GenieError::unreachable("a hunter's update without its Hunt");
-
 mod drop_off;
 mod gathering;
 mod herding;

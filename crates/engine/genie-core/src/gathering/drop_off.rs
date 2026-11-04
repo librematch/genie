@@ -8,10 +8,9 @@ use crate::gathering::drop_sites::SitePlace;
 use crate::gathering::drop_sites::SiteSearch;
 use crate::gathering::drop_sites::{Seeker, drop_site_search};
 use crate::gathering::gather::GatherState;
-use crate::gathering::gather::unit::NO_GATHER;
-use crate::gathering::gather::{GatherRetarget, Walks};
+use crate::gathering::gather::{GatherAction, GatherRetarget, Walks};
 use crate::gathering::gather::{Resource, StopRate, productivity_of, waits_for_farm};
-use crate::gathering::hunt::NO_HUNT;
+use crate::gathering::hunt::HuntAction;
 use crate::map::Distance;
 use crate::map::Position;
 use crate::map::spatial::Spatial;
@@ -54,9 +53,10 @@ impl Unit {
     /// Gather takes what it finds (slot 0x48, [`crate::gathering::gather::GatherAction::retarget`]). Without
     /// one a Gather with its point would walk there to search again (`set_state(11)`, not
     /// modelled, or 0xf3 for a farmer); without a point a computer player's Gather is done, a
-    /// human's idles (`set_state(2)`).
+    /// human's idles (`set_state(2)`). `gather` is the head as the drop left it.
     pub(crate) fn gather_after_drop(
         &mut self,
+        gather: GatherAction,
         actions: &mut Action,
         c: &mut Step<'_>,
         roles: &Roles,
@@ -65,8 +65,8 @@ impl Unit {
         if self.after_drop_orders(c)? == ActionEnd::Ends {
             return Ok(HeadCode::Deletes);
         }
-        let Some(found) = self.after_drop_search(actions, c)? else {
-            return self.after_drop_nothing(actions, c, by, roles);
+        let Some(found) = self.after_drop_search(&gather, actions, c)? else {
+            return self.after_drop_nothing((gather, actions), c, by, roles);
         };
         self.after_drop_retarget(actions, c, found, by, roles)
             .map(|()| HeadCode::Keeps)
@@ -108,10 +108,10 @@ impl Unit {
     /// group, or a unit without a unit AI.
     fn after_drop_search(
         &self,
+        gather: &GatherAction,
         actions: &Action,
         c: &mut Step<'_>,
     ) -> Result<Option<ObjectId>, GenieError> {
-        let gather = actions.list.gather().ok_or(NO_GATHER)?;
         let Some(ai) = c.w.parts.unit_ai.get(self.id) else {
             return Ok(None);
         };
@@ -134,16 +134,12 @@ impl Unit {
     /// [`Unit::idle_sprite`]'s) and lets its drop site go.
     fn after_drop_nothing(
         &mut self,
-        actions: &mut Action,
+        (mut gather, actions): (GatherAction, &mut Action),
         c: &mut Step<'_>,
         by: Releaser,
         roles: &Roles,
     ) -> Result<HeadCode, GenieError> {
-        let farm_waits = waits_for_farm(
-            self.life.master_id,
-            actions.list.gather().and_then(|g| g.target_class),
-            roles,
-        );
+        let farm_waits = waits_for_farm(self.life.master_id, gather.target_class, roles);
         let walks = self.move_walks(
             c.w.parts.mover_of(self.id),
             MasterTables::new(&c.w.model.masters, &c.w.parts.own_master),
@@ -154,7 +150,8 @@ impl Unit {
             ),
             roles,
         )?;
-        let gather = actions.list.gather_mut().ok_or(NO_GATHER)?;
+        // the search and the reads reach no action of the unit's: the copy is the head until it
+        // goes back, before an error too
         if gather.point.x() != -1.0 && gather.point.y() != -1.0 {
             if farm_waits {
                 return Err(GenieError::unsupported(
@@ -166,22 +163,25 @@ impl Unit {
                 c.w.parts
                     .mover_mut(self.id)
                     .ok_or(GenieError::unsupported("a gatherer without movement state"))?;
-            return gather
-                .walk_back(Distance::ZERO, mover, &walks, &c.w.model.tuning.move_to)
-                .map(|()| HeadCode::Keeps);
+            let walked = gather.walk_back(Distance::ZERO, mover, &walks, &c.w.model.tuning.move_to);
+            actions.list.set_gather(Some(gather));
+            return walked.map(|()| HeadCode::Keeps);
         }
         if c.w.players.player(c.player)?.kind.is_computer() {
             return Ok(HeadCode::Deletes);
         }
         let carry_to = gather.carry_to;
-        let shows = self.idle_sprite(actions, c)?;
-        let gather = actions.list.gather_mut().ok_or(NO_GATHER)?;
-        gather.tear_down(c.w.parts.mover_mut(self.id))?;
-        gather.state = GatherState::Idle;
-        gather.timer = Seconds::ZERO;
-        gather.target = None;
-        gather.carry_to = None;
-        gather.point = Position::from([-1.0; 3]);
+        let shows = self.idle_sprite(&gather, c)?;
+        let torn = gather.tear_down(c.w.parts.mover_mut(self.id));
+        if torn.is_ok() {
+            gather.state = GatherState::Idle;
+            gather.timer = Seconds::ZERO;
+            gather.target = None;
+            gather.carry_to = None;
+            gather.point = Position::from([-1.0; 3]);
+        }
+        actions.list.set_gather(Some(gather));
+        torn?;
         if let Some(g) = shows {
             new_sprite(
                 &mut self.sprite,
@@ -199,8 +199,11 @@ impl Unit {
 
     /// The sprite an idle gatherer shows: its task's carrying sprite while it holds at least 1 of
     /// the task's resource, else its master's standing sprite (none the data file lacks).
-    fn idle_sprite(&self, actions: &Action, c: &Step<'_>) -> Result<Option<Graphic>, GenieError> {
-        let gather = actions.list.gather().ok_or(NO_GATHER)?;
+    fn idle_sprite(
+        &self,
+        gather: &GatherAction,
+        c: &Step<'_>,
+    ) -> Result<Option<Graphic>, GenieError> {
         let master = self.master(c.w.master_tables(), c.player)?;
         let standing = master
             .standing_sprite
@@ -350,6 +353,7 @@ impl Unit {
     /// part (notify 0x203) is not modelled.
     pub(crate) fn gather_drop_off(
         &mut self,
+        gather: &mut GatherAction,
         actions: &mut Action,
         c: &mut Step<'_>,
         roles: &Roles,
@@ -368,9 +372,14 @@ impl Unit {
             groups: &c.w.groups,
         };
         let others = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
-        if let Some(site) =
-            self.gather_drop_off_in(actions, mover, w, others, &c.w.model.graphics, by_id)?
-        {
+        if let Some(site) = self.gather_drop_off_in(
+            (gather, actions),
+            mover,
+            w,
+            others,
+            &c.w.model.graphics,
+            by_id,
+        )? {
             let by = self.releaser(c)?;
             take(c, self, site, by, roles)?;
         }
@@ -379,10 +388,11 @@ impl Unit {
 
     /// [`Unit::gather_drop_off`] in `w` with the unit's `mover`, from the update or a command,
     /// with the sprites' table `graphics`: the drop site it took when it is a new second target (the caller's to take,
-    /// slot 0x178).
+    /// slot 0x178). `gather` is the head's copy, which the list holds; it goes back after the
+    /// walk's start, before an error too.
     pub(crate) fn gather_drop_off_in(
         &self,
-        actions: &mut Action,
+        (gather, actions): (&mut GatherAction, &mut Action),
         mover: Option<&mut Mover>,
         mut c: DropWorld<'_>,
         others: OthersRef<'_>,
@@ -396,7 +406,6 @@ impl Unit {
                 "a gather's drop-off carrying nothing (set_state 3)",
             ));
         }
-        let gather = actions.list.gather().ok_or(NO_GATHER)?;
         let (carry_to, state) = (gather.carry_to, gather.state);
         let (site, gap) = self.drop_site(
             (actions, mover.as_deref()),
@@ -417,22 +426,25 @@ impl Unit {
             roles,
         );
         let walks = Walks::of(sprites, (self, mover.as_deref()));
-        let (Some(gather), Some(mover)) = (actions.list.gather_mut(), mover) else {
+        let Some(mover) = mover else {
             return Err(GenieError::unsupported(
                 "a gatherer without its gather or movement state",
             ));
         };
         gather.carry_to = site;
-        gather.set_drop(at, gap, mover, &walks, move_to_tuning)?;
+        let walked = gather.set_drop(at, gap, mover, &walks, move_to_tuning);
+        actions.list.set_gather(Some(*gather));
+        walked?;
         Ok(site.filter(|_| site != carry_to).map(DropSiteId::id))
     }
 
     /// [`Unit::hunt_drop_off`] in `w` with the unit's `mover`, from the update or a command,
     /// with the sprites' table `graphics`: the drop site it took when it is a new second target
-    /// (`FUN_140a7a190`, the caller's to take, slot 0x178).
+    /// (`FUN_140a7a190`, the caller's to take, slot 0x178). `hunt` is the head's copy, which the
+    /// list holds; it goes back after the walk's start, before an error too.
     pub(crate) fn drop_off_in(
         &self,
-        actions: &mut Action,
+        (hunt, actions): (&mut HuntAction, &mut Action),
         mover: Option<&mut Mover>,
         mut c: DropWorld<'_>,
         others: OthersRef<'_>,
@@ -446,7 +458,6 @@ impl Unit {
                 "a hunt's drop-off carrying nothing (set_state 3)",
             ));
         }
-        let hunt = actions.list.hunt().ok_or(NO_HUNT)?;
         let (carry_to, state) = (hunt.carry_to, hunt.state);
         let (site, gap) = self.drop_site(
             (actions, mover.as_deref()),
@@ -472,13 +483,15 @@ impl Unit {
             roles,
         );
         let walks = Walks::of(sprites, (self, mover.as_deref()));
-        let (Some(hunt), Some(mover)) = (actions.list.hunt_mut(), mover) else {
+        let Some(mover) = mover else {
             return Err(GenieError::unsupported(
                 "a hunter without its hunt or movement state",
             ));
         };
         hunt.carry_to = site;
-        hunt.set_drop(at, gap, mover, &walks, move_to_tuning)?;
+        let walked = hunt.set_drop(at, gap, mover, &walks, move_to_tuning);
+        actions.list.set_hunt(Some(*hunt));
+        walked?;
         Ok(site.filter(|_| site != carry_to).map(DropSiteId::id))
     }
 

@@ -2067,7 +2067,7 @@ fn hunt_of_tree_searches_on_failed_walk_or_target_let_go() {
             ..hunting(-1)
         }));
         rig.run(100, |c, u, actions, _, _| {
-            Ok(u.tree_lost(actions, c, &roles()))
+            Ok(u.tree_lost(actions.list.hunt().unwrap(), c, &roles()))
         })
     };
     assert_eq!(

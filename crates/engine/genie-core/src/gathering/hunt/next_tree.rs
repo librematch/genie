@@ -6,7 +6,7 @@ use crate::combat::attack::BeginLayer;
 use crate::combat::attack::{arms, engagement, show_arrived};
 use crate::gathering::hunt::HuntRetarget;
 use crate::gathering::hunt::TreeSearch;
-use crate::gathering::hunt::{NO_HUNT, Quarry};
+use crate::gathering::hunt::{HuntAction, Quarry};
 use crate::map::Distance;
 use crate::map::Position;
 use crate::math::fmath::sqrt;
@@ -42,7 +42,7 @@ impl Unit {
     /// [`TreeSearch::Found`] when it found one.
     pub(crate) fn hunt_tree_search(
         &mut self,
-        actions: &mut Action,
+        (hunt, actions): (&mut HuntAction, &mut Action),
         c: &mut Step<'_>,
         within: Option<Distance>,
         near: Option<Distance>,
@@ -54,7 +54,6 @@ impl Unit {
             let d = sqrt(dx * dx + dz * dz + dy * dy);
             d.partial_cmp(&limit.get()) != Some(Ordering::Less)
         };
-        let hunt = actions.list.hunt().ok_or(NO_HUNT)?;
         if let Some(within) = within
             && beyond(hunt.point, self.position(), within)
         {
@@ -140,7 +139,6 @@ impl Unit {
             ),
             roles,
         )?;
-        let hunt = actions.list.hunt_mut().ok_or(NO_HUNT)?;
         let old = hunt.target;
         let moving = hunt.task.walk_sprite_id(self.life.held());
         let arms = arms(
@@ -151,7 +149,7 @@ impl Unit {
             roles,
         );
         let mover = c.w.parts.mover_mut(self.id).ok_or(HUNTER_UNMOVING)?;
-        if let Some(move_start) = hunt.retarget(
+        let retargeted = hunt.retarget(
             HuntRetarget {
                 target: &quarry,
                 player: c.player,
@@ -167,7 +165,9 @@ impl Unit {
                 move_to_tuning: &c.w.model.tuning.move_to,
             },
             &c.w.model.tuning.hunt,
-        )? {
+        );
+        actions.list.set_hunt(Some(*hunt));
+        if let Some(move_start) = retargeted? {
             if move_start == MoveStart::Arrived {
                 show_arrived(
                     &arms,

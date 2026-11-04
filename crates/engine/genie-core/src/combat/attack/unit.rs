@@ -4,7 +4,7 @@
 use crate::GenieError;
 use crate::combat::MissileCount;
 use crate::combat::attack::Armament;
-use crate::combat::attack::AttackState;
+use crate::combat::attack::{Attack, AttackState};
 use crate::combat::attack::{AttackReads, Fight};
 use crate::combat::damage::Victim;
 use crate::combat::victims::{KillLeft, file_kill, victim, victim_of};
@@ -27,12 +27,8 @@ use crate::world::layer::Roles;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
 
-/// The unit's own Attack's update without its Attack: the caller's test.
-pub(super) const NO_ATTACK: GenieError =
-    GenieError::unreachable("an Attack's update without its Attack");
-
 impl Unit {
-    /// The unit's own Attack in its update: after its target went
+    /// The unit's own Attack in its update, `attack` the head's copy: after its target went
     /// ([`crate::combat::attack::Attack::lost`]), or its update (slot 6, `0x140a82ae0`) with the
     /// strike and what follows; codes 1 and 3 delete it (`RGE_Action_Object::update`). `own` is
     /// the unit as a combat object. The strike reads its target and the blast's objects from
@@ -41,17 +37,21 @@ impl Unit {
     /// the caller's after the update.
     pub(crate) fn attack_part(
         &mut self,
+        mut attack: Attack,
         actions: &mut Action,
         c: &mut Step<'_>,
         me: Me,
         own: Option<Victim>,
         roles: &Roles,
     ) -> Result<HeadCode, GenieError> {
-        match actions.list.attack().map(|a| a.target) {
-            None => Ok(HeadCode::Keeps),
-            Some(None) => self.attack_lost_part(actions, c, me, roles),
-            Some(_) => self.attack_strike_part(actions, c, me, own, roles),
+        if attack.target.is_some() {
+            return self.attack_strike_part(attack, actions, c, me, own, roles);
         }
+        // the lost part reaches no action of the unit's: the copy stands for the head until
+        // it goes back, before an error too (the stop's context reads the list)
+        let code = self.attack_lost_part(&mut attack, c, me, roles);
+        actions.list.set_attack(Some(attack));
+        code
     }
 
     /// The unit's own Attack after its target went
@@ -59,7 +59,7 @@ impl Unit {
     /// disarm posts to the unit AI; codes 1 and 3 delete it.
     fn attack_lost_part(
         &mut self,
-        actions: &mut Action,
+        attack: &mut Attack,
         c: &mut Step<'_>,
         me: Me,
         roles: &Roles,
@@ -72,16 +72,13 @@ impl Unit {
             &c.w.model.tuning.turn,
         );
         let master_class = master.class;
-        let walking = actions.list.attack().is_some_and(|a| {
-            matches!(
-                a.state,
-                AttackState::GotoSeen { .. } | AttackState::GotoPoint { .. }
-            )
-        });
+        let walking = matches!(
+            attack.state,
+            AttackState::GotoSeen { .. } | AttackState::GotoPoint { .. }
+        );
         if walking && armed {
-            return self.attack_walks_unseen(actions, c, me, master_class, roles);
+            return self.attack_walks_unseen(attack, c, me, master_class, roles);
         }
-        let attack = actions.list.attack_mut().ok_or(NO_ATTACK)?;
         let (code, disarmed) = attack.update_targetless(
             c.dt.seconds(),
             if armed {
@@ -109,13 +106,12 @@ impl Unit {
     /// update ([`crate::combat::attack::Attack::update_gone`]); codes 1 and 3 delete it.
     fn attack_walks_unseen(
         &mut self,
-        actions: &mut Action,
+        attack: &mut Attack,
         c: &mut Step<'_>,
         me: Me,
         master_class: ClassId,
         roles: &Roles,
     ) -> Result<HeadCode, GenieError> {
-        let mut attack = *actions.list.attack().ok_or(NO_ATTACK)?;
         let master = self.master(c.w.master_tables(), c.player)?;
         let player_kind =
             c.w.players
@@ -133,26 +129,24 @@ impl Unit {
             roles,
             &c.w.model.tuning.turn,
         );
-        let code = attack.update_gone(c, self, me, &r, master_class, roles);
-        if let Some(a) = actions.list.attack_mut() {
-            *a = attack;
-        }
-        Ok(HeadCode::of(code?))
+        attack
+            .update_gone(c, self, me, &r, master_class, roles)
+            .map(HeadCode::of)
     }
 
     /// The unit's own Attack's update (slot 6, `0x140a82ae0`) on the step: what it reads of the
     /// unit ([`AttackReads::of`]), its target and the unit as combat objects ([`Fight`]); the
-    /// Attack, copied out of the list, goes back after it, then the retaliation's changes to the
-    /// unit ([`Unit::hit_back`]). Codes 1 and 3 delete it (`RGE_Action_Object::update`).
+    /// Attack, the head's copy, goes back after it, then the retaliation's changes to the unit
+    /// ([`Unit::hit_back`]). Codes 1 and 3 delete it (`RGE_Action_Object::update`).
     fn attack_strike_part(
         &mut self,
+        mut attack: Attack,
         actions: &mut Action,
         c: &mut Step<'_>,
         me: Me,
         own: Option<Victim>,
         roles: &Roles,
     ) -> Result<HeadCode, GenieError> {
-        let mut attack = *actions.list.attack().ok_or(NO_ATTACK)?;
         let master = object_master(
             c.w.parts.own_master.get(self.id),
             (self.id, self.life.master_id),

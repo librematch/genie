@@ -5,9 +5,9 @@ use crate::commands::UnitOrderAction;
 use crate::construction::FoundationId;
 use crate::construction::build::BuildAction;
 use crate::construction::build::NOT_HELD;
-use crate::gathering::gather::GATHER;
-use crate::gathering::hunt::HUNT;
+use crate::gathering::gather::{GATHER, GatherAction};
 use crate::gathering::hunt::asked_drop_off as hunt_asked_drop_off;
+use crate::gathering::hunt::{HUNT, HuntAction};
 use crate::gathering::{DropSiteId, GatherTargetId, HuntTargetId};
 use crate::map::Tile;
 use crate::math::conversions::cvttss2si;
@@ -304,7 +304,7 @@ impl World {
                 ));
             }
             match self.drop_off_ask(p, idx, (asks, way_back))? {
-                Some(ask) => self.asked_drop_off(p, idx, ask)?,
+                Some(ask) => self.asked_drop_off(p, idx, &ask)?,
                 None => self.drop_off_unasked(p, idx, action)?,
             }
         }
@@ -330,7 +330,7 @@ impl World {
         let found = match top {
             Some(GATHER) => self.parts.actions_of(unit.id).list.gather().map(|g| {
                 (
-                    DropOffBy::Gather,
+                    DropOffBy::Gather(*g),
                     g.target.map(GatherTargetId::id),
                     g.point,
                     g.task.resource,
@@ -346,7 +346,7 @@ impl World {
             }),
             Some(HUNT) => self.parts.actions_of(unit.id).list.hunt().map(|h| {
                 (
-                    DropOffBy::Hunt,
+                    DropOffBy::Hunt(*h),
                     h.target.map(HuntTargetId::id),
                     h.point,
                     h.task.resource,
@@ -379,7 +379,7 @@ impl World {
         &mut self,
         p: PlayerId,
         idx: ListIndex,
-        ask: DropOffAsk,
+        ask: &DropOffAsk,
     ) -> Result<(), GenieError> {
         if !ask.asked {
             self.other_load(p, idx)?;
@@ -390,7 +390,10 @@ impl World {
         if ask.asked {
             match ask.by {
                 DropOffBy::Build(build) => self.build_drop_off_now((p, idx), build)?,
-                DropOffBy::Gather | DropOffBy::Hunt => self.drop_off_at_site(p, idx, ask.by)?,
+                DropOffBy::Gather(gather) => {
+                    self.drop_off_at_site(p, idx, &SiteWalker::Gather(gather))?;
+                }
+                DropOffBy::Hunt(hunt) => self.drop_off_at_site(p, idx, &SiteWalker::Hunt(hunt))?,
             }
         }
         if ask.unaimed {
@@ -407,7 +410,7 @@ impl World {
         &mut self,
         p: PlayerId,
         idx: ListIndex,
-        by: DropOffBy,
+        walker: &SiteWalker,
     ) -> Result<(), GenieError> {
         let unit = self.take_out(p, idx)?;
         // its action layer goes out of the table with it, as the updating object's
@@ -427,24 +430,23 @@ impl World {
             groups: &self.groups,
         };
         let others = OthersRef::of(&self.players, &self.index, p)?;
-        let result = if matches!(by, DropOffBy::Hunt) {
-            unit.drop_off_in(
-                &mut actions,
+        let result = match *walker {
+            SiteWalker::Hunt(mut hunt) => unit.drop_off_in(
+                (&mut hunt, &mut actions),
                 mover,
                 world,
                 others,
                 &self.model.graphics,
                 by_id,
-            )
-        } else {
-            unit.gather_drop_off_in(
-                &mut actions,
+            ),
+            SiteWalker::Gather(mut gather) => unit.gather_drop_off_in(
+                (&mut gather, &mut actions),
                 mover,
                 world,
                 others,
                 &self.model.graphics,
                 by_id,
-            )
+            ),
         };
         self.parts.put_actions(unit.id, actions);
         let idx = self.put_back_own(p, unit)?;
@@ -455,15 +457,25 @@ impl World {
     }
 }
 
-/// The top action a drop-off order asks ([`World::drop_off_ask`]).
+/// The top action a drop-off order asks ([`World::drop_off_ask`]), the one the ask found.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(super) enum DropOffBy {
     /// A Gather (5).
-    Gather,
-    /// A Build (101), the one the ask found.
+    Gather(GatherAction),
+    /// A Build (101).
     Build(BuildAction),
     /// A Hunt (110).
-    Hunt,
+    Hunt(HuntAction),
+}
+
+/// The top action a drop-off order walks to a drop site ([`World::drop_off_at_site`]), the
+/// one its ask found.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(super) enum SiteWalker {
+    /// A Gather (5).
+    Gather(GatherAction),
+    /// A Hunt (110).
+    Hunt(HuntAction),
 }
 
 /// A drop-off order's ask of a unit's top action ([`World::drop_off_ask`]).

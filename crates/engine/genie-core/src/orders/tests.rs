@@ -5163,10 +5163,20 @@ fn drop_off_order_asks_the_top_gather_build_or_hunt() {
     use super::unit_order::{DropOffAsk, DropOffBy};
     let mut t = foraging();
     let ask = |by, asked, unaimed| Some(DropOffAsk { by, asked, unaimed });
+    // the ask carries the top action it found
+    let gather = |t: &World| {
+        DropOffBy::Gather(
+            *t.parts
+                .actions_of(t.players[1].objects[ListIndex::new(0)].id)
+                .list
+                .gather()
+                .unwrap(),
+        )
+    };
     assert_eq!(
         t.drop_off_ask(PlayerId::new(1), ListIndex::new(0), (true, true))
             .unwrap(),
-        ask(DropOffBy::Gather, true, false)
+        ask(gather(&t), true, false)
     );
     assert_eq!(
         t.drop_off_ask(PlayerId::new(1), ListIndex::new(0), (false, true))
@@ -5177,7 +5187,7 @@ fn drop_off_order_asks_the_top_gather_build_or_hunt() {
     assert_eq!(
         t.drop_off_ask(PlayerId::new(1), ListIndex::new(0), (true, false))
             .unwrap(),
-        ask(DropOffBy::Gather, false, false)
+        ask(gather(&t), false, false)
     );
     let g = t
         .parts
@@ -5191,12 +5201,12 @@ fn drop_off_order_asks_the_top_gather_build_or_hunt() {
     assert_eq!(
         t.drop_off_ask(PlayerId::new(1), ListIndex::new(0), (true, true))
             .unwrap(),
-        ask(DropOffBy::Gather, false, true)
+        ask(gather(&t), false, true)
     );
     assert_eq!(
         t.drop_off_ask(PlayerId::new(1), ListIndex::new(0), (true, false))
             .unwrap(),
-        ask(DropOffBy::Gather, false, false)
+        ask(gather(&t), false, false)
     );
     // a Hunt and a Build of a wood task, aimed
     let mut hunt = hunting(600);
@@ -5212,7 +5222,7 @@ fn drop_off_order_asks_the_top_gather_build_or_hunt() {
     assert_eq!(
         t.drop_off_ask(PlayerId::new(1), ListIndex::new(0), (true, true))
             .unwrap(),
-        ask(DropOffBy::Hunt, true, false)
+        ask(DropOffBy::Hunt(hunt), true, false)
     );
     let task = BuildTask {
         range: Distance::new(0.1),

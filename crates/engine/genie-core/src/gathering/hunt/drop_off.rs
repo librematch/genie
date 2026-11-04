@@ -227,6 +227,7 @@ impl Unit {
     /// [`drop_site_search`]: crate::gathering::drop_sites::drop_site_search
     pub(crate) fn hunt_drop_off(
         &mut self,
+        hunt: &mut HuntAction,
         actions: &mut Action,
         c: &mut Step<'_>,
         roles: &Roles,
@@ -245,9 +246,14 @@ impl Unit {
             groups: &c.w.groups,
         };
         let others = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
-        if let Some(site) =
-            self.drop_off_in(actions, mover, w, others, &c.w.model.graphics, by_id)?
-        {
+        if let Some(site) = self.drop_off_in(
+            (hunt, actions),
+            mover,
+            w,
+            others,
+            &c.w.model.graphics,
+            by_id,
+        )? {
             let by = self.releaser(c)?;
             take(c, self, site, by, roles)?;
         }

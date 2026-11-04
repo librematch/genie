@@ -7,7 +7,7 @@ use crate::combat::victims::victim;
 use crate::gathering::ActionEnd;
 use crate::gathering::hunt::HuntChase;
 use crate::gathering::hunt::HuntState;
-use crate::gathering::hunt::{HuntTask, NO_HUNT, Quarry, stand_sprite};
+use crate::gathering::hunt::{HuntAction, HuntTask, Quarry, stand_sprite};
 use crate::map::Distance;
 use crate::map::spatial::{SearchQuery, Spatial};
 use crate::math::rng::Stream;
@@ -53,19 +53,20 @@ impl Unit {
     /// (`set_state` 2), not modelled.
     pub(crate) fn hunt_set_search(
         &mut self,
+        hunt: &mut HuntAction,
         actions: &mut Action,
         c: &mut Step<'_>,
         roles: &Roles,
     ) -> Result<(), GenieError> {
-        let hunt = actions.list.hunt_mut().ok_or(NO_HUNT)?;
         if !roles
             .of_some_class(hunt.target_class)
             .contains(ClassRoles::PREDATOR)
         {
             let target = hunt.target.take();
+            actions.list.set_hunt(Some(*hunt));
             self.hunt_release(c, [target])?;
         }
-        self.hunt_search_state(actions, c, roles)
+        self.hunt_search_state(hunt, actions, c, roles)
     }
 
     /// The Hunt's `set_state(3)` itself (`0x140ac60e0` case 3; its target stays): the unit AI is
@@ -74,11 +75,11 @@ impl Unit {
     /// target and the second target go), a computer player's would end (1), not modelled.
     pub(crate) fn hunt_search_state(
         &mut self,
+        hunt: &mut HuntAction,
         actions: &mut Action,
         c: &mut Step<'_>,
         roles: &Roles,
     ) -> Result<(), GenieError> {
-        let hunt = actions.list.hunt_mut().ok_or(NO_HUNT)?;
         let task = hunt.task;
         if roles
             .of_some_class(hunt.target_class)
@@ -91,12 +92,14 @@ impl Unit {
                 ));
             }
             let released = hunt.set_done();
+            actions.list.set_hunt(Some(*hunt));
             self.hunt_stand(c, &task)?;
             self.hunt_release(c, released)?;
             return Ok(());
         }
         hunt.timer = SEARCH_AGAIN;
-        self.hunt_search_notify(actions, c)?;
+        actions.list.set_hunt(Some(*hunt));
+        self.hunt_search_notify(hunt, actions, c)?;
         self.hunt_stand(c, &task)
     }
 
@@ -148,9 +151,10 @@ impl Unit {
     /// `0x140ac7a00` case 2): notify 0x202 with the hunt action (0x265), its target class (`+0x68`)
     /// and its drop site: the second target; −1 for a master without drop sites (`+0x7a0`); else
     /// the closest (`FUN_1411671e0` as `set_state(8)` searches, [`Unit::drop_site`]), with none
-    /// found 0, and the hunt's class goes (−1).
+    /// found 0, and the hunt's class goes (−1). `hunt` is the head's copy, which the list holds.
     pub(crate) fn hunt_search_notify(
         &self,
+        hunt: &mut HuntAction,
         actions: &mut Action,
         c: &mut Step<'_>,
     ) -> Result<(), GenieError> {
@@ -163,7 +167,6 @@ impl Unit {
             &c.w.model.tuning,
         );
         let others = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
-        let hunt = actions.list.hunt().ok_or(NO_HUNT)?;
         let (carry_to, class) = (hunt.carry_to, i32::from(ClassId::field(hunt.target_class)));
         let master = self.master(c.w.master_tables(), c.player)?;
         let site = if let Some(carry) = carry_to {
@@ -191,7 +194,8 @@ impl Unit {
             )?;
             match site {
                 None => {
-                    actions.list.hunt_mut().ok_or(NO_HUNT)?.target_class = None;
+                    hunt.target_class = None;
+                    actions.list.set_hunt(Some(*hunt));
                     0
                 }
                 // the notify's record holds the drop site's id
@@ -226,26 +230,27 @@ impl Unit {
     /// [`HuntAction::search_walk`]: crate::gathering::hunt::HuntAction::search_walk
     pub(crate) fn hunt_after_drop(
         &mut self,
+        hunt: &mut HuntAction,
         actions: &mut Action,
         c: &mut Step<'_>,
         roles: &Roles,
     ) -> Result<HeadCode, GenieError> {
         let _ = self.master(c.w.master_tables(), c.player)?;
-        if actions.list.hunt().ok_or(NO_HUNT)?.target.is_some() {
+        if hunt.target.is_some() {
             return self
-                .hunt_back_to_target(actions, c, roles)
+                .hunt_back_to_target(hunt, actions, c, roles)
                 .map(|()| HeadCode::Keeps);
         }
         if self.hunt_drop_orders(c)? == ActionEnd::Ends {
             return Ok(HeadCode::Deletes);
         }
-        let (found, kind) = self.hunt_next_search(actions, c, roles)?;
+        let (found, kind) = self.hunt_next_search(hunt, actions, c, roles)?;
         let Some(found) = found else {
             return self
-                .hunt_found_nothing(actions, c, kind, roles)
+                .hunt_found_nothing(hunt, actions, c, kind, roles)
                 .map(|()| HeadCode::Keeps);
         };
-        self.hunt_take_found(actions, c, found, roles)
+        self.hunt_take_found((hunt, actions), c, found, roles)
             .map(|()| HeadCode::Keeps)
     }
 
@@ -255,11 +260,11 @@ impl Unit {
     /// modelled.
     fn hunt_back_to_target(
         &mut self,
+        hunt: &mut HuntAction,
         actions: &mut Action,
         c: &mut Step<'_>,
         roles: &Roles,
     ) -> Result<(), GenieError> {
-        let hunt = actions.list.hunt().ok_or(NO_HUNT)?;
         let master = self.master(c.w.master_tables(), c.player)?;
         let v = victim(c, hunt.target, roles)?.ok_or(GenieError::unsupported(
             "a hunt's target the slice does not hold live",
@@ -304,8 +309,8 @@ impl Unit {
             moving,
             roles,
         );
-        let hunt = actions.list.hunt_mut().ok_or(NO_HUNT)?;
         let site = hunt.carry_to.take();
+        actions.list.set_hunt(Some(*hunt));
         let by = self.releaser(c)?;
         if site.is_some() {
             release(c, self, site, by)?;
@@ -320,8 +325,7 @@ impl Unit {
             ),
             roles,
         )?;
-        let (Some(hunt), Some(mover)) = (actions.list.hunt_mut(), c.w.parts.mover_mut(self.id))
-        else {
+        let Some(mover) = c.w.parts.mover_mut(self.id) else {
             return Err(GenieError::unsupported(
                 "a hunter without its hunt or movement state",
             ));
@@ -331,7 +335,7 @@ impl Unit {
             player: c.player,
             walks: &walks,
         };
-        if hunt.chase(
+        let chased = hunt.chase(
             chase,
             &engagement,
             arms,
@@ -342,8 +346,9 @@ impl Unit {
                 move_to_tuning: &c.w.model.tuning.move_to,
             },
             &c.w.model.tuning.hunt,
-        )? == MoveStart::Arrived
-        {
+        );
+        actions.list.set_hunt(Some(*hunt));
+        if chased? == MoveStart::Arrived {
             return Err(GenieError::unsupported(
                 "a hunt's Attack whose MoveTo starts arrived after its drop-off",
             ));
@@ -401,11 +406,11 @@ impl Unit {
     /// kind.
     fn hunt_next_search(
         &self,
+        hunt: &HuntAction,
         actions: &Action,
         c: &mut Step<'_>,
         roles: &Roles,
     ) -> Result<(Option<ObjectId>, Option<GatherGroup>), GenieError> {
-        let hunt = actions.list.hunt().ok_or(NO_HUNT)?;
         let ai =
             c.w.parts
                 .unit_ai
@@ -427,7 +432,7 @@ impl Unit {
             {
                 None
             }
-            None => self.hunt_closest_object(actions, c, class, roles)?,
+            None => self.hunt_closest_object((hunt, actions), c, class, roles)?,
             Some(group) => {
                 let cap = if group == GatherGroup::WOOD {
                     WorkerCount::of_data(2)
@@ -447,7 +452,7 @@ impl Unit {
     /// are not modelled. The object found, -1 for none.
     fn hunt_closest_object(
         &self,
-        actions: &Action,
+        (hunt, actions): (&HuntAction, &Action),
         c: &mut Step<'_>,
         class: Option<ClassId>,
         roles: &Roles,
@@ -482,7 +487,7 @@ impl Unit {
             memory: Memory::default(),
         };
         let me = Me {
-            action_state: ActionState::new(actions.list.hunt().ok_or(NO_HUNT)?.state.get()),
+            action_state: ActionState::new(hunt.state.get()),
             ..self.me(actions)
         };
         let mut plan = Planning {
@@ -537,6 +542,7 @@ impl Unit {
     /// (`set_state(2)`), not modelled.
     fn hunt_found_nothing(
         &self,
+        hunt: &mut HuntAction,
         actions: &mut Action,
         c: &mut Step<'_>,
         kind: Option<GatherGroup>,
@@ -557,13 +563,14 @@ impl Unit {
             ),
             roles,
         )?;
-        let hunt = actions.list.hunt_mut().ok_or(NO_HUNT)?;
         if hunt.point.x() == -1.0 || hunt.point.y() == -1.0 {
             return Err(GenieError::unsupported(
                 "a hunt without a point that found nothing after its drop-off (set_state 2)",
             ));
         }
         let mover = c.w.parts.mover_mut(self.id).ok_or(HUNTER_UNMOVING)?;
-        hunt.search_walk(mover, &walks, &c.w.model.tuning.move_to)
+        let walked = hunt.search_walk(mover, &walks, &c.w.model.tuning.move_to);
+        actions.list.set_hunt(Some(*hunt));
+        walked
     }
 }

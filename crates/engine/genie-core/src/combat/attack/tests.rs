@@ -2597,7 +2597,8 @@ fn disarmed_building_targetless_attack_ends_standing_and_posts_0x1fb() {
         (PlayerId::new(1), ListIndex::new(2)),
         50,
         |u, actions, c| {
-            let code = u.attack_part(actions, c, me(object_id(700)), None, &roles())?;
+            let attack = *actions.list.attack().unwrap();
+            let code = u.attack_part(attack, actions, c, me(object_id(700)), None, &roles())?;
             u.end_head_update(actions, c, code)
         },
     )
@@ -2629,7 +2630,8 @@ fn disarmed_building_targetless_attack_ends_standing_and_posts_0x1fb() {
         (PlayerId::new(1), ListIndex::new(0)),
         50,
         |u, actions, c| {
-            let code = u.attack_part(actions, c, me(object_id(9175)), None, &roles())?;
+            let attack = *actions.list.attack().unwrap();
+            let code = u.attack_part(attack, actions, c, me(object_id(9175)), None, &roles())?;
             u.end_head_update(actions, c, code)
         },
     );

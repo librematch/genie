@@ -3,16 +3,15 @@
 use crate::GenieError;
 use crate::combat::attack::BeginLayer;
 use crate::combat::attack::{arms, engagement, show_arrived};
-use crate::gathering::hunt::HuntRetarget;
 use crate::gathering::hunt::HuntState;
 use crate::gathering::hunt::Quarry;
+use crate::gathering::hunt::{HuntAction, HuntRetarget};
 use crate::math::rng::Stream;
 use crate::movement::MoveStart;
 use crate::movement::Speed;
 use crate::objects::ObjectId;
 use crate::objects::layers::Action;
 use crate::objects::masters::MasterTables;
-use crate::objects::masters::TaskSprites;
 use crate::objects::sprite::new_sprite;
 use crate::objects::unit::Unit;
 use crate::players::AllyTest;
@@ -33,7 +32,7 @@ impl Unit {
     /// carries nothing now).
     pub(super) fn hunt_take_found(
         &mut self,
-        actions: &mut Action,
+        (hunt, actions): (&mut HuntAction, &mut Action),
         c: &mut Step<'_>,
         found: ObjectId,
         roles: &Roles,
@@ -86,11 +85,14 @@ impl Unit {
             them,
             c.w.world_time,
         )?;
-        let (sprites, moving) = actions.list.hunt().map_or((TaskSprites::NONE, None), |h| {
-            let moving = h.task.walk_sprite_id(self.life.held());
-            (h.task.sprites, moving)
-        });
-        let arms = arms(master, &c.w.model.graphics, sprites, moving, roles);
+        let moving = hunt.task.walk_sprite_id(self.life.held());
+        let arms = arms(
+            master,
+            &c.w.model.graphics,
+            hunt.task.sprites,
+            moving,
+            roles,
+        );
         let drops_here = master.action_part().drop_sites.contains(&t.life.master_id);
         let walks = self.move_walks(
             c.w.parts.mover_of(self.id),
@@ -103,13 +105,12 @@ impl Unit {
             roles,
         )?;
         let by = self.releaser(c)?;
-        let (Some(hunt), Some(mover)) = (actions.list.hunt_mut(), c.w.parts.mover_mut(self.id))
-        else {
+        let Some(mover) = c.w.parts.mover_mut(self.id) else {
             return Err(GenieError::unsupported(
                 "a hunter without its hunt or movement state",
             ));
         };
-        if let Some(move_start) = hunt.retarget(
+        let retargeted = hunt.retarget(
             HuntRetarget {
                 target: &quarry,
                 player: c.player,
@@ -125,7 +126,9 @@ impl Unit {
                 move_to_tuning: &c.w.model.tuning.move_to,
             },
             &c.w.model.tuning.hunt,
-        )? {
+        );
+        actions.list.set_hunt(Some(*hunt));
+        if let Some(move_start) = retargeted? {
             if move_start == MoveStart::Arrived {
                 show_arrived(
                     &arms,
@@ -137,17 +140,17 @@ impl Unit {
             }
             take(c, self, found, by, roles)?;
         }
-        self.hunt_failed_sprite(actions, c)
+        self.hunt_failed_sprite(hunt, c)
     }
 
     /// A hunt that failed at once after its retarget: the unit shows standing, and a unit with
     /// a sprite takes its master's standing sprite (none in the data file is not modelled).
-    fn hunt_failed_sprite(&mut self, actions: &Action, c: &mut Step<'_>) -> Result<(), GenieError> {
-        let failed = actions
-            .list
-            .hunt()
-            .is_some_and(|h| h.state == HuntState::Failed);
-        if !failed {
+    fn hunt_failed_sprite(
+        &mut self,
+        hunt: &HuntAction,
+        c: &mut Step<'_>,
+    ) -> Result<(), GenieError> {
+        if hunt.state != HuntState::Failed {
             return Ok(());
         }
         let standing = self

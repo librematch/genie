@@ -12,7 +12,6 @@ use crate::gathering::HuntTargetId;
 use crate::gathering::drop_sites::nearest_drop_site;
 use crate::gathering::hunt::DecayRule;
 use crate::gathering::hunt::HuntState;
-use crate::gathering::hunt::NO_HUNT;
 use crate::gathering::hunt::TreeSearch;
 use crate::gathering::hunt::{Herd, HuntAction, HuntNext, HuntReads, HuntSprites};
 use crate::map::Distance;
@@ -49,11 +48,10 @@ impl Unit {
     /// object, taken).
     pub(crate) fn hunt_strike(
         &mut self,
-        actions: &mut Action,
+        (hunt, actions): (&mut HuntAction, &mut Action),
         c: &mut Step<'_>,
         me: Me,
-        own: &mut Option<Victim>,
-        tree_lost: bool,
+        (own, tree_lost): (&mut Option<Victim>, bool),
         roles: &Roles,
     ) -> Result<(), GenieError> {
         let master = object_master(
@@ -61,35 +59,34 @@ impl Unit {
             (self.id, self.life.master_id),
             c.w.model.masters.of(c.player),
         )?;
-        let mut hunt = *actions.list.hunt().ok_or(NO_HUNT)?;
-        let victim = hunt_victim(c, &hunt, roles)?;
+        let victim = hunt_victim(c, hunt, roles)?;
         let own = own.take().ok_or(HUNTER_MASTER)?;
         let herd = self.herd_for(
             c,
             OthersRef::of(&c.w.players, &c.w.index, c.player)?,
-            &hunt,
+            hunt,
             master,
             &victim,
             roles,
         )?;
-        let r = self.hunt_reads(c, master, &hunt, herd, tree_lost, roles)?;
+        let r = self.hunt_reads(c, master, hunt, herd, tree_lost, roles)?;
         let mut f = Fight { victim, own };
         // written back before an error too: the stop's context reads the list
         let next = hunt.update(c, self, actions, me, &mut f, &r);
-        if let Some(h) = actions.list.hunt_mut() {
-            *h = hunt;
-        }
+        actions.list.set_hunt(Some(*hunt));
         let next = next?;
-        // the retaliation's kill of the unit itself, which follows its step
+        // the retaliation's kill of the unit itself, which follows its step; it changes the
+        // unit's actions only by livestock's change to Gaia, and livestock hunts nothing: the
+        // game goes on with the Hunt itself
         if let Some(k) = self.hit_back(f.own, c.w.parts.ai_and_combat_mut(self.id)?)? {
             let own = KillLeft::own(self.id, k);
             file_kill(c, (self, actions), own, roles)?;
         }
         match next {
             HuntNext::Stay => Ok(()),
-            HuntNext::Drop => self.hunt_drop_off(actions, c, roles),
-            HuntNext::Search => self.hunt_set_search(actions, c, roles),
-            HuntNext::AttackFailed => self.hunt_attack_failed(actions, c, roles),
+            HuntNext::Drop => self.hunt_drop_off(hunt, actions, c, roles),
+            HuntNext::Search => self.hunt_set_search(hunt, actions, c, roles),
+            HuntNext::AttackFailed => self.hunt_attack_failed(hunt, actions, c, roles),
         }
     }
 
@@ -167,19 +164,18 @@ impl Unit {
     /// [`Unit::hunt_search_state`]).
     pub(crate) fn hunt_attack_failed(
         &mut self,
+        hunt: &mut HuntAction,
         actions: &mut Action,
         c: &mut Step<'_>,
         roles: &Roles,
     ) -> Result<(), GenieError> {
         let tree = c.w.parts.unit_ai.get(self.id).is_some_and(|ai| {
-            let class = ai
-                .target_class
-                .or_else(|| actions.list.hunt().and_then(|h| h.target_class));
+            let class = ai.target_class.or(hunt.target_class);
             roles.of_some_class(class).contains(ClassRoles::TREE)
         });
         if tree
             && self.hunt_tree_search(
-                actions,
+                (hunt, actions),
                 c,
                 None,
                 Some(Distance::new(c.w.model.tuning.hunt.tree_near)),
@@ -188,10 +184,13 @@ impl Unit {
         {
             return Ok(());
         }
-        let hunt = actions.list.hunt_mut().ok_or(NO_HUNT)?;
-        hunt.tear_down(c.w.parts.mover_mut(self.id))?;
-        hunt.state = HuntState::Search;
-        self.hunt_search_state(actions, c, roles)
+        let torn = hunt.tear_down(c.w.parts.mover_mut(self.id));
+        if torn.is_ok() {
+            hunt.state = HuntState::Search;
+        }
+        actions.list.set_hunt(Some(*hunt));
+        torn?;
+        self.hunt_search_state(hunt, actions, c, roles)
     }
 
     /// What `set_state(6)` on live livestock reads (`0x140ac60e0` case 6), and the lead's update

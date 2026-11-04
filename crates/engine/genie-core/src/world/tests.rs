@@ -5461,8 +5461,10 @@ fn hunt_part_of(t: &mut World, dt: u32) -> Result<(), GenieError> {
                     .map_or(ActionState::NO_ACTION, |a| a.state),
             };
             let mut own = unit.own_victim(actions, c, &roles())?;
-            let tree_lost = unit.tree_lost(actions, c, &roles());
-            let code = unit.hunt_part(actions, c, me, &mut own, tree_lost, &roles())?;
+            let mut hunt = *actions.list.hunt().unwrap();
+            let tree_lost = unit.tree_lost(&hunt, c, &roles());
+            let code =
+                unit.hunt_part((&mut hunt, actions), c, me, (&mut own, tree_lost), &roles())?;
             unit.end_head_update(actions, c, code)
         },
     )
@@ -5630,7 +5632,6 @@ fn failed_hunt_tells_its_unit_ai_and_lets_its_target_go() {
         t.players[0].objects[ListIndex::new(0)].workers,
         WorkerCount::of_data(0)
     );
-    assert_eq!(hunt_part_of(&mut t, 50), Ok(()));
 }
 
 /// The search (state 3, case 2): the timer runs by dt; at its end it starts again at −10 s and
@@ -5932,8 +5933,10 @@ fn hunter_work_reaches_its_deer_in_the_same_update() {
                     .map_or(ActionState::NO_ACTION, |a| a.state),
             };
             let mut own = unit.own_victim(actions, c, &roles())?;
-            let tree_lost = unit.tree_lost(actions, c, &roles());
-            let code = unit.hunt_part(actions, c, me, &mut own, tree_lost, &roles())?;
+            let mut hunt = *actions.list.hunt().unwrap();
+            let tree_lost = unit.tree_lost(&hunt, c, &roles());
+            let code =
+                unit.hunt_part((&mut hunt, actions), c, me, (&mut own, tree_lost), &roles())?;
             unit.end_head_update(actions, c, code)?;
             Ok(OthersRef::of(&c.w.players, &c.w.index, c.player)
                 .unwrap()
@@ -5962,7 +5965,9 @@ fn gathering_hunt_whose_target_left_searches_without_reading_one() {
         (PlayerId::new(1), ListIndex::new(0)),
         50,
         |unit, actions, c| {
-            unit.hunt_targets(actions, c)?;
+            let mut hunt = *actions.list.hunt().unwrap();
+            unit.hunt_targets(&mut hunt, c)?;
+            actions.list.set_hunt(Some(hunt));
             let me = Me {
                 human_order: WorldTime::ZERO,
                 id: unit.id,
@@ -5972,7 +5977,7 @@ fn gathering_hunt_whose_target_left_searches_without_reading_one() {
                     .map_or(ActionState::NO_ACTION, |a| a.state),
             };
             let mut own = unit.own_victim(actions, c, &roles())?;
-            let code = unit.hunt_part(actions, c, me, &mut own, false, &roles())?;
+            let code = unit.hunt_part((&mut hunt, actions), c, me, (&mut own, false), &roles())?;
             unit.end_head_update(actions, c, code)
         },
     );
@@ -6161,8 +6166,9 @@ fn hunter_sheep_walks_before_the_hunter_update_ends() {
                     .map_or(ActionState::NO_ACTION, |a| a.state),
             };
             let mut own = unit.own_victim(actions, c, &roles())?;
-            let tree_lost = unit.tree_lost(actions, c, &roles());
-            let _ = unit.hunt_part(actions, c, me, &mut own, tree_lost, &roles())?;
+            let mut hunt = *actions.list.hunt().unwrap();
+            let tree_lost = unit.tree_lost(&hunt, c, &roles());
+            let _ = unit.hunt_part((&mut hunt, actions), c, me, (&mut own, tree_lost), &roles())?;
             Ok(c.w
                 .parts
                 .actions_of(c.w.players[1].objects[ListIndex::new(3)].id)
@@ -6730,7 +6736,10 @@ fn hunt_that_lost_its_tree_takes_the_next_one() {
             t,
             (PlayerId::new(1), ListIndex::new(0)),
             50,
-            |unit, actions, c| unit.hunt_tree_search(actions, c, within, near, &roles()),
+            |unit, actions, c| {
+                let mut hunt = *actions.list.hunt().unwrap();
+                unit.hunt_tree_search((&mut hunt, actions), c, within, near, &roles())
+            },
         )
     };
     let mut t = lumber_world(31.5);
@@ -6788,7 +6797,8 @@ fn hunt_that_lost_its_tree_takes_the_next_one() {
 fn hunt_whose_attack_failed_takes_near_tree_or_searches() {
     let failed = |t: &mut World| {
         in_update(t, (PlayerId::new(1), ListIndex::new(0)), 50, |u, a, c| {
-            Unit::hunt_attack_failed(u, a, c, &roles())
+            let mut hunt = *a.list.hunt().unwrap();
+            Unit::hunt_attack_failed(u, &mut hunt, a, c, &roles())
         })
     };
     let mut t = lumber_world(31.5);
@@ -12794,8 +12804,9 @@ fn hunter_drop_off_takes_the_drop_site_it_found() {
             player_kind: PlayerKind::Human,
             groups: &t.groups,
         };
+        let mut hunt = *actions.list.hunt().unwrap();
         hunter.drop_off_in(
-            actions,
+            (&mut hunt, actions),
             Some(walker),
             world,
             OthersRef::alone(PlayerId::new(1), &others),
@@ -19395,7 +19406,8 @@ fn forager_with_nothing_found_after_the_drop_idles_or_is_done() {
         (PlayerId::new(1), ListIndex::new(0)),
         50,
         |unit, actions, c| {
-            let code = unit.gather_after_drop(actions, c, &roles())?;
+            let gather = *actions.list.gather().unwrap();
+            let code = unit.gather_after_drop(gather, actions, c, &roles())?;
             unit.end_head_update(actions, c, code)
         },
     )
@@ -19425,7 +19437,8 @@ fn gather_step(t: &mut World) -> Result<(), GenieError> {
                     .top_action()
                     .map_or(ActionState::NO_ACTION, |a| a.state),
             };
-            let code = unit.gather_update(actions, c, me, &roles())?;
+            let gather = *actions.list.gather().unwrap();
+            let code = unit.gather_update(gather, actions, c, me, &roles())?;
             unit.end_head_update(actions, c, code)
         },
     )
@@ -19464,9 +19477,10 @@ fn what_follows_the_gather_update_lets_go_builds_or_reseeds() {
             50,
             |unit, actions, c| {
                 let by = unit.releaser(c)?;
+                let mut gather = *actions.list.gather().unwrap();
                 let r = unit
                     .gather_next(
-                        actions,
+                        (&mut gather, actions),
                         c,
                         next,
                         (old.0.map(GatherTargetId::new), old.1),
@@ -20343,7 +20357,8 @@ fn hunted_without_deer(setup: impl FnOnce(&mut Action, &mut UnitAi)) -> World {
         (PlayerId::new(1), ListIndex::new(0)),
         50,
         |unit, actions, c| {
-            let code = unit.hunt_after_drop(actions, c, &roles())?;
+            let mut hunt = *actions.list.hunt().unwrap();
+            let code = unit.hunt_after_drop(&mut hunt, actions, c, &roles())?;
             unit.end_head_update(actions, c, code)
         },
     )
@@ -22035,8 +22050,10 @@ fn the_unit_ai_orders_reach_the_unit_and_the_units_they_name() {
             50,
             |unit, actions, c| {
                 let by = unit.releaser(c)?;
-                let g = actions.list.gather().copied().unwrap();
-                let _ = unit.gather_next(actions, c, next, (g.target, g.carry_to), by, &roles())?;
+                let mut g = actions.list.gather().copied().unwrap();
+                let (target, carry_to) = (g.target, g.carry_to);
+                let _ =
+                    unit.gather_next((&mut g, actions), c, next, (target, carry_to), by, &roles())?;
                 let bush = OthersRef::of(&c.w.players, &c.w.index, PlayerId::new(0))
                     .unwrap()
                     .find(object_id(600))

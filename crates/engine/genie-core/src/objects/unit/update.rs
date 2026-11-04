@@ -2,6 +2,7 @@
 
 use crate::GenieError;
 use crate::combat::attack::run_down_attack_timers;
+use crate::gathering::hunt::HuntAction;
 use crate::math::rng::Stream;
 use crate::movement::MoveState;
 use crate::movement::{Me, Mover};
@@ -162,11 +163,18 @@ impl Unit {
                 .map(|()| HeadCode::Keeps),
             Some(Action::Fly(_)) => self.fly_part(actions, c, me).map(|()| HeadCode::Keeps),
             Some(Action::Make(_)) => self.make_part(actions, c, roles),
-            Some(Action::Gather(_)) => self.gather_update(actions, c, me, roles),
-            Some(Action::Hunt(_)) => self.hunter_update(actions, c, me, roles),
-            Some(Action::Attack(_)) => {
+            Some(Action::Gather(gather)) => {
+                let gather = *gather;
+                self.gather_update(gather, actions, c, me, roles)
+            }
+            Some(Action::Hunt(hunt)) => {
+                let hunt = *hunt;
+                self.hunter_update(hunt, actions, c, me, roles)
+            }
+            Some(Action::Attack(attack)) => {
+                let attack = *attack;
                 let own = self.own_victim(actions, c, roles)?;
-                self.attack_part(actions, c, me, own, roles)
+                self.attack_part(attack, actions, c, me, own, roles)
             }
         }
     }
@@ -193,20 +201,24 @@ impl Unit {
         Ok(())
     }
 
-    /// The Hunt's update (`0x140ac7a00`): its targets' check ([`Unit::hunt_targets`]), then its
-    /// part by state ([`Unit::hunt_part`]) with the hunter as a combat object, which its hits
-    /// read and change.
+    /// The Hunt's update (`0x140ac7a00`) on `hunt`, the head's copy: its targets' check
+    /// ([`Unit::hunt_targets`]), then its part by state ([`Unit::hunt_part`]) with the hunter as
+    /// a combat object, which its hits read and change.
     fn hunter_update(
         &mut self,
+        mut hunt: HuntAction,
         actions: &mut LayersAction,
         c: &mut Step<'_>,
         me: Me,
         roles: &Roles,
     ) -> Result<HeadCode, GenieError> {
-        self.hunt_targets(actions, c)?;
+        // the check reaches no action of the unit's: the copy goes back, before an error too
+        let checked = self.hunt_targets(&mut hunt, c);
+        actions.list.set_hunt(Some(hunt));
+        checked?;
         let mut own = self.own_victim(actions, c, roles)?;
-        let tree_lost = self.tree_lost(actions, c, roles);
-        self.hunt_part(actions, c, me, &mut own, tree_lost, roles)
+        let tree_lost = self.tree_lost(&hunt, c, roles);
+        self.hunt_part((&mut hunt, actions), c, me, (&mut own, tree_lost), roles)
     }
 
     /// `RGE_Static_Object::update` (`0x14118ad50`): an object flagged to sleep (`+0x643`) drops the

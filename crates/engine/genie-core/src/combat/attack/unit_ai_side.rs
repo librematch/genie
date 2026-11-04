@@ -3,7 +3,6 @@
 //! target as a hit reads it, the start's readiness, the target's sight and a villager's swap.
 
 use crate::GenieError;
-use crate::combat::attack::unit::NO_ATTACK;
 use crate::combat::attack::{
     Attack, AttackCommand, Mark, ReadyReads, Wielder, arms_looking, engagement, speed_of,
 };
@@ -79,14 +78,14 @@ impl UnitView<'_, '_> {
         let Some(t) = self.c.w.spatial.get_known(target)?.copied() else {
             return Ok(no());
         };
-        if self
+        if let Some(&attack) = self
             .actions
             .list
             .attack()
-            .is_some_and(|a| a.target.map(AttackTargetId::id) == Some(target))
+            .filter(|a| a.target.map(AttackTargetId::id) == Some(target))
         {
             if force == OrderForce::Forced {
-                self.attack_again(target, &t, master, ai, roles)?;
+                self.attack_again((target, attack), &t, master, ai, roles)?;
             }
             return Ok(Attacked {
                 attacks: true,
@@ -220,10 +219,11 @@ impl UnitView<'_, '_> {
     /// and its place, with the main building of an annex for a unit of an area effect, the
     /// unit's top speed and canMoveToAttack ([`crate::unit_ai::Seeker::can_move`]); what it lets
     /// go and takes goes through the view at once ([`crate::world::lets::Lets`]), a new target
-    /// clearing the unit's attack count (`+0x900`). Its answer is not read.
+    /// clearing the unit's attack count (`+0x900`). Its answer is not read. `attack` is the
+    /// copy of the top Attack on `target`, which goes back to the list before the releases.
     fn attack_again(
         &mut self,
-        target: ObjectId,
+        (target, mut attack): (ObjectId, Attack),
         t: &Placed,
         master: &Master,
         ai: &UnitAi,
@@ -277,8 +277,9 @@ impl UnitView<'_, '_> {
             radius: master.radius,
         };
         let can_move = ai.current_order.is_some() || ai.stance <= UnitStance::Defensive;
-        let attack = self.actions.list.attack_mut().ok_or(NO_ATTACK)?;
         let w = attack.work(Some(target_mark), main, &wielder, |_| can_move, roles);
+        // the reads above reach no action of the unit's: the copy is the head
+        self.actions.list.set_attack(Some(attack));
         let by = Releaser {
             id: unit.id,
             class: Some(master.class),
