@@ -1708,9 +1708,9 @@ fn villager_on_farm_takes_its_group_farmer_for_the_farm_class() {
             terrain: None,
         };
         work_master(m, &actor, &on, None, &ALONE, slots(), &roles()).map(|w| {
-            w.map(|(id, t)| {
+            w.map(|(m, t)| {
                 (
-                    id.get(),
+                    m.id.get(),
                     ClassId::field(t.object_group),
                     MasterId::field(t.object_id),
                 )
@@ -1774,7 +1774,7 @@ fn villager_takes_the_first_master_of_its_swap_group_with_task_for_its_foundatio
             terrain: None,
         };
         work_master(&m, &actor, &on, None, &ALONE, slots(), &roles())
-            .map(|w| w.map(|(id, t)| (id.get(), t.action_kind)))
+            .map(|w| w.map(|(m, t)| (m.id.get(), t.action_kind)))
     };
     assert_eq!(pick(ids::VILLAGER_MALE), Ok(Some((118, ActionKind::BUILD))));
     assert_eq!(

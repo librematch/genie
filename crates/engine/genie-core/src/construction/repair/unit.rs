@@ -291,6 +291,7 @@ pub(crate) fn repair_target(
         }
     }
     let original = set.clone();
+    // the work's caller read the target (`RepairReads::target`), and the set holds it first
     let Some(first) = set.first() else {
         return Err(GenieError::unreachable(
             "a Repair working on an object the world does not hold",

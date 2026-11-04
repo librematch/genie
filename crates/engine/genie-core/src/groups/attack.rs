@@ -290,7 +290,7 @@ impl World {
                     .attributes
                     .get(CONVERSION_RANGE_ATTRIBUTE)
                     .copied()
-                    .ok_or(GenieError::unreachable(
+                    .ok_or(GenieError::missing_data(
                         "a player's attribute table without the conversion range",
                     ))?;
                 return Ok(bonus.get() + task.work_range.get());

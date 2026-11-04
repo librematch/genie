@@ -97,7 +97,8 @@ impl PlayersMasters for [Arc<Masters>] {
 /// task of another type (its master changes, slot 0x90), except that a gather task (106) for
 /// a farm, a pasture or the other objects the work command lists, with any filter, prefers
 /// the first such master with a task for the target's class and a work value, else the first
-/// with a task for any target. `Ok(None)`: no task.
+/// with a task for any target: the master of the player's list (`masters`) and its task.
+/// `Ok(None)`: no task.
 pub fn work_master<'m>(
     masters: &'m Masters,
     actor: &Actor<'_>,
@@ -106,7 +107,7 @@ pub fn work_master<'m>(
     dip: &impl Diplomacy,
     slots: Slots,
     roles: &Roles,
-) -> Result<Option<(MasterId, &'m Task)>, GenieError> {
+) -> Result<Option<(&'m Master, &'m Task)>, GenieError> {
     let own = actor.master;
     let own_list = masters.get(own.id).ok_or(GenieError::unsupported(
         "a unit of a master the player does not have",
@@ -147,20 +148,20 @@ pub fn work_master<'m>(
                     && (filter.is_none() || filter == Some(REPAIR))
                     && task.object_id != Some(t.master.id)
             }) else {
-                return Ok(Some((candidate.id, task)));
+                return Ok(Some((candidate, task)));
             };
             if by_class.is_none()
                 && task.for_class(target.master.class)
                 && task.work_val1.positive()
             {
-                by_class = Some((candidate.id, task));
+                by_class = Some((candidate, task));
             } else if generic.is_none() && task.object_group.is_none() && task.object_id.is_none() {
-                generic = Some((candidate.id, task));
+                generic = Some((candidate, task));
             }
         }
         if let Some(pick) = by_class.or(generic) {
             return Ok(Some(pick));
         }
     }
-    Ok(own_task.map(|t| (own.id, t)))
+    Ok(own_task.map(|t| (own_list, t)))
 }

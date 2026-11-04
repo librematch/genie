@@ -230,7 +230,9 @@ pub fn shown_attack(v: &Victim, s: &Shown<'_>, roles: &Roles) -> DamageAmount {
 ///
 /// # Errors
 ///
-/// An object without combat values (a type below 50).
+/// An object without combat values (a type below 50): the villager's harmless test, its one
+/// caller, reads an attacker, which is a combat object (below type 50 the class's table has no
+/// slot 0x868).
 pub fn shown_melee_armor(v: &Victim, roles: &Roles) -> Result<DamageAmount, GenieError> {
     let a = v.armored.as_ref().ok_or(GenieError::unreachable(
         "the melee armor of an object without combat values",

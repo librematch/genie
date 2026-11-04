@@ -193,6 +193,7 @@ impl World {
         grow: Distance,
         ignore: &[ObjectId],
     ) -> Result<bool, GenieError> {
+        // the steer tests each member before it walks its line (`World::members_to_slots`)
         let (_, u) = self.object(id).ok_or(GenieError::unreachable(
             "a steered member the world does not hold",
         ))?;

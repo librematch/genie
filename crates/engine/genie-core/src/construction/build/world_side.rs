@@ -331,6 +331,7 @@ impl World {
                 .of_class(new_master.class)
                 .contains(ClassRoles::GATE))
         .then(|| {
+            // the constructor and the save give every building its gate state
             old_lock.ok_or(GenieError::unreachable(
                 "a building without its gate state (every building holds one)",
             ))

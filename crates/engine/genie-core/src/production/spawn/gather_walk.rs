@@ -248,8 +248,9 @@ impl World {
                 None => return self.gather_move(p, new, at, source),
             },
         };
+        // both arms above answer a target the world holds
         let (owner, t) = self.object(target).ok_or(GenieError::unreachable(
-            "unreachable: a gather point's target found",
+            "a gather point's target the world held just before",
         ))?;
         let on_building = t.master(self.master_tables(), owner)?.kind == MasterKind::BUILDING;
         if let Some(m) = self.parts.mover_mut(self.players.live(p, new)?.id) {

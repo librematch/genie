@@ -212,6 +212,8 @@ impl Mover {
             range: w.range,
             target: w.goal.target.map(|(_, t)| t),
         };
+        // `first_plan` tested the planner of the same restriction, and the restriction tables
+        // never change
         let r = self
             .tile_plan(me, world, plan, ask, &mut np.path, by_id)?
             .ok_or(GenieError::unreachable(

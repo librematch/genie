@@ -46,10 +46,6 @@ use crate::world::index::Place;
 use crate::world::slots::PlayerSlots;
 use crate::world::{STATIC_KINDS_END, World};
 
-/// `work_master` returns a master the player has; one it lacks is a broken world.
-const NO_WORK_MASTER: GenieError =
-    GenieError::unreachable("a work master the player does not have");
-
 impl World {
     /// BUILD's builders (the cost was paid with the foundation, [`World::found`]; the pending
     /// debit came before, [`World::debit_listed`]), the handler's last loop: each unit of the
@@ -232,7 +228,7 @@ impl World {
             general: Some(&target),
             terrain: self.task_terrain(Position::new(position.x(), position.y(), 0.0)),
         };
-        let (with, task) = work_master(
+        let (builder, task) = work_master(
             masters,
             &actor,
             &on,
@@ -254,7 +250,6 @@ impl World {
                 "a builder whose Build task is not enabled",
             ));
         }
-        let builder = masters.get(with).ok_or(NO_WORK_MASTER)?;
         let to = WalkTo {
             id: Some(foundation.id()),
             at: position,
@@ -276,7 +271,7 @@ impl World {
             &self.model.roles,
         );
         Ok((
-            with,
+            builder.id,
             BuildAction::start(to, task, &move_reads, &self.model.tuning.move_to)?,
         ))
     }

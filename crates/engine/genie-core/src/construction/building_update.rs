@@ -82,6 +82,8 @@ impl Unit {
                 .locate(players, id)
                 .map(|(_, u, _)| ObjectState::Removed <= u.life.state)
                 .ok_or_else(|| {
+                    // a link clears as its object dies (`Unit::died`'s annexes) and here once it
+                    // is removed, before the world lets the object go
                     GenieError::unreachable(
                         "a building's link to an object the world does not file",
                     )
@@ -185,6 +187,7 @@ impl Unit {
         }
         let (p, id) = (c.player, self.id);
         c.lend((&mut *self, &mut *actions), |w| {
+            // the lend puts the gate back in its slot for the call
             let i = w.live_index(p, id).ok_or_else(|| {
                 GenieError::unreachable("a lent gate left its list").with("object", id)
             })?;

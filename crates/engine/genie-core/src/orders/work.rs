@@ -312,7 +312,7 @@ impl World {
             self.model.slots,
             &self.model.roles,
         )?
-        .map(|(with, task)| (with, *task)))
+        .map(|(with, task)| (with.id, *task)))
     }
 
     /// The terrain the task finder's general search reads at `point` (`FUN_1411a8ba0`,

@@ -64,6 +64,8 @@ impl World {
         if !self.target_pending(group)? {
             return self.attack_target_lost(group, target, relayout);
         }
+        // an attack command's target is pending only while the world holds it; the game reads
+        // it unchecked here (its player, `+0x138`)
         let target = target.ok_or_else(|| {
             GenieError::unreachable("a pending attack target the world does not hold")
                 .with("group", group)

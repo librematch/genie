@@ -609,6 +609,7 @@ pub(crate) fn paid_cost(master: &Master) -> Amount {
     cost
 }
 
-/// A victim the world located without its object.
+/// A victim the world located without its object: `World::locate` and `World::object_mut` read
+/// the same index, and nothing between them removes an object.
 const NOT_LOCATED: GenieError =
     GenieError::unreachable("a victim the world located without its object");

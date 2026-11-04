@@ -143,6 +143,7 @@ impl World {
                 if let Some((_, layer)) = self.object_and_layer_mut(id)? {
                     layer.livestock.push(new);
                 }
+                // `make_new_object` files the object it answers
                 let (_, u) = self
                     .object_mut(new)
                     .ok_or(GenieError::unreachable("the livestock just made"))?;

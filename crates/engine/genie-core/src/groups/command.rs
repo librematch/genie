@@ -14,7 +14,6 @@ use crate::groups::MoveReason;
 use crate::groups::QueueRun;
 use crate::groups::attack::AttackOrder;
 use crate::groups::formation::top_path;
-use crate::groups::group_list::member_gone;
 use crate::groups::{GroupCommand, GroupTarget, SpecificMove, UnitGroup};
 use crate::map::Distance;
 use crate::map::Point;
@@ -520,14 +519,12 @@ impl World {
         node: GroupCommand,
         count: usize,
     ) -> Result<QueueRun, GenieError> {
-        let held = self.world_object(node.target_id).is_some();
-        match node.command {
-            c if TARGET_COMMANDS.contains(&c) && held => {
-                let target = held_id(node.target_id)?;
-                let at = self
-                    .world_object(node.target_id)
-                    .ok_or_else(|| member_gone(node.target_id))?
-                    .position();
+        // the target with its place, when the world holds it
+        let held = node
+            .target_id
+            .and_then(|t| self.world_object(t).map(|o| (t, o.position())));
+        match (node.command, held) {
+            (c, Some((target, at))) if TARGET_COMMANDS.contains(&c) => {
                 let order = CommandArgs {
                     queued: false,
                     direct: true,
@@ -537,8 +534,7 @@ impl World {
                 let _ = self.general_command(group, (c, target), at.ground(), node.range, order)?;
                 Ok(QueueRun::Ends)
             }
-            c if ATTACK_COMMANDS.contains(&c) && held => {
-                let target = held_id(node.target_id)?;
+            (c, Some((target, _))) if ATTACK_COMMANDS.contains(&c) => {
                 let order = AttackOrder {
                     disable_retargeting: node.disable_retargeting != 0,
                     filter: ActionKind::of_data(node.approved_2.cast_signed()),
@@ -546,10 +542,11 @@ impl World {
                 let _ = self.command_attack(group, target, order)?;
                 Ok(QueueRun::Ends)
             }
-            c if (c == MOVE_COMMAND
-                || TARGET_COMMANDS.contains(&c)
-                || ATTACK_COMMANDS.contains(&c))
-                && 1 < count =>
+            (c, _)
+                if (c == MOVE_COMMAND
+                    || TARGET_COMMANDS.contains(&c)
+                    || ATTACK_COMMANDS.contains(&c))
+                    && 1 < count =>
             {
                 self.groups
                     .held_mut(group)?
@@ -686,12 +683,6 @@ fn move_level(
     }
     level.level = WaypointLevel::Top;
     level
-}
-/// The id of a queued command's target, which the world holds.
-fn held_id(id: Option<ObjectId>) -> Result<ObjectId, GenieError> {
-    id.ok_or(GenieError::unreachable(
-        "a held queued target without an id",
-    ))
 }
 
 #[cfg(test)]

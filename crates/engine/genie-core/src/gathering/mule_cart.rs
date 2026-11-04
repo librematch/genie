@@ -143,6 +143,7 @@ impl World {
         let cart = self.take_out(p, idx)?;
         let result = (|| {
             let (before, rest) = self.players.split_at(p.index());
+            // the cart was taken out of player `p`'s list
             let (player, after) = rest.split_first().ok_or(GenieError::unreachable(
                 "a cart's player outside the players",
             ))?;

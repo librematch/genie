@@ -124,6 +124,7 @@ impl World {
         if member == query.target {
             return Ok(None);
         }
+        // the group's task search hands on the members the world holds
         let (player, unit) = self.object(member).ok_or_else(|| {
             GenieError::unreachable("a member the group's task search found is not live")
                 .with("member", member.get())
@@ -201,7 +202,7 @@ impl World {
                     .and_then(|p| p.attributes.get(OWNER_RANGE_ATTRIBUTE))
                     .copied()
                     .ok_or_else(|| {
-                        GenieError::unreachable("a player without the attribute of a task's range")
+                        GenieError::missing_data("a player without the attribute of a task's range")
                             .with("player", target.player)
                             .with("attribute", OWNER_RANGE_ATTRIBUTE)
                     })?
