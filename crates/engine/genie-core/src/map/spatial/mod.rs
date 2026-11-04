@@ -58,7 +58,6 @@ use self::pather::{box_meets_segment, ccw};
 pub use self::record_id::RecordId;
 pub use self::search::{SearchLists, SearchQuery};
 pub use self::tile_sight::TileSight;
-use crate::gathering::PastureId;
 use crate::groups::GroupId;
 use crate::map::terrain::Terrain;
 use crate::movement::explore::InfluenceMap;
@@ -67,6 +66,7 @@ use crate::objects::unit::TAKEN_OUT;
 use crate::objects::{IdTable, WorkerCount};
 use crate::players::{ByPlayer, Relations, UnitRelations};
 use crate::vision::VisionMasks;
+use crate::world::index::ObjectsRef;
 use std::collections::BTreeSet;
 use std::ops::RangeInclusive;
 
@@ -573,22 +573,16 @@ impl SearchCache {
     }
 }
 
-/// [`Spatial::closest_object`]'s per-object checks: livestock that is moving, the objects a
-/// class-10 searcher passes, what it reads of a farm, the build's roles of the classes it
-/// meets and the target search's tuning values.
+/// [`Spatial::closest_object`]'s per-object checks: the world's objects by id (herded livestock,
+/// the masters a class-10 searcher passes, a farm's workers and pasture), the build's roles of
+/// the classes it meets and the target search's tuning values.
 #[derive(Clone, Copy)]
 struct ClosestChecks<'a> {
-    moving: &'a dyn Fn(ObjectId) -> bool,
-    shuns: &'a dyn Fn(&Placed) -> Result<bool, GenieError>,
-    farm: &'a FarmLook<'a>,
+    objects: ObjectsRef<'a>,
     roles: &'a Roles,
     best_target_tuning: &'a BestTargetTuning,
     spatial_tuning: &'a SpatialTuning,
 }
-
-/// What `ClosestObject` reads of a farm it found: its workers (`+0x644`) and the pasture it is in
-/// (`+0x790`, `parent_pasture_id`); None for an object the caller does not hold.
-pub type FarmLook<'a> = dyn Fn(ObjectId) -> Option<(WorkerCount, Option<PastureId>)> + 'a;
 
 #[cfg(test)]
 mod tests;

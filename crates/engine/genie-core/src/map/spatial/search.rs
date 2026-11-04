@@ -8,7 +8,7 @@ use crate::map::Position;
 use crate::map::Tile;
 use crate::map::WholeDistance;
 use crate::map::spatial::{
-    ClosestChecks, FarmLook, Filter, Placed, QUERY_HITS, Reach, RecordId, Spatial, players_seen,
+    ClosestChecks, Filter, Placed, QUERY_HITS, Reach, RecordId, Spatial, players_seen,
     record_meets_segment, tile_record_id,
 };
 use crate::map::{Rect, Segment};
@@ -16,7 +16,10 @@ use crate::math::conversions::cvttss2si;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::WorkerCount;
+use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::ObstructionKind;
+use crate::objects::masters::player_master;
+use crate::ownership::artifact::ARTIFACT_KIND;
 use crate::players::PlayerId;
 use crate::players::UnitRelations;
 use crate::players::{ByRelation, QueryRelation, UnitRelation};
@@ -185,8 +188,8 @@ impl Spatial {
     /// over the player's registry ([`crate::vision::registry::Registry::visible_units`]) unless the
     /// [`SearchCache`] holds near the place (`fresh` false: the last answer stands); then its
     /// [`Pick`], an attack by `attack`'s tests of the objects found and its choice among them. A query that reads nothing leaves the last answer too (and so is not fresh). A
-    /// query near a frozen object, or a last answer the slice has not got, fails. `shuns`
-    /// answers for a found object whether a class-10 searcher passes it ([`Spatial::closest_object`]).
+    /// query near a frozen object, or a last answer the slice has not got, fails. The query's
+    /// `objects` answer what [`Spatial::closest_object`] reads of a found object.
     ///
     /// [`SearchCache`]: crate::map::spatial::SearchCache
     pub fn search(
@@ -203,9 +206,7 @@ impl Spatial {
             search,
             attack,
             reach,
-            moving,
-            shuns,
-            farm,
+            objects,
         } = query;
         let _ = self.sight.as_ref().ok_or(GenieError::unsupported(
             "a search without the players' sight",
@@ -220,9 +221,7 @@ impl Spatial {
             attack,
             reach,
             ClosestChecks {
-                moving,
-                shuns,
-                farm,
+                objects,
                 roles,
                 best_target_tuning,
                 spatial_tuning,
@@ -423,8 +422,8 @@ impl Spatial {
     /// `reach`) and nearer than the nearest so far (by the search's distance; a tie goes to the
     /// lower id) is the nearest. Livestock (class 58) counts when the searcher's player owns it or
     /// it is not in state 2, and not while its top action is the Artifact with a point
-    /// (`moving`: slot 0x288 not −1 and slot 0x530 107, "Sheep is moving"). A searcher of class
-    /// 10 passes the objects `shuns` names (of master 440 or a master with object flag 0x10; the
+    /// ([`herded`]: slot 0x288 not −1 and slot 0x530 107, "Sheep is moving"). A searcher of class
+    /// 10 passes the objects [`shuns`] names (of master 440 or a master with object flag 0x10; the
     /// game's `+0x6b4` of 1, not met, would let it take them). Not modelled: a workers cap
     /// (argument 6; the objects' `+0x644`), the unbuilt farm test of a search for state 0, the
     /// pastures and farms (class 49). Nothing found answers −1.
@@ -530,12 +529,9 @@ pub struct SearchQuery<'a> {
     pub attack: &'a mut dyn AttackPicker,
     /// The reachability of a found object (slot 0x3d0).
     pub reach: &'a mut Reach<'a>,
-    /// Whether livestock is moving (slot 0x288 not −1 and slot 0x530 107).
-    pub moving: &'a dyn Fn(ObjectId) -> bool,
-    /// Whether a class-10 searcher passes a found object.
-    pub shuns: &'a dyn Fn(&Placed) -> Result<bool, GenieError>,
-    /// A farm's workers and pasture.
-    pub farm: &'a FarmLook<'a>,
+    /// The world's objects by id: whether livestock is herded ([`herded`]), the masters a
+    /// class-10 searcher passes ([`shuns`]), a farm's workers and pasture ([`farm_kept`]).
+    pub objects: ObjectsRef<'a>,
 }
 
 impl Debug for SearchQuery<'_> {
@@ -559,21 +555,15 @@ pub(super) struct Searcher {
 
 /// `ClosestObject`'s tests of the object `id` it found (its seer and its place `p`) past the
 /// relation: the [`Filter`]'s class, master and state; a farm ([`farm_kept`]); livestock
-/// (class 58) the searcher's player owns or not in state 2, and not `moving`; for a searcher of
-/// class 10, not what `shuns` names. A workers cap and the unbuilt farm test (a state of 0)
+/// (class 58) the searcher's player owns or not in state 2, and not [`herded`]; for a searcher of
+/// class 10, not what [`shuns`] names. A workers cap and the unbuilt farm test (a state of 0)
 /// are not modelled.
 pub(super) fn closest_kept(
     id: ObjectId,
     (seer, p): (&Seer, &Placed),
     filter: Filter,
     (player, searcher): (PlayerId, Searcher),
-    ClosestChecks {
-        moving,
-        shuns,
-        farm,
-        roles,
-        ..
-    }: ClosestChecks<'_>,
+    ClosestChecks { objects, roles, .. }: ClosestChecks<'_>,
 ) -> Result<bool, GenieError> {
     if filter.group.is_some_and(|g| p.class != g) {
         return Ok(false);
@@ -595,24 +585,55 @@ pub(super) fn closest_kept(
     if roles
         .of_some_class(filter.group)
         .contains(ClassRoles::CLOSEST_PASTURE)
-        && !farm_kept(id, p, filter, searcher, farm, roles)?
+        && !farm_kept(id, p, filter, searcher, objects, roles)?
     {
         return Ok(false);
     }
     if roles
         .of_some_class(filter.group)
         .contains(ClassRoles::CLOSEST_LIVESTOCK)
-        && ((p.player != player && seer.state == ObjectState::Alive) || moving(id))
+        && ((p.player != player && seer.state == ObjectState::Alive) || herded(objects, id))
     {
         return Ok(false);
     }
-    if searcher.class_10 && shuns(p)? {
+    if searcher.class_10 && shuns(objects, roles, p)? {
         return Ok(false);
     }
     Ok(true)
 }
 
-/// A farm (class 49) `ClosestObject` found, as `farm` reads it: not a pasture's livestock
+/// `ClosestObject`'s "Sheep is moving" (`FUN_140c488b0`): the object's top action is the Artifact
+/// (slot 0x530 107) with a point (slot 0x288, the action's `+0x38`, not −1); `by_id` reads its
+/// action layer.
+pub(crate) fn herded(by_id: ObjectsRef<'_>, id: ObjectId) -> bool {
+    by_id.actions(id).is_some_and(|a| {
+        a.top_action_kind() == Some(ARTIFACT_KIND)
+            && a.list
+                .artifact()
+                .is_some_and(|a| a.goal.is_some_and(|g| g.x() != -1.0))
+    })
+}
+
+/// What a searcher of class 10 passes (`FUN_140c488b0`): the found object's master, read from its
+/// player's table, is the petard (master 440) or holds object flag 0x10.
+///
+/// # Errors
+///
+/// A found object of a master its player's table does not hold.
+pub(super) fn shuns(
+    objects: ObjectsRef<'_>,
+    roles: &Roles,
+    p: &Placed,
+) -> Result<bool, GenieError> {
+    let m = player_master(objects.masters().players, p.player, p.master).ok_or(
+        GenieError::unsupported("a found object of a master the slice does not have"),
+    )?;
+    Ok(roles.of_master(p.master).contains(MasterRoles::PETARD)
+        || m.object_flags.contains(ObjectFlags::SCOUT))
+}
+
+/// A farm (class 49) `ClosestObject` found, its workers (`+0x644`) and pasture (`+0x790`,
+/// `parent_pasture_id`) read from `objects`: not a pasture's livestock
 /// (`+0x790`); a pasture is not modelled; without a master asked for, one without workers that
 /// the searcher gathers from (a fish trap for a trapper, any other for a farmer).
 pub(super) fn farm_kept(
@@ -620,12 +641,16 @@ pub(super) fn farm_kept(
     p: &Placed,
     filter: Filter,
     searcher: Searcher,
-    farm: &FarmLook<'_>,
+    objects: ObjectsRef<'_>,
     roles: &Roles,
 ) -> Result<bool, GenieError> {
-    let (workers, parent) = farm(id).ok_or(GenieError::unsupported(
-        "a found farm the slice does not hold",
-    ))?;
+    let (workers, parent) =
+        objects
+            .get(id)
+            .map(|u| (u.workers, u.pasture))
+            .ok_or(GenieError::unsupported(
+                "a found farm the slice does not hold",
+            ))?;
     if parent.is_some() {
         return Ok(false);
     }

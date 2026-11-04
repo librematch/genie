@@ -5,12 +5,11 @@ use crate::combat::attack::BeginLayer;
 use crate::combat::attack::{arms, engagement};
 use crate::combat::victims::victim;
 use crate::gathering::ActionEnd;
-use crate::gathering::closest_resource::herded;
 use crate::gathering::hunt::HuntChase;
 use crate::gathering::hunt::HuntState;
 use crate::gathering::hunt::{HuntTask, NO_HUNT, Quarry, stand_sprite};
 use crate::map::Distance;
-use crate::map::spatial::{Placed, SearchQuery, Spatial};
+use crate::map::spatial::{SearchQuery, Spatial};
 use crate::math::rng::Stream;
 use crate::movement::MoveStart;
 use crate::movement::Speed;
@@ -455,7 +454,6 @@ impl Unit {
         class: Option<ClassId>,
         roles: &Roles,
     ) -> Result<Option<ObjectId>, GenieError> {
-        let others = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
         if self.my_pasture.is_some() {
             return Err(GenieError::unsupported(
                 "a hunter tending a pasture (FUN_1411c7670)",
@@ -509,13 +507,6 @@ impl Unit {
             mover.reaches_object((at, &me), (spatial, by_id), &mut plan, id, range, master_id)
         };
         let mut no_attack = NoAttack;
-        let moving = |id: ObjectId| herded(by_id, id);
-        let shuns = |_: &Placed| -> Result<bool, GenieError> {
-            Err(GenieError::unsupported(
-                "a class-10 searcher in a hunt's search",
-            ))
-        };
-        let farm = |id: ObjectId| others.get(id).map(|u| (u.workers, u.pasture));
         let result = c.w.spatial.search(
             SearchQuery {
                 searcher: self.id,
@@ -523,9 +514,7 @@ impl Unit {
                 search: &search,
                 attack: &mut no_attack,
                 reach: &mut reach,
-                moving: &moving,
-                shuns: &shuns,
-                farm: &farm,
+                objects: by_id,
             },
             roles,
             &c.w.model.tuning.best_target,

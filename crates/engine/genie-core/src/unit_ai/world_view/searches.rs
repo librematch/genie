@@ -8,7 +8,6 @@
 use crate::GenieError;
 use crate::construction::FoundationId;
 use crate::gathering::DropSiteId;
-use crate::gathering::closest_resource::herded;
 use crate::map::Distance;
 use crate::map::DistanceSquared;
 use crate::map::Footprint;
@@ -16,7 +15,7 @@ use crate::map::GridSize;
 use crate::map::Position;
 use crate::map::Tile;
 use crate::map::spatial::TileSight;
-use crate::map::spatial::{Placed, SearchQuery, Spatial};
+use crate::map::spatial::{SearchQuery, Spatial};
 use crate::math::rng::{Stream, Well512};
 use crate::movement::explore::{
     InfluenceMap, SCOUT_MAP_SIZE, Seeker, beyond_sight, closest_undiscovered, unexplored_area,
@@ -27,8 +26,6 @@ use crate::objects::ObjectState;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::ClassMask;
 use crate::objects::masters::MasterTables;
-use crate::objects::masters::ObjectFlags;
-use crate::objects::masters::player_master;
 use crate::orders::nearest_table_site;
 use crate::players::PlayerId;
 use crate::players::UnitRelation;
@@ -97,15 +94,6 @@ impl UnitView<'_, '_> {
             now: self.c.w.world_time,
             mode_680: self.c.w.mode_680,
         };
-        let (others, every) = (
-            owner_view(
-                &self.c.w.players,
-                &self.c.w.index,
-                self.c.player,
-                self.new_owner,
-            )?,
-            &self.c.w.model.masters,
-        );
         // ClosestObject's reachability check (slot 0x3d0) walks the unit's paths
         let mut plan = Planning {
             pathing: &mut self.c.w.pathing,
@@ -142,17 +130,6 @@ impl UnitView<'_, '_> {
                 master_id,
             )
         };
-        let moving = |id: ObjectId| herded(by_id, id);
-        // a class-10 searcher passes master 440 and the masters with object flag 0x10
-        let shuns = |p: &Placed| {
-            let m = player_master(every, p.player, p.master).ok_or(GenieError::unsupported(
-                "a found object of a master the slice does not have",
-            ))?;
-            Ok(roles.of_master(p.master).contains(MasterRoles::PETARD)
-                || m.object_flags.contains(ObjectFlags::SCOUT))
-        };
-        // a farm's workers (`+0x644`) and its pasture (`+0x790`)
-        let farm = |id: ObjectId| others.get(id).map(|u| (u.workers, u.pasture));
         self.c.w.spatial.search(
             SearchQuery {
                 searcher: unit.id,
@@ -160,9 +137,7 @@ impl UnitView<'_, '_> {
                 search,
                 attack: &mut picker,
                 reach: &mut reach,
-                moving: &moving,
-                shuns: &shuns,
-                farm: &farm,
+                objects: by_id,
             },
             roles,
             &self.c.w.model.tuning.best_target,

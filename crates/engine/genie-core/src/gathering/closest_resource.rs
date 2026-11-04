@@ -20,7 +20,6 @@ use crate::objects::masters::{MasterTables, OwnerMasters};
 use crate::objects::unit::Unit;
 use crate::objects::unit::UnitFlags;
 use crate::objects::{ObjectState, WorkerCount};
-use crate::ownership::artifact::ARTIFACT_KIND;
 use crate::pathing::zones::{UNKNOWN_RESTRICTION, Zones};
 use crate::players::PlayerId;
 use crate::unit_ai::world_view::owner_view;
@@ -201,18 +200,6 @@ pub(crate) fn closest_resource_of(
         },
         gather_search_tuning,
     )
-}
-
-/// `ClosestObject`'s "Sheep is moving" (`FUN_140c488b0`): the object's top action is the Artifact
-/// (slot 0x530 107) with a point (slot 0x288, the action's `+0x38`, not −1); `by_id` reads its
-/// action layer.
-pub(crate) fn herded(by_id: ObjectsRef<'_>, id: ObjectId) -> bool {
-    by_id.actions(id).is_some_and(|a| {
-        a.top_action_kind() == Some(ARTIFACT_KIND)
-            && a.list
-                .artifact()
-                .is_some_and(|a| a.goal.is_some_and(|g| g.x() != -1.0))
-    })
 }
 
 impl UnitView<'_, '_> {

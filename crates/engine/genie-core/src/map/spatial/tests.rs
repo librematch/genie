@@ -1,5 +1,6 @@
 use super::*;
 use crate::construction::FoundationId;
+use crate::gathering::PastureId;
 use crate::map::GridSize;
 use crate::map::TerrainMask;
 use crate::map::Tile;
@@ -9,9 +10,14 @@ use crate::map::{Rect, Segment};
 use crate::movement::Speed;
 use crate::objects::HitPoints;
 use crate::objects::ObjectState;
+use crate::objects::actions::ActionList;
+use crate::objects::layers::Action;
 use crate::objects::masters::BuildableOn;
+use crate::objects::masters::Master;
 use crate::objects::masters::MasterKind;
+use crate::objects::masters::ObjectFlags;
 use crate::ownership::CaptureKind;
+use crate::ownership::artifact::Artifact;
 use crate::players::ByPlayer;
 use crate::players::Relation;
 use crate::players::game_status::GameStatus;
@@ -23,12 +29,14 @@ use crate::testing::class;
 use crate::testing::ids;
 use crate::testing::ids::FISH_TRAP;
 use crate::testing::roles;
+use crate::testing::scene::{Scene, Thing as SceneThing};
 use crate::testing::tuning;
 use crate::unit_ai::{Memory, NoAttack};
 use crate::vision::VisionBits;
 use crate::vision::own_masks;
 use crate::vision::registry::UnitUpdate;
 use crate::vision::visibility::Seer;
+use crate::world::World;
 use crate::world::index::{ObjectsRef, TestObjects};
 
 /// The record cells (FD-030-D03) give every query the objects whose record is filed in a
@@ -332,9 +340,6 @@ fn search_near_the_last_reads_its_answer_until_unit_ai_lets_it_go() {
     };
     let mut never = NoAttack;
     let mut reach = |_: &mut Spatial, _: ObjectId, _: Distance| Ok(true);
-    let still = |_: ObjectId| false;
-    let none = |_: &Placed| Ok(false);
-    let no_farm = |_: ObjectId| None;
     let mut search = |s: &mut Spatial, at| {
         let f = s
             .search(
@@ -344,9 +349,7 @@ fn search_near_the_last_reads_its_answer_until_unit_ai_lets_it_go() {
                     search: &look(at),
                     attack: &mut never,
                     reach: &mut reach,
-                    moving: &still,
-                    shuns: &none,
-                    farm: &no_farm,
+                    objects: ObjectsRef::empty(),
                 },
                 &roles(),
                 &tuning().best_target,
@@ -2292,20 +2295,29 @@ fn closest_object_keeps_the_nearest_record_and_on_tie_the_lower_id() {
 #[test]
 fn closest_object_keeps_what_its_filter_and_its_searcher_take() {
     use crate::map::spatial::search::{Searcher, closest_kept};
-    let (still, moving) = (|_: ObjectId| false, |_: ObjectId| true);
-    let (takes, shuns) = (|_: &Placed| Ok(false), |_: &Placed| Ok(true));
-    let fails = |_: &Placed| Err(GenieError::unsupported("a test's shunning"));
-    let farm = |_: ObjectId| None;
+    let p = villager(1.0, 1.0);
+    // the found object 7 as its world holds it: its master in its player's table, without the
+    // scout's object flag; herded, its top action the Artifact with a point; shunned, with the flag
+    let found = Master {
+        id: p.master,
+        class: p.class,
+        ..Master::default()
+    };
+    let plain_world = found_world(vec![found_thing(&p, found.clone(), None)]);
+    let herded_world = found_world(vec![found_thing(&p, found.clone(), Some(herding()))]);
+    let scout = Master {
+        object_flags: ObjectFlags::SCOUT,
+        ..found
+    };
+    let scout_world = found_world(vec![found_thing(&p, scout, None)]);
+    let empty_world = found_world(Vec::new());
     let roles = roles();
     let checks = ClosestChecks {
-        moving: &still,
-        shuns: &takes,
-        farm: &farm,
+        objects: plain_world.objects(),
         roles: &roles,
         best_target_tuning: &tuning().best_target,
         spatial_tuning: &tuning().spatial,
     };
-    let p = villager(1.0, 1.0);
     let kept = |filter, p: &Placed, state, searcher, checks| {
         closest_kept(
             object_id(7),
@@ -2402,8 +2414,7 @@ fn closest_object_keeps_what_its_filter_and_its_searcher_take() {
             ObjectState::Alive,
             plain,
             ClosestChecks {
-                moving: &moving,
-                shuns: &takes,
+                objects: herded_world.objects(),
                 ..checks
             }
         )
@@ -2421,8 +2432,7 @@ fn closest_object_keeps_what_its_filter_and_its_searcher_take() {
             ObjectState::Alive,
             wolf,
             ClosestChecks {
-                moving: &still,
-                shuns: &shuns,
+                objects: scout_world.objects(),
                 ..checks
             }
         )
@@ -2435,8 +2445,7 @@ fn closest_object_keeps_what_its_filter_and_its_searcher_take() {
             ObjectState::Alive,
             plain,
             ClosestChecks {
-                moving: &still,
-                shuns: &shuns,
+                objects: scout_world.objects(),
                 ..checks
             }
         )
@@ -2449,8 +2458,7 @@ fn closest_object_keeps_what_its_filter_and_its_searcher_take() {
             ObjectState::Alive,
             wolf,
             ClosestChecks {
-                moving: &still,
-                shuns: &fails,
+                objects: empty_world.objects(),
                 ..checks
             }
         )
@@ -2473,12 +2481,33 @@ fn closest_object_takes_free_farm_its_searcher_gathers_from() {
         master,
         ..villager(1.0, 1.0)
     };
-    let look = |id: ObjectId| match id.get() {
-        1 => Some((WorkerCount::ZERO, None)),
-        2 => Some((WorkerCount::ONE, None)),
-        3 => Some((WorkerCount::ZERO, Some(PastureId::new(object_id(9))))),
-        _ => None,
+    // the farms 1 (free), 2 (worked) and 3 (a pasture's) as their world holds them; 4 is not held
+    let farm_master = Master {
+        id: ids::FARM,
+        class: class::FARM,
+        ..Master::default()
     };
+    let farm_thing = |id, workers, pasture, x| SceneThing {
+        pasture,
+        workers,
+        ..SceneThing::new(
+            id,
+            PlayerId::new(2),
+            farm_master.clone(),
+            Position::new(x, 1.5, 0.0),
+        )
+    };
+    let farms = found_world(vec![
+        farm_thing(1, WorkerCount::ZERO, None, 1.5),
+        farm_thing(2, WorkerCount::ONE, None, 3.5),
+        farm_thing(
+            3,
+            WorkerCount::ZERO,
+            Some(PastureId::new(object_id(9))),
+            5.5,
+        ),
+    ]);
+    let look = farms.objects();
     let farmer = Searcher {
         farmer: true,
         ..Searcher::default()
@@ -2488,11 +2517,11 @@ fn closest_object_takes_free_farm_its_searcher_gathers_from() {
         ..Searcher::default()
     };
     let (farm, trap) = (farm_of(ids::FARM), farm_of(FISH_TRAP));
-    assert!(farm_kept(object_id(1), &farm, filter, farmer, &look, &roles()).unwrap());
-    assert!(!farm_kept(object_id(1), &farm, filter, trapper, &look, &roles()).unwrap());
-    assert!(farm_kept(object_id(1), &trap, filter, trapper, &look, &roles()).unwrap());
-    assert!(!farm_kept(object_id(1), &trap, filter, farmer, &look, &roles()).unwrap());
-    assert!(!farm_kept(object_id(2), &farm, filter, farmer, &look, &roles()).unwrap());
+    assert!(farm_kept(object_id(1), &farm, filter, farmer, look, &roles()).unwrap());
+    assert!(!farm_kept(object_id(1), &farm, filter, trapper, look, &roles()).unwrap());
+    assert!(farm_kept(object_id(1), &trap, filter, trapper, look, &roles()).unwrap());
+    assert!(!farm_kept(object_id(1), &trap, filter, farmer, look, &roles()).unwrap());
+    assert!(!farm_kept(object_id(2), &farm, filter, farmer, look, &roles()).unwrap());
     let asked = Filter {
         master: Some(master_id(50)),
         ..filter
@@ -2503,19 +2532,19 @@ fn closest_object_takes_free_farm_its_searcher_gathers_from() {
             &farm,
             asked,
             Searcher::default(),
-            &look,
+            look,
             &roles()
         )
         .unwrap()
     );
-    assert!(!farm_kept(object_id(3), &farm, filter, farmer, &look, &roles()).unwrap());
+    assert!(!farm_kept(object_id(3), &farm, filter, farmer, look, &roles()).unwrap());
     assert_eq!(
         farm_kept(
             object_id(1),
             &farm_of(ids::PASTURE_MANGROVE),
             filter,
             farmer,
-            &look,
+            look,
             &roles()
         )
         .unwrap_err()
@@ -2523,18 +2552,15 @@ fn closest_object_takes_free_farm_its_searcher_gathers_from() {
         "ClosestObject over pastures (their workers and livestock)"
     );
     assert_eq!(
-        farm_kept(object_id(4), &farm, filter, farmer, &look, &roles())
+        farm_kept(object_id(4), &farm, filter, farmer, look, &roles())
             .unwrap_err()
             .reason(),
         "a found farm the slice does not hold"
     );
     // through the tests past the relation: the worked farm passed, the free one kept
-    let (still, takes) = (|_: ObjectId| false, |_: &Placed| Ok(false));
     let roles = roles();
     let checks = ClosestChecks {
-        moving: &still,
-        shuns: &takes,
-        farm: &look,
+        objects: look,
         roles: &roles,
         best_target_tuning: &tuning().best_target,
         spatial_tuning: &tuning().spatial,
@@ -2560,6 +2586,34 @@ fn closest_object_takes_free_farm_its_searcher_gathers_from() {
         )
         .unwrap()
     );
+}
+
+/// A scene world of two players holding `things`: the objects `ClosestObject`'s checks read by
+/// id.
+fn found_world(things: Vec<SceneThing>) -> World {
+    things
+        .into_iter()
+        .fold(Scene::open(GridSize::new(8, 8)).players(2), Scene::thing)
+        .build()
+}
+
+/// The object 7 that `p` places, of `master`, with the action layer `actions`.
+fn found_thing(p: &Placed, master: Master, actions: Option<Action>) -> SceneThing {
+    SceneThing {
+        actions,
+        ..SceneThing::new(7, p.player, master, p.position)
+    }
+}
+
+/// A herded animal's action layer: its top action the Artifact with a point to walk to.
+fn herding() -> Action {
+    Action {
+        list: ActionList::default().with_artifact(Some(Artifact {
+            goal: Some(Position::new(5.5, 5.5, 0.0)),
+            ..Artifact::new(PlayerId::new(1), None)
+        })),
+        ..Action::default()
+    }
 }
 
 /// Player `p`'s relation toward `q` in the spatial copy becomes `r`.
