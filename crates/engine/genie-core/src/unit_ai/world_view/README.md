@@ -10,7 +10,8 @@ it does to other objects goes into lists that the caller applies afterwards.
   answers live in their systems as methods of `UnitView`: the attack command in
   `combat/attack/`, the build command in `construction/build/`, the hunt in `gathering/hunt/`.
 - `unit_view.rs` holds what the view asks of its unit.
-- `world_picker.rs` is the world as `bestUnitToAttack` reads it.
+- `world_picker.rs` is the world as `bestUnitToAttack` reads it, and `attack_reads.rs` its
+  reads: the searching unit, the found objects, the tests, the statistics and the quick path.
 - `commands.rs` holds the unit AI's repair and enter commands, and the auto scout's area.
 
 ## Files
@@ -18,6 +19,7 @@ it does to other objects goes into lists that the caller applies afterwards.
 <!-- files -->
 | File | What it holds |
 | --- | --- |
+| [`attack_reads.rs`](attack_reads.rs) | What `bestUnitToAttack` reads of the world through the unit's picker (`WorldPicker`): the searching unit, the found objects, the attack and neutral tests, the statistics' reads and the quick path. |
 | [`calls.rs`](calls.rs) | The unit's calls its unit AI makes through its view, each at once where the game's AI calls the unit's slot: the attack command, the under-attack flag, an `Effect`, the notify its owner hears, the order slots' commands, the wait for a foundation and the stop of a soldier in a group. |
 | [`commands.rs`](commands.rs) | The repair and enter commands of the unit AI and the auto scout's area. |
 | [`looks.rs`](looks.rs) | What the unit AI reads through its view of its unit and of the objects it names: the unit's action list as it stands now, its patrol path, the stand and reach tests, the build answer, an object's look and its target flags, a master's class, and what a damage notify weighs (the duel, a harmless attacker, a defended unit's nearest attacker). |

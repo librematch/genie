@@ -41,7 +41,6 @@ show in checkpoint word 9.
 | [`alert_mode.rs`](alert_mode.rs) | The unit AI's alert mode (`AlertMode`). |
 | [`attack_orders.rs`](attack_orders.rs) | The orders a unit AI takes at once and its attack commands. |
 | [`attack_pick.rs`](attack_pick.rs) | Which object a unit may attack: the attack search, its picks and each type's rules. |
-| [`attack_picker.rs`](attack_picker.rs) | What the attack search asks of the world while a unit AI runs (`AttackPicker`); a search that picks no attack has no picker (`crate::map::spatial::SearchQuery`). |
 | [`attack_rules.rs`](attack_rules.rs) | Conversion, neutral targets, patrol reaches and siege: the attack rules of the unit-AI types. |
 | [`attacked.rs`](attacked.rs) | A unit's answers to damage and attackers, to a unit in its way and to being sent off; the explorers' search. |
 | [`attackers.rs`](attackers.rs) | A unit AI's attackers: the sorted set of the objects whose damage it took. |

@@ -54,7 +54,7 @@ impl UnitView<'_, '_> {
             Pick::Attack { seeker, .. } => Some(seeker),
             _ => None,
         };
-        let mut picker = WorldPicker {
+        let picker = WorldPicker {
             attacker: &self.attacker,
             seeker,
             me: self.unit.id,
@@ -135,7 +135,7 @@ impl UnitView<'_, '_> {
                 searcher: unit.id,
                 player: self.player,
                 search,
-                attack: Some(&mut picker),
+                attack: Some(&picker),
                 reach: &mut reach,
                 objects: by_id,
             },

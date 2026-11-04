@@ -359,7 +359,6 @@ fn villager_fights_back_weak_attacker_of_its_own_master() {
 /// seeker's target, not a conversion. An object the world does not hold is not modelled.
 #[test]
 fn candidate_statistics_are_its_class_hit_points_and_the_damage_to_it() {
-    use crate::unit_ai::AttackPicker;
     let master = |id, class, weapons| Master {
         id,
         kind: MasterKind::COMBAT,
@@ -438,7 +437,7 @@ fn candidate_statistics_are_its_class_hit_points_and_the_damage_to_it() {
         after: &after,
         left: None,
     };
-    let mut picker = WorldPicker {
+    let picker = WorldPicker {
         by_id: ObjectsRef::empty(),
         attacker: &attacker,
         seeker: None,

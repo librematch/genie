@@ -17,6 +17,7 @@ use crate::world::others::OthersRef;
 use crate::world::player::Player;
 use crate::world::slots::PlayerSlots;
 
+mod attack_reads;
 mod calls;
 mod commands;
 mod looks;
@@ -26,7 +27,6 @@ mod world_picker;
 
 pub(crate) use self::commands::{town_centre, town_centre_unit};
 pub(crate) use self::world_picker::NOT_HELD;
-#[cfg(test)]
 use self::world_picker::attacks;
 pub(crate) use self::world_picker::{WorldPicker, patrol_information};
 use crate::construction::FoundationId;

@@ -332,7 +332,7 @@ fn battle(
 fn fielded<R>(
     w: &mut World,
     open: &[i32],
-    f: impl FnOnce(&mut AttackField<'_, '_>) -> R,
+    f: impl FnOnce(&mut AttackField<'_, '_, '_>) -> R,
 ) -> (R, Vec<ObjectId>) {
     let mut asked = Vec::new();
     let answer = with_picker(w, (PlayerId::new(1), object_id(1)), |picker, world| {

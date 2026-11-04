@@ -16,17 +16,14 @@ use crate::movement::{WaypointIndex, footprint_gap};
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::layers::Action;
-use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::player_master;
-use crate::objects::masters::{DamageAmount, DamageClass, Master, MasterTables};
+use crate::objects::masters::{DamageAmount, Master, MasterTables};
 use crate::objects::unit::Unit;
 use crate::objects::unit::UnitFlags;
 use crate::ownership::CaptureKind;
-use crate::pathing::hull_path::{NO_RESTRICTION, NO_TERRAIN, quick_reach};
 use crate::pathing::tile_path::Path;
-use crate::players::AllyTest;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::Relations;
@@ -34,18 +31,10 @@ use crate::unit_ai::AttackTargetFlags;
 use crate::unit_ai::NearestAttacker;
 use crate::unit_ai::TargetRules;
 use crate::unit_ai::UnitAiKind;
-use crate::unit_ai::best_target::FoundFlags;
-use crate::unit_ai::best_target::{
-    AttackCategory, Candidate, FoundObject, Searcher, order_weights,
-};
-use crate::unit_ai::task_finder::allied;
 use crate::unit_ai::world_view::Foreign;
 use crate::unit_ai::{
-    AttackPicker, Attacker, Convertee, Converter, Duel, Memory, PatrolPath, Seeker, Target,
-    attack_sight, attacks_neutral as unit_ai_attacks_neutral, can_attack as unit_ai_can_attack,
-    can_convert, spares_friends as unit_ai_spares_friends,
+    Attacker, Convertee, Converter, Duel, PatrolPath, Seeker, Target, can_convert,
 };
-use crate::world::AiSwitches;
 use crate::world::Mode680;
 use crate::world::WorldTime;
 use crate::world::index::ObjectsRef;
@@ -70,9 +59,8 @@ pub(super) fn attacks(m: &Master) -> f32 {
 pub(crate) const NOT_HELD: GenieError =
     GenieError::unsupported("a found object the slice does not hold");
 
-/// What `bestUnitToAttack` reads of the world for the unit whose AI runs
-/// ([`crate::unit_ai::AttackPicker`]): the objects it found, by what the world holds of them, and
-/// the unit's quick path to them.
+/// What `bestUnitToAttack` reads of the world for the unit whose AI runs: the objects it found,
+/// by what the world holds of them, and the unit's quick path to them.
 pub(crate) struct WorldPicker<'a> {
     /// What the tests read of the unit.
     pub(crate) attacker: &'a Attacker,
@@ -443,233 +431,6 @@ impl WorldPicker<'_> {
                 .mover_of(t.id)
                 .map_or(Speed::ZERO, |m| m.stats.speed);
         Ok((target, moving))
-    }
-}
-
-impl AttackPicker for WorldPicker<'_> {
-    /// The unit, its master and its AI as `bestUnitToAttack` reads them: the AI's targets, order
-    /// and action ([`crate::unit_ai::Seeker`]), its may-move test, the sight
-    /// ([`crate::unit_ai::attack_sight`]), its ranges and speed, its owner's walls flag and
-    /// targeting, the order history's weights and the retarget entries' targets.
-    fn searcher(&mut self, memory: Memory<'_>) -> Result<Searcher, GenieError> {
-        let best_target_tuning = &self.by_id.tuning().best_target;
-        let seeker = self.seeker.ok_or(GenieError::unsupported(
-            "an attack test outside bestUnitToAttack",
-        ))?;
-        let a = self.attacker;
-        Ok(Searcher {
-            id: self.me,
-            target: seeker.target,
-            target_classes: [seeker.target_class, seeker.last_target_class],
-            order: seeker.order,
-            action: seeker.action,
-            master: a.master,
-            class: a.class,
-            kind: a.kind,
-            attack_priority: a.attack_priority,
-            player_kind: a.player_kind,
-            walls_allowed: self
-                .ai_settings
-                .switches
-                .contains(AiSwitches::MAY_ATTACK_WALLS),
-            can_move: seeker.can_move(),
-            sight: attack_sight(a)?,
-            range: a.range_against()?,
-            weapon_range: a.range,
-            min_range: a.min_range,
-            speed: a.speed,
-            scenario: a.scenario,
-            targeting: (
-                self.ai_settings.local_targeting_mode,
-                self.ai_settings.targeting_factor_scalar,
-            ),
-            weights: order_weights(memory.history, self.now, best_target_tuning),
-            retries: memory.retries.iter().map(|&(id, _)| id).collect(),
-            now: self.now,
-        })
-    }
-
-    fn found_object(
-        &mut self,
-        spatial: &Spatial,
-        id: ObjectId,
-    ) -> Result<Option<FoundObject>, GenieError> {
-        let Some((owner, t, _, m)) = self.held(id)? else {
-            return Ok(None);
-        };
-        let placed = spatial
-            .get_known(id)?
-            .ok_or(GenieError::unsupported("a found object without a place"))?;
-        let capture = spatial
-            .sight
-            .as_ref()
-            .and_then(|v| v.seer(id))
-            .map_or(CaptureKind::None, |s| s.capture);
-        let a = self.attacker;
-        Ok(Some(FoundObject {
-            owner,
-            flags: {
-                let mut flags = FoundFlags::empty();
-                flags.set(
-                    FoundFlags::ALLIED,
-                    allied(self.relations, self.player, owner, AllyTest::WithRelation4),
-                );
-                flags.set(FoundFlags::HAS_AI, self.parts.unit_ai.contains(t.id));
-                flags.set(FoundFlags::INSIDE, t.life.inside.is_some());
-                flags.set(
-                    FoundFlags::TARGETABLE,
-                    !t.flags.contains(UnitFlags::UNTARGETABLE),
-                );
-                flags.set(
-                    FoundFlags::ATTACKABLE,
-                    t.flags.contains(UnitFlags::ATTACKABLE),
-                );
-                flags
-            },
-            state: t.life.state,
-            master: t.life.master_id,
-            class: m.class,
-            kind: m.kind,
-            capture,
-            held: t.life.amount,
-            distance: footprint_gap(a.position, a.radius, placed.position, placed.radius),
-            speed: self
-                .parts
-                .mover_of(t.id)
-                .map_or(Speed::ZERO, |mv| mv.stats.speed),
-        }))
-    }
-
-    fn can_attack(&mut self, spatial: &Spatial, id: ObjectId) -> Result<bool, GenieError> {
-        let roles = self.by_id.roles();
-        let unit_ai_tuning = &self.by_id.tuning().unit_ai;
-        let seeker = self.seeker.ok_or(GenieError::unsupported(
-            "an attack test outside bestUnitToAttack",
-        ))?;
-        let (target, _) = self.target(spatial, id)?;
-        unit_ai_can_attack(self.attacker, &seeker, &target, roles, unit_ai_tuning)
-    }
-
-    fn attacks_neutral(&mut self, class: ClassId) -> Result<bool, GenieError> {
-        let roles = self.by_id.roles();
-        Ok(unit_ai_attacks_neutral(self.attacker, class, roles))
-    }
-
-    fn spares_friends(&mut self, spatial: &Spatial, id: ObjectId) -> Result<bool, GenieError> {
-        let roles = self.by_id.roles();
-        let (target, _) = self.target(spatial, id)?;
-        unit_ai_spares_friends(self.attacker, &target, roles)
-    }
-
-    /// `FUN_140c41690`: a human player's unit passes nothing over (the computer player's test
-    /// never runs: its search fails at the sight).
-    fn shuns(&mut self, _: ObjectId) -> Result<bool, GenieError> {
-        Ok(false)
-    }
-
-    /// What the statistics read of object `id`: its class and speed, whether it is armed (its
-    /// attacks' sum, slot 0x228, above 0, or its priest's conversion test on the unit), the
-    /// unit's range against it, the unit's damage per hit to it (slot 0x220: the unit's
-    /// elevation factor, slot 0x1f0, and its armor, slot 0xf0, [`crate::combat::damage::armor_damage`]),
-    /// its hit points, the unit's reload time (slot 0x218) and the unit's own conversion test on
-    /// it.
-    fn candidate(
-        &mut self,
-        spatial: &Spatial,
-        id: ObjectId,
-        distance: Distance,
-        category: Option<AttackCategory>,
-    ) -> Result<Candidate, GenieError> {
-        let damage_tuning = &self.by_id.tuning().damage;
-        let unit_ai_tuning = &self.by_id.tuning().unit_ai;
-        let roles = self.by_id.roles();
-        let (_, t, _, m) = self.held(id)?.ok_or(NOT_HELD)?;
-        let (_, me, _, mm) = self.held(self.me)?.ok_or(GenieError::unsupported(
-            "a searching unit of a master the slice does not have",
-        ))?;
-        let damage = self.damage(spatial, self.me, id, roles, damage_tuning)?;
-        let armed = 0.0 < attacks(m)
-            || self.converts(id, self.me, TargetRules::Any, roles, unit_ai_tuning)?;
-        Ok(Candidate {
-            id,
-            distance,
-            category,
-            class: m.class,
-            speed: self
-                .parts
-                .mover_of(t.id)
-                .map_or(Speed::ZERO, |mv| mv.stats.speed),
-            armed,
-            reach: self.attacker.range_against()?,
-            damage,
-            hp: t.life.hp,
-            reload: self.parts.combat_of(me.id).reload_stinger
-                + (mm.combat_part().reload - self.parts.combat_of(me.id).reload_powerup),
-            workable: self.converts(self.me, id, TargetRules::Own, roles, unit_ai_tuning)?,
-            current: self.seeker.is_some_and(|s| s.target == Some(id)),
-        })
-    }
-
-    /// Slot 0x870's armor (`FUN_141213920` -> `FUN_1410857f0`): the highest melee armor (class
-    /// 3; else the base armor or the highest armor of any class) plus the pierce armor powerup
-    /// (`+0xa4c`, slot 0x710; slot 0x778's stinger `+0xb50` is 0), at least 100.
-    fn armored(&mut self, id: ObjectId) -> Result<bool, GenieError> {
-        let (_, t, _, m) = self.held(id)?.ok_or(NOT_HELD)?;
-        let class3 = m
-            .combat_part()
-            .armors
-            .iter()
-            .filter(|a| a.class == DamageClass::PIERCE)
-            .map(|a| a.amount)
-            .max();
-        let armor = class3.unwrap_or_else(|| {
-            m.combat_part()
-                .armors
-                .iter()
-                .fold(m.combat_part().base_armor, |best, a| {
-                    if best < a.amount { a.amount } else { best }
-                })
-        });
-        Ok(DamageAmount::new(100) <= armor.plus(self.parts.combat_of(t.id).armor_powerups.pierce))
-    }
-
-    /// Object `id`'s weapon range (slot 0x230: a combat object's master's, else 0).
-    fn weapon_range(&mut self, id: ObjectId) -> Result<Distance, GenieError> {
-        let (_, _, _, m) = self.held(id)?.ok_or(NOT_HELD)?;
-        Ok(if MasterKind::RGE_COMBAT <= m.kind {
-            m.combat_part().weapon_range
-        } else {
-            Distance::ZERO
-        })
-    }
-
-    fn engages(&mut self, id: ObjectId) -> Result<bool, GenieError> {
-        let roles = self.by_id.roles();
-        let unit_ai_tuning = &self.by_id.tuning().unit_ai;
-        let (_, _, _, m) = self.held(id)?.ok_or(NOT_HELD)?;
-        Ok(0.0 < attacks(m)
-            || self.converts(id, self.me, TargetRules::Any, roles, unit_ai_tuning)?)
-    }
-
-    /// The quick path (slot 0x3e0) within `range`, with its master's terrain mask and radius on
-    /// x.
-    fn quick_path(
-        &mut self,
-        spatial: &mut Spatial,
-        id: ObjectId,
-        range: Distance,
-    ) -> Result<bool, GenieError> {
-        let terrain = spatial.terrain.as_ref().ok_or(NO_TERRAIN)?;
-        let restriction = self.restriction.ok_or(NO_RESTRICTION)?;
-        let mask = terrain.restriction_mask(restriction);
-        quick_reach(
-            (spatial, self.by_id),
-            self.me,
-            Some(id),
-            mask,
-            Distance::new(self.attacker.radius.x()),
-            range,
-        )
     }
 }
 

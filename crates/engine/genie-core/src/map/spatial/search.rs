@@ -25,7 +25,8 @@ use crate::players::UnitRelations;
 use crate::players::{ByRelation, QueryRelation, UnitRelation};
 use crate::unit_ai::best_target::AttackField;
 use crate::unit_ai::best_target::{Choice, best_unit_to_attack as best_target_best_unit_to_attack};
-use crate::unit_ai::{AttackAsk, AttackPicker, Memory};
+use crate::unit_ai::world_view::WorldPicker;
+use crate::unit_ai::{AttackAsk, Memory};
 use crate::unit_ai::{Found, Pick, Search};
 use crate::vision::SightTiles;
 use crate::vision::registry::Record;
@@ -339,7 +340,7 @@ impl Spatial {
         (me, player): (ObjectId, PlayerId),
         search: &Search<'_>,
         fresh: bool,
-        attack: Option<&mut dyn AttackPicker>,
+        attack: Option<&WorldPicker<'_>>,
         reach: &mut Reach<'_>,
         checks: ClosestChecks<'_>,
     ) -> Result<Found, GenieError> {
@@ -492,7 +493,7 @@ impl Spatial {
         &mut self,
         ask: &AttackAsk,
         memory: Memory<'_>,
-        attack: &mut dyn AttackPicker,
+        attack: &WorldPicker<'_>,
         reach: &mut Reach<'_>,
         roles: &Roles,
         best_target_tuning: &BestTargetTuning,
@@ -531,7 +532,7 @@ pub struct SearchQuery<'a> {
     pub(crate) search: &'a Search<'a>,
     /// An attack pick's reads of the unit and the objects; a search that picks no attack has
     /// none.
-    pub(crate) attack: Option<&'a mut dyn AttackPicker>,
+    pub(crate) attack: Option<&'a WorldPicker<'a>>,
     /// The reachability of a found object (slot 0x3d0).
     pub(crate) reach: &'a mut Reach<'a>,
     /// The world's objects by id: whether livestock is herded ([`herded`]), the masters a

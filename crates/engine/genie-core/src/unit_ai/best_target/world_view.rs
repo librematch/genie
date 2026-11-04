@@ -15,10 +15,10 @@ use crate::ownership::CaptureKind;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::PlayerKind;
-use crate::unit_ai::AttackPicker;
 use crate::unit_ai::best_target::Candidate;
 use crate::unit_ai::best_target::OrderWeight;
 use crate::unit_ai::best_target::{AttackCategory, ByCategory};
+use crate::unit_ai::world_view::WorldPicker;
 use crate::unit_ai::{AiAction, OrderKind};
 use crate::world::WorldTime;
 use crate::world::{Percent, TargetingMode};
@@ -135,22 +135,22 @@ pub struct FoundObject {
 
 /// What `bestUnitToAttack` asks of the world while its unit AI runs: the unit AI's picker for
 /// its reads and tests, the search's reachability for its paths (slot 0x3d0).
-pub(crate) struct AttackField<'p, 'r> {
+pub(crate) struct AttackField<'p, 'r, 'w> {
     /// The unit AI's reads and tests of the unit and the objects.
-    pub(crate) picker: &'p mut dyn AttackPicker,
+    pub(crate) picker: &'p WorldPicker<'w>,
     /// The unit's path to an object (slot 0x3d0).
     pub(crate) reach: &'p mut Reach<'r>,
     /// The spatial index the search and the picker's reads go through.
     pub(crate) world: &'p mut Spatial,
 }
 
-impl AttackField<'_, '_> {
+impl AttackField<'_, '_, '_> {
     /// The object `id` as the world holds it, None for one it does not.
     ///
     /// # Errors
     ///
     /// An object the slice does not hold.
-    pub(crate) fn found_object(&mut self, id: ObjectId) -> Result<Option<FoundObject>, GenieError> {
+    pub(crate) fn found_object(&self, id: ObjectId) -> Result<Option<FoundObject>, GenieError> {
         self.picker.found_object(self.world, id)
     }
 
@@ -159,16 +159,12 @@ impl AttackField<'_, '_> {
     /// # Errors
     ///
     /// What the check does not model.
-    pub(crate) fn can_attack(&mut self, id: ObjectId) -> Result<bool, GenieError> {
+    pub(crate) fn can_attack(&self, id: ObjectId) -> Result<bool, GenieError> {
         self.picker.can_attack(self.world, id)
     }
 
     /// The unit AI's neutral test (slot 0xa8) of an object of `class`.
-    ///
-    /// # Errors
-    ///
-    /// What the test does not model.
-    pub(crate) fn attacks_neutral(&mut self, class: ClassId) -> Result<bool, GenieError> {
+    pub(crate) fn attacks_neutral(&self, class: ClassId) -> bool {
         self.picker.attacks_neutral(class)
     }
 
@@ -177,16 +173,12 @@ impl AttackField<'_, '_> {
     /// # Errors
     ///
     /// What the test does not model.
-    pub(crate) fn spares_friends(&mut self, id: ObjectId) -> Result<bool, GenieError> {
+    pub(crate) fn spares_friends(&self, id: ObjectId) -> Result<bool, GenieError> {
         self.picker.spares_friends(self.world, id)
     }
 
     /// `FUN_140c41690`: a computer player's unit passes object `id` over.
-    ///
-    /// # Errors
-    ///
-    /// What the test does not model.
-    pub(crate) fn shuns(&mut self, id: ObjectId) -> Result<bool, GenieError> {
+    pub(crate) const fn shuns(&self, id: ObjectId) -> bool {
         self.picker.shuns(id)
     }
 
@@ -197,7 +189,7 @@ impl AttackField<'_, '_> {
     ///
     /// What the reads do not model.
     pub(crate) fn candidate(
-        &mut self,
+        &self,
         id: ObjectId,
         distance: Distance,
         category: Option<AttackCategory>,
@@ -210,7 +202,7 @@ impl AttackField<'_, '_> {
     /// # Errors
     ///
     /// What the read does not model.
-    pub(crate) fn armored(&mut self, id: ObjectId) -> Result<bool, GenieError> {
+    pub(crate) fn armored(&self, id: ObjectId) -> Result<bool, GenieError> {
         self.picker.armored(id)
     }
 
@@ -219,7 +211,7 @@ impl AttackField<'_, '_> {
     /// # Errors
     ///
     /// What the read does not model.
-    pub(crate) fn weapon_range(&mut self, id: ObjectId) -> Result<Distance, GenieError> {
+    pub(crate) fn weapon_range(&self, id: ObjectId) -> Result<Distance, GenieError> {
         self.picker.weapon_range(id)
     }
 
@@ -229,7 +221,7 @@ impl AttackField<'_, '_> {
     /// # Errors
     ///
     /// What the reads do not model.
-    pub(crate) fn engages(&mut self, id: ObjectId) -> Result<bool, GenieError> {
+    pub(crate) fn engages(&self, id: ObjectId) -> Result<bool, GenieError> {
         self.picker.engages(id)
     }
 
