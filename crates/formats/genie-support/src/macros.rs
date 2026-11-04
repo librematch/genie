@@ -11,9 +11,12 @@
 /// use genie_support::infallible_try_into;
 /// use std::convert::TryInto;
 /// struct Container(u16);
+/// # fn main() -> Result<(), std::convert::Infallible> {
 /// infallible_try_into!(Container, u32);
-/// let num: u32 = Container(12).try_into().unwrap();
+/// let num: u32 = Container(12).try_into()?;
 /// assert_eq!(num, 12u32);
+/// # Ok(())
+/// # }
 /// ```
 macro_rules! infallible_try_into {
     ($from:ident, $to:ty) => {
@@ -35,10 +38,13 @@ macro_rules! infallible_try_into {
 /// use genie_support::fallible_try_into;
 /// use std::convert::{TryFrom, TryInto};
 /// struct Container(u16);
+/// # fn main() -> Result<(), std::num::TryFromIntError> {
 /// fallible_try_into!(Container, i16);
-/// let num: i16 = Container(12).try_into().unwrap();
+/// let num: i16 = Container(12).try_into()?;
 /// assert_eq!(num, 12i16);
 /// assert!(i16::try_from(Container(50000u16)).is_err());
+/// # Ok(())
+/// # }
 /// ```
 macro_rules! fallible_try_into {
     ($from:ident, $to:ty) => {
@@ -64,9 +70,12 @@ macro_rules! fallible_try_into {
 /// use std::convert::{TryFrom, TryInto};
 /// #[derive(Debug, PartialEq, Eq)]
 /// struct Container(u16);
+/// # fn main() -> Result<(), std::num::TryFromIntError> {
 /// fallible_try_from!(Container, i16);
-/// assert_eq!(Container::try_from(1i16).unwrap(), Container(1));
+/// assert_eq!(Container::try_from(1i16)?, Container(1));
 /// assert!(Container::try_from(-1i16).is_err());
+/// # Ok(())
+/// # }
 /// ```
 macro_rules! fallible_try_from {
     ($to:ty, $from:ident) => {

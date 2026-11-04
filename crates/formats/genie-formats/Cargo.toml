@@ -1,6 +1,6 @@
 [package]
 name = "genie-formats"
-version = "0.5.0"
+version = "0.6.0"
 description = "Readers and writers for Age of Empires II data files (formerly the `genie` crate)"
 documentation = "https://docs.rs/genie-formats/"
 homepage = "https://github.com/librematch/genie/tree/main/crates/formats/genie-formats"
@@ -15,15 +15,15 @@ keywords = ["aoe2", "age-of-empires", "genie", "file-format"]
 categories = ["parser-implementations", "game-development"]
 
 [dependencies]
-genie-cpx = { version = "0.5.0", path = "../genie-cpx" }
-genie-dat = { version = "0.1.0", path = "../genie-dat" }
+genie-cpx = { version = "0.6.0", path = "../genie-cpx" }
+genie-dat = { version = "0.2.0", path = "../genie-dat" }
 genie-drs = { version = "0.2.1", path = "../genie-drs" }
-genie-hki = { version = "0.2.1", path = "../genie-hki" }
+genie-hki = { version = "0.3.0", path = "../genie-hki" }
 genie-json = { version = "0.1.0", path = "../genie-json" }
-genie-lang = { version = "0.2.1", path = "../genie-lang" }
-genie-rec = { version = "0.1.1", path = "../genie-rec" }
+genie-lang = { version = "0.3.0", path = "../genie-lang" }
+genie-rec = { version = "0.2.0", path = "../genie-rec" }
 genie-save = { version = "0.1.0", path = "../genie-save" }
-genie-scx = { version = "4.0.0", path = "../genie-scx" }
+genie-scx = { version = "5.0.0", path = "../genie-scx" }
 jascpal = { version = "0.1.1", path = "../jascpal" }
 
 [dev-dependencies]

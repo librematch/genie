@@ -42,6 +42,7 @@ use std::result::Result as StdResult;
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
+#[non_exhaustive]
 pub enum UnitBaseClass {
     /// The base unit type, for units that do not do anything.
     Static = 10,

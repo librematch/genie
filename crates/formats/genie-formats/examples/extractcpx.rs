@@ -36,7 +36,7 @@ enum Cli {
 
 fn list(args: List) {
     let f = File::open(args.input).expect("could not open file");
-    let mut campaign = Campaign::from(f).expect("not a campaign file");
+    let mut campaign = Campaign::read_from(f).expect("not a campaign file");
 
     println!("Name: {}", campaign.name());
     println!("Version: {}", String::from_utf8_lossy(&campaign.version()));
@@ -59,7 +59,7 @@ fn extract(args: Extract) {
         .unwrap_or_else(|| current_dir().expect("invalid cwd"));
 
     let f = File::open(args.input).expect("could not open file");
-    let mut campaign = Campaign::from(f).expect("not a campaign file");
+    let mut campaign = Campaign::read_from(f).expect("not a campaign file");
 
     let names = campaign
         .entries()

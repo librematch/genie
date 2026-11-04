@@ -5,6 +5,7 @@
 
 /// Available hotkey groups.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum HotkeyGroupId {
     /// Hotkey commands when a unit is selected.
     UnitCommands = 0x0,
@@ -40,6 +41,7 @@ pub enum HotkeyGroupId {
 
 /// Hotkeys for castles.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum CastleHotkeys {
     /// Create a Trebuchet.
     Trebuchet = 0x0,
@@ -51,6 +53,7 @@ pub enum CastleHotkeys {
 
 /// Hotkeys for military units.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum MilitaryUnitHotkeys {
     /// Formation command.
     /// Unused (string id -1) in the `AoC`, HD Edition and `WololoKingdoms` files.
@@ -89,6 +92,7 @@ pub enum MilitaryUnitHotkeys {
 ///
 /// They index the [`HotkeyGroupId::MilitaryUnits`] group, like [`MilitaryUnitHotkeys`] does.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum FormationHotkeys {
     /// Horde formation.
     /// Unused (string id -1) in the `AoC`, HD Edition and `WololoKingdoms` files.
@@ -105,6 +109,7 @@ pub enum FormationHotkeys {
 
 /// Hotkeys to control units.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum UnitCommandHotkeys {
     /// Open the economic buildings a villager can build.
     BuildEconomic = 0x0,
@@ -142,6 +147,7 @@ pub enum UnitCommandHotkeys {
 
 /// Hotkeys for the game UI.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum GameCommandHotkeys {
     /// Create control group 0 (HD Edition shows it as #10).
     CreateGroup0 = 0x0,
@@ -287,6 +293,7 @@ pub enum GameCommandHotkeys {
 /// Only the first four are bound in the `AoC`, HD Edition and `WololoKingdoms` files; the others
 /// have string id -1 there.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum ScrollHotkeys {
     /// Scroll left.
     ScrollLeft = 0x0,
@@ -324,6 +331,7 @@ pub enum ScrollHotkeys {
 
 /// Hotkeys for villagers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum VillagerHotkeys {
     /// Build a House.
     BuildHouse = 0x0,
@@ -392,6 +400,7 @@ pub enum VillagerHotkeys {
 
 /// Hotkeys for the town center.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum TownCenterHotkeys {
     /// Train a villager.
     CreateVillager = 0x0,
@@ -418,6 +427,7 @@ pub enum TownCenterHotkeys {
 
 /// Hotkeys for mills.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum MillHotkeys {
     /// Queue a farm reseed.
     AddFarm = 0x0,
@@ -425,6 +435,7 @@ pub enum MillHotkeys {
 
 /// Hotkeys for docks.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum DockHotkeys {
     /// Build a Fishing Ship.
     CreateFishingShip = 0x0,
@@ -451,6 +462,7 @@ pub enum DockHotkeys {
 
 /// Hotkeys for the barracks.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum BarracksHotkeys {
     /// Train a Militia (or its upgrade).
     CreateMilitia = 0x0,
@@ -464,6 +476,7 @@ pub enum BarracksHotkeys {
 
 /// Hotkeys for archery ranges.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum ArcheryRangeHotkeys {
     /// Train an Archer (or its upgrade).
     CreateArcher = 0x0,
@@ -479,6 +492,7 @@ pub enum ArcheryRangeHotkeys {
 
 /// Hotkeys for stables.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum StableHotkeys {
     /// Train a Scout Cavalry (or its upgrade).
     CreateScout = 0x0,
@@ -493,6 +507,7 @@ pub enum StableHotkeys {
 
 /// Hotkeys for siege workshops.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum SiegeWorkshopHotkeys {
     /// Build a Battering Ram.
     CreateRam = 0x0,
@@ -508,6 +523,7 @@ pub enum SiegeWorkshopHotkeys {
 
 /// Hotkeys for the monastery.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum MonasteryHotkeys {
     /// Train a Monk.
     CreateMonk = 0x0,
@@ -517,6 +533,7 @@ pub enum MonasteryHotkeys {
 
 /// Hotkeys for the market.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum MarketHotkeys {
     /// Build a Trade Cart.
     CreateTradeCart = 0x0,
@@ -524,4 +541,5 @@ pub enum MarketHotkeys {
 
 /// Hotkeys for the blacksmith.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum BlacksmithHotkeys {}

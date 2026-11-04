@@ -2,7 +2,6 @@
 //!
 //! Most of these are more descriptive wrappers around integers.
 use std::cmp::Ordering;
-use std::convert::TryFrom;
 use std::fmt::{self, Debug, Display};
 
 /// The SCX Format version string. In practice, this does not really reflect the game version.
@@ -78,13 +77,10 @@ impl PartialOrd for ScxVersion {
     }
 }
 
-/// Could not parse a diplomatic stance because given number is an unknown stance ID.
-#[derive(Debug, Clone, Copy, thiserror::Error)]
-#[error("invalid diplomatic stance {} (must be 0/1/3)", .0)]
-pub struct ParseDiplomaticStanceError(i32);
-
 /// A player's diplomatic stance toward another player.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, num_enum::FromPrimitive, num_enum::IntoPrimitive)]
+#[repr(i32)]
+#[non_exhaustive]
 pub enum DiplomaticStance {
     /// The other player is an ally.
     Ally = 0,
@@ -92,174 +88,95 @@ pub enum DiplomaticStance {
     Neutral = 1,
     /// The other player is an enemy.
     Enemy = 3,
+    /// A value no stance names (a corrupt file or a newer game's), kept to be written back.
+    #[num_enum(catch_all)]
+    Other(i32),
 }
-
-impl TryFrom<i32> for DiplomaticStance {
-    type Error = ParseDiplomaticStanceError;
-
-    fn try_from(n: i32) -> Result<Self, Self::Error> {
-        match n {
-            0 => Ok(Self::Ally),
-            1 => Ok(Self::Neutral),
-            3 => Ok(Self::Enemy),
-            n => Err(ParseDiplomaticStanceError(n)),
-        }
-    }
-}
-
-impl From<DiplomaticStance> for i32 {
-    fn from(stance: DiplomaticStance) -> Self {
-        match stance {
-            DiplomaticStance::Ally => 0,
-            DiplomaticStance::Neutral => 1,
-            DiplomaticStance::Enemy => 3,
-        }
-    }
-}
-
-/// Could not parse a data set because given number is an unknown data set ID.
-#[derive(Debug, Clone, Copy, thiserror::Error)]
-#[error("invalid data set {} (must be 0/1)", .0)]
-pub struct ParseDataSetError(i32);
 
 /// The data set used by a scenario, HD Edition only.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, num_enum::FromPrimitive, num_enum::IntoPrimitive)]
+#[repr(i32)]
+#[non_exhaustive]
 pub enum DataSet {
     /// The "base" data set, containing Age of Kings and the Age of Conquerors expansion.
-    BaseGame,
+    BaseGame = 0,
     /// The "expansions" data set, containing the HD Edition expansions.
-    Expansions,
+    Expansions = 1,
+    /// A value no data set names, kept to be written back.
+    #[num_enum(catch_all)]
+    Other(i32),
 }
-
-impl TryFrom<i32> for DataSet {
-    type Error = ParseDataSetError;
-    fn try_from(n: i32) -> Result<Self, Self::Error> {
-        match n {
-            0 => Ok(Self::BaseGame),
-            1 => Ok(Self::Expansions),
-            n => Err(ParseDataSetError(n)),
-        }
-    }
-}
-
-impl From<DataSet> for i32 {
-    fn from(id: DataSet) -> Self {
-        match id {
-            DataSet::BaseGame => 0,
-            DataSet::Expansions => 1,
-        }
-    }
-}
-
-/// Could not parse a DLC package identifier because given number is an unknown DLC ID.
-#[derive(Debug, Clone, Copy, thiserror::Error)]
-#[error("unknown dlc package {}", .0)]
-pub struct ParseDlcPackageError(i32);
 
 /// An HD Edition DLC identifier.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, num_enum::FromPrimitive, num_enum::IntoPrimitive)]
+#[repr(i32)]
+#[non_exhaustive]
 pub enum DlcPackage {
     /// The Age of Kings base game.
-    AgeOfKings,
+    AgeOfKings = 2,
     /// The Age of Conquerors expansion.
-    AgeOfConquerors,
+    AgeOfConquerors = 3,
     /// The Forgotten expansion.
-    TheForgotten,
+    TheForgotten = 4,
     /// The African Kingdoms expansion.
-    AfricanKingdoms,
+    AfricanKingdoms = 5,
     /// The Rise of the Rajas expansion.
-    RiseOfTheRajas,
+    RiseOfTheRajas = 6,
     /// The Last Khans expansion.
-    LastKhans,
-}
-
-impl TryFrom<i32> for DlcPackage {
-    type Error = ParseDlcPackageError;
-    fn try_from(n: i32) -> Result<Self, Self::Error> {
-        match n {
-            2 => Ok(Self::AgeOfKings),
-            3 => Ok(Self::AgeOfConquerors),
-            4 => Ok(Self::TheForgotten),
-            5 => Ok(Self::AfricanKingdoms),
-            6 => Ok(Self::RiseOfTheRajas),
-            7 => Ok(Self::LastKhans),
-            n => Err(ParseDlcPackageError(n)),
-        }
-    }
-}
-
-impl From<DlcPackage> for i32 {
-    fn from(dlc_id: DlcPackage) -> Self {
-        match dlc_id {
-            DlcPackage::AgeOfKings => 2,
-            DlcPackage::AgeOfConquerors => 3,
-            DlcPackage::TheForgotten => 4,
-            DlcPackage::AfricanKingdoms => 5,
-            DlcPackage::RiseOfTheRajas => 6,
-            DlcPackage::LastKhans => 7,
-        }
-    }
-}
-
-fn expected_range(version: f32) -> &'static str {
-    if version < 1.25 { "-1-4" } else { "-1-6" }
-}
-
-/// Could not parse a starting age because given number refers to an unknown age.
-#[derive(Debug, Clone, Copy, thiserror::Error)]
-#[error("invalid starting age {} (must be {})", .found, expected_range(*.version))]
-pub struct ParseStartingAgeError {
-    version: f32,
-    found: i32,
+    LastKhans = 7,
+    /// A value no DLC names (a newer one), kept to be written back.
+    #[num_enum(catch_all)]
+    Other(i32),
 }
 
 /// The starting age.
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[non_exhaustive]
 pub enum StartingAge {
     /// Use the game default.
-    Default = -1,
+    Default,
     /// Start in the Dark Age with Nomad resources.
-    Nomad = -2,
+    Nomad,
     /// Start in the Dark Age.
-    DarkAge = 0,
+    DarkAge,
     /// Start in the Feudal Age.
-    FeudalAge = 1,
+    FeudalAge,
     /// Start in the Castle Age.
-    CastleAge = 2,
+    CastleAge,
     /// Start in the Imperial Age.
-    ImperialAge = 3,
+    ImperialAge,
     /// Start in the Imperial Age with all technologies researched.
-    PostImperialAge = 4,
+    PostImperialAge,
+    /// A value no age of the data version names, kept to be written back.
+    Other(i32),
 }
 
 impl StartingAge {
-    /// Convert a starting age number to the appropriate enum for a particular
-    /// data version.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if `n` is not a starting age in that data version.
-    pub fn try_from(n: i32, version: f32) -> Result<Self, ParseStartingAgeError> {
+    /// The starting age that number `n` names in data version `version`: before 1.25 −1 to 4
+    /// (the default, then Dark to Post-Imperial), from 1.25 on −1 or 0 (the default), 1 (Nomad)
+    /// and 2 to 6; any other number is [`StartingAge::Other`].
+    #[must_use]
+    pub const fn from_i32(n: i32, version: f32) -> Self {
         if version < 1.25 {
             match n {
-                -1 => Ok(Self::Default),
-                0 => Ok(Self::DarkAge),
-                1 => Ok(Self::FeudalAge),
-                2 => Ok(Self::CastleAge),
-                3 => Ok(Self::ImperialAge),
-                4 => Ok(Self::PostImperialAge),
-                _ => Err(ParseStartingAgeError { version, found: n }),
+                -1 => Self::Default,
+                0 => Self::DarkAge,
+                1 => Self::FeudalAge,
+                2 => Self::CastleAge,
+                3 => Self::ImperialAge,
+                4 => Self::PostImperialAge,
+                n => Self::Other(n),
             }
         } else {
             match n {
-                -1 | 0 => Ok(Self::Default),
-                1 => Ok(Self::Nomad),
-                2 => Ok(Self::DarkAge),
-                3 => Ok(Self::FeudalAge),
-                4 => Ok(Self::CastleAge),
-                5 => Ok(Self::ImperialAge),
-                6 => Ok(Self::PostImperialAge),
-                _ => Err(ParseStartingAgeError { version, found: n }),
+                -1 | 0 => Self::Default,
+                1 => Self::Nomad,
+                2 => Self::DarkAge,
+                3 => Self::FeudalAge,
+                4 => Self::CastleAge,
+                5 => Self::ImperialAge,
+                6 => Self::PostImperialAge,
+                n => Self::Other(n),
             }
         }
     }
@@ -275,6 +192,7 @@ impl StartingAge {
                 Self::CastleAge => 2,
                 Self::ImperialAge => 3,
                 Self::PostImperialAge => 4,
+                Self::Other(n) => n,
             }
         } else {
             match self {
@@ -285,6 +203,7 @@ impl StartingAge {
                 Self::CastleAge => 4,
                 Self::ImperialAge => 5,
                 Self::PostImperialAge => 6,
+                Self::Other(n) => n,
             }
         }
     }
@@ -292,6 +211,7 @@ impl StartingAge {
 
 /// Known types of victory conditions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum VictoryCondition {
     /// Capture an object.
     Capture,
@@ -507,80 +427,9 @@ impl VersionBundle {
     }
 }
 
-impl From<ParseDiplomaticStanceError> for genie_error::GenieError {
-    /// The error as a [`genie_error::GenieError`]: its kind and reason, the original as the
-    /// source.
-    #[track_caller]
-    fn from(e: ParseDiplomaticStanceError) -> Self {
-        Self::invalid_input("a diplomatic stance id this reader does not know").with_source(e)
-    }
-}
-
-impl From<ParseDataSetError> for genie_error::GenieError {
-    /// The error as a [`genie_error::GenieError`]: its kind and reason, the original as the
-    /// source.
-    #[track_caller]
-    fn from(e: ParseDataSetError) -> Self {
-        Self::invalid_input("a data set id this reader does not know").with_source(e)
-    }
-}
-
-impl From<ParseDlcPackageError> for genie_error::GenieError {
-    /// The error as a [`genie_error::GenieError`]: its kind and reason, the original as the
-    /// source.
-    #[track_caller]
-    fn from(e: ParseDlcPackageError) -> Self {
-        Self::invalid_input("a DLC package id this reader does not know").with_source(e)
-    }
-}
-
-impl From<ParseStartingAgeError> for genie_error::GenieError {
-    /// The error as a [`genie_error::GenieError`]: its kind and reason, the original as the
-    /// source.
-    #[track_caller]
-    fn from(e: ParseStartingAgeError) -> Self {
-        Self::invalid_input("a starting age id this reader does not know").with_source(e)
-    }
-}
-
 #[cfg(test)]
-mod genie_error_tests {
+mod tests {
     use super::*;
-    #[cfg(test)]
-    use std::error::Error as StdError;
-
-    /// The errors convert into `GenieError`s with their kinds and reasons, the original as
-    /// source.
-    #[test]
-    fn id_errors_convert_into_genie_errors() {
-        let e: genie_error::GenieError = ParseDiplomaticStanceError(9).into();
-        assert_eq!(
-            (e.kind(), e.reason()),
-            (
-                genie_error::ErrorKind::InvalidInput,
-                "a diplomatic stance id this reader does not know"
-            )
-        );
-        assert!(StdError::source(&e).is_some());
-        let e: genie_error::GenieError = ParseDataSetError(9).into();
-        assert_eq!(
-            (e.kind(), e.reason()),
-            (
-                genie_error::ErrorKind::InvalidInput,
-                "a data set id this reader does not know"
-            )
-        );
-        assert!(StdError::source(&e).is_some());
-        let e: genie_error::GenieError = ParseDlcPackageError(9).into();
-        assert_eq!(
-            (e.kind(), e.reason()),
-            (
-                genie_error::ErrorKind::InvalidInput,
-                "a DLC package id this reader does not know"
-            )
-        );
-        assert!(StdError::source(&e).is_some());
-    }
 
     /// The victory conditions' ids 0 to 11 and any other kept as it is, both ways.
     #[test]
@@ -605,5 +454,33 @@ mod genie_error_tests {
         }
         assert_eq!(VictoryCondition::from(12), VictoryCondition::Other(12));
         assert_eq!(u8::from(VictoryCondition::Other(200)), 200);
+    }
+
+    /// A value no variant names reads as `Other` and writes back as itself; a named one keeps
+    /// its number.
+    #[test]
+    fn unnamed_values_are_kept_and_written_back() {
+        assert_eq!(DiplomaticStance::from(3), DiplomaticStance::Enemy);
+        assert_eq!(DiplomaticStance::from(2), DiplomaticStance::Other(2));
+        assert_eq!(i32::from(DiplomaticStance::Other(2)), 2);
+        assert_eq!(i32::from(DiplomaticStance::Enemy), 3);
+        assert_eq!(DataSet::from(9), DataSet::Other(9));
+        assert_eq!(i32::from(DataSet::Other(9)), 9);
+        assert_eq!(DlcPackage::from(7), DlcPackage::LastKhans);
+        assert_eq!(DlcPackage::from(8), DlcPackage::Other(8));
+        assert_eq!(i32::from(DlcPackage::Other(8)), 8);
+        assert_eq!(VictoryCondition::from(12), VictoryCondition::Other(12));
+    }
+
+    /// A starting age's number depends on the data version: 1 is Feudal before 1.25 and Nomad
+    /// from 1.25 on; a number past the version's last age is kept.
+    #[test]
+    fn starting_ages_read_by_their_data_version() {
+        assert_eq!(StartingAge::from_i32(1, 1.2), StartingAge::FeudalAge);
+        assert_eq!(StartingAge::from_i32(1, 1.25), StartingAge::Nomad);
+        assert_eq!(StartingAge::from_i32(99, 1.2), StartingAge::Other(99));
+        assert_eq!(StartingAge::Other(99).to_i32(1.2), 99);
+        assert_eq!(StartingAge::from_i32(7, 1.3), StartingAge::Other(7));
+        assert_eq!(StartingAge::PostImperialAge.to_i32(1.3), 6);
     }
 }

@@ -18,7 +18,7 @@ genie-model = { path = "../genie-model", features = ["schema"] }
 genie-math = { path = "../genie-math" }
 # the error every crate returns: its kind, reason, place and context
 genie-error = { path = "../../base/genie-error" }
-genie-dat = { version = "0.1.0", path = "../../formats/genie-dat" }
+genie-dat = { version = "0.2.0", path = "../../formats/genie-dat" }
 genie-json = { version = "0.1.0", path = "../../formats/genie-json" }
 genie-save = { version = "0.1.0", path = "../../formats/genie-save" }
 serde_json.workspace = true

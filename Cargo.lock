@@ -704,7 +704,7 @@ dependencies = [
 
 [[package]]
 name = "genie-cpx"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "anyhow",
  "byteorder",
@@ -717,7 +717,7 @@ dependencies = [
 
 [[package]]
 name = "genie-dat"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "arrayvec 0.7.8",
@@ -728,6 +728,7 @@ dependencies = [
  "genie-error",
  "genie-support",
  "jascpal",
+ "num_enum",
  "thiserror 1.0.69",
 ]
 
@@ -764,7 +765,7 @@ version = "0.1.0"
 
 [[package]]
 name = "genie-formats"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "anyhow",
  "flate2",
@@ -786,7 +787,7 @@ dependencies = [
 
 [[package]]
 name = "genie-hki"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "byteorder",
@@ -824,7 +825,7 @@ dependencies = [
 
 [[package]]
 name = "genie-lang"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "byteorder",
@@ -899,7 +900,7 @@ dependencies = [
 
 [[package]]
 name = "genie-rec"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "arrayvec 0.7.8",
@@ -924,7 +925,7 @@ dependencies = [
 
 [[package]]
 name = "genie-scx"
-version = "4.0.0"
+version = "5.0.0"
 dependencies = [
  "anyhow",
  "byteorder",
@@ -1532,23 +1533,24 @@ dependencies = [
 
 [[package]]
 name = "num_enum"
-version = "0.5.11"
+version = "0.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1f646caf906c20226733ed5b1374287eb97e3c2a5c227ce668c1f2ce20ae57c9"
+checksum = "5d0bca838442ec211fa11de3a8b0e0e8f3a4522575b5c4c06ed722e005036f26"
 dependencies = [
  "num_enum_derive",
+ "rustversion",
 ]
 
 [[package]]
 name = "num_enum_derive"
-version = "0.5.11"
+version = "0.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dcbff9bc912032c62bf65ef1d5aea88983b420f4f839db1e9b0c281a25c9c799"
+checksum = "680998035259dcfcafe653688bf2aa6d3e2dc05e98be6ab46afb089dc84f1df8"
 dependencies = [
  "proc-macro-crate",
  "proc-macro2",
  "quote",
- "syn 1.0.109",
+ "syn 2.0.119",
 ]
 
 [[package]]

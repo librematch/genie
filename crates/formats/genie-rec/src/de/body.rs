@@ -69,6 +69,7 @@ pub struct TriggerSync {
 
 /// One record of a chapter's op stream.
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub enum Op<'a> {
     /// Op 5 as the first record of a recording: the recording settings.
     Pregame(Pregame),

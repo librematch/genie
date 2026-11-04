@@ -14,10 +14,11 @@
 //!
 //! ## Example
 //! ```rust
+//! # fn main() -> Result<(), jascpal::ReadPaletteError> {
 //! use std::io::Cursor;
 //! use jascpal::{Palette, PaletteIndex, Color};
 //! let cursor = Cursor::new(b"JASC-PAL\r\n0100\r\n2\r\n0 0 0\r\n255 255 255\r\n".to_vec());
-//! let pal = Palette::read_from(cursor).unwrap();
+//! let pal = Palette::read_from(cursor)?;
 //! assert_eq!(pal[PaletteIndex::from(0)], Color { r: 0, g: 0, b: 0 });
 //! assert_eq!(pal[PaletteIndex::from(1)], Color { r: 255, g: 255, b: 255 });
 //! let mut pal = pal;
@@ -27,6 +28,8 @@
 //!     pal.to_string(),
 //!     "JASC-PAL\r\n0100\r\n3\r\n0 0 0\r\n0 255 255\r\n255 0 0\r\n".to_string()
 //! );
+//! # Ok(())
+//! # }
 //! ```
 
 #![deny(future_incompatible)]

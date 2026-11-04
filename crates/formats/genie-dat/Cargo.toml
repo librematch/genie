@@ -1,6 +1,6 @@
 [package]
 name = "genie-dat"
-version = "0.1.0"
+version = "0.2.0"
 rust-version.workspace = true
 authors.workspace = true
 edition.workspace = true
@@ -22,6 +22,7 @@ flate2.workspace = true
 genie-error = { path = "../../base/genie-error" }
 genie-support = { version = "^1.0.0", path = "../genie-support" }
 jascpal = { version = "^0.1.0", path = "../jascpal" }
+num_enum.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]

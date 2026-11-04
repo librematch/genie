@@ -1,6 +1,6 @@
 [package]
 name = "genie-rec"
-version = "0.1.1"
+version = "0.2.0"
 authors.workspace = true
 edition.workspace = true
 license = "GPL-3.0-only"
@@ -17,10 +17,10 @@ arrayvec.workspace = true
 binrw.workspace = true
 byteorder.workspace = true
 flate2.workspace = true
-genie-dat = { version = "0.1.0", path = "../genie-dat" }
+genie-dat = { version = "0.2.0", path = "../genie-dat" }
 genie-error = { path = "../../base/genie-error" }
 genie-save = { version = "0.1.0", path = "../genie-save" }
-genie-scx = { version = "4.0.0", path = "../genie-scx" }
+genie-scx = { version = "5.0.0", path = "../genie-scx" }
 genie-support = { version = "1.0.0", path = "../genie-support", features = [
     "strings",
 ] }

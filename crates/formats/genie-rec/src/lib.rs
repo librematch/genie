@@ -57,7 +57,6 @@ use crate::element::ReadableHeaderElement;
 use crate::reader::{RecordingHeaderReader, SmallBufReader};
 use byteorder::{LE, ReadBytesExt};
 use flate2::bufread::DeflateDecoder;
-use genie_scx::DlcOptions;
 use genie_support::{fallible_try_from, fallible_try_into, infallible_try_into};
 pub use header::Header;
 use std::fmt::Debug;
@@ -165,12 +164,6 @@ pub enum Error {
     /// A body action of a type the reader does not know.
     #[error("unsupported action type {0:#x}")]
     UnsupportedAction(i32),
-    /// A command of a type the reader does not know.
-    #[error("unsupported command type {0:#x}")]
-    UnsupportedCommand(u8),
-    /// A game command of a type the reader does not know.
-    #[error("unsupported game command {0:#x}")]
-    UnsupportedGameCommand(u8),
     /// A unit action of a type the reader does not know.
     #[error("unsupported unit action type {0}")]
     UnsupportedUnitAction(u16),
@@ -292,122 +285,6 @@ where
             Err(err) => Some(Err(err.into())),
         }
     }
-}
-
-/// The AI difficulty setting.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum Difficulty {
-    /// The easiest difficulty.
-    Easiest,
-    /// Easy.
-    Easy,
-    /// Standard (moderate).
-    Standard,
-    /// Hard.
-    Hard,
-    /// Hardest.
-    Hardest,
-    /// Age of Empires 2: Definitive Edition only.
-    Extreme,
-}
-
-/// The map size setting. Placeholder: no variants are modelled yet.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum MapSize {}
-
-/// The map type (random map script) setting. Placeholder: no variants are modelled yet.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum MapKind {}
-
-/// The map visibility setting (normal, explored, all visible). Placeholder: no variants are
-/// modelled yet.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum Visibility {}
-
-/// The starting resources setting. Placeholder: no variants are modelled yet.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum ResourceLevel {}
-
-/// An age (Dark, Feudal, Castle, Imperial, Post-Imperial). Placeholder: no variants are modelled
-/// yet.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum Age {}
-
-/// The game mode setting (random map, regicide, death match …). Placeholder: no variants are
-/// modelled yet.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum GameMode {}
-
-/// The game speed setting. Placeholder: no variants are modelled yet.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum GameSpeed {}
-
-/// The game settings an HD Edition recording stores. Not read by this crate yet.
-// The bools mirror the settings' on/off flags.
-#[allow(clippy::struct_excessive_bools)]
-#[derive(Debug, Clone)]
-pub struct HdGameOptions {
-    /// The DLCs the game uses.
-    pub dlc_options: DlcOptions,
-    /// The AI difficulty.
-    pub difficulty: Difficulty,
-    /// The map size.
-    pub map_size: MapSize,
-    /// The map type.
-    pub map_kind: MapKind,
-    /// The map visibility.
-    pub visibility: Visibility,
-    /// The starting resources.
-    pub starting_resources: ResourceLevel,
-    /// The age the players start in.
-    pub starting_age: Age,
-    /// The last age the players can reach.
-    pub ending_age: Age,
-    /// The game mode.
-    pub game_mode: GameMode,
-    // if version < 1001
-    /// The random map script's name.
-    pub random_map_name: Option<String>,
-    // if version < 1001
-    /// The scenario's name.
-    pub scenario_name: Option<String>,
-    /// The game speed.
-    pub game_speed: GameSpeed,
-    /// The treaty length (time before players may attack each other).
-    pub treaty_length: i32,
-    /// The population limit.
-    pub population_limit: i32,
-    /// The number of players.
-    pub num_players: i32,
-    /// The amount the victory condition needs (score, time …).
-    pub victory_amount: i32,
-    /// Whether trading is allowed.
-    pub trading_enabled: bool,
-    /// Whether team bonuses are on.
-    pub team_bonuses_enabled: bool,
-    /// Whether the starting positions are randomized.
-    pub randomize_positions_enabled: bool,
-    /// Whether every civilization gets the full tech tree.
-    pub full_tech_tree_enabled: bool,
-    /// The number of units each player starts with.
-    pub num_starting_units: i8,
-    /// Whether the teams are locked.
-    pub teams_locked: bool,
-    /// Whether the game speed is locked.
-    pub speed_locked: bool,
-    /// Whether it is a multiplayer game.
-    pub multiplayer: bool,
-    /// Whether cheats are allowed.
-    pub cheats_enabled: bool,
-    /// Whether the game is recorded.
-    pub record_game: bool,
-    /// Whether (huntable) animals are on the map.
-    pub animals_enabled: bool,
-    /// Whether predators are on the map.
-    pub predators_enabled: bool,
-    // if version > 1.16 && version < 1002
-    /// The scenario player each player plays.
-    pub scenario_player_indices: Vec<i32>,
 }
 
 /// Recorded game reader.
@@ -549,12 +426,6 @@ impl From<Error> for genie_error::GenieError {
             Error::UnsupportedAction(_) => {
                 Self::invalid_input("an action type this reader does not know")
             }
-            Error::UnsupportedCommand(_) => {
-                Self::invalid_input("a command type this reader does not know")
-            }
-            Error::UnsupportedGameCommand(_) => {
-                Self::invalid_input("a game command type this reader does not know")
-            }
             Error::UnsupportedUnitAction(_) => {
                 Self::invalid_input("a unit action type this reader does not know")
             }
@@ -578,7 +449,7 @@ mod tests {
     #[test]
     fn the_errors_convert_into_genie_errors_of_their_kinds() {
         use genie_error::ErrorKind::{InvalidInput, Io, MissingData};
-        let kinds: [(Error, genie_error::ErrorKind); 13] = [
+        let kinds: [(Error, genie_error::ErrorKind); 11] = [
             (io::Error::other("x").into(), Io),
             (SyncError::ExpectedSync.into(), InvalidInput),
             (genie_support::DecodeStringError.into(), InvalidInput),
@@ -586,8 +457,6 @@ mod tests {
             (Error::InvalidString, InvalidInput),
             (Error::InvalidData("x"), InvalidInput),
             (Error::UnsupportedAction(9), InvalidInput),
-            (Error::UnsupportedCommand(9), InvalidInput),
-            (Error::UnsupportedGameCommand(9), InvalidInput),
             (Error::UnsupportedUnitAction(9), InvalidInput),
             (Error::NotRead("x"), MissingData),
             (Error::NotWritten, MissingData),

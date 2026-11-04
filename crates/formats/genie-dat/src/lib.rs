@@ -48,6 +48,7 @@ use std::str::from_utf8;
 
 /// A game version targeted by a data file.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum GameVersion {
     /// The original expansion-less Age of Empires 2: Age of Kings.
     Aok,
@@ -177,37 +178,37 @@ pub struct DatFile {
 
 impl DatFile {
     /// Get a tech by its ID.
-    pub fn get_tech(&self, id: impl Into<TechId>) -> Option<&Tech> {
+    pub fn tech(&self, id: impl Into<TechId>) -> Option<&Tech> {
         let id: TechId = id.into();
         self.techs.get(usize::from(id))
     }
 
     /// Get a terrain type by its ID.
-    pub fn get_terrain(&self, id: impl Into<TerrainId>) -> Option<&Terrain> {
+    pub fn terrain(&self, id: impl Into<TerrainId>) -> Option<&Terrain> {
         let id: TerrainId = id.into();
         self.terrains.get(usize::from(id))
     }
 
     /// Get the GAIA civilization.
     #[must_use]
-    pub fn get_gaia(&self) -> Option<&Civilization> {
-        self.get_civilization(0)
+    pub fn gaia(&self) -> Option<&Civilization> {
+        self.civilization(0)
     }
 
     /// Get a civilization by its ID.
-    pub fn get_civilization(&self, id: impl Into<CivilizationId>) -> Option<&Civilization> {
+    pub fn civilization(&self, id: impl Into<CivilizationId>) -> Option<&Civilization> {
         let id: CivilizationId = id.into();
         self.civilizations.get(usize::from(id))
     }
 
     /// Get a sound by its ID.
-    pub fn get_sound(&self, id: impl Into<SoundId>) -> Option<&Sound> {
+    pub fn sound(&self, id: impl Into<SoundId>) -> Option<&Sound> {
         let id: SoundId = id.into();
         self.sounds.get(usize::from(id))
     }
 
     /// Get a sprite by its ID.
-    pub fn get_sprite(&self, id: impl Into<SpriteId>) -> Option<&Sprite> {
+    pub fn sprite(&self, id: impl Into<SpriteId>) -> Option<&Sprite> {
         let id: SpriteId = id.into();
         self.sprites.get(usize::from(id)).and_then(Option::as_ref)
     }

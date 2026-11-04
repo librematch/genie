@@ -33,17 +33,17 @@ impl DlcOptions {
     ///
     /// # Errors
     ///
-    /// Returns an error if reading fails, or if the data set or a DLC package ID is unknown.
+    /// Returns an error if reading fails.
     pub fn read_from(mut input: impl Read) -> Result<Self> {
         // If version is 0 or 1, it's actually the dataset identifier from
         // before DLCOptions was versioned.
         let version_or_data_set = input.read_i32::<LE>()?;
         let game_data_set =
-            DataSet::try_from(if version_or_data_set == 0 || version_or_data_set == 1 {
+            DataSet::from(if version_or_data_set == 0 || version_or_data_set == 1 {
                 version_or_data_set
             } else {
                 input.read_i32::<LE>()?
-            })?;
+            });
 
         // Set version to 0 for old DLCOptions.
         let version = if version_or_data_set == 1 {
@@ -55,7 +55,7 @@ impl DlcOptions {
         let num_dependencies = input.read_u32::<LE>()?;
         let mut dependencies = vec![DlcPackage::AgeOfKings; num_dependencies as usize];
         for dependency in &mut dependencies {
-            *dependency = DlcPackage::try_from(input.read_i32::<LE>()?)?;
+            *dependency = DlcPackage::from(input.read_i32::<LE>()?);
         }
 
         Ok(Self {

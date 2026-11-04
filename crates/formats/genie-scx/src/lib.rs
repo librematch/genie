@@ -79,24 +79,6 @@ pub enum Error {
     /// Failed to encode a string into the scenario file, probably because of a wrong encoding.
     #[error(transparent)]
     EncodeStringError(#[from] EncodeStringError),
-    /// The given ID is not a known diplomatic stance.
-    #[error(transparent)]
-    ParseDiplomaticStanceError(#[from] ParseDiplomaticStanceError),
-    /// The given ID is not a known data set.
-    #[error(transparent)]
-    ParseDataSetError(#[from] ParseDataSetError),
-    /// The given ID is not a known HD Edition DLC.
-    #[error(transparent)]
-    ParseDlcPackageError(#[from] ParseDlcPackageError),
-    /// The given ID is not a known starting age in `AoE1` or `AoE2`.
-    #[error(transparent)]
-    ParseStartingAgeError(#[from] ParseStartingAgeError),
-    /// The given ID is not a known error code.
-    #[error(transparent)]
-    ParseAiErrorCodeError(#[from] num_enum::TryFromPrimitiveError<ai::AiErrorCode>),
-    /// The given ID is not a known victory condition state.
-    #[error(transparent)]
-    ParseVictoryConditionStateError(#[from] num_enum::TryFromPrimitiveError<VictoryState>),
     /// A string is too long for the length prefix it is written with.
     #[error("string too long for its length prefix")]
     StringTooLongError,
@@ -161,16 +143,6 @@ impl Scenario {
         let version = format.version();
 
         Ok(Self { format, version })
-    }
-
-    /// Read a scenario file.
-    ///
-    /// # Errors
-    ///
-    /// The same as [`Scenario::read_from`].
-    #[deprecated = "Use Scenario::read_from instead."]
-    pub fn from<R: Read>(input: &mut R) -> Result<Self> {
-        Self::read_from(input)
     }
 
     /// Write the scenario file to an output stream.
@@ -346,14 +318,6 @@ impl From<Error> for genie_error::GenieError {
             }
             Error::DecodeStringError(_) => Self::invalid_input("a string that does not decode"),
             Error::EncodeStringError(_) => Self::invalid_input("a string that does not encode"),
-            Error::ParseDiplomaticStanceError(_)
-            | Error::ParseDataSetError(_)
-            | Error::ParseDlcPackageError(_)
-            | Error::ParseStartingAgeError(_)
-            | Error::ParseAiErrorCodeError(_)
-            | Error::ParseVictoryConditionStateError(_) => {
-                Self::invalid_input("an id this reader does not know")
-            }
             Error::StringTooLongError => {
                 Self::invalid_input("a string too long for its length prefix")
             }
@@ -416,7 +380,6 @@ mod genie_error_tests {
     #[test]
     fn each_scenario_error_has_its_kind_and_reason() {
         use genie_error::ErrorKind::{InvalidInput, Io, Unsupported};
-        let unknown_id = "an id this reader does not know";
         let cases: Vec<(Error, genie_error::ErrorKind, &str)> = vec![
             (
                 Error::UnsupportedFormatVersionError(ScxVersion(*b"9.99")),
@@ -452,31 +415,6 @@ mod genie_error_tests {
                 EncodeStringError.into(),
                 InvalidInput,
                 "a string that does not encode",
-            ),
-            (
-                DiplomaticStance::try_from(9).unwrap_err().into(),
-                InvalidInput,
-                unknown_id,
-            ),
-            (
-                DataSet::try_from(9).unwrap_err().into(),
-                InvalidInput,
-                unknown_id,
-            ),
-            (
-                StartingAge::try_from(99, 1.2).unwrap_err().into(),
-                InvalidInput,
-                unknown_id,
-            ),
-            (
-                ai::AiErrorCode::try_from(999).unwrap_err().into(),
-                InvalidInput,
-                unknown_id,
-            ),
-            (
-                num_enum::TryFromPrimitiveError::<VictoryState> { number: 99 }.into(),
-                InvalidInput,
-                unknown_id,
             ),
             (
                 Error::IoError(io::Error::other("x")),

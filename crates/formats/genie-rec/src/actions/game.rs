@@ -7,6 +7,7 @@ use std::io::Read;
 
 /// Commands affecting the game (command `0x67`), one variant per sub-command.
 #[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
 pub enum GameCommand {
     /// Change the game speed (sub-command 1).
     SetGameSpeed {
@@ -93,6 +94,19 @@ pub enum GameCommand {
         player_id: PlayerId,
         // TODO unknown vars
     },
+    /// A sub-command this reader does not name, its fixed fields kept as the file holds them.
+    Other {
+        /// The sub-command.
+        kind: u8,
+        /// The first word (a player in the named sub-commands).
+        var1: i16,
+        /// The second word.
+        var2: i16,
+        /// The float.
+        var3: f32,
+        /// The last double word.
+        var4: u32,
+    },
 }
 
 #[derive(Debug)]
@@ -129,8 +143,9 @@ impl GameCommand {
     ///
     /// Returns an error if reading from `input` fails.
     ///
-    /// Also fails if the sub-command is not one listed in [`GameCommand`], if the player ID is
-    /// negative or above 255, or if a strategic number's value is above `i32::MAX`.
+    /// Also fails if the player ID of a named sub-command is negative or above 255, or if a
+    /// strategic number's value is above `i32::MAX`; a sub-command no variant names reads as
+    /// [`GameCommand::Other`].
     pub fn read_from(input: impl Read) -> Result<Self> {
         use GameCommand::{
             AddFarmReseedQueue, AlliedVictory, Cheat, FarmReseedAutoQueue, Inventory, QuickBuild,
@@ -147,7 +162,13 @@ impl GameCommand {
         } = RawGameCommand::read_from(input)?;
 
         if !matches!(game_command, 0x01..=0x07 | 0x0a..=0x0e | 0x10) {
-            return Err(crate::Error::UnsupportedGameCommand(game_command));
+            return Ok(Self::Other {
+                kind: game_command,
+                var1,
+                var2,
+                var3,
+                var4,
+            });
         }
         let player_id = fits(var1)?;
         match game_command {
@@ -187,7 +208,13 @@ impl GameCommand {
                 amount: var2,
             }),
             0x10 => Ok(FarmReseedAutoQueue { player_id }),
-            _ => Err(crate::Error::UnsupportedGameCommand(game_command)),
+            kind => Ok(Self::Other {
+                kind,
+                var1,
+                var2,
+                var3,
+                var4,
+            }),
         }
     }
 }

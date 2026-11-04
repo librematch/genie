@@ -96,9 +96,9 @@ pub struct UngarrisonCommand {
     /// Which objects to ungarrison. aoc-mgz names the values 0 (all), 3 (selected), 4 (same
     /// type), 5 (not selected) and 6 (inverse type).
     pub ungarrison_kind: i8,
-    /// The unit type to ungarrison, for the kinds that select by type; read as an optional ID
-    /// (-1 for none).
-    pub unit_kind_id: Option<ObjectId>,
+    /// The unit type to ungarrison, for the kinds that select by type: four bytes, −1 (or −2)
+    /// for none.
+    pub unit_kind_id: Option<UnitKindId>,
     /// Where the ungarrisoned objects go, if a location was given (it is stored as -1, -1 if
     /// not).
     pub location: Option<Location2>,

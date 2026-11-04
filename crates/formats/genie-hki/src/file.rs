@@ -22,12 +22,12 @@ pub struct HotkeyInfo {
 
 impl HotkeyInfo {
     /// Read a hotkey info structure from an uncompressed stream.
-    pub(super) fn from_uncompressed<R: Read>(input: &mut R) -> io::Result<Self> {
+    pub(super) fn read_uncompressed<R: Read>(input: &mut R) -> io::Result<Self> {
         let version = input.read_f32::<LE>()?;
         let num_groups = input.read_u32::<LE>()?;
         let mut groups = Vec::with_capacity(num_groups as usize);
         for _ in 0..num_groups {
-            groups.push(HotkeyGroup::from(input)?);
+            groups.push(HotkeyGroup::read_from(input)?);
         }
 
         Ok(Self { version, groups })
@@ -39,9 +39,9 @@ impl HotkeyInfo {
     ///
     /// Returns an error if reading from `input` fails, including when the data is not valid
     /// DEFLATE or ends early.
-    pub fn from<R: Read>(input: &mut R) -> io::Result<Self> {
+    pub fn read_from(input: impl Read) -> io::Result<Self> {
         let mut input = DeflateDecoder::new(input);
-        Self::from_uncompressed(&mut input)
+        Self::read_uncompressed(&mut input)
     }
 
     /// Writes a hotkey info structure to an uncompressed stream.
@@ -73,11 +73,11 @@ impl HotkeyInfo {
     /// use std::fs::File;
     /// use genie_hki::HotkeyInfo;
     /// let mut f = File::open("test/files/aoc1.hki")?;
-    /// let info = HotkeyInfo::from(&mut f).expect("failed to read file");
+    /// let info = HotkeyInfo::read_from(&mut f)?;
     /// assert_eq!(info.version(), 1.0);
     ///
     /// let mut f = File::open("test/files/hd0.hki")?;
-    /// let info = HotkeyInfo::from(&mut f).expect("failed to read file");
+    /// let info = HotkeyInfo::read_from(&mut f)?;
     /// assert_eq!(info.version(), 3.0);
     /// # Ok(()) }
     /// ```
@@ -93,7 +93,7 @@ impl HotkeyInfo {
     /// use std::fs::File;
     /// use genie_hki::{HotkeyInfo, HotkeyGroupId};
     /// let mut f = File::open("test/files/aoc1.hki")?;
-    /// let info = HotkeyInfo::from(&mut f).expect("failed to read file");
+    /// let info = HotkeyInfo::read_from(&mut f)?;
     /// assert!(info.group(HotkeyGroupId::Villager as usize).is_some());
     /// assert!(info.group(HotkeyGroupId::Mill as usize).is_none());
     /// # Ok(()) }
@@ -115,11 +115,11 @@ impl HotkeyInfo {
     /// use genie_hki::HotkeyInfo;
     ///
     /// let mut f = File::open("test/files/aoc1.hki")?;
-    /// let info = HotkeyInfo::from(&mut f).expect("failed to read file");
+    /// let info = HotkeyInfo::read_from(&mut f)?;
     /// assert_eq!(14, info.num_groups());
     ///
     /// let mut f = File::open("test/files/wk.hki")?;
-    /// let info = HotkeyInfo::from(&mut f).expect("failed to read file");
+    /// let info = HotkeyInfo::read_from(&mut f)?;
     /// assert_eq!(15, info.num_groups());
     /// # Ok(()) }
     /// ```
@@ -214,12 +214,12 @@ impl HotkeyInfo {
     /// Panics if the number of hotkeys in any group of this file differs from
     /// the number of hotkeys given to that group in `him`.
     #[must_use]
-    pub fn get_string_from_lang(&self, lang_file: &LangFile, him: &HotkeyInfoMetadata) -> String {
+    pub fn string_from_lang(&self, lang_file: &LangFile, him: &HotkeyInfoMetadata) -> String {
         let groups: Vec<String> = self
             .groups
             .iter()
             .zip(him.iter())
-            .map(|(grp, sk)| grp.get_string_from_lang(lang_file, sk))
+            .map(|(grp, sk)| grp.string_from_lang(lang_file, sk))
             .collect();
         format!("Version: {}\n{}", self.version, groups.join("\n"))
     }

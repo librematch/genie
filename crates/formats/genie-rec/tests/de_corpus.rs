@@ -90,7 +90,11 @@ fn tier_1_recordings_read_and_round_trip() {
                     }
                     Op::View(_) => rec.views += 1,
                     Op::Chat { .. } => rec.chats += 1,
-                    Op::TriggerSync(_) | Op::End { .. } => {}
+                    // an op a later version of the reader adds: the census must learn to count it
+                    other => problems.push(format!(
+                        "{}: an op the census does not count: {other:?}",
+                        path.display()
+                    )),
                 }
                 if chapter.index == 0 && i == 0 && !matches!(op, Op::Pregame(_)) {
                     problems.push(format!(

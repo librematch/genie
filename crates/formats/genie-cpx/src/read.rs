@@ -3,7 +3,6 @@ use byteorder::{LE, ReadBytesExt};
 use chardet::detect as detect_encoding;
 use encoding_rs::Encoding;
 use genie_scx::{self as scx, DlcPackage, Scenario};
-use std::convert::TryFrom;
 use std::io::{self, Cursor, Read, Seek, SeekFrom};
 use std::result::Result as StdResult;
 
@@ -90,8 +89,7 @@ fn read_campaign_header<R: Read>(input: &mut R) -> Result<CampaignHeader> {
             let num_dependencies = input.read_u32::<LE>()?;
             let mut dependencies = vec![DlcPackage::AgeOfKings; num_dependencies as usize];
             for dependency in &mut dependencies {
-                *dependency =
-                    DlcPackage::try_from(input.read_i32::<LE>()?).map_err(scx::Error::from)?;
+                *dependency = DlcPackage::from(input.read_i32::<LE>()?);
             }
         }
 
@@ -176,9 +174,9 @@ where
     ///
     /// # Errors
     ///
-    /// Returns an error if reading fails, if a string cannot be decoded, if the campaign or a
-    /// scenario has no name, or if a DLC dependency is unknown.
-    pub fn from(mut input: R) -> Result<Self> {
+    /// Returns an error if reading fails, if a string cannot be decoded, or if the campaign or a
+    /// scenario has no name.
+    pub fn read_from(mut input: R) -> Result<Self> {
         let header = read_campaign_header(&mut input)?;
         let mut entries = vec![];
         let read_entry = if header.version == *b"2.00" {
@@ -230,17 +228,17 @@ where
     }
 
     /// Get the user-facing name of the scenario at the given index.
-    pub fn get_name(&self, id: usize) -> Option<&str> {
+    pub fn scenario_name(&self, id: usize) -> Option<&str> {
         self.entries.get(id).map(|entry| entry.name.as_ref())
     }
 
     /// Get the filename of the scenario at the given index.
-    pub fn get_filename(&self, id: usize) -> Option<&str> {
+    pub fn scenario_filename(&self, id: usize) -> Option<&str> {
         self.entries.get(id).map(|entry| entry.filename.as_ref())
     }
 
     /// Return the index of the scenario with the given filename, if it exists.
-    fn get_id(&self, filename: &str) -> Option<usize> {
+    fn index_of(&self, filename: &str) -> Option<usize> {
         self.entries
             .iter()
             .position(|entry| entry.filename == filename)
@@ -276,7 +274,7 @@ where
     ///
     /// Returns an error if no scenario has that file name, or if reading fails.
     pub fn by_name_raw(&mut self, filename: &str) -> Result<Vec<u8>> {
-        self.get_id(filename)
+        self.index_of(filename)
             .ok_or(ReadCampaignError::NotFoundError)
             .and_then(|index| self.by_index_raw(index))
     }
@@ -343,7 +341,7 @@ mod tests {
     #[test]
     fn detect_encoding() -> anyhow::Result<()> {
         let f = File::open("./test/campaigns/DER FALL VON SACSAHUAMAN - TEIL I.cpx")?;
-        let cpx = Campaign::from(f)?;
+        let cpx = Campaign::read_from(f)?;
         assert_eq!(cpx.version(), AOE_AOK);
         assert_eq!(cpx.name(), "DER FALL VON SACSAHUAMÁN - TEIL I");
         assert_eq!(cpx.len(), 1);
@@ -359,7 +357,7 @@ mod tests {
     #[test]
     fn aoe1_trial_cpn() -> anyhow::Result<()> {
         let f = File::open("test/campaigns/Armies at War A Combat Showcase.cpn")?;
-        let mut c = Campaign::from(f).context("could not read meta")?;
+        let mut c = Campaign::read_from(f).context("could not read meta")?;
 
         assert_eq!(c.version(), AOE_AOK);
         assert_eq!(c.name(), "Armies at War, A Combat Showcase");
@@ -380,7 +378,7 @@ mod tests {
     #[test]
     fn aoe1_beta_cpn() -> anyhow::Result<()> {
         let f = File::open("test/campaigns/Rise of Egypt Learning Campaign.cpn")?;
-        let c = Campaign::from(f).context("could not read meta")?;
+        let c = Campaign::read_from(f).context("could not read meta")?;
 
         assert_eq!(c.version(), AOE_AOK);
         assert_eq!(c.name(), "Rise of Egypt Learning Campaign");
@@ -409,7 +407,7 @@ mod tests {
     #[test]
     fn aoe_de() -> anyhow::Result<()> {
         let f = File::open("test/campaigns/10 The First Punic War.aoecpn")?;
-        let c = Campaign::from(f)?;
+        let c = Campaign::read_from(f)?;
 
         assert_eq!(c.version(), AOE1_DE);
         assert_eq!(c.name(), "10 The First Punic War");
@@ -437,7 +435,7 @@ mod tests {
     #[test]
     fn aoe_de2() -> Result<()> {
         let f = File::open("test/campaigns/acam1.aoe2campaign")?;
-        let c = Campaign::from(f)?;
+        let c = Campaign::read_from(f)?;
 
         assert_eq!(c.version(), AOE2_DE);
         assert_eq!(c.name(), "acam1");
@@ -455,7 +453,7 @@ mod tests {
         );
 
         let f = File::open("test/campaigns/rcam3.aoe2campaign")?;
-        let c = Campaign::from(f)?;
+        let c = Campaign::read_from(f)?;
 
         assert_eq!(c.version(), AOE2_DE);
         assert_eq!(c.name(), "rcam3");

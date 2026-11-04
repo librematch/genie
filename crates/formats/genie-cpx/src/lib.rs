@@ -104,7 +104,7 @@ where
             let bytes = self
                 .by_index_raw(i)
                 .map_err(|_| WriteCampaignError::NotFoundError(i))?;
-            match (self.get_name(i), self.get_filename(i)) {
+            match (self.scenario_name(i), self.scenario_filename(i)) {
                 (Some(name), Some(filename)) => {
                     writer.add_raw(name, filename, bytes);
                 }
@@ -128,10 +128,10 @@ mod tests {
     fn rebuild_cpx() -> anyhow::Result<()> {
         let instream = File::open("./test/campaigns/Armies at War A Combat Showcase.cpn")?;
         let mut outstream = vec![];
-        let mut incpx = Campaign::from(instream)?;
+        let mut incpx = Campaign::read_from(instream)?;
         incpx.write_to(&mut outstream)?;
 
-        let mut written_cpx = Campaign::from(Cursor::new(outstream))?;
+        let mut written_cpx = Campaign::read_from(Cursor::new(outstream))?;
         assert_eq!(written_cpx.name(), incpx.name());
         assert_eq!(written_cpx.len(), incpx.len());
         assert_eq!(written_cpx.by_index_raw(0)?, incpx.by_index_raw(0)?);
@@ -142,15 +142,15 @@ mod tests {
     fn rebuild_cpn_de() -> anyhow::Result<()> {
         let instream = File::open("./test/campaigns/10 The First Punic War.aoecpn")?;
         let mut outstream = vec![];
-        let mut incpx = Campaign::from(instream)?;
+        let mut incpx = Campaign::read_from(instream)?;
         incpx.write_to(&mut outstream)?;
 
-        let mut written_cpx = Campaign::from(Cursor::new(outstream))?;
+        let mut written_cpx = Campaign::read_from(Cursor::new(outstream))?;
         assert_eq!(written_cpx.name(), incpx.name());
         assert_eq!(written_cpx.len(), incpx.len());
         assert_eq!(written_cpx.version(), incpx.version());
-        assert_eq!(written_cpx.get_name(0), incpx.get_name(0));
-        assert_eq!(written_cpx.get_filename(0), incpx.get_filename(0));
+        assert_eq!(written_cpx.scenario_name(0), incpx.scenario_name(0));
+        assert_eq!(written_cpx.scenario_filename(0), incpx.scenario_filename(0));
         assert_eq!(written_cpx.by_index_raw(0)?, incpx.by_index_raw(0)?);
         Ok(())
     }
@@ -159,15 +159,15 @@ mod tests {
     fn rebuild_campaign_de2() -> anyhow::Result<()> {
         let instream = File::open("./test/campaigns/AIImprovementsTest.aoe2campaign")?;
         let mut outstream = vec![];
-        let mut incpx = Campaign::from(instream)?;
+        let mut incpx = Campaign::read_from(instream)?;
         incpx.write_to(&mut outstream)?;
 
-        let mut written_cpx = Campaign::from(Cursor::new(outstream))?;
+        let mut written_cpx = Campaign::read_from(Cursor::new(outstream))?;
         assert_eq!(written_cpx.name(), incpx.name());
         assert_eq!(written_cpx.len(), incpx.len());
         assert_eq!(written_cpx.version(), incpx.version());
-        assert_eq!(written_cpx.get_name(0), incpx.get_name(0));
-        assert_eq!(written_cpx.get_filename(0), incpx.get_filename(0));
+        assert_eq!(written_cpx.scenario_name(0), incpx.scenario_name(0));
+        assert_eq!(written_cpx.scenario_filename(0), incpx.scenario_filename(0));
         assert_eq!(written_cpx.by_index_raw(0)?, incpx.by_index_raw(0)?);
         Ok(())
     }

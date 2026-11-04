@@ -63,7 +63,7 @@ fn scenario(bytes: &[u8]) -> Outcome {
 }
 
 fn campaign(bytes: &[u8]) -> Outcome {
-    let mut c = match genie_cpx::Campaign::from(Cursor::new(bytes)) {
+    let mut c = match genie_cpx::Campaign::read_from(Cursor::new(bytes)) {
         Ok(c) => c,
         Err(e) => return failed(e),
     };

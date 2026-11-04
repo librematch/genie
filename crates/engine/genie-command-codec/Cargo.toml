@@ -13,7 +13,7 @@ categories = ["parser-implementations", "game-development"]
 
 [dependencies]
 genie-core = { path = "../genie-core" }
-genie-rec = { version = "0.1.1", path = "../../formats/genie-rec" }
+genie-rec = { version = "0.2.0", path = "../../formats/genie-rec" }
 
 [lints]
 workspace = true

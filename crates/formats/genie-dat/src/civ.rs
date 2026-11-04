@@ -152,7 +152,7 @@ impl Civilization {
     }
 
     /// Get a unit type by its ID.
-    pub fn get_unit_kind(&self, id: impl Into<UnitKindId>) -> Option<&UnitKind> {
+    pub fn unit_kind(&self, id: impl Into<UnitKindId>) -> Option<&UnitKind> {
         let id: UnitKindId = id.into();
         self.unit_kinds
             .get(usize::from(id))

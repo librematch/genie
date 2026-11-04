@@ -10,14 +10,14 @@
 //! ```rust
 //! # fn main() -> anyhow::Result<()> {
 //! use genie_lang::{LangFileKind::Dll, StringKey};
-//! use std::{convert::TryFrom, fs::File};
+//! use std::fs::File;
 //! let f = File::open("./test/dlls/language_x1_p1.dll")?;
 //! let lang_file = Dll.read_from(f)?;
 //! assert_eq!(
-//!     lang_file.get(&StringKey::try_from(30177).unwrap()),
+//!     lang_file.get(&StringKey::from(30177u32)),
 //!     Some(&String::from("Turbo Random Map - Buildings create units faster, villagers gather faster, build faster, and carry more.")));
 //! assert_eq!(
-//!     lang_file.get(&StringKey::try_from(20156).unwrap()),
+//!     lang_file.get(&StringKey::from(20156u32)),
 //!     Some(&String::from("<b>Byzantines<b> \n\
 //!           Defensive civilization \n\
 //!           · Buildings +10% HPs Dark, +20% Feudal, \n +30% Castle, +40% Imperial Age \n\
@@ -35,7 +35,7 @@
 //! ```rust
 //! # fn main() -> anyhow::Result<()> {
 //! use genie_lang::{LangFileKind::Ini, StringKey};
-//! use std::{convert::TryFrom, io::Cursor};
+//! use std::io::Cursor;
 //! let text = br#"
 //! 46523=The Uighurs will join if you kill Ornlu the wolf and return to tell the tale.
 //! ; a comment
@@ -44,7 +44,7 @@
 //! let f = Cursor::new(&text[..]);
 //! let lang_file = Ini.read_from(f)?;
 //! assert_eq!(
-//!     lang_file.get(&StringKey::try_from(46523).unwrap()),
+//!     lang_file.get(&StringKey::from(46523u32)),
 //!     Some(&String::from("The Uighurs will join if you kill Ornlu the wolf and return to tell the tale.")));
 //! # Ok(()) }
 //! ```
@@ -53,7 +53,7 @@
 //! ```rust
 //! # fn main() -> anyhow::Result<()> {
 //! use genie_lang::{LangFileKind::KeyValue, StringKey};
-//! use std::{convert::TryFrom, io::Cursor};
+//! use std::io::Cursor;
 //! let text = br#"
 //! 46523 "The Uighurs will join if you kill Ornlu the wolf and return to tell the tale."
 //! 46524 "Uighurs: Yes, that is the pelt of the great wolf. We will join you, Genghis Khan. And to seal the agreement, we will give you the gift of flaming arrows!"
@@ -63,7 +63,7 @@
 //! let f = Cursor::new(&text[..]);
 //! let lang_file = KeyValue.read_from(f)?;
 //! assert_eq!(
-//!     lang_file.get(&StringKey::try_from(46523).unwrap()),
+//!     lang_file.get(&StringKey::from(46523u32)),
 //!     Some(&String::from("The Uighurs will join if you kill Ornlu the wolf and return to tell the tale.")));
 //! assert_eq!(
 //!     lang_file.get(&StringKey::from("LOBBYBROWSER_DATMOD_TITLE_FORMAT")),
@@ -75,9 +75,9 @@
 //! ```rust
 //! # fn main() -> anyhow::Result<()> {
 //! use genie_lang::{LangFile, StringKey};
-//! use std::{convert::TryFrom, str};
+//! use std::str;
 //! let mut lang_file = LangFile::new();
-//! lang_file.insert(StringKey::try_from(46604).unwrap(), String::from("Kill the traitor, Kushluk.\n\n\
+//! lang_file.insert(StringKey::from(46604u32), String::from("Kill the traitor, Kushluk.\n\n\
 //!                       Prevent the tent of Genghis Khan (Wonder) from being destroyed."));
 //! let mut out = vec![];
 //! lang_file.write_to_ini(&mut out)?;
@@ -146,8 +146,9 @@ pub enum LoadError {
 #[error("{}", self.0)]
 pub struct ParseLangFileKindError(String);
 
-/// Aoe2 supports three types of language files
+/// The kinds of language files the games use.
 #[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
 pub enum LangFileKind {
     /// An AoK/AoC-style DLL file with language resource strings.
     Dll,

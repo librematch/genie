@@ -40,9 +40,9 @@ fn main() -> anyhow::Result<()> {
     let lang_file = cli_input.file_kind.read_from(&mut lang_input)?;
 
     let mut hki_input = File::open(&cli_input.hki_file_name)?;
-    let info = HotkeyInfo::from(&mut hki_input)?;
+    let info = HotkeyInfo::read_from(&mut hki_input)?;
     let aoc_him = default_him();
 
-    println!("{}", info.get_string_from_lang(&lang_file, &aoc_him));
+    println!("{}", info.string_from_lang(&lang_file, &aoc_him));
     Ok(())
 }

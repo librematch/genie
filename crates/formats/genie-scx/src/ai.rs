@@ -1,15 +1,13 @@
 use crate::Result;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
 use genie_support::{DecodeStringError, ReadStringError, ReadStringsExt, write_i32_str};
-use std::convert::TryFrom;
 use std::io::{Read, Write};
 use std::result::Result as StdResult;
 
 /// The error code of an AI script that failed to compile, as the game's AI rule parser reports it.
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, num_enum::IntoPrimitive, num_enum::TryFromPrimitive,
-)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, num_enum::IntoPrimitive, num_enum::FromPrimitive)]
 #[repr(u32)]
+#[non_exhaustive]
 pub enum AiErrorCode {
     /// A `defconst` redefines a constant that already exists.
     ConstantAlreadyDefined = 0,
@@ -65,6 +63,9 @@ pub enum AiErrorCode {
     UnexpectedError = 25,
     /// The file ends in the middle of a construct.
     UnexpectedEof = 26,
+    /// A code the game's parser does not name, kept to be written back.
+    #[num_enum(catch_all)]
+    Other(u32),
 }
 
 /// The compile error the scenario's AI script had when the scenario was saved.
@@ -97,7 +98,7 @@ impl AiErrorInfo {
         let line_number = input.read_i32::<LE>()?;
         let mut description_bytes = [0; 128];
         input.read_exact(&mut description_bytes)?;
-        let error_code = AiErrorCode::try_from(input.read_u32::<LE>()?)?;
+        let error_code = AiErrorCode::from(input.read_u32::<LE>()?);
 
         let filename = parse_bytes(&filename_bytes)?;
         let description = parse_bytes(&description_bytes)?;
@@ -242,7 +243,13 @@ mod tests {
         bytes[..5].fill(0);
         let unnamed = AiErrorInfo::read_from(bytes.as_slice()).unwrap();
         assert_eq!(unnamed.filename, "<empty>");
+        // a code the parser does not name reads as it is and writes back
+        bytes[..5].copy_from_slice(b"a.per");
         bytes[389..].copy_from_slice(&27u32.to_le_bytes());
-        assert!(AiErrorInfo::read_from(bytes.as_slice()).is_err());
+        let other = AiErrorInfo::read_from(bytes.as_slice()).unwrap();
+        assert_eq!(other.error_code, AiErrorCode::Other(27));
+        let mut out = vec![];
+        other.write_to(&mut out).unwrap();
+        assert_eq!(out, bytes);
     }
 }

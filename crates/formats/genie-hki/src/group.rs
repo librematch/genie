@@ -18,11 +18,11 @@ pub struct HotkeyGroup {
 
 impl HotkeyGroup {
     /// Reads a hotkey group from an input stream.
-    pub(crate) fn from<R: Read>(input: &mut R) -> io::Result<Self> {
+    pub(crate) fn read_from<R: Read>(input: &mut R) -> io::Result<Self> {
         let num_hotkeys = input.read_u32::<LE>()?;
         let mut hotkeys = Vec::with_capacity(num_hotkeys as usize);
         for _ in 0..num_hotkeys {
-            hotkeys.push(Hotkey::from(input)?);
+            hotkeys.push(Hotkey::read_from(input)?);
         }
 
         Ok(Self { hotkeys })
@@ -101,9 +101,11 @@ impl HotkeyGroup {
     /// use std::fs::File;
     /// use genie_hki::HotkeyInfo;
     /// let mut f = File::open("test/files/aoc1.hki")?;
-    /// let info = HotkeyInfo::from(&mut f)?;
+    /// let info = HotkeyInfo::read_from(&mut f)?;
     /// // Villager hotkeys are group 3 in AoC and HD Edition.
-    /// let group = info.group(3).expect("file does not contain villager hotkeys");
+    /// let group = info
+    ///     .group(3)
+    ///     .ok_or_else(|| anyhow::anyhow!("the file holds no villager hotkeys"))?;
     /// assert_eq!(28, group.num_hotkeys());
     /// # Ok(()) }
     /// ```
@@ -125,14 +127,14 @@ impl HotkeyGroup {
     /// Returns a string representation of this hotkey group, using the strings
     /// from `lang_file` and the group name string key `sk`.
     #[must_use]
-    pub fn get_string_from_lang(&self, lang_file: &LangFile, sk: &StringKey) -> String {
+    pub fn string_from_lang(&self, lang_file: &LangFile, sk: &StringKey) -> String {
         let group_name = lang_file
             .get(sk)
             .map_or_else(String::new, |name| format!("{name} ({sk}):\n  "));
         let hotkeys: Vec<String> = self
             .hotkeys
             .iter()
-            .map(|hki| hki.get_string_from_lang(lang_file))
+            .map(|hki| hki.string_from_lang(lang_file))
             .collect();
         format!("{}{}", group_name, hotkeys.join("\n  "))
     }

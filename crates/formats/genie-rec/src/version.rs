@@ -5,6 +5,7 @@ use std::io::Read;
 
 /// the variant of `AoE2` game
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
+#[non_exhaustive]
 pub enum GameVariant {
     /// A trial version, either `AoC` or `AoE`
     Trial,

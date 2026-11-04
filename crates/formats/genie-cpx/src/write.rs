@@ -235,7 +235,7 @@ impl<W: Write> CampaignWriter<W> {
     }
 
     /// Get the size in bytes of all metadata.
-    const fn get_meta_size(&self) -> usize {
+    const fn meta_size(&self) -> usize {
         // version + number of scenarios + campaign name
         let header_size = size_of::<CpxVersion>()
             + size_of::<i32>() // number of scenarios
@@ -244,7 +244,7 @@ impl<W: Write> CampaignWriter<W> {
     }
 
     /// Get the size in bytes of all metadata for a `AoE1`: DE campaign file.
-    fn get_meta_size_de(&self) -> usize {
+    fn meta_size_de(&self) -> usize {
         // Length of a single variable string is (4 + byte length)
         const fn strlen(s: &str) -> usize {
             s.len() + 4
@@ -258,7 +258,7 @@ impl<W: Write> CampaignWriter<W> {
     }
 
     /// Get the size in bytes of all metadata for a `AoE2`: DE campaign file.
-    fn get_meta_size_de2(&self) -> usize {
+    fn meta_size_de2(&self) -> usize {
         // Length of a single variable string is (4 + byte length)
         const fn strlen(s: &str) -> usize {
             s.len() + 4
@@ -285,11 +285,11 @@ impl<W: Write> CampaignWriter<W> {
         // TODO: perhaps write to a buffer first instead of having these brittle calculations that
         // may get out of sync
         let mut offset = if self.header.version == AOE2_DE {
-            self.get_meta_size_de2()
+            self.meta_size_de2()
         } else if self.header.version == AOE1_DE {
-            self.get_meta_size_de()
+            self.meta_size_de()
         } else {
-            self.get_meta_size()
+            self.meta_size()
         };
 
         for scen in &self.scenarios {

@@ -7,7 +7,6 @@ use crate::values::{DiplomaticStance, StartingAge};
 use crate::victory::{LegacyVictoryInfo, VictoryInfo};
 use byteorder::{LE, ReadBytesExt};
 use genie_support::{ReadStringsExt, f32_eq};
-use std::convert::TryFrom;
 use std::io::Read;
 
 /// Embeddable scenario data. This includes all scenario settings, but not map data, triggers, and
@@ -101,18 +100,11 @@ pub struct TribeScen {
 }
 
 impl TribeScen {
-    #[deprecated = "Use TribeScen::read_from instead"]
-    #[doc(hidden)]
-    pub fn from(input: impl Read) -> Result<Self> {
-        Self::read_from(input)
-    }
-
     /// Read scenario data from an input stream.
     ///
     /// # Errors
     ///
-    /// Returns an error if reading fails, if a string cannot be decoded, or if a diplomatic
-    /// stance or starting age is unknown.
+    /// Returns an error if reading fails, or if a string cannot be decoded.
     pub fn read_from(mut input: impl Read) -> Result<Self> {
         let mut base = RgeScen::read_from(&mut input)?;
         let version = base.version;
@@ -232,7 +224,7 @@ fn read_diplomacy(mut input: impl Read) -> Result<Vec<Vec<DiplomaticStance>>> {
     let mut diplomacy = vec![vec![DiplomaticStance::Neutral; 16]; 16];
     for player_diplomacy in &mut diplomacy {
         for stance in player_diplomacy.iter_mut() {
-            *stance = DiplomaticStance::try_from(input.read_i32::<LE>()?)?;
+            *stance = DiplomaticStance::from(input.read_i32::<LE>()?);
         }
     }
     Ok(diplomacy)
@@ -286,7 +278,7 @@ fn read_start_ages(mut input: impl Read, version: f32) -> Result<Vec<StartingAge
     let mut player_start_ages = vec![StartingAge::Default; 16];
     if version > 1.05 {
         for start_age in &mut player_start_ages {
-            *start_age = StartingAge::try_from(input.read_i32::<LE>()?, version)?;
+            *start_age = StartingAge::from_i32(input.read_i32::<LE>()?, version);
         }
     }
     Ok(player_start_ages)
@@ -534,7 +526,11 @@ mod tests {
             (read[0], read[1]),
             (StartingAge::Default, StartingAge::DarkAge)
         );
-        assert!(read_start_ages(words(&[9; 16]).as_slice(), 1.25).is_err());
+        // a number past the version's last age is kept
+        assert_eq!(
+            read_start_ages(words(&[9; 16]).as_slice(), 1.25).unwrap()[0],
+            StartingAge::Other(9)
+        );
     }
 
     /// The view from 1.19 on, the map type from 1.21 on (-1 and -2 none), the base priorities
@@ -655,7 +651,7 @@ mod tests {
         assert_eq!(nums, [0, 1]);
     }
 
-    /// The stances, 16 by 16; an unknown one fails.
+    /// The stances, 16 by 16; an unknown one is kept.
     #[test]
     fn the_diplomacy_reads_each_stance() {
         let mut stances = vec![0; 256];
@@ -666,6 +662,9 @@ mod tests {
             (DiplomaticStance::Ally, DiplomaticStance::Enemy)
         );
         stances[5] = 7;
-        assert!(read_diplomacy(words(&stances).as_slice()).is_err());
+        assert_eq!(
+            read_diplomacy(words(&stances).as_slice()).unwrap()[0][5],
+            DiplomaticStance::Other(7)
+        );
     }
 }

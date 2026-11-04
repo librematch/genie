@@ -1,6 +1,6 @@
 [package]
 name = "genie-cpx"
-version = "0.5.0"
+version = "0.6.0"
 rust-version.workspace = true
 authors.workspace = true
 edition.workspace = true
@@ -19,7 +19,7 @@ genie-error = { path = "../../base/genie-error" }
 byteorder.workspace = true
 chardet = "0.2.4"
 encoding_rs.workspace = true
-genie-scx = { version = "4.0.0", path = "../genie-scx" }
+genie-scx = { version = "5.0.0", path = "../genie-scx" }
 thiserror.workspace = true
 
 [dev-dependencies]

@@ -32,7 +32,7 @@ struct DisplayHotkey {
 fn main() -> anyhow::Result<()> {
     let cli_input = DisplayHotkey::from_args();
     let mut f = File::open(&cli_input.file_name)?;
-    let info = HotkeyInfo::from(&mut f)?;
+    let info = HotkeyInfo::read_from(&mut f)?;
     let group = info.group(cli_input.group_index).unwrap();
     let hotkey = group.hotkey(cli_input.hotkey_index).unwrap();
     println!("{hotkey}");

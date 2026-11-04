@@ -143,8 +143,7 @@ impl StringKey {
     ///
     /// ```
     /// use genie_support::StringKey;
-    /// use std::convert::TryFrom;
-    /// assert!(StringKey::try_from(0).unwrap().is_numeric());
+    /// assert!(StringKey::from(0u32).is_numeric());
     /// assert!(!StringKey::from("").is_numeric());
     /// ```
     #[inline]
@@ -162,8 +161,7 @@ impl StringKey {
     ///
     /// ```
     /// use genie_support::StringKey;
-    /// use std::convert::TryFrom;
-    /// assert!(!StringKey::try_from(0).unwrap().is_named());
+    /// assert!(!StringKey::from(0u32).is_named());
     /// assert!(StringKey::from("").is_named());
     /// ```
     #[inline]
@@ -279,7 +277,7 @@ mod tests {
     /// Tests converting from an int to a string key.
     #[test]
     fn string_key_from_int() {
-        if let StringKey::Num(n) = StringKey::try_from(0).unwrap() {
+        if let StringKey::Num(n) = StringKey::from(0u32) {
             assert_eq!(0, n);
         } else {
             panic!();

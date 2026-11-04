@@ -160,6 +160,7 @@ impl ObjectsList {
 
 /// A player command.
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub enum Command {
     /// Command `0x00`, see [`OrderCommand`].
     Order(OrderCommand),
@@ -225,6 +226,14 @@ pub enum Command {
     Unknown7F(Unknown7fCommand),
     /// Command `0x80`, see [`BackToWorkCommand`].
     BackToWork(BackToWorkCommand),
+    /// A command of an id this reader does not decode: its id and the bytes after it, kept
+    /// whole.
+    Unknown {
+        /// The command's id.
+        id: u8,
+        /// The bytes after the id.
+        bytes: Vec<u8>,
+    },
 }
 
 impl Command {
@@ -261,7 +270,8 @@ impl Command {
 ///
 /// # Errors
 ///
-/// Fails on an id no command has.
+/// Returns an error if the command's reader fails; an id no command has reads as
+/// [`Command::Unknown`].
 fn read_unit_command(id: u8, cursor: &mut impl Read, len: u32) -> Result<Command> {
     match id {
         0x00 => OrderCommand::read_from(&mut *cursor).map(Command::Order),
@@ -279,7 +289,7 @@ fn read_unit_command(id: u8, cursor: &mut impl Read, len: u32) -> Result<Command
         0x15 => PatrolCommand::read_from(&mut *cursor).map(Command::Patrol),
         0x17 => FormFormationCommand::read_from(&mut *cursor).map(Command::FormFormation),
         0x35 => UserPatchAiCommand::read_from(&mut *cursor, len).map(Command::UserPatchAi),
-        id => Err(crate::Error::UnsupportedCommand(id)),
+        id => unknown(id, cursor),
     }
 }
 
@@ -287,7 +297,8 @@ fn read_unit_command(id: u8, cursor: &mut impl Read, len: u32) -> Result<Command
 ///
 /// # Errors
 ///
-/// Fails on an id no command has.
+/// Returns an error if the command's reader fails; an id no command has reads as
+/// [`Command::Unknown`].
 fn read_building_command(id: u8, cursor: &mut impl Read) -> Result<Command> {
     match id {
         0x64 => MakeCommand::read_from(&mut *cursor).map(Command::Make),
@@ -307,8 +318,19 @@ fn read_building_command(id: u8, cursor: &mut impl Read) -> Result<Command> {
         0x7b => BuyResourceCommand::read_from(&mut *cursor).map(Command::BuyResource),
         0x7f => Unknown7fCommand::read_from(&mut *cursor).map(Command::Unknown7F),
         0x80 => BackToWorkCommand::read_from(&mut *cursor).map(Command::BackToWork),
-        id => Err(crate::Error::UnsupportedCommand(id)),
+        id => unknown(id, cursor),
     }
+}
+
+/// A command of an id no reader decodes ([`Command::Unknown`]): the bytes after its id, whole.
+///
+/// # Errors
+///
+/// Returns an error if reading from `cursor` fails.
+fn unknown(id: u8, cursor: &mut impl Read) -> Result<Command> {
+    let mut bytes = Vec::new();
+    let _ = cursor.read_to_end(&mut bytes)?;
+    Ok(Command::Unknown { id, bytes })
 }
 
 /// A time step in the body: how much game time passed since the previous one.
@@ -498,6 +520,7 @@ impl Chat {
 
 /// One operation of the recorded game body.
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub enum Action {
     /// A player command (operation 1).
     Command(Command),

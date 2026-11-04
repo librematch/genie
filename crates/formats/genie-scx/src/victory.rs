@@ -1,8 +1,7 @@
 use crate::Result;
 use crate::values::VictoryCondition;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
-use num_enum::{IntoPrimitive, TryFromPrimitive};
-use std::convert::TryFrom;
+use num_enum::{FromPrimitive, IntoPrimitive};
 use std::io::{Read, Write};
 
 /// `AoE1`'s victory info.
@@ -242,12 +241,11 @@ impl VictoryPointEntry {
 }
 
 /// Current achieved-ness state of a victory condition.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, IntoPrimitive, TryFromPrimitive)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, IntoPrimitive, FromPrimitive)]
 #[repr(u8)]
-#[derive(Default)]
+#[non_exhaustive]
 pub enum VictoryState {
     /// The condition is not yet achieved, but may be achieved in the future.
-    #[default]
     NotAchieved = 0,
     /// The condition can no longer be achieved.
     ///
@@ -260,6 +258,16 @@ pub enum VictoryState {
     ///
     /// This appears to happen for invalid condition data?
     Disabled = 3,
+    /// A state the game does not name, kept to be written back.
+    #[num_enum(catch_all)]
+    Other(u8),
+}
+
+impl Default for VictoryState {
+    /// A condition not achieved yet.
+    fn default() -> Self {
+        Self::NotAchieved
+    }
 }
 
 /// Tracks victory conditions for the scenario, used in single player.
@@ -282,18 +290,11 @@ pub struct VictoryConditions {
 }
 
 impl VictoryConditions {
-    #[deprecated = "Use VictoryConditions::read_from instead"]
-    #[doc(hidden)]
-    pub fn from<R: Read>(input: &mut R, has_version: bool) -> Result<Self> {
-        let result = Self::read_from(input, has_version)?;
-        Ok(result)
-    }
-
     /// Read victory conditions from an input stream.
     ///
     /// # Errors
     ///
-    /// Returns an error if reading fails or the victory state is unknown.
+    /// Returns an error if reading fails.
     // The format stores the condition count as an i32; valid files never make it negative.
     #[allow(clippy::cast_sign_loss)]
     pub fn read_from(mut input: impl Read, has_version: bool) -> Result<Self> {
@@ -304,7 +305,7 @@ impl VictoryConditions {
         };
 
         let num_conditions = input.read_i32::<LE>()?;
-        let victory = VictoryState::try_from(input.read_u8()?)?;
+        let victory = VictoryState::from(input.read_u8()?);
 
         let mut entries = Vec::with_capacity(num_conditions as usize);
         for _ in 0..num_conditions {

@@ -8,13 +8,16 @@ use std::io::{self, Error, ErrorKind, Read, Result};
 /// ## Example
 ///
 /// ```rust
+/// # fn main() -> std::io::Result<()> {
 /// use genie_support::read_opt_u16;
 ///
 /// let mut minus_one = std::io::Cursor::new(vec![0xFF, 0xFF]);
 /// let mut zero = std::io::Cursor::new(vec![0x00, 0x00]);
 ///
-/// assert_eq!(read_opt_u16::<u16, _>(&mut minus_one).unwrap(), None);
-/// assert_eq!(read_opt_u16(&mut zero).unwrap(), Some(0));
+/// assert_eq!(read_opt_u16::<u16, _>(&mut minus_one)?, None);
+/// assert_eq!(read_opt_u16(&mut zero)?, Some(0));
+/// # Ok(())
+/// # }
 /// ```
 ///
 /// # Errors
@@ -43,13 +46,16 @@ where
 /// ## Example
 ///
 /// ```rust
+/// # fn main() -> std::io::Result<()> {
 /// use genie_support::read_opt_u32;
 ///
 /// let mut minus_one = std::io::Cursor::new(vec![0xFF, 0xFF, 0xFF, 0xFF]);
 /// let mut one = std::io::Cursor::new(vec![0x01, 0x00, 0x00, 0x00]);
 ///
-/// assert_eq!(read_opt_u32::<u32, _>(&mut minus_one).unwrap(), None);
-/// assert_eq!(read_opt_u32(&mut one).unwrap(), Some(1));
+/// assert_eq!(read_opt_u32::<u32, _>(&mut minus_one)?, None);
+/// assert_eq!(read_opt_u32(&mut one)?, Some(1));
+/// # Ok(())
+/// # }
 /// ```
 ///
 /// # Errors

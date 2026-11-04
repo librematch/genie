@@ -164,7 +164,7 @@ impl Hotkey {
     }
 
     /// Reads a hotkey from an input stream.
-    pub(crate) fn from<R: Read>(input: &mut R) -> io::Result<Self> {
+    pub(crate) fn read_from<R: Read>(input: &mut R) -> io::Result<Self> {
         let key = input.read_i32::<LE>()?;
         let string_id = input.read_i32::<LE>()?;
         let ctrl = input.read_u8()? != 0;
@@ -205,13 +205,13 @@ impl Hotkey {
     /// let mut lang_file = LangFile::new();
     /// lang_file.insert(StringKey::from(5u32), String::from("A"));
     /// let hotkey = Hotkey::default().key(65).string_id(5).ctrl(true);
-    /// assert_eq!("A (5): ctrl-65", hotkey.get_string_from_lang(&lang_file));
+    /// assert_eq!("A (5): ctrl-65", hotkey.string_from_lang(&lang_file));
     ///
     /// let default = Hotkey::default();
-    /// assert_eq!("-1: 0", default.get_string_from_lang(&lang_file));
+    /// assert_eq!("-1: 0", default.string_from_lang(&lang_file));
     /// ```
     #[must_use]
-    pub fn get_string_from_lang(&self, lang_file: &LangFile) -> String {
+    pub fn string_from_lang(&self, lang_file: &LangFile) -> String {
         let ctrl = if self.ctrl { "ctrl-" } else { "" };
         let alt = if self.alt { "ctrl-" } else { "" };
         let shift = if self.shift { "ctrl-" } else { "" };

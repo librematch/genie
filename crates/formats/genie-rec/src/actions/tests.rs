@@ -333,11 +333,21 @@ fn the_commands_without_writers_read_their_fields() {
     assert_eq!(
         (
             ungarrison.ungarrison_kind,
+            ungarrison.unit_kind_id,
             ungarrison.location,
             ungarrison.objects.len()
         ),
-        (4, None, 1)
+        (4, None, None, 1)
     );
+    // the same type (kind 4) of unit type 83
+    let mut by_kind = vec![1u8, 0, 0];
+    by_kind.extend(floats(&[-1.0, -1.0]));
+    by_kind.extend([4, 0, 0, 0]);
+    by_kind.extend(words(&[83, 600]));
+    let Command::Ungarrison(by_kind) = read(0x6f, &by_kind) else {
+        panic!("not Ungarrison")
+    };
+    assert_eq!(by_kind.unit_kind_id, Some(UnitKindId::from(83u16)));
 
     let mut flare = vec![0u8; 3];
     flare.extend(words(&[-1]));
@@ -457,16 +467,16 @@ fn each_game_command_takes_its_values() {
     ));
 }
 
-/// An id no command has is not read.
+/// An id no command has keeps its id and the bytes after it.
 #[test]
-fn an_unknown_unit_command_is_an_error() {
-    let e = Command::read_from(&mut framed(0x06, &[]).as_slice()).unwrap_err();
-    assert!(matches!(e, crate::Error::UnsupportedCommand(0x06)));
+fn unknown_unit_command_keeps_its_bytes() {
+    let command = Command::read_from(&mut framed(0x06, &[1, 2, 3]).as_slice()).unwrap();
+    assert!(matches!(command, Command::Unknown { id: 0x06, ref bytes } if bytes == &[1, 2, 3]));
 }
 
-/// Nor among the building commands.
+/// So does one among the building commands.
 #[test]
-fn an_unknown_building_command_is_an_error() {
-    let e = Command::read_from(&mut framed(0x68, &[]).as_slice()).unwrap_err();
-    assert!(matches!(e, crate::Error::UnsupportedCommand(0x68)));
+fn unknown_building_command_keeps_its_bytes() {
+    let command = Command::read_from(&mut framed(0x68, &[]).as_slice()).unwrap();
+    assert!(matches!(command, Command::Unknown { id: 0x68, ref bytes } if bytes.is_empty()));
 }

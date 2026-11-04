@@ -110,6 +110,7 @@ impl UnitAction {
 
 /// The action types the reader knows, with the data specific to each.
 #[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
 pub enum ActionKind {
     /// Move to a position or object (type 1).
     MoveTo(ActionMoveTo),

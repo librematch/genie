@@ -48,7 +48,7 @@ struct SetHotkey {
 fn main() -> anyhow::Result<()> {
     let cli_input = SetHotkey::from_args();
     let mut f = File::open(&cli_input.file_name)?;
-    let info = HotkeyInfo::from(&mut f)?;
+    let info = HotkeyInfo::read_from(&mut f)?;
     let info = info.bind_key(
         cli_input.group_index as usize,
         cli_input.hotkey_index as usize,
