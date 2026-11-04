@@ -6,7 +6,6 @@ use crate::combat::AttackTargetId;
 use crate::combat::attack::AtOnce;
 use crate::combat::attack::AttackState;
 use crate::combat::attack::AttackerFlags;
-use crate::combat::attack::walks::QUIET_CODE;
 use crate::combat::attack::{
     AiOrder, Attack, AttackReads, Fight, NO_RANGE, NONE, Readiness, move_reads, set_walker_anim,
 };
@@ -21,6 +20,7 @@ use crate::movement::Speed;
 use crate::movement::move_to::GiveUp;
 use crate::movement::move_to::MoveToAction;
 use crate::movement::move_to::Patience;
+use crate::movement::move_to::SubCode;
 use crate::movement::{Me, footprint_gap};
 use crate::objects::Graphics;
 use crate::objects::ObjectId;
@@ -113,8 +113,8 @@ impl Attack {
             },
             stance: r.stance,
         };
-        match self.update_list(c, unit, me, r, gives_up)?.get() {
-            1 | 2 => {
+        match self.update_list(c, unit, me, r, gives_up)? {
+            SubCode::Done => {
                 self.delete_move_to(c.w.parts.mover_mut(unit.id))?;
                 if self.voice.is_loud() {
                     unit.post_own(
@@ -131,9 +131,8 @@ impl Attack {
                 )?;
                 Ok(UpdateCode::Done)
             }
-            3 => self.walk_failed(c, unit),
-            4 => Err(QUIET_CODE),
-            _ => Ok(UpdateCode::UnderWay),
+            SubCode::Failed => self.walk_failed(c, unit),
+            SubCode::UnderWay | SubCode::TargetGone => Ok(UpdateCode::UnderWay),
         }
     }
 

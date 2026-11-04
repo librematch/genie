@@ -4,7 +4,6 @@ use crate::combat::Charge;
 use crate::combat::attack::AtOnce;
 use crate::combat::attack::AttackState;
 use crate::combat::attack::AttackerFlags;
-use crate::combat::attack::walks::QUIET_CODE;
 use crate::combat::attack::{
     AfterHit, Attack, AttackReads, DRAW_SCALE, EPSILON, Fight, HALF, Hit, Readiness, after_hit,
     blast_so_far, reset_sprite, set_attack_timer, set_walker_anim, squared_reach, strike,
@@ -21,6 +20,7 @@ use crate::math::rng::{Stream, Well512};
 use crate::movement::Speed;
 use crate::movement::move_to::GiveUp;
 use crate::movement::move_to::Patience;
+use crate::movement::move_to::SubCode;
 use crate::movement::{Me, footprint_gap_squared};
 use crate::objects::Frame;
 use crate::objects::HitPoints;
@@ -77,9 +77,9 @@ impl Attack {
             },
             stance: r.stance,
         };
-        match self.update_list(c, unit, me, r, gives_up)?.get() {
-            0 => self.within_reach(c, unit, f, r, (target, radius)),
-            1 | 2 => {
+        match self.update_list(c, unit, me, r, gives_up)? {
+            SubCode::UnderWay => self.within_reach(c, unit, f, r, (target, radius)),
+            SubCode::Done => {
                 self.delete_move_to(c.w.parts.mover_mut(unit.id))?;
                 if !matches!(self.state, AttackState::Move { .. }) {
                     return self.arrived_at_seen(c, unit, f, r, target);
@@ -87,9 +87,8 @@ impl Attack {
                 self.ready(unit, &mut c.w.attack_ground(unit.id), f, r)?;
                 Ok(UpdateCode::UnderWay)
             }
-            3 => self.walk_failed(c, unit),
-            4 => Err(QUIET_CODE),
-            _ => Ok(UpdateCode::UnderWay),
+            SubCode::Failed => self.walk_failed(c, unit),
+            SubCode::TargetGone => Ok(UpdateCode::UnderWay),
         }
     }
 

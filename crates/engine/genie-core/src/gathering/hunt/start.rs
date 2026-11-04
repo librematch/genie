@@ -8,7 +8,6 @@ use crate::gathering::DropSiteId;
 use crate::gathering::PastureId;
 use crate::gathering::gather::Walks;
 use crate::gathering::hunt::HuntState;
-use crate::gathering::hunt::walks::QUIET_CODE;
 use crate::gathering::hunt::{HuntAction, HuntTask, Lead, Quarry};
 use crate::gathering::{HuntTargetId, both_food};
 use crate::map::Distance;
@@ -17,6 +16,7 @@ use crate::movement::MoveStart;
 use crate::movement::move_to::GiveUp;
 use crate::movement::move_to::MoveToAction;
 use crate::movement::move_to::Patience;
+use crate::movement::move_to::SubCode;
 use crate::movement::move_to::WalkTo;
 use crate::movement::{Me, Mover};
 use crate::objects::ObjectId;
@@ -529,11 +529,10 @@ impl HuntAction {
             },
             stance: who.stance,
         };
-        let ended = match self.update_list(c, unit, me, gives_up)?.get() {
-            0 => return Ok(PointWalk::Walking),
-            1 | 2 | 5 => true,
-            3 => false,
-            code => return Err(QUIET_CODE.with("code", code)),
+        let ended = match self.update_list(c, unit, me, gives_up)? {
+            SubCode::UnderWay => return Ok(PointWalk::Walking),
+            SubCode::Done | SubCode::TargetGone => true,
+            SubCode::Failed => false,
         };
         if who.player_kind.is_computer() {
             return Err(GenieError::unsupported(if ended {

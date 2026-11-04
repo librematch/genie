@@ -9,8 +9,8 @@ use crate::construction::build::BuildState;
 use crate::construction::build::{BUILDER_UNMOVING, BuildAction, BuildReads, BuildTask};
 use crate::map::Position;
 use crate::movement::Me;
-use crate::movement::move_to::Patience;
 use crate::movement::move_to::{GiveUp, MoveToAction, MoveToReads, WalkTo};
+use crate::movement::move_to::{Patience, SubCode};
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::layers::Action;
@@ -279,11 +279,12 @@ impl BuildAction {
     }
 
     /// Cases 3 and 0xde, the walks to the foundation (4) and off its footprint (223), by the
-    /// sub-action list's code ([`BuildAction::step_walk`]): 1 and 2 end the walk
-    /// ([`BuildAction::walk_ended`]), 3 failed it ([`BuildAction::walk_failed`]), 4 and 5 (its
-    /// target let go) let the foundation go and walk to the point (slot 0x68 with none, then
-    /// `set_state(11)`: [`BuildAction::lose_foundation`]); 0 (it walks or waits) and any code
-    /// above 5 (none) leave the update's 0.
+    /// sub-action list's code ([`BuildAction::step_walk`]): its end (1; the game's 2, which only
+    /// an Attack gives, too) ends the walk ([`BuildAction::walk_ended`]), 3 failed it
+    /// ([`BuildAction::walk_failed`]), its target let go (5; the game's 4 too, which only a loud
+    /// `MoveTo` gives: [`SubCode`]) lets the foundation go and walks to the point (slot 0x68
+    /// with none, then `set_state(11)`: [`BuildAction::lose_foundation`]); 0 (it walks or
+    /// waits) leaves the update's 0.
     ///
     /// # Errors
     ///
@@ -296,19 +297,19 @@ impl BuildAction {
         reads: &BuildReads,
         roles: &Roles,
     ) -> Result<(), GenieError> {
-        match self.step_walk(c, builder, me, reads, roles)?.get() {
-            1 | 2 => self.walk_ended(c, builder, reads, roles),
-            3 => self.walk_failed(c, builder, reads, roles),
-            4 | 5 => self.lose_foundation(c, builder, reads, roles),
-            _ => Ok(()),
+        match self.step_walk(c, builder, me, reads, roles)? {
+            SubCode::Done => self.walk_ended(c, builder, reads, roles),
+            SubCode::Failed => self.walk_failed(c, builder, reads, roles),
+            SubCode::TargetGone => self.lose_foundation(c, builder, reads, roles),
+            SubCode::UnderWay => Ok(()),
         }
     }
 
-    /// Case 10, the walk to the point (11), by the sub-action list's code: at its end (1, 2),
+    /// Case 10, the walk to the point (11), by the sub-action list's code: at its end (1),
     /// failed (3) or its target let go (5) the Build waits (`set_state(3)`,
-    /// [`BuildAction::idle`]); its target let go with 4 lets the foundation go and walks to the
-    /// point again (slot 0x68 with none, then `set_state(11)`); 0 (it walks or waits) and any
-    /// code above 5 (none) leave the update's 0.
+    /// [`BuildAction::idle`]); 0 (it walks or waits) leaves the update's 0. The game's arm for
+    /// 4 (the foundation let go, the walk to the point again) never runs: only a loud `MoveTo`
+    /// gives 4 ([`SubCode`]).
     ///
     /// # Errors
     ///
@@ -321,10 +322,9 @@ impl BuildAction {
         reads: &BuildReads,
         roles: &Roles,
     ) -> Result<(), GenieError> {
-        match self.step_walk(c, builder, me, reads, roles)?.get() {
-            1..=3 | 5 => self.idle(c, builder, reads),
-            4 => self.lose_foundation(c, builder, reads, roles),
-            _ => Ok(()),
+        match self.step_walk(c, builder, me, reads, roles)? {
+            SubCode::Done | SubCode::Failed | SubCode::TargetGone => self.idle(c, builder, reads),
+            SubCode::UnderWay => Ok(()),
         }
     }
 

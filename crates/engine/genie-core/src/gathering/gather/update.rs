@@ -15,13 +15,13 @@ use crate::map::Distance;
 use crate::math::rng::Stream;
 use crate::movement::footprint_gap_squared;
 use crate::movement::move_to::Patience;
+use crate::movement::move_to::SubCode;
 use crate::movement::move_to::WalkTo;
 use crate::movement::move_to::{GiveUp, MoveTo};
 use crate::movement::move_to::{ListUpdate, update_sub_actions};
 use crate::movement::{Me, Mover};
 use crate::objects::ActionState;
 use crate::objects::ObjectState;
-use crate::objects::UpdateCode;
 use crate::objects::WorkerCount;
 use crate::objects::sprite::Graphic;
 use crate::objects::unit::Unit;
@@ -37,11 +37,6 @@ use crate::world::step::Step;
 /// A gatherer without movement state, which the Gather's walks and turns need.
 pub(super) const UNMOVING: GenieError =
     GenieError::unsupported("a gatherer without movement state");
-
-/// A sub-action list's code that a quiet `MoveTo` does not give: 4 is its target let go when it
-/// is not quiet, and no code is above 5.
-pub(super) const QUIET_CODE: GenieError =
-    GenieError::unreachable("a quiet sub-action MoveTo's code that only a loud one gives");
 
 impl GatherAction {
     /// The object the gather's `MoveTo` walks to, which the update holds as `target`, the unit
@@ -330,15 +325,15 @@ impl GatherAction {
         r: &GatherReads,
         roles: &Roles,
     ) -> Result<Next, GenieError> {
-        match self.update_list(c, unit, me, r, roles)?.get() {
-            0 => Ok(Next::Stay),
-            1 | 2 => {
+        match self.update_list(c, unit, me, r, roles)? {
+            SubCode::UnderWay => Ok(Next::Stay),
+            SubCode::Done => {
                 self.tear_down(c.w.parts.mover_mut(unit.id))?;
                 self.set_face(c, unit, target, r, roles)
             }
             // code 3: near a target with more than 3 workers it searches (set_state 3), else it
             // waits a random while (LAB_140a8ef80)
-            3 => {
+            SubCode::Failed => {
                 let mover = c.w.parts.mover_of(unit.id).ok_or(UNMOVING)?;
                 let me = mover.stats.radius.ground();
                 let at = unit.place.position();
@@ -353,14 +348,13 @@ impl GatherAction {
             }
             // its target let go: the Gather's goes too (slot 0x68 with none; the caller lets it
             // go), then `set_state(11)` with no target's radius
-            4 | 5 => {
+            SubCode::TargetGone => {
                 self.target = None;
                 let walks = r.walks(&c.w.model.graphics, (unit, c.w.parts.mover_of(unit.id)));
                 let mover = c.w.parts.mover_mut(unit.id).ok_or(UNMOVING)?;
                 self.set_walk_back(Distance::ZERO, mover, &walks, &c.w.model.tuning.move_to)?;
                 Ok(Next::Stay)
             }
-            code => Err(QUIET_CODE.with("code", code)),
         }
     }
 
@@ -385,7 +379,7 @@ impl GatherAction {
         mut me: Me,
         r: &GatherReads,
         roles: &Roles,
-    ) -> Result<UpdateCode, GenieError> {
+    ) -> Result<SubCode, GenieError> {
         me.action_state = ActionState::new(self.state.get());
         let state = self.state.move_to().map(|m| m.state);
         // the computer player's test is not held: its villagers would fail at once

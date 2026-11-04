@@ -6,12 +6,13 @@ use crate::combat::damage::Victim;
 use crate::gathering::gather::GatherState;
 use crate::gathering::gather::Stand;
 use crate::gathering::gather::WalkEnd;
-use crate::gathering::gather::update::{QUIET_CODE, UNMOVING};
+use crate::gathering::gather::update::UNMOVING;
 use crate::gathering::gather::{
     FARM_WAIT_TIME, GatherAction, GatherReads, NO_GATHER_POINT, Next, SEARCH_WAIT, Walks,
 };
 use crate::map::Distance;
 use crate::map::Position;
+use crate::movement::move_to::SubCode;
 use crate::movement::move_to::{MoveToAction, TargetMoved};
 use crate::movement::{Me, Mover};
 use crate::objects::ObjectId;
@@ -148,10 +149,9 @@ impl GatherAction {
         r: &GatherReads,
         roles: &Roles,
     ) -> Result<Next, GenieError> {
-        match self.update_list(c, unit, me, r, roles)?.get() {
-            0 => Ok(Next::Stay),
-            1 | 2 | 3 | 5 => self.begin_search(c, unit, r),
-            code => Err(QUIET_CODE.with("code", code)),
+        match self.update_list(c, unit, me, r, roles)? {
+            SubCode::UnderWay => Ok(Next::Stay),
+            SubCode::Done | SubCode::Failed | SubCode::TargetGone => self.begin_search(c, unit, r),
         }
     }
 
@@ -248,9 +248,9 @@ impl GatherAction {
         r: &GatherReads,
         roles: &Roles,
     ) -> Result<Next, GenieError> {
-        match self.update_list(c, unit, me, r, roles)?.get() {
-            0 => Ok(Next::Stay),
-            1 | 2 | 5 => {
+        match self.update_list(c, unit, me, r, roles)? {
+            SubCode::UnderWay => Ok(Next::Stay),
+            SubCode::Done | SubCode::TargetGone => {
                 self.tear_down(c.w.parts.mover_mut(unit.id))?;
                 if let Some(t) = target
                     && !(ObjectState::Alive < t.state && t.state != ObjectState::Undead)
@@ -261,10 +261,9 @@ impl GatherAction {
                     end: WalkEnd::Arrived,
                 })
             }
-            3 => Ok(Next::Reseed {
+            SubCode::Failed => Ok(Next::Reseed {
                 end: WalkEnd::Failed,
             }),
-            code => Err(QUIET_CODE.with("code", code)),
         }
     }
 
@@ -349,18 +348,17 @@ impl GatherAction {
         r: &GatherReads,
         roles: &Roles,
     ) -> Result<Next, GenieError> {
-        match self.update_list(c, unit, me, r, roles)?.get() {
-            0 => Ok(Next::Stay),
-            code @ (1 | 2 | 3 | 5) => {
+        match self.update_list(c, unit, me, r, roles)? {
+            SubCode::UnderWay => Ok(Next::Stay),
+            code @ (SubCode::Done | SubCode::Failed | SubCode::TargetGone) => {
                 self.tear_down(c.w.parts.mover_mut(unit.id))?;
-                if code != 3 && r.player_kind.is_computer() {
+                if code != SubCode::Failed && r.player_kind.is_computer() {
                     self.set_done(c, unit, r);
                 } else {
                     self.set_idle(c, unit, r);
                 }
                 Ok(Next::Stay)
             }
-            code => Err(QUIET_CODE.with("code", code)),
         }
     }
 }

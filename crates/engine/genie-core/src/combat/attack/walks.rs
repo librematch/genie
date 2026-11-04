@@ -12,20 +12,14 @@ use crate::movement::MoveStart;
 use crate::movement::Mover;
 use crate::movement::Speed;
 use crate::movement::move_to::{GiveUp, MoveTo, MoveToAction, MoveToReads, SpriteReads, WalkTo};
-use crate::movement::move_to::{ListUpdate, update_sub_actions};
+use crate::movement::move_to::{ListUpdate, SubCode, update_sub_actions};
 use crate::objects::Graphics;
 use crate::objects::SpriteId;
-use crate::objects::UpdateCode;
 use crate::objects::unit::Unit;
 use crate::world::ATTACKER_UNMOVING;
 use crate::world::Seconds;
 use crate::world::layer::generated::MoveToTuning;
 use crate::world::step::Step;
-
-/// A sub-action list's code that a quiet `MoveTo` does not give: 4 is its target let go when it
-/// is not quiet.
-pub(super) const QUIET_CODE: GenieError =
-    GenieError::unreachable("an Attack's quiet MoveTo's code that only a loud one gives");
 
 /// What a new `MoveTo` of `unit` with its mover `mover` reads as `set_state` makes it: the
 /// sprites' defaults of its master (`r`), the sprites' table `graphics`, and the unit's state
@@ -155,7 +149,7 @@ impl Attack {
         me: Me,
         r: &AttackReads,
         gives_up: GiveUp,
-    ) -> Result<UpdateCode, GenieError> {
+    ) -> Result<SubCode, GenieError> {
         let state = self.state.move_to().map(|m| m.state);
         let how = ListUpdate {
             gives_up,

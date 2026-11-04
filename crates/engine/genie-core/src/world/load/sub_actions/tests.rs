@@ -295,7 +295,7 @@ fn attack(state: u8, subs: Vec<(ActionKind, Action)>) -> Action {
     }
 }
 
-/// A `MoveTo` (type 1) in state 4 toward (3, 4).
+/// A quiet `MoveTo` (type 1) in state 4 toward (3, 4).
 fn move_to() -> Action {
     Action {
         rge_action_by_kind: Some(Box::new(RgeActionByKind {
@@ -305,6 +305,8 @@ fn move_to() -> Action {
                     target_x: 3.0,
                     target_y: 4.0,
                     short_val_2: -1,
+                    // quiet (`+0x60` 1), as the Attack makes it
+                    sub_action_value: 1,
                     ..RgeAction::default()
                 },
                 ..RgeActionMoveTo::default()

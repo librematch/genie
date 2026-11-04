@@ -9,7 +9,7 @@ use crate::map::Distance;
 use crate::math::fmath::below_or_unordered;
 use crate::movement::Me;
 use crate::movement::Speed;
-use crate::movement::move_to::TargetMoved;
+use crate::movement::move_to::{SubCode, TargetMoved};
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::SpriteId;
@@ -241,8 +241,8 @@ impl BuildAction {
     /// State 8's update (`0x140ab0370` case 7). While its timer is below 0 (COMISS: a NaN runs
     /// it out) it runs by dt; at its end the drop-off searches again (`set_state(8)`,
     /// [`BuildAction::drop_again`]). Else its quiet `MoveTo` walks to the drop site
-    /// ([`BuildAction::step_walk`]): its target let go (code 5), a failed walk (codes 3 and 4)
-    /// and a drop site gone or not in state 2 search again. At its end (codes 1 and 2; the
+    /// ([`BuildAction::step_walk`]): its target let go (code 5), a failed walk (code 3) and a
+    /// drop site gone or not in state 2 search again. At its end (code 1; the
     /// `MoveTo` stays in the list until the next `set_state`) a drop site that does not take the
     /// load (`FUN_140fdd190`) halts the Build (`set_state(2)`); one beyond `BuildTuning::drop_reach`
     /// (`FUN_14118f8c0`) makes it wait 3 seconds with the unit's animation stopped
@@ -272,14 +272,14 @@ impl BuildAction {
             self.drop_again(c, builder, reads.by, slots, roles)?;
             return Ok(HeadCode::Keeps);
         }
-        match self.step_walk(c, builder, me, reads, roles)?.get() {
-            1 | 2 => {}
-            3..=5 => {
+        match self.step_walk(c, builder, me, reads, roles)? {
+            SubCode::Done => {}
+            SubCode::Failed | SubCode::TargetGone => {
                 self.drop_again(c, builder, reads.by, slots, roles)?;
                 return Ok(HeadCode::Keeps);
             }
-            // 0 (it walks or waits) and any code above 5 (none): the update returns 0
-            _ => return Ok(HeadCode::Keeps),
+            // it walks or waits: the update returns 0
+            SubCode::UnderWay => return Ok(HeadCode::Keeps),
         }
         let Some((ObjectState::Alive, drop)) = reads.deposit.filter(|_| self.site.is_some()) else {
             self.drop_again(c, builder, reads.by, slots, roles)?;

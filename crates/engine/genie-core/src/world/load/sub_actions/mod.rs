@@ -40,7 +40,7 @@ use crate::production::QueuedUnits;
 use crate::technology::TechId;
 use crate::world::Seconds;
 use crate::world::WholeSeconds;
-use crate::world::load::top_actions::{first_action, saved_move_to};
+use crate::world::load::top_actions::{first_action, saved_sub_move_to};
 use genie_import::dat::dat_id;
 use genie_import::dat::{DefaultAction, MasterTable};
 use genie_import::save::core_task;
@@ -133,7 +133,7 @@ pub fn saved_attack(sub: &Action, graphics: Option<&Graphics>) -> Result<Attack,
     // every MoveTo of the Attack is quiet (`FUN_140a7a170` with 1)
     let move_to = match first_action(&b.sub_actions)? {
         None => None,
-        Some((MOVE_TO, s2)) => Some(saved_move_to(s2, Some(graphics), Voice::Quiet)?),
+        Some((MOVE_TO, s2)) => Some(saved_sub_move_to(s2, Some(graphics))?),
         Some(_) => {
             return Err(GenieError::unsupported(
                 "a saved Attack with another sub-action",

@@ -17,10 +17,9 @@ use crate::math::rng::Stream;
 use crate::movement::Me;
 use crate::movement::Mover;
 use crate::movement::move_to::{GiveUp, MoveDefaults, MoveToReads, Patience, SpriteReads};
-use crate::movement::move_to::{ListUpdate, update_sub_actions};
+use crate::movement::move_to::{ListUpdate, SubCode, update_sub_actions};
 use crate::movement::scout_area::ScoutArea;
 use crate::objects::SpriteId;
-use crate::objects::UpdateCode;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::Master;
 use crate::objects::masters::PlayersMasters;
@@ -207,20 +206,20 @@ impl ExploreAction {
     }
 
     /// What the update does after its `MoveTo`'s update returned `code` (`0x140a880c0` in state 11,
-    /// `FUN_140a992b0`): 0 goes on; 1, 2, 3 and 5 make it wait for a new point (`set_state` 3); 4
-    /// runs the action's slot 0x68 and walks again (`set_state` 11), which is not modelled.
+    /// `FUN_140a992b0`): 0 goes on; 1, 3 and 5 (the game's 2 too, which only an Attack gives)
+    /// make it wait for a new point (`set_state` 3). The game's arm for 4 (the action's slot
+    /// 0x68 and the walk again, `set_state` 11) never runs: only a loud `MoveTo` gives 4
+    /// ([`SubCode`]).
     pub fn after_walk(
         &mut self,
-        code: UpdateCode,
+        code: SubCode,
         move_to_tuning: &MoveToTuning,
     ) -> Result<Owner, GenieError> {
-        match code.get() {
-            1 | 2 | 3 | 5 => self.set_state(ExploreState::Wait, None, move_to_tuning),
-            4 => Err(GenieError::unsupported(
-                "an Explore whose MoveTo returned 4 (its slot 0x68)",
-            )),
-            // 0 (and any other code) goes on
-            _ => Ok(Owner::Nothing),
+        match code {
+            SubCode::Done | SubCode::Failed | SubCode::TargetGone => {
+                self.set_state(ExploreState::Wait, None, move_to_tuning)
+            }
+            SubCode::UnderWay => Ok(Owner::Nothing),
         }
     }
 }
@@ -844,11 +843,11 @@ mod tests {
             }
         );
         assert_eq!(
-            a.after_walk(UpdateCode::UnderWay, &tuning().move_to),
+            a.after_walk(SubCode::UnderWay, &tuning().move_to),
             Ok(Owner::Nothing)
         );
         assert_eq!(
-            a.after_walk(UpdateCode::Done, &tuning().move_to),
+            a.after_walk(SubCode::Done, &tuning().move_to),
             Ok(Owner::WantsPoint)
         );
         assert_eq!(a.state, ExploreState::Wait);

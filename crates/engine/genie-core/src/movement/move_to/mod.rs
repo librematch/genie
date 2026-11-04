@@ -32,6 +32,7 @@ mod constructors;
 mod list;
 mod move_wait_state;
 mod sub_action;
+mod sub_code;
 
 use crate::combat::abilities::Look;
 pub(crate) use crate::movement::move_to::action::TARGET_LACKING;
@@ -44,6 +45,7 @@ pub use crate::movement::move_to::list::ListUpdate;
 pub(crate) use crate::movement::move_to::list::update_sub_actions;
 pub use crate::movement::move_to::move_wait_state::MoveWaitState;
 pub use crate::movement::move_to::sub_action::{GiveUp, NO_TARGET_GAP};
+pub use crate::movement::move_to::sub_code::SubCode;
 use crate::objects::Graphics;
 use crate::objects::masters::Master;
 use crate::world::WALKER_UNMOVING;
@@ -630,12 +632,12 @@ mod tests {
                 &mut inbox,
             )
         };
-        assert_eq!(update(&mut m), Ok(UpdateCode::UnderWay));
+        assert_eq!(update(&mut m), Ok(SubCode::UnderWay));
         assert_eq!(
             (m.state, m.wait.state),
             (MoveTo::Moving, MoveWaitState::AskedAgain)
         );
-        assert_eq!(update(&mut m), Ok(UpdateCode::UnderWay));
+        assert_eq!(update(&mut m), Ok(SubCode::UnderWay));
         assert_eq!(m.state, MoveTo::Moving);
         // the walk is a tenth of a second: the wait of 0.15 asks again on its second update
         m.state = MoveTo::Waiting;
@@ -644,20 +646,20 @@ mod tests {
             timer: Seconds::ZERO,
             delay: Seconds::new(0.15),
         };
-        assert_eq!(update(&mut m), Ok(UpdateCode::UnderWay));
+        assert_eq!(update(&mut m), Ok(SubCode::UnderWay));
         assert_eq!(
             (m.state, m.wait.timer),
             (MoveTo::Waiting, Seconds::new(0.1))
         );
-        assert_eq!(update(&mut m), Ok(UpdateCode::UnderWay));
+        assert_eq!(update(&mut m), Ok(SubCode::UnderWay));
         assert_eq!((m.state, m.wait.timer), (MoveTo::Start, Seconds::ZERO));
         m.wait.timer = Seconds::new(f32::NAN);
         m.state = MoveTo::Waiting;
-        assert_eq!(update(&mut m), Ok(UpdateCode::UnderWay));
+        assert_eq!(update(&mut m), Ok(SubCode::UnderWay));
         assert_eq!(m.state, MoveTo::Waiting);
         for (state, code) in [
-            (MoveTo::Arrived, UpdateCode::Done),
-            (MoveTo::Failed, UpdateCode::Failed),
+            (MoveTo::Arrived, SubCode::Done),
+            (MoveTo::Failed, SubCode::Failed),
         ] {
             m.state = state;
             assert_eq!(update(&mut m), Ok(code));
@@ -785,16 +787,16 @@ mod tests {
         let off = Position::new(30.6, 88.0, 0.0);
         assert_eq!(
             walk_on(TargetMoved::AsksAgain, false),
-            (Ok(UpdateCode::UnderWay), MoveTo::Start, vec![], false, off)
+            (Ok(SubCode::UnderWay), MoveTo::Start, vec![], false, off)
         );
         assert_eq!(
             walk_on(TargetMoved::Ignores, false),
-            (Ok(UpdateCode::UnderWay), MoveTo::Moving, vec![], true, off)
+            (Ok(SubCode::UnderWay), MoveTo::Moving, vec![], true, off)
         );
         assert_eq!(
             walk_on(TargetMoved::Follows, false),
             (
-                Ok(UpdateCode::UnderWay),
+                Ok(SubCode::UnderWay),
                 MoveTo::Moving,
                 vec![],
                 true,
@@ -804,7 +806,7 @@ mod tests {
         assert_eq!(
             walk_on(TargetMoved::Follows, true),
             (
-                Ok(UpdateCode::UnderWay),
+                Ok(SubCode::UnderWay),
                 MoveTo::Start,
                 vec![NotifyKind::TARGET_MOVED],
                 true,
@@ -875,7 +877,7 @@ mod tests {
         );
         assert_eq!(
             (code, ObjectId::field(m.target), m.state),
-            (Ok(UpdateCode::Code5), -1, MoveTo::Moving)
+            (Ok(SubCode::TargetGone), -1, MoveTo::Moving)
         );
         let mut loud = MoveToAction {
             target: Some(object_id(10028)),
@@ -925,23 +927,23 @@ mod tests {
         };
         assert_eq!(
             update(Voice::Quiet, MoveTo::Arrived),
-            (UpdateCode::Done, vec![])
+            (SubCode::Done, vec![])
         );
         assert_eq!(
             update(Voice::Quiet, MoveTo::Failed),
-            (UpdateCode::Failed, vec![])
+            (SubCode::Failed, vec![])
         );
         assert_eq!(
             update(Voice::Loud, MoveTo::Arrived),
             (
-                UpdateCode::Done,
+                SubCode::Done,
                 vec![(NotifyKind::ACTION_COMPLETED, [0x262, 0, 0])]
             )
         );
         assert_eq!(
             update(Voice::Loud, MoveTo::Failed),
             (
-                UpdateCode::Failed,
+                SubCode::Failed,
                 vec![(NotifyKind::ACTION_FAILED, [0x262, 0, 0])]
             )
         );

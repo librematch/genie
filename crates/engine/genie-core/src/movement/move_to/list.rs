@@ -2,9 +2,8 @@
 //! `MoveTo`: its first action's update, 1 for an empty list ("There is no list.").
 
 use crate::GenieError;
-use crate::movement::move_to::{GiveUp, MoveTo, MoveToAction, Shown};
+use crate::movement::move_to::{GiveUp, MoveTo, MoveToAction, Shown, SubCode};
 use crate::movement::{Me, PathAsk};
-use crate::objects::UpdateCode;
 use crate::objects::sprite::Graphic;
 use crate::objects::unit::Unit;
 use crate::world::step::Step;
@@ -21,8 +20,8 @@ pub struct ListUpdate {
 }
 
 /// The update of `list` (the owner's one quiet `MoveTo`, [`MoveToAction::sub_update`]) for
-/// `unit` and its code: 0 while it walks or waits, 1 once it ended (or for an empty list), 3
-/// once it failed, 4 and 5 once its target was let go ([`MoveToAction::check_held`]). Its start
+/// `unit` and its code ([`SubCode`]): under way while it walks or waits, done once it ended
+/// (or for an empty list), failed, or its target gone ([`MoveToAction::check_held`]). Its start
 /// shows its sprite (`set_state(4)`); the motion step gives up as `how` says.
 ///
 /// # Errors
@@ -34,9 +33,9 @@ pub(crate) fn update_sub_actions(
     unit: &mut Unit,
     me: Me,
     how: ListUpdate,
-) -> Result<UpdateCode, GenieError> {
+) -> Result<SubCode, GenieError> {
     let Some(move_to) = list else {
-        return Ok(UpdateCode::Done);
+        return Ok(SubCode::Done);
     };
     let held = c.w.object_state(move_to.target);
     let (mut walk, beside) = c.w.walk_beside(c.pace()?, &mut unit.place, me);

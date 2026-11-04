@@ -16,13 +16,12 @@ use crate::math::fmath::below_or_unordered;
 use crate::math::rng::Stream;
 use crate::movement::Mover;
 use crate::movement::move_to::{GiveUp, MoveToAction, MoveToReads, Sprites, TargetMoved, WalkTo};
-use crate::movement::move_to::{ListUpdate, update_sub_actions};
+use crate::movement::move_to::{ListUpdate, SubCode, update_sub_actions};
 use crate::movement::{Me, footprint_gap};
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::SpriteId;
-use crate::objects::UpdateCode;
 use crate::objects::Voice;
 use crate::objects::WorkRate;
 use crate::objects::masters::MasterKind;
@@ -299,10 +298,10 @@ impl RepairAction {
         Ok(())
     }
 
-    /// State 11 (`0x140adaa20` case 10): the walk to the Repair's point; at it (1, 2), failed
-    /// (3), gone (the list empty, 1) or its target let go (5) the Repair ends; a target let go
-    /// with 4 lets the Repair's go too (slot 0x68 with none, [`RepairAction::drop_target`]) and
-    /// walks to the point again (`set_state(11)`).
+    /// State 11 (`0x140adaa20` case 10): the walk to the Repair's point; at it (1), failed (3),
+    /// gone (the list empty, 1) or its target let go (5) the Repair ends. The game's arm for 4
+    /// (the Repair's target let go too, the walk to the point again) never runs: only a loud
+    /// `MoveTo` gives 4 ([`SubCode`]).
     pub(super) fn walking_to_point(
         &mut self,
         c: &mut Step<'_>,
@@ -311,28 +310,21 @@ impl RepairAction {
         reads: &RepairReads,
         roles: &Roles,
     ) -> Result<(), GenieError> {
-        match self.step_walk(c, repairer, me, reads)?.get() {
-            0 => Ok(()),
-            4 => {
-                self.drop_target(c, repairer, reads)?;
-                self.set_state(
-                    c,
-                    repairer,
-                    RepairState::WalkPoint { move_to: None },
-                    reads,
-                    roles,
-                )
+        match self.step_walk(c, repairer, me, reads)? {
+            SubCode::UnderWay => Ok(()),
+            SubCode::Done | SubCode::Failed | SubCode::TargetGone => {
+                self.set_state(c, repairer, RepairState::Done, reads, roles)
             }
-            _ => self.set_state(c, repairer, RepairState::Done, reads, roles),
         }
     }
 
     /// State 4 (`0x140adaa20` case 3): the quiet `MoveTo` toward the target walks
-    /// ([`RepairAction::step_walk`]); once it is at it, waits or failed (or gone: 1, 2, 3), the
+    /// ([`RepairAction::step_walk`]); once it is at it, waits or failed (or gone: 1, 3), the
     /// unit within reach of the target ([`RepairAction::reaches`]) faces it (6), one with a
     /// quick path to it within `RepairTuning::reach` (slot 0x3e0, `canQuickPath`) waits (10), any other
-    /// fails (13). Its target let go (4, 5) lets the Repair's go (slot 0x68 with none,
-    /// [`RepairAction::drop_target`]) and ends the Repair (`set_state(1)`).
+    /// fails (13). Its target let go (5; the game's 4 too, which only a loud `MoveTo` gives:
+    /// [`SubCode`]) lets the Repair's go (slot 0x68 with none, [`RepairAction::drop_target`])
+    /// and ends the Repair (`set_state(1)`).
     pub(super) fn walking(
         &mut self,
         c: &mut Step<'_>,
@@ -341,13 +333,13 @@ impl RepairAction {
         reads: &RepairReads,
         roles: &Roles,
     ) -> Result<(), GenieError> {
-        match self.step_walk(c, repairer, me, reads)?.get() {
-            0 => return Ok(()),
-            4 | 5 => {
+        match self.step_walk(c, repairer, me, reads)? {
+            SubCode::UnderWay => return Ok(()),
+            SubCode::TargetGone => {
                 self.drop_target(c, repairer, reads)?;
                 return self.set_state(c, repairer, RepairState::Done, reads, roles);
             }
-            _ => {}
+            SubCode::Done | SubCode::Failed => {}
         }
         if Self::reaches(repairer, reads, &c.w.model.tuning.repair) {
             return self.set_state(c, repairer, RepairState::Face, reads, roles);
@@ -392,16 +384,16 @@ impl RepairAction {
     }
 
     /// The quiet `MoveTo`'s update and its code (`FUN_140a992b0`, [`MoveToAction::sub_update`]),
-    /// the villager test and the stance deciding a give-up: 0 while it walks or waits, 1 once it
-    /// is at its goal (or gone), 3 once it failed, 5 once its target was let go (a target in a
-    /// state above 6, [`MoveToAction::check_held`]). Its start shows its sprite.
+    /// the villager test and the stance deciding a give-up ([`SubCode`]; [`SubCode::TargetGone`]
+    /// for a target in a state above 6, [`MoveToAction::check_held`]). Its start shows its
+    /// sprite.
     pub(super) fn step_walk(
         &mut self,
         c: &mut Step<'_>,
         repairer: &mut Unit,
         me: Me,
         reads: &RepairReads,
-    ) -> Result<UpdateCode, GenieError> {
+    ) -> Result<SubCode, GenieError> {
         let how = ListUpdate {
             gives_up: GiveUp {
                 patience: reads.patience,

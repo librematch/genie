@@ -38,6 +38,7 @@ use crate::movement::Speed;
 use crate::movement::TurnRate;
 use crate::movement::move_to::MoveToAction;
 use crate::movement::move_to::MoveWaitState;
+use crate::movement::move_to::SubCode;
 use crate::movement::move_to::{ListUpdate, MoveWait, TargetMoved, update_sub_actions};
 use crate::movement::{Me, MoveStats, Mover, SubstituteCount, WaitDelays};
 use crate::objects::ActionState;
@@ -49,7 +50,6 @@ use crate::objects::ObjectState;
 use crate::objects::SpeedMultiplier;
 use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
-use crate::objects::UpdateCode;
 use crate::objects::Voice;
 use crate::objects::facing::SpriteFacets;
 use crate::objects::layers::Animated;
@@ -4565,9 +4565,9 @@ fn the_sub_action_list_update_of_an_empty_list_is_1_and_of_an_arrived_move_to_to
             update_sub_actions(list, c, u, me, ListUpdate::default())
         })
     };
-    assert_eq!(update(&mut None), Ok(UpdateCode::Done));
+    assert_eq!(update(&mut None), Ok(SubCode::Done));
     let mut arrived = enter_of_move(MoveTo::Arrived);
-    assert_eq!(update(&mut arrived), Ok(UpdateCode::Done));
+    assert_eq!(update(&mut arrived), Ok(SubCode::Done));
 }
 
 /// A quiet `MoveTo` to ship 200 in `state`.

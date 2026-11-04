@@ -29,6 +29,7 @@ unit's sprite and the Sprite stream to it.
 | [`mod.rs`](mod.rs) | The `MoveTo` action (`RGE_Action_Move_To`, type 1, vtable `0x142ed6030`): a unit walks to a target object or a point. |
 | [`move_wait_state.rs`](move_wait_state.rs) | A `MoveTo`'s wait state: whether it waited after the motion step gave up. |
 | [`sub_action.rs`](sub_action.rs) | The `MoveTo` as an action's sub-action: its constructor (`FUN_140aa0d30`, made quiet) and its update through the owner's sub-action list (`FUN_140a992b0`). |
+| [`sub_code.rs`](sub_code.rs) | What an owner's sub-action list answers its owner (`SubCode`). |
 <!-- /files -->
 
 ## How it connects

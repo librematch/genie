@@ -14,6 +14,7 @@ use crate::map::terrain::TileTerrain;
 use crate::map::terrain::{Terrain, TerrainKind};
 use crate::movement::Me;
 use crate::movement::Speed;
+use crate::movement::move_to::SubCode;
 use crate::movement::move_to::{MoveDefaults, MoveTo, MoveToAction, MoveToReads, SpriteReads};
 use crate::objects::ActionState;
 use crate::objects::Graphics;
@@ -226,9 +227,9 @@ fn run_on(
     player_kind: PlayerKind,
 ) -> Result<Updated, GenieError> {
     let walked = match t.state.move_to().copied().map(|m| m.state) {
-        Some(MoveTo::Failed) => UpdateCode::Failed,
-        Some(MoveTo::Start | MoveTo::Moving | MoveTo::Waiting) => UpdateCode::UnderWay,
-        None | Some(MoveTo::Arrived) => UpdateCode::Done,
+        Some(MoveTo::Failed) => SubCode::Failed,
+        Some(MoveTo::Start | MoveTo::Moving | MoveTo::Waiting) => SubCode::UnderWay,
+        None | Some(MoveTo::Arrived) => SubCode::Done,
     };
     let look = (Some(STANDING), &mut Well512::default());
     let mut shore = c.shore(s.position);
@@ -810,7 +811,7 @@ fn sail_ends_with_its_move_to_and_failed_one_returns_3() {
     let look = (None, &mut Well512::default());
     assert!(
         t.state_update(
-            UpdateCode::Done,
+            SubCode::Done,
             (&s, &mut c.shore(s.position)),
             (&mut unit, motion.lent(), &mut ais),
             look,
@@ -868,7 +869,7 @@ fn sail_move_to_asks_for_its_path_then_walks_on() {
     let mut t = sailing(Some(MoveTo::Start));
     assert_eq!(
         walker.run(100, |c, u, _, _, _| t.walk(c, u, me)),
-        Ok(UpdateCode::UnderWay)
+        Ok(SubCode::UnderWay)
     );
     assert_eq!(
         t.state.move_to().copied().map(|m| m.state),
@@ -883,7 +884,7 @@ fn sail_move_to_asks_for_its_path_then_walks_on() {
     let mut t = sailing(Some(MoveTo::Moving));
     assert_eq!(
         walker.run(100, |c, u, _, _, _| t.walk(c, u, me)),
-        Ok(UpdateCode::UnderWay)
+        Ok(SubCode::UnderWay)
     );
     assert_eq!(
         (t.state.move_to().copied().map(|m| m.state), walker.posted()),
@@ -894,7 +895,7 @@ fn sail_move_to_asks_for_its_path_then_walks_on() {
     let mut t = sailing(Some(MoveTo::Waiting));
     assert_eq!(
         walker.run(100, |c, u, _, _, _| t.walk(c, u, me)),
-        Ok(UpdateCode::UnderWay)
+        Ok(SubCode::UnderWay)
     );
     assert_eq!(
         (t.state.move_to().copied().map(|m| m.state), walker.posted()),
@@ -902,9 +903,9 @@ fn sail_move_to_asks_for_its_path_then_walks_on() {
     );
     // the ended, the failed and a missing MoveTo walk nothing
     for (move_to, code) in [
-        (Some(MoveTo::Arrived), UpdateCode::Done),
-        (Some(MoveTo::Failed), UpdateCode::Failed),
-        (None, UpdateCode::Done),
+        (Some(MoveTo::Arrived), SubCode::Done),
+        (Some(MoveTo::Failed), SubCode::Failed),
+        (None, SubCode::Done),
     ] {
         let mut walker = rig();
         let mut t = sailing(move_to);

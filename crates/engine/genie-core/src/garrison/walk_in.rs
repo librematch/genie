@@ -16,12 +16,11 @@ use crate::movement::Speed;
 use crate::movement::move_to::Patience;
 use crate::movement::move_to::TargetMoved;
 use crate::movement::move_to::{GiveUp, MoveDefaults, MoveToReads, SpriteReads, WalkTo};
-use crate::movement::move_to::{ListUpdate, update_sub_actions};
+use crate::movement::move_to::{ListUpdate, SubCode, update_sub_actions};
 #[cfg(test)]
 use crate::movement::move_to::{MoveTo, MoveToAction, MoveWait};
 use crate::objects::ObjectState;
 use crate::objects::SpriteId;
-use crate::objects::UpdateCode;
 #[cfg(test)]
 use crate::objects::Voice;
 use crate::objects::layers::Action;
@@ -374,11 +373,12 @@ impl EnterAction {
     }
 
     /// State 4: a target off the action's point ([`EnterAction::target_moved`]) walks it again;
-    /// then the `MoveTo` updates ([`MoveToAction::sub_update`] with the reads' give-up): codes 1
-    /// and 2 enter in reach, a unit that entered in the walk again enters again
-    /// ([`Unit::entered_again`]), else
-    /// they wait (`set_state(2)`); code 3 (a `MoveTo` that failed) walks again once (`+0x68`),
-    /// then waits; codes 4 and 5 (its target in a state above 6 let go) let the Enter's target go
+    /// then the `MoveTo` updates ([`MoveToAction::sub_update`] with the reads' give-up): at its
+    /// end (code 1; the game's 2, which only an Attack gives, too) the unit enters in reach, a
+    /// unit that entered in the walk again enters again ([`Unit::entered_again`]), else it
+    /// waits (`set_state(2)`); code 3 (a `MoveTo` that failed) walks again once (`+0x68`),
+    /// then waits; code 5 (its target in a state above 6 let go; the game's 4 too, which only a
+    /// loud `MoveTo` gives: [`SubCode`]) lets the Enter's target go
     /// and turn to state 11, which is not modelled ([`ENTER_TARGET_DIED`]: the update's own test
     /// of its target, [`EnterAction::held_target`], stops on a target in state 3 first).
     ///
@@ -400,27 +400,26 @@ impl EnterAction {
         let walked_again = self.target_moved(t);
         let entered =
             walked_again && self.again(c, unit, actions, t, reads, roles)? == EnterAgain::Entered;
-        let code = self.move_to_update(c, unit, me, reads)?;
-        match code.get() {
+        match self.move_to_update(c, unit, me, reads)? {
             // the walk again's enter put the unit inside, at the target's place: still in reach,
             // it enters again
-            1 | 2 if entered => self.on_unit(unit, actions, |unit, actions| {
+            SubCode::Done if entered => self.on_unit(unit, actions, |unit, actions| {
                 unit.entered_again(actions, c)
             }),
-            1 | 2 if t.in_reach => self.enter_at_once((actions, c, unit), t.id, roles),
+            SubCode::Done if t.in_reach => self.enter_at_once((actions, c, unit), t.id, roles),
             // a failed MoveTo is none a walk again made in this update
-            3 if self.retry => {
+            SubCode::Failed if self.retry => {
                 self.retry = false;
                 self.again(c, unit, actions, t, reads, roles).map(|_| ())
             }
-            1..=3 => self.wait(c, unit),
-            4 | 5 => Err(ENTER_TARGET_DIED),
-            _ => Ok(()),
+            SubCode::Done | SubCode::Failed => self.wait(c, unit),
+            SubCode::TargetGone => Err(ENTER_TARGET_DIED),
+            SubCode::UnderWay => Ok(()),
         }
     }
 
     /// The `MoveTo`'s update ([`MoveToAction::sub_update`]) with the reads' give-up, its start
-    /// showing its sprite; its code, 1 without one.
+    /// showing its sprite; its code, [`SubCode::Done`] without one.
     ///
     /// [`MoveToAction::sub_update`]: crate::movement::move_to::MoveToAction::sub_update
     ///
@@ -433,7 +432,7 @@ impl EnterAction {
         unit: &mut Unit,
         me: Me,
         reads: &EnterReads,
-    ) -> Result<UpdateCode, GenieError> {
+    ) -> Result<SubCode, GenieError> {
         let how = ListUpdate {
             gives_up: GiveUp {
                 patience: reads.patience,

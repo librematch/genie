@@ -8,7 +8,6 @@ use crate::combat::attack::{Attack, Fight, set_walker_anim};
 use crate::combat::victims::{file_kill, write_back};
 use crate::gathering::hunt::HuntGather;
 use crate::gathering::hunt::HuntState;
-use crate::gathering::hunt::walks::QUIET_CODE;
 use crate::gathering::hunt::{Herd, HuntAction, HuntNext, HuntReads};
 use crate::math::rng::Stream;
 use crate::movement::Me;
@@ -16,6 +15,7 @@ use crate::movement::MoveStart;
 use crate::movement::Speed;
 use crate::movement::move_to::GiveUp;
 use crate::movement::move_to::Patience;
+use crate::movement::move_to::SubCode;
 use crate::objects::layers::Action;
 use crate::objects::layers::MotionMut;
 use crate::objects::masters::MasterTables;
@@ -190,16 +190,15 @@ impl HuntAction {
             },
             stance: r.attack.stance,
         };
-        match self.update_list(c, unit, me, gives_up)?.get() {
-            0 => Ok(HuntNext::Stay),
-            1 | 2 => self.walk_arrived(c, unit, actions, f, r, roles),
-            3 => self
+        match self.update_list(c, unit, me, gives_up)? {
+            SubCode::UnderWay => Ok(HuntNext::Stay),
+            SubCode::Done => self.walk_arrived(c, unit, actions, f, r, roles),
+            SubCode::Failed => self
                 .walk_failed(c.w.parts.motion_mut(unit.id), r, roles)
                 .map(|()| HuntNext::Stay),
-            4 | 5 => self
+            SubCode::TargetGone => self
                 .lost_on_the_way(c, unit, r, roles)
                 .map(|()| HuntNext::Stay),
-            code => Err(QUIET_CODE.with("code", code)),
         }
     }
 

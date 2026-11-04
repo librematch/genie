@@ -4,13 +4,13 @@ use crate::GenieError;
 use crate::combat::damage::Victim;
 use crate::gathering::both_food;
 use crate::gathering::gather::GatherState;
-use crate::gathering::gather::update::QUIET_CODE;
 use crate::gathering::gather::{GatherAction, GatherReads, LAST_BIT, Next, REMAINDER};
 use crate::gathering::hunt::Dropped;
 use crate::gathering::hunt::{DropOff, resource_kind};
 use crate::math::rng::Stream;
 use crate::movement::Me;
 use crate::movement::Speed;
+use crate::movement::move_to::SubCode;
 use crate::objects::ObjectState;
 use crate::objects::sprite::{Graphic, new_sprite};
 use crate::objects::unit::Unit;
@@ -204,15 +204,15 @@ impl GatherAction {
             self.timer = Seconds::ZERO;
             return Ok(Dropped::Again);
         }
-        // the list's code: 0 walks or waits, 1 and 2 end it; 3 to 5 wait at random
-        match self.update_list(c, unit, me, r, roles)?.get() {
-            0 => return Ok(Dropped::Going),
-            3..=5 => {
+        // the list's code: under way walks or waits, done ends it; failed or its target gone
+        // waits at random
+        match self.update_list(c, unit, me, r, roles)? {
+            SubCode::UnderWay => return Ok(Dropped::Going),
+            SubCode::Failed | SubCode::TargetGone => {
                 self.random_wait(c, unit);
                 return Ok(Dropped::Going);
             }
-            1 | 2 => self.tear_down(c.w.parts.mover_mut(unit.id))?,
-            code => return Err(QUIET_CODE.with("code", code)),
+            SubCode::Done => self.tear_down(c.w.parts.mover_mut(unit.id))?,
         }
         // the drop site gone: set_state(8) again
         let Some(site) = site else {

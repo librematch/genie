@@ -9,14 +9,13 @@ use crate::gathering::make::{MakeAction, MakeState};
 use crate::gathering::{FarmStops, GatherTargetId, HuntTargetId, StopIndex};
 use crate::map::Point;
 use crate::movement::move_to::MOVE_TO;
-use crate::objects::Voice;
 use crate::objects::layers;
 use crate::objects::masters::{ClassId, Task};
 use crate::players::Amount;
 use crate::world::Seconds;
 use crate::world::load::sub_actions::saved_attack;
 use crate::world::load::sub_actions::saved_reload;
-use crate::world::load::top_actions::{Saved, TaskAt, first_action, saved_move_to};
+use crate::world::load::top_actions::{Saved, TaskAt, first_action, saved_sub_move_to};
 use genie_save::generated::world::Action;
 
 /// A farm's Make (21): its timers and task; it makes no sub-action.
@@ -97,10 +96,7 @@ pub fn import_hunt(
         None => (None, None),
         Some((ATTACK, sub)) => (None, Some(hunt_attack(saved, sub)?)),
         // every MoveTo of the Hunt is quiet (`FUN_140a7a170` with 1)
-        Some((MOVE_TO, sub)) => (
-            Some(saved_move_to(sub, saved.graphics, Voice::Quiet)?),
-            None,
-        ),
+        Some((MOVE_TO, sub)) => (Some(saved_sub_move_to(sub, saved.graphics)?), None),
         Some(_) => {
             return Err(GenieError::unsupported(
                 "a saved Hunt with another sub-action",
@@ -188,7 +184,7 @@ pub fn import_gather(
         .move_to_sub(GenieError::unsupported(
             "a saved Gather with another sub-action",
         ))?
-        .map(|sub| saved_move_to(sub, saved.graphics, Voice::Quiet))
+        .map(|sub| saved_sub_move_to(sub, saved.graphics))
         .transpose()?;
     let state = GatherState::of_byte(base.state, walk)?;
     let task = hunt_task(&saved.task(task_at)?);

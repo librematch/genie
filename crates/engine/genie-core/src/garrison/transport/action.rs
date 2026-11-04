@@ -23,7 +23,7 @@ use crate::math::rng::{Stream, Well512};
 use crate::movement::Me;
 use crate::movement::Mover;
 use crate::movement::PathAsk;
-use crate::movement::move_to::{ListUpdate, update_sub_actions};
+use crate::movement::move_to::{ListUpdate, SubCode, update_sub_actions};
 use crate::movement::move_to::{MoveTo, MoveToReads, SpriteReads};
 use crate::objects::Graphics;
 use crate::objects::SpriteId;
@@ -329,10 +329,10 @@ impl TransportAction {
     }
 
     /// The update's state after its `MoveTo`'s (`walked`, the code of [`TransportAction::walk`],
-    /// which only states 4 and 11 read), its effects on `unit` at once: a state change stops it
-    /// and state 2 shows the standing sprite (`look`: the master's and the Sprite stream,
-    /// [`stand`]). State 1 is done (1). States 4 and 11: any end of the `MoveTo` (codes 1 to 5;
-    /// without one the list answers 1) unloads (4: `set_state(6)`) or idles (11:
+    /// which only states 4 and 11 read), its effects on `unit` at once: a state change stops it and
+    /// state 2 shows the standing sprite (`look`: the master's and the Sprite stream, [`stand`]).
+    /// State 1 is done (1). States 4 and 11: any end of the `MoveTo` (codes 1, 3 and 5, the game's
+    /// 1 to 5; without one the list answers 1) unloads (4: `set_state(6)`) or idles (11:
     /// `set_state(2)`). State 13 tells the unit's AI it failed (0x1f9 with the Transport's action
     /// value, slot 0x328), idles and returns 3. State 6 unloads:
     /// - with a point, its zone's tile ([`MapShore::zone`]) must lie within `TransportTuning::near`
@@ -351,7 +351,7 @@ impl TransportAction {
     /// the unit lacks.
     pub(crate) fn state_update(
         &mut self,
-        walked: UpdateCode,
+        walked: SubCode,
         (ship, shore): (&Ship<'_>, &mut MapShore<'_>),
         (unit, mut motion, ais): (&mut Unit, MotionMut<'_>, &mut PartTable<UnitAi>),
         look: (Option<Graphic>, &mut Well512),
@@ -363,7 +363,7 @@ impl TransportAction {
         let (changed, code) = match self.state {
             TransportState::Done => return Ok(Updated::Code(UpdateCode::Done)),
             TransportState::SailToUnload { .. } | TransportState::Sail { .. }
-                if (1..=5).contains(&walked.get()) =>
+                if walked != SubCode::UnderWay =>
             {
                 let next = if matches!(self.state, TransportState::Sail { .. }) {
                     TransportState::Idle
@@ -485,8 +485,9 @@ impl TransportAction {
     /// asks for its path by what the unit's AI asks of the path (`0x140aa2a70`,
     /// [`UnitAi::path_ask`]) and shows its sprite; state 4 moves; after either the units in the way
     /// go to the unit AI at once (notify 0x215). A motion step that gives up fails it
-    /// (`set_state(13)`: only a human player's villager waits). Its code: 1 once it ended at the
-    /// point, 3 once it failed, 1 without one ("There is no list"), else 0.
+    /// (`set_state(13)`: only a human player's villager waits). Its code: [`SubCode::Done`] once
+    /// it ended at the point or without one ("There is no list"), [`SubCode::Failed`] once it
+    /// failed, else [`SubCode::UnderWay`].
     ///
     /// # Errors
     ///
@@ -496,9 +497,9 @@ impl TransportAction {
         c: &mut Step<'_>,
         unit: &mut Unit,
         me: Me,
-    ) -> Result<UpdateCode, GenieError> {
+    ) -> Result<SubCode, GenieError> {
         let Some(state) = self.state.move_to().map(|m| m.state) else {
-            return Ok(UpdateCode::Done);
+            return Ok(SubCode::Done);
         };
         let start = state == MoveTo::Start;
         let walks = start || state == MoveTo::Moving;

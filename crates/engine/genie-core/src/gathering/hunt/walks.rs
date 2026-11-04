@@ -6,19 +6,13 @@ use crate::gathering::gather::Walks;
 use crate::gathering::hunt::{HuntAction, HuntReads};
 use crate::map::Distance;
 use crate::movement::move_to::{GiveUp, MoveTo, MoveToAction, SpriteReads, TargetMoved, WalkTo};
-use crate::movement::move_to::{ListUpdate, update_sub_actions};
+use crate::movement::move_to::{ListUpdate, SubCode, update_sub_actions};
 use crate::movement::{Me, Mover};
 use crate::objects::ActionState;
 use crate::objects::Graphics;
-use crate::objects::UpdateCode;
 use crate::objects::unit::Unit;
 use crate::world::layer::generated::MoveToTuning;
 use crate::world::step::Step;
-
-/// A sub-action list's code that a quiet `MoveTo` does not give: 4 is its target let go when it
-/// is not quiet, and no code is above 5.
-pub(super) const QUIET_CODE: GenieError =
-    GenieError::unreachable("a quiet sub-action MoveTo's code that only a loud one gives");
 
 impl HuntReads {
     /// What the `MoveTo`s the update makes read of `unit` with its mover, with the sprites'
@@ -101,7 +95,7 @@ impl HuntAction {
         unit: &mut Unit,
         mut me: Me,
         gives_up: GiveUp,
-    ) -> Result<UpdateCode, GenieError> {
+    ) -> Result<SubCode, GenieError> {
         me.action_state = ActionState::new(self.state.get());
         let state = self.state.move_to().map(|m| m.state);
         let how = ListUpdate {

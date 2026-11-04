@@ -59,7 +59,7 @@ pub struct MoveToAction {
     /// `+0x60` ([`Voice`]). An action makes its sub-action `MoveTo` quiet (`FUN_140a7a170`
     /// with 1): its `set_state` 1, 13 and 14 show no standing sprite (`0x140aa29e0`), and its
     /// update posts no notify 0x1fa, 0x1f9 or 0x1fb (`0x140aa2a70`). A `MoveTo` of its own is
-    /// loud. The save does not hold it: the import takes its maker's.
+    /// loud. The save holds it (the action's load `FUN_140a7a2f0`).
     pub(crate) voice: Voice,
     /// `+0x61`: what it does when its target object left its point ([`TargetMoved`]); 0
     /// ([`TargetMoved::Follows`]) from its constructors (`FUN_140a73e90`), which an Enter sets

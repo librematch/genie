@@ -9,11 +9,11 @@ use crate::movement::PathAsk;
 use crate::movement::Speed;
 use crate::movement::move_to::Patience;
 use crate::movement::move_to::{
-    Follow, MoveTo, MoveToAction, MoveWait, Shown, TargetMoved, Walk, ask_walk, walk_or_give_up,
+    Follow, MoveTo, MoveToAction, MoveWait, Shown, SubCode, TargetMoved, Walk, ask_walk,
+    walk_or_give_up,
 };
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
-use crate::objects::UpdateCode;
 use crate::objects::Voice;
 use crate::objects::sprite::Graphic;
 use crate::unit_ai::NotifyKind;
@@ -23,7 +23,8 @@ use crate::world::Seconds;
 use crate::world::layer::generated::MoveToTuning;
 
 /// A sub-action `MoveTo` that is not quiet letting its target go: its release (slot 0x180) would
-/// be its owner's, and no owner makes one.
+/// be its owner's. No owner makes one (`FUN_140aa0df0` with `+0x60` 1, or the quiet setter
+/// `FUN_140a7a170` with 1), and the import refuses a saved one.
 const SUB_RELEASE: GenieError =
     GenieError::unreachable("a sub-action MoveTo that is not quiet letting its target go");
 
@@ -114,15 +115,15 @@ impl MoveToAction {
         target_state: Option<ObjectState>,
         shown: Option<Shown<'_>>,
         inbox: &mut Inbox<'_>,
-    ) -> Result<UpdateCode, GenieError> {
+    ) -> Result<SubCode, GenieError> {
         let target = self.target;
-        if let Some(code) = self.check_held(target_state, inbox)? {
+        if self.check_held(target_state, inbox)?.is_some() {
             // no owner makes a sub-action MoveTo to an object that is not quiet, which would
-            // owe its target the release (FUN_140a7a230)
+            // owe its target the release (FUN_140a7a230), and the import refuses a saved one
             if self.voice.is_loud() {
                 return Err(SUB_RELEASE.with("target", ObjectId::field(target)));
             }
-            return Ok(code);
+            return Ok(SubCode::TargetGone);
         }
         let GiveUp { patience, stance } = gives_up;
         Ok(match self.state {
@@ -135,11 +136,11 @@ impl MoveToAction {
                     self.point = point;
                 }
                 self.state = started.unwrap_or_else(|| self.wait.give_up(patience, stance));
-                UpdateCode::UnderWay
+                SubCode::UnderWay
             }
             MoveTo::Moving => {
                 match self.check_target(walk)? {
-                    Follow::Again => return Ok(UpdateCode::UnderWay),
+                    Follow::Again => return Ok(SubCode::UnderWay),
                     Follow::Blocked => inbox.post(NotifyKind::TARGET_MOVED, [0, 0, 0])?,
                     Follow::Stays | Follow::PathEnd(_) => {}
                 }
@@ -148,7 +149,7 @@ impl MoveToAction {
                     Some(other) => self.state = other,
                     None => self.state = self.wait.give_up(patience, stance),
                 }
-                UpdateCode::UnderWay
+                SubCode::UnderWay
             }
             MoveTo::Waiting => {
                 self.wait.timer += walk.dt;
@@ -156,15 +157,15 @@ impl MoveToAction {
                     self.wait.timer = Seconds::ZERO;
                     self.state = MoveTo::Start;
                 }
-                UpdateCode::UnderWay
+                SubCode::UnderWay
             }
             MoveTo::Failed => {
                 self.post_end(inbox, NotifyKind::ACTION_FAILED)?;
-                UpdateCode::Failed
+                SubCode::Failed
             }
             MoveTo::Arrived => {
                 self.post_end(inbox, NotifyKind::ACTION_COMPLETED)?;
-                UpdateCode::Done
+                SubCode::Done
             }
         })
     }

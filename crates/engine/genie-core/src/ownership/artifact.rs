@@ -13,7 +13,7 @@ use crate::map::Distance;
 use crate::map::Position;
 use crate::movement::Me;
 use crate::movement::move_to::TargetMoved;
-use crate::movement::move_to::{ListUpdate, update_sub_actions};
+use crate::movement::move_to::{ListUpdate, SubCode, update_sub_actions};
 use crate::movement::move_to::{MoveTo, MoveToAction, MoveToReads, WalkTo};
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
@@ -413,9 +413,9 @@ impl Artifact {
                         &mut c.w.parts.unit_ai,
                     )?;
                 }
-                // its target let go (4, 5): it ends now, as at 1 to 3, its notify posted by the
-                // check
-                if !matches!(code.get(), 4 | 5) {
+                // its target let go (5; the game's 4 too, which only a loud MoveTo gives): it
+                // ends now, as at 1 and 3, its notify posted by the check
+                if code != SubCode::TargetGone {
                     return Ok(());
                 }
                 None

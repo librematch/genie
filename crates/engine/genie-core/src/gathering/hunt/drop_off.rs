@@ -7,7 +7,6 @@ use crate::gathering::DropSiteId;
 use crate::gathering::HuntTargetId;
 use crate::gathering::gather::Walks;
 use crate::gathering::hunt::HuntState;
-use crate::gathering::hunt::walks::QUIET_CODE;
 use crate::gathering::hunt::{
     DropOff, HuntAction, Lead, PointWalker, asked_drop_off, resource_kind,
 };
@@ -18,6 +17,7 @@ use crate::math::rng::Stream;
 use crate::movement::Speed;
 use crate::movement::move_to::GiveUp;
 use crate::movement::move_to::Patience;
+use crate::movement::move_to::SubCode;
 use crate::movement::move_to::WalkTo;
 use crate::movement::{Me, Mover};
 use crate::objects::layers::Action;
@@ -127,16 +127,15 @@ impl HuntAction {
             },
             stance: who.stance,
         };
-        match self.update_list(c, unit, me, gives_up)?.get() {
-            0 => return Ok(Dropped::Going),
+        match self.update_list(c, unit, me, gives_up)? {
+            SubCode::UnderWay => return Ok(Dropped::Going),
             // failed or its target let go: the hunt waits and the unit's animation stops
-            3..=5 => {
+            SubCode::Failed | SubCode::TargetGone => {
                 self.timer = DROP_WAIT;
                 set_walker_anim(c.w.parts.motion_mut(unit.id), Speed::new(0.0));
                 return Ok(Dropped::Going);
             }
-            1 | 2 => self.tear_down(c.w.parts.mover_mut(unit.id))?,
-            code => return Err(QUIET_CODE.with("code", code)),
+            SubCode::Done => self.tear_down(c.w.parts.mover_mut(unit.id))?,
         }
         let site = site.ok_or(GenieError::unsupported(
             "a drop-off whose drop site is gone",

@@ -26,6 +26,7 @@ use crate::movement::MoveAlgorithm;
 use crate::movement::MoveStart;
 use crate::movement::TurnRate;
 use crate::movement::move_to::MoveWaitState;
+use crate::movement::move_to::SubCode;
 use crate::movement::move_to::{
     GiveUp, MoveDefaults, MoveTo, MoveToAction, MoveToReads, MoveWait, SpriteReads,
 };
@@ -2937,7 +2938,7 @@ fn an_attack_move_to_starts_running_or_arrives_in_range() {
     assert_eq!(
         start(Distance::new(0.1)),
         (
-            UpdateCode::UnderWay,
+            SubCode::UnderWay,
             Some((MoveTo::Moving, MoveWaitState::AskedAgain)),
             Some(SpriteId::named(301)),
             Speed::new(1.0),
@@ -2948,7 +2949,7 @@ fn an_attack_move_to_starts_running_or_arrives_in_range() {
     assert_eq!(
         (code, move_to, shown, anim),
         (
-            UpdateCode::UnderWay,
+            SubCode::UnderWay,
             Some((MoveTo::Arrived, MoveWaitState::AskedAgain)),
             None,
             Speed::new(1.0)

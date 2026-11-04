@@ -46,6 +46,7 @@ use crate::world::load::fixtures::{
 use crate::world::load::object::OTHER_SUB_ACTION;
 use crate::world::load::object::saved_missile;
 use crate::world::load::top_actions::saved_actions;
+use crate::world::load::top_actions::{saved_move_to, saved_sub_move_to};
 use genie_save::generated::world::{
     Action, PlayerObjects, RgeAction, RgeActionAttack, RgeActionByKind, RgeActionEnter,
     RgeActionGather, RgeActionMake, RgeActionMissile, RgeActionMoveTo, RgeMissileObject, RgeObject,
@@ -124,6 +125,18 @@ fn move_to(state: u8, range: f32) -> Action {
             default_wait_time: 0.5_f32.to_bits(),
         }));
     })
+}
+
+/// `a`, a [`move_to`], quiet (`+0x60` 1): the sub-action `MoveTo` an action makes.
+fn quiet(mut a: Action) -> Action {
+    if let Some(m) = a
+        .rge_action_by_kind
+        .as_mut()
+        .and_then(|t| t.rge_action_move_to.as_mut())
+    {
+        m.rge_action.sub_action_value = 1;
+    }
+    a
 }
 
 /// `b` with the sub-action `sub` of type `kind`.
@@ -292,6 +305,42 @@ fn move_to_takes_its_state_point_range_and_wait() {
 }
 
 /// A `MoveTo`'s wait state (`+0x6c`) is 0, 1 or 2; a saved 3 fails the read.
+/// A saved `MoveTo`'s voice is the save's `+0x60` (`FUN_140a7a2f0`): 0 is loud, any other byte
+/// quiet. An action's sub-action `MoveTo` to an object that is not quiet, which the game never
+/// makes, is refused; one to a point may be loud (the Fly's, the Artifact's walk to a point).
+#[test]
+fn saved_move_to_takes_its_voice_from_the_save() {
+    let voice = |a: &Action| saved_move_to(a, None).map(|m| m.voice);
+    assert_eq!(voice(&move_to(4, 0.5)), Ok(Voice::Loud));
+    assert_eq!(voice(&quiet(move_to(4, 0.5))), Ok(Voice::Quiet));
+    let to_object = |a: Action| {
+        let mut a = a;
+        if let Some(m) = a
+            .rge_action_by_kind
+            .as_mut()
+            .and_then(|t| t.rge_action_move_to.as_mut())
+        {
+            m.rge_action.target_id = 9;
+        }
+        a
+    };
+    let loud = saved_sub_move_to(&to_object(move_to(4, 0.5)), None).unwrap_err();
+    assert_eq!(
+        (loud.kind(), loud.reason()),
+        (
+            crate::ErrorKind::InvalidInput,
+            "a saved sub-action MoveTo to an object that is not quiet"
+        )
+    );
+    let held = saved_sub_move_to(&to_object(quiet(move_to(4, 0.5))), None).unwrap();
+    assert_eq!(
+        (held.target, held.voice),
+        (Some(object_id(9)), Voice::Quiet)
+    );
+    let to_point = saved_sub_move_to(&move_to(4, 0.5), None).unwrap();
+    assert_eq!((to_point.target, to_point.voice), (None, Voice::Loud));
+}
+
 #[test]
 fn move_to_wait_state_of_none_fails() {
     let mut walk = move_to(4, 0.5);
@@ -377,7 +426,7 @@ fn an_artifact_waits_or_walks_to_its_target() {
     b.target_x = 4.0;
     let a = imported(
         ARTIFACT_KIND,
-        artifact(with_sub(b.clone(), MOVE_TO, move_to(4, 0.5))),
+        artifact(with_sub(b.clone(), MOVE_TO, quiet(move_to(4, 0.5)))),
     )
     .unwrap()
     .list
@@ -391,7 +440,7 @@ fn an_artifact_waits_or_walks_to_its_target() {
         matches!(walk.walks_to(), Goal::Point(p) if bits3(p) == bits3(Position::new(1.0, 2.0, 0.0)))
     );
     assert_eq!(walk.range.get().to_bits(), 0.5_f32.to_bits());
-    let mut to_object = move_to(4, 0.5);
+    let mut to_object = quiet(move_to(4, 0.5));
     to_object
         .rge_action_by_kind
         .as_deref_mut()
@@ -572,7 +621,11 @@ fn farms_make_takes_its_timers_and_task() {
         (1.5_f32.to_bits(), 9.0_f32.to_bits())
     );
     assert_eq!(
-        imported(MAKE, make(with_sub(base(1), MOVE_TO, move_to(4, 0.5)))).unwrap_err(),
+        imported(
+            MAKE,
+            make(with_sub(base(1), MOVE_TO, quiet(move_to(4, 0.5))))
+        )
+        .unwrap_err(),
         GenieError::unsupported("a saved Make with a sub-action")
     );
     assert_eq!(
@@ -643,7 +696,7 @@ fn build_takes_its_task_move_to_and_site() {
     b.target_id = 30;
     b.target2_id = 31;
     let objects = PlayerObjects::default();
-    let walking = with_sub(b.clone(), MOVE_TO, move_to(4, 0.75));
+    let walking = with_sub(b.clone(), MOVE_TO, quiet(move_to(4, 0.75)));
     let a = import(&acting(ActionKind::BUILD, build(walking)), &objects)
         .unwrap()
         .list
@@ -671,7 +724,7 @@ fn build_takes_its_task_move_to_and_site() {
     let mut dropping = b.clone();
     dropping.state = BuildState::Drop { move_to: None }.get();
     // the drop-off's MoveTo with the carrying sprite 12 (its `+0x58`)
-    let mut carrying = move_to(4, 0.75);
+    let mut carrying = quiet(move_to(4, 0.75));
     carrying
         .rge_action_by_kind
         .as_mut()
@@ -741,7 +794,7 @@ fn repair_takes_its_task_and_counts_its_builder() {
     b.sub_action_value = 1;
     let r = imported(
         REPAIR,
-        repair(with_sub(b.clone(), MOVE_TO, move_to(4, 0.5))),
+        repair(with_sub(b.clone(), MOVE_TO, quiet(move_to(4, 0.5)))),
     )
     .unwrap()
     .list
@@ -822,7 +875,7 @@ fn hunt_takes_its_task_lead_and_move_to() {
         hunt(with_sub(
             base(HuntState::Walk { move_to: None }.get()),
             MOVE_TO,
-            move_to(4, 0.75),
+            quiet(move_to(4, 0.75)),
         )),
     )
     .unwrap()
@@ -881,7 +934,7 @@ fn hunt_takes_its_task_lead_and_move_to() {
         GenieError::unsupported("a saved Hunt in a state the slice does not model")
     );
     // a MoveTo belongs to a walk: in any other state it is no state of the game
-    let idle = with_sub(base(HuntState::Idle.get()), MOVE_TO, move_to(4, 0.5));
+    let idle = with_sub(base(HuntState::Idle.get()), MOVE_TO, quiet(move_to(4, 0.5)));
     let stray = imported(HUNT, hunt(idle)).unwrap_err();
     assert_eq!(
         (stray.kind(), stray.reason()),
@@ -933,7 +986,7 @@ fn gather_takes_its_stops_and_move_to() {
         gather(with_sub(
             base(GatherState::Walk { move_to: None }.get()),
             MOVE_TO,
-            move_to(4, 0.75),
+            quiet(move_to(4, 0.75)),
         )),
     )
     .unwrap()
@@ -969,7 +1022,11 @@ fn gather_takes_its_stops_and_move_to() {
         GenieError::unsupported("a saved Gather in a state the slice does not model")
     );
     // a MoveTo belongs to a walk: in any other state it is no state of the game
-    let working = with_sub(base(GatherState::Work.get()), MOVE_TO, move_to(4, 0.5));
+    let working = with_sub(
+        base(GatherState::Work.get()),
+        MOVE_TO,
+        quiet(move_to(4, 0.5)),
+    );
     let stray = imported(GATHER, gather(working)).unwrap_err();
     assert_eq!(
         (stray.kind(), stray.reason()),
@@ -1000,12 +1057,15 @@ fn an_enter_takes_its_task_and_retry() {
     let walking = EnterState::Walk { move_to: None };
     let mut b = base(walking.get());
     b.short_val = 1;
-    let e = imported(ENTER, enter(with_sub(b.clone(), MOVE_TO, move_to(4, 0.5))))
-        .unwrap()
-        .list
-        .enter()
-        .copied()
-        .unwrap();
+    let e = imported(
+        ENTER,
+        enter(with_sub(b.clone(), MOVE_TO, quiet(move_to(4, 0.5)))),
+    )
+    .unwrap()
+    .list
+    .enter()
+    .copied()
+    .unwrap();
     let m = e.state.move_to().copied().unwrap();
     assert_eq!(
         (e.state.bare(), m.state, m.voice, e.task_class),
@@ -1025,7 +1085,11 @@ fn an_enter_takes_its_task_and_retry() {
         GenieError::unsupported("a saved Enter in a state the slice does not model")
     );
     // a MoveTo belongs to a walk: in any other state it is no state of the game
-    let done = with_sub(base(EnterState::Done.get()), MOVE_TO, move_to(4, 0.5));
+    let done = with_sub(
+        base(EnterState::Done.get()),
+        MOVE_TO,
+        quiet(move_to(4, 0.5)),
+    );
     let stray = imported(ENTER, enter(done)).unwrap_err();
     assert_eq!(
         (stray.kind(), stray.reason()),
@@ -1050,7 +1114,11 @@ fn transport_takes_its_base_alone() {
     let sailing = TransportState::Sail { move_to: None };
     let t = imported(
         TRANSPORT,
-        transport(with_sub(base(sailing.get()), MOVE_TO, move_to(4, 0.5))),
+        transport(with_sub(
+            base(sailing.get()),
+            MOVE_TO,
+            quiet(move_to(4, 0.5)),
+        )),
     )
     .unwrap()
     .list
@@ -1074,7 +1142,7 @@ fn transport_takes_its_base_alone() {
     // a MoveTo belongs to a sail: an idle Transport's is no state of the game
     let idle = imported(
         TRANSPORT,
-        transport(with_sub(base(2), MOVE_TO, move_to(4, 0.5))),
+        transport(with_sub(base(2), MOVE_TO, quiet(move_to(4, 0.5)))),
     )
     .unwrap_err();
     assert_eq!(
@@ -1101,7 +1169,7 @@ fn an_explore_takes_its_quiet_move_to_with_its_wait() {
         explore(with_sub(
             base(ExploreState::Walk { move_to: None }.get()),
             MOVE_TO,
-            move_to(4, 0.5),
+            quiet(move_to(4, 0.5)),
         )),
     )
     .unwrap()
@@ -1138,7 +1206,7 @@ fn an_explore_takes_its_quiet_move_to_with_its_wait() {
             explore(with_sub(
                 base(ExploreState::Wait.get()),
                 MOVE_TO,
-                move_to(4, 0.5)
+                quiet(move_to(4, 0.5))
             ))
         )
         .unwrap_err()
@@ -1190,7 +1258,7 @@ fn wait_solidify_waits_for_its_foundation() {
     assert_eq!(
         imported(
             WAIT_SOLIDIFY,
-            wait(with_sub(base(2), MOVE_TO, move_to(4, 0.5)))
+            wait(with_sub(base(2), MOVE_TO, quiet(move_to(4, 0.5))))
         )
         .unwrap_err(),
         GenieError::unsupported("a saved Wait_Solidify with a sub-action")

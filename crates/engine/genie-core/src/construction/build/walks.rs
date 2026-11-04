@@ -5,9 +5,8 @@ use crate::GenieError;
 use crate::construction::FoundationId;
 use crate::construction::build::{BuildAction, BuildReads, BuildTask, SITE_GONE};
 use crate::movement::Me;
-use crate::movement::move_to::{ListUpdate, update_sub_actions};
+use crate::movement::move_to::{ListUpdate, SubCode, update_sub_actions};
 use crate::movement::move_to::{MoveToAction, MoveToReads, TargetMoved, WalkTo};
-use crate::objects::UpdateCode;
 use crate::objects::masters::MasterTables;
 use crate::objects::unit::Unit;
 use crate::world::layer::Roles;
@@ -84,10 +83,9 @@ impl BuildAction {
     }
 
     /// The sub-action list's update (`FUN_140a992b0`: its first action's, the quiet `MoveTo`'s,
-    /// [`MoveToAction::sub_update`]) and its code: 0 while it walks or waits, 1 once it ended,
-    /// 3 once it failed, 5 once its target was let go; 1 for an empty list ("There is no
-    /// list."). Its start shows its sprite; the motion step gives up as [`BuildAction::gives_up`]
-    /// says.
+    /// [`MoveToAction::sub_update`]) and its [`SubCode`]; [`SubCode::Done`] for an empty list
+    /// ("There is no list."). Its start shows its sprite; the motion step gives up as
+    /// [`BuildAction::gives_up`] says.
     ///
     /// # Errors
     ///
@@ -99,7 +97,7 @@ impl BuildAction {
         me: Me,
         reads: &BuildReads,
         roles: &Roles,
-    ) -> Result<UpdateCode, GenieError> {
+    ) -> Result<SubCode, GenieError> {
         let how = ListUpdate {
             gives_up: Self::gives_up(c, builder, reads, roles)?,
             ..ListUpdate::default()

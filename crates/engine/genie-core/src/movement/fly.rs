@@ -12,11 +12,10 @@ use crate::map::Position;
 use crate::math::fmath::{cos, sin};
 use crate::math::rng::{Stream, Well512};
 use crate::movement::MoveState;
-use crate::movement::move_to::{ListUpdate, update_sub_actions};
+use crate::movement::move_to::{ListUpdate, SubCode, update_sub_actions};
 use crate::movement::move_to::{MoveToAction, graphic_of};
 use crate::movement::{Me, Mover};
 use crate::objects::SpriteId;
-use crate::objects::UpdateCode;
 use crate::objects::Voice;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::FlyMode;
@@ -169,7 +168,7 @@ impl Fly {
                 if let FlyState::Flying { move_to: m } = &mut self.state {
                     *m = move_to;
                 }
-                if code == UpdateCode::UnderWay {
+                if code == SubCode::UnderWay {
                     return Ok(());
                 }
                 if EPSILON < rest.get() {
