@@ -506,6 +506,8 @@ impl World {
         }
         match self.put_back(p, unit) {
             Ok(i) => Ok(i),
+            // a removal moves a stand-in with the slot it holds (`ObjectList::outs`), and none
+            // removes it
             Err(unit) => {
                 let id = unit.id;
                 let _ = self.push_live(p, *unit)?;

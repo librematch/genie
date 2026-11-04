@@ -327,6 +327,7 @@ fn an_enter_walks_to_its_building_unless_it_is_in_reach() {
     // the villager walks at 0.8
     walks_at(&mut t, v, 0.8);
     let tc = EnterTarget {
+        id: ContainerId::new(object_id(100)),
         state: ObjectState::Alive,
         allied: true,
         room: true,
@@ -474,6 +475,7 @@ fn an_enter_of_unit_without_speed_starts_failed_beyond_arrived() {
     let (mut t, v) = walk_again_world();
     walks_at(&mut t, v, 0.0);
     let tc = EnterTarget {
+        id: ContainerId::new(object_id(100)),
         state: ObjectState::Alive,
         allied: true,
         room: true,
@@ -513,6 +515,7 @@ fn transport_enter_walks_to_it_and_sends_it_where_they_meet() {
     let mut t = shore_world(Point::new(5.5, 12.5), Point::new(5.5, 30.5));
     let v = villager(&t);
     let ship = EnterTarget {
+        id: ContainerId::new(object_id(200)),
         state: ObjectState::Alive,
         allied: true,
         room: true,
@@ -848,6 +851,7 @@ fn failed_move_walks_again_once_then_waits_and_wait_walks_again() {
 /// A transport target, room for the unit, 1.0 tiles off its point on y.
 fn moved_ship(y: f32) -> EnterTarget {
     EnterTarget {
+        id: ContainerId::new(object_id(7420)),
         state: ObjectState::Alive,
         allied: true,
         room: true,
@@ -4130,7 +4134,8 @@ fn transport_unloads_inside_its_own_update() {
                 .top_action()
                 .map_or(ActionState::NO_ACTION, |a| a.state),
         };
-        let _ = unit.transport_update(actions, c, me, &roles())?;
+        let t = *actions.list.transport().unwrap();
+        let _ = unit.transport_update(t, actions, c, me, &roles())?;
         let inside = c.w.object(object_id(1000)).map(|(_, u)| u.life.inside);
         Ok((inside, actions.list.transport().map(|t| t.state)))
     });

@@ -2,6 +2,7 @@
 //! the meeting point and the reach.
 
 use crate::GenieError;
+use crate::garrison::ContainerId;
 use crate::garrison::EnterKind;
 use crate::garrison::transport::TRANSPORT;
 use crate::garrison::{EnterAction, EnterTarget, NO_SPEED, WalkStart};
@@ -480,6 +481,7 @@ pub(crate) fn enter_view(
         range,
         by_id,
     )?;
+    // the reach above read both records (`enter_reach`), and nothing between removes one
     let placed = |id: ObjectId| {
         spatial.get(id).ok_or_else(|| {
             GenieError::unreachable("an Enter's unit or target unplaced after its reach")
@@ -490,6 +492,7 @@ pub(crate) fn enter_view(
     let gap = footprint_gap(me.position, me.radius, them.position, them.radius);
     Ok((
         EnterTarget {
+            id: ContainerId::new(t.id),
             state: t.life.state,
             allied: true,
             room,

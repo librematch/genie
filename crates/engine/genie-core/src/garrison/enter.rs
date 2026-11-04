@@ -318,6 +318,8 @@ impl World {
         action: EnterAction,
     ) -> Result<(), GenieError> {
         let by = self.releaser(player, idx)?;
+        // `EnterSlot::under` read the Artifact on top before the task search, which takes no
+        // action of the unit
         let art =
             self.parts
                 .actions

@@ -195,6 +195,7 @@ pub(crate) fn in_zone(
     let Some(m) = zone_map else {
         return Ok(false);
     };
+    // the adjacency table covers its zones, and `adjacent` answers false for a zone past them
     m.adjacent(
         ZoneId::new(u16::from(low)),
         ZoneId::new(u16::from(zone.byte())),

@@ -2,7 +2,7 @@
 
 use crate::GenieError;
 use crate::combat::abilities::Look;
-use crate::garrison::transport::{MapShore, NO_TRANSPORT, Ship, TransportAction, TransportReads};
+use crate::garrison::transport::{MapShore, Ship, TransportAction, TransportReads};
 use crate::map::Position;
 use crate::map::spatial::Spatial;
 use crate::math::rng::Well512;
@@ -23,17 +23,17 @@ use genie_model::model::Model;
 
 impl Unit {
     /// The Transport's update ([`crate::garrison::transport::TransportAction::update`] on the
-    /// step, the action copied out of its list and written back after): what it reads of the
-    /// unit's master ([`crate::garrison::transport::TransportReads`]: the sprite its `MoveTo`'s
-    /// start shows, `FUN_140aa0d30`'s default for none); its code, whose 1 or 3 deletes it.
+    /// step): `t`, the head's copy, runs and is written back after. What it reads of the unit's
+    /// master ([`crate::garrison::transport::TransportReads`]: the sprite its `MoveTo`'s start
+    /// shows, `FUN_140aa0d30`'s default for none); its code, whose 1 or 3 deletes it.
     pub(crate) fn transport_update(
         &mut self,
+        mut t: TransportAction,
         actions: &mut Action,
         c: &mut Step<'_>,
         me: Me,
         roles: &Roles,
     ) -> Result<HeadCode, GenieError> {
-        let mut t = *actions.list.transport().ok_or(NO_TRANSPORT)?;
         let master = object_master(
             c.w.parts.own_master.get(self.id),
             (self.id, self.life.master_id),
@@ -64,10 +64,11 @@ impl Unit {
 
     /// The Transport's slot 8 on a move to `point` ([`crate::garrison::transport::TransportAction::move_to`])
     /// with the map about the unit, then what its state change leaves: the unit stops (its
-    /// `MoveTo`'s teardown) and takes its standing sprite; `motion` is the unit's motion layer.
+    /// `MoveTo`'s teardown) and takes its standing sprite. `t` is the head's copy, which goes back
+    /// into `actions` after its move; `motion` is the unit's motion layer.
     pub(crate) fn transport_sail(
         &mut self,
-        actions: &mut Action,
+        (mut t, actions): (TransportAction, &mut Action),
         mut motion: MotionMut<'_>,
         point: Position,
         (spatial, zones, pathing): (&Spatial, &mut Zones, &mut Pathing),
@@ -75,17 +76,12 @@ impl Unit {
         (masters, look, sprite_rng): (OwnerMasters<'_>, Option<&Look>, &mut Well512),
     ) -> Result<(), GenieError> {
         let master = self.master_in(masters)?;
-        let task = actions
-            .list
-            .transport()
-            .ok_or(GenieError::unreachable("a sail without its Transport"))?
-            .task;
         let ship = Ship::of_unit(
             (self, motion.mover()),
             master,
             spatial.map,
             (&model.graphics, look),
-            task,
+            t.task,
             &model.roles,
         )?;
         let restriction = master.terrain_restriction;
@@ -97,17 +93,15 @@ impl Unit {
             self.position(),
             &model.tuning.tile_path,
         )?;
-        let t = actions
-            .list
-            .transport_mut()
-            .ok_or(GenieError::unreachable("a sail without its Transport"))?;
         let changed = t.move_to(
             point,
             &ship,
             &mut shore,
             &model.tuning.transport,
             &model.tuning.move_to,
-        )?;
+        );
+        actions.list.set_transport(Some(t));
+        let changed = changed?;
         if changed.stopped
             && let Some(m) = motion.mover_mut()
         {

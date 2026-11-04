@@ -306,8 +306,8 @@ impl World {
                 self.streams.get(Stream::Sprite),
             ),
         )?;
-        if sails == MoveWith::Sails {
-            self.transport_move(player, idx, m.point)?;
+        if let MoveWith::Sails(t) = sails {
+            self.transport_move((player, idx), t, m.point)?;
         }
         for id in builder_leaves {
             self.leave_builders(Some(id))?;

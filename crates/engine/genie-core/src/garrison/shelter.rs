@@ -46,9 +46,6 @@ const NO_COUNT: GenieError = GenieError::unreachable("a shelter without a count"
 const NO_LISTED_BUILDING: GenieError =
     GenieError::unreachable("a taken building outside the shelter list");
 
-/// A unit the shelter queues an order for, whose AI was tested above.
-const NO_UNIT_AI: GenieError = GenieError::unreachable("a sheltered unit without a unit AI");
-
 /// The shelters `FUN_141621220` sends units to: the buildings (its `param_3`), the transports
 /// (`param_4`), and the count list (`param_5`) its pairs index by their shelter's index, a
 /// transport's after the buildings. Its callers push the counts in their own order (the
@@ -356,6 +353,7 @@ impl World {
         let (going, first_taken) =
             assign_shelters(&pairs, units, (&all, &capacities), shelters.counts.clone())?;
         for building in unordered_map_order(first_taken) {
+            // `assign_shelters` takes its buildings from `all` alone
             let j = all
                 .iter()
                 .position(|&b| b == building)
@@ -428,7 +426,9 @@ impl World {
             {
                 continue;
             }
-            if dispatch == Dispatch::Queued && self.parts.unit_ai.contains(unit.id) {
+            if dispatch == Dispatch::Queued
+                && let Some(ai) = self.parts.unit_ai.get_mut(unit.id)
+            {
                 let state = unit.life.state;
                 let order = QueuedOrder {
                     issuer: Some(Issuer::Object(id)),
@@ -442,11 +442,6 @@ impl World {
                     ready: true,
                     target_kind: Some(OrderTargetKind::of_master(master)),
                 };
-                let ai = self
-                    .parts
-                    .unit_ai
-                    .get_mut(self.players.live(p, idx)?.id)
-                    .ok_or(NO_UNIT_AI)?;
                 let _ = ai.queue_order(state, order, Dispatch::Queued, QueueEnd::Back)?;
                 continue;
             }

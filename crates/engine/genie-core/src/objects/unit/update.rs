@@ -149,7 +149,7 @@ impl Unit {
             Some(Action::Build(_)) => self.build_part(actions, c, me),
             Some(Action::Repair(_)) => self.repair_part(actions, c, me, roles),
             Some(Action::Enter(_)) => self.enter_part(actions, c, me, roles),
-            Some(Action::Transport(_)) => self.transport_update(actions, c, me, roles),
+            Some(Action::Transport(t)) => self.transport_update(*t, actions, c, me, roles),
             Some(Action::WaitSolidify(_)) => Ok(actions.wait_solidify_part(
                 OthersRef::of(&c.w.players, &c.w.index, c.player)?,
                 &c.w.parts.building,

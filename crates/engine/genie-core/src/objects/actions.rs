@@ -259,6 +259,12 @@ impl ActionList {
         self.0.first()
     }
 
+    /// The current action (the head) to change, if any: a dispatch on its kind hands the
+    /// variant on.
+    pub fn head_mut(&mut self) -> Option<&mut Action> {
+        self.0.first_mut()
+    }
+
     /// The head leaves the list (no destructor runs; [`crate::objects::teardown`]'s deletions
     /// run it).
     pub(crate) fn pop_head(&mut self) -> Option<Action> {

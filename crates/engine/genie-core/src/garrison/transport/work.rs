@@ -4,11 +4,12 @@
 use crate::GenieError;
 use crate::garrison::transport::StartCall;
 use crate::garrison::transport::TransportTarget;
-use crate::garrison::transport::{Changed, MapShore, Ship, TRANSPORT, TransportAction};
+use crate::garrison::transport::{Changed, MapShore, Ship, TransportAction};
 use crate::map::Position;
 use crate::math::rng::Stream;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
+use crate::objects::actions::Action;
 use crate::objects::masters::{Task, TaskId};
 use crate::players::PlayerId;
 use crate::unit_ai::AiAction;
@@ -77,16 +78,15 @@ impl World {
         notifies: Notifies,
     ) -> Result<Answer, GenieError> {
         let unit = self.players.live(p, i)?;
-        let on_task = self.parts.actions_of(unit.id).top_action_kind() == Some(TRANSPORT)
-            && self
-                .parts
-                .actions_of(unit.id)
-                .list
-                .transport()
-                .copied()
-                .and_then(|t| t.task)
-                == Some(task.id);
-        if !on_task || self.trade_at_own_market((p, i), target)? {
+        // the Transport on top, on the task the work found
+        let on_task = match self.parts.actions_of(unit.id).list.head() {
+            Some(Action::Transport(t)) if t.task == Some(task.id) => Some(*t),
+            _ => None,
+        };
+        let Some(mut t) = on_task else {
+            return Ok(Answer::NotTaken);
+        };
+        if self.trade_at_own_market((p, i), target)? {
             return Ok(Answer::NotTaken);
         }
         let named = if target == Some(unit.id) {
@@ -94,15 +94,6 @@ impl World {
         } else {
             TransportTarget::Other
         };
-        let mut t = self
-            .parts
-            .actions_of(unit.id)
-            .list
-            .transport()
-            .copied()
-            .ok_or(GenieError::unreachable(
-                "a Transport on top without its action",
-            ))?;
         let move_to_tuning = self.model.tuning.move_to;
         let transport_tuning = self.model.tuning.transport;
         let changed = self.with_shore(p, i, t.task, |ship, shore| {

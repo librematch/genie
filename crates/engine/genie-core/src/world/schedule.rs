@@ -147,7 +147,7 @@ struct UpdateRun<'a> {
     seed: u32,
 }
 
-/// A player without a time slot in the world.
+/// A player without a time slot in the world: `World::new` takes one per player from the save.
 const NO_CLOCK: GenieError = GenieError::unreachable("a player without a time slot");
 
 impl World {

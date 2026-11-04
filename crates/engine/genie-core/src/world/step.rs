@@ -158,8 +158,21 @@ impl Step<'_> {
     /// a routine that reached the stand-in AI.
     pub(crate) fn lend<R>(
         &mut self,
-        (me, actions): (&mut Unit, &mut Action),
+        me: (&mut Unit, &mut Action),
         f: impl FnOnce(&mut World) -> Result<R, GenieError>,
+    ) -> Result<R, GenieError> {
+        self.lend_to(me, |w, _| f(w))
+    }
+
+    /// [`Step::lend`], `f` given the slot the object went back to.
+    ///
+    /// # Errors
+    ///
+    /// As [`Step::lend`]'s.
+    fn lend_to<R>(
+        &mut self,
+        (me, actions): (&mut Unit, &mut Action),
+        f: impl FnOnce(&mut World, ListIndex) -> Result<R, GenieError>,
     ) -> Result<R, GenieError> {
         let p = self.player;
         // while the unit AI's side runs, its AI is out of the unit: a stand-in holds its place,
@@ -170,7 +183,9 @@ impl Step<'_> {
         }
         let lent = replace(me, Unit::taken_out());
         self.w.parts.put_actions(self.me, take(actions));
-        let answer = self.w.put_back_own(p, lent).and_then(|_| f(self.w));
+        let answer = self.w.put_back_own(p, lent).and_then(|i| f(self.w, i));
+        // `f` may move the lent object's slot (another's removal), and no routine run on a
+        // lent object removes it (a gate's toggle, an unload, a group's leave)
         let i = self.w.live_index(p, self.me).ok_or_else(|| {
             GenieError::unreachable("a lent object left its list").with("object", self.me)
         })?;
@@ -202,13 +217,8 @@ impl Step<'_> {
         me: (&mut Unit, &mut Action),
         f: impl FnOnce(&mut World, PlayerId, ListIndex) -> Result<R, GenieError>,
     ) -> Result<R, GenieError> {
-        let (p, id) = (self.player, self.me);
-        self.lend(me, |w| {
-            let i = w.live_index(p, id).ok_or_else(|| {
-                GenieError::unreachable("a lent object left its list").with("object", id)
-            })?;
-            f(w, p, i)
-        })
+        let p = self.player;
+        self.lend_to(me, |w, i| f(w, p, i))
     }
 
     /// A notify for the updating unit `me`'s own AI from a call of the step (an Enter's own

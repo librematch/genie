@@ -10,7 +10,6 @@ use crate::movement::Speed;
 use crate::movement::move_to::Patience;
 use crate::objects::ObjectId;
 use crate::objects::layers::MotionMut;
-use crate::objects::masters::ActionKind;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::sprite::Cargo;
@@ -29,24 +28,16 @@ use crate::objects::release::Releaser;
 use crate::objects::unit::Unit;
 
 use crate::combat::abilities::Look;
-use crate::combat::attack::ATTACK;
-use crate::combat::missile::MISSILE;
-use crate::construction::repair::REPAIR;
-use crate::construction::wait_solidify::WAIT_SOLIDIFY;
-use crate::garrison::ENTER;
-use crate::garrison::transport::TRANSPORT;
-use crate::gathering::gather::GATHER;
-use crate::gathering::hunt::HUNT;
-use crate::gathering::make::MAKE;
+use crate::construction::repair::RepairAction;
+use crate::garrison::transport::TransportAction;
 use crate::gathering::{GatherTargetId, HuntTargetId};
-use crate::movement::explore::EXPLORE;
-use crate::movement::fly::FLY;
 use crate::movement::move_to::{MOVE_TO, TARGET_LACKING, holds_object, object_range};
+use crate::objects::actions::Action as ActionsAction;
 use crate::objects::layers::Action;
 use crate::objects::masters::OwnerMasters;
 use crate::objects::sprite::new_sprite;
 use crate::objects::{Graphics, ObjectState};
-use crate::ownership::artifact::{ARTIFACT_KIND, SubActionsGone};
+use crate::ownership::artifact::SubActionsGone;
 use crate::unit_ai::AiMove;
 use crate::unit_ai::UnitStance;
 use crate::world::layer::ClassRoles;
@@ -112,10 +103,10 @@ impl Unit {
             ),
         )?;
         torn_down(c, self, (leaves, releases))?;
-        if sails == MoveWith::Sails {
+        if let MoveWith::Sails(t) = sails {
             let sprite_rng = c.w.streams.get(Stream::Sprite);
             self.transport_sail(
-                actions,
+                (t, actions),
                 c.w.parts.motion.layer_mut(self.id),
                 m.point,
                 (&c.w.spatial, &mut c.w.zones, &mut c.w.pathing),
@@ -202,7 +193,7 @@ impl Unit {
                 }
                 return Ok(MoveWith::Walks);
             }
-            PointMove::Sails => return Ok(MoveWith::Sails),
+            PointMove::Sails(t) => return Ok(MoveWith::Sails(t)),
             PointMove::Declined => {}
         }
         self.clear_own_actions(actions, motion.reborrow(), releases, builder_leaves, by)?;
@@ -257,20 +248,20 @@ impl Unit {
                 "slot 0x40 of an action the slice does not hold",
             ));
         }
-        match actions.top_action_kind() {
+        match actions.list.head_mut() {
             None
             | Some(
-                MOVE_TO
-                | EXPLORE
-                | ActionKind::BUILD
-                | ATTACK
-                | ENTER
-                | FLY
-                | MISSILE
-                | MAKE
-                | WAIT_SOLIDIFY,
+                ActionsAction::MoveTo(_)
+                | ActionsAction::Explore(_)
+                | ActionsAction::Build(_)
+                | ActionsAction::Attack(_)
+                | ActionsAction::Enter(_)
+                | ActionsAction::Fly(_)
+                | ActionsAction::Missile(_)
+                | ActionsAction::Make(_)
+                | ActionsAction::WaitSolidify(_),
             ) => Ok(PointMove::Declined),
-            Some(ARTIFACT_KIND) => {
+            Some(ActionsAction::Artifact(_)) => {
                 let sprites = self.point_sprites(sprites)?;
                 self.artifact_takes_point(
                     actions,
@@ -280,7 +271,7 @@ impl Unit {
                     move_to_tuning,
                 )
             }
-            Some(HUNT) => {
+            Some(ActionsAction::Hunt(_)) => {
                 let sprites = self.point_sprites(sprites)?;
                 self.hunt_takes_point(
                     actions,
@@ -291,7 +282,7 @@ impl Unit {
                     move_to_tuning,
                 )
             }
-            Some(GATHER) => {
+            Some(ActionsAction::Gather(_)) => {
                 let sprites = self.point_sprites(sprites)?;
                 self.gather_takes_point(
                     actions,
@@ -303,20 +294,23 @@ impl Unit {
                 )
             }
             // the Transport's (0x140aa3e40): the caller sails it there
-            Some(TRANSPORT) => Ok(PointMove::Sails),
-            Some(REPAIR) => {
+            Some(ActionsAction::Transport(t)) => Ok(PointMove::Sails(*t)),
+            // the Repair's (FUN_140ad9700): its point, slot 0x68 with none, set_state(11)
+            Some(ActionsAction::Repair(repair)) => {
                 let move_reads = MoveToReads::of(
                     (self, motion.mover()),
                     self.master_in(masters)?,
                     (graphics, look),
                     roles,
                 );
-                actions.repair_takes_point(motion.mover_mut(), point, &move_reads, move_to_tuning)
+                repair_takes_point(
+                    repair,
+                    motion.mover_mut(),
+                    point,
+                    &move_reads,
+                    move_to_tuning,
+                )
             }
-            Some(other) => Err(GenieError::unreachable(
-                "a top action of a type top_action never holds",
-            )
-            .with("type", other)),
         }
     }
 
@@ -555,18 +549,37 @@ impl Unit {
     }
 }
 
+/// The Repair's slot 0x40 (`FUN_140ad9700`, [`RepairAction::take_point`]): its point, slot 0x68
+/// with none, `set_state(11)`, whose `MoveTo` reads `move_reads`. Returns the target let go and
+/// the one whose repairers it leaves.
+///
+/// # Errors
+///
+/// The point's walk.
+fn repair_takes_point(
+    repair: &mut RepairAction,
+    mover: Option<&mut Mover>,
+    point: Position,
+    move_reads: &MoveToReads<'_>,
+    move_to_tuning: &MoveToTuning,
+) -> Result<PointMove, GenieError> {
+    let (old, counted) = repair.take_point(point, mover, move_reads, move_to_tuning)?;
+    Ok(PointMove::Repairs(old, old.filter(|_| counted)))
+}
+
 /// Whether the unit AI's move goes by sea or on foot ([`Unit::ai_move_with`]).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 #[must_use]
 pub(crate) enum MoveWith {
-    /// A Transport on top takes the point: the caller sails there.
-    Sails,
+    /// A Transport on top takes the point: the caller sails there with this copy of it
+    /// ([`Unit::transport_sail`]).
+    Sails(TransportAction),
     /// The unit moves itself, or nothing moves.
     Walks,
 }
 
 /// What the head action's slot 0x40 did with a move to a point ([`Unit::head_takes_point`]).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) enum PointMove {
     /// It answered 0 (an empty list, the base slot, a Hunt whose task has a work range): the
     /// caller's `MoveTo` replaces the actions.
@@ -578,28 +591,6 @@ pub(crate) enum PointMove {
     /// the target whose repairers a counted repairer left ([`crate::world::World::leave_builders`]).
     Repairs(Option<ObjectId>, Option<ObjectId>),
     /// The Transport answers 1 (`0x140aa3e40`): it sails to the point, which the caller runs
-    /// with the map ([`Unit::transport_sail`]).
-    Sails,
-}
-
-impl Action {
-    /// The Repair's slot 0x40 (`FUN_140ad9700`, [`RepairAction::take_point`]): its point, slot
-    /// 0x68 with none, `set_state(11)`, whose `MoveTo` reads `move_reads`. Returns
-    /// the target let go and the one whose repairers it leaves.
-    ///
-    /// [`RepairAction::take_point`]: crate::construction::repair::RepairAction::take_point
-    fn repair_takes_point(
-        &mut self,
-        mover: Option<&mut Mover>,
-        point: Position,
-        move_reads: &MoveToReads<'_>,
-        move_to_tuning: &MoveToTuning,
-    ) -> Result<PointMove, GenieError> {
-        let repair = self
-            .list
-            .repair_mut()
-            .ok_or(GenieError::unreachable("a Repair head without its Repair"))?;
-        let (old, counted) = repair.take_point(point, mover, move_reads, move_to_tuning)?;
-        Ok(PointMove::Repairs(old, old.filter(|_| counted)))
-    }
+    /// with the map on this copy of it ([`Unit::transport_sail`]).
+    Sails(TransportAction),
 }

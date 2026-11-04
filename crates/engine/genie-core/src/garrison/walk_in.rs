@@ -101,6 +101,8 @@ pub enum EnterKind {
 /// What an Enter's update reads of its target.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct EnterTarget {
+    /// Its id, the Enter's target that the reads found.
+    pub(crate) id: ContainerId,
     /// Its state (`+0x640`).
     pub(crate) state: ObjectState,
     /// The unit's player counts its player as allied (`FUN_141663dc0`), or it is Gaia's.
@@ -405,7 +407,7 @@ impl EnterAction {
             1 | 2 if entered => self.on_unit(unit, actions, |unit, actions| {
                 unit.entered_again(actions, c)
             }),
-            1 | 2 if t.in_reach => self.enter_at_once(actions, c, unit, roles),
+            1 | 2 if t.in_reach => self.enter_at_once((actions, c, unit), t.id, roles),
             // a failed MoveTo is none a walk again made in this update
             3 if self.retry => {
                 self.retry = false;
@@ -504,6 +506,8 @@ impl EnterAction {
         }
         let walking = {
             let w = &mut *c.w;
+            // the update's reads found it (`held_target`), and the Enter's own update removes
+            // no other object
             let (tp, target) = OthersRef::of(&w.players, &w.index, c.player)?
                 .find(self.target)
                 .ok_or(GenieError::unreachable(
@@ -545,7 +549,7 @@ impl EnterAction {
         };
         match walking {
             Walking::Enter => {
-                self.enter_at_once(actions, c, unit, roles)?;
+                self.enter_at_once((actions, c, unit), t.id, roles)?;
                 return Ok(EnterAgain::Entered);
             }
             Walking::Walk(Some(at)) => {
@@ -561,21 +565,19 @@ impl EnterAction {
         Ok(EnterAgain::Walks)
     }
 
-    /// The enter at once (`FUN_140a867b0` into the target, then `set_state(1)`:
-    /// [`Unit::enter_in_update`]) on the unit's Enter: this copy written back first and read back
-    /// after ([`EnterAction::on_unit`]).
+    /// The enter at once (`FUN_140a867b0` into `target`, the one the update's reads held, then
+    /// `set_state(1)`: [`Unit::enter_in_update`]) on the unit's Enter: this copy written back
+    /// first and read back after ([`EnterAction::on_unit`]).
     ///
     /// # Errors
     ///
     /// The enter's.
     fn enter_at_once(
         &mut self,
-        actions: &mut Action,
-        c: &mut Step<'_>,
-        unit: &mut Unit,
+        (actions, c, unit): (&mut Action, &mut Step<'_>, &mut Unit),
+        target: ContainerId,
         roles: &Roles,
     ) -> Result<(), GenieError> {
-        let target = self.target;
         self.on_unit(unit, actions, |unit, actions| {
             unit.enter_in_update(actions, c, target, roles)
         })
@@ -596,6 +598,8 @@ impl EnterAction {
     ) -> Result<R, GenieError> {
         actions.list.set_enter(Some(*self));
         let answer = f(unit, actions);
+        // the routines run here (the enter, `entered_again`, the transport's move) change the
+        // Enter's state, and none takes it from the list
         *self = *actions
             .list
             .enter()

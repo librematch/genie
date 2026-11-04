@@ -275,20 +275,14 @@ static NO_BUILDING: Building = Building::NONE;
 ///
 /// # Errors
 ///
-/// None (an unreachable error where a table lost the part it took).
+/// None (an unreachable error where the combat table lost the part it took).
 pub(in crate::world) fn repairers_in<'a>(
     buildings: &'a mut PartTable<Building>,
     combats: &'a mut PartTable<Combat>,
     id: ObjectId,
 ) -> Result<&'a mut BuilderCount, GenieError> {
-    if buildings.get(id).is_some_and(|b| b.construction.is_some()) {
-        return buildings
-            .get_mut(id)
-            .and_then(|b| b.construction.as_mut())
-            .map(|k| &mut k.builders)
-            .ok_or_else(|| {
-                GenieError::unreachable("a construction the table just held").with("object", id)
-            });
+    if let Some(k) = buildings.get_mut(id).and_then(|b| b.construction.as_mut()) {
+        return Ok(&mut k.builders);
     }
     Ok(&mut combats.get_or_insert_with(id, Combat::default)?.builders)
 }
@@ -626,8 +620,7 @@ impl World {
         }
         self.parts
             .production
-            .get_mut(id)
-            .ok_or(GenieError::unreachable("a production the world just filed"))
+            .get_or_insert_with(id, Production::default)
     }
 
     /// A loaded object's saved parts go into the tables (the import, after the world's lists

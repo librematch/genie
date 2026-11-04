@@ -85,6 +85,8 @@ impl World {
             }
             // the object it is inside, and that object's type
             let container = match unit.life.inside {
+                // a container lets its units out before it leaves the world (its death's
+                // ungarrison)
                 Some(c) => {
                     let (cp, cu) = self.object(c).ok_or(GenieError::unreachable(
                         "a unit inside an object the world does not hold",
@@ -140,6 +142,7 @@ impl World {
         id: ObjectId,
         point: Point,
     ) -> Result<(), GenieError> {
+        // only static objects sleep, and a building that holds units is none
         let Some(Place::Live(cp, ci)) = self.place(c) else {
             return Err(GenieError::unreachable(
                 "a building that holds units outside the live lists",
@@ -255,6 +258,7 @@ impl World {
             return Ok(());
         }
         let made = unit.master(self.master_tables(), ip)?.clone();
+        // only static objects sleep, and a transport that holds units is none
         let Some(Place::Live(hp, hi)) = self.place(holder) else {
             return Err(GenieError::unreachable(
                 "a transport that holds units outside the live lists",

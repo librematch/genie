@@ -1,15 +1,6 @@
 //! FOLLOW and GUARD, a move to an object and the head action's move.
 
 use crate::GenieError;
-use crate::combat::attack::ATTACK;
-use crate::combat::missile::MISSILE;
-use crate::construction::repair::REPAIR;
-use crate::construction::wait_solidify::WAIT_SOLIDIFY;
-use crate::garrison::ENTER;
-use crate::garrison::transport::TRANSPORT;
-use crate::gathering::gather::GATHER;
-use crate::gathering::hunt::HUNT;
-use crate::gathering::make::MAKE;
 use crate::groups::LeavingWalk;
 use crate::map::Distance;
 use crate::map::Point;
@@ -19,15 +10,13 @@ use crate::math::rng::Stream;
 use crate::movement::Speed;
 use crate::movement::ai_moves::MoveSprites;
 use crate::movement::ai_moves::PointMove;
-use crate::movement::explore::EXPLORE;
-use crate::movement::fly::FLY;
 use crate::movement::move_to::{
-    MOVE_TO, MoveToAction, TARGET_LACKING, holds_object, object_range, object_sprite,
+    MoveToAction, TARGET_LACKING, holds_object, object_range, object_sprite,
 };
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
-use crate::objects::masters::ActionKind;
+use crate::objects::actions::Action;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::OwnerMasters;
 use crate::objects::masters::PlayersMasters;
@@ -36,7 +25,6 @@ use crate::orders::Kept;
 use crate::orders::OrderSource;
 use crate::orders::town_bell::BellShelter;
 use crate::orders::{Followed, follow_axis, follow_spread, ignore_unit};
-use crate::ownership::artifact::ARTIFACT_KIND;
 use crate::players::PlayerId;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::AiLayer;
@@ -519,32 +507,28 @@ impl World {
                 "slot 0x40 of an action the slice does not hold",
             ));
         }
-        match self.parts.actions_of(unit.id).top_action_kind() {
+        match self.parts.actions_of(unit.id).list.head() {
             None
             | Some(
-                MOVE_TO
-                | EXPLORE
-                | ActionKind::BUILD
-                | ATTACK
-                | ENTER
-                | FLY
-                | MISSILE
-                | MAKE
-                | WAIT_SOLIDIFY,
+                Action::MoveTo(_)
+                | Action::Explore(_)
+                | Action::Build(_)
+                | Action::Attack(_)
+                | Action::Enter(_)
+                | Action::Fly(_)
+                | Action::Missile(_)
+                | Action::Make(_)
+                | Action::WaitSolidify(_),
             ) => Ok(Answer::NotTaken),
-            Some(ARTIFACT_KIND) => {
+            Some(Action::Artifact(_)) => {
                 self.artifact_take_object(player, idx, target)?;
                 Ok(Answer::Taken)
             }
-            Some(HUNT) => self.hunt_take_move(player, idx, target, point),
-            Some(GATHER) => self.gather_take_move(player, idx, target, point),
+            Some(Action::Hunt(_)) => self.hunt_take_move(player, idx, target, point),
+            Some(Action::Gather(_)) => self.gather_take_move(player, idx, target, point),
             // the Repair's slot 0x40 (FUN_140ad9700) walks to the point whatever the target, and
             // the Transport's (0x140aa3e40) sails there
-            Some(REPAIR | TRANSPORT) => self.point_taken(player, idx, point),
-            Some(other) => Err(GenieError::unreachable(
-                "a top action of a type that top_action never holds",
-            )
-            .with("type", other)),
+            Some(Action::Repair(_) | Action::Transport(_)) => self.point_taken(player, idx, point),
         }
     }
 
@@ -575,8 +559,8 @@ impl World {
             PointMove::Declined => return Ok(Answer::NotTaken),
             PointMove::Taken(released) => (released, None),
             PointMove::Repairs(released, left) => (released, left),
-            PointMove::Sails => {
-                self.transport_move(player, idx, point)?;
+            PointMove::Sails(t) => {
+                self.transport_move((player, idx), t, point)?;
                 return Ok(Answer::Taken);
             }
         };

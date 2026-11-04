@@ -23,16 +23,16 @@ impl World {
     /// `Step`, which holds the world (FD-045-D28; the objects it makes join the list at their
     /// making). It goes back to the slot its stand-in holds then ([`World::put_back_own`]), its
     /// layer to the table. Returns `f`'s result (an error of the put-back, then of the sight's
-    /// registry first).
+    /// registry first): its outcome and its answer `R`.
     ///
     /// [`Parts::take_actions`]: crate::world::parts::Parts::take_actions
     #[allow(clippy::too_many_lines)]
-    pub(super) fn run_object(
+    pub(super) fn run_object<R>(
         &mut self,
         (p, i): (PlayerId, ListIndex),
         (dt, turn): (Millis, Option<Millis>),
-        f: impl FnOnce(&mut Unit, &mut Action, &mut Step<'_>) -> Result<Outcome, GenieError>,
-    ) -> Result<Outcome, GenieError> {
+        f: impl FnOnce(&mut Unit, &mut Action, &mut Step<'_>) -> Result<(Outcome, R), GenieError>,
+    ) -> Result<(Outcome, R), GenieError> {
         let mut unit = self.take_out(p, i)?;
         let mut actions = self.parts.take_actions(unit.id);
         let watch = Watch::of(&unit, &actions, self.parts.unit_ai.get(unit.id));
@@ -101,14 +101,10 @@ impl World {
         i: ListIndex,
         f: impl FnOnce(&mut Unit, &mut Action, &mut Step<'_>) -> Result<R, GenieError>,
     ) -> Result<R, GenieError> {
-        let mut answer = None;
-        let _ = self.step_object((p, i), (Millis::ZERO, None, false), |unit, actions, c| {
-            answer = Some(f(unit, actions, c)?);
-            Ok(Outcome::Stay)
-        })?;
-        answer.ok_or(GenieError::unreachable(
-            "a world routine's step without its answer",
-        ))
+        self.step_answering((p, i), (Millis::ZERO, None, false), |unit, actions, c| {
+            Ok((Outcome::Stay, f(unit, actions, c)?))
+        })
+        .map(|(_, answer)| answer)
     }
 
     /// Runs `f` on the unit AI of object `i` of player `p` for a world routine outside its update
@@ -125,14 +121,10 @@ impl World {
         (p, i): (PlayerId, ListIndex),
         f: impl FnOnce(&mut UnitAi, &mut UnitView<'_, '_>, &mut Well512) -> Result<R, GenieError>,
     ) -> Result<R, GenieError> {
-        let mut answer = None;
-        let _ = self.step_object((p, i), (Millis::ZERO, None, false), |unit, actions, c| {
-            answer = Some(unit.run_calls(actions, c, f)?);
-            Ok(Outcome::Stay)
-        })?;
-        answer.ok_or(GenieError::unreachable(
-            "a world routine's unit AI run without its answer",
-        ))
+        self.step_answering((p, i), (Millis::ZERO, None, false), |unit, actions, c| {
+            Ok((Outcome::Stay, unit.run_calls(actions, c, f)?))
+        })
+        .map(|(_, answer)| answer)
     }
 
     /// Runs `f` on the unit AI of object `i` of player `p` outside its update (a command's

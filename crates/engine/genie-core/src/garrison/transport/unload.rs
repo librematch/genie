@@ -34,7 +34,8 @@ use crate::world::slots::CheckedIndex;
 use crate::world::slots::PlayerSlots;
 use crate::world::{Player, World};
 
-/// An unloading ship whose top action is no Transport where it was read as one.
+/// An unloading ship without the Transport it was lent with: the unload runs on a ship whose
+/// Transport `TransportAction::unload` wrote back to its list before the lend.
 const NO_TRANSPORT: GenieError = GenieError::unreachable("an unloading ship without a Transport");
 
 /// The transports' parts that reach the world: the unload command's install, the unload and the
@@ -149,22 +150,22 @@ impl World {
         Ok(())
     }
 
-    /// The Transport of player `p`'s object at `i` takes a move to `point` (its slot 8,
-    /// [`crate::objects::unit::Unit::transport_sail`]).
+    /// The Transport `t` of player `p`'s object at `i`, its head's copy, takes a move to `point`
+    /// (its slot 8, [`crate::objects::unit::Unit::transport_sail`]).
     ///
     /// # Errors
     ///
     /// A map without its terrain, a unit of a master the slice does not have.
     pub(crate) fn transport_move(
         &mut self,
-        p: PlayerId,
-        i: ListIndex,
+        (p, i): (PlayerId, ListIndex),
+        t: TransportAction,
         point: Position,
     ) -> Result<(), GenieError> {
         let rng = self.streams.get(Stream::Sprite);
         let id = self.players.live(p, i)?.id;
         self.players.live_mut(p, i)?.transport_sail(
-            self.parts.actions.of_mut(id)?,
+            (t, self.parts.actions.of_mut(id)?),
             self.parts.motion.layer_mut(id),
             point,
             (&self.spatial, &mut self.zones, &mut self.pathing),
@@ -229,7 +230,7 @@ impl World {
             .list
             .transport()
             .copied()
-            .ok_or(GenieError::unreachable("an unload without its Transport"))?;
+            .ok_or(NO_TRANSPORT)?;
         let restriction = unit.master(self.master_tables(), p)?.terrain_restriction;
         let (x, y) = (t.point.x(), t.point.y());
         let zone = if x == NONE {

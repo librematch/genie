@@ -46,9 +46,9 @@ use crate::objects::masters::TaskId;
 
 /// The Transport action's type, which word 9 adds.
 pub const TRANSPORT: ActionKind = ActionKind::named(12);
-/// A Transport's update without its action in the unit's list.
+/// A ship whose Transport its unload took (the lend of [`TransportAction::unload`]).
 pub(crate) const NO_TRANSPORT: GenieError =
-    GenieError::unreachable("a Transport's update without its action");
+    GenieError::unreachable("a Transport that its own unload took");
 
 /// The action's point while it has none (`DAT_14330ec20`).
 pub const NONE: f32 = TRANSPORT_NONE;

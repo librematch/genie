@@ -185,12 +185,9 @@ impl Unit {
         &mut self,
         actions: &mut Action,
         c: &mut Step<'_>,
-        target: Option<ContainerId>,
+        target: ContainerId,
         roles: &Roles,
     ) -> Result<(), GenieError> {
-        let target = target.ok_or(GenieError::unreachable(
-            "an Enter's enter without its target",
-        ))?;
         let inside = units_inside(
             OthersRef::of(&c.w.players, &c.w.index, c.player)?,
             target.id(),
@@ -289,6 +286,7 @@ impl Unit {
         inside: usize,
         roles: &Roles,
     ) -> Result<EnterOutcome, GenieError> {
+        // the callers found it: the Enter's update in its reads, `World::enter_now` by its place
         let (tp, building) = c.w.object(target).ok_or(GenieError::unreachable(
             "an enter into a building the world does not hold",
         ))?;
@@ -437,6 +435,8 @@ impl Unit {
                 },
             )?;
         }
+        // the callers found it (`Unit::enter_building`, `World::enter_now`), and the sight's
+        // change removes no object
         let (bp, building) = c.w.object(target).ok_or(GenieError::unreachable(
             "an enter into a building the world does not hold",
         ))?;

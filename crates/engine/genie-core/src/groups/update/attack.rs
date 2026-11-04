@@ -329,10 +329,7 @@ impl World {
             disable_retargeting: g.current_target.disable_retargeting != 0,
             filter: g.current_target.certain_action,
         };
-        let id = Some(target).ok_or_else(|| {
-            GenieError::unreachable("an attack target without an id").with("group", group)
-        })?;
-        if self.command_attack(group, id, order)? == GroupMove::Begun {
+        if self.command_attack(group, target, order)? == GroupMove::Begun {
             return Ok(Some(Progress::Going));
         }
         let range = self.groups.held(group)?.current_target.range;

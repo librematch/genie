@@ -323,6 +323,7 @@ impl TransportAction {
             *own = *self;
         }
         c.lend_at((&mut *unit, &mut *actions), World::transport_unload)?;
+        // the unload changes the lent Transport (`TransportAction::unloaded`) and never takes it
         *self = *actions.list.transport().ok_or(NO_TRANSPORT)?;
         Ok(())
     }

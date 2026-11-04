@@ -10,7 +10,6 @@ use crate::groups::TransformKind;
 use crate::groups::formation::EPSILON;
 use crate::groups::formation::LineKind;
 use crate::groups::formation::SlotOrder;
-use crate::groups::group_list::NO_FORMATION;
 use crate::groups::{Formation, UnitGroup};
 use crate::map::Distance;
 use crate::map::GridSize;
@@ -189,14 +188,14 @@ impl World {
                 .as_ref()
                 .is_some_and(|f| f.kind == kind && f.slots.len() == g.members.len());
         let g = self.groups.held_mut(group)?;
-        if g.current_formation.is_none() {
-            g.current_formation = Some(Formation::new());
-        }
-        if renew {
-            g.previous_formation = g.current_formation.take();
-            g.current_formation = Some(Formation::new());
-        }
-        let mut f = g.current_formation.take().ok_or(NO_FORMATION)?;
+        // a group without a formation takes a new one; a renewal keeps the old as the previous
+        let current = g.current_formation.take().unwrap_or_else(Formation::new);
+        let mut f = if renew {
+            g.previous_formation = Some(current);
+            Formation::new()
+        } else {
+            current
+        };
         let result = match kind {
             FormationKind::Line
             | FormationKind::Staggered

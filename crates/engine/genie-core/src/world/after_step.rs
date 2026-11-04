@@ -35,19 +35,38 @@ impl World {
     /// The step's, or the first of what follows it; the object's outputs after it do not apply.
     pub(super) fn step_object(
         &mut self,
-        (p, i): (PlayerId, ListIndex),
-        (dt, turn, full): (Millis, Option<Millis>, bool),
+        at: (PlayerId, ListIndex),
+        timing: (Millis, Option<Millis>, bool),
         f: impl FnOnce(&mut Unit, &mut Action, &mut Step<'_>) -> Result<Outcome, GenieError>,
     ) -> Result<Stepped, GenieError> {
+        self.step_answering(at, timing, |unit, actions, c| {
+            f(unit, actions, c).map(|outcome| (outcome, ()))
+        })
+        .map(|(stepped, ())| stepped)
+    }
+
+    /// [`World::step_object`] with `f`'s answer `R` beside its outcome: the step and the
+    /// answer.
+    ///
+    /// # Errors
+    ///
+    /// As [`World::step_object`]'s.
+    pub(super) fn step_answering<R>(
+        &mut self,
+        (p, i): (PlayerId, ListIndex),
+        (dt, turn, full): (Millis, Option<Millis>, bool),
+        f: impl FnOnce(&mut Unit, &mut Action, &mut Step<'_>) -> Result<(Outcome, R), GenieError>,
+    ) -> Result<(Stepped, R), GenieError> {
         let id = self.players.live(p, i)?.id;
-        let outcome = self.run_object((p, i), (dt, turn), f)?;
+        let (outcome, answer) = self.run_object((p, i), (dt, turn), f)?;
         let at = (p, self.slot_of(p, id)?, id);
         self.finish_own_update(at, (dt, full), &outcome)?;
         self.hand_changed_tiles();
-        Ok(Stepped {
+        let stepped = Stepped {
             outcome,
             slot: self.slot_of(p, id)?,
-        })
+        };
+        Ok((stepped, answer))
     }
 
     /// The slot of object `id` in player `p`'s live list, after its step.
@@ -57,6 +76,8 @@ impl World {
     /// The object left the list in its own step.
     fn slot_of(&self, p: PlayerId, id: ObjectId) -> Result<ListIndex, GenieError> {
         let _ = self.players.player(p)?;
+        // the step can move the object (another's removal), and its own removal waits for
+        // `World::file_step`
         self.live_index(p, id).ok_or_else(|| {
             GenieError::unreachable("a stepped object left its list in its outcome")
                 .with("object", id)
