@@ -239,16 +239,11 @@ fn row(
         Err(error) => (BuildingLists::default(), Err(error)),
     };
     let gather_read = gather_point(object).map(|_| ());
-    // a capture flag no store of the game writes: the object's unmodelled part
-    let capture = object
-        .combat()
-        .map_or(Ok(CaptureKind::None), |tribe_combat_object| {
-            CaptureKind::try_from(tribe_combat_object.rge_combat_object.capture_flag)
-        });
-    let (capture_flag, capture_read) = match capture {
-        Ok(capture_kind) => (capture_kind, Ok(())),
-        Err(error) => (CaptureKind::None, Err(error)),
-    };
+    // a capture flag no store of the game writes: the object's unmodelled part (its seer in
+    // the sight registry holds the flag, `world::load::map`)
+    let capture_read = object.combat().map_or(Ok(()), |tribe_combat_object| {
+        CaptureKind::try_from(tribe_combat_object.rge_combat_object.capture_flag).map(|_| ())
+    });
     let (construction, construction_read) = match construction(object, rge_static_object, objects) {
         Ok(construction) => (construction, Ok(())),
         Err(error) => (None, Err(error)),
@@ -310,7 +305,6 @@ fn row(
             .map_or(WorkRate::ZERO, |tribe_combat_object| {
                 WorkRate::new(tribe_combat_object.work_rate_powerup)
             }),
-        capture_flag,
         hp_powerup: object
             .combat()
             .map_or(HpPowerup::NONE, |tribe_combat_object| HpPowerup {

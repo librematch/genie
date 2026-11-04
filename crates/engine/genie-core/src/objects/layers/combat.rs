@@ -12,7 +12,6 @@ use crate::map::Distance;
 use crate::objects::HpPowerup;
 use crate::objects::Regeneration;
 use crate::objects::WorkRate;
-use crate::ownership::CaptureKind;
 use crate::players::Amount;
 use crate::players::attribute::AttributeId;
 use crate::world::Seconds;
@@ -29,8 +28,6 @@ pub struct Combat {
     /// `mReloadWorldtime` (`+0x920`, slots 0x248 and 0x250): the world time its attack timer
     /// runs out at (`FUN_141089820`), 0 for none; once past, the volley under way is over.
     pub reload_worldtime: WorldTime,
-    /// `capture_flag` (`+0x924`).
-    pub capture_flag: CaptureKind,
     /// `+0x900`, `attack_count`: the swings that fired a missile (`FUN_141081020`); a missile's
     /// is its firing object's when fired.
     #[diff(

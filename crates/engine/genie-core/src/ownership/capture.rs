@@ -207,7 +207,6 @@ impl Unit {
             return Err(HANDS_LEFT);
         }
         let _ = self.change_owner(actions, step, new, roles)?;
-        step.world.parts.combat_mut(self.id)?.capture_flag = CaptureKind::None;
         if let Some(seer) = step
             .world
             .spatial

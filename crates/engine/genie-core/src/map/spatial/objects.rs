@@ -18,6 +18,7 @@ use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::ObstructionKind;
 use crate::objects::{ObjectId, ObjectKey};
+use crate::ownership::CaptureKind;
 use crate::pathing::tile_path::PlanRect;
 use crate::players::ByPlayer;
 use crate::players::PlayerId;
@@ -40,6 +41,16 @@ pub(super) enum KnownScope<'classes> {
 }
 
 impl Spatial {
+    /// Object `id`'s capture flag (`capture_flag`, `+0x924`), which its seer in the sight
+    /// registry holds; none for an object without one.
+    #[must_use]
+    pub fn capture_of(&self, id: impl ObjectKey) -> CaptureKind {
+        self.sight
+            .as_ref()
+            .and_then(|visibility| visibility.seer(id))
+            .map_or(CaptureKind::None, |seer| seer.capture)
+    }
+
     /// A map without terrain: every tile's class is 0.
     #[must_use]
     pub fn new(map: GridSize) -> Self {

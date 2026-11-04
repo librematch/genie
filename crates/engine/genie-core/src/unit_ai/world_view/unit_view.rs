@@ -12,7 +12,6 @@ use crate::objects::masters::MasterKind;
 use crate::objects::masters::{Master, MasterTables};
 use crate::objects::release::Releaser;
 use crate::objects::unit::Unit;
-use crate::ownership::CaptureKind;
 use crate::players::PlayerId;
 use crate::players::PlayerKind;
 use crate::unit_ai::world_view::owner_view;
@@ -177,14 +176,7 @@ impl UnitView<'_, '_> {
             .player(owner)
             .map_or(PlayerKind::Phantom, |player| player.kind)
         };
-        let capture = self
-            .step
-            .world
-            .spatial
-            .sight
-            .as_ref()
-            .and_then(|visibility| visibility.seer(helper.id))
-            .map_or(CaptureKind::None, |seer| seer.capture);
+        let capture = self.step.world.spatial.capture_of(helper.id);
         let me = helper.attacker_of(
             actions,
             ai.ai_kind,

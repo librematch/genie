@@ -12714,13 +12714,6 @@ fn gaia_archer_player_sees_goes_to_that_player() {
                 },
             ],
         )
-        .with_combats([(
-            object_id(21712),
-            Combat {
-                capture_flag: CaptureKind::BySight,
-                ..Default::default()
-            },
-        )])
         .with_ais([(object_id(21712), hands_ai(21712))])
         .with_ais(live_ais(&[500]));
         world.settings.game_mode = GameMode::of_data(mode);
@@ -12743,10 +12736,7 @@ fn gaia_archer_player_sees_goes_to_that_player() {
     let ids: Vec<ObjectId> = game.players[1].objects.iter().map(|unit| unit.id).collect();
     assert_eq!(ids, [object_id(500), object_id(21712)]);
     let archer = &game.players[1].objects[ListIndex::new(1)];
-    assert_eq!(
-        game.parts.combat_of(archer.id).capture_flag,
-        CaptureKind::None
-    );
+    assert_eq!(game.spatial.capture_of(archer.id), CaptureKind::None);
     assert_eq!(
         game.parts
             .own_master
@@ -12774,9 +12764,8 @@ fn gaia_archer_player_sees_goes_to_that_player() {
     let mut game = world(masters, false, 0);
     game.tick(Millis::new(100));
     assert_eq!(
-        game.parts
-            .combat_of(game.players[0].objects[ListIndex::new(0)].id)
-            .capture_flag,
+        game.spatial
+            .capture_of(game.players[0].objects[ListIndex::new(0)].id),
         CaptureKind::BySight
     );
     assert_eq!(

@@ -143,7 +143,7 @@ pub struct SceneObject {
     /// In the sight registry, the mask its last sight update found (`RGE_Combat_Object::update`'s,
     /// [`Visibility::combat_sight`]): the players who saw its tiles then, whose lists hold it
     /// and whose bits its entry keeps after they look away; a building with its UMV entry. None
-    /// for an object outside the registry.
+    /// for an object outside the registry (with a seer only if it holds a capture flag).
     pub(crate) seen_by: Option<VisionBits>,
     /// A foundation no builder has started: desolid, without its obstruction record.
     pub(crate) desolid: bool,
@@ -155,8 +155,7 @@ pub struct SceneObject {
     pub(crate) inside: Option<ContainerId>,
     /// Its action layer, none for an empty one.
     pub(crate) actions: Option<Action>,
-    /// Its capture flag (`+0x924`): its combat layer's and, in the sight registry, its seer's,
-    /// as a save's load fills both.
+    /// Its capture flag (`+0x924`), which its seer in the sight registry holds.
     pub(crate) capture: CaptureKind,
     /// The pasture it stands in (`+0x790`).
     pub(crate) pasture: Option<PastureId>,
@@ -728,7 +727,7 @@ fn place_object(world: &mut World, scene_object: SceneObject) {
         flags,
         inside,
         ref actions,
-        capture,
+        capture: _,
         pasture,
         sprite,
         annex_of: _,
@@ -774,13 +773,6 @@ fn place_object(world: &mut World, scene_object: SceneObject) {
     let _ = world
         .push_live(player, object)
         .expect("the object joins its player");
-    if capture != CaptureKind::None {
-        world
-            .parts
-            .combat_mut(id)
-            .expect("the object's combat layer")
-            .capture_flag = capture;
-    }
     let solid = 0.0 < master.radius.x() && 0.0 < master.radius.y() && master.is_tall();
     let placed = Placed {
         position: at,
@@ -802,8 +794,10 @@ fn place_object(world: &mut World, scene_object: SceneObject) {
     world.spatial.insert(id, placed);
     world.pathing.moved(id, &placed, MoveState::Standing);
     world.pathing.tiles_changed(world.spatial.take_changes());
-    if let Some(mask) = seen_by {
-        register(world, &scene_object, mask);
+    // the capture flag is the seer's (`+0x924`): an object that holds one has its seer, in
+    // the registry's lists or not
+    if seen_by.is_some() || scene_object.capture != CaptureKind::None {
+        register(world, &scene_object, seen_by);
     }
 }
 
@@ -853,8 +847,8 @@ fn foundation(master: &Master) -> Building {
 /// The object enters the sight registry: its seer with its capture flag, a building's sight and UMV
 /// entry ([`Visibility::link_building`]), then what its sight update writes when it finds `mask`
 /// ([`Visibility::combat_sight`]): the entry's mask and the records in the lists of the players of
-/// `mask` ([`Registry::update_unit`]).
-fn register(world: &mut World, object: &SceneObject, mask: VisionBits) {
+/// `mask` ([`Registry::update_unit`]); none for an object outside the registry's lists.
+fn register(world: &mut World, object: &SceneObject, mask: Option<VisionBits>) {
     let SceneObject {
         id,
         player,
@@ -894,6 +888,9 @@ fn register(world: &mut World, object: &SceneObject, mask: VisionBits) {
             kind: master.kind,
         },
     );
+    let Some(mask) = mask else {
+        return;
+    };
     let registry = visibility
         .registry
         .get_or_insert_with(|| Registry::new(players, CLASSES));

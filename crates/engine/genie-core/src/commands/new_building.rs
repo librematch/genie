@@ -43,7 +43,6 @@ use crate::objects::sprite::new_sprite;
 use crate::objects::unit::Unit;
 use crate::objects::unit::UnitFlags;
 use crate::objects::{DamagedTimer, Frame, Regeneration, WorkerCount};
-use crate::ownership::CaptureKind;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::trace::player_unsupported;
@@ -296,7 +295,6 @@ impl World {
         let combat = Combat {
             builders: BuilderCount::of_data(0),
             work_rate_powerup: WorkRate::ZERO,
-            capture_flag: CaptureKind::None,
             hp_powerup: HpPowerup::default(),
             regen_timer: Seconds::ZERO,
             regen_powerup: Regeneration::ZERO,

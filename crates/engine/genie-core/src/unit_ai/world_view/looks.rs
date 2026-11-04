@@ -94,7 +94,7 @@ impl UnitView<'_, '_> {
         Ok(Some(TargetFlags {
             owner: seen.owner,
             kind,
-            capture: self.step.world.parts.combat_of(unit.id).capture_flag,
+            capture: self.step.world.spatial.capture_of(unit.id),
             pasture: unit.pasture,
             untargetable: unit.flags.contains(UnitFlags::UNTARGETABLE),
             attackable: unit.flags.contains(UnitFlags::ATTACKABLE),

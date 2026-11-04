@@ -2720,3 +2720,34 @@ fn set_relation(spatial: &mut Spatial, (player, other): (u8, u8), relation: Rela
         .unwrap()
         .set(PlayerId::new(other), relation);
 }
+
+/// `+0x924` is the seer's: an object in the sight registry reads its capture flag there, one
+/// outside it (or a map without sight) reads none.
+#[test]
+fn capture_flag_comes_from_the_seer_of_the_object() {
+    let mut spatial = Spatial::new(GridSize::new(10, 10));
+    assert_eq!(spatial.capture_of(object_id(5)), CaptureKind::None);
+    let mut visibility = Visibility::new(
+        GridSize::new(10, 10),
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        0,
+        Vec::new(),
+    );
+    visibility.add_seer(
+        object_id(5),
+        Seer {
+            capture: CaptureKind::Again,
+            ..seer_in(ObjectState::Alive)
+        },
+    );
+    spatial.sight = Some(visibility);
+    assert_eq!(
+        (
+            spatial.capture_of(object_id(5)),
+            spatial.capture_of(object_id(6))
+        ),
+        (CaptureKind::Again, CaptureKind::None)
+    );
+}

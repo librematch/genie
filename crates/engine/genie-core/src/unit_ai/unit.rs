@@ -270,14 +270,9 @@ impl Unit {
         )
     }
 
-    /// The capture kind its seer has in the players' sight (0 without one).
+    /// Its capture flag ([`crate::map::spatial::Spatial::capture_of`]).
     pub(super) fn capture_kind(&self, step: &Step<'_>) -> CaptureKind {
-        step.world
-            .spatial
-            .sight
-            .as_ref()
-            .and_then(|visibility| visibility.seer(self.id))
-            .map_or(CaptureKind::None, |seer| seer.capture)
+        step.world.spatial.capture_of(self.id)
     }
 
     /// One pass of the unit AI ([`Unit::ai_part`]) as the player `captured` names (its new

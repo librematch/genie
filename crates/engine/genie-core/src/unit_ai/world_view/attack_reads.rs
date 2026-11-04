@@ -11,7 +11,6 @@ use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::{DamageAmount, DamageClass};
 use crate::objects::unit::UnitFlags;
-use crate::ownership::CaptureKind;
 use crate::pathing::hull_path::{NO_RESTRICTION, NO_TERRAIN, quick_reach};
 use crate::players::AllyTest;
 use crate::unit_ai::TargetRules;
@@ -96,11 +95,7 @@ impl WorldPicker<'_> {
         let placed = spatial
             .get_known(id)?
             .ok_or(GenieError::unsupported("a found object without a place"))?;
-        let capture = spatial
-            .sight
-            .as_ref()
-            .and_then(|visibility| visibility.seer(id))
-            .map_or(CaptureKind::None, |seer| seer.capture);
+        let capture = spatial.capture_of(id);
         let attacker = self.attacker;
         Ok(Some(FoundObject {
             owner,

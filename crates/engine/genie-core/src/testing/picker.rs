@@ -6,7 +6,6 @@ use crate::map::spatial::Spatial;
 use crate::movement::Speed;
 use crate::objects::ObjectId;
 use crate::objects::masters::MasterTables;
-use crate::ownership::CaptureKind;
 use crate::players::PlayerId;
 use crate::unit_ai::world_view::{WorldPicker, owner_view};
 use crate::world::World;
@@ -46,11 +45,7 @@ pub(crate) fn with_picker<R>(
     let master = unit.master(every, player).expect("the unit's master");
     let ai = parts.unit_ai.get(me).expect("the unit's AI");
     let actions = parts.actions.of(me);
-    let capture = spatial
-        .sight
-        .as_ref()
-        .and_then(|visibility| visibility.seer(me))
-        .map_or(CaptureKind::None, |seer| seer.capture);
+    let capture = spatial.capture_of(me);
     let attacker = unit.attacker_of(
         actions,
         ai.ai_kind,

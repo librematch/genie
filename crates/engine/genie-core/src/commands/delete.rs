@@ -97,7 +97,7 @@ impl World {
                 .roles
                 .of_class(master.class)
                 .contains(ClassRoles::UNDELETABLE)
-            || self.parts.combat_of(unit.id).capture_flag == CaptureKind::Again
+            || self.spatial.capture_of(unit.id) == CaptureKind::Again
         {
             return Ok(());
         }
@@ -613,6 +613,8 @@ mod tests {
     use crate::construction::BuilderCount;
     use crate::construction::build::Construction;
     #[cfg(test)]
+    use crate::map::Distance;
+    use crate::map::GridSize;
     use crate::map::Snow;
     use crate::map::spatial::Obstruction;
     use crate::objects::MasterHitPoints;
@@ -631,6 +633,8 @@ mod tests {
     use crate::testing::class;
     use crate::testing::ids;
     use crate::testing::ids::TOWN_CENTRE_621;
+    use crate::vision::visibility::Seer;
+    use crate::vision::visibility::Visibility;
     use crate::world::Millis;
     use crate::world::Player;
     use crate::world::Seconds;
@@ -769,6 +773,33 @@ mod tests {
         world.players[1].objects[ListIndex::new(0)]
             .flags
             .set(UnitFlags::UNDELETABLE, true);
+        world.delete(player_id(1), object_id(10)).unwrap();
+        assert_eq!(hp(&world, 1, ListIndex::new(0)), HitPoints::new(25.0));
+        // so does one whose capture flag (`+0x924`, its seer's) is 2
+        let mut world = game(0.0, true);
+        let mut visibility = Visibility::new(
+            GridSize::new(10, 10),
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
+            0,
+            Vec::new(),
+        );
+        visibility.add_seer(
+            object_id(10),
+            Seer {
+                player: player_id(1),
+                master: ids::VILLAGER_MALE,
+                los: Distance::new(4.0),
+                state: ObjectState::Alive,
+                explored: true,
+                building: None,
+                umv: 0,
+                capture: CaptureKind::Again,
+                kind: MasterKind::COMBAT,
+            },
+        );
+        world.spatial.sight = Some(visibility);
         world.delete(player_id(1), object_id(10)).unwrap();
         assert_eq!(hp(&world, 1, ListIndex::new(0)), HitPoints::new(25.0));
     }
