@@ -3,6 +3,7 @@
 
 use crate::combat::attack::BeginLayer;
 use crate::combat::attack::{arms, engagement, show_arrived};
+use crate::gathering::gather::unit::WalkSprites;
 use crate::gathering::hunt::HuntRetarget;
 use crate::gathering::hunt::TreeSearch;
 use crate::gathering::hunt::{HuntAction, Quarry};
@@ -131,16 +132,14 @@ impl Unit {
             step.world.world_time,
         )?;
         let walks = self.move_walks(
-            (
-                step.world.parts.mover_of(self.id),
-                step.world.top_speed_terms(step.player, self)?,
-            ),
-            MasterTables::new(&step.world.model.masters, &step.world.parts.own_master),
-            step.player,
-            (
-                &step.world.model.graphics,
-                step.world.parts.combat_of(self.id).abilities.look.as_ref(),
-            ),
+            step.world.parts.mover_of(self.id),
+            step.world.top_speed_terms(step.player, self)?,
+            WalkSprites {
+                every: MasterTables::new(&step.world.model.masters, &step.world.parts.own_master),
+                player: step.player,
+                graphics: &step.world.model.graphics,
+                look: step.world.parts.combat_of(self.id).abilities.look.as_ref(),
+            },
             roles,
         )?;
         let old = hunt.target;

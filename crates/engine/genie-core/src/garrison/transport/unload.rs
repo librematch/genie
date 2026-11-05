@@ -5,6 +5,7 @@ use crate::garrison::SIEGE_UNLOAD;
 use crate::garrison::transport::StartCall;
 use crate::garrison::transport::TransportState;
 use crate::garrison::transport::TransportTarget;
+use crate::garrison::transport::unit::SailWorld;
 use crate::garrison::transport::{
     Around, Changed, DropDraws, MapShore, NONE, Ship, TRANSPORT, TransportAction, in_zone,
     retry_point,
@@ -170,16 +171,23 @@ impl World {
         self.players
             .live_mut(player_id, list_index)?
             .transport_sail(
-                (transport_action, self.parts.actions.of_mut(id)?),
-                (self.parts.motion.layer_mut(id), top_speed),
+                transport_action,
+                self.parts.actions.of_mut(id)?,
+                self.parts.motion.layer_mut(id),
+                top_speed,
                 point,
-                (&self.spatial, &mut self.zones, &mut self.pathing),
-                &self.model,
-                (
-                    OwnerMasters::new(&self.parts.own_master, self.model.masters.of(player_id)),
-                    self.parts.combat.of(id).abilities.look.as_ref(),
-                    rng,
-                ),
+                SailWorld {
+                    spatial: &self.spatial,
+                    zones: &mut self.zones,
+                    pathing: &mut self.pathing,
+                    model: &self.model,
+                    masters: OwnerMasters::new(
+                        &self.parts.own_master,
+                        self.model.masters.of(player_id),
+                    ),
+                    look: self.parts.combat.of(id).abilities.look.as_ref(),
+                    sprite_rng: rng,
+                },
             )
     }
 

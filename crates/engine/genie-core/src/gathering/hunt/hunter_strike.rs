@@ -2,6 +2,7 @@
 //! the herd it leads, the hunt's update and what follows.
 
 use crate::combat::AttackTargetId;
+use crate::combat::attack::AttackSource;
 use crate::combat::attack::{AttackReads, Fight};
 use crate::combat::attack::{arms, engagement};
 use crate::combat::damage::Victim;
@@ -121,20 +122,19 @@ impl Unit {
                 roles,
             ),
             attack: AttackReads::of(
-                (
-                    step.world.parts.combat_of(self.id),
-                    step.world.top_speed_terms(step.player, self)?,
-                ),
-                master,
-                (
-                    OwnerMasters::new(
+                AttackSource {
+                    combat: step.world.parts.combat_of(self.id),
+                    top_speed: step.world.top_speed_terms(step.player, self)?,
+                    master,
+                    masters: OwnerMasters::new(
                         &step.world.parts.own_master,
                         step.world.model.masters.of(step.player),
                     ),
-                    &step.world.model.graphics,
-                ),
-                step.world.parts.unit_ai.get(self.id),
-                (owner.kind, step.world.world_time),
+                    graphics: &step.world.model.graphics,
+                    ai: step.world.parts.unit_ai.get(self.id),
+                    player_kind: owner.kind,
+                    now: step.world.world_time,
+                },
                 roles,
                 &step.world.model.tuning.turn,
             ),

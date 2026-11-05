@@ -21,6 +21,7 @@ use crate::movement::move_to::Patience;
 use crate::movement::move_to::Walk;
 use crate::movement::request_plans::PlanFlags;
 use crate::movement::request_plans::{NewPath, Way};
+use crate::movement::step::VelocityStep;
 use crate::movement::waypoint::LookAhead;
 use crate::objects::ObjectState;
 use crate::objects::SpeedMultiplier;
@@ -2485,11 +2486,15 @@ pub(crate) fn path_world(owner: Player) -> World {
 fn tick(mover: &mut Mover, at: Position, world: &mut Spatial) -> (Position, Motion) {
     let mut place = Static::at(at);
     let at = mover.step_velocity(
-        at,
-        Seconds::new(DT),
-        world.map,
-        None,
-        (WorldTime::ZERO, None, TopSpeed::Own),
+        VelocityStep {
+            position: at,
+            dt: Seconds::new(DT),
+            map: world.map,
+            terrain: None,
+            now: WorldTime::ZERO,
+            group: None,
+            top: TopSpeed::Own,
+        },
         &tuning().movement,
     );
     mover
@@ -2718,15 +2723,15 @@ fn the_velocity_step_of_paused_member_on_its_own_move_stands() {
     let mut mover = builder_9177();
     mover.paths[0].pause_time = Seconds::new(0.028);
     let at = mover.step_velocity(
-        Position::new(28.0, 89.0, 0.0),
-        Seconds::new(DT),
-        GridSize::new(120, 120),
-        None,
-        (
-            WorldTime::ZERO,
-            Some(GroupSpeed::OwnMove(Speed::new(1.2))),
-            TopSpeed::Own,
-        ),
+        VelocityStep {
+            position: Position::new(28.0, 89.0, 0.0),
+            dt: Seconds::new(DT),
+            map: GridSize::new(120, 120),
+            terrain: None,
+            now: WorldTime::ZERO,
+            group: Some(GroupSpeed::OwnMove(Speed::new(1.2))),
+            top: TopSpeed::Own,
+        },
         &tuning().movement,
     );
     assert_eq!(at, Position::new(28.0, 89.0, 0.0));
@@ -2745,11 +2750,15 @@ fn the_step_and_the_speed_control_start_where_the_unit_last_moved_to() {
     mover.velocity.as_mut().unwrap().acceleration = BVector::ZERO;
     // the step: 0.5 tiles a second for a second, from (10, 20) whatever the caller holds
     let at = mover.step_velocity(
-        Position::new(40.0, 40.0, 0.0),
-        Seconds::new(1.0),
-        GridSize::new(120, 120),
-        None,
-        (WorldTime::ZERO, None, TopSpeed::Own),
+        VelocityStep {
+            position: Position::new(40.0, 40.0, 0.0),
+            dt: Seconds::new(1.0),
+            map: GridSize::new(120, 120),
+            terrain: None,
+            now: WorldTime::ZERO,
+            group: None,
+            top: TopSpeed::Own,
+        },
         &tuning().movement,
     );
     assert_eq!(at, Position::new(10.5, 20.0, 0.0));

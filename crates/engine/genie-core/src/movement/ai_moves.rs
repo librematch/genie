@@ -30,8 +30,10 @@ use crate::objects::unit::Unit;
 
 use crate::combat::abilities::Look;
 use crate::construction::repair::RepairAction;
+use crate::garrison::transport::SailWorld;
 use crate::garrison::transport::TransportAction;
 use crate::gathering::{GatherTargetId, HuntTargetId};
+use crate::movement::move_to::ToObject;
 use crate::movement::move_to::{MOVE_TO, TARGET_LACKING, holds_object, object_range};
 use crate::objects::actions::Action as ActionsAction;
 use crate::objects::layers::Action;
@@ -111,23 +113,23 @@ impl Unit {
         if let MoveWith::Sails(transport_action) = sails {
             let sprite_rng = step.world.streams.get_mut(Stream::Sprite);
             self.transport_sail(
-                (transport_action, actions),
-                (step.world.parts.motion.layer_mut(self.id), top_speed),
+                transport_action,
+                actions,
+                step.world.parts.motion.layer_mut(self.id),
+                top_speed,
                 requested.point,
-                (
-                    &step.world.spatial,
-                    &mut step.world.zones,
-                    &mut step.world.pathing,
-                ),
-                &step.world.model,
-                (
-                    OwnerMasters::new(
+                SailWorld {
+                    spatial: &step.world.spatial,
+                    zones: &mut step.world.zones,
+                    pathing: &mut step.world.pathing,
+                    model: &step.world.model,
+                    masters: OwnerMasters::new(
                         &step.world.parts.own_master,
                         step.world.model.masters.of(step.player),
                     ),
-                    step.world.parts.combat.of(self.id).abilities.look.as_ref(),
+                    look: step.world.parts.combat.of(self.id).abilities.look.as_ref(),
                     sprite_rng,
-                ),
+                },
             )?;
         }
         Ok(())
@@ -238,15 +240,15 @@ impl Unit {
     }
 
     /// The head action's slot 0x40 on a move to `point` without a target object (its second
-    /// argument 0), the unit of player `player`. An empty list takes nothing
-    /// (`FUN_140a98730`), nor does the base slot (`FUN_140a78490`, which answers 0) of a `MoveTo`,
-    /// an Explore, a Build (`0x140aade60`), an Attack, an Enter, a Fly, a missile, a Make or a
-    /// wait for a foundation. The Artifact's (`FUN_140aaca30`) takes it
-    /// ([`Artifact::take_point`]; a `MoveTo` it walked goes and stops the unit); the Hunt's
-    /// (`FUN_140ac52c0`, [`HuntAction::take_move`]) unless its task has a work range; the
-    /// Gather's (`0x140a8b740`, [`crate::gathering::gather::GatherAction::take_move`]) always. The Hunt and
-    /// the Gather let their target go (slot 0x68 with none), which [`PointMove::Taken`] names
-    /// for the caller to release; their second target stays.
+    /// argument 0), the unit of player `player`. An empty list takes nothing (`FUN_140a98730`), nor
+    /// does the base slot (`FUN_140a78490`, which answers 0) of a `MoveTo`, an Explore, a Build
+    /// (`0x140aade60`), an Attack, an Enter, a Fly, a missile, a Make or a wait for a foundation.
+    /// The Artifact's (`FUN_140aaca30`) takes it ([`Artifact::take_point`]; a `MoveTo` it walked
+    /// goes and stops the unit); the Hunt's (`FUN_140ac52c0`, [`HuntAction::take_move`]) unless its
+    /// task has a work range; the Gather's (`0x140a8b740`,
+    /// [`crate::gathering::gather::GatherAction::take_move`]) always. The Hunt and the Gather let
+    /// their target go (slot 0x68 with none), which [`PointMove::Taken`] names for the caller to
+    /// release; their second target stays.
     ///
     /// # Errors
     ///
@@ -302,24 +304,34 @@ impl Unit {
                 )
             }
             Some(ActionsAction::Hunt(_)) => {
-                let sprites = self.point_sprites(sprites)?;
+                let walks = Walks::of(
+                    self.point_sprites(sprites)?,
+                    self,
+                    motion.mover(),
+                    top_speed,
+                );
                 self.hunt_takes_point(
                     actions,
                     motion.mover_mut(),
                     point,
                     player,
-                    (sprites, top_speed),
+                    walks,
                     move_to_tuning,
                 )
             }
             Some(ActionsAction::Gather(_)) => {
-                let sprites = self.point_sprites(sprites)?;
+                let walks = Walks::of(
+                    self.point_sprites(sprites)?,
+                    self,
+                    motion.mover(),
+                    top_speed,
+                );
                 self.gather_takes_point(
                     actions,
                     motion.mover_mut(),
                     point,
                     player,
-                    (sprites, top_speed),
+                    walks,
                     move_to_tuning,
                 )
             }
@@ -393,11 +405,10 @@ impl Unit {
         mover: Option<&mut Mover>,
         point: Position,
         player: PlayerId,
-        (sprites, top_speed): (SpriteReads<'_>, TopSpeed),
+        walks: Walks<'_>,
         move_to_tuning: &MoveToTuning,
     ) -> GenieResult<PointMove> {
         let my_pasture = self.my_pasture;
-        let walks = Walks::of(sprites, self, mover.as_deref(), top_speed);
         let (Some(hunt), Some(mover)) = (actions.list.hunt_mut(), mover) else {
             return Err(GenieError::unsupported(
                 "a hunter without its hunt or movement state",
@@ -424,17 +435,17 @@ impl Unit {
     }
 
     /// The Gather's slot 0x40 (its move to the point): the target it had is let go; the
-    /// `MoveTo` it makes takes `sprites`' default for a sprite the task lacks.
+    /// `MoveTo` it makes reads the unit's `walks` (its sprites' default for a sprite the task
+    /// lacks).
     fn gather_takes_point(
         &self,
         actions: &mut Action,
         mover: Option<&mut Mover>,
         point: Position,
         player: PlayerId,
-        (sprites, top_speed): (SpriteReads<'_>, TopSpeed),
+        walks: Walks<'_>,
         move_to_tuning: &MoveToTuning,
     ) -> GenieResult<PointMove> {
-        let walks = Walks::of(sprites, self, mover.as_deref(), top_speed);
         let (Some(gather), Some(mover)) = (actions.list.gather_mut(), mover) else {
             return Err(GenieError::unsupported(
                 "a gatherer without its gather or movement state",
@@ -509,11 +520,16 @@ impl Unit {
             ))?;
         let move_to = MoveToAction::to_object(
             &step.world.spatial,
-            here,
-            (mover, top),
-            (target, state),
-            range,
-            (sprite, livestock),
+            ToObject {
+                me: here,
+                mover,
+                top,
+                target,
+                state,
+                range,
+                sprite,
+                livestock,
+            },
             &step.world.model,
         )?;
         if move_to.shows_standing() {
@@ -533,11 +549,10 @@ impl Unit {
     }
 
     /// `LAB_140aa320c`, the motion step gave up on the unit's own `MoveTo`: a human's villager
-    /// (`waits`) waits once (`set_state(2)`, 1 s or 2 s by its `stance`, which shows nothing);
-    /// any other unit's `MoveTo` fails (`set_state(13)`), which its unit AI's check between turns may
-    /// interrupt with its next order the same update. The failure's `set_state` (`0x140aa29e0`,
-    /// an own `MoveTo` is never quiet) shows the standing sprite at its speed and clears
-    /// `+0x7b8`.
+    /// (`waits`) waits once (`set_state(2)`, 1 s or 2 s by its `stance`, which shows nothing); any
+    /// other unit's `MoveTo` fails (`set_state(13)`), which its unit AI's check between turns may
+    /// interrupt with its next order the same update. The failure's `set_state` (`0x140aa29e0`, an
+    /// own `MoveTo` is never quiet) shows the standing sprite at its speed and clears `+0x7b8`.
     ///
     /// # Errors
     ///
@@ -635,8 +650,8 @@ pub(crate) enum PointMove {
     /// It answered 1: the action walks there itself. The target it let go (slot 0x68 with none),
     /// if any, which the caller releases.
     Taken(Option<ObjectId>),
-    /// A Repair answered 1 (`FUN_140ad9700`): it walks to the point; the target it let go, and
-    /// the target whose repairers a counted repairer left ([`crate::world::World::leave_builders`]).
+    /// A Repair answered 1 (`FUN_140ad9700`): it walks to the point; the target it let go, and the
+    /// target whose repairers a counted repairer left ([`crate::world::World::leave_builders`]).
     Repairs(Option<ObjectId>, Option<ObjectId>),
     /// The Transport answers 1 (`0x140aa3e40`): it sails to the point, which the caller runs
     /// with the map on this copy of it ([`Unit::transport_sail`]).

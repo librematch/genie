@@ -2,6 +2,7 @@
 
 use crate::GenieResult;
 use crate::combat::attack::BeginLayer;
+use crate::gathering::gather::unit::WalkSprites;
 use crate::gathering::hunt::{HuntAction, HuntStart, HuntTask, Quarry};
 use crate::math::rng::Stream;
 use crate::movement::MoveStart;
@@ -73,13 +74,14 @@ impl World {
         let top_speed = self.top_speed_terms(player, self.players.live(player, idx)?)?;
         let unit = self.players.live_mut(player, idx)?;
         let walks = unit.move_walks(
-            (self.parts.mover_of(unit.id), top_speed),
-            MasterTables::new(&self.model.masters, &self.parts.own_master),
-            player,
-            (
-                &self.model.graphics,
-                self.parts.combat_of(unit.id).abilities.look.as_ref(),
-            ),
+            self.parts.mover_of(unit.id),
+            top_speed,
+            WalkSprites {
+                every: MasterTables::new(&self.model.masters, &self.parts.own_master),
+                player,
+                graphics: &self.model.graphics,
+                look: self.parts.combat_of(unit.id).abilities.look.as_ref(),
+            },
             &self.model.roles,
         )?;
         let mover = self.parts.mover_mut(unit.id).ok_or(HUNTER_UNMOVING)?;

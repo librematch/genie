@@ -23,11 +23,13 @@ use crate::world::WorldTime;
 use crate::world::slots::PlayerSlotsExt;
 use crate::{GenieError, GenieResult};
 
+use crate::combat::attack::AttackSource;
 use crate::combat::attack::{AttackCommand, ReadyReads, arms, engagement, show_arrived};
 use crate::combat::victims::victim_of;
 use crate::combat::victims::{VictimLayers, VictimView};
 use crate::combat::{AttackCount, AttackTargetId};
 use crate::gathering::HuntTargetId;
+use crate::gathering::gather::unit::WalkSprites;
 use crate::objects::masters::{Master, MasterTables, OwnerMasters, Task};
 use crate::objects::sprite::new_sprite;
 use crate::unit_ai::AiAction;
@@ -63,17 +65,16 @@ impl World {
         let unit = self.players.live(player, idx)?;
         let held = self.players.player(player)?;
         let reads = AttackReads::of(
-            (
-                self.parts.combat_of(unit.id),
-                self.top_speed_terms(player, unit)?,
-            ),
-            master,
-            (
-                OwnerMasters::new(&self.parts.own_master, self.model.masters.of(player)),
-                &self.model.graphics,
-            ),
-            self.parts.unit_ai.get(unit.id),
-            (held.kind, world_time),
+            AttackSource {
+                combat: self.parts.combat_of(unit.id),
+                top_speed: self.top_speed_terms(player, unit)?,
+                master,
+                masters: OwnerMasters::new(&self.parts.own_master, self.model.masters.of(player)),
+                graphics: &self.model.graphics,
+                ai: self.parts.unit_ai.get(unit.id),
+                player_kind: held.kind,
+                now: world_time,
+            },
             &self.model.roles,
             &self.model.tuning.turn,
         );
@@ -332,13 +333,14 @@ impl World {
             .map(|hunt_action| hunt_action.target)
             .filter(|&role_id| role_id.is_some());
         let walks = unit.move_walks(
-            (self.parts.mover_of(unit.id), top_speed),
-            MasterTables::new(&self.model.masters, &self.parts.own_master),
-            player,
-            (
-                &self.model.graphics,
-                self.parts.combat_of(unit.id).abilities.look.as_ref(),
-            ),
+            self.parts.mover_of(unit.id),
+            top_speed,
+            WalkSprites {
+                every: MasterTables::new(&self.model.masters, &self.parts.own_master),
+                player,
+                graphics: &self.model.graphics,
+                look: self.parts.combat_of(unit.id).abilities.look.as_ref(),
+            },
             &self.model.roles,
         )?;
         let (Some(hunt), Some(mover)) = (

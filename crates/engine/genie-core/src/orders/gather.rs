@@ -3,6 +3,7 @@
 use crate::combat::attack::{Arms, Engagement};
 use crate::combat::attack::{arms as attack_arms, engagement as attack_engagement};
 use crate::construction::MainBuildingId;
+use crate::gathering::gather::unit::WalkSprites;
 use crate::gathering::gather::{
     GatherAction, GatherState, MoveTarget, Resource, StopRate, productivity_of,
 };
@@ -121,16 +122,14 @@ impl World {
         };
         // the sprites its MoveTos' constructors take for none (FUN_140aa0d30, FUN_140aa0df0)
         let walks = unit.move_walks(
-            (
-                self.parts.mover_of(unit.id),
-                self.top_speed_terms(player, unit)?,
-            ),
-            MasterTables::new(&self.model.masters, &self.parts.own_master),
-            player,
-            (
-                &self.model.graphics,
-                self.parts.combat_of(unit.id).abilities.look.as_ref(),
-            ),
+            self.parts.mover_of(unit.id),
+            self.top_speed_terms(player, unit)?,
+            WalkSprites {
+                every: MasterTables::new(&self.model.masters, &self.parts.own_master),
+                player,
+                graphics: &self.model.graphics,
+                look: self.parts.combat_of(unit.id).abilities.look.as_ref(),
+            },
             &self.model.roles,
         )?;
         let unit = self.players.live_mut(player, idx)?;
@@ -217,16 +216,14 @@ impl World {
         });
         let by = self.releaser(player, idx)?;
         let walks = unit.move_walks(
-            (
-                self.parts.mover_of(unit.id),
-                self.top_speed_terms(player, unit)?,
-            ),
-            MasterTables::new(&self.model.masters, &self.parts.own_master),
-            player,
-            (
-                &self.model.graphics,
-                self.parts.combat_of(unit.id).abilities.look.as_ref(),
-            ),
+            self.parts.mover_of(unit.id),
+            self.top_speed_terms(player, unit)?,
+            WalkSprites {
+                every: MasterTables::new(&self.model.masters, &self.parts.own_master),
+                player,
+                graphics: &self.model.graphics,
+                look: self.parts.combat_of(unit.id).abilities.look.as_ref(),
+            },
             &self.model.roles,
         )?;
         let unit = self.players.live_mut(player, idx)?;
@@ -305,13 +302,14 @@ impl World {
         let top_speed = self.top_speed_terms(player, self.players.live(player, idx)?)?;
         let unit = self.players.live_mut(player, idx)?;
         let walks = unit.move_walks(
-            (self.parts.mover_of(unit.id), top_speed),
-            MasterTables::new(&self.model.masters, &self.parts.own_master),
-            player,
-            (
-                &self.model.graphics,
-                self.parts.combat_of(unit.id).abilities.look.as_ref(),
-            ),
+            self.parts.mover_of(unit.id),
+            top_speed,
+            WalkSprites {
+                every: MasterTables::new(&self.model.masters, &self.parts.own_master),
+                player,
+                graphics: &self.model.graphics,
+                look: self.parts.combat_of(unit.id).abilities.look.as_ref(),
+            },
             &self.model.roles,
         )?;
         let my_pasture = unit.my_pasture;
@@ -475,13 +473,14 @@ impl World {
         let top_speed = self.top_speed_terms(player, self.players.live(player, idx)?)?;
         let unit = self.players.live_mut(player, idx)?;
         let walks = unit.move_walks(
-            (self.parts.mover_of(unit.id), top_speed),
-            MasterTables::new(&self.model.masters, &self.parts.own_master),
-            player,
-            (
-                &self.model.graphics,
-                self.parts.combat_of(unit.id).abilities.look.as_ref(),
-            ),
+            self.parts.mover_of(unit.id),
+            top_speed,
+            WalkSprites {
+                every: MasterTables::new(&self.model.masters, &self.parts.own_master),
+                player,
+                graphics: &self.model.graphics,
+                look: self.parts.combat_of(unit.id).abilities.look.as_ref(),
+            },
             &self.model.roles,
         )?;
         let mover = self

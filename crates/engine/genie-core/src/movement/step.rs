@@ -60,8 +60,8 @@ type LevelGaps = (Option<(ObjectId, Placed)>, Distance, Distance);
 pub enum GroupSpeed {
     /// Moved aside (reason 2): the unit stands.
     Aside,
-    /// No own move (reason −1): a speed below `MovementTuning::uncapped_speed` is not capped by the top
-    /// speed.
+    /// No own move (reason −1): a speed below `MovementTuning::uncapped_speed` is not capped by the
+    /// top speed.
     Free,
     /// An own move of another reason: the group's top speed (`+0xbc`) while the unit's walked
     /// level walks (state 3) unpaused, else the unit stands.
@@ -94,11 +94,32 @@ pub(super) struct WalkStep<'world> {
     pub(super) heading: &'world mut BVector,
 }
 
+/// What the velocity part of a moving object's update reads ([`Mover::step_velocity`]): its place,
+/// the step's dt, the map's size and terrain, the world's time, its group's steer and what its top
+/// speed reads.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct VelocityStep<'world> {
+    /// The object's place.
+    pub(crate) position: Position,
+    /// The step's dt.
+    pub(crate) dt: Seconds,
+    /// The map's size.
+    pub(crate) map: GridSize,
+    /// The map's terrain.
+    pub(crate) terrain: Option<&'world Terrain>,
+    /// The world's time.
+    pub(crate) now: WorldTime,
+    /// Its unit group's steer.
+    pub(crate) group: Option<GroupSpeed>,
+    /// What its top speed reads besides its own speed and its place (slot 0x208).
+    pub(crate) top: TopSpeed,
+}
+
 impl Mover {
-    /// Slot 0x5e0 (`FUN_14114f300`): the forward speed the velocity step takes toward `wanted`
-    /// (the acceleration times dt plus the speed). A unit its group steers (`group`) takes the
-    /// group's answer ([`GroupSpeed`]; a free one below `MovementTuning::uncapped_speed`, `COMISS` then `JA`,
-    /// only the floor). Any other is capped by its top speed `top` (slot 0x208; `COMISS` then
+    /// Slot 0x5e0 (`FUN_14114f300`): the forward speed the velocity step takes toward `wanted` (the
+    /// acceleration times dt plus the speed). A unit its group steers (`group`) takes the group's
+    /// answer ([`GroupSpeed`]; a free one below `MovementTuning::uncapped_speed`, `COMISS` then
+    /// `JA`, only the floor). Any other is capped by its top speed `top` (slot 0x208; `COMISS` then
     /// `JA`: a NaN is not above it), then floored at 0 (a NaN stays).
     #[must_use]
     pub fn next_speed(
@@ -138,15 +159,20 @@ impl Mover {
     /// the unit's group's steer, `top` what its top speed reads at `position`), then the unit
     /// moves `dt × speed` along its forward vector (slot 182, `0x141158490`) at the world's time
     /// `now`. Returns the position after it.
-    pub fn step_velocity(
+    pub(crate) fn step_velocity(
         &mut self,
-        position: Position,
-        dt: Seconds,
-        map: GridSize,
-        terrain: Option<&Terrain>,
-        (now, group, top): (WorldTime, Option<GroupSpeed>, TopSpeed),
+        velocity_step: VelocityStep<'_>,
         movement_tuning: &MovementTuning,
     ) -> Position {
+        let VelocityStep {
+            position,
+            dt,
+            map,
+            terrain,
+            now,
+            group,
+            top,
+        } = velocity_step;
         let Some(velocity) = self.velocity.as_ref() else {
             return position;
         };
@@ -175,10 +201,10 @@ impl Mover {
     }
 
     /// The static `new_position`'s end (`0x1411a58b0`, slot 0x60: `FUN_141158000` ->
-    /// `FUN_141193a10`): the place takes the ground's height ([`crate::map::terrain::Terrain::ground`])
-    /// by the master's fly mode: 0 puts it on the ground, 1 lifts it to the ground when below,
-    /// others keep it. Without the map's elevations the height stays; `+0x7f8` (the place is on
-    /// the ground) is not held.
+    /// `FUN_141193a10`): the place takes the ground's height
+    /// ([`crate::map::terrain::Terrain::ground`]) by the master's fly mode: 0 puts it on the
+    /// ground, 1 lifts it to the ground when below, others keep it. Without the map's elevations
+    /// the height stays; `+0x7f8` (the place is on the ground) is not held.
     #[must_use]
     pub fn grounded(&self, at: Position, terrain: Option<&Terrain>) -> Position {
         let height = at.z();

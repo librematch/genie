@@ -14,6 +14,7 @@ use crate::movement::move_to::MoveStep;
 use crate::movement::move_to::Patience;
 use crate::movement::move_to::StepEnd;
 use crate::movement::move_to::{MoveTo, Shows};
+use crate::movement::step::VelocityStep;
 use crate::movement::{GroupSpeed, Me};
 use crate::objects::SpriteId;
 use crate::objects::UpdateCode;
@@ -86,11 +87,15 @@ impl Unit {
         if let Some(mover) = step.world.parts.mover_mut(self.id) {
             let here = self.place.position();
             let at = mover.step_velocity(
-                here,
-                step.dt.seconds(),
-                step.world.spatial.map,
-                step.world.spatial.terrain.as_ref(),
-                (step.world.world_time, group, top),
+                VelocityStep {
+                    position: here,
+                    dt: step.dt.seconds(),
+                    map: step.world.spatial.map,
+                    terrain: step.world.spatial.terrain.as_ref(),
+                    now: step.world.world_time,
+                    group,
+                    top,
+                },
                 &step.world.model.tuning.movement,
             );
             if at != here {

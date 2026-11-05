@@ -7,6 +7,7 @@ use crate::gathering::drop_sites::SitePlace;
 use crate::gathering::drop_sites::SiteSearch;
 use crate::gathering::drop_sites::{Seeker, drop_site_search};
 use crate::gathering::gather::GatherState;
+use crate::gathering::gather::unit::WalkSprites;
 use crate::gathering::gather::{GatherAction, GatherRetarget, Walks};
 use crate::gathering::gather::{Resource, StopRate, productivity_of, waits_for_farm};
 use crate::gathering::hunt::HuntAction;
@@ -142,16 +143,14 @@ impl Unit {
     ) -> GenieResult<HeadCode> {
         let farm_waits = waits_for_farm(self.life.master_id, gather.target_class, roles);
         let walks = self.move_walks(
-            (
-                step.world.parts.mover_of(self.id),
-                step.world.top_speed_terms(step.player, self)?,
-            ),
-            MasterTables::new(&step.world.model.masters, &step.world.parts.own_master),
-            step.player,
-            (
-                &step.world.model.graphics,
-                step.world.parts.combat_of(self.id).abilities.look.as_ref(),
-            ),
+            step.world.parts.mover_of(self.id),
+            step.world.top_speed_terms(step.player, self)?,
+            WalkSprites {
+                every: MasterTables::new(&step.world.model.masters, &step.world.parts.own_master),
+                player: step.player,
+                graphics: &step.world.model.graphics,
+                look: step.world.parts.combat_of(self.id).abilities.look.as_ref(),
+            },
             roles,
         )?;
         // the search and the reads reach no action of the unit's: the copy is the head until it
@@ -253,16 +252,14 @@ impl Unit {
             step.world.settings.farm_mode,
         );
         let walks = self.move_walks(
-            (
-                step.world.parts.mover_of(self.id),
-                step.world.top_speed_terms(step.player, self)?,
-            ),
-            MasterTables::new(&step.world.model.masters, &step.world.parts.own_master),
-            step.player,
-            (
-                &step.world.model.graphics,
-                step.world.parts.combat_of(self.id).abilities.look.as_ref(),
-            ),
+            step.world.parts.mover_of(self.id),
+            step.world.top_speed_terms(step.player, self)?,
+            WalkSprites {
+                every: MasterTables::new(&step.world.model.masters, &step.world.parts.own_master),
+                player: step.player,
+                graphics: &step.world.model.graphics,
+                look: step.world.parts.combat_of(self.id).abilities.look.as_ref(),
+            },
             roles,
         )?;
         let rate = StopRate {

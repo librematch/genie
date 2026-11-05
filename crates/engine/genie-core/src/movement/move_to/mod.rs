@@ -36,6 +36,7 @@ mod sub_code;
 
 use crate::combat::abilities::Look;
 pub(crate) use crate::movement::move_to::action::TARGET_LACKING;
+pub(crate) use crate::movement::move_to::action::ToObject;
 pub use crate::movement::move_to::action::{
     MoveDefaults, MoveStep, MoveToAction, Shows, StepEnd, ai_sprite, holds_object, object_range,
     object_sprite, point_sprite,

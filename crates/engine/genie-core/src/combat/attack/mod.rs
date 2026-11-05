@@ -1,9 +1,9 @@
-//! The Attack action (`RGE_Action_Attack`, type 9, vtable `0x142ed47a8`) of a melee unit: a
-//! hunting villager's sub-action on a tree or on its livestock ([`crate::gathering::hunt`]).
-//! Built away from its target, it walks there with a `MoveTo` sub-action ([`crate::movement::move_to`]); in
-//! reach it swings (state 7): the hit lands on the attack sprite's frame ([`crate::objects::sprite`]), and
-//! the unit waits out its reload between swings (state 6). A target that dies ends the swing
-//! (state 2) and the action (`set_state` 1, code 5 to the hunt).
+//! The Attack action (`RGE_Action_Attack`, type 9, vtable `0x142ed47a8`) of a melee unit: a hunting
+//! villager's sub-action on a tree or on its livestock ([`crate::gathering::hunt`]). Built away
+//! from its target, it walks there with a `MoveTo` sub-action ([`crate::movement::move_to`]); in
+//! reach it swings (state 7): the hit lands on the attack sprite's frame
+//! ([`crate::objects::sprite`]), and the unit waits out its reload between swings (state 6). A
+//! target that dies ends the swing (state 2) and the action (`set_state` 1, code 5 to the hunt).
 //!
 //! 158041: constructor `FUN_140a7c210`, start (slot 5) `0x140a7f8c0`, update (slot 6)
 //! `0x140a82ae0`, `set_state` (slot 16) `0x140a820c0`; the range test `FUN_140a7f9d0`
@@ -351,20 +351,45 @@ pub(crate) struct AttackReads {
     pub(crate) top_speed: TopSpeed,
 }
 
+/// What the Attack's update reads of its unit as it starts ([`AttackReads::of`]): its combat layer
+/// and its top speed's terms, its master, its player's masters and the sprites' table, its unit AI,
+/// its owner's type and the world's time.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct AttackSource<'world> {
+    /// The unit's combat layer.
+    pub(crate) combat: &'world Combat,
+    /// What its top speed reads besides its own speed and its place (slot 0x208).
+    pub(crate) top_speed: TopSpeed,
+    /// Its master.
+    pub(crate) master: &'world Master,
+    /// Its player's masters.
+    pub(crate) masters: OwnerMasters<'world>,
+    /// The sprites' table.
+    pub(crate) graphics: &'world Graphics,
+    /// Its unit AI: its own, or the one running outside it.
+    pub(crate) ai: Option<&'world UnitAi>,
+    /// Its owner's type (`player+0x10`).
+    pub(crate) player_kind: PlayerKind,
+    /// The world's time.
+    pub(crate) now: WorldTime,
+}
+
 impl AttackReads {
     /// What the Attack of a unit of `master` with the combat layer `combat` and its top speed's
     /// terms `top_speed` reads: its player's masters and the sprites' table (`tables`), its unit
     /// AI `ai` (the unit's own, or the one running outside it), whether its owner is a computer
     /// player and the world's time (`now`).
-    pub(crate) fn of(
-        (combat, top_speed): (&Combat, TopSpeed),
-        master: &Master,
-        (masters, graphics): (OwnerMasters<'_>, &Graphics),
-        ai: Option<&UnitAi>,
-        (player_kind, now): (PlayerKind, WorldTime),
-        roles: &Roles,
-        turn_tuning: &TurnTuning,
-    ) -> Self {
+    pub(crate) fn of(source: AttackSource<'_>, roles: &Roles, turn_tuning: &TurnTuning) -> Self {
+        let AttackSource {
+            combat,
+            top_speed,
+            master,
+            masters,
+            graphics,
+            ai,
+            player_kind,
+            now,
+        } = source;
         Self {
             standing: master
                 .standing_sprite

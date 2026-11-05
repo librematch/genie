@@ -55,15 +55,29 @@ use crate::world::slots::PlayerSlotsExt;
 use crate::world::step::Step;
 use crate::{GenieError, GenieResult};
 
+/// Where a gatherer's walks take their sprites ([`Unit::move_walks`]): its master (from `every`, as
+/// `player`'s), the sprites' table and its terrain look.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct WalkSprites<'world, 'graphics> {
+    /// Every player's masters.
+    pub(crate) every: MasterTables<'world>,
+    /// The gatherer's player.
+    pub(crate) player: PlayerId,
+    /// The sprites' table.
+    pub(crate) graphics: &'graphics Graphics,
+    /// The gatherer's terrain look.
+    pub(crate) look: Option<&'world Look>,
+}
+
 impl Unit {
-    /// The Gather's update (slot 6, `0x140a8e1d0`). It first checks its targets: a target gone
-    /// from the world's table goes (slot 0x68 with none), one past state 6 is let go (slot 0x180)
-    /// and goes; a second target gone goes (`FUN_140a7a190` with none), one past state 6 is let
-    /// go and goes. Then state 8 walks the
-    /// load to its drop site ([`crate::gathering::gather::GatherAction::update_drop`]): the load goes to the
-    /// player, the drop site goes (`FUN_140a7a190` with none) and the gather walks back to its
-    /// target (`set_state(4)`); without a target the unit AI's search is not modelled. The other
-    /// states ([`crate::gathering::gather::GatherAction::update`]) may ask for the drop-off
+    /// The Gather's update (slot 6, `0x140a8e1d0`). It first checks its targets: a target gone from
+    /// the world's table goes (slot 0x68 with none), one past state 6 is let go (slot 0x180) and
+    /// goes; a second target gone goes (`FUN_140a7a190` with none), one past state 6 is let go and
+    /// goes. Then state 8 walks the load to its drop site
+    /// ([`crate::gathering::gather::GatherAction::update_drop`]): the load goes to the player, the
+    /// drop site goes (`FUN_140a7a190` with none) and the gather walks back to its target
+    /// (`set_state(4)`); without a target the unit AI's search is not modelled. The other states
+    /// ([`crate::gathering::gather::GatherAction::update`]) may ask for the drop-off
     /// ([`Unit::gather_drop_off`]). `gather` is the head's copy.
     pub(crate) fn gather_update(
         &mut self,
@@ -140,12 +154,17 @@ impl Unit {
     /// A gatherer whose master the table lacks.
     pub(crate) fn move_walks<'graphics>(
         &self,
-        (mover, top_speed): (Option<&Mover>, TopSpeed),
-        every: MasterTables<'_>,
-        player: PlayerId,
-        (graphics, look): (&'graphics Graphics, Option<&Look>),
+        mover: Option<&Mover>,
+        top_speed: TopSpeed,
+        walk_sprites: WalkSprites<'_, 'graphics>,
         roles: &Roles,
     ) -> GenieResult<Walks<'graphics>> {
+        let WalkSprites {
+            every,
+            player,
+            graphics,
+            look,
+        } = walk_sprites;
         let sprites = SpriteReads::of(self.master(every, player)?, look, graphics, roles);
         Ok(Walks::of(sprites, self, mover, top_speed))
     }
@@ -328,16 +347,14 @@ impl Unit {
     ) -> GenieResult<HeadCode> {
         // the unit's load is gone (slot 0xf8 after the drop): its walking sprite is the moving one
         let walks = self.move_walks(
-            (
-                step.world.parts.mover_of(self.id),
-                step.world.top_speed_terms(step.player, self)?,
-            ),
-            MasterTables::new(&step.world.model.masters, &step.world.parts.own_master),
-            step.player,
-            (
-                &step.world.model.graphics,
-                step.world.parts.combat_of(self.id).abilities.look.as_ref(),
-            ),
+            step.world.parts.mover_of(self.id),
+            step.world.top_speed_terms(step.player, self)?,
+            WalkSprites {
+                every: MasterTables::new(&step.world.model.masters, &step.world.parts.own_master),
+                player: step.player,
+                graphics: &step.world.model.graphics,
+                look: step.world.parts.combat_of(self.id).abilities.look.as_ref(),
+            },
             roles,
         )?;
         gather.carry_to = None;

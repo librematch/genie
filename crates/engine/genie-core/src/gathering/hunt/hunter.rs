@@ -5,6 +5,7 @@
 use crate::combat::damage::Victim;
 use crate::combat::victims::readable;
 use crate::gathering::DropSiteId;
+use crate::gathering::gather::unit::WalkSprites;
 use crate::gathering::hunt::HuntAction;
 use crate::gathering::hunt::HuntState;
 use crate::gathering::hunt::TreeSearch;
@@ -365,16 +366,14 @@ impl Unit {
         roles: &Roles,
     ) -> GenieResult<()> {
         let walks = self.move_walks(
-            (
-                step.world.parts.mover_of(self.id),
-                step.world.top_speed_terms(step.player, self)?,
-            ),
-            MasterTables::new(&step.world.model.masters, &step.world.parts.own_master),
-            step.player,
-            (
-                &step.world.model.graphics,
-                step.world.parts.combat_of(self.id).abilities.look.as_ref(),
-            ),
+            step.world.parts.mover_of(self.id),
+            step.world.top_speed_terms(step.player, self)?,
+            WalkSprites {
+                every: MasterTables::new(&step.world.model.masters, &step.world.parts.own_master),
+                player: step.player,
+                graphics: &step.world.model.graphics,
+                look: step.world.parts.combat_of(self.id).abilities.look.as_ref(),
+            },
             roles,
         )?;
         let mover = step.world.parts.mover_mut(self.id).ok_or(HUNTER_UNMOVING)?;

@@ -2,6 +2,7 @@
 //! new Attack, a forced attack again on the unit's own target, the
 //! target as a hit reads it, the start's readiness, the target's sight and a villager's swap.
 
+use crate::combat::attack::AttackSource;
 use crate::combat::attack::{
     Attack, AttackCommand, Mark, ReadyReads, Wielder, arms_looking, engagement,
 };
@@ -472,22 +473,23 @@ impl UnitView<'_, '_> {
             roles,
         );
         let reads = AttackReads::of(
-            (
-                self.step.world.parts.combat_of(unit.id),
-                self.step
-                    .world
-                    .top_speed_terms_with(self.player, unit, ai.current_target)?,
-            ),
-            master,
-            (
-                OwnerMasters::new(
+            AttackSource {
+                combat: self.step.world.parts.combat_of(unit.id),
+                top_speed: self.step.world.top_speed_terms_with(
+                    self.player,
+                    unit,
+                    ai.current_target,
+                )?,
+                master,
+                masters: OwnerMasters::new(
                     &self.step.world.parts.own_master,
                     self.step.world.model.masters.of(self.player),
                 ),
-                &self.step.world.model.graphics,
-            ),
-            Some(ai),
-            (self.player_kind, self.step.world.world_time),
+                graphics: &self.step.world.model.graphics,
+                ai: Some(ai),
+                player_kind: self.player_kind,
+                now: self.step.world.world_time,
+            },
             roles,
             &self.step.world.model.tuning.turn,
         );

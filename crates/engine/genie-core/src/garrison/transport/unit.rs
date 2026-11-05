@@ -22,6 +22,27 @@ use crate::world::layer::Roles;
 use crate::world::step::Step;
 use genie_model::model::Model;
 
+/// What a Transport's sail reads and writes of the world ([`Unit::transport_sail`]): the spatial
+/// index, the zones and the paths it plans, the game data, its owner's masters, its terrain look
+/// and the sprite stream.
+#[derive(Debug)]
+pub(crate) struct SailWorld<'world> {
+    /// The spatial index.
+    pub(crate) spatial: &'world Spatial,
+    /// The map's zones, which the shore test labels.
+    pub(crate) zones: &'world mut Zones,
+    /// The path planners.
+    pub(crate) pathing: &'world mut Pathing,
+    /// The game data.
+    pub(crate) model: &'world Model,
+    /// The unit's player's masters.
+    pub(crate) masters: OwnerMasters<'world>,
+    /// The unit's terrain look.
+    pub(crate) look: Option<&'world Look>,
+    /// The sprite stream, which its standing sprite draws from.
+    pub(crate) sprite_rng: &'world mut Well512,
+}
+
 impl Unit {
     /// The Transport's update ([`crate::garrison::transport::TransportAction::update`] on the
     /// step): `transport_action`, the head's copy, runs and is written back after. What it reads of
@@ -70,13 +91,22 @@ impl Unit {
     /// its move; `motion` is the unit's motion layer, `top_speed` what its slot 0x208 reads.
     pub(crate) fn transport_sail(
         &mut self,
-        (mut transport_action, actions): (TransportAction, &mut Action),
-        (mut motion, top_speed): (MotionMut<'_>, TopSpeed),
+        mut transport_action: TransportAction,
+        actions: &mut Action,
+        mut motion: MotionMut<'_>,
+        top_speed: TopSpeed,
         point: Position,
-        (spatial, zones, pathing): (&Spatial, &mut Zones, &mut Pathing),
-        model: &Model,
-        (masters, look, sprite_rng): (OwnerMasters<'_>, Option<&Look>, &mut Well512),
+        world: SailWorld<'_>,
     ) -> GenieResult<()> {
+        let SailWorld {
+            spatial,
+            zones,
+            pathing,
+            model,
+            masters,
+            look,
+            sprite_rng,
+        } = world;
         let master = self.master_in(masters)?;
         let top = top_speed.of_object(motion.mover(), self.position().ground());
         let ship = Ship::of_unit(

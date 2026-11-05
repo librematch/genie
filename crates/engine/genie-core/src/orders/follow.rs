@@ -9,6 +9,7 @@ use crate::math::rng::Stream;
 use crate::movement::Speed;
 use crate::movement::ai_moves::MoveSprites;
 use crate::movement::ai_moves::PointMove;
+use crate::movement::move_to::ToObject;
 use crate::movement::move_to::{
     MoveToAction, TARGET_LACKING, holds_object, object_range, object_sprite,
 };
@@ -449,11 +450,16 @@ impl World {
         ))?;
         let move_to = MoveToAction::to_object(
             &self.spatial,
-            here,
-            (mover, top),
-            (target, target_state),
-            range,
-            (sprite, livestock),
+            ToObject {
+                me: here,
+                mover,
+                top,
+                target,
+                state: target_state,
+                range,
+                sprite,
+                livestock,
+            },
             &self.model,
         )?;
         if move_to.shows_standing() {

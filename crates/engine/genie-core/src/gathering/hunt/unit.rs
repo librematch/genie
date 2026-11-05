@@ -4,6 +4,7 @@ use crate::combat::attack::BeginLayer;
 use crate::combat::attack::{arms, engagement};
 use crate::combat::victims::victim;
 use crate::gathering::ActionEnd;
+use crate::gathering::gather::unit::WalkSprites;
 use crate::gathering::hunt::HuntChase;
 use crate::gathering::hunt::HuntState;
 use crate::gathering::hunt::{HuntAction, HuntTask, Quarry, stand_sprite};
@@ -315,16 +316,14 @@ impl Unit {
             release(step, self, site, by)?;
         }
         let walks = self.move_walks(
-            (
-                step.world.parts.mover_of(self.id),
-                step.world.top_speed_terms(step.player, self)?,
-            ),
-            MasterTables::new(&step.world.model.masters, &step.world.parts.own_master),
-            step.player,
-            (
-                &step.world.model.graphics,
-                step.world.parts.combat_of(self.id).abilities.look.as_ref(),
-            ),
+            step.world.parts.mover_of(self.id),
+            step.world.top_speed_terms(step.player, self)?,
+            WalkSprites {
+                every: MasterTables::new(&step.world.model.masters, &step.world.parts.own_master),
+                player: step.player,
+                graphics: &step.world.model.graphics,
+                look: step.world.parts.combat_of(self.id).abilities.look.as_ref(),
+            },
             roles,
         )?;
         let Some(mover) = step.world.parts.mover_mut(self.id) else {
@@ -565,16 +564,14 @@ impl Unit {
             ));
         }
         let walks = self.move_walks(
-            (
-                step.world.parts.mover_of(self.id),
-                step.world.top_speed_terms(step.player, self)?,
-            ),
-            MasterTables::new(&step.world.model.masters, &step.world.parts.own_master),
-            step.player,
-            (
-                &step.world.model.graphics,
-                step.world.parts.combat_of(self.id).abilities.look.as_ref(),
-            ),
+            step.world.parts.mover_of(self.id),
+            step.world.top_speed_terms(step.player, self)?,
+            WalkSprites {
+                every: MasterTables::new(&step.world.model.masters, &step.world.parts.own_master),
+                player: step.player,
+                graphics: &step.world.model.graphics,
+                look: step.world.parts.combat_of(self.id).abilities.look.as_ref(),
+            },
             roles,
         )?;
         if hunt.point.x() == -1.0 || hunt.point.y() == -1.0 {

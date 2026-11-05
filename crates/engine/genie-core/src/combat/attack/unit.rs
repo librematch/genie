@@ -3,6 +3,7 @@
 
 use crate::combat::MissileCount;
 use crate::combat::attack::Armament;
+use crate::combat::attack::AttackSource;
 use crate::combat::attack::{Attack, AttackState};
 use crate::combat::attack::{AttackReads, Fight};
 use crate::combat::damage::Victim;
@@ -120,20 +121,19 @@ impl Unit {
             .get(step.player.index())
             .map_or(PlayerKind::Phantom, |player| player.kind);
         let attack_reads = AttackReads::of(
-            (
-                step.world.parts.combat_of(self.id),
-                step.world.top_speed_terms(step.player, self)?,
-            ),
-            master,
-            (
-                OwnerMasters::new(
+            AttackSource {
+                combat: step.world.parts.combat_of(self.id),
+                top_speed: step.world.top_speed_terms(step.player, self)?,
+                master,
+                masters: OwnerMasters::new(
                     &step.world.parts.own_master,
                     step.world.model.masters.of(step.player),
                 ),
-                &step.world.model.graphics,
-            ),
-            step.world.parts.unit_ai.get(self.id),
-            (player_kind, step.world.world_time),
+                graphics: &step.world.model.graphics,
+                ai: step.world.parts.unit_ai.get(self.id),
+                player_kind,
+                now: step.world.world_time,
+            },
             roles,
             &step.world.model.tuning.turn,
         );
@@ -166,20 +166,19 @@ impl Unit {
             .get(step.player.index())
             .map_or(PlayerKind::Phantom, |player| player.kind);
         let attack_reads = AttackReads::of(
-            (
-                step.world.parts.combat_of(self.id),
-                step.world.top_speed_terms(step.player, self)?,
-            ),
-            master,
-            (
-                OwnerMasters::new(
+            AttackSource {
+                combat: step.world.parts.combat_of(self.id),
+                top_speed: step.world.top_speed_terms(step.player, self)?,
+                master,
+                masters: OwnerMasters::new(
                     &step.world.parts.own_master,
                     step.world.model.masters.of(step.player),
                 ),
-                &step.world.model.graphics,
-            ),
-            step.world.parts.unit_ai.get(self.id),
-            (player_kind, step.world.world_time),
+                graphics: &step.world.model.graphics,
+                ai: step.world.parts.unit_ai.get(self.id),
+                player_kind,
+                now: step.world.world_time,
+            },
             roles,
             &step.world.model.tuning.turn,
         );

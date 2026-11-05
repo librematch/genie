@@ -38,6 +38,7 @@ pub use self::shore::MapShore;
 pub(crate) use self::shore::{DropDraws, in_zone, retry_point};
 pub use self::transport_mode::TransportMode;
 pub use self::transport_state::TransportState;
+pub(crate) use self::unit::SailWorld;
 use crate::map::RestrictionId;
 use crate::math::image::transport::{DRAW_SCALE as TRANSPORT_DRAW_SCALE, NONE as TRANSPORT_NONE};
 #[cfg(test)]

@@ -403,6 +403,27 @@ impl Walls<'_> {
     }
 }
 
+/// What [`enter_reach`] tests: the entering unit (its id, its movement state and where it last
+/// moved to) and its target (its id, its mover and its top speed, slot 0x208) within the reach
+/// `range`.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct EnterReach<'world> {
+    /// The entering unit.
+    pub(crate) id: ObjectId,
+    /// Its movement state.
+    pub(crate) stats: &'world MoveStats,
+    /// Where it last moved to (slot 0x520).
+    pub(crate) moved_at: Position,
+    /// Its target.
+    pub(crate) target: ObjectId,
+    /// The target's mover, which says where it last moved to.
+    pub(crate) target_mover: Option<&'world Mover>,
+    /// The target's top speed (slot 0x208, `0x140a85c82`).
+    pub(crate) target_speed: Speed,
+    /// The reach.
+    pub(crate) range: Distance,
+}
+
 /// [`EnterAction::in_reach`] of the unit `id` (its movement state `stats`, its place in
 /// `spatial`) for its target `target` (where it last moved to, by its mover, and its top speed
 /// slot 0x208, `0x140a85c82`): the squared
@@ -410,11 +431,18 @@ impl Walls<'_> {
 /// moved to (slot 0x520), its buildings those whose master (`by_id`'s) is of type 80.
 pub(crate) fn enter_reach(
     spatial: &mut Spatial,
-    (id, stats, moved_at): (ObjectId, &MoveStats, Position),
-    (target, target_mover, target_speed): (ObjectId, Option<&Mover>, Speed),
-    range: Distance,
+    reach: EnterReach<'_>,
     by_id: ObjectsRef<'_>,
 ) -> GenieResult<bool> {
+    let EnterReach {
+        id,
+        stats,
+        moved_at,
+        target,
+        target_mover,
+        target_speed,
+        range,
+    } = reach;
     let me = spatial
         .get_known(id)?
         .ok_or(GenieError::unsupported("an entering unit without a place"))?;
@@ -468,9 +496,15 @@ pub(crate) fn enter_view(
     };
     let in_reach = enter_reach(
         spatial,
-        (unit.id, &stats, moved_at),
-        (target.id, target_mover, target_speed),
-        range,
+        EnterReach {
+            id: unit.id,
+            stats: &stats,
+            moved_at,
+            target: target.id,
+            target_mover,
+            target_speed,
+            range,
+        },
         by_id,
     )?;
     // the reach above read both records (`enter_reach`), and nothing between removes one
@@ -496,9 +530,9 @@ pub(crate) fn enter_view(
     ))
 }
 
-/// What `FUN_140a85f30` ([`meeting_point`]) reads where an Enter's `set_state(4)` or its constructor
-/// meets its target: the map and its zones, the target with its master and whether it has room
-/// for the unit, and the unit.
+/// What `FUN_140a85f30` ([`meeting_point`]) reads where an Enter's `set_state(4)` or its
+/// constructor meets its target: the map and its zones, the target with its master and whether it
+/// has room for the unit, and the unit.
 pub(crate) struct Meeting<'world> {
     /// The map, its places and its terrain.
     pub(crate) spatial: &'world mut Spatial,
@@ -554,9 +588,9 @@ impl Meeting<'_> {
 }
 
 /// A transport's slot 0x3d8 (`FUN_14114ffc0`) for an Enter: whether `ship` reaches within
-/// `GarrisonTuning::enter_near` of the point's tile (the point truncated), [`crate::movement::Mover::reaches`]
-/// from where it last moved to (`actions`, its action layer; `top_speed`, what its top speed
-/// reads); one without movement state does not.
+/// `GarrisonTuning::enter_near` of the point's tile (the point truncated),
+/// [`crate::movement::Mover::reaches`] from where it last moved to (`actions`, its action layer;
+/// `top_speed`, what its top speed reads); one without movement state does not.
 pub(crate) fn ship_reaches(
     (ship, actions, (mover, top_speed)): (&Unit, &Action, (Option<&Mover>, TopSpeed)),
     world: &mut Spatial,

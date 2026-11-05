@@ -53,26 +53,72 @@ pub(crate) fn search_origin<T>(point: Point, site: Option<T>, unit: Position) ->
     }
 }
 
-/// [`crate::gathering::gather_search::closest_resource_at`] for `unit` with its mover of gather group `kind` with fewer
-/// than `cap` workers (−1 any) from the drop site `site` (if any; one the world does not hold
-/// counts as none, `FUN_1415417a0`), its unit AI's current target `current` passed over, below
-/// state `min_state` nothing found, and without a site from `point` unless that is (−1, −1)
-/// (`param_7`, `param_8`; [`crate::unit_ai::NO_POINT`]: the unit's place, as with a site): the
-/// site's place, its master's radii and line of sight, and whether the search starts from its
-/// footprint (the site's tile in the unit's zone of its restriction, or a dock: masters 45 and
-/// 2172, `0x140c49d17`); the answer and the out argument's steps.
+/// What [`closest_resource_of`] looks for: a resource of the group `kind` with fewer than `cap`
+/// workers near the drop site `site`, other than the `current` one, in `min_state` or later, about
+/// `point`.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct SoughtResource {
+    /// The resource group.
+    pub(crate) kind: GatherGroup,
+    /// The workers' cap.
+    pub(crate) cap: WorkerCount,
+    /// The drop site the search starts from.
+    pub(crate) site: Option<DropSiteId>,
+    /// The resource it holds now.
+    pub(crate) current: Option<ObjectId>,
+    /// The least state of a found one.
+    pub(crate) min_state: ObjectState,
+    /// Where the search looks about.
+    pub(crate) point: Point,
+}
+
+/// The gatherer that [`closest_resource_of`] searches for: the unit, its action layer, its mover
+/// and what its top speed reads (slot 0x208).
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct Gatherer<'world> {
+    /// The gatherer.
+    pub(crate) unit: &'world Unit,
+    /// Its action layer.
+    pub(crate) actions: &'world Action,
+    /// Its mover.
+    pub(crate) mover: Option<&'world Mover>,
+    /// What its top speed reads besides its own speed and its place.
+    pub(crate) top_speed: TopSpeed,
+}
+
+/// [`crate::gathering::gather_search::closest_resource_at`] for `unit` with its mover of gather
+/// group `kind` with fewer than `cap` workers (−1 any) from the drop site `site` (if any; one the
+/// world does not hold counts as none, `FUN_1415417a0`), its unit AI's current target `current`
+/// passed over, below state `min_state` nothing found, and without a site from `point` unless that
+/// is (−1, −1) (`param_7`, `param_8`; [`crate::unit_ai::NO_POINT`]: the unit's place, as with a
+/// site): the site's place, its master's radii and line of sight, and whether the search starts
+/// from its footprint (the site's tile in the unit's zone of its restriction, or a dock: masters 45
+/// and 2172, `0x140c49d17`); the answer and the out argument's steps.
 pub(crate) fn closest_resource_of(
-    (unit, actions, mover, top_speed): (&Unit, &Action, Option<&Mover>, TopSpeed),
+    gatherer: Gatherer<'_>,
     resource_world: &mut ResourceWorld<'_, '_>,
     others: OthersRef<'_>,
-    (kind, cap, site): (GatherGroup, WorkerCount, Option<DropSiteId>),
-    (current, min_state, point): (Option<ObjectId>, ObjectState, Point),
+    sought: SoughtResource,
     by_id: ObjectsRef<'_>,
     roles: &Roles,
 ) -> GenieResult<(Option<ObjectId>, Option<i32>)> {
     use crate::gathering::gather_search::closest_resource_at;
     use crate::gathering::gather_search::{self, Candidate, Candidates, ResourceWorld};
     use crate::movement::UnitReach;
+    let Gatherer {
+        unit,
+        actions,
+        mover,
+        top_speed,
+    } = gatherer;
+    let SoughtResource {
+        kind,
+        cap,
+        site,
+        current,
+        min_state,
+        point,
+    } = sought;
     let gather_search_tuning = &by_id.tuning().gather_search;
 
     let site = match site.filter(|&role_id| resource_world.spatial.get(role_id).is_some()) {
@@ -225,12 +271,12 @@ impl UnitView<'_, '_> {
             },
         };
         let (id, _) = closest_resource_of(
-            (
-                self.unit,
-                &*self.actions,
-                self.step.world.parts.mover_of(self.unit.id),
+            Gatherer {
+                unit: self.unit,
+                actions: &*self.actions,
+                mover: self.step.world.parts.mover_of(self.unit.id),
                 top_speed,
-            ),
+            },
             &mut resource_world,
             owner_view(
                 &self.step.world.players,
@@ -238,8 +284,14 @@ impl UnitView<'_, '_> {
                 self.step.player,
                 self.new_owner,
             )?,
-            (search.kind, search.cap, search.site),
-            (search.current, search.min_state, search.point),
+            SoughtResource {
+                kind: search.kind,
+                cap: search.cap,
+                site: search.site,
+                current: search.current,
+                min_state: search.min_state,
+                point: search.point,
+            },
             by_id,
             &self.step.world.model.roles,
         )?;
@@ -267,9 +319,9 @@ impl UnitView<'_, '_> {
 
 impl Unit {
     /// The unit AI's `ClosestResourceObject` (slot 0x80, `FUN_140c49760`) with no drop site, no
-    /// point and `param_6` 2 ([`crate::gathering::gather_search::closest_resource`]): the closest object of
-    /// gather group `kind` with fewer than `cap` workers (−1 any) the unit reaches (slot 0x3d0
-    /// with range 0), from the tiles the player explored that the unit's restriction lets it
+    /// point and `param_6` 2 ([`crate::gathering::gather_search::closest_resource`]): the closest
+    /// object of gather group `kind` with fewer than `cap` workers (−1 any) the unit reaches (slot
+    /// 0x3d0 with range 0), from the tiles the player explored that the unit's restriction lets it
     /// stand on; None for none.
     pub(crate) fn resource_search(
         &self,
@@ -282,9 +334,9 @@ impl Unit {
     }
 
     /// [`Unit::resource_search`] from the drop site `site` (if any;
-    /// [`crate::gathering::gather_search::closest_resource_at`]): the site's place, its master's radii and
-    /// line of sight, and whether the search starts from its footprint (the site's tile in the
-    /// unit's zone of its restriction, or a dock: masters 45 and 2172, `0x140c49d17`).
+    /// [`crate::gathering::gather_search::closest_resource_at`]): the site's place, its master's
+    /// radii and line of sight, and whether the search starts from its footprint (the site's tile
+    /// in the unit's zone of its restriction, or a dock: masters 45 and 2172, `0x140c49d17`).
     pub(crate) fn resource_search_from(
         &self,
         actions: &Action,
@@ -334,11 +386,22 @@ impl Unit {
         };
         let search = (current, ObjectState::Alive, NO_POINT);
         closest_resource_of(
-            (self, actions, step.world.parts.mover_of(self.id), top_speed),
+            Gatherer {
+                unit: self,
+                actions,
+                mover: step.world.parts.mover_of(self.id),
+                top_speed,
+            },
             &mut resource_world,
             others,
-            (kind, cap, site),
-            search,
+            SoughtResource {
+                kind,
+                cap,
+                site,
+                current: search.0,
+                min_state: search.1,
+                point: search.2,
+            },
             by_id,
             &step.world.model.roles,
         )

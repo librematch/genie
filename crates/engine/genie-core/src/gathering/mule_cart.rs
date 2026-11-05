@@ -3,6 +3,8 @@
 
 use crate::construction::build::CART_TASK;
 use crate::gathering::DropSiteId;
+use crate::gathering::closest_resource::Gatherer;
+use crate::gathering::closest_resource::SoughtResource;
 use crate::gathering::closest_resource::{ResourceWorld, closest_resource_of};
 use crate::map::DistanceSquared;
 use crate::map::Position;
@@ -188,16 +190,22 @@ impl World {
             let mut found = Vec::new();
             for kind in kinds {
                 let (object_id, _) = closest_resource_of(
-                    (
-                        &cart,
-                        self.parts.actions_of(cart.id),
-                        self.parts.mover_of(cart.id),
+                    Gatherer {
+                        unit: &cart,
+                        actions: self.parts.actions_of(cart.id),
+                        mover: self.parts.mover_of(cart.id),
                         top_speed,
-                    ),
+                    },
                     &mut resource_world,
                     others,
-                    (kind, WorkerCount::NO_CAP, Some(DropSiteId::new(id))),
-                    (current, ObjectState::Foundation, NO_POINT),
+                    SoughtResource {
+                        kind,
+                        cap: WorkerCount::NO_CAP,
+                        site: Some(DropSiteId::new(id)),
+                        current,
+                        min_state: ObjectState::Foundation,
+                        point: NO_POINT,
+                    },
                     ObjectsRef::new(
                         &self.players,
                         &self.index,
