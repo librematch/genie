@@ -27,7 +27,9 @@ pub use self::combat_level::CombatLevel;
 pub use self::cost_amount::CostAmount;
 pub use self::cost_slot::{COST_SLOTS, CostSlot, entries as cost_entries};
 pub use self::derived::{follow, follow_moving};
-pub use self::lookup::{MasterTables, OwnerMasters, PlayersMastersExt, player_master, work_master};
+pub use self::lookup::{
+    MasterTables, OwnerMasters, PlayersMastersExt, player_master, player_masters, work_master,
+};
 pub use self::missile_part::MissilePart;
 pub use self::moving_part::MovingPart;
 pub use self::spacing_modifier::SpacingModifier;

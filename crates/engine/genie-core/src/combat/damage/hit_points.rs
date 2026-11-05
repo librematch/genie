@@ -65,9 +65,9 @@ pub(super) fn effective(victim: &Victim) -> HitPoints {
 
 /// Slot 0xb0, the loss of `hit_points` hit points: a combat object of type 70 or 80
 /// (`FUN_141205c80`) takes it on its hit point powerups' room first, and its hit points stay above
-/// its `invulnerability_level` floor; left below 1, its stingers credit its kill ([`credit`]).
-/// Another object (`FUN_141189160`) just loses it. Not ported yet (MISSING.md): a surviving
-/// object's hit point transforms (`+0xb20`, `FUN_141204450`).
+/// its `invulnerability_level` floor; left below 1 (`COMISS` with 1, `JC`: a NaN too), its
+/// stingers credit its kill ([`credit`]), else its hit point transforms run
+/// ([`Victim::transform_in_hit`]). Another object (`FUN_141189160`) just loses it.
 pub fn lose(victim: &mut Victim, damage: HitPoints) {
     let unit = matches!(victim.kind, MasterKind::COMBAT | MasterKind::BUILDING);
     let Some(armored) = victim.armored.as_mut().filter(|_| unit) else {
@@ -84,7 +84,11 @@ pub fn lose(victim: &mut Victim, damage: HitPoints) {
     } else {
         floor
     };
-    credit(victim);
+    if below_or_unordered(victim.hp.get(), 1.0) {
+        credit(victim);
+    } else {
+        victim.transform_in_hit();
+    }
 }
 
 /// Slot 0xc8 (200) of a combat unit or building (`FUN_141202bb0`), its most hit points: its hit

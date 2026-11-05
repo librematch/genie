@@ -12,6 +12,10 @@ object, a combat unit, and a building, whose annex passes the hit to its main bu
 `shown_values.rs` holds the bonus damage tasks, and the attack, armor and range that a combat
 object shows.
 
+A loss that leaves a combat unit or building at 1 hit point or more runs its hit point
+transforms. A transform that holds gives the target another master at once, and the rest of
+the hit reads that master (`master_change.rs`). The write-back gives the object the same master.
+
 When a melee hit lands is decided in `combat/attack/`. A missile's hit is decided in
 `combat/missile/`.
 
@@ -32,14 +36,16 @@ When a melee hit lands is decided in `combat/attack/`. A missile's hit is decide
 | [`blasts.rs`](blasts.rs) | The damage beyond what a blast has done (`FUN_141082e80`) and the blast itself (slot 0x848). |
 | [`hit_factors.rs`](hit_factors.rs) | A hit's factors: the elevation, the facing offset and the charges (`FUN_1412623d0`). |
 | [`hit_points.rs`](hit_points.rs) | The shield, the invulnerability floor, and the hit points' loss (slot 0xb0) and gain (slot 0xb8). |
+| [`master_change.rs`](master_change.rs) | A hit's victim that changes its master in the hit: slot 22's hit point transforms (`FUN_141204450`) give it another master at once, and the rest of the hit reads that master's values (`Victim::take_master`). |
 | [`mod.rs`](mod.rs) | The damage side of a hit: what it reads of its target and its attacker and what it changes. |
 | [`shown_values.rs`](shown_values.rs) | The bonus damage tasks (`FUN_14107ce60`) and the attack, armor and range a combat object shows. |
 | [`taking.rs`](taking.rs) | A target's slot 0xe8: a building's, a static object's and a combat unit's, with the unit's facing, its retaliation and the hit's end. |
 | [`tests.rs`](tests.rs) | Tests. |
+| [`master_change/`](master_change/) | The master change's tests. |
 <!-- /files -->
 
 ## How it connects
 
 <!-- uses -->
-- Uses: [`construction`](../../construction/), [`map`](../../map/), [`math`](../../math/), [`objects`](../../objects/), [`players`](../../players/), [`world`](../../world/).
+- Uses: [`construction`](../../construction/), [`map`](../../map/), [`math`](../../math/), [`objects`](../../objects/), [`orders`](../../orders/), [`players`](../../players/), [`world`](../../world/).
 <!-- /uses -->

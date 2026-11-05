@@ -6,7 +6,7 @@ use crate::combat::damage::TransformTest;
 use crate::combat::damage::Victim;
 use crate::combat::damage::blast;
 use crate::combat::victims::file_kill;
-use crate::combat::victims::{VictimLayers, VictimView};
+use crate::combat::victims::{ChargeOf, VictimLayers, VictimView};
 use crate::combat::victims::{victim_of, write_back};
 use crate::construction::Annexes;
 use crate::construction::gates::gate_units;
@@ -29,6 +29,7 @@ use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::PlayersMastersExt;
+use crate::objects::masters::player_masters;
 use crate::objects::sprite::new_sprite;
 use crate::objects::unit::Unit;
 use crate::objects::unit::object_master;
@@ -562,14 +563,15 @@ impl Unit {
                 unit: self,
                 layers: VictimLayers::of(&step.world.parts, self.id, actions),
                 master,
-                special_charge: step.world.special_charge(self, master)?,
+                charge_of: ChargeOf(&|with| step.world.special_charge(self, with)),
                 player: step.player,
+                masters: player_masters(&step.world.model.masters, step.player)?,
                 attributes: &step.world.players.player(step.player)?.attributes,
                 terrain,
                 mode_680: step.world.mode_680,
             },
             roles,
-        );
+        )?;
         let mut targets: Vec<&mut Victim> = step.blasted.iter_mut().collect();
         blast(
             &mut own,
@@ -591,6 +593,7 @@ impl Unit {
             }
         }
         step.blasted = blasted;
+        self.take_own_master_changes(step, actions, &mut own)?;
         let now = step.world.world_time;
         if let Some(own) = self.hit_back(own, step.world.parts.ai_and_combat_mut(self.id)?, now)? {
             file_kill(step, (self, actions), own, roles)?;

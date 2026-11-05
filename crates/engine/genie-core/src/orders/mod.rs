@@ -53,7 +53,7 @@ mod form;
 mod gather;
 mod interact;
 mod master_change;
-pub(crate) use self::master_change::ActionsOnChange;
+pub(crate) use self::master_change::{ActionsOnChange, hit_point_share};
 mod moves;
 pub(crate) use self::moves::{PACK_OR_UNPACK, placed_reach};
 mod order_flags;

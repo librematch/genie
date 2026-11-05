@@ -8,7 +8,7 @@ use crate::combat::attack::{
 };
 use crate::combat::attack::{AttackReads, Fight};
 use crate::combat::damage::Victim;
-use crate::combat::victims::{VictimLayers, VictimView};
+use crate::combat::victims::{ChargeOf, VictimLayers, VictimView};
 use crate::combat::victims::{victim_in, victim_of};
 use crate::combat::{AttackCount, AttackTargetId};
 use crate::map::Tile;
@@ -23,6 +23,7 @@ use crate::objects::masters::PlayersMastersExt;
 use crate::objects::masters::TaskGroup;
 use crate::objects::masters::TaskSprites;
 use crate::objects::masters::player_master;
+use crate::objects::masters::player_masters;
 use crate::objects::masters::{Master, OwnerMasters};
 use crate::objects::release::Releaser;
 use crate::objects::sprite::new_sprite;
@@ -426,8 +427,9 @@ impl UnitView<'_, '_> {
                     self.step.world.parts.actions.of(unit.id),
                 ),
                 master,
-                special_charge: self.step.world.special_charge(unit, master)?,
+                charge_of: ChargeOf(&|with| self.step.world.special_charge(unit, with)),
                 player: player_id,
+                masters: player_masters(&self.step.world.model.masters, player_id)?,
                 attributes,
                 terrain: self.step.world.spatial.terrain.as_ref(),
                 mode_680: self.step.world.mode_680,
@@ -436,7 +438,7 @@ impl UnitView<'_, '_> {
             &dip,
             &self.step.world.spatial,
             roles,
-        )))
+        )?))
     }
 
     /// What the start's `set_state(6)` of the unit's new Attack on `target` reads
@@ -460,18 +462,19 @@ impl UnitView<'_, '_> {
                 unit,
                 layers: VictimLayers::of(&self.step.world.parts, unit.id, &*self.actions),
                 master,
-                special_charge: self.step.world.special_charge_with(
-                    unit,
-                    ai.current_target,
-                    master,
-                )?,
+                charge_of: ChargeOf(&|with| {
+                    self.step
+                        .world
+                        .special_charge_with(unit, ai.current_target, with)
+                }),
                 player: self.player,
+                masters: player_masters(&self.step.world.model.masters, self.player)?,
                 attributes: &self.step.world.players.player(self.player)?.attributes,
                 terrain: self.step.world.spatial.terrain.as_ref(),
                 mode_680: self.step.world.mode_680,
             },
             roles,
-        );
+        )?;
         let reads = AttackReads::of(
             AttackSource {
                 combat: self.step.world.parts.combat_of(unit.id),

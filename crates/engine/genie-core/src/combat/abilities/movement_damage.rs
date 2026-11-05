@@ -7,7 +7,7 @@ use crate::combat::damage::Victim;
 use crate::combat::damage::lose;
 use crate::combat::kill_counts::KilledMaster;
 use crate::combat::victims::victim_of;
-use crate::combat::victims::{VictimLayers, VictimView};
+use crate::combat::victims::{ChargeOf, VictimLayers, VictimView, change_masters_of_hit};
 use crate::construction::build::NOT_HELD;
 use crate::map::Distance;
 use crate::map::Footprint;
@@ -26,6 +26,7 @@ use crate::objects::masters::BlastLevel;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::Task;
+use crate::objects::masters::player_masters;
 use crate::players::AllyTest;
 use crate::players::Amount;
 use crate::players::PlayerId;
@@ -320,16 +321,18 @@ impl World {
                 unit,
                 layers: VictimLayers::of(&self.parts, unit.id, self.parts.actions.of(unit.id)),
                 master,
-                special_charge: self.special_charge(unit, master)?,
+                charge_of: ChargeOf(&|with| self.special_charge(unit, with)),
                 player: player_id,
+                masters: player_masters(&self.model.masters, player_id)?,
                 attributes: &self.players.player(player_id)?.attributes,
                 terrain: self.spatial.terrain.as_ref(),
                 mode_680: self.mode_680,
             },
             &self.model.roles,
-        );
+        )?;
         lose(&mut victim, damage);
         let killed = finish(&mut victim) == HitEnd::Killed;
+        change_masters_of_hit(self, &mut victim)?;
         let (_, unit) = self.object_mut(bystander.id).ok_or(NOT_HELD)?;
         unit.life.hp = victim.hp;
         unit.life.amount = victim.amount;

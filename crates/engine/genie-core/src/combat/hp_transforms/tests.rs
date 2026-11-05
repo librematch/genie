@@ -2,7 +2,9 @@
 
 use crate::combat::attack::AttackState;
 use crate::combat::attack::tests::own_attack;
-use crate::combat::hp_transforms::{HP_TRANSFORM, HpTransform, hp_transforms};
+use crate::combat::damage::{Victim, lose};
+use crate::combat::hp_transforms::{HP_TRANSFORM, HitTransforms, HpTransform, hp_transforms};
+use crate::combat::victims::change_masters_of_hit;
 use crate::map::Distance;
 use crate::map::GridSize;
 use crate::map::Position;
@@ -24,6 +26,7 @@ use crate::objects::masters::Task;
 use crate::objects::masters::TaskFlags;
 use crate::objects::masters::WorkValue;
 use crate::players::Amount;
+use crate::players::PlayerId;
 use crate::players::attribute::AttributeId;
 use crate::testing::player_holding;
 use crate::testing::scene::{PLAYER, Scene, SceneObject, moving_master, walking};
@@ -33,6 +36,7 @@ use crate::world::WholeSeconds;
 use crate::world::World;
 use crate::world::index::Place;
 use crate::world::slots::PlayerSlotsExt;
+use crate::world::tests::in_update;
 
 /// A hit point transform task into master `into` at `threshold`, without attributes, not
 /// scaled.
@@ -133,7 +137,7 @@ fn holder(enabled: f32, added: f32) -> Player {
 /// The master `transform` gives an object of master 1974 at `hp` hit points of `player`.
 fn found(transform: HpTransform, hp: f32, player: &Player) -> Option<MasterId> {
     transform
-        .master_of(&jian(1974, Vec::new()), hp, player, &jians())
+        .master_of(&jian(1974, Vec::new()), hp, &player.attributes, &jians())
         .expect("the player's attributes")
         .map(|master| master.id)
 }
@@ -216,14 +220,18 @@ fn transform_reads_its_player_attributes_and_scales_by_the_master() {
         ..into_1976(10.0)
     };
     let master = jian(1974, Vec::new());
-    assert!(unheld.master_of(&master, 31.0, &player, &jians()).is_err());
+    assert!(
+        unheld
+            .master_of(&master, 31.0, &player.attributes, &jians())
+            .is_err()
+    );
     let unheld_enablement = HpTransform {
         enablement: Some(AttributeId::named(9)),
         ..into_1976(10.0)
     };
     assert!(
         unheld_enablement
-            .master_of(&master, 31.0, &player, &jians())
+            .master_of(&master, 31.0, &player.attributes, &jians())
             .is_err()
     );
 }
@@ -387,4 +395,83 @@ fn regeneration_past_threshold_transforms_the_unit() {
         transformed(&hurt),
         (MasterId::named(1976), HitPoints::new(44.0), true)
     );
+}
+
+/// Object 7 as a hit of player 2 reads it.
+fn hit_victim(world: &World) -> Victim {
+    world
+        .victim(ObjectId::try_from(7).unwrap(), PlayerId::new(2))
+        .unwrap()
+        .expect("object 7 lives")
+}
+
+/// A hit's read of a transforming unit resolves its transforms: from its master on, each master
+/// a transform gives with what the hit reads of it; a master without transforms has none.
+#[test]
+fn hit_victim_reads_the_masters_its_transforms_give() {
+    let victim = hit_victim(&jian_world(46.0));
+    let into = |current, hp| {
+        victim
+            .transforms
+            .first_holding(MasterId::named(current), HitPoints::new(hp))
+            .map(|master| (master.id, master.reads.master_id))
+    };
+    let jian_1976 = MasterId::named(1976);
+    assert_eq!(into(1974, 44.0), Some((jian_1976, jian_1976)));
+    assert_eq!(into(1974, 46.0), None);
+    assert_eq!(into(1976, 46.0), None, "1976 has no transform");
+    let plain = Scene::open(GridSize::new(8, 8))
+        .object(SceneObject::new(
+            7,
+            PLAYER,
+            jian(1974, Vec::new()),
+            Position::new(2.5, 2.5, 0.0),
+        ))
+        .build();
+    assert_eq!(hit_victim(&plain).transforms, HitTransforms::default());
+}
+
+/// Slot 22 in a hit that leaves the victim past its threshold gives it the new master at once
+/// (the rest of the hit reads it) and records it; the write-back gives the object the new master
+/// with its actions kept. A loss below 1 hit point credits the kill and transforms nothing.
+#[test]
+fn hit_loss_past_threshold_changes_the_master_at_once_and_at_write_back() {
+    let mut world = jian_world(46.0);
+    let mut victim = hit_victim(&world);
+    lose(&mut victim, HitPoints::new(2.0));
+    let jian_1976 = MasterId::named(1976);
+    assert_eq!(
+        (victim.master_id, victim.hp, victim.master_changes.clone()),
+        (jian_1976, HitPoints::new(44.0), vec![jian_1976])
+    );
+    change_masters_of_hit(&mut world, &mut victim).unwrap();
+    assert_eq!(victim.master_changes, []);
+    assert_eq!(transformed(&world).0, jian_1976);
+    assert!(transformed(&world).2, "its actions kept");
+    let mut dying = hit_victim(&jian_world(1.5));
+    lose(&mut dying, HitPoints::new(1.0));
+    assert_eq!(
+        (dying.master_id, dying.master_changes.len()),
+        (MasterId::named(1974), 0)
+    );
+}
+
+/// The updating unit's own master changes (a retaliation's transforms) go to it lent to the
+/// world.
+#[test]
+fn own_master_changes_go_to_the_updating_unit() {
+    let mut world = jian_world(40.0);
+    let Some(Place::Live(player, idx)) = world.place(ObjectId::try_from(7).unwrap()) else {
+        panic!("object 7 lives");
+    };
+    let master = in_update(&mut world, (player, idx), 0, |unit, actions, step| {
+        let mut own = Victim {
+            master_changes: vec![MasterId::named(1976)],
+            ..Victim::default()
+        };
+        unit.take_own_master_changes(step, actions, &mut own)?;
+        Ok(unit.life.master_id)
+    })
+    .unwrap();
+    assert_eq!(master, MasterId::named(1976));
 }

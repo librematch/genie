@@ -12,6 +12,7 @@ use crate::objects::ObjectKey;
 use crate::objects::lifecycle::MasterData;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterKind;
+use crate::objects::masters::player_masters;
 use crate::objects::unit::Unit;
 use crate::players::Amount;
 use crate::players::PlayerId;
@@ -24,7 +25,9 @@ use crate::world::slots::PlayerSlotsExt;
 use crate::world::step::Step;
 use crate::{GenieError, GenieResult};
 
-pub(crate) use crate::combat::victim_reads::{VictimLayers, VictimView, victim_in, victim_of};
+pub(crate) use crate::combat::victim_reads::{
+    ChargeOf, VictimLayers, VictimView, victim_in, victim_of,
+};
 use crate::construction::MainBuildingId;
 use crate::map::spatial::TileSight;
 use crate::math::conversions::cvttss2si;
@@ -60,8 +63,9 @@ impl World {
                 unit,
                 layers: VictimLayers::of(&self.parts, unit.id, self.parts.actions.of(unit.id)),
                 master,
-                special_charge: self.special_charge(unit, master)?,
+                charge_of: ChargeOf(&|with| self.special_charge(unit, with)),
                 player: player_id,
+                masters: player_masters(&self.model.masters, player_id)?,
                 attributes: &self.players.player(player_id)?.attributes,
                 terrain: self.spatial.terrain.as_ref(),
                 mode_680: self.mode_680,
@@ -70,7 +74,7 @@ impl World {
             &world,
             &self.spatial,
             &self.model.roles,
-        )))
+        )?))
     }
 
     /// The object `id` as the unit AI of a unit of player `viewer` finds it in the world's object
@@ -252,8 +256,9 @@ pub(crate) fn victim(
                 step.world.parts.actions.of(unit.id),
             ),
             master,
-            special_charge: step.world.special_charge(unit, master)?,
+            charge_of: ChargeOf(&|with| step.world.special_charge(unit, with)),
             player: player_id,
+            masters: player_masters(&step.world.model.masters, player_id)?,
             attributes,
             terrain: step.world.spatial.terrain.as_ref(),
             mode_680: step.world.mode_680,
@@ -262,7 +267,7 @@ pub(crate) fn victim(
         &sides,
         &step.world.spatial,
         roles,
-    )))
+    )?))
 }
 
 /// The hit's changes on its victim `victim`, written back to the world where the hit ran. An object
@@ -296,6 +301,7 @@ pub(crate) fn write_back(
     let Some((_, _, sleeps)) = step.world.locate(victim.id) else {
         return Ok(None);
     };
+    change_masters_of_hit(step.world, victim)?;
     if sleeps {
         let (_, unit) = step.world.object_mut(victim.id).ok_or(NOT_LOCATED)?;
         unit.life.hp = victim.hp;
@@ -350,6 +356,31 @@ pub(crate) fn write_back(
     let counts = left.kill.is_some() || !left.counts.is_empty() || !left.razed.is_empty();
     Ok(counts.then_some(left))
 }
+
+/// The masters a hit's victim took ([`Victim::master_changes`]: slot 22's hit point transforms in
+/// the hit), given to the object in their order ([`World::transform_into`]) before its write-back
+/// gives it the hit's hit points: each change's share of them is the hit's own. Only a combat
+/// unit or building transforms, and neither sleeps.
+///
+/// # Errors
+///
+/// A victim asleep or gone with master changes, and the master change's.
+pub(crate) fn change_masters_of_hit(world: &mut World, victim: &mut Victim) -> GenieResult<()> {
+    let changes = take(&mut victim.master_changes);
+    if changes.is_empty() {
+        return Ok(());
+    }
+    let Some(Place::Live(player, idx)) = world.place(victim.id) else {
+        return Err(CHANGED_ASLEEP.with("object", victim.id));
+    };
+    changes
+        .iter()
+        .try_for_each(|&new| world.transform_into(player, idx, new))
+}
+
+/// A hit's victim with master changes that the world does not hold live.
+const CHANGED_ASLEEP: GenieError =
+    GenieError::invalid_input("a hit's victim with master changes that is not live");
 
 /// [`write_back`]'s decay: a hunt that stopped the victim's decay (`FUN_140ac44b0`, its sign
 /// changed) gave it a master of its own (`FUN_141186d10`: a copy of the master it reads unless

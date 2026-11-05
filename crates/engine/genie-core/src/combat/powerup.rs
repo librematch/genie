@@ -8,7 +8,7 @@ use crate::combat::damage::ArmorBonuses;
 use crate::combat::damage::Shown;
 use crate::combat::damage::shown_attack;
 use crate::combat::victims::victim_of;
-use crate::combat::victims::{VictimLayers, VictimView};
+use crate::combat::victims::{ChargeOf, VictimLayers, VictimView};
 use crate::map::Distance;
 use crate::math::conversions::cvttss2si;
 use crate::math::image::powerup::SPEED_SHARE_BASE;
@@ -24,6 +24,7 @@ use crate::objects::masters::DamageClass;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::player_master;
+use crate::objects::masters::player_masters;
 use crate::vision::SightLayer;
 use crate::world::Millis;
 use crate::world::Seconds;
@@ -543,14 +544,15 @@ impl World {
                 unit,
                 layers: VictimLayers::of(&self.parts, unit.id, self.parts.actions_of(unit.id)),
                 master,
-                special_charge: self.special_charge(unit, master)?,
+                charge_of: ChargeOf(&|with| self.special_charge(unit, with)),
                 player,
+                masters: player_masters(&self.model.masters, player)?,
                 attributes: &owner.attributes,
                 terrain,
                 mode_680: self.mode_680,
             },
             roles,
-        );
+        )?;
         let actions = self.parts.actions_of(unit.id);
         let attacked = (actions.top_action_kind() == Some(ATTACK))
             .then(|| actions.top_target())
@@ -567,14 +569,15 @@ impl World {
                             self.parts.actions_of(target.id),
                         ),
                         master: target_master,
-                        special_charge: self.special_charge(target, target_master)?,
+                        charge_of: ChargeOf(&|with| self.special_charge(target, with)),
                         player: target_player,
+                        masters: player_masters(&self.model.masters, target_player)?,
                         attributes: &self.players.player(target_player)?.attributes,
                         terrain,
                         mode_680: self.mode_680,
                     },
                     roles,
-                ))
+                )?)
             }
             None => None,
         };

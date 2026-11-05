@@ -3,6 +3,7 @@
 
 use crate::combat::powerup::reset_powerup_values;
 use crate::map::spatial::Spatial;
+use crate::math::conversions::cvttss2si;
 use crate::math::rng::Stream;
 use crate::math::rng::Well512;
 use crate::movement::MoveState;
@@ -11,6 +12,7 @@ use crate::movement::move_to::MoveTo;
 use crate::objects::Graphics;
 use crate::objects::HitPoints;
 use crate::objects::ListIndex;
+use crate::objects::MasterHitPoints;
 use crate::objects::ObjectState;
 use crate::objects::actions::Action;
 use crate::objects::layers::Combat;
@@ -218,6 +220,26 @@ fn show_on_change(
     }
 }
 
+/// `FUN_1411a6a70`'s hit points of an object at `hp` whose master of `old` hit points gives way
+/// to one of `next`: their share of the new master's hit points, at most those and at least 1 (a
+/// NaN share is 1), whole (`CVTTSS2SI`, then a short).
+pub(crate) fn hit_point_share(
+    hp: HitPoints,
+    old: MasterHitPoints,
+    next: MasterHitPoints,
+) -> HitPoints {
+    let new_hp = HitPoints::of_master(next).get();
+    let share = hp.get() / HitPoints::of_master(old).get() * new_hp;
+    let clamped = if share > new_hp {
+        new_hp
+    } else if 1.0 <= share {
+        share
+    } else {
+        1.0
+    };
+    HitPoints::new(f32::from(cvttss2si(clamped) as i16))
+}
+
 /// What a master change ([`switch_master`]) changes of the world besides its unit: the place and
 /// its records, the pathing, and the sprites with the Sprite stream.
 pub(crate) struct SwitchWorld<'world> {
@@ -273,17 +295,8 @@ pub(crate) fn switch_master(
                 switched.leaving.push((kind, -amount));
             }
         }
-        let new_hp = HitPoints::of_master(next.hit_points).get();
-        let share = unit.life.hp.get() / HitPoints::of_master(old.hit_points).get() * new_hp;
-        let hp = if share > new_hp {
-            new_hp
-        } else if 1.0 <= share {
-            share
-        } else {
-            1.0
-        };
         let old_hp = unit.life.hp;
-        unit.life.hp = HitPoints::new(f32::from(hp as i32 as i16));
+        unit.life.hp = hit_point_share(old_hp, old.hit_points, next.hit_points);
         // FUN_1411859a0: the damage share picks the damage sprites; one that stays keeps them
         // (the object's `+0xd`, not held, taken to be the old master's share)
         if (old.has_damage_sprites() || next.has_damage_sprites())

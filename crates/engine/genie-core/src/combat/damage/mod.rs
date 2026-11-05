@@ -19,6 +19,7 @@ mod armor_pair;
 mod blasts;
 mod hit_factors;
 mod hit_points;
+mod master_change;
 mod shown_values;
 mod taking;
 
@@ -52,6 +53,7 @@ use self::taking::{count_kill, kill_bonus};
 use crate::combat::AttackBonus;
 use crate::combat::Charge;
 use crate::combat::KillState;
+use crate::combat::hp_transforms::HitTransforms;
 use crate::combat::missile::ShooterId;
 use crate::combat::powerup::InfantryCount;
 use crate::combat::stingers::{Handed, StingerAttackers, StingerTask};
@@ -222,6 +224,11 @@ pub struct Victim {
     pub(crate) kill_counts: Vec<KillCount>,
     /// A building's (type 80) part of a hit ([`Building`]); None for other objects.
     pub(crate) building: Option<Building>,
+    /// Its hit point transforms as its hit runs them ([`HitTransforms`]).
+    pub(crate) transforms: HitTransforms,
+    /// The masters its hit point transforms gave it in the hit, in order, which its write-back
+    /// gives the object (slot 0x90 with 1).
+    pub(crate) master_changes: Vec<MasterId>,
 }
 
 /// What a hit on a building (`TRIBE_Building_Object`, slot 0xe8 `FUN_1411cea90`) reads of it

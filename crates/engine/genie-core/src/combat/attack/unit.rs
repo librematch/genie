@@ -7,7 +7,7 @@ use crate::combat::attack::AttackSource;
 use crate::combat::attack::{Attack, AttackState};
 use crate::combat::attack::{AttackReads, Fight};
 use crate::combat::damage::Victim;
-use crate::combat::victims::{VictimLayers, VictimView};
+use crate::combat::victims::{ChargeOf, VictimLayers, VictimView};
 use crate::combat::victims::{file_kill, victim, victim_of};
 use crate::combat::volley::armed;
 use crate::math::rng::Stream;
@@ -17,6 +17,7 @@ use crate::objects::layers::Combat;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::OwnerMasters;
 use crate::objects::masters::PlayersMastersExt;
+use crate::objects::masters::player_masters;
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Unit;
 use crate::objects::unit::object_master;
@@ -194,6 +195,7 @@ impl Unit {
         }
         let code = code?;
         // the retaliation's kill of the unit itself, which follows its step
+        self.take_own_master_changes(step, actions, &mut fight.own)?;
         if let Some(own) = self.hit_back(
             fight.own,
             step.world.parts.ai_and_combat_mut(self.id)?,
@@ -243,13 +245,14 @@ impl Unit {
                 unit: self,
                 layers: VictimLayers::of(&step.world.parts, self.id, actions),
                 master,
-                special_charge: step.world.special_charge(self, master)?,
+                charge_of: ChargeOf(&|with| step.world.special_charge(self, with)),
                 player: step.player,
+                masters: player_masters(&step.world.model.masters, step.player)?,
                 attributes: &step.world.players.player(step.player)?.attributes,
                 terrain,
                 mode_680: step.world.mode_680,
             },
             roles,
-        )))
+        )?))
     }
 }

@@ -1,9 +1,11 @@
 //! What a hit reads of its victim: the object's values and its relations to the attacker.
 
+use crate::GenieResult;
 use crate::combat::abilities::REMOVAL_REWARD;
 use crate::combat::damage::Allied;
 use crate::combat::damage::{Armored, Attacker, BONUS_DAMAGE, Building as DamageBuilding};
 use crate::combat::damage::{ElevationBonus, SpecialCharge, Victim};
+use crate::combat::hp_transforms::{HitMaster, HitTransform, HitTransforms, hp_transforms};
 use crate::combat::powerup::InfantryCount;
 use crate::combat::stingers::{StingerAttackers, stinger_tasks};
 use crate::combat::victims::{is_trebuchet, paid_cost};
@@ -17,7 +19,9 @@ use crate::objects::layers::Building;
 use crate::objects::layers::Combat;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::Master;
+use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
+use crate::objects::masters::Masters;
 use crate::objects::unit::Unit;
 use crate::players::AllyTest;
 use crate::players::Amount;
@@ -28,6 +32,7 @@ use crate::unit_ai::task_finder::enabled;
 use crate::world::layer::Roles;
 use crate::world::parts::Parts;
 use crate::world::{Mode680, Unread};
+use std::fmt::{self, Debug, Formatter};
 
 /// An object's layers as a hit reads them ([`VictimView::layers`]): whether it has a unit AI, its
 /// building, combat and action layers and its unread notifies.
@@ -59,10 +64,9 @@ impl<'world> VictimLayers<'world> {
     }
 }
 
-/// What a hit reads of an object ([`victim_of`]): the object, its layers, its master with
-/// `FUN_1412161b0`'s answer as its caller read it with the unit AI's target
-/// ([`crate::movement::SpeedReads::special_charge`]), its player and that player's attributes,
-/// the map's terrain and the game's setting `+0x680`.
+/// What a hit reads of an object ([`victim_of`]): the object, its layers, its master,
+/// `FUN_1412161b0` as its caller reads it with the unit AI's target ([`ChargeOf`]), its player,
+/// that player's attributes and masters, the map's terrain and the game's setting `+0x680`.
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct VictimView<'world> {
     /// The object.
@@ -71,16 +75,32 @@ pub(crate) struct VictimView<'world> {
     pub(crate) layers: VictimLayers<'world>,
     /// Its master.
     pub(crate) master: &'world Master,
-    /// Whether its charge of special attack 3 is ready (`FUN_1412161b0`).
-    pub(crate) special_charge: SpecialCharge,
+    /// Whether its charge of special attack 3 is ready with a master (`FUN_1412161b0`).
+    pub(crate) charge_of: ChargeOf<'world>,
     /// Its player.
     pub(crate) player: PlayerId,
     /// Its player's attributes.
     pub(crate) attributes: &'world [Amount],
+    /// Its player's masters, the masters its hit point transforms give (`FUN_141659d20`).
+    pub(crate) masters: &'world Masters,
     /// The map's terrain, which its tile's defense reads.
     pub(crate) terrain: Option<&'world Terrain>,
     /// The game's setting `+0x680`.
     pub(crate) mode_680: Mode680,
+}
+
+/// `FUN_1412161b0` of a hit's object with a master: its own, or one its hit point transforms
+/// give it ([`VictimView::charge_of`]), as its caller reads it with the unit AI's target
+/// ([`crate::movement::SpeedReads::special_charge`]).
+#[derive(Clone, Copy)]
+pub(crate) struct ChargeOf<'world>(
+    pub(crate) &'world dyn Fn(&Master) -> GenieResult<SpecialCharge>,
+);
+
+impl Debug for ChargeOf<'_> {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        formatter.write_str("ChargeOf(FUN_1412161b0)")
+    }
 }
 
 /// What a hit of an attacker of player `attacker` reads of the object of `view` ([`victim_of`]):
@@ -93,8 +113,8 @@ pub(crate) fn victim_in(
     dip: &dyn Diplomacy,
     spatial: &Spatial,
     roles: &Roles,
-) -> Victim {
-    let mut victim = victim_of(view, roles);
+) -> GenieResult<Victim> {
+    let mut victim = victim_of(view, roles)?;
     let (id, player_id) = (view.unit.id, view.player);
     victim.allied = Allied {
         by_attacker: dip.allied(attacker, player_id, AllyTest::WithRelation4),
@@ -107,15 +127,104 @@ pub(crate) fn victim_in(
     if let Some(victim_building) = victim.building.as_mut() {
         victim_building.annexes = view.layers.building.annexes.ids().collect();
     }
-    victim
+    Ok(victim)
 }
 
-/// What a hit reads of the object of `view` ([`Victim`]): its master's values and its own, its
-/// player's elevation attributes, the terrain defense of its tile (the map's; 1 for an object
-/// inside another, which has no tile) and the game's setting `+0x680`. Its relations to an
-/// attacker (`allied`) and whether its place is a guess (`uncertain`) are the caller's. The slice
-/// holds neither its unit AI's alert mode and attackers nor its facing.
-pub(crate) fn victim_of(view: VictimView<'_>, roles: &Roles) -> Victim {
+/// What a hit reads of the object of `view` ([`Victim`]): its master's values and its own
+/// ([`master_read`]) and its hit point transforms as the hit runs them ([`hit_transforms`]).
+///
+/// # Errors
+///
+/// `FUN_1412161b0`'s read of a master, and an attribute a transform reads that its player does
+/// not hold.
+pub(crate) fn victim_of(view: VictimView<'_>, roles: &Roles) -> GenieResult<Victim> {
+    let mut victim = master_read(view, roles)?;
+    victim.transforms = hit_transforms(view, &victim, roles)?;
+    Ok(victim)
+}
+
+/// The hit point transforms of the object of `view` as its hit runs them ([`HitTransforms`]),
+/// `own` its read ([`master_read`]): a combat unit's or a building's (types 70 and 80,
+/// `TRIBE_Combat_Object`'s slot 22), from its master on, each master a transform gives in turn
+/// read as the object with it.
+///
+/// # Errors
+///
+/// As [`victim_of`].
+fn hit_transforms(view: VictimView<'_>, own: &Victim, roles: &Roles) -> GenieResult<HitTransforms> {
+    let own_transforms = resolved_transforms(view, view.master)?;
+    if own_transforms.is_empty() {
+        return Ok(HitTransforms::default());
+    }
+    let mut masters = vec![HitMaster {
+        id: view.master.id,
+        reads: own.clone(),
+        transforms: own_transforms,
+    }];
+    let mut next = 0;
+    while let Some(held) = masters.get(next) {
+        let intos: Vec<MasterId> = held
+            .transforms
+            .iter()
+            .map(|transform| transform.into)
+            .collect();
+        for into in intos {
+            if masters.iter().any(|master| master.id == into) {
+                continue;
+            }
+            // a transform resolves only to a master the table has
+            let Some(master) = view.masters.get(into) else {
+                continue;
+            };
+            let with = VictimView { master, ..view };
+            masters.push(HitMaster {
+                id: into,
+                reads: master_read(with, roles)?,
+                transforms: resolved_transforms(with, master)?,
+            });
+        }
+        next += 1;
+    }
+    Ok(HitTransforms::new(masters))
+}
+
+/// The hit point transforms of an object of `master` ([`hp_transforms`]) with `view`'s player:
+/// each whose enablement holds and whose master its player has, its threshold resolved; none for
+/// an object below type 70 or above 80, whose slot 22 runs no transforms.
+///
+/// # Errors
+///
+/// An attribute a transform reads that its player does not hold.
+fn resolved_transforms(view: VictimView<'_>, master: &Master) -> GenieResult<Vec<HitTransform>> {
+    if !matches!(master.kind, MasterKind::COMBAT | MasterKind::BUILDING) {
+        return Ok(Vec::new());
+    }
+    let mut resolved = Vec::new();
+    for transform in hp_transforms(master) {
+        let Some(threshold) = transform.threshold_of(master, view.attributes)? else {
+            continue;
+        };
+        if let Some(into) = transform.master_given(view.masters) {
+            resolved.push(HitTransform {
+                threshold,
+                into: into.id,
+            });
+        }
+    }
+    Ok(resolved)
+}
+
+/// What a hit reads of the object of `view` ([`Victim`]) but its hit point transforms: its
+/// master's values and its own, its player's elevation attributes, the terrain defense of its
+/// tile (the map's; 1 for an object inside another, which has no tile) and the game's setting
+/// `+0x680`. Its relations to an attacker (`allied`) and whether its place is a guess
+/// (`uncertain`) are the caller's. The slice holds neither its unit AI's alert mode and
+/// attackers nor its facing.
+///
+/// # Errors
+///
+/// `FUN_1412161b0`'s read of its master.
+fn master_read(view: VictimView<'_>, roles: &Roles) -> GenieResult<Victim> {
     let VictimView {
         unit,
         layers:
@@ -127,12 +236,14 @@ pub(crate) fn victim_of(view: VictimView<'_>, roles: &Roles) -> Victim {
                 unread,
             },
         master,
-        special_charge,
+        charge_of,
         player: player_id,
         attributes,
+        masters: _,
         terrain,
         mode_680,
     } = view;
+    let special_charge = (charge_of.0)(master)?;
     let at = |attribute: usize| attributes.get(attribute).copied().unwrap_or(Amount::ZERO);
     let kind = master.kind;
     let attack_elevation = if 212 < attributes.len() {
@@ -162,7 +273,7 @@ pub(crate) fn victim_of(view: VictimView<'_>, roles: &Roles) -> Victim {
             .iter()
             .any(|task| task.action_kind == kind)
     };
-    Victim {
+    Ok(Victim {
         id: unit.id,
         // the caller's, which holds the tile lists
         tile_place: 0,
@@ -293,5 +404,8 @@ pub(crate) fn victim_of(view: VictimView<'_>, roles: &Roles) -> Victim {
             relics: building.relics,
             razed: Vec::new(),
         }),
-    }
+        // the caller's (`victim_of`), which reads the masters the transforms give
+        transforms: HitTransforms::default(),
+        master_changes: Vec::new(),
+    })
 }

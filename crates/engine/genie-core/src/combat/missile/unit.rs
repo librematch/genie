@@ -6,7 +6,7 @@ use crate::combat::missile::MissileState;
 use crate::combat::missile::ShooterId;
 use crate::combat::missile::StrikeResult;
 use crate::combat::missile::VanishMode;
-use crate::combat::victims::{VictimLayers, VictimView};
+use crate::combat::victims::{ChargeOf, VictimLayers, VictimView};
 use crate::combat::victims::{readable, victim, victim_of, write_strike_back};
 use crate::combat::volley::Fired;
 use crate::map::Distance;
@@ -21,24 +21,23 @@ use crate::objects::ObjectKey;
 use crate::objects::ObjectState;
 use crate::objects::masters::BlastDefense;
 use crate::objects::masters::MasterKind;
+use crate::objects::masters::player_masters;
 use crate::objects::unit::{Unit, missed_passes};
 use crate::players::PlayerId;
 use crate::unit_ai::NotifyKind;
 use crate::{GenieError, GenieResult};
-use genie_model::model::Model;
+use std::mem::take;
 
 use crate::combat::attack::{Hit, strike};
 use crate::combat::missile::{
     HitMode, Missile, MissileAction, MissileStats, MissileTargetId, grounded, meets_height,
 };
 use crate::objects::layers::Action;
-use crate::objects::masters::MasterTables;
 use crate::world::World;
 use crate::world::layer::Roles;
 use crate::world::lets::release;
 use crate::world::objects_ref::ObjectsRef;
 use crate::world::others::OthersRef;
-use crate::world::player::Player;
 use crate::world::slots::PlayerSlotsExt;
 use crate::world::step::Step;
 
@@ -411,47 +410,36 @@ impl Unit {
             .world
             .live_index(player_id, action.fired_from)
             .ok_or(SHOOTER_OUTSIDE)?;
-        // `FUN_1412161b0` of the shooter, read before the hit takes it out of its list mutably
-        let special_charge = {
-            let shooter = step.world.players.live(player_id, shooter_slot)?;
-            let master = shooter.master(step.world.master_tables(), player_id)?;
-            step.world.special_charge(shooter, master)?
+        // the shooter as the hit reads it, before the hit takes it out of its list mutably
+        let (mut own, chance) = {
+            let world = &*step.world;
+            let shooter = world.players.live(player_id, shooter_slot)?;
+            let master = shooter.master(world.master_tables(), player_id)?;
+            if Distance::ZERO < master.combat_part().area_effect {
+                return Err(GenieError::unsupported(
+                    "a missile of a shooter with an area effect",
+                ));
+            }
+            let own = victim_of(
+                VictimView {
+                    unit: shooter,
+                    layers: VictimLayers::of(
+                        &world.parts,
+                        shooter.id,
+                        world.parts.actions.of(shooter.id),
+                    ),
+                    master,
+                    charge_of: ChargeOf(&|with| world.special_charge(shooter, with)),
+                    player: player_id,
+                    attributes: &world.players.player(player_id)?.attributes,
+                    masters: player_masters(&world.model.masters, player_id)?,
+                    terrain: world.spatial.terrain.as_ref(),
+                    mode_680,
+                },
+                roles,
+            )?;
+            (own, master.combat_part().hit_chance)
         };
-        let World {
-            players,
-            spatial,
-            streams,
-            parts,
-            model: Model { masters, slots, .. },
-            world_time,
-            ..
-        } = &mut *step.world;
-        let Player {
-            objects,
-            attributes,
-            ..
-        } = players.player_mut(player_id)?;
-        let shooter = objects.get_mut(shooter_slot).ok_or(SHOOTER_OUTSIDE)?;
-        let master = shooter.master(MasterTables::new(masters, &parts.own_master), player_id)?;
-        if Distance::ZERO < master.combat_part().area_effect {
-            return Err(GenieError::unsupported(
-                "a missile of a shooter with an area effect",
-            ));
-        }
-        let terrain = spatial.terrain.as_ref();
-        let mut own = victim_of(
-            VictimView {
-                unit: shooter,
-                layers: VictimLayers::of(parts, shooter.id, parts.actions.of(shooter.id)),
-                master,
-                special_charge,
-                player: player_id,
-                attributes,
-                terrain,
-                mode_680,
-            },
-            roles,
-        );
         let victim = victim.as_mut().ok_or(GenieError::unsupported(
             "a missile's target the slice does not hold live",
         ))?;
@@ -459,21 +447,37 @@ impl Unit {
             at: self.position(),
             from_z: Some(action.origin.position.z()),
             kind: HitKind::Missile,
-            chance: master.combat_part().hit_chance,
+            chance,
         };
-        let object = streams.get_mut(Stream::Object);
+        let slots = step.world.model.slots;
         let struck = strike(
             &mut own,
             victim,
             &mut step.blasted,
             hit,
-            object,
+            step.world.streams.get_mut(Stream::Object),
             HitLayer {
                 roles,
-                slots: *slots,
+                slots,
                 damage_tuning: &damage_tuning,
             },
         )?;
+        // the masters the shooter's hit point transforms gave it in the hit (a retaliation's
+        // loss), before its write-back
+        for new in take(&mut own.master_changes) {
+            step.world.transform_into(player_id, shooter_slot, new)?;
+        }
+        let World {
+            players,
+            parts,
+            world_time,
+            ..
+        } = &mut *step.world;
+        let shooter = players
+            .player_mut(player_id)?
+            .objects
+            .get_mut(shooter_slot)
+            .ok_or(SHOOTER_OUTSIDE)?;
         if let Some(target) = struck.executed {
             shooter.post_own(
                 &mut parts.unit_ai,
@@ -526,14 +530,15 @@ impl Unit {
                 unit: self,
                 layers: VictimLayers::of(&step.world.parts, self.id, actions),
                 master,
-                special_charge: step.world.special_charge(self, master)?,
+                charge_of: ChargeOf(&|with| step.world.special_charge(self, with)),
                 player: step.player,
+                masters: player_masters(&step.world.model.masters, step.player)?,
                 attributes: &step.world.players.player(step.player)?.attributes,
                 terrain,
                 mode_680: step.world.mode_680,
             },
             roles,
-        );
+        )?;
         // the missile's own part is out of the unit while it flies
         own.source.fired_from = fired_from;
         let mut victim = victim(step, action.target, roles)?.ok_or(GenieError::unsupported(
@@ -559,6 +564,7 @@ impl Unit {
                 damage_tuning: &step.world.model.tuning.damage,
             },
         )?;
+        self.take_own_master_changes(step, actions, &mut own)?;
         if self
             .hit_back(
                 own,

@@ -26,10 +26,11 @@ use crate::{GenieError, GenieResult};
 use crate::combat::attack::AttackSource;
 use crate::combat::attack::{AttackCommand, ReadyReads, arms, engagement, show_arrived};
 use crate::combat::victims::victim_of;
-use crate::combat::victims::{VictimLayers, VictimView};
+use crate::combat::victims::{ChargeOf, VictimLayers, VictimView};
 use crate::combat::{AttackCount, AttackTargetId};
 use crate::gathering::HuntTargetId;
 use crate::gathering::gather::unit::WalkSprites;
+use crate::objects::masters::player_masters;
 use crate::objects::masters::{Master, MasterTables, OwnerMasters, Task};
 use crate::objects::sprite::new_sprite;
 use crate::unit_ai::AiAction;
@@ -83,14 +84,15 @@ impl World {
                 unit,
                 layers: VictimLayers::of(&self.parts, unit.id, self.parts.actions.of(unit.id)),
                 master,
-                special_charge: self.special_charge(unit, master)?,
+                charge_of: ChargeOf(&|with| self.special_charge(unit, with)),
                 player,
+                masters: player_masters(&self.model.masters, player)?,
                 attributes: &held.attributes,
                 terrain: self.spatial.terrain.as_ref(),
                 mode_680: self.mode_680,
             },
             &self.model.roles,
-        );
+        )?;
         Ok(self.victim(target, player)?.map(|victim| ReadyReads {
             reads,
             fight: Fight { victim, own },

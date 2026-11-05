@@ -6,7 +6,7 @@ use crate::combat::damage::{
     shown_attack, shown_melee_armor, shown_range,
 };
 use crate::combat::victims::victim_of;
-use crate::combat::victims::{VictimLayers, VictimView};
+use crate::combat::victims::{ChargeOf, VictimLayers, VictimView};
 use crate::map::Distance;
 use crate::map::RestrictionId;
 use crate::map::spatial::Spatial;
@@ -20,6 +20,7 @@ use crate::objects::layers::Action;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::player_master;
+use crate::objects::masters::player_masters;
 use crate::objects::masters::{DamageAmount, Master, MasterTables};
 use crate::objects::unit::Unit;
 use crate::objects::unit::UnitFlags;
@@ -225,27 +226,29 @@ impl WorldPicker<'_> {
                     self.actions_of(target_unit.id),
                 ),
                 master: tm,
-                special_charge: self.special_charge(target_unit, tm)?,
+                charge_of: ChargeOf(&|with| self.special_charge(target_unit, with)),
                 player: tq,
+                masters: player_masters(self.every.players, tq)?,
                 attributes: ta,
                 terrain,
                 mode_680: self.mode_680,
             },
             roles,
-        );
+        )?;
         let unit = victim_of(
             VictimView {
                 unit: from_unit,
                 layers: VictimLayers::of(self.parts, from_unit.id, self.actions_of(from_unit.id)),
                 master: fm,
-                special_charge: self.special_charge(from_unit, fm)?,
+                charge_of: ChargeOf(&|with| self.special_charge(from_unit, with)),
                 player: fq,
+                masters: player_masters(self.every.players, fq)?,
                 attributes: fa,
                 terrain,
                 mode_680: self.mode_680,
             },
             roles,
-        );
+        )?;
         let mut factor = elevation_factor(
             from_unit.position().z(),
             unit.attack_elevation,
@@ -309,14 +312,15 @@ impl WorldPicker<'_> {
                 unit: other_unit,
                 layers: VictimLayers::of(self.parts, other_unit.id, self.actions_of(other_unit.id)),
                 master: om,
-                special_charge: self.special_charge(other_unit, om)?,
+                charge_of: ChargeOf(&|with| self.special_charge(other_unit, with)),
                 player: player_id,
+                masters: player_masters(self.every.players, player_id)?,
                 attributes,
                 terrain,
                 mode_680: self.mode_680,
             },
             roles,
-        );
+        )?;
         let attacked = (self.actions_of(other_unit.id).top_action_kind() == Some(ATTACK))
             .then(|| self.actions_of(other_unit.id).top_target())
             .flatten();
@@ -327,14 +331,15 @@ impl WorldPicker<'_> {
                         unit,
                         layers: VictimLayers::of(self.parts, unit.id, self.actions_of(unit.id)),
                         master: tm,
-                        special_charge: self.special_charge(unit, tm)?,
+                        charge_of: ChargeOf(&|with| self.special_charge(unit, with)),
                         player: tq,
+                        masters: player_masters(self.every.players, tq)?,
                         attributes: ta,
                         terrain,
                         mode_680: self.mode_680,
                     },
                     roles,
-                )),
+                )?),
                 None => None,
             },
             None => None,

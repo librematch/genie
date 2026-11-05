@@ -26,6 +26,20 @@ pub fn player_master(every: &[Arc<Masters>], player: PlayerId, id: MasterId) -> 
     every.of(player)?.get(id)
 }
 
+/// A player the world holds no masters table for.
+const NO_TABLE: GenieError = GenieError::missing_data("a player without a masters table");
+
+/// Player `player`'s masters in `every`, the world's masters (`player+0x28`).
+///
+/// # Errors
+///
+/// A player the world holds no table for.
+pub fn player_masters(every: &[Arc<Masters>], player: PlayerId) -> GenieResult<&Masters> {
+    every
+        .of(player)
+        .ok_or_else(|| NO_TABLE.with("player", player))
+}
+
 /// The masters an object's master pointer (`+0xa0`) reads: its own copy by its id
 /// ([`crate::world::parts::Parts::own_master`]) when it has one, else its player's table of
 /// `players`. [`crate::world::World::master_tables`] gives the world's.
