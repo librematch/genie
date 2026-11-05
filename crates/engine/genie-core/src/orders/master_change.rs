@@ -7,20 +7,16 @@ use crate::math::conversions::cvttss2si;
 use crate::math::rng::Stream;
 use crate::math::rng::Well512;
 use crate::movement::MoveState;
-use crate::movement::MoveStats;
-use crate::movement::move_to::MoveTo;
 use crate::objects::Graphics;
 use crate::objects::HitPoints;
 use crate::objects::ListIndex;
 use crate::objects::MasterHitPoints;
 use crate::objects::ObjectState;
-use crate::objects::actions::Action;
 use crate::objects::layers::Combat;
 use crate::objects::layers::MotionMut;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
-use crate::objects::sprite::Graphic;
-use crate::objects::sprite::{ActiveSprite, new_sprite};
+use crate::objects::task_change::{Looks, action_take_master};
 use crate::objects::unit::Unit;
 use crate::orders::damage_share;
 use crate::pathing::Pathing;
@@ -31,7 +27,6 @@ use crate::vision::SightLayer;
 use crate::world::Seconds;
 use crate::world::World;
 use crate::world::layer::Roles;
-use crate::world::layer::generated::SpriteTuning;
 use crate::world::layer::generated::Tuning;
 use crate::world::slots::PlayerSlotsExt;
 use crate::{GenieError, GenieResult};
@@ -151,19 +146,13 @@ impl World {
     }
 
     /// `FUN_140a979b0` with the new master `next` and no tasks (slot 0x90 with 1): each action of
-    /// object `idx`'s list, the head first, takes `next`'s sprites through its slot 0x50, its
-    /// unit still of `old`: an Attack's ([`Arms::take_master`], `FUN_140a7f800`), a `MoveTo`'s
-    /// ([`MoveToAction::take_master`], `FUN_140aa1fb0`), whose slot 0x60 (`0x140aa1f90`) then
-    /// shows its sprite in state 4 (the unit's slot 0x68; a null sprite shows `old`'s standing
-    /// one, as the `MoveTo`'s state 4 does). Every other action's slot 0x50 is empty
-    /// (`0x140a782d0`).
+    /// object `idx`'s list, the head first, takes `next`'s sprites through its slot 0x50
+    /// ([`action_take_master`]), its unit still of `old`: an Attack's, a `MoveTo`'s, whose slot
+    /// 0x60 then shows its sprite in state 4. The sub-actions do not take part.
     ///
     /// # Errors
     ///
     /// An object the world does not hold live.
-    ///
-    /// [`Arms::take_master`]: crate::combat::attack::Arms::take_master
-    /// [`MoveToAction::take_master`]: crate::movement::move_to::MoveToAction::take_master
     pub(crate) fn retask_actions(
         &mut self,
         player: PlayerId,
@@ -171,52 +160,19 @@ impl World {
         old: &Master,
         next: &Master,
     ) -> GenieResult<()> {
-        let id = self.players.live(player, idx)?.id;
-        let graphics = &self.model.graphics;
-        let standing = graphics.resolve(old.standing_sprite);
-        let mut shows = Vec::new();
-        for action in &mut self.parts.actions.of_mut(id)?.list {
-            match action {
-                Action::Attack(attack) => attack.arms.take_master(next, None, graphics),
-                Action::MoveTo(move_to) => {
-                    move_to.take_master(old, next, None, graphics);
-                    if move_to.state == MoveTo::Moving {
-                        shows.push(move_to.sprite.or(standing));
-                    }
-                }
-                _ => {}
-            }
-        }
-        let sprite_tuning = self.model.tuning.sprite;
         let unit = self.players.live_mut(player, idx)?;
-        for graphic in shows.into_iter().flatten() {
-            show_on_change(
-                &mut unit.sprite,
-                self.parts.motion.move_stats_mut(id),
-                graphic,
-                self.streams.get_mut(Stream::Sprite),
-                sprite_tuning,
-            );
+        let id = unit.id;
+        let actions = self.parts.actions.of_mut(id)?;
+        let mut looks = Looks {
+            sprite: &mut unit.sprite,
+            stats: self.parts.motion.move_stats_mut(id),
+            rng: self.streams.get_mut(Stream::Sprite),
+            sprite_tuning: self.model.tuning.sprite,
+        };
+        for action in &mut actions.list {
+            action_take_master(action, old, next, None, &self.model.graphics, &mut looks);
         }
         Ok(())
-    }
-}
-
-/// Slot 0x68 in a master change (`FUN_141217000`) of a unit showing `sprite` with the movement
-/// `stats`: the unit shows `graphic` ([`new_sprite`]). The slice holds sprites from an attack on:
-/// a unit whose sprite it does not hold keeps none, but the new instance still draws from the
-/// Sprite stream `rng`.
-fn show_on_change(
-    sprite: &mut Option<ActiveSprite>,
-    stats: Option<&mut MoveStats>,
-    graphic: Graphic,
-    rng: &mut Well512,
-    sprite_tuning: SpriteTuning,
-) {
-    if sprite.is_some() {
-        new_sprite(sprite, stats, graphic, rng, sprite_tuning);
-    } else {
-        let _ = ActiveSprite::start(graphic, rng, sprite_tuning);
     }
 }
 
@@ -375,13 +331,13 @@ pub(crate) fn switch_master(
                 .ok_or(GenieError::unsupported(
                     "a new master's standing sprite the data file does not have",
                 ))?;
-            show_on_change(
-                &mut unit.sprite,
-                motion.move_stats_mut(),
-                graphic,
-                world.sprite,
+            Looks {
+                sprite: &mut unit.sprite,
+                stats: motion.move_stats_mut(),
+                rng: world.sprite,
                 sprite_tuning,
-            );
+            }
+            .show(graphic);
         }
         switched.promoted = true;
         for &(kind, amount, flag) in &next.storage {

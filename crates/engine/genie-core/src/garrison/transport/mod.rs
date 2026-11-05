@@ -43,7 +43,7 @@ use crate::map::RestrictionId;
 use crate::math::image::transport::{DRAW_SCALE as TRANSPORT_DRAW_SCALE, NONE as TRANSPORT_NONE};
 #[cfg(test)]
 use crate::math::rng::Well512;
-use crate::objects::masters::TaskId;
+use crate::objects::masters::Task;
 
 /// The Transport action's type, which word 9 adds.
 pub const TRANSPORT: ActionKind = ActionKind::named(12);
@@ -106,8 +106,9 @@ pub struct TransportAction {
     /// `+0x68`: the unload found no drop location and the action sails to a new point.
     pub(crate) retarget: bool,
     /// `+0x48`: the task it works on, none from the unload command (the work command's
-    /// `LAB_1410706a8` retakes only a Transport on the task it finds).
-    pub(crate) task: Option<TaskId>,
+    /// `LAB_1410706a8` retakes only a Transport on the task it finds). It holds the task, as
+    /// the game's pointer does: a task change that finds no match leaves the old master's.
+    pub(crate) task: Option<Task>,
 }
 
 /// What the Transport reads of its unit.

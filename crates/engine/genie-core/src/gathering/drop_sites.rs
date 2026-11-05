@@ -350,6 +350,7 @@ mod tests {
     use crate::objects::masters::Masters;
     use crate::objects::masters::ObstructionKind;
     use crate::objects::masters::TaskId;
+    use crate::objects::masters::TaskSprites;
     #[cfg(test)]
     use crate::objects::masters::WorkValue;
     use crate::pathing::Pathing;
@@ -358,6 +359,7 @@ mod tests {
     use crate::players::PlayerKind;
     use crate::test_ids::master_id;
     use crate::test_ids::object_id;
+    use crate::test_ids::task_key;
     use crate::testing::class;
     use crate::testing::ids;
 
@@ -412,7 +414,8 @@ mod tests {
             work_rate: WorkRate::new(1.0),
             resource: None,
             id: TaskId::of_task(-1),
-            moving: None,
+            key: task_key(ActionKind::BUILD),
+            sprites: TaskSprites::NONE,
         };
         Object::with_actions(
             object(10, ids::VILLAGER_MALE, Point::new(20.0, 20.0)),

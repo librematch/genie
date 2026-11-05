@@ -463,7 +463,7 @@ impl BuildAction {
             move_to: move_reads.to_point(
                 spot.with_height(at.z()),
                 Distance::ZERO,
-                self.task.moving,
+                self.task.sprites.moving,
                 &step.world.model.tuning.move_to,
             )?,
         };

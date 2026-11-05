@@ -234,6 +234,7 @@ use crate::test_ids::order_kind;
 use crate::test_ids::owner;
 use crate::test_ids::player_id;
 use crate::test_ids::task_id;
+use crate::test_ids::task_key;
 use crate::test_ids::tech_id;
 use crate::test_ids::unit_list;
 use crate::test_ids::{adds as test_ids_adds, amounts, attributes};
@@ -3254,7 +3255,8 @@ fn work_command_on_foundation_starts_build_as_its_builder() {
             work_rate: WorkRate::new(1.0),
             resource: None,
             id: task_id(0),
-            moving: None,
+            key: task_key(ActionKind::BUILD),
+            sprites: TaskSprites::NONE,
         }
     );
     let ai = world.parts.unit_ai.get(unit.id).unwrap();
@@ -13341,7 +13343,8 @@ fn clearing_the_actions_tears_the_artifact_fly_enter_and_build_down() {
                 work_rate: WorkRate::new(1.0),
                 resource: None,
                 id: TaskId::of_task(-1),
-                moving: None,
+                key: task_key(ActionKind::BUILD),
+                sprites: TaskSprites::NONE,
             },
             added: true,
             timer: Seconds::ZERO,
@@ -13472,7 +13475,8 @@ fn deaths_world() -> World {
             work_rate: WorkRate::new(1.0),
             resource: None,
             id: TaskId::of_task(-1),
-            moving: None,
+            key: task_key(ActionKind::BUILD),
+            sprites: TaskSprites::NONE,
         },
         added: true,
         timer: Seconds::ZERO,
@@ -17670,6 +17674,7 @@ fn an_ai_move_replaces_done_attack_with_move_to_the_point() {
 fn an_ai_move_hands_the_point_to_the_gather() {
     let task = HuntTask {
         id: task_id(2),
+        key: task_key(HUNT),
         range: Distance::new(0.25),
         resource: Some(AttributeId::named(17)),
         sprites: TaskSprites::NONE,
@@ -19141,6 +19146,7 @@ fn farm_masters() -> Masters {
 fn reseed_world() -> World {
     let task = HuntTask {
         id: task_id(2),
+        key: task_key(HUNT),
         range: Distance::new(0.25),
         resource: Some(attribute::MEAT),
         sprites: TaskSprites::NONE,
@@ -22688,7 +22694,8 @@ fn worked(world: &mut World, site: i32, dt: u32) -> GenieResult<()> {
         work_rate: WorkRate::new(1.0),
         resource: None,
         id: TaskId::of_task(-1),
-        moving: None,
+        key: task_key(ActionKind::BUILD),
+        sprites: TaskSprites::NONE,
     };
     site_mut(world, object_id(10028)).builders = BuilderCount::of_data(1);
     in_update(

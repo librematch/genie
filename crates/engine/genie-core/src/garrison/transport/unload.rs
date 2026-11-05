@@ -88,9 +88,9 @@ impl World {
                     &self.model.graphics,
                     self.parts.combat_of(unit.id).abilities.look.as_ref(),
                 ),
-                task,
+                task.as_ref(),
                 &self.model.roles,
-            )?
+            )
         };
         let restriction = self
             .players
@@ -279,9 +279,9 @@ impl World {
                     &self.model.graphics,
                     self.parts.combat_of(unit.id).abilities.look.as_ref(),
                 ),
-                transport.task,
+                transport.task.as_ref(),
                 &self.model.roles,
-            )?
+            )
         };
         let mut changes = Vec::new();
         if count == 0 {

@@ -1028,24 +1028,24 @@ fn sail_move_to_asks_for_its_path_then_walks_on() {
 }
 
 /// The sprite its `MoveTo` shows (`0x140aa42a0` gives `FUN_140aa0d30` one): its task's moving
-/// sprite, without a task the master's walking sprite, for none the constructor's default; a
-/// task the master lacks is an error.
+/// sprite, without a task the master's walking sprite, for none the constructor's default. The
+/// task is the one it holds, whether its master has it or not (a task change that found no
+/// match leaves the old master's).
 #[test]
 fn transport_move_to_shows_its_task_or_its_master_sprite() {
     use crate::objects::masters::{Master, Task};
+    let showing = Task {
+        id: task_id(4),
+        sprites: TaskSprites::of_data([3, -1, -1, -1]),
+        ..Task::default()
+    };
+    let bare = Task {
+        id: task_id(5),
+        ..Task::default()
+    };
     let master = Master {
         action: Some(ActionPart {
-            tasks: vec![
-                Task {
-                    id: task_id(4),
-                    sprites: TaskSprites::of_data([3, -1, -1, -1]),
-                    ..Task::default()
-                },
-                Task {
-                    id: task_id(5),
-                    ..Task::default()
-                },
-            ],
+            tasks: vec![bare],
             ..ActionPart::default()
         }),
         moving: Some(MovingPart {
@@ -1055,18 +1055,17 @@ fn transport_move_to_shows_its_task_or_its_master_sprite() {
         ..Master::default()
     };
     let on = |task, master: &Master| TransportAction::given_sprite(task, master);
-    assert_eq!(on(Some(task_id(4)), &master), Ok(Some(SpriteId::named(3))));
-    assert_eq!(on(Some(task_id(5)), &master), Ok(None));
-    assert_eq!(on(None, &master), Ok(Some(SpriteId::named(7))));
+    assert_eq!(on(Some(&showing), &master), Some(SpriteId::named(3)));
+    assert_eq!(on(Some(&bare), &master), None);
+    assert_eq!(on(None, &master), Some(SpriteId::named(7)));
     let walkless = Master {
         moving: Some(MovingPart {
             move_sprite: None,
             ..master.moving.unwrap_or_default()
         }),
-        ..master.clone()
+        ..master
     };
-    assert_eq!(on(None, &walkless), Ok(None));
-    assert!(on(Some(task_id(6)), &master).is_err());
+    assert_eq!(on(None, &walkless), None);
 }
 
 fn rng() -> Well512 {

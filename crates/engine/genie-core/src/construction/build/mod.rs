@@ -18,6 +18,7 @@ use crate::map::Position;
 use crate::objects::HitPoints;
 use crate::objects::MasterHitPoints;
 use crate::objects::ObjectId;
+#[cfg(test)]
 use crate::objects::SpriteId;
 use crate::objects::WorkRate;
 use crate::objects::lifecycle::death_parts::FarmBonus;
@@ -25,6 +26,8 @@ use crate::objects::masters::ActionKind;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::TaskId;
+use crate::objects::masters::TaskKey;
+use crate::objects::masters::TaskSprites;
 use crate::players::Amount;
 use crate::players::PlayerKind;
 use crate::players::attribute::AttributeId;
@@ -134,11 +137,12 @@ pub struct BuildTask {
     /// The task's resource (`attribute_type`, `+0x20`, none for any): `UNIT_ORDER`'s drop-off
     /// (slot 0x78) asks a builder carrying another one to its unit AI instead.
     pub(crate) resource: Option<AttributeId>,
-    /// The task's id in its master's list (`+0xa`), which a master's upgrade finds the new
-    /// master's task by (−1 for none).
+    /// The task's id in its master's list (`+0xa`, −1 for none).
     pub(crate) id: TaskId,
-    /// The task's moving sprite (`+0x40`), which it gives its `MoveTo`s; None for none.
-    pub(crate) moving: Option<SpriteId>,
+    /// The task's action type, target class and target master, which a task change matches.
+    pub(crate) key: TaskKey,
+    /// The task's sprites: the moving one (`+0x40`) it gives its `MoveTo`s.
+    pub(crate) sprites: TaskSprites,
 }
 
 impl BuildTask {
@@ -151,7 +155,8 @@ impl BuildTask {
             work_rate,
             resource: task.attribute_kind,
             id: task.id,
-            moving: task.sprites.moving,
+            key: task.key(),
+            sprites: task.sprites,
         }
     }
 }

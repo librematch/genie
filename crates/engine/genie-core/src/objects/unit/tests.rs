@@ -39,7 +39,9 @@ use crate::objects::layers::{Action, Action as LayersAction, DefaultTask};
 use crate::objects::layers::{Animated, Motion};
 use crate::objects::layers::{IdleCount, IdleTime, Speedup, SpeedupValue};
 use crate::objects::lifecycle::{Class, Lifecycle};
+use crate::objects::masters::ActionKind;
 use crate::objects::masters::TaskId;
+use crate::objects::masters::TaskSprites;
 use crate::objects::masters::{Task, WorkValue};
 use crate::objects::sprite::{ActiveSprite, Graphic};
 use crate::objects::unit::Unit;
@@ -50,6 +52,7 @@ use crate::players::PlayerId;
 use crate::test_ids::group_id;
 use crate::test_ids::master_id;
 use crate::test_ids::object_id;
+use crate::test_ids::task_key;
 use crate::testing::class::NO_CLASS;
 use crate::testing::roles;
 use crate::testing::slots;
@@ -496,7 +499,8 @@ fn the_top_action_object_is_its_target_unless_it_has_none() {
         work_rate: WorkRate::new(1.0),
         resource: None,
         id: TaskId::of_task(-1),
-        moving: None,
+        key: task_key(ActionKind::BUILD),
+        sprites: TaskSprites::NONE,
     };
     let building = Action {
         list: ActionList::default().with_build(Some(started(
@@ -559,7 +563,8 @@ fn the_top_action_sub_action_is_its_move_to_or_its_attack() {
             work_rate: WorkRate::new(1.0),
             resource: None,
             id: TaskId::of_task(-1),
-            moving: None,
+            key: task_key(ActionKind::BUILD),
+            sprites: TaskSprites::NONE,
         },
     );
     build.state = BuildState::Move {

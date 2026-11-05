@@ -253,7 +253,7 @@ impl BuildAction {
             move_to: move_reads.to_point(
                 self.point,
                 Distance::ZERO,
-                self.task.moving,
+                self.task.sprites.moving,
                 &step.world.model.tuning.move_to,
             )?,
         };

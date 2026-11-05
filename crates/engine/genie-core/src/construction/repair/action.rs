@@ -166,12 +166,12 @@ impl RepairAction {
         move_to_tuning: &MoveToTuning,
     ) -> GenieResult<Option<MoveToAction>> {
         to.map_or_else(
-            || move_reads.to_nothing(self.range, self.task.moving, move_to_tuning),
+            || move_reads.to_nothing(self.range, self.task.sprites.moving, move_to_tuning),
             |to| {
                 move_reads.to_object(
                     to,
                     self.range,
-                    self.task.moving,
+                    self.task.sprites.moving,
                     TargetMoved::Follows,
                     move_to_tuning,
                 )
@@ -191,7 +191,12 @@ impl RepairAction {
         move_reads: &MoveToReads<'_>,
         move_to_tuning: &MoveToTuning,
     ) -> GenieResult<Option<MoveToAction>> {
-        move_reads.to_point(point, Distance::ZERO, self.task.moving, move_to_tuning)
+        move_reads.to_point(
+            point,
+            Distance::ZERO,
+            self.task.sprites.moving,
+            move_to_tuning,
+        )
     }
 
     /// One update (slot 6, `0x140adaa20`) of `repairer` (`me`) through its step, with what it

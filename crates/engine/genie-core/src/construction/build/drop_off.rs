@@ -234,7 +234,7 @@ impl BuildAction {
         let to = move_reads
             .walk_to(step.world, Some(id.id()))?
             .ok_or(GenieError::unsupported("a drop site without a place"))?;
-        let given = sprite.or(self.task.moving);
+        let given = sprite.or(self.task.sprites.moving);
         self.state = BuildState::Drop {
             move_to: move_reads.to_object(
                 to,

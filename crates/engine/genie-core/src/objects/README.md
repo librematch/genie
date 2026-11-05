@@ -52,7 +52,7 @@ calls `Unit::update` (`unit/update.rs`), which runs the object's chain of update
 | [`relics.rs`](relics.rs) | A building's relic counts (`Relics`). |
 | [`role.rs`](role.rs) | An object's id in a role: the id of the object a field or a routine needs in one part (the container a unit is inside, a foundation, a pasture, a drop site, a building's main part, a missile's shooter, an action's target: the Gather's, the Hunt's, the Repair's, the Attack's, the missile's), so that an id of another role or of any object does not compile there. |
 | [`sprite.rs`](sprite.rs) | An object's active sprite: the frame of its sprite (a `.dat` graphic) and, for a graphic that animates, the clock that advances it. |
-| [`task_change.rs`](task_change.rs) | An action's slot 0x50 across a task change: the action's task and the new master's task that takes its place, whose sprites an Attack and a `MoveTo` swap (`TaskChange`). |
+| [`task_change.rs`](task_change.rs) | An action's slot 0x50 across a task change: the action's task and the new master's task that takes its place, whose sprites an Attack and a `MoveTo` swap (`TaskChange`), and the task change of an object's actions (`FUN_140a97970` -> `FUN_140a78150`, `take_tasks`). |
 | [`teardown.rs`](teardown.rs) | The action list's deletions (`FUN_140a98620`, `FUN_140a98e20`) and each action's destructor (its slot 0): what they leave the unit's world to apply. |
 | [`update_code.rs`](update_code.rs) | What an action's update answers its list. |
 | [`voice.rs`](voice.rs) | Whether an action speaks for its unit (`Voice`): the base action's `+0x60`. |

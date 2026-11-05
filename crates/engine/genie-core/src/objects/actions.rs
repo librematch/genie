@@ -27,6 +27,7 @@ use crate::gathering::gather::GATHER;
 use crate::gathering::gather::GatherAction;
 use crate::gathering::hunt::HUNT;
 use crate::gathering::hunt::HuntAction;
+use crate::gathering::hunt::HuntState;
 use crate::gathering::make::MAKE;
 use crate::gathering::make::MakeAction;
 use crate::movement::explore::EXPLORE;
@@ -41,6 +42,7 @@ use crate::objects::RoleId;
 use crate::objects::masters::ActionKind;
 use crate::ownership::artifact::ARTIFACT_KIND;
 use crate::ownership::artifact::Artifact;
+use crate::ownership::artifact::ArtifactSub;
 use genie_diff::Diff;
 use std::mem::discriminant;
 use std::slice::{Iter, IterMut};
@@ -219,6 +221,50 @@ impl Action {
             _ => None,
         }
     }
+}
+
+/// An action's sub-action (its list at `+0x50`) whose slot 0x50 a task change runs
+/// (`FUN_140a979b0`): a walk's `MoveTo` or a Hunt's Attack.
+#[derive(Debug, PartialEq)]
+pub(crate) enum SubActionMut<'action> {
+    /// A walk's `MoveTo`.
+    MoveTo(&'action mut MoveToAction),
+    /// A Hunt's Attack (its state 12).
+    Attack(&'action mut Attack),
+}
+
+impl Action {
+    /// Its sub-action (`+0x50`, one at most in every state genie models), none for an action
+    /// that holds none: a `MoveTo`, a Missile, a Make and a wait for a foundation make none, and
+    /// an Artifact's Enter has no slot 0x50 of its own (`0x140a782d0`, the base's).
+    pub(crate) fn sub_action_mut(&mut self) -> Option<SubActionMut<'_>> {
+        match self {
+            Self::Attack(attack) => walk(attack.state.walk_mut()),
+            Self::Build(build_action) => walk(build_action.state.walk_mut()),
+            Self::Repair(repair_action) => walk(repair_action.state.walk_mut()),
+            Self::Gather(gather_action) => walk(gather_action.state.walk_mut()),
+            Self::Enter(enter_action) => walk(enter_action.state.walk_mut()),
+            Self::Transport(transport_action) => walk(transport_action.state.walk_mut()),
+            Self::Hunt(hunt_action) => match &mut hunt_action.state {
+                HuntState::Attack { attack } => attack.as_mut().map(SubActionMut::Attack),
+                walking => walk(walking.walk_mut()),
+            },
+            Self::Fly(fly) => fly.state.move_to_mut().map(SubActionMut::MoveTo),
+            Self::Explore(explore_action) => {
+                explore_action.state.move_to_mut().map(SubActionMut::MoveTo)
+            }
+            Self::Artifact(artifact) => match &mut artifact.sub {
+                Some(ArtifactSub::Walk { move_to }) => Some(SubActionMut::MoveTo(move_to)),
+                Some(ArtifactSub::Enter { .. }) | None => None,
+            },
+            Self::MoveTo(_) | Self::Missile(_) | Self::Make(_) | Self::WaitSolidify(_) => None,
+        }
+    }
+}
+
+/// The walk's `MoveTo` of a state's sub-action slot, none for an empty one.
+fn walk(slot: Option<&mut Option<MoveToAction>>) -> Option<SubActionMut<'_>> {
+    slot.and_then(Option::as_mut).map(SubActionMut::MoveTo)
 }
 
 /// The object's actions (`RGE_Action_List`), the head first.

@@ -9,7 +9,7 @@ use crate::gathering::{FarmStops, GatherTargetId, HuntTargetId, StopIndex};
 use crate::map::Point;
 use crate::movement::move_to::MOVE_TO;
 use crate::objects::layers;
-use crate::objects::masters::{ClassId, Task};
+use crate::objects::masters::ClassId;
 use crate::players::Amount;
 use crate::world::Seconds;
 use crate::world::load::sub_actions::saved_attack;
@@ -41,19 +41,6 @@ pub fn import_make(
         task: saved.task(task_at)?,
     }));
     Ok(())
-}
-
-/// A Hunt's or a Gather's task.
-const fn hunt_task(task: &Task) -> HuntTask {
-    HuntTask {
-        id: task.id,
-        range: task.work_range,
-        resource: task.attribute_kind,
-        sprites: task.sprites,
-        work_value: task.work_val1,
-        productivity: task.attribute_kind2,
-        kind4: task.attribute_kind4,
-    }
 }
 
 /// The Hunt (110): its task, drop site and lead, with its Attack or `MoveTo`. Its Attack reads
@@ -90,7 +77,7 @@ pub fn import_hunt(
             "a saved Hunt in a state the slice does not model",
         ));
     }
-    let task = hunt_task(&saved.task(task_at)?);
+    let task = HuntTask::of(&saved.task(task_at)?);
     let target_class = ClassId::of_param(part.target_kind)?;
     let (walk, attack) = match first_action(&base.sub_actions)? {
         None => (None, None),
@@ -187,7 +174,7 @@ pub fn import_gather(
         .map(|sub| saved_sub_move_to(sub, saved.graphics))
         .transpose()?;
     let state = GatherState::of_byte(base.state, walk)?;
-    let task = hunt_task(&saved.task(task_at)?);
+    let task = HuntTask::of(&saved.task(task_at)?);
     let gather = GatherAction {
         target: GatherTargetId::of_field(base.target_id),
         carry_to: DropSiteId::of_field(base.target2_id),

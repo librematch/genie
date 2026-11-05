@@ -10,7 +10,7 @@ use crate::math::rng::Stream;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::actions::Action;
-use crate::objects::masters::{Task, TaskId};
+use crate::objects::masters::Task;
 use crate::players::PlayerId;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::Answer;
@@ -40,7 +40,7 @@ impl World {
     ) -> GenieResult<()> {
         self.notify_transport((player_id, list_index), (target, point), notifies)?;
         self.clear_actions(player_id, list_index)?;
-        let mut transport_action = TransportAction::on_task(Some(task.id), point);
+        let mut transport_action = TransportAction::on_task(Some(*task), point);
         let move_to_tuning = self.model.tuning.move_to;
         let transport_tuning = self.model.tuning.transport;
         let changed = self.with_shore(
@@ -114,7 +114,9 @@ impl World {
         let unit = self.players.live(player_id, list_index)?;
         // the Transport on top, on the task the work found
         let on_task = match self.parts.actions_of(unit.id).list.head() {
-            Some(Action::Transport(transport_action)) if transport_action.task == Some(task.id) => {
+            Some(Action::Transport(transport_action))
+                if transport_action.task.as_ref() == Some(task) =>
+            {
                 Some(*transport_action)
             }
             _ => None,
@@ -228,7 +230,7 @@ impl World {
         &mut self,
         player_id: PlayerId,
         list_index: ListIndex,
-        task: Option<TaskId>,
+        task: Option<Task>,
         work: impl FnOnce(&Ship<'_>, &mut MapShore<'_>) -> GenieResult<Changed>,
     ) -> GenieResult<Changed> {
         let ship = {
@@ -243,9 +245,9 @@ impl World {
                     &self.model.graphics,
                     self.parts.combat_of(unit.id).abilities.look.as_ref(),
                 ),
-                task,
+                task.as_ref(),
                 &self.model.roles,
-            )?
+            )
         };
         let restriction = self
             .players

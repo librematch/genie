@@ -82,6 +82,7 @@ impl HuntTask {
     pub const fn of(task: &Task) -> Self {
         Self {
             id: task.id,
+            key: task.key(),
             range: task.work_range,
             resource: task.attribute_kind,
             sprites: task.sprites,

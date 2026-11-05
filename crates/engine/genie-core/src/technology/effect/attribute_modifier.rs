@@ -22,7 +22,6 @@ use crate::objects::masters::follow;
 use crate::objects::masters::follow_moving;
 use crate::objects::masters::player_master;
 use crate::objects::sprite::{ActiveSprite, new_sprite};
-use crate::objects::task_change::TaskChange;
 use crate::players::PlayerId;
 use crate::technology::effect::object_slots::ObjectChange;
 use crate::technology::effect::{CAPPED, Change, OBJECT_GONE, has_actions, within_table};
@@ -177,13 +176,11 @@ impl World {
     /// The sprite part of `FUN_141614f40` after a sprite's change on object `id` of player
     /// `player`: one below type 40 or without actions shows its master's standing sprite again when
     /// the change was to the one it shows (71 with its idle variant `+0x78c` 0, 72 with 1;
-    /// `FUN_141189760`, slot 0x68); one with actions has each take its master's sprites
-    /// (`FUN_140a97970` -> `FUN_140a78150`): an Attack's
-    /// ([`Arms::take_master`]) its moving, attack and
-    /// standing sprites from its master unless they are its task's, and from type 70 on its idle
-    /// attack and second attack sprites; a `MoveTo` keeps the sprite it holds (it is not one of the
-    /// master's new ones) and shows it again (slot 0x60, which the unit shows already); the other
-    /// actions' slot 0x50 does nothing.
+    /// `FUN_141189760`, slot 0x68); one with actions runs the task change with its master as
+    /// both the old and the new one (`FUN_140a97970` -> `FUN_140a78150`,
+    /// [`World::actions_take_master`]): an action with a task takes the master's last task of
+    /// its key, and an Attack's sprites ([`Arms::take_master`]) and a `MoveTo`'s follow the
+    /// changed master's.
     ///
     /// [`Arms::take_master`]: crate::combat::attack::Arms::take_master
     pub(super) fn show_changed_sprite(
@@ -240,24 +237,8 @@ impl World {
             }
             return Ok(());
         }
-        let graphics = &self.model.graphics;
-        // the object the read above found: its action layer
-        let actions = self.parts.actions_mut(id)?;
-        // a unit's own Attack's task (the work command's attack task) has no sprites
-        if let Some(attack) = actions.list.attack_mut() {
-            attack.arms.take_master(&master, None, graphics);
-        }
-        if let Some(hunt) = actions.list.hunt_mut() {
-            // the master's own task takes the place of the hunt's
-            let change = TaskChange {
-                old: hunt.task.sprites,
-                next: hunt.task.sprites,
-            };
-            if let Some(attack) = hunt.state.attack_mut().and_then(Option::as_mut) {
-                attack.arms.take_master(&master, Some(change), graphics);
-            }
-        }
-        Ok(())
+        let place = self.place(id).ok_or(OBJECT_GONE)?;
+        self.actions_take_master(place, &master, &master)
     }
 
     /// `FUN_14165a000` of player `player_id`: a master `unit` within the player's table changes

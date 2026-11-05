@@ -29,7 +29,7 @@ use crate::objects::SpriteId;
 use crate::objects::UpdateCode;
 use crate::objects::layers::Action;
 use crate::objects::layers::MotionMut;
-use crate::objects::masters::{Master, TaskId};
+use crate::objects::masters::{Master, Task};
 use crate::objects::sprite::{Graphic, new_sprite};
 use crate::objects::unit::Unit;
 use crate::players::PlayerKind;
@@ -59,7 +59,7 @@ impl TransportAction {
     /// task of type 12 at the work command's point `at` (`+0x38`..`+0x40`): state 0 and `+0x34`
     /// −1 (the base's, `FUN_140a73e90`), `+0x68` clear.
     #[must_use]
-    pub const fn on_task(task: Option<TaskId>, at: Position) -> Self {
+    pub const fn on_task(task: Option<Task>, at: Position) -> Self {
         Self {
             state: TransportState::New,
             mode: TransportMode::New,
@@ -462,26 +462,12 @@ impl TransportAction {
     /// its `MoveTo` (`FUN_140aa0d30`): the task's moving sprite (`+0x40`), without a task the
     /// master's walking sprite (`+0x748`); for none the constructor's default
     /// ([`MoveToReads::to_point`]).
-    ///
-    /// # Errors
-    ///
-    /// A task the unit's master (`master`) lacks.
-    pub fn given_sprite(task: Option<TaskId>, master: &Master) -> GenieResult<Option<SpriteId>> {
-        Ok(match task {
-            Some(id) => {
-                let task = master
-                    .action_part()
-                    .tasks
-                    .iter()
-                    .find(|task| task.id == id)
-                    .ok_or_else(|| {
-                        GenieError::missing_data("a Transport's task its master lacks")
-                            .with("task", id.get())
-                    })?;
-                task.sprites.moving
-            }
-            None => master.moving_part().move_sprite,
-        })
+    #[must_use]
+    pub fn given_sprite(task: Option<&Task>, master: &Master) -> Option<SpriteId> {
+        task.map_or_else(
+            || master.moving_part().move_sprite,
+            |task| task.sprites.moving,
+        )
     }
 
     /// The update of its `MoveTo` sub-action (`FUN_140a992b0`) on the step
@@ -629,22 +615,18 @@ impl<'graphics> Ship<'graphics> {
     /// What the Transport on `task` reads of `unit` of top speed `top` (slot 0x208) and `master`
     /// on a map of `map` tiles, with the sprites' table and the unit's terrain look (`graphics`,
     /// [`Ship::of`]).
-    ///
-    /// # Errors
-    ///
-    /// A task the master lacks.
     pub(crate) fn of_unit(
         unit: &Unit,
         top: Speed,
         master: &Master,
         map: GridSize,
         graphics: (&'graphics Graphics, Option<&Look>),
-        task: Option<TaskId>,
+        task: Option<&Task>,
         roles: &Roles,
-    ) -> GenieResult<Self> {
+    ) -> Self {
         let walk = MoveToReads::of(unit, top, master, graphics.0, graphics.1, roles);
-        let given = TransportAction::given_sprite(task, master)?;
-        Ok(Self::of(unit, master.radius, map, walk, given))
+        let given = TransportAction::given_sprite(task, master);
+        Self::of(unit, master.radius, map, walk, given)
     }
 
     /// What the Transport reads of `unit` of master radii `radius` on a map of `map` tiles: its

@@ -3737,7 +3737,7 @@ fn work_command_on_land_point_makes_transport_that_sails_there() {
         (
             tr.state.bare(),
             tr.mode,
-            tr.task,
+            tr.task.map(|task| task.id),
             tr.point,
             tr.state
                 .move_to()

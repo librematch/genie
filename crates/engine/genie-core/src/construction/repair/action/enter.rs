@@ -35,10 +35,10 @@ impl RepairAction {
                 if let Some(repairee) = reads.target {
                     self.point = repairee.position;
                 }
-                show(step, repairer, self.task.moving, reads.standing)?;
+                show(step, repairer, self.task.sprites.moving, reads.standing)?;
             }
             RepairState::Work => {
-                show(step, repairer, self.task.proceeding, reads.standing)?;
+                show(step, repairer, self.task.sprites.proceeding, reads.standing)?;
                 if reads.counted_in.is_some() {
                     Self::count(step, reads, 1)?;
                     self.counted = true;

@@ -256,10 +256,13 @@ mod tests {
     use crate::objects::UpdateCode;
     use crate::objects::WorkRate;
     use crate::objects::layers::Motion;
+    use crate::objects::masters::ActionKind;
     use crate::objects::masters::TaskId;
+    use crate::objects::masters::TaskSprites;
     #[cfg(test)]
     use crate::objects::masters::WorkValue;
     use crate::test_ids::object_id;
+    use crate::test_ids::task_key;
 
     /// A moving object's motion layer, moving (its velocity and animation speed set).
     fn moving() -> Motion {
@@ -281,7 +284,8 @@ mod tests {
             work_rate: WorkRate::new(1.0),
             resource: None,
             id: TaskId::of_task(-1),
-            moving: None,
+            key: task_key(ActionKind::BUILD),
+            sprites: TaskSprites::NONE,
         };
         started(
             object_id(10028),

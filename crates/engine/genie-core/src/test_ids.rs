@@ -10,6 +10,7 @@ use crate::objects::masters::ClassId;
 use crate::objects::masters::CostAmount;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::TaskId;
+use crate::objects::masters::TaskKey;
 use crate::objects::masters::{COST_SLOTS, CostSlot};
 use crate::players::Amount;
 use crate::players::PlayerId;
@@ -149,4 +150,13 @@ pub(crate) fn costs(entries: &[(AttributeId, i16, bool)]) -> [CostSlot; COST_SLO
         *slot = CostSlot::new(attribute, CostAmount::of_data(amount), paid);
     }
     slots
+}
+
+/// The key of a task of action type `action_kind` for any target class and master.
+pub(crate) const fn task_key(action_kind: ActionKind) -> TaskKey {
+    TaskKey {
+        action_kind,
+        object_group: None,
+        object_id: None,
+    }
 }

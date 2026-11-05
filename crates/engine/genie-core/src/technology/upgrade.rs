@@ -7,10 +7,7 @@
 mod damage;
 
 use crate::combat::Charge;
-use crate::construction::build::BuildTask;
-use crate::construction::repair::RepairTask;
 use crate::gathering::gather::unit::give_load;
-use crate::gathering::hunt::HuntTask;
 use crate::math::rng::Stream;
 use crate::objects::HitPoints;
 use crate::objects::ObjectState;
@@ -20,11 +17,9 @@ use crate::objects::masters::ClassId;
 use crate::objects::masters::HpPercent;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::Task;
-use crate::objects::masters::TaskId;
 use crate::objects::masters::player_master;
 use crate::objects::sprite::new_sprite;
-use crate::objects::task_change::TaskChange;
+use crate::objects::task_change::{Looks, take_tasks};
 use crate::objects::unit::Unit;
 use crate::players::Amount;
 use crate::players::PlayerId;
@@ -502,89 +497,42 @@ impl World {
         Ok(())
     }
 
-    /// `FUN_140a97970` -> `FUN_140a78150` for each action of the object at `place` whose master
-    /// `old` gives way to `new`: an action with a task takes the last of `new`'s tasks of the same
-    /// action type, target class and target master (none: it keeps its task and changes nothing
-    /// else); then its slot 0x50 with the tasks: an Attack's sprites follow `new`'s and the new
-    /// task's ([`Arms::take_master`]), its sub-actions alike (`FUN_140a979b0`).
+    /// `FUN_140a97970` -> `FUN_140a78150` on the actions of the object at `place` whose master
+    /// `old` gives way to `new` ([`take_tasks`]): each takes the last of `new`'s tasks of its
+    /// task's type, class and target, its slot 0x50 and its sub-action's with the two tasks'
+    /// sprites; one without a task runs them with none. An object the table holds no layer of
+    /// has no actions.
     ///
-    /// [`Arms::take_master`]: crate::combat::attack::Arms::take_master
+    /// # Errors
+    ///
+    /// A place the world does not hold.
     pub(crate) fn actions_take_master(
         &mut self,
         place: Place,
         old: &Master,
         new: &Master,
     ) -> GenieResult<()> {
-        let find = |task: &Task| {
-            new.action_part()
-                .tasks
-                .iter()
-                .rev()
-                .find(|candidate| {
-                    candidate.action_kind == task.action_kind
-                        && candidate.object_group == task.object_group
-                        && candidate.object_id == task.object_id
-                })
-                .copied()
-        };
-        let old_task = |id: TaskId| {
-            old.action_part()
-                .tasks
-                .iter()
-                .find(|task| task.id == id)
-                .copied()
-        };
-        let graphics = &self.model.graphics;
         let id = self.object_at(place)?.id;
-        // an object the table holds no layer of has no actions to follow the master
         let Some(actions) = self.parts.actions.get_mut(id) else {
             return Ok(());
         };
-        if let Some(attack) = actions.list.attack_mut() {
-            attack.arms.take_master(new, None, graphics);
-        }
-        if let Some(hunt) = actions.list.hunt_mut()
-            && let Some(found) = old_task(hunt.task.id).as_ref().and_then(find)
-        {
-            let change = TaskChange {
-                old: hunt.task.sprites,
-                next: found.sprites,
-            };
-            hunt.task = HuntTask::of(&found);
-            if let Some(attack) = hunt.state.attack_mut().and_then(Option::as_mut) {
-                attack.arms.take_master(new, Some(change), graphics);
-            }
-        }
-        if let Some(gather) = actions.list.gather_mut()
-            && let Some(task) = old_task(gather.task.id).as_ref().and_then(find)
-        {
-            gather.task = HuntTask::of(&task);
-        }
-        if let Some(make) = actions.list.make_mut()
-            && let Some(task) = find(&make.task)
-        {
-            make.task = task;
-        }
-        if let Some(fly) = actions.list.fly_mut()
-            && let Some(task) = find(&fly.task)
-        {
-            fly.task = task;
-        }
-        if let Some(wait_solidify) = actions.list.wait_solidify_mut()
-            && let Some(task) = find(&wait_solidify.task)
-        {
-            wait_solidify.task = task;
-        }
-        if let Some(repair_action) = actions.list.repair_mut()
-            && let Some(task) = old_task(repair_action.task.id).as_ref().and_then(find)
-        {
-            repair_action.task = RepairTask::of(&task);
-        }
-        if let Some(build_action) = actions.list.build_mut()
-            && let Some(task) = old_task(build_action.task.id).as_ref().and_then(find)
-        {
-            build_action.task = BuildTask::of(&task, build_action.task.work_rate);
-        }
+        let unit = match place {
+            Place::Live(owner, slot) => self.players.live_mut(owner, slot)?,
+            Place::Sleeping(owner, slot) => self.players.asleep_mut(owner, slot)?,
+        };
+        let mut looks = Looks {
+            sprite: &mut unit.sprite,
+            stats: self.parts.motion.move_stats_mut(id),
+            rng: self.streams.get_mut(Stream::Sprite),
+            sprite_tuning: self.model.tuning.sprite,
+        };
+        take_tasks(
+            &mut actions.list,
+            old,
+            new,
+            &self.model.graphics,
+            &mut looks,
+        );
         Ok(())
     }
 
@@ -659,6 +607,7 @@ mod tests {
     use crate::objects::masters::MasterId;
     use crate::objects::masters::MovingPart;
     use crate::objects::masters::ObstructionKind;
+    use crate::objects::masters::TaskKey;
     use crate::objects::masters::TaskSprites;
     #[cfg(test)]
     use crate::objects::masters::WorkValue;
@@ -1152,7 +1101,7 @@ mod tests {
         );
     }
 
-    /// `FUN_140a97970` -> `FUN_140a78150`: each action finds its old task's match among the new
+    /// `FUN_140a97970` -> `FUN_140a78150`: each action finds its task's match among the new
     /// master's tasks (action type, target class and master; the last of equals) and takes it; an
     /// action without a match keeps its task.
     #[test]
@@ -1208,14 +1157,12 @@ mod tests {
             ..old.clone()
         };
         let players = &mut world.players[1].objects[ListIndex::new(0)];
-        let build = BuildTask {
-            range: Distance::new(0.25),
-            work_value: WorkValue::new(0.5),
-            work_rate: WorkRate::new(1.0),
-            resource: Some(AttributeId::named(17)),
-            id: task_id(3),
-            moving: None,
-        };
+        let held = old
+            .action_part()
+            .tasks
+            .iter()
+            .find(|task| task.id == task_id(3));
+        let build = BuildTask::of(held.unwrap(), WorkRate::new(1.0));
         world
             .parts
             .actions
@@ -1281,7 +1228,15 @@ mod tests {
                 work_rate: WorkRate::new(1.0),
                 resource: Some(AttributeId::named(17)),
                 id: task_id(7),
-                moving: Some(SpriteId::named(12)),
+                key: TaskKey {
+                    action_kind: ActionKind::BUILD,
+                    object_group: Some(class_id(3)),
+                    object_id: None,
+                },
+                sprites: TaskSprites {
+                    moving: Some(SpriteId::named(12)),
+                    ..TaskSprites::NONE
+                },
             }
         );
         assert_eq!(
@@ -1306,7 +1261,8 @@ mod tests {
                 .task,
             waiting
         );
-        // a Gather whose task the old master lacks keeps it
+        // a Gather holds its task's key, as the game its pointer: a master that lacks the task
+        // still gives way to the new master's last task of that key
         let gather = world
             .parts
             .actions_of(unit.id)

@@ -6,11 +6,13 @@ use crate::commands::Departure;
 use crate::construction::build::BuildState;
 use crate::construction::build::BuildTask;
 use crate::construction::build::tests::started_on;
+use crate::construction::repair::REPAIR;
 use crate::construction::repair::RepairState;
 use crate::construction::repair::{RepairAction, RepairTask};
 use crate::gathering::PastureId;
 use crate::gathering::gather::GatherState;
 use crate::gathering::gather::{GatherAction, Resource, StopRate};
+use crate::gathering::hunt::HUNT;
 use crate::gathering::hunt::HuntState;
 use crate::gathering::hunt::HuntTask;
 use crate::gathering::hunt::tests::walker;
@@ -70,6 +72,7 @@ use crate::test_ids::object_id;
 use crate::test_ids::object_ids;
 use crate::test_ids::player_id;
 use crate::test_ids::task_id;
+use crate::test_ids::task_key;
 use crate::test_ids::tech_id;
 use crate::test_ids::{adds, amounts};
 use crate::testing::attribute;
@@ -265,6 +268,7 @@ fn each_action_with_its_own_stop_halts_and_answers_true() {
     };
     let task = HuntTask {
         id: task_id(0),
+        key: task_key(HUNT),
         range: Distance::new(0.25),
         resource: Some(AttributeId::named(17)),
         sprites: TaskSprites::NONE,
@@ -307,7 +311,8 @@ fn each_action_with_its_own_stop_halts_and_answers_true() {
         work_rate: WorkRate::new(1.0),
         resource: None,
         id: TaskId::of_task(-1),
-        moving: None,
+        key: task_key(ActionKind::BUILD),
+        sprites: TaskSprites::NONE,
     };
     let build = add(Object::with_actions(
         Unit {
@@ -326,9 +331,9 @@ fn each_action_with_its_own_stop_halts_and_answers_true() {
     ));
     let repair_task = RepairTask {
         id: task_id(0),
+        key: task_key(REPAIR),
         work_value: WorkValue::new(1.0),
-        moving: None,
-        proceeding: None,
+        sprites: TaskSprites::NONE,
     };
     let repair = add(Object::with_actions(
         Unit {
@@ -479,6 +484,7 @@ fn stopped_hunter_keeps_its_halted_hunt() {
                 target_class: None,
                 task: HuntTask {
                     id: task_id(0),
+                    key: task_key(HUNT),
                     range: Distance::ZERO,
                     resource: None,
                     sprites: TaskSprites::NONE,

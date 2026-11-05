@@ -20,6 +20,7 @@ use crate::objects::masters::ActionKind;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::TaskId;
+use crate::objects::masters::TaskKey;
 use crate::objects::masters::TaskSprites;
 use crate::objects::sprite::Graphic;
 use crate::players::Amount;
@@ -161,6 +162,8 @@ pub struct Herd {
 pub struct HuntTask {
     /// Its id in the master's task list (`+0xa`).
     pub(crate) id: TaskId,
+    /// Its action type, target class and target master, which a task change matches.
+    pub(crate) key: TaskKey,
     /// The work range (`+0x30`).
     pub(crate) range: Distance,
     /// The resource it gathers (`attribute_type`, `+0x20`), none for −1.

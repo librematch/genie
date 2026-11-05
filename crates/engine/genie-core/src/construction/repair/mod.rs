@@ -27,6 +27,8 @@ use crate::objects::masters::MasterId;
 use crate::objects::masters::Task;
 use crate::objects::masters::TaskGroup;
 use crate::objects::masters::TaskId;
+use crate::objects::masters::TaskKey;
+use crate::objects::masters::TaskSprites;
 use crate::players::PlayerId;
 use crate::world::Seconds;
 use crate::world::layer::MasterSlots;
@@ -74,19 +76,19 @@ pub const fn repairers(masters: MasterSlots) -> [(TaskGroup, MasterId); 2] {
 pub const SHIP_REPAIR: GenieError =
     GenieError::unsupported("the task finder's repair (106) of a ship (FUN_140ad9120)");
 
-/// What a Repair works with: its task's id, work value (`+0x28`, `work_val1`) and the two
-/// sprites its states show.
+/// What a Repair works with: its task's id, key, work value (`+0x28`, `work_val1`) and
+/// sprites.
 #[derive(Clone, Copy, Debug, PartialEq, Diff)]
 pub struct RepairTask {
     /// The task's id.
     pub(crate) id: TaskId,
+    /// Its action type, target class and target master, which a task change matches.
+    pub(crate) key: TaskKey,
     /// Its work value.
     pub(crate) work_value: WorkValue,
-    /// Its moving sprite (`+0x40`), which its `MoveTo`s take and its turn toward the target
-    /// (state 6) shows; None for none.
-    pub(crate) moving: Option<SpriteId>,
-    /// Its proceeding sprite (`+0x48`), which its work (state 7) shows; None for none.
-    pub(crate) proceeding: Option<SpriteId>,
+    /// Its sprites: the moving one (`+0x40`), which its `MoveTo`s take and its turn toward the
+    /// target (state 6) shows, and the proceeding one (`+0x48`), which its work (state 7) shows.
+    pub(crate) sprites: TaskSprites,
 }
 
 impl RepairTask {
@@ -95,9 +97,9 @@ impl RepairTask {
     pub const fn of(task: &Task) -> Self {
         Self {
             id: task.id,
+            key: task.key(),
             work_value: task.work_val1,
-            moving: task.sprites.moving,
-            proceeding: task.sprites.proceeding,
+            sprites: task.sprites,
         }
     }
 }

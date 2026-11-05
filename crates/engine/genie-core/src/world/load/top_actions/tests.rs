@@ -37,6 +37,7 @@ use crate::ownership::artifact::{ARTIFACT_KIND, ArtifactState};
 use crate::test_ids::action_kind;
 use crate::test_ids::class_id;
 use crate::test_ids::object_id;
+use crate::test_ids::task_key;
 use crate::testing::attribute;
 use crate::world::Seconds;
 use crate::world::load::fixtures::{
@@ -182,7 +183,11 @@ fn import_drawn(
                 work_rate: WorkRate::new(2.0),
                 resource: None,
                 id: TaskId::of_task(7),
-                moving: Some(SpriteId::named(9)),
+                key: task_key(ActionKind::BUILD),
+                sprites: TaskSprites {
+                    moving: Some(SpriteId::named(9)),
+                    ..TaskSprites::NONE
+                },
             })
         },
         |_| Ok(task(8, 3.0)),
@@ -815,7 +820,7 @@ fn build_takes_its_task_move_to_and_site() {
         .unwrap();
     assert_eq!(build_action.state.move_to().copied(), None);
     // without a MoveTo, the task's moving sprite for the next
-    assert_eq!(build_action.task.moving, Some(SpriteId::named(9)));
+    assert_eq!(build_action.task.sprites.moving, Some(SpriteId::named(9)));
     assert_eq!(
         imported(
             ActionKind::BUILD,

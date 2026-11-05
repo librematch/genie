@@ -61,7 +61,7 @@ impl Unit {
             (self.id, self.life.master_id),
             step.world.model.masters.of(step.player),
         )?;
-        let given = TransportAction::given_sprite(transport_action.task, master)?;
+        let given = TransportAction::given_sprite(transport_action.task.as_ref(), master);
         let reads = TransportReads {
             radius: master.radius,
             restriction: master.terrain_restriction,
@@ -115,9 +115,9 @@ impl Unit {
             master,
             spatial.map,
             (&model.graphics, look),
-            transport_action.task,
+            transport_action.task.as_ref(),
             &model.roles,
-        )?;
+        );
         let restriction = master.terrain_restriction;
         let mut shore = MapShore::new(
             spatial,

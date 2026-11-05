@@ -6,6 +6,7 @@ use crate::combat::attack::BeginLayer;
 use crate::gathering::DropSiteId;
 use crate::gathering::gather::Walks;
 use crate::gathering::hunt::DecayRule;
+use crate::gathering::hunt::HUNT;
 use crate::map::Footprint;
 use crate::map::Radii;
 use crate::map::RestrictionId;
@@ -39,6 +40,7 @@ use crate::players::PlayerKind;
 use crate::test_ids::carrying;
 use crate::test_ids::class_of;
 use crate::test_ids::object_id;
+use crate::test_ids::task_key;
 use crate::testing::attribute;
 use crate::testing::class;
 use crate::testing::ids;
@@ -370,6 +372,7 @@ const ARMS: Arms = Arms {
 
 const CHOP: HuntTask = HuntTask {
     id: task_id(0),
+    key: task_key(HUNT),
     range: Distance::ZERO,
     resource: Some(attribute::MEAT),
     sprites: TaskSprites::of_data([-1, 1239, 1961, 1960]),

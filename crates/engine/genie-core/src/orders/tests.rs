@@ -101,6 +101,7 @@ use crate::test_ids::object_id_list;
 use crate::test_ids::object_ids;
 use crate::test_ids::player_id;
 use crate::test_ids::task_id;
+use crate::test_ids::task_key;
 use crate::testing::ai::run_ai;
 use crate::testing::attribute;
 use crate::testing::class;
@@ -407,7 +408,8 @@ fn unit_order_drop_off_sends_carrying_builder_to_the_table_drop_site() {
                         work_rate: WorkRate::new(1.0),
                         resource: None,
                         id: TaskId::of_task(-1),
-                        moving: None,
+                        key: task_key(ActionKind::BUILD),
+                        sprites: TaskSprites::NONE,
                     },
                 )
             })),
@@ -3729,7 +3731,8 @@ fn build_new_target_leaves_the_old_foundation_builders() {
                 work_rate: WorkRate::new(1.0),
                 resource: None,
                 id: TaskId::of_task(-1),
-                moving: None,
+                key: task_key(ActionKind::BUILD),
+                sprites: TaskSprites::NONE,
             },
             added: true,
             timer: Seconds::ZERO,
@@ -5679,7 +5682,8 @@ fn drop_off_order_asks_the_top_gather_build_or_hunt() {
         work_rate: WorkRate::new(1.0),
         resource: Some(attribute::WOOD),
         id: TaskId::of_task(-1),
-        moving: None,
+        key: task_key(ActionKind::BUILD),
+        sprites: TaskSprites::NONE,
     };
     let players = &mut foraging.players[1].objects[ListIndex::new(0)];
     let build = started(
@@ -6244,7 +6248,8 @@ fn work_command_task_is_retaken_by_the_action_on_top() {
         work_rate: WorkRate::new(1.0),
         resource: None,
         id: task_id(3),
-        moving: None,
+        key: task_key(ActionKind::BUILD),
+        sprites: TaskSprites::NONE,
     };
     world
         .parts

@@ -28,12 +28,12 @@ impl BuildTask {
         move_to_tuning: &MoveToTuning,
     ) -> GenieResult<Option<MoveToAction>> {
         to.map_or_else(
-            || move_reads.to_nothing(self.range, self.moving, move_to_tuning),
+            || move_reads.to_nothing(self.range, self.sprites.moving, move_to_tuning),
             |to| {
                 move_reads.to_object(
                     to,
                     self.range,
-                    self.moving,
+                    self.sprites.moving,
                     TargetMoved::Follows,
                     move_to_tuning,
                 )

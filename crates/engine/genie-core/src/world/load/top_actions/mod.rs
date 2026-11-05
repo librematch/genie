@@ -44,7 +44,6 @@ use crate::movement::explore::{EXPLORE, ExploreAction};
 use crate::movement::fly::FlyState;
 use crate::movement::{Acceleration, Speed};
 use crate::objects::Graphics;
-use crate::objects::masters::TaskId;
 use crate::ownership::artifact::{Artifact, ArtifactState, ArtifactSub};
 use crate::world::load::top_actions::gathering::{import_gather, import_hunt, import_make};
 use genie_save::generated::world::ActionList;
@@ -108,7 +107,7 @@ pub fn saved_actions(
         HUNT => import_hunt(&saved, &task_at, actions),
         GATHER => import_gather(&saved, &task_at, actions),
         ENTER => import_enter(&saved, &task_at, actions),
-        TRANSPORT => import_transport(&saved, actions),
+        TRANSPORT => import_transport(&saved, &task_at, actions),
         EXPLORE => import_explore(&saved, actions),
         ATTACK => import_attack(&saved, actions),
         WAIT_SOLIDIFY => import_wait_solidify(&saved, &task_at, actions),
@@ -504,9 +503,14 @@ fn import_enter(
 }
 
 /// The Transport (12): the base alone is saved (`FUN_140aa3b20`): +0x34 is its second target's
-/// word, its task the base's task id (−1 for none), and +0x68 starts clear; `set_state` makes no
-/// sub-action but a `MoveTo`.
-fn import_transport(saved: &Saved<'_>, actions: &mut layers::Action) -> GenieResult<()> {
+/// word, its task the base's task slot (−1 for none: the base load's unsigned test,
+/// `0x140a7b5f1`, gives no task), and +0x68 starts clear; `set_state` makes no sub-action but a
+/// `MoveTo`.
+fn import_transport(
+    saved: &Saved<'_>,
+    task_at: TaskAt<'_>,
+    actions: &mut layers::Action,
+) -> GenieResult<()> {
     let base = saved.base;
     // `set_state` makes no other sub-action: a save that holds one is no game's
     let sub = saved.move_to_sub(GenieError::invalid_input(
@@ -522,8 +526,10 @@ fn import_transport(saved: &Saved<'_>, actions: &mut layers::Action) -> GenieRes
         mode: TransportMode::try_from(base.target2_id)?,
         point: saved.point(),
         retarget: false,
-        // the save writes the task's id, −1 for none
-        task: TaskId::of_field(base.short_val)?,
+        task: match base.short_val {
+            ..0 => None,
+            _ => Some(saved.task(task_at)?),
+        },
     }));
     Ok(())
 }

@@ -38,6 +38,7 @@ use crate::players::attribute::AttributeId;
 use crate::test_ids::costs;
 use crate::test_ids::master_id;
 use crate::test_ids::object_id;
+use crate::test_ids::task_key;
 use crate::testing::attribute;
 use crate::testing::class;
 use crate::testing::tuning;
@@ -449,18 +450,22 @@ fn farm_bonus_wants_both_attributes_238_and_239() {
 }
 
 /// A villager's Build task: range 0.1, work value 1, work rate 1.
-pub(super) const TASK: BuildTask = BuildTask {
+pub(crate) const TASK: BuildTask = BuildTask {
     range: Distance::new(0.1),
     work_value: WorkValue::new(1.0),
     work_rate: WorkRate::new(1.0),
     resource: None,
     id: TaskId::of_task(-1),
-    moving: None,
+    key: task_key(ActionKind::BUILD),
+    sprites: TaskSprites::NONE,
 };
 
 /// [`TASK`] with moving sprite 3.
 pub(super) const MOVING_TASK: BuildTask = BuildTask {
-    moving: Some(SpriteId::named(3)),
+    sprites: TaskSprites {
+        moving: Some(SpriteId::named(3)),
+        ..TaskSprites::NONE
+    },
     ..TASK
 };
 

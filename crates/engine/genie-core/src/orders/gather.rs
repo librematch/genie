@@ -417,15 +417,7 @@ impl World {
             state: target_unit.life.state,
             radius: tm.radius,
         };
-        let task = HuntTask {
-            id: task.id,
-            range: task.work_range,
-            resource: task.attribute_kind,
-            sprites: task.sprites,
-            work_value: task.work_val1,
-            productivity: task.attribute_kind2,
-            kind4: task.attribute_kind4,
-        };
+        let task = HuntTask::of(task);
         // the constructor's time per stop: the gatherer's work rate (its master's plus its
         // powerup, slot 0x6e8), capacity and productivity attribute (none: 1.0)
         let rate = StopRate {

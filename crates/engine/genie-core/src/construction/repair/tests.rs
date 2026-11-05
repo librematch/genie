@@ -37,6 +37,7 @@ use crate::players::relation_row;
 use crate::test_ids::costs;
 use crate::test_ids::object_id;
 use crate::test_ids::task_id;
+use crate::test_ids::task_key;
 use crate::testing::attribute;
 use crate::testing::class;
 use crate::testing::ids;
@@ -50,15 +51,18 @@ use std::sync::Arc;
 
 const TASK: RepairTask = RepairTask {
     id: task_id(7),
+    key: task_key(REPAIR),
     work_value: WorkValue::new(0.5),
-    moving: None,
-    proceeding: None,
+    sprites: TaskSprites::NONE,
 };
 
 /// [`TASK`] with the moving sprite 3 and the proceeding sprite 4.
 const SHOWING: RepairTask = RepairTask {
-    moving: Some(SpriteId::named(3)),
-    proceeding: Some(SpriteId::named(4)),
+    sprites: TaskSprites {
+        moving: Some(SpriteId::named(3)),
+        proceeding: Some(SpriteId::named(4)),
+        ..TaskSprites::NONE
+    },
     ..TASK
 };
 
@@ -523,7 +527,10 @@ fn repair_move_to_shows_its_task_moving_sprite_else_its_default() {
     );
     assert_eq!(shown(SHOWING), [Some(SpriteId::named(3)); 2]);
     let lacking = RepairTask {
-        moving: Some(SpriteId::named(6)),
+        sprites: TaskSprites {
+            moving: Some(SpriteId::named(6)),
+            ..TaskSprites::NONE
+        },
         ..TASK
     };
     let repair_action = RepairAction {
