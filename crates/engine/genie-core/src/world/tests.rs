@@ -25393,29 +25393,45 @@ fn container_id(value: i32) -> ContainerId {
     ContainerId::new(object_id(value))
 }
 
-/// A frozen unit's place grows by its master's speed as the master stands at each tick
-/// ([`World::grow_unknown`]): 2 s at 0.8 tiles a second, 1.6 tiles; a master the world does not
-/// hold may be anywhere.
+/// A frozen unit's place grows by its master's bound of speed as the master stands at each tick
+/// ([`World::grow_unknown`], [`MotionBound::speed`]): its speed (`+0x740`) 0.8 times the factor
+/// 1.5 of its standing sprite for 2 s, 2.4 tiles; one filed under a master its player's table
+/// does not hold may be anywhere.
 #[test]
 fn frozen_unit_may_have_moved_its_master_speed() {
     let mut world = forage_world();
     let id = world.players[1].objects[ListIndex::new(0)].id;
-    let master = world.players[1].objects[ListIndex::new(0)].life.master_id;
-    Arc::make_mut(&mut world.model.masters[1])
-        .get_mut(master)
-        .unwrap()
-        .move_stats
-        .as_mut()
-        .unwrap()
-        .base = Speed::new(0.8);
     let mut placed = *world.spatial.get(id).unwrap();
+    // the spatial index's master of the object, which its growth reads
+    let forager = Arc::make_mut(&mut world.model.masters[1])
+        .get_mut(placed.master)
+        .unwrap();
+    move_by(forager, walking(Speed::new(0.8)));
+    forager.standing_sprite = Some(SpriteId::named(1));
+    let fast = Graphic {
+        id: SpriteId::named(1),
+        frames: Frame::of_data(1),
+        facets: FacetCount::of_data(8),
+        speed_multiplier: SpeedMultiplier::of_data(1.5),
+        frame_duration: Seconds::ZERO,
+        replay_delay: Seconds::ZERO,
+        flags: SpriteFlags::NONE,
+    };
+    world.model.graphics = Arc::new(Graphics::from([(fast.id, fast)]));
     placed.moves = true;
     world.spatial.insert(id, placed);
     world.spatial.freeze(id);
-    world.grow_unknown(Seconds::new(2.0));
-    assert_eq!(world.spatial.get(id).unwrap().unknown, Some(1.6));
-    world.model.masters[1] = Arc::new(Masters::new([]));
-    world.grow_unknown(Seconds::new(0.05));
+    world.grow_unknown(Seconds::new(2.0)).unwrap();
+    assert_eq!(
+        world.spatial.get(id).unwrap().unknown,
+        Some(0.8 * 1.5 * 2.0)
+    );
+    // the spatial index files it under a master its player's table lacks (an own master's id)
+    let mut placed = *world.spatial.get(id).unwrap();
+    placed.master = master_id(999);
+    world.spatial.insert(id, placed);
+    world.spatial.freeze(id);
+    world.grow_unknown(Seconds::new(0.05)).unwrap();
     assert_eq!(world.spatial.get(id).unwrap().unknown, Some(f32::INFINITY));
 }
 

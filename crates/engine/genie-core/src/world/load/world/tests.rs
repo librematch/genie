@@ -198,7 +198,6 @@ fn the_load_takes_the_master_tables() {
     let turns = saved_world(&save, Some(&table), layer()).unwrap();
     assert_eq!(turns.history_period, HistoryUpdates::of_data(9));
     assert_eq!(turns.model.masters.len(), 2);
-    assert_eq!(turns.spatial.fastest.to_bits(), 0.0_f32.to_bits());
 }
 
 /// With the master table, a unit inside a building of its player is in the building's garrison

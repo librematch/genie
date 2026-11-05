@@ -13,6 +13,7 @@ use crate::map::spatial::{
     tile_record_id,
 };
 use crate::movement::Speed;
+use crate::movement::larger_bound;
 use crate::objects::IdTable;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
@@ -38,6 +39,16 @@ pub(super) enum KnownScope<'classes> {
     Records,
     /// Only those of the classes (the registry's lists).
     Classes(&'classes [ClassId]),
+}
+
+/// The way `speed` covers in `seconds` (one `f32` product), none in no time: a speed without
+/// bound covers no way before time passes, where its product would not be a number.
+fn covered(speed: Speed, seconds: Seconds) -> f32 {
+    if seconds == Seconds::ZERO {
+        0.0
+    } else {
+        (speed * seconds).get()
+    }
 }
 
 impl Spatial {
@@ -72,7 +83,7 @@ impl Spatial {
             tiles,
             changed: Vec::new(),
             frozen_for: IdTable::new(),
-            fastest: 0.0,
+            fastest: Speed::ZERO,
             reach: Distance::ZERO,
             scout_maps: BTreeMap::new(),
             relations: ByPlayer::default(),
@@ -275,6 +286,27 @@ impl Spatial {
         }
     }
 
+    /// Whether the slice stopped updating object `id` ([`Spatial::freeze`]) and has not taken
+    /// its place from the game since.
+    #[must_use]
+    pub fn is_frozen(&self, id: ObjectId) -> bool {
+        self.frozen_for.contains_key(id)
+    }
+
+    /// Whether the slice stopped updating any object ([`Spatial::is_frozen`]).
+    #[must_use]
+    pub const fn has_frozen(&self) -> bool {
+        !self.frozen_for.is_empty()
+    }
+
+    /// What a stopped player's units may have done rises to `fastest` and `reach`, the bounds
+    /// of its unit masters as they stand ([`crate::movement::MotionBound`]); it never falls, as
+    /// a frozen object's time counts from its freeze. A bound that is not a number has none.
+    pub const fn raise_frozen_bounds(&mut self, fastest: Speed, reach: Distance) {
+        self.fastest = Speed::new(larger_bound(self.fastest.get(), fastest.get()));
+        self.reach = Distance::new(larger_bound(self.reach.get(), reach.get()));
+    }
+
     /// The object's place is the game's again (the oracle's forced replay): it is known.
     pub fn unfreeze(&mut self, id: ObjectId) {
         if let Some(placed) = self.objects.get_mut(id) {
@@ -290,7 +322,7 @@ impl Spatial {
             if let Some(unknown) = placed.unknown.as_mut()
                 && placed.moves
             {
-                *unknown += (speed(placed.player, placed.master) * dt).get();
+                *unknown += covered(speed(placed.player, placed.master), dt);
             }
         }
         for seconds in self.frozen_for.values_mut() {
@@ -370,7 +402,10 @@ impl Spatial {
             let moved = if placed.moves {
                 unknown
             } else {
-                self.fastest * self.frozen_for.get(other).copied().unwrap_or(Seconds::ZERO)
+                covered(
+                    self.fastest,
+                    self.frozen_for.get(other).copied().unwrap_or(Seconds::ZERO),
+                )
             };
             let grow = moved + self.reach.get();
             rect.overlaps(placed.bounds().grown(Distance::new(grow)))

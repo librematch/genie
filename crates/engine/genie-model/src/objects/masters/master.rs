@@ -92,12 +92,11 @@ impl Master {
             .is_some_and(|move_stats| Speed::ZERO < move_stats.base)
     }
 
-    /// The facets the facing routines read of a unit of this master ([`MoveStats::facets`]):
-    /// those of its standing sprites, its moving ones (types 30 and up), its attack sprite (50
-    /// and up) and its tasks' sprites, when every one the graphics hold has the same count and
-    /// bit 1 (as the masters' loader derives them).
+    /// The sprites a unit of this master shows, in the masters' loader's order: its standing
+    /// sprites, its moving ones (types 30 and up), its attack sprite (50 and up) and its tasks'
+    /// sprites ([`Master::sprite_facets`]).
     #[must_use]
-    pub fn sprite_facets(&self, graphics: &Graphics) -> Option<SpriteFacets> {
+    pub fn shown_sprites(&self) -> Vec<SpriteId> {
         let mut sprites = vec![self.standing_sprite, self.standing_sprite_2];
         if MasterKind::MOVING <= self.kind {
             sprites.extend([
@@ -111,9 +110,18 @@ impl Master {
         for task in &self.action_part().tasks {
             sprites.extend(task.sprites.ids());
         }
-        let mut seen = sprites
+        sprites.into_iter().flatten().collect()
+    }
+
+    /// The facets the facing routines read of a unit of this master ([`MoveStats::facets`]):
+    /// those of its standing sprites, its moving ones (types 30 and up), its attack sprite (50
+    /// and up) and its tasks' sprites, when every one the graphics hold has the same count and
+    /// bit 1 (as the masters' loader derives them).
+    #[must_use]
+    pub fn sprite_facets(&self, graphics: &Graphics) -> Option<SpriteFacets> {
+        let mut seen = self
+            .shown_sprites()
             .into_iter()
-            .flatten()
             .filter_map(|id| graphics.get(id))
             .map(|graphic| SpriteFacets {
                 count: graphic.facets,

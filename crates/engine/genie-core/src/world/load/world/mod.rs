@@ -44,7 +44,6 @@ use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::lines::UnitLines;
 use crate::objects::masters::MasterId;
-use crate::objects::masters::MasterKind;
 use crate::objects::unit::Unit;
 use crate::pathing::zones::{ZoneMap, Zones};
 use crate::pathing::{Pathing, PlanBudget, PlanCap, PlanCount};
@@ -493,37 +492,6 @@ pub fn saved_world(
             ..Model::default()
         };
         turns.model = take(&mut turns.model).with_layer(build);
-        // the players' unit masters (type 70), Gaia's left out
-        let all = || {
-            turns
-                .model
-                .masters
-                .iter()
-                .skip(1)
-                .flat_map(|masters| masters.iter())
-                .filter(|master| master.kind == MasterKind::COMBAT)
-        };
-        turns.spatial.fastest = all()
-            .filter_map(|master| {
-                master
-                    .move_stats
-                    .as_ref()
-                    .map(|move_stats| move_stats.speed.get())
-            })
-            .fold(0.0, f32::max);
-        turns.spatial.reach = Distance::new(
-            all()
-                .flat_map(|master| {
-                    master
-                        .action_part()
-                        .tasks
-                        .iter()
-                        .map(|task| task.work_range)
-                        .chain([master.combat_part().weapon_range])
-                })
-                .map(Distance::get)
-                .fold(0.0, f32::max),
-        );
         garrison_firepower(&mut turns);
         // the planners the load makes and the shape mesh it builds (a dump of the game's mesh
         // replaces it)

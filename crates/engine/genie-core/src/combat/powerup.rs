@@ -239,17 +239,24 @@ pub(crate) fn count_infantry(combat: &mut Combat, change: InfantryChange, tuning
 
 /// Whether a unit of master `unit` counts among the infantry inside a container of master
 /// `container` (slots 52 and 53, `FUN_141212e10`, `FUN_141213120`): the container is a siege unit
-/// (class 13) other than masters 1704 and 1706, and the unit's class speeds it up (6, 45, 46, 50
-/// or 56).
+/// the infantry speeds up ([`sped_by_infantry`]), and the unit's class speeds it up (6, 45, 46,
+/// 50 or 56).
 #[must_use]
 pub(crate) fn speeds_up_siege(unit: &Master, container: &Master, roles: &Roles) -> bool {
+    sped_by_infantry(container, roles)
+        && roles
+            .of_class(unit.class)
+            .contains(ClassRoles::SPEEDS_SIEGE)
+}
+
+/// Whether the infantry inside an object of master `container` speeds it up (slots 52 and 53's
+/// first test): a siege unit (class 13) other than masters 1704 and 1706.
+#[must_use]
+pub(crate) fn sped_by_infantry(container: &Master, roles: &Roles) -> bool {
     roles.of_class(container.class).contains(ClassRoles::SIEGE)
         && !roles
             .of_master(container.id)
             .contains(MasterRoles::UNSPED_SIEGE)
-        && roles
-            .of_class(unit.class)
-            .contains(ClassRoles::SPEEDS_SIEGE)
 }
 
 /// The milliseconds an aura's powerup holds (`FUN_141200dd0`'s immediate `0x3e8` at

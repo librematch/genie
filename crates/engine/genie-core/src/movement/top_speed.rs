@@ -33,6 +33,7 @@ use crate::world::Model;
 use crate::world::OBJECT_MASTER;
 use crate::world::World;
 use crate::world::index::ObjectIndex;
+use crate::world::layer::generated::MovementTuning;
 use crate::world::parts::Parts;
 use crate::world::player::Player;
 
@@ -165,6 +166,20 @@ impl ChargeRun {
         let gap = sqrt(dy * dy + dx * dx);
         gap - self.radii.0.get() - self.radii.1.get() < self.reach.get()
     }
+}
+
+/// The factor a ready charge of `master` runs by (slot 0x208's tail): its task (0x85, any,
+/// 0x7d1, `FUN_14109e1a0`)'s `work_range` when not 0 (`UCOMISS`, `JP` then `JZ`: a NaN is not
+/// 0), else the tuning's `charge_run_factor`; without the task, the tuning's.
+#[must_use]
+pub(crate) fn run_factor(master: &Master, tuning: &MovementTuning) -> RunFactor {
+    let range = task_by_flags(&master.action_part().tasks, RUN_TASK)
+        .map_or(0.0, |task| task.work_range.get());
+    RunFactor::new(if range == 0.0 {
+        tuning.charge_run_factor
+    } else {
+        range
+    })
 }
 
 /// `FUN_14109e1a0`: the first task of `tasks` (a master's list, `+0x788`) of action `kind`, of
@@ -324,18 +339,9 @@ impl<'world> SpeedReads<'world> {
             return Ok(None);
         };
         let tuning = &self.model.tuning.movement;
-        let (reach, factor) = task_by_flags(&master.action_part().tasks, RUN_TASK).map_or(
-            (tuning.charge_run_reach, tuning.charge_run_factor),
-            |task| {
-                let range = task.work_range.get();
-                let factor = if range == 0.0 {
-                    tuning.charge_run_factor
-                } else {
-                    range
-                };
-                (task.work_val2.get(), factor)
-            },
-        );
+        let reach = task_by_flags(&master.action_part().tasks, RUN_TASK)
+            .map_or(tuning.charge_run_reach, |task| task.work_val2.get());
+        let factor = run_factor(master, tuning);
         Ok(Some(ChargeRun {
             target: target.position().ground(),
             radii: (
@@ -343,7 +349,7 @@ impl<'world> SpeedReads<'world> {
                 Distance::new(self.object_master(target)?.radius.x()),
             ),
             reach: Distance::new(reach),
-            factor: RunFactor::new(factor),
+            factor,
         }))
     }
 

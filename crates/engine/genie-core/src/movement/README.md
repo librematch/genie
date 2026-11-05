@@ -28,6 +28,10 @@ This folder also holds the actions that are walks:
 the own speed with a speed-up building's share, and for a combat object its lock, its speed
 powerup and stinger, and a ready charger's run near its target.
 
+`motion_bound.rs` is genie's own, no routine of the game: the most a unit of a master may move
+in a second and the farthest it may act, whatever its state. The frozen check reads it for what
+a stopped player's unit may have done since it froze.
+
 `unit.rs` is the unit's part: the velocity step in the unit's update, the speed-up's drop, and
 the update of its own `MoveTo`, its Explore and its Fly.
 
@@ -60,6 +64,7 @@ If the object's action walks, the action runs the motion step. The planners that
 | [`levels.rs`](levels.rs) | The levels of a unit's path data by their role: the walked level and its parent. |
 | [`long_walk.rs`](long_walk.rs) | A step's reach of its waypoint, the long pather's walker and the units whose tiles it lowers. |
 | [`mod.rs`](mod.rs) | A unit's movement (`RGE_Moving_Object`, MovingObject.cpp in 158041): the velocity step that moves it along its forward vector, and the motion step that steers it along its path. |
+| [`motion_bound.rs`](motion_bound.rs) | genie's bound on how far a unit may move and act (no routine of the game): what a stopped player's unit may have done since it froze (`World::grow_unknown`, `Spatial::check_known`). |
 | [`move_start.rs`](move_start.rs) | How a `MoveTo` to a target started. |
 | [`new_path.rs`](new_path.rs) | A new level's path: no path, its link under the walked level, the short pather's ignore list and a blocked start. |
 | [`path_counts.rs`](path_counts.rs) | A path level's link to its parent and the plans it may still try; a mover's wait delays and substitute count. |
@@ -78,6 +83,7 @@ If the object's action walks, the action runs the motion step. The planners that
 | [`waypoint.rs`](waypoint.rs) | A reached waypoint and what follows it: the next waypoint, a level's end and the moving state. |
 | [`waypoint_index.rs`](waypoint_index.rs) | A waypoint's place in a level's path. |
 | [`waypoint_level.rs`](waypoint_level.rs) | A path level's place in a unit's path data. |
+| [`motion_bound/`](motion_bound/) | The motion bound's tests. |
 | [`move_to/`](move_to/) | The `MoveTo` action (`RGE_Action_Move_To`, type 1, vtable `0x142ed6030`): a unit walks to a target object or a point. |
 | [`step/`](step/) |  |
 | [`top_speed/`](top_speed/) | The top speed's tests. |

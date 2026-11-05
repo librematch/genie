@@ -3,9 +3,13 @@
 
 use crate::commands::Command;
 use crate::construction::build::CART_TASK;
+use crate::map::spatial::Spatial;
+use crate::movement::MotionBound;
 use crate::movement::Speed;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
+use crate::objects::masters::MasterKind;
+use crate::objects::masters::Masters;
 use crate::objects::masters::PlayersMastersExt;
 use crate::objects::masters::player_master;
 use crate::objects::unit::Outcome;
@@ -19,6 +23,7 @@ use crate::world::Seconds;
 use crate::world::World;
 use crate::world::slots::PlayerSlotsExt;
 use crate::{GenieError, GenieResult};
+use std::sync::Arc;
 
 /// Whether the object list's loop counts on past the object it filed ([`World::file_step`]).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -67,18 +72,42 @@ impl World {
         }
     }
 
-    /// A tick of `dt` seconds passed: every frozen object that moves may have moved its master's
-    /// speed times `dt` ([`Spatial::grow_unknown`]), as its master stands now; one of a master
-    /// the world does not hold may be anywhere.
+    /// A tick of `dt` seconds passed, while objects are frozen: what a stopped player's units may
+    /// have done rises to their masters as they stand now ([`World::raise_frozen_bounds`]), and
+    /// every frozen object that moves may have moved its master's bound of speed times `dt`
+    /// ([`MotionBound::speed`], [`Spatial::grow_unknown`]); one of a master the world does not
+    /// hold may be anywhere.
     ///
     /// [`Spatial::grow_unknown`]: crate::map::spatial::Spatial::grow_unknown
-    pub(crate) fn grow_unknown(&mut self, dt: Seconds) {
+    ///
+    /// # Errors
+    ///
+    /// An object whose master the world lacks.
+    pub(crate) fn grow_unknown(&mut self, dt: Seconds) -> GenieResult<()> {
+        if !self.spatial.has_frozen() {
+            return Ok(());
+        }
+        let bound = MotionBound::of(&self.model, &self.parts, &self.players)?;
         let masters = &self.model.masters;
+        raise_frozen_bounds(&mut self.spatial, masters, &bound);
         self.spatial.grow_unknown(dt, |player, master| {
             player_master(masters, player, master)
-                .and_then(|master| master.move_stats)
-                .map_or(Speed::new(f32::INFINITY), |move_stats| move_stats.base)
+                .map_or(Speed::new(f32::INFINITY), |master| bound.speed(master))
         });
+        Ok(())
+    }
+
+    /// What a stopped player's units may have done rises to the bounds of the players' unit
+    /// masters as they stand ([`raise_frozen_bounds`]): at each new freeze, so the queries of
+    /// the same update read them.
+    ///
+    /// # Errors
+    ///
+    /// An object whose master the world lacks.
+    fn raise_frozen_bounds(&mut self) -> GenieResult<()> {
+        let bound = MotionBound::of(&self.model, &self.parts, &self.players)?;
+        raise_frozen_bounds(&mut self.spatial, &self.model.masters, &bound);
+        Ok(())
     }
 
     /// The world's table by id ([`World::reindex`]) and the spatial index's view of a world
@@ -147,7 +176,11 @@ impl World {
             let unit = player.live(list_index)?;
             let stopped = player.stopped || unit.stopped;
             if stopped && unit.life.is_alive() {
+                let newly = !self.spatial.is_frozen(unit.id);
                 self.spatial.freeze(unit.id);
+                if newly {
+                    self.raise_frozen_bounds()?;
+                }
                 list_index = list_index.next();
                 continue;
             }
@@ -352,6 +385,20 @@ impl World {
             player.live_mut(list_index)?.stopped = true;
         }
         self.spatial.freeze(id);
-        Ok(())
+        self.raise_frozen_bounds()
+    }
+}
+
+/// What a stopped player's building may have made since it froze, and a frozen unit's reach:
+/// `spatial`'s bounds rise to the largest `bound` gives the players' unit masters (type 70) of
+/// `masters`, Gaia's left out ([`Spatial::raise_frozen_bounds`]).
+fn raise_frozen_bounds(spatial: &mut Spatial, masters: &[Arc<Masters>], bound: &MotionBound<'_>) {
+    let units = masters
+        .iter()
+        .skip(1)
+        .flat_map(|masters| masters.iter())
+        .filter(|master| master.kind == MasterKind::COMBAT);
+    for master in units {
+        spatial.raise_frozen_bounds(bound.speed(master), bound.reach(master));
     }
 }

@@ -293,11 +293,7 @@ fn area_of(task: &Task) -> AuraArea {
 /// The powerup of an aura task (slot 277's inner key): its sprite where `graphics` holds it.
 fn powerup_of(task: &Task, graphics: &Graphics) -> AuraPowerup {
     AuraPowerup {
-        share: if task.combat_level_flag.contains(TaskFlags::AURA_SHARE) {
-            PowerupShare::MasterShare
-        } else {
-            PowerupShare::Plain
-        },
+        share: share_of(task),
         attribute: PowerupAttribute::of_task(task.wait_time),
         amount: PowerupAmount::new(task.work_val1.get()),
         most: MostObjects::new(task.work_val2.get()),
@@ -305,6 +301,16 @@ fn powerup_of(task: &Task, graphics: &Graphics) -> AuraPowerup {
             .sprites
             .proceeding
             .filter(|&sprite_id| graphics.get(sprite_id).is_some()),
+    }
+}
+
+/// What the amount of an aura task is (`FUN_141200dd0`'s fifth argument): a share of the
+/// object's master's value with the task's flag 1 ([`TaskFlags::AURA_SHARE`]), else itself.
+pub(crate) const fn share_of(task: &Task) -> PowerupShare {
+    if task.combat_level_flag.contains(TaskFlags::AURA_SHARE) {
+        PowerupShare::MasterShare
+    } else {
+        PowerupShare::Plain
     }
 }
 

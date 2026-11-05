@@ -63,6 +63,7 @@ pub use self::search::{SearchLists, SearchQuery};
 pub use self::tile_sight::TileSight;
 use crate::groups::GroupId;
 use crate::map::terrain::Terrain;
+use crate::movement::Speed;
 use crate::movement::explore::InfluenceMap;
 #[cfg(test)]
 use crate::objects::unit::TAKEN_OUT;
@@ -539,11 +540,12 @@ pub struct Spatial {
     /// The seconds since each frozen object froze.
     frozen_for: IdTable<Seconds>,
     /// What a stopped player's units may have done since: the fastest any of the players' unit
-    /// masters (type 70) moves and the farthest any acts beyond its footprint (its weapon or work
-    /// range), for [`Spatial::check_known`]. 0 when not set.
-    pub(crate) fastest: f32,
-    /// The farthest any of the players' units acts beyond its footprint.
-    pub(crate) reach: Distance,
+    /// masters (type 70) may move and the farthest any may act beyond its footprint, the
+    /// largest since the first freeze ([`Spatial::raise_frozen_bounds`]), for
+    /// [`Spatial::check_known`]. 0 before it.
+    fastest: Speed,
+    /// The farthest any of the players' units may act beyond its footprint.
+    reach: Distance,
     /// Each player's scout map (`player+0x1370`, `mIsScoutMapEnabled` `+0x1368`), once made.
     scout_maps: BTreeMap<PlayerId, InfluenceMap>,
     /// `relation[i]` of each player (`player+0x260`), for the walk's query's allies.

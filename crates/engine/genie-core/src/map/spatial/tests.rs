@@ -2199,7 +2199,7 @@ fn frozen_object_that_does_not_move_is_known_unless_stopped_unit_may_reach_it() 
     };
     spatial.insert(object_id(9365), tree);
     spatial.freeze(object_id(9365));
-    spatial.reach = Distance::new(1.0);
+    spatial.raise_frozen_bounds(Speed::ZERO, Distance::new(1.0));
     let near = Rect::new(24.0, 37.0, 24.6, 38.0);
     assert!(spatial.check_known(near).is_ok());
     // a stopped villager 10 tiles off, 0.8 tiles a second (every master's speed here: the tree
@@ -2214,6 +2214,46 @@ fn frozen_object_that_does_not_move_is_known_unless_stopped_unit_may_reach_it() 
     assert!(spatial.check_known(near).is_ok());
     spatial.grow_unknown(Seconds::new(2.0), villager_speed);
     assert!(spatial.check_known(near).is_err());
+}
+
+/// A stopped player's building may have made a unit that walked off: what a stopped player's
+/// units may have done ([`Spatial::raise_frozen_bounds`]) grows a frozen building's box by the
+/// fastest speed times its time frozen, plus the reach. The bounds never fall, a bound that is
+/// not a number has none, and a speed without bound covers no way before time passes.
+#[test]
+fn frozen_bounds_rise_and_never_fall() {
+    let frozen = || {
+        let mut spatial = Spatial::new(GridSize::new(64, 64));
+        let tree = Placed {
+            player: PlayerId::new(0),
+            moves: false,
+            ..villager(24.5, 20.5)
+        };
+        let barracks = Placed {
+            player: PlayerId::new(1),
+            moves: false,
+            ..villager(20.5, 20.5)
+        };
+        spatial.insert(object_id(9365), tree);
+        spatial.insert(object_id(500), barracks);
+        spatial.freeze(object_id(9365));
+        spatial.freeze(object_id(500));
+        spatial
+    };
+    let at_tree = Rect::new(24.4, 20.4, 24.6, 20.6);
+    let still = |_, _| Speed::ZERO;
+    let mut spatial = frozen();
+    spatial.raise_frozen_bounds(Speed::new(1.0), Distance::ZERO);
+    spatial.grow_unknown(Seconds::new(3.0), still);
+    assert!(spatial.check_known(at_tree).is_ok());
+    spatial.raise_frozen_bounds(Speed::new(0.1), Distance::ZERO);
+    spatial.grow_unknown(Seconds::new(1.0), still);
+    assert!(spatial.check_known(at_tree).is_err());
+    let mut spatial = frozen();
+    spatial.raise_frozen_bounds(Speed::new(f32::NAN), Distance::ZERO);
+    assert!(spatial.check_known(at_tree).is_ok());
+    spatial.grow_unknown(Seconds::new(0.05), still);
+    assert!(spatial.check_known(at_tree).is_err());
 }
 
 /// `FUN_1410562e0`'s list stays with the obstruction manager: the walk's query and the stand
