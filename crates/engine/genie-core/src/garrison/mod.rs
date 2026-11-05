@@ -81,4 +81,6 @@ const COMPUTER_IDS: usize = 500;
 const CLASS_FLAGS: [u32; 64] = GARRISON_CLASS_FLAGS;
 
 #[cfg(test)]
+mod siege_tests;
+#[cfg(test)]
 pub(crate) mod tests;

@@ -116,7 +116,7 @@ impl Visibility {
                 position,
                 radius,
                 shape,
-                los: SightTiles::of(seer.los),
+                los: SightTiles::of(seer.sight_radius()),
                 centre,
             },
             roles,
@@ -264,7 +264,7 @@ impl Visibility {
                 position,
                 radius,
                 shape,
-                los: SightTiles::of(seer.los),
+                los: SightTiles::of(seer.sight_radius()),
                 centre,
             },
             roles,
@@ -496,6 +496,14 @@ impl Visibility {
             },
         )?;
         Ok(())
+    }
+
+    /// The sight powerup of seer `id` (`+0xad4`), set between its sight's going and coming
+    /// ([`crate::map::spatial::Spatial::raise_sight_powerup`]).
+    pub fn set_los_powerup(&mut self, id: ObjectId, powerup: Distance) {
+        if let Some(seer) = self.seers.get_mut(id) {
+            seer.los_powerup = powerup;
+        }
     }
 
     /// The master and line of sight of seer `id` without its sight (a master change inside

@@ -48,7 +48,7 @@ pub(super) fn melee_armor(
     state: ObjectState,
     roles: &Roles,
 ) -> DamageAmount {
-    let armor = master_melee_armor(armored).plus(armored.armor_powerups.melee);
+    let armor = master_melee_armor(armored).plus(armored.armor_powerups.melee_armor());
     if roles.of_class(own_class).contains(ClassRoles::WALL) && state == ObjectState::Foundation {
         return DamageAmount::ZERO;
     }
@@ -101,7 +101,7 @@ pub(super) fn class_armor(
                 armor = any(armored.base_armor);
             }
             armor
-                .plus(armored.armor_powerups.pierce)
+                .plus(armored.armor_powerups.pierce_armor())
                 .minus(armored.armor_removed.pierce)
         }
     }

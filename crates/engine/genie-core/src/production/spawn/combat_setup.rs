@@ -52,11 +52,11 @@ impl World {
     /// Held elsewhere: the unit AI (`FUN_141215a90`, [`crate::unit_ai::UnitAi::constructed`]),
     /// the capture flag `+0x924`, the town-bell records (`+0x9ac`..`+0x9d8`, all −1:
     /// [`crate::orders::town_bell::TownBell`]'s default), the powerups `FUN_1412066b0` clears
-    /// (0 on a new object). Not held: slot 277's caches of the master's tasks
-    /// (`TRIBE_Combat_Object::slot277`, `0x141206d50`: the aura map `+0xa58`, the lists
-    /// `+0xaa8` and `+0xb20`, `+0xac4`..`+0xacc`, `+0xb74`), which the powerup update
-    /// (`FUN_141204a10`) reads, and the speed powerup `+0xa2c` (`+0xad8` times 0.05, 0 on a new
-    /// object).
+    /// (0 on a new object, the speed powerup `+0xa2c` its infantry's: 0). Slot 277's caches of
+    /// the master's tasks (`TRIBE_Combat_Object::slot277`, `0x141206d50`) are derived where read:
+    /// the aura map `+0xa58` and its list `+0xaa8` by the powerup update
+    /// ([`crate::combat::aura`]), `+0xb74` by [`crate::unit_ai::NewObject::of`]. Not held: the
+    /// hit point transforms `+0xb20` and the sounds `+0xac4`..`+0xacc`.
     ///
     /// # Errors
     ///

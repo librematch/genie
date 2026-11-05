@@ -38,6 +38,7 @@ Units go into buildings and transports, and come out again. This folder holds bo
 | [`raider_countdown.rs`](raider_countdown.rs) | A combat object's raider countdown. |
 | [`scope.rs`](scope.rs) | Which shelters a garrison takes (`GarrisonScope`) and how far a unit goes to one (`ShelterReach`). |
 | [`shelter.rs`](shelter.rs) | The garrison order and `SEEK_SHELTER`: each unit to a building that takes it in, nearest first (`Shelters`). |
+| [`siege_tests.rs`](siege_tests.rs) | Tests: A siege unit's count of the infantry inside it, and a ranged unit's reload as it leaves one. |
 | [`takes_in.rs`](takes_in.rs) | A building's test whether it takes a unit in (`FUN_14120eb10`), its room and what it holds. |
 | [`tests.rs`](tests.rs) | Tests. |
 | [`unit.rs`](unit.rs) | A unit entering a building or a transport, and its update inside. |

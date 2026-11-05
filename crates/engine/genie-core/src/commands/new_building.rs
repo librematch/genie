@@ -2,7 +2,8 @@
 //! its storage and its annexes.
 
 use crate::combat::abilities::Abilities;
-use crate::combat::damage::ArmorPair;
+use crate::combat::damage::{ArmorPair, ArmorPowerups};
+use crate::combat::powerup::{ConversionPowerup, InfantryCount};
 use crate::combat::{AbilityTimer, AttackCount, AttackPowerup, MissileCount, SpecialSprite};
 use crate::construction::build::Clearer;
 use crate::construction::build::Construction;
@@ -21,6 +22,7 @@ use crate::math::Angle;
 use crate::math::conversions::cvttss2si;
 use crate::math::rng::Stream;
 use crate::movement::Mover;
+use crate::movement::Speed;
 use crate::objects::HitPoints;
 use crate::objects::HpPowerup;
 use crate::objects::ObjectId;
@@ -278,8 +280,12 @@ impl World {
             reload_powerup: Seconds::ZERO,
             attack_powerup: AttackPowerup::ZERO,
             range_powerup: Distance::ZERO,
-            armor_powerups: ArmorPair::ZERO,
+            armor_powerups: ArmorPowerups::ZERO,
             armor_removed: ArmorPair::ZERO,
+            speed_powerup: Speed::ZERO,
+            conversion_powerup: ConversionPowerup::ZERO,
+            applied_powerups: Vec::new(),
+            infantry_inside: InfantryCount::ZERO,
             charge: setup.charge,
             decay_timer: setup.decay_timer,
             charge_hit: false,

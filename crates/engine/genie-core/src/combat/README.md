@@ -12,12 +12,15 @@ Combat is what happens between an attacker and its target. This folder holds eve
   and its counts.
 - `abilities/` holds a combat object's passive abilities: resources it generates, damage it does
   while it moves, the look it takes on a terrain, and the reward for its removal.
+- `powerup.rs` holds an object's powerups: what an aura gives it, how long it holds, and its
+  reset. `aura/` holds the auras that give them and the powerup update that runs them.
 
 ## How the tick reaches it
 
 An object's update (`objects/unit/update.rs`) runs down the attack timer. If the Attack is the
 object's first action, the update runs it. A missile is an object of its own, and its Missile action flies
-it. After the combat update, every combat unit and building runs its passive abilities.
+it. After the combat update, every combat unit and building runs its passive abilities, then
+its powerup update (`aura/`).
 
 ## In the game
 
@@ -37,6 +40,7 @@ it. After the combat update, every combat unit and building runs its passive abi
 | [`attack_target.rs`](attack_target.rs) | An Attack's target as its own type: the object it attacks. |
 | [`combat_update.rs`](combat_update.rs) | `TRIBE_Combat_Object::update` (`0x141208440`), a combat object's or building's own update (types 70 and 80) around `RGE_Combat_Object::update`. |
 | [`mod.rs`](mod.rs) | Combat: attacks, hits and missiles. |
+| [`powerup.rs`](powerup.rs) | An object's powerups (`+0xa24`..`+0xa54`, `+0xa98`, `+0xad4`): an aura's powerup (`World::apply_powerup`, `FUN_141200dd0`) and their reset (`World::reset_powerups`, `FUN_1412066b0`). |
 | [`reload.rs`](reload.rs) | An object's reload time (slot 0x218, `FUN_141086c90`): the time between its attacks, from its master's and its own values, which technologies and effects change. |
 | [`special_sprite.rs`](special_sprite.rs) | Whether a combat object shows its master's special sprite. |
 | [`victim_reads.rs`](victim_reads.rs) | What a hit reads of its victim: the object's values and its relations to the attacker. |
@@ -44,9 +48,11 @@ it. After the combat update, every combat unit and building runs its passive abi
 | [`volley.rs`](volley.rs) | A unit's strikes back and its volleys: the missiles it fires and launches. |
 | [`abilities/`](abilities/) | A combat object's passive abilities: `FUN_1412072f0`, which `TRIBE_Combat_Object::update` (`0x141208440`) runs on every combat unit and building (types 70 and 80) after `RGE_Combat_Object::update`, with what that one returned (the object leaves its list); a building's update (`TRIBE_Building_Object::update`) runs its production after it. |
 | [`attack/`](attack/) | The Attack action (`RGE_Action_Attack`, type 9, vtable `0x142ed47a8`) of a melee unit: a hunting villager's sub-action on a tree or on its livestock (`crate::gathering::hunt`). |
+| [`aura/`](aura/) | An object's auras: its master's tasks of type 155 (`ActionKind::AURA`) in the groups that slot 277 builds of them (`TRIBE_Combat_Object::slot277`, `0x141206d50`), which the powerup update (`FUN_141204a10`, `World::powerup_update`) reads. |
 | [`combat_update/`](combat_update/) | The combat update's tests. |
 | [`damage/`](damage/) | The damage side of a hit: what it reads of its target and its attacker and what it changes. |
 | [`missile/`](missile/) | The missile (`RGE_Missile_Object`, type 60) and its action (`RGE_Action_Missile`, type 8): a ranged attacker's swing makes one at its weapon offset (`FUN_141081020`, `spawn_point`), its action aims at the target (`FUN_140a9c600`, `aim`; `set_state` 3, `FUN_140a9de70`, `MissileAction::launch`) and flies it each update (`FUN_140a9e6e0`, `MissileAction::fly`) until it hits the target (the shooter's hit, slot 0x860) or the ground. |
+| [`powerup/`](powerup/) | The powerups' tests. |
 | [`volley/`](volley/) | The missile launch. |
 <!-- /files -->
 

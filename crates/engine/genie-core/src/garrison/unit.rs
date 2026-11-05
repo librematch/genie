@@ -1,6 +1,7 @@
 //! A unit entering a building or a transport, and its update inside.
 
 use crate::combat::Firepower;
+use crate::combat::powerup::{InfantryChange, count_infantry, speeds_up_siege};
 use crate::garrison::ContainerId;
 use crate::garrison::EnterOutcome;
 use crate::garrison::EnterSlot;
@@ -380,6 +381,9 @@ impl Unit {
             ));
         }
         if bm.garrison.units() <= inside {
+            // slot 0x1a0's room test (`FUN_1411921d0`) keeps the unit out; its tail runs all the
+            // same
+            self.enter_tail(step, target, (&me, &bm), roles)?;
             return Ok(EnterOutcome::NoRoom);
         }
         self.go_inside(actions, step, target, &me, &bm, roles)?;
@@ -400,8 +404,9 @@ impl Unit {
     /// slot; `FUN_14152ff40`) and stands; it joins the building's (slot 0x1c0: the building's
     /// list and, for a unit of type 70, its volleys' share, [`crate::garrison::share`]); its
     /// records leave the registry's lists; the building's sight takes a circle of 5 and the
-    /// villager's town-bell flag follows the garrison (`FUN_1412067f0` with 3). The building's
-    /// `+0x9a8` (the units inside the unit), and a siege building's slot 0x1b0 are not modelled.
+    /// villager's town-bell flag follows the garrison and a siege unit counts its infantry
+    /// ([`Unit::enter_tail`]). The building's `+0x9a8` (the units inside the unit) is not
+    /// modelled.
     pub(crate) fn go_inside(
         &mut self,
         actions: &mut Action,
@@ -445,9 +450,8 @@ impl Unit {
         let (bp, building) = step.world.object(target).ok_or(GenieError::unreachable(
             "an enter into a building the world does not hold",
         ))?;
-        let (at, state, reload) = (
+        let (at, reload) = (
             building.position(),
-            building.life.state,
             step.world.parts.combat_of(building.id).reload_powerup,
         );
         self.place.go_inside(id, at, &mut step.world.spatial);
@@ -474,10 +478,36 @@ impl Unit {
         self.life.inside = Some(target);
         self.join_building(step, Some(target), bp, reload, me, bm)?;
         self.enter_sight(step, target, at, building_radius, placed, bm)?;
+        self.enter_tail(step, target, (me, bm), roles)
+    }
+
+    /// The end of slot 0x1a0 (`FUN_141212e10`) into building `target`, the unit's master `me` and
+    /// the building's `bm`, whether its room test let the unit in or not: the villager's town-bell
+    /// flag follows the garrison (`FUN_1412067f0` with 3, [`Unit::enter_town_bell`]), and a siege
+    /// unit counts the infantry that enters it ([`speeds_up_siege`]; slot 0x1b0 with 1,
+    /// [`count_infantry`]: `+0xad8` and its speed powerup `+0xa2c`). The count's test of the
+    /// editor's screen mode (`FUN_140c87f20` not 4) holds in a game.
+    fn enter_tail(
+        &self,
+        step: &mut Step<'_>,
+        target: ContainerId,
+        (me, bm): (&Master, &Master),
+        roles: &Roles,
+    ) -> GenieResult<()> {
+        let id = self.id;
+        let (_, building) = step.world.object(target).ok_or(GenieError::unreachable(
+            "an enter into a building the world does not hold",
+        ))?;
+        let (at, state) = (building.position(), building.life.state);
         let mut bell = step.world.parts.town_bell_of(id);
         let ai = step.world.parts.unit_ai.get(id);
         self.enter_town_bell((&mut bell, ai), Some(target), at, state, (me, bm), roles)?;
         step.world.parts.set_town_bell(id, bell);
+        if speeds_up_siege(me, bm, roles) {
+            let tuning = step.world.model.tuning.powerup;
+            let combat = step.world.parts.combat_mut(target.id())?;
+            count_infantry(combat, InfantryChange::Entered, tuning);
+        }
         Ok(())
     }
 

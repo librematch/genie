@@ -793,6 +793,7 @@ mod tests {
                 player: player_id(1),
                 master: ids::VILLAGER_MALE,
                 los: Distance::new(4.0),
+                los_powerup: Distance::ZERO,
                 state: ObjectState::Alive,
                 explored: true,
                 building: None,

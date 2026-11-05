@@ -104,6 +104,7 @@ fn dat_task(task: &Task, sounds: &[Sound]) -> GenieResult<work::Task> {
         terrain: TaskTerrain::of_data(task.terrain_id),
         owner_kind: TargetOwner::of_data(task.target_diplomacy),
         holding_attr: task.carry_check,
+        search_flag: task.auto_search_targets,
         attribute_kind,
         attribute_kind2,
         attribute_kind3,

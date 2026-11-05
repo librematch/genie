@@ -30,6 +30,7 @@ found, as in the game.
 | [`record_id.rs`](record_id.rs) | The id of an obstruction record and of an entry of a pather's ignore list: an object's, a tile's temporary record's or a map edge's. |
 | [`search.rs`](search.rs) | A position's change, the sight check and the unit AI's searches: the closest object and the best unit to attack. |
 | [`sight.rs`](sight.rs) | The artifact's owner search, an ownership change, vision and sight, ghosts and the standable spots. |
+| [`sight_powerup.rs`](sight_powerup.rs) | An object's sight powerup (`+0xad4`): the powerup reset takes it off, an aura's powerup raises it, each time between the sight's going and coming. |
 | [`tests.rs`](tests.rs) | Tests. |
 | [`tile_sight.rs`](tile_sight.rs) | What a player knows of a tile. |
 <!-- /files -->

@@ -9,9 +9,10 @@ use crate::combat::Firepower;
 use crate::combat::MissileCount;
 use crate::combat::SpecialSprite;
 use crate::combat::abilities::Abilities;
-use crate::combat::damage::ArmorPair;
+use crate::combat::damage::{ArmorPair, ArmorPowerups};
 use crate::combat::missile::ShooterId;
 use crate::combat::missile::{MISSILE, Missile};
+use crate::combat::powerup::{ConversionPowerup, InfantryCount};
 use crate::construction::Annexes;
 use crate::construction::BuilderCount;
 use crate::construction::MainBuildingId;
@@ -429,12 +430,21 @@ fn row(
             }),
         armor_powerups: object
             .combat()
-            .map_or(ArmorPair::ZERO, |tribe_combat_object| {
-                ArmorPair::new(
-                    tribe_combat_object.melee_armor_powerup as i16,
-                    tribe_combat_object.pierce_armor_powerup as i16,
+            .map_or(ArmorPowerups::ZERO, |tribe_combat_object| {
+                ArmorPowerups::new(
+                    tribe_combat_object.melee_armor_powerup,
+                    tribe_combat_object.pierce_armor_powerup,
                 )
             }),
+        speed_powerup: Speed::new(
+            object
+                .combat()
+                .map_or(0.0, |tribe_combat_object| tribe_combat_object.speed_powerup),
+        ),
+        // unsaved: the load leaves them empty
+        conversion_powerup: ConversionPowerup::ZERO,
+        applied_powerups: Vec::new(),
+        infantry_inside: InfantryCount::ZERO,
         armor_removed: object
             .combat()
             .map_or(ArmorPair::ZERO, |tribe_combat_object| {

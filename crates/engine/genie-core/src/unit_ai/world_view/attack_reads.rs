@@ -257,7 +257,7 @@ impl WorldPicker<'_> {
             )
         });
         Ok(DamageAmount::new(100)
-            <= armor.plus(self.parts.combat_of(unit.id).armor_powerups.pierce))
+            <= armor.plus(self.parts.combat_of(unit.id).armor_powerups.pierce_armor()))
     }
 
     /// Object `id`'s weapon range (slot 0x230: a combat object's master's, else 0).

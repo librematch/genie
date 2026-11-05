@@ -1,6 +1,7 @@
 //! A spot beside a building, the remains a death leaves, a plain object, the flares and a
 //! building a death makes.
 
+use crate::map::Distance;
 use crate::map::Point;
 use crate::map::Position;
 use crate::map::Rect;
@@ -192,6 +193,7 @@ impl World {
                     player: player_id,
                     master,
                     los: made.line_of_sight,
+                    los_powerup: Distance::ZERO,
                     state: ObjectState::Alive,
                     explored: false,
                     building: None,

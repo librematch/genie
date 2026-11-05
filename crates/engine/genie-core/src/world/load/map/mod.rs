@@ -157,6 +157,7 @@ pub fn spatial(
                     player,
                     master,
                     los: placement.los,
+                    los_powerup: Distance::ZERO,
                     state: ObjectState::of_byte(rge_static_object.object_state)?,
                     // a foundation made in the game explores first when its construction starts
                     explored: building.is_none_or(|tribe_building_object| {

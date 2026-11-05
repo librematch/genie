@@ -1,6 +1,7 @@
 //! Taking and releasing targets, the order record, actions cleared, transformations, gates
 //! and master switches.
 
+use crate::combat::powerup::reset_powerup_values;
 use crate::construction::gates::gate_units;
 use crate::map::Distance;
 use crate::map::spatial::Spatial;
@@ -20,7 +21,7 @@ use crate::objects::masters::MasterKind;
 use crate::objects::release::Releaser;
 use crate::objects::sprite::{ActiveSprite, new_sprite};
 use crate::objects::unit::Unit;
-use crate::orders::{TROPHIES, clear_powerups, damage_share};
+use crate::orders::{TROPHIES, damage_share};
 use crate::pathing::Pathing;
 use crate::players::Amount;
 use crate::players::PlayerId;
@@ -37,8 +38,7 @@ use crate::world::index::Place;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
-use crate::world::layer::generated::SpriteTuning;
-use crate::world::layer::generated::VisibilityTuning;
+use crate::world::layer::generated::Tuning;
 use crate::world::objects_ref::ObjectsRef;
 use crate::world::slots::PlayerSlotsExt;
 use crate::{GenieError, GenieResult};
@@ -311,15 +311,16 @@ impl World {
         Ok(())
     }
 
-    /// Slot 0x90 (`FUN_141225b70` with 0): the unit changes its master. Its action list is
-    /// cleared; in a state below 3 (`FUN_1411a6a70`) the old master's storage leaves its player's
-    /// attributes and the new one's comes in (`FUN_1411a56c0`, flag 2), its hit points keep their
-    /// share of the new master's (whole, at least 1), its sight goes and the new master's comes
-    /// (slots 0x1d8, 0x1d0), its place and obstruction record take the new master's
-    /// (`FUN_141055b40`, `FUN_14118c540`) and it moves with the new master's values; its powerups
-    /// go ([`clear_powerups`]) and in state 2 its volleys (`+0xa00`) are the new master's volley
-    /// fire; it takes the new master's standing sprite (slot 0x68). Its
-    /// per-master counts, facet, class registry (`DAT_143f69170`) and particles are not held.
+    /// Slot 0x90 (`FUN_141225b70` with 0): the unit changes its master. Its action list is cleared;
+    /// in a state below 3 (`FUN_1411a6a70`) the old master's storage leaves its player's attributes
+    /// and the new one's comes in (`FUN_1411a56c0`, flag 2), its hit points keep their share of the
+    /// new master's (whole, at least 1), its sight goes and the new master's comes (slots 0x1d8,
+    /// 0x1d0), its place and obstruction record take the new master's (`FUN_141055b40`,
+    /// `FUN_14118c540`) and it moves with the new master's values; its powerups go
+    /// ([`reset_powerup_values`], and a sight powerup through its sight) and in state 2 its volleys
+    /// (`+0xa00`) are the new master's volley fire; it takes the new master's standing sprite (slot
+    /// 0x68). Its per-master counts, facet, class registry (`DAT_143f69170`) and particles are not
+    /// held.
     pub(crate) fn change_master(
         &mut self,
         player: PlayerId,
@@ -344,8 +345,7 @@ impl World {
             &next,
             world,
             &self.model.roles,
-            self.model.tuning.sprite,
-            self.model.tuning.visibility,
+            &self.model.tuning,
         )?;
         let owner = self.players.player_mut(player)?;
         for &(kind, amount) in &switched.leaving {
@@ -384,14 +384,15 @@ pub(crate) struct Switched {
     pub(crate) coming: Vec<(AttributeId, Amount)>,
 }
 
-/// Slot 0x90's unit part (`FUN_141225b70` with 0) of a master change from `old` to `next` of
-/// `unit` with its combat layer `combat` and its motion layer `motion`, its action list cleared by the caller: in a state below 3 (`FUN_1411a6a70`) the old master's
-/// storage leaves its player's attributes and the new one's comes in (`FUN_1411a56c0`, flag 2:
-/// the owner's, [`Switched`]), its hit points keep their share of the new master's (whole, at
-/// least 1), its sight goes and the new master's comes (slots 0x1d8, 0x1d0), its place and
-/// obstruction record take the new master's (`FUN_141055b40`, `FUN_14118c540`) and it moves with
-/// the new master's values; it takes the new master's standing sprite (slot 0x68). Then its
-/// powerups go ([`clear_powerups`]) and in state 2 its volleys (`+0xa00`) are the new master's
+/// Slot 0x90's unit part (`FUN_141225b70` with 0) of a master change from `old` to `next` of `unit`
+/// with its combat layer `combat` and its motion layer `motion`, its action list cleared by the
+/// caller: in a state below 3 (`FUN_1411a6a70`) the old master's storage leaves its player's
+/// attributes and the new one's comes in (`FUN_1411a56c0`, flag 2: the owner's, [`Switched`]), its
+/// hit points keep their share of the new master's (whole, at least 1), its sight goes and the new
+/// master's comes (slots 0x1d8, 0x1d0), its place and obstruction record take the new master's
+/// (`FUN_141055b40`, `FUN_14118c540`) and it moves with the new master's values; it takes the new
+/// master's standing sprite (slot 0x68). Then its powerups go ([`reset_powerup_values`], and a
+/// sight powerup through its sight) and in state 2 its volleys (`+0xa00`) are the new master's
 /// volley fire. Its per-master counts, facet, class registry (`DAT_143f69170`) and particles are
 /// not held.
 ///
@@ -405,9 +406,9 @@ pub(crate) fn switch_master(
     next: &Master,
     world: SwitchWorld<'_>,
     roles: &Roles,
-    sprite_tuning: SpriteTuning,
-    visibility_tuning: VisibilityTuning,
+    tuning: &Tuning,
 ) -> GenieResult<Switched> {
+    let (sprite_tuning, visibility_tuning) = (tuning.sprite, tuning.visibility);
     let mut switched = Switched::default();
     let new = next.id;
     if unit.life.state < ObjectState::Dying {
@@ -524,7 +525,15 @@ pub(crate) fn switch_master(
             }
         }
     }
-    clear_powerups(combat);
+    reset_powerup_values(combat, tuning.powerup);
+    world.spatial.take_sight_powerup(
+        unit.id,
+        unit.life.inside.is_some(),
+        SightLayer {
+            roles,
+            visibility_tuning,
+        },
+    )?;
     // in state 2 the volleys (`+0xa00`) are the new master's volley fire, the shares of the
     // units inside dropped
     if unit.life.state == ObjectState::Alive {

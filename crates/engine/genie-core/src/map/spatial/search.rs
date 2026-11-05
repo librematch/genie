@@ -2,6 +2,7 @@
 //! best unit to attack.
 
 use crate::map::Distance;
+use crate::map::Footprint;
 use crate::map::Point;
 use crate::map::Position;
 use crate::map::Tile;
@@ -16,6 +17,7 @@ use crate::math::conversions::cvttss2si;
 use crate::objects::ObjectId;
 use crate::objects::masters::ObstructionKind;
 use crate::players::PlayerId;
+use crate::players::RelationMask;
 use crate::players::UnitRelations;
 use crate::players::{ByRelation, UnitRelation};
 use crate::unit_ai::best_target::AttackField;
@@ -24,8 +26,11 @@ use crate::unit_ai::world_view::WorldPicker;
 use crate::unit_ai::{AttackAsk, Memory};
 use crate::unit_ai::{Found, Pick, Search};
 use crate::vision::SightTiles;
+use crate::vision::registry::QueryShape;
 use crate::vision::registry::Record;
+use crate::vision::registry::Registry;
 use crate::vision::registry::VisibleQuery;
+use crate::vision::visibility::Visibility;
 use crate::world::layer::Roles;
 use crate::world::layer::generated::BestTargetTuning;
 use crate::world::layer::generated::RegistryTuning;
@@ -270,26 +275,14 @@ impl Spatial {
         spatial_tuning: &SpatialTuning,
         registry_tuning: RegistryTuning,
     ) -> GenieResult<SearchLists> {
-        let visibility = self.sight.as_ref().ok_or(GenieError::unsupported(
-            "a search without the players' sight",
-        ))?;
-        let registry = visibility.registry.as_ref().ok_or(GenieError::unsupported(
-            "a search without the objects-in-sight registry",
-        ))?;
+        let registry = registry_of(self.sight.as_ref())?;
         let relations = self.query_kinds(player, registry.players)?;
         let (x, y) = (search.at.x(), search.at.y());
         let mut answer = SearchLists::Cached;
         let (dx, dy) = (x - self.search_cache.at.x(), y - self.search_cache.at.y());
         if spatial_tuning.search_reuse_squared < dy * dy + dx * dx || !self.search_cache.holds {
             self.search_cache.hold(search.at);
-            let radius = search.radius.get().min(1000.0);
-            let (rx, ry) = (search.size.x(), search.size.y());
-            let rect = Rect::new(
-                (x - (radius + rx)) - 0.001,
-                (y - (radius + ry)) - 0.001,
-                x + (radius + rx) + 0.001,
-                y + (radius + ry) + 0.001,
-            );
+            let rect = query_rect(search.at, search.radius, search.size);
             self.check_known_classes(rect, search.classes)?;
             self.check_sight(player, rect)?;
             if let Some(lists) = registry.visible_units(
@@ -297,11 +290,11 @@ impl Spatial {
                     player,
                     position: search.at,
                     radius: search.radius,
-                    mode: 0,
+                    shape: QueryShape::RoundedRectangle,
                     classes: search.classes,
                     relations: &relations,
                     size: search.size,
-                    wanted: 0xff,
+                    wanted: RelationMask::ALL,
                 },
                 registry_tuning,
             )? {
@@ -310,6 +303,41 @@ impl Spatial {
             }
         }
         Ok(answer)
+    }
+
+    /// What `player`'s queries make of the players the registry lists ([`Spatial::query_kinds`]
+    /// of its players).
+    ///
+    /// # Errors
+    ///
+    /// A slice without the registry, or a player whose kinds it did not load.
+    pub fn registry_kinds(&self, player: PlayerId) -> GenieResult<UnitRelations> {
+        self.query_kinds(player, registry_of(self.sight.as_ref())?.players)
+    }
+
+    /// An aura's query (`FUN_141204a10` through `FUN_141288b80`): the registry's lists of
+    /// `query` ([`Registry::visible_units`]) become the last answer (`DAT_143f69178`, which the
+    /// unit AIs' search cache reads; the cache's place and hold stay), and the last answer is
+    /// what the aura reads: a query that reads nothing leaves it. The checks of a unit AI's
+    /// query ([`Spatial::search_query`]) guard it.
+    ///
+    /// # Errors
+    ///
+    /// A slice without the registry, a query near a frozen object, or no last answer.
+    pub fn aura_lists(
+        &mut self,
+        query: VisibleQuery<'_>,
+        registry_tuning: RegistryTuning,
+    ) -> GenieResult<&ByRelation<Vec<Record>>> {
+        let rect = query_rect(query.position, query.radius, query.size);
+        self.check_known_classes(rect, query.classes)?;
+        self.check_sight(query.player, rect)?;
+        if let Some(lists) =
+            registry_of(self.sight.as_ref())?.visible_units(query, registry_tuning)?
+        {
+            self.search_cache.remember(lists);
+        }
+        self.last_found()
     }
 
     /// A unit AI's full update starts (`0x140c66b10`): the search cache lets go.
@@ -488,4 +516,29 @@ impl Debug for SearchQuery<'_> {
             .field("search", &self.search)
             .finish_non_exhaustive()
     }
+}
+
+/// The objects-in-sight registry of the players' sight `sight`, which the queries read.
+fn registry_of(sight: Option<&Visibility>) -> GenieResult<&Registry> {
+    let visibility = sight.ok_or(GenieError::unsupported(
+        "a search without the players' sight",
+    ))?;
+    visibility.registry.as_ref().ok_or(GenieError::unsupported(
+        "a search without the objects-in-sight registry",
+    ))
+}
+
+/// The place a query of `radius` (at most 1000) at `at` for a searcher of radii `size` may read,
+/// a thousandth wider: what the checks of frozen objects test ([`Spatial::check_known_classes`],
+/// [`Spatial::check_sight`]).
+fn query_rect(at: Point, radius: Distance, size: Footprint) -> Rect {
+    let (x, y) = (at.x(), at.y());
+    let radius = radius.get().min(1000.0);
+    let (rx, ry) = (size.x(), size.y());
+    Rect::new(
+        (x - (radius + rx)) - 0.001,
+        (y - (radius + ry)) - 0.001,
+        x + (radius + rx) + 0.001,
+        y + (radius + ry) + 0.001,
+    )
 }

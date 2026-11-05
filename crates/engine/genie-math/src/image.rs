@@ -164,6 +164,8 @@ pub mod garrison {
     pub const FAR: f32 = f32::from_bits(0x7f7f_ffff);
     /// 0.5
     pub const HALF_TILE: f32 = f32::from_bits(0x3f00_0000);
+    /// 1.0
+    pub const MELEE_REACH: f32 = f32::from_bits(0x3f80_0000);
     /// -1.0
     pub const NO_POINT: f32 = f32::from_bits(0xbf80_0000);
     /// 1.0
@@ -348,6 +350,14 @@ pub mod movement {
 pub mod order {
     /// 100.0
     pub const DAMAGE_WHOLE: f32 = f32::from_bits(0x42c8_0000);
+}
+
+/// The values the `powerup` port reads.
+pub mod powerup {
+    /// 1.0000000116860974e-07
+    pub const EPSILON: f32 = f32::from_bits(0x33d6_bf95);
+    /// 1.0
+    pub const SPEED_SHARE_BASE: f32 = f32::from_bits(0x3f80_0000);
 }
 
 /// The values the `repair` port reads.

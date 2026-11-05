@@ -49,6 +49,7 @@ mod pather;
 mod record_id;
 mod search;
 mod sight;
+mod sight_powerup;
 mod tile_sight;
 
 pub use self::grid::{TileRecords, WalkQuery};

@@ -115,8 +115,12 @@ pub struct Seer {
     pub player: PlayerId,
     /// The master's id (`+0x58`, decoded).
     pub master: MasterId,
-    /// The master's `line_of_sight` (`+0x5d0`); slot 0x210 adds the object's powerup (`+0xad4`).
+    /// The master's `line_of_sight` (`+0x5d0`).
     pub los: Distance,
+    /// A combat object's sight powerup (`+0xad4`, unsaved, 0 after a load), which an aura's
+    /// powerup of attribute 1 raises and the powerup reset takes off
+    /// ([`crate::combat::powerup`]).
+    pub(crate) los_powerup: Distance,
     /// `object_state` (`+0x640`): only state 2 sees from a new tile.
     pub(crate) state: ObjectState,
     /// `+0x684`: the object explored since it was made (unsaved; a load sets it, `FUN_14116a500`,
@@ -132,6 +136,16 @@ pub struct Seer {
     pub(crate) capture: CaptureKind,
     /// The object's type (`+0xf`): 70 a combat unit, 80 a building, below 70 anything else.
     pub(crate) kind: MasterKind,
+}
+
+impl Seer {
+    /// Slot 0x210, its line of sight (`FUN_141202b60` of a combat object or building): the
+    /// master's (`+0x5d0`) plus its sight powerup (`+0xad4`), which a sight's slots 0x1d0 and
+    /// 0x1d8 read for an argument of −1 (`FUN_141192560`).
+    #[must_use]
+    pub(crate) fn sight_radius(&self) -> Distance {
+        self.los + self.los_powerup
+    }
 }
 
 /// An entry of the map's UMV data list (map `+0x5e08`, `+0x5e10`): a building's extent around

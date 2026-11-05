@@ -15,6 +15,7 @@
 mod allied;
 mod armor;
 mod armor_pair;
+mod armor_powerups;
 mod blasts;
 mod hit_factors;
 mod hit_points;
@@ -25,6 +26,7 @@ pub use self::allied::Allied;
 pub use self::armor::armor_damage;
 use self::armor::{master_melee_armor, melee_armor};
 pub use self::armor_pair::ArmorPair;
+pub use self::armor_powerups::ArmorPowerups;
 pub use self::blasts::blast;
 #[cfg(test)]
 use self::blasts::blast_tiles;
@@ -303,7 +305,7 @@ pub struct Armored {
     /// slice lacks the map or the restriction.
     pub(crate) terrain: Option<f32>,
     /// The object's armor powerups (melee, pierce).
-    pub(crate) armor_powerups: ArmorPair,
+    pub(crate) armor_powerups: ArmorPowerups,
     /// The melee and pierce armor taken off it.
     pub(crate) armor_removed: ArmorPair,
     /// Its hit point powerup (`+0xa38`, `+0xa3c`), which absorbs damage first.

@@ -36,6 +36,19 @@ impl AbilityTimer {
         cvttsd2si(left / f64::from(duration) * PERCENT)
     }
 
+    /// `FUN_14107d270`: an ability began (its duration is not 0).
+    #[must_use]
+    pub const fn began(self) -> bool {
+        self.duration.get() != 0
+    }
+
+    /// `FUN_14107d200`: an ability began and its duration has passed at `now` (the span since
+    /// its start, `SUB` wrapping, at least the duration, `CMP`/`JBE` unsigned).
+    #[must_use]
+    pub const fn over(self, now: WorldTime) -> bool {
+        self.began() && self.duration.get() <= now.since(self.activated).get()
+    }
+
     /// Whether the ability lasts at `now`: the low byte of [`AbilityTimer::left_percent`] above
     /// 0 as a signed byte (`TEST AL,AL`, `JG`, `0x141208e98`).
     #[must_use]
@@ -74,6 +87,21 @@ mod tests {
         assert_eq!(ability.left_percent(WorldTime::from_millis(20_000)), 0);
         assert!(ability.lasts(WorldTime::from_millis(7_500)));
         assert!(!ability.lasts(WorldTime::from_millis(15_000)));
+    }
+
+    /// An ability begins with a duration and is over once the span since its start reaches it;
+    /// none began without one, and none is over then.
+    #[test]
+    fn ability_is_over_once_its_duration_has_passed() {
+        let ability = timer(10_000, 5_000);
+        assert!(ability.began());
+        assert!(!ability.over(WorldTime::from_millis(14_999)));
+        assert!(ability.over(WorldTime::from_millis(15_000)));
+        // a moment before its start wraps past the duration
+        assert!(ability.over(WorldTime::from_millis(4_999)));
+        let none = timer(0, 5_000);
+        assert!(!none.began());
+        assert!(!none.over(WorldTime::from_millis(20_000)));
     }
 
     /// A duration of 0 (no ability began) is 0 over 0: the integer indefinite, whose low byte is

@@ -74,6 +74,7 @@ fn building_relics_scale_its_elevation_factor() {
 
 use super::*;
 use crate::combat::abilities::REMOVAL_REWARD;
+use crate::combat::damage::ArmorPowerups;
 use crate::combat::damage::HitKind;
 use crate::combat::damage::ShieldBlock;
 use crate::combat::damage::armor::{OwnSlot, class_armor};
@@ -645,7 +646,7 @@ fn combat_object_shows_its_attack_armor_and_range() {
     // the melee armor: its best of class 4 plus the powerup; a wall foundation none; type 50
     // without the powerup; else its best of any, else its base armor
     let mut victim = hunter();
-    victim.armored.as_mut().unwrap().armor_powerups = ArmorPair::new(2, 0);
+    victim.armored.as_mut().unwrap().armor_powerups = ArmorPowerups::new(2, 0);
     assert_eq!(
         shown_melee_armor(&victim, &roles()),
         Ok(DamageAmount::new(2))

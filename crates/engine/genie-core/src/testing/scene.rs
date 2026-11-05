@@ -876,6 +876,7 @@ fn register(world: &mut World, object: &SceneObject, mask: Option<VisionBits>) {
             player,
             master: master.id,
             los: master.line_of_sight,
+            los_powerup: Distance::ZERO,
             state,
             explored: false,
             building: building.then_some(if desolid {

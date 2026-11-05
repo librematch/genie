@@ -629,6 +629,7 @@ mod tests {
                 player: PlayerId::new(1),
                 master: HOUSE,
                 los: Distance::new(2.0),
+                los_powerup: Distance::ZERO,
                 state: ObjectState::Alive,
                 explored: true,
                 building: None,

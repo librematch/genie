@@ -85,8 +85,8 @@ impl World {
     }
 
     /// The parts of the object's own update after its actions, once, with the update's unit AI
-    /// part (`own_update`): the regeneration, the passive abilities with the hit point powerup
-    /// check, and a building's production.
+    /// part (`own_update`): the regeneration, the passive abilities, the powerup update
+    /// ([`World::powerup_update`]) and the hit point powerup check, and a building's production.
     fn finish_own_update(
         &mut self,
         (player_id, list_index, id): (PlayerId, ListIndex, ObjectId),
@@ -108,6 +108,8 @@ impl World {
                 _ => (player_id, false),
             };
             let _ = self.abilities((id, player_id, list_index), owner, leaves)?;
+            // then its powerup update (FUN_141204a10)
+            self.powerup_update((player_id, list_index, id))?;
             // then its hit point powerup check
             self.clamp_object_powerup((player_id, list_index, id))?;
         }

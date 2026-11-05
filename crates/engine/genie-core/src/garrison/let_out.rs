@@ -2,6 +2,8 @@
 //! place on the map.
 
 use crate::combat::Firepower;
+use crate::combat::powerup::{InfantryChange, count_infantry, speeds_up_siege};
+use crate::combat::reload::full_reload;
 use crate::commands::GatherPoint;
 use crate::commands::GatherPointState;
 use crate::garrison::LetOut;
@@ -10,6 +12,7 @@ use crate::garrison::{INSIDE_SIGHT, NO_POINT, SIEGE_UNLOAD, attack_rate, share};
 use crate::map::Point;
 use crate::map::Position;
 use crate::map::spatial::Obstruction;
+use crate::math::image::garrison::MELEE_REACH;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
@@ -31,6 +34,7 @@ use crate::vision::visibility::LosSight;
 use crate::world::World;
 use crate::world::index::Place;
 use crate::world::layer::ClassRoles;
+use crate::world::layer::MasterRoles;
 use crate::world::slots::PlayerSlotsExt;
 use crate::{GenieError, GenieResult};
 
@@ -201,6 +205,7 @@ impl World {
                 self.model.tuning.visibility,
             )?;
         }
+        self.leave_siege((bid, id), made, &bm)?;
         // slot 0x58: on the map at the spot (new_position: its tile's list, its sight)
         let mut placed = self.spatial.come_out(id).ok_or_else(|| {
             GenieError::unsupported("a unit inside a building without its record")
@@ -244,6 +249,44 @@ impl World {
         }
         if let Some(error) = self.take_sight_unsupported() {
             return Err(error);
+        }
+        Ok(())
+    }
+
+    /// Slot 0x1a8's end (`FUN_141213120`) for unit `id` of master `made` leaving the container
+    /// `bid` of master `bm`, a siege unit (class 13) but masters 1704 and 1706: the siege unit no
+    /// longer counts the infantry of a class that speeds it up ([`speeds_up_siege`]; slot 0x1b0
+    /// with −1, [`count_infantry`]: `+0xad8` and its speed powerup `+0xa2c`), and a unit of a range
+    /// above 1 (slot 0x230, `+0x828`, above `garrison::MELEE_REACH`, `COMISS`: a NaN is not) starts
+    /// its attack timer `+0x91c` at its full reload time (`FUN_141087040`, [`full_reload`] of its
+    /// master's reload, stinger and powerup).
+    ///
+    /// # Errors
+    ///
+    /// None (an unreachable error where a combat table lost the layer it took).
+    pub(super) fn leave_siege(
+        &mut self,
+        (bid, id): (ObjectId, ObjectId),
+        made: &Master,
+        bm: &Master,
+    ) -> GenieResult<()> {
+        let roles = &self.model.roles;
+        if !roles.of_class(bm.class).contains(ClassRoles::SIEGE)
+            || roles.of_master(bm.id).contains(MasterRoles::UNSPED_SIEGE)
+        {
+            return Ok(());
+        }
+        if speeds_up_siege(made, bm, roles) {
+            let tuning = self.model.tuning.powerup;
+            count_infantry(self.parts.combat_mut(bid)?, InfantryChange::Left, tuning);
+        }
+        if MELEE_REACH < made.combat_part().weapon_range.get() {
+            let combat = self.parts.combat_mut(id)?;
+            combat.attack_timer = full_reload(
+                made.combat_part().reload,
+                combat.reload_stinger,
+                combat.reload_powerup,
+            );
         }
         Ok(())
     }

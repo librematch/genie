@@ -339,44 +339,97 @@ impl IntKey for i32 {
     }
 }
 
-/// The bucket of a 32-bit key: `std::hash<int>`, FNV-1a over its four bytes (little-endian), and
-/// the bucket mask.
-fn bucket(key: impl IntKey, mask: u64) -> u64 {
-    const OFFSET: u64 = 0xcbf2_9ce4_8422_2325;
-    const PRIME: u64 = 0x0100_0000_01b3;
-    let hash = key.int().to_le_bytes().iter().fold(OFFSET, |hash, &byte| {
-        (hash ^ u64::from(byte)).wrapping_mul(PRIME)
-    });
-    hash & mask
+/// A key of a `std::unordered_map`: the hash its map buckets it by, and its equality (the
+/// map's `operator==` on the key's fields).
+pub trait HashKey: Copy + PartialEq {
+    /// The key's hash.
+    fn map_hash(self) -> u64;
 }
 
-/// A new key goes in front of its bucket's elements, or at the list's end when its bucket is
-/// empty (`_Find_last`'s insertion point, then `_Insert_new_node_before`).
-fn insert_in_bucket<K: IntKey>(list: &mut Vec<K>, key: K, mask: u64) {
-    let wanted = bucket(key, mask);
-    match list
-        .iter()
-        .position(|&listed| bucket(listed, mask) == wanted)
-    {
-        Some(lo) => list.insert(lo, key),
-        None => list.push(key),
+/// An integer key's hash is `std::hash<int>`: FNV-1a over its four bytes (little-endian).
+impl<K: IntKey> HashKey for K {
+    fn map_hash(self) -> u64 {
+        fnv1a(&self.int().to_le_bytes())
     }
 }
 
-/// The order in which a `std::unordered_map<int, …>` with the maximum load factor 1.0 lists its
-/// keys (its element list, which iteration follows) after `try_emplace` of `keys` in turn
-/// (`FUN_1415f0c40`; a key already in it is found, not inserted). An insertion that would pass
-/// the load factor first rehashes (`FUN_141615a30`): to eight times the buckets below 512, else
-/// to the need, then each element in list order goes in front of its new bucket's (where it
-/// already leads its bucket, it stays).
+/// FNV-1a over `bytes` (`std::_Fnv1a_append_bytes` from its offset basis): the hash of a value
+/// that `std::hash` hashes by its bytes.
 #[must_use]
-pub fn unordered_map_order<K: IntKey>(keys: impl IntoIterator<Item = K>) -> Vec<K> {
-    let mut buckets = MIN_BUCKETS;
-    let mut list: Vec<K> = Vec::new();
+pub fn fnv1a(bytes: &[u8]) -> u64 {
+    const OFFSET: u64 = 0xcbf2_9ce4_8422_2325;
+    const PRIME: u64 = 0x0100_0000_01b3;
+    bytes.iter().fold(OFFSET, |hash, &byte| {
+        (hash ^ u64::from(byte)).wrapping_mul(PRIME)
+    })
+}
+
+/// The hash of a `float` (`std::hash<float>`): FNV-1a over its bytes, a negative zero first
+/// made a positive one (the `x == 0.0` test, so a NaN keeps its bits).
+#[must_use]
+pub fn float_hash(value: f32) -> u64 {
+    let value = if value == 0.0 { 0.0 } else { value };
+    fnv1a(&value.to_le_bytes())
+}
+
+/// `boost::hash_combine` of `seed` with the hash `hash` (the game's key hashes of several fields,
+/// `FUN_1411e86d0`): `seed ^ (hash + 0x9e3779b9 + (seed << 6) + (seed >> 2))`, all in 64 bits.
+#[must_use]
+pub const fn hash_combine(seed: u64, hash: u64) -> u64 {
+    seed ^ hash
+        .wrapping_add(0x9e37_79b9)
+        .wrapping_add(seed << 6)
+        .wrapping_add(seed >> 2)
+}
+
+/// The bucket of a key: its hash and the bucket mask.
+fn bucket(key: impl HashKey, mask: u64) -> u64 {
+    key.map_hash() & mask
+}
+
+/// A new key goes in front of its bucket's elements, or at the list's end when its bucket is
+/// empty (`_Find_last`'s insertion point, then `_Insert_new_node_before`): `list` holds
+/// positions into `keys`, `new` the position of the key it takes.
+fn insert_in_bucket<K: HashKey>(list: &mut Vec<usize>, keys: &[K], new: usize, mask: u64) {
+    let wanted = keys.get(new).map(|&key| bucket(key, mask));
+    match list
+        .iter()
+        .position(|&listed| keys.get(listed).map(|&key| bucket(key, mask)) == wanted)
+    {
+        Some(lo) => list.insert(lo, new),
+        None => list.push(new),
+    }
+}
+
+/// The order in which a `std::unordered_map` with the maximum load factor 1.0 lists its keys (its
+/// element list, which iteration follows) after `try_emplace` of `keys` in turn (`FUN_1415f0c40`
+/// for `int` keys, `FUN_1411e9710` and `FUN_1411e9390` for the aura's; a key already in it is
+/// found, not inserted: [`HashKey`]'s equality, so a key that is not equal to itself, as a NaN
+/// float is not, goes in anew each time). [`insertion_order`] lists them.
+#[must_use]
+pub fn unordered_map_order<K: HashKey>(keys: impl IntoIterator<Item = K>) -> Vec<K> {
+    let mut inserted: Vec<K> = Vec::new();
     for key in keys {
-        if list.contains(&key) {
-            continue;
+        if !inserted.contains(&key) {
+            inserted.push(key);
         }
+    }
+    insertion_order(&inserted)
+        .into_iter()
+        .filter_map(|position| inserted.get(position).copied())
+        .collect()
+}
+
+/// The order, as positions into `inserted`, in which a new `std::unordered_map` with the maximum
+/// load factor 1.0 lists the keys `inserted` in turn, each a new one. An insertion that would
+/// pass the load factor first rehashes (`FUN_141615a30`, `FUN_14120a890`): to eight times the
+/// buckets below 512, else to the need, then each element in list order goes in front of its
+/// new bucket's (where it already leads its bucket, it stays).
+#[must_use]
+pub fn insertion_order<K: HashKey>(inserted: &[K]) -> Vec<usize> {
+    let mut buckets = MIN_BUCKETS;
+    let mut list: Vec<usize> = Vec::new();
+    for new in 0..inserted.len() {
         let size = list.len() + 1;
         if 1.0 < size as f32 / buckets as f32 {
             let need = MIN_BUCKETS.max(size);
@@ -389,12 +442,11 @@ pub fn unordered_map_order<K: IntKey>(keys: impl IntoIterator<Item = K>) -> Vec<
             }
             buckets = buckets.next_power_of_two();
             let mask = buckets as u64 - 1;
-            let old = take(&mut list);
-            for key in old {
-                insert_in_bucket(&mut list, key, mask);
+            for listed in take(&mut list) {
+                insert_in_bucket(&mut list, inserted, listed, mask);
             }
         }
-        insert_in_bucket(&mut list, key, buckets as u64 - 1);
+        insert_in_bucket(&mut list, inserted, new, buckets as u64 - 1);
     }
     list
 }
@@ -417,6 +469,26 @@ mod tests {
         assert_eq!(bucket(1, 7), bucket(9, 7));
         assert_ne!(bucket(1, 7), bucket(2, 7));
         assert_eq!(unordered_map_order([1, 2, 9, 2]), [9, 1, 2]);
+    }
+
+    /// A key not equal to itself (a NaN float's) goes in each time; the positions name each
+    /// insertion.
+    #[test]
+    fn key_unequal_to_itself_goes_in_each_time() {
+        #[derive(Clone, Copy, PartialEq)]
+        struct FloatKey(f32);
+        impl HashKey for FloatKey {
+            fn map_hash(self) -> u64 {
+                float_hash(self.0)
+            }
+        }
+        let keys = [FloatKey(f32::NAN), FloatKey(1.0), FloatKey(f32::NAN)];
+        assert_eq!(unordered_map_order(keys).len(), 3);
+        let mut order = insertion_order(&keys);
+        order.sort_unstable();
+        assert_eq!(order, [0, 1, 2]);
+        // -0 hashes as +0
+        assert_eq!(float_hash(-0.0), float_hash(0.0));
     }
 
     #[test]

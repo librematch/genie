@@ -19,6 +19,15 @@ pub fn reload_time(
     if kind < MasterKind::MISSILE {
         return Seconds::ZERO;
     }
+    full_reload(master_reload, stinger, powerup)
+}
+
+/// The reload time's sum (slot 0x218 from type 60 on, and `FUN_141087040`, which sets a ranged
+/// unit's attack timer `+0x91c` to it as it leaves a siege unit): the stinger `stinger` (slot
+/// 0x758) plus the master's reload time `master_reload` (`+0x838`) less the powerup `powerup`
+/// (slot 0x6e0), in the game's order.
+#[must_use]
+pub fn full_reload(master_reload: Seconds, stinger: Seconds, powerup: Seconds) -> Seconds {
     stinger + (master_reload - powerup)
 }
 

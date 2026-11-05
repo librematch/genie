@@ -107,6 +107,38 @@ impl Ord for UnitRelation {
     }
 }
 
+/// The relations a visible-units query keeps (`FUN_141288c00`'s last argument): one bit each
+/// ([`UnitRelation::bit`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct RelationMask(u8);
+
+impl RelationMask {
+    /// Every bit: what a unit AI's search keeps (`0xff`).
+    pub const ALL: Self = Self(0xff);
+
+    /// The mask of `relations`.
+    #[must_use]
+    pub fn of(relations: &[UnitRelation]) -> Self {
+        Self(
+            relations
+                .iter()
+                .fold(0, |bits, relation| bits | relation.bit()),
+        )
+    }
+
+    /// Whether it keeps `relation`.
+    #[must_use]
+    pub const fn keeps(self, relation: UnitRelation) -> bool {
+        self.0 & relation.bit() != 0
+    }
+
+    /// The byte, as the game's key hashes it.
+    #[must_use]
+    pub const fn get(self) -> u8 {
+        self.0
+    }
+}
+
 /// What a player's queries make of each player's objects (`unit_diplomacy[i]`, `player+0x278`),
 /// by the other player: none for a saved value past the five relations.
 pub type UnitRelations = ByPlayer<Option<UnitRelation>>;
@@ -171,7 +203,22 @@ impl<T> IndexMut<UnitRelation> for ByRelation<T> {
 
 #[cfg(test)]
 mod tests {
+    use crate::players::RelationMask;
     use crate::players::{ByRelation, UnitRelation};
+
+    /// A mask keeps the relations it was made of, one bit each.
+    #[test]
+    fn relation_mask_keeps_the_relations_it_names() {
+        let mask = RelationMask::of(&[UnitRelation::Gaia, UnitRelation::Enemy]);
+        assert_eq!(mask.get(), 0x11);
+        assert!(mask.keeps(UnitRelation::Enemy));
+        assert!(!mask.keeps(UnitRelation::Own));
+        assert!(
+            UnitRelation::ALL
+                .iter()
+                .all(|&relation| RelationMask::ALL.keeps(relation))
+        );
+    }
 
     /// 0 to 4 are the relations, in their lists' order, each with its bit; other values none.
     #[test]

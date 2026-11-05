@@ -3,6 +3,7 @@
 
 use crate::construction::FoundationId;
 use crate::construction::build::Clearer;
+use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::Point;
 use crate::map::Position;
@@ -428,6 +429,7 @@ impl World {
                     player,
                     master: made.id,
                     los: made.line_of_sight,
+                    los_powerup: Distance::ZERO,
                     state: ObjectState::Foundation,
                     explored: false,
                     building: Some(BuildingSight::default()),

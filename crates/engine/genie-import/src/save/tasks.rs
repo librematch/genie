@@ -98,6 +98,7 @@ pub fn core_task(task: &WorldTask) -> GenieResult<Task> {
         terrain: TaskTerrain::of_data(task.terrain_id),
         owner_kind: TargetOwner::of_data(task.owner_kind),
         holding_attr: task.holding_attr,
+        search_flag: task.search_flag,
         attribute_kind,
         attribute_kind2,
         attribute_kind3,

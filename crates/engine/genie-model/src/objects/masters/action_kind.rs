@@ -85,6 +85,9 @@ impl ActionKind {
 
     /// The type 156 (`0x9c`): a task of a new unit that spawns more units (`FUN_140ace760`).
     pub const ACTION_156: Self = Self::named(0x9c);
+    /// The type 155 (`0x9b`): an aura's task, which powers up the objects its object finds
+    /// around it (slot 277 `0x141206d50`, the powerup update `FUN_141204a10`).
+    pub const AURA: Self = Self::named(0x9b);
 
     /// The type 154 (`0x9a`) of the task a kill's bonus reads (`kill_bonus_tasks`); the villager's
     /// wait for a foundation (`genie_core::construction::wait_solidify::WAIT_SOLIDIFY`) has the same

@@ -182,6 +182,7 @@ impl Unit {
                     player: step.player,
                     master: made.id,
                     los: made.line_of_sight,
+                    los_powerup: Distance::ZERO,
                     state: ObjectState::Alive,
                     explored: false,
                     building: None,

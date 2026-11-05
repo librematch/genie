@@ -16,6 +16,11 @@ bitflags::bitflags! {
         const MARKS_TARGET = 1 << 2;
         /// A volley shoots all its missiles, without the draw of how many (bit 4).
         const FULL_VOLLEY = 1 << 4;
+        /// Its auras run: its master's tasks of type 155 power up what it finds around it, and
+        /// its special sprite ends with its timed ability (bit 5, `FUN_141204a10`).
+        const AURA = 1 << 5;
+        /// Its auras power up itself instead of the objects they find (bit 6, `FUN_141204a10`).
+        const AURA_ON_SELF = 1 << 6;
         /// Its hits apply its effects to a target not allied both ways (bit 7,
         /// `FUN_14107bdf0`).
         const HIT_EFFECTS = 1 << 7;

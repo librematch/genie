@@ -4,7 +4,8 @@
 
 use crate::combat::Charge;
 use crate::combat::abilities::Abilities;
-use crate::combat::damage::ArmorPair;
+use crate::combat::damage::{ArmorPair, ArmorPowerups};
+use crate::combat::powerup::{AppliedPowerup, ConversionPowerup, InfantryCount};
 use crate::combat::{
     AbilityTimer, AttackCount, AttackPowerup, Firepower, MissileCount, SpecialSprite,
 };
@@ -13,6 +14,7 @@ use crate::garrison::RaiderCountdown;
 use crate::gathering::DecayTimer;
 use crate::gathering::SalvageAmounts;
 use crate::map::Distance;
+use crate::movement::Speed;
 use crate::objects::HpPowerup;
 use crate::objects::Regeneration;
 use crate::objects::WorkRate;
@@ -106,8 +108,21 @@ pub struct Combat {
     /// `mMaxRangePowerup` (`+0xa40`, slot 0x700): what its shown range adds
     /// ([`crate::combat::damage::shown_range`]).
     pub range_powerup: Distance,
-    /// Its melee and pierce armor powerups (`+0xa48`, `+0xa4c`, read as 16 bits).
-    pub armor_powerups: ArmorPair,
+    /// Its melee and pierce armor powerups (`+0xa48`, `+0xa4c`, 32 bits read as 16).
+    pub armor_powerups: ArmorPowerups,
+    /// `mSpeedPowerup` (`+0xa2c`): what an aura's speed powerup adds, and a siege unit's share
+    /// of the infantry inside it (slot 0x1b0, [`crate::combat::powerup::count_infantry`]; after a
+    /// powerup reset [`crate::combat::powerup::speed_of_infantry`]).
+    pub speed_powerup: Speed,
+    /// Its conversion chance powerup (`+0xa50`, unsaved; [`ConversionPowerup`]).
+    #[diff(unsaved)]
+    pub conversion_powerup: ConversionPowerup,
+    /// The powerups it holds (its map `+0xa98`, unsaved; [`AppliedPowerup`]).
+    #[diff(unsaved)]
+    pub applied_powerups: Vec<AppliedPowerup>,
+    /// A siege unit's infantry inside it (`+0xad8`, unsaved; [`InfantryCount`]).
+    #[diff(unsaved)]
+    pub infantry_inside: InfantryCount,
     /// A building's own store (`+0xae0`, `FUN_1411abad0`'s map by attribute): what its storage
     /// entries of mode 16 put in at its completion and take out at its death
     /// (`FUN_1411e6580`).

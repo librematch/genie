@@ -42,6 +42,7 @@ fn unit(player: PlayerId, los: Distance) -> Seer {
         player,
         master: ids::VILLAGER_MALE,
         los,
+        los_powerup: Distance::ZERO,
         state: ObjectState::Alive,
         explored: true,
         building: None,

@@ -831,6 +831,7 @@ fn building_sight(world: &mut World, player_id: PlayerId, id: i32, sight: Buildi
             player: player_id,
             master: master_id(1021),
             los: Distance::new(6.0),
+            los_powerup: Distance::ZERO,
             state: ObjectState::Alive,
             explored: true,
             building: Some(sight),

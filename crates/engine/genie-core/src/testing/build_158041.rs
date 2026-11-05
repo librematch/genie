@@ -32,6 +32,7 @@ use genie_model::layer::generated::MoveToTuning;
 use genie_model::layer::generated::MovementTuning;
 use genie_model::layer::generated::OrderTuning;
 use genie_model::layer::generated::PastureTuning;
+use genie_model::layer::generated::PowerupTuning;
 use genie_model::layer::generated::RegistryTuning;
 use genie_model::layer::generated::RepairTuning;
 use genie_model::layer::generated::Slots;
@@ -90,6 +91,7 @@ pub fn build_158041() -> BuildLayer {
             movement: movement(),
             order: order(),
             pasture: pasture(),
+            powerup: powerup(),
             registry: registry(),
             repair: repair(),
             spatial: spatial(),
@@ -169,7 +171,8 @@ const CLASS_ROLES: [(usize, ClassRoles); 65] = [
             .union(ClassRoles::LION_TARGET)
             .union(ClassRoles::MILITARY_COUNT)
             .union(ClassRoles::MILITARY_KEY)
-            .union(ClassRoles::PREDATOR_TARGET),
+            .union(ClassRoles::PREDATOR_TARGET)
+            .union(ClassRoles::SPEEDS_SIEGE),
     ),
     (
         7,
@@ -453,6 +456,7 @@ const CLASS_ROLES: [(usize, ClassRoles); 65] = [
             .union(ClassRoles::MILITARY_COUNT)
             .union(ClassRoles::MILITARY_KEY)
             .union(ClassRoles::PREDATOR_TARGET)
+            .union(ClassRoles::SPEEDS_SIEGE)
             .union(ClassRoles::TWO_HANDED_SWORDSMAN),
     ),
     (
@@ -461,7 +465,8 @@ const CLASS_ROLES: [(usize, ClassRoles); 65] = [
             .union(ClassRoles::MILITARY_COUNT)
             .union(ClassRoles::MILITARY_KEY)
             .union(ClassRoles::PIKEMAN)
-            .union(ClassRoles::PREDATOR_TARGET),
+            .union(ClassRoles::PREDATOR_TARGET)
+            .union(ClassRoles::SPEEDS_SIEGE),
     ),
     (
         47,
@@ -494,7 +499,8 @@ const CLASS_ROLES: [(usize, ClassRoles); 65] = [
             .union(ClassRoles::MILITARY_COUNT)
             .union(ClassRoles::MILITARY_KEY)
             .union(ClassRoles::PREDATOR_TARGET)
-            .union(ClassRoles::SPEARMAN),
+            .union(ClassRoles::SPEARMAN)
+            .union(ClassRoles::SPEEDS_SIEGE),
     ),
     (
         51,
@@ -564,7 +570,8 @@ const CLASS_ROLES: [(usize, ClassRoles); 65] = [
             .union(ClassRoles::MILITARY_COUNT)
             .union(ClassRoles::MILITARY_KEY)
             .union(ClassRoles::PREDATOR_TARGET)
-            .union(ClassRoles::RAIDER),
+            .union(ClassRoles::RAIDER)
+            .union(ClassRoles::SPEEDS_SIEGE),
     ),
     (
         57,
@@ -803,8 +810,14 @@ const MASTER_ROLES: [(usize, MasterRoles); 90] = [
         1697,
         MasterRoles::FLEMISH_MILITIA_FEMALE.union(MasterRoles::MILITARY_235),
     ),
-    (1704, MasterRoles::UNTURNED_ATTACKER),
-    (1706, MasterRoles::UNTURNED_ATTACKER),
+    (
+        1704,
+        MasterRoles::UNSPED_SIEGE.union(MasterRoles::UNTURNED_ATTACKER),
+    ),
+    (
+        1706,
+        MasterRoles::UNSPED_SIEGE.union(MasterRoles::UNTURNED_ATTACKER),
+    ),
     (1715, MasterRoles::JADWIGA),
     (
         1744,
@@ -1329,6 +1342,13 @@ const fn pasture() -> PastureTuning {
         end: f32::from_bits(0x3f80_0000),
         inset: f32::from_bits(0x3f00_0000),
         step: f32::from_bits(0x3e99_999a),
+    }
+}
+
+/// The `powerup` port's tuning values.
+const fn powerup() -> PowerupTuning {
+    PowerupTuning {
+        speed_per_infantry: f32::from_bits(0x3d4c_cccd),
     }
 }
 

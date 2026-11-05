@@ -2322,6 +2322,7 @@ const fn seer_in(state: ObjectState) -> Seer {
         player: PlayerId::new(2),
         master: ids::ID_0,
         los: Distance::new(4.0),
+        los_powerup: Distance::ZERO,
         state,
         explored: true,
         building: None,

@@ -193,52 +193,58 @@ bitflags! {
         const SKIPS_SIEGE_CHECK = 1 << 86;
         /// Class 50, the random-map scripts' `SPEARMAN_CLASS` (950).
         const SPEARMAN = 1 << 87;
+        /// The classes whose units speed up a siege unit they are inside (6, 45, 46, 50 and 56):
+        /// entering one counts them in its `+0xad8` and adds 0.05 to its speed powerup `+0xa2c`
+        /// (slot 52, `FUN_141212e10`, through slot 0x1b0, `FUN_141209d60`), leaving takes both off
+        /// (slot 53, `FUN_141213120`), and the powerup reset (`FUN_1412066b0`) makes the speed
+        /// powerup 0.05 a unit.
+        const SPEEDS_SIEGE = 1 << 88;
         /// Class 8, the random-map scripts' `STONE_MINE_CLASS` (908).
-        const STONE_MINE = 1 << 88;
+        const STONE_MINE = 1 << 89;
         /// The building classes a movement damage hits (`0x141207ae8`, decoded 0x33 and 0x36); it hits any object of another type.
-        const STRUCK_BUILDING = 1 << 89;
+        const STRUCK_BUILDING = 1 << 90;
         /// Class 14, the random-map scripts' `TERRAIN_CLASS` (914).
-        const TERRAIN = 1 << 90;
+        const TERRAIN = 1 << 91;
         /// Towers.
-        const TOWER = 1 << 91;
+        const TOWER = 1 << 92;
         /// The trade cart's and the trade boat's classes (`FUN_141195400`, `FUN_141195490`).
-        const TRADER = 1 << 92;
+        const TRADER = 1 << 93;
         /// The trade boat (`-0xeaa` raw): its cared classes and its trade partner are not the cart's.
-        const TRADE_BOAT = 1 << 93;
+        const TRADE_BOAT = 1 << 94;
         /// The trade cart (decoded `0x13`).
-        const TRADE_CART = 1 << 94;
+        const TRADE_CART = 1 << 95;
         /// The class whose busy units skip the idle check (`-0xe98` raw).
-        const TRANSPORT = 1 << 95;
+        const TRANSPORT = 1 << 96;
         /// Class 62, which the best target's category puts with the transports (attack category 10).
-        const TRANSPORT_CATEGORY = 1 << 96;
+        const TRANSPORT_CATEGORY = 1 << 97;
         /// What a trebuchet (class 51 or 54) attacks by its own choice: the rams' but siege and scorpions.
-        const TREBUCHET_TARGET = 1 << 97;
+        const TREBUCHET_TARGET = 1 << 98;
         /// Trees.
-        const TREE = 1 << 98;
+        const TREE = 1 << 99;
         /// Class 16, the random-map scripts' `TREE_STUMP_CLASS` (916).
-        const TREE_STUMP = 1 << 99;
+        const TREE_STUMP = 1 << 100;
         /// Class 45, the random-map scripts' `TWO_HANDED_SWORDSMAN_CLASS` (945).
-        const TWO_HANDED_SWORDSMAN = 1 << 100;
+        const TWO_HANDED_SWORDSMAN = 1 << 101;
         /// The classes no delete takes (`DAT_142f925c0`, and `FUN_14120f620`'s own test): livestock, class 42, artifacts and class 60.
-        const UNDELETABLE = 1 << 101;
+        const UNDELETABLE = 1 << 102;
         /// Unpacked siege units (`.dat` class 54, `-0xe76` raw: the trebuchet, the bombard cannon): they block a placement though desolid, and their ghosts stay watched.
-        const UNPACKED_TREBUCHET = 1 << 102;
+        const UNPACKED_TREBUCHET = 1 << 103;
         /// The classes a building's watch leaves out (`FUN_1411cc980`).
-        const UNWATCHED = 1 << 103;
+        const UNWATCHED = 1 << 104;
         /// Villagers (`-0xea8` raw).
-        const VILLAGER = 1 << 104;
+        const VILLAGER = 1 << 105;
         /// Walls (decoded 27, `0x1b`).
-        const WALL = 1 << 105;
+        const WALL = 1 << 106;
         /// The villagers' class (`FUN_141195750`: the master's class is 4), tested by the wall's train locations.
-        const WALL_BUILDER = 1 << 106;
+        const WALL_BUILDER = 1 << 107;
         /// The warships (`-0xe96` raw), whose attackers make a computer's unit warn its group.
-        const WARSHIP = 1 << 107;
+        const WARSHIP = 1 << 108;
         /// Class 24 (`-0xe94` raw), listed as `CAVALRY` is.
-        const WAR_ELEPHANT = 1 << 108;
+        const WAR_ELEPHANT = 1 << 109;
         /// The class whose garrison share is 1 whatever its firepower (`FUN_141213520`, `-0xe82` raw); UNLOAD's flag 0 leaves it inside (`FUN_14118a610`).
-        const WHOLE_GARRISON_SHARE = 1 << 109;
+        const WHOLE_GARRISON_SHARE = 1 << 110;
         /// The target class whose reach test (the path end's) plans with the wide range added to the range, as master 45 does.
-        const WIDE_REACH = 1 << 110;
+        const WIDE_REACH = 1 << 111;
     }
 }
 
@@ -427,20 +433,23 @@ bitflags! {
         const TREBUCHET_PACKED = 1 << 88;
         /// The masters whose exhaustion the update does not check (`FUN_140a99e30`: the master id, not 0x765 and not 0x769): the pastures.
         const UNEXHAUSTED = 1 << 89;
+        /// The siege masters their infantry inside does not speed up (`0x6744`, `0x6746` raw): the
+        /// enter and the leave (slots 52 and 53) leave their count `+0xad8` alone.
+        const UNSPED_SIEGE = 1 << 90;
         /// The buildings a stop leaves alone (`FUN_1411e6290`).
-        const UNSTOPPED = 1 << 90;
+        const UNSTOPPED = 1 << 91;
         /// The masters readyToAttack does not turn to face their target (`0x6744`, `0x6746` raw).
-        const UNTURNED_ATTACKER = 1 << 91;
+        const UNTURNED_ATTACKER = 1 << 92;
         /// Master 1810, the `.dat`'s `SVMBAS`, which a queue order names for a villager of either sex: the queue takes the male villager, then draws the sex (`World::queue_at`).
-        const VILLAGER_ANY = 1 << 92;
+        const VILLAGER_ANY = 1 << 93;
         /// The female villager (`0x125`).
-        const VILLAGER_FEMALE = 1 << 93;
+        const VILLAGER_FEMALE = 1 << 94;
         /// The male villager (`0x53`): the master QUEUE draws a sex for, and the one the generic villager (`0x712`) becomes first (`FUN_1411cbc40`).
-        const VILLAGER_MALE = 1 << 94;
+        const VILLAGER_MALE = 1 << 95;
         /// Master 1811, the `.dat`'s `WARRIORPRIEST`.
-        const WARRIOR_PRIEST = 1 << 95;
+        const WARRIOR_PRIEST = 1 << 96;
         /// The Wonder (`0x114`, raw `0x61b0`), whose death lowers its owner's attribute 42 (`FUN_1411dbb70`) and whose construction rate the player's attribute raises at most to `DAT_142ed66b4`.
-        const WONDER = 1 << 96;
+        const WONDER = 1 << 97;
     }
 }
 
@@ -812,6 +821,8 @@ pub struct Tuning {
     pub order: OrderTuning,
     /// The `pasture` port's.
     pub pasture: PastureTuning,
+    /// The `powerup` port's.
+    pub powerup: PowerupTuning,
     /// The `registry` port's.
     pub registry: RegistryTuning,
     /// The `repair` port's.
@@ -1630,6 +1641,18 @@ pub struct PastureTuning {
     ///
     /// `pasture::STEP`: 0.3 in build 158041.
     pub step: f32,
+}
+
+/// The `powerup` port's tuning values.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct PowerupTuning {
+    /// A siege unit's speed powerup per infantry unit inside it (`DAT_14330eb78`): the powerup
+    /// reset (`FUN_1412066b0`) makes `+0xa2c` its `+0xad8` times this, and slot 0x1b0
+    /// (`FUN_141209d60`) adds the entering or leaving unit's 1 or −1 times this to it.
+    ///
+    /// `powerup::SPEED_PER_INFANTRY`: 0.05 in build 158041.
+    pub speed_per_infantry: f32,
 }
 
 /// The `registry` port's tuning values.

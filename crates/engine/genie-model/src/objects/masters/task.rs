@@ -43,6 +43,10 @@ pub struct Task {
     pub owner_kind: TargetOwner,
     /// `+0x19`, `holding_attr` (`carry_check`): 1 wants a target holding the task's resource.
     pub holding_attr: u8,
+    /// `+0x1b`, `search_flag` (`auto_search_targets`): an aura task (type 155) with it counts the
+    /// objects it names toward its amount instead of powering them up (slot 277,
+    /// `0x141206d50`, the entry's `+0x16`).
+    pub search_flag: u8,
     /// `+0x20` to `+0x26`, `attribute_type` to `attribute_type4` (`resource_in`,
     /// `resource_multiplier`: the attribute that scales the gathering, `resource_out`,
     /// `unused_resource`).
@@ -96,6 +100,7 @@ impl Default for Task {
             terrain: TaskTerrain::NONE,
             owner_kind: TargetOwner::ANY,
             holding_attr: 0,
+            search_flag: 0,
             attribute_kind: None,
             attribute_kind2: None,
             attribute_kind3: None,

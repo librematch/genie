@@ -412,6 +412,7 @@ impl World {
                     player: player_id,
                     master,
                     los: made.line_of_sight,
+                    los_powerup: Distance::ZERO,
                     state: ObjectState::Alive,
                     explored: false,
                     building: None,

@@ -15,6 +15,7 @@ use crate::objects::ObjectId;
 use crate::objects::masters::ClassId;
 use crate::players::ByRelation;
 use crate::players::PlayerId;
+use crate::players::RelationMask;
 #[cfg(test)]
 use crate::players::UnitRelation;
 use crate::players::UnitRelations;
@@ -90,16 +91,37 @@ pub struct VisibleQuery<'world> {
     pub(crate) position: Point,
     /// How far, at most 44.
     pub(crate) radius: Distance,
-    /// 0: a rounded box, 1: a box.
-    pub(crate) mode: i32,
+    /// Its area's shape.
+    pub(crate) shape: QueryShape,
     /// The classes it reads.
     pub(crate) classes: &'world [ClassId],
     /// What the owners are to the player (none for a saved value past the relations).
     pub(crate) relations: &'world UnitRelations,
     /// The searcher's radii (x, y).
     pub(crate) size: Footprint,
-    /// The relations kept, one bit each.
-    pub(crate) wanted: u8,
+    /// The relations kept.
+    pub(crate) wanted: RelationMask,
+}
+
+/// The shape of a visible-units query's area (`FUN_141288c00`'s mode): a rectangle with rounded
+/// corners (0) or a rectangle (1).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum QueryShape {
+    /// 0: within the radius of the searcher's rectangle, its corners rounded.
+    RoundedRectangle,
+    /// 1: within the radius of the searcher's rectangle.
+    Rectangle,
+}
+
+impl QueryShape {
+    /// The mode, as the game passes and an aura's key hashes it.
+    #[must_use]
+    pub const fn get(self) -> i32 {
+        match self {
+            Self::RoundedRectangle => 0,
+            Self::Rectangle => 1,
+        }
+    }
 }
 
 /// The registry: `lists[player][class]`, and each object's [`Entry`].
@@ -260,7 +282,7 @@ impl Registry {
 
     /// `GetVisibleUnits` (`FUN_141288c00`) for `player`: the records of its lists of `classes`
     /// whose object is within `radius` (at most 44) of (`x`, `y`) for a searcher of radii `rx`,
-    /// `ry` (`mode` 0: a rounded box, 1: a box), and whose owner's relation (`relations[owner]`:
+    /// `ry` (its [`QueryShape`]), and whose owner's relation (`relations[owner]`:
     /// 0 Gaia, 1 self, 2 friend, 3 neutral, 4 enemy) is in `wanted`; by relation, each with its
     /// edge distance, at most 256 each. None when the query reads nothing (no classes, a player
     /// out of range), which leaves the game's last answer in place.
@@ -273,7 +295,7 @@ impl Registry {
             player,
             position,
             radius,
-            mode,
+            shape,
             classes,
             relations,
             size,
@@ -313,8 +335,7 @@ impl Registry {
                 let relation = *relations.get(record.owner).ok_or(GenieError::unsupported(
                     "a record of an owner without a relation",
                 ))?;
-                let Some(relation) =
-                    relation.filter(|unit_relation| wanted & unit_relation.bit() != 0)
+                let Some(relation) = relation.filter(|&unit_relation| wanted.keeps(unit_relation))
                 else {
                     continue;
                 };
@@ -324,8 +345,8 @@ impl Registry {
                 }
                 let dx = (px - x).abs() - record.radius.x();
                 let dy = (py - y).abs() - record.radius.y();
-                let inside = match mode {
-                    0 => {
+                let inside = match shape {
+                    QueryShape::RoundedRectangle => {
                         if rx < dx {
                             if ry < dy {
                                 (dy - ry) * (dy - ry) + (dx - rx) * (dx - rx) <= round * round
@@ -336,8 +357,7 @@ impl Registry {
                             dy < tall
                         }
                     }
-                    1 => dx <= wide && dy <= tall,
-                    _ => false,
+                    QueryShape::Rectangle => dx <= wide && dy <= tall,
                 };
                 if !inside {
                     continue;
@@ -479,11 +499,11 @@ mod tests {
                     player: PlayerId::new(0),
                     position: Point::new(10.0, 10.0),
                     radius: Distance::new(3.0),
-                    mode: 0,
+                    shape: QueryShape::RoundedRectangle,
                     classes: &[class_id(4), class_id(9)],
                     relations: &relations,
                     size: Footprint::new(0.2, 0.2),
-                    wanted: 0xff,
+                    wanted: RelationMask::ALL,
                 },
                 tuning().registry,
             )
@@ -519,11 +539,11 @@ mod tests {
                         player: PlayerId::new(0),
                         position: Point::new(10.0, 10.0),
                         radius: Distance::new(3.0),
-                        mode: 0,
+                        shape: QueryShape::RoundedRectangle,
                         classes: &[],
                         relations: &relations,
                         size: Footprint::new(0.2, 0.2),
-                        wanted: 0xff
+                        wanted: RelationMask::ALL
                     },
                     tuning().registry
                 )
@@ -563,7 +583,7 @@ mod tests {
                     player: PlayerId::new(0),
                     position: Point::new(10.0, 10.0),
                     radius: Distance::new(100.0),
-                    mode: 1,
+                    shape: QueryShape::Rectangle,
                     classes: &[class_id(4)],
                     relations: &ByPlayer::new(vec![
                         Some(UnitRelation::Own),
@@ -571,7 +591,7 @@ mod tests {
                         Some(UnitRelation::Enemy),
                     ]),
                     size: Footprint::new(0.2, 0.2),
-                    wanted: 0xff,
+                    wanted: RelationMask::ALL,
                 },
                 tuning().registry,
             )
@@ -607,7 +627,7 @@ mod tests {
                     player: PlayerId::new(0),
                     position: Point::new(10.0, 10.0),
                     radius: Distance::new(3.0),
-                    mode: 0,
+                    shape: QueryShape::RoundedRectangle,
                     classes: &[class_id(4)],
                     relations: &ByPlayer::new(vec![
                         Some(UnitRelation::Own),
@@ -615,7 +635,7 @@ mod tests {
                         Some(UnitRelation::Enemy),
                     ]),
                     size: Footprint::new(0.2, 0.2),
-                    wanted: 0xff,
+                    wanted: RelationMask::ALL,
                 },
                 tuning().registry,
             )

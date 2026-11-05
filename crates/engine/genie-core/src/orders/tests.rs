@@ -40,12 +40,12 @@ use crate::movement::PathFlags;
 use crate::movement::WaypointIndex;
 use crate::movement::move_to::{MOVE_TO, MoveTo, MoveToAction, MoveWait, TargetMoved};
 use crate::objects::Graphics;
-use crate::objects::HpPowerup;
 use crate::objects::ObjectId;
 use crate::objects::SpeedMultiplier;
 use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
 use crate::objects::Voice;
+use crate::objects::WorkRate;
 use crate::objects::actions::ActionList;
 use crate::objects::layers::{Action, Motion, MotionMut, Static};
 use crate::objects::lifecycle::Held;
@@ -2785,8 +2785,7 @@ fn master_change_inside_building_keeps_to_its_record() {
         &next,
         world,
         &roles(),
-        tuning().sprite,
-        tuning().visibility,
+        tuning(),
     )
     .unwrap();
     assert!(switched.promoted);
@@ -2865,8 +2864,7 @@ fn switched_in_the_open(
         next,
         world,
         &roles(),
-        tuning().sprite,
-        tuning().visibility,
+        tuning(),
     )?;
     let record = spatial.get(unit.id).copied().unwrap();
     Ok((switched, (unit, combat), record))
@@ -3064,51 +3062,6 @@ fn master_change_unmodelled_parts_fail() {
         reason(switched_in_the_open((unit, None), &old, &next, &[10])),
         "a new master's standing sprite the data file does not have"
     );
-}
-
-/// `FUN_1412066b0`: the attack, reload, work rate, regeneration, most hit points and armor
-/// powerups go, the hit points powerup and the reload stinger stay.
-#[test]
-fn master_change_clears_the_powerups_but_the_hit_points_one() {
-    let mut combat = Combat {
-        attack_powerup: AttackPowerup::new(2.0),
-        reload_powerup: Seconds::new(0.5),
-        reload_stinger: Seconds::new(0.25),
-        work_rate_powerup: WorkRate::new(0.15),
-        regen_powerup: Regeneration::new(5.0),
-        hp_powerup: HpPowerup {
-            taken: HitPoints::new(10.0),
-            max: HitPoints::new(20.0),
-        },
-        armor_powerups: ArmorPair::new(1, 2),
-        ..Default::default()
-    };
-    clear_powerups(&mut combat);
-    assert_eq!(
-        (
-            combat.attack_powerup,
-            combat.reload_powerup,
-            combat.work_rate_powerup,
-            combat.regen_powerup
-        ),
-        (
-            AttackPowerup::ZERO,
-            Seconds::ZERO,
-            WorkRate::ZERO,
-            Regeneration::ZERO
-        )
-    );
-    assert_eq!(
-        (combat.hp_powerup, combat.armor_powerups),
-        (
-            HpPowerup {
-                taken: HitPoints::new(10.0),
-                max: HitPoints::ZERO
-            },
-            ArmorPair::ZERO
-        )
-    );
-    assert_eq!(combat.reload_stinger, Seconds::new(0.25));
 }
 
 /// `FUN_140a97730`: an empty list and a `MoveTo` head take no move; an Artifact head takes

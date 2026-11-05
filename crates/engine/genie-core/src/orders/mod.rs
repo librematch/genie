@@ -8,7 +8,6 @@
 //! slot 0x7e8 `FUN_141227190`): the unit takes the master and the task the task finder picks for
 //! the target ([`crate::unit_ai::task_finder`]), and the task's action replaces its action list.
 
-use crate::combat::damage::ArmorPair;
 use crate::groups::GroupId;
 use crate::map::Distance;
 use crate::map::Point;
@@ -20,8 +19,6 @@ use crate::objects::MasterHitPoints;
 use crate::objects::ObjectId;
 use crate::objects::ObjectKey;
 use crate::objects::ObjectState;
-use crate::objects::Regeneration;
-use crate::objects::WorkRate;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
@@ -39,7 +36,6 @@ use crate::unit_ai::OrderKind;
 use crate::unit_ai::StopOrder;
 use crate::unit_ai::task_finder::TaskTarget;
 use crate::world::Millis;
-use crate::world::Seconds;
 use crate::world::World;
 use crate::world::WorldTime;
 use crate::world::index::Place;
@@ -78,7 +74,6 @@ use self::actions::{SwitchWorld, switch_master};
 pub use self::dispatch::Dispatch;
 use self::points::{centroid, follow_axis, follow_spread, grid_point, offset_point};
 pub(crate) use self::work::MasterSwap;
-use crate::combat::AttackPowerup;
 use crate::gathering::DropSiteId;
 #[cfg(test)]
 use crate::gathering::hunt::HUNT;
@@ -439,22 +434,6 @@ pub(crate) fn readiness(orders: &mut Vec<QueuedOrder>, ready: ReadyOrders) {
             true
         }
     });
-}
-
-/// `FUN_1412066b0`, a master change's powerups: the attack (`+0xa24`), reload (`+0xa28`), work
-/// rate (`+0xa30`), regeneration (`+0xa34`), most hit points (`+0xa3c`), max range (`+0xa40`)
-/// and melee and pierce armor (`+0xa48`, `+0xa4c`) powerups go; the hit points powerup
-/// (`+0xa38`) stays. The routine also zeroes `+0xa50` and `+0x9f8`, empties the powerup map
-/// (`+0xa98`, count `+0xaa0`), sets `+0xa2c` to slot 0x1b8 × 0.05 and takes a sight powerup
-/// (`+0xad4`) off (slots 0x1d8, 0x1d0): none of them is held.
-const fn clear_powerups(combat: &mut Combat) {
-    combat.attack_powerup = AttackPowerup::ZERO;
-    combat.range_powerup = Distance::ZERO;
-    combat.reload_powerup = Seconds::ZERO;
-    combat.work_rate_powerup = WorkRate::ZERO;
-    combat.regen_powerup = Regeneration::ZERO;
-    combat.hp_powerup.max = HitPoints::ZERO;
-    combat.armor_powerups = ArmorPair::ZERO;
 }
 
 /// `FUN_140c4da50`: the target of the first order in unit AI `ai`'s queue (`+0x20`, count

@@ -66,6 +66,7 @@ fn task(id: i16, range: f32) -> Task {
         terrain: TaskTerrain::NONE,
         owner_kind: TargetOwner::ANY,
         holding_attr: 0,
+        search_flag: 0,
         attribute_kind: Some(attribute::WOOD),
         attribute_kind2: Some(attribute::STONE),
         attribute_kind3: Some(attribute::GOLD),
