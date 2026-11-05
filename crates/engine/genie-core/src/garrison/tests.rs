@@ -3519,6 +3519,40 @@ fn ashore(world: &mut World, center: Point, radius: f32) -> Point {
     }
 }
 
+/// The object stop (slot 0x148) of a ship sailing to unload: its Transport's slot 0x38 (slot 7,
+/// `FUN_140aa4620`: `set_state(2)`, true) keeps the action list, the Transport idle, its
+/// `MoveTo` gone. (A unit AI's stop, which a STOP runs after it, would clear the list.)
+#[test]
+fn stopped_transport_keeps_its_idle_transport() {
+    let mut world = coast_world(Point::new(10.5, 10.5));
+    UnloadCommand {
+        player: player_id(1),
+        units: unit_list(object_ids([200])),
+        point: Point::new(17.5, 10.5),
+        pick: UnloadPick::of_packet(0, -1),
+        sound: false,
+    }
+    .run(&mut world)
+    .unwrap();
+    world.parts.set_unit_ai(object_id(200), None);
+    let list_index = world.players[1]
+        .objects
+        .position_of(object_id(200))
+        .unwrap();
+    world.object_stop(PlayerId::new(1), list_index).unwrap();
+    let transport = world
+        .parts
+        .actions_of(object_id(200))
+        .list
+        .transport()
+        .copied()
+        .expect("the Transport");
+    assert_eq!(
+        (transport.state.bare(), transport.state.move_to().is_some()),
+        (TransportState::Idle, false)
+    );
+}
+
 /// UNLOAD of a ship off the shore (`FUN_14161f410`'s last branch): its unit AI takes the
 /// unload order on itself at once (0x2d1 -> slot 0x118 -> slot 0x3a8 `FUN_14108d050`): a new
 /// Transport (`FUN_140aa3ab0`) at the ship's place starts (`set_state(11)`), then its work at

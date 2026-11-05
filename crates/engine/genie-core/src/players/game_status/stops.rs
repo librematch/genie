@@ -262,8 +262,9 @@ impl World {
     /// and second target go, [`World::release`]), the Build's (`FUN_140ab0350`,
     /// [`crate::construction::build::BuildAction::halt`]: a counted builder leaves its foundation's
     /// builders, [`World::leave_builders`], before the rest; the foundation goes), the Attack's
-    /// (`FUN_140a82ac0`, [`crate::combat::attack::Attack::halt`]) and the Artifact's
-    /// (`FUN_140aad1a0`, [`crate::ownership::artifact::Artifact::stop`]). The Gather, the Build and
+    /// (`FUN_140a82ac0`, [`crate::combat::attack::Attack::halt`]), the Artifact's
+    /// (`FUN_140aad1a0`, [`crate::ownership::artifact::Artifact::stop`]) and the Transport's
+    /// (`FUN_140aa4620`, [`World::halt_transport`]). The Gather, the Build and
     /// the Artifact show the master's standing sprite (the Gather the task's carrying one while it
     /// carries at least 1 of the task's resource, `FUN_140a8b6b0`).
     /// [`Action::list`](crate::objects::layers::Action::list) holds no other kind.
@@ -296,10 +297,19 @@ impl World {
                 halted?;
             }
             Action::Artifact(artifact) => self.halt_artifact((player_id, idx), artifact, by)?,
-            _ => {
-                return Err(GenieError::unsupported(
-                    "a stop of an action whose slot 0x38 is not modelled",
-                ));
+            Action::Transport(transport) => self.halt_transport((player_id, idx), transport)?,
+            Action::MoveTo(_)
+            | Action::Explore(_)
+            | Action::Enter(_)
+            | Action::Fly(_)
+            | Action::Missile(_)
+            | Action::Make(_)
+            | Action::WaitSolidify(_)
+            | Action::Hunt(_) => {
+                return Err(GenieError::unreachable(
+                    "a stop's slot 0x38 that World::halt_top_action answers itself",
+                )
+                .with("action", head.kind()));
             }
         }
         Ok(StopList::Keeps)

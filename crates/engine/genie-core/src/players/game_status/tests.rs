@@ -1,4 +1,5 @@
 use super::*;
+use crate::ErrorKind;
 use crate::combat::attack::AttackState;
 use crate::combat::attack::tests::own_attack;
 use crate::commands::Departure;
@@ -7,7 +8,6 @@ use crate::construction::build::BuildTask;
 use crate::construction::build::tests::started_on;
 use crate::construction::repair::RepairState;
 use crate::construction::repair::{RepairAction, RepairTask};
-use crate::garrison::transport::TransportAction;
 use crate::gathering::PastureId;
 use crate::gathering::gather::GatherState;
 use crate::gathering::gather::{GatherAction, Resource, StopRate};
@@ -20,6 +20,7 @@ use crate::map::Point;
 use crate::map::Position;
 use crate::movement::Speed;
 use crate::movement::move_to::{MoveDefaults, MoveToReads, NO_TARGET_GAP, SpriteReads, WalkTo};
+use crate::movement::move_to::{MoveTo, MoveToAction};
 use crate::objects::Graphics;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
@@ -250,8 +251,9 @@ fn defeat_names_the_player_with_the_most_of_its_own_attribute() {
 
 /// Slot 0x38 of the actions with their own ([`World::halt_other`]), each true: the Gather
 /// idles (state 2), the Build and the Repair halt (state 2), the Attack ends (state 1, its
-/// animation at speed 1, standing) and the Artifact checks again (state 6); a kind it does
-/// not model is refused.
+/// animation at speed 1, standing) and the Artifact checks again (state 6); a kind whose stop
+/// [`World::halt_top_action`] answers itself is an error (the Transport's is
+/// `garrison::tests::stopped_transport_keeps_its_idle_transport`).
 #[test]
 fn each_action_with_its_own_stop_halts_and_answers_true() {
     let mut game = game();
@@ -452,8 +454,13 @@ fn each_action_with_its_own_stop_halts_and_answers_true() {
             .map(|artifact| artifact.state),
         Some(ArtifactState::Check)
     );
-    let sail = ActionsAction::Transport(TransportAction::new(Position::new(1.0, 1.0, 0.0)));
-    assert!(game.halt_other(PlayerId::new(1), gather, sail).is_err());
+    // a kind whose stop halt_top_action answers itself never reaches it
+    let walk = ActionsAction::MoveTo(MoveToAction::sub_in(MoveTo::Moving));
+    assert_eq!(
+        game.halt_other(PlayerId::new(1), gather, walk)
+            .map_err(|error| error.kind()),
+        Err(ErrorKind::Unreachable)
+    );
 }
 
 #[test]

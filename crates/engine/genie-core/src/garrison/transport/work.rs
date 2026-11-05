@@ -64,6 +64,34 @@ impl World {
         self.transport_changed(player_id, list_index, changed)
     }
 
+    /// The stop's slot 0x38 of the Transport on top (slot 7, `FUN_140aa4620`: `set_state(2)`,
+    /// [`TransportAction::stop`]) of player `player_id`'s object at `list_index`, the action
+    /// `transport_action` as the stop took it: it goes back on the list, and what the state
+    /// change leaves applies ([`World::transport_changed`]).
+    ///
+    /// # Errors
+    ///
+    /// A map without its terrain, and a sprite the table lacks.
+    pub(crate) fn halt_transport(
+        &mut self,
+        (player_id, list_index): (PlayerId, ListIndex),
+        mut transport_action: TransportAction,
+    ) -> GenieResult<()> {
+        let move_to_tuning = self.model.tuning.move_to;
+        let transport_tuning = self.model.tuning.transport;
+        let changed = self.with_shore(
+            player_id,
+            list_index,
+            transport_action.task,
+            |ship, shore| transport_action.stop(ship, shore, &transport_tuning, &move_to_tuning),
+        );
+        self.parts
+            .actions_mut(self.players.live(player_id, list_index)?.id)?
+            .list
+            .set_transport(Some(transport_action));
+        self.transport_changed(player_id, list_index, changed?)
+    }
+
     /// The work command's retake (`LAB_1410706a8`) of the Transport on top on the `task` it
     /// found (its `+0x48`): the top action's slot 0x48 ([`TransportAction::work`] at the work's
     /// point, from the unit itself when the target is the unit), then the unit AI's notify as
