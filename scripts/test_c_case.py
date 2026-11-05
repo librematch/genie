@@ -108,6 +108,7 @@ class Kind(unittest.TestCase):
             struct PlayerKind { r#type: u8, typeface: u8 }
             fn f() -> std::any::TypeId { std::any::type_name::<u8>(); }
             #[allow(clippy::type_complexity)]
+            #![allow(clippy::disallowed_types)]
             struct Typed(Type50);
             const S: &str = "unit_type";
         """

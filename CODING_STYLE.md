@@ -645,9 +645,26 @@ genie gives the same bits as the game on every host, WebAssembly included.
 - Draw from the same random stream as the game, in the same order (`math/rng.rs`).
 - Keep the game's list order. A removal swaps the last element into the free place, as the
   game's lists do, so a generic "order-preserving removal" is wrong here. A sort uses MSVC's
-  introsort (`math/msvc.rs`), which is not stable: its ties fall as the game's do. Never iterate
-  a `HashMap` or a `HashSet`: clippy's `iter_over_hash_type` fails the build. A hash map is for
-  lookups. A map that is walked is a `BTreeMap` or a list.
+  introsort (`math/msvc.rs`), which is not stable: its ties fall as the game's do.
+- The simulation holds no `HashMap` or `HashSet`: their order follows a seed that each process
+  picks at random. `clippy.toml`'s `disallowed-types` fails the build on one. A lookup by a dense
+  id is a column indexed by it; any other map is a `BTreeMap`, and a walked one a `BTreeMap` or
+  a list. A format or tool crate that keeps a hash map allows the lint crate-wide with its reason,
+  and clippy's `iter_over_hash_type` still keeps it from being walked in a loop.
+- Keep the order of the game's hash containers. Where the game walks an `unordered_map` or an
+  `unordered_set` keyed by game data (ids, numbers), port its order with `math/msvc.rs`: the
+  hash, the bucket count and where a new key goes.
+- A container that the game keys by an address (a pointer's bytes in its hash, a `std::set` of
+  pointers) has an order that differs in every process. No implementation can repeat it, the
+  game's own replay included. Read the routine to see whether the outcome depends on that order.
+  - It does not: port the container's structure, that is what it collects and its loops in
+    their sequence. Walk it in a fixed order, such as first appearance. A test runs the walk in
+    more than one order and compares the bits.
+  - It does: the game has no single behaviour there, and two of its clients can disagree. Take
+    the order the game gives most often: each address key as if alone in its bucket, which is the
+    insertion order. The doc comment names the site and says so.
+- These rules let genie play one multiplayer game with the game's own clients: genie agrees with
+  a game client wherever two game clients agree.
 - Run parallel work outside a world: many worlds at once (the census's recordings), never
   threads inside an update.
 - Check each change to the simulation against the recordings' checkpoints. No recording that

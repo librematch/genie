@@ -17,7 +17,7 @@ use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::slots::{CheckedIndexExt, PlayerSlotsExt};
 use crate::{GenieError, GenieResult};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 impl World {
     /// `FUN_141090430`: player `owner`'s watched list takes object `id` at tile (`x`, `y`) (an
@@ -134,7 +134,7 @@ impl World {
     pub fn build_watched(&mut self) -> GenieResult<()> {
         // each id's object as [`World::object`] finds it (the first player in order, its live list
         // before its sleeping list), looked up once: the loop changes only the watched lists
-        let mut first: HashMap<ObjectId, (PlayerId, bool, ListIndex)> = HashMap::new();
+        let mut first: BTreeMap<ObjectId, (PlayerId, bool, ListIndex)> = BTreeMap::new();
         for (player_id, player) in PlayerId::each(self.players.len()).zip(&self.players) {
             for (sleeping, list) in [(false, &player.objects), (true, &player.sleeping)] {
                 for (list_index, unit) in list.indexed() {

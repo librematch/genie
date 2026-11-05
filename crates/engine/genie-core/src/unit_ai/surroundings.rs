@@ -48,7 +48,7 @@ use crate::world::layer::generated::UnitAiTuning;
 use crate::world::others::OthersRef;
 use crate::world::step::Step;
 use genie_diff::Diff;
-use std::collections::HashSet;
+use std::collections::BTreeSet;
 
 /// What a [`Search`] answers: the object picked, if any, and whether the lists it read hold
 /// enemies (the fifth relation list), which sets the alert mode when its query ran (`fresh`; a
@@ -105,7 +105,7 @@ pub fn flood_search(
     mut test: impl FnMut(Tile) -> GenieResult<Option<ObjectId>>,
 ) -> GenieResult<Option<ObjectId>> {
     let (ux, uy) = (at.x(), at.y());
-    let mut reached = HashSet::from([at]);
+    let mut reached = BTreeSet::from([at]);
     if let Some(id) = test(at)? {
         return Ok(Some(id));
     }

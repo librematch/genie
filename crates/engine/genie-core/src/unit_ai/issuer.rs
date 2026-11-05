@@ -91,7 +91,7 @@ mod tests {
     use crate::players::PlayerId;
     use crate::test_ids::object_id;
     use crate::unit_ai::Issuer;
-    use std::collections::HashSet;
+    use std::hash::{BuildHasher, BuildHasherDefault, DefaultHasher};
 
     /// A saved issuer is the queue's own object at its id, a player at a player's number and
     /// another object at any other value; −1 names none.
@@ -125,16 +125,12 @@ mod tests {
     }
 
     /// An issuer hashes by its value, as it compares: a player and the object of its number
-    /// are one entry of a set.
+    /// hash alike.
     #[test]
     fn issuers_hash_by_their_values() {
-        let set: HashSet<Issuer> = [
-            Issuer::from(PlayerId::new(5)),
-            Issuer::from(object_id(5)),
-            Issuer::from(object_id(6)),
-        ]
-        .into_iter()
-        .collect();
-        assert_eq!(set.len(), 2);
+        let hasher = BuildHasherDefault::<DefaultHasher>::default();
+        let player = hasher.hash_one(Issuer::from(PlayerId::new(5)));
+        assert_eq!(player, hasher.hash_one(Issuer::from(object_id(5))));
+        assert_ne!(player, hasher.hash_one(Issuer::from(object_id(6))));
     }
 }

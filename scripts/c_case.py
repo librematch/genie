@@ -19,7 +19,7 @@ generated ones too (their generators follow the rule), and checks four rules:
 - Kind, not Type (FD-043-D33): no name holds the word `type`, a Rust keyword, nor `types` or a
   numbered `type4`: `PlayerKind`, `unit_kind`, `KIND_2`. The keyword itself passes, and so do
   the names other crates and published formats define (`TypeId`, `type_name`, syn's `Type`,
-  clippy's `type_complexity`, genieutils' `Type50`).
+  clippy's `type_complexity` and `disallowed_types`, genieutils' `Type50`).
 
 Python 3.11 or later, no packages.
 """
@@ -54,6 +54,7 @@ OUTSIDE_TYPE_NAMES = {
     "type_params_mut",
     "type_generics",
     "type_complexity",
+    "disallowed_types",  # clippy's lint (`clippy.toml`'s `disallowed-types`)
     "type_repetition_in_bounds",
     "Type50",  # genieutils' name of the `.dat` unit's combat part
     "type50",

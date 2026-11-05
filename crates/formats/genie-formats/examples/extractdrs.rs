@@ -2,7 +2,7 @@
 
 use genie_drs::{DrsReader, DrsTable, DrsWriter, ReserveDirectoryStrategy};
 use genie_error::{GenieError, GenieResult};
-use std::collections::HashSet;
+use std::collections::BTreeSet;
 use std::fs::rename;
 use std::fs::{File, create_dir_all};
 use std::io::{self, Write, stdout};
@@ -164,7 +164,7 @@ fn add(args: Add) -> GenieResult<()> {
 
     let tables = count(drs_read.tables().len())?;
     let files = count(drs_read.tables().map(DrsTable::len).sum::<usize>())?;
-    let new_tables = count(args.table.iter().collect::<HashSet<_>>().len())?;
+    let new_tables = count(args.table.iter().collect::<BTreeSet<_>>().len())?;
     let new_files = count(args.id.len())?;
 
     let suffix = SystemTime::now()

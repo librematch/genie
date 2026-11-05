@@ -339,17 +339,28 @@ impl IntKey for i32 {
     }
 }
 
+/// A key's hash as far as the game's data decides it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MapHash {
+    /// A hash of the key's data: the map buckets the key by it and its mask.
+    Data(u64),
+    /// A hash that takes an address (a pointer's bytes), which differs in every process, so two
+    /// of the game's clients can list the key differently. genie puts the key in as if alone in
+    /// its bucket, the game's most frequent case: at the end of the list.
+    Address,
+}
+
 /// A key of a `std::unordered_map`: the hash its map buckets it by, and its equality (the
 /// map's `operator==` on the key's fields).
 pub trait HashKey: Copy + PartialEq {
     /// The key's hash.
-    fn map_hash(self) -> u64;
+    fn map_hash(self) -> MapHash;
 }
 
 /// An integer key's hash is `std::hash<int>`: FNV-1a over its four bytes (little-endian).
 impl<K: IntKey> HashKey for K {
-    fn map_hash(self) -> u64 {
-        fnv1a(&self.int().to_le_bytes())
+    fn map_hash(self) -> MapHash {
+        MapHash::Data(fnv1a(&self.int().to_le_bytes()))
     }
 }
 
@@ -382,19 +393,27 @@ pub const fn hash_combine(seed: u64, hash: u64) -> u64 {
         .wrapping_add(seed >> 2)
 }
 
-/// The bucket of a key: its hash and the bucket mask.
-fn bucket(key: impl HashKey, mask: u64) -> u64 {
-    key.map_hash() & mask
+/// The bucket of a key: its hash and the bucket mask; none for a hash of an address, which
+/// shares no bucket ([`MapHash::Address`]).
+fn bucket(key: impl HashKey, mask: u64) -> Option<u64> {
+    match key.map_hash() {
+        MapHash::Data(hash) => Some(hash & mask),
+        MapHash::Address => None,
+    }
 }
 
 /// A new key goes in front of its bucket's elements, or at the list's end when its bucket is
 /// empty (`_Find_last`'s insertion point, then `_Insert_new_node_before`): `list` holds
-/// positions into `keys`, `new` the position of the key it takes.
+/// positions into `keys`, `new` the position of the key it takes. A key hashed by an address
+/// goes at the end.
 fn insert_in_bucket<K: HashKey>(list: &mut Vec<usize>, keys: &[K], new: usize, mask: u64) {
-    let wanted = keys.get(new).map(|&key| bucket(key, mask));
+    let Some(wanted) = keys.get(new).and_then(|&key| bucket(key, mask)) else {
+        list.push(new);
+        return;
+    };
     match list
         .iter()
-        .position(|&listed| keys.get(listed).map(|&key| bucket(key, mask)) == wanted)
+        .position(|&listed| keys.get(listed).and_then(|&key| bucket(key, mask)) == Some(wanted))
     {
         Some(lo) => list.insert(lo, new),
         None => list.push(new),
@@ -471,6 +490,41 @@ mod tests {
         assert_eq!(unordered_map_order([1, 2, 9, 2]), [9, 1, 2]);
     }
 
+    /// A key hashed by an address goes at the end in its turn and no data key joins it; a data
+    /// key still goes in front of its own bucket's.
+    #[test]
+    fn address_key_goes_at_end_alone_in_its_bucket() {
+        #[derive(Clone, Copy, Debug, PartialEq)]
+        enum Key {
+            Number(i32),
+            Pointer(u8),
+        }
+        impl HashKey for Key {
+            fn map_hash(self) -> MapHash {
+                match self {
+                    Self::Number(number) => number.map_hash(),
+                    Self::Pointer(_) => MapHash::Address,
+                }
+            }
+        }
+        let keys = [
+            Key::Pointer(1),
+            Key::Number(1),
+            Key::Pointer(2),
+            Key::Number(9),
+        ];
+        // 1 and 9 share bucket 4: 9 goes in front of 1; the pointers keep their turns
+        assert_eq!(
+            unordered_map_order(keys),
+            [
+                Key::Pointer(1),
+                Key::Number(9),
+                Key::Number(1),
+                Key::Pointer(2)
+            ]
+        );
+    }
+
     /// A key not equal to itself (a NaN float's) goes in each time; the positions name each
     /// insertion.
     #[test]
@@ -478,8 +532,8 @@ mod tests {
         #[derive(Clone, Copy, PartialEq)]
         struct FloatKey(f32);
         impl HashKey for FloatKey {
-            fn map_hash(self) -> u64 {
-                float_hash(self.0)
+            fn map_hash(self) -> MapHash {
+                MapHash::Data(float_hash(self.0))
             }
         }
         let keys = [FloatKey(f32::NAN), FloatKey(1.0), FloatKey(f32::NAN)];

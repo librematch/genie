@@ -101,6 +101,9 @@
 //! ```
 
 #![deny(future_incompatible)]
+// a language file's strings by key: a lookup outside the simulation, which holds no hash container (CODING_STYLE.md
+// section 12)
+#![allow(clippy::disallowed_types)]
 #![deny(nonstandard_style)]
 #![deny(rust_2018_idioms)]
 #![deny(unsafe_code)]

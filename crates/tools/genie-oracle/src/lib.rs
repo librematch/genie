@@ -33,7 +33,10 @@
     clippy::too_many_lines,
     clippy::too_long_first_doc_paragraph,
     // every error is `GenieError`, which names the part the slice does not model
-    clippy::missing_errors_doc
+    clippy::missing_errors_doc,
+    // its comparison tables are lookups by id outside the simulation, which holds no hash
+    // container (CODING_STYLE.md section 12)
+    clippy::disallowed_types
 )]
 #![warn(
     clippy::unwrap_used,

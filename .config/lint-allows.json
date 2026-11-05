@@ -75,6 +75,11 @@
  "clippy::cognitive_complexity": {
   "crates/formats/genie-scx/src/format/mod.rs": 1
  },
+ "clippy::disallowed_types": {
+  "crates/formats/genie-hki/src/lib.rs": 1,
+  "crates/formats/genie-lang/src/lib.rs": 1,
+  "crates/tools/genie-oracle/src/lib.rs": 1
+ },
  "clippy::eq_op": {
   "crates/engine/genie-core/src/map/spatial/pather.rs": 1,
   "crates/engine/genie-math/src/fmath/fmod_and_log.rs": 2,

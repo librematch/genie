@@ -12,7 +12,7 @@
 //! tile lists and contact lists keep their order of insertion.
 
 use crate::pathing::{FixedDistance, FixedPoint, FixedRect, ShapeId, ShapeSide};
-use std::collections::HashSet;
+use std::collections::BTreeSet;
 
 /// One tile in fixed point.
 pub const ONE: i32 = 0x40_0000;
@@ -227,7 +227,7 @@ impl Mesh {
             ShapeId::new((self.shapes.len() - 1) as u32)
         };
         let (tx0, ty0, tx1, ty1) = tile_range(shape, self.width);
-        let mut visited = HashSet::new();
+        let mut visited = BTreeSet::new();
         for ty in ty0..=ty1 {
             for tx in tx0..=tx1 {
                 let tile = (ty * self.width + tx) as usize;
@@ -366,7 +366,7 @@ impl Mesh {
             return;
         };
         let (tx0, ty0, tx1, ty1) = tile_range(fixed_rect, self.width);
-        let mut visited = HashSet::new();
+        let mut visited = BTreeSet::new();
         for ty in ty0..=ty1 {
             for tx in tx0..=tx1 {
                 let tile = (ty * self.width + tx) as usize;

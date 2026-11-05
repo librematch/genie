@@ -14,7 +14,7 @@ mod update;
 
 use crate::combat::powerup::{PowerupAmount, PowerupAttribute, PowerupShare};
 use crate::map::Distance;
-use crate::math::msvc::{HashKey, float_hash, fnv1a, hash_combine, insertion_order};
+use crate::math::msvc::{HashKey, MapHash, float_hash, fnv1a, hash_combine, insertion_order};
 use crate::objects::Graphics;
 use crate::objects::SpriteId;
 use crate::objects::masters::ActionKind;
@@ -124,10 +124,10 @@ pub(crate) struct AuraArea {
 
 impl HashKey for AuraArea {
     /// `FUN_1411e86d0`: the radius's, the mode's and the relations' hashes combined in turn.
-    fn map_hash(self) -> u64 {
+    fn map_hash(self) -> MapHash {
         let seed = hash_combine(0, float_hash(self.radius.get()));
         let seed = hash_combine(seed, fnv1a(&self.shape.get().to_le_bytes()));
-        hash_combine(seed, fnv1a(&[self.relations.get()]))
+        MapHash::Data(hash_combine(seed, fnv1a(&[self.relations.get()])))
     }
 }
 
@@ -215,18 +215,22 @@ pub(crate) struct AuraPowerup {
 
 impl HashKey for AuraPowerup {
     /// `FUN_141200200`: the share's byte, the attribute's, the amount's, the most's and the
-    /// sprite pointer's eight bytes combined in turn. genie hashes the sprite's id where the
-    /// game hashes its address; none is 0 in both.
-    fn map_hash(self) -> u64 {
+    /// sprite pointer's eight bytes combined in turn. A part without a sprite hashes the null
+    /// pointer, as the game does. A part with one hashes the sprite's address, which differs in
+    /// every process: two of the game's clients can list such parts differently, and with them
+    /// the Object stream's draws of the objects they power up (158041's HZAWISZA 1078, ZHANGFEI
+    /// 2038, HYUJI 2047 and CAOCAO 2052 have two parts that differ by the sprite alone). genie
+    /// lists such a part as the game does most often ([`MapHash::Address`]).
+    fn map_hash(self) -> MapHash {
+        if self.sprite.is_some() {
+            return MapHash::Address;
+        }
         let share = u8::from(self.share == PowerupShare::MasterShare);
         let seed = hash_combine(0, fnv1a(&[share]));
         let seed = hash_combine(seed, fnv1a(&self.attribute.get().to_le_bytes()));
         let seed = hash_combine(seed, float_hash(self.amount.get()));
         let seed = hash_combine(seed, float_hash(self.most.get()));
-        let sprite = self
-            .sprite
-            .map_or(0, |sprite_id| i64::from(sprite_id.get()));
-        hash_combine(seed, fnv1a(&sprite.to_le_bytes()))
+        MapHash::Data(hash_combine(seed, fnv1a(&0_u64.to_le_bytes())))
     }
 }
 

@@ -6,6 +6,9 @@
 //! group determines the action that will be taken when it is activated.
 
 #![deny(future_incompatible)]
+// a hotkey file's bindings by key code: a lookup outside the simulation, which holds no hash container (CODING_STYLE.md
+// section 12)
+#![allow(clippy::disallowed_types)]
 #![deny(nonstandard_style)]
 #![deny(rust_2018_idioms)]
 #![deny(unsafe_code)]

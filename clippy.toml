@@ -9,3 +9,10 @@ upper-case-acronyms-aggressive = true
 # K9 (CODING_STYLE.md section 3): a name of one letter only for a coordinate or an axis
 # (`Axis::X`); `min_ident_chars` (Cargo.toml) refuses every other.
 allowed-idents-below-min-chars = ["x", "y", "z", "X", "Y"]
+# CODING_STYLE.md section 12: std's hash containers order their entries by a seed each process
+# picks at random. The simulation holds none: a lookup by a dense id is a column, any other map
+# a `BTreeMap` or a list.
+disallowed-types = [
+    { path = "std::collections::HashMap", reason = "its order differs in every process (CODING_STYLE.md section 12): a column by id, a `BTreeMap` or a list" },
+    { path = "std::collections::HashSet", reason = "its order differs in every process (CODING_STYLE.md section 12): a column by id, a `BTreeSet` or a list" },
+]

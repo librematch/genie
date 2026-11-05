@@ -10,11 +10,14 @@ use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::GridSize;
 use crate::map::Position;
-use crate::math::msvc::HashKey;
+use crate::math::msvc::{HashKey, MapHash};
 use crate::math::rng::Stream;
 use crate::objects::Graphics;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::SpeedMultiplier;
+use crate::objects::SpriteFlags;
+use crate::objects::SpriteId;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::ActionPart;
 use crate::objects::masters::ClassId;
@@ -27,7 +30,10 @@ use crate::objects::masters::Masters;
 use crate::objects::masters::TargetOwner;
 use crate::objects::masters::Task;
 use crate::objects::masters::TaskFlags;
+use crate::objects::masters::TaskSprites;
 use crate::objects::masters::WorkValue;
+use crate::objects::sprite::Graphic;
+use crate::objects::{FacetCount, Frame};
 use crate::players::RelationMask;
 use crate::players::UnitRelation;
 use crate::testing::class;
@@ -93,7 +99,7 @@ fn aura_keys_hash_as_the_game() {
         shape: QueryShape::RoundedRectangle,
         relations: RelationMask::of(&[UnitRelation::Own]),
     };
-    assert_eq!(area.map_hash(), 0x50ff_fac3_9b13_d616);
+    assert_eq!(area.map_hash(), MapHash::Data(0x50ff_fac3_9b13_d616));
     let powerup = AuraPowerup {
         share: PowerupShare::MasterShare,
         attribute: PowerupAttribute::MOVEMENT_SPEED,
@@ -101,7 +107,7 @@ fn aura_keys_hash_as_the_game() {
         most: MostObjects::new(1.0),
         sprite: None,
     };
-    assert_eq!(powerup.map_hash(), 0x22f5_db9e_18b0_ebb5);
+    assert_eq!(powerup.map_hash(), MapHash::Data(0x22f5_db9e_18b0_ebb5));
 }
 
 /// An aura task of class `target`, attribute `attribute` (its wait time), amount `amount` at most
@@ -189,6 +195,49 @@ fn aura_groups_list_areas_in_the_maps_order() {
             enablement: None,
         }]
     );
+}
+
+/// A graphic of id `id`, one frame.
+fn graphic(id: i16) -> Graphic {
+    Graphic {
+        id: SpriteId::named(id),
+        frames: Frame::of_data(1),
+        facets: FacetCount::of_data(1),
+        speed_multiplier: SpeedMultiplier::ONE,
+        frame_duration: Seconds::new(0.1),
+        replay_delay: Seconds::ZERO,
+        flags: SpriteFlags::NONE,
+    }
+}
+
+/// HYUJI's (2047) two parts equal but for their sprites (13023 and 13024): the game hashes each
+/// sprite's address, so genie lists them in their tasks' order, either way round, as the game
+/// does unless the two share a bucket; a part without a sprite still goes by its hash.
+#[test]
+fn parts_differing_by_sprite_keep_task_order() {
+    let own = (TargetOwner::OWN, TaskFlags::NONE);
+    let with_sprite = |sprite: i16| Task {
+        sprites: TaskSprites {
+            proceeding: Some(SpriteId::named(sprite)),
+            ..TaskSprites::default()
+        },
+        ..aura_task(class::VILLAGER, 109.0, (150.0, 1.0), 6.0, own)
+    };
+    let graphics = Graphics::from([
+        (SpriteId::named(13023), graphic(13023)),
+        (SpriteId::named(13024), graphic(13024)),
+    ]);
+    for sprites in [[13023, 13024], [13024, 13023]] {
+        let tasks = sprites.iter().map(|&sprite| with_sprite(sprite)).collect();
+        let groups = aura_groups(&aura_master(tasks, CombatAbility::AURA), None, &graphics);
+        let listed: Vec<Option<SpriteId>> = groups[0]
+            .parts
+            .iter()
+            .map(|part| part.powerup.sprite)
+            .collect();
+        assert_eq!(listed, sprites.map(|sprite| Some(SpriteId::named(sprite))));
+        assert_eq!(groups[0].parts[0].powerup.map_hash(), MapHash::Address);
+    }
 }
 
 /// A task without the rounded flag searches a box (mode 1); a NaN radius is never found again,
