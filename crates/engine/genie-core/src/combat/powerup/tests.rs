@@ -1,10 +1,10 @@
 //! An object's powerups: an aura's powerup and its hold, the reset, the attributes it raises and
 //! a siege unit's infantry count.
 
-use crate::combat::AttackPowerup;
+use crate::combat::AttackBonus;
 use crate::combat::attack::AttackState;
 use crate::combat::attack::tests::own_attack;
-use crate::combat::damage::ArmorPowerups;
+use crate::combat::damage::ArmorBonuses;
 use crate::combat::damage::BONUS_DAMAGE;
 use crate::combat::powerup::{
     AppliedPowerup, ConversionPowerup, InfantryChange, InfantryCount, Powerup, PowerupAmount,
@@ -52,7 +52,7 @@ use crate::world::WorldTime;
 #[test]
 fn reset_clears_the_powerups_but_the_hit_points_taken_and_the_stingers() {
     let mut combat = Combat {
-        attack_powerup: AttackPowerup::new(2.0),
+        attack_powerup: AttackBonus::new(2.0),
         reload_powerup: Seconds::new(0.5),
         reload_stinger: Seconds::new(0.25),
         work_rate_powerup: WorkRate::new(0.15),
@@ -63,7 +63,7 @@ fn reset_clears_the_powerups_but_the_hit_points_taken_and_the_stingers() {
             max: HitPoints::new(20.0),
         },
         range_powerup: Distance::new(1.0),
-        armor_powerups: ArmorPowerups::new(1, 2),
+        armor_powerups: ArmorBonuses::new(1, 2),
         speed_powerup: Speed::new(0.7),
         conversion_powerup: ConversionPowerup::new(0.3),
         applied_powerups: vec![AppliedPowerup::default()],
@@ -85,12 +85,12 @@ fn reset_clears_the_powerups_but_the_hit_points_taken_and_the_stingers() {
             combat.conversion_powerup,
         ),
         (
-            AttackPowerup::ZERO,
+            AttackBonus::ZERO,
             Seconds::ZERO,
             WorkRate::ZERO,
             Regeneration::ZERO,
             Distance::ZERO,
-            ArmorPowerups::ZERO,
+            ArmorBonuses::ZERO,
             ConversionPowerup::ZERO,
         )
     );
@@ -315,7 +315,7 @@ fn held_powerup_waits_for_its_end() {
     let attack = powerup(PowerupAttribute::ATTACK, 2.7, PowerupShare::Plain);
     world.apply_powerup(seven(), attack).unwrap();
     let combat = world.parts.combat_of(seven());
-    assert_eq!(combat.attack_powerup, AttackPowerup::new(2.0));
+    assert_eq!(combat.attack_powerup, AttackBonus::new(2.0));
     assert_eq!(combat.powerup_update, powerup_until(world.world_time, draw));
     assert_eq!(
         combat.applied_powerups,
@@ -328,7 +328,7 @@ fn held_powerup_waits_for_its_end() {
     world.apply_powerup(seven(), attack).unwrap();
     assert_eq!(
         world.parts.combat_of(seven()).attack_powerup,
-        AttackPowerup::new(2.0)
+        AttackBonus::new(2.0)
     );
     assert_eq!(world.streams, streams);
 }
@@ -344,7 +344,7 @@ fn held_powerup_past_its_end_resets_every_powerup_first() {
     world.world_time = world.parts.combat_of(seven()).powerup_update;
     world.apply_powerup(seven(), attack).unwrap();
     let combat = world.parts.combat_of(seven());
-    assert_eq!(combat.attack_powerup, AttackPowerup::new(2.0));
+    assert_eq!(combat.attack_powerup, AttackBonus::new(2.0));
     assert_eq!(combat.range_powerup, Distance::ZERO);
     assert_eq!(combat.applied_powerups.len(), 1);
 }
@@ -373,7 +373,7 @@ fn powerups_add_to_their_attributes() {
     assert_eq!(combat.work_rate_powerup, WorkRate::new(0.1));
     assert_eq!(combat.regen_powerup, Regeneration::new(4.0));
     assert_eq!(combat.conversion_powerup, ConversionPowerup::new(0.2));
-    assert_eq!(combat.armor_powerups, ArmorPowerups::new(2, -1));
+    assert_eq!(combat.armor_powerups, ArmorBonuses::new(2, -1));
 }
 
 /// The soldier with a melee attack of 6 and, with `bonus`, a bonus damage task against master
@@ -422,7 +422,7 @@ fn attack_share_replaces_powerup_by_share_of_shown_attack() {
     // (6 + 2) − 2, times 0.5
     assert_eq!(
         world.parts.combat_of(seven()).attack_powerup,
-        AttackPowerup::new(3.0)
+        AttackBonus::new(3.0)
     );
 }
 
@@ -459,7 +459,7 @@ fn attack_share_counts_bonus_damage_against_attack_target() {
     // (6 + 0 + 2 × 3) − 0, times 0.5
     assert_eq!(
         world.parts.combat_of(seven()).attack_powerup,
-        AttackPowerup::new(6.0)
+        AttackBonus::new(6.0)
     );
 }
 

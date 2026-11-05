@@ -407,6 +407,7 @@ impl Unit {
             streams,
             parts,
             model: Model { masters, slots, .. },
+            world_time,
             ..
         } = &mut *step.world;
         let Player {
@@ -472,7 +473,7 @@ impl Unit {
             )?;
         }
         if shooter
-            .hit_back(own, parts.ai_and_combat_mut(shooter.id)?)?
+            .hit_back(own, parts.ai_and_combat_mut(shooter.id)?, *world_time)?
             .is_some()
         {
             return Err(GenieError::unsupported(
@@ -553,7 +554,11 @@ impl Unit {
             },
         )?;
         if self
-            .hit_back(own, step.world.parts.ai_and_combat_mut(self.id)?)?
+            .hit_back(
+                own,
+                step.world.parts.ai_and_combat_mut(self.id)?,
+                step.world.world_time,
+            )?
             .is_some()
         {
             return Err(GenieError::unsupported("a retaliation killing a missile"));

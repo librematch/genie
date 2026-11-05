@@ -197,6 +197,7 @@ fn house(id: i32, hp: HitPoints) -> Repaired {
         master_hp: MasterHitPoints::of_data(550),
         hp,
         hp_powerup: HpPowerup::default(),
+        hp_stinger: HitPoints::ZERO,
         main: None,
         annexes: Vec::new(),
         unit_repair_cost: Amount::new(0.5),

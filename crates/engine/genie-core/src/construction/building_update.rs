@@ -569,7 +569,8 @@ impl Unit {
             }
         }
         step.blasted = blasted;
-        let _ = self.hit_back(own, step.world.parts.ai_and_combat_mut(self.id)?)?;
+        let now = step.world.world_time;
+        let _ = self.hit_back(own, step.world.parts.ai_and_combat_mut(self.id)?, now)?;
         Ok(())
     }
 

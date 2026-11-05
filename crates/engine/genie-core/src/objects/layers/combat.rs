@@ -4,10 +4,11 @@
 
 use crate::combat::Charge;
 use crate::combat::abilities::Abilities;
-use crate::combat::damage::{ArmorPair, ArmorPowerups};
+use crate::combat::damage::{ArmorBonuses, ArmorPair};
 use crate::combat::powerup::{AppliedPowerup, ConversionPowerup, InfantryCount};
+use crate::combat::stingers::ActiveStinger;
 use crate::combat::{
-    AbilityTimer, AttackCount, AttackPowerup, Firepower, MissileCount, SpecialSprite,
+    AbilityTimer, AttackBonus, AttackCount, Firepower, MissileCount, SpecialSprite,
 };
 use crate::construction::BuilderCount;
 use crate::garrison::RaiderCountdown;
@@ -15,6 +16,7 @@ use crate::gathering::DecayTimer;
 use crate::gathering::SalvageAmounts;
 use crate::map::Distance;
 use crate::movement::Speed;
+use crate::objects::HitPoints;
 use crate::objects::HpPowerup;
 use crate::objects::Regeneration;
 use crate::objects::WorkRate;
@@ -80,7 +82,7 @@ pub struct Combat {
     /// `+0xa4c` pierce, slots 0x708 and 0x710; whole numbers), the armor attacks removed
     /// (`+0x9e4`, `+0x9e6`), the charge (`+0x9e0`) and `mHitSomethingValidForChargeAttack`
     /// (`+0x8a8`: its last hit was its charge's).
-    pub attack_powerup: AttackPowerup,
+    pub attack_powerup: AttackBonus,
     /// `mReloadPowerup` (`+0xa28`), taken off its master's reload time.
     pub reload_powerup: Seconds,
     /// `+0xa30`, `mWorkRatePowerup`: what the unit adds to its master's work rate.
@@ -97,6 +99,23 @@ pub struct Combat {
     pub regen_stinger: Regeneration,
     /// `mReloadStinger` (`+0xb40`), added to its master's reload time.
     pub reload_stinger: Seconds,
+    /// `mSpeedStinger` (`+0xb38`), which its top speed adds (slot 0x208, `FUN_141202c70`).
+    pub speed_stinger: Speed,
+    /// Its hit point stinger (`+0xb44`, unsaved, slot 0x760), which its most hit points add
+    /// (slot 0xc8, `FUN_141202bb0`).
+    #[diff(unsaved)]
+    pub hp_stinger: HitPoints,
+    /// Its attack stinger (`+0xb48`, unsaved, slot 0x768), which its attack adds with its
+    /// attack powerup.
+    #[diff(unsaved)]
+    pub attack_stinger: AttackBonus,
+    /// Its melee and pierce armor stingers (`+0xb4c`, `+0xb50`, unsaved, slots 0x770 and 0x778).
+    #[diff(unsaved)]
+    pub armor_stingers: ArmorBonuses,
+    /// `mActiveStingers` (`+0xb58`, saved): the stingers its attackers' hits handed it, from
+    /// which the stinger update rebuilds the stinger sums above in each update
+    /// ([`crate::world::World::object_stingers`]).
+    pub active_stingers: Vec<ActiveStinger>,
     /// `mPowerupUpdateOffset` (`+0xa54`): the world time after which the powerup update
     /// (`FUN_141204a10`) resets the powerups (`FUN_1412066b0`) in each update. The combat
     /// setup (`FUN_14121df60`) sets it to the world time plus its "setup" draw mod 100, an
@@ -109,7 +128,7 @@ pub struct Combat {
     /// ([`crate::combat::damage::shown_range`]).
     pub range_powerup: Distance,
     /// Its melee and pierce armor powerups (`+0xa48`, `+0xa4c`, 32 bits read as 16).
-    pub armor_powerups: ArmorPowerups,
+    pub armor_powerups: ArmorBonuses,
     /// `mSpeedPowerup` (`+0xa2c`): what an aura's speed powerup adds, and a siege unit's share
     /// of the infantry inside it (slot 0x1b0, [`crate::combat::powerup::count_infantry`]; after a
     /// powerup reset [`crate::combat::powerup::speed_of_infantry`]).

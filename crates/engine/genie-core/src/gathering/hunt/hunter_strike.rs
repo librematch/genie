@@ -77,9 +77,11 @@ impl Unit {
         // the retaliation's kill of the unit itself, which follows its step; it changes the
         // unit's actions only by livestock's change to Gaia, and livestock hunts nothing: the
         // game goes on with the Hunt itself
-        if let Some(kill) =
-            self.hit_back(fight.own, step.world.parts.ai_and_combat_mut(self.id)?)?
-        {
+        if let Some(kill) = self.hit_back(
+            fight.own,
+            step.world.parts.ai_and_combat_mut(self.id)?,
+            step.world.world_time,
+        )? {
             let own = KillLeft::own(self.id, kill);
             file_kill(step, (self, actions), own, roles)?;
         }

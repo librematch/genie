@@ -20,6 +20,9 @@ impl DamageClass {
     pub const PIERCE: Self = Self(3);
     /// Melee (4).
     pub const MELEE: Self = Self(4);
+    /// Class 11, whose weapon adds ten per unit of infantry inside its attacker
+    /// (`FUN_141082530`'s `CMP word ptr [R13], 0xb`).
+    pub const CLASS_11: Self = Self(11);
     /// Class 31, which a master's own weapons add to the firepower.
     pub const CLASS_31: Self = Self(31);
     /// Class 38, which the missiles add to the firepower.

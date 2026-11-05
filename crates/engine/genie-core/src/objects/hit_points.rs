@@ -4,7 +4,7 @@
 //! that heals around it) calls the healed object's heal here.
 
 use crate::combat::damage::ArmorPair;
-use crate::combat::damage::{gain_hp as damage_gain_hp, heal_hp};
+use crate::combat::damage::{gain_hp as damage_gain_hp, heal_hp, most_hp};
 use crate::math::fmath::{at_most_or_unordered, maxss};
 use crate::math::image::turn::{
     REGENERATION_EPSILON as TURN_REGENERATION_EPSILON,
@@ -120,7 +120,7 @@ impl Unit {
         let _ = heal_hp(
             &mut self.life.hp,
             &mut combat.hp_powerup,
-            hit_points,
+            (hit_points, combat.hp_stinger),
             amount,
         );
         Ok(())
@@ -133,16 +133,16 @@ impl Unit {
         damage_gain_hp(
             &mut self.life.hp,
             &mut combat.hp_powerup,
-            master.hit_points,
+            (master.hit_points, combat.hp_stinger),
             amount,
         );
     }
 
     /// Slot 0xb0 of a combat object (`FUN_141205c80`), the loss of `d` hit points: the hit point
     /// powerups' room (`+0xa38` up to `+0xa3c`) takes it first, the rest comes off the hit points,
-    /// which stay above the master's `invulnerability_level` floor (`FUN_141202a80`). Not held
-    /// (no update of the recordings fills either list): a dying object's kill credits of its
-    /// active stingers (`+0xb58`, `+0x954`) and a surviving one's hit point transforms
+    /// which stay above the master's `invulnerability_level` floor (`FUN_141202a80`). Not ported
+    /// yet: a dying object's kill credits of its active stingers (`+0xb58`, `+0x954`); not held
+    /// (no update of the recordings fills the list): a surviving one's hit point transforms
     /// (`FUN_141204450`); [`crate::combat::damage::lose`] is the same loss on a hit's victim.
     pub(crate) fn lose_hp(&mut self, combat: &mut Combat, master: &Master, loss: HitPoints) {
         let Some(hit_points) = combat.hp_powerup.absorb(loss) else {
@@ -167,8 +167,8 @@ impl Unit {
     /// seconds: the world's dt plus the time held back (`berserker_timer`, `+0xa10`) over that
     /// period (none for a period of at most [`REGENERATION_EPSILON`]), its fraction (`fmodf`)
     /// held back as time. Whole points above 0 heal (a positive rate: slot 0xb8,
-    /// [`Unit::gain_hp`]) at most the room below its most (slot 200: its master's hit points plus
-    /// its powerups' room; the hit point stinger `+0xb44`, written only by auras, is not held), or
+    /// [`Unit::gain_hp`]) at most the room below its most (slot 200,
+    /// [`most_hp`]), or
     /// come off (slot 0xb0, [`Unit::lose_hp`]) at most its hit points with its powerups' room
     /// (slot 0xc0). Then an object at its most (slot 0xc0 at least slot 200) has the armor its
     /// charge's hits took back (`+0x9e4` and `+0x9e6`, one dword, zeroed).
@@ -202,7 +202,7 @@ impl Unit {
         if at_most_or_unordered(whole, 0.0) {
             return;
         }
-        let most = HitPoints::of_master(master.hit_points).get() + combat.hp_powerup.max.get();
+        let most = most_hp(combat.hp_stinger, master.hit_points, combat.hp_powerup).get();
         let now = (combat.hp_powerup.room() + self.life.hp).get();
         if at_most_or_unordered(rate, 0.0) {
             let amount = if at_most_or_unordered(whole, now) {

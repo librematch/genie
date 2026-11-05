@@ -64,9 +64,10 @@ pub(super) fn effective(victim: &Victim) -> HitPoints {
 
 /// Slot 0xb0, the loss of `hit_points` hit points: a combat object of type 70 or 80
 /// (`FUN_141205c80`) takes it on its hit point powerups' room first, and its hit points stay above
-/// its `invulnerability_level` floor; another object (`FUN_141189160`) just loses it. Not modelled
-/// (no update of this recording fills either list): the kill credits of a dying object's active
-/// stingers (`+0xb58`) and a surviving object's hit point transforms (`+0xb20`, `FUN_141204450`).
+/// its `invulnerability_level` floor; another object (`FUN_141189160`) just loses it. Not ported
+/// yet: the kill credits of a dying object's active stingers (`+0xb58`, `+0x954`); not modelled
+/// (no update of the recordings fills the list): a surviving object's hit point transforms
+/// (`+0xb20`, `FUN_141204450`).
 pub fn lose(victim: &mut Victim, damage: HitPoints) {
     let unit = matches!(victim.kind, MasterKind::COMBAT | MasterKind::BUILDING);
     let Some(armored) = victim.armored.as_mut().filter(|_| unit) else {
@@ -85,19 +86,27 @@ pub fn lose(victim: &mut Victim, damage: HitPoints) {
     };
 }
 
+/// Slot 0xc8 (200) of a combat unit or building (`FUN_141202bb0`), its most hit points: its hit
+/// point stinger `stinger` (`+0xb44`, slot 0x760) plus its master's hit points `master_hp`, plus
+/// its most hit points powerup (`+0xa3c`, `powerup`'s room).
+#[must_use]
+pub fn most_hp(stinger: HitPoints, master_hp: MasterHitPoints, powerup: HpPowerup) -> HitPoints {
+    HitPoints::new(stinger.get() + HitPoints::of_master(master_hp).get() + powerup.max.get())
+}
+
 /// Slot 0xb8 of a combat object (`FUN_141203be0`) on hit points `hp` with the powerups
-/// `hp_powerups` (`+0xa38`, its room `+0xa3c`) of a master of `master_hp`: `amount` added up to
-/// its most (the master's plus the room), an overflow taken off the powerup (never below 0); a
-/// powerup above its room first takes the room. The hit point transforms of `FUN_141204450`,
-/// empty in the recordings, are not held.
+/// `hp_powerups` (`+0xa38`, its room `+0xa3c`) of a master of `master_hp` and the hit point
+/// stinger `stinger`: `amount` added up to its most (slot 200, [`most_hp`]), an overflow taken
+/// off the powerup (never below 0); a powerup above its room first takes the room. The hit point
+/// transforms of `FUN_141204450`, empty in the recordings, are not held.
 pub fn gain_hp(
     hp: &mut HitPoints,
     powerup: &mut HpPowerup,
-    master_hp: MasterHitPoints,
+    (master_hp, stinger): (MasterHitPoints, HitPoints),
     amount: HitPoints,
 ) {
     let (mut up, room) = (powerup.taken, powerup.max);
-    let most = HitPoints::of_master(master_hp) + room;
+    let most = most_hp(stinger, master_hp, *powerup);
     if room < up {
         up = room;
     }
@@ -129,19 +138,20 @@ pub enum Heal {
 }
 
 /// `FUN_141193b30`: slot 0xb8 adds `amount` ([`gain_hp`]); a loss (`amount` below 0) leaves at
-/// least 1 hit point; healed to its full hit points (slot 0xc0 at least slot 200, `COMISS` with
-/// `JC`: a NaN is not), it holds exactly its master's ([`Heal::Full`], else [`Heal::Partial`]).
+/// least 1 hit point; healed to its full hit points (slot 0xc0 at least slot 200, [`most_hp`];
+/// `COMISS` with `JC`: a NaN is not), it holds exactly its master's ([`Heal::Full`], else
+/// [`Heal::Partial`]).
 pub fn heal_hp(
     hp: &mut HitPoints,
     powerup: &mut HpPowerup,
-    master_hp: MasterHitPoints,
+    (master_hp, stinger): (MasterHitPoints, HitPoints),
     amount: HitPoints,
 ) -> Heal {
-    gain_hp(hp, powerup, master_hp, amount);
+    gain_hp(hp, powerup, (master_hp, stinger), amount);
     if amount < HitPoints::ZERO && *hp < HitPoints::new(1.0) {
         *hp = HitPoints::new(1.0);
     }
-    let most = HitPoints::of_master(master_hp) + powerup.max;
+    let most = most_hp(stinger, master_hp, *powerup);
     if below_or_unordered((powerup.room() + *hp).get(), most.get()) {
         return Heal::Partial;
     }

@@ -36,8 +36,9 @@ its powerup update (`aura/`).
 | File | What it holds |
 | --- | --- |
 | [`ability_timer.rs`](ability_timer.rs) | A combat object's timed ability: how long it lasts and when it began. |
-| [`attack_powerup.rs`](attack_powerup.rs) | An object's attack powerup. |
+| [`attack_bonus.rs`](attack_bonus.rs) | What an object's powerup or stingers add to its attack (`AttackBonus`). |
 | [`attack_target.rs`](attack_target.rs) | An Attack's target as its own type: the object it attacks. |
+| [`class_or_master.rs`](class_or_master.rs) | The object a combat task names (`ClassOrMaster`): a class or a master, as slot 277 keeps it in the aura groups and the stinger tasks. |
 | [`combat_update.rs`](combat_update.rs) | `TRIBE_Combat_Object::update` (`0x141208440`), a combat object's or building's own update (types 70 and 80) around `RGE_Combat_Object::update`. |
 | [`mod.rs`](mod.rs) | Combat: attacks, hits and missiles. |
 | [`powerup.rs`](powerup.rs) | An object's powerups (`+0xa24`..`+0xa54`, `+0xa98`, `+0xad4`): an aura's powerup (`World::apply_powerup`, `FUN_141200dd0`) and their reset (`World::reset_powerups`, `FUN_1412066b0`). |
@@ -53,6 +54,7 @@ its powerup update (`aura/`).
 | [`damage/`](damage/) | The damage side of a hit: what it reads of its target and its attacker and what it changes. |
 | [`missile/`](missile/) | The missile (`RGE_Missile_Object`, type 60) and its action (`RGE_Action_Missile`, type 8): a ranged attacker's swing makes one at its weapon offset (`FUN_141081020`, `spawn_point`), its action aims at the target (`FUN_140a9c600`, `aim`; `set_state` 3, `FUN_140a9de70`, `MissileAction::launch`) and flies it each update (`FUN_140a9e6e0`, `MissileAction::fly`) until it hits the target (the shooter's hit, slot 0x860) or the ground. |
 | [`powerup/`](powerup/) | The powerups' tests. |
+| [`stingers/`](stingers/) | An object's stingers (`mActiveStingers`, `+0xb58`): what its attackers' hits hand it (`hand_off`, `FUN_14107bdf0`) from their masters' stinger tasks (`stinger_tasks`), and the sums the stinger update rebuilds from them in each update (`World::object_stingers`, `FUN_1412092e0`). |
 | [`volley/`](volley/) | The missile launch. |
 <!-- /files -->
 

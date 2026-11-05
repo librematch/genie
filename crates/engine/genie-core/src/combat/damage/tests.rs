@@ -73,13 +73,16 @@ fn building_relics_scale_its_elevation_factor() {
 }
 
 use super::*;
+use crate::combat::ClassOrMaster;
 use crate::combat::abilities::REMOVAL_REWARD;
-use crate::combat::damage::ArmorPowerups;
+use crate::combat::damage::ArmorBonuses;
 use crate::combat::damage::HitKind;
 use crate::combat::damage::ShieldBlock;
 use crate::combat::damage::armor::{OwnSlot, class_armor};
 use crate::combat::damage::blasts::BlastHit;
 use crate::combat::damage::shown_values::HpPart;
+use crate::combat::powerup::{InfantryChange, InfantryCount, PowerupAttribute};
+use crate::combat::stingers::{StingerReceiver, StingerSeconds, StingerTask, StingerValue};
 use crate::construction::MainBuildingId;
 use crate::construction::build::NOT_HELD;
 use crate::map::Tile;
@@ -90,6 +93,7 @@ use crate::objects::masters::ClassAmount;
 use crate::objects::masters::DamageAmount;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::RestrictionField;
+use crate::objects::masters::TaskFlags;
 use crate::objects::masters::WorkValue;
 use crate::players::attribute::AttributeId;
 use crate::test_ids::class_of;
@@ -552,7 +556,7 @@ fn bonus_damage_counts_whole_steps_of_hit_point_share() {
 #[test]
 fn the_bonus_damage_adds_to_the_first_melee_weapon() {
     let (sheep, mut hunter) = (sheep(), hunter());
-    hunter.source.attack_powerup = AttackPowerup::new(1.0);
+    hunter.source.attack_powerup = AttackBonus::new(1.0);
     assert_eq!(
         armor_damage(
             &sheep,
@@ -575,7 +579,7 @@ fn combat_object_shows_its_attack_armor_and_range() {
     let (sheep, mut victim) = (sheep(), hunter());
     let none = Shown::default();
     assert_eq!(shown_attack(&victim, &none, &roles()), DamageAmount::new(3));
-    victim.source.attack_powerup = AttackPowerup::new(1.7);
+    victim.source.attack_powerup = AttackBonus::new(1.7);
     assert_eq!(shown_attack(&victim, &none, &roles()), DamageAmount::new(4));
     let mut far = victim.clone();
     far.weapons = vec![ClassAmount::new(13, 6), ClassAmount::new(11, -2)];
@@ -646,7 +650,7 @@ fn combat_object_shows_its_attack_armor_and_range() {
     // the melee armor: its best of class 4 plus the powerup; a wall foundation none; type 50
     // without the powerup; else its best of any, else its base armor
     let mut victim = hunter();
-    victim.armored.as_mut().unwrap().armor_powerups = ArmorPowerups::new(2, 0);
+    victim.armored.as_mut().unwrap().armor_powerups = ArmorBonuses::new(2, 0);
     assert_eq!(
         shown_melee_armor(&victim, &roles()),
         Ok(DamageAmount::new(2))
@@ -1750,31 +1754,40 @@ fn trebuchet_razing_counts_kill_unless_its_damage_counted_it() {
 }
 
 /// With the flag, an attacker of type 50 and up leaves a building of 1 hit point or more (`COMISS
-/// hp, 1` / `JC` past) to its combat ability's effects (`FUN_14107bdf0`): only
+/// hp, 1` / `JC` past) to its stingers (`FUN_14107bdf0`): with
 /// [`crate::objects::masters::CombatAbility::HIT_EFFECTS`] against a player not allied both ways
-/// does anything, which is not modelled. The kill bonus (`FUN_1415c6510`) of a razing: only an
+/// each stinger task naming the building. The kill bonus (`FUN_1415c6510`) of a razing: only an
 /// attacker of type 40 and up with a task of action type 0x9a does anything, which is not modelled.
 #[test]
-fn building_attacker_effects_and_kill_bonus_are_the_game_s() {
+fn building_attacker_stingers_and_kill_bonus_are_the_game_s() {
     let mut villager = hunter();
     villager.source.ability = CombatAbility::HIT_EFFECTS;
+    let burn = StingerTask {
+        target: ClassOrMaster::of_class(class::BUILDING),
+        enablement: None,
+        kind: PowerupAttribute::REGENERATION_RATE,
+        value: StingerValue::new(-60.0),
+        seconds: StingerSeconds::new(5),
+        receiver: StingerReceiver::Target,
+        flags: TaskFlags::NONE,
+    };
+    villager.stinger_tasks = vec![burn];
     let mut house_victim = house();
-    assert!(
-        take(
-            &mut house_victim,
-            &mut villager,
-            &mut [],
-            &[ClassAmount::new(4, 3)],
-            1.0,
-            HitPoints::ZERO,
-            HitLayer {
-                roles: &roles(),
-                slots: slots(),
-                damage_tuning: &tuning().damage,
-            },
-        )
-        .is_err()
-    );
+    take(
+        &mut house_victim,
+        &mut villager,
+        &mut [],
+        &[ClassAmount::new(4, 3)],
+        1.0,
+        HitPoints::ZERO,
+        HitLayer {
+            roles: &roles(),
+            slots: slots(),
+            damage_tuning: &tuning().damage,
+        },
+    )
+    .unwrap();
+    assert_eq!(house_victim.stung, vec![(villager.id, burn)]);
     let mut victim = Victim {
         allied: Allied::BOTH,
         ..house()
@@ -1993,14 +2006,14 @@ fn gain_fills_hit_points_and_its_overflow_takes_off_the_powerup() {
     gain_hp(
         &mut hp,
         &mut ups,
-        MasterHitPoints::of_data(60),
+        (MasterHitPoints::of_data(60), HitPoints::ZERO),
         HitPoints::new(5.0),
     );
     assert_eq!((hp, ups), (HitPoints::new(55.0), pu(0.0, 0.0)));
     gain_hp(
         &mut hp,
         &mut ups,
-        MasterHitPoints::of_data(60),
+        (MasterHitPoints::of_data(60), HitPoints::ZERO),
         HitPoints::new(10.0),
     );
     assert_eq!((hp, ups), (HitPoints::new(60.0), pu(0.0, 0.0)));
@@ -2009,14 +2022,14 @@ fn gain_fills_hit_points_and_its_overflow_takes_off_the_powerup() {
     gain_hp(
         &mut hp,
         &mut ups,
-        MasterHitPoints::of_data(60),
+        (MasterHitPoints::of_data(60), HitPoints::ZERO),
         HitPoints::new(10.0),
     );
     assert_eq!((hp, ups), (HitPoints::new(70.0), pu(3.0, 10.0)));
     gain_hp(
         &mut hp,
         &mut ups,
-        MasterHitPoints::of_data(60),
+        (MasterHitPoints::of_data(60), HitPoints::ZERO),
         HitPoints::new(5.0),
     );
     assert_eq!((hp, ups), (HitPoints::new(70.0), pu(0.0, 10.0)));
@@ -2024,7 +2037,7 @@ fn gain_fills_hit_points_and_its_overflow_takes_off_the_powerup() {
     gain_hp(
         &mut hp,
         &mut ups,
-        MasterHitPoints::of_data(60),
+        (MasterHitPoints::of_data(60), HitPoints::ZERO),
         HitPoints::new(0.0),
     );
     assert_eq!(ups, pu(10.0, 10.0));
@@ -2041,7 +2054,7 @@ fn heal_to_full_holds_the_master_hit_points() {
         heal_hp(
             &mut hp,
             &mut ups,
-            MasterHitPoints::of_data(60),
+            (MasterHitPoints::of_data(60), HitPoints::ZERO),
             HitPoints::new(10.0)
         ),
         Heal::Partial
@@ -2051,7 +2064,7 @@ fn heal_to_full_holds_the_master_hit_points() {
         heal_hp(
             &mut hp,
             &mut ups,
-            MasterHitPoints::of_data(60),
+            (MasterHitPoints::of_data(60), HitPoints::ZERO),
             HitPoints::new(25.0)
         ),
         Heal::Full
@@ -2062,7 +2075,7 @@ fn heal_to_full_holds_the_master_hit_points() {
         heal_hp(
             &mut hp,
             &mut ups,
-            MasterHitPoints::of_data(60),
+            (MasterHitPoints::of_data(60), HitPoints::ZERO),
             HitPoints::new(-3.0)
         ),
         Heal::Partial
@@ -2074,7 +2087,7 @@ fn heal_to_full_holds_the_master_hit_points() {
         heal_hp(
             &mut hp,
             &mut ups,
-            MasterHitPoints::of_data(60),
+            (MasterHitPoints::of_data(60), HitPoints::ZERO),
             HitPoints::new(4.0)
         ),
         Heal::Partial
@@ -2085,7 +2098,7 @@ fn heal_to_full_holds_the_master_hit_points() {
         heal_hp(
             &mut hp,
             &mut HpPowerup::default(),
-            MasterHitPoints::of_data(60),
+            (MasterHitPoints::of_data(60), HitPoints::ZERO),
             HitPoints::new(1.0)
         ),
         Heal::Partial
@@ -2579,5 +2592,121 @@ fn blast_passes_over_what_it_spares_and_hits_the_rest() {
     assert_eq!(
         hit(&elephant_blast, unsure).unwrap_err().reason(),
         "a blast over an object whose player's update is not modelled"
+    );
+}
+
+/// A weapon of class 11 adds ten per unit of infantry inside its attacker before its armor
+/// (slot 0x1b8): two units take the hunter's 3 to 23 against the house's base armor 0; the
+/// count converts as unsigned 64 bits, so −1 adds 2^64 − 10.
+#[test]
+fn class_eleven_weapon_adds_ten_per_infantry_unit_inside() {
+    let mut ram = hunter();
+    let two = InfantryCount::ZERO
+        .changed(InfantryChange::Entered)
+        .changed(InfantryChange::Entered);
+    ram.source.infantry_inside = two;
+    let house = house();
+    let weapons = [ClassAmount::new(11, 3)];
+    let damage = armor_damage(&house, &weapons, 1.0, &ram.source, 0.0, &roles()).unwrap();
+    assert_eq!(damage, HitPoints::new(23.0));
+    assert_eq!(armor::infantry_attack(two), 20.0);
+    let below = InfantryCount::ZERO.changed(InfantryChange::Left);
+    assert_eq!(
+        armor::infantry_attack(below).to_bits(),
+        ((-10_i64).cast_unsigned() as f32).to_bits()
+    );
+    assert_eq!(armor::infantry_attack(InfantryCount::ZERO), 0.0);
+}
+
+/// The first melee, pierce or class-31 weapon of a combat attacker adds its bonus, then its
+/// attack stinger plus its powerup (`+0xb48` plus `+0xa24`).
+#[test]
+fn first_weapon_adds_the_attack_stinger_with_the_powerup() {
+    let mut fighter = hunter();
+    fighter.source.attack_stinger = AttackBonus::new(1.5);
+    fighter.source.attack_powerup = AttackBonus::new(0.25);
+    let house = house();
+    let weapons = [ClassAmount::new(4, 3), ClassAmount::new(4, 3)];
+    let damage = armor_damage(&house, &weapons, 1.0, &fighter.source, 2.0, &roles()).unwrap();
+    assert_eq!(damage, HitPoints::new((3.0 + (2.0 + (1.5 + 0.25))) + 3.0));
+}
+
+/// Slot 0xc8 of a combat unit or building is its hit point stinger plus its master's hit
+/// points, plus its most hit points powerup; any other object's is its master's.
+#[test]
+fn most_hit_points_add_the_stinger_to_the_masters() {
+    let mut victim = hunter();
+    let armored = victim.armored.as_mut().unwrap();
+    armored.hp_stinger = HitPoints::new(-5.0);
+    armored.hp_powerup = HpPowerup {
+        taken: HitPoints::ZERO,
+        max: HitPoints::new(10.0),
+    };
+    assert_eq!(victim.most_hp(), HitPoints::new(-5.0 + 25.0 + 10.0));
+    assert_eq!(
+        most_hp(
+            HitPoints::new(-5.0),
+            MasterHitPoints::of_data(25),
+            HpPowerup::default()
+        ),
+        HitPoints::new(20.0)
+    );
+    victim.kind = MasterKind::RGE_COMBAT;
+    assert_eq!(victim.most_hp(), HitPoints::new(25.0));
+}
+
+/// The melee and pierce armor add their stingers (`+0xb4c`, `+0xb50`) to the powerups as 16
+/// bits; the shown attack adds its stinger as a whole number.
+#[test]
+fn armor_and_shown_attack_add_their_stingers() {
+    let mut victim = hunter();
+    let armored = victim.armored.as_mut().unwrap();
+    armored.armor_powerups = ArmorBonuses::new(1, 2);
+    armored.armor_stingers = ArmorBonuses::new(0x1_0003, -4);
+    let armored = victim.armored.clone().unwrap();
+    assert_eq!(
+        class_armor(
+            &armored,
+            OwnSlot::Melee,
+            victim.class,
+            victim.state,
+            &roles()
+        ),
+        DamageAmount::new(1 + 3)
+    );
+    assert_eq!(
+        class_armor(
+            &armored,
+            OwnSlot::Pierce,
+            victim.class,
+            victim.state,
+            &roles()
+        ),
+        DamageAmount::new(2 - 4)
+    );
+    victim.source.attack_stinger = AttackBonus::new(2.9);
+    assert_eq!(
+        shown_attack(&victim, &Shown::default(), &roles()),
+        DamageAmount::new(3 + 2)
+    );
+}
+
+/// Slot 0x870's master part starts from −1: a class-3 armor of −1 counts as none, and the base
+/// armor and the best of any class take its place.
+#[test]
+fn pierce_armor_of_minus_one_reads_as_none() {
+    let armors = [ClassAmount::new(3, -1), ClassAmount::new(4, 6)];
+    assert_eq!(
+        master_pierce_armor(&armors, DamageAmount::new(2)),
+        DamageAmount::new(6)
+    );
+    let armors = [ClassAmount::new(3, -3), ClassAmount::new(3, 0)];
+    assert_eq!(
+        master_pierce_armor(&armors, DamageAmount::new(2)),
+        DamageAmount::new(0)
+    );
+    assert_eq!(
+        master_pierce_armor(&[], DamageAmount::new(2)),
+        DamageAmount::new(2)
     );
 }

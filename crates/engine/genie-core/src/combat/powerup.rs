@@ -2,9 +2,9 @@
 //! ([`World::apply_powerup`], `FUN_141200dd0`) and their reset ([`World::reset_powerups`],
 //! `FUN_1412066b0`).
 
-use crate::combat::AttackPowerup;
+use crate::combat::AttackBonus;
 use crate::combat::attack::ATTACK;
-use crate::combat::damage::ArmorPowerups;
+use crate::combat::damage::ArmorBonuses;
 use crate::combat::damage::Shown;
 use crate::combat::damage::shown_attack;
 use crate::combat::victims::victim_of;
@@ -65,8 +65,14 @@ impl PowerupAttribute {
     /// 120 (`0x78`), the regeneration rate as a share of the most hit points (`+0xa34`).
     pub const REGENERATION_HP_PERCENT: Self = Self(0x78);
 
-    /// The attribute of an aura task's `search_wait_time` (`CVTTSS2SI`: a NaN or a value past
-    /// 32 bits is `0x80000000`).
+    /// The save's integer `value` (an active stinger's kind, `+0x8`).
+    #[must_use]
+    pub const fn of_data(value: i32) -> Self {
+        Self(value)
+    }
+
+    /// The attribute of an aura or stinger task's `search_wait_time` (`CVTTSS2SI`: a NaN or a
+    /// value past 32 bits is `0x80000000`).
     #[must_use]
     pub fn of_task(search_wait_time: Seconds) -> Self {
         Self(cvttss2si(search_wait_time.get()))
@@ -276,13 +282,13 @@ pub(crate) fn speed_of_infantry(count: InfantryCount, tuning: PowerupTuning) -> 
 /// ([`speed_of_infantry`]). The aura's sprite `+0x9f8` is the renderer's. The sight powerup
 /// goes in [`World::reset_powerups`].
 pub(crate) fn reset_powerup_values(combat: &mut Combat, tuning: PowerupTuning) {
-    combat.attack_powerup = AttackPowerup::ZERO;
+    combat.attack_powerup = AttackBonus::ZERO;
     combat.reload_powerup = Seconds::ZERO;
     combat.work_rate_powerup = WorkRate::ZERO;
     combat.regen_powerup = Regeneration::ZERO;
     combat.hp_powerup.max = HitPoints::ZERO;
     combat.range_powerup = Distance::ZERO;
-    combat.armor_powerups = ArmorPowerups::ZERO;
+    combat.armor_powerups = ArmorBonuses::ZERO;
     combat.conversion_powerup = ConversionPowerup::ZERO;
     combat.applied_powerups.clear();
     combat.speed_powerup = speed_of_infantry(combat.infantry_inside, tuning);
@@ -507,7 +513,7 @@ impl World {
         } else {
             libm::floorf(powerup.amount.get()) + self.parts.combat_of(id).attack_powerup.get()
         };
-        self.parts.combat_mut(id)?.attack_powerup = AttackPowerup::new(attack);
+        self.parts.combat_mut(id)?.attack_powerup = AttackBonus::new(attack);
         Ok(())
     }
 

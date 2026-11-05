@@ -25,6 +25,12 @@ bitflags::bitflags! {
         /// An aura task gives its object a master of its own (bit 6, slot 277's
         /// `FUN_141186d10`).
         const AURA_OWN_MASTER = 1 << 6;
+        /// A stinger's value is a share of its object's master's value (bit 0, the stinger
+        /// update `FUN_1412092e0`'s `+0x14` bit 0).
+        const STINGER_SCALED = 1;
+        /// A stinger counts once per kind and key in a pass of the stinger update: a second
+        /// one goes (bit 1, `FUN_1412092e0`'s `+0x14` bit 1).
+        const STINGER_UNIQUE = 1 << 1;
         /// Any other bit.
         const _ = !0;
     }

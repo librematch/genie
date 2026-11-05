@@ -27,8 +27,8 @@ When a melee hit lands is decided in `combat/attack/`. A missile's hit is decide
 | --- | --- |
 | [`allied.rs`](allied.rs) | How a hit's two players stand to each other (`Allied`). |
 | [`armor.rs`](armor.rs) | The armor against melee and against each weapon class, and the damage per weapon (`FUN_141082530`). |
+| [`armor_bonuses.rs`](armor_bonuses.rs) | What an object's powerups or stingers add to its melee and pierce armor (`ArmorBonuses`). |
 | [`armor_pair.rs`](armor_pair.rs) | An object's two armor values (`ArmorPair`): melee and pierce. |
-| [`armor_powerups.rs`](armor_powerups.rs) | An object's melee and pierce armor powerups (`ArmorPowerups`). |
 | [`blasts.rs`](blasts.rs) | The damage beyond what a blast has done (`FUN_141082e80`) and the blast itself (slot 0x848). |
 | [`hit_factors.rs`](hit_factors.rs) | A hit's factors: the elevation, the facing offset and the charges (`FUN_1412623d0`). |
 | [`hit_points.rs`](hit_points.rs) | The shield, the invulnerability floor, and the hit points' loss (slot 0xb0) and gain (slot 0xb8). |

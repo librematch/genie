@@ -4,6 +4,8 @@ use crate::combat::abilities::REMOVAL_REWARD;
 use crate::combat::damage::Allied;
 use crate::combat::damage::{Armored, Attacker, BONUS_DAMAGE, Building as DamageBuilding};
 use crate::combat::damage::{ElevationBonus, Victim};
+use crate::combat::powerup::InfantryCount;
+use crate::combat::stingers::stinger_tasks;
 use crate::combat::victims::{is_trebuchet, paid_cost};
 use crate::map::Tile;
 use crate::map::spatial::Spatial;
@@ -21,6 +23,7 @@ use crate::players::Amount;
 use crate::players::AmountRate;
 use crate::players::PlayerId;
 use crate::unit_ai::task_finder::Diplomacy;
+use crate::unit_ai::task_finder::enabled;
 use crate::world::layer::Roles;
 use crate::world::{Mode680, Unread};
 
@@ -171,6 +174,13 @@ pub(crate) fn victim_of(
             charge: combat.charge,
             charge_hit: combat.charge_hit,
             attack_powerup: combat.attack_powerup,
+            attack_stinger: combat.attack_stinger,
+            // slot 0x1b8: RGE's (FUN_14106a6b0) is 0
+            infantry_inside: if matches!(kind, MasterKind::COMBAT | MasterKind::BUILDING) {
+                combat.infantry_inside
+            } else {
+                InfantryCount::ZERO
+            },
             mode_680,
             player: player_id,
             kill_bonus_tasks: tasks(ActionKind::LOOT),
@@ -186,6 +196,11 @@ pub(crate) fn victim_of(
             .filter(|task| task.action_kind == BONUS_DAMAGE)
             .copied()
             .collect(),
+        stinger_tasks: stinger_tasks(master)
+            .into_iter()
+            .filter(|task| enabled(attributes, task.enablement))
+            .collect(),
+        stung: Vec::new(),
         // a combat object's slot 0xf0 is FUN_141082530 (types 50 and up)
         armored: (MasterKind::RGE_COMBAT <= kind).then(|| Armored {
             armors: master.combat_part().armors.clone(),
@@ -200,8 +215,10 @@ pub(crate) fn victim_of(
             special_sprite: master.creatable_part().special_sprite,
             terrain: defense,
             armor_powerups: combat.armor_powerups,
+            armor_stingers: combat.armor_stingers,
             armor_removed: combat.armor_removed,
             hp_powerup: combat.hp_powerup,
+            hp_stinger: combat.hp_stinger,
             kill_tasks: master
                 .action_part()
                 .tasks

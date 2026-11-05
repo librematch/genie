@@ -8,6 +8,7 @@
 //! slot 0x7e8 `FUN_141227190`): the unit takes the master and the task the task finder picks for
 //! the target ([`crate::unit_ai::task_finder`]), and the task's action replaces its action list.
 
+use crate::combat::damage::most_hp;
 use crate::groups::GroupId;
 use crate::map::Distance;
 use crate::map::Point;
@@ -399,8 +400,10 @@ impl World {
             state: unit.life.state,
             held: unit.life.held(),
             hp: unit.life.hp + self.parts.combat_of(unit.id).hp_powerup.room(),
-            max_hp: HitPoints::of_master(master.hit_points)
-                + self.parts.combat_of(unit.id).hp_powerup.max,
+            max_hp: {
+                let combat = self.parts.combat_of(unit.id);
+                most_hp(combat.hp_stinger, master.hit_points, combat.hp_powerup)
+            },
             attackable: unit.flags.contains(UnitFlags::ATTACKABLE),
             pasture: unit.pasture,
             top_action: self.parts.actions_of(unit.id).top_action_kind(),

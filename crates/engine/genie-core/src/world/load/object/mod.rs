@@ -2,17 +2,18 @@
 //! town bell, a building's gate and its construction.
 
 use crate::combat::AbilityTimer;
+use crate::combat::AttackBonus;
 use crate::combat::AttackCount;
-use crate::combat::AttackPowerup;
 use crate::combat::Charge;
 use crate::combat::Firepower;
 use crate::combat::MissileCount;
 use crate::combat::SpecialSprite;
 use crate::combat::abilities::Abilities;
-use crate::combat::damage::{ArmorPair, ArmorPowerups};
+use crate::combat::damage::{ArmorBonuses, ArmorPair};
 use crate::combat::missile::ShooterId;
 use crate::combat::missile::{MISSILE, Missile};
 use crate::combat::powerup::{ConversionPowerup, InfantryCount};
+use crate::combat::stingers::ActiveStinger;
 use crate::construction::Annexes;
 use crate::construction::BuilderCount;
 use crate::construction::MainBuildingId;
@@ -420,7 +421,7 @@ fn row(
             .map_or(WorldTime::ZERO, |tribe_combat_object| {
                 WorldTime::from_millis(tribe_combat_object.powerup_update_offset)
             }),
-        attack_powerup: AttackPowerup::new(object.combat().map_or(0.0, |tribe_combat_object| {
+        attack_powerup: AttackBonus::new(object.combat().map_or(0.0, |tribe_combat_object| {
             tribe_combat_object.attack_powerup
         })),
         range_powerup: object
@@ -430,8 +431,8 @@ fn row(
             }),
         armor_powerups: object
             .combat()
-            .map_or(ArmorPowerups::ZERO, |tribe_combat_object| {
-                ArmorPowerups::new(
+            .map_or(ArmorBonuses::ZERO, |tribe_combat_object| {
+                ArmorBonuses::new(
                     tribe_combat_object.melee_armor_powerup,
                     tribe_combat_object.pierce_armor_powerup,
                 )
@@ -441,7 +442,26 @@ fn row(
                 .combat()
                 .map_or(0.0, |tribe_combat_object| tribe_combat_object.speed_powerup),
         ),
+        speed_stinger: Speed::new(
+            object
+                .combat()
+                .map_or(0.0, |tribe_combat_object| tribe_combat_object.speed_stinger),
+        ),
+        // the load reads each saved stinger's 32 bytes raw (FUN_14121ec90)
+        active_stingers: object
+            .combat()
+            .map(|tribe_combat_object| {
+                tribe_combat_object
+                    .stinger
+                    .iter()
+                    .map(ActiveStinger::of_save)
+                    .collect()
+            })
+            .unwrap_or_default(),
         // unsaved: the load leaves them empty
+        hp_stinger: HitPoints::ZERO,
+        attack_stinger: AttackBonus::ZERO,
+        armor_stingers: ArmorBonuses::ZERO,
         conversion_powerup: ConversionPowerup::ZERO,
         applied_powerups: Vec::new(),
         infantry_inside: InfantryCount::ZERO,

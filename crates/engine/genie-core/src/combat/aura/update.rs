@@ -3,9 +3,8 @@
 
 use crate::GenieResult;
 use crate::combat::AbilityTimer;
-use crate::combat::aura::{
-    AuraCount, AuraEntry, AuraGroup, AuraRole, AuraTarget, aura_amount, aura_groups,
-};
+use crate::combat::ClassOrMaster;
+use crate::combat::aura::{AuraCount, AuraEntry, AuraGroup, AuraRole, aura_amount, aura_groups};
 use crate::combat::powerup::Powerup;
 use crate::math::rng::Stream;
 use crate::objects::ListIndex;
@@ -40,10 +39,10 @@ impl AuraEntry {
 
 /// The targets of an aura part's entries that work now, each with the role of its first entry
 /// (`try_emplace` into the part's map at its node's `+0x58`).
-type PartTargets = Vec<(AuraTarget, AuraRole)>;
+type PartTargets = Vec<(ClassOrMaster, AuraRole)>;
 
 /// The role `targets` give `target`, none where they do not name it (the map's `find`).
-fn role_of(targets: &PartTargets, target: AuraTarget) -> Option<AuraRole> {
+fn role_of(targets: &PartTargets, target: ClassOrMaster) -> Option<AuraRole> {
     targets
         .iter()
         .find(|&&(named, _)| named == target)
@@ -234,8 +233,8 @@ impl World {
             if found_master.kind < MasterKind::COMBAT || found.life.state != ObjectState::Alive {
                 continue;
             }
-            let by_class = AuraTarget::of_class(found_master.class);
-            let by_master = AuraTarget::of_master(found_master.id);
+            let by_class = ClassOrMaster::of_class(found_master.class);
+            let by_master = ClassOrMaster::of_master(found_master.id);
             for ((part_targets, list), count) in targets.iter().zip(&mut powered).zip(&mut counted)
             {
                 match role_of(part_targets, by_class).or_else(|| role_of(part_targets, by_master)) {

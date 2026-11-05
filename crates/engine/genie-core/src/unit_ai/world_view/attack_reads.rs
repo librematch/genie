@@ -2,6 +2,7 @@
 //! searching unit, the found objects, the attack and neutral tests, the statistics' reads and
 //! the quick path.
 
+use crate::combat::damage::master_pierce_armor;
 use crate::combat::reload::reload_time;
 use crate::map::Distance;
 use crate::map::spatial::Spatial;
@@ -9,8 +10,8 @@ use crate::movement::Speed;
 use crate::movement::footprint_gap;
 use crate::objects::ObjectId;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::DamageAmount;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::{DamageAmount, DamageClass};
 use crate::objects::unit::UnitFlags;
 use crate::pathing::hull_path::{NO_RESTRICTION, NO_TERRAIN, quick_reach};
 use crate::players::AllyTest;
@@ -228,36 +229,22 @@ impl WorldPicker<'_> {
         })
     }
 
-    /// Slot 0x870's armor (`FUN_141213920` -> `FUN_1410857f0`): the highest melee armor (class
-    /// 3; else the base armor or the highest armor of any class) plus the pierce armor powerup
-    /// (`+0xa4c`, slot 0x710; slot 0x778's stinger `+0xb50` is 0), at least 100.
+    /// Slot 0x870's armor (`FUN_141213920` -> `FUN_1410857f0`, [`master_pierce_armor`]) plus the
+    /// pierce armor powerup and stinger (`+0xa4c`, `+0xb50`, slots 0x710 and 0x778), at least 100.
     ///
     /// # Errors
     ///
     /// What the read does not model.
     pub(crate) fn armored(&self, id: ObjectId) -> GenieResult<bool> {
         let (_, unit, _, master) = self.held(id)?.ok_or(NOT_HELD)?;
-        let class3 = master
-            .combat_part()
-            .armors
-            .iter()
-            .filter(|class_amount| class_amount.class == DamageClass::PIERCE)
-            .map(|class_amount| class_amount.amount)
-            .max();
-        let armor = class3.unwrap_or_else(|| {
-            master.combat_part().armors.iter().fold(
-                master.combat_part().base_armor,
-                |best, class_amount| {
-                    if best < class_amount.amount {
-                        class_amount.amount
-                    } else {
-                        best
-                    }
-                },
-            )
-        });
-        Ok(DamageAmount::new(100)
-            <= armor.plus(self.parts.combat_of(unit.id).armor_powerups.pierce_armor()))
+        let combat = self.parts.combat_of(unit.id);
+        let armor = master_pierce_armor(
+            &master.combat_part().armors,
+            master.combat_part().base_armor,
+        )
+        .plus(combat.armor_powerups.pierce_armor())
+        .plus(combat.armor_stingers.pierce_armor());
+        Ok(DamageAmount::new(100) <= armor)
     }
 
     /// Object `id`'s weapon range (slot 0x230: a combat object's master's, else 0).

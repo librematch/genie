@@ -2,7 +2,8 @@
 //! shows.
 
 use crate::combat::damage::{
-    EPSILON, ONE, Victim, charge_hit, charged, master_melee_armor, melee_armor, range_charge_hit,
+    EPSILON, ONE, Victim, charge_hit, charged, master_melee_armor, melee_armor, most_hp,
+    range_charge_hit,
 };
 use crate::map::Distance;
 use crate::math::fmath::{at_most_or_unordered, below_or_unordered, maxss, minss};
@@ -49,18 +50,17 @@ impl Victim {
             .map_or(self.hp, |armored| armored.hp_powerup.room() + self.hp)
     }
 
-    /// Slot 0xc8, its most hit points: a combat unit's or building's (`FUN_141202bb0`) hit point
-    /// stinger (`+0xb44`, slot 0x760) plus its master's hit points plus its most hit points
-    /// powerup (`+0xa3c`); any other object's its master's hit points (`FUN_1411889a0`). The
-    /// stingers (`+0xb38`..`+0xb50`) are 0: `TRIBE_Combat_Object::update` zeroes them and rebuilds
-    /// them from the object's stinger list (`FUN_1412092e0`), which the slice holds empty.
+    /// Slot 0xc8, its most hit points: a combat unit's or building's ([`most_hp`]); any other
+    /// object's its master's hit points (`FUN_1411889a0`).
     #[must_use]
     pub fn most_hp(&self) -> HitPoints {
         let hp = HitPoints::of_master(self.master_hp);
         self.armored
             .as_ref()
             .filter(|_| self.tribe())
-            .map_or(hp, |armored| hp + armored.hp_powerup.max)
+            .map_or(hp, |armored| {
+                most_hp(armored.hp_stinger, self.master_hp, armored.hp_powerup)
+            })
     }
 
     /// `FUN_141188880`: the share of its most hit points it has (slot 0xc0, at most slot 0xc8 by
@@ -192,7 +192,7 @@ pub(super) fn best_attack(weapons: &[ClassAmount], of: Weapons) -> DamageAmount 
 /// charge projectile's master among its player's, that master's best melee, pierce or class-31
 /// attack (`FUN_1410d5740`). Else its best melee, pierce or class-31 attack, without one its best
 /// attack (from 0), plus its attack powerup (`+0xa24`, slot 0x6d8) and stinger (`+0xb48`, slot
-/// 0x768, 0 as [`Victim::most_hp`] says), each as a whole number ([`DamageAmount::of_effect`]), plus the bonus
+/// 0x768), each as a whole number ([`DamageAmount::of_effect`]), plus the bonus
 /// damage of its tasks against its attack's target ([`bonus_damage`]); a ready charge of type 1
 /// or 3 adds the charge (`+0x9e0`). A combat object of type 50 or 60 has no powerups (its slots
 /// answer 0). The sums wrap at 16 bits.
@@ -210,14 +210,14 @@ pub fn shown_attack(target: &Victim, shown: &Shown<'_>, roles: &Roles) -> Damage
     if attack == DamageAmount::ZERO {
         attack = best_attack(&target.weapons, Weapons::Any);
     }
-    let powerup = if target.tribe() {
-        attacker.attack_powerup.get()
+    let (powerup, stinger) = if target.tribe() {
+        (attacker.attack_powerup.get(), attacker.attack_stinger.get())
     } else {
-        0.0
+        (0.0, 0.0)
     };
     attack = attack
         .plus(DamageAmount::of_effect(powerup))
-        .plus(DamageAmount::of_effect(0.0));
+        .plus(DamageAmount::of_effect(stinger));
     if let Some(victim) = shown.target {
         attack = attack.plus(DamageAmount::of_effect(bonus_damage(target, victim, roles)));
     }

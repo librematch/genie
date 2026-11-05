@@ -5,6 +5,7 @@ use crate::combat::damage::{
     Armored, Attacker, Building, EPSILON, ONE, Razed, Victim, charge_hit, damage, effective,
     elevation_factor, facing_offset, hp_floor, lose, special_charge_ready,
 };
+use crate::combat::stingers::hand_off;
 use crate::world::slots::CheckedIndexExt;
 use crate::{GenieError, GenieResult};
 
@@ -19,7 +20,6 @@ use crate::objects::DamagedTimer;
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::masters::ClassAmount;
-use crate::objects::masters::CombatAbility;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::SpecialAttack;
 use crate::players::Amount;
@@ -187,7 +187,7 @@ pub(super) enum HitRoute {
 /// values (172, 153). Then `damaged_lately_timer` (`+0x30d`) is 60 and its annexes take its hit
 /// points (the write-back gives them to those `others` does not hold, [`Building::struck`]); a
 /// dealt hit's attacker of type 50 and up leaves a building of 1 hit point or more (`COMISS hp, 1`
-/// / `JC` past) to its effects ([`attack_effects`]). [`BuildingHit::Past`] when the hit got past
+/// / `JC` past) to its stingers ([`hand_off`]). [`BuildingHit::Past`] when the hit got past
 /// the hit point test.
 pub(super) fn take_building(
     target: &mut Victim,
@@ -282,7 +282,7 @@ pub(super) fn take_building(
         && MasterKind::RGE_COMBAT <= src.kind
         && target.hp >= HitPoints::new(ONE)
     {
-        attack_effects(&src.source, target)?;
+        hand_off(src, target);
     }
     Ok(BuildingHit::Past)
 }
@@ -336,19 +336,6 @@ pub(super) fn kill_bonus(src: &Attacker) -> GenieResult<()> {
     if MasterKind::ACTION <= src.kind && src.kill_bonus_tasks {
         return Err(GenieError::unsupported(
             "an attacker's kill bonus task (action type 0x9a)",
-        ));
-    }
-    Ok(())
-}
-
-/// `FUN_14107bdf0`, the attacker `src`'s combat ability's effects on its target `victim`: only a
-/// combat ability with [`CombatAbility::HIT_EFFECTS`], against a target whose player is not allied
-/// with the attacker's both ways (`FUN_141663d90` with the ally flag, [`Victim::allied`]), does
-/// anything (its master's effects on the target, not modelled).
-pub(super) const fn attack_effects(src: &Attacker, victim: &Victim) -> GenieResult<()> {
-    if src.ability.contains(CombatAbility::HIT_EFFECTS) && !victim.allied.both() {
-        return Err(GenieError::unsupported(
-            "an attacker whose hits apply effects (FUN_14107bdf0)",
         ));
     }
     Ok(())
@@ -412,8 +399,8 @@ pub(super) fn take_static(
 /// hit takes at least one hit point (but past the hit point floor); a target with
 /// `damage_reflection` gives its attacker that share of the loss, at least 1 (slot 0xb0, no kill
 /// handling). Not held: the statistics (`FUN_1417783d0`); not modelled: a kill bonus task of the
-/// attacker (action type 0x9a, `FUN_1415c6510`) and its combat ability's effects
-/// ([`CombatAbility::HIT_EFFECTS`], `FUN_14107bdf0`).
+/// attacker (action type 0x9a, `FUN_1415c6510`). A target left at 1 hit point or more takes the
+/// attacker's stingers ([`hand_off`], `FUN_14107bdf0`).
 pub(super) fn take_unit(
     victim: &mut Victim,
     src: &mut Victim,
@@ -566,7 +553,7 @@ pub(super) fn after_hit(
         kill_bonus(&src.source)?;
     }
     if MasterKind::RGE_COMBAT <= src.kind && victim.hp >= HitPoints::new(ONE) {
-        attack_effects(&src.source, victim)?;
+        hand_off(src, victim);
     }
     Ok(())
 }

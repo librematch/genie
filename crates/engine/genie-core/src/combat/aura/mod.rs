@@ -12,6 +12,7 @@
 
 mod update;
 
+use crate::combat::ClassOrMaster;
 use crate::combat::powerup::{PowerupAmount, PowerupAttribute, PowerupShare};
 use crate::map::Distance;
 use crate::math::msvc::{HashKey, MapHash, float_hash, fnv1a, hash_combine, insertion_order};
@@ -20,7 +21,6 @@ use crate::objects::SpriteId;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::Master;
-use crate::objects::masters::MasterId;
 use crate::objects::masters::Masters;
 use crate::objects::masters::TargetOwner;
 use crate::objects::masters::Task;
@@ -29,59 +29,6 @@ use crate::players::RelationMask;
 use crate::players::UnitRelation;
 use crate::players::attribute::AttributeId;
 use crate::vision::registry::QueryShape;
-
-/// The offset of a class among an aura's targets (`FUN_140fdde00`, `ADD 900`): a target from
-/// 900 to 999 names the class 900 below it (`FUN_140fde260`, `FUN_140fe0f60`), any other a
-/// master.
-const CLASS_TARGETS: i32 = 900;
-/// How many classes the targets name (`FUN_140fde260`: the target less 900 below 100,
-/// unsigned).
-const CLASS_TARGET_SPAN: u32 = 100;
-
-/// The object an aura's entry names (slot 277's entry `+0x0`, an `int`): a class (its id plus
-/// 900) or a master (its id), −1 for none.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct AuraTarget(i32);
-
-impl AuraTarget {
-    /// The target of an aura task (slot 277): its class (`object_group`, `+0x10`) when it has
-    /// one, else its master (`object_id`, `+0x12`), else none (−1).
-    fn of_task(task: &Task) -> Self {
-        match (task.object_group, task.object_id) {
-            (Some(class), _) => Self::of_class(class),
-            (None, Some(master)) => Self::of_master(master),
-            (None, None) => Self(-1),
-        }
-    }
-
-    /// Class `class` (`FUN_140fdde00`).
-    pub(crate) fn of_class(class: ClassId) -> Self {
-        Self(i32::from(class.get()) + CLASS_TARGETS)
-    }
-
-    /// Master `master`.
-    pub(crate) fn of_master(master: MasterId) -> Self {
-        Self(i32::from(master.get()))
-    }
-
-    /// The class a target from 900 to 999 names (`FUN_140fde260`, `FUN_140fe0f60`); None for a
-    /// master or none.
-    fn class(self) -> Option<ClassId> {
-        let class = self.0.wrapping_sub(CLASS_TARGETS);
-        (class.cast_unsigned() < CLASS_TARGET_SPAN).then(|| ClassId::of_master(class as i16))
-    }
-
-    /// The class the aura's query reads for this target (slot 277): a class target's own, a
-    /// master target's master's class in the object's player's table `masters` (`player+0x28`);
-    /// None for a master the table has not got (or none), whose task then joins no group.
-    fn query_class(self, masters: Option<&Masters>) -> Option<ClassId> {
-        if let Some(class) = self.class() {
-            return Some(class);
-        }
-        let master = i16::try_from(self.0).ok().and_then(MasterId::of_data)?;
-        masters?.get(master).map(|target| target.class)
-    }
-}
 
 /// What an aura's entry does with the objects it names (the entry's `+0x16`, the task's
 /// [`Task::search_flag`]; the value, 1 or 2, of its part's map of targets).
@@ -100,7 +47,7 @@ pub(crate) enum AuraRole {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct AuraEntry {
     /// The object it names.
-    pub(crate) target: AuraTarget,
+    pub(crate) target: ClassOrMaster,
     /// What it does with them.
     pub(crate) role: AuraRole,
     /// The task's flags (`+0x15`).
@@ -275,7 +222,7 @@ pub(crate) fn aura_relations(owner: TargetOwner) -> RelationMask {
 }
 
 /// Slot 277's aura groups of `master`'s tasks (`0x141206d50`): each task of type 155 whose
-/// target resolves ([`AuraTarget::query_class`] in `masters`, the object's player's table) and
+/// target resolves ([`ClassOrMaster::query_class`] in `masters`, the object's player's table) and
 /// whose most objects (`work_val2`) are above 0 joins the group of its area, its class the
 /// group's, and its entry the part of its powerup; groups and parts in the order the game's maps
 /// list them, entries in the tasks' order. `graphics` resolves the sprite as the game's pointer.
@@ -295,7 +242,7 @@ pub(crate) fn aura_groups(
         .iter()
         .filter(|task| task.action_kind == ActionKind::AURA);
     for task in auras {
-        let target = AuraTarget::of_task(task);
+        let target = ClassOrMaster::of_task(task);
         let Some(class) = target.query_class(masters) else {
             continue;
         };

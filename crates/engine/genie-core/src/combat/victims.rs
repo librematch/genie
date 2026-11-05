@@ -2,6 +2,7 @@
 //! the kill and its counts.
 
 use crate::combat::damage::{Kill, Razed, Victim};
+use crate::combat::stingers::ActiveStinger;
 use crate::map::Distance;
 use crate::map::Rect;
 use crate::map::Tile;
@@ -261,8 +262,9 @@ pub(crate) fn victim(
 /// asleep (a tree a blast reached) takes its hit points and what it holds; below 1 hit point
 /// (COMISS/JBE: a NaN sleeps on) the hit wakes it (`FUN_14119deb0` with 0, [`World::wake_sleeper`])
 /// to take the rest. A live one takes its hit points, what it holds, its sleep flag, its decay, its
-/// powerups and charge, a struck building's `damaged_lately_timer`, the damage notifies (500) to
-/// its unit AI, and a struck building's annexes take its hit points (`+0xbc0`..). Returns its kill
+/// powerups and charge, the stingers the hit handed it (at the world time), a struck building's
+/// `damaged_lately_timer`, the damage notifies (500) to its unit AI, and a struck building's
+/// annexes take its hit points (`+0xbc0`..). Returns its kill
 /// and razings for the caller ([`KillLeft`]); `victim` keeps neither them nor its notifies, so
 /// another write-back repeats none.
 ///
@@ -305,10 +307,17 @@ pub(crate) fn write_back(
         unit.damaged_lately = building.damaged_lately;
     }
     let state = unit.life.state;
+    let now = step.world.world_time;
     let combat = step.world.parts.combat_mut(victim.id)?;
     if let Some(armored) = victim.armored.as_ref() {
         combat.hp_powerup = armored.hp_powerup;
     }
+    // the stingers the hit handed it (FUN_141200830's push_back)
+    combat.active_stingers.extend(
+        take(&mut victim.stung)
+            .iter()
+            .map(|(attacker, task)| ActiveStinger::handed(task, *attacker, now)),
+    );
     // a shield spends its charge
     combat.charge = victim.source.charge;
     // the damage notify (500) to its unit AI

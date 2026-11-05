@@ -2,6 +2,7 @@
 //! (`FUN_141082530`).
 
 use crate::combat::damage::{Armored, Attacker, Victim, charge_damage, charge_works};
+use crate::combat::powerup::InfantryCount;
 use crate::objects::HitPoints;
 use crate::objects::ObjectState;
 use crate::objects::masters::ClassId;
@@ -40,15 +41,17 @@ pub(super) fn master_melee_armor(armored: &Armored) -> DamageAmount {
 }
 
 /// Slot 0x868 of a combat unit or building (`FUN_141213810`): [`master_melee_armor`] plus its
-/// melee armor powerup (`+0xa48`, slot 0x708) and stinger (`+0xb4c`, slot 0x770, 0 as
-/// [`Victim::most_hp`] says), each as 16 bits; a wall foundation (class 27 in state 0) has none.
+/// melee armor powerup (`+0xa48`, slot 0x708) and stinger (`+0xb4c`, slot 0x770), each as 16
+/// bits (`FUN_141085450`'s adds); a wall foundation (class 27 in state 0) has none.
 pub(super) fn melee_armor(
     armored: &Armored,
     own_class: ClassId,
     state: ObjectState,
     roles: &Roles,
 ) -> DamageAmount {
-    let armor = master_melee_armor(armored).plus(armored.armor_powerups.melee_armor());
+    let armor = master_melee_armor(armored)
+        .plus(armored.armor_powerups.melee_armor())
+        .plus(armored.armor_stingers.melee_armor());
     if roles.of_class(own_class).contains(ClassRoles::WALL) && state == ObjectState::Foundation {
         return DamageAmount::ZERO;
     }
@@ -57,8 +60,8 @@ pub(super) fn melee_armor(
 
 /// The armor a combat object (type 70 and up) has against melee (class 4; slot 0x868,
 /// [`melee_armor`]) or pierce (class 3; slot 0x870, `FUN_1410857f0`: its best armor of the
-/// class, else its base armor and best of any, plus its powerup; the stinger `+0xb50` is 0, as
-/// [`Victim::most_hp`] says), less the armor removed.
+/// class, else its base armor and best of any, plus its powerup `+0xa4c` and its stinger
+/// `+0xb50`, slots 0x710 and 0x778, each as 16 bits), less the armor removed.
 pub(super) fn class_armor(
     armored: &Armored,
     class: OwnSlot,
@@ -66,44 +69,43 @@ pub(super) fn class_armor(
     state: ObjectState,
     roles: &Roles,
 ) -> DamageAmount {
-    let best = |damage_class: DamageClass, from: DamageAmount| {
-        armored
-            .armors
-            .iter()
-            .filter(|class_amount| class_amount.class == damage_class)
-            .fold(from, |damage_amount, class_amount| {
-                if damage_amount < class_amount.amount {
-                    class_amount.amount
-                } else {
-                    damage_amount
-                }
-            })
-    };
-    let any = |from: DamageAmount| {
-        armored
-            .armors
-            .iter()
-            .fold(from, |damage_amount, class_amount| {
-                if damage_amount < class_amount.amount {
-                    class_amount.amount
-                } else {
-                    damage_amount
-                }
-            })
-    };
     match class {
         OwnSlot::Melee => {
             melee_armor(armored, own_class, state, roles).minus(armored.armor_removed.melee)
         }
-        OwnSlot::Pierce => {
-            let mut armor = best(DamageClass::PIERCE, DamageAmount::NO_CLASS);
-            if armor == DamageAmount::NO_CLASS {
-                armor = any(armored.base_armor);
-            }
-            armor
-                .plus(armored.armor_powerups.pierce_armor())
-                .minus(armored.armor_removed.pierce)
-        }
+        OwnSlot::Pierce => master_pierce_armor(&armored.armors, armored.base_armor)
+            .plus(armored.armor_powerups.pierce_armor())
+            .plus(armored.armor_stingers.pierce_armor())
+            .minus(armored.armor_removed.pierce),
+    }
+}
+
+/// `FUN_1410857f0`'s master part, slot 0x870's armor as a master holds it (`armors`,
+/// `base_armor`): its best armor of class 3 from −1 on, else (still −1) its base armor or its
+/// best armor of any class. The slot adds the object's pierce armor powerup and stinger (slots
+/// 0x710 and 0x778, 0 of type 50 and 60).
+#[must_use]
+pub(crate) fn master_pierce_armor(
+    armors: &[ClassAmount],
+    base_armor: DamageAmount,
+) -> DamageAmount {
+    let best = |from: DamageAmount, of: Option<DamageClass>| {
+        armors
+            .iter()
+            .filter(|class_amount| of.is_none_or(|damage_class| damage_class == class_amount.class))
+            .fold(from, |damage_amount, class_amount| {
+                if damage_amount < class_amount.amount {
+                    class_amount.amount
+                } else {
+                    damage_amount
+                }
+            })
+    };
+    let armor = best(DamageAmount::NO_CLASS, Some(DamageClass::PIERCE));
+    if armor == DamageAmount::NO_CLASS {
+        best(base_armor, None)
+    } else {
+        armor
     }
 }
 
@@ -185,11 +187,12 @@ pub(super) fn charges(
 /// class (the last armor entry of the class wins: its amount, or for a type of 70 and up the
 /// melee or pierce armor, [`class_armor`]; an attacker of type 60 and up whose combat ability
 /// has bit 0 ignores melee and pierce armor unless the target's has bit 1), else the base armor.
+/// A weapon of class 11 adds ten per unit of infantry inside the attacker (slot 0x1b8, `+0xad8`
+/// of a TRIBE combat object, 0 of type 50 and 60; the product converts as unsigned 64 bits).
 /// For an attacker of type 70 and up: the first melee, pierce or class-31 weapon with an attack
 /// adds a ready charge of type 1 or 3 that works on the target ([`charge_works`],
-/// `FUN_141202580`), and the first such weapon adds the attack powerup (the stinger `+0xb48`,
-/// unsaved and never written here, is 0); a weapon of class 11 adds ten per `+0xad8` (unsaved,
-/// written only by `FUN_141209d60`, which no update of this recording runs). Another class is
+/// `FUN_141202580`), and the first such weapon adds the bonus and then the attack stinger and
+/// powerup (`+0xb48` plus `+0xa24`, slots 0x768 and 0x6d8). Another class is
 /// scaled by 1 less the `bonus_damage_resistance` when it does damage. Each weapon's attack less
 /// armor, times the elevation factor and the terrain defense, adds when above 0 (or below 0
 /// against an armor below the base that rises above the attack: then at most 0). The damage is
@@ -224,6 +227,9 @@ pub fn armor_damage(
         let armor_f =
             weapon_armor(armored, class, attacker, kind, own_class, state, roles).as_f32();
         let mut attack = amount.as_f32();
+        if class == DamageClass::CLASS_11 {
+            attack += infantry_attack(attacker.infantry_inside);
+        }
         let pierce_or_melee = matches!(
             class,
             DamageClass::PIERCE | DamageClass::MELEE | DamageClass::CLASS_31
@@ -247,7 +253,7 @@ pub fn armor_damage(
             }
             if pierce_or_melee && !bonused {
                 // the bonus, then the stinger plus the powerup
-                attack += bonus + (0.0 + attacker.attack_powerup.get());
+                attack += bonus + (attacker.attack_stinger.get() + attacker.attack_powerup.get());
                 bonused = true;
             }
         }
@@ -273,4 +279,18 @@ pub fn armor_damage(
     } else {
         sum
     }))
+}
+
+/// What a weapon of class 11 adds per unit of infantry inside its attacker (`LEA RCX, [RAX +
+/// RAX*4]`, `ADD RCX, RCX` at `0x1410827ed`).
+const INFANTRY_ATTACK: i64 = 10;
+
+/// What a weapon of class 11 adds for the infantry inside its attacker (`FUN_141082530`, slot
+/// 0x1b8): ten per unit, the count widened to 64 bits with its sign and the product converted as
+/// unsigned (`CVTSI2SS` of a halved value, doubled, for one at or above 2^63: −1 gives about
+/// 1.8e19).
+#[must_use]
+pub(super) fn infantry_attack(inside: InfantryCount) -> f32 {
+    let tens = i64::from(inside.get()).wrapping_mul(INFANTRY_ATTACK);
+    tens.cast_unsigned() as f32
 }

@@ -3,6 +3,7 @@
 
 use crate::combat::damage::Heal;
 use crate::combat::damage::heal_hp;
+use crate::combat::damage::most_hp;
 use crate::construction::MainBuildingId;
 use crate::construction::repair::ONE;
 use crate::math::fmath::below_or_unordered;
@@ -63,6 +64,8 @@ pub struct Repaired {
     pub(crate) hp: HitPoints,
     /// Its hit point powerup (`+0xa38`, `+0xa3c`).
     pub(crate) hp_powerup: HpPowerup,
+    /// Its hit point stinger (`+0xb44`), which its most hit points add (slot 200).
+    pub(crate) hp_stinger: HitPoints,
     /// An annex's main building (`+0xbb8`).
     pub(crate) main: Option<MainBuildingId>,
     /// A main building's annexes (`+0xbc0`, its four slots in their order).
@@ -215,7 +218,7 @@ pub fn repair_unit(
         .of_class(repaired.class)
         .contains(ClassRoles::REPAIR_COSTED)
     {
-        let most = HitPoints::of_master(repaired.master_hp) + repaired.hp_powerup.max;
+        let most = most_hp(repaired.hp_stinger, repaired.master_hp, repaired.hp_powerup);
         let now = repaired.hp_powerup.room() + repaired.hp;
         if most < now + amount {
             amount = most - now;
@@ -237,7 +240,7 @@ pub fn repair_unit(
         match heal_hp(
             &mut repaired.hp,
             &mut repaired.hp_powerup,
-            repaired.master_hp,
+            (repaired.master_hp, repaired.hp_stinger),
             amount,
         ) {
             Heal::Full => RepairOutcome::Full,

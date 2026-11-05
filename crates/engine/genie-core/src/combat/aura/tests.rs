@@ -1,9 +1,9 @@
 //! The aura groups and the powerup update.
 
-use crate::combat::AttackPowerup;
+use crate::combat::AttackBonus;
+use crate::combat::ClassOrMaster;
 use crate::combat::aura::{
-    AuraArea, AuraEntry, AuraPowerup, AuraRole, AuraTarget, MostObjects, aura_groups,
-    aura_relations,
+    AuraArea, AuraEntry, AuraPowerup, AuraRole, MostObjects, aura_groups, aura_relations,
 };
 use crate::combat::powerup::{PowerupAmount, PowerupAttribute, PowerupShare, powerup_until};
 use crate::map::Distance;
@@ -26,7 +26,6 @@ use crate::objects::masters::CombatPart;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::Masters;
 use crate::objects::masters::TargetOwner;
 use crate::objects::masters::Task;
 use crate::objects::masters::TaskFlags;
@@ -60,34 +59,6 @@ fn aura_relations_follow_the_owner_kind() {
         aura_relations(TargetOwner::OTHER).get(),
         0x1f & !bit(UnitRelation::Own)
     );
-}
-
-/// A class target is its class plus 900; a master from 900 to 999 reads as the class 900 below
-/// it, as the game's test of the range does.
-#[test]
-fn aura_target_names_class_by_900_and_else_master() {
-    assert_eq!(AuraTarget::of_class(class::VILLAGER), AuraTarget(904));
-    assert_eq!(AuraTarget(904).class(), Some(class::VILLAGER));
-    assert_eq!(
-        AuraTarget::of_master(MasterId::named(950)).class(),
-        Some(ClassId::named(50))
-    );
-    assert_eq!(AuraTarget::of_master(MasterId::named(1000)).class(), None);
-    assert_eq!(AuraTarget(-1).class(), None);
-    let masters = Masters::new([Master {
-        id: MasterId::named(83),
-        class: class::VILLAGER,
-        ..Master::default()
-    }]);
-    assert_eq!(
-        AuraTarget::of_master(MasterId::named(83)).query_class(Some(&masters)),
-        Some(class::VILLAGER)
-    );
-    assert_eq!(
-        AuraTarget::of_master(MasterId::named(84)).query_class(Some(&masters)),
-        None
-    );
-    assert_eq!(AuraTarget(-1).query_class(Some(&masters)), None);
 }
 
 /// The keys hash as the game's `FUN_1411e86d0` and `FUN_141200200` (the values computed from
@@ -189,7 +160,7 @@ fn aura_groups_list_areas_in_the_maps_order() {
     assert_eq!(
         groups[2].parts[0].entries,
         [AuraEntry {
-            target: AuraTarget::of_class(infantry),
+            target: ClassOrMaster::of_class(infantry),
             role: AuraRole::Powered,
             flags: rounded,
             enablement: None,
@@ -314,11 +285,11 @@ fn attack_aura_powers_up_the_object_it_finds() {
     let draw = streams.get_mut(Stream::Object).rand15();
     update(&mut world);
     let found = world.parts.combat_of(object(8));
-    assert_eq!(found.attack_powerup, AttackPowerup::new(2.0));
+    assert_eq!(found.attack_powerup, AttackBonus::new(2.0));
     assert_eq!(found.powerup_update, powerup_until(world.world_time, draw));
     assert_eq!(
         world.parts.combat_of(object(7)).attack_powerup,
-        AttackPowerup::ZERO
+        AttackBonus::ZERO
     );
     assert_eq!(world.streams, streams);
 }
@@ -341,18 +312,18 @@ fn counted_aura_on_self_gives_its_amount_to_itself() {
     // one object of most 2: 1 × 4 / 2
     assert_eq!(
         world.parts.combat_of(object(7)).attack_powerup,
-        AttackPowerup::new(2.0)
+        AttackBonus::new(2.0)
     );
     assert_eq!(
         world.parts.combat_of(object(8)).attack_powerup,
-        AttackPowerup::ZERO
+        AttackBonus::ZERO
     );
     let mut idle = aura_world(aura_master(vec![task], CombatAbility::NONE));
     let streams = idle.streams.clone();
     update(&mut idle);
     assert_eq!(
         idle.parts.combat_of(object(7)).attack_powerup,
-        AttackPowerup::ZERO
+        AttackBonus::ZERO
     );
     assert_eq!(idle.streams, streams);
     let far = Task {
@@ -363,7 +334,7 @@ fn counted_aura_on_self_gives_its_amount_to_itself() {
     update(&mut away);
     assert_eq!(
         away.parts.combat_of(object(7)).attack_powerup,
-        AttackPowerup::ZERO
+        AttackBonus::ZERO
     );
 }
 
@@ -387,7 +358,7 @@ fn aura_entries_off_or_waiting_for_ability_do_not_work() {
         update(&mut world);
         assert_eq!(
             world.parts.combat_of(object(8)).attack_powerup,
-            AttackPowerup::ZERO
+            AttackBonus::ZERO
         );
     }
     let task = aura_task(
@@ -403,7 +374,7 @@ fn aura_entries_off_or_waiting_for_ability_do_not_work() {
     update(&mut world);
     assert_eq!(
         world.parts.combat_of(object(8)).attack_powerup,
-        AttackPowerup::ZERO
+        AttackBonus::ZERO
     );
 }
 
@@ -411,17 +382,17 @@ fn aura_entries_off_or_waiting_for_ability_do_not_work() {
 #[test]
 fn powerups_past_their_end_reset() {
     let mut world = aura_world(aura_master(Vec::new(), CombatAbility::NONE));
-    world.parts.combat_mut(object(7)).unwrap().attack_powerup = AttackPowerup::new(3.0);
+    world.parts.combat_mut(object(7)).unwrap().attack_powerup = AttackBonus::new(3.0);
     world.parts.combat_mut(object(7)).unwrap().powerup_update = WorldTime::from_millis(10_000);
     update(&mut world);
     assert_eq!(
         world.parts.combat_of(object(7)).attack_powerup,
-        AttackPowerup::new(3.0)
+        AttackBonus::new(3.0)
     );
     world.world_time = WorldTime::from_millis(10_001);
     update(&mut world);
     assert_eq!(
         world.parts.combat_of(object(7)).attack_powerup,
-        AttackPowerup::ZERO
+        AttackBonus::ZERO
     );
 }

@@ -2,9 +2,9 @@
 //! its storage and its annexes.
 
 use crate::combat::abilities::Abilities;
-use crate::combat::damage::{ArmorPair, ArmorPowerups};
+use crate::combat::damage::{ArmorBonuses, ArmorPair};
 use crate::combat::powerup::{ConversionPowerup, InfantryCount};
-use crate::combat::{AbilityTimer, AttackCount, AttackPowerup, MissileCount, SpecialSprite};
+use crate::combat::{AbilityTimer, AttackBonus, AttackCount, MissileCount, SpecialSprite};
 use crate::construction::build::Clearer;
 use crate::construction::build::Construction;
 use crate::construction::build::{NO_CONSTRUCTION, NOT_HELD};
@@ -277,10 +277,15 @@ impl World {
             attack_timer: Seconds::ZERO,
             abilities: Abilities::default(),
             reload_stinger: Seconds::ZERO,
+            speed_stinger: Speed::ZERO,
+            hp_stinger: HitPoints::ZERO,
+            attack_stinger: AttackBonus::ZERO,
+            armor_stingers: ArmorBonuses::ZERO,
+            active_stingers: Vec::new(),
             reload_powerup: Seconds::ZERO,
-            attack_powerup: AttackPowerup::ZERO,
+            attack_powerup: AttackBonus::ZERO,
             range_powerup: Distance::ZERO,
-            armor_powerups: ArmorPowerups::ZERO,
+            armor_powerups: ArmorBonuses::ZERO,
             armor_removed: ArmorPair::ZERO,
             speed_powerup: Speed::ZERO,
             conversion_powerup: ConversionPowerup::ZERO,

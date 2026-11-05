@@ -444,6 +444,7 @@ fn repaired(
         master_hp: om.hit_points,
         hp: unit.life.hp,
         hp_powerup: step.world.parts.combat_of(unit.id).hp_powerup,
+        hp_stinger: step.world.parts.combat_of(unit.id).hp_stinger,
         main: if om.kind == MasterKind::BUILDING {
             step.world.parts.building_of(unit.id).annex_of
         } else {

@@ -2,11 +2,11 @@
 //! a target's state and the search of slot 0x820.
 
 use crate::GenieResult;
+use crate::combat::damage::most_hp;
 use crate::construction::FoundationId;
 use crate::map::Position;
 use crate::map::TerrainId;
 use crate::map::terrain::Terrain;
-use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::layers::Building;
@@ -144,7 +144,10 @@ pub(crate) fn task_target_with<'world>(
         state: unit.life.state,
         held: unit.life.held(),
         hp: unit.life.hp + parts.combat_of(unit.id).hp_powerup.room(),
-        max_hp: HitPoints::of_master(master.hit_points) + parts.combat_of(unit.id).hp_powerup.max,
+        max_hp: {
+            let combat = parts.combat_of(unit.id);
+            most_hp(combat.hp_stinger, master.hit_points, combat.hp_powerup)
+        },
         attackable: unit.flags.contains(UnitFlags::ATTACKABLE),
         pasture: unit.pasture,
         top_action: parts.actions_of(unit.id).top_action_kind(),

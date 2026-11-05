@@ -14,8 +14,8 @@
 
 mod allied;
 mod armor;
+mod armor_bonuses;
 mod armor_pair;
-mod armor_powerups;
 mod blasts;
 mod hit_factors;
 mod hit_points;
@@ -24,9 +24,10 @@ mod taking;
 
 pub use self::allied::Allied;
 pub use self::armor::armor_damage;
+pub(crate) use self::armor::master_pierce_armor;
 use self::armor::{master_melee_armor, melee_armor};
+pub use self::armor_bonuses::ArmorBonuses;
 pub use self::armor_pair::ArmorPair;
-pub use self::armor_powerups::ArmorPowerups;
 pub use self::blasts::blast;
 #[cfg(test)]
 use self::blasts::blast_tiles;
@@ -38,7 +39,7 @@ pub use self::hit_factors::{
 };
 use self::hit_factors::{charge_damage, special_charge_ready};
 pub use self::hit_points::{
-    Heal, HitKind, ShieldBlock, gain_hp, heal_base_hp, heal_hp, lose, shield,
+    Heal, HitKind, ShieldBlock, gain_hp, heal_base_hp, heal_hp, lose, most_hp, shield,
 };
 use self::hit_points::{effective, hp_floor};
 pub use self::shown_values::{
@@ -48,9 +49,11 @@ use self::taking::kill_bonus;
 pub use self::taking::take;
 #[cfg(test)]
 use self::taking::take_static;
-use crate::combat::AttackPowerup;
+use crate::combat::AttackBonus;
 use crate::combat::Charge;
 use crate::combat::missile::ShooterId;
+use crate::combat::powerup::InfantryCount;
+use crate::combat::stingers::{Handed, StingerTask};
 use crate::construction::MainBuildingId;
 use crate::map::Distance;
 use crate::map::Footprint;
@@ -188,6 +191,12 @@ pub struct Victim {
     /// Its master's tasks of action type 0xa0 ([`BONUS_DAMAGE`]), in their order: the damage its
     /// hits add by hit points ([`bonus_damage`]).
     pub(crate) bonus_tasks: Vec<Task>,
+    /// Its master's stinger tasks that its player's attribute enables, in their order
+    /// ([`stinger_tasks`](crate::combat::stingers::stinger_tasks)): what its hits hand
+    /// ([`hand_off`](fn@crate::combat::stingers::hand_off)).
+    pub(crate) stinger_tasks: Vec<StingerTask>,
+    /// The stingers a hit handed it, for its write-back.
+    pub(crate) stung: Handed,
     /// Its own attack (a retaliation's): its values as a hit's source and its master's weapons
     /// (class, amount).
     pub(crate) source: Attacker,
@@ -305,11 +314,15 @@ pub struct Armored {
     /// slice lacks the map or the restriction.
     pub(crate) terrain: Option<f32>,
     /// The object's armor powerups (melee, pierce).
-    pub(crate) armor_powerups: ArmorPowerups,
+    pub(crate) armor_powerups: ArmorBonuses,
+    /// The object's armor stingers (melee, pierce; `+0xb4c`, `+0xb50`).
+    pub(crate) armor_stingers: ArmorBonuses,
     /// The melee and pierce armor taken off it.
     pub(crate) armor_removed: ArmorPair,
     /// Its hit point powerup (`+0xa38`, `+0xa3c`), which absorbs damage first.
     pub(crate) hp_powerup: HpPowerup,
+    /// Its hit point stinger (`+0xb44`), which its most hit points add.
+    pub(crate) hp_stinger: HitPoints,
     /// Its master has a task of action type 0xa1 with a work value (a kill reward,
     /// `FUN_14120b5f0`).
     pub(crate) kill_tasks: bool,
@@ -366,7 +379,12 @@ pub struct Attacker {
     pub(crate) charge_hit: bool,
     /// Its attack powerup (`+0xa24`) and the game's setting `+0x680`
     /// ([`crate::world::World::mode_680`]: at 1 a hit may do no damage).
-    pub(crate) attack_powerup: AttackPowerup,
+    pub(crate) attack_powerup: AttackBonus,
+    /// Its attack stinger (`+0xb48`).
+    pub(crate) attack_stinger: AttackBonus,
+    /// The infantry inside it (`+0xad8`, slot 0x1b8 of a TRIBE combat object; 0 of type 50 and
+    /// 60): a weapon of class 11 adds ten per unit ([`armor_damage`]).
+    pub(crate) infantry_inside: InfantryCount,
     /// The game's setting `+0x680` ([`crate::world::World::mode_680`]).
     pub(crate) mode_680: Mode680,
     /// Its player and whether its master has a task of action type 0x9a (a kill bonus,
