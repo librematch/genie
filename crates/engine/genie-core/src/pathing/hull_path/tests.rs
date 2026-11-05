@@ -10,6 +10,7 @@ use crate::map::TileRect;
 use crate::map::spatial::Gait;
 use crate::map::spatial::{Obstruction, Tiles};
 use crate::movement::Me;
+use crate::movement::TopSpeed;
 use crate::objects::ActionState;
 use crate::objects::masters::BuildableOn;
 use crate::objects::masters::ClassId;
@@ -378,6 +379,7 @@ fn unit_short_reach_is_its_old_short_path_length() {
         id: object_id(9171),
         action_state: ActionState::NO_ACTION,
         group: None,
+        top_speed: TopSpeed::Own,
     };
     let length = mover
         .short_reach(

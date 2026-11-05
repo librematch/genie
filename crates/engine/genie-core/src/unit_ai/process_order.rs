@@ -558,7 +558,9 @@ impl UnitAi {
         let Some((class, position)) = self.attack_check(target, TargetRules::Own, at, side)? else {
             return Ok(Answer::NotTaken);
         };
-        if self.current_action.is_some() && !side.reaches(target, at.weapon_range)? {
+        if self.current_action.is_some()
+            && !side.reaches(target, at.weapon_range, self.current_target)?
+        {
             return Ok(Answer::NotTaken);
         }
         if self.attack_command(target, OrderForce::Forced, at, (side, rng))? == Answer::NotTaken {

@@ -42,14 +42,20 @@ pub enum Heard {
 }
 
 impl UnitView<'_, '_> {
-    /// The owner hears `notify` (the hear logic after slot 0x2e8): a computer player's AI that
-    /// holds its module hears an explorer wanting a point. Its tasking and detasking of the unit
-    /// (the tactical module's groups) are not modelled.
+    /// The owner hears `notify` (the hear logic after slot 0x2e8) of the unit whose unit AI's
+    /// target is `ai_target`: a computer player's AI that holds its module hears an explorer
+    /// wanting a point. Its tasking and detasking of the unit (the tactical module's groups) are
+    /// not modelled.
     ///
     /// # Errors
     ///
     /// The tasking or detasking, and what the search does not model.
-    pub(crate) fn hears(&mut self, notify: Notify, roles: &Roles) -> GenieResult<()> {
+    pub(crate) fn hears(
+        &mut self,
+        notify: Notify,
+        ai_target: Option<ObjectId>,
+        roles: &Roles,
+    ) -> GenieResult<()> {
         let player = self.player;
         if !self.player_kind.is_computer() || notify.kind != NotifyKind::REQUIRES_SEARCH {
             return Ok(());
@@ -58,7 +64,7 @@ impl UnitView<'_, '_> {
             return Ok(());
         };
         let saved = self.step.world.streams.clone();
-        let heard = self.hear_explore(&mut module, notify, roles);
+        let heard = self.hear_explore(&mut module, (notify, ai_target), roles);
         self.step.world.streams = saved;
         self.step.world.ai.put_back(player, module);
         match heard? {
@@ -73,7 +79,8 @@ impl UnitView<'_, '_> {
         }
     }
 
-    /// The hear logic's case 0x202 (`FUN_14162e1b0`): the explorer's search.
+    /// The hear logic's case 0x202 (`FUN_14162e1b0`): the explorer's search (its unit AI's
+    /// target `ai_target`, which its top speed reads).
     ///
     /// # Errors
     ///
@@ -81,7 +88,7 @@ impl UnitView<'_, '_> {
     pub(crate) fn hear_explore(
         &mut self,
         module: &mut AiModule,
-        notify: Notify,
+        (notify, ai_target): (Notify, Option<ObjectId>),
         roles: &Roles,
     ) -> GenieResult<Heard> {
         let explore = [
@@ -126,7 +133,7 @@ impl UnitView<'_, '_> {
             (alive, centre)
         };
         let mut unsynced = self.step.world.streams.get_mut(Stream::Unsynced).clone();
-        let (mut area, map, _) = self.scout_area()?;
+        let (mut area, map, _) = self.scout_area(ai_target)?;
         let info = &mut module.info;
         let mut search = |info: &mut InfoModule, from: Point| {
             info.closest_unexplored_tile(&unit, from, &mut area, (map, &mut unsynced))

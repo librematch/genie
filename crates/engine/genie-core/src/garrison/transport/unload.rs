@@ -79,7 +79,7 @@ impl World {
             let unit = self.players.live(player_id, list_index)?;
             let master = unit.master(self.master_tables(), player_id)?;
             Ship::of_unit(
-                (unit, self.parts.mover_of(unit.id)),
+                (unit, self.top_speed(player_id, unit)?),
                 master,
                 self.spatial.map,
                 (
@@ -162,13 +162,15 @@ impl World {
         transport_action: TransportAction,
         point: Position,
     ) -> GenieResult<()> {
-        let rng = self.streams.get_mut(Stream::Sprite);
         let id = self.players.live(player_id, list_index)?.id;
+        let top_speed =
+            self.top_speed_terms(player_id, self.players.live(player_id, list_index)?)?;
+        let rng = self.streams.get_mut(Stream::Sprite);
         self.players
             .live_mut(player_id, list_index)?
             .transport_sail(
                 (transport_action, self.parts.actions.of_mut(id)?),
-                self.parts.motion.layer_mut(id),
+                (self.parts.motion.layer_mut(id), top_speed),
                 point,
                 (&self.spatial, &mut self.zones, &mut self.pathing),
                 &self.model,
@@ -260,7 +262,7 @@ impl World {
             let unit = self.players.live(player_id, list_index)?;
             let master = unit.master(self.master_tables(), player_id)?;
             Ship::of_unit(
-                (unit, self.parts.mover_of(unit.id)),
+                (unit, self.top_speed(player_id, unit)?),
                 master,
                 self.spatial.map,
                 (

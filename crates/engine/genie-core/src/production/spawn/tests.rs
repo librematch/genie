@@ -26,6 +26,7 @@ use crate::objects::SpriteId;
 use crate::objects::Voice;
 use crate::objects::facing::{SpriteFacets, angle_of_facet};
 use crate::objects::layers::Static;
+use crate::objects::masters::AnimatedPart;
 use crate::objects::masters::BuildableOn;
 use crate::objects::masters::FogVisibility;
 use crate::objects::masters::HillMode;
@@ -1054,27 +1055,40 @@ fn gather_point_without_target_walks_the_new_unit_there() {
     );
 }
 
-/// A unit without speed only waits to move; one that already acts, or one not in state 2,
-/// is not modelled.
+/// A unit whose master does not move (the work command's slot 0xe8, `+0x740` not above 0; a
+/// NaN does not move) only waits to move, whatever its own top speed; one whose master moves
+/// walks without a top speed of its own. One that already acts, or one not in state 2, is not
+/// modelled.
 #[test]
-fn gather_point_walk_waits_without_speed_and_stops_at_the_unmodelled() {
-    let mut game = forage_world();
-    game.parts
-        .mover_mut(game.players[1].objects[ListIndex::new(0)].id)
-        .unwrap()
-        .stats
-        .speed = Speed::ZERO;
-    game.gather_move(
-        PlayerId::new(1),
-        ListIndex::new(0),
-        Position::new(40.0, 80.0, 0.0),
-        OrderSource::Direct,
-    )
-    .unwrap();
-    let unit = &game.players[1].objects[ListIndex::new(0)];
-    assert_eq!(game.parts.mover_of(unit.id).unwrap().waiting, 1);
-    assert_eq!(game.parts.actions_of(unit.id).list.move_to().copied(), None);
-    assert_eq!(game.parts.unit_ai.get(unit.id).unwrap().current_order, None);
+fn gather_point_walk_waits_without_master_speed_and_stops_at_the_unmodelled() {
+    let walk = |master_speed: f32, own: Speed| {
+        let mut game = forage_world();
+        let unit = &game.players[1].objects[ListIndex::new(0)];
+        let (id, master_id) = (unit.id, unit.life.master_id);
+        for masters in &mut game.model.masters {
+            if let Some(master) = Arc::make_mut(masters).get_mut(master_id) {
+                master.animated = Some(AnimatedPart {
+                    max_speed: Speed::new(master_speed),
+                });
+            }
+        }
+        game.parts.mover_mut(id).unwrap().stats.speed = own;
+        game.gather_move(
+            PlayerId::new(1),
+            ListIndex::new(0),
+            Position::new(40.0, 80.0, 0.0),
+            OrderSource::Direct,
+        )
+        .unwrap();
+        assert_eq!(game.parts.mover_of(id).unwrap().waiting, 1);
+        (
+            game.parts.actions_of(id).list.move_to().is_some(),
+            game.parts.unit_ai.get(id).unwrap().current_order,
+        )
+    };
+    assert_eq!(walk(0.0, Speed::new(0.8)), (false, None));
+    assert_eq!(walk(f32::NAN, Speed::new(0.8)), (false, None));
+    assert_eq!(walk(0.8, Speed::ZERO), (true, Some(OrderKind::Move)));
     // a second walk finds the first's `MoveTo`
     let mut game = forage_world();
     game.gather_move(

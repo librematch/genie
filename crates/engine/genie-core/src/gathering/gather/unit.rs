@@ -17,6 +17,7 @@ use crate::gathering::hunt::HuntSprites;
 use crate::map::Footprint;
 use crate::map::Position;
 use crate::math::rng::Stream;
+use crate::movement::TopSpeed;
 use crate::movement::move_to::WalkTo;
 use crate::movement::move_to::{MoveDefaults, SpriteReads};
 use crate::movement::{Me, Mover, footprint_gap, footprint_gap_squared};
@@ -129,23 +130,24 @@ impl Unit {
         Ok(())
     }
 
-    /// What the Gather's `MoveTo` constructors read of this gatherer with its mover `mover`
-    /// (`player`'s, whose masters are `every`): the sprites' table `graphics` with the defaults
-    /// of its master and terrain look `look`, and what it carries now.
+    /// What the Gather's `MoveTo` constructors read of this gatherer with its mover `mover` and
+    /// what its slot 0x208 reads `top_speed` (`player`'s, whose masters are `every`): the
+    /// sprites' table `graphics` with the defaults of its master and terrain look `look`, and
+    /// what it carries now.
     ///
     /// # Errors
     ///
     /// A gatherer whose master the table lacks.
     pub(crate) fn move_walks<'graphics>(
         &self,
-        mover: Option<&Mover>,
+        (mover, top_speed): (Option<&Mover>, TopSpeed),
         every: MasterTables<'_>,
         player: PlayerId,
         (graphics, look): (&'graphics Graphics, Option<&Look>),
         roles: &Roles,
     ) -> GenieResult<Walks<'graphics>> {
         let sprites = SpriteReads::of(self.master(every, player)?, look, graphics, roles);
-        Ok(Walks::of(sprites, (self, mover)))
+        Ok(Walks::of(sprites, (self, mover, top_speed)))
     }
 
     /// What the Gather's update reads of the gatherer and its player as it starts
@@ -208,6 +210,7 @@ impl Unit {
                 .get(FARM_FOOD_SOLD)
                 .copied()
                 .unwrap_or(Amount::ZERO),
+            top_speed: step.world.top_speed_terms(step.player, self)?,
         })
     }
 
@@ -325,7 +328,10 @@ impl Unit {
     ) -> GenieResult<HeadCode> {
         // the unit's load is gone (slot 0xf8 after the drop): its walking sprite is the moving one
         let walks = self.move_walks(
-            step.world.parts.mover_of(self.id),
+            (
+                step.world.parts.mover_of(self.id),
+                step.world.top_speed_terms(step.player, self)?,
+            ),
             MasterTables::new(&step.world.model.masters, &step.world.parts.own_master),
             step.player,
             (
@@ -495,7 +501,9 @@ impl Unit {
         let site = if let Some(carry) = carry_to {
             carry.id().get()
         } else if !master.action_part().drop_sites.is_empty() {
+            let top_speed = step.world.top_speed_terms(step.player, self)?;
             let mut drop_world = DropWorld {
+                top_speed,
                 masters: OwnerMasters::new(
                     &step.world.parts.own_master,
                     step.world.model.masters.of(step.player),

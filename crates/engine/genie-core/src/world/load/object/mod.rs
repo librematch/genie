@@ -7,6 +7,7 @@ use crate::combat::AttackCount;
 use crate::combat::Charge;
 use crate::combat::Firepower;
 use crate::combat::KillState;
+use crate::combat::LockdownCount;
 use crate::combat::MissileCount;
 use crate::combat::SpecialSprite;
 use crate::combat::abilities::Abilities;
@@ -379,6 +380,9 @@ fn row(
                 tribe_combat_object.raider_build_countdown
             }),
         ),
+        locked_down: LockdownCount::of_data(object.combat().map_or(0, |tribe_combat_object| {
+            tribe_combat_object.locked_down_count
+        })),
         reload_worldtime: WorldTime::from_millis(
             object
                 .combat()

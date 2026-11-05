@@ -1,5 +1,7 @@
 //! A unit's missile launch: the missile's making and start, which its fire and its volley share.
 
+use crate::objects::layers::Speedup;
+
 use crate::combat::missile::AimAt;
 use crate::combat::missile::ShooterId;
 use crate::combat::missile::{
@@ -128,6 +130,7 @@ impl Unit {
             last_move: step.world.world_time,
             moved_at: Position::ORIGIN,
             substitute_count: SubstituteCount::NONE,
+            speedup: Speedup::NONE,
             ignore_units: Vec::new(),
             user_waypoints: Vec::new(),
             last_turn: Seconds::ZERO,
@@ -136,8 +139,11 @@ impl Unit {
             in_the_way: Vec::new(),
             sprite_facets: facets,
         };
+        // a missile's slot 0x208 is RGE's (FUN_14114d1d0)
+        let top = mover.own_speed();
         let mut position = mover.set_position(
             shot.at,
+            top,
             step.world.spatial.map,
             &step.world.model.tuning.movement,
         );

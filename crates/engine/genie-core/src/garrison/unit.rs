@@ -131,10 +131,15 @@ impl Unit {
                     tp,
                 )?;
                 let room = units_inside(others, unit.id) < master.garrison.units();
+                let target_speed = step.world.top_speed(tp, unit)?;
                 let (mut view, start) = enter_view(
                     &mut step.world.spatial,
                     (self, step.world.parts.mover_of(self.id)),
-                    ((unit, step.world.parts.mover_of(unit.id)), master, room),
+                    (
+                        (unit, step.world.parts.mover_of(unit.id), target_speed),
+                        master,
+                        room,
+                    ),
                     enter.range,
                     by_id,
                 )?;

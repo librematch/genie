@@ -16,6 +16,7 @@ use crate::map::Tile;
 use crate::map::spatial::TileSight;
 use crate::map::spatial::{SearchQuery, Spatial};
 use crate::math::rng::{Stream, Well512};
+use crate::movement::SpeedReads;
 use crate::movement::explore::{
     InfluenceMap, SCOUT_MAP_SIZE, Seeker, beyond_sight, closest_undiscovered, unexplored_area,
 };
@@ -50,6 +51,10 @@ impl UnitView<'_, '_> {
     /// What the search does not model.
     pub(crate) fn closest(&mut self, search: &Search<'_>) -> GenieResult<Found> {
         let roles = &self.step.world.model.roles.clone();
+        let top_speed =
+            self.step
+                .world
+                .top_speed_terms_with(self.player, self.unit, search.ai_target)?;
         let seeker = match search.pick {
             Pick::Attack { seeker, .. } => Some(seeker),
             _ => None,
@@ -77,6 +82,13 @@ impl UnitView<'_, '_> {
                 &self.step.world.parts.own_master,
             ),
             parts: &self.step.world.parts,
+            speeds: SpeedReads::of(
+                &self.step.world.players,
+                &self.step.world.index,
+                &self.step.world.parts,
+                &self.step.world.groups,
+                &self.step.world.model,
+            ),
             by_id: ObjectsRef::new(
                 &self.step.world.players,
                 &self.step.world.index,
@@ -107,7 +119,7 @@ impl UnitView<'_, '_> {
             groups: &self.step.world.groups,
         };
         let unit = &*self.unit;
-        let walker = unit.me(self.actions);
+        let walker = unit.me(self.actions, top_speed);
         let (mover, master_id, at) = (
             self.step.world.parts.mover_of(unit.id),
             unit.life.master_id,
@@ -359,7 +371,7 @@ impl UnitView<'_, '_> {
         let (at, player_kind) = (self.unit.position(), self.player_kind);
         // the search about the town centre only while the player has no scout map
         let scout_map = self.step.world.spatial.scout_map(self.player).is_some();
-        let (mut area, map, line_of_sight) = self.scout_area()?;
+        let (mut area, map, line_of_sight) = self.scout_area(ai.current_target)?;
         if !scout_map && let Some(tile) = unexplored_area(tc, map, &mut area)? {
             return Ok(Some(tile));
         }
@@ -375,15 +387,20 @@ impl UnitView<'_, '_> {
     }
 
     /// The auto scout's last search (`FUN_140c4b130`, [`beyond_sight`]), drawing from the AI
-    /// stream (`rng`); None when it finds no point. The point found is marked in the scout map.
+    /// stream (`rng`), its unit AI's target `ai_target`; None when it finds no point. The point
+    /// found is marked in the scout map.
     ///
     /// # Errors
     ///
     /// What the search does not model.
-    pub(crate) fn seek_beyond_sight(&mut self, rng: &mut Well512) -> GenieResult<Option<Tile>> {
+    pub(crate) fn seek_beyond_sight(
+        &mut self,
+        rng: &mut Well512,
+        ai_target: Option<ObjectId>,
+    ) -> GenieResult<Option<Tile>> {
         let (at, player) = (self.unit.position(), self.player);
         let scouted = self.step.world.spatial.scout_map(player).is_some();
-        let (mut area, map, line_of_sight) = self.scout_area()?;
+        let (mut area, map, line_of_sight) = self.scout_area(ai_target)?;
         area.scouted = scouted;
         let found = beyond_sight(&mut area, at, line_of_sight, map, rng)?;
         // the point found is marked in the scout map (FUN_140f4d5e0 with 1)

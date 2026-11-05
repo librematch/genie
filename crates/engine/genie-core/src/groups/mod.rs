@@ -55,6 +55,7 @@ pub use self::motion_flags::MotionFlags;
 pub use self::move_reason::{MovePath, MoveReason};
 pub(crate) use self::objects::WorldObject;
 pub use self::objects::sub_formation;
+pub(crate) use self::objects::world_object_in;
 pub use self::outcomes::{
     GroupFate, GroupMove, Join, Layout, MemberMove, Orientation, Progress, QueueRun, Resize,
     SlotTry, SpriteShow,

@@ -771,14 +771,17 @@ mod tests {
             &world.model.roles,
             &world.model.tuning,
         );
-        let (_, unit, _) = objects
+        let (owner, unit, _) = objects
             .with_master(id)?
             .ok_or(GenieError::missing_data("the seeking villager"))?;
         let mover = world
             .parts
             .mover_of(id)
             .ok_or(GenieError::missing_data("the villager's movement state"))?;
-        let walker = unit.me(world.parts.actions_of(id));
+        let walker = unit.me(
+            world.parts.actions_of(id),
+            world.top_speed_terms(owner, unit)?,
+        );
         let mut plan = Planning {
             pathing: &mut world.pathing,
             now: world.world_time,

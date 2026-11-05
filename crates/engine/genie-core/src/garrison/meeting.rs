@@ -16,6 +16,7 @@ use crate::math::image::garrison::HALF_TILE as GARRISON_HALF_TILE;
 use crate::movement::MoveStats;
 use crate::movement::Mover;
 use crate::movement::Speed;
+use crate::movement::TopSpeed;
 use crate::movement::footprint_gap_squared;
 use crate::movement::move_to::MOVE_TO;
 use crate::movement::{Planning, footprint_gap};
@@ -222,18 +223,13 @@ fn buildings_on(spatial: &Spatial, by_id: ObjectsRef<'_>, tile: Tile) -> GenieRe
 }
 
 /// [`MeetingTarget`] of the target `unit` with its action layer `target_actions`, why the load
-/// could not read it whole `target_unread` ([`crate::world::Unread`]) and its mover `target_mover`
-/// (of master `tm`) with `room` for the unit: its top speed
-/// ([`crate::movement::MoveStats::speed`]), its top action's state and its point (`+0x38`,
+/// could not read it whole `target_unread` ([`crate::world::Unread`]) and its top speed
+/// `target_speed` (slot 0x208, [`crate::world::World::top_speed`]; of master `tm`) with `room`
+/// for the unit: that speed, its top action's state and its point (`+0x38`,
 /// `+0x3c`): a `MoveTo`'s ([`crate::movement::move_to::MoveToAction::point`]) or a Transport's. An
 /// action the slice does not hold has neither; another no point the slice keeps.
 pub(crate) fn meeting_target(
-    (unit, target_actions, target_unread, target_mover): (
-        &Unit,
-        &Action,
-        Option<&Unread>,
-        Option<&Mover>,
-    ),
+    (unit, target_actions, target_unread, target_speed): (&Unit, &Action, Option<&Unread>, Speed),
     tm: &Master,
     room: bool,
 ) -> GenieResult<MeetingTarget> {
@@ -255,7 +251,7 @@ pub(crate) fn meeting_target(
     };
     Ok(MeetingTarget {
         room,
-        speed: target_mover.map_or(Speed::ZERO, |mover| mover.stats.speed),
+        speed: target_speed,
         state: target_actions
             .top_action()
             .map_or(ActionState::NO_ACTION, |top_action| top_action.state),
@@ -405,13 +401,14 @@ impl Walls<'_> {
 }
 
 /// [`EnterAction::in_reach`] of the unit `id` (its movement state `stats`, its place in
-/// `spatial`) for its target `target` (its top speed and where it last moved to): the squared
+/// `spatial`) for its target `target` (where it last moved to, by its mover, and its top speed
+/// slot 0x208, `0x140a85c82`): the squared
 /// footprints' gap of their places, and the tile test ([`walled_off`]) about where each last
 /// moved to (slot 0x520), its buildings those whose master (`by_id`'s) is of type 80.
 pub(crate) fn enter_reach(
     spatial: &mut Spatial,
     (id, stats, moved_at): (ObjectId, &MoveStats, Position),
-    (target, target_mover): (ObjectId, Option<&Mover>),
+    (target, target_mover, target_speed): (ObjectId, Option<&Mover>, Speed),
     range: Distance,
     by_id: ObjectsRef<'_>,
 ) -> GenieResult<bool> {
@@ -422,7 +419,7 @@ pub(crate) fn enter_reach(
         "an Enter's building without a place",
     ))?;
     let gap = footprint_gap_squared(me.position, me.radius, them.position, them.radius);
-    let speed = target_mover.map_or(Speed::ZERO, |mover| mover.stats.speed);
+    let speed = target_speed;
     let them_at = target_mover.map_or(them.position, |mover| mover.moved_at);
     let mut walls = Walls {
         me: moved_at.ground(),
@@ -446,7 +443,11 @@ pub(crate) fn enter_reach(
 pub(crate) fn enter_view(
     spatial: &mut Spatial,
     (unit, mover): (&Unit, Option<&Mover>),
-    ((target, target_mover), tm, room): ((&Unit, Option<&Mover>), &Master, bool),
+    ((target, target_mover, target_speed), tm, room): (
+        (&Unit, Option<&Mover>, Speed),
+        &Master,
+        bool,
+    ),
     range: Distance,
     by_id: ObjectsRef<'_>,
 ) -> GenieResult<(EnterTarget, WalkStart)> {
@@ -465,7 +466,7 @@ pub(crate) fn enter_view(
     let in_reach = enter_reach(
         spatial,
         (unit.id, &stats, moved_at),
-        (target.id, target_mover),
+        (target.id, target_mover, target_speed),
         range,
         by_id,
     )?;
@@ -514,8 +515,8 @@ pub(crate) struct Meeting<'world> {
     pub(crate) unit: &'world Unit,
     /// The entering unit's mover (its motion layer's), none for one that does not move.
     pub(crate) mover: Option<&'world Mover>,
-    /// The target's mover, none for one that does not move.
-    pub(crate) target_mover: Option<&'world Mover>,
+    /// The target's top speed (slot 0x208, `0x140a8602b`).
+    pub(crate) target_speed: Speed,
 }
 
 impl Meeting<'_> {
@@ -536,7 +537,7 @@ impl Meeting<'_> {
                 self.target,
                 self.target_actions,
                 self.target_unread,
-                self.target_mover,
+                self.target_speed,
             ),
             self.master,
             self.room,
@@ -553,10 +554,10 @@ impl Meeting<'_> {
 
 /// A transport's slot 0x3d8 (`FUN_14114ffc0`) for an Enter: whether `ship` reaches within
 /// `GarrisonTuning::enter_near` of the point's tile (the point truncated), [`crate::movement::Mover::reaches`]
-/// from where it last moved to (`actions`, its action layer); one without movement state does
-/// not.
+/// from where it last moved to (`actions`, its action layer; `top_speed`, what its top speed
+/// reads); one without movement state does not.
 pub(crate) fn ship_reaches(
-    (ship, actions, mover): (&Unit, &Action, Option<&Mover>),
+    (ship, actions, (mover, top_speed)): (&Unit, &Action, (Option<&Mover>, TopSpeed)),
     world: &mut Spatial,
     plan: &mut Planning<'_>,
     to: Position,
@@ -566,7 +567,7 @@ pub(crate) fn ship_reaches(
     let Some(mover) = mover else {
         return Ok(false);
     };
-    let me = ship.me(actions);
+    let me = ship.me(actions, top_speed);
     let goal = Point::new(cvttss2si(to.x()) as f32, cvttss2si(to.y()) as f32);
     mover.reaches(
         (ship.position(), &me),

@@ -93,13 +93,13 @@ impl WalkTo {
 }
 
 impl<'graphics> MoveToReads<'graphics> {
-    /// What a new `MoveTo` reads of `unit` with its mover `mover` (its motion layer's) of
-    /// `master` (its own, or the one its task switches it to), with the sprites' table
-    /// `graphics` and the unit's terrain look `look` (its combat layer's): an object without
-    /// movement has no speed (a static object's slot 0x208).
+    /// What a new `MoveTo` reads of `unit` of top speed `top` (slot 0x208 where it stands,
+    /// [`crate::world::World::top_speed`]: an object without movement has none) of `master`
+    /// (its own, or the one its task switches it to), with the sprites' table `graphics` and
+    /// the unit's terrain look `look` (its combat layer's).
     #[must_use]
     pub fn of(
-        (unit, mover): (&Unit, Option<&Mover>),
+        (unit, top): (&Unit, Speed),
         master: &Master,
         (graphics, look): (&'graphics Graphics, Option<&Look>),
         roles: &Roles,
@@ -107,24 +107,24 @@ impl<'graphics> MoveToReads<'graphics> {
         Self {
             sprites: SpriteReads::of(master, look, graphics, roles),
             state: unit.life.state,
-            speed: mover.map_or(Speed::ZERO, |mover| mover.stats.speed),
+            speed: top,
             at: unit.position(),
             ground: master.radius,
         }
     }
 
-    /// What a new `MoveTo` reads of `unit` with its mover `mover` and the sprites `sprites`:
-    /// its state and speed, its place and the radii of its movement state (none for a unit that
-    /// does not move).
+    /// What a new `MoveTo` reads of `unit` with its mover `mover`, its top speed `top` (slot
+    /// 0x208 where it stands) and the sprites `sprites`: its state and speed, its place and the
+    /// radii of its movement state (none for a unit that does not move).
     #[must_use]
     pub fn with_sprites(
         sprites: SpriteReads<'graphics>,
-        (unit, mover): (&Unit, Option<&Mover>),
+        (unit, mover, top): (&Unit, Option<&Mover>, Speed),
     ) -> Self {
         Self {
             sprites,
             state: unit.life.state,
-            speed: mover.map_or(Speed::ZERO, |mover| mover.stats.speed),
+            speed: top,
             at: unit.position(),
             ground: mover.map_or(Footprint::ZERO, |mover| mover.stats.radius.ground()),
         }
@@ -285,14 +285,14 @@ impl Unit {
     /// A unit whose master the table lacks.
     pub(crate) fn move_to_reads<'graphics>(
         &self,
-        mover: Option<&Mover>,
+        top: Speed,
         every: MasterTables<'_>,
         player: PlayerId,
         graphics: (&'graphics Graphics, Option<&Look>),
         roles: &Roles,
     ) -> GenieResult<MoveToReads<'graphics>> {
         Ok(MoveToReads::of(
-            (self, mover),
+            (self, top),
             self.master(every, player)?,
             graphics,
             roles,

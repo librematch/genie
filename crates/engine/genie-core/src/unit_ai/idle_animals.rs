@@ -235,6 +235,7 @@ impl UnitAi {
                 reach: true,
             },
             memory: Memory::default(),
+            ai_target: self.current_target,
         })?;
         self.alert(found, at.dt_seconds);
         if found.id.is_some() {
@@ -303,6 +304,7 @@ impl UnitAi {
         } else {
             sight
         };
+        let ai_target = self.current_target;
         let search = |group| Search {
             at: at.position.ground(),
             radius,
@@ -318,6 +320,7 @@ impl UnitAi {
                 reach: true,
             },
             memory: Memory::default(),
+            ai_target,
         };
         let mut reach = if at.flags.contains(SurroundingFlags::MODE_1) {
             at.los

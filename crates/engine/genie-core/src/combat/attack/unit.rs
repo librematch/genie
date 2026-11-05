@@ -119,7 +119,10 @@ impl Unit {
             .get(step.player.index())
             .map_or(PlayerKind::Phantom, |player| player.kind);
         let attack_reads = AttackReads::of(
-            step.world.parts.combat_of(self.id),
+            (
+                step.world.parts.combat_of(self.id),
+                step.world.top_speed_terms(step.player, self)?,
+            ),
             master,
             (
                 OwnerMasters::new(
@@ -162,7 +165,10 @@ impl Unit {
             .get(step.player.index())
             .map_or(PlayerKind::Phantom, |player| player.kind);
         let attack_reads = AttackReads::of(
-            step.world.parts.combat_of(self.id),
+            (
+                step.world.parts.combat_of(self.id),
+                step.world.top_speed_terms(step.player, self)?,
+            ),
             master,
             (
                 OwnerMasters::new(

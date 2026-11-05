@@ -13,6 +13,7 @@ use crate::map::spatial::Tiles;
 use crate::map::spatial::{Gait, Obstruction, Placed};
 use crate::math::fmath::{cross, minss, normalize};
 use crate::movement::LevelFlags;
+use crate::movement::TopSpeed;
 use crate::movement::Turn;
 use crate::movement::WaypointLevel;
 use crate::movement::move_to::MoveWaitState;
@@ -26,6 +27,7 @@ use crate::objects::SpeedMultiplier;
 use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
 use crate::objects::facing::{angle_of_facet, facet_of_forward};
+use crate::objects::layers::Speedup;
 use crate::objects::layers::{Action, Motion as LayersMotion, Static};
 use crate::objects::masters::BuildableOn;
 use crate::objects::masters::ClassId;
@@ -216,6 +218,7 @@ pub(crate) fn builder_9177() -> Mover {
         last_move: WorldTime::ZERO,
         moved_at: Position::new(28.0, 89.0, 0.0),
         substitute_count: SubstituteCount::of_data(0),
+        speedup: Speedup::NONE,
         ignore_units: Vec::new(),
         user_waypoints: Vec::new(),
         last_turn: Seconds::ZERO,
@@ -298,6 +301,7 @@ fn the_ignore_list_takes_the_own_list_when_the_top_path_is_this_update_s() {
         id: object_id(9177),
         group: None,
         action_state: ActionState::NO_ACTION,
+        top_speed: TopSpeed::Own,
     };
     let mut builder = builder_9177();
     builder.ignore_units = vec![object_id(5), object_id(9177), object_id(6)];
@@ -479,6 +483,7 @@ fn drop_off_walker_ignores_the_allied_workers_standing_beside_it() {
         id: object_id(9177),
         group: None,
         action_state,
+        top_speed: TopSpeed::Own,
     };
     let mut builder = builder_9177();
     builder.paths.clear();
@@ -734,13 +739,18 @@ fn kept_hit_on_the_target_alone_is_kept_and_reaches_the_waypoint() {
         id: object_id(9177),
         group: None,
         action_state: ActionState::NO_ACTION,
+        top_speed: TopSpeed::Own,
     };
     let place = Static::at(Position::new(28.0, 89.0, 0.0));
     let mut mover = builder_9177();
     mover.paths[0].target = Some(object_id(9175));
     let position = mover.moved_at.vector();
     let waypoint = mover.paths[0].point(WaypointIndex::of_data(1));
-    let projected = mover.projected(mover.direction_to(position, waypoint), Seconds::new(DT));
+    let projected = mover.projected(
+        mover.direction_to(position, waypoint),
+        Seconds::new(DT),
+        mover.own_speed(),
+    );
     let avoided = mover.avoid(
         (place.position(), &me),
         (&spatial, None, objects.view()),
@@ -803,6 +813,7 @@ fn kept_hits_replan_the_parent_or_stop_walk_without_one() {
         id: object_id(9177),
         group: None,
         action_state: ActionState::NO_ACTION,
+        top_speed: TopSpeed::Own,
     };
     let mut mover = builder_9177();
     assert_eq!(mover.paths.len(), 2);
@@ -852,13 +863,18 @@ fn map_edge_record_is_hit_without_an_object() {
         id: object_id(9177),
         group: None,
         action_state: ActionState::NO_ACTION,
+        top_speed: TopSpeed::Own,
     };
     let place = Static::at(Position::new(28.0, 89.0, 0.0));
     let mut mover = builder_9177();
     mover.paths[0].target = Some(object_id(9175));
     let position = mover.moved_at.vector();
     let waypoint = mover.paths[0].point(WaypointIndex::of_data(1));
-    let projected = mover.projected(mover.direction_to(position, waypoint), Seconds::new(DT));
+    let projected = mover.projected(
+        mover.direction_to(position, waypoint),
+        Seconds::new(DT),
+        mover.own_speed(),
+    );
     let edge = RecordId::Edge(Tile::new(5, 3));
     let avoided = mover
         .avoid(
@@ -970,6 +986,7 @@ fn big_unit_path_request_takes_the_old_pather_with_the_walk_kept_hits() {
         id: object_id(9171),
         group: None,
         action_state: ActionState::NO_ACTION,
+        top_speed: TopSpeed::Own,
     };
     let mut pathing = Pathing::default();
     let mut object = Well512::default();
@@ -1076,6 +1093,7 @@ fn the_reach_test_starts_where_the_unit_last_moved_to() {
         id: object_id(9177),
         group: None,
         action_state: ActionState::NO_ACTION,
+        top_speed: TopSpeed::Own,
     };
     let place = Static::at(Position::new(5.5, 5.5, 0.0));
     let mut mover = builder_9177();
@@ -1298,6 +1316,7 @@ fn the_position_setter_holds_the_row_by_the_map_width() {
     // a map 40 wide and 120 high: y 100 lies beyond the width less the radius and the gap
     let at = mover.set_position(
         Position::new(10.0, 100.0, 0.0),
+        mover.own_speed(),
         GridSize::new(40, 120),
         &tuning().movement,
     );
@@ -1309,8 +1328,9 @@ fn the_position_setter_holds_the_row_by_the_map_width() {
         still
             .set_position(
                 Position::new(10.0, 100.0, 0.0),
+                still.own_speed(),
                 GridSize::new(40, 120),
-                &tuning().movement
+                &tuning().movement,
             )
             .y(),
         100.0
@@ -1430,6 +1450,7 @@ fn loop_reached_waypoint_moves_on_and_its_first_ends_the_step() {
         id: object_id(9177),
         group: None,
         action_state: ActionState::NO_ACTION,
+        top_speed: TopSpeed::Own,
     };
     let goal = Goal {
         target: None,
@@ -1513,6 +1534,7 @@ fn walk_whose_target_is_gone_walks_as_to_point() {
             id: object_id(9926),
             group: None,
             action_state: ActionState::NO_ACTION,
+            top_speed: TopSpeed::Own,
         };
         let motion = mover.motion(
             &mut place,
@@ -1784,6 +1806,7 @@ fn level_0_looks_ahead_to_the_farthest_parent_waypoint_it_walks_to_straight() {
         id: object_id(9517),
         group: None,
         action_state: ActionState::NO_ACTION,
+        top_speed: TopSpeed::Own,
     };
     // land of a terrain class the unit's mask (6) has
     let mut spatial = Spatial::with_tiles(
@@ -2017,6 +2040,7 @@ fn unit_closes_in_along_clear_straight_line() {
         id: object_id(9177),
         group: None,
         action_state: ActionState::NO_ACTION,
+        top_speed: TopSpeed::Own,
     };
     let mut open = tiled_world(vec![4; 120 * 120]);
     assert_eq!(
@@ -2097,6 +2121,7 @@ fn close_in_leaves_the_managers_ignore_list_its_query_set() {
         id: object_id(9177),
         group: None,
         action_state: ActionState::NO_ACTION,
+        top_speed: TopSpeed::Own,
     };
     let mut classes = vec![4; 120 * 120];
     for x in 26..31 {
@@ -2137,6 +2162,7 @@ fn long_path_ends_before_its_first_walled_stretch() {
         id: object_id(9177),
         group: None,
         action_state: ActionState::NO_ACTION,
+        top_speed: TopSpeed::Own,
     };
     let path = || Path {
         points: vec![
@@ -2228,6 +2254,7 @@ fn long_plan_reaches_its_waypoint_stops_short_or_ends_at_band() {
             id: object_id(9177),
             group: None,
             action_state: ActionState::NO_ACTION,
+            top_speed: TopSpeed::Own,
         };
         let place = Static::at(Position::new(28.0, 89.0, 0.0));
         let mut mover = builder_9177();
@@ -2402,6 +2429,7 @@ impl WalkRig {
                 id: object_id(9177),
                 group: None,
                 action_state: ActionState::new(state),
+                top_speed: TopSpeed::Own,
             },
             dt: Seconds::new(0.1),
             world: &mut self.world,
@@ -2461,7 +2489,7 @@ fn tick(mover: &mut Mover, at: Position, world: &mut Spatial) -> (Position, Moti
         Seconds::new(DT),
         world.map,
         None,
-        (WorldTime::ZERO, None),
+        (WorldTime::ZERO, None, TopSpeed::Own),
         &tuning().movement,
     );
     mover
@@ -2482,6 +2510,7 @@ fn tick(mover: &mut Mover, at: Position, world: &mut Spatial) -> (Position, Moti
                 id: object_id(9177),
                 group: None,
                 action_state: ActionState::NO_ACTION,
+                top_speed: TopSpeed::Own,
             },
             Seconds::new(DT),
             world,
@@ -2503,6 +2532,7 @@ fn walk_on_or_past_its_waypoint_counts_it_reached() {
         id: object_id(9177),
         group: None,
         action_state: ActionState::NO_ACTION,
+        top_speed: TopSpeed::Own,
     };
     let levels = |mover: &Mover| {
         mover
@@ -2578,45 +2608,77 @@ fn the_speed_slot_caps_the_speed_unless_the_unit_group_steers_it() {
     let mut mover = builder_9177();
     mover.stats.speed = Speed::new(1.2);
     assert_eq!(
-        mover.next_speed(Speed::new(5.0), None, &tuning().movement),
+        mover.next_speed(
+            Speed::new(5.0),
+            (None, mover.own_speed()),
+            &tuning().movement
+        ),
         Speed::new(1.2)
     );
     assert_eq!(
-        mover.next_speed(Speed::new(-1.0), None, &tuning().movement),
+        mover.next_speed(
+            Speed::new(-1.0),
+            (None, mover.own_speed()),
+            &tuning().movement
+        ),
         Speed::new(0.0)
     );
     assert_eq!(
-        mover.next_speed(Speed::new(0.7), None, &tuning().movement),
+        mover.next_speed(
+            Speed::new(0.7),
+            (None, mover.own_speed()),
+            &tuning().movement
+        ),
         Speed::new(0.7)
     );
     assert!(
         mover
-            .next_speed(Speed::new(f32::NAN), None, &tuning().movement)
+            .next_speed(
+                Speed::new(f32::NAN),
+                (None, mover.own_speed()),
+                &tuning().movement
+            )
             .get()
             .is_nan()
     );
     assert_eq!(
-        mover.next_speed(Speed::new(5.0), Some(GroupSpeed::Aside), &tuning().movement),
+        mover.next_speed(
+            Speed::new(5.0),
+            (Some(GroupSpeed::Aside), mover.own_speed()),
+            &tuning().movement
+        ),
         Speed::new(0.0)
     );
     assert_eq!(
-        mover.next_speed(Speed::new(5.0), Some(GroupSpeed::Free), &tuning().movement),
+        mover.next_speed(
+            Speed::new(5.0),
+            (Some(GroupSpeed::Free), mover.own_speed()),
+            &tuning().movement
+        ),
         Speed::new(5.0)
     );
     assert_eq!(
-        mover.next_speed(Speed::new(-1.0), Some(GroupSpeed::Free), &tuning().movement),
+        mover.next_speed(
+            Speed::new(-1.0),
+            (Some(GroupSpeed::Free), mover.own_speed()),
+            &tuning().movement
+        ),
         Speed::new(0.0)
     );
     assert_eq!(
-        mover.next_speed(Speed::new(10.0), Some(GroupSpeed::Free), &tuning().movement),
+        mover.next_speed(
+            Speed::new(10.0),
+            (Some(GroupSpeed::Free), mover.own_speed()),
+            &tuning().movement
+        ),
         Speed::new(1.2)
     );
     assert!(
         mover
             .next_speed(
                 Speed::new(f32::NAN),
-                Some(GroupSpeed::Free),
-                &tuning().movement
+                (Some(GroupSpeed::Free), mover.own_speed()),
+                &tuning().movement,
             )
             .get()
             .is_nan()
@@ -2624,28 +2686,48 @@ fn the_speed_slot_caps_the_speed_unless_the_unit_group_steers_it() {
     let own = Some(GroupSpeed::OwnMove(Speed::new(1.44)));
     assert_eq!(mover.paths[0].state, PathState::Walking);
     assert_eq!(
-        mover.next_speed(Speed::new(-1.0), own, &tuning().movement),
+        mover.next_speed(
+            Speed::new(-1.0),
+            (own, mover.own_speed()),
+            &tuning().movement
+        ),
         Speed::new(1.44)
     );
     mover.paths[0].pause_time = Seconds::new(0.028);
     assert_eq!(
-        mover.next_speed(Speed::new(0.5), own, &tuning().movement),
+        mover.next_speed(
+            Speed::new(0.5),
+            (own, mover.own_speed()),
+            &tuning().movement
+        ),
         Speed::new(0.0)
     );
     mover.paths[0].pause_time = Seconds::new(f32::NAN);
     assert_eq!(
-        mover.next_speed(Speed::new(0.5), own, &tuning().movement),
+        mover.next_speed(
+            Speed::new(0.5),
+            (own, mover.own_speed()),
+            &tuning().movement
+        ),
         Speed::new(1.44)
     );
     mover.paths[0].pause_time = Seconds::ZERO;
     mover.paths[0].state = PathState::WantsPath;
     assert_eq!(
-        mover.next_speed(Speed::new(0.5), own, &tuning().movement),
+        mover.next_speed(
+            Speed::new(0.5),
+            (own, mover.own_speed()),
+            &tuning().movement
+        ),
         Speed::new(0.0)
     );
     mover.paths.clear();
     assert_eq!(
-        mover.next_speed(Speed::new(0.5), own, &tuning().movement),
+        mover.next_speed(
+            Speed::new(0.5),
+            (own, mover.own_speed()),
+            &tuning().movement
+        ),
         Speed::new(0.0)
     );
 }
@@ -2661,7 +2743,11 @@ fn the_velocity_step_of_paused_member_on_its_own_move_stands() {
         Seconds::new(DT),
         GridSize::new(120, 120),
         None,
-        (WorldTime::ZERO, Some(GroupSpeed::OwnMove(Speed::new(1.2)))),
+        (
+            WorldTime::ZERO,
+            Some(GroupSpeed::OwnMove(Speed::new(1.2))),
+            TopSpeed::Own,
+        ),
         &tuning().movement,
     );
     assert_eq!(at, Position::new(28.0, 89.0, 0.0));
@@ -2684,14 +2770,18 @@ fn the_step_and_the_speed_control_start_where_the_unit_last_moved_to() {
         Seconds::new(1.0),
         GridSize::new(120, 120),
         None,
-        (WorldTime::ZERO, None),
+        (WorldTime::ZERO, None, TopSpeed::Own),
         &tuning().movement,
     );
     assert_eq!(at, Position::new(10.5, 20.0, 0.0));
     assert_eq!(mover.moved_at, Position::new(10.5, 20.0, 0.0));
     // the projection along +x: 0.5 tiles from (10.5, 20)
     assert_eq!(
-        mover.projected(BVector::new(1.0, 0.0, 0.0), Seconds::new(1.0)),
+        mover.projected(
+            BVector::new(1.0, 0.0, 0.0),
+            Seconds::new(1.0),
+            mover.own_speed()
+        ),
         BVector::new(11.0, 0.0, 20.0)
     );
     // the speed control's turning circle around (10.5, 20) grown to the right by 1: a
@@ -2699,10 +2789,18 @@ fn the_step_and_the_speed_control_start_where_the_unit_last_moved_to() {
     mover.stats.turn_radius = Distance::new(2.0);
     mover.stats.turn_radius_speed = Speed::new(1.0);
     mover.right = BVector::new(0.0, 0.0, -1.0);
-    mover.control_speed(BVector::new(10.5, 0.0, 19.2), Turn::Whole);
+    mover.control_speed(
+        BVector::new(10.5, 0.0, 19.2),
+        Turn::Whole,
+        mover.own_speed(),
+    );
     assert_eq!(mover.velocity.as_ref().unwrap().acceleration.y(), -f32::MAX);
     mover.velocity.as_mut().unwrap().acceleration = BVector::ZERO;
-    mover.control_speed(BVector::new(12.0, 0.0, 17.0), Turn::Whole);
+    mover.control_speed(
+        BVector::new(12.0, 0.0, 17.0),
+        Turn::Whole,
+        mover.own_speed(),
+    );
     assert_eq!(mover.velocity.as_ref().unwrap().acceleration.y(), f32::MAX);
 }
 
@@ -2754,6 +2852,7 @@ fn walk_to_point_goes_on_until_its_range() {
         id: object_id(9926),
         group: None,
         action_state: ActionState::NO_ACTION,
+        top_speed: TopSpeed::Own,
     };
     assert_eq!(
         hawk.motion(
@@ -2854,6 +2953,7 @@ fn top_level_short_of_its_moved_target_arrives() {
             id: object_id(9177),
             group: None,
             action_state: ActionState::NO_ACTION,
+            top_speed: TopSpeed::Own,
         };
         let mut place = Static::at(Position::new(30.0, 88.0, 0.0));
         mover.paths[0].target = ObjectId::of_field(target_id);
@@ -2952,6 +3052,7 @@ fn next_waypoint_an_object_stands_on_goes() {
         id: object_id(9177),
         group: None,
         action_state: ActionState::NO_ACTION,
+        top_speed: TopSpeed::Own,
     };
     let goal = Goal {
         target: None,
@@ -3031,6 +3132,7 @@ fn reached_waypoint_ends_the_walk_at_the_end_of_the_path() {
         id: object_id(9175),
         group: None,
         action_state: ActionState::NO_ACTION,
+        top_speed: TopSpeed::Own,
     };
     assert_eq!(
         mover.motion(
@@ -3098,6 +3200,7 @@ fn path_request_makes_the_top_level_from_the_unit_to_its_goal() {
         id: object_id(9175),
         group: None,
         action_state: ActionState::NO_ACTION,
+        top_speed: TopSpeed::Own,
     };
     assert_eq!(
         mover.motion(
@@ -3124,6 +3227,7 @@ fn unit_with_no_speed_or_no_path_is_done() {
         id: object_id(9177),
         group: None,
         action_state: ActionState::NO_ACTION,
+        top_speed: TopSpeed::Own,
     };
     assert_eq!(
         mover.motion(
@@ -3180,6 +3284,7 @@ fn an_arrived_level_under_one_without_path_ends_the_step() {
         id: object_id(9177),
         group: None,
         action_state: ActionState::NO_ACTION,
+        top_speed: TopSpeed::Own,
     };
     assert_eq!(
         mover.motion(
@@ -3218,6 +3323,7 @@ fn human_walker_pauses_met_unit_of_an_older_human_order() {
         id: object_id(9177),
         group: None,
         action_state: ActionState::NO_ACTION,
+        top_speed: TopSpeed::Own,
     };
     let walker = |human_order| Gait {
         human_order,
@@ -3298,6 +3404,7 @@ fn two_members_of_one_group_rank_by_their_places_in_it() {
         id: object_id(9177),
         group: Some(group_id(4)),
         action_state: ActionState::NO_ACTION,
+        top_speed: TopSpeed::Own,
     };
     let groups = |ids: &[i32]| UnitGroups {
         groups: vec![UnitGroup {
@@ -3318,7 +3425,11 @@ fn two_members_of_one_group_rank_by_their_places_in_it() {
         let mover = builder_9177();
         let position = mover.moved_at.vector();
         let waypoint = mover.paths[0].point(WaypointIndex::of_data(1));
-        let projected = mover.projected(mover.direction_to(position, waypoint), Seconds::new(DT));
+        let projected = mover.projected(
+            mover.direction_to(position, waypoint),
+            Seconds::new(DT),
+            mover.own_speed(),
+        );
         mover
             .avoid(
                 (place.position(), me),
@@ -3369,6 +3480,7 @@ fn group_member_on_an_own_move_of_reason_0_keeps_only_buildings_walls_and_gates(
         id: object_id(9177),
         group: Some(group_id(4)),
         action_state: ActionState::NO_ACTION,
+        top_speed: TopSpeed::Own,
     };
     let groups = |member: i32, reason: i32| UnitGroups {
         groups: vec![UnitGroup {
@@ -3390,7 +3502,11 @@ fn group_member_on_an_own_move_of_reason_0_keeps_only_buildings_walls_and_gates(
         let mover = builder_9177();
         let position = mover.moved_at.vector();
         let waypoint = mover.paths[0].point(WaypointIndex::of_data(1));
-        let projected = mover.projected(mover.direction_to(position, waypoint), Seconds::new(DT));
+        let projected = mover.projected(
+            mover.direction_to(position, waypoint),
+            Seconds::new(DT),
+            mover.own_speed(),
+        );
         mover
             .avoid(
                 (place.position(), &me),

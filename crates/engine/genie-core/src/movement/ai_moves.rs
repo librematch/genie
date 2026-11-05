@@ -6,6 +6,7 @@ use crate::map::Distance;
 use crate::map::Position;
 use crate::movement::Mover;
 use crate::movement::Speed;
+use crate::movement::TopSpeed;
 use crate::movement::move_to::Patience;
 use crate::objects::ObjectId;
 use crate::objects::layers::MotionMut;
@@ -49,8 +50,8 @@ use crate::world::step::Step;
 use crate::world::{Unread, WALKER_UNMOVING};
 
 /// What the sprites of a move the unit AI gives read: the owner's masters, the sprites' table,
-/// the unit's terrain look and the build's roles ([`Unit::ai_move_with`],
-/// [`Unit::head_takes_point`]).
+/// the unit's terrain look and the build's roles, and what its slot 0x208 reads
+/// ([`Unit::ai_move_with`], [`Unit::head_takes_point`]).
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct MoveSprites<'world> {
     /// The unit's owner's masters.
@@ -65,6 +66,8 @@ pub(crate) struct MoveSprites<'world> {
     pub(crate) sprite_tuning: SpriteTuning,
     /// The `MoveTo`'s tuning values.
     pub(crate) move_to_tuning: &'world MoveToTuning,
+    /// What the unit's slot 0x208 reads besides its mover's own speed and its place.
+    pub(crate) top_speed: TopSpeed,
 }
 
 impl Unit {
@@ -79,6 +82,7 @@ impl Unit {
         roles: &Roles,
     ) -> GenieResult<()> {
         let by = self.releaser(step)?;
+        let top_speed = step.world.top_speed_terms(step.player, self)?;
         let sprite_rng = step.world.streams.get_mut(Stream::Sprite);
         let (mut releases, mut leaves) = (Vec::new(), Vec::new());
         let sails = self.ai_move_with(
@@ -98,6 +102,7 @@ impl Unit {
                     roles,
                     sprite_tuning: step.world.model.tuning.sprite,
                     move_to_tuning: &step.world.model.tuning.move_to,
+                    top_speed,
                 },
                 sprite_rng,
             ),
@@ -107,7 +112,7 @@ impl Unit {
             let sprite_rng = step.world.streams.get_mut(Stream::Sprite);
             self.transport_sail(
                 (transport_action, actions),
-                step.world.parts.motion.layer_mut(self.id),
+                (step.world.parts.motion.layer_mut(self.id), top_speed),
                 requested.point,
                 (
                     &step.world.spatial,
@@ -207,13 +212,24 @@ impl Unit {
             PointMove::Sails(transport_action) => return Ok(MoveWith::Sails(transport_action)),
             PointMove::Declined => {}
         }
-        self.clear_own_actions(actions, motion.reborrow(), releases, builder_leaves, by)?;
+        let top = sprites
+            .top_speed
+            .of_object(motion.mover(), self.position().ground());
+        self.clear_own_actions(
+            actions,
+            (motion.reborrow(), top),
+            releases,
+            builder_leaves,
+            by,
+        )?;
         let master = self.master_in(masters)?;
         let sprite = ai_sprite(master, ai_move.pace)
             .or_else(|| point_sprite(master, look, Cargo::Empty, roles))
             .and_then(|id| graphics.get(id).copied());
-        let move_to =
-            MoveToAction::to_point(ai_move.point, ai_move.range, sprite, motion.mover_mut());
+        let top = sprites
+            .top_speed
+            .of_object(motion.mover(), self.position().ground());
+        let move_to = MoveToAction::to_point(ai_move.point, ai_move.range, sprite, top);
         if move_to.shows_standing() {
             self.shows_standing_sprite(motion, masters, graphics, sprite_rng, sprite_tuning)?;
         }
@@ -253,6 +269,7 @@ impl Unit {
             look,
             roles,
             move_to_tuning,
+            top_speed,
             ..
         } = sprites;
         if unread.is_some() {
@@ -279,7 +296,7 @@ impl Unit {
                     actions,
                     motion.mover_mut(),
                     point,
-                    &sprites,
+                    (&sprites, top_speed),
                     move_to_tuning,
                 )
             }
@@ -290,7 +307,7 @@ impl Unit {
                     motion.mover_mut(),
                     point,
                     player,
-                    sprites,
+                    (sprites, top_speed),
                     move_to_tuning,
                 )
             }
@@ -301,7 +318,7 @@ impl Unit {
                     motion.mover_mut(),
                     point,
                     player,
-                    sprites,
+                    (sprites, top_speed),
                     move_to_tuning,
                 )
             }
@@ -311,8 +328,9 @@ impl Unit {
             }
             // the Repair's (FUN_140ad9700): its point, slot 0x68 with none, set_state(11)
             Some(ActionsAction::Repair(repair)) => {
+                let top = top_speed.of_object(motion.mover(), self.position().ground());
                 let move_reads = MoveToReads::of(
-                    (self, motion.mover()),
+                    (self, top),
                     self.master_in(masters)?,
                     (graphics, look),
                     roles,
@@ -352,10 +370,11 @@ impl Unit {
         actions: &mut Action,
         mover: Option<&mut Mover>,
         point: Position,
-        sprites: &SpriteReads<'_>,
+        (sprites, top_speed): (&SpriteReads<'_>, TopSpeed),
         move_to_tuning: &MoveToTuning,
     ) -> GenieResult<PointMove> {
-        let reads = MoveToReads::with_sprites(*sprites, (self, mover.as_deref()));
+        let top = top_speed.of_object(mover.as_deref(), self.position().ground());
+        let reads = MoveToReads::with_sprites(*sprites, (self, mover.as_deref(), top));
         let gone = match actions.list.artifact_mut() {
             Some(artifact) => artifact.take_point(point, &reads, move_to_tuning)?,
             None => SubActionsGone::default(),
@@ -376,11 +395,11 @@ impl Unit {
         mover: Option<&mut Mover>,
         point: Position,
         player: PlayerId,
-        sprites: SpriteReads<'_>,
+        (sprites, top_speed): (SpriteReads<'_>, TopSpeed),
         move_to_tuning: &MoveToTuning,
     ) -> GenieResult<PointMove> {
         let my_pasture = self.my_pasture;
-        let walks = Walks::of(sprites, (self, mover.as_deref()));
+        let walks = Walks::of(sprites, (self, mover.as_deref(), top_speed));
         let (Some(hunt), Some(mover)) = (actions.list.hunt_mut(), mover) else {
             return Err(GenieError::unsupported(
                 "a hunter without its hunt or movement state",
@@ -414,10 +433,10 @@ impl Unit {
         mover: Option<&mut Mover>,
         point: Position,
         player: PlayerId,
-        sprites: SpriteReads<'_>,
+        (sprites, top_speed): (SpriteReads<'_>, TopSpeed),
         move_to_tuning: &MoveToTuning,
     ) -> GenieResult<PointMove> {
-        let walks = Walks::of(sprites, (self, mover.as_deref()));
+        let walks = Walks::of(sprites, (self, mover.as_deref(), top_speed));
         let (Some(gather), Some(mover)) = (actions.list.gather_mut(), mover) else {
             return Err(GenieError::unsupported(
                 "a gatherer without its gather or movement state",
@@ -467,9 +486,10 @@ impl Unit {
             take(step, self, target, by, roles)?;
         }
         let (mut releases, mut leaves) = (Vec::new(), Vec::new());
+        let top = step.world.top_speed(step.player, self)?;
         self.clear_own_actions(
             actions,
-            step.world.parts.motion_mut(self.id),
+            (step.world.parts.motion_mut(self.id), top),
             &mut releases,
             &mut leaves,
             by,
@@ -481,17 +501,18 @@ impl Unit {
             .or_else(|| object_sprite(own))
             .and_then(|id| step.world.model.graphics.get(id).copied());
         let here = self.position();
+        let top = step.world.top_speed(step.player, self)?;
         let mover = step
             .world
             .parts
-            .mover_mut(self.id)
+            .mover_of(self.id)
             .ok_or(GenieError::unreachable(
                 "a walker tested above without its mover",
             ))?;
         let move_to = MoveToAction::to_object(
             &step.world.spatial,
             here,
-            mover,
+            (mover, top),
             (target, state),
             range,
             (sprite, livestock),

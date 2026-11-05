@@ -437,9 +437,13 @@ impl World {
             return Err(GenieError::unsupported("a sleeping member's own move"));
         };
         let player_kind = self.players.player(player_id)?.kind;
+        let top_speed = {
+            let unit = self.players.live(player_id, idx)?;
+            self.top_speed_terms(player_id, unit)?
+        };
         // the member is out of its slot for its step, as the updating object is
         let mut unit = self.take_out(player_id, idx)?;
-        let me = unit.me(self.parts.actions_of(unit.id));
+        let me = unit.me(self.parts.actions_of(unit.id), top_speed);
         let (mover, by_id) = self
             .parts
             .lend_mover(unit.id, (&self.players, &self.index, &self.model));

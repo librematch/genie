@@ -269,7 +269,7 @@ impl Mover {
             position: at,
             radius: self.stats.radius.ground(),
             mask: self.stats.restriction_mask,
-            moves: self.stats.speed != Speed::ZERO
+            moves: self.top_speed(me.top_speed, at.ground()) != Speed::ZERO
                 || roles
                     .of_some_master(master)
                     .contains(MasterRoles::LONG_PATH_MOVER),

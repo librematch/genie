@@ -435,6 +435,7 @@ impl UnitAi {
                         reach: true,
                     },
                     memory: Memory::default(),
+                    ai_target: self.current_target,
                 })?;
                 self.alert(found, at.dt_seconds);
                 match (found.id, found.position) {
@@ -558,6 +559,7 @@ impl UnitAi {
                         reach: true,
                     },
                     memory: Memory::default(),
+                    ai_target: self.current_target,
                 })?;
                 self.alert(found, at.dt_seconds);
                 match (found.id, found.position) {

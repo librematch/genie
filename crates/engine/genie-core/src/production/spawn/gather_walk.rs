@@ -12,6 +12,7 @@ use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::Voice;
 use crate::objects::masters::MasterKind;
+use crate::objects::masters::MasterTables;
 use crate::objects::unit::Unit;
 use crate::orders::OrderSource;
 use crate::orders::Work;
@@ -85,13 +86,18 @@ impl World {
                 "a gather point's move of a unit with an action",
             ));
         }
-        // a unit without speed takes nothing; one not in state 2 would notify without moving
-        if self
-            .parts
-            .mover_of(unit.id)
-            .map_or(Speed::ZERO, |mover| mover.stats.speed)
-            <= Speed::ZERO
-        {
+        // FUN_14106ff70: a unit whose master does not move (slot 0xe8, its speed `+0x740`;
+        // `COMISS`, `JBE`: a NaN does not) takes nothing; one not in state 2 would notify
+        // without moving
+        let master_speed = unit
+            .master(
+                MasterTables::new(&self.model.masters, &self.parts.own_master),
+                player_id,
+            )?
+            .animated_part()
+            .max_speed;
+        let moves = Speed::ZERO < master_speed;
+        if !moves {
             return Ok(());
         }
         if unit.life.state != ObjectState::Alive {

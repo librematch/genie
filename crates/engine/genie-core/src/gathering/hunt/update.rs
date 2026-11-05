@@ -351,7 +351,7 @@ impl HuntAction {
         roles: &Roles,
     ) -> GenieResult<()> {
         let reads = unit.move_to_reads(
-            step.world.parts.motion.mover(unit.id),
+            step.world.top_speed(step.player, unit)?,
             MasterTables::new(&step.world.model.masters, &step.world.parts.own_master),
             step.player,
             (

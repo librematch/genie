@@ -167,13 +167,9 @@ impl Attack {
             AiOrder::Order(_) => attack_reads.flags.contains(AttackerFlags::QUEUE_EMPTY),
         };
         if human && waits {
-            let speed = step
-                .world
-                .parts
-                .mover_of(unit.id)
-                .map_or(Speed::ZERO, |mover| mover.stats.speed);
+            // the stance, then slot 0x208 (`COMISS`, `JBE`: a NaN top speed does not move)
             if attack_reads.stance == UnitStance::Aggressive
-                && Speed::ZERO < speed
+                && Speed::ZERO < step.world.top_speed(step.player, unit)?
                 && !roles
                     .of_class(fight.own.class)
                     .contains(ClassRoles::VILLAGER)

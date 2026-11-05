@@ -76,6 +76,7 @@ fn task(id: i16, range: f32) -> Task {
         work_val2: WorkValue::ZERO,
         work_range: Distance::new(range),
         work_flag: 0,
+        work_flag2: 0,
         enablement: Some(attribute::FOOD),
         sprites: TaskSprites::NONE,
         sound_events: SoundEvents::new(-1, -1),

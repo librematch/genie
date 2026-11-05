@@ -320,7 +320,7 @@ impl World {
         let Some(unit_group) = self.groups.get(group) else {
             return Ok(());
         };
-        let Some(lead) = self.lead_view(unit_group.motion.lead) else {
+        let Some(lead) = self.lead_view(unit_group.motion.lead)? else {
             return Ok(());
         };
         let view = GroupView {

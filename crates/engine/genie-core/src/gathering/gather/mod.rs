@@ -23,6 +23,7 @@ use crate::map::Point;
 use crate::map::Position;
 use crate::math::rng::Well512;
 use crate::movement::MoveStats;
+use crate::movement::TopSpeed;
 use crate::movement::move_to::MoveDefaults;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
@@ -240,6 +241,9 @@ pub(crate) struct GatherReads {
     pub(crate) stop_productivity: Amount,
     /// The player's attribute 96: a farm's food is sold at once.
     pub(crate) food_sold: Amount,
+    /// What the gatherer's slot 0x208 reads besides its mover's own speed and its place
+    /// ([`Walks::top_speed`](crate::gathering::gather::Walks::top_speed)).
+    pub(crate) top_speed: TopSpeed,
 }
 
 /// What an update asks of the caller.

@@ -9,7 +9,6 @@ use crate::map::Position;
 use crate::map::Tile;
 use crate::math::rng::Stream;
 use crate::movement::MoveStart;
-use crate::movement::Speed;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
@@ -63,7 +62,10 @@ impl World {
         let unit = self.players.live(player, idx)?;
         let held = self.players.player(player)?;
         let reads = AttackReads::of(
-            self.parts.combat_of(unit.id),
+            (
+                self.parts.combat_of(unit.id),
+                self.top_speed_terms(player, unit)?,
+            ),
             master,
             (
                 OwnerMasters::new(&self.parts.own_master, self.model.masters.of(player)),
@@ -150,10 +152,7 @@ impl World {
             || (aim.fog_visibility != FogVisibility::INVISIBLE
                 && self.spatial.explored(player, Tile::new(tx, ty))?);
         let ready = self.attack_ready(player, idx, target, (master, world_time))?;
-        let speed = self
-            .parts
-            .mover_of(self.players.live(player, idx)?.id)
-            .map_or(Speed::ZERO, |mover| mover.stats.speed);
+        let speed = self.top_speed(player, self.players.live(player, idx)?)?;
         let engagement = engagement(
             self.parts.unit_ai.get(self.players.live(player, idx)?.id),
             speed,
@@ -325,6 +324,7 @@ impl World {
             .drop_sites
             .iter()
             .any(|&master_id| Some(master_id) == target_master);
+        let top_speed = self.top_speed_terms(player, self.players.live(player, idx)?)?;
         let unit = self.players.live_mut(player, idx)?;
         let old = self
             .parts
@@ -334,7 +334,7 @@ impl World {
             .map(|hunt_action| hunt_action.target)
             .filter(|&role_id| role_id.is_some());
         let walks = unit.move_walks(
-            self.parts.mover_of(unit.id),
+            (self.parts.mover_of(unit.id), top_speed),
             MasterTables::new(&self.model.masters, &self.parts.own_master),
             player,
             (

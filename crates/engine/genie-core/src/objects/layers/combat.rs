@@ -4,6 +4,7 @@
 
 use crate::combat::Charge;
 use crate::combat::KillState;
+use crate::combat::LockdownCount;
 use crate::combat::abilities::Abilities;
 use crate::combat::damage::{ArmorBonuses, ArmorPair};
 use crate::combat::powerup::{AppliedPowerup, ConversionPowerup, InfantryCount};
@@ -66,6 +67,9 @@ pub struct Combat {
     /// A combat object's `raider_build_countdown` (`+0x9a0`): the seconds it may stay inside a
     /// building.
     pub raider_countdown: RaiderCountdown,
+    /// `locked_down_count` (`+0xa08`): the locks that hold it in place, its top speed 0 while
+    /// any holds ([`LockdownCount`]).
+    pub locked_down: LockdownCount,
     /// `berserker_timer` (`+0xa10`): the seconds the regeneration holds back toward its next
     /// whole hit point ([`crate::objects::unit::Unit::regenerate`]).
     pub regen_timer: Seconds,

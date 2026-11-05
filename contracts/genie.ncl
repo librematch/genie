@@ -668,6 +668,9 @@
   },
   MovementTuning | doc "The `movement` port's tuning values." = {
     ally_pause | Number | doc "The pause a kept hit's ranking gives a unit the walker outranks: 0.1 for an ally (`DAT_142eb5690`), 0.5 for another (`DAT_142e7f384`).\n\n`movement::ALLY_PAUSE`: 0.1 in build 158041.",
+    charge_ready_slack | Number | doc "A charge of special attack 3 is ready (`FUN_1412161b0`) once the object's charge (`+0x9e0`, widened) is at least its master's most (`+0x918`, widened) less this double (`DAT_142eb56a0`, `COMISD` then `JC`: a NaN is not ready).\n\n`movement::CHARGE_READY_SLACK`: 0.01 in build 158041.",
+    charge_run_factor | Number | doc "The run of a ready charge (slot 0x208, `FUN_141202c70`) multiplies the top speed by its master's task (0x85, any, 0x7d1)'s `work_range` when that is not 0, else by this (`DAT_142eb4838`).\n\n`movement::CHARGE_RUN_FACTOR`: 1.5 in build 158041.",
+    charge_run_reach | Number | doc "The run of a ready charge (slot 0x208, `FUN_141202c70`) starts where the gap to its target, less both masters' radii on x, is below its master's task (0x85, any, 0x7d1)'s `work_val2`, else below this (`DAT_142eb0f4c`).\n\n`movement::CHARGE_RUN_REACH`: 10 in build 158041.",
     close | Number | doc "A waypoint or target nearer than this takes the close-in path (`DAT_14330eb8c`).\n\n`movement::CLOSE`: 1 in build 158041.",
     edge_gap | Number | doc "How far inside the map's edge a moving unit's footprint stays (`DAT_142eb99cc`), and how far below the edge a position stays (`DAT_142eb1e9c`).\n\n`movement::EDGE_GAP`: 0.01 in build 158041.",
     edge_position_gap | Number | doc "How far inside the map's edge a moving unit's footprint stays (`DAT_142eb99cc`), and how far below the edge a position stays (`DAT_142eb1e9c`).\n\n`movement::EDGE_POSITION_GAP`: 0.001 in build 158041.",
@@ -822,6 +825,7 @@
     work_val2 | WorkValue | doc "`+0x2c`, the save's `work_val2`.",
     work_range | Distance | doc "`+0x30`: how near the target the work is done.",
     work_flag | std.contract.from_predicate (fun x => std.is_number x && x % 1 == 0 && -32768 <= x && x <= 32767) | doc "`+0x34`, `work_flag` (the `.dat`'s `gather_type`): a Make adds to its player's attribute,\nnot to its object's holding (`genie_core::gathering::make`).",
+    work_flag2 | std.contract.from_predicate (fun x => std.is_number x && x % 1 == 0 && -32768 <= x && x <= 32767) | doc "`+0x36`, `work_flag2` (the `.dat`'s `work_flag_2`): the task lookup by action, `+0x34`\nand this (`FUN_14109e1a0`) matches it; a charge's run is task (0x85, any, 0x7d1).",
     enablement | AttributeId | optional | doc "`+0x38`, `enablement_resource_id` (`enabled`): the resource that enables the task, -1 none.",
     sprites | TaskSprites | doc "`+0x40`..`+0x58`: the moving, proceeding, working and carrying sprites.",
     sound_events | SoundEvents | doc "`+0x60` and `+0x78`: the event ids (`mEventId`) of the gathering and the deposit sound,\nas the task's load (`FUN_141062470`) leaves them; a terrain look task (159) names its\ndying and its undead sprite with them (`genie_core::combat::abilities`).",

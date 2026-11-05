@@ -2,7 +2,6 @@
 //! ([`Unit::surroundings`]).
 
 use crate::math::rng::{Stream, Well512};
-use crate::movement::Speed;
 use crate::movement::{Mover, footprint_gap_squared};
 use crate::objects::ObjectId;
 use crate::objects::layers::Action;
@@ -205,10 +204,7 @@ impl Unit {
             (
                 at.capture,
                 step.world.parts.combat_of(self.id).firepower,
-                step.world
-                    .parts
-                    .mover_of(self.id)
-                    .map_or(Speed::ZERO, |mover| mover.stats.speed),
+                step.world.top_speed(step.player, self)?,
             ),
         );
         self.with_side(
@@ -254,10 +250,7 @@ impl Unit {
             (
                 self.capture_kind(step),
                 step.world.parts.combat_of(self.id).firepower,
-                step.world
-                    .parts
-                    .mover_of(self.id)
-                    .map_or(Speed::ZERO, |mover| mover.stats.speed),
+                step.world.top_speed(step.player, self)?,
             ),
         );
         self.with_side(
@@ -374,10 +367,7 @@ impl Unit {
             (
                 at.capture,
                 step.world.parts.combat_of(self.id).firepower,
-                step.world
-                    .parts
-                    .mover_of(self.id)
-                    .map_or(Speed::ZERO, |mover| mover.stats.speed),
+                step.world.top_speed(step.player, self)?,
             ),
         );
         self.with_side(

@@ -67,22 +67,26 @@ fn stop_if_moving(mut motion: MotionMut<'_>, moves: bool) -> GenieResult<()> {
 }
 
 impl Action {
-    /// The action's destructor (slot 0) on its unit's `body`. A `MoveTo`'s (`FUN_140aa1f30`, an
+    /// The action's destructor (slot 0) on its unit's motion layer, its top speed `top` (slot
+    /// 0x208 as the deletion starts: a teardown changes none of what it reads). A `MoveTo`'s (`FUN_140aa1f30`, an
     /// action's sub-action's too) stops the unit (slot 0x5d0). The base teardown
     /// (`FUN_140a73fc0`) lets the target go (slot 0x180) unless the action is quiet (`+0x60`;
     /// the Hunt's Attack is, so only the Hunt lets its target go), then the second target. The
     /// Build's (`FUN_140aadbf0`) first takes a counted builder (`+0x68`) out of its building's
     /// builders (`FUN_140aaddb0`, `+0x9e8`), as the Repair's (`FUN_140ad8fd0`) a counted
     /// repairer (`+0x6c`) its target's; the Artifact's (`FUN_140aab0d0`) lets its target go and
-    /// its `MoveTo`'s stops the unit; the Fly's (`FUN_140a84750`) gives the unit its top speed as
-    /// its animation speed (slot 0x208 into `+0x7b8`); the missile's lets its target and the
+    /// its `MoveTo`'s stops the unit; the Fly's (`FUN_140a84750`) gives the unit its top speed
+    /// `top` as its animation speed (slot 0x208 into `+0x7b8`); the missile's lets its target and the
     /// object it was fired from go. The Make, the wait for a foundation (`0x140ae8780`) and the
     /// Transport hold no target.
     ///
     /// # Errors
     ///
     /// The unit's stop that the motion step does not model.
-    pub(crate) fn tear_down(self, mut motion: MotionMut<'_>) -> GenieResult<TornDown> {
+    pub(crate) fn tear_down(
+        self,
+        (mut motion, top): (MotionMut<'_>, Speed),
+    ) -> GenieResult<TornDown> {
         let mut torn = TornDown::default();
         match self {
             Self::WaitSolidify(_) | Self::Make(_) => {}
@@ -93,11 +97,8 @@ impl Action {
                 stop_if_moving(motion, gone.stops)?;
             }
             Self::Fly(fly) => {
-                motion.set_anim_speed(
-                    motion
-                        .mover()
-                        .map_or(Speed::ZERO, |mover| mover.stats.speed),
-                );
+                // RGE_Action_Bird's destructor: `+0x7b8` takes the bird's slot 0x208
+                motion.set_anim_speed(top);
                 stop_if_moving(motion, fly.state.move_to().is_some())?;
             }
             Self::Enter(enter_action) => {
@@ -192,7 +193,7 @@ const NEXT_HEAD: &str = "a deleted head with a second action under it (slot 0x28
 
 impl ActionList {
     /// `FUN_140a98e20`: the head goes and its destructor runs ([`Action::tear_down`] on the
-    /// unit's `body`); then, with another action at the head and the unit below state 3
+    /// unit's motion layer and top speed); then, with another action at the head and the unit below state 3
     /// (`state`, `+0x640`), that action's slot 0x28 with 0 ([`NEXT_HEAD`]). Nothing for an empty
     /// list.
     ///
@@ -201,13 +202,13 @@ impl ActionList {
     /// The destructor's, and a second action under the head below state 3.
     pub(crate) fn delete_head(
         &mut self,
-        motion: MotionMut<'_>,
+        (motion, top): (MotionMut<'_>, Speed),
         state: ObjectState,
     ) -> GenieResult<TornDown> {
         let Some(head) = self.pop_head() else {
             return Ok(TornDown::default());
         };
-        let torn = head.tear_down(motion)?;
+        let torn = head.tear_down((motion, top))?;
         if !self.is_empty() && state < ObjectState::Dying {
             return Err(GenieError::unreachable(NEXT_HEAD));
         }
@@ -222,12 +223,12 @@ impl ActionList {
     /// The first deletion's that fails.
     pub(crate) fn delete_all(
         &mut self,
-        mut motion: MotionMut<'_>,
+        (mut motion, top): (MotionMut<'_>, Speed),
         state: ObjectState,
     ) -> GenieResult<TornDown> {
         let mut all = TornDown::default();
         while !self.is_empty() {
-            let torn = self.delete_head(motion.reborrow(), state)?;
+            let torn = self.delete_head((motion.reborrow(), top), state)?;
             all.releases.extend(torn.releases);
             all.builder_leaves.extend(torn.builder_leaves);
         }
@@ -325,7 +326,7 @@ mod tests {
             },
         );
         let torn = Action::Build(build_action)
-            .tear_down(motion.lent())
+            .tear_down((motion.lent(), Speed::new(1.0)))
             .unwrap();
         assert_eq!(
             torn,
@@ -341,7 +342,7 @@ mod tests {
             Some(DropSiteId::new(object_id(10050))),
         );
         let torn = Action::Build(build_action)
-            .tear_down(moving().lent())
+            .tear_down((moving().lent(), Speed::new(1.0)))
             .unwrap();
         assert_eq!(
             (torn.releases, torn.builder_leaves),
@@ -370,9 +371,11 @@ mod tests {
             Position::new(5.0, 5.0, 0.0),
             Distance::ZERO,
             None,
-            motion.mover_mut(),
+            Speed::new(1.0),
         );
-        let torn = Action::MoveTo(to).tear_down(motion.lent()).unwrap();
+        let torn = Action::MoveTo(to)
+            .tear_down((motion.lent(), Speed::new(1.0)))
+            .unwrap();
         assert_eq!(torn, TornDown::default());
         assert!(!moves(&motion));
     }
@@ -384,31 +387,33 @@ mod tests {
     fn the_list_deletions_tear_down_the_head_and_stop_at_second_action() {
         let mut motion = moving();
         let mut list = ActionList::default().with_build(Some(build()));
-        let torn = list.delete_all(motion.lent(), ObjectState::Alive).unwrap();
+        let torn = list
+            .delete_all((motion.lent(), Speed::new(1.0)), ObjectState::Alive)
+            .unwrap();
         assert_eq!(torn.releases, [object_id(10028)]);
         assert!(list.is_empty());
         assert_eq!(
-            list.delete_head(motion.lent(), ObjectState::Alive),
+            list.delete_head((motion.lent(), Speed::new(1.0)), ObjectState::Alive),
             Ok(TornDown::default())
         );
         let to = MoveToAction::to_point(
             Position::new(5.0, 5.0, 0.0),
             Distance::ZERO,
             None,
-            motion.mover_mut(),
+            Speed::new(1.0),
         );
         let two = ActionList::default()
             .with_build(Some(build()))
             .with_move_to(Some(to));
         let err = two
             .clone()
-            .delete_head(motion.lent(), ObjectState::Alive)
+            .delete_head((motion.lent(), Speed::new(1.0)), ObjectState::Alive)
             .unwrap_err();
         assert_eq!(err.reason(), NEXT_HEAD);
         let mut dying = two;
         assert_eq!(
             dying
-                .delete_head(motion.lent(), ObjectState::Dying)
+                .delete_head((motion.lent(), Speed::new(1.0)), ObjectState::Dying)
                 .map(|torn_down| torn_down.releases),
             Ok(vec![])
         );

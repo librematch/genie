@@ -15,6 +15,7 @@ use crate::map::terrain::TileTerrain;
 use crate::map::terrain::{Terrain, TerrainKind};
 use crate::movement::Me;
 use crate::movement::Speed;
+use crate::movement::TopSpeed;
 use crate::movement::move_to::SubCode;
 use crate::movement::move_to::{MoveDefaults, MoveTo, MoveToAction, MoveToReads, SpriteReads};
 use crate::objects::ActionState;
@@ -941,6 +942,7 @@ fn sail_move_to_asks_for_its_path_then_walks_on() {
         id: object_id(9177),
         group: None,
         action_state: ActionState::new(TransportState::Sail { move_to: None }.get()),
+        top_speed: TopSpeed::Own,
     };
     let rig = || {
         let mut rig = Rig::on_the_path(Victim::default());

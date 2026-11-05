@@ -108,6 +108,7 @@ pub fn core_task(task: &WorldTask) -> GenieResult<Task> {
         work_val2: WorkValue::new(task.work_val2),
         work_range: Distance::new(task.work_range),
         work_flag: task.work_flag,
+        work_flag2: task.work_flag2,
         enablement,
         sprites: TaskSprites::of_data([
             task.short_val,

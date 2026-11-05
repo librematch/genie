@@ -3,7 +3,7 @@
 //! target as a hit reads it, the start's readiness, the target's sight and a villager's swap.
 
 use crate::combat::attack::{
-    Attack, AttackCommand, Mark, ReadyReads, Wielder, arms_looking, engagement, speed_of,
+    Attack, AttackCommand, Mark, ReadyReads, Wielder, arms_looking, engagement,
 };
 use crate::combat::attack::{AttackReads, Fight};
 use crate::combat::damage::Victim;
@@ -13,7 +13,6 @@ use crate::map::Tile;
 use crate::map::spatial::Placed;
 use crate::math::rng::Stream;
 use crate::math::rng::Well512;
-use crate::movement::Speed;
 use crate::objects::ObjectId;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::ClassId;
@@ -34,6 +33,7 @@ use crate::unit_ai::task_finder::world::SideWorld;
 use crate::unit_ai::world_view::owner_view;
 use crate::unit_ai::world_view::{NOT_HELD, UnitView};
 use crate::unit_ai::{AiCommand, Effect};
+use crate::world::ATTACKER_UNMOVING;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
 use crate::world::slots::PlayerSlotsExt;
@@ -92,7 +92,7 @@ impl UnitView<'_, '_> {
                 posted: Vec::new(),
             });
         }
-        let master = &self.swapped_master(own, roles)?;
+        let master = &self.swapped_master(own, ai.current_target, roles)?;
         let me_at = *self
             .step
             .world
@@ -125,9 +125,16 @@ impl UnitView<'_, '_> {
                 "an attack command of a unit whose sprite the slice does not hold",
             ));
         }
-        let by = self.attack_clears_actions(master.class)?;
+        let by = self.attack_clears_actions(master.class, ai.current_target)?;
         let unit = &mut *self.unit;
-        let speed = speed_of(self.step.world.parts.mover_of(unit.id))?;
+        // slot 0x208 where it stands, its unit AI's target the running AI's
+        if self.step.world.parts.mover_of(unit.id).is_none() {
+            return Err(ATTACKER_UNMOVING);
+        }
+        let speed = self
+            .step
+            .world
+            .top_speed_with(self.player, unit, ai.current_target)?;
         let engagement = engagement(
             Some(ai),
             speed,
@@ -222,12 +229,18 @@ impl UnitView<'_, '_> {
 
     /// The attack command's master: a villager switches to its player's villager of its task
     /// swap group first ([`UnitView::villager_swap`]; slot 0x90 with 0: the action list clears,
-    /// then the master change at once, [`UnitView::switch_unit_master`]), else it keeps `own`.
-    fn swapped_master(&mut self, own: Master, roles: &Roles) -> GenieResult<Master> {
+    /// then the master change at once, [`UnitView::switch_unit_master`]), else it keeps `own`;
+    /// `ai_target` is the running unit AI's target.
+    fn swapped_master(
+        &mut self,
+        own: Master,
+        ai_target: Option<ObjectId>,
+        roles: &Roles,
+    ) -> GenieResult<Master> {
         let Some(next) = self.villager_swap(&own, roles).cloned() else {
             return Ok(own);
         };
-        self.switch_unit_master(&own, next.id)?;
+        self.switch_unit_master(&own, next.id, ai_target)?;
         Ok(next)
     }
 
@@ -260,18 +273,27 @@ impl UnitView<'_, '_> {
 
     /// The action list's clearing before the attack command's Attack (`FUN_140a98620`): an
     /// Attack on another target tears down (its `MoveTo`'s stops the unit) and lets its targets
-    /// go (slot 0x180) through the view, as do the others. The releaser, the unit as master
+    /// go (slot 0x180) through the view, as do the others; the teardowns read the unit's top
+    /// speed with the running unit AI's target `ai_target`. The releaser, the unit as master
     /// class `class`.
-    fn attack_clears_actions(&mut self, class: ClassId) -> GenieResult<Releaser> {
+    fn attack_clears_actions(
+        &mut self,
+        class: ClassId,
+        ai_target: Option<ObjectId>,
+    ) -> GenieResult<Releaser> {
         let by = Releaser {
             id: self.unit.id,
             class: Some(class),
             player: self.player,
         };
         let (mut releases, mut leaves) = (Vec::new(), Vec::new());
+        let top = self
+            .step
+            .world
+            .top_speed_with(self.player, self.unit, ai_target)?;
         self.unit.tear_down_actions(
             (self.actions, self.step.world.parts.unread.get(self.unit.id)),
-            self.step.world.parts.motion.layer_mut(self.unit.id),
+            (self.step.world.parts.motion.layer_mut(self.unit.id), top),
             &mut releases,
             &mut leaves,
             by,
@@ -330,15 +352,14 @@ impl UnitView<'_, '_> {
             },
             None => None,
         };
+        let speed = self
+            .step
+            .world
+            .top_speed_with(self.player, self.unit, ai.current_target)?;
         let unit = &mut *self.unit;
         let wielder = Wielder {
             area_effect: master.combat_part().area_effect,
-            speed: self
-                .step
-                .world
-                .parts
-                .mover_of(unit.id)
-                .map_or(Speed::ZERO, |mover| mover.stats.speed),
+            speed,
             position: unit.position(),
             radius: master.radius,
         };
@@ -442,7 +463,12 @@ impl UnitView<'_, '_> {
             roles,
         );
         let reads = AttackReads::of(
-            self.step.world.parts.combat_of(unit.id),
+            (
+                self.step.world.parts.combat_of(unit.id),
+                self.step
+                    .world
+                    .top_speed_terms_with(self.player, unit, ai.current_target)?,
+            ),
             master,
             (
                 OwnerMasters::new(

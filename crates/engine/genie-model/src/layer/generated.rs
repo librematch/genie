@@ -1485,6 +1485,18 @@ pub struct MovementTuning {
     ///
     /// `movement::ALLY_PAUSE`: 0.1 in build 158041.
     pub ally_pause: f32,
+    /// A charge of special attack 3 is ready (`FUN_1412161b0`) once the object's charge (`+0x9e0`, widened) is at least its master's most (`+0x918`, widened) less this double (`DAT_142eb56a0`, `COMISD` then `JC`: a NaN is not ready).
+    ///
+    /// `movement::CHARGE_READY_SLACK`: 0.01 in build 158041.
+    pub charge_ready_slack: f64,
+    /// The run of a ready charge (slot 0x208, `FUN_141202c70`) multiplies the top speed by its master's task (0x85, any, 0x7d1)'s `work_range` when that is not 0, else by this (`DAT_142eb4838`).
+    ///
+    /// `movement::CHARGE_RUN_FACTOR`: 1.5 in build 158041.
+    pub charge_run_factor: f32,
+    /// The run of a ready charge (slot 0x208, `FUN_141202c70`) starts where the gap to its target, less both masters' radii on x, is below its master's task (0x85, any, 0x7d1)'s `work_val2`, else below this (`DAT_142eb0f4c`).
+    ///
+    /// `movement::CHARGE_RUN_REACH`: 10 in build 158041.
+    pub charge_run_reach: f32,
     /// A waypoint or target nearer than this takes the close-in path (`DAT_14330eb8c`).
     ///
     /// `movement::CLOSE`: 1 in build 158041.

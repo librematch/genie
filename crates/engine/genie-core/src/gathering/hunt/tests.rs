@@ -15,6 +15,7 @@ use crate::math::fmath::BVector;
 use crate::movement::MoveAlgorithm;
 use crate::movement::MoveStart;
 use crate::movement::Speed;
+use crate::movement::TopSpeed;
 use crate::movement::TurnRate;
 use crate::movement::move_to::MoveWaitState;
 use crate::movement::move_to::{
@@ -28,6 +29,7 @@ use crate::objects::SpeedMultiplier;
 use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
 use crate::objects::Voice;
+use crate::objects::layers::Speedup;
 use crate::objects::lifecycle::Held;
 use crate::objects::masters::FlyMode;
 use crate::objects::masters::MasterKind;
@@ -98,6 +100,7 @@ pub(crate) fn walks(held: Held) -> Walks<'static> {
             ground: Footprint::ZERO,
         },
         held,
+        top_speed: TopSpeed::Own,
     }
 }
 
@@ -169,6 +172,7 @@ const fn me(state: &HuntState) -> Me {
         id: object_id(9177),
         group: None,
         action_state: ActionState::new(state.get()),
+        top_speed: TopSpeed::Own,
     }
 }
 
@@ -307,6 +311,7 @@ pub(crate) fn walker() -> Mover {
         last_move: WorldTime::ZERO,
         moved_at: Position::ORIGIN,
         substitute_count: SubstituteCount::of_data(0),
+        speedup: Speedup::NONE,
         ignore_units: Vec::new(),
         user_waypoints: Vec::new(),
         last_turn: Seconds::ZERO,

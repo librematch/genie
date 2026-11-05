@@ -232,11 +232,13 @@ impl Unit {
         step: &mut Step<'_>,
         roles: &Roles,
     ) -> GenieResult<()> {
+        let top_speed = step.world.top_speed_terms(step.player, self)?;
         let (mover, by_id) = step.world.parts.lend_mover(
             self.id,
             (&step.world.players, &step.world.index, &step.world.model),
         );
         let drop_world = DropWorld {
+            top_speed,
             masters: by_id.masters().of(step.player),
             spatial: &mut step.world.spatial,
             zones: &mut step.world.zones,

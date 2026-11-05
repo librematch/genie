@@ -6,6 +6,7 @@ use crate::gathering::gather::{GatherAction, GatherReads};
 use crate::map::Distance;
 use crate::map::Position;
 use crate::movement::Mover;
+use crate::movement::TopSpeed;
 use crate::movement::move_to::{MoveToAction, MoveToReads, SpriteReads, TargetMoved, WalkTo};
 use crate::objects::Graphics;
 use crate::objects::lifecycle::Held;
@@ -21,25 +22,32 @@ pub struct Walks<'graphics> {
     pub(crate) reads: MoveToReads<'graphics>,
     /// What the unit carries: its resource kind (`+0x308`) and amount (`+0x310`).
     pub(crate) held: Held,
+    /// What the unit's slot 0x208 reads besides its mover's own speed and its place, as the
+    /// action's update or command starts: its lock, powerup and stinger do not change within
+    /// it, and its charge's run keeps a speed above 0 so.
+    pub(crate) top_speed: TopSpeed,
 }
 
 impl<'graphics> Walks<'graphics> {
-    /// The reads of `unit` with the sprites `sprites`, and what it carries.
+    /// The reads of `unit` with the sprites `sprites`, its mover `mover` and what its slot 0x208
+    /// reads `top_speed`, and what it carries.
     pub(crate) fn of(
         sprites: SpriteReads<'graphics>,
-        (unit, mover): (&Unit, Option<&Mover>),
+        (unit, mover, top_speed): (&Unit, Option<&Mover>, TopSpeed),
     ) -> Self {
+        let top = top_speed.of_object(mover, unit.position().ground());
         Self {
-            reads: MoveToReads::with_sprites(sprites, (unit, mover)),
+            reads: MoveToReads::with_sprites(sprites, (unit, mover, top)),
             held: unit.life.held(),
+            top_speed,
         }
     }
 
-    /// The reads with the speed `mover` has now (slot 0x208, which a start reads as the
-    /// constructor runs).
-    pub(crate) const fn live(&self, mover: &Mover) -> MoveToReads<'graphics> {
+    /// The reads with the top speed `mover` has now (slot 0x208, which a start reads as the
+    /// constructor runs: its sprite's factor changes with the sprite).
+    pub(crate) fn live(&self, mover: &Mover) -> MoveToReads<'graphics> {
         MoveToReads {
-            speed: mover.stats.speed,
+            speed: mover.top_speed(self.top_speed, self.reads.at.ground()),
             ..self.reads
         }
     }
@@ -51,9 +59,9 @@ impl GatherReads {
     pub(crate) fn walks<'graphics>(
         &self,
         graphics: &'graphics Graphics,
-        unit: (&Unit, Option<&Mover>),
+        (unit, mover): (&Unit, Option<&Mover>),
     ) -> Walks<'graphics> {
-        Walks::of(self.sprites_of(graphics), unit)
+        Walks::of(self.sprites_of(graphics), (unit, mover, self.top_speed))
     }
 
     /// The sprites a `MoveTo` takes when its maker gives none.

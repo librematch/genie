@@ -83,16 +83,20 @@ impl UnitView<'_, '_> {
         done
     }
 
-    /// The unit AI hands the notify it handled to its owner (slot 0x48, then the owner's slot
-    /// 0x2e8, whose hear logic a computer player's AI runs). A human player's owner does nothing
-    /// the simulation reads.
+    /// The unit AI (its target `ai_target`) hands the notify it handled to its owner (slot 0x48,
+    /// then the owner's slot 0x2e8, whose hear logic a computer player's AI runs). A human
+    /// player's owner does nothing the simulation reads.
     ///
     /// # Errors
     ///
     /// What the AI's hear logic does not model.
-    pub(crate) fn owner_hears(&mut self, notify: Notify) -> GenieResult<()> {
+    pub(crate) fn owner_hears(
+        &mut self,
+        notify: Notify,
+        ai_target: Option<ObjectId>,
+    ) -> GenieResult<()> {
         let roles = &self.step.world.model.roles.clone();
-        self.hears(notify, roles)
+        self.hears(notify, ai_target, roles)
     }
 
     /// A command of the unit's that the unit AI's order slots give ([`UnitCommand`]): taken when

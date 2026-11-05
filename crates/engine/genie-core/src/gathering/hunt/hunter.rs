@@ -365,7 +365,10 @@ impl Unit {
         roles: &Roles,
     ) -> GenieResult<()> {
         let walks = self.move_walks(
-            step.world.parts.mover_of(self.id),
+            (
+                step.world.parts.mover_of(self.id),
+                step.world.top_speed_terms(step.player, self)?,
+            ),
             MasterTables::new(&step.world.model.masters, &step.world.parts.own_master),
             step.player,
             (

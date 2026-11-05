@@ -15,7 +15,10 @@ use crate::objects::{ObjectId, ObjectKey};
 use crate::players::PlayerId;
 use crate::vision::ghost::Ghost;
 use crate::world::World;
+use crate::world::index::ObjectIndex;
 use crate::world::layer::Slots;
+use crate::world::parts::Parts;
+use crate::world::player::Player;
 
 /// An object of the world's id table (`FUN_1415417a0`, `BaseWorld::object`): the objects of
 /// every player's live, sleeping and doppelganger lists, which the player's add and removal
@@ -114,30 +117,37 @@ impl World {
     /// none for `i32::MIN` (the routine's own test, [`ObjectId::TAKEN_OUT`]'s value) and for an
     /// id no list holds. Only the negative half holds ghosts.
     pub(crate) fn world_object(&self, id: impl ObjectKey) -> Option<WorldObject<'_>> {
-        let id = id.key()?;
-        if id == ObjectId::TAKEN_OUT {
-            return None;
-        }
-        if let Some((player_id, unit)) = self.object(id) {
-            return Some(WorldObject::Unit(
-                player_id,
-                unit,
-                self.parts.mover_of(unit.id),
-            ));
-        }
-        if id.get() < 0 {
-            for (player_id, player) in PlayerId::each(self.players.len()).zip(&self.players) {
-                if let Some(ghost) = player
-                    .ghosts
-                    .iter()
-                    .find(|ghost| ghost.id.key() == Some(id))
-                {
-                    return Some(WorldObject::Ghost(player_id, ghost));
-                }
+        world_object_in(&self.players, &self.index, &self.parts, id)
+    }
+}
+
+/// [`World::world_object`] of the world's `players`, its table by id `index` and its `parts`
+/// (the movers), for a caller that holds other tables of the world.
+pub(crate) fn world_object_in<'world>(
+    players: &'world [Player],
+    index: &'world ObjectIndex,
+    parts: &'world Parts,
+    id: impl ObjectKey,
+) -> Option<WorldObject<'world>> {
+    let id = id.key()?;
+    if id == ObjectId::TAKEN_OUT {
+        return None;
+    }
+    if let Some((player_id, unit, _)) = index.locate(players, id) {
+        return Some(WorldObject::Unit(player_id, unit, parts.mover_of(unit.id)));
+    }
+    if id.get() < 0 {
+        for (player_id, player) in PlayerId::each(players.len()).zip(players) {
+            if let Some(ghost) = player
+                .ghosts
+                .iter()
+                .find(|ghost| ghost.id.key() == Some(id))
+            {
+                return Some(WorldObject::Ghost(player_id, ghost));
             }
         }
-        None
     }
+    None
 }
 
 /// A unit's sub-formation in its group (`FUN_141011300`, `World::unit_category` for a held object),

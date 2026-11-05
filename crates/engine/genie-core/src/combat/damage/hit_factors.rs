@@ -201,8 +201,8 @@ pub(super) const fn special_charge_ready(attacker: &Attacker) -> GenieResult<boo
     Ok(false)
 }
 
-/// The gap of [`special_charge_ready`], which a unit's speed (slot 0x208, `FUN_141202c70`) reads
-/// too.
+/// The gap of [`special_charge_ready`]: the damage's attacker read lacks its unit AI's and its
+/// group's targets (slot 0x208 reads the routine whole, [`crate::movement::SpeedReads`]).
 pub(crate) const SPECIAL_CHARGE_GAP: GenieError =
     GenieError::unsupported("a charge of special attack 3 (FUN_1412161b0)");
 

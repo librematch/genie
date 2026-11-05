@@ -28,6 +28,7 @@ use crate::math::fmath::{maxss, minss};
 use crate::objects::ActionState;
 use crate::objects::ObjectId;
 use crate::objects::layers::Animated;
+use crate::objects::layers::Speedup;
 use crate::objects::masters::MasterId;
 use crate::players::PlayerId;
 use crate::players::PlayerKind;
@@ -68,6 +69,9 @@ pub use genie_model::movement::TurnRate;
 use genie_model::movement::speed;
 mod step;
 pub use self::step::GroupSpeed;
+mod top_speed;
+pub(crate) use self::top_speed::SpeedReads;
+pub use self::top_speed::{ChargeRun, CombatSpeed, RunFactor, TopSpeed, task_by_flags};
 use genie_model::movement::move_stats;
 mod path_counts;
 mod unit;
@@ -229,6 +233,11 @@ pub struct Mover {
     pub(crate) moved_at: Position,
     /// `+0x874`, `mConsecutiveSubstituteCount`: above 2 a walk counts its waypoint reached.
     pub(crate) substitute_count: SubstituteCount,
+    /// `mSpeedupBuildingId` and `mSpeedupValue` (`+0x808`, `+0x80c`, saved): the building that
+    /// speeds it up and by what share of its master's speed (its own speed,
+    /// [`Mover::own_speed`]). Only a load sets one; its update drops one gone or out of range
+    /// ([`Unit::speedup_drop`](crate::objects::unit::Unit::speedup_drop)).
+    pub(crate) speedup: Speedup,
     /// The unit's ignore list (`+0x670`, count `+0x678`; the save's `numberUnits` and `tempInt`
     /// of the static part): the other units of an order to several (`FUN_14118c790`), which the
     /// short pather ignores for a top path made this update. A stop empties it.
@@ -260,7 +269,7 @@ pub struct Mover {
 
 /// The moving unit, as the motion step needs it besides its [`Mover`], whose place it walks
 /// ([`Walk::position`](crate::movement::move_to::Walk::position)).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Me {
     /// The unit.
     pub(crate) id: ObjectId,
@@ -274,6 +283,9 @@ pub struct Me {
     /// `+0x650`, `mLastHumanOrderTime`: its rank against a unit it meets (the walk's pause and
     /// the path end's keep), as the walk starts.
     pub(crate) human_order: WorldTime,
+    /// What its top speed (slot 0x208) reads besides its own speed and its place, as the walk
+    /// starts ([`TopSpeed`], [`Mover::top_speed`] at the place the walk is at).
+    pub(crate) top_speed: TopSpeed,
 }
 
 /// What the motion step returns to the `MoveTo` action.

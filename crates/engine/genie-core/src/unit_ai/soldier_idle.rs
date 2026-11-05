@@ -122,6 +122,7 @@ impl UnitAi {
                 ask: AttackAsk::IDLE,
             },
             memory: self.memory(),
+            ai_target: self.current_target,
         })?;
         self.add_retries(&found);
         self.attack_search_alert(found, player_kind, unit_ai_tuning)?;
@@ -241,6 +242,7 @@ impl UnitAi {
             size: at.size,
             pick: Pick::Look,
             memory: Memory::default(),
+            ai_target: self.current_target,
         })?;
         self.attack_search_alert(found, player_kind, &at.unit_ai_tuning)?;
         if !matches!(

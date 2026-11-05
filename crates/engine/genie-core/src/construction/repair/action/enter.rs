@@ -85,7 +85,7 @@ impl RepairAction {
         roles: &Roles,
     ) -> GenieResult<()> {
         let move_reads = repairer.move_to_reads(
-            step.world.parts.motion.mover(repairer.id),
+            step.world.top_speed(step.player, repairer)?,
             step.world.master_tables(),
             step.player,
             (
@@ -123,7 +123,7 @@ impl RepairAction {
             self.point = repairee.position;
         }
         let move_reads = repairer.move_to_reads(
-            step.world.parts.motion.mover(repairer.id),
+            step.world.top_speed(step.player, repairer)?,
             step.world.master_tables(),
             step.player,
             (

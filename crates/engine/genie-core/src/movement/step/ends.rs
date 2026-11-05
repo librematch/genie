@@ -10,6 +10,7 @@ use crate::movement::LevelFlags;
 use crate::movement::LevelsExt;
 use crate::movement::PathFlags;
 use crate::movement::PathState;
+use crate::movement::Speed;
 use crate::movement::{EPSILON, Goal, Motion, Mover, Next, footprint_gap, gate_gap};
 use crate::world::Seconds;
 use crate::world::layer::generated::MovementTuning;
@@ -89,12 +90,11 @@ impl Mover {
     pub(super) fn loop_end(
         &mut self,
         dt: Seconds,
-        walked: BVector,
-        heading: BVector,
+        (walked, heading, top): (BVector, BVector, Speed),
         movement_tuning: &MovementTuning,
     ) -> GenieResult<Motion> {
         let clipped = self.steer(heading, dt, movement_tuning)?;
-        self.control_speed(walked, clipped);
+        self.control_speed(walked, clipped, top);
         if self
             .paths
             .first()

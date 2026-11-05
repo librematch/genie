@@ -1294,6 +1294,9 @@ const fn move_to() -> MoveToTuning {
 const fn movement() -> MovementTuning {
     MovementTuning {
         ally_pause: f32::from_bits(0x3dcc_cccd),
+        charge_ready_slack: f64::from_bits(0x3f84_7ae1_47ae_147b),
+        charge_run_factor: f32::from_bits(0x3fc0_0000),
+        charge_run_reach: f32::from_bits(0x4120_0000),
         close: f32::from_bits(0x3f80_0000),
         edge_gap: f32::from_bits(0x3c23_d70a),
         edge_position_gap: f32::from_bits(0x3a83_126f),

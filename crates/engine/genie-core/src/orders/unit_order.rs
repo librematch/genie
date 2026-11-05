@@ -75,7 +75,7 @@ impl World {
         let unit = &self.players.live(player, idx)?;
         // what its MoveTo's constructor (FUN_140aa0df0) reads of the unit and the target
         let reads = unit.move_to_reads(
-            self.parts.motion.mover(unit.id),
+            self.top_speed(player, unit)?,
             MasterTables::new(&self.model.masters, &self.parts.own_master),
             player,
             (
@@ -436,6 +436,10 @@ impl World {
         idx: ListIndex,
         walker: &SiteWalker,
     ) -> GenieResult<()> {
+        let top_speed = {
+            let unit = self.players.live(player_id, idx)?;
+            self.top_speed_terms(player_id, unit)?
+        };
         let unit = self.take_out(player_id, idx)?;
         // its action layer goes out of the table with it, as the updating object's
         let mut actions = self.parts.take_actions(unit.id);
@@ -444,6 +448,7 @@ impl World {
             .parts
             .lend_mover(unit.id, (&self.players, &self.index, &self.model));
         let world = DropWorld {
+            top_speed,
             masters: by_id.masters().of(player_id),
             spatial: &mut self.spatial,
             zones: &mut self.zones,

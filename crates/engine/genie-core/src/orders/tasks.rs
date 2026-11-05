@@ -150,7 +150,7 @@ impl World {
         );
         // the sprites its MoveTo's constructor takes for none (FUN_140aa0df0)
         let move_reads = MoveToReads::of(
-            (unit, self.parts.mover_of(unit.id)),
+            (unit, self.top_speed(player, unit)?),
             builder,
             (
                 &self.model.graphics,
@@ -207,7 +207,7 @@ impl World {
         let unit = &self.players.live(player, idx)?;
         let master = unit.master(self.master_tables(), player)?;
         let move_reads = MoveToReads::of(
-            (unit, self.parts.mover_of(unit.id)),
+            (unit, self.top_speed(player, unit)?),
             master,
             (
                 &self.model.graphics,
@@ -383,7 +383,7 @@ impl World {
             }
             let unit = &self.players.live(player, idx)?;
             let move_reads = MoveToReads::of(
-                (unit, self.parts.mover_of(unit.id)),
+                (unit, self.top_speed(player, unit)?),
                 unit.master(self.master_tables(), player)?,
                 (
                     &self.model.graphics,
@@ -484,7 +484,7 @@ impl World {
         };
         // set_state(4)'s MoveTo to the foundation (FUN_140aa0df0), made before the borrows below
         let move_reads = MoveToReads::of(
-            (unit, self.parts.mover_of(unit.id)),
+            (unit, self.top_speed(player, unit)?),
             builder,
             (
                 &self.model.graphics,

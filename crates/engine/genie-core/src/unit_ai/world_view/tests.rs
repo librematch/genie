@@ -5,6 +5,7 @@ use crate::map::Footprint;
 use crate::map::GridSize;
 use crate::map::Position;
 use crate::movement::Speed;
+use crate::movement::SpeedReads;
 use crate::objects::HitPoints;
 use crate::objects::MasterHitPoints;
 use crate::objects::ObjectState;
@@ -138,6 +139,7 @@ fn harmless(master: Master) -> bool {
     };
     let picker = WorldPicker {
         by_id: ObjectsRef::empty(),
+        speeds: SpeedReads::empty(),
         attacker: &attacker,
         seeker: None,
         me: object_id(123),
@@ -249,6 +251,7 @@ fn ward_nearest_attacker_is_its_closest_held_one() {
     };
     let picker = WorldPicker {
         by_id: ObjectsRef::empty(),
+        speeds: SpeedReads::empty(),
         attacker: &attacker,
         seeker: None,
         me: object_id(123),
@@ -443,6 +446,7 @@ fn candidate_statistics_are_its_class_hit_points_and_the_damage_to_it() {
     };
     let picker = WorldPicker {
         by_id: ObjectsRef::empty(),
+        speeds: SpeedReads::empty(),
         attacker: &attacker,
         seeker: None,
         me: object_id(123),

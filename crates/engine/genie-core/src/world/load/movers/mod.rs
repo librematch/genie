@@ -19,6 +19,7 @@ use crate::objects::ObjectId;
 use crate::objects::SpeedMultiplier;
 use crate::objects::SpriteId;
 use crate::objects::layers::Animated;
+use crate::objects::layers::{Speedup, SpeedupValue};
 use crate::players::CivId;
 use crate::world::Seconds;
 use crate::world::WorldTime;
@@ -93,9 +94,9 @@ pub fn path_level(path_data: &PathData, paths: &[Path]) -> GenieResult<MovementP
 /// its speed, turning and radii. `None` for an object that does not move (types below 30).
 ///
 /// The top speed is the master's speed times the saved sprite's speed factor when that is above 0
-/// (`FUN_14114d1d0`); slot 65's other terms (`+0xa08`, `+0xa2c`, `+0xb38`, a followed object) are
-/// not read yet. moveForward's factor `+0x878` is not in the save; every moving object of
-/// MarvinBlue/426048731 holds 1.0 at tick 680 (the tick oracle).
+/// (`FUN_14114d1d0`'s first term); its speed-up (`+0x808`, `+0x80c`) is the save's. moveForward's
+/// factor `+0x878` is not in the save; every moving object of MarvinBlue/426048731 holds 1.0 at
+/// tick 680 (the tick oracle).
 pub fn mover(
     object: &genie_save::Object,
     rge_static_object: &RgeStaticObject,
@@ -270,6 +271,10 @@ pub fn mover(
             Position::new(float_at(0), float_at(8), float_at(4))
         },
         substitute_count: SubstituteCount::of_data(rge_moving_object.consecutive_substitute_count),
+        speedup: Speedup {
+            building: ObjectId::of_field(rge_moving_object.speedup_building_id),
+            value: SpeedupValue::of_data(rge_moving_object.speedup_value),
+        },
         ignore_units,
         // the save's userDefinedWaypoints, in the game's layout (x, height, y)
         user_waypoints: rge_moving_object

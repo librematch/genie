@@ -114,6 +114,7 @@ fn dat_task(task: &Task, sounds: &[Sound]) -> GenieResult<work::Task> {
         work_val2: work::WorkValue::new(task.work_value2),
         work_range: Distance::new(task.work_range),
         work_flag: task.gather_kind,
+        work_flag2: task.work_flag2,
         enablement: task
             .enabled
             .map(AttributeId::of_field)

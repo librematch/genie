@@ -25,6 +25,7 @@ use crate::math::rng::Stream;
 use crate::movement::Me;
 use crate::movement::MoveAlgorithm;
 use crate::movement::MoveStart;
+use crate::movement::TopSpeed;
 use crate::movement::TurnRate;
 use crate::movement::move_to::MoveWaitState;
 use crate::movement::move_to::SubCode;
@@ -49,6 +50,7 @@ use crate::objects::Voice;
 use crate::objects::facing::SpriteFacets;
 use crate::objects::layers::Action;
 use crate::objects::layers::Animated;
+use crate::objects::layers::Speedup;
 use crate::objects::layers::{Motion, MotionMut, Static};
 use crate::objects::masters::BlastDefense;
 use crate::objects::masters::BlastLevel;
@@ -635,6 +637,7 @@ fn soldier_mover(speed: f32) -> Mover {
         last_move: WorldTime::ZERO,
         moved_at: Position::ORIGIN,
         substitute_count: SubstituteCount::of_data(0),
+        speedup: Speedup::NONE,
         ignore_units: Vec::new(),
         user_waypoints: Vec::new(),
         last_turn: Seconds::ZERO,
@@ -674,6 +677,7 @@ pub(crate) fn reads() -> AttackReads {
         ai_order: AiOrder::Idle,
         ai_kind: None,
         next_volley: MissileCount::ZERO,
+        top_speed: TopSpeed::Own,
     }
 }
 
@@ -942,6 +946,7 @@ const fn me(id: i32, state: AttackState) -> Me {
         id: object_id(id),
         group: None,
         action_state: ActionState::new(state.get()),
+        top_speed: TopSpeed::Own,
     }
 }
 
@@ -2769,6 +2774,7 @@ fn disarmed_building_targetless_attack_ends_standing_and_posts_0x1fb() {
         id,
         group: None,
         action_state: ActionState::NO_ACTION,
+        top_speed: TopSpeed::Own,
     };
     let mut world = forage_world();
     // the town centre's master without a missile cannot attack

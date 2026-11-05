@@ -1,5 +1,7 @@
 //! The velocity step, a new object's setup, the position setter and the motion step's loop.
 
+use crate::objects::layers::Speedup;
+
 use crate::combat::missile::grounded as missile_grounded;
 use crate::groups::UnitGroups;
 use crate::map::Distance;
@@ -18,6 +20,7 @@ use crate::movement::MoveState;
 use crate::movement::PathState;
 use crate::movement::Speed;
 use crate::movement::StepPlans;
+use crate::movement::TopSpeed;
 use crate::movement::{
     AfterRequest, EPSILON, FAR, Goal, Me, Motion, MoveStats, Mover, Next, Planning, Reach, Reached,
     footprint_gap, gate_gap, ground, include_kept, moved_far, pause_holds, point_or_zero_of, reach,
@@ -95,13 +98,13 @@ impl Mover {
     /// Slot 0x5e0 (`FUN_14114f300`): the forward speed the velocity step takes toward `wanted`
     /// (the acceleration times dt plus the speed). A unit its group steers (`group`) takes the
     /// group's answer ([`GroupSpeed`]; a free one below `MovementTuning::uncapped_speed`, `COMISS` then `JA`,
-    /// only the floor). Any other is capped by the top speed (slot 0x208; `COMISS` then `JA`: a
-    /// NaN is not above it), then floored at 0 (a NaN stays).
+    /// only the floor). Any other is capped by its top speed `top` (slot 0x208; `COMISS` then
+    /// `JA`: a NaN is not above it), then floored at 0 (a NaN stays).
     #[must_use]
     pub fn next_speed(
         &self,
         wanted: Speed,
-        group: Option<GroupSpeed>,
+        (group, top): (Option<GroupSpeed>, Speed),
         movement_tuning: &MovementTuning,
     ) -> Speed {
         match group {
@@ -117,8 +120,8 @@ impl Mover {
             }
             Some(GroupSpeed::Free) if wanted.get() < movement_tuning.uncapped_speed => {}
             Some(GroupSpeed::Free) | None => {
-                if self.stats.speed.get() < wanted.get() {
-                    return self.stats.speed;
+                if top.get() < wanted.get() {
+                    return top;
                 }
             }
         }
@@ -131,32 +134,37 @@ impl Mover {
 
     /// The velocity part of `RGE_Moving_Object::update` (`FUN_140f9ba80`): the forward speed moves
     /// toward the acceleration's target, as slot 0x5e0 takes it ([`Mover::next_speed`], `group`
-    /// the unit's group's steer), then the unit moves `dt × speed` along its forward vector (slot
-    /// 182, `0x141158490`) at the world's time `now`. Returns the position after it.
+    /// the unit's group's steer, `top` what its top speed reads at `position`), then the unit
+    /// moves `dt × speed` along its forward vector (slot 182, `0x141158490`) at the world's time
+    /// `now`. Returns the position after it.
     pub fn step_velocity(
         &mut self,
         position: Position,
         dt: Seconds,
         map: GridSize,
         terrain: Option<&Terrain>,
-        (now, group): (WorldTime, Option<GroupSpeed>),
+        (now, group, top): (WorldTime, Option<GroupSpeed>, TopSpeed),
         movement_tuning: &MovementTuning,
     ) -> Position {
         let Some(velocity) = self.velocity.as_ref() else {
             return position;
         };
+        let top = self.top_speed(top, position.ground());
         let speed = self.next_speed(
             Speed::new(velocity.acceleration.y() * dt + velocity.velocity.y()),
-            group,
+            (group, top),
             movement_tuning,
         );
         if let Some(velocity) = self.velocity.as_mut() {
             velocity.velocity = velocity.velocity.with_y(speed.get());
         }
         // the position setter runs only for a distance it moves
-        let Some(at) =
-            self.move_forward(Distance::new(dt.get() * speed.get()), map, movement_tuning)
-        else {
+        let Some(at) = self.move_forward(
+            Distance::new(dt.get() * speed.get()),
+            top,
+            map,
+            movement_tuning,
+        ) else {
             return position;
         };
         let at = self.grounded(at, terrain);
@@ -212,6 +220,7 @@ impl Mover {
             last_move: now,
             moved_at: at,
             substitute_count: SubstituteCount::NONE,
+            speedup: Speedup::NONE,
             ignore_units: Vec::new(),
             user_waypoints: Vec::new(),
             last_turn: Seconds::ZERO,
@@ -233,10 +242,11 @@ impl Mover {
 
     /// `moveForward` (slot 182, `FUN_141158490`): `distance × factor` along the forward vector
     /// from where the unit last moved to (`+0x824`, [`Mover::moved_at`]), through the position
-    /// setter; a distance below 1e-7 moves nothing.
+    /// setter (the unit's top speed `top`); a distance below 1e-7 moves nothing.
     pub(super) fn move_forward(
         &self,
         distance: Distance,
+        top: Speed,
         map: GridSize,
         movement_tuning: &MovementTuning,
     ) -> Option<Position> {
@@ -245,7 +255,7 @@ impl Mover {
             return None;
         }
         let to = self.moved_at.vector() + distance.get() * self.forward;
-        Some(self.set_position(to.position(), map, movement_tuning))
+        Some(self.set_position(to.position(), top, map, movement_tuning))
     }
 
     /// The unit's place setter from its moving layer: its place `place` (the row's static
@@ -271,10 +281,12 @@ impl Mover {
     }
 
     /// The position setter (slot 11 -> `FUN_141161950` -> `0x1411a58b0`): a unit that can move
-    /// keeps its footprint 0.01 inside the map, then any position stays 0.001 below the map's size.
+    /// (its top speed `top`, slot 0x208 where it stands, above 1e-7) keeps its footprint 0.01
+    /// inside the map, then any position stays 0.001 below the map's size.
     pub(crate) fn set_position(
         &self,
         at: Position,
+        top: Speed,
         map: GridSize,
         movement_tuning: &MovementTuning,
     ) -> Position {
@@ -291,7 +303,7 @@ impl Mover {
         };
         // both clamps read the map's +0x18, its width (0x14116220d for y): on a map that is not
         // square the y clamp takes the width
-        let (x, y) = if EPSILON < self.stats.speed.get() {
+        let (x, y) = if EPSILON < top.get() {
             (
                 inside(x, self.stats.radius.x(), map.width()),
                 inside(y, self.stats.radius.y(), map.width()),
@@ -443,7 +455,8 @@ impl Mover {
         by_id: ObjectsRef<'_>,
     ) -> GenieResult<Motion> {
         let movement_tuning = &by_id.tuning().movement;
-        if self.stats.speed == Speed::ZERO {
+        // FUN_141194060 with 2: a top speed of 0 (slot 0x208) ends the step
+        if self.top_speed(me.top_speed, place.position().ground()) == Speed::ZERO {
             return Ok(Motion::Done);
         }
         let Some(level) = self.paths.first_mut() else {
@@ -485,7 +498,10 @@ impl Mover {
                     Reached::Pass(Next::Again) => continue,
                     Reached::Pass(Next::Dispatch) => {}
                     Reached::Pass(Next::Done(motion)) => return Ok(motion),
-                    Reached::LoopEnd => return self.loop_end(dt, walked, heading, movement_tuning),
+                    Reached::LoopEnd => {
+                        let top = self.top_speed(me.top_speed, place.position().ground());
+                        return self.loop_end(dt, (walked, heading, top), movement_tuning);
+                    }
                 }
             }
             match self.level_state(
@@ -570,7 +586,9 @@ impl Mover {
         }
         let direction = self.direction_to(position, waypoint);
         *heading = direction;
-        let projected = self.projected(direction, dt);
+        // slot 0x208 from the unit's place, which the walk leaves as it is
+        let top = self.top_speed(me.top_speed, at.ground());
+        let projected = self.projected(direction, dt, top);
         match reach(waypoint, position, projected) {
             Reach::Away => {
                 self.paths.walked_mut()?.flags |= LevelFlags::REACHED | LevelFlags::AT_WAYPOINT;
@@ -635,7 +653,7 @@ impl Mover {
             return Ok(next);
         }
         let clipped = self.steer(direction, dt, movement_tuning)?;
-        self.control_speed(waypoint, clipped);
+        self.control_speed(waypoint, clipped, top);
         Ok(Next::Done(Motion::Moving))
     }
 }

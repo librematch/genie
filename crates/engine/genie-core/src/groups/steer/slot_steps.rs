@@ -88,78 +88,14 @@ impl World {
         id: ObjectId,
         to: BVector,
     ) -> GenieResult<SlotTry> {
-        let (player_id, unit) = self.object(id).ok_or_else(|| member_gone(id))?;
+        let (_, unit) = self.object(id).ok_or_else(|| member_gone(id))?;
         let mover = self.parts.mover_of(unit.id).ok_or(NO_MOVER)?;
-        let held = self.groups.held(group)?;
-        let player_kind = self
-            .players
-            .get(player_id.index())
-            .map_or(PlayerKind::Phantom, |player| player.kind);
-        let solid = mover.stats.radius.sized();
-        let found = if solid {
-            let members: Vec<ObjectId> = held.members.iter().map(|member| member.id).collect();
-            let at = unit.moved_vector(self.parts.mover_of(unit.id));
-            let walker = mover.walker(id);
-            let mut plan = Planning {
-                pathing: &mut self.pathing,
-                now: self.world_time,
-                player_kind,
-                object: self.streams.get_mut(Stream::Object),
-                groups: &self.groups,
-            };
-            let mut path = Path::default();
-            let short_found = short_path_for(
-                walker,
-                at.ground(),
-                (
-                    &mut self.spatial,
-                    ObjectsRef::new(
-                        &self.players,
-                        &self.index,
-                        &self.model.masters,
-                        &self.parts,
-                        &self.model.roles,
-                        &self.model.tuning,
-                    ),
-                ),
-                &mut plan,
-                (to, Distance::ZERO, None),
-                &members,
-                &mut path,
-            )?;
-            !short_found.fails()
+        // the group the caller holds the slot of
+        let _ = self.groups.held(group)?;
+        let found = if mover.stats.radius.sized() {
+            self.short_way_to_slot(group, id, to)?
         } else {
-            let walker = LongWalker {
-                id,
-                position: unit.position(),
-                radius: mover.stats.radius.ground(),
-                mask: mover.stats.restriction_mask,
-                moves: mover.stats.speed != Speed::ZERO
-                    || self
-                        .model
-                        .roles
-                        .of_master(unit.life.master_id)
-                        .contains(MasterRoles::LONG_PATH_MOVER),
-                ignore_units: &mover.ignore_units,
-                group_units: self.groups.group_units(unit.group.id),
-            };
-            long_path_for(
-                &walker,
-                unit.position().ground(),
-                &self.spatial,
-                player_kind,
-                (to, 0.0),
-                None,
-                ObjectsRef::new(
-                    &self.players,
-                    &self.index,
-                    &self.model.masters,
-                    &self.parts,
-                    &self.model.roles,
-                    &self.model.tuning,
-                ),
-            )?
-            .0
+            self.long_way_to_slot(id, to)?
         };
         if found {
             self.place_member(id, to)?;
@@ -172,6 +108,106 @@ impl World {
         })
     }
 
+    /// [`World::try_slot`]'s short pather for member `id` of group `group` with a footprint and
+    /// a height: a way from where it last moved to `to` past the group's members.
+    ///
+    /// # Errors
+    ///
+    /// A member the world lacks, and what the short pather does not model.
+    fn short_way_to_slot(
+        &mut self,
+        group: GroupId,
+        id: ObjectId,
+        to: BVector,
+    ) -> GenieResult<bool> {
+        let (player_id, unit) = self.object(id).ok_or_else(|| member_gone(id))?;
+        let mover = self.parts.mover_of(unit.id).ok_or(NO_MOVER)?;
+        let player_kind = self
+            .players
+            .get(player_id.index())
+            .map_or(PlayerKind::Phantom, |player| player.kind);
+        let held = self.groups.held(group)?;
+        let members: Vec<ObjectId> = held.members.iter().map(|member| member.id).collect();
+        let at = unit.moved_vector(self.parts.mover_of(unit.id));
+        let walker = mover.walker(id);
+        let mut plan = Planning {
+            pathing: &mut self.pathing,
+            now: self.world_time,
+            player_kind,
+            object: self.streams.get_mut(Stream::Object),
+            groups: &self.groups,
+        };
+        let mut path = Path::default();
+        let short_found = short_path_for(
+            walker,
+            at.ground(),
+            (
+                &mut self.spatial,
+                ObjectsRef::new(
+                    &self.players,
+                    &self.index,
+                    &self.model.masters,
+                    &self.parts,
+                    &self.model.roles,
+                    &self.model.tuning,
+                ),
+            ),
+            &mut plan,
+            (to, Distance::ZERO, None),
+            &members,
+            &mut path,
+        )?;
+        Ok(!short_found.fails())
+    }
+
+    /// [`World::try_slot`]'s long pather for member `id` without a footprint: a way from its
+    /// place to `to`; it moves when its top speed (slot 0x208) is not 0 or its master is a
+    /// long-path mover.
+    ///
+    /// # Errors
+    ///
+    /// A member the world lacks, and what the long pather does not model.
+    fn long_way_to_slot(&self, id: ObjectId, to: BVector) -> GenieResult<bool> {
+        let (player_id, unit) = self.object(id).ok_or_else(|| member_gone(id))?;
+        let mover = self.parts.mover_of(unit.id).ok_or(NO_MOVER)?;
+        let top = self.top_speed(player_id, unit)?;
+        let player_kind = self
+            .players
+            .get(player_id.index())
+            .map_or(PlayerKind::Phantom, |player| player.kind);
+        let walker = LongWalker {
+            id,
+            position: unit.position(),
+            radius: mover.stats.radius.ground(),
+            mask: mover.stats.restriction_mask,
+            moves: top != Speed::ZERO
+                || self
+                    .model
+                    .roles
+                    .of_master(unit.life.master_id)
+                    .contains(MasterRoles::LONG_PATH_MOVER),
+            ignore_units: &mover.ignore_units,
+            group_units: self.groups.group_units(unit.group.id),
+        };
+        Ok(long_path_for(
+            &walker,
+            unit.position().ground(),
+            &self.spatial,
+            player_kind,
+            (to, 0.0),
+            None,
+            ObjectsRef::new(
+                &self.players,
+                &self.index,
+                &self.model.masters,
+                &self.parts,
+                &self.model.roles,
+                &self.model.tuning,
+            ),
+        )?
+        .0)
+    }
+
     /// The steering of a member on a clear line to its slot (`0x1410277eb`..`0x141027bff`):
     /// see [`World::steer_to_slot`]. `gap` is the ground distance to the slot.
     pub(super) fn steer_member(
@@ -182,7 +218,9 @@ impl World {
         gap: Distance,
     ) -> GenieResult<()> {
         let dt = self.dt_seconds;
-        let (_, unit) = self.object(id).ok_or_else(|| member_gone(id))?;
+        let (player_id, unit) = self.object(id).ok_or_else(|| member_gone(id))?;
+        // slot 0x208 from the member's place, which the steer leaves as it is
+        let top = self.top_speed(player_id, unit)?;
         let facets = unit.sprite.map(|active_sprite| SpriteFacets {
             count: active_sprite.graphic.facets,
             turns: active_sprite.graphic.flags.contains(SpriteFlags::TURNS),
@@ -197,10 +235,10 @@ impl World {
         );
         let facets = facets.or_else(|| mover.facets());
         mover.yaw(turn, facets)?;
-        let next = mover.projected(direction, dt);
+        let next = mover.projected(direction, dt, top);
         let state = SlotState::of_passing(passes_waypoint(to, at, next, &self.model.tuning.group));
         let radius = mover.stats.radius.x();
-        let speed = mover.stats.speed;
+        let speed = top;
         self.set_slot_state(group, slot, state)?;
         let within = !below_or_unordered(radius, gap.get());
         let near =
@@ -346,9 +384,14 @@ impl World {
         let Some(place) = self.place(id) else {
             return Ok(());
         };
-        let (player, master_id) = {
+        let (player, master_id, top) = {
             let (player_id, unit) = self.object(id).ok_or_else(|| member_gone(id))?;
-            (player_id, unit.life.master_id)
+            // the position setter reads slot 0x208 where the member stands (FUN_141161950)
+            (
+                player_id,
+                unit.life.master_id,
+                self.top_speed(player_id, unit)?,
+            )
         };
         let kind = self.master(player, master_id)?.kind;
         let unit = match place {
@@ -361,10 +404,10 @@ impl World {
             return Ok(());
         };
         let map = self.spatial.map;
-        let at = mover.set_position(to.position(), map, &self.model.tuning.movement);
+        let at = mover.set_position(to.position(), top, map, &self.model.tuning.movement);
         let at = mover.grounded(at, self.spatial.terrain.as_ref());
         mover.mark_move(at, self.world_time);
-        let (speed, radius) = (mover.stats.speed, mover.stats.radius);
+        let radius = mover.stats.radius;
         mover.new_position(
             &mut unit.place,
             id,
@@ -373,6 +416,11 @@ impl World {
             &self.model.roles,
             self.model.tuning.visibility,
         )?;
+        // slot 0x208 again where the member now stands (FUN_14108c320)
+        let speed = match self.object(id) {
+            Some((owner, unit)) => self.top_speed(owner, unit)?,
+            None => Speed::ZERO,
+        };
         if !id.is_recyclable()
             // The types of action objects (`RGE_Action_Object`) and of buildings (`TRIBE_Building_Object`).
             && kind < MasterKind::BUILDING

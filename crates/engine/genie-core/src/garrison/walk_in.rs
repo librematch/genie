@@ -517,6 +517,7 @@ impl EnterAction {
         {
             mover.stop()?;
         }
+        let top = step.world.top_speed(step.player, unit)?;
         let walking = {
             let world = &mut *step.world;
             // the update's reads found it (`held_target`), and the Enter's own update removes
@@ -530,6 +531,7 @@ impl EnterAction {
                 MasterTables::new(&world.model.masters, &world.parts.own_master),
                 tp,
             )?;
+            let target_speed = world.top_speed(tp, target)?;
             let meeting = Meeting {
                 spatial: &mut world.spatial,
                 zones: &mut world.zones,
@@ -540,13 +542,13 @@ impl EnterAction {
                 mover: world.parts.mover_of(unit.id),
                 target_actions: world.parts.actions_of(target.id),
                 target_unread: world.parts.unread.get(target.id),
-                target_mover: world.parts.mover_of(target.id),
+                target_speed,
             };
             let sprites = SpriteReads {
                 defaults: reads.defaults,
                 graphics: &world.model.graphics,
             };
-            let moves = MoveToReads::with_sprites(sprites, (meeting.unit, meeting.mover));
+            let moves = MoveToReads::with_sprites(sprites, (meeting.unit, meeting.mover, top));
             self.walk_again(
                 enter_target,
                 reads.start,

@@ -441,18 +441,16 @@ impl World {
             .master(self.master_tables(), player)?;
         let range = object_range(Distance::ZERO, Some(master), &self.model.tuning.order);
         let sprite = object_sprite(master).and_then(|id| self.model.graphics.get(id).copied());
+        let top = self.top_speed(player, self.players.live(player, idx)?)?;
         let unit = self.players.live_mut(player, idx)?;
         let here = unit.position();
-        let mover = self
-            .parts
-            .mover_mut(unit.id)
-            .ok_or(GenieError::unsupported(
-                "a moved unit without movement state",
-            ))?;
+        let mover = self.parts.mover_of(unit.id).ok_or(GenieError::unsupported(
+            "a moved unit without movement state",
+        ))?;
         let move_to = MoveToAction::to_object(
             &self.spatial,
             here,
-            mover,
+            (mover, top),
             (target, target_state),
             range,
             (sprite, livestock),
@@ -534,6 +532,7 @@ impl World {
     ) -> GenieResult<Answer> {
         let by = self.releaser(player, idx)?;
         let id = self.players.live(player, idx)?.id;
+        let top_speed = self.top_speed_terms(player, self.players.live(player, idx)?)?;
         let (released, left) = match self.players.live_mut(player, idx)?.head_takes_point(
             (self.parts.actions.of_mut(id)?, self.parts.unread.get(id)),
             self.parts.motion.layer_mut(id),
@@ -546,6 +545,7 @@ impl World {
                 roles: &self.model.roles,
                 sprite_tuning: self.model.tuning.sprite,
                 move_to_tuning: &self.model.tuning.move_to,
+                top_speed,
             },
         )? {
             PointMove::Declined => return Ok(Answer::NotTaken),

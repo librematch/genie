@@ -76,6 +76,10 @@ impl ActionKind {
     /// The type 132 (`0x84`): picking an object up (a monk's relic); the group commands use it too.
     pub const PICK_UP: Self = Self::named(0x84);
 
+    /// The type 133 (`0x85`): a master's task (0x85, any, 0x7d1) gives the run of its ready charge
+    /// its reach and factor (slot 0x208, `FUN_141202c70`).
+    pub const ACTION_133: Self = Self::named(0x85);
+
     /// The type 135 (`0x87`): the task a monk carrying a relic takes at its own town centre.
     pub const ACTION_135: Self = Self::named(0x87);
 

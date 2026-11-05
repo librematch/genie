@@ -430,7 +430,7 @@ impl World {
             position: unit.position(),
             radius: mover.stats.radius.ground(),
             mask: mover.stats.restriction_mask,
-            moves: mover.stats.speed != Speed::ZERO
+            moves: self.top_speed(player_id, unit)? != Speed::ZERO
                 || self
                     .model
                     .roles

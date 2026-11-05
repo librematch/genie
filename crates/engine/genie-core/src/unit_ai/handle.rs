@@ -152,6 +152,7 @@ impl UnitAi {
                 reach: Speed::ZERO < at.speed,
             },
             memory: Memory::default(),
+            ai_target: self.current_target,
         })?;
         self.alert(found, at.dt_seconds);
         if found.players < 2

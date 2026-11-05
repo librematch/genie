@@ -41,6 +41,7 @@ its powerup update (`aura/`).
 | [`class_or_master.rs`](class_or_master.rs) | The object a combat task names (`ClassOrMaster`): a class or a master, as slot 277 keeps it in the aura groups and the stinger tasks. |
 | [`combat_update.rs`](combat_update.rs) | `TRIBE_Combat_Object::update` (`0x141208440`), a combat object's or building's own update (types 70 and 80) around `RGE_Combat_Object::update`. |
 | [`kill_state.rs`](kill_state.rs) | Whether an object's kill is counted. |
+| [`lockdown.rs`](lockdown.rs) | How often an object is locked down. |
 | [`mod.rs`](mod.rs) | Combat: attacks, hits and missiles. |
 | [`powerup.rs`](powerup.rs) | An object's powerups (`+0xa24`..`+0xa54`, `+0xa98`, `+0xad4`): an aura's powerup (`World::apply_powerup`, `FUN_141200dd0`) and their reset (`World::reset_powerups`, `FUN_1412066b0`). |
 | [`reload.rs`](reload.rs) | An object's reload time (slot 0x218, `FUN_141086c90`): the time between its attacks, from its master's and its own values, which technologies and effects change. |

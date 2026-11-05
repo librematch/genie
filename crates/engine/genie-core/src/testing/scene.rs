@@ -6,6 +6,8 @@
 //! map's words; an object ([`SceneObject`]) is filed as the game files a new one. Tests build their
 //! world here instead of standing in for its reads.
 
+use crate::objects::layers::Speedup;
+
 use crate::construction::BuilderCount;
 use crate::construction::MainBuildingId;
 use crate::construction::build::Construction;
@@ -35,6 +37,7 @@ use crate::movement::MoveAlgorithm;
 use crate::movement::MoveState;
 use crate::movement::Mover;
 use crate::movement::Speed;
+use crate::movement::TopSpeed;
 use crate::movement::TurnRate;
 use crate::movement::scout_area::ScoutArea;
 use crate::movement::{MoveStats, SubstituteCount, WaitDelays};
@@ -698,6 +701,7 @@ fn standing(stats: MoveStats, at: Position) -> Mover {
         last_move: WorldTime::ZERO,
         moved_at: at,
         substitute_count: SubstituteCount::of_data(0),
+        speedup: Speedup::NONE,
         ignore_units: Vec::new(),
         user_waypoints: Vec::new(),
         last_turn: Seconds::ZERO,
@@ -927,6 +931,7 @@ pub(crate) fn scout_area(world: &mut World) -> (ScoutArea<'_>, GridSize, Distanc
         id: unit.id,
         group: None,
         action_state: ActionState::NO_ACTION,
+        top_speed: TopSpeed::Own,
     };
     ScoutArea::of(world, &unit, me, PLAYER, PlayerKind::Human).expect("the scout's reads")
 }

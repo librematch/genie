@@ -11,7 +11,6 @@ use crate::map::Distance;
 use crate::map::spatial::{SearchQuery, Spatial};
 use crate::math::rng::Stream;
 use crate::movement::MoveStart;
-use crate::movement::Speed;
 use crate::movement::{Me, Planning};
 use crate::objects::ActionState;
 use crate::objects::ObjectId;
@@ -170,7 +169,9 @@ impl Unit {
         } else if master.action_part().drop_sites.is_empty() {
             -1
         } else {
+            let top_speed = step.world.top_speed_terms(step.player, self)?;
             let mut drop_world = DropWorld {
+                top_speed,
                 masters: OwnerMasters::new(
                     &step.world.parts.own_master,
                     step.world.model.masters.of(step.player),
@@ -290,11 +291,7 @@ impl Unit {
                 .get_known(victim.id)?
                 .ok_or(GenieError::unsupported("a hunt's target without a place"))?,
         );
-        let speed = step
-            .world
-            .parts
-            .mover_of(self.id)
-            .map_or(Speed::ZERO, |mover| mover.stats.speed);
+        let speed = step.world.top_speed(step.player, self)?;
         let engagement = engagement(
             step.world.parts.unit_ai.get(self.id),
             speed,
@@ -318,7 +315,10 @@ impl Unit {
             release(step, self, site, by)?;
         }
         let walks = self.move_walks(
-            step.world.parts.mover_of(self.id),
+            (
+                step.world.parts.mover_of(self.id),
+                step.world.top_speed_terms(step.player, self)?,
+            ),
             MasterTables::new(&step.world.model.masters, &step.world.parts.own_master),
             step.player,
             (
@@ -489,10 +489,12 @@ impl Unit {
                 reach: true,
             },
             memory: Memory::default(),
+            ai_target: step.world.ai_target(self.id),
         };
+        let top_speed = step.world.top_speed_terms(step.player, self)?;
         let me = Me {
             action_state: ActionState::new(hunt.state.get()),
-            ..self.me(actions)
+            ..self.me(actions, top_speed)
         };
         let closest = step.world.closest_world();
         let mut plan = Planning {
@@ -563,7 +565,10 @@ impl Unit {
             ));
         }
         let walks = self.move_walks(
-            step.world.parts.mover_of(self.id),
+            (
+                step.world.parts.mover_of(self.id),
+                step.world.top_speed_terms(step.player, self)?,
+            ),
             MasterTables::new(&step.world.model.masters, &step.world.parts.own_master),
             step.player,
             (

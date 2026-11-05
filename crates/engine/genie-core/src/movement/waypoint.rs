@@ -182,7 +182,8 @@ impl Mover {
         let level = self.paths.walked()?;
         if level.waypoint.within(level.points.len()) {
             let point = level.point(level.waypoint);
-            let at = self.set_position(point.position(), world.map, movement_tuning);
+            let top = self.top_speed(me.top_speed, place.position().ground());
+            let at = self.set_position(point.position(), top, world.map, movement_tuning);
             let at = self.grounded(at, world.terrain.as_ref());
             self.moved_to(
                 place,

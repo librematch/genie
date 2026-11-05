@@ -211,6 +211,7 @@ impl UnitAi {
                 },
             },
             memory: self.memory(),
+            ai_target: self.current_target,
         })?;
         self.add_retries(&found);
         self.attack_search_alert(found, player_kind, unit_ai_tuning)?;
@@ -234,7 +235,7 @@ impl UnitAi {
     ) -> GenieResult<u32> {
         let roles = &at.roles;
         let attacker_id = attacker.id;
-        let reaches = side.reaches(attacker_id, at.weapon_range)?;
+        let reaches = side.reaches(attacker_id, at.weapon_range, self.current_target)?;
         let Some(target) = current else {
             if reaches {
                 return self.strike_back(attacker_id, at, ai_rng, side);
@@ -524,7 +525,7 @@ impl UnitAi {
                 "a scout that finds no undiscovered tile (the player's slot 0x2e8 with 0x211)",
             )),
             Some(OrderKind::AutoScout) => {
-                let Some(tile) = side.seek_beyond_sight(ai_rng)? else {
+                let Some(tile) = side.seek_beyond_sight(ai_rng, self.current_target)? else {
                     // the player's scout map, from the tiles it sees; on the auto scout's action
                     // the AI's slot 0x40 hands the notify to the owner (slot 0x2e8 with 0x202,
                     // FUN_14162dab0: no case for it but the old short pather's hulled area, a
@@ -548,7 +549,7 @@ impl UnitAi {
             _ => {
                 self.remove_target();
                 self.stop_current(StopOrder::Keep, at, side, ai_rng)?;
-                side.owner_hears(notify)?;
+                side.owner_hears(notify, self.current_target)?;
                 Ok(GO_ON)
             }
         }

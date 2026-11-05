@@ -207,10 +207,7 @@ impl World {
                 unit,
                 // the game's vector (x, height, y) of where it last moved to (x, y, height)
                 at: moved_place(object, self.parts.mover_of(object.id)),
-                speed: self
-                    .parts
-                    .mover_of(object.id)
-                    .map_or(Speed::ZERO, |mover| mover.stats.speed),
+                speed: self.top_speed_with(player_id, object, ai.current_target)?,
                 range: weapon_range(master),
                 under_attack: object.flags.contains(UnitFlags::UNDER_ATTACK),
                 attacking: ai.current_action == Some(AiAction::Attack),
@@ -344,6 +341,7 @@ impl World {
             size: master.radius,
             pick: Pick::Look,
             memory: Memory::default(),
+            ai_target: self.ai_target(id),
         };
         let fresh = self.spatial.search_query(
             player_id,

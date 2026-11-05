@@ -247,13 +247,9 @@ impl World {
             // clears, then the start)
             self.clear_actions(player, idx)?;
             let sprite = self.point_move_sprite(player, idx)?;
+            let top = self.top_speed(player, self.players.live(player, idx)?)?;
             let unit = self.players.live_mut(player, idx)?;
-            let move_to = MoveToAction::to_point(
-                point,
-                Distance::ZERO,
-                sprite,
-                self.parts.mover_mut(unit.id),
-            );
+            let move_to = MoveToAction::to_point(point, Distance::ZERO, sprite, top);
             if move_to.shows_standing() {
                 unit.shows_standing_sprite(
                     self.parts.motion.layer_mut(unit.id),
@@ -300,6 +296,7 @@ impl World {
         let class = unit.master(self.master_tables(), player)?.class;
         let by = self.releaser(player, idx)?;
         let id = self.players.live(player, idx)?.id;
+        let top_speed = self.top_speed_terms(player, unit)?;
         let (mut releases, mut builder_leaves) = (Vec::new(), Vec::new());
         let sails = self.players.live_mut(player, idx)?.ai_move_with(
             (self.parts.actions.of_mut(id)?, self.parts.unread.get(id)),
@@ -318,6 +315,7 @@ impl World {
                     roles: &self.model.roles,
                     sprite_tuning: self.model.tuning.sprite,
                     move_to_tuning: &self.model.tuning.move_to,
+                    top_speed,
                 },
                 self.streams.get_mut(Stream::Sprite),
             ),

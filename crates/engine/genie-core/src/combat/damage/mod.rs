@@ -32,7 +32,6 @@ pub use self::blasts::blast;
 #[cfg(test)]
 use self::blasts::blast_tiles;
 use self::blasts::damage;
-pub(crate) use self::hit_factors::SPECIAL_CHARGE_GAP;
 pub use self::hit_factors::{
     building_elevation_factor, charge_hit, charge_works, charged, elevation_factor, facing_offset,
     range_charge_hit,

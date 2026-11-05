@@ -341,6 +341,7 @@ impl UnitAi {
             size: at.size,
             pick: Pick::Look,
             memory: Memory::default(),
+            ai_target: self.current_target,
         })?;
         self.attack_search_alert(found, player_kind, unit_ai_tuning)?;
         side.call_for_help(attacker)
@@ -403,7 +404,11 @@ impl UnitAi {
             }
             Some(AiAction::Build) => {
                 if let Some(found) = side.foundation_search()?
-                    && side.reaches(found, Distance::new(unit_ai_tuning.foundation_reach))?
+                    && side.reaches(
+                        found,
+                        Distance::new(unit_ai_tuning.foundation_reach),
+                        self.current_target,
+                    )?
                 {
                     let _ = self.build_object(
                         FoundationId::new(found),

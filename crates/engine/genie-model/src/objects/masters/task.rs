@@ -68,6 +68,9 @@ pub struct Task {
     /// `+0x34`, `work_flag` (the `.dat`'s `gather_type`): a Make adds to its player's attribute,
     /// not to its object's holding (`genie_core::gathering::make`).
     pub work_flag: i16,
+    /// `+0x36`, `work_flag2` (the `.dat`'s `work_flag_2`): the task lookup by action, `+0x34`
+    /// and this (`FUN_14109e1a0`) matches it; a charge's run is task (0x85, any, 0x7d1).
+    pub work_flag2: i16,
     /// `+0x38`, `enablement_resource_id` (`enabled`): the resource that enables the task, -1 none.
     pub enablement: Option<AttributeId>,
     /// `+0x40`..`+0x58`: the moving, proceeding, working and carrying sprites.
@@ -110,6 +113,7 @@ impl Default for Task {
             work_val2: WorkValue::ZERO,
             work_range: Distance::ZERO,
             work_flag: 0,
+            work_flag2: 0,
             enablement: None,
             sprites: TaskSprites::NONE,
             sound_events: SoundEvents::new(0, 0),

@@ -238,11 +238,11 @@ impl MoveToAction {
     /// already in state 1, which its next update ends. States 1 and 13 (`0x140aa29e0`, not quiet)
     /// show the master's standing sprite ([`MoveToAction::shows_standing`]; the sprite itself and
     /// `+0x7b8`, cleared, are the caller's, [`MoveToAction::shows_standing`]). `me` is the unit's
-    /// place.
+    /// place, `mover` its movement state and `top` its top speed (slot 0x208).
     pub fn to_target(
         world: &Spatial,
         me: Position,
-        mover: &mut Mover,
+        (mover, top): (&Mover, Speed),
         target: ObjectId,
         range: Distance,
         sprite: Option<Graphic>,
@@ -254,7 +254,7 @@ impl MoveToAction {
             <= Distance::new(move_to_tuning.arrived)
         {
             MoveTo::Arrived
-        } else if mover.stats.speed == Speed::ZERO {
+        } else if top == Speed::ZERO {
             MoveTo::Failed
         } else {
             MoveTo::Start
@@ -278,7 +278,8 @@ impl MoveToAction {
     /// or later is not held either (`FUN_140a7a230`: its id stays −1) and the `MoveTo` walks to
     /// its place, as a `MoveTo` to that point starts ([`MoveToAction::to_point`]). Any other
     /// target is held ([`MoveToAction::to_target`]), and the caller takes it (slot
-    /// 0x178, [`MoveToAction::target`] not −1).
+    /// 0x178, [`MoveToAction::target`] not −1). `mover` is the unit's movement state, `top` its
+    /// top speed (slot 0x208).
     ///
     /// # Errors
     ///
@@ -286,7 +287,7 @@ impl MoveToAction {
     pub fn to_object(
         world: &Spatial,
         me: Position,
-        mover: &mut Mover,
+        (mover, top): (&Mover, Speed),
         (target, state): (ObjectId, ObjectState),
         range: Distance,
         (sprite, livestock): (Option<Graphic>, bool),
@@ -307,30 +308,35 @@ impl MoveToAction {
                 at.z(),
             )
         } else if holds_object(livestock, placed.master, state, roles) {
-            return Self::to_target(world, me, mover, target, range, sprite, move_to_tuning);
+            return Self::to_target(
+                world,
+                me,
+                (mover, top),
+                target,
+                range,
+                sprite,
+                move_to_tuning,
+            );
         } else {
             at
         };
-        Ok(Self::to_point(goal, range, sprite, Some(mover)))
+        Ok(Self::to_point(goal, range, sprite, top))
     }
 
     /// A new `MoveTo` of its own (not quiet) to `point` within `range` (`FUN_140aa0d30`), with its
     /// `sprite` ([`MoveToAction::sprite`]), as its start (slot 0x808 -> `0x140aa2100`) leaves it.
     /// Without a target object the start's gap (`FUN_14118f680` with none) is `f32::MAX`, never
-    /// within 0.01: a unit with speed (slot 0x208, `UCOMISS`: a NaN speed has some) is in state 3,
-    /// one without in 13 (`0x140aa29e0`, not quiet: the master's standing sprite,
+    /// within 0.01: a unit with speed `top` (slot 0x208, `UCOMISS`: a NaN speed has some) is in
+    /// state 3, one without in 13 (`0x140aa29e0`, not quiet: the master's standing sprite,
     /// [`MoveToAction::shows_standing`]; the sprite itself and `+0x7b8`, cleared, are the caller's,
-    /// [`MoveToAction::shows_standing`]). A unit without movement state has no speed.
+    /// [`MoveToAction::shows_standing`]). A unit without movement state has no speed
+    /// ([`TopSpeed::of_object`](crate::movement::TopSpeed::of_object)).
     #[must_use]
-    pub fn to_point(
-        point: Position,
-        range: Distance,
-        sprite: Option<Graphic>,
-        mover: Option<&mut Mover>,
-    ) -> Self {
-        let state = match mover {
-            Some(mover) if mover.stats.speed != Speed::ZERO => MoveTo::Start,
-            Some(_) | None => MoveTo::Failed,
+    pub fn to_point(point: Position, range: Distance, sprite: Option<Graphic>, top: Speed) -> Self {
+        let state = if top == Speed::ZERO {
+            MoveTo::Failed
+        } else {
+            MoveTo::Start
         };
         Self {
             state,
@@ -933,13 +939,13 @@ mod tests {
         let mut world = Spatial::new(GridSize::new(120, 120));
         world.insert(object_id(9185), sheep(30.4, 40.0));
         world.insert(object_id(9186), sheep(35.0, 40.0));
-        let mut walker = tests_walker();
+        let walker = tests_walker();
         // footprints 0 apart: within ARRIVED, state 1 (its owner shows the standing sprite)
         let me = Position::new(30.0, 40.0, 0.0);
         let at_hand = MoveToAction::to_target(
             &world,
             me,
-            &mut walker,
+            (&walker, walker.stats.speed),
             object_id(9185),
             Distance::ZERO,
             None,
@@ -948,11 +954,11 @@ mod tests {
         .unwrap();
         assert!(at_hand.arrived());
         // 4.6 tiles on it starts walking (state 3)
-        let mut walker = tests_walker();
+        let walker = tests_walker();
         let far = MoveToAction::to_target(
             &world,
             me,
-            &mut walker,
+            (&walker, walker.stats.speed),
             object_id(9186),
             Distance::ZERO,
             None,
@@ -981,12 +987,11 @@ mod tests {
         );
         let me = Position::new(30.0, 40.0, 0.0);
         let to = |target, livestock, speed: f32| {
-            let mut walker = tests_walker();
-            walker.stats.speed = Speed::new(speed);
+            let walker = tests_walker();
             MoveToAction::to_object(
                 &world,
                 me,
-                &mut walker,
+                (&walker, Speed::new(speed)),
                 target,
                 Distance::ZERO,
                 (None, livestock),
@@ -1021,18 +1026,15 @@ mod tests {
     }
 
     /// `FUN_140aa0d30` and its start `0x140aa2100`: a point is never within 0.01 (no target, so
-    /// `f32::MAX`): state 3 for a unit with speed (a NaN speed has some), 13 for one without,
-    /// whose not quiet `set_state` shows the standing sprite (its speed); without movement state
-    /// a unit has no speed. Its point is `+0x38`.
+    /// `f32::MAX`): state 3 for a unit with top speed (slot 0x208; a NaN speed has some), 13 for
+    /// one without, whose not quiet `set_state` shows the standing sprite. Its point is `+0x38`.
     #[test]
     fn move_to_point_starts_unless_its_unit_has_no_speed() {
         let point = Position::new(12.0, 34.0, 1.0);
         let start = |speed: f32| {
-            let mut walker = tests_walker();
-            walker.stats.speed = Speed::new(speed);
             let move_to_action =
-                MoveToAction::to_point(point, Distance::new(0.5), Some(RUNNING), Some(&mut walker));
-            (move_to_action, walker.stats.speed)
+                MoveToAction::to_point(point, Distance::new(0.5), Some(RUNNING), Speed::new(speed));
+            (move_to_action, Speed::new(speed))
         };
         let (moving, speed) = start(0.8);
         assert_eq!(
@@ -1058,7 +1060,7 @@ mod tests {
         let (stuck, _) = start(0.0);
         assert_eq!(stuck.state, MoveTo::Failed);
         assert!(stuck.shows_standing());
-        let none = MoveToAction::to_point(point, Distance::ZERO, None, None);
+        let none = MoveToAction::to_point(point, Distance::ZERO, None, Speed::ZERO);
         assert_eq!(none.state, MoveTo::Failed);
     }
 
@@ -1074,7 +1076,7 @@ mod tests {
         let far = MoveToAction::to_target(
             &world,
             me,
-            &mut walker,
+            (&walker, walker.stats.speed),
             object_id(9186),
             Distance::ZERO,
             None,
@@ -1087,7 +1089,7 @@ mod tests {
         let stuck = MoveToAction::to_target(
             &world,
             me,
-            &mut walker,
+            (&walker, walker.stats.speed),
             object_id(9186),
             Distance::ZERO,
             None,

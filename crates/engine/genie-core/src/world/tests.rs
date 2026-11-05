@@ -88,6 +88,7 @@ use crate::math::rng::{Stream, Streams, Well512};
 use crate::movement::MoveAlgorithm;
 use crate::movement::PathFlags;
 use crate::movement::Speed;
+use crate::movement::TopSpeed;
 use crate::movement::TurnRate;
 use crate::movement::ai_moves::MoveSprites;
 use crate::movement::ai_moves::PointMove;
@@ -676,7 +677,7 @@ fn dead_objects_unit_ai_draws_nothing() {
 /// The masters of MarvinBlue/426048731's player 2 that its BUILD at tick 679 uses, shortened
 /// from build 158041's save and `.dat`.
 pub(crate) fn builder_masters() -> Masters {
-    use crate::objects::masters::{Master, Masters, Task};
+    use crate::objects::masters::{AnimatedPart, Master, Masters, Task};
     let task = |action_kind, object_group| Task {
         action_kind,
         object_group,
@@ -695,7 +696,11 @@ pub(crate) fn builder_masters() -> Masters {
         object_flags: ObjectFlags::NONE,
         combat_level: CombatLevel::NONE,
         hit_points: MasterHitPoints::of_data(25),
-        // a villager moves (its master's slot 0xe8), which BUILD's last loop asks
+        // a villager moves (its master's slot 0xe8, `+0x740`), which BUILD's last loop and the
+        // work command ask
+        animated: Some(AnimatedPart {
+            max_speed: Speed::new(0.8),
+        }),
         move_stats: Some(MoveStats {
             fly_mode: FlyMode::GROUND,
             speed: Speed::new(0.8),
@@ -3349,6 +3354,7 @@ fn builder_with_master_of_its_own_walks_with_its_own_master_sprite() {
                     action_state: actions
                         .top_action()
                         .map_or(ActionState::NO_ACTION, |top_action| top_action.state),
+                    top_speed: TopSpeed::Own,
                 };
                 let _ = unit.build_part(actions, step, me)?;
                 Ok(unit.sprite.map(|active_sprite| active_sprite.graphic.id))
@@ -5931,6 +5937,7 @@ fn hunt_part_of(world: &mut World, dt: u32) -> GenieResult<()> {
                 action_state: actions
                     .top_action()
                     .map_or(ActionState::NO_ACTION, |top_action| top_action.state),
+                top_speed: TopSpeed::Own,
             };
             let mut own = unit.own_victim(actions, step, &roles())?;
             let mut hunt = *actions.list.hunt().unwrap();
@@ -6465,6 +6472,7 @@ fn hunter_work_reaches_its_deer_in_the_same_update() {
                 action_state: actions
                     .top_action()
                     .map_or(ActionState::NO_ACTION, |top_action| top_action.state),
+                top_speed: TopSpeed::Own,
             };
             let mut own = unit.own_victim(actions, step, &roles())?;
             let mut hunt = *actions.list.hunt().unwrap();
@@ -6518,6 +6526,7 @@ fn gathering_hunt_whose_target_left_searches_without_reading_one() {
                 action_state: actions
                     .top_action()
                     .map_or(ActionState::NO_ACTION, |top_action| top_action.state),
+                top_speed: TopSpeed::Own,
             };
             let mut own = unit.own_victim(actions, step, &roles())?;
             let code =
@@ -6722,6 +6731,7 @@ fn hunter_sheep_walks_before_the_hunter_update_ends() {
                 action_state: actions
                     .top_action()
                     .map_or(ActionState::NO_ACTION, |top_action| top_action.state),
+                top_speed: TopSpeed::Own,
             };
             let mut own = unit.own_victim(actions, step, &roles())?;
             let mut hunt = *actions.list.hunt().unwrap();
@@ -7300,7 +7310,7 @@ fn side_without_mover_reaches_nothing() {
                 &view,
                 attacker,
                 (PlayerId::new(1), PlayerKind::Human),
-                |_, side, _| side.reaches(object_id(500), Distance::new(4.0)),
+                |_, side, _| side.reaches(object_id(500), Distance::new(4.0), None),
             )
         },
     );
@@ -8335,7 +8345,7 @@ fn an_inside_unit_update_deletes_its_top_action() {
             Position::new(40.0, 80.0, 0.0),
             Distance::ZERO,
             None,
-            None,
+            Speed::ZERO,
         )));
     world.tick(Millis::new(50));
     let unit = &world.players[1].objects[ListIndex::new(0)];
@@ -8404,6 +8414,7 @@ fn an_enter_update_adds_its_unit_to_its_building_own_or_an_ally_s() {
                     action_state: actions
                         .top_action()
                         .map_or(ActionState::NO_ACTION, |top_action| top_action.state),
+                    top_speed: TopSpeed::Own,
                 };
                 let code = unit.enter_part(actions, step, me, &roles())?;
                 unit.end_head_update(actions, step, code)?;
@@ -8469,6 +8480,7 @@ fn an_enter_unit_leaves_its_group_inside_the_update() {
                 action_state: actions
                     .top_action()
                     .map_or(ActionState::NO_ACTION, |top_action| top_action.state),
+                top_speed: TopSpeed::Own,
             };
             let code = unit.enter_part(actions, step, me, &roles())?;
             unit.end_head_update(actions, step, code)?;
@@ -14009,6 +14021,7 @@ fn hunter_drop_off_takes_the_drop_site_it_found() {
     let drop_off = |(hunter, actions, walker): (&mut Unit, &mut Action, &mut Mover),
                     played: &mut World| {
         let world = DropWorld {
+            top_speed: TopSpeed::Own,
             masters: OwnerMasters::new(no_own_masters(), Some(&masters)),
             spatial: &mut played.spatial,
             zones: &mut played.zones,
@@ -17523,6 +17536,7 @@ fn ai_move_of(
                 roles: static_roles(),
                 sprite_tuning: tuning().sprite,
                 move_to_tuning: &tuning().move_to,
+                top_speed: TopSpeed::Own,
             },
             &mut rng,
         ),
@@ -17767,7 +17781,7 @@ fn an_unforced_ai_move_leaves_move_to_the_same_point() {
         force: OrderForce::Unforced,
         ..forced(Pace::Run)
     };
-    let old = MoveToAction::to_point(AI_POINT, Distance::ZERO, None, None);
+    let old = MoveToAction::to_point(AI_POINT, Distance::ZERO, None, Speed::ZERO);
     let (mut unit, mut actions, mut motion) = mover_unit(5);
     actions.list.set_move_to(Some(old));
     assert_eq!(
@@ -17874,6 +17888,7 @@ fn an_ai_move_of_trebuchet_packs_and_the_base_slot_takes_nothing() {
                 roles: static_roles(),
                 sprite_tuning: tuning().sprite,
                 move_to_tuning: &tuning().move_to,
+                top_speed: TopSpeed::Own,
             },
         ),
         Ok(PointMove::Declined)
@@ -17893,6 +17908,7 @@ fn an_ai_move_of_trebuchet_packs_and_the_base_slot_takes_nothing() {
                 roles: static_roles(),
                 sprite_tuning: tuning().sprite,
                 move_to_tuning: &tuning().move_to,
+                top_speed: TopSpeed::Own,
             },
         )
         .is_err()
@@ -17969,7 +17985,7 @@ fn an_own_move_to_that_gives_up_fails_standing_unless_villager_waits() {
             Position::new(119.5, 172.5, 0.0),
             Distance::ZERO,
             None,
-            None,
+            Speed::ZERO,
         )));
         (unit, actions, motion)
     };
@@ -21175,6 +21191,7 @@ fn gather_step(world: &mut World) -> GenieResult<()> {
                 action_state: actions
                     .top_action()
                     .map_or(ActionState::NO_ACTION, |top_action| top_action.state),
+                top_speed: TopSpeed::Own,
             };
             let gather = *actions.list.gather().unwrap();
             let code = unit.gather_update(gather, actions, step, me, &roles())?;
@@ -21535,6 +21552,7 @@ fn drop_site_sought(
     forage_world.build_mesh().unwrap();
     setup(&mut forage_world);
     let mut world = DropWorld {
+        top_speed: TopSpeed::Own,
         masters: OwnerMasters::new(
             &forage_world.parts.own_master,
             forage_world.model.masters.get(1).map(|masters| &**masters),
@@ -21736,6 +21754,7 @@ fn own_move(world: &mut World) -> OwnMoved {
                     .map_or(ActionState::NO_ACTION, |move_to_action| {
                         ActionState::new(move_to_action.state.number())
                     }),
+                top_speed: TopSpeed::Own,
             };
             let code = unit.move_to_part(actions, step, me, &roles())?;
             unit.end_head_update(actions, step, code)
@@ -21878,6 +21897,7 @@ fn flown(move_to: MoveTo, setup: impl FnOnce(&mut World)) -> Flown {
                 id: unit.id,
                 group: unit.group.id,
                 action_state: ActionState::new(4),
+                top_speed: TopSpeed::Own,
             };
             unit.fly_part(actions, step, me)
         },
@@ -21963,6 +21983,7 @@ fn explored(set: impl FnOnce(&mut ExploreAction)) -> Explored {
                 id: unit.id,
                 group: unit.group.id,
                 action_state: ActionState::new(ExploreState::Walk { move_to: None }.get()),
+                top_speed: TopSpeed::Own,
             };
             unit.explore_part(actions, step, me, &roles())
         },
@@ -22026,6 +22047,7 @@ fn an_explore_move_to_shows_the_master_walking_sprite_as_it_starts() {
                 id: unit.id,
                 group: unit.group.id,
                 action_state: ActionState::new(ExploreState::Walk { move_to: None }.get()),
+                top_speed: TopSpeed::Own,
             };
             unit.explore_part(actions, step, me, &roles())
         },
@@ -22550,6 +22572,7 @@ fn built_the_centre(setup: impl FnOnce(&mut World)) -> (World, BuildSearched) {
                 action_state: actions
                     .top_action()
                     .map_or(ActionState::NO_ACTION, |top_action| top_action.state),
+                top_speed: TopSpeed::Own,
             };
             let _ = unit.build_part(actions, step, me)?;
             let heard = step
@@ -22664,6 +22687,7 @@ fn worked(world: &mut World, site: i32, dt: u32) -> GenieResult<()> {
                 action_state: actions
                     .top_action()
                     .map_or(ActionState::NO_ACTION, |top_action| top_action.state),
+                top_speed: TopSpeed::Own,
             };
             unit.build_part(actions, step, me).map(drop)
         },
@@ -23192,6 +23216,7 @@ fn repair_for(world: &mut World, updates: usize) -> Vec<Option<RepairState>> {
                     action_state: actions
                         .top_action()
                         .map_or(ActionState::NO_ACTION, |top_action| top_action.state),
+                    top_speed: TopSpeed::Own,
                 };
                 let code = unit.repair_part(actions, step, me, &roles())?;
                 unit.end_head_update(actions, step, code)
@@ -23305,6 +23330,7 @@ fn repair_pays_from_what_its_owner_holds_at_the_payment() {
                 action_state: actions
                     .top_action()
                     .map_or(ActionState::NO_ACTION, |top_action| top_action.state),
+                top_speed: TopSpeed::Own,
             };
             let code = unit.repair_part(actions, step, me, &roles())?;
             unit.end_head_update(actions, step, code)
@@ -23613,6 +23639,7 @@ fn repaired_by(count: usize) -> [(f32, f32); 2] {
                         action_state: actions
                             .top_action()
                             .map_or(ActionState::NO_ACTION, |top_action| top_action.state),
+                        top_speed: TopSpeed::Own,
                     };
                     let code = unit.repair_part(actions, step, me, &roles())?;
                     unit.end_head_update(actions, step, code)
@@ -25280,11 +25307,10 @@ fn explorer_world(open: &[[i32; 2]], slots: Vec<i32>) -> World {
 /// its tasking or detasking ends in names it.
 fn explorer_hears(world: &mut World) -> String {
     let heard = world.run_unit_ai((PlayerId::new(1), ListIndex::new(0)), |_, _, side, _, _| {
-        side.owner_hears(Notify::own(
-            object_id(9175),
-            NotifyKind::REQUIRES_SEARCH,
-            [605, 0, 0],
-        ))
+        side.owner_hears(
+            Notify::own(object_id(9175), NotifyKind::REQUIRES_SEARCH, [605, 0, 0]),
+            None,
+        )
     });
     format!("{:?}", heard.unwrap_err())
 }
@@ -25336,27 +25362,24 @@ fn only_computer_players_explorer_notify_reaches_the_ai() {
     let before = human.ai.clone();
     human
         .run_unit_ai((PlayerId::new(1), ListIndex::new(0)), |_, _, side, _, _| {
-            side.owner_hears(Notify::own(
-                object_id(9175),
-                NotifyKind::REQUIRES_SEARCH,
-                [605, 0, 0],
-            ))
+            side.owner_hears(
+                Notify::own(object_id(9175), NotifyKind::REQUIRES_SEARCH, [605, 0, 0]),
+                None,
+            )
         })
         .unwrap();
     assert_eq!(human.ai, before);
     let mut world = explorer_world(&[[31, 89]], vec![]);
     world
         .run_unit_ai((PlayerId::new(1), ListIndex::new(0)), |_, _, side, _, _| {
-            side.owner_hears(Notify::own(
-                object_id(9175),
-                NotifyKind::from(0x201),
-                [605, 0, 0],
-            ))?;
-            side.owner_hears(Notify::own(
-                object_id(9175),
-                NotifyKind::REQUIRES_SEARCH,
-                [999, 0, 0],
-            ))
+            side.owner_hears(
+                Notify::own(object_id(9175), NotifyKind::from(0x201), [605, 0, 0]),
+                None,
+            )?;
+            side.owner_hears(
+                Notify::own(object_id(9175), NotifyKind::REQUIRES_SEARCH, [999, 0, 0]),
+                None,
+            )
         })
         .unwrap();
 }

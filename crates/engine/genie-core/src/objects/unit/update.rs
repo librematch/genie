@@ -128,7 +128,8 @@ impl Unit {
         roles: &Roles,
         slots: Slots,
     ) -> GenieResult<Option<Captured>> {
-        let me = self.me(actions);
+        let top_speed = step.world.top_speed_terms(step.player, self)?;
+        let me = self.me(actions, top_speed);
         let mut captured = None;
         let code = self.head_part(actions, step, me, &mut captured, roles, slots)?;
         self.end_head_update(actions, step, code)?;
@@ -310,10 +311,11 @@ impl Unit {
         }
         if loses_actions(&self.life, &step.world.model.roles) {
             let by = self.releaser(step)?;
+            let top = step.world.top_speed(step.player, self)?;
             let (mut releases, mut leaves) = (Vec::new(), Vec::new());
             self.clear_own_actions(
                 actions,
-                step.world.parts.motion.layer_mut(self.id),
+                (step.world.parts.motion.layer_mut(self.id), top),
                 &mut releases,
                 &mut leaves,
                 by,

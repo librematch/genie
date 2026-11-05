@@ -9,6 +9,7 @@ use crate::map::DistanceSquared;
 use crate::math::Angle;
 use crate::math::rng::{Stream, Well512};
 use crate::movement::Speed;
+use crate::movement::TopSpeed;
 use crate::movement::move_to::{
     MoveDefaults, MoveTo, MoveToAction, MoveToReads, MoveWait, SpriteReads, TargetMoved, WalkTo,
 };
@@ -66,6 +67,7 @@ fn reads() -> GatherReads {
         player_kind: PlayerKind::Human,
         stop_productivity: Amount::new(1.0),
         food_sold: Amount::ZERO,
+        top_speed: TopSpeed::Own,
     }
 }
 
@@ -86,6 +88,7 @@ fn walks(held: Held) -> Walks<'static> {
             ground: Footprint::ZERO,
         },
         held,
+        top_speed: TopSpeed::Own,
     }
 }
 
@@ -160,6 +163,7 @@ impl Rig {
                     id: unit.id,
                     group: None,
                     action_state: ActionState::new(state.get()),
+                    top_speed: TopSpeed::Own,
                 };
                 work(step, unit, actions, me)
             },

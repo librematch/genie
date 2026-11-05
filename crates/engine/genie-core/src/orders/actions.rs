@@ -145,10 +145,11 @@ impl World {
     pub(crate) fn clear_actions(&mut self, player: PlayerId, idx: ListIndex) -> GenieResult<()> {
         let by = self.releaser(player, idx)?;
         let (mut releases, mut builder_leaves) = (Vec::new(), Vec::new());
+        let top = self.top_speed(player, self.players.live(player, idx)?)?;
         let unit = self.players.live_mut(player, idx)?;
         unit.clear_own_actions(
             self.parts.actions.of_mut(unit.id)?,
-            self.parts.motion.layer_mut(unit.id),
+            (self.parts.motion.layer_mut(unit.id), top),
             &mut releases,
             &mut builder_leaves,
             by,

@@ -2,6 +2,7 @@
 //! applied.
 
 use crate::math::rng::{Stream, Well512};
+use crate::movement::Speed;
 use crate::objects::Graphics;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
@@ -33,13 +34,14 @@ impl Unit {
         step: &mut Step<'_>,
     ) -> GenieResult<()> {
         let by = self.releaser(step)?;
+        let top = step.world.top_speed(step.player, self)?;
         let sprite = step.world.streams.get_mut(Stream::Sprite);
         let (mut releases, mut leaves) = (Vec::new(), Vec::new());
         self.stop_with(
             (
                 actions,
                 step.world.parts.unread.get(self.id),
-                step.world.parts.motion.layer_mut(self.id),
+                (step.world.parts.motion.layer_mut(self.id), top),
             ),
             (&mut releases, &mut leaves),
             by,
@@ -56,11 +58,15 @@ impl Unit {
     /// [`Unit::stop_action`] on the parts of the world it changes: the targets its actions let
     /// go and the foundations its Build leaves (`by` the unit, [`Unit::clear_own_actions`]), its
     /// masters, the model's sprites and tuning values, and the Sprite stream; `actions` and
-    /// `motion` are its action and motion layers, `unread` why the load could not read it whole
-    /// ([`Unread`]).
+    /// `motion` are its action and motion layers, `top` its top speed (slot 0x208), `unread` why
+    /// the load could not read it whole ([`Unread`]).
     pub(crate) fn stop_with(
         &mut self,
-        (actions, unread, mut motion): (&mut Action, Option<&Unread>, MotionMut<'_>),
+        (actions, unread, (mut motion, top)): (
+            &mut Action,
+            Option<&Unread>,
+            (MotionMut<'_>, Speed),
+        ),
         (releases, builder_leaves): (&mut Vec<(ObjectId, Releaser)>, &mut Vec<ObjectId>),
         by: Releaser,
         masters: OwnerMasters<'_>,
@@ -69,7 +75,7 @@ impl Unit {
     ) -> GenieResult<()> {
         self.tear_down_actions(
             (actions, unread),
-            motion.reborrow(),
+            (motion.reborrow(), top),
             releases,
             builder_leaves,
             by,
@@ -89,11 +95,11 @@ impl Unit {
     /// The action list's clearing (`FUN_140a98620`) as the unit's own commands and stops run it
     /// ([`Unit::clear_own_actions`]) on its action layer `actions`; an action the slice does not
     /// hold has a teardown it cannot run (`unread`: the load could not read it whole,
-    /// [`Unread`]).
+    /// [`Unread`]); `motion` is its motion layer, `top` its top speed (slot 0x208).
     pub(crate) fn tear_down_actions(
         &self,
         (actions, unread): (&mut Action, Option<&Unread>),
-        motion: MotionMut<'_>,
+        motion: (MotionMut<'_>, Speed),
         releases: &mut Vec<(ObjectId, Releaser)>,
         builder_leaves: &mut Vec<ObjectId>,
         by: Releaser,
@@ -147,8 +153,9 @@ impl Unit {
     /// The action list's deletion (`FUN_140a98620`, [`ActionList::delete_all`]), the one every
     /// caller shares (the unit's death, its stops and commands,
     /// [`crate::world::World::clear_actions`]): each action's destructor
-    /// ([`crate::objects::actions::Action::tear_down`]) in the list's order. The targets they let
-    /// go go into `releases` with the unit as `by`, the buildings a counted builder or repairer
+    /// ([`crate::objects::actions::Action::tear_down`], on `motion`: the motion layer and the
+    /// unit's top speed) in the list's order. The targets they let go go into `releases` with the
+    /// unit as `by`, the buildings a counted builder or repairer
     /// leaves into `builder_leaves` ([`crate::world::World::leave_builders`]). A building's
     /// production is a list of its own, which stays.
     ///
@@ -160,7 +167,7 @@ impl Unit {
     pub(crate) fn clear_own_actions(
         &self,
         actions: &mut Action,
-        motion: MotionMut<'_>,
+        motion: (MotionMut<'_>, Speed),
         releases: &mut Vec<(ObjectId, Releaser)>,
         builder_leaves: &mut Vec<ObjectId>,
         by: Releaser,
@@ -186,9 +193,10 @@ impl Unit {
         step: &mut Step<'_>,
     ) -> GenieResult<()> {
         let by = self.releaser(step)?;
+        let top = step.world.top_speed(step.player, self)?;
         let torn = actions
             .list
-            .delete_head(step.world.parts.motion_mut(self.id), self.life.state)?;
+            .delete_head((step.world.parts.motion_mut(self.id), top), self.life.state)?;
         torn.let_go(step, self, by)
     }
 

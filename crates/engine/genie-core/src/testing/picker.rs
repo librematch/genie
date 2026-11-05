@@ -3,7 +3,7 @@
 //! `bestUnitToAttack`'s field holds both.
 
 use crate::map::spatial::Spatial;
-use crate::movement::Speed;
+use crate::movement::SpeedReads;
 use crate::objects::ObjectId;
 use crate::objects::masters::MasterTables;
 use crate::players::PlayerId;
@@ -29,6 +29,7 @@ pub(crate) fn with_picker<R>(
         index,
         model,
         parts,
+        groups,
         spatial,
         settings,
         world_time,
@@ -55,9 +56,9 @@ pub(crate) fn with_picker<R>(
         (
             capture,
             parts.combat_of(me).firepower,
-            parts
-                .mover_of(me)
-                .map_or(Speed::ZERO, |mover| mover.stats.speed),
+            SpeedReads::of(players, index, parts, groups, model)
+                .top_speed(player, unit)
+                .expect("the unit's top speed"),
         ),
     );
     let others = owner_view(players, index, player, None).expect("the owner's view");
@@ -70,6 +71,7 @@ pub(crate) fn with_picker<R>(
         foreign: others.players(),
         every,
         parts,
+        speeds: SpeedReads::of(players, index, parts, groups, model),
         by_id: ObjectsRef::new(
             players,
             index,

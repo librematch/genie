@@ -4,8 +4,6 @@
 //! 0x1e8, `FUN_141086330`).
 
 use crate::GenieResult;
-use crate::combat::Charge;
-use crate::combat::damage::SPECIAL_CHARGE_GAP;
 use crate::groups::GroupId;
 use crate::groups::WorldObject;
 use crate::groups::attack::AttackOrder;
@@ -15,15 +13,11 @@ use crate::math::conversions::cvttss2si_64;
 use crate::math::fmath::at_most_or_unordered;
 use crate::math::image::group::EPSILON;
 use crate::math::rng::Stream;
-use crate::movement::Speed;
 use crate::objects::ActionState;
 use crate::objects::ObjectId;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::SpecialAttack;
-use crate::objects::unit::Unit;
 use crate::orders::OrderSource;
 use crate::orders::Work;
-use crate::players::PlayerId;
 use crate::players::PlayerKind;
 use crate::world::Millis;
 use crate::world::World;
@@ -35,8 +29,6 @@ use crate::world::slots::PlayerSlotsExt;
 const TRAVEL_MS: i32 = 2000;
 /// The span of a unit that does not move ([`Travel::Any`]): the immediate `1000`.
 const STANDING_SPAN: Millis = Millis::new(1000);
-/// A combat unit of this type (`'F'`) gets the charge's speed.
-const CHARGER: MasterKind = MasterKind::COMBAT;
 
 /// What a unit sent at a target draws its retarget timer for ([`World::set_travel_timer`]).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -139,7 +131,7 @@ impl World {
         let WorldObject::Unit(player, own_unit, _) = unit else {
             return Ok(());
         };
-        let speed = self.unit_speed(player, own_unit)?;
+        let speed = self.top_speed(player, own_unit)?.get();
         let span = match rule {
             Travel::Fast if at_most_or_unordered(speed, EPSILON) => return Ok(()),
             Travel::Any if speed == 0.0 => STANDING_SPAN,
@@ -223,33 +215,6 @@ impl World {
         let gap = self.footprint_gap_squared(unit, target)?;
         let range = weapon_range(master);
         Ok(gap <= range.squared() && master.combat_part().min_range.squared() <= gap)
-    }
-
-    /// Slot 0x208 of a unit of player `player` (`FUN_141202c70`): its top speed, which the
-    /// mover holds (its powerups, `+0xa2c` and `+0xb38`, and the count at `+0xa08` that gives 0
-    /// are not held). A combat unit of type 70 whose master has a charge (`max_charge` above
-    /// 0) runs faster within reach of its target while its charge is ready, which only a master
-    /// of special attack 3 can have (`FUN_1412161b0`).
-    ///
-    /// # Errors
-    ///
-    /// A master the world lacks and a charge of special attack 3.
-    pub(super) fn unit_speed(&self, player: PlayerId, unit: &Unit) -> GenieResult<f32> {
-        let Some(mover) = self.parts.mover_of(unit.id) else {
-            return Ok(0.0);
-        };
-        let speed = mover.stats.speed;
-        if speed == Speed::ZERO {
-            return Ok(speed.get());
-        }
-        let master = unit.master(self.master_tables(), player)?;
-        if master.kind != CHARGER
-            || master.creatable_part().max_charge <= Charge::ZERO
-            || master.creatable_part().special_attack != SpecialAttack::CHARGE
-        {
-            return Ok(speed.get());
-        }
-        Err(SPECIAL_CHARGE_GAP)
     }
 }
 

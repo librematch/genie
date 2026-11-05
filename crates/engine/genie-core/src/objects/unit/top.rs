@@ -18,6 +18,7 @@ use crate::gathering::HuntTargetId;
 use crate::map::spatial::Gait;
 use crate::math::fmath::length;
 use crate::movement::Me;
+use crate::movement::TopSpeed;
 use crate::objects::WorkerCount;
 use crate::objects::layers::{Action, Building};
 use crate::ownership::artifact::ARTIFACT_KIND;
@@ -105,9 +106,10 @@ impl Unit {
     }
 
     /// The unit as its walk reads it ([`crate::movement::Me`]): its id, its top action's state
-    /// (0 without one), its group and its last human order's time.
+    /// (0 without one), its group, its last human order's time and what its top speed reads
+    /// (`top_speed`, [`crate::world::World::top_speed_terms`]).
     #[must_use]
-    pub fn me(&self, actions: &Action) -> Me {
+    pub fn me(&self, actions: &Action, top_speed: TopSpeed) -> Me {
         Me {
             id: self.id,
             action_state: actions
@@ -115,6 +117,7 @@ impl Unit {
                 .map_or(ActionState::NO_ACTION, |top_action| top_action.state),
             group: self.group.id,
             human_order: self.last_human_order,
+            top_speed,
         }
     }
 

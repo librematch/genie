@@ -2,6 +2,7 @@
 //! its storage and its annexes.
 
 use crate::combat::KillState;
+use crate::combat::LockdownCount;
 use crate::combat::abilities::Abilities;
 use crate::combat::damage::{ArmorBonuses, ArmorPair};
 use crate::combat::powerup::{ConversionPowerup, InfantryCount};
@@ -275,6 +276,7 @@ impl World {
             ability: AbilityTimer::default(),
             reload_worldtime: WorldTime::ZERO,
             raider_countdown: RaiderCountdown::NONE,
+            locked_down: LockdownCount::ZERO,
             attack_timer: Seconds::ZERO,
             abilities: Abilities::default(),
             reload_stinger: Seconds::ZERO,

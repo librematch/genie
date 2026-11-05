@@ -181,6 +181,12 @@ impl Mover {
             }
             None
         };
+        // FUN_140f9eb70 reads slot 0x208 once: a unit whose top speed is not 0, or a master of
+        // class 0x2a
+        let moves = self.top_speed(me.top_speed, at.ground()) != Speed::ZERO
+            || roles
+                .of_master(master)
+                .contains(MasterRoles::LONG_PATH_MOVER);
         // FUN_140f9eb70 lowers the tall counts under its list (FUN_140f60440): the unit and its
         // ignore units that wait or move, or its group's differentiator units, then the target
         let walker = LongWalker {
@@ -188,10 +194,7 @@ impl Mover {
             position: at,
             radius: ground,
             mask: self.stats.restriction_mask,
-            moves: self.stats.speed != Speed::ZERO
-                || roles
-                    .of_master(master)
-                    .contains(MasterRoles::LONG_PATH_MOVER),
+            moves,
             ignore_units: &self.ignore_units,
             group_units: plan.groups.group_units(me.group),
         };
@@ -206,10 +209,7 @@ impl Mover {
             to: Tile::new(cvttss2si(to.x()), cvttss2si(to.y())),
             range,
             target: long_target,
-            moves: self.stats.speed != Speed::ZERO
-                || roles
-                    .of_master(master)
-                    .contains(MasterRoles::LONG_PATH_MOVER),
+            moves,
             mask: self.stats.restriction_mask,
             player_kind: plan.player_kind,
             lowered,
@@ -460,15 +460,16 @@ impl Mover {
 
     /// Where this tick's speed would take the unit along `direction` (slot 199, `0x141161860`)
     /// from where it last moved to (`+0x824`, [`Mover::moved_at`]): the forward speed after one
-    /// more step of acceleration, capped by the top speed (COMISS/JA, then JC: a NaN speed stays).
-    pub(crate) fn projected(&self, direction: BVector, dt: Seconds) -> BVector {
+    /// more step of acceleration, capped by its top speed `top` (slot 0x208; COMISS/JA, then JC:
+    /// a NaN speed stays).
+    pub(crate) fn projected(&self, direction: BVector, dt: Seconds, top: Speed) -> BVector {
         let position = self.moved_at.vector();
         let Some(velocity) = &self.velocity else {
             return position;
         };
         let mut next = velocity.velocity + dt.get() * velocity.acceleration;
-        if self.stats.speed < Speed::new(next.y()) || next.y() <= 0.0 {
-            next = next.with_y(self.stats.speed.get());
+        if top < Speed::new(next.y()) || next.y() <= 0.0 {
+            next = next.with_y(top.get());
         }
         position + dt.get() * next.y() * direction
     }

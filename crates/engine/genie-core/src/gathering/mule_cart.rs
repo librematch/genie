@@ -149,7 +149,9 @@ impl World {
             kinds.push(kind);
         }
         let cart = self.take_out(player_id, idx)?;
+        let top_speed = self.top_speed_terms_with(player_id, &cart, current);
         let result = (|| {
+            let top_speed = top_speed?;
             let (before, rest) = self.players.split_at(player_id.index());
             // the cart was taken out of player `player_id`'s list
             let (player, after) = rest.split_first().ok_or(GenieError::unreachable(
@@ -190,6 +192,7 @@ impl World {
                         &cart,
                         self.parts.actions_of(cart.id),
                         self.parts.mover_of(cart.id),
+                        top_speed,
                     ),
                     &mut resource_world,
                     others,

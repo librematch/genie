@@ -32,6 +32,7 @@ use self::world_picker::attacks;
 pub(crate) use self::world_picker::{WorldPicker, patrol_information};
 use crate::construction::FoundationId;
 use crate::groups::UnitGroups;
+use crate::movement::TopSpeed;
 use crate::objects::layers::Action;
 use crate::objects::masters::{OwnerMasters, Task};
 use crate::objects::object_list::ObjectList;
@@ -50,6 +51,9 @@ use std::cmp::Ordering;
 /// the world with its zone maps and planners, the world's time, the Object stream (the drop-site
 /// search's plans) and the owner's type.
 pub(crate) struct DropWorld<'world> {
+    /// What the gatherer's top speed reads besides its own speed and its place ([`TopSpeed`]),
+    /// which its walks' reach checks read.
+    pub top_speed: TopSpeed,
     pub masters: OwnerMasters<'world>,
     pub spatial: &'world mut Spatial,
     pub zones: &'world mut Zones,

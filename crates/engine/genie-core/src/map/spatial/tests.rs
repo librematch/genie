@@ -353,6 +353,7 @@ fn search_near_the_last_reads_its_answer_until_unit_ai_lets_it_go() {
         size: Footprint::new(0.2, 0.2),
         pick: Pick::Look,
         memory: Memory::default(),
+        ai_target: None,
     };
     let mut reach = |_: &mut Spatial, _: ObjectId, _: Distance| Ok(true);
     let mut search = |spatial: &mut Spatial, at| {

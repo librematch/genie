@@ -6,7 +6,6 @@ use crate::combat::damage::master_pierce_armor;
 use crate::combat::reload::reload_time;
 use crate::map::Distance;
 use crate::map::spatial::Spatial;
-use crate::movement::Speed;
 use crate::movement::footprint_gap;
 use crate::objects::ObjectId;
 use crate::objects::masters::ClassId;
@@ -131,10 +130,7 @@ impl WorldPicker<'_> {
                 placed.position,
                 placed.radius,
             ),
-            speed: self
-                .parts
-                .mover_of(unit.id)
-                .map_or(Speed::ZERO, |mv| mv.stats.speed),
+            speed: self.speeds.top_speed(owner, unit)?,
         }))
     }
 
@@ -195,7 +191,7 @@ impl WorldPicker<'_> {
         let damage_tuning = &self.by_id.tuning().damage;
         let unit_ai_tuning = &self.by_id.tuning().unit_ai;
         let roles = self.by_id.roles();
-        let (_, unit, _, master) = self.held(id)?.ok_or(NOT_HELD)?;
+        let (owner, unit, _, master) = self.held(id)?.ok_or(NOT_HELD)?;
         let (_, me, _, mm) = self.held(self.me)?.ok_or(GenieError::unsupported(
             "a searching unit of a master the slice does not have",
         ))?;
@@ -207,10 +203,7 @@ impl WorldPicker<'_> {
             distance,
             category,
             class: master.class,
-            speed: self
-                .parts
-                .mover_of(unit.id)
-                .map_or(Speed::ZERO, |mv| mv.stats.speed),
+            speed: self.speeds.top_speed(owner, unit)?,
             armed,
             reach: self.attacker.range_against()?,
             damage,

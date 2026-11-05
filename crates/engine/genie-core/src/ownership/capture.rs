@@ -134,9 +134,10 @@ impl Unit {
             // any other top action's slot 0x38 is the base's false for what an animal or an
             // artifact holds (a `MoveTo` of its own), and the list goes
             let (mut releases, mut leaves) = (Vec::new(), Vec::new());
+            let top = step.world.top_speed(step.player, self)?;
             self.tear_down_actions(
                 (actions, step.world.parts.unread.get(self.id)),
-                step.world.parts.motion.layer_mut(self.id),
+                (step.world.parts.motion.layer_mut(self.id), top),
                 &mut releases,
                 &mut leaves,
                 by,

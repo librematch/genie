@@ -159,8 +159,10 @@ impl World {
             .actions_of(unit.id)
             .top_action()
             .map_or(ActionState::NO_ACTION, |top_action| top_action.state);
+        let top_speed = self.top_speed_terms(player_id, unit)?;
         let player = &self.players.player(player_id)?;
         let mut world = DropWorld {
+            top_speed,
             masters: OwnerMasters::new(&self.parts.own_master, self.model.masters.of(player_id)),
             spatial: &mut self.spatial,
             zones: &mut self.zones,

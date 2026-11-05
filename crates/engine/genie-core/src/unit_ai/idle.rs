@@ -131,6 +131,7 @@ impl UnitAi {
                 reach: true,
             },
             memory: Memory::default(),
+            ai_target: self.current_target,
         })?;
         self.alert(found, at.dt_seconds);
         let Some(id) = found.id else {
@@ -191,7 +192,7 @@ impl UnitAi {
         if self.retarget_disabled != 0 && at.target.is_some() {
             // slot 0x3d0 with the top target (−1 answers 0) and the weapon range
             if let Some(object_id) = target
-                && side.reaches(object_id, at.weapon_range)?
+                && side.reaches(object_id, at.weapon_range, self.current_target)?
             {
                 return Ok(IdleOutcome::Idle);
             }
@@ -272,6 +273,7 @@ impl UnitAi {
             size: at.size,
             pick: Pick::Look,
             memory: Memory::default(),
+            ai_target: self.current_target,
         })?;
         self.attack_search_alert(found, player_kind, unit_ai_tuning)?;
         if !matches!(
@@ -311,6 +313,7 @@ impl UnitAi {
                 ask: AttackAsk::IDLE,
             },
             memory: self.memory(),
+            ai_target: self.current_target,
         })?;
         self.add_retries(&found);
         self.attack_search_alert(found, player_kind, unit_ai_tuning)?;
@@ -372,6 +375,7 @@ impl UnitAi {
                 size: at.size,
                 pick: Pick::Look,
                 memory: Memory::default(),
+                ai_target: self.current_target,
             })?;
             self.attack_search_alert(found, player_kind, unit_ai_tuning)?;
             return Ok(IdleOutcome::Idle);
@@ -393,6 +397,7 @@ impl UnitAi {
                 ask: AttackAsk::IDLE,
             },
             memory: self.memory(),
+            ai_target: self.current_target,
         })?;
         self.add_retries(&found);
         self.attack_search_alert(found, player_kind, unit_ai_tuning)?;

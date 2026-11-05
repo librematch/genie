@@ -565,8 +565,9 @@ impl Unit {
             && let Some(enter_action) = after.take()
         {
             // its sub-action list deletes it (FUN_140a98e20): the Enter's destructor
+            let top = step.world.top_speed(step.player, self)?;
             Action::Enter(enter_action)
-                .tear_down(step.world.parts.motion_mut(self.id))?
+                .tear_down((step.world.parts.motion_mut(self.id), top))?
                 .let_go(step, self, by)?;
         }
         if let Some(art) = actions.list.artifact_mut() {
@@ -669,6 +670,7 @@ mod tests {
     use crate::garrison::tests::enter_task;
     use crate::map::Footprint;
     use crate::movement::Speed;
+    use crate::movement::TopSpeed;
     use crate::movement::move_to::MoveWaitState;
     use crate::movement::move_to::{MoveDefaults, MoveToReads, MoveWait, SpriteReads, WalkTo};
     use crate::objects::ActionState;
@@ -1308,6 +1310,7 @@ mod tests {
             id: object_id(9177),
             group: None,
             action_state: ActionState::NO_ACTION,
+            top_speed: TopSpeed::Own,
         }
     }
 

@@ -10,7 +10,7 @@ use crate::gathering::gather::{GatherRetarget, GatherStart};
 use crate::gathering::hunt::{HuntMove, HuntTask, Quarry};
 use crate::map::Position;
 use crate::math::rng::Stream;
-use crate::movement::{Speed, footprint_gap};
+use crate::movement::footprint_gap;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectKey;
@@ -121,7 +121,10 @@ impl World {
         };
         // the sprites its MoveTos' constructors take for none (FUN_140aa0d30, FUN_140aa0df0)
         let walks = unit.move_walks(
-            self.parts.mover_of(unit.id),
+            (
+                self.parts.mover_of(unit.id),
+                self.top_speed_terms(player, unit)?,
+            ),
             MasterTables::new(&self.model.masters, &self.parts.own_master),
             player,
             (
@@ -214,7 +217,10 @@ impl World {
         });
         let by = self.releaser(player, idx)?;
         let walks = unit.move_walks(
-            self.parts.mover_of(unit.id),
+            (
+                self.parts.mover_of(unit.id),
+                self.top_speed_terms(player, unit)?,
+            ),
             MasterTables::new(&self.model.masters, &self.parts.own_master),
             player,
             (
@@ -296,9 +302,10 @@ impl World {
         let quarry = Some(quarry);
         let gap = self.engagement(player, idx, target)?.gap;
         let by = self.releaser(player, idx)?;
+        let top_speed = self.top_speed_terms(player, self.players.live(player, idx)?)?;
         let unit = self.players.live_mut(player, idx)?;
         let walks = unit.move_walks(
-            self.parts.mover_of(unit.id),
+            (self.parts.mover_of(unit.id), top_speed),
             MasterTables::new(&self.model.masters, &self.parts.own_master),
             player,
             (
@@ -432,7 +439,7 @@ impl World {
                 &self.model.tuning.gather,
             ),
         };
-        let mut gather = GatherAction::new(
+        let gather = GatherAction::new(
             task,
             &resource,
             self.settings.farm_mode,
@@ -444,11 +451,30 @@ impl World {
             self.notify_gather(player, idx, (target, resource.class), notify)?;
         }
         self.clear_actions(player, idx)?;
+        self.install_gather(player, idx, target, (gather, &resource))
+    }
+
+    /// [`World::start_gather`]'s install (slot 0x808) after the list's clearing: the `gather`'s
+    /// start on `resource` with the gatherer's walks (its top speed's terms, slot 0x208) and
+    /// load; a load to its own drop site takes `target` as the second target, then lets it go
+    /// as the first, as a farm another farmer works is let go.
+    ///
+    /// # Errors
+    ///
+    /// A gatherer without movement state, and what the start does not model.
+    fn install_gather(
+        &mut self,
+        player: PlayerId,
+        idx: ListIndex,
+        target: ObjectId,
+        (mut gather, resource): (GatherAction, &Resource),
+    ) -> GenieResult<()> {
         let player_kind = self.players.player(player)?.kind;
         let carry_rule = self.settings.carry_rule();
+        let top_speed = self.top_speed_terms(player, self.players.live(player, idx)?)?;
         let unit = self.players.live_mut(player, idx)?;
         let walks = unit.move_walks(
-            self.parts.mover_of(unit.id),
+            (self.parts.mover_of(unit.id), top_speed),
             MasterTables::new(&self.model.masters, &self.parts.own_master),
             player,
             (
@@ -465,7 +491,7 @@ impl World {
         let rng = self.streams.get_mut(Stream::Action);
         gather.start(
             GatherStart {
-                target: &resource,
+                target: resource,
                 player,
                 player_kind,
                 carry_rule,
@@ -558,10 +584,7 @@ impl World {
         let master = unit.master(self.master_tables(), player)?;
         let me = self.spatial.get(unit.id).ok_or(ATTACKER_UNPLACED)?;
         let them = self.spatial.get_known(target)?.ok_or(TARGET_UNPLACED)?;
-        let speed = self
-            .parts
-            .mover_of(unit.id)
-            .map_or(Speed::ZERO, |mover| mover.stats.speed);
+        let speed = self.top_speed(player, unit)?;
         attack_engagement(
             self.parts.unit_ai.get(unit.id),
             speed,

@@ -181,6 +181,9 @@
     },
     movement = {
       ally_pause = 0.1,
+      charge_ready_slack = 0.01,
+      charge_run_factor = 1.5,
+      charge_run_reach = 10,
       close = 1,
       edge_gap = 0.01,
       edge_position_gap = 0.001,

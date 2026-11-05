@@ -9,6 +9,7 @@ use crate::map::spatial::Spatial;
 use crate::math::rng::Stream;
 use crate::movement::Mover;
 use crate::movement::Planning;
+use crate::movement::TopSpeed;
 use crate::objects::ObjectId;
 use crate::objects::layers::Action;
 use crate::objects::masters::GatherGroup;
@@ -61,7 +62,7 @@ pub(crate) fn search_origin<T>(point: Point, site: Option<T>, unit: Position) ->
 /// footprint (the site's tile in the unit's zone of its restriction, or a dock: masters 45 and
 /// 2172, `0x140c49d17`); the answer and the out argument's steps.
 pub(crate) fn closest_resource_of(
-    (unit, actions, mover): (&Unit, &Action, Option<&Mover>),
+    (unit, actions, mover, top_speed): (&Unit, &Action, Option<&Mover>, TopSpeed),
     resource_world: &mut ResourceWorld<'_, '_>,
     others: OthersRef<'_>,
     (kind, cap, site): (GatherGroup, WorkerCount, Option<DropSiteId>),
@@ -166,7 +167,7 @@ pub(crate) fn closest_resource_of(
             reach: UnitReach {
                 mover,
                 at: unit.position(),
-                walker: unit.me(actions),
+                walker: unit.me(actions, top_speed),
                 master: unit.life.master_id,
                 plan: &mut resource_world.plan,
                 objects: by_id,
@@ -184,6 +185,10 @@ impl UnitView<'_, '_> {
         &mut self,
         search: ResourceSearch,
     ) -> GenieResult<Option<Gatherable>> {
+        let top_speed =
+            self.step
+                .world
+                .top_speed_terms_with(self.player, self.unit, search.current)?;
         let by_id = ObjectsRef::new(
             &self.step.world.players,
             &self.step.world.index,
@@ -224,6 +229,7 @@ impl UnitView<'_, '_> {
                 self.unit,
                 &*self.actions,
                 self.step.world.parts.mover_of(self.unit.id),
+                top_speed,
             ),
             &mut resource_world,
             owner_view(
@@ -305,6 +311,9 @@ impl Unit {
                 "a resource search without a unit AI",
             ))?
             .current_target;
+        let top_speed = step
+            .world
+            .top_speed_terms_with(step.player, self, current)?;
         let mut resource_world = ResourceWorld {
             player: step.player,
             spatial: &mut step.world.spatial,
@@ -325,7 +334,7 @@ impl Unit {
         };
         let search = (current, ObjectState::Alive, NO_POINT);
         closest_resource_of(
-            (self, actions, step.world.parts.mover_of(self.id)),
+            (self, actions, step.world.parts.mover_of(self.id), top_speed),
             &mut resource_world,
             others,
             (kind, cap, site),

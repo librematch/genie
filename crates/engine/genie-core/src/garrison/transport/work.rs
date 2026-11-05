@@ -234,7 +234,7 @@ impl World {
             let unit = self.players.live(player_id, list_index)?;
             let master = unit.master(self.master_tables(), player_id)?;
             Ship::of_unit(
-                (unit, self.parts.mover_of(unit.id)),
+                (unit, self.top_speed(player_id, unit)?),
                 master,
                 self.spatial.map,
                 (

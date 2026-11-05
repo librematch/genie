@@ -7,6 +7,7 @@ use crate::map::Position;
 use crate::map::spatial::Spatial;
 use crate::math::rng::Well512;
 use crate::movement::Me;
+use crate::movement::TopSpeed;
 use crate::movement::move_to::MoveDefaults;
 use crate::objects::layers::Action;
 use crate::objects::layers::MotionMut;
@@ -66,19 +67,20 @@ impl Unit {
     /// ([`crate::garrison::transport::TransportAction::move_to`]) with the map about the unit, then
     /// what its state change leaves: the unit stops (its `MoveTo`'s teardown) and takes its
     /// standing sprite. `transport_action` is the head's copy, which goes back into `actions` after
-    /// its move; `motion` is the unit's motion layer.
+    /// its move; `motion` is the unit's motion layer, `top_speed` what its slot 0x208 reads.
     pub(crate) fn transport_sail(
         &mut self,
         (mut transport_action, actions): (TransportAction, &mut Action),
-        mut motion: MotionMut<'_>,
+        (mut motion, top_speed): (MotionMut<'_>, TopSpeed),
         point: Position,
         (spatial, zones, pathing): (&Spatial, &mut Zones, &mut Pathing),
         model: &Model,
         (masters, look, sprite_rng): (OwnerMasters<'_>, Option<&Look>, &mut Well512),
     ) -> GenieResult<()> {
         let master = self.master_in(masters)?;
+        let top = top_speed.of_object(motion.mover(), self.position().ground());
         let ship = Ship::of_unit(
-            (self, motion.mover()),
+            (self, top),
             master,
             spatial.map,
             (&model.graphics, look),

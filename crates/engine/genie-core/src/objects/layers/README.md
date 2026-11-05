@@ -31,7 +31,7 @@ without an entry reads an empty layer or the game's defaults (below type 40, 50 
 | [`idle_time.rs`](idle_time.rs) | A villager's idle time (`RGE_Action_Object` `+0x898` to `+0x8a0`): what its update counts while it may be interrupted and adds to its owner's statistics once it dies (`RGE_Action_Object::update`, `0x14106ac90`). |
 | [`mod.rs`](mod.rs) | The object's class chain (FD-045-D06): the game's object classes, each layer holding the one below it, as the save reads them (`RgeMovingObject` holds `rge_animated_object`). |
 | [`motion.rs`](motion.rs) | The layers between an object's place and its action layer (FD-045-D58): the animated object's (types 20 to 29) and the moving object's (30 and up), which holds the animated one, as the object's `Motion` in the world's table, and `MotionMut`, the one a routine changes beside the object's row. |
-| [`speedup.rs`](speedup.rs) | The building that speeds an action object up (`mSpeedupBuildingId` `+0x890`, `mSpeedupValue` `+0x894`): the save holds both, the update drops them once the building is gone or out of range (`RGE_Action_Object::update`, `0x14106ac90`). |
+| [`speedup.rs`](speedup.rs) | The building that speeds an object up: an action object's (`mSpeedupBuildingId` `+0x890`, `mSpeedupValue` `+0x894`) and a moving object's (`+0x808`, `+0x80c`). |
 <!-- /files -->
 
 ## How it connects

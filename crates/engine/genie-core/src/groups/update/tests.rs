@@ -2449,7 +2449,7 @@ fn gate_out_of_reach_is_struck_at_its_nearest_part() {
 }
 
 /// Slot 0x208 (`FUN_141202c70`) of a unit: its mover's speed (0 without a mover); a charger
-/// (type 70 with `max_charge`) of special attack 3 is the charge's, which is not modelled.
+/// (type 70 with `max_charge`) of special attack 3 whose charge is not ready keeps it.
 #[test]
 fn unit_speed_is_its_movers_unless_charge_runs() {
     let mut world = world();
@@ -2459,7 +2459,7 @@ fn unit_speed_is_its_movers_unless_charge_runs() {
     );
     let speed = |world: &World, id| {
         let (player_id, unit) = world.object(object_id(id)).unwrap();
-        world.unit_speed(player_id, unit)
+        world.top_speed(player_id, unit).map(Speed::get)
     };
     assert_eq!(speed(&world, 11).unwrap(), 0.0);
     assert_eq!(speed(&world, 10).unwrap(), 0.8);
@@ -2471,7 +2471,7 @@ fn unit_speed_is_its_movers_unless_charge_runs() {
         .get_or_insert_with(Default::default)
         .special_attack = SpecialAttack::CHARGE;
     world.model.masters[1] = Arc::new(Masters::new([m4.clone()]));
-    assert!(speed(&world, 10).is_err());
+    assert_eq!(speed(&world, 10).unwrap(), 0.8);
     m4.creatable.get_or_insert_with(Default::default).max_charge = Charge::ZERO;
     world.model.masters[1] = Arc::new(Masters::new([m4]));
     assert_eq!(speed(&world, 10).unwrap(), 0.8);

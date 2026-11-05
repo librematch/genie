@@ -477,11 +477,7 @@ impl Unit {
         Ok(Surroundings {
             position: self.position(),
             hp: self.life.hp,
-            speed: step
-                .world
-                .parts
-                .mover_of(self.id)
-                .map_or(Speed::ZERO, |mover| mover.stats.speed),
+            speed: step.world.top_speed(player, self)?,
             map: step.world.spatial.map,
             dt_seconds: step.dt.seconds(),
             flags: {

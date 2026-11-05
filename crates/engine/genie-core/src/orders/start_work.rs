@@ -252,7 +252,8 @@ impl World {
             my_pasture: unit.my_pasture,
             min_state: ObjectState::Alive,
         };
-        let me_walk = unit.me(self.parts.actions_of(unit.id));
+        let top_speed = self.top_speed_terms_with(player_id, unit, ai.current_target)?;
+        let me_walk = unit.me(self.parts.actions_of(unit.id), top_speed);
         Ok((seeker, me_walk))
     }
 

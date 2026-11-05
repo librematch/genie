@@ -406,12 +406,17 @@ impl World {
         let tm = target_unit.master(self.master_tables(), tp)?.clone();
         let room = self.has_room(tp, target_unit, Some(id))?;
         let placed_object = placed_object(&self.players, self.place(target))?;
+        let target_speed = self.top_speed(tp, placed_object)?;
         let unit = self.players.live(player, idx)?;
         enter_view(
             &mut self.spatial,
             (unit, self.parts.mover_of(unit.id)),
             (
-                (placed_object, self.parts.mover_of(placed_object.id)),
+                (
+                    placed_object,
+                    self.parts.mover_of(placed_object.id),
+                    target_speed,
+                ),
                 &tm,
                 room,
             ),
@@ -447,9 +452,10 @@ impl World {
         let (tp, target) = self.object(action.target).ok_or(UNPLACED)?;
         let master = target.master(self.master_tables(), tp)?.clone();
         let target = placed_object(&self.players, self.place(action.target))?;
+        let target_speed = self.top_speed(tp, target)?;
         let unit = self.players.live(player, idx)?;
         let reads = MoveToReads::of(
-            (unit, self.parts.mover_of(unit.id)),
+            (unit, self.top_speed(player, unit)?),
             unit.master(self.master_tables(), player)?,
             (
                 &self.model.graphics,
@@ -467,7 +473,7 @@ impl World {
             mover: self.parts.mover_of(unit.id),
             target_actions: self.parts.actions_of(target.id),
             target_unread: self.parts.unread.get(target.id),
-            target_mover: self.parts.mover_of(target.id),
+            target_speed,
         };
         action.walk_again(enter_target, start, meeting, &reads, by_id)
     }
@@ -499,6 +505,7 @@ impl World {
         let master = target_unit.master(self.master_tables(), tp)?.clone();
         let room = self.has_room(tp, target_unit, Some(id))?;
         let target = placed_object(&self.players, self.place(target))?;
+        let target_speed = self.top_speed(tp, target)?;
         let unit = self.players.live(player, idx)?;
         Meeting {
             spatial: &mut self.spatial,
@@ -510,7 +517,7 @@ impl World {
             mover: self.parts.mover_of(unit.id),
             target_actions: self.parts.actions_of(target.id),
             target_unread: self.parts.unread.get(target.id),
-            target_mover: self.parts.mover_of(target.id),
+            target_speed,
         }
         .point(by_id)
     }
@@ -537,6 +544,7 @@ impl World {
             return Err(UNREACHED);
         };
         let ship = self.players.live(tp, ti)?;
+        let top_speed = self.top_speed_terms(tp, ship)?;
         let mut plan = Planning {
             pathing: &mut self.pathing,
             now: self.world_time,
@@ -548,7 +556,7 @@ impl World {
             (
                 ship,
                 self.parts.actions_of(ship.id),
-                self.parts.mover_of(ship.id),
+                (self.parts.mover_of(ship.id), top_speed),
             ),
             &mut self.spatial,
             &mut plan,

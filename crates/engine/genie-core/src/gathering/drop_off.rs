@@ -142,7 +142,10 @@ impl Unit {
     ) -> GenieResult<HeadCode> {
         let farm_waits = waits_for_farm(self.life.master_id, gather.target_class, roles);
         let walks = self.move_walks(
-            step.world.parts.mover_of(self.id),
+            (
+                step.world.parts.mover_of(self.id),
+                step.world.top_speed_terms(step.player, self)?,
+            ),
             MasterTables::new(&step.world.model.masters, &step.world.parts.own_master),
             step.player,
             (
@@ -250,7 +253,10 @@ impl Unit {
             step.world.settings.farm_mode,
         );
         let walks = self.move_walks(
-            step.world.parts.mover_of(self.id),
+            (
+                step.world.parts.mover_of(self.id),
+                step.world.top_speed_terms(step.player, self)?,
+            ),
             MasterTables::new(&step.world.model.masters, &step.world.parts.own_master),
             step.player,
             (
@@ -373,11 +379,13 @@ impl Unit {
         step: &mut Step<'_>,
         roles: &Roles,
     ) -> GenieResult<()> {
+        let top_speed = step.world.top_speed_terms(step.player, self)?;
         let (mover, by_id) = step.world.parts.lend_mover(
             self.id,
             (&step.world.players, &step.world.index, &step.world.model),
         );
         let drop_world = DropWorld {
+            top_speed,
             masters: by_id.masters().of(step.player),
             spatial: &mut step.world.spatial,
             zones: &mut step.world.zones,
@@ -441,7 +449,7 @@ impl Unit {
             graphics,
             roles,
         );
-        let walks = Walks::of(sprites, (self, mover.as_deref()));
+        let walks = Walks::of(sprites, (self, mover.as_deref(), drop_world.top_speed));
         let Some(mover) = mover else {
             return Err(GenieError::unsupported(
                 "a gatherer without its gather or movement state",
@@ -498,7 +506,7 @@ impl Unit {
             graphics,
             roles,
         );
-        let walks = Walks::of(sprites, (self, mover.as_deref()));
+        let walks = Walks::of(sprites, (self, mover.as_deref(), drop_world.top_speed));
         let Some(mover) = mover else {
             return Err(GenieError::unsupported(
                 "a hunter without its hunt or movement state",
@@ -630,7 +638,7 @@ impl Unit {
             .of(drop_world.spatial.map, &terrain.kinds, values)?;
         let me = Me {
             action_state: state,
-            ..self.me(actions)
+            ..self.me(actions, drop_world.top_speed)
         };
         let mut plan = Planning {
             pathing: &mut *drop_world.pathing,

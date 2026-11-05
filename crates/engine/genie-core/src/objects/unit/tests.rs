@@ -17,6 +17,7 @@ use crate::map::Distance;
 use crate::map::Position;
 use crate::math::rng::Well512;
 use crate::movement::Speed;
+use crate::movement::TopSpeed;
 use crate::movement::explore::{ExploreAction, bare_walk};
 use crate::movement::fly::{Fly, FlyState};
 use crate::movement::move_to::TargetMoved;
@@ -775,12 +776,13 @@ fn unit_own_view_for_its_walk() {
     };
     unit.group.id = Some(group_id(4));
     assert_eq!(
-        unit.me(&Action::default()),
+        unit.me(&Action::default(), TopSpeed::Own),
         Me {
             id: object_id(5),
             action_state: ActionState::NO_ACTION,
             group: Some(group_id(4)),
             human_order: WorldTime::from_millis(2001),
+            top_speed: TopSpeed::Own,
         }
     );
 }

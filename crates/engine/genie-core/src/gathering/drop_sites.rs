@@ -337,6 +337,7 @@ mod tests {
     #[cfg(test)]
     use crate::map::{GridSize, TerrainId};
     use crate::math::rng::Well512;
+    use crate::movement::TopSpeed;
     use crate::objects::ActionState;
     use crate::objects::WorkRate;
     use crate::objects::actions::ActionList;
@@ -490,6 +491,7 @@ mod tests {
                 id: unit.id,
                 action_state: ActionState::NO_ACTION,
                 group: None,
+                top_speed: TopSpeed::Own,
             },
             mover: &mover,
             plan: &mut plan,

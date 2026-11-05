@@ -317,10 +317,21 @@ impl UnitView<'_, '_> {
         Ok(Answer::Taken)
     }
 
-    /// What an explorer's searches ask of the world ([`ScoutArea::of`] for the unit), the map's
-    /// size and the unit's line of sight.
-    pub(crate) fn scout_area(&mut self) -> GenieResult<(ScoutArea<'_>, GridSize, Distance)> {
-        let me = self.unit.me(self.actions);
+    /// What an explorer's searches ask of the world ([`ScoutArea::of`] for the unit, its unit
+    /// AI's target `ai_target`), the map's size and the unit's line of sight.
+    ///
+    /// # Errors
+    ///
+    /// A unit whose master the world lacks, and what the area does not model.
+    pub(crate) fn scout_area(
+        &mut self,
+        ai_target: Option<ObjectId>,
+    ) -> GenieResult<(ScoutArea<'_>, GridSize, Distance)> {
+        let top_speed = self
+            .step
+            .world
+            .top_speed_terms_with(self.player, self.unit, ai_target)?;
+        let me = self.unit.me(self.actions, top_speed);
         ScoutArea::of(
             self.step.world,
             self.unit,

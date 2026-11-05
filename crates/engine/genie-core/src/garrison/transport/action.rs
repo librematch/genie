@@ -20,8 +20,8 @@ use crate::math::conversions::cvttss2si;
 use crate::math::fmath::{at_most_or_unordered, below_or_unordered, maxss};
 use crate::math::rng::{Stream, Well512};
 use crate::movement::Me;
-use crate::movement::Mover;
 use crate::movement::PathAsk;
+use crate::movement::Speed;
 use crate::movement::move_to::{ListUpdate, SubCode, update_sub_actions};
 use crate::movement::move_to::{MoveTo, MoveToReads, SpriteReads};
 use crate::objects::Graphics;
@@ -262,6 +262,7 @@ impl TransportAction {
     ) -> GenieResult<UpdateCode> {
         let walked = self.walk(step, unit, me)?;
         let player_kind = step.world.players.player(step.player)?.kind;
+        let top = step.world.top_speed(step.player, unit)?;
         let World {
             spatial,
             zones,
@@ -277,7 +278,7 @@ impl TransportAction {
             defaults: transport_reads.defaults,
             graphics,
         };
-        let walk = MoveToReads::with_sprites(sprites, (unit, parts.motion.mover(unit.id)));
+        let walk = MoveToReads::with_sprites(sprites, (unit, parts.motion.mover(unit.id), top));
         let ship = Ship::of(
             unit,
             transport_reads.radius,
@@ -625,21 +626,22 @@ pub(crate) fn stand(
 }
 
 impl<'graphics> Ship<'graphics> {
-    /// What the Transport on `task` reads of `unit` with its mover of `master` on a map of `map`
-    /// tiles, with the sprites' table and the unit's terrain look (`graphics`, [`Ship::of`]).
+    /// What the Transport on `task` reads of `unit` of top speed `top` (slot 0x208) and `master`
+    /// on a map of `map` tiles, with the sprites' table and the unit's terrain look (`graphics`,
+    /// [`Ship::of`]).
     ///
     /// # Errors
     ///
     /// A task the master lacks.
     pub(crate) fn of_unit(
-        (unit, mover): (&Unit, Option<&Mover>),
+        (unit, top): (&Unit, Speed),
         master: &Master,
         map: GridSize,
         graphics: (&'graphics Graphics, Option<&Look>),
         task: Option<TaskId>,
         roles: &Roles,
     ) -> GenieResult<Self> {
-        let walk = MoveToReads::of((unit, mover), master, graphics, roles);
+        let walk = MoveToReads::of((unit, top), master, graphics, roles);
         let given = TransportAction::given_sprite(task, master)?;
         Ok(Self::of(unit, master.radius, map, walk, given))
     }

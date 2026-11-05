@@ -13,7 +13,7 @@ use crate::math::rng::{Stream, Well512};
 use crate::movement::MoveState;
 use crate::movement::move_to::{ListUpdate, SubCode, update_sub_actions};
 use crate::movement::move_to::{MoveToAction, graphic_of};
-use crate::movement::{Me, Mover};
+use crate::movement::{Me, Mover, Speed};
 use crate::objects::SpriteId;
 use crate::objects::Voice;
 use crate::objects::masters::ActionKind;
@@ -138,6 +138,7 @@ impl Fly {
                 self.set_state_of(bird, FlyState::Choosing, step)
             }
             FlyState::Choosing => {
+                let top = step.world.top_speed(step.player, bird)?;
                 let mover = step.world.parts.mover_of(bird.id).ok_or(NO_MOVER)?;
                 let sprites = FlightSprites {
                     walking: bird
@@ -149,7 +150,7 @@ impl Fly {
                 let action = step.world.streams.get_mut(Stream::Action);
                 let dropped = self.choose(
                     bird.position(),
-                    mover,
+                    (mover, top),
                     step.world.spatial.map,
                     action,
                     &sprites,
@@ -204,7 +205,8 @@ impl Fly {
     }
 
     /// State 3: an angle drawn from the Action stream (`0..360`, `FUN_140810fc0`), a distance of
-    /// speed × time left × the task's distance factor (1 for none); from the bird the point that
+    /// the bird's top speed `top` (slot 0x208, `0x140a84cf5`) × time left × the task's distance
+    /// factor (1 for none); from the bird the point that
     /// far along the angle (the y axis turned by it), tried at most 12 times, 80° on each time:
     /// it must lie inside the map and, with a leash, the bird must be within it of its centre or
     /// the point nearer the centre than the bird. A terrain the point must have and objects of a
@@ -216,13 +218,13 @@ impl Fly {
     fn choose(
         &mut self,
         at: Position,
-        mover: &Mover,
+        (mover, top): (&Mover, Speed),
         map: GridSize,
         action: &mut Well512,
         sprites: &FlightSprites<'_>,
     ) -> GenieResult<MoveToDrop> {
         let task = self.task;
-        let (speed, position) = (mover.stats.speed, at);
+        let (speed, position) = (top, at);
         let radius = mover.stats.radius.ground();
         let leash = f32::from(task.holding_attr) * f32::from(task.holding_attr);
         let mut angle = action.below_checked(360) as i32;
@@ -432,6 +434,7 @@ mod tests {
     #[cfg(test)]
     use crate::map::spatial::Spatial;
     use crate::movement::Speed;
+    use crate::movement::TopSpeed;
     use crate::movement::move_to::MoveTo;
     use crate::objects::ActionState;
     use crate::objects::DefaultStart;
@@ -570,6 +573,7 @@ mod tests {
             id: object_id(9925),
             group: None,
             action_state: ActionState::NO_ACTION,
+            top_speed: TopSpeed::Own,
         };
         in_update(
             world,
@@ -650,7 +654,7 @@ mod tests {
                 walking: None,
                 graphics: &graphics,
             };
-            let got = fly.choose(AT, mover, map, &mut rng, &sprites);
+            let got = fly.choose(AT, (mover, mover.stats.speed), map, &mut rng, &sprites);
             (got, rng.draws)
         };
         let mut fly = hawk(FlyState::Choosing, 0.0);
@@ -933,5 +937,19 @@ mod tests {
             Point::new(40.0, 10.0),
             9.0
         ));
+    }
+
+    /// `RGE_Action_Bird`'s destructor (`FUN_140a84750`): the bird's animation speed (`+0x7b8`)
+    /// takes its top speed (slot 0x208, the deletion's `top`); the flight lets nothing go.
+    #[test]
+    fn torn_down_flight_animates_at_the_top_speed() {
+        use crate::objects::actions::Action as ListAction;
+        use crate::objects::teardown::TornDown;
+        let mut motion = Motion::Moving(wings(1.32));
+        let torn = ListAction::Fly(hawk(FlyState::Resting, 0.0))
+            .tear_down((motion.lent(), Speed::new(1.7)))
+            .unwrap();
+        assert_eq!(torn, TornDown::default());
+        assert_eq!(motion.lent().anim_speed(), Some(Speed::new(1.7)));
     }
 }

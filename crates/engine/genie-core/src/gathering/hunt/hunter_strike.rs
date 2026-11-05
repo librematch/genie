@@ -14,7 +14,6 @@ use crate::gathering::hunt::TreeSearch;
 use crate::gathering::hunt::{Herd, HuntAction, HuntNext, HuntReads, HuntSprites};
 use crate::map::Distance;
 use crate::map::DistanceSquared;
-use crate::movement::Speed;
 use crate::movement::move_to::{MoveDefaults, MoveTo};
 use crate::movement::{Me, footprint_gap_squared};
 use crate::objects::ObjectId;
@@ -122,7 +121,10 @@ impl Unit {
                 roles,
             ),
             attack: AttackReads::of(
-                step.world.parts.combat_of(self.id),
+                (
+                    step.world.parts.combat_of(self.id),
+                    step.world.top_speed_terms(step.player, self)?,
+                ),
                 master,
                 (
                     OwnerMasters::new(
@@ -238,11 +240,7 @@ impl Unit {
                 .ok_or(GenieError::unsupported("a hunt's object without a place"))
         };
         let (me_at, them) = (at(Some(self.id))?, at(Some(target.id()))?);
-        let speed = step
-            .world
-            .parts
-            .mover_of(self.id)
-            .map_or(Speed::ZERO, |mover| mover.stats.speed);
+        let speed = step.world.top_speed(step.player, self)?;
         let engagement = engagement(
             step.world.parts.unit_ai.get(self.id),
             speed,

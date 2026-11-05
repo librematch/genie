@@ -297,10 +297,7 @@ impl World {
                 kind: master.kind,
                 grouped: master.creatable_part().formation_category.grouped(),
                 turns: master.object_flags.contains(ObjectFlags::SHIP),
-                speed: self
-                    .parts
-                    .mover_of(unit.id)
-                    .map_or(Speed::ZERO, |mover| mover.stats.speed),
+                speed: self.top_speed(player_id, unit)?,
                 position: unit.position(),
                 moved_at: self
                     .parts

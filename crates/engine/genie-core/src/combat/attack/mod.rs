@@ -20,6 +20,7 @@ use crate::map::spatial::Spatial;
 use crate::math::rng::Well512;
 use crate::movement::MoveStart;
 use crate::movement::Speed;
+use crate::movement::TopSpeed;
 use crate::movement::move_to::{MoveDefaults, TargetMoved};
 use crate::objects::ObjectId;
 use crate::objects::Voice;
@@ -74,7 +75,6 @@ pub use self::sprites::{SwingSprites, swing_sprites};
 pub(crate) use self::unit::run_down_attack_timers;
 use self::update::squared_reach;
 use self::walks::move_reads;
-pub(crate) use self::walks::speed_of;
 pub use self::work_slots::{Mark, Wielder, Worked};
 #[cfg(test)]
 use crate::combat::damage;
@@ -344,14 +344,20 @@ pub(crate) struct AttackReads {
     /// The sprites a `MoveTo` of the Attack takes when the Attack gives none: the defaults of the
     /// unit's master and terrain look.
     pub(crate) move_defaults: MoveDefaults,
+    /// What its top speed reads besides its own speed and its place, as the update starts
+    /// ([`TopSpeed`]): the `MoveTo`s it makes read whether the unit has a speed (slot 0x208).
+    /// Within the unit's own update its lock, powerup and stinger stay, and a ready charge's run
+    /// multiplies by a factor that is not 0, which keeps whether the speed is 0.
+    pub(crate) top_speed: TopSpeed,
 }
 
 impl AttackReads {
-    /// What the Attack of a unit of `master` with the combat layer `combat` reads: its player's masters and the sprites' table
-    /// (`tables`), its unit AI `ai` (the unit's own, or the one running outside it), whether its
-    /// owner is a computer player and the world's time (`now`).
+    /// What the Attack of a unit of `master` with the combat layer `combat` and its top speed's
+    /// terms `top_speed` reads: its player's masters and the sprites' table (`tables`), its unit
+    /// AI `ai` (the unit's own, or the one running outside it), whether its owner is a computer
+    /// player and the world's time (`now`).
     pub(crate) fn of(
-        combat: &Combat,
+        (combat, top_speed): (&Combat, TopSpeed),
         master: &Master,
         (masters, graphics): (OwnerMasters<'_>, &Graphics),
         ai: Option<&UnitAi>,
@@ -404,6 +410,7 @@ impl AttackReads {
             ai_kind: ai.map(|ai| ai.ai_kind),
             next_volley: combat.next_volley,
             move_defaults: MoveDefaults::of(master, combat.abilities.look.as_ref(), roles),
+            top_speed,
         }
     }
 }

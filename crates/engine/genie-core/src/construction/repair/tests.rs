@@ -10,6 +10,7 @@ use crate::map::TerrainFlags;
 use crate::math::rng::Well512;
 use crate::movement::Me;
 use crate::movement::Speed;
+use crate::movement::TopSpeed;
 use crate::movement::move_to::TargetMoved;
 use crate::movement::move_to::{
     MoveDefaults, MoveTo, MoveToAction, MoveToReads, MoveWait, SpriteReads, WalkTo,
@@ -441,6 +442,7 @@ fn repaired(world: &mut World) -> GenieResult<HeadCode> {
                 action_state: actions
                     .top_action()
                     .map_or(ActionState::NO_ACTION, |top_action| top_action.state),
+                top_speed: TopSpeed::Own,
             };
             unit.repair_part(actions, step, me, &roles())
         },

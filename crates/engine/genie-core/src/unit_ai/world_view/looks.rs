@@ -301,13 +301,23 @@ impl UnitView<'_, '_> {
         )
     }
 
-    /// The unit's slot 0x3d0: whether it reaches object `target` within `range`. An object that
-    /// does not move (types 10 to 25, `FUN_141071b50`) reaches nothing.
+    /// The unit's slot 0x3d0: whether it reaches object `target` within `range`, its unit AI's
+    /// target `ai_target` (its top speed reads it). An object that does not move (types 10 to
+    /// 25, `FUN_141071b50`) reaches nothing.
     ///
     /// # Errors
     ///
     /// What the reach test does not model.
-    pub(crate) fn reaches(&mut self, target: ObjectId, range: Distance) -> GenieResult<bool> {
+    pub(crate) fn reaches(
+        &mut self,
+        target: ObjectId,
+        range: Distance,
+        ai_target: Option<ObjectId>,
+    ) -> GenieResult<bool> {
+        let top_speed = self
+            .step
+            .world
+            .top_speed_terms_with(self.player, self.unit, ai_target)?;
         let mut plan = Planning {
             pathing: &mut self.step.world.pathing,
             now: self.step.world.world_time,
@@ -316,7 +326,7 @@ impl UnitView<'_, '_> {
             groups: &self.step.world.groups,
         };
         let unit = &*self.unit;
-        let walker = unit.me(self.actions);
+        let walker = unit.me(self.actions, top_speed);
         let Some(mover) = self.step.world.parts.mover_of(unit.id) else {
             return Ok(false);
         };

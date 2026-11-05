@@ -249,6 +249,7 @@ impl UnitAi {
                 },
             },
             memory: self.memory(),
+            ai_target: self.current_target,
         })?;
         self.add_retries(&found);
         self.attack_search_alert(found, player_kind, unit_ai_tuning)?;

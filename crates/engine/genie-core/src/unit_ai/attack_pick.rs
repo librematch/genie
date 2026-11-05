@@ -60,6 +60,9 @@ pub struct Search<'world> {
     pub(crate) pick: Pick,
     /// What an attack pick reads of the unit AI's memory.
     pub(crate) memory: Memory<'world>,
+    /// The unit AI's target (`+0x48`), which the unit's top speed reads in the reachability
+    /// check (slot 0x208's charge run, [`crate::world::World::top_speed_terms`]).
+    pub(crate) ai_target: Option<ObjectId>,
 }
 
 bitflags::bitflags! {

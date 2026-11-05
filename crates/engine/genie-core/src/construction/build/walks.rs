@@ -58,7 +58,7 @@ impl BuildAction {
         roles: &Roles,
     ) -> GenieResult<(Option<WalkTo>, Option<MoveToAction>)> {
         let move_reads = builder.move_to_reads(
-            step.world.parts.motion.mover(builder.id),
+            step.world.top_speed(step.player, builder)?,
             MasterTables::new(&step.world.model.masters, &step.world.parts.own_master),
             step.player,
             (

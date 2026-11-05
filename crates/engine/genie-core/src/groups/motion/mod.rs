@@ -274,10 +274,17 @@ impl World {
     }
 
     /// What `BMotion` reads of the lead `id` (a unit with movement state), None without one.
-    fn lead_view(&self, id: Option<ObjectId>) -> Option<Lead> {
-        let id = id?;
-        let (player_id, unit) = self.object(id)?;
-        let mover = self.parts.mover_of(unit.id)?;
+    ///
+    /// # Errors
+    ///
+    /// A lead whose master the world lacks (its top speed, slot 0x208).
+    fn lead_view(&self, id: Option<ObjectId>) -> GenieResult<Option<Lead>> {
+        let Some((player_id, unit)) = id.and_then(|id| self.object(id)) else {
+            return Ok(None);
+        };
+        let Some(mover) = self.parts.mover_of(unit.id) else {
+            return Ok(None);
+        };
         let group = unit
             .group
             .id
@@ -288,11 +295,11 @@ impl World {
                 differentiator_units: self.groups.differentiator_units(group, SHORT_IGNORED),
                 lowered: self.groups.group_units(unit.group.id).unwrap_or_default(),
             });
-        Some(Lead {
-            walker: mover.walker(id),
+        Ok(Some(Lead {
+            walker: mover.walker(unit.id),
             position: unit.position(),
             radius: mover.stats.radius.ground(),
-            moves: mover.stats.speed != Speed::ZERO
+            moves: self.top_speed(player_id, unit)? != Speed::ZERO
                 || self
                     .model
                     .roles
@@ -306,7 +313,7 @@ impl World {
                 .get(player_id.index())
                 .map_or(PlayerKind::Phantom, |player| player.kind),
             group,
-        })
+        }))
     }
 }
 

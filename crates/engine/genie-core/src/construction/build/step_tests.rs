@@ -9,6 +9,7 @@ use crate::map::Restriction;
 use crate::map::TerrainId;
 use crate::map::Tile;
 use crate::movement::Speed;
+use crate::movement::TopSpeed;
 use crate::movement::move_to::MoveWaitState;
 use crate::objects::ActionState;
 use crate::objects::Graphics;
@@ -296,6 +297,7 @@ fn update(world: &mut World, dt: u32) -> GenieResult<(HeadCode, Top)> {
                 action_state: actions
                     .top_action()
                     .map_or(ActionState::NO_ACTION, |top_action| top_action.state),
+                top_speed: TopSpeed::Own,
             };
             let code = unit.build_part(actions, step, me)?;
             Ok((code, (actions.top_action_kind(), actions.top_target())))

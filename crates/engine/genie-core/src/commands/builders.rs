@@ -261,7 +261,7 @@ impl World {
         );
         // the sprites its MoveTo's constructor takes for none (FUN_140aa0df0)
         let move_reads = MoveToReads::of(
-            (unit, self.parts.mover_of(unit.id)),
+            (unit, self.top_speed(player_id, unit)?),
             builder,
             (
                 &self.model.graphics,
@@ -484,7 +484,7 @@ impl World {
             state: Some(foundation_unit.life.state),
         };
         let move_reads = MoveToReads::of(
-            (unit, self.parts.mover_of(unit.id)),
+            (unit, self.top_speed(player, unit)?),
             builder,
             (
                 &self.model.graphics,

@@ -10,7 +10,6 @@ use crate::map::Position;
 use crate::movement::Me;
 use crate::movement::MoveStart;
 use crate::movement::Mover;
-use crate::movement::Speed;
 use crate::movement::move_to::{GiveUp, MoveTo, MoveToAction, MoveToReads, SpriteReads, WalkTo};
 use crate::movement::move_to::{ListUpdate, SubCode, update_sub_actions};
 use crate::objects::Graphics;
@@ -23,7 +22,7 @@ use crate::world::step::Step;
 
 /// What a new `MoveTo` of `unit` with its mover `mover` reads as `set_state` makes it: the sprites'
 /// defaults of its master (`attack_reads`), the sprites' table `graphics`, and the unit's state and
-/// top speed now.
+/// top speed now (slot 0x208 where it stands, with the update's terms).
 ///
 /// # Errors
 ///
@@ -33,21 +32,14 @@ pub(super) fn move_reads<'graphics>(
     attack_reads: &AttackReads,
     graphics: &'graphics Graphics,
 ) -> GenieResult<MoveToReads<'graphics>> {
-    let _ = speed_of(mover)?;
+    let top = mover
+        .ok_or(ATTACKER_UNMOVING)?
+        .top_speed(attack_reads.top_speed, unit.position().ground());
     let sprites = SpriteReads {
         defaults: attack_reads.move_defaults,
         graphics,
     };
-    Ok(MoveToReads::with_sprites(sprites, (unit, mover)))
-}
-
-/// The top speed (slot 0x208) of a unit with the mover `mover`, which a `MoveTo`'s start reads.
-///
-/// # Errors
-///
-/// A unit that does not move.
-pub(crate) fn speed_of(mover: Option<&Mover>) -> GenieResult<Speed> {
-    Ok(mover.ok_or(ATTACKER_UNMOVING)?.stats.speed)
+    Ok(MoveToReads::with_sprites(sprites, (unit, mover, top)))
 }
 
 impl Attack {

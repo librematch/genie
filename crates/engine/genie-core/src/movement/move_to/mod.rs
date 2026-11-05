@@ -580,6 +580,7 @@ mod tests {
     use crate::map::spatial::Placed;
     use crate::math::Angle;
     use crate::movement::Speed;
+    use crate::movement::TopSpeed;
     #[cfg(test)]
     use crate::movement::tests::{WalkRig, builder_9177, tiled_world};
     use crate::objects::ActionState;
@@ -1084,6 +1085,7 @@ mod tests {
                     id: object_id(9177),
                     group: None,
                     action_state: ActionState::new(4),
+                    top_speed: TopSpeed::Own,
                 },
                 dt: Seconds::new(0.1),
                 world: &mut world,

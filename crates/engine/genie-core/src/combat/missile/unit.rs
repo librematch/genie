@@ -170,8 +170,11 @@ impl Unit {
             .parts
             .mover_mut(self.id)
             .ok_or(GenieError::unsupported("a missile without its moving part"))?;
+        // a missile's slot 0x208 is RGE's (FUN_14114d1d0)
+        let top = mover.own_speed();
         let mut at = mover.set_position(
             to,
+            top,
             context.world.spatial.map,
             &context.world.model.tuning.movement,
         );

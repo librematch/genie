@@ -70,9 +70,10 @@ impl World {
         let arms = self.arms(player, idx, &task)?;
         let player_kind = self.players.player(player)?.kind;
         let carry_rule = self.settings.carry_rule();
+        let top_speed = self.top_speed_terms(player, self.players.live(player, idx)?)?;
         let unit = self.players.live_mut(player, idx)?;
         let walks = unit.move_walks(
-            self.parts.mover_of(unit.id),
+            (self.parts.mover_of(unit.id), top_speed),
             MasterTables::new(&self.model.masters, &self.parts.own_master),
             player,
             (

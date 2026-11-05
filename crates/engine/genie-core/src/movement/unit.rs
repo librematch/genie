@@ -4,10 +4,12 @@
 use crate::GenieResult;
 use crate::groups::MoveReason;
 use crate::groups::UnitGroups;
-use crate::math::fmath::sqrt;
+use crate::math::fmath::{at_most_or_unordered, sqrt};
 use crate::math::rng::Stream;
 use crate::movement::PathAsk;
 use crate::movement::Speed;
+use crate::movement::TopSpeed;
+use crate::movement::footprint_gap_squared;
 use crate::movement::move_to::MoveStep;
 use crate::movement::move_to::Patience;
 use crate::movement::move_to::StepEnd;
@@ -16,6 +18,7 @@ use crate::movement::{GroupSpeed, Me};
 use crate::objects::SpriteId;
 use crate::objects::UpdateCode;
 use crate::objects::layers::Action;
+use crate::objects::layers::Speedup;
 use crate::objects::masters::OwnerMasters;
 use crate::objects::masters::PlayersMastersExt;
 use crate::objects::sprite::Cargo;
@@ -27,6 +30,7 @@ use crate::unit_ai::AiAction;
 use crate::unit_ai::NotifyKind;
 use crate::unit_ai::UnitAi;
 use crate::unit_ai::UnitStance;
+use crate::world::NO_ATTRIBUTE;
 use crate::world::SPEED_EPSILON;
 use crate::world::Unread;
 use crate::world::layer::ClassRoles;
@@ -74,6 +78,11 @@ impl Unit {
             )?,
             None => None,
         };
+        let top = if step.world.parts.mover_of(self.id).is_some() {
+            step.world.top_speed_terms(step.player, self)?
+        } else {
+            TopSpeed::Own
+        };
         if let Some(mover) = step.world.parts.mover_mut(self.id) {
             let here = self.place.position();
             let at = mover.step_velocity(
@@ -81,7 +90,7 @@ impl Unit {
                 step.dt.seconds(),
                 step.world.spatial.map,
                 step.world.spatial.terrain.as_ref(),
-                (step.world.world_time, group),
+                (step.world.world_time, group, top),
                 &step.world.model.tuning.movement,
             );
             if at != here {
@@ -102,6 +111,49 @@ impl Unit {
                     step.world.parts.set_anim_speed(self.id, Speed::new(speed));
                 }
             }
+        }
+        self.speedup_drop(step)
+    }
+
+    /// `RGE_Moving_Object::update`'s speed-up check (`0x14114de0a`): while the unit's mover holds
+    /// a speed-up building (`+0x808` not −1), its owner's speed-up range (attribute 256) is read,
+    /// then the building is looked up among the world's objects (`FUN_1415417a0`). A building
+    /// gone, or one whose squared footprint gap to the unit (`FUN_14118f8c0`) is above the range
+    /// squared (`COMISS`, `JBE`: a NaN gap keeps it), is dropped: `+0x808` takes −1 and `+0x80c`
+    /// 0 ([`Speedup::NONE`]), and slot 0x208 adds no share any more ([`Mover::own_speed`]).
+    ///
+    /// [`Mover::own_speed`]: crate::movement::Mover::own_speed
+    ///
+    /// # Errors
+    ///
+    /// An owner without the attribute, and a unit or a building whose master the world lacks.
+    fn speedup_drop(&self, step: &mut Step<'_>) -> GenieResult<()> {
+        let Some(building) = step
+            .world
+            .parts
+            .mover_of(self.id)
+            .and_then(|mover| mover.speedup.building)
+        else {
+            return Ok(());
+        };
+        let range = step
+            .world
+            .players
+            .player(step.player)?
+            .attribute(step.world.model.slots.attribute.speedup_range)
+            .ok_or(NO_ATTRIBUTE)?
+            .get();
+        let keeps = match step.world.world_object(Some(building)) {
+            Some(found) => {
+                let radius = self.master(step.world.master_tables(), step.player)?.radius;
+                let other = step.world.speed_reads().object_master(found)?.radius;
+                let gap = footprint_gap_squared(self.position(), radius, found.position(), other);
+                at_most_or_unordered(gap.get(), range * range)
+            }
+            None => false,
+        };
+        if !keeps && let Some(mover) = step.world.parts.mover_mut(self.id) {
+            mover.speedup = Speedup::NONE;
         }
         Ok(())
     }

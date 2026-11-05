@@ -11,6 +11,7 @@ use crate::map::RestrictionId;
 use crate::map::spatial::Spatial;
 use crate::movement::Mover;
 use crate::movement::Speed;
+use crate::movement::SpeedReads;
 use crate::movement::{WaypointIndex, footprint_gap};
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
@@ -82,6 +83,8 @@ pub(crate) struct WorldPicker<'world> {
     /// The world's parts by id ([`crate::world::parts::Parts`]): the units' AIs (the unit's own
     /// is out of the table) and the buildings' layers.
     pub(crate) parts: &'world Parts,
+    /// What the found objects' top speeds (slot 0x208) read of the world.
+    pub(crate) speeds: SpeedReads<'world>,
     /// The unit's master's terrain restriction (`+0x606`).
     pub(crate) restriction: Option<RestrictionId>,
     /// The unit itself.
@@ -427,11 +430,7 @@ impl WorldPicker<'_> {
             position: placed.position,
             radius: placed.radius,
         };
-        let moving = Speed::ZERO
-            < self
-                .parts
-                .mover_of(unit.id)
-                .map_or(Speed::ZERO, |mover| mover.stats.speed);
+        let moving = Speed::ZERO < self.speeds.top_speed(owner, unit)?;
         Ok((target, moving))
     }
 }

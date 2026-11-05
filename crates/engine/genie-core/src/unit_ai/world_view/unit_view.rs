@@ -2,7 +2,7 @@
 
 use crate::GenieResult;
 use crate::map::Position;
-use crate::movement::Speed;
+use crate::movement::SpeedReads;
 use crate::movement::footprint_gap_squared;
 use crate::objects::ObjectId;
 use crate::objects::layers::Action;
@@ -49,6 +49,13 @@ impl UnitView<'_, '_> {
                 &self.step.world.parts.own_master,
             ),
             parts: &self.step.world.parts,
+            speeds: SpeedReads::of(
+                &self.step.world.players,
+                &self.step.world.index,
+                &self.step.world.parts,
+                &self.step.world.groups,
+                &self.step.world.model,
+            ),
             by_id: ObjectsRef::new(
                 &self.step.world.players,
                 &self.step.world.index,
@@ -188,9 +195,7 @@ impl UnitView<'_, '_> {
                 self.step.world.parts.combat_of(helper.id).firepower,
                 self.step
                     .world
-                    .parts
-                    .mover_of(helper.id)
-                    .map_or(Speed::ZERO, |mover| mover.stats.speed),
+                    .top_speed_with(owner, helper, ai.current_target)?,
             ),
         );
         let target_master_kind = match ai.current_target.and_then(find) {
@@ -217,21 +222,31 @@ impl UnitView<'_, '_> {
     /// action list clears (the old actions' teardowns), then the master change at once, the unit
     /// lent back to its slot ([`World::change_master`](crate::world::World::change_master): the
     /// master's unit part, what it gives and takes of the owner's attributes and the tracker's
-    /// promotion).
+    /// promotion). The teardowns read the unit's top speed with the running unit AI's target
+    /// `ai_target`.
     ///
     /// # Errors
     ///
     /// What the teardowns and the switch do not model.
-    pub(crate) fn switch_unit_master(&mut self, own: &Master, next: MasterId) -> GenieResult<()> {
+    pub(crate) fn switch_unit_master(
+        &mut self,
+        own: &Master,
+        next: MasterId,
+        ai_target: Option<ObjectId>,
+    ) -> GenieResult<()> {
         let by = Releaser {
             id: self.unit.id,
             class: Some(own.class),
             player: self.player,
         };
         let (mut releases, mut leaves) = (Vec::new(), Vec::new());
+        let top = self
+            .step
+            .world
+            .top_speed_with(self.player, self.unit, ai_target)?;
         self.unit.tear_down_actions(
             (self.actions, self.step.world.parts.unread.get(self.unit.id)),
-            self.step.world.parts.motion.layer_mut(self.unit.id),
+            (self.step.world.parts.motion.layer_mut(self.unit.id), top),
             &mut releases,
             &mut leaves,
             by,

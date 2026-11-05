@@ -14,8 +14,7 @@ use crate::map::Position;
 use crate::map::{Tile, TileOffset};
 use crate::math::rng::Stream;
 use crate::movement::Me;
-use crate::movement::Mover;
-use crate::movement::move_to::{GiveUp, MoveDefaults, MoveToReads, Patience, SpriteReads};
+use crate::movement::move_to::{GiveUp, MoveToReads, Patience};
 use crate::movement::move_to::{ListUpdate, SubCode, update_sub_actions};
 use crate::movement::scout_area::ScoutArea;
 use crate::objects::SpriteId;
@@ -40,9 +39,10 @@ use crate::combat::abilities::Look;
 use crate::map::Footprint;
 use crate::math::image::explore::NO_POINT as EXPLORE_NO_POINT;
 use crate::math::rng::Well512;
-#[cfg(test)]
 use crate::movement::Speed;
 pub use crate::movement::explore_state::ExploreState;
+#[cfg(test)]
+use crate::movement::move_to::{MoveDefaults, SpriteReads};
 use crate::movement::stop_mover;
 use crate::objects::Graphics;
 #[cfg(test)]
@@ -93,11 +93,11 @@ pub struct ExploreMove<'graphics> {
 }
 
 impl<'graphics> ExploreMove<'graphics> {
-    /// What the `MoveTo` of `unit` with its mover of `master` reads, with the sprites' table
-    /// and the unit's terrain look (`graphics`).
+    /// What the `MoveTo` of `unit` of top speed `top` (slot 0x208) and `master` reads, with the
+    /// sprites' table and the unit's terrain look (`graphics`).
     #[must_use]
     pub fn of(
-        unit: (&Unit, Option<&Mover>),
+        unit: (&Unit, Speed),
         master: &Master,
         graphics: (&'graphics Graphics, Option<&Look>),
         roles: &Roles,
@@ -580,7 +580,7 @@ impl Unit {
         roles: &Roles,
     ) -> GenieResult<()> {
         let at = Position::new(point.x(), point.y(), self.position().z());
-        let walk = self.explore_move(step, roles);
+        let walk = self.explore_move(step, roles)?;
         let owner = if let Some(explore_action) = actions.list.explore_mut() {
             let walked = explore_action.state.move_to().is_some();
             let owner = explore_action.take_point(at, &walk, &step.world.model.tuning.move_to)?;
@@ -602,41 +602,31 @@ impl Unit {
         self.explore_owner(owner, step)
     }
 
-    /// What an Explore's `MoveTo` reads of this unit ([`ExploreMove`]); a unit whose master the world
-    /// lacks reads no sprite defaults and gives none.
+    /// What an Explore's `MoveTo` reads of this unit ([`ExploreMove`]), its top speed slot
+    /// 0x208 where it stands.
+    ///
+    /// # Errors
+    ///
+    /// A unit whose master the world lacks.
     fn explore_move<'graphics>(
         &self,
         step: &'graphics Step<'_>,
         roles: &Roles,
-    ) -> ExploreMove<'graphics> {
+    ) -> GenieResult<ExploreMove<'graphics>> {
         let master = object_master(
             step.world.parts.own_master.get(self.id),
             (self.id, self.life.master_id),
             step.world.model.masters.of(step.player),
-        );
-        master.map_or_else(
-            |_| ExploreMove {
-                reads: MoveToReads::with_sprites(
-                    SpriteReads {
-                        defaults: MoveDefaults::default(),
-                        graphics: &step.world.model.graphics,
-                    },
-                    (self, step.world.parts.mover_of(self.id)),
-                ),
-                given: None,
-            },
-            |master| {
-                ExploreMove::of(
-                    (self, step.world.parts.mover_of(self.id)),
-                    master,
-                    (
-                        &step.world.model.graphics,
-                        step.world.parts.combat_of(self.id).abilities.look.as_ref(),
-                    ),
-                    roles,
-                )
-            },
-        )
+        )?;
+        Ok(ExploreMove::of(
+            (self, step.world.top_speed(step.player, self)?),
+            master,
+            (
+                &step.world.model.graphics,
+                step.world.parts.combat_of(self.id).abilities.look.as_ref(),
+            ),
+            roles,
+        ))
     }
 
     /// What an Explore's `set_state` asks of its unit ([`crate::movement::explore::Owner`]): its notify 0x202

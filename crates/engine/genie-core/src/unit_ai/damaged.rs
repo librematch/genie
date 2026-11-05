@@ -394,6 +394,7 @@ impl UnitAi {
                     reach: true,
                 },
                 memory: Memory::default(),
+                ai_target: self.current_target,
             })?;
             self.alert(found, at.dt_seconds);
             if let Some(id) = found.id
@@ -403,7 +404,11 @@ impl UnitAi {
             }
         }
         if let Some(site) = best.0
-            && side.reaches(site, Distance::new(unit_ai_tuning.foundation_reach))?
+            && side.reaches(
+                site,
+                Distance::new(unit_ai_tuning.foundation_reach),
+                self.current_target,
+            )?
         {
             let _ =
                 self.build_object(FoundationId::new(site), OrderForce::Forced, at, side, rng)?;

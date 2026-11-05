@@ -7,7 +7,6 @@ use crate::gathering::hunt::Quarry;
 use crate::gathering::hunt::{HuntAction, HuntRetarget};
 use crate::math::rng::Stream;
 use crate::movement::MoveStart;
-use crate::movement::Speed;
 use crate::objects::ObjectId;
 use crate::objects::layers::Action;
 use crate::objects::masters::MasterTables;
@@ -80,11 +79,7 @@ impl Unit {
                 .get_known(found)?
                 .ok_or(GenieError::unsupported("a hunt's target without a place"))?,
         );
-        let speed = step
-            .world
-            .parts
-            .mover_of(self.id)
-            .map_or(Speed::ZERO, |mover| mover.stats.speed);
+        let speed = step.world.top_speed(step.player, self)?;
         let engagement = engagement(
             step.world.parts.unit_ai.get(self.id),
             speed,
@@ -106,7 +101,10 @@ impl Unit {
             .drop_sites
             .contains(&unit.life.master_id);
         let walks = self.move_walks(
-            step.world.parts.mover_of(self.id),
+            (
+                step.world.parts.mover_of(self.id),
+                step.world.top_speed_terms(step.player, self)?,
+            ),
             MasterTables::new(&step.world.model.masters, &step.world.parts.own_master),
             step.player,
             (

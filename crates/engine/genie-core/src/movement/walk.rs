@@ -259,11 +259,11 @@ impl Mover {
     }
 
     /// The speed control toward the waypoint (slot 198, `0x141150a80`): a unit whose turn fell
-    /// short stops (its speed 0, slot 0x598) and brakes; else it accelerates to the top speed
-    /// unless the waypoint lies inside the turning circle, where it brakes. The way to the
-    /// waypoint and the circle start where the unit last moved to (`+0x824`,
+    /// short stops (its speed 0, slot 0x598) and brakes; else it accelerates to its top speed
+    /// `top` (slot 0x208) unless the waypoint lies inside the turning circle, where it brakes.
+    /// The way to the waypoint and the circle start where the unit last moved to (`+0x824`,
     /// [`Mover::moved_at`]).
-    pub(super) fn control_speed(&mut self, waypoint: BVector, clipped: Turn) {
+    pub(super) fn control_speed(&mut self, waypoint: BVector, clipped: Turn, top: Speed) {
         let position = self.moved_at.vector();
         let Some(velocity) = self.velocity.as_mut() else {
             self.velocity = Some(Velocity {
@@ -305,7 +305,7 @@ impl Mover {
                 return;
             }
         }
-        if self.stats.speed <= Speed::new(velocity.velocity.y()) {
+        if top <= Speed::new(velocity.velocity.y()) {
             return;
         }
         velocity.acceleration = velocity.acceleration.with_y(f32::MAX);

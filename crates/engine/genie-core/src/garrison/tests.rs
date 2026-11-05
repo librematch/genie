@@ -36,6 +36,7 @@ use crate::math::fmath::BVector;
 use crate::math::rng::Stream;
 use crate::movement::MoveAlgorithm;
 use crate::movement::Speed;
+use crate::movement::TopSpeed;
 use crate::movement::TurnRate;
 use crate::movement::move_to::MoveToAction;
 use crate::movement::move_to::MoveWaitState;
@@ -54,6 +55,7 @@ use crate::objects::SpriteId;
 use crate::objects::Voice;
 use crate::objects::facing::SpriteFacets;
 use crate::objects::layers::Animated;
+use crate::objects::layers::Speedup;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::ActionPart;
 use crate::objects::masters::BuildableOn;
@@ -657,6 +659,7 @@ fn enter_update(world: &mut World, dt: u32) -> GenieResult<HeadCode> {
                 action_state: actions
                     .top_action()
                     .map_or(ActionState::NO_ACTION, |top_action| top_action.state),
+                top_speed: TopSpeed::Own,
             };
             unit.enter_part(actions, step, me, &roles())
         },
@@ -2787,6 +2790,7 @@ pub(crate) fn walker(
             last_move: WorldTime::ZERO,
             moved_at: Position::ORIGIN,
             substitute_count: SubstituteCount::of_data(0),
+            speedup: Speedup::NONE,
             ignore_units: Vec::new(),
             user_waypoints: Vec::new(),
             last_turn: Seconds::ZERO,
@@ -4618,6 +4622,7 @@ fn transport_unloads_inside_its_own_update() {
                 action_state: actions
                     .top_action()
                     .map_or(ActionState::NO_ACTION, |top_action| top_action.state),
+                top_speed: TopSpeed::Own,
             };
             let transport = *actions.list.transport().unwrap();
             let _ = unit.transport_update(transport, actions, step, me, &roles())?;
@@ -5099,6 +5104,7 @@ fn the_sub_action_list_update_of_an_empty_list_is_1_and_of_an_arrived_move_to_to
                     id: unit.id,
                     group: unit.group.id,
                     action_state: ActionState::NO_ACTION,
+                    top_speed: TopSpeed::Own,
                 };
                 update_sub_actions(list, step, unit, me, ListUpdate::default())
             },
