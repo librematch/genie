@@ -1269,9 +1269,10 @@ fn gatherer_searches(world: &mut World, notify: Notify, hunt: bool) -> GenieResu
 /// action stops. A class without a gather group (a deer, 9) takes `ClosestObject`: what it
 /// finds (deer 40) it hunts (its Hunt at once) and the processing breaks; finding nothing a
 /// human player's villager does nothing more. A group's class searches by kind (a boar's
-/// 0x21: food, any workers, from the notify's drop site). A computer player's villager finding
-/// nothing and a farm's search (its workers cap) are not modelled; every object a search finds
-/// has its place, so the double's placeless find is a case no world reaches.
+/// 0x21: food, any workers, from the notify's drop site). A farm found (below one worker) the
+/// villager works at its place, and so gathers. A computer player's villager finding nothing
+/// is not modelled; every object a search finds has its place, so the double's placeless find
+/// is a case no world reaches.
 #[test]
 fn hunter_asked_for_another_target_hunts_what_its_search_finds() {
     let hunt = AiAction::Hunt.value();
@@ -1323,11 +1324,18 @@ fn hunter_asked_for_another_target_hunts_what_its_search_finds() {
             "a computer player's hunter that found nothing"
         ))
     );
+    // a farm found: the unit works it at its place (slot 0x140), which gathers it
     assert_eq!(
-        run(civilian(AiAction::Hunt, -1, -1), &[own_farm()], 49, human).0,
-        Err(GenieError::unsupported(
-            "ClosestObject's workers cap (+0x644)"
-        ))
+        run(civilian(AiAction::Hunt, -1, -1), &[own_farm()], 49, human),
+        (
+            Ok(BREAK),
+            (
+                Some(object_id(12557)),
+                class_of(49),
+                Some(AiAction::Gather),
+                Some(GATHER)
+            )
+        )
     );
     // a boar's 0x21 searches by its kind from the drop site
     let boar = resource(
@@ -10950,9 +10958,9 @@ fn fishing_ship_on_the_move_takes_its_damage_without_running() {
 /// foundations (relation 3, state 0) of the classes 3, 27, 39, 52 and 49, in that order;
 /// the nearest by `ClosestObject`'s distance (a tie keeps the first) that it reaches it
 /// builds (3). Finding none, a human player's ship goes on (2); a computer player's posts
-/// itself its build's completion. A search for state 0 meets `ClosestObject`'s unbuilt farm
-/// test on the first foundation it finds, which is not modelled (MISSING.md): the build of
-/// foundation 42, the nearest of three, and the walk past one walled in by rocks wait for it.
+/// itself its build's completion: the build of foundation 42, the nearest of three (a
+/// search for state 0 passes only a farm that has workers, `ClosestObject`'s unbuilt farm
+/// test).
 #[test]
 fn fishing_ship_builds_the_nearest_foundation_it_reaches() {
     let builder = UnitAi {
@@ -11017,10 +11025,17 @@ fn fishing_ship_builds_the_nearest_foundation_it_reaches() {
         site(42, class::WALL, at(24.7, 30.0)),
         site(43, class::GATE, at(15.3, 30.0)),
     ];
-    let (result, _) = hear(PlayerKind::Human, sites);
+    let (result, world) = hear(PlayerKind::Human, sites);
+    assert_eq!(result, Ok(BREAK));
     assert_eq!(
-        result,
-        Err(GenieError::unsupported("ClosestObject's unbuilt farm test"))
+        world
+            .parts
+            .actions
+            .of(object_id(500))
+            .list
+            .build()
+            .map(|build_action| build_action.target),
+        Some(Some(FoundationId::new(object_id(42))))
     );
     // none found: the human's goes on, the computer's posts its completion
     let (result, world) = hear(PlayerKind::Human, Vec::new());

@@ -3,6 +3,7 @@
 
 use crate::gathering::DropSiteId;
 use crate::math::rng::Well512;
+use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::WorkerCount;
 use crate::objects::masters::ClassId;
@@ -392,8 +393,9 @@ impl UnitAi {
     /// with 1, [`UnitAi::hunt_object`]) and the processing breaks; finding none, a human player's
     /// villager does nothing more. A class the slot names a kind of searches by it (slot 0x80,
     /// `ClosestResourceObject` from the notify's drop site, its third parameter: kind 0 below 2
-    /// workers, the others any; [`UnitView::closest_resource`]). A farm found (class 49) and a
-    /// computer player's villager that found nothing are not modelled.
+    /// workers, the others any; [`UnitView::closest_resource`]). A farm found (class 49) the unit
+    /// works ([`UnitAi::task_to_farm`]). A computer player's villager that found nothing is not
+    /// modelled.
     pub(super) fn hunter_search(
         &mut self,
         notify: Notify,
@@ -472,9 +474,40 @@ impl UnitAi {
             return Ok(GO_ON);
         };
         if roles.of_class(class).contains(ClassRoles::FARM) {
-            return Err(GenieError::unsupported("a hunter's search finding a farm"));
+            return self.task_to_farm(found.id, at, side, rng);
         }
         self.hunt_object(found.id, found.class, found.position, at, side, rng)?;
+        Ok(BREAK)
+    }
+
+    /// The hunt's farm found (class 49, `FUN_140c22bf0`'s case 0x202 on action 0x265): the world's
+    /// object of its id (`FUN_140c54e30`), at whose place the unit works it after the AI's stop
+    /// (slot 0xb0 with 1; the unit's slot 0x140, `FUN_141070c90`: slot 0x7e8 with the
+    /// carried-resource test, any task and `+0xa14` 0, [`AiCommand::WorkOn`]; its count `+0x888`
+    /// is not held), and the processing breaks. A farm the world does not hold ("Failed to be
+    /// tasked to new farm.") loses the target, stops the AI and goes on (slot 0x48 hands the
+    /// notify to the owner, not held).
+    fn task_to_farm(
+        &mut self,
+        farm: ObjectId,
+        at: &Surroundings,
+        side: &mut UnitView<'_, '_>,
+        rng: &mut Well512,
+    ) -> GenieResult<u32> {
+        let Some(held) = Self::world_object(farm, at, side)? else {
+            self.remove_target();
+            self.stop_current(StopOrder::Keep, at, side, rng)?;
+            return Ok(GO_ON);
+        };
+        self.stop_current(StopOrder::Keep, at, side, rng)?;
+        side.effect_now(
+            Effect::Command(AiCommand::WorkOn {
+                target: held.id,
+                point: held.position,
+            }),
+            self,
+            rng,
+        )?;
         Ok(BREAK)
     }
 

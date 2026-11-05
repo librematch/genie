@@ -2470,29 +2470,71 @@ fn closest_object_keeps_what_its_filter_and_its_searcher_take() {
         )
         .unwrap()
     );
-    assert_eq!(
-        kept(
-            with(|filter| filter.workers = WorkerCount::of_data(1)),
-            &villager,
-            ObjectState::Alive,
+    // the workers cap (argument 6, `+0x644`): an object below it counts, one at it does not
+    // ("Too many workers")
+    let found_master = |id| Master {
+        id,
+        class: villager.class,
+        ..Master::default()
+    };
+    let worked = |master: Master| {
+        found_world(vec![SceneObject {
+            workers: WorkerCount::ONE,
+            ..placed_object(&villager, master, None)
+        }])
+    };
+    let worked_world = worked(found_master(villager.master));
+    let capped = with(|filter| filter.workers = WorkerCount::ONE);
+    assert!(kept(capped, &villager, ObjectState::Alive, plain, checks).unwrap());
+    let worked_checks = ClosestChecks {
+        objects: worked_world.objects(),
+        ..checks
+    };
+    assert!(!kept(capped, &villager, ObjectState::Alive, plain, worked_checks).unwrap());
+    // a search for state 0 passes a farm (50 or 1187) that has workers ("Unbuilt farm that
+    // already has workers"); a free farm and a worked object of another master count
+    let unbuilt = with(|filter| filter.state = Some(ObjectState::Foundation));
+    let farm = Placed {
+        master: ids::FARM,
+        ..villager
+    };
+    let worked_farm_world = worked(found_master(ids::FARM));
+    let free_farm_world = found_world(vec![placed_object(&farm, found_master(ids::FARM), None)]);
+    assert!(
+        !kept(
+            unbuilt,
+            &farm,
+            ObjectState::Foundation,
             plain,
-            checks
+            ClosestChecks {
+                objects: worked_farm_world.objects(),
+                ..checks
+            }
         )
-        .unwrap_err()
-        .reason(),
-        "ClosestObject's workers cap (+0x644)"
+        .unwrap()
     );
-    assert_eq!(
+    assert!(
         kept(
-            with(|filter| filter.state = Some(ObjectState::Foundation)),
+            unbuilt,
+            &farm,
+            ObjectState::Foundation,
+            plain,
+            ClosestChecks {
+                objects: free_farm_world.objects(),
+                ..checks
+            }
+        )
+        .unwrap()
+    );
+    assert!(
+        kept(
+            unbuilt,
             &villager,
             ObjectState::Foundation,
             plain,
-            checks
+            worked_checks
         )
-        .unwrap_err()
-        .reason(),
-        "ClosestObject's unbuilt farm test"
+        .unwrap()
     );
     let livestock = with(|filter| filter.group = Some(class_id(58)));
     let mut sheep = Placed {
@@ -2651,7 +2693,7 @@ fn closest_object_takes_free_farm_its_searcher_gathers_from() {
         farm_kept(object_id(4), &farm, filter, farmer, look, &roles())
             .unwrap_err()
             .reason(),
-        "a found farm the slice does not hold"
+        "a found object the slice does not hold"
     );
     // through the tests past the relation: the worked farm passed, the free one kept
     let roles = roles();

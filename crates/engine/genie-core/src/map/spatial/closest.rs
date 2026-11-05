@@ -29,9 +29,9 @@ impl Spatial {
     /// it is not in state 2, and not while its top action is the Artifact with a point
     /// ([`herded`]: slot 0x288 not −1 and slot 0x530 107, "Sheep is moving"). A searcher of class
     /// 10 passes the objects [`shuns`] names (of master 440 or a master with object flag 0x10; the
-    /// game's `+0x6b4` of 1, not met, would let it take them). Not modelled: a workers cap
-    /// (argument 6; the objects' `+0x644`), the unbuilt farm test of a search for state 0, the
-    /// pastures and farms (class 49). Nothing found answers −1.
+    /// game's `+0x6b4` of 1, not met, would let it take them). The found object's workers
+    /// (`+0x644`) meet the cap (argument 6) and a search for state 0's unbuilt farm test
+    /// ([`closest_kept`]). Not modelled: the pastures. Nothing found answers −1.
     pub(super) fn closest_object(
         &mut self,
         me: ObjectId,
@@ -111,11 +111,16 @@ pub(super) struct Searcher {
     pub(super) trapper: bool,
 }
 
+/// A found object the world does not hold, whose workers (`+0x644`) or pasture the search reads.
+const FOUND_NOT_HELD: GenieError =
+    GenieError::unsupported("a found object the slice does not hold");
+
 /// `ClosestObject`'s tests of the object `id` it found (its seer and its place `placed`) past the
-/// relation: the [`Filter`]'s class, master and state; a farm ([`farm_kept`]); livestock
+/// relation: the [`Filter`]'s class, master and state; its workers (`+0x644`) below the cap
+/// (argument 6, "Too many workers"); for a search of state 0, a farm (masters 50 and 1187)
+/// without workers ("Unbuilt farm that already has workers"); a farm ([`farm_kept`]); livestock
 /// (class 58) the searcher's player owns or not in state 2, and not [`herded`]; for a searcher of
-/// class 10, not what [`shuns`] names. A workers cap and the unbuilt farm test (a state of 0)
-/// are not modelled.
+/// class 10, not what [`shuns`] names.
 pub(super) fn closest_kept(
     id: ObjectId,
     (seer, placed): (&Seer, &Placed),
@@ -138,13 +143,22 @@ pub(super) fn closest_kept(
     if filter.state.is_some_and(|state| seer.state != state) {
         return Ok(false);
     }
-    if filter.workers != WorkerCount::NO_CAP {
-        return Err(GenieError::unsupported(
-            "ClosestObject's workers cap (+0x644)",
-        ));
+    let workers = || {
+        objects
+            .get(id)
+            .map(|unit| unit.workers)
+            .ok_or(FOUND_NOT_HELD)
+    };
+    if filter.workers != WorkerCount::NO_CAP && filter.workers <= workers()? {
+        return Ok(false);
     }
-    if filter.state == Some(ObjectState::Foundation) {
-        return Err(GenieError::unsupported("ClosestObject's unbuilt farm test"));
+    if filter.state == Some(ObjectState::Foundation)
+        && roles
+            .of_master(placed.master)
+            .intersects(MasterRoles::FARM | MasterRoles::RICE_FARM)
+        && WorkerCount::ZERO < workers()?
+    {
+        return Ok(false);
     }
     if roles
         .of_some_class(filter.group)
@@ -211,9 +225,7 @@ pub(super) fn farm_kept(
     let (workers, parent) = objects
         .get(id)
         .map(|unit| (unit.workers, unit.pasture))
-        .ok_or(GenieError::unsupported(
-            "a found farm the slice does not hold",
-        ))?;
+        .ok_or(FOUND_NOT_HELD)?;
     if parent.is_some() {
         return Ok(false);
     }

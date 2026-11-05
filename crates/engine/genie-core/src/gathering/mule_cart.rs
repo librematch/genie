@@ -237,8 +237,8 @@ impl World {
     }
 
     /// Slot 0x1e8's end: slot 0x140 (`FUN_141070c90`), the work command toward the found
-    /// target at its place, else at the cart's own (slot 0x7e8: no carried-resource test, any
-    /// task; `+0x888`'s count is not held).
+    /// target at its place, else at the cart's own (slot 0x7e8 with the carried-resource test,
+    /// any task and `+0xa14` 0; `+0x888`'s count is not held).
     pub(crate) fn cart_work(
         &mut self,
         player_id: PlayerId,
@@ -248,9 +248,9 @@ impl World {
         let work = Work {
             target,
             point,
-            carry_test: false,
+            carry_test: true,
             filter: None,
-            source: OrderSource::Direct,
+            source: OrderSource::Queued,
         };
         self.order_work(player_id, idx, &work)
     }
