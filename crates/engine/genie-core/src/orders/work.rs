@@ -11,8 +11,8 @@ use crate::gathering::gather::GATHER;
 use crate::gathering::hunt::{HUNT, HuntTask};
 use crate::map::Position;
 use crate::map::TerrainId;
+use crate::math::fmath::at_most_or_unordered;
 use crate::math::rng::Stream;
-use crate::movement::Speed;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
@@ -392,10 +392,9 @@ impl World {
     ) -> GenieResult<()> {
         let unit = &self.players.live(player, idx)?;
         let master = unit.master(self.master_tables(), player)?;
-        if !master
-            .move_stats
-            .is_some_and(|move_stats| Speed::ZERO < move_stats.speed)
-        {
+        // slot 0xe8: the master's speed (`+0x740`), before a sprite's factor; not above 0
+        // (`COMISS`: a NaN too) ends here
+        if at_most_or_unordered(master.animated_part().max_speed.get(), 0.0) {
             return Ok(());
         }
         // slot 0x828 with 1 (the move's order and action) for a unit in state 2, -1 for

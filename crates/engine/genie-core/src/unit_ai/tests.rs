@@ -97,7 +97,7 @@ use crate::testing::ids;
 use crate::testing::ids::WONDER;
 use crate::testing::roles;
 use crate::testing::scene::SceneObject;
-use crate::testing::scene::{Scene, walking};
+use crate::testing::scene::{Scene, move_by, moving_master, walking};
 use crate::testing::slots;
 use crate::testing::tuning;
 use crate::unit_ai::AlertMode;
@@ -528,8 +528,7 @@ fn villager_master() -> Master {
         height: Distance::new(1.0),
         hit_points: MasterHitPoints::of_data(25),
         terrain_restriction: Some(RestrictionId::named(7)),
-        move_stats: Some(walking(Speed::new(0.8))),
-        ..Master::default()
+        ..moving_master(walking(Speed::new(0.8)))
     }
 }
 
@@ -682,8 +681,7 @@ fn unit_sent_off_footprint_keeps_its_move_aside_through_the_update() {
         height: Distance::new(1.0),
         hit_points: MasterHitPoints::of_data(5),
         terrain_restriction: Some(RestrictionId::named(7)),
-        move_stats: Some(walking(Speed::new(1.0))),
-        ..Master::default()
+        ..moving_master(walking(Speed::new(1.0)))
     };
     let town_centre = Master {
         id: ids::TOWN_CENTRE,
@@ -1112,8 +1110,7 @@ fn gather_world_on(
         height: Distance::new(3.0),
         hit_points: MasterHitPoints::of_data(2400),
         terrain_restriction: Some(RestrictionId::named(7)),
-        move_stats: Some(walking(Speed::ZERO)),
-        ..Master::default()
+        ..moving_master(walking(Speed::ZERO))
     };
     let mut scene = Scene::open(GridSize::new(64, 64))
         .players(2)
@@ -1181,8 +1178,7 @@ fn gaia_deer(id: i32, (x, y): (f32, f32)) -> SceneObject {
         height: Distance::new(1.0),
         hit_points: MasterHitPoints::of_data(5),
         terrain_restriction: Some(RestrictionId::named(7)),
-        move_stats: Some(walking(Speed::new(1.0))),
-        ..Master::default()
+        ..moving_master(walking(Speed::new(1.0)))
     };
     SceneObject {
         ai: Some(idle(UnitAiKind::Hunted)),
@@ -1199,8 +1195,7 @@ fn own_farm() -> SceneObject {
         class: class::FARM,
         radius: Footprint::new(1.5, 1.5),
         terrain_restriction: Some(RestrictionId::named(7)),
-        move_stats: Some(walking(Speed::ZERO)),
-        ..Master::default()
+        ..moving_master(walking(Speed::ZERO))
     };
     SceneObject {
         holds: Some((attribute::FOOD, Amount::new(175.0))),
@@ -3315,10 +3310,8 @@ fn an_idle_soldier_attacks_back_what_best_unit_to_attack_names() {
         .move_to()
         .map(|move_to| move_to.point);
     assert!(run.is_some_and(|point| point.x() < 10.0), "{run:?}");
-    let still = Master {
-        move_stats: Some(walking(Speed::ZERO)),
-        ..guard_master()
-    };
+    let mut still = guard_master();
+    move_by(&mut still, walking(Speed::ZERO));
     let unseen = foe_unit(7, class::RELIC, 12.0);
     let mut world = guard_world(
         (still, idle(UnitAiKind::Soldier)),
@@ -4353,24 +4346,28 @@ fn lone_master(kind: UnitAiKind) -> Master {
     match kind {
         UnitAiKind::Building | UnitAiKind::Tower => {
             let (house, _) = house_and_tree();
-            Master {
+            let mut house = Master {
                 terrain_restriction: Some(RestrictionId::named(7)),
-                move_stats: Some(walking(Speed::ZERO)),
                 ..house
-            }
+            };
+            move_by(&mut house, walking(Speed::ZERO));
+            house
         }
         UnitAiKind::Civilian => villager_master(),
         UnitAiKind::Livestock => walker(594, class::LIVESTOCK),
         UnitAiKind::Boar => walker(48, class::CLASS_11),
-        UnitAiKind::Hunted => Master {
-            line_of_sight: Distance::new(2.0),
-            action: Some(ActionPart {
-                search_radius: Distance::new(1.0),
-                ..ActionPart::default()
-            }),
-            move_stats: Some(walking(Speed::new(1.2))),
-            ..walker(65, class::PREY)
-        },
+        UnitAiKind::Hunted => {
+            let mut hunted = Master {
+                line_of_sight: Distance::new(2.0),
+                action: Some(ActionPart {
+                    search_radius: Distance::new(1.0),
+                    ..ActionPart::default()
+                }),
+                ..walker(65, class::PREY)
+            };
+            move_by(&mut hunted, walking(Speed::new(1.2)));
+            hunted
+        }
         UnitAiKind::Transport => walker(545, class::TRANSPORT),
         _ => walker(4, class::CLASS_6),
     }
@@ -4660,8 +4657,7 @@ fn scouting(ai: UnitAi, kind: PlayerKind, unexplored: &[Tile]) -> World {
         hit_points: MasterHitPoints::of_data(45),
         line_of_sight: Distance::new(4.0),
         terrain_restriction: Some(RestrictionId::named(7)),
-        move_stats: Some(walking(Speed::new(1.2))),
-        ..Master::default()
+        ..moving_master(walking(Speed::new(1.2)))
     };
     Scene::open(GridSize::new(120, 120))
         .sight(TileSight::Explored)
@@ -6414,14 +6410,13 @@ fn making_world(ai: UnitAi, missile: i16, firepower: f32) -> World {
         hit_points: MasterHitPoints::of_data(2400),
         line_of_sight: Distance::new(8.0),
         terrain_restriction: Some(RestrictionId::named(7)),
-        move_stats: Some(walking(Speed::ZERO)),
         standing_sprite: Some(STANDING.id),
         combat: Some(CombatPart {
             weapon_range: Distance::new(6.0),
             missile: MasterField::of_data(missile),
             ..CombatPart::default()
         }),
-        ..Master::default()
+        ..moving_master(walking(Speed::ZERO))
     };
     let mut world = Scene::open(GridSize::new(64, 64))
         .players(2)
@@ -7502,14 +7497,13 @@ fn tower_world(unit_ai: UnitAi, others: &[SceneObject]) -> World {
         hit_points: MasterHitPoints::of_data(1020),
         line_of_sight: Distance::new(8.0),
         terrain_restriction: Some(RestrictionId::named(7)),
-        move_stats: Some(walking(Speed::ZERO)),
         standing_sprite: Some(STANDING.id),
         combat: Some(CombatPart {
             weapon_range: Distance::new(8.0),
             missile: MasterField::of_data(363),
             ..CombatPart::default()
         }),
-        ..Master::default()
+        ..moving_master(walking(Speed::ZERO))
     };
     let mut scene = Scene::open(GridSize::new(64, 64))
         .players(2)
@@ -8987,8 +8981,7 @@ fn walker(id: i16, class: ClassId) -> Master {
         height: Distance::new(1.0),
         hit_points: MasterHitPoints::of_data(40),
         terrain_restriction: Some(RestrictionId::named(7)),
-        move_stats: Some(walking(Speed::new(1.0))),
-        ..Master::default()
+        ..moving_master(walking(Speed::new(1.0)))
     }
 }
 
@@ -12871,10 +12864,8 @@ fn the_stop_order_stops_and_ends_the_order() {
 /// `MoveTo` at once); standing its ground, a player's unit stays (not taken).
 #[test]
 fn the_run_away_order_runs_from_the_unit_attackers() {
-    let still = Master {
-        move_stats: Some(walking(Speed::ZERO)),
-        ..order_soldier()
-    };
+    let mut still = order_soldier();
+    move_by(&mut still, walking(Speed::ZERO));
     let mut world = order_world(order_unit(still.clone(), idle(UnitAiKind::Soldier)), &[]);
     let before = world.streams.get_mut(Stream::Ai).draws;
     assert_eq!(
@@ -14172,8 +14163,7 @@ fn building_master(id: i16, class: ClassId) -> Master {
         height: Distance::new(2.0),
         hit_points: MasterHitPoints::of_data(550),
         terrain_restriction: Some(RestrictionId::named(7)),
-        move_stats: Some(walking(Speed::ZERO)),
-        ..Master::default()
+        ..moving_master(walking(Speed::ZERO))
     }
 }
 

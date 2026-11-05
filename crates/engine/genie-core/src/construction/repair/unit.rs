@@ -240,10 +240,8 @@ fn repairee_of(
         radius: tm.radius,
         class: tm.class,
         moves: MasterKind::MOVING <= tm.kind
-            && tm
-                .move_stats
-                .as_ref()
-                .is_some_and(|move_stats| Speed::ZERO < move_stats.speed),
+            // slot 0xe8: the master's speed (`+0x740`), before a sprite's factor
+            && Speed::ZERO < tm.animated_part().max_speed,
     };
     let counting = if tm.kind == MasterKind::BUILDING {
         step.world

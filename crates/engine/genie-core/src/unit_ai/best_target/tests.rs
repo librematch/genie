@@ -33,7 +33,7 @@ use crate::testing::ids;
 use crate::testing::picker::with_picker;
 use crate::testing::roles;
 use crate::testing::scene::SceneObject;
-use crate::testing::scene::{Scene, walking};
+use crate::testing::scene::{Scene, moving_master, walking};
 use crate::testing::tuning;
 use crate::unit_ai::OrderRecord;
 use crate::unit_ai::UnitAi;
@@ -230,7 +230,6 @@ fn soldier_master(range: f32, blast: f32) -> Master {
         hit_points: MasterHitPoints::of_data(40),
         line_of_sight: Distance::new(6.0),
         terrain_restriction: Some(RestrictionId::named(7)),
-        move_stats: Some(walking(Speed::new(1.0))),
         combat: Some(CombatPart {
             weapons: vec![ClassAmount::new(4, 4)],
             reload: Seconds::new(2.0),
@@ -238,7 +237,7 @@ fn soldier_master(range: f32, blast: f32) -> Master {
             area_effect: Distance::new(blast),
             ..CombatPart::default()
         }),
-        ..Master::default()
+        ..moving_master(walking(Speed::new(1.0)))
     }
 }
 

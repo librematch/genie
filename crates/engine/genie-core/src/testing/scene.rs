@@ -51,6 +51,7 @@ use crate::objects::layers::Action;
 use crate::objects::layers::Building;
 use crate::objects::layers::{Animated, Static};
 use crate::objects::lifecycle::Lifecycle;
+use crate::objects::masters::AnimatedPart;
 use crate::objects::masters::BuildableOn;
 use crate::objects::masters::FlyMode;
 use crate::objects::masters::MasterId;
@@ -651,6 +652,23 @@ pub fn walking(speed: Speed) -> MoveStats {
     }
 }
 
+/// A master moving by `stats` and nothing else: its movement and its animated layer, whose speed
+/// (`+0x740`, the master's slot 0xe8) is the movement's base, as the masters' loader fills both.
+#[must_use]
+pub fn moving_master(stats: MoveStats) -> Master {
+    let mut master = Master::default();
+    move_by(&mut master, stats);
+    master
+}
+
+/// Master `master` moving by `stats` ([`moving_master`]'s two layers).
+pub fn move_by(master: &mut Master, stats: MoveStats) {
+    master.animated = Some(AnimatedPart {
+        max_speed: stats.base,
+    });
+    master.move_stats = Some(stats);
+}
+
 /// The scout's master: a walking villager of `line_of_sight`.
 fn scout_master(line_of_sight: Distance) -> Master {
     Master {
@@ -660,8 +678,7 @@ fn scout_master(line_of_sight: Distance) -> Master {
         radius: Footprint::new(0.2, 0.2),
         height: Distance::new(1.0),
         line_of_sight,
-        move_stats: Some(walk_stats()),
-        ..Master::default()
+        ..moving_master(walk_stats())
     }
 }
 

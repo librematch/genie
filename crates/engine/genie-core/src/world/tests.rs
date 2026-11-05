@@ -241,6 +241,7 @@ use crate::testing::ids;
 use crate::testing::ids::VILLAGER_FEMALE;
 use crate::testing::ids::VILLAGER_MALE;
 use crate::testing::roles;
+use crate::testing::scene::{move_by, moving_master, walking};
 use crate::testing::slots;
 use crate::testing::static_roles;
 use crate::testing::tuning;
@@ -1091,8 +1092,7 @@ fn pasture_game(at: Position, livestock: f32, livestock_masters: &[MasterId]) ->
         radius: Footprint::new(0.2, 0.2),
         standing_sprite,
         storage: vec![(Some(attribute::FOOD), Amount::new(100.0), 0)],
-        move_stats: Some(walker().stats),
-        ..Master::default()
+        ..moving_master(walker().stats)
     };
     let mut masters = vec![pasture];
     for &master_id in livestock_masters {
@@ -4166,7 +4166,7 @@ fn loaded_forager_sent_to_its_town_centre_carries_its_load_there() {
 /// The work command without a task (`FUN_14106ff70`'s move): the forager sent to its town
 /// centre empty-handed (no task on class 3) is told of the move (order 0x2c6, the centre with
 /// its class) and walks to the centre; sent to a point it walks there; in state 1 it is told of
-/// no order (−1) and stays; a master that does not move does nothing.
+/// no order (−1) and stays; a master of speed 0 (its slot 0xe8) does nothing.
 #[test]
 fn work_command_without_task_moves_the_unit_there() {
     let work = |target| Work {
@@ -4227,10 +4227,12 @@ fn work_command_without_task_moves_the_unit_there() {
         Some(None)
     );
     let mut world = forage_world();
-    Arc::make_mut(&mut world.model.masters[1])
-        .get_mut(master_id(120))
-        .unwrap()
-        .move_stats = None;
+    move_by(
+        Arc::make_mut(&mut world.model.masters[1])
+            .get_mut(master_id(120))
+            .unwrap(),
+        walking(Speed::ZERO),
+    );
     let before = world
         .parts
         .actions_of(world.players[1].objects[ListIndex::new(0)].id)
@@ -5139,7 +5141,6 @@ fn cart_world() -> World {
             class: class::BUILDING,
             radius: Footprint::new(0.5, 0.5),
             line_of_sight: Distance::new(4.0),
-            move_stats: Some(walker().stats),
             action: Some(ActionPart {
                 tasks: vec![Task {
                     action_kind: CART_TASK,
@@ -5148,7 +5149,7 @@ fn cart_world() -> World {
                 }],
                 ..ActionPart::default()
             }),
-            ..Master::default()
+            ..moving_master(walker().stats)
         };
         *masters = Arc::new(Masters::new(masters.iter().cloned().chain([cart])));
     }
@@ -6561,8 +6562,7 @@ fn shepherd_world(x: f32) -> World {
             kind: MasterKind::COMBAT,
             class: class::LIVESTOCK,
             radius: Footprint::new(0.2, 0.2),
-            move_stats: Some(walker().stats),
-            ..Master::default()
+            ..moving_master(walker().stats)
         };
         *masters = Arc::new(Masters::new(masters.iter().cloned().chain([sheep])));
         Arc::make_mut(masters)
@@ -8091,7 +8091,6 @@ fn livestock_enter_world() -> World {
         kind: MasterKind::COMBAT,
         class: class::LIVESTOCK,
         radius: Footprint::new(0.2, 0.2),
-        move_stats: Some(walker().stats),
         standing_sprite: None,
         action: Some(ActionPart {
             tasks: vec![Task {
@@ -8108,7 +8107,7 @@ fn livestock_enter_world() -> World {
             move_sprite: None,
             ..MovingPart::default()
         }),
-        ..Master::default()
+        ..moving_master(walker().stats)
     };
     for masters in &mut world.model.masters {
         *masters = Arc::new(Masters::new(masters.iter().cloned().chain([sheep.clone()])));
@@ -10629,7 +10628,6 @@ fn gate_world() -> World {
         height,
         hit_points: MasterHitPoints::of_data(1650),
         // a gate moves (its master's slot 0xe8): its last move time is the mover's
-        move_stats: Some(walker().stats),
         building: Some(BuildingMaster {
             transform_unit: opt_master(transform_unit),
             stack_unit: None,
@@ -10639,7 +10637,7 @@ fn gate_world() -> World {
             annexes: [None; 4],
             ..BuildingMaster::default()
         }),
-        ..Master::default()
+        ..moving_master(walker().stats)
     };
     let soldier = Master {
         id: master_id(4),
@@ -18443,7 +18441,6 @@ fn villager_attack_command_switches_it_to_the_villager_first() {
         hit_points: MasterHitPoints::of_data(25),
         standing_sprite: Some(SpriteId::named(300)),
         storage,
-        move_stats: Some(walker().stats),
         combat: Some(CombatPart {
             attack_sprite: Some(SpriteId::named(301)),
             weapon_range: Distance::new(0.5),
@@ -18454,7 +18451,7 @@ fn villager_attack_command_switches_it_to_the_villager_first() {
             task_by_group: TaskGroup::MALE_VILLAGERS,
             ..ActionPart::default()
         }),
-        ..Master::default()
+        ..moving_master(walker().stats)
     };
     let (unit, attacked, housed, tracker) = attack_by(
         villager(
@@ -20054,7 +20051,6 @@ fn archer_masters(hit_chance: i16, max_volley: u8, spread: f32) -> Masters {
         hit_points: MasterHitPoints::of_data(30),
         radius: Footprint::new(0.2, 0.2),
         standing_sprite: Some(SpriteId::named(300)),
-        move_stats: Some(walker().stats),
         creatable: Some(CreatablePart {
             max_volley: MissileCount::of_data(max_volley),
             volley_spread: VolleySpread {
@@ -20073,7 +20069,7 @@ fn archer_masters(hit_chance: i16, max_volley: u8, spread: f32) -> Masters {
             hit_chance: HitChance::of_data(hit_chance),
             ..CombatPart::default()
         }),
-        ..Master::default()
+        ..moving_master(walker().stats)
     };
     let arrow = Master {
         id: master_id(363),

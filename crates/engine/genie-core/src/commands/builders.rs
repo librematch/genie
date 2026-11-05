@@ -9,7 +9,6 @@ use crate::map::Distance;
 use crate::map::Position;
 use crate::math::fmath::below_or_unordered;
 use crate::math::rng::Stream;
-use crate::movement::Speed;
 use crate::movement::footprint_gap;
 use crate::movement::move_to::{MoveToReads, WalkTo};
 use crate::objects::HitPoints;
@@ -78,9 +77,8 @@ impl World {
                 continue;
             };
             let master = unit.master(self.master_tables(), owner)?;
-            let speed = master
-                .move_stats
-                .map_or(Speed::ZERO, |move_stats| move_stats.speed);
+            // slot 0xe8: the master's speed (`+0x740`), before a sprite's factor
+            let speed = master.animated_part().max_speed;
             let kind = master.kind;
             let moves = MasterKind::MOVING <= kind && below_or_unordered(0.0, speed.get());
             if !moves && !queued {

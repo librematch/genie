@@ -36,6 +36,7 @@ use crate::map::spatial::{Obstruction, Placed, Spatial, Tiles};
 use crate::map::terrain::TileTerrain;
 use crate::map::terrain::{Terrain, TerrainKind};
 use crate::math::fmath::BVector;
+use crate::movement::MoveStats;
 use crate::movement::PathFlags;
 use crate::movement::WaypointIndex;
 use crate::movement::move_to::{MOVE_TO, MoveTo, MoveToAction, MoveWait, TargetMoved};
@@ -52,6 +53,7 @@ use crate::objects::lifecycle::Held;
 use crate::objects::lifecycle::Lifecycle;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::ActionPart;
+use crate::objects::masters::AnimatedPart;
 use crate::objects::masters::BuildableOn;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::CombatPart;
@@ -104,7 +106,7 @@ use crate::testing::attribute;
 use crate::testing::class;
 use crate::testing::ids;
 use crate::testing::roles;
-use crate::testing::scene::{Scene, SceneObject};
+use crate::testing::scene::{Scene, SceneObject, move_by, moving_master};
 use crate::testing::tuning;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::Answer;
@@ -1072,7 +1074,7 @@ fn work_attack(stance: UnitStance) -> (World, Task) {
         .get_or_insert_with(Default::default)
         .weapon_range = Distance::ZERO;
     soldier.combat.get_or_insert_with(Default::default).reload = Seconds::new(2.0);
-    soldier.move_stats = Some(walker.stats);
+    move_by(soldier, walker.stats);
     world.model.masters[0] = Arc::new(Masters::new([Master {
         id: master_id(126),
         kind: MasterKind::COMBAT,
@@ -1564,7 +1566,7 @@ fn an_order_to_another_player_unit_goes_to_its_queue_with_the_setting() {
     world.model.masters.push(Arc::new(Masters::new([])));
     let walker = walker();
     if let Some(master) = Arc::make_mut(&mut world.model.masters[1]).get_mut(ids::VILLAGER_MALE) {
-        master.move_stats = Some(walker.stats);
+        move_by(master, walker.stats);
     }
     let unit = &mut world.players[1].objects[ListIndex::new(0)];
     world.parts.put_mover(unit.id, Some(walker));
@@ -1606,6 +1608,48 @@ fn an_order_to_another_player_unit_goes_to_its_queue_with_the_setting() {
     assert_eq!(
         queued,
         [(player_2, OrderKind::Move), (player_2, OrderKind::OnTarget)]
+    );
+}
+
+/// MOVE (`FUN_140e67800`) reads the master's speed at slot 0xe8 (`+0x740`, the animated layer's),
+/// not its movement's top speed: a master of speed 0.8 moves its unit where its movement reads 0,
+/// and one of speed 0 leaves it standing where its movement reads 0.8.
+#[test]
+fn move_reads_the_master_speed_at_slot_0xe8() {
+    let moved = |max_speed: Speed, top_speed: Speed| {
+        let mut world = soldiers(&[(11, 4, Point::new(20.0, 20.0))], &[]);
+        let walker = walker();
+        for masters in &mut world.model.masters {
+            if let Some(soldier) = Arc::make_mut(masters).get_mut(master_id(4)) {
+                move_by(
+                    soldier,
+                    MoveStats {
+                        speed: top_speed,
+                        ..walker.stats
+                    },
+                );
+                soldier.animated = Some(AnimatedPart { max_speed });
+            }
+        }
+        let id = world.players[1].objects[ListIndex::new(0)].id;
+        world.parts.put_mover(id, Some(walker));
+        let order = MoveOrder {
+            target: None,
+            point: Point::new(30.0, 30.0),
+            flags: OrderFlags::empty(),
+            control: ControlKey::Up,
+        };
+        world
+            .move_order(PlayerId::new(1), &object_ids([11]), &order)
+            .unwrap();
+        world.parts.actions_of(id).list.move_to().is_some()
+    };
+    assert_eq!(
+        (
+            moved(Speed::new(0.8), Speed::ZERO),
+            moved(Speed::ZERO, Speed::new(0.8))
+        ),
+        (true, false)
     );
 }
 
@@ -1950,7 +1994,7 @@ fn an_order_to_busy_unit_ai_readies_its_queue_and_stops_the_unit() {
     let mut world = soldiers(&[(11, 83, Point::new(20.0, 20.0))], &[]);
     let walker = walker();
     if let Some(master) = Arc::make_mut(&mut world.model.masters[1]).get_mut(ids::VILLAGER_MALE) {
-        master.move_stats = Some(walker.stats);
+        move_by(master, walker.stats);
     }
     let unit = &mut world.players[1].objects[ListIndex::new(0)];
     world.parts.put_mover(unit.id, Some(walker));
@@ -2017,7 +2061,7 @@ fn an_interact_unit_queues_its_offset_point_and_takes_no_work_on_itself() {
         if let Some(master) =
             Arc::make_mut(&mut soldiers.model.masters[1]).get_mut(ids::VILLAGER_MALE)
         {
-            master.move_stats = Some(walker.stats);
+            move_by(master, walker.stats);
         }
         let unit = &mut soldiers.players[1].objects[ListIndex::new(0)];
         soldiers.parts.put_mover(unit.id, Some(walker));
@@ -2302,7 +2346,7 @@ fn soldier_with_queued_order() -> World {
     let walker = walker();
     for masters in &mut world.model.masters {
         if let Some(soldier) = Arc::make_mut(masters).get_mut(master_id(4)) {
-            soldier.move_stats = Some(walker.stats);
+            move_by(soldier, walker.stats);
         }
     }
     world
@@ -3213,8 +3257,7 @@ fn followers() -> World {
     world.model.masters[1] = Arc::new(Masters::new([Master {
         id: master_id(4),
         kind: MasterKind::COMBAT,
-        move_stats: Some(walker.stats),
-        ..Master::default()
+        ..moving_master(walker.stats)
     }]));
     for unit in &mut world.players[1].objects {
         world.parts.put_mover(unit.id, Some(walker.clone()));
@@ -3928,8 +3971,7 @@ fn led_sheep_takes_the_idle_livestock_about_it_to_the_drop_site() {
         kind: MasterKind::COMBAT,
         class: class::LIVESTOCK,
         radius: Footprint::new(0.2, 0.2),
-        move_stats: Some(walker.stats),
-        ..Master::default()
+        ..moving_master(walker.stats)
     };
     world.model.masters[1] = Arc::new(Masters::new([
         sheep_master.clone(),

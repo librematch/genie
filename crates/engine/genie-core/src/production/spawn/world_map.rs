@@ -144,10 +144,8 @@ impl WorldMap<'_> {
                         );
                         flags.set(
                             NearFlags::MOVING,
-                            master
-                                .move_stats
-                                .as_ref()
-                                .is_some_and(|move_stats| Speed::ZERO < move_stats.speed),
+                            // slot 0xe8: the master's speed (`+0x740`)
+                            Speed::ZERO < master.animated_part().max_speed,
                         );
                         flags.set(
                             NearFlags::HOLDS,

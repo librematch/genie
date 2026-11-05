@@ -105,10 +105,8 @@ impl World {
             .players
             .live(player, idx)?
             .master(self.master_tables(), player)?;
-        let speed = master
-            .move_stats
-            .as_ref()
-            .map_or(Speed::ZERO, |move_stats| move_stats.speed);
+        // slot 0xe8: the master's speed (`+0x740`), before a sprite's factor
+        let speed = master.animated_part().max_speed;
         if master.kind < MasterKind::MOVING || speed <= Speed::ZERO {
             if order.flags.contains(OrderFlags::QUEUED) {
                 return Err(GenieError::unsupported(

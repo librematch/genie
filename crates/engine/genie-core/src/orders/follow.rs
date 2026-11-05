@@ -6,7 +6,6 @@ use crate::map::Point;
 use crate::map::Position;
 use crate::math::fmath::below_or_unordered;
 use crate::math::rng::Stream;
-use crate::movement::Speed;
 use crate::movement::ai_moves::MoveSprites;
 use crate::movement::ai_moves::PointMove;
 use crate::movement::move_to::ToObject;
@@ -204,10 +203,8 @@ impl World {
             return Ok(None);
         };
         let master = unit.master(self.master_tables(), player_id)?;
-        let speed = master
-            .move_stats
-            .as_ref()
-            .map_or(Speed::ZERO, |move_stats| move_stats.speed);
+        // slot 0xe8: the master's speed (`+0x740`), before a sprite's factor
+        let speed = master.animated_part().max_speed;
         let moves = MasterKind::MOVING <= master.kind && below_or_unordered(0.0, speed.get());
         Ok(moves.then_some(unit.position().ground()))
     }

@@ -53,7 +53,7 @@ use crate::testing::attribute;
 use crate::testing::class;
 use crate::testing::ids;
 use crate::testing::roles;
-use crate::testing::scene::{Scene, SceneObject, walking};
+use crate::testing::scene::{Scene, SceneObject, moving_master, walking};
 use crate::testing::tuning;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::Issuer;
@@ -308,8 +308,7 @@ fn sheep_master() -> Master {
         obstruction_kind: ObstructionKind::CIRCLE,
         fog_visibility: FogVisibility::INVISIBLE,
         hit_points: MasterHitPoints::of_data(7),
-        move_stats: Some(walking(Speed::new(0.7))),
-        ..Master::default()
+        ..moving_master(walking(Speed::new(0.7)))
     }
 }
 
@@ -1158,8 +1157,7 @@ fn remains_world() -> World {
         id: master_id(801),
         kind: MasterKind::MOVING,
         standing_sprite: Some(SpriteId::named(21)),
-        move_stats: Some(walker().stats),
-        ..Master::default()
+        ..moving_master(walker().stats)
     };
     for masters in &mut world.model.masters {
         *masters = Arc::new(Masters::new(
