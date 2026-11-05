@@ -81,7 +81,7 @@ fn siege_unit_counts_infantry_inside_and_ranged_unit_leaves_reloaded() {
     combat.reload_stinger = Seconds::new(0.5);
     combat.reload_powerup = Seconds::new(0.25);
     world
-        .leave_siege((object(7), object(8)), &infantry, &ram)
+        .leave_siege(object(7), object(8), &infantry, &ram)
         .unwrap();
     let siege = world.parts.combat_of(object(7));
     assert_eq!(siege.infantry_inside.get(), 0);
@@ -115,7 +115,8 @@ fn unsped_siege_masters_and_other_classes_count_none() {
     // a melee unit (range 0.5) keeps its attack timer
     world
         .leave_siege(
-            (object(7), object(8)),
+            object(7),
+            object(8),
             &combat_master(1260, class::MONK, 0.5),
             &combat_master(1258, class::SIEGE, 0.0),
         )

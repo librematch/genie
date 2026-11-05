@@ -80,7 +80,8 @@ impl Unit {
         let master = self.master_in(masters)?;
         let top = top_speed.of_object(motion.mover(), self.position().ground());
         let ship = Ship::of_unit(
-            (self, top),
+            self,
+            top,
             master,
             spatial.map,
             (&model.graphics, look),

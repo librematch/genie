@@ -63,7 +63,8 @@ impl HuntAction {
             HuntState::Walk { .. } if self.timer < Seconds::ZERO => {
                 let walks = hunt_reads.walks(
                     &step.world.model.graphics,
-                    (unit, step.world.parts.mover_of(unit.id)),
+                    unit,
+                    step.world.parts.mover_of(unit.id),
                 );
                 let mover = step.world.parts.mover_mut(unit.id).ok_or(HUNTER_UNMOVING)?;
                 self.wait_then_walk(
@@ -156,7 +157,8 @@ impl HuntAction {
                 self.decay_check(step, unit, actions, hunt_reads.decay, fight, roles)?;
                 let walks = hunt_reads.walks(
                     &step.world.model.graphics,
-                    (unit, step.world.parts.mover_of(unit.id)),
+                    unit,
+                    step.world.parts.mover_of(unit.id),
                 );
                 let player = fight.own.player;
                 self.set_walk(
@@ -175,7 +177,8 @@ impl HuntAction {
                 unit.hunt_release(step, [target])?;
                 let walks = hunt_reads.walks(
                     &step.world.model.graphics,
-                    (unit, step.world.parts.mover_of(unit.id)),
+                    unit,
+                    step.world.parts.mover_of(unit.id),
                 );
                 let mover = step.world.parts.mover_mut(unit.id).ok_or(HUNTER_UNMOVING)?;
                 self.set_point_walk(
@@ -314,7 +317,8 @@ impl HuntAction {
         self.set_target(None);
         let walks = hunt_reads.walks(
             &step.world.model.graphics,
-            (unit, step.world.parts.mover_of(unit.id)),
+            unit,
+            step.world.parts.mover_of(unit.id),
         );
         let mover = step.world.parts.mover_mut(unit.id).ok_or(HUNTER_UNMOVING)?;
         self.set_point_walk(

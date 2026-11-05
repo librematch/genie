@@ -451,7 +451,7 @@ impl World {
             self.notify_gather(player, idx, (target, resource.class), notify)?;
         }
         self.clear_actions(player, idx)?;
-        self.install_gather(player, idx, target, (gather, &resource))
+        self.install_gather(player, idx, target, gather, &resource)
     }
 
     /// [`World::start_gather`]'s install (slot 0x808) after the list's clearing: the `gather`'s
@@ -467,7 +467,8 @@ impl World {
         player: PlayerId,
         idx: ListIndex,
         target: ObjectId,
-        (mut gather, resource): (GatherAction, &Resource),
+        mut gather: GatherAction,
+        resource: &Resource,
     ) -> GenieResult<()> {
         let player_kind = self.players.player(player)?.kind;
         let carry_rule = self.settings.carry_rule();

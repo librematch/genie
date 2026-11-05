@@ -64,7 +64,7 @@ impl UnitView<'_, '_> {
             return Ok(());
         };
         let saved = self.step.world.streams.clone();
-        let heard = self.hear_explore(&mut module, (notify, ai_target), roles);
+        let heard = self.hear_explore(&mut module, notify, ai_target, roles);
         self.step.world.streams = saved;
         self.step.world.ai.put_back(player, module);
         match heard? {
@@ -88,7 +88,8 @@ impl UnitView<'_, '_> {
     pub(crate) fn hear_explore(
         &mut self,
         module: &mut AiModule,
-        (notify, ai_target): (Notify, Option<ObjectId>),
+        notify: Notify,
+        ai_target: Option<ObjectId>,
         roles: &Roles,
     ) -> GenieResult<Heard> {
         let explore = [

@@ -2691,13 +2691,7 @@ fn closest_object_takes_free_farm_its_searcher_gathers_from() {
     let alive = seer_in(ObjectState::Alive);
     let world = closest_world();
     let kept = |id, placed: &Placed, filter, searcher| {
-        farm_kept(
-            object_id(id),
-            (&alive, placed),
-            filter,
-            searcher,
-            (look, world),
-        )
+        farm_kept(object_id(id), &alive, placed, filter, searcher, look, world)
     };
     assert!(kept(1, &farm, filter, farmer).unwrap());
     assert!(!kept(1, &farm, filter, trapper).unwrap());
@@ -2806,10 +2800,12 @@ fn closest_object_takes_pasture_with_room_and_livestock() {
         };
         farm_kept(
             object_id(5),
-            (&seer_in(state), &placed),
+            &seer_in(state),
+            &placed,
             filter,
             farmer,
-            (world.objects(), closest_world()),
+            world.objects(),
+            closest_world(),
         )
         .unwrap()
     };

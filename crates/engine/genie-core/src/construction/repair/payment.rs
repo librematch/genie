@@ -240,7 +240,8 @@ pub fn repair_unit(
         match heal_hp(
             &mut repaired.hp,
             &mut repaired.hp_powerup,
-            (repaired.master_hp, repaired.hp_stinger),
+            repaired.master_hp,
+            repaired.hp_stinger,
             amount,
         ) {
             Heal::Full => RepairOutcome::Full,

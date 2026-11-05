@@ -147,7 +147,7 @@ impl Unit {
         roles: &Roles,
     ) -> GenieResult<Walks<'graphics>> {
         let sprites = SpriteReads::of(self.master(every, player)?, look, graphics, roles);
-        Ok(Walks::of(sprites, (self, mover, top_speed)))
+        Ok(Walks::of(sprites, self, mover, top_speed))
     }
 
     /// What the Gather's update reads of the gatherer and its player as it starts

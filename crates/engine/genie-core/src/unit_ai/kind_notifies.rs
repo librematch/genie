@@ -142,7 +142,8 @@ impl UnitAi {
                 OrderForce::Forced,
                 TargetRules::Own,
                 at,
-                (side, ai_rng),
+                side,
+                ai_rng,
             )?;
             return Ok(BREAK);
         }

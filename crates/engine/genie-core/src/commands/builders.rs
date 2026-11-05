@@ -261,12 +261,11 @@ impl World {
         );
         // the sprites its MoveTo's constructor takes for none (FUN_140aa0df0)
         let move_reads = MoveToReads::of(
-            (unit, self.top_speed(player_id, unit)?),
+            unit,
+            self.top_speed(player_id, unit)?,
             builder,
-            (
-                &self.model.graphics,
-                self.parts.combat_of(unit.id).abilities.look.as_ref(),
-            ),
+            &self.model.graphics,
+            self.parts.combat_of(unit.id).abilities.look.as_ref(),
             &self.model.roles,
         );
         Ok((
@@ -484,12 +483,11 @@ impl World {
             state: Some(foundation_unit.life.state),
         };
         let move_reads = MoveToReads::of(
-            (unit, self.top_speed(player, unit)?),
+            unit,
+            self.top_speed(player, unit)?,
             builder,
-            (
-                &self.model.graphics,
-                self.parts.combat_of(unit.id).abilities.look.as_ref(),
-            ),
+            &self.model.graphics,
+            self.parts.combat_of(unit.id).abilities.look.as_ref(),
             &self.model.roles,
         );
         let build = BuildAction::start(

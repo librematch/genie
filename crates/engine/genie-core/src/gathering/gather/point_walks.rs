@@ -212,7 +212,8 @@ impl GatherAction {
             {
                 let walks = gather_reads.walks(
                     &step.world.model.graphics,
-                    (unit, step.world.parts.mover_of(unit.id)),
+                    unit,
+                    step.world.parts.mover_of(unit.id),
                 );
                 let mover = step.world.parts.mover_mut(unit.id).ok_or(UNMOVING)?;
                 self.set_walk_back(
@@ -230,7 +231,8 @@ impl GatherAction {
         }
         let walks = gather_reads.walks(
             &step.world.model.graphics,
-            (unit, step.world.parts.mover_of(unit.id)),
+            unit,
+            step.world.parts.mover_of(unit.id),
         );
         let mover = step.world.parts.mover_mut(unit.id).ok_or(UNMOVING)?;
         self.begin_reseed_walk(

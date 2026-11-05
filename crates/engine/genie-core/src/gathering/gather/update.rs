@@ -218,7 +218,8 @@ impl GatherAction {
         self.timer = Seconds::ZERO;
         let walks = gather_reads.walks(
             &step.world.model.graphics,
-            (unit, step.world.parts.mover_of(unit.id)),
+            unit,
+            step.world.parts.mover_of(unit.id),
         );
         let mover = step.world.parts.mover_mut(unit.id).ok_or(UNMOVING)?;
         if self.stops.several() {
@@ -324,7 +325,8 @@ impl GatherAction {
                 }
                 let walks = gather_reads.walks(
                     &step.world.model.graphics,
-                    (unit, step.world.parts.mover_of(unit.id)),
+                    unit,
+                    step.world.parts.mover_of(unit.id),
                 );
                 let mover = step.world.parts.mover_mut(unit.id).ok_or(UNMOVING)?;
                 let rng = step.world.streams.get_mut(Stream::Action);
@@ -385,7 +387,8 @@ impl GatherAction {
                 self.target = None;
                 let walks = gather_reads.walks(
                     &step.world.model.graphics,
-                    (unit, step.world.parts.mover_of(unit.id)),
+                    unit,
+                    step.world.parts.mover_of(unit.id),
                 );
                 let mover = step.world.parts.mover_mut(unit.id).ok_or(UNMOVING)?;
                 self.set_walk_back(

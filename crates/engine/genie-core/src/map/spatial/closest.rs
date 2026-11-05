@@ -206,7 +206,7 @@ pub(super) fn closest_kept(
     if roles
         .of_some_class(filter.group)
         .contains(ClassRoles::CLOSEST_PASTURE)
-        && !farm_kept(id, (seer, placed), filter, searcher, (objects, world))?
+        && !farm_kept(id, seer, placed, filter, searcher, objects, world)?
     {
         return Ok(false);
     }
@@ -214,11 +214,11 @@ pub(super) fn closest_kept(
         .of_some_class(filter.group)
         .contains(ClassRoles::CLOSEST_LIVESTOCK)
         && ((placed.player != player && seer.state == ObjectState::Alive)
-            || herded(objects, (id, placed))?)
+            || herded(objects, id, placed)?)
     {
         return Ok(false);
     }
-    if searcher.class_10 && !world.mode_one && shuns(objects, roles, (id, placed))? {
+    if searcher.class_10 && !world.mode_one && shuns(objects, roles, id, placed)? {
         return Ok(false);
     }
     Ok(true)
@@ -233,10 +233,7 @@ pub(super) fn closest_kept(
 /// # Errors
 ///
 /// A found object without its master.
-pub(crate) fn herded(
-    by_id: ObjectsRef<'_>,
-    (id, placed): (ObjectId, &Placed),
-) -> GenieResult<bool> {
+pub(crate) fn herded(by_id: ObjectsRef<'_>, id: ObjectId, placed: &Placed) -> GenieResult<bool> {
     if by_id.masters().of_placed(id, placed)?.kind < MasterKind::COMBAT {
         return Ok(false);
     }
@@ -259,7 +256,8 @@ pub(crate) fn herded(
 pub(super) fn shuns(
     objects: ObjectsRef<'_>,
     roles: &Roles,
-    (id, placed): (ObjectId, &Placed),
+    id: ObjectId,
+    placed: &Placed,
 ) -> GenieResult<bool> {
     let master = objects.masters().of_placed(id, placed)?;
     Ok(roles.of_master(placed.master).contains(MasterRoles::PETARD)
@@ -278,10 +276,12 @@ pub(super) fn shuns(
 /// A found object the world does not hold, its master, and its owner's attribute 290.
 pub(super) fn farm_kept(
     id: ObjectId,
-    (seer, placed): (&Seer, &Placed),
+    seer: &Seer,
+    placed: &Placed,
     filter: Filter,
     searcher: Searcher,
-    (objects, world): (ObjectsRef<'_>, ClosestWorld),
+    objects: ObjectsRef<'_>,
+    world: ClosestWorld,
 ) -> GenieResult<bool> {
     let roles = objects.roles();
     let (workers, parent) = objects

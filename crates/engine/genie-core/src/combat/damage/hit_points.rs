@@ -103,7 +103,8 @@ pub fn most_hp(stinger: HitPoints, master_hp: MasterHitPoints, powerup: HpPoweru
 pub fn gain_hp(
     hp: &mut HitPoints,
     powerup: &mut HpPowerup,
-    (master_hp, stinger): (MasterHitPoints, HitPoints),
+    master_hp: MasterHitPoints,
+    stinger: HitPoints,
     amount: HitPoints,
 ) {
     let (mut up, room) = (powerup.taken, powerup.max);
@@ -145,10 +146,11 @@ pub enum Heal {
 pub fn heal_hp(
     hp: &mut HitPoints,
     powerup: &mut HpPowerup,
-    (master_hp, stinger): (MasterHitPoints, HitPoints),
+    master_hp: MasterHitPoints,
+    stinger: HitPoints,
     amount: HitPoints,
 ) -> Heal {
-    gain_hp(hp, powerup, (master_hp, stinger), amount);
+    gain_hp(hp, powerup, master_hp, stinger, amount);
     if amount < HitPoints::ZERO && *hp < HitPoints::new(1.0) {
         *hp = HitPoints::new(1.0);
     }

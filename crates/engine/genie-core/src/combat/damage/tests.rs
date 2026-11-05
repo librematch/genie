@@ -2094,14 +2094,16 @@ fn gain_fills_hit_points_and_its_overflow_takes_off_the_powerup() {
     gain_hp(
         &mut hp,
         &mut ups,
-        (MasterHitPoints::of_data(60), HitPoints::ZERO),
+        MasterHitPoints::of_data(60),
+        HitPoints::ZERO,
         HitPoints::new(5.0),
     );
     assert_eq!((hp, ups), (HitPoints::new(55.0), pu(0.0, 0.0)));
     gain_hp(
         &mut hp,
         &mut ups,
-        (MasterHitPoints::of_data(60), HitPoints::ZERO),
+        MasterHitPoints::of_data(60),
+        HitPoints::ZERO,
         HitPoints::new(10.0),
     );
     assert_eq!((hp, ups), (HitPoints::new(60.0), pu(0.0, 0.0)));
@@ -2110,14 +2112,16 @@ fn gain_fills_hit_points_and_its_overflow_takes_off_the_powerup() {
     gain_hp(
         &mut hp,
         &mut ups,
-        (MasterHitPoints::of_data(60), HitPoints::ZERO),
+        MasterHitPoints::of_data(60),
+        HitPoints::ZERO,
         HitPoints::new(10.0),
     );
     assert_eq!((hp, ups), (HitPoints::new(70.0), pu(3.0, 10.0)));
     gain_hp(
         &mut hp,
         &mut ups,
-        (MasterHitPoints::of_data(60), HitPoints::ZERO),
+        MasterHitPoints::of_data(60),
+        HitPoints::ZERO,
         HitPoints::new(5.0),
     );
     assert_eq!((hp, ups), (HitPoints::new(70.0), pu(0.0, 10.0)));
@@ -2125,7 +2129,8 @@ fn gain_fills_hit_points_and_its_overflow_takes_off_the_powerup() {
     gain_hp(
         &mut hp,
         &mut ups,
-        (MasterHitPoints::of_data(60), HitPoints::ZERO),
+        MasterHitPoints::of_data(60),
+        HitPoints::ZERO,
         HitPoints::new(0.0),
     );
     assert_eq!(ups, pu(10.0, 10.0));
@@ -2142,7 +2147,8 @@ fn heal_to_full_holds_the_master_hit_points() {
         heal_hp(
             &mut hp,
             &mut ups,
-            (MasterHitPoints::of_data(60), HitPoints::ZERO),
+            MasterHitPoints::of_data(60),
+            HitPoints::ZERO,
             HitPoints::new(10.0)
         ),
         Heal::Partial
@@ -2152,7 +2158,8 @@ fn heal_to_full_holds_the_master_hit_points() {
         heal_hp(
             &mut hp,
             &mut ups,
-            (MasterHitPoints::of_data(60), HitPoints::ZERO),
+            MasterHitPoints::of_data(60),
+            HitPoints::ZERO,
             HitPoints::new(25.0)
         ),
         Heal::Full
@@ -2163,7 +2170,8 @@ fn heal_to_full_holds_the_master_hit_points() {
         heal_hp(
             &mut hp,
             &mut ups,
-            (MasterHitPoints::of_data(60), HitPoints::ZERO),
+            MasterHitPoints::of_data(60),
+            HitPoints::ZERO,
             HitPoints::new(-3.0)
         ),
         Heal::Partial
@@ -2175,7 +2183,8 @@ fn heal_to_full_holds_the_master_hit_points() {
         heal_hp(
             &mut hp,
             &mut ups,
-            (MasterHitPoints::of_data(60), HitPoints::ZERO),
+            MasterHitPoints::of_data(60),
+            HitPoints::ZERO,
             HitPoints::new(4.0)
         ),
         Heal::Partial
@@ -2186,7 +2195,8 @@ fn heal_to_full_holds_the_master_hit_points() {
         heal_hp(
             &mut hp,
             &mut HpPowerup::default(),
-            (MasterHitPoints::of_data(60), HitPoints::ZERO),
+            MasterHitPoints::of_data(60),
+            HitPoints::ZERO,
             HitPoints::new(1.0)
         ),
         Heal::Partial

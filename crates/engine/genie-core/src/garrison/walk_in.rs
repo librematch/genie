@@ -548,7 +548,7 @@ impl EnterAction {
                 defaults: reads.defaults,
                 graphics: &world.model.graphics,
             };
-            let moves = MoveToReads::with_sprites(sprites, (meeting.unit, meeting.mover, top));
+            let moves = MoveToReads::with_sprites(sprites, meeting.unit, meeting.mover, top);
             self.walk_again(
                 enter_target,
                 reads.start,

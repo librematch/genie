@@ -2608,34 +2608,28 @@ fn the_speed_slot_caps_the_speed_unless_the_unit_group_steers_it() {
     let mut mover = builder_9177();
     mover.stats.speed = Speed::new(1.2);
     assert_eq!(
-        mover.next_speed(
-            Speed::new(5.0),
-            (None, mover.own_speed()),
-            &tuning().movement
-        ),
+        mover.next_speed(Speed::new(5.0), None, mover.own_speed(), &tuning().movement),
         Speed::new(1.2)
     );
     assert_eq!(
         mover.next_speed(
             Speed::new(-1.0),
-            (None, mover.own_speed()),
+            None,
+            mover.own_speed(),
             &tuning().movement
         ),
         Speed::new(0.0)
     );
     assert_eq!(
-        mover.next_speed(
-            Speed::new(0.7),
-            (None, mover.own_speed()),
-            &tuning().movement
-        ),
+        mover.next_speed(Speed::new(0.7), None, mover.own_speed(), &tuning().movement),
         Speed::new(0.7)
     );
     assert!(
         mover
             .next_speed(
                 Speed::new(f32::NAN),
-                (None, mover.own_speed()),
+                None,
+                mover.own_speed(),
                 &tuning().movement
             )
             .get()
@@ -2644,7 +2638,8 @@ fn the_speed_slot_caps_the_speed_unless_the_unit_group_steers_it() {
     assert_eq!(
         mover.next_speed(
             Speed::new(5.0),
-            (Some(GroupSpeed::Aside), mover.own_speed()),
+            Some(GroupSpeed::Aside),
+            mover.own_speed(),
             &tuning().movement
         ),
         Speed::new(0.0)
@@ -2652,7 +2647,8 @@ fn the_speed_slot_caps_the_speed_unless_the_unit_group_steers_it() {
     assert_eq!(
         mover.next_speed(
             Speed::new(5.0),
-            (Some(GroupSpeed::Free), mover.own_speed()),
+            Some(GroupSpeed::Free),
+            mover.own_speed(),
             &tuning().movement
         ),
         Speed::new(5.0)
@@ -2660,7 +2656,8 @@ fn the_speed_slot_caps_the_speed_unless_the_unit_group_steers_it() {
     assert_eq!(
         mover.next_speed(
             Speed::new(-1.0),
-            (Some(GroupSpeed::Free), mover.own_speed()),
+            Some(GroupSpeed::Free),
+            mover.own_speed(),
             &tuning().movement
         ),
         Speed::new(0.0)
@@ -2668,7 +2665,8 @@ fn the_speed_slot_caps_the_speed_unless_the_unit_group_steers_it() {
     assert_eq!(
         mover.next_speed(
             Speed::new(10.0),
-            (Some(GroupSpeed::Free), mover.own_speed()),
+            Some(GroupSpeed::Free),
+            mover.own_speed(),
             &tuning().movement
         ),
         Speed::new(1.2)
@@ -2677,8 +2675,9 @@ fn the_speed_slot_caps_the_speed_unless_the_unit_group_steers_it() {
         mover
             .next_speed(
                 Speed::new(f32::NAN),
-                (Some(GroupSpeed::Free), mover.own_speed()),
-                &tuning().movement,
+                Some(GroupSpeed::Free),
+                mover.own_speed(),
+                &tuning().movement
             )
             .get()
             .is_nan()
@@ -2686,48 +2685,28 @@ fn the_speed_slot_caps_the_speed_unless_the_unit_group_steers_it() {
     let own = Some(GroupSpeed::OwnMove(Speed::new(1.44)));
     assert_eq!(mover.paths[0].state, PathState::Walking);
     assert_eq!(
-        mover.next_speed(
-            Speed::new(-1.0),
-            (own, mover.own_speed()),
-            &tuning().movement
-        ),
+        mover.next_speed(Speed::new(-1.0), own, mover.own_speed(), &tuning().movement),
         Speed::new(1.44)
     );
     mover.paths[0].pause_time = Seconds::new(0.028);
     assert_eq!(
-        mover.next_speed(
-            Speed::new(0.5),
-            (own, mover.own_speed()),
-            &tuning().movement
-        ),
+        mover.next_speed(Speed::new(0.5), own, mover.own_speed(), &tuning().movement),
         Speed::new(0.0)
     );
     mover.paths[0].pause_time = Seconds::new(f32::NAN);
     assert_eq!(
-        mover.next_speed(
-            Speed::new(0.5),
-            (own, mover.own_speed()),
-            &tuning().movement
-        ),
+        mover.next_speed(Speed::new(0.5), own, mover.own_speed(), &tuning().movement),
         Speed::new(1.44)
     );
     mover.paths[0].pause_time = Seconds::ZERO;
     mover.paths[0].state = PathState::WantsPath;
     assert_eq!(
-        mover.next_speed(
-            Speed::new(0.5),
-            (own, mover.own_speed()),
-            &tuning().movement
-        ),
+        mover.next_speed(Speed::new(0.5), own, mover.own_speed(), &tuning().movement),
         Speed::new(0.0)
     );
     mover.paths.clear();
     assert_eq!(
-        mover.next_speed(
-            Speed::new(0.5),
-            (own, mover.own_speed()),
-            &tuning().movement
-        ),
+        mover.next_speed(Speed::new(0.5), own, mover.own_speed(), &tuning().movement),
         Speed::new(0.0)
     );
 }

@@ -205,7 +205,7 @@ impl World {
                 self.model.tuning.visibility,
             )?;
         }
-        self.leave_siege((bid, id), made, &bm)?;
+        self.leave_siege(bid, id, made, &bm)?;
         // slot 0x58: on the map at the spot (new_position: its tile's list, its sight)
         let mut placed = self.spatial.come_out(id).ok_or_else(|| {
             GenieError::unsupported("a unit inside a building without its record")
@@ -266,7 +266,8 @@ impl World {
     /// None (an unreachable error where a combat table lost the layer it took).
     pub(super) fn leave_siege(
         &mut self,
-        (bid, id): (ObjectId, ObjectId),
+        bid: ObjectId,
+        id: ObjectId,
         made: &Master,
         bm: &Master,
     ) -> GenieResult<()> {

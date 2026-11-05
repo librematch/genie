@@ -172,7 +172,9 @@ impl Unit {
         builder_leaves: &mut Vec<ObjectId>,
         by: Releaser,
     ) -> GenieResult<()> {
-        let torn = actions.list.delete_all(motion, self.life.state)?;
+        let torn = actions
+            .list
+            .delete_all(motion.0, motion.1, self.life.state)?;
         releases.extend(torn.releases.into_iter().map(|object_id| (object_id, by)));
         builder_leaves.extend(torn.builder_leaves);
         Ok(())
@@ -194,9 +196,10 @@ impl Unit {
     ) -> GenieResult<()> {
         let by = self.releaser(step)?;
         let top = step.world.top_speed(step.player, self)?;
-        let torn = actions
-            .list
-            .delete_head((step.world.parts.motion_mut(self.id), top), self.life.state)?;
+        let torn =
+            actions
+                .list
+                .delete_head(step.world.parts.motion_mut(self.id), top, self.life.state)?;
         torn.let_go(step, self, by)
     }
 

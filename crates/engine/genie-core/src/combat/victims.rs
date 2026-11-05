@@ -529,7 +529,7 @@ impl World {
                 &KillCount::Owner {
                     attacker_class,
                     attacker_player,
-                } => self.count_owner_loss(player_id, master, (attacker_class, attacker_player))?,
+                } => self.count_owner_loss(player_id, master, attacker_class, attacker_player)?,
                 &KillCount::Killer(killer) => self.count_kill_of(player_id, master, killer)?,
             }
         }
@@ -549,7 +549,8 @@ impl World {
         &mut self,
         player_id: PlayerId,
         master: &Master,
-        (attacker_class, attacker_player): (ClassId, PlayerId),
+        attacker_class: ClassId,
+        attacker_player: PlayerId,
     ) -> GenieResult<()> {
         if self.players.player(player_id)?.kind.is_computer() {
             return Err(GenieError::unsupported(

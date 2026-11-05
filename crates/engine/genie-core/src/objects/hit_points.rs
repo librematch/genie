@@ -122,7 +122,8 @@ impl Unit {
         let _ = heal_hp(
             &mut self.life.hp,
             &mut combat.hp_powerup,
-            (hit_points, combat.hp_stinger),
+            hit_points,
+            combat.hp_stinger,
             amount,
         );
         Ok(())
@@ -135,7 +136,8 @@ impl Unit {
         damage_gain_hp(
             &mut self.life.hp,
             &mut combat.hp_powerup,
-            (master.hit_points, combat.hp_stinger),
+            master.hit_points,
+            combat.hp_stinger,
             amount,
         );
     }

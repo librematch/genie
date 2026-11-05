@@ -90,7 +90,9 @@ impl Mover {
     pub(super) fn loop_end(
         &mut self,
         dt: Seconds,
-        (walked, heading, top): (BVector, BVector, Speed),
+        walked: BVector,
+        heading: BVector,
+        top: Speed,
         movement_tuning: &MovementTuning,
     ) -> GenieResult<Motion> {
         let clipped = self.steer(heading, dt, movement_tuning)?;

@@ -327,13 +327,14 @@ impl UnitAi {
         tile: Tile,
         force: OrderForce,
         at: &Surroundings,
-        (side, rng): (&mut UnitView<'_, '_>, &mut Well512),
+        side: &mut UnitView<'_, '_>,
+        rng: &mut Well512,
     ) -> GenieResult<Answer> {
         let unit_ai_tuning = &at.unit_ai_tuning;
         if force == OrderForce::Unforced && self.current_action.is_some() {
             return Ok(Answer::NotTaken);
         }
-        if self.attack_command(target, force, at, (side, rng))? == Answer::NotTaken {
+        if self.attack_command(target, force, at, side, rng)? == Answer::NotTaken {
             return Ok(Answer::NotTaken);
         }
         self.set_action(Some(AiAction::SeekAndDestroy));

@@ -758,7 +758,7 @@ fn the_unit_ai_calls_reach_the_unit_in_their_order() {
         |ai, at, side, _, rng| {
             ai.cap_human_order(side, rng)?;
             ai.stop_with(StopOrder::Keep, None, side, rng, &at.roles)?;
-            ai.attack_command(object_id(70), OrderForce::Forced, at, (side, rng))
+            ai.attack_command(object_id(70), OrderForce::Forced, at, side, rng)
         },
     );
     assert_eq!(answer, Ok(Answer::Taken));
@@ -1857,7 +1857,7 @@ fn stop_before_an_attack_command_runs_first() {
         &mut world,
         (PlayerId::GAIA, object_id(29825)),
         |ai, at, side, _, rng| {
-            ai.attack_command(object_id(31126), OrderForce::Forced, at, (side, rng))
+            ai.attack_command(object_id(31126), OrderForce::Forced, at, side, rng)
         },
     );
     assert_eq!(first, Ok(Answer::Taken));
@@ -8634,7 +8634,8 @@ fn ship_or_livestock_may_attack_anything_and_building_nothing() {
                     OrderForce::Forced,
                     TargetRules::Own,
                     at,
-                    (side, rng),
+                    side,
+                    rng,
                 )
             },
         );
@@ -10753,7 +10754,8 @@ fn the_base_attack_check_lets_every_kind_without_its_own_attack() {
                     OrderForce::Forced,
                     TargetRules::Own,
                     at,
-                    (side, rng),
+                    side,
+                    rng,
                 )
             },
         );

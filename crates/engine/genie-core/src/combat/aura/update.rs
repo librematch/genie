@@ -97,7 +97,7 @@ impl World {
         }
         self.end_special_sprite(player, index)?;
         for group in &groups {
-            self.run_aura((player, index), group)?;
+            self.run_aura(player, index, group)?;
         }
         Ok(())
     }
@@ -173,7 +173,8 @@ impl World {
     /// or a powerup does not model.
     fn run_aura(
         &mut self,
-        (player, index): (PlayerId, ListIndex),
+        player: PlayerId,
+        index: ListIndex,
         group: &AuraGroup,
     ) -> GenieResult<()> {
         let unit = self.players.live(player, index)?;

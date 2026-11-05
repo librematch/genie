@@ -278,7 +278,7 @@ impl TransportAction {
             defaults: transport_reads.defaults,
             graphics,
         };
-        let walk = MoveToReads::with_sprites(sprites, (unit, parts.motion.mover(unit.id), top));
+        let walk = MoveToReads::with_sprites(sprites, unit, parts.motion.mover(unit.id), top);
         let ship = Ship::of(
             unit,
             transport_reads.radius,
@@ -634,14 +634,15 @@ impl<'graphics> Ship<'graphics> {
     ///
     /// A task the master lacks.
     pub(crate) fn of_unit(
-        (unit, top): (&Unit, Speed),
+        unit: &Unit,
+        top: Speed,
         master: &Master,
         map: GridSize,
         graphics: (&'graphics Graphics, Option<&Look>),
         task: Option<TaskId>,
         roles: &Roles,
     ) -> GenieResult<Self> {
-        let walk = MoveToReads::of((unit, top), master, graphics, roles);
+        let walk = MoveToReads::of(unit, top, master, graphics.0, graphics.1, roles);
         let given = TransportAction::given_sprite(task, master)?;
         Ok(Self::of(unit, master.radius, map, walk, given))
     }

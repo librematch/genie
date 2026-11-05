@@ -74,7 +74,8 @@ impl World {
     /// A map without its terrain, and a sprite the table lacks.
     pub(crate) fn halt_transport(
         &mut self,
-        (player_id, list_index): (PlayerId, ListIndex),
+        player_id: PlayerId,
+        list_index: ListIndex,
         mut transport_action: TransportAction,
     ) -> GenieResult<()> {
         let move_to_tuning = self.model.tuning.move_to;
@@ -234,7 +235,8 @@ impl World {
             let unit = self.players.live(player_id, list_index)?;
             let master = unit.master(self.master_tables(), player_id)?;
             Ship::of_unit(
-                (unit, self.top_speed(player_id, unit)?),
+                unit,
+                self.top_speed(player_id, unit)?,
                 master,
                 self.spatial.map,
                 (

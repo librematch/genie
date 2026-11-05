@@ -99,9 +99,11 @@ impl<'graphics> MoveToReads<'graphics> {
     /// the unit's terrain look `look` (its combat layer's).
     #[must_use]
     pub fn of(
-        (unit, top): (&Unit, Speed),
+        unit: &Unit,
+        top: Speed,
         master: &Master,
-        (graphics, look): (&'graphics Graphics, Option<&Look>),
+        graphics: &'graphics Graphics,
+        look: Option<&Look>,
         roles: &Roles,
     ) -> Self {
         Self {
@@ -119,7 +121,9 @@ impl<'graphics> MoveToReads<'graphics> {
     #[must_use]
     pub fn with_sprites(
         sprites: SpriteReads<'graphics>,
-        (unit, mover, top): (&Unit, Option<&Mover>, Speed),
+        unit: &Unit,
+        mover: Option<&Mover>,
+        top: Speed,
     ) -> Self {
         Self {
             sprites,
@@ -292,9 +296,11 @@ impl Unit {
         roles: &Roles,
     ) -> GenieResult<MoveToReads<'graphics>> {
         Ok(MoveToReads::of(
-            (self, top),
+            self,
+            top,
             self.master(every, player)?,
-            graphics,
+            graphics.0,
+            graphics.1,
             roles,
         ))
     }

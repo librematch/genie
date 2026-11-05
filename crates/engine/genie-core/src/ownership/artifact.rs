@@ -567,7 +567,7 @@ impl Unit {
             // its sub-action list deletes it (FUN_140a98e20): the Enter's destructor
             let top = step.world.top_speed(step.player, self)?;
             Action::Enter(enter_action)
-                .tear_down((step.world.parts.motion_mut(self.id), top))?
+                .tear_down(step.world.parts.motion_mut(self.id), top)?
                 .let_go(step, self, by)?;
         }
         if let Some(art) = actions.list.artifact_mut() {

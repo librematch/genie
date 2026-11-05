@@ -150,7 +150,8 @@ impl Fly {
                 let action = step.world.streams.get_mut(Stream::Action);
                 let dropped = self.choose(
                     bird.position(),
-                    (mover, top),
+                    mover,
+                    top,
                     step.world.spatial.map,
                     action,
                     &sprites,
@@ -218,7 +219,8 @@ impl Fly {
     fn choose(
         &mut self,
         at: Position,
-        (mover, top): (&Mover, Speed),
+        mover: &Mover,
+        top: Speed,
         map: GridSize,
         action: &mut Well512,
         sprites: &FlightSprites<'_>,
@@ -654,7 +656,7 @@ mod tests {
                 walking: None,
                 graphics: &graphics,
             };
-            let got = fly.choose(AT, (mover, mover.stats.speed), map, &mut rng, &sprites);
+            let got = fly.choose(AT, mover, mover.stats.speed, map, &mut rng, &sprites);
             (got, rng.draws)
         };
         let mut fly = hawk(FlyState::Choosing, 0.0);
@@ -947,7 +949,7 @@ mod tests {
         use crate::objects::teardown::TornDown;
         let mut motion = Motion::Moving(wings(1.32));
         let torn = ListAction::Fly(hawk(FlyState::Resting, 0.0))
-            .tear_down((motion.lent(), Speed::new(1.7)))
+            .tear_down(motion.lent(), Speed::new(1.7))
             .unwrap();
         assert_eq!(torn, TornDown::default());
         assert_eq!(motion.lent().anim_speed(), Some(Speed::new(1.7)));

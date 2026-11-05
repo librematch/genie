@@ -103,7 +103,7 @@ impl<'graphics> ExploreMove<'graphics> {
         roles: &Roles,
     ) -> Self {
         Self {
-            reads: MoveToReads::of(unit, master, graphics, roles),
+            reads: MoveToReads::of(unit.0, unit.1, master, graphics.0, graphics.1, roles),
             given: master.moving_part().move_sprite,
         }
     }

@@ -233,7 +233,7 @@ impl UnitAi {
         ) {
             self.save_patrol(side);
         }
-        if self.attack_object(target, OrderForce::Forced, TargetRules::Own, at, (side, ai))?
+        if self.attack_object(target, OrderForce::Forced, TargetRules::Own, at, side, ai)?
             == Answer::Taken
         {
             if self.current_order != Some(OrderKind::Defend) {
@@ -406,7 +406,7 @@ impl UnitAi {
         };
         // slot 0xb8 with 1 (`+0x1d5` then 1, not held)
         Ok(
-            match self.attack_object(id, OrderForce::Forced, TargetRules::Own, at, (side, rng))? {
+            match self.attack_object(id, OrderForce::Forced, TargetRules::Own, at, side, rng)? {
                 Answer::Taken => IdleOutcome::Acted,
                 Answer::NotTaken => IdleOutcome::Idle,
             },

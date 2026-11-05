@@ -449,7 +449,7 @@ impl Unit {
             graphics,
             roles,
         );
-        let walks = Walks::of(sprites, (self, mover.as_deref(), drop_world.top_speed));
+        let walks = Walks::of(sprites, self, mover.as_deref(), drop_world.top_speed);
         let Some(mover) = mover else {
             return Err(GenieError::unsupported(
                 "a gatherer without its gather or movement state",
@@ -506,7 +506,7 @@ impl Unit {
             graphics,
             roles,
         );
-        let walks = Walks::of(sprites, (self, mover.as_deref(), drop_world.top_speed));
+        let walks = Walks::of(sprites, self, mover.as_deref(), drop_world.top_speed);
         let Some(mover) = mover else {
             return Err(GenieError::unsupported(
                 "a hunter without its hunt or movement state",

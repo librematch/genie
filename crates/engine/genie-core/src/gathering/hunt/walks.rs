@@ -20,13 +20,14 @@ impl HuntReads {
     pub(crate) fn walks<'graphics>(
         &self,
         graphics: &'graphics Graphics,
-        (unit, mover): (&Unit, Option<&Mover>),
+        unit: &Unit,
+        mover: Option<&Mover>,
     ) -> Walks<'graphics> {
         let sprites = SpriteReads {
             defaults: self.defaults,
             graphics,
         };
-        Walks::of(sprites, (unit, mover, self.attack.top_speed))
+        Walks::of(sprites, unit, mover, self.attack.top_speed)
     }
 }
 

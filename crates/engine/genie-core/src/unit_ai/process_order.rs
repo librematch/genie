@@ -262,10 +262,10 @@ impl UnitAi {
             }
             (OrderKind::SeekAndDestroy, Some(target)) => {
                 let tiles = queued_order.point.tile();
-                self.seek_and_destroy(target, tiles, OrderForce::Forced, at, (side, ai))?
+                self.seek_and_destroy(target, tiles, OrderForce::Forced, at, side, ai)?
             }
             (OrderKind::AttackRoundup, Some(object)) => {
-                self.attack_roundup(object, at, (side, ai))?
+                self.attack_roundup(object, at, side, ai)?
             }
             (OrderKind::AttackMove, target) => {
                 if let Some(object_id) = target
@@ -524,7 +524,7 @@ impl UnitAi {
         match self.ai_kind {
             UnitAiKind::Civilian => self.civilian_attack(target, at, side, rng),
             UnitAiKind::Soldier => {
-                if self.attack_object(target, OrderForce::Forced, rules, at, (side, rng))?
+                if self.attack_object(target, OrderForce::Forced, rules, at, side, rng)?
                     == Answer::NotTaken
                 {
                     return Ok(Answer::NotTaken);
@@ -534,7 +534,7 @@ impl UnitAi {
                 }
                 Ok(Answer::Taken)
             }
-            _ => self.attack_object(target, OrderForce::Forced, rules, at, (side, rng)),
+            _ => self.attack_object(target, OrderForce::Forced, rules, at, side, rng),
         }
     }
 
@@ -550,7 +550,8 @@ impl UnitAi {
         &mut self,
         target: ObjectId,
         at: &Surroundings,
-        (side, rng): (&mut UnitView<'_, '_>, &mut Well512),
+        side: &mut UnitView<'_, '_>,
+        rng: &mut Well512,
     ) -> GenieResult<Answer> {
         if self.current_target == Some(target) {
             return Ok(Answer::NotTaken);
@@ -563,7 +564,7 @@ impl UnitAi {
         {
             return Ok(Answer::NotTaken);
         }
-        if self.attack_command(target, OrderForce::Forced, at, (side, rng))? == Answer::NotTaken {
+        if self.attack_command(target, OrderForce::Forced, at, side, rng)? == Answer::NotTaken {
             return Ok(Answer::NotTaken);
         }
         self.set_action(Some(AiAction::Attack));

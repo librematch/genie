@@ -39,7 +39,7 @@ pub(super) fn move_reads<'graphics>(
         defaults: attack_reads.move_defaults,
         graphics,
     };
-    Ok(MoveToReads::with_sprites(sprites, (unit, mover, top)))
+    Ok(MoveToReads::with_sprites(sprites, unit, mover, top))
 }
 
 impl Attack {

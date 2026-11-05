@@ -229,7 +229,10 @@ fn buildings_on(spatial: &Spatial, by_id: ObjectsRef<'_>, tile: Tile) -> GenieRe
 /// `+0x3c`): a `MoveTo`'s ([`crate::movement::move_to::MoveToAction::point`]) or a Transport's. An
 /// action the slice does not hold has neither; another no point the slice keeps.
 pub(crate) fn meeting_target(
-    (unit, target_actions, target_unread, target_speed): (&Unit, &Action, Option<&Unread>, Speed),
+    unit: &Unit,
+    target_actions: &Action,
+    target_unread: Option<&Unread>,
+    target_speed: Speed,
     tm: &Master,
     room: bool,
 ) -> GenieResult<MeetingTarget> {
@@ -533,12 +536,10 @@ impl Meeting<'_> {
         }
         let stats = self.mover.map(|mover| mover.stats).ok_or(NO_SPEED)?;
         let meeting_target = meeting_target(
-            (
-                self.target,
-                self.target_actions,
-                self.target_unread,
-                self.target_speed,
-            ),
+            self.target,
+            self.target_actions,
+            self.target_unread,
+            self.target_speed,
             self.master,
             self.room,
         )?;

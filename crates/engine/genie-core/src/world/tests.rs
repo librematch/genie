@@ -15224,7 +15224,7 @@ fn killed_villager_counts_its_attacker_kind_and_player_kind() {
     };
     // Gaia's wolf: an animal, Gaia's type
     let mut game = world(PlayerKind::Human);
-    game.count_owner_loss(PlayerId::new(1), &villager, (class::PREY, PlayerId::new(0)))
+    game.count_owner_loss(PlayerId::new(1), &villager, class::PREY, PlayerId::new(0))
         .unwrap();
     assert_eq!(counts(&game), amounts([1.0, 1.0, 0.0, 0.0]));
     // the archers of a human, a computer and the editor's phantom
@@ -15238,7 +15238,8 @@ fn killed_villager_counts_its_attacker_kind_and_player_kind() {
             .count_owner_loss(
                 PlayerId::new(1),
                 &villager,
-                (class::CLASS_0, PlayerId::new(2)),
+                class::CLASS_0,
+                PlayerId::new(2),
             )
             .unwrap();
         assert_eq!(counts(&kind_world), amounts(seen));
@@ -15248,7 +15249,8 @@ fn killed_villager_counts_its_attacker_kind_and_player_kind() {
         .count_owner_loss(
             PlayerId::new(1),
             &villager,
-            (class::PREDATOR, PlayerId::new(2)),
+            class::PREDATOR,
+            PlayerId::new(2),
         )
         .unwrap();
     assert_eq!(counts(&world), amounts([0.0, 1.0, 0.0, 1.0]));
@@ -15258,7 +15260,8 @@ fn killed_villager_counts_its_attacker_kind_and_player_kind() {
             .count_owner_loss(
                 PlayerId::new(1),
                 &villager,
-                (class::CLASS_0, PlayerId::new(2))
+                class::CLASS_0,
+                PlayerId::new(2)
             )
             .is_err()
     );
@@ -18272,7 +18275,7 @@ fn scout_attack_on(
         UnitGroups::default(),
         |side| {
             let mut ai = ai.clone();
-            side.attack(object_id(50), force, (&mut ai, &mut Well512::default()))
+            side.attack(object_id(50), force, &mut ai, &mut Well512::default())
                 .unwrap()
         },
     );
@@ -18414,7 +18417,7 @@ fn attack_by(who: Master, also: Vec<Master>) -> (Object, Attacked, f32, Tracker)
         |side| {
             let mut ai = ai.clone();
             let attacked = side
-                .attack(object_id(50), force, (&mut ai, &mut Well512::default()))
+                .attack(object_id(50), force, &mut ai, &mut Well512::default())
                 .unwrap();
             (attacked, side.step.world.players[1].attributes[4].get())
         },

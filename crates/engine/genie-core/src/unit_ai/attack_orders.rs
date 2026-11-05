@@ -125,7 +125,8 @@ impl UnitAi {
         force: OrderForce,
         rules: TargetRules,
         at: &Surroundings,
-        (side, rng): (&mut UnitView<'_, '_>, &mut Well512),
+        side: &mut UnitView<'_, '_>,
+        rng: &mut Well512,
     ) -> GenieResult<Answer> {
         if force == OrderForce::Unforced && self.current_action.is_some() {
             return Ok(Answer::NotTaken);
@@ -133,7 +134,7 @@ impl UnitAi {
         let Some((class, position)) = self.attack_check(target, rules, at, side)? else {
             return Ok(Answer::NotTaken);
         };
-        if self.attack_command(target, force, at, (side, rng))? == Answer::NotTaken {
+        if self.attack_command(target, force, at, side, rng)? == Answer::NotTaken {
             return Ok(Answer::NotTaken);
         }
         self.set_action(Some(AiAction::Attack));
@@ -204,9 +205,10 @@ impl UnitAi {
         target: ObjectId,
         force: OrderForce,
         at: &Surroundings,
-        (side, rng): (&mut UnitView<'_, '_>, &mut Well512),
+        side: &mut UnitView<'_, '_>,
+        rng: &mut Well512,
     ) -> GenieResult<Answer> {
-        let attacked = side.attack(target, force, (self, rng))?;
+        let attacked = side.attack(target, force, self, rng)?;
         for (kind, params) in attacked.posted {
             self.post(Notify::own(at.id, kind, params), at.state)?;
         }
@@ -252,13 +254,7 @@ impl UnitAi {
             )?;
             return Ok(Answer::Taken);
         }
-        self.attack_object(
-            target,
-            OrderForce::Forced,
-            TargetRules::Own,
-            at,
-            (side, rng),
-        )
+        self.attack_object(target, OrderForce::Forced, TargetRules::Own, at, side, rng)
     }
 
     /// The attackers' upkeep of the full update (`0x140c6741b`): with none, a unit under attack

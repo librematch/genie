@@ -33,11 +33,13 @@ impl<'graphics> Walks<'graphics> {
     /// reads `top_speed`, and what it carries.
     pub(crate) fn of(
         sprites: SpriteReads<'graphics>,
-        (unit, mover, top_speed): (&Unit, Option<&Mover>, TopSpeed),
+        unit: &Unit,
+        mover: Option<&Mover>,
+        top_speed: TopSpeed,
     ) -> Self {
         let top = top_speed.of_object(mover, unit.position().ground());
         Self {
-            reads: MoveToReads::with_sprites(sprites, (unit, mover, top)),
+            reads: MoveToReads::with_sprites(sprites, unit, mover, top),
             held: unit.life.held(),
             top_speed,
         }
@@ -59,9 +61,10 @@ impl GatherReads {
     pub(crate) fn walks<'graphics>(
         &self,
         graphics: &'graphics Graphics,
-        (unit, mover): (&Unit, Option<&Mover>),
+        unit: &Unit,
+        mover: Option<&Mover>,
     ) -> Walks<'graphics> {
-        Walks::of(self.sprites_of(graphics), (unit, mover, self.top_speed))
+        Walks::of(self.sprites_of(graphics), unit, mover, self.top_speed)
     }
 
     /// The sprites a `MoveTo` takes when its maker gives none.

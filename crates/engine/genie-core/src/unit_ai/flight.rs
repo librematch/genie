@@ -290,7 +290,8 @@ impl UnitAi {
                 OrderForce::Unforced,
                 TargetRules::Own,
                 at,
-                (side, ai_rng),
+                side,
+                ai_rng,
             )?;
             true
         } else {
@@ -299,7 +300,8 @@ impl UnitAi {
                 OrderForce::Forced,
                 TargetRules::Own,
                 at,
-                (side, ai_rng),
+                side,
+                ai_rng,
             )?;
             self.idle_timer = Millis::ZERO;
             villager

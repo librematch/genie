@@ -173,7 +173,8 @@ impl HuntAction {
             {
                 let walks = hunt_reads.walks(
                     &step.world.model.graphics,
-                    (unit, step.world.parts.mover_of(unit.id)),
+                    unit,
+                    step.world.parts.mover_of(unit.id),
                 );
                 let player = fight.own.player;
                 self.set_walk(

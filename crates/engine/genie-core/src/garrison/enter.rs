@@ -455,12 +455,11 @@ impl World {
         let target_speed = self.top_speed(tp, target)?;
         let unit = self.players.live(player, idx)?;
         let reads = MoveToReads::of(
-            (unit, self.top_speed(player, unit)?),
+            unit,
+            self.top_speed(player, unit)?,
             unit.master(self.master_tables(), player)?,
-            (
-                &self.model.graphics,
-                self.parts.combat_of(unit.id).abilities.look.as_ref(),
-            ),
+            &self.model.graphics,
+            self.parts.combat_of(unit.id).abilities.look.as_ref(),
             &self.model.roles,
         );
         let meeting = Meeting {

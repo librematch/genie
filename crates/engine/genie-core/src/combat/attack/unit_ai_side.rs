@@ -63,7 +63,8 @@ impl UnitView<'_, '_> {
         &mut self,
         target: ObjectId,
         force: OrderForce,
-        (ai, rng): (&mut UnitAi, &mut Well512),
+        ai: &mut UnitAi,
+        rng: &mut Well512,
         roles: &Roles,
     ) -> GenieResult<Attacked> {
         // the unit's master, a copy: the attack's start changes the unit (its master's switch)
@@ -72,7 +73,7 @@ impl UnitView<'_, '_> {
             .master(self.step.world.master_tables(), self.player)?
             .clone();
         let master = &own;
-        if let Some(attacked) = self.trebuchet_attack(target, master, (ai, rng), roles)? {
+        if let Some(attacked) = self.trebuchet_attack(target, master, ai, rng, roles)? {
             return Ok(attacked);
         }
         let ai = &*ai;
@@ -187,7 +188,8 @@ impl UnitView<'_, '_> {
         &mut self,
         target: ObjectId,
         master: &Master,
-        (ai, rng): (&mut UnitAi, &mut Well512),
+        ai: &mut UnitAi,
+        rng: &mut Well512,
         roles: &Roles,
     ) -> GenieResult<Option<Attacked>> {
         let class = roles.of_class(master.class);

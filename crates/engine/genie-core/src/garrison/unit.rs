@@ -388,7 +388,7 @@ impl Unit {
         if bm.garrison.units() <= inside {
             // slot 0x1a0's room test (`FUN_1411921d0`) keeps the unit out; its tail runs all the
             // same
-            self.enter_tail(step, target, (&me, &bm), roles)?;
+            self.enter_tail(step, target, &me, &bm, roles)?;
             return Ok(EnterOutcome::NoRoom);
         }
         self.go_inside(actions, step, target, &me, &bm, roles)?;
@@ -483,7 +483,7 @@ impl Unit {
         self.life.inside = Some(target);
         self.join_building(step, Some(target), bp, reload, me, bm)?;
         self.enter_sight(step, target, at, building_radius, placed, bm)?;
-        self.enter_tail(step, target, (me, bm), roles)
+        self.enter_tail(step, target, me, bm, roles)
     }
 
     /// The end of slot 0x1a0 (`FUN_141212e10`) into building `target`, the unit's master `me` and
@@ -496,7 +496,8 @@ impl Unit {
         &self,
         step: &mut Step<'_>,
         target: ContainerId,
-        (me, bm): (&Master, &Master),
+        me: &Master,
+        bm: &Master,
         roles: &Roles,
     ) -> GenieResult<()> {
         let id = self.id;

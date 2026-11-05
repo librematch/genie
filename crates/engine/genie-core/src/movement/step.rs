@@ -104,7 +104,8 @@ impl Mover {
     pub fn next_speed(
         &self,
         wanted: Speed,
-        (group, top): (Option<GroupSpeed>, Speed),
+        group: Option<GroupSpeed>,
+        top: Speed,
         movement_tuning: &MovementTuning,
     ) -> Speed {
         match group {
@@ -152,7 +153,8 @@ impl Mover {
         let top = self.top_speed(top, position.ground());
         let speed = self.next_speed(
             Speed::new(velocity.acceleration.y() * dt + velocity.velocity.y()),
-            (group, top),
+            group,
+            top,
             movement_tuning,
         );
         if let Some(velocity) = self.velocity.as_mut() {
@@ -500,7 +502,7 @@ impl Mover {
                     Reached::Pass(Next::Done(motion)) => return Ok(motion),
                     Reached::LoopEnd => {
                         let top = self.top_speed(me.top_speed, place.position().ground());
-                        return self.loop_end(dt, (walked, heading, top), movement_tuning);
+                        return self.loop_end(dt, walked, heading, top, movement_tuning);
                     }
                 }
             }

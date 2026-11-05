@@ -253,7 +253,7 @@ impl World {
         let Some(target) = self.gather_target(player_id, new, gather_point)? else {
             return self.gather_move(player_id, new, at, source);
         };
-        self.gather_work(player_id, new, (target, at), source, finder)
+        self.gather_work(player_id, new, target, at, source, finder)
     }
 
     /// [`World::gather`]'s target: the gather point's while the world holds it, else the one
@@ -289,7 +289,8 @@ impl World {
         &mut self,
         player_id: PlayerId,
         new: ListIndex,
-        (target, at): (ObjectId, Position),
+        target: ObjectId,
+        at: Position,
         source: OrderSource,
         finder: FinderUse,
     ) -> GenieResult<()> {

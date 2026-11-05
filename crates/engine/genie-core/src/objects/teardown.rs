@@ -83,10 +83,7 @@ impl Action {
     /// # Errors
     ///
     /// The unit's stop that the motion step does not model.
-    pub(crate) fn tear_down(
-        self,
-        (mut motion, top): (MotionMut<'_>, Speed),
-    ) -> GenieResult<TornDown> {
+    pub(crate) fn tear_down(self, mut motion: MotionMut<'_>, top: Speed) -> GenieResult<TornDown> {
         let mut torn = TornDown::default();
         match self {
             Self::WaitSolidify(_) | Self::Make(_) => {}
@@ -202,13 +199,14 @@ impl ActionList {
     /// The destructor's, and a second action under the head below state 3.
     pub(crate) fn delete_head(
         &mut self,
-        (motion, top): (MotionMut<'_>, Speed),
+        motion: MotionMut<'_>,
+        top: Speed,
         state: ObjectState,
     ) -> GenieResult<TornDown> {
         let Some(head) = self.pop_head() else {
             return Ok(TornDown::default());
         };
-        let torn = head.tear_down((motion, top))?;
+        let torn = head.tear_down(motion, top)?;
         if !self.is_empty() && state < ObjectState::Dying {
             return Err(GenieError::unreachable(NEXT_HEAD));
         }
@@ -223,12 +221,13 @@ impl ActionList {
     /// The first deletion's that fails.
     pub(crate) fn delete_all(
         &mut self,
-        (mut motion, top): (MotionMut<'_>, Speed),
+        mut motion: MotionMut<'_>,
+        top: Speed,
         state: ObjectState,
     ) -> GenieResult<TornDown> {
         let mut all = TornDown::default();
         while !self.is_empty() {
-            let torn = self.delete_head((motion.reborrow(), top), state)?;
+            let torn = self.delete_head(motion.reborrow(), top, state)?;
             all.releases.extend(torn.releases);
             all.builder_leaves.extend(torn.builder_leaves);
         }
@@ -326,7 +325,7 @@ mod tests {
             },
         );
         let torn = Action::Build(build_action)
-            .tear_down((motion.lent(), Speed::new(1.0)))
+            .tear_down(motion.lent(), Speed::new(1.0))
             .unwrap();
         assert_eq!(
             torn,
@@ -342,7 +341,7 @@ mod tests {
             Some(DropSiteId::new(object_id(10050))),
         );
         let torn = Action::Build(build_action)
-            .tear_down((moving().lent(), Speed::new(1.0)))
+            .tear_down(moving().lent(), Speed::new(1.0))
             .unwrap();
         assert_eq!(
             (torn.releases, torn.builder_leaves),
@@ -374,7 +373,7 @@ mod tests {
             Speed::new(1.0),
         );
         let torn = Action::MoveTo(to)
-            .tear_down((motion.lent(), Speed::new(1.0)))
+            .tear_down(motion.lent(), Speed::new(1.0))
             .unwrap();
         assert_eq!(torn, TornDown::default());
         assert!(!moves(&motion));
@@ -388,12 +387,12 @@ mod tests {
         let mut motion = moving();
         let mut list = ActionList::default().with_build(Some(build()));
         let torn = list
-            .delete_all((motion.lent(), Speed::new(1.0)), ObjectState::Alive)
+            .delete_all(motion.lent(), Speed::new(1.0), ObjectState::Alive)
             .unwrap();
         assert_eq!(torn.releases, [object_id(10028)]);
         assert!(list.is_empty());
         assert_eq!(
-            list.delete_head((motion.lent(), Speed::new(1.0)), ObjectState::Alive),
+            list.delete_head(motion.lent(), Speed::new(1.0), ObjectState::Alive),
             Ok(TornDown::default())
         );
         let to = MoveToAction::to_point(
@@ -407,13 +406,13 @@ mod tests {
             .with_move_to(Some(to));
         let err = two
             .clone()
-            .delete_head((motion.lent(), Speed::new(1.0)), ObjectState::Alive)
+            .delete_head(motion.lent(), Speed::new(1.0), ObjectState::Alive)
             .unwrap_err();
         assert_eq!(err.reason(), NEXT_HEAD);
         let mut dying = two;
         assert_eq!(
             dying
-                .delete_head((motion.lent(), Speed::new(1.0)), ObjectState::Dying)
+                .delete_head(motion.lent(), Speed::new(1.0), ObjectState::Dying)
                 .map(|torn_down| torn_down.releases),
             Ok(vec![])
         );

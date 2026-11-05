@@ -296,7 +296,8 @@ impl Unit {
                     actions,
                     motion.mover_mut(),
                     point,
-                    (&sprites, top_speed),
+                    &sprites,
+                    top_speed,
                     move_to_tuning,
                 )
             }
@@ -329,12 +330,8 @@ impl Unit {
             // the Repair's (FUN_140ad9700): its point, slot 0x68 with none, set_state(11)
             Some(ActionsAction::Repair(repair)) => {
                 let top = top_speed.of_object(motion.mover(), self.position().ground());
-                let move_reads = MoveToReads::of(
-                    (self, top),
-                    self.master_in(masters)?,
-                    (graphics, look),
-                    roles,
-                );
+                let move_reads =
+                    MoveToReads::of(self, top, self.master_in(masters)?, graphics, look, roles);
                 repair_takes_point(
                     repair,
                     motion.mover_mut(),
@@ -370,11 +367,12 @@ impl Unit {
         actions: &mut Action,
         mover: Option<&mut Mover>,
         point: Position,
-        (sprites, top_speed): (&SpriteReads<'_>, TopSpeed),
+        sprites: &SpriteReads<'_>,
+        top_speed: TopSpeed,
         move_to_tuning: &MoveToTuning,
     ) -> GenieResult<PointMove> {
         let top = top_speed.of_object(mover.as_deref(), self.position().ground());
-        let reads = MoveToReads::with_sprites(*sprites, (self, mover.as_deref(), top));
+        let reads = MoveToReads::with_sprites(*sprites, self, mover.as_deref(), top);
         let gone = match actions.list.artifact_mut() {
             Some(artifact) => artifact.take_point(point, &reads, move_to_tuning)?,
             None => SubActionsGone::default(),
@@ -399,7 +397,7 @@ impl Unit {
         move_to_tuning: &MoveToTuning,
     ) -> GenieResult<PointMove> {
         let my_pasture = self.my_pasture;
-        let walks = Walks::of(sprites, (self, mover.as_deref(), top_speed));
+        let walks = Walks::of(sprites, self, mover.as_deref(), top_speed);
         let (Some(hunt), Some(mover)) = (actions.list.hunt_mut(), mover) else {
             return Err(GenieError::unsupported(
                 "a hunter without its hunt or movement state",
@@ -436,7 +434,7 @@ impl Unit {
         (sprites, top_speed): (SpriteReads<'_>, TopSpeed),
         move_to_tuning: &MoveToTuning,
     ) -> GenieResult<PointMove> {
-        let walks = Walks::of(sprites, (self, mover.as_deref(), top_speed));
+        let walks = Walks::of(sprites, self, mover.as_deref(), top_speed);
         let (Some(gather), Some(mover)) = (actions.list.gather_mut(), mover) else {
             return Err(GenieError::unsupported(
                 "a gatherer without its gather or movement state",

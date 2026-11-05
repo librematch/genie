@@ -28,10 +28,11 @@ impl UnitView<'_, '_> {
         &mut self,
         target: ObjectId,
         force: OrderForce,
-        (ai, rng): (&mut UnitAi, &mut Well512),
+        ai: &mut UnitAi,
+        rng: &mut Well512,
     ) -> GenieResult<Attacked> {
         let roles = &self.step.world.model.roles.clone();
-        self.start_attack_now(target, force, (ai, rng), roles)
+        self.start_attack_now(target, force, ai, rng, roles)
     }
 
     /// The unit's `+0x685`, `underAttackValue`, becomes `value` (`FUN_14119d2d0`).

@@ -297,7 +297,7 @@ impl World {
                 halted?;
             }
             Action::Artifact(artifact) => self.halt_artifact((player_id, idx), artifact, by)?,
-            Action::Transport(transport) => self.halt_transport((player_id, idx), transport)?,
+            Action::Transport(transport) => self.halt_transport(player_id, idx, transport)?,
             Action::MoveTo(_)
             | Action::Explore(_)
             | Action::Enter(_)
