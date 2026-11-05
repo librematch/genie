@@ -95,27 +95,44 @@ pub fn most_hp(stinger: HitPoints, master_hp: MasterHitPoints, powerup: HpPoweru
     HitPoints::new(stinger.get() + HitPoints::of_master(master_hp).get() + powerup.max.get())
 }
 
+/// Whether a combat object's hit point change runs its hit point transforms' test
+/// (`FUN_141204450`, [`crate::world::World::transform_by_hit_points`]).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[must_use]
+pub enum TransformTest {
+    /// It runs: a loss left at least 1 hit point (slot 22: `COMISS` with 1, `JC` past it, so not
+    /// a NaN), or a gain found the object below its most (slot 0xb8).
+    Runs,
+    /// It does not: the powerups' room took the loss, a loss left less than 1 hit point (or a
+    /// NaN), or the gain found the object at its most.
+    #[default]
+    Skipped,
+}
+
 /// Slot 0xb8 of a combat object (`FUN_141203be0`) on hit points `hp` with the powerups
 /// `hp_powerups` (`+0xa38`, its room `+0xa3c`) of a master of `master_hp` and the hit point
 /// stinger `stinger`: `amount` added up to its most (slot 200, [`most_hp`]), an overflow taken
-/// off the powerup (never below 0); a powerup above its room first takes the room. The hit point
-/// transforms of `FUN_141204450`, empty in the recordings, are not held.
+/// off the powerup (never below 0, nor a NaN); a powerup above its room first takes the room.
+/// Below its most (not a NaN) its hit point transforms' test follows ([`TransformTest::Runs`],
+/// the caller's: it reads the world).
 pub fn gain_hp(
     hp: &mut HitPoints,
     powerup: &mut HpPowerup,
     master_hp: MasterHitPoints,
     stinger: HitPoints,
     amount: HitPoints,
-) {
+) -> TransformTest {
     let (mut up, room) = (powerup.taken, powerup.max);
     let most = most_hp(stinger, master_hp, *powerup);
     if room < up {
         up = room;
     }
-    if most <= *hp {
+    // COMISS with the hit points, JBE: a NaN, most or hit points, takes no gain
+    let test = if at_most_or_unordered(most.get(), hp.get()) {
         if HitPoints::ZERO < up {
             up = HitPoints::new((up - amount).get().max(0.0));
         }
+        TransformTest::Skipped
     } else {
         let healed = *hp + amount;
         *hp = healed;
@@ -125,8 +142,19 @@ pub fn gain_hp(
                 up = HitPoints::new((up - (healed - most)).get().max(0.0));
             }
         }
-    }
+        TransformTest::Runs
+    };
     powerup.taken = up;
+    test
+}
+
+/// What a heal ([`heal_hp`]) left of its object.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct Healed {
+    /// Whether it holds its full hit points.
+    pub heal: Heal,
+    /// Whether its slot 0xb8 runs the hit point transforms' test.
+    pub test: TransformTest,
 }
 
 /// Whether a heal left its object at its full hit points ([`heal_hp`]).
@@ -139,27 +167,33 @@ pub enum Heal {
     Partial,
 }
 
-/// `FUN_141193b30`: slot 0xb8 adds `amount` ([`gain_hp`]); a loss (`amount` below 0) leaves at
-/// least 1 hit point; healed to its full hit points (slot 0xc0 at least slot 200, [`most_hp`];
-/// `COMISS` with `JC`: a NaN is not), it holds exactly its master's ([`Heal::Full`], else
-/// [`Heal::Partial`]).
+/// `FUN_141193b30`: slot 0xb8 adds `amount` ([`gain_hp`], whose transforms' test it passes on);
+/// a loss (`amount` below 0) leaves at least 1 hit point; healed to its full hit points (slot
+/// 0xc0 at least slot 200, [`most_hp`]; `COMISS` with `JC`: a NaN is not), it holds exactly its
+/// master's ([`Heal::Full`], else [`Heal::Partial`]).
 pub fn heal_hp(
     hp: &mut HitPoints,
     powerup: &mut HpPowerup,
     master_hp: MasterHitPoints,
     stinger: HitPoints,
     amount: HitPoints,
-) -> Heal {
-    gain_hp(hp, powerup, master_hp, stinger, amount);
+) -> Healed {
+    let test = gain_hp(hp, powerup, master_hp, stinger, amount);
     if amount < HitPoints::ZERO && *hp < HitPoints::new(1.0) {
         *hp = HitPoints::new(1.0);
     }
     let most = most_hp(stinger, master_hp, *powerup);
     if below_or_unordered((powerup.room() + *hp).get(), most.get()) {
-        return Heal::Partial;
+        return Healed {
+            heal: Heal::Partial,
+            test,
+        };
     }
     *hp = HitPoints::of_master(master_hp);
-    Heal::Full
+    Healed {
+        heal: Heal::Full,
+        test,
+    }
 }
 
 /// `FUN_141193b30` on an object below type 70 or a tree, slot 0x110 of its class: its slot 0xb8

@@ -28,7 +28,7 @@ The files hold the orders by kind:
 <!-- files -->
 | File | What it holds |
 | --- | --- |
-| [`actions.rs`](actions.rs) | Taking and releasing targets, the order record, actions cleared, transformations, gates and master switches. |
+| [`actions.rs`](actions.rs) | Taking and releasing targets, the order record, actions cleared, transformations and gates. |
 | [`attack.rs`](attack.rs) | An attack's start, a hunt's and an action's retarget. |
 | [`commands.rs`](commands.rs) | The unit AI's state, gates, the auto scout and the STOP, EXPLORE and standing commands. |
 | [`dispatch.rs`](dispatch.rs) | How an order reaches its units (`Dispatch`). |
@@ -37,6 +37,7 @@ The files hold the orders by kind:
 | [`form.rs`](form.rs) | `FORM_FORMATION`'s handler (`FUN_14161dba0`): the listed units are split into groups, which lock to the formation the command names. |
 | [`gather.rs`](gather.rs) | A gather's retarget and take, the quarry, a gather's and a hunt's start. |
 | [`interact.rs`](interact.rs) | An interact order's unit, an order on a target, MOVE and its groups. |
+| [`master_change.rs`](master_change.rs) | Slot 0x90, a unit's or a building's change of master: its actions cleared or kept, its hit points, sight, place, sprites, powerups and volleys taken from the new master. |
 | [`mod.rs`](mod.rs) | The orders a command gives its units: INTERACT and its splitter into loose units and groups, the moves, patrols and follows, the work, gather, hunt and build orders, the drop-offs, the town bell and the Empire Wars start. |
 | [`moves.rs`](moves.rs) | A unit's move, to a point or aside, a work order, its reach and a point's move order. |
 | [`order_flags.rs`](order_flags.rs) | The orders' flag bytes `+0x13` to `+0x15` (`OrderFlags`), which INTERACT and MOVE share. |

@@ -5,9 +5,10 @@
 
 use crate::combat::damage::ArmorPair;
 use crate::combat::damage::KillCount;
+use crate::combat::damage::TransformTest;
 use crate::combat::damage::{gain_hp as damage_gain_hp, heal_hp, most_hp};
 use crate::combat::stingers::credit_combat;
-use crate::math::fmath::{at_most_or_unordered, maxss};
+use crate::math::fmath::{at_most_or_unordered, below_or_unordered, maxss};
 use crate::math::image::turn::{
     REGENERATION_EPSILON as TURN_REGENERATION_EPSILON,
     REGENERATION_MINUTE as TURN_REGENERATION_MINUTE,
@@ -96,10 +97,43 @@ pub(crate) fn regeneration_rate(
     combat.regen_stinger + (combat.regen_powerup + (bonus + master.creatable_part().regeneration))
 }
 
+/// What a regeneration step ([`Unit::regenerate`]) leaves to its caller.
+#[derive(Clone, Debug, PartialEq)]
+#[must_use]
+pub(crate) struct Regenerated {
+    /// Its loss's or gain's change.
+    pub(crate) change: HpChange,
+    /// The most hit points it read before them (slot 200), none where it took no whole point.
+    pub(crate) most: Option<HitPoints>,
+}
+
+impl Regenerated {
+    /// A step that took no whole point.
+    const NONE: Self = Self {
+        change: HpChange::Settled,
+        most: None,
+    };
+}
+
+/// What a combat object's hit point change through its slots 0xb0 and 0xb8 leaves to its caller,
+/// which reads the world.
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[must_use]
+pub(crate) enum HpChange {
+    /// Nothing more: no change, the powerups' room took the loss, or the gain found the object
+    /// at its most.
+    Settled,
+    /// Its hit point transforms' test runs (`FUN_141204450`, [`TransformTest::Runs`]).
+    TransformTest,
+    /// A loss left it below 1 hit point: its stingers' kill credits, if any (slot 22's).
+    Fell(Option<KillCount>),
+}
+
 impl Unit {
     /// Slot 0x110 of a combat object (`FUN_141213b10`) of its master's `class` and
     /// `hit_points`: the classes 2, 20, 21, 22 and 53 repair at a cost (not modelled); any other
-    /// heals (`FUN_141193b30`, [`crate::combat::damage::heal_hp`]).
+    /// heals (`FUN_141193b30`, [`crate::combat::damage::heal_hp`]), whose slot 0xb8 may run its
+    /// hit point transforms' test (the caller's: it reads the world).
     pub(crate) fn heal(
         &mut self,
         combat: &mut Combat,
@@ -107,7 +141,7 @@ impl Unit {
         hit_points: MasterHitPoints,
         amount: HitPoints,
         roles: &Roles,
-    ) -> GenieResult<()> {
+    ) -> GenieResult<TransformTest> {
         if roles.of_class(class).intersects(
             ClassRoles::TRADE_BOAT
                 | ClassRoles::TRANSPORT
@@ -119,42 +153,53 @@ impl Unit {
                 "a heal at a cost (FUN_141213b10's classes)",
             ));
         }
-        let _ = heal_hp(
+        Ok(heal_hp(
             &mut self.life.hp,
             &mut combat.hp_powerup,
             hit_points,
             combat.hp_stinger,
             amount,
-        );
-        Ok(())
+        )
+        .test)
     }
 
     /// Slot 0xb8 of a combat object (`FUN_141203be0`): `amount` added up to its hit points with
-    /// its powerups' room, an overflow taken off the powerup (`+0xa38`, never below 0; the hit
-    /// point transforms of `FUN_141204450`, empty in the recordings, are not held).
-    pub(crate) fn gain_hp(&mut self, combat: &mut Combat, master: &Master, amount: HitPoints) {
-        damage_gain_hp(
+    /// its powerups' room, an overflow taken off the powerup (`+0xa38`, never below 0); below its
+    /// most its hit point transforms' test follows ([`HpChange::TransformTest`], the caller's).
+    pub(crate) fn gain_hp(
+        &mut self,
+        combat: &mut Combat,
+        master: &Master,
+        amount: HitPoints,
+    ) -> HpChange {
+        match damage_gain_hp(
             &mut self.life.hp,
             &mut combat.hp_powerup,
             master.hit_points,
             combat.hp_stinger,
             amount,
-        );
+        ) {
+            TransformTest::Runs => HpChange::TransformTest,
+            TransformTest::Skipped => HpChange::Settled,
+        }
     }
 
     /// Slot 0xb0 of a combat object (`FUN_141205c80`), the loss of `d` hit points: the hit point
     /// powerups' room (`+0xa38` up to `+0xa3c`) takes it first, the rest comes off the hit points,
     /// which stay above the master's `invulnerability_level` floor (`FUN_141202a80`). Left below
-    /// 1, its stingers credit its kill: the credits for the caller to count ([`credit_combat`]).
-    /// Not ported yet (MISSING.md): a surviving one's hit point transforms (`FUN_141204450`);
-    /// [`crate::combat::damage::lose`] is the same loss on a hit's victim.
+    /// 1 (`COMISS` with 1, `JC`: a NaN too), its stingers credit its kill: the credits for the
+    /// caller to count ([`credit_combat`]); at 1 or more its hit point transforms' test follows
+    /// ([`HpChange::TransformTest`], the caller's). [`crate::combat::damage::lose`] is the same
+    /// loss on a hit's victim.
     pub(crate) fn lose_hp(
         &mut self,
         combat: &mut Combat,
         master: &Master,
         loss: HitPoints,
-    ) -> Option<KillCount> {
-        let hit_points = combat.hp_powerup.absorb(loss)?;
+    ) -> HpChange {
+        let Some(hit_points) = combat.hp_powerup.absorb(loss) else {
+            return HpChange::Settled;
+        };
         let floor = master
             .creatable_part()
             .invulnerability
@@ -165,7 +210,11 @@ impl Unit {
         } else {
             floor
         };
-        credit_combat(combat, self.life.hp)
+        if below_or_unordered(self.life.hp.get(), 1.0) {
+            HpChange::Fell(credit_combat(combat, self.life.hp))
+        } else {
+            HpChange::TransformTest
+        }
     }
 
     /// `TRIBE_Combat_Object::update`'s regeneration (`0x141208440` after
@@ -178,25 +227,26 @@ impl Unit {
     /// [`Unit::gain_hp`]) at most the room below its most (slot 200,
     /// [`most_hp`]), or
     /// come off (slot 0xb0, [`Unit::lose_hp`]) at most its hit points with its powerups' room
-    /// (slot 0xc0). Then an object at its most (slot 0xc0 at least slot 200) has the armor its
-    /// charge's hits took back (`+0x9e4` and `+0x9e6`, one dword, zeroed). Returns the kill
-    /// credits of a loss that left it below 1 hit point, for the caller to count.
+    /// (slot 0xc0). Returns what the loss or the gain leaves to the caller ([`HpChange`]: the
+    /// kill credits of a loss that left it below 1 hit point, or the hit point transforms' test)
+    /// and the most it read before them (slot 200), with which the caller then gives back the
+    /// armor its charge's hits took ([`Unit::restore_charged_armor`]); none where it took no
+    /// whole point.
     pub(crate) fn regenerate(
         &mut self,
         combat: &mut Combat,
         master: &Master,
         dt_seconds: Seconds,
         turn_tuning: &TurnTuning,
-    ) -> Option<KillCount> {
-        use crate::math::fmath::{at_most_or_unordered, below_or_unordered};
+    ) -> Regenerated {
         let rate = regeneration_rate(master, combat, turn_tuning).get();
         if below_or_unordered(self.life.hp.get(), turn_tuning.regeneration_least_hp)
             || self.life.state != ObjectState::Alive
         {
-            return None;
+            return Regenerated::NONE;
         }
         if !below_or_unordered(REGENERATION_EPSILON, rate.abs()) {
-            return None;
+            return Regenerated::NONE;
         }
         let held = dt_seconds + combat.regen_timer;
         let per = (REGENERATION_MINUTE / rate).abs();
@@ -209,10 +259,10 @@ impl Unit {
         let whole = points - fraction;
         combat.regen_timer = Seconds::new(fraction * per);
         if at_most_or_unordered(whole, 0.0) {
-            return None;
+            return Regenerated::NONE;
         }
         let most = most_hp(combat.hp_stinger, master.hit_points, combat.hp_powerup).get();
-        let mut credited = None;
+        let mut change = HpChange::Settled;
         let now = (combat.hp_powerup.room() + self.life.hp).get();
         if at_most_or_unordered(rate, 0.0) {
             let amount = if at_most_or_unordered(whole, now) {
@@ -221,7 +271,7 @@ impl Unit {
                 now
             };
             if !at_most_or_unordered(amount, 0.0) {
-                credited = self.lose_hp(combat, master, HitPoints::new(amount));
+                change = self.lose_hp(combat, master, HitPoints::new(amount));
             }
         } else {
             let left = most - now;
@@ -231,15 +281,22 @@ impl Unit {
                 left
             };
             if !at_most_or_unordered(amount, 0.0) {
-                self.gain_hp(combat, master, HitPoints::new(amount));
+                change = self.gain_hp(combat, master, HitPoints::new(amount));
             }
         }
-        // at its most hit points (slot 0xc0 at least slot 200, `COMISS`: a NaN is not) the
-        // armor its charge's hits took (`+0x9e4`, `+0x9e6`) comes back
-        if most <= (combat.hp_powerup.room() + self.life.hp).get() {
+        Regenerated {
+            change,
+            most: Some(HitPoints::new(most)),
+        }
+    }
+
+    /// The regeneration's end (`0x141208440`, after slot 0xb0 or 0xb8 and its transforms' test):
+    /// at its most hit points `most` (read before, slot 200; slot 0xc0 now at least it, `COMISS`:
+    /// a NaN is not) the armor its charge's hits took (`+0x9e4`, `+0x9e6`) comes back.
+    pub(crate) fn restore_charged_armor(&self, combat: &mut Combat, most: HitPoints) {
+        if most <= combat.hp_powerup.room() + self.life.hp {
             combat.armor_removed = ArmorPair::ZERO;
         }
-        credited
     }
 
     /// `TRIBE_Combat_Object::update`'s hit point powerup check (after its abilities): a powerup

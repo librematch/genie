@@ -13,6 +13,7 @@ use crate::movement::move_to::{
     Follow, Goal, MoveTo, MoveWait, TargetMoved, Walk, ask_walk, target_left, walk_or_give_up,
 };
 use crate::movement::{Mover, PathAsk, footprint_gap};
+use crate::objects::Graphics;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::SpriteId;
@@ -23,6 +24,7 @@ use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::sprite::Cargo;
 use crate::objects::sprite::{ActiveSprite, Graphic, new_sprite, standing, walking};
+use crate::objects::task_change::{TaskChange, TaskSprite, swapped};
 use crate::unit_ai::NotifyKind;
 use crate::unit_ai::Pace;
 use crate::unit_ai::{AiAction, Inbox};
@@ -136,6 +138,51 @@ pub fn object_range(
         Distance::new(order_tuning.cart_move_range)
     } else {
         Distance::ZERO
+    }
+}
+
+impl MoveToAction {
+    /// The `MoveTo`'s slot 0x50 (`FUN_140aa1fb0`) with the new master `next` and the tasks of a
+    /// task change (`tasks`, none in slot 0x90 with 1 and for an action without a task), its unit
+    /// still of `old`: a sprite (`+0x58`) that is `old`'s standing sprite (`+0x470`), walking
+    /// sprite (`+0x748`) or attack sprite (`+0x7f8`) takes `next`'s; else one that is the old
+    /// task's moving, proceeding or working sprite takes the new task's; any other stays. A
+    /// sprite `graphics` lacks is none (a null pointer). Its slot 0x60 (`0x140aa1f90`, in state 4
+    /// the unit's slot 0x68 with the sprite) is the caller's: the unit is not here.
+    pub(crate) fn take_master(
+        &mut self,
+        old: &Master,
+        next: &Master,
+        tasks: Option<TaskChange>,
+        graphics: &Graphics,
+    ) {
+        let Some(shown) = self.sprite else {
+            return;
+        };
+        let pairs = [
+            (old.standing_sprite, next.standing_sprite),
+            (
+                old.moving_part().move_sprite,
+                next.moving_part().move_sprite,
+            ),
+            (
+                old.combat_part().attack_sprite,
+                next.combat_part().attack_sprite,
+            ),
+        ];
+        let slots = [
+            TaskSprite::Moving,
+            TaskSprite::Proceeding,
+            TaskSprite::Working,
+        ];
+        self.sprite = if let Some(&(_, taken)) = pairs
+            .iter()
+            .find(|(was, _)| graphics.resolve(*was) == Some(shown))
+        {
+            graphics.resolve(taken)
+        } else {
+            swapped(shown, tasks, &slots, Some(shown), graphics)
+        };
     }
 }
 
@@ -625,7 +672,9 @@ mod tests {
     use crate::objects::SpeedMultiplier;
     use crate::objects::SpriteFlags;
     use crate::objects::masters::ActionPart;
+    use crate::objects::masters::CombatPart;
     use crate::objects::masters::MovingPart;
+    use crate::objects::masters::TaskSprites;
     #[cfg(test)]
     use crate::objects::{FacetCount, Frame};
     use crate::test_ids::object_id;
@@ -1169,5 +1218,61 @@ mod tests {
         .unwrap();
         assert_eq!(stuck.state, MoveTo::Failed);
         assert!(stuck.shows_standing());
+    }
+
+    /// A master whose standing, walking and attack sprites are `standing`, `walking` and
+    /// `attack`.
+    fn shown_by(standing: i16, walking: i16, attack: i16) -> Master {
+        Master {
+            standing_sprite: Some(SpriteId::named(standing)),
+            moving: Some(MovingPart {
+                move_sprite: Some(SpriteId::named(walking)),
+                ..MovingPart::default()
+            }),
+            combat: Some(CombatPart {
+                attack_sprite: Some(SpriteId::named(attack)),
+                ..CombatPart::default()
+            }),
+            ..Master::default()
+        }
+    }
+
+    /// A `MoveTo`'s slot 0x50 (`FUN_140aa1fb0`): a sprite that is the old master's standing,
+    /// walking or attack sprite takes the new master's (none where the table lacks it); else,
+    /// with tasks, one that is the old task's moving, proceeding or working sprite takes the new
+    /// task's; any other stays, and none stays none.
+    #[test]
+    fn move_to_takes_new_master_sprite_where_it_shows_old_one_s() {
+        let graphics = Graphics::from(
+            [1, 2, 3, 4, 5, 6, 11, 12, 13, 21, 22, 23]
+                .map(|id| (SpriteId::named(id), graphic(id, 1.0))),
+        );
+        let old = shown_by(1, 2, 3);
+        let taken = |next: &Master, shown: Option<i16>, tasks| {
+            let sprite = shown.map(|id| graphic(id, 1.0));
+            let mut move_to = own_move_to(MoveTo::Moving, sprite, 10028);
+            move_to.take_master(&old, next, tasks, &graphics);
+            move_to.sprite.map(|shown_graphic| shown_graphic.id.get())
+        };
+        let next = shown_by(11, 12, 13);
+        let change = TaskChange {
+            old: TaskSprites::of_data([4, 5, 6, 1]),
+            next: TaskSprites::of_data([21, 22, 23, 24]),
+        };
+        assert_eq!(
+            [1, 2, 3, 4].map(|id| taken(&next, Some(id), None)),
+            [Some(11), Some(12), Some(13), Some(4)]
+        );
+        assert_eq!(
+            [4, 5, 6, 1].map(|id| taken(&next, Some(id), Some(change))),
+            [Some(21), Some(22), Some(23), Some(11)],
+            "the master's sprites before the task's"
+        );
+        assert_eq!(taken(&next, None, Some(change)), None);
+        assert_eq!(
+            taken(&shown_by(31, 12, 13), Some(1), None),
+            None,
+            "a sprite the table lacks"
+        );
     }
 }

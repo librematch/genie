@@ -18,7 +18,6 @@ mod resources;
 mod tech_change;
 mod upgrade;
 
-pub(crate) use self::attribute_modifier::{MasterSprites, follow_master};
 pub use self::change::Change;
 #[cfg(test)]
 use self::object_slots::charge_after;

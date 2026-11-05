@@ -17,6 +17,7 @@ use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::Task;
 use crate::objects::{ObjectId, ObjectKey};
+use crate::orders::ActionsOnChange;
 use crate::orders::MasterSwap;
 use crate::orders::gather::HuntOrder;
 use crate::orders::{HUNT_TARGET_GONE, NO_HUNT_TASK};
@@ -290,7 +291,7 @@ impl World {
                 task,
             } => {
                 for master in switches.into_iter().flatten() {
-                    self.change_master(player, idx, master)?;
+                    self.change_master(player, idx, master, ActionsOnChange::Clear)?;
                 }
                 if let Some(task) = task {
                     let (repair, _) = self.new_repair(player, idx, target, &task)?;

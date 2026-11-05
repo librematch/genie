@@ -52,6 +52,7 @@ calls `Unit::update` (`unit/update.rs`), which runs the object's chain of update
 | [`relics.rs`](relics.rs) | A building's relic counts (`Relics`). |
 | [`role.rs`](role.rs) | An object's id in a role: the id of the object a field or a routine needs in one part (the container a unit is inside, a foundation, a pasture, a drop site, a building's main part, a missile's shooter, an action's target: the Gather's, the Hunt's, the Repair's, the Attack's, the missile's), so that an id of another role or of any object does not compile there. |
 | [`sprite.rs`](sprite.rs) | An object's active sprite: the frame of its sprite (a `.dat` graphic) and, for a graphic that animates, the clock that advances it. |
+| [`task_change.rs`](task_change.rs) | An action's slot 0x50 across a task change: the action's task and the new master's task that takes its place, whose sprites an Attack and a `MoveTo` swap (`TaskChange`). |
 | [`teardown.rs`](teardown.rs) | The action list's deletions (`FUN_140a98620`, `FUN_140a98e20`) and each action's destructor (its slot 0): what they leave the unit's world to apply. |
 | [`update_code.rs`](update_code.rs) | What an action's update answers its list. |
 | [`voice.rs`](voice.rs) | Whether an action speaks for its unit (`Voice`): the base action's `+0x60`. |
@@ -60,6 +61,7 @@ calls `Unit::update` (`unit/update.rs`), which runs the object's chain of update
 | [`lifecycle/`](lifecycle/) | What happens to an object once it is dead: the state steps of `RGE_Static_Object::update` (158041 `0x14118ad50`) and `RGE_Animated_Object::update` (`0x141071880`), up to the update that returns 1 and so takes the object off its player's list (`RGE_Object_List::update`, `0x141166550`). |
 | [`masters/`](masters/) | What the engine reads of a player's masters: the tasks a unit can do and the masters a unit changes into to do them, and how an effect changes a master: the attribute setters (slots 0x18, 0x20 and 0x28 of every master type, `Master::set_attribute`), the master copy of an upgrade (slot 8, `Master::copy_from`) and the values the slice derives from a master (`follow`). |
 | [`sprite/`](sprite/) | A sprite's definition. |
+| [`task_change/`](task_change/) | The task change's tests. |
 | [`unit/`](unit/) | What the slice tracks of one object (`Unit`) and its update, action by action. |
 <!-- /files -->
 

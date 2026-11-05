@@ -1,7 +1,6 @@
 //! The player's attribute modifier (slot 0x148, `FUN_1416121b0`): the hooks around it, the
 //! masters' change and what their objects and an Attack follow of it.
 
-use crate::combat::attack::Arms;
 use crate::garrison::{attack_rate, share};
 use crate::map::Distance;
 use crate::map::spatial::Obstruction;
@@ -19,11 +18,11 @@ use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObstructionKind;
 use crate::objects::masters::PlayersMastersExt;
-use crate::objects::masters::TaskSprites;
 use crate::objects::masters::follow;
 use crate::objects::masters::follow_moving;
 use crate::objects::masters::player_master;
-use crate::objects::sprite::{ActiveSprite, Graphic, new_sprite};
+use crate::objects::sprite::{ActiveSprite, new_sprite};
+use crate::objects::task_change::TaskChange;
 use crate::players::PlayerId;
 use crate::technology::effect::object_slots::ObjectChange;
 use crate::technology::effect::{CAPPED, Change, OBJECT_GONE, has_actions, within_table};
@@ -179,11 +178,14 @@ impl World {
     /// `player`: one below type 40 or without actions shows its master's standing sprite again when
     /// the change was to the one it shows (71 with its idle variant `+0x78c` 0, 72 with 1;
     /// `FUN_141189760`, slot 0x68); one with actions has each take its master's sprites
-    /// (`FUN_140a97970` -> `FUN_140a78150`): an Attack's (`FUN_140a7f800`) its moving, attack and
+    /// (`FUN_140a97970` -> `FUN_140a78150`): an Attack's
+    /// ([`Arms::take_master`]) its moving, attack and
     /// standing sprites from its master unless they are its task's, and from type 70 on its idle
     /// attack and second attack sprites; a `MoveTo` keeps the sprite it holds (it is not one of the
     /// master's new ones) and shows it again (slot 0x60, which the unit shows already); the other
     /// actions' slot 0x50 does nothing.
+    ///
+    /// [`Arms::take_master`]: crate::combat::attack::Arms::take_master
     pub(super) fn show_changed_sprite(
         &mut self,
         player: PlayerId,
@@ -238,24 +240,21 @@ impl World {
             }
             return Ok(());
         }
-        let sprites = MasterSprites {
-            moving: graphic_of(master.moving_part().move_sprite),
-            attack: graphic_of(master.combat_part().attack_sprite),
-            standing: graphic_of(master.standing_sprite),
-            idle_attack: graphic_of(master.creatable_part().idle_attack_sprite),
-            second: graphic_of(master.combat_part().attack_sprite2),
-            combat: MasterKind::COMBAT <= master.kind,
-        };
+        let graphics = &self.model.graphics;
         // the object the read above found: its action layer
         let actions = self.parts.actions_mut(id)?;
         // a unit's own Attack's task (the work command's attack task) has no sprites
         if let Some(attack) = actions.list.attack_mut() {
-            follow_master(&mut attack.arms, None, &sprites);
+            attack.arms.take_master(&master, None, graphics);
         }
         if let Some(hunt) = actions.list.hunt_mut() {
-            let task = hunt.task.sprites;
+            // the master's own task takes the place of the hunt's
+            let change = TaskChange {
+                old: hunt.task.sprites,
+                next: hunt.task.sprites,
+            };
             if let Some(attack) = hunt.state.attack_mut().and_then(Option::as_mut) {
-                follow_master(&mut attack.arms, Some(task), &sprites);
+                attack.arms.take_master(&master, Some(change), graphics);
             }
         }
         Ok(())
@@ -595,49 +594,5 @@ impl World {
             }
         }
         Ok(())
-    }
-}
-
-/// A master's sprites an Attack's slot 0x50 (`FUN_140a7f800`) takes ([`follow_master`]), as
-/// graphics: the walking, attack, standing, idle attack and second attack sprites, and whether
-/// the master is of a combat type (70 and up).
-#[derive(Clone, Copy, Debug)]
-pub(crate) struct MasterSprites {
-    pub(crate) moving: Option<Graphic>,
-    pub(crate) attack: Option<Graphic>,
-    pub(crate) standing: Option<Graphic>,
-    pub(crate) idle_attack: Option<Graphic>,
-    pub(crate) second: Option<Graphic>,
-    pub(crate) combat: bool,
-}
-
-/// An Attack's slot 0x50 (`FUN_140a7f800`): its walking, attack and standing sprites take the
-/// master's (`sprites`) unless they are its task's (`task`, the moving, proceeding, working and
-/// carrying sprites; none for a unit's own Attack), and from type 70 on its idle attack and
-/// second attack sprites.
-pub(crate) fn follow_master(arms: &mut Arms, task: Option<TaskSprites>, sprites: &MasterSprites) {
-    let of_task = |shown: Option<Graphic>, pick: fn(TaskSprites) -> Option<SpriteId>| {
-        task.zip(shown)
-            .is_some_and(|(task_sprites, graphic)| pick(task_sprites) == Some(graphic.id))
-    };
-    let proceeding = |task_sprites: TaskSprites| task_sprites.proceeding;
-    let working = |task_sprites: TaskSprites| task_sprites.working;
-    if arms.move_sprite.is_some() && !of_task(arms.move_sprite, |task_sprites| task_sprites.moving)
-    {
-        arms.move_sprite = sprites.moving;
-    }
-    if arms.sprite.is_some() && !of_task(arms.sprite, proceeding) && !of_task(arms.sprite, working)
-    {
-        arms.sprite = sprites.attack;
-    }
-    if arms.idle_sprite.is_some()
-        && !of_task(arms.idle_sprite, proceeding)
-        && !of_task(arms.idle_sprite, working)
-    {
-        arms.idle_sprite = sprites.standing;
-    }
-    if sprites.combat {
-        arms.idle_attack_sprite = sprites.idle_attack;
-        arms.second_sprite = sprites.second;
     }
 }

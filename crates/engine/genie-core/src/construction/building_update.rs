@@ -2,6 +2,7 @@
 //! death blast.
 
 use crate::combat::damage::HitLayer;
+use crate::combat::damage::TransformTest;
 use crate::combat::damage::Victim;
 use crate::combat::damage::blast;
 use crate::combat::victims::file_kill;
@@ -412,7 +413,34 @@ impl Unit {
                 ));
             }
         }
-        let rate = bm.garrison_heal_rate;
+        let villagers = self.heal_garrison(step, bm.garrison_heal_rate, roles)?;
+        if 0 < villagers
+            && HitPoints::ZERO < bm.garrison_repair_rate
+            && self.life.hp < HitPoints::new(HitPoints::of_master(master_hp).get())
+        {
+            return Err(GenieError::unsupported(
+                "a building its villagers inside repair (FUN_1411d33e0)",
+            ));
+        }
+        Ok(())
+    }
+
+    /// The heal of a building's units inside, from the first ([`Unit::building_seconds`]): each
+    /// below its master's hit points heals by `rate` (slot 0x110, [`Unit::heal`]), whose slot
+    /// 0xb8 may run its hit point transforms ([`World::transform_by_hit_points`]). Returns how
+    /// many villagers are inside, which the building's repair by its garrison counts.
+    ///
+    /// [`World::transform_by_hit_points`]: crate::world::World::transform_by_hit_points
+    ///
+    /// # Errors
+    ///
+    /// A unit inside whose master its player lacks, and the heal's and the transforms'.
+    fn heal_garrison(
+        &self,
+        step: &mut Step<'_>,
+        rate: HitPoints,
+        roles: &Roles,
+    ) -> GenieResult<usize> {
         let mut villagers = 0;
         for &id in &self.garrison {
             let _ = step.world.players.player(step.player)?;
@@ -430,25 +458,21 @@ impl Unit {
                 villagers += 1;
             }
             let (class, hit_points) = (master.class, master.hit_points);
-            if HitPoints::ZERO < rate && unit.life.hp < HitPoints::of_master(hit_points) {
-                unit.heal(
+            if HitPoints::ZERO < rate
+                && unit.life.hp < HitPoints::of_master(hit_points)
+                && unit.heal(
                     step.world.parts.combat_mut(unit.id)?,
                     class,
                     hit_points,
                     rate,
                     roles,
-                )?;
+                )? == TransformTest::Runs
+            {
+                step.world
+                    .transform_by_hit_points(step.player, list_index)?;
             }
         }
-        if 0 < villagers
-            && HitPoints::ZERO < bm.garrison_repair_rate
-            && self.life.hp < HitPoints::new(HitPoints::of_master(master_hp).get())
-        {
-            return Err(GenieError::unsupported(
-                "a building its villagers inside repair (FUN_1411d33e0)",
-            ));
-        }
-        Ok(())
+        Ok(villagers)
     }
 
     /// The animated object's idle swap (the end of `RGE_Animated_Object::update`,

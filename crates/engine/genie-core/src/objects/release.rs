@@ -8,6 +8,7 @@ use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::WorkerCount;
+use crate::objects::hit_points::HpChange;
 use crate::objects::layers::Building;
 use crate::objects::lifecycle::death_parts::{count_class, forget_resource};
 use crate::objects::masters::ClassId;
@@ -130,7 +131,9 @@ impl World {
     /// `TRIBE_Combat_Object::update`'s regeneration ([`Unit::regenerate`]) of the object in
     /// `slot` ([`World::live_slot`]), a combat object or building (types 70 and 80) by its own
     /// master, else its player's; a loss that leaves it below 1 hit point counts its stingers'
-    /// kill credits at once ([`World::count_kills`]).
+    /// kill credits at once ([`World::count_kills`]), any other loss or a gain below its most
+    /// runs its hit point transforms' test ([`World::transform_by_hit_points`]), and then it may
+    /// have its charge's armor back ([`Unit::restore_charged_armor`]).
     ///
     /// # Errors
     ///
@@ -150,14 +153,22 @@ impl World {
         }
         let master = master.clone();
         let unit = self.players.live_mut(player_id, list_index)?;
-        let credited = unit.regenerate(
+        let regenerated = unit.regenerate(
             self.parts.combat_mut(unit.id)?,
             &master,
             dt_seconds,
             &self.model.tuning.turn,
         );
-        if let Some(count) = credited {
-            self.count_kills(player_id, KilledMaster::of(&master), &[count])?;
+        match regenerated.change {
+            HpChange::Fell(Some(count)) => {
+                self.count_kills(player_id, KilledMaster::of(&master), &[count])?;
+            }
+            HpChange::TransformTest => self.transform_by_hit_points(player_id, list_index)?,
+            HpChange::Fell(None) | HpChange::Settled => {}
+        }
+        if let Some(most) = regenerated.most {
+            let unit = self.players.live(player_id, list_index)?;
+            unit.restore_charged_armor(self.parts.combat_mut(unit.id)?, most);
         }
         Ok(())
     }

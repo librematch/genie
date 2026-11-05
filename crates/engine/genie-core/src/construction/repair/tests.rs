@@ -1,6 +1,7 @@
 use super::*;
 use crate::GenieResult;
 use crate::combat::damage::ArmorPair;
+use crate::combat::damage::TransformTest;
 use crate::construction::MainBuildingId;
 use crate::construction::repair::RepairFrom;
 use crate::construction::repair::RepairerCount;
@@ -203,6 +204,7 @@ fn house(id: i32, hp: HitPoints) -> Repaired {
         annexes: Vec::new(),
         unit_repair_cost: Amount::new(0.5),
         building_repair_cost: Amount::new(0.15),
+        transform_test: TransformTest::Skipped,
     }
 }
 

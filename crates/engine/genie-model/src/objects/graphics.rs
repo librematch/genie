@@ -53,6 +53,13 @@ impl Graphics {
         self.by_id.get(index(sprite))?.as_ref()
     }
 
+    /// The graphic a sprite field (`sprite`, a master's or a task's) points to, as the game's
+    /// load links it: none for no sprite and for one the table lacks (a null pointer).
+    #[must_use]
+    pub fn resolve(&self, sprite: Option<SpriteId>) -> Option<Graphic> {
+        sprite.and_then(|sprite_id| self.get(sprite_id).copied())
+    }
+
     /// Whether it holds a graphic of `sprite`.
     #[must_use]
     pub fn contains_key(&self, sprite: SpriteId) -> bool {
@@ -159,6 +166,20 @@ mod tests {
             replay_delay: Seconds::ZERO,
             flags: SpriteFlags::ANIMATED,
         }
+    }
+
+    /// A sprite field points to its graphic; no sprite and one the table lacks point to none.
+    #[test]
+    fn sprite_field_resolves_to_its_graphic_or_none() {
+        let table = Graphics::from([(SpriteId::named(2), graphic(2, 1))]);
+        assert_eq!(
+            [
+                table.resolve(Some(SpriteId::named(2))),
+                table.resolve(Some(SpriteId::named(3))),
+                table.resolve(None)
+            ],
+            [Some(graphic(2, 1)), None, None]
+        );
     }
 
     /// The walk stays at its end once past the last sprite.

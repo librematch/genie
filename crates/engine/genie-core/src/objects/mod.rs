@@ -29,6 +29,7 @@ use genie_model::objects::speed_multiplier;
 pub mod sprite;
 use genie_model::objects::sprite_flags;
 use genie_model::objects::sprite_id;
+pub(crate) mod task_change;
 pub(crate) mod teardown;
 pub mod unit;
 mod update_code;

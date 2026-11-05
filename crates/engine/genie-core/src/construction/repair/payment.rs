@@ -2,6 +2,7 @@
 //! repairer's player.
 
 use crate::combat::damage::Heal;
+use crate::combat::damage::TransformTest;
 use crate::combat::damage::heal_hp;
 use crate::combat::damage::most_hp;
 use crate::construction::MainBuildingId;
@@ -74,6 +75,9 @@ pub struct Repaired {
     pub(crate) unit_repair_cost: Amount,
     /// Its owner's attribute 271 ([`BUILDING_REPAIR_COST`]): a building's repair cost rate.
     pub(crate) building_repair_cost: Amount,
+    /// Whether its heal's slot 0xb8 runs its hit point transforms' test, which the repair's
+    /// caller runs once the set is written back.
+    pub(crate) transform_test: TransformTest,
 }
 
 /// What a repair pays with: the repairer's player's masters and attributes (`FUN_14162fb60`
@@ -236,18 +240,18 @@ pub fn repair_unit(
             return Ok(RepairOutcome::Unpaid);
         }
     }
-    Ok(
-        match heal_hp(
-            &mut repaired.hp,
-            &mut repaired.hp_powerup,
-            repaired.master_hp,
-            repaired.hp_stinger,
-            amount,
-        ) {
-            Heal::Full => RepairOutcome::Full,
-            Heal::Partial => RepairOutcome::Healed,
-        },
-    )
+    let healed = heal_hp(
+        &mut repaired.hp,
+        &mut repaired.hp_powerup,
+        repaired.master_hp,
+        repaired.hp_stinger,
+        amount,
+    );
+    repaired.transform_test = healed.test;
+    Ok(match healed.heal {
+        Heal::Full => RepairOutcome::Full,
+        Heal::Partial => RepairOutcome::Healed,
+    })
 }
 
 /// A repairer's player's attributes as its repair pays from them

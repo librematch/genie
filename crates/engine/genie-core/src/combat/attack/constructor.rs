@@ -25,6 +25,7 @@ use crate::objects::ObjectId;
 use crate::objects::SpriteId;
 use crate::objects::Voice;
 use crate::objects::layers::MotionMut;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::PlayersMastersExt;
 use crate::objects::masters::TaskSprites;
 use crate::objects::masters::{Master, MasterTables, OwnerMasters};
@@ -32,6 +33,7 @@ use crate::objects::sprite::ActiveSprite;
 use crate::objects::sprite::Cargo;
 use crate::objects::sprite::new_sprite;
 use crate::objects::sprite::{running, walking};
+use crate::objects::task_change::{TaskChange, TaskSprite, swapped};
 use crate::objects::unit::Unit;
 use crate::players::PlayerId;
 use crate::unit_ai::UnitStance;
@@ -489,6 +491,42 @@ pub fn arms_looking(
         missile: master.combat_part().missile.master(),
         fire_frame: master.combat_part().fire_frame,
         interrupt_frame: master.combat_part().interrupt_frame,
+    }
+}
+
+impl Arms {
+    /// The Attack's slot 0x50 (`FUN_140a7f800`) with the new master `next` and the tasks of a
+    /// task change (`tasks`, none in slot 0x90 with 1 and for an action without a task). Each
+    /// sprite it holds changes: its `MoveTo`'s (`+0x68`) takes the new task's moving sprite when
+    /// it is the old task's, else `next`'s walking sprite (`+0x748`); the attack sprite (`+0x70`)
+    /// and the one it stands with (`+0x80`) take the new task's proceeding or working sprite when
+    /// they are the old task's, else `next`'s attack (`+0x7f8`) and standing sprite (`+0x470`).
+    /// For a master of type 70 and up the sprite it waits with (`+0x88`) and the second attack
+    /// sprite (`+0x78`) take `next`'s (`+0x910`, `+0x878`), none or not. A sprite `graphics`
+    /// lacks is none (a null pointer).
+    pub(crate) fn take_master(
+        &mut self,
+        next: &Master,
+        tasks: Option<TaskChange>,
+        graphics: &Graphics,
+    ) {
+        let worked = [TaskSprite::Proceeding, TaskSprite::Working];
+        if let Some(shown) = self.move_sprite {
+            let walking = graphics.resolve(next.moving_part().move_sprite);
+            self.move_sprite = swapped(shown, tasks, &[TaskSprite::Moving], walking, graphics);
+        }
+        if let Some(shown) = self.sprite {
+            let attack = graphics.resolve(next.combat_part().attack_sprite);
+            self.sprite = swapped(shown, tasks, &worked, attack, graphics);
+        }
+        if let Some(shown) = self.idle_sprite {
+            let standing = graphics.resolve(next.standing_sprite);
+            self.idle_sprite = swapped(shown, tasks, &worked, standing, graphics);
+        }
+        if MasterKind::COMBAT <= next.kind {
+            self.idle_attack_sprite = graphics.resolve(next.creatable_part().idle_attack_sprite);
+            self.second_sprite = graphics.resolve(next.combat_part().attack_sprite2);
+        }
     }
 }
 

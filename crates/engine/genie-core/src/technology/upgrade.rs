@@ -24,10 +24,10 @@ use crate::objects::masters::Task;
 use crate::objects::masters::TaskId;
 use crate::objects::masters::player_master;
 use crate::objects::sprite::new_sprite;
+use crate::objects::task_change::TaskChange;
 use crate::objects::unit::Unit;
 use crate::players::Amount;
 use crate::players::PlayerId;
-use crate::technology::effect::{MasterSprites, follow_master};
 use crate::technology::upgrade::damage::{damage_share_of, damage_sprites};
 use crate::unit_ai::UnitAi;
 use crate::unit_ai::unit_ai_kind;
@@ -505,8 +505,10 @@ impl World {
     /// `FUN_140a97970` -> `FUN_140a78150` for each action of the object at `place` whose master
     /// `old` gives way to `new`: an action with a task takes the last of `new`'s tasks of the same
     /// action type, target class and target master (none: it keeps its task and changes nothing
-    /// else); then its slot 0x50 with the tasks: an Attack's sprites follow `new`'s
-    /// ([`crate::technology::effect::follow_master`]), its sub-actions alike (`FUN_140a979b0`).
+    /// else); then its slot 0x50 with the tasks: an Attack's sprites follow `new`'s and the new
+    /// task's ([`Arms::take_master`]), its sub-actions alike (`FUN_140a979b0`).
+    ///
+    /// [`Arms::take_master`]: crate::combat::attack::Arms::take_master
     pub(crate) fn actions_take_master(
         &mut self,
         place: Place,
@@ -533,31 +535,24 @@ impl World {
                 .copied()
         };
         let graphics = &self.model.graphics;
-        let graphic_of =
-            |id: Option<SpriteId>| id.and_then(|sprite_id| graphics.get(sprite_id).copied());
-        let sprites = MasterSprites {
-            moving: graphic_of(new.moving_part().move_sprite),
-            attack: graphic_of(new.combat_part().attack_sprite),
-            standing: graphic_of(new.standing_sprite),
-            idle_attack: graphic_of(new.creatable_part().idle_attack_sprite),
-            second: graphic_of(new.combat_part().attack_sprite2),
-            combat: MasterKind::COMBAT <= new.kind,
-        };
         let id = self.object_at(place)?.id;
         // an object the table holds no layer of has no actions to follow the master
         let Some(actions) = self.parts.actions.get_mut(id) else {
             return Ok(());
         };
         if let Some(attack) = actions.list.attack_mut() {
-            follow_master(&mut attack.arms, None, &sprites);
+            attack.arms.take_master(new, None, graphics);
         }
         if let Some(hunt) = actions.list.hunt_mut()
             && let Some(found) = old_task(hunt.task.id).as_ref().and_then(find)
         {
+            let change = TaskChange {
+                old: hunt.task.sprites,
+                next: found.sprites,
+            };
             hunt.task = HuntTask::of(&found);
-            let task = hunt.task.sprites;
             if let Some(attack) = hunt.state.attack_mut().and_then(Option::as_mut) {
-                follow_master(&mut attack.arms, Some(task), &sprites);
+                attack.arms.take_master(new, Some(change), graphics);
             }
         }
         if let Some(gather) = actions.list.gather_mut()

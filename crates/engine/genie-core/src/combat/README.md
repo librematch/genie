@@ -14,6 +14,8 @@ Combat is what happens between an attacker and its target. This folder holds eve
   while it moves, the look it takes on a terrain, and the reward for its removal.
 - `powerup.rs` holds an object's powerups: what an aura gives it, how long it holds, and its
   reset. `aura/` holds the auras that give them and the powerup update that runs them.
+- `hp_transforms.rs` holds an object's hit point transforms: past a threshold of its hit
+  points, after a loss or a gain, it takes another master and keeps its actions.
 
 ## How the tick reaches it
 
@@ -40,6 +42,7 @@ its powerup update (`aura/`).
 | [`attack_target.rs`](attack_target.rs) | An Attack's target as its own type: the object it attacks. |
 | [`class_or_master.rs`](class_or_master.rs) | The object a combat task names (`ClassOrMaster`): a class or a master, as slot 277 keeps it in the aura groups and the stinger tasks. |
 | [`combat_update.rs`](combat_update.rs) | `TRIBE_Combat_Object::update` (`0x141208440`), a combat object's or building's own update (types 70 and 80) around `RGE_Combat_Object::update`. |
+| [`hp_transforms.rs`](hp_transforms.rs) | An object's hit point transforms (`+0xb20`..`+0xb30`, 48-byte entries that slot 277 `0x141206d50` fills from its master's tasks of type 158 in their order): after a loss it survives (slot 22, `FUN_141205c80`) and after a gain below its most (slot 0xb8, `FUN_141203be0`), the first whose test holds gives it another master (`FUN_141204450`). |
 | [`kill_counts.rs`](kill_counts.rs) | A kill's counts in its players' attributes (`World::count_kills`): slot 22's credits of its burns, the damage's counts for its owner and `FUN_1412005b0`'s for a killer. |
 | [`kill_state.rs`](kill_state.rs) | Whether an object's kill is counted. |
 | [`lockdown.rs`](lockdown.rs) | How often an object is locked down. |
@@ -55,6 +58,7 @@ its powerup update (`aura/`).
 | [`aura/`](aura/) | An object's auras: its master's tasks of type 155 (`ActionKind::AURA`) in the groups that slot 277 builds of them (`TRIBE_Combat_Object::slot277`, `0x141206d50`), which the powerup update (`FUN_141204a10`, `World::powerup_update`) reads. |
 | [`combat_update/`](combat_update/) | The combat update's tests. |
 | [`damage/`](damage/) | The damage side of a hit: what it reads of its target and its attacker and what it changes. |
+| [`hp_transforms/`](hp_transforms/) | The hit point transforms' tests. |
 | [`missile/`](missile/) | The missile (`RGE_Missile_Object`, type 60) and its action (`RGE_Action_Missile`, type 8): a ranged attacker's swing makes one at its weapon offset (`FUN_141081020`, `spawn_point`), its action aims at the target (`FUN_140a9c600`, `aim`; `set_state` 3, `FUN_140a9de70`, `MissileAction::launch`) and flies it each update (`FUN_140a9e6e0`, `MissileAction::fly`) until it hits the target (the shooter's hit, slot 0x860) or the ground. |
 | [`powerup/`](powerup/) | The powerups' tests. |
 | [`stingers/`](stingers/) | An object's stingers (`mActiveStingers`, `+0xb58`): what its attackers' hits hand it (`hand_off`, `FUN_14107bdf0`) from their masters' stinger tasks (`stinger_tasks`), and the sums the stinger update rebuilds from them in each update (`World::object_stingers`, `FUN_1412092e0`). |

@@ -5,6 +5,7 @@ use crate::combat::abilities::Abilities;
 use crate::combat::attack::AttackState;
 use crate::combat::attack::{Arms, Attack};
 use crate::combat::damage::ArmorPair;
+use crate::combat::damage::TransformTest;
 use crate::combat::damage::{Kill, KillCount, Razed, Victim};
 use crate::combat::missile::ShooterId;
 use crate::combat::missile::SmartMode;
@@ -119,6 +120,7 @@ use crate::objects::Wake;
 use crate::objects::WorkRate;
 use crate::objects::actions::ActionList;
 use crate::objects::facing::{SpriteFacets, drawn_angle};
+use crate::objects::hit_points::HpChange;
 use crate::objects::layers::{
     Action, Animated, Building, Combat, DefaultTask, Motion, MotionMut, Static, Unstartable,
 };
@@ -10132,14 +10134,17 @@ fn unit_inside_heals_up_to_its_hit_points() {
         ..Unit::default()
     };
     let mut combat = Combat::default();
-    unit.heal(
-        &mut combat,
-        master.class,
-        master.hit_points,
-        HitPoints::new(0.1),
-        &roles(),
-    )
-    .unwrap();
+    assert_eq!(
+        unit.heal(
+            &mut combat,
+            master.class,
+            master.hit_points,
+            HitPoints::new(0.1),
+            &roles(),
+        )
+        .unwrap(),
+        TransformTest::Runs
+    );
     assert_eq!(unit.life.hp, HitPoints::new(11.1));
     // a heal past the hit points stops at them, the powerup's room taking the rest
     unit.life.hp = HitPoints::new(24.95);
@@ -10147,14 +10152,17 @@ fn unit_inside_heals_up_to_its_hit_points() {
         taken: HitPoints::new(1.0),
         max: HitPoints::new(2.0),
     };
-    unit.heal(
-        &mut combat,
-        master.class,
-        master.hit_points,
-        HitPoints::new(0.1),
-        &roles(),
-    )
-    .unwrap();
+    assert_eq!(
+        unit.heal(
+            &mut combat,
+            master.class,
+            master.hit_points,
+            HitPoints::new(0.1),
+            &roles(),
+        )
+        .unwrap(),
+        TransformTest::Runs
+    );
     assert_eq!(
         (unit.life.hp, combat.hp_powerup.taken, combat.hp_powerup.max),
         (
@@ -10166,14 +10174,17 @@ fn unit_inside_heals_up_to_its_hit_points() {
     // past them with the room: the overflow comes off the powerup, then a full unit holds
     // exactly its master's hit points
     unit.life.hp = HitPoints::new(26.95);
-    unit.heal(
-        &mut combat,
-        master.class,
-        master.hit_points,
-        HitPoints::new(0.1),
-        &roles(),
-    )
-    .unwrap();
+    assert_eq!(
+        unit.heal(
+            &mut combat,
+            master.class,
+            master.hit_points,
+            HitPoints::new(0.1),
+            &roles(),
+        )
+        .unwrap(),
+        TransformTest::Runs
+    );
     assert_eq!(unit.life.hp, HitPoints::new(25.0));
     assert_eq!(
         combat.hp_powerup.taken,
@@ -17048,6 +17059,14 @@ fn annexes_before_their_dying_foundation_die_in_the_next_update() {
 /// keeps the loss.
 #[test]
 fn unit_regenerated_to_its_most_has_its_armor_back() {
+    // the regeneration and, after its change, the charge's armor (the update's order)
+    let regenerate = |unit: &mut Unit, combat: &mut Combat, master: &Master, dt: Seconds| {
+        let regenerated = unit.regenerate(combat, master, dt, &tuning().turn);
+        if let Some(most) = regenerated.most {
+            unit.restore_charged_armor(combat, most);
+        }
+        regenerated.change
+    };
     let berserk = Master {
         id: master_id(692),
         kind: MasterKind::COMBAT,
@@ -17077,13 +17096,8 @@ fn unit_regenerated_to_its_most_has_its_armor_back() {
     };
     let (mut healed, mut healed_combat) = unit(HitPoints::new(53.0));
     assert_eq!(
-        healed.regenerate(
-            &mut healed_combat,
-            &berserk,
-            Seconds::new(3.0),
-            &tuning().turn,
-        ),
-        None
+        regenerate(&mut healed, &mut healed_combat, &berserk, Seconds::new(3.0)),
+        HpChange::TransformTest
     );
     assert_eq!(
         (healed.life.hp, healed_combat.armor_removed),
@@ -17091,13 +17105,8 @@ fn unit_regenerated_to_its_most_has_its_armor_back() {
     );
     let (mut hurt, mut hurt_combat) = unit(HitPoints::new(40.0));
     assert_eq!(
-        hurt.regenerate(
-            &mut hurt_combat,
-            &berserk,
-            Seconds::new(3.0),
-            &tuning().turn,
-        ),
-        None
+        regenerate(&mut hurt, &mut hurt_combat, &berserk, Seconds::new(3.0)),
+        HpChange::TransformTest
     );
     assert_eq!(
         (hurt.life.hp, hurt_combat.armor_removed),
@@ -17114,6 +17123,14 @@ fn unit_regenerated_to_its_most_has_its_armor_back() {
 #[test]
 fn unit_regenerates_whole_hit_points_and_keeps_the_rest_as_time() {
     use crate::objects::hit_points::regeneration_rate;
+    // the regeneration and, after its change, the charge's armor (the update's order)
+    let regenerate = |unit: &mut Unit, combat: &mut Combat, master: &Master, dt: Seconds| {
+        let regenerated = unit.regenerate(combat, master, dt, &tuning().turn);
+        if let Some(most) = regenerated.most {
+            unit.restore_charged_armor(combat, most);
+        }
+        regenerated.change
+    };
     let berserk = Master {
         id: master_id(692),
         kind: MasterKind::COMBAT,
@@ -17141,13 +17158,13 @@ fn unit_regenerates_whole_hit_points_and_keeps_the_rest_as_time() {
         ..Default::default()
     };
     assert_eq!(
-        regenerating.regenerate(
+        regenerate(
+            &mut regenerating,
             &mut unit_combat,
             &berserk,
-            Seconds::new(2.0),
-            &tuning().turn,
+            Seconds::new(2.0)
         ),
-        None
+        HpChange::TransformTest
     );
     assert_eq!(
         (regenerating.life.hp, unit_combat.regen_timer),
@@ -17160,13 +17177,8 @@ fn unit_regenerates_whole_hit_points_and_keeps_the_rest_as_time() {
     let mut full = unit(HitPoints::new(54.0));
     let mut full_combat = Combat::default();
     assert_eq!(
-        full.regenerate(
-            &mut full_combat,
-            &berserk,
-            Seconds::new(3.0),
-            &tuning().turn,
-        ),
-        None
+        regenerate(&mut full, &mut full_combat, &berserk, Seconds::new(3.0)),
+        HpChange::Settled
     );
     assert_eq!(
         (full.life.hp, full_combat.regen_timer),
@@ -17194,7 +17206,7 @@ fn unit_regenerates_whole_hit_points_and_keeps_the_rest_as_time() {
             hero_flag: HeroFlags::REGENERATES | HeroFlags::INVERTED,
             ..berserk.clone().creatable.unwrap_or_default()
         }),
-        ..berserk.clone()
+        ..berserk
     };
     assert_eq!(
         regeneration_rate(&not_hero, &powered_combat, &tuning().turn),
@@ -17213,23 +17225,23 @@ fn unit_regenerates_whole_hit_points_and_keeps_the_rest_as_time() {
     let mut gate_unit = unit(HitPoints::new(1650.0));
     let mut gate_combat = Combat::default();
     assert_eq!(
-        gate_unit.regenerate(&mut gate_combat, &gate, Seconds::new(0.104), &tuning().turn),
-        None
+        regenerate(&mut gate_unit, &mut gate_combat, &gate, Seconds::new(0.104)),
+        HpChange::TransformTest
     );
     assert_eq!(gate_unit.life.hp, HitPoints::new(1649.0));
     let mut low = unit(HitPoints::new(1.0));
     let mut low_combat = Combat::default();
     assert_eq!(
-        low.regenerate(&mut low_combat, &gate, Seconds::new(1.0), &tuning().turn),
-        None
+        regenerate(&mut low, &mut low_combat, &gate, Seconds::new(1.0)),
+        HpChange::Fell(None)
     );
     assert_eq!(low.life.hp, HitPoints::ZERO);
     // below 1 hit point or out of state 2: nothing
     let mut dead = unit(HitPoints::new(0.5));
     let mut dead_combat = Combat::default();
     assert_eq!(
-        dead.regenerate(&mut dead_combat, &gate, Seconds::new(1.0), &tuning().turn),
-        None
+        regenerate(&mut dead, &mut dead_combat, &gate, Seconds::new(1.0)),
+        HpChange::Settled
     );
     assert_eq!(
         (dead.life.hp, dead_combat.regen_timer),

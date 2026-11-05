@@ -38,7 +38,8 @@ pub use self::hit_factors::{
 };
 use self::hit_factors::{charge_damage, special_charge_ready};
 pub use self::hit_points::{
-    Heal, HitKind, ShieldBlock, gain_hp, heal_base_hp, heal_hp, lose, most_hp, shield,
+    Heal, Healed, HitKind, ShieldBlock, TransformTest, gain_hp, heal_base_hp, heal_hp, lose,
+    most_hp, shield,
 };
 use self::hit_points::{effective, hp_floor};
 pub use self::shown_values::{

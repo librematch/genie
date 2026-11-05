@@ -25,6 +25,7 @@ use crate::objects::masters::OwnerMasters;
 use crate::objects::masters::PlayersMastersExt;
 use crate::objects::masters::Task;
 use crate::objects::unit::Unit;
+use crate::orders::ActionsOnChange;
 use crate::orders::GARRISON;
 use crate::orders::MasterSwap;
 use crate::orders::object_gone;
@@ -169,7 +170,7 @@ impl World {
         order: EnterOrder,
     ) -> GenieResult<Option<Notify>> {
         if let Some(master) = order.switch {
-            self.change_master(player, idx, master)?;
+            self.change_master(player, idx, master, ActionsOnChange::Clear)?;
         }
         self.enter_with(player, idx, order.target, &order.task, order.slot)
     }

@@ -1,6 +1,7 @@
 //! The repair part of the update and the unit's attackers and seen target.
 
 use crate::combat::Firepower;
+use crate::combat::damage::TransformTest;
 use crate::combat::damage::{Heal, heal_base_hp};
 use crate::construction::MainBuildingId;
 use crate::construction::RepairTargetId;
@@ -45,6 +46,7 @@ use crate::unit_ai::task_finder::allied;
 use crate::unit_ai::{Attacker, TopTarget};
 use crate::world::GameMode;
 use crate::world::World;
+use crate::world::index::Place;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
 use crate::world::layer::generated::MovementTuning;
@@ -364,6 +366,16 @@ pub(crate) fn repair_target(
         .player_mut(player)?
         .add_attributes(paid.adds)?;
     repair_write_back(step.world, &set, &original)?;
+    // a heal's slot 0xb8 runs the healed object's hit point transforms' test (`FUN_141204450`);
+    // the set's objects are each healed once, and no later step of the repair reads a master
+    // the test may change
+    for repaired in &set {
+        if repaired.transform_test == TransformTest::Runs
+            && let Some(Place::Live(owner, list_index)) = step.world.place(repaired.id)
+        {
+            step.world.transform_by_hit_points(owner, list_index)?;
+        }
+    }
     Ok((answer, kind))
 }
 
@@ -451,6 +463,7 @@ fn repaired(
         annexes,
         unit_repair_cost: rate(UNIT_REPAIR_COST),
         building_repair_cost: rate(BUILDING_REPAIR_COST),
+        transform_test: TransformTest::Skipped,
     })
 }
 

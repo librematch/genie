@@ -58,6 +58,7 @@ use crate::objects::masters::BuildableOn;
 use crate::objects::masters::ClassAmount;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::CombatPart;
+use crate::objects::masters::CreatablePart;
 use crate::objects::masters::DamageShare;
 use crate::objects::masters::FlyMode;
 use crate::objects::masters::MasterField;
@@ -67,6 +68,7 @@ use crate::objects::masters::MovingPart;
 use crate::objects::masters::ObstructionKind;
 use crate::objects::masters::RestrictionField;
 use crate::objects::masters::TaskSprites;
+use crate::objects::task_change::TaskChange;
 use crate::objects::unit::Unit;
 use crate::objects::{FacetCount, RelicCount, WorkerCount};
 use crate::players::PlayerId;
@@ -4008,4 +4010,141 @@ fn an_attack_on_dead_target_posts_by_its_unit_ai() {
         (rig.fight.own.class, rig.fight.victim.player) = (class::VILLAGER, PlayerId::GAIA);
     };
     assert!(!lost(AiOrder::Idle, gaia).2);
+}
+
+/// The graphic of sprite `id`, ten frames of 0.1 s.
+const fn sprite_graphic(id: i16) -> Graphic {
+    Graphic {
+        id: SpriteId::named(id),
+        frames: Frame::of_data(10),
+        facets: FacetCount::of_data(1),
+        speed_multiplier: SpeedMultiplier::ONE,
+        frame_duration: Seconds::new(0.1),
+        replay_delay: Seconds::ZERO,
+        flags: SpriteFlags::NONE,
+    }
+}
+
+/// A master of `kind` whose walking, attack, second attack, standing and idle attack sprites
+/// are 11 to 15, and the graphics of sprites 1 to 5, 11 to 15 and 21 to 23.
+fn sprited_master(kind: MasterKind) -> (Master, Graphics) {
+    let sprite = |id| Some(SpriteId::named(id));
+    let master = Master {
+        kind,
+        standing_sprite: sprite(14),
+        moving: Some(MovingPart {
+            move_sprite: sprite(11),
+            ..MovingPart::default()
+        }),
+        combat: Some(CombatPart {
+            attack_sprite: sprite(12),
+            attack_sprite2: sprite(13),
+            ..CombatPart::default()
+        }),
+        creatable: Some(CreatablePart {
+            idle_attack_sprite: sprite(15),
+            ..CreatablePart::default()
+        }),
+        ..Master::default()
+    };
+    let graphics = Graphics::from(
+        [1, 2, 3, 4, 5, 11, 12, 13, 14, 15, 21, 22, 23]
+            .map(|id| (SpriteId::named(id), sprite_graphic(id))),
+    );
+    (master, graphics)
+}
+
+/// The Attack's arms showing sprites 1 to 4 (walking, attack, second attack, standing).
+fn shown_arms() -> Arms {
+    Arms {
+        move_sprite: Some(sprite_graphic(1)),
+        sprite: Some(sprite_graphic(2)),
+        second_sprite: Some(sprite_graphic(3)),
+        idle_sprite: Some(sprite_graphic(4)),
+        idle_attack_sprite: None,
+        ..standing_arms()
+    }
+}
+
+/// An Attack's slot 0x50 (`FUN_140a7f800`) without tasks: its walking, attack and standing
+/// sprites take the new master's, a sprite it lacks stays lacking, and only a master of type 70
+/// and up replaces its idle attack and second attack sprites (none or not).
+#[test]
+fn attack_takes_new_master_sprites_without_tasks() {
+    let (rge_combat, graphics) = sprited_master(MasterKind::RGE_COMBAT);
+    let mut arms = shown_arms();
+    arms.take_master(&rge_combat, None, &graphics);
+    assert_eq!(
+        [
+            arms.move_sprite,
+            arms.sprite,
+            arms.idle_sprite,
+            arms.second_sprite,
+            arms.idle_attack_sprite
+        ],
+        [11, 12, 14, 3]
+            .map(|id| Some(sprite_graphic(id)))
+            .into_iter()
+            .chain([None])
+            .collect::<Vec<_>>()
+            .as_slice()
+    );
+    let (mut combat, graphics) = sprited_master(MasterKind::COMBAT);
+    let mut lacking = Arms {
+        move_sprite: None,
+        ..shown_arms()
+    };
+    lacking.take_master(&combat, None, &graphics);
+    assert_eq!(
+        [
+            lacking.move_sprite,
+            lacking.second_sprite,
+            lacking.idle_attack_sprite
+        ],
+        [None, Some(sprite_graphic(13)), Some(sprite_graphic(15))]
+    );
+    // a combat master without a second attack sprite takes none
+    if let Some(combat_part) = combat.combat.as_mut() {
+        combat_part.attack_sprite2 = None;
+    }
+    let mut arms = shown_arms();
+    arms.take_master(&combat, None, &graphics);
+    assert_eq!(arms.second_sprite, None);
+}
+
+/// With the tasks of a task change, a walking sprite that is the old task's moving one takes
+/// the new task's, an attack or standing sprite that is the old task's proceeding or working
+/// one takes the new task's (none where it has none); any other takes the new master's.
+#[test]
+fn attack_takes_new_task_sprites_where_it_shows_old_task_s() {
+    let (master, graphics) = sprited_master(MasterKind::RGE_COMBAT);
+    let change = TaskChange {
+        old: TaskSprites::of_data([1, 4, 2, 5]),
+        next: TaskSprites::of_data([21, 22, 23, 24]),
+    };
+    let mut arms = shown_arms();
+    arms.take_master(&master, Some(change), &graphics);
+    assert_eq!(
+        [arms.move_sprite, arms.sprite, arms.idle_sprite],
+        [21, 23, 22].map(|id| Some(sprite_graphic(id)))
+    );
+    // the old task's sprites are none of those it shows: the master's
+    let other = TaskChange {
+        old: TaskSprites::of_data([5, 5, 5, 1]),
+        ..change
+    };
+    let mut arms = shown_arms();
+    arms.take_master(&master, Some(other), &graphics);
+    assert_eq!(
+        [arms.move_sprite, arms.sprite, arms.idle_sprite],
+        [11, 12, 14].map(|id| Some(sprite_graphic(id)))
+    );
+    // a new task without the sprite: none
+    let lacking = TaskChange {
+        next: TaskSprites::of_data([-1, 22, 23, 24]),
+        ..change
+    };
+    let mut arms = shown_arms();
+    arms.take_master(&master, Some(lacking), &graphics);
+    assert_eq!(arms.move_sprite, None);
 }

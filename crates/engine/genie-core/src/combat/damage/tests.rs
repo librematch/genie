@@ -2086,54 +2086,99 @@ const fn pu(taken: f32, max: f32) -> HpPowerup {
 
 /// `FUN_141203be0`: hit points gain up to the master's plus the powerup room; the overflow
 /// comes off the powerup, never below 0; a powerup above its room first takes the room; at
-/// its most a gain only takes off the powerup.
+/// its most a gain only takes off the powerup. Below its most the hit point transforms' test
+/// runs, at its most it does not, nor with a NaN.
 #[test]
 fn gain_fills_hit_points_and_its_overflow_takes_off_the_powerup() {
     let mut hp = HitPoints::new(50.0);
     let mut ups = pu(0.0, 0.0);
-    gain_hp(
+    let test = gain_hp(
         &mut hp,
         &mut ups,
         MasterHitPoints::of_data(60),
         HitPoints::ZERO,
         HitPoints::new(5.0),
     );
-    assert_eq!((hp, ups), (HitPoints::new(55.0), pu(0.0, 0.0)));
-    gain_hp(
+    assert_eq!(
+        ((hp, ups), test),
+        ((HitPoints::new(55.0), pu(0.0, 0.0)), TransformTest::Runs)
+    );
+    let test = gain_hp(
         &mut hp,
         &mut ups,
         MasterHitPoints::of_data(60),
         HitPoints::ZERO,
         HitPoints::new(10.0),
     );
-    assert_eq!((hp, ups), (HitPoints::new(60.0), pu(0.0, 0.0)));
+    assert_eq!(
+        ((hp, ups), test),
+        ((HitPoints::new(60.0), pu(0.0, 0.0)), TransformTest::Runs)
+    );
     let mut hp = HitPoints::new(65.0);
     let mut ups = pu(8.0, 10.0);
-    gain_hp(
+    let test = gain_hp(
         &mut hp,
         &mut ups,
         MasterHitPoints::of_data(60),
         HitPoints::ZERO,
         HitPoints::new(10.0),
     );
-    assert_eq!((hp, ups), (HitPoints::new(70.0), pu(3.0, 10.0)));
-    gain_hp(
+    assert_eq!(
+        ((hp, ups), test),
+        ((HitPoints::new(70.0), pu(3.0, 10.0)), TransformTest::Runs)
+    );
+    let test = gain_hp(
         &mut hp,
         &mut ups,
         MasterHitPoints::of_data(60),
         HitPoints::ZERO,
         HitPoints::new(5.0),
     );
-    assert_eq!((hp, ups), (HitPoints::new(70.0), pu(0.0, 10.0)));
+    assert_eq!(
+        ((hp, ups), test),
+        (
+            (HitPoints::new(70.0), pu(0.0, 10.0)),
+            TransformTest::Skipped
+        )
+    );
     let mut ups = pu(12.0, 10.0);
-    gain_hp(
+    let test = gain_hp(
         &mut hp,
         &mut ups,
         MasterHitPoints::of_data(60),
         HitPoints::ZERO,
         HitPoints::new(0.0),
     );
-    assert_eq!(ups, pu(10.0, 10.0));
+    assert_eq!((ups, test), (pu(10.0, 10.0), TransformTest::Skipped));
+    // a NaN, hit points or most, takes no gain (`JBE`): only the powerup's part, and its NaN
+    // leaves 0
+    let mut nan_hp = HitPoints::new(f32::NAN);
+    let mut ups = pu(8.0, 10.0);
+    let test = gain_hp(
+        &mut nan_hp,
+        &mut ups,
+        MasterHitPoints::of_data(60),
+        HitPoints::ZERO,
+        HitPoints::new(5.0),
+    );
+    assert!(nan_hp.get().is_nan());
+    assert_eq!((ups, test), (pu(3.0, 10.0), TransformTest::Skipped));
+    let mut hp = HitPoints::new(50.0);
+    let mut ups = pu(8.0, 10.0);
+    let test = gain_hp(
+        &mut hp,
+        &mut ups,
+        MasterHitPoints::of_data(60),
+        HitPoints::new(f32::NAN),
+        HitPoints::new(f32::NAN),
+    );
+    assert_eq!(
+        ((hp, ups), test),
+        (
+            (HitPoints::new(50.0), pu(0.0, 10.0)),
+            TransformTest::Skipped
+        )
+    );
 }
 
 /// `FUN_141193b30`: a loss leaves at least 1 hit point; full hit points (room less powerup
@@ -2150,7 +2195,8 @@ fn heal_to_full_holds_the_master_hit_points() {
             MasterHitPoints::of_data(60),
             HitPoints::ZERO,
             HitPoints::new(10.0)
-        ),
+        )
+        .heal,
         Heal::Partial
     );
     assert_eq!(hp, HitPoints::new(40.0));
@@ -2161,7 +2207,8 @@ fn heal_to_full_holds_the_master_hit_points() {
             MasterHitPoints::of_data(60),
             HitPoints::ZERO,
             HitPoints::new(25.0)
-        ),
+        )
+        .heal,
         Heal::Full
     );
     assert_eq!(hp, HitPoints::new(60.0));
@@ -2173,7 +2220,8 @@ fn heal_to_full_holds_the_master_hit_points() {
             MasterHitPoints::of_data(60),
             HitPoints::ZERO,
             HitPoints::new(-3.0)
-        ),
+        )
+        .heal,
         Heal::Partial
     );
     assert_eq!(hp, HitPoints::new(1.0));
@@ -2186,7 +2234,8 @@ fn heal_to_full_holds_the_master_hit_points() {
             MasterHitPoints::of_data(60),
             HitPoints::ZERO,
             HitPoints::new(4.0)
-        ),
+        )
+        .heal,
         Heal::Partial
     );
     assert_eq!(hp, HitPoints::new(59.0));
@@ -2198,7 +2247,8 @@ fn heal_to_full_holds_the_master_hit_points() {
             MasterHitPoints::of_data(60),
             HitPoints::ZERO,
             HitPoints::new(1.0)
-        ),
+        )
+        .heal,
         Heal::Partial
     );
 }

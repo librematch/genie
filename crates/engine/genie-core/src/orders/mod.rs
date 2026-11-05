@@ -52,6 +52,8 @@ mod follow;
 mod form;
 mod gather;
 mod interact;
+mod master_change;
+pub(crate) use self::master_change::ActionsOnChange;
 mod moves;
 pub(crate) use self::moves::{PACK_OR_UNPACK, placed_reach};
 mod order_flags;
@@ -70,9 +72,9 @@ pub mod town_bell;
 mod unit_order;
 mod work;
 
-#[cfg(test)]
-use self::actions::{SwitchWorld, switch_master};
 pub use self::dispatch::Dispatch;
+#[cfg(test)]
+use self::master_change::{ShownOnChange, SwitchWorld, switch_master};
 use self::points::{centroid, follow_axis, follow_spread, grid_point, offset_point};
 pub(crate) use self::work::MasterSwap;
 use crate::gathering::DropSiteId;

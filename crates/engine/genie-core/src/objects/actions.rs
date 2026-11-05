@@ -43,7 +43,7 @@ use crate::ownership::artifact::ARTIFACT_KIND;
 use crate::ownership::artifact::Artifact;
 use genie_diff::Diff;
 use std::mem::discriminant;
-use std::slice::Iter;
+use std::slice::{Iter, IterMut};
 
 /// Declares the action kinds: the [`Action`] variants and, for each, the list's accessors.
 macro_rules! action_kinds {
@@ -279,6 +279,11 @@ impl ActionList {
     pub fn iter(&self) -> Iter<'_, Action> {
         self.0.iter()
     }
+
+    /// The actions to change, the head first.
+    pub(crate) fn iter_mut(&mut self) -> IterMut<'_, Action> {
+        self.0.iter_mut()
+    }
 }
 
 impl<'list> IntoIterator for &'list ActionList {
@@ -287,6 +292,15 @@ impl<'list> IntoIterator for &'list ActionList {
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.iter()
+    }
+}
+
+impl<'list> IntoIterator for &'list mut ActionList {
+    type Item = &'list mut Action;
+    type IntoIter = IterMut<'list, Action>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter_mut()
     }
 }
 

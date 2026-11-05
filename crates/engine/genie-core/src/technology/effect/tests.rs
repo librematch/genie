@@ -1,7 +1,6 @@
 use super::*;
 use crate::combat::Charge;
 use crate::combat::Firepower;
-use crate::combat::attack::Arms;
 use crate::combat::missile::Missile;
 use crate::construction::MainBuildingId;
 use crate::construction::build::Construction;
@@ -42,7 +41,6 @@ use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObstructionClass;
 use crate::objects::masters::ObstructionKind;
-use crate::objects::masters::TaskSprites;
 use crate::objects::masters::{BuildingMaster, Task};
 use crate::objects::masters::{CostSlot, Master, Masters};
 use crate::objects::sprite::{ActiveSprite, Graphic};
@@ -149,103 +147,6 @@ fn an_object_has_actions_while_it_holds_one() {
         progress: Seconds::ZERO,
     }));
     assert!(has_actions(&action, Some(&production), None));
-}
-
-/// An Attack's slot 0x50 (`FUN_140a7f800`): its sprites take the master's unless they are
-/// its task's (the walking sprite the task's moving one, the attack and standing sprites the
-/// task's proceeding or working one), a sprite it lacks stays lacking, and only a combat
-/// master's idle attack and second attack sprites replace its own.
-#[test]
-fn an_attack_takes_its_master_sprites_but_its_task_s() {
-    let graphic_of = |id| Graphic {
-        id,
-        frames: Frame::of_data(10),
-        facets: FacetCount::of_data(1),
-        speed_multiplier: SpeedMultiplier::ONE,
-        frame_duration: Seconds::new(0.1),
-        replay_delay: Seconds::ZERO,
-        flags: SpriteFlags::NONE,
-    };
-    let arms = Arms {
-        move_sprite: Some(graphic_of(SpriteId::named(1))),
-        sprite: Some(graphic_of(SpriteId::named(2))),
-        second_sprite: Some(graphic_of(SpriteId::named(3))),
-        idle_sprite: Some(graphic_of(SpriteId::named(4))),
-        idle_attack_sprite: None,
-        missile: None,
-        fire_frame: Frame::of_data(0),
-        interrupt_frame: Frame::of_data(-1),
-    };
-    let sprites = MasterSprites {
-        moving: Some(graphic_of(SpriteId::named(11))),
-        attack: Some(graphic_of(SpriteId::named(12))),
-        standing: Some(graphic_of(SpriteId::named(14))),
-        idle_attack: Some(graphic_of(SpriteId::named(15))),
-        second: Some(graphic_of(SpriteId::named(13))),
-        combat: false,
-    };
-    let mut followed = arms;
-    follow_master(&mut followed, None, &sprites);
-    assert_eq!(
-        [
-            followed.move_sprite,
-            followed.sprite,
-            followed.idle_sprite,
-            followed.second_sprite,
-            followed.idle_attack_sprite
-        ],
-        [
-            Some(graphic_of(SpriteId::named(11))),
-            Some(graphic_of(SpriteId::named(12))),
-            Some(graphic_of(SpriteId::named(14))),
-            Some(graphic_of(SpriteId::named(3))),
-            None
-        ]
-    );
-    // the task's moving (1) and working (4, the standing sprite's) sprites stay
-    let mut kept_arms = arms;
-    follow_master(
-        &mut kept_arms,
-        Some(TaskSprites::of_data([1, 9, 4, 9])),
-        &sprites,
-    );
-    assert_eq!(
-        [
-            kept_arms.move_sprite,
-            kept_arms.sprite,
-            kept_arms.idle_sprite
-        ],
-        [
-            Some(graphic_of(SpriteId::named(1))),
-            Some(graphic_of(SpriteId::named(12))),
-            Some(graphic_of(SpriteId::named(4)))
-        ]
-    );
-    // a sprite it lacks stays lacking; a combat master's last two replace its own
-    let mut followed = Arms {
-        move_sprite: None,
-        ..arms
-    };
-    follow_master(
-        &mut followed,
-        None,
-        &MasterSprites {
-            combat: true,
-            ..sprites
-        },
-    );
-    assert_eq!(
-        [
-            followed.move_sprite,
-            followed.second_sprite,
-            followed.idle_attack_sprite
-        ],
-        [
-            None,
-            Some(graphic_of(SpriteId::named(13))),
-            Some(graphic_of(SpriteId::named(15)))
-        ]
-    );
 }
 
 /// `FUN_1412163c0`'s population set (110) over the master's first three storage entries: the

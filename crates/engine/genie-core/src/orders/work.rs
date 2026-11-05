@@ -23,6 +23,7 @@ use crate::objects::masters::MasterKind;
 use crate::objects::masters::Task;
 use crate::objects::masters::TaskGroup;
 use crate::objects::masters::work_master;
+use crate::orders::ActionsOnChange;
 use crate::orders::gather::HuntOrder;
 use crate::orders::{ATTACK_TASK, Work};
 use crate::ownership::artifact::ARTIFACT_KIND;
@@ -228,7 +229,7 @@ impl World {
             MasterSwap::Change
         };
         if master == MasterSwap::Change {
-            self.change_master(player, idx, with)?;
+            self.change_master(player, idx, with, ActionsOnChange::Clear)?;
         }
         if !enabled(&self.players.player(player)?.attributes, task.enablement) {
             return Ok(());
@@ -527,9 +528,9 @@ impl World {
         };
         if swap == MasterSwap::Change {
             if self.master(player, with)?.kind == MasterKind::BUILDING {
-                self.transform_building(player, idx, with)?;
+                self.transform_building(player, idx, with, ActionsOnChange::Clear)?;
             } else {
-                self.change_master(player, idx, with)?;
+                self.change_master(player, idx, with, ActionsOnChange::Clear)?;
             }
         }
         Ok(Some(task))

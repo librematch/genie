@@ -24,6 +24,7 @@ use crate::objects::masters::PlayersMastersExt;
 use crate::objects::masters::player_master;
 use crate::objects::masters::work_master;
 use crate::objects::masters::{MasterTables, OwnerMasters};
+use crate::orders::ActionsOnChange;
 use crate::orders::Dispatch;
 use crate::orders::OrderSource;
 use crate::orders::ReadyOrders;
@@ -334,7 +335,7 @@ impl World {
         // the work command (FUN_14106ff70): the master changes (slot 0x90, its action list
         // cleared); the Build action takes its foundation (FUN_140a7a230, slot 0x178)
         if self.players.live(player, idx)?.life.master_id != with {
-            self.change_master(player, idx, with)?;
+            self.change_master(player, idx, with, ActionsOnChange::Clear)?;
         }
         self.take(foundation.id(), self.releaser(player, idx)?)?;
         // the work command's notify (slot 0x828): the build order and the foundation, with
@@ -374,7 +375,7 @@ impl World {
         wait: Wait,
     ) -> GenieResult<()> {
         if let Some(master) = wait.switch {
-            self.change_master(player, idx, master)?;
+            self.change_master(player, idx, master, ActionsOnChange::Clear)?;
         }
         self.clear_actions(player, idx)?;
         self.parts
@@ -498,7 +499,7 @@ impl World {
             &self.model.tuning.move_to,
         )?;
         if let Some(master_id) = switch.map(|master| master.id) {
-            self.change_master(player, idx, master_id)?;
+            self.change_master(player, idx, master_id, ActionsOnChange::Clear)?;
         }
         self.take(foundation.id(), self.releaser(player, idx)?)?;
         self.clear_actions(player, idx)?;

@@ -12,6 +12,7 @@ use crate::objects::masters::MasterKind;
 use crate::objects::masters::{Master, MasterTables};
 use crate::objects::release::Releaser;
 use crate::objects::unit::Unit;
+use crate::orders::ActionsOnChange;
 use crate::players::PlayerId;
 use crate::players::PlayerKind;
 use crate::unit_ai::world_view::owner_view;
@@ -278,7 +279,9 @@ impl UnitView<'_, '_> {
         self.torn_down((leaves, releases))?;
         self.step.lend_at(
             (&mut *self.unit, &mut *self.actions),
-            |world, player_id, list_index| world.change_master(player_id, list_index, next),
+            |world, player_id, list_index| {
+                world.change_master(player_id, list_index, next, ActionsOnChange::Clear)
+            },
         )
     }
 }

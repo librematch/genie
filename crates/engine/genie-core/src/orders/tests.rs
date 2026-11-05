@@ -106,7 +106,7 @@ use crate::testing::attribute;
 use crate::testing::class;
 use crate::testing::ids;
 use crate::testing::roles;
-use crate::testing::scene::{Scene, SceneObject, move_by, moving_master};
+use crate::testing::scene::{PLAYER, Scene, SceneObject, move_by, moving_master, walking};
 use crate::testing::tuning;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::Answer;
@@ -2828,6 +2828,7 @@ fn master_change_inside_building_keeps_to_its_record() {
         &old,
         &next,
         world,
+        ShownOnChange::Standing,
         &roles(),
         tuning(),
     )
@@ -2847,7 +2848,7 @@ fn master_change_inside_building_keeps_to_its_record() {
 
 /// What [`switched_in_the_open`] gives: what the switch leaves to the owner, the unit with its
 /// combat layer, and its record.
-type InTheOpen = (actions::Switched, (Unit, Combat), Placed);
+type InTheOpen = (master_change::Switched, (Unit, Combat), Placed);
 
 /// Slot 0x90's unit part ([`switch_master`]) of `unit` (with the motion part `motion`), at
 /// (3.5, 3.5) in the open, from `old` to `next`, with the graphics `shown`: what it leaves to
@@ -2907,6 +2908,7 @@ fn switched_in_the_open(
         old,
         next,
         world,
+        ShownOnChange::Standing,
         &roles(),
         tuning(),
     )?;
@@ -6405,4 +6407,103 @@ fn an_interact_of_soldiers_on_an_enemy_building_forms_group_that_attacks_it() {
         (GroupCommandKind::ATTACK, GroupTarget::Object(object_id(60)))
     );
     assert_eq!(world.groups.commands, Differentiator::of_data(1));
+}
+
+/// The graphic of sprite `id`: ten frames of 0.1 s, eight facets.
+const fn eight_facet_sprite(id: i16) -> Graphic {
+    Graphic {
+        id: SpriteId::named(id),
+        frames: Frame::of_data(10),
+        facets: FacetCount::of_data(8),
+        speed_multiplier: SpeedMultiplier::ONE,
+        frame_duration: Seconds::new(0.1),
+        replay_delay: Seconds::ZERO,
+        flags: SpriteFlags::ANIMATED,
+    }
+}
+
+/// A walking combat master `id` of 40 hit points standing with sprite `standing` and walking
+/// with `walk_sprite`.
+fn sprited_walker(id: i16, standing: i16, walk_sprite: i16) -> Master {
+    Master {
+        id: master_id(id),
+        kind: MasterKind::COMBAT,
+        hit_points: MasterHitPoints::of_data(40),
+        standing_sprite: Some(SpriteId::named(standing)),
+        moving: Some(MovingPart {
+            move_sprite: Some(SpriteId::named(walk_sprite)),
+            ..MovingPart::default()
+        }),
+        ..moving_master(walking(Speed::new(1.0)))
+    }
+}
+
+/// Object 7, a 4 that stands with sprite 1, walks with 2 and shows 2, with a `MoveTo` in `state`
+/// showing 2; and object 8, a 5 that stands with 11 and walks with 12. The master change of
+/// object 7 to 5 with `actions`: the sprites the unit and its `MoveTo` show.
+fn changed_master_shows(state: MoveTo, actions: ActionsOnChange) -> [Option<SpriteId>; 2] {
+    let moving = MoveToAction {
+        sprite: Some(eight_facet_sprite(2)),
+        ..MoveToAction::sub_in(state)
+    };
+    let mut scene = Scene::open(GridSize::new(8, 8));
+    for id in [1, 2, 11, 12] {
+        scene = scene.graphic(eight_facet_sprite(id));
+    }
+    let mut world = scene
+        .object(SceneObject {
+            actions: Some(Action {
+                list: ActionList::default().with_move_to(Some(moving)),
+                ..Action::default()
+            }),
+            sprite: Some(SpriteId::named(2)),
+            ..SceneObject::new(
+                7,
+                PLAYER,
+                sprited_walker(4, 1, 2),
+                Position::new(2.5, 2.5, 0.0),
+            )
+        })
+        .object(SceneObject::new(
+            8,
+            PLAYER,
+            sprited_walker(5, 11, 12),
+            Position::new(5.5, 5.5, 0.0),
+        ))
+        .build();
+    let Some(Place::Live(player, idx)) = world.place(object_id(7)) else {
+        panic!("object 7 lives");
+    };
+    world
+        .change_master(player, idx, master_id(5), actions)
+        .unwrap();
+    let unit = world.object(object_id(7)).unwrap().1;
+    let move_to = world.parts.actions_of(object_id(7)).list.move_to();
+    [
+        unit.sprite.map(|active_sprite| active_sprite.graphic.id),
+        move_to
+            .and_then(|move_to_action| move_to_action.sprite)
+            .map(|graphic| graphic.id),
+    ]
+}
+
+/// `FUN_141225b70` with 1 (a hit point transform's): the unit keeps its actions, each taking
+/// the new master's sprites (`FUN_140a979b0`); a `MoveTo` that moves (state 4) shows its new
+/// sprite (slot 0x60), which the unit then keeps; one that waits only takes it. With 0 the list
+/// goes and the unit shows the new standing sprite.
+#[test]
+fn master_change_keeping_actions_shows_the_new_master_walking_sprite() {
+    let sprite = |id| Some(SpriteId::named(id));
+    assert_eq!(
+        changed_master_shows(MoveTo::Moving, ActionsOnChange::Keep),
+        [sprite(12), sprite(12)]
+    );
+    assert_eq!(
+        changed_master_shows(MoveTo::Waiting, ActionsOnChange::Keep),
+        [sprite(2), sprite(12)]
+    );
+    assert_eq!(
+        changed_master_shows(MoveTo::Moving, ActionsOnChange::Clear),
+        [sprite(11), None]
+    );
 }
