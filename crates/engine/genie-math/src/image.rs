@@ -56,6 +56,12 @@ pub mod damage {
     pub const TWO_PI: f32 = f32::from_bits(0x40c9_0fdb);
 }
 
+/// The values the `decay` port reads.
+pub mod decay {
+    /// 1000.0
+    pub const MS_PER_SECOND: f32 = f32::from_bits(0x447a_0000);
+}
+
 /// The values the `diplomacy` port reads.
 pub mod diplomacy {
     /// -1.0

@@ -1,10 +1,9 @@
 //! A new building: BUILD's foundation and the building constructor, with its combat setup,
 //! its storage and its annexes.
 
-use crate::combat::Charge;
 use crate::combat::abilities::Abilities;
 use crate::combat::damage::ArmorPair;
-use crate::combat::{AttackCount, AttackPowerup, Firepower, MissileCount};
+use crate::combat::{AttackCount, AttackPowerup, MissileCount};
 use crate::construction::build::Clearer;
 use crate::construction::build::Construction;
 use crate::construction::build::{NO_CONSTRUCTION, NOT_HELD};
@@ -30,12 +29,10 @@ use crate::objects::WorkRate;
 use crate::objects::layers::default_start;
 use crate::objects::layers::{Action, Animated, Building, Combat, DefaultTask, Motion, Static};
 use crate::objects::lifecycle::Held;
-use crate::objects::lifecycle::death_parts::count_class;
 use crate::objects::lifecycle::static_storage;
 use crate::objects::lifecycle::{Class, Lifecycle};
 use crate::objects::masters::BlastDefense;
 use crate::objects::masters::MasterId;
-use crate::objects::masters::MasterKind;
 use crate::objects::masters::cost_entries;
 use crate::objects::masters::{Master, player_master};
 use crate::objects::sprite::new_sprite;
@@ -88,39 +85,6 @@ impl World {
         Ok((FoundationId::new(made.0), made.1))
     }
 
-    /// [`World::make_building`]'s combat setup (`FUN_14121df60`): its class counters
-    /// (`FUN_141226060`), its powerup offset (`+0xa54`, the Object stream's "setup" draw) and,
-    /// for a building with a train location (an entry of `+0x898` other than −1), its paid cost
-    /// in attribute 247 (slot 0xf8).
-    pub(super) fn building_combat_setup(
-        &mut self,
-        player: PlayerId,
-        master: MasterId,
-    ) -> GenieResult<()> {
-        if let Some(master) = player_master(&self.model.masters, player, master) {
-            count_class(
-                &mut self.players.player_mut(player)?.attributes,
-                master,
-                1.0,
-                &self.model.roles,
-            );
-        }
-        let _ = self.streams.get_mut(Stream::Object).rand15();
-        if let Some(master) = player_master(&self.model.masters, player, master).filter(|master| {
-            master.kind == MasterKind::BUILDING && !master.creatable_part().trained_at.is_empty()
-        }) {
-            let paid: i32 = cost_entries(&master.creatable_part().cost)
-                .filter(|&(_, _, paid)| paid)
-                .map(|(_, amount, _)| i32::from(amount.get()))
-                .sum();
-            self.players.player_mut(player)?.add_attribute(
-                self.model.slots.attribute.building_cost,
-                Amount::new(paid as f32),
-            )?;
-        }
-        Ok(())
-    }
-
     /// [`World::make_building`]'s static init (`FUN_1411a45a0`): the storage entries of flags 1, 2
     /// and 32 go to the owner (`FUN_141193860`); returns the last entry of flag 0, which the
     /// building holds (`FUN_141193710`; none: −1 and 0).
@@ -140,10 +104,10 @@ impl World {
     /// `FUN_1411de5f0`) of `master` for `player` at `position`, the ground's height: its id
     /// (`mNextObjectId`), its unit AI of the given type if its class gets one, the setups' draws
     /// with its master's standing sprite current ([`World::setup_draws`]: the angle it faces), its
-    /// movement state ([`Mover::new_object`]), the combat setup's class counters
-    /// ([`count_class`]), its powerup offset (the Object stream's "setup" draw)
-    /// and a building with a train location its paid cost (attribute 247); the static init's
-    /// storage; its place and sight (its place links its tiles to its anchor, `FUN_1411e6780`).
+    /// movement state ([`Mover::new_object`]), the static init's storage, then the combat
+    /// setup's writes and counts ([`World::combat_setup`]: its powerup offset is the Object
+    /// stream's "setup" draw, a building with a train location adds its paid cost to attribute
+    /// 247); its place and sight (its place links its tiles to its anchor, `FUN_1411e6780`).
     /// The constructor: masters 50 and 1889 on snow keep their snow (`+0xc61` 2); a master
     /// neither of classes 51, 54 nor 357, 1188, nor an annex (`+0x9b8` −1) takes its build time
     /// as a foundation (a build time above 0: hit points 1, a farm's terrain,
@@ -221,8 +185,8 @@ impl World {
             let (active_sprite, _, angle) = self.setup_draws(graphic);
             (Some(active_sprite), angle)
         });
-        self.building_combat_setup(player, master)?;
         let held = self.building_storage(player, master)?;
+        let setup = self.combat_setup(player, &made)?;
         // the moving setup (FUN_1411580a0) of every building, a moving object though it never
         // moves (a mule cart does): the walk reads its last move time
         let mut mover = player_master(&self.model.masters, player, master)
@@ -300,11 +264,7 @@ impl World {
             regen_powerup: Regeneration::ZERO,
             regen_stinger: Regeneration::ZERO,
             attack_count: AttackCount::ZERO,
-            // the TRIBE combat setup (FUN_14121df60): the master's volley fire
-            firepower: player_master(&self.model.masters, player, master)
-                .map_or(Firepower::ZERO, |master| {
-                    master.creatable_part().volley_fire
-                }),
+            firepower: setup.firepower,
             next_volley: MissileCount::ZERO,
             reload_worldtime: WorldTime::ZERO,
             raider_countdown: RaiderCountdown::NONE,
@@ -316,9 +276,11 @@ impl World {
             range_powerup: Distance::ZERO,
             armor_powerups: ArmorPair::ZERO,
             armor_removed: ArmorPair::ZERO,
-            charge: Charge::ZERO,
+            charge: setup.charge,
+            decay_timer: setup.decay_timer,
             charge_hit: false,
             store: Vec::new(),
+            powerup_update: setup.powerup_update,
             order_source: OrderSource::Direct,
         };
         let unit = Unit {
@@ -329,8 +291,9 @@ impl World {
                 state: ObjectState::Foundation,
                 hp: HitPoints::new(hp),
                 master_id: master,
-                attribute_kind: held.kind,
-                amount: held.amount,
+                // the combat setup's faith, if any, replaces the static setup's storage
+                attribute_kind: setup.faith.map_or(held.kind, |(kind, _)| Some(kind)),
+                amount: setup.faith.map_or(held.amount, |(_, amount)| amount),
                 ..Lifecycle::default()
             },
             place: Static::at(position),

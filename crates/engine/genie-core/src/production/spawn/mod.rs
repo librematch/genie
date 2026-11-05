@@ -9,6 +9,7 @@
 //! where it is (a building, a dead tree, a relic, a resting animal ...) ends; another blocker
 //! lets the spot try its next candidate.
 
+mod combat_setup;
 mod gather_walk;
 pub(crate) use self::gather_walk::FinderUse;
 mod make_action;

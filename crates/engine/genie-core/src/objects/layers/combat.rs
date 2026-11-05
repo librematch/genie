@@ -8,6 +8,7 @@ use crate::combat::damage::ArmorPair;
 use crate::combat::{AttackCount, AttackPowerup, Firepower, MissileCount};
 use crate::construction::BuilderCount;
 use crate::garrison::RaiderCountdown;
+use crate::gathering::DecayTimer;
 use crate::map::Distance;
 use crate::objects::HpPowerup;
 use crate::objects::Regeneration;
@@ -20,7 +21,8 @@ use crate::world::WorldTime;
 use genie_diff::Diff;
 
 /// The combat layer of an object: its attack's timer and count, its capture flag, its volleys,
-/// its unit AI, its town bell, its builders, its charge, its powerups and stingers, its store.
+/// its decay timer, its unit AI, its town bell, its builders, its charge, its powerups and
+/// stingers, its store.
 #[derive(Clone, Debug, Default, PartialEq, Diff)]
 pub struct Combat {
     /// `+0x91c`, `attack_timer`: the time until it may attack again; `mReloadStinger` and
@@ -39,6 +41,9 @@ pub struct Combat {
     pub charge_hit: bool,
     /// `next_volley` (`+0xa04`): the missiles of the volley under way already fired.
     pub next_volley: MissileCount,
+    /// `decay_timer` (`+0x99c`): the milliseconds before a salvage pile loses one of what it
+    /// holds ([`DecayTimer`]).
+    pub decay_timer: DecayTimer,
     /// A combat object's `raider_build_countdown` (`+0x9a0`): the seconds it may stay inside a
     /// building.
     pub raider_countdown: RaiderCountdown,
@@ -78,6 +83,11 @@ pub struct Combat {
     pub regen_stinger: Regeneration,
     /// `mReloadStinger` (`+0xb40`), added to its master's reload time.
     pub reload_stinger: Seconds,
+    /// `mPowerupUpdateOffset` (`+0xa54`): the world time after which the powerup update
+    /// (`FUN_141204a10`) resets the powerups (`FUN_1412066b0`) in each update. The combat
+    /// setup (`FUN_14121df60`) sets it to the world time plus its "setup" draw mod 100, an
+    /// aura's powerup (`FUN_141200dd0`) to that plus 1000.
+    pub powerup_update: WorldTime,
     /// `mHitpointsPowerup` and `mHitpointsMaxPowerup` (`+0xa38`, `+0xa3c`), which the task finder
     /// adds to the hit points.
     pub hp_powerup: HpPowerup,

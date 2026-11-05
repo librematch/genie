@@ -706,6 +706,95 @@ fn made_unit_moves_at_the_speed_of_its_standing_sprite() {
     );
 }
 
+/// The combat setup (`FUN_14121df60`) of a new unit: its charge starts at its master's
+/// `max_charge` (`+0x9e0` from `+0x918`), its decay timer (`+0x99c`) at its player's salvage
+/// decay rate (attribute 65) times 1000, its powerup update offset (`+0xa54`) is the world time
+/// plus the "setup" draw mod 100, and a monk (class 18) holds the faith (attribute 34 at 100),
+/// a villager none.
+#[test]
+fn made_unit_takes_its_master_charge_decay_powerup_offset_and_faith() {
+    use crate::combat::Charge;
+    use crate::gathering::DecayTimer;
+    let made = |class| {
+        let mut world = forage_world();
+        for masters in &mut world.model.masters {
+            let villager = Arc::make_mut(masters).get_mut(ids::VILLAGER_MALE).unwrap();
+            villager.standing_sprite = Some(SpriteId::named(300));
+            villager.class = class;
+            villager
+                .creatable
+                .get_or_insert_with(Default::default)
+                .max_charge = Charge::new(3.0);
+        }
+        let _ = Arc::make_mut(&mut world.model.graphics).insert(
+            SpriteId::named(300),
+            Graphic {
+                id: SpriteId::named(300),
+                frames: Frame::of_data(10),
+                facets: FacetCount::of_data(8),
+                speed_multiplier: SpeedMultiplier::ONE,
+                frame_duration: Seconds::new(0.1),
+                replay_delay: Seconds::ZERO,
+                flags: SpriteFlags::ANIMATED,
+            },
+        );
+        world.players[1].attributes[attribute::IN_PRODUCTION.index()] = Amount::new(1.0);
+        world.players[1].attributes[attribute::SALVAGE_DECAY_RATE.index()] = Amount::new(2.5);
+        let now = world.world_time;
+        world
+            .spawn(
+                PlayerId::new(1),
+                ListIndex::new(2),
+                ids::VILLAGER_MALE,
+                Amount::new(1.0),
+            )
+            .unwrap();
+        let unit = world.players[1].objects.last().unwrap();
+        let combat = world.parts.combat_of(unit.id);
+        (
+            combat.charge,
+            combat.decay_timer,
+            combat.powerup_update.since(now) < Millis::new(100),
+            unit.life.attribute_kind,
+            unit.life.amount,
+        )
+    };
+    assert_eq!(
+        made(class::MONK),
+        (
+            Charge::new(3.0),
+            DecayTimer::of_data(2500),
+            true,
+            Some(attribute::FAITH),
+            Amount::new(100.0)
+        )
+    );
+    assert_eq!(
+        made(class::VILLAGER),
+        (
+            Charge::new(3.0),
+            DecayTimer::of_data(2500),
+            true,
+            None,
+            Amount::ZERO
+        )
+    );
+}
+
+/// The powerup update offset is the world time plus the draw mod 100 milliseconds.
+#[test]
+fn powerup_update_offset_is_the_time_plus_the_draw_mod_100() {
+    use crate::production::spawn::combat_setup::powerup_update_after;
+    assert_eq!(
+        powerup_update_after(WorldTime::from_millis(1234), 0x7fff),
+        WorldTime::from_millis(1234 + 0x7fff % 100)
+    );
+    assert_eq!(
+        powerup_update_after(WorldTime::from_millis(50), 199),
+        WorldTime::from_millis(149)
+    );
+}
+
 /// `FUN_140ace9c0` sends the new unit to its building's gather point only for a state of 1
 /// (`+0xc30`); a state of 0xff (SET GATHER STATE's) leaves it standing, which the unit's wait
 /// to move (`+0x7f9`) shows.

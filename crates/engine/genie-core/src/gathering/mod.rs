@@ -6,6 +6,7 @@ use crate::players::attribute::AttributeId;
 
 mod action_end;
 pub(crate) mod closest_resource;
+mod decay_timer;
 pub(crate) mod drop_off;
 pub mod drop_site_id;
 pub(crate) mod drop_sites;
@@ -24,6 +25,7 @@ mod pasture_id;
 mod queue_count;
 
 pub use self::action_end::ActionEnd;
+pub use self::decay_timer::DecayTimer;
 pub use self::drop_site_id::DropSiteId;
 pub use self::farm_stops::{FarmStops, StopIndex};
 pub use self::gather_target::{GatherTarget, GatherTargetId};

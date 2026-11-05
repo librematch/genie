@@ -14,6 +14,7 @@ use crate::construction::Annexes;
 use crate::construction::BuilderCount;
 use crate::construction::MainBuildingId;
 use crate::garrison::RaiderCountdown;
+use crate::gathering::DecayTimer;
 use crate::gathering::PastureId;
 use crate::groups::{GroupId, GroupLink};
 use crate::map::Distance;
@@ -336,6 +337,11 @@ fn row(
                 .combat()
                 .map_or(0, |tribe_combat_object| tribe_combat_object.next_volley),
         ),
+        decay_timer: DecayTimer::of_data(
+            object
+                .combat()
+                .map_or(0, |tribe_combat_object| tribe_combat_object.decay_timer),
+        ),
         raider_countdown: RaiderCountdown::of_data(
             object.combat().map_or(0, |tribe_combat_object| {
                 tribe_combat_object.raider_build_countdown
@@ -389,6 +395,11 @@ fn row(
             .combat()
             .map_or(Seconds::ZERO, |tribe_combat_object| {
                 Seconds::new(tribe_combat_object.reload_powerup)
+            }),
+        powerup_update: object
+            .combat()
+            .map_or(WorldTime::ZERO, |tribe_combat_object| {
+                WorldTime::from_millis(tribe_combat_object.powerup_update_offset)
             }),
         attack_powerup: AttackPowerup::new(object.combat().map_or(0.0, |tribe_combat_object| {
             tribe_combat_object.attack_powerup

@@ -23,6 +23,7 @@ test: the map's edge, the terrain, the explored tiles and the objects in the way
 <!-- files -->
 | File | What it holds |
 | --- | --- |
+| [`combat_setup.rs`](combat_setup.rs) | The combat setup (`FUN_14121df60`): what a new combat object (a unit or a building) takes from its master and its player, and what its player's attributes count of it. |
 | [`gather_walk.rs`](gather_walk.rs) | A new unit's walk to its building's gather point (`FUN_140ace9c0`). |
 | [`make_action.rs`](make_action.rs) | A building's production list and its make action (`TRIBE_Action_Make_Obj`). |
 | [`mod.rs`](mod.rs) | A trained unit's spawn: where the make action (`TRIBE_Action_Make_Obj`, `FUN_140ad0240`) puts the unit its building made. |

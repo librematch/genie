@@ -612,6 +612,10 @@ pub struct AttributeSlots {
     pub farm_exponent: AttributeId,
     /// The population cap (32).
     pub population_cap: AttributeId,
+    /// The faith a priest holds (its attribute kind `+0x308` and amount `+0x310`): the combat setup
+    /// (`FUN_14121df60`) gives a unit of class 18 or 53, or of a master with a conversion task
+    /// (0x68), the kind 34 and the amount 100.
+    pub faith: AttributeId,
     /// The food the farms hold (Farm Food Amount, `player+0x100` at `+0x120`: 36), which `set_state(6)` of a farm's Make reads and an effect's change grows (`FUN_141615270`).
     pub farm_food_amount: AttributeId,
     /// The civilian population.
@@ -636,6 +640,10 @@ pub struct AttributeSlots {
     pub monasteries: AttributeId,
     /// The giver's tribute given (53).
     pub tribute_given: AttributeId,
+    /// The salvage decay rate (65, seconds): the combat setup (`FUN_14121df60`) starts every combat
+    /// object's decay timer (`+0x99c`) at it times 1000, and a salvage pile's update
+    /// (`TRIBE_Combat_Object::update`) again each time its timer runs out.
+    pub salvage_decay_rate: AttributeId,
     /// The share of a trade's worth the market keeps (78).
     pub market_fee: AttributeId,
     /// The units queued (80).

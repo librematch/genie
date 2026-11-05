@@ -70,6 +70,10 @@ pub const TOWN_CENTRE_LIMIT: AttributeId = AttributeId::named(218);
 pub const TRICKLES: AttributeId = AttributeId::named(230);
 /// The relics the player holds (7): a research paid in them (`FUN_1413d0e70`).
 pub const RELICS_HELD: AttributeId = AttributeId::named(7);
+/// The faith a priest holds (34): the combat setup's attribute kind at 100.
+pub const FAITH: AttributeId = AttributeId::named(34);
+/// The salvage decay rate (65): the combat setup's decay timer takes it times 1000.
+pub const SALVAGE_DECAY_RATE: AttributeId = AttributeId::named(65);
 /// The units queued (80).
 pub const QUEUED: AttributeId = AttributeId::named(80);
 /// The units in production (81).

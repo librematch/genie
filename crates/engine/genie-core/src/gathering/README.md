@@ -33,6 +33,7 @@ part of the update, which binds the action to the world.
 | --- | --- |
 | [`action_end.rs`](action_end.rs) | Whether a gathering action ends at its drop-off for the unit AI's queued orders. |
 | [`closest_resource.rs`](closest_resource.rs) | `ClosestResourceObject` (`FUN_140c49760`): where it searches from and what it finds; a herded sheep. |
+| [`decay_timer.rs`](decay_timer.rs) | A combat object's decay timer, which a salvage pile's decay runs. |
 | [`drop_off.rs`](drop_off.rs) | A gatherer's walk after a drop and the drop sites it walks to. |
 | [`drop_site_id.rs`](drop_site_id.rs) | A drop site's id as its own type: the object a worker carries its load to. |
 | [`drop_sites.rs`](drop_sites.rs) | The drop-site searches (`FUN_1411671e0`): from a unit, or from a point without one. |

@@ -40,7 +40,6 @@ use crate::{GenieError, GenieResult};
 use crate::combat::missile::grounded;
 use crate::objects::facing::{SpriteFacets, drawn_angle, draws_angle};
 use crate::objects::layers::{Action, Combat, Motion, Static, default_start};
-use crate::objects::lifecycle::death_parts::count_class;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::Master;
 use crate::technology::Attributes;
@@ -282,21 +281,6 @@ impl World {
         })
     }
 
-    /// The master's slot 0x40 for a combat unit (type 70, `0x141266120`, the constructor
-    /// `FUN_1411eae40` with its setups) of `master` for its player at `position`: the setups in
-    /// order (static `FUN_1411a45a0`, animated `FUN_141072690`, moving `FUN_141161450`, combat
-    /// `FUN_14121df60`) with their draws: the facet (Object stream, for a standing sprite with a
-    /// random first frame and several facets), the standing sprite ([`ActiveSprite::start`],
-    /// Sprite stream), the angle (Object stream, sequence flag 2), the unit AI
-    /// ([`UnitAi::constructed`], three AI-stream draws) and the powerup offset (Object stream).
-    /// The object takes its place (its height the ground's, by its master's fly mode), its record
-    /// and mesh shape, its sight and its storage (flags 1, 2 and 32, `FUN_141193860`); its
-    /// player's attributes 98, 164 and 246 grow by its paid cost (246 while the telemetry's
-    /// match runs: `FUN_140982ff0()`'s `+0x921`, which every game's start sets, `FUN_140f1fb20`
-    /// with `FUN_140980ac0`, and only its teardown `FUN_140c85fb0` clears, `FUN_140980de0`) and
-    /// a villager's (class 4) attribute 248 by one, and its class counts
-    /// ([`crate::objects::lifecycle::death_parts::count_class`]). It joins its player's list last; its
-    /// index there.
     /// The static, animated and moving setups' draws (`FUN_1411a45a0`, `FUN_141072690`,
     /// `FUN_141161450`) of a new object whose current sprite is `standing` (slot 0x798: its
     /// master's standing sprite, a building's too, `FUN_1412029f0`): a sprite with a random first
@@ -325,6 +309,23 @@ impl World {
         (sprite, facets, angle)
     }
 
+    /// The master's slot 0x40 for a combat unit (type 70, `0x141266120`, the constructor
+    /// `FUN_1411eae40` with its setups) of `master` for its player at `position`: the setups in
+    /// order (static `FUN_1411a45a0`, animated `FUN_141072690`, moving `FUN_141161450`, combat
+    /// `FUN_14121df60`) with their draws: the facet (Object stream, for a standing sprite with a
+    /// random first frame and several facets), the standing sprite ([`ActiveSprite::start`],
+    /// Sprite stream), the angle (Object stream, sequence flag 2) and the unit AI
+    /// ([`UnitAi::constructed`], three AI-stream draws). The object takes its place (its height
+    /// the ground's, by its master's fly mode), its record and mesh shape, its sight and its
+    /// storage (flags 1, 2 and 32, `FUN_141193860`), then the combat setup's writes and counts
+    /// ([`World::combat_setup`], the powerup offset's draw on the Object stream). It joins its
+    /// player's list last; its index there.
+    ///
+    /// # Errors
+    ///
+    /// A computer player's unit, a world without the players' sight, a recyclable master, one
+    /// that does not move or has no unit AI or standing sprite, and what the combat setup
+    /// fails on.
     pub(crate) fn combat_object(
         &mut self,
         player_id: PlayerId,
@@ -381,7 +382,6 @@ impl World {
             self.streams.get_mut(Stream::Ai),
             &self.model.roles,
         );
-        let _ = self.streams.get_mut(Stream::Object).rand15();
         // its place, record, mesh shape and sight (new_position, slot 0x58, and FUN_141054fe0)
         let solid = 0.0 < made.radius.x() && 0.0 < made.radius.y() && made.is_tall();
         let placed = Placed {
@@ -435,6 +435,7 @@ impl World {
         if let Some(error) = self.take_sight_unsupported() {
             return Err(error);
         }
+        // the static setup's storage (FUN_1411a45a0), before the combat setup
         let owner = self.players.player_mut(player_id)?;
         for &(kind, amount, flag) in &made.storage {
             if let Some(kind) = kind
@@ -443,49 +444,23 @@ impl World {
                 owner.add_attribute(kind, amount)?;
             }
         }
-        let cost: i32 = made
-            .creatable_part()
-            .cost
-            .iter()
-            .filter_map(|slot| slot.entry())
-            .filter(|&(_, _, paid)| paid)
-            .map(|(_, amount, _)| i32::from(amount.get()))
-            .sum();
-        owner.add_attribute(
-            self.model.slots.attribute.total_value,
-            Amount::new(cost as f32),
-        )?;
-        owner.add_attribute(
-            self.model.slots.attribute.units_value,
-            Amount::new(cost as f32),
-        )?;
-        owner.add_attribute(
-            self.model.slots.attribute.made_units_cost,
-            Amount::new(cost as f32),
-        )?;
-        if self
-            .model
-            .roles
-            .of_class(made.class)
-            .contains(ClassRoles::VILLAGER)
-        {
-            owner.add_attribute(self.model.slots.attribute.made_villagers, Amount::new(1.0))?;
-        }
-        // the combat setup's class counters (FUN_141226060)
-        count_class(&mut owner.attributes, made, 1.0, &self.model.roles);
+        let setup = self.combat_setup(player_id, made)?;
         let combat = Combat {
-            // the TRIBE combat setup (FUN_14121df60): the master's volley fire
-            firepower: made.creatable_part().volley_fire,
+            firepower: setup.firepower,
+            charge: setup.charge,
+            decay_timer: setup.decay_timer,
+            powerup_update: setup.powerup_update,
             ..Default::default()
         };
+        let faith = setup.faith;
         let unit = Unit {
             id,
             life: Lifecycle {
                 class: Class::Animated,
                 state: ObjectState::Alive,
                 hp: HitPoints::of_master(made.hit_points),
-                attribute_kind: None,
-                amount: Amount::ZERO,
+                attribute_kind: faith.map(|(kind, _)| kind),
+                amount: faith.map_or(Amount::ZERO, |(_, amount)| amount),
                 death_facets: None,
                 inside: None,
                 goto_sleep: false,
