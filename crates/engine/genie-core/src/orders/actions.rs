@@ -529,7 +529,7 @@ pub(crate) fn switch_master(
     reset_powerup_values(combat, tuning.powerup);
     world.spatial.take_sight_powerup(
         unit.id,
-        unit.life.inside.is_some(),
+        unit.life.inside,
         SightLayer {
             roles,
             visibility_tuning,

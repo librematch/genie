@@ -11,6 +11,7 @@ pub(crate) mod aura;
 use genie_model::combat::charge;
 pub(crate) mod combat_update;
 pub mod damage;
+pub(crate) mod kill_counts;
 use genie_model::combat::firepower;
 mod class_or_master;
 mod kill_state;

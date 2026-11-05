@@ -15224,8 +15224,13 @@ fn killed_villager_counts_its_attacker_kind_and_player_kind() {
     };
     // Gaia's wolf: an animal, Gaia's type
     let mut game = world(PlayerKind::Human);
-    game.count_owner_loss(PlayerId::new(1), &villager, class::PREY, PlayerId::new(0))
-        .unwrap();
+    game.count_owner_loss(
+        PlayerId::new(1),
+        villager.class,
+        class::PREY,
+        PlayerId::new(0),
+    )
+    .unwrap();
     assert_eq!(counts(&game), amounts([1.0, 1.0, 0.0, 0.0]));
     // the archers of a human, a computer and the editor's phantom
     for (kind, seen) in [
@@ -15237,7 +15242,7 @@ fn killed_villager_counts_its_attacker_kind_and_player_kind() {
         kind_world
             .count_owner_loss(
                 PlayerId::new(1),
-                &villager,
+                villager.class,
                 class::CLASS_0,
                 PlayerId::new(2),
             )
@@ -15248,7 +15253,7 @@ fn killed_villager_counts_its_attacker_kind_and_player_kind() {
     world
         .count_owner_loss(
             PlayerId::new(1),
-            &villager,
+            villager.class,
             class::PREDATOR,
             PlayerId::new(2),
         )
@@ -15259,7 +15264,7 @@ fn killed_villager_counts_its_attacker_kind_and_player_kind() {
         world
             .count_owner_loss(
                 PlayerId::new(1),
-                &villager,
+                villager.class,
                 class::CLASS_0,
                 PlayerId::new(2)
             )

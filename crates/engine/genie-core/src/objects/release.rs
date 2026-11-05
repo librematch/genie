@@ -2,6 +2,7 @@
 //! update's regeneration and hit point check, and a walk's pause.
 
 use crate::GenieResult;
+use crate::combat::kill_counts::KilledMaster;
 use crate::objects::HitPoints;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
@@ -156,7 +157,7 @@ impl World {
             &self.model.tuning.turn,
         );
         if let Some(count) = credited {
-            self.count_kills(player_id, &master, &[count])?;
+            self.count_kills(player_id, KilledMaster::of(&master), &[count])?;
         }
         Ok(())
     }

@@ -38,5 +38,5 @@ found, as in the game.
 ## How it connects
 
 <!-- uses -->
-- Uses: [`construction`](../../construction/), [`groups`](../../groups/), [`math`](../../math/), [`movement`](../../movement/), [`objects`](../../objects/), [`ownership`](../../ownership/), [`pathing`](../../pathing/), [`players`](../../players/), [`unit_ai`](../../unit_ai/), [`vision`](../../vision/), [`world`](../../world/).
+- Uses: [`construction`](../../construction/), [`garrison`](../../garrison/), [`groups`](../../groups/), [`math`](../../math/), [`movement`](../../movement/), [`objects`](../../objects/), [`ownership`](../../ownership/), [`pathing`](../../pathing/), [`players`](../../players/), [`unit_ai`](../../unit_ai/), [`vision`](../../vision/), [`world`](../../world/).
 <!-- /uses -->

@@ -380,11 +380,11 @@ impl World {
     /// An object the world does not hold.
     pub(crate) fn reset_powerups(&mut self, id: ObjectId) -> GenieResult<()> {
         let (_, unit) = self.object(id).ok_or(UNHELD)?;
-        let inside = unit.life.inside.is_some();
+        let container = unit.life.inside;
         reset_powerup_values(self.parts.combat_mut(id)?, self.model.tuning.powerup);
         self.spatial.take_sight_powerup(
             id,
-            inside,
+            container,
             SightLayer {
                 roles: &self.model.roles,
                 visibility_tuning: self.model.tuning.visibility,
@@ -487,7 +487,7 @@ impl World {
     /// powerup), and the sight comes again (slot 0x1d0).
     fn raise_sight(&mut self, id: ObjectId, powerup: Powerup) -> GenieResult<()> {
         let (player, unit) = self.object(id).ok_or(UNHELD)?;
-        let inside = unit.life.inside.is_some();
+        let container = unit.life.inside;
         let master = unit.master(self.master_tables(), player)?;
         let amount = Distance::new(if powerup.share == PowerupShare::MasterShare {
             powerup.amount.get() * master.line_of_sight.get()
@@ -498,7 +498,8 @@ impl World {
             roles: &self.model.roles,
             visibility_tuning: self.model.tuning.visibility,
         };
-        self.spatial.raise_sight_powerup(id, inside, amount, layer)
+        self.spatial
+            .raise_sight_powerup(id, container, amount, layer)
     }
 
     /// [`World::apply_powerup`]'s attack: the amount plus the powerup after the floor (`floorf`),

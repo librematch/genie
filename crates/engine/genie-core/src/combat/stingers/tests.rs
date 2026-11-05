@@ -11,6 +11,7 @@ use crate::combat::damage::Attacker;
 use crate::combat::damage::KillCount;
 use crate::combat::damage::Victim;
 use crate::combat::damage::lose;
+use crate::combat::kill_counts::KilledMaster;
 use crate::combat::powerup::PowerupAttribute;
 use crate::combat::stingers::update::{StingerReads, update_stingers};
 use crate::combat::stingers::{
@@ -611,7 +612,7 @@ fn burns_credit_each_player_once_in_any_order() {
     let credited = |order: &[Option<ObjectId>]| {
         let mut credited = world.clone();
         credited
-            .credit_burns(PlayerId::new(2), &victim, order)
+            .credit_burns(PlayerId::new(2), KilledMaster::of(&victim), order)
             .unwrap();
         credited
             .players
@@ -629,7 +630,7 @@ fn burns_credit_each_player_once_in_any_order() {
     assert_eq!(credited(&attackers), credited(&reversed));
     let mut forward = world.clone();
     forward
-        .credit_burns(PlayerId::new(2), &victim, &attackers)
+        .credit_burns(PlayerId::new(2), KilledMaster::of(&victim), &attackers)
         .unwrap();
     let (one, two) = (
         &forward.players[1].attributes,

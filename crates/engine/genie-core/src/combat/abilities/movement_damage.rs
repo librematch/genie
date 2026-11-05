@@ -5,6 +5,7 @@ use crate::GenieResult;
 use crate::combat::abilities::{ALWAYS_REACHED, ONE, Own};
 use crate::combat::damage::Victim;
 use crate::combat::damage::lose;
+use crate::combat::kill_counts::KilledMaster;
 use crate::combat::victims::victim_of;
 use crate::combat::victims::{VictimLayers, VictimView};
 use crate::construction::build::NOT_HELD;
@@ -340,8 +341,8 @@ impl World {
         // the loss's own counts first: its stingers' credits (slot 22)
         if !victim.kill_counts.is_empty() {
             let (player_id, unit) = self.object(bystander.id).ok_or(NOT_HELD)?;
-            let master = unit.master(self.master_tables(), player_id)?.clone();
-            self.count_kills(player_id, &master, &victim.kill_counts)?;
+            let killed = KilledMaster::of(unit.master(self.master_tables(), player_id)?);
+            self.count_kills(player_id, killed, &victim.kill_counts)?;
         }
         if killed && bystander.kind == MasterKind::COMBAT {
             self.count_kill(bystander.id, owner)?;

@@ -40,6 +40,7 @@ its powerup update (`aura/`).
 | [`attack_target.rs`](attack_target.rs) | An Attack's target as its own type: the object it attacks. |
 | [`class_or_master.rs`](class_or_master.rs) | The object a combat task names (`ClassOrMaster`): a class or a master, as slot 277 keeps it in the aura groups and the stinger tasks. |
 | [`combat_update.rs`](combat_update.rs) | `TRIBE_Combat_Object::update` (`0x141208440`), a combat object's or building's own update (types 70 and 80) around `RGE_Combat_Object::update`. |
+| [`kill_counts.rs`](kill_counts.rs) | A kill's counts in its players' attributes (`World::count_kills`): slot 22's credits of its burns, the damage's counts for its owner and `FUN_1412005b0`'s for a killer. |
 | [`kill_state.rs`](kill_state.rs) | Whether an object's kill is counted. |
 | [`lockdown.rs`](lockdown.rs) | How often an object is locked down. |
 | [`mod.rs`](mod.rs) | Combat: attacks, hits and missiles. |

@@ -4,13 +4,13 @@
 use crate::GenieResult;
 use crate::combat::KillState;
 use crate::combat::damage::{KillCount, Victim};
+use crate::combat::kill_counts::KilledMaster;
 use crate::combat::powerup::PowerupAttribute;
 use crate::combat::stingers::ActiveStinger;
 use crate::math::fmath::below_or_unordered;
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::layers::Combat;
-use crate::objects::masters::Master;
 use crate::players::PlayerId;
 use crate::world::World;
 
@@ -111,9 +111,9 @@ impl World {
         players
     }
 
-    /// Slot 22's credits of a kill of an object of player `player_id` and `master` for the
-    /// burns' `attackers`: `FUN_1412005b0` for each player ([`World::burning_players`],
-    /// [`World::count_kill_of`]).
+    /// Slot 22's credits of a kill of an object of player `player_id` (its master's class and cost
+    /// `killed`) for the burns' `attackers`: `FUN_1412005b0` for each player
+    /// ([`World::burning_players`], [`World::count_kill_of`]).
     ///
     /// # Errors
     ///
@@ -121,11 +121,11 @@ impl World {
     pub(crate) fn credit_burns(
         &mut self,
         player_id: PlayerId,
-        master: &Master,
+        killed: KilledMaster,
         attackers: &[Option<ObjectId>],
     ) -> GenieResult<()> {
         for killer in self.burning_players(attackers) {
-            self.count_kill_of(player_id, master, killer)?;
+            self.count_kill_of(player_id, killed, killer)?;
         }
         Ok(())
     }

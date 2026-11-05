@@ -2,6 +2,7 @@
 //! raises it, each time between the sight's going and coming.
 
 use crate::GenieResult;
+use crate::garrison::ContainerId;
 use crate::map::Distance;
 use crate::map::spatial::Spatial;
 use crate::math::image::powerup::EPSILON as POWERUP_EPSILON;
@@ -20,7 +21,7 @@ impl Spatial {
     pub fn take_sight_powerup(
         &mut self,
         id: ObjectId,
-        inside: bool,
+        container: Option<ContainerId>,
         sight: SightLayer<'_>,
     ) -> GenieResult<()> {
         let held = self
@@ -30,7 +31,7 @@ impl Spatial {
             .map(|seer| seer.los_powerup);
         match held {
             Some(powerup) if POWERUP_EPSILON < powerup.get() => {
-                self.sight_powerup(id, inside, Distance::ZERO, sight)
+                self.sight_powerup(id, container, Distance::ZERO, sight)
             }
             _ => Ok(()),
         }
@@ -45,7 +46,7 @@ impl Spatial {
     pub fn raise_sight_powerup(
         &mut self,
         id: ObjectId,
-        inside: bool,
+        container: Option<ContainerId>,
         amount: Distance,
         sight: SightLayer<'_>,
     ) -> GenieResult<()> {
@@ -54,16 +55,16 @@ impl Spatial {
             .as_ref()
             .and_then(|visibility| visibility.seer(id))
             .map_or(Distance::ZERO, |seer| seer.los_powerup);
-        self.sight_powerup(id, inside, amount + held, sight)
+        self.sight_powerup(id, container, amount + held, sight)
     }
 
     /// The sight powerup of seer `id` becomes `powerup` between slots 0x1d8 and 0x1d0 (each with
     /// the object's player, the circle, its own line of sight and the tile's centre: `0`, `−1`,
-    /// `0`). Inside another (`+0x2f0`) the object has no tile and the slots see nothing.
+    /// `0`). Inside its `container` (`+0x2f0`) the object has no tile and the slots see nothing.
     fn sight_powerup(
         &mut self,
         id: ObjectId,
-        inside: bool,
+        container: Option<ContainerId>,
         powerup: Distance,
         sight: SightLayer<'_>,
     ) -> GenieResult<()> {
@@ -71,7 +72,7 @@ impl Spatial {
         let Some(visibility) = self.sight.as_mut() else {
             return Ok(());
         };
-        let around = placed.filter(|_| !inside);
+        let around = placed.filter(|_| container.is_none());
         if let Some(placed) = around {
             visibility.sight_off(
                 id,
