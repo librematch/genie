@@ -101,9 +101,6 @@
 //! ```
 
 #![deny(future_incompatible)]
-// a language file's strings by key: a lookup outside the simulation, which holds no hash container (CODING_STYLE.md
-// section 12)
-#![allow(clippy::disallowed_types)]
 #![deny(nonstandard_style)]
 #![deny(rust_2018_idioms)]
 #![deny(unsafe_code)]
@@ -111,7 +108,7 @@
 
 use genie_error::{GenieError, GenieResult};
 pub use genie_support::StringKey;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::io::Read;
 use std::str::FromStr;
 
@@ -166,12 +163,13 @@ impl FromStr for LangFileKind {
     }
 }
 
-/// A mapping of `StringKey` key to `String` values.
+/// A mapping of `StringKey` key to `String` values, in key order: the numbers in turn, then
+/// the names. A file is written in that order, the same in every run.
 ///
 /// May be read from or written to one of the three file formats for Aoe2
 /// language files.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct LangFile(HashMap<StringKey, String>);
+pub struct LangFile(BTreeMap<StringKey, String>);
 
 #[cfg(test)]
 mod error_tests {

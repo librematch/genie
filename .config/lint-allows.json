@@ -77,7 +77,6 @@
  },
  "clippy::disallowed_types": {
   "crates/formats/genie-hki/src/lib.rs": 1,
-  "crates/formats/genie-lang/src/lib.rs": 1,
   "crates/tools/genie-oracle/src/lib.rs": 1
  },
  "clippy::eq_op": {

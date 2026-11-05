@@ -257,6 +257,27 @@ mod tests {
     use crate::LangFileKind;
     use std::fs::File;
 
+    /// A file is written in key order, the numbers in turn and then the names, whatever order
+    /// its strings went in: the same bytes in every run.
+    #[test]
+    fn keyval_file_is_written_in_key_order() {
+        let lang: LangFile = [
+            (StringKey::from(2u32), String::from("two")),
+            (StringKey::from("b"), String::from("bee")),
+            (StringKey::from(0u32), String::from("zero")),
+            (StringKey::from("a"), String::from("ay")),
+            (StringKey::from(1u32), String::from("one")),
+        ]
+        .into_iter()
+        .collect();
+        let mut out = Vec::new();
+        lang.write_to_keyval(&mut out).unwrap();
+        assert_eq!(
+            String::from_utf8(out).unwrap(),
+            "0 \"zero\"\n1 \"one\"\n2 \"two\"\na \"ay\"\nb \"bee\"\n"
+        );
+    }
+
     /// The game's DLL's string tables: block n's strings take the ids from (n - 1) × 16 on.
     #[test]
     fn dll_string_tables_give_their_strings_by_id() {

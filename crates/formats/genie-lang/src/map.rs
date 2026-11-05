@@ -2,10 +2,11 @@
 
 use crate::LangFile;
 use genie_support::StringKey;
-use std::collections::HashMap;
-use std::collections::hash_map::{Drain, Entry, IntoIter, Iter, IterMut, Keys, Values, ValuesMut};
+use std::collections::BTreeMap;
+use std::collections::btree_map::{Entry, IntoIter, Iter, IterMut, Keys, Values, ValuesMut};
 use std::fmt;
 use std::iter::FromIterator;
+use std::mem::take;
 use std::ops::Index;
 
 impl LangFile {
@@ -19,8 +20,8 @@ impl LangFile {
     /// let lang_file = LangFile::new();
     /// ```
     #[must_use]
-    pub fn new() -> Self {
-        Self(HashMap::new())
+    pub const fn new() -> Self {
+        Self(BTreeMap::new())
     }
 
     /// Returns `true` if this language file contains no key-value pairs,
@@ -74,7 +75,7 @@ impl LangFile {
         self.0.clear();
     }
 
-    /// Clears this Language file, returning all key-value pairs as an iterator.
+    /// Clears this Language file, returning all key-value pairs as an iterator, in key order.
     ///
     /// # Examples
     ///
@@ -82,17 +83,17 @@ impl LangFile {
     /// use genie_lang::{LangFile, StringKey};
     ///
     /// let mut lang_file = LangFile::new();
-    /// lang_file.insert(StringKey::from(0u32), String::from("a"));
     /// lang_file.insert(StringKey::from(1u32), String::from("b"));
+    /// lang_file.insert(StringKey::from(0u32), String::from("a"));
     ///
     /// for (key, value) in lang_file.drain().take(1) {
-    ///     assert!(key == StringKey::from(0u32) || key == StringKey::from(1u32));
-    ///     assert!(value == "a" || value == "b");
+    ///     assert_eq!(key, StringKey::from(0u32));
+    ///     assert_eq!(value, "a");
     /// }
     /// assert!(lang_file.is_empty());
     /// ```
-    pub fn drain(&mut self) -> Drain<'_, StringKey, String> {
-        self.0.drain()
+    pub fn drain(&mut self) -> IntoIter<StringKey, String> {
+        take(&mut self.0).into_iter()
     }
 
     /// Returns `true` if the map contains a value for key `string_key`, `false` if not.
@@ -235,7 +236,7 @@ impl LangFile {
         self.0.retain(keep);
     }
 
-    /// An iterator visiting all key-value pairs in an arbitrary order.
+    /// An iterator visiting all key-value pairs in key order.
     /// Each element borrows the file: `(&StringKey, &String)`.
     ///
     /// # Examples
@@ -251,12 +252,11 @@ impl LangFile {
     ///
     /// for (key, value) in lang_file.iter() { println!("key: {}, val: {}", key, value); }
     /// ```
-    #[must_use]
     pub fn iter(&self) -> Iter<'_, StringKey, String> {
         self.0.iter()
     }
 
-    /// Returns an iterator that visits all key-values pairs in an arbitrary
+    /// Returns an iterator that visits all key-values pairs in key
     /// order, with mutable references to the values.
     /// Each element borrows the file: `(&StringKey, &mut String)`.
     ///
@@ -278,7 +278,7 @@ impl LangFile {
         self.0.iter_mut()
     }
 
-    /// Returns an iterator that visits all keys in arbitrary order.
+    /// Returns an iterator that visits all keys in key order.
     /// Each element borrows the file: `&StringKey`.
     ///
     /// # Examples
@@ -294,12 +294,11 @@ impl LangFile {
     ///
     /// for key in lang_file.keys() { println!("key: {}", key); }
     /// ```
-    #[must_use]
     pub fn keys(&self) -> Keys<'_, StringKey, String> {
         self.0.keys()
     }
 
-    /// Returns an iterator that visits all values in arbitrary order.
+    /// Returns an iterator that visits all values in key order.
     /// Each element borrows the file: `&String`.
     ///
     /// # Examples
@@ -315,12 +314,11 @@ impl LangFile {
     ///
     /// for value in lang_file.values() { println!("value: {}", value); }
     /// ```
-    #[must_use]
     pub fn values(&self) -> Values<'_, StringKey, String> {
         self.0.values()
     }
 
-    /// Returns an iterator visiting all values mutable in arbitrary order.
+    /// Returns an iterator visiting all values mutable in key order.
     /// Each element borrows the file: `&mut String`.
     ///
     /// # Examples

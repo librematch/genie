@@ -119,7 +119,8 @@ fallible_try_from!(SpriteId, u32);
 /// The original game supports only nonnegative integers.
 /// The HD Edition allows for integers as well as Strings to serve as keys in a
 /// key value file.
-#[derive(Debug, Hash, Clone, PartialEq, Eq)]
+/// Keys order as a language file lists them: the numbers in turn, then the names.
+#[derive(Debug, Hash, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum StringKey {
     /// An integer string key.
     Num(u32),
