@@ -9,12 +9,11 @@ use crate::objects::layers::Action;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::OwnerMasters;
 use crate::objects::unit::Unit;
-use crate::orders::OrderSource;
 use crate::orders::Work;
 use crate::unit_ai::task_finder::drop_site;
-use crate::world::index::ObjectsRef;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
+use crate::world::objects_ref::ObjectsRef;
 use crate::world::slots::PlayerSlotsExt;
 use crate::world::step::Step;
 use crate::{GenieError, GenieResult};
@@ -29,7 +28,7 @@ impl Unit {
     /// object's gather group and workers cap ([`crate::gathering::gather_search::gather_group`],
     /// [`crate::gathering::gather_search::closest_resource`]) names the target, the found object when it
     /// names none, and slot 0x7e8 works it at its place (the work flag 1 only logged, any task,
-    /// no carried-resource test, `+0xa14` as it stands outside slot 0x128: 1; the caller's).
+    /// the retargeting byte 0, the unit's `+0xa14` as it stands; the caller's).
     pub(crate) fn more_work(
         &self,
         actions: &Action,
@@ -149,12 +148,6 @@ impl Unit {
                 "a builder's new work without a place",
             ))?
             .position;
-        Ok(Some(Work {
-            target: Some(target),
-            point,
-            carry_test: false,
-            filter: None,
-            source: OrderSource::Direct,
-        }))
+        Ok(Some(Work::on(Some(target), point)))
     }
 }

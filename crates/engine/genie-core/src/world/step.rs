@@ -23,7 +23,7 @@ use crate::world::Millis;
 use crate::world::Seconds;
 use crate::world::World;
 use crate::world::WorldTime;
-use crate::world::index::ObjectsRef;
+use crate::world::objects_ref::ObjectsRef;
 use crate::world::parts::PartTable;
 use crate::world::slots::PlayerSlotsExt;
 use crate::{GenieError, GenieResult};

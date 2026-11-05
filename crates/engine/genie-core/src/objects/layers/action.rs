@@ -11,7 +11,9 @@ use crate::objects::ActionState;
 use crate::objects::ObjectId;
 use crate::objects::actions;
 use crate::objects::actions::ActionList;
+use crate::objects::layers::CommandCount;
 use crate::objects::layers::DefaultTask;
+use crate::objects::layers::{IdleTime, Speedup};
 use crate::objects::masters::ActionKind;
 use crate::ownership::artifact::{ARTIFACT_KIND, Artifact};
 use crate::world::Unread;
@@ -19,7 +21,8 @@ use crate::world::checkpoint::TopAction;
 use crate::{GenieError, GenieResult};
 use genie_diff::Diff;
 
-/// The action layer of an object: its action list and its master's default task.
+/// The action layer of an object: its action list, its master's default task, a villager's
+/// idle time, the building that speeds it up and its command count.
 #[derive(Clone, Debug, Default, PartialEq, Diff)]
 pub struct Action {
     /// Its action list (`RGE_Action_List`, [`ActionList`]): the actions it holds, its current one
@@ -28,6 +31,14 @@ pub struct Action {
     /// What its master's default task starts once its action list is empty in state 2
     /// ([`DefaultTask`]).
     pub default_task: DefaultTask,
+    /// A villager's idle time not yet in its owner's statistics (`+0x898` to `+0x8a0`,
+    /// [`IdleTime`]).
+    #[diff(unsaved)]
+    pub idle: IdleTime,
+    /// The building that speeds it up (`+0x890`, `+0x894`, [`Speedup`]).
+    pub speedup: Speedup,
+    /// The works and moves it took (`command_flag`, `+0x888`, [`CommandCount`]).
+    pub commands: CommandCount,
 }
 
 impl Action {

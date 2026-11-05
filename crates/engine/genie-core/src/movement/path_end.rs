@@ -34,10 +34,10 @@ use crate::pathing::long_path::{LongRequest, LongTarget, gate_lets_pass, reaches
 use crate::pathing::tile_path::{Path, Request};
 use crate::players::PlayerId;
 use crate::players::PlayerSet;
-use crate::world::index::ObjectsRef;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::generated::MovementTuning;
+use crate::world::objects_ref::ObjectsRef;
 use crate::{GenieError, GenieResult};
 
 /// What a reach test asks of the unit ([`Mover::reach_test`]'s arguments after the world).

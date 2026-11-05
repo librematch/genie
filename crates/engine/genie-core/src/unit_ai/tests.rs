@@ -62,6 +62,7 @@ use crate::objects::masters::MasterField;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObjectFlags;
+use crate::objects::masters::TargetOwner;
 use crate::objects::masters::WorkValue;
 use crate::objects::masters::{Master, Task};
 use crate::objects::sprite::Graphic;
@@ -69,6 +70,7 @@ use crate::objects::unit::UnitFlags;
 use crate::objects::{FacetCount, Frame, SpeedMultiplier, SpriteFlags, SpriteId};
 use crate::orders::Dispatch;
 use crate::orders::GARRISON;
+use crate::orders::PACK_OR_UNPACK;
 use crate::ownership::CaptureKind;
 use crate::ownership::artifact::Artifact;
 use crate::players::Amount;
@@ -756,7 +758,7 @@ fn the_unit_ai_calls_reach_the_unit_in_their_order() {
         |ai, at, side, _, rng| {
             ai.cap_human_order(side, rng)?;
             ai.stop_with(StopOrder::Keep, None, side, rng, &at.roles)?;
-            ai.attack_command(object_id(70), OrderForce::Forced, at, side)
+            ai.attack_command(object_id(70), OrderForce::Forced, at, (side, rng))
         },
     );
     assert_eq!(answer, Ok(Answer::Taken));
@@ -1854,7 +1856,9 @@ fn stop_before_an_attack_command_runs_first() {
     let first = run_ai(
         &mut world,
         (PlayerId::GAIA, object_id(29825)),
-        |ai, at, side, _, _| ai.attack_command(object_id(31126), OrderForce::Forced, at, side),
+        |ai, at, side, _, rng| {
+            ai.attack_command(object_id(31126), OrderForce::Forced, at, (side, rng))
+        },
     );
     assert_eq!(first, Ok(Answer::Taken));
     let done = Notify::own(
@@ -7064,7 +7068,7 @@ fn lone_human_order(world: &World, owner: PlayerId) -> WorldTime {
 /// Gaia's walker 1 tile off it attacks (`AttackObject`), one 4.5 tiles off it finds and leaves,
 /// one 6 tiles off it does not find. Away from its state position, a stance-2 soldier walks
 /// back ("I'm in Defend or `StandGround`, returning to state pos.", `FUN_140c5e7d0`), which its
-/// processIdle does not count as an action (5).
+/// processIdle does not count as an action (5); one in a group stays.
 #[test]
 fn an_idle_soldier_caps_its_human_order_time_and_searches_for_something_to_attack() {
     let scout = (player_id(2), 50);
@@ -7098,7 +7102,7 @@ fn an_idle_soldier_caps_its_human_order_time_and_searches_for_something_to_attac
         state_position: Point::new(25.0, 92.5),
         ..idle_scout()
     };
-    let mut world = idle_scout_world(idle_scout_unit(player_id(2), away), &[]);
+    let mut world = idle_scout_world(idle_scout_unit(player_id(2), away.clone()), &[]);
     let (_, unit_ai, _) = update_of(&mut world, scout, Millis::new(28), WorldTime::ZERO);
     assert_eq!(
         lone_walks(&world),
@@ -7108,6 +7112,16 @@ fn an_idle_soldier_caps_its_human_order_time_and_searches_for_something_to_attac
         (unit_ai.last_action, unit_ai.current_action),
         (None, Some(AiAction::Move))
     );
+    // in a group (its +0x6d0, a group the world need not hold) it stays
+    let mut world = idle_scout_world(idle_scout_unit(player_id(2), away), &[]);
+    world.players[2]
+        .objects
+        .by_id_mut(object_id(50))
+        .unwrap()
+        .group
+        .id = Some(group_id(7));
+    let (answer, ..) = update_of(&mut world, scout, Millis::new(28), WorldTime::ZERO);
+    assert_eq!((answer, lone_walks(&world)), (Ok(None), None));
 }
 
 /// Gaia's soldier that takes owners by sight caps its last human order time and does not
@@ -8613,13 +8627,13 @@ fn ship_or_livestock_may_attack_anything_and_building_nothing() {
         let run_ai = run_ai(
             &mut world,
             (player_id(1), object_id(9)),
-            |ai, at, side, _, _| {
+            |ai, at, side, _, rng| {
                 ai.attack_object(
                     object_id(9800),
                     OrderForce::Forced,
                     TargetRules::Own,
                     at,
-                    side,
+                    (side, rng),
                 )
             },
         );
@@ -10732,13 +10746,13 @@ fn the_base_attack_check_lets_every_kind_without_its_own_attack() {
         let answer = run_ai(
             &mut world,
             (player_id(1), object_id(9)),
-            |ai, at, side, _, _| {
+            |ai, at, side, _, rng| {
                 ai.attack_object(
                     object_id(77),
                     OrderForce::Forced,
                     TargetRules::Own,
                     at,
-                    side,
+                    (side, rng),
                 )
             },
         );
@@ -13507,8 +13521,10 @@ fn slot_0x1b0_gives_the_kind_of_resource_by_the_unit_ai_kind() {
 }
 
 /// The attack move of a trebuchet (classes 51 and 54) attacks player 2's house 70: the packed
-/// one (51) never attacks, so it takes nothing; the unpacked one's attack command is not
-/// modelled. Any other class, or no target, moves to the order's point (its `MoveTo` at once).
+/// one (51) never attacks, so it takes nothing; the unpacked one's attack command is its work
+/// order on the house (slot 0x7e8), whose attack task attacks it within its reach and packs
+/// (not held) out of it. Any other class, or no target, moves to the order's point (its
+/// `MoveTo` at once).
 #[test]
 fn the_attack_move_attacks_with_trebuchet_and_moves_otherwise() {
     let (house, _) = house_and_tree();
@@ -13534,13 +13550,32 @@ fn the_attack_move_attacks_with_trebuchet_and_moves_otherwise() {
         (attacks_9(&enemy_world), ai_9(&enemy_world)),
         (None, &idle(UnitAiKind::Siege))
     );
-    let mut enemy_world = order_world(unit(class::CLASS_54, UnitAiKind::Siege), from_ref(&enemy));
+    let trebuchet = |weapon_range| {
+        let mut master = Master {
+            id: master_id(4),
+            class: class::CLASS_54,
+            combat: Some(CombatPart {
+                weapon_range: Distance::new(weapon_range),
+                ..CombatPart::default()
+            }),
+            ..order_soldier()
+        };
+        master.action.get_or_insert_with(Default::default).tasks = vec![Task {
+            action_kind: ActionKind::COMBAT,
+            owner_kind: TargetOwner::ENEMY,
+            object_group: Some(class_id(3)),
+            ..Task::default()
+        }];
+        order_unit(master, idle(UnitAiKind::Siege))
+    };
+    let mut enemy_world = order_world(trebuchet(16.0), from_ref(&enemy));
     assert_eq!(
         orders(&mut enemy_world, &attack_move),
-        Err(GenieError::unsupported(
-            "the attack command of a unit of class 51 or 54"
-        ))
+        Ok(OrderOutcome::Taken)
     );
+    assert_eq!(attacks_9(&enemy_world), Some(object_id(70)));
+    let mut enemy_world = order_world(trebuchet(1.0), from_ref(&enemy));
+    assert_eq!(orders(&mut enemy_world, &attack_move), Err(PACK_OR_UNPACK));
     for (class, target) in [(class::CLASS_6, 70), (class::CLASS_51, -1)] {
         let mut world = order_world(unit(class, UnitAiKind::Soldier), from_ref(&enemy));
         assert_eq!(

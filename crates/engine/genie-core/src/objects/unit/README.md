@@ -41,6 +41,7 @@ The other files of this folder:
 | --- | --- |
 | [`death.rs`](death.rs) | An object's death (`set_state(3)` and the static part of it) and a foundation's death. |
 | [`default_task.rs`](default_task.rs) | The master's default task, which an idle unit starts in its update: a bird's Fly, a farm's Make or the Artifact of livestock. |
+| [`idle_time.rs`](idle_time.rs) | What `RGE_Action_Object::update` (`0x14106ac90`) does after the action list: a villager's idle statistics, then the drop of a speed-up building that is gone or out of range. |
 | [`life_step.rs`](life_step.rs) | The life cycle's step in a unit's update: the hit points, the states, and what each new state sets off. |
 | [`mod.rs`](mod.rs) | What the slice tracks of one object (`Unit`) and its update, action by action. |
 | [`stop.rs`](stop.rs) | A unit's stops: its actions torn down or cleared, its standing sprite, an action's effects applied. |

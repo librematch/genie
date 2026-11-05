@@ -36,6 +36,7 @@ outside the tick's own frame seeds.
 | [`moves.rs`](moves.rs) | The current command's update: a move, the members' moves and steps, the order queue's due orders and the idle timer. |
 | [`release.rs`](release.rs) | A group's units sent at the target one by one (FD-036): `FUN_14103d460` (the log's "`UnlockedAttackWithoutPlan`"), which the attack update (`World::attack_update`) runs for the units of a category in reach. |
 | [`send.rs`](send.rs) | A member sent at the target of its group's order (FD-036): the branch of `FUN_14102bbd0` for a member within reach, with the gate rule that picks the part of a gate it strikes (`FUN_14100dbe0`), the unit's speed (slot 0x208, `FUN_141202c70`) and its weapon reach (slot 0x1e8, `FUN_141086330`). |
+| [`sprites.rs`](sprites.rs) | The sprites the group update shows its members: standing, walking and running, each from the member's master and its action. |
 | [`tests.rs`](tests.rs) | Tests. |
 <!-- /files -->
 

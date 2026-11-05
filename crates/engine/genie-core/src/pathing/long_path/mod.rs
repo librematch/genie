@@ -38,7 +38,7 @@ use crate::math::fmath::BVector;
 use crate::pathing::tile_path::Path;
 use crate::players::PlayerId;
 use crate::players::PlayerKind;
-use crate::world::index::ObjectsRef;
+use crate::world::objects_ref::ObjectsRef;
 use crate::world::slots::CheckedIndexExt;
 use crate::{GenieError, GenieResult};
 

@@ -24,8 +24,8 @@ use crate::objects::ObjectId;
 use crate::objects::masters::MasterId;
 use crate::players::PlayerId;
 use crate::world::World;
-use crate::world::index::ObjectsRef;
 use crate::world::layer::generated::GroupTuning;
+use crate::world::objects_ref::ObjectsRef;
 use crate::world::slots::CheckedIndexExt;
 use crate::{GenieError, GenieResult};
 

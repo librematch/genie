@@ -262,7 +262,7 @@ macro_rules! interact_packet {
             x: $o.point.x(),
             y: $o.point.y(),
             num: $units.count,
-            field_0x12: u8::from($o.carry_test),
+            field_0x12: u8::from($o.disable_retargeting),
             field_0x13: $o.flags.byte(OrderFlags::QUEUED),
             field_0x14: $o.flags.byte(OrderFlags::DIRECT),
             field_0x15: $o.flags.byte(OrderFlags::HUMAN),

@@ -17,18 +17,18 @@ use crate::world::index::Place;
 use crate::{GenieError, GenieResult};
 
 impl World {
-    /// `FUN_14103d460` of group `group` for the units `units` (the ids a category lists) and
-    /// the target `target`: nothing without a target the world holds. Each unit with a unit AI
-    /// (the world holds it live) that is not idle ([`World::member_idle`]) and already works on
-    /// the group's target is left alone. Any other takes the part of the target
-    /// ([`World::gate_part`]) as its own: with no queued command and the target not pending
-    /// ([`World::target_pending`]) it leaves the group (`removeUnit` with the part); it stops
-    /// (slot 0x560, [`crate::movement::Mover::stand`]), its own move in the group is cleared
-    /// (path and reason -1), and it takes the work command on the part at the part's place (slot
-    /// 0x128: carry test 1, `+0xa14` the group's retargeting byte, the group's certain action as
-    /// the filter). A unit on the special list ([`crate::groups::UnitGroup::special_units`])
-    /// with a speed above the epsilon draws its retarget timer from the time to the part at that
-    /// speed ([`crate::unit_ai::UnitAi::set_randomized_retarget_timer`]).
+    /// `FUN_14103d460` of group `group` for the units `units` (the ids a category lists) and the
+    /// target `target`: nothing without a target the world holds. Each unit with a unit AI (the
+    /// world holds it live) that is not idle ([`World::member_idle`]) and already works on the
+    /// group's target is left alone. Any other takes the part of the target ([`World::gate_part`])
+    /// as its own: with no queued command and the target not pending ([`World::target_pending`]) it
+    /// leaves the group (`removeUnit` with the part); it stops (slot 0x560,
+    /// [`crate::movement::Mover::stand`]), its own move in the group is cleared (path and reason
+    /// -1), and it takes the work command on the part at the part's place (slot 0x128 with 1: the
+    /// group's retargeting byte, the group's certain action as the filter). A unit on the special
+    /// list ([`crate::groups::UnitGroup::special_units`]) with a speed above the epsilon draws its
+    /// retarget timer from the time to the part at that speed
+    /// ([`crate::unit_ai::UnitAi::set_randomized_retarget_timer`]).
     ///
     /// # Errors
     ///
@@ -86,14 +86,10 @@ impl World {
             &Work {
                 target: Some(part),
                 point: at,
-                carry_test: true,
+                disable_retargeting: retarget != 0,
                 filter: certain,
-                source: if retarget == 0 {
-                    OrderSource::Queued
-                } else {
-                    OrderSource::Direct
-                },
             },
+            OrderSource::Direct,
         )?;
         if self.groups.held(group)?.special_units.contains(&id) {
             self.set_travel_timer(id, part, Travel::Fast)?;

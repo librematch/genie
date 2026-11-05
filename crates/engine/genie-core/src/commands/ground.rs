@@ -38,8 +38,9 @@ use crate::unit_ai::Notify;
 use crate::unit_ai::NotifyKind;
 use crate::vision::visibility::{BuildingSight, Seer, capture_kind};
 use crate::world::World;
-use crate::world::index::{ObjectsRef, Place};
+use crate::world::index::Place;
 use crate::world::layer::ClassRoles;
+use crate::world::objects_ref::ObjectsRef;
 use crate::{GenieError, GenieResult};
 
 /// Whether a footprint clearing's object lost its record already: the builder's clearing in the
@@ -210,7 +211,7 @@ impl World {
             {
                 ai.set_action(Some(AiAction::MoveAside));
             }
-            self.move_point_order(player_id, list_index, Position::new(x, y, z))?;
+            let _ = self.move_point_order(player_id, list_index, Position::new(x, y, z))?;
         }
         for &id in units {
             let Some(Place::Live(player_id, list_index)) = self.place(id) else {

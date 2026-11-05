@@ -39,13 +39,13 @@ use crate::unit_ai::{NotifyKind, UnitAi};
 use crate::world::ATTACKER_UNMOVING;
 use crate::world::Seconds;
 use crate::world::WorldTime;
-use crate::world::index::ObjectsRef;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 use crate::world::layer::generated::AttackTuning;
 use crate::world::layer::generated::MoveToTuning;
 use crate::world::layer::generated::SpriteTuning;
+use crate::world::objects_ref::ObjectsRef;
 use crate::world::step::Step;
 use crate::{GenieError, GenieResult};
 

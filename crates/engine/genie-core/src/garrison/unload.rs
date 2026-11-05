@@ -15,6 +15,7 @@ use crate::objects::ObjectKey;
 use crate::objects::ObjectState;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterKind;
+use crate::orders::OrderSource;
 use crate::orders::object_gone;
 use crate::orders::town_bell::BellShelter;
 use crate::world::slots::PlayerSlotsExt;
@@ -414,8 +415,9 @@ impl World {
     /// target class, the unit AI takes the action (`FUN_140c64b50`) and the unit tells it to search
     /// (notify 0x202 with the action, the class and the old target). From a building the unit then
     /// leaves it toward the record's point with the object to work on ([`World::let_out`],
-    /// `FUN_1411e7220` with its sound); outside it goes back ([`World::back_outside`]). Once out or
-    /// back it is no longer under the town bell (`+0x9dc`; `+0xa14` takes 1, not held).
+    /// `FUN_1411e7220` with its sound); outside it goes back ([`World::back_outside`]). Its
+    /// `+0xa14` takes 0 first; once out or back it is no longer under the town bell (`+0x9dc`) and
+    /// `+0xa14` takes 1 again, so a unit that stays keeps 0 ([`crate::orders::OrderSource`]).
     /// [`WorkReturn::Went`] when it went.
     ///
     /// [`TownBell::back_to_work`]: crate::orders::town_bell::TownBell::back_to_work
@@ -433,6 +435,7 @@ impl World {
                 _ => return Ok(WorkReturn::Stayed),
             },
         };
+        self.set_order_source(id, OrderSource::Queued)?;
         let mut bell = self.parts.town_bell_of(id);
         let (found, record) = bell.back_to_work(self.objects(), &self.model.roles)?;
         self.parts.set_town_bell(id, bell);
@@ -452,11 +455,15 @@ impl World {
             )?;
         }
         let Some((player_id, building)) = from else {
-            return self.back_outside(
+            let went = self.back_outside(
                 id,
                 found.map(|record_target| record_target.id),
                 record.point,
-            );
+            )?;
+            if went == WorkReturn::Went {
+                self.set_order_source(id, OrderSource::Direct)?;
+            }
+            return Ok(went);
         };
         let out = self.let_out(
             player_id,
@@ -467,6 +474,7 @@ impl World {
         )? == LetOut::Out;
         if out && self.object(id).is_some() {
             self.parts.set_town_bell_flag(id, BellShelter::Free);
+            self.set_order_source(id, OrderSource::Direct)?;
         }
         Ok(if out {
             WorkReturn::Went

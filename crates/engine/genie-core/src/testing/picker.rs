@@ -9,7 +9,7 @@ use crate::objects::masters::MasterTables;
 use crate::players::PlayerId;
 use crate::unit_ai::world_view::{WorldPicker, owner_view};
 use crate::world::World;
-use crate::world::index::ObjectsRef;
+use crate::world::objects_ref::ObjectsRef;
 use crate::world::slots::PlayerSlotsExt;
 
 /// Runs `work` on the picker of object `me` of player `player` over `world` and on `world`'s

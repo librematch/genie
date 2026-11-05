@@ -33,13 +33,13 @@ use crate::vision::SightLayer;
 use crate::world::Millis;
 use crate::world::Seconds;
 use crate::world::World;
-use crate::world::index::ObjectsRef;
 use crate::world::index::Place;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 use crate::world::layer::generated::SpriteTuning;
 use crate::world::layer::generated::VisibilityTuning;
+use crate::world::objects_ref::ObjectsRef;
 use crate::world::slots::PlayerSlotsExt;
 use crate::{GenieError, GenieResult};
 

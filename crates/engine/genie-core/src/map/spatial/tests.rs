@@ -4,6 +4,7 @@ use crate::gathering::PastureId;
 use crate::map::GridSize;
 use crate::map::TerrainMask;
 use crate::map::Tile;
+use crate::map::spatial::ClosestWorld;
 use crate::map::spatial::Movers;
 use crate::map::spatial::TileRecords;
 use crate::map::{Rect, Segment};
@@ -18,8 +19,10 @@ use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObjectFlags;
 use crate::ownership::CaptureKind;
 use crate::ownership::artifact::Artifact;
+use crate::players::Amount;
 use crate::players::ByPlayer;
 use crate::players::Relation;
+use crate::players::attribute::AttributeId;
 use crate::players::game_status::GameStatus;
 use crate::players::relation_row;
 use crate::players::relations;
@@ -37,7 +40,8 @@ use crate::vision::own_masks;
 use crate::vision::registry::UnitUpdate;
 use crate::vision::visibility::Seer;
 use crate::world::World;
-use crate::world::index::{ObjectsRef, TestObjects};
+use crate::world::index::TestObjects;
+use crate::world::objects_ref::ObjectsRef;
 
 /// The record cells (FD-030-D03) give every query the objects whose record is filed in a
 /// cell it visits, as the full scan's cell test does, in id order: on and off the map, on
@@ -361,6 +365,7 @@ fn search_near_the_last_reads_its_answer_until_unit_ai_lets_it_go() {
                     attack: None,
                     reach: &mut reach,
                     objects: ObjectsRef::empty(),
+                    closest: closest_world(),
                 },
                 &roles(),
                 &tuning().best_target,
@@ -2413,6 +2418,7 @@ fn closest_object_keeps_what_its_filter_and_its_searcher_take() {
         roles: &roles,
         best_target_tuning: &tuning().best_target,
         spatial_tuning: &tuning().spatial,
+        world: closest_world(),
     };
     let kept = |filter, placed: &Placed, state, searcher, checks| {
         closest_kept(
@@ -2655,44 +2661,30 @@ fn closest_object_takes_free_farm_its_searcher_gathers_from() {
         ..Searcher::default()
     };
     let (farm, trap) = (farm_of(ids::FARM), farm_of(FISH_TRAP));
-    assert!(farm_kept(object_id(1), &farm, filter, farmer, look, &roles()).unwrap());
-    assert!(!farm_kept(object_id(1), &farm, filter, trapper, look, &roles()).unwrap());
-    assert!(farm_kept(object_id(1), &trap, filter, trapper, look, &roles()).unwrap());
-    assert!(!farm_kept(object_id(1), &trap, filter, farmer, look, &roles()).unwrap());
-    assert!(!farm_kept(object_id(2), &farm, filter, farmer, look, &roles()).unwrap());
+    let alive = seer_in(ObjectState::Alive);
+    let world = closest_world();
+    let kept = |id, placed: &Placed, filter, searcher| {
+        farm_kept(
+            object_id(id),
+            (&alive, placed),
+            filter,
+            searcher,
+            (look, world),
+        )
+    };
+    assert!(kept(1, &farm, filter, farmer).unwrap());
+    assert!(!kept(1, &farm, filter, trapper).unwrap());
+    assert!(kept(1, &trap, filter, trapper).unwrap());
+    assert!(!kept(1, &trap, filter, farmer).unwrap());
+    assert!(!kept(2, &farm, filter, farmer).unwrap());
     let asked = Filter {
         master: Some(master_id(50)),
         ..filter
     };
-    assert!(
-        farm_kept(
-            object_id(2),
-            &farm,
-            asked,
-            Searcher::default(),
-            look,
-            &roles()
-        )
-        .unwrap()
-    );
-    assert!(!farm_kept(object_id(3), &farm, filter, farmer, look, &roles()).unwrap());
+    assert!(kept(2, &farm, asked, Searcher::default()).unwrap());
+    assert!(!kept(3, &farm, filter, farmer).unwrap());
     assert_eq!(
-        farm_kept(
-            object_id(1),
-            &farm_of(ids::PASTURE_MANGROVE),
-            filter,
-            farmer,
-            look,
-            &roles()
-        )
-        .unwrap_err()
-        .reason(),
-        "ClosestObject over pastures (their workers and livestock)"
-    );
-    assert_eq!(
-        farm_kept(object_id(4), &farm, filter, farmer, look, &roles())
-            .unwrap_err()
-            .reason(),
+        kept(4, &farm, filter, farmer).unwrap_err().reason(),
         "a found object the slice does not hold"
     );
     // through the tests past the relation: the worked farm passed, the free one kept
@@ -2702,6 +2694,7 @@ fn closest_object_takes_free_farm_its_searcher_gathers_from() {
         roles: &roles,
         best_target_tuning: &tuning().best_target,
         spatial_tuning: &tuning().spatial,
+        world,
     };
     let seer = seer_in(ObjectState::Alive);
     assert!(
@@ -2728,6 +2721,77 @@ fn closest_object_takes_free_farm_its_searcher_gathers_from() {
 
 /// A scene world of two players holding `objects`: the objects `ClosestObject`'s checks read by
 /// id.
+/// What `ClosestObject` reads of a test world beside its objects: attribute 290 for a pasture's
+/// workers, the content mode 0.
+const fn closest_world() -> ClosestWorld {
+    ClosestWorld {
+        pasture_workers: AttributeId::named(290),
+        mode_one: false,
+    }
+}
+
+/// `ClosestObject`'s pasture (masters 1893 and 1897, `FUN_140c488b0`): one in state 2 as a
+/// building is kept while its livestock's workers are below its owner's attribute 290 and it
+/// holds livestock, then without the farms' workers cap; one in another state skips that test.
+#[test]
+fn closest_object_takes_pasture_with_room_and_livestock() {
+    use crate::map::spatial::closest::{Searcher, farm_kept};
+    let filter = Filter {
+        group: Some(class_id(49)),
+        ..any_filter()
+    };
+    let pasture_master = Master {
+        id: ids::PASTURE_MANGROVE,
+        kind: MasterKind::BUILDING,
+        class: class::FARM,
+        ..Master::default()
+    };
+    let animal_master = Master {
+        id: master_id(1060),
+        class: class::FARM,
+        ..Master::default()
+    };
+    let at = |x| Position::new(x, 1.5, 0.0);
+    let run = |room: f32, livestock: &[i32], state| {
+        let mut world = found_world(vec![
+            SceneObject {
+                workers: WorkerCount::ONE,
+                ..SceneObject::new(5, PlayerId::new(2), pasture_master.clone(), at(1.5))
+            },
+            SceneObject {
+                workers: WorkerCount::ONE,
+                ..SceneObject::new(6, PlayerId::new(2), animal_master.clone(), at(3.5))
+            },
+        ]);
+        world.players[2].attributes.resize(300, Amount::ZERO);
+        world.players[2].attributes[290] = Amount::new(room);
+        world.parts.building_mut(object_id(5)).unwrap().livestock =
+            livestock.iter().map(|&id| object_id(id)).collect();
+        let placed = Placed {
+            class: class::FARM,
+            master: ids::PASTURE_MANGROVE,
+            player: PlayerId::new(2),
+            ..villager(1.5, 1.5)
+        };
+        let farmer = Searcher {
+            farmer: true,
+            ..Searcher::default()
+        };
+        farm_kept(
+            object_id(5),
+            (&seer_in(state), &placed),
+            filter,
+            farmer,
+            (world.objects(), closest_world()),
+        )
+        .unwrap()
+    };
+    assert!(run(2.0, &[6], ObjectState::Alive));
+    assert!(!run(1.0, &[6], ObjectState::Alive));
+    assert!(!run(2.0, &[], ObjectState::Alive));
+    assert!(run(1.0, &[], ObjectState::Foundation));
+}
+
 fn found_world(objects: Vec<SceneObject>) -> World {
     objects
         .into_iter()
@@ -2792,4 +2856,18 @@ fn capture_flag_comes_from_the_seer_of_the_object() {
         ),
         (CaptureKind::Again, CaptureKind::None)
     );
+}
+
+/// `FUN_141195750` and `FUN_1411945a0`: a villager (class 4) gathers from farms, a fishing
+/// ship (masters 13, 2356, 2171) from fish traps; no other class or master does.
+#[test]
+fn villagers_gather_farms_and_fishing_ships_fish_traps() {
+    use crate::map::spatial::closest::{gathers_farms, gathers_fish_traps};
+    let roles = roles();
+    assert!(gathers_farms(class_id(4), &roles));
+    assert!(!gathers_farms(class_id(22), &roles));
+    for master in [13, 2356, 2171] {
+        assert!(gathers_fish_traps(master_id(master), &roles), "{master}");
+    }
+    assert!(!gathers_fish_traps(master_id(83), &roles));
 }

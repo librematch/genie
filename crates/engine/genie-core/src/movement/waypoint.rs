@@ -28,7 +28,7 @@ use crate::objects::sprite::Graphic;
 use crate::pathing::Pathing;
 use crate::vision::SightLayer;
 use crate::world::WorldTime;
-use crate::world::index::ObjectsRef;
+use crate::world::objects_ref::ObjectsRef;
 use crate::world::slots::CheckedIndexExt;
 use crate::{GenieError, GenieResult};
 
@@ -326,8 +326,8 @@ impl Mover {
     /// point must lie within the map less the unit's radii (the game takes the height radius for
     /// the low edge in y); then the walk's query (`FUN_14114cc60` with the tiles' records, flags
     /// `0x190`, its radius times 0.5) must find nothing but the unit and its target with their
-    /// annexes ([`ObjectsRef::query_ignore`](crate::world::index::ObjectsRef::query_ignore)): no
-    /// tile its terrain mask lacks, no static record (kinds 2, 11, 13)
+    /// annexes ([`ObjectsRef::query_ignore`](crate::world::objects_ref::ObjectsRef::query_ignore)):
+    /// no tile its terrain mask lacks, no static record (kinds 2, 11, 13)
     /// ([`Spatial::segment_blocked`]). The game also writes the straight path into a scratch path,
     /// which it drops.
     pub(super) fn straight(

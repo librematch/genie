@@ -33,9 +33,9 @@ use crate::combat::missile::{
 use crate::objects::layers::Action;
 use crate::objects::masters::MasterTables;
 use crate::world::World;
-use crate::world::index::ObjectsRef;
 use crate::world::layer::Roles;
 use crate::world::lets::release;
+use crate::world::objects_ref::ObjectsRef;
 use crate::world::others::OthersRef;
 use crate::world::player::Player;
 use crate::world::slots::PlayerSlotsExt;

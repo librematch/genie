@@ -36,10 +36,10 @@ use crate::unit_ai::{
 };
 use crate::world::Mode680;
 use crate::world::WorldTime;
-use crate::world::index::ObjectsRef;
 use crate::world::layer::Roles;
 use crate::world::layer::generated::DamageTuning;
 use crate::world::layer::generated::UnitAiTuning;
+use crate::world::objects_ref::ObjectsRef;
 use crate::world::others::OthersRef;
 use crate::world::parts::Parts;
 use crate::world::player::AiSettings;

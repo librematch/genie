@@ -225,7 +225,7 @@ impl World {
         let (site, point) = Some(site)
             .and_then(|id| self.spatial.get(id).map(|placed| (id, placed.position)))
             .ok_or(GenieError::unsupported("a drop site without a place"))?;
-        self.move_to_object(player, idx, site.id(), point)
+        self.move_to_object(player, idx, site.id(), point).map(drop)
     }
 
     /// `UNIT_ORDER`'s action 4 (`FUN_14161e370` case 4) to the objects `ids`: each the world

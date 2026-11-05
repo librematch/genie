@@ -32,11 +32,11 @@ use crate::pathing::Pathing;
 use crate::players::PlayerKind;
 use crate::world::Seconds;
 use crate::world::WorldTime;
-use crate::world::index::ObjectsRef;
 use crate::world::layer::Roles;
 use crate::world::layer::generated::MovementTuning;
 use crate::world::layer::generated::SpawnTuning;
 use crate::world::layer::generated::VisibilityTuning;
+use crate::world::objects_ref::ObjectsRef;
 use crate::{GenieError, GenieResult};
 
 mod ends;

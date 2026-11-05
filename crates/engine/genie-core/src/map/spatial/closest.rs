@@ -3,19 +3,26 @@
 
 use crate::map::Distance;
 use crate::map::spatial::{ClosestChecks, Filter, Placed, Reach, Spatial};
+use crate::math::fmath::below_or_unordered;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::WorkerCount;
+use crate::objects::masters::ClassId;
+use crate::objects::masters::MasterId;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObjectFlags;
 use crate::ownership::artifact::ARTIFACT_KIND;
 use crate::players::PlayerId;
+use crate::players::attribute::AttributeId;
 use crate::players::{QueryRelation, UnitRelation};
 use crate::vision::registry::Record;
 use crate::vision::visibility::Seer;
-use crate::world::index::ObjectsRef;
+use crate::world::NO_ATTRIBUTE;
+use crate::world::World;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
+use crate::world::objects_ref::ObjectsRef;
 use crate::{GenieError, GenieResult};
 use std::fmt::Debug;
 
@@ -31,7 +38,8 @@ impl Spatial {
     /// 10 passes the objects [`shuns`] names (of master 440 or a master with object flag 0x10; the
     /// game's `+0x6b4` of 1, not met, would let it take them). The found object's workers
     /// (`+0x644`) meet the cap (argument 6) and a search for state 0's unbuilt farm test
-    /// ([`closest_kept`]). Not modelled: the pastures. Nothing found answers −1.
+    /// ([`closest_kept`]), and a farm the searcher gathers from ([`farm_kept`]: the pastures
+    /// with room and livestock). Nothing found answers −1.
     pub(super) fn closest_object(
         &mut self,
         me: ObjectId,
@@ -45,14 +53,8 @@ impl Spatial {
         let searcher = Searcher {
             class_10: at
                 .is_some_and(|placed| roles.of_class(placed.class).contains(ClassRoles::PREDATOR)),
-            // The villagers' class, which gathers from farms (`FUN_141195750`).
-            farmer: at
-                .is_some_and(|placed| roles.of_class(placed.class).contains(ClassRoles::VILLAGER)),
-            trapper: at.is_some_and(|placed| {
-                roles
-                    .of_master(placed.master)
-                    .contains(MasterRoles::TRAPPER)
-            }),
+            farmer: at.is_some_and(|placed| gathers_farms(placed.class, roles)),
+            trapper: at.is_some_and(|placed| gathers_fish_traps(placed.master, roles)),
         };
         let spared = filter.spared.map(QueryRelation::list);
         let mut best: Option<(ObjectId, f32)> = None;
@@ -102,6 +104,41 @@ impl Spatial {
     }
 }
 
+/// `FUN_141195750`: an object of class `class` gathers from farms, a villager (class 4).
+pub(super) fn gathers_farms(class: ClassId, roles: &Roles) -> bool {
+    roles.of_class(class).contains(ClassRoles::VILLAGER)
+}
+
+/// `FUN_1411945a0`: an object of master `master` gathers from fish traps, a fishing ship
+/// (masters 13, 2356 and 2171).
+pub(super) fn gathers_fish_traps(master: MasterId, roles: &Roles) -> bool {
+    roles.of_master(master).contains(MasterRoles::TRAPPER)
+}
+
+/// What `ClosestObject` reads of the world beside its objects: the attribute of a pasture's
+/// workers (290) and whether the loaded world's content mode (`+0x6b4`, [`World::mode_680`])
+/// is 1, which lets a searcher of class 10 take what [`shuns`] names.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct ClosestWorld {
+    /// The owner's attribute of a pasture's workers ([`AttributeSlots::pasture_workers`]).
+    ///
+    /// [`AttributeSlots::pasture_workers`]: crate::world::layer::AttributeSlots::pasture_workers
+    pub(crate) pasture_workers: AttributeId,
+    /// The content mode `+0x6b4` is 1.
+    pub(crate) mode_one: bool,
+}
+
+impl World {
+    /// What `ClosestObject` reads of the world beside its objects ([`ClosestWorld`]).
+    #[must_use]
+    pub(crate) const fn closest_world(&self) -> ClosestWorld {
+        ClosestWorld {
+            pasture_workers: self.model.slots.attribute.pasture_workers,
+            mode_one: self.mode_680.is_one(),
+        }
+    }
+}
+
 /// What `ClosestObject` reads of its searcher (`FUN_140c488b0`): of class 10 it passes the
 /// objects `shuns` names; a farmer takes farms, a trapper fish traps ([`farm_kept`]).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -120,13 +157,18 @@ const FOUND_NOT_HELD: GenieError =
 /// (argument 6, "Too many workers"); for a search of state 0, a farm (masters 50 and 1187)
 /// without workers ("Unbuilt farm that already has workers"); a farm ([`farm_kept`]); livestock
 /// (class 58) the searcher's player owns or not in state 2, and not [`herded`]; for a searcher of
-/// class 10, not what [`shuns`] names.
+/// class 10, not what [`shuns`] names unless the content mode is 1.
 pub(super) fn closest_kept(
     id: ObjectId,
     (seer, placed): (&Seer, &Placed),
     filter: Filter,
     (player, searcher): (PlayerId, Searcher),
-    ClosestChecks { objects, roles, .. }: ClosestChecks<'_>,
+    ClosestChecks {
+        objects,
+        roles,
+        world,
+        ..
+    }: ClosestChecks<'_>,
 ) -> GenieResult<bool> {
     if filter
         .group
@@ -163,7 +205,7 @@ pub(super) fn closest_kept(
     if roles
         .of_some_class(filter.group)
         .contains(ClassRoles::CLOSEST_PASTURE)
-        && !farm_kept(id, placed, filter, searcher, objects, roles)?
+        && !farm_kept(id, (seer, placed), filter, searcher, (objects, world))?
     {
         return Ok(false);
     }
@@ -174,7 +216,7 @@ pub(super) fn closest_kept(
     {
         return Ok(false);
     }
-    if searcher.class_10 && shuns(objects, roles, (id, placed))? {
+    if searcher.class_10 && !world.mode_one && shuns(objects, roles, (id, placed))? {
         return Ok(false);
     }
     Ok(true)
@@ -211,17 +253,23 @@ pub(super) fn shuns(
 }
 
 /// A farm (class 49) `ClosestObject` found, its workers (`+0x644`) and pasture (`+0x790`,
-/// `parent_pasture_id`) read from `objects`: not a pasture's livestock
-/// (`+0x790`); a pasture is not modelled; without a master asked for, one without workers that
-/// the searcher gathers from (a fish trap for a trapper, any other for a farmer).
+/// `parent_pasture_id`) read from `objects`: not a pasture's livestock (`+0x790`); a pasture
+/// (masters 1893, 1897) in state 2 as a building (type 80) that is full or without livestock
+/// is passed ([`pasture_open`]); then, without a master asked for, a pasture or an object
+/// without workers that the searcher gathers from: a fish trap for a trapper
+/// ([`gathers_fish_traps`]), any other for a farmer ([`gathers_farms`]).
+///
+/// # Errors
+///
+/// A found object the world does not hold, its master, and its owner's attribute 290.
 pub(super) fn farm_kept(
     id: ObjectId,
-    placed: &Placed,
+    (seer, placed): (&Seer, &Placed),
     filter: Filter,
     searcher: Searcher,
-    objects: ObjectsRef<'_>,
-    roles: &Roles,
+    (objects, world): (ObjectsRef<'_>, ClosestWorld),
 ) -> GenieResult<bool> {
+    let roles = objects.roles();
     let (workers, parent) = objects
         .get(id)
         .map(|unit| (unit.workers, unit.pasture))
@@ -229,35 +277,53 @@ pub(super) fn farm_kept(
     if parent.is_some() {
         return Ok(false);
     }
-    if roles
+    let pasture = roles
         .of_master(placed.master)
-        .contains(MasterRoles::COUNTED_PASTURE)
+        .contains(MasterRoles::COUNTED_PASTURE);
+    if pasture
+        && seer.state == ObjectState::Alive
+        && objects.masters().of_placed(id, placed)?.kind == MasterKind::BUILDING
+        && !pasture_open(id, placed.player, objects, world)?
     {
-        return Err(GenieError::unsupported(
-            "ClosestObject over pastures (their workers and livestock)",
-        ));
+        return Ok(false);
     }
-    if filter.master.is_none() {
-        if WorkerCount::ONE <= workers {
-            return Ok(false);
-        }
-        // The fish trap (raw `0x6163`), which only the fishing ships gather from (`FUN_1411945a0`).
-        if !searcher.trapper
-            && roles
-                .of_master(placed.master)
-                .contains(MasterRoles::FISH_TRAP)
-        {
-            return Ok(false);
-        }
-        if !searcher.farmer
-            && !roles
-                .of_master(placed.master)
-                .contains(MasterRoles::FISH_TRAP)
-        {
-            return Ok(false);
-        }
+    if filter.master.is_some() {
+        return Ok(true);
     }
-    Ok(true)
+    if !pasture && WorkerCount::ONE <= workers {
+        return Ok(false);
+    }
+    let fish_trap = roles
+        .of_master(placed.master)
+        .contains(MasterRoles::FISH_TRAP);
+    if fish_trap {
+        return Ok(searcher.trapper);
+    }
+    Ok(searcher.farmer)
+}
+
+/// `ClosestObject`'s test of a pasture `id` of player `owner` (`FUN_140c488b0`): its livestock's
+/// workers (slot 0x780, [`ObjectsRef::livestock_workers`]; `CVTDQ2PS`) below the owner's
+/// attribute 290 (`COMISS`, `JC`: a NaN is below), and it holds livestock (slot 0x788,
+/// `FUN_1411c5db0`: its list's length).
+///
+/// # Errors
+///
+/// An owner without attribute 290.
+fn pasture_open(
+    id: ObjectId,
+    owner: PlayerId,
+    objects: ObjectsRef<'_>,
+    world: ClosestWorld,
+) -> GenieResult<bool> {
+    let room = objects
+        .attribute(owner, world.pasture_workers)
+        .ok_or(NO_ATTRIBUTE)?;
+    let workers = objects.livestock_workers(id);
+    let livestock = objects
+        .building(id)
+        .map_or(0, |building| building.livestock.len());
+    Ok(below_or_unordered(workers.as_f32(), room.get()) && livestock != 0)
 }
 
 /// The nearer of the nearest so far, `best`, and `record`, by the search's distance; a tie

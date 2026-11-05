@@ -19,7 +19,7 @@ use crate::pathing::zones::{UNKNOWN_RESTRICTION, ZoneId, ZoneMap};
 use crate::players::PlayerId;
 use crate::players::PlayerKind;
 use crate::world::World;
-use crate::world::index::ObjectsRef;
+use crate::world::objects_ref::ObjectsRef;
 use crate::{GenieError, GenieResult};
 
 /// What the auto scout's searches ([`crate::movement::explore`]) and the AI's explorer

@@ -18,6 +18,7 @@ mod entry;
 mod moves;
 mod release;
 mod send;
+mod sprites;
 
 pub use self::awake::IDLE_SPAN;
 use crate::construction::repair::REPAIR as CONSTRUCTION_REPAIR;

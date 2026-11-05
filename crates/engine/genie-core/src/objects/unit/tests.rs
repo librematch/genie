@@ -36,6 +36,7 @@ use crate::objects::actions::ActionList;
 use crate::objects::facing::SpriteFacets;
 use crate::objects::layers::{Action, Action as LayersAction, DefaultTask};
 use crate::objects::layers::{Animated, Motion};
+use crate::objects::layers::{IdleCount, IdleTime, Speedup, SpeedupValue};
 use crate::objects::lifecycle::{Class, Lifecycle};
 use crate::objects::masters::TaskId;
 use crate::objects::masters::{Task, WorkValue};
@@ -43,6 +44,7 @@ use crate::objects::sprite::{ActiveSprite, Graphic};
 use crate::objects::unit::Unit;
 use crate::objects::{FacetCount, Frame};
 use crate::ownership::artifact::{Artifact, ArtifactSub};
+use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::test_ids::group_id;
 use crate::test_ids::master_id;
@@ -53,11 +55,12 @@ use crate::testing::slots;
 use crate::testing::tuning;
 use crate::unit_ai::UnitAi;
 use crate::world::Seconds;
-use crate::world::index::ObjectsRef;
+use crate::world::World;
+use crate::world::objects_ref::ObjectsRef;
 use crate::world::others::OthersRef;
 use crate::world::parts::Part;
 use crate::world::tests::{forage_world, in_update};
-use crate::world::{OBJECT_MASTER, Unread, WorldTime};
+use crate::world::{Millis, OBJECT_MASTER, Unread, WorldTime};
 use std::iter::once;
 use std::sync::Arc;
 
@@ -780,4 +783,84 @@ fn unit_own_view_for_its_walk() {
             human_order: WorldTime::from_millis(2001),
         }
     );
+}
+
+/// The idle statistics of `RGE_Action_Object::update` (from `0x14106b11d`): a villager that may
+/// be interrupted in state 2 begins an idle once (its count one more, its start the world's
+/// time) and keeps it; past state 2 the idle ends into its milliseconds, its owner's
+/// attribute 250 takes the seconds and 249 the count, and the fields go to 0; the update after
+/// adds nothing. Another class keeps none.
+#[test]
+fn villager_idle_time_goes_to_its_owner_past_its_life() {
+    let mut world = forage_world();
+    world.players[1].attributes.resize(300, Amount::ZERO);
+    let me = (PlayerId::new(1), ListIndex::new(0));
+    let id = world.players[1].objects[ListIndex::new(0)].id;
+    let step = |world: &mut World, at: u32| {
+        world.world_time = WorldTime::from_millis(at);
+        in_update(world, me, 50, |unit, action, step| {
+            unit.action_update_end(action, step)
+        })
+        .unwrap();
+    };
+    let begun = IdleTime {
+        since: WorldTime::from_millis(1000),
+        idle: Millis::ZERO,
+        count: IdleCount::ZERO.next(),
+    };
+    step(&mut world, 1000);
+    assert_eq!(world.parts.actions_of(id).idle, begun);
+    step(&mut world, 1400);
+    assert_eq!(world.parts.actions_of(id).idle, begun);
+    let statistics = |world: &World| {
+        let attributes = &world.players[1].attributes;
+        (attributes[249].get(), attributes[250].get())
+    };
+    let (count, seconds) = statistics(&world);
+    world.players[1].objects[ListIndex::new(0)].life.state = ObjectState::Dying;
+    step(&mut world, 1800);
+    assert_eq!(world.parts.actions_of(id).idle, IdleTime::default());
+    assert_eq!(statistics(&world), (count + 1.0, seconds + 0.8));
+    step(&mut world, 2000);
+    assert_eq!(statistics(&world), (count + 1.0, seconds + 0.8));
+    let mut world = forage_world();
+    let master = world.players[1].objects[ListIndex::new(0)].life.master_id;
+    for masters in &mut world.model.masters {
+        if let Some(master) = Arc::make_mut(masters).get_mut(master) {
+            master.class = NO_CLASS;
+        }
+    }
+    step(&mut world, 1000);
+    assert_eq!(world.parts.actions_of(id).idle, IdleTime::default());
+}
+
+/// The speed-up's check of `RGE_Action_Object::update` (`0x14106b34f`): a building the world
+/// holds whose squared footprint gap is below the square of the owner's attribute 256 stays;
+/// out of range, or gone, the building is none and the value 0.
+#[test]
+fn speedup_building_stays_only_within_its_range() {
+    let mut world = forage_world();
+    world.players[1].attributes.resize(300, Amount::ZERO);
+    let me = (PlayerId::new(1), ListIndex::new(0));
+    let id = world.players[1].objects[ListIndex::new(0)].id;
+    let held = Speedup {
+        building: Some(object_id(600)),
+        value: SpeedupValue::of_data(1.5),
+    };
+    let check = |world: &mut World, speedup: Speedup, range: f32| {
+        world.players[1].attributes[256] = Amount::new(range);
+        world.parts.actions.of_mut(id).unwrap().speedup = speedup;
+        in_update(world, me, 50, |unit, action, step| {
+            unit.action_update_end(action, step)
+        })
+        .unwrap();
+        world.parts.actions_of(id).speedup
+    };
+    assert_eq!(check(&mut world, held, 1000.0), held);
+    assert_eq!(check(&mut world, held, 0.0), Speedup::NONE);
+    let gone = Speedup {
+        building: Some(object_id(9999)),
+        ..held
+    };
+    assert_eq!(check(&mut world, gone, 1000.0), Speedup::NONE);
 }

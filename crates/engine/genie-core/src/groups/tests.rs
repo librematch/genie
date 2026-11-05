@@ -910,6 +910,89 @@ fn the_reach_pass_raises_the_range_and_sends_member_in_reach() {
     assert_eq!(range, 4.0);
 }
 
+/// `FUN_14102bbd0`'s send of a member in reach: slot 0x128 with 1 (`FUN_141211b80`: the member's
+/// unit AI's order queue empties) and the order's retargeting byte as the work command's 8th
+/// argument, which an attack task makes the unit AI's `+0x1d6` (`FUN_140c40ef0`); the member's
+/// command count (`+0x888`) goes one up.
+#[test]
+fn the_reach_pass_sends_direct_orders_with_the_order_retargeting_byte() {
+    use crate::math::rng::Well512;
+    use crate::objects::sprite::{ActiveSprite, Graphic};
+    use crate::objects::{FacetCount, Frame, SpeedMultiplier, SpriteFlags, SpriteId};
+    use crate::unit_ai::{Issuer, OrderKind, OrderPriority, QueuedOrder};
+    use crate::world::Seconds;
+    for disable_retargeting in [false, true] {
+        let mut world = attack_world(&[(8, 4, 38.0, 45.0)]);
+        for master in world
+            .model
+            .masters
+            .iter_mut()
+            .filter_map(|masters| Arc::make_mut(masters).get_mut(master_id(4)))
+        {
+            master.action.get_or_insert_with(Default::default).tasks = vec![Task {
+                work_range: Distance::ZERO,
+                ..attack_task()
+            }];
+            master.standing_sprite = Some(SpriteId::named(300));
+        }
+        let standing = Graphic {
+            id: SpriteId::named(300),
+            frames: Frame::of_data(10),
+            facets: FacetCount::of_data(16),
+            speed_multiplier: SpeedMultiplier::ONE,
+            frame_duration: Seconds::new(0.1),
+            replay_delay: Seconds::ZERO,
+            flags: SpriteFlags::ANIMATED,
+        };
+        let _ = Arc::make_mut(&mut world.model.graphics).insert(standing.id, standing);
+        let sprite_tuning = world.model.tuning.sprite;
+        world.players[1].objects[ListIndex::new(0)].sprite = Some(ActiveSprite::start(
+            standing,
+            &mut Well512::default(),
+            sprite_tuning,
+        ));
+        register(&mut world);
+        let id = world.players[1].objects[ListIndex::new(0)].id;
+        let queued = QueuedOrder {
+            issuer: Some(Issuer::Player(PlayerId::new(1))),
+            order: OrderKind::Move,
+            priority: OrderPriority::of_data(100),
+            target: None,
+            target_owner: None,
+            point: Position::new(1.0, 1.0, 0.0),
+            range: Distance::ZERO,
+            shown: Point::new(1.0, 1.0),
+            ready: true,
+            target_kind: None,
+        };
+        world.parts.set_unit_ai(
+            id,
+            Some(UnitAi {
+                orders: vec![queued],
+                ..UnitAi::default()
+            }),
+        );
+        world.parts.put_mover(id, Some(walker()));
+        let mut range = -1.0;
+        let order = attack::AttackOrder {
+            disable_retargeting,
+            filter: None,
+        };
+        world
+            .reach_pass(group_id(1), object_id(60), order, &mut range)
+            .unwrap();
+        let ai = world.parts.unit_ai.get(id).unwrap();
+        assert_eq!(
+            (
+                ai.orders.len(),
+                ai.retarget_disabled,
+                world.parts.actions_of(id).commands.get()
+            ),
+            (0, u8::from(disable_retargeting), 1)
+        );
+    }
+}
+
 /// `FUN_1415cd0d0`: no filter is -1; a filter takes the range of the master's task of that
 /// action type (the conversion's adds attribute 280); no such task -1; a master the player does
 /// not have 0.

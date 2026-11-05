@@ -32,6 +32,7 @@ use crate::objects::WorkRate;
 use crate::objects::WorkerCount;
 use crate::objects::layers::Building;
 use crate::objects::layers::{Action, Animated, Combat, DefaultTask, Motion, Static, Unstartable};
+use crate::objects::layers::{CommandCount, Speedup, SpeedupValue};
 use crate::objects::lifecycle::Lifecycle;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::ClassId;
@@ -39,6 +40,7 @@ use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
 use crate::objects::unit::Unit;
 use crate::objects::unit::UnitFlags;
+use crate::orders::OrderSource;
 use crate::orders::town_bell::{BellShelter, TownBell};
 use crate::ownership::CaptureKind;
 use crate::players::Amount;
@@ -450,6 +452,8 @@ fn row(
                     .collect()
             })
             .unwrap_or_default(),
+        // not saved: the load's constructor sets 1
+        order_source: OrderSource::Direct,
     };
     // the animated layer (types 20 and up); a moving object's mover takes it below
     let animated = object
@@ -539,6 +543,17 @@ fn row(
         }
     };
     actions.default_task = default_start(default, saved);
+    actions.speedup = object
+        .action_part()
+        .map_or(Speedup::NONE, |rge_action_object| Speedup {
+            building: ObjectId::of_field(rge_action_object.speedup_building_id),
+            value: SpeedupValue::of_data(rge_action_object.speedup_value),
+        });
+    actions.commands = object
+        .action_part()
+        .map_or(CommandCount::ZERO, |rge_action_object| {
+            CommandCount::of_data(rge_action_object.command_flag)
+        });
     let production = production(object).map(|_| ());
     let (mover, moving) = match mover(object, rge_static_object, objects, paths, civ, masters) {
         Ok(mover) => (mover, Ok(())),

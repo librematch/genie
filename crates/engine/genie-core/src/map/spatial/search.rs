@@ -6,6 +6,7 @@ use crate::map::Point;
 use crate::map::Position;
 use crate::map::Tile;
 use crate::map::WholeDistance;
+use crate::map::spatial::ClosestWorld;
 use crate::map::spatial::{
     ClosestChecks, Filter, QUERY_HITS, Reach, RecordId, Spatial, players_seen,
     record_meets_segment, tile_record_id,
@@ -25,12 +26,12 @@ use crate::unit_ai::{Found, Pick, Search};
 use crate::vision::SightTiles;
 use crate::vision::registry::Record;
 use crate::vision::registry::VisibleQuery;
-use crate::world::index::ObjectsRef;
 use crate::world::layer::Roles;
 use crate::world::layer::generated::BestTargetTuning;
 use crate::world::layer::generated::RegistryTuning;
 use crate::world::layer::generated::SpatialTuning;
 use crate::world::layer::generated::VisibilityTuning;
+use crate::world::objects_ref::ObjectsRef;
 use crate::{GenieError, GenieResult};
 use std::fmt::{Debug, Error, Formatter};
 
@@ -205,6 +206,7 @@ impl Spatial {
             attack,
             reach,
             objects,
+            closest,
         } = query;
         let _ = self.sight.as_ref().ok_or(GenieError::unsupported(
             "a search without the players' sight",
@@ -223,6 +225,7 @@ impl Spatial {
                 roles,
                 best_target_tuning,
                 spatial_tuning,
+                world: closest,
             },
         )
     }
@@ -472,6 +475,8 @@ pub struct SearchQuery<'world> {
     /// ([`shuns`](crate::map::spatial::closest::shuns)), a farm's workers and pasture
     /// ([`farm_kept`](crate::map::spatial::closest::farm_kept)).
     pub(crate) objects: ObjectsRef<'world>,
+    /// What `ClosestObject` reads of the world beside them ([`ClosestWorld`]).
+    pub(crate) closest: ClosestWorld,
 }
 
 impl Debug for SearchQuery<'_> {

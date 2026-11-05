@@ -285,10 +285,22 @@ impl UnitAi {
             .of_class(attacker.class)
             .contains(ClassRoles::VILLAGER);
         let furious = if self.current_action == Some(AiAction::Attack) {
-            let _ = self.attack_object(target, OrderForce::Unforced, TargetRules::Own, at, side)?;
+            let _ = self.attack_object(
+                target,
+                OrderForce::Unforced,
+                TargetRules::Own,
+                at,
+                (side, ai_rng),
+            )?;
             true
         } else {
-            let _ = self.attack_object(target, OrderForce::Forced, TargetRules::Own, at, side)?;
+            let _ = self.attack_object(
+                target,
+                OrderForce::Forced,
+                TargetRules::Own,
+                at,
+                (side, ai_rng),
+            )?;
             self.idle_timer = Millis::ZERO;
             villager
         };

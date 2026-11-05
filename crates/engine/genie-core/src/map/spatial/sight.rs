@@ -28,10 +28,10 @@ use crate::vision::visibility::MasterChange;
 use crate::vision::visibility::Seeing;
 use crate::vision::visibility::Visibility;
 use crate::vision::{VisionBits, VisionMasks};
-use crate::world::index::ObjectsRef;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
 use crate::world::layer::generated::VisibilityTuning;
+use crate::world::objects_ref::ObjectsRef;
 use crate::world::player::Player;
 use crate::{GenieError, GenieResult};
 impl Spatial {

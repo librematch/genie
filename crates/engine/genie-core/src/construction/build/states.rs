@@ -12,7 +12,6 @@ use crate::objects::masters::MasterId;
 use crate::objects::masters::PlayersMastersExt;
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Unit;
-use crate::orders::OrderSource;
 use crate::players::Amount;
 use crate::players::PlayerKind;
 use crate::players::attribute::AttributeId;
@@ -268,13 +267,7 @@ impl BuildAction {
                 "a builder's building without a place",
             ))?
             .position;
-        let work = Work {
-            target: self.target.map(FoundationId::id),
-            point,
-            carry_test: false,
-            filter: None,
-            source: OrderSource::Direct,
-        };
+        let work = Work::on(self.target.map(FoundationId::id), point);
         self.lend(step, builder, actions, |world, player_id, list_index| {
             world.order_work(player_id, list_index, &work)
         })

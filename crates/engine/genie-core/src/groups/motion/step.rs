@@ -19,8 +19,8 @@ use crate::movement::PathState;
 use crate::movement::WaypointLevel;
 use crate::movement::{Planning, footprint_gap, footprint_gap_squared};
 use crate::world::Seconds;
-use crate::world::index::ObjectsRef;
 use crate::world::layer::generated::GroupTuning;
+use crate::world::objects_ref::ObjectsRef;
 use crate::world::slots::CheckedIndexExt;
 
 /// One pass's end (the routine's labels).

@@ -102,11 +102,11 @@ use crate::pathing::tile_path::Path;
 #[cfg(test)]
 use crate::pathing::{Pathing, PlanBudget};
 use crate::world::WALKER_UNMOVING;
-use crate::world::index::ObjectsRef;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 use crate::world::layer::generated::MovementTuning;
+use crate::world::objects_ref::ObjectsRef;
 pub use genie_model::movement::{Turning, turn_rate, turning};
 
 /// The velocity data (`+0x868`): velocity and acceleration in the unit's own frame; component 2 is

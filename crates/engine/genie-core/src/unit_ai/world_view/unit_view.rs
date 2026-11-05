@@ -17,9 +17,9 @@ use crate::players::PlayerKind;
 use crate::unit_ai::world_view::owner_view;
 use crate::unit_ai::world_view::{UnitView, WorldPicker};
 use crate::unit_ai::{Seeker, can_attack};
-use crate::world::index::ObjectsRef;
 use crate::world::layer::Roles;
 use crate::world::lets::{release as lets_release, take as lets_take, torn_down as lets_torn_down};
+use crate::world::objects_ref::ObjectsRef;
 use crate::world::slots::PlayerSlotsExt;
 
 impl UnitView<'_, '_> {

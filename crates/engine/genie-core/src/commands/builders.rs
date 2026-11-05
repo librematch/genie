@@ -56,7 +56,7 @@ impl World {
     /// (`FUN_140c4dfa0`), goes into its queue as the build order (slot 0x30 into slot 0x28:
     /// [`World::queue_build`], issued by the unit's own player); else its slot 0x128 on the
     /// foundation with 1: a static object's (types below 40, `FUN_141071bd0`) does nothing; a
-    /// combat object's empties its unit AI's queue first ([`World::empty_queue_for_work`]); a unit's
+    /// combat object's empties its unit AI's queue first ([`World::in_work_frame`]); a unit's
     /// takes the Build ([`World::build_task`], [`World::build_directly`]), another player's
     /// whatever task its slot 0x7e8 finds on the foundation ([`World::order_work`]). A unit the world no
     /// longer holds is passed over. A committing BUILD's queue then takes the readiness pass with
@@ -120,21 +120,22 @@ impl World {
         if to_queue {
             self.queue_builder((player_id, idx), site, position, commits)?;
         } else if STATIC_KINDS_END <= kind && player_id == player {
+            // slot 0x128 with 1: its frame, the Build the work command starts, then
+            // FUN_14106c590's count
             let task = self.build_task(player_id, id, site, position)?;
-            self.empty_queue_for_work(player_id, idx, kind)?;
-            self.build_directly(player_id, idx, task, site, position)?;
+            self.in_work_frame(id, kind, OrderSource::Direct, |world| {
+                world.build_directly(player_id, idx, task, site, position)?;
+                world.count_command(id)
+            })?;
         } else if STATIC_KINDS_END <= kind {
-            self.empty_queue_for_work(player_id, idx, kind)?;
             // another player's unit: slot 0x128's slot 0x7e8 finds whatever task it has on
             // the foundation (a Build on an ally's), the work command's general path
-            let work = Work {
-                target: Some(foundation.id()),
-                point: Position::new(position.x(), position.y(), 0.0),
-                carry_test: false,
-                filter: None,
-                source: OrderSource::Direct,
-            };
-            self.order_work(player_id, idx, &work)?;
+            let point = Position::new(position.x(), position.y(), 0.0);
+            self.give_work(
+                id,
+                &Work::on(Some(foundation.id()), point),
+                OrderSource::Direct,
+            )?;
         } else if let Some(mover) = self.parts.mover_mut(self.players.live(player_id, idx)?.id) {
             mover.ignore_units.clear();
         }
@@ -158,27 +159,6 @@ impl World {
                 .get_mut(self.players.live(player_id, idx)?.id)
         {
             readiness(&mut ai.orders, ReadyOrders::Keep);
-        }
-        Ok(())
-    }
-
-    /// Slot 0x128's start with 1 on the unit at `idx` of player `player_id`, of master type `kind`:
-    /// a combat object's and a building's (`FUN_141211b80`, types 70 and 80) set `+0xa14` and empty
-    /// their unit AI's order queue (`FUN_140c5e010`); the action object's (`FUN_14106c590`, types
-    /// 40 to 60) goes straight to the work.
-    pub(super) fn empty_queue_for_work(
-        &mut self,
-        player_id: PlayerId,
-        idx: ListIndex,
-        kind: MasterKind,
-    ) -> GenieResult<()> {
-        if MasterKind::COMBAT <= kind
-            && let Some(ai) = self
-                .parts
-                .unit_ai
-                .get_mut(self.players.live(player_id, idx)?.id)
-        {
-            ai.orders.clear();
         }
         Ok(())
     }

@@ -12,8 +12,8 @@ use crate::movement::PathFlags;
 use crate::movement::PathState;
 use crate::movement::{EPSILON, Goal, Motion, Mover, Next, footprint_gap, gate_gap};
 use crate::world::Seconds;
-use crate::world::index::ObjectsRef;
 use crate::world::layer::generated::MovementTuning;
+use crate::world::objects_ref::ObjectsRef;
 
 impl Mover {
     /// [`Mover::walk`]'s ends before its steer: a walk to a target in range of it counts the

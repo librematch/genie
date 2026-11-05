@@ -25,10 +25,10 @@ use crate::movement::{
 };
 use crate::objects::ObjectId;
 use crate::pathing::tile_path::Path;
-use crate::world::index::ObjectsRef;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::generated::MovementTuning;
+use crate::world::objects_ref::ObjectsRef;
 
 /// What the long pather is asked for a far waypoint ([`Mover::long_plan`]'s arguments after the
 /// planning state).

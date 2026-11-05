@@ -15,7 +15,7 @@ use crate::math::conversions::cvttss2si;
 use crate::pathing::hull_path::{
     ClosedLists, HALF, HullPather, KeptHulls, Nodes, ONE, PATHS, Point, Waypoints,
 };
-use crate::world::index::ObjectsRef;
+use crate::world::objects_ref::ObjectsRef;
 use crate::{GenieError, GenieResult};
 
 /// A quick path without the map's terrain.

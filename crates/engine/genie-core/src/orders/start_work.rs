@@ -11,7 +11,7 @@
 //! `ClosestResourceObject` (slot 0x80, [`crate::gathering::gather_search::closest_resource_at`]: no drop
 //! site, any workers, the least distance wins, the first group at a tie). Slot 0x140
 //! (`FUN_141070c90`) then gives the unit its work on the target at the target's place
-//! ([`World::order_work`], slot 0x7e8; `+0x888`, the work's count, is not held). Any other
+//! ([`World::work_at`]: slot 0x7e8, then the command count). Any other
 //! object that is a building (master type 80) whose master has a task of action type 0x99 (a
 //! mule cart), may be interrupted as above and has a unit AI runs that AI's slot 0x1e8, the
 //! cart's own search for resources ([`World::cart_work_search`]).
@@ -33,14 +33,12 @@ use crate::objects::masters::GatherGroup;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::MasterTables;
 use crate::objects::unit::Unit;
-use crate::orders::OrderSource;
-use crate::orders::Work;
 use crate::players::PlayerId;
 use crate::world::World;
-use crate::world::index::ObjectsRef;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
+use crate::world::objects_ref::ObjectsRef;
 use crate::world::settings::FarmMode;
 use crate::world::slots::PlayerSlotsExt;
 use crate::{GenieError, GenieResult};
@@ -164,14 +162,7 @@ impl World {
                         "the Empire Wars start's target without a place",
                     ))?
                     .position;
-                let work = Work {
-                    target: Some(target),
-                    point,
-                    carry_test: false,
-                    filter: None,
-                    source: OrderSource::Direct,
-                };
-                self.order_work(player_id, list_index, &work)?;
+                self.work_at(player_id, list_index, Some(target), point)?;
             }
             list_index = list_index.next();
         }

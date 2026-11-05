@@ -104,8 +104,8 @@ impl World {
                 .contains(ClassRoles::UNPACKED_TREBUCHET)
                 && speed <= Speed::ZERO);
         if still {
-            // an object that does not move takes slot 0x128 at once with 1 (no carried-resource
-            // test, any task) at the order's point, z 0; a queued order then goes on as a mover's
+            // an object that does not move takes slot 0x128 at once with 1 (the retargeting byte
+            // 0, any task) at the order's point, z 0; a queued order then goes on as a mover's
             self.order_at_once(player, idx, order.target, order.point)?;
             if !order.flags.contains(OrderFlags::QUEUED) {
                 return Ok(());
@@ -178,32 +178,25 @@ impl World {
                 }
                 Ok(())
             }
-            ai => {
-                // slot 0x128 with 1 (FUN_141211b80): `+0xa14` is 1 and a unit AI's order queue
-                // empties (FUN_140c5e010); FUN_14106c590 passes the order on unless the target is
-                // the unit itself (and counts `+0x888`, not held)
-                if let Some(ai) = ai {
-                    ai.orders.clear();
-                }
-                if order.target == Some(id) {
-                    return Ok(());
-                }
+            _ => {
+                // slot 0x128 with 1, the order's retargeting byte and task filter
                 let work = Work {
                     target: order.target,
                     point: point.with_height(0.0),
-                    carry_test: order.carry_test,
+                    disable_retargeting: order.disable_retargeting,
                     filter: order.filter,
-                    source: OrderSource::Direct,
                 };
-                self.order_work(player, idx, &work)
+                self.give_work(id, &work, OrderSource::Direct)
             }
         }
     }
 
-    /// Slot 0x128 with 1 (`FUN_141211b80`) on `target` at `point` (z 0), no carried-resource test
-    /// and any task: `+0xa14` is 1 and a unit AI's order queue empties (`FUN_140c5e010`);
-    /// `FUN_14106c590` passes the order on to slot 0x7e8 unless the target is the unit itself
-    /// (its `+0x888` count is not held).
+    /// Slot 0x128 with 1 on `target` at `point` (z 0), the retargeting byte 0 and any task
+    /// ([`World::give_work`]).
+    ///
+    /// # Errors
+    ///
+    /// What the work command does not model.
     pub(super) fn order_at_once(
         &mut self,
         player: PlayerId,
@@ -211,52 +204,18 @@ impl World {
         target: Option<ObjectId>,
         point: Point,
     ) -> GenieResult<()> {
-        let unit = self.players.live_mut(player, idx)?;
-        if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
-            ai.orders.clear();
-        }
-        if target == Some(unit.id) {
-            return Ok(());
-        }
-        let work = Work {
-            target,
-            point: point.with_height(0.0),
-            carry_test: false,
-            filter: None,
-            source: OrderSource::Direct,
-        };
-        self.order_work(player, idx, &work)
-    }
-
-    /// Slot 0x128 (`FUN_141211b80`) of object `id` with `work`: `+0xa14` takes `work.source`
-    /// while the command runs, and with it set the unit AI's order queue empties
-    /// (`FUN_140c5e010`); `FUN_14106c590` passes the order on to slot 0x7e8 unless the target
-    /// is the unit itself (its `+0x888` count is not held). Nothing for an object the world
-    /// does not hold live.
-    ///
-    /// # Errors
-    ///
-    /// What the work command does not model.
-    pub(crate) fn give_work(&mut self, id: ObjectId, work: &Work) -> GenieResult<()> {
-        let Some(Place::Live(player, idx)) = self.place(id) else {
-            return Ok(());
-        };
-        if work.source == OrderSource::Direct
-            && let Some(ai) = self.parts.unit_ai.get_mut(id)
-        {
-            ai.orders.clear();
-        }
-        if work.target == Some(id) {
-            return Ok(());
-        }
-        self.order_work(player, idx, work)
+        let id = self.players.live(player, idx)?.id;
+        self.give_work(
+            id,
+            &Work::on(target, point.with_height(0.0)),
+            OrderSource::Direct,
+        )
     }
 
     /// The unit AI's order on a target (`FUN_140c5c170` case `0x2db`, from its queue): the unit's
-    /// slot 0x128 on the target at its place with 0 — its `+0xa14` clear while the work command
-    /// runs, so the new action's notify leaves the AI's notifies, and its order queue stays —
-    /// with no carried-resource test and no filter; `FUN_14106c590` passes it on unless the target
-    /// is the unit itself (its `+0x888` count is not held). Then the tail at `LAB_140c5d432` with
+    /// slot 0x128 on the target at its place with 0 ([`World::give_work`]: its `+0xa14` 0 while
+    /// the work runs, so the new action's notify leaves the AI's notifies, and its order queue
+    /// stays), the retargeting byte 0 and any task. Then the tail at `LAB_140c5d432` with
     /// the order the work gave the AI ([`crate::unit_ai::UnitAi::order_tail`]: the order's
     /// priority; a stop order ends, a class-18 unit's attack order forgets its target and ends).
     /// The unit AI runs the case on a target that is gone itself.
@@ -270,16 +229,8 @@ impl World {
             "a queued order on a target that is gone",
         ))?;
         let point = unit.position();
-        if order.target != Some(self.players.live(player, idx)?.id) {
-            let work = Work {
-                target: order.target,
-                point,
-                carry_test: false,
-                filter: None,
-                source: OrderSource::Queued,
-            };
-            self.order_work(player, idx, &work)?;
-        }
+        let id = self.players.live(player, idx)?.id;
+        self.give_work(id, &Work::on(order.target, point), OrderSource::Queued)?;
         let class = self
             .players
             .live(player, idx)?
@@ -412,7 +363,7 @@ impl World {
             args: CommandArgs {
                 queued: order.flags.contains(OrderFlags::QUEUED),
                 direct: order.flags.contains(OrderFlags::DIRECT),
-                disable_retargeting: order.carry_test,
+                disable_retargeting: order.disable_retargeting,
                 filter: order.filter,
             },
             first: FirstTarget {

@@ -28,9 +28,9 @@ use crate::objects::masters::MasterKind;
 use crate::objects::unit::Unit;
 use crate::pathing::zones::{NO_TERRAIN, UNKNOWN_RESTRICTION, ZoneId, Zones};
 use crate::world::Unread;
-use crate::world::index::ObjectsRef;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
+use crate::world::objects_ref::ObjectsRef;
 use crate::{GenieError, GenieResult};
 use std::iter::FusedIterator;
 

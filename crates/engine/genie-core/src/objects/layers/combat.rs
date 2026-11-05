@@ -12,6 +12,7 @@ use crate::map::Distance;
 use crate::objects::HpPowerup;
 use crate::objects::Regeneration;
 use crate::objects::WorkRate;
+use crate::orders::OrderSource;
 use crate::players::Amount;
 use crate::players::attribute::AttributeId;
 use crate::world::Seconds;
@@ -93,4 +94,8 @@ pub struct Combat {
     /// the shares of the units inside it ([`crate::garrison::share`]).
     #[diff(unsaved)]
     pub firepower: Firepower,
+    /// `+0xa14` (not saved; 1 from the constructor, `FUN_1411ea960`, and the load): where the
+    /// order its work runs on comes from ([`OrderSource`]).
+    #[diff(unsaved)]
+    pub order_source: OrderSource,
 }

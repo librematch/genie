@@ -21,7 +21,7 @@ use crate::unit_ai::task_finder::allied;
 use crate::unit_ai::world_view::owner_view;
 use crate::unit_ai::world_view::{UnitView, patrol_information};
 use crate::unit_ai::{Duel, NearestAttacker, PatrolPath, TargetFlags, UnitSeen};
-use crate::world::index::ObjectsRef;
+use crate::world::objects_ref::ObjectsRef;
 use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlotsExt;
 use crate::{GenieError, GenieResult};

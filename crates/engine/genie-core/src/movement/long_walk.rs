@@ -28,8 +28,8 @@ use crate::pathing::short_path::{Call, Entry, Listed};
 use crate::pathing::tile_path::{Found, Path, Request};
 use crate::pathing::{Pathing, PlanBudget, ShortFound};
 use crate::players::PlayerSet;
-use crate::world::index::ObjectsRef;
 use crate::world::layer::generated::MovementTuning;
+use crate::world::objects_ref::ObjectsRef;
 use crate::{GenieError, GenieResult, pathing::short_path};
 use std::iter::once;
 

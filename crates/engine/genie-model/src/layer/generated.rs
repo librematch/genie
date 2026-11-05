@@ -708,8 +708,20 @@ pub struct AttributeSlots {
     pub building_cost: AttributeId,
     /// The villagers a player makes: a new villager's (class 4) combat setup adds one.
     pub made_villagers: AttributeId,
+    /// The idles a player's villagers began: `RGE_Action_Object::update` adds a villager's idle
+    /// count (`+0x8a0`, `CVTDQ2PS`) past its state 2; the telemetry's flush (`FUN_14106fc60`) adds
+    /// it too.
+    pub villager_idles: AttributeId,
+    /// The seconds a player's villagers stood idle: `RGE_Action_Object::update` adds a villager's
+    /// idle milliseconds (`+0x89c`, `CVTSI2SS`, `DIVSS` by 1000) past its state 2; the telemetry's
+    /// flush (`FUN_14106fc60`) adds them too.
+    pub villager_idle_seconds: AttributeId,
     /// The food a minute of the livestock in the player's mills.
     pub mill_food: AttributeId,
+    /// The range within which an action object keeps the building that speeds it up
+    /// (`mSpeedupBuildingId` `+0x890`): `RGE_Action_Object::update` drops it beyond the square of
+    /// this range.
+    pub speedup_range: AttributeId,
     /// The attribute naming the world's effect a player gets after each research (`+0x868`: 269).
     pub world_effect: AttributeId,
     /// The owner's attribute of a pasture's food, which its livestock share.

@@ -27,7 +27,6 @@ use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::Relics;
 use crate::objects::WorkRate;
-use crate::objects::actions::ActionList;
 use crate::objects::layers::default_start;
 use crate::objects::layers::{Action, Animated, Building, Combat, DefaultTask, Motion, Static};
 use crate::objects::lifecycle::Held;
@@ -43,6 +42,7 @@ use crate::objects::sprite::new_sprite;
 use crate::objects::unit::Unit;
 use crate::objects::unit::UnitFlags;
 use crate::objects::{DamagedTimer, Frame, Regeneration, WorkerCount};
+use crate::orders::OrderSource;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::trace::player_unsupported;
@@ -319,6 +319,7 @@ impl World {
             charge: Charge::ZERO,
             charge_hit: false,
             store: Vec::new(),
+            order_source: OrderSource::Direct,
         };
         let unit = Unit {
             id,
@@ -378,8 +379,8 @@ impl World {
         };
         let parts = ObjectParts {
             actions: Action {
-                list: ActionList::default(),
                 default_task,
+                ..Action::default()
             },
             unit_ai: ai,
             building: layer,

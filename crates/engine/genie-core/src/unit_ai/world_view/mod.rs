@@ -206,25 +206,25 @@ pub(crate) fn changed_view(view: OthersRef<'_>, new: Option<PlayerId>) -> Others
 /// names (`looks.rs`) and the unit's own calls (`calls.rs`). The world is the update's step's,
 /// the unit out of its slot.
 pub(crate) struct UnitView<'unit, 'world> {
-    /// The update'world step: the world without the unit (its stand-in holds its slot), the
-    /// updating player and the unit'world id.
+    /// The update's step: the world without the unit (its stand-in holds its slot), the
+    /// updating player and the unit's id.
     pub(crate) step: &'unit mut Step<'world>,
     /// The unit, without its unit AI.
     pub(crate) unit: &'unit mut Unit,
-    /// The unit'world action layer, out of the table with it.
+    /// The unit's action layer, out of the table with it.
     pub(crate) actions: &'unit mut Action,
     /// What the attack check of a search reads of the unit.
     pub(crate) attacker: Attacker,
-    /// The owner, as the AI runs (a captured unit'world new one): its diplomacy, attributes and
+    /// The owner, as the AI runs (a captured unit's new one): its diplomacy, attributes and
     /// civ are what the task search reads of it.
     pub(crate) player: PlayerId,
-    /// The owner'world type (`player+0x10`; [`PlayerKind::is_computer`] is `FUN_141659cf0`).
+    /// The owner's type (`player+0x10`; [`PlayerKind::is_computer`] is `FUN_141659cf0`).
     pub(crate) player_kind: PlayerKind,
     /// The player that took the unit over in its update ([`changed_view`]).
     pub(crate) new_owner: Option<PlayerId>,
-    /// The owner'world civ.
+    /// The owner's civ.
     pub(crate) civ: CivId,
-    /// The owner'world AI settings.
+    /// The owner's AI settings.
     pub(crate) ai_settings: AiSettings,
 }
 

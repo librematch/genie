@@ -65,7 +65,7 @@ use crate::math::image::hull_path::{
     QUADRANT as HULL_PATH_QUADRANT, SIDES as HULL_PATH_SIDES, SQRT_2 as HULL_PATH_SQRT_2,
     TURN as HULL_PATH_TURN, UNTURN as HULL_PATH_UNTURN,
 };
-use crate::world::index::ObjectsRef;
+use crate::world::objects_ref::ObjectsRef;
 use std::ops::Index;
 
 /// How many records the manager's query lists before it stops (`FUN_141051900`: `0x18 < count`).

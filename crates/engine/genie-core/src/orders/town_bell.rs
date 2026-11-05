@@ -17,7 +17,6 @@ use crate::objects::masters::ActionKind;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::GarrisonKinds;
 use crate::objects::masters::MasterKind;
-use crate::orders::OrderSource;
 use crate::orders::Work;
 use crate::orders::{GARRISON, own_order_target};
 use crate::players::AllyTest;
@@ -28,9 +27,9 @@ use crate::unit_ai::task_finder::world::TaskWorld;
 use crate::unit_ai::{AiMove, OrderForce, Pace};
 use crate::world::Seconds;
 use crate::world::World;
-use crate::world::index::ObjectsRef;
 use crate::world::index::Place;
 use crate::world::layer::{ClassRoles, MasterRoles, Roles};
+use crate::world::objects_ref::ObjectsRef;
 use crate::world::slots::PlayerSlotsExt;
 use crate::{GenieError, GenieResult};
 use genie_diff::Diff;
@@ -268,8 +267,9 @@ impl World {
     /// axis (`UCOMISS`/`JP`/`JZ`: only an exact −1 stops it, a NaN goes on), it goes there: with
     /// no object to work on, slot 0x340 (`FUN_141216c50`, [`crate::world::World::move_aside`]) to
     /// the point on the ground, range 0, forced, not walking; else slot 0x7e8 on the object at
-    /// the point with the carried-resource test, any task, `+0xa14` 0. Then it is no longer under
-    /// the town bell (`+0xa14` takes 1, not held). [`WorkReturn::Went`] when it went.
+    /// the point with the retargeting byte 0 and any task, its `+0xa14` 0 from
+    /// [`World::back_to_work`]. Then it is no longer under the town bell. [`WorkReturn::Went`]
+    /// when it went.
     pub(crate) fn back_outside(
         &mut self,
         id: ObjectId,
@@ -297,17 +297,9 @@ impl World {
                     pace: Pace::Run,
                 },
             )?,
-            Some(target) => self.order_work(
-                up,
-                ui,
-                &Work {
-                    target: Some(target),
-                    point: Position::new(x, y, 0.0),
-                    carry_test: true,
-                    filter: None,
-                    source: OrderSource::Queued,
-                },
-            )?,
+            Some(target) => {
+                self.order_work(up, ui, &Work::on(Some(target), Position::new(x, y, 0.0)))?;
+            }
         }
         if self.object(id).is_some() {
             self.parts.set_town_bell_flag(id, BellShelter::Free);

@@ -91,7 +91,8 @@ impl Unit {
     /// 2 starts the master's default task, which waits for the next update; an object inside
     /// another (`+0x2f0`) runs its inside update (`FUN_140a98790`, [`Unit::inside_update`]);
     /// any other runs its list's update (`FUN_140a992b0`, [`Unit::update_head`]). Then what
-    /// follows the actions; the Artifact's capture, which the unit AI's part reads.
+    /// follows the actions, a villager's idle statistics and the speed-up's check
+    /// ([`Unit::action_update_end`]); the Artifact's capture, which the unit AI's part reads.
     pub(crate) fn update_actions(
         &mut self,
         actions: &mut LayersAction,
@@ -109,6 +110,7 @@ impl Unit {
             self.update_head(actions, step, roles, slots)?
         };
         self.after_actions(step)?;
+        self.action_update_end(actions, step)?;
         Ok(captured)
     }
 

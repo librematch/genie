@@ -12,8 +12,10 @@ use crate::combat::{AttackCount, AttackTargetId};
 use crate::map::Tile;
 use crate::map::spatial::Placed;
 use crate::math::rng::Stream;
+use crate::math::rng::Well512;
 use crate::movement::Speed;
 use crate::objects::ObjectId;
+use crate::objects::masters::ActionKind;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::FogVisibility;
 use crate::objects::masters::PlayersMastersExt;
@@ -23,6 +25,7 @@ use crate::objects::masters::player_master;
 use crate::objects::masters::{Master, OwnerMasters};
 use crate::objects::release::Releaser;
 use crate::objects::sprite::new_sprite;
+use crate::orders::{PACK_OR_UNPACK, placed_reach};
 use crate::unit_ai::Attacked;
 use crate::unit_ai::OrderForce;
 use crate::unit_ai::UnitAi;
@@ -30,6 +33,7 @@ use crate::unit_ai::UnitStance;
 use crate::unit_ai::task_finder::world::SideWorld;
 use crate::unit_ai::world_view::owner_view;
 use crate::unit_ai::world_view::{NOT_HELD, UnitView};
+use crate::unit_ai::{AiCommand, Effect};
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
 use crate::world::slots::PlayerSlotsExt;
@@ -37,19 +41,20 @@ use crate::world::{ATTACKER_UNPLACED, NO_STANDING_SPRITE};
 use crate::{GenieError, GenieResult};
 
 impl UnitView<'_, '_> {
-    /// The attack command (slot 0x338, `FUN_14120cea0`; classes 51 and 54 are not modelled) ->
-    /// `FUN_141081a80`: a target the world does not hold fails; `+0x648` takes the world's time
-    /// (not held); the unit's own Attack on the target answers true, forced after its slot 0x48
-    /// on it ([`UnitView::attack_again`]); a villager's master switch (slot 0x90) is not modelled.
-    /// Then the new
-    /// Attack ([`crate::combat::attack::Attack::command`]): the constructor takes its target (slot 0x178,
-    /// through the view) and clears the unit's `+0x900` (its target is new), the action list
-    /// clears ([`UnitView::attack_clears_actions`]), and the install's start (`0x140a7f8c0`) of a unit inside
-    /// another fails it at once (`set_state(13)`, [`crate::combat::attack::Attack::fail_at_start`]); else
-    /// it puts the unit on its standing sprite (slot 0x68 with `+0x80`) and runs the range test
-    /// ([`crate::combat::attack::Attack::begin`]): readyToAttack's failure
-    /// before a `set_state(4)` leaves the animation at speed 1; a `MoveTo` that starts arrived
-    /// shows the standing sprite; a unit that cannot move in reach goes ready (`set_state(6)`,
+    /// The attack command (slot 0x338, `FUN_14120cea0`; a trebuchet's own part first,
+    /// [`UnitView::trebuchet_attack`]) -> `FUN_141081a80`: a target the world does not hold fails;
+    /// `+0x648` takes the world's time (not held); the unit's own Attack on the target answers
+    /// true, forced after its slot 0x48 on it ([`UnitView::attack_again`]); a villager's master
+    /// switch (slot 0x90) is not modelled. Then the new Attack
+    /// ([`crate::combat::attack::Attack::command`]): the constructor takes its target (slot 0x178,
+    /// through the view) and clears the unit's `+0x900` (its target is new), the action list clears
+    /// ([`UnitView::attack_clears_actions`]), and the install's start (`0x140a7f8c0`) of a unit
+    /// inside another fails it at once (`set_state(13)`,
+    /// [`crate::combat::attack::Attack::fail_at_start`]); else it puts the unit on its standing
+    /// sprite (slot 0x68 with `+0x80`) and runs the range test
+    /// ([`crate::combat::attack::Attack::begin`]): readyToAttack's failure before a `set_state(4)`
+    /// leaves the animation at speed 1; a `MoveTo` that starts arrived shows the standing sprite; a
+    /// unit that cannot move in reach goes ready (`set_state(6)`,
     /// [`crate::combat::attack::Attack::enter_ready`]: readyToAttack again, then the swing, `set_state(7)`,
     /// when it faces its target and may attack), whose notifies join the start's. A notify posted
     /// while the AI runs (its buffer, `FUN_140c55270`) is not modelled.
@@ -57,7 +62,7 @@ impl UnitView<'_, '_> {
         &mut self,
         target: ObjectId,
         force: OrderForce,
-        ai: &UnitAi,
+        (ai, rng): (&mut UnitAi, &mut Well512),
         roles: &Roles,
     ) -> GenieResult<Attacked> {
         // the unit's master, a copy: the attack's start changes the unit (its master's switch)
@@ -66,14 +71,10 @@ impl UnitView<'_, '_> {
             .master(self.step.world.master_tables(), self.player)?
             .clone();
         let master = &own;
-        if roles
-            .of_class(master.class)
-            .intersects(ClassRoles::PACKED_TREBUCHET | ClassRoles::UNPACKED_TREBUCHET)
-        {
-            return Err(GenieError::unsupported(
-                "the attack command of a unit of class 51 or 54",
-            ));
+        if let Some(attacked) = self.trebuchet_attack(target, master, (ai, rng), roles)? {
+            return Ok(attacked);
         }
+        let ai = &*ai;
         let no = Attacked::default;
         let Some(placed) = self.step.world.spatial.get_known(target)?.copied() else {
             return Ok(no());
@@ -163,6 +164,60 @@ impl UnitView<'_, '_> {
             attacks: true,
             posted,
         })
+    }
+
+    /// Slot 0x338's (`FUN_14120cea0`) own part for a trebuchet, of class 51 (packed) or 54
+    /// (unpacked); none hands the unit over to `FUN_141081a80`, as for any other class. Under its
+    /// Pack or Unpack (top action `0x7c`, `0x7d`; `FUN_140a986f0`) it answers false, under
+    /// another action it hands over. Without one, a target the world does not hold
+    /// (`FUN_1415417a0`) answers false; class 54 works the target at its place (slot 0x7e8 with
+    /// the retargeting byte 0 and any task, [`AiCommand::WorkOn`] at once) and
+    /// answers true; class 51 unpacks within its reach (`FUN_1410862c0`, [`placed_reach`]:
+    /// `FUN_140ae58a0` through slot 0x808, [`PACK_OR_UNPACK`]) and hands over out of it. A unit
+    /// the load could not read whole may be under its Pack or Unpack ([`PACK_OR_UNPACK`] too).
+    fn trebuchet_attack(
+        &mut self,
+        target: ObjectId,
+        master: &Master,
+        (ai, rng): (&mut UnitAi, &mut Well512),
+        roles: &Roles,
+    ) -> GenieResult<Option<Attacked>> {
+        let class = roles.of_class(master.class);
+        if !class.intersects(ClassRoles::PACKED_TREBUCHET | ClassRoles::UNPACKED_TREBUCHET) {
+            return Ok(None);
+        }
+        if self.step.world.parts.unread.contains(self.unit.id) {
+            return Err(PACK_OR_UNPACK);
+        }
+        match self.actions.top_action_kind() {
+            Some(ActionKind::PACK | ActionKind::UNPACK) => return Ok(Some(Attacked::default())),
+            Some(_) => return Ok(None),
+            None => {}
+        }
+        let Some(placed) = self.step.world.spatial.get_known(target)?.copied() else {
+            return Ok(Some(Attacked::default()));
+        };
+        if class.contains(ClassRoles::UNPACKED_TREBUCHET) {
+            let work = AiCommand::WorkOn {
+                target,
+                point: placed.position,
+            };
+            self.effect_now(Effect::Command(work), ai, rng)?;
+            return Ok(Some(Attacked {
+                attacks: true,
+                posted: Vec::new(),
+            }));
+        }
+        let me_at = self
+            .step
+            .world
+            .spatial
+            .get(self.unit.id)
+            .ok_or(ATTACKER_UNPLACED)?;
+        if placed_reach(me_at, &placed, master).0 {
+            return Err(PACK_OR_UNPACK);
+        }
+        Ok(None)
     }
 
     /// The attack command's master: a villager switches to its player's villager of its task

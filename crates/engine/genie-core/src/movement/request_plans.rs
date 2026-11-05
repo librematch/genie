@@ -24,8 +24,8 @@ use crate::movement::{
 use crate::objects::ObjectId;
 use crate::pathing::ShortFound;
 use crate::pathing::tile_path::{Found, Path};
-use crate::world::index::ObjectsRef;
 use crate::world::layer::generated::MovementTuning;
+use crate::world::objects_ref::ObjectsRef;
 use crate::{GenieError, GenieResult};
 
 bitflags::bitflags! {

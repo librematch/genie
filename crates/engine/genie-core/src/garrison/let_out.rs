@@ -301,17 +301,12 @@ impl World {
         class: ClassId,
         (point, gather, bid, work_on): (Point, Option<GatherPoint>, ObjectId, Option<ObjectId>),
     ) -> GenieResult<LetOut> {
-        // an object to work on (GO_BACK_TO_WORK's): slot 0x128 on it at the point, the unit's
-        // `+0xa14` 0 (its unit AI keeps its notifies)
+        // an object to work on (GO_BACK_TO_WORK's): slot 0x128 with 0 on it at the point (its
+        // unit AI keeps its order queue and notifies)
         if let Some(target) = work_on {
-            let work = Work {
-                target: Some(target),
-                point: point.with_height(0.0),
-                carry_test: false,
-                filter: None,
-                source: OrderSource::Queued,
-            };
-            self.order_work(up, ui, &work)?;
+            let id = self.players.live(up, ui)?.id;
+            let work = Work::on(Some(target), point.with_height(0.0));
+            self.give_work(id, &work, OrderSource::Queued)?;
             return Ok(LetOut::Out);
         }
         // the gather point (`+0xc30` 1, not on the building) gives a unit without a point its

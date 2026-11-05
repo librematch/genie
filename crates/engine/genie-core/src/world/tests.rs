@@ -180,7 +180,6 @@ use crate::objects::{DamagedTimer, FacetCount, Frame, Regeneration, WorkerCount}
 use crate::orders::ControlKey;
 use crate::orders::Dispatch;
 use crate::orders::OrderFlags;
-use crate::orders::OrderSource;
 use crate::orders::SavedPatrols;
 use crate::orders::town_bell::BackToWork;
 use crate::orders::{Interact, MoveOrder, Sweep, Work};
@@ -1497,7 +1496,8 @@ fn villager_tends_the_nearest_livestock_with_room() {
     worked(&mut game, by_gap[1], 1);
     worked(&mut game, by_gap[2], 1);
     assert_eq!(
-        game.livestock_workers(PastureId::new(object_id(50))),
+        game.objects()
+            .livestock_workers(PastureId::new(object_id(50))),
         WorkerCount::of_data(3)
     );
     // all worked: the nearest below the room
@@ -1548,9 +1548,8 @@ fn villager_ordered_on_pasture_works_its_livestock() {
     let order = |target| Work {
         target,
         point: Position::new(20.0, 20.0, 0.0),
-        carry_test: true,
+        disable_retargeting: true,
         filter: None,
-        source: OrderSource::Queued,
     };
     let mut world = tended_pasture(Position::new(18.0, 18.0, 0.0), 2.0);
     let players = world.players[1].objects.last_place().unwrap();
@@ -1602,9 +1601,8 @@ fn unit_past_state_2_ignores_work_order() {
     let order = Work {
         target: Some(object_id(50)),
         point: Position::new(20.0, 20.0, 0.0),
-        carry_test: true,
+        disable_retargeting: true,
         filter: None,
-        source: OrderSource::Queued,
     };
     let mut world = tended_pasture(Position::new(18.0, 18.0, 0.0), 2.0);
     let list_index = world.players[1].objects.last_place().unwrap();
@@ -1624,9 +1622,8 @@ fn villager_ordered_on_pasture_without_livestock_tends_on() {
     let order = Work {
         target: Some(object_id(50)),
         point: Position::new(20.0, 20.0, 0.0),
-        carry_test: true,
+        disable_retargeting: true,
         filter: None,
-        source: OrderSource::Queued,
     };
     let mut world = tended_pasture(Position::new(18.0, 18.0, 0.0), 2.0);
     let list_index = world.players[1].objects.last_place().unwrap();
@@ -3022,9 +3019,8 @@ fn work_command_on_damaged_building_starts_repair() {
     let work = Work {
         target: Some(object_id(10028)),
         point: Position::new(30.0, 88.0, 0.0),
-        carry_test: false,
+        disable_retargeting: false,
         filter: None,
-        source: OrderSource::Direct,
     };
     world
         .order_work(PlayerId::new(1), ListIndex::new(0), &work)
@@ -3112,9 +3108,8 @@ fn work_command_on_another_building_moves_the_repair_there() {
     let work = |target| Work {
         target,
         point: Position::new(30.0, 88.0, 0.0),
-        carry_test: false,
+        disable_retargeting: false,
         filter: None,
-        source: OrderSource::Direct,
     };
     world
         .order_work(
@@ -3197,9 +3192,8 @@ fn work_command_on_foundation_starts_build_as_its_builder() {
     let work = Work {
         target: Some(object_id(10028)),
         point: Position::new(30.0, 88.0, 0.0),
-        carry_test: false,
+        disable_retargeting: false,
         filter: None,
-        source: OrderSource::Direct,
     };
     world
         .order_work(PlayerId::new(1), ListIndex::new(0), &work)
@@ -3328,9 +3322,8 @@ fn builder_with_master_of_its_own_walks_with_its_own_master_sprite() {
     let work = Work {
         target: Some(object_id(10028)),
         point: Position::new(30.0, 88.0, 0.0),
-        carry_test: false,
+        disable_retargeting: false,
         filter: None,
-        source: OrderSource::Direct,
     };
     let walking = Graphic {
         id: SpriteId::named(7),
@@ -3405,9 +3398,8 @@ fn work_command_on_the_build_own_foundation_keeps_the_work_or_walks_again() {
     let work = Work {
         target: Some(object_id(10028)),
         point: Position::new(30.0, 88.0, 0.0),
-        carry_test: false,
+        disable_retargeting: false,
         filter: None,
-        source: OrderSource::Direct,
     };
     world
         .order_work(PlayerId::new(1), ListIndex::new(0), &work)
@@ -3525,9 +3517,8 @@ fn work_command_on_another_foundation_moves_the_build_there() {
     let work = |target| Work {
         target,
         point: Position::new(30.0, 88.0, 0.0),
-        carry_test: false,
+        disable_retargeting: false,
         filter: None,
-        source: OrderSource::Direct,
     };
     world
         .order_work(
@@ -3888,9 +3879,8 @@ fn work_command_on_bush_starts_gather_and_another_moves_it() {
     let work = |target| Work {
         target,
         point: Position::new(32.5, 89.5, 0.0),
-        carry_test: false,
+        disable_retargeting: false,
         filter: None,
-        source: OrderSource::Direct,
     };
     forage_world
         .order_work(
@@ -4097,9 +4087,8 @@ fn loaded_forager_sent_to_its_town_centre_carries_its_load_there() {
     let work = Work {
         target: Some(object_id(700)),
         point: Position::new(20.0, 89.5, 0.0),
-        carry_test: false,
+        disable_retargeting: false,
         filter: None,
-        source: OrderSource::Direct,
     };
     let loaded = || {
         let mut forage_world = forage_world();
@@ -4175,9 +4164,8 @@ fn work_command_without_task_moves_the_unit_there() {
     let work = |target| Work {
         target,
         point: Position::new(20.0, 89.5, 0.0),
-        carry_test: false,
+        disable_retargeting: false,
         filter: None,
-        source: OrderSource::Direct,
     };
     let mut world = forage_world();
     world
@@ -4278,13 +4266,7 @@ fn gather_takes_move_toward_an_object_as_its_point_or_drop_site() {
         .state = GatherState::Work;
     let point = Position::new(36.0, 89.0, 0.0);
     assert_eq!(
-        world.move_to_object_with(
-            PlayerId::new(1),
-            ListIndex::new(0),
-            object_id(601),
-            point,
-            OrderSource::Queued
-        ),
+        world.move_to_object(PlayerId::new(1), ListIndex::new(0), object_id(601), point,),
         Ok(Answer::Taken)
     );
     let gather_action = world
@@ -4324,12 +4306,11 @@ fn gather_takes_move_toward_an_object_as_its_point_or_drop_site() {
     let unit = &mut world.players[1].objects[ListIndex::new(0)];
     (unit.life.attribute_kind, unit.life.amount) = (Some(AttributeId::named(17)), Amount::new(6.0));
     assert_eq!(
-        world.move_to_object_with(
+        world.move_to_object(
             PlayerId::new(1),
             ListIndex::new(0),
             object_id(700),
             Position::new(20.0, 89.5, 0.0),
-            OrderSource::Queued
         ),
         Ok(Answer::Taken)
     );
@@ -4361,12 +4342,11 @@ fn gather_takes_move_toward_an_object_as_its_point_or_drop_site() {
     // a move toward the drop site it already carries to changes nothing
     let before = world.players[1].objects[ListIndex::new(0)].clone();
     assert_eq!(
-        world.move_to_object_with(
+        world.move_to_object(
             PlayerId::new(1),
             ListIndex::new(0),
             object_id(700),
             Position::new(20.0, 89.5, 0.0),
-            OrderSource::Queued
         ),
         Ok(Answer::Taken)
     );
@@ -4686,7 +4666,7 @@ fn the_unit_ai_explore_walks_to_its_point_or_asks_for_one() {
 /// The unit AI's move to an object (slot 0x348, `FUN_141086440`): the forager's Gather goes (its
 /// bush let go), a `MoveTo` to the other bush replaces it within the range given; the unit AI's
 /// cap of its last human order (slot 0x300) and its works follow in order: a work on the bush
-/// (slot 0x7e8 with the carried-resource test) starts a Gather there.
+/// (slot 0x7e8 with the retargeting byte 0) starts a Gather there.
 #[test]
 fn the_unit_ai_moves_and_works_apply_in_order() {
     use crate::unit_ai::Effect;
@@ -5331,9 +5311,8 @@ fn the_units_on_new_foundation_are_sent_off_it() {
             &Work {
                 target: Some(object_id(10028)),
                 point: Position::new(30.0, 88.0, 0.0),
-                carry_test: false,
+                disable_retargeting: false,
                 filter: None,
-                source: OrderSource::Direct,
             },
         )
         .unwrap();
@@ -5726,9 +5705,8 @@ fn work_command_on_another_deer_moves_the_hunt_there() {
     let work = Work {
         target: Some(object_id(501)),
         point: Position::new(36.5, 89.5, 0.0),
-        carry_test: false,
+        disable_retargeting: false,
         filter: None,
-        source: OrderSource::Direct,
     };
     world
         .order_work(PlayerId::new(1), ListIndex::new(0), &work)
@@ -5797,13 +5775,7 @@ fn hunt_takes_move_toward_an_object_as_its_point_or_drop_site() {
         .unwrap();
     let point = Position::new(36.0, 89.0, 0.0);
     assert_eq!(
-        world.move_to_object_with(
-            PlayerId::new(1),
-            ListIndex::new(0),
-            object_id(501),
-            point,
-            OrderSource::Queued
-        ),
+        world.move_to_object(PlayerId::new(1), ListIndex::new(0), object_id(501), point,),
         Ok(Answer::Taken)
     );
     let hunt_action = world
@@ -5832,12 +5804,11 @@ fn hunt_takes_move_toward_an_object_as_its_point_or_drop_site() {
     let unit = &mut world.players[1].objects[ListIndex::new(0)];
     (unit.life.attribute_kind, unit.life.amount) = (Some(attribute::MEAT), Amount::new(6.0));
     assert_eq!(
-        world.move_to_object_with(
+        world.move_to_object(
             PlayerId::new(1),
             ListIndex::new(0),
             object_id(700),
             Position::new(20.0, 89.5, 0.0),
-            OrderSource::Queued
         ),
         Ok(Answer::Taken)
     );
@@ -7353,9 +7324,8 @@ fn unit_ai_stop_lets_its_target_go_within_the_update() {
     let work = Work {
         target: Some(object_id(600)),
         point: Position::new(32.5, 89.5, 0.0),
-        carry_test: false,
+        disable_retargeting: false,
         filter: None,
-        source: OrderSource::Direct,
     };
     world
         .order_work(PlayerId::new(1), ListIndex::new(0), &work)
@@ -10465,7 +10435,7 @@ fn gate_counts_the_moving_units_between_its_posts() {
         &mut spatial,
         object_id(27745),
         &[object_id(27746), object_id(27747)],
-        index::ObjectsRef::empty(),
+        objects_ref::ObjectsRef::empty(),
     )
     .unwrap();
     assert_eq!((units, allied), (vec![object_id(1)], 1));
@@ -10503,7 +10473,7 @@ fn gate_counts_the_moving_units_between_its_posts() {
         &mut spatial,
         object_id(27745),
         &[object_id(27746), object_id(27747)],
-        index::ObjectsRef::empty(),
+        objects_ref::ObjectsRef::empty(),
     )
     .unwrap();
     assert_eq!((units, allied), (vec![object_id(1), object_id(3)], 1));
@@ -10512,7 +10482,7 @@ fn gate_counts_the_moving_units_between_its_posts() {
             &mut spatial,
             object_id(27745),
             &[object_id(27746)],
-            index::ObjectsRef::empty()
+            objects_ref::ObjectsRef::empty()
         )
         .is_err()
     );
@@ -13618,7 +13588,7 @@ fn move_to_an_object_takes_it_and_lets_it_go_when_it_is_replaced_or_cleared() {
         object_id(9149),
         placed(20.0, class::TOWER, ids::TOWN_CENTRE),
     );
-    world
+    let _ = world
         .move_to_object(
             PlayerId::new(1),
             ListIndex::new(2),
@@ -13638,7 +13608,7 @@ fn move_to_an_object_takes_it_and_lets_it_go_when_it_is_replaced_or_cleared() {
             .map(|move_to_action| ObjectId::field(move_to_action.target)),
         Some(50)
     );
-    world
+    let _ = world
         .move_to_object(
             PlayerId::new(1),
             ListIndex::new(2),
@@ -13936,7 +13906,7 @@ fn hunter_drop_off_takes_the_drop_site_it_found() {
             world,
             OthersRef::alone(PlayerId::new(1), &others),
             &played.model.graphics,
-            index::ObjectsRef::empty(),
+            objects_ref::ObjectsRef::empty(),
         )
     };
     assert_eq!(
@@ -15748,6 +15718,27 @@ fn stopped_decay_gives_the_victim_its_own_master() {
     assert_eq!(
         world.model.masters[0].get(master_id(333)).map(decay),
         Some(Some(AmountRate::new(0.25)))
+    );
+    // a deer with a master of its own keeps it (`+0x6c0` set: no new copy), its decay changed
+    if let Some(own) = world.parts.own_master.get_mut(object_id(60)) {
+        own.hit_points = MasterHitPoints::of_data(7);
+    }
+    let again = world
+        .victim(object_id(60), PlayerId::new(1))
+        .unwrap()
+        .unwrap();
+    write_hit(
+        &mut world,
+        hunter,
+        Victim {
+            decay: AmountRate::new(0.5),
+            ..again
+        },
+    );
+    let own = world.parts.own_master.get(object_id(60)).unwrap();
+    assert_eq!(
+        (own.hit_points, decay(own)),
+        (MasterHitPoints::of_data(7), Some(AmountRate::new(0.5)))
     );
 }
 
@@ -18099,7 +18090,11 @@ fn scout_attack_on(
         (gaia, vec![unit], Tracker::default()),
         (spatial, every, graphics),
         UnitGroups::default(),
-        |side| side.attack(object_id(50), force, &ai).unwrap(),
+        |side| {
+            let mut ai = ai.clone();
+            side.attack(object_id(50), force, (&mut ai, &mut Well512::default()))
+                .unwrap()
+        },
     );
     // the takes reach Gaia's objects through the view: each counts a worker
     let taken = world.players[0].objects.iter();
@@ -18237,7 +18232,10 @@ fn attack_by(who: Master, also: Vec<Master>) -> (Object, Attacked, f32, Tracker)
         (spatial, every, graphics),
         UnitGroups::default(),
         |side| {
-            let attacked = side.attack(object_id(50), force, &ai).unwrap();
+            let mut ai = ai.clone();
+            let attacked = side
+                .attack(object_id(50), force, (&mut ai, &mut Well512::default()))
+                .unwrap();
             (attacked, side.step.world.players[1].attributes[4].get())
         },
     );
@@ -21398,7 +21396,7 @@ fn drop_site_sought(
         objects,
         ActionState::NO_ACTION,
         args,
-        index::ObjectsRef::new(
+        objects_ref::ObjectsRef::new(
             &forage_world.players,
             &forage_world.index,
             &forage_world.model.masters,
@@ -23003,9 +23001,8 @@ fn repair_for(world: &mut World, updates: usize) -> Vec<Option<RepairState>> {
     let work = Work {
         target: Some(object_id(10028)),
         point: Position::new(30.0, 88.0, 0.0),
-        carry_test: false,
+        disable_retargeting: false,
         filter: None,
-        source: OrderSource::Direct,
     };
     world
         .order_work(PlayerId::new(1), ListIndex::new(0), &work)
@@ -23430,9 +23427,8 @@ fn repaired_by(count: usize) -> [(f32, f32); 2] {
     let work = Work {
         target: Some(object_id(10028)),
         point: Position::new(30.0, 88.0, 0.0),
-        carry_test: false,
+        disable_retargeting: false,
         filter: None,
-        source: OrderSource::Direct,
     };
     for &list_index in &repairers {
         repairing

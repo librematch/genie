@@ -50,9 +50,9 @@ pub(in crate::groups) enum Travel {
 impl World {
     /// A member within reach of the target when the group is ordered on it (`FUN_14102bbd0`'s
     /// branch): it stops (slot 0x560, [`crate::movement::Mover::stand`]), takes the part of the
-    /// target ([`World::gate_part`]) and the work command on it at the part's place (slot
-    /// 0x128, [`World::give_work`]: carry test 1, `+0xa14` the order's retargeting byte, its task
-    /// filter), stops again in an action state 6 or 7 (slot 0x2b0), and draws its retarget timer
+    /// target ([`World::gate_part`]) and the work command on it at the part's place (slot 0x128
+    /// with 1, [`World::give_work`]: the order's retargeting byte, its task filter), stops again in
+    /// an action state 6 or 7 (slot 0x2b0), and draws its retarget timer
     /// ([`World::set_travel_timer`]): any unit of a human owner draws, a computer's only the ones
     /// on the special list ([`crate::groups::UnitGroup::special_units`]) that move.
     ///
@@ -78,14 +78,10 @@ impl World {
             &Work {
                 target: Some(part),
                 point: at,
-                carry_test: true,
+                disable_retargeting: order.disable_retargeting,
                 filter: order.filter,
-                source: if order.disable_retargeting {
-                    OrderSource::Direct
-                } else {
-                    OrderSource::Queued
-                },
             },
+            OrderSource::Direct,
         )?;
         let state = match self.object(id) {
             Some((player_id, unit)) => {

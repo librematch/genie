@@ -21,8 +21,8 @@ use crate::players::PlayerId;
 use crate::players::PlayerKind;
 use crate::world::Seconds;
 use crate::world::WorldTime;
-use crate::world::index::ObjectsRef;
 use crate::world::layer::generated::MovementTuning;
+use crate::world::objects_ref::ObjectsRef;
 use crate::{GenieError, GenieResult};
 
 /// Whether slot 195's turn ([`Mover::turn_toward`]) took the whole angle or fell short of it (the

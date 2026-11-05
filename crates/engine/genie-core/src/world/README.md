@@ -46,6 +46,7 @@ moves it on. The behaviours that a tick runs live in their systems. Many of them
 | [`mode_680.rs`](mode_680.rs) | The game object's tagged value at `+0x680`. |
 | [`motions.rs`](motions.rs) | The motion part's reads and writes (FD-045-D58): an object's animated layer and its mover, by id in the world's table (`Parts::motion`), beside the row's place. |
 | [`object_step.rs`](object_step.rs) | One object's step with its `Step` (`World::run_object`) and a unit AI run outside its update. |
+| [`objects_ref.rs`](objects_ref.rs) | The world's objects by id to read (`ObjectsRef`): the players' lists through the table by id (`crate::world::index::ObjectIndex`), with the players' masters and the objects' parts. |
 | [`others.rs`](others.rs) | The world's objects by id as an update reaches them (FD-045-D19, D28): `OthersRef` to read them (the owner's live list and the other players' lists), `Others` to change them while the unit AI runs, and the world's own lookups for the update itself, which holds the world (`World::locate`, `World::wake_sleeper`, `World::take_out_own`). |
 | [`parts.rs`](parts.rs) | The parts only some objects hold, each in a table by id on the world (FD-045-D51), so that an object's row holds only what every object has. |
 | [`parts_fixtures.rs`](parts_fixtures.rs) | A test's world with its parts: fixtures that file a test object's parts beside its row (`World::with_parts`, `World::split_layers`) and the whole objects tests push. |

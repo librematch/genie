@@ -123,7 +123,7 @@ macro_rules! interact {
         Interact {
             target: ObjectId::of_field($c.tid),
             point: Point::new($c.x, $c.y),
-            carry_test: $c.field_0x12 != 0,
+            disable_retargeting: $c.field_0x12 != 0,
             flags: OrderFlags::of_bytes($c.field_0x13, $c.field_0x14, $c.field_0x15),
             filter: ActionKind::of_data($c.field_0x16.cast_signed()),
         }

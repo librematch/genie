@@ -442,6 +442,30 @@ impl Object {
             })
     }
 
+    /// The action object of the types 40 and up: its action list and its speed-up building.
+    #[must_use]
+    pub fn action_part(&self) -> Option<&RgeActionObject> {
+        if let Some(tribe_combat_object) = self.combat() {
+            return Some(&tribe_combat_object.rge_combat_object.rge_action_object);
+        }
+        let rge_object = self.rge_object.as_deref()?;
+        None.or(rge_object.rge_action_object.as_deref())
+            .or_else(|| {
+                rge_object
+                    .rge_combat_object
+                    .as_deref()
+                    .map(|rge_combat_object| &rge_combat_object.rge_action_object)
+            })
+            .or_else(|| {
+                rge_object
+                    .rge_missile_object
+                    .as_deref()
+                    .map(|rge_missile_object| {
+                        &rge_missile_object.rge_combat_object.rge_action_object
+                    })
+            })
+    }
+
     /// The animated object of the types 20 and up: its sprite's clock speed (`current_speed`, the
     /// game's `+0x7b8`), its sprite list's owner.
     #[must_use]

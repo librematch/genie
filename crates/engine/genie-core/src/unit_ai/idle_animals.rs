@@ -349,7 +349,7 @@ impl UnitAi {
         if Distance::ZERO <= reach && reach.squared() < unit_seen.gap_squared {
             return Ok(IdleOutcome::Idle);
         }
-        let _ = self.attack_object(id, OrderForce::Unforced, TargetRules::Own, at, side)?;
+        let _ = self.attack_object(id, OrderForce::Unforced, TargetRules::Own, at, (side, ai))?;
         Ok(IdleOutcome::Acted)
     }
 }

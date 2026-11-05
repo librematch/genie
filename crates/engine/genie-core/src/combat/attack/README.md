@@ -51,5 +51,5 @@ The damage of the hit is in `combat/damage/`.
 ## How it connects
 
 <!-- uses -->
-- Uses: [`construction`](../../construction/), [`map`](../../map/), [`math`](../../math/), [`movement`](../../movement/), [`objects`](../../objects/), [`players`](../../players/), [`unit_ai`](../../unit_ai/), [`world`](../../world/).
+- Uses: [`construction`](../../construction/), [`map`](../../map/), [`math`](../../math/), [`movement`](../../movement/), [`objects`](../../objects/), [`orders`](../../orders/), [`players`](../../players/), [`unit_ai`](../../unit_ai/), [`world`](../../world/).
 <!-- /uses -->

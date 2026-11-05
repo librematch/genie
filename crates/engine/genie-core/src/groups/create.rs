@@ -26,9 +26,9 @@ use crate::unit_ai::AiAction;
 use crate::unit_ai::OrderKind;
 use crate::world::Seconds;
 use crate::world::World;
-use crate::world::index::ObjectsRef;
 use crate::world::index::Place;
 use crate::world::layer::generated::GroupTuning;
+use crate::world::objects_ref::ObjectsRef;
 use crate::world::slots::{CheckedIndexExt, PlayerSlotsExt};
 use std::mem::take;
 

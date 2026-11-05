@@ -15,7 +15,6 @@ use crate::objects::masters::MasterKind;
 use crate::objects::unit::Unit;
 use crate::orders::OrderSource;
 use crate::orders::Work;
-use crate::orders::town_bell::BellShelter;
 use crate::players::PlayerId;
 use crate::world::slots::PlayerSlotsExt;
 use crate::{GenieError, GenieResult};
@@ -43,16 +42,15 @@ pub(crate) enum FinderUse {
 
 impl World {
     /// `FUN_140ace9c0` with a gather point without a target, and an unloaded unit's move
-    /// (`FUN_1411e7220`): the unit waits to move (slot 0x2a0 with 1) and takes slot 0x128
-    /// (`FUN_141211b80`) with no target at the point (z 0; its `+0xa14` `source`: 1 for a new
-    /// unit, whose unit AI's order queue empties, `FUN_140c5e010`; 0 for an unloaded one); slot
-    /// 0x7e8 (`FUN_141227190`) runs the work command (`FUN_14106ff70`), which finds no task: a
-    /// unit with speed in state 2 notifies its unit AI with the `MoveTo`'s order and action, no
-    /// target and the point, its notifies cleared with `+0xa14` ([`UnitAi::notify_work`], slot
-    /// 0x828), and moves (slot 0x138, `FUN_141216f10`: a villager is no longer under the town bell,
-    /// `+0x9dc`; with `+0xa14` the order queue empties again; `FUN_14106d340`: the notifies
-    /// cleared with the world time, then, the unit holding no action, the `MoveTo` to the point,
-    /// range 0, installed). The command count (`+0x888`) is not held.
+    /// (`FUN_1411e7220`): the unit waits to move (slot 0x2a0 with 1) and takes slot 0x128 with no
+    /// target at the point (z 0) from `source` ([`World::with_order_source`]: 1 for a new unit,
+    /// whose unit AI's order queue empties; 0 for an unloaded one); slot 0x7e8 (`FUN_141227190`)
+    /// runs the work command (`FUN_14106ff70`), which finds no task: a unit with speed in state 2
+    /// notifies its unit AI with the `MoveTo`'s order and action, no target and the point, its
+    /// notifies cleared by its `+0xa14` ([`UnitAi::notify_work`], slot 0x828), and moves (slot
+    /// 0x138: [`World::move_start`]; `FUN_14106d340`: the notifies cleared with the world time,
+    /// then, the unit holding no action, the `MoveTo` to the point, range 0, installed, and the
+    /// command count one more). `FUN_14106c590` counts it once more after the work.
     ///
     /// [`UnitAi::notify_work`]: crate::unit_ai::UnitAi::notify_work
     pub(crate) fn gather_move(
@@ -62,18 +60,22 @@ impl World {
         point: Position,
         source: OrderSource,
     ) -> GenieResult<()> {
+        let id = self.players.live(player_id, new)?.id;
+        self.with_order_source(id, source, |world| {
+            world.gather_move_work(player_id, new, point)?;
+            world.count_command(id)
+        })
+    }
+
+    /// [`World::gather_move`]'s work command inside slot 0x128's frame.
+    fn gather_move_work(
+        &mut self,
+        player_id: PlayerId,
+        new: ListIndex,
+        point: Position,
+    ) -> GenieResult<()> {
         let world_time = self.world_time;
         let sprite = self.point_move_sprite(player_id, new)?;
-        let villager =
-            // A building's master type (`'P'`).
-            // A combat unit's master type (`'F'`, `TRIBE_Master_Combat_Object`).
-            // The wall class, which the search checks the building's corners for (`FUN_1415417f0`).
-            // Classes the placement tests treat apart: a tree placed (15) passes over farms (49); buildings
-            // of classes 51 and 54 block though desolid.
-            // The gate class, whose own walls BUILD's placement scan passes over (`FUN_14123aee0`).
-            // The relic's master, which always stays (`FUN_141194e80`).
-            // The villager class, whose new units count in attribute 248.
-            self.model.roles.of_class(self.players.live(player_id, new)?.master(self.master_tables(), player_id)?.class).contains(ClassRoles::VILLAGER);
         let unit = self.players.live_mut(player_id, new)?;
         if let Some(mover) = self.parts.mover_mut(unit.id) {
             mover.waiting = 1;
@@ -97,25 +99,27 @@ impl World {
                 "a gather point's move of a unit not in state 2",
             ));
         }
+        let source = self.parts.combat_of(unit.id).order_source;
+        let kind = self
+            .players
+            .live(player_id, new)?
+            .master(self.master_tables(), player_id)?
+            .kind;
+        let unit = self.players.live_mut(player_id, new)?;
         if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
-            if source == OrderSource::Direct {
-                ai.orders.clear();
-            }
             ai.notify_work(
                 Some(OrderKind::Move),
                 Some(AiAction::Move),
                 None,
                 point,
-                source.notifies(),
+                source.notifies(kind),
                 self.streams.get_mut(Stream::Ai),
             )?;
-            if source == OrderSource::Direct {
-                ai.orders.clear();
-            }
-            ai.clear_notifies(world_time.since_start())?;
         }
-        if villager {
-            self.parts.set_town_bell_flag(unit.id, BellShelter::Free);
+        self.move_start(player_id, new)?;
+        let unit = self.players.live(player_id, new)?;
+        if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
+            ai.clear_notifies(world_time.since_start())?;
         }
         self.parts
             .actions_mut(unit.id)?
@@ -130,15 +134,10 @@ impl World {
                 on_target_moved: TargetMoved::Follows,
                 wait: MoveWait::default(),
             }));
-        Ok(())
+        let id = self.players.live(player_id, new)?.id;
+        self.count_command(id)
     }
 
-    /// `FUN_140ace9c0` with a gather point (`+0xc30` 1) and a building whose unit AI holds no
-    /// command queue location (its slot 0x218): the new unit waits to move (slot 0x2a0 with 1,
-    /// `+0x7f9`) and takes the work command on the target at the point (slot 0x128: z 0, its
-    /// `+0xa14` 1, no carry test, any task). A target that is gone is looked for again
-    /// ([`World::lost_gather_target`]); one on the building itself (a garrison) and a building
-    /// target (slot 0x7e8) are not modelled.
     /// `FUN_140ace9c0`'s search for a gather point's target that is gone: the closest (by its
     /// centre, the first of equals) of Gaia's live objects of the class of Gaia's master the
     /// point names (`FUN_141166670` over `+0x30`), unless it lies farther than the new unit's
@@ -245,17 +244,50 @@ impl World {
                 return self.enter_forced(player_id, new, ContainerId::new(building));
             }
         }
-        let target = match gather_point
+        let Some(target) = self.gather_target(player_id, new, gather_point)? else {
+            return self.gather_move(player_id, new, at, source);
+        };
+        self.gather_work(player_id, new, (target, at), source, finder)
+    }
+
+    /// [`World::gather`]'s target: the gather point's while the world holds it, else the one
+    /// looked for again ([`World::lost_gather_target`]); none found leaves a move.
+    ///
+    /// # Errors
+    ///
+    /// What the search for a lost target does not model.
+    fn gather_target(
+        &self,
+        player_id: PlayerId,
+        new: ListIndex,
+        gather_point: GatherPoint,
+    ) -> GenieResult<Option<ObjectId>> {
+        gather_point
             .target
             .filter(|&object_id| self.object(object_id).is_some())
-        {
-            Some(object_id) => object_id,
-            None => match self.lost_gather_target(player_id, new, gather_point)? {
-                Some(id) => id,
-                None => return self.gather_move(player_id, new, at, source),
-            },
-        };
-        // both arms above answer a target the world holds
+            .map_or_else(
+                || self.lost_gather_target(player_id, new, gather_point),
+                |object_id| Ok(Some(object_id)),
+            )
+    }
+
+    /// [`World::gather`]'s work on `target` the world holds at `at`: the unit waits to move (slot
+    /// 0x2a0 with 1); on a building whose garrison task the finder finds (filter 3,
+    /// [`World::garrison_task_found`]) slot 0x7e8 with the garrison filter, outside slot 0x128;
+    /// else slot 0x128 from `source` with any task ([`World::give_work`]).
+    ///
+    /// # Errors
+    ///
+    /// A target the world no longer holds, its master, and what the work does not model.
+    fn gather_work(
+        &mut self,
+        player_id: PlayerId,
+        new: ListIndex,
+        (target, at): (ObjectId, Position),
+        source: OrderSource,
+        finder: FinderUse,
+    ) -> GenieResult<()> {
+        // both of the target's sources answer a target the world holds
         let (owner, unit) = self.object(target).ok_or(GenieError::unreachable(
             "a gather point's target the world held just before",
         ))?;
@@ -266,17 +298,15 @@ impl World {
         let garrison = finder == FinderUse::Asks
             && on_building
             && self.garrison_task_found(player_id, new, target, at)?;
-        let work = Work {
-            target: Some(target),
-            point: at,
-            carry_test: false,
-            filter: if garrison { Some(ENTER) } else { None },
-            source: if garrison {
-                OrderSource::Direct
-            } else {
-                source
-            },
-        };
-        self.order_work(player_id, new, &work)
+        // the garrison task found: slot 0x7e8 with the garrison filter, outside slot 0x128
+        if garrison {
+            let work = Work {
+                filter: Some(ENTER),
+                ..Work::on(Some(target), at)
+            };
+            return self.order_work(player_id, new, &work);
+        }
+        let id = self.players.live(player_id, new)?.id;
+        self.give_work(id, &Work::on(Some(target), at), source)
     }
 }

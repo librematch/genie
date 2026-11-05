@@ -350,9 +350,17 @@ pub enum AiCommand {
     /// (slot 0x380) on the foundation ([`crate::world::World::build_command`]); the AI's part,
     /// the build action and the foundation as its target, is its own ([`UnitAi::build_object`]).
     BuildObject(FoundationId),
-    /// The unit's slot 0x7e8 (`FUN_141227190`) on object `target` at `point`, with the
-    /// carried-resource test, any task and `+0xa14` 0 ([`crate::world::World::order_work`]).
+    /// The unit's slot 0x7e8 on object `target` at `point` with the retargeting byte 0 and any
+    /// task, its `+0xa14` as it stands ([`crate::world::World::order_work`]).
     WorkOn {
+        /// The object.
+        target: ObjectId,
+        /// Its place.
+        point: Position,
+    },
+    /// The unit's slot 0x140 on object `target` at `point`: the same work, then its command
+    /// count one more ([`crate::world::World::work_at`]).
+    WorkAt {
         /// The object.
         target: ObjectId,
         /// Its place.

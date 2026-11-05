@@ -36,10 +36,10 @@ use crate::unit_ai::QueueEnd;
 use crate::unit_ai::world_view::DropWorld;
 use crate::unit_ai::{Notify, NotifyKind, OrderPriority, QueuedOrder};
 use crate::world::World;
-use crate::world::index::ObjectsRef;
 use crate::world::layer::AttributeRoles;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
+use crate::world::objects_ref::ObjectsRef;
 use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlotsExt;
 use crate::{GenieError, GenieResult};
@@ -50,7 +50,7 @@ impl World {
     /// below 0) searches them from the unit ([`World::ordered_drop_site`]); with none found, or
     /// without drop sites, the drop-site table's nearest building for the resource it holds from
     /// its class ([`World::table_drop_site`]); with none, nothing. A unit (type 70 and up) then
-    /// works on it (slot 0x7e8 at (−1, −1, −1): no carried-resource test, the task filter 110 for a
+    /// works on it (slot 0x7e8 at (−1, −1, −1): the retargeting byte 0, the task filter 110 for a
     /// load of meat, wood or food, kinds 15, 1 and 0, else 5; [`World::order_work`]) and, for the
     /// drop-off 8 ([`UnitOrderAction::DropOffAndBack`]), queues its way back to work
     /// ([`World::queue_way_back`]).
@@ -90,9 +90,8 @@ impl World {
         let work = Work {
             target: Some(site.id()),
             point: Position::from([NO_POINT; 3]),
-            carry_test: false,
+            disable_retargeting: false,
             filter: Some(filter),
-            source: OrderSource::Queued,
         };
         self.order_work(player_id, idx, &work)?;
         if action == UnitOrderAction::DropOffAndBack {
@@ -286,8 +285,9 @@ impl World {
     /// (`unit_owner`, `idx`) with the drop-site table's building `site` at `point`, its place where
     /// the table's search found it (`FUN_141658e20`), and the target its top action had (`back`,
     /// slot 0x190: the action's target id, `+0x30`, that the world holds): it works on the site at
-    /// its place (slot 0x128: the carried-resource test, any task, `+0xa14` 0,
-    /// [`World::order_work`]); with a target its unit AI then queues the order on it (slot 0x30:
+    /// its place (slot 0x128 with 1, the retargeting byte 0 and any task, [`World::give_work`]:
+    /// its unit AI's order queue empties first); with a target its unit AI then queues the order
+    /// on it (slot 0x30:
     /// `0x2db` issued by the unit, the target's master as its type and its owner's number, its
     /// place, shown at its x and y, range 0, priority 100, ready, neither at once nor in front).
     ///
@@ -307,14 +307,8 @@ impl World {
                 let (player_id, unit) = self.object(object_id)?;
                 Some((object_id, unit.life.master_id, player_id, unit.position()))
             });
-        let work = Work {
-            target: Some(site.id()),
-            point,
-            carry_test: true,
-            filter: None,
-            source: OrderSource::Queued,
-        };
-        self.order_work(unit_owner, idx, &work)?;
+        let id = self.players.live(unit_owner, idx)?.id;
+        self.give_work(id, &Work::on(Some(site.id()), point), OrderSource::Direct)?;
         let Some((target, master, owner, place)) = back else {
             return Ok(());
         };

@@ -15,7 +15,7 @@ use crate::players::AllyTest;
 use crate::players::PlayerId;
 use crate::players::{NO_RELATIONS, PlayerSet};
 use crate::unit_ai::task_finder::allied as task_finder_allied;
-use crate::world::index::ObjectsRef;
+use crate::world::objects_ref::ObjectsRef;
 use crate::{GenieError, GenieResult};
 
 /// A walk's obstruction query ([`Spatial::walk_hits`]'s arguments).

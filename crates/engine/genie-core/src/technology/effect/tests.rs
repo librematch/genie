@@ -1791,6 +1791,84 @@ fn an_upgrade_copies_the_new_master_into_the_old() {
     );
 }
 
+/// An object past its use (slot 0xa8 false: a combat object from state 4 on) in an upgrade keeps
+/// the old master as its own (`FUN_141186d10`: a copy, unless it has one) and its death spawn's
+/// copy as its dead master (`FUN_141201d50`: of type 10 to 40, 70 or 80 only), while the table's
+/// master takes the new one.
+#[test]
+fn an_object_past_its_use_keeps_the_old_master_as_its_own() {
+    let mut world = World::new(
+        WorldTime::ZERO,
+        FrameSeed::of_data(0),
+        PlayerId::new(0),
+        vec![Millis::ZERO],
+        vec![Player::default()],
+    );
+    let mut militia = combat(master_id(74), class::CLASS_6, 40);
+    militia.death_spawns[0] = Some(master_id(76));
+    let man_at_arms = combat(master_id(75), class::CLASS_6, 45);
+    let remains = combat(master_id(76), class::CLASS_6, 1);
+    world.model.masters = vec![Arc::new(Masters::new([
+        militia.clone(),
+        man_at_arms,
+        remains,
+    ]))];
+    let mut dying = unit_of(1, master_id(74), HitPoints::new(0.0));
+    dying.life.state = ObjectState::DyingSprite;
+    let _ = world.push_live(PlayerId::new(0), dying).unwrap();
+    world
+        .do_effect(PlayerId::new(0), &[attribute(3, 74, 75, -1, 0.0)], None)
+        .unwrap();
+    let id = object_id(1);
+    assert_eq!(
+        (
+            world
+                .parts
+                .own_master
+                .get(id)
+                .map(|master| (master.id, master.hit_points)),
+            world.parts.dead_master.get(id).map(|master| master.id),
+            world.model.masters[0]
+                .get(master_id(74))
+                .map(|master| master.hit_points),
+        ),
+        (
+            Some((master_id(74), MasterHitPoints::of_data(40))),
+            Some(master_id(76)),
+            Some(MasterHitPoints::of_data(45)),
+        )
+    );
+    // a death spawn of another type (a missile, 60) gives no dead master
+    let mut missile = combat(master_id(76), class::CLASS_6, 1);
+    missile.kind = MasterKind::MISSILE;
+    world.model.masters = vec![Arc::new(Masters::new([
+        militia,
+        combat(master_id(75), class::CLASS_6, 45),
+        missile,
+    ]))];
+    let mut dying = unit_of(2, master_id(74), HitPoints::new(0.0));
+    dying.life.state = ObjectState::DyingSprite;
+    let _ = world.push_live(PlayerId::new(0), dying).unwrap();
+    world
+        .do_effect(PlayerId::new(0), &[attribute(3, 74, 75, -1, 0.0)], None)
+        .unwrap();
+    assert_eq!(
+        (
+            world
+                .parts
+                .own_master
+                .get(object_id(2))
+                .map(|master| master.id),
+            world
+                .parts
+                .dead_master
+                .get(object_id(2))
+                .map(|master| master.id),
+        ),
+        (Some(master_id(74)), None)
+    );
+}
+
 /// Kind 7 (`FUN_1416136f0`) makes objects at the built buildings of a master, which this file
 /// leaves to the spawning; with none built it does nothing. Kind 5 on a cost by a negative
 /// amount empties (−2) a cost slot in its place or fills (−1) the first empty one

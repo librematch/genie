@@ -137,7 +137,13 @@ impl UnitAi {
             && !below_or_unordered(at.los.squared().get(), gap.get())
             && !flags.contains(ObjectFlags::SCOUT)
         {
-            let _ = self.attack_object(target, OrderForce::Forced, TargetRules::Own, at, side)?;
+            let _ = self.attack_object(
+                target,
+                OrderForce::Forced,
+                TargetRules::Own,
+                at,
+                (side, ai_rng),
+            )?;
             return Ok(BREAK);
         }
         // "Target is invalid or no longer visible, stopping pursuit.": the target

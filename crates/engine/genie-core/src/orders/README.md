@@ -42,6 +42,7 @@ The files hold the orders by kind:
 | [`order_flags.rs`](order_flags.rs) | The orders' flag bytes `+0x13` to `+0x15` (`OrderFlags`), which INTERACT and MOVE share. |
 | [`patrol.rs`](patrol.rs) | PATROL, the attack move and their sweep, and the group the splitter keeps. |
 | [`points.rs`](points.rs) | Where the units of an order go: their centroid, offsets, spreads and grid points. |
+| [`slots.rs`](slots.rs) | The object slots that hand a work or a move on, by master type: slot 0x128 (a work from a source), slot 0x140 (a work with nothing else) and the start of slot 0x138 (a move), with what they keep of the unit: where its order comes from (`+0xa14`) and its command count (`+0x888`). |
 | [`split.rs`](split.rs) | INTERACT and the order splitter: which units move loose and which form groups. |
 | [`start_work.rs`](start_work.rs) | The Empire Wars start: in the game's first update every idle villager is put to work (`BaseWorld::update`, `0x14154fc70`, its per-player part before the player's objects update). |
 | [`tasks.rs`](tasks.rs) | The hunt and gather commands, a build's and a repair's start, retake and target. |
@@ -58,5 +59,5 @@ The files hold the orders by kind:
 
 <!-- uses -->
 - Uses: [`combat`](../combat/), [`commands`](../commands/), [`construction`](../construction/), [`garrison`](../garrison/), [`gathering`](../gathering/), [`groups`](../groups/), [`map`](../map/), [`math`](../math/), [`movement`](../movement/), [`objects`](../objects/), [`ownership`](../ownership/), [`pathing`](../pathing/), [`players`](../players/), [`production`](../production/), [`technology`](../technology/), [`testing`](../testing/), [`unit_ai`](../unit_ai/), [`vision`](../vision/), [`world`](../world/).
-- Used by: [`commands`](../commands/), [`construction`](../construction/), [`garrison`](../garrison/), [`gathering`](../gathering/), [`groups`](../groups/), [`objects`](../objects/), [`ownership`](../ownership/), [`production`](../production/), [`unit_ai`](../unit_ai/), [`world`](../world/).
+- Used by: [`combat`](../combat/), [`commands`](../commands/), [`construction`](../construction/), [`garrison`](../garrison/), [`groups`](../groups/), [`objects`](../objects/), [`ownership`](../ownership/), [`production`](../production/), [`unit_ai`](../unit_ai/), [`world`](../world/).
 <!-- /uses -->

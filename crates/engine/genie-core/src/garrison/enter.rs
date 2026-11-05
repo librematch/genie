@@ -40,7 +40,8 @@ use crate::unit_ai::world_view::EnterOrder;
 use crate::unit_ai::{AiMove, Notify, NotifyKind};
 use crate::world::Player;
 use crate::world::World;
-use crate::world::index::{ObjectsRef, Place};
+use crate::world::index::Place;
+use crate::world::objects_ref::ObjectsRef;
 use crate::world::slots::PlayerSlotsExt;
 use crate::{GenieError, GenieResult};
 

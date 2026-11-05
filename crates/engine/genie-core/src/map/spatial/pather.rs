@@ -10,8 +10,8 @@ use crate::map::{Rect, Segment};
 use crate::math::fmath::below_or_unordered;
 use crate::objects::masters::ObstructionKind;
 use crate::pathing::tile_path::SegmentTest;
-use crate::world::index::ObjectsRef;
 use crate::world::layer::ClassRoles;
+use crate::world::objects_ref::ObjectsRef;
 use crate::{GenieError, GenieResult};
 
 /// A record a pather query met (an entry of `FUN_141051900`'s list): an object's, a temporary

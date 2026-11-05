@@ -113,7 +113,7 @@ fn an_interact_keeps_its_order_and_units() {
     let order = Interact {
         target: Some(object_id(500)),
         point: Point::new(1.0, 2.0),
-        carry_test: true,
+        disable_retargeting: true,
         flags: OrderFlags::DIRECT | OrderFlags::HUMAN,
         filter: Some(ENTER),
     };

@@ -92,7 +92,8 @@ use crate::objects::layers::Action;
 use crate::pathing::Pathing;
 use crate::testing::tuning;
 use crate::world::FrameSeed;
-use crate::world::index::{ObjectsRef, TestObjects};
+use crate::world::index::TestObjects;
+use crate::world::objects_ref::ObjectsRef;
 use std::f32::consts::FRAC_PI_2;
 
 fn level(level: u8, points: &[Point], waypoint: i32, state: PathState) -> PathData {

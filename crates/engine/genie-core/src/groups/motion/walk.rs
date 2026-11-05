@@ -28,8 +28,8 @@ use crate::players::PlayerKind;
 use crate::world::Seconds;
 use crate::world::World;
 use crate::world::WorldTime;
-use crate::world::index::ObjectsRef;
 use crate::world::layer::generated::GroupTuning;
+use crate::world::objects_ref::ObjectsRef;
 use crate::world::slots::CheckedIndexExt;
 use std::mem::take;
 

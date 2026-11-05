@@ -23,7 +23,7 @@ use crate::objects::sprite::{ActiveSprite, Graphic, new_sprite};
 use crate::unit_ai::UnitStance;
 use crate::world::Seconds;
 use crate::world::WorldTime;
-use crate::world::index::ObjectsRef;
+use crate::world::objects_ref::ObjectsRef;
 use crate::{GenieError, GenieResult};
 use genie_diff::Diff;
 

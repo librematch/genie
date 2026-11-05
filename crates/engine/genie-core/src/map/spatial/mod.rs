@@ -40,6 +40,7 @@ use genie_diff::Diff;
 use std::collections::BTreeMap;
 
 mod closest;
+pub(crate) use self::closest::ClosestWorld;
 mod footprint;
 pub use self::footprint::{Movers, SpotPick};
 mod grid;
@@ -67,7 +68,7 @@ use crate::objects::unit::TAKEN_OUT;
 use crate::objects::{IdTable, WorkerCount};
 use crate::players::{ByPlayer, Relations, UnitRelations};
 use crate::vision::VisionMasks;
-use crate::world::index::ObjectsRef;
+use crate::world::objects_ref::ObjectsRef;
 use std::collections::BTreeSet;
 use std::ops::RangeInclusive;
 
@@ -109,7 +110,7 @@ fn players_seen(found: &ByRelation<Vec<Record>>) -> u32 {
 /// not 0: slot 0x5c8, `FUN_1411583d0`), its last move time (`+0x870`, slot 0x5e8) and its current
 /// path level's pause time (`+0x858`'s `+0x34`, slot 0x528), none without a level, and when that
 /// level's path was made. The walk reads it from the met unit itself, by id
-/// ([`crate::world::index::ObjectsRef::gait`], [`crate::objects::unit::Unit::gait`]).
+/// ([`crate::world::objects_ref::ObjectsRef::gait`], [`crate::objects::unit::Unit::gait`]).
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Gait {
     /// It moves: its velocity (`+0x868`) is not 0 (slot 0x5c8).
@@ -605,6 +606,7 @@ struct ClosestChecks<'world> {
     roles: &'world Roles,
     best_target_tuning: &'world BestTargetTuning,
     spatial_tuning: &'world SpatialTuning,
+    world: ClosestWorld,
 }
 
 #[cfg(test)]

@@ -482,9 +482,8 @@ impl UnitAi {
 
     /// The hunt's farm found (class 49, `FUN_140c22bf0`'s case 0x202 on action 0x265): the world's
     /// object of its id (`FUN_140c54e30`), at whose place the unit works it after the AI's stop
-    /// (slot 0xb0 with 1; the unit's slot 0x140, `FUN_141070c90`: slot 0x7e8 with the
-    /// carried-resource test, any task and `+0xa14` 0, [`AiCommand::WorkOn`]; its count `+0x888`
-    /// is not held), and the processing breaks. A farm the world does not hold ("Failed to be
+    /// (slot 0xb0 with 1; the unit's slot 0x140, [`AiCommand::WorkAt`]), and the processing
+    /// breaks. A farm the world does not hold ("Failed to be
     /// tasked to new farm.") loses the target, stops the AI and goes on (slot 0x48 hands the
     /// notify to the owner, not held).
     fn task_to_farm(
@@ -501,7 +500,7 @@ impl UnitAi {
         };
         self.stop_current(StopOrder::Keep, at, side, rng)?;
         side.effect_now(
-            Effect::Command(AiCommand::WorkOn {
+            Effect::Command(AiCommand::WorkAt {
                 target: held.id,
                 point: held.position,
             }),

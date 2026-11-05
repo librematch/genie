@@ -27,8 +27,8 @@ use crate::pathing::DelayCount;
 use crate::pathing::ShortFound;
 use crate::pathing::tile_path::Path;
 use crate::world::WorldTime;
-use crate::world::index::ObjectsRef;
 use crate::world::layer::generated::GroupTuning;
+use crate::world::objects_ref::ObjectsRef;
 use crate::world::slots::CheckedIndexExt;
 
 /// What the request plans toward: the walked level's number, range and target, its waypoint,

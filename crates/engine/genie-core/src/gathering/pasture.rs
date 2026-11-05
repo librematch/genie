@@ -15,6 +15,7 @@ use crate::math::rng::Stream;
 use crate::movement::footprint_gap_squared;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
+use crate::objects::ObjectKey;
 use crate::objects::SpriteFlags;
 use crate::objects::WorkerCount;
 use crate::objects::masters::MasterId;
@@ -25,6 +26,7 @@ use crate::technology::Attributes;
 use crate::world::World;
 use crate::world::layer::MasterSlots;
 use crate::world::layer::generated::PastureTuning;
+use crate::world::objects_ref::ObjectsRef;
 use crate::world::slots::CheckedIndexExt;
 use crate::world::slots::PlayerSlotsExt;
 use crate::{GenieError, GenieResult};
@@ -181,22 +183,6 @@ impl World {
         Ok(())
     }
 
-    /// A pasture's slot 0x780 (`FUN_1411c5dd0`): the workers (`+0x644`) of its livestock
-    /// ([`crate::objects::layers::Building::livestock`]) the world holds, summed; 0 for an object the world does
-    /// not hold.
-    pub(crate) fn livestock_workers(&self, pasture: PastureId) -> WorkerCount {
-        self.object(pasture)
-            .map_or(WorkerCount::ZERO, |(_, pasture_unit)| {
-                self.parts
-                    .building_of(pasture_unit.id)
-                    .livestock
-                    .iter()
-                    .filter_map(|&id| self.object(id))
-                    .map(|(_, unit)| unit.workers)
-                    .sum()
-            })
-    }
-
     /// `FUN_1411c7670`: the livestock of pasture `pasture` that player `player`'s unit at `idx`
     /// tends, with its place, −1 for none (a unit of another player, too): its livestock the world
     /// holds with their workers and their footprints' squared gap to the unit (`FUN_14118f8c0`),
@@ -290,6 +276,24 @@ impl World {
                 unit.pasture == Some(pasture) && kinds.contains(&unit.life.master_id)
             })
         })
+    }
+}
+
+impl ObjectsRef<'_> {
+    /// A pasture's slot 0x780 (`FUN_1411c5dd0`): the workers (`+0x644`) of its livestock
+    /// ([`crate::objects::layers::Building::livestock`]) the world holds, summed; 0 for an object
+    /// the world does not hold.
+    #[must_use]
+    pub(crate) fn livestock_workers(&self, pasture: impl ObjectKey) -> WorkerCount {
+        self.building(pasture)
+            .map_or(WorkerCount::ZERO, |building| {
+                building
+                    .livestock
+                    .iter()
+                    .filter_map(|&id| self.get(id))
+                    .map(|unit| unit.workers)
+                    .sum()
+            })
     }
 }
 

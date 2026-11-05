@@ -35,7 +35,6 @@ use crate::players::PlayerKind;
 use crate::players::attribute::AttributeId;
 use crate::players::tracker::ListKey;
 use crate::unit_ai::AiAction;
-use crate::unit_ai::Notifies;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::StopOrder;
 use crate::unit_ai::task_finder::TaskTarget;
@@ -57,11 +56,15 @@ mod form;
 mod gather;
 mod interact;
 mod moves;
+pub(crate) use self::moves::{PACK_OR_UNPACK, placed_reach};
 mod order_flags;
 pub use self::order_flags::OrderFlags;
 mod patrol;
 pub use self::patrol::SavedPatrols;
 mod points;
+mod slots;
+pub use self::slots::OrderSource;
+pub(crate) use self::slots::Work;
 mod split;
 pub(crate) use self::split::Kept;
 pub mod start_work;
@@ -106,8 +109,9 @@ pub struct Interact {
     pub target: Option<ObjectId>,
     /// `x`, `y` (`+0x8`, `+0xc`).
     pub point: Point,
-    /// `+0x12`: the work command's carried-resource test.
-    pub carry_test: bool,
+    /// `+0x12`: the work command's retargeting byte ([`Work::disable_retargeting`]; any byte but
+    /// 0 is 1).
+    pub disable_retargeting: bool,
     /// `+0x13` to `+0x15`.
     pub flags: OrderFlags,
     /// `+0x16`: the work command's task filter, -1 for any.
@@ -159,44 +163,6 @@ impl ControlKey {
     pub const fn is_held(self) -> bool {
         matches!(self, Self::Held)
     }
-}
-
-/// Where a unit's order comes from: the unit's `+0xa14`, which is 1 but while slot 0x128
-/// (`FUN_141211b80`) holds it at its argument for its work command. A direct order (1: INTERACT,
-/// a new unit's gather point, any order outside the work command) empties the unit AI's order
-/// queue (`FUN_140c5e010`), and the new action's notify of a unit of type 70 and up clears the
-/// unit AI's notifies (`FUN_140c64e50`); a queued one (0: the unit AI's queued order on a
-/// target, an unloaded unit's gather point) does neither.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum OrderSource {
-    /// A direct order (1).
-    Direct,
-    /// The unit AI's queued order (0).
-    Queued,
-}
-
-impl OrderSource {
-    /// Whether the notify of a unit of type 70 and up clears the unit AI's notifies.
-    #[must_use]
-    pub const fn notifies(self) -> Notifies {
-        match self {
-            Self::Direct => Notifies::Cleared,
-            Self::Queued => Notifies::Kept,
-        }
-    }
-}
-
-/// What a unit's slot 0x7e8 (`FUN_141227190`) is given through slot 0x128: the target, the point
-/// (x, y, z), the work command's carried-resource test and task filter, and the unit's `+0xa14`
-/// while it runs ([`OrderSource`]): only a direct order's new action's notify clears the unit
-/// AI's notifies (`FUN_140c64e50`, for a unit of a type above 69).
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub(crate) struct Work {
-    pub target: Option<ObjectId>,
-    pub point: Position,
-    pub carry_test: bool,
-    pub filter: Option<ActionKind>,
-    pub source: OrderSource,
 }
 
 /// [`World::order_work`]'s Pack or Unpack (each through slot 0x808): against a target out of

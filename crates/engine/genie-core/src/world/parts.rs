@@ -709,7 +709,7 @@ mod tests {
     #[cfg(test)]
     use crate::test_ids::tech_id;
     #[cfg(test)]
-    use crate::world::index::ObjectsRef;
+    use crate::world::objects_ref::ObjectsRef;
     #[cfg(test)]
     use crate::world::player::Player;
     #[cfg(test)]

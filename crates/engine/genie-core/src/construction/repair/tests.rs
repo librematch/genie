@@ -29,7 +29,6 @@ use crate::objects::sprite::{ActiveSprite, Graphic};
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Unit;
 use crate::objects::{FacetCount, Frame, Graphics};
-use crate::orders::OrderSource;
 use crate::orders::Work;
 use crate::players::Amount;
 use crate::players::relation_row;
@@ -397,9 +396,8 @@ fn repair_at(at: Position, set: impl FnOnce(&mut RepairAction)) -> World {
     let work = Work {
         target: Some(object_id(10028)),
         point: Position::new(30.0, 88.0, 0.0),
-        carry_test: false,
+        disable_retargeting: false,
         filter: None,
-        source: OrderSource::Direct,
     };
     world
         .order_work(PlayerId::new(1), ListIndex::new(0), &work)

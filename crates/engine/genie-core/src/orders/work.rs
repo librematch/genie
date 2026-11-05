@@ -23,7 +23,6 @@ use crate::objects::masters::MasterKind;
 use crate::objects::masters::Task;
 use crate::objects::masters::TaskGroup;
 use crate::objects::masters::work_master;
-use crate::orders::OrderSource;
 use crate::orders::gather::HuntOrder;
 use crate::orders::{ATTACK_TASK, Work};
 use crate::ownership::artifact::ARTIFACT_KIND;
@@ -145,12 +144,12 @@ impl World {
         Ok(())
     }
 
-    /// The work command's carried-resource test (`+0x12`, `FUN_14106ff70` with `param_8`) on the
-    /// task found: a gather or hunt task (action type 5 or 0x6e) of another resource (`+0x20`)
-    /// than the unit holds (`+0x308`; the food kinds 0 and 15 to 17 count as one) leaves the
-    /// unit holding none of the task's (`FUN_14119d310` with 0); an attack task (7 or 9) of a unit
-    /// that is no villager turns its unit AI's retargeting off (`+0x1d6`, `FUN_140c40ef0` with
-    /// the test's 1).
+    /// The work command's retargeting byte set ([`Work::disable_retargeting`], `FUN_14106ff70`'s
+    /// `param_8`) on the task found: a gather or hunt task (action type 5 or 0x6e) of another
+    /// resource (`+0x20`) than the unit holds (`+0x308`; the food kinds 0 and 15 to 17 count as
+    /// one) leaves the unit holding none of the task's (`FUN_14119d310` with 0); an attack task (7
+    /// or 9) of a unit that is no villager turns its unit AI's retargeting off (`+0x1d6`,
+    /// `FUN_140c40ef0` with the byte, 1).
     pub(super) fn carried_resource_test(
         &mut self,
         player: PlayerId,
@@ -196,22 +195,19 @@ impl World {
         let Work {
             target,
             point,
-            carry_test,
+            disable_retargeting,
             filter,
-            source,
         } = *order;
         let unit = &self.players.live(player, idx)?;
         if target == Some(unit.id) {
             return Ok(());
         }
-        // FUN_140c64e50: a unit of a type below 70 always clears its AI's notifies
-        let notifies = if source == OrderSource::Direct
-            || unit.master(self.master_tables(), player)?.kind < MasterKind::COMBAT
-        {
-            Notifies::Cleared
-        } else {
-            Notifies::Kept
-        };
+        // FUN_140c64e50 on the new action's notify: the unit's `+0xa14` and type
+        let notifies = self
+            .parts
+            .combat_of(unit.id)
+            .order_source
+            .notifies(unit.master(self.master_tables(), player)?.kind);
         let found = self.work_task(player, idx, (target, point), filter)?;
         let Some((with, task)) = found else {
             if filter.is_some() {
@@ -223,7 +219,7 @@ impl World {
             if self.keep_attack(player, idx, target, filter, point, notifies)? == Answer::Taken {
                 return Ok(());
             }
-            return self.work_move(player, idx, target, point, (notifies, source));
+            return self.work_move(player, idx, target, point, notifies);
         };
         // a new master's task is another than the one the unit's action holds
         let master = if with == self.players.live(player, idx)?.life.master_id {
@@ -243,7 +239,7 @@ impl World {
             .actions_of(self.players.live(player, idx)?.id)
             .top_action_kind();
         let kept = self.retake_task(player, idx, (target, point, notifies), &task, master)?;
-        if carry_test {
+        if disable_retargeting {
             self.carried_resource_test(player, idx, &task)?;
         }
         if self.keep_attack(player, idx, target, filter, point, notifies)? == Answer::Taken {
@@ -257,7 +253,7 @@ impl World {
         if kept == Answer::Taken {
             return Ok(());
         }
-        self.start_task(player, idx, (target, point), &task, (notifies, source))
+        self.start_task(player, idx, (target, point), &task, notifies)
     }
 
     /// The work command's master and task for the unit at (`player`, `idx`) on `target` (none
@@ -329,11 +325,11 @@ impl World {
         idx: ListIndex,
         (target, point): (Option<ObjectId>, Position),
         task: &Task,
-        (notifies, source): (Notifies, OrderSource),
+        notifies: Notifies,
     ) -> GenieResult<()> {
         match task.action_kind {
             // the factory makes no action of a mule cart's task: the move without one
-            CART_TASK => self.work_move(player, idx, target, point, (notifies, source)),
+            CART_TASK => self.work_move(player, idx, target, point, notifies),
             TRANSPORT => self.start_transport((player, idx), (target, point), task, notifies),
             ENTER | ATTACK_TASK | HUNT | ActionKind::BUILD | REPAIR | GATHER => {
                 let target = target.ok_or(TERRAIN_TASK)?;
@@ -384,15 +380,15 @@ impl World {
     /// factory makes no action of, the mule cart's 0x99): a unit whose master moves (slot 0xe8,
     /// its speed `+0x740`) is told of a move (slot 0x828, its notifies cleared with
     /// [`Notifies::Cleared`]) and, in state 2 or of class 51, moves to the target or the point
-    /// (slot 0x138 with the unit's `+0xa14`, the work's `source`); one that does not move does
-    /// nothing.
+    /// (slot 0x138, [`World::move_point_order`], [`World::move_to_object`]); one that does not
+    /// move does nothing.
     pub(super) fn work_move(
         &mut self,
         player: PlayerId,
         idx: ListIndex,
         target: Option<ObjectId>,
         point: Position,
-        (notifies, source): (Notifies, OrderSource),
+        notifies: Notifies,
     ) -> GenieResult<()> {
         let unit = &self.players.live(player, idx)?;
         let master = unit.master(self.master_tables(), player)?;
@@ -440,9 +436,11 @@ impl World {
                 .contains(ClassRoles::PACKED_TREBUCHET)
         {
             match target {
-                None => self.move_point_order_with(player, idx, point, source)?,
+                None => {
+                    let _ = self.move_point_order(player, idx, point)?;
+                }
                 Some(target) => {
-                    let _ = self.move_to_object_with(player, idx, target, point, source)?;
+                    let _ = self.move_to_object(player, idx, target, point)?;
                 }
             }
         }

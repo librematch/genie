@@ -126,7 +126,7 @@ use crate::world::Player;
 use crate::world::Seconds;
 use crate::world::WorldTime;
 use crate::world::index::ObjectIndex;
-use crate::world::index::ObjectsRef;
+use crate::world::objects_ref::ObjectsRef;
 use crate::world::parts::Object;
 use crate::world::parts::Part;
 use crate::world::parts::Parts;
@@ -3699,9 +3699,8 @@ fn work_at(target: i32, point: Position) -> Work {
     Work {
         target: ObjectId::of_field(target),
         point,
-        carry_test: false,
+        disable_retargeting: false,
         filter: None,
-        source: OrderSource::Direct,
     }
 }
 

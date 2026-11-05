@@ -19,7 +19,7 @@ use crate::construction::build::ClearLook;
 use crate::map::TerrainMask;
 use crate::map::spatial::{Placed, QUERY_HITS, RecordId, Spatial, tile_record_id};
 use crate::math::image::spatial::{NO_SPOT as SPATIAL_NO_SPOT, TILE_CENTRE};
-use crate::world::index::ObjectsRef;
+use crate::world::objects_ref::ObjectsRef;
 
 /// Whether the obstruction manager's point query counts a moving object's record (its flag
 /// 0x40, [`Spatial::point_hit`]).

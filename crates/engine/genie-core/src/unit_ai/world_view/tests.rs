@@ -36,7 +36,7 @@ use crate::unit_ai::NearestAttacker;
 use crate::unit_ai::UnitAiKind;
 use crate::world::Mode680;
 use crate::world::Seconds;
-use crate::world::index::ObjectsRef;
+use crate::world::objects_ref::ObjectsRef;
 use crate::world::others::OthersRef;
 use crate::world::parts::{Parts, no_own_masters, no_parts};
 use std::sync::Arc;

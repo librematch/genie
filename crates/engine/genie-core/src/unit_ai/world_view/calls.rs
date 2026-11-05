@@ -17,8 +17,9 @@ use std::mem::{swap, take};
 
 impl UnitView<'_, '_> {
     /// The unit's attack command on object `target` (slot 0x338, `FUN_14120cea0`), forced or
-    /// not, while its unit AI stands as `ai`: true when the unit attacks it, with the notifies
-    /// the command posts to the unit AI (kind and parameters), which the AI queues.
+    /// not, while its unit AI stands as `ai` with the AI stream `rng` (a trebuchet's work order
+    /// runs as [`UnitView::effect_now`]): true when the unit attacks it, with the notifies the
+    /// command posts to the unit AI (kind and parameters), which the AI queues.
     ///
     /// # Errors
     ///
@@ -27,10 +28,10 @@ impl UnitView<'_, '_> {
         &mut self,
         target: ObjectId,
         force: OrderForce,
-        ai: &UnitAi,
+        (ai, rng): (&mut UnitAi, &mut Well512),
     ) -> GenieResult<Attacked> {
         let roles = &self.step.world.model.roles.clone();
-        self.start_attack_now(target, force, ai, roles)
+        self.start_attack_now(target, force, (ai, rng), roles)
     }
 
     /// The unit's `+0x685`, `underAttackValue`, becomes `value` (`FUN_14119d2d0`).

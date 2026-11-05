@@ -231,7 +231,7 @@ impl UnitAi {
         ) {
             self.save_patrol(side);
         }
-        if self.attack_object(target, OrderForce::Forced, TargetRules::Own, at, side)?
+        if self.attack_object(target, OrderForce::Forced, TargetRules::Own, at, (side, ai))?
             == Answer::Taken
         {
             if self.current_order != Some(OrderKind::Defend) {
@@ -355,7 +355,7 @@ impl UnitAi {
     /// [`UnitAi::attack_object`]; then, with retargeting on and off order 0x2bd, the order goes)
     /// and processIdle produced ([`IdleOutcome::Acted`]); a patrol order's saved patrol data is not
     /// modelled. Else a patrol order stops. The search leaves the alert mode clear, so `+0x1bc`
-    /// stays. Then, outside a unit group (`+0x6d0` −1; its test is not held), a unit in Defend or
+    /// stays. Then, outside a unit group (`+0x6d0` −1), a unit in Defend or
     /// `StandGround` (stance 1, 2) walks back to its state position ([`UnitAi::walk_back`]), which
     /// leaves the result 5; a patrol path (`+0x1c0`) and the healer's ally search (`FUN_140c16f00`,
     /// for a master with a task of action type 0x69) are not modelled.
@@ -482,9 +482,11 @@ impl UnitAi {
     }
 
     /// [`UnitAi::soldier_idle`]'s end without an attack: a patrol order stops there ("I have a
-    /// patrol order, so I'm stopping here."); a unit in Defend or `StandGround` walks back to its
-    /// state position ("returning to state pos.", its result not the processIdle's); then the
-    /// saved patrol, if any, goes on (`restorePatrolInformation`: processIdle produced). Else
+    /// patrol order, so I'm stopping here."), and so does a unit in a group (its `+0x6d0`, the
+    /// field, not whether the world holds the group: "And I'm in a formation, returning no
+    /// action."); a unit in Defend or `StandGround` walks back to its state position
+    /// ("returning to state pos.", its result not the processIdle's); then the saved patrol, if
+    /// any, goes on (`restorePatrolInformation`: processIdle produced). Else
     /// [`IdleOutcome::Idle`].
     ///
     /// # Errors
@@ -500,7 +502,8 @@ impl UnitAi {
         if matches!(
             self.current_order,
             Some(OrderKind::Patrol | OrderKind::AttackMove)
-        ) {
+        ) || side.unit.group.id.is_some()
+        {
             return Ok(IdleOutcome::Idle);
         }
         if self.stance.leashed() {
@@ -619,7 +622,7 @@ impl UnitAi {
         };
         // slot 0xb8 with 1 (`+0x1d5` then 1, not held)
         Ok(
-            match self.attack_object(id, OrderForce::Forced, TargetRules::Own, at, side)? {
+            match self.attack_object(id, OrderForce::Forced, TargetRules::Own, at, (side, rng))? {
                 Answer::Taken => IdleOutcome::Acted,
                 Answer::NotTaken => IdleOutcome::Idle,
             },

@@ -34,10 +34,10 @@ use crate::unit_ai::world_view::DropWorld;
 use crate::unit_ai::{CIVILIAN_CARED, Memory, Pick, civilian_kind, civilian_search_radius};
 use crate::world::HUNTER_UNMOVING;
 use crate::world::SEARCH_AGAIN;
-use crate::world::index::ObjectsRef;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
 use crate::world::lets::release;
+use crate::world::objects_ref::ObjectsRef;
 use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlotsExt;
 use crate::world::step::Step;
@@ -494,6 +494,7 @@ impl Unit {
             action_state: ActionState::new(hunt.state.get()),
             ..self.me(actions)
         };
+        let closest = step.world.closest_world();
         let mut plan = Planning {
             pathing: &mut step.world.pathing,
             now: step.world.world_time,
@@ -521,6 +522,7 @@ impl Unit {
                 attack: None,
                 reach: &mut reach,
                 objects: by_id,
+                closest,
             },
             roles,
             &step.world.model.tuning.best_target,

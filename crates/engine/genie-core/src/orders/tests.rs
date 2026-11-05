@@ -12,6 +12,7 @@ use crate::construction::build::{BuildAction, BuildTask, Construction};
 use crate::construction::{BuilderCount, FoundationId};
 use crate::garrison::ContainerId;
 use crate::garrison::ENTER;
+use crate::garrison::WorkReturn;
 use crate::gathering::DropSiteId;
 use crate::gathering::gather::GATHER;
 use crate::gathering::gather::GatherState;
@@ -80,6 +81,7 @@ use crate::orders::ReadyOrders;
 use crate::orders::SavedPatrols;
 use crate::orders::split::JoinTest;
 use crate::orders::split::splits_together;
+use crate::orders::town_bell::BellShelter;
 use crate::ownership::artifact::Artifact;
 use crate::pathing::Pathing;
 use crate::players::Amount;
@@ -1583,7 +1585,7 @@ fn an_order_to_another_player_unit_goes_to_its_queue_with_the_setting() {
     let interact = Interact {
         target: None,
         point: Point::new(25.0, 30.0),
-        carry_test: false,
+        disable_retargeting: false,
         flags: OrderFlags::QUEUED,
         filter: None,
     };
@@ -1662,7 +1664,7 @@ fn the_loose_units_of_move_or_an_interact_leave_their_groups() {
     let interact = Interact {
         target: None,
         point: Point::new(30.0, 30.0),
-        carry_test: false,
+        disable_retargeting: false,
         flags: OrderFlags::empty(),
         filter: None,
     };
@@ -1904,7 +1906,7 @@ fn queued_interact_to_an_object_that_does_not_move_also_queues_it() {
     let interact = |queued| Interact {
         target: None,
         point: Point::new(25.0, 30.0),
-        carry_test: false,
+        disable_retargeting: false,
         flags: if queued {
             OrderFlags::QUEUED
         } else {
@@ -1970,7 +1972,7 @@ fn an_order_to_busy_unit_ai_readies_its_queue_and_stops_the_unit() {
     let interact = Interact {
         target: None,
         point: Point::new(25.0, 30.0),
-        carry_test: false,
+        disable_retargeting: false,
         flags: OrderFlags::empty(),
         filter: None,
     };
@@ -2005,7 +2007,7 @@ fn an_interact_unit_queues_its_offset_point_and_takes_no_work_on_itself() {
     let interact = Interact {
         target: None,
         point: Point::new(25.0, 30.0),
-        carry_test: false,
+        disable_retargeting: false,
         flags: OrderFlags::QUEUED,
         filter: None,
     };
@@ -2152,7 +2154,7 @@ fn the_readiness_pass_readies_the_unready_and_drops_the_ready() {
     );
 }
 
-/// `FUN_14106ff70`'s carried-resource test: a gather or hunt task of another resource than
+/// `FUN_14106ff70`'s retargeting byte set: a gather or hunt task of another resource than
 /// the one held leaves the unit holding none of the task's (the food kinds 0 and 15 to 17
 /// are one); an attack task (7 or 9) turns a unit's retargeting off unless it is a villager.
 #[test]
@@ -2251,14 +2253,16 @@ fn move_inside_work_command_with_0_keeps_the_order_queue() {
             ..UnitAi::default()
         }),
     );
-    world
-        .move_point_order_with(
+    let unit_id = world.players[1].objects[ListIndex::new(0)].id;
+    world.parts.combat_mut(unit_id).unwrap().order_source = OrderSource::Queued;
+    let _ = world
+        .move_point_order(
             PlayerId::new(1),
             ListIndex::new(0),
             Position::new(30.0, 30.0, 0.0),
-            OrderSource::Queued,
         )
         .unwrap();
+    world.parts.combat_mut(unit_id).unwrap().order_source = OrderSource::Direct;
     let unit = &world.players[1].objects[ListIndex::new(0)];
     assert_eq!(world.parts.unit_ai.get(unit.id).unwrap().orders.len(), 1);
     assert_eq!(
@@ -2272,7 +2276,7 @@ fn move_inside_work_command_with_0_keeps_the_order_queue() {
             .goal(),
         Some(Position::new(30.0, 30.0, 0.0))
     );
-    world
+    let _ = world
         .move_point_order(
             PlayerId::new(1),
             ListIndex::new(0),
@@ -2289,6 +2293,185 @@ fn move_inside_work_command_with_0_keeps_the_order_queue() {
             .len(),
         0
     );
+}
+
+/// A soldier of [`soldiers`] at (20, 20) that walks ([`walker`]) and whose unit AI holds one
+/// queued move order.
+fn soldier_with_queued_order() -> World {
+    let mut world = soldiers(&[(11, 4, Point::new(20.0, 20.0))], &[]);
+    let walker = walker();
+    for masters in &mut world.model.masters {
+        if let Some(soldier) = Arc::make_mut(masters).get_mut(master_id(4)) {
+            soldier.move_stats = Some(walker.stats);
+        }
+    }
+    world
+        .parts
+        .put_mover(world.players[1].objects[ListIndex::new(0)].id, Some(walker));
+    let order = QueuedOrder {
+        issuer: Some(Issuer::Player(player_id(1))),
+        order: OrderKind::Move,
+        priority: OrderPriority::of_data(100),
+        target: None,
+        target_owner: None,
+        point: Position::new(1.0, 1.0, 0.0),
+        range: Distance::ZERO,
+        shown: Point::new(1.0, 1.0),
+        ready: true,
+        target_kind: None,
+    };
+    world.parts.set_unit_ai(
+        world.players[1].objects[ListIndex::new(0)].id,
+        Some(UnitAi {
+            orders: vec![order],
+            ..UnitAi::default()
+        }),
+    );
+    world
+}
+
+/// The soldier's queued orders, `+0xa14` and command count (`+0x888`).
+fn queue_source_count(world: &World) -> (usize, OrderSource, u8) {
+    let id = world.players[1].objects[ListIndex::new(0)].id;
+    (
+        world.parts.unit_ai.get(id).map_or(0, |ai| ai.orders.len()),
+        world.parts.combat_of(id).order_source,
+        world.parts.actions_of(id).commands.get(),
+    )
+}
+
+/// Slot 0x128 (`FUN_141211b80`): `+0xa14` holds the source while the work runs and is 1 after;
+/// with 0 the unit AI's queue stays through the work's move (slot 0x138 reads `+0xa14`), with 1
+/// it empties. A work at a point moves the unit: `FUN_14106d340` counts the move and
+/// `FUN_14106c590` the work, two commands; on the unit itself the queue still empties but
+/// nothing is counted.
+#[test]
+fn slot_0x128_holds_its_source_while_it_works_and_counts_the_commands() {
+    let mut world = soldier_with_queued_order();
+    let id = world.players[1].objects[ListIndex::new(0)].id;
+    let point = Position::new(30.0, 30.0, 0.0);
+    world
+        .give_work(id, &Work::on(None, point), OrderSource::Queued)
+        .unwrap();
+    assert_eq!(queue_source_count(&world), (1, OrderSource::Direct, 2));
+    world
+        .give_work(id, &Work::on(None, point), OrderSource::Direct)
+        .unwrap();
+    assert_eq!(queue_source_count(&world), (0, OrderSource::Direct, 4));
+    let mut world = soldier_with_queued_order();
+    world
+        .give_work(id, &Work::on(Some(id), point), OrderSource::Direct)
+        .unwrap();
+    assert_eq!(queue_source_count(&world), (0, OrderSource::Direct, 0));
+}
+
+/// `FUN_1412081e0` sets `+0xa14` 0 first and 1 again only where the unit went back: a unit
+/// outside no longer under the town bell stays, so its next move (slot 0x138) keeps the unit
+/// AI's queue; the next slot 0x128 sets 1 again.
+#[test]
+fn failed_way_back_to_work_leaves_the_order_source_queued() {
+    let mut world = soldier_with_queued_order();
+    let id = world.players[1].objects[ListIndex::new(0)].id;
+    assert_eq!(world.back_to_work(None, id).unwrap(), WorkReturn::Stayed);
+    assert_eq!(queue_source_count(&world), (1, OrderSource::Queued, 0));
+    let _ = world
+        .move_point_order(
+            PlayerId::new(1),
+            ListIndex::new(0),
+            Position::new(30.0, 30.0, 0.0),
+        )
+        .unwrap();
+    assert_eq!(queue_source_count(&world), (1, OrderSource::Queued, 1));
+    world
+        .give_work(
+            id,
+            &Work::on(None, Position::new(31.0, 30.0, 0.0)),
+            OrderSource::Direct,
+        )
+        .unwrap();
+    assert_eq!(queue_source_count(&world), (0, OrderSource::Direct, 3));
+}
+
+/// Slot 0x140 (`FUN_141070c90`): the work with the byte 0 and any task at `+0xa14` as it
+/// stands, then one command more; on the unit itself nothing.
+#[test]
+fn slot_0x140_works_and_counts_at_the_order_source_as_it_stands() {
+    let mut world = soldier_with_queued_order();
+    let id = world.players[1].objects[ListIndex::new(0)].id;
+    world.parts.combat_mut(id).unwrap().order_source = OrderSource::Queued;
+    world
+        .work_at(
+            PlayerId::new(1),
+            ListIndex::new(0),
+            None,
+            Position::new(30.0, 30.0, 0.0),
+        )
+        .unwrap();
+    assert_eq!(queue_source_count(&world), (1, OrderSource::Queued, 2));
+    world
+        .work_at(
+            PlayerId::new(1),
+            ListIndex::new(0),
+            Some(id),
+            Position::ORIGIN,
+        )
+        .unwrap();
+    assert_eq!(queue_source_count(&world), (1, OrderSource::Queued, 2));
+}
+
+/// An action object (types 40 to 60) has no `+0xa14`: its slot 0x128 (`FUN_14106c590`) and its
+/// slot 0x138 (`FUN_14106d340`) leave its unit AI's order queue alone, and its notifies always
+/// clear; the work and the move are counted as a combat object's.
+#[test]
+fn an_action_object_works_and_moves_without_emptying_its_order_queue() {
+    let mut world = soldier_with_queued_order();
+    let master = world.players[1].objects[ListIndex::new(0)].life.master_id;
+    for masters in &mut world.model.masters {
+        if let Some(own) = Arc::make_mut(masters).get_mut(master) {
+            own.kind = MasterKind::ACTION;
+        }
+    }
+    let id = world.players[1].objects[ListIndex::new(0)].id;
+    world
+        .give_work(
+            id,
+            &Work::on(None, Position::new(30.0, 30.0, 0.0)),
+            OrderSource::Direct,
+        )
+        .unwrap();
+    assert_eq!(queue_source_count(&world), (1, OrderSource::Direct, 2));
+    let _ = world
+        .move_point_order(
+            PlayerId::new(1),
+            ListIndex::new(0),
+            Position::new(31.0, 30.0, 0.0),
+        )
+        .unwrap();
+    assert_eq!(queue_source_count(&world), (1, OrderSource::Direct, 3));
+}
+
+/// Slot 0x138's start (`FUN_141216f10`): a villager is no longer under the town bell.
+#[test]
+fn villager_move_drops_its_town_bell_flag() {
+    let mut world = soldiers(&[(11, 4, Point::new(20.0, 20.0))], &[]);
+    let villager = world.players[1].objects[ListIndex::new(0)].id;
+    world.players[1].objects[ListIndex::new(0)].life.master_id = ids::VILLAGER_MALE;
+    for masters in &mut world.model.masters {
+        if let Some(own) = Arc::make_mut(masters).get_mut(ids::VILLAGER_MALE) {
+            own.class = class::VILLAGER;
+        }
+    }
+    world
+        .parts
+        .set_town_bell_flag(villager, BellShelter::Sheltered);
+    let _ = world
+        .move_point_order(
+            PlayerId::new(1),
+            ListIndex::new(0),
+            Position::new(30.0, 30.0, 0.0),
+        )
+        .unwrap();
+    assert_eq!(world.parts.town_bell_of(villager).flag, BellShelter::Free);
 }
 
 /// `FUN_140e666f0`: another player's scout takes the order as its owner's, a unit without
@@ -4030,9 +4213,8 @@ fn an_order_on_an_enemy_below_the_least_range_notifies_the_unit_ai() {
     let work = Work {
         target: Some(object_id(20)),
         point: Position::new(11.0, 10.0, 0.0),
-        carry_test: false,
+        disable_retargeting: false,
         filter: None,
-        source: OrderSource::Direct,
     };
     world
         .order_work(PlayerId::new(1), ListIndex::new(0), &work)
@@ -5396,9 +5578,8 @@ fn foraging() -> World {
     let work = Work {
         target: Some(object_id(600)),
         point: Position::new(32.5, 89.5, 0.0),
-        carry_test: false,
+        disable_retargeting: false,
         filter: None,
-        source: OrderSource::Direct,
     };
     world
         .order_work(PlayerId::new(1), ListIndex::new(0), &work)
@@ -6118,7 +6299,7 @@ fn work_command_factory_starts_the_task_action() {
             ListIndex::new(0),
             (Some(object_id(600)), Position::new(32.5, 89.5, 0.0)),
             &task,
-            (Notifies::Cleared, OrderSource::Direct),
+            Notifies::Cleared,
         )
         .unwrap();
     assert_eq!(
@@ -6144,7 +6325,7 @@ fn work_command_factory_starts_the_task_action() {
                 ListIndex::new(0),
                 (Some(object_id(600)), Position::new(32.5, 89.5, 0.0)),
                 &unknown,
-                (Notifies::Cleared, OrderSource::Direct)
+                Notifies::Cleared
             )
             .err()
             .map(|error| error.reason()),
@@ -6213,7 +6394,7 @@ fn an_interact_of_soldiers_on_an_enemy_building_forms_group_that_attacks_it() {
     let order = Interact {
         target: Some(object_id(60)),
         point: Point::new(40.0, 40.0),
-        carry_test: false,
+        disable_retargeting: false,
         flags: OrderFlags::DIRECT | OrderFlags::HUMAN,
         filter: None,
     };

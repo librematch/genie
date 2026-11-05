@@ -29,6 +29,7 @@ pub mod index;
 pub(crate) mod lets;
 pub mod load;
 pub mod motions;
+pub mod objects_ref;
 pub(crate) mod others;
 pub mod parts;
 #[cfg(test)]

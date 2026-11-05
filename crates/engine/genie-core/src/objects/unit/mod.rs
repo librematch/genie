@@ -32,6 +32,7 @@ use crate::{GenieError, GenieResult};
 
 mod death;
 mod default_task;
+mod idle_time;
 mod life_step;
 mod stop;
 mod top;

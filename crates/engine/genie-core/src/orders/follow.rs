@@ -21,8 +21,6 @@ use crate::objects::masters::OwnerMasters;
 use crate::objects::masters::PlayersMastersExt;
 use crate::orders::ControlKey;
 use crate::orders::Kept;
-use crate::orders::OrderSource;
-use crate::orders::town_bell::BellShelter;
 use crate::orders::{Followed, follow_axis, follow_spread, ignore_unit};
 use crate::players::PlayerId;
 use crate::unit_ai::AiAction;
@@ -247,10 +245,10 @@ impl World {
     /// at their offsets): it leaves its unit group (`FUN_14102c160` with the target's id); one that
     /// does not move takes nothing ([`World::follower`]); else it starts
     /// ([`World::follower_start`]) and moves to the target at its place (slot 0x138,
-    /// [`World::move_to_object_with`], z 0). Its unit AI takes the follow order and action
+    /// [`World::move_to_object`], z 0). Its unit AI takes the follow order and action
     /// (`FUN_140c64b60` with 1, `FUN_140c64b50`) only when no action of its took the move; then the
     /// target with its class (none without a footprint) at its place (`FUN_140c64be0`). Slot
-    /// 0x2d8's walk and show targets and `+0x888` are not held.
+    /// 0x2d8's walk and show targets are not held.
     pub(super) fn follow_unit(
         &mut self,
         loose: &[ObjectId],
@@ -263,13 +261,7 @@ impl World {
         }
         let (player_id, idx) = self.follower_start(loose, loose_index)?;
         let (x, y) = (followed.place.x(), followed.place.y());
-        let taken = self.move_to_object_with(
-            player_id,
-            idx,
-            followed.id,
-            Position::new(x, y, 0.0),
-            OrderSource::Direct,
-        )?;
+        let taken = self.move_to_object(player_id, idx, followed.id, Position::new(x, y, 0.0))?;
         let rng = self.streams.get_mut(Stream::Ai);
         if let Some(ai) = self
             .parts
@@ -292,7 +284,7 @@ impl World {
     /// box): one that moves ([`World::follower`]) starts ([`World::follower_start`]) and goes to
     /// its place less `mean` plus the target's, held on the map ([`follow_axis`]): slot 0x138 (z 0)
     /// to the target there when its master has a footprint, else to the point
-    /// ([`World::move_point_order_with`]). Its unit AI takes the move order and action
+    /// ([`World::move_point_order`]). Its unit AI takes the move order and action
     /// (`FUN_140c64b60` with 1, `FUN_140c64b50`) and the target (none without a footprint) at that
     /// place (`FUN_140c64be0`). Slot 0x2d8's walk and show targets are not held.
     pub(super) fn follow_offset(
@@ -323,10 +315,11 @@ impl World {
         );
         match followed.class {
             Some(_) => {
-                let _ =
-                    self.move_to_object_with(player_id, idx, followed.id, at, OrderSource::Direct)?;
+                let _ = self.move_to_object(player_id, idx, followed.id, at)?;
             }
-            None => self.move_point_order_with(player_id, idx, at, OrderSource::Direct)?,
+            None => {
+                let _ = self.move_point_order(player_id, idx, at)?;
+            }
         }
         let rng = self.streams.get_mut(Stream::Ai);
         if let Some(ai) = self
@@ -344,22 +337,8 @@ impl World {
         Ok(())
     }
 
-    /// Slot 0x138 to `target` outside slot 0x128's work command (the unit's `+0xa14` 1):
-    /// [`World::move_to_object_with`].
-    pub(crate) fn move_to_object(
-        &mut self,
-        player: PlayerId,
-        idx: ListIndex,
-        target: ObjectId,
-        point: Position,
-    ) -> GenieResult<()> {
-        self.move_to_object_with(player, idx, target, point, OrderSource::Direct)
-            .map(|_| ())
-    }
-
-    /// Slot 0x138 to `target` (`FUN_141216f10`): a villager is no longer under the town bell
-    /// (`+0x9dc`); with `+0xa14` (`source`: 1 but inside slot 0x128's work command with 0) its unit
-    /// AI's order queue empties (`FUN_140c5e010`); then `FUN_14106d340`: unless the unit is its own
+    /// Slot 0x138 to `target`: its start ([`World::move_start`]: a villager's town-bell flag, the
+    /// order queue by the unit's `+0xa14`); then `FUN_14106d340`: unless the unit is its own
     /// target, its unit AI's notifies go with the world time (`FUN_140c5dc10`) and, but after a
     /// kill it stops on (`FUN_140c41c10`), its current action's slot 0x40 may take the target and
     /// `point` (a Hunt's, [`World::hunt_take_move`]; an Artifact's, `FUN_140aaca30`, would: not
@@ -368,37 +347,25 @@ impl World {
     /// walking sprite) takes the target it holds
     /// (slot 0x178, [`crate::movement::move_to::holds_object`]) and replaces its actions (slot 0x808, the
     /// old ones' teardowns let their targets go, [`World::clear_actions`]; then its start,
-    /// [`MoveToAction::to_object`]). Its `command_flag` (`+0x888`) is not held.
+    /// [`MoveToAction::to_object`]) and its command count goes one up
+    /// ([`World::count_command`]).
     ///
     /// [`MoveToAction::to_object`]: crate::movement::move_to::MoveToAction::to_object
-    pub(crate) fn move_to_object_with(
+    pub(crate) fn move_to_object(
         &mut self,
         player: PlayerId,
         idx: ListIndex,
         target: ObjectId,
         point: Position,
-        source: OrderSource,
     ) -> GenieResult<Answer> {
         let world_time = self.world_time;
+        self.move_start(player, idx)?;
         let class = self
             .players
             .live(player, idx)?
             .master(self.master_tables(), player)?
             .class;
-        let villager = self
-            .model
-            .roles
-            .of_class(class)
-            .contains(ClassRoles::VILLAGER);
         let unit = self.players.live_mut(player, idx)?;
-        if villager {
-            self.parts.set_town_bell_flag(unit.id, BellShelter::Free);
-        }
-        if source == OrderSource::Direct
-            && let Some(ai) = self.parts.unit_ai.get_mut(unit.id)
-        {
-            ai.orders.clear();
-        }
         if target == unit.id {
             return Ok(Answer::NotTaken);
         }
@@ -449,10 +416,12 @@ impl World {
         }
         self.clear_actions(player, idx)?;
         self.start_object_move(player, idx, (target, target_state), livestock)?;
+        let id = self.players.live(player, idx)?.id;
+        self.count_command(id)?;
         Ok(Answer::NotTaken)
     }
 
-    /// [`World::move_to_object_with`]'s new `MoveTo` toward `target` (in state `target_state`), once the
+    /// [`World::move_to_object`]'s new `MoveTo` toward `target` (in state `target_state`), once the
     /// unit's actions are cleared: its range and sprite, the action's start and the standing
     /// sprite it may show; no action took the move.
     ///

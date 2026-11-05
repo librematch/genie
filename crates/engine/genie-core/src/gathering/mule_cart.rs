@@ -15,14 +15,12 @@ use crate::objects::WorkerCount;
 use crate::objects::masters::GatherGroup;
 use crate::objects::masters::PlayersMastersExt;
 use crate::objects::masters::{MasterTables, OwnerMasters};
-use crate::orders::OrderSource;
-use crate::orders::Work;
 use crate::players::PlayerId;
 use crate::unit_ai::NO_POINT;
 use crate::unit_ai::world_view::Foreign;
 use crate::world::World;
-use crate::world::index::ObjectsRef;
 use crate::world::layer::ClassRoles;
+use crate::world::objects_ref::ObjectsRef;
 use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlotsExt;
 use crate::{GenieError, GenieResult};
@@ -77,7 +75,7 @@ impl World {
             if let Some(target) = target
                 && let Some(at) = self.spatial.get(target).map(|placed| placed.position)
             {
-                self.move_to_object(player_id, idx, target, at)?;
+                let _ = self.move_to_object(player_id, idx, target, at)?;
             }
             Ok::<_, GenieError>(())
         })();
@@ -236,22 +234,14 @@ impl World {
         Ok(best.map_or((None, at), |(object_id, at)| (Some(object_id), at)))
     }
 
-    /// Slot 0x1e8's end: slot 0x140 (`FUN_141070c90`), the work command toward the found
-    /// target at its place, else at the cart's own (slot 0x7e8 with the carried-resource test,
-    /// any task and `+0xa14` 0; `+0x888`'s count is not held).
+    /// Slot 0x1e8's end: slot 0x140 ([`World::work_at`]), the work command toward the found
+    /// target at its place, else at the cart's own.
     pub(crate) fn cart_work(
         &mut self,
         player_id: PlayerId,
         idx: ListIndex,
         (target, point): (Option<ObjectId>, Position),
     ) -> GenieResult<()> {
-        let work = Work {
-            target,
-            point,
-            carry_test: true,
-            filter: None,
-            source: OrderSource::Queued,
-        };
-        self.order_work(player_id, idx, &work)
+        self.work_at(player_id, idx, target, point)
     }
 }

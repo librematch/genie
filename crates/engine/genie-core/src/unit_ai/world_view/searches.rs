@@ -34,9 +34,9 @@ use crate::unit_ai::{
     Found, Gatherable, OffFootprint, Pick, ResourceSearch, Seeker as UnitAiSeeker, helper_answers,
 };
 use crate::unit_ai::{Search, UnitAi};
-use crate::world::index::ObjectsRef;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
+use crate::world::objects_ref::ObjectsRef;
 use crate::world::slots::PlayerSlotsExt;
 use crate::{GenieError, GenieResult};
 
@@ -97,6 +97,7 @@ impl UnitView<'_, '_> {
             now: self.step.world.world_time,
             mode_680: self.step.world.mode_680,
         };
+        let closest = self.step.world.closest_world();
         // ClosestObject's reachability check (slot 0x3d0) walks the unit's paths
         let mut plan = Planning {
             pathing: &mut self.step.world.pathing,
@@ -141,6 +142,7 @@ impl UnitView<'_, '_> {
                 attack: Some(&picker),
                 reach: &mut reach,
                 objects: by_id,
+                closest,
             },
             roles,
             &self.step.world.model.tuning.best_target,

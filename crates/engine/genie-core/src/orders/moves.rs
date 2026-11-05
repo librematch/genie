@@ -4,6 +4,7 @@ use crate::gathering::PastureId;
 use crate::map::Distance;
 use crate::map::Point;
 use crate::map::Position;
+use crate::map::spatial::Placed;
 use crate::math::rng::Stream;
 use crate::movement::Speed;
 use crate::movement::ai_moves::MoveSprites;
@@ -21,9 +22,7 @@ use crate::objects::sprite::Cargo;
 use crate::objects::sprite::Graphic;
 use crate::orders::Dispatch;
 use crate::orders::OrderFlags;
-use crate::orders::OrderSource;
 use crate::orders::ReadyOrders;
-use crate::orders::town_bell::BellShelter;
 use crate::orders::{MoveOrder, Work, ignore_unit, packs, readiness, work_reach};
 use crate::players::AllyTest;
 use crate::players::Amount;
@@ -44,6 +43,22 @@ use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::slots::PlayerSlotsExt;
 use crate::{GenieError, GenieResult};
+
+/// The Pack (`TRIBE_Action_Pack`, `FUN_140ad4ff0`) or Unpack (`TRIBE_Action_Unpack`,
+/// `FUN_140ae58a0`) a trebuchet's work order or attack command makes, neither held.
+pub(crate) const PACK_OR_UNPACK: GenieError =
+    GenieError::unsupported("a Pack or Unpack of class 54 or 51 (FUN_140ad4ff0, FUN_140ae58a0)");
+
+/// `FUN_1410862c0` of the unit at `me` of master `master` against the object at `them`
+/// ([`work_reach`] of the footprint gap): within its reach, and too close.
+pub(crate) fn placed_reach(me: &Placed, them: &Placed, master: &Master) -> (bool, bool) {
+    let gap = footprint_gap(me.position, me.radius, them.position, them.radius);
+    work_reach(
+        gap,
+        master.combat_part().weapon_range,
+        master.combat_part().min_range,
+    )
+}
 
 /// What a work order leaves of the pasture its unit tends ([`World::work_pasture`]).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -153,11 +168,8 @@ impl World {
             }
             return Ok(());
         }
-        // slot 0x138 (FUN_141216f10): a villager's town-bell flag (not held) and, `+0xa14` being
-        // 1, the unit AI's order queue empties (FUN_140c5e010); then FUN_14106d340
-        if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
-            ai.orders.clear();
-        }
+        // slot 0x138's start (FUN_141216f10), then FUN_14106d340
+        self.move_start(player, idx)?;
         if order.target == Some(id) {
             return Ok(());
         }
@@ -187,7 +199,8 @@ impl World {
     /// `FUN_14106d340` on a move of the unit at `idx` to `point`: a unit with a unit AI
     /// (`FUN_140c5dc10` clears its notifies with the world time) lets its head action take the
     /// point ([`World::head_takes_move`]) unless it stops after a kill (`FUN_140c41c10`); else a
-    /// `MoveTo` to the point replaces its actions. Taken when the action took it.
+    /// `MoveTo` to the point replaces its actions and its command count goes one up
+    /// ([`World::count_command`]). Taken when the action took it.
     pub(crate) fn move_to_point(
         &mut self,
         player: PlayerId,
@@ -250,10 +263,9 @@ impl World {
                     self.model.tuning.sprite,
                 )?;
             }
-            self.parts
-                .actions_mut(unit.id)?
-                .list
-                .set_move_to(Some(move_to));
+            let id = unit.id;
+            self.parts.actions_mut(id)?.list.set_move_to(Some(move_to));
+            self.count_command(id)?;
         }
         Ok(taken)
     }
@@ -322,7 +334,9 @@ impl World {
         Ok(())
     }
 
-    /// Slot 0x7e8 (`FUN_141227190`) of a unit on a target object: a unit in state 3 or later, or of
+    /// Slot 0x7e8 of a unit on a target object: an action object's (types 40 to 60) is the work
+    /// command (`FUN_14106ff70`, [`World::work_command`]). A combat object's or a building's
+    /// (`FUN_141227190`): a unit in state 3 or later, or of
     /// class 54 under its own Pack or Unpack (`0x7d`, `0x7c`), ignores it. Against a target the
     /// unit is not allied with (`FUN_141663d90` with allies) [`work_reach`] (`FUN_1410862c0`)
     /// decides: class 54 out of reach packs (`FUN_140ad4ff0`), class 51 in reach unpacks
@@ -331,7 +345,8 @@ impl World {
     /// Without a target the world holds (none, or one gone) the work command goes to the point, and
     /// a computer's class 54 packs instead. Neither action is held. A villager drops its town-bell
     /// flag (`FUN_1412067f0`); then the work command. A villager on a pasture (1893, 1897) whose
-    /// livestock's workers (slot 0x780, [`World::livestock_workers`]) are below its owner's
+    /// livestock's workers (slot 0x780,
+    /// [`ObjectsRef::livestock_workers`](crate::world::objects_ref::ObjectsRef::livestock_workers)) are below its owner's
     /// [`AttributeSlots::pasture_workers`](crate::world::layer::AttributeSlots::pasture_workers)
     /// (COMISS, JBE) works the livestock [`World::pasture_pick`] gives at its place with the
     /// order's flags (slot 0x7e8 again) and then tends the pasture; none given ends the order
@@ -346,6 +361,10 @@ impl World {
     ) -> GenieResult<()> {
         let unit = &self.players.live(player, idx)?;
         let master = unit.master(self.master_tables(), player)?;
+        // an action object's slot 0x7e8 is the work command itself (FUN_14106ff70)
+        if master.kind < MasterKind::COMBAT {
+            return self.work_command(player, idx, order);
+        }
         // the class-54 test of its top action comes first in the game, but either way the order
         // is ignored
         if ObjectState::Alive < unit.life.state {
@@ -370,9 +389,7 @@ impl World {
                 .contains(ClassRoles::UNPACKED_TREBUCHET)
                 && self.parts.unread.contains(unit.id))
         {
-            return Err(GenieError::unsupported(
-                "a Pack or Unpack of class 54 or 51 (FUN_140ad4ff0, FUN_140ae58a0)",
-            ));
+            return Err(PACK_OR_UNPACK);
         }
         if reach.is_some_and(|(_, too_close)| too_close) {
             let unit = self.players.live_mut(player, idx)?;
@@ -458,12 +475,7 @@ impl World {
                         .get_known(order.target)?
                         .ok_or(GenieError::unsupported("a target without a place"))?,
                 );
-                let gap = footprint_gap(me.position, me.radius, them.position, them.radius);
-                Some(work_reach(
-                    gap,
-                    master.combat_part().weapon_range,
-                    master.combat_part().min_range,
-                ))
+                Some(placed_reach(me, them, master))
             }
             _ => None,
         })
@@ -505,7 +517,7 @@ impl World {
             self.players.player(player)?,
             self.model.slots.attribute.pasture_workers,
         )?;
-        let workers = self.livestock_workers(on).as_f32();
+        let workers = self.objects().livestock_workers(on).as_f32();
         // COMISS room with the workers, JBE: a NaN is full
         if room > Amount::new(workers) {
             let Some((pick, point)) = self.pasture_pick(on, player, idx)? else {
@@ -538,49 +550,20 @@ impl World {
         Ok(PastureAfter::Tends(None))
     }
 
-    /// Slot 0x138 (`FUN_141216f10`) without a target, outside slot 0x128's work command (the
-    /// unit's `+0xa14` 1): [`World::move_point_order_with`].
+    /// Slot 0x138 without a target: its start ([`World::move_start`]: a villager's town-bell
+    /// flag, the order queue by the unit's `+0xa14`), then the move to the point
+    /// ([`World::move_to_point`], `FUN_14106d340`). Taken when an action of the unit took it.
+    ///
+    /// # Errors
+    ///
+    /// What the move does not model.
     pub(crate) fn move_point_order(
         &mut self,
         player: PlayerId,
         idx: ListIndex,
         point: Position,
-    ) -> GenieResult<()> {
-        self.move_point_order_with(player, idx, point, OrderSource::Direct)
-    }
-
-    /// Slot 0x138 (`FUN_141216f10`) without a target, the no-task end of a work command on a
-    /// point: a villager drops its town-bell flag (not held otherwise), the unit AI's order queue
-    /// empties (`FUN_140c5e010`) while the unit's `+0xa14` (`source`) is set, then the move to the
-    /// point ([`World::move_to_point`], `FUN_14106d340`). `+0xa14` is 1 but inside slot 0x128
-    /// (`FUN_141211b80`), which holds it at its argument while its work command runs.
-    pub(crate) fn move_point_order_with(
-        &mut self,
-        player: PlayerId,
-        idx: ListIndex,
-        point: Position,
-        source: OrderSource,
-    ) -> GenieResult<()> {
-        let villager = self
-            .model
-            .roles
-            .of_class(
-                self.players
-                    .live(player, idx)?
-                    .master(self.master_tables(), player)?
-                    .class,
-            )
-            .contains(ClassRoles::VILLAGER);
-        let unit = self.players.live_mut(player, idx)?;
-        if villager {
-            self.parts.set_town_bell_flag(unit.id, BellShelter::Free);
-        }
-        if source == OrderSource::Direct
-            && let Some(ai) = self.parts.unit_ai.get_mut(unit.id)
-        {
-            ai.orders.clear();
-        }
-        let _ = self.move_to_point(player, idx, point)?;
-        Ok(())
+    ) -> GenieResult<Answer> {
+        self.move_start(player, idx)?;
+        self.move_to_point(player, idx, point)
     }
 }

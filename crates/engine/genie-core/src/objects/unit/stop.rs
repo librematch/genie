@@ -13,7 +13,6 @@ use crate::objects::masters::PlayersMastersExt;
 use crate::objects::release::Releaser;
 use crate::objects::sprite::new_sprite;
 use crate::objects::unit::Unit;
-use crate::orders::OrderSource;
 use crate::orders::Work;
 use crate::unit_ai::{AiCommand, Effect};
 use crate::world::Unread;
@@ -276,18 +275,18 @@ impl Unit {
                 |world, player_id, list_index| world.gather_command(player_id, list_index, target),
             ),
             AiCommand::WorkOn { target, point } => {
-                let work = Work {
-                    target: Some(target),
-                    point,
-                    carry_test: true,
-                    filter: None,
-                    source: OrderSource::Queued,
-                };
+                let work = Work::on(Some(target), point);
                 step.lend_at(
                     (&mut *self, &mut *actions),
                     |world, player_id, list_index| world.order_work(player_id, list_index, &work),
                 )
             }
+            AiCommand::WorkAt { target, point } => step.lend_at(
+                (&mut *self, &mut *actions),
+                |world, player_id, list_index| {
+                    world.work_at(player_id, list_index, Some(target), point)
+                },
+            ),
             AiCommand::BuildObject(target) => step.lend_at(
                 (&mut *self, &mut *actions),
                 |target_world, target_player_id, target_list_index| {

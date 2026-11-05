@@ -35,10 +35,10 @@ use crate::players::NO_RELATIONS;
 use crate::unit_ai::task_finder::allied as task_finder_allied;
 use crate::world::Seconds;
 use crate::world::WorldTime;
-use crate::world::index::ObjectsRef;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::generated::MovementTuning;
 use crate::world::layer::generated::TilePathTuning;
+use crate::world::objects_ref::ObjectsRef;
 use crate::world::slots::CheckedIndexExt;
 use crate::{GenieError, GenieResult, pathing::short_path};
 

@@ -23,9 +23,9 @@ use crate::objects::masters::OwnerMasters;
 use crate::objects::unit::Unit;
 use crate::pathing::zones::ZoneMap;
 use crate::world::Unread;
-use crate::world::index::ObjectsRef;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
+use crate::world::objects_ref::ObjectsRef;
 use crate::world::others::OthersRef;
 
 /// The unit a drop-site search goes from ([`drop_site_search`]).

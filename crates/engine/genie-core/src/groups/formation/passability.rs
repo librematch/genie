@@ -26,8 +26,8 @@ use crate::math::fmath::{at_most_or_unordered, rotation};
 use crate::math::image::group::FARTHEST;
 use crate::math::image::group::{PASS_HALF as GROUP_PASS_HALF, PASS_ONE as GROUP_PASS_ONE};
 use crate::world::World;
-use crate::world::index::ObjectsRef;
 use crate::world::layer::generated::GroupTuning;
+use crate::world::objects_ref::ObjectsRef;
 
 /// The grid's extra cell, and the spacing below which slots are nudged (`DAT_14330eb8c`).
 pub(super) const PASS_ONE: f32 = GROUP_PASS_ONE;

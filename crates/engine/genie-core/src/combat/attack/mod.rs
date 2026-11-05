@@ -88,9 +88,9 @@ use crate::objects::masters::{MasterTables, OwnerMasters};
 use crate::objects::sprite::ActiveSprite;
 use crate::objects::{Frame, Graphics};
 use crate::unit_ai::NotifyKind;
-use crate::world::index::ObjectsRef;
 use crate::world::layer::Roles;
 use crate::world::layer::generated::TurnTuning;
+use crate::world::objects_ref::ObjectsRef;
 
 /// The Attack action's type, which word 9 adds.
 pub const ATTACK: ActionKind = ActionKind::named(9);
