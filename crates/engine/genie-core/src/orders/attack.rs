@@ -25,6 +25,7 @@ use crate::{GenieError, GenieResult};
 
 use crate::combat::attack::{AttackCommand, ReadyReads, arms, engagement, show_arrived};
 use crate::combat::victims::victim_of;
+use crate::combat::victims::{VictimLayers, VictimView};
 use crate::combat::{AttackCount, AttackTargetId};
 use crate::gathering::HuntTargetId;
 use crate::objects::masters::{Master, MasterTables, OwnerMasters, Task};
@@ -77,19 +78,16 @@ impl World {
             &self.model.tuning.turn,
         );
         let own = victim_of(
-            (
+            VictimView {
                 unit,
-                self.parts.unit_ai.contains(unit.id),
-                self.parts.building_of(unit.id),
-                self.parts.combat_of(unit.id),
-                self.parts.actions.of(unit.id),
-                self.parts.unread.get(unit.id),
-            ),
-            master,
-            &held.attributes,
-            player,
-            self.spatial.terrain.as_ref(),
-            self.mode_680,
+                layers: VictimLayers::of(&self.parts, unit.id, self.parts.actions.of(unit.id)),
+                master,
+                special_charge: self.special_charge(unit, master)?,
+                player,
+                attributes: &held.attributes,
+                terrain: self.spatial.terrain.as_ref(),
+                mode_680: self.mode_680,
+            },
             &self.model.roles,
         );
         Ok(self.victim(target, player)?.map(|victim| ReadyReads {

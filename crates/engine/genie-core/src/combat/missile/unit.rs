@@ -6,6 +6,7 @@ use crate::combat::missile::MissileState;
 use crate::combat::missile::ShooterId;
 use crate::combat::missile::StrikeResult;
 use crate::combat::missile::VanishMode;
+use crate::combat::victims::{VictimLayers, VictimView};
 use crate::combat::victims::{readable, victim, victim_of, write_strike_back};
 use crate::combat::volley::Fired;
 use crate::map::Distance;
@@ -40,6 +41,9 @@ use crate::world::others::OthersRef;
 use crate::world::player::Player;
 use crate::world::slots::PlayerSlotsExt;
 use crate::world::step::Step;
+
+/// A missile whose shooter its player's live list does not hold.
+const SHOOTER_OUTSIDE: GenieError = GenieError::unsupported("a missile's shooter outside its list");
 
 impl Unit {
     /// The missile action's update (slot 6, `FUN_140a9e6e0`). First its target and the object it
@@ -403,7 +407,16 @@ impl Unit {
         }
         let mut victim = victim(step, action.target, roles)?;
         let (player_id, mode_680) = (step.player, step.world.mode_680);
-        let shooter_slot = step.world.live_index(player_id, action.fired_from);
+        let shooter_slot = step
+            .world
+            .live_index(player_id, action.fired_from)
+            .ok_or(SHOOTER_OUTSIDE)?;
+        // `FUN_1412161b0` of the shooter, read before the hit takes it out of its list mutably
+        let special_charge = {
+            let shooter = step.world.players.live(player_id, shooter_slot)?;
+            let master = shooter.master(step.world.master_tables(), player_id)?;
+            step.world.special_charge(shooter, master)?
+        };
         let World {
             players,
             spatial,
@@ -418,11 +431,7 @@ impl Unit {
             attributes,
             ..
         } = players.player_mut(player_id)?;
-        let shooter = shooter_slot
-            .and_then(|list_index| objects.get_mut(list_index))
-            .ok_or(GenieError::unsupported(
-                "a missile's shooter outside its list",
-            ))?;
+        let shooter = objects.get_mut(shooter_slot).ok_or(SHOOTER_OUTSIDE)?;
         let master = shooter.master(MasterTables::new(masters, &parts.own_master), player_id)?;
         if Distance::ZERO < master.combat_part().area_effect {
             return Err(GenieError::unsupported(
@@ -431,19 +440,16 @@ impl Unit {
         }
         let terrain = spatial.terrain.as_ref();
         let mut own = victim_of(
-            (
-                shooter,
-                parts.unit_ai.contains(shooter.id),
-                parts.building_of(shooter.id),
-                parts.combat_of(shooter.id),
-                parts.actions.of(shooter.id),
-                parts.unread.get(shooter.id),
-            ),
-            master,
-            attributes,
-            player_id,
-            terrain,
-            mode_680,
+            VictimView {
+                unit: shooter,
+                layers: VictimLayers::of(parts, shooter.id, parts.actions.of(shooter.id)),
+                master,
+                special_charge,
+                player: player_id,
+                attributes,
+                terrain,
+                mode_680,
+            },
             roles,
         );
         let victim = victim.as_mut().ok_or(GenieError::unsupported(
@@ -516,19 +522,16 @@ impl Unit {
         }
         let terrain = step.world.spatial.terrain.as_ref();
         let mut own = victim_of(
-            (
-                self,
-                step.world.parts.unit_ai.contains(self.id),
-                step.world.parts.building_of(self.id),
-                step.world.parts.combat_of(self.id),
-                actions,
-                step.world.parts.unread.get(self.id),
-            ),
-            master,
-            &step.world.players.player(step.player)?.attributes,
-            step.player,
-            terrain,
-            step.world.mode_680,
+            VictimView {
+                unit: self,
+                layers: VictimLayers::of(&step.world.parts, self.id, actions),
+                master,
+                special_charge: step.world.special_charge(self, master)?,
+                player: step.player,
+                attributes: &step.world.players.player(step.player)?.attributes,
+                terrain,
+                mode_680: step.world.mode_680,
+            },
             roles,
         );
         // the missile's own part is out of the unit while it flies

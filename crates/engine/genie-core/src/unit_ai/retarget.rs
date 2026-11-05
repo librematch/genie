@@ -471,7 +471,7 @@ impl UnitAi {
             return Ok(MiscEnd::Ends);
         }
         if let Some((target, _)) = defended {
-            match side.defended_attacker(target)? {
+            match side.defended_attacker(target, self.current_target)? {
                 NearestAttacker::Attacker(attacker) => {
                     let _ = self.attack_slot(attacker, TargetRules::Any, at, side, ai)?;
                     return Ok(MiscEnd::Ends);

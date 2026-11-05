@@ -30,7 +30,7 @@ use crate::orders::nearest_table_site;
 use crate::players::PlayerId;
 use crate::players::UnitRelation;
 use crate::unit_ai::world_view::owner_view;
-use crate::unit_ai::world_view::{UnitView, WorldPicker, town_centre};
+use crate::unit_ai::world_view::{Helper, UnitView, WorldPicker, town_centre};
 use crate::unit_ai::{
     Found, Gatherable, OffFootprint, Pick, ResourceSearch, Seeker as UnitAiSeeker, helper_answers,
 };
@@ -63,6 +63,7 @@ impl UnitView<'_, '_> {
             attacker: &self.attacker,
             seeker,
             me: self.unit.id,
+            ai_target: search.ai_target,
             player: self.player,
             others: owner_view(
                 &self.step.world.players,
@@ -267,7 +268,11 @@ impl UnitView<'_, '_> {
     /// # Errors
     ///
     /// A search that read no lists yet, and a helper that passes them ([`helper_answers`]).
-    pub(crate) fn call_for_help(&self, attacker: ObjectId) -> GenieResult<()> {
+    pub(crate) fn call_for_help(
+        &self,
+        attacker: ObjectId,
+        ai_target: Option<ObjectId>,
+    ) -> GenieResult<()> {
         /// The classes that never help: 1 to 3, 18 to 21, 27 and 39.
         const NO_HELP_CLASSES: ClassMask = ClassMask::new(0x0080_083c_000e, 0x28);
 
@@ -332,14 +337,13 @@ impl UnitView<'_, '_> {
             if DistanceSquared::new(self.step.world.model.tuning.unit_ai.help_reach) < gap {
                 continue;
             }
-            if !self.helper_free(
+            let helper = Helper {
                 owner,
                 unit,
-                self.step.world.parts.actions_of(unit.id),
+                actions: self.step.world.parts.actions_of(unit.id),
                 master,
-                attacker,
-                roles,
-            )? {
+            };
+            if !self.helper_free(helper, attacker, ai_target, roles)? {
                 continue;
             }
             return helper_answers();

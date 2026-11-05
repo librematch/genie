@@ -240,11 +240,7 @@ pub fn armor_damage(
                 && 0.0 < attack
                 && pierce_or_melee
                 && charges(attacker, own_class, kind, roles);
-            let charge_attack = if charge {
-                charge_damage(attacker)?
-            } else {
-                0.0
-            };
+            let charge_attack = if charge { charge_damage(attacker) } else { 0.0 };
             if 0.0 < charge_attack {
                 charged = true;
                 attack += charge_attack + 0.0;

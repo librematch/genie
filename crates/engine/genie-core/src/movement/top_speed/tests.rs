@@ -3,6 +3,7 @@
 
 use crate::combat::Charge;
 use crate::combat::LockdownCount;
+use crate::combat::damage::SpecialCharge;
 use crate::gathering::hunt::tests::walker;
 use crate::map::Distance;
 use crate::map::Footprint;
@@ -224,6 +225,42 @@ fn ready_charger_runs_near_its_unit_ai_target() {
     assert_eq!(top_of(&world), Speed::new(OWN + 0.5 - 0.25));
     world.parts.combat_mut(object_id(5)).unwrap().locked_down = LockdownCount::of_data(1);
     assert_eq!(top_of(&world), Speed::ZERO);
+}
+
+/// `FUN_1412161b0`'s answer as a hit's attacker holds it: [`World::special_charge`] reads the
+/// target of the unit AI the world holds, [`World::special_charge_with`] the one its caller
+/// passes (a lent unit AI's): ready with the target, unready without one or not ready.
+#[test]
+fn special_charge_reads_the_unit_ai_target_it_is_given() {
+    let answers = |world: &World| {
+        let unit = &world.players[1].objects[ListIndex::new(0)];
+        let master = unit
+            .master(world.master_tables(), PlayerId::new(1))
+            .unwrap();
+        (
+            world.special_charge(unit, master).unwrap(),
+            world
+                .special_charge_with(unit, Some(object_id(6)), master)
+                .unwrap(),
+            world.special_charge_with(unit, None, master).unwrap(),
+        )
+    };
+    assert_eq!(
+        answers(&charge_world(7.5, 10.0)),
+        (
+            SpecialCharge::Ready,
+            SpecialCharge::Ready,
+            SpecialCharge::Unready
+        )
+    );
+    assert_eq!(
+        answers(&charge_world(7.5, 9.9)),
+        (
+            SpecialCharge::Unready,
+            SpecialCharge::Unready,
+            SpecialCharge::Unready
+        )
+    );
 }
 
 /// A master below type 70 reads RGE's slot: its own speed, whatever its combat layer holds;

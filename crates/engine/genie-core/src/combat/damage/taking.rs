@@ -527,7 +527,7 @@ pub(super) fn retaliates(
         src,
         damage_tuning,
     );
-    if src.kind == MasterKind::COMBAT && special_charge_ready(&src.source)? {
+    if src.kind == MasterKind::COMBAT && special_charge_ready(&src.source) {
         elevation_factor *= damage_tuning.retaliation_scale;
     }
     let class_amounts = victim.weapons.clone();

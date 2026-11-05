@@ -8,6 +8,7 @@ use crate::combat::damage::ArmorBonuses;
 use crate::combat::damage::Shown;
 use crate::combat::damage::shown_attack;
 use crate::combat::victims::victim_of;
+use crate::combat::victims::{VictimLayers, VictimView};
 use crate::map::Distance;
 use crate::math::conversions::cvttss2si;
 use crate::math::image::powerup::SPEED_SHARE_BASE;
@@ -530,19 +531,16 @@ impl World {
         let terrain = self.spatial.terrain.as_ref();
         let owner = self.players.player(player)?;
         let victim = victim_of(
-            (
+            VictimView {
                 unit,
-                self.parts.unit_ai.contains(unit.id),
-                self.parts.building_of(unit.id),
-                self.parts.combat_of(unit.id),
-                self.parts.actions_of(unit.id),
-                self.parts.unread.get(unit.id),
-            ),
-            master,
-            &owner.attributes,
-            player,
-            terrain,
-            self.mode_680,
+                layers: VictimLayers::of(&self.parts, unit.id, self.parts.actions_of(unit.id)),
+                master,
+                special_charge: self.special_charge(unit, master)?,
+                player,
+                attributes: &owner.attributes,
+                terrain,
+                mode_680: self.mode_680,
+            },
             roles,
         );
         let actions = self.parts.actions_of(unit.id);
@@ -553,19 +551,20 @@ impl World {
             Some((target_player, target)) => {
                 let target_master = target.master(self.master_tables(), target_player)?;
                 Some(victim_of(
-                    (
-                        target,
-                        self.parts.unit_ai.contains(target.id),
-                        self.parts.building_of(target.id),
-                        self.parts.combat_of(target.id),
-                        self.parts.actions_of(target.id),
-                        self.parts.unread.get(target.id),
-                    ),
-                    target_master,
-                    &self.players.player(target_player)?.attributes,
-                    target_player,
-                    terrain,
-                    self.mode_680,
+                    VictimView {
+                        unit: target,
+                        layers: VictimLayers::of(
+                            &self.parts,
+                            target.id,
+                            self.parts.actions_of(target.id),
+                        ),
+                        master: target_master,
+                        special_charge: self.special_charge(target, target_master)?,
+                        player: target_player,
+                        attributes: &self.players.player(target_player)?.attributes,
+                        terrain,
+                        mode_680: self.mode_680,
+                    },
                     roles,
                 ))
             }

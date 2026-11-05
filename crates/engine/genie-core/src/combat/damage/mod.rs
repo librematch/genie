@@ -33,8 +33,8 @@ pub use self::blasts::blast;
 use self::blasts::blast_tiles;
 use self::blasts::damage;
 pub use self::hit_factors::{
-    building_elevation_factor, charge_hit, charge_works, charged, elevation_factor, facing_offset,
-    range_charge_hit,
+    SpecialCharge, building_elevation_factor, charge_hit, charge_works, charged, elevation_factor,
+    facing_offset, range_charge_hit,
 };
 use self::hit_factors::{charge_damage, special_charge_ready};
 pub use self::hit_points::{
@@ -401,6 +401,9 @@ pub struct Attacker {
     pub(crate) special_attack: SpecialAttack,
     /// Its charge (`+0x9e0`).
     pub(crate) charge: Charge,
+    /// `FUN_1412161b0`'s answer as the read found it: its charge of special attack 3 is ready
+    /// on its unit AI's or its group's target ([`crate::movement::SpeedReads::special_charge`]).
+    pub(crate) special_charge: SpecialCharge,
     /// `mHitSomethingValidForChargeAttack` (`+0x8a8`), which its hits set.
     pub(crate) charge_hit: bool,
     /// Its attack powerup (`+0xa24`) and the game's setting `+0x680`

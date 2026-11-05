@@ -22,14 +22,34 @@ use crate::world::lets::{release as lets_release, take as lets_take, torn_down a
 use crate::world::objects_ref::ObjectsRef;
 use crate::world::slots::PlayerSlotsExt;
 
+/// A helper that `AskForHelp` tests ([`UnitView::helper_free`]): one of player `owner`'s units
+/// with its action layer and its master.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct Helper<'world> {
+    /// The helper's player.
+    pub(crate) owner: PlayerId,
+    /// The helper.
+    pub(crate) unit: &'world Unit,
+    /// Its action layer.
+    pub(crate) actions: &'world Action,
+    /// Its master.
+    pub(crate) master: &'world Master,
+}
+
 impl UnitView<'_, '_> {
     /// The world as `bestUnitToAttack` and the attack tests read it for the unit
-    /// ([`WorldPicker`]), with `seeker` and without a terrain restriction.
-    pub(super) fn picker(&self, seeker: Option<Seeker>) -> GenieResult<WorldPicker<'_>> {
+    /// ([`WorldPicker`]), with `seeker`, its running unit AI's target `ai_target` and without a
+    /// terrain restriction.
+    pub(super) fn picker(
+        &self,
+        seeker: Option<Seeker>,
+        ai_target: Option<ObjectId>,
+    ) -> GenieResult<WorldPicker<'_>> {
         Ok(WorldPicker {
             attacker: &self.attacker,
             seeker,
             me: self.unit.id,
+            ai_target,
             player: self.player,
             others: owner_view(
                 &self.step.world.players,
@@ -83,7 +103,7 @@ impl UnitView<'_, '_> {
         seeker: &Seeker,
         roles: &Roles,
     ) -> GenieResult<Option<(ClassId, Position)>> {
-        let picker = self.picker(Some(*seeker))?;
+        let picker = self.picker(Some(*seeker), seeker.target)?;
         let (target, _) = picker.target(&self.step.world.spatial, target)?;
         Ok(can_attack(
             &self.attacker,
@@ -116,16 +136,20 @@ impl UnitView<'_, '_> {
     /// footprints' squared gap between the least and the weapon range squared) keeps it, but a
     /// building whose master has no attack for a patrolling group's member; then its unit AI's
     /// attack check (slot 0xa0 with 0, [`crate::unit_ai::can_attack`]) on the attacker. True for a
-    /// helper that answers.
+    /// helper that answers. The asking unit's unit AI runs with the target `ai_target`.
     pub(crate) fn helper_free(
         &self,
-        owner: PlayerId,
-        helper: &Unit,
-        actions: &Action,
-        master: &Master,
+        helper: Helper<'_>,
         attacker: ObjectId,
+        ai_target: Option<ObjectId>,
         roles: &Roles,
     ) -> GenieResult<bool> {
+        let Helper {
+            owner,
+            unit: helper,
+            actions,
+            master,
+        } = helper;
         let others = owner_view(
             &self.step.world.players,
             &self.step.world.index,
@@ -205,7 +229,7 @@ impl UnitView<'_, '_> {
             ),
             None => None,
         };
-        let picker = self.picker(None)?;
+        let picker = self.picker(None, ai_target)?;
         let (target, _) = picker.target(&self.step.world.spatial, attacker)?;
         can_attack(
             &me,

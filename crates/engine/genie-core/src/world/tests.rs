@@ -266,6 +266,7 @@ use crate::unit_ai::task_finder::world::{
     SideWorld, TaskWorld, task_search, task_target_with, wait_progress,
 };
 use crate::unit_ai::task_finder::{Actor, Diplomacy};
+use crate::unit_ai::world_view::Helper;
 use crate::unit_ai::world_view::UnitView;
 use crate::unit_ai::world_view::{DropWorld, Foreign, Wait, patrol_information};
 use crate::unit_ai::{
@@ -18617,15 +18618,14 @@ fn helper_free_of(owner: PlayerId, helper: Object, groups: &UnitGroups) -> bool 
         .own_iter()
         .next()
         .unwrap();
-        side.helper_free(
+        let helper = Helper {
             owner,
-            helper,
-            side.step.world.parts.actions_of(helper.id),
-            &scout,
-            object_id(50),
-            &roles(),
-        )
-        .unwrap()
+            unit: helper,
+            actions: side.step.world.parts.actions_of(helper.id),
+            master: &scout,
+        };
+        side.helper_free(helper, object_id(50), None, &roles())
+            .unwrap()
     })
 }
 
@@ -25241,7 +25241,7 @@ fn call_for_help_walks_the_lists_for_free_helper_in_reach() {
     let groups = UnitGroups::default();
     let call = |helper: Object, searched| {
         help_view(helper, searched, &groups, |side| {
-            side.call_for_help(object_id(50))
+            side.call_for_help(object_id(50), None)
         })
     };
     assert_eq!(

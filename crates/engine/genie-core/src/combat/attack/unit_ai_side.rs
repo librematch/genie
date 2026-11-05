@@ -7,6 +7,7 @@ use crate::combat::attack::{
 };
 use crate::combat::attack::{AttackReads, Fight};
 use crate::combat::damage::Victim;
+use crate::combat::victims::{VictimLayers, VictimView};
 use crate::combat::victims::{victim_in, victim_of};
 use crate::combat::{AttackCount, AttackTargetId};
 use crate::map::Tile;
@@ -414,18 +415,23 @@ impl UnitView<'_, '_> {
             drop_sites: &self.step.world.model.drop_sites,
         };
         Ok(Some(victim_in(
-            (
+            VictimView {
                 unit,
-                self.step.world.parts.unit_ai.contains(unit.id),
-                self.step.world.parts.building_of(unit.id),
-                self.step.world.parts.combat_of(unit.id),
-                self.step.world.parts.actions.of(unit.id),
-                self.step.world.parts.unread.get(unit.id),
-            ),
-            (player_id, master, attributes),
-            (self.player, &dip),
+                layers: VictimLayers::of(
+                    &self.step.world.parts,
+                    unit.id,
+                    self.step.world.parts.actions.of(unit.id),
+                ),
+                master,
+                special_charge: self.step.world.special_charge(unit, master)?,
+                player: player_id,
+                attributes,
+                terrain: self.step.world.spatial.terrain.as_ref(),
+                mode_680: self.step.world.mode_680,
+            },
+            self.player,
+            &dip,
             &self.step.world.spatial,
-            self.step.world.mode_680,
             roles,
         )))
     }
@@ -447,19 +453,20 @@ impl UnitView<'_, '_> {
         };
         let unit = &*self.unit;
         let own = victim_of(
-            (
+            VictimView {
                 unit,
-                self.step.world.parts.unit_ai.contains(unit.id),
-                self.step.world.parts.building_of(unit.id),
-                self.step.world.parts.combat_of(unit.id),
-                &*self.actions,
-                self.step.world.parts.unread.get(unit.id),
-            ),
-            master,
-            &self.step.world.players.player(self.player)?.attributes,
-            self.player,
-            self.step.world.spatial.terrain.as_ref(),
-            self.step.world.mode_680,
+                layers: VictimLayers::of(&self.step.world.parts, unit.id, &*self.actions),
+                master,
+                special_charge: self.step.world.special_charge_with(
+                    unit,
+                    ai.current_target,
+                    master,
+                )?,
+                player: self.player,
+                attributes: &self.step.world.players.player(self.player)?.attributes,
+                terrain: self.step.world.spatial.terrain.as_ref(),
+                mode_680: self.step.world.mode_680,
+            },
             roles,
         );
         let reads = AttackReads::of(

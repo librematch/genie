@@ -66,6 +66,7 @@ pub(crate) fn with_picker<R>(
         attacker: &attacker,
         seeker: Some(ai.seeker_with(None)),
         me,
+        ai_target: ai.current_target,
         player,
         others,
         foreign: others.players(),

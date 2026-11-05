@@ -789,6 +789,35 @@ fn ready_charge_adds_to_the_first_melee_weapon_and_empties() {
     );
 }
 
+/// `FUN_141202580`: a master of special attack 3 adds its ready charge only while
+/// `FUN_1412161b0` holds for it ([`SpecialCharge::Ready`]); unready, the hit adds none. A master
+/// of another special attack adds it either way.
+#[test]
+fn special_charge_adds_only_while_ready() {
+    let (sheep, mut hunter) = (sheep(), hunter());
+    hunter.source.charge_kind = ChargeKind::ATTACK;
+    hunter.source.charge_target = ChargeTarget::EVERY;
+    hunter.source.max_charge = Charge::new(5.0);
+    hunter.source.charge = Charge::new(5.0);
+    hunter.source.special_attack = SpecialAttack::CHARGE;
+    let damage = |source: &Attacker| {
+        armor_damage(
+            &sheep,
+            &[ClassAmount::new(4, 3)],
+            1.0,
+            source,
+            0.0,
+            &roles(),
+        )
+    };
+    assert_eq!(damage(&hunter.source), Ok(HitPoints::new(3.0)));
+    hunter.source.special_charge = SpecialCharge::Ready;
+    assert_eq!(damage(&hunter.source), Ok(HitPoints::new(5.0 + 3.0)));
+    hunter.source.special_attack = SpecialAttack::RETALIATION;
+    hunter.source.special_charge = SpecialCharge::Unready;
+    assert_eq!(damage(&hunter.source), Ok(HitPoints::new(5.0 + 3.0)));
+}
+
 #[test]
 fn charge_target_picks_the_class_groups() {
     // 0: everything but buildings outside classes 51 and 54
@@ -1026,6 +1055,54 @@ fn retaliation_strikes_the_melee_attacker_first() {
         (HitPoints::ZERO, HitPoints::new(10.0))
     );
     assert!(hunter.killed.is_some());
+}
+
+/// The retaliation strikes a combat attacker whose charge of special attack 3 is ready
+/// (`FUN_1412161b0` in `take_unit`) with its factor times `DamageTuning::retaliation_scale`
+/// (4); an unready one, or one of another type, takes the plain strike.
+#[test]
+fn retaliation_strikes_ready_charger_four_times_over() {
+    let strike = |kind: MasterKind, special_charge: SpecialCharge| {
+        let (mut sheep, mut hunter) = (sheep(), hunter());
+        sheep.weapons = vec![ClassAmount::new(4, 5)];
+        let x = sheep.armored.as_mut().unwrap();
+        x.special_attack = SpecialAttack::RETALIATION;
+        x.unit_ai = true;
+        x.alert_idle = Some(true);
+        x.facing = Some(Facing {
+            angle: Angle::new(FRAC_PI_2),
+            facets: FacetCount::of_data(8),
+        });
+        hunter.kind = kind;
+        hunter.source.special_charge = special_charge;
+        take(
+            &mut sheep,
+            &mut hunter,
+            &mut [],
+            &[ClassAmount::new(4, 3)],
+            1.0,
+            HitPoints::ZERO,
+            HitLayer {
+                roles: &roles(),
+                slots: slots(),
+                damage_tuning: &tuning().damage,
+            },
+        )
+        .unwrap();
+        hunter.hp
+    };
+    assert_eq!(
+        strike(MasterKind::COMBAT, SpecialCharge::Ready),
+        HitPoints::new(25.0 - 5.0 * 4.0)
+    );
+    assert_eq!(
+        strike(MasterKind::COMBAT, SpecialCharge::Unready),
+        HitPoints::new(20.0)
+    );
+    assert_eq!(
+        strike(MasterKind::BUILDING, SpecialCharge::Ready),
+        HitPoints::new(20.0)
+    );
 }
 
 /// A target that reflects gives its attacker that share of its loss, at least 1.

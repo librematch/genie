@@ -285,7 +285,7 @@ impl UnitAi {
         {
             return Ok(GO_ON);
         }
-        let target_duel = side.duel(target.id)?;
+        let target_duel = side.duel(target.id, self.current_target)?;
         // "my current target cannot damage me": UCOMISS, JP, JNZ (exactly 0)
         if (target_duel.attacks == 0.0 || target_duel.harms == HitPoints::ZERO)
             && !target_duel.converts
@@ -307,7 +307,7 @@ impl UnitAi {
         } else {
             unit_ai_tuning.never_killed
         };
-        let duel = side.duel(attacker_id)?;
+        let duel = side.duel(attacker_id, self.current_target)?;
         let attacker_time = if HitPoints::ZERO < duel.harmed {
             duel.hp / duel.harmed
         } else {

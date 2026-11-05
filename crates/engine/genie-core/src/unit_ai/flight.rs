@@ -344,7 +344,7 @@ impl UnitAi {
             ai_target: self.current_target,
         })?;
         self.attack_search_alert(found, player_kind, unit_ai_tuning)?;
-        side.call_for_help(attacker)
+        side.call_for_help(attacker, self.current_target)
     }
 
     /// What a search of the unit AI covers (`FUN_140c63e20`): the classes its constructor gave

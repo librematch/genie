@@ -102,7 +102,7 @@ impl UnitAi {
         if self.villager_ignores(at, &attacker, fierce)? {
             return Ok(GO_ON);
         }
-        if attacker.owner != PlayerId::GAIA && !side.harmless(caller)? {
+        if attacker.owner != PlayerId::GAIA && !side.harmless(caller, self.current_target)? {
             // "I have %d attackers, evading them.", but on the move action at a speed (not 0,
             // UCOMISS: a NaN keeps moving): the current order goes to the queue's end (slot 0x30
             // neither immediate nor in front), the action stops (slot 0xb0 with 1) and it runs

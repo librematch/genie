@@ -14,7 +14,6 @@ use crate::objects::masters::SpecialAttack;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
 use crate::world::layer::generated::DamageTuning;
-use crate::{GenieError, GenieResult};
 
 /// Slot 0x1f0 of a combat object (`FUN_14120d780`) at height `z` whose player has `own` as
 /// attributes 211 and 212: a hit from higher up gains 25% and attributes 211 and the target's
@@ -192,27 +191,39 @@ pub fn charge_hit(attacker: &Attacker, victim: &Victim, roles: &Roles) -> bool {
         && charged(attacker)
 }
 
-/// `FUN_1412161b0`: a master of special attack 3 whose charge is ready on its unit AI's (or
-/// group's) target in reach; false for other masters. Special attack 3 is not modelled.
-pub(super) const fn special_charge_ready(attacker: &Attacker) -> GenieResult<bool> {
-    if attacker.special_attack.get() == SpecialAttack::CHARGE.get() {
-        return Err(SPECIAL_CHARGE_GAP);
-    }
-    Ok(false)
+/// `FUN_1412161b0`'s answer for an attacker, as its read found it
+/// ([`crate::movement::SpeedReads::special_charge`]): a master of special attack 3 whose charge
+/// is ready on a target its charge works on.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub enum SpecialCharge {
+    /// Not ready, or a master of another special attack.
+    #[default]
+    Unready,
+    /// Ready.
+    Ready,
 }
 
-/// The gap of [`special_charge_ready`]: the damage's attacker read lacks its unit AI's and its
-/// group's targets (slot 0x208 reads the routine whole, [`crate::movement::SpeedReads`]).
-pub(crate) const SPECIAL_CHARGE_GAP: GenieError =
-    GenieError::unsupported("a charge of special attack 3 (FUN_1412161b0)");
-
-/// `FUN_141202580`: the damage a ready charge adds, the charge itself; a master of special
-/// attack 3 adds it only while [`special_charge_ready`] holds.
-pub(super) fn charge_damage(attacker: &Attacker) -> GenieResult<f32> {
-    if attacker.special_attack == SpecialAttack::CHARGE && !special_charge_ready(attacker)? {
-        return Ok(0.0);
+impl SpecialCharge {
+    /// The answer of `ready`.
+    #[must_use]
+    pub const fn of(ready: bool) -> Self {
+        if ready { Self::Ready } else { Self::Unready }
     }
-    Ok(attacker.charge.get())
+}
+
+/// `FUN_1412161b0` of the attacker: its charge of special attack 3 is ready
+/// ([`Attacker::special_charge`]).
+pub(super) const fn special_charge_ready(attacker: &Attacker) -> bool {
+    matches!(attacker.special_charge, SpecialCharge::Ready)
+}
+
+/// `FUN_141202580`: the damage a ready charge adds, the charge itself (`+0x9e0`); a master of
+/// special attack 3 (`+0x8d8`) adds it only while [`special_charge_ready`] holds, else 0.
+pub(super) fn charge_damage(attacker: &Attacker) -> f32 {
+    if attacker.special_attack == SpecialAttack::CHARGE && !special_charge_ready(attacker) {
+        return 0.0;
+    }
+    attacker.charge.get()
 }
 
 /// Slot 0x2f8 of a combat unit or building (`FUN_14120f510`): a charge of type 6 or 7 (slot

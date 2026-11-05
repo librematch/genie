@@ -6,6 +6,7 @@ use crate::combat::attack::Armament;
 use crate::combat::attack::{Attack, AttackState};
 use crate::combat::attack::{AttackReads, Fight};
 use crate::combat::damage::Victim;
+use crate::combat::victims::{VictimLayers, VictimView};
 use crate::combat::victims::{file_kill, victim, victim_of};
 use crate::combat::volley::armed;
 use crate::math::rng::Stream;
@@ -239,19 +240,16 @@ impl Unit {
         let master = self.master(step.world.master_tables(), step.player)?;
         let terrain = step.world.spatial.terrain.as_ref();
         Ok(Some(victim_of(
-            (
-                self,
-                step.world.parts.unit_ai.contains(self.id),
-                step.world.parts.building_of(self.id),
-                step.world.parts.combat_of(self.id),
-                actions,
-                step.world.parts.unread.get(self.id),
-            ),
-            master,
-            &step.world.players.player(step.player)?.attributes,
-            step.player,
-            terrain,
-            step.world.mode_680,
+            VictimView {
+                unit: self,
+                layers: VictimLayers::of(&step.world.parts, self.id, actions),
+                master,
+                special_charge: step.world.special_charge(self, master)?,
+                player: step.player,
+                attributes: &step.world.players.player(step.player)?.attributes,
+                terrain,
+                mode_680: step.world.mode_680,
+            },
             roles,
         )))
     }

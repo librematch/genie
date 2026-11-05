@@ -6,6 +6,7 @@
 use crate::GenieResult;
 use crate::combat::Charge;
 use crate::combat::LockdownCount;
+use crate::combat::damage::SpecialCharge;
 use crate::combat::damage::charge_works;
 use crate::groups::GroupCommandKind;
 use crate::groups::UnitGroups;
@@ -409,6 +410,22 @@ impl<'world> SpeedReads<'world> {
             && target.state() == ObjectState::Alive)
     }
 
+    /// [`SpeedReads::special_charge_ready`]'s answer, which a hit's read of its attacker holds
+    /// ([`crate::combat::damage::Attacker`]).
+    ///
+    /// # Errors
+    ///
+    /// As [`SpeedReads::special_charge_ready`].
+    pub(crate) fn special_charge(
+        self,
+        unit: &Unit,
+        ai_target: Option<ObjectId>,
+        master: &Master,
+    ) -> GenieResult<SpecialCharge> {
+        self.special_charge_ready(unit, ai_target, master)
+            .map(SpecialCharge::of)
+    }
+
     /// `FUN_1412161b0`'s target of `unit`: its unit AI's target `ai_target` when the world
     /// holds it, else its group's target while the group's command is an attack (9).
     fn charge_target(
@@ -500,6 +517,36 @@ impl World {
         ai_target: Option<ObjectId>,
     ) -> GenieResult<TopSpeed> {
         self.speed_reads().terms(player, unit, ai_target)
+    }
+
+    /// [`SpeedReads::special_charge`] over the world, the unit AI's target `ai_target` given (its
+    /// unit AI lent out).
+    ///
+    /// # Errors
+    ///
+    /// As [`SpeedReads::special_charge_ready`].
+    pub(crate) fn special_charge_with(
+        &self,
+        unit: &Unit,
+        ai_target: Option<ObjectId>,
+        master: &Master,
+    ) -> GenieResult<SpecialCharge> {
+        self.speed_reads().special_charge(unit, ai_target, master)
+    }
+
+    /// [`SpeedReads::special_charge`] over the world with the target of the unit AI it holds for
+    /// `unit`.
+    ///
+    /// # Errors
+    ///
+    /// As [`SpeedReads::special_charge_ready`].
+    pub(crate) fn special_charge(
+        &self,
+        unit: &Unit,
+        master: &Master,
+    ) -> GenieResult<SpecialCharge> {
+        let reads = self.speed_reads();
+        reads.special_charge(unit, reads.ai_target(unit.id), master)
     }
 
     /// [`SpeedReads::terms`] over the world with the target of the unit AI it holds for `unit`.

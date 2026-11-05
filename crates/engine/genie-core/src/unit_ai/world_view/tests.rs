@@ -1,4 +1,5 @@
 use super::*;
+use crate::combat::Charge;
 use crate::combat::Firepower;
 use crate::map::Distance;
 use crate::map::Footprint;
@@ -14,12 +15,15 @@ use crate::objects::lifecycle::Lifecycle;
 use crate::objects::masters::AttackPriority;
 use crate::objects::masters::BlastLevel;
 use crate::objects::masters::ChargeKind;
+use crate::objects::masters::ChargeTarget;
 use crate::objects::masters::ClassAmount;
 use crate::objects::masters::CombatPart;
+use crate::objects::masters::CreatablePart;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::Masters;
 use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::RestrictionField;
+use crate::objects::masters::SpecialAttack;
 use crate::objects::masters::{Master, MasterTables};
 use crate::objects::object_list::ObjectList;
 use crate::ownership::CaptureKind;
@@ -30,7 +34,9 @@ use crate::test_ids::master_id;
 use crate::test_ids::object_id;
 use crate::testing::class;
 use crate::testing::ids;
+use crate::testing::picker::with_picker;
 use crate::testing::roles;
+use crate::testing::scene::{Scene, SceneObject};
 use crate::testing::tuning;
 use crate::unit_ai::Attackers;
 use crate::unit_ai::NearestAttacker;
@@ -143,6 +149,7 @@ fn harmless(master: Master) -> bool {
         attacker: &attacker,
         seeker: None,
         me: object_id(123),
+        ai_target: None,
         player: PlayerId::new(1),
         others: OthersRef::new(PlayerId::new(1), &none, foreign, ObjectIndex::scanning()),
         foreign,
@@ -255,6 +262,7 @@ fn ward_nearest_attacker_is_its_closest_held_one() {
         attacker: &attacker,
         seeker: None,
         me: object_id(123),
+        ai_target: None,
         player: PlayerId::new(1),
         others: OthersRef::new(PlayerId::new(1), &others, foreign, ObjectIndex::scanning()),
         foreign,
@@ -359,6 +367,66 @@ fn villager_fights_back_weak_attacker_of_its_own_master() {
         .weapon_range = Distance::new(f32::NAN)));
 }
 
+/// The picker's damage of its own unit reads `FUN_1412161b0` with the target of its unit AI,
+/// which is out of the table while it runs ([`WorldPicker::ai_target`]): a charger of special
+/// attack 3 with a full charge adds the charge to its first melee weapon only with a target.
+#[test]
+fn picker_damage_reads_its_unit_ai_target_for_the_charge() {
+    let charger = Master {
+        id: master_id(1755),
+        kind: MasterKind::COMBAT,
+        class: class::VILLAGER,
+        hit_points: MasterHitPoints::of_data(100),
+        radius: Footprint::new(0.5, 0.5),
+        combat: Some(CombatPart {
+            weapons: vec![ClassAmount::new(4, 3)],
+            armors: vec![ClassAmount::new(4, 0)],
+            terrain_bonus: RestrictionField::NONE,
+            ..CombatPart::default()
+        }),
+        creatable: Some(CreatablePart {
+            special_attack: SpecialAttack::CHARGE,
+            charge_kind: ChargeKind::ATTACK,
+            max_charge: Charge::new(10.0),
+            charge_target: ChargeTarget::EVERY,
+            ..CreatablePart::default()
+        }),
+        ..Master::default()
+    };
+    let mut me = SceneObject::new(
+        5,
+        PlayerId::new(1),
+        charger.clone(),
+        Position::new(8.0, 4.0, 0.0),
+    );
+    me.ai = Some(UnitAi {
+        current_target: Some(object_id(6)),
+        ..UnitAi::default()
+    });
+    let target = SceneObject::new(6, PlayerId::new(1), charger, Position::new(10.0, 4.0, 0.0));
+    let mut world = Scene::open(GridSize::new(16, 16))
+        .object(me)
+        .object(target)
+        .build();
+    world.parts.combat_mut(object_id(5)).unwrap().charge = Charge::new(10.0);
+    let roles = world.model.roles.clone();
+    let damage_tuning = world.model.tuning.damage;
+    let mut damage = |ai_target: Option<ObjectId>| {
+        with_picker(
+            &mut world,
+            (PlayerId::new(1), object_id(5)),
+            |picker, spatial| {
+                picker.ai_target = ai_target;
+                picker
+                    .damage(spatial, object_id(5), object_id(6), &roles, &damage_tuning)
+                    .unwrap()
+            },
+        )
+    };
+    assert_eq!(damage(Some(object_id(6))), HitPoints::new(10.0 + 3.0));
+    assert_eq!(damage(None), HitPoints::new(3.0));
+}
+
 /// What the statistics read of a candidate (`FUN_140c44680`'s reads): soldier 123 (master 4,
 /// attack 6 of class 4, reload 2) of player 1 reads player 2's unit 50 (master 5, class 6,
 /// attack 3, 40 hit points, no armor, standing): armed by its attacks, the soldier's range,
@@ -450,6 +518,7 @@ fn candidate_statistics_are_its_class_hit_points_and_the_damage_to_it() {
         attacker: &attacker,
         seeker: None,
         me: object_id(123),
+        ai_target: None,
         player: PlayerId::new(1),
         others: OthersRef::new(PlayerId::new(1), &none, foreign, ObjectIndex::scanning()),
         foreign,

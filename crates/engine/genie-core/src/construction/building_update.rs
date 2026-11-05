@@ -5,6 +5,7 @@ use crate::combat::damage::HitLayer;
 use crate::combat::damage::Victim;
 use crate::combat::damage::blast;
 use crate::combat::victims::file_kill;
+use crate::combat::victims::{VictimLayers, VictimView};
 use crate::combat::victims::{victim_of, write_back};
 use crate::construction::Annexes;
 use crate::construction::gates::gate_units;
@@ -533,19 +534,16 @@ impl Unit {
         }
         let terrain = step.world.spatial.terrain.as_ref();
         let mut own = victim_of(
-            (
-                self,
-                step.world.parts.unit_ai.contains(self.id),
-                step.world.parts.building_of(self.id),
-                step.world.parts.combat_of(self.id),
-                actions,
-                step.world.parts.unread.get(self.id),
-            ),
-            master,
-            &step.world.players.player(step.player)?.attributes,
-            step.player,
-            terrain,
-            step.world.mode_680,
+            VictimView {
+                unit: self,
+                layers: VictimLayers::of(&step.world.parts, self.id, actions),
+                master,
+                special_charge: step.world.special_charge(self, master)?,
+                player: step.player,
+                attributes: &step.world.players.player(step.player)?.attributes,
+                terrain,
+                mode_680: step.world.mode_680,
+            },
             roles,
         );
         let mut targets: Vec<&mut Victim> = step.blasted.iter_mut().collect();

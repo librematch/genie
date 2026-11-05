@@ -215,17 +215,18 @@ impl UnitView<'_, '_> {
             .map(|master| master.class)
     }
 
-    /// What a computer player's unit weighs of object `other` (its current target or its
-    /// attacker) on a damage notify ([`Duel`], [`UnitAi::damaged`]).
+    /// What a computer player's unit (its running unit AI's target `ai_target`) weighs of object
+    /// `other` (its current target or its attacker) on a damage notify ([`Duel`],
+    /// [`UnitAi::damaged`]).
     ///
     /// # Errors
     ///
     /// An object the world does not hold.
     ///
     /// [`UnitAi::damaged`]: crate::unit_ai::UnitAi::damaged
-    pub(crate) fn duel(&self, other: ObjectId) -> GenieResult<Duel> {
+    pub(crate) fn duel(&self, other: ObjectId, ai_target: Option<ObjectId>) -> GenieResult<Duel> {
         let roles = &self.step.world.model.roles.clone();
-        self.picker(None)?.duel(
+        self.picker(None, ai_target)?.duel(
             &self.step.world.spatial,
             other,
             roles,
@@ -234,18 +235,22 @@ impl UnitView<'_, '_> {
         )
     }
 
-    /// The villager's test of its attacker on a damage notify: the attacker shows too little
-    /// attack, armor and range to run from, and is fought back as Gaia's are
-    /// ([`UnitAi::villager_damaged`]).
+    /// The villager's test of its attacker on a damage notify (its running unit AI's target
+    /// `ai_target`): the attacker shows too little attack, armor and range to run from, and is
+    /// fought back as Gaia's are ([`UnitAi::villager_damaged`]).
     ///
     /// # Errors
     ///
     /// An object the world does not hold.
     ///
     /// [`UnitAi::villager_damaged`]: crate::unit_ai::UnitAi::villager_damaged
-    pub(crate) fn harmless(&self, attacker: ObjectId) -> GenieResult<bool> {
+    pub(crate) fn harmless(
+        &self,
+        attacker: ObjectId,
+        ai_target: Option<ObjectId>,
+    ) -> GenieResult<bool> {
         let roles = &self.step.world.model.roles.clone();
-        self.picker(None)?.harmless(
+        self.picker(None, ai_target)?.harmless(
             &self.step.world.spatial,
             attacker,
             roles,
@@ -255,15 +260,20 @@ impl UnitView<'_, '_> {
 
     /// The attacker of object `target` nearest to it (its unit AI's slot 0x78, `FUN_140c48610`:
     /// of its attackers in their order, those the world holds, the least footprint gap,
-    /// `FUN_14118f680`, the first of a tie; [`NearestAttacker`], [`UnitAi::defend_misc`]).
+    /// `FUN_14118f680`, the first of a tie; [`NearestAttacker`], [`UnitAi::defend_misc`]), as the
+    /// unit's running unit AI (its target `ai_target`) asks it.
     ///
     /// # Errors
     ///
     /// An object the world does not hold.
     ///
     /// [`UnitAi::defend_misc`]: crate::unit_ai::UnitAi::defend_misc
-    pub(crate) fn defended_attacker(&self, target: ObjectId) -> GenieResult<NearestAttacker> {
-        self.picker(None)?.nearest_attacker_of(target)
+    pub(crate) fn defended_attacker(
+        &self,
+        target: ObjectId,
+        ai_target: Option<ObjectId>,
+    ) -> GenieResult<NearestAttacker> {
+        self.picker(None, ai_target)?.nearest_attacker_of(target)
     }
 
     /// The unit's slot 0x278 (`FUN_141158720`, [`Spatial::point_clear`]): the unit, of its radius

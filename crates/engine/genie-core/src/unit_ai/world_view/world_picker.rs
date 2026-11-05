@@ -2,10 +2,11 @@
 
 use crate::combat::attack::ATTACK;
 use crate::combat::damage::{
-    Shown, armor_damage, bonus_damage, building_elevation_factor, elevation_factor, shown_attack,
-    shown_melee_armor, shown_range,
+    Shown, SpecialCharge, armor_damage, bonus_damage, building_elevation_factor, elevation_factor,
+    shown_attack, shown_melee_armor, shown_range,
 };
 use crate::combat::victims::victim_of;
+use crate::combat::victims::{VictimLayers, VictimView};
 use crate::map::Distance;
 use crate::map::RestrictionId;
 use crate::map::spatial::Spatial;
@@ -70,6 +71,9 @@ pub(crate) struct WorldPicker<'world> {
     pub(crate) seeker: Option<Seeker>,
     /// The unit.
     pub(crate) me: ObjectId,
+    /// Its unit AI's target (`+0x48`; none without a unit AI): the unit AI is out of the table
+    /// while it runs.
+    pub(crate) ai_target: Option<ObjectId>,
     /// Its owner.
     pub(crate) player: PlayerId,
     /// The owner's other objects.
@@ -115,6 +119,21 @@ impl WorldPicker<'_> {
         } else {
             self.parts.actions.of(id)
         }
+    }
+
+    /// `FUN_1412161b0` of object `unit` of master `master` ([`SpeedReads::special_charge`]): the
+    /// unit's own with [`WorldPicker::ai_target`], another's with its unit AI's in the world.
+    ///
+    /// # Errors
+    ///
+    /// As [`SpeedReads::special_charge`].
+    fn special_charge(&self, unit: &Unit, master: &Master) -> GenieResult<SpecialCharge> {
+        let ai_target = if unit.id == self.me {
+            self.ai_target
+        } else {
+            self.speeds.ai_target(unit.id)
+        };
+        self.speeds.special_charge(unit, ai_target, master)
     }
 
     /// The object `id` (another player's, the owner's others or the unit itself) with its owner,
@@ -198,35 +217,33 @@ impl WorldPicker<'_> {
         let (tq, target_unit, ta, tm) = self.held(to)?.ok_or(NOT_HELD)?;
         let terrain = spatial.terrain.as_ref();
         let target = victim_of(
-            (
-                target_unit,
-                self.parts.unit_ai.contains(target_unit.id),
-                self.parts.building_of(target_unit.id),
-                self.parts.combat_of(target_unit.id),
-                self.actions_of(target_unit.id),
-                self.parts.unread.get(target_unit.id),
-            ),
-            tm,
-            ta,
-            tq,
-            terrain,
-            self.mode_680,
+            VictimView {
+                unit: target_unit,
+                layers: VictimLayers::of(
+                    self.parts,
+                    target_unit.id,
+                    self.actions_of(target_unit.id),
+                ),
+                master: tm,
+                special_charge: self.special_charge(target_unit, tm)?,
+                player: tq,
+                attributes: ta,
+                terrain,
+                mode_680: self.mode_680,
+            },
             roles,
         );
         let unit = victim_of(
-            (
-                from_unit,
-                self.parts.unit_ai.contains(from_unit.id),
-                self.parts.building_of(from_unit.id),
-                self.parts.combat_of(from_unit.id),
-                self.actions_of(from_unit.id),
-                self.parts.unread.get(from_unit.id),
-            ),
-            fm,
-            fa,
-            fq,
-            terrain,
-            self.mode_680,
+            VictimView {
+                unit: from_unit,
+                layers: VictimLayers::of(self.parts, from_unit.id, self.actions_of(from_unit.id)),
+                master: fm,
+                special_charge: self.special_charge(from_unit, fm)?,
+                player: fq,
+                attributes: fa,
+                terrain,
+                mode_680: self.mode_680,
+            },
             roles,
         );
         let mut factor = elevation_factor(
@@ -288,43 +305,38 @@ impl WorldPicker<'_> {
         }
         let terrain = spatial.terrain.as_ref();
         let victim = victim_of(
-            (
-                other_unit,
-                self.parts.unit_ai.contains(other_unit.id),
-                self.parts.building_of(other_unit.id),
-                self.parts.combat_of(other_unit.id),
-                self.actions_of(other_unit.id),
-                self.parts.unread.get(other_unit.id),
-            ),
-            om,
-            attributes,
-            player_id,
-            terrain,
-            self.mode_680,
+            VictimView {
+                unit: other_unit,
+                layers: VictimLayers::of(self.parts, other_unit.id, self.actions_of(other_unit.id)),
+                master: om,
+                special_charge: self.special_charge(other_unit, om)?,
+                player: player_id,
+                attributes,
+                terrain,
+                mode_680: self.mode_680,
+            },
             roles,
         );
         let attacked = (self.actions_of(other_unit.id).top_action_kind() == Some(ATTACK))
             .then(|| self.actions_of(other_unit.id).top_target())
             .flatten();
         let target = match attacked {
-            Some(object_id) => self.held(object_id)?.map(|(tq, unit, ta, tm)| {
-                victim_of(
-                    (
+            Some(object_id) => match self.held(object_id)? {
+                Some((tq, unit, ta, tm)) => Some(victim_of(
+                    VictimView {
                         unit,
-                        self.parts.unit_ai.contains(unit.id),
-                        self.parts.building_of(unit.id),
-                        self.parts.combat_of(unit.id),
-                        self.actions_of(unit.id),
-                        self.parts.unread.get(unit.id),
-                    ),
-                    tm,
-                    ta,
-                    tq,
-                    terrain,
-                    self.mode_680,
+                        layers: VictimLayers::of(self.parts, unit.id, self.actions_of(unit.id)),
+                        master: tm,
+                        special_charge: self.special_charge(unit, tm)?,
+                        player: tq,
+                        attributes: ta,
+                        terrain,
+                        mode_680: self.mode_680,
+                    },
                     roles,
-                )
-            }),
+                )),
+                None => None,
+            },
             None => None,
         };
         let shown = Shown {

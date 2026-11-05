@@ -6,6 +6,7 @@ use crate::combat::abilities::{ALWAYS_REACHED, ONE, Own};
 use crate::combat::damage::Victim;
 use crate::combat::damage::lose;
 use crate::combat::victims::victim_of;
+use crate::combat::victims::{VictimLayers, VictimView};
 use crate::construction::build::NOT_HELD;
 use crate::map::Distance;
 use crate::map::Footprint;
@@ -314,19 +315,16 @@ impl World {
         };
         let master = unit.master(self.master_tables(), player_id)?;
         let mut victim = victim_of(
-            (
+            VictimView {
                 unit,
-                self.parts.unit_ai.contains(unit.id),
-                self.parts.building_of(unit.id),
-                self.parts.combat_of(unit.id),
-                self.parts.actions.of(unit.id),
-                self.parts.unread.get(unit.id),
-            ),
-            master,
-            &self.players.player(player_id)?.attributes,
-            player_id,
-            self.spatial.terrain.as_ref(),
-            self.mode_680,
+                layers: VictimLayers::of(&self.parts, unit.id, self.parts.actions.of(unit.id)),
+                master,
+                special_charge: self.special_charge(unit, master)?,
+                player: player_id,
+                attributes: &self.players.player(player_id)?.attributes,
+                terrain: self.spatial.terrain.as_ref(),
+                mode_680: self.mode_680,
+            },
             &self.model.roles,
         );
         lose(&mut victim, damage);

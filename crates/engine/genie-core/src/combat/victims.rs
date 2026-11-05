@@ -25,7 +25,7 @@ use crate::world::slots::PlayerSlotsExt;
 use crate::world::step::Step;
 use crate::{GenieError, GenieResult};
 
-pub(crate) use crate::combat::victim_reads::{victim_in, victim_of};
+pub(crate) use crate::combat::victim_reads::{VictimLayers, VictimView, victim_in, victim_of};
 use crate::construction::MainBuildingId;
 use crate::construction::build::NOT_HELD;
 use crate::map::spatial::TileSight;
@@ -58,22 +58,19 @@ impl World {
             drop_sites: &self.model.drop_sites,
         };
         Ok(Some(victim_in(
-            (
+            VictimView {
                 unit,
-                self.parts.unit_ai.contains(unit.id),
-                self.parts.building_of(unit.id),
-                self.parts.combat_of(unit.id),
-                self.parts.actions.of(unit.id),
-                self.parts.unread.get(unit.id),
-            ),
-            (
-                player_id,
+                layers: VictimLayers::of(&self.parts, unit.id, self.parts.actions.of(unit.id)),
                 master,
-                &self.players.player(player_id)?.attributes,
-            ),
-            (attacker, &world),
+                special_charge: self.special_charge(unit, master)?,
+                player: player_id,
+                attributes: &self.players.player(player_id)?.attributes,
+                terrain: self.spatial.terrain.as_ref(),
+                mode_680: self.mode_680,
+            },
+            attacker,
+            &world,
             &self.spatial,
-            self.mode_680,
             &self.model.roles,
         )))
     }
@@ -249,18 +246,23 @@ pub(crate) fn victim(
         drop_sites: &step.world.model.drop_sites,
     };
     Ok(Some(victim_in(
-        (
+        VictimView {
             unit,
-            step.world.parts.unit_ai.contains(unit.id),
-            step.world.parts.building_of(unit.id),
-            step.world.parts.combat_of(unit.id),
-            step.world.parts.actions.of(unit.id),
-            step.world.parts.unread.get(unit.id),
-        ),
-        (player_id, master, attributes),
-        (step.player, &sides),
+            layers: VictimLayers::of(
+                &step.world.parts,
+                unit.id,
+                step.world.parts.actions.of(unit.id),
+            ),
+            master,
+            special_charge: step.world.special_charge(unit, master)?,
+            player: player_id,
+            attributes,
+            terrain: step.world.spatial.terrain.as_ref(),
+            mode_680: step.world.mode_680,
+        },
+        step.player,
+        &sides,
         &step.world.spatial,
-        step.world.mode_680,
         roles,
     )))
 }
