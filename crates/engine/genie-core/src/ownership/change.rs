@@ -430,7 +430,7 @@ impl World {
             let at = self
                 .object(id)
                 .map_or(Position::ORIGIN, |(_, unit)| unit.position());
-            self.remains(owner, stack, at, None)?;
+            let _ = self.remains(owner, stack, at, None)?;
         }
         if let Some(tech) = building.and_then(|building_master| building_master.tech) {
             self.research_built(owner, tech)?;

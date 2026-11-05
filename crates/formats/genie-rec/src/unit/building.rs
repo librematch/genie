@@ -118,8 +118,9 @@ pub struct BuildingUnitAttributes {
     /// Whether the building is semi-asleep (updated less often); stored from save version
     /// 11.43 on.
     pub semi_asleep: bool,
-    /// Should this building be rendered with the snow graphic?
-    pub snow_flag: bool,
+    /// The snow flag (`snow_flag`): 0 no snow, 1 a completion on snow (its decal), 2 a farm's or
+    /// a pasture's kept snow; stored from save version 11.54 on.
+    pub snow_flag: u8,
 }
 
 impl ReadHeader for BuildingUnitAttributes {
@@ -225,7 +226,7 @@ impl BuildingUnitAttributes {
             self.semi_asleep = input.read_u8()? != 0;
         }
         if input.version() >= 11.54 {
-            self.snow_flag = input.read_u8()? != 0;
+            self.snow_flag = input.read_u8()?;
         }
         Ok(())
     }

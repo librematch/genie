@@ -10,7 +10,9 @@ use crate::objects::ObjectState;
 use crate::objects::SpriteId;
 use crate::objects::layers::Action;
 use crate::objects::lifecycle::Class;
-use crate::objects::lifecycle::death_parts::{built_death, combat_dies, farm_bonus, refund_of};
+use crate::objects::lifecycle::death_parts::{
+    built_death, combat_dies, farm_bonus, refund_of, snow_leaves,
+};
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
@@ -40,8 +42,9 @@ impl Unit {
         master: &Master,
     ) -> GenieResult<Option<(MasterId, TechId)>> {
         // FUN_1411dbb70 to state 3 from 2: the storage leaves (FUN_1411e63f0), the owner's
-        // watched list lets it go (FUN_141091310), the tiles unlink (FUN_140f65580), and
-        // a monastery's, wonder's or castle's count leaves, at least 0 left
+        // watched list lets it go (FUN_141091310), the tiles unlink (FUN_140f65580), a
+        // completion's snow goes, and a monastery's, wonder's or castle's count leaves, at
+        // least 0 left
         let player_kind = step.world.players.player(step.player)?.kind;
         let (id, annex_of) = (self.id, step.world.parts.building_of(self.id).annex_of);
         let death = built_death(
@@ -60,6 +63,7 @@ impl Unit {
         if let (Some(visibility), Some(at)) = (step.world.spatial.sight.as_mut(), death.unlink) {
             visibility.unlink_building(at, master.radius, step.world.model.tuning.visibility)?;
         }
+        snow_leaves(&mut step.world.parts.building, self.id);
         if let Some(kind) = death.building.count {
             step.world
                 .players

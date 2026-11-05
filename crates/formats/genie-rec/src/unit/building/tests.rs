@@ -103,7 +103,7 @@ fn building_of_11_54_reads_every_later_field() {
     let bytes = links_and_queues(head)
         .floats(&[1.0, 2.0, 3.0, 4.0, 5.0, 6.0])
         .words(&[1, 2, 3])
-        .raw(&[7, 1, 1])
+        .raw(&[7, 1, 2])
         .0;
     let building = read_all::<BuildingUnitAttributes>(&bytes, 11.54);
     assert_eq!(building.pending_order, 9);
@@ -117,5 +117,7 @@ fn building_of_11_54_reads_every_later_field() {
         (1, 2, 3)
     );
     assert_eq!(building.terrain_kind.map(u16::from), Some(7));
-    assert!(building.semi_asleep && building.snow_flag);
+    assert!(building.semi_asleep);
+    // the byte as saved: a farm's kept snow is 2
+    assert_eq!(building.snow_flag, 2);
 }

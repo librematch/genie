@@ -14,7 +14,7 @@ use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::lifecycle::death_parts::{
-    built_death, combat_dies, forget_resource, refund_of,
+    built_death, combat_dies, forget_resource, refund_of, snow_leaves,
 };
 use crate::objects::masters::GhostMode;
 use crate::objects::masters::Master;
@@ -569,6 +569,7 @@ impl World {
         if let (Some(visibility), Some(at)) = (self.spatial.sight.as_mut(), death.unlink) {
             visibility.unlink_building(at, master.radius, self.model.tuning.visibility)?;
         }
+        snow_leaves(&mut self.parts.building, id);
         self.combat_set_state(owner, id, ObjectState::Dying, master)?;
         if let Some(kind) = death.building.count {
             self.players
@@ -620,6 +621,7 @@ mod tests {
     use crate::objects::MasterHitPoints;
     #[cfg(test)]
     use crate::objects::layers::Building;
+    use crate::objects::masters::BuildingMaster;
     use crate::objects::masters::CreatablePart;
     use crate::objects::masters::ObstructionClass;
     use crate::objects::masters::ObstructionKind;
@@ -802,6 +804,49 @@ mod tests {
         world.spatial.sight = Some(visibility);
         world.delete(player_id(1), object_id(10)).unwrap();
         assert_eq!(hp(&world, 1, ListIndex::new(0)), HitPoints::new(25.0));
+    }
+
+    /// A built building's death (`FUN_1411dbb70` to state 3 from 2) takes back a completion's
+    /// snow (1) with its decal; a farm's (2) stays for its death spawn.
+    #[test]
+    fn built_house_death_loses_its_completion_snow() {
+        let snow_after = |snow| {
+            let mut world = game(25.0, false);
+            for masters in &mut world.model.masters {
+                Arc::make_mut(masters).get_mut(ids::HOUSE).unwrap().building =
+                    Some(BuildingMaster::default());
+            }
+            world.players[1].objects[ListIndex::new(1)].life.state = ObjectState::Alive;
+            // the refund's attributes (98 and 165)
+            world.players[1].attributes = vec![Amount::ZERO; 200];
+            let construction = world
+                .parts
+                .building
+                .get_mut(object_id(11))
+                .and_then(|building| building.construction.as_mut())
+                .unwrap();
+            construction.snow = snow;
+            world
+                .set_state(player_id(1), object_id(11), ObjectState::Dying)
+                .unwrap();
+            (
+                world.players[1].objects[ListIndex::new(1)].life.state,
+                world
+                    .parts
+                    .building_of(object_id(11))
+                    .construction
+                    .as_ref()
+                    .map(|construction| construction.snow),
+            )
+        };
+        assert_eq!(
+            [Snow::None, Snow::Completed, Snow::Kept].map(snow_after),
+            [
+                (ObjectState::Dying, Some(Snow::None)),
+                (ObjectState::Dying, Some(Snow::None)),
+                (ObjectState::Dying, Some(Snow::Kept)),
+            ]
+        );
     }
 
     #[test]

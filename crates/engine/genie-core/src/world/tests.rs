@@ -9618,6 +9618,81 @@ fn dead_object_leaves_its_remains_and_its_death_spawn() {
     );
 }
 
+/// A building's death spawn (`FUN_1411e5cd0` after the base slot 0x160): a farm's kept snow
+/// (2) goes to a spawn that is a building; a completion's (1) does not (the spawn holds the
+/// constructor's none, off the snow), nor does a spawn without a construction (a static one).
+#[test]
+fn dead_farm_gives_its_death_spawn_its_kept_snow() {
+    let spawn_snow = |snow: Snow, kind: MasterKind| {
+        let mut world = forage_world();
+        let id = world.players[1].objects[ListIndex::new(0)].id;
+        let spawn = Master {
+            id: master_id(98),
+            kind,
+            building: (kind == MasterKind::BUILDING).then(BuildingMaster::default),
+            ..Master::default()
+        };
+        let ms = &mut world.model.masters[1];
+        *ms = Arc::new(Masters::new(
+            ms.iter()
+                .cloned()
+                .map(|mut master| {
+                    if master.id == master_id(120) {
+                        master.death_spawns = [Some(master_id(98)), None];
+                    }
+                    master
+                })
+                .chain([spawn]),
+        ));
+        let construction = Construction {
+            progress: Seconds::new(15.0),
+            desolid: false,
+            builders: BuilderCount::of_data(0),
+            hit_points: MasterHitPoints::of_data(480),
+            build_time: WholeSeconds::of_data(15),
+            record: Obstruction {
+                kind: ObstructionKind::KIND_2,
+                class: ObstructionClass::NONE,
+            },
+            snow,
+            sprite_override: false,
+        };
+        world
+            .set_part(
+                id,
+                Part::Building(Box::new(Building {
+                    construction: Some(construction),
+                    ..Building::default()
+                })),
+            )
+            .unwrap();
+        in_update(
+            &mut world,
+            (PlayerId::new(1), ListIndex::new(0)),
+            50,
+            Unit::death_spawn_comes,
+        )
+        .unwrap();
+        let made = world.players[1].objects.iter().last().unwrap().id;
+        assert_ne!(made, id);
+        world
+            .parts
+            .building_of(made)
+            .construction
+            .as_ref()
+            .map(|made_construction| made_construction.snow)
+    };
+    assert_eq!(
+        spawn_snow(Snow::Kept, MasterKind::BUILDING),
+        Some(Snow::Kept)
+    );
+    assert_eq!(
+        spawn_snow(Snow::Completed, MasterKind::BUILDING),
+        Some(Snow::None)
+    );
+    assert_eq!(spawn_snow(Snow::Kept, MasterKind::ANIMATED), None);
+}
+
 /// The Artifact's handover to Gaia (state 100, [`Unit::artifact_handover`]): player 1's sheep
 /// stops and changes hands to Gaia (slot 0x70), and its Artifact checks again (state 6). The
 /// world's first update runs no Artifact (`0x140aad250` from the second on).
@@ -17015,7 +17090,8 @@ fn the_attack_timer_runs_down_at_the_object_rate() {
 
 /// records/425984813: a barracks (12) that dies short of its build time plays its destruction
 /// sprite (389), not its death sprite (2573) (`RGE_Static_Object::update`'s sprite after the
-/// death), a foundation (state 0) as a building in state 2.
+/// death), a foundation (state 0) as a building in state 2. The built one's death takes back
+/// its completion's snow (`FUN_1411dbb70` to state 3 from 2); a foundation's keeps it.
 #[test]
 fn building_short_of_its_build_time_that_dies_plays_its_destruction_sprite() {
     for state in [ObjectState::Foundation, ObjectState::Alive] {
@@ -17081,7 +17157,7 @@ fn building_short_of_its_build_time_dies(state: ObjectState) {
                     kind: ObstructionKind::KIND_2,
                     class: ObstructionClass::NONE,
                 },
-                snow: Snow::None,
+                snow: Snow::Completed,
                 sprite_override: false,
             }),
             ..Default::default()
@@ -17115,6 +17191,18 @@ fn building_short_of_its_build_time_dies(state: ObjectState) {
     let unit = &world.players[0].objects[ListIndex::new(0)];
     assert_eq!(unit.life.state, ObjectState::DyingSprite);
     assert_eq!(unit.sprite.unwrap().graphic.id, SpriteId::named(389));
+    let snow = world
+        .parts
+        .building_of(object_id(5))
+        .construction
+        .as_ref()
+        .map(|construction| construction.snow);
+    let kept = if state == ObjectState::Alive {
+        Snow::None
+    } else {
+        Snow::Completed
+    };
+    assert_eq!(snow, Some(kept));
 }
 
 /// GAME's cheat code (sub-command 6, `FUN_1415c92c0`): without the game's cheats it does

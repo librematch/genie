@@ -106,7 +106,7 @@ impl World {
                     player_id,
                     AllyTest::AlliesOnly,
                 ) {
-                    self.remains(player_id, self.model.slots.master.flare_4, at, None)?;
+                    let _ = self.remains(player_id, self.model.slots.master.flare_4, at, None)?;
                     self.made_new_object(player_id)?;
                 }
             }

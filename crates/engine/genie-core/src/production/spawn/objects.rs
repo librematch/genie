@@ -130,45 +130,51 @@ impl World {
     /// `FUN_14114d780`). It joins the owner's list and updates later in the same tick. Remains of
     /// type 80 ([`World::new_building`]), of type 70 (a combat unit, [`World::combat_object`]: a
     /// placeholder villager's death spawn, masters 1875 and 1876, is a villager) and the plain
-    /// objects' types are modelled; not held: the remains' sprite.
+    /// objects' types are modelled; not held: the remains' sprite. The made object's id.
     pub(crate) fn remains(
         &mut self,
         player_id: PlayerId,
         master: MasterId,
         at: Position,
         facet: Option<Facet>,
-    ) -> GenieResult<()> {
+    ) -> GenieResult<ObjectId> {
         let made = self.master(player_id, master)?.clone();
         if made.kind == MasterKind::BUILDING {
             return self.new_building(player_id, &made, at);
         }
         if made.kind == MasterKind::COMBAT {
             let new = self.combat_object(player_id, master, &made, at)?;
-            // a moving dead object's override (FUN_14119d490, FUN_14114d780): the new unit takes
-            // its facet's angle
+            let id = self.players.live(player_id, new)?.id;
             if let Some(facet) = facet {
-                let standing = made
-                    .standing_sprite
-                    .and_then(|sprite_id| self.model.graphics.get(sprite_id))
-                    .copied();
-                let own = standing.map_or(
-                    SpriteFacets {
-                        count: FacetCount::NONE,
-                        turns: false,
-                    },
-                    |graphic| SpriteFacets {
-                        count: graphic.facets,
-                        turns: graphic.flags.contains(SpriteFlags::TURNS),
-                    },
-                );
-                if let Some(mover) = self.parts.mover_mut(self.players.live(player_id, new)?.id) {
-                    mover.angle = angle_of_facet(facet, own);
-                }
+                self.face_dead_facet(id, &made, facet);
             }
-            return Ok(());
+            return Ok(id);
         }
-        let _ = self.plain_object(player_id, master, &made, at, Facing::Dead(facet))?;
-        Ok(())
+        let new = self.plain_object(player_id, master, &made, at, Facing::Dead(facet))?;
+        Ok(self.players.live(player_id, new)?.id)
+    }
+
+    /// A moving dead object's override (`FUN_14119d490`, `FUN_14114d780`) for its remains `id` of
+    /// `made`: the new unit takes the angle of the dead object's `facet` on its own standing
+    /// sprite's facets (none without one).
+    fn face_dead_facet(&mut self, id: ObjectId, made: &Master, facet: Facet) {
+        let standing = made
+            .standing_sprite
+            .and_then(|sprite_id| self.model.graphics.get(sprite_id))
+            .copied();
+        let own = standing.map_or(
+            SpriteFacets {
+                count: FacetCount::NONE,
+                turns: false,
+            },
+            |graphic| SpriteFacets {
+                count: graphic.facets,
+                turns: graphic.flags.contains(SpriteFlags::TURNS),
+            },
+        );
+        if let Some(mover) = self.parts.mover_mut(id) {
+            mover.angle = angle_of_facet(facet, own);
+        }
     }
 
     /// The plain object's sight: its seer joins its owner's map and its sight comes on.
@@ -400,7 +406,7 @@ impl World {
         let at = self.spatial.get(target).map(|placed| placed.position);
         let at = at.unwrap_or_else(|| point.with_height(0.0));
         for player_id in PlayerId::each(usize::from(players)).skip(1) {
-            self.remains(player_id, self.model.slots.master.flare_2, at, None)?;
+            let _ = self.remains(player_id, self.model.slots.master.flare_2, at, None)?;
             self.made_new_object(player_id)?;
         }
         Ok(())
@@ -421,7 +427,7 @@ impl World {
         doubled: bool,
     ) -> GenieResult<()> {
         let before = self.players.player(player_id)?.objects.next_place();
-        self.remains(player_id, self.model.slots.master.flare, at, None)?;
+        let _ = self.remains(player_id, self.model.slots.master.flare, at, None)?;
         self.made_new_object(player_id)?;
         if doubled && let Some(unit) = self.players.player_mut(player_id)?.objects.get_mut(before) {
             unit.life.amount += unit.life.amount;
@@ -433,7 +439,7 @@ impl World {
     /// building at `at` (`FUN_1411ac5c0` with 1, so its init `FUN_1411de5f0`): the building's
     /// factory and constructor as any new building's ([`World::make_building`], with the unit AI
     /// its class gets, [`unit_ai_kind`]). Not held: the dead
-    /// object's `+0x6a8` and its facet (`FUN_14119d490`).
+    /// object's `+0x6a8` and its facet (`FUN_14119d490`). The new building's id.
     ///
     /// # Errors
     ///
@@ -443,15 +449,15 @@ impl World {
         player_id: PlayerId,
         made: &Master,
         at: Position,
-    ) -> GenieResult<()> {
+    ) -> GenieResult<ObjectId> {
         if self.players.player(player_id)?.kind.is_computer() {
             return Err(GenieError::unsupported(
                 "a computer player's new building (its AI's slot 0x398)",
             ));
         }
         let ai_kind = unit_ai_kind(made, made.id, &self.model.roles);
-        let _ = self.make_building(player_id, made.id, Ok(ai_kind), at)?;
-        Ok(())
+        let (id, _) = self.make_building(player_id, made.id, Ok(ai_kind), at)?;
+        Ok(id)
     }
 }
 

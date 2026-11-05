@@ -26,6 +26,7 @@ use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 use crate::world::layer::Slots;
 use crate::world::layer::generated::VisibilityTuning;
+use crate::world::parts::PartTable;
 use crate::world::{BuildingDeath, RESTORED_FOUNDATION};
 use crate::{GenieError, GenieResult};
 
@@ -207,7 +208,8 @@ pub(crate) struct BuiltDeath {
 /// stands ([`World::withdraw_tech`]). A foundation terrain stays. Not modelled: a computer
 /// player's (`FUN_1411e7ca0`), one with a pasture or its workers (`+0xcb8`), units inside, the
 /// terrain 1 a foundation terrain of 28 lays at the death (`FUN_1411ce250`). Not held: its
-/// linked objects (`+0xb78`, none held), `+0xca4` and the snow decal (`FUN_1413b9e20`).
+/// linked objects (`+0xb78`, none held), `+0xca4` and the snow decal (`FUN_1413b9e20`); its
+/// snow flag the caller takes back ([`snow_leaves`]).
 ///
 /// # Errors
 ///
@@ -259,6 +261,18 @@ pub(crate) fn built_death(
         unlink,
         building: BuildingDeath { count, tech },
     })
+}
+
+/// A built building's death takes back its completion's snow ([`crate::map::Snow::after_death`]) in
+/// `buildings`, the building layers: the building `id`'s flag, none for an object without its
+/// construction.
+pub(crate) fn snow_leaves(buildings: &mut PartTable<Building>, id: ObjectId) {
+    let construction = buildings
+        .get_mut(id)
+        .and_then(|building| building.construction.as_mut());
+    if let Some(construction) = construction {
+        construction.snow = construction.snow.after_death();
+    }
 }
 
 /// What a built building's storage gave its owner leaves (`FUN_1411e63f0`, then

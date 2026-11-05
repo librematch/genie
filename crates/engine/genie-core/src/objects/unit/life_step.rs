@@ -1,6 +1,7 @@
 //! The life cycle's step in a unit's update: the hit points, the states, and what each new
 //! state sets off.
 
+use crate::map::Snow;
 use crate::math::rng::Stream;
 use crate::movement::Speed;
 use crate::objects::AnimateState;
@@ -248,7 +249,7 @@ impl Unit {
                 .mover_of(self.id)
                 .map(|mover| facet_of_angle(mover.angle, mover.stats.facets).0);
             let (player_id, at) = (step.player, self.position());
-            step.lend((&mut *self, &mut *actions), |world| {
+            let _ = step.lend((&mut *self, &mut *actions), |world| {
                 world.remains(player_id, remains, at, facet)
             })?;
         }
@@ -257,8 +258,11 @@ impl Unit {
 
     /// A dead object that holds nothing goes to state 7 and its death spawn comes (slot 0x160,
     /// `FUN_1411a5090`: the master's `death_spawn_obj_id` makes an object at its place; a
-    /// moving object's override gives it the dead object's facet and that facet's angle). The
-    /// spawn's sprite from slot 0x7a8 (the master's undead sprite) is not held.
+    /// moving object's override gives it the dead object's facet and that facet's angle). A
+    /// building's override (`FUN_1411e5cd0`) then gives a spawn that is a building its snow
+    /// flag of 2 ([`Snow::Kept`], a farm's). The spawn's sprite from slot 0x7a8 (the master's
+    /// undead sprite), a building's rubble sprite of an unfinished one (`+0x968`) and its facet
+    /// are not held, as no remains hold them; its salvage pile (`+0x9c8`) is not made.
     pub(crate) fn death_spawn_comes(
         &mut self,
         actions: &mut Action,
@@ -275,9 +279,27 @@ impl Unit {
             .parts
             .mover_of(self.id)
             .map(|mover| facet_of_angle(mover.angle, mover.stats.facets).0);
+        let kept = step
+            .world
+            .parts
+            .building_of(self.id)
+            .construction
+            .as_ref()
+            .is_some_and(|construction| construction.snow == Snow::Kept);
         let (player_id, at) = (step.player, self.position());
-        step.lend((&mut *self, &mut *actions), |world| {
+        let made = step.lend((&mut *self, &mut *actions), |world| {
             world.remains(player_id, spawn, at, facet)
-        })
+        })?;
+        // the override writes the byte whatever the spawn is; only a building holds it
+        let made_construction = step
+            .world
+            .parts
+            .building
+            .get_mut(made)
+            .and_then(|building| building.construction.as_mut());
+        if kept && let Some(construction) = made_construction {
+            construction.snow = Snow::Kept;
+        }
+        Ok(())
     }
 }

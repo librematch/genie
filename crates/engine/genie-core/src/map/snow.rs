@@ -41,6 +41,17 @@ impl Snow {
     pub const fn on_snow(self) -> bool {
         !matches!(self, Self::None)
     }
+
+    /// The flag after a built building's death (`FUN_1411dbb70` to state 3 from 2, at
+    /// `0x1411dda85`): a completion's 1 goes with its decal (`FUN_1413b9e20`, not held), a
+    /// farm's 2 stays for its death spawn.
+    #[must_use]
+    pub const fn after_death(self) -> Self {
+        match self {
+            Self::Completed => Self::None,
+            Self::None | Self::Kept => self,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -60,6 +71,15 @@ mod tests {
         assert_eq!(
             [Snow::None, Snow::Completed, Snow::Kept].map(Snow::on_snow),
             [false, true, true]
+        );
+    }
+
+    /// A built building's death takes back a completion's snow (1) only: a farm's (2) stays.
+    #[test]
+    fn death_clears_completion_snow_and_keeps_farm_snow() {
+        assert_eq!(
+            [Snow::None, Snow::Completed, Snow::Kept].map(Snow::after_death),
+            [Snow::None, Snow::None, Snow::Kept]
         );
     }
 }

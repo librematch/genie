@@ -174,9 +174,6 @@ pub struct Construction {
     pub(crate) record: Obstruction,
     /// `+0xc61`, `snow_flag` ([`crate::map::Snow`]): it stands on snow, completed there or kept
     /// as a farm's or a pasture's (its decal is not held).
-    #[diff(
-        gap = "the death's and the teardowns' clearing (FUN_1411dbb70 at 0x1411dda85, FUN_1411d5600, FUN_1411ad250) is not ported"
-    )]
     pub(crate) snow: Snow,
     /// `+0x788`, `sprite_override_id`, is not −1.
     pub(crate) sprite_override: bool,

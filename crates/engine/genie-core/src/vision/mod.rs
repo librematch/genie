@@ -156,7 +156,7 @@ impl World {
         // the flares (slot 0x1c0 with master 697, [`World::remains`]), in the players' order, each
         // town centre in its owner's list order; each flared player is recorded
         for (owner, target, at) in flares {
-            self.remains(owner, self.model.slots.master.flare_4, at, None)?;
+            let _ = self.remains(owner, self.model.slots.master.flare_4, at, None)?;
             self.made_new_object(owner)?;
             let flared = &mut self.players.player_mut(owner)?.tc_flared;
             if flared.len() <= target.index() {
