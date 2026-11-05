@@ -59,7 +59,7 @@ serde_json = { version = "1", features = ["preserve_order"] }
 # the model types' JSON Schema, which genie-nickel writes as Nickel contracts (FD-046-D15)
 schemars = "1.2"
 # the model's schema hash, a part of the model cache's key (FD-046-D18)
-sha2 = "0.10"
+sha2 = "0.11"
 postcard = { version = "1", default-features = false, features = ["use-std"] }
 indexmap = { version = "2", features = ["serde"] }
 rayon = "1"
