@@ -40,6 +40,14 @@ pub mod build {
     pub const EPSILON: f32 = f32::from_bits(0x33d6_bf95);
 }
 
+/// The values the `combat_update` port reads.
+pub mod combat_update {
+    /// 1.0
+    pub const ONE: f32 = f32::from_bits(0x3f80_0000);
+    /// 100.0
+    pub const PERCENT: f64 = f64::from_bits(0x4059_0000_0000_0000);
+}
+
 /// The values the `damage` port reads.
 pub mod damage {
     /// 1.0000000116860974e-07

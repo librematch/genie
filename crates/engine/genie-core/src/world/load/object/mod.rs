@@ -1,11 +1,13 @@
 //! A saved object as the slice's object ([`object`]: its row, [`unit`], and its parts): its
 //! town bell, a building's gate and its construction.
 
+use crate::combat::AbilityTimer;
 use crate::combat::AttackCount;
 use crate::combat::AttackPowerup;
 use crate::combat::Charge;
 use crate::combat::Firepower;
 use crate::combat::MissileCount;
+use crate::combat::SpecialSprite;
 use crate::combat::abilities::Abilities;
 use crate::combat::damage::ArmorPair;
 use crate::combat::missile::ShooterId;
@@ -16,9 +18,9 @@ use crate::construction::MainBuildingId;
 use crate::garrison::RaiderCountdown;
 use crate::gathering::DecayTimer;
 use crate::gathering::PastureId;
+use crate::gathering::SalvageAmounts;
 use crate::groups::{GroupId, GroupLink};
 use crate::map::Distance;
-use crate::map::Point;
 use crate::map::{Offset, Position};
 use crate::movement::Speed;
 use crate::objects::DamagedTimer;
@@ -36,18 +38,17 @@ use crate::objects::layers::{Action, Animated, Combat, DefaultTask, Motion, Stat
 use crate::objects::layers::{CommandCount, Speedup, SpeedupValue};
 use crate::objects::lifecycle::Lifecycle;
 use crate::objects::masters::ActionKind;
-use crate::objects::masters::ClassId;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
 use crate::objects::unit::Unit;
 use crate::objects::unit::UnitFlags;
 use crate::orders::OrderSource;
-use crate::orders::town_bell::{BellShelter, TownBell};
+use crate::orders::town_bell::TownBell;
 use crate::ownership::CaptureKind;
 use crate::players::Amount;
 use crate::players::CivId;
 use crate::players::attribute::AttributeId;
-use crate::unit_ai::{AiAction, UnitAi};
+use crate::world::Millis;
 use crate::world::Seconds;
 use crate::world::Unread;
 use crate::world::WorldTime;
@@ -58,8 +59,8 @@ use crate::world::load::object::building::annexes;
 use crate::world::load::object::building::building_lists;
 use crate::world::load::object::building::construction;
 use crate::world::load::object::building::saved_gate;
+use crate::world::load::object::town_bell::ai_parts;
 use crate::world::load::object_parts::lifecycle;
-use crate::world::load::object_parts::unit_ai;
 use crate::world::load::sub_actions::DefaultStart;
 use crate::world::load::sub_actions::build_task;
 use crate::world::load::sub_actions::default_task;
@@ -73,11 +74,11 @@ use crate::world::parts::{Object, ObjectParts};
 use crate::{GenieError, GenieResult};
 use genie_import::dat::MasterTable;
 use genie_import::save::own_master::{own_master, successor_master};
-use genie_import::save::{own_task_at, task_at};
-use genie_save::generated::world::TribeCombatObject;
+use genie_import::save::tasks::{own_task_at, task_at};
 use genie_save::generated::world::{Path, PlayerObjects, RgeMissileObject, RgeStaticObject};
 
 pub mod building;
+mod town_bell;
 
 /// The slice's view of one saved object, whole: its row ([`unit`]) and its parts (the gather
 /// point, the production lists, the missile's own fields, the town bell, the unit AI, its own and
@@ -337,11 +338,28 @@ fn row(
                 .combat()
                 .map_or(0, |tribe_combat_object| tribe_combat_object.next_volley),
         ),
+        special_sprite: SpecialSprite::of_data(object.combat().map_or(0, |tribe_combat_object| {
+            tribe_combat_object.using_special_attack_animation
+        })),
+        salvage: object
+            .combat()
+            .map_or(SalvageAmounts::NONE, |tribe_combat_object| {
+                salvage_of(&tribe_combat_object.attr_amt)
+            }),
         decay_timer: DecayTimer::of_data(
             object
                 .combat()
                 .map_or(0, |tribe_combat_object| tribe_combat_object.decay_timer),
         ),
+        ability: object
+            .combat()
+            .map_or_else(AbilityTimer::default, |tribe_combat_object| {
+                let rge_combat_object = &tribe_combat_object.rge_combat_object;
+                AbilityTimer {
+                    duration: Millis::new(rge_combat_object.special_ability_duration_ms),
+                    activated: WorldTime::from_millis(rge_combat_object.ability_activated_time_ms),
+                }
+            }),
         raider_countdown: RaiderCountdown::of_data(
             object.combat().map_or(0, |tribe_combat_object| {
                 tribe_combat_object.raider_build_countdown
@@ -600,6 +618,15 @@ fn row(
 /// once its action list empties: nothing, a Fly or a Make before its first update, the Artifact
 /// again, or a start the slice cannot make. A saved object's Fly is its saved action's: none
 /// starts again (it never ends); a saved Make started.
+/// A salvage pile's six amounts from the save's `attr_amt` (six shorts, the format's count).
+fn salvage_of(saved: &[i16]) -> SalvageAmounts {
+    let mut values = [0; 6];
+    for (value, &held) in values.iter_mut().zip(saved) {
+        *value = held;
+    }
+    SalvageAmounts::of_data(values)
+}
+
 fn default_start(default: Result<Option<DefaultStart>, Unstartable>, saved: bool) -> DefaultTask {
     use crate::objects::layers::DefaultTask;
     match default {
@@ -610,57 +637,6 @@ fn default_start(default: Result<Option<DefaultStart>, Unstartable>, saved: bool
         Ok(Some(DefaultStart::Artifact(_))) => DefaultTask::Artifact,
         Err(unstartable) => DefaultTask::Fails(unstartable),
     }
-}
-
-/// The parts of a saved object that hold its unit AI's order and action values: the unit AI
-/// and the town bell (none for an object without a combat part).
-///
-/// # Errors
-///
-/// A value no order or action holds.
-fn ai_parts(
-    object: &genie_save::Object,
-    own: ObjectId,
-    players: usize,
-) -> GenieResult<(Option<UnitAi>, TownBell)> {
-    let bell = object.combat().map(town_bell).transpose()?;
-    Ok((unit_ai(object, own, players)?, bell.unwrap_or_default()))
-}
-
-/// A combat object's town-bell flag and back-to-work records.
-///
-/// # Errors
-///
-/// A record's action value no action holds ([`AiAction::try_from`]).
-pub fn town_bell(tribe_combat_object: &TribeCombatObject) -> GenieResult<TownBell> {
-    use crate::orders::town_bell::BackToWork;
-    Ok(TownBell {
-        flag: BellShelter::of_byte(tribe_combat_object.town_bell_flag),
-        work: BackToWork {
-            target: ObjectId::of_field(tribe_combat_object.back_to_work1_town_bell_target_id),
-            target_class: ClassId::of_param(
-                tribe_combat_object.back_to_work1_town_bell_target_kind,
-            )?,
-            action: AiAction::of_field(tribe_combat_object.back_to_work1_town_bell_action)?,
-            target2: ObjectId::of_field(tribe_combat_object.back_to_work1_town_bell_target_id2),
-            point: Point::new(
-                tribe_combat_object.back_to_work1_town_bell_target_x,
-                tribe_combat_object.back_to_work1_town_bell_target_y,
-            ),
-        },
-        before_building: BackToWork {
-            target: ObjectId::of_field(tribe_combat_object.back_to_work2_town_bell_target_id),
-            target_class: ClassId::of_param(
-                tribe_combat_object.back_to_work2_town_bell_target_kind,
-            )?,
-            action: AiAction::of_field(tribe_combat_object.back_to_work2_town_bell_action)?,
-            target2: ObjectId::of_field(tribe_combat_object.back_to_work2_town_bell_target_id2),
-            point: Point::new(
-                tribe_combat_object.back_to_work2_town_bell_target_x,
-                tribe_combat_object.back_to_work2_town_bell_target_y,
-            ),
-        },
-    })
 }
 
 /// A saved Build's or Repair's sub-action other than a `MoveTo`.

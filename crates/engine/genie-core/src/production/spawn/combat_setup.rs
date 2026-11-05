@@ -2,6 +2,7 @@
 //! its master and its player, and what its player's attributes count of it.
 
 use crate::GenieResult;
+use crate::combat::combat_update::FAITH_TOP;
 use crate::combat::{Charge, Firepower};
 use crate::gathering::DecayTimer;
 use crate::math::rng::Stream;
@@ -19,10 +20,6 @@ use crate::world::World;
 use crate::world::WorldTime;
 use crate::world::layer::ClassRoles;
 use crate::world::slots::PlayerSlotsExt;
-
-/// The faith the combat setup gives (`FUN_14121df60`'s store to `+0x310`: the immediate
-/// `0x42c80000`).
-const NEW_FAITH: Amount = Amount::new(100.0);
 
 /// What the combat setup writes on its object besides the zeroes and −1s of a new object's
 /// defaults.
@@ -114,10 +111,10 @@ impl World {
     }
 
     /// The combat setup's faith (`FUN_14121df60`): an object of master `made` (player
-    /// `player_id`'s) of class 18 or 53 (the monk's and the boarding boat's roles), or one whose
-    /// master has a conversion task (`FUN_1415c60b0` with 0x68, [`World::has_task`]), holds the
-    /// attribute kind [`AttributeSlots::faith`] (`+0x308`, the immediate 0x22) at
-    /// [`NEW_FAITH`] (`+0x310`); none for any other.
+    /// `player_id`'s) of a faithful class (18 or 53), or one whose master has a conversion task
+    /// (`FUN_1415c60b0` with 0x68, [`World::has_task`]), holds the attribute kind
+    /// [`AttributeSlots::faith`] (`+0x308`, the immediate 0x22) at [`FAITH_TOP`] (`+0x310`);
+    /// none for any other.
     ///
     /// # Errors
     ///
@@ -133,9 +130,9 @@ impl World {
             .model
             .roles
             .of_class(made.class)
-            .intersects(ClassRoles::MONK | ClassRoles::BOARDING_SHIP)
+            .contains(ClassRoles::FAITHFUL)
             || self.has_task(player_id, made.id, ActionKind::CONVERT)?;
-        Ok(faithful.then_some((self.model.slots.attribute.faith, NEW_FAITH)))
+        Ok(faithful.then_some((self.model.slots.attribute.faith, FAITH_TOP)))
     }
 }
 

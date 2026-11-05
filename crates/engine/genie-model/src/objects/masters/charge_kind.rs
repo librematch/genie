@@ -34,6 +34,9 @@ impl ChargeKind {
     pub const MISSILE_SHIELD: Self = Self(4);
     /// 5: a charge of 1 blocks a melee hit (`FUN_14108d8a0`).
     pub const MELEE_SHIELD: Self = Self(5);
+    /// −3: a timed ability's charge, which does not refill while the ability lasts
+    /// (`FUN_14107d160`, `TRIBE_Combat_Object::update`).
+    pub const TIMED_ABILITY: Self = Self(-3);
     /// −4: the charge works on every object (`FUN_1412623d0`).
     pub const EVERY_TARGET: Self = Self(-4);
 

@@ -23,6 +23,7 @@ pub(crate) mod mule_cart;
 pub mod pasture;
 mod pasture_id;
 mod queue_count;
+mod salvage_amounts;
 
 pub use self::action_end::ActionEnd;
 pub use self::decay_timer::DecayTimer;
@@ -32,6 +33,7 @@ pub use self::gather_target::{GatherTarget, GatherTargetId};
 pub use self::hunt_target::{HuntTarget, HuntTargetId};
 pub use self::pasture_id::{Pasture, PastureId};
 pub use self::queue_count::QueueCount;
+pub use self::salvage_amounts::SalvageAmounts;
 
 /// Both loads are food (0, or the foods a unit carries, 15 to 17; [`AttributeId::is_food_load`]):
 /// a gatherer or a hunter keeps a load of one for another. None is no food.

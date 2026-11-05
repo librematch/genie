@@ -96,6 +96,8 @@ impl World {
         // TRIBE_Combat_Object::update's regeneration after RGE_Combat_Object::update
         if own_update {
             self.regenerate_object((player_id, list_index, id), dt.seconds())?;
+            // then its charge's refill
+            self.refill_object_charge((player_id, list_index, id), dt.seconds())?;
         }
         // TRIBE_Combat_Object::update's passive abilities (FUN_1412072f0) as the object's owner
         // after its update; a removal reward's command comes back as the recording's own

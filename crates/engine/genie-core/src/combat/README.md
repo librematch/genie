@@ -32,15 +32,19 @@ it. After the combat update, every combat unit and building runs its passive abi
 <!-- files -->
 | File | What it holds |
 | --- | --- |
+| [`ability_timer.rs`](ability_timer.rs) | A combat object's timed ability: how long it lasts and when it began. |
 | [`attack_powerup.rs`](attack_powerup.rs) | An object's attack powerup. |
 | [`attack_target.rs`](attack_target.rs) | An Attack's target as its own type: the object it attacks. |
+| [`combat_update.rs`](combat_update.rs) | `TRIBE_Combat_Object::update` (`0x141208440`), a combat object's or building's own update (types 70 and 80) around `RGE_Combat_Object::update`. |
 | [`mod.rs`](mod.rs) | Combat: attacks, hits and missiles. |
 | [`reload.rs`](reload.rs) | An object's reload time (slot 0x218, `FUN_141086c90`): the time between its attacks, from its master's and its own values, which technologies and effects change. |
+| [`special_sprite.rs`](special_sprite.rs) | Whether a combat object shows its master's special sprite. |
 | [`victim_reads.rs`](victim_reads.rs) | What a hit reads of its victim: the object's values and its relations to the attacker. |
 | [`victims.rs`](victims.rs) | A hit's victim: what the hit reads of it, the objects it may reach, the hit written back, the kill and its counts. |
 | [`volley.rs`](volley.rs) | A unit's strikes back and its volleys: the missiles it fires and launches. |
 | [`abilities/`](abilities/) | A combat object's passive abilities: `FUN_1412072f0`, which `TRIBE_Combat_Object::update` (`0x141208440`) runs on every combat unit and building (types 70 and 80) after `RGE_Combat_Object::update`, with what that one returned (the object leaves its list); a building's update (`TRIBE_Building_Object::update`) runs its production after it. |
 | [`attack/`](attack/) | The Attack action (`RGE_Action_Attack`, type 9, vtable `0x142ed47a8`) of a melee unit: a hunting villager's sub-action on a tree or on its livestock (`crate::gathering::hunt`). |
+| [`combat_update/`](combat_update/) | The combat update's tests. |
 | [`damage/`](damage/) | The damage side of a hit: what it reads of its target and its attacker and what it changes. |
 | [`missile/`](missile/) | The missile (`RGE_Missile_Object`, type 60) and its action (`RGE_Action_Missile`, type 8): a ranged attacker's swing makes one at its weapon offset (`FUN_141081020`, `spawn_point`), its action aims at the target (`FUN_140a9c600`, `aim`; `set_state` 3, `FUN_140a9de70`, `MissileAction::launch`) and flies it each update (`FUN_140a9e6e0`, `MissileAction::fly`) until it hits the target (the shooter's hit, slot 0x860) or the ground. |
 | [`volley/`](volley/) | The missile launch. |
@@ -49,6 +53,6 @@ it. After the combat update, every combat unit and building runs its passive abi
 ## How it connects
 
 <!-- uses -->
-- Uses: [`construction`](../construction/), [`gathering`](../gathering/), [`map`](../map/), [`math`](../math/), [`movement`](../movement/), [`objects`](../objects/), [`orders`](../orders/), [`players`](../players/), [`testing`](../testing/), [`unit_ai`](../unit_ai/), [`vision`](../vision/), [`world`](../world/).
+- Uses: [`construction`](../construction/), [`gathering`](../gathering/), [`map`](../map/), [`math`](../math/), [`movement`](../movement/), [`objects`](../objects/), [`orders`](../orders/), [`players`](../players/), [`technology`](../technology/), [`testing`](../testing/), [`unit_ai`](../unit_ai/), [`vision`](../vision/), [`world`](../world/).
 - Used by: [`commands`](../commands/), [`construction`](../construction/), [`garrison`](../garrison/), [`gathering`](../gathering/), [`groups`](../groups/), [`movement`](../movement/), [`objects`](../objects/), [`orders`](../orders/), [`ownership`](../ownership/), [`production`](../production/), [`technology`](../technology/), [`testing`](../testing/), [`unit_ai`](../unit_ai/), [`world`](../world/).
 <!-- /uses -->

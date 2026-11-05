@@ -1,5 +1,5 @@
 //! The x86 conversions the game's code runs where Rust's `as` gives other results:
-//! `CVTTSS2SI` into a 32-bit and into a 64-bit register.
+//! `CVTTSS2SI` into a 32-bit and into a 64-bit register, `CVTTSD2SI` into a 32-bit one.
 
 /// `CVTTSS2SI`: f32 to i32, truncating toward zero. NaN and values outside the i32 range give
 /// `i32::MIN` (the "integer indefinite" value), where Rust's `as` would saturate.
@@ -26,6 +26,17 @@ pub fn cvttss2si_64(value: f32) -> i64 {
     }
 }
 
+/// `CVTTSD2SI`: f64 to i32, truncating toward zero. NaN and values outside the i32 range give
+/// `i32::MIN` (the "integer indefinite" value), where Rust's `as` would saturate.
+#[must_use]
+pub fn cvttsd2si(value: f64) -> i32 {
+    if value.is_nan() || !(-2_147_483_649.0 < value && value < 2_147_483_648.0) {
+        i32::MIN
+    } else {
+        value as i32
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -39,6 +50,16 @@ mod tests {
         assert_eq!(cvttss2si_64(4_294_967_296.0) as i32, 0);
         for value in [f32::NAN, f32::INFINITY, -f32::INFINITY, 1.0e19] {
             assert_eq!(cvttss2si_64(value), i64::MIN, "{value}");
+        }
+    }
+
+    #[test]
+    fn cvttsd2si_truncates_toward_zero_and_is_indefinite_outside_i32() {
+        assert_eq!((cvttsd2si(2.9), cvttsd2si(-2.9)), (2, -2));
+        assert_eq!(cvttsd2si(-2_147_483_648.9), i32::MIN);
+        assert_eq!(cvttsd2si(2_147_483_647.9), i32::MAX);
+        for value in [f64::NAN, 2_147_483_648.0, -2_147_483_649.0, f64::INFINITY] {
+            assert_eq!(cvttsd2si(value), i32::MIN, "{value}");
         }
     }
 

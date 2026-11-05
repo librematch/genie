@@ -63,6 +63,8 @@ impl Unit {
         step: &mut Step<'_>,
         roles: &Roles,
     ) -> GenieResult<Option<Outcome>> {
+        // a unit's combat update (TRIBE_Combat_Object::update) starts its update
+        self.combat_update_start(actions, step, roles, MasterKind::COMBAT)?;
         self.death_blast(actions, step, roles)?;
         if self.go_to_sleep(
             step.world.parts.mover_of(self.id),
@@ -76,6 +78,8 @@ impl Unit {
         self.gate_update(actions, step, roles)?;
         self.complete_on_update(actions, step, roles)?;
         self.building_seconds(step, roles)?;
+        // a building's starts after its own steps (TRIBE_Building_Object::update)
+        self.combat_update_start(actions, step, roles, MasterKind::BUILDING)?;
         // a new object's combat layer (none in the table) has no timer to run down
         if let Some(combat) = step.world.parts.combat.get_mut(self.id) {
             run_down_attack_timers(combat, step.dt.seconds(), step.world.world_time);

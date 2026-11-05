@@ -5,10 +5,13 @@
 use crate::combat::Charge;
 use crate::combat::abilities::Abilities;
 use crate::combat::damage::ArmorPair;
-use crate::combat::{AttackCount, AttackPowerup, Firepower, MissileCount};
+use crate::combat::{
+    AbilityTimer, AttackCount, AttackPowerup, Firepower, MissileCount, SpecialSprite,
+};
 use crate::construction::BuilderCount;
 use crate::garrison::RaiderCountdown;
 use crate::gathering::DecayTimer;
+use crate::gathering::SalvageAmounts;
 use crate::map::Distance;
 use crate::objects::HpPowerup;
 use crate::objects::Regeneration;
@@ -20,9 +23,9 @@ use crate::world::Seconds;
 use crate::world::WorldTime;
 use genie_diff::Diff;
 
-/// The combat layer of an object: its attack's timer and count, its capture flag, its volleys,
-/// its decay timer, its unit AI, its town bell, its builders, its charge, its powerups and
-/// stingers, its store.
+/// The combat layer of an object: its attack's timer and count, its capture flag, its timed
+/// ability, its volleys, its special sprite, a salvage pile's amounts and decay timer, its unit
+/// AI, its town bell, its builders, its charge, its powerups and stingers, its store.
 #[derive(Clone, Debug, Default, PartialEq, Diff)]
 pub struct Combat {
     /// `+0x91c`, `attack_timer`: the time until it may attack again; `mReloadStinger` and
@@ -39,8 +42,17 @@ pub struct Combat {
     pub attack_count: AttackCount,
     /// `mHitSomethingValidForChargeAttack` (`+0x8a8`): its last hit was its charge's.
     pub charge_hit: bool,
+    /// `m_specialAbilityDurationMs` and `m_abilityActivatedTimeMs` (`+0x914`, `+0x918`): its
+    /// timed ability ([`AbilityTimer`]).
+    pub ability: AbilityTimer,
     /// `next_volley` (`+0xa04`): the missiles of the volley under way already fired.
     pub next_volley: MissileCount,
+    /// `using_special_attack_animation` (`+0xa05`): whether it shows its master's special sprite
+    /// ([`SpecialSprite`]).
+    pub special_sprite: SpecialSprite,
+    /// `attr_amt` (`+0x990`..`+0x99a`): what a salvage pile holds of six attributes
+    /// ([`SalvageAmounts`]).
+    pub salvage: SalvageAmounts,
     /// `decay_timer` (`+0x99c`): the milliseconds before a salvage pile loses one of what it
     /// holds ([`DecayTimer`]).
     pub decay_timer: DecayTimer,

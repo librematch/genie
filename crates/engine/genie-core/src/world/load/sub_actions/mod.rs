@@ -43,8 +43,8 @@ use crate::world::load::top_actions::{first_action, saved_sub_move_to};
 use crate::{GenieError, GenieResult};
 use genie_import::dat::dat_id;
 use genie_import::dat::{DefaultAction, MasterTable};
-use genie_import::save::core_task;
 use genie_import::save::parts::combat_master;
+use genie_import::save::tasks::core_task;
 use genie_save::generated::world::Action;
 use genie_save::generated::world::{Master, PlayerObjects, RgeStaticObject};
 

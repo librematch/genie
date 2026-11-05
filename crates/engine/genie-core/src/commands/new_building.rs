@@ -3,12 +3,13 @@
 
 use crate::combat::abilities::Abilities;
 use crate::combat::damage::ArmorPair;
-use crate::combat::{AttackCount, AttackPowerup, MissileCount};
+use crate::combat::{AbilityTimer, AttackCount, AttackPowerup, MissileCount, SpecialSprite};
 use crate::construction::build::Clearer;
 use crate::construction::build::Construction;
 use crate::construction::build::{NO_CONSTRUCTION, NOT_HELD};
 use crate::construction::{Annexes, BuilderCount, FootprintWaits, FoundationId, MainBuildingId};
 use crate::garrison::RaiderCountdown;
+use crate::gathering::SalvageAmounts;
 use crate::groups::GroupLink;
 use crate::map::Distance;
 use crate::map::Position;
@@ -266,6 +267,9 @@ impl World {
             attack_count: AttackCount::ZERO,
             firepower: setup.firepower,
             next_volley: MissileCount::ZERO,
+            special_sprite: SpecialSprite::Hidden,
+            salvage: SalvageAmounts::NONE,
+            ability: AbilityTimer::default(),
             reload_worldtime: WorldTime::ZERO,
             raider_countdown: RaiderCountdown::NONE,
             attack_timer: Seconds::ZERO,

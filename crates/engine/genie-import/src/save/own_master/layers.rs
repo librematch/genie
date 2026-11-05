@@ -4,10 +4,11 @@
 use crate::dat::MasterTable;
 use crate::save::build_cost;
 use crate::save::class_amounts;
-use crate::save::core_task;
 use crate::save::own_master::Record;
+use crate::save::tasks::core_task;
 use genie_model::GenieResult;
 use genie_model::combat::Charge;
+use genie_model::combat::ChargeRate;
 use genie_model::combat::Firepower;
 use genie_model::combat::MissileCount;
 use genie_model::combat::missile::MissSpread;
@@ -35,6 +36,7 @@ use genie_model::objects::masters::AttackPriority;
 use genie_model::objects::masters::BlastLevel;
 use genie_model::objects::masters::BuildingMaster;
 use genie_model::objects::masters::BuiltMode;
+use genie_model::objects::masters::ChargeEvent;
 use genie_model::objects::masters::ChargeKind;
 use genie_model::objects::masters::ChargeTarget;
 use genie_model::objects::masters::CombatAbility;
@@ -194,6 +196,8 @@ pub(super) fn own_creatable(
         .ok()
         .and_then(SpriteId::of_data);
     part.max_charge = Charge::new(creatable.max_charge);
+    part.recharge_rate = ChargeRate::new(creatable.recharge_rate);
+    part.charge_event = ChargeEvent::of_data(creatable.charge_event);
     part.charge_kind = ChargeKind::of_data(creatable.charge_kind);
     part.charge_target = ChargeTarget::of_data(creatable.charge_target);
     part.charge_projectile = id(creatable.charge_projectile_unit);

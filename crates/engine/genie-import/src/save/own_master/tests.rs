@@ -189,23 +189,27 @@ fn record_starts_from_the_dat_master_of_its_copy_id() {
     dat_master.id = copy;
     if let Some(creatable) = &mut dat_master.creatable {
         creatable.recharge_rate = ChargeRate::new(0.5);
+        creatable.garrison_sprite = SpriteId::of_data(44);
     }
     let table = MasterTable::from_rows([((CIV, copy), MasterData::default(), DefaultAction::None)])
         .with_work(CIV, copy, dat_master);
     let creatable_object = holding(MasterKind::COMBAT, |object| {
-        object.tribe_master_combat_object =
-            Some(Box::new(creatable_layer(OwnRgeMasterStaticObject {
-                read_temp_4: 83,
-                ..static_part(70)
-            })));
+        let mut creatable = creatable_layer(OwnRgeMasterStaticObject {
+            read_temp_4: 83,
+            ..static_part(70)
+        });
+        creatable.recharge_rate = 0.25;
+        object.tribe_master_combat_object = Some(Box::new(creatable));
     });
     let master = own_master(&creatable_object, CIV, Some(&table))
         .unwrap()
         .unwrap();
-    // the record holds no recharge rate: the `.dat` copy's stays
+    // the record holds no garrison sprite: the `.dat` copy's stays; its recharge rate replaces
+    // the copy's
+    let creatable = master.creatable.unwrap();
     assert_eq!(
-        master.creatable.unwrap().recharge_rate,
-        ChargeRate::new(0.5)
+        (creatable.garrison_sprite, creatable.recharge_rate),
+        (SpriteId::of_data(44), ChargeRate::new(0.25))
     );
     assert_eq!(master.id, MasterId::named(70));
     // a static record drops the layers its `.dat` copy has above it
@@ -285,7 +289,7 @@ fn moving_record_moves_with_its_own_turning_and_the_tables_sprite() {
 /// list (`FUN_140a7a2f0`); a slot of −1 or past the list is reported.
 #[test]
 fn own_master_gives_the_task_at_its_slot() {
-    use crate::save::own_task_at;
+    use crate::save::tasks::own_task_at;
     use genie_model::objects::masters::{ActionPart, Task, TaskId};
     let own = Master {
         action: Some(ActionPart {

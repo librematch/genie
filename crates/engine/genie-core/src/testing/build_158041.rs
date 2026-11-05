@@ -244,6 +244,7 @@ const CLASS_ROLES: [(usize, ClassRoles); 65] = [
     (
         18,
         ClassRoles::CATEGORY_LIST_TARGET
+            .union(ClassRoles::FAITHFUL)
             .union(ClassRoles::MILITARY_COUNT)
             .union(ClassRoles::MILITARY_KEY)
             .union(ClassRoles::MONK)
@@ -528,6 +529,7 @@ const CLASS_ROLES: [(usize, ClassRoles); 65] = [
         53,
         ClassRoles::BOARDING_SHIP
             .union(ClassRoles::BOAT)
+            .union(ClassRoles::FAITHFUL)
             .union(ClassRoles::MILITARY_COUNT)
             .union(ClassRoles::MILITARY_KEY)
             .union(ClassRoles::REPAIRED_AT_SHORE)
@@ -1009,6 +1011,7 @@ const fn attribute_slots() -> AttributeSlots {
         mill_food: AttributeId::named(254),
         speedup_range: AttributeId::named(256),
         world_effect: AttributeId::named(269),
+        converter_faith_rate: AttributeId::named(282),
         pasture_food: AttributeId::named(288),
         pasture_livestock: AttributeId::named(289),
         pasture_workers: AttributeId::named(290),

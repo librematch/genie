@@ -49,6 +49,7 @@ part of the update, which binds the action to the world.
 | [`pasture.rs`](pasture.rs) | A pasture's livestock (`FUN_1411c8410`, `SetupPasture`): the completion's first part (`FUN_1411c6bd0`) of a pasture (masters 1893 and 1897, class 49) whose build points reached its build time puts its owner's livestock on points along its edges, each holding its share of the pasture's food. |
 | [`pasture_id.rs`](pasture_id.rs) | A pasture's id as its own type: the building whose livestock a unit is in or tends. |
 | [`queue_count.rs`](queue_count.rs) | The count of farms or fish traps a queue paid for. |
+| [`salvage_amounts.rs`](salvage_amounts.rs) | What a salvage pile holds of six attributes. |
 | [`gather/`](gather/) | The Gather action (`RGE_Action_Gather`, type 5, vtable `0x142ed4f28`): a forager sent to a resource walks to it (state 4, a quiet `MoveTo`), faces it (6), gathers (7), takes the load to a drop site (8) and walks back to the resource (4). |
 | [`gather_search/`](gather_search/) | The resource search's passes. |
 | [`hunt/`](hunt/) | The Hunt action (`TRIBE_Action_Hunt`, type 110, vtable `0x142ed70f8`): a villager sent to a tree (or an animal) with a gather task attacks it first (state 12, an `Attack` sub-action); once it is dead the villager walks to it (state 4, a `MoveTo` sub-action), faces it (6) and gathers (7), then carries the load to a drop site (8). |
