@@ -34,7 +34,8 @@ impl Spatial {
     /// `reach`) and nearer than the nearest so far (by the search's distance; a tie goes to the
     /// lower id) is the nearest. Livestock (class 58) counts when the searcher's player owns it or
     /// it is not in state 2, and not while its top action is the Artifact with a point
-    /// ([`herded`]: slot 0x288 not −1 and slot 0x530 107, "Sheep is moving"). A searcher of class
+    /// ([`herded`]: slot 0x288 not −1 and slot 0x530 107, "Sheep is moving"; from type 70 on). A
+    /// searcher of class
     /// 10 passes the objects [`shuns`] names (of master 440 or a master with object flag 0x10; the
     /// game's `+0x6b4` of 1, not met, would let it take them). The found object's workers
     /// (`+0x644`) meet the cap (argument 6) and a search for state 0's unbuilt farm test
@@ -212,7 +213,8 @@ pub(super) fn closest_kept(
     if roles
         .of_some_class(filter.group)
         .contains(ClassRoles::CLOSEST_LIVESTOCK)
-        && ((placed.player != player && seer.state == ObjectState::Alive) || herded(objects, id))
+        && ((placed.player != player && seer.state == ObjectState::Alive)
+            || herded(objects, (id, placed))?)
     {
         return Ok(false);
     }
@@ -222,17 +224,29 @@ pub(super) fn closest_kept(
     Ok(true)
 }
 
-/// `ClosestObject`'s "Sheep is moving" (`FUN_140c488b0`): the object's top action is the Artifact
-/// (slot 0x530 107) with a point (slot 0x288, the action's `+0x38`, not −1); `by_id` reads its
-/// action layer.
-pub(crate) fn herded(by_id: ObjectsRef<'_>, id: ObjectId) -> bool {
-    by_id.actions(id).is_some_and(|action| {
+/// `ClosestObject`'s "Sheep is moving" (`FUN_140c488b0`) of the object `id` at `placed`: its slot
+/// 0x288 is not −1 and its slot 0x530 is 107. Below master type 70 slot 0x288 is −1
+/// (`FUN_14106c3e0`). From 70 on (`FUN_141082dc0`) it is the top action's point (`+0x38`), and
+/// slot 0x530 (`RGE_Action_Object::actionType`) the top action's type: the Artifact with a point.
+/// `by_id` reads its master and its action layer.
+///
+/// # Errors
+///
+/// A found object without its master.
+pub(crate) fn herded(
+    by_id: ObjectsRef<'_>,
+    (id, placed): (ObjectId, &Placed),
+) -> GenieResult<bool> {
+    if by_id.masters().of_placed(id, placed)?.kind < MasterKind::COMBAT {
+        return Ok(false);
+    }
+    Ok(by_id.actions(id).is_some_and(|action| {
         action.top_action_kind() == Some(ARTIFACT_KIND)
             && action
                 .list
                 .artifact()
                 .is_some_and(|artifact| artifact.goal.is_some_and(|position| position.x() != -1.0))
-    })
+    }))
 }
 
 /// What a searcher of class 10 passes (`FUN_140c488b0`): the found object `id`'s master (its own

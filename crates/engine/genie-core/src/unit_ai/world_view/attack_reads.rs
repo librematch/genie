@@ -2,6 +2,7 @@
 //! searching unit, the found objects, the attack and neutral tests, the statistics' reads and
 //! the quick path.
 
+use crate::combat::reload::reload_time;
 use crate::map::Distance;
 use crate::map::spatial::Spatial;
 use crate::movement::Speed;
@@ -213,8 +214,15 @@ impl WorldPicker<'_> {
             reach: self.attacker.range_against()?,
             damage,
             hp: unit.life.hp,
-            reload: self.parts.combat_of(me.id).reload_stinger
-                + (mm.combat_part().reload - self.parts.combat_of(me.id).reload_powerup),
+            reload: {
+                let combat = self.parts.combat_of(me.id);
+                reload_time(
+                    mm.kind,
+                    mm.combat_part().reload,
+                    combat.reload_stinger,
+                    combat.reload_powerup,
+                )
+            },
             workable: self.converts(self.me, id, TargetRules::Own, roles, unit_ai_tuning)?,
             current: self.seeker.is_some_and(|seeker| seeker.target == Some(id)),
         })

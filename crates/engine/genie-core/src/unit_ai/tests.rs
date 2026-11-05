@@ -4580,6 +4580,7 @@ fn new_building_unit_ai_draws_its_three_timers() {
             state_position: Point::new(30.0, 88.0),
             retarget_disabled: 0,
             alert_mode: AlertMode::Calm,
+            alert_object: None,
             time_since_enemy: Seconds::ZERO,
             patrol_path: None,
             patrol_waypoint: WaypointIndex::of_data(0),

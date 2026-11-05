@@ -139,6 +139,7 @@ pub fn unit_ai(
         state_position: Point::new(ai.state_position_xvalue, ai.state_position_yvalue),
         retarget_disabled: ai.disable_retargeting,
         alert_mode: AlertMode::of_data(ai.alert_mode_value),
+        alert_object: ObjectId::of_field(ai.alert_mode_object_id_value),
         time_since_enemy: Seconds::new(ai.time_since_enemy_sighting),
         patrol_path: patrol_path(ai)?,
         patrol_waypoint: WaypointIndex::of_data(ai.patrol_current_waypoint),

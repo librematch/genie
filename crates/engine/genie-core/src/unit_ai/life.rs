@@ -205,6 +205,7 @@ impl UnitAi {
             state_position: position.ground(),
             retarget_disabled: 0,
             alert_mode: AlertMode::Calm,
+            alert_object: None,
             time_since_enemy: Seconds::ZERO,
             patrol_path: None,
             patrol_waypoint: WaypointIndex::FIRST,

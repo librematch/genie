@@ -10,6 +10,7 @@ use genie_model::combat::charge;
 pub mod damage;
 use genie_model::combat::firepower;
 pub mod missile;
+pub(crate) mod reload;
 pub(crate) mod victim_reads;
 pub(crate) mod victims;
 pub(crate) mod volley;

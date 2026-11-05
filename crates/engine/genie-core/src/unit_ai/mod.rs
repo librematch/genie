@@ -47,6 +47,7 @@ mod process_order;
 mod queue_end;
 mod retarget;
 mod side;
+mod soldier_idle;
 mod stop_order;
 mod surroundings;
 mod target_kind;
@@ -463,6 +464,10 @@ pub struct UnitAi {
     pub(crate) retarget_disabled: u8,
     /// `+0x1b8`, `alertModeValue`.
     pub(crate) alert_mode: AlertMode,
+    /// `+0x1bc`, `alertModeObjectIDValue`: what slot 0x1d8 last named with the alert mode on
+    /// ([`UnitAi::watch_alert`]), −1 from the constructor (`FUN_140c2e080`). Only the save
+    /// reads it.
+    pub(crate) alert_object: Option<ObjectId>,
     /// `+0x1b4`, `time_since_enemy_sighting`: seconds since a search last found enemies; each full
     /// update adds the world's dt.
     pub(crate) time_since_enemy: Seconds,

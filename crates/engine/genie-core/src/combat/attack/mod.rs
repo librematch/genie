@@ -12,6 +12,7 @@
 //! [`crate::combat::damage`]'s).
 
 use crate::combat::damage::Victim;
+use crate::combat::reload::reload_time;
 use crate::map::Distance;
 use crate::map::Point;
 use crate::map::Position;
@@ -387,7 +388,12 @@ impl AttackReads {
                 );
                 flags
             },
-            reload: combat.reload_stinger + (master.combat_part().reload - combat.reload_powerup),
+            reload: reload_time(
+                master.kind,
+                master.combat_part().reload,
+                combat.reload_stinger,
+                combat.reload_powerup,
+            ),
             hit_chance: master.combat_part().hit_chance,
             swing_sprites: swing_sprites(combat.abilities.look.as_ref(), master, graphics),
             player_kind,

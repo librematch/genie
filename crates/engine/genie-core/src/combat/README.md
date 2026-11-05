@@ -35,6 +35,7 @@ it. After the combat update, every combat unit and building runs its passive abi
 | [`attack_powerup.rs`](attack_powerup.rs) | An object's attack powerup. |
 | [`attack_target.rs`](attack_target.rs) | An Attack's target as its own type: the object it attacks. |
 | [`mod.rs`](mod.rs) | Combat: attacks, hits and missiles. |
+| [`reload.rs`](reload.rs) | An object's reload time (slot 0x218, `FUN_141086c90`): the time between its attacks, from its master's and its own values, which technologies and effects change. |
 | [`victim_reads.rs`](victim_reads.rs) | What a hit reads of its victim: the object's values and its relations to the attacker. |
 | [`victims.rs`](victims.rs) | A hit's victim: what the hit reads of it, the objects it may reach, the hit written back, the kill and its counts. |
 | [`volley.rs`](volley.rs) | A unit's strikes back and its volleys: the missiles it fires and launches. |

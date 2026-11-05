@@ -3,12 +3,14 @@
 //! an object's look and its target flags, a master's class, and what a damage notify weighs
 //! (the duel, a harmless attacker, a defended unit's nearest attacker).
 
+use crate::combat::reload::reload_time;
 use crate::construction::FoundationId;
 use crate::map::Distance;
 use crate::map::Point;
 use crate::math::rng::Stream;
 use crate::movement::Planning;
 use crate::movement::WaypointIndex;
+use crate::movement::footprint_gap;
 use crate::movement::footprint_gap_squared;
 use crate::objects::ObjectId;
 use crate::objects::masters::ClassId;
@@ -17,10 +19,12 @@ use crate::objects::unit::UnitFlags;
 use crate::orders::object_gone;
 use crate::players::AllyTest;
 use crate::players::PlayerId;
+use crate::players::UnitRelation;
 use crate::unit_ai::task_finder::allied;
 use crate::unit_ai::world_view::owner_view;
 use crate::unit_ai::world_view::{UnitView, patrol_information};
 use crate::unit_ai::{Duel, NearestAttacker, PatrolPath, TargetFlags, UnitSeen};
+use crate::world::Seconds;
 use crate::world::objects_ref::ObjectsRef;
 use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlotsExt;
@@ -48,6 +52,49 @@ impl UnitView<'_, '_> {
     pub(crate) fn interruptible_now(&self) -> GenieResult<bool> {
         self.actions
             .interruptible(self.step.world.parts.unread.get(self.unit.id))
+    }
+
+    /// The soldier's slot 0x1d8 (`FUN_140c1c6e0`): of the last search's enemies (list 4) the world
+    /// holds, the first whose reload time (slot 0x218, [`reload_time`]) is not 0
+    /// (`UCOMISS`: a NaN is not 0), then each strictly nearer by the footprint gap to the unit
+    /// (`FUN_14118f680`; `COMISS`: a NaN gap is not); none without one.
+    ///
+    /// # Errors
+    ///
+    /// The unit or an enemy without its master.
+    pub(crate) fn nearest_armed_enemy(&self) -> GenieResult<Option<ObjectId>> {
+        let world = &*self.step.world;
+        let Some(found) = world.spatial.searched() else {
+            return Ok(None);
+        };
+        let radius = self.unit.master(world.master_tables(), self.player)?.radius;
+        let mut nearest: Option<(ObjectId, Distance)> = None;
+        for record in &found[UnitRelation::Enemy] {
+            let Some((player, enemy)) = world.object(record.id) else {
+                continue;
+            };
+            let master = enemy.master(world.master_tables(), player)?;
+            let combat = world.parts.combat_of(enemy.id);
+            let reload = reload_time(
+                master.kind,
+                master.combat_part().reload,
+                combat.reload_stinger,
+                combat.reload_powerup,
+            );
+            if reload == Seconds::ZERO {
+                continue;
+            }
+            let gap = footprint_gap(
+                self.unit.position(),
+                radius,
+                enemy.position(),
+                master.radius,
+            );
+            if nearest.is_none_or(|(_, best)| gap < best) {
+                nearest = Some((enemy.id, gap));
+            }
+        }
+        Ok(nearest.map(|(id, _)| id))
     }
 
     /// The unit's slot 0x468 (`FUN_141157c50`, `getPatrolInformation`): a copy of its top path
@@ -254,11 +301,12 @@ impl UnitView<'_, '_> {
         )
     }
 
-    /// The unit's slot 0x3d0: whether it reaches object `target` within `range`.
+    /// The unit's slot 0x3d0: whether it reaches object `target` within `range`. An object that
+    /// does not move (types 10 to 25, `FUN_141071b50`) reaches nothing.
     ///
     /// # Errors
     ///
-    /// A unit that does not move, and what the reach test does not model.
+    /// What the reach test does not model.
     pub(crate) fn reaches(&mut self, target: ObjectId, range: Distance) -> GenieResult<bool> {
         let mut plan = Planning {
             pathing: &mut self.step.world.pathing,
@@ -269,14 +317,9 @@ impl UnitView<'_, '_> {
         };
         let unit = &*self.unit;
         let walker = unit.me(self.actions);
-        let mover = self
-            .step
-            .world
-            .parts
-            .mover_of(unit.id)
-            .ok_or(GenieError::unsupported(
-                "a reach test of a unit that does not move",
-            ))?;
+        let Some(mover) = self.step.world.parts.mover_of(unit.id) else {
+            return Ok(false);
+        };
         let by_id = ObjectsRef::new(
             &self.step.world.players,
             &self.step.world.index,

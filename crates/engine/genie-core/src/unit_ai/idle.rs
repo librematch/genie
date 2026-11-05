@@ -1,4 +1,5 @@
-//! The idle checks of ships, siege, soldiers, units that do not attack and towers.
+//! The idle checks of ships, siege, units that do not attack and towers; the soldier's is in
+//! `soldier_idle.rs`.
 
 use crate::map::Distance;
 use crate::map::Position;
@@ -23,13 +24,12 @@ use crate::unit_ai::UnitStance;
 use crate::unit_ai::flight::BadPoint;
 use crate::unit_ai::world_view::UnitView;
 use crate::unit_ai::{
-    AttackAsk, FISHING_CARED, Found, Memory, Pick, SIEGE_CARED, SOLDIER_CARED, Search, Seeker,
-    Surroundings, TOWER_CARED, TRADE_CART_CARED, TRADE_SHIP_CARED, UnitAi, attack_search_radius,
+    AttackAsk, FISHING_CARED, Found, Memory, Pick, SIEGE_CARED, Search, Seeker, Surroundings,
+    TOWER_CARED, TRADE_CART_CARED, TRADE_SHIP_CARED, UnitAi, attack_search_radius,
     civilian_search_radius, computer_idle_check, search_radius,
 };
 use crate::world::Seconds;
 use crate::world::layer::ClassRoles;
-use crate::world::layer::MasterRoles;
 use crate::world::layer::generated::UnitAiTuning;
 use crate::{GenieError, GenieResult};
 
@@ -164,10 +164,11 @@ impl UnitAi {
     /// 0, [`UnitAi::attack_object`]), a patrol order's patrol saved first: once it attacks, off
     /// the defend order (`0x2bd`) the order goes (`FUN_140c64b60` with −1, 0) and it gives 6; a
     /// failed attack on a patrol order loses the saved patrol. On a patrol order it then gives 5.
-    /// Else (the alert mode's object `+0x1bc` taking the base's slot 0x1d8, −1, not held) a human
-    /// player's unit in a group gives 5 ("I'm in a formation"), one in Defend or `StandGround`
-    /// walks back; last the saved patrol, if any, goes on (`restorePatrolInformation`,
-    /// [`UnitAi::restore_patrol`]: 6). Else 5.
+    /// Else, the alert object taking the base's slot 0x1d8 with the alert mode on
+    /// ([`UnitAi::watch_alert`]), a human player's unit in a group (its `+0x6d0`, the field)
+    /// gives 5 ("I'm in a formation"), one in Defend or `StandGround` walks back; last the saved
+    /// patrol, if any, goes on (`restorePatrolInformation`, [`UnitAi::restore_patrol`]: 6). Else
+    /// 5.
     pub(super) fn siege_idle(
         &mut self,
         at: &Surroundings,
@@ -249,8 +250,9 @@ impl UnitAi {
     }
 
     /// [`UnitAi::siege_idle`] in `NoAttack` (stance 3): it searches alone (slot 0x50 with mode 1
-    /// from its place, [`Pick::Look`] over [`SIEGE_CARED`], [`UnitAi::attack_search_alert`]) and
-    /// but on the patrol orders walks back to its state position ([`UnitAi::walk_back`]).
+    /// from its place, [`Pick::Look`] over [`SIEGE_CARED`], [`UnitAi::attack_search_alert`]), but
+    /// on the patrol orders walks back to its state position ([`UnitAi::walk_back`]), and with
+    /// the alert mode on its alert object takes slot 0x1d8 ([`UnitAi::watch_alert`]).
     ///
     /// # Errors
     ///
@@ -278,7 +280,7 @@ impl UnitAi {
         ) {
             let _ = self.walk_back(at, side, rng)?;
         }
-        Ok(())
+        self.watch_alert(side)
     }
 
     /// [`UnitAi::siege_idle`]'s `bestUnitToAttack` without a target, from its place
@@ -315,9 +317,11 @@ impl UnitAi {
         Ok(found.id)
     }
 
-    /// [`UnitAi::siege_idle`]'s end without an attack: on a patrol order 5; a human player's unit
-    /// in a group 5 ("I'm in a formation"), one in Defend or `StandGround` walks back; last the
-    /// saved patrol, if any, goes on ([`UnitAi::restore_patrol`]: 6). Else 5.
+    /// [`UnitAi::siege_idle`]'s end without an attack: on a patrol order 5; then the alert object
+    /// ([`UnitAi::watch_alert`]); a human player's unit in a group (its `+0x6d0`, the field, not
+    /// whether the world holds the group) 5 ("I'm in a formation"), one in Defend or
+    /// `StandGround` walks back; last the saved patrol, if any, goes on
+    /// ([`UnitAi::restore_patrol`]: 6). Else 5.
     pub(super) fn siege_idle_end(
         &mut self,
         at: &Surroundings,
@@ -331,8 +335,9 @@ impl UnitAi {
         ) {
             return Ok(IdleOutcome::Idle);
         }
+        self.watch_alert(side)?;
         if !player_kind.is_computer() {
-            if at.group.is_some() {
+            if side.unit.group.id.is_some() {
                 return Ok(IdleOutcome::Idle);
             }
             if self.stance.leashed() {
@@ -340,232 +345,6 @@ impl UnitAi {
             }
         }
         self.restore_patrol(at, ai, side)
-    }
-
-    /// The soldier's idle check (slot 72, `FUN_140c20db0`, factory type 13). Before its cap
-    /// (`FUN_140c41e50`, [`UnitAi::cap_human_order`]), a player that is out (`+0x89` 2; not held, 0
-    /// in every player probed) would stop, and slot 0x250 (`FUN_140c5d9a0`) retries no order, the
-    /// soldier's slot 0x60 taking none as retryable. A Gaia unit stops unless it is of the combat
-    /// type with `+0x924` 0 outside the scenario modes (`FUN_141302540`); one in `NoAttack`
-    /// (stance 3) searches and returns to its state position ([`UnitAi::no_attack_idle`]); master
-    /// 706 stops. Its target is the target of its top action within its range (slot 400, slot
-    /// 0x1e8) with retargeting on (`+0x1d6` 0), else its current target; neither is modelled, nor a
-    /// computer's branches (patrol data, priorities, evasion). Without one, `bestUnitToAttack` from
-    /// its place ([`Pick::Attack`]): an object found it attacks (slot 0xb8 forced,
-    /// [`UnitAi::attack_object`]; then, with retargeting on and off order 0x2bd, the order goes)
-    /// and processIdle produced ([`IdleOutcome::Acted`]); a patrol order's saved patrol data is not
-    /// modelled. Else a patrol order stops. The search leaves the alert mode clear, so `+0x1bc`
-    /// stays. Then, outside a unit group (`+0x6d0` −1), a unit in Defend or
-    /// `StandGround` (stance 1, 2) walks back to its state position ([`UnitAi::walk_back`]), which
-    /// leaves the result 5; a patrol path (`+0x1c0`) and the healer's ally search (`FUN_140c16f00`,
-    /// for a master with a task of action type 0x69) are not modelled.
-    pub(super) fn soldier_idle(
-        &mut self,
-        at: &Surroundings,
-        player_kind: PlayerKind,
-        ai: &mut Well512,
-        side: &mut UnitView<'_, '_>,
-    ) -> GenieResult<IdleOutcome> {
-        self.cap_human_order(side, ai)?;
-        let searches = !at.flags.contains(SurroundingFlags::SCENARIO)
-            && MasterKind::COMBAT <= at.kind
-            && !at.capture.any();
-        if at.player == PlayerId::GAIA && !searches {
-            return Ok(IdleOutcome::Idle);
-        }
-        if self.stance == UnitStance::NoAttack {
-            return self
-                .no_attack_idle(at, player_kind, side, ai)
-                .map(|()| IdleOutcome::Idle);
-        }
-        if at
-            .roles
-            .of_master(at.master)
-            .contains(MasterRoles::IDLES_STILL)
-        {
-            return Ok(IdleOutcome::Idle);
-        }
-        // its target: with retargeting on, its top action's within its range (slot 400, slot
-        // 0x1e8); with it off, its current target while the world holds it, else the top
-        // action's
-        let held =
-            (self.retarget_disabled != 0 && at.target.is_some()).then_some(self.current_target);
-        let target = match held {
-            Some(object_id) => Some(object_id),
-            None => Self::top_target_in_range(at, side)?.map(Some),
-        };
-        if player_kind.is_computer() {
-            computer_idle_check()?;
-        }
-        let target = match target {
-            Some(object_id) => object_id,
-            None => self.soldier_best(at, player_kind, side)?,
-        };
-        if let Some(object_id) = target
-            && self.soldier_attack(object_id, at, ai, side)? == Answer::Taken
-        {
-            return Ok(IdleOutcome::Acted);
-        }
-        self.soldier_idle_end(at, ai, side)
-    }
-
-    /// [`UnitAi::soldier_idle`]'s `bestUnitToAttack` without a target, from its place
-    /// ([`Pick::Attack`] over [`SOLDIER_CARED`]): the object found, if any.
-    ///
-    /// # Errors
-    ///
-    /// What the search and its alert do not model.
-    fn soldier_best(
-        &mut self,
-        at: &Surroundings,
-        player_kind: PlayerKind,
-        side: &mut UnitView<'_, '_>,
-    ) -> GenieResult<Option<ObjectId>> {
-        let unit_ai_tuning = &at.unit_ai_tuning;
-        let found = side.closest(&Search {
-            at: at.position.ground(),
-            radius: attack_search_radius(at),
-            classes: &SOLDIER_CARED,
-            size: at.size,
-            pick: Pick::Attack {
-                lowest: if at.flags.contains(SurroundingFlags::SCENARIO) {
-                    2
-                } else {
-                    0
-                },
-                seeker: self.seeker(at),
-                ask: AttackAsk::IDLE,
-            },
-            memory: self.memory(),
-        })?;
-        self.add_retries(&found);
-        self.attack_search_alert(found, player_kind, unit_ai_tuning)?;
-        Ok(found.id)
-    }
-
-    /// [`UnitAi::soldier_idle`]'s attack on `target`, a patrol order's patrol saved first ("I need
-    /// to save the patrol information in case the attack works."): slot 0xb8 forced
-    /// (`FUN_140c17550`: the base's, then the unit's group); once it attacks, with retargeting on
-    /// and off order 0x2bd the order goes (`FUN_140c64b60` with −1, 0); a failed attack on a
-    /// patrol order loses the saved patrol. [`Answer::Taken`] when it attacks.
-    ///
-    /// # Errors
-    ///
-    /// What the attack does not model.
-    fn soldier_attack(
-        &mut self,
-        target: ObjectId,
-        at: &Surroundings,
-        ai: &mut Well512,
-        side: &mut UnitView<'_, '_>,
-    ) -> GenieResult<Answer> {
-        if matches!(
-            self.current_order,
-            Some(OrderKind::Patrol | OrderKind::AttackMove)
-        ) {
-            self.save_patrol(side);
-        }
-        if self.attack_slot(target, TargetRules::Own, at, side, ai)? == Answer::Taken {
-            if self.retarget_disabled == 0 && self.current_order != Some(OrderKind::Defend) {
-                self.set_order_with(None, OrderHistory::Skipped, ai);
-            }
-            return Ok(Answer::Taken);
-        }
-        // "Attack failed, so I'm nuking the saved patrol information."
-        if matches!(
-            self.current_order,
-            Some(OrderKind::Patrol | OrderKind::AttackMove)
-        ) {
-            self.zero_patrol();
-        }
-        Ok(Answer::NotTaken)
-    }
-
-    /// [`UnitAi::soldier_idle`]'s end without an attack: a patrol order stops there ("I have a
-    /// patrol order, so I'm stopping here."), and so does a unit in a group (its `+0x6d0`, the
-    /// field, not whether the world holds the group: "And I'm in a formation, returning no
-    /// action."); a unit in Defend or `StandGround` walks back to its state position
-    /// ("returning to state pos.", its result not the processIdle's); then the saved patrol, if
-    /// any, goes on (`restorePatrolInformation`: processIdle produced). Else
-    /// [`IdleOutcome::Idle`].
-    ///
-    /// # Errors
-    ///
-    /// The healer's search for an ally (a master with a task of action type 0x69), and what the
-    /// walk and the patrol do not model.
-    fn soldier_idle_end(
-        &mut self,
-        at: &Surroundings,
-        ai: &mut Well512,
-        side: &mut UnitView<'_, '_>,
-    ) -> GenieResult<IdleOutcome> {
-        if matches!(
-            self.current_order,
-            Some(OrderKind::Patrol | OrderKind::AttackMove)
-        ) || side.unit.group.id.is_some()
-        {
-            return Ok(IdleOutcome::Idle);
-        }
-        if self.stance.leashed() {
-            let _ = self.walk_back(at, side, ai)?;
-        }
-        if self.restore_patrol(at, ai, side)? == IdleOutcome::Acted {
-            return Ok(IdleOutcome::Acted);
-        }
-        if at.flags.contains(SurroundingFlags::TASK_0X69) {
-            return Err(GenieError::unsupported(
-                "a healer's search for an ally to heal",
-            ));
-        }
-        Ok(IdleOutcome::Idle)
-    }
-
-    /// The soldier's idle check in `NoAttack` (stance 3, `FUN_140c20db0`: "searching and returning
-    /// to state pos."): the search alone from its place (slot 0x50, `FUN_140c63e20` with mode 1,
-    /// [`Pick::Look`]) sets the alert mode to whether it found enemies, their sighting time
-    /// restarting ([`UnitAi::attack_search_alert`]); then, but on the patrol orders, it walks
-    /// back to its state position ([`UnitAi::walk_back`], its result unread); with the alert mode
-    /// on, its object `+0x1bc` takes slot 0x1d8 (the base's −1, not held); last the healer's ally
-    /// search (`FUN_140c16f00`). Not modelled: a defend order's search (from its target's
-    /// objects), a computer's cared classes (`+0x190` with 10) and the healer's search.
-    pub(super) fn no_attack_idle(
-        &mut self,
-        at: &Surroundings,
-        player_kind: PlayerKind,
-        side: &mut UnitView<'_, '_>,
-        rng: &mut Well512,
-    ) -> GenieResult<()> {
-        if self.current_order == Some(OrderKind::Defend) {
-            return Err(GenieError::unsupported(
-                "a defend order's search (its target's objects)",
-            ));
-        }
-        if player_kind.is_computer() {
-            return Err(GenieError::unsupported(
-                "a computer player's soldier's NoAttack search",
-            ));
-        }
-        let found = side.closest(&Search {
-            at: at.position.ground(),
-            radius: attack_search_radius(at),
-            classes: &SOLDIER_CARED,
-            size: at.size,
-            pick: Pick::Look,
-            memory: Memory::default(),
-        })?;
-        self.attack_search_alert(found, player_kind, &at.unit_ai_tuning)?;
-        if !matches!(
-            self.current_order,
-            Some(OrderKind::Patrol | OrderKind::AttackMove)
-        ) {
-            let _ = self.walk_back(at, side, rng)?;
-        }
-        if at.flags.contains(SurroundingFlags::TASK_0X69) {
-            return Err(GenieError::unsupported(
-                "a healer's search for an ally to heal",
-            ));
-        }
-        Ok(())
     }
 
     /// The base unit AI's idle check (slot 72, `FUN_140c564c0`), the tower's (factory type 15):

@@ -122,9 +122,11 @@ impl UnitView<'_, '_> {
             &self.step.world.model.tuning,
         );
         let mut reach = |spatial: &mut Spatial, id: ObjectId, range: Distance| {
-            let mover = mover.ok_or(GenieError::unsupported(
-                "a reach test of a unit that does not move",
-            ))?;
+            // slot 0x3d0 of an object that does not move (types 10 to 25) is
+            // `FUN_141071b50`'s 0
+            let Some(mover) = mover else {
+                return Ok(false);
+            };
             mover.reaches_object(
                 (at, &walker),
                 (spatial, by_id),

@@ -7190,6 +7190,122 @@ fn side_own_release_tells_the_unit_ai_as_the_side_returns() {
     assert_eq!(notified(&world, NotifyKind::NO_LONGER_ON_ME).len(), 1);
 }
 
+/// The alert object (`+0x1bc`) with the alert mode on: a soldier's slot 0x1d8
+/// (`FUN_140c1c6e0`) names the last search's nearest enemy whose reload time (slot 0x218) is not
+/// 0, so deer 500, whose powerup takes its 2 s off, gives way to deer 501; any other factory
+/// type's names none (the base's −1); with the alert mode off it stays.
+#[test]
+fn alert_watch_names_the_nearest_armed_enemy() {
+    use crate::players::ByRelation;
+    use crate::unit_ai::world_view::OwnerView;
+    use crate::unit_ai::{AlertMode, UnitAi, UnitAiKind};
+    use crate::vision::registry::Record;
+    let mut world = hunt_world();
+    Arc::make_mut(&mut world.model.masters[0])
+        .get_mut(master_id(65))
+        .unwrap()
+        .combat
+        .get_or_insert_with(Default::default)
+        .reload = Seconds::new(2.0);
+    world
+        .parts
+        .combat_mut(object_id(500))
+        .unwrap()
+        .reload_powerup = Seconds::new(2.0);
+    let enemy = |id: i32, x: f32| Record {
+        id: object_id(id),
+        distance: Distance::new(f32::MAX),
+        owner: PlayerId::GAIA,
+        at: Point::new(x, 89.5),
+        radius: Footprint::new(0.4, 0.4),
+    };
+    world.spatial.set_searched(ByRelation::new([
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        vec![enemy(500, 32.5), enemy(501, 36.5)],
+    ]));
+    let watched = |world: &mut World, kind: UnitAiKind, mode: AlertMode| {
+        in_update(
+            world,
+            (PlayerId::new(1), ListIndex::new(0)),
+            50,
+            |unit, actions, step| {
+                let view = OwnerView::of(step, None).unwrap();
+                let attacker = unit.attacker_of(
+                    actions,
+                    UnitAiKind::Soldier,
+                    None,
+                    (PlayerId::new(1), PlayerKind::Human),
+                    GameMode::RandomMap,
+                    (CaptureKind::None, Firepower::ZERO, Speed::ZERO),
+                );
+                unit.with_side(
+                    actions,
+                    step,
+                    &view,
+                    attacker,
+                    (PlayerId::new(1), PlayerKind::Human),
+                    |ai: &mut UnitAi, side, _| {
+                        (ai.ai_kind, ai.alert_mode, ai.alert_object) =
+                            (kind, mode, Some(object_id(7)));
+                        ai.watch_alert(side)?;
+                        Ok(ai.alert_object)
+                    },
+                )
+            },
+        )
+    };
+    assert_eq!(
+        watched(&mut world, UnitAiKind::Soldier, AlertMode::Alert),
+        Ok(Some(object_id(501)))
+    );
+    assert_eq!(
+        watched(&mut world, UnitAiKind::Siege, AlertMode::Alert),
+        Ok(None)
+    );
+    assert_eq!(
+        watched(&mut world, UnitAiKind::Soldier, AlertMode::Calm),
+        Ok(Some(object_id(7)))
+    );
+}
+
+/// Slot 0x3d0 of an object that does not move (types 10 to 25, `FUN_141071b50`) answers 0: the
+/// unit AI's side of a unit without a mover reaches no object, the deer 3 tiles away included.
+#[test]
+fn side_without_mover_reaches_nothing() {
+    use crate::unit_ai::world_view::OwnerView;
+    let mut world = hunt_world();
+    let id = world.players[1].objects[ListIndex::new(0)].id;
+    world.set_motion(id, None);
+    let reached = in_update(
+        &mut world,
+        (PlayerId::new(1), ListIndex::new(0)),
+        50,
+        |unit, actions, step| {
+            let view = OwnerView::of(step, None).unwrap();
+            let attacker = unit.attacker_of(
+                actions,
+                UnitAiKind::Soldier,
+                None,
+                (PlayerId::new(1), PlayerKind::Human),
+                GameMode::RandomMap,
+                (CaptureKind::None, Firepower::ZERO, Speed::ZERO),
+            );
+            unit.with_side(
+                actions,
+                step,
+                &view,
+                attacker,
+                (PlayerId::new(1), PlayerKind::Human),
+                |_, side, _| side.reaches(object_id(500), Distance::new(4.0)),
+            )
+        },
+    );
+    assert_eq!(reached, Ok(false));
+}
+
 /// A notify for the updating unit's own AI from a call of its step ([`Step::notify_own`]):
 /// posted at once while the AI is in the world's table; held while the AI's side runs, the AI
 /// out of the table, and posted as the side returns.

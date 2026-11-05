@@ -2387,8 +2387,8 @@ fn closest_object_keeps_the_nearest_record_and_on_tie_the_lower_id() {
 
 /// `ClosestObject`'s tests past the relation: the filter's class, master and state keep or
 /// pass an object; a workers cap and the unbuilt farm test fail; livestock counts when the
-/// searcher's player owns it or it is not in state 2, and not while it moves; a searcher of
-/// class 10 passes what it shuns.
+/// searcher's player owns it or it is not in state 2, and not while it moves (an object of type
+/// 70 or 80 only); a searcher of class 10 passes what it shuns.
 #[test]
 fn closest_object_keeps_what_its_filter_and_its_searcher_take() {
     use crate::map::spatial::closest::{Searcher, closest_kept};
@@ -2403,7 +2403,19 @@ fn closest_object_keeps_what_its_filter_and_its_searcher_take() {
     let plain_world = found_world(vec![placed_object(&villager, found.clone(), None)]);
     let herded_world = found_world(vec![placed_object(
         &villager,
-        found.clone(),
+        Master {
+            kind: MasterKind::COMBAT,
+            ..found.clone()
+        },
+        Some(herding()),
+    )]);
+    // below type 70 slot 0x288 is −1 (`FUN_14106c3e0`): an action object's Artifact never moves
+    let action_world = found_world(vec![placed_object(
+        &villager,
+        Master {
+            kind: MasterKind::ACTION,
+            ..found.clone()
+        },
         Some(herding()),
     )]);
     let scout = Master {
@@ -2559,6 +2571,19 @@ fn closest_object_keeps_what_its_filter_and_its_searcher_take() {
             plain,
             ClosestChecks {
                 objects: herded_world.objects(),
+                ..checks
+            }
+        )
+        .unwrap()
+    );
+    assert!(
+        kept(
+            livestock,
+            &sheep,
+            ObjectState::Alive,
+            plain,
+            ClosestChecks {
+                objects: action_world.objects(),
                 ..checks
             }
         )
