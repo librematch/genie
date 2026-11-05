@@ -4,9 +4,11 @@
 
 use crate::GenieError;
 use crate::gathering::make::MAKE;
+use crate::movement::fly::FLY;
 use crate::objects::masters::ACTION_FACTORY_KINDS;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::Master;
+use crate::ownership::artifact::ARTIFACT_KIND;
 use genie_diff::{Diff, Differ};
 
 /// What an object's default task starts once its action list is empty in state 2: one value
@@ -116,18 +118,26 @@ impl DefaultTask {
     }
 }
 
-/// What a new building of master `master` starts once its action list is empty in state 2
-/// (`RGE_Action_Object::update`, slot 0x7f0): a Make ([`crate::gathering::make`]), or a start
-/// the slice cannot make of another type the factory makes; nothing for a type the factory
-/// makes no action of.
+/// What a new object of master `master` starts once its action list is empty in state 2
+/// (`RGE_Action_Object::update`, slot 0x7f0) by its master's default task: livestock's
+/// Artifact (107), a bird's Fly (10), a Make (21, [`crate::gathering::make`]), or a start the
+/// slice cannot make of another type the factory makes; nothing for none or a type the factory
+/// makes no action of (a wild animal's Explore, 6).
 #[must_use]
 pub fn default_start(master: &Master) -> DefaultTask {
-    match master.default_task() {
-        Some(first_task) if first_task.action_kind == MAKE => DefaultTask::Make,
-        Some(task) if ACTION_FACTORY_KINDS.contains(&task.action_kind) => {
-            DefaultTask::Fails(Unstartable::Unported(task.action_kind))
-        }
-        _ => DefaultTask::Nothing,
+    let Some(kind) = master.default_task().map(|task| task.action_kind) else {
+        return DefaultTask::Nothing;
+    };
+    if kind == ARTIFACT_KIND {
+        DefaultTask::Artifact
+    } else if kind == FLY {
+        DefaultTask::Fly
+    } else if kind == MAKE {
+        DefaultTask::Make
+    } else if ACTION_FACTORY_KINDS.contains(&kind) {
+        DefaultTask::Fails(Unstartable::Unported(kind))
+    } else {
+        DefaultTask::Nothing
     }
 }
 

@@ -8009,8 +8009,8 @@ fn the_point_gap_keeps_gap_that_is_not_number() {
 
 /// `FUN_140c20db0` in `NoAttack` ("searching and returning to state pos."): the search alone
 /// (slot 0x50 with mode 1), then off the patrol orders the walk back; processIdle stays 5. On
-/// a patrol order it stays. A search that finds enemies (player 1's walker 4.5 tiles off) is
-/// not modelled.
+/// a patrol order it stays. A search that finds enemies (player 1's walker 4.5 tiles off) turns
+/// the alert mode on and restarts the sighting time; the soldier still walks back.
 #[test]
 fn no_attack_soldier_searches_then_walks_back_to_its_state_position() {
     let peaceful = UnitAi {
@@ -8029,13 +8029,20 @@ fn no_attack_soldier_searches_then_walks_back_to_its_state_position() {
     );
     assert_eq!(lone_human_order(&world, player_id(2)), HUMAN_ORDER_CAP);
     let near = [scout_foe(77, player_id(1), 4.5)];
-    let mut world = idle_scout_world(idle_scout_unit(player_id(2), peaceful.clone()), &near);
-    let (answer, ..) = update_of(&mut world, scout, Millis::new(28), WorldTime::ZERO);
+    let sighted_long_ago = UnitAi {
+        time_since_enemy: Seconds::new(12.0),
+        ..peaceful.clone()
+    };
+    let mut world = idle_scout_world(idle_scout_unit(player_id(2), sighted_long_ago), &near);
+    let (answer, unit_ai, _) = update_of(&mut world, scout, Millis::new(28), WorldTime::ZERO);
+    assert_eq!(answer, Ok(None));
     assert_eq!(
-        answer,
-        Err(GenieError::unsupported(
-            "a NoAttack soldier's search that finds enemies"
-        ))
+        (unit_ai.alert_mode, unit_ai.time_since_enemy),
+        (AlertMode::Alert, Seconds::ZERO)
+    );
+    assert_eq!(
+        lone_walks(&world),
+        Some((Position::new(25.0, 92.5, 0.0), Distance::new(1.0)))
     );
     let patrolling = UnitAi {
         current_order: Some(OrderKind::Patrol),

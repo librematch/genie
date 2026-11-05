@@ -9693,6 +9693,61 @@ fn dead_farm_gives_its_death_spawn_its_kept_snow() {
     assert_eq!(spawn_snow(Snow::Kept, MasterKind::ANIMATED), None);
 }
 
+/// A new unit's default task is its master's (slot 0x7f0 starts it once its list is empty in
+/// state 2, [`crate::objects::layers::default_start`]): a death spawn of a bird's master (its
+/// default task a Fly) flies, where the spawn gave only livestock its Artifact.
+#[test]
+fn death_spawn_of_bird_master_takes_its_fly() {
+    use crate::objects::layers::DefaultTask;
+    let mut world = forage_world();
+    let villager = world.model.masters[1].get(master_id(120)).unwrap().clone();
+    let mut bird = Master {
+        id: master_id(98),
+        ..villager
+    };
+    let action = bird.action.get_or_insert_with(Default::default);
+    action.tasks[0].action_kind = FLY;
+    action.default_task = TaskIndex::of_data(0);
+    // the new unit's standing sprite, which its making starts
+    let standing = SpriteId::named(207);
+    bird.standing_sprite = Some(standing);
+    let _ = Arc::make_mut(&mut world.model.graphics).insert(
+        standing,
+        Graphic {
+            id: standing,
+            frames: Frame::of_data(10),
+            facets: FacetCount::of_data(1),
+            speed_multiplier: SpeedMultiplier::ONE,
+            frame_duration: Seconds::new(0.1),
+            replay_delay: Seconds::ZERO,
+            flags: SpriteFlags::ANIMATED,
+        },
+    );
+    let ms = &mut world.model.masters[1];
+    *ms = Arc::new(Masters::new(
+        ms.iter()
+            .cloned()
+            .map(|mut master| {
+                if master.id == master_id(120) {
+                    master.death_spawns = [Some(master_id(98)), None];
+                }
+                master
+            })
+            .chain([bird]),
+    ));
+    let id = world.players[1].objects[ListIndex::new(0)].id;
+    in_update(
+        &mut world,
+        (PlayerId::new(1), ListIndex::new(0)),
+        50,
+        Unit::death_spawn_comes,
+    )
+    .unwrap();
+    let made = world.players[1].objects.iter().last().unwrap().id;
+    assert_ne!(made, id);
+    assert_eq!(world.parts.actions_of(made).default_task, DefaultTask::Fly);
+}
+
 /// The Artifact's handover to Gaia (state 100, [`Unit::artifact_handover`]): player 1's sheep
 /// stops and changes hands to Gaia (slot 0x70), and its Artifact checks again (state 6). The
 /// world's first update runs no Artifact (`0x140aad250` from the second on).
@@ -9856,16 +9911,26 @@ fn farm_starts_its_make_in_its_first_update_and_fills_from_the_next() {
     assert!(world.players[0].unsupported.is_none());
 }
 
+/// What a new object's master's default task starts (slot 0x7f0, [`default_start`]): a farm's
+/// Make, a bird's Fly, livestock's Artifact; another type the factory makes is reported.
+///
+/// [`default_start`]: crate::objects::layers::default_start
 #[test]
-fn built_farm_master_starts_make_and_another_default_task_is_reported() {
+fn new_object_default_task_starts_by_its_master_task_kind() {
     use crate::objects::layers::DefaultTask;
     use crate::objects::layers::default_start;
+    use crate::ownership::artifact::ARTIFACT_KIND;
     assert_eq!(default_start(&farm_master()), DefaultTask::Make);
     let mut other = farm_master();
-    other.action.get_or_insert_with(Default::default).tasks[0].action_kind = FLY;
+    let with_kind = |master: &mut Master, kind| {
+        master.action.get_or_insert_with(Default::default).tasks[0].action_kind = kind;
+        default_start(master)
+    };
+    assert_eq!(with_kind(&mut other, FLY), DefaultTask::Fly);
+    assert_eq!(with_kind(&mut other, ARTIFACT_KIND), DefaultTask::Artifact);
     assert_eq!(
-        default_start(&other),
-        DefaultTask::Fails(Unstartable::Unported(FLY))
+        with_kind(&mut other, GATHER),
+        DefaultTask::Fails(Unstartable::Unported(GATHER))
     );
     // a type the factories make nothing of starts nothing (a wild animal's Explore, 6)
     other.action.get_or_insert_with(Default::default).tasks[0].action_kind = ActionKind::named(6);

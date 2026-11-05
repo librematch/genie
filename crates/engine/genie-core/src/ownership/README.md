@@ -35,5 +35,5 @@ unit, a player loses a building with its garrison.
 
 <!-- uses -->
 - Uses: [`combat`](../combat/), [`garrison`](../garrison/), [`map`](../map/), [`math`](../math/), [`movement`](../movement/), [`objects`](../objects/), [`orders`](../orders/), [`players`](../players/), [`testing`](../testing/), [`unit_ai`](../unit_ai/), [`vision`](../vision/), [`world`](../world/).
-- Used by: [`commands`](../commands/), [`construction`](../construction/), [`garrison`](../garrison/), [`map`](../map/), [`movement`](../movement/), [`objects`](../objects/), [`orders`](../orders/), [`players`](../players/), [`production`](../production/), [`technology`](../technology/), [`testing`](../testing/), [`unit_ai`](../unit_ai/), [`vision`](../vision/), [`world`](../world/).
+- Used by: [`commands`](../commands/), [`construction`](../construction/), [`garrison`](../garrison/), [`map`](../map/), [`movement`](../movement/), [`objects`](../objects/), [`orders`](../orders/), [`players`](../players/), [`technology`](../technology/), [`testing`](../testing/), [`unit_ai`](../unit_ai/), [`vision`](../vision/), [`world`](../world/).
 <!-- /uses -->

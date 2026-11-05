@@ -519,12 +519,12 @@ impl UnitAi {
 
     /// The soldier's idle check in `NoAttack` (stance 3, `FUN_140c20db0`: "searching and returning
     /// to state pos."): the search alone from its place (slot 0x50, `FUN_140c63e20` with mode 1,
-    /// [`Pick::Look`]) leaves the alert mode clear when it finds no enemies; then, but on the
-    /// patrol orders, it walks back to its state position ([`UnitAi::walk_back`], its result
-    /// unread); last the healer's ally search (`FUN_140c16f00`). Not modelled: enemies found (the
-    /// alert mode on, its object `+0x1bc` from slot 0x1d8, and after 10 s without a sighting the
-    /// player's notify 0x210, slot 0x2e8), a defend order's search (from its target's objects), a
-    /// computer's cared classes (`+0x190` with 10) and the healer's search.
+    /// [`Pick::Look`]) sets the alert mode to whether it found enemies, their sighting time
+    /// restarting ([`UnitAi::attack_search_alert`]); then, but on the patrol orders, it walks
+    /// back to its state position ([`UnitAi::walk_back`], its result unread); with the alert mode
+    /// on, its object `+0x1bc` takes slot 0x1d8 (the base's −1, not held); last the healer's ally
+    /// search (`FUN_140c16f00`). Not modelled: a defend order's search (from its target's
+    /// objects), a computer's cared classes (`+0x190` with 10) and the healer's search.
     pub(super) fn no_attack_idle(
         &mut self,
         at: &Surroundings,
@@ -550,14 +550,7 @@ impl UnitAi {
             pick: Pick::Look,
             memory: Memory::default(),
         })?;
-        if found.enemies {
-            return Err(GenieError::unsupported(
-                "a NoAttack soldier's search that finds enemies",
-            ));
-        }
-        if found.fresh {
-            self.alert_mode = AlertMode::Calm;
-        }
+        self.attack_search_alert(found, player_kind, &at.unit_ai_tuning)?;
         if !matches!(
             self.current_order,
             Some(OrderKind::Patrol | OrderKind::AttackMove)

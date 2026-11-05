@@ -39,11 +39,10 @@ use crate::{GenieError, GenieResult};
 
 use crate::combat::missile::grounded;
 use crate::objects::facing::{SpriteFacets, drawn_angle, draws_angle};
-use crate::objects::layers::{Action, Combat, DefaultTask, Motion, Static};
+use crate::objects::layers::{Action, Combat, Motion, Static, default_start};
 use crate::objects::lifecycle::death_parts::count_class;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::Master;
-use crate::ownership::artifact::ARTIFACT_KIND;
 use crate::technology::Attributes;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::{NewObject, Notify, UnitAi};
@@ -501,15 +500,8 @@ impl World {
         };
         let parts = ObjectParts {
             actions: Action {
-                // livestock's default task, the Artifact, starts once its action list is empty
-                default_task: if made
-                    .default_task()
-                    .is_some_and(|task| task.action_kind == ARTIFACT_KIND)
-                {
-                    DefaultTask::Artifact
-                } else {
-                    DefaultTask::Nothing
-                },
+                // what its master's default task starts once its action list is empty
+                default_task: default_start(made),
                 ..Default::default()
             },
             unit_ai: Some(ai),
