@@ -18,7 +18,7 @@ genie-model = { path = "../genie-model", features = ["schema"] }
 # the Nickel evaluator's stable interface (MIT, FD-046-D13)
 nickel-lang = "2.2"
 # the exact rationals' integers, for the one rounding to f32 (FD-046-D16)
-num-bigint = "0.4"
+num-bigint = "0.5"
 serde.workspace = true
 # the model types' JSON Schema (FD-046-D15)
 schemars.workspace = true
