@@ -1,6 +1,7 @@
 //! A new building: BUILD's foundation and the building constructor, with its combat setup,
 //! its storage and its annexes.
 
+use crate::combat::KillState;
 use crate::combat::abilities::Abilities;
 use crate::combat::damage::{ArmorBonuses, ArmorPair};
 use crate::combat::powerup::{ConversionPowerup, InfantryCount};
@@ -294,6 +295,8 @@ impl World {
             charge: setup.charge,
             decay_timer: setup.decay_timer,
             charge_hit: false,
+            // the constructor's (FUN_141072ad0)
+            kill_state: KillState::Open,
             store: Vec::new(),
             powerup_update: setup.powerup_update,
             order_source: OrderSource::Direct,

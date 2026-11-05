@@ -1,15 +1,15 @@
 //! A hit's victim: what the hit reads of it, the objects it may reach, the hit written back,
 //! the kill and its counts.
 
-use crate::combat::damage::{Kill, Razed, Victim};
+use crate::combat::damage::{Kill, KillCount, Razed, Victim};
 use crate::combat::stingers::ActiveStinger;
 use crate::map::Distance;
 use crate::map::Rect;
 use crate::map::Tile;
-use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectKey;
 use crate::objects::lifecycle::MasterData;
+use crate::objects::masters::ClassId;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterKind;
 use crate::objects::unit::Unit;
@@ -186,20 +186,27 @@ impl World {
 pub(crate) struct KillLeft {
     /// The object.
     pub(crate) id: ObjectId,
-    /// A hit killed it ([`World::killed`]).
+    /// A hit killed it ([`World::kill_left`]).
     pub(crate) kill: Option<Kill>,
+    /// What its hits' kills counted, in the game's order ([`World::count_kills`]).
+    pub(crate) counts: Vec<KillCount>,
     /// What each hit that left it, a building, below 1 hit point counted.
     pub(crate) razed: Vec<Razed>,
 }
 
 impl KillLeft {
-    /// The updating unit `id`, killed by its target's retaliation (`kill`).
-    pub(crate) const fn own(id: ObjectId, kill: Kill) -> Self {
-        Self {
-            id,
-            kill: Some(kill),
-            razed: Vec::new(),
+    /// The updating unit's own part of its hit (`own`): what its target's retaliation or reflected
+    /// damage killed and counted, taken off it; None for neither.
+    pub(crate) fn own(own: &mut Victim) -> Option<Self> {
+        if own.killed.is_none() && own.kill_counts.is_empty() {
+            return None;
         }
+        Some(Self {
+            id: own.id,
+            kill: own.killed.take(),
+            counts: take(&mut own.kill_counts),
+            razed: Vec::new(),
+        })
     }
 }
 
@@ -262,11 +269,11 @@ pub(crate) fn victim(
 /// asleep (a tree a blast reached) takes its hit points and what it holds; below 1 hit point
 /// (COMISS/JBE: a NaN sleeps on) the hit wakes it (`FUN_14119deb0` with 0, [`World::wake_sleeper`])
 /// to take the rest. A live one takes its hit points, what it holds, its sleep flag, its decay, its
-/// powerups and charge, the stingers the hit handed it (at the world time), a struck building's
-/// `damaged_lately_timer`, the damage notifies (500) to its unit AI, and a struck building's
-/// annexes take its hit points (`+0xbc0`..). Returns its kill
-/// and razings for the caller ([`KillLeft`]); `victim` keeps neither them nor its notifies, so
-/// another write-back repeats none.
+/// powerups and charge, its kill flag (`+0x954`), the stingers the hit handed it (at the world
+/// time), a struck building's `damaged_lately_timer`, the damage notifies (500) to its unit AI,
+/// and a struck building's annexes take its hit points (`+0xbc0`..). Returns its kill, its kill
+/// counts and its razings for the caller ([`KillLeft`]); `victim` keeps none of them nor its
+/// notifies, so another write-back repeats none.
 ///
 /// # Errors
 ///
@@ -279,6 +286,7 @@ pub(crate) fn write_back(
     let left = KillLeft {
         id: victim.id,
         kill: victim.killed.take(),
+        counts: take(&mut victim.kill_counts),
         razed: victim
             .building
             .as_mut()
@@ -312,6 +320,7 @@ pub(crate) fn write_back(
     if let Some(armored) = victim.armored.as_ref() {
         combat.hp_powerup = armored.hp_powerup;
     }
+    combat.kill_state = victim.kill_state;
     // the stingers the hit handed it (FUN_141200830's push_back)
     combat.active_stingers.extend(
         take(&mut victim.stung)
@@ -338,7 +347,8 @@ pub(crate) fn write_back(
             x.life.hp = victim.hp;
         }
     }
-    Ok((left.kill.is_some() || !left.razed.is_empty()).then_some(left))
+    let counts = left.kill.is_some() || !left.counts.is_empty() || !left.razed.is_empty();
+    Ok(counts.then_some(left))
 }
 
 /// [`write_back`]'s decay: a hunt that stopped the victim's decay (`FUN_140ac44b0`, its sign
@@ -373,7 +383,7 @@ fn decay_stopped(step: &mut Step<'_>, victim: &Victim) -> GenieResult<()> {
 /// A hit's kill and razings where the hit runs (the damage slot `FUN_1412108e0` kills and counts
 /// at once: `FUN_141082e80`, slot 0x8b0): another object's reach the world
 /// ([`World::kill_left`]); the updating object's own (`me`, out of its slot) counts as its
-/// player's ([`World::count_killed`]), and a livestock's change to Gaia (slot 0x70) is the
+/// player's ([`World::count_kills`]), and a livestock's change to Gaia (slot 0x70) is the
 /// unit's own at once ([`Unit::ai_change_owner`]: its list's move follows the update, as a
 /// takeover's).
 ///
@@ -389,12 +399,13 @@ pub(crate) fn file_kill(
     if kill_left.id != step.me {
         return step.world.kill_left(&kill_left);
     }
-    if let Some(kill) = kill_left.kill {
+    if !kill_left.counts.is_empty() {
         let master = me.master(step.world.master_tables(), step.player)?.clone();
-        step.world.count_killed(step.player, &master, kill)?;
-        if kill.to_gaia {
-            me.ai_change_owner(actions, PlayerId::GAIA, step, roles)?;
-        }
+        step.world
+            .count_kills(step.player, &master, &kill_left.counts)?;
+    }
+    if kill_left.kill.is_some_and(|kill| kill.to_gaia) {
+        me.ai_change_owner(actions, PlayerId::GAIA, step, roles)?;
     }
     step.world.count_razed(&kill_left.razed)
 }
@@ -445,7 +456,11 @@ pub(crate) fn write_strike_back(
 
 impl World {
     /// What a hit's write-back left ([`KillLeft`]) on an object the world holds live: its kill
-    /// ([`World::killed`]), then its razings ([`World::count_razed`]).
+    /// counts by its master, its own one, else its player's ([`World::count_kills`]); a killed
+    /// player's livestock goes to Gaia (slot 0x70, [`World::give_gaia`]: its place and sight, its
+    /// Artifact's wait, its unit AI's notifies (cleared, then 0x20b), its storage (the old owner
+    /// loses flags 2, 16 and 32, Gaia gains 1, 2 and 32) and its list (the old owner's last
+    /// object takes its place)); then its razings ([`World::count_razed`]).
     ///
     /// # Errors
     ///
@@ -454,8 +469,13 @@ impl World {
         let Some(Place::Live(player_id, list_index)) = self.place(left.id) else {
             return Ok(());
         };
-        if let Some(kill) = left.kill {
-            self.killed(player_id, list_index, kill)?;
+        if !left.counts.is_empty() {
+            let unit = &self.players.live(player_id, list_index)?;
+            let master = unit.master(self.master_tables(), player_id)?.clone();
+            self.count_kills(player_id, &master, &left.counts)?;
+        }
+        if left.kill.is_some_and(|kill| kill.to_gaia) {
+            self.give_gaia(player_id, list_index)?;
         }
         self.count_razed(&left.razed)
     }
@@ -484,88 +504,92 @@ impl World {
         Ok(())
     }
 
-    /// A combat object's death by a hit (`FUN_141082e80`, `FUN_1412108e0`): its owner's computer
-    /// AI is told (slot 0x2f0, not modelled); the killed handling (slot 0x8b0, `FUN_141205880` ->
-    /// `FUN_1412005b0`): unless its class is one of the non-military ones the attacker's player
-    /// counts a kill (attribute 20) and its owner a loss (154); the attacker's player counts it
-    /// against the owner (300 + the owner) and the owner against the attacker (325 + the
-    /// attacker's player); both count its paid cost (170 and 152, and 400 + the owner). A killed
-    /// villager first counts for its owner (`FUN_141082e80`): an attacker of class 9 or 10 (an
-    /// animal) in attribute 227, and by the attacker's player type a human's in 229, Gaia's in
-    /// 226, a computer's in 228. Gaia takes a player's livestock (slot 0x70): its place and sight, its Artifact's
-    /// wait, its unit AI's notifies (cleared, then 0x20b), its storage (the old owner loses flags 2,
-    /// 16 and 32, Gaia gains 1, 2 and 32) and its list (the old owner's last object takes its
-    /// place). Not held: the killer (`+0x690`, `+0x694`), `+0x954`, the statistics of the local
-    /// player and the particles (`FUN_141158bb0`).
-    pub(crate) fn killed(
-        &mut self,
-        player_id: PlayerId,
-        list_index: ListIndex,
-        kill: Kill,
-    ) -> GenieResult<()> {
-        let unit = &self.players.live(player_id, list_index)?;
-        let master = unit.master(self.master_tables(), player_id)?.clone();
-        self.count_killed(player_id, &master, kill)?;
-        if kill.to_gaia {
-            self.give_gaia(player_id, list_index)?;
-        }
-        Ok(())
-    }
-
-    /// [`World::killed`]'s counts of an object of player `player_id` and `master`: its owner's
-    /// computer AI (not modelled), a villager's counts for its owner, then the kill's
-    /// ([`World::count_kill_of`]).
+    /// The counts of a kill of an object of player `player_id` and `master`, `counts` in the
+    /// game's order: slot 22's credits of its burns ([`World::credit_burns`]), the damage's counts
+    /// for its owner ([`World::count_owner_loss`]) and `FUN_1412005b0`'s for a killer
+    /// ([`World::count_kill_of`]). Not held: the killer (`+0x690`, `+0x694`), the statistics of the
+    /// local player and the particles (`FUN_141158bb0`).
     ///
     /// # Errors
     ///
     /// A computer player's object, and an attribute a player lacks.
-    pub(crate) fn count_killed(
+    pub(crate) fn count_kills(
         &mut self,
         player_id: PlayerId,
         master: &Master,
-        kill: Kill,
+        counts: &[KillCount],
+    ) -> GenieResult<()> {
+        for count in counts {
+            match count {
+                KillCount::Stingers(attackers) => {
+                    self.credit_burns(player_id, master, attackers)?;
+                }
+                &KillCount::Owner {
+                    attacker_class,
+                    attacker_player,
+                } => self.count_owner_loss(player_id, master, (attacker_class, attacker_player))?,
+                &KillCount::Killer(killer) => self.count_kill_of(player_id, master, killer)?,
+            }
+        }
+        Ok(())
+    }
+
+    /// The damage's counts of a killed object of player `player_id` and `master` for its owner
+    /// (`FUN_141082e80` below 1 hit point), by the attacker's class and player `attacker`: its
+    /// owner's computer AI is told (slot 0x2f0, not modelled); a villager first counts for its
+    /// owner, an attacker of class 9 or 10 (an animal) in attribute 227, and by the attacker's
+    /// player type a human's in 229, Gaia's in 226, a computer's in 228.
+    ///
+    /// # Errors
+    ///
+    /// A computer player's object, and an attribute a player lacks.
+    pub(crate) fn count_owner_loss(
+        &mut self,
+        player_id: PlayerId,
+        master: &Master,
+        (attacker_class, attacker_player): (ClassId, PlayerId),
     ) -> GenieResult<()> {
         if self.players.player(player_id)?.kind.is_computer() {
             return Err(GenieError::unsupported(
                 "a computer player's killed object (its AI's slot 0x2f0)",
             ));
         }
-        let ap = kill.attacker_player;
-        if self
+        if !self
             .model
             .roles
             .of_class(master.class)
             .contains(ClassRoles::VILLAGER)
         {
-            // the attacker's class as the hit saw it: the attacker may be out for its update
-            if self
-                .model
-                .roles
-                .of_class(kill.attacker_class)
-                .intersects(ClassRoles::PREY | ClassRoles::PREDATOR)
-            {
-                self.players.player_mut(player_id)?.add_attribute(
-                    self.model.slots.attribute.villager_killed_by_animal,
-                    Amount::new(1.0),
-                )?;
-            }
-            let by_kind = match self.players.player(ap)?.kind {
-                PlayerKind::Human => Some(self.model.slots.attribute.villager_killed_by_kind_1),
-                PlayerKind::Gaia => Some(self.model.slots.attribute.villager_killed_by_kind_2),
-                PlayerKind::Computer => Some(self.model.slots.attribute.villager_killed_by_kind_3),
-                PlayerKind::Phantom => None,
-            };
-            if let Some(kind) = by_kind {
-                self.players
-                    .player_mut(player_id)?
-                    .add_attribute(kind, Amount::new(1.0))?;
-            }
+            return Ok(());
         }
-        self.count_kill_of(player_id, master, ap)
+        // the attacker's class as the hit saw it: the attacker may be out for its update
+        if self
+            .model
+            .roles
+            .of_class(attacker_class)
+            .intersects(ClassRoles::PREY | ClassRoles::PREDATOR)
+        {
+            self.players.player_mut(player_id)?.add_attribute(
+                self.model.slots.attribute.villager_killed_by_animal,
+                Amount::new(1.0),
+            )?;
+        }
+        let by_kind = match self.players.player(attacker_player)?.kind {
+            PlayerKind::Human => Some(self.model.slots.attribute.villager_killed_by_kind_1),
+            PlayerKind::Gaia => Some(self.model.slots.attribute.villager_killed_by_kind_2),
+            PlayerKind::Computer => Some(self.model.slots.attribute.villager_killed_by_kind_3),
+            PlayerKind::Phantom => None,
+        };
+        if let Some(kind) = by_kind {
+            self.players
+                .player_mut(player_id)?
+                .add_attribute(kind, Amount::new(1.0))?;
+        }
+        Ok(())
     }
 
     /// `FUN_1412005b0` on the object `id` killed for player `killer` (a movement damage's,
-    /// [`crate::combat::abilities`]): the counts of [`World::killed`] by its master (its own one, else
+    /// [`crate::combat::abilities`]): [`World::count_kill_of`] by its master (its own one, else
     /// its player's).
     ///
     /// # Errors

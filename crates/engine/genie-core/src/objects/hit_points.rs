@@ -4,7 +4,9 @@
 //! that heals around it) calls the healed object's heal here.
 
 use crate::combat::damage::ArmorPair;
+use crate::combat::damage::KillCount;
 use crate::combat::damage::{gain_hp as damage_gain_hp, heal_hp, most_hp};
+use crate::combat::stingers::credit_combat;
 use crate::math::fmath::{at_most_or_unordered, maxss};
 use crate::math::image::turn::{
     REGENERATION_EPSILON as TURN_REGENERATION_EPSILON,
@@ -140,14 +142,17 @@ impl Unit {
 
     /// Slot 0xb0 of a combat object (`FUN_141205c80`), the loss of `d` hit points: the hit point
     /// powerups' room (`+0xa38` up to `+0xa3c`) takes it first, the rest comes off the hit points,
-    /// which stay above the master's `invulnerability_level` floor (`FUN_141202a80`). Not ported
-    /// yet: a dying object's kill credits of its active stingers (`+0xb58`, `+0x954`); not held
-    /// (no update of the recordings fills the list): a surviving one's hit point transforms
-    /// (`FUN_141204450`); [`crate::combat::damage::lose`] is the same loss on a hit's victim.
-    pub(crate) fn lose_hp(&mut self, combat: &mut Combat, master: &Master, loss: HitPoints) {
-        let Some(hit_points) = combat.hp_powerup.absorb(loss) else {
-            return;
-        };
+    /// which stay above the master's `invulnerability_level` floor (`FUN_141202a80`). Left below
+    /// 1, its stingers credit its kill: the credits for the caller to count ([`credit_combat`]).
+    /// Not ported yet (MISSING.md): a surviving one's hit point transforms (`FUN_141204450`);
+    /// [`crate::combat::damage::lose`] is the same loss on a hit's victim.
+    pub(crate) fn lose_hp(
+        &mut self,
+        combat: &mut Combat,
+        master: &Master,
+        loss: HitPoints,
+    ) -> Option<KillCount> {
+        let hit_points = combat.hp_powerup.absorb(loss)?;
         let floor = master
             .creatable_part()
             .invulnerability
@@ -158,6 +163,7 @@ impl Unit {
         } else {
             floor
         };
+        credit_combat(combat, self.life.hp)
     }
 
     /// `TRIBE_Combat_Object::update`'s regeneration (`0x141208440` after
@@ -171,23 +177,24 @@ impl Unit {
     /// [`most_hp`]), or
     /// come off (slot 0xb0, [`Unit::lose_hp`]) at most its hit points with its powerups' room
     /// (slot 0xc0). Then an object at its most (slot 0xc0 at least slot 200) has the armor its
-    /// charge's hits took back (`+0x9e4` and `+0x9e6`, one dword, zeroed).
+    /// charge's hits took back (`+0x9e4` and `+0x9e6`, one dword, zeroed). Returns the kill
+    /// credits of a loss that left it below 1 hit point, for the caller to count.
     pub(crate) fn regenerate(
         &mut self,
         combat: &mut Combat,
         master: &Master,
         dt_seconds: Seconds,
         turn_tuning: &TurnTuning,
-    ) {
+    ) -> Option<KillCount> {
         use crate::math::fmath::{at_most_or_unordered, below_or_unordered};
         let rate = regeneration_rate(master, combat, turn_tuning).get();
         if below_or_unordered(self.life.hp.get(), turn_tuning.regeneration_least_hp)
             || self.life.state != ObjectState::Alive
         {
-            return;
+            return None;
         }
         if !below_or_unordered(REGENERATION_EPSILON, rate.abs()) {
-            return;
+            return None;
         }
         let held = dt_seconds + combat.regen_timer;
         let per = (REGENERATION_MINUTE / rate).abs();
@@ -200,9 +207,10 @@ impl Unit {
         let whole = points - fraction;
         combat.regen_timer = Seconds::new(fraction * per);
         if at_most_or_unordered(whole, 0.0) {
-            return;
+            return None;
         }
         let most = most_hp(combat.hp_stinger, master.hit_points, combat.hp_powerup).get();
+        let mut credited = None;
         let now = (combat.hp_powerup.room() + self.life.hp).get();
         if at_most_or_unordered(rate, 0.0) {
             let amount = if at_most_or_unordered(whole, now) {
@@ -211,7 +219,7 @@ impl Unit {
                 now
             };
             if !at_most_or_unordered(amount, 0.0) {
-                self.lose_hp(combat, master, HitPoints::new(amount));
+                credited = self.lose_hp(combat, master, HitPoints::new(amount));
             }
         } else {
             let left = most - now;
@@ -229,6 +237,7 @@ impl Unit {
         if most <= (combat.hp_powerup.room() + self.life.hp).get() {
             combat.armor_removed = ArmorPair::ZERO;
         }
+        credited
     }
 
     /// `TRIBE_Combat_Object::update`'s hit point powerup check (after its abilities): a powerup

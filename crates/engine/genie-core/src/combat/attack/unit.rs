@@ -6,7 +6,7 @@ use crate::combat::attack::Armament;
 use crate::combat::attack::{Attack, AttackState};
 use crate::combat::attack::{AttackReads, Fight};
 use crate::combat::damage::Victim;
-use crate::combat::victims::{KillLeft, file_kill, victim, victim_of};
+use crate::combat::victims::{file_kill, victim, victim_of};
 use crate::combat::volley::armed;
 use crate::math::rng::Stream;
 use crate::movement::Me;
@@ -188,12 +188,11 @@ impl Unit {
         }
         let code = code?;
         // the retaliation's kill of the unit itself, which follows its step
-        if let Some(kill) = self.hit_back(
+        if let Some(own) = self.hit_back(
             fight.own,
             step.world.parts.ai_and_combat_mut(self.id)?,
             step.world.world_time,
         )? {
-            let own = KillLeft::own(self.id, kill);
             file_kill(step, (self, actions), own, roles)?;
         }
         Ok(HeadCode::of(code))

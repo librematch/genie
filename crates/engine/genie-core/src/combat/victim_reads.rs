@@ -5,7 +5,7 @@ use crate::combat::damage::Allied;
 use crate::combat::damage::{Armored, Attacker, BONUS_DAMAGE, Building as DamageBuilding};
 use crate::combat::damage::{ElevationBonus, Victim};
 use crate::combat::powerup::InfantryCount;
-use crate::combat::stingers::stinger_tasks;
+use crate::combat::stingers::{StingerAttackers, stinger_tasks};
 use crate::combat::victims::{is_trebuchet, paid_cost};
 use crate::map::Tile;
 use crate::map::spatial::Spatial;
@@ -201,6 +201,7 @@ pub(crate) fn victim_of(
             .filter(|task| enabled(attributes, task.enablement))
             .collect(),
         stung: Vec::new(),
+        stinger_attackers: StingerAttackers::of(&combat.active_stingers),
         // a combat object's slot 0xf0 is FUN_141082530 (types 50 and up)
         armored: (MasterKind::RGE_COMBAT <= kind).then(|| Armored {
             armors: master.combat_part().armors.clone(),
@@ -223,7 +224,7 @@ pub(crate) fn victim_of(
                 .action_part()
                 .tasks
                 .iter()
-                .any(|task| task.action_kind == REMOVAL_REWARD && 1e-7 < task.work_val1.get()),
+                .any(|task| task.action_kind == REMOVAL_REWARD && 1e-7 < task.work_range.get()),
             busy: actions.top_action_kind().is_some() || unread.is_some(),
             unit_ai,
             alert_idle: None,
@@ -231,6 +232,8 @@ pub(crate) fn victim_of(
         }),
         damaged: Vec::new(),
         killed: None,
+        kill_state: combat.kill_state,
+        kill_counts: Vec::new(),
         // a building's slot 0xe8 is FUN_1411cea90
         building: (kind == MasterKind::BUILDING).then(|| DamageBuilding {
             main: building.annex_of,

@@ -3,15 +3,19 @@
 
 use crate::combat::AttackBonus;
 use crate::combat::ClassOrMaster;
+use crate::combat::KillState;
 use crate::combat::damage::Allied;
 use crate::combat::damage::ArmorBonuses;
+use crate::combat::damage::Armored;
 use crate::combat::damage::Attacker;
+use crate::combat::damage::KillCount;
 use crate::combat::damage::Victim;
+use crate::combat::damage::lose;
 use crate::combat::powerup::PowerupAttribute;
 use crate::combat::stingers::update::{StingerReads, update_stingers};
 use crate::combat::stingers::{
-    ActiveStinger, STINGER, StingerReceiver, StingerSeconds, StingerTask, StingerValue, hand_off,
-    stinger_tasks,
+    ActiveStinger, STINGER, StingerAttackers, StingerReceiver, StingerSeconds, StingerTask,
+    StingerValue, credit_combat, hand_off, stinger_tasks,
 };
 use crate::map::Distance;
 use crate::map::GridSize;
@@ -19,6 +23,7 @@ use crate::map::Position;
 use crate::movement::Speed;
 use crate::objects::HitPoints;
 use crate::objects::MasterHitPoints;
+use crate::objects::ObjectId;
 use crate::objects::Regeneration;
 use crate::objects::layers::Combat;
 use crate::objects::masters::ActionKind;
@@ -36,11 +41,16 @@ use crate::objects::masters::MasterKind;
 use crate::objects::masters::Task;
 use crate::objects::masters::TaskFlags;
 use crate::objects::masters::WorkValue;
+use crate::players::Amount;
+use crate::players::PlayerId;
 use crate::players::attribute::AttributeId;
+use crate::test_ids::costs;
 use crate::test_ids::object_id;
+use crate::testing::attribute;
 use crate::testing::class;
 use crate::testing::scene::{PLAYER, Scene, SceneObject};
 use crate::world::Seconds;
+use crate::world::World;
 use crate::world::WorldTime;
 
 /// A master with stinger tasks among its tasks: the Fire Archer's burn of a class (attribute
@@ -457,4 +467,222 @@ fn world_updates_the_stingers_of_combat_units_only() {
     let animal = world.parts.combat_of(object_id(8));
     assert_eq!(animal.regen_stinger, Regeneration::new(5.0));
     assert_eq!(animal.active_stingers.len(), 2);
+}
+
+/// A combat unit of player 2 at `hp` hit points, its stingers' list held with the burns of
+/// `burning` ([`StingerAttackers`]), for slot 22's tests (`FUN_141205c80`).
+fn burning(hp: f32, burning: Vec<Option<ObjectId>>) -> Victim {
+    Victim {
+        id: object_id(70),
+        kind: MasterKind::COMBAT,
+        player: PlayerId::new(2),
+        hp: HitPoints::new(hp),
+        armored: Some(Armored::default()),
+        stinger_attackers: StingerAttackers {
+            held: true,
+            burning,
+        },
+        ..Victim::default()
+    }
+}
+
+/// Slot 22's loss that leaves its object below 1 hit point (`FUN_141205c80`) records the
+/// attackers of its burns, those of its list in their order (an ended one and a −1 among them),
+/// then those the hit handed it (a speed stinger's attacker is not one), and counts its kill
+/// (`+0x954`).
+#[test]
+fn loss_below_one_credits_the_burns_and_counts_the_kill() {
+    let [burn, speed] = [0, 1].map(|index| stinger_tasks(&archer())[index]);
+    let mut victim = burning(3.0, vec![Some(object_id(5)), None, Some(object_id(5))]);
+    victim.stung = vec![(object_id(7), burn), (object_id(8), speed)];
+    lose(&mut victim, HitPoints::new(2.5));
+    assert_eq!(victim.hp, HitPoints::new(0.5));
+    assert_eq!(
+        victim.kill_counts,
+        vec![KillCount::Stingers(vec![
+            Some(object_id(5)),
+            None,
+            Some(object_id(5)),
+            Some(object_id(7)),
+        ])]
+    );
+    assert_eq!(victim.kill_state, KillState::Counted);
+}
+
+/// Slot 22 counts the kill of an object with stingers but no burns too, crediting nobody, and
+/// a counted kill credits nothing again; a survivor, an object without stingers and one below
+/// type 70 (`FUN_141189160`) credit nothing; a NaN loss takes the credits' branch
+/// (`COMISS hp, 1` / `JC`).
+#[test]
+fn slot_22_credits_only_the_first_death_of_an_object_with_stingers() {
+    let mut no_burns = burning(2.0, Vec::new());
+    lose(&mut no_burns, HitPoints::new(1.5));
+    assert_eq!(no_burns.kill_counts, vec![KillCount::Stingers(Vec::new())]);
+    assert_eq!(no_burns.kill_state, KillState::Counted);
+    lose(&mut no_burns, HitPoints::new(0.25));
+    assert_eq!(no_burns.kill_counts.len(), 1);
+    let mut survivor = burning(5.0, vec![Some(object_id(5))]);
+    lose(&mut survivor, HitPoints::new(1.0));
+    let mut bare = Victim {
+        stinger_attackers: StingerAttackers::default(),
+        ..burning(2.0, Vec::new())
+    };
+    lose(&mut bare, HitPoints::new(1.5));
+    let mut below_tribe = Victim {
+        kind: MasterKind::RGE_COMBAT,
+        ..burning(2.0, vec![Some(object_id(5))])
+    };
+    lose(&mut below_tribe, HitPoints::new(1.5));
+    for victim in [&survivor, &bare, &below_tribe] {
+        assert!(victim.kill_counts.is_empty() && !victim.kill_state.is_counted());
+    }
+    let mut unordered = burning(2.0, vec![Some(object_id(5))]);
+    lose(&mut unordered, HitPoints::new(f32::NAN));
+    assert_eq!(
+        unordered.kill_counts,
+        vec![KillCount::Stingers(vec![Some(object_id(5))])]
+    );
+}
+
+/// The regeneration's slot 22 (`Unit::lose_hp`) credits the burns its object holds (kinds 109
+/// and 120, not the speed stinger) once: at a loss below 1 hit point, its kill not counted yet.
+#[test]
+fn the_regenerations_loss_credits_the_held_burns_once() {
+    let held = |kind, attacker| ActiveStinger {
+        attacker: Some(object_id(attacker)),
+        ..stinger(kind, -1.0, TaskFlags::NONE)
+    };
+    let mut combat = Combat {
+        active_stingers: vec![
+            held(PowerupAttribute::REGENERATION_RATE, 5),
+            held(PowerupAttribute::MOVEMENT_SPEED, 6),
+            held(PowerupAttribute::REGENERATION_HP_PERCENT, 7),
+        ],
+        ..Combat::default()
+    };
+    assert_eq!(credit_combat(&mut combat, HitPoints::new(1.0)), None);
+    assert_eq!(combat.kill_state, KillState::Open);
+    assert_eq!(
+        credit_combat(&mut combat, HitPoints::new(0.5)),
+        Some(KillCount::Stingers(vec![
+            Some(object_id(5)),
+            Some(object_id(7))
+        ]))
+    );
+    assert_eq!(combat.kill_state, KillState::Counted);
+    assert_eq!(credit_combat(&mut combat, HitPoints::new(0.25)), None);
+}
+
+/// Slot 22's credits in the world (`World::credit_burns`, `FUN_1412005b0` per player): each player
+/// of an attacker the world holds counts once, in the order they first appear; an attacker it no
+/// longer holds and a −1 credit nobody. The game walks the players in an address order no run
+/// repeats: the counts come out the same in either order, bit for bit (`CODING_STYLE.md` section
+/// 12).
+#[test]
+fn burns_credit_each_player_once_in_any_order() {
+    let at = |x| Position::new(x, 1.5, 0.0);
+    let mut world = Scene::open(GridSize::new(8, 8))
+        .players(3)
+        .object(SceneObject::new(5, PlayerId::new(1), archer(), at(1.5)))
+        .object(SceneObject::new(6, PlayerId::new(1), archer(), at(2.5)))
+        .object(SceneObject::new(7, PlayerId::new(3), archer(), at(3.5)))
+        .build();
+    for player in &mut world.players {
+        player.attributes = vec![Amount::ZERO; 500];
+    }
+    let attackers = [
+        Some(object_id(6)),
+        None,
+        Some(object_id(99)),
+        Some(object_id(7)),
+        Some(object_id(5)),
+    ];
+    assert_eq!(
+        world.burning_players(&attackers),
+        [PlayerId::new(1), PlayerId::new(3)]
+    );
+    let victim = Master {
+        creatable: Some(CreatablePart {
+            cost: costs(&[(attribute::WOOD, 25, true), (attribute::GOLD, 45, true)]),
+            ..CreatablePart::default()
+        }),
+        ..archer()
+    };
+    let credited = |order: &[Option<ObjectId>]| {
+        let mut credited = world.clone();
+        credited
+            .credit_burns(PlayerId::new(2), &victim, order)
+            .unwrap();
+        credited
+            .players
+            .iter()
+            .map(|player| {
+                player
+                    .attributes
+                    .iter()
+                    .map(|amount| amount.get().to_bits())
+                    .collect::<Vec<_>>()
+            })
+            .collect::<Vec<_>>()
+    };
+    let reversed: Vec<_> = attackers.iter().rev().copied().collect();
+    assert_eq!(credited(&attackers), credited(&reversed));
+    let mut forward = world.clone();
+    forward
+        .credit_burns(PlayerId::new(2), &victim, &attackers)
+        .unwrap();
+    let (one, two) = (
+        &forward.players[1].attributes,
+        &forward.players[2].attributes,
+    );
+    assert_eq!(
+        [one[20], one[302], one[170], one[402]],
+        [1.0, 1.0, 70.0, 70.0].map(Amount::new)
+    );
+    assert_eq!(
+        [two[154], two[326], two[328], two[152]],
+        [2.0, 1.0, 1.0, 140.0].map(Amount::new)
+    );
+}
+
+/// A burn's kill through the regeneration (`World::regenerate_object`, slot 22 in
+/// `TRIBE_Combat_Object::update`'s loss): a unit of player 1 at 1.5 hit points that burns at −60
+/// a minute (a point a second) for 2 seconds dies, its kill counted (`+0x954`), and the burn's
+/// attacker's player 3 counts it once (attribute 20, 300 + 1; its owner 325 + 3); a later loss
+/// credits nothing again.
+#[test]
+fn burning_units_death_credits_its_burner_once() {
+    let at = |x| Position::new(x, 1.5, 0.0);
+    let (burner, burnt) = (object_id(7), object_id(9));
+    let mut world = Scene::open(GridSize::new(8, 8))
+        .players(3)
+        .object(SceneObject::new(7, PlayerId::new(3), archer(), at(1.5)))
+        .object(SceneObject::new(9, PlayerId::new(1), archer(), at(3.5)))
+        .build();
+    for player in &mut world.players {
+        player.attributes = vec![Amount::ZERO; 500];
+    }
+    world.object_mut(burnt).unwrap().1.life.hp = HitPoints::new(1.5);
+    let combat = world.parts.combat_mut(burnt).unwrap();
+    combat.regen_stinger = Regeneration::new(-60.0);
+    combat.active_stingers = vec![ActiveStinger {
+        attacker: Some(burner),
+        ..stinger(PowerupAttribute::REGENERATION_RATE, -60.0, TaskFlags::NONE)
+    }];
+    let index = world.live_index(PlayerId::new(1), burnt).unwrap();
+    world
+        .regenerate_object((PlayerId::new(1), index, burnt), Seconds::new(2.0))
+        .unwrap();
+    assert!(world.object(burnt).unwrap().1.life.hp < HitPoints::new(1.0));
+    assert_eq!(world.parts.combat_of(burnt).kill_state, KillState::Counted);
+    let counted = |world: &World| {
+        let (killer, owner) = (&world.players[3].attributes, &world.players[1].attributes);
+        [killer[20], killer[301], owner[154], owner[328]]
+    };
+    assert_eq!(counted(&world), [1.0; 4].map(Amount::new));
+    world.object_mut(burnt).unwrap().1.life.hp = HitPoints::new(1.5);
+    world
+        .regenerate_object((PlayerId::new(1), index, burnt), Seconds::new(2.0))
+        .unwrap();
+    assert_eq!(counted(&world), [1.0; 4].map(Amount::new));
 }

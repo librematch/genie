@@ -3,6 +3,7 @@
 //! object holds it for now, with the game's defaults below type 50 (T4 step 1).
 
 use crate::combat::Charge;
+use crate::combat::KillState;
 use crate::combat::abilities::Abilities;
 use crate::combat::damage::{ArmorBonuses, ArmorPair};
 use crate::combat::powerup::{AppliedPowerup, ConversionPowerup, InfantryCount};
@@ -49,6 +50,8 @@ pub struct Combat {
     /// `m_specialAbilityDurationMs` and `m_abilityActivatedTimeMs` (`+0x914`, `+0x918`): its
     /// timed ability ([`AbilityTimer`]).
     pub ability: AbilityTimer,
+    /// `mProcessedKill` (`+0x954`): whether its kill is counted ([`KillState`]).
+    pub kill_state: KillState,
     /// `next_volley` (`+0xa04`): the missiles of the volley under way already fired.
     pub next_volley: MissileCount,
     /// `using_special_attack_animation` (`+0xa05`): whether it shows its master's special sprite

@@ -45,15 +45,16 @@ use self::hit_points::{effective, hp_floor};
 pub use self::shown_values::{
     BONUS_DAMAGE, Shown, bonus_damage, shown_attack, shown_melee_armor, shown_range,
 };
-use self::taking::kill_bonus;
 pub use self::taking::take;
 #[cfg(test)]
 use self::taking::take_static;
+use self::taking::{count_kill, kill_bonus};
 use crate::combat::AttackBonus;
 use crate::combat::Charge;
+use crate::combat::KillState;
 use crate::combat::missile::ShooterId;
 use crate::combat::powerup::InfantryCount;
-use crate::combat::stingers::{Handed, StingerTask};
+use crate::combat::stingers::{Handed, StingerAttackers, StingerTask};
 use crate::construction::MainBuildingId;
 use crate::map::Distance;
 use crate::map::Footprint;
@@ -197,6 +198,9 @@ pub struct Victim {
     pub(crate) stinger_tasks: Vec<StingerTask>,
     /// The stingers a hit handed it, for its write-back.
     pub(crate) stung: Handed,
+    /// What slot 22's kill credits read of the stingers it had before the hit
+    /// ([`StingerAttackers`]).
+    pub(crate) stinger_attackers: StingerAttackers,
     /// Its own attack (a retaliation's): its values as a hit's source and its master's weapons
     /// (class, amount).
     pub(crate) source: Attacker,
@@ -211,6 +215,11 @@ pub struct Victim {
     pub(crate) damaged: Vec<(Option<ObjectId>, [i32; 3])>,
     /// A hit killed it, for the caller's death handling.
     pub(crate) killed: Option<Kill>,
+    /// `mProcessedKill` (`+0x954`): whether its kill is counted
+    /// ([`Combat::kill_state`](crate::objects::layers::Combat::kill_state)).
+    pub(crate) kill_state: KillState,
+    /// What its hits' kills counted, in the game's order, for the write-back ([`KillCount`]).
+    pub(crate) kill_counts: Vec<KillCount>,
     /// A building's (type 80) part of a hit ([`Building`]); None for other objects.
     pub(crate) building: Option<Building>,
 }
@@ -260,18 +269,36 @@ pub struct Razed {
 }
 
 /// What a killing hit leaves for the caller after the update
-/// ([`crate::world::World::kill_left`]).
+/// ([`crate::world::World::kill_left`]); its counts are [`Victim::kill_counts`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Kill {
     /// The object that killed it.
     pub(crate) attacker: ObjectId,
     /// That object's player.
     pub(crate) attacker_player: PlayerId,
-    /// That object's master's class as the hit saw it (`FUN_141082e80` reads it of the
-    /// attacker it gets: an animal's 9 or 10 counts a villager's loss).
-    pub(crate) attacker_class: ClassId,
     /// Gaia takes it: a player's livestock (`FUN_1412108e0`).
     pub(crate) to_gaia: bool,
+}
+
+/// What a hit's kill counts, in the game's order, for the write-back
+/// ([`crate::world::World::count_kills`]).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum KillCount {
+    /// Slot 22's kill credits (`FUN_141205c80`): the attackers (`+0x10`) of the stingers that
+    /// burn it, in its list's order; each player of one the world holds counts the kill once.
+    Stingers(Vec<Option<ObjectId>>),
+    /// The damage's kill (`FUN_141082e80` below 1 hit point): its owner's computer AI hears of
+    /// it (slot 0x2f0), and a villager counts for its owner by the attacker's class (as the hit
+    /// saw it: an animal's 9 or 10) and player.
+    Owner {
+        /// The attacker's master's class.
+        attacker_class: ClassId,
+        /// The attacker's player.
+        attacker_player: PlayerId,
+    },
+    /// `FUN_1412005b0`'s count of the kill for this player: slot 0x8b0's (`FUN_141205880`),
+    /// a fixed blast's and a movement damage's.
+    Killer(PlayerId),
 }
 
 /// Where an object faces (`FUN_14114eaa0`'s inputs): its angle (`+0x7e8`, which follows its
@@ -323,8 +350,8 @@ pub struct Armored {
     pub(crate) hp_powerup: HpPowerup,
     /// Its hit point stinger (`+0xb44`), which its most hit points add.
     pub(crate) hp_stinger: HitPoints,
-    /// Its master has a task of action type 0xa1 with a work value (a kill reward,
-    /// `FUN_14120b5f0`).
+    /// Its master has a task of action type 0xa1 with a `work_range` above 1e-7 (a kill reward,
+    /// `FUN_14120b5f0`, which slot 0x8b0 pays).
     pub(crate) kill_tasks: bool,
     /// It has a current action (`FUN_140a98730` on its action list), a unit AI, and
     /// `FUN_140c42b30` on that AI (alert mode 1, `+0x1b8`; no attacking units, `+0xc8`; no

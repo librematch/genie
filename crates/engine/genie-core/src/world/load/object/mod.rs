@@ -6,6 +6,7 @@ use crate::combat::AttackBonus;
 use crate::combat::AttackCount;
 use crate::combat::Charge;
 use crate::combat::Firepower;
+use crate::combat::KillState;
 use crate::combat::MissileCount;
 use crate::combat::SpecialSprite;
 use crate::combat::abilities::Abilities;
@@ -305,6 +306,17 @@ fn row(
             .is_some_and(|byte| byte != 0),
         ..Default::default()
     };
+    // a combat object's RGE part, a missile's too (both hold their attack count and kill flag)
+    let rge_combat_object = object
+        .combat()
+        .map(|tribe_combat_object| &tribe_combat_object.rge_combat_object)
+        .or_else(|| {
+            object
+                .rge_object
+                .as_deref()
+                .and_then(|rge_object| rge_object.rge_missile_object.as_deref())
+                .map(|rge_missile_object| &rge_missile_object.rge_combat_object)
+        });
     let combat = Combat {
         work_rate_powerup: object
             .combat()
@@ -482,19 +494,12 @@ fn row(
                 .hit_something_valid_for_charge_attack
                 != 0
         }),
-        attack_count: object
-            .combat()
-            .map(|tribe_combat_object| &tribe_combat_object.rge_combat_object)
-            .or_else(|| {
-                object
-                    .rge_object
-                    .as_deref()
-                    .and_then(|rge_object| rge_object.rge_missile_object.as_deref())
-                    .map(|rge_missile_object| &rge_missile_object.rge_combat_object)
-            })
-            .map_or(AttackCount::ZERO, |rge_combat_object| {
-                AttackCount::of_data(rge_combat_object.attack_count)
-            }),
+        attack_count: rge_combat_object.map_or(AttackCount::ZERO, |rge_combat_object| {
+            AttackCount::of_data(rge_combat_object.attack_count)
+        }),
+        kill_state: rge_combat_object.map_or(KillState::Open, |rge_combat_object| {
+            KillState::of_data(rge_combat_object.processed_kill)
+        }),
         // the combat object's localResourceStore (+0xae0), a map by attribute saved in its order
         store: object
             .combat()

@@ -1,13 +1,13 @@
 //! A unit's strikes back and its volleys: the missiles it fires and launches.
 
 use crate::combat::MissileCount;
-use crate::combat::damage::Kill;
 use crate::combat::damage::Victim;
 use crate::combat::missile::ShooterId;
 use crate::combat::missile::{
     Aimer, reach, scatter, spawn_point, volley_count, volley_reach, volley_spawn_point,
 };
 use crate::combat::stingers::ActiveStinger;
+use crate::combat::victims::KillLeft;
 use crate::combat::{AttackCount, Firepower};
 use crate::map::Distance;
 use crate::map::Radii;
@@ -43,17 +43,18 @@ mod launch;
 
 impl Unit {
     /// The unit's own part of its hit, written back: what a retaliation or reflected damage left
-    /// of its hit points and powerups (its combat layer `combat`), its charge and `+0x8a8`, the
-    /// stingers its hit handed itself (at the world time `now`), the damage notify (500) a
-    /// retaliation posts to its unit AI (`ai`); a retaliation that killed it is the caller's
-    /// (Gaia taking a killed attacker is not modelled).
+    /// of its hit points and powerups (its combat layer `combat`), its charge and `+0x8a8`, its
+    /// kill flag (`+0x954`), the stingers its hit handed itself (at the world time `now`), the
+    /// damage notify (500) a retaliation posts to its unit AI (`ai`); what killed and counted it
+    /// is the caller's ([`KillLeft::own`]; Gaia taking a killed attacker is not modelled).
     pub(crate) fn hit_back(
         &mut self,
-        own: Victim,
+        mut own: Victim,
         (ai, combat): (Option<&mut UnitAi>, &mut Combat),
         now: WorldTime,
-    ) -> GenieResult<Option<Kill>> {
+    ) -> GenieResult<Option<KillLeft>> {
         self.life.hp = own.hp;
+        combat.kill_state = own.kill_state;
         // the stingers its hit handed itself (FUN_141200830's push_back)
         combat.active_stingers.extend(
             own.stung
@@ -81,7 +82,7 @@ impl Unit {
                 "a killed attacker that goes to Gaia",
             ));
         }
-        Ok(own.killed)
+        Ok(KillLeft::own(&mut own))
     }
 
     /// Slot 0x858 (`FUN_14120c0a0`), a combat object's hit at its target from the Attack's swing

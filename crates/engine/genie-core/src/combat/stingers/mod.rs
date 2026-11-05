@@ -8,9 +8,12 @@
 //! `FUN_14107cb70`, TRIBE's slot 277 for an effect's master). genie derives them from the
 //! master where the hand-off reads them, as it does the aura groups ([`crate::combat::aura`]).
 
+mod credits;
 mod hand_off;
 mod update;
 
+pub use self::credits::StingerAttackers;
+pub(crate) use self::credits::{credit, credit_combat};
 pub(crate) use self::hand_off::{Handed, hand_off};
 
 use crate::combat::ClassOrMaster;

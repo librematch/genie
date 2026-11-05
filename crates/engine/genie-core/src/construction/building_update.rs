@@ -570,7 +570,9 @@ impl Unit {
         }
         step.blasted = blasted;
         let now = step.world.world_time;
-        let _ = self.hit_back(own, step.world.parts.ai_and_combat_mut(self.id)?, now)?;
+        if let Some(own) = self.hit_back(own, step.world.parts.ai_and_combat_mut(self.id)?, now)? {
+            file_kill(step, (self, actions), own, roles)?;
+        }
         Ok(())
     }
 

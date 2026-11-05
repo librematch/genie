@@ -128,11 +128,12 @@ impl World {
 
     /// `TRIBE_Combat_Object::update`'s regeneration ([`Unit::regenerate`]) of the object in
     /// `slot` ([`World::live_slot`]), a combat object or building (types 70 and 80) by its own
-    /// master, else its player's.
+    /// master, else its player's; a loss that leaves it below 1 hit point counts its stingers'
+    /// kill credits at once ([`World::count_kills`]).
     ///
     /// # Errors
     ///
-    /// A slot the player's list does not hold.
+    /// A slot the player's list does not hold, and an attribute a player lacks.
     pub(crate) fn regenerate_object(
         &mut self,
         slot: (PlayerId, ListIndex, ObjectId),
@@ -148,12 +149,15 @@ impl World {
         }
         let master = master.clone();
         let unit = self.players.live_mut(player_id, list_index)?;
-        unit.regenerate(
+        let credited = unit.regenerate(
             self.parts.combat_mut(unit.id)?,
             &master,
             dt_seconds,
             &self.model.tuning.turn,
         );
+        if let Some(count) = credited {
+            self.count_kills(player_id, &master, &[count])?;
+        }
         Ok(())
     }
 

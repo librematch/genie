@@ -298,7 +298,8 @@ impl World {
     }
 
     /// A movement damage's hit of `bystander` by player `owner`'s hitter: `damage` hit points off
-    /// (slot 0xb0), then [`finish`] and a combat unit's kill count.
+    /// (slot 0xb0, with its stingers' kill credits and its kill flag `+0x954`), then [`finish`]
+    /// and a combat unit's kill count (`FUN_1412005b0` alone, whatever `+0x954` holds).
     pub(super) fn movement_hit(
         &mut self,
         bystander: Bystander,
@@ -334,7 +335,15 @@ impl World {
         unit.life.hp = victim.hp;
         unit.life.amount = victim.amount;
         if let Some(armored) = victim.armored.as_ref() {
-            self.parts.combat_mut(bystander.id)?.hp_powerup = armored.hp_powerup;
+            let combat = self.parts.combat_mut(bystander.id)?;
+            combat.hp_powerup = armored.hp_powerup;
+            combat.kill_state = victim.kill_state;
+        }
+        // the loss's own counts first: its stingers' credits (slot 22)
+        if !victim.kill_counts.is_empty() {
+            let (player_id, unit) = self.object(bystander.id).ok_or(NOT_HELD)?;
+            let master = unit.master(self.master_tables(), player_id)?.clone();
+            self.count_kills(player_id, &master, &victim.kill_counts)?;
         }
         if killed && bystander.kind == MasterKind::COMBAT {
             self.count_kill(bystander.id, owner)?;

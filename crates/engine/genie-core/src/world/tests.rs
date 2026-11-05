@@ -1,10 +1,11 @@
 use super::*;
 use crate::combat::Firepower;
+use crate::combat::KillState;
 use crate::combat::abilities::Abilities;
 use crate::combat::attack::AttackState;
 use crate::combat::attack::{Arms, Attack};
 use crate::combat::damage::ArmorPair;
-use crate::combat::damage::{Kill, Razed, Victim};
+use crate::combat::damage::{Kill, KillCount, Razed, Victim};
 use crate::combat::missile::ShooterId;
 use crate::combat::missile::SmartMode;
 use crate::combat::missile::{MissSpread, Missile, MissileState, ProjectileKind, StrikeResult};
@@ -15199,23 +15200,18 @@ fn killed_villager_counts_its_attacker_kind_and_player_kind() {
         world.model.masters = vec![masters; 3].into_iter().map(Arc::new).collect();
         world
     };
-    let by = |attacker, attacker_player, attacker_class| Kill {
-        attacker,
-        attacker_player,
-        attacker_class,
-        to_gaia: false,
+    let villager = Master {
+        id: VILLAGER_MALE,
+        class: class::VILLAGER,
+        ..Master::default()
     };
     let counts = |world: &World| {
         [226, 227, 228, 229].map(|attribute| world.players[1].attributes[attribute])
     };
     // Gaia's wolf: an animal, Gaia's type
     let mut game = world(PlayerKind::Human);
-    game.killed(
-        PlayerId::new(1),
-        ListIndex::new(0),
-        by(object_id(50), PlayerId::new(0), class::PREY),
-    )
-    .unwrap();
+    game.count_owner_loss(PlayerId::new(1), &villager, (class::PREY, PlayerId::new(0)))
+        .unwrap();
     assert_eq!(counts(&game), amounts([1.0, 1.0, 0.0, 0.0]));
     // the archers of a human, a computer and the editor's phantom
     for (kind, seen) in [
@@ -15225,30 +15221,30 @@ fn killed_villager_counts_its_attacker_kind_and_player_kind() {
     ] {
         let mut kind_world = world(kind);
         kind_world
-            .killed(
+            .count_owner_loss(
                 PlayerId::new(1),
-                ListIndex::new(1),
-                by(object_id(60), PlayerId::new(2), class::CLASS_0),
+                &villager,
+                (class::CLASS_0, PlayerId::new(2)),
             )
             .unwrap();
         assert_eq!(counts(&kind_world), amounts(seen));
     }
     let mut world = world(PlayerKind::Human);
     world
-        .killed(
+        .count_owner_loss(
             PlayerId::new(1),
-            ListIndex::new(0),
-            by(object_id(99), PlayerId::new(2), class::PREDATOR),
+            &villager,
+            (class::PREDATOR, PlayerId::new(2)),
         )
         .unwrap();
     assert_eq!(counts(&world), amounts([0.0, 1.0, 0.0, 1.0]));
     world.players[1].kind = PlayerKind::Computer;
     assert!(
         world
-            .killed(
+            .count_owner_loss(
                 PlayerId::new(1),
-                ListIndex::new(0),
-                by(object_id(60), PlayerId::new(2), class::CLASS_0)
+                &villager,
+                (class::CLASS_0, PlayerId::new(2))
             )
             .is_err()
     );
@@ -15326,9 +15322,17 @@ fn killed_sheep(killer_last: bool) -> (World, Victim) {
     victim.killed = Some(Kill {
         attacker: object_id(10029),
         attacker_player: PlayerId::new(1),
-        attacker_class: ClassId::of_master(80),
         to_gaia: true,
     });
+    // the town centre's damage (FUN_141082e80): the owner's counts, then slot 0x8b0's
+    victim.kill_counts = vec![
+        KillCount::Owner {
+            attacker_class: ClassId::of_master(80),
+            attacker_player: PlayerId::new(1),
+        },
+        KillCount::Killer(PlayerId::new(1)),
+    ];
+    victim.kill_state = KillState::Counted;
     (world, victim)
 }
 
@@ -15465,21 +15469,26 @@ fn hit_kill_reaches_the_world_where_the_hit_runs() {
                 .position_of(object_id(9520))
                 .is_some();
             let counted = step.world.players[1].attributes[301];
-            let kill = Kill {
-                attacker: object_id(9520),
-                attacker_player: PlayerId::new(0),
-                attacker_class: class::LIVESTOCK,
-                to_gaia: false,
+            let own = KillLeft {
+                id: step.me,
+                kill: Some(Kill {
+                    attacker: object_id(9520),
+                    attacker_player: PlayerId::new(0),
+                    to_gaia: false,
+                }),
+                counts: vec![
+                    KillCount::Owner {
+                        attacker_class: class::LIVESTOCK,
+                        attacker_player: PlayerId::new(0),
+                    },
+                    KillCount::Killer(PlayerId::new(0)),
+                ],
+                razed: Vec::new(),
             };
             // the town centre as a master of the table, its own kill counted by it
             unit.life.master_id = master_id(705);
             let before = step.world.players[1].attributes[325];
-            file_kill(
-                step,
-                (unit, actions),
-                KillLeft::own(step.me, kill),
-                &roles(),
-            )?;
+            file_kill(step, (unit, actions), own, &roles())?;
             Ok((
                 gaia_s,
                 counted,
@@ -15503,18 +15512,23 @@ fn an_own_kill_gives_the_livestock_to_gaia_at_once() {
         (PlayerId::new(1), ListIndex::new(1)),
         0,
         |unit, actions, step| {
-            let kill = Kill {
-                attacker: object_id(10029),
-                attacker_player: PlayerId::new(1),
-                attacker_class: class::CLASS_0,
-                to_gaia: true,
+            let own = KillLeft {
+                id: step.me,
+                kill: Some(Kill {
+                    attacker: object_id(10029),
+                    attacker_player: PlayerId::new(1),
+                    to_gaia: true,
+                }),
+                counts: vec![
+                    KillCount::Owner {
+                        attacker_class: class::CLASS_0,
+                        attacker_player: PlayerId::new(1),
+                    },
+                    KillCount::Killer(PlayerId::new(1)),
+                ],
+                razed: Vec::new(),
             };
-            file_kill(
-                step,
-                (unit, actions),
-                KillLeft::own(step.me, kill),
-                &roles(),
-            )?;
+            file_kill(step, (unit, actions), own, &roles())?;
             Ok((
                 step.taken_over,
                 step.world
@@ -15709,9 +15723,16 @@ fn razed_building_write_back_reaches_its_annexes_history_and_counts() {
     main_victim.killed = Some(Kill {
         attacker: object_id(9),
         attacker_player: PlayerId::new(1),
-        attacker_class: class::CLASS_0,
         to_gaia: false,
     });
+    // the castle's damage (FUN_141082e80): the owner's counts, then slot 0x8b0's
+    main_victim.kill_counts = vec![
+        KillCount::Owner {
+            attacker_class: class::CLASS_0,
+            attacker_player: PlayerId::new(1),
+        },
+        KillCount::Killer(PlayerId::new(1)),
+    ];
     let building = main_victim.building.as_mut().unwrap();
     (building.struck, building.damaged_lately) = (true, DamagedTimer::of_data(60));
     building.razed.push(Razed {
@@ -17035,22 +17056,28 @@ fn unit_regenerated_to_its_most_has_its_armor_back() {
         )
     };
     let (mut healed, mut healed_combat) = unit(HitPoints::new(53.0));
-    healed.regenerate(
-        &mut healed_combat,
-        &berserk,
-        Seconds::new(3.0),
-        &tuning().turn,
+    assert_eq!(
+        healed.regenerate(
+            &mut healed_combat,
+            &berserk,
+            Seconds::new(3.0),
+            &tuning().turn,
+        ),
+        None
     );
     assert_eq!(
         (healed.life.hp, healed_combat.armor_removed),
         (HitPoints::new(54.0), ArmorPair::ZERO)
     );
     let (mut hurt, mut hurt_combat) = unit(HitPoints::new(40.0));
-    hurt.regenerate(
-        &mut hurt_combat,
-        &berserk,
-        Seconds::new(3.0),
-        &tuning().turn,
+    assert_eq!(
+        hurt.regenerate(
+            &mut hurt_combat,
+            &berserk,
+            Seconds::new(3.0),
+            &tuning().turn,
+        ),
+        None
     );
     assert_eq!(
         (hurt.life.hp, hurt_combat.armor_removed),
@@ -17093,11 +17120,14 @@ fn unit_regenerates_whole_hit_points_and_keeps_the_rest_as_time() {
         regen_timer: Seconds::new(1.5),
         ..Default::default()
     };
-    regenerating.regenerate(
-        &mut unit_combat,
-        &berserk,
-        Seconds::new(2.0),
-        &tuning().turn,
+    assert_eq!(
+        regenerating.regenerate(
+            &mut unit_combat,
+            &berserk,
+            Seconds::new(2.0),
+            &tuning().turn,
+        ),
+        None
     );
     assert_eq!(
         (regenerating.life.hp, unit_combat.regen_timer),
@@ -17109,11 +17139,14 @@ fn unit_regenerates_whole_hit_points_and_keeps_the_rest_as_time() {
     // at the most nothing is added, and the time still runs
     let mut full = unit(HitPoints::new(54.0));
     let mut full_combat = Combat::default();
-    full.regenerate(
-        &mut full_combat,
-        &berserk,
-        Seconds::new(3.0),
-        &tuning().turn,
+    assert_eq!(
+        full.regenerate(
+            &mut full_combat,
+            &berserk,
+            Seconds::new(3.0),
+            &tuning().turn,
+        ),
+        None
     );
     assert_eq!(
         (full.life.hp, full_combat.regen_timer),
@@ -17159,16 +17192,25 @@ fn unit_regenerates_whole_hit_points_and_keeps_the_rest_as_time() {
     };
     let mut gate_unit = unit(HitPoints::new(1650.0));
     let mut gate_combat = Combat::default();
-    gate_unit.regenerate(&mut gate_combat, &gate, Seconds::new(0.104), &tuning().turn);
+    assert_eq!(
+        gate_unit.regenerate(&mut gate_combat, &gate, Seconds::new(0.104), &tuning().turn),
+        None
+    );
     assert_eq!(gate_unit.life.hp, HitPoints::new(1649.0));
     let mut low = unit(HitPoints::new(1.0));
     let mut low_combat = Combat::default();
-    low.regenerate(&mut low_combat, &gate, Seconds::new(1.0), &tuning().turn);
+    assert_eq!(
+        low.regenerate(&mut low_combat, &gate, Seconds::new(1.0), &tuning().turn),
+        None
+    );
     assert_eq!(low.life.hp, HitPoints::ZERO);
     // below 1 hit point or out of state 2: nothing
     let mut dead = unit(HitPoints::new(0.5));
     let mut dead_combat = Combat::default();
-    dead.regenerate(&mut dead_combat, &gate, Seconds::new(1.0), &tuning().turn);
+    assert_eq!(
+        dead.regenerate(&mut dead_combat, &gate, Seconds::new(1.0), &tuning().turn),
+        None
+    );
     assert_eq!(
         (dead.life.hp, dead_combat.regen_timer),
         (HitPoints::new(0.5), Seconds::ZERO)
@@ -24187,6 +24229,7 @@ fn own_razing(adds: &[(AttributeId, f32)]) -> KillLeft {
     KillLeft {
         id: object_id(9175),
         kill: None,
+        counts: Vec::new(),
         razed: vec![Razed {
             attacker_player: PlayerId::new(1),
             owner: PlayerId::new(1),

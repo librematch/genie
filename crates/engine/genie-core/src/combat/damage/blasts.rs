@@ -6,8 +6,8 @@ use crate::combat::damage::HitKind;
 use crate::combat::damage::HitLayer;
 use crate::combat::damage::ShieldBlock;
 use crate::combat::damage::{
-    Attacker, Kill, Victim, armor_damage, bonus_damage, charge_hit, elevation_factor,
-    facing_offset, kill_bonus, lose, shield, take,
+    Attacker, Kill, KillCount, Victim, armor_damage, bonus_damage, charge_hit, count_kill,
+    elevation_factor, facing_offset, kill_bonus, lose, shield, take,
 };
 use crate::combat::missile::ShooterId;
 use crate::construction::build::NOT_HELD;
@@ -38,11 +38,13 @@ use std::mem::replace;
 /// a charge without an area effect (slot 0x318 with 0); the target loses it (slot 0xb0). The
 /// target's unit AI gets notify 500 (but from an attacker of class 64) with the attacker, the hit
 /// points left and its master's, sent by the attacker (a missile, type 60: by what it was fired
-/// from, `+0x998`). Below 1 hit point it has 0 and is killed: Gaia takes a player's livestock
-/// (type 70). Not modelled: an attacker of type 60 and up whose combat ability marks its target
-/// (bit 2, `FUN_141206250`) and a kill reward task (action type 0xa1). Not held: the damaged flag (`+0x683`), the last damage
-/// time (`+0x648`), the alerts of another owner (slot 0x2e8), the killer (`+0x690`, `+0x694`),
-/// the local player's statistics, the damage sprites (slot 0x4c0) and the trigger events.
+/// from, `+0x998`). Below 1 hit point (`COMISS 1, hp` / `JBE` past: a NaN lives) it has 0 and is
+/// killed: its owner's counts ([`KillCount::Owner`]), then slot 0x8b0 unless its kill is counted
+/// (`+0x954`, [`count_kill`]); Gaia takes a player's livestock (type 70). Not modelled: an
+/// attacker of type 60 and up whose combat ability marks its target (bit 2, `FUN_141206250`).
+/// Not held: the damaged flag (`+0x683`), the last damage time (`+0x648`), the alerts of another
+/// owner (slot 0x2e8), the killer (`+0x690`, `+0x694`), the local player's statistics, the
+/// damage sprites (slot 0x4c0) and the trigger events.
 pub(super) fn damage(
     victim: &mut Victim,
     src: &mut Victim,
@@ -99,19 +101,16 @@ pub(super) fn damage(
     }
     if victim.hp < HitPoints::new(1.0) {
         victim.hp = HitPoints::ZERO;
-        if victim
-            .armored
-            .as_ref()
-            .is_some_and(|armored| armored.kill_tasks)
-        {
-            return Err(GenieError::unsupported(
-                "a kill reward task (action type 0xa1)",
-            ));
+        victim.kill_counts.push(KillCount::Owner {
+            attacker_class: src.class,
+            attacker_player: src.player,
+        });
+        if !victim.kill_state.is_counted() {
+            count_kill(victim, src.player)?;
         }
         victim.killed = Some(Kill {
             attacker: src.id,
             attacker_player: src.player,
-            attacker_class: src.class,
             // The livestock class, which goes to Gaia when killed.
             // The artifact class (1), which no blast reaches.
             to_gaia: victim.kind == MasterKind::COMBAT
@@ -517,7 +516,8 @@ pub(super) fn outside_cone(
 
 /// A fixed blast damage (an `area_damage` `share` below 0) on `victim`: it loses the share's size
 /// alone (slot 0xb0); below 1 it has 0 hit points and holds nothing (`FUN_14119d320`); a combat
-/// unit of a player that had 1 is counted killed (`FUN_1412005b0`).
+/// unit of a player that had 1 is counted killed for the attacker's player (`FUN_1412005b0`
+/// alone, whatever `+0x954` holds), then the attacker's kill bonus.
 pub(super) fn fixed_blast(
     attacker: &Victim,
     source: &Attacker,
@@ -536,10 +536,10 @@ pub(super) fn fixed_blast(
             && victim.player != PlayerId::GAIA
             && victim.kind == MasterKind::COMBAT
         {
+            victim.kill_counts.push(KillCount::Killer(attacker.player));
             victim.killed = Some(Kill {
                 attacker: attacker.id,
                 attacker_player: attacker.player,
-                attacker_class: attacker.class,
                 to_gaia: false,
             });
             kill_bonus(source)?;

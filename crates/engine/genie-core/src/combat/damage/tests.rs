@@ -402,10 +402,21 @@ fn hunter_strikes_its_sheep_for_twelve() {
         Some(Kill {
             attacker: object_id(10029),
             attacker_player: PlayerId::new(1),
-            attacker_class: class::VILLAGER,
             to_gaia: true
         })
     );
+    // the owner's counts, then slot 0x8b0's for the attacker's player; its kill counted
+    assert_eq!(
+        sheep.kill_counts,
+        [
+            KillCount::Owner {
+                attacker_class: class::VILLAGER,
+                attacker_player: PlayerId::new(1),
+            },
+            KillCount::Killer(PlayerId::new(1)),
+        ]
+    );
+    assert_eq!(sheep.kill_state, KillState::Counted);
     // armor above the attack does nothing, and a hit does at least one
     let mut armored = self::sheep();
     let x = armored.armored.as_mut().unwrap();
@@ -2421,12 +2432,15 @@ fn fixed_blast_damage_takes_its_size_and_kills_below_one() {
             .map(|kill| (kill.attacker, kill.attacker_player)),
         Some((object_id(10029), PlayerId::new(1)))
     );
+    // FUN_1412005b0 alone: no owner's counts, whatever +0x954 holds
+    assert_eq!(victim.kill_counts, [KillCount::Killer(PlayerId::new(1))]);
     let mut gaia = Victim {
         player: PlayerId::new(0),
         ..sheep()
     };
     fixed_blast(&attacker, &attacker.source, &mut gaia, -20.0).unwrap();
     assert_eq!((gaia.hp, gaia.killed), (HitPoints::ZERO, None));
+    assert_eq!(gaia.kill_counts, Vec::<KillCount>::new());
     let bonus = Attacker {
         kill_bonus_tasks: true,
         ..attacker.source
@@ -2709,4 +2723,100 @@ fn pierce_armor_of_minus_one_reads_as_none() {
         master_pierce_armor(&[], DamageAmount::new(2)),
         DamageAmount::new(2)
     );
+}
+
+/// Slot 0x8b0 ([`count_kill`]): a TRIBE victim's (`FUN_141205880`) counts the kill for the
+/// killer, then fails on a kill reward task (action type 0xa1 with a `work_range` above 1e-7,
+/// not modelled); one of type 50 or 60 (`FUN_14107da00`) counts nothing; both mark the kill
+/// counted (`+0x954`).
+#[test]
+fn slot_0x8b0_counts_the_kill_for_the_killer_and_marks_it() {
+    let mut victim = sheep();
+    count_kill(&mut victim, PlayerId::new(3)).unwrap();
+    assert_eq!(victim.kill_counts, [KillCount::Killer(PlayerId::new(3))]);
+    assert_eq!(victim.kill_state, KillState::Counted);
+    let mut below_tribe = Victim {
+        kind: MasterKind::RGE_COMBAT,
+        ..sheep()
+    };
+    count_kill(&mut below_tribe, PlayerId::new(3)).unwrap();
+    assert!(below_tribe.kill_counts.is_empty() && below_tribe.kill_state.is_counted());
+    let mut rewarding = sheep();
+    rewarding.armored.as_mut().unwrap().kill_tasks = true;
+    assert!(count_kill(&mut rewarding, PlayerId::new(3)).is_err());
+}
+
+/// The damage's kill (`FUN_141082e80`) of a victim whose kill is counted already (`+0x954`, its
+/// stingers' credits) runs no slot 0x8b0: only its owner's counts.
+#[test]
+fn counted_kill_runs_only_the_owners_counts() {
+    let (mut victim, mut hunter) = (sheep(), hunter());
+    victim.hp = HitPoints::new(2.0);
+    victim.kill_state = KillState::Counted;
+    let weapons = hunter.weapons.clone();
+    take(
+        &mut victim,
+        &mut hunter,
+        &mut [],
+        &weapons,
+        1.0,
+        HitPoints::ZERO,
+        hit_layer(),
+    )
+    .unwrap();
+    assert_eq!(victim.hp, HitPoints::ZERO);
+    assert_eq!(
+        victim.kill_counts,
+        [KillCount::Owner {
+            attacker_class: class::VILLAGER,
+            attacker_player: PlayerId::new(1),
+        }]
+    );
+}
+
+/// `take_unit`'s own kill (`FUN_1412108e0` after the damage): a hit's least loss (one hit point,
+/// a direct write) takes below 1 a victim its damage left alive (a hit of no damage under the
+/// game's setting `+0x680` at 1); a player's victim whose kill is not counted then runs slot
+/// 0x8b0 (no owner's counts: the damage did not kill it); Gaia's does not, and neither does a
+/// counted one.
+#[test]
+fn the_least_loss_kills_and_counts_the_victim_of_player_one() {
+    let hit = |victim: &mut Victim| {
+        let mut hunter = hunter();
+        hunter.source.mode_680 = Mode680::ONE;
+        let weapons = hunter.weapons.clone();
+        take(
+            victim,
+            &mut hunter,
+            &mut [],
+            &weapons,
+            0.0,
+            HitPoints::ZERO,
+            hit_layer(),
+        )
+        .unwrap();
+    };
+    let mut victim = Victim {
+        hp: HitPoints::new(1.5),
+        ..sheep()
+    };
+    hit(&mut victim);
+    assert_eq!((victim.hp, victim.killed), (HitPoints::new(0.5), None));
+    assert_eq!(victim.kill_counts, [KillCount::Killer(PlayerId::new(1))]);
+    assert_eq!(victim.kill_state, KillState::Counted);
+    let mut wild = Victim {
+        player: PlayerId::GAIA,
+        hp: HitPoints::new(1.5),
+        ..sheep()
+    };
+    hit(&mut wild);
+    let mut counted = Victim {
+        hp: HitPoints::new(1.5),
+        kill_state: KillState::Counted,
+        ..sheep()
+    };
+    hit(&mut counted);
+    assert_eq!(wild.hp, HitPoints::new(0.5));
+    assert!(wild.kill_counts.is_empty() && !wild.kill_state.is_counted());
+    assert_eq!(counted.kill_counts, Vec::<KillCount>::new());
 }

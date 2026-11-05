@@ -1,9 +1,10 @@
 //! A target's slot 0xe8: a building's, a static object's and a combat unit's, with the
 //! unit's facing, its retaliation and the hit's end.
 
+use crate::combat::KillState;
 use crate::combat::damage::{
-    Armored, Attacker, Building, EPSILON, ONE, Razed, Victim, charge_hit, damage, effective,
-    elevation_factor, facing_offset, hp_floor, lose, special_charge_ready,
+    Armored, Attacker, Building, EPSILON, KillCount, ONE, Razed, Victim, charge_hit, damage,
+    effective, elevation_factor, facing_offset, hp_floor, lose, special_charge_ready,
 };
 use crate::combat::stingers::hand_off;
 use crate::world::slots::CheckedIndexExt;
@@ -182,8 +183,8 @@ pub(super) enum HitRoute {
 /// (`FUN_140a4b540`). A player's building (`+0x718` above 0) left below 1 hit point (`COMISS 1, hp`
 /// / `JBE` past) is razed ([`Razed`]): a castle's or a wonder's history event; but for an annex or
 /// a wall (class 27), the razing counts, or a trebuchet's kill counts unless its kill is counted
-/// (`+0x954`, which its damage's kill sets: slot 0x8b0's `FUN_14107da00`; a building at 0 hit
-/// points takes no hit, so no earlier one did), then the kill bonus ([`kill_bonus`]) and the razing
+/// (`+0x954`, which its damage's slot 0x8b0 sets, [`count_kill`], or its stingers' credits,
+/// [`crate::combat::stingers::credit`]), then the kill bonus ([`kill_bonus`]) and the razing
 /// values (172, 153). Then `damaged_lately_timer` (`+0x30d`) is 60 and its annexes take its hit
 /// points (the write-back gives them to those `others` does not hold, [`Building::struck`]); a
 /// dealt hit's attacker of type 50 and up leaves a building of 1 hit point or more (`COMISS hp, 1`
@@ -219,8 +220,8 @@ pub(super) fn take_building(
         return Ok(BuildingHit::Stopped);
     }
     damage(target, src, weapons, factor, blast_taken, roles)?;
-    // the kill of its damage ran slot 0x8b0, which counts it (+0x954)
-    let counted = target.killed.is_some();
+    // +0x954 after the damage: its slot 0x8b0 or its stingers' credits counted the kill
+    let counted = target.kill_state.is_counted();
     if blast_taken == HitPoints::ZERO {
         let least = if src.source.mode_680.is_one()
             && roles
@@ -329,6 +330,33 @@ fn forward_to_main(
     struck.map(|_| ())
 }
 
+/// Slot 0x8b0 of `victim`, whose kill is not counted yet (`+0x954`), for the attacker's player
+/// `killer`: a TRIBE combat object's (types 70 and 80, `FUN_141205880`) counts the kill for
+/// `killer` (`FUN_1412005b0`, [`KillCount::Killer`]), then pays its master's kill rewards (each
+/// task of action type 0xa1 with a `work_range` above 1e-7, `FUN_14120b5f0`); a combat object's
+/// of type 50 or 60 (`FUN_14107da00`) pays nothing. Both then count its kill (`+0x954`) and tell
+/// the local player's event log (`FUN_140a4d670`, not the simulation's).
+///
+/// # Errors
+///
+/// A kill reward task, which is not modelled.
+pub(super) fn count_kill(victim: &mut Victim, killer: PlayerId) -> GenieResult<()> {
+    if matches!(victim.kind, MasterKind::COMBAT | MasterKind::BUILDING) {
+        victim.kill_counts.push(KillCount::Killer(killer));
+        if victim
+            .armored
+            .as_ref()
+            .is_some_and(|armored| armored.kill_tasks)
+        {
+            return Err(GenieError::unsupported(
+                "a kill reward task (action type 0xa1)",
+            ));
+        }
+    }
+    victim.kill_state = KillState::Counted;
+    Ok(())
+}
+
 /// `FUN_1415c6510`, the kill bonus of the attacker `src` (type 40 and up) for an object it
 /// killed: its master's tasks of action type 0x9a pay their owner's attributes, research
 /// technologies and run effects (not modelled); an attacker without one does nothing.
@@ -398,8 +426,10 @@ pub(super) fn take_static(
 /// attacker left with at most 1 hit point takes the hit to nothing. Then the damage ([`damage`]); a
 /// hit takes at least one hit point (but past the hit point floor); a target with
 /// `damage_reflection` gives its attacker that share of the loss, at least 1 (slot 0xb0, no kill
-/// handling). Not held: the statistics (`FUN_1417783d0`); not modelled: a kill bonus task of the
-/// attacker (action type 0x9a, `FUN_1415c6510`). A target left at 1 hit point or more takes the
+/// handling). Left below 1 hit point, a player's target whose kill is not counted (`+0x954`)
+/// runs slot 0x8b0 ([`count_kill`]): a hit's least loss can kill what its damage left alive. Not
+/// held: the statistics (`FUN_1417783d0`); not modelled: a kill bonus task of the attacker
+/// (action type 0x9a, `FUN_1415c6510`). A target left at 1 hit point or more takes the
 /// attacker's stingers ([`hand_off`], `FUN_14107bdf0`).
 pub(super) fn take_unit(
     victim: &mut Victim,
@@ -514,9 +544,10 @@ pub(super) fn retaliates(
 }
 
 /// [`take_unit`]'s end after the damage: a hit takes at least one hit point of the `before`
-/// effective ones (but past the hit point floor); a target with `damage_reflection` gives its
-/// attacker that share of the loss, at least 1; below 1 hit point the attacker's kill bonus,
-/// else its combat ability's effects.
+/// effective ones (but past the hit point floor; a direct write, no slot 0xb0); a target with
+/// `damage_reflection` gives its attacker that share of the loss, at least 1 (slot 0xb0); below 1
+/// hit point a player's target whose kill is not counted runs slot 0x8b0 ([`count_kill`]) and the
+/// attacker's kill bonus follows, else its stingers ([`hand_off`]).
 ///
 /// # Errors
 ///
@@ -547,9 +578,13 @@ pub(super) fn after_hit(
             },
         );
     }
-    // COMISS 1, hp / JBE past: below 1 (not NaN) the kill bonus; COMISS hp, 1 / JC past: at 1
-    // or more (not NaN) the attacker's effects
+    // COMISS 1, hp / JBE past: below 1 (not NaN) slot 0x8b0 for a player's victim whose kill
+    // is not counted, then the kill bonus; COMISS hp, 1 / JC past: at 1 or more (not NaN) the
+    // attacker's effects
     if ONE > victim.hp.get() {
+        if victim.player != PlayerId::GAIA && !victim.kill_state.is_counted() {
+            count_kill(victim, src.player)?;
+        }
         kill_bonus(&src.source)?;
     }
     if MasterKind::RGE_COMBAT <= src.kind && victim.hp >= HitPoints::new(ONE) {
