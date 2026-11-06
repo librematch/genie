@@ -71,7 +71,7 @@ use crate::players::PlayerKind;
 use crate::players::Relation;
 use crate::players::Relations;
 use crate::players::attribute::AttributeId;
-use crate::players::{UnitRelation, UnitRelations};
+use crate::players::{UnitDiplomacy, UnitRelation, UnitRelations};
 use crate::testing::class;
 use crate::unit_ai::UnitAi;
 use crate::vision::TileCount;
@@ -559,22 +559,24 @@ fn player(
 }
 
 /// What player `own`'s queries make of each player's objects (`player+0x278`) as its diplomacy
-/// `relations` writes it: its own, an ally's, a neutral's or an enemy's.
+/// `relations` writes it: its own, an ally's, a neutral's or an enemy's (any other relation's,
+/// as `FUN_141676b80` makes it).
 fn unit_diplomacy(own: usize, relations: &Relations) -> UnitRelations {
     relations
         .values()
         .iter()
         .enumerate()
         .map(|(other, &relation)| {
-            if other == own {
-                return Some(UnitRelation::Own);
-            }
-            match relation {
-                Relation::Ally | Relation::Relation4 => Some(UnitRelation::Ally),
-                Relation::Neutral => Some(UnitRelation::Neutral),
-                Relation::Enemy => Some(UnitRelation::Enemy),
-                Relation::Other(_) => None,
-            }
+            let unit_relation = if other == own {
+                UnitRelation::Own
+            } else {
+                match relation {
+                    Relation::Ally | Relation::Relation4 => UnitRelation::Ally,
+                    Relation::Neutral => UnitRelation::Neutral,
+                    Relation::Enemy | Relation::Other(_) => UnitRelation::Enemy,
+                }
+            };
+            UnitDiplomacy::from(unit_relation)
         })
         .collect()
 }

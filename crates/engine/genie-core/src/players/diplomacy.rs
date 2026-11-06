@@ -136,8 +136,15 @@ impl World {
         if let Some(row) = self.spatial.relations.get_mut(player) {
             row.set(player_id, relation);
         }
-        if let Some(row) = self.spatial.unit_diplomacy.get_mut(player) {
-            row.set(player_id, Some(unit_kind(player, player_id, relation)));
+        // the row holds the load's value per player, and `set_diplomacy` names a player of the
+        // world: the game's array has no value past it
+        if let Some(diplomacy) = self
+            .spatial
+            .unit_diplomacy
+            .get_mut(player)
+            .and_then(|row| row.get_mut(player_id))
+        {
+            *diplomacy = unit_kind(player, player_id, relation).into();
         }
         let mut list_index = ListIndex::FIRST;
         while self.players.player(player)?.objects.holds(list_index) {
@@ -417,7 +424,7 @@ mod tests {
     use super::*;
     use crate::players::Amount;
     #[cfg(test)]
-    use crate::players::{ByPlayer, relation_row};
+    use crate::players::{ByPlayer, UnitDiplomacy, relation_row};
     #[cfg(test)]
     use crate::world::FrameSeed;
     use crate::world::Millis;
@@ -448,7 +455,7 @@ mod tests {
             .map(|own| {
                 (0..4)
                     .map(|other| {
-                        Some(unit_kind(
+                        UnitDiplomacy::from(unit_kind(
                             PlayerId::new(own),
                             PlayerId::new(other),
                             Relation::Enemy,
@@ -529,7 +536,7 @@ mod tests {
                 .unit_diplomacy
                 .get(PlayerId::new(1))
                 .and_then(|by_player| by_player.get(PlayerId::new(2))),
-            Some(&Some(UnitRelation::Ally))
+            Some(&UnitDiplomacy::from(UnitRelation::Ally))
         );
         world
             .set_diplomacy(PlayerId::new(1), PlayerId::new(2), Stance::Neutral)
@@ -544,7 +551,7 @@ mod tests {
                 .unit_diplomacy
                 .get(PlayerId::new(1))
                 .and_then(|by_player| by_player.get(PlayerId::new(2))),
-            Some(&Some(UnitRelation::Neutral))
+            Some(&UnitDiplomacy::from(UnitRelation::Neutral))
         );
         world
             .set_diplomacy(PlayerId::new(1), PlayerId::new(2), Stance::Enemy)
@@ -563,7 +570,7 @@ mod tests {
                 .unit_diplomacy
                 .get(PlayerId::new(1))
                 .and_then(|by_player| by_player.get(PlayerId::new(2))),
-            Some(&Some(UnitRelation::Enemy))
+            Some(&UnitDiplomacy::from(UnitRelation::Enemy))
         );
         let before = world.players.clone();
         world

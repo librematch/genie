@@ -53,4 +53,6 @@ pub use self::team::Team;
 pub use self::tribute_fee::TributeFee;
 #[cfg(test)]
 pub(crate) use self::unit_relation::relations;
-pub use self::unit_relation::{ByRelation, RelationMask, UnitRelation, UnitRelations};
+pub use self::unit_relation::{
+    ByRelation, RelationMask, UnitDiplomacy, UnitRelation, UnitRelations,
+};

@@ -39,6 +39,23 @@ pub const MOST_FOUND: usize = 256;
 /// (`FUN_141287d20`), empty; a load or a new game starts there, and the objects' updates fill it.
 pub const CLASSES: usize = 65;
 
+/// A player below the registry's count without its lists: [`Registry::new`] makes one per player.
+const NO_PLAYER_LISTS: GenieError =
+    GenieError::unreachable("a player of the registry without its lists");
+
+/// A visible-units query of a class past the player's lists: the game reads past them.
+const NO_CLASS_LIST: GenieError =
+    GenieError::invalid_input("a visible-units query of a class past the registry's lists");
+
+/// A record of an owner past the relations the query reads: the game reads past them.
+const NO_RELATION: GenieError =
+    GenieError::invalid_input("a visible-units record of an owner past the relations");
+
+/// A record that the query keeps by its owner's saved value, whose low byte names none of the
+/// five lists: the game writes past them.
+const NO_LIST: GenieError =
+    GenieError::invalid_input("a visible-units record whose relation lists past the five");
+
 /// One record (0x1c bytes): the object, a distance (`FLT_MAX` in the lists; a query's copy holds
 /// its own), the owner's id (`player+0x718`), the place and the master's radii.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -365,10 +382,19 @@ impl Registry {
 
     /// `GetVisibleUnits` (`FUN_141288c00`) for `player`: the records of its lists of `classes`
     /// whose object is within `radius` (at most 44) of (`x`, `y`) for a searcher of radii `rx`,
-    /// `ry` (its [`QueryShape`]), and whose owner's relation (`relations[owner]`:
-    /// 0 Gaia, 1 self, 2 friend, 3 neutral, 4 enemy) is in `wanted`; by relation, each with its
+    /// `ry` (its [`QueryShape`]), and whose owner's saved relation (`relations[owner]`) has its
+    /// bit in `wanted` ([`RelationMask::keeps`]); by the relation of its low byte
+    /// ([`UnitDiplomacy::list`]: 0 Gaia, 1 self, 2 friend, 3 neutral, 4 enemy), each with its
     /// edge distance, at most 256 each. None when the query reads nothing (no classes, a player
     /// out of range), which leaves the game's last answer in place.
+    ///
+    /// # Errors
+    ///
+    /// The game's reads and writes past its arrays: a class past the player's lists, a record
+    /// of an owner past `relations`, and a record that the query keeps whose relation lists past
+    /// the five.
+    ///
+    /// [`UnitDiplomacy::list`]: crate::players::UnitDiplomacy::list
     pub fn visible_units(
         &self,
         query: VisibleQuery<'_>,
@@ -386,23 +412,21 @@ impl Registry {
         if classes.is_empty() || self.players <= player.index() {
             return Ok(None);
         }
+        let lists = self.lists.get(player.index()).ok_or(NO_PLAYER_LISTS)?;
         let area = QueryArea::new(&query, registry_tuning);
         let mut found: ByRelation<Vec<Record>> = ByRelation::default();
         for &class in classes {
             let list = class
                 .index()
-                .and_then(|class_index| self.lists.get(player.index())?.get(class_index))
-                .ok_or(GenieError::unsupported(
-                    "a query of a class beyond the registry's",
-                ))?;
+                .and_then(|class_index| lists.get(class_index))
+                .ok_or_else(|| NO_CLASS_LIST.with("class", class))?;
             for record in list {
-                let relation = *relations.get(record.owner).ok_or(GenieError::unsupported(
-                    "a record of an owner without a relation",
-                ))?;
-                let Some(relation) = relation.filter(|&unit_relation| wanted.keeps(unit_relation))
-                else {
+                let diplomacy = *relations
+                    .get(record.owner)
+                    .ok_or_else(|| NO_RELATION.with("owner", record.owner))?;
+                if !wanted.keeps(diplomacy) {
                     continue;
-                };
+                }
                 if !area.bounds(record.at) {
                     continue;
                 }
@@ -411,6 +435,9 @@ impl Registry {
                 if !area.holds(dx, dy) {
                     continue;
                 }
+                let relation = diplomacy
+                    .list()
+                    .ok_or_else(|| NO_LIST.with("owner", record.owner))?;
                 let out = &mut found[relation];
                 if out.len() < MOST_FOUND {
                     out.push(Record {
@@ -427,8 +454,8 @@ impl Registry {
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[cfg(test)]
-    use crate::players::{ByPlayer, relations};
+    use crate::ErrorKind;
+    use crate::players::relations;
     use crate::test_ids::{class_id, object_id};
     use crate::testing::class;
     use crate::testing::tuning;
@@ -634,11 +661,7 @@ mod tests {
                     radius: Distance::new(100.0),
                     shape: QueryShape::Rectangle,
                     classes: &[class_id(4)],
-                    relations: &ByPlayer::new(vec![
-                        Some(UnitRelation::Own),
-                        Some(UnitRelation::Enemy),
-                        Some(UnitRelation::Enemy),
-                    ]),
+                    relations: &relations([1, 4, 4]),
                     size: Footprint::new(0.2, 0.2),
                     wanted: RelationMask::ALL,
                 },
@@ -678,11 +701,7 @@ mod tests {
                     radius: Distance::new(3.0),
                     shape: QueryShape::RoundedRectangle,
                     classes: &[class_id(4)],
-                    relations: &ByPlayer::new(vec![
-                        Some(UnitRelation::Own),
-                        Some(UnitRelation::Enemy),
-                        Some(UnitRelation::Enemy),
-                    ]),
+                    relations: &relations([1, 4, 4]),
                     size: Footprint::new(0.2, 0.2),
                     wanted: RelationMask::ALL,
                 },
@@ -734,6 +753,17 @@ mod tests {
             size: Footprint::new(0.2, 0.2),
             wanted: RelationMask::ALL,
         }
+    }
+
+    /// Whether `query` finds nothing of any relation.
+    fn nothing_found(registry: &Registry, query: VisibleQuery<'_>) -> bool {
+        registry
+            .visible_units(query, tuning().registry)
+            .unwrap()
+            .unwrap()
+            .values()
+            .iter()
+            .all(Vec::is_empty)
     }
 
     /// The ids `query` finds of `relation`.
@@ -809,5 +839,87 @@ mod tests {
         );
         let beyond = registry_seeing(Point::new(13.5, 14.375), Footprint::new(0.0, 0.0));
         assert_eq!(found_ids(&beyond, query, UnitRelation::Enemy), []);
+    }
+
+    /// A record's list is the low byte of its owner's saved relation (`MOVZX`), and its bit the
+    /// value's low five bits: a saved 260 keeps and lists an enemy's record.
+    #[test]
+    fn query_lists_record_by_low_byte_of_its_owner_saved_relation() {
+        let registry = registry_seeing(Point::new(11.0, 10.0), Footprint::new(0.2, 0.2));
+        let relations = relations([1, 260, 4]);
+        assert_eq!(
+            found_ids(&registry, centre_query(&relations), UnitRelation::Enemy),
+            [object_id(1)]
+        );
+    }
+
+    /// A saved relation whose bit lies past the mask's byte (8; -1 shifts by 31) lists nowhere,
+    /// even for a query that keeps every bit, and one whose bit the mask lacks lists nowhere.
+    #[test]
+    fn query_skips_record_whose_relation_bit_it_lacks() {
+        let registry = registry_seeing(Point::new(11.0, 10.0), Footprint::new(0.2, 0.2));
+        for value in [8, -1] {
+            let relations = relations([1, value, 4]);
+            assert!(nothing_found(&registry, centre_query(&relations)));
+        }
+        let relations = relations([1, 5, 4]);
+        assert!(nothing_found(
+            &registry,
+            VisibleQuery {
+                wanted: RelationMask::of(&[UnitRelation::Enemy]),
+                ..centre_query(&relations)
+            }
+        ));
+    }
+
+    /// A record within the area that the mask keeps by a saved relation whose low byte names
+    /// none of the five lists (5, 36) is an error: the game writes past its lists. One outside
+    /// the area goes to no list.
+    #[test]
+    fn record_kept_past_the_five_lists_is_an_error() {
+        let registry = registry_seeing(Point::new(11.0, 10.0), Footprint::new(0.2, 0.2));
+        for value in [5, 36] {
+            let relations = relations([1, value, 4]);
+            assert_eq!(
+                registry
+                    .visible_units(centre_query(&relations), tuning().registry)
+                    .map_err(|error| error.kind()),
+                Err(ErrorKind::InvalidInput)
+            );
+        }
+        let far = registry_seeing(Point::new(30.0, 10.0), Footprint::new(0.2, 0.2));
+        let relations = relations([1, 5, 4]);
+        assert_eq!(
+            found_ids(&far, centre_query(&relations), UnitRelation::Enemy),
+            []
+        );
+    }
+
+    /// A class past the player's lists (65, -1) and a record of an owner past the relations the
+    /// query reads are errors: the game reads past its arrays.
+    #[test]
+    fn query_past_its_lists_or_relations_is_an_error() {
+        let registry = registry_seeing(Point::new(11.0, 10.0), Footprint::new(0.2, 0.2));
+        let enemies = relations([1, 4, 4]);
+        for class in [class_id(65), ClassId::of_master(-1)] {
+            let classes = [class];
+            let query = VisibleQuery {
+                classes: &classes,
+                ..centre_query(&enemies)
+            };
+            assert_eq!(
+                registry
+                    .visible_units(query, tuning().registry)
+                    .map_err(|error| error.kind()),
+                Err(ErrorKind::InvalidInput)
+            );
+        }
+        let gaia_only = relations([1]);
+        assert_eq!(
+            registry
+                .visible_units(centre_query(&gaia_only), tuning().registry)
+                .map_err(|error| error.kind()),
+            Err(ErrorKind::InvalidInput)
+        );
     }
 }

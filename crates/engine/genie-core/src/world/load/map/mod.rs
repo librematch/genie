@@ -15,7 +15,7 @@ use crate::objects::masters::ObstructionKind;
 use crate::objects::masters::{MasterId, MasterKind};
 use crate::ownership::CaptureKind;
 use crate::players::PlayerId;
-use crate::players::{PlayerKind, UnitRelation};
+use crate::players::{PlayerKind, UnitDiplomacy};
 use crate::vision::TileCount;
 use crate::vision::VisionBits;
 use crate::vision::visibility::{
@@ -103,7 +103,7 @@ pub fn spatial(
                 .base
                 .unit_diplomacy
                 .iter()
-                .map(|&field| UnitRelation::of_field(field))
+                .map(|&field| UnitDiplomacy::of_field(field))
                 .collect()
         })
         .collect();

@@ -551,7 +551,7 @@ pub struct Spatial {
     /// `relation[i]` of each player (`player+0x260`), for the walk's query's allies.
     pub(crate) relations: ByPlayer<Relations>,
     /// What each player's queries make of the other players' objects (`player+0x278`, the
-    /// save's `unit_diplomacy`): none for a saved value past the five relations.
+    /// save's `unit_diplomacy`), as the save holds it.
     /// Loaded, not derived: the slice runs no diplomacy change (command 0x76), whose handler
     /// would write it with `relation`.
     pub(crate) unit_diplomacy: ByPlayer<UnitRelations>,

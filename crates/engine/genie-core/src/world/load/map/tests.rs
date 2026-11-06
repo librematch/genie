@@ -6,7 +6,7 @@ use crate::objects::masters::MasterKind;
 use crate::objects::masters::{ObstructionClass, ObstructionKind};
 use crate::ownership::CaptureKind;
 use crate::players::PlayerId;
-use crate::players::{ByPlayer, UnitRelation};
+use crate::players::{ByPlayer, UnitDiplomacy, UnitRelation};
 use crate::test_ids::object_id;
 use crate::testing::ids::VILLAGER_MALE;
 use crate::testing::layer;
@@ -118,7 +118,12 @@ fn unit_takes_its_masters_footprint_and_obstruction() {
         out.unit_diplomacy
             .get(PlayerId::new(1))
             .map(ByPlayer::values),
-        Some(&[Some(UnitRelation::Gaia), Some(UnitRelation::Own)][..])
+        Some(
+            &[
+                UnitDiplomacy::from(UnitRelation::Gaia),
+                UnitDiplomacy::from(UnitRelation::Own)
+            ][..]
+        )
     );
 }
 

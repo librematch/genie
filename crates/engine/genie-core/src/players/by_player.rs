@@ -9,8 +9,16 @@ const NO_PLAYER: GenieError = GenieError::unreachable("a player the row does not
 /// One value per player, in the players' order (Gaia first): a row the game indexes by a
 /// player's number, such as a player's relations (`player+0x260`) or the spatial copies of
 /// every player's rows. A player past the row has no value.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct ByPlayer<T>(Vec<T>);
+
+impl<T> Default for ByPlayer<T> {
+    /// The empty row. Written out: the derive would bound `T: Default`, which the empty row
+    /// does not need.
+    fn default() -> Self {
+        Self(Vec::new())
+    }
+}
 
 impl<T> ByPlayer<T> {
     /// The row of `values`, for players 0, 1, … in their order.
