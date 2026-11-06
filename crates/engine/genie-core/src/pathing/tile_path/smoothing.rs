@@ -1,27 +1,12 @@
 //! The smoothing of a found path (`FUN_140f7dbb0`): its straight stretches wherever the unit
 //! can walk straight.
 
-use crate::map::Point;
+use crate::map::spatial::SmoothingWalls;
 use crate::math::conversions::cvttss2si;
 use crate::math::fmath::BVector;
 use crate::math::fmath::sqrt;
 use crate::pathing::tile_path::Path;
 use crate::world::layer::generated::TilePathTuning;
-
-/// The obstruction manager as the smoothing asks it for a unit (`FUN_140f7dbb0`).
-pub trait SegmentTest<E> {
-    /// Whether the unit's straight walk from `point` to `point` (x, y) meets an obstruction
-    /// (`FUN_141052b90`, then `FUN_141052350` with flags `0x100`).
-    ///
-    /// # Errors
-    ///
-    /// What the test cannot answer.
-    fn blocked(&mut self, point: Point, point: Point) -> Result<bool, E>;
-
-    /// A pass that tested walks ends (`FUN_1410561f0`): the temporary tile records its walks put
-    /// go.
-    fn pass_ends(&mut self);
-}
 
 /// The point at `index`, or the zero point outside the path (`FUN_140f9bcd0`).
 pub(super) fn point_at(path: &Path, index: i32) -> BVector {
@@ -78,38 +63,30 @@ pub(super) fn straighten(
 
 /// `FUN_140f7dbb0`: straighten a found path wherever the unit can walk straight: from each
 /// kept point, the line to two points on is tested (`walls`, the obstruction manager's segment
-/// test); where it is blocked, the stretch up to the point before becomes straight, and the last
-/// stretch is straightened at the end. A path of more than two points ends the pass
-/// ([`SegmentTest::pass_ends`]), as the game does after its last test.
-///
-/// # Errors
-///
-/// What the segment test cannot answer (the pass ends all the same).
-pub fn smooth<E>(
-    path: &mut Path,
-    walls: &mut dyn SegmentTest<E>,
-    tile_path_tuning: &TilePathTuning,
-) -> Result<(), E> {
+/// test for the unit, [`SmoothingWalls::blocked`]); where it is blocked, the stretch up to the
+/// point before becomes straight, and the last stretch is straightened at the end. A path of
+/// more than two points ends the pass ([`SmoothingWalls::pass_ends`]), as the game does after
+/// its last test.
+pub fn smooth(path: &mut Path, walls: &mut SmoothingWalls<'_>, tile_path_tuning: &TilePathTuning) {
     if path.points.len() <= 2 {
-        return Ok(());
+        return;
     }
-    let smoothed = smooth_pass(path, walls, tile_path_tuning);
+    smooth_pass(path, walls, tile_path_tuning);
     walls.pass_ends();
-    smoothed
 }
 
 /// [`smooth`]'s tests and straight stretches over a path of more than two points.
-pub(super) fn smooth_pass<E>(
+pub(super) fn smooth_pass(
     path: &mut Path,
-    walls: &mut dyn SegmentTest<E>,
+    walls: &mut SmoothingWalls<'_>,
     tile_path_tuning: &TilePathTuning,
-) -> Result<(), E> {
+) {
     let mut first: i32 = 0;
     let mut probe: i32 = 2;
     while (probe as usize) < path.points.len() {
         let (from, to) = (point_at(path, first), point_at(path, probe));
         let next;
-        if walls.blocked(from.ground(), to.ground())? {
+        if walls.blocked(from.ground(), to.ground()) {
             let between = (probe - first) - 2;
             if between < 1 {
                 first = probe - 1;
@@ -127,5 +104,4 @@ pub(super) fn smooth_pass<E>(
         }
         probe = next;
     }
-    Ok(())
 }

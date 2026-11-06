@@ -1,16 +1,17 @@
 //! The planner's entry (`FUN_140f7c530`): the search over the levels, the shortcut near the
 //! start and the search on the tiles.
 
+use crate::GenieResult;
 use crate::map::Distance;
 use crate::map::Point;
+use crate::map::spatial::SmoothingWalls;
 use crate::math::fmath::BVector;
 use crate::math::fmath::sqrt;
 use crate::pathing::tile_path::goal_marks::Mark;
 use crate::pathing::tile_path::{
-    CellKind, Found, GridLevel, NodeIndex, Path, PlanTile, Planner, Request, SegmentTest, smooth,
+    CellKind, Found, GridLevel, NodeIndex, Path, PlanTile, Planner, Request, smooth,
 };
 use crate::world::layer::generated::TilePathTuning;
-use crate::{GenieError, GenieResult};
 
 impl Planner {
     /// `FUN_140f77f20`: the search over the levels: from the coarsest node cell that holds the
@@ -122,18 +123,22 @@ impl Planner {
 
     /// The planner's entry (`FUN_140f7c530`): the search over the levels; for a human player's
     /// path to the goal under 35 tiles between passable tiles also the search on the tiles, else
-    /// a shorter first stretch to the last point within 10 tiles; both smoothed (`blocked`, the
+    /// a shorter first stretch to the last point within 10 tiles; both smoothed (`walls`, the
     /// obstruction manager's segment test for the unit, None without a unit); the shorter, or
     /// the one with the better result, appended to `out`. `target_box` is the target's flag the
     /// game reads at `+0x658` (a goal tile without edges then counts if a neighbour has some).
-    pub fn plan<E: From<GenieError>>(
+    ///
+    /// # Errors
+    ///
+    /// What the planner's searches fail on.
+    pub fn plan(
         &mut self,
         req: &Request,
         target_box: bool,
         out: &mut Path,
-        walls: Option<&mut dyn SegmentTest<E>>,
+        walls: Option<&mut SmoothingWalls<'_>>,
         tile_path_tuning: &TilePathTuning,
-    ) -> Result<Found, E> {
+    ) -> GenieResult<Found> {
         let (width, height) = (self.size.width() as f32, self.size.height() as f32);
         if req.to.x() < 0.0 || width <= req.to.x() || req.to.y() < 0.0 || height <= req.to.y() {
             return Ok(Found::OffMap);
@@ -151,10 +156,10 @@ impl Planner {
         if let Some(walls) = walls {
             let smoothed = |found: Found| !matches!(found, Found::OffMap | Found::Nothing);
             if smoothed(first) {
-                smooth(&mut levels, walls, tile_path_tuning)?;
+                smooth(&mut levels, walls, tile_path_tuning);
             }
             if second.is_some_and(smoothed) {
-                smooth(&mut tiles, walls, tile_path_tuning)?;
+                smooth(&mut tiles, walls, tile_path_tuning);
             }
         }
         levels.measure();
@@ -227,7 +232,7 @@ impl Planner {
             full: false,
         };
         let mut path = Path::default();
-        let found = self.plan::<GenieError>(&req, false, &mut path, None, tile_path_tuning)?;
+        let found = self.plan(&req, false, &mut path, None, tile_path_tuning)?;
         if found == Found::OffMap {
             return Ok(None);
         }

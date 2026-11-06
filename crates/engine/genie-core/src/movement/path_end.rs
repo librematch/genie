@@ -130,8 +130,7 @@ impl Mover {
                 closed: Vec::new(),
                 full: false,
             };
-            let found =
-                planner.plan::<GenieError>(&req, false, &mut path, None, tile_path_tuning)?;
+            let found = planner.plan(&req, false, &mut path, None, tile_path_tuning)?;
             if !found.reaches() {
                 return Ok(false);
             }

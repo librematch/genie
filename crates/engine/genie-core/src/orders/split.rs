@@ -199,33 +199,28 @@ impl World {
         // it to the first (FUN_140f7c530, its result and the measured path's length)
         let tiles = self.spatial.tiles();
         let pathing = &mut self.pathing;
-        let mut path =
-            |target: &Splittable, walker: &Splittable| -> GenieResult<Option<(Found, Distance)>> {
-                let Some(restriction) = walker.restriction else {
-                    return Ok(None);
-                };
-                let Some(planner) = pathing.planner(restriction, tiles)? else {
-                    return Ok(None);
-                };
-                let req = Request {
-                    from: walker.position.ground(),
-                    to: target.position.ground(),
-                    radii: target.radius,
-                    range: walker.radius,
-                    closed: Vec::new(),
-                    full: false,
-                };
-                let mut path = Path::default();
-                let found = planner.plan::<GenieError>(
-                    &req,
-                    false,
-                    &mut path,
-                    None,
-                    &self.model.tuning.tile_path,
-                )?;
-                path.measure();
-                Ok(Some((found, path.length)))
+        let mut path = |target: &Splittable,
+                        walker: &Splittable|
+         -> GenieResult<Option<(Found, Distance)>> {
+            let Some(restriction) = walker.restriction else {
+                return Ok(None);
             };
+            let Some(planner) = pathing.planner(restriction, tiles)? else {
+                return Ok(None);
+            };
+            let req = Request {
+                from: walker.position.ground(),
+                to: target.position.ground(),
+                radii: target.radius,
+                range: walker.radius,
+                closed: Vec::new(),
+                full: false,
+            };
+            let mut path = Path::default();
+            let found = planner.plan(&req, false, &mut path, None, &self.model.tuning.tile_path)?;
+            path.measure();
+            Ok(Some((found, path.length)))
+        };
         // then the unit with the most others that join it, the first of equals, with them
         while !left.is_empty() {
             let mut best = (0, 0);

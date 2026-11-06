@@ -1,5 +1,6 @@
 //! PATROL, the attack move and their sweep, and the group the splitter keeps.
 
+use crate::GenieResult;
 use crate::groups::FarMembers;
 use crate::groups::GroupFlags;
 use crate::groups::GroupId;
@@ -37,7 +38,6 @@ use crate::world::World;
 use crate::world::layer::generated::TilePathTuning;
 use crate::world::slots::CheckedIndexExt;
 use crate::world::slots::PlayerSlotsExt;
-use crate::{GenieError, GenieResult};
 
 /// What PATROL's and `ATTACK_MOVE`'s flag `+0x8` (`FUN_14161b970`'s `param_6`) does to the listed
 /// units' AIs' saved patrols (`zeroPatrolInformation`).
@@ -486,6 +486,6 @@ fn can_reach_group(
         full: false,
     };
     let mut path = Path::default();
-    let found = planner.plan::<GenieError>(&req, false, &mut path, None, tile_path_tuning)?;
+    let found = planner.plan(&req, false, &mut path, None, tile_path_tuning)?;
     Ok(found == Found::Goal)
 }

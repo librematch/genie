@@ -1,6 +1,7 @@
 //! The ends of the builder's walk: at its end, failed, its foundation lost; the walk to a
 //! point (state 11).
 
+use crate::GenieResult;
 use crate::construction::build::BuildState;
 use crate::construction::build::{
     BUILDER_UNMOVING, BuildAction, BuildReads, FOREIGN_SITE, SITE_GONE, UNSEEN_SITE,
@@ -17,7 +18,6 @@ use crate::world::layer::Roles;
 use crate::world::lets::release;
 use crate::world::slots::PlayerSlotsExt;
 use crate::world::step::Step;
-use crate::{GenieError, GenieResult};
 
 impl BuildAction {
     /// The update's cases 3 and 0xde with the sub-action list's 1 or 2 (its `MoveTo` at its
@@ -162,7 +162,7 @@ impl BuildAction {
                 full: false,
             };
             let mut path = Path::default();
-            found = planner.plan::<GenieError>(
+            found = planner.plan(
                 &req,
                 false,
                 &mut path,

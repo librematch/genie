@@ -9,7 +9,6 @@ use crate::map::spatial::{MOST_HITS, QUERY_HITS, RecordId, Spatial};
 use crate::map::{Rect, Segment};
 use crate::math::fmath::below_or_unordered;
 use crate::objects::masters::ObstructionKind;
-use crate::pathing::tile_path::SegmentTest;
 use crate::world::layer::ClassRoles;
 use crate::world::objects_ref::ObjectsRef;
 use crate::{GenieError, GenieResult};
@@ -267,10 +266,11 @@ pub(super) fn ccw(p0: Point, p1: Point, p2: Point) -> i32 {
     0
 }
 
-/// The smoothing's segment test for a unit (`FUN_140f7dbb0`, [`crate::pathing::tile_path::SegmentTest`]):
-/// each walk puts its temporary tile records ([`Spatial::put_tile_records`]) and is tested
-/// ([`Spatial::segment_meets`]) against them and those of the pass's earlier walks; the pass's
-/// end removes them ([`Spatial::clear_tile_records`]).
+/// The obstruction manager as the smoothing asks it for a unit (`FUN_140f7dbb0`,
+/// [`crate::pathing::tile_path::smooth`]): each walk puts its temporary tile records
+/// ([`Spatial::put_tile_records`]) and is tested ([`Spatial::segment_meets`]) against them and
+/// those of the pass's earlier walks; the pass's end removes them
+/// ([`Spatial::clear_tile_records`]).
 #[derive(Debug)]
 pub struct SmoothingWalls<'world> {
     pub(super) world: &'world mut Spatial,
@@ -299,19 +299,22 @@ impl<'world> SmoothingWalls<'world> {
             ran: false,
         }
     }
-}
 
-impl<E> SegmentTest<E> for SmoothingWalls<'_> {
-    fn blocked(&mut self, from: Point, to: Point) -> Result<bool, E> {
+    /// Whether the unit's straight walk from `from` to `to` (x, y) meets an obstruction
+    /// (`FUN_141052b90`, then `FUN_141052350` with flags `0x100`), the manager's buffer the
+    /// unit's radius.
+    pub fn blocked(&mut self, from: Point, to: Point) -> bool {
         self.ran = true;
         // the pass's buffer, the unit's radius (FUN_1410562d0 with 1)
         self.world.set_manager_buffer(Some(self.radius));
         self.world
             .put_tile_records(from, to, self.radius, self.mask);
-        Ok(self.world.segment_meets(from, to, self.radius, self.ignore))
+        self.world.segment_meets(from, to, self.radius, self.ignore)
     }
 
-    fn pass_ends(&mut self) {
+    /// A pass that tested walks ends (`FUN_1410561f0`): the manager's buffer goes, and the
+    /// temporary tile records its walks put.
+    pub fn pass_ends(&mut self) {
         self.world.set_manager_buffer(None);
         self.world.clear_tile_records();
     }

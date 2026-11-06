@@ -1,6 +1,7 @@
 //! The way round a record on the line to the slot: the short pather, the long pather and the
 //! tile planner.
 
+use crate::GenieResult;
 use crate::groups::GroupId;
 use crate::groups::MovePath;
 use crate::groups::MoveReason;
@@ -30,7 +31,6 @@ use crate::world::World;
 use crate::world::layer::MasterRoles;
 use crate::world::objects_ref::ObjectsRef;
 use crate::world::slots::CheckedIndexExt;
-use crate::{GenieError, GenieResult};
 
 impl World {
     /// The way round a record on the line to the slot (`0x141026867`..`0x1410277e5`), for member
@@ -480,8 +480,7 @@ impl World {
             closed: Vec::new(),
             full: false,
         };
-        let found =
-            planner.plan::<GenieError>(&req, false, record, None, &self.model.tuning.tile_path)?;
+        let found = planner.plan(&req, false, record, None, &self.model.tuning.tile_path)?;
         Ok(Some(found))
     }
 }

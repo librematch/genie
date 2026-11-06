@@ -4,9 +4,12 @@ use crate::map::GridSize;
 use crate::map::Point;
 use crate::map::Restriction;
 use crate::map::TerrainId;
+use crate::map::TerrainMask;
 use crate::map::Tile;
+use crate::map::spatial::SmoothingWalls;
 use crate::map::spatial::Tiles;
 use crate::pathing::tile_path::goal_marks::Mark;
+use crate::testing::scene::Scene;
 use crate::testing::tuning;
 use std::iter::from_fn;
 
@@ -60,7 +63,7 @@ fn plan_from_off_the_map_reads_no_start_cell() {
     };
     let mut out = Path::default();
     let found = planner
-        .plan::<crate::GenieError>(&req, false, &mut out, None, &tuning().tile_path)
+        .plan(&req, false, &mut out, None, &tuning().tile_path)
         .unwrap();
     assert_eq!(found, Found::OffMap);
 }
@@ -274,7 +277,7 @@ fn full_plan_searches_the_tiles_near_and_shortens_the_start_far() {
         let mut out = Path::default();
         assert_eq!(
             planner
-                .plan::<crate::GenieError>(&req, false, &mut out, None, &tuning().tile_path)
+                .plan(&req, false, &mut out, None, &tuning().tile_path)
                 .unwrap(),
             Found::Goal
         );
@@ -390,7 +393,11 @@ fn stretch_without_points_between_is_left_as_it_is() {
 }
 
 /// MarvinBlue/426048731's 9520 in update 758 (the probe's log): the search's twelve tile
-/// points become three where the walk is blocked at (103.5, 46.5) and beyond.
+/// points become three where the walk from the start to (103.5, 45.5) is blocked. On the
+/// scene's land, the water tile at (104, 45) blocks it: the walk puts the tile's temporary
+/// record and meets it. The walks from (103.5, 44.5) on pass beside the record, which stays
+/// until the pass ends; its end removes the records and the manager's buffer. On open land the
+/// path is one straight stretch.
 #[test]
 fn the_smoothing_keeps_the_points_before_blocked_walk() {
     let points = [
@@ -407,53 +414,70 @@ fn the_smoothing_keeps_the_points_before_blocked_walk() {
         Point::new(103.5, 46.5),
         Point::new(103.604_164, 46.854_168),
     ];
-    let mut path = Path {
-        points: points
+    let smoothed = |scene: Scene| {
+        let mut world = scene.build();
+        let mut path = Path {
+            points: points
+                .iter()
+                .map(|point| BVector::new(point.x(), 0.0, point.y()))
+                .collect(),
+            length: Distance::ZERO,
+        };
+        let mut walls = SmoothingWalls::new(&mut world.spatial, WALKER_RADIUS, LAND_MASK, &[]);
+        smooth(&mut path, &mut walls, &tuning().tile_path);
+        assert!(walls.ran);
+        assert_eq!(world.spatial.tile_records(), Vec::<Tile>::new());
+        assert_eq!(world.spatial.manager_buffer(), None);
+        path.points
             .iter()
-            .map(|point| BVector::new(point.x(), 0.0, point.y()))
-            .collect(),
-        length: Distance::ZERO,
+            .map(|point| point.ground())
+            .collect::<Vec<Point>>()
     };
-    // blocked: any walk from the start that ends beyond y = 44.5
-    let mut walls = Walls::default();
-    smooth(&mut path, &mut walls, &tuning().tile_path).unwrap();
-    let ends: Vec<Point> = path.points.iter().map(|point| point.ground()).collect();
+    let land = || Scene::open(GridSize::new(112, 48));
     assert_eq!(
-        ends,
+        smoothed(land().water([Tile::new(104, 45)])),
         [
             Point::new(109.5, 42.5),
             Point::new(103.5, 44.5),
             Point::new(103.604_164, 46.854_168)
         ]
     );
-    assert_eq!(walls.passes, 1);
-    // a path of two points tests nothing and ends no pass
-    let mut short = Path {
-        points: vec![BVector::ZERO, BVector::new(5.0, 0.0, 5.0)],
+    assert_eq!(
+        smoothed(land()),
+        [Point::new(109.5, 42.5), Point::new(103.604_164, 46.854_168)]
+    );
+}
+
+/// `FUN_140f7dbb0` returns at once for a path of two points: it tests no walk and ends no pass,
+/// so the manager keeps its buffer and the tile records an earlier walk put.
+#[test]
+fn the_smoothing_of_two_points_tests_no_walk_and_ends_no_pass() {
+    let mut world = Scene::rows(&["...", ".~.", "..."]).build();
+    world.spatial.set_manager_buffer(Some(WALKER_RADIUS));
+    world.spatial.put_tile_records(
+        Point::new(0.5, 0.5),
+        Point::new(2.5, 2.5),
+        Distance::ZERO,
+        LAND_MASK,
+    );
+    let mut path = Path {
+        points: vec![BVector::new(0.5, 0.0, 0.5), BVector::new(2.5, 0.0, 2.5)],
         length: Distance::ZERO,
     };
-    smooth(&mut short, &mut walls, &tuning().tile_path).unwrap();
-    assert_eq!((walls.tests, walls.passes), (10, 1));
+    let before = path.points.clone();
+    let mut walls = SmoothingWalls::new(&mut world.spatial, WALKER_RADIUS, LAND_MASK, &[]);
+    smooth(&mut path, &mut walls, &tuning().tile_path);
+    assert!(!walls.ran);
+    assert_eq!(path.points, before);
+    assert_eq!(world.spatial.tile_records(), vec![Tile::new(1, 1)]);
+    assert_eq!(world.spatial.manager_buffer(), Some(WALKER_RADIUS));
 }
 
-/// The smoothing test's stand-in: any walk from (109.5, 42.5) that ends beyond y = 44.5 is
-/// blocked; it counts the tests and the passes that ended.
-#[derive(Default)]
-struct Walls {
-    tests: usize,
-    passes: usize,
-}
+/// The smoothing tests' walker: its radius, the manager's buffer.
+const WALKER_RADIUS: Distance = Distance::new(0.2);
 
-impl SegmentTest<()> for Walls {
-    fn blocked(&mut self, from: Point, to: Point) -> Result<bool, ()> {
-        self.tests += 1;
-        Ok(from == Point::new(109.5, 42.5) && 44.5 < to.y())
-    }
-
-    fn pass_ends(&mut self) {
-        self.passes += 1;
-    }
-}
+/// The smoothing tests' walker's terrain mask: the scene's land class, not its water's.
+const LAND_MASK: TerrainMask = TerrainMask::of_bits(6);
 
 /// `FUN_140f7be80` orders each pair of corners, holds the rectangle on the map (its low
 /// corner at 0, its high one at `+0x404`/`+0x406`, the size less one) and closes, from each

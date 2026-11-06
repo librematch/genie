@@ -281,8 +281,7 @@ pub(crate) fn tile_plan_for(
     };
     let ignore: Vec<RecordId> = ignore.into_iter().map(RecordId::from).collect();
     let mut walls = SmoothingWalls::new(world, radius, mask, &ignore);
-    let found =
-        planner.plan::<GenieError>(&req, target_box, out, Some(&mut walls), tile_path_tuning)?;
+    let found = planner.plan(&req, target_box, out, Some(&mut walls), tile_path_tuning)?;
     if walls.ran {
         plan.pathing.smoothing_ran(slots);
         // FUN_140f7dbb0 sets the manager's ignore list to it (FUN_1410562e0)

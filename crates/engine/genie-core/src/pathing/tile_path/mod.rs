@@ -39,9 +39,9 @@ pub use self::plan_tile::{PlanRect, PlanTile};
 #[cfg(test)]
 use self::search::Node;
 use self::search::{NodeIndex, Nodes, OpenList};
+pub use self::smoothing::smooth;
 #[cfg(test)]
 use self::smoothing::straighten;
-pub use self::smoothing::{SegmentTest, smooth};
 use crate::math::image::tile_path::ONE as TILE_PATH_ONE;
 
 /// The cost the best node starts from in each search (`0x497423f0`).
