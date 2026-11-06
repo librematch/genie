@@ -10,7 +10,7 @@ exclude = [
     "src/generated/**",
     "src/de/command/generated.rs",
     "src/los_tables.rs",
-    "src/ai_kinds.rs",
+    "src/unit_ai/logged_kinds.rs",
     "src/image.rs",
     "src/**/tests.rs",
 ]

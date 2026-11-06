@@ -1,7 +1,7 @@
 //! What the unit tests share: a header reader over bytes and the write-read-write check.
 
 use crate::element::{ReadHeader, WriteHeader};
-use crate::reader::RecordingHeaderReader;
+use crate::header_reader::RecordingHeaderReader;
 use genie_error::GenieResult;
 use std::io::Read;
 

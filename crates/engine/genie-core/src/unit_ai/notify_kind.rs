@@ -1,12 +1,12 @@
 //! A unit AI notify's kind as one type: what an object tells a unit AI (an action completed, a
 //! hit, a search asked for), the value the save's `temp_notify` holds at `+0x8`.
 
-use crate::unit_ai::ai_kinds;
+use crate::unit_ai::logged_kinds;
 use std::fmt::{Error, Formatter, LowerHex};
 
 /// A notify's kind (`+0x8` of the save's `temp_notify`): the case of the unit AI's notify
 /// handlers (`processNotify`) it takes. The game posts kinds the slice does not name (the
-/// generated [`crate::unit_ai::ai_kinds`] has the ones its log lines name) and a save may hold
+/// generated [`crate::unit_ai::logged_kinds`] has the ones its log lines name) and a save may hold
 /// any of them, so the kind is a newtype with named constants: every `i32` is a kind. Its
 /// value is open to the crate (no value breaks an invariant), so that the handlers' switches
 /// match the game's ranges of kinds (`NotifyKind(0x259..=0x262)`, the action values).
@@ -15,13 +15,13 @@ pub struct NotifyKind(pub(crate) i32);
 
 impl NotifyKind {
     /// `500`: the unit took damage (p1 the attacker, p2 the damage).
-    pub const DAMAGED: Self = Self(ai_kinds::NOTIFY_DAMAGED);
+    pub const DAMAGED: Self = Self(logged_kinds::NOTIFY_DAMAGED);
     /// `0x1f9`: an action failed (p1 its action value).
-    pub const ACTION_FAILED: Self = Self(ai_kinds::NOTIFY_ACTION_FAILED);
+    pub const ACTION_FAILED: Self = Self(logged_kinds::NOTIFY_ACTION_FAILED);
     /// `0x1fa`: an action completed (p1 the action value).
-    pub const ACTION_COMPLETED: Self = Self(ai_kinds::NOTIFY_ACTION_COMPLETED);
+    pub const ACTION_COMPLETED: Self = Self(logged_kinds::NOTIFY_ACTION_COMPLETED);
     /// `0x1fb`: an action's invalidation (p1 the action value).
-    pub const ACTION_INVALIDATED: Self = Self(ai_kinds::NOTIFY_ACTION_INVALIDATED);
+    pub const ACTION_INVALIDATED: Self = Self(logged_kinds::NOTIFY_ACTION_INVALIDATED);
     /// `0x1fc`: a `MoveTo`'s target left its point and its path's end did not follow (p1..p3 0).
     pub const TARGET_MOVED: Self = Self(0x1fc);
     /// `0x1fd`: readyToAttack's target is out of reach.
@@ -59,10 +59,10 @@ impl NotifyKind {
     /// unit made).
     pub const PASTURE_BUILT: Self = Self(0x21d);
     /// `0x258`: the unit was attacked.
-    pub const ATTACKED: Self = Self(ai_kinds::NOTIFY_ATTACKED);
+    pub const ATTACKED: Self = Self(logged_kinds::NOTIFY_ATTACKED);
     /// `699`: an object no longer acts on the unit (its action let the unit go,
     /// `FUN_141086e60`).
-    pub const NO_LONGER_ON_ME: Self = Self(ai_kinds::NOTIFY_NO_LONGER_ON_ME);
+    pub const NO_LONGER_ON_ME: Self = Self(logged_kinds::NOTIFY_NO_LONGER_ON_ME);
 
     /// Its value, as the save and the game's log lines hold it.
     #[must_use]

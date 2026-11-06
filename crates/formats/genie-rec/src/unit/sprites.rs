@@ -1,7 +1,7 @@
 //! The sprites drawn for an object: their nodes and animations.
 
 use crate::element::{ReadHeader, ReadOptionalHeader, WriteHeader};
-use crate::reader::RecordingHeaderReader;
+use crate::header_reader::RecordingHeaderReader;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
 use genie_dat::sprite::SpriteId;
 use genie_error::GenieResult;

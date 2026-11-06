@@ -1,9 +1,9 @@
 use crate::GameVersion;
 use crate::element::{ReadHeader, read_counted};
 use crate::fits;
+use crate::header_reader::RecordingHeaderReader;
 use crate::map::Map;
 use crate::player::Player;
-use crate::reader::RecordingHeaderReader;
 use crate::string_table::StringTable;
 use byteorder::{LE, ReadBytesExt};
 use genie_error::GenieResult;

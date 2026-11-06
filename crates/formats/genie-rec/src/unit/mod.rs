@@ -1,6 +1,6 @@
 use crate::element::{ReadHeader, ReadOptionalHeader, WriteHeader};
 use crate::fits;
-use crate::reader::RecordingHeaderReader;
+use crate::header_reader::RecordingHeaderReader;
 use crate::unit_kind::UnitBaseClass;
 use byteorder::ReadBytesExt;
 pub use genie_dat::sprite::SpriteId;

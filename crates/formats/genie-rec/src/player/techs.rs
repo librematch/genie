@@ -1,7 +1,7 @@
 //! The technologies' states, and `UserPatch`'s extra player data.
 
 use crate::element::ReadHeader;
-use crate::reader::RecordingHeaderReader;
+use crate::header_reader::RecordingHeaderReader;
 use byteorder::{LE, ReadBytesExt};
 use genie_error::GenieResult;
 use genie_support::read_list;

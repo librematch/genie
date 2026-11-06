@@ -6,7 +6,7 @@
 
 use crate::ObjectId;
 use crate::element::ReadHeader;
-use crate::reader::RecordingHeaderReader;
+use crate::header_reader::RecordingHeaderReader;
 use byteorder::{LE, ReadBytesExt};
 use genie_error::GenieResult;
 use std::io::Read;

@@ -30,12 +30,12 @@ use crate::world::layer::generated::VisibilityTuning;
 use crate::world::step::Step;
 use crate::{GenieError, GenieResult};
 
+mod answers;
 mod death;
 mod default_task;
 mod idle_time;
 mod life_step;
 mod stop;
-mod top;
 mod update;
 
 /// A dying sprite the `.dat` does not have.

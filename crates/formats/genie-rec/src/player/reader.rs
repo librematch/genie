@@ -4,11 +4,11 @@ use crate::ObjectId;
 use crate::ai::PlayerAi;
 use crate::element::{ReadHeader, ReadOptionalHeader};
 use crate::fits;
+use crate::header_reader::RecordingHeaderReader;
 use crate::player::{
     DiplomacyOffer, GaiaData, HistoryInfo, Player, PlayerTech, UserPatchData, VisibleMap,
     VisibleResources,
 };
-use crate::reader::RecordingHeaderReader;
 use crate::unit::Unit;
 use crate::unit_kind::CompactUnitKind;
 use byteorder::{LE, ReadBytesExt};

@@ -1,5 +1,5 @@
-//! The orders by kind: defend, build, work, gather, hunt, follow, enter, transport, unload,
-//! seek and explore; an order on a target and one taken at once.
+//! The unit AI's order slots, one per kind of order: defend, build, work, gather, hunt, follow,
+//! enter, transport, unload, seek and explore; an order on a target and one taken at once.
 
 use crate::GenieResult;
 use crate::construction::FoundationId;

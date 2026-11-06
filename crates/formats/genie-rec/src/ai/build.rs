@@ -1,7 +1,7 @@
 //! The build AI module (its build list) and the construction AI module (its lots).
 
 use crate::element::ReadHeader;
-use crate::reader::RecordingHeaderReader;
+use crate::header_reader::RecordingHeaderReader;
 use byteorder::{LE, ReadBytesExt};
 use genie_error::GenieResult;
 use genie_support::ReadStringsExt;

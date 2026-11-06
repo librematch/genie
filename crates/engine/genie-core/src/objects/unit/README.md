@@ -22,8 +22,8 @@ The other files of this folder:
 - `life_step.rs` holds the life cycle's step in the update: the hit points, the states and what
   each new state sets off.
 - `default_task.rs` holds the master's default task, which an idle unit starts.
-- `top.rs` answers what the object and its actions hold: its taker, its gait, whether its top
-  action may be interrupted and the target it attacks. The top action itself is the action
+- `answers.rs` holds what the object and its actions answer: its taker, its gait, whether its
+  top action may be interrupted and the target it attacks. The top action itself is the action
   layer's (`objects/layers/action.rs`).
 - `stop.rs` tears down an object's actions and shows its standing sprite.
 - `death.rs` holds an object's death and a foundation's death.
@@ -39,6 +39,7 @@ The other files of this folder:
 <!-- files -->
 | File | What it holds |
 | --- | --- |
+| [`answers.rs`](answers.rs) | What a unit and its action layer answer: their taker, its context, its gait, whether its top action may be interrupted and the target it attacks. |
 | [`death.rs`](death.rs) | An object's death (`set_state(3)` and the static part of it) and a foundation's death. |
 | [`default_task.rs`](default_task.rs) | The master's default task, which an idle unit starts in its update: a bird's Fly, a farm's Make or the Artifact of livestock. |
 | [`idle_time.rs`](idle_time.rs) | What `RGE_Action_Object::update` (`0x14106ac90`) does after the action list: a villager's idle statistics, then the drop of a speed-up building that is gone or out of range. |
@@ -46,7 +47,6 @@ The other files of this folder:
 | [`mod.rs`](mod.rs) | What the slice tracks of one object (`Unit`) and its update, action by action. |
 | [`stop.rs`](stop.rs) | A unit's stops: its actions torn down or cleared, its standing sprite, an action's effects applied. |
 | [`tests.rs`](tests.rs) | Tests. |
-| [`top.rs`](top.rs) | What a unit and its action layer answer: their taker, its context, its gait, whether its top action may be interrupted and the target it attacks. |
 | [`update.rs`](update.rs) | A unit's update on its owner's turn, action by action. |
 <!-- /files -->
 

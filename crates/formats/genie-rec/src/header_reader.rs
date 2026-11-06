@@ -311,7 +311,7 @@ impl Default for RecordingState {
 
 #[cfg(test)]
 mod tests {
-    use crate::reader::{InflatableReader, Peek};
+    use crate::header_reader::{InflatableReader, Peek};
     use std::io::{Cursor, Read};
 
     #[test]

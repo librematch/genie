@@ -1,7 +1,7 @@
 use crate::area;
 use crate::element::{ReadHeader, WriteHeader};
 use crate::fits;
-use crate::reader::RecordingHeaderReader;
+use crate::header_reader::RecordingHeaderReader;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
 use genie_error::GenieResult;
 use genie_support::{ReadSkipExt, read_i8s, read_le, read_list};

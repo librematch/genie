@@ -1,7 +1,7 @@
 //! A player's diplomacy offers and its history: the timeline's events and entries.
 
 use crate::element::{ReadHeader, read_counted};
-use crate::reader::RecordingHeaderReader;
+use crate::header_reader::RecordingHeaderReader;
 use byteorder::{LE, ReadBytesExt};
 use genie_error::GenieResult;
 use genie_support::ReadStringsExt;

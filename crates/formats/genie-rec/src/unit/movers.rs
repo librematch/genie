@@ -1,7 +1,7 @@
 //! The moving and action base classes' attributes: paths, movement and the action stack.
 
 use crate::element::{ReadHeader, WriteHeader, read_counted, read_xyz};
-use crate::reader::RecordingHeaderReader;
+use crate::header_reader::RecordingHeaderReader;
 use crate::unit_action::UnitAction;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
 use genie_error::GenieResult;

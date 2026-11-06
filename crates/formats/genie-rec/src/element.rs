@@ -1,5 +1,5 @@
 use crate::errors::not_written;
-use crate::reader::RecordingHeaderReader;
+use crate::header_reader::RecordingHeaderReader;
 use genie_error::GenieResult;
 use std::io::Error;
 use std::io::{Read, Write};

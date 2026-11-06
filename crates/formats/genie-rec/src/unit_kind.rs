@@ -1,6 +1,6 @@
 use crate::element::{ReadHeader, WriteHeader};
 use crate::fits;
-use crate::reader::RecordingHeaderReader;
+use crate::header_reader::RecordingHeaderReader;
 use arrayvec::ArrayVec;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
 pub use genie_dat::unit_kind::{AttributeCost, UnitBaseClass};

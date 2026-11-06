@@ -3,7 +3,7 @@
 use crate::ObjectId;
 use crate::element::{ReadHeader, read_xyz};
 use crate::fits;
-use crate::reader::RecordingHeaderReader;
+use crate::header_reader::RecordingHeaderReader;
 use crate::unit_action::UnitAction;
 use arrayvec::ArrayVec;
 use byteorder::{LE, ReadBytesExt};

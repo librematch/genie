@@ -1,7 +1,7 @@
 use crate::element::{ReadHeader, WriteHeader};
 use crate::errors::not_utf8;
 use crate::fits;
-use crate::reader::RecordingHeaderReader;
+use crate::header_reader::RecordingHeaderReader;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
 use genie_error::GenieResult;
 use genie_support::{FIELD_DOES_NOT_FIT, read_bytes, reserved};

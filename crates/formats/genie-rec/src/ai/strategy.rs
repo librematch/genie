@@ -4,7 +4,7 @@ use crate::ObjectId;
 use crate::ai::read_id_list;
 use crate::element::{ReadHeader, WriteHeader};
 use crate::errors::not_read;
-use crate::reader::RecordingHeaderReader;
+use crate::header_reader::RecordingHeaderReader;
 use crate::unit::Waypoint;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
 use genie_error::GenieResult;

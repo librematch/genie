@@ -3,7 +3,7 @@
 use crate::area;
 use crate::element::ReadHeader;
 use crate::fits;
-use crate::reader::RecordingHeaderReader;
+use crate::header_reader::RecordingHeaderReader;
 use crate::{ObjectId, PlayerId};
 use byteorder::{LE, ReadBytesExt};
 use genie_error::GenieResult;

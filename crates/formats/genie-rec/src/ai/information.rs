@@ -6,7 +6,7 @@ use crate::ai::{
 };
 use crate::element::ReadHeader;
 use crate::errors::not_read;
-use crate::reader::RecordingHeaderReader;
+use crate::header_reader::RecordingHeaderReader;
 use crate::{ObjectId, fits};
 use byteorder::{LE, ReadBytesExt};
 use genie_error::GenieResult;

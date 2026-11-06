@@ -33,12 +33,12 @@ pub mod element;
 mod errors;
 /// The recorded-game header (pre-DE layout).
 pub mod header;
+/// Readers that track the header's versions while reading.
+pub mod header_reader;
 /// The map: tiles, zones, visibility and obstruction data.
 pub mod map;
 /// The players' state in the header.
 pub mod player;
-/// Readers that track the header's versions while reading.
-pub mod reader;
 /// The string table in the header.
 pub mod string_table;
 /// Units (game objects) in the header.
@@ -56,7 +56,7 @@ mod test_support;
 use crate::actions::{Action, Meta};
 use crate::element::ReadHeader;
 use crate::errors::{early_sync, missing_sync, unknown_action};
-use crate::reader::{RecordingHeaderReader, SmallBufReader};
+use crate::header_reader::{RecordingHeaderReader, SmallBufReader};
 use byteorder::{LE, ReadBytesExt};
 use flate2::bufread::DeflateDecoder;
 use genie_error::GenieResult;

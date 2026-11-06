@@ -2,7 +2,7 @@
 
 use crate::ObjectId;
 use crate::element::{ReadHeader, WriteHeader};
-use crate::reader::RecordingHeaderReader;
+use crate::header_reader::RecordingHeaderReader;
 use crate::unit::UnitAi;
 use byteorder::{LE, ReadBytesExt};
 use genie_dat::unit_kind::UnitKind;

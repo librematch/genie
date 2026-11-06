@@ -2,7 +2,7 @@
 
 use crate::element::{ReadHeader, WriteHeader, read_xyz};
 use crate::fits;
-use crate::reader::RecordingHeaderReader;
+use crate::header_reader::RecordingHeaderReader;
 use crate::unit::SpriteList;
 use crate::{ObjectId, PlayerId};
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};

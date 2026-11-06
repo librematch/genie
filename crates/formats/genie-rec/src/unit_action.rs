@@ -1,7 +1,7 @@
 use crate::ObjectId;
 use crate::element::{ReadHeader, WriteHeader};
 use crate::errors::unknown_unit_action;
-use crate::reader::RecordingHeaderReader;
+use crate::header_reader::RecordingHeaderReader;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
 pub use genie_dat::sprite::SpriteId;
 use genie_error::GenieResult;
