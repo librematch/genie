@@ -292,3 +292,6 @@ impl World {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests;

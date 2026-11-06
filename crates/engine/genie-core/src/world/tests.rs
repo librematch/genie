@@ -36,7 +36,6 @@ use crate::construction::MainBuildingId;
 use crate::construction::build::BuildState;
 use crate::construction::build::{BUILDER_UNMOVING, CART_TASK};
 use crate::construction::build::{BuildAction, BuildTask, Construction};
-use crate::construction::gates::gate_units;
 use crate::construction::repair::RepairState;
 use crate::construction::repair::{BUILDING_REPAIR_COST, REPAIR};
 use crate::construction::wait_solidify::{WAIT_SOLIDIFY, WaitSolidify};
@@ -365,7 +364,7 @@ fn building() -> UnitAi {
 }
 
 /// Object `id`'s construction, to change.
-fn site_mut(world: &mut World, id: ObjectId) -> &mut Construction {
+pub(crate) fn site_mut(world: &mut World, id: ObjectId) -> &mut Construction {
     world
         .parts
         .building_mut(id)
@@ -10452,137 +10451,10 @@ fn gate_opens_for_its_allies_while_they_update() {
     assert!(blocked(&game));
 }
 
-/// records/425906646's gate 27745 of player 3 (annexes 27746 and 27747) in update 2865: an
-/// ally walking between the posts opens it; a standing Gaia animal does not count, an enemy
-/// counts but is no ally, a wall next to it neither.
-#[test]
-fn gate_counts_the_moving_units_between_its_posts() {
-    let mut spatial = Spatial::with_tiles(
-        GridSize::new(40, 40),
-        Tiles::new(GridSize::new(40, 40), vec![1; 1600]),
-    );
-    spatial.relations = ByPlayer::new(vec![
-        relation_row([0, 3, 3]),
-        relation_row([3, 0, 3]),
-        relation_row([3, 3, 0]),
-    ]);
-    let placed = |x: f32, class, player, speed, kind| Placed {
-        position: Position::new(x, 20.0, 0.0),
-        radius: Footprint::new(0.2, 0.2),
-        class,
-        player,
-        master: ids::ID_0,
-        obstruction_kind: kind,
-        buildable_on: BuildableOn::NO,
-        tall: true,
-        moves: Speed::ZERO < speed,
-        unknown: None,
-        obstruction: Some(Obstruction {
-            kind,
-            class: ObstructionClass::UNIT,
-        }),
-    };
-    spatial.insert(
-        object_id(27745),
-        placed(
-            20.0,
-            class::GATE,
-            PlayerId::new(1),
-            Speed::ZERO,
-            ObstructionKind::KIND_2,
-        ),
-    );
-    spatial.insert(
-        object_id(27746),
-        placed(
-            18.5,
-            class::GATE,
-            PlayerId::new(1),
-            Speed::ZERO,
-            ObstructionKind::KIND_2,
-        ),
-    );
-    spatial.insert(
-        object_id(27747),
-        placed(
-            21.5,
-            class::GATE,
-            PlayerId::new(1),
-            Speed::ZERO,
-            ObstructionKind::KIND_2,
-        ),
-    );
-    spatial.insert(
-        object_id(1),
-        placed(
-            19.6,
-            class::VILLAGER,
-            PlayerId::new(1),
-            Speed::new(0.8),
-            ObstructionKind::CIRCLE,
-        ),
-    );
-    let (units, allied) = gate_units(
-        &mut spatial,
-        object_id(27745),
-        &[object_id(27746), object_id(27747)],
-        objects_ref::ObjectsRef::empty(),
-    )
-    .unwrap();
-    assert_eq!((units, allied), (vec![object_id(1)], 1));
-    spatial.insert(
-        object_id(2),
-        placed(
-            20.4,
-            class::PREDATOR,
-            PlayerId::new(0),
-            Speed::ZERO,
-            ObstructionKind::CIRCLE,
-        ),
-    );
-    spatial.insert(
-        object_id(3),
-        placed(
-            20.8,
-            class::CLASS_6,
-            PlayerId::new(2),
-            Speed::new(0.9),
-            ObstructionKind::CIRCLE,
-        ),
-    );
-    spatial.insert(
-        object_id(4),
-        placed(
-            21.0,
-            class::WALL,
-            PlayerId::new(1),
-            Speed::ZERO,
-            ObstructionKind::KIND_2,
-        ),
-    );
-    let (units, allied) = gate_units(
-        &mut spatial,
-        object_id(27745),
-        &[object_id(27746), object_id(27747)],
-        objects_ref::ObjectsRef::empty(),
-    )
-    .unwrap();
-    assert_eq!((units, allied), (vec![object_id(1), object_id(3)], 1));
-    assert!(
-        gate_units(
-            &mut spatial,
-            object_id(27745),
-            &[object_id(27746)],
-            objects_ref::ObjectsRef::empty()
-        )
-        .is_err()
-    );
-}
-
 /// records/425906646's gate 27745 of player 1 (annexes 27746 and 27747, master 88: open, no
 /// height, its `transform_unit` the shut 91 of height 2; 92 transforms into nothing) at (20, 20)
 /// with the moving soldier 1 (player 1's object 3) between its posts, at world time 400.
-fn gate_world() -> World {
+pub(crate) fn gate_world() -> World {
     let gate_master = |id: i16, transform_unit: i16, height| Master {
         id: master_id(id),
         kind: MasterKind::BUILDING,
@@ -10849,7 +10721,7 @@ fn gate_toggle_shuts_on_the_units_between_its_posts_or_opens() {
 /// [`Unit::gate_update`] of [`gate_world`]'s gate as master `master` with its gate state `gate`:
 /// the gate's master within the update after it (its toggle's, [`World::toggle_gate`]), its
 /// state after, or the error.
-fn gate_update_of(
+pub(crate) fn gate_update_of(
     master: MasterId,
     gate: Option<Gate>,
     setup: impl FnOnce(&mut World),
@@ -21505,7 +21377,7 @@ fn the_gather_update_ends_asks_again_and_walks_back() {
 /// [`forage_world`]'s forager (player 1's object 0) building house 10028 (master 70, at (30, 88),
 /// player 1's object 2) by the build command; the town centre 700 is complete in its tracker
 /// and the drop-site table's town centre takes the four basic resources.
-fn house_builder() -> World {
+pub(crate) fn house_builder() -> World {
     let mut world = forage_world();
     let placed = *world.spatial.get(object_id(700)).unwrap();
     let site = Placed {
@@ -22451,7 +22323,7 @@ fn site_of(world: &World, unit: &Unit) -> (ObjectState, f32, Option<f32>) {
 /// [`house_builder`]'s house 10028 with an annex: a second house foundation 10030 (player 1's
 /// last object) in its owner's pending tracker list, linked to the house as the game links an
 /// annex (`+0xbc0`, `+0xbb8`).
-fn annexed_house() -> World {
+pub(crate) fn annexed_house() -> World {
     let mut world = house_builder();
     let mut annex = world.object_of(world.players[1].objects.by_id(object_id(10028)).unwrap());
     annex.unit.id = object_id(10030);
@@ -23205,25 +23077,10 @@ fn dying_desolid_foundation_owner_watches_it_within_its_update() {
     assert_eq!(seen.map_err(|error| error.reason().to_owned()), Ok(1));
 }
 
-/// [`house_builder`]'s town centre 700 (master 109: 2400 hit points, a garrison heal rate of 2)
-/// at world time 3000 with the forager (master 120: 25 hit points, at 10) inside, changed by
-/// `setup`, after the centre's whole seconds ([`Unit::building_seconds`]): the forager's hit
-/// points and the centre's garrison time.
-fn centre_seconds(setup: impl FnOnce(&mut World)) -> GenieResult<(f32, u32)> {
-    let world = after_centre_seconds(setup)?;
-    let hp = world.players[1].objects[ListIndex::new(0)].life.hp.get();
-    Ok((
-        hp,
-        world
-            .parts
-            .building_of(world.players[1].objects[ListIndex::new(2)].id)
-            .garrison_time
-            .millis(),
-    ))
-}
-
-/// [`centre_seconds`]'s world after the centre's whole seconds.
-fn after_centre_seconds(setup: impl FnOnce(&mut World)) -> GenieResult<World> {
+/// [`house_builder`]'s town centre 700 (player 1's object 2, master 109: 2400 hit points, a
+/// garrison heal rate of 2) at world time 3000 with the forager inside (player 1's object 0, as
+/// it builds of the builder's master 118: 25 hit points, at 10).
+pub(crate) fn garrisoned_centre() -> World {
     use crate::objects::masters::BuildingMaster;
     let mut world = house_builder();
     for masters in &mut world.model.masters {
@@ -23241,6 +23098,27 @@ fn after_centre_seconds(setup: impl FnOnce(&mut World)) -> GenieResult<World> {
     world.world_time = WorldTime::from_millis(3000);
     world.players[1].objects[ListIndex::new(2)].garrison = vec![object_id(9175)];
     world.players[1].objects[ListIndex::new(0)].life.hp = HitPoints::new(10.0);
+    world
+}
+
+/// [`garrisoned_centre`] changed by `setup`, after the centre's whole seconds
+/// ([`Unit::building_seconds`]): the forager's hit points and the centre's garrison time.
+pub(crate) fn centre_seconds(setup: impl FnOnce(&mut World)) -> GenieResult<(f32, u32)> {
+    let world = after_centre_seconds(setup)?;
+    let hp = world.players[1].objects[ListIndex::new(0)].life.hp.get();
+    Ok((
+        hp,
+        world
+            .parts
+            .building_of(world.players[1].objects[ListIndex::new(2)].id)
+            .garrison_time
+            .millis(),
+    ))
+}
+
+/// [`centre_seconds`]'s world after the centre's whole seconds.
+fn after_centre_seconds(setup: impl FnOnce(&mut World)) -> GenieResult<World> {
+    let mut world = garrisoned_centre();
     setup(&mut world);
     in_update(
         &mut world,

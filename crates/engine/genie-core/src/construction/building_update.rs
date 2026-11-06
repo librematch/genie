@@ -664,3 +664,6 @@ pub(crate) fn blasts_at_death(
                 .of_class(master.class)
                 .contains(ClassRoles::DEATH_BLAST))
 }
+
+#[cfg(test)]
+mod tests;

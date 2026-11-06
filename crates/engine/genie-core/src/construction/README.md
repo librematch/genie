@@ -48,6 +48,8 @@ building's own steps first, then the builder's or repairer's action.
 | [`wait_solidify.rs`](wait_solidify.rs) | A villager's wait for a foundation: `TRIBE_Action_Wait_Solidify` (action type 0x9a, vtable `0x142ed82f8`). |
 | [`wait_solidify_state.rs`](wait_solidify_state.rs) | A Wait Solidify's state: waiting for its foundation to turn solid. |
 | [`build/`](build/) | A builder's Build action (`TRIBE_Action_Build`, type 101, vtable `0x142ed6628`) up to the builder's walk: the action starts in state 4 with a `MoveTo` sub-action (`RGE_Action_Move_To`, type 1) toward the foundation; a builder already at the foundation works in its first update (state 6). |
+| [`building_update/`](building_update/) | The building update's tests. |
+| [`gates/`](gates/) | The gates' tests. |
 | [`repair/`](repair/) | A repairer's Repair action (`TRIBE_Action_Repair`, type 106, vtable `0x142ed7b88`): the action walks to its target (state 4, a `MoveTo` sub-action within the unit's weapon range), faces it (state 6) and repairs it each update (state 7) until the target holds its most hit points or the player cannot pay for more; a target out of reach makes it wait (state 10) or fail (state 13). |
 <!-- /files -->
 
