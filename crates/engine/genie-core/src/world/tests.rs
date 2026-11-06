@@ -12,6 +12,7 @@ use crate::combat::missile::SmartMode;
 use crate::combat::missile::{MissSpread, Missile, MissileState, ProjectileKind, StrikeResult};
 use crate::combat::victims::{KillLeft, file_kill, write_back};
 use crate::combat::volley::Aimed;
+use crate::combat::volley::VolleyEnd;
 use crate::combat::{AttackCount, AttackTargetId, MissileCount};
 use crate::commands::Bell;
 use crate::commands::Departure;
@@ -20264,7 +20265,7 @@ fn hit_flare_is_made_where_the_volley_runs() {
         (PlayerId::new(1), ListIndex::new(0)),
         0,
         |unit, _, step| {
-            unit.volley(step, aimed, &roles())?;
+            assert_eq!(unit.volley(step, aimed, &roles())?, VolleyEnd::Done);
             let own = &step.world.players[1].objects;
             Ok(own
                 .iter()

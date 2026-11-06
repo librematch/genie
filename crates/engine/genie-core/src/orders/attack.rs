@@ -16,7 +16,6 @@ use crate::objects::Voice;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::FogVisibility;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::PlayersMastersExt;
 use crate::players::PlayerId;
 use crate::unit_ai::Notifies;
 use crate::world::WorldTime;
@@ -32,7 +31,7 @@ use crate::gathering::HuntTargetId;
 use crate::gathering::gather::unit::WalkSprites;
 use crate::gathering::hunt::HUNTER_STATE_LACKING;
 use crate::objects::masters::player_masters;
-use crate::objects::masters::{Master, MasterTables, OwnerMasters, Task};
+use crate::objects::masters::{Master, MasterTables, Task};
 use crate::objects::sprite::new_sprite;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::Notify;
@@ -71,7 +70,6 @@ impl World {
                 combat: self.parts.combat_of(unit.id),
                 top_speed: self.top_speed_terms(player, unit)?,
                 master,
-                masters: OwnerMasters::new(&self.parts.own_master, self.model.masters.of(player)),
                 graphics: &self.model.graphics,
                 ai: self.parts.unit_ai.get(unit.id),
                 player_kind: held.kind,

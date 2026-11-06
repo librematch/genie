@@ -11,7 +11,7 @@ use crate::objects::SpriteId;
 use crate::objects::facing::{face, turn_toward};
 use crate::objects::layers::Combat;
 use crate::objects::layers::MotionMut;
-use crate::objects::masters::{Master, MasterId, Masters};
+use crate::objects::masters::Master;
 use crate::objects::sprite::new_sprite;
 use crate::objects::sprite::{ActiveSprite, Graphic};
 use crate::world::Millis;
@@ -63,13 +63,6 @@ pub(super) fn set_attack_timer(
     combat.reload_worldtime = now.after(Millis::new(
         (seconds.get() * attack_tuning.reload_ms) as i64 as u32,
     ));
-}
-
-/// `FUN_14120c0a0`'s test of `master`: it has a volley missile or a charge projectile its player
-/// has (`masters`), so its hits go through its volley even without a missile.
-pub(crate) fn volleys(master: &Master, masters: &Masters) -> bool {
-    let has = |id: Option<MasterId>| id.and_then(|id| masters.get(id)).is_some();
-    has(master.creatable_part().volley_missile) || has(master.creatable_part().charge_projectile)
 }
 
 /// Slot 0x68 (`FUN_141217000`): the unit's sprite becomes `graphic` unless it is already; a new

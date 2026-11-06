@@ -69,7 +69,7 @@ pub use self::ready_to_attack::AtOnce;
 use self::ready_to_attack::in_range;
 #[cfg(test)]
 use self::sprites::SpriteReset;
-pub(crate) use self::sprites::{Aim, face_target, reset_sprite, show_arrived, volleys};
+pub(crate) use self::sprites::{Aim, face_target, reset_sprite, show_arrived};
 use self::sprites::{NO_OBJECT_STREAM, set_attack_timer};
 pub use self::sprites::{SwingSprites, swing_sprites};
 pub(crate) use self::unit::run_down_attack_timers;
@@ -84,7 +84,7 @@ use crate::math::image::attack::{EPSILON as ATTACK_EPSILON, NONE as ATTACK_NONE}
 #[cfg(test)]
 use crate::movement::Mover;
 use crate::objects::layers::Combat;
-use crate::objects::masters::{MasterTables, OwnerMasters};
+use crate::objects::masters::MasterTables;
 #[cfg(test)]
 use crate::objects::sprite::ActiveSprite;
 use crate::objects::{Frame, Graphics};
@@ -294,17 +294,14 @@ bitflags::bitflags! {
     /// ([`AttackReads`]).
     #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
     pub(crate) struct AttackerFlags: u8 {
-        /// Its master has a volley missile (`+0x8d4`) or a charge projectile (`+0x928`) its player
-        /// has: a hit without a missile is a volley too (`FUN_14120c0a0`), not the melee hit.
-        const VOLLEYS = 1;
         /// `FUN_14120ea30` for a building: it can attack (class 51 or 54, a missile, or a firepower
         /// above 1); true for the others.
-        const ARMED = 1 << 1;
+        const ARMED = 1;
         /// The unit AI's canMoveToAttack (slot 0x1d0, `FUN_140c48420`), which readyToAttack reads
         /// of a target out of reach.
-        const CAN_MOVE = 1 << 2;
+        const CAN_MOVE = 1 << 1;
         /// The unit has a unit AI whose order queue is empty (`FUN_140c564a0` is 0).
-        const QUEUE_EMPTY = 1 << 3;
+        const QUEUE_EMPTY = 1 << 2;
     }
 }
 
@@ -352,8 +349,8 @@ pub(crate) struct AttackReads {
 }
 
 /// What the Attack's update reads of its unit as it starts ([`AttackReads::of`]): its combat layer
-/// and its top speed's terms, its master, its player's masters and the sprites' table, its unit AI,
-/// its owner's type and the world's time.
+/// and its top speed's terms, its master and the sprites' table, its unit AI, its owner's type and
+/// the world's time.
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct AttackSource<'world> {
     /// The unit's combat layer.
@@ -362,8 +359,6 @@ pub(crate) struct AttackSource<'world> {
     pub(crate) top_speed: TopSpeed,
     /// Its master.
     pub(crate) master: &'world Master,
-    /// Its player's masters.
-    pub(crate) masters: OwnerMasters<'world>,
     /// The sprites' table.
     pub(crate) graphics: &'world Graphics,
     /// Its unit AI: its own, or the one running outside it.
@@ -376,15 +371,14 @@ pub(crate) struct AttackSource<'world> {
 
 impl AttackReads {
     /// What the Attack of a unit of `master` with the combat layer `combat` and its top speed's
-    /// terms `top_speed` reads: its player's masters and the sprites' table (`tables`), its unit
-    /// AI `ai` (the unit's own, or the one running outside it), whether its owner is a computer
-    /// player and the world's time (`now`).
+    /// terms `top_speed` reads: the sprites' table (`graphics`), its unit AI `ai` (the unit's
+    /// own, or the one running outside it), whether its owner is a computer player and the
+    /// world's time (`now`).
     pub(crate) fn of(source: AttackSource<'_>, roles: &Roles, turn_tuning: &TurnTuning) -> Self {
         let AttackSource {
             combat,
             top_speed,
             master,
-            masters,
             graphics,
             ai,
             player_kind,
@@ -397,12 +391,6 @@ impl AttackReads {
                 .copied(),
             flags: {
                 let mut flags = AttackerFlags::empty();
-                flags.set(
-                    AttackerFlags::VOLLEYS,
-                    masters
-                        .table
-                        .is_some_and(|masters| volleys(master, masters)),
-                );
                 flags.set(
                     AttackerFlags::ARMED,
                     armed(master, combat.firepower, roles, turn_tuning),

@@ -3,7 +3,6 @@
 use crate::combat::Charge;
 use crate::combat::attack::AtOnce;
 use crate::combat::attack::AttackState;
-use crate::combat::attack::AttackerFlags;
 use crate::combat::attack::{
     AfterHit, Attack, AttackReads, DRAW_SCALE, EPSILON, Fight, HALF, Hit, Readiness, after_hit,
     blast_so_far, reset_sprite, set_attack_timer, set_walker_anim, squared_reach, strike,
@@ -13,6 +12,7 @@ use crate::combat::damage::ShieldBlock;
 use crate::combat::damage::Victim;
 use crate::combat::victims::write_strike_back;
 use crate::combat::volley::Aimed;
+use crate::combat::volley::VolleyEnd;
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::Position;
@@ -40,7 +40,7 @@ use crate::combat::damage::{blast, charge_hit, elevation_factor, shield, take};
 use crate::objects::layers::Action;
 use crate::world::ATTACKER_UNMOVING;
 use crate::world::layer::ClassRoles;
-use crate::world::layer::MasterRoles;
+use crate::world::layer::Roles;
 use crate::world::step::Step;
 use crate::{GenieError, GenieResult};
 
@@ -231,12 +231,10 @@ impl Attack {
     }
 
     /// The swing's hit at its firing frame: the attack timer becomes the reload less the time to
-    /// that frame (`FUN_141089820`); the volley fires at once ([`Unit::volley`]) for a ranged
-    /// unit or one with volleys, else the target takes the melee hit ([`Attack::hit`]): the unit
-    /// tells its unit AI the action executed (0x200 with 600) and the target and the blast's
-    /// objects go back to the world there ([`write_strike_back`]). A dead target ends the swing
-    /// (`set_state` 2); else the rest of the reload past the sprite is the swing's. A
-    /// self-destructing attacker's hit is not modelled.
+    /// that frame (`FUN_141089820`), then the unit's hit at its target (slot 0x858,
+    /// [`Unit::volley`]), which may leave the target the melee hit ([`Attack::melee_hit`]). A dead
+    /// target ends the swing (`set_state` 2); else the rest of the reload past the sprite is the
+    /// swing's.
     pub(super) fn land_hit(
         &mut self,
         step: &mut Step<'_>,
@@ -260,49 +258,18 @@ impl Attack {
                 - Seconds::new(frame.as_f32() * sprite.graphic.frame_duration.get()),
             &step.world.model.tuning.attack,
         );
-        // slot 0x858 (FUN_14120c0a0): the volley, but for a unit without a missile, volley
-        // missile or charge projectile, whose hit is FUN_141081020's melee one
-        if ranged || attack_reads.flags.contains(AttackerFlags::VOLLEYS) {
-            unit.volley(
-                step,
-                Aimed::at(self.target.map(AttackTargetId::id), &fight.victim),
-                roles,
-            )?;
-        } else {
-            if roles.of_master(fight.own.master_id).intersects(
-                MasterRoles::DEMOLITION_SHIP
-                    | MasterRoles::HEAVY_DEMOLITION_SHIP
-                    | MasterRoles::DEMOLITION_RAFT
-                    | MasterRoles::INCENDIARY_RAFT
-                    | MasterRoles::INCENDIARY_SHIP
-                    | MasterRoles::HEAVY_INCENDIARY_SHIP,
-            ) {
-                return Err(GenieError::unsupported(
-                    "a self-destructing attacker's hit (masters 527, 528, 1104, 2133..2135)",
-                ));
+        // slot 0x858 (FUN_14120c0a0): the volley, whose hit of a master without a missile, a
+        // volley missile or a charge projectile is slot 0x860's melee one (FUN_141081020)
+        let end = unit.volley(
+            step,
+            Aimed::at(self.target.map(AttackTargetId::id), &fight.victim),
+            roles,
+        )?;
+        match end {
+            VolleyEnd::Done => {}
+            VolleyEnd::MeleeHit => {
+                Self::melee_hit(step, unit, actions, fight, attack_reads.hit_chance, roles)?;
             }
-            let executed = {
-                let object = step.world.streams.get_mut(Stream::Object);
-                Self::hit(
-                    fight,
-                    &mut step.blasted,
-                    attack_reads.hit_chance,
-                    object,
-                    HitLayer {
-                        roles,
-                        slots: step.world.model.slots,
-                        damage_tuning: &step.world.model.tuning.damage,
-                    },
-                )?
-            };
-            if let Some(target) = executed {
-                unit.post_own(
-                    &mut step.world.parts.unit_ai,
-                    NotifyKind::ACTION_EXECUTED,
-                    [600, target.get(), 0],
-                )?;
-            }
-            write_strike_back(step, unit, actions, &mut fight.victim, roles)?;
         }
         self.pending = false;
         if fight.victim.hp <= HitPoints::ZERO {
@@ -316,6 +283,42 @@ impl Attack {
             self.rest = Seconds::ZERO;
         }
         Ok(())
+    }
+
+    /// Slot 0x860 (`FUN_1412115e0`) where slot 0x858 leaves the hit to it
+    /// ([`VolleyEnd::MeleeHit`]): the fight's target takes the hit of hit chance `chance`
+    /// ([`Attack::hit`]), the unit tells its unit AI the action executed (0x200 with 600) and the
+    /// target and the blast's objects go back to the world ([`write_strike_back`]).
+    fn melee_hit(
+        step: &mut Step<'_>,
+        unit: &mut Unit,
+        actions: &mut Action,
+        fight: &mut Fight,
+        chance: HitChance,
+        roles: &Roles,
+    ) -> GenieResult<()> {
+        let executed = {
+            let object = step.world.streams.get_mut(Stream::Object);
+            Self::hit(
+                fight,
+                &mut step.blasted,
+                chance,
+                object,
+                HitLayer {
+                    roles,
+                    slots: step.world.model.slots,
+                    damage_tuning: &step.world.model.tuning.damage,
+                },
+            )?
+        };
+        if let Some(target) = executed {
+            unit.post_own(
+                &mut step.world.parts.unit_ai,
+                NotifyKind::ACTION_EXECUTED,
+                [600, target.get(), 0],
+            )?;
+        }
+        write_strike_back(step, unit, actions, &mut fight.victim, roles)
     }
 
     /// The swing after its hit: a done swing ends (`set_state` 2), a ready one readies
@@ -395,8 +398,8 @@ impl Attack {
     /// `blasted` about it: a unit with an area effect and a weapon range below 0.99 tramples
     /// ([`Attack::trample`]) unless its charge of type 3 is not its hit's (slot 0x2f0); else
     /// `FUN_141084230` ([`Attack::strike`]). Returns the target of the executed action the unit
-    /// tells its unit AI of (0x200 with 600). Not held: the attack count (`+0x900`) and the
-    /// damaged flag of masters 83, 293, 122 and 216 (`+0x683`); masters 122 and 123 under the
+    /// tells its unit AI of (0x200 with 600). Not held: the damaged flag of masters 83, 293, 122
+    /// and 216 (`+0x683`, `FUN_141081020`'s, [`Unit::fire`]); masters 122 and 123 under the
     /// game's `+0xc14` (`FUN_140c884c0`, 0 as the tick oracle holds it) would take the target at
     /// once.
     pub(super) fn hit(

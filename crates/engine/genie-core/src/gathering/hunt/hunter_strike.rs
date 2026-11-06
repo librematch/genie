@@ -27,7 +27,6 @@ use crate::objects::layers::Action;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::OwnerMasters;
 use crate::objects::masters::PlayersMastersExt;
 use crate::objects::unit::Unit;
 use crate::objects::unit::object_master;
@@ -130,10 +129,6 @@ impl Unit {
                     combat: step.world.parts.combat_of(self.id),
                     top_speed: step.world.top_speed_terms(step.player, self)?,
                     master,
-                    masters: OwnerMasters::new(
-                        &step.world.parts.own_master,
-                        step.world.model.masters.of(step.player),
-                    ),
                     graphics: &step.world.model.graphics,
                     ai: step.world.parts.unit_ai.get(self.id),
                     player_kind: owner.kind,

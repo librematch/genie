@@ -40,10 +40,10 @@ pub struct Combat {
     /// `mReloadWorldtime` (`+0x920`, slots 0x248 and 0x250): the world time its attack timer
     /// runs out at (`FUN_141089820`), 0 for none; once past, the volley under way is over.
     pub reload_worldtime: WorldTime,
-    /// `+0x900`, `attack_count`: the swings that fired a missile (`FUN_141081020`); a missile's
-    /// is its firing object's when fired.
+    /// `+0x900`, `attack_count`: its swings at a target, melee or ranged (`FUN_141081020`); a
+    /// missile's is its firing object's when fired.
     #[diff(
-        gap = "differs on 380 of MarvinBlue/426048731's samples (9181 at update 1075: genie 0, game 1): the resets on a new target (FUN_140a7c210, FUN_140a82a10) are not checked"
+        gap = "differs on 533 of MarvinBlue/426048731's samples (every 10th of updates 1..=3000; 9181 at update 1171: genie 2, game 0): genie resets it where the game does not, which resets it only on a new target (FUN_140a7c210, FUN_140a82a10)"
     )]
     pub attack_count: AttackCount,
     /// `mHitSomethingValidForChargeAttack` (`+0x8a8`): its last hit was its charge's.

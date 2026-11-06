@@ -21,9 +21,11 @@ use crate::objects::masters::CombatAbility;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
+use crate::objects::masters::Masters;
 use crate::objects::masters::OwnerMasters;
 use crate::objects::masters::PlayersMastersExt;
 use crate::objects::masters::VolleySpread;
+use crate::objects::masters::player_master;
 use crate::objects::unit::Unit;
 use crate::objects::unit::object_master;
 use crate::players::PlayerId;
@@ -42,7 +44,7 @@ use crate::{GenieError, GenieResult};
 /// A ranged unit without movement state, whose facing its shot reads.
 const RANGED_UNMOVING: GenieError = GenieError::unsupported("a ranged unit that does not move");
 /// A shot's missile of a master its player's table does not hold.
-pub(crate) const MISSILE_MASTER_LACKING: GenieError =
+const MISSILE_MASTER_LACKING: GenieError =
     GenieError::unsupported("a missile its player's masters do not have");
 
 mod launch;
@@ -91,10 +93,11 @@ impl Unit {
         Ok(KillLeft::own(&mut own))
     }
 
-    /// Slot 0x858 (`FUN_14120c0a0`), a combat object's hit at its target from the Attack's swing
-    /// when it has a missile, a volley missile or a charge projectile
-    /// ([`crate::combat::attack::volleys`]; the others' melee hit is the Attack's). A master
-    /// without `max_attacks_in_volley` fires its missile ([`Unit::fire`]). One with it fires its
+    /// Slot 0x858 (`FUN_14120c0a0`), a combat object's hit at its target from the Attack's swing;
+    /// none without a target. A master without a missile, a volley missile or a charge projectile
+    /// its player has ([`volleys`]) swings as [`Unit::fire`] does, which leaves the Attack the
+    /// melee hit ([`VolleyEnd::MeleeHit`]). A master without `max_attacks_in_volley` fires its
+    /// missile ([`Unit::fire`]); one without a missile, nothing. One with it fires its
     /// volley (`next_volley`, `+0xa04`, already fired of [`crate::combat::missile::volley_count`]
     /// missiles): unless its `combat_ability` has
     /// [`crate::objects::masters::CombatAbility::FULL_VOLLEY`], a master with a spread fires 1 to 3
@@ -104,15 +107,19 @@ impl Unit {
     /// (none without one) and the others its extra missiles ([`Unit::volley_missile`]), each
     /// scattered by two draws. A target of a player but Gaia has its player make a flare at the
     /// attacker ([`crate::world::World::make_flare`]). Not modelled: the self-destructing masters
-    /// (527, 528, 1104, 2133..2135, classes 35 and 64 alive), a charge (charge types 6 and 7) and a
-    /// target of a computer player (its notify 0x214). Not held: the local player's statistics
+    /// (527, 528, 1104, 2133..2135, classes 35 and 64 alive), a charge (charge types 6 and 7: slot
+    /// 0x2f8, and slot 0x308's route of a master with a volley but no missile to the melee hit) and
+    /// a target of a computer player (its notify 0x214). Not held: the local player's statistics
     /// (`FUN_140a4ba80`).
     pub(crate) fn volley(
         &mut self,
         step: &mut Step<'_>,
         aimed: Aimed,
         roles: &Roles,
-    ) -> GenieResult<()> {
+    ) -> GenieResult<VolleyEnd> {
+        if aimed.target.is_none() {
+            return Ok(VolleyEnd::Done);
+        }
         let master = object_master(
             step.world.parts.own_master.get(self.id),
             (self.id, self.life.master_id),
@@ -140,6 +147,17 @@ impl Unit {
             ));
         }
         let missile = master.combat_part().missile.master().is_some();
+        // FUN_14120c0a0's first test: a hit with nothing to fire is FUN_141081020's
+        if !missile
+            && !step
+                .world
+                .model
+                .masters
+                .of(step.player)
+                .is_some_and(|masters| volleys(master, masters))
+        {
+            return self.fire(step, &aimed, roles);
+        }
         // what the rest reads of the master, before the notify changes the unit
         let notifies = roles
             .of_master(master.id)
@@ -201,9 +219,9 @@ impl Unit {
             ));
         }
         if first && missile {
-            self.fire(step, &aimed, roles)?;
+            return self.fire(step, &aimed, roles);
         }
-        Ok(())
+        Ok(VolleyEnd::Done)
     }
 
     /// The volley's shots of a master with a volley (`max_volley`, `spread`, `full`: its full
@@ -263,21 +281,26 @@ impl Unit {
         ))
     }
 
-    /// `FUN_141081020`, a ranged unit's swing at its target (from its volley): its attack count
-    /// (`+0x900`) rises; its master's missile (`missile_id`; a charge projectile, slot 0x2f8 with
-    /// charge types 6 and 7, is not modelled) at its weapon offset turned by its facing
-    /// ([`crate::combat::missile::spawn_point`]), its reach [`crate::combat::missile::reach`], aimed at the
-    /// target's place, the shooter its origin ([`Unit::launch`], `FUN_14113f520`). Last the
-    /// shooter tells its unit AI the action executed (0x200 with 600, but for masters 73 and
-    /// 559). Not modelled: a target of a computer player, which a shooter whose blast does not
-    /// spare friends notifies (0x20f). Not held: the damaged flag of masters 83, 293, 122 and 216
-    /// (`+0x683`).
+    /// `FUN_141081020`, a unit's swing at its target (from its volley); none without a target. Its
+    /// attack count (`+0x900`) rises. A master without a missile leaves the Attack the melee hit
+    /// (slot 0x860, [`VolleyEnd::MeleeHit`]); a missile its player's masters lack
+    /// (`FUN_141659d20`) is not fired. Else its master's missile (`missile_id`; a charge
+    /// projectile, slot 0x2f8 with charge types 6 and 7, is not modelled) at its weapon offset
+    /// turned by its facing ([`crate::combat::missile::spawn_point`]), its reach
+    /// [`crate::combat::missile::reach`], aimed at the target's place, the shooter its origin
+    /// ([`Unit::launch`], `FUN_14113f520`). Last the shooter tells its unit AI the action executed
+    /// (0x200 with 600, but for masters 73 and 559). Not modelled: a target of a computer player,
+    /// which a shooter whose blast does not spare friends notifies (0x20f). Not held: the damaged
+    /// flag of masters 83, 293, 122 and 216 (`+0x683`).
     pub(crate) fn fire(
         &mut self,
         step: &mut Step<'_>,
         aimed: &Aimed,
         roles: &Roles,
-    ) -> GenieResult<()> {
+    ) -> GenieResult<VolleyEnd> {
+        if aimed.target.is_none() {
+            return Ok(VolleyEnd::Done);
+        }
         let combat = step.world.parts.combat_mut(self.id)?;
         combat.attack_count = combat.attack_count.next();
         let master = self.master(step.world.master_tables(), step.player)?;
@@ -286,6 +309,14 @@ impl Unit {
                 "a charge projectile (charge types 6 and 7, slot 0x2f8)",
             ));
         }
+        // no missile: slot 0x860's melee hit, which reads the Attack's fight
+        let Some(missile) = master.combat_part().missile.master() else {
+            return Ok(VolleyEnd::MeleeHit);
+        };
+        // FUN_141659d20: a missile its player lacks is not made, and nothing is told
+        if player_master(&step.world.model.masters, step.player, missile).is_none() {
+            return Ok(VolleyEnd::Done);
+        }
         let facing = step
             .world
             .parts
@@ -293,13 +324,7 @@ impl Unit {
             .map(|mover| mover.angle)
             .ok_or(RANGED_UNMOVING)?;
         let shot = Shot {
-            made: master
-                .combat_part()
-                .missile
-                .master()
-                .ok_or(GenieError::missing_data(
-                    "a ranged unit whose master has no missile",
-                ))?,
+            made: missile,
             at: spawn_point(self.position(), facing, master.combat_part().weapon_offset),
             point: aimed.position,
             reach: reach(
@@ -342,7 +367,7 @@ impl Unit {
                 "a missile fired at a computer player's object (its notify 0x20f)",
             ));
         }
-        Ok(())
+        Ok(VolleyEnd::Done)
     }
 
     /// `FUN_141226690`, a volley's extra missile scattered by `scatter`: the master's volley
@@ -484,6 +509,27 @@ pub(crate) fn armed(
             .intersects(ClassRoles::PACKED_TREBUCHET | ClassRoles::UNPACKED_TREBUCHET)
         || master.combat_part().missile.master().is_some()
         || Firepower::new(turn_tuning.armed_firepower) < firepower
+}
+
+/// What a unit's hit at its target (slot 0x858, [`Unit::volley`]) leaves to its Attack: nothing,
+/// or slot 0x860's melee hit. The game's slot answers whether it hit, which
+/// `RGE_Action_Attack::work` drops.
+#[must_use = "a melee hit is the Attack's to run"]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum VolleyEnd {
+    /// The hit is done: its missiles fired, or none.
+    Done,
+    /// The hit is slot 0x860's melee hit (`FUN_1412115e0`), which the Attack runs at once on its
+    /// fight's target ([`crate::combat::attack::Attack::hit`]).
+    MeleeHit,
+}
+
+/// `FUN_14120c0a0`'s test of `master`: it has a volley missile (`+0x8d4`) or a charge projectile
+/// (`+0x928`) its player has (`masters`, `FUN_141659d20`), so its hit goes through its volley
+/// even without a missile.
+pub(crate) fn volleys(master: &Master, masters: &Masters) -> bool {
+    let has = |id: Option<MasterId>| id.and_then(|id| masters.get(id)).is_some();
+    has(master.creatable_part().volley_missile) || has(master.creatable_part().charge_projectile)
 }
 
 /// Whether two lists hold the same objects, in any order.

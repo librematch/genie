@@ -19,12 +19,11 @@ use crate::objects::ObjectId;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::FogVisibility;
-use crate::objects::masters::PlayersMastersExt;
+use crate::objects::masters::Master;
 use crate::objects::masters::TaskGroup;
 use crate::objects::masters::TaskSprites;
 use crate::objects::masters::player_master;
 use crate::objects::masters::player_masters;
-use crate::objects::masters::{Master, OwnerMasters};
 use crate::objects::release::Releaser;
 use crate::objects::sprite::new_sprite;
 use crate::orders::{PACK_OR_UNPACK, placed_reach};
@@ -488,10 +487,6 @@ impl UnitView<'_, '_> {
                     ai.current_target,
                 )?,
                 master,
-                masters: OwnerMasters::new(
-                    &self.step.world.parts.own_master,
-                    self.step.world.model.masters.of(self.player),
-                ),
                 graphics: &self.step.world.model.graphics,
                 ai: Some(ai),
                 player_kind: self.player_kind,

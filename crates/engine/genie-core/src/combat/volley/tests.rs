@@ -6,7 +6,7 @@ use crate::combat::damage::{Armored, Attacker, Kill, KillCount, Victim};
 use crate::combat::missile::Aimer;
 use crate::combat::stingers::{STINGER, StingerTask, stinger_tasks};
 use crate::combat::victims::KillLeft;
-use crate::combat::volley::{Aimed, Shot, armed, same_members};
+use crate::combat::volley::{Aimed, Shot, VolleyEnd, armed, same_members, volleys};
 use crate::combat::{AttackCount, Charge, Firepower, KillState, MissileCount};
 use crate::map::Distance;
 use crate::map::Footprint;
@@ -90,7 +90,7 @@ fn change_combat(world: &mut World, change: impl Fn(&mut CombatPart)) {
 }
 
 /// The archer's volley at `aimed` in its update ([`Unit::volley`]).
-fn volley_at(world: &mut World, aimed: Aimed) -> GenieResult<()> {
+fn volley_at(world: &mut World, aimed: Aimed) -> GenieResult<VolleyEnd> {
     in_update(
         world,
         (PlayerId::new(1), ListIndex::new(0)),
@@ -100,7 +100,7 @@ fn volley_at(world: &mut World, aimed: Aimed) -> GenieResult<()> {
 }
 
 /// The archer's fire at `aimed` in its update ([`Unit::fire`]).
-fn fire_at(world: &mut World, aimed: &Aimed) -> GenieResult<()> {
+fn fire_at(world: &mut World, aimed: &Aimed) -> GenieResult<VolleyEnd> {
     in_update(
         world,
         (PlayerId::new(1), ListIndex::new(0)),
@@ -121,7 +121,7 @@ fn volley_missile_at(world: &mut World, aimed: &Aimed) -> GenieResult<()> {
 }
 
 /// The reason of `result`'s error; none for success.
-fn reason(result: GenieResult<()>) -> Option<String> {
+fn reason<T>(result: GenieResult<T>) -> Option<String> {
     result.err().map(|error| error.reason().to_owned())
 }
 
@@ -373,7 +373,7 @@ fn self_destructing_attacker_hit_is_unmodelled_only_while_alive() {
             .is_some_and(|text| text.starts_with("a self-destructing attacker's hit"))
     );
     world.players[1].objects[ListIndex::new(0)].life.state = ObjectState::Dying;
-    assert_eq!(volley_at(&mut world, at_deer()), Ok(()));
+    assert_eq!(volley_at(&mut world, at_deer()), Ok(VolleyEnd::Done));
     assert_eq!(missiles(&world).len(), 1);
 }
 
@@ -388,7 +388,7 @@ fn hit_on_gaia_target_makes_no_flare() {
         ..Master::default()
     };
     add_master(&mut world, &flare);
-    assert_eq!(volley_at(&mut world, at_deer()), Ok(()));
+    assert_eq!(volley_at(&mut world, at_deer()), Ok(VolleyEnd::Done));
     let flares = world
         .players
         .iter()
@@ -406,11 +406,167 @@ fn full_volley_fires_all_its_missiles_in_one_swing() {
     change_combat(&mut world, |combat| {
         combat.combat_ability = CombatAbility::FULL_VOLLEY;
     });
-    assert_eq!(volley_at(&mut world, at_deer()), Ok(()));
+    assert_eq!(volley_at(&mut world, at_deer()), Ok(VolleyEnd::Done));
     assert_eq!(missiles(&world).len(), 3);
     assert_eq!(
         world.parts.combat_of(ARCHER).next_volley,
         MissileCount::ZERO
+    );
+}
+
+/// `FUN_14120c0a0`'s test: a volley missile (`+0x8d4`) or a charge projectile (`+0x928`) of a
+/// master its player has sends the hit through the volley; one the player lacks counts as none.
+#[test]
+fn volleys_with_volley_missile_or_charge_projectile_its_player_has() {
+    let world = archer_world(100, 0, 0.0);
+    let masters = &world.model.masters[1];
+    let archer = masters.get(master_id(4)).unwrap();
+    let with = |volley_missile, charge_projectile| {
+        let mut master = archer.clone();
+        let creatable = master.creatable.get_or_insert_with(Default::default);
+        (creatable.volley_missile, creatable.charge_projectile) =
+            (volley_missile, charge_projectile);
+        volleys(&master, masters)
+    };
+    assert!(!with(None, None));
+    assert!(with(Some(master_id(363)), None));
+    assert!(with(None, Some(master_id(363))));
+    assert!(!with(Some(master_id(999)), Some(master_id(998))));
+}
+
+/// A master without a missile, a volley missile or a charge projectile its player has: its
+/// volley goes to `FUN_141081020`, whose hit is slot 0x860's melee hit, the Attack's. The attack
+/// count rises; no volley is split (no draw, `next_volley` and the attack timer as they were),
+/// nothing is fired or told.
+#[test]
+fn volley_of_master_without_missile_is_its_melee_hit() {
+    let mut world = archer_world(100, 3, 0.5);
+    change_combat(&mut world, |combat| combat.missile = MasterField::of(None));
+    let streams = world.streams.clone();
+    let timer = world.parts.combat_of(ARCHER).attack_timer;
+    assert_eq!(volley_at(&mut world, at_deer()), Ok(VolleyEnd::MeleeHit));
+    let combat = world.parts.combat_of(ARCHER);
+    assert_eq!(
+        (combat.attack_count, combat.next_volley, combat.attack_timer),
+        (AttackCount::ZERO.next(), MissileCount::ZERO, timer)
+    );
+    assert_eq!(world.streams, streams);
+    assert_eq!(
+        (missiles(&world).len(), archer_notifies(&world).len()),
+        (0, 0)
+    );
+}
+
+/// A volley missile the player lacks counts as none: the volley of a master without a missile
+/// is its melee hit.
+#[test]
+fn volley_missile_its_player_lacks_leaves_the_melee_hit() {
+    let mut world = archer_world(100, 3, 0.5);
+    change_combat(&mut world, |combat| combat.missile = MasterField::of(None));
+    change_master(&mut world, 4, |master| {
+        master
+            .creatable
+            .get_or_insert_with(Default::default)
+            .volley_missile = Some(master_id(999));
+    });
+    assert_eq!(volley_at(&mut world, at_deer()), Ok(VolleyEnd::MeleeHit));
+    assert_eq!(missiles(&world).len(), 0);
+}
+
+/// A master without a missile but with a volley missile its player has fires no first missile:
+/// without `max_attacks_in_volley` nothing, with a full volley of 3 its two extra missiles
+/// (shooterless, its attack count as it was).
+#[test]
+fn volley_without_missile_fires_only_its_extra_missiles() {
+    let volley_of = |max_volley| {
+        let mut world = archer_world(100, max_volley, 0.0);
+        let own = Master {
+            id: master_id(364),
+            ..world.model.masters[1].get(master_id(363)).unwrap().clone()
+        };
+        add_master(&mut world, &own);
+        change_combat(&mut world, |combat| {
+            combat.missile = MasterField::of(None);
+            combat.combat_ability = CombatAbility::FULL_VOLLEY;
+        });
+        change_master(&mut world, 4, |master| {
+            master
+                .creatable
+                .get_or_insert_with(Default::default)
+                .volley_missile = Some(master_id(364));
+        });
+        assert_eq!(volley_at(&mut world, at_deer()), Ok(VolleyEnd::Done));
+        assert_eq!(
+            world.parts.combat_of(ARCHER).attack_count,
+            AttackCount::ZERO
+        );
+        missiles(&world)
+            .iter()
+            .map(|&(_, master, _)| master)
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(volley_of(0), Vec::<i16>::new());
+    assert_eq!(volley_of(3), [364, 364]);
+}
+
+/// `FUN_14120c0a0` and `FUN_141081020` without a target do nothing: no attack counted, no
+/// missile, no notify.
+#[test]
+fn volley_and_fire_without_target_do_nothing() {
+    let untargeted = Aimed {
+        target: None,
+        ..at_deer()
+    };
+    let mut world = archer_world(100, 0, 0.0);
+    assert_eq!(volley_at(&mut world, untargeted), Ok(VolleyEnd::Done));
+    let untargeted = Aimed {
+        target: None,
+        ..at_deer()
+    };
+    assert_eq!(fire_at(&mut world, &untargeted), Ok(VolleyEnd::Done));
+    assert_eq!(
+        world.parts.combat_of(ARCHER).attack_count,
+        AttackCount::ZERO
+    );
+    assert_eq!(
+        (missiles(&world).len(), archer_notifies(&world).len()),
+        (0, 0)
+    );
+}
+
+/// `FUN_141081020` of a master without a missile: the attack count rises (`+0x900`), then the
+/// hit is slot 0x860's melee hit, the Attack's; nothing is fired or told.
+#[test]
+fn fire_of_master_without_missile_counts_the_attack_and_is_its_melee_hit() {
+    let mut world = archer_world(100, 0, 0.0);
+    change_combat(&mut world, |combat| combat.missile = MasterField::of(None));
+    assert_eq!(fire_at(&mut world, &at_deer()), Ok(VolleyEnd::MeleeHit));
+    assert_eq!(
+        world.parts.combat_of(ARCHER).attack_count,
+        AttackCount::ZERO.next()
+    );
+    assert_eq!(
+        (missiles(&world).len(), archer_notifies(&world).len()),
+        (0, 0)
+    );
+}
+
+/// `FUN_141081020` with a missile its player's masters lack (`FUN_141659d20`): the attack count
+/// rises, then nothing: no missile, no notify, no error.
+#[test]
+fn fire_with_missile_its_player_lacks_counts_the_attack_and_fires_nothing() {
+    let mut world = archer_world(100, 0, 0.0);
+    change_combat(&mut world, |combat| {
+        combat.missile = MasterField::of(Some(master_id(999)));
+    });
+    assert_eq!(fire_at(&mut world, &at_deer()), Ok(VolleyEnd::Done));
+    assert_eq!(
+        world.parts.combat_of(ARCHER).attack_count,
+        AttackCount::ZERO.next()
+    );
+    assert_eq!(
+        (missiles(&world).len(), archer_notifies(&world).len()),
+        (0, 0)
     );
 }
 
@@ -426,7 +582,7 @@ fn volley_notifies_its_unit_ai_per_missile_but_chu_ko_nu_once_per_volley() {
     };
     let mut world = archer_world(100, 3, 0.0);
     full(&mut world);
-    assert_eq!(volley_at(&mut world, at_deer()), Ok(()));
+    assert_eq!(volley_at(&mut world, at_deer()), Ok(VolleyEnd::Done));
     let executed = NotifyKind::ACTION_EXECUTED;
     assert_eq!(
         archer_notifies(&world),
@@ -453,7 +609,7 @@ fn volley_notifies_its_unit_ai_per_missile_but_chu_ko_nu_once_per_volley() {
     chu_ko_nu.players[1].objects[ListIndex::new(0)]
         .life
         .master_id = master_id(73);
-    assert_eq!(volley_at(&mut chu_ko_nu, at_deer()), Ok(()));
+    assert_eq!(volley_at(&mut chu_ko_nu, at_deer()), Ok(VolleyEnd::Done));
     assert_eq!(missiles(&chu_ko_nu).len(), 3);
     assert_eq!(archer_notifies(&chu_ko_nu), [(executed, [600, -1, 0])]);
 }
@@ -486,7 +642,7 @@ fn fire_at_computer_target_is_unmodelled_unless_its_blast_spares_friends() {
     change_combat(&mut sparing, |combat| {
         combat.blast_level = BlastLevel::SPARES_FRIENDS;
     });
-    assert_eq!(fire_at(&mut sparing, &at_deer()), Ok(()));
+    assert_eq!(fire_at(&mut sparing, &at_deer()), Ok(VolleyEnd::Done));
     assert_eq!(missiles(&sparing).len(), 1);
 }
 
@@ -555,9 +711,10 @@ fn volley_missile_without_missile_its_player_has_fails() {
     );
 }
 
-/// `FUN_1410d5920` makes the missile of its player's master: one the table lacks fails; a
-/// pooled missile that landed takes the ground by its fly mode, which a map without terrain
-/// cannot give.
+/// `FUN_1410d5920` makes the missile of its player's master: the fire and the volley's extra
+/// missile find it first, so a shot of one the table lacks breaks their invariant; a pooled
+/// missile that landed takes the ground by its fly mode, which a map without terrain cannot
+/// give.
 #[test]
 fn launch_fails_without_its_missile_master_or_the_ground_it_takes() {
     let mut world = archer_world(100, 0, 0.0);
@@ -593,7 +750,7 @@ fn launch_fails_without_its_missile_master_or_the_ground_it_takes() {
     };
     assert_eq!(
         reason(made(&mut world, 999)).as_deref(),
-        Some("a missile its player's masters do not have")
+        Some("a shot whose missile master its player lacks")
     );
     world.recycling.missiles = vec![(object_id(-5), false)];
     world.spatial.terrain = None;
@@ -615,7 +772,7 @@ fn launched_missile_holds_its_master_storage() {
             (Some(AttributeId::named(13)), Amount::new(3.0), 0),
         ];
     });
-    assert_eq!(fire_at(&mut world, &at_deer()), Ok(()));
+    assert_eq!(fire_at(&mut world, &at_deer()), Ok(VolleyEnd::Done));
     let missile = world.players[1].objects.by_id(object_id(-2)).unwrap();
     assert_eq!(
         (missile.life.attribute_kind, missile.life.amount),
@@ -631,7 +788,7 @@ fn launch_takes_the_target_and_the_shooter() {
     let workers =
         |world: &World| [ARCHER, DEER].map(|id| world.object(id).map(|(_, unit)| unit.workers));
     let mut world = archer_world(100, 0, 0.0);
-    assert_eq!(fire_at(&mut world, &at_deer()), Ok(()));
+    assert_eq!(fire_at(&mut world, &at_deer()), Ok(VolleyEnd::Done));
     assert_eq!(
         workers(&world),
         [Some(WorkerCount::ONE), Some(WorkerCount::ONE)]

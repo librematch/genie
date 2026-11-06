@@ -1,5 +1,6 @@
 use super::*;
 use crate::GenieResult;
+use crate::combat::AttackCount;
 use crate::combat::AttackTargetId;
 use crate::combat::MissileCount;
 use crate::combat::abilities::Look;
@@ -2983,12 +2984,23 @@ fn ranged_swing_fires_at_its_firing_frame_and_melee_one_counts_down() {
 /// target the strike reads dead ends the swing (`set_state` 2).
 #[test]
 fn swing_unmodelled_parts_fail_and_killing_hit_ends_it() {
-    let reason = |class, master, ranged, fire| {
+    let reason = |class, master: MasterId, ranged, fire| {
         let mut rig = Rig::on_the_path(Victim {
             hp: HitPoints::new(50.0),
             ..Victim::default()
         });
         (rig.fight.own.class, rig.fight.own.master_id) = (class, master);
+        // the unit is of that master too, which its volley (slot 0x858) reads
+        for masters in &mut rig.world.model.masters {
+            let own = Master {
+                id: master,
+                ..masters.get(master_id(4)).unwrap().clone()
+            };
+            *masters = Arc::new(Masters::new(masters.iter().cloned().chain([own])));
+        }
+        rig.world.players[1].objects[ListIndex::new(0)]
+            .life
+            .master_id = master;
         let mut swinging_attack = swinging_attack(AttackState::Swing, ranged, fire);
         rig.run(100, |step, unit, actions, fight, attack_reads| {
             swinging_attack.swing_to_hit(step, unit, actions, fight, attack_reads, at_frame(5, 4))
@@ -3011,7 +3023,7 @@ fn swing_unmodelled_parts_fail_and_killing_hit_ends_it() {
     );
     assert_eq!(
         reason(class::CLASS_6, ids::ID_527, false, 0),
-        "a self-destructing attacker's hit (masters 527, 528, 1104, 2133..2135)"
+        "a self-destructing attacker's hit (its object 112 and its death)"
     );
     let mut world = archer_world(100, 0, 0.0);
     let mut attack = *world
@@ -3053,6 +3065,28 @@ fn swing_unmodelled_parts_fail_and_killing_hit_ends_it() {
     .unwrap();
     assert_eq!((attack.pending, attack.state), (false, AttackState::Killed));
     assert_eq!(missiles(&world).len(), 1);
+}
+
+/// A melee swing's hit at its firing frame goes through slot 0x858 ([`Unit::volley`]): a master
+/// without a missile, a volley missile or a charge projectile takes `FUN_141081020`'s melee hit,
+/// whose attack count rises (`+0x900`) before the target takes the hit (slot 0x860).
+#[test]
+fn melee_swing_hit_counts_the_attack() {
+    let mut rig = Rig::on_the_path(Victim {
+        id: object_id(10028),
+        hp: HitPoints::new(50.0),
+        ..Victim::default()
+    });
+    let mut melee = swinging_attack(AttackState::Swing, false, 0);
+    rig.run(100, |step, unit, actions, fight, attack_reads| {
+        melee.land_hit(step, unit, actions, fight, attack_reads, at_frame(5, 4))
+    })
+    .unwrap();
+    assert!(!melee.pending);
+    assert_eq!(
+        rig.world.parts.combat_of(object_id(9177)).attack_count,
+        AttackCount::ZERO.next()
+    );
 }
 
 /// The swing after its hit ([`Attack::swing_after_hit`]): a ranged swing whose timer ran out

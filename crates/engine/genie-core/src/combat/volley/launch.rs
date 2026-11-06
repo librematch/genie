@@ -1,6 +1,5 @@
 //! A unit's missile launch: the missile's making and start, which its fire and its volley share.
 
-use crate::combat::volley::MISSILE_MASTER_LACKING;
 use crate::objects::layers::Speedup;
 
 use crate::combat::missile::AimAt;
@@ -50,6 +49,11 @@ use crate::world::slots::PlayerSlotsExt;
 use crate::world::step::Step;
 use crate::{GenieError, GenieResult};
 
+/// A shot whose missile master its player lacks: [`Unit::fire`] and [`Unit::volley_missile`]
+/// find the master in the player's table before they launch it.
+const SHOT_MASTER_LACKING: GenieError =
+    GenieError::unreachable("a shot whose missile master its player lacks");
+
 impl Unit {
     /// A missile's making and start, which [`Unit::fire`] and [`Unit::volley_missile`] share. The
     /// missile master comes from the player's master's slot 0x40 (`FUN_1410d5920`): from the pool
@@ -79,7 +83,7 @@ impl Unit {
         roles: &Roles,
     ) -> GenieResult<()> {
         let made = player_master(&step.world.model.masters, step.player, shot.made)
-            .ok_or(MISSILE_MASTER_LACKING)?;
+            .ok_or(SHOT_MASTER_LACKING)?;
         let stats = made.missile_stats().ok_or(GenieError::unsupported(
             "a missile master without its flight",
         ))?;
