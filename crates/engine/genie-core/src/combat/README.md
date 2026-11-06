@@ -59,10 +59,13 @@ its powerup update (`aura/`).
 | [`combat_update/`](combat_update/) | The combat update's tests. |
 | [`damage/`](damage/) | The damage side of a hit: what it reads of its target and its attacker and what it changes. |
 | [`hp_transforms/`](hp_transforms/) | The hit point transforms' tests. |
+| [`kill_counts/`](kill_counts/) | The kill counts' tests. |
 | [`missile/`](missile/) | The missile (`RGE_Missile_Object`, type 60) and its action (`RGE_Action_Missile`, type 8): a ranged attacker's swing makes one at its weapon offset (`FUN_141081020`, `spawn_point`), its action aims at the target (`FUN_140a9c600`, `aim`; `set_state` 3, `FUN_140a9de70`, `MissileAction::launch`) and flies it each update (`FUN_140a9e6e0`, `MissileAction::fly`) until it hits the target (the shooter's hit, slot 0x860) or the ground. |
 | [`powerup/`](powerup/) | The powerups' tests. |
 | [`stingers/`](stingers/) | An object's stingers (`mActiveStingers`, `+0xb58`): what its attackers' hits hand it (`hand_off`, `FUN_14107bdf0`) from their masters' stinger tasks (`stinger_tasks`), and the sums the stinger update rebuilds from them in each update (`World::object_stingers`, `FUN_1412092e0`). |
-| [`volley/`](volley/) | The missile launch. |
+| [`victim_reads/`](victim_reads/) | The victim reads' tests. |
+| [`victims/`](victims/) | The victims' tests. |
+| [`volley/`](volley/) | The missile launch and the volleys' tests. |
 <!-- /files -->
 
 ## How it connects

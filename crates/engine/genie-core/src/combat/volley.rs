@@ -514,3 +514,6 @@ pub(crate) struct Shot {
     pub(crate) aimer: Aimer,
     pub(crate) attack_count: AttackCount,
 }
+
+#[cfg(test)]
+mod tests;

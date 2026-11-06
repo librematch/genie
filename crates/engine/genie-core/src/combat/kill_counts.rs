@@ -197,3 +197,6 @@ impl KilledMaster {
         }
     }
 }
+
+#[cfg(test)]
+mod tests;

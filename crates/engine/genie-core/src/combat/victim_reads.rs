@@ -413,3 +413,6 @@ fn master_read(view: VictimView<'_>, roles: &Roles) -> GenieResult<Victim> {
         master_changes: Vec::new(),
     })
 }
+
+#[cfg(test)]
+mod tests;

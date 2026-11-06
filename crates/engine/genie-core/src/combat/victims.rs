@@ -562,3 +562,6 @@ pub(crate) fn paid_cost(master: &Master) -> Amount {
 /// the same index, and nothing between them removes an object.
 const NOT_LOCATED: GenieError =
     GenieError::unreachable("a victim the world located without its object");
+
+#[cfg(test)]
+mod tests;
