@@ -19,6 +19,12 @@ pub struct AbilityTimer {
 }
 
 impl AbilityTimer {
+    /// No ability: a duration of 0 that began at world time 0.
+    pub const NONE: Self = Self {
+        duration: Millis::ZERO,
+        activated: WorldTime::ZERO,
+    };
+
     /// `FUN_14107df50`: the per cent of the ability left at `now`. The span since it began
     /// (`SUB`, wrapping) past its duration (`CMP`/`JA`, unsigned) leaves none; else the
     /// duration less that span (`CVTSI2SD` of the 64-bit register). Over the duration

@@ -18,6 +18,15 @@ pub struct IdleTime {
     pub count: IdleCount,
 }
 
+impl IdleTime {
+    /// No idle: none began, none counted.
+    pub const NONE: Self = Self {
+        since: WorldTime::ZERO,
+        idle: Millis::ZERO,
+        count: IdleCount::ZERO,
+    };
+}
+
 /// The number of idles a villager began (`+0x8a0`, an int: `INC`, then `CVTDQ2PS`).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct IdleCount(i32);

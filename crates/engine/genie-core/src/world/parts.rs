@@ -39,7 +39,6 @@ use crate::unit_ai::Inbox;
 pub(crate) use crate::world::parts_fixtures::{no_own_masters, no_parts};
 use std::mem::replace;
 use std::slice::Iter as SliceIter;
-use std::sync::LazyLock;
 
 /// One part's table: the parts packed in a dense vector in the order they came, each id's slot
 /// in a table by id. A removal moves the last part into the gap.
@@ -55,15 +54,21 @@ pub struct PartTable<T> {
 
 impl<T> Default for PartTable<T> {
     fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<T> PartTable<T> {
+    /// An empty table.
+    #[must_use]
+    pub const fn new() -> Self {
         Self {
             parts: Vec::new(),
             ids: Vec::new(),
             slots: IdTable::new(),
         }
     }
-}
 
-impl<T> PartTable<T> {
     /// Object `id`'s part, if it holds one.
     #[must_use]
     pub fn get(&self, id: ObjectId) -> Option<&T> {
@@ -161,16 +166,20 @@ impl PartTable<Building> {
     /// Object `id`'s building layer: [`Building::NONE`] where the table holds none.
     #[must_use]
     pub fn of(&self, id: ObjectId) -> &Building {
-        self.get(id).unwrap_or(&NO_BUILDING)
+        // A constant that holds a `Vec` is not promoted: the inline `const` lends it for
+        // `'static`.
+        self.get(id).unwrap_or(const { &Building::NONE })
     }
 }
 
 impl PartTable<Combat> {
-    /// Object `id`'s combat layer: a new object's ([`Combat::default`]) where the table holds
+    /// Object `id`'s combat layer: a new object's ([`Combat::NONE`]) where the table holds
     /// none.
     #[must_use]
     pub fn of(&self, id: ObjectId) -> &Combat {
-        self.get(id).unwrap_or(&NO_COMBAT)
+        // A constant that holds a `Vec` is not promoted: the inline `const` lends it for
+        // `'static`.
+        self.get(id).unwrap_or(const { &Combat::NONE })
     }
 }
 
@@ -266,9 +275,6 @@ pub struct Parts {
     pub(crate) unread: PartTable<Unread>,
 }
 
-/// The building layer of an object the table does not hold.
-static NO_BUILDING: Building = Building::NONE;
-
 /// Object `id`'s repairers or builders to change ([`Parts::repairers_of`]) in the tables
 /// `buildings` and `combats`: a building's construction's, else its combat layer's (a new
 /// object's put in where the table holds none).
@@ -289,9 +295,6 @@ pub(in crate::world) fn repairers_in<'world>(
     }
     Ok(&mut combats.get_or_insert_with(id, Combat::default)?.builders)
 }
-
-/// The combat layer of an object the table does not hold: a new object's.
-static NO_COMBAT: LazyLock<Combat> = LazyLock::new(Combat::default);
 
 impl Parts {
     /// Object `id`'s parts filed in the tables (it enters the world).
@@ -334,13 +337,13 @@ impl Parts {
         if building != Building::NONE {
             let _ = self.building.insert(id, building);
         }
-        if combat != Combat::default() {
+        if combat != Combat::NONE {
             let _ = self.combat.insert(id, combat);
         }
         if let Some(motion) = motion {
             let _ = self.motion.insert(id, motion);
         }
-        if actions != Action::default() {
+        if actions != Action::NONE {
             let _ = self.actions.insert(id, actions);
         }
         if let Some(unread) = unread {
@@ -583,7 +586,7 @@ impl World {
             Part::Building(building) => {
                 let _ = self.parts.building.insert(id, *building);
             }
-            Part::Combat(held) if *held == Combat::default() => {
+            Part::Combat(held) if *held == Combat::NONE => {
                 let _ = self.parts.combat.remove(id);
             }
             Part::Combat(combat) => {
@@ -740,6 +743,17 @@ mod tests {
         let _ = part_table.insert(object_id(9), 'd');
         assert_eq!(table, part_table);
         assert!(!table.contains(object_id(5)) && !table.is_empty());
+    }
+
+    #[test]
+    fn no_parts_are_the_default() {
+        assert_eq!(no_parts(), &Parts::default());
+    }
+
+    #[test]
+    fn the_combat_layer_of_an_object_without_one_is_the_default() {
+        assert_eq!(Combat::NONE, Combat::default());
+        assert_eq!(Parts::default().combat.of(object_id(1)), &Combat::NONE);
     }
 
     /// The world files an object's parts with it: a part made in its life only for an object

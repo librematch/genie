@@ -162,3 +162,50 @@ pub struct Combat {
     #[diff(unsaved)]
     pub order_source: OrderSource,
 }
+
+impl Combat {
+    /// The layer of an object the world's table does not hold, a new object's: every timer,
+    /// count, powerup and stinger 0, no timed ability, its kill open, the master's sprites, the
+    /// constructor's abilities ([`Abilities::NEW`]), an empty store and a direct order.
+    pub const NONE: Self = Self {
+        attack_timer: Seconds::ZERO,
+        reload_worldtime: WorldTime::ZERO,
+        attack_count: AttackCount::ZERO,
+        charge_hit: false,
+        ability: AbilityTimer::NONE,
+        kill_state: KillState::Open,
+        next_volley: MissileCount::ZERO,
+        special_sprite: SpecialSprite::Hidden,
+        salvage: SalvageAmounts::NONE,
+        decay_timer: DecayTimer::ZERO,
+        raider_countdown: RaiderCountdown::NONE,
+        locked_down: LockdownCount::ZERO,
+        regen_timer: Seconds::ZERO,
+        builders: BuilderCount::NONE,
+        charge: Charge::ZERO,
+        armor_removed: ArmorPair::ZERO,
+        abilities: Abilities::NEW,
+        attack_powerup: AttackBonus::ZERO,
+        reload_powerup: Seconds::ZERO,
+        work_rate_powerup: WorkRate::ZERO,
+        regen_powerup: Regeneration::ZERO,
+        regen_stinger: Regeneration::ZERO,
+        reload_stinger: Seconds::ZERO,
+        speed_stinger: Speed::ZERO,
+        hp_stinger: HitPoints::ZERO,
+        attack_stinger: AttackBonus::ZERO,
+        armor_stingers: ArmorBonuses::ZERO,
+        active_stingers: Vec::new(),
+        powerup_update: WorldTime::ZERO,
+        hp_powerup: HpPowerup::NONE,
+        range_powerup: Distance::ZERO,
+        armor_powerups: ArmorBonuses::ZERO,
+        speed_powerup: Speed::ZERO,
+        conversion_powerup: ConversionPowerup::ZERO,
+        applied_powerups: Vec::new(),
+        infantry_inside: InfantryCount::ZERO,
+        store: Vec::new(),
+        firepower: Firepower::ZERO,
+        order_source: OrderSource::Direct,
+    };
+}

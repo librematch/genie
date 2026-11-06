@@ -568,7 +568,16 @@ scheduler breaks a bit-for-bit replay. No pattern changes the game's order of up
 - **Ids as the game hands them out.** Reuse no id that the game does not reuse.
 - **No global state.** Engine crates hold no `static mut`, `thread_local!`, `OnceLock`,
   `LazyLock` or `lazy_static`. A shared table is a field of the world. Many parallel instances
-  and WebAssembly need this.
+  and WebAssembly need this. A default that a lookup lends for `'static` is a `const`
+  (`Combat::NONE`). A const that holds a `Vec` is not promoted by `&Combat::NONE`: borrow it
+  through an inline `const { &Combat::NONE }`.
+- **Test fixtures.** A test can borrow an immutable fixture for `'static` from a `LazyLock`
+  where the fixture cannot be a constant: the generated build layer, a model built from it, a
+  table with content. The fixture never changes, nextest runs each test in a process of its
+  own, and a test build never ships: no engine instance shares its state. Such a fixture
+  lives in a test-only file: the `testing` module, a `tests.rs` or a `*_fixtures.rs`. A
+  fixture that can be a constant is one there too, and no test holds a `static mut`, a
+  `thread_local!` or a `OnceLock`.
 - **Observers outside the update.** A frontend reads the state and the events after an update.
   No callback runs inside it.
 

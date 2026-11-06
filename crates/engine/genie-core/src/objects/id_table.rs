@@ -43,14 +43,19 @@ struct Column<T> {
 
 impl<T> Default for Column<T> {
     fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<T> Column<T> {
+    /// An empty column.
+    const fn new() -> Self {
         Self {
             values: Vec::new(),
             held: Vec::new(),
         }
     }
-}
 
-impl<T> Column<T> {
     /// The value at `index`.
     fn get(&self, index: usize) -> Option<&T> {
         self.values.get(index)?.as_ref()
@@ -144,13 +149,7 @@ impl Iterator for Bits<'_> {
 
 impl<T> Default for IdTable<T> {
     fn default() -> Self {
-        Self {
-            ahead: Column::default(),
-            behind: Column::default(),
-            far_below: BTreeMap::new(),
-            far_above: BTreeMap::new(),
-            len: 0,
-        }
+        Self::new()
     }
 }
 
@@ -196,8 +195,14 @@ fn behind_id(index: usize) -> Option<ObjectId> {
 impl<T> IdTable<T> {
     /// An empty table.
     #[must_use]
-    pub fn new() -> Self {
-        Self::default()
+    pub const fn new() -> Self {
+        Self {
+            ahead: Column::new(),
+            behind: Column::new(),
+            far_below: BTreeMap::new(),
+            far_above: BTreeMap::new(),
+            len: 0,
+        }
     }
 
     /// How many values it holds.

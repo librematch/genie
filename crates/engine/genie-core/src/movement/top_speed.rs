@@ -239,9 +239,10 @@ impl<'world> SpeedReads<'world> {
     pub(crate) fn empty() -> SpeedReads<'static> {
         use crate::testing::model;
         use crate::world::parts::no_parts;
-        use std::sync::LazyLock;
-        static GROUPS: LazyLock<UnitGroups> = LazyLock::new(UnitGroups::default);
-        SpeedReads::of(&[], ObjectIndex::scanning(), no_parts(), &GROUPS, model())
+        // A constant that holds a `Vec` is not promoted: the inline `const` lends it for
+        // `'static`.
+        let groups = const { &UnitGroups::NONE };
+        SpeedReads::of(&[], ObjectIndex::scanning(), no_parts(), groups, model())
     }
 
     /// Slot 0x208 of `unit` of player `player` at its place, its unit AI's target `ai_target`

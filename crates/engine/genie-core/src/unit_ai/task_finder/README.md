@@ -25,11 +25,12 @@ player's other masters of the task swap group.
 | --- | --- |
 | [`mod.rs`](mod.rs) | The task finder (`TRIBE_Task_List` slot 2, `FUN_1412784d0`, with the `RGE_Task_List` finder `FUN_1411a8ba0` and its test of a task on a target, slot 4 `FUN_1411a8620`): which task of a master's task list a unit does on a target object. |
 | [`target_steps.rs`](target_steps.rs) | The task finder's steps on a target: the drop-off, its player's foundation, the garrison into it and its repair. |
+| [`tests.rs`](tests.rs) | Tests. |
 | [`world.rs`](world.rs) | What the task finder reads of the world: the relations, the drop sites, a wait's progress, a target's state and the search of slot 0x820. |
 <!-- /files -->
 
 ## How it connects
 
 <!-- uses -->
-- Uses: [`combat`](../../combat/), [`construction`](../../construction/), [`garrison`](../../garrison/), [`gathering`](../../gathering/), [`map`](../../map/), [`objects`](../../objects/), [`orders`](../../orders/), [`players`](../../players/), [`testing`](../../testing/), [`world`](../../world/).
+- Uses: [`combat`](../../combat/), [`construction`](../../construction/), [`garrison`](../../garrison/), [`gathering`](../../gathering/), [`map`](../../map/), [`objects`](../../objects/), [`orders`](../../orders/), [`players`](../../players/), [`world`](../../world/).
 <!-- /uses -->

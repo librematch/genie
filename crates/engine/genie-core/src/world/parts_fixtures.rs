@@ -14,7 +14,6 @@ use crate::unit_ai::UnitAi;
 use crate::world::Unread;
 use crate::world::World;
 use crate::world::parts::{Object, ObjectParts, Part, PartTable, Parts};
-use std::sync::LazyLock;
 
 /// No own masters: a test's master lookups without a world.
 pub(crate) fn no_own_masters() -> &'static PartTable<Master> {
@@ -22,12 +21,28 @@ pub(crate) fn no_own_masters() -> &'static PartTable<Master> {
 }
 
 /// No parts: a test's reads by id without a world.
-pub(crate) fn no_parts() -> &'static Parts {
-    static NONE: LazyLock<Parts> = LazyLock::new(Parts::default);
-    &NONE
+pub(crate) const fn no_parts() -> &'static Parts {
+    // A constant that holds a `Vec` is not promoted: the inline `const` lends it for `'static`.
+    const { &Parts::EMPTY }
 }
 
 impl Parts {
+    /// Every table empty: a world's without objects.
+    const EMPTY: Self = Self {
+        dead_master: PartTable::new(),
+        gather_point: PartTable::new(),
+        production: PartTable::new(),
+        missile: PartTable::new(),
+        own_master: PartTable::new(),
+        town_bell: PartTable::new(),
+        unit_ai: PartTable::new(),
+        building: PartTable::new(),
+        combat: PartTable::new(),
+        motion: PartTable::new(),
+        actions: PartTable::new(),
+        unread: PartTable::new(),
+    };
+
     /// A test's unit AI `ai` of object `id` (none removes it), a borrow apart from the lists.
     pub(crate) fn set_unit_ai(&mut self, id: ObjectId, ai: Option<UnitAi>) {
         match ai {

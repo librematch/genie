@@ -62,7 +62,7 @@ impl<'world> OthersRef<'world> {
 
     /// Player `player`'s view of its live list `own` alone, no other player's.
     #[cfg(test)]
-    pub(crate) fn alone(player: PlayerId, own: &'world ObjectList) -> Self {
+    pub(crate) const fn alone(player: PlayerId, own: &'world ObjectList) -> Self {
         let foreign = Foreign {
             before: &[],
             after: &[],

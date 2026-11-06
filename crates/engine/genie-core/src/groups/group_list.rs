@@ -43,6 +43,14 @@ pub struct UnitGroups {
 }
 
 impl UnitGroups {
+    /// No group: the counter at the first id, no command counted and the scratch array empty.
+    pub const NONE: Self = Self {
+        groups: Vec::new(),
+        counter: GroupId::FIRST,
+        commands: Differentiator::ZERO,
+        unit_kinds_scratch: Vec::new(),
+    };
+
     /// The long pather's list for a unit in group `group` (`FUN_140f9eb70`: `+0x6d0`, the group
     /// by id `FUN_14152ff40`, then `FUN_14100bbe0` with 255): None for no group (-1) or one the
     /// world does not hold.

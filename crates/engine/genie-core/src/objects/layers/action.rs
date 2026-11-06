@@ -42,6 +42,16 @@ pub struct Action {
 }
 
 impl Action {
+    /// The layer of an object the world's table does not hold (a tree's): no action, no default
+    /// task, no idle time, no speed-up building and no command.
+    pub const NONE: Self = Self {
+        list: ActionList::EMPTY,
+        default_task: DefaultTask::Nothing,
+        idle: IdleTime::NONE,
+        speedup: Speedup::NONE,
+        commands: CommandCount::ZERO,
+    };
+
     /// Its slot 0x190 (`FUN_14106d090`, then `FUN_140a78450`): the object its top action targets
     /// (the action's `+0x30` when not −1); none without a top action. `unread`: the load could
     /// not read the object whole ([`Unread`]).

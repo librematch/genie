@@ -93,8 +93,8 @@ const ONE: f32 = ABILITIES_ONE;
 /// The range below which a removal reward task pays (`DAT_142eb0c60`).
 const EPSILON: f32 = ABILITIES_EPSILON;
 
-/// What the routine keeps on its object. The constructor's values are the default: no timer,
-/// rate 1 and the master's look.
+/// What the routine keeps on its object. The constructor's values are the default
+/// ([`Abilities::NEW`]).
 #[derive(Clone, Copy, Debug, PartialEq, Diff)]
 pub struct Abilities {
     /// `+0x9a4`, `mMovementDamageTimer` (saved): the seconds before a movement damage task hits
@@ -110,13 +110,18 @@ pub struct Abilities {
     pub(crate) look: Option<Look>,
 }
 
+impl Abilities {
+    /// The constructor's values: no timer, rate 1 and the master's look.
+    pub const NEW: Self = Self {
+        movement_damage_timer: Seconds::ZERO,
+        attack_rate: 1.0,
+        look: None,
+    };
+}
+
 impl Default for Abilities {
     fn default() -> Self {
-        Self {
-            movement_damage_timer: Seconds::ZERO,
-            attack_rate: 1.0,
-            look: None,
-        }
+        Self::NEW
     }
 }
 

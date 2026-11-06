@@ -272,6 +272,9 @@ fn walk(slot: Option<&mut Option<MoveToAction>>) -> Option<SubActionMut<'_>> {
 pub struct ActionList(Vec<Action>);
 
 impl ActionList {
+    /// No action.
+    pub const EMPTY: Self = Self(Vec::new());
+
     /// `action` replaces the list's action of its kind in its place, or else becomes the head.
     pub fn put(&mut self, action: Action) {
         let kind = discriminant(&action);

@@ -7,17 +7,14 @@ use crate::objects::ObjectId;
 use crate::objects::layers::Action;
 use crate::world::parts::{PartTable, Parts};
 use std::mem::take;
-use std::sync::LazyLock;
-
-/// The action layer of an object the table does not hold: an empty one (a tree's).
-static NO_ACTIONS: LazyLock<Action> = LazyLock::new(Action::default);
 
 impl PartTable<Action> {
-    /// Object `id`'s action layer: an empty one ([`Action::default`]) where the table holds
-    /// none.
+    /// Object `id`'s action layer: an empty one ([`Action::NONE`]) where the table holds none.
     #[must_use]
     pub fn of(&self, id: ObjectId) -> &Action {
-        self.get(id).unwrap_or(&NO_ACTIONS)
+        // A constant that holds a `Vec` is not promoted: the inline `const` lends it for
+        // `'static`.
+        self.get(id).unwrap_or(const { &Action::NONE })
     }
 
     /// Object `id`'s action layer to change, an empty one put in where the table holds none,
@@ -59,7 +56,7 @@ impl Parts {
     /// Object `id`'s action layer `layer` in the table: filed where it differs from an empty
     /// one, else the entry goes.
     pub(crate) fn put_actions(&mut self, id: ObjectId, layer: Action) {
-        if layer == Action::default() {
+        if layer == Action::NONE {
             let _ = self.actions.remove(id);
         } else {
             let _ = self.actions.insert(id, layer);
@@ -80,6 +77,12 @@ mod tests {
             default_task: DefaultTask::Fly,
             ..Action::default()
         }
+    }
+
+    #[test]
+    fn the_layer_of_an_object_without_one_is_the_default() {
+        assert_eq!(Action::NONE, Action::default());
+        assert_eq!(Parts::default().actions_of(object_id(1)), &Action::NONE);
     }
 
     #[test]

@@ -11,6 +11,9 @@ impl Differentiator {
     /// −1: a group no command ordered yet.
     pub const NONE: Self = Self(-1);
 
+    /// 0: the count before any command ran the splitter ([`crate::groups::UnitGroups::NONE`]).
+    pub const ZERO: Self = Self(0);
+
     /// The count of the save's or the dump's value `value`.
     #[must_use]
     pub const fn of_data(value: i32) -> Self {

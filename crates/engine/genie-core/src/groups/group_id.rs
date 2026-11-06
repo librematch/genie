@@ -22,6 +22,10 @@ impl GroupId {
     /// The value a field takes for none.
     const NONE: i32 = -1;
 
+    /// 0: the counter of a world that made no group yet ([`crate::groups::UnitGroups::NONE`]),
+    /// the id of the first group it makes.
+    pub const FIRST: Self = Self(0);
+
     /// The id the world gives the group after this one (`FUN_14152efc0`: the counter up by one,
     /// a 32-bit add).
     #[must_use]

@@ -40,8 +40,6 @@ use crate::world::player::Player;
 use crate::world::slots::PlayerSlotsExt;
 #[cfg(test)]
 use std::sync::Arc;
-#[cfg(test)]
-use std::sync::LazyLock;
 
 /// Which of a player's object lists: the live one or the sleeping one.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -136,12 +134,15 @@ impl ObjectIndex {
     /// A table that never answers, so that every lookup scans: the view of lists no world holds
     /// (a test's).
     #[cfg(test)]
-    pub(crate) fn scanning() -> &'static Self {
-        static SCANNING: LazyLock<ObjectIndex> = LazyLock::new(|| ObjectIndex {
-            places: IdTable::new(),
-            twice: true,
-        });
-        &SCANNING
+    pub(crate) const fn scanning() -> &'static Self {
+        // A constant that holds a `Vec` is not promoted: the inline `const` lends it for
+        // `'static`.
+        const {
+            &Self {
+                places: IdTable::new(),
+                twice: true,
+            }
+        }
     }
 
     /// Whether a lookup scans the lists (they held one id twice).

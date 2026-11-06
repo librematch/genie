@@ -44,6 +44,11 @@ use crate::world::World;
 use crate::world::{FrameSeed, Player};
 use std::sync::Arc;
 
+#[test]
+fn no_groups_are_the_default() {
+    assert_eq!(UnitGroups::NONE, UnitGroups::default());
+}
+
 /// `BMotion`'s constructor (`FUN_141041850`): the 0x7f7fffff turn limits at `+0x9c`,
 /// `+0xa0`, `+0xa8`, zero speeds and accelerations, the lead (`+0xc4`) -1, flags 3, the
 /// frame at the origin facing x, one level without a path.

@@ -12,6 +12,9 @@ use crate::world::Millis;
 pub struct DecayTimer(i16);
 
 impl DecayTimer {
+    /// No milliseconds left.
+    pub const ZERO: Self = Self(0);
+
     /// The timer of the save's short `value`.
     #[must_use]
     pub const fn of_data(value: i16) -> Self {
