@@ -113,7 +113,10 @@ impl Mover {
                     .contains(ClassRoles::WIDE_REACH)
         });
         let mut path = Path::default();
-        if let Some(planner) = plan.pathing.planner(self.stats.restriction, world.tiles()) {
+        if let Some(planner) = plan
+            .pathing
+            .planner(self.stats.restriction, world.tiles())?
+        {
             let req = Request {
                 from: Point::new(x, y),
                 to,

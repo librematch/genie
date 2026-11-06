@@ -204,7 +204,7 @@ impl World {
                 let Some(restriction) = walker.restriction else {
                     return Ok(None);
                 };
-                let Some(planner) = pathing.planner(restriction, tiles) else {
+                let Some(planner) = pathing.planner(restriction, tiles)? else {
                     return Ok(None);
                 };
                 let req = Request {

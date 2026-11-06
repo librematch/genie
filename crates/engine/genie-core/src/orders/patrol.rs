@@ -8,6 +8,8 @@ use crate::groups::{CommandMoveTo, common_group};
 use crate::map::Distance;
 use crate::map::Point;
 use crate::map::Position;
+use crate::map::RestrictionId;
+use crate::map::spatial::Tiles;
 use crate::math::fmath::BVector;
 use crate::math::rng::Stream;
 use crate::movement::footprint_gap_squared;
@@ -22,6 +24,7 @@ use crate::orders::{
     ATTACK_MOVE_QUEUED, LISTED, Place, Split, Sweep, ignore_unit, patrol_timeout,
     set_differentiator_groups, waypoints_from,
 };
+use crate::pathing::Pathing;
 use crate::pathing::tile_path::{Found, Path, Request};
 use crate::players::PlayerId;
 use crate::unit_ai::AiAction;
@@ -31,6 +34,7 @@ use crate::unit_ai::OrderKind;
 use crate::unit_ai::Pace;
 use crate::world::Millis;
 use crate::world::World;
+use crate::world::layer::generated::TilePathTuning;
 use crate::world::slots::CheckedIndexExt;
 use crate::world::slots::PlayerSlotsExt;
 use crate::{GenieError, GenieResult};
@@ -313,30 +317,17 @@ impl World {
                 .parts
                 .mover_of(unit.id)
                 .map(|mover| mover.stats.restriction);
-            let tiles = self.spatial.tiles();
-            if let Some(planner) =
-                restriction.and_then(|restriction_id| self.pathing.planner(restriction_id, tiles))
-            {
-                let req = Request {
-                    from,
-                    to: at.ground(),
-                    radii: Distance::ZERO,
-                    range: Distance::ZERO,
-                    closed: Vec::new(),
-                    full: false,
-                };
-                let mut path = Path::default();
-                if planner.plan::<GenieError>(
-                    &req,
-                    false,
-                    &mut path,
-                    None,
-                    &self.model.tuning.tile_path,
-                )? != Found::Goal
-                {
-                    index += 1;
-                    continue;
-                }
+            let reaches = can_reach_group(
+                &mut self.pathing,
+                self.spatial.tiles(),
+                &self.model.tuning.tile_path,
+                restriction,
+                from,
+                at.ground(),
+            )?;
+            if !reaches {
+                index += 1;
+                continue;
             }
             // slot 0x520: +0x824 as the game holds it (x, height, y)
             let offset = BVector::new(moved.x(), moved.z(), moved.y()) - at;
@@ -462,4 +453,39 @@ impl World {
         }
         Ok(())
     }
+}
+
+/// `FUN_140fd9f40`'s path test ([`World::keep_group`]): whether the tile planner of a loose unit's
+/// terrain restriction, where one exists, reaches the group's place `to` from the unit's `from`
+/// (`FUN_140f7c530`, no radii, no range: result 1). A unit without a restriction or a planner
+/// passes.
+///
+/// # Errors
+///
+/// What the planner's build or search fails on.
+fn can_reach_group(
+    pathing: &mut Pathing,
+    tiles: &Tiles,
+    tile_path_tuning: &TilePathTuning,
+    restriction: Option<RestrictionId>,
+    from: Point,
+    to: Point,
+) -> GenieResult<bool> {
+    let Some(restriction_id) = restriction else {
+        return Ok(true);
+    };
+    let Some(planner) = pathing.planner(restriction_id, tiles)? else {
+        return Ok(true);
+    };
+    let req = Request {
+        from,
+        to,
+        radii: Distance::ZERO,
+        range: Distance::ZERO,
+        closed: Vec::new(),
+        full: false,
+    };
+    let mut path = Path::default();
+    let found = planner.plan::<GenieError>(&req, false, &mut path, None, tile_path_tuning)?;
+    Ok(found == Found::Goal)
 }

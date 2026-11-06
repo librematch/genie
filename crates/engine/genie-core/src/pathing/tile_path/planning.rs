@@ -7,7 +7,7 @@ use crate::math::fmath::BVector;
 use crate::math::fmath::sqrt;
 use crate::pathing::tile_path::goal_marks::Mark;
 use crate::pathing::tile_path::{
-    CellKind, Found, GridLevel, Path, PlanTile, Planner, Request, SegmentTest, smooth,
+    CellKind, Found, GridLevel, NodeIndex, Path, PlanTile, Planner, Request, SegmentTest, smooth,
 };
 use crate::world::layer::generated::TilePathTuning;
 use crate::{GenieError, GenieResult};
@@ -19,28 +19,26 @@ impl Planner {
     ///
     /// # Errors
     ///
-    /// What the open list's sort fails on.
+    /// A cell off the grid, a node the pool does not hold, what the open list's sort fails on.
     pub fn search_over_levels(
         &mut self,
         req: &Request,
         out: &mut Path,
         tile_path_tuning: &TilePathTuning,
     ) -> GenieResult<Found> {
-        for &plan_rect in &req.closed {
-            self.close_rect(plan_rect, Mark::Set);
-        }
+        self.close_rects(&req.closed, Mark::Set)?;
         let start = PlanTile::of_point(req.from);
         let goal = PlanTile::of_point(req.to);
         if !self.on_map(start) || !self.on_map(goal) {
             return Ok(Found::OffMap);
         }
         self.open.clear();
-        self.mark_goal(req.goal(), Mark::Set, tile_path_tuning);
+        self.mark_goal(req.goal(), Mark::Set, tile_path_tuning)?;
         self.best = None;
         let mut found = (None, Found::Nearest);
         for level in GridLevel::ALL.into_iter().rev() {
             let cell = start.at_level(level);
-            if level == GridLevel::TILES || self.cell(level, cell).kind.contains(CellKind::NODE) {
+            if level == GridLevel::TILES || self.cell(level, cell)?.kind.contains(CellKind::NODE) {
                 found = match self.search_levels(level, cell, start, req.full, tile_path_tuning)? {
                     None => (self.best, Found::Nearest),
                     Some(node) if self.goal_marked => (Some(node), Found::Goal),
@@ -54,50 +52,72 @@ impl Planner {
         let result = match found {
             (None, _) => Found::Nothing,
             (Some(node_index), result) => {
-                self.last = goal;
-                let (to_x, to_y) = (req.to.x(), req.to.y());
-                let mut end = BVector::new(to_x, 0.0, to_y);
-                let toward =
-                    result != Found::Goal || self.cell(GridLevel::TILES, goal).edges.is_empty();
-                if toward {
-                    let plan_tile = self.tile_toward(node_index, goal);
-                    let dy = f32::from(goal.y()) - f32::from(plan_tile.y());
-                    let dx = f32::from(goal.x()) - f32::from(plan_tile.x());
-                    if result != Found::Goal
-                        || req.radii.get() + tile_path_tuning.goal_gap < sqrt(dy * dy + dx * dx)
-                    {
-                        end = Self::centre(plan_tile);
-                    }
-                }
-                self.points.push(end);
-                self.trace_back(node_index, start);
-                self.points
-                    .push(BVector::new(req.from.x(), 0.0, req.from.y()));
+                self.trace_over_levels(req, node_index, result, tile_path_tuning)?;
                 result
             }
         };
         for &point in self.points.iter().rev() {
             let _ = out.push(point);
         }
-        self.mark_goal(req.goal(), Mark::Clear, tile_path_tuning);
-        self.clear_nodes();
-        for &plan_rect in &req.closed {
-            self.close_rect(plan_rect, Mark::Clear);
-        }
+        self.mark_goal(req.goal(), Mark::Clear, tile_path_tuning)?;
+        self.clear_nodes()?;
+        self.close_rects(&req.closed, Mark::Clear)?;
         Ok(result)
+    }
+
+    /// `FUN_140f77f20`'s path from the node it found (`result`, the goal or the nearest): its end
+    /// at the goal's point, or at the node cell's tile nearest the goal's tile when the search
+    /// fell short of the goal, or the goal's tile has no edges and that tile lies beyond the
+    /// radii and the goal's gap; then the crossings back to the start, and the start's point.
+    ///
+    /// # Errors
+    ///
+    /// A cell off the grid, a node the pool does not hold.
+    fn trace_over_levels(
+        &mut self,
+        req: &Request,
+        node_index: NodeIndex,
+        result: Found,
+        tile_path_tuning: &TilePathTuning,
+    ) -> GenieResult<()> {
+        let start = PlanTile::of_point(req.from);
+        let goal = PlanTile::of_point(req.to);
+        self.last = goal;
+        let (to_x, to_y) = (req.to.x(), req.to.y());
+        let mut end = BVector::new(to_x, 0.0, to_y);
+        let toward = result != Found::Goal || self.cell(GridLevel::TILES, goal)?.edges.is_empty();
+        if toward {
+            let plan_tile = self.tile_toward(node_index, goal)?;
+            let dy = f32::from(goal.y()) - f32::from(plan_tile.y());
+            let dx = f32::from(goal.x()) - f32::from(plan_tile.x());
+            if result != Found::Goal
+                || req.radii.get() + tile_path_tuning.goal_gap < sqrt(dy * dy + dx * dx)
+            {
+                end = Self::centre(plan_tile);
+            }
+        }
+        self.points.push(end);
+        self.trace_back(node_index, start)?;
+        self.points
+            .push(BVector::new(req.from.x(), 0.0, req.from.y()));
+        Ok(())
     }
 
     /// `FUN_140f7d160`: the tile or one of its four neighbours (right, below, left, above) has an
     /// edge.
-    pub(super) fn near_passable(&self, tile: PlanTile) -> bool {
-        let edges = |plan_tile: PlanTile| {
-            self.on_map(plan_tile) && !self.cell(GridLevel::TILES, plan_tile).edges.is_empty()
+    ///
+    /// # Errors
+    ///
+    /// A tile off the grid.
+    pub(super) fn near_passable(&self, tile: PlanTile) -> GenieResult<bool> {
+        let edges = |plan_tile: PlanTile| -> GenieResult<bool> {
+            Ok(self.on_map(plan_tile) && !self.cell(GridLevel::TILES, plan_tile)?.edges.is_empty())
         };
-        edges(tile)
-            || edges(tile.stepped(1, 0))
-            || edges(tile.stepped(0, 1))
-            || edges(tile.stepped(-1, 0))
-            || edges(tile.stepped(0, -1))
+        Ok(edges(tile)?
+            || edges(tile.stepped(1, 0))?
+            || edges(tile.stepped(0, 1))?
+            || edges(tile.stepped(-1, 0))?
+            || edges(tile.stepped(0, -1))?)
     }
 
     /// The planner's entry (`FUN_140f7c530`): the search over the levels; for a human player's
@@ -122,22 +142,7 @@ impl Planner {
         let mut tiles = Path::default();
         let first = self.search_over_levels(req, &mut levels, tile_path_tuning)?;
         let mut second = None;
-        let goal = PlanTile::of_point(req.to);
-        // the start's cell is read only once the search over the levels reached the goal
-        if req.range == Distance::ZERO
-            && req.full
-            && first == Found::Goal
-            && !self
-                .cell(GridLevel::TILES, PlanTile::of_point(req.from))
-                .edges
-                .is_empty()
-            && (!self.cell(GridLevel::TILES, goal).edges.is_empty()
-                || (target_box && self.near_passable(goal)))
-            && {
-                levels.measure();
-                levels.length < Distance::new(tile_path_tuning.tile_search_length)
-            }
-        {
+        if self.wants_tile_search(req, first, target_box, &mut levels, tile_path_tuning)? {
             second = Some(self.search_on_tiles(req, &mut tiles, tile_path_tuning)?);
         }
         if req.full && second != Some(Found::Goal) && !levels.points.is_empty() {
@@ -163,6 +168,39 @@ impl Planner {
             };
         out.append(chosen);
         Ok(result)
+    }
+
+    /// Whether the entry searches on the tiles too (`FUN_140f7c530`): a human player's search
+    /// with no range whose search over the levels (`first`) reached the goal, from a start tile
+    /// with edges to a goal tile with edges (or one beside it for a target's box), along a path
+    /// over the levels shorter than the tile search's length, which it measures.
+    ///
+    /// # Errors
+    ///
+    /// A tile off the grid.
+    fn wants_tile_search(
+        &self,
+        req: &Request,
+        first: Found,
+        target_box: bool,
+        levels: &mut Path,
+        tile_path_tuning: &TilePathTuning,
+    ) -> GenieResult<bool> {
+        let goal = PlanTile::of_point(req.to);
+        // the start's cell is read only once the search over the levels reached the goal
+        Ok(req.range == Distance::ZERO
+            && req.full
+            && first == Found::Goal
+            && !self
+                .cell(GridLevel::TILES, PlanTile::of_point(req.from))?
+                .edges
+                .is_empty()
+            && (!self.cell(GridLevel::TILES, goal)?.edges.is_empty()
+                || (target_box && self.near_passable(goal)?))
+            && {
+                levels.measure();
+                levels.length < Distance::new(tile_path_tuning.tile_search_length)
+            })
     }
 
     /// `FUN_140f7c390`: the planner's path from `from` to `to` ([`Planner::plan`] with no radii,
@@ -193,17 +231,16 @@ impl Planner {
         if found == Found::OffMap {
             return Ok(None);
         }
-        Ok(path
-            .points
-            .iter()
-            .rev()
-            .find(|point| {
-                !self
-                    .cell(GridLevel::TILES, PlanTile::of_point(point.ground()))
-                    .edges
-                    .is_empty()
-            })
-            .map(|point| point.ground()))
+        for point in path.points.iter().rev() {
+            if !self
+                .cell(GridLevel::TILES, PlanTile::of_point(point.ground()))?
+                .edges
+                .is_empty()
+            {
+                return Ok(Some(point.ground()));
+            }
+        }
+        Ok(None)
     }
 
     /// `FUN_140f7c530`'s shortcut: the last point of the path within 10 tiles of its start (past
@@ -270,22 +307,20 @@ impl Planner {
     ///
     /// # Errors
     ///
-    /// What the open list's sort fails on.
+    /// A cell off the grid, a node the pool does not hold, what the open list's sort fails on.
     pub fn search_on_tiles(
         &mut self,
         req: &Request,
         out: &mut Path,
         tile_path_tuning: &TilePathTuning,
     ) -> GenieResult<Found> {
-        for &plan_rect in &req.closed {
-            self.close_rect(plan_rect, Mark::Set);
-        }
+        self.close_rects(&req.closed, Mark::Set)?;
         let start = PlanTile::of_point(req.from);
         let goal = PlanTile::of_point(req.to);
         if !self.on_map(start) || !self.on_map(goal) {
             return Ok(Found::OffMap);
         }
-        self.mark_goal_tiles(req.goal(), Mark::Set);
+        self.mark_goal_tiles(req.goal(), Mark::Set)?;
         self.best = None;
         let found = match self.search_tiles(start, tile_path_tuning)? {
             None => (self.best, Found::Nearest),
@@ -298,15 +333,15 @@ impl Planner {
             (Some(node_index), result) => {
                 self.last = goal;
                 let end = if result == Found::Goal
-                    && !self.cell(GridLevel::TILES, goal).edges.is_empty()
+                    && !self.cell(GridLevel::TILES, goal)?.edges.is_empty()
                 {
                     let (to_x, to_y) = (req.to.x(), req.to.y());
                     BVector::new(to_x, 0.0, to_y)
                 } else {
-                    Self::centre(self.tile_toward(node_index, goal))
+                    Self::centre(self.tile_toward(node_index, goal)?)
                 };
                 self.points.push(end);
-                self.trace_back(node_index, start);
+                self.trace_back(node_index, start)?;
                 self.points
                     .push(BVector::new(req.from.x(), 0.0, req.from.y()));
                 result
@@ -315,11 +350,9 @@ impl Planner {
         for &point in self.points.iter().rev() {
             let _ = out.push(point);
         }
-        self.mark_goal_tiles(req.goal(), Mark::Clear);
-        self.clear_nodes();
-        for &plan_rect in &req.closed {
-            self.close_rect(plan_rect, Mark::Clear);
-        }
+        self.mark_goal_tiles(req.goal(), Mark::Clear)?;
+        self.clear_nodes()?;
+        self.close_rects(&req.closed, Mark::Clear)?;
         Ok(result)
     }
 }

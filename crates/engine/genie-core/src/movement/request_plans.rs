@@ -137,7 +137,7 @@ impl Mover {
         np: &mut NewPath,
         by_id: ObjectsRef<'_>,
     ) -> GenieResult<()> {
-        if self.planner_exists(world, plan) {
+        if self.planner_exists(world, plan)? {
             if !self.near_target_path(me, world, plan, way, np, by_id)? {
                 self.first_tile_plan(me, world, plan, way, np, by_id)?;
             }

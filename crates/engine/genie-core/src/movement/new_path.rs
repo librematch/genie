@@ -487,7 +487,10 @@ impl Mover {
         tile_path_tuning: &TilePathTuning,
     ) -> GenieResult<Option<(Found, Distance)>> {
         let full = !plan.player_kind.is_computer();
-        let Some(planner) = plan.pathing.planner(self.stats.restriction, world.tiles()) else {
+        let Some(planner) = plan
+            .pathing
+            .planner(self.stats.restriction, world.tiles())?
+        else {
             return Ok(None);
         };
         let req = Request {

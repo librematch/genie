@@ -159,12 +159,12 @@ pub fn planner_from_save(
         .collect();
     let layer = layer()?;
     let spatial = spatial(&header, terrain, layer)?;
-    Ok(Planner::new(
+    Planner::new(
         GridSize::new(map.map_width, map.map_height),
         terrain_ids,
         passable,
         spatial.tiles(),
-    ))
+    )
 }
 
 #[cfg(test)]

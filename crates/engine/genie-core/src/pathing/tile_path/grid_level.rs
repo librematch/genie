@@ -28,12 +28,6 @@ impl GridLevel {
         self.0
     }
 
-    /// The level as an index into the per-level tables.
-    #[must_use]
-    pub const fn index(self) -> usize {
-        self.0 as usize
-    }
-
     /// The level above.
     #[must_use]
     pub const fn up(self) -> Self {

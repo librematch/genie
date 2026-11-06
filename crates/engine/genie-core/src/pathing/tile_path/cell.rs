@@ -2,7 +2,7 @@
 //! kind ([`CellKind`]), the grid's two bytes; the grid ([`Cells`]) by a cell's place
 //! ([`CellIndex`]).
 
-use std::ops::{Index, IndexMut};
+use crate::{GenieError, GenieResult};
 
 bitflags::bitflags! {
     /// A cell's byte 0: the edges a unit can cross to the cells beside it and, during a search,
@@ -129,18 +129,26 @@ impl Cell {
     }
 }
 
+/// A place the planner's grid does not hold. Every place the planner reads lies in its grid:
+/// the build and the updates walk the map's top cells and their children, a search steps only
+/// across a cell's edges (no tile has one toward a tile off the map), and the entry tests the
+/// start and the goal against the map ([`crate::pathing::tile_path::Planner::plan`]).
+const OFF_GRID: GenieError = GenieError::unreachable("a cell outside the planner's grid");
+
 /// A cell's place in a planner's grid: the levels one after another, the tiles first, each
-/// row by row (`+0x3d8`'s index, a node's `+0`).
+/// row by row (`+0x3d8`'s index, a node's `+0`). It is the game's sum of a level's first cell,
+/// a row's width times y and x, so it can name a place off the grid: the lookups of [`Cells`]
+/// refuse one.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub(super) struct CellIndex(
     /// The place.
-    usize,
+    i64,
 );
 
 impl CellIndex {
     /// Place `index`.
     #[must_use]
-    pub(super) const fn new(index: usize) -> Self {
+    pub(super) const fn new(index: i64) -> Self {
         Self(index)
     }
 }
@@ -157,22 +165,38 @@ impl Cells {
     }
 
     /// The `count` cells from place `start` on (a level's).
-    #[must_use]
-    pub(super) fn run(&self, start: CellIndex, count: usize) -> &[Cell] {
-        &self.0[start.0..start.0 + count]
+    ///
+    /// # Errors
+    ///
+    /// A run the grid does not hold ([`OFF_GRID`]).
+    pub(super) fn run(&self, start: CellIndex, count: usize) -> GenieResult<&[Cell]> {
+        usize::try_from(start.0)
+            .ok()
+            .and_then(|first| self.0.get(first..first.checked_add(count)?))
+            .ok_or_else(|| OFF_GRID.with("start", start.0).with("count", count))
     }
-}
 
-impl Index<CellIndex> for Cells {
-    type Output = Cell;
-
-    fn index(&self, cell_index: CellIndex) -> &Cell {
-        &self.0[cell_index.0]
+    /// The cell at `cell_index`.
+    ///
+    /// # Errors
+    ///
+    /// A place the grid does not hold ([`OFF_GRID`]).
+    pub(super) fn checked(&self, cell_index: CellIndex) -> GenieResult<&Cell> {
+        usize::try_from(cell_index.0)
+            .ok()
+            .and_then(|index| self.0.get(index))
+            .ok_or_else(|| OFF_GRID.with("cell", cell_index.0))
     }
-}
 
-impl IndexMut<CellIndex> for Cells {
-    fn index_mut(&mut self, cell_index: CellIndex) -> &mut Cell {
-        &mut self.0[cell_index.0]
+    /// The cell at `cell_index`, to change.
+    ///
+    /// # Errors
+    ///
+    /// A place the grid does not hold ([`OFF_GRID`]).
+    pub(super) fn checked_mut(&mut self, cell_index: CellIndex) -> GenieResult<&mut Cell> {
+        usize::try_from(cell_index.0)
+            .ok()
+            .and_then(|index| self.0.get_mut(index))
+            .ok_or_else(|| OFF_GRID.with("cell", cell_index.0))
     }
 }

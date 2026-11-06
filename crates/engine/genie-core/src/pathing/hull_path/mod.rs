@@ -66,7 +66,6 @@ use crate::math::image::hull_path::{
     TURN as HULL_PATH_TURN, UNTURN as HULL_PATH_UNTURN,
 };
 use crate::world::objects_ref::ObjectsRef;
-use std::ops::Index;
 
 /// How many records the manager's query lists before it stops (`FUN_141051900`: `0x18 < count`).
 const LINE_HITS: usize = 25;
@@ -179,20 +178,22 @@ struct EntranceIndex(usize);
 struct NodeIndex(usize);
 
 /// One of the pather's two node lists, each an open list headed by its own node and a closed
-/// list: the search's (0, `+0x20` and `+0x90`) and the walks' in and out of a hull (1, `+0x58`
-/// and `+0xa0`).
+/// list.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-struct NodeList(usize);
+enum NodeList {
+    /// The search's (0, `+0x20` and `+0x90`).
+    Search,
+    /// The walks' in and out of a hull (1, `+0x58` and `+0xa0`).
+    Walks,
+}
 
 impl NodeList {
-    /// The search's list.
-    const SEARCH: Self = Self(0);
-    /// The walks' list.
-    const WALKS: Self = Self(1);
-
-    /// The node heading its open list.
+    /// The node heading its open list: the pather's first two nodes, the search's first.
     const fn head(self) -> NodeIndex {
-        NodeIndex(self.0)
+        match self {
+            Self::Search => NodeIndex(0),
+            Self::Walks => NodeIndex(1),
+        }
     }
 }
 
@@ -229,27 +230,30 @@ impl Nodes {
     }
 }
 
-impl Index<NodeIndex> for Nodes {
-    type Output = Node;
-
-    fn index(&self, node_index: NodeIndex) -> &Node {
-        &self.0[node_index.0]
-    }
-}
-
 /// The two lists' closed nodes, in the order closed.
 #[derive(Clone, Debug, Default)]
-struct ClosedLists([Vec<NodeIndex>; 2]);
+struct ClosedLists {
+    /// The search's (`+0x90`).
+    search: Vec<NodeIndex>,
+    /// The walks' (`+0xa0`).
+    walks: Vec<NodeIndex>,
+}
 
 impl ClosedLists {
     /// List `node_list`'s closed nodes.
     const fn of(&self, node_list: NodeList) -> &Vec<NodeIndex> {
-        &self.0[node_list.0]
+        match node_list {
+            NodeList::Search => &self.search,
+            NodeList::Walks => &self.walks,
+        }
     }
 
     /// List `node_list`'s closed nodes, to change.
     const fn of_mut(&mut self, node_list: NodeList) -> &mut Vec<NodeIndex> {
-        &mut self.0[node_list.0]
+        match node_list {
+            NodeList::Search => &mut self.search,
+            NodeList::Walks => &mut self.walks,
+        }
     }
 }
 

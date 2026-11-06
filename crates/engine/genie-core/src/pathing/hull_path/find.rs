@@ -169,7 +169,7 @@ impl HullPather<'_> {
             (ax1 + 6) as f32,
             (ay1 + 6) as f32,
         ))?;
-        self.empty(NodeList::SEARCH)?;
+        self.empty(NodeList::Search)?;
         let mut rounds = Rounds::new(walk_length(from, to));
         if let Some(result) = self.search(&hull_query, hulls, &mut rounds, &mut path)? {
             return Ok((result, path, true));

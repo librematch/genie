@@ -12,6 +12,7 @@
 //! and every change of a static record's tiles rebuilds the planners' cells over them (the
 //! manager's callback `FUN_140f7d4b0` -> `FUN_140f7e4b0`).
 
+use crate::GenieResult;
 use crate::map::Footprint;
 use crate::map::GridSize;
 use crate::map::Position;
@@ -296,23 +297,42 @@ impl Pathing {
     /// the load's planners whose restriction has the same values, else none (the slice builds it
     /// from the map on first use, `FUN_140f74f90`); the planners built before see the tiles'
     /// changes first. None for a restriction the data has not got.
-    pub fn planner(&mut self, restriction: RestrictionId, tiles: &Tiles) -> Option<&mut Planner> {
+    ///
+    /// # Errors
+    ///
+    /// What a planner's build or update fails on.
+    pub fn planner(
+        &mut self,
+        restriction: RestrictionId,
+        tiles: &Tiles,
+    ) -> GenieResult<Option<&mut Planner>> {
         for rect in self.pending.drain(..) {
             for planner in self.planners.values_mut() {
-                planner.update(rect, tiles);
+                planner.update(rect, tiles)?;
             }
         }
-        let _ = self.restrictions.get(restriction.index())?;
-        let key = match self.planned.as_ref() {
-            None => restriction,
-            Some(_) => self.planned_for(restriction)?,
+        let Some(key) = self.planner_key(restriction) else {
+            return Ok(None);
         };
         if !self.planners.contains_key(&key) {
-            let passable = self.restrictions.get(key.index())?.clone();
-            let planner = Planner::new(self.size, self.terrain.clone(), passable, tiles);
+            let Some(passable) = self.restrictions.get(key.index()) else {
+                return Ok(None);
+            };
+            let planner = Planner::new(self.size, self.terrain.clone(), passable.clone(), tiles)?;
             let _ = self.planners.insert(key, planner);
         }
-        self.planners.get_mut(&key)
+        Ok(self.planners.get_mut(&key))
+    }
+
+    /// The restriction whose planner serves `restriction` ([`Pathing::planner`]): itself, or
+    /// with the load's planners the first whose restriction has the same values; None for a
+    /// restriction the data has not got.
+    fn planner_key(&self, restriction: RestrictionId) -> Option<RestrictionId> {
+        let _ = self.restrictions.get(restriction.index())?;
+        match self.planned.as_ref() {
+            None => Some(restriction),
+            Some(_) => self.planned_for(restriction),
+        }
     }
 
     /// Static marks changed over these tile rectangles.

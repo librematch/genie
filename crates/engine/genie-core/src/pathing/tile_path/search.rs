@@ -1,14 +1,14 @@
 //! The A* searches over the node cells and over the tiles: the nodes, the open list, the
 //! estimates and the expansions.
 
-use crate::GenieResult;
 use crate::map::Distance;
 use crate::math::fmath::sqrt;
 use crate::math::msvc::sort;
 use crate::pathing::tile_path::PlanTile;
 use crate::pathing::tile_path::{CellEdges, CellIndex, CellKind, GridLevel, NO_COST, Planner};
 use crate::world::layer::generated::TilePathTuning;
-use std::ops::{Index, IndexMut};
+use crate::world::slots::CheckedIndexExt;
+use crate::{GenieError, GenieResult};
 use std::slice::Iter;
 
 /// The searches' four steps from a node, in their order: the edge, the step and the neighbour's
@@ -19,6 +19,11 @@ const STEPS: [(CellEdges, i16, i16, CellEdges); 4] = [
     (CellEdges::N, 0, -1, CellEdges::S),
     (CellEdges::S, 0, 1, CellEdges::N),
 ];
+
+/// A node the planner's pool does not hold. The pool hands out every [`NodeIndex`] as it
+/// appends the node ([`Nodes::push`]), and a search reads only the nodes it made: the pool is
+/// emptied after the search's path is traced ([`Planner::clear_nodes`]).
+const NO_NODE: GenieError = GenieError::unreachable("a node the planner's pool does not hold");
 
 /// A node's place in the planner's pool (`+0x428`, `FUN_140f79c90` hands them out in order).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -36,6 +41,28 @@ impl Nodes {
         NodeIndex(self.0.len() - 1)
     }
 
+    /// Node `node_index`.
+    ///
+    /// # Errors
+    ///
+    /// A node the pool does not hold ([`NO_NODE`]).
+    pub(super) fn checked(&self, node_index: NodeIndex) -> GenieResult<&Node> {
+        self.0
+            .get(node_index.0)
+            .ok_or_else(|| NO_NODE.with("node", node_index.0))
+    }
+
+    /// Node `node_index`, to change.
+    ///
+    /// # Errors
+    ///
+    /// A node the pool does not hold ([`NO_NODE`]).
+    pub(super) fn checked_mut(&mut self, node_index: NodeIndex) -> GenieResult<&mut Node> {
+        self.0
+            .get_mut(node_index.0)
+            .ok_or_else(|| NO_NODE.with("node", node_index.0))
+    }
+
     /// Every node, in the order made.
     pub(super) fn iter(&self) -> Iter<'_, Node> {
         self.0.iter()
@@ -44,20 +71,6 @@ impl Nodes {
     /// The pool emptied.
     pub(super) fn clear(&mut self) {
         self.0.clear();
-    }
-}
-
-impl Index<NodeIndex> for Nodes {
-    type Output = Node;
-
-    fn index(&self, node_index: NodeIndex) -> &Node {
-        &self.0[node_index.0]
-    }
-}
-
-impl IndexMut<NodeIndex> for Nodes {
-    fn index_mut(&mut self, node_index: NodeIndex) -> &mut Node {
-        &mut self.0[node_index.0]
     }
 }
 
@@ -83,11 +96,22 @@ pub(super) struct Node {
     pub(super) parent: Option<NodeIndex>,
 }
 
+/// An open node with its cost so far plus the estimate ([`Node::total`]), which the open list
+/// sorts by. A node's total is set as the pool hands the node out, before it is opened, and
+/// never changes.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(super) struct OpenNode {
+    /// The node.
+    pub(super) node: NodeIndex,
+    /// Its total.
+    pub(super) total: Distance,
+}
+
 /// The open nodes (`+0x480`): a bucket per whole cost, the lowest one sorted with its cheapest
 /// node last (`FUN_140f9cba0`, `FUN_140f9cd40`).
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(super) struct OpenList {
-    pub(super) buckets: Vec<Vec<NodeIndex>>,
+    pub(super) buckets: Vec<Vec<OpenNode>>,
     /// `+0x18` with its flag `+0x1c`, `+0x20` with `+0x24`.
     pub(super) min: Option<i32>,
     pub(super) max: Option<i32>,
@@ -109,8 +133,16 @@ impl OpenList {
 
     /// `FUN_140f9cba0`: into the lowest bucket before the first node from the back that costs
     /// more; into a new lowest or a higher bucket at its end.
-    pub(super) fn push(&mut self, node: NodeIndex, nodes: &Nodes) {
-        let distance = nodes[node].total;
+    ///
+    /// # Errors
+    ///
+    /// A node the pool does not hold.
+    pub(super) fn push(&mut self, node: NodeIndex, nodes: &Nodes) -> GenieResult<()> {
+        let distance = nodes.checked(node)?.total;
+        let open_node = OpenNode {
+            node,
+            total: distance,
+        };
         let slot = distance.get() as i32;
         let index = slot as usize;
         if self.buckets.len() <= index {
@@ -118,13 +150,13 @@ impl OpenList {
         }
         match self.min {
             Some(least) if slot == least => {
-                let bucket = &mut self.buckets[index];
-                let at = (1..=bucket.len())
-                    .rev()
-                    .find(|&index| distance < nodes[bucket[index - 1]].total)
-                    .unwrap_or(0);
-                bucket.insert(at, node);
-                return;
+                let bucket = self.buckets.checked_mut(index)?;
+                let at = bucket
+                    .iter()
+                    .rposition(|queued| distance < queued.total)
+                    .map_or(0, |place| place + 1);
+                bucket.insert(at, open_node);
+                return Ok(());
             }
             Some(lowest) if lowest < slot => {}
             _ => self.min = Some(slot),
@@ -132,7 +164,8 @@ impl OpenList {
         if self.max.is_none_or(|highest| highest < slot) {
             self.max = Some(slot);
         }
-        self.buckets[index].push(node);
+        self.buckets.checked_mut(index)?.push(open_node);
+        Ok(())
     }
 
     /// `FUN_140f9cd40`: the last node of the lowest bucket; an emptied bucket hands over to the
@@ -140,31 +173,35 @@ impl OpenList {
     ///
     /// # Errors
     ///
-    /// What the sort of the next bucket fails on.
-    pub(super) fn pop(&mut self, nodes: &Nodes) -> GenieResult<Option<NodeIndex>> {
+    /// A bucket the list has not got, or what the sort of the next bucket fails on.
+    pub(super) fn pop(&mut self) -> GenieResult<Option<NodeIndex>> {
         let Some(lowest) = self.min else {
             return Ok(None);
         };
-        let bucket = &mut self.buckets[lowest as usize];
-        let Some(node) = bucket.pop() else {
+        let bucket = self.buckets.checked_mut(lowest as usize)?;
+        let Some(open_node) = bucket.pop() else {
             return Ok(None);
         };
         if bucket.is_empty() {
             let max = self.max.unwrap_or(lowest);
-            if let Some(next) =
-                (lowest + 1..=max).find(|&candidate| !self.buckets[candidate as usize].is_empty())
+            if let Some((next, bucket)) = self
+                .buckets
+                .iter_mut()
+                .enumerate()
+                .skip(lowest as usize + 1)
+                .take((max - lowest).max(0) as usize)
+                .find(|(_, bucket)| !bucket.is_empty())
             {
-                self.min = Some(next);
-                sort(
-                    &mut self.buckets[next as usize],
-                    &|left: NodeIndex, right: NodeIndex| nodes[left].total > nodes[right].total,
-                )?;
+                self.min = Some(next as i32);
+                sort(bucket, &|left: OpenNode, right: OpenNode| {
+                    left.total > right.total
+                })?;
             } else {
                 self.min = None;
                 self.max = None;
             }
         }
-        Ok(Some(node))
+        Ok(Some(open_node.node))
     }
 }
 
@@ -230,12 +267,16 @@ impl Planner {
     /// Where a new node's cost is measured from (`FUN_140f764c0`, `FUN_140f76840`): a turn
     /// (a move across the parent's own move) measures from the grandparent, unless the parent
     /// already did; returns that node's cost so far, its tile and whether it was the grandparent.
+    ///
+    /// # Errors
+    ///
+    /// A parent or a grandparent the pool does not hold.
     pub(super) fn measured_from(
         &self,
         parent: NodeIndex,
         dir: CellEdges,
-    ) -> (Distance, PlanTile, bool) {
-        let node = &self.nodes[parent];
+    ) -> GenieResult<(Distance, PlanTile, bool)> {
+        let node = self.nodes.checked(parent)?;
         if let (Some(gp), false) = (node.parent, node.shortcut) {
             let turn = if dir == CellEdges::W || dir == CellEdges::E {
                 node.dir == CellEdges::N || node.dir == CellEdges::S
@@ -243,15 +284,19 @@ impl Planner {
                 node.dir == CellEdges::W || node.dir == CellEdges::E
             };
             if turn {
-                let gp = &self.nodes[gp];
-                return (gp.cost, gp.entry, true);
+                let gp = self.nodes.checked(gp)?;
+                return Ok((gp.cost, gp.entry, true));
             }
         }
-        (node.cost, node.entry, false)
+        Ok((node.cost, node.entry, false))
     }
 
     /// `FUN_140f764c0`: the neighbour across edge `dir` (the neighbour's edge back) of a node, at
     /// the level where it is a node cell; Some when it lies in the goal.
+    ///
+    /// # Errors
+    ///
+    /// A cell off the grid, a node the pool does not hold.
     pub(super) fn expand(
         &mut self,
         level: GridLevel,
@@ -259,12 +304,12 @@ impl Planner {
         cost: Distance,
         parent: NodeIndex,
         dir: CellEdges,
-    ) -> Option<NodeIndex> {
+    ) -> GenieResult<Option<NodeIndex>> {
         use CellEdges as Ed;
         let cell_index = self.index(level, at);
-        let cell = self.cells[cell_index];
+        let cell = *self.cells.checked(cell_index)?;
         if !cell.edges.intersects(dir) {
-            return None;
+            return Ok(None);
         }
         if !cell.kind.contains(CellKind::NODE) {
             if !cell.kind.contains(CellKind::MIXED) {
@@ -272,33 +317,22 @@ impl Planner {
             }
             // the children on the edge `dir`: (2x, 2y) above and left, (2x + 1, 2y) above and
             // right, (2x, 2y + 1) left and below, (2x + 1, 2y + 1) right and below
-            let ([c0, c1, c2, c3], grid_level) = (at.children(), level.down());
-            if dir.intersects(Ed::N | Ed::W)
-                && let Some(node_index) = self.expand(grid_level, c0, cost, parent, dir)
-            {
-                return Some(node_index);
+            let sides = [Ed::N | Ed::W, Ed::N | Ed::E, Ed::W | Ed::S, Ed::E | Ed::S];
+            for (child, side) in at.children().into_iter().zip(sides) {
+                if dir.intersects(side)
+                    && let Some(node_index) = self.expand(level.down(), child, cost, parent, dir)?
+                {
+                    return Ok(Some(node_index));
+                }
             }
-            if dir.intersects(Ed::N | Ed::E)
-                && let Some(node_index) = self.expand(grid_level, c1, cost, parent, dir)
-            {
-                return Some(node_index);
-            }
-            if dir.intersects(Ed::W | Ed::S)
-                && let Some(node_index) = self.expand(grid_level, c2, cost, parent, dir)
-            {
-                return Some(node_index);
-            }
-            if !dir.intersects(Ed::E | Ed::S) {
-                return None;
-            }
-            return self.expand(grid_level, c3, cost, parent, dir);
+            return Ok(None);
         }
         if cell.edges.contains(CellEdges::CLOSED) {
-            return None;
+            return Ok(None);
         }
         let centre = at.centre_at(level);
-        let (g0, entry, shortcut) = match self.measured_from(parent, dir) {
-            (_, _, false) => (cost, self.nodes[parent].entry, false),
+        let (g0, entry, shortcut) = match self.measured_from(parent, dir)? {
+            (_, _, false) => (cost, self.nodes.checked(parent)?.entry, false),
             found => found,
         };
         let dx = i32::from(entry.x()) - i32::from(centre.x());
@@ -314,19 +348,15 @@ impl Planner {
             dir,
             entry: centre,
         });
-        self.open.push(node_index, &self.nodes);
-        self.nodes[node_index].shortcut = shortcut;
-        if !self.cells[cell_index].edges.contains(CellEdges::OPEN) {
-            self.cells[cell_index].edges = self.cells[cell_index].edges.plus(CellEdges::OPEN);
-        }
-        self.cells[cell_index]
-            .kind
-            .contains(CellKind::GOAL)
-            .then_some(node_index)
+        self.mark_open(node_index, cell_index, shortcut)
     }
 
     /// `FUN_140f76840`: the level-0 neighbour across edge `dir`; a turn's cost from the
     /// grandparent counts 1.1 times the grandparent's cost so far.
+    ///
+    /// # Errors
+    ///
+    /// A cell off the grid, a node the pool does not hold.
     pub(super) fn expand0(
         &mut self,
         at: PlanTile,
@@ -334,15 +364,15 @@ impl Planner {
         parent: NodeIndex,
         dir: CellEdges,
         tile_path_tuning: &TilePathTuning,
-    ) -> Option<NodeIndex> {
+    ) -> GenieResult<Option<NodeIndex>> {
         let cell_index = self.index(GridLevel::TILES, at);
-        let b0 = self.cells[cell_index].edges;
+        let b0 = self.cells.checked(cell_index)?.edges;
         if !b0.intersects(dir) || b0.contains(CellEdges::CLOSED) {
-            return None;
+            return Ok(None);
         }
-        let (g0, entry, shortcut) = match self.measured_from(parent, dir) {
+        let (g0, entry, shortcut) = match self.measured_from(parent, dir)? {
             (gp, entry, true) => (gp * tile_path_tuning.shortcut_cost, entry, true),
-            _ => (cost, self.nodes[parent].entry, false),
+            _ => (cost, self.nodes.checked(parent)?.entry, false),
         };
         let dx = i32::from(entry.x()) - i32::from(at.x());
         let dy = i32::from(entry.y()) - i32::from(at.y());
@@ -357,32 +387,51 @@ impl Planner {
             dir,
             entry: at,
         });
-        self.open.push(node_index, &self.nodes);
-        self.nodes[node_index].shortcut = shortcut;
-        if !self.cells[cell_index].edges.contains(CellEdges::OPEN) {
-            self.cells[cell_index].edges = self.cells[cell_index].edges.plus(CellEdges::OPEN);
+        self.mark_open(node_index, cell_index, shortcut)
+    }
+
+    /// A new neighbour's node opened (the end of `FUN_140f764c0` and `FUN_140f76840`): into the
+    /// open list, its shortcut kept, its cell marked open unless it is; Some when the cell lies
+    /// in the goal.
+    ///
+    /// # Errors
+    ///
+    /// A cell off the grid, a node the pool does not hold.
+    fn mark_open(
+        &mut self,
+        node_index: NodeIndex,
+        cell_index: CellIndex,
+        shortcut: bool,
+    ) -> GenieResult<Option<NodeIndex>> {
+        self.open.push(node_index, &self.nodes)?;
+        self.nodes.checked_mut(node_index)?.shortcut = shortcut;
+        let cell = self.cells.checked_mut(cell_index)?;
+        if !cell.edges.contains(CellEdges::OPEN) {
+            cell.edges = cell.edges.plus(CellEdges::OPEN);
         }
-        self.cells[cell_index]
-            .kind
-            .contains(CellKind::GOAL)
-            .then_some(node_index)
+        Ok(cell.kind.contains(CellKind::GOAL).then_some(node_index))
     }
 
     /// Close a popped node and keep it as the best when its estimate is the lowest yet; its
     /// cell's edges before the close, None for a cell closed already.
-    pub(super) fn close(&mut self, node_index: NodeIndex) -> Option<CellEdges> {
-        let cell = self.nodes[node_index].cell;
-        let cell_edges = self.cells[cell].edges;
+    ///
+    /// # Errors
+    ///
+    /// A cell off the grid, a node the pool does not hold.
+    pub(super) fn close(&mut self, node_index: NodeIndex) -> GenieResult<Option<CellEdges>> {
+        let node = *self.nodes.checked(node_index)?;
+        let cell = self.cells.checked_mut(node.cell)?;
+        let cell_edges = cell.edges;
         if cell_edges.contains(CellEdges::CLOSED) {
-            return None;
+            return Ok(None);
         }
-        self.cells[cell].edges = cell_edges.plus(CellEdges::CLOSED);
-        let distance = self.nodes[node_index].total - self.nodes[node_index].cost;
+        cell.edges = cell_edges.plus(CellEdges::CLOSED);
+        let distance = node.total - node.cost;
         if distance < self.best_cost {
             self.best_cost = distance;
             self.best = Some(node_index);
         }
-        Some(cell_edges)
+        Ok(Some(cell_edges))
     }
 
     /// `FUN_140f78850`: A* over the node cells from the start's cell at `level`; Some node in the
@@ -391,7 +440,7 @@ impl Planner {
     ///
     /// # Errors
     ///
-    /// What the open list's sort fails on.
+    /// A cell off the grid, a node the pool does not hold, what the open list's sort fails on.
     pub(super) fn search_levels(
         &mut self,
         level: GridLevel,
@@ -400,8 +449,8 @@ impl Planner {
         full: bool,
         tile_path_tuning: &TilePathTuning,
     ) -> GenieResult<Option<NodeIndex>> {
-        let start_cell = self.cell(level, cell);
-        if !start_cell.kind.contains(CellKind::LONE) && start_cell.edges.is_empty() {
+        let first = self.cell(level, cell)?;
+        if !first.kind.contains(CellKind::LONE) && first.edges.is_empty() {
             return Ok(None);
         }
         let h0 = self.start_estimate(start);
@@ -415,23 +464,25 @@ impl Planner {
             dir: CellEdges::NONE,
             entry: start,
         });
-        let cell = self.nodes[allocated].cell;
-        if self.cells[cell].kind.contains(CellKind::GOAL) {
+        let start_cell = self
+            .cells
+            .checked_mut(self.nodes.checked(allocated)?.cell)?;
+        if start_cell.kind.contains(CellKind::GOAL) {
             return Ok(Some(allocated));
         }
         // the start's open mark, added without a test
-        self.cells[cell].edges = self.cells[cell].edges.plus(CellEdges::OPEN);
-        self.open.push(allocated, &self.nodes);
+        start_cell.edges = start_cell.edges.plus(CellEdges::OPEN);
+        self.open.push(allocated, &self.nodes)?;
         self.best_cost = NO_COST;
         while !self.open.is_empty() {
-            let Some(node_index) = self.open.pop(&self.nodes)? else {
+            let Some(node_index) = self.open.pop()? else {
                 return Ok(None);
             };
             count += 1;
-            let Some(cell_edges) = self.close(node_index) else {
+            let Some(cell_edges) = self.close(node_index)? else {
                 continue;
             };
-            let node = self.nodes[node_index];
+            let node = *self.nodes.checked(node_index)?;
             let distance = node.total - node.cost;
             if !full
                 && distance <= Distance::new(tile_path_tuning.early_left)
@@ -449,7 +500,7 @@ impl Planner {
                         node.cost,
                         node_index,
                         back,
-                    )
+                    )?
                 {
                     return Ok(Some(found));
                 }
@@ -462,13 +513,13 @@ impl Planner {
     ///
     /// # Errors
     ///
-    /// What the open list's sort fails on.
+    /// A cell off the grid, a node the pool does not hold, what the open list's sort fails on.
     pub(super) fn search_tiles(
         &mut self,
         start: PlanTile,
         tile_path_tuning: &TilePathTuning,
     ) -> GenieResult<Option<NodeIndex>> {
-        if self.cell(GridLevel::TILES, start).edges.is_empty() {
+        if self.cell(GridLevel::TILES, start)?.edges.is_empty() {
             return Ok(None);
         }
         let h0 = self.start_estimate(start);
@@ -481,23 +532,25 @@ impl Planner {
             dir: CellEdges::NONE,
             entry: start,
         });
-        let cell = self.nodes[allocated].cell;
-        if self.cells[cell].kind.contains(CellKind::GOAL) {
+        let start_cell = self
+            .cells
+            .checked_mut(self.nodes.checked(allocated)?.cell)?;
+        if start_cell.kind.contains(CellKind::GOAL) {
             return Ok(Some(allocated));
         }
         self.open.clear();
         // the start's open mark, added without a test
-        self.cells[cell].edges = self.cells[cell].edges.plus(CellEdges::OPEN);
-        self.open.push(allocated, &self.nodes);
+        start_cell.edges = start_cell.edges.plus(CellEdges::OPEN);
+        self.open.push(allocated, &self.nodes)?;
         self.best_cost = NO_COST;
         while !self.open.is_empty() {
-            let Some(node_index) = self.open.pop(&self.nodes)? else {
+            let Some(node_index) = self.open.pop()? else {
                 return Ok(None);
             };
-            let Some(cell_edges) = self.close(node_index) else {
+            let Some(cell_edges) = self.close(node_index)? else {
                 continue;
             };
-            let node = self.nodes[node_index];
+            let node = *self.nodes.checked(node_index)?;
             for (edge, dx, dy, back) in STEPS {
                 if cell_edges.intersects(edge)
                     && let Some(found) = self.expand0(
@@ -506,7 +559,7 @@ impl Planner {
                         node_index,
                         back,
                         tile_path_tuning,
-                    )
+                    )?
                 {
                     return Ok(Some(found));
                 }

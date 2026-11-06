@@ -468,7 +468,7 @@ impl World {
         record: &mut Path,
     ) -> GenieResult<Option<Found>> {
         let tiles = self.spatial.tiles();
-        let Some(planner) = self.pathing.planner(restriction, tiles) else {
+        let Some(planner) = self.pathing.planner(restriction, tiles)? else {
             return Ok(None);
         };
         record.points.clear();

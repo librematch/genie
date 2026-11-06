@@ -253,7 +253,7 @@ impl HullPather<'_> {
         let mut add = |me: &mut Self, point: Point| -> GenieResult<()> {
             if near(point) && me.hulls.checked(hull.index())?.box_holding(point).is_none() {
                 let _ = me.add_node(NewNode {
-                    list: NodeList::WALKS,
+                    list: NodeList::Walks,
                     open: true,
                     parent: Some(root),
                     position: point,
@@ -335,7 +335,7 @@ impl HullPather<'_> {
                 .is_none()
             {
                 let _ = self.add_node(NewNode {
-                    list: NodeList::WALKS,
+                    list: NodeList::Walks,
                     open: true,
                     parent: Some(root),
                     position: point,
@@ -425,7 +425,7 @@ impl HullPather<'_> {
         } = walk;
         *count = 0;
         let mut left_boxes = false;
-        self.empty(NodeList::WALKS)?;
+        self.empty(NodeList::Walks)?;
         let mut nearest: Option<NodeIndex> = None;
         let mut best = goal.map_or(Distance::ZERO, |point| walk_length(from, point));
         let (inside, stuck) = self.begin_walk_out(hull, from, goal)?;
@@ -443,11 +443,11 @@ impl HullPather<'_> {
                 if HULL_ITERATIONS <= iterations || most <= *count {
                     break 'search;
                 }
-                let Some(node_index) = self.nodes.checked(NodeList::WALKS.head())?.next else {
+                let Some(node_index) = self.nodes.checked(NodeList::Walks.head())?.next else {
                     break 'search;
                 };
                 iterations += 1;
-                self.close(NodeList::WALKS, node_index)?;
+                self.close(NodeList::Walks, node_index)?;
                 if self.on_map(self.nodes.checked(node_index)?.at) {
                     break node_index;
                 }
@@ -474,7 +474,7 @@ impl HullPather<'_> {
                 }
                 if !self.blocked(at, point)? {
                     let end = self.add_node(NewNode {
-                        list: NodeList::WALKS,
+                        list: NodeList::Walks,
                         open: false,
                         parent: Some(node),
                         position: point,
@@ -549,7 +549,7 @@ impl HullPather<'_> {
     ) -> GenieResult<(Option<usize>, bool)> {
         let hull_path_tuning = &self.by_id.tuning().hull_path;
         let root = self.add_unrefused(UnrefusedNode {
-            list: NodeList::WALKS,
+            list: NodeList::Walks,
             open: true,
             parent: None,
             position: from,
@@ -561,7 +561,7 @@ impl HullPather<'_> {
         let Some(object) = inside else {
             return Ok((inside, false));
         };
-        self.close(NodeList::WALKS, root)?;
+        self.close(NodeList::Walks, root)?;
         let mut made = self.first_steps(hull, root, from, goal)? == Steps::Made;
         let bounds = self
             .hulls
@@ -634,7 +634,7 @@ impl HullPather<'_> {
                 .ray_to_box(at, side, checked.hull)
             {
                 let _ = self.add_node(NewNode {
-                    list: NodeList::WALKS,
+                    list: NodeList::Walks,
                     open: true,
                     parent: Some(node),
                     position: point,
@@ -653,7 +653,7 @@ impl HullPather<'_> {
             };
             if goal.is_some() {
                 let _ = self.add_node(NewNode {
-                    list: NodeList::WALKS,
+                    list: NodeList::Walks,
                     open: true,
                     parent: Some(node),
                     position: point,
@@ -674,7 +674,7 @@ impl HullPather<'_> {
                     );
                 }
                 if let Some(end) = self.add_node(NewNode {
-                    list: NodeList::WALKS,
+                    list: NodeList::Walks,
                     open: false,
                     parent: Some(node),
                     position: point,

@@ -827,6 +827,7 @@ mod tests {
         let planner = &*world
             .pathing
             .planner(RestrictionId::named(7), world.spatial.tiles())
+            .unwrap()
             .unwrap();
         let corner = TileOffset::new(0, 0);
         let seen = reached(Tile::new(0, 1), GridSize::new(5, 3), corner, planner)
@@ -865,7 +866,7 @@ mod tests {
         );
         let planner = world
             .pathing
-            .planner(RestrictionId::named(7), world.spatial.tiles())
+            .planner(RestrictionId::named(7), world.spatial.tiles())?
             .ok_or(GenieError::missing_data("the villagers' planner"))?;
         let candidates = Candidates { objects, me: None };
         let found = more_work(

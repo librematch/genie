@@ -276,7 +276,7 @@ pub(crate) fn tile_plan_for(
         level_target.map(|object_id| (object_id, annexes.as_slice())),
     );
     let (radius, mask) = (walker.radius, walker.mask);
-    let Some(planner) = plan.pathing.planner(walker.restriction, world.tiles()) else {
+    let Some(planner) = plan.pathing.planner(walker.restriction, world.tiles())? else {
         return Ok(None);
     };
     let ignore: Vec<RecordId> = ignore.into_iter().map(RecordId::from).collect();

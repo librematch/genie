@@ -149,7 +149,7 @@ impl BuildAction {
             && let Some(planner) = step
                 .world
                 .pathing
-                .planner(restriction, step.world.spatial.tiles())
+                .planner(restriction, step.world.spatial.tiles())?
         {
             let placed = known?.ok_or(SITE_GONE)?;
             let radius = master_radius.unwrap_or_else(|| placed.radius.x());

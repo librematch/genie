@@ -372,10 +372,19 @@ impl Mover {
 
     /// Whether the unit's restriction has a planner (`FUN_140f7cb30`); the slice builds one for
     /// any restriction its data has.
-    pub(super) fn planner_exists(&self, world: &Spatial, plan: &mut Planning<'_>) -> bool {
-        plan.pathing
-            .planner(self.stats.restriction, world.tiles())
-            .is_some()
+    ///
+    /// # Errors
+    ///
+    /// What the planner's build or update fails on.
+    pub(super) fn planner_exists(
+        &self,
+        world: &Spatial,
+        plan: &mut Planning<'_>,
+    ) -> GenieResult<bool> {
+        Ok(plan
+            .pathing
+            .planner(self.stats.restriction, world.tiles())?
+            .is_some())
     }
 
     /// `FUN_14114d3d0`: the walked level's goal is in reach: its target's gap (else where its top

@@ -113,7 +113,7 @@ impl Unit {
             let planner = step
                 .world
                 .pathing
-                .planner(restriction, spatial.tiles())
+                .planner(restriction, spatial.tiles())?
                 .ok_or(GenieError::unsupported(
                     "a builder's restriction without a planner",
                 ))?;

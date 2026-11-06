@@ -18,11 +18,9 @@ use crate::world::slots::CheckedIndexExt;
 /// A terrain restriction's planner (`0x4a8` bytes, built by `FUN_140f74f90`).
 #[derive(Clone, Debug, PartialEq)]
 pub struct Planner {
-    /// `+0x400`, `+0x402`: the map's size (as shorts).
+    /// `+0x400`, `+0x402`: the map's size (as shorts). The levels' sizes (`+0x3f0`, `+0x3f8`)
+    /// and first cells (`+0x3e0`) follow from it ([`Planner::level_size`]).
     pub(super) size: GridSize,
-    /// Per level: `+0x3f0` its width, `+0x3f8` its height (as shorts), `+0x3e0` its first cell.
-    pub(super) levels: [GridSize; 4],
-    pub(super) offsets: [i32; 4],
     pub(super) cells: Cells,
     /// `+0x3c0`: the restriction's passability per terrain.
     pub(super) passable: Restriction,
@@ -46,15 +44,13 @@ pub struct Planner {
 }
 
 impl Planner {
-    /// Whether two planners hold the same grid: the map's size, the levels, the cells, the
-    /// restriction's passability and the terrain. What a search leaves (the region, the goal, the
-    /// last tile, the goal's marks, the nodes, the open list, the best node and the points) is
-    /// not compared: a planner built afresh has searched nothing.
+    /// Whether two planners hold the same grid: the map's size, the cells, the restriction's
+    /// passability and the terrain. What a search leaves (the region, the goal, the last tile,
+    /// the goal's marks, the nodes, the open list, the best node and the points) is not
+    /// compared: a planner built afresh has searched nothing.
     #[must_use]
     pub fn same_grid(&self, other: &Self) -> bool {
         self.size == other.size
-            && self.levels == other.levels
-            && self.offsets == other.offsets
             && self.cells == other.cells
             && self.passable == other.passable
             && self.terrain == other.terrain
@@ -64,26 +60,21 @@ impl Planner {
     /// every tile's edges and the levels above them (`FUN_140f7e4b0` over the whole map).
     /// `terrain` holds each tile's terrain row by row, `passable` the restriction's value per
     /// terrain (above 0 passes).
-    #[must_use]
+    ///
+    /// # Errors
+    ///
+    /// A cell or a terrain the build reads off the grid, which its walk over the map's cells
+    /// never does.
     pub fn new(
         size: GridSize,
         terrain: Vec<TerrainId>,
         passable: Restriction,
         tiles: &Tiles,
-    ) -> Self {
+    ) -> GenieResult<Self> {
         let (width, height) = (size.width() as i16, size.height() as i16);
-        let w0 = (width.wrapping_add(7)) & !7;
-        let h0 = (height.wrapping_add(7)) & !7;
-        let levels =
-            [0, 1, 2, 3].map(|level| GridSize::new(i32::from(w0 >> level), i32::from(h0 >> level)));
-        let area = |level: usize| levels[level].width() * levels[level].height();
-        let offsets = [0, area(0), area(0) + area(1), area(0) + area(1) + area(2)];
-        let total = (offsets[3] + area(3)).max(0) as usize;
         let mut planner = Self {
             size: GridSize::new(i32::from(width), i32::from(height)),
-            levels,
-            offsets,
-            cells: Cells::cleared(total),
+            cells: Cells::default(),
             passable,
             terrain,
             region: PlanRect::default(),
@@ -96,13 +87,16 @@ impl Planner {
             best_cost: NO_COST,
             points: Vec::new(),
         };
-        for x in (0..w0 >> 3).rev() {
-            for y in (0..h0 >> 3).rev() {
-                planner.init_cell(GridLevel::TOP, PlanTile::new(x, y));
+        let total = planner.first_cell(GridLevel::TOP) + planner.level_area(GridLevel::TOP);
+        planner.cells = Cells::cleared(total.max(0) as usize);
+        let top = planner.level_size(GridLevel::TOP);
+        for x in (0..top.width() as i16).rev() {
+            for y in (0..top.height() as i16).rev() {
+                planner.init_cell(GridLevel::TOP, PlanTile::new(x, y))?;
             }
         }
-        planner.update(PlanRect::new(0, 0, width, height), tiles);
-        planner
+        planner.update(PlanRect::new(0, 0, width, height), tiles)?;
+        Ok(planner)
     }
 
     /// The map's last tile (its width and height less one) as the planner's shorts.
@@ -117,12 +111,14 @@ impl Planner {
     }
 
     /// The grid of `level`, row by row.
-    #[must_use]
-    pub fn level(&self, level: GridLevel) -> &[Cell] {
-        let start = CellIndex::new(self.offsets[level.index()] as usize);
-        let size = self.levels[level.index()];
-        let count = (size.width() * size.height()) as usize;
-        self.cells.run(start, count)
+    ///
+    /// # Errors
+    ///
+    /// A level whose cells the grid does not hold (none of the four).
+    pub fn level(&self, level: GridLevel) -> GenieResult<&[Cell]> {
+        let count = self.level_area(level).max(0) as usize;
+        self.cells
+            .run(CellIndex::new(self.first_cell(level)), count)
     }
 
     /// Whether the tile level's cell of `tile` has no edges, so no tile path leaves it (the
@@ -134,85 +130,139 @@ impl Planner {
     pub fn tile_closed(&self, tile: Tile) -> GenieResult<bool> {
         let width = i64::from(self.level_size(GridLevel::TILES).width());
         let cell = (width * i64::from(tile.y()) + i64::from(tile.x())) as usize;
-        Ok(self.level(GridLevel::TILES).checked(cell)?.edges.is_empty())
+        Ok(self
+            .level(GridLevel::TILES)?
+            .checked(cell)?
+            .edges
+            .is_empty())
     }
 
-    /// The size of `level`'s grid in cells.
+    /// The size of `level`'s grid in cells (`+0x3f0`, `+0x3f8`): the map's as the planner's
+    /// shorts, rounded up to whole top cells of 8 × 8 tiles, then shifted down by the level.
     #[must_use]
     pub const fn level_size(&self, level: GridLevel) -> GridSize {
-        self.levels[level.index()]
+        let width = (self.size.width() as i16).wrapping_add(7) & !7;
+        let height = (self.size.height() as i16).wrapping_add(7) & !7;
+        let shift = level.get();
+        GridSize::new((width >> shift) as i32, (height >> shift) as i32)
     }
 
-    /// The cell `at` of `level`'s place in the cells.
+    /// The number of `level`'s cells.
+    const fn level_area(&self, level: GridLevel) -> i64 {
+        let size = self.level_size(level);
+        size.width() as i64 * size.height() as i64
+    }
+
+    /// `level`'s first cell in the grid (`+0x3e0`): the cells of the levels below it.
+    fn first_cell(&self, level: GridLevel) -> i64 {
+        GridLevel::ALL
+            .into_iter()
+            .take_while(|&below| below < level)
+            .map(|below| self.level_area(below))
+            .sum()
+    }
+
+    /// The cell `at` of `level`'s place in the cells: the level's first cell, plus its width
+    /// times y, plus x.
     pub(super) fn index(&self, level: GridLevel, at: PlanTile) -> CellIndex {
-        let index = level.index();
-        let offset = i64::from(self.levels[index].width()) * i64::from(at.y())
-            + i64::from(at.x())
-            + i64::from(self.offsets[index]);
-        CellIndex::new(usize::try_from(offset).expect("a cell outside the planner's grid"))
+        CellIndex::new(
+            i64::from(self.level_size(level).width()) * i64::from(at.y())
+                + i64::from(at.x())
+                + self.first_cell(level),
+        )
     }
 
-    pub(super) fn cell(&self, level: GridLevel, at: PlanTile) -> Cell {
-        self.cells[self.index(level, at)]
+    /// The cell `at` of `level`.
+    ///
+    /// # Errors
+    ///
+    /// A place off the grid.
+    pub(super) fn cell(&self, level: GridLevel, at: PlanTile) -> GenieResult<Cell> {
+        self.cells.checked(self.index(level, at)).copied()
+    }
+
+    /// The cell `at` of `level`, to change.
+    ///
+    /// # Errors
+    ///
+    /// A place off the grid.
+    pub(super) fn cell_mut(&mut self, level: GridLevel, at: PlanTile) -> GenieResult<&mut Cell> {
+        let cell_index = self.index(level, at);
+        self.cells.checked_mut(cell_index)
     }
 
     /// `FUN_140f7da90`: clear a cell and mark its children that lie off the map (its kind holds
     /// [`CellKind::OFF_MAP`] when all of it does).
-    pub(super) fn init_cell(&mut self, level: GridLevel, at: PlanTile) {
-        let cell_index = self.index(level, at);
-        self.cells[cell_index] = Cell::EMPTY;
+    ///
+    /// # Errors
+    ///
+    /// A place off the grid.
+    pub(super) fn init_cell(&mut self, level: GridLevel, at: PlanTile) -> GenieResult<()> {
+        *self.cell_mut(level, at)? = Cell::EMPTY;
         if level == GridLevel::TILES {
             if self.size.width() <= i32::from(at.x()) || self.size.height() <= i32::from(at.y()) {
-                self.cells[cell_index].kind = CellKind::OFF_MAP;
+                self.cell_mut(level, at)?.kind = CellKind::OFF_MAP;
             }
         } else {
             for (bit, child) in at.children().into_iter().enumerate() {
-                self.init_cell(level.down(), child);
+                self.init_cell(level.down(), child)?;
                 if self
-                    .cell(level.down(), child)
+                    .cell(level.down(), child)?
                     .kind
                     .contains(CellKind::OFF_MAP)
                 {
-                    self.cells[cell_index].kind = self.cells[cell_index]
-                        .kind
-                        .plus(CellKind::child_off_map(bit));
+                    let cell = self.cell_mut(level, at)?;
+                    cell.kind = cell.kind.plus(CellKind::child_off_map(bit));
                 }
             }
         }
+        Ok(())
     }
 
     /// `FUN_140f799b0` (through the passability lambda, `0x140f7b110`): 1 when the tile is
     /// blocked, else a bit per passable neighbour (2 left, 4 right, 8 above, 0x10 below).
-    pub(super) fn adjacency(&self, tile: Tile, tiles: &Tiles) -> u32 {
+    ///
+    /// # Errors
+    ///
+    /// A tile off the map, whose terrain the planner has not got.
+    pub(super) fn adjacency(&self, tile: Tile, tiles: &Tiles) -> GenieResult<u32> {
         let (width, height) = (self.size.width(), self.size.height());
-        let passes = |tile: Tile| {
-            let kind = self.terrain[(tile.y() * width + tile.x()) as usize];
-            self.passable.passes(kind) && !tiles.blocked(tile)
+        let passes = |tile: Tile| -> GenieResult<bool> {
+            let kind = *self
+                .terrain
+                .checked((tile.y() * width + tile.x()) as usize)
+                .map_err(|error| error.with("x", tile.x()).with("y", tile.y()))?;
+            Ok(self.passable.passes(kind) && !tiles.blocked(tile))
         };
-        if !passes(tile) {
-            return 1;
+        if !passes(tile)? {
+            return Ok(1);
         }
         let (x, y) = (tile.x(), tile.y());
         let [left, right, up, down] = tile.beside();
         let mut bits = 0;
-        if 0 < x && passes(left) {
+        if 0 < x && passes(left)? {
             bits = 2;
         }
-        if x < width - 1 && passes(right) {
+        if x < width - 1 && passes(right)? {
             bits |= 4;
         }
-        if 0 < y && passes(up) {
+        if 0 < y && passes(up)? {
             bits |= 8;
         }
-        if y < height - 1 && passes(down) {
+        if y < height - 1 && passes(down)? {
             bits |= 0x10;
         }
-        bits
+        Ok(bits)
     }
 
     /// Rebuild the cells over a changed rectangle of tiles and its border (`FUN_140f7e4b0`, which
     /// the obstruction manager calls back through `FUN_140f7d4b0` when tiles change).
-    pub fn update(&mut self, rect: PlanRect, tiles: &Tiles) {
+    ///
+    /// # Errors
+    ///
+    /// A cell or a terrain the rebuild reads off the grid, which its walk over the map's cells
+    /// never does.
+    pub fn update(&mut self, rect: PlanRect, tiles: &Tiles) -> GenieResult<()> {
         let [x0, y0, x1, y1] = rect.get();
         let (lo_x, hi_x) = (x0.min(x1), x0.max(x1).wrapping_add(1));
         let (lo_y, hi_y) = (y0.min(y1), y0.max(y1).wrapping_add(1));
@@ -224,63 +274,38 @@ impl Planner {
         self.region = PlanRect::new(rx0, ry0, rx1, ry1);
         for cx in (rx0 >> 3)..=(rx1 >> 3) {
             for cy in (ry0 >> 3)..=(ry1 >> 3) {
-                let _ = self.rebuild(GridLevel::TOP, PlanTile::new(cx, cy), tiles);
+                let _ = self.rebuild(GridLevel::TOP, PlanTile::new(cx, cy), tiles)?;
             }
         }
+        Ok(())
     }
 
     /// `FUN_140f7e5e0`: a cell's edges and kind from its tile (level 0) or its children; returns
     /// the cell.
-    pub(super) fn rebuild(&mut self, level: GridLevel, at: PlanTile, tiles: &Tiles) -> Cell {
-        let cell_at = self.index(level, at);
-        let old = self.cells[cell_at].kind;
-        let mut low = old.off_map();
+    ///
+    /// # Errors
+    ///
+    /// A cell or a terrain off the grid.
+    pub(super) fn rebuild(
+        &mut self,
+        level: GridLevel,
+        at: PlanTile,
+        tiles: &Tiles,
+    ) -> GenieResult<Cell> {
         if level == GridLevel::TILES {
-            self.cells[cell_at].kind = low;
-            if old.contains(CellKind::LONE) {
-                self.cells[cell_at].kind = low.plus(CellKind::LONE);
-            }
-            if self.region.holds_at(GridLevel::TILES, at) {
-                let adjacency = self.adjacency(at.tile(), tiles);
-                self.cells[cell_at].edges = CellEdges::NONE;
-                if adjacency & 1 == 0 {
-                    let mut cell_edges = CellEdges::NONE;
-                    if adjacency & 2 != 0 {
-                        cell_edges = CellEdges::W;
-                    }
-                    if adjacency & 4 != 0 {
-                        cell_edges |= CellEdges::E;
-                    }
-                    if adjacency & 8 != 0 {
-                        cell_edges |= CellEdges::N;
-                    }
-                    if adjacency & 0x10 != 0 {
-                        cell_edges |= CellEdges::S;
-                    }
-                    self.cells[cell_at].edges = cell_edges;
-                    if cell_edges.is_empty() {
-                        self.cells[cell_at].kind |= CellKind::LONE | CellKind::NODE;
-                    } else {
-                        self.cells[cell_at].kind &= !CellKind::LONE;
-                    }
-                }
-            }
-            return self.cells[cell_at];
+            return self.rebuild_tile(at, tiles);
         }
+        let old = self.cell(level, at)?.kind;
+        let mut low = old.off_map();
         let grid_level = level.down();
         let children = at.children();
         let mut child = [Cell::EMPTY; 4];
-        for (index, &plan_tile) in children.iter().enumerate() {
-            if low.is_empty()
-                || !self.cells[cell_at]
-                    .kind
-                    .intersects(CellKind::child_off_map(index))
-            {
-                child[index] = self.rebuild(grid_level, plan_tile, tiles);
+        for (bit, (&plan_tile, rebuilt)) in children.iter().zip(&mut child).enumerate() {
+            if low.is_empty() || !old.intersects(CellKind::child_off_map(bit)) {
+                *rebuilt = self.rebuild(grid_level, plan_tile, tiles)?;
             }
         }
         let [d0, d1, d2, d3] = child.map(|cell| cell.edges);
-        low = self.cells[cell_at].kind.off_map();
         // the game adds the four disjoint edges
         let dirs = ((d3 | d2) & CellEdges::S)
             .plus((d3 | d1) & CellEdges::E)
@@ -292,23 +317,69 @@ impl Planner {
             || self.splits(child.map(|cell| cell.edges), dirs);
         if complex {
             low = low.plus(CellKind::MIXED);
-            for (index, &at) in children.iter().enumerate() {
-                if !child[index]
-                    .kind
-                    .intersects(CellKind::NODE | CellKind::MIXED)
-                {
-                    let cell_index = self.index(grid_level, at);
-                    self.cells[cell_index].kind = self.cells[cell_index].kind.plus(CellKind::NODE);
+            for (&plan_tile, rebuilt) in children.iter().zip(&child) {
+                if !rebuilt.kind.intersects(CellKind::NODE | CellKind::MIXED) {
+                    let cell = self.cell_mut(grid_level, plan_tile)?;
+                    cell.kind = cell.kind.plus(CellKind::NODE);
                 }
             }
         } else if level == GridLevel::TOP {
             low = low.plus(CellKind::NODE);
         }
-        self.cells[cell_at] = Cell {
+        let cell = Cell {
             edges: dirs,
             kind: low,
         };
-        self.cells[cell_at]
+        *self.cell_mut(level, at)? = cell;
+        Ok(cell)
+    }
+
+    /// `FUN_140f7e5e0` at level 0: a tile's kind keeps its off-map and lone marks; within the
+    /// region its edges are its passable neighbours' (none for a blocked tile), and a passable
+    /// tile with none is a lone node.
+    ///
+    /// # Errors
+    ///
+    /// A cell or a terrain off the grid.
+    fn rebuild_tile(&mut self, at: PlanTile, tiles: &Tiles) -> GenieResult<Cell> {
+        // the neighbours are read from the terrain and the blocked tiles, not the cells
+        let adjacency = if self.region.holds_at(GridLevel::TILES, at) {
+            Some(self.adjacency(at.tile(), tiles)?)
+        } else {
+            None
+        };
+        let cell = self.cell_mut(GridLevel::TILES, at)?;
+        let old = cell.kind;
+        let low = old.off_map();
+        cell.kind = low;
+        if old.contains(CellKind::LONE) {
+            cell.kind = low.plus(CellKind::LONE);
+        }
+        if let Some(adjacency) = adjacency {
+            cell.edges = CellEdges::NONE;
+            if adjacency & 1 == 0 {
+                let mut cell_edges = CellEdges::NONE;
+                if adjacency & 2 != 0 {
+                    cell_edges = CellEdges::W;
+                }
+                if adjacency & 4 != 0 {
+                    cell_edges |= CellEdges::E;
+                }
+                if adjacency & 8 != 0 {
+                    cell_edges |= CellEdges::N;
+                }
+                if adjacency & 0x10 != 0 {
+                    cell_edges |= CellEdges::S;
+                }
+                cell.edges = cell_edges;
+                if cell_edges.is_empty() {
+                    cell.kind |= CellKind::LONE | CellKind::NODE;
+                } else {
+                    cell.kind &= !CellKind::LONE;
+                }
+            }
+        }
+        Ok(*cell)
     }
 
     /// Whether four children with edges `d0` to `d3` fall apart as one cell (`FUN_140f7e5e0`'s

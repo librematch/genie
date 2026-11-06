@@ -116,12 +116,12 @@ impl HullPather<'_> {
         rounds: &mut Rounds,
         path: &mut Waypoints,
     ) -> GenieResult<Option<ShortFound>> {
-        self.close_all(NodeList::SEARCH)?;
+        self.close_all(NodeList::Search)?;
         if hulls == Hulls::New && rounds.growths == 0 {
             self.build_hulls()?;
         }
         let root = self.add_unrefused(UnrefusedNode {
-            list: NodeList::SEARCH,
+            list: NodeList::Search,
             open: true,
             parent: None,
             position: hull_query.from,
@@ -191,7 +191,7 @@ impl HullPather<'_> {
         if count < 1 {
             return Ok(Some(ShortFound::Blocked));
         }
-        self.close(NodeList::SEARCH, root)?;
+        self.close(NodeList::Search, root)?;
         self.add_exits(root, count, hull_query.to, sh)?;
         Ok(None)
     }
@@ -239,7 +239,7 @@ impl HullPather<'_> {
             let mut node = root;
             for &point in points.iter().take(count - 1).skip(1) {
                 node = self.add_unrefused(UnrefusedNode {
-                    list: NodeList::SEARCH,
+                    list: NodeList::Search,
                     open: false,
                     parent: Some(node),
                     position: point,
@@ -250,7 +250,7 @@ impl HullPather<'_> {
             }
             let last = *points.checked(count - 1)?;
             let _ = self.add_unrefused(UnrefusedNode {
-                list: NodeList::SEARCH,
+                list: NodeList::Search,
                 open: true,
                 parent: Some(node),
                 position: last,
@@ -308,11 +308,11 @@ impl HullPather<'_> {
             return Ok(Expanded::NextRound);
         }
         rounds.iterations += 1;
-        let Some(best) = self.nodes.checked(NodeList::SEARCH.head())?.next else {
+        let Some(best) = self.nodes.checked(NodeList::Search.head())?.next else {
             return Ok(Expanded::End);
         };
         if self.open_off_map(best)? {
-            self.close(NodeList::SEARCH, best)?;
+            self.close(NodeList::Search, best)?;
             return Ok(Expanded::Next);
         }
         if !self.in_area(self.nodes.checked(best)?.at) {
@@ -322,7 +322,7 @@ impl HullPather<'_> {
             rounds.growths += 1;
             return Ok(Expanded::NextRound);
         }
-        self.close(NodeList::SEARCH, best)?;
+        self.close(NodeList::Search, best)?;
         let at = self.nodes.checked(best)?.at;
         if self.reached(hull_query, at) {
             rounds.found = hull_query.target.is_none()
@@ -344,7 +344,7 @@ impl HullPather<'_> {
             return Ok(Expanded::Next);
         }
         let node = self.add_unrefused(UnrefusedNode {
-            list: NodeList::SEARCH,
+            list: NodeList::Search,
             open: false,
             parent: Some(best),
             position: point,
@@ -427,7 +427,7 @@ impl HullPather<'_> {
         );
         if !self.blocked(at, hull_query.to)? {
             rounds.best_node = self.add_node(NewNode {
-                list: NodeList::SEARCH,
+                list: NodeList::Search,
                 open: false,
                 parent: Some(best),
                 position: hull_query.to,
@@ -479,7 +479,7 @@ impl HullPather<'_> {
                     .points
                     .checked(back as usize)?;
                 backward = self.add_node(NewNode {
-                    list: NodeList::SEARCH,
+                    list: NodeList::Search,
                     open: true,
                     parent: Some(x),
                     position: point,
@@ -493,7 +493,7 @@ impl HullPather<'_> {
             if let Some(x) = forward {
                 let point = *self.hulls.checked(hit.index())?.points.checked(fwd)?;
                 forward = self.add_node(NewNode {
-                    list: NodeList::SEARCH,
+                    list: NodeList::Search,
                     open: true,
                     parent: Some(x),
                     position: point,
@@ -543,7 +543,7 @@ impl HullPather<'_> {
         };
         if let Some(x) = on_a {
             let _ = self.add_node(NewNode {
-                list: NodeList::SEARCH,
+                list: NodeList::Search,
                 open: true,
                 parent: Some(x),
                 position: qa,
@@ -555,7 +555,7 @@ impl HullPather<'_> {
             })?;
         } else if let Some(y) = node_index {
             let _ = self.add_node(NewNode {
-                list: NodeList::SEARCH,
+                list: NodeList::Search,
                 open: true,
                 parent: Some(y),
                 position: qb,

@@ -309,10 +309,10 @@ impl<'world> MapShore<'world> {
     ///
     /// What the planner's searches fail on.
     pub(crate) fn shore_point(&mut self, from: Point, to: Point) -> GenieResult<Option<Point>> {
-        let Some(planner) = self
-            .restriction
-            .and_then(|restriction_id| self.pathing.planner(restriction_id, self.tiles))
-        else {
+        let Some(restriction_id) = self.restriction else {
+            return Ok(None);
+        };
+        let Some(planner) = self.pathing.planner(restriction_id, self.tiles)? else {
             return Ok(None);
         };
         planner.last_open_point(from, to, self.tile_path_tuning)
