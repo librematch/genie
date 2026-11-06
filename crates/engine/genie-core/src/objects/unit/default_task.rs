@@ -58,14 +58,13 @@ impl Unit {
                 Ok(DefaultStart::Started)
             }
             DefaultTask::Artifact => {
-                // the factory gives the action the default task, whose moving sprite its
-                // MoveTos take
-                let moving =
+                // the factory gives the action the default task
+                let task =
                     Master::default_task(self.master(step.world.master_tables(), step.player)?)
-                        .and_then(|task| task.sprites.moving);
+                        .copied();
                 actions
                     .list
-                    .set_artifact(Some(Artifact::new(step.player, moving)));
+                    .set_artifact(Some(Artifact::new(step.player, task)));
                 Ok(DefaultStart::Started)
             }
             DefaultTask::Fails(unstartable) => Err(unstartable.error()),

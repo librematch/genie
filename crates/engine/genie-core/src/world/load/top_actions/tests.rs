@@ -1162,7 +1162,7 @@ fn an_enter_takes_its_task_and_retry() {
     assert!(enter_action.retry);
     assert_eq!(
         (
-            enter_action.range.get().to_bits(),
+            enter_action.task.work_range.get().to_bits(),
             move_to_action.wait.state
         ),
         (2.0_f32.to_bits(), MoveWaitState::AskedAgain)
@@ -1317,6 +1317,38 @@ fn an_explore_takes_its_quiet_move_to_with_its_wait() {
         .reason(),
         "a MoveTo of an Explore that does not walk"
     );
+}
+
+/// An Explore and an Artifact hold the task of their slot (`+0x48`, the base's `short_val`), none
+/// for −1: an Explore of the explore command holds none.
+#[test]
+fn an_explore_and_an_artifact_take_the_task_of_their_slot() {
+    use crate::movement::explore::{EXPLORE, ExploreState};
+    let slot = |state: u8, short_val: i16| RgeAction {
+        short_val,
+        ..base(state)
+    };
+    let explore_task = |short_val: i16| {
+        imported(EXPLORE, explore(slot(ExploreState::Wait.get(), short_val)))
+            .unwrap()
+            .list
+            .explore()
+            .and_then(|explore_action| explore_action.task)
+    };
+    assert_eq!(explore_task(-1), None);
+    assert_eq!(explore_task(2), Some(task(2, 2.0)));
+    let artifact_task = |short_val: i16| {
+        imported(
+            ARTIFACT_KIND,
+            artifact(slot(ArtifactState::Wait.get(), short_val)),
+        )
+        .unwrap()
+        .list
+        .artifact()
+        .and_then(|imported_artifact| imported_artifact.task)
+    };
+    assert_eq!(artifact_task(-1), None);
+    assert_eq!(artifact_task(4), Some(task(4, 2.0)));
 }
 
 #[test]

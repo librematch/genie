@@ -548,18 +548,18 @@ pub fn default_task(
     match action {
         DefaultAction::None => Ok(None),
         DefaultAction::Kind(ARTIFACT_KIND) => {
-            // the factory gives the action the default task, whose moving sprite its MoveTos take
-            let moving = own
+            // the factory gives the action the default task
+            let task = own
                 .or_else(|| {
                     masters.and_then(|master_table| {
                         master_table.work(civ, dat_id(objects, rge_static_object.master_obj)?)
                     })
                 })
                 .and_then(MastersMaster::default_task)
-                .and_then(|task| task.sprites.moving);
+                .copied();
             Ok(Some(DefaultStart::Artifact(Box::new(Artifact::new(
                 PlayerId::new(rge_static_object.owner),
-                moving,
+                task,
             )))))
         }
         DefaultAction::Kind(FLY) => Ok(Some(DefaultStart::Fly)),

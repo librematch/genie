@@ -140,7 +140,7 @@ impl Unit {
                         master,
                         room,
                     ),
-                    enter.range,
+                    enter.task.work_range,
                     by_id,
                 )?;
                 // FUN_141663dc0 with allies, or Gaia's

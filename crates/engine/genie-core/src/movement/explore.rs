@@ -21,6 +21,7 @@ use crate::objects::SpriteId;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::Master;
 use crate::objects::masters::PlayersMastersExt;
+use crate::objects::masters::Task;
 use crate::objects::unit::{Unit, object_master};
 use crate::players::PlayerKind;
 use crate::unit_ai::AiAction;
@@ -74,16 +75,24 @@ pub enum Owner {
 /// An Explore action.
 #[derive(Clone, Copy, Debug, PartialEq, Diff)]
 pub struct ExploreAction {
-    /// `+0x18`, with state 11's `MoveTo` to the point (quiet, range 0, the master's walking
-    /// sprite, [`ExploreMove::given`]).
+    /// `+0x18`, with state 11's `MoveTo` to the point (quiet, range 0, its task's moving sprite
+    /// else the master's walking sprite, [`ExploreAction::given`]).
     pub(crate) state: ExploreState,
     /// The point it walks to (`+0x38`..`+0x40`), x −1 for none.
     pub(crate) point: Position,
+    /// `+0x48`: its task, whose moving sprite (`+0x40`) state 11's `MoveTo` takes: the task
+    /// factory's (`FUN_140a97e00` case 4); none from the explore command (`FUN_141084db0`) and
+    /// from a save whose slot names none. A task change gives it the new master's
+    /// ([`Action::hold_task`]).
+    ///
+    /// [`Action::hold_task`]: crate::objects::actions::Action::hold_task
+    pub(crate) task: Option<Task>,
 }
 
 /// What an Explore's `MoveTo` reads of its unit as `set_state(11)` makes it: [`MoveToReads`], and
-/// the sprite its maker gives (`FUN_140aa0d30` takes the task's moving sprite, an Explore has no
-/// task: the master's walking sprite, `+0x748`; none leaves the constructor's default).
+/// the master's walking sprite (`+0x748`), which its maker gives (`FUN_140aa0d30`) for an
+/// Explore without a task or with a task without a moving sprite ([`ExploreAction::given`]);
+/// none leaves the constructor's default.
 #[derive(Clone, Copy, Debug)]
 pub struct ExploreMove<'graphics> {
     /// What every new sub-action `MoveTo` reads of the unit.
@@ -110,9 +119,19 @@ impl<'graphics> ExploreMove<'graphics> {
 }
 
 impl ExploreAction {
-    /// `FUN_140a87d30`, then its first (slot 0x28, `0x140a87e10`) as the action list adds it:
-    /// state 3 without a point, else 11, whose `MoveTo` is made from `walk`
-    /// ([`ExploreAction::set_state`]).
+    /// The sprite `set_state(11)` gives its `MoveTo` (`0x140a87e30`): its task's moving sprite
+    /// (`+0x40`), else, without a task or for a sprite the table lacks (a null pointer), the
+    /// master's walking sprite (`walk`'s).
+    fn given(&self, walk: &ExploreMove<'_>) -> Option<SpriteId> {
+        self.task
+            .and_then(|task| task.sprites.moving)
+            .filter(|&sprite| walk.reads.sprites.graphics.contains_key(sprite))
+            .or(walk.given)
+    }
+
+    /// `FUN_140a87d30` as the explore command calls it (`FUN_141084db0`, its task none), then its
+    /// first (slot 0x28, `0x140a87e10`) as the action list adds it: state 3 without a point, else
+    /// 11, whose `MoveTo` is made from `walk` ([`ExploreAction::set_state`]).
     ///
     /// # Errors
     ///
@@ -125,6 +144,7 @@ impl ExploreAction {
         let mut explore_action = Self {
             state: ExploreState::New,
             point,
+            task: None,
         };
         let state = if explore_action.point.x() == NO_POINT {
             ExploreState::Wait
@@ -167,7 +187,7 @@ impl ExploreAction {
                     move_to: walk.reads.to_point(
                         self.point,
                         Distance::ZERO,
-                        walk.given,
+                        self.given(walk),
                         move_to_tuning,
                     )?,
                 };
@@ -709,6 +729,7 @@ mod tests {
     use crate::objects::SpeedMultiplier;
     use crate::objects::SpriteFlags;
     use crate::objects::Voice;
+    use crate::objects::masters::TaskSprites;
     use crate::objects::sprite::Graphic;
     #[cfg(test)]
     use crate::objects::{FacetCount, Frame};
@@ -768,6 +789,49 @@ mod tests {
         };
         assert_eq!(sprite(Some(SpriteId::named(7))), Some(SpriteId::named(7)));
         assert_eq!(sprite(None), Some(SpriteId::named(20)));
+    }
+
+    /// `set_state(11)` with a task (`0x140a87e30`): the `MoveTo` takes the task's moving sprite;
+    /// a task without one, or with one the table lacks (a null pointer), gives the master's
+    /// walking sprite.
+    #[test]
+    fn an_explore_on_task_walks_with_its_task_moving_sprite() {
+        let moving = Graphic {
+            id: SpriteId::named(8),
+            ..WALKING
+        };
+        let table = Graphics::from([(SpriteId::named(7), WALKING), (SpriteId::named(8), moving)]);
+        let walk = walk_of(&table, Some(SpriteId::named(7)));
+        let sprite = |sprites: [i16; 4]| {
+            let mut explore_action = ExploreAction {
+                state: ExploreState::New,
+                point: Position::new(5.0, 5.0, 0.0),
+                task: Some(Task {
+                    sprites: TaskSprites::of_data(sprites),
+                    ..Task::default()
+                }),
+            };
+            let owner = explore_action
+                .set_state(
+                    ExploreState::Walk { move_to: None },
+                    &walk,
+                    &tuning().move_to,
+                )
+                .unwrap();
+            assert_eq!(owner, Owner::Nothing);
+            explore_action
+                .state
+                .move_to()
+                .and_then(|move_to_action| move_to_action.sprite)
+                .map(|graphic| graphic.id)
+        };
+        assert_eq!(sprite([8, -1, -1, -1]), Some(SpriteId::named(8)));
+        assert_eq!(sprite([-1, -1, -1, -1]), Some(SpriteId::named(7)));
+        assert_eq!(
+            sprite([9, -1, -1, -1]),
+            Some(SpriteId::named(7)),
+            "a sprite the table lacks"
+        );
     }
 
     /// The scout map (`FUN_140f4a240`, `FUN_140f4d5e0`): 480 by 480 from tile (0, 0), each

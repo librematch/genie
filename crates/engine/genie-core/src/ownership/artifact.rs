@@ -21,6 +21,7 @@ use crate::objects::SpriteId;
 use crate::objects::Voice;
 use crate::objects::actions::Action;
 use crate::objects::masters::ActionKind;
+use crate::objects::masters::Task;
 use crate::objects::release::Releaser;
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Unit;
@@ -98,8 +99,12 @@ pub struct Artifact {
     pub goal: Option<Position>,
     /// The target of a move to an object (`+0x20`, its id at `+0x30`).
     pub target: Option<ObjectId>,
-    /// Its task's moving sprite (`+0x40`), which its `MoveTo`s take; None for none.
-    pub moving: Option<SpriteId>,
+    /// `+0x48`: its task (the object's default task), whose moving sprite (`+0x40`) its
+    /// `MoveTo`s take; none only from a save whose slot names none. A task change gives it the
+    /// new master's ([`Action::hold_task`]).
+    ///
+    /// [`Action::hold_task`]: crate::objects::actions::Action::hold_task
+    pub task: Option<Task>,
 }
 
 /// The action type the checkpoint adds for an Artifact action.
@@ -120,10 +125,9 @@ use crate::world::lets::release;
 use std::mem::take;
 
 impl Artifact {
-    /// A new action of an object of player `owner` and a task whose moving sprite is `moving`,
-    /// about to check for a new owner.
+    /// A new action of an object of player `owner` on `task`, about to check for a new owner.
     #[must_use]
-    pub fn new(owner: PlayerId, moving: Option<SpriteId>) -> Self {
+    pub fn new(owner: PlayerId, task: Option<Task>) -> Self {
         Self {
             state: ArtifactState::Check,
             timer: Seconds::ZERO,
@@ -131,7 +135,18 @@ impl Artifact {
             sub: None,
             goal: None,
             target: None,
-            moving,
+            task,
+        }
+    }
+
+    /// Its task's moving sprite (`+0x40`), which its `MoveTo`s take (`set_state` 4 and 5,
+    /// `0x140aace30`). The game reads it through the task with no test: an Artifact without one,
+    /// which only a save can hold, would read through a null pointer; genie gives none, the
+    /// constructors' default.
+    const fn moving(&self) -> Option<SpriteId> {
+        match self.task {
+            Some(task) => task.sprites.moving,
+            None => None,
         }
     }
 
@@ -271,7 +286,7 @@ impl Artifact {
         let walk = reads.to_object(
             held,
             Distance::new(range),
-            self.moving,
+            self.moving(),
             TargetMoved::Follows,
             move_to_tuning,
         )?;
@@ -302,7 +317,7 @@ impl Artifact {
         reads: &MoveToReads<'_>,
         move_to_tuning: &MoveToTuning,
     ) -> GenieResult<SubActionsGone> {
-        let walk = reads.to_point(point, Distance::ZERO, self.moving, move_to_tuning)?;
+        let walk = reads.to_point(point, Distance::ZERO, self.moving(), move_to_tuning)?;
         self.goal = Some(point);
         let gone = self.drop_sub_actions();
         self.sub = walk.map(|move_to_action| ArtifactSub::Walk {
@@ -678,6 +693,7 @@ mod tests {
     use crate::objects::ObjectId;
     use crate::objects::SpeedMultiplier;
     use crate::objects::SpriteFlags;
+    use crate::objects::masters::TaskSprites;
     use crate::objects::sprite::Graphic;
     #[cfg(test)]
     use crate::objects::{FacetCount, Frame};
@@ -1413,7 +1429,10 @@ mod tests {
             )
             .unwrap();
         assert_eq!(shown(&artifact), Some(SpriteId::named(21)));
-        artifact.moving = Some(SpriteId::named(3));
+        artifact.task = Some(Task {
+            sprites: TaskSprites::of_data([3, -1, -1, -1]),
+            ..Task::default()
+        });
         let _ = artifact
             .take_point(
                 Position::new(28.5, 93.5, 0.0),
@@ -1424,7 +1443,10 @@ mod tests {
         assert_eq!(shown(&artifact), Some(SpriteId::named(3)));
         // a sprite the table lacks fails the move before it changes anything
         let before = Artifact {
-            moving: Some(SpriteId::named(4)),
+            task: Some(Task {
+                sprites: TaskSprites::of_data([4, -1, -1, -1]),
+                ..Task::default()
+            }),
             ..artifact
         };
         let mut lacking = before;
@@ -1487,7 +1509,13 @@ mod tests {
     /// to the unit AI at once, starting or walking on.
     #[test]
     fn an_artifact_walk_shows_its_sprite_as_it_starts() {
-        let mut artifact = Artifact::new(PlayerId::new(1), Some(SpriteId::named(3)));
+        let mut artifact = Artifact::new(
+            PlayerId::new(1),
+            Some(Task {
+                sprites: TaskSprites::of_data([3, -1, -1, -1]),
+                ..Task::default()
+            }),
+        );
         let graphics = Graphics::from([(SpriteId::named(3), graphic(3))]);
         let with_3 = SpriteReads {
             defaults: MoveDefaults::default(),

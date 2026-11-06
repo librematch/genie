@@ -341,7 +341,7 @@ fn own_master_default_task_is_its_own() {
     };
     assert!(matches!(
         start(Some(&own(TaskIndex::of_data(0)))),
-        Ok(Some(DefaultStart::Artifact(started))) if started.moving == Some(sprite)
+        Ok(Some(DefaultStart::Artifact(started))) if started.task.and_then(|task| task.sprites.moving) == Some(sprite)
     ));
     assert!(matches!(start(Some(&own(None))), Ok(None)));
     assert!(matches!(

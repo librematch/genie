@@ -108,7 +108,7 @@ pub fn saved_actions(
         GATHER => import_gather(&saved, &task_at, actions),
         ENTER => import_enter(&saved, &task_at, actions),
         TRANSPORT => import_transport(&saved, &task_at, actions),
-        EXPLORE => import_explore(&saved, actions),
+        EXPLORE => import_explore(&saved, &task_at, actions),
         ATTACK => import_attack(&saved, actions),
         WAIT_SOLIDIFY => import_wait_solidify(&saved, &task_at, actions),
         _ => Err(not_imported().with("action type", kind)),
@@ -212,10 +212,10 @@ fn import_artifact(
 ) -> GenieResult<()> {
     let base = saved.base;
     // its task (the base's `short_val`, −1 for none)
-    let moving = if base.short_val < 0 {
+    let task = if base.short_val < 0 {
         None
     } else {
-        saved.task(task_at)?.sprites.moving
+        Some(saved.task(task_at)?)
     };
     let sub = saved.move_to_sub(GenieError::unsupported(
         "a saved Artifact action with another sub-action",
@@ -237,7 +237,7 @@ fn import_artifact(
             (base.target_x != -1.0).then_some(saved.point())
         },
         target: ObjectId::of_field(base.target_id),
-        moving,
+        task,
     }));
     Ok(())
 }
@@ -493,11 +493,10 @@ fn import_enter(
         target: ContainerId::of_field(base.target_id),
         state,
         point: saved.point(),
-        range: task.work_range,
         timer: Seconds::new(base.timer),
         retry: first_time != 0,
         task_class: task.object_group,
-        moving: task.sprites.moving,
+        task,
     }));
     Ok(())
 }
@@ -534,8 +533,13 @@ fn import_transport(
     Ok(())
 }
 
-/// The Explore (4): its state, its `MoveTo` and the wait.
-fn import_explore(saved: &Saved<'_>, actions: &mut layers::Action) -> GenieResult<()> {
+/// The Explore (4): its state, its `MoveTo`, the wait and its task (the base's `short_val`, −1
+/// for none).
+fn import_explore(
+    saved: &Saved<'_>,
+    task_at: TaskAt<'_>,
+    actions: &mut layers::Action,
+) -> GenieResult<()> {
     use crate::movement::explore::ExploreState;
     let base = saved.base;
     let sub = saved.move_to_sub(GenieError::unsupported(
@@ -554,6 +558,10 @@ fn import_explore(saved: &Saved<'_>, actions: &mut layers::Action) -> GenieResul
     actions.list.set_explore(Some(ExploreAction {
         state,
         point: saved.point(),
+        task: match base.short_val {
+            ..0 => None,
+            _ => Some(saved.task(task_at)?),
+        },
     }));
     Ok(())
 }

@@ -19,7 +19,6 @@ use crate::movement::move_to::{ListUpdate, SubCode, update_sub_actions};
 #[cfg(test)]
 use crate::movement::move_to::{MoveTo, MoveToAction, MoveWait};
 use crate::objects::ObjectState;
-use crate::objects::SpriteId;
 #[cfg(test)]
 use crate::objects::Voice;
 use crate::objects::layers::Action;
@@ -66,7 +65,7 @@ pub struct EnterAction {
     /// The building or transport (`+0x20`, its id `+0x30`).
     pub(crate) target: Option<ContainerId>,
     /// The action state (`+0x18`), with its walk's `MoveTo` sub-action to the target: quiet,
-    /// within [`EnterAction::walk_range`], with the task's moving sprite ([`EnterAction::moving`])
+    /// within [`EnterAction::walk_range`], with its task's moving sprite ([`EnterAction::task`])
     /// ([`EnterAction::walk_again`]).
     pub(crate) state: EnterState,
     /// `+0x38`..`+0x40`: where it meets the target ([`meeting`]: a building's place; for a
@@ -75,17 +74,18 @@ pub struct EnterAction {
     ///
     /// [`meeting`]: crate::garrison::meeting::meeting_point
     pub(crate) point: Position,
-    /// The task's work range (`+0x30`): a building's `MoveTo` stops this near, and the enter
-    /// needs it.
-    pub(crate) range: Distance,
     /// `+0x44`: state 2's wait, in seconds.
     pub(crate) timer: Seconds,
     /// `+0x68`, 1 at first: a `MoveTo` that fails (code 3) asks once more.
     pub(crate) retry: bool,
-    /// `+0x6c`: the task's class (its `+0x10`), none for any.
+    /// `+0x6c`: the task's class (its `+0x10`) as the constructor copies it, none for any.
     pub(crate) task_class: Option<ClassId>,
-    /// The task's moving sprite (`+0x40`), which its `MoveTo`s take; None for none.
-    pub(crate) moving: Option<SpriteId>,
+    /// `+0x48`: its task, whose work range (`+0x30`) a building's `MoveTo` stops within and the
+    /// enter needs, and whose moving sprite (`+0x40`) its `MoveTo`s take. A task change gives it
+    /// the new master's ([`Action::hold_task`]).
+    ///
+    /// [`Action::hold_task`]: crate::objects::actions::Action::hold_task
+    pub(crate) task: Task,
 }
 
 /// What an Enter goes into: a building (type 80) or a transport.
@@ -165,7 +165,7 @@ pub(super) enum EnterAgain {
 impl EnterAction {
     /// The factory's constructor (`FUN_140a855d0`): the target (an annex's main building, the
     /// caller's, as its add, slot 0x178), the point [`meeting`] gives at the target's height,
-    /// the task's (`task`) range, class and moving sprite, `+0x68` 1; the start (slot 5,
+    /// its task (`task`, `+0x48`) and the task's class (`+0x6c`), `+0x68` 1; the start (slot 5,
     /// `FUN_140a86f20`) and its `set_state(4)` are [`EnterAction::walk_again`].
     ///
     /// [`meeting`]: crate::garrison::meeting::meeting_point
@@ -175,11 +175,10 @@ impl EnterAction {
             target: Some(target),
             state: EnterState::Walk { move_to: None },
             point,
-            range: task.work_range,
             timer: Seconds::ZERO,
             retry: true,
             task_class: task.object_group,
-            moving: task.sprites.moving,
+            task: *task,
         }
     }
 
@@ -194,7 +193,7 @@ impl EnterAction {
     /// `FUN_140aa0df0` with the unit's slot 0x268, 0, alike), and code 1 asks the transport to
     /// move to the point. Both `MoveTo`s are quiet (`FUN_140a7a170` with 1) and leave a target
     /// that moves (`+0x61` 2); each starts with a new wait, takes the task's moving
-    /// sprite ([`EnterAction::moving`]) from `sprites`, and starts as
+    /// sprite ([`EnterAction::task`]) from `sprites`, and starts as
     /// [`WalkStart`] says.
     ///
     /// # Errors
@@ -237,7 +236,7 @@ impl EnterAction {
             reads.to_object(
                 to,
                 self.walk_range(enter_target.kind),
-                self.moving,
+                self.task.sprites.moving,
                 TargetMoved::Ignores,
                 move_to_tuning,
             )?
@@ -245,7 +244,7 @@ impl EnterAction {
             reads.to_point_of(
                 to,
                 (self.point, self.walk_range(EnterKind::Transport).get()),
-                self.moving,
+                self.task.sprites.moving,
                 TargetMoved::Ignores,
                 move_to_tuning,
             )?
@@ -269,7 +268,7 @@ impl EnterAction {
                 Some(role_id) => Some(role_id.id()),
                 None => None,
             },
-            range: self.range,
+            range: self.task.work_range,
             sprite: None,
             voice: Voice::Quiet,
             on_target_moved: TargetMoved::Ignores,
@@ -282,7 +281,7 @@ impl EnterAction {
     /// The range its `MoveTo` stops within: the task's for a building, 0 for a transport.
     pub(super) const fn walk_range(&self, kind: EnterKind) -> Distance {
         match kind {
-            EnterKind::Building => self.range,
+            EnterKind::Building => self.task.work_range,
             EnterKind::Transport => Distance::ZERO,
         }
     }

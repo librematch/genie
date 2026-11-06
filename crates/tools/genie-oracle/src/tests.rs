@@ -31,7 +31,7 @@ fn building_production_state_comes_before_its_top_action_s() {
         sub: None,
         goal: None,
         target: None,
-        moving: None,
+        task: None,
     };
     let making = Production {
         action: Some(Making::Unit(MakeObj {

@@ -97,8 +97,9 @@ impl HeldTask {
 impl Action {
     /// Its task (`+0x48`) as a task change reads it, none for an action without one: the task
     /// factory gives an Attack none (`FUN_140a97e00` case 7), a `MoveTo` and a Missile hold none,
-    /// nor does a Transport of the unload command. genie holds no task of an Explore, an Enter or
-    /// an Artifact (MISSING.md), which the game's hold.
+    /// nor do a Transport of the unload command and an Explore of the explore command. The
+    /// Attack's constructors (`FUN_140a7c210`, `FUN_140a7bf50`) and the Missile's
+    /// (`FUN_140a9a040`) store no task.
     pub(crate) fn held_task(&self) -> Option<HeldTask> {
         match self {
             Self::Hunt(hunt_action) => Some(HeldTask {
@@ -121,12 +122,10 @@ impl Action {
             Self::Make(make_action) => Some(HeldTask::of(&make_action.task)),
             Self::Fly(fly) => Some(HeldTask::of(&fly.task)),
             Self::WaitSolidify(wait_solidify) => Some(HeldTask::of(&wait_solidify.task)),
-            Self::Attack(_)
-            | Self::MoveTo(_)
-            | Self::Missile(_)
-            | Self::Explore(_)
-            | Self::Enter(_)
-            | Self::Artifact(_) => None,
+            Self::Enter(enter_action) => Some(HeldTask::of(&enter_action.task)),
+            Self::Explore(explore_action) => explore_action.task.as_ref().map(HeldTask::of),
+            Self::Artifact(artifact) => artifact.task.as_ref().map(HeldTask::of),
+            Self::Attack(_) | Self::MoveTo(_) | Self::Missile(_) => None,
         }
     }
 
@@ -145,12 +144,10 @@ impl Action {
             Self::Make(make_action) => make_action.task = *task,
             Self::Fly(fly) => fly.task = *task,
             Self::WaitSolidify(wait_solidify) => wait_solidify.task = *task,
-            Self::Attack(_)
-            | Self::MoveTo(_)
-            | Self::Missile(_)
-            | Self::Explore(_)
-            | Self::Enter(_)
-            | Self::Artifact(_) => {}
+            Self::Enter(enter_action) => enter_action.task = *task,
+            Self::Explore(explore_action) => explore_action.task = Some(*task),
+            Self::Artifact(artifact) => artifact.task = Some(*task),
+            Self::Attack(_) | Self::MoveTo(_) | Self::Missile(_) => {}
         }
     }
 }

@@ -8224,7 +8224,13 @@ fn an_enter_move_to_shows_its_sprite_as_it_starts() {
             .set_enter(Some(EnterAction {
                 state: EnterState::Wait,
                 timer: Seconds::ZERO,
-                moving,
+                task: Task {
+                    sprites: TaskSprites {
+                        moving,
+                        ..task.sprites
+                    },
+                    ..task
+                },
                 ..EnterAction::new(
                     ContainerId::new(object_id(10028)),
                     Position::new(30.0, 88.0, 0.0),
@@ -13280,11 +13286,10 @@ fn clearing_the_actions_tears_the_artifact_fly_enter_and_build_down() {
             target: Some(ContainerId::new(object_id(9150))),
             state: EnterState::Wait,
             point: Position::new(20.0, 20.0, 0.0),
-            range: Distance::ZERO,
             timer: Seconds::ZERO,
             retry: true,
             task_class: Some(class_id(0)),
-            moving: None,
+            task: Task::default(),
         }));
     // a walking villager: an Enter without a MoveTo does not stop it
     world.parts.set_anim_speed(villager.id, Speed::new(1.0));

@@ -289,9 +289,9 @@ fn an_action_without_task_takes_the_new_master_with_no_tasks() {
     }
 }
 
-/// The task each action holds (`+0x48`): a Hunt's, a Build's, a Transport's on a task, a Make's
-/// and a wait's whole task; none for a `MoveTo`, a Transport of the unload command, an Explore,
-/// an Enter and an Artifact (genie holds none of the last three).
+/// The task each action holds (`+0x48`): a Hunt's, a Build's, a Transport's on a task, a Make's,
+/// a wait's, an Enter's and an Artifact's whole task; none for a `MoveTo`, a Transport of the
+/// unload command, an Explore of the explore command and an Artifact of a save without one.
 #[test]
 fn the_held_task_is_the_one_each_action_holds() {
     let task = hunt_task(4, Some(3), [1, 2, 3, 4]);
@@ -323,14 +323,22 @@ fn the_held_task_is_the_one_each_action_holds() {
         Action::WaitSolidify(WaitSolidify::new(task, foundation)).held_task(),
         of(&task)
     );
+    assert_eq!(
+        Action::Enter(EnterAction::new(RoleId::new(object_id(30)), point, &task)).held_task(),
+        of(&task)
+    );
+    assert_eq!(
+        Action::Artifact(Artifact::new(PlayerId::new(1), Some(task))).held_task(),
+        of(&task)
+    );
     for none in [
         Action::MoveTo(walk(MoveTo::Start, 1)),
         Action::Transport(TransportAction::new(point)),
         Action::Explore(ExploreAction {
             state: ExploreState::Wait,
             point,
+            task: None,
         }),
-        Action::Enter(EnterAction::new(RoleId::new(object_id(30)), point, &task)),
         Action::Artifact(Artifact::new(PlayerId::new(1), None)),
     ] {
         assert_eq!(none.held_task(), None, "{none:?}");
@@ -405,6 +413,7 @@ fn the_sub_action_is_the_walk_or_the_hunt_attack() {
             move_to: Some(walk(MoveTo::Start, 3)),
         },
         point,
+        task: None,
     });
     assert_eq!(
         explore.sub_action_mut(),
@@ -476,4 +485,45 @@ fn the_unit_showing_one_sprite_of_the_new_task_keeps_its_instance() {
         list.hunt().map(|hunt| hunt.task),
         Some(HuntTask::of(&found))
     );
+}
+
+/// The Enter, the Explore and the Artifact hold their task (`+0x48`): a task change gives the
+/// Enter the new task's range for its walk to a building, the Explore's and the Artifact's
+/// `MoveTo`s the new task's moving sprite.
+#[test]
+fn the_enter_explore_and_artifact_take_the_new_task_values() {
+    let point = Position::new(5.0, 5.0, 0.0);
+    let held = Task {
+        work_range: Distance::new(1.0),
+        ..hunt_task(0, None, [1, 2, 3, 4])
+    };
+    let new = Task {
+        work_range: Distance::new(2.5),
+        ..hunt_task(1, None, [11, 12, 13, 14])
+    };
+    let mut enter = Action::Enter(EnterAction::new(RoleId::new(object_id(30)), point, &held));
+    assert_eq!(enter.held_task().map(|task| task.key), Some(held.key()));
+    enter.hold_task(&new);
+    let Action::Enter(enter_action) = enter else {
+        panic!("the Enter");
+    };
+    assert_eq!(enter_action.task.work_range, Distance::new(2.5));
+    let mut artifact = Action::Artifact(Artifact::new(PlayerId::new(1), Some(held)));
+    assert_eq!(
+        artifact.held_task().map(|task| task.sprites),
+        Some(held.sprites)
+    );
+    artifact.hold_task(&new);
+    assert_eq!(
+        artifact.held_task().map(|task| task.sprites),
+        Some(new.sprites)
+    );
+    let mut explore = Action::Explore(ExploreAction {
+        state: ExploreState::Wait,
+        point,
+        task: None,
+    });
+    assert_eq!(explore.held_task(), None, "the explore command's has none");
+    explore.hold_task(&new);
+    assert_eq!(explore.held_task().map(|task| task.key), Some(new.key()));
 }
