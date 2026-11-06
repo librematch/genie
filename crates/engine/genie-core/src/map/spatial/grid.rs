@@ -391,9 +391,9 @@ impl Spatial {
 
     /// `FUN_1411570c0`'s query (`FUN_141051900` with flags 0x10, any player): the records the
     /// line `from` -> `to` meets, each box grown by `grow` (the manager's buffer,
-    /// `FUN_1410562d0`), but the `ignore`d objects' (`FUN_1410562e0`), at most 25 (the query
-    /// stops there). First the map edge's records when the grown rectangle leaves the map
-    /// ([`Spatial::edge_records`]); with `tiles` the temporary tile records still put in the
+    /// `FUN_1410562d0`), but the `ignore`d objects' (`FUN_1410562e0`), at most [`MOST_HITS`]
+    /// (the query stops there). First the map edge's records when the grown rectangle leaves the
+    /// map ([`Spatial::edge_records`]); with `tiles` the temporary tile records still put in the
     /// cells the query visits ([`Spatial::put_tile_records`], kind 3, the tile's box), in the
     /// tiles' row order; then the objects' records of a tested kind (kind 10 filed as 2) in the
     /// cells the query visits whose grown box meets the line's rectangle and the line

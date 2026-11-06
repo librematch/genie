@@ -1631,6 +1631,8 @@ fn hunt_update_runs_the_step_of_its_state() {
     );
     // a walk whose MoveTo failed (code 3) waits with the unit's animation stopped, the store the
     // drop-off's failures share
+    let id = rig.unit().id;
+    rig.world.parts.set_anim_speed(id, Speed::new(1.0));
     let mut hunt_action = walking(10028, Seconds::ZERO, MoveTo::Failed);
     assert_eq!(
         update(&mut hunt_action, &mut rig, PlayerKind::Human, 0.0),

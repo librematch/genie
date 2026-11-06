@@ -32,12 +32,12 @@ pub const fn tile_record_id(tile: Tile) -> RecordId {
 }
 
 /// Where the old short pather's query stops: at its first hit (`FUN_141052350`) or at the 25th
-/// (`FUN_141051900`).
+/// ([`MOST_HITS`], `FUN_141051900`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(super) enum HitLimit {
     /// The first hit.
     First,
-    /// The 25th.
+    /// The 25th ([`MOST_HITS`]).
     Most,
 }
 
@@ -52,9 +52,10 @@ impl Spatial {
     /// the pather's). An object that moves (its record's `+3` bit 0x10, set from slot 0x5c8 at the
     /// end of its update, [`Gait::moving`]) is left out, as is a gate the player may pass (slot
     /// 0x678, not modelled). [`HitLimit::First`] stops at the first hit (`FUN_141052350`); else at
-    /// the 25th (`FUN_141051900`). The hits are in the tiles' row order, then by id; the game's are
-    /// in its grid's order, which its callers do not read. A walk whose grown box leaves the map is
-    /// blocked (`FUN_141052350`) or meets the map's edge records first ([`Spatial::edge_records`]).
+    /// the 25th ([`MOST_HITS`], `FUN_141051900`). The hits are in the tiles' row order, then by
+    /// id; the game's are in its grid's order, which its callers do not read. A walk whose grown
+    /// box leaves the map is blocked (`FUN_141052350`) or meets the map's edge records first
+    /// ([`Spatial::edge_records`]).
     ///
     /// [`Gait::moving`]: crate::map::spatial::Gait::moving
     pub(super) fn pather_query(
@@ -172,7 +173,7 @@ impl Spatial {
             .is_empty())
     }
 
-    /// The records the old short pather's walk `from` -> `point` meets, at most 25
+    /// The records the old short pather's walk `from` -> `point` meets, at most [`MOST_HITS`]
     /// ([`Spatial::pather_query`]: `FUN_141052b90`, then `FUN_141051900` with flags 0x40).
     pub fn pather_hits(
         &mut self,
