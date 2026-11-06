@@ -116,7 +116,8 @@ pub struct VisibleQuery<'world> {
     pub(crate) shape: QueryShape,
     /// The classes it reads.
     pub(crate) classes: &'world [ClassId],
-    /// What the owners are to the player (none for a saved value past the relations).
+    /// What the owners are to the player: each owner's saved `unit_diplomacy` dword
+    /// (`player+0x278`), as the save holds it.
     pub(crate) relations: &'world UnitRelations,
     /// The searcher's radii (x, y).
     pub(crate) size: Footprint,

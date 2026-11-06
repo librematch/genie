@@ -103,7 +103,8 @@ pub fn spatial(
                 .base
                 .unit_diplomacy
                 .iter()
-                .map(|&field| UnitDiplomacy::of_field(field))
+                .copied()
+                .map(UnitDiplomacy::from)
                 .collect()
         })
         .collect();

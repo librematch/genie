@@ -6,23 +6,25 @@ use std::array::IntoIter as ArrayIter;
 use std::iter::Zip;
 use std::ops::{Index, IndexMut};
 use std::slice::Iter as SliceIter;
+use strum::FromRepr;
 
 /// What a player's queries make of another player's objects: Gaia's, its own, an ally's, a
 /// neutral's or an enemy's. `FUN_141676b80` writes it to `player+0x278` as a [`UnitDiplomacy`].
 /// The visible-units query (`GetVisibleUnits`, `FUN_141288c00`) lists each object by it, in
 /// this order.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, FromRepr)]
+#[repr(u8)]
 pub enum UnitRelation {
     /// Gaia's objects (0).
-    Gaia,
+    Gaia = 0,
     /// Its own objects (1).
-    Own,
+    Own = 1,
     /// An ally's objects (2).
-    Ally,
+    Ally = 2,
     /// A neutral's objects (3).
-    Neutral,
+    Neutral = 3,
     /// An enemy's objects (4).
-    Enemy,
+    Enemy = 4,
 }
 
 impl UnitRelation {
@@ -35,28 +37,10 @@ impl UnitRelation {
         Self::Enemy,
     ];
 
-    /// The relation of list `list` (0 to 4), none past the five.
-    const fn of_list(list: u8) -> Option<Self> {
-        match list {
-            0 => Some(Self::Gaia),
-            1 => Some(Self::Own),
-            2 => Some(Self::Ally),
-            3 => Some(Self::Neutral),
-            4 => Some(Self::Enemy),
-            _ => None,
-        }
-    }
-
     /// Its value.
     #[must_use]
     pub const fn get(self) -> u8 {
-        match self {
-            Self::Gaia => 0,
-            Self::Own => 1,
-            Self::Ally => 2,
-            Self::Neutral => 3,
-            Self::Enemy => 4,
-        }
+        self as u8
     }
 
     /// Its bit in a query's mask of the relations it keeps (`1 << relation`).
@@ -79,16 +63,10 @@ const SHIFT_COUNT: u32 = 0x1f;
 /// save can hold as any value. The visible-units query (`GetVisibleUnits`, `FUN_141288c00`)
 /// keeps a record by its bit ([`UnitDiplomacy::bit`]) and lists it by its low byte
 /// ([`UnitDiplomacy::list`]).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct UnitDiplomacy(i32);
 
 impl UnitDiplomacy {
-    /// The value a save holds.
-    #[must_use]
-    pub const fn of_field(value: i32) -> Self {
-        Self(value)
-    }
-
     /// Its bit in a query's mask (`MOV EAX, 1`, `SHL AL, CL`): 1 shifted within a byte by the
     /// value's low five bits, so none for a shift past 7.
     #[must_use]
@@ -101,7 +79,14 @@ impl UnitDiplomacy {
     /// none past the five lists, where the game writes past them.
     #[must_use]
     pub const fn list(self) -> Option<UnitRelation> {
-        UnitRelation::of_list(self.0 as u8)
+        UnitRelation::from_repr(self.0 as u8)
+    }
+}
+
+impl From<i32> for UnitDiplomacy {
+    /// The value a save holds.
+    fn from(value: i32) -> Self {
+        Self(value)
     }
 }
 
@@ -149,11 +134,10 @@ impl RelationMask {
 /// by the other player, as the save holds it.
 pub type UnitRelations = ByPlayer<UnitDiplomacy>;
 
-/// A test's row of saved relations (`unit_diplomacy`): each value as
-/// [`UnitDiplomacy::of_field`] reads it.
+/// A test's row of saved relations (`unit_diplomacy`): each value as the save holds it.
 #[cfg(test)]
 pub(crate) fn relations<const N: usize>(values: [i32; N]) -> UnitRelations {
-    values.into_iter().map(UnitDiplomacy::of_field).collect()
+    values.into_iter().map(UnitDiplomacy::from).collect()
 }
 
 /// One value per [`UnitRelation`], in their order: the visible-units query's lists.
@@ -248,18 +232,18 @@ mod tests {
     #[test]
     fn every_relation_value_maps_to_its_list_and_back() {
         for relation in UnitRelation::ALL {
-            assert_eq!(UnitRelation::of_list(relation.get()), Some(relation));
+            assert_eq!(UnitRelation::from_repr(relation.get()), Some(relation));
             assert_eq!(UnitDiplomacy::from(relation).list(), Some(relation));
             assert_eq!(UnitDiplomacy::from(relation).bit(), relation.bit());
         }
-        assert_eq!(UnitRelation::of_list(5), None);
+        assert_eq!(UnitRelation::from_repr(5), None);
     }
 
     /// A saved value's bit is 1 shifted within a byte by its low five bits (`SHL AL, CL`): 5
     /// has bit 5, 36 an enemy's bit, 8 and -1 (a shift of 31) none.
     #[test]
     fn saved_value_bit_shifts_within_byte_by_its_low_five_bits() {
-        let bit = |value| UnitDiplomacy::of_field(value).bit();
+        let bit = |value: i32| UnitDiplomacy::from(value).bit();
         assert_eq!(bit(4), 0x10);
         assert_eq!(bit(5), 0x20);
         assert_eq!(bit(7), 0x80);
@@ -272,7 +256,7 @@ mod tests {
     /// nowhere among the five.
     #[test]
     fn saved_value_lists_by_its_low_byte() {
-        let list = |value| UnitDiplomacy::of_field(value).list();
+        let list = |value: i32| UnitDiplomacy::from(value).list();
         assert_eq!(list(260), Some(UnitRelation::Enemy));
         assert_eq!(list(256), Some(UnitRelation::Gaia));
         assert_eq!(list(5), None);
