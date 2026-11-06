@@ -23,6 +23,7 @@ use crate::objects::Frame;
 use crate::orders::Interact;
 use crate::orders::SavedPatrols;
 use crate::players::Amount;
+use crate::players::MarketTrade;
 use crate::players::PlayerId;
 use crate::players::TributeFee;
 use crate::players::tribute::Gift;
@@ -162,7 +163,7 @@ fn one_of_each(player: u8) -> Vec<Command> {
             attribute: ResourceWord::of_data(0),
             times: TradeLots::of_data(1),
             market: None,
-            buy: true,
+            trade: MarketTrade::Buy,
         }),
         Command::Gate(GateCommand {
             player: player_id(player),
@@ -289,7 +290,7 @@ fn trade_of_another_commodity_does_nothing() {
             attribute: ResourceWord::of_data(attribute),
             times: TradeLots::of_data(1),
             market: None,
-            buy: true,
+            trade: MarketTrade::Buy,
         }
         .run(&mut world)
         .unwrap();

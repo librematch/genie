@@ -1,3 +1,4 @@
+use crate::contracts::ContractsMode;
 use crate::contracts::Outcome;
 use crate::contracts::contracts;
 use crate::contracts::schema_hash;
@@ -150,17 +151,20 @@ fn written_contracts_check_current_until_the_file_differs() {
     let folder = env::temp_dir().join(format!("genie-contracts-{}", process::id()));
     let path = folder.join("contracts").join("genie.ncl");
     assert_eq!(
-        write_or_check(&path, "{ A = Number }\n", false).unwrap(),
+        write_or_check(&path, "{ A = Number }\n", ContractsMode::Write).unwrap(),
         Outcome::Written
     );
     assert_eq!(
-        write_or_check(&path, "{ A = Number }\n", true).unwrap(),
+        write_or_check(&path, "{ A = Number }\n", ContractsMode::Check).unwrap(),
         Outcome::Current
     );
     assert_eq!(
-        write_or_check(&path, "{ A = String }\n", true).unwrap(),
+        write_or_check(&path, "{ A = String }\n", ContractsMode::Check).unwrap(),
         Outcome::Stale
     );
     fs::remove_dir_all(&folder).unwrap();
-    assert_eq!(write_or_check(&path, "", true).unwrap(), Outcome::Stale);
+    assert_eq!(
+        write_or_check(&path, "", ContractsMode::Check).unwrap(),
+        Outcome::Stale
+    );
 }

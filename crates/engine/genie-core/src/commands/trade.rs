@@ -4,6 +4,7 @@ use crate::GenieResult;
 use crate::commands::ResourceWord;
 use crate::commands::TradeLots;
 use crate::objects::ObjectId;
+use crate::players::MarketTrade;
 use crate::players::PlayerId;
 use crate::world::World;
 
@@ -22,8 +23,8 @@ pub struct TradeCommand {
     /// `+0x8`: the market, which the check (`FUN_140e6f3f0`) reads; none for −1, which a
     /// recorded trade can hold.
     pub market: Option<ObjectId>,
-    /// A purchase, else a sale.
-    pub buy: bool,
+    /// A purchase (`BUY_COMMODITY`) or a sale (`SELL_COMMODITY`).
+    pub trade: MarketTrade,
 }
 
 impl TradeCommand {
@@ -34,11 +35,9 @@ impl TradeCommand {
         let Some(commodity) = self.attribute.traded() else {
             return Ok(());
         };
-        if self.buy {
-            world.buy(self.player, commodity, self.times)?;
-        } else {
-            world.sell(self.player, commodity, self.times)?;
+        match self.trade {
+            MarketTrade::Buy => world.buy(self.player, commodity, self.times),
+            MarketTrade::Sell => world.sell(self.player, commodity, self.times),
         }
-        Ok(())
     }
 }

@@ -18,7 +18,7 @@
 pub mod body;
 pub mod command;
 
-pub use body::{Checkpoint, Op, OpReader, Pregame, TriggerSync, View};
+pub use body::{ChapterOrder, Checkpoint, Op, OpReader, Pregame, TriggerSync, View};
 use genie_error::GenieResult;
 pub use genie_save::SaveVersion;
 
@@ -117,7 +117,12 @@ impl<'data> Chapter<'data> {
     /// The ops of this chapter.
     #[must_use]
     pub const fn ops(&self) -> OpReader<'data> {
-        OpReader::new(self.body, self.body_offset, self.index == 0)
+        let order = if self.index == 0 {
+            ChapterOrder::First
+        } else {
+            ChapterOrder::Later
+        };
+        OpReader::new(self.body, self.body_offset, order)
     }
 
     /// Inflate the whole header (the chapter's world save).

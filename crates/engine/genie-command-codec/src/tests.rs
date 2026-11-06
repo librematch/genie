@@ -27,6 +27,7 @@ use genie_core::objects::ObjectId;
 use genie_core::objects::masters::MasterId;
 use genie_core::orders::{ControlKey, Interact, MoveOrder, OrderFlags, SavedPatrols};
 use genie_core::players::Amount;
+use genie_core::players::MarketTrade;
 use genie_core::players::PlayerId;
 use genie_core::players::TributeFee;
 use genie_core::players::tribute::Gift;
@@ -864,7 +865,7 @@ fn flare_trade_and_game_keep_their_fields() {
                 attribute: ResourceWord::of_data(1),
                 times: TradeLots::of_data(2),
                 market: Some(object_id(96)),
-                buy: true,
+                trade: MarketTrade::Buy,
             }),
         ),
         (
@@ -881,7 +882,7 @@ fn flare_trade_and_game_keep_their_fields() {
                 attribute: ResourceWord::of_data(0x0102),
                 times: TradeLots::of_data(1),
                 market: Some(object_id(97)),
-                buy: false,
+                trade: MarketTrade::Sell,
             }),
         ),
         (

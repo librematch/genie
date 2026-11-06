@@ -112,6 +112,16 @@ pub enum Op<'data> {
     },
 }
 
+/// A chapter's place among a recording's chapters: only the first chapter's first record may be
+/// a [`Pregame`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ChapterOrder {
+    /// The recording's first chapter.
+    First,
+    /// A chapter after the first.
+    Later,
+}
+
 /// Iterator over the ops of one chapter. It stops after `End`, at the end of the body, or after the
 /// first error.
 #[derive(Debug, Clone)]
@@ -124,15 +134,15 @@ pub struct OpReader<'data> {
 }
 
 impl<'data> OpReader<'data> {
-    /// `base` is the body's file offset, used in error offsets. Only the first chapter's first record
-    /// may be a [`Pregame`].
+    /// The ops of a chapter's `body` in its `order`. `base` is the body's file offset, used in
+    /// error offsets. Only the first chapter's first record may be a [`Pregame`].
     #[must_use]
-    pub const fn new(body: &'data [u8], base: usize, first_chapter: bool) -> Self {
+    pub const fn new(body: &'data [u8], base: usize, order: ChapterOrder) -> Self {
         Self {
             data: body,
             base,
             pos: 0,
-            pregame_allowed: first_chapter,
+            pregame_allowed: matches!(order, ChapterOrder::First),
             done: false,
         }
     }
@@ -299,8 +309,8 @@ mod tests {
         words.iter().flat_map(|word| word.to_le_bytes()).collect()
     }
 
-    fn read(body: &[u8], first_chapter: bool) -> Vec<GenieResult<Op<'_>>> {
-        OpReader::new(body, BASE, first_chapter).collect()
+    fn read(body: &[u8], order: ChapterOrder) -> Vec<GenieResult<Op<'_>>> {
+        OpReader::new(body, BASE, order).collect()
     }
 
     fn checkpoint_body() -> (Vec<u8>, Checkpoint) {
@@ -332,7 +342,7 @@ mod tests {
             unknown6: 0,
         };
         assert_eq!(
-            read(&body, true),
+            read(&body, ChapterOrder::First),
             vec![
                 Ok(Op::Pregame(pregame)),
                 Ok(Op::TriggerSync(TriggerSync {
@@ -342,7 +352,7 @@ mod tests {
             ]
         );
         assert_eq!(
-            read(&le(&[5, 7, 3]), false),
+            read(&le(&[5, 7, 3]), ChapterOrder::Later),
             vec![Ok(Op::TriggerSync(TriggerSync {
                 condition: 7,
                 trigger: 3
@@ -356,7 +366,7 @@ mod tests {
         body.extend([0x67, 1, 0x10]);
         body.extend(le(&[4242]));
         assert_eq!(
-            read(&body, false),
+            read(&body, ChapterOrder::Later),
             vec![Ok(Op::Command {
                 packet: &[0x67, 1, 0x10],
                 world_time: 4242
@@ -374,7 +384,7 @@ mod tests {
             player: 5,
         };
         assert_eq!(
-            read(&body, false),
+            read(&body, ChapterOrder::Later),
             vec![Ok(Op::Sync { dt: 104 }), Ok(Op::View(view))]
         );
     }
@@ -384,14 +394,17 @@ mod tests {
         let (body, checkpoint) = checkpoint_body();
         let checkpoint = Box::new(checkpoint);
         assert_eq!(
-            read(&body, false),
+            read(&body, ChapterOrder::Later),
             vec![Ok(Op::Checkpoint { dt: 33, checkpoint })]
         );
     }
 
     #[test]
     fn sync_at_the_end_of_the_body_is_plain_sync() {
-        assert_eq!(read(&le(&[2, 20]), false), vec![Ok(Op::Sync { dt: 20 })]);
+        assert_eq!(
+            read(&le(&[2, 20]), ChapterOrder::Later),
+            vec![Ok(Op::Sync { dt: 20 })]
+        );
     }
 
     #[test]
@@ -399,7 +412,7 @@ mod tests {
         let mut body = le(&[4, u32::MAX, 2]);
         body.extend(b"hi");
         assert_eq!(
-            read(&body, false),
+            read(&body, ChapterOrder::Later),
             vec![Ok(Op::Chat {
                 channel: -1,
                 text: b"hi"
@@ -412,7 +425,7 @@ mod tests {
         let mut body = le(&[6]);
         body.extend(b"postgame");
         assert_eq!(
-            read(&body, false),
+            read(&body, ChapterOrder::Later),
             vec![Ok(Op::End {
                 trailer: b"postgame"
             })]
@@ -423,7 +436,7 @@ mod tests {
     fn truncated_record_reports_its_file_offset_and_stops() {
         let mut body = le(&[2, 20, 1, 10]);
         body.extend([1, 2, 3]);
-        let ops = read(&body, false);
+        let ops = read(&body, ChapterOrder::Later);
         assert_eq!(ops, vec![Ok(Op::Sync { dt: 20 }), Err(truncated(BASE + 8))]);
         let error = ops[1].clone().unwrap_err();
         assert_eq!(
@@ -435,7 +448,7 @@ mod tests {
     #[test]
     fn an_unknown_op_is_an_error() {
         let body = le(&[9]);
-        let ops = read(&body, false);
+        let ops = read(&body, ChapterOrder::Later);
         assert_eq!(ops, vec![Err(unknown_op(9, BASE))]);
         let error = ops[0].clone().unwrap_err();
         assert_eq!(
@@ -453,7 +466,7 @@ mod tests {
         body.extend(le(&[5, 7, 3, 6]));
         body.extend(b"postgame");
         let mut out = Vec::new();
-        for op in OpReader::new(&body, BASE, true) {
+        for op in OpReader::new(&body, BASE, ChapterOrder::First) {
             op.unwrap().write(&mut out).unwrap();
         }
         assert_eq!(out, body);

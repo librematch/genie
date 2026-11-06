@@ -1,5 +1,6 @@
 //! `GenieSwissKnife` Abscissa Application
 
+use crate::subscriber::Verbosity;
 use crate::subscriber::install;
 use crate::{commands::EntryPoint, config::GenieSwissKnifeConfig};
 use abscissa_core::{
@@ -61,8 +62,12 @@ impl Application for GenieSwissKnifeApp {
         &mut self,
         command: &Self::Cmd,
     ) -> Result<Vec<Box<dyn Component<Self>>>, FrameworkError> {
-        install(command.verbose)
-            .map_err(|error| FrameworkErrorKind::ComponentError.context(error))?;
+        let verbosity = if command.verbose {
+            Verbosity::Verbose
+        } else {
+            Verbosity::Quiet
+        };
+        install(verbosity).map_err(|error| FrameworkErrorKind::ComponentError.context(error))?;
         Ok(vec![Box::new(Terminal::new(self.term_colors(command)))])
     }
 

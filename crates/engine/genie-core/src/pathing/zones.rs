@@ -73,6 +73,16 @@ impl ZoneId {
     }
 }
 
+/// A tile's passability for a zone map's restriction, which a patch's tiles share
+/// (`FUN_141413340`'s compare with its first tile's).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Passability {
+    /// The restriction is above 0 on the tile's terrain.
+    Passable,
+    /// It is 0 or below, or the restriction has no value for the terrain.
+    Impassable,
+}
+
 /// The zones of one passability pattern.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ZoneMap {
@@ -146,14 +156,19 @@ impl ZoneMap {
         map
     }
 
-    /// Whether the restriction is above 0 on a tile's terrain (`+0x818` indexed by map tile
-    /// `+0x9`).
-    fn open(&self, kinds: &[TerrainId], index: usize) -> bool {
-        kinds
+    /// The tile `index`'s passability: passable where the restriction is above 0 on its terrain
+    /// (`+0x818` indexed by map tile `+0x9`).
+    fn passability(&self, kinds: &[TerrainId], index: usize) -> Passability {
+        let passable = kinds
             .get(index)
             .and_then(|&terrain_id| self.passable.get(terrain_id.index()))
             .copied()
-            .unwrap_or(false)
+            .unwrap_or(false);
+        if passable {
+            Passability::Passable
+        } else {
+            Passability::Impassable
+        }
     }
 
     /// `FUN_141413190`: the zones numbered again from the terrain `kinds`. The game fills and scans
@@ -192,19 +207,24 @@ impl ZoneMap {
                 }
                 let zone = if next < i32::from(PATCHES) { next } else { 0 };
                 *cell = ZoneId::new(zone as u16);
-                let kind = self.open(kinds, start);
-                self.flood(kinds, Tile::new(x, y), kind, ZoneId::new(zone as u16));
+                let passability = self.passability(kinds, start);
+                self.flood(
+                    kinds,
+                    Tile::new(x, y),
+                    passability,
+                    ZoneId::new(zone as u16),
+                );
                 next = zone + 1;
             }
         }
         self.count = if wrapped { i32::from(PATCHES) } else { next };
     }
 
-    /// `FUN_141413340`: from tile `from` the zone goes to every tile not yet reached that is,
-    /// like it, passable or not (`kind`), over the left, upper, right and lower neighbours. The
-    /// game keeps a FIFO queue of pool nodes (`+0x850`), the slice a stack: both reach the same
-    /// 4-connected tiles. Then the zone's tile count (`FUN_141413bb0`).
-    fn flood(&mut self, kinds: &[TerrainId], from: Tile, kind: bool, zone: ZoneId) {
+    /// `FUN_141413340`: from tile `from` the zone goes to every tile not yet reached of its
+    /// `passability`, over the left, upper, right and lower neighbours. The game keeps a FIFO
+    /// queue of pool nodes (`+0x850`), the slice a stack: both reach the same 4-connected tiles.
+    /// Then the zone's tile count (`FUN_141413bb0`).
+    fn flood(&mut self, kinds: &[TerrainId], from: Tile, passability: Passability, zone: ZoneId) {
         let mut stack = vec![from];
         while let Some(current) = stack.pop() {
             for step in FLOOD_STEPS {
@@ -212,10 +232,10 @@ impl ZoneMap {
                 let Some(index) = self.size.index(tile) else {
                     continue;
                 };
-                let open = self.open(kinds, index) == kind;
+                let alike = self.passability(kinds, index) == passability;
                 if let Some(cell) = self.zones.get_mut(index)
                     && *cell == UNREACHED
-                    && open
+                    && alike
                 {
                     *cell = zone;
                     stack.push(tile);

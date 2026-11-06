@@ -92,14 +92,23 @@ pub enum Outcome {
     Stale,
 }
 
-/// The contracts `text` at `path`: written (its folder made), or with `check` compared with the
-/// file.
+/// What [`write_or_check`] does with the contracts.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ContractsMode {
+    /// It writes them to the file.
+    Write,
+    /// It compares them with the file.
+    Check,
+}
+
+/// The contracts `text` at `path` by the `mode`: written (its folder made), or compared with
+/// the file.
 ///
 /// # Errors
 ///
 /// A [`GenieError`] when the file or its folder cannot be written.
-pub fn write_or_check(path: &Path, text: &str, check: bool) -> GenieResult<Outcome> {
-    if check {
+pub fn write_or_check(path: &Path, text: &str, mode: ContractsMode) -> GenieResult<Outcome> {
+    if mode == ContractsMode::Check {
         let current = fs::read_to_string(path).ok().as_deref() == Some(text);
         return Ok(if current {
             Outcome::Current

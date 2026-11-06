@@ -1,6 +1,7 @@
 //! The player's attribute modifier (slot 0x148, `FUN_1416121b0`): the hooks around it, the
 //! masters' change and what their objects and an Attack follow of it.
 
+use crate::garrison::ContainerId;
 use crate::garrison::{attack_rate, share};
 use crate::map::Distance;
 use crate::map::spatial::Obstruction;
@@ -371,7 +372,7 @@ impl World {
                 _ => false,
             };
             if unrecorded {
-                self.take_record(id, unit.life.inside.is_some(), &master);
+                self.take_record(id, unit.life.inside, &master);
                 kept.push(id);
             } else if attribute == MasterAttribute::HERO_STATUS && MasterKind::COMBAT <= kind {
                 let _ = self.change_object(id, change, value, attribute)?;
@@ -417,12 +418,18 @@ impl World {
         Ok(())
     }
 
-    /// `FUN_141189670` on object `id` (`inside`: it is inside another, `+0x686`'s case; the slice
-    /// takes the flag as that): a master with height above 0 (the record's `+0x658`, which the
-    /// slice holds with the place's record, otherwise) has the obstruction manager drop the
-    /// object's record (`FUN_141055b40`) and the mesh its shape (`+0x660`, `FUN_141053840`).
-    pub(super) fn take_record(&mut self, id: ObjectId, inside: bool, master: &Master) {
-        if inside {
+    /// `FUN_141189670` on object `id`, inside `container` or on the map (`+0x686`'s case; the
+    /// slice takes the flag as that): on the map, a master with height above 0 (the record's
+    /// `+0x658`, which the slice holds with the place's record, otherwise) has the obstruction
+    /// manager drop the object's record (`FUN_141055b40`) and the mesh its shape (`+0x660`,
+    /// `FUN_141053840`).
+    pub(super) fn take_record(
+        &mut self,
+        id: ObjectId,
+        container: Option<ContainerId>,
+        master: &Master,
+    ) {
+        if container.is_some() {
             return;
         }
         let recorded = self

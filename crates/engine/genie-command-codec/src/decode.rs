@@ -31,6 +31,7 @@ use genie_core::orders::OrderFlags;
 use genie_core::orders::SavedPatrols;
 use genie_core::orders::{ControlKey, Interact, MoveOrder};
 use genie_core::players::Amount;
+use genie_core::players::MarketTrade;
 use genie_core::players::PlayerId;
 use genie_core::players::TributeFee;
 use genie_core::players::tribute::Gift;
@@ -445,14 +446,14 @@ fn single_command(packet: &Packet) -> GenieResult<Option<Command>> {
             sell_commodity.attr,
             sell_commodity.amt,
             sell_commodity.uid,
-            false,
+            MarketTrade::Sell,
         ),
         Packet::BuyCommodity(buy_commodity) => trade(
             buy_commodity.commp_id,
             buy_commodity.attr,
             buy_commodity.amt,
             buy_commodity.uid,
-            true,
+            MarketTrade::Buy,
         ),
         Packet::Flare(flare) => Command::Flare(FlareCommand {
             player: PlayerId::from(flare.commp_id),
@@ -477,15 +478,15 @@ fn single_command(packet: &Packet) -> GenieResult<Option<Command>> {
     }))
 }
 
-/// `SELL_COMMODITY` (0x7a) or `BUY_COMMODITY` (0x7b): the attribute (`+0x4`), the lots
-/// (`+0x6`) and the market (`+0x8`).
-fn trade(player: u8, attribute: u16, times: u16, market: i32, buy: bool) -> Command {
+/// `SELL_COMMODITY` (0x7a) or `BUY_COMMODITY` (0x7b), its `trade`: the attribute (`+0x4`), the
+/// lots (`+0x6`) and the market (`+0x8`).
+fn trade(player: u8, attribute: u16, times: u16, market: i32, trade: MarketTrade) -> Command {
     Command::Trade(TradeCommand {
         player: PlayerId::from(player),
         attribute: ResourceWord::of_data(attribute),
         times: TradeLots::of_data(times),
         market: ObjectId::of_field(market),
-        buy,
+        trade,
     })
 }
 

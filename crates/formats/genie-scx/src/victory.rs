@@ -271,6 +271,16 @@ impl Default for VictoryState {
     }
 }
 
+/// Whether victory conditions start with their data version (an `f32`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum VictoryVersion {
+    /// The version comes first: in a scenario's player data from version 1.09 on, and in a
+    /// recording.
+    Saved,
+    /// No version comes: the data reads as version 0.0.
+    Unsaved,
+}
+
 /// Tracks victory conditions for the scenario, used in single player.
 #[derive(Debug, Clone, Default)]
 pub struct VictoryConditions {
@@ -291,18 +301,18 @@ pub struct VictoryConditions {
 }
 
 impl VictoryConditions {
-    /// Read victory conditions from an input stream.
+    /// Read victory conditions from an input stream, their data version first or not
+    /// (`versioning`).
     ///
     /// # Errors
     ///
     /// Returns an error if reading fails.
     // The format stores the condition count as an i32; valid files never make it negative.
     #[allow(clippy::cast_sign_loss)]
-    pub fn read_from(mut input: impl Read, has_version: bool) -> GenieResult<Self> {
-        let version = if has_version {
-            input.read_f32::<LE>()?
-        } else {
-            0.0
+    pub fn read_from(mut input: impl Read, versioning: VictoryVersion) -> GenieResult<Self> {
+        let version = match versioning {
+            VictoryVersion::Saved => input.read_f32::<LE>()?,
+            VictoryVersion::Unsaved => 0.0,
         };
 
         let num_conditions = input.read_i32::<LE>()?;

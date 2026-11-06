@@ -34,20 +34,30 @@ fn vec3(bytes: &[u8; 12]) -> [f32; 3] {
     [float_at(0), float_at(4), float_at(8)]
 }
 
+/// What the unit groups' view shows of each group ([`groups`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum GroupView {
+    /// Its saved fields' lines.
+    Saved,
+    /// Every field as genie-core imports it.
+    Imported,
+}
+
 /// The world's unit groups (`saveUnitGroups`: `world+0x50`'s list, as genie-save's generated
-/// reader of the build holds it): the count and the id counter, then per group its id, owner,
-/// state and flags, its units with their specific moves, its formations, centroid, waypoints,
-/// current command and target and its queues; with `full`, every saved field as read.
+/// reader of the build holds it): the count and the id counter, then in the [`GroupView::Saved`]
+/// `view` per group its id, owner, state and flags, its units with their specific moves, its
+/// formations, centroid, waypoints, current command and target and its queues; in the
+/// [`GroupView::Imported`] one every field as genie-core imports it.
 ///
 /// # Errors
 ///
 /// When the save cannot be read.
-pub fn groups(data: &[u8], full: bool) -> GenieResult<String> {
-    Ok(groups_of(&chapter(data)?.header()?, full))
+pub fn groups(data: &[u8], view: GroupView) -> GenieResult<String> {
+    Ok(groups_of(&chapter(data)?.header()?, view))
 }
 
 /// [`groups`] of a save read.
-fn groups_of(header: &Header, full: bool) -> String {
+fn groups_of(header: &Header, view: GroupView) -> String {
     let saved_groups = &header.world.base_world.unit_groups;
     let mut out = String::new();
     let _ = writeln!(
@@ -55,7 +65,7 @@ fn groups_of(header: &Header, full: bool) -> String {
         "{} unit groups, counter {}",
         saved_groups.number_unit_groups, saved_groups.unit_group_counter
     );
-    if full {
+    if view == GroupView::Imported {
         // the state as genie-core holds it, every vector decoded
         match unit_groups(&header.world.base_world) {
             Ok(groups) => {

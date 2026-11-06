@@ -5,6 +5,7 @@ use genie_dat::CivilizationId;
 use genie_dat::tech_tree::TechTree;
 use genie_error::GenieResult;
 use genie_scx::VictoryConditions;
+use genie_scx::VictoryVersion;
 use std::io::Read;
 
 mod gaia;
@@ -80,7 +81,7 @@ impl Player {
     ///
     /// Returns an error if they cannot be read.
     pub fn read_info<R: Read>(&mut self, input: &mut RecordingHeaderReader<R>) -> GenieResult<()> {
-        self.victory = VictoryConditions::read_from(input, true)?;
+        self.victory = VictoryConditions::read_from(input, VictoryVersion::Saved)?;
         Ok(())
     }
 }

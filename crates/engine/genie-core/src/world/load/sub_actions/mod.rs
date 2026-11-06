@@ -18,7 +18,7 @@ use crate::objects::ObjectId;
 use crate::objects::SpriteId;
 use crate::objects::Voice;
 use crate::objects::WorkRate;
-use crate::objects::layers::{UnreadDefault, Unstartable};
+use crate::objects::layers::{DefaultTask, UnreadDefault, Unstartable};
 use crate::objects::masters::ACTION_FACTORY_KINDS;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::MasterId;
@@ -570,6 +570,50 @@ pub fn default_task(
         DefaultAction::Kind(kind) if !ACTION_FACTORY_KINDS.contains(&kind) => Ok(None),
         DefaultAction::Kind(action_kind) => Err(Unstartable::Unported(action_kind)),
         DefaultAction::NoSuchTask => Err(Unstartable::Unread(UnreadDefault::NoSuchTask)),
+    }
+}
+
+/// Whether an object's save holds actions: a save from the start of a game holds none, one from
+/// later in the game holds them.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum SaveHolds {
+    /// Its action list holds an entry.
+    Actions,
+    /// It has no action list, or an empty one.
+    NoActions,
+}
+
+impl SaveHolds {
+    /// What `object`'s save holds.
+    pub(crate) fn of(object: &genie_save::Object) -> Self {
+        if object
+            .actions()
+            .is_some_and(|action_list| action_list.entries().next().is_some())
+        {
+            Self::Actions
+        } else {
+            Self::NoActions
+        }
+    }
+}
+
+/// What the default task `default` of an object starts once its action list empties, by what
+/// its save `holds`: nothing, a Fly or a Make before its first update, the Artifact again, or a
+/// start the slice cannot make. A saved object's Fly is its saved action's: none starts again
+/// (it never ends); a saved Make started.
+pub(crate) fn loaded_default_task(
+    default: &Result<Option<DefaultStart>, Unstartable>,
+    holds: SaveHolds,
+) -> DefaultTask {
+    match default {
+        Ok(None) => DefaultTask::Nothing,
+        Ok(Some(DefaultStart::Fly | DefaultStart::Make)) if holds == SaveHolds::Actions => {
+            DefaultTask::Nothing
+        }
+        Ok(Some(DefaultStart::Fly)) => DefaultTask::Fly,
+        Ok(Some(DefaultStart::Make)) => DefaultTask::Make,
+        Ok(Some(DefaultStart::Artifact(_))) => DefaultTask::Artifact,
+        Err(unstartable) => DefaultTask::Fails(*unstartable),
     }
 }
 

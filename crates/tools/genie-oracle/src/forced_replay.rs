@@ -1,6 +1,7 @@
 //! The forced replay (FD-008): its steps, its continuous run, the old pather's answers and the
 //! game's state in a save.
 
+use crate::groups::GroupGlobals;
 use crate::groups::{globals_from_dump, group_differences};
 use crate::masters::MasterTable;
 use crate::{
@@ -471,7 +472,8 @@ pub(super) fn owned_group_differences(
     let Some(groups) = game.groups.as_ref() else {
         return Vec::new();
     };
-    group_differences(&turns.groups, groups, globals.is_some())
+    let compared = globals.map_or(GroupGlobals::Skipped, |_| GroupGlobals::Compared);
+    group_differences(&turns.groups, groups, compared)
         .into_iter()
         .map(|text| (group_owner(turns, game, &text), text))
         .collect()

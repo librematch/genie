@@ -49,15 +49,28 @@ pub fn globals_from_dump(text: &str, groups: &mut UnitGroups) {
     }
 }
 
+/// Whether a comparison of unit groups holds the game's process globals.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum GroupGlobals {
+    /// The globals were dumped: the command counter and the unit types' scratch array count.
+    Compared,
+    /// None were dumped: the comparison leaves them out.
+    Skipped,
+}
+
 /// The differences of the slice's unit groups from the game's, one line per field that differs:
 /// `group ID: FIELD slice A game B`, every field named by its path in the group's state
 /// (`motion.velocity[1]`, `members[2].specific_move.timer`; a list's length is its `len`), each
-/// float in full; a group only one side holds shows in the list of ids. With `globals` (the
-/// game's process globals were dumped) the command counter and the scratch array count too.
+/// float in full; a group only one side holds shows in the list of ids. With the `globals`
+/// [`GroupGlobals::Compared`] the command counter and the scratch array count too.
 #[must_use]
-pub fn group_differences(slice: &UnitGroups, game: &UnitGroups, globals: bool) -> Vec<String> {
+pub fn group_differences(
+    slice: &UnitGroups,
+    game: &UnitGroups,
+    globals: GroupGlobals,
+) -> Vec<String> {
     let mut out = Vec::new();
-    if globals {
+    if globals == GroupGlobals::Compared {
         if slice.commands != game.commands {
             out.push(format!(
                 "group commands slice {} game {}",
@@ -417,7 +430,11 @@ mod tests {
 
     #[test]
     fn equal_groups_have_no_differences() {
-        let texts = group_differences(&world(vec![group(3)]), &world(vec![group(3)]), false);
+        let texts = group_differences(
+            &world(vec![group(3)]),
+            &world(vec![group(3)]),
+            GroupGlobals::Skipped,
+        );
         assert_eq!(texts, Vec::<String>::new());
     }
 
@@ -426,7 +443,11 @@ mod tests {
         let mut theirs = group(3);
         theirs.motion.velocity = theirs.motion.velocity.with_height(0.1);
         theirs.members[0].specific_move.timer = Seconds::new(-0.0);
-        let texts = group_differences(&world(vec![group(3)]), &world(vec![theirs]), false);
+        let texts = group_differences(
+            &world(vec![group(3)]),
+            &world(vec![theirs]),
+            GroupGlobals::Skipped,
+        );
         assert_eq!(
             texts,
             [
@@ -440,7 +461,11 @@ mod tests {
     fn list_of_another_length_shows_its_length_and_the_entries_one_side_holds() {
         let mut theirs = group(3);
         theirs.waypoints.push(BVector::new(1.5, 2.5, 0.0));
-        let texts = group_differences(&world(vec![group(3)]), &world(vec![theirs]), false);
+        let texts = group_differences(
+            &world(vec![group(3)]),
+            &world(vec![theirs]),
+            GroupGlobals::Skipped,
+        );
         assert_eq!(
             texts,
             [
@@ -474,7 +499,7 @@ mod tests {
     fn groups_only_one_side_holds_and_the_counter_show_in_the_world_lines() {
         let mut theirs = world(vec![group(3), group(4)]);
         theirs.counter = group_id(8);
-        let texts = group_differences(&world(vec![group(3)]), &theirs, false);
+        let texts = group_differences(&world(vec![group(3)]), &theirs, GroupGlobals::Skipped);
         assert_eq!(
             texts,
             [

@@ -200,6 +200,7 @@ use crate::players::AmountRate;
 use crate::players::ByPlayer;
 use crate::players::ByRelation;
 use crate::players::CivId;
+use crate::players::MarketTrade;
 use crate::players::PlayerKind;
 use crate::players::Relation;
 use crate::players::TributeFee;
@@ -24894,7 +24895,7 @@ fn the_command_phase_runs_each_player_command_by_its_handler() {
                 attribute: ResourceWord::of_data(1),
                 times: TradeLots::of_data(1),
                 market: None,
-                buy: true,
+                trade: MarketTrade::Buy,
             }),
             PlayerId::new(1),
             |world| {
@@ -24911,7 +24912,7 @@ fn the_command_phase_runs_each_player_command_by_its_handler() {
                 attribute: ResourceWord::of_data(1),
                 times: TradeLots::of_data(1),
                 market: None,
-                buy: false,
+                trade: MarketTrade::Sell,
             }),
             PlayerId::new(1),
             |world| {

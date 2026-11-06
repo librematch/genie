@@ -6,6 +6,7 @@ use crate::construction::FoundationId;
 use crate::garrison::ContainerId;
 use crate::gathering::DropSiteId;
 use crate::movement::Speed;
+use crate::movement::move_to::MoveToAction;
 use crate::objects::ObjectId;
 use crate::objects::ObjectKey;
 use crate::objects::ObjectState;
@@ -14,6 +15,7 @@ use crate::objects::actions::{Action, ActionList};
 use crate::objects::layers::MotionMut;
 use crate::objects::release::Releaser;
 use crate::objects::unit::Unit;
+use crate::ownership::artifact::SubActionsGone;
 use crate::world::lets::torn_down;
 use crate::world::step::Step;
 use crate::{GenieError, GenieResult};
@@ -57,10 +59,44 @@ impl TornDown {
     }
 }
 
-/// The unit's stop (slot 0x5d0) for a torn-down action's `MoveTo`, when it had one (`moves`)
-/// and the unit moves at all.
-fn stop_if_moving(mut motion: MotionMut<'_>, moves: bool) -> GenieResult<()> {
-    if moves && let Some(mover) = motion.mover_mut() {
+/// What a torn-down action's teardown does to its unit's walk.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum TornWalk {
+    /// A `MoveTo` went with the action (its own, its sub-action's or the Artifact's Enter's):
+    /// its teardown (`0x140aa1f30`) stops the unit (slot 0x5d0).
+    Stops,
+    /// No `MoveTo` went: the unit's motion stays as it is.
+    Untouched,
+}
+
+impl From<Option<&MoveToAction>> for TornWalk {
+    /// The walk of an action whose state holds `move_to`, if any.
+    fn from(move_to: Option<&MoveToAction>) -> Self {
+        if move_to.is_some() {
+            Self::Stops
+        } else {
+            Self::Untouched
+        }
+    }
+}
+
+impl From<SubActionsGone> for TornWalk {
+    /// The walk of the Artifact whose sub-actions went (`gone`).
+    fn from(gone: SubActionsGone) -> Self {
+        if gone.stops {
+            Self::Stops
+        } else {
+            Self::Untouched
+        }
+    }
+}
+
+/// The unit's stop (slot 0x5d0) for a torn-down action whose `walk` stops, when the unit moves
+/// at all.
+fn stop_if_moving(mut motion: MotionMut<'_>, walk: TornWalk) -> GenieResult<()> {
+    if walk == TornWalk::Stops
+        && let Some(mover) = motion.mover_mut()
+    {
         mover.stop()?;
     }
     Ok(())
@@ -91,19 +127,19 @@ impl Action {
                 let (released, gone) = artifact.tear_down();
                 torn.release(released);
                 torn.release(gone.released);
-                stop_if_moving(motion, gone.stops)?;
+                stop_if_moving(motion, TornWalk::from(gone))?;
             }
             Self::Fly(fly) => {
                 // RGE_Action_Bird's destructor: `+0x7b8` takes the bird's slot 0x208
                 motion.set_anim_speed(top);
-                stop_if_moving(motion, fly.state.move_to().is_some())?;
+                stop_if_moving(motion, TornWalk::from(fly.state.move_to()))?;
             }
             Self::Enter(enter_action) => {
-                stop_if_moving(motion, enter_action.state.move_to().is_some())?;
+                stop_if_moving(motion, TornWalk::from(enter_action.state.move_to()))?;
                 torn.release(enter_action.target.map(ContainerId::id));
             }
             Self::Transport(transport_action) => {
-                stop_if_moving(motion, transport_action.state.move_to().is_some())?;
+                stop_if_moving(motion, TornWalk::from(transport_action.state.move_to()))?;
             }
             Self::Build(build_action) => {
                 if build_action.added
@@ -113,7 +149,7 @@ impl Action {
                 }
                 torn.release(build_action.target.map(FoundationId::id));
                 torn.release(build_action.site.map(DropSiteId::id));
-                stop_if_moving(motion, build_action.state.move_to().is_some())?;
+                stop_if_moving(motion, TornWalk::from(build_action.state.move_to()))?;
             }
             Self::Repair(repair_action) => {
                 if repair_action.counted
@@ -122,10 +158,10 @@ impl Action {
                     torn.builder_leaves.push(target.id());
                 }
                 torn.release(repair_action.target);
-                stop_if_moving(motion, repair_action.state.move_to().is_some())?;
+                stop_if_moving(motion, TornWalk::from(repair_action.state.move_to()))?;
             }
             Self::Explore(explore_action) => {
-                stop_if_moving(motion, explore_action.state.move_to().is_some())?;
+                stop_if_moving(motion, TornWalk::from(explore_action.state.move_to()))?;
             }
             Self::Hunt(mut hunt_action) => {
                 hunt_action.tear_down(motion.mover_mut())?;
@@ -143,7 +179,7 @@ impl Action {
                 torn.release(attack.target2);
             }
             Self::MoveTo(move_to_action) => {
-                stop_if_moving(motion, true)?;
+                stop_if_moving(motion, TornWalk::Stops)?;
                 torn.release(move_to_action.target);
             }
             Self::Missile(missile_action) => {
@@ -313,6 +349,27 @@ mod tests {
                 .velocity
                 .is_some_and(|velocity| velocity.velocity.y() != 0.0)
         })
+    }
+
+    /// A torn-down action stops its unit only when a `MoveTo` went with it: one its state held,
+    /// or the Artifact's walking sub-action; the stop leaves a unit without one moving.
+    #[test]
+    fn only_move_to_that_went_stops_the_unit() {
+        let walking = MoveToAction::sub_in(MoveTo::Moving);
+        assert_eq!(TornWalk::from(Some(&walking)), TornWalk::Stops);
+        assert_eq!(TornWalk::from(None), TornWalk::Untouched);
+        let gone = SubActionsGone::default();
+        assert_eq!(TornWalk::from(gone), TornWalk::Untouched);
+        let walked = SubActionsGone {
+            stops: true,
+            ..gone
+        };
+        assert_eq!(TornWalk::from(walked), TornWalk::Stops);
+        let mut motion = moving();
+        stop_if_moving(motion.lent(), TornWalk::Untouched).unwrap();
+        assert!(moves(&motion));
+        stop_if_moving(motion.lent(), TornWalk::Stops).unwrap();
+        assert!(!moves(&motion));
     }
 
     /// A Build's destructor (`FUN_140aadbf0`): a counted builder leaves its building's builders,

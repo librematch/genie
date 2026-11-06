@@ -106,8 +106,8 @@ pub use self::game_tables::{drop_sites, linked_techs, unit_lines};
 #[cfg(test)]
 use self::header_runs::checkpoint_action;
 pub use self::header_runs::{
-    GROUP_COMMANDS, GroupCommand, Word9, Word9Terms, blocks_per_tick, header_run, simulate_word9,
-    slice_from_header, trace_commands, word9_terms,
+    CommandTrace, GROUP_COMMANDS, GroupCommand, Word9, Word9Terms, blocks_per_tick, header_run,
+    simulate_word9, slice_from_header, trace_commands, word9_terms,
 };
 use self::header_runs::{lane_block, run, top_action};
 use self::map_and_sight::{SavedStep, tile_differences};

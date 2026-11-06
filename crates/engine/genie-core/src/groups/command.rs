@@ -385,7 +385,7 @@ impl World {
         let mut path_flags = move_path_flags(
             unit_group.motion.position[0],
             at,
-            how.flags.contains(MoveFlags::LEG),
+            how.flags,
             &self.model.tuning.group,
         );
         // `MoveFlags::KEEP_FLAG` sets PATROL (0x141010dc1) off a leg, which the hold's test then decides
@@ -645,16 +645,16 @@ impl World {
     }
 }
 
-/// [`World::command_move_to`]'s path flags: a patrol leg sets [`PathFlags::LOOPS`] and, when the
-/// group's place `from` lies at least `GroupTuning::patrol_leg_reach` from `to` on the ground
-/// (`COMISS`/`JBE`: a NaN too), [`PathFlags::BACK_AND_FORTH`]; any other move clears
-/// [`PathFlags::LOOPS`] and sets [`PathFlags::BACK_AND_FORTH`].
-fn move_path_flags(from: BVector, to: BVector, leg: bool, group_tuning: &GroupTuning) -> PathFlags {
-    if leg {
+/// [`World::command_move_to`]'s path flags: a patrol leg (`how` holds [`MoveFlags::LEG`]) sets
+/// [`PathFlags::LOOPS`] and, when the group's place `from` lies at least the `tuning`'s patrol
+/// leg reach from `to` on the ground (`COMISS`/`JBE`: a NaN too), [`PathFlags::BACK_AND_FORTH`];
+/// any other move clears [`PathFlags::LOOPS`] and sets [`PathFlags::BACK_AND_FORTH`].
+fn move_path_flags(from: BVector, to: BVector, how: MoveFlags, tuning: &GroupTuning) -> PathFlags {
+    if how.contains(MoveFlags::LEG) {
         let mut offset = from - to;
         offset = offset.with_height(0.0);
         let length = sqrt(offset.x() * offset.x() + 0.0 + offset.y() * offset.y());
-        if at_most_or_unordered(group_tuning.patrol_leg_reach, length) {
+        if at_most_or_unordered(tuning.patrol_leg_reach, length) {
             // A new path's flags (`FUN_14152eea0`'s construction).
             // The plans a path level may still try (`FUN_140f9b800`, `FUN_140f98e80`).
             PathFlags::NEW | PathFlags::LOOPS | PathFlags::BACK_AND_FORTH

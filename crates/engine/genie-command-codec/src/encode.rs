@@ -12,6 +12,7 @@ use genie_core::objects::ObjectId;
 use genie_core::objects::masters::{ActionKind, MasterId};
 use genie_core::orders::OrderFlags;
 use genie_core::orders::SavedPatrols;
+use genie_core::players::MarketTrade;
 use genie_core::technology::TechId;
 use genie_core::{GenieError, GenieResult};
 use genie_rec::de::command::{self as packets, Command as Packet};
@@ -517,20 +518,19 @@ fn tribute(tribute_command: &TributeCommand) -> Packet {
 /// `SELL_COMMODITY` (0x7a) or `BUY_COMMODITY` (0x7b).
 fn trade(trade_command: &TradeCommand) -> Packet {
     let player = trade_command.player.get();
-    if trade_command.buy {
-        Packet::BuyCommodity(packets::BuyCommodity {
+    match trade_command.trade {
+        MarketTrade::Buy => Packet::BuyCommodity(packets::BuyCommodity {
             commp_id: player,
             attr: trade_command.attribute.get(),
             amt: trade_command.times.get(),
             uid: ObjectId::field(trade_command.market),
-        })
-    } else {
-        Packet::SellCommodity(packets::SellCommodity {
+        }),
+        MarketTrade::Sell => Packet::SellCommodity(packets::SellCommodity {
             commp_id: player,
             attr: trade_command.attribute.get(),
             amt: trade_command.times.get(),
             uid: ObjectId::field(trade_command.market),
-        })
+        }),
     }
 }
 

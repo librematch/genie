@@ -157,7 +157,7 @@ impl LangFile {
                 .with("id", id)
                 .with_source(parse_int_error)
         })?;
-        let value = unescape(value.chars(), false);
+        let value = unescape(value.chars(), Quoting::Bare);
         // A later line with the same ID replaces the earlier one.
         let _ = self.0.insert(StringKey::from(id), value);
         Ok(())
@@ -196,7 +196,7 @@ impl LangFile {
         // TODO unquoting and un-escaping
         let mut iter = iter.skip_while(|&character| char::is_whitespace(character));
         let value = if iter.next() == Some('"') {
-            unescape(iter, true)
+            unescape(iter, Quoting::Quoted)
         } else {
             return;
         };
@@ -214,7 +214,7 @@ impl LangFile {
     pub fn write_to_ini<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         // TODO warning if there are string ids
         for (id, string) in self.iter().filter(|(id, _)| id.is_numeric()) {
-            output.write_all(format!("{}={}\n", id, escape(string, false)).as_bytes())?;
+            output.write_all(format!("{}={}\n", id, escape(string, Quoting::Bare)).as_bytes())?;
         }
         Ok(())
     }
@@ -227,14 +227,26 @@ impl LangFile {
     /// Returns an error if writing to `output` fails.
     pub fn write_to_keyval<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         for (id, string) in self {
-            output.write_all(format!("{} \"{}\"\n", id, escape(string, true)).as_bytes())?;
+            output.write_all(
+                format!("{} \"{}\"\n", id, escape(string, Quoting::Quoted)).as_bytes(),
+            )?;
         }
         Ok(())
     }
 }
 
+/// How a format writes a string: in quotes (the key-value format), where a quote is escaped and
+/// the closing one ends it, or bare (the ini format), where a quote is a plain character.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum Quoting {
+    /// In quotes.
+    Quoted,
+    /// Without quotes.
+    Bare,
+}
+
 // TODO specify
-pub(super) fn unescape(escaped: impl Iterator<Item = char>, quoted: bool) -> String {
+pub(super) fn unescape(escaped: impl Iterator<Item = char>, quoting: Quoting) -> String {
     let mut unescaped = String::new();
     let mut prev = 'x'; // Innocuous character
     for current in escaped {
@@ -246,8 +258,8 @@ pub(super) fn unescape(escaped: impl Iterator<Item = char>, quoted: bool) -> Str
             ('\\', 'n') => unescaped.push('\n'),
             ('\\', 'r') => unescaped.push('\r'),
             ('\\', 't') => unescaped.push('\t'),
-            ('\\', '"') if quoted => unescaped.push('"'),
-            (_, '"') if quoted => break,
+            ('\\', '"') if quoting == Quoting::Quoted => unescaped.push('"'),
+            (_, '"') if quoting == Quoting::Quoted => break,
             (_, '\\') => {} // Might be escape, wait for one more
             ('\\', escaped_character) => {
                 // Previous character was escape,
@@ -263,7 +275,7 @@ pub(super) fn unescape(escaped: impl Iterator<Item = char>, quoted: bool) -> Str
 }
 
 // TODO specify
-pub(super) fn escape(source: &str, quoted: bool) -> String {
+pub(super) fn escape(source: &str, quoting: Quoting) -> String {
     let mut escaped = String::new();
     for character in source.chars() {
         match character {
@@ -271,7 +283,7 @@ pub(super) fn escape(source: &str, quoted: bool) -> String {
             '\n' => escaped.push_str(r"\n"),
             '\r' => escaped.push_str(r"\r"),
             '\t' => escaped.push_str(r"\t"),
-            '"' if quoted => escaped.push_str(r#"\""#),
+            '"' if quoting == Quoting::Quoted => escaped.push_str(r#"\""#),
             other => escaped.push(other),
         }
     }
@@ -418,13 +430,22 @@ mod tests {
     #[test]
     fn the_text_escapes_read_back_what_they_wrote() {
         let text = "b\nc\rd\te\"f";
-        assert_eq!(escape(text, true), r#"b\nc\rd\te\"f"#);
-        assert_eq!(escape(text, false), r#"b\nc\rd\te"f"#);
-        assert_eq!(unescape(escape(text, true).chars(), true), text);
-        assert_eq!(escape("a\\b", false), r"a\\b");
-        assert_eq!(unescape(r"a\\".chars(), false), "a\\");
-        assert_eq!(unescape(r#"say "hi" there"#.chars(), true), "say ");
-        assert_eq!(unescape(r#"say "hi""#.chars(), false), r#"say "hi""#);
-        assert_eq!(unescape(r"\q\n".chars(), false), "\\q\n");
+        assert_eq!(escape(text, Quoting::Quoted), r#"b\nc\rd\te\"f"#);
+        assert_eq!(escape(text, Quoting::Bare), r#"b\nc\rd\te"f"#);
+        assert_eq!(
+            unescape(escape(text, Quoting::Quoted).chars(), Quoting::Quoted),
+            text
+        );
+        assert_eq!(escape("a\\b", Quoting::Bare), r"a\\b");
+        assert_eq!(unescape(r"a\\".chars(), Quoting::Bare), "a\\");
+        assert_eq!(
+            unescape(r#"say "hi" there"#.chars(), Quoting::Quoted),
+            "say "
+        );
+        assert_eq!(
+            unescape(r#"say "hi""#.chars(), Quoting::Bare),
+            r#"say "hi""#
+        );
+        assert_eq!(unescape(r"\q\n".chars(), Quoting::Bare), "\\q\n");
     }
 }

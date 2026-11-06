@@ -1,4 +1,5 @@
 use crate::victory::VictoryConditions;
+use crate::victory::VictoryVersion;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
 use genie_error::GenieResult;
 use genie_support::{ReadStringsExt, reserved, write_opt_str};
@@ -170,7 +171,12 @@ impl ScenarioPlayerData {
             None
         };
 
-        let victory = VictoryConditions::read_from(&mut input, version >= 1.09)?;
+        let victory_version = if version >= 1.09 {
+            VictoryVersion::Saved
+        } else {
+            VictoryVersion::Unsaved
+        };
+        let victory = VictoryConditions::read_from(&mut input, victory_version)?;
 
         Ok(Self {
             name,

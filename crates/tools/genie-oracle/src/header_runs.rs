@@ -58,10 +58,19 @@ pub struct Word9 {
 /// Whether the runs list each decoded command with the update it runs in ([`trace_commands`]).
 pub(super) static TRACE_COMMANDS: AtomicBool = AtomicBool::new(false);
 
-/// Every run from now on lists each decoded command with the update it runs in, on standard
-/// error (`on`), or stops listing them.
-pub fn trace_commands(on: bool) {
-    TRACE_COMMANDS.store(on, Ordering::Relaxed);
+/// Whether the runs list the commands they decode ([`trace_commands`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CommandTrace {
+    /// Each decoded command with the update it runs in, on standard error.
+    Listed,
+    /// None.
+    Silent,
+}
+
+/// Every run from now on lists each decoded command with the update it runs in, or stops
+/// listing them, by the `trace`.
+pub fn trace_commands(trace: CommandTrace) {
+    TRACE_COMMANDS.store(trace == CommandTrace::Listed, Ordering::Relaxed);
 }
 
 /// Run the slice over `frames`, each tick with its commands.

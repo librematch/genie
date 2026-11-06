@@ -289,11 +289,7 @@ pub(crate) fn repair_target(
             player_id,
             unit,
         )?;
-        for id in reached_ids(
-            step.world.objects(),
-            target,
-            tm.kind == MasterKind::BUILDING,
-        ) {
+        for id in reached_ids(step.world.objects(), target, tm.kind) {
             let Some(other) = others.find(id) else {
                 continue;
             };
@@ -379,11 +375,12 @@ pub(crate) fn repair_target(
     Ok((answer, kind))
 }
 
-/// The objects a repair of `target` reaches, in order: the target; for a building, an annex's
-/// main building, then the main building's annexes by id, the target left out.
-fn reached_ids(by_id: ObjectsRef<'_>, target: ObjectId, building: bool) -> Vec<ObjectId> {
+/// The objects a repair of `target`, of its master's `kind`, reaches, in order: the target; for
+/// a building, an annex's main building, then the main building's annexes by id, the target left
+/// out.
+fn reached_ids(by_id: ObjectsRef<'_>, target: ObjectId, kind: MasterKind) -> Vec<ObjectId> {
     let mut ids = vec![target];
-    if building {
+    if kind == MasterKind::BUILDING {
         // the annex's main building, else the target is its own
         let head = by_id
             .annex_of(target)

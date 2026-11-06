@@ -2,6 +2,7 @@ use crate::errors::no_player;
 use crate::fixtures::{combat_mut, combat_object, gaia, header, moving_mut, static_mut};
 use crate::fixtures::{human, recording};
 use crate::masters::MasterTable;
+use crate::views::GroupView;
 use crate::views::{checkpoint_lines, groups_of, movement_of, objects_of, unit_ais_of};
 use crate::views::{checkpoints, groups, movement, objects, unit_ais};
 use genie_core::objects::masters::FlyMode;
@@ -81,7 +82,7 @@ fn group_view_lists_its_units_formations_and_command() {
         current_command: 9,
         ..UnitGroup::default()
     }];
-    let text = groups_of(&save, false);
+    let text = groups_of(&save, GroupView::Saved);
     let lines: Vec<&str> = text.lines().collect();
     assert_eq!(lines[0], "1 unit groups, counter 5");
     assert!(lines[1].starts_with("group 3 owner 0 state 2 flags 0x0 centroid [1.0, 2.0, 0.0]"));
@@ -94,7 +95,7 @@ fn group_view_lists_its_units_formations_and_command() {
     assert_eq!(lines.len(), 6);
 }
 
-/// With `full` the groups print as genie-core imports them; a group the import refuses says
+/// In the imported view the groups print as genie-core imports them; a group the import refuses says
 /// why.
 #[test]
 fn full_group_view_imports_the_groups() {
@@ -103,13 +104,13 @@ fn full_group_view_imports_the_groups() {
         id: 3,
         ..UnitGroup::default()
     }];
-    let text = groups_of(&save, true);
+    let text = groups_of(&save, GroupView::Imported);
     assert!(text.contains("UnitGroup {"), "{text}");
     // path data whose path (id 0) is not in the world's table
     save.world.base_world.unit_groups.unit_group[0]
         .motion
         .temp_path_data = vec![PathData::default()];
-    let text = groups_of(&save, true);
+    let text = groups_of(&save, GroupView::Imported);
     assert!(text.contains("the groups do not import: "), "{text}");
 }
 
@@ -277,7 +278,10 @@ fn the_views_of_recording_read_its_header() {
         objects(&rec, 0, None).unwrap(),
         objects_of(&save, 0, None).unwrap()
     );
-    assert_eq!(groups(&rec, false).unwrap(), groups_of(&save, false));
+    assert_eq!(
+        groups(&rec, GroupView::Saved).unwrap(),
+        groups_of(&save, GroupView::Saved)
+    );
     assert_eq!(
         movement(&rec, 0, &[6]).unwrap(),
         movement_of(&save, 0, &[6]).unwrap()

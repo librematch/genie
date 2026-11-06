@@ -40,7 +40,9 @@ pub use map::{Map, Tile};
 pub use player::{ScenarioPlayerData, WorldPlayerData};
 pub use triggers::{Trigger, TriggerCondition, TriggerEffect, TriggerSystem};
 pub use values::*;
-pub use victory::{VictoryConditions, VictoryEntry, VictoryPointEntry, VictoryState};
+pub use victory::{
+    VictoryConditions, VictoryEntry, VictoryPointEntry, VictoryState, VictoryVersion,
+};
 
 /// A Scenario file.
 #[derive(Debug, Clone)]

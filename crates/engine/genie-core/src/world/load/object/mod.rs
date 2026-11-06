@@ -38,7 +38,7 @@ use crate::objects::Relics;
 use crate::objects::WorkRate;
 use crate::objects::WorkerCount;
 use crate::objects::layers::Building;
-use crate::objects::layers::{Action, Animated, Combat, DefaultTask, Motion, Static, Unstartable};
+use crate::objects::layers::{Action, Animated, Combat, Motion, Static};
 use crate::objects::layers::{CommandCount, Speedup, SpeedupValue};
 use crate::objects::lifecycle::Lifecycle;
 use crate::objects::masters::ActionKind;
@@ -66,10 +66,12 @@ use crate::world::load::object::building::saved_gate;
 use crate::world::load::object::town_bell::ai_parts;
 use crate::world::load::object_parts::lifecycle;
 use crate::world::load::sub_actions::DefaultStart;
+use crate::world::load::sub_actions::SaveHolds;
 use crate::world::load::sub_actions::build_task;
 use crate::world::load::sub_actions::default_task;
 use crate::world::load::sub_actions::fly_task;
 use crate::world::load::sub_actions::gather_point;
+use crate::world::load::sub_actions::loaded_default_task;
 use crate::world::load::sub_actions::production;
 use crate::world::load::sub_actions::saved_sprite;
 use crate::world::load::sub_actions::{own_build_task, own_fly_task};
@@ -230,9 +232,7 @@ fn row(
             unmodelled(GenieError::invalid_input("an object's master is negative")),
         );
     };
-    let saved = object
-        .actions()
-        .is_some_and(|action_list| action_list.entries().next().is_some());
+    let holds = SaveHolds::of(object);
     // an order or action value no order or action holds: the object's first unmodelled part
     let ((ai, town_bell), ai_read) = match ai_parts(object, id, players) {
         Ok(parts) => (parts, Ok(())),
@@ -572,8 +572,8 @@ fn row(
     };
     let mut actions = Action::default();
     let default = default_task(object, rge_static_object, objects, civ, masters, own);
-    let imported = if saved {
-        saved_actions(
+    let imported = match holds {
+        SaveHolds::Actions => saved_actions(
             object,
             rge_static_object,
             objects,
@@ -596,21 +596,20 @@ fn row(
             },
             masters.map(|master_table| &master_table.graphics),
             &mut actions,
-        )
-    } else {
+        ),
         // an object without actions in a save: its default task's action, which the game starts
         // in state 2 only (`RGE_Action_Object::update`: an Artifact exists from the load on, a
         // Fly starts in its first update); a dead object's list stays empty
-        match &default {
+        SaveHolds::NoActions => match &default {
             Ok(Some(DefaultStart::Artifact(artifact))) if life.state == ObjectState::Alive => {
                 actions.list.set_artifact(Some(**artifact));
                 Ok(())
             }
             Ok(_) => Ok(()),
             Err(unstartable) => Err(unstartable.error()),
-        }
+        },
     };
-    actions.default_task = default_start(default, saved);
+    actions.default_task = loaded_default_task(&default, holds);
     actions.speedup = object
         .action_part()
         .map_or(Speedup::NONE, |rge_action_object| Speedup {
@@ -653,10 +652,6 @@ fn row(
     )
 }
 
-/// What the default task `default` of an object (`saved`: its save holds its actions) starts
-/// once its action list empties: nothing, a Fly or a Make before its first update, the Artifact
-/// again, or a start the slice cannot make. A saved object's Fly is its saved action's: none
-/// starts again (it never ends); a saved Make started.
 /// A salvage pile's six amounts from the save's `attr_amt` (six shorts, the format's count).
 fn salvage_of(saved: &[i16]) -> SalvageAmounts {
     let mut values = [0; 6];
@@ -664,18 +659,6 @@ fn salvage_of(saved: &[i16]) -> SalvageAmounts {
         *value = held;
     }
     SalvageAmounts::of_data(values)
-}
-
-fn default_start(default: Result<Option<DefaultStart>, Unstartable>, saved: bool) -> DefaultTask {
-    use crate::objects::layers::DefaultTask;
-    match default {
-        Ok(None) => DefaultTask::Nothing,
-        Ok(Some(DefaultStart::Fly | DefaultStart::Make)) if saved => DefaultTask::Nothing,
-        Ok(Some(DefaultStart::Fly)) => DefaultTask::Fly,
-        Ok(Some(DefaultStart::Make)) => DefaultTask::Make,
-        Ok(Some(DefaultStart::Artifact(_))) => DefaultTask::Artifact,
-        Err(unstartable) => DefaultTask::Fails(unstartable),
-    }
 }
 
 /// A saved Build's or Repair's sub-action other than a `MoveTo`.
