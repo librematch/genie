@@ -17,6 +17,20 @@ fn unreadable_dll(error: pelite::Error) -> GenieError {
     GenieError::invalid_input("a language DLL that does not read").with_source(error)
 }
 
+/// The first string id of a string table's block: block n holds the 16 ids from (n - 1) × 16
+/// on, as Windows' `LoadString` numbers them.
+///
+/// Returns an error for block 0 and for a block whose first id is past the last id.
+fn first_string_id(block: u32) -> GenieResult<u32> {
+    block
+        .checked_sub(1)
+        .and_then(|blocks_before| blocks_before.checked_mul(16))
+        .ok_or_else(|| {
+            GenieError::invalid_input("a string block id outside the string ids")
+                .with("block", block)
+        })
+}
+
 impl LangFile {
     /// Reads a language file from a .DLL.
     /// This function eagerly loads all the strings into memory.
@@ -46,7 +60,7 @@ impl LangFile {
     pub(super) fn load_pe_directory(&mut self, directory: Directory<'_>) -> GenieResult<()> {
         for entry in directory.entries() {
             let base_index = if let Name::Id(id) = entry.name().map_err(unreadable_dll)? {
-                (id - 1) * 16
+                first_string_id(id)?
             } else {
                 continue;
             };
@@ -61,29 +75,34 @@ impl LangFile {
         Ok(())
     }
 
-    /// TODO specify
-    // The cursor runs over the in-memory `data` slice and never past its end (the slice index
-    // below would panic first), so its u64 position fits in a usize.
-    #[allow(clippy::cast_possible_truncation)]
-    pub(super) fn load_pe_data(&mut self, mut index: u32, data: &[u8]) -> GenieResult<()> {
-        use std::io::{Cursor, Seek, SeekFrom};
-        let mut cursor = Cursor::new(data);
-        while (cursor.position() as usize) < data.len() {
+    /// Reads one block of a string table: each string is its count of UTF-16 code units,
+    /// then the units. The strings take the ids from `first_index` on, one each: an empty
+    /// string only counts its id, a string that does not decode is left out.
+    ///
+    /// Returns an error if a string reaches past the end of the block, or past the last id.
+    pub(super) fn load_pe_data(&mut self, first_index: u32, mut data: &[u8]) -> GenieResult<()> {
+        let mut indexes = first_index..=u32::MAX;
+        while !data.is_empty() {
+            let index = indexes.next().ok_or_else(|| {
+                GenieError::invalid_input("a string id past the last id").with("first", first_index)
+            })?;
             // The length is a count of UTF-16 code units.
-            let units = cursor.read_u16::<LE>()?;
-            let len = usize::from(units) * 2;
-            if len == 0 {
-                index += 1;
+            let units = data.read_u16::<LE>()?;
+            let (encoded, rest) =
+                data.split_at_checked(usize::from(units) * 2)
+                    .ok_or_else(|| {
+                        GenieError::invalid_input("a string past the end of the strings table")
+                            .with("index", index)
+                    })?;
+            data = rest;
+            if encoded.is_empty() {
                 continue;
             }
-            let start = cursor.position() as usize;
-            let (string, _enc, failed) = UTF_16LE.decode(&data[start..start + len]);
+            let (string, _enc, failed) = UTF_16LE.decode(encoded);
             if !failed {
                 // A later string with the same index replaces the earlier one.
                 let _ = self.0.insert(StringKey::from(index), string.to_string());
             }
-            let _ = cursor.seek(SeekFrom::Current(i64::from(units) * 2))?;
-            index += 1;
         }
         Ok(())
     }
@@ -255,6 +274,7 @@ pub(super) fn escape(source: &str, quoted: bool) -> String {
 mod tests {
     use super::*;
     use crate::LangFileKind;
+    use genie_error::ErrorKind;
     use std::fs::File;
 
     /// A file is written in key order, the numbers in turn and then the names, whatever order
@@ -317,6 +337,71 @@ mod tests {
             lang.get(&StringKey::from(19u32)).map(String::as_str),
             Some("y")
         );
+    }
+
+    /// A string whose count of code units reaches past the end of its block is an error, not
+    /// a panic: the strings before it are kept.
+    #[test]
+    fn string_past_block_end_is_an_error() {
+        let mut lang = LangFile::new();
+        let data = [1, 0, b'a', 0, 3, 0, b'h', 0];
+        let error = lang.load_pe_data(16, &data).unwrap_err();
+        assert_eq!(
+            (error.kind(), error.reason()),
+            (
+                ErrorKind::InvalidInput,
+                "a string past the end of the strings table"
+            )
+        );
+        assert_eq!(error.context().collect::<Vec<_>>(), [("index", "17")]);
+        assert_eq!(
+            lang.get(&StringKey::from(16u32)).map(String::as_str),
+            Some("a")
+        );
+    }
+
+    /// A string after the one with the last id is an error, not an overflow: each string,
+    /// an empty one too, takes the next id.
+    #[test]
+    fn string_past_last_id_is_an_error() {
+        let mut lang = LangFile::new();
+        let data = [1, 0, b'a', 0, 0, 0];
+        let error = lang.load_pe_data(u32::MAX, &data).unwrap_err();
+        assert_eq!(
+            (error.kind(), error.reason()),
+            (ErrorKind::InvalidInput, "a string id past the last id")
+        );
+        assert_eq!(
+            error.context().collect::<Vec<_>>(),
+            [("first", "4294967295")]
+        );
+        assert_eq!(
+            lang.get(&StringKey::from(u32::MAX)).map(String::as_str),
+            Some("a")
+        );
+    }
+
+    /// Block n of a string table holds the ids from (n - 1) × 16 on; block 0 and a block past
+    /// the last id hold none.
+    #[test]
+    fn string_block_gives_its_first_id() {
+        assert_eq!(first_string_id(1).unwrap(), 0);
+        assert_eq!(first_string_id(2).unwrap(), 16);
+        assert_eq!(first_string_id(1 << 28).unwrap(), u32::MAX - 15);
+        for block in [0, (1 << 28) + 1] {
+            let error = first_string_id(block).unwrap_err();
+            assert_eq!(
+                (error.kind(), error.reason()),
+                (
+                    ErrorKind::InvalidInput,
+                    "a string block id outside the string ids"
+                )
+            );
+            assert_eq!(
+                error.context().collect::<Vec<_>>(),
+                [("block", block.to_string().as_str())]
+            );
+        }
     }
 
     /// The escapes of the text formats: backslash, newline, carriage return and tab, a quote

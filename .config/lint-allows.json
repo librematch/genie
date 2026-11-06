@@ -19,7 +19,6 @@
   "crates/formats/genie-drs/src/write.rs": 1,
   "crates/formats/genie-hki/src/file.rs": 1,
   "crates/formats/genie-hki/src/group.rs": 1,
-  "crates/formats/genie-lang/src/formats.rs": 1,
   "crates/formats/genie-rec/src/de/body.rs": 1,
   "crates/formats/genie-save/src/lib.rs": 1,
   "crates/formats/genie-scx/src/ai.rs": 1,

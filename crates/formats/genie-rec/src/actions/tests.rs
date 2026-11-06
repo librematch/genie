@@ -4,6 +4,7 @@
 use super::*;
 use crate::test_support::{floats, words};
 use arrayvec::ArrayVec;
+use genie_error::ErrorKind;
 use genie_support::UnitKindId;
 
 /// A command's frame: its length (the id and the body), the id, the body, a world time.
@@ -202,6 +203,23 @@ fn the_group_commands_write_back_what_they_read() {
         }
     );
     assert_eq!(ai.params.as_slice(), [5, 6, 7]);
+}
+
+/// A patrol that says it has more than ten waypoints is an error, not a panic: the command
+/// holds ten.
+#[test]
+fn patrol_above_ten_waypoints_is_an_error() {
+    let mut body = vec![0, 11, 0];
+    body.extend([0; 80]);
+    let error = PatrolCommand::read_from(body.as_slice()).unwrap_err();
+    assert_eq!(
+        (error.kind(), error.reason()),
+        (
+            ErrorKind::InvalidInput,
+            "a value that does not fit its field"
+        )
+    );
+    assert_eq!(error.context().collect::<Vec<_>>(), [("waypoints", "11")]);
 }
 
 /// The building and market commands with writers: make, research, cancel build, attack ground,

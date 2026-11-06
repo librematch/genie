@@ -241,6 +241,9 @@ impl PatrolCommand {
         let mut command = Self::default();
         let selected_count = input.read_i8()?;
         let waypoint_count = input.read_u8()?;
+        if usize::from(waypoint_count) > command.waypoints.capacity() {
+            return Err(out_of_range().with("waypoints", waypoint_count));
+        }
         let _padding = input.read_u8()?;
         let mut raw_waypoints = [(0.0, 0.0); 10];
         for waypoint in &mut raw_waypoints {
@@ -249,10 +252,10 @@ impl PatrolCommand {
         for waypoint in &mut raw_waypoints {
             waypoint.1 = input.read_f32::<LE>()?;
         }
-        command
-            .waypoints
-            .try_extend_from_slice(&raw_waypoints[0..usize::from(waypoint_count)])
-            .map_err(|_| out_of_range())?;
+        command.waypoints = raw_waypoints
+            .into_iter()
+            .take(usize::from(waypoint_count))
+            .collect();
         command.objects = ObjectsList::read_from(input, i32::from(selected_count))?;
         Ok(command)
     }
