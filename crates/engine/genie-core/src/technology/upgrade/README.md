@@ -22,5 +22,5 @@ change of the hit points; an upgrade (`../upgrade.rs`) runs it with the new mast
 ## How it connects
 
 <!-- uses -->
-- Uses: [`math`](../../math/), [`objects`](../../objects/), [`players`](../../players/), [`testing`](../../testing/), [`world`](../../world/).
+- Uses: [`math`](../../math/), [`movement`](../../movement/), [`objects`](../../objects/), [`players`](../../players/), [`testing`](../../testing/), [`world`](../../world/).
 <!-- /uses -->

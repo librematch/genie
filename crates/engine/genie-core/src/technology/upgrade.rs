@@ -621,7 +621,6 @@ mod tests {
     use crate::players::attribute::AttributeId;
     use crate::players::tracker::ListKey;
     use crate::technology::UpgradeMode;
-    use crate::technology::upgrade::damage::{SPRITE_PLACED, SPRITE_SCATTERED, SPRITE_SHOWN};
     use crate::test_ids::carrying;
     use crate::test_ids::class_id;
     use crate::test_ids::master_id;
@@ -727,7 +726,7 @@ mod tests {
             (hp_percent, unit.life.hp),
             (Ok(HpPercent::of_data(7)), HitPoints::new(150.0))
         );
-        let placed = building(70, 100, SPRITE_PLACED, -1);
+        let placed = building(70, 100, DamageSpriteMode::PLACED, -1);
         let hp_percent = damage_sprites(
             (&mut unit, MotionMut::new(None)),
             &placed,
@@ -779,7 +778,7 @@ mod tests {
         );
         assert_eq!(object, before);
         // mode 1: two draws of the Object stream
-        let scattered = building(70, 100, SPRITE_SCATTERED, -1);
+        let scattered = building(70, 100, DamageSpriteMode::SCATTERED, -1);
         let mut expected = object.clone();
         let _ = (expected.rand15(), expected.rand15());
         let mut hurt = object_of(HitPoints::new(40.0));
@@ -810,7 +809,7 @@ mod tests {
         );
         assert_eq!(object, expected);
         // mode 2: the entry's sprite, then the standing one when it goes
-        let shown = building(70, 100, SPRITE_SHOWN, -1);
+        let shown = building(70, 100, DamageSpriteMode::SHOWN, -1);
         let mut unit = Unit {
             sprite: Some(ActiveSprite::start(
                 graphic(1070),
@@ -850,6 +849,50 @@ mod tests {
             unit.sprite.map(|active_sprite| active_sprite.graphic.id),
             Some(SpriteId::named(1070))
         );
+    }
+
+    /// `FUN_1411859a0`'s mode 2 on an object whose sprite the slice does not hold: slot 0x68's
+    /// new instance is not held, but its start's draws on the Sprite stream are, for the entry's
+    /// sprite and for the standing sprite when the entry goes.
+    #[test]
+    fn shown_damage_sprite_of_object_without_sprite_keeps_only_its_draws() {
+        let graphics: Graphics = [70, 1070, 2095, 2120, 2145]
+            .map(|id| (SpriteId::named(id), graphic(id)))
+            .into_iter()
+            .collect();
+        let (mut object, mut sprite) = (Well512::default(), Well512::default());
+        let shown = building(70, 100, DamageSpriteMode::SHOWN, -1);
+        let mut unit = object_of(HitPoints::new(40.0));
+        let mut expected = sprite.clone();
+        let _ = ActiveSprite::start(graphic(2120), &mut expected, tuning().sprite);
+        assert_ne!(expected, Well512::default());
+        assert_eq!(
+            damage_sprites(
+                (&mut unit, MotionMut::new(None)),
+                &shown,
+                HpPercent::of_data(0),
+                (&graphics, &mut object, &mut sprite),
+                &roles(),
+                tuning().sprite
+            ),
+            Ok(HpPercent::of_data(60))
+        );
+        assert_eq!((unit.sprite, &sprite), (None, &expected));
+        unit.life.hp = HitPoints::new(100.0);
+        let _ = ActiveSprite::start(graphic(1070), &mut expected, tuning().sprite);
+        assert_eq!(
+            damage_sprites(
+                (&mut unit, MotionMut::new(None)),
+                &shown,
+                HpPercent::of_data(60),
+                (&graphics, &mut object, &mut sprite),
+                &roles(),
+                tuning().sprite
+            ),
+            Ok(HpPercent::of_data(0))
+        );
+        assert_eq!((unit.sprite, &sprite), (None, &expected));
+        assert_eq!(object, Well512::default());
     }
 
     fn object_of(hp: HitPoints) -> Unit {
@@ -915,11 +958,11 @@ mod tests {
     fn an_age_upgrade_keeps_house_share_of_its_hit_points() {
         let old = Master {
             death_spawns: [Some(master_id(1403)), None],
-            ..building(70, 550, SPRITE_PLACED, 1403)
+            ..building(70, 550, DamageSpriteMode::PLACED, 1403)
         };
         let new = Master {
             class: class::BUILDING,
-            ..building(464, 900, SPRITE_PLACED, 1435)
+            ..building(464, 900, DamageSpriteMode::PLACED, 1435)
         };
         let rubble = |id: i16, copy: i16| Master {
             id: master_id(id),

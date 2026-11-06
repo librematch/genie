@@ -6,6 +6,7 @@ use crate::GenieResult;
 use crate::math::conversions::cvttss2si;
 use crate::math::image::upgrade::WHOLE as UPGRADE_WHOLE;
 use crate::math::rng::Well512;
+use crate::movement::MoveStats;
 use crate::objects::Graphics;
 use crate::objects::HitPoints;
 use crate::objects::ObjectState;
@@ -14,7 +15,7 @@ use crate::objects::layers::MotionMut;
 use crate::objects::masters::DamageSpriteMode;
 use crate::objects::masters::HpPercent;
 use crate::objects::masters::Master;
-use crate::objects::sprite::{ActiveSprite, NO_SPRITE, new_sprite};
+use crate::objects::sprite::{ActiveSprite, Graphic, NO_SPRITE, new_sprite};
 use crate::objects::unit::Unit;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
@@ -22,12 +23,6 @@ use crate::world::layer::generated::SpriteTuning;
 
 /// The whole of a damage share (`DAT_14330ebcc`, 100).
 const WHOLE: f32 = UPGRADE_WHOLE;
-
-/// What a damage sprite apply mode does to the simulation (`FUN_1411859a0`'s switch on the
-/// entry's `+0x9`).
-pub(super) const SPRITE_PLACED: DamageSpriteMode = DamageSpriteMode::PLACED;
-pub(super) const SPRITE_SCATTERED: DamageSpriteMode = DamageSpriteMode::SCATTERED;
-pub(super) const SPRITE_SHOWN: DamageSpriteMode = DamageSpriteMode::SHOWN;
 
 /// `FUN_141193590`: an object of `master` in `state` whose damage share is its storage's
 /// (`+0x681` set, or a resource class: those of [`ClassRoles::DAMAGE_BY_STORAGE`] and
@@ -54,8 +49,11 @@ fn storage_share(master: &Master, state: ObjectState, roles: &Roles) -> bool {
 /// (`FUN_14118a9d0`, else a decal), mode 1 at a random spot of its footprint (two draws of the
 /// Object stream, `CheckDamageSprites`, then a decal), mode 2 as the object's sprite (slot 0x68);
 /// then the old entry goes: a decal of mode 0 or 1, or for mode 2 the master's standing sprite
-/// (slots 0x798 and 0x68) unless the new entry also shows one. The attachments and decals are
-/// drawn, not simulated. Returns the share (`+0xd`), which the slice does not hold.
+/// (slots 0x798 and 0x68) unless the new entry also shows one. The attachments (`+0x198`) are
+/// drawn. A decal is a node of the object's sprite list (`FUN_1413b7bf0` on `+0x148`, for modes
+/// 0 and 1 only on an object with one), whose start draws on the Sprite stream for a graphic
+/// with a random first frame: the slice holds neither the list nor these draws. Returns the
+/// share (`+0xd`), which the slice does not hold.
 ///
 /// # Errors
 ///
@@ -97,49 +95,62 @@ pub(crate) fn damage_sprites(
         |id: Option<SpriteId>| id.and_then(|id| graphics.get(id)).copied().ok_or(NO_SPRITE);
     if let Some(now_damage_graphic) = shown(now) {
         match now_damage_graphic.apply_mode {
-            SPRITE_SCATTERED => {
+            DamageSpriteMode::SCATTERED => {
+                // `CheckDamageSprites`' two draws (its lines 0x1046 and 0x104a) pick the decal's
+                // spot on the footprint, which `FUN_140f69080` turns into the offsets the decal
+                // takes: nothing else reads them. The game draws them only on an object with a
+                // sprite list (`+0x148`), which the slice does not hold.
                 let _ = (object.rand15(), object.rand15());
             }
-            SPRITE_SHOWN if !graphics.is_empty() => {
-                if unit.sprite.is_some() {
-                    new_sprite(
-                        &mut unit.sprite,
-                        motion.move_stats_mut(),
-                        graphic(now_damage_graphic.sprite)?,
-                        sprite,
-                        sprite_tuning,
-                    );
-                } else {
-                    let _ = ActiveSprite::start(
-                        graphic(now_damage_graphic.sprite)?,
-                        sprite,
-                        sprite_tuning,
-                    );
-                }
-            }
+            DamageSpriteMode::SHOWN if !graphics.is_empty() => show_sprite(
+                &mut unit.sprite,
+                motion.move_stats_mut(),
+                graphic(now_damage_graphic.sprite)?,
+                sprite,
+                sprite_tuning,
+            ),
+            // mode 0 places the entry on the object: its attachments (`FUN_14118a9d0`), else a
+            // decal, which the slice does not hold; the game's switch shows nothing for any other
+            // mode
             _ => {}
         }
     }
     if let Some(was_damage_graphic) = shown(was)
-        && was_damage_graphic.apply_mode == SPRITE_SHOWN
-        && shown(now).is_none_or(|damage_graphic| damage_graphic.apply_mode != SPRITE_SHOWN)
+        && was_damage_graphic.apply_mode == DamageSpriteMode::SHOWN
+        && shown(now)
+            .is_none_or(|damage_graphic| damage_graphic.apply_mode != DamageSpriteMode::SHOWN)
         && !graphics.is_empty()
     {
-        let standing = graphic(master.standing_sprite)?;
-        if unit.sprite.is_some() {
-            new_sprite(
-                &mut unit.sprite,
-                motion.move_stats_mut(),
-                standing,
-                sprite,
-                sprite_tuning,
-            );
-        } else {
-            let _ = ActiveSprite::start(standing, sprite, sprite_tuning);
-        }
+        show_sprite(
+            &mut unit.sprite,
+            motion.move_stats_mut(),
+            graphic(master.standing_sprite)?,
+            sprite,
+            sprite_tuning,
+        );
     }
-    let _ = SPRITE_PLACED;
     Ok(share)
+}
+
+/// Slot 0x68 (`FUN_141196580` under its overrides) of [`damage_sprites`]: the object whose
+/// sprite is `object_sprite` and whose top speed is `stats` shows `graphic` ([`new_sprite`]).
+/// The game keeps the new sprite as the object's (`+0x140`, a node of its sprite list) unless it
+/// shows it already. Where the slice holds no sprite for the object ([`Unit::sprite`]'s gap), it
+/// can do neither: it starts the instance for its draws on the Sprite stream `sprite_rng` alone,
+/// as for a sprite the object did not show.
+fn show_sprite(
+    object_sprite: &mut Option<ActiveSprite>,
+    stats: Option<&mut MoveStats>,
+    graphic: Graphic,
+    sprite_rng: &mut Well512,
+    sprite_tuning: SpriteTuning,
+) {
+    if object_sprite.is_some() {
+        new_sprite(object_sprite, stats, graphic, sprite_rng, sprite_tuning);
+    } else {
+        // the instance the game keeps, which the slice does not hold: only its draws stay
+        let _ = ActiveSprite::start(graphic, sprite_rng, sprite_tuning);
+    }
 }
 
 /// The damage share [`damage_sprites`] finds for object `unit` under `master`, with its hit points
