@@ -360,6 +360,12 @@ pub mod powerup {
     pub const SPEED_SHARE_BASE: f32 = f32::from_bits(0x3f80_0000);
 }
 
+/// The values the `registry` port reads.
+pub mod registry {
+    /// 0.5
+    pub const HALF: f32 = f32::from_bits(0x3f00_0000);
+}
+
 /// The values the `repair` port reads.
 pub mod repair {
     /// 1.0

@@ -10,7 +10,10 @@
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::Point;
+use crate::math::fmath::below_or_unordered;
+use crate::math::fmath::minss;
 use crate::math::fmath::sqrt;
+use crate::math::image::registry::HALF;
 use crate::objects::IdTable;
 use crate::objects::ObjectId;
 use crate::objects::masters::ClassId;
@@ -121,6 +124,85 @@ impl QueryShape {
         match self {
             Self::RoundedRectangle => 0,
             Self::Rectangle => 1,
+        }
+    }
+}
+
+/// A visible-units query's area, as `FUN_141288c00` makes it before its loop: the capped radius
+/// grown by the searcher's radii, the box that bounds the records' places, and its shape's tests
+/// of a record's edge gaps.
+#[derive(Clone, Copy, Debug)]
+struct QueryArea {
+    /// Its shape.
+    shape: QueryShape,
+    /// The searcher's radii (x, y).
+    size: Footprint,
+    /// The capped radius plus the searcher's radius on x.
+    wide: f32,
+    /// The capped radius plus the searcher's radius on y.
+    tall: f32,
+    /// The box's least corner: the place less `wide` and `tall`, less the margin.
+    least: Point,
+    /// The box's most corner: the place plus `wide` and `tall`, plus the margin.
+    most: Point,
+    /// The corners' rounding, squared.
+    round_squared: f32,
+}
+
+impl QueryArea {
+    /// The area of `query`: its radius capped at the tuning's most (`MINSS` of the most and the
+    /// radius, so a NaN radius stays NaN), the box grown by the tuning's margin, and the
+    /// corners' rounding, the mean of the radius on both axes:
+    /// `((wide - rx) + (tall - ry)) * 0.5`.
+    fn new(query: &VisibleQuery<'_>, registry_tuning: RegistryTuning) -> Self {
+        let (x, y) = (query.position.x(), query.position.y());
+        let (rx, ry) = (query.size.x(), query.size.y());
+        let radius = minss(registry_tuning.most_radius, query.radius.get());
+        let wide = radius + rx;
+        let tall = radius + ry;
+        let margin = registry_tuning.margin;
+        let round = ((wide - rx) + (tall - ry)) * HALF;
+        Self {
+            shape: query.shape,
+            size: query.size,
+            wide,
+            tall,
+            least: Point::new((x - wide) - margin, (y - tall) - margin),
+            most: Point::new((x + wide) + margin, (y + tall) + margin),
+            round_squared: round * round,
+        }
+    }
+
+    /// Whether its box bounds a record at `at` (`COMISS` with each bound, `JC` past it: a NaN
+    /// place lies outside).
+    fn bounds(&self, at: Point) -> bool {
+        let (px, py) = (at.x(), at.y());
+        px <= self.most.x() && self.least.x() <= px && py <= self.most.y() && self.least.y() <= py
+    }
+
+    /// Whether it holds a record whose edges lie `dx` and `dy` off the place.
+    ///
+    /// The rounded box (mode 0) tests the gap on y within `tall` where the gap on x is within the
+    /// searcher's radius, else the gap on x within `wide` where the gap on y is, else the corner:
+    /// the gaps past the searcher's radii within the rounding. Each of its first two compares
+    /// takes the unordered case to the corner's side (`COMISS`, `JC` at `0x141288e5a` and
+    /// `0x141288e68`), and each last test fails on a NaN (`SETA`, `SETNC`): no record of a NaN
+    /// gap lies within it. The box (mode 1) tests both gaps within `wide` and `tall`.
+    fn holds(&self, dx: f32, dy: f32) -> bool {
+        let (rx, ry) = (self.size.x(), self.size.y());
+        match self.shape {
+            QueryShape::RoundedRectangle => {
+                if below_or_unordered(rx, dx) {
+                    if below_or_unordered(ry, dy) {
+                        (dy - ry) * (dy - ry) + (dx - rx) * (dx - rx) <= self.round_squared
+                    } else {
+                        dx < self.wide
+                    }
+                } else {
+                    dy < self.tall
+                }
+            }
+            QueryShape::Rectangle => dx <= self.wide && dy <= self.tall,
         }
     }
 }
@@ -295,35 +377,16 @@ impl Registry {
         let VisibleQuery {
             player,
             position,
-            radius,
-            shape,
             classes,
             relations,
-            size,
             wanted,
+            ..
         } = query;
         let (x, y) = (position.x(), position.y());
-        let (rx, ry) = (size.x(), size.y());
         if classes.is_empty() || self.players <= player.index() {
             return Ok(None);
         }
-        let radius = radius.get();
-        let radius = if radius <= registry_tuning.most_radius {
-            radius
-        } else {
-            registry_tuning.most_radius
-        };
-        let wide = radius + rx;
-        let tall = radius + ry;
-        let (x0, x1) = (
-            (x - wide) - registry_tuning.margin,
-            x + wide + registry_tuning.margin,
-        );
-        let (y0, y1) = (
-            (y - tall) - registry_tuning.margin,
-            y + tall + registry_tuning.margin,
-        );
-        let round = f32::midpoint(wide - rx, tall - ry);
+        let area = QueryArea::new(&query, registry_tuning);
         let mut found: ByRelation<Vec<Record>> = ByRelation::default();
         for &class in classes {
             let list = class
@@ -340,27 +403,12 @@ impl Registry {
                 else {
                     continue;
                 };
-                let (px, py) = (record.at.x(), record.at.y());
-                if !(px <= x1 && x0 <= px && py <= y1 && y0 <= py) {
+                if !area.bounds(record.at) {
                     continue;
                 }
-                let dx = (px - x).abs() - record.radius.x();
-                let dy = (py - y).abs() - record.radius.y();
-                let inside = match shape {
-                    QueryShape::RoundedRectangle => {
-                        if rx < dx {
-                            if ry < dy {
-                                (dy - ry) * (dy - ry) + (dx - rx) * (dx - rx) <= round * round
-                            } else {
-                                dx < wide
-                            }
-                        } else {
-                            dy < tall
-                        }
-                    }
-                    QueryShape::Rectangle => dx <= wide && dy <= tall,
-                };
-                if !inside {
+                let dx = (record.at.x() - x).abs() - record.radius.x();
+                let dy = (record.at.y() - y).abs() - record.radius.y();
+                if !area.holds(dx, dy) {
                     continue;
                 }
                 let out = &mut found[relation];
@@ -651,5 +699,115 @@ mod tests {
                 .collect::<Vec<_>>(),
             [object_id(1)]
         );
+    }
+
+    /// The villagers' class, the one the queries below read.
+    const VILLAGERS: [ClassId; 1] = [class::VILLAGER];
+
+    /// A registry whose player 0 sees one villager of player 1 at `position`, of `radii`.
+    fn registry_seeing(position: Point, radii: Footprint) -> Registry {
+        let mut registry = registry();
+        registry
+            .update_unit(UnitUpdate {
+                id: object_id(1),
+                owner: PlayerId::new(1),
+                position,
+                radii,
+                class: class::VILLAGER,
+                old: VisionBits::NONE,
+                new: VisionBits::from_bits_retain(1),
+            })
+            .unwrap();
+        registry
+    }
+
+    /// Player 0's query of the villagers from (10, 10) within 3 of a rounded box, for a
+    /// searcher of radii 0.2, keeping every relation that `relations` gives.
+    fn centre_query(relations: &UnitRelations) -> VisibleQuery<'_> {
+        VisibleQuery {
+            player: PlayerId::new(0),
+            position: Point::new(10.0, 10.0),
+            radius: Distance::new(3.0),
+            shape: QueryShape::RoundedRectangle,
+            classes: &VILLAGERS,
+            relations,
+            size: Footprint::new(0.2, 0.2),
+            wanted: RelationMask::ALL,
+        }
+    }
+
+    /// The ids `query` finds of `relation`.
+    fn found_ids(
+        registry: &Registry,
+        query: VisibleQuery<'_>,
+        relation: UnitRelation,
+    ) -> Vec<ObjectId> {
+        let found = registry
+            .visible_units(query, tuning().registry)
+            .unwrap()
+            .unwrap();
+        found[relation].iter().map(|record| record.id).collect()
+    }
+
+    /// A NaN radius passes the cap (`MINSS` of 44 and the radius gives the radius): the box's
+    /// bounds are NaN and every record fails them.
+    #[test]
+    fn query_of_nan_radius_finds_nothing() {
+        let registry = registry_seeing(Point::new(11.0, 10.0), Footprint::new(0.2, 0.2));
+        let relations = relations([1, 4, 4]);
+        for shape in [QueryShape::RoundedRectangle, QueryShape::Rectangle] {
+            let query = VisibleQuery {
+                radius: Distance::new(f32::NAN),
+                shape,
+                ..centre_query(&relations)
+            };
+            assert_eq!(found_ids(&registry, query, UnitRelation::Enemy), []);
+        }
+    }
+
+    /// A record whose radius on x is NaN has a NaN gap on x: the rounded box's first compare
+    /// takes the unordered case to the corner's side (`COMISS`, `JC`), whose tests a NaN fails,
+    /// though its gap on y lies within the box.
+    #[test]
+    fn rounded_query_finds_no_record_of_nan_radius_x() {
+        let registry = registry_seeing(Point::new(11.0, 10.0), Footprint::new(f32::NAN, 0.2));
+        let relations = relations([1, 4, 4]);
+        assert_eq!(
+            found_ids(&registry, centre_query(&relations), UnitRelation::Enemy),
+            []
+        );
+    }
+
+    /// A record whose radius on y is NaN and whose gap on x is past the searcher's radius goes
+    /// to the corner (the second compare's unordered case, `COMISS`, `JC`), whose distance is
+    /// NaN, though its gap on x lies within the box.
+    #[test]
+    fn rounded_query_finds_no_record_of_nan_radius_y() {
+        let registry = registry_seeing(Point::new(12.0, 10.0), Footprint::new(0.2, f32::NAN));
+        let relations = relations([1, 4, 4]);
+        assert_eq!(
+            found_ids(&registry, centre_query(&relations), UnitRelation::Enemy),
+            []
+        );
+    }
+
+    /// The corners round by the mean of the radius on both axes, here 5:
+    /// `((wide - rx) + (tall - ry)) * 0.5`. A record whose gaps past the searcher's radii are 3
+    /// and 4 lies on the rounding and is found (`SETNC`), one a little farther is not.
+    #[test]
+    fn rounded_query_finds_record_on_its_corner_rounding() {
+        let relations = relations([1, 4, 4]);
+        let query = VisibleQuery {
+            radius: Distance::new(5.0),
+            size: Footprint::new(0.5, 0.25),
+            ..centre_query(&relations)
+        };
+        let on_edge = registry_seeing(Point::new(13.5, 14.25), Footprint::new(0.0, 0.0));
+        assert_eq!(
+            found_ids(&on_edge, query, UnitRelation::Enemy),
+            [object_id(1)]
+        );
+        let beyond = registry_seeing(Point::new(13.5, 14.375), Footprint::new(0.0, 0.0));
+        assert_eq!(found_ids(&beyond, query, UnitRelation::Enemy), []);
     }
 }
