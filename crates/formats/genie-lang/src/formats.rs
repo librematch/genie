@@ -43,7 +43,10 @@ impl LangFile {
         self.load_pe_file(pe)
     }
 
-    /// TODO specify
+    /// Reads the string tables of a DLL's resources: the root's entry of resource kind 6
+    /// (`RT_STRING`) holds the directory of the string blocks ([`LangFile::load_pe_directory`]).
+    ///
+    /// Returns an error if the resources do not read, or if a block does not.
     pub(super) fn load_pe_file(&mut self, pe: PeFile<'_>) -> GenieResult<()> {
         let resources = pe.resources().map_err(unreadable_dll)?;
         for root_dir_entry in resources.root().map_err(unreadable_dll)?.entries() {
@@ -56,7 +59,12 @@ impl LangFile {
         Ok(())
     }
 
-    /// TODO specify
+    /// Reads the directory of a string table's blocks: an entry named by its block id holds the
+    /// block once per language, and each language's data is the block's strings
+    /// ([`LangFile::load_pe_data`]). An entry named by a string is skipped.
+    ///
+    /// Returns an error if an entry does not read, if its block id is 0 or past the last id
+    /// ([`first_string_id`]), or if a block's strings do not read.
     pub(super) fn load_pe_directory(&mut self, directory: Directory<'_>) -> GenieResult<()> {
         for entry in directory.entries() {
             let base_index = if let Name::Id(id) = entry.name().map_err(unreadable_dll)? {
@@ -98,7 +106,7 @@ impl LangFile {
             if encoded.is_empty() {
                 continue;
             }
-            let (string, _enc, failed) = UTF_16LE.decode(encoded);
+            let (string, _encoding, failed) = UTF_16LE.decode(encoded);
             if !failed {
                 // A later string with the same index replaces the earlier one.
                 let _ = self.0.insert(StringKey::from(index), string.to_string());
