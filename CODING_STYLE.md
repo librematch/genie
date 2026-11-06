@@ -127,17 +127,19 @@ data-oriented architect makes it.
 
 - Import from the crate root: `use crate::movement::move_to::MoveWait;`, then name the item
   by its own name (`MoveWait`, `Snow::None`); `use std::mem::take;`, then `take`. Do not write
-  `use super::…`. A test module's `use super::*;` is the one exception. The code holds no
-  item by its whole path: `clippy::absolute_paths` denies one of more than two segments
-  (section 15). Where another item holds the name, the import takes an alias of its module's
-  name and its own: `use std::fmt::Error as FmtError;`. std's `fmt::Result` and
-  `io::Result<T>` are the prelude's `Result` with the error imported: `Result<(), Error>`,
+  `use super::…`, and no path in the code goes through `super` (`super::written_len(x)`). A
+  test module's `use super::*;` is the one exception. A generator writes its imports the same
+  way. The code holds no item by its whole path: `clippy::absolute_paths` denies one of more
+  than two segments (section 15). Where another item holds the name, the import takes an alias
+  of its module's name and its own: `use std::fmt::Error as FmtError;`. std's `fmt::Result`
+  and `io::Result<T>` are the prelude's `Result` with the error imported: `Result<(), Error>`,
   `use std::fmt::Error;`. Doc links name the item by its path from the crate root.
 - A function of genie's is imported by its own name too, never called through its module:
   `use crate::math::fmath::sqrt;`, then `sqrt(x)`, not `use crate::math::fmath;`, then
   `fmath::sqrt(x)`. A type or a constant may keep its module (`layers::Action`), and std's and
   other crates' modules keep Rust's idiom (`mem::take`). `scripts/module_paths.py` (pre-commit
-  and CI) fails on a function through an imported module (FD-043-D37).
+  and CI) fails on a function through an imported module (FD-043-D37), and on a path through
+  `super` but a test module's `use super::*;`.
 - Give each engine system a folder with a `README.md`. Write its prose by hand.
   `scripts/readmes.py SRC` fills the generated tables. If you add a file or a folder, run it.
   If you change the first sentence of a `//!` doc, run it too.

@@ -1,5 +1,5 @@
-use super::ScxFormat;
 use crate::VersionBundle;
+use crate::format::ScxFormat;
 use genie_error::GenieResult;
 use std::fs::File;
 use std::io::{Cursor, ErrorKind, Read};

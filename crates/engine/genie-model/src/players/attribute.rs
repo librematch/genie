@@ -166,8 +166,8 @@ impl From<AttributeId> for i16 {
 
 #[cfg(test)]
 mod tests {
-    use super::AttributeId;
     use crate::ErrorKind;
+    use crate::players::attribute::AttributeId;
 
     const FOOD: AttributeId = AttributeId::named(0);
     const WOOD: AttributeId = AttributeId::named(1);

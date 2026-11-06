@@ -743,7 +743,6 @@ mod tests {
     }
 
     mod rings {
-        use super::{bell, set_bell};
         use crate::commands::Bell;
         #[cfg(test)]
         use crate::garrison::ContainerId;
@@ -755,6 +754,7 @@ mod tests {
         #[cfg(test)]
         use crate::orders::town_bell::BackToWork as TownBellBackToWork;
         use crate::orders::town_bell::BellShelter;
+        use crate::orders::town_bell::tests::{bell, set_bell};
         use crate::players::PlayerId;
         use crate::test_ids::object_id;
         use crate::test_ids::player_id;

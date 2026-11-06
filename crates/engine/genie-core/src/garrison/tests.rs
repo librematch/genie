@@ -4886,7 +4886,7 @@ fn unit_let_out_works_its_record_or_the_gather_point_target() {
 /// without a point to its target, one of state 0 or none leaves the point.
 #[test]
 fn gather_point_of_state_0xff_replaces_the_point_of_let_out() {
-    use super::let_out::{LetOutAim, let_out_aim};
+    use crate::garrison::let_out::{LetOutAim, let_out_aim};
     let at = |state, target| {
         Some(GatherPoint {
             state,

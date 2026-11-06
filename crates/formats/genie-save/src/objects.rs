@@ -2,7 +2,7 @@
 //! share. Each class's struct holds its base class's as its first field, as the game's loads call
 //! the base load first; the factories hold one optional struct per object type.
 
-use super::generated::world::{
+use crate::generated::world::{
     Action, ActionList, Master, Object, ObjectList, OwnRgeMasterActionObject,
     OwnRgeMasterAnimatedObject, OwnRgeMasterMovingObject, OwnRgeMasterStaticObject,
     OwnTribeMasterCombatObject, Player, PlayerObjects, RgeAction, RgeActionObject,

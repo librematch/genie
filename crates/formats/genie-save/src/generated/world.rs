@@ -23,7 +23,7 @@
     clippy::unreadable_literal
 )]
 
-use super::super::{LenString16, LenString32, LenVec32, Positioned, SigString};
+use crate::{LenString16, LenString32, LenVec32, Positioned, SigString};
 use binrw::binrw;
 
 /// Read by `FUN_140cba350` of the build.

@@ -1418,7 +1418,7 @@ fn narrow_sub_formation_takes_one_line_ahead_of_wider_one() {
 /// NaN width (`CVTTSS2SI` of a NaN, clamped) one line.
 #[test]
 fn sub_formation_fits_the_widest_line() {
-    use super::column_line::{Category, fit_to_widest};
+    use crate::groups::formation::column_line::{Category, fit_to_widest};
     let cat = |count, spacing| Category {
         count,
         spacing,

@@ -5596,7 +5596,7 @@ fn foraging() -> World {
 /// and a unit without such an action ask nothing.
 #[test]
 fn drop_off_order_asks_the_top_gather_build_or_hunt() {
-    use super::unit_order::{DropOffAsk, DropOffBy};
+    use crate::orders::unit_order::{DropOffAsk, DropOffBy};
     let mut foraging = foraging();
     let ask = |by, asked, unaimed| Some(DropOffAsk { by, asked, unaimed });
     // the ask carries the top action it found

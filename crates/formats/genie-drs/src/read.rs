@@ -1,4 +1,4 @@
-use super::{DrsHeader, DrsResource, DrsTable, DrsTableIterator, ResourceKind};
+use crate::{DrsHeader, DrsResource, DrsTable, DrsTableIterator, ResourceKind};
 use genie_error::{GenieError, GenieResult};
 use std::io::{Read, Seek, SeekFrom};
 

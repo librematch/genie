@@ -511,6 +511,7 @@ fn constructed_snow(
 
 #[cfg(test)]
 mod tests {
+    use crate::commands::new_building::constructed_snow;
     use crate::map::Snow;
     use crate::map::terrain::{Terrain, TerrainKind, TileTerrain};
     use crate::map::{GridSize, TerrainFlags};
@@ -540,15 +541,14 @@ mod tests {
             kinds,
             Vec::new(),
         );
-        let snow =
-            |master, tile| super::constructed_snow(master, tile, Some(&terrain), &roles()).unwrap();
+        let snow = |master, tile| constructed_snow(master, tile, Some(&terrain), &roles()).unwrap();
         assert_eq!(snow(ids::FARM, (0, 0)), Snow::Kept);
         assert_eq!(snow(ids::PASTURE_1889, (0, 0)), Snow::Kept);
         assert_eq!(snow(ids::HOUSE, (0, 0)), Snow::None);
         assert_eq!(snow(ids::FARM, (1, 0)), Snow::None);
         assert_eq!(snow(ids::FARM, (-1, 0)), Snow::None);
         assert_eq!(
-            super::constructed_snow(ids::FARM, (0, 0), None, &roles()).unwrap(),
+            constructed_snow(ids::FARM, (0, 0), None, &roles()).unwrap(),
             Snow::None
         );
     }

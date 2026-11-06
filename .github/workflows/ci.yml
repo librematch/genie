@@ -56,7 +56,8 @@ jobs:
       # scripts/c_case.py: every name follows RFC 430 (CODING_STYLE.md section 3, C-CASE)
       - run: scripts/c_case.py
       # scripts/module_paths.py: no function is reached through an imported module of genie's
-      # (CODING_STYLE.md section 4, FD-043-D37)
+      # (CODING_STYLE.md section 4, FD-043-D37), and no path goes through `super` but a test
+      # module's `use super::*;`
       - run: scripts/module_paths.py
 
   contracts:

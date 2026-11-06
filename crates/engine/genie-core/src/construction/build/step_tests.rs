@@ -35,9 +35,9 @@ use crate::world::Millis;
 use crate::world::WorldTime;
 use std::sync::Arc;
 
-use super::tests::{MOVING_TASK, TASK, started};
 use super::*;
 use crate::construction::FootprintWaits;
+use crate::construction::build::tests::{MOVING_TASK, TASK, started};
 use crate::gathering::hunt::tests::walker;
 use crate::map::Footprint;
 use crate::map::spatial::{Placed, Tiles};

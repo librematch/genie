@@ -8,10 +8,12 @@ use genie_diff::Diff;
 
 /// A Build's state (`+0x18`, set by `set_state`, `0x140aae200`) with the data only that state
 /// holds (FD-045-D62): every `set_state` drops the sub-actions first
-/// ([`super::BuildAction::leave`]), and the four walks make their `MoveTo`, none once the
+/// ([`BuildAction::leave`]), and the four walks make their `MoveTo`, none once the
 /// `MoveTo`'s update dropped it, until the next `set_state`. Its update switches on it; the
 /// update's default case takes the bytes without a state (0, 5, 9, 10, 12, 14 to 221 and above
 /// 224), which no step modelled here sets.
+///
+/// [`BuildAction::leave`]: crate::construction::build::BuildAction::leave
 #[derive(Clone, Copy, Debug, PartialEq, Diff, Display)]
 #[display("{}", self.get())]
 pub enum BuildState {

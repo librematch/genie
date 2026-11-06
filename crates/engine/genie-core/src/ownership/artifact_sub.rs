@@ -5,20 +5,26 @@ use crate::movement::move_to::MoveToAction;
 use genie_diff::Diff;
 
 /// An Artifact's sub-action (FD-045-D63): one at most, as `FUN_140a98620` deletes the one it
-/// holds before another comes ([`super::artifact::Artifact::drop_sub_actions`]). No state of
+/// holds before another comes ([`Artifact::drop_sub_actions`]). No state of
 /// the Artifact makes it: a move or an enter command gives it, and the check that follows
 /// (`set_state(6)`) keeps it, so it is the action's own field and not a state's.
+///
+/// [`Artifact::drop_sub_actions`]: crate::ownership::artifact::Artifact::drop_sub_actions
 #[derive(Clone, Copy, Debug, PartialEq, Diff)]
 pub enum ArtifactSub {
     /// The `MoveTo` of a move its player gave the animal: to the point
-    /// ([`super::artifact::Artifact::take_point`]) or, quiet, to an object
-    /// ([`super::artifact::Artifact::take_object`]).
+    /// ([`Artifact::take_point`]) or, quiet, to an object ([`Artifact::take_object`]).
+    ///
+    /// [`Artifact::take_point`]: crate::ownership::artifact::Artifact::take_point
+    /// [`Artifact::take_object`]: crate::ownership::artifact::Artifact::take_object
     Walk {
         /// The walk.
         move_to: MoveToAction,
     },
     /// The Enter an enter command made its sub-action (`FUN_1410847e0` under an Artifact on
-    /// top), which its update runs first ([`super::artifact::Artifact::hold_enter`]).
+    /// top), which its update runs first ([`Artifact::hold_enter`]).
+    ///
+    /// [`Artifact::hold_enter`]: crate::ownership::artifact::Artifact::hold_enter
     Enter {
         /// The Enter.
         enter: EnterAction,

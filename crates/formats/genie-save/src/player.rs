@@ -1,6 +1,7 @@
 //! A player section: the player list's load of one player, generated from the game's load code.
 
-use super::generated::world::{Object, Player, PlayerObjects, WorldPlayer};
+use crate::generated::world::{Object, Player, PlayerObjects, WorldPlayer};
+use crate::written_len;
 use genie_error::{GenieError, GenieResult};
 
 /// Where a player section starts and ends.
@@ -58,7 +59,7 @@ impl<'save> PlayerSection<'save> {
     pub fn ends(&self) -> GenieResult<PlayerEnds> {
         Ok(PlayerEnds {
             start: self.start,
-            end: self.start + super::written_len(self.player)?,
+            end: self.start + written_len(self.player)?,
         })
     }
 

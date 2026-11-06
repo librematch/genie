@@ -963,7 +963,7 @@ fn far_waypoint_takes_the_long_pather_path() {
 /// the waypoint reached on a looping path.
 #[test]
 fn request_without_path_pauses_waits_gives_up_or_counts_its_waypoint() {
-    use super::request::link;
+    use crate::groups::motion::request::link;
     use crate::pathing::tile_path::Path;
     let at = |level_index: u8, waypoints: &[Point], counter| {
         let mut motion = Motion::new();

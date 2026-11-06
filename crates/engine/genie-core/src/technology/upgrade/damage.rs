@@ -196,6 +196,7 @@ mod tests {
     use crate::objects::masters::{DamageGraphic, DamageSpriteMode, HpPercent, Master};
     use crate::objects::unit::Unit;
     use crate::players::Amount;
+    use crate::technology::upgrade::damage::share_of;
     use crate::test_ids::{master_id, object_id};
     use crate::testing::attribute;
     use crate::testing::class;
@@ -228,18 +229,18 @@ mod tests {
         };
         (unit.life.attribute_kind, unit.life.amount) = (Some(attribute::WOOD), Amount::new(25.0));
         assert_eq!(
-            super::share_of(&unit, &tree, &roles()),
+            share_of(&unit, &tree, &roles()),
             Some((HpPercent::of_data(75), 20.0))
         );
         unit.life.attribute_kind = Some(attribute::STONE);
         assert_eq!(
-            super::share_of(&unit, &tree, &roles()),
+            share_of(&unit, &tree, &roles()),
             Some((HpPercent::of_data(0), 20.0))
         );
         unit.life.state = ObjectState::Alive;
         unit.life.hp = HitPoints::new(5.0);
         assert_eq!(
-            super::share_of(&unit, &tree, &roles()),
+            share_of(&unit, &tree, &roles()),
             Some((HpPercent::of_data(75), 5.0))
         );
     }
