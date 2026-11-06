@@ -17,6 +17,7 @@ use crate::objects::masters::{MasterTables, OwnerMasters};
 use crate::objects::unit::Unit;
 use crate::orders::object_gone;
 use crate::ownership::CaptureKind;
+use crate::ownership::artifact::ANIMAL_UNMOVING;
 use crate::ownership::change::change_hands;
 use crate::ownership::change::dead_master_of;
 use crate::players::PlayerId;
@@ -112,9 +113,7 @@ impl Unit {
                 step.world
                     .parts
                     .mover_mut(self.id)
-                    .ok_or(GenieError::unsupported(
-                        "a walking animal without movement state",
-                    ))?
+                    .ok_or(ANIMAL_UNMOVING)?
                     .stop()?;
             }
             for object_id in [gone.released, released].into_iter().flatten() {

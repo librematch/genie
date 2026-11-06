@@ -51,6 +51,10 @@ use crate::world::{BUILDING_TERRAIN, GATE_CLOSE_DELAY, GATE_EPSILON};
 use crate::{GenieError, GenieResult};
 use std::mem::take;
 
+/// A farm's foundation without the map's terrain, which the foundation covers.
+pub(crate) const FARM_TERRAIN_LACKING: GenieError =
+    GenieError::unsupported("a farm's foundation without the map's terrain");
+
 /// `TRIBE_Building_Object::update`'s walls' branch (`0x1411c9000`): a master of class 27 (a
 /// wall) or the house runs only its damage frames by its hit points and its combat update; no
 /// whole seconds, and an annex of it completes as well ([`Unit::complete_on_update`]).
@@ -271,9 +275,7 @@ impl Unit {
             .spatial
             .terrain
             .as_mut()
-            .ok_or(GenieError::unsupported(
-                "a farm's foundation without the map's terrain",
-            ))?
+            .ok_or(FARM_TERRAIN_LACKING)?
             .cover(&foundation, roles, step.world.model.tuning.terrain)
     }
 

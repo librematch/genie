@@ -11,6 +11,7 @@
 //! `FUN_1415e23f0`; the revealed units `FUN_14152bcb0`; the tile list's refill `FUN_141285cb0`.
 
 use crate::garrison::ContainerId;
+use crate::garrison::HOUSED_NOT_LIVE;
 use crate::garrison::LetOut;
 use crate::garrison::SIEGE_UNLOAD;
 use crate::map::Point;
@@ -313,10 +314,7 @@ impl World {
 
     /// The index of the unit `id` inside a building in player `player_id`'s live list.
     fn housed_index(&self, player_id: PlayerId, id: ObjectId) -> GenieResult<ListIndex> {
-        self.live_index(player_id, id)
-            .ok_or(GenieError::unsupported(
-                "a unit inside a building outside the live lists",
-            ))
+        self.live_index(player_id, id).ok_or(HOUSED_NOT_LIVE)
     }
 
     /// `FUN_141285cb0` on player `player_id`'s map: each tile of the map (rows, then columns) whose

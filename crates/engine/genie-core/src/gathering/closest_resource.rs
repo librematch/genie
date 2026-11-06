@@ -30,6 +30,13 @@ use crate::world::slots::PlayerSlotsExt;
 use crate::world::step::Step;
 use crate::{GenieError, GenieResult};
 
+/// A resource search by a unit without movement state.
+pub(crate) const SEARCHER_UNMOVING: GenieError =
+    GenieError::unsupported("a resource search without movement state");
+/// A resource search by a unit without a unit AI.
+pub(crate) const SEARCHER_AI_LACKING: GenieError =
+    GenieError::unsupported("a resource search without a unit AI");
+
 /// What `ClosestResourceObject` reads of the world, as the unit's update or its unit AI sees it.
 pub(crate) struct ResourceWorld<'world, 'plan> {
     pub(crate) player: PlayerId,
@@ -138,12 +145,7 @@ pub(crate) fn closest_resource_of(
                 .of_master(master.id)
                 .contains(MasterRoles::SEARCH_FROM_FOOTPRINT)
                 || {
-                    let restriction = mover
-                        .ok_or(GenieError::unsupported(
-                            "a resource search without movement state",
-                        ))?
-                        .stats
-                        .restriction;
+                    let restriction = mover.ok_or(SEARCHER_UNMOVING)?.stats.restriction;
                     let terrain = resource_world.spatial.terrain.as_ref().ok_or(NO_TERRAIN)?;
                     let values = terrain
                         .restriction(restriction)
@@ -172,9 +174,7 @@ pub(crate) fn closest_resource_of(
         ));
     }
     let master = unit.master_in(resource_world.masters)?;
-    let mover = mover.ok_or(GenieError::unsupported(
-        "a resource search without movement state",
-    ))?;
+    let mover = mover.ok_or(SEARCHER_UNMOVING)?;
     let mask = mover.stats.restriction_mask;
     let player = resource_world.player;
     // the unit out of its slot while it updates, as it stands
@@ -356,9 +356,7 @@ impl Unit {
             .parts
             .unit_ai
             .get(self.id)
-            .ok_or(GenieError::unsupported(
-                "a resource search without a unit AI",
-            ))?
+            .ok_or(SEARCHER_AI_LACKING)?
             .current_target;
         let top_speed = step
             .world

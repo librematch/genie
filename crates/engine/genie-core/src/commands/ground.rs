@@ -24,8 +24,11 @@ use crate::world::slots::CheckedIndexExt;
 use crate::world::slots::PlayerSlotsExt;
 use std::collections::BTreeMap;
 
+use crate::construction::build::CLEARED_NOT_HELD;
+use crate::construction::build::SENT_OFF_UNMOVING;
 use crate::construction::build::{ClearLook, clearing_objects, footprint_clearing};
 use crate::construction::build::{Cleared, ClearingSite};
+use crate::construction::building_update::FARM_TERRAIN_LACKING;
 use crate::map::Snow;
 use crate::map::spatial::Obstruction;
 use crate::map::spatial::Placed;
@@ -179,12 +182,7 @@ impl World {
         let (_, first) = self
             .object(*units.checked(0)?)
             .ok_or(GenieError::unsupported("a unit sent off that is gone"))?;
-        let mover = self
-            .parts
-            .mover_of(first.id)
-            .ok_or(GenieError::unsupported(
-                "a unit sent off without movement state",
-            ))?;
+        let mover = self.parts.mover_of(first.id).ok_or(SENT_OFF_UNMOVING)?;
         let spot = self.spatial.spot_off(
             first.position(),
             (first.id, mover.stats.radius.x()),
@@ -268,9 +266,7 @@ impl World {
         self.spatial
             .terrain
             .as_mut()
-            .ok_or(GenieError::unsupported(
-                "a farm's foundation without the map's terrain",
-            ))?
+            .ok_or(FARM_TERRAIN_LACKING)?
             .cover(&foundation, &self.model.roles, self.model.tuning.terrain)
     }
 
@@ -321,9 +317,7 @@ impl World {
             }
             // FUN_141189670 after its destroy: unless +0x686 is set, a tall master's (COMISS: a
             // NaN height too) or a recorded object's record goes; then +0x686 (FUN_141189b60)
-            let look = self.clear_look(cl.id)?.ok_or(GenieError::unsupported(
-                "a footprint clearing of an object the slice does not hold",
-            ))?;
+            let look = self.clear_look(cl.id)?.ok_or(CLEARED_NOT_HELD)?;
             let recorded = self
                 .spatial
                 .get(cl.id)
@@ -362,9 +356,7 @@ impl World {
     ///
     /// An object the slice does not hold, and what the deletes do not model.
     pub(crate) fn clear_object(&mut self, cl: Cleared, record: RecordDrop) -> GenieResult<()> {
-        let (owner, _) = self.object(cl.id).ok_or(GenieError::unsupported(
-            "a footprint clearing of an object the slice does not hold",
-        ))?;
+        let (owner, _) = self.object(cl.id).ok_or(CLEARED_NOT_HELD)?;
         if cl.wall {
             self.remove_building(owner, cl.id)?;
         }

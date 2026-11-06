@@ -595,6 +595,15 @@ pub(crate) fn set_walker_anim(mut motion: MotionMut<'_>, speed: Speed) {
 /// `+0xa4`, else notify 0x1f9) is MISSING.md's.
 const ATTACK_WITHOUT_TARGET: GenieError =
     GenieError::unreachable("an Attack's set_state(4) without its target");
+/// An Attack's unit without a standing sprite.
+const STANDING_SPRITE_LACKING: GenieError =
+    GenieError::unsupported("an Attack's unit without a standing sprite");
+/// An attack's target the slice does not hold among the live objects.
+pub(crate) const ATTACK_TARGET_NOT_LIVE: GenieError =
+    GenieError::unsupported("an attack's target the slice does not hold live");
+/// An attacker whose charge adds to its range (slot 0x2f8).
+pub(crate) const CHARGE_RANGE: GenieError =
+    GenieError::unsupported("an attacker whose charge adds to its range (slot 0x2f8)");
 
 /// What readyToAttack answers: ready to swing, waiting for the attack timer, or the target out of
 /// reach at this gap (the unit follows it).

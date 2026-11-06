@@ -219,6 +219,7 @@ use crate::production::{HotkeyId, MakeObjState, MakeTechState, Making, Productio
 use crate::technology::CostPaid;
 use crate::technology::Linked;
 use crate::technology::ResearchState;
+use crate::technology::UNKNOWN_TECH;
 use crate::technology::{CostOverride, OverrideUse, ResearchCap, TechKind};
 use crate::test_ids::attack_category;
 use crate::test_ids::carrying;
@@ -284,6 +285,7 @@ use crate::vision::SightShape;
 use crate::vision::TileCount;
 use crate::vision::VisionBits;
 use crate::vision::ghost::{Cell, Watched};
+use crate::vision::registry::NO_LAST_ANSWER;
 use crate::vision::registry::UnitUpdate;
 use crate::vision::registry::{Record, Registry};
 use crate::vision::visibility::{Seer, capture_kind};
@@ -11841,7 +11843,7 @@ fn research_unmodelled_parts_fail() {
     };
     assert_eq!(
         fails(&|world| Arc::make_mut(&mut world.model.techs).truncate(5)),
-        "a technology the data file has not got"
+        UNKNOWN_TECH.reason()
     );
     assert_eq!(
         fails(&|world| Arc::make_mut(&mut world.model.techs)[5].kind = TechKind::SHARED),
@@ -25290,12 +25292,7 @@ fn call_for_help_walks_the_lists_for_free_helper_in_reach() {
     let mut far = helper_scout(idle.clone(), None);
     far.unit.place_for_test(Position::new(14.0, 10.0, 0.0));
     assert_eq!(call(far, Some(lists())), Ok(()));
-    assert_eq!(
-        call(helper_scout(idle, None), None),
-        Err(GenieError::unsupported(
-            "a search that reads the registry's last answer (before any query)"
-        ))
-    );
+    assert_eq!(call(helper_scout(idle, None), None), Err(NO_LAST_ANSWER));
 }
 
 /// RESEARCH's handler on its listed buildings, every one kept by its check.

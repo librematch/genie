@@ -34,6 +34,10 @@ use crate::world::layer::Slots;
 use crate::world::step::Step;
 use crate::{GenieError, GenieResult};
 
+/// A Gather action in a state the slice does not model.
+const UNMODELLED_STATE: GenieError =
+    GenieError::unsupported("a Gather action in a state the slice does not model");
+
 impl GatherAction {
     /// The object the gather's `MoveTo` walks to, which the update holds as `target`, the unit
     /// `gap` from its footprint.
@@ -150,9 +154,7 @@ impl GatherAction {
             }
             GatherState::Face => self.update_face(step, unit, target, gather_reads, roles),
             GatherState::Work => self.update_work(step, unit, target, gather_reads, roles),
-            _ => Err(GenieError::unsupported(
-                "a Gather action in a state the slice does not model",
-            )),
+            _ => Err(UNMODELLED_STATE),
         }
     }
 
@@ -183,9 +185,7 @@ impl GatherAction {
             self.state,
             GatherState::Walk { .. } | GatherState::Face | GatherState::Work
         ) {
-            return Err(GenieError::unsupported(
-                "a Gather action in a state the slice does not model",
-            ));
+            return Err(UNMODELLED_STATE);
         }
         if Amount::ZERO < unit.life.amount {
             return Ok(Next::Drop);

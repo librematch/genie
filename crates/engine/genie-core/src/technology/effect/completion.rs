@@ -19,6 +19,7 @@ use crate::production::Research;
 use crate::technology::ChangeMode;
 use crate::technology::DisabledTech;
 use crate::technology::ResearchState;
+use crate::technology::SHARED_RESEARCH;
 use crate::technology::TechId;
 use crate::technology::TechMode;
 use crate::technology::effect::ATTRIBUTE_39;
@@ -486,9 +487,7 @@ impl World {
                 None => false,
             };
             if building {
-                return Err(GenieError::unsupported(
-                    "a research of the shared kind (FUN_1411c49a0)",
-                ));
+                return Err(SHARED_RESEARCH);
             }
             return Ok(());
         }

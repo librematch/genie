@@ -19,6 +19,7 @@ use crate::unit_ai::NotifyKind;
 use crate::unit_ai::{AiAction, OrderKind};
 use crate::{GenieError, GenieResult};
 
+use crate::construction::build::BUILDING_UNPLACED;
 use crate::construction::{BuilderCount, FoundationId};
 use crate::movement::Mover;
 use crate::objects::layers::Action;
@@ -263,9 +264,7 @@ impl BuildAction {
             .world
             .spatial
             .get(self.target)
-            .ok_or(GenieError::unsupported(
-                "a builder's building without a place",
-            ))?
+            .ok_or(BUILDING_UNPLACED)?
             .position;
         let work = Work::on(self.target.map(FoundationId::id), point);
         self.lend(step, builder, actions, |world, player_id, list_index| {

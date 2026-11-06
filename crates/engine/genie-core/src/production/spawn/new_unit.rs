@@ -42,6 +42,7 @@ use crate::objects::facing::{SpriteFacets, drawn_angle, draws_angle};
 use crate::objects::layers::{Action, Combat, Motion, Static, default_start};
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::Master;
+use crate::production::spawn::objects::RECYCLABLE_NEW_OBJECT;
 use crate::technology::Attributes;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::{NewObject, Notify, UnitAi};
@@ -50,6 +51,15 @@ use crate::vision::visibility::{Seer, capture_kind};
 use crate::world::World;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
+
+/// A computer player's new unit (its AI's slot 0x398).
+const COMPUTER_NEW_UNIT: GenieError =
+    GenieError::unsupported("a computer player's new unit (its AI's slot 0x398)");
+/// A spawn without the players' sight.
+const SPAWN_UNSIGHTED: GenieError = GenieError::unsupported("a spawn without the players' sight");
+/// A new unit of a master that does not move.
+const NEW_UNIT_UNMOVING: GenieError =
+    GenieError::unsupported("a new unit of a master that does not move");
 
 impl World {
     /// `FUN_140ad0240`: the unit of `master` spawns beside the building at `list_index`. The spawn
@@ -77,21 +87,15 @@ impl World {
         pop: Amount,
     ) -> GenieResult<()> {
         if self.players.player(player_id)?.kind.is_computer() {
-            return Err(GenieError::unsupported(
-                "a computer player's new unit (its AI's slot 0x398)",
-            ));
+            return Err(COMPUTER_NEW_UNIT);
         }
         if self.spatial.sight.is_none() {
-            return Err(GenieError::unsupported(
-                "a spawn without the players' sight",
-            ));
+            return Err(SPAWN_UNSIGHTED);
         }
         let building = &self.players.live(player_id, list_index)?;
         let made = self.master(player_id, master)?.clone();
         if made.recyclable.recycled() {
-            return Err(GenieError::unsupported(
-                "a new object of a recyclable master (a negative id)",
-            ));
+            return Err(RECYCLABLE_NEW_OBJECT);
         }
         // the building unit AI's command queue (`+0x1f0`, saved as `savedOrder`): without a
         // gather point its first location is the spot's goal (FUN_1411d12d0, slot 0x220)
@@ -110,9 +114,7 @@ impl World {
                 .map(|gather_point| gather_point.point.ground()),
         };
         if made.move_stats.is_none() {
-            return Err(GenieError::unsupported(
-                "a new unit of a master that does not move",
-            ));
+            return Err(NEW_UNIT_UNMOVING);
         }
         let point = self.spot_beside(player_id, list_index, &made, toward)?;
         let new = self.combat_object(player_id, master, &made, point.with_height(position.z()))?;
@@ -334,23 +336,15 @@ impl World {
         position: Position,
     ) -> GenieResult<ListIndex> {
         if self.players.player(player_id)?.kind.is_computer() {
-            return Err(GenieError::unsupported(
-                "a computer player's new unit (its AI's slot 0x398)",
-            ));
+            return Err(COMPUTER_NEW_UNIT);
         }
         if self.spatial.sight.is_none() {
-            return Err(GenieError::unsupported(
-                "a spawn without the players' sight",
-            ));
+            return Err(SPAWN_UNSIGHTED);
         }
         if made.recyclable.recycled() {
-            return Err(GenieError::unsupported(
-                "a new object of a recyclable master (a negative id)",
-            ));
+            return Err(RECYCLABLE_NEW_OBJECT);
         }
-        let moving = made.move_stats.ok_or(GenieError::unsupported(
-            "a new unit of a master that does not move",
-        ))?;
+        let moving = made.move_stats.ok_or(NEW_UNIT_UNMOVING)?;
         // the constructor's new_position: the ground's height by the master's fly mode (slot
         // 0x60, FUN_141193a10)
         let position = self.spatial.terrain.as_ref().map_or(position, |terrain| {

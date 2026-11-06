@@ -1,7 +1,9 @@
 //! `ClosestObject` (`FUN_140c488b0`): the search's pick of the closest object it found, and its tests
 //! of each one.
 
+use crate::GenieResult;
 use crate::map::Distance;
+use crate::map::spatial::search::NO_SIGHT;
 use crate::map::spatial::{ClosestChecks, Filter, Placed, Reach, Spatial};
 use crate::math::fmath::below_or_unordered;
 use crate::objects::ObjectId;
@@ -24,7 +26,6 @@ use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 use crate::world::objects_ref::ObjectsRef;
-use crate::{GenieError, GenieResult};
 use std::fmt::Debug;
 
 impl Spatial {
@@ -73,9 +74,7 @@ impl Spatial {
                 if record.id == me {
                     continue;
                 }
-                let sight = self.sight.as_ref().ok_or(GenieError::unsupported(
-                    "a search without the players' sight",
-                ))?;
+                let sight = self.sight.as_ref().ok_or(NO_SIGHT)?;
                 let (Some(seer), Some(placed)) =
                     (sight.seer(record.id), self.objects.get(record.id))
                 else {

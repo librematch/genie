@@ -38,15 +38,17 @@ use crate::world::layer::MasterRoles;
 use crate::world::slots::PlayerSlotsExt;
 use crate::{GenieError, GenieResult};
 
+/// A unit inside a building that is not in its player's live list.
+pub(crate) const HOUSED_NOT_LIVE: GenieError =
+    GenieError::unsupported("a unit inside a building outside the live lists");
+
 impl World {
     /// The player and live index of the unit `id` inside a building or a transport, whoever's
     /// it is.
     pub(crate) fn live_inside(&self, id: ObjectId) -> GenieResult<(PlayerId, ListIndex)> {
         match self.place(id) {
             Some(Place::Live(player_id, list_index)) => Ok((player_id, list_index)),
-            _ => Err(GenieError::unsupported(
-                "a unit inside a building outside the live lists",
-            )),
+            _ => Err(HOUSED_NOT_LIVE),
         }
     }
 

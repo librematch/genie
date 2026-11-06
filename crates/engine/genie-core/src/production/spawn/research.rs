@@ -15,6 +15,7 @@ use crate::technology::Repeat;
 use crate::technology::RepeatLimit;
 use crate::technology::ResearchState;
 use crate::technology::TechId;
+use crate::technology::UNKNOWN_TECH;
 use crate::technology::{Location, ResearchCount, TechDef, TechKind, is_age};
 use crate::unit_ai::AiAction;
 use crate::unit_ai::Notify;
@@ -61,13 +62,7 @@ impl World {
             .ok_or(GenieError::unsupported(
                 "a research of a technology the tree has not got",
             ))?;
-        let def = self
-            .model
-            .techs
-            .get(tech_index)
-            .ok_or(GenieError::unsupported(
-                "a technology the data file has not got",
-            ))?;
+        let def = self.model.techs.get(tech_index).ok_or(UNKNOWN_TECH)?;
         Ok((tech_index, def))
     }
 

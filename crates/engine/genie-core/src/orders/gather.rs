@@ -2,13 +2,16 @@
 
 use crate::combat::attack::{Arms, Engagement};
 use crate::combat::attack::{arms as attack_arms, engagement as attack_engagement};
+use crate::construction::MAIN_BUILDING_GONE;
 use crate::construction::MainBuildingId;
+use crate::gathering::gather::GATHERER_STATE_LACKING;
 use crate::gathering::gather::GATHERER_UNMOVING;
 use crate::gathering::gather::unit::WalkSprites;
 use crate::gathering::gather::{
     GatherAction, GatherState, MoveTarget, Resource, StopRate, productivity_of,
 };
 use crate::gathering::gather::{GatherRetarget, GatherStart};
+use crate::gathering::hunt::HUNTER_STATE_LACKING;
 use crate::gathering::hunt::{HuntMove, HuntTask, Quarry};
 use crate::map::Position;
 use crate::math::rng::Stream;
@@ -39,6 +42,13 @@ use crate::world::layer::MasterRoles;
 use crate::world::slots::PlayerSlotsExt;
 use crate::world::{ATTACKER_UNPLACED, TARGET_UNPLACED};
 use crate::{GenieError, GenieResult};
+
+/// A gather's target the slice does not hold.
+const GATHER_TARGET_NOT_HELD: GenieError =
+    GenieError::unsupported("a gather's target the slice does not hold");
+/// A hunt's target the slice does not hold.
+const HUNT_TARGET_NOT_HELD: GenieError =
+    GenieError::unsupported("a hunt's target the slice does not hold");
 
 mod hunt;
 
@@ -74,9 +84,7 @@ impl World {
         idx: ListIndex,
         target: ObjectId,
     ) -> GenieResult<Answer> {
-        let (tp, target_unit) = self.object(target).ok_or(GenieError::unsupported(
-            "a gather's target the slice does not hold",
-        ))?;
+        let (tp, target_unit) = self.object(target).ok_or(GATHER_TARGET_NOT_HELD)?;
         let tm = target_unit.master(self.master_tables(), tp)?;
         if !self.gatherable_building(player, (tp, target_unit), tm)? {
             return Ok(Answer::NotTaken);
@@ -138,9 +146,7 @@ impl World {
             self.parts.actions.of_mut(unit.id)?.list.gather_mut(),
             self.parts.motion.mover_mut(unit.id),
         ) else {
-            return Err(GenieError::unsupported(
-                "a gatherer without its gather or movement state",
-            ));
+            return Err(GATHERER_STATE_LACKING);
         };
         let old = gather.targets();
         let rng = self.streams.get_mut(Stream::Action);
@@ -232,9 +238,7 @@ impl World {
             self.parts.actions.of_mut(unit.id)?.list.gather_mut(),
             self.parts.motion.mover_mut(unit.id),
         ) else {
-            return Err(GenieError::unsupported(
-                "a gatherer without its gather or movement state",
-            ));
+            return Err(GATHERER_STATE_LACKING);
         };
         let old = gather.targets();
         gather.take_move(
@@ -258,9 +262,7 @@ impl World {
         idx: ListIndex,
         target: ObjectId,
     ) -> GenieResult<bool> {
-        let (tp, target_unit) = self.object(target).ok_or(GenieError::unsupported(
-            "a hunt's target the slice does not hold",
-        ))?;
+        let (tp, target_unit) = self.object(target).ok_or(HUNT_TARGET_NOT_HELD)?;
         let tm = target_unit.master(self.master_tables(), tp)?;
         let main = if tm.kind == MasterKind::BUILDING {
             self.parts
@@ -318,9 +320,7 @@ impl World {
             self.parts.actions.of_mut(unit.id)?.list.hunt_mut(),
             self.parts.motion.mover_mut(unit.id),
         ) else {
-            return Err(GenieError::unsupported(
-                "a hunter without its hunt or movement state",
-            ));
+            return Err(HUNTER_STATE_LACKING);
         };
         let (old_target, old_second) = (hunt.target, hunt.carry_to);
         if hunt.take_move(
@@ -358,9 +358,7 @@ impl World {
 
     /// What a hunt reads of its target.
     pub(super) fn quarry(&self, player: PlayerId, target: ObjectId) -> GenieResult<Quarry> {
-        let (tp, unit) = self.object(target).ok_or(GenieError::unsupported(
-            "a hunt's target the slice does not hold",
-        ))?;
+        let (tp, unit) = self.object(target).ok_or(HUNT_TARGET_NOT_HELD)?;
         let target_master = unit.master(self.master_tables(), tp)?;
         let world = TaskWorld {
             players: &self.players,
@@ -395,9 +393,7 @@ impl World {
         task: &Task,
         notify: Option<(Position, Notifies)>,
     ) -> GenieResult<()> {
-        let (tp, target_unit) = self.object(target).ok_or(GenieError::unsupported(
-            "a gather's target the slice does not hold",
-        ))?;
+        let (tp, target_unit) = self.object(target).ok_or(GATHER_TARGET_NOT_HELD)?;
         let tm = target_unit.master(self.master_tables(), tp)?;
         let unit = &self.players.live(player, idx)?;
         let me = unit.master(self.master_tables(), player)?;
@@ -610,9 +606,7 @@ impl World {
             }
             if !tm.object_flags.contains(ObjectFlags::GATHERED_BUILDING) {
                 let (mp, main) = match self.parts.building_of(unit.id).annex_of {
-                    Some(role_id) => self.object(role_id).ok_or(GenieError::unsupported(
-                        "an annex whose main building is gone",
-                    ))?,
+                    Some(role_id) => self.object(role_id).ok_or(MAIN_BUILDING_GONE)?,
                     None => (tp, unit),
                 };
                 let main_master = main.master(self.master_tables(), mp)?.id;

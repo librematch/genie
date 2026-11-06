@@ -17,6 +17,10 @@ use crate::players::PlayerId;
 use crate::production::spawn::WorldMap;
 use crate::{GenieError, GenieResult};
 
+/// A hill mode's test where the map's elevations are not known.
+pub(crate) const NO_ELEVATIONS: GenieError =
+    GenieError::unsupported("a hill mode where the elevations are not known");
+
 bitflags::bitflags! {
     /// What BUILD's placement test runs ([`BuildSite`]).
     #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -78,9 +82,7 @@ pub(super) fn hill_fails(
         HillMode::SIDE_SLOPES => !matches!(shape()?, 0 | 5..=8),
         HillMode::FLAT => shape()? != 0,
         HillMode::ONE_STEP if tile.x() == corner.x() || tile.y() == corner.y() => {
-            let elevation = i32::from(map.elevation(tile).ok_or(GenieError::unsupported(
-                "a hill mode where the elevations are not known",
-            ))?);
+            let elevation = i32::from(map.elevation(tile).ok_or(NO_ELEVATIONS)?);
             let base_elevation = i32::from(base.unwrap_or(0));
             elevation < base_elevation - 1 || base_elevation + 1 < elevation
         }

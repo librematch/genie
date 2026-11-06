@@ -21,6 +21,7 @@ use crate::objects::masters::OwnerMasters;
 use crate::objects::masters::PlayersMastersExt;
 use crate::orders::ControlKey;
 use crate::orders::Kept;
+use crate::orders::moves::MOVED_UNMOVING;
 use crate::orders::{Followed, follow_axis, follow_spread, ignore_unit};
 use crate::players::PlayerId;
 use crate::unit_ai::AiAction;
@@ -34,6 +35,7 @@ use crate::world::index::Place;
 use crate::world::layer::ClassRoles;
 use crate::world::slots::CheckedIndexExt;
 use crate::world::slots::PlayerSlotsExt;
+use crate::world::unread::UNREAD_ACTION;
 use crate::{GenieError, GenieResult};
 
 impl World {
@@ -442,9 +444,7 @@ impl World {
         let top = self.top_speed(player, self.players.live(player, idx)?)?;
         let unit = self.players.live_mut(player, idx)?;
         let here = unit.position();
-        let mover = self.parts.mover_of(unit.id).ok_or(GenieError::unsupported(
-            "a moved unit without movement state",
-        ))?;
+        let mover = self.parts.mover_of(unit.id).ok_or(MOVED_UNMOVING)?;
         let move_to = MoveToAction::to_object(
             &self.spatial,
             ToObject {
@@ -496,9 +496,7 @@ impl World {
             return self.point_taken(player, idx, point);
         };
         if self.parts.unread.contains(unit.id) {
-            return Err(GenieError::unsupported(
-                "slot 0x40 of an action the slice does not hold",
-            ));
+            return Err(UNREAD_ACTION);
         }
         match self.parts.actions_of(unit.id).list.head() {
             None

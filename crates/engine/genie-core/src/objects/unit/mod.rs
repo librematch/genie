@@ -41,6 +41,9 @@ mod update;
 /// A dying sprite the `.dat` does not have.
 const NO_DYING_SPRITE: GenieError =
     GenieError::unsupported("a dying sprite the data file does not have");
+/// A stopped unit without its standing sprite.
+pub(crate) const STOPPED_SPRITE_LACKING: GenieError =
+    GenieError::unsupported("a stopped unit without its standing sprite");
 
 bitflags::bitflags! {
     /// An object's flag bytes `+0x685` to `+0x68a` ([`Unit`]).

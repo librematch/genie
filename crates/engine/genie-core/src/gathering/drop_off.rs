@@ -6,11 +6,13 @@ use crate::gathering::drop_sites::DropMeasure;
 use crate::gathering::drop_sites::SitePlace;
 use crate::gathering::drop_sites::SiteSearch;
 use crate::gathering::drop_sites::{DROP_SITE_UNPLACED, Seeker, drop_site_search};
+use crate::gathering::gather::GATHERER_STATE_LACKING;
 use crate::gathering::gather::GATHERER_UNMOVING;
 use crate::gathering::gather::GatherState;
 use crate::gathering::gather::unit::WalkSprites;
 use crate::gathering::gather::{GatherAction, GatherRetarget, Walks};
 use crate::gathering::gather::{Resource, StopRate, productivity_of, waits_for_farm};
+use crate::gathering::hunt::HUNTER_STATE_LACKING;
 use crate::gathering::hunt::HuntAction;
 use crate::map::Distance;
 use crate::map::Position;
@@ -44,6 +46,14 @@ use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlotsExt;
 use crate::world::step::Step;
 use crate::{GenieError, GenieResult};
+
+/// A drop-off of a player without a masters table.
+pub(crate) const DROP_OFF_MASTERS_LACKING: GenieError =
+    GenieError::unsupported("a drop-off of a player without masters");
+/// Slot 0x1b0 (a target class's gather group) of another unit AI than the civilian's, which the
+/// search after a drop-off asks.
+pub(crate) const NON_CIVILIAN_GROUP: GenieError =
+    GenieError::unsupported("slot 0x1b0 of another unit AI than the civilian's");
 
 impl Unit {
     /// The Gather's state 8 after the deposit without a target (`0x140a8e1d0` case 7; its drop
@@ -120,9 +130,7 @@ impl Unit {
         };
         let class = ai.target_class.or(gather.target_class);
         if ai.ai_kind != UnitAiKind::Civilian {
-            return Err(GenieError::unsupported(
-                "slot 0x1b0 of another unit AI than the civilian's",
-            ));
+            return Err(NON_CIVILIAN_GROUP);
         }
         let Some(kind) = class.and_then(|class| civilian_kind(class, &step.world.model.roles))
         else {
@@ -281,9 +289,7 @@ impl Unit {
             actions.list.gather_mut(),
             step.world.parts.mover_mut(self.id),
         ) else {
-            return Err(GenieError::unsupported(
-                "a gatherer without its gather or movement state",
-            ));
+            return Err(GATHERER_STATE_LACKING);
         };
         let old = gather.targets();
         let rng = step.world.streams.get_mut(Stream::Action);
@@ -450,9 +456,7 @@ impl Unit {
         );
         let walks = Walks::of(sprites, self, mover.as_deref(), drop_world.top_speed);
         let Some(mover) = mover else {
-            return Err(GenieError::unsupported(
-                "a gatherer without its gather or movement state",
-            ));
+            return Err(GATHERER_STATE_LACKING);
         };
         gather.carry_to = site;
         let walked = gather.set_drop(at, gap, mover, &walks, move_to_tuning);
@@ -507,9 +511,7 @@ impl Unit {
         );
         let walks = Walks::of(sprites, self, mover.as_deref(), drop_world.top_speed);
         let Some(mover) = mover else {
-            return Err(GenieError::unsupported(
-                "a hunter without its hunt or movement state",
-            ));
+            return Err(HUNTER_STATE_LACKING);
         };
         hunt.carry_to = site;
         let walked = hunt.set_drop(at, gap, mover, &walks, move_to_tuning);
@@ -536,9 +538,7 @@ impl Unit {
         let mover = mover.ok_or(GATHERER_UNMOVING)?;
         let mut site = carry_to;
         if site.is_none() && !master.action_part().drop_sites.is_empty() {
-            let masters = drop_world.masters.table.ok_or(GenieError::unsupported(
-                "a drop-off of a player without masters",
-            ))?;
+            let masters = drop_world.masters.table.ok_or(DROP_OFF_MASTERS_LACKING)?;
             let sites = &master.action_part().drop_sites;
             site = match self.drop_site_from(
                 (actions, Some(mover)),
@@ -617,9 +617,7 @@ impl Unit {
         search: SiteSearch,
         by_id: ObjectsRef<'_>,
     ) -> GenieResult<Option<DropSiteId>> {
-        let masters = drop_world.masters.table.ok_or(GenieError::unsupported(
-            "a drop-off of a player without masters",
-        ))?;
+        let masters = drop_world.masters.table.ok_or(DROP_OFF_MASTERS_LACKING)?;
         let master = self.master_in(drop_world.masters)?;
         let mover = mover.ok_or(GATHERER_UNMOVING)?;
         let terrain = drop_world.spatial.terrain.as_ref().ok_or(NO_TERRAIN)?;

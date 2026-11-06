@@ -3,6 +3,7 @@
 use crate::combat::attack::BeginLayer;
 use crate::combat::attack::{arms, engagement, show_arrived};
 use crate::gathering::gather::unit::WalkSprites;
+use crate::gathering::hunt::HUNTER_STATE_LACKING;
 use crate::gathering::hunt::HuntState;
 use crate::gathering::hunt::Quarry;
 use crate::gathering::hunt::{HUNT_TARGET_UNPLACED, HUNTER_UNPLACED, HuntAction, HuntRetarget};
@@ -114,9 +115,7 @@ impl Unit {
         )?;
         let by = self.releaser(step)?;
         let Some(mover) = step.world.parts.mover_mut(self.id) else {
-            return Err(GenieError::unsupported(
-                "a hunter without its hunt or movement state",
-            ));
+            return Err(HUNTER_STATE_LACKING);
         };
         let retargeted = hunt.retarget(
             HuntRetarget {

@@ -26,6 +26,7 @@ use crate::unit_ai::world_view::WorldPicker;
 use crate::unit_ai::{AttackAsk, Memory};
 use crate::unit_ai::{Found, Pick, Search};
 use crate::vision::SightTiles;
+use crate::vision::registry::NO_LAST_ANSWER;
 use crate::vision::registry::QueryShape;
 use crate::vision::registry::Record;
 use crate::vision::registry::Registry;
@@ -213,9 +214,7 @@ impl Spatial {
             objects,
             closest,
         } = query;
-        let _ = self.sight.as_ref().ok_or(GenieError::unsupported(
-            "a search without the players' sight",
-        ))?;
+        let _ = self.sight.as_ref().ok_or(NO_SIGHT)?;
         let fresh = self.search_query(player, search, spatial_tuning, registry_tuning)?
             == SearchLists::Fresh;
         let _ = self.last_found()?;
@@ -238,12 +237,7 @@ impl Spatial {
     /// The lists the last search left, as the cache holds them, or the error of a search that
     /// reads the registry's last answer before any query.
     pub(super) fn last_found(&self) -> GenieResult<&ByRelation<Vec<Record>>> {
-        self.search_cache
-            .last
-            .as_ref()
-            .ok_or(GenieError::unsupported(
-                "a search that reads the registry's last answer (before any query)",
-            ))
+        self.search_cache.last.as_ref().ok_or(NO_LAST_ANSWER)
     }
 
     /// What player `player`'s queries make of the first `players` players' objects
@@ -483,6 +477,9 @@ impl Spatial {
 /// An attack pick in a search that has no attack picker ([`SearchQuery::attack`]).
 const NO_PICKER: GenieError =
     GenieError::unsupported("an attack test in a search that picks no attack");
+/// A search without the players' sight.
+pub(crate) const NO_SIGHT: GenieError =
+    GenieError::unsupported("a search without the players' sight");
 
 /// What a unit AI's search takes ([`Spatial::search`]): the searcher, its [`Search`], and the
 /// callers' answers for what the search reads of the world beyond the spatial index.
@@ -520,9 +517,7 @@ impl Debug for SearchQuery<'_> {
 
 /// The objects-in-sight registry of the players' sight `sight`, which the queries read.
 fn registry_of(sight: Option<&Visibility>) -> GenieResult<&Registry> {
-    let visibility = sight.ok_or(GenieError::unsupported(
-        "a search without the players' sight",
-    ))?;
+    let visibility = sight.ok_or(NO_SIGHT)?;
     visibility.registry.as_ref().ok_or(GenieError::unsupported(
         "a search without the objects-in-sight registry",
     ))

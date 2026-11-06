@@ -54,6 +54,16 @@ use crate::production::LocationButton;
 use crate::world::WholeSeconds;
 use crate::world::layer::Slots;
 
+/// A technology the data file has not got, which a research or a queued research names.
+pub(crate) const UNKNOWN_TECH: GenieError =
+    GenieError::unsupported("a technology the data file has not got");
+/// A research cost the building holds (`FUN_141204310`).
+const HELD_RESEARCH_COST: GenieError =
+    GenieError::unsupported("a research cost the building holds (FUN_141204310)");
+/// A research of the shared kind (`FUN_1411c49a0`).
+const SHARED_RESEARCH: GenieError =
+    GenieError::unsupported("a research of the shared kind (FUN_1411c49a0)");
+
 /// The age technologies (`FUN_1413cc3c0`: 101 to 103), whose costs the research cost modifier
 /// leaves alone.
 #[must_use]
@@ -233,9 +243,7 @@ impl TechState {
                 .sum::<Amount>()
                 .get();
             if cost.paid == CostPaid::BUILDING {
-                return Err(GenieError::unsupported(
-                    "a research cost the building holds (FUN_141204310)",
-                ));
+                return Err(HELD_RESEARCH_COST);
             }
             if attributes.get(attr)?.get() + before < due {
                 return Ok(false);
@@ -349,9 +357,7 @@ impl TechState {
                 continue;
             };
             if paid == CostPaid::BUILDING {
-                return Err(GenieError::unsupported(
-                    "a research cost the building holds (FUN_141204310)",
-                ));
+                return Err(HELD_RESEARCH_COST);
             }
             if attributes.get(attr)?.get() < amount {
                 return Ok(false);
@@ -400,9 +406,7 @@ impl TechState {
             }
         }
         if def.kind == TechKind::SHARED {
-            return Err(GenieError::unsupported(
-                "a research of the shared kind (FUN_1411c49a0)",
-            ));
+            return Err(SHARED_RESEARCH);
         }
         self.state = ResearchState::Queued;
         self.building_master = Some(building);

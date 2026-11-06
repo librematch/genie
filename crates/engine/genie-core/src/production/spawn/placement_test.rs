@@ -19,6 +19,7 @@ use crate::players::PlayerId;
 use crate::production::spawn::PlacementCode;
 use crate::production::spawn::SiteChecks;
 use crate::production::spawn::WorldMap;
+use crate::production::spawn::terrains::NO_ELEVATIONS;
 use crate::production::spawn::{BuildSite, Tested, hill_fails, placement_terrains};
 use crate::production::spawn::{Near, NearFlags};
 use crate::world::layer::ClassRoles;
@@ -30,6 +31,9 @@ use crate::{GenieError, GenieResult};
 /// terrain restriction to test its place by).
 pub(crate) const NOT_MOVING: GenieError =
     GenieError::unsupported("a unit to put down of a master that does not move");
+/// A terrain the master's terrain restriction does not list.
+const UNLISTED_TERRAIN: GenieError =
+    GenieError::unsupported("a terrain its restriction does not list");
 
 /// The master a placement test places (its slot 0x50 with the spawn's arguments: by its radii,
 /// the terrain checked, the player's explored tiles needed, the elevation checked by its hill
@@ -237,12 +241,7 @@ pub(super) fn build_static_test(
     }
     // hill mode 3 measures the box's edge against the elevation of its first column's last row
     let base = if site.hill_mode == HillMode::ONE_STEP {
-        Some(
-            map.elevation(Tile::new(x0, y1))
-                .ok_or(GenieError::unsupported(
-                    "a hill mode where the elevations are not known",
-                ))?,
-        )
+        Some(map.elevation(Tile::new(x0, y1)).ok_or(NO_ELEVATIONS)?)
     } else {
         None
     };
@@ -250,12 +249,7 @@ pub(super) fn build_static_test(
         for ty in y0..=y1 {
             let tile = Tile::new(tx, ty);
             let terrain_id = map.terrain(tile)?;
-            let value = site
-                .restriction
-                .value(terrain_id)
-                .ok_or(GenieError::unsupported(
-                    "a terrain its restriction does not list",
-                ))?;
+            let value = site.restriction.value(terrain_id).ok_or(UNLISTED_TERRAIN)?;
             if value <= spawn_tuning.passable {
                 return Ok(Some(PlacementCode::Terrain));
             }
@@ -495,12 +489,7 @@ pub(crate) fn placement(
             for ty in y0..=y1 {
                 let tile = Tile::new(tx, ty);
                 let terrain_id = map.terrain(tile)?;
-                let value = me
-                    .restriction
-                    .value(terrain_id)
-                    .ok_or(GenieError::unsupported(
-                        "a terrain its restriction does not list",
-                    ))?;
+                let value = me.restriction.value(terrain_id).ok_or(UNLISTED_TERRAIN)?;
                 if value <= spawn_tuning.passable {
                     passable = false;
                     break 'tiles;

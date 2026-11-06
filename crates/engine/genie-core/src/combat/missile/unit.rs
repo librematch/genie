@@ -29,6 +29,8 @@ use crate::{GenieError, GenieResult};
 use std::mem::take;
 
 use crate::combat::attack::{Hit, strike};
+use crate::combat::missile::MISSILE_TARGET_NOT_LIVE;
+use crate::combat::missile::MISSILE_TERRAIN_LACKING;
 use crate::combat::missile::{
     HitMode, MISSILE_UNMOVING, Missile, MissileAction, MissileStats, MissileTargetId, grounded,
     meets_height,
@@ -187,9 +189,7 @@ impl Unit {
             .spatial
             .terrain
             .as_ref()
-            .ok_or(GenieError::unsupported(
-                "a missile without the map's terrain",
-            ))?
+            .ok_or(MISSILE_TERRAIN_LACKING)?
             .ground(at.ground())?;
         // a missile still flying (`+0x994`) keeps its height
         if !flying {
@@ -441,9 +441,7 @@ impl Unit {
             )?;
             (own, master.combat_part().hit_chance)
         };
-        let victim = victim.as_mut().ok_or(GenieError::unsupported(
-            "a missile's target the slice does not hold live",
-        ))?;
+        let victim = victim.as_mut().ok_or(MISSILE_TARGET_NOT_LIVE)?;
         let hit = Hit {
             at: self.position(),
             from_z: Some(action.origin.position.z()),
@@ -542,9 +540,7 @@ impl Unit {
         )?;
         // the missile's own part is out of the unit while it flies
         own.source.fired_from = fired_from;
-        let mut victim = victim(step, action.target, roles)?.ok_or(GenieError::unsupported(
-            "a missile's target the slice does not hold live",
-        ))?;
+        let mut victim = victim(step, action.target, roles)?.ok_or(MISSILE_TARGET_NOT_LIVE)?;
         let victim = &mut victim;
         let hit = Hit {
             at: self.position(),

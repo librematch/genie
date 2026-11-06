@@ -35,6 +35,14 @@ use crate::world::settings::OptionFlags;
 use crate::world::slots::PlayerSlotsExt;
 use crate::{GenieError, GenieResult};
 
+/// An object inside another that the base destroy (`FUN_14118f1e0`) would let out first (slot
+/// 0x1a8), which the slice does not model.
+pub(crate) const DESTROYED_INSIDE: GenieError =
+    GenieError::unsupported("a destroyed object inside another (slot 0x1a8)");
+/// A `set_state` of an object the slice does not hold.
+const SET_STATE_NOT_HELD: GenieError =
+    GenieError::unsupported("a set_state of an object the slice does not hold");
+
 /// The first master type a delete takes (`FUN_1416257c0`: above `0x45`).
 const DELETABLE_KIND: MasterKind = MasterKind::of_data(70);
 
@@ -360,9 +368,7 @@ impl World {
             return Ok(());
         }
         if unit.life.inside.is_some() {
-            return Err(GenieError::unsupported(
-                "a destroyed object inside another (slot 0x1a8)",
-            ));
+            return Err(DESTROYED_INSIDE);
         }
         let list_index = self.wake(id)?;
         self.players.live_mut(owner, list_index)?.life.hp = HitPoints::ZERO;
@@ -384,9 +390,7 @@ impl World {
         id: ObjectId,
         new: ObjectState,
     ) -> GenieResult<()> {
-        let (_, unit) = self.object(id).ok_or(GenieError::unsupported(
-            "a set_state of an object the slice does not hold",
-        ))?;
+        let (_, unit) = self.object(id).ok_or(SET_STATE_NOT_HELD)?;
         let master = unit.master(self.master_tables(), owner)?.clone();
         match master.kind {
             MasterKind::BUILDING => self.building_set_state(owner, id, new, &master),
@@ -494,9 +498,7 @@ impl World {
         new: ObjectState,
         master: &Master,
     ) -> GenieResult<()> {
-        let (_, unit) = self.object(id).ok_or(GenieError::unsupported(
-            "a set_state of an object the slice does not hold",
-        ))?;
+        let (_, unit) = self.object(id).ok_or(SET_STATE_NOT_HELD)?;
         let (old, position) = (unit.life.state, unit.position());
         if old == new || (new < old && new != ObjectState::Foundation) {
             return Ok(());

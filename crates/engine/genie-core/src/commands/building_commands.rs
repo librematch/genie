@@ -21,6 +21,7 @@ use crate::technology::Effect;
 use crate::technology::RepeatLimit;
 use crate::technology::ResearchState;
 use crate::technology::TechId;
+use crate::technology::UNKNOWN_TECH;
 use crate::technology::{TechKind, TechState, factors};
 use crate::unit_ai::AiAction;
 use crate::unit_ai::OrderKind;
@@ -330,9 +331,7 @@ impl World {
             return Ok(());
         }
         let tech = tech_id.index();
-        let def = self.model.techs.get(tech).ok_or(GenieError::unsupported(
-            "a technology the data file has not got",
-        ))?;
+        let def = self.model.techs.get(tech).ok_or(UNKNOWN_TECH)?;
         let factors = factors(tech_id, owner, self.model.slots)?;
         let listed = owner.techs.checked(tech)?.listed_costs(def, factors)?;
         debit_listed(self.players.player_mut(player)?, listed);

@@ -3,6 +3,7 @@
 
 use crate::combat::attack::AttackState;
 use crate::combat::attack::AttackerFlags;
+use crate::combat::attack::STANDING_SPRITE_LACKING;
 use crate::combat::attack::update::let_go;
 use crate::combat::attack::{
     AiOrder, Attack, AttackReads, Engagement, Fight, HALF, NO_RANGE, NONE, set_walker_anim,
@@ -318,9 +319,7 @@ impl Attack {
         }
         self.state = AttackState::Done;
         motion.set_anim_speed(Speed::new(1.0));
-        let idle = self.arms.idle_sprite.ok_or(GenieError::unsupported(
-            "an Attack's unit without a standing sprite",
-        ))?;
+        let idle = self.arms.idle_sprite.ok_or(STANDING_SPRITE_LACKING)?;
         new_sprite(sprite, motion.move_stats_mut(), idle, rng, sprite_tuning);
         Ok(())
     }
@@ -336,9 +335,7 @@ impl Attack {
     ) -> GenieResult<()> {
         self.enter(state, motion.reborrow())?;
         set_walker_anim(motion.reborrow(), Speed::new(1.0));
-        let idle = self.arms.idle_sprite.ok_or(GenieError::unsupported(
-            "an Attack's unit without a standing sprite",
-        ))?;
+        let idle = self.arms.idle_sprite.ok_or(STANDING_SPRITE_LACKING)?;
         new_sprite(
             &mut unit.sprite,
             motion.move_stats_mut(),

@@ -97,6 +97,15 @@ pub(crate) const BUILDER_UNMOVING: GenieError =
 /// test), which the Build's world does not hold.
 const UNSEEN_SITE: GenieError =
     GenieError::unsupported("a foundation its owner sees only through its ghosts (slot 0x1e0)");
+/// A footprint clearing of an object the slice does not hold.
+pub(crate) const CLEARED_NOT_HELD: GenieError =
+    GenieError::unsupported("a footprint clearing of an object the slice does not hold");
+/// A unit sent off a footprint without movement state, whose radius its spot reads.
+pub(crate) const SENT_OFF_UNMOVING: GenieError =
+    GenieError::unsupported("a unit sent off without movement state");
+/// A builder's building without a place on the map.
+const BUILDING_UNPLACED: GenieError =
+    GenieError::unsupported("a builder's building without a place");
 
 /// The Build action of a builder (`TRIBE_Action_Build`, type 101).
 #[derive(Clone, Copy, Debug, PartialEq, Diff)]

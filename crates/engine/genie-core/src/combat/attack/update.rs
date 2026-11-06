@@ -5,6 +5,7 @@ use crate::combat::AttackTargetId;
 use crate::combat::attack::AtOnce;
 use crate::combat::attack::AttackState;
 use crate::combat::attack::AttackerFlags;
+use crate::combat::attack::STANDING_SPRITE_LACKING;
 use crate::combat::attack::{
     AiOrder, Attack, AttackReads, Fight, NO_RANGE, NONE, Readiness, move_reads, set_walker_anim,
 };
@@ -150,9 +151,7 @@ impl Attack {
             return Err(GenieError::unsupported("a building's Attack with a MoveTo"));
         }
         motion.set_anim_speed(Speed::new(1.0));
-        let idle = self.arms.idle_sprite.ok_or(GenieError::unsupported(
-            "an Attack's unit without a standing sprite",
-        ))?;
+        let idle = self.arms.idle_sprite.ok_or(STANDING_SPRITE_LACKING)?;
         new_sprite(sprite, motion.move_stats_mut(), idle, rng, sprite_tuning);
         Ok(self.voice.is_loud().then_some((
             NotifyKind::ACTION_INVALIDATED,

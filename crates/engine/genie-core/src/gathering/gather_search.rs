@@ -48,6 +48,10 @@ use crate::{GenieError, GenieResult};
 use std::fmt::Debug;
 use std::mem::take;
 
+/// An object on a tile's list that the slice does not hold.
+pub(crate) const TILE_OBJECT_NOT_HELD: GenieError =
+    GenieError::unsupported("an object on a tile the slice does not hold");
+
 mod passes;
 
 /// What the searches read of an object in a map tile's list.
@@ -135,11 +139,7 @@ impl Candidates<'_> {
                     return Ok(me);
                 }
                 let (owner, unit, master) =
-                    self.objects
-                        .with_master(id)?
-                        .ok_or(GenieError::unsupported(
-                            "an object on a tile the slice does not hold",
-                        ))?;
+                    self.objects.with_master(id)?.ok_or(TILE_OBJECT_NOT_HELD)?;
                 Ok(Candidate::of(id, owner, unit, master, placed.position))
             })
             .collect()

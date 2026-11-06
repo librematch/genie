@@ -2,8 +2,10 @@
 //! build command takes a foundation, the builder's search for another foundation, and a unit's
 //! spot off a foundation's footprint.
 
+use crate::GenieResult;
 use crate::commands::FOUNDATION_GONE;
 use crate::construction::FoundationId;
+use crate::construction::build::SENT_OFF_UNMOVING;
 use crate::map::Footprint;
 use crate::map::Point;
 use crate::map::Tile;
@@ -28,7 +30,6 @@ use crate::world::layer::Slots;
 use crate::world::objects_ref::ObjectsRef;
 use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlotsExt;
-use crate::{GenieError, GenieResult};
 
 impl UnitView<'_, '_> {
     /// Slot 0x380's answer (forced) on `foundation` without its effects, which `BuildObject`
@@ -268,14 +269,12 @@ impl UnitView<'_, '_> {
         };
         let spot = match self.step.world.spatial.get(site) {
             Some(placed) => {
-                let mover =
-                    self.step
-                        .world
-                        .parts
-                        .mover_of(unit.id)
-                        .ok_or(GenieError::unsupported(
-                            "a unit sent off without movement state",
-                        ))?;
+                let mover = self
+                    .step
+                    .world
+                    .parts
+                    .mover_of(unit.id)
+                    .ok_or(SENT_OFF_UNMOVING)?;
                 self.step.world.spatial.spot_off(
                     unit.position(),
                     (unit.id, mover.stats.radius.x()),

@@ -2,6 +2,7 @@
 
 use crate::combat::Firepower;
 use crate::combat::attack::ATTACK;
+use crate::combat::attack::CHARGE_RANGE;
 use crate::map::Distance;
 use crate::map::DistanceSquared;
 use crate::map::Footprint;
@@ -440,9 +441,7 @@ impl Attacker {
     /// A charge of type 6 or 7.
     pub const fn range_against(&self) -> GenieResult<Distance> {
         if self.charge_kind.ranged() {
-            return Err(GenieError::unsupported(
-                "an attacker whose charge adds to its range (slot 0x2f8)",
-            ));
+            return Err(CHARGE_RANGE);
         }
         Ok(self.range)
     }

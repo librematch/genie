@@ -55,6 +55,9 @@ const NO_RELATION: GenieError =
 /// five lists: the game writes past them.
 const NO_LIST: GenieError =
     GenieError::invalid_input("a visible-units record whose relation lists past the five");
+/// A search that reads the registry's last answer before any query.
+pub(crate) const NO_LAST_ANSWER: GenieError =
+    GenieError::unsupported("a search that reads the registry's last answer (before any query)");
 
 /// One record (0x1c bytes): the object, a distance (`FLT_MAX` in the lists; a query's copy holds
 /// its own), the owner's id (`player+0x718`), the place and the master's radii.

@@ -116,6 +116,10 @@ pub(crate) const FARM_FOOD_SOLD: usize = 96;
 /// A gatherer without movement state, which the Gather's walks and turns and its drop-off need.
 pub(crate) const GATHERER_UNMOVING: GenieError =
     GenieError::unsupported("a gatherer without movement state");
+/// A gatherer without its Gather or its movement state, which its orders, its walks and its
+/// drop-off need.
+pub(crate) const GATHERER_STATE_LACKING: GenieError =
+    GenieError::unsupported("a gatherer without its gather or movement state");
 
 /// The Gather action of a gatherer (`RGE_Action_Gather`, type 5), with the save's fields.
 #[derive(Clone, Copy, Debug, PartialEq, Diff)]

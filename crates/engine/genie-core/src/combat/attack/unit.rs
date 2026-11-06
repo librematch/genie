@@ -1,7 +1,9 @@
 //! The unit's own Attack in its update: a lost target's end, and the strike with what
 //! follows.
 
+use crate::GenieResult;
 use crate::combat::MissileCount;
+use crate::combat::attack::ATTACK_TARGET_NOT_LIVE;
 use crate::combat::attack::Armament;
 use crate::combat::attack::AttackSource;
 use crate::combat::attack::{Attack, AttackState};
@@ -28,7 +30,6 @@ use crate::world::WorldTime;
 use crate::world::layer::Roles;
 use crate::world::slots::PlayerSlotsExt;
 use crate::world::step::Step;
-use crate::{GenieError, GenieResult};
 
 impl Unit {
     /// The unit's own Attack in its update, `attack` the head's copy: after its target went
@@ -183,9 +184,7 @@ impl Unit {
             roles,
             &step.world.model.tuning.turn,
         );
-        let victim = victim(step, attack.target, roles)?.ok_or(GenieError::unsupported(
-            "an attack's target the slice does not hold live",
-        ))?;
+        let victim = victim(step, attack.target, roles)?.ok_or(ATTACK_TARGET_NOT_LIVE)?;
         let own = own.ok_or(ATTACKER_MASTER)?;
         let mut fight = Fight { victim, own };
         // written back before an error too: the stop's context reads the list

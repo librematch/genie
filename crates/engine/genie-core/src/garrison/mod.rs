@@ -19,6 +19,7 @@ mod enter_state;
 mod firepower;
 mod inside_count;
 mod let_out;
+pub(crate) use self::let_out::HOUSED_NOT_LIVE;
 mod meeting;
 mod outcomes;
 mod raider_countdown;

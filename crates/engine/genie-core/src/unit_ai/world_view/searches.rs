@@ -5,6 +5,7 @@
 //! foundation searches in `construction/build/unit_ai_side.rs` and the resource search in
 //! `gathering/closest_resource.rs`.
 
+use crate::GenieResult;
 use crate::construction::FoundationId;
 use crate::gathering::DropSiteId;
 use crate::map::Distance;
@@ -35,11 +36,11 @@ use crate::unit_ai::{
     Found, Gatherable, OffFootprint, Pick, ResourceSearch, Seeker as UnitAiSeeker, helper_answers,
 };
 use crate::unit_ai::{Search, UnitAi};
+use crate::vision::registry::NO_LAST_ANSWER;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::objects_ref::ObjectsRef;
 use crate::world::slots::PlayerSlotsExt;
-use crate::{GenieError, GenieResult};
 
 impl UnitView<'_, '_> {
     /// A search (the unit AI's `FUN_140c63e20` with its pick) over the objects-in-sight
@@ -277,14 +278,7 @@ impl UnitView<'_, '_> {
         const NO_HELP_CLASSES: ClassMask = ClassMask::new(0x0080_083c_000e, 0x28);
 
         let roles = &self.step.world.model.roles.clone();
-        let lists = self
-            .step
-            .world
-            .spatial
-            .searched()
-            .ok_or(GenieError::unsupported(
-                "a search that reads the registry's last answer (before any query)",
-            ))?;
+        let lists = self.step.world.spatial.searched().ok_or(NO_LAST_ANSWER)?;
         let others = owner_view(
             &self.step.world.players,
             &self.step.world.index,

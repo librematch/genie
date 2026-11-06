@@ -3,7 +3,10 @@
 
 use crate::combat::AttackTargetId;
 use crate::combat::abilities::Look;
+use crate::combat::attack::ATTACK_TARGET_NOT_LIVE;
 use crate::combat::attack::AttackState;
+use crate::combat::attack::CHARGE_RANGE;
+use crate::combat::attack::STANDING_SPRITE_LACKING;
 use crate::combat::attack::TARGET_GONE;
 use crate::combat::attack::{
     Arms, Attack, AttackCommand, AttackReads, Begun, Engagement, Fight, Ground, NONE, Posted,
@@ -254,9 +257,7 @@ impl Attack {
             )?;
         }
         if begun == Begun::Ready {
-            let ready = cmd.ready.as_ref().ok_or(GenieError::unsupported(
-                "an attack's target the slice does not hold live",
-            ))?;
+            let ready = cmd.ready.as_ref().ok_or(ATTACK_TARGET_NOT_LIVE)?;
             let (motion, by_id) = step.world.parts.lend_motion(
                 unit.id,
                 (&step.world.players, &step.world.index, &step.world.model),
@@ -426,9 +427,7 @@ impl Attack {
         // State 13 ("Failed"): the target went out of sight.
         self.state = AttackState::Failed;
         motion.set_anim_speed(Speed::new(1.0));
-        let idle = self.arms.idle_sprite.ok_or(GenieError::unsupported(
-            "an Attack's unit without a standing sprite",
-        ))?;
+        let idle = self.arms.idle_sprite.ok_or(STANDING_SPRITE_LACKING)?;
         new_sprite(sprite, motion.move_stats_mut(), idle, rng, sprite_tuning);
         Ok(())
     }
@@ -541,9 +540,7 @@ pub fn engagement(
     world_time: WorldTime,
 ) -> GenieResult<Engagement> {
     if master.creatable_part().charge_kind.ranged() {
-        return Err(GenieError::unsupported(
-            "an attacker whose charge adds to its range (slot 0x2f8)",
-        ));
+        return Err(CHARGE_RANGE);
     }
     Ok(Engagement {
         gap: footprint_gap(me.position, me.radius, them.position, them.radius),

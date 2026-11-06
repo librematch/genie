@@ -4,6 +4,7 @@ use crate::combat::volley::MISSILE_MASTER_LACKING;
 use crate::objects::layers::Speedup;
 
 use crate::combat::missile::AimAt;
+use crate::combat::missile::MISSILE_TERRAIN_LACKING;
 use crate::combat::missile::ShooterId;
 use crate::combat::missile::{
     Missile, MissileAction, MissileState, MissileTargetId, Origin, StrikeResult, aim, grounded,
@@ -153,9 +154,7 @@ impl Unit {
                 .spatial
                 .terrain
                 .as_ref()
-                .ok_or(GenieError::unsupported(
-                    "a missile without the map's terrain",
-                ))?
+                .ok_or(MISSILE_TERRAIN_LACKING)?
                 .ground(position.ground())?;
             position = position.with_z(grounded(position.z(), ground, stats.fly_mode));
         }

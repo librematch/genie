@@ -43,6 +43,10 @@ use crate::world::parts::{Object, ObjectParts};
 use crate::world::slots::PlayerSlotsExt;
 use crate::{GenieError, GenieResult};
 
+/// A new object of a recyclable master, which takes a negative id.
+pub(crate) const RECYCLABLE_NEW_OBJECT: GenieError =
+    GenieError::unsupported("a new object of a recyclable master (a negative id)");
+
 impl World {
     /// `FUN_1411d12d0` for a unit of `made` beside the building at `list_index` of player
     /// `player_id`, `toward` the point the search faces (its gather point's, or the command's):
@@ -479,9 +483,7 @@ fn remains_supported(made: &Master) -> GenieResult<()> {
         ));
     }
     if made.recyclable.recycled() {
-        return Err(GenieError::unsupported(
-            "a new object of a recyclable master (a negative id)",
-        ));
+        return Err(RECYCLABLE_NEW_OBJECT);
     }
     Ok(())
 }

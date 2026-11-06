@@ -19,6 +19,7 @@ use crate::objects::actions::Action;
 use crate::objects::masters::ActionKind;
 use crate::objects::release::Releaser;
 use crate::objects::sprite::new_sprite;
+use crate::ownership::artifact::ANIMAL_UNMOVING;
 use crate::ownership::artifact::Artifact;
 use crate::players::PlayerId;
 use crate::players::game_status::KEEPING_KINDS;
@@ -419,9 +420,7 @@ impl World {
         if gone.stops {
             self.parts
                 .mover_mut(unit.id)
-                .ok_or(GenieError::unsupported(
-                    "a walking animal without movement state",
-                ))?
+                .ok_or(ANIMAL_UNMOVING)?
                 .stop()?;
         }
         for object_id in [gone.released, released].into_iter().flatten() {

@@ -23,6 +23,9 @@ use crate::world::layer::MasterRoles;
 use crate::world::slots::PlayerSlotsExt;
 use crate::{GenieError, GenieResult};
 
+/// A healer's search for an ally to heal.
+const HEALER_SEARCH: GenieError = GenieError::unsupported("a healer's search for an ally to heal");
+
 impl UnitAi {
     /// The soldier's idle check (slot 72, `FUN_140c20db0`, factory type 13). Before its cap
     /// (`FUN_140c41e50`, [`UnitAi::cap_human_order`]), the unit of a player that lost (`+0x89` 2,
@@ -203,9 +206,7 @@ impl UnitAi {
             return Ok(IdleOutcome::Acted);
         }
         if at.flags.contains(SurroundingFlags::TASK_0X69) {
-            return Err(GenieError::unsupported(
-                "a healer's search for an ally to heal",
-            ));
+            return Err(HEALER_SEARCH);
         }
         Ok(IdleOutcome::Idle)
     }
@@ -253,9 +254,7 @@ impl UnitAi {
         }
         self.watch_alert(side)?;
         if at.flags.contains(SurroundingFlags::TASK_0X69) {
-            return Err(GenieError::unsupported(
-                "a healer's search for an ally to heal",
-            ));
+            return Err(HEALER_SEARCH);
         }
         Ok(())
     }

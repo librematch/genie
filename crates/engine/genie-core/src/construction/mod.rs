@@ -19,6 +19,7 @@ pub use self::annexes::Annexes;
 pub use self::builder_count::BuilderCount;
 pub use self::footprint_waits::FootprintWaits;
 pub use self::foundation_id::{Foundation, FoundationId};
+pub(crate) use self::main_building_id::MAIN_BUILDING_GONE;
 pub use self::main_building_id::{MainBuilding, MainBuildingId};
 pub use self::outcomes::{BuildProgress, ConstructionStart};
 pub use self::repair_target::{RepairTarget, RepairTargetId};

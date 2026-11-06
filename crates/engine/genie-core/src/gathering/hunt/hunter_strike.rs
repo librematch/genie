@@ -2,6 +2,7 @@
 //! the herd it leads, the hunt's update and what follows.
 
 use crate::combat::AttackTargetId;
+use crate::combat::attack::ATTACK_TARGET_NOT_LIVE;
 use crate::combat::attack::AttackSource;
 use crate::combat::attack::{AttackReads, Fight};
 use crate::combat::attack::{arms, engagement};
@@ -351,8 +352,6 @@ fn hunt_victim(step: &Step<'_>, action: &HuntAction, roles: &Roles) -> GenieResu
             id: ObjectId::NOBODY,
             ..Victim::default()
         }),
-        Some(object_id) => victim(step, object_id, roles)?.ok_or(GenieError::unsupported(
-            "an attack's target the slice does not hold live",
-        )),
+        Some(object_id) => victim(step, object_id, roles)?.ok_or(ATTACK_TARGET_NOT_LIVE),
     }
 }

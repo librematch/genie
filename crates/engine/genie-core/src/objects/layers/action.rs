@@ -21,6 +21,10 @@ use crate::world::checkpoint::TopAction;
 use crate::{GenieError, GenieResult};
 use genie_diff::Diff;
 
+/// Slots 0x190 and 0x288 of an action the slice does not model.
+const UNMODELLED_SLOTS: GenieError =
+    GenieError::unsupported("slots 0x190 and 0x288 of an action the slice does not model");
+
 /// The action layer of an object: its action list, its master's default task, a villager's
 /// idle time, the building that speeds it up and its command count.
 #[derive(Clone, Debug, Default, PartialEq, Diff)]
@@ -78,18 +82,14 @@ impl Action {
     /// A top action the slice does not model.
     pub fn top_action_idle(&self, unread: Option<&Unread>) -> GenieResult<bool> {
         if unread.is_some() {
-            return Err(GenieError::unsupported(
-                "slots 0x190 and 0x288 of an action the slice does not model",
-            ));
+            return Err(UNMODELLED_SLOTS);
         }
         match self.top_action_kind() {
             None => Ok(true),
             Some(ARTIFACT_KIND) => Ok(self.list.artifact().is_some_and(Artifact::idle)),
             // a Make has no target, but its point (`+0x38`) is the base constructor's 0.0
             Some(MOVE_TO | MAKE) => Ok(false),
-            Some(_) => Err(GenieError::unsupported(
-                "slots 0x190 and 0x288 of an action the slice does not model",
-            )),
+            Some(_) => Err(UNMODELLED_SLOTS),
         }
     }
 

@@ -3,6 +3,7 @@
 //! `ClosestResourceObject` names it.
 
 use crate::construction::build::BUILDER_UNMOVING;
+use crate::construction::build::BUILDING_UNPLACED;
 use crate::map::Distance;
 use crate::map::spatial::Spatial;
 use crate::objects::ObjectId;
@@ -57,13 +58,7 @@ impl Unit {
         let site = masters.get(built).ok_or(GenieError::unsupported(
             "a building of a master the slice does not have",
         ))?;
-        let at = *step
-            .world
-            .spatial
-            .get(building)
-            .ok_or(GenieError::unsupported(
-                "a builder's building without a place",
-            ))?;
+        let at = *step.world.spatial.get(building).ok_or(BUILDING_UNPLACED)?;
         let entry = drop_site(
             &step.world.model.drop_sites,
             built,

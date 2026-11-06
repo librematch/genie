@@ -13,6 +13,7 @@ use crate::testing::class;
 
 use crate::movement::move_to::TargetMoved;
 use crate::objects::WorkerCount;
+use crate::ownership::artifact::ANIMAL_UNMOVING;
 use crate::ownership::artifact::{ArtifactState, ArtifactSub};
 use crate::testing::roles;
 use crate::unit_ai::AiAction;
@@ -168,7 +169,7 @@ fn capture_stop_keeps_the_artifact_and_lets_its_target_go() {
         .set_artifact(Some(artifact()));
     world.parts.put_mover(unit.id, None);
     assert_eq!(
-        stopped(world, class::LIVESTOCK).unwrap_err().reason(),
-        "a walking animal without movement state"
+        stopped(world, class::LIVESTOCK).unwrap_err(),
+        ANIMAL_UNMOVING
     );
 }

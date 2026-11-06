@@ -17,6 +17,9 @@
 //! cart's own search for resources ([`World::cart_work_search`]).
 
 use crate::construction::build::CART_TASK;
+use crate::gathering::closest_resource::SEARCHER_AI_LACKING;
+use crate::gathering::closest_resource::SEARCHER_UNMOVING;
+use crate::gathering::gather_search::TILE_OBJECT_NOT_HELD;
 use crate::gathering::gather_search::closest_resource_at;
 use crate::gathering::gather_search::{self, Candidates, ResourceWorld};
 use crate::map::Rect;
@@ -181,9 +184,7 @@ impl World {
         self.spatial
             .check_known(Rect::new(at.x(), at.y(), at.x(), at.y()))?;
         for (id, _) in self.spatial.objects_on(Tile::new(x, y)) {
-            let (owner, unit) = self.object(id).ok_or(GenieError::unsupported(
-                "an object on a tile the slice does not hold",
-            ))?;
+            let (owner, unit) = self.object(id).ok_or(TILE_OBJECT_NOT_HELD)?;
             let master = unit.master(self.master_tables(), owner)?;
             if self
                 .model
@@ -236,13 +237,7 @@ impl World {
         unit: &Unit,
     ) -> GenieResult<(gather_search::Seeker, Me)> {
         let master = unit.master(self.master_tables(), player_id)?;
-        let ai = self
-            .parts
-            .unit_ai
-            .get(unit.id)
-            .ok_or(GenieError::unsupported(
-                "a resource search without a unit AI",
-            ))?;
+        let ai = self.parts.unit_ai.get(unit.id).ok_or(SEARCHER_AI_LACKING)?;
         let seeker = gather_search::Seeker {
             player: player_id,
             position: unit.position(),
@@ -268,9 +263,7 @@ impl World {
     ) -> GenieResult<(Option<ObjectId>, Option<i32>)> {
         let owner = self.players.player(player_id)?;
         let unit = owner.live(list_index)?;
-        let mover = self.parts.mover_of(unit.id).ok_or(GenieError::unsupported(
-            "a resource search without movement state",
-        ))?;
+        let mover = self.parts.mover_of(unit.id).ok_or(SEARCHER_UNMOVING)?;
         let (seeker, me_walk) = self.search_seeker(player_id, unit)?;
         let (mask, master_id, at) = (
             mover.stats.restriction_mask,

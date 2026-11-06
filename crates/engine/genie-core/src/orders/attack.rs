@@ -30,6 +30,7 @@ use crate::combat::victims::{ChargeOf, VictimLayers, VictimView};
 use crate::combat::{AttackCount, AttackTargetId};
 use crate::gathering::HuntTargetId;
 use crate::gathering::gather::unit::WalkSprites;
+use crate::gathering::hunt::HUNTER_STATE_LACKING;
 use crate::objects::masters::player_masters;
 use crate::objects::masters::{Master, MasterTables, OwnerMasters, Task};
 use crate::objects::sprite::new_sprite;
@@ -349,9 +350,7 @@ impl World {
             self.parts.actions.of_mut(unit.id)?.list.hunt_mut(),
             self.parts.motion.mover_mut(unit.id),
         ) else {
-            return Err(GenieError::unsupported(
-                "a hunter without its hunt or movement state",
-            ));
+            return Err(HUNTER_STATE_LACKING);
         };
         let unit_player = player;
         if let Some(move_start) = hunt.retarget(

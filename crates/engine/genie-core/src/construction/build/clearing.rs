@@ -15,8 +15,9 @@ use crate::objects::masters::MasterKind;
 use crate::players::PlayerId;
 use std::collections::BTreeMap;
 
-use crate::{GenieError, GenieResult};
+use crate::GenieResult;
 
+use crate::construction::build::CLEARED_NOT_HELD;
 use crate::map::spatial::Placed;
 use crate::map::spatial::Spatial;
 use crate::world::layer::ClassRoles;
@@ -228,9 +229,7 @@ pub(super) fn clearing_takes(
     if !placed.buildable_on.cleared() && !own_wall && !tree {
         return Ok(None);
     }
-    let seen = *looks.get(&id).ok_or(GenieError::unsupported(
-        "a footprint clearing of an object the slice does not hold",
-    ))?;
+    let seen = *looks.get(&id).ok_or(CLEARED_NOT_HELD)?;
     // the tree's test: COMISS 1.0 against its hit points, JC passes it over (a NaN too)
     if !placed.buildable_on.cleared()
         && !own_wall

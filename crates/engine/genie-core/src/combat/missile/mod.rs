@@ -77,6 +77,15 @@ const VOLLEY_HALF: f32 = MISSILE_VOLLEY_HALF;
 /// A missile without its moving part, which its flight and its import need.
 pub(crate) const MISSILE_UNMOVING: GenieError =
     GenieError::unsupported("a missile without its moving part");
+/// A missile's target the slice does not hold among the live objects.
+const MISSILE_TARGET_NOT_LIVE: GenieError =
+    GenieError::unsupported("a missile's target the slice does not hold live");
+/// A missile of projectile type 1 or 2, which the slice does not model.
+const UNMODELLED_PROJECTILE: GenieError =
+    GenieError::unsupported("a missile of projectile type 1 or 2");
+/// A missile without the map's terrain.
+pub(crate) const MISSILE_TERRAIN_LACKING: GenieError =
+    GenieError::unsupported("a missile without the map's terrain");
 
 /// Where a missile came from (`+0x9c`, `mProjectileData`, `FUN_140aa86e0`): the firing object's
 /// place, the missile master's radii on the ground, the firing object's master and owner (−1
@@ -399,9 +408,7 @@ impl MissileAction {
                 Some(Angle::new(atan2(dy, dx)))
             }
             _ => {
-                return Err(GenieError::unsupported(
-                    "a missile of projectile type 1 or 2",
-                ));
+                return Err(UNMODELLED_PROJECTILE);
             }
         };
         let (acceleration, velocity) = if way <= 0.0 || stats.arc.is_flat() {
@@ -457,9 +464,7 @@ impl MissileAction {
                 self.direction
             }
             _ => {
-                return Err(GenieError::unsupported(
-                    "a missile of projectile type 1 or 2",
-                ));
+                return Err(UNMODELLED_PROJECTILE);
             }
         };
         if !stats.arc.is_flat() {

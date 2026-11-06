@@ -50,6 +50,9 @@ pub(crate) const PACK_OR_UNPACK: GenieError =
     GenieError::unsupported("a Pack or Unpack of class 54 or 51 (FUN_140ad4ff0, FUN_140ae58a0)");
 /// An order's target without a place on the map.
 const ORDER_TARGET_UNPLACED: GenieError = GenieError::unsupported("a target without a place");
+/// A unit a move order moves without movement state.
+pub(crate) const MOVED_UNMOVING: GenieError =
+    GenieError::unsupported("a moved unit without movement state");
 
 /// `FUN_1410862c0` of the unit at `me` of master `master` against the object at `them`
 /// ([`work_reach`] of the footprint gap): within its reach, and too close.
@@ -122,12 +125,7 @@ impl World {
             .map(|(tp, unit)| (unit.life.master_id, tp));
         let unit = self.players.live_mut(player, idx)?;
         // FUN_141197da0, then slot 0x2a0 with 1: it waits to move
-        let mover = self
-            .parts
-            .mover_mut(unit.id)
-            .ok_or(GenieError::unsupported(
-                "a moved unit without movement state",
-            ))?;
+        let mover = self.parts.mover_mut(unit.id).ok_or(MOVED_UNMOVING)?;
         mover.ignore_units.clear();
         mover.waiting = 1;
         for &other in others {

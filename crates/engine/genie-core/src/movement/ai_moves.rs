@@ -32,6 +32,8 @@ use crate::combat::abilities::Look;
 use crate::construction::repair::RepairAction;
 use crate::garrison::transport::SailWorld;
 use crate::garrison::transport::TransportAction;
+use crate::gathering::gather::GATHERER_STATE_LACKING;
+use crate::gathering::hunt::HUNTER_STATE_LACKING;
 use crate::gathering::{GatherTargetId, HuntTargetId};
 use crate::movement::move_to::ToObject;
 use crate::movement::move_to::{MOVE_TO, TARGET_LACKING, holds_object, object_range};
@@ -49,6 +51,7 @@ use crate::world::layer::generated::MoveToTuning;
 use crate::world::layer::generated::SpriteTuning;
 use crate::world::lets::{take, torn_down};
 use crate::world::step::Step;
+use crate::world::unread::UNREAD_ACTION;
 use crate::world::{Unread, WALKER_UNMOVING};
 
 /// What the sprites of a move the unit AI gives read: the owner's masters, the sprites' table,
@@ -275,9 +278,7 @@ impl Unit {
             ..
         } = sprites;
         if unread.is_some() {
-            return Err(GenieError::unsupported(
-                "slot 0x40 of an action the slice does not hold",
-            ));
+            return Err(UNREAD_ACTION);
         }
         match actions.list.head_mut() {
             None
@@ -410,9 +411,7 @@ impl Unit {
     ) -> GenieResult<PointMove> {
         let my_pasture = self.my_pasture;
         let (Some(hunt), Some(mover)) = (actions.list.hunt_mut(), mover) else {
-            return Err(GenieError::unsupported(
-                "a hunter without its hunt or movement state",
-            ));
+            return Err(HUNTER_STATE_LACKING);
         };
         let old = hunt.target.map(HuntTargetId::id);
         if hunt.take_move(
@@ -447,9 +446,7 @@ impl Unit {
         move_to_tuning: &MoveToTuning,
     ) -> GenieResult<PointMove> {
         let (Some(gather), Some(mover)) = (actions.list.gather_mut(), mover) else {
-            return Err(GenieError::unsupported(
-                "a gatherer without its gather or movement state",
-            ));
+            return Err(GATHERER_STATE_LACKING);
         };
         let old = gather.target.map(GatherTargetId::id);
         gather.take_move(None, point, player, mover, &walks, move_to_tuning)?;

@@ -110,6 +110,7 @@ pub struct Artifact {
 /// The action type the checkpoint adds for an Artifact action.
 pub const ARTIFACT_KIND: ActionKind = ActionKind::named(107);
 
+use crate::GenieError;
 use crate::garrison::EnterAction;
 use crate::objects::layers::Action as LayersAction;
 use crate::objects::masters::MasterKind;
@@ -123,6 +124,10 @@ use crate::world::layer::generated::ArtifactTuning;
 use crate::world::layer::generated::MoveToTuning;
 use crate::world::lets::release;
 use std::mem::take;
+
+/// A walking animal without movement state, which the stop of its artifact action halts.
+pub(crate) const ANIMAL_UNMOVING: GenieError =
+    GenieError::unsupported("a walking animal without movement state");
 
 impl Artifact {
     /// A new action of an object of player `owner` on `task`, about to check for a new owner.

@@ -33,6 +33,7 @@ use crate::objects::masters::PlayersMastersExt;
 use crate::objects::masters::{MasterTables, OwnerMasters};
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Unit;
+use crate::orders::town_bell::BELL_AI_LACKING;
 use crate::orders::town_bell::BellShelter;
 use crate::orders::town_bell::{BackToWork, TownBell};
 use crate::ownership::artifact::ArtifactSub;
@@ -63,6 +64,10 @@ use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlotsExt;
 use crate::world::step::Step;
 use crate::{GenieError, GenieResult};
+
+/// An enter into a building the world does not hold: each caller found the building first.
+const ENTERED_NOT_HELD: GenieError =
+    GenieError::unreachable("an enter into a building the world does not hold");
 
 /// The units inside object `id`, any player's (its slot 0x498).
 fn units_inside(others: OthersRef<'_>, id: ObjectId) -> usize {
@@ -292,9 +297,7 @@ impl Unit {
         roles: &Roles,
     ) -> GenieResult<EnterOutcome> {
         // the callers found it: the Enter's update in its reads, `World::enter_now` by its place
-        let (tp, building) = step.world.object(target).ok_or(GenieError::unreachable(
-            "an enter into a building the world does not hold",
-        ))?;
+        let (tp, building) = step.world.object(target).ok_or(ENTERED_NOT_HELD)?;
         let own = step.world.model.masters.of(step.player);
         let masters = own.ok_or(NO_MASTERS)?;
         // copies: going inside changes the unit and the world, which hold them
@@ -453,9 +456,7 @@ impl Unit {
         }
         // the callers found it (`Unit::enter_building`, `World::enter_now`), and the sight's
         // change removes no object
-        let (bp, building) = step.world.object(target).ok_or(GenieError::unreachable(
-            "an enter into a building the world does not hold",
-        ))?;
+        let (bp, building) = step.world.object(target).ok_or(ENTERED_NOT_HELD)?;
         let (at, reload) = (
             building.position(),
             step.world.parts.combat_of(building.id).reload_powerup,
@@ -502,9 +503,7 @@ impl Unit {
         roles: &Roles,
     ) -> GenieResult<()> {
         let id = self.id;
-        let (_, building) = step.world.object(target).ok_or(GenieError::unreachable(
-            "an enter into a building the world does not hold",
-        ))?;
+        let (_, building) = step.world.object(target).ok_or(ENTERED_NOT_HELD)?;
         let (at, state) = (building.position(), building.life.state);
         let mut bell = step.world.parts.town_bell_of(id);
         let ai = step.world.parts.unit_ai.get(id);
@@ -626,11 +625,7 @@ impl Unit {
             return Ok(());
         }
         if !bell.flag.is_sheltered() {
-            let action = ai
-                .map(|ai| ai.current_action)
-                .ok_or(GenieError::unsupported(
-                    "a town-bell record of a unit without a unit AI",
-                ))?;
+            let action = ai.map(|ai| ai.current_action).ok_or(BELL_AI_LACKING)?;
             bell.record(BackToWork {
                 target: target.map(ContainerId::id),
                 target_class: None,

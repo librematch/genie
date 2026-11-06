@@ -1,5 +1,6 @@
 //! A building's test whether it takes a unit in (`FUN_14120eb10`), its room and what it holds.
 
+use crate::construction::MAIN_BUILDING_GONE;
 use crate::garrison::ContainerId;
 use crate::garrison::InsideCount;
 use crate::garrison::{CLASS_FLAGS, ClassFlags};
@@ -234,9 +235,7 @@ impl World {
             return Ok(false);
         }
         let (bp, building) = match self.parts.building_of(building_unit.id).annex_of {
-            Some(main) => self.object(main).ok_or(GenieError::unsupported(
-                "an annex whose main building is gone",
-            ))?,
+            Some(main) => self.object(main).ok_or(MAIN_BUILDING_GONE)?,
             None => (bp, building_unit),
         };
         let bm = building.master(self.master_tables(), bp)?;

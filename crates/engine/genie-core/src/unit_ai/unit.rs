@@ -30,6 +30,9 @@ use std::mem::{replace, take};
 
 /// A unit that runs its unit AI's side where it has none.
 const NO_UNIT_AI: GenieError = GenieError::unreachable("a unit without a unit AI where one runs");
+/// A unit AI's run of a unit without one: its callers test for one.
+const RUN_WITHOUT_AI: GenieError =
+    GenieError::unreachable("a unit AI's run of a unit without one (its callers test for one)");
 
 impl Unit {
     /// The end of [`Unit::update`] after the actions (`captured`: the Artifact's capture, `leaves`:
@@ -178,9 +181,7 @@ impl Unit {
         // every caller tests the unit for its unit AI first (`World::run_ai_calls`'s and
         // `World::run_unit_ai`'s callers, the capture's stop)
         let Some(ai_kind) = step.world.parts.unit_ai.get(self.id).map(|ai| ai.ai_kind) else {
-            return Err(GenieError::unreachable(
-                "a unit AI's run of a unit without one (its callers test for one)",
-            ));
+            return Err(RUN_WITHOUT_AI);
         };
         let busy = actions.top_action_kind().is_some() || step.world.parts.unread.contains(self.id);
         let master = Some(self.master(step.world.master_tables(), step.player)?);
@@ -234,9 +235,7 @@ impl Unit {
         // every caller tests the unit for its unit AI first (`World::run_ai_calls`'s and
         // `World::run_unit_ai`'s callers, the capture's stop)
         let Some(ai_kind) = step.world.parts.unit_ai.get(self.id).map(|ai| ai.ai_kind) else {
-            return Err(GenieError::unreachable(
-                "a unit AI's run of a unit without one (its callers test for one)",
-            ));
+            return Err(RUN_WITHOUT_AI);
         };
         let master = Some(self.master(step.world.master_tables(), step.player)?);
         let (player, player_kind) = (step.player, step.world.players.player(step.player)?.kind);

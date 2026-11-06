@@ -34,6 +34,10 @@ use crate::world::slots::PlayerSlotsExt;
 use crate::{GenieError, GenieResult};
 use genie_diff::Diff;
 
+/// A town-bell record of a unit without a unit AI.
+pub(crate) const BELL_AI_LACKING: GenieError =
+    GenieError::unsupported("a town-bell record of a unit without a unit AI");
+
 mod commands;
 
 /// One back-to-work record.
@@ -419,13 +423,7 @@ impl World {
                 .and_then(|gather_action| gather_action.target_class),
             _ => None,
         };
-        let ai = self
-            .parts
-            .unit_ai
-            .get(unit.id)
-            .ok_or(GenieError::unsupported(
-                "a town-bell record of a unit without a unit AI",
-            ))?;
+        let ai = self.parts.unit_ai.get(unit.id).ok_or(BELL_AI_LACKING)?;
         let target2 = actions
             .top_second_target()
             .and_then(held)

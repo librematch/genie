@@ -1,6 +1,7 @@
 //! A missile's landing (`missile_lands`): on its target, or on the ground, where it ends and,
 //! unless its master's vanish mode keeps it, is destroyed.
 
+use crate::combat::missile::MISSILE_TARGET_NOT_LIVE;
 use crate::combat::missile::MissileState;
 use crate::combat::missile::ShooterId;
 use crate::combat::missile::StrikeResult;
@@ -9,6 +10,7 @@ use crate::combat::missile::VanishMode;
 use crate::combat::missile::{Missile, MissileAction, MissileStats, MissileTargetId, on_target};
 use crate::combat::victims::victim;
 use crate::combat::volley::Fired;
+use crate::commands::delete::DESTROYED_INSIDE;
 use crate::map::Distance;
 use crate::objects::HitPoints;
 use crate::objects::ObjectState;
@@ -98,9 +100,7 @@ impl Unit {
         if action.state == MissileState::Done || action.met.contains(&target.id()) {
             return Ok(());
         }
-        let victim = victim(step, action.target, roles)?.ok_or(GenieError::unsupported(
-            "a missile's target the slice does not hold live",
-        ))?;
+        let victim = victim(step, action.target, roles)?.ok_or(MISSILE_TARGET_NOT_LIVE)?;
         let owner = if step.player == victim.player {
             TargetOwner::Own
         } else {
@@ -146,9 +146,7 @@ impl Unit {
         }
         if self.life.state < ObjectState::Removed {
             if self.life.inside.is_some() {
-                return Err(GenieError::unsupported(
-                    "a destroyed object inside another (slot 0x1a8)",
-                ));
+                return Err(DESTROYED_INSIDE);
             }
             let before = self.life.state;
             self.life.hp = HitPoints::ZERO;

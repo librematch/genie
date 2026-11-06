@@ -46,6 +46,7 @@ use crate::players::PlayerKind;
 use crate::production::spawn::NearFlags;
 use crate::production::spawn::SiteChecks;
 use crate::production::spawn::ZoneTest;
+use crate::production::spawn::objects::RECYCLABLE_NEW_OBJECT;
 use crate::test_ids::master_id;
 use crate::test_ids::object_id;
 use crate::test_ids::player_id;
@@ -1257,7 +1258,7 @@ fn remains_take_their_storage_and_face_their_dead_object_facet() {
             &|master| master.recyclable = RecycleMode::RECYCLED,
             Facing::Drawn
         ),
-        "a new object of a recyclable master (a negative id)"
+        RECYCLABLE_NEW_OBJECT.reason()
     );
     assert_eq!(
         reason(&unchanged, Facing::Dead(None)),

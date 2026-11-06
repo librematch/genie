@@ -4,6 +4,10 @@
 
 use crate::GenieError;
 
+/// Slot 0x40 of an unread object's action, which the slice does not hold.
+pub(crate) const UNREAD_ACTION: GenieError =
+    GenieError::unsupported("slot 0x40 of an action the slice does not hold");
+
 /// An object the load could not read whole: the first part of its save the import could not
 /// read (its life, unit AI, lists, gather, production or mover, or a garrison's share). The slice
 /// cannot run it: it counts as busy, and a routine that needs its actions stops the run with

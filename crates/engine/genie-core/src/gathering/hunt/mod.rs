@@ -85,6 +85,10 @@ pub(crate) const HUNT_TARGET_UNPLACED: GenieError =
 /// The hunter or its target without a place where the hunt reads both.
 pub(crate) const HUNT_OBJECT_UNPLACED: GenieError =
     GenieError::unsupported("a hunt's object without a place");
+/// A hunter without its Hunt or its movement state, which its orders, its walks and its drop-off
+/// need.
+pub(crate) const HUNTER_STATE_LACKING: GenieError =
+    GenieError::unsupported("a hunter without its hunt or movement state");
 
 /// The Hunt action of a gatherer (`TRIBE_Action_Hunt`, type 110).
 #[derive(Clone, Copy, Debug, PartialEq, Diff)]

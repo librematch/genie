@@ -13,6 +13,7 @@ use crate::objects::masters::OwnerMasters;
 use crate::objects::masters::PlayersMastersExt;
 use crate::objects::release::Releaser;
 use crate::objects::sprite::new_sprite;
+use crate::objects::unit::STOPPED_SPRITE_LACKING;
 use crate::objects::unit::Unit;
 use crate::orders::Work;
 use crate::unit_ai::{AiCommand, Effect};
@@ -136,9 +137,7 @@ impl Unit {
             mover.shows(standing.as_ref());
         }
         if self.sprite.is_some() {
-            let standing = standing.ok_or(GenieError::unsupported(
-                "a stopped unit without its standing sprite",
-            ))?;
+            let standing = standing.ok_or(STOPPED_SPRITE_LACKING)?;
             new_sprite(
                 &mut self.sprite,
                 motion.move_stats_mut(),

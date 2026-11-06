@@ -30,6 +30,10 @@ use crate::unit_ai::{
 use crate::world::AiSwitches;
 use crate::{GenieError, GenieResult};
 
+/// An attack test outside `bestUnitToAttack`.
+const OUTSIDE_BEST_TARGET: GenieError =
+    GenieError::unsupported("an attack test outside bestUnitToAttack");
+
 /// What `bestUnitToAttack` (`FUN_140c44680`, [`crate::unit_ai::best_target::best_unit_to_attack`])
 /// asks of the world while its unit AI runs: the searching unit ([`WorldPicker::searcher`]) and
 /// its reads and tests of the objects its search found; the paths (slot 0x3d0) are the search's.
@@ -44,9 +48,7 @@ impl WorldPicker<'_> {
     /// A unit the reads do not model (a computer player's).
     pub(crate) fn searcher(&self, memory: Memory<'_>) -> GenieResult<Searcher> {
         let best_target_tuning = &self.by_id.tuning().best_target;
-        let seeker = self.seeker.ok_or(GenieError::unsupported(
-            "an attack test outside bestUnitToAttack",
-        ))?;
+        let seeker = self.seeker.ok_or(OUTSIDE_BEST_TARGET)?;
         let attacker = self.attacker;
         Ok(Searcher {
             id: self.me,
@@ -140,9 +142,7 @@ impl WorldPicker<'_> {
     pub(crate) fn can_attack(&self, spatial: &Spatial, id: ObjectId) -> GenieResult<bool> {
         let roles = self.by_id.roles();
         let unit_ai_tuning = &self.by_id.tuning().unit_ai;
-        let seeker = self.seeker.ok_or(GenieError::unsupported(
-            "an attack test outside bestUnitToAttack",
-        ))?;
+        let seeker = self.seeker.ok_or(OUTSIDE_BEST_TARGET)?;
         let (target, _) = self.target(spatial, id)?;
         unit_ai_can_attack(self.attacker, &seeker, &target, roles, unit_ai_tuning)
     }

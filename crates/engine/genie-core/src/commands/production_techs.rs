@@ -1,6 +1,7 @@
 //! QUEUE's technologies: a building's researches, paid and queued, joining its last entry or a
 //! new one.
 
+use crate::GenieResult;
 use crate::objects::ListIndex;
 use crate::objects::masters::MasterId;
 use crate::players::Amount;
@@ -15,13 +16,13 @@ use crate::production::{Queue, as_entry_costs, same_costs};
 use crate::technology::Repeat;
 use crate::technology::RepeatLimit;
 use crate::technology::TechId;
+use crate::technology::UNKNOWN_TECH;
 use crate::technology::{TechDef, factors};
 use crate::world::World;
 use crate::world::layer::Slots;
 use crate::world::player::Player;
 use crate::world::slots::CheckedIndexExt;
 use crate::world::slots::PlayerSlotsExt;
-use crate::{GenieError, GenieResult};
 use std::mem::take;
 
 impl World {
@@ -42,9 +43,7 @@ impl World {
         button: QueueButton,
     ) -> GenieResult<QueueOutcome> {
         let index = tech.index();
-        let def = self.model.techs.get(index).ok_or(GenieError::unsupported(
-            "a technology the data file has not got",
-        ))?;
+        let def = self.model.techs.get(index).ok_or(UNKNOWN_TECH)?;
         let owner = self.players.player_mut(player)?;
         let state = owner.techs.checked(index)?;
         let done = state

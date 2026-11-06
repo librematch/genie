@@ -4,7 +4,9 @@ use crate::combat::attack::BeginLayer;
 use crate::combat::attack::{arms, engagement};
 use crate::combat::victims::victim;
 use crate::gathering::ActionEnd;
+use crate::gathering::drop_off::NON_CIVILIAN_GROUP;
 use crate::gathering::gather::unit::WalkSprites;
+use crate::gathering::hunt::HUNTER_STATE_LACKING;
 use crate::gathering::hunt::HuntChase;
 use crate::gathering::hunt::HuntState;
 use crate::gathering::hunt::{
@@ -44,6 +46,10 @@ use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlotsExt;
 use crate::world::step::Step;
 use crate::{GenieError, GenieResult};
+
+/// A hunter without a unit AI after its drop-off, whose next target the AI's class names.
+const HUNTER_AI_LACKING: GenieError =
+    GenieError::unsupported("a hunt without a unit AI after its drop-off");
 
 mod found;
 
@@ -329,9 +335,7 @@ impl Unit {
             roles,
         )?;
         let Some(mover) = step.world.parts.mover_mut(self.id) else {
-            return Err(GenieError::unsupported(
-                "a hunter without its hunt or movement state",
-            ));
+            return Err(HUNTER_STATE_LACKING);
         };
         let chase = HuntChase {
             target: &quarry,
@@ -375,9 +379,7 @@ impl Unit {
             .parts
             .unit_ai
             .get_mut(self.id)
-            .ok_or(GenieError::unsupported(
-                "a hunt without a unit AI after its drop-off",
-            ))?;
+            .ok_or(HUNTER_AI_LACKING)?;
         let spatial: &Spatial = &step.world.spatial;
         let gone = |id: Option<ObjectId>| {
             let Some(id) = id.filter(|&id| spatial.get(id).is_some()) else {
@@ -420,14 +422,10 @@ impl Unit {
             .parts
             .unit_ai
             .get(self.id)
-            .ok_or(GenieError::unsupported(
-                "a hunt without a unit AI after its drop-off",
-            ))?;
+            .ok_or(HUNTER_AI_LACKING)?;
         let class = ai.target_class.or(hunt.target_class);
         if ai.ai_kind != UnitAiKind::Civilian {
-            return Err(GenieError::unsupported(
-                "slot 0x1b0 of another unit AI than the civilian's",
-            ));
+            return Err(NON_CIVILIAN_GROUP);
         }
         let kind = class.and_then(|class| civilian_kind(class, roles));
         let found = match kind {
@@ -538,9 +536,7 @@ impl Unit {
             .parts
             .unit_ai
             .get_mut(self.id)
-            .ok_or(GenieError::unsupported(
-                "a hunt without a unit AI after its drop-off",
-            ))?;
+            .ok_or(HUNTER_AI_LACKING)?;
         ai.alert(result, step.dt.seconds());
         Ok(result.id)
     }

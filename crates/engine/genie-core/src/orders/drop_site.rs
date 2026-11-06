@@ -1,9 +1,11 @@
 //! The drop-offs: an unasked one, the ordered drop site, the table's, one now and elsewhere,
 //! and the way back.
 
+use crate::GenieResult;
 use crate::commands::UnitOrderAction;
 use crate::construction::build::BuildAction;
 use crate::gathering::DropSiteId;
+use crate::gathering::drop_off::DROP_OFF_MASTERS_LACKING;
 use crate::gathering::drop_sites::DropMeasure;
 use crate::gathering::drop_sites::SitePlace;
 use crate::gathering::drop_sites::SiteSearch;
@@ -42,7 +44,6 @@ use crate::world::layer::MasterRoles;
 use crate::world::objects_ref::ObjectsRef;
 use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlotsExt;
-use crate::{GenieError, GenieResult};
 
 impl World {
     /// `UNIT_ORDER`'s drop-off of a carrying unit without a gather action on top (`FUN_14161e370`'s
@@ -140,9 +141,7 @@ impl World {
             .model
             .masters
             .of(player_id)
-            .ok_or(GenieError::unsupported(
-                "a drop-off of a player without masters",
-            ))?;
+            .ok_or(DROP_OFF_MASTERS_LACKING)?;
         if !seeks {
             return drop_site_search(
                 &self.players.player(player_id)?.objects,

@@ -2853,10 +2853,7 @@ fn disarmed_building_targetless_attack_ends_standing_and_posts_0x1fb() {
             unit.end_head_update(actions, step, code)
         },
     );
-    assert_eq!(
-        in_update.unwrap_err().reason(),
-        "an attack's target the slice does not hold live"
-    );
+    assert_eq!(in_update.unwrap_err(), ATTACK_TARGET_NOT_LIVE);
 }
 
 /// A sprite of [`STANDING`]'s graphic (ten frames of 0.1 s) that just advanced from frame

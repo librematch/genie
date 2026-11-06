@@ -1,6 +1,7 @@
 //! The Transport action's slots ([`TransportAction`]): its start, state, move, stop, work and
 //! update, its walk and its test beside the shore.
 
+use crate::GenieResult;
 use crate::combat::abilities::Look;
 use crate::garrison::transport::StartCall;
 use crate::garrison::transport::TransportMode;
@@ -31,6 +32,7 @@ use crate::objects::layers::Action;
 use crate::objects::layers::MotionMut;
 use crate::objects::masters::{Master, Task};
 use crate::objects::sprite::{Graphic, new_sprite};
+use crate::objects::unit::STOPPED_SPRITE_LACKING;
 use crate::objects::unit::Unit;
 use crate::players::PlayerKind;
 use crate::unit_ai::{AiAction, UnitAi};
@@ -44,7 +46,6 @@ use crate::world::layer::generated::Tuning;
 use crate::world::parts::PartTable;
 use crate::world::slots::PlayerSlotsExt;
 use crate::world::step::Step;
-use crate::{GenieError, GenieResult};
 use genie_model::model::Model;
 
 impl TransportAction {
@@ -597,9 +598,7 @@ pub(crate) fn stand(
         mover.shows(standing.as_ref());
     }
     if unit.sprite.is_some() {
-        let standing = standing.ok_or(GenieError::unsupported(
-            "a stopped unit without its standing sprite",
-        ))?;
+        let standing = standing.ok_or(STOPPED_SPRITE_LACKING)?;
         new_sprite(
             &mut unit.sprite,
             motion.move_stats_mut(),

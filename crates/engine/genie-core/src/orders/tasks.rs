@@ -35,6 +35,9 @@ use crate::{GenieError, GenieResult};
 /// A Repair's target the world does not hold where the work command starts or retargets it.
 const REPAIR_TARGET_GONE: GenieError =
     GenieError::unreachable("a Repair's target the world does not hold");
+/// A Build's foundation the slice does not hold.
+const FOUNDATION_NOT_HELD: GenieError =
+    GenieError::unsupported("a Build's foundation the slice does not hold");
 
 impl World {
     /// `HuntObject`'s unit part (`FUN_140c4e220`, [`crate::unit_ai::AiCommand::HuntObject`], after
@@ -123,9 +126,7 @@ impl World {
         point: Position,
         notifies: Notifies,
     ) -> GenieResult<()> {
-        let (tp, target_unit) = self.object(target).ok_or(GenieError::unsupported(
-            "a Build's foundation the slice does not hold",
-        ))?;
+        let (tp, target_unit) = self.object(target).ok_or(FOUNDATION_NOT_HELD)?;
         let tm = target_unit.master(self.master_tables(), tp)?;
         let (target_at, target_radius, class) = (target_unit.position(), tm.radius, tm.class);
         let target_state = Some(target_unit.life.state);
@@ -453,9 +454,7 @@ impl World {
         old: BuildAction,
         target: ObjectId,
     ) -> GenieResult<ClassId> {
-        let (tp, target_unit) = self.object(target).ok_or(GenieError::unsupported(
-            "a Build's foundation the slice does not hold",
-        ))?;
+        let (tp, target_unit) = self.object(target).ok_or(FOUNDATION_NOT_HELD)?;
         if tp != player {
             return Err(GenieError::unsupported(
                 "a Build retargeted to another player's object (set_state 11)",
