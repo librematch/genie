@@ -7,14 +7,14 @@ use crate::garrison::ContainerId;
 use crate::garrison::GarrisonCounts;
 use crate::garrison::{NO_MASTERS, attack_rate, share};
 use crate::objects::ObjectId;
+use crate::objects::layers::{Building, Combat};
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::PlayersMastersExt;
 use crate::objects::unit::Unit;
 use crate::players::PlayerId;
 use crate::world::Seconds;
-use crate::world::layer::Roles;
-use crate::world::parts::Parts;
+use crate::world::parts::PartTable;
 use crate::world::step::Step;
 
 impl Unit {
@@ -70,43 +70,39 @@ impl Unit {
     }
 
     /// The container's slot 0x1c8 (`FUN_141217910`, a building's through `FUN_1411d6ad0`; its
-    /// master `bm`, its parts in `parts`) for unit `id` of master `made` that leaves it, with its
-    /// share `share` of the volleys: the share comes off the volleys, back to the master's volley
-    /// fire when none is left inside or they fell below it; its list lets the unit go
-    /// (`FUN_141197e10`); a building (type 80) then counts the unit out by its countdown to its
-    /// raid (`+0x9a0`, [`GarrisonCounts::of_unit`]), which slot 0x1a8 ends only after it.
+    /// master `bm`) for unit `id` that leaves it, with its share `share` of the volleys and what
+    /// it counts `counts` ([`GarrisonCounts::of_unit`] by its countdown to its raid, `+0x9a0`,
+    /// which slot 0x1a8 ends only after it): the share comes off the volleys in `combats`, back
+    /// to the master's volley fire when none is left inside or they fell below it; its list lets
+    /// the unit go (`FUN_141197e10`); a building (type 80) then counts the unit out of its layer
+    /// in `buildings`.
     ///
     /// # Errors
     ///
-    /// None (an unreachable error where a parts' table lost the layer it took).
+    /// None (an unreachable error where a table lost the layer it took).
     pub(crate) fn let_go(
         &mut self,
-        parts: &mut Parts,
+        combats: &mut PartTable<Combat>,
+        buildings: &mut PartTable<Building>,
         id: ObjectId,
         share: Option<Firepower>,
-        made: &Master,
+        counts: GarrisonCounts,
         bm: &Master,
-        roles: &Roles,
     ) -> GenieResult<()> {
         if let Some(share) = share {
-            parts.combat_mut(self.id)?.firepower -= share;
+            combats.of_mut(self.id)?.firepower -= share;
         }
         if let Some(slot) = self.garrison.iter().position(|&object_id| object_id == id) {
             let _ = self.garrison.swap_remove(slot);
         }
         // COMISS volley, firepower; JBE keeps it: a NaN firepower stays
         if self.garrison.is_empty()
-            || parts.combat_of(self.id).firepower < bm.creatable_part().volley_fire
+            || combats.of(self.id).firepower < bm.creatable_part().volley_fire
         {
-            parts.combat_mut(self.id)?.firepower = bm.creatable_part().volley_fire;
+            combats.of_mut(self.id)?.firepower = bm.creatable_part().volley_fire;
         }
         if bm.kind == MasterKind::BUILDING {
-            let countdown = parts.combat_of(id).raider_countdown;
-            let counts = GarrisonCounts::of_unit(made, countdown, roles);
-            parts
-                .building_mut(self.id)?
-                .garrison_counts
-                .count_out(counts);
+            buildings.of_mut(self.id)?.garrison_counts.count_out(counts);
         }
         Ok(())
     }

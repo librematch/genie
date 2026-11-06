@@ -38,6 +38,7 @@ moves it on. The behaviours that a tick runs live in their systems. Many of them
 | [`after_step.rs`](after_step.rs) | An object's step and what follows it (`World::step_object`): what its `Step` gathered, applied to the world in the order the game's update makes them. |
 | [`ai_values.rs`](ai_values.rs) | The values of a player's AI settings (`crate::world::AiSettings`). |
 | [`checkpoint.rs`](checkpoint.rs) | The per-player 11-word state block that recorded games checkpoint every N syncs. |
+| [`combat_parts.rs`](combat_parts.rs) | The combat object's parts (FD-045-D51): its combat layer (`RGE_Combat_Object`, types 50 and up) and a building's layer (`TRIBE_Building_Object`, type 80) by id in the world's tables (`Parts::combat`, `Parts::building`), a new object's where a table holds none, and the repairers or builders that one of the two holds. |
 | [`forced.rs`](forced.rs) | The forced replay (dev only): the game's state after a tick (`GameState`) and the step that forces it on the world. |
 | [`frame_seed.rs`](frame_seed.rs) | The world's frame seed. |
 | [`index.rs`](index.rs) | The world's table by id (`FUN_1415417a0`: `world+0x168` for ids 0 and up, `+0x178` for the recycled ones, FD-045-D49): where each object is, a player's live or sleeping slot. |

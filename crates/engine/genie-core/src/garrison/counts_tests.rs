@@ -8,13 +8,13 @@ use crate::garrison::RaiderCountdown;
 use crate::map::Footprint;
 use crate::map::GridSize;
 use crate::map::Position;
-use crate::objects::ObjectId;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::GarrisonCapacity;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObjectFlags;
+use crate::test_ids::object_id;
 use crate::testing::class;
 use crate::testing::scene::{PLAYER, Scene, SceneObject};
 use crate::unit_ai::UnitAi;
@@ -31,13 +31,10 @@ const VILLAGER: i32 = 10;
 const RAIDER: i32 = 11;
 /// A second unit of type 70 of that class.
 const SOLDIER: i32 = 12;
+/// A second villager, which the load finds inside the transport.
+const CARRIED: i32 = 13;
 /// A class of no meaning to the counts (6, the infantry's).
 const INFANTRY: ClassId = ClassId::named(6);
-
-/// Object `id`.
-fn object(id: i32) -> ObjectId {
-    ObjectId::try_from(id).unwrap()
-}
 
 /// A master `id` of type `kind` and class `class`, of radius 0.2 (a building's 1).
 fn master(id: i16, kind: MasterKind, class: ClassId) -> Master {
@@ -64,15 +61,26 @@ fn transport_master() -> Master {
     }
 }
 
-/// Player 1's building, transport, villager, raider and soldier, the units outside with their
-/// unit AI (an entering villager records its work for the town bell); `inside` puts them in
-/// the building, as a save holds them.
-fn counts_world(inside: Option<ContainerId>) -> World {
-    let unit = |id, master: Master, x| SceneObject {
+/// Unit `id` of master `master` with its unit AI (an entering villager records its work for the
+/// town bell) at `x` in the first row, inside `inside` as a save holds it.
+fn counted_unit(id: i32, master: Master, x: f32, inside: Option<ContainerId>) -> SceneObject {
+    SceneObject {
         ai: Some(UnitAi::default()),
         inside,
         ..SceneObject::new(id, PLAYER, master, Position::new(x, 1.5, 0.0))
-    };
+    }
+}
+
+/// Player 1's building, transport, villager, raider and soldier, the units outside
+/// ([`counts_scene`]).
+fn counts_world(inside: Option<ContainerId>) -> World {
+    counts_scene(inside).build()
+}
+
+/// Player 1's building, transport, villager, raider and soldier ([`counted_unit`]); `inside`
+/// puts the units in the building, as a save holds them.
+fn counts_scene(inside: Option<ContainerId>) -> Scene {
+    let unit = |id, master, x| counted_unit(id, master, x, inside);
     Scene::open(GridSize::new(12, 12))
         .object(SceneObject::new(
             BUILDING,
@@ -93,27 +101,29 @@ fn counts_world(inside: Option<ContainerId>) -> World {
         ))
         .object(unit(RAIDER, master(4, MasterKind::COMBAT, INFANTRY), 2.5))
         .object(unit(SOLDIER, master(4, MasterKind::COMBAT, INFANTRY), 3.5))
-        .build()
 }
 
 /// Unit `id`'s countdown to its raid (`+0x9a0`) is `seconds`.
 fn count_down(world: &mut World, id: i32, seconds: i32) {
-    world.parts.combat_mut(object(id)).unwrap().raider_countdown =
-        RaiderCountdown::of_data(seconds);
+    world
+        .parts
+        .combat_mut(object_id(id))
+        .unwrap()
+        .raider_countdown = RaiderCountdown::of_data(seconds);
 }
 
 /// Unit `id` goes into `container` at once (slot 0x1a0 with 1).
 fn enter(world: &mut World, id: i32, container: i32) {
-    let index = world.live_index(PLAYER, object(id)).unwrap();
+    let index = world.live_index(PLAYER, object_id(id)).unwrap();
     world
-        .enter_forced(PLAYER, index, ContainerId::new(object(container)))
+        .enter_forced(PLAYER, index, ContainerId::new(object_id(container)))
         .unwrap();
 }
 
 /// Unit `id` leaves `container` for a spot beside it (slot 0x1a8, then slot 0x58).
 fn leave(world: &mut World, id: i32, container: i32) {
-    let held = world.live_index(PLAYER, object(container)).unwrap();
-    let index = world.live_index(PLAYER, object(id)).unwrap();
+    let held = world.live_index(PLAYER, object_id(container)).unwrap();
+    let index = world.live_index(PLAYER, object_id(id)).unwrap();
     let made = world.players[1].objects[index]
         .master(world.master_tables(), PLAYER)
         .unwrap()
@@ -130,7 +140,10 @@ fn leave(world: &mut World, id: i32, container: i32) {
 
 /// `container`'s counts.
 fn counts(world: &World, container: i32) -> (i32, i32) {
-    let counts = world.parts.building_of(object(container)).garrison_counts;
+    let counts = world
+        .parts
+        .building_of(object_id(container))
+        .garrison_counts;
     (counts.villagers.get(), counts.raiders.get())
 }
 
@@ -165,7 +178,10 @@ fn building_counts_entering_villagers_and_raiders() {
     enter(&mut world, RAIDER, BUILDING);
     enter(&mut world, SOLDIER, BUILDING);
     assert_eq!(counts(&world, BUILDING), (1, 1));
-    assert_eq!(world.garrisoned(object(BUILDING)), Ok(InsideCount::new(2)));
+    assert_eq!(
+        world.garrisoned(object_id(BUILDING)),
+        Ok(InsideCount::new(2))
+    );
 }
 
 /// The building's slot 0x1c8 (`FUN_1411d6ad0`) counts them out by the countdown as it leaves,
@@ -180,12 +196,15 @@ fn building_counts_leaving_units_by_their_countdown_then() {
     }
     leave(&mut world, RAIDER, BUILDING);
     assert_eq!(counts(&world, BUILDING), (1, 0));
-    let raider = world.parts.combat_of(object(RAIDER)).raider_countdown;
+    let raider = world.parts.combat_of(object_id(RAIDER)).raider_countdown;
     assert_eq!(raider, RaiderCountdown::NONE);
     count_down(&mut world, SOLDIER, 5);
     leave(&mut world, SOLDIER, BUILDING);
     assert_eq!(counts(&world, BUILDING), (1, -1));
-    assert_eq!(world.garrisoned(object(BUILDING)), Ok(InsideCount::new(2)));
+    assert_eq!(
+        world.garrisoned(object_id(BUILDING)),
+        Ok(InsideCount::new(2))
+    );
     leave(&mut world, VILLAGER, BUILDING);
     assert_eq!(counts(&world, BUILDING), (0, -1));
 }
@@ -200,22 +219,41 @@ fn transport_counts_nothing() {
     assert_eq!(counts(&world, TRANSPORT), (0, 0));
     leave(&mut world, RAIDER, TRANSPORT);
     assert_eq!(counts(&world, TRANSPORT), (0, 0));
-    assert_eq!(world.garrisoned(object(TRANSPORT)), Ok(InsideCount::ONE));
+    assert_eq!(world.garrisoned(object_id(TRANSPORT)), Ok(InsideCount::ONE));
 }
 
 /// The load sets neither count (its constructor's 0); its re-link enters each unit inside
 /// again (`RGE_Static_Object::rehook`, slot 0x1a0 with 1), which counts them in by the saved
-/// countdowns.
+/// countdowns: the building's slot 0x1c0 does, the transport's keeps no counts.
 #[test]
 fn load_counts_the_units_inside_again() {
-    let mut world = counts_world(Some(ContainerId::new(object(BUILDING))));
+    let carried = counted_unit(
+        CARRIED,
+        master(83, MasterKind::COMBAT, class::VILLAGER),
+        4.5,
+        Some(ContainerId::new(object_id(TRANSPORT))),
+    );
+    let mut world = counts_scene(Some(ContainerId::new(object_id(BUILDING))))
+        .object(carried)
+        .build();
     count_down(&mut world, RAIDER, 20);
+    count_down(&mut world, CARRIED, 20);
     assert_eq!(counts(&world, BUILDING), (0, 0));
     garrison_firepower(&mut world);
+    let garrison = |container| {
+        let index = world.live_index(PLAYER, object_id(container)).unwrap();
+        world.players[1].objects[index].garrison.clone()
+    };
     assert_eq!(
-        world.players[1].objects[world.live_index(PLAYER, object(BUILDING)).unwrap()].garrison,
-        [object(VILLAGER), object(RAIDER), object(SOLDIER)]
+        garrison(BUILDING),
+        [object_id(VILLAGER), object_id(RAIDER), object_id(SOLDIER)]
     );
+    assert_eq!(garrison(TRANSPORT), [object_id(CARRIED)]);
     assert_eq!(counts(&world, BUILDING), (1, 1));
-    assert_eq!(world.garrisoned(object(BUILDING)), Ok(InsideCount::new(2)));
+    assert_eq!(counts(&world, TRANSPORT), (0, 0));
+    assert_eq!(
+        world.garrisoned(object_id(BUILDING)),
+        Ok(InsideCount::new(2))
+    );
+    assert_eq!(world.garrisoned(object_id(TRANSPORT)), Ok(InsideCount::ONE));
 }

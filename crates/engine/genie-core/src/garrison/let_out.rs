@@ -6,6 +6,7 @@ use crate::combat::powerup::{InfantryChange, count_infantry, speeds_up_siege};
 use crate::combat::reload::full_reload;
 use crate::commands::GatherPoint;
 use crate::commands::GatherPointState;
+use crate::garrison::GarrisonCounts;
 use crate::garrison::LetOut;
 use crate::garrison::RaiderCountdown;
 use crate::garrison::{INSIDE_SIGHT, NO_POINT, SIEGE_UNLOAD, attack_rate, share};
@@ -186,8 +187,17 @@ impl World {
         let (bid, id) = (live.id, self.players.live(up, ui)?.id);
         let bm = live.master(self.master_tables(), player)?.clone();
         let share = self.unloaded_share((player, container), (up, ui), made, &bm)?;
+        let countdown = self.parts.combat_of(id).raider_countdown;
+        let counts = GarrisonCounts::of_unit(made, countdown, &self.model.roles);
         let unit = self.players.live_mut(player, container)?;
-        unit.let_go(&mut self.parts, id, share, made, &bm, &self.model.roles)?;
+        unit.let_go(
+            &mut self.parts.combat,
+            &mut self.parts.building,
+            id,
+            share,
+            counts,
+            &bm,
+        )?;
         // a building's sight lets the circle of 5 go (slot 0x1d8 with 5)
         let (building_at, building_radius) = (unit.position(), bm.radius);
         if bm.kind == MasterKind::BUILDING

@@ -25,6 +25,7 @@
 
 mod action_parts;
 pub mod checkpoint;
+mod combat_parts;
 pub mod index;
 pub(crate) mod lets;
 pub mod load;
