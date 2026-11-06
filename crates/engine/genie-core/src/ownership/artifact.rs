@@ -24,6 +24,7 @@ use crate::objects::masters::ActionKind;
 use crate::objects::masters::Task;
 use crate::objects::release::Releaser;
 use crate::objects::teardown::HeadCode;
+use crate::objects::teardown::TornWalk;
 use crate::objects::unit::Unit;
 use crate::ownership::CaptureKind;
 use crate::ownership::capture::Captured;
@@ -77,9 +78,9 @@ pub enum Handover {
 /// ([`Artifact::drop_sub_actions`]).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct SubActionsGone {
-    /// A walking `MoveTo` went, the Artifact's own or the Enter's: its teardown (`0x140aa1f30`)
-    /// stops the unit (slot 0x5d0).
-    pub(crate) stops: bool,
+    /// What went does to the unit's walk: a walking `MoveTo`, the Artifact's own or the
+    /// Enter's, stops the unit with its teardown (`0x140aa1f30`, slot 0x5d0).
+    pub(crate) walk: TornWalk,
     /// The building or transport the Enter's teardown let go (slot 0x180).
     pub(crate) released: Option<ObjectId>,
 }
@@ -208,11 +209,11 @@ impl Artifact {
         match self.sub.take() {
             None => SubActionsGone::default(),
             Some(ArtifactSub::Walk { .. }) => SubActionsGone {
-                stops: true,
+                walk: TornWalk::Stops,
                 released: None,
             },
             Some(ArtifactSub::Enter { enter }) => SubActionsGone {
-                stops: enter.state.move_to().is_some(),
+                walk: TornWalk::from(enter.state.move_to()),
                 released: enter.target.map(ContainerId::id),
             },
         }
@@ -530,7 +531,7 @@ fn let_go_gone(
     if let Some(object_id) = gone.released {
         release(step, unit, object_id, by)?;
     }
-    if gone.stops
+    if gone.walk == TornWalk::Stops
         && let Some(mover) = step.world.parts.mover_mut(unit.id)
     {
         mover.stop()?;
@@ -765,7 +766,7 @@ mod tests {
                 &tuning().move_to
             ),
             Ok(SubActionsGone {
-                stops: true,
+                walk: TornWalk::Stops,
                 released: None
             })
         );
@@ -839,7 +840,7 @@ mod tests {
             .walking(MoveTo::Moving)
         };
         let by_enter = SubActionsGone {
-            stops: true,
+            walk: TornWalk::Stops,
             released: Some(object_id(11970)),
         };
         let mut artifact = Artifact::new(PlayerId::new(1), None);
@@ -913,7 +914,7 @@ mod tests {
                 &tuning().move_to
             ),
             Ok(SubActionsGone {
-                stops: false,
+                walk: TornWalk::Untouched,
                 released: Some(object_id(11970))
             })
         );
@@ -931,7 +932,7 @@ mod tests {
         );
         enter_action = enter_action.walking(MoveTo::Moving);
         let by_enter = SubActionsGone {
-            stops: true,
+            walk: TornWalk::Stops,
             released: Some(object_id(11970)),
         };
         let mut artifact = Artifact::new(PlayerId::new(1), None);
@@ -994,12 +995,12 @@ mod tests {
                 &enter_task(Distance::ZERO, class::TRANSPORT),
             )
         };
-        let gone = |stops, released| SubActionsGone { stops, released };
+        let gone = |walk, released| SubActionsGone { walk, released };
         let mut artifact = Artifact::new(PlayerId::new(1), None);
         // nothing held: nothing to let go, nothing walking
         assert_eq!(
             artifact.hold_enter(enter(ContainerId::new(object_id(7934)))),
-            gone(false, None)
+            gone(TornWalk::Untouched, None)
         );
         // the held Enter walks: its MoveTo's teardown stops the unit
         let held = artifact.take_enter().unwrap();
@@ -1008,7 +1009,7 @@ mod tests {
         });
         assert_eq!(
             artifact.hold_enter(enter(ContainerId::new(object_id(7934)))),
-            gone(true, Some(object_id(7934)))
+            gone(TornWalk::Stops, Some(object_id(7934)))
         );
         assert_eq!(
             artifact
@@ -1020,7 +1021,7 @@ mod tests {
         // an Enter not walking only lets its target go
         assert_eq!(
             artifact.hold_enter(enter(ContainerId::new(object_id(7935)))),
-            gone(false, Some(object_id(7934)))
+            gone(TornWalk::Untouched, Some(object_id(7934)))
         );
         // the Artifact's own MoveTo goes with its goal and stops the unit
         artifact.sub = None;
@@ -1029,7 +1030,7 @@ mod tests {
         });
         assert_eq!(
             artifact.hold_enter(enter(ContainerId::new(object_id(7934)))),
-            gone(true, None)
+            gone(TornWalk::Stops, None)
         );
         assert_eq!(artifact.move_to().copied(), None);
     }
@@ -1096,7 +1097,7 @@ mod tests {
             walking.stop(),
             (
                 SubActionsGone {
-                    stops: true,
+                    walk: TornWalk::Stops,
                     released: None
                 },
                 Some(object_id(9149))
@@ -1143,7 +1144,7 @@ mod tests {
             Some(Handover::Taken {
                 new: PlayerId::new(1),
                 gone: SubActionsGone {
-                    stops: true,
+                    walk: TornWalk::Stops,
                     released: None
                 }
             })
@@ -1214,7 +1215,7 @@ mod tests {
                 &tuning().move_to,
             )
             .unwrap();
-        assert!(gone.stops);
+        assert_eq!(gone.walk, TornWalk::Stops);
         assert_eq!(
             targets,
             Targets {
@@ -1255,7 +1256,7 @@ mod tests {
             (
                 Some(object_id(9149)),
                 SubActionsGone {
-                    stops: true,
+                    walk: TornWalk::Stops,
                     released: None
                 }
             )

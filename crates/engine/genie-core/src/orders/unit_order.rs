@@ -19,6 +19,7 @@ use crate::objects::ObjectState;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::MasterTables;
+use crate::objects::teardown::TornWalk;
 use crate::orders::object_gone;
 use crate::orders::{HERD_MOST, NO_POINT};
 use crate::players::Amount;
@@ -108,7 +109,7 @@ impl World {
         if let Some(object_id) = gone.released {
             self.release(object_id, by)?;
         }
-        if gone.stops {
+        if gone.walk == TornWalk::Stops {
             self.parts
                 .mover_mut(self.players.live(player, idx)?.id)
                 .ok_or(WALKER_UNMOVING)?

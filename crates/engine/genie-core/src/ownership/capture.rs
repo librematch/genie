@@ -14,6 +14,7 @@ use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::PlayersMastersExt;
 use crate::objects::masters::{MasterTables, OwnerMasters};
+use crate::objects::teardown::TornWalk;
 use crate::objects::unit::Unit;
 use crate::orders::object_gone;
 use crate::ownership::CaptureKind;
@@ -109,7 +110,7 @@ impl Unit {
         let by = self.releaser(step)?;
         if let Some(artifact) = actions.list.artifact_mut() {
             let (gone, released) = artifact.stop();
-            if gone.stops {
+            if gone.walk == TornWalk::Stops {
                 step.world
                     .parts
                     .mover_mut(self.id)

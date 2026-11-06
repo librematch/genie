@@ -573,8 +573,8 @@ pub fn default_task(
     }
 }
 
-/// Whether an object's save holds actions: a save from the start of a game holds none, one from
-/// later in the game holds them.
+/// Whether an object's save holds its actions: an entry in its action list, or none (every
+/// object of a save from a game's start, an idle one later).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum SaveHolds {
     /// Its action list holds an entry.
@@ -597,23 +597,19 @@ impl SaveHolds {
     }
 }
 
-/// What the default task `default` of an object starts once its action list empties, by what
-/// its save `holds`: nothing, a Fly or a Make before its first update, the Artifact again, or a
-/// start the slice cannot make. A saved object's Fly is its saved action's: none starts again
-/// (it never ends); a saved Make started.
-pub(crate) fn loaded_default_task(
-    default: &Result<Option<DefaultStart>, Unstartable>,
-    holds: SaveHolds,
-) -> DefaultTask {
-    match default {
-        Ok(None) => DefaultTask::Nothing,
-        Ok(Some(DefaultStart::Fly | DefaultStart::Make)) if holds == SaveHolds::Actions => {
+/// What the default task's start `start` of an object starts once its action list empties, by
+/// what its save `holds`: nothing, a Fly or a Make before its first update, or the Artifact
+/// again. A saved object's Fly is its saved action's: none starts again (it never ends); a saved
+/// Make started. A default task the slice cannot start is the caller's.
+pub(crate) fn loaded_default_task(start: Option<&DefaultStart>, holds: SaveHolds) -> DefaultTask {
+    match start {
+        None => DefaultTask::Nothing,
+        Some(DefaultStart::Fly | DefaultStart::Make) if holds == SaveHolds::Actions => {
             DefaultTask::Nothing
         }
-        Ok(Some(DefaultStart::Fly)) => DefaultTask::Fly,
-        Ok(Some(DefaultStart::Make)) => DefaultTask::Make,
-        Ok(Some(DefaultStart::Artifact(_))) => DefaultTask::Artifact,
-        Err(unstartable) => DefaultTask::Fails(*unstartable),
+        Some(DefaultStart::Fly) => DefaultTask::Fly,
+        Some(DefaultStart::Make) => DefaultTask::Make,
+        Some(DefaultStart::Artifact(_)) => DefaultTask::Artifact,
     }
 }
 

@@ -38,7 +38,7 @@ use crate::objects::Relics;
 use crate::objects::WorkRate;
 use crate::objects::WorkerCount;
 use crate::objects::layers::Building;
-use crate::objects::layers::{Action, Animated, Combat, Motion, Static};
+use crate::objects::layers::{Action, Animated, Combat, DefaultTask, Motion, Static};
 use crate::objects::layers::{CommandCount, Speedup, SpeedupValue};
 use crate::objects::lifecycle::Lifecycle;
 use crate::objects::masters::ActionKind;
@@ -609,7 +609,10 @@ fn row(
             Err(unstartable) => Err(unstartable.error()),
         },
     };
-    actions.default_task = loaded_default_task(&default, holds);
+    actions.default_task = default.as_ref().map_or_else(
+        |unstartable| DefaultTask::Fails(*unstartable),
+        |start| loaded_default_task(start.as_ref(), holds),
+    );
     actions.speedup = object
         .action_part()
         .map_or(Speedup::NONE, |rge_action_object| Speedup {

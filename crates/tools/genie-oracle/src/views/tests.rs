@@ -95,10 +95,10 @@ fn group_view_lists_its_units_formations_and_command() {
     assert_eq!(lines.len(), 6);
 }
 
-/// In the imported view the groups print as genie-core imports them; a group the import refuses says
-/// why.
+/// In the imported view the groups print as genie-core imports them; a group the import
+/// refuses says why.
 #[test]
-fn full_group_view_imports_the_groups() {
+fn imported_group_view_prints_the_groups_as_imported() {
     let mut save = header(vec![]);
     save.world.base_world.unit_groups.unit_group = vec![UnitGroup {
         id: 3,

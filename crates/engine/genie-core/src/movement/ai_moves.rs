@@ -26,6 +26,7 @@ use crate::movement::move_to::{
     MoveTo, MoveToAction, MoveToReads, SpriteReads, ai_sprite, object_sprite, point_sprite,
 };
 use crate::objects::release::Releaser;
+use crate::objects::teardown::TornWalk;
 use crate::objects::unit::Unit;
 
 use crate::combat::abilities::Look;
@@ -390,7 +391,7 @@ impl Unit {
             Some(artifact) => artifact.take_point(point, &reads, move_to_tuning)?,
             None => SubActionsGone::default(),
         };
-        if gone.stops {
+        if gone.walk == TornWalk::Stops {
             mover.ok_or(WALKER_UNMOVING)?.stop()?;
         }
         Ok(PointMove::Taken(gone.released))

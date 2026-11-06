@@ -19,6 +19,7 @@ use crate::objects::actions::Action;
 use crate::objects::masters::ActionKind;
 use crate::objects::release::Releaser;
 use crate::objects::sprite::new_sprite;
+use crate::objects::teardown::TornWalk;
 use crate::ownership::artifact::ANIMAL_UNMOVING;
 use crate::ownership::artifact::Artifact;
 use crate::players::PlayerId;
@@ -417,7 +418,7 @@ impl World {
             .actions_mut(unit.id)?
             .list
             .set_artifact(Some(artifact));
-        if gone.stops {
+        if gone.walk == TornWalk::Stops {
             self.parts
                 .mover_mut(unit.id)
                 .ok_or(ANIMAL_UNMOVING)?

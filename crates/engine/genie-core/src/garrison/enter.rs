@@ -24,6 +24,7 @@ use crate::objects::masters::MasterKind;
 use crate::objects::masters::OwnerMasters;
 use crate::objects::masters::PlayersMastersExt;
 use crate::objects::masters::Task;
+use crate::objects::teardown::TornWalk;
 use crate::objects::unit::Unit;
 use crate::orders::ActionsOnChange;
 use crate::orders::GARRISON;
@@ -341,7 +342,7 @@ impl World {
             self.release(object_id, by)?;
         }
         let unit = self.players.live(player, idx)?;
-        if gone.stops
+        if gone.walk == TornWalk::Stops
             && let Some(mover) = self.parts.mover_mut(unit.id)
         {
             mover.stop()?;

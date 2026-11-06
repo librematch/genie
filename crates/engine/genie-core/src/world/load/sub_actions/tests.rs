@@ -23,8 +23,10 @@ use crate::objects::masters::TaskId;
 use crate::objects::masters::TaskIndex;
 use crate::objects::masters::TaskSprites;
 use crate::ownership::artifact::ARTIFACT_KIND;
+use crate::ownership::artifact::Artifact;
 use crate::players::Amount;
 use crate::players::CivId;
+use crate::players::PlayerId;
 use crate::production::{MakeObjState, MakeTechState, Making};
 use crate::technology::TechId;
 use crate::test_ids::object_id;
@@ -488,30 +490,30 @@ fn own_master_gives_the_fly_and_build_tasks() {
 }
 
 /// A default Fly or Make starts before the object's first update only when its save holds no
-/// actions: a saved object's actions are that task's own. No default task starts nothing, and
-/// one the slice cannot start fails either way.
+/// actions: a saved object's actions are that task's own. No default task starts nothing, and an
+/// Artifact starts again either way.
 #[test]
 fn default_fly_or_make_starts_only_without_saved_actions() {
-    let unread = Unstartable::Unread(UnreadDefault::NoMasterTable);
-    for (default, without, with) in [
+    let artifact = DefaultStart::Artifact(Box::new(Artifact::new(PlayerId::GAIA, None)));
+    for (start, without, with) in [
         (
-            Ok(Some(DefaultStart::Fly)),
+            Some(&DefaultStart::Fly),
             DefaultTask::Fly,
             DefaultTask::Nothing,
         ),
         (
-            Ok(Some(DefaultStart::Make)),
+            Some(&DefaultStart::Make),
             DefaultTask::Make,
             DefaultTask::Nothing,
         ),
-        (Ok(None), DefaultTask::Nothing, DefaultTask::Nothing),
+        (None, DefaultTask::Nothing, DefaultTask::Nothing),
         (
-            Err(unread),
-            DefaultTask::Fails(unread),
-            DefaultTask::Fails(unread),
+            Some(&artifact),
+            DefaultTask::Artifact,
+            DefaultTask::Artifact,
         ),
     ] {
-        assert_eq!(loaded_default_task(&default, SaveHolds::NoActions), without);
-        assert_eq!(loaded_default_task(&default, SaveHolds::Actions), with);
+        assert_eq!(loaded_default_task(start, SaveHolds::NoActions), without);
+        assert_eq!(loaded_default_task(start, SaveHolds::Actions), with);
     }
 }

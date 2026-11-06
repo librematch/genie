@@ -15,7 +15,6 @@ use crate::objects::actions::{Action, ActionList};
 use crate::objects::layers::MotionMut;
 use crate::objects::release::Releaser;
 use crate::objects::unit::Unit;
-use crate::ownership::artifact::SubActionsGone;
 use crate::world::lets::torn_down;
 use crate::world::step::Step;
 use crate::{GenieError, GenieResult};
@@ -60,12 +59,13 @@ impl TornDown {
 }
 
 /// What a torn-down action's teardown does to its unit's walk.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum TornWalk {
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub(crate) enum TornWalk {
     /// A `MoveTo` went with the action (its own, its sub-action's or the Artifact's Enter's):
     /// its teardown (`0x140aa1f30`) stops the unit (slot 0x5d0).
     Stops,
     /// No `MoveTo` went: the unit's motion stays as it is.
+    #[default]
     Untouched,
 }
 
@@ -73,17 +73,6 @@ impl From<Option<&MoveToAction>> for TornWalk {
     /// The walk of an action whose state holds `move_to`, if any.
     fn from(move_to: Option<&MoveToAction>) -> Self {
         if move_to.is_some() {
-            Self::Stops
-        } else {
-            Self::Untouched
-        }
-    }
-}
-
-impl From<SubActionsGone> for TornWalk {
-    /// The walk of the Artifact whose sub-actions went (`gone`).
-    fn from(gone: SubActionsGone) -> Self {
-        if gone.stops {
             Self::Stops
         } else {
             Self::Untouched
@@ -127,7 +116,7 @@ impl Action {
                 let (released, gone) = artifact.tear_down();
                 torn.release(released);
                 torn.release(gone.released);
-                stop_if_moving(motion, TornWalk::from(gone))?;
+                stop_if_moving(motion, gone.walk)?;
             }
             Self::Fly(fly) => {
                 // RGE_Action_Bird's destructor: `+0x7b8` takes the bird's slot 0x208
@@ -351,20 +340,13 @@ mod tests {
         })
     }
 
-    /// A torn-down action stops its unit only when a `MoveTo` went with it: one its state held,
-    /// or the Artifact's walking sub-action; the stop leaves a unit without one moving.
+    /// A torn-down action stops its unit only when a `MoveTo` went with it, one its state held;
+    /// the stop leaves a unit without one moving.
     #[test]
     fn only_move_to_that_went_stops_the_unit() {
         let walking = MoveToAction::sub_in(MoveTo::Moving);
         assert_eq!(TornWalk::from(Some(&walking)), TornWalk::Stops);
         assert_eq!(TornWalk::from(None), TornWalk::Untouched);
-        let gone = SubActionsGone::default();
-        assert_eq!(TornWalk::from(gone), TornWalk::Untouched);
-        let walked = SubActionsGone {
-            stops: true,
-            ..gone
-        };
-        assert_eq!(TornWalk::from(walked), TornWalk::Stops);
         let mut motion = moving();
         stop_if_moving(motion.lent(), TornWalk::Untouched).unwrap();
         assert!(moves(&motion));
