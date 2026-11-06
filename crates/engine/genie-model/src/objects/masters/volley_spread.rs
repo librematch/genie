@@ -21,6 +21,13 @@ pub struct VolleySpread {
 }
 
 impl VolleySpread {
+    /// No scatter: every value 0.
+    pub const ZERO: Self = Self {
+        x: Distance::ZERO,
+        y: Distance::ZERO,
+        start: Distance::ZERO,
+    };
+
     /// The value an effect's attribute changes: its width, its length, else its randomness.
     pub const fn lane_mut(&mut self, attribute: MasterAttribute) -> &mut Distance {
         match attribute {

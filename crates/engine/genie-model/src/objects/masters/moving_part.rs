@@ -8,7 +8,6 @@ use crate::world::Seconds;
 use genie_diff::Diff;
 use serde::Deserialize;
 use serde::Serialize;
-use std::sync::LazyLock;
 
 /// The moving layer of a master of type 30 and up but 90 (`RGE_Master_Moving_Object`,
 /// `+0x748`..`+0x764`; the `.dat`'s type-30 section, genieutils' `DeadFish`): its walking and
@@ -30,16 +29,23 @@ pub struct MovingPart {
     pub trail: Trail,
 }
 
-/// What a master without the layer reads ([`Master::moving_part`]): no sprites, no turn speed and
-/// no trail, the import's values for a unit without the type-30 section.
-static ABSENT: LazyLock<MovingPart> = LazyLock::new(MovingPart::default);
+impl MovingPart {
+    /// What a master without the layer reads ([`Master::moving_part`]): no sprites, no turn speed
+    /// and no trail, the import's values for a unit without the type-30 section.
+    pub const ABSENT: Self = Self {
+        move_sprite: None,
+        run_sprite: None,
+        turn_speed: Seconds::ZERO,
+        trail: Trail::NONE,
+    };
+}
 
 impl Master {
     /// Its moving layer, or for a master of another type the values a master without it reads
-    /// ([`ABSENT`]).
+    /// ([`MovingPart::ABSENT`]).
     #[must_use]
     pub fn moving_part(&self) -> &MovingPart {
-        self.moving.as_ref().unwrap_or(&ABSENT)
+        self.moving.as_ref().unwrap_or(&MovingPart::ABSENT)
     }
 }
 

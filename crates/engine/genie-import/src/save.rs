@@ -306,7 +306,7 @@ pub fn work_masters(
         // the combat layer is the save's RGE combat part: a master without one has no attack,
         // armor or blast, whatever its copy's are
         if let Some(rc) = rge_combat {
-            let combat_part = work.combat.get_or_insert_with(CombatPart::absent);
+            let combat_part = work.combat.get_or_insert(CombatPart::ABSENT);
             combat_part.weapon_range = Distance::new(rc.weapon_range);
             combat_part.min_range = Distance::new(rc.minimum_weapon_range);
             combat_part.missile = MasterField::of_data(rc.missile_id);

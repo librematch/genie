@@ -26,6 +26,13 @@ pub struct CostSlot {
 }
 
 impl CostSlot {
+    /// An empty slot: no attribute (−1), amount 0, unpaid.
+    pub const EMPTY: Self = Self {
+        attribute: None,
+        amount: CostAmount::ZERO,
+        paid: false,
+    };
+
     /// A slot of `attribute`, `amount` and the paid flag.
     #[must_use]
     pub const fn new(attribute: AttributeId, amount: CostAmount, paid: bool) -> Self {

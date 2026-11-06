@@ -368,6 +368,15 @@ pub struct Shown {
     pub melee_armor: DamageAmount,
 }
 
+impl Shown {
+    /// Nothing shown: every value 0.
+    pub const ZERO: Self = Self {
+        attack: DamageAmount::ZERO,
+        range: Distance::ZERO,
+        melee_armor: DamageAmount::ZERO,
+    };
+}
+
 /// A player's masters by id.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]

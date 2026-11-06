@@ -20,6 +20,16 @@ pub struct Trail {
     pub density: TrailDensity,
 }
 
+impl Trail {
+    /// No trail: no master (−1), mode 0 and density 0, the import's values for a unit without
+    /// the type-30 section.
+    pub const NONE: Self = Self {
+        unit: MasterField::NONE,
+        mode: TrailMode::of_data(0),
+        density: TrailDensity::new(0.0),
+    };
+}
+
 /// A trail's mode (`obj_trail_options`, `+0x760`, a byte), which no modelled routine reads.
 #[derive(
     Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, PartialOrd, Ord, Hash,

@@ -6,7 +6,6 @@ use crate::objects::masters::Master;
 use genie_diff::Diff;
 use serde::Deserialize;
 use serde::Serialize;
-use std::sync::LazyLock;
 
 /// The animated layer of a master of type 20 and up but 90 (`RGE_Master_Animated_Object`, `+0x740`;
 /// the `.dat`'s `speed`, read for the types 20 and up): its top speed. An animated object (20), a
@@ -20,16 +19,20 @@ pub struct AnimatedPart {
     pub max_speed: Speed,
 }
 
-/// What a master without the layer reads ([`Master::animated_part`]): a top speed of 0, the
-/// import's value for a unit without the speed.
-static ABSENT: LazyLock<AnimatedPart> = LazyLock::new(AnimatedPart::default);
+impl AnimatedPart {
+    /// What a master without the layer reads ([`Master::animated_part`]): a top speed of 0, the
+    /// import's value for a unit without the speed.
+    pub const ABSENT: Self = Self {
+        max_speed: Speed::ZERO,
+    };
+}
 
 impl Master {
     /// Its animated layer, or for a master of another type the values a master without it reads
-    /// ([`ABSENT`]).
+    /// ([`AnimatedPart::ABSENT`]).
     #[must_use]
     pub fn animated_part(&self) -> &AnimatedPart {
-        self.animated.as_ref().unwrap_or(&ABSENT)
+        self.animated.as_ref().unwrap_or(&AnimatedPart::ABSENT)
     }
 }
 

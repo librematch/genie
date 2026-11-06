@@ -219,7 +219,7 @@ fn master(record: &Record<'_>, civ: CivId, table: Option<&MasterTable>) -> Genie
     master.moving = record.moving.map(own_moving);
     master.action = record.action.map(own_action).transpose()?;
     // a layer the record lacks goes; one it holds keeps the `.dat` copy's values it does not hold
-    let combat = master.combat.take().unwrap_or_else(CombatPart::absent);
+    let combat = master.combat.take().unwrap_or(CombatPart::ABSENT);
     master.combat = record.combat.map(|saved| own_combat(combat, saved));
     let creatable = master.creatable.take().unwrap_or_default();
     master.creatable = record

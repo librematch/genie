@@ -35,7 +35,6 @@ use crate::world::WholeSeconds;
 use genie_diff::Diff;
 use serde::Deserialize;
 use serde::Serialize;
-use std::sync::LazyLock;
 
 /// The creatable layer of a master of type 70 or 80 (`TRIBE_Master_Combat_Object`,
 /// `+0x880`..`+0x94f`; the `.dat`'s creatable section): its costs, train locations, volleys, charge
@@ -114,8 +113,40 @@ pub struct CreatablePart {
     pub pierce_armor_shown: DamageAmount,
 }
 
-/// What a master without the layer reads ([`Master::creatable_part`]): the part's default.
-static ABSENT: LazyLock<CreatablePart> = LazyLock::new(CreatablePart::default);
+impl CreatablePart {
+    /// What a master without the layer reads ([`Master::creatable_part`]): the part's defaults,
+    /// empty cost slots, no train locations, no sprites and zeros.
+    pub const ABSENT: Self = Self {
+        cost: [CostSlot::EMPTY; COST_SLOTS],
+        build_time: WholeSeconds::ZERO,
+        trained_at: Vec::new(),
+        charge_kind: ChargeKind::NONE,
+        formation_category: FormationClass::of_data(0),
+        hero_flag: HeroFlags::NONE,
+        spacing_modifier: SpacingModifier::new(0.0),
+        invulnerability: InvulnerabilityLevel::NONE,
+        attack_priority: AttackPriority::PRIORITY_0,
+        special_attack: SpecialAttack::NONE,
+        special_sprite: None,
+        max_charge: Charge::ZERO,
+        charge_target: ChargeTarget::of_data(0),
+        idle_attack_sprite: None,
+        volley_fire: Firepower::ZERO,
+        max_volley: MissileCount::ZERO,
+        volley_spread: VolleySpread::ZERO,
+        volley_missile: None,
+        charge_projectile: None,
+        train_locations: Vec::new(),
+        train_location_entry: TrainLocationEntry::of_data(0),
+        regeneration: Regeneration::ZERO,
+        recharge_rate: ChargeRate::ZERO,
+        charge_event: ChargeEvent::of_data(0),
+        conversion: ConversionAdjust::ZERO,
+        hero_glow_sprite: None,
+        garrison_sprite: None,
+        pierce_armor_shown: DamageAmount::ZERO,
+    };
+}
 
 impl Master {
     /// A master of type `kind` with the defaults of the layers its type holds (the animated layer
@@ -141,10 +172,14 @@ impl Master {
     }
 
     /// Its creatable layer, or for a master of another type the part's defaults (what the
-    /// game's static class answers for a value it does not have).
+    /// game's static class answers for a value it does not have, [`CreatablePart::ABSENT`]).
     #[must_use]
     pub fn creatable_part(&self) -> &CreatablePart {
-        self.creatable.as_ref().unwrap_or(&ABSENT)
+        // A constant that holds a `Vec` is not promoted: the inline `const` lends it for
+        // `'static`.
+        self.creatable
+            .as_ref()
+            .unwrap_or(const { &CreatablePart::ABSENT })
     }
 }
 

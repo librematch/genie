@@ -21,7 +21,6 @@ use crate::world::Seconds;
 use genie_diff::Diff;
 use serde::Deserialize;
 use serde::Serialize;
-use std::sync::LazyLock;
 
 /// The combat layer of a master of type 50 and up but 90 (`RGE_Master_Combat_Object`,
 /// `+0x7f8`..`+0x87f`; the `.dat`'s type-50 section): its attack, its armor, its blast and the
@@ -99,28 +98,49 @@ pub struct CombatPart {
     pub shown: Shown,
 }
 
-/// What a master without the layer reads ([`Master::combat_part`]): the part's defaults but no
-/// terrain bonus (−1, the import's value for a unit without the type-50 section).
-static ABSENT: LazyLock<CombatPart> = LazyLock::new(CombatPart::absent);
-
 impl CombatPart {
     /// The layer of a master without the `.dat`'s type-50 section: the defaults but no terrain
-    /// bonus (−1), what the import gave such a master; the save import starts a layer from it.
-    #[must_use]
-    pub fn absent() -> Self {
-        Self {
-            terrain_bonus: RestrictionField::NONE,
-            ..Self::default()
-        }
-    }
+    /// bonus (−1), what the import gave such a master and what a master without the layer reads
+    /// ([`Master::combat_part`]); the save import starts a layer from it.
+    pub const ABSENT: Self = Self {
+        weapon_range: Distance::ZERO,
+        min_range: Distance::ZERO,
+        terrain_bonus: RestrictionField::NONE,
+        base_armor: DamageAmount::ZERO,
+        armors: Vec::new(),
+        resistance: DamageShare::ZERO,
+        combat_ability: CombatAbility::NONE,
+        reflection: DamageShare::ZERO,
+        friendly_fire: DamageShare::ZERO,
+        area_effect: Distance::ZERO,
+        blast_level: BlastLevel::NONE,
+        area_damage: DamageShare::ZERO,
+        attack_sprite: None,
+        attack_sprite2: None,
+        missile: MasterField::NONE,
+        fire_frame: Frame::ZERO,
+        interrupt_frame: Frame::ZERO,
+        hit_chance: HitChance::of_data(0),
+        reload: Seconds::ZERO,
+        weapons: Vec::new(),
+        weapon_offset: Offset::ZERO,
+        missed_spread: MissSpread::ZERO,
+        garrison_firepower: Firepower::ZERO,
+        shown: Shown::ZERO,
+    };
 }
 
 impl Master {
     /// Its combat layer, or for a master of another type the part's defaults with no terrain
-    /// bonus (what the game's lower class answers for a value it does not have).
+    /// bonus (what the game's lower class answers for a value it does not have,
+    /// [`CombatPart::ABSENT`]).
     #[must_use]
     pub fn combat_part(&self) -> &CombatPart {
-        self.combat.as_ref().unwrap_or(&ABSENT)
+        // A constant that holds a `Vec` is not promoted: the inline `const` lends it for
+        // `'static`.
+        self.combat
+            .as_ref()
+            .unwrap_or(const { &CombatPart::ABSENT })
     }
 }
 

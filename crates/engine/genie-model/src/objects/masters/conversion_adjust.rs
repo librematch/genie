@@ -20,6 +20,13 @@ pub struct ConversionAdjust {
 }
 
 impl ConversionAdjust {
+    /// No adjustment: every value 0.
+    pub const ZERO: Self = Self {
+        min_time: 0.0,
+        max_time: 0.0,
+        chance: 0.0,
+    };
+
     /// The value an effect's attribute changes: the shortest time's, the longest's, else the
     /// chance's.
     pub const fn lane_mut(&mut self, attribute: MasterAttribute) -> &mut f32 {

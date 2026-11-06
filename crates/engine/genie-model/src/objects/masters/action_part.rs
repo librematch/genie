@@ -12,7 +12,6 @@ use crate::objects::masters::TaskIndex;
 use genie_diff::Diff;
 use serde::Deserialize;
 use serde::Serialize;
-use std::sync::LazyLock;
 
 /// The action layer of a master of type 40 and up but 90 (`RGE_Master_Action_Object`,
 /// `+0x790`..`+0x7b9`; the `.dat`'s type-40 section, genieutils' `Bird`): its tasks and the default
@@ -40,17 +39,31 @@ pub struct ActionPart {
     pub run_pattern: RunPattern,
 }
 
-/// What a master without the layer reads ([`Master::action_part`]): no tasks, no default task, no
-/// task swap group, no drop sites and zeros, the import's values for a unit without the type-40
-/// section.
-static ABSENT: LazyLock<ActionPart> = LazyLock::new(ActionPart::default);
+impl ActionPart {
+    /// What a master without the layer reads ([`Master::action_part`]): no tasks, no default
+    /// task, no task swap group, no drop sites and zeros, the import's values for a unit without
+    /// the type-40 section.
+    pub const ABSENT: Self = Self {
+        task_by_group: TaskGroup::NONE,
+        tasks: Vec::new(),
+        default_task: None,
+        work_rate: WorkRate::ZERO,
+        search_radius: Distance::ZERO,
+        drop_sites: Vec::new(),
+        run_pattern: RunPattern::NONE,
+    };
+}
 
 impl Master {
     /// Its action layer, or for a master of another type the values a master without it reads
-    /// ([`ABSENT`]).
+    /// ([`ActionPart::ABSENT`]).
     #[must_use]
     pub fn action_part(&self) -> &ActionPart {
-        self.action.as_ref().unwrap_or(&ABSENT)
+        // A constant that holds a `Vec` is not promoted: the inline `const` lends it for
+        // `'static`.
+        self.action
+            .as_ref()
+            .unwrap_or(const { &ActionPart::ABSENT })
     }
 }
 
