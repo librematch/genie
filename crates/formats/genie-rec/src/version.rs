@@ -189,7 +189,7 @@ mod test {
     use crate::*;
 
     #[test]
-    pub fn test_game_variant_resolution() {
+    fn game_variant_resolves_from_the_game_and_save_versions() {
         assert_eq!(
             Some(Trial),
             GameVariant::resolve_variant(&TRIAL_VERSION, 0.0)
@@ -228,7 +228,7 @@ mod test {
 
     #[allow(clippy::bool_assert_comparison)]
     #[test]
-    pub fn test_game_variant_comparison() {
+    fn originals_precede_mods_and_updates_and_mods_do_not_compare_with_updates() {
         // Am I going add all cases here? WHO KNOWS
         assert!(Trial < AgeOfKings);
         assert!(AgeOfKings > Trial);

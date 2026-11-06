@@ -228,7 +228,7 @@ mod tests {
     };
 
     #[test]
-    fn aok() -> GenieResult<()> {
+    fn aok_data_file_reads_its_14_civilizations() -> GenieResult<()> {
         let mut file = File::open("fixtures/aok.dat")?;
         let dat = DatFile::read_from(&mut file)?;
         assert_eq!(dat.civilizations.len(), 14);
@@ -236,7 +236,7 @@ mod tests {
     }
 
     #[test]
-    fn aoc() -> GenieResult<()> {
+    fn aoc_data_file_reads_its_19_civilizations() -> GenieResult<()> {
         let mut file = File::open("fixtures/aoc1.0c.dat")?;
         let dat = DatFile::read_from(&mut file)?;
         assert_eq!(dat.civilizations.len(), 19);
@@ -244,7 +244,7 @@ mod tests {
     }
 
     #[test]
-    fn non_7bit_ascii_tech_name() -> GenieResult<()> {
+    fn tech_name_beyond_ascii_reads_as_its_text() -> GenieResult<()> {
         let mut file = File::open("fixtures/age-of-chivalry.dat")?;
         let dat = DatFile::read_from(&mut file)?;
         assert_eq!(dat.techs[859].name(), "Székely (enable)");
@@ -252,7 +252,7 @@ mod tests {
     }
 
     #[test]
-    fn hd_edition() -> GenieResult<()> {
+    fn hd_edition_data_file_reads_its_32_civilizations() -> GenieResult<()> {
         let mut file = File::open("fixtures/hd.dat")?;
         let dat = DatFile::read_from(&mut file)?;
         assert_eq!(dat.civilizations.len(), 32);
@@ -260,7 +260,7 @@ mod tests {
     }
 
     #[test]
-    fn reserialize() -> GenieResult<()> {
+    fn aoc_data_file_written_and_read_again_holds_the_same_values() -> GenieResult<()> {
         let original = read("fixtures/aoc1.0c.dat")?;
         let mut cursor = Cursor::new(&original);
         let dat = DatFile::read_from(&mut cursor)?;

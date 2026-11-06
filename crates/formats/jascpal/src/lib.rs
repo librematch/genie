@@ -372,7 +372,7 @@ mod tests {
     }
 
     #[test]
-    fn parse_test() {
+    fn parser_reads_each_colour_and_leaves_no_bytes() {
         let (rest, colors) =
             parse(b"JASC-PAL\r\n0100\r\n2\r\n0 0 0\r\n255 255 255\r\n").expect("failed to parse");
         assert_eq!(rest, b"");
@@ -380,7 +380,7 @@ mod tests {
     }
 
     #[test]
-    fn from_str() {
+    fn palette_parses_from_its_text() {
         assert_eq!(
             "JASC-PAL\r\n0100\r\n3\r\n255 0 255\r\n0 0 255\r\n0 255 0\r\n"
                 .parse::<Palette>()
@@ -398,7 +398,7 @@ mod tests {
     }
 
     #[test]
-    fn make() {
+    fn palette_of_256_colours_writes_its_header_count_and_lines() {
         let mut pal = Palette::new();
         for index in 0..=255 {
             pal.add(RGB {
@@ -422,7 +422,7 @@ mod tests {
     }
 
     #[test]
-    fn it_works() {
+    fn palette_read_from_bytes_writes_back_the_same_text() {
         let cursor = Cursor::new(b"JASC-PAL\r\n0100\r\n2\r\n0 0 0\r\n255 255 255\r\n".to_vec());
         let pal = Palette::read_from(cursor).expect("failed to parse");
         assert_eq!(

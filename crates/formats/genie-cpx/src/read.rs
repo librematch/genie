@@ -324,7 +324,7 @@ mod tests {
     /// Try to parse a file with an encoding that is not compatible with UTF-8.
     /// Source: <http://aok.heavengames.com/blacksmith/showfile.php?fileid=884>
     #[test]
-    fn detect_encoding() -> GenieResult<()> {
+    fn campaign_names_not_in_utf8_decode_in_their_detected_encoding() -> GenieResult<()> {
         let file = File::open("./test/campaigns/DER FALL VON SACSAHUAMAN - TEIL I.cpx")?;
         let cpx = Campaign::read_from(file)?;
         assert_eq!(cpx.version(), AOE_AOK);
@@ -346,7 +346,7 @@ mod tests {
 
     /// Source: <http://aoe.heavengames.com/dl-php/showfile.php?fileid=1678>
     #[test]
-    fn aoe1_trial_cpn() -> GenieResult<()> {
+    fn aoe1_trial_campaign_finds_its_scenario_by_index_and_by_name() -> GenieResult<()> {
         let file = File::open("test/campaigns/Armies at War A Combat Showcase.cpn")?;
         let mut campaign = Campaign::read_from(file)?;
 
@@ -371,7 +371,7 @@ mod tests {
     }
 
     #[test]
-    fn aoe1_beta_cpn() -> GenieResult<()> {
+    fn aoe1_beta_campaign_lists_its_12_scenario_files() -> GenieResult<()> {
         let file = File::open("test/campaigns/Rise of Egypt Learning Campaign.cpn")?;
         let campaign = Campaign::read_from(file)?;
 
@@ -403,7 +403,7 @@ mod tests {
     }
 
     #[test]
-    fn aoe_de() -> GenieResult<()> {
+    fn aoe1_de_campaign_lists_its_3_scenario_files() -> GenieResult<()> {
         let file = File::open("test/campaigns/10 The First Punic War.aoecpn")?;
         let campaign = Campaign::read_from(file)?;
 
@@ -434,7 +434,7 @@ mod tests {
     }
 
     #[test]
-    fn aoe_de2() -> GenieResult<()> {
+    fn aoe2_de_campaigns_list_their_5_scenario_files() -> GenieResult<()> {
         let file = File::open("test/campaigns/acam1.aoe2campaign")?;
         let campaign = Campaign::read_from(file)?;
 

@@ -271,9 +271,9 @@ try_from_string_key!(i16);
 mod tests {
     use super::*;
 
-    /// Tests converting from an int to a string key.
+    /// A number becomes a numeric string key.
     #[test]
-    fn string_key_from_int() {
+    fn number_becomes_numeric_string_key() {
         if let StringKey::Num(number) = StringKey::from(0u32) {
             assert_eq!(0, number);
         } else {
@@ -281,9 +281,9 @@ mod tests {
         }
     }
 
-    /// Tests converting from a string representing an int to a string key.
+    /// A text of digits becomes the numeric string key of its number.
     #[test]
-    fn string_key_from_str_to_int() {
+    fn text_of_digits_becomes_numeric_string_key() {
         let text = "57329";
         if let StringKey::Num(number) = StringKey::from(text) {
             assert_eq!(57329, number);
@@ -292,9 +292,9 @@ mod tests {
         }
     }
 
-    /// Tests converting from a string not representing an int to a string key.
+    /// A text that is no number becomes a named string key.
     #[test]
-    fn string_key_from_str_to_str() {
+    fn text_of_no_number_becomes_named_string_key() {
         let name = "grassDaut";
         if let StringKey::Name(text) = StringKey::from(name) {
             assert_eq!(name, text);

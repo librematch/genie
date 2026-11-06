@@ -11,7 +11,7 @@ fn hotkeys_past_the_file_fail_at_its_end() {
 }
 
 #[test]
-fn aoc1() -> GenieResult<()> {
+fn the_aoc1_hotkey_file_reads() -> GenieResult<()> {
     let mut file = File::open("test/files/aoc1.hki")?;
     // The test only checks that the file reads.
     let _ = HotkeyInfo::read_from(&mut file)?;
@@ -19,7 +19,7 @@ fn aoc1() -> GenieResult<()> {
 }
 
 #[test]
-fn aoc2() -> GenieResult<()> {
+fn the_aoc2_hotkey_file_reads() -> GenieResult<()> {
     let mut file = File::open("test/files/aoc2.hki")?;
     // The test only checks that the file reads.
     let _ = HotkeyInfo::read_from(&mut file)?;
@@ -27,7 +27,7 @@ fn aoc2() -> GenieResult<()> {
 }
 
 #[test]
-fn aoc3() -> GenieResult<()> {
+fn the_aoc3_hotkey_file_reads() -> GenieResult<()> {
     let mut file = File::open("test/files/aoc3.hki")?;
     // The test only checks that the file reads.
     let _ = HotkeyInfo::read_from(&mut file)?;
@@ -35,7 +35,7 @@ fn aoc3() -> GenieResult<()> {
 }
 
 #[test]
-fn hd0() -> GenieResult<()> {
+fn the_hd0_hotkey_file_reads() -> GenieResult<()> {
     let mut file = File::open("test/files/hd0.hki")?;
     // The test only checks that the file reads.
     let _ = HotkeyInfo::read_from(&mut file)?;
@@ -43,7 +43,7 @@ fn hd0() -> GenieResult<()> {
 }
 
 #[test]
-fn hd1() -> GenieResult<()> {
+fn the_hd1_hotkey_file_reads() -> GenieResult<()> {
     let mut file = File::open("test/files/hd1.hki")?;
     // The test only checks that the file reads.
     let _ = HotkeyInfo::read_from(&mut file)?;
@@ -51,7 +51,7 @@ fn hd1() -> GenieResult<()> {
 }
 
 #[test]
-fn wk() -> GenieResult<()> {
+fn the_wololo_kingdoms_hotkey_file_reads() -> GenieResult<()> {
     let mut file = File::open("test/files/wk.hki")?;
     // The test only checks that the file reads.
     let _ = HotkeyInfo::read_from(&mut file)?;
@@ -59,7 +59,7 @@ fn wk() -> GenieResult<()> {
 }
 
 #[test]
-fn hk_group_iter() -> GenieResult<()> {
+fn group_walks_its_hotkeys_in_file_order() -> GenieResult<()> {
     let mut file = File::open("test/files/aoc1.hki")?;
     let info = HotkeyInfo::read_from(&mut file)?;
     let group = info.group(HotkeyGroupId::UnitCommands as usize).unwrap();
@@ -84,7 +84,7 @@ fn hk_group_iter() -> GenieResult<()> {
 }
 
 #[test]
-fn hk_info_iter() -> GenieResult<()> {
+fn hotkey_file_walks_its_groups_in_id_order() -> GenieResult<()> {
     let mut file = File::open("test/files/aoc1.hki")?;
     let info = HotkeyInfo::read_from(&mut file)?;
     let mut iter = info.iter();
@@ -122,7 +122,7 @@ fn hk_info_iter() -> GenieResult<()> {
 }
 
 #[test]
-fn hk_group_unbind() -> GenieResult<()> {
+fn group_unbind_clears_the_key_in_the_copy_only() -> GenieResult<()> {
     let mut file = File::open("test/files/aoc1.hki")?;
     let info = HotkeyInfo::read_from(&mut file)?;
     let group0 = info.group(HotkeyGroupId::UnitCommands as usize).unwrap();
@@ -133,7 +133,7 @@ fn hk_group_unbind() -> GenieResult<()> {
 }
 
 #[test]
-fn hk_group_bind() -> GenieResult<()> {
+fn group_bind_sets_the_key_in_the_copy_only() -> GenieResult<()> {
     let mut file = File::open("test/files/aoc1.hki")?;
     let info = HotkeyInfo::read_from(&mut file)?;
     let group0 = info.group(HotkeyGroupId::UnitCommands as usize).unwrap();
@@ -150,7 +150,7 @@ fn hk_group_bind() -> GenieResult<()> {
 }
 
 #[test]
-fn hk_group_bad_index() -> GenieResult<()> {
+fn group_unbind_of_hotkey_past_the_group_fails() -> GenieResult<()> {
     let mut file = File::open("test/files/aoc1.hki")?;
     let info = HotkeyInfo::read_from(&mut file)?;
     let group = info.group(HotkeyGroupId::UnitCommands as usize).unwrap();
@@ -160,7 +160,7 @@ fn hk_group_bad_index() -> GenieResult<()> {
 }
 
 #[test]
-fn hk_info_unbind() -> GenieResult<()> {
+fn file_unbind_clears_the_key_in_the_copy_only() -> GenieResult<()> {
     let mut file = File::open("test/files/aoc1.hki")?;
     let info0 = HotkeyInfo::read_from(&mut file)?;
     let info1 = info0.unbind_key(0, 0)?;
@@ -186,7 +186,7 @@ fn hk_info_unbind() -> GenieResult<()> {
 }
 
 #[test]
-fn hk_info_bind() -> GenieResult<()> {
+fn file_bind_sets_the_key_in_the_copy_only() -> GenieResult<()> {
     let mut file = File::open("test/files/aoc1.hki")?;
     let info0 = HotkeyInfo::read_from(&mut file)?;
     let info1 = info0.bind_key(0, 0, 65, false, false, false)?;
@@ -212,7 +212,7 @@ fn hk_info_bind() -> GenieResult<()> {
 }
 
 #[test]
-fn hk_info_bad_index_group() -> GenieResult<()> {
+fn file_unbind_in_group_past_the_file_fails() -> GenieResult<()> {
     let mut file = File::open("test/files/aoc1.hki")?;
     let info = HotkeyInfo::read_from(&mut file)?;
     let result = info.unbind_key(999_999, 0);
@@ -221,7 +221,7 @@ fn hk_info_bad_index_group() -> GenieResult<()> {
 }
 
 #[test]
-fn hk_info_bad_index_hk() -> GenieResult<()> {
+fn file_unbind_of_hotkey_past_the_group_fails() -> GenieResult<()> {
     let mut file = File::open("test/files/aoc1.hki")?;
     let info = HotkeyInfo::read_from(&mut file)?;
     let result = info.unbind_key(0, 999_999);
@@ -230,7 +230,7 @@ fn hk_info_bad_index_hk() -> GenieResult<()> {
 }
 
 #[test]
-fn test_keycode_to_bindings_map() -> GenieResult<()> {
+fn bindings_per_keycode_list_the_hotkeys_of_each_key_in_file_order() -> GenieResult<()> {
     let mut file = File::open("test/files/aoc1.hki")?;
     let info = HotkeyInfo::read_from(&mut file)?;
     let map = info.bindings_per_keycode();

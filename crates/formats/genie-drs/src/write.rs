@@ -466,7 +466,7 @@ mod test {
     }
 
     #[test]
-    fn one_file_reserve() -> GenieResult<()> {
+    fn one_file_archive_writes_its_bytes_with_reserved_directory() -> GenieResult<()> {
         let output = Cursor::new(vec![]);
         let mut drs = DrsWriter::new(output, ReserveDirectoryStrategy::new(1, 1))?;
         drs.add("txt", 1, &b"example test file"[..])?;
@@ -476,7 +476,7 @@ mod test {
     }
 
     #[test]
-    fn one_file_memory() -> GenieResult<()> {
+    fn one_file_archive_writes_its_bytes_in_memory() -> GenieResult<()> {
         let output = Cursor::new(vec![]);
         let mut drs = DrsWriter::new(output, InMemoryStrategy::default())?;
         drs.add("txt", 1, &b"example test file"[..])?;

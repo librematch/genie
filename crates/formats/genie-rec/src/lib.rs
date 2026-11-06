@@ -395,7 +395,7 @@ mod tests {
     #[test]
     // AI data parsing is incomplete: remove this attribute when the test starts passing
     #[should_panic = "assertion"] // matches the pre- and post-1.73 assert_eq! panic text
-    fn incomplete_up_15_rec_with_ai() {
+    fn up_15_recording_with_ai_does_not_read_yet() {
         let file = File::open("test/rec.20181208-195117.mgz").unwrap();
         let mut recorded_game = RecordedGame::new(file).unwrap();
         let _ = recorded_game
@@ -407,7 +407,7 @@ mod tests {
     }
 
     #[test]
-    fn aoc_1_0_rec() -> GenieResult<()> {
+    fn aoc_1_0_recording_reads_its_header_and_actions() -> GenieResult<()> {
         let file = File::open("test/missyou_finally_vs_11.mgx")?;
         let mut recorded_game = RecordedGame::new(file)?;
         let _ = recorded_game.header()?;
@@ -424,7 +424,7 @@ mod tests {
     }
 
     #[test]
-    fn aok_rec() -> GenieResult<()> {
+    fn aok_recording_reads_its_header_and_actions() -> GenieResult<()> {
         let file = File::open("test/aok.mgl")?;
         let mut recorded_game = RecordedGame::new(file)?;
         let _ = recorded_game.header()?;

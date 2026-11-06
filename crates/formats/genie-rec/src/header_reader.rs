@@ -315,7 +315,7 @@ mod tests {
     use std::io::{Cursor, Read};
 
     #[test]
-    pub fn test_inflatable_buffer() {
+    fn inflatable_reader_peeks_past_its_capacity_and_reads_on() {
         let data = (0..20).into_iter().collect::<Vec<_>>();
         let cursor = Cursor::new(data);
         let mut inflatable_buffer = InflatableReader::new_with_capacity(cursor, 4);

@@ -32,7 +32,7 @@ fn assert_consumed(mut input: impl Read) {
 
 /// Source: <http://aoe.heavengames.com/dl-php/showfile.php?fileid=42>
 #[test]
-fn oldest_aoe1_scn_on_aoeheaven() {
+fn oldest_aoe1_scenario_on_aoe_heaven_reads_to_its_end_and_writes() {
     let mut file = File::open("test/scenarios/ The Destruction of Rome.scn").unwrap();
     let format = ScxFormat::load_scenario(&mut file).expect("failed to read");
     assert_consumed(file);
@@ -43,7 +43,7 @@ fn oldest_aoe1_scn_on_aoeheaven() {
 }
 
 #[test]
-fn aoe1_beta_scn_reserialize() {
+fn aoe1_beta_scenario_writes_back_the_same_scenario() {
     let mut file = File::open("test/scenarios/Dawn of a New Age.scn").unwrap();
     let format = ScxFormat::load_scenario(&mut file).expect("failed to read");
     assert_consumed(file);
@@ -57,7 +57,7 @@ fn aoe1_beta_scn_reserialize() {
 }
 
 #[test]
-fn aoe1_beta_scn_to_aoc() {
+fn aoe1_beta_scenario_converts_to_the_aoc_versions() {
     let mut file = File::open("test/scenarios/Dawn of a New Age.scn").unwrap();
     let format = ScxFormat::load_scenario(&mut file).expect("failed to read");
     assert_consumed(file);
@@ -72,7 +72,7 @@ fn aoe1_beta_scn_to_aoc() {
 
 /// Source: <http://aoe.heavengames.com/dl-php/showfile.php?fileid=1678>
 #[test]
-fn aoe1_trial_scn() {
+fn aoe1_trial_scenario_reads_to_its_end_and_writes() {
     let mut file = File::open("test/scenarios/Bronze Age Art of War.scn").unwrap();
     let format = ScxFormat::load_scenario(&mut file).expect("failed to read");
     assert_consumed(file);
@@ -84,7 +84,7 @@ fn aoe1_trial_scn() {
 
 /// Source: <http://aoe.heavengames.com/dl-php/showfile.php?fileid=2409>
 #[test]
-fn aoe1_ppc_trial_scn() {
+fn aoe1_ppc_trial_scenario_reads_to_its_end_and_writes() {
     let mut file = File::open("test/scenarios/CEASAR.scn").unwrap();
     let format = ScxFormat::load_scenario(&mut file).expect("failed to read");
     assert_consumed(file);
@@ -96,7 +96,7 @@ fn aoe1_ppc_trial_scn() {
 
 /// Source: <http://aoe.heavengames.com/dl-php/showfile.php?fileid=1651>
 #[test]
-fn aoe1_scn() {
+fn aoe1_scenario_reads_to_its_end_and_writes() {
     let mut file = File::open("test/scenarios/A New Emporer.scn").unwrap();
     let format = ScxFormat::load_scenario(&mut file).expect("failed to read");
     assert_consumed(file);
@@ -108,7 +108,7 @@ fn aoe1_scn() {
 
 /// Source: <http://aoe.heavengames.com/dl-php/showfile.php?fileid=880>
 #[test]
-fn aoe1_ror_scx() {
+fn aoe1_ror_scenario_reads_to_its_end_and_writes() {
     let mut file = File::open("test/scenarios/Jeremiah Johnson (Update).scx").unwrap();
     let format = ScxFormat::load_scenario(&mut file).expect("failed to read");
     assert_consumed(file);
@@ -119,7 +119,7 @@ fn aoe1_ror_scx() {
 }
 
 #[test]
-fn aoe1_ror_to_aoc() -> GenieResult<()> {
+fn aoe1_ror_scenario_converts_to_the_aoc_versions() -> GenieResult<()> {
     let mut file = File::open("test/scenarios/El advenimiento de los hunos_.scx")?;
     let format = ScxFormat::load_scenario(&mut file)?;
     assert_consumed(file);
@@ -136,7 +136,7 @@ fn aoe1_ror_to_aoc() -> GenieResult<()> {
 
 /// Source: <http://aok.heavengames.com/blacksmith/showfile.php?fileid=1271>
 #[test]
-fn oldest_aok_scn_on_aokheaven() {
+fn oldest_aok_scenario_on_aok_heaven_reads_to_its_end_and_writes() {
     let mut file = File::open("test/scenarios/CAMELOT.SCN").unwrap();
     let format = ScxFormat::load_scenario(&mut file).expect("failed to read");
     assert_consumed(file);
@@ -147,7 +147,7 @@ fn oldest_aok_scn_on_aokheaven() {
 }
 
 #[test]
-fn aoc_scx() {
+fn aoc_scenario_reads_to_its_end_and_writes() {
     let mut file = File::open("test/scenarios/Age of Heroes b1-3-5.scx").unwrap();
     let format = ScxFormat::load_scenario(&mut file).expect("failed to read");
     assert_consumed(file);
@@ -158,7 +158,7 @@ fn aoc_scx() {
 }
 
 #[test]
-fn hd_aoe2scenario() {
+fn hd_aoe2scenario_writes_back_the_same_scenario() {
     let mut file = File::open("test/scenarios/Year_of_the_Pig.aoe2scenario").unwrap();
     let format = ScxFormat::load_scenario(&mut file).expect("failed to read");
     assert_consumed(file);
@@ -172,7 +172,7 @@ fn hd_aoe2scenario() {
 }
 
 #[test]
-fn hd_scx2() {
+fn hd_scx2_scenario_reads_to_its_end_and_writes() {
     let mut file = File::open("test/scenarios/real_world_amazon.scx").unwrap();
     let format = ScxFormat::load_scenario(&mut file).expect("failed to read");
     assert_consumed(file);
@@ -188,7 +188,7 @@ fn hd_scx2() {
 /// Source: <http://aoe.heavengames.com/dl-php/showfile.php?fileid=2708>
 #[test]
 #[ignore = "Definitive Edition (AoE1) scenarios are not supported yet"]
-fn aoe_de_scn() {
+fn aoe1_de_scenario_reads_to_its_end_and_writes() {
     let mut file = File::open("test/scenarios/Corlis.aoescn").unwrap();
     let format = ScxFormat::load_scenario(&mut file).expect("failed to read");
     assert_consumed(file);
@@ -202,7 +202,7 @@ fn aoe_de_scn() {
 ///
 /// Source: <https://www.ageofempires.com/mods/details/2015>/
 #[test]
-fn aoe_de2_1_36() {
+fn aoe2_de_scenario_of_1_36_writes_back_the_same_scenario() {
     let mut file = File::open("test/scenarios/Hotkey Trainer Buildings.aoe2scenario").unwrap();
     let format = ScxFormat::load_scenario(&mut file).expect("failed to read");
     assert_consumed(file);
@@ -217,7 +217,7 @@ fn aoe_de2_1_36() {
 /// A Definitive Edition 2 scenario, based on the included `AIImprovementsBucket10Test` file,
 /// saved as a 1.37 format version with some layered terrain in the corners.
 #[test]
-fn aoe_de2_1_37() {
+fn aoe2_de_scenario_of_1_37_with_layered_terrain_writes_back_the_same_scenario() {
     let mut file = File::open("test/scenarios/layertest.aoe2scenario").unwrap();
     let format = ScxFormat::load_scenario(&mut file).expect("failed to read");
     assert_consumed(file);

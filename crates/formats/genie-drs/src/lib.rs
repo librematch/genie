@@ -399,7 +399,7 @@ mod tests {
     use std::fs::File;
 
     #[test]
-    fn it_works() -> GenieResult<()> {
+    fn archive_lists_each_resource_with_its_kind_id_and_size() -> GenieResult<()> {
         let mut file = File::open("test.drs")?;
         let drs = DrsReader::new(&mut file)?;
         let mut expected = vec![

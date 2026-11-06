@@ -579,7 +579,7 @@ mod tests {
 
     #[allow(clippy::neg_cmp_op_on_partial_ord)]
     #[test]
-    fn cmp_unit_base_class() {
+    fn unit_base_classes_order_by_inheritance_and_siblings_do_not_compare() {
         assert_eq!(UnitBaseClass::Static, UnitBaseClass::Static);
         assert!(UnitBaseClass::Static < UnitBaseClass::Animated);
         assert!(UnitBaseClass::Static < UnitBaseClass::Doppelganger);

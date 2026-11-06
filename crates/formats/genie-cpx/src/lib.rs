@@ -114,7 +114,7 @@ mod tests {
     use std::io::Cursor;
 
     #[test]
-    fn rebuild_cpx() -> GenieResult<()> {
+    fn aoe1_trial_campaign_written_back_holds_its_name_count_and_scenario() -> GenieResult<()> {
         let instream = File::open("./test/campaigns/Armies at War A Combat Showcase.cpn")?;
         let mut outstream = vec![];
         let mut incpx = Campaign::read_from(instream)?;
@@ -128,7 +128,7 @@ mod tests {
     }
 
     #[test]
-    fn rebuild_cpn_de() -> GenieResult<()> {
+    fn aoe1_de_campaign_written_back_reads_the_same_header_and_scenario() -> GenieResult<()> {
         let instream = File::open("./test/campaigns/10 The First Punic War.aoecpn")?;
         let mut outstream = vec![];
         let mut incpx = Campaign::read_from(instream)?;
@@ -145,7 +145,7 @@ mod tests {
     }
 
     #[test]
-    fn rebuild_campaign_de2() -> GenieResult<()> {
+    fn aoe2_de_campaign_written_back_reads_the_same_header_and_scenario() -> GenieResult<()> {
         let instream = File::open("./test/campaigns/AIImprovementsTest.aoe2campaign")?;
         let mut outstream = vec![];
         let mut incpx = Campaign::read_from(instream)?;
