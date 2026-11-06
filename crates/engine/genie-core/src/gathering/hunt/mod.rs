@@ -44,8 +44,6 @@ pub(crate) mod unit;
 mod update;
 mod walks;
 
-#[cfg(test)]
-use self::drop_off::DROP_WAIT;
 pub use self::drop_off::Dropped;
 pub use self::hunt_state::HuntState;
 pub use self::outcomes::{HuntGather, TreeSearch};
@@ -72,6 +70,12 @@ const HERD_FAR: DistanceSquared = DistanceSquared::new(900.0);
 const LEAD_REACH: DistanceSquared = DistanceSquared::new(2.25);
 /// The wait of a herder leading livestock (`set_state(10)`'s timer, `0xbf800000`).
 const LEAD_WAIT: Seconds = Seconds::new(-1.0);
+/// The wait of a hunt whose walk cannot go on: the immediate `0xc0400000` of its update's one
+/// store to the timer (`0x140ac7a00` at `0x140ac7f0f`), which a failed walk to its target, a
+/// drop-off's walk that failed or lost its target (codes 3 to 5) and a drop site out of reach
+/// all jump to; the unit's animation stops after it (`FUN_141161850`). The build's drop-off
+/// stores an immediate of its own with the same bits (`construction::build`'s `DROP_WAIT`).
+const STOP_WAIT: Seconds = Seconds::new(-3.0);
 /// Below this a target's or a load's remainder counts as nothing (`DAT_142eb5690`).
 const REMAINDER: Amount = Amount::new(HUNT_REMAINDER);
 /// A target's last bit adds its master's first storage amount times this (`DAT_142eb1e9c`).

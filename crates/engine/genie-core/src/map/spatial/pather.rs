@@ -5,7 +5,7 @@ use crate::map::GridSize;
 use crate::map::Point;
 use crate::map::TerrainMask;
 use crate::map::Tile;
-use crate::map::spatial::{QUERY_HITS, RecordId, Spatial};
+use crate::map::spatial::{MOST_HITS, QUERY_HITS, RecordId, Spatial};
 use crate::map::{Rect, Segment};
 use crate::math::fmath::below_or_unordered;
 use crate::objects::masters::ObstructionKind;
@@ -66,7 +66,6 @@ impl Spatial {
         (ignore, by_id): (&[RecordId], ObjectsRef<'_>),
         limit: HitLimit,
     ) -> GenieResult<Vec<Hit>> {
-        const MOST_HITS: usize = 25;
         let roles = by_id.roles();
         let lo_x = if point.x() <= from.x() {
             point.x()

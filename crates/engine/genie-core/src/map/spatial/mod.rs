@@ -206,6 +206,12 @@ pub const BLOCKED: u64 = 0x4000;
 /// `0x19`), which the edge records (`FUN_141057290`) also respect.
 const QUERY_HITS: usize = 0x19;
 
+/// The most hits the manager's query lists (`FUN_141051900`'s own immediates: `count < 0x19`
+/// after the map edge's records, `0x18 < count` after each cell's): the old short pather's query
+/// ([`Spatial::pather_hits`]), the line query ([`Spatial::line_hits`]) and the hull pather's
+/// walks stop there. Its callers' room of the list is their own immediate ([`QUERY_HITS`]).
+pub(crate) const MOST_HITS: usize = 0x19;
+
 /// The most objects a tile's list holds (`FUN_140f5f0a0`'s `count < 0xfa`).
 const MOST_ON_TILE: usize = 0xfa;
 

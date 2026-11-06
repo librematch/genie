@@ -4,10 +4,10 @@
 use crate::GenieResult;
 use crate::map::Distance;
 use crate::map::spatial::TileRecords;
-use crate::map::spatial::{Hit, RecordId};
+use crate::map::spatial::{Hit, MOST_HITS, RecordId};
 use crate::objects::ObjectId;
 use crate::pathing::hull_path::{
-    EPSILON, HullPather, LINE_HITS, Node, NodeIndex, NodeList, Point, Waypoints, walk_length,
+    EPSILON, HullPather, Node, NodeIndex, NodeList, Point, Waypoints, walk_length,
 };
 use crate::world::slots::CheckedIndexExt;
 
@@ -281,7 +281,7 @@ impl HullPather<'_> {
         Ok(!self.included_movers(from, to)?.is_empty())
     }
 
-    /// The records the walk `point` -> `to` meets, at most [`LINE_HITS`] (`FUN_141052b90`, then
+    /// The records the walk `point` -> `to` meets, at most [`MOST_HITS`] (`FUN_141052b90`, then
     /// `FUN_141051900` with flags 0x40), with the pather's buffer, ignore list and include list:
     /// Spatial's pather query and the included objects that move
     /// ([`HullPather::included_movers`]). The callers read how many and which, not their order.
@@ -297,7 +297,7 @@ impl HullPather<'_> {
                 });
             }
         }
-        hits.truncate(LINE_HITS);
+        hits.truncate(MOST_HITS);
         Ok(hits)
     }
 
@@ -306,7 +306,7 @@ impl HullPather<'_> {
     /// (its `+3` bit 0x10) out only when the include list does not hold it (`FUN_141051e00`, before
     /// the ignore list). Spatial's pather query leaves every moving record out; its line query
     /// (flags 0x10) tests the same records alike, the buffer the grow, and leaves none out, at most
-    /// [`LINE_HITS`] a call: what it lists goes into its ignore list until a call lists fewer.
+    /// [`MOST_HITS`] a call: what it lists goes into its ignore list until a call lists fewer.
     pub(super) fn included_movers(&self, point: Point, to: Point) -> GenieResult<Vec<ObjectId>> {
         let movers: Vec<ObjectId> = self
             .include
@@ -324,7 +324,7 @@ impl HullPather<'_> {
             let hits = self
                 .world
                 .line_hits(point, to, grow, TileRecords::Passed, &skip)?;
-            let full = LINE_HITS <= hits.len();
+            let full = MOST_HITS <= hits.len();
             for id in hits {
                 if let Some(object_id) = id.object()
                     && movers.contains(&object_id)

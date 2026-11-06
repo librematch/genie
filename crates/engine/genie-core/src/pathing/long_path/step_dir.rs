@@ -3,7 +3,9 @@
 
 use crate::map::{Tile, TileOffset};
 
-/// The tiles one step away in the order the search tries them (the switch of `FUN_140f9eb70`).
+/// The tiles one step away in the order the search tries them (the switch of `FUN_140f9eb70`,
+/// each case a step on from the tile before). The explore search's switch of its own holds a
+/// ring's points in the same order (`movement::explore`'s `AROUND`).
 pub(super) const STEPS: [TileOffset; 8] = TileOffset::table([
     [-1, -1],
     [0, -1],

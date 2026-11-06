@@ -6,7 +6,7 @@ use crate::map::Point;
 use crate::map::TerrainMask;
 use crate::map::Tile;
 use crate::map::spatial::{
-    Placed, QUERY_HITS, RecordId, Spatial, record_meets_segment, tile_record_id,
+    MOST_HITS, Placed, QUERY_HITS, RecordId, Spatial, record_meets_segment, tile_record_id,
 };
 use crate::map::{Rect, Segment};
 use crate::movement::WALKER_UNPLACED;
@@ -411,7 +411,6 @@ impl Spatial {
         tiles: TileRecords,
         ignore: &[RecordId],
     ) -> GenieResult<Vec<RecordId>> {
-        const MOST_HITS: usize = 25;
         let rect = Rect::spanning(from, to);
         let query = rect.grown(grow);
         let mut hits: Vec<RecordId> = Vec::new();

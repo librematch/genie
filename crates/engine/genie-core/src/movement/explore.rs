@@ -374,8 +374,10 @@ impl InfluenceMap {
 /// The search's rings around the town centre: 10, 15 and 20 tiles (`FUN_140c65490`).
 const RINGS: [i32; 3] = [10, 15, 20];
 
-/// The eight points of a ring in the order the search tries them (`FUN_140c65490`'s switch):
-/// down-left first, then round through down, down-right, right, up-right, up, up-left and left.
+/// The eight points of a ring in the order the search tries them (`FUN_140c65490`'s switch,
+/// each case an offset from the centre): down-left first, then round through down, down-right,
+/// right, up-right, up, up-left and left. The long pather's switch of its own steps round a tile
+/// in the same order (`pathing::long_path`'s `STEPS`).
 const AROUND: [TileOffset; 8] = TileOffset::table([
     [-1, -1],
     [0, -1],

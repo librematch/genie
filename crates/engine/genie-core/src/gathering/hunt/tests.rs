@@ -1190,7 +1190,7 @@ fn hunter_walks_to_its_drop_site_and_to_its_point() {
     assert_eq!(drop(&mut action, &mut rig), Ok(Dropped::Going));
     assert_eq!(
         (action.timer, rig.mover_mut().animated.speed),
-        (DROP_WAIT, Speed::ZERO)
+        (STOP_WAIT, Speed::ZERO)
     );
     action.timer = Seconds::new(-0.05);
     assert_eq!(drop(&mut action, &mut rig), Ok(Dropped::Again));
@@ -1548,9 +1548,10 @@ fn herder_slaughters_its_animal_once_it_stands_or_walks_after_it() {
 
 /// One update (`0x140ac7a00`) by the hunt's state: a computer player's and a state without a
 /// case are not modelled; a walk whose target went on the way walks to the point (state 11); a
-/// walk that gave up waits, then walks there; a walk under way steps on, or asks again once its
-/// target left the `MoveTo`'s point; a lead and a face on nothing search; a gather without a
-/// target carries its load off (full) or searches.
+/// walk that failed waits ([`STOP_WAIT`]) with the animation stopped; one that gave up waits,
+/// then walks there; a walk under way steps on, or asks again once its target left the
+/// `MoveTo`'s point; a lead and a face on nothing search; a gather without a target carries its
+/// load off (full) or searches.
 #[test]
 fn hunt_update_runs_the_step_of_its_state() {
     let update =
@@ -1626,6 +1627,25 @@ fn hunt_update_runs_the_step_of_its_state() {
             HuntState::WalkSearch { move_to: None },
             None,
             Some((MoveTo::Start, -1))
+        )
+    );
+    // a walk whose MoveTo failed (code 3) waits with the unit's animation stopped, the store the
+    // drop-off's failures share
+    let mut hunt_action = walking(10028, Seconds::ZERO, MoveTo::Failed);
+    assert_eq!(
+        update(&mut hunt_action, &mut rig, PlayerKind::Human, 0.0),
+        Ok(HuntNext::Stay)
+    );
+    assert_eq!(
+        (
+            hunt_action.state.bare(),
+            hunt_action.timer,
+            rig.world.parts.anim_speed_of(rig.unit().id)
+        ),
+        (
+            HuntState::Walk { move_to: None },
+            STOP_WAIT,
+            Some(Speed::ZERO)
         )
     );
     // a walk that gave up waits its time, then walks to the point
@@ -2093,7 +2113,7 @@ fn drop_off_gives_the_load_to_the_player() {
     );
     assert_eq!(
         (hunt.timer, rig.world.parts.anim_speed_of(rig.unit().id)),
-        (DROP_WAIT, Some(Speed::ZERO))
+        (STOP_WAIT, Some(Speed::ZERO))
     );
     hunt.timer = Seconds::new(-0.01);
     assert_eq!(
@@ -2248,7 +2268,7 @@ fn move_to_that_lost_its_target_ends_the_drop_off_and_the_point_walk() {
         )
     });
     assert_eq!(got, Ok(Dropped::Going));
-    assert_eq!(hunt_action.timer, DROP_WAIT);
+    assert_eq!(hunt_action.timer, STOP_WAIT);
     let mut rig = lost();
     let mut hunt_action = HuntAction {
         state: HuntState::WalkSearch {

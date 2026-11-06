@@ -455,7 +455,9 @@ pub(crate) struct BuildReads {
 /// The progress a started foundation holds before its first work (`0x2edbe6ff`, about 1e-10).
 const STARTED: u32 = 0x2edb_e6ff;
 
-/// The drop-off's wait after a drop site out of reach (`0xc0400000`).
+/// The drop-off's wait after a drop site out of reach: the immediate `0xc0400000` its update
+/// stores to the timer (`0x140ab0370` case 7, at `0x140ab17c3`). The hunt's update stores an
+/// immediate of its own with the same bits (`gathering::hunt`'s `STOP_WAIT`).
 const DROP_WAIT: Seconds = Seconds::new(-3.0);
 /// The orders whose targets gone the unit AI drops after a drop-off (`FUN_140c5de60`: the bits
 /// of `0x400011` over `order - 0x2c5`).

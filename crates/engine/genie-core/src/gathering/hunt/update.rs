@@ -7,6 +7,7 @@ use crate::combat::attack::{Attack, Fight, set_walker_anim};
 use crate::combat::victims::{file_kill, write_back};
 use crate::gathering::hunt::HuntGather;
 use crate::gathering::hunt::HuntState;
+use crate::gathering::hunt::STOP_WAIT;
 use crate::gathering::hunt::{Herd, HuntAction, HuntNext, HuntReads};
 use crate::math::rng::Stream;
 use crate::movement::Me;
@@ -235,8 +236,8 @@ impl HuntAction {
     /// The failed `MoveTo`'s update returns 3 (quiet: no notify): `FUN_140ac4670` with 8 and -1
     /// looks for another target only for a class the unit AI's slot 0x1b0 gives 0
     /// (`FUN_140c1c4f0`: 15, trees; the class its unit AI targets, else the hunt's: the caller's
-    /// search, `Unit::hunt_tree_search`, which found none); then the hunt waits 3 seconds and the
-    /// unit's animation stops (`FUN_141161850`).
+    /// search, `Unit::hunt_tree_search`, which found none); then the hunt waits ([`STOP_WAIT`])
+    /// and the unit's animation stops (`FUN_141161850`).
     fn walk_failed(
         &mut self,
         motion: MotionMut<'_>,
@@ -244,7 +245,7 @@ impl HuntAction {
         roles: &Roles,
     ) -> GenieResult<()> {
         self.no_tree_search(hunt_reads, roles)?;
-        self.timer = Seconds::new(-3.0);
+        self.timer = STOP_WAIT;
         set_walker_anim(motion, Speed::new(0.0));
         Ok(())
     }

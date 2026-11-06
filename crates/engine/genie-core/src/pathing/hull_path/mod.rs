@@ -67,8 +67,6 @@ use crate::math::image::hull_path::{
 };
 use crate::world::objects_ref::ObjectsRef;
 
-/// How many records the manager's query lists before it stops (`FUN_141051900`: `0x18 < count`).
-const LINE_HITS: usize = 25;
 /// `MShortPather::IterationCap` (`+0x18`, 0x40 from the constructor `FUN_140f84e40`): how many
 /// nodes the search expands.
 const ITERATION_CAP: i32 = 0x40;

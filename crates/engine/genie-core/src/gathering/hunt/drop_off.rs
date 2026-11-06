@@ -6,6 +6,7 @@ use crate::gathering::DropSiteId;
 use crate::gathering::HuntTargetId;
 use crate::gathering::gather::Walks;
 use crate::gathering::hunt::HuntState;
+use crate::gathering::hunt::STOP_WAIT;
 use crate::gathering::hunt::{
     DropOff, HuntAction, Lead, PointWalker, asked_drop_off, resource_kind,
 };
@@ -48,9 +49,6 @@ pub enum Dropped {
     /// the targets go).
     Idle,
 }
-
-/// The wait of a hunt's drop-off that cannot go on (`0xc0400000`).
-pub(super) const DROP_WAIT: Seconds = Seconds::new(-3.0);
 
 impl HuntAction {
     /// `set_state(8)` (`0x140ac60e0` case 8) with a load and its drop site (`carry_to`, at `site`,
@@ -131,7 +129,7 @@ impl HuntAction {
             SubCode::UnderWay => return Ok(Dropped::Going),
             // failed or its target let go: the hunt waits and the unit's animation stops
             SubCode::Failed | SubCode::TargetGone => {
-                self.timer = DROP_WAIT;
+                self.timer = STOP_WAIT;
                 set_walker_anim(step.world.parts.motion_mut(unit.id), Speed::new(0.0));
                 return Ok(Dropped::Going);
             }
@@ -146,7 +144,7 @@ impl HuntAction {
             ));
         }
         if step.world.model.tuning.hunt.drop_reach < site.gap_squared.get() {
-            self.timer = DROP_WAIT;
+            self.timer = STOP_WAIT;
             set_walker_anim(step.world.parts.motion_mut(unit.id), Speed::new(0.0));
             return Ok(Dropped::Going);
         }
