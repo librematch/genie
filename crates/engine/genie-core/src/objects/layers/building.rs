@@ -1,10 +1,11 @@
 //! `TRIBE_Building_Object` (type 80, FD-045-D06): the building layer, its fields in the save's
-//! order (`TribeBuildingObject`), then the two the save does not hold. It is an object's part
+//! order (`TribeBuildingObject`), then the three the save does not hold. It is an object's part
 //! (`World::parts.building`, FD-045-D56): an object the table does not hold reads
 //! [`Building::NONE`], the game's defaults below type 80.
 
 use crate::construction::build::Construction;
 use crate::construction::{Annexes, MainBuildingId};
+use crate::garrison::GarrisonCounts;
 use crate::objects::Frame;
 use crate::objects::ObjectId;
 use crate::objects::Relics;
@@ -15,7 +16,8 @@ use genie_diff::Diff;
 
 /// The building layer of an object: its construction, its garrison's clock, its relics, its
 /// main building, its production queue, its gate, its livestock and pasture
-/// workers, the units that took it as their target, its rice flag, its stack unit and its frame.
+/// workers, the units that took it as their target, its rice flag, its stack unit, its frame
+/// and its counts of the units inside.
 #[derive(Clone, Debug, Default, PartialEq, Diff)]
 pub struct Building {
     /// A building's construction.
@@ -56,6 +58,11 @@ pub struct Building {
     /// `+0x1c`), which its standing sprite takes once built; 0 from its constructor and the load.
     #[diff(unsaved)]
     pub(crate) build_frame: Frame,
+    /// A building's counts of its villagers and its raiders inside (`+0xba8`, `+0xc2c`), which
+    /// its slots 0x1c0 and 0x1c8 keep ([`GarrisonCounts`]); 0 from its constructors and the
+    /// load, whose re-link counts the units inside in again.
+    #[diff(unsaved)]
+    pub(crate) garrison_counts: GarrisonCounts,
 }
 
 impl Building {
@@ -75,5 +82,6 @@ impl Building {
         rice: false,
         stack_made: None,
         build_frame: Frame::ZERO,
+        garrison_counts: GarrisonCounts::NONE,
     };
 }

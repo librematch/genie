@@ -22,7 +22,7 @@ header then needs what the game's own load builds, which the save does not hold.
 <!-- files -->
 | File | What it holds |
 | --- | --- |
-| [`garrisons.rs`](garrisons.rs) | The garrisons' firepower after a load (`garrison_firepower`): each unit inside a building of its own in that building's list, its share in the building's volleys. |
+| [`garrisons.rs`](garrisons.rs) | The garrisons after a load (`garrison_firepower`): each unit inside a building of its own in that building's list, its share in the building's volleys, its count in the building's. |
 | [`loaded.rs`](loaded.rs) | The world as a recording's header load leaves it (`loaded_world`): what the game's load builds that the save does not hold. |
 | [`market.rs`](market.rs) | The world's market as the save holds it (`market`). |
 | [`mod.rs`](mod.rs) | The world as a save holds it (`saved_world`): every player's objects in their saved order, its technologies, wonder time, ghosts, AI settings and history, the map, the groups and the garrisons' firepower; and as the game's load leaves it (`loaded_world`). |

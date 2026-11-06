@@ -1,10 +1,12 @@
 //! How many units an object holds inside ([`InsideCount`]).
 
 use crate::objects::masters::GarrisonCapacity;
+use genie_diff::Diff;
 
-/// How many units an object holds inside (slot 0x498, [`crate::world::World::garrisoned`]): the
-/// count the game keeps as an int and holds against a master's [`GarrisonCapacity`].
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+/// How many units an object holds inside (slot 0x498, [`crate::world::World::garrisoned`]), or
+/// how many of a kind a building counts in ([`crate::garrison::GarrisonCounts`]): the count the
+/// game keeps as an int and holds against a master's [`GarrisonCapacity`].
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Diff)]
 pub struct InsideCount(i32);
 
 impl InsideCount {
@@ -29,6 +31,12 @@ impl InsideCount {
     #[must_use]
     pub const fn plus(self, other: Self) -> Self {
         Self(self.0 + other.0)
+    }
+
+    /// The count less `other`'s (a building's slot 0x498 less its raiders, a unit that left).
+    #[must_use]
+    pub const fn minus(self, other: Self) -> Self {
+        Self(self.0 - other.0)
     }
 
     /// The count is at most `capacity` (slot 0x198's `<=`).
@@ -59,5 +67,10 @@ mod tests {
         assert!(two.within(cap) && !two.below(cap));
         assert!(InsideCount::ONE.below(cap));
         assert!(!two.plus(InsideCount::ONE).within(cap));
+        assert_eq!(two.minus(InsideCount::ONE), InsideCount::ONE);
+        assert_eq!(
+            InsideCount::ZERO.minus(InsideCount::ONE),
+            InsideCount::new(-1)
+        );
     }
 }

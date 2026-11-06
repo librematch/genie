@@ -59,22 +59,22 @@ impl World {
     /// at the building's height (`FUN_14119d610`), leaves the building (slot 0x1a8,
     /// `FUN_141213120`: the building's slot 0x1c8, `FUN_1411d6ad0` -> `FUN_141217910`, takes its
     /// share off the volleys, back to its master's volley fire when none is left inside or it fell
-    /// below it, and lets it out of its list, `FUN_141197e10`; the building's sight lets the circle
-    /// of 5 go, slot 0x1d8 with 5) and goes on the map there (slot 0x58: its tile's list, its
-    /// obstruction record, the mesh, its sight). With a gather point (`+0xc30` 1) not on the
-    /// building and no point, it then goes to work on the gather point's target when the world
-    /// holds it (its unit AI forgets its target, `FUN_140c5e1e0`; [`World::gather`]); else, or with
-    /// a point, it moves there ([`World::gather_move`] after the same forgetting).
+    /// below it, lets it out of its list, `FUN_141197e10`, and counts it out of its villagers and
+    /// raiders, [`Unit::let_go`]; the building's sight lets the circle of 5 go, slot 0x1d8 with
+    /// 5) and goes on the map there (slot 0x58: its tile's list, its obstruction record, the mesh,
+    /// its sight). With a gather point (`+0xc30` 1) not on the building and no point, it then goes
+    /// to work on the gather point's target when the world holds it (its unit AI forgets its
+    /// target, `FUN_140c5e1e0`; [`World::gather`]); else, or with a point, it moves there
+    /// ([`World::gather_move`] after the same forgetting).
     /// [`LetOut::Stayed`] when no spot is free, before anything changes. With neither a point nor a
     /// gather point its unit AI stops, forgets its target and takes its stance again (slots 0xb0
     /// and 0x1c0). With an object to work on (`work_on`, `GO_BACK_TO_WORK`'s) its work command
     /// (slot 0x128) goes to it at the point first. Not modelled: class 42's and livestock's counts
     /// in a building of a player with `+0x88`, a siege building's (class 13) slot 0x1b0; not held:
-    /// the building's villager count (`+0xba8`) and raider count (`+0xc2c`, which the building's
-    /// slot 0x1c8 `FUN_1411d6ad0` lowers for a unit of type 70 whose `+0x9a0` runs: such a unit
-    /// inside is refused, [`World::garrisoned`]), its sound (slot 0x4c0), its garrison sprite. Its
-    /// work command (slot 0x128) has `+0xa14` 0: the unit AI keeps its notifies and its queued
-    /// orders.
+    /// its sound (slot 0x4c0), its garrison sprite. Its work command (slot 0x128) has `+0xa14` 0:
+    /// the unit AI keeps its notifies and its queued orders.
+    ///
+    /// [`Unit::let_go`]: crate::objects::unit::Unit::let_go
     pub(crate) fn let_out(
         &mut self,
         player: PlayerId,
@@ -161,19 +161,20 @@ impl World {
 
     /// Slot 0x1a8 (`FUN_141213120`) of the unit at (`up`, `ui`), of master `made`, inside the
     /// object at (`player`, `container`), then its slot 0x58 at `at`. The container's slot 0x1c8
-    /// (`FUN_141217910`; a building's `FUN_1411d6ad0` adds its counts, not held) takes the unit's
-    /// share off its volleys, back to its master's volley fire when none is left inside or it fell
-    /// below it, and lets it out of its list (`FUN_141197e10`); a building's sight lets the circle
-    /// of 5 go (slot 0x1d8 with 5); the unit's countdown to its raid (`+0x9a0`) ends; a container
-    /// of type 70 or more takes off its `+0x9a8` what the unit holds inside (slot 0x498), none in
-    /// the slice. Slot 0x58 puts the unit on the map at `at` (`new_position`: its tile's list,
-    /// its obstruction record, the mesh, its sight); its sprites (`FUN_14118a8f0`) are the
-    /// interface's.
+    /// (`FUN_141217910`, a building's `FUN_1411d6ad0`, [`Unit::let_go`]) takes the unit's share
+    /// off its volleys, lets it out of its list and a building counts it out of its villagers
+    /// and raiders; a building's sight lets the circle of 5 go (slot 0x1d8 with 5); the unit's
+    /// countdown to its raid (`+0x9a0`) ends; a container of type 70 or more takes off its `+0x9a8`
+    /// what the unit holds inside (slot 0x498), none in the slice. Slot 0x58 puts the unit on the
+    /// map at `at` (`new_position`: its tile's list, its obstruction record, the mesh, its sight);
+    /// its sprites (`FUN_14118a8f0`) are the interface's.
     ///
     /// # Errors
     ///
     /// A unit without its record, an unload without the masters, and the sight's unsupported
     /// cases.
+    ///
+    /// [`Unit::let_go`]: crate::objects::unit::Unit::let_go
     pub(crate) fn leave_container(
         &mut self,
         (player, container): (PlayerId, ListIndex),
@@ -186,19 +187,7 @@ impl World {
         let bm = live.master(self.master_tables(), player)?.clone();
         let share = self.unloaded_share((player, container), (up, ui), made, &bm)?;
         let unit = self.players.live_mut(player, container)?;
-        if let Some(share) = share {
-            self.parts.combat_mut(unit.id)?.firepower -= share;
-        }
-        // the unit out of its list (`FUN_141197e10`)
-        if let Some(slot) = unit.garrison.iter().position(|&object_id| object_id == id) {
-            let _ = unit.garrison.swap_remove(slot);
-        }
-        // COMISS volley, firepower; JBE keeps it: a NaN firepower stays
-        if unit.garrison.is_empty()
-            || self.parts.combat_of(unit.id).firepower < bm.creatable_part().volley_fire
-        {
-            self.parts.combat_mut(unit.id)?.firepower = bm.creatable_part().volley_fire;
-        }
+        unit.let_go(&mut self.parts, id, share, made, &bm, &self.model.roles)?;
         // a building's sight lets the circle of 5 go (slot 0x1d8 with 5)
         let (building_at, building_radius) = (unit.position(), bm.radius);
         if bm.kind == MasterKind::BUILDING

@@ -8,7 +8,8 @@ Units go into buildings and transports, and come out again. This folder holds bo
 - `enter.rs`, `walk_in.rs` and `meeting.rs` hold the Enter action: the command, the walk to the
   building or transport, and the point where they meet.
 - `unit.rs` is the unit's part: a unit entering and its update while it is inside another
-  object.
+  object. `holder.rs` is the container's part of an enter and a leave: its list, its volleys
+  and, in a building, its counts of the villagers and raiders inside (`counts.rs`).
 - `unload.rs` and `let_out.rs` hold UNLOAD, `GO_BACK_TO_WORK` and a unit's leave.
 - `firepower.rs` holds a unit's attack rate and firepower, and its share of a building's volleys.
 - `transport/` holds the Transport action: a transport's sail and its unload ashore.
@@ -26,10 +27,13 @@ Units go into buildings and transports, and come out again. This folder holds bo
 | --- | --- |
 | [`class_flags.rs`](class_flags.rs) | A class's garrison flags (`ClassFlags`, the class-flags table's word). |
 | [`container_id.rs`](container_id.rs) | A container's id as its own type: the object a unit is inside, enters or leaves. |
+| [`counts.rs`](counts.rs) | A building's counts of the units inside it (`GarrisonCounts`). |
+| [`counts_tests.rs`](counts_tests.rs) | Tests: A building's counts of the units inside it, its villagers (`+0xba8`) and its raiders (`+0xc2c`): as units enter and leave, as the load links them in again, and in its slot 0x498. |
 | [`damage_rate.rs`](damage_rate.rs) | The damage an object deals per second (`DamageRate`). |
 | [`enter.rs`](enter.rs) | The enter command and the Enter's construction, install and start, at once or with the transport's move. |
 | [`enter_state.rs`](enter_state.rs) | An Enter's state: walking to a building or transport, waiting, inside; each walk with its `MoveTo`. |
 | [`firepower.rs`](firepower.rs) | A unit's attack rate and firepower, and its share of a building's volleys (`FUN_141213520`). |
+| [`holder.rs`](holder.rs) | A container's own part of a unit's enter and leave (its slots 0x1c0 and 0x1c8): its list, its volleys and a building's counts. |
 | [`inside_count.rs`](inside_count.rs) | How many units an object holds inside (`InsideCount`). |
 | [`let_out.rs`](let_out.rs) | A unit's leave of the building or the transport it is inside (`FUN_1411e7220`), or its place on the map. |
 | [`meeting.rs`](meeting.rs) | Where an Enter meets its target (`FUN_140a85f30`): the landing tile, the walled-off test, the meeting point and the reach. |

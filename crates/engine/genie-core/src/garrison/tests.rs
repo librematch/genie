@@ -4699,7 +4699,7 @@ fn unit_on_the_map_let_out_moves_beside_the_building() {
 }
 
 #[test]
-fn buildings_count_takes_relics_in_and_leaves_raiders_unmodelled() {
+fn buildings_count_takes_relics_in_and_leaves_raiders_out() {
     // FUN_1411d0ce0 = FUN_141213500 (the +0x2f8 count and +0x9a8) less +0xc2c, which counts
     // the units of type 70 that came in with +0x9a0 set (FUN_1411cb850)
     let mut world = garrison_world();
@@ -4721,13 +4721,20 @@ fn buildings_count_takes_relics_in_and_leaves_raiders_unmodelled() {
         let _ = world.push_live(PlayerId::new(player), unit).unwrap();
     }
     assert_eq!(world.garrisoned(object_id(100)), Ok(InsideCount::new(3)));
-    // a raider inside a building: its +0xc2c share is not kept
+    // a raider inside a building: the building's +0xc2c, not the unit's countdown, leaves it out
     world
         .parts
         .combat_mut(object_id(1000))
         .unwrap()
         .raider_countdown = RaiderCountdown::of_data(20);
-    assert!(world.garrisoned(object_id(100)).is_err());
+    assert_eq!(world.garrisoned(object_id(100)), Ok(InsideCount::new(3)));
+    world
+        .parts
+        .building_mut(object_id(100))
+        .unwrap()
+        .garrison_counts
+        .raiders = InsideCount::ONE;
+    assert_eq!(world.garrisoned(object_id(100)), Ok(InsideCount::new(2)));
     // a transport has no +0xc2c term
     let mut unit = unit(3000, VILLAGER, HitPoints::new(25.0));
     unit.life.inside = Some(ContainerId::new(object_id(200)));

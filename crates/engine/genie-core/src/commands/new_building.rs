@@ -11,6 +11,7 @@ use crate::construction::build::Clearer;
 use crate::construction::build::Construction;
 use crate::construction::build::{NO_CONSTRUCTION, NOT_HELD};
 use crate::construction::{Annexes, BuilderCount, FootprintWaits, FoundationId, MainBuildingId};
+use crate::garrison::GarrisonCounts;
 use crate::garrison::RaiderCountdown;
 use crate::gathering::SalvageAmounts;
 use crate::groups::GroupLink;
@@ -355,6 +356,7 @@ impl World {
             livestock: Vec::new(),
             pasture_workers: Vec::new(),
             build_frame: Frame::ZERO,
+            garrison_counts: GarrisonCounts::NONE,
             // every building holds a gate's lock, open
             gate: Some(Gate {
                 first_update: true,

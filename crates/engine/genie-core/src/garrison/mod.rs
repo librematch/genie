@@ -12,11 +12,13 @@ use crate::vision::SightTiles;
 
 mod class_flags;
 mod container_id;
+mod counts;
 mod damage_rate;
 mod enter;
 pub(crate) use self::enter::EnterSlot;
 mod enter_state;
 mod firepower;
+mod holder;
 mod inside_count;
 mod let_out;
 pub(crate) use self::let_out::HOUSED_NOT_LIVE;
@@ -33,6 +35,7 @@ mod walk_in;
 
 pub use self::class_flags::ClassFlags;
 pub use self::container_id::{Container, ContainerId};
+pub use self::counts::GarrisonCounts;
 pub use self::damage_rate::DamageRate;
 pub use self::enter_state::EnterState;
 pub use self::firepower::{attack_rate, firepower, share};
@@ -84,6 +87,8 @@ const COMPUTER_IDS: usize = 500;
 /// `DAT_1439e2cf8`, is 64), as the image holds it (nothing writes it).
 const CLASS_FLAGS: [u32; 64] = GARRISON_CLASS_FLAGS;
 
+#[cfg(test)]
+mod counts_tests;
 #[cfg(test)]
 mod siege_tests;
 #[cfg(test)]

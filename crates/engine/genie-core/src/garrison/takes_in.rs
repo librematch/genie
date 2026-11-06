@@ -271,10 +271,9 @@ impl World {
 
     /// Slot 0x498 of the object `id`: the objects inside it (`+0x2f8`'s count, relics too) and
     /// what its own `+0x9a8` (`inside_garrison_count`, a saved byte) adds (`FUN_141213500`); a
-    /// building (`FUN_1411d0ce0`) less its `+0xc2c`, the units of type 70 that came in with a
-    /// running `raider_build_countdown` (`+0x9a0`, `FUN_1411cb850`/`FUN_1411d6ad0`). Not
-    /// modelled: an object inside that holds others (the slice reads no `+0x9a8`) and, in a
-    /// building, a unit with its countdown set (`+0xc2c`, which the slice does not keep).
+    /// building (`FUN_1411d0ce0`) less its raiders (`+0xc2c`, the units of type 70 that came in
+    /// with their `raider_build_countdown` set, [`crate::garrison::GarrisonCounts`]). Not
+    /// modelled: an object inside that holds others (the slice reads no `+0x9a8`).
     pub(crate) fn garrisoned(&self, building: ObjectId) -> GenieResult<InsideCount> {
         let holds = |id: ObjectId| {
             self.players.iter().any(|player| {
@@ -294,28 +293,23 @@ impl World {
             .transpose()?
             .unwrap_or(false);
         let mut count = 0;
-        for (player_id, player) in PlayerId::each(self.players.len()).zip(&self.players) {
-            for unit in player.objects.iter().chain(&player.sleeping) {
-                if unit.life.inside.key() != Some(building) {
-                    continue;
-                }
-                let kind = unit.master(self.master_tables(), player_id)?.kind;
-                if is_building
-                    && kind == MasterKind::COMBAT
-                    && self.parts.combat_of(unit.id).raider_countdown.is_set()
-                {
-                    return Err(GenieError::unsupported(
-                        "a unit inside a building with its raider_build_countdown (+0xc2c)",
-                    ));
-                }
-                if holds(unit.id) {
-                    return Err(GenieError::unsupported(
-                        "an object inside a building that holds others (+0x9a8)",
-                    ));
-                }
-                count += 1;
+        let objects = self
+            .players
+            .iter()
+            .flat_map(|player| player.objects.iter().chain(&player.sleeping));
+        for unit in objects.filter(|unit| unit.life.inside.key() == Some(building)) {
+            if holds(unit.id) {
+                return Err(GenieError::unsupported(
+                    "an object inside a building that holds others (+0x9a8)",
+                ));
             }
+            count += 1;
         }
-        Ok(InsideCount::new(count))
+        let raiders = if is_building {
+            self.parts.building_of(building).garrison_counts.raiders
+        } else {
+            InsideCount::ZERO
+        };
+        Ok(InsideCount::new(count).minus(raiders))
     }
 }

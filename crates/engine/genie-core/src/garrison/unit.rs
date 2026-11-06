@@ -1,14 +1,12 @@
 //! A unit entering a building or a transport, and its update inside.
 
-use crate::combat::Firepower;
 use crate::combat::powerup::{InfantryChange, count_infantry, speeds_up_siege};
 use crate::garrison::ContainerId;
 use crate::garrison::EnterOutcome;
 use crate::garrison::EnterSlot;
 use crate::garrison::EnterState;
 use crate::garrison::{
-    ENTERING_UNPLACED, EnterAction, EnterReads, INSIDE_SIGHT, NO_MASTERS, WalkStart, attack_rate,
-    enter_view, share,
+    ENTERING_UNPLACED, EnterAction, EnterReads, INSIDE_SIGHT, NO_MASTERS, WalkStart, enter_view,
 };
 use crate::gathering::gather::unit::give_load;
 use crate::groups::LeavingWalk;
@@ -54,7 +52,6 @@ use crate::vision::registry::Entry;
 use crate::vision::registry::UnitUpdate;
 use crate::vision::visibility::LosSight;
 use crate::world::AllySharing;
-use crate::world::Seconds;
 use crate::world::layer::AttributeRoles;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
@@ -285,9 +282,10 @@ impl Unit {
     /// records leave the registry's lists (`FUN_14128a1d0` from its mask to 0); the building's
     /// sight takes a circle of 5 (slot 0x1d0 with 5) and the villager's town-bell flag follows the
     /// garrison (`FUN_1412067f0` with 3). Then notify 0x1fa with the enter action value and
-    /// `set_state(1)` ([`Unit::entered`]). The building's firepower (`+0xa00`) and villager count
-    /// (`+0xba8`) follow from the units inside; the sound, the tracker and a Gaia building's
-    /// capture (slot 0x70) are not held. [`EnterOutcome::NoRoom`] without room in the building.
+    /// `set_state(1)` ([`Unit::entered`]). The building's firepower (`+0xa00`) and its counts
+    /// (`+0xba8`, `+0xc2c`) follow the units in ([`Unit::join_building`]); the sound, the tracker
+    /// and a Gaia building's capture (slot 0x70) are not held. [`EnterOutcome::NoRoom`] without
+    /// room in the building.
     pub(crate) fn enter_building(
         &mut self,
         actions: &mut Action,
@@ -411,11 +409,11 @@ impl Unit {
     /// group leaves the group when the world holds it (removeUnit, `FUN_14102c160` with the
     /// building and 0, [`crate::world::World::remove_unit`] at once on the unit lent back to its
     /// slot; `FUN_14152ff40`) and stands; it joins the building's (slot 0x1c0: the building's
-    /// list and, for a unit of type 70, its volleys' share, [`crate::garrison::share`]); its
-    /// records leave the registry's lists; the building's sight takes a circle of 5 and the
-    /// villager's town-bell flag follows the garrison and a siege unit counts its infantry
-    /// ([`Unit::enter_tail`]). The building's `+0x9a8` (the units inside the unit) is not
-    /// modelled.
+    /// list, for a unit of type 70 its volleys' share and a building's counts,
+    /// [`Unit::join_building`]); its records leave the registry's lists; the building's sight
+    /// takes a circle of 5 and the villager's town-bell flag follows the garrison and a siege unit
+    /// counts its infantry ([`Unit::enter_tail`]). The building's `+0x9a8` (the units inside the
+    /// unit) is not modelled.
     pub(crate) fn go_inside(
         &mut self,
         actions: &mut Action,
@@ -513,46 +511,6 @@ impl Unit {
             let tuning = step.world.model.tuning.powerup;
             let combat = step.world.parts.combat_mut(target.id())?;
             count_infantry(combat, InfantryChange::Entered, tuning);
-        }
-        Ok(())
-    }
-
-    /// [`Unit::go_inside`]'s slot 0x1c0 of building `target` (`FUN_1411cb850` -> `FUN_14118c890`,
-    /// `FUN_14120b790`; its owner `bp`, its reload powerup `reload`): its list takes the unit,
-    /// and a unit (type 70) adds its share to the building's volleys.
-    fn join_building(
-        &self,
-        step: &mut Step<'_>,
-        target: Option<ContainerId>,
-        bp: PlayerId,
-        reload: Seconds,
-        me: &Master,
-        bm: &Master,
-    ) -> GenieResult<()> {
-        let roles = &step.world.model.roles.clone();
-        let masters = step
-            .world
-            .model
-            .masters
-            .get(step.player.index())
-            .ok_or(NO_MASTERS)?;
-        let firepower = if me.kind == MasterKind::COMBAT {
-            let own = step.world.model.masters.of(bp).unwrap_or(masters);
-            let rate = attack_rate(bm, own, reload, roles, &step.world.model.tuning.garrison);
-            share(
-                me,
-                masters,
-                step.world.parts.combat_of(self.id).reload_powerup,
-                rate,
-                roles,
-            )?
-        } else {
-            Firepower::ZERO
-        };
-        if let Some((_, unit)) = step.world.object_mut(target) {
-            unit.garrison.push(self.id);
-            let id = unit.id;
-            step.world.parts.combat_mut(id)?.firepower += firepower;
         }
         Ok(())
     }
