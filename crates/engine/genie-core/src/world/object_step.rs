@@ -26,7 +26,6 @@ impl World {
     /// registry first): its outcome and its answer `R`.
     ///
     /// [`Parts::take_actions`]: crate::world::parts::Parts::take_actions
-    #[allow(clippy::too_many_lines)]
     pub(super) fn run_object<R>(
         &mut self,
         (player_id, list_index): (PlayerId, ListIndex),

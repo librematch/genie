@@ -232,6 +232,10 @@ pub fn command_phase(
 /// per update, each with that update's own differences, and where the run's time went. The saves
 /// are parsed on rayon's pool while the run goes on, at most `window` ahead of it. Dev only.
 #[allow(clippy::too_many_arguments)]
+#[expect(
+    clippy::too_many_lines,
+    reason = "one rayon scope holds the run's loop and the saves parsed ahead of it"
+)]
 pub fn forced_run(
     start_save: &[u8],
     recording: &[u8],
@@ -288,10 +292,10 @@ pub fn forced_run(
                 };
                 let tick = turns.ticks.get();
                 compare_players(&turns, &after, Some(tick), &mut report)?;
-                let tiles = dump_after(start + index + 1, "tiles")
+                let dumped_tiles = dump_after(start + index + 1, "tiles")
                     .map(|text| tile_lists_from_dump(&text))
                     .transpose()?;
-                if let Some(tile_lists) = tiles.as_ref() {
+                if let Some(tile_lists) = dumped_tiles.as_ref() {
                     for text in tile_order_differences(&turns.spatial, tile_lists) {
                         report.differences.push((0, text));
                     }
@@ -368,7 +372,7 @@ pub fn forced_run(
                     mut game,
                     ..
                 } = after;
-                game.tile_lists = tiles;
+                game.tile_lists = dumped_tiles;
                 game.missile_pool = pool;
                 game.ghost_pool = ghost_pool;
                 // the groups take the game's state only where they differ

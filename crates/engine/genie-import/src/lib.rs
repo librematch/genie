@@ -11,8 +11,7 @@
     clippy::cast_possible_truncation,
     clippy::cast_sign_loss,
     clippy::cast_possible_wrap,
-    // a routine is ported whole, its documentation opens with the routine and its addresses
-    clippy::too_many_lines,
+    // a port's documentation opens with the routine and its addresses
     clippy::too_long_first_doc_paragraph,
     // every error is `GenieError`, which names the part the import does not read
     clippy::missing_errors_doc

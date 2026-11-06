@@ -71,6 +71,10 @@ pub fn map_terrain(header: &Header, terrain: &TerrainTable) -> Terrain {
 /// # Errors
 ///
 /// An object's id or master of −1, or what the sight does not model of the save.
+#[expect(
+    clippy::too_many_lines,
+    reason = "every player's objects filed into the spatial lists in the save's order, as the game's load files them"
+)]
 pub fn spatial(
     header: &Header,
     terrain: &TerrainTable,

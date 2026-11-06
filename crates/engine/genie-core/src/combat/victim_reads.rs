@@ -224,6 +224,10 @@ fn resolved_transforms(view: VictimView<'_>, master: &Master) -> GenieResult<Vec
 /// # Errors
 ///
 /// `FUN_1412161b0`'s read of its master.
+#[expect(
+    clippy::too_many_lines,
+    reason = "every value a hit reads of its victim, read in one place as the hit's routines read them"
+)]
 fn master_read(view: VictimView<'_>, roles: &Roles) -> GenieResult<Victim> {
     let VictimView {
         unit,

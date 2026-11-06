@@ -201,6 +201,10 @@ fn unmodelled(why: GenieError) -> ObjectParts {
 /// update ([`default_task`]); a save from later in the game holds them, and the slice imports
 /// the ones it models into the action layer ([`saved_actions`]). A gather point or production
 /// lists the save holds that the slice cannot read are the object's unmodelled part.
+#[expect(
+    clippy::too_many_lines,
+    reason = "a saved object's layers and parts read in the save's order (`FUN_141089880`, `FUN_14121ec90`)"
+)]
 fn row(
     object: &genie_save::Object,
     objects: &PlayerObjects,

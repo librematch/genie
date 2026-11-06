@@ -98,6 +98,10 @@ pub fn path_level(path_data: &PathData, paths: &[Path]) -> GenieResult<MovementP
 /// (`FUN_14114d1d0`'s first term); its speed-up (`+0x808`, `+0x80c`) is the save's. moveForward's
 /// factor `+0x878` is not in the save; every moving object of MarvinBlue/426048731 holds 1.0 at
 /// tick 680 (the tick oracle).
+#[expect(
+    clippy::too_many_lines,
+    reason = "a mover's saved state read field by field, in the save's order"
+)]
 pub fn mover(
     object: &genie_save::Object,
     rge_static_object: &RgeStaticObject,

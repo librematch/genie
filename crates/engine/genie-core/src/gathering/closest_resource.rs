@@ -101,6 +101,10 @@ pub(crate) struct Gatherer<'world> {
 /// site): the site's place, its master's radii and line of sight, and whether the search starts
 /// from its footprint (the site's tile in the unit's zone of its restriction, or a dock: masters 45
 /// and 2172, `0x140c49d17`); the answer and the out argument's steps.
+#[expect(
+    clippy::too_many_lines,
+    reason = "the resource search (`FUN_140c49760`) ported as one function with its origin and its filters, in the game's order"
+)]
 pub(crate) fn closest_resource_of(
     gatherer: Gatherer<'_>,
     resource_world: &mut ResourceWorld<'_, '_>,

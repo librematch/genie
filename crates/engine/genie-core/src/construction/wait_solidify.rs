@@ -95,6 +95,10 @@ impl UnitView<'_, '_> {
     /// finds on `target` (any action type, with the master switch) gives the wait, made at once on
     /// the unit lent back to its slot ([`crate::world::World::wait_for_foundation`]); not taken
     /// without one.
+    #[expect(
+        clippy::too_many_lines,
+        reason = "the wait for a foundation (`FUN_141226fc0`) ported as one function, its branches in the game's order"
+    )]
     pub(crate) fn start_wait_now(
         &mut self,
         target: ObjectId,

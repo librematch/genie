@@ -40,6 +40,10 @@ impl Unit {
     /// farther than it from the unit (the same 3D distance) does not count. The hunt takes it (slot
     /// 0x48: [`crate::gathering::hunt::HuntAction::retarget`], the new target taken).
     /// [`TreeSearch::Found`] when it found one.
+    #[expect(
+        clippy::too_many_lines,
+        reason = "the hunt's search for another target (`FUN_140ac4670`) ported as one function, its branches in the game's order"
+    )]
     pub(crate) fn hunt_tree_search(
         &mut self,
         (hunt, actions): (&mut HuntAction, &mut Action),

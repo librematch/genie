@@ -328,6 +328,10 @@ impl World {
     /// A computer player's unit, a world without the players' sight, a recyclable master, one
     /// that does not move or has no unit AI or standing sprite, and what the combat setup
     /// fails on.
+    #[expect(
+        clippy::too_many_lines,
+        reason = "a combat unit's making (`0x141266120`, the constructor `FUN_1411eae40`) ported as one function, its setups and draws in the game's order"
+    )]
     pub(crate) fn combat_object(
         &mut self,
         player_id: PlayerId,

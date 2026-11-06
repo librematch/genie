@@ -348,6 +348,10 @@ mod tests {
     /// `FUN_1413cf2f0`, each mode with a game it allows (and its negative not) and a game of
     /// mode 9 at the default age, which none of these allows.
     #[test]
+    #[expect(
+        clippy::too_many_lines,
+        reason = "every technology mode of `FUN_1413cf2f0`, its games one by one"
+    )]
     fn each_technology_mode_takes_its_game_mode_flag_option_or_age() {
         let mode = |game_mode: i32| Settings {
             game_mode: GameMode::of_data(game_mode),

@@ -60,6 +60,10 @@ impl World {
     /// # Errors
     ///
     /// A formation line past the lines' array, and the routines it runs.
+    #[expect(
+        clippy::too_many_lines,
+        reason = "`FormationTransform` (`FUN_14103a1f0`) ported as one function, its branches in the game's order"
+    )]
     pub fn formation_transform(
         &mut self,
         formation: &mut Formation,
@@ -213,7 +217,6 @@ impl World {
     /// know.
     ///
     /// Never: an active slot was found, so the nearest one is too (its distance is finite).
-    #[allow(clippy::too_many_lines)]
     pub(super) fn passable_slots(
         &mut self,
         formation: &mut Formation,

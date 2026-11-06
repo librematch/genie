@@ -241,6 +241,10 @@ impl World {
     ///
     /// Another type, a static object with hit points, a recyclable master, the moving remains
     /// of an object without a facet the slice holds, and what the sight does not model.
+    #[expect(
+        clippy::too_many_lines,
+        reason = "the master's slot 0x40 for types 10 to 39 ported as one function, its setups and draws in the game's order"
+    )]
     pub(crate) fn plain_object(
         &mut self,
         player_id: PlayerId,

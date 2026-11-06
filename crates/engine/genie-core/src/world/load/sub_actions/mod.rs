@@ -345,6 +345,10 @@ pub fn master_build_task(
 /// change counter (`+0xc00`) and `+0xc01` start at 0. The action: a unit's make action or a
 /// research, each with its state and `+0x60` (the base's `subActionValue`). `Ok(None)`: a building
 /// without slots, action or local lists.
+#[expect(
+    clippy::too_many_lines,
+    reason = "a building's saved production (`FUN_1411df160`) read field by field, in the save's order"
+)]
 pub fn production(object: &genie_save::Object) -> GenieResult<Option<Production>> {
     use crate::production::{
         Entry, MakeObj, MakeObjState, MakeTech, MakeTechState, Making, Production, Queue,

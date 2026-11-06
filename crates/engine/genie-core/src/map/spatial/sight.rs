@@ -46,6 +46,10 @@ impl Spatial {
     /// it from nobody; a player whose attribute 97 is above 0 counts 100 more (the most units then
     /// win). One other player takes it; of several, the nearest (Gaia never); a player out of the
     /// game takes it never. A frozen unit that counts and may have moved onto the tiles fails it.
+    #[expect(
+        clippy::too_many_lines,
+        reason = "the Artifact action's owner search (`FUN_140aabc40`) ported as one function, its tiles and lists in the game's order"
+    )]
     pub fn artifact_owner(
         &self,
         me: ObjectId,

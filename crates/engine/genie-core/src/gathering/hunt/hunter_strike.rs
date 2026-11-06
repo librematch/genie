@@ -211,6 +211,10 @@ impl Unit {
     /// hunter's engagement and arms, the animal's owner, its drop site with the gap to it, the
     /// animal's idleness and the hunter's special graphic; none in the other states and none
     /// without the hunt's target (`Herd::target`).
+    #[expect(
+        clippy::too_many_lines,
+        reason = "what the hunt's `set_state(6)` and the lead's update (`FUN_140ac7a00`) read of a herd, in the game's order"
+    )]
     fn herd_for(
         &self,
         step: &Step<'_>,

@@ -115,6 +115,10 @@ impl Mover {
 
     /// The obstruction query's ends (`FUN_14114cc60`): the step's two ends, each held within 0.1
     /// of the map's far edges (`FUN_141051900` orders them into its rectangle).
+    #[expect(
+        clippy::unused_self,
+        reason = "`FUN_14114cc60`, a member of `RGE_Moving_Object`; the query's ends read nothing of the mover"
+    )]
     pub(super) fn query_ends(&self, from: BVector, to: BVector, map: GridSize) -> (Point, Point) {
         let far = |size: i32| size as f32 - 0.1;
         let hold = |value: f32, max: f32| if value < 0.0 { 0.0 } else { value.min(max) };

@@ -1,7 +1,5 @@
 //! This module contains the data format reading/writing.
 
-#![allow(clippy::cognitive_complexity)]
-
 use byteorder::{LE, WriteBytesExt};
 use genie_error::GenieResult;
 use genie_support::StringKey;

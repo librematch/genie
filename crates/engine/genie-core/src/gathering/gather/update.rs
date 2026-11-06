@@ -41,6 +41,10 @@ const UNMODELLED_STATE: GenieError =
 impl GatherAction {
     /// The object the gather's `MoveTo` walks to, which the update holds as `target`, the unit
     /// `gap` from its footprint.
+    #[expect(
+        clippy::unused_self,
+        reason = "a part of `TRIBE_Action_Gather::update` (slot 6, `0x140a8e1d0`), the action's member; the walk's end reads only the target"
+    )]
     const fn walk_to(&self, target: &Victim, gap: Distance) -> WalkTo {
         WalkTo {
             id: Some(target.id),

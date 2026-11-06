@@ -67,6 +67,10 @@ impl Unit {
     /// the object's id as what it was fired from, its reach and the object's attack count. Not
     /// held: the missile's sprite and pitch facet, and a shooter's own master copy (its origin's
     /// master −1).
+    #[expect(
+        clippy::too_many_lines,
+        reason = "a missile's making and start (slot 0x40, `FUN_1410d5920`) ported as one function, its setups and draws in the game's order"
+    )]
     pub(crate) fn launch(
         &mut self,
         step: &mut Step<'_>,

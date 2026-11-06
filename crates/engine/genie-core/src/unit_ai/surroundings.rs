@@ -469,7 +469,10 @@ impl Unit {
     ///
     /// A busy unit of a master the slice does not have, and what the target's block and the
     /// named units do not model.
-    #[allow(clippy::too_many_lines)]
+    #[expect(
+        clippy::too_many_lines,
+        reason = "what the unit AI reads of the unit and the world, gathered in one place before it runs"
+    )]
     pub(crate) fn surroundings(
         &self,
         actions: &Action,

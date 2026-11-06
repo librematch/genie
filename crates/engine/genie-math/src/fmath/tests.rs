@@ -158,6 +158,10 @@ fn atan_is_the_games_atanf_at_its_bounds() {
 /// atan2f `0x14099e020` on every pair of ±0, ±1, 1/2, −3, the smallest subnormal, 1e20, ±∞
 /// and a NaN: the game's outputs (unicorn).
 #[test]
+#[expect(
+    clippy::too_many_lines,
+    reason = "the game's outputs on every special pair, one row each"
+)]
 fn atan2_is_the_games_atan2f_on_special_pairs() {
     for (y, x, game) in [
         (0x0000_0000, 0x0000_0000, 0x0000_0000),
@@ -690,6 +694,10 @@ fn cos_and_sin_are_the_games_on_the_rare_reductions() {
 /// `__rem_pio2_large` `0x14099cbc0` on one to three 24-bit chunks, exponents 0 to 1000 and
 /// every precision (0: one double, 1 and 2: two, 3: three), the game's results (unicorn).
 #[test]
+#[expect(
+    clippy::too_many_lines,
+    reason = "the game's results at every precision, one case each"
+)]
 fn rem_pio2_large_is_the_games_at_every_precision() {
     // the chunks, e0, the precision, then the game's count and remainder pieces
     type Case = (&'static [f64], i32, usize, i32, [u64; 3]);

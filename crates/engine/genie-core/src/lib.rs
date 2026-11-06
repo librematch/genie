@@ -24,19 +24,25 @@
     clippy::cast_possible_wrap,
     clippy::cast_precision_loss,
     // the decompiled routines' math names (dx, dy, x0, y1 …), formulas, flag fields and
-    // parameters, assignment order, and member functions whose `this` goes unused
+    // parameters, and assignment order
     clippy::many_single_char_names,
     clippy::similar_names,
     clippy::suspicious_operation_groupings,
     clippy::useless_let_if_seq,
-    clippy::unused_self,
     // the contexts are bundles of references, passed by value
     clippy::needless_pass_by_value,
-    // a routine is ported whole, its documentation opens with the routine and its addresses
-    clippy::too_many_lines,
+    // a port's documentation opens with the routine and its addresses
     clippy::too_long_first_doc_paragraph,
     // every error is a `GenieError`, which names the part the slice does not model
     clippy::missing_errors_doc
+)]
+// A long production function carries its own expectation, which names the routine it ports.
+#![cfg_attr(
+    test,
+    expect(
+        clippy::too_many_lines,
+        reason = "a test builds its world literally, every object and layer the routine reads"
+    )
 )]
 
 pub use genie_error::{ErrorKind, GenieError, GenieResult};

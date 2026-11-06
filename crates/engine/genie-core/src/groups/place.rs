@@ -292,6 +292,10 @@ impl World {
     ///
     /// When the world does not hold `group`: the game's routine gets the group itself, from a
     /// caller that holds it.
+    #[expect(
+        clippy::too_many_lines,
+        reason = "`movePositionToFront` (`FUN_141025a20`) ported as one function, its branches in the game's order"
+    )]
     pub fn move_position_to_front(&mut self, group: GroupId, ahead: Distance) -> GenieResult<()> {
         let by_id = ObjectsRef::new(
             &self.players,

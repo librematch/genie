@@ -65,6 +65,10 @@ impl World {
     /// the unit's point (slot 0x28, or without a centroid slot 0x30, which shows the point it
     /// queues: priority 100, the order's point shown, ready when direct); after an order neither
     /// queued nor direct the readiness pass with 1 and the unit's stop ([`readiness`]).
+    #[expect(
+        clippy::too_many_lines,
+        reason = "one unit of INTERACT (`FUN_140e68b90`) ported as one function, its branches in the game's order"
+    )]
     pub(super) fn interact_unit(
         &mut self,
         player: PlayerId,

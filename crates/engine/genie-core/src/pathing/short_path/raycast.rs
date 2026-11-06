@@ -91,6 +91,10 @@ impl Ctx<'_> {
 
     /// One tile of the raycast: the callback over the tile's shapes; its last hit (each nearer
     /// than the one before) and the callback's result for it, none without one.
+    #[expect(
+        clippy::too_many_lines,
+        reason = "the raycast's tile callbacks (`FUN_140fa1f60`, `FUN_140fa2180`, `FUN_140fa2850`) ported as one function, in the game's order"
+    )]
     pub(super) fn ray_tile(&self, tile: RayTile<'_>) -> GenieResult<Option<(Meet, Hit)>> {
         let RayTile {
             callback: cb,

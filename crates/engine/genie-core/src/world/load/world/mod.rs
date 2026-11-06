@@ -84,6 +84,10 @@ use std::mem::take;
 /// # Errors
 ///
 /// None yet: what the world does not model of the save stops every player instead.
+#[expect(
+    clippy::too_many_lines,
+    reason = "the world's saved fields read in the save's order"
+)]
 pub fn saved_world(
     header: &Header,
     masters: Option<&MasterTable>,

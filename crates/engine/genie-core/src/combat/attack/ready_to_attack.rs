@@ -135,6 +135,10 @@ impl Attack {
     /// the point and the unit faces it ([`Attack::face`]). A gate's reach (class 39) is to the
     /// nearest of it and its first two parts (its slot 0x680 through `FUN_1415417a0`, `MINSS`:
     /// [`crate::movement::gate_gap`]).
+    #[expect(
+        clippy::too_many_lines,
+        reason = "`RGE_Action_Attack::ready_to_attack` (`FUN_140a7f9d0`) ported as one function, its branches in the game's order"
+    )]
     pub(super) fn ready_to_attack(
         &mut self,
         unit: &mut Unit,
@@ -312,6 +316,10 @@ impl Attack {
     /// (`FUN_141162db0`, [`face_target`]; masters 1704 and 1706 skip it); one not facing it yet
     /// waits; one facing it swings once its attack timer ran out (slot 0x100, `FUN_141082d40`:
     /// `COMISS` with 0 then `SETBE`, so a NaN timer has run out).
+    #[expect(
+        clippy::unused_self,
+        reason = "a part of `RGE_Action_Attack::ready_to_attack` (`FUN_140a7f9d0`), the action's member; its ready end reads nothing of the action"
+    )]
     pub(super) fn face(
         &self,
         (at, mover): (Position, Option<&mut Mover>),

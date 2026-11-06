@@ -293,6 +293,10 @@ pub(crate) fn phalanx_slots(
 /// fixed places on the corners and middles of the sides at x `max` and `min`; more walk the
 /// perimeter from (`max.x`, `min.z`) by the perimeter over the count, as the game walks it
 /// (its first corner's x is `max.z` less the step's rest, which its third corner reuses).
+#[expect(
+    clippy::too_many_lines,
+    reason = "`placeBoxPerimeter` (`FUN_14102ab30`) ported as one function, its branches in the game's order"
+)]
 pub fn place_box_perimeter(
     count: usize,
     out: &mut [BVector; BOX_POSITIONS],

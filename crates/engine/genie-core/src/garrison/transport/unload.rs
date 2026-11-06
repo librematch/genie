@@ -235,6 +235,10 @@ impl World {
     /// ashore do not model.
     ///
     /// [`Updated::Unload`]: crate::garrison::transport::Updated::Unload
+    #[expect(
+        clippy::too_many_lines,
+        reason = "the Transport's unload (`FUN_140aa3ba0`) ported as one function, its branches in the game's order"
+    )]
     pub(crate) fn transport_unload(
         &mut self,
         player_id: PlayerId,

@@ -71,9 +71,6 @@
   "crates/tools/genie-oracle/src/lib.rs": 1,
   "crates/tools/genie-oracle/tests/tick_trace.rs": 1
  },
- "clippy::cognitive_complexity": {
-  "crates/formats/genie-scx/src/format/mod.rs": 1
- },
  "clippy::disallowed_types": {
   "crates/formats/genie-hki/src/lib.rs": 1,
   "crates/tools/genie-oracle/src/lib.rs": 1
@@ -96,9 +93,6 @@
  },
  "clippy::large_enum_variant": {
   "crates/engine/genie-core/src/objects/layers/motion.rs": 1
- },
- "clippy::literal_string_with_formatting_args": {
-  "Cargo.toml": 1
  },
  "clippy::many_single_char_names": {
   "crates/engine/genie-core/src/lib.rs": 1,
@@ -134,9 +128,7 @@
   "crates/tools/genie-swiss-knife/tests/acceptance.rs": 2
  },
  "clippy::similar_names": {
-  "crates/engine/genie-core/src/lib.rs": 1,
-  "crates/engine/genie-model/src/lib.rs": 1,
-  "crates/tools/genie-oracle/src/lib.rs": 1
+  "crates/engine/genie-core/src/lib.rs": 1
  },
  "clippy::struct_excessive_bools": {
   "crates/formats/genie-dat/src/unit_kind/statics.rs": 1,
@@ -171,20 +163,60 @@
   "crates/tools/genie-oracle/src/forced_replay.rs": 1
  },
  "clippy::too_many_lines": {
+  "crates/engine/genie-core/src/combat/attack/ready_to_attack.rs": 1,
+  "crates/engine/genie-core/src/combat/attack/unit_ai_side.rs": 1,
+  "crates/engine/genie-core/src/combat/victim_reads.rs": 1,
+  "crates/engine/genie-core/src/combat/volley/launch.rs": 1,
+  "crates/engine/genie-core/src/commands/builders.rs": 1,
+  "crates/engine/genie-core/src/commands/new_building.rs": 1,
+  "crates/engine/genie-core/src/construction/wait_solidify.rs": 1,
+  "crates/engine/genie-core/src/garrison/transport/unload.rs": 1,
+  "crates/engine/genie-core/src/gathering/closest_resource.rs": 1,
+  "crates/engine/genie-core/src/gathering/hunt/hunter_strike.rs": 1,
+  "crates/engine/genie-core/src/gathering/hunt/next_tree.rs": 1,
+  "crates/engine/genie-core/src/gathering/hunt/unit/found.rs": 1,
+  "crates/engine/genie-core/src/gathering/mule_cart.rs": 1,
   "crates/engine/genie-core/src/groups/formation/passability.rs": 1,
+  "crates/engine/genie-core/src/groups/layout.rs": 1,
+  "crates/engine/genie-core/src/groups/place.rs": 1,
   "crates/engine/genie-core/src/lib.rs": 1,
+  "crates/engine/genie-core/src/map/spatial/sight.rs": 1,
+  "crates/engine/genie-core/src/movement/path_end.rs": 1,
+  "crates/engine/genie-core/src/orders/interact.rs": 1,
+  "crates/engine/genie-core/src/orders/master_change.rs": 1,
+  "crates/engine/genie-core/src/pathing/hull_path/walks.rs": 1,
+  "crates/engine/genie-core/src/pathing/short_path/outline.rs": 1,
+  "crates/engine/genie-core/src/pathing/short_path/raycast.rs": 1,
+  "crates/engine/genie-core/src/production/spawn/new_unit.rs": 1,
+  "crates/engine/genie-core/src/production/spawn/objects.rs": 1,
+  "crates/engine/genie-core/src/unit_ai/process_order.rs": 1,
   "crates/engine/genie-core/src/unit_ai/surroundings.rs": 1,
-  "crates/engine/genie-core/src/world/object_step.rs": 1,
-  "crates/engine/genie-import/src/lib.rs": 1,
-  "crates/engine/genie-math/src/lib.rs": 1,
-  "crates/engine/genie-model/src/lib.rs": 1,
+  "crates/engine/genie-core/src/unit_ai/world_view/commands.rs": 2,
+  "crates/engine/genie-core/src/unit_ai/world_view/searches.rs": 1,
+  "crates/engine/genie-core/src/world/load/groups/mod.rs": 1,
+  "crates/engine/genie-core/src/world/load/map/mod.rs": 1,
+  "crates/engine/genie-core/src/world/load/movers/mod.rs": 1,
+  "crates/engine/genie-core/src/world/load/object/mod.rs": 1,
+  "crates/engine/genie-core/src/world/load/sub_actions/mod.rs": 1,
+  "crates/engine/genie-core/src/world/load/world/mod.rs": 1,
+  "crates/engine/genie-import/src/save.rs": 1,
+  "crates/engine/genie-math/src/fmath/reduction.rs": 1,
+  "crates/engine/genie-math/src/fmath/tests.rs": 2,
+  "crates/engine/genie-model/src/world/settings.rs": 1,
   "crates/formats/genie-rec/tests/de_oracle.rs": 1,
-  "crates/tools/genie-oracle/src/lib.rs": 1,
+  "crates/tools/genie-oracle/src/forced_replay.rs": 1,
   "crates/tools/genie-oracle/tests/tick_trace.rs": 1
  },
  "clippy::unused_self": {
-  "crates/engine/genie-core/src/lib.rs": 1,
-  "crates/tools/genie-oracle/src/lib.rs": 1
+  "crates/engine/genie-core/src/combat/attack/ready_to_attack.rs": 1,
+  "crates/engine/genie-core/src/garrison/unit.rs": 1,
+  "crates/engine/genie-core/src/gathering/gather/update.rs": 1,
+  "crates/engine/genie-core/src/gathering/hunt/herding.rs": 1,
+  "crates/engine/genie-core/src/movement/ai_moves.rs": 1,
+  "crates/engine/genie-core/src/movement/walk.rs": 1,
+  "crates/engine/genie-core/src/pathing/tile_path/grid.rs": 1,
+  "crates/engine/genie-core/src/pathing/tile_path/path_trace.rs": 1,
+  "crates/engine/genie-core/src/unit_ai/world_view/attack_reads.rs": 1
  },
  "clippy::useless_let_if_seq": {
   "crates/engine/genie-core/src/lib.rs": 1,

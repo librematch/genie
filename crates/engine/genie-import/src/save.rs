@@ -174,6 +174,10 @@ pub fn action_part(master: &Master) -> Option<&RgeMasterActionObject> {
 /// A player's masters as the work command reads them: each master the save holds, with its saved
 /// class, radii, cost and (where saved) tasks, and the `.dat`'s task swap group and type, which
 /// the save does not carry (the game copies them from the `.dat` master).
+#[expect(
+    clippy::too_many_lines,
+    reason = "each saved master's fields read in the save's order, with the `.dat`'s the save does not carry"
+)]
 pub fn work_masters(
     objects: &PlayerObjects,
     civ: CivId,

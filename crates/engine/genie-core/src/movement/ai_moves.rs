@@ -437,6 +437,10 @@ impl Unit {
     /// The Gather's slot 0x40 (its move to the point): the target it had is let go; the
     /// `MoveTo` it makes reads the unit's `walks` (its sprites' default for a sprite the task
     /// lacks).
+    #[expect(
+        clippy::unused_self,
+        reason = "the unit's call of `TRIBE_Action_Gather::move_to` (slot 0x40, `FUN_140a97730`), which reads the Gather, not the unit"
+    )]
     fn gather_takes_point(
         &self,
         actions: &mut Action,

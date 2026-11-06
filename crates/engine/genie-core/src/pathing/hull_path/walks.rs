@@ -176,6 +176,7 @@ impl HullPather<'_> {
     /// region of `from` about the box (inside it, its nearest side and those within the radius), a
     /// point every `step` of the side's length, [`NUDGE`] off the box; with `reach`, only those
     /// within it of `from`; none inside a box of the hull. [`Steps::Made`] when one was.
+    #[expect(clippy::too_many_lines, reason = "`FUN_140f88ee0` as one function")]
     pub(super) fn side_points(
         &mut self,
         hull: HullIndex,

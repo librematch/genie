@@ -385,6 +385,10 @@ impl Planner {
     /// Whether four children with edges `d0` to `d3` fall apart as one cell (`FUN_140f7e5e0`'s
     /// labels): three links among the ring of children, no edge out but a passable child, or
     /// children with edges that join none of the others.
+    #[expect(
+        clippy::unused_self,
+        reason = "a part of the tile planner's member `FUN_140f7e5e0`, whose labels read nothing of the planner"
+    )]
     pub(super) fn splits(&self, [d0, d1, d2, d3]: [CellEdges; 4], dirs: CellEdges) -> bool {
         let link01 = d0.contains(CellEdges::E);
         let mut b4: u8 = if d1.is_empty() { 0 } else { 2 };

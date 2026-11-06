@@ -132,6 +132,10 @@ fn formation(saved: &saved::Formation) -> GenieResult<Formation> {
     })
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "a saved unit group read field by field, in the save's order"
+)]
 fn group(saved: &saved::UnitGroup, paths: &[saved::Path]) -> GenieResult<UnitGroup> {
     let target_data = &saved.current_target;
     Ok(UnitGroup {

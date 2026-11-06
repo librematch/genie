@@ -89,6 +89,10 @@ impl Planner {
     /// # Errors
     ///
     /// What `tile_at` fails on.
+    #[expect(
+        clippy::unused_self,
+        reason = "a part of the tile planner's members `FUN_140f775a0` and `FUN_140f794f0`; the scan reads nothing of the planner"
+    )]
     pub(super) fn nearest_on_boundary(
         &self,
         at: i16,

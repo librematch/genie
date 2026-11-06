@@ -31,6 +31,10 @@ impl Unit {
     /// of its own player's directly, never listed). A farm found is not modelled. A hunt that
     /// fails at once takes the standing sprite (slot 0x68 with `FUN_140ac5210`'s: the unit
     /// carries nothing now).
+    #[expect(
+        clippy::too_many_lines,
+        reason = "the hunt's retarget on the found object (slot 0x48 in `FUN_140ac7a00`) ported as one function, its branches in the game's order"
+    )]
     pub(super) fn hunt_take_found(
         &mut self,
         (hunt, actions): (&mut HuntAction, &mut Action),

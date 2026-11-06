@@ -610,6 +610,10 @@ impl Unit {
     /// `target` at its place `at`, no target class, the unit AI's action, no second target),
     /// then the flag set for a building in state 2 (`state`; its own player's) that takes
     /// villagers; with 3 it is never cleared.
+    #[expect(
+        clippy::unused_self,
+        reason = "a part of the unit's member `FUN_1412067f0`; its town-bell record reads nothing of the unit but its arguments"
+    )]
     fn enter_town_bell(
         &self,
         (bell, ai): (&mut TownBell, Option<&UnitAi>),

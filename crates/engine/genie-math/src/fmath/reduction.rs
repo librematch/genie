@@ -108,6 +108,10 @@ pub(super) const PIO2: [f64; 8] = [
 /// against 2/π's (Payne and Hanek). `x` holds the argument's 24-bit chunks (at most 3, the first
 /// scaled by 2^`e0`); `prec` (0 to 3) picks how many doubles carry the remainder. Returns the
 /// quadrant count's low 3 bits and the remainder's pieces (the unused ones 0).
+#[expect(
+    clippy::too_many_lines,
+    reason = "msun's `__kernel_rem_pio2` (`0x14099cbc0`) ported as one function, its loops as the routine runs them"
+)]
 pub(super) fn rem_pio2_large(x: &[f64], e0: i32, prec: usize) -> (i32, [f64; 3]) {
     let jk = INIT_JK[prec];
     let jp = jk;

@@ -95,6 +95,10 @@ impl UnitAi {
     /// queue between turns pass; [`UnitAi::take_order_now`] passes none but the unit's
     /// `place` (its x and y and its master's class), as its own order (`AUTO_SCOUT`'s stop or
     /// auto scout order) is the one that runs.
+    #[expect(
+        clippy::too_many_lines,
+        reason = "slot 0x230 (`FUN_140c5c170`) ported as one function, one case per order in the game's order"
+    )]
     pub(crate) fn process_order(
         &mut self,
         queued_order: &QueuedOrder,

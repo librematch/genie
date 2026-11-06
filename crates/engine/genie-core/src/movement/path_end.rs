@@ -69,6 +69,10 @@ impl Mover {
     /// planner's other arguments unset: no path, the reach within a tile, no player's objects); a
     /// nearer one is not reached. `master` is the unit's master's id (42 moves for the long
     /// pather without a speed).
+    #[expect(
+        clippy::too_many_lines,
+        reason = "the reach test (`FUN_140fa0370`) ported as one function, its planners in the game's order"
+    )]
     pub(super) fn reach_test(
         &self,
         at: Position,

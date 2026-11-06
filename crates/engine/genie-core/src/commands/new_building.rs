@@ -133,6 +133,10 @@ impl World {
     /// A master the player has not got or without its building part, an annex of another type,
     /// and what the clearing and the attributes do not model.
     #[track_caller]
+    #[expect(
+        clippy::too_many_lines,
+        reason = "a building's making (`FUN_1411ac5c0`, `FUN_1411aca00`, the constructor `FUN_1411de5f0`) ported as one function, its setups and draws in the game's order"
+    )]
     pub(crate) fn make_building(
         &mut self,
         player: PlayerId,

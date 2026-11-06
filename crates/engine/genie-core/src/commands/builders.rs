@@ -393,6 +393,10 @@ impl World {
     /// 0x380's 1); [`Answer::NotTaken`] for the foundation gone or no task (its 0, which the
     /// Gather's `set_state(6)` ignores and `BuildObject` reads first,
     /// [`crate::unit_ai::world_view::UnitView::builds`]).
+    #[expect(
+        clippy::too_many_lines,
+        reason = "the build command (slot 0x380, `FUN_14120d410`) ported as one function, its branches in the game's order"
+    )]
     pub(crate) fn build_command(
         &mut self,
         player: PlayerId,

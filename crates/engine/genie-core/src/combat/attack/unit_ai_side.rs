@@ -61,6 +61,10 @@ impl UnitView<'_, '_> {
     /// [`crate::combat::attack::Attack::enter_ready`]: readyToAttack again, then the swing, `set_state(7)`,
     /// when it faces its target and may attack), whose notifies join the start's. A notify posted
     /// while the AI runs (its buffer, `FUN_140c55270`) is not modelled.
+    #[expect(
+        clippy::too_many_lines,
+        reason = "the attack command (slot 0x338, `FUN_14120cea0`) and `FUN_141081a80` ported as one function, its branches in the game's order"
+    )]
     pub(crate) fn start_attack_now(
         &mut self,
         target: ObjectId,

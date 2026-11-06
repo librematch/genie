@@ -15,8 +15,7 @@
     clippy::cast_precision_loss,
     // the ported routines' math names (x, y, z, k, hx …)
     clippy::many_single_char_names,
-    // a routine is ported whole, its documentation opens with the routine and its addresses
-    clippy::too_many_lines,
+    // a port's documentation opens with the routine and its addresses
     clippy::too_long_first_doc_paragraph
 )]
 

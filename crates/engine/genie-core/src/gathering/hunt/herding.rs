@@ -62,6 +62,10 @@ impl HuntAction {
 
     /// `FUN_141162db0` on the animal at `to` at once (a unit without a turn time turns by the
     /// facets between) at the world's time `now`, of the hunter at `at` with its mover.
+    #[expect(
+        clippy::unused_self,
+        reason = "a part of `TRIBE_Action_Hunt`'s update (slot 6, `0x140ac7a00`), the action's member; its turn to the animal (`FUN_141162db0`) reads nothing of the action"
+    )]
     pub(super) fn face_animal(
         &self,
         (at, mover): (Position, Option<&mut Mover>),

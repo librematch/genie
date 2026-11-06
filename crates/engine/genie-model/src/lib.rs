@@ -14,10 +14,7 @@
     clippy::cast_sign_loss,
     clippy::cast_possible_wrap,
     clippy::cast_precision_loss,
-    // the decompiled routines' names (dx, dy, x0, y1 …) and flag fields
-    clippy::similar_names,
-    // a routine is ported whole, its documentation opens with the routine and its addresses
-    clippy::too_many_lines,
+    // a port's documentation opens with the routine and its addresses
     clippy::too_long_first_doc_paragraph
 )]
 

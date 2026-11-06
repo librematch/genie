@@ -166,6 +166,10 @@ impl WorldPicker<'_> {
 
     /// `FUN_140c41690`: a human player's unit passes nothing over (the computer player's test
     /// never runs: its search fails at the sight).
+    #[expect(
+        clippy::unused_self,
+        reason = "`FUN_140c41690`, a member of the unit AI; a human player's unit reads nothing of it"
+    )]
     pub(crate) const fn shuns(&self, _: ObjectId) -> bool {
         false
     }

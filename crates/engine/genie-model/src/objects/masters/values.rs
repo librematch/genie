@@ -175,9 +175,9 @@ pub(super) fn resize_damage_graphics(
 ) {
     let resize_count = resize_count(value).min(MOST_DAMAGE_GRAPHICS) as usize;
     list.resize(resize_count, DamageGraphic::default());
-    let last = DamageGraphicEntry::of_data((resize_count as u8).wrapping_sub(1));
-    if last < *entry {
-        *entry = last;
+    let last_entry = DamageGraphicEntry::of_data((resize_count as u8).wrapping_sub(1));
+    if last_entry < *entry {
+        *entry = last_entry;
     }
 }
 
@@ -192,9 +192,9 @@ pub(super) fn resize_train_locations(
     let resize_count = resize_count(value).min(MOST_TRAIN_LOCATIONS) as usize;
     let fill = list.last().copied().unwrap_or_default();
     list.resize(resize_count, fill);
-    let last = TrainLocationEntry::of_data((resize_count as i16).wrapping_sub(1));
-    if last < *entry {
-        *entry = last;
+    let last_entry = TrainLocationEntry::of_data((resize_count as i16).wrapping_sub(1));
+    if last_entry < *entry {
+        *entry = last_entry;
     }
 }
 
@@ -221,8 +221,8 @@ pub(super) fn insert_damage_graphic(
         at = at.min(list.len() as i32);
         list.insert(at as usize, DamageGraphic::default());
     }
-    let last = list.len() as i32 - 1;
-    *entry = DamageGraphicEntry::of_selected(if last < at { last } else { at });
+    let last_at = list.len() as i32 - 1;
+    *entry = DamageGraphicEntry::of_selected(if last_at < at { last_at } else { at });
 }
 
 /// A multiply of the train locations' selected entry (`FUN_141249040`): as
@@ -248,8 +248,8 @@ pub(super) fn insert_train_location(
         let fill = list.last().copied().unwrap_or_default();
         list.insert(at as usize, fill);
     }
-    let last = list.len() as i32 - 1;
-    *entry = TrainLocationEntry::of_selected(if last < at { last } else { at });
+    let last_at = list.len() as i32 - 1;
+    *entry = TrainLocationEntry::of_selected(if last_at < at { last_at } else { at });
 }
 
 /// The selected entry moved to `wanted` (the attributes 154 and 158): at most the last of `count`

@@ -104,6 +104,10 @@ impl World {
     /// searched by `ClosestResourceObject` (slot 0x80) from the cart as the drop site, any
     /// workers, from state 0 on; of those found, the nearest by the squared footprint gap
     /// (`FUN_14118f8c0`, below 99999, `DAT_142ef9008`), with its place; none at the cart's own.
+    #[expect(
+        clippy::too_many_lines,
+        reason = "slot 0x1e8's search (`FUN_140c16240`) ported as one function, its branches in the game's order"
+    )]
     pub(crate) fn cart_find(
         &mut self,
         player_id: PlayerId,

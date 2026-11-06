@@ -166,6 +166,10 @@ impl Search<'_> {
     /// side `s0` at `start` (counter-clockwise, the shapes on the left): along each side to its
     /// nearest contact ahead (ties to the first in the list) or its end; around the bounds' border
     /// where it leaves them. Closed when the outline closes, the step limit after 2,000 steps.
+    #[expect(
+        clippy::too_many_lines,
+        reason = "the outline trace (`FUN_140fa8fa0`) ported as one function, its branches in the game's order"
+    )]
     pub(super) fn trace(
         &self,
         shape0: ShapeId,

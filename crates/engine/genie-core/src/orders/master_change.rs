@@ -231,6 +231,10 @@ pub(crate) struct Switched {
 ///
 /// A change of its damage sprites, a moving unit's new master that does not move and a standing
 /// sprite the data file lacks.
+#[expect(
+    clippy::too_many_lines,
+    reason = "slot 0x90's unit part (`FUN_141225b70`) ported as one function, its branches in the game's order"
+)]
 pub(crate) fn switch_master(
     (unit, combat, mut motion): (&mut Unit, &mut Combat, MotionMut<'_>),
     old: &Master,

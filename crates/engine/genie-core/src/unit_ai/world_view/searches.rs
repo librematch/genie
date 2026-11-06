@@ -50,6 +50,10 @@ impl UnitView<'_, '_> {
     /// # Errors
     ///
     /// What the search does not model.
+    #[expect(
+        clippy::too_many_lines,
+        reason = "the unit AI's search (`FUN_140c63e20`) with its pick ported as one function, in the game's order"
+    )]
     pub(crate) fn closest(&mut self, search: &Search<'_>) -> GenieResult<Found> {
         let roles = &self.step.world.model.roles.clone();
         let top_speed =

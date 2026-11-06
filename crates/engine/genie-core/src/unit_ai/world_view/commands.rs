@@ -37,6 +37,10 @@ impl UnitView<'_, '_> {
     /// (`FUN_140ad7fa0`) replaces the unit's actions (slot 0x808): 1; none: 0. The switches and
     /// the Repair are made at once on the unit lent back to its slot ([`RepairOrder`],
     /// [`World::repair_order`](crate::world::World::repair_order)).
+    #[expect(
+        clippy::too_many_lines,
+        reason = "the repair command (slot 0x378, `FUN_141217c00`) ported as one function, its branches in the game's order"
+    )]
     pub(super) fn repair_command(
         &mut self,
         target: ObjectId,
@@ -190,6 +194,10 @@ impl UnitView<'_, '_> {
     /// sub-action): 1; none: 0. The switch and the Enter are made at once on the unit lent back to
     /// its slot ([`EnterOrder`], [`World::enter_order`](crate::world::World::enter_order)); the
     /// notify its install gives the unit's own AI waits for the side's return.
+    #[expect(
+        clippy::too_many_lines,
+        reason = "the enter command (slot 0x3a0, `FUN_1410847e0`) ported as one function, its branches in the game's order"
+    )]
     pub(super) fn enter_command(
         &mut self,
         target: ObjectId,
