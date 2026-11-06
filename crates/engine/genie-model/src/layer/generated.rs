@@ -68,9 +68,7 @@ bitflags! {
         const DOMESTIC_ANIMAL = 1 << 25;
         /// Class 26, the random-map scripts' `ELEPHANT_ARCHER_CLASS` (926).
         const ELEPHANT_ARCHER = 1 << 26;
-        /// The classes whose objects hold faith (18, the monks, and 53, the boarding boats): the
-        /// combat setup (`FUN_14121df60`) gives them 100, the combat update
-        /// (`TRIBE_Combat_Object::update`) regains it by the master's reload time.
+        /// The classes whose objects hold faith (18, the monks, and 53, the boarding boats): the combat setup (`FUN_14121df60`) gives them 100, the combat update (`TRIBE_Combat_Object::update`) regains it by the master's reload time.
         const FAITHFUL = 1 << 27;
         /// Farms and a pasture's livestock (decoded 49, `0x31`).
         const FARM = 1 << 28;
@@ -174,8 +172,7 @@ bitflags! {
         const REPAIR_COSTED = 1 << 77;
         /// Class 41, the random-map scripts' `RESOURCE_PILE_CLASS` (941).
         const RESOURCE_PILE = 1 << 78;
-        /// Class 40, the random-map scripts' `SALVAGE_PILE_CLASS` (940): a pile holding an amount
-        /// decays by one each time its decay timer runs out (`TRIBE_Combat_Object::update`).
+        /// Class 40, the random-map scripts' `SALVAGE_PILE_CLASS` (940): a pile holding an amount decays by one each time its decay timer runs out (`TRIBE_Combat_Object::update`).
         const SALVAGE_PILE = 1 << 79;
         /// Scorpions and the like (`.dat` class 55, `-0xe75` raw), which the task finder treats apart.
         const SCORPION = 1 << 80;
@@ -193,11 +190,7 @@ bitflags! {
         const SKIPS_SIEGE_CHECK = 1 << 86;
         /// Class 50, the random-map scripts' `SPEARMAN_CLASS` (950).
         const SPEARMAN = 1 << 87;
-        /// The classes whose units speed up a siege unit they are inside (6, 45, 46, 50 and 56):
-        /// entering one counts them in its `+0xad8` and adds 0.05 to its speed powerup `+0xa2c`
-        /// (slot 52, `FUN_141212e10`, through slot 0x1b0, `FUN_141209d60`), leaving takes both off
-        /// (slot 53, `FUN_141213120`), and the powerup reset (`FUN_1412066b0`) makes the speed
-        /// powerup 0.05 a unit.
+        /// The classes whose units speed up a siege unit they are inside (6, 45, 46, 50 and 56): entering one counts them in its `+0xad8` and adds 0.05 to its speed powerup `+0xa2c` (slot 52, `FUN_141212e10`, through slot 0x1b0, `FUN_141209d60`), leaving takes both off (slot 53, `FUN_141213120`), and the powerup reset (`FUN_1412066b0`) makes the speed powerup 0.05 a unit.
         const SPEEDS_SIEGE = 1 << 88;
         /// Class 8, the random-map scripts' `STONE_MINE_CLASS` (908).
         const STONE_MINE = 1 << 89;
@@ -433,8 +426,7 @@ bitflags! {
         const TREBUCHET_PACKED = 1 << 88;
         /// The masters whose exhaustion the update does not check (`FUN_140a99e30`: the master id, not 0x765 and not 0x769): the pastures.
         const UNEXHAUSTED = 1 << 89;
-        /// The siege masters their infantry inside does not speed up (`0x6744`, `0x6746` raw): the
-        /// enter and the leave (slots 52 and 53) leave their count `+0xad8` alone.
+        /// The siege masters their infantry inside does not speed up (`0x6744`, `0x6746` raw): the enter and the leave (slots 52 and 53) leave their count `+0xad8` alone.
         const UNSPED_SIEGE = 1 << 90;
         /// The buildings a stop leaves alone (`FUN_1411e6290`).
         const UNSTOPPED = 1 << 91;
@@ -626,9 +618,7 @@ pub struct AttributeSlots {
     pub farm_exponent: AttributeId,
     /// The population cap (32).
     pub population_cap: AttributeId,
-    /// The faith a priest holds (its attribute kind `+0x308` and amount `+0x310`): the combat setup
-    /// (`FUN_14121df60`) gives a unit of class 18 or 53, or of a master with a conversion task
-    /// (0x68), the kind 34 and the amount 100.
+    /// The faith a priest holds (its attribute kind `+0x308` and amount `+0x310`): the combat setup (`FUN_14121df60`) gives a unit of class 18 or 53, or of a master with a conversion task (0x68), the kind 34 and the amount 100.
     pub faith: AttributeId,
     /// The food the farms hold (Farm Food Amount, `player+0x100` at `+0x120`: 36), which `set_state(6)` of a farm's Make reads and an effect's change grows (`FUN_141615270`).
     pub farm_food_amount: AttributeId,
@@ -654,9 +644,7 @@ pub struct AttributeSlots {
     pub monasteries: AttributeId,
     /// The giver's tribute given (53).
     pub tribute_given: AttributeId,
-    /// The salvage decay rate (65, seconds): the combat setup (`FUN_14121df60`) starts every combat
-    /// object's decay timer (`+0x99c`) at it times 1000, and a salvage pile's update
-    /// (`TRIBE_Combat_Object::update`) again each time its timer runs out.
+    /// The salvage decay rate (65, seconds): the combat setup (`FUN_14121df60`) starts every combat object's decay timer (`+0x99c`) at it times 1000, and a salvage pile's update (`TRIBE_Combat_Object::update`) again each time its timer runs out.
     pub salvage_decay_rate: AttributeId,
     /// The share of a trade's worth the market keeps (78).
     pub market_fee: AttributeId,
@@ -730,24 +718,17 @@ pub struct AttributeSlots {
     pub building_cost: AttributeId,
     /// The villagers a player makes: a new villager's (class 4) combat setup adds one.
     pub made_villagers: AttributeId,
-    /// The idles a player's villagers began: `RGE_Action_Object::update` adds a villager's idle
-    /// count (`+0x8a0`, `CVTDQ2PS`) past its state 2; the telemetry's flush (`FUN_14106fc60`) adds
-    /// it too.
+    /// The idles a player's villagers began: `RGE_Action_Object::update` adds a villager's idle count (`+0x8a0`, `CVTDQ2PS`) past its state 2; the telemetry's flush (`FUN_14106fc60`) adds it too.
     pub villager_idles: AttributeId,
-    /// The seconds a player's villagers stood idle: `RGE_Action_Object::update` adds a villager's
-    /// idle milliseconds (`+0x89c`, `CVTSI2SS`, `DIVSS` by 1000) past its state 2; the telemetry's
-    /// flush (`FUN_14106fc60`) adds them too.
+    /// The seconds a player's villagers stood idle: `RGE_Action_Object::update` adds a villager's idle milliseconds (`+0x89c`, `CVTSI2SS`, `DIVSS` by 1000) past its state 2; the telemetry's flush (`FUN_14106fc60`) adds them too.
     pub villager_idle_seconds: AttributeId,
     /// The food a minute of the livestock in the player's mills.
     pub mill_food: AttributeId,
-    /// The range within which an action object keeps the building that speeds it up
-    /// (`mSpeedupBuildingId` `+0x890`): `RGE_Action_Object::update` drops it beyond the square of
-    /// this range.
+    /// The range within which an action object keeps the building that speeds it up (`mSpeedupBuildingId` `+0x890`): `RGE_Action_Object::update` drops it beyond the square of this range.
     pub speedup_range: AttributeId,
     /// The attribute naming the world's effect a player gets after each research (`+0x868`: 269).
     pub world_effect: AttributeId,
-    /// The faith a second an object with a conversion task (0x68) that is no priest regains (282):
-    /// the combat update (`TRIBE_Combat_Object::update`) adds it times the world's dt.
+    /// The faith a second an object with a conversion task (0x68) that is no priest regains (282): the combat update (`TRIBE_Combat_Object::update`) adds it times the world's dt.
     pub converter_faith_rate: AttributeId,
     /// The owner's attribute of a pasture's food, which its livestock share.
     pub pasture_food: AttributeId,
@@ -1659,9 +1640,7 @@ pub struct PastureTuning {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct PowerupTuning {
-    /// A siege unit's speed powerup per infantry unit inside it (`DAT_14330eb78`): the powerup
-    /// reset (`FUN_1412066b0`) makes `+0xa2c` its `+0xad8` times this, and slot 0x1b0
-    /// (`FUN_141209d60`) adds the entering or leaving unit's 1 or −1 times this to it.
+    /// A siege unit's speed powerup per infantry unit inside it (`DAT_14330eb78`): the powerup reset (`FUN_1412066b0`) makes `+0xa2c` its `+0xad8` times this, and slot 0x1b0 (`FUN_141209d60`) adds the entering or leaving unit's 1 or −1 times this to it.
     ///
     /// `powerup::SPEED_PER_INFANTRY`: 0.05 in build 158041.
     pub speed_per_infantry: f32,
@@ -1745,6 +1724,18 @@ pub struct SpawnTuning {
     ///
     /// `spawn::REACH`: 8 in build 158041.
     pub reach: f32,
+    /// The spawn search's later rings step back along a side by adding this (`FUN_1411d12d0`'s `XMM15`, `DAT_14330ec20`).
+    ///
+    /// `spawn::RING_BACK_STEP`: -1 in build 158041.
+    pub ring_back_step: f32,
+    /// The spawn search's outer ring lies this far outside the building's half sizes, its inner ring this far inside them (`FUN_1411d12d0`, `DAT_142e7f384`).
+    ///
+    /// `spawn::RING_MARGIN`: 0.5 in build 158041.
+    pub ring_margin: f32,
+    /// The spawn search's later rings step on along a side by this (`FUN_1411d12d0`, `DAT_14330eb8c`).
+    ///
+    /// `spawn::RING_STEP`: 1 in build 158041.
+    pub ring_step: f32,
     /// The share of a side the first segments cover (`DAT_142eb880c`).
     ///
     /// `spawn::SIDE_SHARE`: 0.25 in build 158041.

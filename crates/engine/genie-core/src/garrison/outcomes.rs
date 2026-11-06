@@ -7,7 +7,7 @@
 pub enum LetOut {
     /// It stands on the spot beside the building.
     Out,
-    /// No spot was free: the game's 0. The port reaches it nowhere yet: a spot search past the first ring is not modelled and stops the update.
+    /// No spot was free, nor a point inside the building's footprint: the game's 0.
     Stayed,
 }
 

@@ -36,6 +36,7 @@ fn building_production_state_comes_before_its_top_action_s() {
     let making = Production {
         action: Some(Making::Unit(MakeObj {
             state: MakeObjState::Making,
+            timer: Seconds::ZERO,
             paid: true,
             master: Some(VILLAGER_MALE),
             progress: Seconds::new(0.5),

@@ -407,6 +407,7 @@ pub fn production(object: &genie_save::Object) -> GenieResult<Option<Production>
             ))?;
             Some(Making::Unit(MakeObj {
                 state: MakeObjState::of_byte(base.state)?,
+                timer: Seconds::new(base.timer),
                 paid: base.sub_action_value != 0,
                 master: MasterId::of_data(make.obj_id),
                 progress: Seconds::new(make.work_done),

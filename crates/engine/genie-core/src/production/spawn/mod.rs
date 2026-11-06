@@ -20,13 +20,14 @@ mod placement_code;
 pub use self::near::{Near, NearFlags};
 mod placement_test;
 mod research;
+mod rings;
 mod search;
 mod terrains;
 mod world_map;
 
 pub use self::placement_code::PlacementCode;
 pub(crate) use self::placement_test::NOT_MOVING;
-pub use self::placement_test::{Placing, ZoneTest};
+pub use self::placement_test::{PlacementCall, Placing, UnitScan, ZoneTest};
 pub(crate) use self::placement_test::{build_placement, placement};
 use self::search::corner_tiles;
 pub use self::search::spawn_point;
@@ -36,8 +37,6 @@ use self::terrains::hill_fails;
 pub(crate) use self::terrains::placement_terrains;
 pub use self::terrains::{BuildSite, SiteChecks};
 pub(crate) use self::world_map::WorldMap;
-#[cfg(test)]
-use crate::GenieError;
 use crate::combat::missile::grounded;
 use crate::map::Footprint;
 use crate::map::Point;
@@ -80,6 +79,21 @@ pub struct Site {
     /// A wall at its corners (both tiles beside each: left top, right top, right bottom, left
     /// bottom), which closes the sides that meet there.
     pub(crate) walls: [bool; 4],
+}
+
+/// Which of the spawn search's tests asks the unit master's slot 0x50 about a point: each
+/// passes its own arguments ([`PlacementCall`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum SpawnTest {
+    /// A spot's candidate (`FUN_1411c5b60`): a blocker reported, no object passed over, the
+    /// units passed over for the mule cart (master id 1808) only.
+    Spot,
+    /// A point of the ring about the building's edge (`FUN_1411d12d0`'s cases 11 to 14): no
+    /// blocker reported, no object passed over, the units counted.
+    Outer,
+    /// A point inside the building's footprint (`FUN_1411d0b20`, cases 15 to 18): no blocker
+    /// reported, the building passed over, the units counted.
+    Inner,
 }
 
 /// What the placement test found at a candidate.

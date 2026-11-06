@@ -11,6 +11,7 @@ use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::production::Entry;
 use crate::production::ProductionStart;
+use crate::production::spawn::new_unit::SpawnOutcome;
 use crate::production::{
     MakeObj, MakeObjState, MakeTech, MakeTechState, Making, housed, population,
 };
@@ -354,45 +355,44 @@ impl World {
     /// `player_id`: in state 1 it is done; in state 6 the building's work rate (its powerup, slot
     /// 0x6e8, plus its master's `work_rate`) times dt adds to its progress, and once its train time
     /// ([`MakeObj::time`]) is reached (`COMISS`, `JC`: a NaN waits) its unit spawns
-    /// ([`World::spawn`], which a computer player's unit does not reach) and it is done; any other
-    /// state waits. Not modelled: a computer player's handicaps (`FUN_141659cf0`, the difficulty's
-    /// factors on the rate), the game's instant work (`+0xc14`, `FUN_140c884c0`, 0 as the tick
-    /// oracle holds it), the spot search's failure (state 10's timer, `FUN_140ace630`).
+    /// ([`World::spawn`], which a computer player's unit does not reach) and it is done; in state
+    /// 10 its timer loses dt (`SUBSS`), and at 0 or below (`COMISS`, `JC`: a NaN waits) the spawn
+    /// tries again; any other state waits. A spawn without a spot waits for one
+    /// ([`MakeObj::wait_for_spot`]). Not modelled: a computer player's handicaps
+    /// (`FUN_141659cf0`, the difficulty's factors on the rate), the game's instant work
+    /// (`+0xc14`, `FUN_140c884c0`, 0 as the tick oracle holds it).
     pub(super) fn make_step(
         &mut self,
         (player_id, list_index): (PlayerId, ListIndex),
         make: MakeObj,
         dt_seconds: Seconds,
     ) -> GenieResult<UpdateCode> {
-        let building = &self.players.live(player_id, list_index)?;
-        match make.state {
+        let waits = match make.state {
             MakeObjState::Done => return Ok(UpdateCode::Done),
-            MakeObjState::Making => {}
-            MakeObjState::New | MakeObjState::NoSpot => return Ok(UpdateCode::UnderWay),
+            MakeObjState::New => return Ok(UpdateCode::UnderWay),
+            MakeObjState::Making => {
+                let (progress, time) =
+                    self.make_progress(player_id, list_index, make, dt_seconds)?;
+                below_or_unordered(progress.get(), time.get())
+            }
+            MakeObjState::NoSpot => {
+                let timer = make.timer - dt_seconds;
+                if let Some(make_obj) = self.make_obj_mut(player_id, list_index)? {
+                    make_obj.timer = timer;
+                }
+                below_or_unordered(0.0, timer.get())
+            }
+        };
+        if waits {
+            return Ok(UpdateCode::UnderWay);
         }
-        let site = building.master(self.master_tables(), player_id)?;
-        let rate =
-            self.parts.combat_of(building.id).work_rate_powerup + site.action_part().work_rate;
         let made = make
             .master
             .and_then(|master_id| player_master(&self.model.masters, player_id, master_id));
-        let time = Seconds::of_master(make.time(made, building.life.master_id)).get();
-        let progress = Seconds::new(rate * dt_seconds) + make.progress;
-        if let Some(Some(Making::Unit(make_obj))) = self
-            .parts
-            .production
-            .get_mut(self.players.live(player_id, list_index)?.id)
-            .map(|production| production.action.as_mut())
-        {
-            make_obj.progress = progress;
-        }
-        if below_or_unordered(progress.get(), time) {
-            return Ok(UpdateCode::UnderWay);
-        }
         let pop = made.map_or(Amount::ZERO, |master| {
             population(&master.storage, &self.model.roles)
         });
-        self.spawn(
+        let outcome = self.spawn(
             player_id,
             list_index,
             make.master.ok_or(GenieError::invalid_input(
@@ -400,15 +400,62 @@ impl World {
             ))?,
             pop,
         )?;
-        if let Some(Some(Making::Unit(make_obj))) = self
-            .parts
-            .production
-            .get_mut(self.players.live(player_id, list_index)?.id)
-            .map(|production| production.action.as_mut())
-        {
-            make_obj.state = MakeObjState::Done;
+        let make_obj = self.make_obj_mut(player_id, list_index)?;
+        Ok(match outcome {
+            SpawnOutcome::Made => {
+                if let Some(make_obj) = make_obj {
+                    make_obj.state = MakeObjState::Done;
+                }
+                UpdateCode::Done
+            }
+            SpawnOutcome::NoSpot => {
+                if let Some(make_obj) = make_obj {
+                    make_obj.wait_for_spot();
+                }
+                UpdateCode::UnderWay
+            }
+        })
+    }
+
+    /// State 6 of the make action's update (`0x140ad0490`) at the building at `list_index` of
+    /// player `player_id`: the building's work rate times dt adds to the action's progress; the
+    /// new progress and the train time.
+    fn make_progress(
+        &mut self,
+        player_id: PlayerId,
+        list_index: ListIndex,
+        make: MakeObj,
+        dt_seconds: Seconds,
+    ) -> GenieResult<(Seconds, Seconds)> {
+        let building = &self.players.live(player_id, list_index)?;
+        let site = building.master(self.master_tables(), player_id)?;
+        let rate =
+            self.parts.combat_of(building.id).work_rate_powerup + site.action_part().work_rate;
+        let made = make
+            .master
+            .and_then(|master_id| player_master(&self.model.masters, player_id, master_id));
+        let time = Seconds::of_master(make.time(made, building.life.master_id));
+        let progress = Seconds::new(rate * dt_seconds) + make.progress;
+        if let Some(make_obj) = self.make_obj_mut(player_id, list_index)? {
+            make_obj.progress = progress;
         }
-        Ok(UpdateCode::Done)
+        Ok((progress, time))
+    }
+
+    /// The make action of the building at `list_index` of player `player_id`, when its
+    /// production list's action is one.
+    fn make_obj_mut(
+        &mut self,
+        player_id: PlayerId,
+        list_index: ListIndex,
+    ) -> GenieResult<Option<&mut MakeObj>> {
+        let id = self.players.live(player_id, list_index)?.id;
+        Ok(self.parts.production.get_mut(id).and_then(|production| {
+            match production.action.as_mut() {
+                Some(Making::Unit(make_obj)) => Some(make_obj),
+                Some(Making::Research(_)) | None => None,
+            }
+        }))
     }
 
     /// The production list's first action goes (`FUN_140a98e20`, and `FUN_140a98620` for the list

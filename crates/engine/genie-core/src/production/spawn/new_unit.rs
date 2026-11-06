@@ -52,6 +52,17 @@ use crate::world::World;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 
+/// What a make action's spawn did (`FUN_140ad0240`'s answer).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[must_use]
+pub(super) enum SpawnOutcome {
+    /// Its unit came beside the building: the game's 1.
+    Made,
+    /// No spot was free, nor a point inside the footprint: the game's 0, before anything
+    /// changed.
+    NoSpot,
+}
+
 /// A computer player's new unit (its AI's slot 0x398).
 const COMPUTER_NEW_UNIT: GenieError =
     GenieError::unsupported("a computer player's new unit (its AI's slot 0x398)");
@@ -64,7 +75,8 @@ const NEW_UNIT_UNMOVING: GenieError =
 impl World {
     /// `FUN_140ad0240`: the unit of `master` spawns beside the building at `list_index`. The spawn
     /// point ([`spawn_point`], from `FUN_140ace630`), then the master's slot 0x40 at the building's
-    /// height (the ground's then, [`World::combat_object`]). Then attribute 81 lowers by its
+    /// height (the ground's then, [`World::combat_object`]); without a spot nothing changes
+    /// ([`SpawnOutcome::NoSpot`]). Then attribute 81 lowers by its
     /// population, the building notifies its unit AI 506 with 619, and the gather point's work
     /// comes (`FUN_140ace9c0`): `+0x7f9` (waiting to move) set, the work command on the gather
     /// point's target at the point (slot 0x128 with 1). A building without a gather point
@@ -85,7 +97,7 @@ impl World {
         list_index: ListIndex,
         master: MasterId,
         pop: Amount,
-    ) -> GenieResult<()> {
+    ) -> GenieResult<SpawnOutcome> {
         if self.players.player(player_id)?.kind.is_computer() {
             return Err(COMPUTER_NEW_UNIT);
         }
@@ -116,7 +128,11 @@ impl World {
         if made.move_stats.is_none() {
             return Err(NEW_UNIT_UNMOVING);
         }
-        let point = self.spot_beside(player_id, list_index, &made, toward)?;
+        let Some(point) = self.spot_beside(player_id, list_index, &made, toward)? else {
+            // `FUN_140ace630`'s 0: the make action waits for a spot (its caller's
+            // `set_state(10)`); the game's event (`FUN_140c898a0` with 0x68) is the interface's
+            return Ok(SpawnOutcome::NoSpot);
+        };
         let new = self.combat_object(player_id, master, &made, point.with_height(position.z()))?;
         let class = self.tracker_key(player_id, master).class;
         let owner = self.players.player_mut(player_id)?;
@@ -166,7 +182,7 @@ impl World {
                 "a new unit's task that spawns more units",
             ));
         }
-        Ok(())
+        Ok(SpawnOutcome::Made)
     }
 
     /// `FUN_140c15e50`: each order of a building's command queue goes into the unit AI's queue of

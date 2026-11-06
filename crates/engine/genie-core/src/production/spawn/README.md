@@ -2,10 +2,14 @@
 
 When the make action finishes a unit, the unit needs a place beside its building. The spawn point
 search walks the building's sides in segments and tries each spot through the master's placement
-test: the map's edge, the terrain, the explored tiles and the objects in the way.
+test: the map's edge, the terrain, the explored tiles and the objects in the way. When no spot is
+free, it tries a ring about the building's edge, then the points inside its footprint, where it
+keeps the point whose tile holds the fewest objects. When even that fails, the make action waits
+five seconds and tries again.
 
 - `make_action.rs` holds the production list and the make action.
-- `search.rs` holds the spawn point search.
+- `search.rs` holds the spawn point search, `rings.rs` its later rings about the building's edge
+  and inside its footprint.
 - `placement_test.rs`, `terrains.rs` and `world_map.rs` hold the placement test and what it
   reads.
 - `new_unit.rs` makes the unit, gives it its command queue and its unit AI.
@@ -33,10 +37,12 @@ test: the map's edge, the terrain, the explored tiles and the objects in the way
 | [`placement_code.rs`](placement_code.rs) | What a building's placement test answers. |
 | [`placement_test.rs`](placement_test.rs) | The master's placement test (slot 0x50): the objects near a candidate, BUILD's placement test and the spawn's. |
 | [`research.rs`](research.rs) | The research action (`TRIBE_Action_Make_Tech`): its technology, its update, its end and its destructor. |
+| [`rings.rs`](rings.rs) | The spawn search's later rings (`FUN_1411d12d0`'s cases 11 to 18): the points about the building's edge, then the points inside its footprint (`FUN_1411d0b20`). |
 | [`search.rs`](search.rs) | The spawn point search (`FUN_1411d12d0`): the building's sides in segments, each spot's candidates (`FUN_1411c5b60`) and the corners' wall checks. |
 | [`terrains.rs`](terrains.rs) | The placement test's terrains (`FUN_141123f80`): the hill mode, the placement and side terrains and the tiles beside a box. |
 | [`tests.rs`](tests.rs) | Tests. |
 | [`world_map.rs`](world_map.rs) | The map as the placement test reads it from the world (`WorldMap`). |
+| [`rings/`](rings/) | The later rings' tests. |
 <!-- /files -->
 
 ## How it connects

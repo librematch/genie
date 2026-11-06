@@ -341,12 +341,19 @@ pub fn train_time(
         .map_or(first, |train_location| train_location.time)
 }
 
+/// The seconds a make action whose unit found no spot waits before it tries again: the
+/// immediate `0x40a00000` its `set_state(10)` (`FUN_140acfec0`) stores in its timer (`+0x44`).
+pub const SPOT_RETRY: Seconds = Seconds::new(5.0);
+
 /// `TRIBE_Action_Make_Obj` (type 0x66, 0x80 bytes): the make action of a building's first
 /// queue entry (the save's `tribe_action_make_obj`).
 #[derive(Clone, Copy, Debug, PartialEq, Diff)]
 pub struct MakeObj {
     /// `+0x18`: its state.
     pub state: MakeObjState,
+    /// `+0x44`, `mTimer`: the seconds until a unit that found no spot tries again (state 10,
+    /// [`MakeObj::wait_for_spot`]); the action's constructor (`FUN_140a73e90`) makes it 0.
+    pub timer: Seconds,
     /// `+0x60`: the queue paid for its unit (`FUN_140acb140`'s `param_5` 0), so its destructor
     /// gives nothing back; clear, the destructor refunds the master's paid costs
     /// (`FUN_141630770`).
@@ -370,6 +377,7 @@ impl MakeObj {
     pub const fn for_entry(entry: &Entry) -> Self {
         Self {
             state: MakeObjState::New,
+            timer: Seconds::ZERO,
             paid: true,
             master: entry.master,
             progress: Seconds::ZERO,
@@ -377,6 +385,13 @@ impl MakeObj {
             button: entry.button,
             train_time: entry.train_time,
         }
+    }
+
+    /// Its `set_state(10)` (slot 0x80, `FUN_140acfec0`) when its unit found no spot
+    /// (`FUN_140ad0240`): state 10, and its timer [`SPOT_RETRY`].
+    pub const fn wait_for_spot(&mut self) {
+        self.state = MakeObjState::NoSpot;
+        self.timer = SPOT_RETRY;
     }
 
     /// `FUN_140acf280`: the seconds its unit takes. A master with flag 0x80 (`+0x654`) takes

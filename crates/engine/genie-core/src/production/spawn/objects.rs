@@ -30,7 +30,8 @@ use crate::objects::{Facet, FacetCount};
 use crate::players::PlayerId;
 use crate::production::spawn::ZoneTest;
 use crate::production::spawn::{
-    Facing, NOT_MOVING, Placing, Site, WorldMap, corner_tiles, placement, spawn_point,
+    Facing, NOT_MOVING, PlacementCall, Placing, Site, SpawnTest, UnitScan, WorldMap, corner_tiles,
+    placement, spawn_point,
 };
 use crate::unit_ai::unit_ai_kind;
 use crate::vision::SightCentre;
@@ -51,17 +52,25 @@ impl World {
     /// `FUN_1411d12d0` for a unit of `made` beside the building at `list_index` of player
     /// `player_id`, `toward` the point the search faces (its gather point's, or the command's):
     /// [`spawn_point`] with the walls at the building's corners (class 27 on both tiles beside
-    /// each) and the master's placement test at each candidate ([`placement`]).
+    /// each), the master's placement test at each point ([`placement`] with each test's
+    /// arguments, [`SpawnTest`]) and the object count of a tile on the map (its list's length,
+    /// the map tile's `+0x1b` byte). None when no spot is free: the game's 0.
+    ///
+    /// # Errors
+    ///
+    /// A building the world does not hold, a unit master that does not move or whose terrain
+    /// restriction the data file lacks, a place the frozen objects make unknown, and the
+    /// placement test's.
     pub(crate) fn spot_beside(
         &self,
         player_id: PlayerId,
         list_index: ListIndex,
         made: &Master,
         toward: Option<Point>,
-    ) -> GenieResult<Point> {
+    ) -> GenieResult<Option<Point>> {
         let building = &self.players.live(player_id, list_index)?;
         let site_master = building.master(self.master_tables(), player_id)?;
-        let position = building.position();
+        let (building_id, position) = (building.id, building.position());
         let mut walls = [false; 4];
         for (wall, tiles) in walls.iter_mut().zip(corner_tiles(
             position,
@@ -109,21 +118,45 @@ impl World {
         };
         let map = WorldMap { turns: self };
         let spatial = &self.spatial;
+        // a spot's test passes over the units for the mule cart (`FUN_1411c5b60`'s `[0x60]`)
+        let spot_units = if made.id == self.model.slots.master.mule_cart {
+            UnitScan::Passed
+        } else {
+            UnitScan::Counted
+        };
         spawn_point(
             &site,
             made.radius,
-            &mut |spot| {
+            &mut |spot, spawn_test| {
                 let (x, y) = (spot.x(), spot.y());
                 let (rx, ry) = (made.radius.x(), made.radius.y());
                 spatial.check_known(Rect::new(x - rx, y - ry, x + rx, y + ry))?;
+                let (passed, units) = match spawn_test {
+                    SpawnTest::Spot => (None, spot_units),
+                    SpawnTest::Outer => (None, UnitScan::Counted),
+                    SpawnTest::Inner => (Some(building_id), UnitScan::Counted),
+                };
                 placement(
                     &placing,
                     &map,
                     spot,
-                    ZoneTest::Skipped,
+                    PlacementCall {
+                        zones: ZoneTest::Skipped,
+                        passed,
+                        units,
+                    },
                     &self.model.roles,
                     &self.model.tuning.spawn,
                 )
+            },
+            &|tile| {
+                if spatial.map.index(tile).is_none() {
+                    return Ok(None);
+                }
+                let (fx, fy) = (tile.x() as f32, tile.y() as f32);
+                spatial.check_known(Rect::new(fx, fy, fx + 1.0, fy + 1.0))?;
+                // the tile's count is a byte
+                Ok(Some(spatial.tile_list(tile).len() as u8))
             },
             &self.model.tuning.spawn,
         )

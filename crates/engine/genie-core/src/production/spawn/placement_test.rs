@@ -7,6 +7,7 @@ use crate::map::Point;
 use crate::map::Restriction;
 use crate::map::{Tile, TileRect};
 use crate::objects::HitPoints;
+use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::FogVisibility;
@@ -448,17 +449,41 @@ pub enum ZoneTest {
     Skipped,
 }
 
-/// The master's slot 0x50 (`0x141264db0`) with the spawn's arguments: `FUN_141123f80`'s test
+/// Whether the master's slot 0x50 counts the units (type 70) its own scan meets: its argument
+/// `[0x60]` (`param_13`), 1 for a mule cart's spot (`FUN_1411c5b60`), 0 for the spawn's rings
+/// and the transport's drop (`FUN_141192d10`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum UnitScan {
+    /// 0: every object its scan meets counts.
+    Counted,
+    /// 1: its scan passes over the units; `FUN_141123f80`'s scan before it still counts them.
+    Passed,
+}
+
+/// The arguments of a call of the master's slot 0x50 that change what [`placement`] answers.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PlacementCall {
+    /// Whether it runs the zone test.
+    pub(crate) zones: ZoneTest,
+    /// `[0x58]` (`param_12`): the object both scans pass over (the inner ring's building), none
+    /// for the null pointer.
+    pub(crate) passed: Option<ObjectId>,
+    /// `[0x60]` (`param_13`): whether its own scan counts the units.
+    pub(crate) units: UnitScan,
+}
+
+/// The master's slot 0x50 (`0x141264db0`) with the arguments of `call`: `FUN_141123f80`'s test
 /// (the map's edge, then per tile of the box the terrain restriction and the explored tiles,
 /// then the objects overlapping), then its own scan of the objects overlapping, which reports
-/// the first one. The editor's case (the game's mode 4), the placement terrains, the hill modes,
-/// the zone test (`FUN_1415c6400`, the world's `+0x820` mode 1) and the moving objects' own
-/// check (`DAT_143f01833`, probed 0) are not modelled.
+/// the first one. Both scans pass over the call's object (`[0x58]`); the own scan passes over
+/// the units where the call says so (`[0x60]` 1). The editor's case (the game's mode 4), the
+/// placement terrains, the hill modes, the zone test (`FUN_1415c6400`, the world's `+0x820`
+/// mode 1) and the moving objects' own check (`DAT_143f01833`, probed 0) are not modelled.
 pub(crate) fn placement(
     me: &Placing<'_>,
     map: &WorldMap<'_>,
     point: Point,
-    zones: ZoneTest,
+    call: PlacementCall,
     roles: &Roles,
     spawn_tuning: &SpawnTuning,
 ) -> GenieResult<Tested> {
@@ -503,11 +528,12 @@ pub(crate) fn placement(
         if !passable || !seen {
             false
         } else if 0.0 < rx || 0.0 < ry {
-            if zones == ZoneTest::Tested {
+            if call.zones == ZoneTest::Tested {
                 return Err(GenieError::unsupported("a placement test in a zone mode"));
             }
             let counts = |near: &Near| {
-                let listed = near.state < ObjectState::Removed
+                let listed = call.passed != Some(near.id)
+                    && near.state < ObjectState::Removed
                     && !near.buildable_on.passed()
                     && (near.kind != MasterKind::BUILDING
                         || !near.flags.contains(NearFlags::DESOLID));
@@ -531,7 +557,9 @@ pub(crate) fn placement(
     };
     // slot 0x50's own scan
     let counts = |near: &Near| {
-        let listed = near.state < ObjectState::Removed
+        let listed = call.passed != Some(near.id)
+            && !(call.units == UnitScan::Passed && near.kind == MasterKind::COMBAT)
+            && near.state < ObjectState::Removed
             && !near.buildable_on.passed()
             && (near.kind != MasterKind::BUILDING
                 || roles

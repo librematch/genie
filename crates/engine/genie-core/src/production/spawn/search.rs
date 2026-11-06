@@ -1,14 +1,15 @@
 //! The spawn point search (`FUN_1411d12d0`): the building's sides in segments, each spot's
 //! candidates (`FUN_1411c5b60`) and the corners' wall checks.
 
+use crate::GenieResult;
 use crate::map::Footprint;
 use crate::map::GroundOffset;
 use crate::map::Point;
 use crate::map::Position;
 use crate::map::{Tile, TileOffset};
-use crate::production::spawn::{NONE, Site, Tested};
+use crate::production::spawn::rings::{inner_ring, outer_ring};
+use crate::production::spawn::{NONE, Site, SpawnTest, Tested};
 use crate::world::layer::generated::SpawnTuning;
-use crate::{GenieError, GenieResult};
 
 /// The ways a spot tries its next point: up, down, left and right.
 const UP: TileOffset = TileOffset::new(0, 1);
@@ -50,23 +51,32 @@ pub(super) fn try_spot(
 /// the sides facing the gather point come first (the top side's left part, the left side's top
 /// part, the top's right part, the left's lower part; then the right side down; then the bottom
 /// side), each only where no wall closes its corner; a second pass tries every open side
-/// ([`Frame::segments`]). Without a gather point there is one pass. The search's later rings
-/// (cases 11 to 18: the spots on the building's edge and the rings around it, `FUN_1411d0b20`)
-/// and its first test under `DAT_143f01833` (`FUN_1411c52f0`, probed 0) are not modelled.
+/// ([`Frame::segments`]). Without a gather point there is one pass. Each spot's candidates go
+/// to `test` as [`SpawnTest::Spot`]. Then the later rings: the points about the building's edge
+/// ([`outer_ring`], cases 11 to 14), then the points inside its footprint ([`inner_ring`],
+/// cases 15 to 18, `FUN_1411d0b20`), which keep the point whose tile holds the fewest objects
+/// (`tile_objects`, none off the map) for want of a free one. None when even they find
+/// nothing: the game's 0. Its first test under `DAT_143f01833` (`FUN_1411c52f0`, probed 0) is
+/// not modelled.
+///
+/// # Errors
+///
+/// The tests' and the tile counts'.
 pub fn spawn_point(
     site: &Site,
     unit: Footprint,
-    test: &mut dyn FnMut(Point) -> GenieResult<Tested>,
+    test: &mut dyn FnMut(Point, SpawnTest) -> GenieResult<Tested>,
+    tile_objects: &dyn Fn(Tile) -> GenieResult<Option<u8>>,
     spawn_tuning: &SpawnTuning,
-) -> GenieResult<Point> {
+) -> GenieResult<Option<Point>> {
     let frame = Frame::new(site, unit, spawn_tuning);
     for pass in [SearchPass::First, SearchPass::Second] {
         for segment in frame.segments(pass, spawn_tuning) {
             // a segment's spots are all made before its first is tried
             let spots: Vec<Spot> = segment.iter().flat_map(|run| frame.spots(run)).collect();
             for spot in &spots {
-                if let Some(point) = try_spot(spot, test)? {
-                    return Ok(point);
+                if let Some(point) = try_spot(spot, &mut |point| test(point, SpawnTest::Spot))? {
+                    return Ok(Some(point));
                 }
             }
         }
@@ -74,9 +84,10 @@ pub fn spawn_point(
             break;
         }
     }
-    Err(GenieError::unsupported(
-        "a spawn point beyond the building's sides (the search's later rings)",
-    ))
+    if let Some(point) = outer_ring(site, test, spawn_tuning)? {
+        return Ok(Some(point));
+    }
+    inner_ring(site, frame.step, test, tile_objects, spawn_tuning)
 }
 
 /// Where a run's spots lie and which way each tries its next point: above the building (up),

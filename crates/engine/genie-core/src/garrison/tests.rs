@@ -4483,6 +4483,186 @@ fn unit_let_out_toward_nothing_stops_and_keeps_its_stance() {
     assert_eq!(ai.state_position, unit.position().ground());
 }
 
+/// [`let_out_world`] with villager 1000 inside town centre 100 on a map where the villager may
+/// stand nowhere (its restriction's value 0 on the only terrain), the centre's master of radius
+/// `radius`.
+fn walled_in_world(radius: f32) -> World {
+    let mut world = let_out_world();
+    for masters in &mut world.model.masters {
+        if let Some(tc) = Arc::make_mut(masters).get_mut(TC) {
+            tc.radius = Footprint::new(radius, radius);
+        }
+    }
+    if let Some(terrain) = world.spatial.terrain.as_mut() {
+        terrain.restrictions[0] = Restriction::new(vec![0.0]);
+    }
+    inside_tc(&mut world, PlayerId::new(1), 1000, VILLAGER);
+    world
+}
+
+/// `FUN_1411e7220` where no spot beside the centre (radius 2 at (10, 10)) is free: the search's
+/// inner ring keeps its first point, (8.5, 11.5), whose tile (8, 11) holds no object, and the
+/// villager comes out there, inside the centre's footprint.
+#[test]
+fn walled_in_unit_comes_out_inside_the_footprint() {
+    let mut world = walled_in_world(2.0);
+    assert_eq!(
+        world.let_out(
+            PlayerId::new(1),
+            ListIndex::new(0),
+            object_id(1000),
+            Point::new(NO_POINT, NO_POINT),
+            (None, false)
+        ),
+        Ok(LetOut::Out)
+    );
+    let unit = world.object(object_id(1000)).unwrap().1;
+    assert_eq!(
+        (unit.life.inside, unit.position().ground()),
+        (None, Point::new(8.5, 11.5))
+    );
+}
+
+/// `FUN_1411e7220` on a map whose terrain the villager may stand on (0) covers only the
+/// centre's footprint (its tiles 8 to 11) but its corner tile (8, 11): the inner ring's points
+/// pass over the centre (`FUN_1411d0b20`'s `[0x58]`), so its second point, (9.5, 11.5), is
+/// free; were the centre counted, the first point (8.5, 11.5) would be kept.
+#[test]
+fn walled_in_unit_takes_the_first_free_point_inside_the_footprint() {
+    let mut world = let_out_world();
+    let size = GridSize::new(20, 20);
+    let tiles = (0..20)
+        .flat_map(|y| (0..20).map(move |x| (x, y)))
+        .map(|(x, y)| {
+            let open = (8..12).contains(&x) && (8..12).contains(&y) && (x, y) != (8, 11);
+            TileTerrain::of_save(u8::from(!open), 255, -1)
+        })
+        .collect();
+    let kind = TerrainKind {
+        shown: true,
+        flags: TerrainFlags::NONE,
+        forest: false,
+    };
+    let mut terrain = Terrain::new(
+        size,
+        tiles,
+        vec![kind; 2],
+        vec![Restriction::new(vec![1.0, 0.0])],
+    );
+    terrain.set_elevations(vec![0; 400]);
+    world.spatial.terrain = Some(terrain);
+    inside_tc(&mut world, PlayerId::new(1), 1000, VILLAGER);
+    assert_eq!(
+        world.let_out(
+            PlayerId::new(1),
+            ListIndex::new(0),
+            object_id(1000),
+            Point::new(NO_POINT, NO_POINT),
+            (None, false)
+        ),
+        Ok(LetOut::Out)
+    );
+    let unit = world.object(object_id(1000)).unwrap().1;
+    assert_eq!(unit.position().ground(), Point::new(9.5, 11.5));
+}
+
+/// `FUN_1411e7220` toward no point: the first spot (the top side's left part, at (7.5, 12.5))
+/// meets a villager 1002 (which moves off) first in its tile's list and a building 101 (which
+/// stays) after it. The villager's first candidate reports the villager and tries the next one
+/// up, (7.5, 13.0). A mule cart's spot test passes over the units in the slot's own scan
+/// (`FUN_1411c5b60`'s `[0x60]`): the building reports, the spot ends, and the mule cart takes
+/// the next spot clear of both, (8.5, 12.5).
+#[test]
+fn mule_cart_spot_ends_at_building_behind_unit() {
+    let let_out_from = |master: fn(&World) -> MasterId| {
+        let mut world = let_out_world();
+        let mule_cart = world.model.slots.master.mule_cart;
+        for masters in &mut world.model.masters {
+            let villager = masters.get(VILLAGER).cloned().unwrap();
+            *masters = Arc::new(Masters::new(masters.iter().cloned().chain([Master {
+                id: mule_cart,
+                ..villager
+            }])));
+        }
+        let made = master(&world);
+        inside_tc(&mut world, PlayerId::new(1), 1000, made);
+        let tc = *world.spatial.get(object_id(100)).unwrap();
+        let mut walker = unit(1002, VILLAGER, HitPoints::new(25.0));
+        walker.place_for_test(Position::new(7.5, 12.4, 0.0));
+        let _ = world.push_live(PlayerId::new(1), walker).unwrap();
+        world.spatial.insert(
+            object_id(1002),
+            Placed {
+                position: Position::new(7.5, 12.4, 0.0),
+                radius: Footprint::new(0.35, 0.35),
+                class: class::VILLAGER,
+                master: VILLAGER,
+                obstruction_kind: ObstructionKind::NONE,
+                obstruction: None,
+                ..tc
+            },
+        );
+        let mut building = unit(101, TC, HitPoints::new(2400.0));
+        building.place_for_test(Position::new(7.9, 12.3, 0.0));
+        let _ = world.push_live(PlayerId::new(1), building).unwrap();
+        world.spatial.insert(
+            object_id(101),
+            Placed {
+                position: Position::new(7.9, 12.3, 0.0),
+                radius: Footprint::new(0.3, 0.3),
+                ..tc
+            },
+        );
+        assert_eq!(
+            world.let_out(
+                PlayerId::new(1),
+                ListIndex::new(0),
+                object_id(1000),
+                Point::new(NO_POINT, NO_POINT),
+                (None, false)
+            ),
+            Ok(LetOut::Out)
+        );
+        world.object(object_id(1000)).unwrap().1.position().ground()
+    };
+    assert_eq!(let_out_from(|_| VILLAGER), Point::new(7.5, 13.0));
+    assert_eq!(
+        let_out_from(|world| world.model.slots.master.mule_cart),
+        Point::new(8.5, 12.5)
+    );
+}
+
+/// `FUN_1411e7220` where the search finds nothing (a centre narrower than the inner ring's
+/// margin: no point inside it): the game's 0 before anything changes, the unit with units
+/// inside too (its refusal comes with slot 0x1a8, after the spot).
+#[test]
+fn unit_without_spot_stays_inside() {
+    let mut world = walled_in_world(0.4);
+    world.players[1]
+        .objects
+        .iter_mut()
+        .find(|unit| unit.id == object_id(1000))
+        .unwrap()
+        .garrison
+        .push(object_id(1001));
+    assert_eq!(
+        world.let_out(
+            PlayerId::new(1),
+            ListIndex::new(0),
+            object_id(1000),
+            Point::new(NO_POINT, NO_POINT),
+            (None, false)
+        ),
+        Ok(LetOut::Stayed)
+    );
+    let unit = world.object(object_id(1000)).unwrap().1;
+    assert_eq!(unit.life.inside, Some(ContainerId::new(object_id(100))));
+    assert_eq!(
+        world.players[1].objects[ListIndex::new(0)].garrison,
+        [object_id(1000)]
+    );
+}
+
 /// `FUN_1411e7220` on a unit that is not inside (an effect's new unit the building could not
 /// take in, `FUN_1416136f0`): slot 0x1a8 does nothing (the building's list and volleys
 /// unchanged), slot 0x58 moves it from where it stands to a spot beside the building.

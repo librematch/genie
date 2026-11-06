@@ -25,7 +25,9 @@ use crate::pathing::zones::ZoneId;
 use crate::pathing::zones::{NO_TERRAIN, UNKNOWN_RESTRICTION};
 use crate::players::PlayerId;
 use crate::production::spawn::ZoneTest;
-use crate::production::spawn::{NOT_MOVING, Placing, Tested, WorldMap, placement};
+use crate::production::spawn::{
+    NOT_MOVING, PlacementCall, Placing, Tested, UnitScan, WorldMap, placement,
+};
 use crate::unit_ai::alert_owner;
 use crate::world::layer::ClassRoles;
 use crate::world::objects_ref::ObjectsRef;
@@ -416,8 +418,10 @@ impl World {
     /// transport at (`player_id`, `list_index`) ([`DropDraws`] on the Object stream, the place
     /// `last` across the caller's units): the first place on the map in the zone ([`in_zone`] on
     /// the transport's zone map) that is free. A place is free where the unit's master may stand
-    /// for the transport's owner (its slot 0x50, [`crate::production::spawn::placement`] with the
-    /// spawn's arguments: its arguments 9 and 12, 1 and 0 here, change nothing the slice reads) and
+    /// for the transport's owner (its slot 0x50, [`crate::production::spawn::placement`] with no
+    /// blocker reported, no object passed over and the units counted, [`PlacementCall`]; its
+    /// `[0x48]` 1, where the spawn passes 0, changes nothing: the scans' overlap needs the master's
+    /// height either way) and
     /// the unit could stand (its slot 0x278, [`crate::map::spatial::Spatial::point_clear`] by its
     /// radius and its restriction's mask).
     pub(crate) fn drop_location(
@@ -496,7 +500,11 @@ impl World {
                     &placing,
                     &map,
                     spot,
-                    ZoneTest::Skipped,
+                    PlacementCall {
+                        zones: ZoneTest::Skipped,
+                        passed: None,
+                        units: UnitScan::Counted,
+                    },
                     &self.model.roles,
                     &self.model.tuning.spawn,
                 )? == Tested::Free

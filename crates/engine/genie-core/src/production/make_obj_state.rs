@@ -20,8 +20,7 @@ pub enum MakeObjState {
     /// 6: making its unit (its start's `set_state(6)`, `FUN_140acf0a0`).
     Making = 6,
     /// 10: its unit found no spot beside the building (the spawn's `set_state(10)`,
-    /// `FUN_140ad0240`): its timer (`+0x44`) runs down from 5 s and the spawn tries again; not
-    /// modelled (the spot search fails with an error).
+    /// `FUN_140ad0240`): its timer (`+0x44`) runs down from 5 s and the spawn tries again.
     NoSpot = 10,
 }
 

@@ -13,6 +13,7 @@ use crate::map::TerrainId;
 use crate::map::Tile;
 use crate::map::TileOffset;
 use crate::map::TileRect;
+use crate::map::spatial::Placed;
 use crate::map::spatial::TileSight;
 use crate::movement::Speed;
 use crate::movement::move_to::TargetMoved;
@@ -23,6 +24,7 @@ use crate::objects::ObjectState;
 use crate::objects::SpeedMultiplier;
 use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
+use crate::objects::UpdateCode;
 use crate::objects::Voice;
 use crate::objects::facing::{SpriteFacets, angle_of_facet};
 use crate::objects::layers::Static;
@@ -46,7 +48,9 @@ use crate::players::PlayerKind;
 use crate::production::spawn::NearFlags;
 use crate::production::spawn::SiteChecks;
 use crate::production::spawn::ZoneTest;
+use crate::production::spawn::new_unit::SpawnOutcome;
 use crate::production::spawn::objects::RECYCLABLE_NEW_OBJECT;
+use crate::production::{Entry, MakeObj, MakeObjState, Making, Production, SPOT_RETRY};
 use crate::test_ids::master_id;
 use crate::test_ids::object_id;
 use crate::test_ids::player_id;
@@ -216,7 +220,7 @@ fn the_tc_spawns_its_villager_below_the_sheep_on_its_right() {
     let spawn_point = spawn_point(
         &site,
         Footprint::new(0.2, 0.2),
-        &mut |point| {
+        &mut |point, _| {
             tried.push(point);
             Ok(if point.y() > 46.9 {
                 Tested::Blocked { stays: true }
@@ -224,10 +228,11 @@ fn the_tc_spawns_its_villager_below_the_sheep_on_its_right() {
                 Tested::Free
             })
         },
+        &|_| Ok(None),
         &tuning().spawn,
     )
     .unwrap();
-    assert_eq!(spawn_point, Point::new(106.5, 46.5));
+    assert_eq!(spawn_point, Some(Point::new(106.5, 46.5)));
     assert_eq!(
         tried,
         [
@@ -425,7 +430,7 @@ fn the_sheep_blocks_the_villager_where_their_boxes_overlap() {
             &villager,
             &map,
             Point::new(x, y),
-            ZoneTest::Skipped,
+            COUNTED,
             &roles(),
             &tuning().spawn,
         )
@@ -467,7 +472,7 @@ fn the_first_object_of_tile_list_reports_the_block() {
             &villager,
             &WorldMap { turns: &world },
             Point::new(106.5, 47.5),
-            ZoneTest::Skipped,
+            COUNTED,
             &roles(),
             &tuning().spawn,
         )
@@ -475,6 +480,83 @@ fn the_first_object_of_tile_list_reports_the_block() {
     };
     assert_eq!(at(sheep(), soldier()), Tested::Blocked { stays: true });
     assert_eq!(at(soldier(), sheep()), Tested::Blocked { stays: false });
+}
+
+/// The villager the sheep tests place: radius 0.2, tall, on a map whose terrain 0 it may stand
+/// on.
+fn placed_villager(restriction: &Restriction) -> Placing<'_> {
+    Placing {
+        player: PlayerId::new(1),
+        radius: Footprint::new(0.2, 0.2),
+        tall: true,
+        class: class::VILLAGER,
+        restriction,
+        hill_mode: HillMode::ANY,
+        placement: PlacementTerrains::NONE,
+    }
+}
+
+/// The master's slot 0x50 passes over its call's object (`[0x58]`, the inner ring's building)
+/// in both scans: the sheep that blocks the villager at (106.5, 47.5) is not there.
+#[test]
+fn placement_passes_over_the_object_of_its_call() {
+    let restriction = Restriction::new(vec![1.0, 0.0]);
+    let villager = placed_villager(&restriction);
+    let world = Scene::open(GridSize::new(120, 120)).object(sheep()).build();
+    let at = |passed| {
+        placement(
+            &villager,
+            &WorldMap { turns: &world },
+            Point::new(106.5, 47.5),
+            PlacementCall { passed, ..COUNTED },
+            &roles(),
+            &tuning().spawn,
+        )
+        .unwrap()
+    };
+    assert_eq!(at(None), Tested::Blocked { stays: true });
+    assert_eq!(at(Some(object_id(9520))), Tested::Free);
+}
+
+/// A mule cart's spot (`[0x60]` 1): the slot's own scan passes over the units, so a soldier
+/// first on the tile (which `FUN_141123f80`'s scan still meets) no longer reports the block,
+/// and the house after it, which stays, does.
+#[test]
+fn placement_of_mule_cart_passes_over_the_units_in_its_own_scan() {
+    let restriction = Restriction::new(vec![1.0, 0.0]);
+    let villager = placed_villager(&restriction);
+    let soldier = Master {
+        id: master_id(4),
+        class: class::CLASS_6,
+        ..sheep_master()
+    };
+    let world = Scene::open(GridSize::new(120, 120))
+        .object(SceneObject::new(
+            9521,
+            PlayerId::GAIA,
+            soldier,
+            Position::new(106.6, 47.2, 0.0),
+        ))
+        .object(SceneObject::new(
+            500,
+            PlayerId::GAIA,
+            house_master(),
+            Position::new(106.5, 47.9, 0.0),
+        ))
+        .build();
+    let at = |units| {
+        placement(
+            &villager,
+            &WorldMap { turns: &world },
+            Point::new(106.5, 47.5),
+            PlacementCall { units, ..COUNTED },
+            &roles(),
+            &tuning().spawn,
+        )
+        .unwrap()
+    };
+    assert_eq!(at(UnitScan::Counted), Tested::Blocked { stays: false });
+    assert_eq!(at(UnitScan::Passed), Tested::Blocked { stays: true });
 }
 
 /// `FUN_140ad0240` at the forage world's town centre 700: a villager (master 83) spawns beside
@@ -522,13 +604,16 @@ fn made_villager_spawns_beside_its_town_centre_and_takes_its_queue() {
     };
     let mut game = world();
     let before = game.players[1].objects.len();
-    game.spawn(
-        PlayerId::new(1),
-        ListIndex::new(2),
-        ids::VILLAGER_MALE,
-        Amount::new(1.0),
-    )
-    .unwrap();
+    assert_eq!(
+        game.spawn(
+            PlayerId::new(1),
+            ListIndex::new(2),
+            ids::VILLAGER_MALE,
+            Amount::new(1.0),
+        )
+        .unwrap(),
+        SpawnOutcome::Made
+    );
     let player = &game.players[1];
     assert_eq!(player.objects.len(), before + 1);
     let made = player.objects.last().unwrap();
@@ -569,13 +654,16 @@ fn made_villager_spawns_beside_its_town_centre_and_takes_its_queue() {
         .unwrap()
         .building_orders
         .push(order);
-    game.spawn(
-        PlayerId::new(1),
-        ListIndex::new(2),
-        ids::VILLAGER_MALE,
-        Amount::new(1.0),
-    )
-    .unwrap();
+    assert_eq!(
+        game.spawn(
+            PlayerId::new(1),
+            ListIndex::new(2),
+            ids::VILLAGER_MALE,
+            Amount::new(1.0),
+        )
+        .unwrap(),
+        SpawnOutcome::Made
+    );
     let made = game.players[1].objects.last().unwrap();
     let queued = game
         .parts
@@ -615,13 +703,16 @@ fn made_villager_spawns_beside_its_town_centre_and_takes_its_queue() {
             target: Some(centre),
             ..queued_move()
         });
-    game.spawn(
-        PlayerId::new(1),
-        ListIndex::new(2),
-        ids::VILLAGER_MALE,
-        Amount::new(1.0),
-    )
-    .unwrap();
+    assert_eq!(
+        game.spawn(
+            PlayerId::new(1),
+            ListIndex::new(2),
+            ids::VILLAGER_MALE,
+            Amount::new(1.0),
+        )
+        .unwrap(),
+        SpawnOutcome::Made
+    );
     let made = game.players[1].objects.last().unwrap();
     let targets: Vec<_> = game
         .parts
@@ -665,6 +756,158 @@ fn made_villager_spawns_beside_its_town_centre_and_takes_its_queue() {
     );
 }
 
+/// [`forage_world`] with its town centre 700 (list index 2 of player 1) making a villager (its
+/// standing sprite a graphic of ten frames): the centre of radius 0.4 (no point inside it for
+/// the spawn search's inner ring) on a map where the villager may stand nowhere.
+fn walled_in_centre() -> World {
+    let mut world = forage_world();
+    for masters in &mut world.model.masters {
+        let masters = Arc::make_mut(masters);
+        if let Some(centre) = masters.get_mut(ids::TOWN_CENTRE) {
+            centre.radius = Footprint::new(0.4, 0.4);
+        }
+        if let Some(villager) = masters.get_mut(ids::VILLAGER_MALE) {
+            villager.standing_sprite = Some(SpriteId::named(300));
+        }
+    }
+    let _ = Arc::make_mut(&mut world.model.graphics).insert(
+        SpriteId::named(300),
+        Graphic {
+            id: SpriteId::named(300),
+            frames: Frame::of_data(10),
+            facets: FacetCount::of_data(8),
+            speed_multiplier: SpeedMultiplier::ONE,
+            frame_duration: Seconds::new(0.1),
+            replay_delay: Seconds::ZERO,
+            flags: SpriteFlags::ANIMATED,
+        },
+    );
+    set_standing(&mut world, 0.0);
+    world.players[1].attributes[attribute::IN_PRODUCTION.index()] = Amount::new(1.0);
+    let centre = world.players[1].objects[ListIndex::new(2)].id;
+    if let Some(&placed) = world.spatial.get(centre) {
+        world.spatial.insert(
+            centre,
+            Placed {
+                radius: Footprint::new(0.4, 0.4),
+                ..placed
+            },
+        );
+    }
+    let make = MakeObj {
+        state: MakeObjState::Making,
+        master: Some(ids::VILLAGER_MALE),
+        ..MakeObj::for_entry(&Entry::default())
+    };
+    world
+        .set_part(
+            centre,
+            Part::Production(Some(Box::new(Production {
+                action: Some(Making::Unit(make)),
+                ..Production::default()
+            }))),
+        )
+        .unwrap();
+    world
+}
+
+/// Every restriction of `world`'s map takes `value` on its terrain.
+fn set_standing(world: &mut World, value: f32) {
+    if let Some(terrain) = world.spatial.terrain.as_mut() {
+        for restriction in &mut terrain.restrictions {
+            *restriction = Restriction::new(vec![value]);
+        }
+    }
+}
+
+/// The make action of [`walled_in_centre`]'s town centre.
+fn centre_make(world: &World) -> MakeObj {
+    let centre = world.players[1].objects[ListIndex::new(2)].id;
+    match world
+        .parts
+        .production
+        .get(centre)
+        .and_then(|production| production.action)
+    {
+        Some(Making::Unit(make)) => make,
+        _ => panic!("the centre's make action"),
+    }
+}
+
+/// `FUN_140ad0240` where the spot search finds nothing: no unit, attribute 81 as it was.
+#[test]
+fn spawn_without_spot_makes_nothing() {
+    let mut world = walled_in_centre();
+    let before = world.players[1].objects.len();
+    assert_eq!(
+        world
+            .spawn(
+                PlayerId::new(1),
+                ListIndex::new(2),
+                ids::VILLAGER_MALE,
+                Amount::new(1.0)
+            )
+            .unwrap(),
+        SpawnOutcome::NoSpot
+    );
+    let player = &world.players[1];
+    assert_eq!(player.objects.len(), before);
+    assert_eq!(
+        player.attributes[attribute::IN_PRODUCTION.index()],
+        Amount::new(1.0)
+    );
+}
+
+/// The make action's update (`0x140ad0490`) whose unit finds no spot: `set_state(10)` with its
+/// timer at 5 s; each update takes dt off it, and at 0 the spawn tries again, which on open
+/// ground makes the villager and ends the action (state 1).
+#[test]
+fn make_action_without_spot_waits_five_seconds_and_tries_again() {
+    let mut world = walled_in_centre();
+    let before = world.players[1].objects.len();
+    let step = |world: &mut World, seconds| {
+        world
+            .update_production_action(PlayerId::new(1), ListIndex::new(2), Seconds::new(seconds))
+            .unwrap()
+    };
+    assert_eq!(step(&mut world, 0.5), UpdateCode::UnderWay);
+    let make = centre_make(&world);
+    assert_eq!((make.state, make.timer), (MakeObjState::NoSpot, SPOT_RETRY));
+    assert_eq!(step(&mut world, 2.0), UpdateCode::UnderWay);
+    assert_eq!(centre_make(&world).timer, Seconds::new(3.0));
+    set_standing(&mut world, 1.0);
+    assert_eq!(step(&mut world, 2.5), UpdateCode::UnderWay);
+    assert_eq!(world.players[1].objects.len(), before);
+    assert_eq!(step(&mut world, 0.5), UpdateCode::Done);
+    assert_eq!(centre_make(&world).state, MakeObjState::Done);
+    assert_eq!(world.players[1].objects.len(), before + 1);
+}
+
+/// A NaN timer of a make action in state 10 waits (`COMISS 0, timer`; `JC`).
+#[test]
+fn make_action_of_nan_timer_waits() {
+    let mut world = walled_in_centre();
+    set_standing(&mut world, 1.0);
+    let centre = world.players[1].objects[ListIndex::new(2)].id;
+    if let Some(Some(Making::Unit(make))) = world
+        .parts
+        .production
+        .get_mut(centre)
+        .map(|production| production.action.as_mut())
+    {
+        make.state = MakeObjState::NoSpot;
+        make.timer = Seconds::new(f32::NAN);
+    }
+    let before = world.players[1].objects.len();
+    assert_eq!(
+        world
+            .update_production_action(PlayerId::new(1), ListIndex::new(2), Seconds::new(1.0))
+            .unwrap(),
+        UpdateCode::UnderWay
+    );
+    assert_eq!(world.players[1].objects.len(), before);
+}
+
 /// A new unit's top speed (slot 65, `FUN_14114d1d0`) is the one of the sprite it holds, its
 /// standing one: its master's speed times that sprite's factor, not the master's speed with its
 /// running sprite (the deer 9655 of MarvinBlue/426048731 ran at the running speed).
@@ -691,14 +934,17 @@ fn made_unit_moves_at_the_speed_of_its_standing_sprite() {
         },
     );
     world.players[1].attributes[attribute::IN_PRODUCTION.index()] = Amount::new(1.0);
-    world
-        .spawn(
-            PlayerId::new(1),
-            ListIndex::new(2),
-            ids::VILLAGER_MALE,
-            Amount::new(1.0),
-        )
-        .unwrap();
+    assert_eq!(
+        world
+            .spawn(
+                PlayerId::new(1),
+                ListIndex::new(2),
+                ids::VILLAGER_MALE,
+                Amount::new(1.0),
+            )
+            .unwrap(),
+        SpawnOutcome::Made
+    );
     let made = world.players[1].objects.last().unwrap();
     assert_eq!(made.life.master_id, ids::VILLAGER_MALE);
     assert_eq!(
@@ -742,14 +988,17 @@ fn made_unit_takes_its_master_charge_decay_powerup_offset_and_faith() {
         world.players[1].attributes[attribute::IN_PRODUCTION.index()] = Amount::new(1.0);
         world.players[1].attributes[attribute::SALVAGE_DECAY_RATE.index()] = Amount::new(2.5);
         let now = world.world_time;
-        world
-            .spawn(
-                PlayerId::new(1),
-                ListIndex::new(2),
-                ids::VILLAGER_MALE,
-                Amount::new(1.0),
-            )
-            .unwrap();
+        assert_eq!(
+            world
+                .spawn(
+                    PlayerId::new(1),
+                    ListIndex::new(2),
+                    ids::VILLAGER_MALE,
+                    Amount::new(1.0),
+                )
+                .unwrap(),
+            SpawnOutcome::Made
+        );
         let unit = world.players[1].objects.last().unwrap();
         let combat = world.parts.combat_of(unit.id);
         (
@@ -841,14 +1090,17 @@ fn only_gather_point_of_state_1_sends_the_new_unit() {
             target_master: None,
         });
         world.set_part(at, Part::GatherPoint(gather)).unwrap();
-        world
-            .spawn(
-                PlayerId::new(1),
-                ListIndex::new(2),
-                ids::VILLAGER_MALE,
-                Amount::new(1.0),
-            )
-            .unwrap();
+        assert_eq!(
+            world
+                .spawn(
+                    PlayerId::new(1),
+                    ListIndex::new(2),
+                    ids::VILLAGER_MALE,
+                    Amount::new(1.0),
+                )
+                .unwrap(),
+            SpawnOutcome::Made
+        );
         world.players[1]
             .objects
             .last()
@@ -858,28 +1110,46 @@ fn only_gather_point_of_state_1_sends_the_new_unit() {
     assert_eq!(waits(GatherPointState::Kept), Some(0));
 }
 
-/// Every candidate of `site`'s search for a unit of radius 0.5 (a step of 0.5, no gap), all
-/// blocked by objects that stay: each spot's first candidate in turn, and the error of the
-/// later rings.
-fn all_blocked(site: &Site) -> (Vec<Point>, GenieResult<Point>) {
+/// Every point of `site`'s search for a unit of radius 0.5 (a step of 0.5, no gap) with its
+/// test, all blocked by objects that stay: each spot's first candidate in turn, then the later
+/// rings' points; no tile on the map, so none is kept.
+fn all_blocked(site: &Site) -> (Vec<(Point, SpawnTest)>, GenieResult<Option<Point>>) {
     let mut tried = Vec::new();
     let spawn_point = spawn_point(
         site,
         Footprint::new(0.5, 0.5),
-        &mut |point| {
-            tried.push(point);
+        &mut |point, spawn_test| {
+            tried.push((point, spawn_test));
             Ok(Tested::Blocked { stays: true })
         },
+        &|_| Ok(None),
         &tuning().spawn,
     );
     (tried, spawn_point)
 }
 
+/// The points of `tried` its test `spawn_test` asked about, in order.
+fn tried_by(tried: &[(Point, SpawnTest)], spawn_test: SpawnTest) -> Vec<Point> {
+    tried
+        .iter()
+        .filter(|&&(_, test)| test == spawn_test)
+        .map(|&(point, _)| point)
+        .collect()
+}
+
+/// The arguments of the spawn's placement test for a unit other than the mule cart.
+const COUNTED: PlacementCall = PlacementCall {
+    zones: ZoneTest::Skipped,
+    passed: None,
+    units: UnitScan::Counted,
+};
+
 /// `FUN_1411d12d0` without a gather point: one pass over the eight segments of an open
 /// building's frame (left 8.5, right 11.5, bottom 8.5, top 11.5): the top side's left quarter
 /// and a half more (1), the left side's top part (2), the top's right part (3), the left's
 /// lower part (4), the right side's top half (5) and lower half (6), the bottom side's left
-/// half (7) and right half (8). Then the later rings, not modelled.
+/// half (7) and right half (8). Then the later rings: the edge's eight points, then the
+/// footprint's five, each with its three neighbours; none is free, and no tile is on the map.
 #[test]
 fn spawn_search_without_gather_point_walks_the_eight_segments_once() {
     let site = Site {
@@ -935,13 +1205,23 @@ fn spawn_search_without_gather_point_walks_the_eight_segments_once() {
         &bottom,
         &bottom_right,
     ];
-    assert_eq!(tried, segments.concat());
+    assert_eq!(tried_by(&tried, SpawnTest::Spot), segments.concat());
+    let kinds: Vec<_> = tried.iter().map(|&(_, spawn_test)| spawn_test).collect();
+    let spots = segments.concat().len();
     assert_eq!(
-        point,
-        Err(GenieError::unsupported(
-            "a spawn point beyond the building's sides (the search's later rings)"
-        ))
+        kinds,
+        [
+            vec![SpawnTest::Spot; spots],
+            vec![SpawnTest::Outer; 8],
+            vec![SpawnTest::Inner; 20]
+        ]
+        .concat()
     );
+    assert_eq!(
+        tried_by(&tried, SpawnTest::Outer).first(),
+        Some(&Point::new(9.5, 11.5))
+    );
+    assert_eq!(point, Ok(None));
 }
 
 /// With a gather point away from the walled corners (top right, bottom left) the first pass
@@ -957,7 +1237,7 @@ fn second_pass_between_walled_corners_tries_the_bottom_right_corner() {
     };
     let (tried, point) = all_blocked(&site);
     assert_eq!(
-        tried,
+        tried_by(&tried, SpawnTest::Spot),
         [
             Point::new(8.5, 11.5),
             Point::new(9.0, 11.5),
@@ -971,7 +1251,7 @@ fn second_pass_between_walled_corners_tries_the_bottom_right_corner() {
             Point::new(11.5, 9.0)
         ]
     );
-    assert!(point.is_err());
+    assert_eq!(point, Ok(None));
 }
 
 /// A queued move of the centre's, which a new unit's notified walk forgets.

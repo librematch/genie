@@ -55,24 +55,26 @@ impl World {
     /// `FUN_1411e7220`: the unit `id` (any player's, with its own player's masters and orders)
     /// leaves the building at `building` of player `player` toward `point`, when a spot beside it
     /// is free ([`World::spot_beside`], toward the point, or the building's gather point when not
-    /// on itself): it takes the spot at the building's height (`FUN_14119d610`), leaves the
-    /// building (slot 0x1a8, `FUN_141213120`: the building's slot 0x1c8, `FUN_1411d6ad0` ->
-    /// `FUN_141217910`, takes its share off the volleys, back to its master's volley fire when none
-    /// is left inside or it fell below it, and lets it out of its list, `FUN_141197e10`; the
-    /// building's sight lets the circle of 5 go, slot 0x1d8 with 5) and goes on the map there (slot
-    /// 0x58: its tile's list, its obstruction record, the mesh, its sight). With a gather point
-    /// (`+0xc30` 1) not on the building and no point, it then goes to work on the gather point's
-    /// target when the world holds it (its unit AI forgets its target, `FUN_140c5e1e0`;
-    /// [`World::gather`]); else, or with a point, it moves there ([`World::gather_move`] after the
-    /// same forgetting). [`LetOut::Stayed`] when no spot is free. With neither a point nor a gather
-    /// point its unit AI stops, forgets its target and takes its stance again (slots 0xb0 and
-    /// 0x1c0). With an object to work on (`work_on`, `GO_BACK_TO_WORK`'s) its work command (slot
-    /// 0x128) goes to it at the point first. Not modelled: class 42's and livestock's counts in a
-    /// building of a player with `+0x88`, a siege building's (class 13) slot 0x1b0; not held: the
-    /// building's villager count (`+0xba8`) and raider count (`+0xc2c`, which the building's slot
-    /// 0x1c8 `FUN_1411d6ad0` lowers for a unit of type 70 whose `+0x9a0` runs: such a unit inside
-    /// is refused, [`World::garrisoned`]), its sound (slot 0x4c0), its garrison sprite. Its work
-    /// command (slot 0x128) has `+0xa14` 0: the unit AI keeps its notifies and its queued orders.
+    /// on itself; its later rings take a spot inside the building's footprint): it takes the spot
+    /// at the building's height (`FUN_14119d610`), leaves the building (slot 0x1a8,
+    /// `FUN_141213120`: the building's slot 0x1c8, `FUN_1411d6ad0` -> `FUN_141217910`, takes its
+    /// share off the volleys, back to its master's volley fire when none is left inside or it fell
+    /// below it, and lets it out of its list, `FUN_141197e10`; the building's sight lets the circle
+    /// of 5 go, slot 0x1d8 with 5) and goes on the map there (slot 0x58: its tile's list, its
+    /// obstruction record, the mesh, its sight). With a gather point (`+0xc30` 1) not on the
+    /// building and no point, it then goes to work on the gather point's target when the world
+    /// holds it (its unit AI forgets its target, `FUN_140c5e1e0`; [`World::gather`]); else, or with
+    /// a point, it moves there ([`World::gather_move`] after the same forgetting).
+    /// [`LetOut::Stayed`] when no spot is free, before anything changes. With neither a point nor a
+    /// gather point its unit AI stops, forgets its target and takes its stance again (slots 0xb0
+    /// and 0x1c0). With an object to work on (`work_on`, `GO_BACK_TO_WORK`'s) its work command
+    /// (slot 0x128) goes to it at the point first. Not modelled: class 42's and livestock's counts
+    /// in a building of a player with `+0x88`, a siege building's (class 13) slot 0x1b0; not held:
+    /// the building's villager count (`+0xba8`) and raider count (`+0xc2c`, which the building's
+    /// slot 0x1c8 `FUN_1411d6ad0` lowers for a unit of type 70 whose `+0x9a0` runs: such a unit
+    /// inside is refused, [`World::garrisoned`]), its sound (slot 0x4c0), its garrison sprite. Its
+    /// work command (slot 0x128) has `+0xa14` 0: the unit AI keeps its notifies and its queued
+    /// orders.
     pub(crate) fn let_out(
         &mut self,
         player: PlayerId,
@@ -106,8 +108,15 @@ impl World {
         };
         // the unit is any player's (an ally's too): its own player's masters and orders
         let (up, ui) = self.live_inside(id)?;
-        let unit = self.players.live(up, ui)?;
-        let made = unit.master(self.master_tables(), up)?.clone();
+        let made = self
+            .players
+            .live(up, ui)?
+            .master(self.master_tables(), up)?
+            .clone();
+        // no spot answers 0 before anything changes
+        let Some(spot) = self.spot_beside(player, building, &made, toward)? else {
+            return Ok(LetOut::Stayed);
+        };
         // The class of siege weapons, whose own place an Enter's point keeps (`FUN_140a85f30`, the
         // short `0xd`).
         if self
@@ -133,16 +142,11 @@ impl World {
                 "a class 42 or livestock unit leaving a building (its player's counts)",
             ));
         }
-        if !unit.garrison.is_empty() {
+        if !self.players.live(up, ui)?.garrison.is_empty() {
             return Err(GenieError::unsupported(
                 "a unit with units inside leaving a building",
             ));
         }
-        let Ok(spot) = self.spot_beside(player, building, &made, toward) else {
-            return Err(GenieError::unsupported(
-                "an unload whose unit finds no spot (its later rings)",
-            ));
-        };
         let z = self.players.live(player, building)?.position().z();
         let at = spot.with_height(z);
         // slot 0x1a8 (`FUN_141213120`) does its part only for a unit inside an object (`+0x2f0`):
