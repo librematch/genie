@@ -21,7 +21,8 @@ impl DatFile {
     ///
     /// # Errors
     ///
-    /// Returns an error if reading or inflating `input` fails, or if an ID is out of range.
+    /// Returns an error if reading or inflating `input` fails, if the file's version is not
+    /// `VER d.d` ([`FileVersion`]), or if an ID is out of range.
     ///
     /// Also fails if a civilization's player type is not 1, or if a name does not fit its fixed-size
     /// buffer after decoding (see [`Civilization::read_from`] and [`TechEffect::read_from`]).
@@ -30,7 +31,7 @@ impl DatFile {
 
         let mut file_version = [0u8; 8];
         input.read_exact(&mut file_version)?;
-        let file_version = FileVersion(file_version);
+        let file_version = FileVersion::try_from(file_version)?;
 
         let num_terrain_tables = input.read_u16::<LE>()?;
         let num_terrains = input.read_u16::<LE>()?;

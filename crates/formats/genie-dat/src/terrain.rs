@@ -9,7 +9,7 @@ use arrayvec::ArrayString;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
 use genie_error::{GenieResult, invalid_input};
 use genie_support::{
-    MapInto, fallible_try_from, fallible_try_into, infallible_try_into, read_le, read_list,
+    MapIntoExt, fallible_try_from, fallible_try_into, infallible_try_into, read_le, read_list,
     read_opt_u16, read_opt_u32,
 };
 use std::io::{Read, Write};

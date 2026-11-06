@@ -10,6 +10,9 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 * **(breaking)** rec: an unknown command keeps its id and bytes (`Command::Unknown`), an unknown game sub-command its fields (`GameCommand::Other`); `Error::UnsupportedCommand` and `UnsupportedGameCommand` go. `UngarrisonCommand::unit_kind_id` is an `Option<UnitKindId>`. The unread HD game settings (`HdGameOptions`, `Difficulty` and the placeholder enums) and the unused `element::ReadableElement` and `WritableElement` go. genie-rec is v0.2.0.
 * **(breaking)** cpx: `Campaign::from` is `Campaign::read_from`; `get_name(i)`, `get_filename(i)` are `scenario_name(i)`, `scenario_filename(i)`. genie-cpx is v0.6.0.
 * **(breaking)** hki: `HotkeyInfo::from(&mut R)` is `HotkeyInfo::read_from(impl Read)`; `get_string_from_lang` is `string_from_lang`. genie-hki is v0.3.0.
+* **(breaking)** drs: `DrsWriter::add` takes a `ResourceKind`, and the `IntoResourceKind` trait goes: a caller with a name parses it first (`"slp".parse()?`).
+* **(breaking)** support: `MapInto` is `MapIntoExt`, as an extension trait's name ends in `Ext` (RFC 445).
+* **(breaking)** dat: `FileVersion` parses with `TryFrom<[u8; 8]>` and `TryFrom<&str>`, which return an error for a version of more than 8 bytes or not of the form `VER d.d`; the `From` implementations, which panicked there, go. `DatFile::read_from` fails on such a version.
 * **(breaking)** The enums whose values come from the games' files (versions, kinds, ids, the hotkey catalogue, the language file kinds, the recording's ops and commands) are `#[non_exhaustive]`: a later game's value is not a breaking change. genie-lang is v0.3.0.
 * Doc examples propagate errors with `?` instead of `unwrap`.
 

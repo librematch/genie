@@ -6,7 +6,7 @@ use arrayvec::ArrayVec;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
 use genie_error::{GenieError, GenieResult, invalid_input};
 pub use genie_support::SpriteId;
-use genie_support::{MapInto, fallible_try_into, infallible_try_into, read_opt_u16};
+use genie_support::{MapIntoExt, fallible_try_into, infallible_try_into, read_opt_u16};
 use std::convert::TryFrom;
 use std::io::{Read, Write};
 

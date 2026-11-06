@@ -41,6 +41,7 @@ pub use crate::task::{Task, TaskList};
 pub use crate::tech::{Tech, TechEffect};
 use crate::tech_tree::TechTree;
 use crate::terrain::{Terrain, TerrainBorder, TerrainId, TerrainRestriction, TileSize};
+use genie_error::{GenieError, invalid_input};
 use genie_support::TechId;
 use std::cmp::{Ordering, PartialOrd};
 use std::fmt;
@@ -70,27 +71,38 @@ impl GameVersion {
     }
 }
 
-/// A data file version.
+/// A data file version: `VER d.d` and a zero byte, as the file's first 8 bytes hold it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct FileVersion([u8; 8]);
 
-impl From<[u8; 8]> for FileVersion {
-    fn from(identifier: [u8; 8]) -> Self {
-        assert!(matches!(
+/// Parse a data file version from its 8 bytes.
+impl TryFrom<[u8; 8]> for FileVersion {
+    type Error = GenieError;
+    fn try_from(identifier: [u8; 8]) -> Result<Self, Self::Error> {
+        if matches!(
             identifier,
-            // "VER *.*\0"
             [b'V', b'E', b'R', b' ', b'0'..=b'9', b'.', b'0'..=b'9', 0]
-        ));
-        Self(identifier)
+        ) {
+            Ok(Self(identifier))
+        } else {
+            Err(invalid_input("a file version not of the form VER d.d")
+                .with("version", identifier.escape_ascii()))
+        }
     }
 }
 
-impl From<&str> for FileVersion {
-    fn from(string: &str) -> Self {
-        assert!(string.len() <= 8);
+/// Parse a data file version from its text, padded with zero bytes to 8.
+impl TryFrom<&str> for FileVersion {
+    type Error = GenieError;
+    fn try_from(text: &str) -> Result<Self, Self::Error> {
         let mut bytes = [0; 8];
-        (bytes[..string.len()]).copy_from_slice(string.as_bytes());
-        Self::from(bytes)
+        bytes
+            .get_mut(..text.len())
+            .ok_or_else(|| {
+                invalid_input("a file version of more than 8 bytes").with("version", text)
+            })?
+            .copy_from_slice(text.as_bytes());
+        Self::try_from(bytes)
     }
 }
 
@@ -215,67 +227,4 @@ impl DatFile {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use genie_error::GenieResult;
-    #[cfg(test)]
-    use std::fs::read;
-    use std::{
-        collections::hash_map::DefaultHasher,
-        fs::File,
-        hash::{Hash, Hasher},
-        io::Cursor,
-    };
-
-    #[test]
-    fn aok_data_file_reads_its_14_civilizations() -> GenieResult<()> {
-        let mut file = File::open("fixtures/aok.dat")?;
-        let dat = DatFile::read_from(&mut file)?;
-        assert_eq!(dat.civilizations.len(), 14);
-        Ok(())
-    }
-
-    #[test]
-    fn aoc_data_file_reads_its_19_civilizations() -> GenieResult<()> {
-        let mut file = File::open("fixtures/aoc1.0c.dat")?;
-        let dat = DatFile::read_from(&mut file)?;
-        assert_eq!(dat.civilizations.len(), 19);
-        Ok(())
-    }
-
-    #[test]
-    fn tech_name_beyond_ascii_reads_as_its_text() -> GenieResult<()> {
-        let mut file = File::open("fixtures/age-of-chivalry.dat")?;
-        let dat = DatFile::read_from(&mut file)?;
-        assert_eq!(dat.techs[859].name(), "Székely (enable)");
-        Ok(())
-    }
-
-    #[test]
-    fn hd_edition_data_file_reads_its_32_civilizations() -> GenieResult<()> {
-        let mut file = File::open("fixtures/hd.dat")?;
-        let dat = DatFile::read_from(&mut file)?;
-        assert_eq!(dat.civilizations.len(), 32);
-        Ok(())
-    }
-
-    #[test]
-    fn aoc_data_file_written_and_read_again_holds_the_same_values() -> GenieResult<()> {
-        let original = read("fixtures/aoc1.0c.dat")?;
-        let mut cursor = Cursor::new(&original);
-        let dat = DatFile::read_from(&mut cursor)?;
-        let mut serialized = vec![];
-        dat.write_to(&mut serialized)?;
-
-        let mut cursor = Cursor::new(&serialized);
-        let dat2 = DatFile::read_from(&mut cursor)?;
-
-        let mut orig_hasher = DefaultHasher::new();
-        let mut new_hasher = DefaultHasher::new();
-        format!("{dat:?}").hash(&mut orig_hasher);
-        format!("{dat2:?}").hash(&mut new_hasher);
-        assert_eq!(orig_hasher.finish(), new_hasher.finish());
-
-        Ok(())
-    }
-}
+mod tests;

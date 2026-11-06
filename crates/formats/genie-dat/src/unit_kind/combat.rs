@@ -4,7 +4,7 @@ use crate::conv::fits;
 use crate::sprite::SpriteId;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
 use genie_error::GenieResult;
-use genie_support::{MapInto, UnitKindId, read_opt_u16};
+use genie_support::{MapIntoExt, UnitKindId, read_opt_u16};
 use std::io::{Read, Write};
 
 /// One attack or armour value: a class and the amount for it.

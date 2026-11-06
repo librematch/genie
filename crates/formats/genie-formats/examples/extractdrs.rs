@@ -199,7 +199,7 @@ fn add(args: Add) -> GenieResult<()> {
 
     for (index, path) in args.file.iter().enumerate() {
         drs_write.add(
-            args.table[index].as_str(),
+            args.table[index].parse()?,
             args.id[index],
             File::open(path)?,
         )?;

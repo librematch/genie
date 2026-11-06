@@ -1,4 +1,4 @@
-use crate::{DrsHeader, DrsResource, DrsTable, IntoResourceKind, ResourceKind};
+use crate::{DrsHeader, DrsResource, DrsTable, ResourceKind};
 use byteorder::{LE, WriteBytesExt};
 use genie_error::{GenieError, GenieResult};
 use std::fmt::{Debug, Error, Formatter};
@@ -280,8 +280,8 @@ where
 /// # fn main() -> genie_error::GenieResult<()> {
 /// let buf = Cursor::new(vec![]);
 /// let mut writer = DrsWriter::new(buf, InMemoryStrategy::default())?;
-/// writer.add("bina", 50500, "JASC-PAL\r\n0100\r\n...".as_bytes())?;
-/// writer.add("slp", 2, &b"some bytes"[..])?;
+/// writer.add("bina".parse()?, 50500, "JASC-PAL\r\n0100\r\n...".as_bytes())?;
+/// writer.add("slp".parse()?, 2, &b"some bytes"[..])?;
 /// let buf = writer.flush()?;
 /// // → a Vec<u8> containing the DRS file
 /// # Ok(()) }
@@ -333,26 +333,15 @@ where
         Ok(writer)
     }
 
-    /// Add a file to the archive.
+    /// Add a file to the archive, in the table of its resource type.
     ///
     /// # Errors
     ///
     /// Returns an error if reading `data` or writing to the output fails.
     ///
-    /// Returns an `InvalidData` error if the resource type is not 4 bytes of UTF-8 at most, if
-    /// the file is 4 GiB or larger, or, with [`ReserveDirectoryStrategy`], if more files are
-    /// added than were reserved.
-    #[inline]
+    /// Returns an `InvalidInput` error if the file is 4 GiB or larger, or, with
+    /// [`ReserveDirectoryStrategy`], if more files are added than were reserved.
     pub fn add(
-        &mut self,
-        kind: impl IntoResourceKind,
-        id: u32,
-        data: impl Read,
-    ) -> GenieResult<()> {
-        self.add_inner(kind.into_resource_kind()?, id, data)
-    }
-
-    fn add_inner(
         &mut self,
         resource_kind: ResourceKind,
         id: u32,
@@ -404,84 +393,4 @@ where
 }
 
 #[cfg(test)]
-mod test {
-    use super::*;
-    use genie_error::ErrorKind;
-    use std::io::Cursor;
-
-    /// A drs archive with a single text file containing the ASCII text "example test file".
-    ///
-    /// Copyright
-    /// Version 1.00
-    /// Password tribe
-    /// Resource types 1
-    /// First file offset 88
-    /// Table "txt", offset 76, resources 1
-    /// File 1, offset 88, size 17
-    static ONE_FILE: &[u8] = b"Copyright (c) 1997 Ensemble Studios.\x1a\x00\x00\x001.00tribe\x00\x00\x00\x00\x00\x00\x00\x01\x00\x00\x00\x58\x00\x00\x00 txt\x4C\x00\x00\x00\x01\x00\x00\x00\x01\x00\x00\x00\x58\x00\x00\x00\x11\x00\x00\x00example test file";
-
-    fn invalid(error: &GenieError) -> bool {
-        error.kind() == ErrorKind::InvalidInput
-    }
-
-    /// More files than a reserved directory holds fail to add.
-    #[test]
-    fn reserved_directory_refuses_one_file_too_many() -> GenieResult<()> {
-        let mut drs = DrsWriter::new(Cursor::new(vec![]), ReserveDirectoryStrategy::new(2, 1))?;
-        drs.add("txt", 1, &b"a"[..])?;
-        assert!(invalid(&drs.add("txt", 2, &b"b"[..]).unwrap_err()));
-        Ok(())
-    }
-
-    /// More tables than a reserved directory holds fail to close.
-    #[test]
-    fn reserved_directory_refuses_one_table_too_many() -> GenieResult<()> {
-        let mut drs = DrsWriter::new(Cursor::new(vec![]), ReserveDirectoryStrategy::new(1, 2))?;
-        drs.add("txt", 1, &b"a"[..])?;
-        drs.add("bin", 2, &b"b"[..])?;
-        assert!(invalid(&drs.flush().unwrap_err()));
-        Ok(())
-    }
-
-    /// A resource type of more than 4 bytes or of bytes that are no UTF-8 fails to add.
-    #[test]
-    fn bad_resource_kind_fails_to_add() -> GenieResult<()> {
-        let mut drs = DrsWriter::new(Cursor::new(vec![]), InMemoryStrategy::default())?;
-        assert!(invalid(&drs.add("toolong", 1, &b"a"[..]).unwrap_err()));
-        assert!(invalid(&drs.add(&[0xff_u8][..], 1, &b"a"[..]).unwrap_err()));
-        assert!(drs.add(&b"ok"[..], 1, &b"a"[..]).is_ok());
-        Ok(())
-    }
-
-    /// A resource type reads back as the text it was given, and one stored as no UTF-8 does not
-    /// read.
-    #[test]
-    fn resource_kind_reads_back_or_does_not_read() {
-        let slp = ResourceKind::try_from(*b" pls").unwrap();
-        assert_eq!(slp.to_string(), "slp");
-        assert!(ResourceKind::try_from([0xff, 0, 0, 0]).is_err());
-        let mut table = [0_u8; 12];
-        table[..4].copy_from_slice(&[0xff, 0, 0, 0]);
-        assert!(invalid(&DrsTable::from(&mut &table[..]).unwrap_err()));
-    }
-
-    #[test]
-    fn one_file_archive_writes_its_bytes_with_reserved_directory() -> GenieResult<()> {
-        let output = Cursor::new(vec![]);
-        let mut drs = DrsWriter::new(output, ReserveDirectoryStrategy::new(1, 1))?;
-        drs.add("txt", 1, &b"example test file"[..])?;
-        let output = drs.flush()?.into_inner();
-        assert_eq!(output, ONE_FILE.to_vec());
-        Ok(())
-    }
-
-    #[test]
-    fn one_file_archive_writes_its_bytes_in_memory() -> GenieResult<()> {
-        let output = Cursor::new(vec![]);
-        let mut drs = DrsWriter::new(output, InMemoryStrategy::default())?;
-        drs.add("txt", 1, &b"example test file"[..])?;
-        let output = drs.flush()?.into_inner();
-        assert_eq!(output, ONE_FILE.to_vec());
-        Ok(())
-    }
-}
+mod tests;

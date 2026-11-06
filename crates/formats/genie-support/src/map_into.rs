@@ -1,8 +1,8 @@
-/// Helper trait to map a container of `T` to a container of some type `F` that implements
-/// `From<T>`.
+/// Map a container of a value to the same container of a type that converts `From` that value:
+/// an extension of [`Option`] and [`Result`].
 ///
 /// For example, `Result<T>` to `Result<From<T>>`, or `Option<T>` to `Option<From<T>>`.
-pub trait MapInto<T> {
+pub trait MapIntoExt<T> {
     /// Map the contained `T` into a different type.
     ///
     /// Essentially, `.map_into()` is the same as doing `.map(|val| val.into())`.
@@ -10,7 +10,7 @@ pub trait MapInto<T> {
     /// **Example**
     ///
     /// ```rust
-    /// use genie_support::MapInto;
+    /// use genie_support::MapIntoExt;
     ///
     /// let small: Option<u8> = Some(10);
     /// let wide: Option<u16> = small.map_into();
@@ -19,7 +19,7 @@ pub trait MapInto<T> {
     fn map_into(self) -> T;
 }
 
-impl<Source, Target, Error> MapInto<Result<Target, Error>> for Result<Source, Error>
+impl<Source, Target, Error> MapIntoExt<Result<Target, Error>> for Result<Source, Error>
 where
     Target: From<Source>,
 {
@@ -29,7 +29,7 @@ where
     }
 }
 
-impl<Source, Target> MapInto<Option<Target>> for Option<Source>
+impl<Source, Target> MapIntoExt<Option<Target>> for Option<Source>
 where
     Target: From<Source>,
 {
@@ -38,3 +38,6 @@ where
         self.map(Into::into)
     }
 }
+
+#[cfg(test)]
+mod tests;

@@ -5,7 +5,7 @@ use byteorder::{LE, ReadBytesExt, WriteBytesExt};
 use encoding_rs::WINDOWS_1252;
 use genie_error::{GenieResult, invalid_input};
 pub use genie_support::TechId;
-use genie_support::{MapInto, StringKey, read_bytes, read_opt_u16, read_opt_u32};
+use genie_support::{MapIntoExt, StringKey, read_bytes, read_opt_u16, read_opt_u32};
 use std::io::{Read, Write};
 
 /// An effect command specifies an attribute change when a tech effect is triggered.

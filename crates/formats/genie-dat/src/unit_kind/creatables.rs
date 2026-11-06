@@ -7,7 +7,7 @@ use crate::terrain::TerrainId;
 use arrayvec::ArrayVec;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
 use genie_error::GenieResult;
-use genie_support::{MapInto, TechId, UnitKindId, read_opt_u16, read_opt_u32};
+use genie_support::{MapIntoExt, TechId, UnitKindId, read_opt_u16, read_opt_u32};
 use std::io::{Read, Write};
 
 /// Resource cost for a unit.

@@ -140,35 +140,6 @@ impl TryFrom<&str> for ResourceKind {
     }
 }
 
-/// What names a resource type for [`DrsWriter::add`]: a [`ResourceKind`] itself, or its name as
-/// a string (at most 4 bytes) or as bytes.
-pub trait IntoResourceKind {
-    /// The resource type.
-    ///
-    /// # Errors
-    ///
-    /// An `InvalidData` error for a name of more than 4 bytes or one that is not UTF-8.
-    fn into_resource_kind(self) -> GenieResult<ResourceKind>;
-}
-
-impl IntoResourceKind for ResourceKind {
-    fn into_resource_kind(self) -> GenieResult<ResourceKind> {
-        Ok(self)
-    }
-}
-
-impl IntoResourceKind for &str {
-    fn into_resource_kind(self) -> GenieResult<ResourceKind> {
-        ResourceKind::try_from(self)
-    }
-}
-
-impl IntoResourceKind for &[u8] {
-    fn into_resource_kind(self) -> GenieResult<ResourceKind> {
-        ResourceKind::try_from(self)
-    }
-}
-
 /// The DRS archive header.
 #[derive(Clone, Copy)]
 pub struct DrsHeader {
