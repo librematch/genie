@@ -6,7 +6,7 @@ use crate::combat::attack::face_target;
 use crate::combat::damage::Victim;
 use crate::gathering::gather::GatherState;
 use crate::gathering::gather::{
-    GatherAction, GatherReads, Next, SEARCH_WAIT, StopRate, waits_for_farm,
+    GATHERER_UNMOVING, GatherAction, GatherReads, Next, SEARCH_WAIT, StopRate, waits_for_farm,
 };
 use crate::gathering::hunt::asked_drop_off;
 use crate::gathering::hunt::walk_sprite;
@@ -33,10 +33,6 @@ use crate::world::layer::Roles;
 use crate::world::layer::Slots;
 use crate::world::step::Step;
 use crate::{GenieError, GenieResult};
-
-/// A gatherer without movement state, which the Gather's walks and turns need.
-pub(super) const UNMOVING: GenieError =
-    GenieError::unsupported("a gatherer without movement state");
 
 impl GatherAction {
     /// The object the gather's `MoveTo` walks to, which the update holds as `target`, the unit
@@ -221,7 +217,11 @@ impl GatherAction {
             unit,
             step.world.parts.mover_of(unit.id),
         );
-        let mover = step.world.parts.mover_mut(unit.id).ok_or(UNMOVING)?;
+        let mover = step
+            .world
+            .parts
+            .mover_mut(unit.id)
+            .ok_or(GATHERER_UNMOVING)?;
         if self.stops.several() {
             let rng = step.world.streams.get_mut(Stream::Action);
             let to = self.walk_to(target, Distance::ZERO);
@@ -285,7 +285,11 @@ impl GatherAction {
             }
         }
         let at = unit.place.position();
-        let mover = step.world.parts.mover_mut(unit.id).ok_or(UNMOVING)?;
+        let mover = step
+            .world
+            .parts
+            .mover_mut(unit.id)
+            .ok_or(GATHERER_UNMOVING)?;
         if face_target(mover, at, target.position, step.world.world_time)? == Aim::Turning {
             return Ok(Next::Stay);
         }
@@ -328,7 +332,11 @@ impl GatherAction {
                     unit,
                     step.world.parts.mover_of(unit.id),
                 );
-                let mover = step.world.parts.mover_mut(unit.id).ok_or(UNMOVING)?;
+                let mover = step
+                    .world
+                    .parts
+                    .mover_mut(unit.id)
+                    .ok_or(GATHERER_UNMOVING)?;
                 let rng = step.world.streams.get_mut(Stream::Action);
                 let to = self.walk_to(target, Distance::ZERO);
                 self.set_walk(
@@ -369,7 +377,11 @@ impl GatherAction {
             // code 3: near a target with more than 3 workers it searches (set_state 3), else it
             // waits a random while (LAB_140a8ef80)
             SubCode::Failed => {
-                let mover = step.world.parts.mover_of(unit.id).ok_or(UNMOVING)?;
+                let mover = step
+                    .world
+                    .parts
+                    .mover_of(unit.id)
+                    .ok_or(GATHERER_UNMOVING)?;
                 let me = mover.stats.radius.ground();
                 let at = unit.place.position();
                 let gap = footprint_gap_squared(at, me, target.position, target.radius);
@@ -390,7 +402,11 @@ impl GatherAction {
                     unit,
                     step.world.parts.mover_of(unit.id),
                 );
-                let mover = step.world.parts.mover_mut(unit.id).ok_or(UNMOVING)?;
+                let mover = step
+                    .world
+                    .parts
+                    .mover_mut(unit.id)
+                    .ok_or(GATHERER_UNMOVING)?;
                 self.set_walk_back(
                     Distance::ZERO,
                     mover,

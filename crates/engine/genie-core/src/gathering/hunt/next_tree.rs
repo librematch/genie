@@ -6,7 +6,7 @@ use crate::combat::attack::{arms, engagement, show_arrived};
 use crate::gathering::gather::unit::WalkSprites;
 use crate::gathering::hunt::HuntRetarget;
 use crate::gathering::hunt::TreeSearch;
-use crate::gathering::hunt::{HuntAction, Quarry};
+use crate::gathering::hunt::{HUNT_OBJECT_UNPLACED, HuntAction, Quarry};
 use crate::map::Distance;
 use crate::map::Position;
 use crate::math::fmath::sqrt;
@@ -119,7 +119,7 @@ impl Unit {
             step.world
                 .spatial
                 .get_known(id)?
-                .ok_or(GenieError::unsupported("a hunt's object without a place"))
+                .ok_or(HUNT_OBJECT_UNPLACED)
         };
         let (me_at, them) = (at(self.id)?, at(found)?);
         let speed = step.world.top_speed(step.player, self)?;

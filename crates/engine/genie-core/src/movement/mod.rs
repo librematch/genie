@@ -15,6 +15,7 @@ use self::path_points::{
     AfterRequest, Avoided, Goal, Next, Reached, cut_path, ground, ground_line, moved_far,
     point_or_zero, point_or_zero_of, short_range, split, too_short,
 };
+use crate::GenieError;
 use crate::GenieResult;
 use crate::map::Distance;
 use crate::map::Footprint;
@@ -115,6 +116,9 @@ use crate::world::layer::Roles;
 use crate::world::layer::generated::MovementTuning;
 use crate::world::objects_ref::ObjectsRef;
 pub use genie_model::movement::{Turning, turn_rate, turning};
+
+/// A walker without a place on the map, whose walk reads its player from it.
+pub(crate) const WALKER_UNPLACED: GenieError = GenieError::unsupported("a walker without a place");
 
 /// The velocity data (`+0x868`): velocity and acceleration in the unit's own frame; component 2 is
 /// along the forward vector.

@@ -5,7 +5,8 @@ use crate::gathering::DropSiteId;
 use crate::gathering::drop_sites::DropMeasure;
 use crate::gathering::drop_sites::SitePlace;
 use crate::gathering::drop_sites::SiteSearch;
-use crate::gathering::drop_sites::{Seeker, drop_site_search};
+use crate::gathering::drop_sites::{DROP_SITE_UNPLACED, Seeker, drop_site_search};
+use crate::gathering::gather::GATHERER_UNMOVING;
 use crate::gathering::gather::GatherState;
 use crate::gathering::gather::unit::WalkSprites;
 use crate::gathering::gather::{GatherAction, GatherRetarget, Walks};
@@ -28,6 +29,7 @@ use crate::objects::sprite::{Graphic, new_sprite};
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Unit;
 use crate::objects::{Graphics, WorkerCount};
+use crate::pathing::zones::NO_TERRAIN;
 use crate::pathing::zones::UNKNOWN_RESTRICTION;
 use crate::players::Amount;
 use crate::unit_ai::OrderKind;
@@ -166,7 +168,7 @@ impl Unit {
                 .world
                 .parts
                 .mover_mut(self.id)
-                .ok_or(GenieError::unsupported("a gatherer without movement state"))?;
+                .ok_or(GATHERER_UNMOVING)?;
             let walked = gather.walk_back(
                 Distance::ZERO,
                 mover,
@@ -531,7 +533,7 @@ impl Unit {
         by_id: ObjectsRef<'_>,
     ) -> GenieResult<(Option<DropSiteId>, Distance)> {
         let master = self.master_in(drop_world.masters)?;
-        let mover = mover.ok_or(GenieError::unsupported("a gatherer without movement state"))?;
+        let mover = mover.ok_or(GATHERER_UNMOVING)?;
         let mut site = carry_to;
         if site.is_none() && !master.action_part().drop_sites.is_empty() {
             let masters = drop_world.masters.table.ok_or(GenieError::unsupported(
@@ -565,7 +567,7 @@ impl Unit {
         let placed = drop_world
             .spatial
             .get_known(site)?
-            .ok_or(GenieError::unsupported("a drop site without a place"))?;
+            .ok_or(DROP_SITE_UNPLACED)?;
         Ok((
             Some(site),
             footprint_gap(self.position(), ground, placed.position, placed.radius),
@@ -619,14 +621,8 @@ impl Unit {
             "a drop-off of a player without masters",
         ))?;
         let master = self.master_in(drop_world.masters)?;
-        let mover = mover.ok_or(GenieError::unsupported("a gatherer without movement state"))?;
-        let terrain = drop_world
-            .spatial
-            .terrain
-            .as_ref()
-            .ok_or(GenieError::unsupported(
-                "the map's zones without its terrain",
-            ))?;
+        let mover = mover.ok_or(GATHERER_UNMOVING)?;
+        let terrain = drop_world.spatial.terrain.as_ref().ok_or(NO_TERRAIN)?;
         let values = terrain
             .restriction(mover.stats.restriction)
             .ok_or(UNKNOWN_RESTRICTION)?;

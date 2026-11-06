@@ -6,9 +6,9 @@ use crate::combat::damage::Victim;
 use crate::gathering::gather::GatherState;
 use crate::gathering::gather::Stand;
 use crate::gathering::gather::WalkEnd;
-use crate::gathering::gather::update::UNMOVING;
 use crate::gathering::gather::{
-    FARM_WAIT_TIME, GatherAction, GatherReads, NO_GATHER_POINT, Next, SEARCH_WAIT, Walks,
+    FARM_WAIT_TIME, GATHERER_UNMOVING, GatherAction, GatherReads, NO_GATHER_POINT, Next,
+    SEARCH_WAIT, Walks,
 };
 use crate::map::Distance;
 use crate::map::Position;
@@ -215,7 +215,11 @@ impl GatherAction {
                     unit,
                     step.world.parts.mover_of(unit.id),
                 );
-                let mover = step.world.parts.mover_mut(unit.id).ok_or(UNMOVING)?;
+                let mover = step
+                    .world
+                    .parts
+                    .mover_mut(unit.id)
+                    .ok_or(GATHERER_UNMOVING)?;
                 self.set_walk_back(
                     Distance::new(radius),
                     mover,
@@ -234,7 +238,11 @@ impl GatherAction {
             unit,
             step.world.parts.mover_of(unit.id),
         );
-        let mover = step.world.parts.mover_mut(unit.id).ok_or(UNMOVING)?;
+        let mover = step
+            .world
+            .parts
+            .mover_mut(unit.id)
+            .ok_or(GATHERER_UNMOVING)?;
         self.begin_reseed_walk(
             Distance::new(radius),
             mover,

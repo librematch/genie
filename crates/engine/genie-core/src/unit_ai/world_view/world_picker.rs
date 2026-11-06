@@ -58,10 +58,13 @@ pub(super) fn attacks(master: &Master) -> f32 {
         .fold(0.0, |sum, class_amount| sum + class_amount.amount.as_f32())
 }
 
-/// An object the unit AI found or names that the slice does not hold (another player's it does
-/// not keep).
+/// An object the unit AI or a search found or names that the slice does not hold (another
+/// player's it does not keep).
 pub(crate) const NOT_HELD: GenieError =
     GenieError::unsupported("a found object the slice does not hold");
+/// An object the unit AI found without a place on the map.
+pub(crate) const FOUND_UNPLACED: GenieError =
+    GenieError::unsupported("a found object without a place");
 
 /// What `bestUnitToAttack` reads of the world for the unit whose AI runs: the objects it found,
 /// by what the world holds of them, and the unit's quick path to them.
@@ -404,9 +407,7 @@ impl WorldPicker<'_> {
     pub(crate) fn target(&self, spatial: &Spatial, id: ObjectId) -> GenieResult<(Target, bool)> {
         let (owner, unit) = self.others.find(id).ok_or(NOT_HELD)?;
         let master = unit.master(self.every, owner)?;
-        let placed = spatial
-            .get_known(id)?
-            .ok_or(GenieError::unsupported("a found object without a place"))?;
+        let placed = spatial.get_known(id)?.ok_or(FOUND_UNPLACED)?;
         let capture = spatial
             .sight
             .as_ref()

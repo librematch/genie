@@ -2,13 +2,6 @@
 
 use genie_error::GenieError;
 
-/// A count or an id that does not fit the field it is read from or written to.
-#[must_use]
-#[track_caller]
-pub(crate) const fn out_of_range() -> GenieError {
-    GenieError::invalid_input("a value that does not fit its field")
-}
-
 /// A string that is not valid UTF-8.
 #[must_use]
 #[track_caller]

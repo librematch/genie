@@ -1,5 +1,6 @@
 //! The drop-site searches (`FUN_1411671e0`): from a unit, or from a point without one.
 
+use crate::GenieError;
 use crate::GenieResult;
 use crate::gathering::DropSiteId;
 use crate::map::Distance;
@@ -79,6 +80,10 @@ pub(crate) struct SiteSearch {
 /// The point of a search from no point (`DAT_14330ec20`): at or below it on either axis the
 /// search has no zone and goes by distance; at it on both axes the first drop site wins.
 pub(crate) const NO_POINT: f32 = DROP_NO_POINT;
+
+/// A drop site without a place on the map, which a carrier's walk to it reads.
+pub(crate) const DROP_SITE_UNPLACED: GenieError =
+    GenieError::unsupported("a drop site without a place");
 
 impl Seeker<'_, '_> {
     /// A fishing ship ([`ClassRoles::FISHING_SHIP`]) seeks in every zone and counts a drop site its path

@@ -7,6 +7,7 @@
 //! 158041: constructor `FUN_140ac2dd0`, start (slot 5) `0x140ac49b0`, update (slot 6)
 //! `0x140ac7a00`, `set_state` (slot 16) `0x140ac60e0`.
 
+use crate::GenieError;
 use crate::combat::attack::{Arms, AttackReads, Engagement};
 use crate::map::Distance;
 use crate::map::DistanceSquared;
@@ -75,6 +76,15 @@ const LEAD_WAIT: Seconds = Seconds::new(-1.0);
 const REMAINDER: Amount = Amount::new(HUNT_REMAINDER);
 /// A target's last bit adds its master's first storage amount times this (`DAT_142eb1e9c`).
 const LAST_BIT: f32 = HUNT_LAST_BIT;
+
+/// A hunter without a place on the map.
+pub(crate) const HUNTER_UNPLACED: GenieError = GenieError::unsupported("a hunter without a place");
+/// A hunt's target without a place on the map.
+pub(crate) const HUNT_TARGET_UNPLACED: GenieError =
+    GenieError::unsupported("a hunt's target without a place");
+/// The hunter or its target without a place where the hunt reads both.
+pub(crate) const HUNT_OBJECT_UNPLACED: GenieError =
+    GenieError::unsupported("a hunt's object without a place");
 
 /// The Hunt action of a gatherer (`TRIBE_Action_Hunt`, type 110).
 #[derive(Clone, Copy, Debug, PartialEq, Diff)]

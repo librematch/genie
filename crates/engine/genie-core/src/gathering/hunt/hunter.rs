@@ -9,7 +9,7 @@ use crate::gathering::gather::unit::WalkSprites;
 use crate::gathering::hunt::HuntAction;
 use crate::gathering::hunt::HuntState;
 use crate::gathering::hunt::TreeSearch;
-use crate::gathering::hunt::{DropOff, Dropped, PointWalk, PointWalker};
+use crate::gathering::hunt::{DropOff, Dropped, HUNTER_UNPLACED, PointWalk, PointWalker};
 use crate::map::Distance;
 use crate::movement::move_to::MoveTo;
 use crate::movement::{Me, footprint_gap_squared};
@@ -211,7 +211,7 @@ impl Unit {
             .world
             .spatial
             .get_known(self.id)?
-            .ok_or(GenieError::unsupported("a hunter without a place"))?;
+            .ok_or(HUNTER_UNPLACED)?;
         let (me_position, me_radius) = (me_at.position, me_at.radius);
         let site = match step.world.spatial.get_known(hunt.carry_to)? {
             Some(placed) => {

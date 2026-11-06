@@ -5,6 +5,7 @@
 
 use crate::combat::reload::reload_time;
 use crate::construction::FoundationId;
+use crate::construction::build::NOT_HELD;
 use crate::map::Distance;
 use crate::map::Point;
 use crate::math::rng::Stream;
@@ -164,7 +165,7 @@ impl UnitView<'_, '_> {
             self.step.player,
         )?
         .find(id)
-        .ok_or(GenieError::unsupported("an object the slice does not hold"))?;
+        .ok_or(NOT_HELD)?;
         let master = unit.master(self.step.world.master_tables(), owner)?;
         let me = self
             .unit

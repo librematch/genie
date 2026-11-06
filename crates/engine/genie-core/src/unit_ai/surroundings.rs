@@ -50,6 +50,10 @@ use crate::world::step::Step;
 use genie_diff::Diff;
 use std::collections::BTreeSet;
 
+/// A search's answer that picked an object without its place ([`Found`]'s `position`).
+pub(crate) const FOUND_WITHOUT_POSITION: GenieError =
+    GenieError::unsupported("a found object without its place");
+
 /// What a [`Search`] answers: the object picked, if any, and whether the lists it read hold
 /// enemies (the fifth relation list), which sets the alert mode when its query ran (`fresh`; a
 /// search that read the last answer leaves the alert mode as it is).

@@ -4,6 +4,11 @@ use crate::generated::world::{Object, Player, PlayerObjects, WorldPlayer};
 use crate::written_len;
 use genie_error::{GenieError, GenieResult};
 
+/// A player type no creator of the game's player factory handles (`WorldPlayerFactory.cpp`, the
+/// game's `InvalidPlayerType`).
+pub const UNKNOWN_PLAYER_KIND: GenieError =
+    GenieError::invalid_input("a player type the game does not have");
+
 /// Where a player section starts and ends.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct PlayerEnds {
@@ -35,10 +40,10 @@ impl<'save> PlayerSection<'save> {
     ///
     /// # Errors
     ///
-    /// A player type no creator handles (the game's `InvalidPlayerType`).
+    /// A player type no creator handles ([`UNKNOWN_PLAYER_KIND`]).
     pub fn new(start: usize, player: &'save Player) -> GenieResult<Self> {
         let (Some(world_player), Some(objects)) = (player.world_player(), player.objects()) else {
-            return Err(GenieError::invalid_input("InvalidPlayerType")
+            return Err(UNKNOWN_PLAYER_KIND
                 .with("type", player.kind)
                 .with("at", start));
         };

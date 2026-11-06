@@ -1,8 +1,10 @@
 //! State 8: a builder that carries something walks to a drop site first ([`DropSearch`]).
 
+use crate::GenieResult;
 use crate::construction::build::BuildState;
 use crate::construction::build::{BuildAction, BuildReads, DROP_WAIT, DROPPED_ORDERS};
 use crate::gathering::DropSiteId;
+use crate::gathering::drop_sites::DROP_SITE_UNPLACED;
 use crate::gathering::hunt::resource_kind;
 use crate::map::Distance;
 use crate::math::fmath::below_or_unordered;
@@ -31,7 +33,6 @@ use crate::world::lets::{release, take};
 use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlotsExt;
 use crate::world::step::Step;
-use crate::{GenieError, GenieResult};
 use std::mem::replace;
 
 /// What the drop-off's search gives `set_state(8)` ([`BuildAction::set_drop`]).
@@ -233,7 +234,7 @@ impl BuildAction {
         )?;
         let to = move_reads
             .walk_to(step.world, Some(id.id()))?
-            .ok_or(GenieError::unsupported("a drop site without a place"))?;
+            .ok_or(DROP_SITE_UNPLACED)?;
         let given = sprite.or(self.task.sprites.moving);
         self.state = BuildState::Drop {
             move_to: move_reads.to_object(

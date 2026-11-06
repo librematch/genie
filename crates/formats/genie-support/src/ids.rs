@@ -3,6 +3,13 @@ use genie_error::{GenieError, GenieResult};
 use std::convert::{TryFrom, TryInto};
 use std::fmt;
 
+/// An id that does not fit the integer it converts to or from ([`fallible_try_from`],
+/// [`fallible_try_into`]).
+pub const ID_DOES_NOT_FIT: GenieError =
+    GenieError::invalid_input("an id that does not fit the integer");
+/// A string key read from a negative number.
+const NEGATIVE_STRING_KEY: GenieError = GenieError::invalid_input("a negative string key");
+
 /// An ID identifying a unit type.
 #[derive(Debug, Hash, Default, Clone, Copy, PartialEq, Eq)]
 pub struct UnitKindId(u16);
@@ -204,7 +211,7 @@ impl TryFrom<i32> for StringKey {
     fn try_from(number: i32) -> GenieResult<Self> {
         u32::try_from(number)
             .map(Self::Num)
-            .map_err(|_| GenieError::invalid_input("a negative string key").with("key", number))
+            .map_err(|_| NEGATIVE_STRING_KEY.with("key", number))
     }
 }
 
@@ -214,7 +221,7 @@ impl TryFrom<i16> for StringKey {
     fn try_from(number: i16) -> GenieResult<Self> {
         u32::try_from(number)
             .map(Self::Num)
-            .map_err(|_| GenieError::invalid_input("a negative string key").with("key", number))
+            .map_err(|_| NEGATIVE_STRING_KEY.with("key", number))
     }
 }
 

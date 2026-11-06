@@ -13,6 +13,7 @@
 //! `FUN_1413b2d90` (always), frame reset `FUN_1413b5030`, looped (slot 12) `FUN_1413b38e0`
 //! (never).
 
+use crate::GenieError;
 use genie_model::objects::sprite::graphic;
 
 pub use self::graphic::Graphic;
@@ -39,6 +40,10 @@ use genie_diff::Diff;
 
 /// The gap below which a speed multiplier counts as none (`DAT_142eb0c60`).
 const EPSILON: f32 = SPRITE_EPSILON;
+
+/// A sprite the data file does not have.
+pub(crate) const NO_SPRITE: GenieError =
+    GenieError::unsupported("a sprite the data file does not have");
 
 /// Slot 0x68, `new_sprite` (a combat object's `FUN_141217000`, the moving object's
 /// `FUN_141158620`, the static object's `FUN_141196580`): the object shows `graphic`. The sprite it

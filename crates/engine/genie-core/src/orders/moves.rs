@@ -48,6 +48,8 @@ use crate::{GenieError, GenieResult};
 /// `FUN_140ae58a0`) a trebuchet's work order or attack command makes, neither held.
 pub(crate) const PACK_OR_UNPACK: GenieError =
     GenieError::unsupported("a Pack or Unpack of class 54 or 51 (FUN_140ad4ff0, FUN_140ae58a0)");
+/// An order's target without a place on the map.
+const ORDER_TARGET_UNPLACED: GenieError = GenieError::unsupported("a target without a place");
 
 /// `FUN_1410862c0` of the unit at `me` of master `master` against the object at `them`
 /// ([`work_reach`] of the footprint gap): within its reach, and too close.
@@ -431,7 +433,7 @@ impl World {
             let at = self
                 .spatial
                 .get_known(target)?
-                .ok_or(GenieError::unsupported("a target without a place"))?
+                .ok_or(ORDER_TARGET_UNPLACED)?
                 .position;
             order.point = order.point.with_x(at.x()).with_y(at.y());
             order.target = None;
@@ -469,7 +471,7 @@ impl World {
                         .ok_or(GenieError::unsupported("an ordered unit without a place"))?,
                     self.spatial
                         .get_known(order.target)?
-                        .ok_or(GenieError::unsupported("a target without a place"))?,
+                        .ok_or(ORDER_TARGET_UNPLACED)?,
                 );
                 Some(placed_reach(me, them, master))
             }

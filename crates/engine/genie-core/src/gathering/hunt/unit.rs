@@ -7,7 +7,9 @@ use crate::gathering::ActionEnd;
 use crate::gathering::gather::unit::WalkSprites;
 use crate::gathering::hunt::HuntChase;
 use crate::gathering::hunt::HuntState;
-use crate::gathering::hunt::{HuntAction, HuntTask, Quarry, stand_sprite};
+use crate::gathering::hunt::{
+    HUNT_TARGET_UNPLACED, HUNTER_UNPLACED, HuntAction, HuntTask, Quarry, stand_sprite,
+};
 use crate::map::Distance;
 use crate::map::spatial::{SearchQuery, Spatial};
 use crate::math::rng::Stream;
@@ -286,11 +288,11 @@ impl Unit {
             step.world
                 .spatial
                 .get_known(self.id)?
-                .ok_or(GenieError::unsupported("a hunter without a place"))?,
+                .ok_or(HUNTER_UNPLACED)?,
             step.world
                 .spatial
                 .get_known(victim.id)?
-                .ok_or(GenieError::unsupported("a hunt's target without a place"))?,
+                .ok_or(HUNT_TARGET_UNPLACED)?,
         );
         let speed = step.world.top_speed(step.player, self)?;
         let engagement = engagement(

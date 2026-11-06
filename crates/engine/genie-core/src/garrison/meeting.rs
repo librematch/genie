@@ -4,7 +4,7 @@
 use crate::garrison::ContainerId;
 use crate::garrison::EnterKind;
 use crate::garrison::transport::TRANSPORT;
-use crate::garrison::{EnterAction, EnterTarget, NO_SPEED, WalkStart};
+use crate::garrison::{ENTERING_UNPLACED, EnterAction, EnterTarget, NO_SPEED, WalkStart};
 use crate::map::Distance;
 use crate::map::GroundOffset;
 use crate::map::Point;
@@ -443,9 +443,7 @@ pub(crate) fn enter_reach(
         target_speed,
         range,
     } = reach;
-    let me = spatial
-        .get_known(id)?
-        .ok_or(GenieError::unsupported("an entering unit without a place"))?;
+    let me = spatial.get_known(id)?.ok_or(ENTERING_UNPLACED)?;
     let them = spatial.get_known(target)?.ok_or(GenieError::unsupported(
         "an Enter's building without a place",
     ))?;

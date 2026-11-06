@@ -4,6 +4,7 @@ use crate::commands::UnitOrderAction;
 use crate::construction::FoundationId;
 use crate::construction::build::BuildAction;
 use crate::construction::build::NOT_HELD;
+use crate::gathering::drop_sites::DROP_SITE_UNPLACED;
 use crate::gathering::gather::{GATHER, GatherAction};
 use crate::gathering::hunt::asked_drop_off as hunt_asked_drop_off;
 use crate::gathering::hunt::{HUNT, HuntAction};
@@ -224,7 +225,7 @@ impl World {
         // the hunt's drop site is a raw field yet
         let (site, point) = Some(site)
             .and_then(|id| self.spatial.get(id).map(|placed| (id, placed.position)))
-            .ok_or(GenieError::unsupported("a drop site without a place"))?;
+            .ok_or(DROP_SITE_UNPLACED)?;
         self.move_to_object(player, idx, site.id(), point).map(drop)
     }
 

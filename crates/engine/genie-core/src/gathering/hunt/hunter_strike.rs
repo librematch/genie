@@ -12,7 +12,9 @@ use crate::gathering::drop_sites::nearest_drop_site;
 use crate::gathering::hunt::DecayRule;
 use crate::gathering::hunt::HuntState;
 use crate::gathering::hunt::TreeSearch;
-use crate::gathering::hunt::{Herd, HuntAction, HuntNext, HuntReads, HuntSprites};
+use crate::gathering::hunt::{
+    HUNT_OBJECT_UNPLACED, Herd, HuntAction, HuntNext, HuntReads, HuntSprites,
+};
 use crate::map::Distance;
 use crate::map::DistanceSquared;
 use crate::movement::move_to::{MoveDefaults, MoveTo};
@@ -238,7 +240,7 @@ impl Unit {
             step.world
                 .spatial
                 .get_known(id)?
-                .ok_or(GenieError::unsupported("a hunt's object without a place"))
+                .ok_or(HUNT_OBJECT_UNPLACED)
         };
         let (me_at, them) = (at(Some(self.id))?, at(Some(target.id()))?);
         let speed = step.world.top_speed(step.player, self)?;

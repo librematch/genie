@@ -321,6 +321,9 @@ pub fn siege_attacks_neutral(
 
 /// `FUN_140f95e10`'s first least distance (`DAT_14330ebf4`, the largest f32).
 pub(super) const PATROL_FARTHEST: f32 = UNIT_AI_PATROL_FARTHEST;
+/// A patrol path without points: the import refuses it (`invalid_input`), and a patrol's
+/// distance behind the import has none (`unreachable`).
+pub(crate) const PATROL_WITHOUT_POINTS: &str = "a saved patrol without points";
 
 /// `FUN_14087e7c0`: the distance from `point` to the line through `start` and `end` (the cross
 /// product's length over the direction's, its squares divided before `sqrtf`, in the routine's
@@ -355,7 +358,7 @@ pub(super) fn line_distance(point: BVector, start: BVector, end: BVector) -> Dis
 /// An empty path, whose loop the game runs past its end.
 pub(crate) fn patrol_distance(points: &[BVector], point: BVector) -> GenieResult<Distance> {
     if points.is_empty() {
-        return Err(GenieError::unreachable("a saved patrol without points"));
+        return Err(GenieError::unreachable(PATROL_WITHOUT_POINTS));
     }
     let mut least = PATROL_FARTHEST;
     for pair in points.windows(2) {

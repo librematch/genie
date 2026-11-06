@@ -1,6 +1,7 @@
 //! BUILD's builders: their task, the queue and the direct path, the wait for the foundation
 //! and the build command.
 
+use crate::commands::BUILD_MASTER_LACKING;
 use crate::commands::FOUNDATION_GONE;
 use crate::construction::FoundationId;
 use crate::construction::build::{BuildAction, BuildTask};
@@ -181,9 +182,7 @@ impl World {
             .ok_or(GenieError::unsupported(
                 "BUILD tasks the builders: no master table",
             ))?;
-        let site = player_master(&self.model.masters, fp, master).ok_or(
-            GenieError::unsupported("BUILD of a master the player does not have"),
-        )?;
+        let site = player_master(&self.model.masters, fp, master).ok_or(BUILD_MASTER_LACKING)?;
         let target = TaskTarget {
             id: foundation.id(),
             master: site,

@@ -45,7 +45,7 @@ pub use layout_shapes::{
     LenString16, LenString32, LenVec32, Positioned, STRING_SIGNATURE, SigString,
 };
 pub use layout_shapes::{Unsupported, unsupported_in};
-pub use player::{PlayerEnds, PlayerSection};
+pub use player::{PlayerEnds, PlayerSection, UNKNOWN_PLAYER_KIND};
 
 use binrw::BinRead;
 use binrw::io::{Read, Seek, SeekFrom};
@@ -365,7 +365,7 @@ mod tests {
             },
         }];
         let error = parse(&bytes(&header)).unwrap_err();
-        assert_eq!(error, GenieError::invalid_input("InvalidPlayerType"));
+        assert_eq!(error, UNKNOWN_PLAYER_KIND);
         assert_eq!(error.context().next(), Some(("type", "4")));
     }
 

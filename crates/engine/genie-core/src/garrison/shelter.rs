@@ -45,6 +45,9 @@ const NO_COUNT: GenieError = GenieError::unreachable("a shelter without a count"
 const NO_LISTED_BUILDING: GenieError =
     GenieError::unreachable("a taken building outside the shelter list");
 
+/// A garrison's building the world no longer holds.
+const BUILDING_GONE: GenieError = GenieError::unsupported("a garrison's building is gone");
+
 /// The shelters `FUN_141621220` sends units to: the buildings (its `param_3`), the transports
 /// (`param_4`), and the count list (`param_5`) its pairs index by their shelter's index, a
 /// transport's after the buildings. Its callers push the counts in their own order (the
@@ -302,9 +305,7 @@ impl World {
         let mut pairs = Vec::new();
         let mut capacities = Vec::with_capacity(all.len());
         for &building in &all {
-            let (bp, unit) = self
-                .object(building)
-                .ok_or(GenieError::unsupported("a garrison's building is gone"))?;
+            let (bp, unit) = self.object(building).ok_or(BUILDING_GONE)?;
             let bm = unit.master(self.master_tables(), bp)?;
             capacities.push((bm.kind == MasterKind::BUILDING, bm.garrison, bm.class));
         }
@@ -394,9 +395,7 @@ impl World {
         going: &[ObjectId],
         dispatch: Dispatch,
     ) -> GenieResult<()> {
-        let (bp, shelter) = self
-            .object(building)
-            .ok_or(GenieError::unsupported("a garrison's building is gone"))?;
+        let (bp, shelter) = self.object(building).ok_or(BUILDING_GONE)?;
         // the splitter tests a unit with a unit AI only
         let keeps = |id: ObjectId| -> GenieResult<bool> {
             let (player_id, unit) = self.object(id).ok_or_else(|| object_gone(id))?;

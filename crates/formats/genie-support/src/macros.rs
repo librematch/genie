@@ -53,10 +53,8 @@ macro_rules! fallible_try_into {
             #[inline]
             fn try_from(id: $from) -> ::genie_error::GenieResult<Self> {
                 use ::std::convert::TryInto;
-                id.0.try_into().map_err(|_| {
-                    ::genie_error::GenieError::invalid_input("an id that does not fit the integer")
-                        .with("id", id.0)
-                })
+                id.0.try_into()
+                    .map_err(|_| $crate::ID_DOES_NOT_FIT.with("id", id.0))
             }
         }
     };
@@ -87,10 +85,9 @@ macro_rules! fallible_try_from {
             #[inline]
             fn try_from(id: $from) -> ::genie_error::GenieResult<Self> {
                 use ::std::convert::TryInto;
-                id.try_into().map(Self).map_err(|_| {
-                    ::genie_error::GenieError::invalid_input("an id that does not fit the integer")
-                        .with("id", id)
-                })
+                id.try_into()
+                    .map(Self)
+                    .map_err(|_| $crate::ID_DOES_NOT_FIT.with("id", id))
             }
         }
     };

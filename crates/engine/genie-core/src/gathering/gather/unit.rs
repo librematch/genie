@@ -9,7 +9,8 @@ use crate::gathering::GatherTargetId;
 use crate::gathering::drop_sites::SitePlace;
 use crate::gathering::gather::Walks;
 use crate::gathering::gather::{
-    FARM_FOOD_SOLD, GatherAction, GatherReads, GatherState, Next, productivity_of,
+    FARM_FOOD_SOLD, GATHERER_UNMOVING, GatherAction, GatherReads, GatherState, Next,
+    productivity_of,
 };
 use crate::gathering::hunt::DropOff;
 use crate::gathering::hunt::Dropped;
@@ -374,7 +375,7 @@ impl Unit {
             .world
             .parts
             .mover_mut(self.id)
-            .ok_or(GenieError::unsupported("a gatherer without movement state"))?;
+            .ok_or(GATHERER_UNMOVING)?;
         let rng = step.world.streams.get_mut(Stream::Action);
         let to = WalkTo {
             id: gather.target.map(GatherTargetId::id),

@@ -17,7 +17,7 @@ use crate::objects::masters::PlayersMastersExt;
 use crate::objects::masters::{MasterTables, OwnerMasters};
 use crate::objects::unit::Unit;
 use crate::objects::{ObjectState, WorkerCount};
-use crate::pathing::zones::{UNKNOWN_RESTRICTION, Zones};
+use crate::pathing::zones::{NO_TERRAIN, UNKNOWN_RESTRICTION, Zones};
 use crate::players::PlayerId;
 use crate::unit_ai::world_view::owner_view;
 use crate::unit_ai::world_view::{Foreign, UnitView};
@@ -134,33 +134,30 @@ pub(crate) fn closest_resource_of(
                 "a resource search's drop site the slice does not hold",
             ))?;
             let master = searcher.master(resource_world.every, sp)?;
-            let footprint =
-                roles
-                    .of_master(master.id)
-                    .contains(MasterRoles::SEARCH_FROM_FOOTPRINT)
-                    || {
-                        let restriction = mover
-                            .ok_or(GenieError::unsupported(
-                                "a resource search without movement state",
-                            ))?
-                            .stats
-                            .restriction;
-                        let terrain = resource_world.spatial.terrain.as_ref().ok_or(
-                            GenieError::unsupported("the map's zones without its terrain"),
-                        )?;
-                        let values = terrain
-                            .restriction(restriction)
-                            .ok_or(UNKNOWN_RESTRICTION)?;
-                        let zones = resource_world.zones.of(
-                            resource_world.spatial.map,
-                            &terrain.kinds,
-                            values,
-                        )?;
-                        let zone = |position: Position| {
-                            zones.zone(Tile::new(position.x() as i32, position.y() as i32))
-                        };
-                        zone(searcher.position()) == zone(unit.position())
+            let footprint = roles
+                .of_master(master.id)
+                .contains(MasterRoles::SEARCH_FROM_FOOTPRINT)
+                || {
+                    let restriction = mover
+                        .ok_or(GenieError::unsupported(
+                            "a resource search without movement state",
+                        ))?
+                        .stats
+                        .restriction;
+                    let terrain = resource_world.spatial.terrain.as_ref().ok_or(NO_TERRAIN)?;
+                    let values = terrain
+                        .restriction(restriction)
+                        .ok_or(UNKNOWN_RESTRICTION)?;
+                    let zones = resource_world.zones.of(
+                        resource_world.spatial.map,
+                        &terrain.kinds,
+                        values,
+                    )?;
+                    let zone = |position: Position| {
+                        zones.zone(Tile::new(position.x() as i32, position.y() as i32))
                     };
+                    zone(searcher.position()) == zone(unit.position())
+                };
             Some(gather_search::SearchSite {
                 position: searcher.position(),
                 radius: master.radius,

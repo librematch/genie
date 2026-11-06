@@ -2,13 +2,12 @@
 //! `UserPatch`'s AI commands.
 
 use crate::actions::{Location2, ObjectsList};
-use crate::errors::out_of_range;
 use crate::{ObjectId, PlayerId};
 use crate::{fits, opt_fits};
 use arrayvec::ArrayVec;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
 use genie_error::{GenieError, GenieResult};
-use genie_support::{ReadSkipExt, read_opt_u32};
+use genie_support::{FIELD_DOES_NOT_FIT, ReadSkipExt, read_opt_u32};
 use std::io::{Read, Write};
 
 /// A player resigns or drops from the game.
@@ -242,7 +241,7 @@ impl PatrolCommand {
         let selected_count = input.read_i8()?;
         let waypoint_count = input.read_u8()?;
         if usize::from(waypoint_count) > command.waypoints.capacity() {
-            return Err(out_of_range().with("waypoints", waypoint_count));
+            return Err(FIELD_DOES_NOT_FIT.with("waypoints", waypoint_count));
         }
         let _padding = input.read_u8()?;
         let mut raw_waypoints = [(0.0, 0.0); 10];
@@ -365,7 +364,7 @@ impl UserPatchAiCommand {
     /// Also fails if `size` is below 4, or if it leaves room for more than 3 parameters (20 or
     /// more).
     pub fn read_from(mut input: impl Read, size: u32) -> GenieResult<Self> {
-        let num_params = size.checked_sub(4).ok_or(out_of_range())? / 4;
+        let num_params = size.checked_sub(4).ok_or(FIELD_DOES_NOT_FIT)? / 4;
         if 4 <= num_params {
             return Err(GenieError::invalid_input(
                 "a user patch AI command with more than 3 parameters",

@@ -55,12 +55,14 @@ mod test_support;
 
 use crate::actions::{Action, Meta};
 use crate::element::ReadHeader;
-use crate::errors::{early_sync, missing_sync, out_of_range, unknown_action};
+use crate::errors::{early_sync, missing_sync, unknown_action};
 use crate::reader::{RecordingHeaderReader, SmallBufReader};
 use byteorder::{LE, ReadBytesExt};
 use flate2::bufread::DeflateDecoder;
 use genie_error::GenieResult;
-use genie_support::{fallible_try_from, fallible_try_into, infallible_try_into};
+use genie_support::{
+    FIELD_DOES_NOT_FIT, fallible_try_from, fallible_try_into, infallible_try_into,
+};
 pub use header::Header;
 use std::fmt::Debug;
 use std::io::{self, BufRead, BufReader, Read, Seek, SeekFrom};
@@ -135,7 +137,7 @@ fallible_try_into!(ObjectId, i32);
 ///
 /// Invalid input when it does not fit.
 pub(crate) fn fits<T, U: TryInto<T>>(value: U) -> GenieResult<T> {
-    value.try_into().map_err(|_| out_of_range())
+    value.try_into().map_err(|_| FIELD_DOES_NOT_FIT)
 }
 
 /// The tiles of a map `width` by `height`.

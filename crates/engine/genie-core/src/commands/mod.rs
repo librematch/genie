@@ -271,6 +271,9 @@ const ONE_UNIT_AGE: f32 = TURN_ONE_UNIT_AGE;
 /// A build order on a foundation the world no longer holds.
 pub(crate) const FOUNDATION_GONE: GenieError =
     GenieError::unsupported("a build order on a foundation that is gone");
+/// A BUILD command of a master its player's table does not hold.
+pub(crate) const BUILD_MASTER_LACKING: GenieError =
+    GenieError::unsupported("BUILD of a master the player does not have");
 
 /// The units a human player's command names at most (`FUN_140e6b290`'s `0x3c`).
 const HUMAN_UNITS: usize = 60;

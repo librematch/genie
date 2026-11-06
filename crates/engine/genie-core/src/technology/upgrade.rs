@@ -6,6 +6,7 @@
 
 mod damage;
 
+use crate::GenieResult;
 use crate::combat::Charge;
 use crate::gathering::gather::unit::give_load;
 use crate::math::rng::Stream;
@@ -18,6 +19,7 @@ use crate::objects::masters::HpPercent;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::player_master;
+use crate::objects::sprite::NO_SPRITE;
 use crate::objects::sprite::new_sprite;
 use crate::objects::task_change::{Looks, take_tasks};
 use crate::objects::unit::Unit;
@@ -38,13 +40,10 @@ use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
 use crate::world::parts::Part;
 use crate::world::slots::PlayerSlotsExt;
-use crate::{GenieError, GenieResult};
 use std::mem::take;
 
 /// A master's hit points this near 0 give no share (`ABS(x) <= 1.1920929e-07`).
 const NO_HIT_POINTS: f32 = f32::EPSILON;
-/// A sprite the data file does not have.
-const NO_SPRITE: GenieError = GenieError::unsupported("a sprite the data file does not have");
 
 /// Slot 0xa8 (`FUN_141201670` for a combat object and a building; the base's `FUN_14106a520`
 /// answers 1): whether an object of a master of type `kind` in state `state` takes an upgrade

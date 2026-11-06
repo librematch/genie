@@ -20,6 +20,7 @@ use crate::objects::SpeedMultiplier;
 use crate::objects::SpriteId;
 use crate::objects::layers::Animated;
 use crate::objects::layers::{Speedup, SpeedupValue};
+use crate::objects::sprite::NO_SPRITE;
 use crate::players::CivId;
 use crate::world::Seconds;
 use crate::world::WorldTime;
@@ -180,9 +181,7 @@ pub fn mover(
     } else {
         SpriteId::of_data(rge_static_object.sprite)
             .and_then(|sprite| table.sprite_speed(sprite))
-            .ok_or(GenieError::unsupported(
-                "a sprite the data file does not have",
-            ))?
+            .ok_or(NO_SPRITE)?
     };
     let speed = factor.applied_to(Speed::new(base));
     let turning = dat_id(objects, rge_static_object.master_obj)

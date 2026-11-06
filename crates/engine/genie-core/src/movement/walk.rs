@@ -14,7 +14,7 @@ use crate::movement::LevelFlags;
 use crate::movement::LevelsExt;
 use crate::movement::PathState;
 use crate::movement::Speed;
-use crate::movement::{EPSILON, Me, Motion, Mover, Next, UP, Velocity};
+use crate::movement::{EPSILON, Me, Motion, Mover, Next, UP, Velocity, WALKER_UNPLACED};
 use crate::objects::ObjectKey;
 use crate::objects::facing::{SpriteFacets, angle_of_facet, facet_of_forward};
 use crate::players::PlayerId;
@@ -57,10 +57,7 @@ impl Mover {
     ) -> GenieResult<Next> {
         let movement_tuning = &by_id.tuning().movement;
         let level = self.paths.walked()?;
-        let player = world
-            .get(me.id)
-            .ok_or(GenieError::unsupported("a walker without a place"))?
-            .player;
+        let player = world.get(me.id).ok_or(WALKER_UNPLACED)?.player;
         for &hit in hits {
             let Some(id) = by_id
                 .annex_of(hit)

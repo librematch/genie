@@ -67,7 +67,6 @@ pub use self::attack_pick::{
     AttackAsk, AttackChecks, AttackTargetFlags, Attacker, Memory, Pick, Search, Seeker, Target,
     can_attack, soldier_can_attack, tower_can_attack,
 };
-pub(crate) use self::attack_rules::patrol_distance;
 pub use self::attack_rules::{
     Attacked, Convertee, Converter, TargetRules, attack_sight, attacks_neutral, can_convert,
     kind_attacks_neutral, priest_attacks_neutral, siege_attacks_neutral, siege_can_attack,
@@ -75,6 +74,7 @@ pub use self::attack_rules::{
 };
 #[cfg(test)]
 use self::attack_rules::{PATROL_FARTHEST, line_distance};
+pub(crate) use self::attack_rules::{PATROL_WITHOUT_POINTS, patrol_distance};
 use self::attack_rules::{
     back_up, civilian_may_attack, computer_idle_check, defend_patrol_range, lion_may_attack,
 };
@@ -120,6 +120,7 @@ pub use self::side::{
     UnitCommand,
 };
 pub use self::stop_order::StopOrder;
+pub(crate) use self::surroundings::FOUND_WITHOUT_POSITION;
 pub use self::surroundings::{
     AiMove, Duel, Found, GroupState, Home, OrderForce, Pace, Seen, SurroundingFlags, Surroundings,
     TopTarget, UnitSeen, flood_search,

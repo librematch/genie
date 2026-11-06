@@ -15,7 +15,7 @@ use crate::movement::{Me, Mover, Planning};
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterTables;
 use crate::objects::unit::Unit;
-use crate::pathing::zones::{UNKNOWN_RESTRICTION, ZoneId, ZoneMap};
+use crate::pathing::zones::{NO_TERRAIN, UNKNOWN_RESTRICTION, ZoneId, ZoneMap};
 use crate::players::PlayerId;
 use crate::players::PlayerKind;
 use crate::world::World;
@@ -73,13 +73,7 @@ impl<'world> ScoutArea<'world> {
                 "an auto scout without movement state",
             ))?;
         let map = world.spatial.map;
-        let terrain = world
-            .spatial
-            .terrain
-            .as_ref()
-            .ok_or(GenieError::unsupported(
-                "the map's zones without its terrain",
-            ))?;
+        let terrain = world.spatial.terrain.as_ref().ok_or(NO_TERRAIN)?;
         let values = terrain
             .restriction(mover.stats.restriction)
             .ok_or(UNKNOWN_RESTRICTION)?;

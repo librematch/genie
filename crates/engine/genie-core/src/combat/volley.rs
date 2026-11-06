@@ -39,6 +39,12 @@ use crate::world::layer::generated::TurnTuning;
 use crate::world::step::Step;
 use crate::{GenieError, GenieResult};
 
+/// A ranged unit without movement state, whose facing its shot reads.
+const RANGED_UNMOVING: GenieError = GenieError::unsupported("a ranged unit that does not move");
+/// A shot's missile of a master its player's table does not hold.
+pub(crate) const MISSILE_MASTER_LACKING: GenieError =
+    GenieError::unsupported("a missile its player's masters do not have");
+
 mod launch;
 
 impl Unit {
@@ -285,7 +291,7 @@ impl Unit {
             .parts
             .mover_of(self.id)
             .map(|mover| mover.angle)
-            .ok_or(GenieError::unsupported("a ranged unit that does not move"))?;
+            .ok_or(RANGED_UNMOVING)?;
         let shot = Shot {
             made: master
                 .combat_part()
@@ -370,7 +376,7 @@ impl Unit {
             .parts
             .mover_of(self.id)
             .map(|mover| mover.angle)
-            .ok_or(GenieError::unsupported("a ranged unit that does not move"))?;
+            .ok_or(RANGED_UNMOVING)?;
         let building = roles.of_class(master.class).contains(ClassRoles::BUILDING);
         let at = volley_spawn_point(
             self.position(),
@@ -391,9 +397,7 @@ impl Unit {
                 .missile
                 .master()
                 .and_then(|master_id| masters.get(master_id))
-                .ok_or(GenieError::unsupported(
-                    "a missile its player's masters do not have",
-                ))?,
+                .ok_or(MISSILE_MASTER_LACKING)?,
             None => {
                 return Err(GenieError::unsupported(
                     "a volley's extra missile of a master without a missile",

@@ -30,7 +30,8 @@ use std::mem::take;
 
 use crate::combat::attack::{Hit, strike};
 use crate::combat::missile::{
-    HitMode, Missile, MissileAction, MissileStats, MissileTargetId, grounded, meets_height,
+    HitMode, MISSILE_UNMOVING, Missile, MissileAction, MissileStats, MissileTargetId, grounded,
+    meets_height,
 };
 use crate::objects::layers::Action;
 use crate::world::World;
@@ -172,7 +173,7 @@ impl Unit {
             .world
             .parts
             .mover_mut(self.id)
-            .ok_or(GenieError::unsupported("a missile without its moving part"))?;
+            .ok_or(MISSILE_UNMOVING)?;
         // a missile's slot 0x208 is RGE's (FUN_14114d1d0)
         let top = mover.own_speed();
         let mut at = mover.set_position(

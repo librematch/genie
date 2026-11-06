@@ -70,6 +70,9 @@ pub(crate) const INSIDE_SIGHT: SightTiles = SightTiles::new(5);
 const ENTER_SLEEPING: GenieError = GenieError::unsupported("an enter into a sleeping object");
 /// An enter without its owner's masters.
 pub(crate) const NO_MASTERS: GenieError = GenieError::unsupported("an enter without the masters");
+/// An entering unit without a place on the map.
+pub(crate) const ENTERING_UNPLACED: GenieError =
+    GenieError::unsupported("an entering unit without a place");
 
 /// The ids a command's check reads (`FUN_140e558b0`): a human player's first 60, a computer
 /// player's first 500.

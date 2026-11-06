@@ -20,6 +20,7 @@ use crate::players::Amount;
 use crate::players::attribute::AttributeId;
 use crate::unit_ai::AlertMode;
 use crate::unit_ai::OrderPriority;
+use crate::unit_ai::PATROL_WITHOUT_POINTS;
 use crate::unit_ai::best_target::AttackCategory;
 use crate::unit_ai::{AiAction, OrderKind};
 use crate::unit_ai::{
@@ -186,7 +187,7 @@ fn patrol_path(ai: &UnitAiModule) -> GenieResult<Option<PatrolPath>> {
         return Ok(None);
     };
     if path.waypoints.is_empty() {
-        return Err(GenieError::invalid_input("a saved patrol without points"));
+        return Err(GenieError::invalid_input(PATROL_WITHOUT_POINTS));
     }
     Ok(Some(PatrolPath {
         path: Path {

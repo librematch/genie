@@ -28,8 +28,8 @@ mod world_picker;
 
 pub(crate) use self::commands::{town_centre, town_centre_unit};
 pub(crate) use self::unit_view::Helper;
-pub(crate) use self::world_picker::NOT_HELD;
 use self::world_picker::attacks;
+pub(crate) use self::world_picker::{FOUND_UNPLACED, NOT_HELD};
 pub(crate) use self::world_picker::{WorldPicker, patrol_information};
 use crate::construction::FoundationId;
 use crate::groups::UnitGroups;

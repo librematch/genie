@@ -12,6 +12,8 @@ const UNDECODED_STRING: GenieError =
     GenieError::invalid_input("a campaign string that does not decode");
 /// A campaign or a scenario without its name.
 const NO_NAME: GenieError = GenieError::invalid_input("a campaign or scenario without a name");
+/// A scenario, by name or by index, that the campaign does not hold.
+const NO_SCENARIO: GenieError = GenieError::missing_data("a scenario the campaign does not hold");
 
 /// Decode a string with unknown encoding.
 fn decode_str(bytes: &[u8]) -> GenieResult<String> {
@@ -254,10 +256,9 @@ where
     ///
     /// Returns an error if no scenario has that file name, or if reading fails.
     pub fn by_name_raw(&mut self, filename: &str) -> GenieResult<Vec<u8>> {
-        let index = self.index_of(filename).ok_or_else(|| {
-            GenieError::missing_data("a scenario the campaign does not hold")
-                .with("scenario", filename)
-        })?;
+        let index = self
+            .index_of(filename)
+            .ok_or_else(|| NO_SCENARIO.with("scenario", filename))?;
         self.by_index_raw(index)
     }
 
@@ -270,10 +271,7 @@ where
     /// Returns an error if the index is out of range, or if seeking or reading fails.
     pub fn by_index_raw(&mut self, index: usize) -> GenieResult<Vec<u8>> {
         let Some(entry) = self.entries.get(index) else {
-            return Err(
-                GenieError::missing_data("a scenario the campaign does not hold")
-                    .with("index", index),
-            );
+            return Err(NO_SCENARIO.with("index", index));
         };
 
         let mut result = vec![];

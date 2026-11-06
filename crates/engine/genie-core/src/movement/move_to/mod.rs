@@ -308,10 +308,7 @@ pub fn ask_walk(
     let sprite_tuning = walk.by_id.tuning().sprite;
     let (point, target, radius) = match goal {
         Goal::Target(id) => {
-            let placed = walk
-                .world
-                .get_known(id)?
-                .ok_or(GenieError::unsupported("a MoveTo whose target is gone"))?;
+            let placed = walk.world.get_known(id)?.ok_or(TARGET_GONE)?;
             (placed.position, Some(id), placed.radius)
         }
         Goal::Point(position) => (position, None, Footprint::ZERO),
@@ -339,6 +336,9 @@ pub fn ask_walk(
     // the MoveTo's point (`+0x38`): the target's place when it asks for the path
     Ok((walk_or_give_up(walk.reborrow())?, Some(point)))
 }
+
+/// A `MoveTo` to an object the world no longer places.
+const TARGET_GONE: GenieError = GenieError::unsupported("a MoveTo whose target is gone");
 
 /// A `MoveTo`'s sprite outside the sprites' table.
 const SPRITE_LACKING: GenieError =
@@ -538,10 +538,7 @@ pub fn target_left(
     if mode == TargetMoved::Ignores {
         return Ok(Follow::Stays);
     }
-    let placed = walk
-        .world
-        .get_known(target)?
-        .ok_or(GenieError::unsupported("a MoveTo whose target is gone"))?;
+    let placed = walk.world.get_known(target)?.ok_or(TARGET_GONE)?;
     let at = placed.position;
     let (dx, dy) = (point.x() - at.x(), point.y() - at.y());
     if !(dx < move_to_tuning.off_low

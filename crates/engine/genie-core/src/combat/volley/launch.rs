@@ -1,5 +1,6 @@
 //! A unit's missile launch: the missile's making and start, which its fire and its volley share.
 
+use crate::combat::volley::MISSILE_MASTER_LACKING;
 use crate::objects::layers::Speedup;
 
 use crate::combat::missile::AimAt;
@@ -72,9 +73,8 @@ impl Unit {
         shot: &Shot,
         roles: &Roles,
     ) -> GenieResult<()> {
-        let made = player_master(&step.world.model.masters, step.player, shot.made).ok_or(
-            GenieError::unsupported("a missile its player's masters do not have"),
-        )?;
+        let made = player_master(&step.world.model.masters, step.player, shot.made)
+            .ok_or(MISSILE_MASTER_LACKING)?;
         let stats = made.missile_stats().ok_or(GenieError::unsupported(
             "a missile master without its flight",
         ))?;

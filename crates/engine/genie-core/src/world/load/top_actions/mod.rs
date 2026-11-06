@@ -29,7 +29,8 @@ mod gathering;
 
 use crate::combat::attack::ATTACK;
 use crate::combat::missile::{
-    HitMode, MISSILE, MissileAction, MissileState, MissileTargetId, Origin, StrikeResult,
+    HitMode, MISSILE, MISSILE_UNMOVING, MissileAction, MissileState, MissileTargetId, Origin,
+    StrikeResult,
 };
 use crate::construction::build::BuildState;
 use crate::construction::repair::{REPAIR, RepairAction, RepairState, RepairTask};
@@ -337,7 +338,7 @@ fn import_missile(saved: &Saved<'_>, actions: &mut layers::Action) -> GenieResul
         ));
     }
     if object.moving_part().is_none() {
-        return Err(GenieError::unsupported("a missile without its moving part"));
+        return Err(MISSILE_UNMOVING);
     }
     // the hit mode copies the master's (`+0x80`, a miss's 1 is not saved)
     let hit_mode = saved

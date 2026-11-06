@@ -4,6 +4,10 @@ use std::convert::{TryFrom, TryInto};
 use std::error::Error as StdError;
 use std::io::{self, Read};
 
+/// A count or an id that does not fit the width its field has in the file.
+pub const FIELD_DOES_NOT_FIT: GenieError =
+    GenieError::invalid_input("a value that does not fit its field");
+
 /// An optional value that does not fit its type.
 #[track_caller]
 fn not_fitting(value: u32, error: impl StdError + Send + Sync + 'static) -> GenieError {

@@ -3,6 +3,7 @@
 use crate::combat::attack::{Arms, Engagement};
 use crate::combat::attack::{arms as attack_arms, engagement as attack_engagement};
 use crate::construction::MainBuildingId;
+use crate::gathering::gather::GATHERER_UNMOVING;
 use crate::gathering::gather::unit::WalkSprites;
 use crate::gathering::gather::{
     GatherAction, GatherState, MoveTarget, Resource, StopRate, productivity_of,
@@ -475,10 +476,7 @@ impl World {
             },
             &self.model.roles,
         )?;
-        let mover = self
-            .parts
-            .mover_mut(unit.id)
-            .ok_or(GenieError::unsupported("a gatherer without movement state"))?;
+        let mover = self.parts.mover_mut(unit.id).ok_or(GATHERER_UNMOVING)?;
         let mut held = unit.life.held();
         let rng = self.streams.get_mut(Stream::Action);
         gather.start(

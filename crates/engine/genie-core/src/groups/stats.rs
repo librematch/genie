@@ -37,6 +37,8 @@ use crate::{GenieError, GenieResult};
 
 /// The objects of the members' searches a group keeps at most (`FUN_140c65c60`'s `0x46`).
 const MOST_OBJECTS: usize = 70;
+/// A group's member without a unit AI, whose stats the group reads.
+const MEMBER_WITHOUT_AI: GenieError = GenieError::unsupported("a group member without a unit AI");
 
 /// The members' views in the members' order, each with the index the member has then.
 type MemberViews = Vec<(usize, MemberView)>;
@@ -197,11 +199,7 @@ impl World {
             };
             let master = object.master(self.master_tables(), player_id)?;
             let unit = FormationUnit::of(master, &self.model.tuning.group);
-            let ai = self
-                .parts
-                .unit_ai
-                .get(object.id)
-                .ok_or(GenieError::unsupported("a group member without a unit AI"))?;
+            let ai = self.parts.unit_ai.get(object.id).ok_or(MEMBER_WITHOUT_AI)?;
             let view = MemberView {
                 id,
                 unit,
@@ -312,11 +310,7 @@ impl World {
         let (player_id, held) = self.object(id).ok_or(GenieError::unsupported(
             "a group member's search for a unit not held",
         ))?;
-        let ai = self
-            .parts
-            .unit_ai
-            .get(held.id)
-            .ok_or(GenieError::unsupported("a group member without a unit AI"))?;
+        let ai = self.parts.unit_ai.get(held.id).ok_or(MEMBER_WITHOUT_AI)?;
         let ai_kind = ai.ai_kind;
         let player_kind = self.players.player(player_id)?.kind;
         if player_kind.is_computer() {

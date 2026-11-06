@@ -20,9 +20,9 @@ use crate::unit_ai::best_target::{
     AttackCategory, Candidate, FoundObject, Searcher, order_weights,
 };
 use crate::unit_ai::task_finder::allied;
-use crate::unit_ai::world_view::NOT_HELD;
 use crate::unit_ai::world_view::WorldPicker;
 use crate::unit_ai::world_view::attacks;
+use crate::unit_ai::world_view::{FOUND_UNPLACED, NOT_HELD};
 use crate::unit_ai::{
     Memory, attack_sight, attacks_neutral as unit_ai_attacks_neutral,
     can_attack as unit_ai_can_attack, spares_friends as unit_ai_spares_friends,
@@ -93,9 +93,7 @@ impl WorldPicker<'_> {
         let Some((owner, unit, _, master)) = self.held(id)? else {
             return Ok(None);
         };
-        let placed = spatial
-            .get_known(id)?
-            .ok_or(GenieError::unsupported("a found object without a place"))?;
+        let placed = spatial.get_known(id)?.ok_or(FOUND_UNPLACED)?;
         let capture = spatial.capture_of(id);
         let attacker = self.attacker;
         Ok(Some(FoundObject {

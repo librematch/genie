@@ -1,6 +1,7 @@
 //! BUILD's tests before its foundation: a farm on rice terrain, the pending debit, the
 //! builders, the placement test and the payment.
 
+use crate::commands::BUILD_MASTER_LACKING;
 use crate::map::Point;
 use crate::map::Position;
 use crate::map::Restriction;
@@ -53,9 +54,8 @@ impl World {
     /// BUILD's pending debit (`FUN_141630d10` with 0, before its placement test): every cost
     /// entry of the master, paid or not, by resource, comes off the player's pending debit.
     pub(crate) fn debit_listed(&mut self, player: PlayerId, master: MasterId) -> GenieResult<()> {
-        let site = player_master(&self.model.masters, player, master).ok_or(
-            GenieError::unsupported("BUILD of a master the player does not have"),
-        )?;
+        let site =
+            player_master(&self.model.masters, player, master).ok_or(BUILD_MASTER_LACKING)?;
         let mut listed = [0i16; 4];
         for (resource, amount, _) in cost_entries(&site.creatable_part().cost) {
             if let Some(index) = resource.is_resource().then(|| resource.index()) {

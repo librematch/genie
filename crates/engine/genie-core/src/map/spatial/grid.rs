@@ -1,5 +1,6 @@
 //! The obstruction grid's cells and visits, the scout map, alliances and the line queries.
 
+use crate::GenieResult;
 use crate::map::Distance;
 use crate::map::Point;
 use crate::map::TerrainMask;
@@ -8,6 +9,7 @@ use crate::map::spatial::{
     Placed, QUERY_HITS, RecordId, Spatial, record_meets_segment, tile_record_id,
 };
 use crate::map::{Rect, Segment};
+use crate::movement::WALKER_UNPLACED;
 use crate::movement::explore::InfluenceMap;
 use crate::objects::ObjectId;
 use crate::objects::masters::ObstructionKind;
@@ -16,7 +18,6 @@ use crate::players::PlayerId;
 use crate::players::{NO_RELATIONS, PlayerSet};
 use crate::unit_ai::task_finder::allied as task_finder_allied;
 use crate::world::objects_ref::ObjectsRef;
-use crate::{GenieError, GenieResult};
 
 /// A walk's obstruction query ([`Spatial::walk_hits`]'s arguments).
 #[derive(Clone, Copy, Debug)]
@@ -340,7 +341,7 @@ impl Spatial {
                 continue;
             }
             let distance = if by_id.moving(id) {
-                let player = player.ok_or(GenieError::unsupported("a walker without a place"))?;
+                let player = player.ok_or(WALKER_UNPLACED)?;
                 if self.allied(placed.player, player) {
                     ally_factor * grow
                 } else {

@@ -25,9 +25,9 @@ use crate::unit_ai::StopOrder;
 use crate::unit_ai::SurroundingFlags;
 use crate::unit_ai::world_view::UnitView;
 use crate::unit_ai::{
-    AfterOrder, AiMove, BREAK, CIVILIAN_CARED, DEAD, Effect, GO_ON, Gatherable, GroupState,
-    LIVE_TARGET_ACTIONS, Memory, NO_POINT, Notify, Pick, ResourceSearch, Retarget, Search,
-    Surroundings, UnitAi, civilian_kind, civilian_search_radius, retarget_kind,
+    AfterOrder, AiMove, BREAK, CIVILIAN_CARED, DEAD, Effect, FOUND_WITHOUT_POSITION, GO_ON,
+    Gatherable, GroupState, LIVE_TARGET_ACTIONS, Memory, NO_POINT, Notify, Pick, ResourceSearch,
+    Retarget, Search, Surroundings, UnitAi, civilian_kind, civilian_search_radius, retarget_kind,
 };
 use crate::world::Millis;
 use crate::world::WorldTime;
@@ -445,7 +445,7 @@ impl UnitAi {
                         class,
                     }),
                     (Some(_), None) => {
-                        return Err(GenieError::unsupported("a found object without its place"));
+                        return Err(FOUND_WITHOUT_POSITION);
                     }
                     (None, _) => None,
                 }
@@ -569,7 +569,7 @@ impl UnitAi {
                         class,
                     }),
                     (Some(_), None) => {
-                        return Err(GenieError::unsupported("a found object without its place"));
+                        return Err(FOUND_WITHOUT_POSITION);
                     }
                     (None, _) => None,
                 }

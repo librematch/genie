@@ -14,6 +14,7 @@
 //! `point_walks.rs`; the face, the work, the drop-off's update and the random waits after a failed
 //! walk or a drop-off out of reach (the Action stream's `"update"` draws) are in `work.rs`.
 
+use crate::GenieError;
 use crate::gathering::FarmStops;
 use crate::gathering::StopIndex;
 use crate::gathering::hunt::{HuntSprites, HuntTask};
@@ -111,6 +112,10 @@ const FARM_STOPS: FarmStops = FarmStops::of_data(4);
 const STOP_DRAWS: u32 = 10;
 /// The player's attribute that sells a farm's food at once (`player+0x100` at `+0x300`).
 pub(crate) const FARM_FOOD_SOLD: usize = 96;
+
+/// A gatherer without movement state, which the Gather's walks and turns and its drop-off need.
+pub(crate) const GATHERER_UNMOVING: GenieError =
+    GenieError::unsupported("a gatherer without movement state");
 
 /// The Gather action of a gatherer (`RGE_Action_Gather`, type 5), with the save's fields.
 #[derive(Clone, Copy, Debug, PartialEq, Diff)]

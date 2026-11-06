@@ -1,10 +1,10 @@
 use crate::element::{ReadHeader, WriteHeader};
-use crate::errors::{not_utf8, out_of_range};
+use crate::errors::not_utf8;
 use crate::fits;
 use crate::reader::RecordingHeaderReader;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
 use genie_error::GenieResult;
-use genie_support::{read_bytes, reserved};
+use genie_support::{FIELD_DOES_NOT_FIT, read_bytes, reserved};
 use std::io::{Read, Write};
 use std::vec::IntoIter as VecIntoIter;
 
@@ -41,7 +41,7 @@ impl StringTable {
         if len < usize::from(u16::MAX) {
             fits(len)
         } else {
-            Err(out_of_range())
+            Err(FIELD_DOES_NOT_FIT)
         }
     }
 
@@ -81,7 +81,7 @@ impl WriteHeader for StringTable {
         for string in &self.strings {
             let len = string.len();
             if u32::MAX as usize <= len {
-                return Err(out_of_range());
+                return Err(FIELD_DOES_NOT_FIT);
             }
             handle.write_u32::<LE>(fits(len)?)?;
             handle.write_all(string.as_bytes())?;

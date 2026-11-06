@@ -7,7 +7,8 @@ use crate::garrison::EnterOutcome;
 use crate::garrison::EnterSlot;
 use crate::garrison::EnterState;
 use crate::garrison::{
-    EnterAction, EnterReads, INSIDE_SIGHT, NO_MASTERS, WalkStart, attack_rate, enter_view, share,
+    ENTERING_UNPLACED, EnterAction, EnterReads, INSIDE_SIGHT, NO_MASTERS, WalkStart, attack_rate,
+    enter_view, share,
 };
 use crate::gathering::gather::unit::give_load;
 use crate::groups::LeavingWalk;
@@ -436,7 +437,7 @@ impl Unit {
             .spatial
             .get(id)
             .copied()
-            .ok_or(GenieError::unsupported("an entering unit without a place"))?;
+            .ok_or(ENTERING_UNPLACED)?;
         if let Some(visibility) = step.world.spatial.sight.as_mut() {
             visibility.sight_off(
                 id,

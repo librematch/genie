@@ -20,8 +20,9 @@ use crate::unit_ai::flight::BadPoint;
 use crate::unit_ai::world_view::UnitView;
 use crate::unit_ai::{
     AI_MOVE_RANGE, AiMove, BOAR_HOME, BOAR_LEASH, BOAR_LEASH_DRAW, BOAR_OFFSET, BOAR_STEP,
-    BOAR_WANDER, Effect, Found, HUNTED_CARED, HUNTED_HOME, HUNTED_SIGHT_GROWTH, HUNTED_STEP,
-    LION_CARED, LION_IDLE_TIMEOUT, Memory, Pick, Search, Surroundings, UnitAi, point_gap_squared,
+    BOAR_WANDER, Effect, FOUND_WITHOUT_POSITION, Found, HUNTED_CARED, HUNTED_HOME,
+    HUNTED_SIGHT_GROWTH, HUNTED_STEP, LION_CARED, LION_IDLE_TIMEOUT, Memory, Pick, Search,
+    Surroundings, UnitAi, point_gap_squared,
 };
 use crate::world::Seconds;
 use crate::world::layer::ClassRoles;
@@ -239,9 +240,7 @@ impl UnitAi {
         })?;
         self.alert(found, at.dt_seconds);
         if found.id.is_some() {
-            let other = found
-                .position
-                .ok_or(GenieError::unsupported("a found object without its place"))?;
+            let other = found.position.ok_or(FOUND_WITHOUT_POSITION)?;
             self.evade(at, other, ai, side)?;
             return Ok(IdleOutcome::Acted);
         }

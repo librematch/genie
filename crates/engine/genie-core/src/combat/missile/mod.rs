@@ -74,6 +74,9 @@ const VOLLEY_EPSILON: f32 = MISSILE_VOLLEY_EPSILON;
 /// A volley's scatter: the draw's scale and the half spread (`FUN_14120c0a0`).
 const VOLLEY_SCALE: f32 = MISSILE_VOLLEY_SCALE;
 const VOLLEY_HALF: f32 = MISSILE_VOLLEY_HALF;
+/// A missile without its moving part, which its flight and its import need.
+pub(crate) const MISSILE_UNMOVING: GenieError =
+    GenieError::unsupported("a missile without its moving part");
 
 /// Where a missile came from (`+0x9c`, `mProjectileData`, `FUN_140aa86e0`): the firing object's
 /// place, the missile master's radii on the ground, the firing object's master and owner (−1

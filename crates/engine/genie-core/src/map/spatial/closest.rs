@@ -15,6 +15,7 @@ use crate::ownership::artifact::ARTIFACT_KIND;
 use crate::players::PlayerId;
 use crate::players::attribute::AttributeId;
 use crate::players::{QueryRelation, UnitRelation};
+use crate::unit_ai::world_view::NOT_HELD;
 use crate::vision::registry::Record;
 use crate::vision::visibility::Seer;
 use crate::world::NO_ATTRIBUTE;
@@ -149,10 +150,6 @@ pub(super) struct Searcher {
     pub(super) trapper: bool,
 }
 
-/// A found object the world does not hold, whose workers (`+0x644`) or pasture the search reads.
-const FOUND_NOT_HELD: GenieError =
-    GenieError::unsupported("a found object the slice does not hold");
-
 /// `ClosestObject`'s tests of the object `id` it found (its seer and its place `placed`) past the
 /// relation: the [`Filter`]'s class, master and state; its workers (`+0x644`) below the cap
 /// (argument 6, "Too many workers"); for a search of state 0, a farm (masters 50 and 1187)
@@ -186,12 +183,7 @@ pub(super) fn closest_kept(
     if filter.state.is_some_and(|state| seer.state != state) {
         return Ok(false);
     }
-    let workers = || {
-        objects
-            .get(id)
-            .map(|unit| unit.workers)
-            .ok_or(FOUND_NOT_HELD)
-    };
+    let workers = || objects.get(id).map(|unit| unit.workers).ok_or(NOT_HELD);
     if filter.workers != WorkerCount::NO_CAP && filter.workers <= workers()? {
         return Ok(false);
     }
@@ -287,7 +279,7 @@ pub(super) fn farm_kept(
     let (workers, parent) = objects
         .get(id)
         .map(|unit| (unit.workers, unit.pasture))
-        .ok_or(FOUND_NOT_HELD)?;
+        .ok_or(NOT_HELD)?;
     if parent.is_some() {
         return Ok(false);
     }

@@ -5,7 +5,9 @@ use crate::combat::damage::Victim;
 use crate::gathering::gather::Walks;
 use crate::gathering::hunt::HuntGather;
 use crate::gathering::hunt::HuntState;
-use crate::gathering::hunt::{HERD_FAR, HuntAction, HuntNext, HuntReads, LAST_BIT, REMAINDER};
+use crate::gathering::hunt::{
+    HERD_FAR, HUNT_TARGET_UNPLACED, HuntAction, HuntNext, HuntReads, LAST_BIT, REMAINDER,
+};
 use crate::gathering::{HuntTargetId, both_food};
 use crate::map::Distance;
 use crate::map::DistanceSquared;
@@ -63,9 +65,7 @@ impl HuntAction {
                 "a hunt's set_state 4 on a live target after its attack",
             ));
         }
-        let placed = map
-            .get_known(self.target)?
-            .ok_or(GenieError::unsupported("a hunt's target without a place"))?;
+        let placed = map.get_known(self.target)?.ok_or(HUNT_TARGET_UNPLACED)?;
         self.point = placed.position;
         let range = if victim.state <= ObjectState::Alive {
             hunt_tuning.own_livestock_range
@@ -156,7 +156,7 @@ impl HuntAction {
                 .world
                 .spatial
                 .get_known(self.target)?
-                .ok_or(GenieError::unsupported("a hunt's target without a place"))?;
+                .ok_or(HUNT_TARGET_UNPLACED)?;
             let ground = step
                 .world
                 .parts

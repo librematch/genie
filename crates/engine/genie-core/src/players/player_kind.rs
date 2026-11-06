@@ -1,6 +1,7 @@
 //! A player's type as one type: `player+0x10`, the save's class byte.
 
 use crate::{GenieError, GenieResult};
+use genie_save::UNKNOWN_PLAYER_KIND;
 use std::fmt::{Display, Error, Formatter};
 use strum::FromRepr;
 
@@ -43,10 +44,10 @@ impl TryFrom<u8> for PlayerKind {
     ///
     /// # Errors
     ///
-    /// A byte of a type no creator handles (the game's `InvalidPlayerType`).
+    /// A byte of a type no creator handles ([`UNKNOWN_PLAYER_KIND`], the game's
+    /// `InvalidPlayerType`).
     fn try_from(value: u8) -> GenieResult<Self> {
-        Self::from_repr(value)
-            .ok_or_else(|| GenieError::invalid_input("InvalidPlayerType").with("type", value))
+        Self::from_repr(value).ok_or_else(|| UNKNOWN_PLAYER_KIND.with("type", value))
     }
 }
 
@@ -65,6 +66,7 @@ impl genie_diff::Diff for PlayerKind {
 #[cfg(test)]
 mod tests {
     use crate::players::PlayerKind;
+    use genie_save::UNKNOWN_PLAYER_KIND;
 
     /// A saved byte is its type; the default is the phantom's 0.
     #[test]
@@ -81,7 +83,8 @@ mod tests {
     fn unhandled_byte_is_refused() {
         for byte in [4, 0xff] {
             let error = PlayerKind::try_from(byte).unwrap_err();
-            assert!(error.to_string().contains("InvalidPlayerType"), "{error}");
+            assert_eq!(error, UNKNOWN_PLAYER_KIND);
+            assert_eq!(error.reason(), "a player type the game does not have");
         }
     }
 

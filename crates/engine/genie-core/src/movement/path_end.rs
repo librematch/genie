@@ -26,8 +26,9 @@ use crate::math::fmath::BVector;
 use crate::math::fmath::{at_most_or_unordered, below_or_unordered, sqrt};
 use crate::movement::WaypointIndex;
 use crate::movement::{
-    Avoided, EPSILON, LongWalker, Me, Mover, PathAsk, PathData, Planning, ShortAsk, footprint_gap,
-    footprint_gap_squared, lowered_units, overlap, pause_rank, point_or_zero, point_or_zero_of,
+    Avoided, EPSILON, LongWalker, Me, Mover, PathAsk, PathData, Planning, ShortAsk,
+    WALKER_UNPLACED, footprint_gap, footprint_gap_squared, lowered_units, overlap, pause_rank,
+    point_or_zero, point_or_zero_of,
 };
 use crate::objects::masters::MasterId;
 use crate::pathing::long_path::{LongRequest, LongTarget, gate_lets_pass, reaches};
@@ -555,10 +556,7 @@ impl Mover {
     ) -> GenieResult<Avoided> {
         let roles = by_id.roles();
         let level = self.paths.walked()?;
-        let player = world
-            .get(me.id)
-            .ok_or(GenieError::unsupported("a walker without a place"))?
-            .player;
+        let player = world.get(me.id).ok_or(WALKER_UNPLACED)?.player;
         // a hit the world holds no object of (a map edge's record) is passed over
         let met = |hit: RecordId| -> GenieResult<Option<(ObjectId, &Placed)>> {
             let Some(id) = by_id

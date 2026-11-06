@@ -4,6 +4,11 @@ use genie_error::{GenieError, GenieResult};
 use std::fmt::{Debug, Error, Formatter};
 use std::io::{self, Read, Seek, SeekFrom, Write};
 
+/// A file whose size the archive's 32-bit size field cannot hold.
+const FILE_TOO_LARGE: GenieError = GenieError::invalid_input("file too large");
+/// More tables than the archive's header reserved or its 32-bit count holds.
+const TOO_MANY_TABLES: GenieError = GenieError::invalid_input("too many tables");
+
 /// Strategy to use when writing files to the archive.
 ///
 /// DRS files contain metadata at the start of the archive, and the size of this metadata depends
@@ -76,7 +81,7 @@ where
         resource.size = u32::try_from(bytes.len())
             .ok()
             .filter(|&size| size < u32::MAX)
-            .ok_or_else(|| GenieError::invalid_input("file too large"))?;
+            .ok_or(FILE_TOO_LARGE)?;
         self.resources.push((table, bytes));
         Ok(resource)
     }
@@ -190,14 +195,14 @@ where
         resource.size = u32::try_from(len)
             .ok()
             .filter(|&size| size < u32::MAX)
-            .ok_or_else(|| GenieError::invalid_input("file too large"))?;
+            .ok_or(FILE_TOO_LARGE)?;
         self.write_offset += resource.size;
         Ok(resource)
     }
 
     fn close(&mut self, drs: &mut InnerDrsWriter<W>) -> GenieResult<()> {
         if drs.tables.len() > self.reserved_tables as usize {
-            return Err(GenieError::invalid_input("too many tables"));
+            return Err(TOO_MANY_TABLES);
         }
 
         // Update the resource type count
@@ -206,8 +211,7 @@ where
         let _ = drs.output.seek(SeekFrom::Current(4))?;
 
         // Assign table offsets
-        let num_tables = u32::try_from(drs.tables.len())
-            .map_err(|_| GenieError::invalid_input("too many tables"))?;
+        let num_tables = u32::try_from(drs.tables.len()).map_err(|_| TOO_MANY_TABLES)?;
         let mut table_offset = 64 + 12 * num_tables;
         for table in &mut drs.tables {
             table.offset = table_offset;
@@ -391,7 +395,7 @@ where
         self.inner.header.num_resource_kinds = u32::try_from(self.inner.tables.len())
             .ok()
             .filter(|&value| value < u32::MAX)
-            .ok_or_else(|| GenieError::invalid_input("too many tables"))?;
+            .ok_or(TOO_MANY_TABLES)?;
 
         self.strategy.close(&mut self.inner)?;
 

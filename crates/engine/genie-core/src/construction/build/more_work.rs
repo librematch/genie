@@ -2,6 +2,7 @@
 //! case 0xdf): a resource around the building it finished, as the unit AI's
 //! `ClosestResourceObject` names it.
 
+use crate::construction::build::BUILDER_UNMOVING;
 use crate::map::Distance;
 use crate::map::spatial::Spatial;
 use crate::objects::ObjectId;
@@ -86,11 +87,7 @@ impl Unit {
             building: at.position,
             range: reach as i32 as i16,
         };
-        let mover = step
-            .world
-            .parts
-            .mover_of(self.id)
-            .ok_or(GenieError::unsupported("a builder without movement state"))?;
+        let mover = step.world.parts.mover_of(self.id).ok_or(BUILDER_UNMOVING)?;
         let restriction = mover.stats.restriction;
         let objects = ObjectsRef::new(
             &step.world.players,
