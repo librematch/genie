@@ -234,8 +234,8 @@ pub fn volley_spawn_point(
     let mut position = spawn_point(at, angle, offset);
     if let Some(point) = building_at {
         let (dx, dy) = (point.x() - at.x(), point.y() - at.y());
-        let gap = (dx * dx + dy * dy).sqrt();
-        if gap < (ox * ox + oy * oy).sqrt() {
+        let gap = sqrt(dx * dx + dy * dy);
+        if gap < sqrt(ox * ox + oy * oy) {
             let (tx, ty) = (point.x(), point.y());
             position = position.with_x(tx).with_y(ty);
         }
@@ -788,6 +788,22 @@ mod tests {
             Distance::new(0.0),
             GroundOffset::ZERO,
             Some(Point::new(13.0, 10.0)),
+        );
+        assert_eq!(position, Position::new(12.0, 10.0, 1.0));
+    }
+
+    /// `FUN_141226690`'s `COMISS length, gap; JBE` (`0x141226c23`) skips the target's place when
+    /// the gap is NaN (unordered), and the inlined sqrt (`UCOMISS 0, x; JA`) takes `SQRTSS` for
+    /// a NaN, which gives the NaN back.
+    #[test]
+    fn building_volley_missile_keeps_its_offset_when_the_gap_to_its_target_is_nan() {
+        let position = volley_spawn_point(
+            Position::new(10.0, 10.0, 0.0),
+            Angle::ZERO,
+            Offset::new(0.0, 2.0, 1.0),
+            Distance::new(0.0),
+            GroundOffset::ZERO,
+            Some(Point::new(f32::NAN, 10.0)),
         );
         assert_eq!(position, Position::new(12.0, 10.0, 1.0));
     }

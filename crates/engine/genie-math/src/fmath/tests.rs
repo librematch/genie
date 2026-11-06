@@ -936,6 +936,33 @@ fn fabs_clears_the_sign_bit() {
     );
 }
 
+/// sqrtf `0x14099ef70` off its normal path: ±0 and +∞ come back as they are; a NaN or a value
+/// below 0 goes to `0x14099cb70`'s `(x - x) / (x - x)`, so a NaN comes back quieted with its
+/// sign and payload and a negative value (−∞ and the least negative denormal included) gives
+/// the default NaN. (The `crt_math` fixture draws no NaN and no negative input, and its compare
+/// takes any NaN for any other; these outputs follow the asm and Intel's rule for `SUBSS` and
+/// `DIVSS`.)
+#[test]
+fn sqrt_is_the_games_sqrtf_at_its_special_values() {
+    assert_bits(
+        "sqrt",
+        sqrt,
+        &[
+            (0x0000_0000, 0x0000_0000),
+            (0x8000_0000, 0x8000_0000),
+            (0x7f80_0000, 0x7f80_0000),
+            (0xbf80_0000, 0xffc0_0000),
+            (0x8000_0001, 0xffc0_0000),
+            (0xff80_0000, 0xffc0_0000),
+            (0x7fc0_0000, 0x7fc0_0000),
+            (0x7f80_0001, 0x7fc0_0001),
+            (0xff81_2345, 0xffc1_2345),
+            (0x7fc0_1234, 0x7fc0_1234),
+            (0xffff_ffff, 0xffff_ffff),
+        ],
+    );
+}
+
 /// `0x14099e870` (isnan through the double): true for every NaN, quiet or signalling, of
 /// either sign; false for the infinities and the largest finite value.
 #[test]

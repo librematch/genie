@@ -10,6 +10,7 @@
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::Point;
+use crate::math::fmath::sqrt;
 use crate::objects::IdTable;
 use crate::objects::ObjectId;
 use crate::objects::masters::ClassId;
@@ -365,7 +366,7 @@ impl Registry {
                 let out = &mut found[relation];
                 if out.len() < MOST_FOUND {
                     out.push(Record {
-                        distance: Distance::new((dy * dy + dx * dx).sqrt()),
+                        distance: Distance::new(sqrt(dy * dy + dx * dx)),
                         ..*record
                     });
                 }
