@@ -5,8 +5,10 @@ use genie_error::GenieResult;
 use genie_support::{ReadStringsExt, read_list, write_opt_i32_str};
 use std::convert::TryFrom;
 use std::io::{Read, Write};
-use std::result::Result as StdResult;
-use std::time::{SystemTime, SystemTimeError, UNIX_EPOCH};
+use std::time::Duration;
+
+#[cfg(test)]
+mod tests;
 
 /// The data set and the DLC packages a scenario needs (HD Edition and later).
 #[derive(Debug, Clone)]
@@ -219,17 +221,12 @@ impl ScxHeader {
         Ok(())
     }
 
-    /// Update the timestamp to the current time.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the system clock is before the Unix epoch.
-    // The format stores a 32-bit Unix timestamp.
+    /// Stamp the header with a time: its whole seconds since the Unix epoch, as the
+    /// [`timestamp`](Self::timestamp) holds them. The caller reads its clock:
+    /// `SystemTime::now().duration_since(UNIX_EPOCH)?` gives the current time.
+    // The format stores a 32-bit Unix timestamp: a time after 2106 keeps its low 32 bits.
     #[allow(clippy::cast_possible_truncation)]
-    pub fn touch(&mut self) -> StdResult<(), SystemTimeError> {
-        let system_time = SystemTime::now();
-        let duration = system_time.duration_since(UNIX_EPOCH)?;
-        self.timestamp = duration.as_secs() as u32;
-        Ok(())
+    pub const fn touch(&mut self, since_epoch: Duration) {
+        self.timestamp = since_epoch.as_secs() as u32;
     }
 }
