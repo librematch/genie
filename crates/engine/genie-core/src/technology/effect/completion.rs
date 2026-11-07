@@ -242,8 +242,9 @@ impl World {
     /// this game mode; else with fewer of its requirements researched than it needs it turns to 0
     /// (from above 0), with them all to 1 (from below 1) unless its research is done already (its
     /// work done reaching a location's time), which completes it ([`World::complete_research`]).
-    /// Each such technology, and each in state 2, counts; none counted sets attribute 39 to 1 where
-    /// it is 0. The game's lists hold the dependents by id, as the `.dat`'s requirements give them.
+    /// Each such technology but one completed at its building, and each in state 2, counts; none
+    /// counted sets attribute 39 to 1 where it is 0. The game's lists hold the dependents by id, as
+    /// the `.dat`'s requirements give them.
     pub(crate) fn update_dependents(
         &mut self,
         player_id: PlayerId,
@@ -366,10 +367,12 @@ impl World {
         // its research done already: it completes (`FUN_1413cdcd0` with `param_3` 0 and no
         // building), once per location reached without a building of its own (each
         // uncounting it; past the first the technology is done and the call does nothing),
-        // else once for its building's
+        // else once for its building's, which leaves it uncounted (the walk keeps the count it
+        // had before it, `0x1413cd3c8`)
         if let Some(building_master) = state.building_master {
             if state.location(building_master).is_some_and(reached) {
                 let _ = self.complete_research(player_id, TechId::of_index(dependent)?, None)?;
+                counted -= 1;
                 return Ok(counted);
             }
         } else {

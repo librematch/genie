@@ -2127,6 +2127,71 @@ fn dependent_technology_done_already_completes_with_its_requirement() {
     assert_eq!(states, [3, 3, 3, 0]);
 }
 
+/// A dependent whose research is done already at its own building's location completes and
+/// stays uncounted (`FUN_1413cce70` keeps the count it had before it, `0x1413cd3c8`): with none
+/// else counted, attribute 39 turns 1, though the completed technology's own walk counted the
+/// one that requires it and set nothing.
+#[test]
+fn dependent_completed_at_its_building_is_not_counted() {
+    use crate::technology::{Location, TechDef, TechState};
+    let def = |required: [i16; 2], count| TechDef {
+        required: [
+            TechId::of_data(required[0]),
+            TechId::of_data(required[1]),
+            None,
+            None,
+            None,
+            None,
+        ],
+        required_count: count,
+        ..TechDef::default()
+    };
+    let at_building = TechState {
+        locations: vec![Location {
+            building: Some(ids::TOWN_CENTRE),
+            ..Location::default()
+        }],
+        building_master: Some(ids::TOWN_CENTRE),
+        ..TechState::default()
+    };
+    let player = Player {
+        techs: vec![
+            TechState {
+                state: ResearchState::Researched,
+                ..TechState::default()
+            },
+            at_building,
+            TechState::default(),
+            TechState::default(),
+        ],
+        attributes: vec![Amount::ZERO; 200],
+        ..Player::default()
+    };
+    let mut world = World::new(
+        WorldTime::ZERO,
+        FrameSeed::of_data(0),
+        PlayerId::new(0),
+        vec![Millis::ZERO],
+        vec![player],
+    );
+    world.model.techs = Arc::new(vec![
+        def([-1, -1], 0),
+        def([0, -1], 1),
+        def([1, 3], 2),
+        def([-1, -1], 0),
+    ]);
+    world
+        .update_dependents(PlayerId::new(0), tech_id(0))
+        .unwrap();
+    let states: Vec<i16> = world.players[0]
+        .techs
+        .iter()
+        .map(|tech_state| tech_state.state.get())
+        .collect();
+    assert_eq!(states, [3, 3, 0, 0]);
+    assert_eq!(world.players[0].attributes[39], Amount::new(1.0));
+}
+
 /// `FUN_1413cce70`'s civilisation test: a dependent of another civilisation turns −1; one of
 /// its own of mode 0 does too under the full tech tree (`+0x63`), not one of mode 1; one for
 /// every civilisation (civ 0) is available either way.
