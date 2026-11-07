@@ -88,7 +88,7 @@ impl World {
     /// part (`own_update`): the regeneration, the passive abilities, the powerup update
     /// ([`World::powerup_update`]), the stinger update ([`World::object_stingers`]) and the hit
     /// point powerup check, and a building's production and a pasture's food
-    /// ([`World::sum_livestock_food`]).
+    /// ([`World::hand_livestock_food_to_make`]).
     fn finish_own_update(
         &mut self,
         (player_id, list_index, id): (PlayerId, ListIndex, ObjectId),
@@ -122,7 +122,7 @@ impl World {
                 self.building_production(player_id, list_index, dt.seconds())?;
             }
             // then a pasture's food, whatever the combat update answered
-            self.sum_livestock_food(player_id, list_index, id)?;
+            self.hand_livestock_food_to_make(player_id, list_index, id)?;
         }
         Ok(())
     }

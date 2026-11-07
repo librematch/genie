@@ -11,9 +11,9 @@
 //! A farm whose completion gave its owner the farm bonus takes the bonus off its Make's food
 //! still to make in its next update ([`Unit::take_farm_bonus`]). A pasture holds nothing at its
 //! update's end, and its Make's food still to make is then what its livestock holds
-//! ([`World::sum_livestock_food`]).
+//! ([`World::hand_livestock_food_to_make`]).
 //!
-//! [`World::sum_livestock_food`]: crate::world::World::sum_livestock_food
+//! [`World::hand_livestock_food_to_make`]: crate::world::World::hand_livestock_food_to_make
 
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;

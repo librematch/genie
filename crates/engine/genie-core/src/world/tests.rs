@@ -62,7 +62,7 @@ use crate::gathering::hunt::tests::{hunting, walker};
 use crate::gathering::hunt::{HUNT, HuntAction, HuntTask};
 use crate::gathering::make::MAKE;
 use crate::gathering::make::MakeState;
-use crate::gathering::pasture::tests::{building_master, make, pasture_food, pasture_world};
+use crate::gathering::pasture::tests::{make, master_of_kind, pasture_food, pasture_world};
 use crate::gathering::{GatherTargetId, HuntTargetId};
 use crate::groups::GroupFlags;
 use crate::groups::{Member, UnitGroup};
@@ -25654,7 +25654,7 @@ fn death_reads_the_dying_sprite_of_the_master_the_object_has_now() {
 /// (603 passed over) and its gone livestock left.
 #[test]
 fn pasture_update_ends_with_its_livestock_food() {
-    let master = building_master(ids::PASTURE, MasterKind::BUILDING, class::FARM);
+    let master = master_of_kind(ids::PASTURE, MasterKind::BUILDING, class::FARM);
     let mut world = pasture_world(master, &[make(100.0)]);
     let _ = world
         .step_object(

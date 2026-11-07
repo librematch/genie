@@ -39,7 +39,7 @@ pub struct Building {
     /// A pasture's livestock (`+0xb78`, saved as `livestockId`): the objects its completion put
     /// on its edges ([`crate::world::World::setup_pasture`]), in the order it made them; its
     /// update's end lets the ones the world no longer holds go
-    /// ([`crate::world::World::sum_livestock_food`]).
+    /// ([`crate::world::World::hand_livestock_food_to_make`]).
     pub(crate) livestock: Vec<ObjectId>,
     /// A pasture's workers (`+0xcb8`, saved as `pastureWorkerId`): the units that tend it
     /// ([`crate::world::World::tend_pasture`]), in the order they came.

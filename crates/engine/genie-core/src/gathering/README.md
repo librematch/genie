@@ -11,13 +11,21 @@ folder holds every part of that work:
 - `gather_search.rs` and `closest_resource.rs` search for a resource to gather.
 - `drop_sites.rs` and `drop_off.rs` find the drop site and walk the gatherer there.
 - `farm_queue.rs` holds the farms and fish traps that a player paid for in advance.
-- `pasture.rs` puts a new pasture's livestock on its edges.
+- `pasture.rs` puts a new pasture's livestock on its edges, and at the end of the pasture's
+  update hands their food to its Make: the pasture holds nothing, its Make's food still to
+  make is what its livestock holds, and the livestock the world no longer holds leave.
 - `mule_cart.rs` holds the mule cart's resource searches.
 
 ## How the tick reaches it
 
 The object's update runs the gatherer's action. Each action folder has a `unit.rs`: the unit's
 part of the update, which binds the action to the world.
+
+A building's own update reaches it twice. Before its combat update, a farm takes its bonus off
+its Make (`make.rs`, `Unit::take_farm_bonus`, from `Unit::building_update` in
+`construction/building_update.rs`). After its production, a pasture hands its livestock's
+food to its Make (`pasture.rs`, `World::hand_livestock_food_to_make`, from
+`World::finish_own_update` in `world/after_step.rs`).
 
 ## In the game
 
