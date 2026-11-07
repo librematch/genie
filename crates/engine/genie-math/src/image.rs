@@ -170,6 +170,8 @@ pub mod garrison {
     pub const NO_POINT: f32 = f32::from_bits(0xbf80_0000);
     /// 1.0
     pub const ONE_MISSILE: f32 = f32::from_bits(0x3f80_0000);
+    /// 1.0
+    pub const ONE_RELIC: f32 = f32::from_bits(0x3f80_0000);
 }
 
 /// The values the `gather` port reads.

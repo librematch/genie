@@ -70,6 +70,14 @@ impl Master {
         action.tasks.get(action.default_task?.index())
     }
 
+    /// Its first storage's `attribute_amount_held` (`+0x610`): what a gatherer takes of one of
+    /// its objects, and what one of its livestock adds to a building's `mLivestockSummation`
+    /// inside; 0 for a master without a storage.
+    #[must_use]
+    pub fn amount_held(&self) -> Amount {
+        self.storage.first().map_or(Amount::ZERO, |stored| stored.1)
+    }
+
     /// Whether its objects count as tall on their tiles: its height (`radius_z`, `+0x5e0`) is
     /// above 0.
     #[must_use]
@@ -432,6 +440,7 @@ mod tests {
     use crate::objects::masters::{ActionPart, CombatPart, MovingPart, Task};
     use crate::objects::sprite::Graphic;
     use crate::objects::{FacetCount, Frame, SpeedMultiplier, SpriteFlags, SpriteId};
+    use crate::players::Amount;
     use crate::world::Seconds;
 
     /// The default master and its parts name no sprite, so a test's master shows only the
@@ -493,5 +502,14 @@ mod tests {
         assert!(!master.has_damage_sprites());
         master.damage_graphics.push(DamageGraphic::default());
         assert!(master.has_damage_sprites());
+    }
+
+    /// A master's amount held is its first storage's amount, 0 without a storage.
+    #[test]
+    fn amount_held_is_the_first_storage_amount() {
+        let mut master = Master::default();
+        assert_eq!(master.amount_held(), Amount::ZERO);
+        master.storage = vec![(None, Amount::new(-7.5), 2), (None, Amount::new(3.0), 1)];
+        assert_eq!(master.amount_held(), Amount::new(-7.5));
     }
 }

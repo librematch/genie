@@ -5,30 +5,38 @@ use crate::GenieResult;
 use crate::combat::Firepower;
 use crate::garrison::ContainerId;
 use crate::garrison::GarrisonCounts;
+use crate::garrison::Kept;
 use crate::garrison::{NO_MASTERS, attack_rate, share};
 use crate::objects::ObjectId;
+use crate::objects::layers::Action;
 use crate::objects::layers::{Building, Combat};
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::PlayersMastersExt;
 use crate::objects::unit::Unit;
 use crate::players::PlayerId;
-use crate::world::Seconds;
+use crate::technology::effect::Dependents;
 use crate::world::parts::PartTable;
+use crate::world::slots::PlayerSlotsExt;
 use crate::world::step::Step;
 
 impl Unit {
     /// [`Unit::go_inside`]'s slot 0x1c0 of container `target` (`FUN_14120b790`, a building's
-    /// through `FUN_1411cb850`; its owner `bp`, its reload powerup `reload`), the unit's master
-    /// `me` and the container's `bm`: a unit (type 70) adds its share to the container's
-    /// volleys, and its list takes the unit (`FUN_14118c890`); a building (type 80) then counts
-    /// the unit in by its countdown to its raid (`+0x9a0`, [`GarrisonCounts::of_unit`]).
+    /// through `FUN_1411cb850`; its owner `bp`), the unit's master `me` and the container's `bm`:
+    /// a unit (type 70) adds its share to the container's volleys (by the container's reload
+    /// powerup), and its list takes the unit (`FUN_14118c890`); a building (type 80) then counts
+    /// the unit in by its countdown to its raid (`+0x9a0`, [`GarrisonCounts::of_unit`]) and keeps
+    /// count of a relic or livestock ([`Unit::keep_inside`]).
+    ///
+    /// # Errors
+    ///
+    /// A player without its masters, the share's, and [`Unit::keep_inside`]'s.
     pub(crate) fn join_building(
-        &self,
+        &mut self,
+        actions: &mut Action,
         step: &mut Step<'_>,
-        target: Option<ContainerId>,
+        target: ContainerId,
         bp: PlayerId,
-        reload: Seconds,
         me: &Master,
         bm: &Master,
     ) -> GenieResult<()> {
@@ -41,6 +49,7 @@ impl Unit {
             .ok_or(NO_MASTERS)?;
         let firepower = if me.kind == MasterKind::COMBAT {
             let own = step.world.model.masters.of(bp).unwrap_or(masters);
+            let reload = step.world.parts.combat_of(target.id()).reload_powerup;
             let rate = attack_rate(bm, own, reload, roles, &step.world.model.tuning.garrison);
             share(
                 me,
@@ -52,19 +61,54 @@ impl Unit {
         } else {
             Firepower::ZERO
         };
-        if let Some((_, unit)) = step.world.object_mut(target) {
-            unit.garrison.push(self.id);
-            let id = unit.id;
-            step.world.parts.combat_mut(id)?.firepower += firepower;
-            if bm.kind == MasterKind::BUILDING {
-                let countdown = step.world.parts.combat_of(self.id).raider_countdown;
-                let counts = GarrisonCounts::of_unit(me, countdown, roles);
-                step.world
-                    .parts
-                    .building_mut(id)?
-                    .garrison_counts
-                    .count_in(counts);
-            }
+        let Some((_, unit)) = step.world.object_mut(target) else {
+            return Ok(());
+        };
+        unit.garrison.push(self.id);
+        let id = unit.id;
+        step.world.parts.combat_mut(id)?.firepower += firepower;
+        if bm.kind == MasterKind::BUILDING {
+            let countdown = step.world.parts.combat_of(self.id).raider_countdown;
+            let counts = GarrisonCounts::of_unit(me, countdown, roles);
+            step.world
+                .parts
+                .building_mut(id)?
+                .garrison_counts
+                .count_in(counts);
+            self.keep_inside(actions, step, id, bp, me)?;
+        }
+        Ok(())
+    }
+
+    /// The end of a building's slot 0x1c0 (`FUN_1411cb850`) for the unit (of master `me`) that
+    /// went into `building` of player `bp`: what the building keeps of it ([`Kept::of_unit`],
+    /// [`World::keep_in`]); after a relic every technology of the player is updated
+    /// (`FUN_1413cce70` with −1, [`World::update_dependents`]) on the world that holds the unit
+    /// again ([`Step::lend`]: a research it completes may reach it).
+    ///
+    /// # Errors
+    ///
+    /// A player the world does not hold, the count's, the update's and the lend's.
+    ///
+    /// [`World::keep_in`]: crate::world::World::keep_in
+    /// [`World::update_dependents`]: crate::world::World::update_dependents
+    fn keep_inside(
+        &mut self,
+        actions: &mut Action,
+        step: &mut Step<'_>,
+        building: ObjectId,
+        bp: PlayerId,
+        me: &Master,
+    ) -> GenieResult<()> {
+        let culture = step.world.players.player(bp)?.culture;
+        let Some(kept) = Kept::of_unit(culture, me, &step.world.model.roles) else {
+            return Ok(());
+        };
+        step.world.keep_in(building, bp, kept)?;
+        if kept == Kept::Relic {
+            step.lend((&mut *self, &mut *actions), |world| {
+                world.update_dependents(bp, Dependents::Every)
+            })?;
         }
         Ok(())
     }

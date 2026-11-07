@@ -25,6 +25,8 @@ pub(crate) use self::let_out::HOUSED_NOT_LIVE;
 mod meeting;
 mod outcomes;
 mod raider_countdown;
+mod relics;
+pub(crate) use self::relics::Kept;
 mod scope;
 mod shelter;
 mod takes_in;
@@ -89,6 +91,8 @@ const CLASS_FLAGS: [u32; 64] = GARRISON_CLASS_FLAGS;
 
 #[cfg(test)]
 mod counts_tests;
+#[cfg(test)]
+mod relics_tests;
 #[cfg(test)]
 mod siege_tests;
 #[cfg(test)]

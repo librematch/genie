@@ -290,10 +290,7 @@ fn master_read(view: VictimView<'_>, roles: &Roles) -> GenieResult<Victim> {
         master_id: master.id,
         radius: master.radius,
         height: master.height,
-        storage: master
-            .storage
-            .first()
-            .map_or(Amount::ZERO, |stored| stored.1),
+        storage: master.amount_held(),
         capacity: master.capacity,
         workers: unit.workers,
         blast_defense: master.blast_defense,

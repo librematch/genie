@@ -19,6 +19,7 @@ use crate::technology::ModifyLocation;
 use crate::technology::ModifyMode;
 use crate::technology::ResearchState;
 use crate::technology::TechId;
+use crate::technology::effect::Dependents;
 use crate::technology::effect::{ONE, ROUND};
 use crate::technology::{Location, ResearchCap, factors};
 use crate::world::Seconds;
@@ -93,7 +94,7 @@ impl World {
         }
         if let Some(time_mode) = tech_time_mode(mode) {
             self.research_time(player_id, tech, value, time_mode, building)?;
-            return self.update_dependents(player_id, tech_id);
+            return self.update_dependents(player_id, Dependents::Of(tech_id));
         }
         self.set_tech_field(player_id, tech_id, (mode, value), at)
     }

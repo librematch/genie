@@ -35,6 +35,15 @@ use crate::world::slots::{CheckedIndexExt, PlayerSlotsExt};
 use crate::{GenieError, GenieResult};
 use std::sync::Arc;
 
+/// The technologies `FUN_1413cce70` updates ([`World::update_dependents`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub(crate) enum Dependents {
+    /// Those that require a technology (its id).
+    Of(TechId),
+    /// Every technology of the player's tree (−1).
+    Every,
+}
+
 /// An enable command finds the master it tested gone.
 const NO_MASTER: GenieError =
     GenieError::unreachable("an enable command for a master the player lacks");
@@ -87,7 +96,7 @@ impl World {
             .checked(index)?
             .effect(&def);
         self.do_table_effect(player_id, effect, None)?;
-        self.update_dependents(player_id, tech)?;
+        self.update_dependents(player_id, Dependents::Of(tech))?;
         let owner = &self.players.player(player_id)?;
         let state = owner.techs.checked(index)?;
         let location = building.map_or_else(
@@ -232,12 +241,13 @@ impl World {
             .techs
             .checked_mut(index)?
             .state = ResearchState::Unavailable;
-        self.update_dependents(player_id, tech)
+        self.update_dependents(player_id, Dependents::Of(tech))
     }
 
-    /// `FUN_1413cce70` for player `player_id`'s technology `tech`: each technology that requires
-    /// it, by id (`+0x38`'s lists), not of the shared kind: one in state 0 or 1 and not held by
-    /// `+0x60` turns to −1 when it is another civ's (or its civ's under the full tech tree,
+    /// `FUN_1413cce70` for player `player_id`'s technologies `dependents`: each technology that
+    /// requires a technology, by id (`+0x38`'s lists), or with −1 each of the player's tree (its
+    /// count `+0x20`), not of the shared kind: one in state 0 or 1 and not held by `+0x60` turns to
+    /// −1 when it is another civ's (or its civ's under the full tech tree,
     /// [`crate::world::settings::OptionFlags::FULL_TECH_TREE`], while not of mode 1) or not for
     /// this game mode; else with fewer of its requirements researched than it needs it turns to 0
     /// (from above 0), with them all to 1 (from below 1) unless its research is done already (its
@@ -248,12 +258,17 @@ impl World {
     pub(crate) fn update_dependents(
         &mut self,
         player_id: PlayerId,
-        tech: TechId,
+        dependents: Dependents,
     ) -> GenieResult<()> {
         let mut counted = 0;
-        let civ = self.players.player(player_id)?.civ;
-        for index in 0..self.model.techs.len() {
-            counted += self.update_dependent(player_id, civ, (index, tech))?;
+        let owner = self.players.player(player_id)?;
+        let (civ, tree) = (owner.civ, owner.techs.len());
+        let walked = match dependents {
+            Dependents::Of(_) => self.model.techs.len(),
+            Dependents::Every => tree,
+        };
+        for index in 0..walked {
+            counted += self.update_dependent(player_id, civ, index, dependents)?;
         }
         if counted == 0 {
             let owner = self.players.player_mut(player_id)?;
@@ -268,17 +283,22 @@ impl World {
         Ok(())
     }
 
-    /// One technology `dependent` of [`World::update_dependents`]'s walk, for player `player_id` of
-    /// civ `civ` and the changed technology `tech`: how much it adds to the count.
+    /// One technology `dependent` of [`World::update_dependents`]'s walk over `dependents`, for
+    /// player `player_id` of civ `civ`: how much it adds to the count.
     fn update_dependent(
         &mut self,
         player_id: PlayerId,
         civ: CivId,
-        (dependent, tech): (usize, TechId),
+        dependent: usize,
+        dependents: Dependents,
     ) -> GenieResult<i32> {
         let mut counted = 0;
         let def = self.model.techs.checked(dependent)?;
-        if !def.required.contains(&Some(tech)) || def.kind == TechKind::SHARED {
+        let walked = match dependents {
+            Dependents::Of(tech) => def.required.contains(&Some(tech)),
+            Dependents::Every => true,
+        };
+        if !walked || def.kind == TechKind::SHARED {
             return Ok(counted);
         }
         let Some(state) = self.players.player(player_id)?.techs.get(dependent) else {

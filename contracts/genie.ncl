@@ -37,6 +37,7 @@
     gold | AttributeId | doc "Gold: a sale gives it and a purchase costs it, the treason costs it.",
     headroom | AttributeId | doc "The population headroom (`+0x308` 4): a building's held amount gives it, and a cost check skips it (`FUN_141618db0` with its fifth argument 1).",
     current_age | AttributeId | doc "The current age (`+0x30`, `player+0x100`), as the `i16` game mode 16's QUEUE, a new soldier's unit AI (`FUN_140c12300`) and a command compare; the mode's bound is `DAT_14330eb8c`.",
+    relics_held | AttributeId | doc "The relics the player holds (7, `player+0x100`'s `+0x38`): a building of a player of a culture counts a relic in and out (`FUN_1411cb850`, `FUN_1411d6ad0`), and a researched technology paid in more relics than are left goes back.",
     population | AttributeId | doc "The population.",
     units_owned | AttributeId | doc "The units owned.",
     kills | AttributeId | doc "The kills.",

@@ -282,10 +282,10 @@ impl Unit {
     /// records leave the registry's lists (`FUN_14128a1d0` from its mask to 0); the building's
     /// sight takes a circle of 5 (slot 0x1d0 with 5) and the villager's town-bell flag follows the
     /// garrison (`FUN_1412067f0` with 3). Then notify 0x1fa with the enter action value and
-    /// `set_state(1)` ([`Unit::entered`]). The building's firepower (`+0xa00`) and its counts
-    /// (`+0xba8`, `+0xc2c`) follow the units in ([`Unit::join_building`]); the sound, the tracker
-    /// and a Gaia building's capture (slot 0x70) are not held. [`EnterOutcome::NoRoom`] without
-    /// room in the building.
+    /// `set_state(1)` ([`Unit::entered`]). The building's firepower (`+0xa00`), its counts
+    /// (`+0xba8`, `+0xc2c`), its relics and livestock (`+0xc20`, `+0xc28`) follow the units in
+    /// ([`Unit::join_building`]); the sound, the tracker and a Gaia building's capture (slot 0x70)
+    /// are not held. [`EnterOutcome::NoRoom`] without room in the building.
     pub(crate) fn enter_building(
         &mut self,
         actions: &mut Action,
@@ -403,17 +403,17 @@ impl Unit {
         Ok(EnterOutcome::Inside)
     }
 
-    /// The unit's slot 0x1a0 into building `target` (`FUN_141212e10`; the room test, slot 0x198,
-    /// is the caller's), the unit's master `me` and the building's `bm`: its sight goes from its
-    /// tile, it leaves its tile's list, the obstruction manager and the mesh; a member of a unit
-    /// group leaves the group when the world holds it (removeUnit, `FUN_14102c160` with the
-    /// building and 0, [`crate::world::World::remove_unit`] at once on the unit lent back to its
-    /// slot; `FUN_14152ff40`) and stands; it joins the building's (slot 0x1c0: the building's
-    /// list, for a unit of type 70 its volleys' share and a building's counts,
-    /// [`Unit::join_building`]); its records leave the registry's lists; the building's sight
-    /// takes a circle of 5 and the villager's town-bell flag follows the garrison and a siege unit
-    /// counts its infantry ([`Unit::enter_tail`]). The building's `+0x9a8` (the units inside the
-    /// unit) is not modelled.
+    /// The unit's slot 0x1a0 into building `target` (`FUN_141212e10`; the room test, slot 0x198, is
+    /// the caller's), the unit's master `me` and the building's `bm`: its sight goes from its tile,
+    /// it leaves its tile's list, the obstruction manager and the mesh; a member of a unit group
+    /// leaves the group when the world holds it (removeUnit, `FUN_14102c160` with the building and
+    /// 0, [`crate::world::World::remove_unit`] at once on the unit lent back to its slot;
+    /// `FUN_14152ff40`) and stands; it joins the building's (slot 0x1c0: the building's list, for a
+    /// unit of type 70 its volleys' share, a building's counts and its relics and livestock,
+    /// [`Unit::join_building`]); its records leave the registry's lists; the building's sight takes
+    /// a circle of 5 and the villager's town-bell flag follows the garrison and a siege unit counts
+    /// its infantry ([`Unit::enter_tail`]). The building's `+0x9a8` (the units inside the unit) is
+    /// not modelled.
     pub(crate) fn go_inside(
         &mut self,
         actions: &mut Action,
@@ -455,10 +455,7 @@ impl Unit {
         // the callers found it (`Unit::enter_building`, `World::enter_now`), and the sight's
         // change removes no object
         let (bp, building) = step.world.object(target).ok_or(ENTERED_NOT_HELD)?;
-        let (at, reload) = (
-            building.position(),
-            step.world.parts.combat_of(building.id).reload_powerup,
-        );
+        let at = building.position();
         self.place.go_inside(id, at, &mut step.world.spatial);
         step.world.pathing.removed(id);
         // a member of a unit group (+0x6d0) leaves the group the world holds, then stands
@@ -481,7 +478,7 @@ impl Unit {
             .get(target)
             .map_or(bm.radius, |target_placed| target_placed.radius);
         self.life.inside = Some(target);
-        self.join_building(step, Some(target), bp, reload, me, bm)?;
+        self.join_building(actions, step, target, bp, me, bm)?;
         self.enter_sight(step, target, at, building_radius, placed, bm)?;
         self.enter_tail(step, target, me, bm, roles)
     }

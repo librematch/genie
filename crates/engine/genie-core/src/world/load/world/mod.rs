@@ -14,7 +14,7 @@ use crate::objects::ListIndex;
 use crate::players::game_status::Fealty;
 use crate::players::game_status::GameStatus;
 use crate::players::game_status::VictoryState;
-use crate::players::{Amount, Chance, CivId, EscrowShare, LotVolume, Team};
+use crate::players::{Amount, Chance, CivId, Culture, EscrowShare, LotVolume, Team};
 use crate::world::FrameSeed;
 use crate::world::Millis;
 use crate::world::Model;
@@ -160,6 +160,7 @@ pub fn saved_world(
                     .map(|&bits| Amount::new(f32::from_bits(bits)))
                     .collect(),
                 civ,
+                culture: Culture::of_data(player_section.world_player().base.culture),
                 relations: Relations::of_bytes(
                     player_section.world_player().base.relation.iter().copied(),
                 ),

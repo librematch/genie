@@ -218,10 +218,7 @@ impl World {
         let master = unit.master(self.master_tables(), player_id)?;
         Ok(Some(WorkTarget {
             hp: unit.life.hp,
-            storage: master
-                .storage
-                .first()
-                .map_or(Amount::ZERO, |stored| stored.1),
+            storage: master.amount_held(),
             class: master.class,
         }))
     }

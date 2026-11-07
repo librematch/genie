@@ -15,7 +15,7 @@ use crate::players::history::History;
 use crate::players::tracker::Tracker;
 use crate::players::world_player::VictoryTimes;
 use crate::players::{
-    ByPlayer, Chance, CivId, EscrowShare, LotVolume, PlayerKind, Relations, Stance,
+    ByPlayer, Chance, CivId, Culture, EscrowShare, LotVolume, PlayerKind, Relations, Stance,
 };
 use crate::technology::{Attributes, TechState};
 use crate::trace::{player_stops, player_unsupported};
@@ -146,6 +146,9 @@ pub struct Player {
     pub(crate) generated: Vec<Amount>,
     /// The civ (`player+0x738`), which drop sites read.
     pub civ: CivId,
+    /// `culture` (`+0x88`, saved): its civ's icon set; a building of a player without one counts
+    /// no relics and no livestock ([`Culture`]).
+    pub(crate) culture: Culture,
     /// `relation[i]` (`player+0x260`): how the player stands to player i.
     pub(crate) relations: Relations,
     /// The sleeping objects, in their list's order: they are not updated; a unit's work on one

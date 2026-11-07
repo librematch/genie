@@ -106,7 +106,7 @@ bitflags! {
         const LEAST_HIT = 1 << 44;
         /// The classes a lion attacks by its own choice (its slot 0xa0's list, `FUN_140c18d50`; the game's `+0x6b4` of 1, not met, adds 13, 18 and 55).
         const LION_TARGET = 1 << 45;
-        /// Livestock (decoded 58, `0x3a`, `-0xe72` raw), which goes to Gaia when killed.
+        /// Livestock (decoded 58, `0x3a`, `-0xe72` raw), which goes to Gaia when killed, and whose amount held a building of a player of a culture sums as it goes in and out (`FUN_1411cb850`, `FUN_1411d6ad0`).
         const LIVESTOCK = 1 << 46;
         /// The classes a combat object of which counts in its player's attribute 40 (`FUN_141226060`).
         const MILITARY_COUNT = 1 << 47;
@@ -162,7 +162,7 @@ bitflags! {
         const RAIDER = 1 << 72;
         /// What a ram attacks by its own choice: buildings, siege, walls, gates, farms, the packed units, towers, the unpacked siege and the scorpions.
         const RAM_TARGET = 1 << 73;
-        /// Relics (`.dat` class 42, `0x2a`, `-0xe82` raw): a delete spares them.
+        /// Relics (`.dat` class 42, `0x2a`, `-0xe82` raw): a delete spares them, and a building of a player of a culture counts them in and out (`FUN_1411cb850`, `FUN_1411d6ad0`).
         const RELIC = 1 << 74;
         /// The trebuchets' classes (51, 54), whose building repair is the unit's.
         const REPAIRED_AS_UNIT = 1 << 75;
@@ -484,7 +484,7 @@ bitflags! {
         const ORE = 1 << 11;
         /// A relic, as a monk carries it (`+0x308` 0x39): the monk tasks for carried relics; a unit carrying one never attacks.
         const RELIC = 1 << 12;
-        /// The relics the player holds (7): a research paid in them (`FUN_1413d0e70`).
+        /// The relics the player holds (7): a research paid in them (`FUN_1413d0e70`), and a researched one paid in more than are left after a relic left a building (`FUN_1411d6ad0`).
         const RELICS_HELD = 1 << 13;
         /// The attribute that shares every player's sight (0xb7): the masks are rebuilt.
         const SHARED_VISION = 1 << 14;
@@ -604,6 +604,8 @@ pub struct AttributeSlots {
     pub headroom: AttributeId,
     /// The current age (`+0x30`, `player+0x100`), as the `i16` game mode 16's QUEUE, a new soldier's unit AI (`FUN_140c12300`) and a command compare; the mode's bound is `DAT_14330eb8c`.
     pub current_age: AttributeId,
+    /// The relics the player holds (7, `player+0x100`'s `+0x38`): a building of a player of a culture counts a relic in and out (`FUN_1411cb850`, `FUN_1411d6ad0`), and a researched technology paid in more relics than are left goes back.
+    pub relics_held: AttributeId,
     /// The population.
     pub population: AttributeId,
     /// The units owned.

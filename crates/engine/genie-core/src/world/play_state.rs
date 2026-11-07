@@ -1,7 +1,7 @@
 //! The world's game state.
 
 /// The world's game state (`+0x88`, the save's `tempGameState`): 0 while the game is played, 1
-/// once it is over; in state 2 a death leaves no ghosts.
+/// once it is over, 2 while the world is cleared or loaded.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub enum PlayState {
     /// The game is played (0).
@@ -9,6 +9,10 @@ pub enum PlayState {
     Playing,
     /// The game is over (1).
     Over,
+    /// The world is cleared (2): its clear (`BaseWorld::slot9`, `FUN_14152f270`) and the start of
+    /// its load (`BaseWorld::load_world`) set it. A death leaves no ghosts, and a relic leaving a
+    /// building takes back no technology (`FUN_1411d6ad0`).
+    Clearing,
     /// A value the game names nowhere, as the save or the game holds it.
     Other(Unnamed),
 }
@@ -24,6 +28,7 @@ impl PlayState {
         match value {
             0 => Self::Playing,
             1 => Self::Over,
+            2 => Self::Clearing,
             other => Self::Other(Unnamed(other)),
         }
     }
@@ -33,12 +38,10 @@ impl PlayState {
         match self {
             Self::Playing => 0,
             Self::Over => 1,
+            Self::Clearing => 2,
             Self::Other(Unnamed(value)) => value,
         }
     }
-
-    /// The state in which a death leaves no ghosts (2).
-    const NO_GHOSTS: u32 = 2;
 
     /// The state of the save's word `value`.
     #[must_use]
@@ -52,10 +55,11 @@ impl PlayState {
         self.raw()
     }
 
-    /// Whether a death leaves its ghosts (any state but 2: `FUN_14118e990`'s callers).
+    /// Whether a death leaves its ghosts (any state but [`PlayState::Clearing`]:
+    /// `FUN_14118e990`'s callers).
     #[must_use]
     pub const fn leaves_ghosts(self) -> bool {
-        self.raw() != Self::NO_GHOSTS
+        !matches!(self, Self::Clearing)
     }
 }
 
@@ -73,6 +77,7 @@ mod tests {
     #[test]
     fn only_state_2_leaves_no_ghosts() {
         assert!(PlayState::Playing.leaves_ghosts() && PlayState::Over.leaves_ghosts());
+        assert!(PlayState::of_data(3).leaves_ghosts());
         assert!(!PlayState::of_data(2).leaves_ghosts());
         assert_eq!(PlayState::default(), PlayState::Playing);
     }
@@ -80,9 +85,10 @@ mod tests {
     /// Each named value and one the set names nowhere go to their variant and back.
     #[test]
     fn every_play_state_value_maps_to_its_variant_and_back() {
-        for value in [0, 1, 2] {
+        for value in [0, 1, 2, 3] {
             assert_eq!(PlayState::of_raw(value).raw(), value);
         }
-        assert!(matches!(PlayState::of_raw(2), PlayState::Other(_)));
+        assert_eq!(PlayState::of_raw(2), PlayState::Clearing);
+        assert!(matches!(PlayState::of_raw(3), PlayState::Other(_)));
     }
 }

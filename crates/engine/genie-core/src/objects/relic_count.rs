@@ -27,6 +27,12 @@ impl RelicCount {
     pub const fn plus_one(self) -> Self {
         Self(self.0.wrapping_add(1))
     }
+
+    /// One relic less (`DEC`: below 0 too).
+    #[must_use]
+    pub const fn minus_one(self) -> Self {
+        Self(self.0.wrapping_sub(1))
+    }
 }
 
 impl genie_diff::Diff for RelicCount {
@@ -44,5 +50,12 @@ mod tests {
     fn count_grows_by_one() {
         assert_eq!(RelicCount::ZERO.plus_one().get(), 1);
         assert_eq!(RelicCount::of_data(i32::MAX).plus_one().get(), i32::MIN);
+    }
+
+    /// A count shrinks by one, below 0 and wrapping as an int.
+    #[test]
+    fn count_shrinks_by_one() {
+        assert_eq!(RelicCount::ZERO.minus_one().get(), -1);
+        assert_eq!(RelicCount::of_data(i32::MIN).minus_one().get(), i32::MAX);
     }
 }

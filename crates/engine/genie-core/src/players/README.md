@@ -25,6 +25,7 @@ A player has more than its objects. This folder holds the rest:
 | --- | --- |
 | [`by_player.rs`](by_player.rs) | One value per player, looked up by the player (`ByPlayer`). |
 | [`chance.rs`](chance.rs) | A computer player's chance setting: the percent a unit AI's draw is held against. |
+| [`culture.rs`](culture.rs) | A player's culture: its civilisation's icon set, which a building's counts of the relics and the livestock inside it test. |
 | [`diplomacy.rs`](diplomacy.rs) | A player's diplomacy change (the world player's slot 0x30, `FUN_141639690`, which GAME's sub-command 0 runs): its stance toward another player (`diplomacy[i]`, `+0xe12`), the relation it makes (`relation[i]`, `+0x260`) and what its queries make of that player's objects (`unit_diplomacy[i]`, `+0x278`); its objects hear of it (slot 0x120: units inside a building or siege tower of a player no longer allied leave it); the players' sight masks and tile lists are made again; then the world's teams (`FUN_1415e23f0`) and the units the players reveal (`FUN_14152bcb0`). |
 | [`escrow_share.rs`](escrow_share.rs) | The share of a resource's income a computer player sets aside. |
 | [`market.rs`](market.rs) | The market: the world's commodity prices (`+0x868`..`+0x8a0`, saved) and the two commands that trade at them, `TRIBE_COMMAND_SELL_COMMODITY` (0x7a, `FUN_141639310`) and `TRIBE_COMMAND_BUY_COMMODITY` (0x7b, `FUN_141618390`). |
@@ -45,6 +46,7 @@ A player has more than its objects. This folder holds the rest:
 | [`tribute_fee.rs`](tribute_fee.rs) | The fee a tribute costs. |
 | [`unit_relation.rs`](unit_relation.rs) | What a player's queries make of another player's objects as one type, its saved value, and the tables by it. |
 | [`ai_module/`](ai_module/) | A computer player's AI module (`player+0x7a8`, `TribeMainDecisionAIModule`, 0x28fb8 bytes). |
+| [`culture/`](culture/) | The culture's tests. |
 | [`game_status/`](game_status/) | The players' game status (`+0x89`: playing, won, lost) and what changes it: RESIGN (`FUN_140d25af0`), the world's victory check after every update (`TRIBE_World` slot 0x68, `FUN_1415c9480`, whose tail `FUN_14152e3d0` decides who won), and the status setter (`WorldPlayer` slot 1, `FUN_141639860`) with a defeated player's stop of its objects (`FUN_141613ed0`): its villagers, fishing boats and explorers stop and stand, its buildings stop and give back their queues, and every unit AI's orders go. |
 | [`history/`](history/) | The player's history (`TRIBE_History_Info`, TribeHistoryInfo.cpp; player `+0xdb8`, saved with the player): a population entry each history period and a list of events, newest first. |
 | [`world_player/`](world_player/) | The world player's own update (`WorldPlayer::update`, `0x14163b100`, slot 0x100) and Gaia's (`WorldPlayerGaia::update`, `0x141681cd0`, its slot 0x100). |

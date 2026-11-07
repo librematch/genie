@@ -2181,7 +2181,7 @@ fn dependent_completed_at_its_building_is_not_counted() {
         def([-1, -1], 0),
     ]);
     world
-        .update_dependents(PlayerId::new(0), tech_id(0))
+        .update_dependents(PlayerId::new(0), Dependents::Of(tech_id(0)))
         .unwrap();
     let states: Vec<i16> = world.players[0]
         .techs
@@ -2241,6 +2241,84 @@ fn the_full_tech_tree_disables_civ_own_technologies_but_those_of_mode_1() {
     };
     assert_eq!(states(false), [3, 1, 1, -1, 1]);
     assert_eq!(states(true), [3, -1, 1, -1, 1]);
+}
+
+/// `FUN_1413cce70` with −1 (a relic's enter, `FUN_1411cb850`) walks every technology of the
+/// player's tree, whatever it requires: one with its requirements met turns 1, one missing one
+/// turns 0 from 1, another civ's turns −1, a researched one and one of the shared kind stay;
+/// with a technology's id only those that require it change. With none counted (a tree of
+/// researched technologies) attribute 39 turns 1 from 0.
+#[test]
+fn update_of_every_dependent_walks_the_whole_tree() {
+    use crate::technology::{TechDef, TechState};
+    let def = |required: i16, civ: i16, kind: i16| TechDef {
+        required: [TechId::of_data(required), None, None, None, None, None],
+        required_count: i16::from(required != -1),
+        civ: CivId::of_tech(civ).unwrap(),
+        kind: TechKind::from(kind),
+        ..TechDef::default()
+    };
+    let state = |research_state: ResearchState| TechState {
+        state: research_state,
+        ..TechState::default()
+    };
+    let world = |states: Vec<TechState>| {
+        let player = Player {
+            civ: CivId::new(5),
+            techs: states,
+            attributes: vec![Amount::ZERO; 40],
+            ..Player::default()
+        };
+        let mut world = World::new(
+            WorldTime::ZERO,
+            FrameSeed::of_data(0),
+            PlayerId::new(0),
+            vec![Millis::ZERO],
+            vec![player],
+        );
+        world.model.techs = Arc::new(vec![
+            def(-1, 0, 0),
+            def(0, 0, 0),
+            def(3, 0, 0),
+            def(-1, 7, 0),
+            def(-1, 0, 0x20),
+        ]);
+        world
+    };
+    let tree = || {
+        vec![
+            state(ResearchState::Researched),
+            state(ResearchState::Unavailable),
+            state(ResearchState::Available),
+            state(ResearchState::Unavailable),
+            state(ResearchState::Unavailable),
+        ]
+    };
+    let states = |dependents: Dependents| {
+        let mut world = world(tree());
+        world
+            .update_dependents(PlayerId::new(0), dependents)
+            .unwrap();
+        let states: Vec<i16> = world.players[0]
+            .techs
+            .iter()
+            .map(|tech_state| tech_state.state.get())
+            .collect();
+        (states, world.players[0].attributes[39])
+    };
+    assert_eq!(
+        states(Dependents::Every),
+        (vec![3, 1, 0, -1, 0], Amount::ZERO)
+    );
+    assert_eq!(
+        states(Dependents::Of(tech_id(0))),
+        (vec![3, 1, 1, 0, 0], Amount::ZERO)
+    );
+    let mut researched = world(vec![state(ResearchState::Researched); 5]);
+    researched
+        .update_dependents(PlayerId::new(0), Dependents::Every)
+        .unwrap();
+    assert_eq!(researched.players[0].attributes[39], Amount::new(1.0));
 }
 
 /// The technology commands of an effect: the disable command (`'f'`, MarvinBlue/426048737's

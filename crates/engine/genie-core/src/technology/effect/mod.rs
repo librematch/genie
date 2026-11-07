@@ -19,6 +19,7 @@ mod tech_change;
 mod upgrade;
 
 pub use self::change::Change;
+pub(crate) use self::completion::Dependents;
 #[cfg(test)]
 use self::object_slots::charge_after;
 use self::object_slots::{CAPPED, ONE, ROUND, has_actions, within_table};

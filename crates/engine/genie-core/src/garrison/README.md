@@ -9,7 +9,9 @@ Units go into buildings and transports, and come out again. This folder holds bo
   building or transport, and the point where they meet.
 - `unit.rs` is the unit's part: a unit entering and its update while it is inside another
   object. `holder.rs` is the container's part of an enter and a leave: its list, its volleys
-  and, in a building, its counts of the villagers and raiders inside (`counts.rs`).
+  and, in a building, its counts of the villagers and raiders inside (`counts.rs`) and of the
+  relics and livestock (`relics.rs`: a relic also counts in its player's relics held, and its
+  leave takes back the technologies paid in more relics than are left).
 - `unload.rs` and `let_out.rs` hold UNLOAD, `GO_BACK_TO_WORK` and a unit's leave.
 - `firepower.rs` holds a unit's attack rate and firepower, and its share of a building's volleys.
 - `transport/` holds the Transport action: a transport's sail and its unload ashore.
@@ -40,6 +42,8 @@ Units go into buildings and transports, and come out again. This folder holds bo
 | [`mod.rs`](mod.rs) | Units inside other objects: the garrison order, the Enter action, the unloads and the Transport action. |
 | [`outcomes.rs`](outcomes.rs) | What a unit's way out of a building (`LetOut`), its way in (`EnterOutcome`) and its way back to work after the town bell (`WorkReturn`) answer. |
 | [`raider_countdown.rs`](raider_countdown.rs) | A combat object's raider countdown. |
+| [`relics.rs`](relics.rs) | A building's relics and livestock inside it (`FUN_1411cb850`, `FUN_1411d6ad0`): their counts, the relics its player holds and the researched technologies paid in relics. |
+| [`relics_tests.rs`](relics_tests.rs) | Tests: A building's relics and livestock (`FUN_1411cb850`, `FUN_1411d6ad0`): their counts as they go in and out, the relics its player holds, the technologies updated as a relic comes in and those paid in relics that go back as one leaves. |
 | [`scope.rs`](scope.rs) | Which shelters a garrison takes (`GarrisonScope`) and how far a unit goes to one (`ShelterReach`). |
 | [`shelter.rs`](shelter.rs) | The garrison order and `SEEK_SHELTER`: each unit to a building that takes it in, nearest first (`Shelters`). |
 | [`siege_tests.rs`](siege_tests.rs) | Tests: A siege unit's count of the infantry inside it, and a ranged unit's reload as it leaves one. |
@@ -54,6 +58,6 @@ Units go into buildings and transports, and come out again. This folder holds bo
 ## How it connects
 
 <!-- uses -->
-- Uses: [`combat`](../combat/), [`commands`](../commands/), [`construction`](../construction/), [`gathering`](../gathering/), [`groups`](../groups/), [`map`](../map/), [`math`](../math/), [`movement`](../movement/), [`objects`](../objects/), [`orders`](../orders/), [`ownership`](../ownership/), [`pathing`](../pathing/), [`players`](../players/), [`production`](../production/), [`unit_ai`](../unit_ai/), [`vision`](../vision/), [`world`](../world/).
+- Uses: [`combat`](../combat/), [`commands`](../commands/), [`construction`](../construction/), [`gathering`](../gathering/), [`groups`](../groups/), [`map`](../map/), [`math`](../math/), [`movement`](../movement/), [`objects`](../objects/), [`orders`](../orders/), [`ownership`](../ownership/), [`pathing`](../pathing/), [`players`](../players/), [`production`](../production/), [`technology`](../technology/), [`unit_ai`](../unit_ai/), [`vision`](../vision/), [`world`](../world/).
 - Used by: [`commands`](../commands/), [`map`](../map/), [`movement`](../movement/), [`objects`](../objects/), [`orders`](../orders/), [`ownership`](../ownership/), [`players`](../players/), [`production`](../production/), [`technology`](../technology/), [`testing`](../testing/), [`unit_ai`](../unit_ai/), [`world`](../world/).
 <!-- /uses -->

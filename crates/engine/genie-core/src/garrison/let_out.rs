@@ -7,6 +7,7 @@ use crate::combat::reload::full_reload;
 use crate::commands::GatherPoint;
 use crate::commands::GatherPointState;
 use crate::garrison::GarrisonCounts;
+use crate::garrison::Kept;
 use crate::garrison::LetOut;
 use crate::garrison::RaiderCountdown;
 use crate::garrison::{INSIDE_SIGHT, NO_POINT, SIEGE_UNLOAD, attack_rate, share};
@@ -60,20 +61,20 @@ impl World {
     /// at the building's height (`FUN_14119d610`), leaves the building (slot 0x1a8,
     /// `FUN_141213120`: the building's slot 0x1c8, `FUN_1411d6ad0` -> `FUN_141217910`, takes its
     /// share off the volleys, back to its master's volley fire when none is left inside or it fell
-    /// below it, lets it out of its list, `FUN_141197e10`, and counts it out of its villagers and
-    /// raiders, [`Unit::let_go`]; the building's sight lets the circle of 5 go, slot 0x1d8 with
-    /// 5) and goes on the map there (slot 0x58: its tile's list, its obstruction record, the mesh,
-    /// its sight). With a gather point (`+0xc30` 1) not on the building and no point, it then goes
-    /// to work on the gather point's target when the world holds it (its unit AI forgets its
-    /// target, `FUN_140c5e1e0`; [`World::gather`]); else, or with a point, it moves there
-    /// ([`World::gather_move`] after the same forgetting).
+    /// below it, lets it out of its list, `FUN_141197e10`, counts it out of its villagers and
+    /// raiders, [`Unit::let_go`], and out of its relics or livestock, [`World::keep_out`]; the
+    /// building's sight lets the circle of 5 go, slot 0x1d8 with 5) and goes on the map there (slot
+    /// 0x58: its tile's list, its obstruction record, the mesh, its sight). With a gather point
+    /// (`+0xc30` 1) not on the building and no point, it then goes to work on the gather point's
+    /// target when the world holds it (its unit AI forgets its target, `FUN_140c5e1e0`;
+    /// [`World::gather`]); else, or with a point, it moves there ([`World::gather_move`] after the
+    /// same forgetting).
     /// [`LetOut::Stayed`] when no spot is free, before anything changes. With neither a point nor a
     /// gather point its unit AI stops, forgets its target and takes its stance again (slots 0xb0
     /// and 0x1c0). With an object to work on (`work_on`, `GO_BACK_TO_WORK`'s) its work command
-    /// (slot 0x128) goes to it at the point first. Not modelled: class 42's and livestock's counts
-    /// in a building of a player with `+0x88`, a siege building's (class 13) slot 0x1b0; not held:
-    /// its sound (slot 0x4c0), its garrison sprite. Its work command (slot 0x128) has `+0xa14` 0:
-    /// the unit AI keeps its notifies and its queued orders.
+    /// (slot 0x128) goes to it at the point first. Not modelled: a siege building's (class 13) slot
+    /// 0x1b0; not held: its sound (slot 0x4c0), its garrison sprite. Its work command (slot 0x128)
+    /// has `+0xa14` 0: the unit AI keeps its notifies and its queued orders.
     ///
     /// [`Unit::let_go`]: crate::objects::unit::Unit::let_go
     pub(crate) fn let_out(
@@ -128,21 +129,6 @@ impl World {
         {
             return Err(SIEGE_UNLOAD);
         }
-        if self
-            .model
-            .roles
-            .of_class(made.class)
-            .contains(ClassRoles::WHOLE_GARRISON_SHARE)
-            || self
-                .model
-                .roles
-                .of_class(made.class)
-                .contains(ClassRoles::LIVESTOCK)
-        {
-            return Err(GenieError::unsupported(
-                "a class 42 or livestock unit leaving a building (its player's counts)",
-            ));
-        }
         if !self.players.live(up, ui)?.garrison.is_empty() {
             return Err(GenieError::unsupported(
                 "a unit with units inside leaving a building",
@@ -162,18 +148,19 @@ impl World {
 
     /// Slot 0x1a8 (`FUN_141213120`) of the unit at (`up`, `ui`), of master `made`, inside the
     /// object at (`player`, `container`), then its slot 0x58 at `at`. The container's slot 0x1c8
-    /// (`FUN_141217910`, a building's `FUN_1411d6ad0`, [`Unit::let_go`]) takes the unit's share
-    /// off its volleys, lets it out of its list and a building counts it out of its villagers
-    /// and raiders; a building's sight lets the circle of 5 go (slot 0x1d8 with 5); the unit's
-    /// countdown to its raid (`+0x9a0`) ends; a container of type 70 or more takes off its `+0x9a8`
-    /// what the unit holds inside (slot 0x498), none in the slice. Slot 0x58 puts the unit on the
-    /// map at `at` (`new_position`: its tile's list, its obstruction record, the mesh, its sight);
-    /// its sprites (`FUN_14118a8f0`) are the interface's.
+    /// (`FUN_141217910`, a building's `FUN_1411d6ad0`, [`Unit::let_go`]) takes the unit's share off
+    /// its volleys, lets it out of its list and a building counts it out of its villagers and
+    /// raiders, then out of the relics or livestock it keeps ([`Kept::of_unit`],
+    /// [`World::keep_out`]); a building's sight lets the circle of 5 go (slot 0x1d8 with 5); the
+    /// unit's countdown to its raid (`+0x9a0`) ends; a container of type 70 or more takes off its
+    /// `+0x9a8` what the unit holds inside (slot 0x498), none in the slice. Slot 0x58 puts the unit
+    /// on the map at `at` (`new_position`: its tile's list, its obstruction record, the mesh, its
+    /// sight); its sprites (`FUN_14118a8f0`) are the interface's.
     ///
     /// # Errors
     ///
-    /// A unit without its record, an unload without the masters, and the sight's unsupported
-    /// cases.
+    /// A unit without its record, an unload without the masters, the relics' withdrawal's, and
+    /// the sight's unsupported cases.
     ///
     /// [`Unit::let_go`]: crate::objects::unit::Unit::let_go
     pub(crate) fn leave_container(
@@ -198,8 +185,18 @@ impl World {
             counts,
             &bm,
         )?;
-        // a building's sight lets the circle of 5 go (slot 0x1d8 with 5)
         let (building_at, building_radius) = (unit.position(), bm.radius);
+        // the building's slot 0x1c8 ends with the relics and the livestock it keeps
+        if bm.kind == MasterKind::BUILDING
+            && let Some(kept) = Kept::of_unit(
+                self.players.player(player)?.culture,
+                made,
+                &self.model.roles,
+            )
+        {
+            self.keep_out(bid, player, kept)?;
+        }
+        // a building's sight lets the circle of 5 go (slot 0x1d8 with 5)
         if bm.kind == MasterKind::BUILDING
             && let Some(visibility) = self.spatial.sight.as_mut()
         {

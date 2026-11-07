@@ -962,6 +962,7 @@ const fn attribute_slots() -> AttributeSlots {
         gold: AttributeId::named(3),
         headroom: AttributeId::named(4),
         current_age: AttributeId::named(6),
+        relics_held: AttributeId::named(7),
         population: AttributeId::named(11),
         units_owned: AttributeId::named(19),
         kills: AttributeId::named(20),
