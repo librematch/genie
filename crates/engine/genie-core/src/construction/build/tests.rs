@@ -353,8 +353,9 @@ fn cleared_object_loses_its_record_by_its_kind_and_the_call() {
 /// The completion's first part (`FUN_1411c6bd0`) of a farm whose build points reached its
 /// build time: attribute 237's amount for the resource of 238 only when 239 is 0 or more too
 /// and names a master the owner does not have, and the resource lies within the owner's
-/// attribute count (`FUN_1411c66a0`'s `CMP`, `JG`: the count itself too); a pasture is not
-/// modelled; a mule cart's search follows with a unit AI only.
+/// attribute count (`FUN_1411c66a0`'s `CMP`, `JG`: the count itself owes the bonus and gains
+/// nothing, as slot 0xf8's add holds no attribute there); a pasture is not modelled; a mule
+/// cart's search follows with a unit AI only.
 #[test]
 fn farm_bonus_wants_both_attributes_238_and_239() {
     let farm = Master {
@@ -398,7 +399,7 @@ fn farm_bonus_wants_both_attributes_238_and_239() {
     assert_eq!(part([45.0, -1.0, 2.0], &built).unwrap().farm_bonus, None);
     assert_eq!(
         part([45.0, 0.0, 2.0], &built).unwrap().farm_bonus,
-        Some((attribute::FOOD, Amount::new(45.0)))
+        Some(FarmBonusGain::Attribute(attribute::FOOD, Amount::new(45.0)))
     );
     assert_eq!(
         part([45.0, 0.0, 68.0], &built),
@@ -406,11 +407,18 @@ fn farm_bonus_wants_both_attributes_238_and_239() {
             "a farm's bonus near a master (FUN_1411d3cd0)"
         ))
     );
-    // the resource up to the owner's attribute count, the count itself too; past it nothing,
-    // the `i16` range's end too
+    // the resource below the owner's attribute count gains; the count itself owes the bonus
+    // and gains nothing; past it nothing, the `i16` range's end too
+    assert_eq!(
+        part([45.0, 299.0, 2.0], &built).unwrap().farm_bonus,
+        Some(FarmBonusGain::Attribute(
+            AttributeId::named(299),
+            Amount::new(45.0)
+        ))
+    );
     assert_eq!(
         part([45.0, 300.0, 2.0], &built).unwrap().farm_bonus,
-        Some((AttributeId::named(300), Amount::new(45.0)))
+        Some(FarmBonusGain::Nothing)
     );
     for past in [301.0, 40000.0] {
         assert_eq!(part([45.0, past, 2.0], &built).unwrap().farm_bonus, None);
@@ -450,6 +458,34 @@ fn farm_bonus_wants_both_attributes_238_and_239() {
         .cart
     };
     assert_eq!((searches(true), searches(false)), (true, false));
+}
+
+/// Slot 0xf8 takes a farm bonus's resource by its low word (`FUN_1411c66a0`'s `MOVZX`), which
+/// its add (`FUN_14165d040`) reads signed and gains only below the owner's attribute count: a
+/// resource past 32767 of an owner with more attributes owes the bonus, and gains the attribute
+/// of its low word where that is one below the count.
+#[test]
+fn farm_bonus_gains_the_attribute_of_its_resource_low_word() {
+    let amount = Amount::new(45.0);
+    assert_eq!(
+        bonus_gain(65_536, 70_000, amount),
+        Some(FarmBonusGain::Attribute(attribute::FOOD, amount))
+    );
+    for no_attribute in [32_768, 65_535] {
+        assert_eq!(
+            bonus_gain(no_attribute, 70_000, amount),
+            Some(FarmBonusGain::Nothing)
+        );
+    }
+    assert_eq!(bonus_gain(300, 300, amount), Some(FarmBonusGain::Nothing));
+    // past the `i16` range even the count's low word can name an attribute below it
+    assert_eq!(
+        bonus_gain(70_000, 70_000, amount),
+        Some(FarmBonusGain::Attribute(AttributeId::named(4464), amount))
+    );
+    for no_bonus in [70_001, -1] {
+        assert_eq!(bonus_gain(no_bonus, 70_000, amount), None);
+    }
 }
 
 /// A villager's Build task: range 0.1, work value 1, work rate 1.

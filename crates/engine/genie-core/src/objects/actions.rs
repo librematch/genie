@@ -306,14 +306,15 @@ impl ActionList {
         self.of_kind(kind).is_some()
     }
 
-    /// The current action (the head), if any.
+    /// The current action (the head), if any (`FUN_140a986f0`: the action of the list's first
+    /// node, `+0x10`; null for an empty list).
     #[must_use]
     pub fn head(&self) -> Option<&Action> {
         self.0.first()
     }
 
-    /// The current action (the head) to change, if any: a dispatch on its kind hands the
-    /// variant on.
+    /// The current action (the head) to change, if any ([`ActionList::head`], `FUN_140a986f0`):
+    /// a dispatch on its kind hands the variant on.
     pub fn head_mut(&mut self) -> Option<&mut Action> {
         self.0.first_mut()
     }

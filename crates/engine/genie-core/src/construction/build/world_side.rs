@@ -8,6 +8,7 @@ use crate::construction::BuildProgress;
 use crate::construction::ConstructionStart;
 use crate::construction::FoundationId;
 use crate::construction::build::Clearer;
+use crate::construction::build::FarmBonusGain;
 use crate::construction::build::{Completion, Construction, StackUnit};
 use crate::gathering::PastureId;
 use crate::map::Position;
@@ -24,9 +25,7 @@ use crate::objects::masters::PlayersMastersExt;
 use crate::objects::masters::{Master, player_master};
 use crate::objects::unit::Unit;
 use crate::orders::lock_gate;
-use crate::players::Amount;
 use crate::players::PlayerId;
-use crate::players::attribute::AttributeId;
 use crate::production::spawn::Facing;
 use crate::unit_ai::QueuedOrder;
 use crate::unit_ai::unit_ai_kind;
@@ -105,8 +104,8 @@ impl World {
         let part = completion.first_part(&construction, &self.model.roles)?;
         // its tracker part (FUN_14104eac0): the foundation leaves the pending lists
         self.track_complete(owner, id, master.id)?;
-        if let Some((kind, amount)) = part.farm_bonus {
-            self.give_farm_bonus(owner, id, kind, amount)?;
+        if let Some(gain) = part.farm_bonus {
+            self.give_farm_bonus(owner, id, gain)?;
         }
         if part.pasture {
             self.setup_pasture(owner, PastureId::new(id))?;
@@ -119,7 +118,8 @@ impl World {
 
     /// `FUN_1411c66a0`'s farm bonus ([`FirstPart::farm_bonus`]) of the building `id` of
     /// `owner`: the farm owes it to its Make (`+0xcac`, [`Building::owes_bonus`]), then its owner
-    /// gains `amount` of attribute `kind` (slot 0xf8 with 1 and 1).
+    /// gains what `gain` names (slot 0xf8 with 1 and 1), nothing for an attribute its add does
+    /// not hold ([`FarmBonusGain::Nothing`]).
     ///
     /// [`FirstPart::farm_bonus`]: crate::construction::build::FirstPart::farm_bonus
     /// [`Building::owes_bonus`]: crate::objects::layers::Building::owes_bonus
@@ -131,11 +131,15 @@ impl World {
         &mut self,
         owner: PlayerId,
         id: ObjectId,
-        kind: AttributeId,
-        amount: Amount,
+        gain: FarmBonusGain,
     ) -> GenieResult<()> {
         self.parts.building_mut(id)?.owes_bonus = true;
-        self.players.player_mut(owner)?.add_attribute(kind, amount)
+        match gain {
+            FarmBonusGain::Attribute(kind, amount) => {
+                self.players.player_mut(owner)?.add_attribute(kind, amount)
+            }
+            FarmBonusGain::Nothing => Ok(()),
+        }
     }
 
     /// The construction's start (`FUN_1411e5670`, [`Construction::begin`]) of the foundation

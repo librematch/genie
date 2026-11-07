@@ -245,9 +245,8 @@ impl Unit {
             .player_mut(step.player)?
             .tracker
             .complete(self.id, key);
-        if let Some((kind, amount)) = part.farm_bonus {
-            step.world
-                .give_farm_bonus(step.player, self.id, kind, amount)?;
+        if let Some(gain) = part.farm_bonus {
+            step.world.give_farm_bonus(step.player, self.id, gain)?;
         }
         // a pasture's livestock and a mule cart's search (from state 0), the foundation lent to
         // the world for what they place and search

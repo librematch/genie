@@ -22907,6 +22907,9 @@ fn foundation_whose_build_points_reached_its_build_time_completes() {
     }
 }
 
+/// The attribute count of [`farm_with_bonus`]'s owner.
+const FARM_OWNER_ATTRIBUTES: usize = 250;
+
 /// [`house_builder`]'s house as a farm (class 49), its owner's farm bonus (attributes 237 to
 /// 239) 45 to food near master 999, which the owner lacks.
 fn farm_with_bonus(world: &mut World) {
@@ -22917,10 +22920,17 @@ fn farm_with_bonus(world: &mut World) {
     }
     let attribute_slots = slots().attribute;
     let attributes = &mut world.players[1].attributes;
-    attributes.resize(250, Amount::ZERO);
+    attributes.resize(FARM_OWNER_ATTRIBUTES, Amount::ZERO);
     attributes[attribute_slots.folwark_collection_amount.index()] = Amount::new(45.0);
     attributes[attribute_slots.folwark_collection_kind.index()] = Amount::ZERO;
     attributes[attribute_slots.folwark_building.index()] = Amount::new(999.0);
+}
+
+/// [`farm_with_bonus`] with the bonus going to attribute `resource` (attribute 238).
+fn farm_with_bonus_to(world: &mut World, resource: usize) {
+    farm_with_bonus(world);
+    world.players[1].attributes[slots().attribute.folwark_collection_kind.index()] =
+        Amount::new(resource as f32);
 }
 
 /// A farm completing in its own update with its owner's farm bonus gives its owner the bonus
@@ -22936,6 +22946,25 @@ fn farm_completion_gives_its_owner_the_bonus_and_owes_it_to_its_make() {
         world.players[1].attributes[slots().attribute.folwark_collection_kind.index()] =
             Amount::new(-1.0);
     });
+    assert_eq!(gained, vec![(98, 25.0), (165, 25.0)]);
+    assert!(!world.parts.building_of(object_id(10028)).owes_bonus);
+}
+
+/// A farm completing with a bonus whose resource (attribute 238) is its owner's attribute
+/// count owes the bonus to its Make, as `FUN_1411c66a0`'s test lets the count through (`CMP`,
+/// `JG`), and its owner gains nothing of it: slot 0xf8's add (`FUN_14165d040`) holds no
+/// attribute there ([`FarmBonusGain::Nothing`]). One past the count owes and gains nothing.
+///
+/// [`FarmBonusGain::Nothing`]: crate::construction::build::FarmBonusGain::Nothing
+#[test]
+fn farm_bonus_at_its_owner_attribute_count_is_owed_and_gains_nothing() {
+    let (world, (gained, _)) =
+        completed_house(|world| farm_with_bonus_to(world, FARM_OWNER_ATTRIBUTES));
+    assert_eq!(gained, vec![(98, 25.0), (165, 25.0)]);
+    assert_eq!(world.players[1].attributes.len(), FARM_OWNER_ATTRIBUTES);
+    assert!(world.parts.building_of(object_id(10028)).owes_bonus);
+    let (world, (gained, _)) =
+        completed_house(|world| farm_with_bonus_to(world, FARM_OWNER_ATTRIBUTES + 1));
     assert_eq!(gained, vec![(98, 25.0), (165, 25.0)]);
     assert!(!world.parts.building_of(object_id(10028)).owes_bonus);
 }
