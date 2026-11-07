@@ -2,7 +2,7 @@
 
 use crate::combat::Firepower;
 use crate::combat::damage::TransformTest;
-use crate::combat::damage::{Heal, heal_base_hp};
+use crate::combat::damage::heal_base_hp;
 use crate::construction::MainBuildingId;
 use crate::construction::RepairTargetId;
 use crate::construction::repair::RepairFrom;
@@ -349,12 +349,11 @@ pub(crate) fn repair_target(
         // any other type's slot 0x110, its class's heal without a payment
         _ => {
             let repaired = set.checked_mut(0)?;
-            Ok(
-                match heal_base_hp(&mut repaired.hp, repaired.master_hp, amount) {
-                    Heal::Full => RepairOutcome::Full,
-                    Heal::Partial => RepairOutcome::Healed,
-                },
-            )
+            Ok(RepairOutcome::from(heal_base_hp(
+                &mut repaired.hp,
+                repaired.master_hp,
+                amount,
+            )))
         }
     }?;
     step.world

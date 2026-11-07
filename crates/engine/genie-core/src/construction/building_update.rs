@@ -2,7 +2,6 @@
 //! death blast.
 
 use crate::combat::damage::HitLayer;
-use crate::combat::damage::TransformTest;
 use crate::combat::damage::Victim;
 use crate::combat::damage::blast;
 use crate::combat::victims::file_kill;
@@ -320,6 +319,29 @@ impl Unit {
         })
     }
 
+    /// `TRIBE_Building_Object::update` (`0x1411c9000`) before its combat update, for any object
+    /// (each step tests its own): the links to removed objects ([`Unit::let_removed_links_go`]),
+    /// a gate's update ([`Unit::gate_update`]), then by the state the update reads once before
+    /// its switch (`cVar3`) a built building's whole seconds ([`Unit::building_seconds`]) or a
+    /// foundation's completion ([`Unit::complete_on_update`]): a foundation that completes in
+    /// this update runs no seconds.
+    ///
+    /// # Errors
+    ///
+    /// Each step's.
+    pub(crate) fn building_update(
+        &mut self,
+        actions: &mut Action,
+        step: &mut Step<'_>,
+        roles: &Roles,
+    ) -> GenieResult<()> {
+        self.let_removed_links_go(step, roles)?;
+        self.gate_update(actions, step, roles)?;
+        // the seconds test state 2 before the completion makes it
+        self.building_seconds(actions, step, roles)?;
+        self.complete_on_update(actions, step, roles)
+    }
+
     /// `TRIBE_Building_Object::update`'s whole seconds of a building in state 2 (`0x1411c9000`,
     /// before its combat update), outside the walls' branch ([`walls_branch`], which counts
     /// none): `FUN_1411c39b0` (attribute 255 naming its master: a terrain
@@ -327,15 +349,20 @@ impl Unit {
     /// (`+0xbe0`, which moves on by them): a monastery's (master 104) relics give their goods
     /// while its player plays (`+0x89` 0, [`World::relic_goods`], with no relics too); each unit
     /// inside (from the last) whose `raider_build_countdown` (`+0x9a0`) runs would be let out at
-    /// its end (not modelled); the units inside (from the first) heal by the master's
-    /// `garrison_heal_rate` below their master's hit points (slot 0x110, [`Unit::heal`]); with
-    /// villagers inside, a damaged building with a `garrison_repair_rate` repairs itself at a cost
-    /// (`FUN_1411d33e0`, not modelled). Its `damaged_lately_timer` (`+0x30d`) loses one when whole
+    /// its end (not modelled); the units inside (from the first, whoever's) heal by the master's
+    /// `garrison_heal_rate` ([`Unit::heal_garrison`]); with villagers inside, a damaged building
+    /// with a `garrison_repair_rate` repairs itself at its owner's cost
+    /// ([`Unit::repair_by_garrison`]). Its `damaged_lately_timer` (`+0x30d`) loses one when whole
     /// seconds passed.
+    ///
+    /// # Errors
+    ///
+    /// What the seconds do not model, and the relic goods', the heal's and the repair's.
     ///
     /// [`World::relic_goods`]: crate::world::World::relic_goods
     pub(crate) fn building_seconds(
         &mut self,
+        actions: &mut Action,
         step: &mut Step<'_>,
         roles: &Roles,
     ) -> GenieResult<()> {
@@ -419,65 +446,7 @@ impl Unit {
             }
         }
         let villagers = self.heal_garrison(step, bm.garrison_heal_rate, roles)?;
-        if 0 < villagers
-            && HitPoints::ZERO < bm.garrison_repair_rate
-            && self.life.hp < HitPoints::new(HitPoints::of_master(master_hp).get())
-        {
-            return Err(GenieError::unsupported(
-                "a building its villagers inside repair (FUN_1411d33e0)",
-            ));
-        }
-        Ok(())
-    }
-
-    /// The heal of a building's units inside, from the first ([`Unit::building_seconds`]): each
-    /// below its master's hit points heals by `rate` (slot 0x110, [`Unit::heal`]), whose slot
-    /// 0xb8 may run its hit point transforms ([`World::transform_by_hit_points`]). Returns how
-    /// many villagers are inside, which the building's repair by its garrison counts.
-    ///
-    /// [`World::transform_by_hit_points`]: crate::world::World::transform_by_hit_points
-    ///
-    /// # Errors
-    ///
-    /// A unit inside whose master its player lacks, and the heal's and the transforms'.
-    fn heal_garrison(
-        &self,
-        step: &mut Step<'_>,
-        rate: HitPoints,
-        roles: &Roles,
-    ) -> GenieResult<usize> {
-        let mut villagers = 0;
-        for &id in &self.garrison {
-            let _ = step.world.players.player(step.player)?;
-            let Some(list_index) = step.world.live_index(step.player, id) else {
-                continue;
-            };
-            let unit = step.world.players.live_mut(step.player, list_index)?;
-            let master = object_master(
-                step.world.parts.own_master.get(unit.id),
-                (unit.id, unit.life.master_id),
-                step.world.model.masters.of(step.player),
-            )?;
-            // The villager's class (4), which a building's repair by its garrison counts.
-            if roles.of_class(master.class).contains(ClassRoles::VILLAGER) {
-                villagers += 1;
-            }
-            let (class, hit_points) = (master.class, master.hit_points);
-            if HitPoints::ZERO < rate
-                && unit.life.hp < HitPoints::of_master(hit_points)
-                && unit.heal(
-                    step.world.parts.combat_mut(unit.id)?,
-                    class,
-                    hit_points,
-                    rate,
-                    roles,
-                )? == TransformTest::Runs
-            {
-                step.world
-                    .transform_by_hit_points(step.player, list_index)?;
-            }
-        }
-        Ok(villagers)
+        self.repair_by_garrison(actions, step, villagers, bm.garrison_repair_rate, master_hp)
     }
 
     /// The animated object's idle swap (the end of `RGE_Animated_Object::update`,

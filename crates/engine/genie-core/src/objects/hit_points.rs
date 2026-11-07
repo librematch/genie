@@ -1,12 +1,12 @@
 //! A combat object's hit points, a unit's or a building's (`TRIBE_Combat_Object`, types 70 and
-//! 80): the heal, the gain and the loss, the regeneration and the powerup's clamp (slots 0x110,
-//! 0xb8 and 0x260, and the update's checks). Whatever heals (a monk's heal action, a building
-//! that heals around it) calls the healed object's heal here.
+//! 80): the gain and the loss, the regeneration and the powerup's clamp (slots 0xb8 and 0x260,
+//! and the update's checks). The heal by an amount (slot 0x110), which whatever heals calls
+//! (a monk's heal action, a building that heals its units inside), is `objects/heal.rs`'s.
 
 use crate::combat::damage::ArmorPair;
 use crate::combat::damage::KillCount;
 use crate::combat::damage::TransformTest;
-use crate::combat::damage::{gain_hp as damage_gain_hp, heal_hp, most_hp};
+use crate::combat::damage::{gain_hp as damage_gain_hp, most_hp};
 use crate::combat::stingers::credit_combat;
 use crate::math::fmath::{at_most_or_unordered, below_or_unordered, maxss};
 use crate::math::image::turn::{
@@ -14,19 +14,14 @@ use crate::math::image::turn::{
     REGENERATION_MINUTE as TURN_REGENERATION_MINUTE,
 };
 use crate::objects::HitPoints;
-use crate::objects::MasterHitPoints;
 use crate::objects::ObjectState;
 use crate::objects::Regeneration;
 use crate::objects::layers::Combat;
-use crate::objects::masters::ClassId;
 use crate::objects::masters::HeroFlags;
 use crate::objects::masters::Master;
 use crate::objects::unit::Unit;
 use crate::world::Seconds;
-use crate::world::layer::ClassRoles;
-use crate::world::layer::Roles;
 use crate::world::layer::generated::TurnTuning;
-use crate::{GenieError, GenieResult};
 use genie_diff::Diff;
 
 /// The regeneration's minute (`DAT_14330ebc8`).
@@ -130,39 +125,6 @@ pub(crate) enum HpChange {
 }
 
 impl Unit {
-    /// Slot 0x110 of a combat object (`FUN_141213b10`) of its master's `class` and
-    /// `hit_points`: the classes 2, 20, 21, 22 and 53 repair at a cost (not modelled); any other
-    /// heals (`FUN_141193b30`, [`crate::combat::damage::heal_hp`]), whose slot 0xb8 may run its
-    /// hit point transforms' test (the caller's: it reads the world).
-    pub(crate) fn heal(
-        &mut self,
-        combat: &mut Combat,
-        class: ClassId,
-        hit_points: MasterHitPoints,
-        amount: HitPoints,
-        roles: &Roles,
-    ) -> GenieResult<TransformTest> {
-        if roles.of_class(class).intersects(
-            ClassRoles::TRADE_BOAT
-                | ClassRoles::TRANSPORT
-                | ClassRoles::FISHING_SHIP
-                | ClassRoles::WARSHIP
-                | ClassRoles::BOARDING_SHIP,
-        ) {
-            return Err(GenieError::unsupported(
-                "a heal at a cost (FUN_141213b10's classes)",
-            ));
-        }
-        Ok(heal_hp(
-            &mut self.life.hp,
-            &mut combat.hp_powerup,
-            hit_points,
-            combat.hp_stinger,
-            amount,
-        )
-        .test)
-    }
-
     /// Slot 0xb8 of a combat object (`FUN_141203be0`): `amount` added up to its hit points with
     /// its powerups' room, an overflow taken off the powerup (`+0xa38`, never below 0); below its
     /// most its hit point transforms' test follows ([`HpChange::TransformTest`], the caller's).

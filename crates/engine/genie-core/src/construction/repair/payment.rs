@@ -30,7 +30,7 @@ use crate::world::slots::CheckedIndexExt;
 use crate::{GenieError, GenieResult};
 use std::fmt::{Debug, Error, Formatter};
 
-/// What a repair's slot 0x8c8 answers (the game's 0, 1 and 2).
+/// What a repair's slot 0x8c8 and a heal's slot 0x110 answer (the game's 0, 1 and 2).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum RepairOutcome {
     /// 0: it healed, the target short of its most hit points.
@@ -39,6 +39,16 @@ pub enum RepairOutcome {
     Full,
     /// 2: it took nothing (the player cannot pay, or a building below 1 hit point).
     Unpaid,
+}
+
+impl From<Heal> for RepairOutcome {
+    /// The answer of a heal that took its hit points (`FUN_141193b30`'s): 1 full, else 0.
+    fn from(heal: Heal) -> Self {
+        match heal {
+            Heal::Full => Self::Full,
+            Heal::Partial => Self::Healed,
+        }
+    }
 }
 
 /// The owner's attributes of a unit's and a building's repair cost (270, 271: `player+0x100`
@@ -248,10 +258,7 @@ pub fn repair_unit(
         amount,
     );
     repaired.transform_test = healed.test;
-    Ok(match healed.heal {
-        Heal::Full => RepairOutcome::Full,
-        Heal::Partial => RepairOutcome::Healed,
-    })
+    Ok(RepairOutcome::from(healed.heal))
 }
 
 /// A repairer's player's attributes as its repair pays from them

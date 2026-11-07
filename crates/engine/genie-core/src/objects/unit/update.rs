@@ -53,10 +53,9 @@ impl Unit {
     }
 
     /// `RGE_Static_Object::update` and the combat object's steps before the actions: the death
-    /// blast, the sleep ([`Unit::go_to_sleep`], None), the sprite's facets, a building's links
-    /// to removed objects ([`Unit::let_removed_links_go`]), a gate's and a building's update,
-    /// the attack timers, the motion, the life step (what the unit AI later reads of it), the
-    /// animation and the actions past the unit's life.
+    /// blast, the sleep ([`Unit::go_to_sleep`], None), the sprite's facets, a building's own
+    /// update ([`Unit::building_update`]), the attack timers, the motion, the life step (what the
+    /// unit AI later reads of it), the animation and the actions past the unit's life.
     pub(crate) fn update_to_actions(
         &mut self,
         actions: &mut LayersAction,
@@ -74,10 +73,7 @@ impl Unit {
             return Ok(None);
         }
         self.take_sprite_facets(step.world.parts.mover_mut(self.id));
-        self.let_removed_links_go(step, roles)?;
-        self.gate_update(actions, step, roles)?;
-        self.complete_on_update(actions, step, roles)?;
-        self.building_seconds(step, roles)?;
+        self.building_update(actions, step, roles)?;
         // a building's starts after its own steps (TRIBE_Building_Object::update)
         self.combat_update_start(actions, step, roles, MasterKind::BUILDING)?;
         // a new object's combat layer (none in the table) has no timer to run down

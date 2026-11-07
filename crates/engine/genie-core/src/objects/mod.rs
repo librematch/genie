@@ -9,6 +9,9 @@ use genie_model::objects::facet;
 pub mod facing;
 use genie_model::objects::frame;
 use genie_model::objects::graphics;
+mod heal;
+#[cfg(test)]
+mod heal_tests;
 pub(crate) mod hit_points;
 use genie_model::objects::hp;
 mod id_table;

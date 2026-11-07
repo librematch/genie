@@ -17,6 +17,9 @@ missile. This folder holds the object itself and the parts that every object has
   first.
 - `release.rs` handles an object that leaves the world, and the release of a target by the
   action that held it.
+- `hit_points.rs` holds a combat object's hit points: their gain and loss, the regeneration and
+  the powerup. `heal.rs` holds the heal by an amount (slot 0x110) that whatever heals calls:
+  a combat object's, at its owner's cost for the ships, and a building's, always at a cost.
 - `lines.rs` reads the unit lines from `unitlines.json`: the upgrade chains of the masters.
 
 ## How the tick reaches it
@@ -40,7 +43,9 @@ calls `Unit::update` (`unit/update.rs`), which runs the object's chain of update
 | [`actions.rs`](actions.rs) | The object's action list (`RGE_Action_List`, FD-045-D12): the actions it holds, its current one (the head) first, each a variant of `Action`. |
 | [`damaged_timer.rs`](damaged_timer.rs) | A building's timer since its last hit. |
 | [`facing.rs`](facing.rs) | Where an object faces: its angle (`+0x7e8`, radians on the map, 0 to 2π) and its facet (`+0xe`), counted in its current sprite's facets (`+0x140` -> `+0xa`). |
-| [`hit_points.rs`](hit_points.rs) | A combat object's hit points, a unit's or a building's (`TRIBE_Combat_Object`, types 70 and 80): the heal, the gain and the loss, the regeneration and the powerup's clamp (slots 0x110, 0xb8 and 0x260, and the update's checks). |
+| [`heal.rs`](heal.rs) | An object's heal by an amount (slot 0x110): a combat object's (`FUN_141213b10`), at a cost for the ships' classes, and a building's (`FUN_1411d33e0`), always at a cost, both paid by the object's owner. |
+| [`heal_tests.rs`](heal_tests.rs) | Tests: An object's heal by an amount (slot 0x110): a combat object's (`FUN_141213b10`), at a cost of its owner's for the ships' classes, a building's (`FUN_1411d33e0`) always at a cost with the population tested, and the hit point transforms' test the heal runs at once. |
+| [`hit_points.rs`](hit_points.rs) | A combat object's hit points, a unit's or a building's (`TRIBE_Combat_Object`, types 70 and 80): the gain and the loss, the regeneration and the powerup's clamp (slots 0xb8 and 0x260, and the update's checks). |
 | [`id_table.rs`](id_table.rs) | A table of values by object id: a dense column per sign of the id, so that a lookup indexes and a walk takes the ids in a sorted map's order, the most negative first (the order the side tables kept as `BTreeMap`s). |
 | [`list_index.rs`](list_index.rs) | An object's place in its player's list (`ListIndex`) and a list's places (`Places`). |
 | [`mod.rs`](mod.rs) | One object and what every object has and runs: the object the engine tracks (`unit::Unit`) with its update, its actions' holdings and stops, its life and death, its release, its sprite and facing, and the masters it is made from. |
@@ -68,6 +73,6 @@ calls `Unit::update` (`unit/update.rs`), which runs the object's chain of update
 ## How it connects
 
 <!-- uses -->
-- Uses: [`combat`](../combat/), [`construction`](../construction/), [`garrison`](../garrison/), [`gathering`](../gathering/), [`groups`](../groups/), [`map`](../map/), [`math`](../math/), [`movement`](../movement/), [`orders`](../orders/), [`ownership`](../ownership/), [`pathing`](../pathing/), [`players`](../players/), [`technology`](../technology/), [`testing`](../testing/), [`unit_ai`](../unit_ai/), [`vision`](../vision/), [`world`](../world/).
+- Uses: [`combat`](../combat/), [`construction`](../construction/), [`garrison`](../garrison/), [`gathering`](../gathering/), [`groups`](../groups/), [`map`](../map/), [`math`](../math/), [`movement`](../movement/), [`orders`](../orders/), [`ownership`](../ownership/), [`pathing`](../pathing/), [`players`](../players/), [`production`](../production/), [`technology`](../technology/), [`testing`](../testing/), [`unit_ai`](../unit_ai/), [`vision`](../vision/), [`world`](../world/).
 - Used by: [`combat`](../combat/), [`commands`](../commands/), [`construction`](../construction/), [`garrison`](../garrison/), [`gathering`](../gathering/), [`groups`](../groups/), [`map`](../map/), [`movement`](../movement/), [`orders`](../orders/), [`ownership`](../ownership/), [`pathing`](../pathing/), [`players`](../players/), [`production`](../production/), [`technology`](../technology/), [`testing`](../testing/), [`unit_ai`](../unit_ai/), [`vision`](../vision/), [`world`](../world/).
 <!-- /uses -->

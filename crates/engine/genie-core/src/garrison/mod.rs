@@ -18,6 +18,7 @@ mod enter;
 pub(crate) use self::enter::EnterSlot;
 mod enter_state;
 mod firepower;
+mod heal;
 mod holder;
 mod inside_count;
 mod let_out;
@@ -93,6 +94,8 @@ const CLASS_FLAGS: [u32; 64] = GARRISON_CLASS_FLAGS;
 
 #[cfg(test)]
 mod counts_tests;
+#[cfg(test)]
+mod heal_tests;
 #[cfg(test)]
 mod nested_tests;
 #[cfg(test)]

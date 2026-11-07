@@ -5,7 +5,6 @@ use crate::combat::abilities::Abilities;
 use crate::combat::attack::AttackState;
 use crate::combat::attack::{Arms, Attack};
 use crate::combat::damage::ArmorPair;
-use crate::combat::damage::TransformTest;
 use crate::combat::damage::{Kill, KillCount, Razed, Victim};
 use crate::combat::missile::ShooterId;
 use crate::combat::missile::SmartMode;
@@ -10127,98 +10126,6 @@ fn centre(id: i32) -> Unit {
     let mut tc = town_centre(id);
     tc.life.master_id = ids::TOWN_CENTRE;
     tc
-}
-
-#[test]
-fn unit_inside_heals_up_to_its_hit_points() {
-    // records/425906646's update 2191: villager 27260 inside TC 27150 heals by the TC's
-    // garrison heal rate once a second
-    let master = Master {
-        id: master_id(592),
-        class: class::VILLAGER,
-        hit_points: MasterHitPoints::of_data(25),
-        ..Master::default()
-    };
-    let mut unit = Unit {
-        id: object_id(27260),
-        life: Lifecycle {
-            hp: HitPoints::new(11.0),
-            ..Lifecycle::default()
-        },
-        ..Unit::default()
-    };
-    let mut combat = Combat::default();
-    assert_eq!(
-        unit.heal(
-            &mut combat,
-            master.class,
-            master.hit_points,
-            HitPoints::new(0.1),
-            &roles(),
-        )
-        .unwrap(),
-        TransformTest::Runs
-    );
-    assert_eq!(unit.life.hp, HitPoints::new(11.1));
-    // a heal past the hit points stops at them, the powerup's room taking the rest
-    unit.life.hp = HitPoints::new(24.95);
-    combat.hp_powerup = HpPowerup {
-        taken: HitPoints::new(1.0),
-        max: HitPoints::new(2.0),
-    };
-    assert_eq!(
-        unit.heal(
-            &mut combat,
-            master.class,
-            master.hit_points,
-            HitPoints::new(0.1),
-            &roles(),
-        )
-        .unwrap(),
-        TransformTest::Runs
-    );
-    assert_eq!(
-        (unit.life.hp, combat.hp_powerup.taken, combat.hp_powerup.max),
-        (
-            HitPoints::new(24.95f32 + 0.1),
-            HitPoints::new(1.0),
-            HitPoints::new(2.0)
-        )
-    );
-    // past them with the room: the overflow comes off the powerup, then a full unit holds
-    // exactly its master's hit points
-    unit.life.hp = HitPoints::new(26.95);
-    assert_eq!(
-        unit.heal(
-            &mut combat,
-            master.class,
-            master.hit_points,
-            HitPoints::new(0.1),
-            &roles(),
-        )
-        .unwrap(),
-        TransformTest::Runs
-    );
-    assert_eq!(unit.life.hp, HitPoints::new(25.0));
-    assert_eq!(
-        combat.hp_powerup.taken,
-        HitPoints::new(1.0 - (26.95f32 + 0.1 - 27.0))
-    );
-    // a paid class heals at a cost: not modelled
-    let ship = Master {
-        class: class::WARSHIP,
-        ..master
-    };
-    assert!(
-        unit.heal(
-            &mut combat,
-            ship.class,
-            ship.hit_points,
-            HitPoints::new(0.1),
-            &roles()
-        )
-        .is_err()
-    );
 }
 
 /// `FUN_140e6cfc0` resets every listed unit the world holds, a sleeping one too, and passes
@@ -23070,7 +22977,7 @@ fn after_centre_seconds(setup: impl FnOnce(&mut World)) -> GenieResult<World> {
         &mut world,
         (PlayerId::new(1), ListIndex::new(2)),
         50,
-        |unit, _, step| unit.building_seconds(step, &roles()),
+        |unit, actions, step| unit.building_seconds(actions, step, &roles()),
     )?;
     Ok(world)
 }
@@ -23079,8 +22986,8 @@ fn after_centre_seconds(setup: impl FnOnce(&mut World)) -> GenieResult<World> {
 /// them, the units inside below their master's hit points heal by its garrison heal rate; no
 /// whole second, a unit at its hit points, or a building not built heals nothing. Not modelled:
 /// a building at most a fifth of its hit points (it lets its garrison out), one attribute 255
-/// names, a unit inside whose raider countdown runs, and villagers inside repairing a damaged
-/// building.
+/// names, and a unit inside whose raider countdown runs. The repair by the villagers inside is
+/// `garrison/heal_tests.rs`'s.
 #[test]
 fn building_heals_its_garrison_each_whole_second() {
     let reason = |result: GenieResult<(f32, u32)>| result.unwrap_err().reason();
@@ -23124,22 +23031,6 @@ fn building_heals_its_garrison_each_whole_second() {
             .raider_countdown =
             RaiderCountdown::of_data(1))),
         "a unit inside whose raider_build_countdown runs (FUN_1411e7220)"
-    );
-    let repairs = |world: &mut World| {
-        for masters in &mut world.model.masters {
-            let building_master = Arc::make_mut(masters)
-                .get_mut(ids::TOWN_CENTRE)
-                .unwrap()
-                .building
-                .as_mut()
-                .unwrap();
-            building_master.garrison_repair_rate = HitPoints::new(1.0);
-        }
-        world.players[1].objects[ListIndex::new(2)].life.hp = HitPoints::new(2000.0);
-    };
-    assert_eq!(
-        reason(centre_seconds(repairs)),
-        "a building its villagers inside repair (FUN_1411d33e0)"
     );
 }
 

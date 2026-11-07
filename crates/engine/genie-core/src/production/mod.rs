@@ -47,8 +47,8 @@ pub use self::batch::Batch;
 pub use self::button::{LocationButton, QueueButton};
 pub use self::cost_count::CostCount;
 pub use self::costs::{
-    PopulationTest, as_entry_costs, cost_test, costed, master_costs, pay, refund, refund_master,
-    refund_research, refund_tech,
+    PopulationTest, as_entry_costs, cost_test, costed, master_costs, pay, pay_with, refund,
+    refund_master, refund_research, refund_tech,
 };
 pub use self::hotkey::HotkeyId;
 pub use self::make_obj_state::MakeObjState;
@@ -1235,6 +1235,46 @@ mod tests {
             Payment::Unpaid
         );
         assert_eq!(player.attributes[0], Amount::ZERO);
+    }
+
+    /// `FUN_14162fb60` with `param_4` 0 ([`pay_with`] with [`PopulationTest::Tested`], a
+    /// building's repair by its garrison): a population at its cap pays nothing, as its cost test
+    /// fails; with 1 ([`pay`]) the same player pays.
+    #[test]
+    fn payment_tests_the_population_only_with_param_4_zero() {
+        let ms = Masters::new([villager(&[
+            (attribute::FOOD, 50, true),
+            (attribute::HEADROOM, 1, false),
+        ])]);
+        let mut player = held();
+        player.attributes[32] = Amount::new(4.0);
+        assert_eq!(
+            pay_with(
+                &ms,
+                ids::VILLAGER_MALE,
+                CostCount::ONE,
+                PopulationTest::Tested,
+                &mut player,
+                &roles(),
+                slots()
+            )
+            .unwrap(),
+            Payment::Unpaid
+        );
+        assert_eq!(player.attributes[0], Amount::new(100.0));
+        assert_eq!(
+            pay(
+                &ms,
+                ids::VILLAGER_MALE,
+                CostCount::ONE,
+                &mut player,
+                &roles(),
+                slots()
+            )
+            .unwrap(),
+            Payment::Paid
+        );
+        assert_eq!(player.attributes[0], Amount::new(50.0));
     }
 
     /// An annex (master 2, head 3 whose stack unit is 4) is tested by its stack unit's paid

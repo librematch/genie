@@ -17,6 +17,8 @@ Units go into buildings and transports, and come out again. This folder holds bo
   `takes_in.rs`) adds them to the units inside.
 - `unload.rs` and `let_out.rs` hold UNLOAD, `GO_BACK_TO_WORK` and a unit's leave.
 - `firepower.rs` holds a unit's attack rate and firepower, and its share of a building's volleys.
+- `heal.rs` holds what a building's whole seconds do for its units inside: each heals, whoever's
+  it is, and the villagers inside repair the building at its owner's cost.
 - `transport/` holds the Transport action: a transport's sail and its unload ashore.
 
 ## In the game
@@ -38,6 +40,8 @@ Units go into buildings and transports, and come out again. This folder holds bo
 | [`enter.rs`](enter.rs) | The enter command and the Enter's construction, install and start, at once or with the transport's move. |
 | [`enter_state.rs`](enter_state.rs) | An Enter's state: walking to a building or transport, waiting, inside; each walk with its `MoveTo`. |
 | [`firepower.rs`](firepower.rs) | A unit's attack rate and firepower, and its share of a building's volleys (`FUN_141213520`). |
+| [`heal.rs`](heal.rs) | A building's heal of its units inside and its repair by the villagers inside: the end of `TRIBE_Building_Object::update`'s whole seconds (`0x1411c9000`). |
+| [`heal_tests.rs`](heal_tests.rs) | Tests: A building's whole seconds with units inside (`TRIBE_Building_Object::update`, `0x1411c9000`): the heal of every unit inside by its own master and type, the armor a full heal gives back, the repair by the villagers inside, and a foundation completed in its update, which runs none. |
 | [`holder.rs`](holder.rs) | A container's own part of a unit's enter and leave (its slots 0x1c0 and 0x1c8): its list, its volleys and a building's counts. |
 | [`inside_count.rs`](inside_count.rs) | How many units an object holds inside (`InsideCount`). |
 | [`let_out.rs`](let_out.rs) | A unit's leave of the building or the transport it is inside (`FUN_1411e7220`), or its place on the map. |

@@ -248,11 +248,12 @@ pub fn cost_test(
     Ok(true)
 }
 
-/// `FUN_14162fb60`: when the player can pay `count` units of master `master` without the
-/// population's test ([`cost_test`] with [`PopulationTest::Skipped`], `param_5` 1), each of the
-/// master's own cost entries with an attribute and a paid flag comes off its attribute, its amount
-/// times `count` (straight into the attribute; the statistics `FUN_14097daf0` are not the
-/// simulation's).
+/// [`pay_with`] without the population's test ([`PopulationTest::Skipped`], `param_4` 1), as
+/// every caller of `FUN_14162fb60` but a building's heal at a cost passes it.
+///
+/// # Errors
+///
+/// As [`pay_with`]'s.
 pub fn pay(
     masters: &Masters,
     master: MasterId,
@@ -261,11 +262,40 @@ pub fn pay(
     roles: &Roles,
     slots: Slots,
 ) -> GenieResult<Payment> {
-    if !cost_test(
+    pay_with(
         masters,
         master,
         count,
         PopulationTest::Skipped,
+        attributes,
+        roles,
+        slots,
+    )
+}
+
+/// `FUN_14162fb60`: when the player can pay `count` units of master `master` ([`cost_test`],
+/// `FUN_141618db0` with `param_4` as its `param_5`: the population's entry tested by
+/// `population`), each of the master's own cost entries with an attribute and a paid flag comes
+/// off its attribute, its amount times `count` (straight into the attribute; the statistics
+/// `FUN_14097daf0` are not the simulation's).
+///
+/// # Errors
+///
+/// An attribute the player does not have.
+pub fn pay_with(
+    masters: &Masters,
+    master: MasterId,
+    count: CostCount,
+    population: PopulationTest,
+    attributes: &mut dyn Attributes,
+    roles: &Roles,
+    slots: Slots,
+) -> GenieResult<Payment> {
+    if !cost_test(
+        masters,
+        master,
+        count,
+        population,
         &*attributes,
         roles,
         slots,
