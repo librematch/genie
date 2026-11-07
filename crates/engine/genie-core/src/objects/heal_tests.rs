@@ -229,9 +229,9 @@ fn heal_runs_hit_point_transforms_test_at_once() {
 }
 
 /// A ship's class heals at its owner's cost (`FUN_141213b10`): its master's hit points times the
-/// amount over its train time, at most to its master's hit points, paid by its owner's
-/// attribute 270 times them over its most of its costs; an owner who cannot pay heals nothing
-/// (2). Without a train location the heal divides by 0: all it lacks, paid in full share.
+/// amount over its train time, at most to its master's hit points (a NaN takes no less), paid by
+/// its owner's attribute 270 times them over its most of its costs; an owner who cannot pay heals
+/// nothing (2). Without a train location the heal divides by 0: all it lacks, paid in full share.
 #[test]
 fn ship_heals_at_its_owner_cost_by_its_train_time() {
     let mut world = heal_world();
@@ -249,6 +249,13 @@ fn ship_heals_at_its_owner_cost_by_its_train_time() {
         healed(&mut world, OTHER, GALLEY, 118.0, 3.0, World::heal),
         (RepairOutcome::Full, 120.0, left(0.5 * 2.0 / 120.0))
     );
+    let mut world = heal_world();
+    let (answer, hp, held) = healed(&mut world, OTHER, GALLEY, f32::NAN, 3.0, World::heal);
+    assert_eq!(
+        (answer, held),
+        (RepairOutcome::Healed, left(0.5 * 6.0 / 120.0))
+    );
+    assert!(hp.is_nan());
     let mut world = heal_world();
     world.players[2].attributes[attribute::WOOD.index()] = Amount::ZERO;
     assert_eq!(
