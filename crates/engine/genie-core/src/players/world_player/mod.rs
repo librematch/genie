@@ -66,7 +66,8 @@ use crate::world::layer::MasterSlots;
 const SECOND: f32 = WORLD_PLAYER_SECOND;
 /// One hundred (`DAT_14330ebcc`): attribute 22 is a percentage.
 const PERCENT: f32 = WORLD_PLAYER_PERCENT;
-/// A minute's seconds (`DAT_14330ebc8`): the trickles and the mills' food are rates a minute.
+/// A minute's seconds (`DAT_14330ebc8`): the trickles, the mills' food and a monastery's relic
+/// goods are rates a minute.
 const MINUTE: f32 = WORLD_PLAYER_MINUTE;
 /// Until this world time (ms) the scout map takes only the explored tiles the player sees.
 const EARLY_SCOUTING_MS: WorldTime = WorldTime::from_millis(5000);

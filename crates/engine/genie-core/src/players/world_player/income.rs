@@ -6,6 +6,7 @@ use crate::map::Tile;
 use crate::map::spatial::TileSight;
 use crate::math::fmath::at_most_or_unordered;
 use crate::math::fmath::log;
+use crate::objects::Relics;
 use crate::objects::masters::MasterKind;
 use crate::players::AllyTest;
 use crate::players::Amount;
@@ -98,14 +99,67 @@ impl World {
         Ok(())
     }
 
-    /// The world player's attribute add (slot 0xf8, `FUN_141616820`) of `amount` to resource `kind`
-    /// (food, wood, stone, gold: 0 to 3) of player `player_id`, with `stat` (its fourth argument)
-    /// and `share` (its fifth, [`ResourceShare`]): with `stat` 1 the gathered total grows first
-    /// (166 to 168; gold: any `stat` but 0 adds to attribute 49 unchecked, then 1 adds to 169),
-    /// then the resource ([`World::add_attribute_base`]). The resource panel's event when a
-    /// resource crosses 100 (`FUN_140c898a0` 0x80) is the interface's. The kinds 50, 183 and 196
-    /// and the others are not resources: their branches are
-    /// [`crate::world::Player::add_attribute`]'s.
+    /// A monastery's relic goods for `seconds` whole seconds (`TRIBE_Building_Object::update`,
+    /// `0x1411c9000`, a monastery in state 2 whose player plays): `relics`' count plus twice its
+    /// specific count (`+0xc20`, `+0xc24`) times `seconds` (`LEA`, `IMUL`: a wrapping int, then
+    /// `CVTDQ2PS`) are the relic seconds. Each of player `player_id`'s relic rates over 60
+    /// (`DIVSS`, then `MULSS` by the relic seconds: attributes 225, 264, 265 and 191) gives food,
+    /// wood, stone and gold in turn through slot 0xf8 with 1 and 1 ([`World::add_resource`]), the
+    /// gold then attribute 100 too. With no relics each adds 0.0. The local player's statistics
+    /// (`FUN_14097daf0` four times) are not held.
+    ///
+    /// # Errors
+    ///
+    /// No such player, and the adds'.
+    pub(crate) fn relic_goods(
+        &mut self,
+        player_id: PlayerId,
+        relics: Relics,
+        seconds: u32,
+    ) -> GenieResult<()> {
+        let relic_seconds = relics
+            .count
+            .get()
+            .wrapping_add(relics.specific.get().wrapping_mul(2))
+            .wrapping_mul(seconds as i32) as f32;
+        let slots = self.model.slots.attribute;
+        let attributes = &self.players.player(player_id)?.attributes;
+        let goods = [
+            slots.relic_food_rate,
+            slots.relic_wood_rate,
+            slots.relic_stone_rate,
+            slots.relic_gold_rate,
+        ]
+        .map(|rate| get(attributes, rate) / MINUTE * relic_seconds);
+        for (kind, amount) in AttributeId::resources().into_iter().zip(goods) {
+            self.add_resource(
+                player_id,
+                kind,
+                amount,
+                ResourceStat::Gathered,
+                ResourceShare::Shared,
+            )?;
+        }
+        let [.., gold] = goods;
+        self.add_resource(
+            player_id,
+            slots.relic_income_summation,
+            gold,
+            ResourceStat::Gathered,
+            ResourceShare::Shared,
+        )
+    }
+
+    /// The world player's attribute add (slot 0xf8, `FUN_141616820`) of `amount` to attribute
+    /// `kind` of player `player_id`, with `stat` (its fourth argument) and `share` (its fifth,
+    /// [`ResourceShare`]): with `stat` 1 a resource's gathered total grows first (food, wood and
+    /// stone: 166 to 168; gold: any `stat` but 0 adds to attribute 49 unchecked, then 1 adds to
+    /// 169), then the attribute ([`World::add_attribute_base`]). The resource panel's event when a
+    /// resource crosses 100 (`FUN_140c898a0` 0x80) is the interface's. A kind outside the slot's
+    /// branches (the relic income, 100) takes the base add alone; the side effects of 50, 183 and
+    /// 196 are [`World::add_player_attribute`]'s and [`crate::world::Player::add_attribute`]'s.
+    ///
+    /// [`World::add_player_attribute`]: crate::world::World::add_player_attribute
     pub fn add_resource(
         &mut self,
         player_id: PlayerId,
@@ -138,7 +192,8 @@ impl World {
                     )?;
                 }
             }
-        } else if stat.gathered() {
+        } else if kind.is_resource() && stat.gathered() {
+            // the game's kinds 0, 1 and 2
             self.add_attribute_base(
                 player_id,
                 self.model.slots.attribute.gathered.offset(kind.index())?,

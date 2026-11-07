@@ -113,6 +113,8 @@ use crate::objects::ListIndex;
 use crate::objects::MasterHitPoints;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::RelicCount;
+use crate::objects::Relics;
 use crate::objects::SpeedMultiplier;
 use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
@@ -23032,6 +23034,20 @@ fn dying_desolid_foundation_owner_watches_it_within_its_update() {
 /// `setup`, after the centre's whole seconds ([`Unit::building_seconds`]): the forager's hit
 /// points and the centre's garrison time.
 fn centre_seconds(setup: impl FnOnce(&mut World)) -> GenieResult<(f32, u32)> {
+    let world = after_centre_seconds(setup)?;
+    let hp = world.players[1].objects[ListIndex::new(0)].life.hp.get();
+    Ok((
+        hp,
+        world
+            .parts
+            .building_of(world.players[1].objects[ListIndex::new(2)].id)
+            .garrison_time
+            .millis(),
+    ))
+}
+
+/// [`centre_seconds`]'s world after the centre's whole seconds.
+fn after_centre_seconds(setup: impl FnOnce(&mut World)) -> GenieResult<World> {
     use crate::objects::masters::BuildingMaster;
     let mut world = house_builder();
     for masters in &mut world.model.masters {
@@ -23056,15 +23072,7 @@ fn centre_seconds(setup: impl FnOnce(&mut World)) -> GenieResult<(f32, u32)> {
         50,
         |unit, _, step| unit.building_seconds(step, &roles()),
     )?;
-    let hp = world.players[1].objects[ListIndex::new(0)].life.hp.get();
-    Ok((
-        hp,
-        world
-            .parts
-            .building_of(world.players[1].objects[ListIndex::new(2)].id)
-            .garrison_time
-            .millis(),
-    ))
+    Ok(world)
 }
 
 /// A built building's whole seconds (`0x1411c9000`): since its garrison time, which moves on by
@@ -23133,6 +23141,46 @@ fn building_heals_its_garrison_each_whole_second() {
         reason(centre_seconds(repairs)),
         "a building its villagers inside repair (FUN_1411d33e0)"
     );
+}
+
+/// A monastery's whole seconds give its relics' goods ([`World::relic_goods`]) while its player
+/// plays: two relics for 3 s give 6 relic seconds of attribute 191's 30 gold a minute; no relics
+/// add 0.0 (a −0.0 gold becomes 0.0); a player who won or lost gets nothing, nor does another
+/// building's.
+#[test]
+fn monastery_gives_relic_goods_each_whole_second_while_its_player_plays() {
+    let gold = |relics: Relics, status: GameStatus, master: MasterId| {
+        after_centre_seconds(|world| {
+            for masters in &mut world.model.masters {
+                let monastery = Master {
+                    id: ids::MONASTERY,
+                    ..masters.get(ids::TOWN_CENTRE).unwrap().clone()
+                };
+                *masters = Arc::new(Masters::new(masters.iter().cloned().chain([monastery])));
+            }
+            let building = &mut world.players[1].objects[ListIndex::new(2)];
+            building.life.master_id = master;
+            let id = building.id;
+            world.parts.building_mut(id).unwrap().relics = relics;
+            let player = &mut world.players[1];
+            player.game_status = status;
+            player.attributes.resize(300, Amount::ZERO);
+            player.attributes[191] = Amount::new(30.0);
+            player.attributes[3] = Amount::new(-0.0);
+        })
+        .map(|world| world.players[1].attributes[3].get().to_bits())
+    };
+    let two = Relics::new(RelicCount::of_data(2), RelicCount::ZERO);
+    let (playing, monastery) = (GameStatus::Playing, ids::MONASTERY);
+    assert_eq!(gold(two, playing, monastery), Ok(3.0f32.to_bits()));
+    assert_eq!(gold(Relics::NONE, playing, monastery), Ok(0));
+    for (status, master) in [
+        (GameStatus::Won, monastery),
+        (GameStatus::Lost, monastery),
+        (playing, ids::TOWN_CENTRE),
+    ] {
+        assert_eq!(gold(two, status, master), Ok((-0.0f32).to_bits()));
+    }
 }
 
 /// A wall's or a house's update takes the walls' branch (`0x1411c9000`, [`walls_branch`]): no

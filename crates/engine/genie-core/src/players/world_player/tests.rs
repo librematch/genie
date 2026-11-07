@@ -6,6 +6,8 @@ use crate::movement::explore::InfluenceMap;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::RelicCount;
+use crate::objects::Relics;
 use crate::objects::masters::Availability;
 use crate::objects::masters::BuiltMode;
 use crate::objects::masters::ClassId;
@@ -277,6 +279,92 @@ fn mill_livestock_makes_food() {
     let food = 15.0 / 60.0 * (1.5 * grows);
     assert_eq!(world.players[1].attributes[0], Amount::new(food));
     assert_eq!(world.players[1].attributes[166], Amount::new(food));
+}
+
+/// A monastery's relics: (relics + 2 times the specific relics) times the seconds make the
+/// relic seconds, by which each relic rate over 60 (225, 264, 265 and 191) gives food, wood,
+/// stone and gold with their gathered totals and gold's counter (49); the gold goes to attribute
+/// 100 too, which is no resource: no gathered total (266) and no escrow.
+#[test]
+fn relics_give_sixtieth_of_their_rates_each_relic_second() {
+    let mut world = world();
+    world.players[1].kind = PlayerKind::Computer;
+    world.players[1].escrow_percentage = [0.0, 0.0, 0.0, 0.5].map(EscrowShare::of_data);
+    let rates = &mut world.players[1].attributes;
+    (rates[225], rates[264], rates[265], rates[191]) = (
+        Amount::new(7.0),
+        Amount::new(0.5),
+        Amount::new(-3.0),
+        Amount::new(30.0),
+    );
+    let relics = Relics::new(RelicCount::of_data(2), RelicCount::of_data(1));
+    world.relic_goods(PlayerId::new(1), relics, 3).unwrap();
+    let relic_seconds = 12.0;
+    let gold = 30.0 / 60.0 * relic_seconds;
+    let goods = amounts([
+        7.0 / 60.0 * relic_seconds,
+        0.5 / 60.0 * relic_seconds,
+        -3.0 / 60.0 * relic_seconds,
+        gold,
+    ]);
+    let player = &world.players[1];
+    assert_eq!(player.resources(), goods);
+    assert_eq!(
+        [166, 167, 168, 169].map(|attribute| player.attributes[attribute]),
+        goods
+    );
+    assert_eq!(
+        [49, 100, 266].map(|attribute| player.attributes[attribute]),
+        amounts([gold, gold, 0.0])
+    );
+    assert_eq!(player.escrow[3], Amount::new(0.5 * gold));
+}
+
+/// Without relics each good is 0.0 and still added: a −0.0 resource, gathered total or relic
+/// income becomes 0.0. The relic seconds are the game's int product: 2^30 relics for 2 s wrap
+/// to −2^31, which takes food away.
+#[test]
+fn relics_give_their_int_product_of_relic_seconds() {
+    let mut world = world();
+    world.players[1].attributes[225] = Amount::new(6.0);
+    for attribute in [0, 166, 100] {
+        world.players[1].attributes[attribute] = Amount::new(-0.0);
+    }
+    world
+        .relic_goods(PlayerId::new(1), Relics::NONE, 5)
+        .unwrap();
+    assert_eq!(
+        [0, 166, 100].map(|attribute| world.players[1].attributes[attribute].get().to_bits()),
+        [0; 3]
+    );
+    let many = Relics::new(RelicCount::of_data(1 << 30), RelicCount::ZERO);
+    world.relic_goods(PlayerId::new(1), many, 2).unwrap();
+    assert_eq!(
+        world.players[1].attributes[0],
+        Amount::new(6.0 / 60.0 * -2_147_483_648.0)
+    );
+}
+
+/// A sharing player's relic goods go to the allies that count it as theirs, as its other income
+/// does; the relic income (100) stays its own.
+#[test]
+fn relic_goods_go_to_mutual_allies_but_relic_income() {
+    let mut world = world();
+    world.players[1]
+        .ally_sharing
+        .set(AllySharing::RESOURCES, true);
+    world.players[1].relations = relation_row([1, 0, 0, 3]);
+    world.players[2].relations = relation_row([1, 0, 0, 3]);
+    world.players[1].attributes[191] = Amount::new(60.0);
+    let relics = Relics::new(RelicCount::of_data(1), RelicCount::ZERO);
+    world.relic_goods(PlayerId::new(1), relics, 1).unwrap();
+    assert_eq!(
+        [1, 2, 3].map(|player| (
+            world.players[player].attributes[3].get(),
+            world.players[player].attributes[100].get()
+        )),
+        [(1.0, 1.0), (1.0, 0.0), (0.0, 0.0)]
+    );
 }
 
 /// A computer player's income fills its escrow by the share, held to the resource; with

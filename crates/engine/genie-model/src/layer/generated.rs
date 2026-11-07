@@ -664,6 +664,8 @@ pub struct AttributeSlots {
     pub total_value: AttributeId,
     /// The resources spent on research (0x63).
     pub research_spent: AttributeId,
+    /// The gold the player's relics gave (100, the scripts' `cAttributeRelicIncomeSummation`): `TRIBE_Building_Object::update` adds a monastery's relic gold to it through slot 0xf8 (`EDX` = `EBX` 2 plus 0x62), after the gold itself.
+    pub relic_income_summation: AttributeId,
     /// The castles the player holds (134).
     pub castles: AttributeId,
     /// The kills' value of the other players.
@@ -696,6 +698,8 @@ pub struct AttributeSlots {
     pub tribute_paid: AttributeId,
     /// Where a castle's or a wonder's paid cost goes rather than to 98 and 165 (184, `FUN_1411dbb70`).
     pub castle_wonder_cost: AttributeId,
+    /// The gold each relic in a monastery gives a minute (191, the scripts' `cAttributeRelicRate`; `player+0x100`'s `+0x5f8`): `TRIBE_Building_Object::update` adds its sixtieth for each relic second (each specific relic twice) of a monastery whose player plays.
+    pub relic_gold_rate: AttributeId,
     /// The construction rate modifier (195), which a builder's work reads (at the player's attributes `+0x618`).
     pub construction_rate: AttributeId,
     /// The attribute of the town centres' flare reveal across the players (0xc4, Spies' "Treason"): a player with it above 0 changes nothing; else each other player with it at most 0 takes the amount too.
@@ -704,6 +708,8 @@ pub struct AttributeSlots {
     pub treason_discount: AttributeId,
     /// The town centres a player may have (`FUN_141625a20`).
     pub town_centre_limit: AttributeId,
+    /// The food each relic in a monastery gives a minute (225, the scripts' `cAttributeRelicFoodRate`; `player+0x100`'s `+0x708`): `TRIBE_Building_Object::update` adds its sixtieth for each relic second (each specific relic twice) of a monastery whose player plays.
+    pub relic_food_rate: AttributeId,
     /// A villager's death by a player of type 2.
     pub villager_killed_by_kind_2: AttributeId,
     /// A villager's death by a hunted animal (a prey or predator attacker).
@@ -728,6 +734,10 @@ pub struct AttributeSlots {
     pub mill_food: AttributeId,
     /// The range within which an action object keeps the building that speeds it up (`mSpeedupBuildingId` `+0x890`): `RGE_Action_Object::update` drops it beyond the square of this range.
     pub speedup_range: AttributeId,
+    /// The wood each relic in a monastery gives a minute (264, the scripts' `cAttributeRelicWoodRate`; `player+0x100`'s `+0x840`): `TRIBE_Building_Object::update` adds its sixtieth for each relic second (each specific relic twice) of a monastery whose player plays.
+    pub relic_wood_rate: AttributeId,
+    /// The stone each relic in a monastery gives a minute (265, the scripts' `cAttributeRelicStoneRate`; `player+0x100`'s `+0x848`): `TRIBE_Building_Object::update` adds its sixtieth for each relic second (each specific relic twice) of a monastery whose player plays.
+    pub relic_stone_rate: AttributeId,
     /// The attribute naming the world's effect a player gets after each research (`+0x868`: 269).
     pub world_effect: AttributeId,
     /// The faith a second an object with a conversion task (0x68) that is no priest regains (282): the combat update (`TRIBE_Combat_Object::update`) adds it times the world's dt.

@@ -20,7 +20,6 @@ use crate::objects::Graphics;
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
-use crate::objects::Relics;
 use crate::objects::SpriteId;
 use crate::objects::layers::Action;
 use crate::objects::layers::MotionMut;
@@ -34,6 +33,7 @@ use crate::objects::sprite::new_sprite;
 use crate::objects::unit::Unit;
 use crate::objects::unit::object_master;
 use crate::players::Amount;
+use crate::players::game_status::GameStatus;
 use crate::unit_ai::HUMAN_ORDER_CAP;
 use crate::world::Millis;
 use crate::world::Seconds;
@@ -324,12 +324,15 @@ impl Unit {
     /// none): `FUN_1411c39b0` (attribute 255 naming its master: a terrain
     /// effect around it, not modelled); then for each whole second since `last_garrison_time`
     /// (`+0xbe0`, which moves on by them): a monastery's (master 104) relics give their goods
-    /// (not modelled with relics inside); each unit inside (from the last) whose
-    /// `raider_build_countdown` (`+0x9a0`) runs would be let out at its end (not modelled); the
-    /// units inside (from the first) heal by the master's `garrison_heal_rate` below their
-    /// master's hit points (slot 0x110, [`Unit::heal`]); with villagers inside, a damaged
-    /// building with a `garrison_repair_rate` repairs itself at a cost (`FUN_1411d33e0`, not
-    /// modelled). Its `damaged_lately_timer` (`+0x30d`) loses one when whole seconds passed.
+    /// while its player plays (`+0x89` 0, [`World::relic_goods`], with no relics too); each unit
+    /// inside (from the last) whose `raider_build_countdown` (`+0x9a0`) runs would be let out at
+    /// its end (not modelled); the units inside (from the first) heal by the master's
+    /// `garrison_heal_rate` below their master's hit points (slot 0x110, [`Unit::heal`]); with
+    /// villagers inside, a damaged building with a `garrison_repair_rate` repairs itself at a cost
+    /// (`FUN_1411d33e0`, not modelled). Its `damaged_lately_timer` (`+0x30d`) loses one when whole
+    /// seconds passed.
+    ///
+    /// [`World::relic_goods`]: crate::world::World::relic_goods
     pub(crate) fn building_seconds(
         &mut self,
         step: &mut Step<'_>,
@@ -395,11 +398,10 @@ impl Unit {
             self.damaged_lately = self.damaged_lately.tick();
         }
         if roles.of_master(master_id).contains(MasterRoles::MONASTERY)
-            && step.world.parts.building_of(self.id).relics != Relics::NONE
+            && step.world.players.player(step.player)?.game_status == GameStatus::Playing
         {
-            return Err(GenieError::unsupported(
-                "a monastery's relics' goods (its seconds)",
-            ));
+            let relics = step.world.parts.building_of(self.id).relics;
+            step.world.relic_goods(step.player, relics, seconds)?;
         }
         for &id in self.garrison.iter().rev() {
             let Some(unit) =
