@@ -1,9 +1,12 @@
-//! A pasture's livestock (`FUN_1411c8410`, `SetupPasture`): the completion's first part
-//! (`FUN_1411c6bd0`) of a pasture (masters 1893 and 1897, class 49) whose build points reached its
-//! build time puts its owner's livestock on points along its edges, each holding its share of the
-//! pasture's food.
+//! A pasture's livestock: their setup (`FUN_1411c8410`, `SetupPasture`) and their food, which is
+//! the pasture's own. The completion's first part (`FUN_1411c6bd0`) of a pasture (masters 1893 and
+//! 1897, class 49) whose build points reached its build time puts its owner's livestock on points
+//! along its edges, each holding its share of the pasture's food. At the end of each of its
+//! updates the pasture holds nothing, and its Make's food still to make is what its livestock
+//! holds ([`World::sum_livestock_food`]).
 
 use crate::construction::build::world_side::MakeMode;
+use crate::construction::building_update::walls_branch;
 use crate::gathering::PastureId;
 use crate::map::Distance;
 use crate::map::Point;
@@ -21,9 +24,11 @@ use crate::objects::WorkerCount;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::unit::UnitFlags;
+use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::technology::Attributes;
 use crate::world::World;
+use crate::world::layer::MasterRoles;
 use crate::world::layer::MasterSlots;
 use crate::world::layer::generated::PastureTuning;
 use crate::world::objects_ref::ObjectsRef;
@@ -297,10 +302,116 @@ impl ObjectsRef<'_> {
     }
 }
 
+/// The walk over a pasture's `livestock` (`+0xb78`..`+0xb80`) at its update's end
+/// ([`World::sum_livestock_food`], `0x1411ca48f`): from the first, an id the world's table does
+/// not find (`FUN_1415417a0`, `food_of` None) leaves the list (`memmove`: the later ones move up
+/// one place), and the walk goes on at the next place on both paths (`INC R14D`, `ADD R15, 4`),
+/// so the id that moved up into the gone one's place is passed over in this walk, a gone one
+/// too. The others' food (their `+0x310`) sums in `f32` from 0.0 in the list's order (`ADDSS`).
+/// The list kept and the sum.
+pub(crate) fn held_livestock(
+    livestock: &[ObjectId],
+    food_of: impl Fn(ObjectId) -> Option<Amount>,
+) -> (Vec<ObjectId>, Amount) {
+    let mut kept = Vec::with_capacity(livestock.len());
+    let mut food = Amount::ZERO;
+    // the id after a gone one takes its place, which the walk has passed
+    let mut passes_next = false;
+    for &id in livestock {
+        if passes_next {
+            passes_next = false;
+            kept.push(id);
+        } else if let Some(held) = food_of(id) {
+            food += held;
+            kept.push(id);
+        } else {
+            passes_next = true;
+        }
+    }
+    (kept, food)
+}
+
+impl World {
+    /// `TRIBE_Building_Object::update`'s end (`0x1411ca41f`, after the production's part,
+    /// [`World::building_production`]) on player `player_id`'s object `id` at `list_index` (or
+    /// where the update's later parts moved it, [`World::live_slot`]): outside the walls' branch
+    /// ([`walls_branch`], whose combat update ends the update), a building of a pasture's master
+    /// ([`MasterRoles::PASTURE_MANGROVE`] and [`MasterRoles::PASTURE`], 1893 and 1897: `MOVSX`
+    /// of its id less 0x765, `TEST` with `0xfffffffb`) walks its livestock ([`held_livestock`]:
+    /// the gone ones leave), holds nothing itself (`+0x310`, a dword store of 0), and the action
+    /// on top of its list, its Make, takes the livestock's food as its food still to make
+    /// (`+0x44`, `FUN_140a78140`, [`ActionList::top_make_mut`]). So what its Make made into its
+    /// holding in this update is gone, and what is left to make is what its livestock holds. Any
+    /// other object keeps its food. It runs whatever the combat update answered.
+    ///
+    /// # Errors
+    ///
+    /// A master the player has not got, and an action on top other than a Make.
+    ///
+    /// [`ActionList::top_make_mut`]: crate::objects::actions::ActionList::top_make_mut
+    pub(crate) fn sum_livestock_food(
+        &mut self,
+        player_id: PlayerId,
+        list_index: ListIndex,
+        id: ObjectId,
+    ) -> GenieResult<()> {
+        let Some((player_id, list_index)) = self.live_slot((player_id, list_index, id)) else {
+            return Ok(());
+        };
+        let pasture = self.players.live(player_id, list_index)?;
+        let master = pasture.master(self.master_tables(), player_id)?;
+        let roles = &self.model.roles;
+        if master.kind != MasterKind::BUILDING
+            || walls_branch(master, roles)
+            || !roles
+                .of_master(master.id)
+                .intersects(MasterRoles::PASTURE_MANGROVE | MasterRoles::PASTURE)
+        {
+            return Ok(());
+        }
+        let livestock = &self.parts.building_of(id).livestock;
+        let (kept, food) = held_livestock(livestock, |livestock_id| {
+            self.object(livestock_id).map(|(_, unit)| unit.life.amount)
+        });
+        if kept.len() != livestock.len() {
+            self.parts.building_mut(id)?.livestock = kept;
+        }
+        self.players.live_mut(player_id, list_index)?.life.amount = Amount::ZERO;
+        if let Some(layer) = self.parts.actions.get_mut(id)
+            && let Some(make) = layer.list.top_make_mut(id)?
+        {
+            make.remaining = food;
+        }
+        Ok(())
+    }
+}
+
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
+    use crate::construction::FoundationId;
+    use crate::construction::wait_solidify::WaitSolidify;
+    use crate::gathering::make::MakeAction;
+    use crate::gathering::make::MakeState;
+    use crate::objects::HitPoints;
+    use crate::objects::ObjectState;
+    use crate::objects::actions::Action as ActionsAction;
+    use crate::objects::actions::ActionList;
+    use crate::objects::layers::{Action, Building};
+    use crate::objects::lifecycle::Lifecycle;
+    use crate::objects::masters::ClassId;
+    use crate::objects::masters::Task;
+    use crate::objects::masters::{Master, Masters};
+    use crate::objects::unit::Unit;
+    use crate::test_ids::object_id;
+    use crate::testing::class;
+    use crate::testing::ids;
     use crate::testing::tuning;
+    use crate::world::FrameSeed;
+    use crate::world::Millis;
+    use crate::world::Player;
+    use crate::world::WorldTime;
+    use std::sync::Arc;
 
     /// 429381190's pasture 15342 (master 1897, radius 2) at (136, 72): sixteen points, four an
     /// edge; its livestock stood on the left edge's second and third (134.5, 71.4), (134.5,
@@ -325,5 +436,222 @@ mod tests {
         // the left edge from (134.5, 70.5) up
         assert_eq!(points[13], Point::new(134.5, 71.4));
         assert_eq!(points[14], Point::new(134.5, 72.3));
+    }
+
+    /// The food of livestock 601, 603 and 604 by id; 602 is gone.
+    fn food_of(id: ObjectId) -> Option<Amount> {
+        match id.get() {
+            601 => Some(Amount::new(10.0)),
+            603 => Some(Amount::new(20.0)),
+            604 => Some(Amount::new(30.0)),
+            _ => None,
+        }
+    }
+
+    /// A gone id leaves the list (`memmove`), and the walk goes on at the next place: the id
+    /// that moved up into it is kept unread in this walk, a gone one too.
+    #[test]
+    fn gone_livestock_leaves_and_the_next_one_is_passed_over() {
+        let livestock = [601, 602, 603, 604].map(object_id);
+        assert_eq!(
+            held_livestock(&livestock, food_of),
+            ([601, 603, 604].map(object_id).to_vec(), Amount::new(40.0))
+        );
+        let after_two = [601, 602, 602, 604, 602].map(object_id);
+        assert_eq!(
+            held_livestock(&after_two, food_of),
+            ([601, 602, 604].map(object_id).to_vec(), Amount::new(40.0))
+        );
+        let held = [601, 603, 604].map(object_id);
+        assert_eq!(
+            held_livestock(&held, food_of),
+            (held.to_vec(), Amount::new(60.0))
+        );
+    }
+
+    /// The sum is `ADDSS` in the list's order from 0.0: 2^24 swallows each 1 after it, and a
+    /// sum of −0.0 alone or of nothing is 0.0.
+    #[test]
+    fn livestock_food_sums_in_list_order_from_zero() {
+        let foods = |id: ObjectId| match id.get() {
+            1 => Some(Amount::new(16_777_216.0)),
+            2 | 3 => Some(Amount::new(1.0)),
+            _ => Some(Amount::new(-0.0)),
+        };
+        let food = |ids: &[i32]| {
+            let livestock: Vec<ObjectId> = ids.iter().copied().map(object_id).collect();
+            held_livestock(&livestock, foods).1.get()
+        };
+        assert_eq!(food(&[1, 2, 3]), 16_777_216.0);
+        assert_eq!(food(&[2, 3, 1]), 16_777_218.0);
+        assert_eq!(food(&[4]).to_bits(), 0.0f32.to_bits());
+        assert_eq!(food(&[]).to_bits(), 0.0f32.to_bits());
+    }
+
+    /// A building master `id` of kind `kind` and class `class`.
+    pub(crate) fn building_master(id: MasterId, kind: MasterKind, class: ClassId) -> Master {
+        Master {
+            id,
+            kind,
+            class,
+            ..Master::default()
+        }
+    }
+
+    /// A Make with `remaining` food still to make.
+    pub(crate) fn make(remaining: f32) -> ActionsAction {
+        ActionsAction::Make(MakeAction {
+            state: MakeState::Making,
+            remaining: Amount::new(remaining),
+            total: Amount::new(175.0),
+            task: Task::default(),
+        })
+    }
+
+    /// Player 1's building 600 of `master` holding 5 food, its livestock 601 to 604 and
+    /// `actions` on its list; the livestock 601, 603 and 604 beside it hold 10, 20 and 30 food,
+    /// and 602 is gone.
+    pub(crate) fn pasture_world(master: Master, actions: &[ActionsAction]) -> World {
+        let unit = |id: i32, master_id: MasterId, amount: f32| Unit {
+            id: object_id(id),
+            life: Lifecycle {
+                state: ObjectState::Alive,
+                hp: HitPoints::new(50.0),
+                master_id,
+                amount: Amount::new(amount),
+                ..Lifecycle::default()
+            },
+            ..Unit::default()
+        };
+        let objects = vec![
+            unit(600, master.id, 5.0),
+            unit(601, ids::PASTURE_ARGALI, 10.0),
+            unit(603, ids::PASTURE_ARGALI, 20.0),
+            unit(604, ids::PASTURE_ARGALI, 30.0),
+        ];
+        let owner = Player {
+            objects: objects.into(),
+            ..Player::default()
+        };
+        let mut list = ActionList::EMPTY;
+        for action in actions.iter().rev() {
+            list.put(action.clone());
+        }
+        let mut world = World::new(
+            WorldTime::ZERO,
+            FrameSeed::of_data(1),
+            PlayerId::new(1),
+            vec![Millis::ZERO, Millis::ZERO],
+            vec![Player::default(), owner],
+        )
+        .with_actions([(
+            object_id(600),
+            Action {
+                list,
+                ..Action::default()
+            },
+        )])
+        .with_buildings([(
+            object_id(600),
+            Building {
+                livestock: [601, 602, 603, 604].map(object_id).to_vec(),
+                ..Building::NONE
+            },
+        )]);
+        let livestock = building_master(ids::PASTURE_ARGALI, MasterKind::COMBAT, class::LIVESTOCK);
+        world.model.masters = vec![
+            Arc::new(Masters::default()),
+            Arc::new(Masters::new([master, livestock])),
+        ];
+        world
+    }
+
+    /// The building's livestock, what it holds and its Make's food still to make.
+    pub(crate) fn pasture_food(world: &World) -> (Vec<ObjectId>, Amount, Option<Amount>) {
+        let id = object_id(600);
+        (
+            world.parts.building_of(id).livestock.clone(),
+            world.players[1].objects[ListIndex::new(0)].life.amount,
+            world
+                .parts
+                .actions_of(id)
+                .list
+                .make()
+                .map(|make_action| make_action.remaining),
+        )
+    }
+
+    /// A pasture of either master (1893, 1897) holds nothing at its update's end, its Make's
+    /// food still to make is its livestock's (603 passed over), and its gone livestock left.
+    #[test]
+    fn pasture_food_is_its_livestock_food() {
+        for id in [ids::PASTURE_MANGROVE, ids::PASTURE] {
+            let master = building_master(id, MasterKind::BUILDING, class::FARM);
+            let mut world = pasture_world(master, &[make(100.0)]);
+            world
+                .sum_livestock_food(PlayerId::new(1), ListIndex::new(0), object_id(600))
+                .unwrap();
+            assert_eq!(
+                pasture_food(&world),
+                (
+                    [601, 603, 604].map(object_id).to_vec(),
+                    Amount::ZERO,
+                    Some(Amount::new(40.0))
+                )
+            );
+        }
+    }
+
+    /// Without an action on top the pasture still holds nothing and lets its gone livestock go.
+    #[test]
+    fn pasture_without_an_action_on_top_holds_nothing() {
+        let master = building_master(ids::PASTURE, MasterKind::BUILDING, class::FARM);
+        let mut world = pasture_world(master, &[]);
+        world
+            .sum_livestock_food(PlayerId::new(1), ListIndex::new(0), object_id(600))
+            .unwrap();
+        assert_eq!(
+            pasture_food(&world),
+            ([601, 603, 604].map(object_id).to_vec(), Amount::ZERO, None)
+        );
+    }
+
+    /// Another action on top, which no pasture of genie's holds, is an error.
+    #[test]
+    fn pasture_with_another_action_on_top_fails() {
+        let master = building_master(ids::PASTURE, MasterKind::BUILDING, class::FARM);
+        let wait = ActionsAction::WaitSolidify(WaitSolidify::new(
+            Task::default(),
+            FoundationId::new(object_id(601)),
+        ));
+        let mut world = pasture_world(master, &[wait, make(100.0)]);
+        assert_eq!(
+            world
+                .sum_livestock_food(PlayerId::new(1), ListIndex::new(0), object_id(600))
+                .map_err(|error| error.reason().to_owned()),
+            Err("a farm whose action on top is not its Make".to_owned())
+        );
+    }
+
+    /// A farm (50), a pasture's master of the walls' class (the walls' branch returns before
+    /// the end) and one of another kind than the building's keep their food, Make and list.
+    #[test]
+    fn farm_walls_branch_and_other_kind_keep_their_food() {
+        let untouched = (
+            [601, 602, 603, 604].map(object_id).to_vec(),
+            Amount::new(5.0),
+            Some(Amount::new(100.0)),
+        );
+        for master in [
+            building_master(ids::FARM, MasterKind::BUILDING, class::FARM),
+            building_master(ids::PASTURE, MasterKind::BUILDING, class::WALL),
+            building_master(ids::PASTURE, MasterKind::COMBAT, class::FARM),
+        ] {
+            let mut world = pasture_world(master, &[make(100.0)]);
+            world
+                .sum_livestock_food(PlayerId::new(1), ListIndex::new(0), object_id(600))
+                .unwrap();
+            assert_eq!(pasture_food(&world), untouched);
+        }
     }
 }

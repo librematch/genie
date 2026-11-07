@@ -46,7 +46,7 @@ part of the update, which binds the action to the world.
 | [`make_state.rs`](make_state.rs) | A Make's state: making food. |
 | [`mod.rs`](mod.rs) | Gathering resources: the Gather and Hunt actions with each gatherer's part of its update, a farm's food, the searches for a resource, the drop sites and drop-offs, the mill's and the dock's queues and the pastures. |
 | [`mule_cart.rs`](mule_cart.rs) | The mule cart: the resources a finished cart searches (its completion, `FUN_1411c6bd0`'s tail) and its unit AI's own search (slot 0x1e8), then the work command toward the one it found. |
-| [`pasture.rs`](pasture.rs) | A pasture's livestock (`FUN_1411c8410`, `SetupPasture`): the completion's first part (`FUN_1411c6bd0`) of a pasture (masters 1893 and 1897, class 49) whose build points reached its build time puts its owner's livestock on points along its edges, each holding its share of the pasture's food. |
+| [`pasture.rs`](pasture.rs) | A pasture's livestock: their setup (`FUN_1411c8410`, `SetupPasture`) and their food, which is the pasture's own. |
 | [`pasture_id.rs`](pasture_id.rs) | A pasture's id as its own type: the building whose livestock a unit is in or tends. |
 | [`queue_count.rs`](queue_count.rs) | The count of farms or fish traps a queue paid for. |
 | [`salvage_amounts.rs`](salvage_amounts.rs) | What a salvage pile holds of six attributes. |

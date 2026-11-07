@@ -62,6 +62,7 @@ use crate::gathering::hunt::tests::{hunting, walker};
 use crate::gathering::hunt::{HUNT, HuntAction, HuntTask};
 use crate::gathering::make::MAKE;
 use crate::gathering::make::MakeState;
+use crate::gathering::pasture::tests::{building_master, make, pasture_food, pasture_world};
 use crate::gathering::{GatherTargetId, HuntTargetId};
 use crate::groups::GroupFlags;
 use crate::groups::{Member, UnitGroup};
@@ -25646,4 +25647,28 @@ fn death_reads_the_dying_sprite_of_the_master_the_object_has_now() {
     };
     assert_eq!(state_after_death(None), ObjectState::Dead);
     assert_eq!(state_after_death(Some(dying)), ObjectState::DyingSprite);
+}
+
+/// A pasture's own update ends with its food its livestock's (`TRIBE_Building_Object::update`'s
+/// end, after the production): it holds nothing, its Make's food still to make is its livestock's
+/// (603 passed over) and its gone livestock left.
+#[test]
+fn pasture_update_ends_with_its_livestock_food() {
+    let master = building_master(ids::PASTURE, MasterKind::BUILDING, class::FARM);
+    let mut world = pasture_world(master, &[make(100.0)]);
+    let _ = world
+        .step_object(
+            (PlayerId::new(1), ListIndex::new(0)),
+            (Millis::new(104), None, true),
+            |_, _, _| Ok(Outcome::Stay),
+        )
+        .unwrap();
+    assert_eq!(
+        pasture_food(&world),
+        (
+            [601, 603, 604].map(object_id).to_vec(),
+            Amount::ZERO,
+            Some(Amount::new(40.0))
+        )
+    );
 }

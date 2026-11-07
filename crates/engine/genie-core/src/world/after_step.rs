@@ -87,7 +87,8 @@ impl World {
     /// The parts of the object's own update after its actions, once, with the update's unit AI
     /// part (`own_update`): the regeneration, the passive abilities, the powerup update
     /// ([`World::powerup_update`]), the stinger update ([`World::object_stingers`]) and the hit
-    /// point powerup check, and a building's production.
+    /// point powerup check, and a building's production and a pasture's food
+    /// ([`World::sum_livestock_food`]).
     fn finish_own_update(
         &mut self,
         (player_id, list_index, id): (PlayerId, ListIndex, ObjectId),
@@ -115,9 +116,13 @@ impl World {
             // then its hit point powerup check
             self.clamp_object_powerup((player_id, list_index, id))?;
         }
-        // TRIBE_Building_Object::update: the production after the combat update
-        if matches!(outcome, Outcome::Stay) && own_update {
-            self.building_production(player_id, list_index, dt.seconds())?;
+        if own_update {
+            // TRIBE_Building_Object::update: the production after the combat update
+            if matches!(outcome, Outcome::Stay) {
+                self.building_production(player_id, list_index, dt.seconds())?;
+            }
+            // then a pasture's food, whatever the combat update answered
+            self.sum_livestock_food(player_id, list_index, id)?;
         }
         Ok(())
     }

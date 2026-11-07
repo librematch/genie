@@ -9,11 +9,17 @@
 //! still to make starts at the player's farm food (attribute 36) or fish trap food (88); once it
 //! is made and the farmers took the last of it, the farm's slot 0xd8 sets its hit points to 0.
 //! A farm whose completion gave its owner the farm bonus takes the bonus off its Make's food
-//! still to make in its next update ([`Unit::take_farm_bonus`]).
+//! still to make in its next update ([`Unit::take_farm_bonus`]). A pasture holds nothing at its
+//! update's end, and its Make's food still to make is then what its livestock holds
+//! ([`World::sum_livestock_food`]).
+//!
+//! [`World::sum_livestock_food`]: crate::world::World::sum_livestock_food
 
 use crate::objects::HitPoints;
+use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::actions::Action as ActionsAction;
+use crate::objects::actions::ActionList;
 use crate::objects::lifecycle::Lifecycle;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::MasterKind;
@@ -213,12 +219,11 @@ impl Unit {
     /// owes the bonus on.
     ///
     /// [`Building::owes_bonus`]: crate::objects::layers::Building::owes_bonus
-    /// [`ActionList::head`]: crate::objects::actions::ActionList::head
     ///
     /// # Errors
     ///
-    /// An action on top other than a Make, which no farm of genie's holds, and an owner without
-    /// attribute 237.
+    /// An action on top other than a Make, which no farm of genie's holds
+    /// ([`ActionList::top_make_mut`]), and an owner without attribute 237.
     pub(crate) fn take_farm_bonus(
         &self,
         actions: &mut Action,
@@ -229,16 +234,8 @@ impl Unit {
         {
             return Ok(());
         }
-        let Some(top) = actions.list.head_mut() else {
+        let Some(make) = actions.list.top_make_mut(self.id)? else {
             return Ok(());
-        };
-        let ActionsAction::Make(make) = top else {
-            // a farm's list holds its default task's Make only
-            return Err(GenieError::unreachable(
-                "a farm owing its bonus whose action on top is not its Make",
-            )
-            .with("object", self.id)
-            .with("action", top.kind()));
         };
         let bonus = Attributes::get(
             step.world.players.player(step.player)?,
@@ -250,6 +247,29 @@ impl Unit {
     }
 }
 
+impl ActionList {
+    /// A farm's action on top (`FUN_140a986f0`, [`ActionList::head`]) as its Make, whose `+0x44`
+    /// (its food still to make, [`MakeAction::remaining`]) the building's update writes
+    /// (`FUN_140a78140`): the Make of a farm master's default task, which starts in the farm's
+    /// first update in state 2. None for an empty list.
+    ///
+    /// # Errors
+    ///
+    /// Another action on top of farm `farm`'s list: a farm's list holds its default task's Make
+    /// only (its other task, the Farm 121, `TRIBE_Action_Farm`, no list of genie's holds).
+    pub(crate) fn top_make_mut(&mut self, farm: ObjectId) -> GenieResult<Option<&mut MakeAction>> {
+        match self.head_mut() {
+            None => Ok(None),
+            Some(ActionsAction::Make(make)) => Ok(Some(make)),
+            Some(top) => Err(
+                GenieError::unreachable("a farm whose action on top is not its Make")
+                    .with("object", farm)
+                    .with("action", top.kind()),
+            ),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -257,7 +277,6 @@ mod tests {
     use crate::construction::wait_solidify::WaitSolidify;
     use crate::objects::ListIndex;
     use crate::objects::WorkRate;
-    use crate::objects::actions::ActionList;
     use crate::objects::layers::Building;
     use crate::objects::masters::ActionPart;
     use crate::objects::masters::CarryCapacity;
@@ -619,7 +638,7 @@ mod tests {
         let (taken, remaining, owes) = bonus_taken(&mut world);
         assert_eq!(
             taken.map_err(|error| error.reason().to_owned()),
-            Err("a farm owing its bonus whose action on top is not its Make".to_owned())
+            Err("a farm whose action on top is not its Make".to_owned())
         );
         assert_eq!((remaining, owes), (Some(175.0), true));
     }
