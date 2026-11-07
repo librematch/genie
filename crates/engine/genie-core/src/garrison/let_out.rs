@@ -71,9 +71,10 @@ impl World {
     /// [`LetOut::Stayed`] when no spot is free, before anything changes. With neither a point nor a
     /// gather point its unit AI stops, forgets its target and takes its stance again (slots 0xb0
     /// and 0x1c0). With an object to work on (`work_on`, `GO_BACK_TO_WORK`'s) its work command
-    /// (slot 0x128) goes to it at the point first. Not modelled: a siege building's (class 13) slot
-    /// 0x1b0; not held: its sound (slot 0x4c0), its garrison sprite. Its work command (slot 0x128)
-    /// has `+0xa14` 0: the unit AI keeps its notifies and its queued orders.
+    /// (slot 0x128) goes to it at the point first. A unit leaves a container of class 13 as any
+    /// other: slot 0x1a8 then runs the container's slot 0x1b0 with −1 and the unit's reload
+    /// ([`World::leave_siege`]). Not held: its sound (slot 0x4c0), its garrison sprite. Its work
+    /// command (slot 0x128) has `+0xa14` 0: the unit AI keeps its notifies and its queued orders.
     ///
     /// [`Unit::let_go`]: crate::objects::unit::Unit::let_go
     pub(crate) fn let_out(

@@ -53,8 +53,10 @@ pub(super) const WAIT_SECONDS: Seconds = Seconds::new(1.0);
 pub(crate) const NO_SPEED: GenieError =
     GenieError::unsupported("an Enter's MoveTo of a unit without speed");
 
-/// An unload of a siege building or tower (class 13: its spot search `FUN_141192d10` and the
-/// unit's leave), not modelled.
+/// An unload of a siege building or tower (class 13: its spot search `FUN_141192d10`), not
+/// modelled. The unit's leave of one (slot 0x1a8) is [`World::leave_siege`]'s.
+///
+/// [`World::leave_siege`]: crate::world::World::leave_siege
 pub(crate) const SIEGE_UNLOAD: GenieError =
     GenieError::unsupported("an unload of a siege building (class 13)");
 

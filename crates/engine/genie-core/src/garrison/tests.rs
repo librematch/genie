@@ -5305,6 +5305,68 @@ fn gather_point_on_unit_skips_the_task_finder() {
     );
 }
 
+/// `FUN_1411e7220` with a gather point on a gate (a building, type 80, with no room): its
+/// master's task finder (filter 3) finds no garrison task there (`0x1411e75ce`'s `JZ`), so slot
+/// 0x128 works the gate at the gather point with any task (`+0xa14` 0) and counts the command
+/// (`FUN_14106c590`), where the finder's slot 0x7e8 would neither count nor move. The villager
+/// has no task on a gate: its work command tells its unit AI of a move to the gate (slot 0x828)
+/// and moves there (slot 0x138, a `MoveTo` that counts the command again), after the unit waits
+/// to move (slot 0x2a0 with 1).
+#[test]
+fn gather_point_on_building_without_garrison_task_works_it() {
+    let gate = |world: &mut World| {
+        moving_villager(world);
+        let mut gate = unit(103, GATE, HitPoints::new(2750.0));
+        gate.place_for_test(Position::new(16.0, 4.0, 0.0));
+        let _ = world.push_live(PlayerId::new(1), gate).unwrap();
+        let placed = *world.spatial.get(object_id(100)).unwrap();
+        world.spatial.insert(
+            object_id(103),
+            Placed {
+                position: Position::new(16.0, 4.0, 0.0),
+                radius: Footprint::new(0.5, 0.5),
+                class: class::GATE,
+                master: GATE,
+                obstruction: None,
+                ..placed
+            },
+        );
+        gather_on(103, GATE)(world);
+    };
+    let (let_out, world) = let_out_beside_second_centre(gate, Point::new(NO_POINT, NO_POINT), None);
+    assert_eq!(let_out, Ok(LetOut::Out));
+    let unit = world.object(object_id(1000)).unwrap().1;
+    assert_eq!(unit.life.inside, None);
+    assert_eq!(
+        world
+            .parts
+            .unit_ai
+            .get(unit.id)
+            .map(|unit_ai| (unit_ai.current_order, unit_ai.current_target)),
+        Some((Some(OrderKind::Move), Some(object_id(103))))
+    );
+    assert_eq!(
+        world.parts.motion.mover(unit.id).map(|mover| mover.waiting),
+        Some(1)
+    );
+    let actions = world.parts.actions_of(object_id(1000));
+    assert_eq!(
+        (
+            actions
+                .list
+                .move_to()
+                .map(|move_to| (move_to.point, move_to.target)),
+            actions.list.enter().copied(),
+            actions.commands
+        ),
+        (
+            Some((Position::new(16.0, 4.0, 0.0), Some(object_id(103)))),
+            None,
+            CommandCount::of_data(2)
+        )
+    );
+}
+
 /// `FUN_1411e7220` with a gather point whose target the world no longer holds: the game looks
 /// for no other (`FUN_1415417a0` finds none), so the unit moves to the point, though Gaia's
 /// centre 300 of the target's master stands there, which a new unit's walk would take
