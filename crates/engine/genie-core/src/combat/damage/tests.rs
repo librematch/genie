@@ -293,7 +293,7 @@ fn moving_object_takes_hit_as_static_one() {
         HitPoints::ZERO,
         HitLayer {
             roles: &roles(),
-            slots: slots(),
+            slots: &slots(),
             damage_tuning: &tuning().damage,
         },
     )
@@ -311,7 +311,7 @@ fn moving_object_takes_hit_as_static_one() {
         HitPoints::ZERO,
         HitLayer {
             roles: &roles(),
-            slots: slots(),
+            slots: &slots(),
             damage_tuning: &tuning().damage,
         },
     )
@@ -333,7 +333,7 @@ fn moving_object_takes_hit_as_static_one() {
         HitPoints::ZERO,
         HitLayer {
             roles: &roles(),
-            slots: slots(),
+            slots: &slots(),
             damage_tuning: &tuning().damage,
         },
     )
@@ -349,7 +349,7 @@ fn moving_object_takes_hit_as_static_one() {
         HitPoints::ZERO,
         HitLayer {
             roles: &roles(),
-            slots: slots(),
+            slots: &slots(),
             damage_tuning: &tuning().damage,
         },
     )
@@ -374,7 +374,7 @@ fn hunter_strikes_its_sheep_for_twelve() {
         HitPoints::ZERO,
         HitLayer {
             roles: &roles(),
-            slots: slots(),
+            slots: &slots(),
             damage_tuning: &tuning().damage,
         },
     )
@@ -391,7 +391,7 @@ fn hunter_strikes_its_sheep_for_twelve() {
         HitPoints::ZERO,
         HitLayer {
             roles: &roles(),
-            slots: slots(),
+            slots: &slots(),
             damage_tuning: &tuning().damage,
         },
     )
@@ -766,7 +766,7 @@ fn ready_charge_adds_to_the_first_melee_weapon_and_empties() {
         HitPoints::ZERO,
         HitLayer {
             roles: &roles(),
-            slots: slots(),
+            slots: &slots(),
             damage_tuning: &tuning().damage,
         },
     )
@@ -953,7 +953,7 @@ fn special_attack_takes_hit_from_the_front_to_two_thirds() {
         HitPoints::ZERO,
         HitLayer {
             roles: &roles(),
-            slots: slots(),
+            slots: &slots(),
             damage_tuning: &tuning().damage,
         },
     )
@@ -975,7 +975,7 @@ fn special_attack_takes_hit_from_the_front_to_two_thirds() {
         HitPoints::ZERO,
         HitLayer {
             roles: &roles(),
-            slots: slots(),
+            slots: &slots(),
             damage_tuning: &tuning().damage,
         },
     )
@@ -993,7 +993,7 @@ fn special_attack_takes_hit_from_the_front_to_two_thirds() {
             HitPoints::ZERO,
             HitLayer {
                 roles: &roles(),
-                slots: slots(),
+                slots: &slots(),
                 damage_tuning: &tuning().damage,
             },
         )
@@ -1024,7 +1024,7 @@ fn retaliation_strikes_the_melee_attacker_first() {
         HitPoints::ZERO,
         HitLayer {
             roles: &roles(),
-            slots: slots(),
+            slots: &slots(),
             damage_tuning: &tuning().damage,
         },
     )
@@ -1044,7 +1044,7 @@ fn retaliation_strikes_the_melee_attacker_first() {
         HitPoints::ZERO,
         HitLayer {
             roles: &roles(),
-            slots: slots(),
+            slots: &slots(),
             damage_tuning: &tuning().damage,
         },
     )
@@ -1084,7 +1084,7 @@ fn retaliation_strikes_ready_charger_four_times_over() {
             HitPoints::ZERO,
             HitLayer {
                 roles: &roles(),
-                slots: slots(),
+                slots: &slots(),
                 damage_tuning: &tuning().damage,
             },
         )
@@ -1119,7 +1119,7 @@ fn reflected_damage_comes_back_at_least_one() {
         HitPoints::ZERO,
         HitLayer {
             roles: &roles(),
-            slots: slots(),
+            slots: &slots(),
             damage_tuning: &tuning().damage,
         },
     )
@@ -1137,7 +1137,7 @@ fn reflected_damage_comes_back_at_least_one() {
         HitPoints::ZERO,
         HitLayer {
             roles: &roles(),
-            slots: slots(),
+            slots: &slots(),
             damage_tuning: &tuning().damage,
         },
     )
@@ -1183,7 +1183,7 @@ fn blast_nan_paths_are_the_game_s() {
             1.0,
             HitLayer {
                 roles: &roles(),
-                slots: slots(),
+                slots: &slots(),
                 damage_tuning: &tuning().damage,
             },
         ),
@@ -1219,7 +1219,7 @@ fn blast_nan_paths_are_the_game_s() {
             1.0,
             HitLayer {
                 roles: &roles(),
-                slots: slots(),
+                slots: &slots(),
                 damage_tuning: &tuning().damage,
             },
         ),
@@ -1240,7 +1240,7 @@ fn blast_nan_paths_are_the_game_s() {
             1.0,
             HitLayer {
                 roles: &roles(),
-                slots: slots(),
+                slots: &slots(),
                 damage_tuning: &tuning().damage,
             },
         ),
@@ -1259,7 +1259,7 @@ fn blast_nan_paths_are_the_game_s() {
             1.0,
             HitLayer {
                 roles: &roles(),
-                slots: slots(),
+                slots: &slots(),
                 damage_tuning: &tuning().damage,
             },
         ),
@@ -1276,7 +1276,7 @@ fn blast_nan_paths_are_the_game_s() {
             1.0,
             HitLayer {
                 roles: &roles(),
-                slots: slots(),
+                slots: &slots(),
                 damage_tuning: &tuning().damage,
             },
         ),
@@ -1329,7 +1329,7 @@ fn blast_reaches_the_objects_about_its_attacker() {
             1.0,
             HitLayer {
                 roles: &roles(),
-                slots: slots(),
+                slots: &slots(),
                 damage_tuning: &tuning().damage,
             },
         ),
@@ -1358,7 +1358,7 @@ fn blast_reaches_the_objects_about_its_attacker() {
             1.0,
             HitLayer {
                 roles: &roles(),
-                slots: slots(),
+                slots: &slots(),
                 damage_tuning: &tuning().damage,
             },
         ),
@@ -1413,7 +1413,7 @@ fn building_takes_its_damage_and_at_least_its_least_hit() {
         HitPoints::ZERO,
         HitLayer {
             roles: &roles(),
-            slots: slots(),
+            slots: &slots(),
             damage_tuning: &tuning().damage,
         },
     )
@@ -1445,7 +1445,7 @@ fn building_takes_its_damage_and_at_least_its_least_hit() {
         HitPoints::ZERO,
         HitLayer {
             roles: &roles(),
-            slots: slots(),
+            slots: &slots(),
             damage_tuning: &tuning().damage,
         },
     )
@@ -1462,7 +1462,7 @@ fn building_takes_its_damage_and_at_least_its_least_hit() {
         HitPoints::ZERO,
         HitLayer {
             roles: &roles(),
-            slots: slots(),
+            slots: &slots(),
             damage_tuning: &tuning().damage,
         },
     )
@@ -1482,7 +1482,7 @@ fn building_takes_its_damage_and_at_least_its_least_hit() {
         HitPoints::ZERO,
         HitLayer {
             roles: &roles(),
-            slots: slots(),
+            slots: &slots(),
             damage_tuning: &tuning().damage,
         },
     )
@@ -1503,7 +1503,7 @@ fn building_takes_its_damage_and_at_least_its_least_hit() {
         HitPoints::new(2.0),
         HitLayer {
             roles: &roles(),
-            slots: slots(),
+            slots: &slots(),
             damage_tuning: &tuning().damage,
         },
     )
@@ -1518,7 +1518,7 @@ fn building_takes_its_damage_and_at_least_its_least_hit() {
         HitPoints::new(f32::NAN),
         HitLayer {
             roles: &roles(),
-            slots: slots(),
+            slots: &slots(),
             damage_tuning: &tuning().damage,
         },
     )
@@ -1544,7 +1544,7 @@ fn building_without_hit_points_takes_no_hit() {
         HitPoints::ZERO,
         HitLayer {
             roles: &roles(),
-            slots: slots(),
+            slots: &slots(),
             damage_tuning: &tuning().damage,
         },
     )
@@ -1567,7 +1567,7 @@ fn building_without_hit_points_takes_no_hit() {
         HitPoints::ZERO,
         HitLayer {
             roles: &roles(),
-            slots: slots(),
+            slots: &slots(),
             damage_tuning: &tuning().damage,
         },
     )
@@ -1614,7 +1614,7 @@ fn hit_on_an_annex_goes_to_its_main_building() {
         HitPoints::ZERO,
         HitLayer {
             roles: &roles(),
-            slots: slots(),
+            slots: &slots(),
             damage_tuning: &tuning().damage,
         },
     )
@@ -1642,7 +1642,7 @@ fn hit_on_an_annex_goes_to_its_main_building() {
             HitPoints::ZERO,
             HitLayer {
                 roles: &roles(),
-                slots: slots(),
+                slots: &slots(),
                 damage_tuning: &tuning().damage,
             },
         ),
@@ -1672,7 +1672,7 @@ fn player_building_below_one_hit_point_is_razed() {
         HitPoints::ZERO,
         HitLayer {
             roles: &roles(),
-            slots: slots(),
+            slots: &slots(),
             damage_tuning: &tuning().damage,
         },
     )
@@ -1726,7 +1726,7 @@ fn player_building_below_one_hit_point_is_razed() {
         HitPoints::ZERO,
         HitLayer {
             roles: &roles(),
-            slots: slots(),
+            slots: &slots(),
             damage_tuning: &tuning().damage,
         },
     )
@@ -1750,7 +1750,7 @@ fn player_building_below_one_hit_point_is_razed() {
         HitPoints::ZERO,
         HitLayer {
             roles: &roles(),
-            slots: slots(),
+            slots: &slots(),
             damage_tuning: &tuning().damage,
         },
     )
@@ -1788,7 +1788,7 @@ fn trebuchet_razing_counts_kill_unless_its_damage_counted_it() {
         HitPoints::ZERO,
         HitLayer {
             roles: &roles(),
-            slots: slots(),
+            slots: &slots(),
             damage_tuning: &tuning().damage,
         },
     )
@@ -1822,7 +1822,7 @@ fn trebuchet_razing_counts_kill_unless_its_damage_counted_it() {
         HitPoints::ZERO,
         HitLayer {
             roles: &roles(),
-            slots: slots(),
+            slots: &slots(),
             damage_tuning: &tuning().damage,
         },
     )
@@ -1870,7 +1870,7 @@ fn building_attacker_stingers_and_kill_bonus_are_the_game_s() {
         HitPoints::ZERO,
         HitLayer {
             roles: &roles(),
-            slots: slots(),
+            slots: &slots(),
             damage_tuning: &tuning().damage,
         },
     )
@@ -1889,7 +1889,7 @@ fn building_attacker_stingers_and_kill_bonus_are_the_game_s() {
         HitPoints::ZERO,
         HitLayer {
             roles: &roles(),
-            slots: slots(),
+            slots: &slots(),
             damage_tuning: &tuning().damage,
         },
     )
@@ -1907,7 +1907,7 @@ fn building_attacker_stingers_and_kill_bonus_are_the_game_s() {
         HitPoints::ZERO,
         HitLayer {
             roles: &roles(),
-            slots: slots(),
+            slots: &slots(),
             damage_tuning: &tuning().damage,
         },
     )
@@ -1928,7 +1928,7 @@ fn building_attacker_stingers_and_kill_bonus_are_the_game_s() {
             HitPoints::ZERO,
             HitLayer {
                 roles: &roles(),
-                slots: slots(),
+                slots: &slots(),
                 damage_tuning: &tuning().damage,
             },
         )
@@ -1948,7 +1948,7 @@ fn building_attacker_stingers_and_kill_bonus_are_the_game_s() {
         HitPoints::ZERO,
         HitLayer {
             roles: &roles(),
-            slots: slots(),
+            slots: &slots(),
             damage_tuning: &tuning().damage,
         },
     )
@@ -2007,7 +2007,7 @@ fn blast_takes_main_building_less_what_its_annexes_took() {
             1.0,
             HitLayer {
                 roles: &roles(),
-                slots: slots(),
+                slots: &slots(),
                 damage_tuning: &tuning().damage,
             },
         ),
@@ -2064,7 +2064,7 @@ fn blast_walks_tile_objects_in_its_list_order() {
             1.0,
             HitLayer {
                 roles: &roles(),
-                slots: slots(),
+                slots: &slots(),
                 damage_tuning: &tuning().damage,
             },
         ),

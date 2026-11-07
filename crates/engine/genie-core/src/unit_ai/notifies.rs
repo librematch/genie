@@ -28,7 +28,7 @@ pub struct AiLayer<'model> {
     /// The build's roles.
     pub(crate) roles: &'model Roles,
     /// The build's slots.
-    pub(crate) slots: Slots,
+    pub(crate) slots: &'model Slots,
     /// The unit AI's tuning values.
     pub(crate) unit_ai_tuning: &'model UnitAiTuning,
 }
@@ -160,7 +160,7 @@ impl UnitAi {
             position: place.0.with_height(0.0),
             class: place.1,
             roles: layer.roles.clone(),
-            slots: layer.slots,
+            slots: *layer.slots,
             unit_ai_tuning: *layer.unit_ai_tuning,
             ..Surroundings::default()
         };

@@ -679,7 +679,12 @@ const MASTER_ROLES: [(usize, MasterRoles); 90] = [
     (68, MasterRoles::DROP_SITE),
     (70, MasterRoles::HOUSE),
     (73, MasterRoles::CHU_KO_NU.union(MasterRoles::QUIET_SWING)),
-    (82, MasterRoles::BOAT_HUNTER.union(MasterRoles::CASTLE)),
+    (
+        82,
+        MasterRoles::BOAT_HUNTER
+            .union(MasterRoles::CASTLE)
+            .union(MasterRoles::WORK_SPEEDUP_SPARED),
+    ),
     (83, MasterRoles::VILLAGER_MALE),
     (84, MasterRoles::MARKET.union(MasterRoles::TRADE_TARGET)),
     (104, MasterRoles::MONASTERY),
@@ -688,7 +693,8 @@ const MASTER_ROLES: [(usize, MasterRoles); 90] = [
         MasterRoles::BOAT_HUNTER
             .union(MasterRoles::NEVER_CONVERTED)
             .union(MasterRoles::PACKED_PEACEFUL)
-            .union(MasterRoles::TOWN_CENTRE),
+            .union(MasterRoles::TOWN_CENTRE)
+            .union(MasterRoles::WORK_SPEEDUP_SPARED),
     ),
     (112, MasterRoles::CIRCLE_SIGHT),
     (118, MasterRoles::BUILDER),
@@ -1031,7 +1037,13 @@ const fn attribute_slots() -> AttributeSlots {
         villager_idles: AttributeId::named(249),
         villager_idle_seconds: AttributeId::named(250),
         mill_food: AttributeId::named(254),
+        speedup_building: AttributeId::named(255),
         speedup_range: AttributeId::named(256),
+        speedup_percentage: AttributeId::named(257),
+        speedup_object: AttributeId::named(258),
+        speedup_effect: AttributeId::named(259),
+        speedup_secondary_effect: AttributeId::named(260),
+        speedup_secondary_percentage: AttributeId::named(261),
         relic_wood_rate: AttributeId::named(264),
         relic_stone_rate: AttributeId::named(265),
         world_effect: AttributeId::named(269),
@@ -1476,6 +1488,7 @@ const fn turn() -> TurnTuning {
         regeneration_least_hp: f32::from_bits(0x3f80_0000),
         regeneration_point: f32::from_bits(0x3f80_0000),
         short_drop_reach: f32::from_bits(0x4120_0000),
+        speedup_edge: f32::from_bits(0x3a83_126f),
         treason_cost: f32::from_bits(0x43c8_0000),
         tree_search_within: f32::from_bits(0x4100_0000),
     }

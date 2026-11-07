@@ -253,9 +253,9 @@ pub(super) fn take_building(
         if building.main.is_none() && !roles.of_class(target.class).contains(ClassRoles::WALL) {
             let cost = building.cost;
             if !building.trebuchet {
-                adds.extend(razing_counts((ap, player_id), cost, slots)?);
+                adds.extend(razing_counts((ap, player_id), cost, *slots)?);
             } else if !counted {
-                adds.extend(kill_counts((ap, player_id), cost, slots)?);
+                adds.extend(kill_counts((ap, player_id), cost, *slots)?);
             }
             kill_bonus(&src.source)?;
             adds.extend([

@@ -76,7 +76,7 @@ pub fn static_roles() -> &'static Roles {
 pub fn hit_layer() -> HitLayer<'static> {
     HitLayer {
         roles: static_roles(),
-        slots: slots(),
+        slots: &layer().slots,
         damage_tuning: &tuning().damage,
     }
 }

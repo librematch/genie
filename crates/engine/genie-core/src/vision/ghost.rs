@@ -119,6 +119,20 @@ pub(super) enum AnnexLink {
 }
 
 impl World {
+    /// Ghost `id` with its viewer, the player whose ghosts hold it (its `+0x138`), in the
+    /// players' order; none for an id no player's ghosts hold.
+    pub(crate) fn ghost(&self, id: ObjectId) -> Option<(PlayerId, &Ghost)> {
+        PlayerId::each(self.players.len())
+            .zip(&self.players)
+            .find_map(|(viewer, player)| {
+                player
+                    .ghosts
+                    .iter()
+                    .find(|ghost| ghost.id == id)
+                    .map(|ghost| (viewer, ghost))
+            })
+    }
+
     /// The vision mask of player `player_id` (`player+0x2a8`, [`crate::vision`]).
     fn vision_mask(&self, player_id: PlayerId) -> VisionBits {
         self.spatial.vision(player_id).visible

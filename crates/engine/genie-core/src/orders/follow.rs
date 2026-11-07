@@ -377,7 +377,7 @@ impl World {
             self.run_ai_calls((player, idx), |ai, side, rng| {
                 let layer = AiLayer {
                     roles: &roles,
-                    slots,
+                    slots: &slots,
                     unit_ai_tuning: &unit_ai_tuning,
                 };
                 ai.clear_notifies_at(world_time.since_start(), place, side, rng, layer)

@@ -31,7 +31,6 @@ use crate::objects::masters::player_masters;
 use crate::objects::sprite::new_sprite;
 use crate::objects::unit::Unit;
 use crate::objects::unit::object_master;
-use crate::players::Amount;
 use crate::players::game_status::GameStatus;
 use crate::unit_ai::HUMAN_ORDER_CAP;
 use crate::world::ClockSeconds;
@@ -47,7 +46,7 @@ use crate::world::objects_ref::ObjectsRef;
 use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlotsExt;
 use crate::world::step::Step;
-use crate::world::{BUILDING_TERRAIN, GATE_CLOSE_DELAY, GATE_EPSILON};
+use crate::world::{GATE_CLOSE_DELAY, GATE_EPSILON};
 use crate::{GenieError, GenieResult};
 use std::mem::take;
 
@@ -344,20 +343,21 @@ impl Unit {
 
     /// `TRIBE_Building_Object::update`'s whole seconds of a building in state 2 (`0x1411c9000`,
     /// before its combat update), outside the walls' branch ([`walls_branch`], which counts
-    /// none): `FUN_1411c39b0` (attribute 255 naming its master: a terrain
-    /// effect around it, not modelled); then for each whole second since `last_garrison_time`
-    /// (`+0xbe0`, which moves on by them): a monastery's (master 104) relics give their goods
-    /// while its player plays (`+0x89` 0, [`World::relic_goods`], with no relics too); each unit
-    /// inside (from the last) whose `raider_build_countdown` (`+0x9a0`) runs would be let out at
-    /// its end (not modelled); the units inside (from the first, whoever's) heal by the master's
-    /// `garrison_heal_rate` ([`Unit::heal_garrison`]); with villagers inside, a damaged building
-    /// with a `garrison_repair_rate` repairs itself at its owner's cost
-    /// ([`Unit::repair_by_garrison`]). Its `damaged_lately_timer` (`+0x30d`) loses one when whole
-    /// seconds passed.
+    /// none): `FUN_1411c39b0` (attribute 255 naming its master: its work on the objects about
+    /// it, [`Unit::speed_up_around`]); then ([`Unit::whole_seconds`]) for each whole second
+    /// since `last_garrison_time` (`+0xbe0`, which moves on by them): a monastery's (master
+    /// 104) relics give their goods while its player plays (`+0x89` 0, [`World::relic_goods`],
+    /// with no relics too); each unit inside (from the last) whose `raider_build_countdown`
+    /// (`+0x9a0`) runs would be let out at its end (not modelled); the units inside (from the
+    /// first, whoever's) heal by the master's `garrison_heal_rate` ([`Unit::heal_garrison`]);
+    /// with villagers inside, a damaged building with a `garrison_repair_rate` repairs itself at
+    /// its owner's cost ([`Unit::repair_by_garrison`]). Its `damaged_lately_timer` (`+0x30d`)
+    /// loses one when whole seconds passed.
     ///
     /// # Errors
     ///
-    /// What the seconds do not model, and the relic goods', the heal's and the repair's.
+    /// What the seconds do not model, and the speed-up's, the relic goods', the heal's and the
+    /// repair's.
     ///
     /// [`World::relic_goods`]: crate::world::World::relic_goods
     pub(crate) fn building_seconds(
@@ -376,9 +376,9 @@ impl Unit {
         ) else {
             return Ok(());
         };
-        let Some(bm) = master.building else {
+        if master.building.is_none() {
             return Ok(());
-        };
+        }
         // at most a fifth of its hit points (DAT_142eae8d0), it lets its garrison out
         // (FUN_1411e7220 for each from the last, then their slots 0x1a8 and 0xd0); its master's
         // slot 0x110 only sets a sound flag
@@ -397,18 +397,34 @@ impl Unit {
         if walls_branch(master, roles) {
             return Ok(());
         }
-        if step
-            .world
-            .players
-            .player(step.player)?
-            .attributes
-            .get(BUILDING_TERRAIN)
-            == Some(&Amount::new(f32::from(master.id.get())))
-        {
-            return Err(GenieError::unsupported(
-                "a building whose master attribute 255 names (FUN_1411c39b0)",
-            ));
-        }
+        let (master_id, radius) = (master.id, master.radius);
+        self.speed_up_around(actions, step, master_id, radius)?;
+        self.whole_seconds(actions, step, roles)
+    }
+
+    /// `TRIBE_Building_Object::update`'s whole seconds of a built building after
+    /// `FUN_1411c39b0` ([`Unit::building_seconds`]), its master read again (a heal of the
+    /// building there can transform it).
+    ///
+    /// # Errors
+    ///
+    /// What the seconds do not model, and the relic goods', the heal's and the repair's.
+    fn whole_seconds(
+        &mut self,
+        actions: &mut Action,
+        step: &mut Step<'_>,
+        roles: &Roles,
+    ) -> GenieResult<()> {
+        let Ok(master) = object_master(
+            step.world.parts.own_master.get(self.id),
+            (self.id, self.life.master_id),
+            step.world.model.masters.of(step.player),
+        ) else {
+            return Ok(());
+        };
+        let Some(bm) = master.building else {
+            return Ok(());
+        };
         let seconds = step
             .world
             .world_time
@@ -555,7 +571,7 @@ impl Unit {
             step.world.model.tuning.turn.death_blast_factor,
             HitLayer {
                 roles,
-                slots: step.world.model.slots,
+                slots: &step.world.model.slots,
                 damage_tuning: &step.world.model.tuning.damage,
             },
         )?;

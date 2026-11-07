@@ -890,7 +890,7 @@ fn the_build_order_builds_and_takes_the_order_at_once() {
                 side,
                 AiLayer {
                     roles: &roles(),
-                    slots: slots(),
+                    slots: &slots(),
                     unit_ai_tuning: &tuning().unit_ai,
                 },
             )
@@ -3658,7 +3658,7 @@ fn retarget_check_stops_in_stand_ground_and_while_attacking() {
             Some(true),
             AiLayer {
                 roles: &roles(),
-                slots: slots(),
+                slots: &slots(),
                 unit_ai_tuning: &tuning().unit_ai
             }
         ),
@@ -3673,7 +3673,7 @@ fn retarget_check_stops_in_stand_ground_and_while_attacking() {
             Some(true),
             AiLayer {
                 roles: &roles(),
-                slots: slots(),
+                slots: &slots(),
                 unit_ai_tuning: &tuning().unit_ai
             }
         ),
@@ -3688,7 +3688,7 @@ fn retarget_check_stops_in_stand_ground_and_while_attacking() {
             Some(true),
             AiLayer {
                 roles: &roles(),
-                slots: slots(),
+                slots: &slots(),
                 unit_ai_tuning: &tuning().unit_ai
             }
         ),
@@ -3707,7 +3707,7 @@ fn retarget_check_stops_in_stand_ground_and_while_attacking() {
             Some(true),
             AiLayer {
                 roles: &roles(),
-                slots: slots(),
+                slots: &slots(),
                 unit_ai_tuning: &tuning().unit_ai
             }
         ),
@@ -3734,7 +3734,7 @@ fn retarget_check_stops_in_stand_ground_and_while_attacking() {
             Some(false),
             AiLayer {
                 roles: &roles(),
-                slots: slots(),
+                slots: &slots(),
                 unit_ai_tuning: &tuning().unit_ai
             }
         ),
@@ -3751,7 +3751,7 @@ fn retarget_check_stops_in_stand_ground_and_while_attacking() {
                 None,
                 AiLayer {
                     roles: &roles(),
-                    slots: slots(),
+                    slots: &slots(),
                     unit_ai_tuning: &tuning().unit_ai
                 }
             )
@@ -3850,7 +3850,7 @@ fn hunter_world(others: &[SceneObject]) -> World {
                 side,
                 AiLayer {
                     roles: &at.roles,
-                    slots: at.slots,
+                    slots: &at.slots,
                     unit_ai_tuning: &at.unit_ai_tuning,
                 },
             )
@@ -7802,7 +7802,7 @@ fn an_immediate_order_in_front_keeps_the_current_order_behind_it() {
                 side,
                 AiLayer {
                     roles: &at.roles,
-                    slots: at.slots,
+                    slots: &at.slots,
                     unit_ai_tuning: &at.unit_ai_tuning,
                 },
             )
@@ -7875,7 +7875,7 @@ fn an_immediate_attack_roundup_keeps_the_target_until_it_attacks_the_next() {
                 side,
                 AiLayer {
                     roles: &at.roles,
-                    slots: at.slots,
+                    slots: &at.slots,
                     unit_ai_tuning: &at.unit_ai_tuning,
                 },
             )
@@ -7905,7 +7905,7 @@ fn an_immediate_attack_roundup_keeps_the_target_until_it_attacks_the_next() {
                 side,
                 AiLayer {
                     roles: &at.roles,
-                    slots: at.slots,
+                    slots: &at.slots,
                     unit_ai_tuning: &at.unit_ai_tuning,
                 },
             )
@@ -12343,7 +12343,7 @@ fn orders(world: &mut World, queued_order: &QueuedOrder) -> GenieResult<OrderOut
                 side,
                 AiLayer {
                     roles: &at.roles,
-                    slots: at.slots,
+                    slots: &at.slots,
                     unit_ai_tuning: &at.unit_ai_tuning,
                 },
             )
@@ -13853,7 +13853,7 @@ fn other_load_world(with_camp: bool) -> World {
                 side,
                 AiLayer {
                     roles: &at.roles,
-                    slots: at.slots,
+                    slots: &at.slots,
                     unit_ai_tuning: &at.unit_ai_tuning,
                 },
             )

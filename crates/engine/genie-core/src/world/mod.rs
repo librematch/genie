@@ -190,10 +190,6 @@ pub(crate) struct BuildingDeath {
     pub(crate) tech: Option<(MasterId, TechId)>,
 }
 
-/// The attribute naming a building master that changes the terrain around its buildings
-/// (`FUN_1411c39b0`, the player's attribute 255).
-pub(crate) const BUILDING_TERRAIN: usize = 255;
-
 /// A building's queue holds at most 15 units (`FUN_1411cbc40`).
 pub(crate) const QUEUE_LIMIT: usize = 15;
 /// A computer player's QUEUE fills a building's queue to at most 2 (`FUN_141614450`).

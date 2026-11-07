@@ -242,7 +242,8 @@ pub struct Mover {
     pub(crate) substitute_count: SubstituteCount,
     /// `mSpeedupBuildingId` and `mSpeedupValue` (`+0x808`, `+0x80c`, saved): the building that
     /// speeds it up and by what share of its master's speed (its own speed,
-    /// [`Mover::own_speed`]). Only a load sets one; its update drops one gone or out of range
+    /// [`Mover::own_speed`]). A speed-up building about it sets one
+    /// ([`crate::construction::speedup`]); its update drops one gone or out of range
     /// ([`Unit::speedup_drop`](crate::objects::unit::Unit::speedup_drop)).
     pub(crate) speedup: Speedup,
     /// The unit's ignore list (`+0x670`, count `+0x678`; the save's `numberUnits` and `tempInt`

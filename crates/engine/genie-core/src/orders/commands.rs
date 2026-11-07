@@ -221,7 +221,7 @@ impl World {
                     side,
                     AiLayer {
                         roles: &roles,
-                        slots,
+                        slots: &slots,
                         unit_ai_tuning: &unit_ai_tuning,
                     },
                 )

@@ -8732,7 +8732,7 @@ fn queued_build_order_builds_and_leaves_patrol_order() {
                     side,
                     AiLayer {
                         roles: &roles(),
-                        slots: slots(),
+                        slots: &slots(),
                         unit_ai_tuning: &tuning().unit_ai,
                     },
                 )?;
@@ -22984,10 +22984,11 @@ fn after_centre_seconds(setup: impl FnOnce(&mut World)) -> GenieResult<World> {
 
 /// A built building's whole seconds (`0x1411c9000`): since its garrison time, which moves on by
 /// them, the units inside below their master's hit points heal by its garrison heal rate; no
-/// whole second, a unit at its hit points, or a building not built heals nothing. Not modelled:
-/// a building at most a fifth of its hit points (it lets its garrison out), one attribute 255
-/// names, and a unit inside whose raider countdown runs. The repair by the villagers inside is
-/// `garrison/heal_tests.rs`'s.
+/// whole second, a unit at its hit points, or a building not built heals nothing; one that
+/// attribute 255 names works on the objects about it first (none here,
+/// `construction/speedup_tests.rs`). Not modelled: a building at most a fifth of its hit points
+/// (it lets its garrison out) and a unit inside whose raider countdown runs. The repair by the
+/// villagers inside is `garrison/heal_tests.rs`'s.
 #[test]
 fn building_heals_its_garrison_each_whole_second() {
     let reason = |result: GenieResult<(f32, u32)>| result.unwrap_err().reason();
@@ -23017,11 +23018,11 @@ fn building_heals_its_garrison_each_whole_second() {
         "a damaged building lets its garrison out (a fifth of its hit points)"
     );
     assert_eq!(
-        reason(centre_seconds(|world| {
-            world.players[1].attributes.resize(256, Amount::ZERO);
+        centre_seconds(|world| {
+            world.players[1].attributes.resize(262, Amount::ZERO);
             world.players[1].attributes[255] = Amount::new(109.0);
-        })),
-        "a building whose master attribute 255 names (FUN_1411c39b0)"
+        }),
+        Ok((12.0, 3000))
     );
     assert_eq!(
         reason(centre_seconds(|world| world

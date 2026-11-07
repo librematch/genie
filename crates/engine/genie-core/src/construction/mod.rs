@@ -12,6 +12,9 @@ mod main_building_id;
 mod outcomes;
 pub mod repair;
 mod repair_target;
+pub(crate) mod speedup;
+#[cfg(test)]
+mod speedup_tests;
 pub mod wait_solidify;
 mod wait_solidify_state;
 

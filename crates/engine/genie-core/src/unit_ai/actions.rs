@@ -558,7 +558,7 @@ impl UnitAi {
                 side,
                 AiLayer {
                     roles,
-                    slots: at.slots,
+                    slots: &at.slots,
                     unit_ai_tuning,
                 },
             )?;

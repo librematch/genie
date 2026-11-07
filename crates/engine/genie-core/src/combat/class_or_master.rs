@@ -70,6 +70,16 @@ impl ClassOrMaster {
         masters?.get(master).map(|target| target.class)
     }
 
+    /// A speed-up building's test of an object of master `master` and class `class`
+    /// (`FUN_1411c4a00`): a class target names its class (a 16-bit compare), any other its
+    /// master's id; no value names any.
+    pub(crate) fn targets(self, class: ClassId, master: MasterId) -> bool {
+        self.class().map_or_else(
+            || i32::from(master.get()) == self.0,
+            |target_class| target_class == class,
+        )
+    }
+
     /// The hand-off's test of an object of master `master` and class `class` (`FUN_14107bdf0`):
     /// any target names it (below 0), a class target its class (a 16-bit compare), a master
     /// target its master's id.

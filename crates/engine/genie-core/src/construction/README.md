@@ -9,6 +9,9 @@ work and a building's own update:
 - `building_update.rs` holds a building's own update: a gate's and a farm's update, the
   completion, the whole seconds (a monastery's relic goods, which `players/world_player/income.rs`
   adds, and the heal of the units inside), the hit points' regeneration and the death blast.
+- `speedup.rs` holds a speed-up building's work on the objects about it, with which its whole
+  seconds start: the moving speed-up, the work-rate speed-up or the heal its player's attributes
+  255 to 261 give.
 - `gates.rs` holds the gates: which units are in a gate, and the gates that open for their
   player's update and close after it.
 
@@ -40,6 +43,8 @@ building's own steps first, then the builder's or repairer's action.
 | [`mod.rs`](mod.rs) | Building and repairing: the Build and Repair actions with each worker's part of its update, the wait for a foundation, a building's own update and the gates. |
 | [`outcomes.rs`](outcomes.rs) | What a foundation's work answers: whether its construction goes on (`BuildProgress`) and whether it began (`ConstructionStart`). |
 | [`repair_target.rs`](repair_target.rs) | A Repair's target as its own type: the object it repairs. |
+| [`speedup.rs`](speedup.rs) | A speed-up building's work on the objects about it (`FUN_1411c39b0`, `FUN_1411c4a00`): a building that its player's attribute 255 names gives each allied object of its player's object target on the tiles of its reach a moving speed-up, a work-rate speed-up or a heal. |
+| [`speedup_tests.rs`](speedup_tests.rs) | Tests: A speed-up building's work on the objects about it (`FUN_1411c39b0`, `FUN_1411c4a00`): the tiles of its reach, its three effects on the allied objects its player's object target names, and the call in its whole seconds. |
 | [`wait_solidify.rs`](wait_solidify.rs) | A villager's wait for a foundation: `TRIBE_Action_Wait_Solidify` (action type 0x9a, vtable `0x142ed82f8`). |
 | [`wait_solidify_state.rs`](wait_solidify_state.rs) | A Wait Solidify's state: waiting for its foundation to turn solid. |
 | [`build/`](build/) | A builder's Build action (`TRIBE_Action_Build`, type 101, vtable `0x142ed6628`) up to the builder's walk: the action starts in state 4 with a `MoveTo` sub-action (`RGE_Action_Move_To`, type 1) toward the foundation; a builder already at the foundation works in its first update (state 6). |

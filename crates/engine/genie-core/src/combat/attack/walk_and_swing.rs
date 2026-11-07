@@ -306,7 +306,7 @@ impl Attack {
                 object,
                 HitLayer {
                     roles,
-                    slots: step.world.model.slots,
+                    slots: &step.world.model.slots,
                     damage_tuning: &step.world.model.tuning.damage,
                 },
             )?

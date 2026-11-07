@@ -281,23 +281,19 @@ impl World {
                 radius: master.radius,
             }));
         }
-        for (player_id, player) in PlayerId::each(self.players.len()).zip(&self.players) {
-            if let Some(ghost) = player.ghosts.iter().find(|ghost| ghost.id == id) {
-                let master = self.master(player_id, self.model.slots.master.doppelganger)?;
-                return Ok(Some(Bystander {
-                    id,
-                    player: player_id,
-                    allied: allied(player_id),
-                    kind: MasterKind::DOPPELGANGER,
-                    class: master.class,
-                    state: ghost.state,
-                    blast_defense: master.blast_defense,
-                    position: ghost.position,
-                    radius: master.radius,
-                }));
-            }
-        }
-        Err(NOT_HELD)
+        let (player_id, ghost) = self.ghost(id).ok_or(NOT_HELD)?;
+        let master = self.master(player_id, self.model.slots.master.doppelganger)?;
+        Ok(Some(Bystander {
+            id,
+            player: player_id,
+            allied: allied(player_id),
+            kind: MasterKind::DOPPELGANGER,
+            class: master.class,
+            state: ghost.state,
+            blast_defense: master.blast_defense,
+            position: ghost.position,
+            radius: master.radius,
+        }))
     }
 
     /// A movement damage's hit of `bystander` by player `owner`'s hitter: `damage` hit points off

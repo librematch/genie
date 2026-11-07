@@ -105,7 +105,7 @@ pub struct HitLayer<'model> {
     /// The build layer's roles.
     pub(crate) roles: &'model Roles,
     /// The build layer's slots.
-    pub(crate) slots: Slots,
+    pub(crate) slots: &'model Slots,
     /// The damage's tuning values.
     pub(crate) damage_tuning: &'model DamageTuning,
 }

@@ -457,7 +457,7 @@ impl Unit {
             step.world.streams.get_mut(Stream::Object),
             HitLayer {
                 roles,
-                slots,
+                slots: &slots,
                 damage_tuning: &damage_tuning,
             },
         )?;
@@ -557,7 +557,7 @@ impl Unit {
             object,
             HitLayer {
                 roles,
-                slots: step.world.model.slots,
+                slots: &step.world.model.slots,
                 damage_tuning: &step.world.model.tuning.damage,
             },
         )?;

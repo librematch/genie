@@ -444,6 +444,8 @@ bitflags! {
         const WARRIOR_PRIEST = 1 << 96;
         /// The Wonder (`0x114`, raw `0x61b0`), whose death lowers its owner's attribute 42 (`FUN_1411dbb70`) and whose construction rate the player's attribute raises at most to `DAT_142ed66b4`.
         const WONDER = 1 << 97;
+        /// The masters a speed-up building's work-rate effect (13) spares when its object target names a class (`FUN_1411c4a00`: the town centre `0x6d` and the castle `0x52`).
+        const WORK_SPEEDUP_SPARED = 1 << 98;
     }
 }
 
@@ -734,8 +736,20 @@ pub struct AttributeSlots {
     pub villager_idle_seconds: AttributeId,
     /// The food a minute of the livestock in the player's mills.
     pub mill_food: AttributeId,
+    /// The master of a player's speed-up building (255, the scripts' `cAttributeSpeedUpBuildingType`; `player+0x100`'s `+0x7f8`): `FUN_1411c39b0` works on the tiles about each building in state 2 whose master id (`CVTDQ2PS`) it equals (`UCOMISS`, `JP`: a NaN names none).
+    pub speedup_building: AttributeId,
     /// The range within which an action object keeps the building that speeds it up (`mSpeedupBuildingId` `+0x890`): `RGE_Action_Object::update` drops it beyond the square of this range.
     pub speedup_range: AttributeId,
+    /// The amount of a speed-up building's first effect (257, the scripts' `cAttributeSpeedUpPercentage`; `player+0x100`'s `+0x808`): a moving or action object's speed-up value, or the regeneration a heal adds (`FUN_1411c39b0` to `FUN_1411c4a00`).
+    pub speedup_percentage: AttributeId,
+    /// The objects a speed-up building works on (258, the scripts' `cAttributeSpeedUpObjectType`; `player+0x100`'s `+0x810`, `CVTTSS2SI`): a class plus 900, else a master (`FUN_1411c4a00` with `FUN_140fde260`).
+    pub speedup_object: AttributeId,
+    /// A speed-up building's first effect (259, the scripts' `cAttributeSpeedUpEffectType`; `player+0x100`'s `+0x818`, `CVTTSS2SI`): 5 the movement speed, 13 the work rate, 109 the regeneration (`FUN_1411c4a00`).
+    pub speedup_effect: AttributeId,
+    /// A speed-up building's second effect (260, the scripts' `cAttributeSpeedUpSecondaryEffectType`; `player+0x100`'s `+0x820`, `CVTTSS2SI`), on each tile after the first (`FUN_1411c4a00`).
+    pub speedup_secondary_effect: AttributeId,
+    /// The amount of a speed-up building's second effect (261, the scripts' `cAttributeSpeedUpSecondaryPercentage`; `player+0x100`'s `+0x828`).
+    pub speedup_secondary_percentage: AttributeId,
     /// The wood each relic in a monastery gives a minute (264, the scripts' `cAttributeRelicWoodRate`; `player+0x100`'s `+0x840`): `TRIBE_Building_Object::update` adds its sixtieth for each relic second (each specific relic twice) of a monastery whose player plays.
     pub relic_wood_rate: AttributeId,
     /// The stone each relic in a monastery gives a minute (265, the scripts' `cAttributeRelicStoneRate`; `player+0x100`'s `+0x848`): `TRIBE_Building_Object::update` adds its sixtieth for each relic second (each specific relic twice) of a monastery whose player plays.
@@ -1930,6 +1944,10 @@ pub struct TurnTuning {
     ///
     /// `turn::SHORT_DROP_REACH`: 10 in build 158041.
     pub short_drop_reach: f32,
+    /// A speed-up building's reach stops its last tile short of its far edges by this (`FUN_1411c39b0`, `DAT_142eb1e9c`).
+    ///
+    /// `turn::SPEEDUP_EDGE`: 0.001 in build 158041.
+    pub speedup_edge: f32,
     /// What Treason's command takes off the pending debit of gold (`DAT_142eb5bd4`, 400.0, read at `0x140e7c73d`).
     ///
     /// `turn::TREASON_COST`: 400 in build 158041.
