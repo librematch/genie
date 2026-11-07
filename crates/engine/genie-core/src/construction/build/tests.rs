@@ -352,8 +352,9 @@ fn cleared_object_loses_its_record_by_its_kind_and_the_call() {
 
 /// The completion's first part (`FUN_1411c6bd0`) of a farm whose build points reached its
 /// build time: attribute 237's amount for the resource of 238 only when 239 is 0 or more too
-/// and names a master the owner does not have; a pasture is not modelled; a mule cart's
-/// search follows with a unit AI only.
+/// and names a master the owner does not have, and the resource lies within the owner's
+/// attribute count (`FUN_1411c66a0`'s `CMP`, `JG`: the count itself too); a pasture is not
+/// modelled; a mule cart's search follows with a unit AI only.
 #[test]
 fn farm_bonus_wants_both_attributes_238_and_239() {
     let farm = Master {
@@ -385,6 +386,7 @@ fn farm_bonus_wants_both_attributes_238_and_239() {
                 amount: Amount::new(amount),
                 resource: Amount::new(resource),
                 near: Amount::new(near),
+                attribute_count: 300,
             },
             masters: Some(&masters),
             player_kind: PlayerKind::Human,
@@ -392,17 +394,11 @@ fn farm_bonus_wants_both_attributes_238_and_239() {
         }
         .first_part(construction, &roles())
     };
+    assert_eq!(part([45.0, 0.0, -1.0], &built).unwrap().farm_bonus, None);
+    assert_eq!(part([45.0, -1.0, 2.0], &built).unwrap().farm_bonus, None);
     assert_eq!(
-        part([45.0, 0.0, -1.0], &built).unwrap().attributes,
-        Vec::new()
-    );
-    assert_eq!(
-        part([45.0, -1.0, 2.0], &built).unwrap().attributes,
-        Vec::new()
-    );
-    assert_eq!(
-        part([45.0, 0.0, 2.0], &built).unwrap().attributes,
-        adds([(attribute::FOOD, 45.0)])
+        part([45.0, 0.0, 2.0], &built).unwrap().farm_bonus,
+        Some((attribute::FOOD, Amount::new(45.0)))
     );
     assert_eq!(
         part([45.0, 0.0, 68.0], &built),
@@ -410,15 +406,21 @@ fn farm_bonus_wants_both_attributes_238_and_239() {
             "a farm's bonus near a master (FUN_1411d3cd0)"
         ))
     );
+    // the resource up to the owner's attribute count, the count itself too; past it nothing,
+    // the `i16` range's end too
+    assert_eq!(
+        part([45.0, 300.0, 2.0], &built).unwrap().farm_bonus,
+        Some((AttributeId::named(300), Amount::new(45.0)))
+    );
+    for past in [301.0, 40000.0] {
+        assert_eq!(part([45.0, past, 2.0], &built).unwrap().farm_bonus, None);
+    }
     // not built yet: nothing
     let going = Construction {
         progress: Seconds::new(14.5),
         ..built
     };
-    assert_eq!(
-        part([45.0, 0.0, 2.0], &going).unwrap().attributes,
-        Vec::new()
-    );
+    assert_eq!(part([45.0, 0.0, 2.0], &going).unwrap().farm_bonus, None);
     // a cart (a task of action type 0x99) with a unit AI searches
     let cart = Master {
         action: Some(ActionPart {
@@ -437,6 +439,7 @@ fn farm_bonus_wants_both_attributes_238_and_239() {
                 amount: Amount::ZERO,
                 resource: Amount::ZERO,
                 near: Amount::ZERO,
+                attribute_count: 300,
             },
             masters: None,
             player_kind: PlayerKind::Human,
@@ -1364,7 +1367,6 @@ use crate::objects::masters::BuildingMaster;
 use crate::objects::masters::BuiltMode;
 use crate::objects::sprite::Graphic;
 use crate::players::history::{EntryKind, Population};
-use crate::test_ids::adds;
 use crate::testing::ids;
 use crate::testing::roles;
 use crate::world::FrameSeed;

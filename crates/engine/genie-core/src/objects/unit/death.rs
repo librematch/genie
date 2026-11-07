@@ -201,11 +201,12 @@ impl Unit {
     /// A foundation's death (`FUN_1411dbb70` to state 3 from state 0), before the combat object's:
     /// the completion's first part (`FUN_1411c6bd0`,
     /// [`World::completion_part`](crate::world::World::completion_part): a farm's bonus once its
-    /// build points reached its build time, a pasture's livestock and a mule cart's search for
-    /// resources at once, the foundation lent to the world), then, as the state is still 0 and 3
-    /// lies within 1 to 6, its construction's start (`FUN_1411e5670`, [`Construction::begin`]: a
-    /// desolid one gets its record and sight, its missiles per volley its master's; its owner
-    /// watches it at once, the foundation lent to the world).
+    /// build points reached its build time, which the farm owes to its Make (`+0xcac`,
+    /// [`World::give_farm_bonus`](crate::world::World::give_farm_bonus)), a pasture's livestock
+    /// and a mule cart's search for resources at once, the foundation lent to the world), then, as
+    /// the state is still 0 and 3 lies within 1 to 6, its construction's start (`FUN_1411e5670`,
+    /// [`Construction::begin`]: a desolid one gets its record and sight, its missiles per volley
+    /// its master's; its owner watches it at once, the foundation lent to the world).
     pub(crate) fn foundation_died(
         &mut self,
         actions: &mut Action,
@@ -223,7 +224,10 @@ impl Unit {
             .ok_or(NO_CONSTRUCTION)?;
         let completion = Completion {
             master: Some(master),
-            farm_bonus: farm_bonus(&step.world.players.player(step.player)?.attributes),
+            farm_bonus: farm_bonus(
+                &step.world.players.player(step.player)?.attributes,
+                step.world.model.slots,
+            ),
             masters: step.world.model.masters.of(step.player),
             player_kind: step.world.players.player(step.player)?.kind,
             ai,
@@ -241,10 +245,10 @@ impl Unit {
             .player_mut(step.player)?
             .tracker
             .complete(self.id, key);
-        step.world
-            .players
-            .player_mut(step.player)?
-            .add_attributes(part.attributes)?;
+        if let Some((kind, amount)) = part.farm_bonus {
+            step.world
+                .give_farm_bonus(step.player, self.id, kind, amount)?;
+        }
         // a pasture's livestock and a mule cart's search (from state 0), the foundation lent to
         // the world for what they place and search
         if part.pasture || part.cart {

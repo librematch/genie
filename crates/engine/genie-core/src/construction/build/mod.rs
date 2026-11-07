@@ -80,7 +80,6 @@ use crate::objects::{Frame, Graphics, ObjectState};
 use crate::pathing::Pathing;
 #[cfg(test)]
 use crate::players::PlayerId;
-use crate::world::NO_ATTRIBUTE;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
@@ -209,12 +208,15 @@ pub struct Completion<'masters> {
     pub(crate) ai: bool,
 }
 
-/// What the completion's first part (`FUN_1411c6bd0`) gives its caller: the attributes its owner
-/// gains (a farm's bonus) and whether a mule cart's search for resources follows.
-#[derive(Clone, Debug, Default, PartialEq)]
+/// What the completion's first part (`FUN_1411c6bd0`) gives its caller: a farm's bonus and
+/// whether a mule cart's search for resources follows.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct FirstPart {
-    /// The attributes its owner gains, in order.
-    pub(crate) attributes: Vec<(AttributeId, Amount)>,
+    /// A farm's bonus (`FUN_1411c66a0`): the attribute its owner gains (238's resource) and by
+    /// how much (237's amount). The farm then owes it to its Make (`+0xcac`,
+    /// [`Building::owes_bonus`](crate::objects::layers::Building::owes_bonus)), which its caller
+    /// sets before the owner gains it.
+    pub(crate) farm_bonus: Option<(AttributeId, Amount)>,
     /// The building's master has a task of action type 0x99 and the building a unit AI: its
     /// search for resources follows ([`crate::world::World::cart_search`]).
     pub(crate) cart: bool,
@@ -229,13 +231,16 @@ impl Completion<'_> {
     /// time (COMISS, JC: a NaN does not) gets its owner's bonus when attributes 238 (a resource)
     /// and 239 (a master), cut to integers (CVTTSS2SI), are both 0 or more (`FUN_1411c66a0`): a
     /// master 239 the owner has (`FUN_141659d20`) gives it only near the farm
-    /// (`FUN_1411d3cd0`, not modelled); a resource up to the owner's attribute count gets
-    /// attribute 237's amount (slot 0xf8 with 1 and 1); a pasture (1893, 1897) then fills
+    /// (`FUN_1411d3cd0`, not modelled); a resource up to the owner's attribute count (`CMP`,
+    /// `JG`: one at the count too) gets attribute 237's amount (slot 0xf8 with 1 and 1), and
+    /// the farm owes it to its Make (`+0xcac`, [`FirstPart::farm_bonus`], the caller's); a
+    /// resource past the count gets nothing. A pasture (1893, 1897) then fills
     /// ([`FirstPart::pasture`], the caller's); a master with a task of action type 0x99 and a unit AI
     /// runs its cart's search (the tail's game mode 4 test, `FUN_140c87f20`, holds in a game).
     /// Not modelled: a computer player's (`FUN_1411e7ca0`) and an overridden sprite's master
     /// copy (`+0x788`). Not held: the owner's `+0x137c` (cleared for master 109), the object
-    /// tracker (`FUN_14104eac0`, `FUN_14104faf0`) and the farm's `+0xcac`.
+    /// tracker (`FUN_14104eac0`, `FUN_14104faf0`) and the local player's statistics of the
+    /// bonus (`FUN_14097daf0`).
     ///
     /// # Errors
     ///
@@ -263,6 +268,7 @@ impl Completion<'_> {
                 amount,
                 resource,
                 near,
+                attribute_count,
             } = self.farm_bonus;
             let (resource, near) = (cvttss2si(resource.get()), cvttss2si(near.get()));
             if 0 <= resource && 0 <= near {
@@ -276,11 +282,8 @@ impl Completion<'_> {
                         "a farm's bonus near a master (FUN_1411d3cd0)",
                     ));
                 }
-                let attribute = i16::try_from(resource)
-                    .ok()
-                    .and_then(AttributeId::of_data)
-                    .ok_or(NO_ATTRIBUTE)?;
-                part.attributes.push((attribute, amount));
+                part.farm_bonus =
+                    bonus_resource(resource, attribute_count).map(|attribute| (attribute, amount));
             }
             // the game mode is not the editor's (4) in a game
             part.pasture = roles
@@ -300,6 +303,17 @@ impl Completion<'_> {
 /// The action type of the mule cart's tasks (its moves to resources, `0x99`): the action
 /// factory makes no action of it.
 pub const CART_TASK: ActionKind = ActionKind::named(0x99);
+
+/// The attribute a farm's bonus goes to (`FUN_1411c66a0`): `resource` (attribute 238, cut to an
+/// integer) from 0 (`TEST`, `JS`) up to the owner's `attribute_count` (`CMP`, `JG`: the count
+/// itself too, one past the attributes); none past it. A resource above the `i16` range, past
+/// any player's attributes, gives none too.
+fn bonus_resource(resource: i32, attribute_count: usize) -> Option<AttributeId> {
+    usize::try_from(resource)
+        .ok()
+        .filter(|&index| index <= attribute_count)
+        .and_then(AttributeId::of_index)
+}
 
 /// A completed building's stack unit (`FUN_1411dbb70`'s block for `+0x986`): the master its
 /// owner's slot 0x1c0 makes (`FUN_14162ce00` with its flag set), the place, and the hit points

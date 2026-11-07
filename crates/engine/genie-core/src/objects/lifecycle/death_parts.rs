@@ -30,26 +30,29 @@ use crate::world::parts::PartTable;
 use crate::world::{BuildingDeath, RESTORED_FOUNDATION};
 use crate::{GenieError, GenieResult};
 
-/// The owner's attributes 237, 238 and 239: a built farm's bonus ([`farm_bonus`]);
-/// −1 for those the player has not got.
-pub(crate) fn farm_bonus(attributes: &[Amount]) -> FarmBonus {
-    let at = |attribute: usize| {
+/// The owner's `attributes` 237, 238 and 239 (the build layer's `folwark_collection_amount`,
+/// `folwark_collection_kind` and `folwark_building`) and their count: a built farm's bonus
+/// ([`FarmBonus`]); −1 for those the player has not got.
+pub(crate) fn farm_bonus(attributes: &[Amount], slots: Slots) -> FarmBonus {
+    let at = |attribute: AttributeId| {
         attributes
-            .get(attribute)
+            .get(attribute.index())
             .copied()
             .unwrap_or(Amount::new(-1.0))
     };
     FarmBonus {
-        amount: at(237),
-        resource: at(238),
-        near: at(239),
+        amount: at(slots.attribute.folwark_collection_amount),
+        resource: at(slots.attribute.folwark_collection_kind),
+        near: at(slots.attribute.folwark_building),
+        attribute_count: attributes.len(),
     }
 }
 
 /// The owner's attributes 237, 238 and 239 (`player+0x768`..`+0x778`): a farm's bonus when built,
 /// its amount, the resource it goes to and a master near which it is given
 /// ([`Completion::first_part`](crate::construction::build::Completion::first_part)); each −1 when
-/// the player has not got it.
+/// the player has not got it. With them the owner's attribute count (`+0x90`), past which a
+/// resource gets nothing.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct FarmBonus {
     /// Attribute 237: the amount.
@@ -58,6 +61,8 @@ pub struct FarmBonus {
     pub(crate) resource: Amount,
     /// Attribute 239: the master near which it is given (an id as the value holds it).
     pub(crate) near: Amount,
+    /// The owner's attribute count (`player+0x90`).
+    pub(crate) attribute_count: usize,
 }
 
 /// `FUN_1411980b0`'s visible resources, from `set_state` leaving a state below 4 for one above 6

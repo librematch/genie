@@ -319,11 +319,12 @@ impl Unit {
     }
 
     /// `TRIBE_Building_Object::update` (`0x1411c9000`) before its combat update, for any object
-    /// (each step tests its own): the links to removed objects ([`Unit::let_removed_links_go`]),
-    /// a gate's update ([`Unit::gate_update`]), then by the state the update reads once before
-    /// its switch (`cVar3`) a built building's whole seconds ([`Unit::building_seconds`]) or a
-    /// foundation's completion ([`Unit::complete_on_update`]): a foundation that completes in
-    /// this update runs no seconds.
+    /// (each step tests its own): a farm's bonus ([`Unit::take_farm_bonus`], before the walls'
+    /// branch), the links to removed objects ([`Unit::let_removed_links_go`]), a gate's update
+    /// ([`Unit::gate_update`]), then by the state the update reads once before its switch
+    /// (`cVar3`) a built building's whole seconds ([`Unit::building_seconds`]) or a foundation's
+    /// completion ([`Unit::complete_on_update`]): a foundation that completes in this update runs
+    /// no seconds.
     ///
     /// # Errors
     ///
@@ -334,6 +335,7 @@ impl Unit {
         step: &mut Step<'_>,
         roles: &Roles,
     ) -> GenieResult<()> {
+        self.take_farm_bonus(actions, step)?;
         self.let_removed_links_go(step, roles)?;
         self.gate_update(actions, step, roles)?;
         // the seconds test state 2 before the completion makes it

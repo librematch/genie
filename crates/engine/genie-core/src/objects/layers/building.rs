@@ -16,8 +16,8 @@ use genie_diff::Diff;
 
 /// The building layer of an object: its construction, its garrison's clock, its relics, its
 /// main building, its production queue, its gate, its livestock and pasture
-/// workers, the units that took it as their target, its rice flag, its stack unit, its frame
-/// and its counts of the units inside.
+/// workers, the units that took it as their target, its rice flag, its stack unit, its frame,
+/// its counts of the units inside and the bonus a farm owes its Make.
 #[derive(Clone, Debug, Default, PartialEq, Diff)]
 pub struct Building {
     /// A building's construction.
@@ -63,6 +63,15 @@ pub struct Building {
     /// load, whose re-link counts the units inside in again.
     #[diff(unsaved)]
     pub(crate) garrison_counts: GarrisonCounts,
+    /// A farm's `+0xcac`: its completion gave its owner the farm bonus (`FUN_1411c66a0`,
+    /// [`FirstPart::farm_bonus`]), which its next update in state 2 with an action on top takes
+    /// off that action, its Make ([`Unit::take_farm_bonus`]); false from its constructors and
+    /// the load.
+    ///
+    /// [`FirstPart::farm_bonus`]: crate::construction::build::FirstPart::farm_bonus
+    /// [`Unit::take_farm_bonus`]: crate::objects::unit::Unit::take_farm_bonus
+    #[diff(unsaved)]
+    pub(crate) owes_bonus: bool,
 }
 
 impl Building {
@@ -83,5 +92,6 @@ impl Building {
         stack_made: None,
         build_frame: Frame::ZERO,
         garrison_counts: GarrisonCounts::NONE,
+        owes_bonus: false,
     };
 }

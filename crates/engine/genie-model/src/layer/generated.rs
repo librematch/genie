@@ -724,6 +724,12 @@ pub struct AttributeSlots {
     pub villager_killed_by_kind_1: AttributeId,
     /// The first of the trickles a minute of food, wood, stone and gold (230 to 233).
     pub trickles: AttributeId,
+    /// The amount a farm's completion gives its owner (237, the scripts' `cAttributeFolwarkCollectionAmount`; `player+0x100`'s `+0x768`): `FUN_1411c6bd0` gives it to the resource of attribute 238 (`FUN_1411c66a0`), and the farm's next update with its Make on top takes it off what the Make has still to make (`TRIBE_Building_Object::update`, `+0xcac`).
+    pub folwark_collection_amount: AttributeId,
+    /// The resource a farm's completion gives attribute 237's amount to (238, the scripts' `cAttributeFolwarkCollectionType`; `player+0x100`'s `+0x770`), cut to an integer (`CVTTSS2SI`): none below 0, or past the player's attribute count (`FUN_1411c66a0`).
+    pub folwark_collection_kind: AttributeId,
+    /// The master near which a farm's completion gives its bonus (239, the scripts' `cAttributeBuildingId`; `player+0x100`'s `+0x778`), cut to an integer (`CVTTSS2SI`): no bonus below 0; a master its owner has gives it only near the farm (`FUN_1411c66a0`, `FUN_1411d3cd0`).
+    pub folwark_building: AttributeId,
     /// The paid cost of the units a player makes while the telemetry's match runs (`FUN_140982ff0()`'s `+0x921`): a new unit's combat setup adds it beside 98 and 164.
     pub made_units_cost: AttributeId,
     /// The buildings' paid costs (247), which the combat setup adds for a building with a train location (`FUN_14121df60`).

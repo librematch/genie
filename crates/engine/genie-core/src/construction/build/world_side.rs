@@ -24,7 +24,9 @@ use crate::objects::masters::PlayersMastersExt;
 use crate::objects::masters::{Master, player_master};
 use crate::objects::unit::Unit;
 use crate::orders::lock_gate;
+use crate::players::Amount;
 use crate::players::PlayerId;
+use crate::players::attribute::AttributeId;
 use crate::production::spawn::Facing;
 use crate::unit_ai::QueuedOrder;
 use crate::unit_ai::unit_ai_kind;
@@ -71,9 +73,12 @@ impl World {
     }
 
     /// The completion's first part (`FUN_1411c6bd0`, [`Completion::first_part`]) of the
-    /// foundation `id` of `owner` outside its update: its owner gains its attributes, a pasture
-    /// fills ([`crate::world::World::setup_pasture`]), then a mule cart's search runs from state 0
+    /// foundation `id` of `owner` outside its update: a farm owes its bonus to its Make
+    /// (`+0xcac`, [`Building::owes_bonus`]) and its owner gains it, a pasture fills
+    /// ([`crate::world::World::setup_pasture`]), then a mule cart's search runs from state 0
     /// ([`crate::world::World::cart_search`]).
+    ///
+    /// [`Building::owes_bonus`]: crate::objects::layers::Building::owes_bonus
     ///
     /// # Errors
     ///
@@ -92,7 +97,7 @@ impl World {
             .ok_or(NO_CONSTRUCTION)?;
         let completion = Completion {
             master: Some(master),
-            farm_bonus: farm_bonus(&self.players.player(owner)?.attributes),
+            farm_bonus: farm_bonus(&self.players.player(owner)?.attributes, self.model.slots),
             masters: self.model.masters.of(owner),
             player_kind: self.players.player(owner)?.kind,
             ai: self.parts.unit_ai.contains(unit.id),
@@ -100,10 +105,8 @@ impl World {
         let part = completion.first_part(&construction, &self.model.roles)?;
         // its tracker part (FUN_14104eac0): the foundation leaves the pending lists
         self.track_complete(owner, id, master.id)?;
-        for (kind, amount) in part.attributes {
-            self.players
-                .player_mut(owner)?
-                .add_attribute(kind, amount)?;
+        if let Some((kind, amount)) = part.farm_bonus {
+            self.give_farm_bonus(owner, id, kind, amount)?;
         }
         if part.pasture {
             self.setup_pasture(owner, PastureId::new(id))?;
@@ -112,6 +115,27 @@ impl World {
             self.cart_search(owner, id, ObjectState::Foundation)?;
         }
         Ok(())
+    }
+
+    /// `FUN_1411c66a0`'s farm bonus ([`FirstPart::farm_bonus`]) of the building `id` of
+    /// `owner`: the farm owes it to its Make (`+0xcac`, [`Building::owes_bonus`]), then its owner
+    /// gains `amount` of attribute `kind` (slot 0xf8 with 1 and 1).
+    ///
+    /// [`FirstPart::farm_bonus`]: crate::construction::build::FirstPart::farm_bonus
+    /// [`Building::owes_bonus`]: crate::objects::layers::Building::owes_bonus
+    ///
+    /// # Errors
+    ///
+    /// A building the world does not hold, and the add's.
+    pub(crate) fn give_farm_bonus(
+        &mut self,
+        owner: PlayerId,
+        id: ObjectId,
+        kind: AttributeId,
+        amount: Amount,
+    ) -> GenieResult<()> {
+        self.parts.building_mut(id)?.owes_bonus = true;
+        self.players.player_mut(owner)?.add_attribute(kind, amount)
     }
 
     /// The construction's start (`FUN_1411e5670`, [`Construction::begin`]) of the foundation

@@ -10025,6 +10025,69 @@ fn farm_starts_its_make_in_its_first_update_and_fills_from_the_next() {
     assert!(world.players[0].unsupported.is_none());
 }
 
+/// A farm whose completion gave its owner the farm bonus (`+0xcac`) owes it to its Make: its
+/// first update in state 2 starts the Make after the building's steps
+/// (`TRIBE_Building_Object::update`, then `RGE_Action_Object::update`), so the farm takes the
+/// bonus (attribute 237) off the Make's food still to make in its next update, before the Make
+/// makes ([`Unit::take_farm_bonus`]).
+#[test]
+fn farm_owing_its_bonus_takes_it_off_its_make_in_the_update_after_the_start() {
+    let farm = Object::with_actions(
+        Unit {
+            id: object_id(40),
+            life: Lifecycle {
+                master_id: ids::FARM,
+                attribute_kind: Some(attribute::FOOD),
+                ..Lifecycle::default()
+            },
+            ..Unit::default()
+        },
+        Action {
+            default_task: DefaultTask::Make,
+            ..Default::default()
+        },
+    );
+    let mut attributes = vec![Amount::ZERO; 240];
+    attributes[attribute::FARM_FOOD_AMOUNT.index()] = Amount::new(175.0);
+    attributes[slots().attribute.folwark_collection_amount.index()] = Amount::new(45.0);
+    let mut world = World::new(
+        WorldTime::ZERO,
+        FrameSeed::of_data(1),
+        PlayerId::new(0),
+        vec![Millis::ZERO],
+        vec![Player {
+            objects: vec![farm.unit].into(),
+            attributes,
+            ..Player::default()
+        }],
+    )
+    .with_actions([(object_id(40), farm.parts.actions)])
+    .with_buildings([(
+        object_id(40),
+        Building {
+            owes_bonus: true,
+            ..Building::NONE
+        },
+    )]);
+    world.model.masters = vec![Arc::new(Masters::new([farm_master()]))];
+    let made_and_owed = |world: &World| {
+        let make = world.parts.actions_of(object_id(40)).list.make().copied();
+        (
+            make.map(|make| make.remaining),
+            world.parts.building_of(object_id(40)).owes_bonus,
+        )
+    };
+    world.tick(Millis::new(104));
+    assert_eq!(made_and_owed(&world), (Some(Amount::new(175.0)), true));
+    world.tick(Millis::new(104));
+    let made = 0.4f32 * 1.0 * Millis::new(104).seconds();
+    assert_eq!(
+        made_and_owed(&world),
+        (Some(Amount::new(175.0 - 45.0 - made)), false)
+    );
+    assert!(world.players[0].unsupported.is_none());
+}
+
 /// What a new object's master's default task starts (slot 0x7f0, [`default_start`]): a farm's
 /// Make, a bird's Fly, livestock's Artifact; another type the factory makes is reported.
 ///
@@ -22842,6 +22905,74 @@ fn foundation_whose_build_points_reached_its_build_time_completes() {
             ObjectState::Foundation
         );
     }
+}
+
+/// [`house_builder`]'s house as a farm (class 49), its owner's farm bonus (attributes 237 to
+/// 239) 45 to food near master 999, which the owner lacks.
+fn farm_with_bonus(world: &mut World) {
+    for masters in &mut world.model.masters {
+        if let Some(house) = Arc::make_mut(masters).get_mut(ids::HOUSE) {
+            house.class = class::FARM;
+        }
+    }
+    let attribute_slots = slots().attribute;
+    let attributes = &mut world.players[1].attributes;
+    attributes.resize(250, Amount::ZERO);
+    attributes[attribute_slots.folwark_collection_amount.index()] = Amount::new(45.0);
+    attributes[attribute_slots.folwark_collection_kind.index()] = Amount::ZERO;
+    attributes[attribute_slots.folwark_building.index()] = Amount::new(999.0);
+}
+
+/// A farm completing in its own update with its owner's farm bonus gives its owner the bonus
+/// and owes it to its Make (`FUN_1411c66a0`'s `+0xcac`, [`World::completion_part`]); with
+/// attribute 238 below 0 it gives and owes nothing.
+#[test]
+fn farm_completion_gives_its_owner_the_bonus_and_owes_it_to_its_make() {
+    let (world, (gained, _)) = completed_house(farm_with_bonus);
+    assert_eq!(gained, vec![(0, 45.0), (98, 25.0), (165, 25.0)]);
+    assert!(world.parts.building_of(object_id(10028)).owes_bonus);
+    let (world, (gained, _)) = completed_house(|world| {
+        farm_with_bonus(world);
+        world.players[1].attributes[slots().attribute.folwark_collection_kind.index()] =
+            Amount::new(-1.0);
+    });
+    assert_eq!(gained, vec![(98, 25.0), (165, 25.0)]);
+    assert!(!world.parts.building_of(object_id(10028)).owes_bonus);
+}
+
+/// A farm foundation that dies once its build points reached its build time gives its owner
+/// the farm bonus and owes it as a completed one does ([`Unit::foundation_died`]).
+#[test]
+fn dying_farm_foundation_at_its_build_time_gives_its_bonus_and_owes_it() {
+    let mut world = house_builder();
+    farm_with_bonus(&mut world);
+    for masters in &mut world.model.masters {
+        let house = Arc::make_mut(masters).get_mut(ids::HOUSE).unwrap();
+        house.death_sprite = None;
+        if let Some(building_master) = house.building.as_mut() {
+            building_master.destruction_sprite = None;
+        }
+    }
+    let construction = site_mut(&mut world, object_id(10028));
+    construction.progress = Seconds::of_master(construction.build_time);
+    let seen = in_update(
+        &mut world,
+        (PlayerId::new(1), ListIndex::new(1)),
+        0,
+        |unit, actions, step| {
+            let before = attribute_values(step.world, 1);
+            unit.life.state = ObjectState::Dying;
+            unit.died(actions, step, ObjectState::Foundation, &roles())?;
+            Ok((
+                gained(step.world, 1, &before),
+                step.world.parts.building_of(object_id(10028)).owes_bonus,
+            ))
+        },
+    );
+    assert_eq!(
+        seen.map_err(|error| error.reason().to_owned()),
+        Ok((vec![(0, 45.0)], true))
+    );
 }
 
 /// A building completing in its own update leaves its owner what the builder's completion

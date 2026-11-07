@@ -8,9 +8,12 @@
 //! powerup) times the task's `work_val1` per second, and the farmers take from it. The food
 //! still to make starts at the player's farm food (attribute 36) or fish trap food (88); once it
 //! is made and the farmers took the last of it, the farm's slot 0xd8 sets its hit points to 0.
+//! A farm whose completion gave its owner the farm bonus takes the bonus off its Make's food
+//! still to make in its next update ([`Unit::take_farm_bonus`]).
 
-use crate::GenieResult;
 use crate::objects::HitPoints;
+use crate::objects::ObjectState;
+use crate::objects::actions::Action as ActionsAction;
 use crate::objects::lifecycle::Lifecycle;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::MasterKind;
@@ -20,8 +23,10 @@ use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Unit;
 use crate::objects::unit::object_master;
 use crate::players::Amount;
+use crate::technology::Attributes;
 use crate::world::slots::PlayerSlotsExt;
 use crate::world::step::Step;
+use crate::{GenieError, GenieResult};
 use genie_diff::Diff;
 
 /// The action type (`+0x8`, 0x15).
@@ -194,14 +199,67 @@ impl Unit {
         }
         made
     }
+
+    /// `TRIBE_Building_Object::update`'s farm bonus (`0x1411c9000`, after the fifth of its hit
+    /// points, before the walls' branch): a building in state 2 that owes the bonus its
+    /// completion gave (`+0xcac`, [`Building::owes_bonus`]) and holds an action on top
+    /// (`FUN_140a986f0`: the first of its list `+0x880`, at the list's `+0x10`,
+    /// [`ActionList::head`]) takes its owner's attribute 237 (`+0x768`, the build layer's
+    /// `folwark_collection_amount`) off that action's `+0x44` (`SUBSS`, then `FUN_140a78140`'s
+    /// store) and owes nothing more. A farm's action on top is its Make, whose `+0x44` is its
+    /// food still to make ([`MakeAction::remaining`]): the farm masters' (50, 199, 1187, 1893,
+    /// 1897) default task, which starts in the farm's first update in state 2, after its
+    /// building's steps, so the farm takes the bonus in its next update. Their other task, the
+    /// Farm (121, `TRIBE_Action_Farm`), no list of genie's holds. Without an action on top it
+    /// owes the bonus on.
+    ///
+    /// [`Building::owes_bonus`]: crate::objects::layers::Building::owes_bonus
+    /// [`ActionList::head`]: crate::objects::actions::ActionList::head
+    ///
+    /// # Errors
+    ///
+    /// An action on top other than a Make, which no farm of genie's holds, and an owner without
+    /// attribute 237.
+    pub(crate) fn take_farm_bonus(
+        &self,
+        actions: &mut Action,
+        step: &mut Step<'_>,
+    ) -> GenieResult<()> {
+        if self.life.state != ObjectState::Alive
+            || !step.world.parts.building_of(self.id).owes_bonus
+        {
+            return Ok(());
+        }
+        let Some(top) = actions.list.head_mut() else {
+            return Ok(());
+        };
+        let ActionsAction::Make(make) = top else {
+            // a farm's list holds its default task's Make only
+            return Err(GenieError::unreachable(
+                "a farm owing its bonus whose action on top is not its Make",
+            )
+            .with("object", self.id)
+            .with("action", top.kind()));
+        };
+        let bonus = Attributes::get(
+            step.world.players.player(step.player)?,
+            step.world.model.slots.attribute.folwark_collection_amount,
+        )?;
+        make.remaining -= bonus;
+        step.world.parts.building_mut(self.id)?.owes_bonus = false;
+        Ok(())
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::construction::FoundationId;
+    use crate::construction::wait_solidify::WaitSolidify;
     use crate::objects::ListIndex;
-    use crate::objects::ObjectState;
     use crate::objects::WorkRate;
+    use crate::objects::actions::ActionList;
+    use crate::objects::layers::Building;
     use crate::objects::masters::ActionPart;
     use crate::objects::masters::CarryCapacity;
     use crate::objects::masters::MasterId;
@@ -225,6 +283,7 @@ mod tests {
     #[cfg(test)]
     use crate::world::tests::in_update;
     use crate::world::{Player, World};
+    use std::slice::from_ref;
     use std::sync::Arc;
 
     /// The farm's default task in build 158041's `.dat` (master 50, task 0).
@@ -451,5 +510,95 @@ mod tests {
             |unit, action, step| Unit::make_part(unit, action, step, &roles()),
         );
         assert!(head_code.is_err());
+    }
+
+    /// [`farm_world`]'s farm in `state` with `actions` on its list, owing the bonus its
+    /// completion gave (`+0xcac`) when `owes`, its owner's attribute 237 at 45.
+    fn bonus_world(actions: &[ActionsAction], state: ObjectState, owes: bool) -> World {
+        let mut world = farm_world(making(175.0, 175.0, farm_task()), ids::FARM, 0.0);
+        let farm = &mut world.players[1].objects[ListIndex::new(0)];
+        farm.life.state = state;
+        let id = farm.id;
+        let list = &mut world.parts.actions_mut(id).unwrap().list;
+        *list = ActionList::EMPTY;
+        for action in actions.iter().rev() {
+            list.put(action.clone());
+        }
+        let attributes = &mut world.players[1].attributes;
+        attributes.resize(240, Amount::ZERO);
+        attributes[slots().attribute.folwark_collection_amount.index()] = Amount::new(45.0);
+        world.with_buildings([(
+            id,
+            Building {
+                owes_bonus: owes,
+                ..Building::NONE
+            },
+        )])
+    }
+
+    /// The farm's bonus ([`Unit::take_farm_bonus`]) in an update of [`bonus_world`]'s farm: its
+    /// result, its Make's food still to make and whether it still owes the bonus.
+    fn bonus_taken(world: &mut World) -> (GenieResult<()>, Option<f32>, bool) {
+        let taken = in_update(
+            world,
+            (PlayerId::new(1), ListIndex::new(0)),
+            104,
+            |unit, action, step| Ok(unit.take_farm_bonus(action, step)),
+        )
+        .unwrap();
+        let id = world.players[1].objects[ListIndex::new(0)].id;
+        (
+            taken,
+            world
+                .parts
+                .actions_of(id)
+                .list
+                .make()
+                .map(|make| make.remaining.get()),
+            world.parts.building_of(id).owes_bonus,
+        )
+    }
+
+    /// A farm in state 2 that owes its bonus (`TRIBE_Building_Object::update`, `+0xcac`) takes
+    /// its owner's attribute 237 off its Make's food still to make (`+0x44`, `SUBSS`), once.
+    #[test]
+    fn farm_owing_its_bonus_takes_it_off_its_make_once() {
+        let make = ActionsAction::Make(making(175.0, 175.0, farm_task()));
+        let mut world = bonus_world(&[make], ObjectState::Alive, true);
+        assert_eq!(bonus_taken(&mut world), (Ok(()), Some(175.0 - 45.0), false));
+        assert_eq!(bonus_taken(&mut world), (Ok(()), Some(175.0 - 45.0), false));
+    }
+
+    /// A farm owes its bonus on without an action on top (its Make not started yet) or outside
+    /// state 2; one that owes none keeps its Make as it is.
+    #[test]
+    fn farm_owes_its_bonus_on_without_an_action_on_top_or_outside_state_2() {
+        let make = ActionsAction::Make(making(175.0, 175.0, farm_task()));
+        let mut empty = bonus_world(&[], ObjectState::Alive, true);
+        assert_eq!(bonus_taken(&mut empty), (Ok(()), None, true));
+        for state in [ObjectState::Foundation, ObjectState::Dying] {
+            let mut world = bonus_world(from_ref(&make), state, true);
+            assert_eq!(bonus_taken(&mut world), (Ok(()), Some(175.0), true));
+        }
+        let mut paid = bonus_world(&[make], ObjectState::Alive, false);
+        assert_eq!(bonus_taken(&mut paid), (Ok(()), Some(175.0), false));
+    }
+
+    /// The bonus goes to the action on top (`FUN_140a986f0`), not to a Make below it: another
+    /// action there, which no farm of genie's holds, is an error, and the Make keeps its food.
+    #[test]
+    fn farm_owing_its_bonus_with_another_action_on_top_fails() {
+        let wait = ActionsAction::WaitSolidify(WaitSolidify::new(
+            Task::default(),
+            FoundationId::new(object_id(601)),
+        ));
+        let make = ActionsAction::Make(making(175.0, 175.0, farm_task()));
+        let mut world = bonus_world(&[wait, make], ObjectState::Alive, true);
+        let (taken, remaining, owes) = bonus_taken(&mut world);
+        assert_eq!(
+            taken.map_err(|error| error.reason().to_owned()),
+            Err("a farm owing its bonus whose action on top is not its Make".to_owned())
+        );
+        assert_eq!((remaining, owes), (Some(175.0), true));
     }
 }

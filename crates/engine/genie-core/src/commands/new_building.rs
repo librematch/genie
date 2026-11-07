@@ -359,6 +359,7 @@ impl World {
             pasture_workers: Vec::new(),
             build_frame: Frame::ZERO,
             garrison_counts: GarrisonCounts::NONE,
+            owes_bonus: false,
             // every building holds a gate's lock, open
             gate: Some(Gate {
                 first_update: true,
