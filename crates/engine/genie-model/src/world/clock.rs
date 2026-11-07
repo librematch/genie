@@ -1,12 +1,17 @@
 //! The world's clock in the game's milliseconds: a moment of it ([`WorldTime`]) and a span
-//! ([`Millis`]). The game keeps both as `u32` and its arithmetic on them wraps. The update's
-//! span in seconds and the timers that count it down are `f32` ([`Seconds`]).
+//! ([`Millis`]). The game keeps both as `u32` and its arithmetic on them wraps. A span's whole
+//! seconds are its unsigned quotient ([`ClockSeconds`]). The update's span in seconds and the
+//! timers that count it down are `f32` ([`Seconds`]).
 
 use crate::math::image::facing::MS_PER_SECOND;
 use derive_more::{Add, AddAssign, Display, Neg, Sub, SubAssign};
 use serde::Deserialize;
 use serde::Serialize;
 use std::ops::{Div, Mul, MulAssign};
+
+/// The milliseconds of a whole second in the game's int arithmetic on the clock: `IMUL` by
+/// `0x3e8`, and the unsigned division by it (`MUL` by `0x10624dd3`, then `SHR` 6).
+const MS_PER_WHOLE_SECOND: u32 = 1000;
 
 /// A moment of the world's clock in milliseconds since the game's start (`world_time`): the
 /// clock itself and the moments the objects keep (a unit AI's last retarget, a reload's end,
@@ -109,11 +114,42 @@ impl Millis {
     pub fn seconds(self) -> Seconds {
         Seconds(self.0 as f32 / 1000.0)
     }
+
+    /// The span's whole seconds, truncated by the game's unsigned division by 1000 (`MUL` by
+    /// `0x10624dd3`, then `SHR` 6: a building's seconds since its last garrison count).
+    #[must_use]
+    pub const fn whole_seconds(self) -> ClockSeconds {
+        ClockSeconds(self.0 / MS_PER_WHOLE_SECOND)
+    }
 }
 
 impl genie_diff::Diff for Millis {
     fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
         self.0.diff(&other.0, differ);
+    }
+}
+
+/// A span of the world's clock in whole seconds: a [`Millis`] span's quotient by 1000
+/// ([`Millis::whole_seconds`]). A building in state 2 counts them since its last garrison count
+/// (`+0xbe0`, `TRIBE_Building_Object::update`), which then moves on by them.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Display)]
+pub struct ClockSeconds(u32);
+
+impl ClockSeconds {
+    /// No whole second.
+    pub const ZERO: Self = Self(0);
+
+    /// The whole seconds, as the game's int arithmetic takes them (a monastery's relic seconds).
+    #[must_use]
+    pub const fn get(self) -> u32 {
+        self.0
+    }
+
+    /// The whole seconds in milliseconds (`IMUL` by 1000, which wraps): what a building's last
+    /// garrison count moves on by.
+    #[must_use]
+    pub const fn millis(self) -> Millis {
+        Millis(self.0.wrapping_mul(MS_PER_WHOLE_SECOND))
     }
 }
 
@@ -319,6 +355,20 @@ mod tests {
         assert!(WholeSeconds::ZERO < WholeSeconds::of_data(1));
         assert_eq!(WholeSeconds::default().get(), 0);
         assert_eq!(WholeSeconds::of_data(i16::MAX).plus(1).get(), i16::MIN);
+    }
+
+    #[test]
+    fn whole_seconds_truncate_unsigned_and_give_their_milliseconds_back() {
+        assert_eq!(Millis::new(2999).whole_seconds().get(), 2);
+        assert_eq!(Millis::new(999).whole_seconds(), ClockSeconds::ZERO);
+        assert_eq!(Millis::new(u32::MAX).whole_seconds().get(), 4_294_967);
+        assert_eq!(
+            Millis::new(2999).whole_seconds().millis(),
+            Millis::new(2000)
+        );
+        assert_eq!(ClockSeconds::default(), ClockSeconds::ZERO);
+        assert!(ClockSeconds::ZERO < Millis::new(1000).whole_seconds());
+        assert_eq!(Millis::new(7000).whole_seconds().to_string(), "7");
     }
 
     #[test]

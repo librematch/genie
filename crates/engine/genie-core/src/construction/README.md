@@ -7,7 +7,8 @@ work and a building's own update:
 - `repair/` holds the Repair action and its payment.
 - `wait_solidify.rs` holds a villager's wait until a foundation's construction starts.
 - `building_update.rs` holds a building's own update: a gate's and a farm's update, the
-  completion, the hit points' regeneration and the death blast.
+  completion, the whole seconds (a monastery's relic goods, which `players/world_player/income.rs`
+  adds, and the heal of the units inside), the hit points' regeneration and the death blast.
 - `gates.rs` holds the gates: which units are in a gate, and the gates that open for their
   player's update and close after it.
 

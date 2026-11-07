@@ -79,7 +79,7 @@ mod tick;
 mod world_update;
 
 pub use self::ai_values::{LureDestination, Percent, TargetingMode, VillagerGarrison};
-pub use self::clock::{Millis, Seconds, WholeSeconds, WorldTime};
+pub use self::clock::{ClockSeconds, Millis, Seconds, WholeSeconds, WorldTime};
 pub use self::forced::GameState;
 pub use self::frame_seed::FrameSeed;
 pub use self::mode_680::Mode680;

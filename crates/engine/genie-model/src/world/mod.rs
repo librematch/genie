@@ -4,6 +4,7 @@
 pub mod clock;
 pub mod options;
 pub mod settings;
+pub use self::clock::ClockSeconds;
 pub use self::clock::Millis;
 pub use self::clock::Seconds;
 pub use self::clock::WholeSeconds;

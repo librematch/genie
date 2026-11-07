@@ -1,5 +1,5 @@
-//! The income: the trickles, the mills' food, the attribute adds and their sharing, and the
-//! update's tail.
+//! The income: the trickles, the mills' food, a monastery's relic goods, the attribute adds
+//! and their sharing, and the update's tail.
 
 use crate::GenieResult;
 use crate::map::Tile;
@@ -17,6 +17,7 @@ use crate::players::attribute::AttributeId;
 use crate::players::tracker::ListKey;
 use crate::players::world_player::{EARLY_SCOUTING_MS, MINUTE, SECOND, get, set};
 use crate::world::AllySharing;
+use crate::world::ClockSeconds;
 use crate::world::Seconds;
 use crate::world::World;
 use crate::world::layer::AttributeRoles;
@@ -100,12 +101,11 @@ impl World {
     }
 
     /// A monastery's relic goods for `seconds` whole seconds (`TRIBE_Building_Object::update`,
-    /// `0x1411c9000`, a monastery in state 2 whose player plays): `relics`' count plus twice its
-    /// specific count (`+0xc20`, `+0xc24`) times `seconds` (`LEA`, `IMUL`: a wrapping int, then
-    /// `CVTDQ2PS`) are the relic seconds. Each of player `player_id`'s relic rates over 60
-    /// (`DIVSS`, then `MULSS` by the relic seconds: attributes 225, 264, 265 and 191) gives food,
-    /// wood, stone and gold in turn through slot 0xf8 with 1 and 1 ([`World::add_resource`]), the
-    /// gold then attribute 100 too. With no relics each adds 0.0. The local player's statistics
+    /// `0x1411c9000`, a monastery in state 2 whose player plays): each of player `player_id`'s
+    /// relic rates over 60 (`DIVSS`, then `MULSS` by `relics`' relic seconds,
+    /// [`Relics::relic_seconds`]: attributes 225, 264, 265 and 191) gives food, wood, stone and
+    /// gold in turn through slot 0xf8 with 1 and 1 ([`World::add_resource`]), the gold then
+    /// attribute 100 too. With no relics each adds 0.0. The local player's statistics
     /// (`FUN_14097daf0` four times) are not held.
     ///
     /// # Errors
@@ -115,13 +115,9 @@ impl World {
         &mut self,
         player_id: PlayerId,
         relics: Relics,
-        seconds: u32,
+        seconds: ClockSeconds,
     ) -> GenieResult<()> {
-        let relic_seconds = relics
-            .count
-            .get()
-            .wrapping_add(relics.specific.get().wrapping_mul(2))
-            .wrapping_mul(seconds as i32) as f32;
+        let relic_seconds = relics.relic_seconds(seconds);
         let slots = self.model.slots.attribute;
         let attributes = &self.players.player(player_id)?.attributes;
         let goods = [

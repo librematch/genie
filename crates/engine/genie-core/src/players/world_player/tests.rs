@@ -298,7 +298,10 @@ fn relics_give_sixtieth_of_their_rates_each_relic_second() {
         Amount::new(30.0),
     );
     let relics = Relics::new(RelicCount::of_data(2), RelicCount::of_data(1));
-    world.relic_goods(PlayerId::new(1), relics, 3).unwrap();
+    let seconds = Millis::new(3000).whole_seconds();
+    world
+        .relic_goods(PlayerId::new(1), relics, seconds)
+        .unwrap();
     let relic_seconds = 12.0;
     let gold = 30.0 / 60.0 * relic_seconds;
     let goods = amounts([
@@ -321,8 +324,8 @@ fn relics_give_sixtieth_of_their_rates_each_relic_second() {
 }
 
 /// Without relics each good is 0.0 and still added: a −0.0 resource, gathered total or relic
-/// income becomes 0.0. The relic seconds are the game's int product: 2^30 relics for 2 s wrap
-/// to −2^31, which takes food away.
+/// income becomes 0.0. The relic seconds are the game's int product
+/// ([`Relics::relic_seconds`]): 2^30 relics for 2 s wrap to −2^31, which takes food away.
 #[test]
 fn relics_give_their_int_product_of_relic_seconds() {
     let mut world = world();
@@ -330,15 +333,18 @@ fn relics_give_their_int_product_of_relic_seconds() {
     for attribute in [0, 166, 100] {
         world.players[1].attributes[attribute] = Amount::new(-0.0);
     }
+    let seconds = |millis| Millis::new(millis).whole_seconds();
     world
-        .relic_goods(PlayerId::new(1), Relics::NONE, 5)
+        .relic_goods(PlayerId::new(1), Relics::NONE, seconds(5000))
         .unwrap();
     assert_eq!(
         [0, 166, 100].map(|attribute| world.players[1].attributes[attribute].get().to_bits()),
         [0; 3]
     );
     let many = Relics::new(RelicCount::of_data(1 << 30), RelicCount::ZERO);
-    world.relic_goods(PlayerId::new(1), many, 2).unwrap();
+    world
+        .relic_goods(PlayerId::new(1), many, seconds(2000))
+        .unwrap();
     assert_eq!(
         world.players[1].attributes[0],
         Amount::new(6.0 / 60.0 * -2_147_483_648.0)
@@ -357,7 +363,8 @@ fn relic_goods_go_to_mutual_allies_but_relic_income() {
     world.players[2].relations = relation_row([1, 0, 0, 3]);
     world.players[1].attributes[191] = Amount::new(60.0);
     let relics = Relics::new(RelicCount::of_data(1), RelicCount::ZERO);
-    world.relic_goods(PlayerId::new(1), relics, 1).unwrap();
+    let second = Millis::new(1000).whole_seconds();
+    world.relic_goods(PlayerId::new(1), relics, second).unwrap();
     assert_eq!(
         [1, 2, 3].map(|player| (
             world.players[player].attributes[3].get(),

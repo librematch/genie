@@ -35,6 +35,7 @@ use crate::objects::unit::object_master;
 use crate::players::Amount;
 use crate::players::game_status::GameStatus;
 use crate::unit_ai::HUMAN_ORDER_CAP;
+use crate::world::ClockSeconds;
 use crate::world::Millis;
 use crate::world::Seconds;
 use crate::world::WholeSeconds;
@@ -385,15 +386,14 @@ impl Unit {
             .world
             .world_time
             .since(step.world.parts.building_of(self.id).garrison_time)
-            .get()
-            / 1000;
-        if seconds == 0 {
+            .whole_seconds();
+        if seconds == ClockSeconds::ZERO {
             return Ok(());
         }
         // the master's own copy lives beside the layer: what the rest reads of it, first
         let (master_id, master_hp) = (master.id, master.hit_points);
         let layer = step.world.parts.building_mut(self.id)?;
-        layer.garrison_time = layer.garrison_time.after(Millis::new(seconds * 1000));
+        layer.garrison_time = layer.garrison_time.after(seconds.millis());
         if self.damaged_lately.running() {
             self.damaged_lately = self.damaged_lately.tick();
         }
