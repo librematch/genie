@@ -121,16 +121,17 @@ impl MakeAction {
     /// within its master's capacity (`+0x61c`; `FUN_14119d320` with 1 and 1), and what it gained
     /// is no longer left to make; a task with a work flag (`+0x34`) adds to its player's
     /// attribute `task.attribute_kind` instead (the player's slot 0xf8, `FUN_141616820` with 0
-    /// and 1), so nothing is taken off. Once all is made, a farm that holds nothing (not a
-    /// pasture) runs its slot 0xd8: a combat object's or building's (`FUN_141211340`) spares
-    /// class 42, then `FUN_14118f580` takes its hit points to 0 (the object is in its list, so
-    /// not asleep; the special-object list, `+0x30c` bit 0, is not held). The game's `+0xc14`
-    /// (`FUN_140c884c0`), which makes 1000 at once, is 0, as the tick oracle holds it. The other
-    /// states do nothing.
+    /// and 1: [`crate::world::World::add_player_attribute`]), so nothing is taken off. Once all
+    /// is made, a farm that holds nothing (not a pasture) runs its slot 0xd8: a combat object's
+    /// or building's (`FUN_141211340`) spares class 42, then `FUN_14118f580` takes its hit
+    /// points to 0 (the object is in its list, so not asleep; the special-object list, `+0x30c`
+    /// bit 0, is not held). The game's `+0xc14` (`FUN_140c884c0`), which makes 1000 at once, is
+    /// 0, as the tick oracle holds it. The other states do nothing.
     ///
     /// # Errors
     ///
-    /// A farm whose master the slice lacks, and an attribute its player has not got.
+    /// A farm whose master the slice lacks, a task with a work flag and no attribute, and the
+    /// add's.
     pub(crate) fn update(
         &mut self,
         step: &mut Step<'_>,
@@ -161,9 +162,7 @@ impl MakeAction {
                 } else {
                     let attribute = self.task.attribute_kind.ok_or(NO_ATTRIBUTE)?;
                     step.world
-                        .players
-                        .player_mut(step.player)?
-                        .add_attribute(attribute, Amount::new(rate))?;
+                        .add_player_attribute(step.player, attribute, Amount::new(rate))?;
                 }
                 self.remaining -= farm.life.amount - before;
             }
@@ -267,7 +266,9 @@ mod tests {
     #[cfg(test)]
     use crate::objects::masters::WorkValue;
     use crate::objects::masters::{Master, Masters};
+    use crate::players::EscrowShare;
     use crate::players::PlayerId;
+    use crate::players::PlayerKind;
     use crate::players::attribute::AttributeId;
     use crate::test_ids::master_id;
     use crate::test_ids::object_id;
@@ -487,6 +488,27 @@ mod tests {
         let food = world.players[1].attributes[attribute::FARM_FOOD.index()];
         assert_eq!(food, Amount::new(0.4 * 0.104));
         assert_eq!((amount, make.remaining), (0.0, Amount::new(5.0)));
+    }
+
+    /// A work flag's add is its player's slot 0xf8 with 0 and 1: a computer player's food sets
+    /// its share aside.
+    #[test]
+    fn task_with_work_flag_food_takes_the_computer_escrow() {
+        let task = Task {
+            work_flag: 1,
+            attribute_kind: Some(attribute::FOOD),
+            ..farm_task()
+        };
+        let mut world = farm_world(making(5.0, 5.0, task), ids::FARM, 0.0);
+        world.players[1].kind = PlayerKind::Computer;
+        world.players[1].escrow_percentage = [0.5, 0.0, 0.0, 0.0].map(EscrowShare::of_data);
+        let _ = made(&mut world);
+        let player = &world.players[1];
+        let gained = Amount::new(0.4 * 0.104);
+        assert_eq!(
+            (player.attributes[0], player.escrow[0]),
+            (gained, EscrowShare::of_data(0.5).of(gained))
+        );
     }
 
     #[test]

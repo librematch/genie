@@ -135,7 +135,7 @@ impl World {
         let new = self.combat_object(player_id, master, &made, point.with_height(position.z()))?;
         let class = self.tracker_key(player_id, master).class;
         let owner = self.players.player_mut(player_id)?;
-        owner.add_attribute(self.model.slots.attribute.in_production, -pop)?;
+        owner.add_attribute(self.model.slots.attribute.in_production, -pop);
         // its queue place goes (FUN_14104fb00 with -1, FUN_14104f330)
         owner.tracker.count_queued(QueuedUnits::ONE.negated());
         owner.tracker.unplace(Some(master), class);
@@ -442,15 +442,8 @@ impl World {
         if let Some(error) = self.take_sight_unsupported() {
             return Err(error);
         }
-        // the static setup's storage (FUN_1411a45a0), before the combat setup
-        let owner = self.players.player_mut(player_id)?;
-        for &(kind, amount, flag) in &made.storage {
-            if let Some(kind) = kind
-                && matches!(flag, 1 | 2 | 32)
-            {
-                owner.add_attribute(kind, amount)?;
-            }
-        }
+        // the static setup's storage (FUN_1411a45a0's FUN_141193860), before the combat setup
+        self.give_static_storage(player_id, &made.storage)?;
         let setup = self.combat_setup(player_id, made)?;
         let combat = Combat {
             firepower: setup.firepower,

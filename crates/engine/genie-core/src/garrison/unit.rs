@@ -8,7 +8,6 @@ use crate::garrison::EnterState;
 use crate::garrison::{
     ENTERING_UNPLACED, EnterAction, EnterReads, INSIDE_SIGHT, NO_MASTERS, WalkStart, enter_view,
 };
-use crate::gathering::gather::unit::give_load;
 use crate::groups::LeavingWalk;
 use crate::map::Distance;
 use crate::map::Footprint;
@@ -49,7 +48,6 @@ use crate::vision::VisionBits;
 use crate::vision::registry::Entry;
 use crate::vision::registry::UnitUpdate;
 use crate::vision::visibility::LosSight;
-use crate::world::AllySharing;
 use crate::world::layer::AttributeRoles;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
@@ -347,8 +345,10 @@ impl Unit {
 
     /// [`Unit::enter_building`]'s load: a building (of master `bm`) that takes what the unit (of
     /// master `me`) carries as a drop site (`FUN_140fdd190`) takes its load (the resource for
-    /// kinds 15 to 17 is food, 0 to 3 and 56 their own, others none: [`give_load`]); the unit
-    /// carries nothing after (`FUN_14119d310` with −1). Nothing for any other.
+    /// kinds 15 to 17 is food, 0 to 3 and 56 their own, others none: [`World::give_load`]); the
+    /// unit carries nothing after (`FUN_14119d310` with −1). Nothing for any other.
+    ///
+    /// [`World::give_load`]: crate::world::World::give_load
     ///
     /// # Errors
     ///
@@ -396,23 +396,8 @@ impl Unit {
             return Ok(());
         };
         // the building takes the load: the owner's attributes gain it at once
-        let mut adds = Vec::new();
-        give_load(
-            (
-                &step.world.spatial.relations,
-                owner.ally_sharing.contains(AllySharing::RESOURCES),
-            ),
-            step.player,
-            &mut adds,
-            resource,
-            self.life.amount,
-            roles,
-            step.world.model.slots,
-        )?;
         step.world
-            .players
-            .player_mut(step.player)?
-            .add_attributes(adds)?;
+            .give_load(step.player, resource, self.life.amount)?;
         self.life.attribute_kind = None;
         self.life.amount = Amount::ZERO;
         Ok(())

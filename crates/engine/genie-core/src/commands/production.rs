@@ -464,7 +464,7 @@ impl World {
             population(&master.storage, &self.model.roles)
         });
         let owner = self.players.player_mut(player)?;
-        owner.add_attribute(self.model.slots.attribute.queued, pop * f32::from(count))?;
+        owner.add_attribute(self.model.slots.attribute.queued, pop * f32::from(count));
         let costs = as_entry_costs(master_costs(
             masters,
             master,

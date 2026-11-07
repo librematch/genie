@@ -78,7 +78,8 @@ impl World {
     /// Slot 0x90 (`FUN_141225b70`, with `actions` its third argument): the unit changes its
     /// master. Its action list is cleared, or each action takes the new master's sprites
     /// ([`ActionsOnChange`]); in a state below 3 (`FUN_1411a6a70`) the old master's storage
-    /// leaves its player's attributes and the new one's comes in (`FUN_1411a56c0`, flag 2), its
+    /// leaves its player's attributes and the new one's comes in (`FUN_1411a56c0`, flag 2; slot
+    /// 0xf8 with 0 and 1 each, [`World::add_player_attribute`]), its
     /// hit points keep their share of the new master's (whole, at least 1), its sight goes and
     /// the new master's comes (slots 0x1d8, 0x1d0), its place and obstruction record take the
     /// new master's (`FUN_141055b40`, `FUN_14118c540`) and it moves with the new master's
@@ -128,9 +129,9 @@ impl World {
             &self.model.roles,
             &self.model.tuning,
         )?;
-        let owner = self.players.player_mut(player)?;
+        // FUN_1411a56c0 with 1: slot 0xf8 with 0 and 1 on each
         for &(kind, amount) in &switched.leaving {
-            owner.add_attribute(kind, amount)?;
+            self.add_player_attribute(player, kind, amount)?;
         }
         if switched.promoted {
             // the tracker's promotion (FUN_14104fb20): last in its new key master's list and
@@ -138,9 +139,9 @@ impl World {
             let id = self.players.live(player, idx)?.id;
             self.track_promote(player, id, old.id, new)?;
         }
-        let owner = self.players.player_mut(player)?;
+        // the new master's flag 2 (FUN_1411a6a70's loop): slot 0xf8 with 0 and 1 on each
         for &(kind, amount) in &switched.coming {
-            owner.add_attribute(kind, amount)?;
+            self.add_player_attribute(player, kind, amount)?;
         }
         Ok(())
     }

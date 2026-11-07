@@ -22,6 +22,7 @@ use crate::players::EscrowShare;
 use crate::players::PlayerId;
 use crate::players::PlayerKind;
 use crate::players::ResourceStat;
+use crate::players::attribute::AttributeId;
 use crate::players::game_status::GameStatus;
 use crate::players::history::HistoryUpdates;
 use crate::players::relation_row;
@@ -432,6 +433,186 @@ fn the_income_fills_computer_escrow_and_goes_to_mutual_allies() {
         world.shares_with(PlayerId::new(1), PlayerId::new(2))
             && !world.shares_with(PlayerId::new(1), PlayerId::new(3))
             && !world.shares_with(PlayerId::new(1), PlayerId::new(0))
+    );
+}
+
+/// The base add's escrow (`FUN_14165d040`, [`Player::add_attribute`]): a computer player's
+/// resource add above 0 sets its share aside, and an escrow above the resource falls to it, or
+/// to 0 below 0; a NaN amount or share sets nothing aside, nor does a share of 0; a human's
+/// resource and a computer's other attribute take no escrow, and an attribute past the count
+/// takes nothing.
+#[test]
+fn computer_player_sets_aside_its_share_of_each_resource_add() {
+    let mut computer = Player {
+        kind: PlayerKind::Computer,
+        escrow_percentage: [0.5, 0.25, f32::NAN, 0.0].map(EscrowShare::of_data),
+        ..human()
+    };
+    computer.add_attribute(attribute::FOOD, Amount::new(10.0));
+    assert_eq!(
+        (computer.attributes[0], computer.escrow[0]),
+        (Amount::new(10.0), Amount::new(5.0))
+    );
+    computer.add_attribute(attribute::FOOD, Amount::new(-7.0));
+    assert_eq!(computer.escrow[0], Amount::new(3.0));
+    computer.add_attribute(attribute::FOOD, Amount::new(-5.0));
+    assert_eq!(
+        (computer.attributes[0], computer.escrow[0]),
+        (Amount::new(-2.0), Amount::ZERO)
+    );
+    computer.escrow[1] = Amount::new(1.0);
+    computer.add_attribute(attribute::WOOD, Amount::new(f32::NAN));
+    // a NaN resource is not below its escrow
+    assert_eq!(computer.escrow[1], Amount::new(1.0));
+    computer.add_attribute(attribute::STONE, Amount::new(8.0));
+    computer.add_attribute(attribute::GOLD, Amount::new(8.0));
+    assert_eq!([computer.escrow[2], computer.escrow[3]], [Amount::ZERO; 2]);
+    computer.add_attribute(attribute::HEADROOM, Amount::new(8.0));
+    computer.add_attribute(AttributeId::named(300), Amount::new(1.0));
+    assert_eq!(
+        (computer.attributes[4], computer.attributes.len()),
+        (Amount::new(8.0), 300)
+    );
+    let mut person = Player {
+        escrow_percentage: [0.5; 4].map(EscrowShare::of_data),
+        ..human()
+    };
+    person.add_attribute(attribute::FOOD, Amount::new(10.0));
+    assert_eq!(person.escrow, [Amount::ZERO; 4]);
+}
+
+/// Slot 0xf8's escrow takes the share of each add, the shared ones too: a computer ally that
+/// gets a sharing player's food sets its share of it aside.
+#[test]
+fn computer_ally_sets_aside_its_share_of_shared_food() {
+    let mut world = world();
+    world.players[1]
+        .ally_sharing
+        .set(AllySharing::RESOURCES, true);
+    world.players[1].relations = relation_row([1, 0, 0, 3]);
+    world.players[2].relations = relation_row([1, 0, 0, 3]);
+    world.players[2].kind = PlayerKind::Computer;
+    world.players[2].escrow_percentage = [0.5, 0.0, 0.0, 0.0].map(EscrowShare::of_data);
+    world
+        .add_player_attribute(PlayerId::new(1), attribute::FOOD, Amount::new(6.0))
+        .unwrap();
+    assert_eq!(
+        [1, 2].map(|player| (
+            world.players[player].attributes[0],
+            world.players[player].escrow[0]
+        )),
+        [
+            (Amount::new(6.0), Amount::ZERO),
+            (Amount::new(6.0), Amount::new(3.0))
+        ]
+    );
+}
+
+/// Slot 0xf8 with 0 and 1 ([`World::add_player_attribute`]): no gathered total and no gold
+/// counter, but a sharing player's resource goes to its mutual allies; an attribute past the
+/// four resources stays its own.
+#[test]
+fn player_attribute_adds_share_resources_without_gathered_totals() {
+    let mut world = world();
+    world.players[1]
+        .ally_sharing
+        .set(AllySharing::RESOURCES, true);
+    world.players[1].relations = relation_row([1, 0, 0, 3]);
+    world.players[2].relations = relation_row([1, 0, 0, 3]);
+    world
+        .add_player_attribute(PlayerId::new(1), attribute::GOLD, Amount::new(5.0))
+        .unwrap();
+    world
+        .add_player_attribute(PlayerId::new(1), attribute::HEADROOM, Amount::new(2.0))
+        .unwrap();
+    assert_eq!(
+        [1, 2].map(|player| [3, 4, 49, 169].map(|kind| world.players[player].attributes[kind])),
+        [amounts([5.0, 2.0, 0.0, 0.0]), amounts([5.0, 0.0, 0.0, 0.0])]
+    );
+}
+
+/// Slot 0xf8 with 1 and 1 on a load ([`World::give_load`]): records/425906646's update 818,
+/// player 6 with allies that does not share (`+0x1426` 0), keeps its food and its gathered
+/// total; a sharing player's gold, its counter and its gathered total go to its mutual allies
+/// too, slot 0xf8 with 1 for each.
+#[test]
+fn load_goes_to_its_player_alone_unless_the_player_shares() {
+    let mut world = world();
+    world.players[1].relations = relation_row([1, 0, 0, 3]);
+    world.players[2].relations = relation_row([1, 0, 0, 3]);
+    world
+        .give_load(PlayerId::new(1), attribute::FOOD, Amount::new(10.0))
+        .unwrap();
+    assert_eq!(
+        [1, 2].map(|player| [0, 166].map(|kind| world.players[player].attributes[kind])),
+        [amounts([10.0, 10.0]), amounts([0.0, 0.0])]
+    );
+    world.players[1]
+        .ally_sharing
+        .set(AllySharing::RESOURCES, true);
+    world
+        .give_load(PlayerId::new(1), attribute::GOLD, Amount::new(4.0))
+        .unwrap();
+    assert_eq!(
+        [1, 2, 3].map(|player| [3, 49, 169].map(|kind| world.players[player].attributes[kind])),
+        [
+            amounts([4.0, 4.0, 4.0]),
+            amounts([4.0, 4.0, 4.0]),
+            amounts([0.0, 0.0, 0.0])
+        ]
+    );
+}
+
+/// Slot 0xf8's gold with a statistic of neither 0 nor 1 grows its counter (49) alone; the
+/// spread attribute (196) of a player at most 0, a NaN too, spreads the amount to the others
+/// at most 0 but Gaia (a NaN one keeps its own) and takes its sum; one above 0 takes nothing.
+#[test]
+fn slot_f8_branches_on_gold_and_the_spread_attribute() {
+    let mut world = world();
+    world
+        .add_resource(
+            PlayerId::new(1),
+            attribute::GOLD,
+            Amount::new(3.0),
+            ResourceStat::of_data(2),
+            ResourceShare::Unshared,
+        )
+        .unwrap();
+    assert_eq!(
+        [3, 49, 169].map(|kind| world.players[1].attributes[kind]),
+        amounts([3.0, 3.0, 0.0])
+    );
+    let spread = AttributeId::named(196);
+    for (player, value) in [(1, f32::NAN), (2, f32::NAN), (3, -1.0)] {
+        world.players[player].attributes[196] = Amount::new(value);
+    }
+    world
+        .add_resource(
+            PlayerId::new(1),
+            spread,
+            Amount::new(2.0),
+            ResourceStat::None,
+            ResourceShare::Shared,
+        )
+        .unwrap();
+    let values = |world: &World| [0, 1, 2, 3].map(|player| world.players[player].attributes[196]);
+    let [gaia, own, nan, other] = values(&world);
+    assert_eq!((gaia, other), (Amount::ZERO, Amount::new(1.0)));
+    assert!(own.get().is_nan() && nan.get().is_nan());
+    world.players[1].attributes[196] = Amount::new(0.5);
+    let before = values(&world);
+    world
+        .add_resource(
+            PlayerId::new(1),
+            spread,
+            Amount::new(2.0),
+            ResourceStat::None,
+            ResourceShare::Shared,
+        )
+        .unwrap();
+    assert_eq!(
+        values(&world).map(|amount| amount.get().to_bits()),
+        before.map(|amount| amount.get().to_bits())
     );
 }
 

@@ -34,21 +34,17 @@ use crate::objects::release::Releaser;
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Presence;
 use crate::objects::unit::{Unit, second_target_checked};
-use crate::players::AllyTest;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute::AttributeId;
-use crate::players::{ByPlayer, NO_RELATIONS, Relations};
 use crate::unit_ai::AiAction;
 use crate::unit_ai::NotifyKind;
 use crate::unit_ai::UnitStance;
 use crate::unit_ai::task_finder::Actor;
+use crate::unit_ai::task_finder::drops_at;
 use crate::unit_ai::task_finder::world::state_of;
-use crate::unit_ai::task_finder::{allied, drops_at};
 use crate::unit_ai::world_view::DropWorld;
-use crate::world::layer::AttributeRoles;
 use crate::world::layer::Roles;
-use crate::world::layer::Slots;
 use crate::world::lets::release;
 use crate::world::objects_ref::ObjectsRef;
 use crate::world::others::OthersRef;
@@ -312,7 +308,8 @@ impl Unit {
     }
 
     /// A load dropped at the drop site (`load`: its kind and amount) goes to the player (its slot
-    /// 0xf8 with 1 and 1, [`give_load`], as the hunt's drop-off). Without a target the search
+    /// 0xf8 with 1 and 1, [`crate::world::World::give_load`], as the hunt's drop-off). Without a
+    /// target the search
     /// follows ([`Unit::gather_after_drop`]); else the drop site goes (`FUN_140a7a190` with none)
     /// and the gather walks back to its target (`set_state(4)`, the gap from the gatherer's
     /// footprint, `radius` its radii). `gather` is the head as the drop left it.
@@ -557,40 +554,6 @@ impl Unit {
             ],
         )
     }
-}
-
-/// The player's slot 0xf8 (`FUN_141616820`) with 1 and 1 on a unit's load: the resource and its
-/// gathered total (166 to 168; gold's 49 and 169) in `adds`, which the caller gives the player; the
-/// statistics (slot 0xb8) and the local player's tracker (`FUN_14097daf0`) are not held. With 1
-/// the resources would go to the allies too when the player shares (`sharing`, `+0x1426`,
-/// `FUN_14165d040`): a sharing player with allies is not modelled.
-pub(crate) fn give_load(
-    (relations, sharing): (&ByPlayer<Relations>, bool),
-    player: PlayerId,
-    adds: &mut Vec<(AttributeId, Amount)>,
-    kind: AttributeId,
-    amount: Amount,
-    roles: &Roles,
-    slots: Slots,
-) -> GenieResult<()> {
-    let own = relations.get(player).unwrap_or(&NO_RELATIONS);
-    let allied = PlayerId::each(own.len()).skip(1).any(|player_id| {
-        player_id != player && allied(own, player, player_id, AllyTest::WithRelation4)
-    });
-    if sharing && allied {
-        return Err(GenieError::unsupported(
-            "a load given to a player with allies (+0x1426)",
-        ));
-    }
-    adds.push((kind, amount));
-    if roles.of_attribute(kind).contains(AttributeRoles::GOLD) {
-        adds.push((slots.attribute.gold_counter, amount));
-        adds.push((slots.attribute.gold_gathered, amount));
-    } else if kind.is_resource() {
-        // food, wood and stone gathered: 166 and on
-        adds.push((slots.attribute.gathered.offset(kind.index())?, amount));
-    }
-    Ok(())
 }
 
 impl Action {

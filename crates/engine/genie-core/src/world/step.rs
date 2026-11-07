@@ -1,7 +1,6 @@
 //! What a tick's update of one object reads and writes ([`Step`]) and its walks.
 
 use crate::combat::damage::Victim;
-use crate::gathering::gather::unit::give_load as unit_give_load;
 use crate::math::rng::Well512;
 use crate::movement::move_to::Walk;
 use crate::movement::{Me, Planning};
@@ -18,7 +17,6 @@ use crate::players::PlayerKind;
 use crate::players::attribute::AttributeId;
 use crate::unit_ai::Notify;
 use crate::unit_ai::UnitAi;
-use crate::world::AllySharing;
 use crate::world::Millis;
 use crate::world::Seconds;
 use crate::world::World;
@@ -243,35 +241,13 @@ impl Step<'_> {
     }
 
     /// The owner's slot 0xf8 with 1 and 1 on a unit's load (`FUN_141616820`,
-    /// [`give_load`]): the owner gains the resource and its gathered total at once.
-    ///
-    /// [`give_load`]: crate::gathering::gather::unit::give_load
+    /// [`World::give_load`]): the owner gains the resource and its gathered total at once.
     ///
     /// # Errors
     ///
-    /// [`give_load`]'s, or an attribute the owner does not have.
+    /// [`World::give_load`]'s.
     pub(crate) fn give_load(&mut self, kind: AttributeId, amount: Amount) -> GenieResult<()> {
-        let mut adds = Vec::new();
-        unit_give_load(
-            (
-                &self.world.spatial.relations,
-                self.world
-                    .players
-                    .player(self.player)?
-                    .ally_sharing
-                    .contains(AllySharing::RESOURCES),
-            ),
-            self.player,
-            &mut adds,
-            kind,
-            amount,
-            &self.world.model.roles,
-            self.world.model.slots,
-        )?;
-        self.world
-            .players
-            .player_mut(self.player)?
-            .add_attributes(adds)
+        self.world.give_load(self.player, kind, amount)
     }
 
     /// What a walk takes of the update beside the world ([`World::walk_beside`]).

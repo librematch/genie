@@ -167,8 +167,8 @@ impl World {
     /// when that is not below it under the player's `+0x648` ([`CAPPED`])); the line of sight lets
     /// the old circle go and takes the new one (an object on the map in state 2: slot 0x1d8, then
     /// 0x1d0 with the new value, truncated); a set of a resource storage (21, 26, 27) moves its
-    /// player's attribute from the old amount to the new one (slot 0xf8 twice) unless the master
-    /// keeps it (flag `'@'`).
+    /// player's attribute from the old amount to the new one (slot 0xf8 with 0 and 1 twice,
+    /// [`World::add_player_attribute`]) unless the master keeps it (flag `'@'`).
     pub(super) fn change_static(
         &mut self,
         player_id: PlayerId,
@@ -218,9 +218,9 @@ impl World {
                 if let Some(&(Some(kind), amount, flag)) = master.storage.get(slot)
                     && flag != KEPT_STORAGE
                 {
-                    let owner = self.players.player_mut(player_id)?;
-                    owner.add_attribute(kind, -amount)?;
-                    owner.add_attribute(kind, Amount::new(value))?;
+                    // slot 0xf8 with 0 and 1, the old amount's sign flipped, then the new one
+                    self.add_player_attribute(player_id, kind, -amount)?;
+                    self.add_player_attribute(player_id, kind, Amount::new(value))?;
                 }
             }
             _ => {}
@@ -330,13 +330,13 @@ impl World {
             // its magnitude.
             let held = self.model.roles.of_some_attribute(kind);
             if held.contains(AttributeRoles::HEADROOM) {
-                owner.add_attribute(self.model.slots.attribute.headroom, amount.abs())?;
-                owner.add_attribute(self.model.slots.attribute.headroom, Amount::new(value))?;
+                owner.add_attribute(self.model.slots.attribute.headroom, amount.abs());
+                owner.add_attribute(self.model.slots.attribute.headroom, Amount::new(value));
             } else if held.contains(AttributeRoles::MAGNITUDE_STORAGE)
                 && let Some(kind) = kind
             {
-                owner.add_attribute(kind, -amount)?;
-                owner.add_attribute(kind, Amount::new(value.abs()))?;
+                owner.add_attribute(kind, -amount);
+                owner.add_attribute(kind, Amount::new(value.abs()));
             }
         }
         Ok(())

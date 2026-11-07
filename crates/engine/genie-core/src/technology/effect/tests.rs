@@ -49,6 +49,7 @@ use crate::objects::{FacetCount, Frame};
 use crate::ownership::CaptureKind;
 use crate::players::Amount;
 use crate::players::CivId;
+use crate::players::EscrowShare;
 use crate::players::PlayerId;
 use crate::players::PlayerKind;
 use crate::players::attribute::AttributeId;
@@ -1389,6 +1390,48 @@ fn the_resource_commands_side_effects() {
         world
             .do_effect(PlayerId::new(1), &[attribute(1, 0x21, 0, -1, 7.0)], None)
             .is_err()
+    );
+}
+
+/// A technology's resource add is slot 0xf8 with 0 and 1 (`FUN_141661160`): no gathered total,
+/// but a sharing player's resource goes to its mutual allies too, and a computer ally sets its
+/// share of it aside.
+#[test]
+fn technology_resource_add_reaches_sharing_allies() {
+    let player = |relations: Vec<u8>| Player {
+        relations: relation_row(relations),
+        attributes: vec![Amount::ZERO; 300],
+        ..Player::default()
+    };
+    let mut world = World::new(
+        WorldTime::ZERO,
+        FrameSeed::of_data(0),
+        PlayerId::new(0),
+        vec![Millis::ZERO; 3],
+        vec![
+            player(vec![0, 3, 3]),
+            player(vec![3, 0, 0]),
+            player(vec![3, 0, 0]),
+        ],
+    );
+    world.players[1]
+        .ally_sharing
+        .set(AllySharing::RESOURCES, true);
+    world.players[2].kind = PlayerKind::Computer;
+    world.players[2].escrow_percentage = [0.0, 0.5, 0.0, 0.0].map(EscrowShare::of_data);
+    world
+        .do_effect(PlayerId::new(1), &[attribute(1, 1, 1, -1, 30.0)], None)
+        .unwrap();
+    assert_eq!(
+        [1, 2].map(|player| (
+            world.players[player].attributes[1],
+            world.players[player].attributes[167],
+            world.players[player].escrow[1]
+        )),
+        [
+            (Amount::new(30.0), Amount::ZERO, Amount::ZERO),
+            (Amount::new(30.0), Amount::ZERO, Amount::new(15.0))
+        ]
     );
 }
 

@@ -74,7 +74,8 @@ impl World {
     /// `FUN_140e7d040`: player `from` gives player `to` its `gifts` ([`settle`]), unless the two
     /// are one or `from` has no market ([`World::pays_tribute`]). For each resource entry the
     /// receiver gains the amount and the giver loses it with the fee (the player's slot 0xf8,
-    /// `FUN_141616820`, with 0 and 1: no gathered totals); the giver counts it in attributes 53
+    /// `FUN_141616820`, with 0 and 1, [`World::add_player_attribute`]: no gathered totals, a
+    /// computer's escrow and a sharing player's allies too); the giver counts it in attributes 53
     /// and 450 + `to` and with the fee in 175, the receiver in 171 and 475 + `from`; then the
     /// receiver hears notify 0x20a (its slot 0x2e8, `FUN_14162dab0`: no case for it but the old
     /// short pather's hulled area and the shapes of the obstruction manager, neither held; a
@@ -104,25 +105,16 @@ impl World {
                 .attributes
                 .checked(kind.index())?;
             let (given, paid) = settle(have, gift);
-            self.players.player_mut(to)?.add_attribute(kind, given)?;
-            self.players.player_mut(from)?.add_attribute(kind, -paid)?;
+            self.add_player_attribute(to, kind, given)?;
+            self.add_player_attribute(from, kind, -paid)?;
+            let slots = self.model.slots.attribute;
             let giver = self.players.player_mut(from)?;
-            giver.add_attribute(self.model.slots.attribute.tribute_given, given)?;
-            giver.add_attribute(self.model.slots.attribute.tribute_paid, paid)?;
-            giver.add_attribute(
-                self.model.slots.attribute.tribute_to.offset(to.index())?,
-                given,
-            )?;
+            giver.add_attribute(slots.tribute_given, given);
+            giver.add_attribute(slots.tribute_paid, paid);
+            giver.add_attribute(slots.tribute_to.offset(to.index())?, given);
             let receiver = self.players.player_mut(to)?;
-            receiver.add_attribute(self.model.slots.attribute.tribute_received, given)?;
-            receiver.add_attribute(
-                self.model
-                    .slots
-                    .attribute
-                    .tribute_from
-                    .offset(from.index())?,
-                given,
-            )?;
+            receiver.add_attribute(slots.tribute_received, given);
+            receiver.add_attribute(slots.tribute_from.offset(from.index())?, given);
             if receiver.kind.is_computer() {
                 return Err(GenieError::unsupported(
                     "a computer player's AI told of a tribute (0x20a, slot 0x3c8)",
@@ -138,8 +130,10 @@ mod tests {
     use super::*;
     use crate::objects::masters::MasterKind;
     use crate::objects::masters::{Master, Masters};
+    use crate::players::EscrowShare;
     #[cfg(test)]
     use crate::players::PlayerKind;
+    use crate::players::relation_row;
     #[cfg(test)]
     use crate::players::tracker::Key;
     use crate::test_ids::object_id;
@@ -148,6 +142,7 @@ mod tests {
     use crate::test_ids::{amounts, attributes};
     use crate::testing::class;
     use crate::testing::ids;
+    use crate::world::AllySharing;
     #[cfg(test)]
     use crate::world::FrameSeed;
     use crate::world::Millis;
@@ -278,6 +273,36 @@ mod tests {
                 .unwrap();
             assert_eq!(market_world.players, before);
         }
+    }
+
+    /// The tribute's resource adds are slot 0xf8 with 0 and 1: a receiver who shares its
+    /// resources gives the gift to its mutual allies too, the giver among them; a computer
+    /// giver sets its share of that aside, and its escrow falls to what it has left once it pays.
+    #[test]
+    fn tribute_adds_reach_sharing_allies_and_hold_the_escrow() {
+        let mut game = world(true);
+        for player in [1, 2] {
+            game.players[player].relations = relation_row([1, 0, 0]);
+        }
+        game.players[2]
+            .ally_sharing
+            .set(AllySharing::RESOURCES, true);
+        game.players[1].kind = PlayerKind::Computer;
+        game.players[1].escrow_percentage = [0.0, 0.5, 0.0, 0.0].map(EscrowShare::of_data);
+        game.players[1].escrow[1] = Amount::new(450.0);
+        let gifts = [
+            gift(1, 100.0, 0.3),
+            gift(0, 0.0, 0.3),
+            gift(0, 0.0, 0.3),
+            gift(0, 0.0, 0.3),
+        ];
+        game.tribute(player_id(1), player_id(2), &gifts).unwrap();
+        let (giver, receiver) = (&game.players[1], &game.players[2]);
+        // the receiver's 100 reaches the giver too (its escrow 500), then the giver pays 130
+        assert_eq!(
+            (giver.attributes[1], giver.escrow[1], receiver.attributes[1]),
+            (Amount::new(470.0), Amount::new(470.0), Amount::new(600.0))
+        );
     }
 
     /// A computer player's AI would hear the tribute (its slot 0x3c8).

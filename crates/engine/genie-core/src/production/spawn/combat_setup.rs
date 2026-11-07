@@ -86,12 +86,12 @@ impl World {
         let owner = self.players.player_mut(player_id)?;
         if made.kind == MasterKind::BUILDING {
             if !made.creatable_part().trained_at.is_empty() {
-                owner.add_attribute(slots.building_cost, paid)?;
+                owner.add_attribute(slots.building_cost, paid);
             }
         } else {
-            owner.add_attribute(slots.total_value, paid)?;
-            owner.add_attribute(slots.units_value, paid)?;
-            owner.add_attribute(slots.made_units_cost, paid)?;
+            owner.add_attribute(slots.total_value, paid);
+            owner.add_attribute(slots.units_value, paid);
+            owner.add_attribute(slots.made_units_cost, paid);
         }
         if self
             .model
@@ -99,7 +99,7 @@ impl World {
             .of_class(made.class)
             .contains(ClassRoles::VILLAGER)
         {
-            owner.add_attribute(slots.made_villagers, Amount::new(1.0))?;
+            owner.add_attribute(slots.made_villagers, Amount::new(1.0));
         }
         Ok(CombatSetup {
             firepower: made.creatable_part().volley_fire,

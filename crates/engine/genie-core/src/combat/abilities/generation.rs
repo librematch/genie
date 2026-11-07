@@ -2,7 +2,6 @@
 
 use crate::GenieResult;
 use crate::combat::abilities::{ONE, Own, WORKING, WORKING_ACTIONS};
-use crate::gathering::gather::unit::give_load;
 use crate::math::fmath::below_or_unordered;
 use crate::objects::ActionState;
 use crate::objects::HitPoints;
@@ -17,7 +16,6 @@ use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute::AttributeId;
 use crate::vision::visibility::BuildingSight;
-use crate::world::AllySharing;
 use crate::world::Seconds;
 use crate::world::Unread;
 use crate::world::World;
@@ -116,15 +114,15 @@ pub fn store(amount: Amount, out: AttributeId, stores: &mut [Amount]) -> Option<
 impl World {
     /// A generation task of the object at `(player_id, list_index)` as `owner`'s ([`generates`],
     /// [`generated`], [`store`]): what reaches the store's threshold goes to the player (slot 0xf8
-    /// with 1 and 1, as a load's, [`crate::gathering::gather::unit::give_load`]); the statistics
+    /// with 1 and 1, as a load's, [`World::give_load`]); the statistics
     /// (`FUN_14097daf0`, the local player's, and `FUN_140a4c020`'s telemetry) are not held. The top
     /// action's target is read as the world holds it after the update (its hits wrote their victims
     /// back where they ran).
     ///
     /// # Errors
     ///
-    /// The top action of a unit whose action the slice does not model, and a give to a player
-    /// who shares with allies ([`crate::gathering::gather::unit::give_load`]).
+    /// The top action of a unit whose action the slice does not model, and the give's
+    /// ([`World::give_load`]).
     pub(super) fn generate(
         &mut self,
         (player_id, list_index): (PlayerId, ListIndex),
@@ -190,23 +188,7 @@ impl World {
         let Some(give) = store(amount, out, &mut player.generated) else {
             return Ok(());
         };
-        let sharing = player.ally_sharing.contains(AllySharing::RESOURCES);
-        let mut adds = Vec::new();
-        give_load(
-            (&self.spatial.relations, sharing),
-            owner,
-            &mut adds,
-            out,
-            give,
-            &self.model.roles,
-            self.model.slots,
-        )?;
-        for (kind, amount) in adds {
-            self.players
-                .player_mut(owner)?
-                .add_attribute(kind, amount)?;
-        }
-        Ok(())
+        self.give_load(owner, out, give)
     }
 
     /// What a generation task's test reads of the object `id` its top action works on, as the

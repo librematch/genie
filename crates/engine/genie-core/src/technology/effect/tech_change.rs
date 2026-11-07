@@ -289,11 +289,11 @@ impl World {
         owner.add_attribute(
             self.model.slots.attribute.techs_researched,
             Amount::new(1.0),
-        )?;
+        );
         owner.add_attribute(
             self.model.slots.attribute.research_spent,
             Amount::new(spent),
-        )?;
+        );
         Ok(Research::Completed)
     }
 

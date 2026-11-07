@@ -529,7 +529,7 @@ impl World {
             for &(player_id, attribute, amount) in &razed.adds {
                 self.players
                     .player_mut(player_id)?
-                    .add_attribute(attribute, amount)?;
+                    .add_attribute(attribute, amount);
             }
         }
         Ok(())

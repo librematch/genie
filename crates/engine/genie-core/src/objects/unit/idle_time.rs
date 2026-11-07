@@ -70,8 +70,8 @@ impl Unit {
         owner.add_attribute(
             slots.villager_idle_seconds,
             Amount::new(idle.idle.seconds().get()),
-        )?;
-        owner.add_attribute(slots.villager_idles, Amount::new(idle.count.as_f32()))?;
+        );
+        owner.add_attribute(slots.villager_idles, Amount::new(idle.count.as_f32()));
         idle.idle = Millis::ZERO;
         idle.count = IdleCount::ZERO;
         Ok(())

@@ -17,7 +17,6 @@ use crate::objects::ObjectState;
 use crate::objects::SpriteFlags;
 use crate::objects::facing::{SpriteFacets, angle_of_facet, drawn_angle, draws_angle};
 use crate::objects::layers::{Animated, Motion, Static};
-use crate::objects::lifecycle::static_storage;
 use crate::objects::lifecycle::{Class, Lifecycle};
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
@@ -366,8 +365,7 @@ impl World {
         if let Some(error) = self.take_sight_unsupported() {
             return Err(error);
         }
-        let owner = self.players.player_mut(player_id)?;
-        let held = static_storage(owner, &made.storage)?;
+        let held = self.static_storage(player_id, &made.storage)?;
         // a static object (type 10) dies on its sprite after its death (the dying one, else its
         // standing one), which may start on a random facet
         let death_facets = if made.kind == MasterKind::STATIC {

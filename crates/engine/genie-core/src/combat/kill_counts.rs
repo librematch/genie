@@ -93,7 +93,7 @@ impl World {
             self.players.player_mut(player_id)?.add_attribute(
                 self.model.slots.attribute.villager_killed_by_animal,
                 Amount::new(1.0),
-            )?;
+            );
         }
         let by_kind = match self.players.player(attacker_player)?.kind {
             PlayerKind::Human => Some(self.model.slots.attribute.villager_killed_by_kind_1),
@@ -104,7 +104,7 @@ impl World {
         if let Some(kind) = by_kind {
             self.players
                 .player_mut(player_id)?
-                .add_attribute(kind, Amount::new(1.0))?;
+                .add_attribute(kind, Amount::new(1.0));
         }
         Ok(())
     }
@@ -142,10 +142,10 @@ impl World {
         {
             self.players
                 .player_mut(ap)?
-                .add_attribute(self.model.slots.attribute.kills, Amount::new(1.0))?;
+                .add_attribute(self.model.slots.attribute.kills, Amount::new(1.0));
             self.players
                 .player_mut(player_id)?
-                .add_attribute(self.model.slots.attribute.kills_other, Amount::new(1.0))?;
+                .add_attribute(self.model.slots.attribute.kills_other, Amount::new(1.0));
         }
         self.players.player_mut(ap)?.add_attribute(
             self.model
@@ -154,18 +154,18 @@ impl World {
                 .kills_of
                 .offset(player_id.index())?,
             Amount::new(1.0),
-        )?;
+        );
         self.players.player_mut(player_id)?.add_attribute(
             self.model.slots.attribute.killed_by.offset(ap.index())?,
             Amount::new(1.0),
-        )?;
+        );
         let cost = killed.cost;
         self.players
             .player_mut(ap)?
-            .add_attribute(self.model.slots.attribute.kills_value, cost)?;
+            .add_attribute(self.model.slots.attribute.kills_value, cost);
         self.players
             .player_mut(player_id)?
-            .add_attribute(self.model.slots.attribute.kills_value_other, cost)?;
+            .add_attribute(self.model.slots.attribute.kills_value_other, cost);
         self.players.player_mut(ap)?.add_attribute(
             self.model
                 .slots
@@ -173,7 +173,7 @@ impl World {
                 .kills_value_of
                 .offset(player_id.index())?,
             cost,
-        )?;
+        );
         Ok(())
     }
 }

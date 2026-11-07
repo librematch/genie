@@ -55,7 +55,6 @@ use crate::gathering::drop_sites::SiteSearch;
 use crate::gathering::farm_queue::Reseed;
 use crate::gathering::gather::GatherState;
 use crate::gathering::gather::WalkEnd;
-use crate::gathering::gather::unit::give_load;
 use crate::gathering::gather::{GATHER, GatherAction, Resource, StopRate};
 use crate::gathering::hunt::HuntState;
 use crate::gathering::hunt::TreeSearch;
@@ -202,6 +201,7 @@ use crate::players::AmountRate;
 use crate::players::ByPlayer;
 use crate::players::ByRelation;
 use crate::players::CivId;
+use crate::players::EscrowShare;
 use crate::players::MarketTrade;
 use crate::players::PlayerKind;
 use crate::players::Relation;
@@ -10233,43 +10233,6 @@ fn an_order_resets_its_units_sleeping_ones_too() {
     }
 }
 
-#[test]
-fn load_goes_to_its_player_alone_unless_the_player_shares() {
-    // records/425906646's update 818: player 6, with allies, does not share (+0x1426 0)
-    let relations = ByPlayer::new(vec![
-        relation_row([0, 3, 3]),
-        relation_row([3, 0, 0]),
-        relation_row([3, 0, 0]),
-    ]);
-    let mut adds = Vec::new();
-    give_load(
-        (&relations, false),
-        PlayerId::new(1),
-        &mut adds,
-        attribute::FOOD,
-        Amount::new(10.0),
-        &roles(),
-        slots(),
-    )
-    .unwrap();
-    assert_eq!(
-        adds,
-        test_ids_adds([(attribute::FOOD, 10.0), (attribute::GATHERED, 10.0)])
-    );
-    assert!(
-        give_load(
-            (&relations, true),
-            PlayerId::new(1),
-            &mut adds,
-            attribute::GOLD,
-            Amount::new(10.0),
-            &roles(),
-            slots()
-        )
-        .is_err()
-    );
-}
-
 /// A gate's slot 0x678 (`FUN_1411d4a30`): a standing, unlocked object of class 39 whose
 /// master transforms (`+0x9ba` not -1), between allies; any other object answers false.
 #[test]
@@ -15140,6 +15103,63 @@ fn an_object_changing_hands_takes_its_storage_and_class_counts_along() {
         amounts([1.0, 1.0])
     );
     assert_eq!(world.players[1].attributes[11], Amount::ZERO);
+}
+
+/// An ownership change's storage goes through slot 0xf8 with 0 and 1
+/// ([`World::add_player_attribute`]): a computer new owner sets its share of the wood its object
+/// stores aside, and the old owner's escrow falls to the wood it has left.
+#[test]
+fn an_object_changing_hands_moves_its_resource_storage_through_slot_f8() {
+    let computer = || Player {
+        kind: PlayerKind::Computer,
+        attributes: vec![Amount::ZERO; 300],
+        escrow_percentage: [0.0, 0.5, 0.0, 0.0].map(EscrowShare::of_data),
+        ..Player::default()
+    };
+    let mut world = World::new(
+        WorldTime::ZERO,
+        FrameSeed::of_data(1),
+        PlayerId::new(0),
+        vec![Millis::ZERO; 3],
+        vec![Player::default(), computer(), computer()],
+    );
+    world.players[1].attributes[1] = Amount::new(10.0);
+    world.players[1].escrow[1] = Amount::new(9.0);
+    let own = Master {
+        storage: vec![(Some(attribute::WOOD), Amount::new(4.0), 2)],
+        ..Master::default()
+    };
+    world
+        .hand_over_attributes(PlayerId::new(1), PlayerId::new(2), Some(&own))
+        .unwrap();
+    assert_eq!(
+        [1, 2].map(|player| (
+            world.players[player].attributes[1],
+            world.players[player].escrow[1]
+        )),
+        [
+            (Amount::new(6.0), Amount::new(6.0)),
+            (Amount::new(4.0), Amount::new(2.0))
+        ]
+    );
+}
+
+/// A desolid foundation's delete gives its whole paid cost back (`FUN_1411ccbb0`, 25 wood for
+/// the house) through its owner's slot 0xf8 with 0 and 1 ([`World::add_player_attribute`]).
+#[test]
+fn removed_foundation_refunds_its_cost_through_slot_f8() {
+    let mut world = house_builder();
+    let before = world.players[1].resources();
+    world
+        .remove_building(PlayerId::new(1), object_id(10028))
+        .unwrap();
+    let refund: Vec<f32> = world.players[1]
+        .resources()
+        .iter()
+        .zip(before)
+        .map(|(after, before)| (*after - before).get())
+        .collect();
+    assert_eq!(refund, [0.0, 25.0, 0.0, 0.0]);
 }
 
 /// `FUN_141082e80` before the kill's counts: a killed villager (class 4) counts for its owner an
@@ -22934,12 +22954,16 @@ fn farm_with_bonus_to(world: &mut World, resource: usize) {
 }
 
 /// A farm completing in its own update with its owner's farm bonus gives its owner the bonus
-/// and owes it to its Make (`FUN_1411c66a0`'s `+0xcac`, [`World::completion_part`]); with
-/// attribute 238 below 0 it gives and owes nothing.
+/// and owes it to its Make (`FUN_1411c66a0`'s `+0xcac`, [`World::completion_part`]): slot 0xf8
+/// with 1 and 1, so the food's gathered total (166) grows too; with attribute 238 below 0 it
+/// gives and owes nothing.
 #[test]
 fn farm_completion_gives_its_owner_the_bonus_and_owes_it_to_its_make() {
     let (world, (gained, _)) = completed_house(farm_with_bonus);
-    assert_eq!(gained, vec![(0, 45.0), (98, 25.0), (165, 25.0)]);
+    assert_eq!(
+        gained,
+        vec![(0, 45.0), (98, 25.0), (165, 25.0), (166, 45.0)]
+    );
     assert!(world.parts.building_of(object_id(10028)).owes_bonus);
     let (world, (gained, _)) = completed_house(|world| {
         farm_with_bonus(world);
@@ -22970,7 +22994,8 @@ fn farm_bonus_at_its_owner_attribute_count_is_owed_and_gains_nothing() {
 }
 
 /// A farm foundation that dies once its build points reached its build time gives its owner
-/// the farm bonus and owes it as a completed one does ([`Unit::foundation_died`]).
+/// the farm bonus, with its gathered total, and owes it as a completed one does
+/// ([`Unit::foundation_died`]).
 #[test]
 fn dying_farm_foundation_at_its_build_time_gives_its_bonus_and_owes_it() {
     let mut world = house_builder();
@@ -23000,7 +23025,7 @@ fn dying_farm_foundation_at_its_build_time_gives_its_bonus_and_owes_it() {
     );
     assert_eq!(
         seen.map_err(|error| error.reason().to_owned()),
-        Ok((vec![(0, 45.0)], true))
+        Ok((vec![(0, 45.0), (166, 45.0)], true))
     );
 }
 
@@ -24403,8 +24428,8 @@ fn own_razing(adds: &[(AttributeId, f32)]) -> KillLeft {
 
 /// The updating unit's own razings count where the hit runs, within its update
 /// ([`crate::combat::victims::file_kill`] on the unit out of its slot): the attribute adds in
-/// their order, and the first that fails stops the ones after it (a count of an attribute the
-/// player does not have stops the next one).
+/// their order; a count of an attribute past the player's count adds nothing (the base add's
+/// `+0x90` test, `FUN_14165d040`) and the next one holds.
 #[test]
 fn the_own_razings_count_where_the_hit_runs() {
     use crate::combat::victims::file_kill;
@@ -24426,13 +24451,12 @@ fn the_own_razings_count_where_the_hit_runs() {
         )
     };
     assert_eq!(razed(&[(attribute::TOTAL_VALUE, -5.0)]), (Ok(5.0), 5.0));
-    let missing = Err("an attribute the player does not have".to_owned());
     assert_eq!(
         razed(&[
             (AttributeId::named(9999), 5.0),
             (attribute::TOTAL_VALUE, -5.0)
         ]),
-        (missing, 10.0)
+        (Ok(5.0), 5.0)
     );
 }
 

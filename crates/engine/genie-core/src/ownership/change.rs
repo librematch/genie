@@ -36,10 +36,8 @@ use crate::world::layer::AttributeRoles;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
-use crate::world::layer::Slots;
 use crate::world::layer::generated::VisibilityTuning;
 use crate::world::parts::Part;
-use crate::world::player::Player;
 
 impl World {
     /// Slot 0x70 ([`change_hands`]) to Gaia of the object at `j` of player `player_id`, from
@@ -166,14 +164,7 @@ impl World {
             self.unrecord(id);
         }
         if state == ObjectState::Alive {
-            lose_built_storage(
-                self.players.player_mut(old)?,
-                &master,
-                held,
-                amount,
-                &self.model.roles,
-                self.model.slots,
-            )?;
+            self.lose_built_storage(old, &master, held, amount)?;
         }
         if state == ObjectState::Foundation {
             self.foundation_sight_off(id, placed)?;
@@ -191,14 +182,7 @@ impl World {
         }
         if state == ObjectState::Alive {
             self.built_with_new_owner(owner, id, &master, rice)?;
-            gain_built_storage(
-                self.players.player_mut(owner)?,
-                &master,
-                held,
-                amount,
-                &self.model.roles,
-                self.model.slots,
-            )?;
+            self.gain_built_storage(owner, &master, held, amount)?;
         }
         self.garrison_leaves(owner, id)?;
         if state < ObjectState::Dying {
@@ -493,7 +477,7 @@ impl World {
             if let Some(kind) = kind
                 && matches!(flag, 2 | 16 | 32)
             {
-                self.players.player_mut(old)?.add_attribute(kind, -amount)?;
+                self.add_player_attribute(old, kind, -amount)?;
             }
         }
         count_class(
@@ -512,8 +496,73 @@ impl World {
             if let Some(kind) = kind
                 && matches!(flag, 1 | 2 | 32)
             {
-                self.players.player_mut(new)?.add_attribute(kind, amount)?;
+                self.add_player_attribute(new, kind, amount)?;
             }
+        }
+        Ok(())
+    }
+
+    /// [`World::building_changes_hands`] of a building in state 2: its old owner `player` loses
+    /// its master's storage of flag 4 and a `held` attribute 4 (`FUN_1411cd860`'s slot 0xf8 with
+    /// the `amount`'s sign flipped, `DAT_142e88e80`, 0 and 1: [`World::add_player_attribute`]).
+    ///
+    /// # Errors
+    ///
+    /// A player the world does not hold, and the adds'.
+    fn lose_built_storage(
+        &mut self,
+        player: PlayerId,
+        master: &Master,
+        held: Option<AttributeId>,
+        amount: Amount,
+    ) -> GenieResult<()> {
+        for &(kind, amount, flag) in &master.storage {
+            if let Some(kind) = kind
+                && flag == STORAGE_WHILE_BUILT
+            {
+                self.add_player_attribute(player, kind, -amount)?;
+            }
+        }
+        // The population headroom attribute, which a building's held amount gives (`+0x308` 4).
+        if self
+            .model
+            .roles
+            .of_some_attribute(held)
+            .contains(AttributeRoles::HEADROOM)
+        {
+            self.add_player_attribute(player, self.model.slots.attribute.headroom, -amount)?;
+        }
+        Ok(())
+    }
+
+    /// [`World::building_changes_hands`] of a building in state 2: its new owner `player` gains
+    /// its master's storage of flags 4 and 8 and a `held` attribute 4 (its `amount`; slot 0xf8
+    /// with 0 and 1, [`World::add_player_attribute`]).
+    ///
+    /// # Errors
+    ///
+    /// A player the world does not hold, and the adds'.
+    fn gain_built_storage(
+        &mut self,
+        player: PlayerId,
+        master: &Master,
+        held: Option<AttributeId>,
+        amount: Amount,
+    ) -> GenieResult<()> {
+        for &(kind, amount, flag) in &master.storage {
+            if let Some(kind) = kind
+                && matches!(flag, STORAGE_WHILE_BUILT | STORAGE_8)
+            {
+                self.add_player_attribute(player, kind, amount)?;
+            }
+        }
+        if self
+            .model
+            .roles
+            .of_some_attribute(held)
+            .contains(AttributeRoles::HEADROOM)
+        {
+            self.add_player_attribute(player, self.model.slots.attribute.headroom, amount)?;
         }
         Ok(())
     }
@@ -622,68 +671,6 @@ pub(crate) fn change_hands(
     }
     inbox.post(NotifyKind::OWNER_CHANGED, [new.index() as i32, 0, 0])?;
     Ok(Some(own))
-}
-
-/// [`World::building_changes_hands`] of a building in state 2: its old owner `player` loses its
-/// master's storage of flag 4 and a `held` attribute 4 (slot 0xf8, the `amount`'s sign
-/// flipped, `DAT_142e88e80`).
-///
-/// # Errors
-///
-/// An attribute the player does not hold.
-pub(crate) fn lose_built_storage(
-    player: &mut Player,
-    master: &Master,
-    held: Option<AttributeId>,
-    amount: Amount,
-    roles: &Roles,
-    slots: Slots,
-) -> GenieResult<()> {
-    for &(kind, amount, flag) in &master.storage {
-        if let Some(kind) = kind
-            && flag == STORAGE_WHILE_BUILT
-        {
-            player.add_attribute(kind, -amount)?;
-        }
-    }
-    // The population headroom attribute, which a building's held amount gives (`+0x308` 4).
-    if roles
-        .of_some_attribute(held)
-        .contains(AttributeRoles::HEADROOM)
-    {
-        player.add_attribute(slots.attribute.headroom, -amount)?;
-    }
-    Ok(())
-}
-
-/// [`World::building_changes_hands`] of a building in state 2: its new owner `player` gains its
-/// master's storage of flags 4 and 8 and a `held` attribute 4 (its `amount`).
-///
-/// # Errors
-///
-/// An attribute the player does not hold.
-pub(crate) fn gain_built_storage(
-    player: &mut Player,
-    master: &Master,
-    held: Option<AttributeId>,
-    amount: Amount,
-    roles: &Roles,
-    slots: Slots,
-) -> GenieResult<()> {
-    for &(kind, amount, flag) in &master.storage {
-        if let Some(kind) = kind
-            && matches!(flag, STORAGE_WHILE_BUILT | STORAGE_8)
-        {
-            player.add_attribute(kind, amount)?;
-        }
-    }
-    if roles
-        .of_some_attribute(held)
-        .contains(AttributeRoles::HEADROOM)
-    {
-        player.add_attribute(slots.attribute.headroom, amount)?;
-    }
-    Ok(())
 }
 
 /// A building's storage flag that its owner holds while it stands built (slot 0x70's).

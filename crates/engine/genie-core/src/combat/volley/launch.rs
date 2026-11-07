@@ -27,11 +27,9 @@ use crate::objects::SpriteFlags;
 use crate::objects::actions::ActionList;
 use crate::objects::facing::{SpriteFacets, drawn_angle, draws_angle};
 use crate::objects::layers::{Action, Animated, Combat, Motion, Static};
-use crate::objects::lifecycle::static_storage;
 use crate::objects::lifecycle::{Class, Lifecycle};
 use crate::objects::masters::ObstructionKind;
 use crate::objects::masters::PlayersMastersExt;
-use crate::objects::masters::player_master;
 use crate::objects::release::Releaser;
 use crate::objects::sprite::ActiveSprite;
 use crate::objects::unit::Unit;
@@ -48,6 +46,7 @@ use crate::world::parts::{Object, ObjectParts};
 use crate::world::slots::PlayerSlotsExt;
 use crate::world::step::Step;
 use crate::{GenieError, GenieResult};
+use std::sync::Arc;
 
 /// A shot whose missile master its player lacks: [`Unit::fire`] and [`Unit::volley_missile`]
 /// find the master in the player's table before they launch it.
@@ -82,7 +81,17 @@ impl Unit {
         shot: &Shot,
         roles: &Roles,
     ) -> GenieResult<()> {
-        let made = player_master(&step.world.model.masters, step.player, shot.made)
+        // the player's masters table (an `Arc`: no table is copied) held beside the world, whose
+        // slot 0xf8 the missile's storage calls while its master is read
+        let table = step
+            .world
+            .model
+            .masters
+            .get(step.player.index())
+            .map(Arc::clone);
+        let made = table
+            .as_deref()
+            .and_then(|masters| masters.get(shot.made))
             .ok_or(SHOT_MASTER_LACKING)?;
         let stats = made.missile_stats().ok_or(GenieError::unsupported(
             "a missile master without its flight",
@@ -216,7 +225,7 @@ impl Unit {
                 },
             )?;
         }
-        let held = static_storage(step.world.players.player_mut(step.player)?, &made.storage)?;
+        let held = step.world.static_storage(step.player, &made.storage)?;
         // its action: the target and the shooter taken (slot 0x178), then the start
         let mut action = MissileAction {
             state: MissileState::New,

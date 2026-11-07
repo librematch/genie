@@ -8,7 +8,6 @@ mod damage;
 
 use crate::GenieResult;
 use crate::combat::Charge;
-use crate::gathering::gather::unit::give_load;
 use crate::math::rng::Stream;
 use crate::objects::HitPoints;
 use crate::objects::ObjectState;
@@ -33,7 +32,6 @@ use crate::vision::SightLayer;
 use crate::vision::SightShape;
 use crate::vision::SightTiles;
 use crate::vision::visibility::LosSight;
-use crate::world::AllySharing;
 use crate::world::World;
 use crate::world::index::Place;
 use crate::world::layer::ClassRoles;
@@ -247,7 +245,7 @@ impl World {
     /// The static object's part of an upgrade from `old` without its master kept
     /// (`FUN_141186580`): a combat object leaves its class counters
     /// ([`crate::objects::lifecycle::death_parts::count_class`] with −1) and a villager's load
-    /// goes to its player (slot 0xf8 with 1 and 1, the foods as food).
+    /// goes to its player (slot 0xf8 with 1 and 1, the foods as food: [`World::give_load`]).
     fn hand_in_load(&mut self, player_id: PlayerId, place: Place, old: &Master) -> GenieResult<()> {
         let kind = old.kind;
         if MasterKind::COMBAT <= kind {
@@ -272,27 +270,7 @@ impl World {
                 kind
             };
             let amount = object_at.life.amount;
-            let mut adds = Vec::new();
-            give_load(
-                (
-                    &self.spatial.relations,
-                    self.players
-                        .player(player_id)?
-                        .ally_sharing
-                        .contains(AllySharing::RESOURCES),
-                ),
-                player_id,
-                &mut adds,
-                kind,
-                amount,
-                &self.model.roles,
-                self.model.slots,
-            )?;
-            for (attribute_id, amount) in adds {
-                self.players
-                    .player_mut(player_id)?
-                    .add_attribute(attribute_id, amount)?;
-            }
+            self.give_load(player_id, kind, amount)?;
             let unit = self.object_at_mut(place)?;
             unit.life.attribute_kind = None;
             unit.life.amount = Amount::ZERO;

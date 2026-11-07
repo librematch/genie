@@ -244,8 +244,9 @@ impl World {
 
     /// `FUN_1411ccbb0`, the core of a building's delete ([`World::delete_building`]) and of a
     /// construction start's clearing ([`World::clear_foundations_under`]): the building wakes,
-    /// a foundation's paid cost comes back by the share its build time has still to go, its hit
-    /// points go to 0 and a desolid foundation is destroyed at once.
+    /// a foundation's paid cost comes back by the share its build time has still to go (slot
+    /// 0xf8 with 0 and 1, [`World::add_player_attribute`]), its hit points go to 0 and a desolid
+    /// foundation is destroyed at once.
     pub(crate) fn remove_building(&mut self, owner: PlayerId, id: ObjectId) -> GenieResult<()> {
         let (_, unit) = self.object(id).ok_or(GenieError::unsupported(
             "a removed building the slice does not hold",
@@ -270,9 +271,11 @@ impl World {
         if 0.0 < share {
             for (resource, amount, paid) in cost_entries(&cost) {
                 if paid {
-                    self.players
-                        .player_mut(owner)?
-                        .add_attribute(resource, Amount::new(amount.as_f32() * share))?;
+                    self.add_player_attribute(
+                        owner,
+                        resource,
+                        Amount::new(amount.as_f32() * share),
+                    )?;
                 }
             }
         }
@@ -476,7 +479,7 @@ impl World {
         if new == ObjectState::Dying && state == ObjectState::Alive {
             for (kind, amount) in refund_of(master, main, &self.model.roles, self.model.slots) {
                 let player = self.players.player_mut(owner)?;
-                player.take_at_least_zero(kind, amount)?;
+                player.take_at_least_zero(kind, amount);
             }
         }
         self.base_set_state(owner, id, new, master)
@@ -529,7 +532,7 @@ impl World {
     }
 
     /// The storage of the master's entries of a flag `leaves` takes, which leaves its owner
-    /// (`FUN_1411a56c0` with 0).
+    /// (`FUN_1411a56c0` with 0: slot 0xf8 with 0 and 1, [`World::add_player_attribute`]).
     fn leave_storage(
         &mut self,
         owner: PlayerId,
@@ -540,9 +543,7 @@ impl World {
             if let Some(kind) = kind
                 && leaves(flag)
             {
-                self.players
-                    .player_mut(owner)?
-                    .add_attribute(kind, -amount)?;
+                self.add_player_attribute(owner, kind, -amount)?;
             }
         }
         Ok(())
@@ -563,9 +564,7 @@ impl World {
         let held = self.object_and_combat_mut(id)?.ok_or(NOT_HELD)?;
         let death = built_death(held, annex_of, master, player_kind, &roles, slots)?;
         for &(kind, amount) in &death.adds {
-            self.players
-                .player_mut(owner)?
-                .add_attribute(kind, amount)?;
+            self.add_player_attribute(owner, kind, amount)?;
         }
         self.unwatch(owner, id)?;
         if let (Some(visibility), Some(at)) = (self.spatial.sight.as_mut(), death.unlink) {
@@ -576,7 +575,7 @@ impl World {
         if let Some(kind) = death.building.count {
             self.players
                 .player_mut(owner)?
-                .take_at_least_zero(kind, Amount::new(1.0))?;
+                .take_at_least_zero(kind, Amount::new(1.0));
         }
         if let Some((master_id, tech)) = death.building.tech {
             self.withdraw_tech(owner, master_id, tech)?;

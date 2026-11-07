@@ -120,20 +120,22 @@ fn peaceful_class_kill_counts_neither_kill_nor_loss() {
     assert_eq!(held(&world, 1, [154, 327, 152]), [0.0, 1.0, 5.0]);
 }
 
-/// A player without the counts' attributes fails the count with its error.
+/// A count past a player's attributes adds nothing (the base add's `+0x90` test,
+/// `FUN_14165d040`): a killer with 100 attributes counts the kill (20) alone.
 #[test]
-fn kill_counted_for_player_without_its_attributes_fails() {
+fn kill_counted_for_player_without_its_attributes_adds_nothing_past_them() {
     let mut world = world();
     world.players[2].attributes = vec![Amount::ZERO; 100];
-    assert!(
-        world
-            .count_kill_of(
-                PlayerId::new(1),
-                KilledMaster::of(&archer()),
-                PlayerId::new(2)
-            )
-            .is_err()
-    );
+    world
+        .count_kill_of(
+            PlayerId::new(1),
+            KilledMaster::of(&archer()),
+            PlayerId::new(2),
+        )
+        .unwrap();
+    let killer = &world.players[2].attributes;
+    assert_eq!((killer.len(), killer[20]), (100, Amount::new(1.0)));
+    assert_eq!(held(&world, 1, [154, 327, 152]), [1.0, 1.0, 70.0]);
 }
 
 /// `FUN_1412005b0` on an object by its master: the object's own one (here a prey's, no kill

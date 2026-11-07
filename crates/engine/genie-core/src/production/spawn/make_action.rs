@@ -163,7 +163,7 @@ impl World {
                 });
             self.players
                 .player_mut(player_id)?
-                .add_attribute(self.model.slots.attribute.queued, -pop)?;
+                .add_attribute(self.model.slots.attribute.queued, -pop);
         }
         if let Some(production) = self
             .parts
@@ -275,7 +275,7 @@ impl World {
                     let pop = population(&master.storage, &self.model.roles);
                     self.players
                         .player_mut(player_id)?
-                        .add_attribute(self.model.slots.attribute.in_production, pop)?;
+                        .add_attribute(self.model.slots.attribute.in_production, pop);
                     make.state = MakeObjState::Making;
                 }
             }
@@ -506,7 +506,7 @@ impl World {
             });
             let refund = (!make.paid).then(|| made.cloned()).flatten();
             let owner = self.players.player_mut(player_id)?;
-            owner.add_attribute(self.model.slots.attribute.in_production, -pop)?;
+            owner.add_attribute(self.model.slots.attribute.in_production, -pop);
             if let Some(master) = refund {
                 refund_master(&master, QueueCount::ONE, owner)?;
             }

@@ -356,10 +356,7 @@ pub(crate) fn repair_target(
             )))
         }
     }?;
-    step.world
-        .players
-        .player_mut(player)?
-        .add_attributes(paid.adds)?;
+    paid.take_from(step.world.players.player_mut(player)?)?;
     repair_write_back(step.world, &set, &original)?;
     // a heal's slot 0xb8 runs the healed object's hit point transforms' test (`FUN_141204450`);
     // the set's objects are each healed once, and no later step of the repair reads a master

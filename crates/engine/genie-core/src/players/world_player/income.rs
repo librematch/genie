@@ -21,7 +21,7 @@ use crate::world::ClockSeconds;
 use crate::world::Seconds;
 use crate::world::World;
 use crate::world::layer::AttributeRoles;
-use crate::world::slots::{CheckedIndexExt, PlayerSlotsExt};
+use crate::world::slots::PlayerSlotsExt;
 
 /// Whether a resource add (slot 0xf8's fifth argument) goes on to the players its player
 /// shares its gathered resources with.
@@ -146,16 +146,30 @@ impl World {
         )
     }
 
-    /// The world player's attribute add (slot 0xf8, `FUN_141616820`) of `amount` to attribute
+    /// The world player's attribute add, slot 0xf8 (`FUN_141616820`), of `amount` to attribute
     /// `kind` of player `player_id`, with `stat` (its fourth argument) and `share` (its fifth,
-    /// [`ResourceShare`]): with `stat` 1 a resource's gathered total grows first (food, wood and
-    /// stone: 166 to 168; gold: any `stat` but 0 adds to attribute 49 unchecked, then 1 adds to
-    /// 169), then the attribute ([`World::add_attribute_base`]). The resource panel's event when a
-    /// resource crosses 100 (`FUN_140c898a0` 0x80) is the interface's. A kind outside the slot's
-    /// branches (the relic income, 100) takes the base add alone; the side effects of 50, 183 and
-    /// 196 are [`World::add_player_attribute`]'s and [`crate::world::Player::add_attribute`]'s.
+    /// [`ResourceShare`]). Its branches by the kind, in the game's order:
     ///
-    /// [`World::add_player_attribute`]: crate::world::World::add_player_attribute
+    /// - gold ([`AttributeRoles::GOLD`], the game's 3): with any `stat` but 0 its counter (49)
+    ///   grows unchecked, with 1 its gathered total (169) through the base add
+    ///   ([`World::gold_counts`]);
+    /// - the spread attribute (196, [`AttributeRoles::SPREAD_ATTRIBUTE`]): above 0 (`COMISS`, `JA`:
+    ///   not a NaN) the add does nothing at all; else the other players' at most 0 take `amount`
+    ///   too ([`World::spread_attribute_add`]);
+    /// - food, wood and stone (0 to 2): with `stat` 1 their gathered totals (166 to 168) grow
+    ///   through the base add;
+    /// - the allied vision (50, [`AttributeRoles::ALLIED_VISION`]) turns on first
+    ///   ([`World::allied_vision_on`]);
+    /// - the shared vision (183, [`AttributeRoles::SHARED_VISION`]) rebuilds the masks first (the
+    ///   world's slot 0x78).
+    ///
+    /// Then the base add of the attribute itself ([`World::add_attribute_base`]). The interface's
+    /// events (`FUN_140c898a0` 0x94 and 0x8b, and the resource panel's 0x80 when a resource
+    /// crosses 100) are not the simulation's.
+    ///
+    /// # Errors
+    ///
+    /// A player the world does not hold, and the vision's rebuild.
     pub fn add_resource(
         &mut self,
         player_id: PlayerId,
@@ -164,54 +178,140 @@ impl World {
         stat: ResourceStat,
         share: ResourceShare,
     ) -> GenieResult<()> {
-        if self
-            .model
-            .roles
-            .of_attribute(kind)
-            .contains(AttributeRoles::GOLD)
-        {
-            if stat.counts_gold() {
-                let amounts = &mut self.players.player_mut(player_id)?.attributes;
-                let counter = get(amounts, self.model.slots.attribute.gold_counter);
-                set(
-                    amounts,
-                    self.model.slots.attribute.gold_counter,
-                    amount + counter,
-                );
-                if stat.gathered() {
-                    self.add_attribute_base(
-                        player_id,
-                        self.model.slots.attribute.gold_gathered,
-                        amount,
-                        ResourceStat::Gathered,
-                        share,
-                    )?;
-                }
+        let held = self.model.roles.of_attribute(kind);
+        if held.contains(AttributeRoles::GOLD) {
+            self.gold_counts(player_id, amount, stat, share)?;
+        } else if held.contains(AttributeRoles::SPREAD_ATTRIBUTE) {
+            let spread = self.model.slots.attribute.spread_attribute;
+            if Amount::ZERO < get(&self.players.player(player_id)?.attributes, spread) {
+                return Ok(());
             }
-        } else if kind.is_resource() && stat.gathered() {
+            self.spread_attribute_add(player_id, amount)?;
+        } else if kind.is_resource() {
             // the game's kinds 0, 1 and 2
+            if stat.gathered() {
+                self.add_attribute_base(
+                    player_id,
+                    self.model.slots.attribute.gathered.offset(kind.index())?,
+                    amount,
+                    ResourceStat::Gathered,
+                    share,
+                )?;
+            }
+        } else if held.contains(AttributeRoles::ALLIED_VISION) {
+            self.allied_vision_on(player_id)?;
+        } else if held.contains(AttributeRoles::SHARED_VISION) {
+            self.rebuild_vision()?;
+        }
+        self.add_attribute_base(player_id, kind, amount, stat, share)
+    }
+
+    /// Slot 0xf8 with 0 and 1 ([`World::add_resource`] with [`ResourceStat::None`] and
+    /// [`ResourceShare::Shared`]) of `amount` to attribute `kind` of player `player_id`: the
+    /// call of a storage's entries (`FUN_141193860`, `FUN_1411a56c0`, `FUN_1411e63f0`), a
+    /// foundation's refund (`FUN_1411ccbb0`), a tribute (`FUN_140e7d040`), a Make's food
+    /// (`FUN_140a99e30`) and a technology's resource add (`FUN_141661160`).
+    ///
+    /// # Errors
+    ///
+    /// [`World::add_resource`]'s.
+    pub(crate) fn add_player_attribute(
+        &mut self,
+        player_id: PlayerId,
+        kind: AttributeId,
+        amount: Amount,
+    ) -> GenieResult<()> {
+        self.add_resource(
+            player_id,
+            kind,
+            amount,
+            ResourceStat::None,
+            ResourceShare::Shared,
+        )
+    }
+
+    /// Slot 0xf8 with 1 and 1 ([`World::add_resource`] with [`ResourceStat::Gathered`] and
+    /// [`ResourceShare::Shared`]) on a unit's load of `amount` of `kind`, which player `player_id`
+    /// gains with its gathered total: a gatherer's, a hunter's or a builder's drop
+    /// (`FUN_140aadc50`), the load a unit takes into a building (`FUN_140a867b0`), a villager's
+    /// at its upgrade and a generation's. The statistics (slot 0xb8) and the local player's
+    /// tracker (`FUN_14097daf0`) are not held.
+    ///
+    /// # Errors
+    ///
+    /// [`World::add_resource`]'s.
+    pub(crate) fn give_load(
+        &mut self,
+        player_id: PlayerId,
+        kind: AttributeId,
+        amount: Amount,
+    ) -> GenieResult<()> {
+        self.add_resource(
+            player_id,
+            kind,
+            amount,
+            ResourceStat::Gathered,
+            ResourceShare::Shared,
+        )
+    }
+
+    /// Slot 0xf8's gold branch for player `player_id`'s add of `amount`: with any `stat` but 0 its
+    /// gold counter (49) grows unchecked (`+0x188`, straight into it), with 1 its gathered
+    /// gold (169) through the base add with `share` ([`World::add_attribute_base`]).
+    fn gold_counts(
+        &mut self,
+        player_id: PlayerId,
+        amount: Amount,
+        stat: ResourceStat,
+        share: ResourceShare,
+    ) -> GenieResult<()> {
+        if !stat.counts_gold() {
+            return Ok(());
+        }
+        let amounts = &mut self.players.player_mut(player_id)?.attributes;
+        let counter = get(amounts, self.model.slots.attribute.gold_counter);
+        set(
+            amounts,
+            self.model.slots.attribute.gold_counter,
+            amount + counter,
+        );
+        if stat.gathered() {
             self.add_attribute_base(
                 player_id,
-                self.model.slots.attribute.gathered.offset(kind.index())?,
+                self.model.slots.attribute.gold_gathered,
                 amount,
                 ResourceStat::Gathered,
                 share,
             )?;
         }
-        self.add_attribute_base(player_id, kind, amount, stat, share)?;
+        Ok(())
+    }
+
+    /// Slot 0xf8's spread of attribute 196 from player `player_id`, whose own is at most 0: each
+    /// other player from 1 on whose attribute 196 is at most 0 (`COMISS`, `JC`: not a NaN) takes
+    /// `amount` plus it, straight into it.
+    fn spread_attribute_add(&mut self, player_id: PlayerId, amount: Amount) -> GenieResult<()> {
+        let spread = self.model.slots.attribute.spread_attribute;
+        for other in PlayerId::each(self.players.len()).skip(1) {
+            if other == player_id {
+                continue;
+            }
+            let amounts = &mut self.players.player_mut(other)?.attributes;
+            let theirs = get(amounts, spread);
+            if theirs <= Amount::ZERO {
+                set(amounts, spread, amount + theirs);
+            }
+        }
         Ok(())
     }
 
     /// The base player's attribute add (`FUN_14165d040`) of `amount` to attribute `kind` of player
-    /// `owner`, for a kind out of 0 to the attribute count nothing: the attribute takes `amount`
-    /// plus its value. A computer player's resource fills its escrow: an `amount` above 0 with a
-    /// share above 0 (`COMISS`, `JBE`) adds the share times it; an escrow above the resource (`JBE`
-    /// skips a NaN) falls to it, or to 0 when the resource is below 0. [`ResourceShare::Shared`], a
-    /// player who shares its gathered resources (`+0x1426`,
-    /// [`crate::world::AllySharing::RESOURCES`]) gives each resource to the players, in order, it
-    /// counts as allies and who count it as theirs ([`World::shares_with`]): their slot 0xf8 with
-    /// `stat` and no sharing. Attribute 11's peak (`+0x6fc`, unsaved) is not held; no resource add
-    /// reaches it.
+    /// `owner`: for a kind within the player's count the player's own add with its escrow
+    /// ([`crate::world::Player::add_attribute`]), and with [`ResourceShare::Shared`], a player who
+    /// shares its gathered resources (`+0x1426`, [`crate::world::AllySharing::RESOURCES`]) gives
+    /// each resource to the players, in order, it counts as allies and who count it as theirs
+    /// ([`World::shares_with`]): their slot 0xf8 with `stat` and no sharing. A kind past the
+    /// count does nothing, the sharing neither.
     pub(super) fn add_attribute_base(
         &mut self,
         owner: PlayerId,
@@ -221,25 +321,10 @@ impl World {
         share: ResourceShare,
     ) -> GenieResult<()> {
         let player = self.players.player_mut(owner)?;
-        let index = kind.index();
-        if player.attributes.len() <= index {
+        if player.attribute(kind).is_none() {
             return Ok(());
         }
-        *player.attributes.checked_mut(index)? += amount;
-        if player.kind == PlayerKind::Computer && kind.is_resource() {
-            let pct = *player.escrow_percentage.checked(index)?;
-            if !at_most_or_unordered(amount.get(), 0.0) && !at_most_or_unordered(pct.get(), 0.0) {
-                *player.escrow.checked_mut(index)? += pct.of(amount);
-            }
-            let held = *player.attributes.checked(index)?;
-            if !at_most_or_unordered(player.escrow.checked(index)?.get(), held.get()) {
-                *player.escrow.checked_mut(index)? = if at_most_or_unordered(0.0, held.get()) {
-                    held
-                } else {
-                    Amount::ZERO
-                };
-            }
-        }
+        player.add_attribute(kind, amount);
         if share == ResourceShare::Shared
             && player.ally_sharing.contains(AllySharing::RESOURCES)
             && kind.is_resource()

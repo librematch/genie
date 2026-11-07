@@ -37,7 +37,8 @@ pub enum SpritePlay {
 }
 use crate::garrison::ContainerId;
 use crate::objects::FacetCount;
-use crate::world::player::Player;
+use crate::players::PlayerId;
+use crate::world::World;
 
 /// Which update chain the object runs. `RGE_Animated_Object::update` and everything derived from
 /// it (types 20 and up) adds a step after the static update's.
@@ -60,34 +61,63 @@ pub struct Held {
     pub amount: Amount,
 }
 
-/// The static init's storage (`FUN_1411a45a0`) of a new object of a master with storage
-/// `storage`: the entries of flags 1, 2 and 32 with an attribute go to its `owner` at once
-/// (`FUN_141193860`); the last entry of flag 0 with one is what the object holds
-/// (`FUN_141193710`; none without one).
-///
-/// # Errors
-///
-/// An attribute the owner does not have.
-pub(crate) fn static_storage(
-    owner: &mut Player,
-    storage: &[(Option<AttributeId>, Amount, u8)],
-) -> GenieResult<Held> {
+impl World {
+    /// The static init's storage (`FUN_1411a45a0`) of a new object of player `owner`'s, of a
+    /// master with storage `storage`: what the object holds ([`held_storage`], `FUN_141193710`),
+    /// then the entries that go to its owner at once ([`World::give_static_storage`],
+    /// `FUN_141193860`).
+    ///
+    /// # Errors
+    ///
+    /// [`World::give_static_storage`]'s.
+    pub(crate) fn static_storage(
+        &mut self,
+        owner: PlayerId,
+        storage: &[(Option<AttributeId>, Amount, u8)],
+    ) -> GenieResult<Held> {
+        let held = held_storage(storage);
+        self.give_static_storage(owner, storage)?;
+        Ok(held)
+    }
+
+    /// `FUN_141193860`: each of `storage`'s entries of flag 1, 2 or 32 with an attribute (`-1 <`
+    /// its short) goes to player `owner`, in order (slot 0xf8 with 0 and 1,
+    /// [`World::add_player_attribute`]).
+    ///
+    /// # Errors
+    ///
+    /// A player the world does not hold, and the adds'.
+    pub(crate) fn give_static_storage(
+        &mut self,
+        owner: PlayerId,
+        storage: &[(Option<AttributeId>, Amount, u8)],
+    ) -> GenieResult<()> {
+        for &(kind, amount, flag) in storage {
+            if let Some(kind) = kind
+                && matches!(flag, 1 | 2 | 32)
+            {
+                self.add_player_attribute(owner, kind, amount)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+/// `FUN_141193710`: what a new object of a master with storage `storage` holds, the last entry
+/// of flag 0 with an attribute (none without one).
+fn held_storage(storage: &[(Option<AttributeId>, Amount, u8)]) -> Held {
     let mut held = Held::default();
     for &(kind, amount, flag) in storage {
-        let Some(kind) = kind else {
-            continue;
-        };
-        if matches!(flag, 1 | 2 | 32) {
-            owner.add_attribute(kind, amount)?;
-        }
-        if flag == 0 {
+        if let Some(kind) = kind
+            && flag == 0
+        {
             held = Held {
                 kind: Some(kind),
                 amount,
             };
         }
     }
-    Ok(held)
+    held
 }
 
 /// What the dead-object steps read of the object's master (`+0xa0`, its own first) as they run:
@@ -271,13 +301,18 @@ impl Lifecycle {
 mod tests {
     use super::*;
     use crate::garrison::ContainerId;
+    use crate::players::EscrowShare;
+    use crate::players::PlayerKind;
     use crate::players::attribute::AttributeId;
     #[cfg(test)]
     use crate::test_ids::amounts;
     use crate::test_ids::master_id;
     use crate::test_ids::object_id;
     use crate::testing::attribute;
+    use crate::world::FrameSeed;
     use crate::world::Millis;
+    use crate::world::WorldTime;
+    use crate::world::player::Player;
 
     /// The states after each update with `master` until the object leaves, and the update
     /// (1-based) it leaves in.
@@ -595,14 +630,24 @@ mod tests {
     }
 
     /// The static init's storage (a new missile's too): flags 1, 2 and 32 with an attribute
-    /// go to the owner (resources and attributes alike), one without an attribute (−1) does
-    /// not; the last of flag 0 is what the object holds.
+    /// go to the owner (resources and attributes alike) through slot 0xf8 with 0 and 1, so a
+    /// computer owner's wood sets its share aside; one without an attribute (−1) does not go;
+    /// the last of flag 0 is what the object holds.
     #[test]
     fn new_object_storage_gives_its_owner_flags_1_2_and_32_and_holds_flag_0() {
-        let mut owner = Player {
+        let owner = Player {
+            kind: PlayerKind::Computer,
             attributes: vec![Amount::ZERO; 20],
+            escrow_percentage: [0.0, 0.25, 0.0, 0.0].map(EscrowShare::of_data),
             ..Player::default()
         };
+        let mut world = World::new(
+            WorldTime::from_millis(0),
+            FrameSeed::of_data(1),
+            PlayerId::GAIA,
+            vec![Millis::ZERO; 2],
+            vec![Player::default(), owner],
+        );
         let storage = [
             (Some(attribute::WOOD), 2.0, 1),
             (Some(attribute::POPULATION), 5.0, 2),
@@ -613,14 +658,17 @@ mod tests {
             (Some(AttributeId::named(13)), 4.0, 4),
         ]
         .map(|(kind, amount, flag)| (kind, Amount::new(amount), flag));
+        let owner_id = PlayerId::new(1);
         assert_eq!(
-            static_storage(&mut owner, &storage),
+            world.static_storage(owner_id, &storage),
             Ok(Held {
                 kind: Some(attribute::RELICS_HELD),
                 amount: Amount::new(1.5)
             })
         );
+        let owner = &world.players[1];
         assert_eq!(owner.resources(), amounts([0.0, 2.0, 0.0, 0.0]));
+        assert_eq!(owner.escrow, amounts([0.0, 0.5, 0.0, 0.0]));
         let gained: Vec<(usize, f32)> = owner
             .attributes
             .iter()
@@ -630,6 +678,6 @@ mod tests {
             .map(|(attribute, amount)| (attribute, amount.get()))
             .collect();
         assert_eq!(gained, [(1, 2.0), (11, 5.0), (12, 3.0)]);
-        assert_eq!(static_storage(&mut owner, &[]), Ok(Held::default()));
+        assert_eq!(world.static_storage(owner_id, &[]), Ok(Held::default()));
     }
 }

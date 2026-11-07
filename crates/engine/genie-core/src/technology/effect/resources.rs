@@ -20,10 +20,10 @@ impl World {
     /// Slot 0x1b0 (`FUN_141620c70`) of player `player_id` on resource `attribute` with `amount`:
     /// every live combat unit's and building's volleys lose the shares of the units inside, the
     /// attribute changes (`FUN_141661160`: `change` sets it, slot 0xf0
-    /// [`World::set_player_attribute`]; or adds to it, slot 0xf8 with no statistics,
-    /// [`World::add_player_attribute`]; the local player's statistics are not simulation), and the
-    /// volleys take the shares again. A change of resource 0x20 would not run in the screen's mode
-    /// 4 (a playback's is not) or with the game's `+0x668` set (not held: taken unset).
+    /// [`World::set_player_attribute`]; or adds to it, slot 0xf8 with 0 and 1,
+    /// [`World::add_player_attribute`]; the local player's statistics are not simulation), and
+    /// the volleys take the shares again. A change of resource 0x20 would not run in the screen's
+    /// mode 4 (a playback's is not) or with the game's `+0x668` set (not held: taken unset).
     pub(super) fn modify_resource(
         &mut self,
         player_id: PlayerId,
@@ -151,56 +151,10 @@ impl World {
         Ok(())
     }
 
-    /// Slot 0xf8 (`FUN_141616820`) of player `player` with no statistics (`param_4` 0): `amount`
-    /// adds to attribute `attribute` ([`crate::world::Player::add_attribute`]), with the side
-    /// effects of 0x32 (the allied vision on first), 0xb7 (the masks rebuilt first, with the old
-    /// value) and 0xc4 (nothing for a player above 0; the others at most 0 add it too).
-    pub(crate) fn add_player_attribute(
-        &mut self,
-        player: PlayerId,
-        attribute: AttributeId,
-        amount: Amount,
-    ) -> GenieResult<()> {
-        {
-            let held = self.model.roles.of_attribute(attribute);
-            if held.contains(AttributeRoles::ALLIED_VISION) {
-                self.allied_vision_on(player)?;
-            } else if held.contains(AttributeRoles::SHARED_VISION) {
-                self.rebuild_vision()?;
-            } else if held.contains(AttributeRoles::SPREAD_ATTRIBUTE) {
-                if Amount::ZERO
-                    < self.attribute_of(player, self.model.slots.attribute.spread_attribute)
-                {
-                    return Ok(());
-                }
-                for player_id in PlayerId::each(self.players.len()).skip(1) {
-                    let theirs =
-                        self.attribute_of(player_id, self.model.slots.attribute.spread_attribute);
-                    if player_id != player && theirs <= Amount::ZERO {
-                        self.store_attribute(
-                            player_id,
-                            self.model.slots.attribute.spread_attribute,
-                            amount + theirs,
-                        )?;
-                    }
-                }
-            } else {
-                return self
-                    .players
-                    .player_mut(player)?
-                    .add_attribute(attribute, amount);
-            }
-        }
-        // FUN_14165d040's store of the sum
-        let sum = amount + self.attribute_of(player, attribute);
-        self.store_attribute(player, attribute, sum)?;
-        Ok(())
-    }
-
     /// Attribute 0x32's side effect: player `player_id`'s allied vision (`+0x2cc`) on, the masks
     /// rebuilt (the world's slot 0x78, `FUN_1415e92b0`) and its tile list refilled
     /// ([`World::refill_tiles`], `FUN_141285cb0`).
-    pub(super) fn allied_vision_on(&mut self, player_id: PlayerId) -> GenieResult<()> {
+    pub(crate) fn allied_vision_on(&mut self, player_id: PlayerId) -> GenieResult<()> {
         self.players
             .player_mut(player_id)?
             .ally_sharing

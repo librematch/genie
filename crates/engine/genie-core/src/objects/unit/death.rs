@@ -55,10 +55,10 @@ impl Unit {
             &step.world.model.roles,
             step.world.model.slots,
         )?;
-        step.world
-            .players
-            .player_mut(step.player)?
-            .add_attributes(death.adds)?;
+        // FUN_1411e63f0's slot 0xf8 with 0 and 1 on each
+        for (kind, amount) in death.adds {
+            step.world.add_player_attribute(step.player, kind, amount)?;
+        }
         step.world.unwatch(step.player, self.id)?;
         if let (Some(visibility), Some(at)) = (step.world.spatial.sight.as_mut(), death.unlink) {
             visibility.unlink_building(at, master.radius, step.world.model.tuning.visibility)?;
@@ -68,7 +68,7 @@ impl Unit {
             step.world
                 .players
                 .player_mut(step.player)?
-                .take_at_least_zero(kind, Amount::new(1.0))?;
+                .take_at_least_zero(kind, Amount::new(1.0));
         }
         Ok(death.building.tech)
     }
@@ -145,7 +145,7 @@ impl Unit {
                 roles,
                 step.world.model.slots,
             ) {
-                owner.take_at_least_zero(kind, cost)?;
+                owner.take_at_least_zero(kind, cost);
             }
         }
         if let Some((master_id, tech_id)) = tech {

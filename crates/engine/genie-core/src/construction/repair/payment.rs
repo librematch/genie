@@ -23,6 +23,7 @@ use crate::production::Payment;
 use crate::production::pay;
 use crate::technology::Attributes;
 use crate::world::NO_ATTRIBUTE;
+use crate::world::Player;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
 use crate::world::layer::Slots;
@@ -263,19 +264,33 @@ pub fn repair_unit(
 
 /// A repairer's player's attributes as its repair pays from them
 /// ([`crate::construction::repair::Payer`]): the attributes as the repair reads them, each payment
-/// kept as an add the caller makes the owner's right after the repair's step (a subtraction, so the
-/// player's value comes out as the repair saw it).
+/// kept for the caller to take off the owner's right after the repair's step
+/// ([`PaidAttributes::take_from`]), so the player's value comes out as the repair saw it.
 pub(crate) struct PaidAttributes {
     pub(super) values: Vec<Amount>,
-    pub(crate) adds: Vec<(AttributeId, Amount)>,
+    /// The payments, in order: each attribute and the amount it lost.
+    payments: Vec<(AttributeId, Amount)>,
 }
 
 impl PaidAttributes {
     pub(crate) fn new(attributes: &[Amount]) -> Self {
         Self {
             values: attributes.to_vec(),
-            adds: Vec::new(),
+            payments: Vec::new(),
         }
+    }
+
+    /// The payments taken off `owner`'s attributes in order, as `FUN_14162fb60` writes them:
+    /// straight into each attribute (`SUBSS`), with no slot 0xf8 and so no computer's escrow.
+    ///
+    /// # Errors
+    ///
+    /// An attribute the owner does not have.
+    pub(crate) fn take_from(self, owner: &mut Player) -> GenieResult<()> {
+        for (attribute_id, amount) in self.payments {
+            owner.subtract(attribute_id, amount)?;
+        }
+        Ok(())
     }
 }
 
@@ -293,7 +308,7 @@ impl Attributes for PaidAttributes {
             .get_mut(attribute_id.index())
             .ok_or(NO_ATTRIBUTE)?;
         *value -= amount;
-        self.adds.push((attribute_id, -amount));
+        self.payments.push((attribute_id, amount));
         Ok(())
     }
 }

@@ -26,6 +26,8 @@ use crate::objects::masters::{Master, player_master};
 use crate::objects::unit::Unit;
 use crate::orders::lock_gate;
 use crate::players::PlayerId;
+use crate::players::ResourceStat;
+use crate::players::world_player::ResourceShare;
 use crate::production::spawn::Facing;
 use crate::unit_ai::QueuedOrder;
 use crate::unit_ai::unit_ai_kind;
@@ -50,11 +52,12 @@ pub(crate) enum MakeMode {
 
 impl World {
     /// What a built building's storage gave its owner leaves (`FUN_1411e63f0`, then
-    /// `FUN_1411e6580`, [`crate::objects::lifecycle::death_parts::storage_leaves`]) outside its update.
+    /// `FUN_1411e6580`, [`crate::objects::lifecycle::death_parts::storage_leaves`]) outside its
+    /// update, each through its owner's slot 0xf8 with 0 and 1 ([`World::add_player_attribute`]).
     ///
     /// # Errors
     ///
-    /// An object the slice does not hold, its own store, and an attribute the owner lacks.
+    /// An object the slice does not hold, and its own store.
     pub(crate) fn storage_leaves(
         &mut self,
         owner: PlayerId,
@@ -64,9 +67,7 @@ impl World {
         let (roles, slots) = (self.model.roles.clone(), self.model.slots);
         let held = self.object_and_combat_mut(id)?.ok_or(NOT_HELD)?;
         for (kind, amount) in death_parts_storage_leaves(held, master, &roles, slots) {
-            self.players
-                .player_mut(owner)?
-                .add_attribute(kind, amount)?;
+            self.add_player_attribute(owner, kind, amount)?;
         }
         Ok(())
     }
@@ -118,8 +119,9 @@ impl World {
 
     /// `FUN_1411c66a0`'s farm bonus ([`FirstPart::farm_bonus`]) of the building `id` of
     /// `owner`: the farm owes it to its Make (`+0xcac`, [`Building::owes_bonus`]), then its owner
-    /// gains what `gain` names (slot 0xf8 with 1 and 1), nothing for an attribute its add does
-    /// not hold ([`FarmBonusGain::Nothing`]).
+    /// gains what `gain` names (slot 0xf8 with 1 and 1, [`World::add_resource`]: its gathered
+    /// total, its escrow and its sharing too), nothing for an attribute its add does not hold
+    /// ([`FarmBonusGain::Nothing`]).
     ///
     /// [`FirstPart::farm_bonus`]: crate::construction::build::FirstPart::farm_bonus
     /// [`Building::owes_bonus`]: crate::objects::layers::Building::owes_bonus
@@ -135,9 +137,13 @@ impl World {
     ) -> GenieResult<()> {
         self.parts.building_mut(id)?.owes_bonus = true;
         match gain {
-            FarmBonusGain::Attribute(kind, amount) => {
-                self.players.player_mut(owner)?.add_attribute(kind, amount)
-            }
+            FarmBonusGain::Attribute(kind, amount) => self.add_resource(
+                owner,
+                kind,
+                amount,
+                ResourceStat::Gathered,
+                ResourceShare::Shared,
+            ),
             FarmBonusGain::Nothing => Ok(()),
         }
     }

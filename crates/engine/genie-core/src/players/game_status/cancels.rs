@@ -114,7 +114,8 @@ impl World {
         owner.add_attribute(
             self.model.slots.attribute.queued,
             -pop * f32::from(count.get()),
-        )
+        );
+        Ok(())
     }
 
     /// `count` researches of a research entry `entry` at the building at `idx` of player
@@ -281,7 +282,8 @@ impl World {
         let pop = master.as_ref().map_or(Amount::ZERO, |master| {
             population(&master.storage, &self.model.roles)
         });
-        owner.add_attribute(self.model.slots.attribute.queued, -pop)
+        owner.add_attribute(self.model.slots.attribute.queued, -pop);
+        Ok(())
     }
 
     /// `FUN_1411d66b0`'s cancel of up to five of a kind, from the unit entry `entry` of the

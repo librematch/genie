@@ -103,12 +103,12 @@ impl World {
 
     /// The block for state 2's start: the building `id`'s build points hold its build time, and its
     /// master's storage ([`hand_storage`]) goes to its owner `player_id` (modes 4, 8 and 64: slot
-    /// 0xf8 at once) and to its own store (mode 16).
+    /// 0xf8 with 0 and 1 at once, `0x1411dbf43`, [`World::add_player_attribute`]) and to its own
+    /// store (mode 16).
     ///
     /// # Errors
     ///
-    /// A building the world does not hold or without its construction, and an attribute its
-    /// owner lacks.
+    /// A building the world does not hold or without its construction.
     fn completion_storage(
         &mut self,
         player_id: PlayerId,
@@ -124,7 +124,10 @@ impl World {
             &mut gains,
             Some(&mut self.parts.combat_mut(id)?.store),
         );
-        self.players.player_mut(player_id)?.add_attributes(gains)
+        for (kind, amount) in gains {
+            self.add_player_attribute(player_id, kind, amount)?;
+        }
+        Ok(())
     }
 
     /// The block for state 2's sight and sprite: the building `id` at `placed` swaps its sight
@@ -232,12 +235,13 @@ impl World {
     /// foundation ([`lay_foundation`]: its snow flag, its foundation terrain over its clearance);
     /// then its owner `player_id` records the castle's or the wonder's event in its history
     /// (`FUN_141560ae0` with its own id, `+0x718`, as `data1`) and gains its counts
-    /// ([`completion_counts`], slot 0xf8 at once).
+    /// ([`completion_counts`], slot 0xf8 at once: counts of the build layer outside its branches,
+    /// [`crate::world::Player::add_attribute`]).
     ///
     /// # Errors
     ///
-    /// A building the world does not hold or without its construction, a map without its
-    /// terrain, and an attribute its owner lacks.
+    /// A building the world does not hold or without its construction, and a map without its
+    /// terrain.
     fn completion_ground(
         &mut self,
         player_id: PlayerId,
@@ -293,7 +297,8 @@ impl World {
                 now,
             );
         }
-        self.players.player_mut(player_id)?.add_attributes(counts)
+        self.players.player_mut(player_id)?.add_attributes(counts);
+        Ok(())
     }
 }
 

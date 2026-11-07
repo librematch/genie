@@ -19,8 +19,9 @@ use crate::objects::masters::MasterKind;
 use crate::objects::masters::MasterTables;
 use crate::objects::sprite::dying;
 use crate::objects::unit::{Outcome, Unit};
+use crate::players::Amount;
+use crate::players::attribute::AttributeId;
 use crate::world::layer::Roles;
-use crate::world::slots::PlayerSlotsExt;
 use crate::world::step::Step;
 use crate::{GenieError, GenieResult};
 
@@ -80,11 +81,11 @@ impl Unit {
 
     /// `set_state(3)`'s storage (`FUN_1411a56c0` with 0) for a live object below one hit point:
     /// each of kinds 2 and 16 of an attribute leaves the player (its slot 0xf8 with the amount
-    /// negated, at once).
+    /// negated, 0 and 1, at once: [`crate::world::World::add_player_attribute`]).
     ///
     /// # Errors
     ///
-    /// An attribute the player does not have.
+    /// A player the world does not hold, and the add's.
     pub(crate) fn dying_storage_leaves(&self, step: &mut Step<'_>) -> GenieResult<()> {
         // a NaN hit point is not below one
         if !(self.life.is_alive() && self.life.hp < HitPoints::new(1.0)) {
@@ -94,15 +95,19 @@ impl Unit {
             MasterTables::new(&step.world.model.masters, &step.world.parts.own_master),
             step.player,
         )?;
-        for &(attribute, amount, kind) in &master.storage {
-            if let Some(attribute) = attribute
-                && matches!(kind, 2 | 16)
-            {
-                step.world
-                    .players
-                    .player_mut(step.player)?
-                    .add_attribute(attribute, -amount)?;
-            }
+        // the master's storage is read whole before the adds, which change no master
+        let leaving: Vec<(AttributeId, Amount)> = master
+            .storage
+            .iter()
+            .filter_map(|&(attribute, amount, kind)| {
+                attribute
+                    .filter(|_| matches!(kind, 2 | 16))
+                    .map(|attribute| (attribute, -amount))
+            })
+            .collect();
+        for (attribute, amount) in leaving {
+            step.world
+                .add_player_attribute(step.player, attribute, amount)?;
         }
         Ok(())
     }

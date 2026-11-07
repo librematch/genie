@@ -36,7 +36,6 @@ use crate::objects::WorkRate;
 use crate::objects::layers::default_start;
 use crate::objects::layers::{Action, Animated, Building, Combat, DefaultTask, Motion, Static};
 use crate::objects::lifecycle::Held;
-use crate::objects::lifecycle::static_storage;
 use crate::objects::lifecycle::{Class, Lifecycle};
 use crate::objects::masters::BlastDefense;
 use crate::objects::masters::MasterId;
@@ -103,7 +102,7 @@ impl World {
         let storage = player_master(&self.model.masters, player, master)
             .map(|master| master.storage.clone())
             .unwrap_or_default();
-        static_storage(self.players.player_mut(player)?, &storage)
+        self.static_storage(player, &storage)
     }
 
     /// A new building (the master's slot 0x40 or 0x108, `FUN_1411ac5c0` / `FUN_1411aca00` with

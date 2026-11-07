@@ -33,7 +33,11 @@ use crate::objects::unit::Unit;
 use crate::objects::{FacetCount, Frame, Graphics};
 use crate::orders::Work;
 use crate::players::Amount;
+use crate::players::EscrowShare;
+use crate::players::PlayerKind;
 use crate::players::relation_row;
+use crate::technology::Attributes;
+use crate::test_ids::amounts;
 use crate::test_ids::costs;
 use crate::test_ids::object_id;
 use crate::test_ids::task_id;
@@ -288,6 +292,27 @@ fn building_repair_pays_its_share_of_the_cost_and_heals() {
             slots()
         ),
         Ok(RepairOutcome::Unpaid)
+    );
+}
+
+/// A repair's payments come off its player straight into the attributes (`FUN_14162fb60`,
+/// [`PaidAttributes::take_from`]): no slot 0xf8, so a computer player's escrow stays above the
+/// wood it has left.
+#[test]
+fn repair_payment_comes_off_its_player_straight() {
+    let mut owner = Player {
+        kind: PlayerKind::Computer,
+        attributes: amounts([0.0, 100.0, 0.0, 0.0]).to_vec(),
+        escrow: amounts([0.0, 90.0, 0.0, 0.0]),
+        escrow_percentage: [0.5; 4].map(EscrowShare::of_data),
+        ..Player::default()
+    };
+    let mut paid = PaidAttributes::new(&owner.attributes);
+    paid.subtract(attribute::WOOD, Amount::new(30.0)).unwrap();
+    paid.take_from(&mut owner).unwrap();
+    assert_eq!(
+        (owner.attributes[1], owner.escrow[1]),
+        (Amount::new(70.0), Amount::new(90.0))
     );
 }
 

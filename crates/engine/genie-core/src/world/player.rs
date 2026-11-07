@@ -3,6 +3,7 @@
 use crate::gathering::QueueCount;
 use crate::map::Distance;
 use crate::map::WholeDistance;
+use crate::math::fmath::at_most_or_unordered;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::object_list::ObjectList;
@@ -324,52 +325,69 @@ impl Player {
             .unwrap_or(Amount::ZERO)
     }
 
-    /// `FUN_141616820` for the attributes an object's storage holds: the attribute's value grows
-    /// by `amount` (`FUN_14165d040`; the peak of attribute 11, `+0x6fc`, and the resource events of
-    /// `FUN_140c898a0` are not held). The attributes whose change has side effects (50, 183, 196)
-    /// are not modelled.
-    pub fn add_attribute(&mut self, kind: AttributeId, amount: Amount) -> GenieResult<()> {
+    /// The base player's attribute add (`FUN_14165d040`) on this player alone: within its count
+    /// (`+0x90`) attribute `kind` grows by `amount`, nothing past it. A computer player's
+    /// (`+0x10` 3) resource sets part of it aside ([`escrow_add`]). The players it shares its
+    /// resources with are the world's ([`World::add_resource`]), as are slot 0xf8's branches
+    /// (`FUN_141616820`) before it: a resource's gathered totals, gold's counter and the side
+    /// effects of attributes 50, 183 and 196. So a slot 0xf8 call of a kind the data names (a
+    /// storage's, a cost's, a load's) adds through the world; a slot of the build layer that
+    /// none of the branches names (a count, a statistic) adds here. Attribute 11's peak
+    /// (`+0x6fc`, unsaved) is not held.
+    ///
+    /// [`World::add_resource`]: crate::world::World::add_resource
+    pub fn add_attribute(&mut self, kind: AttributeId, amount: Amount) {
         let index = kind.index();
-        match index {
-            50 | 183 | 196 => Err(GenieError::unsupported(
-                "an attribute whose change has side effects",
-            )),
-            _ => {
-                let attribute = self.attributes.get_mut(index).ok_or(NO_ATTRIBUTE)?;
-                *attribute += amount;
-                Ok(())
-            }
+        let Some(attribute) = self.attributes.get_mut(index) else {
+            return;
+        };
+        *attribute += amount;
+        let held = *attribute;
+        if self.kind == PlayerKind::Computer
+            && kind.is_resource()
+            && let (Some(escrow), Some(&share)) = (
+                self.escrow.get_mut(index),
+                self.escrow_percentage.get(index),
+            )
+        {
+            escrow_add(escrow, share, amount, held);
         }
     }
 
     /// Takes `amount` of attribute `kind`, at least 0 left (slot 0xf8 with the amount negated,
-    /// then slot 0xf0 with 0 below 0).
-    ///
-    /// # Errors
-    ///
-    /// [`Player::add_attribute`]'s.
-    pub fn take_at_least_zero(&mut self, kind: AttributeId, amount: Amount) -> GenieResult<()> {
-        self.add_attribute(kind, -amount)?;
+    /// then slot 0xf0 with 0 below 0), for a slot of the build layer outside slot 0xf8's branches
+    /// ([`Player::add_attribute`]).
+    pub fn take_at_least_zero(&mut self, kind: AttributeId, amount: Amount) {
+        self.add_attribute(kind, -amount);
         if let Some(amount) = self.attributes.get_mut(kind.index())
             && *amount < Amount::ZERO
         {
             *amount = Amount::ZERO;
         }
-        Ok(())
     }
 
     /// [`Player::add_attribute`] for each of `adds`, in order.
-    ///
-    /// # Errors
-    ///
-    /// The first add [`Player::add_attribute`] fails on; the adds before it hold.
-    pub fn add_attributes(
-        &mut self,
-        adds: impl IntoIterator<Item = (AttributeId, Amount)>,
-    ) -> GenieResult<()> {
+    pub fn add_attributes(&mut self, adds: impl IntoIterator<Item = (AttributeId, Amount)>) {
         for (kind, amount) in adds {
-            self.add_attribute(kind, amount)?;
+            self.add_attribute(kind, amount);
         }
-        Ok(())
+    }
+}
+
+/// `FUN_14165d040`'s escrow of a computer player's resource add of `amount`, after which the
+/// resource holds `held`: an amount above 0 with a `share` above 0 (`COMISS`, `JBE`: a NaN sets
+/// nothing aside) adds the share times it to `escrow` (`+0x6dc`; `MULSS`, then `ADDSS` onto the
+/// escrow); an escrow above the resource (`JBE`: not with a NaN) falls to it, or to 0 when the
+/// resource is below 0.
+fn escrow_add(escrow: &mut Amount, share: EscrowShare, amount: Amount, held: Amount) {
+    if !at_most_or_unordered(amount.get(), 0.0) && !at_most_or_unordered(share.get(), 0.0) {
+        *escrow = share.of(amount) + *escrow;
+    }
+    if !at_most_or_unordered(escrow.get(), held.get()) {
+        *escrow = if at_most_or_unordered(0.0, held.get()) {
+            held
+        } else {
+            Amount::ZERO
+        };
     }
 }
