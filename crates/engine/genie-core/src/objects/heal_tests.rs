@@ -54,7 +54,8 @@ const VETERAN_MASTER: MasterId = MasterId::named(5);
 /// built in `time` seconds at its one train location (none for `None`).
 fn master(
     id: i16,
-    (kind, class): (MasterKind, ClassId),
+    kind: MasterKind,
+    class: ClassId,
     hit_points: i16,
     cost: [CostSlot; 3],
     time: Option<i16>,
@@ -88,7 +89,8 @@ const fn paid(attribute: AttributeId, amount: i16) -> CostSlot {
 fn galley(time: Option<i16>) -> Master {
     master(
         539,
-        (MasterKind::COMBAT, class::WARSHIP),
+        MasterKind::COMBAT,
+        class::WARSHIP,
         120,
         [
             paid(attribute::WOOD, 90),
@@ -113,7 +115,8 @@ fn soldier() -> Master {
         }),
         ..master(
             4,
-            (MasterKind::COMBAT, INFANTRY),
+            MasterKind::COMBAT,
+            INFANTRY,
             40,
             [CostSlot::EMPTY; 3],
             Some(21),
@@ -127,7 +130,8 @@ fn soldier() -> Master {
 fn heal_world() -> World {
     let castle = master(
         82,
-        (MasterKind::BUILDING, class::BUILDING),
+        MasterKind::BUILDING,
+        class::BUILDING,
         800,
         [
             paid(attribute::STONE, 100),
@@ -138,7 +142,8 @@ fn heal_world() -> World {
     );
     let veteran = master(
         5,
-        (MasterKind::COMBAT, INFANTRY),
+        MasterKind::COMBAT,
+        INFANTRY,
         60,
         [CostSlot::EMPTY; 3],
         None,
@@ -175,7 +180,8 @@ fn heal_world() -> World {
 /// owner's wood, gold and stone.
 fn healed(
     world: &mut World,
-    (owner, id): (PlayerId, i32),
+    owner: PlayerId,
+    id: i32,
     hp: f32,
     amount: f32,
     heal: fn(&mut World, PlayerId, ListIndex, HitPoints) -> GenieResult<RepairOutcome>,
@@ -193,16 +199,16 @@ fn healed(
 
 /// A combat object of no ship's class heals by the amount for nothing (`FUN_141213b10` ->
 /// `FUN_141193b30`): short of its master's hit points it answers 0, at them or past them it holds
-/// exactly them and answers 1 (records/425906646's update 2191: a villager inside a town centre).
+/// exactly them and answers 1.
 #[test]
 fn combat_object_heals_by_its_amount_up_to_its_master_hit_points() {
     let mut world = heal_world();
     assert_eq!(
-        healed(&mut world, (PLAYER, VETERAN), 11.0, 0.1, World::heal),
+        healed(&mut world, PLAYER, VETERAN, 11.0, 0.1, World::heal),
         (RepairOutcome::Healed, 11.0 + 0.1, [100.0; 3])
     );
     assert_eq!(
-        healed(&mut world, (PLAYER, VETERAN), 59.95, 0.1, World::heal),
+        healed(&mut world, PLAYER, VETERAN, 59.95, 0.1, World::heal),
         (RepairOutcome::Full, 60.0, [100.0; 3])
     );
 }
@@ -216,9 +222,9 @@ fn heal_runs_hit_point_transforms_test_at_once() {
         let index = world.live_index(PLAYER, object_id(SOLDIER)).unwrap();
         world.players[1].objects[index].life.master_id
     };
-    let _ = healed(&mut world, (PLAYER, SOLDIER), 15.0, 2.0, World::heal);
+    let _ = healed(&mut world, PLAYER, SOLDIER, 15.0, 2.0, World::heal);
     assert_eq!(master(&world), MasterId::named(4));
-    let _ = healed(&mut world, (PLAYER, SOLDIER), 15.0, 10.0, World::heal);
+    let _ = healed(&mut world, PLAYER, SOLDIER, 15.0, 10.0, World::heal);
     assert_eq!(master(&world), VETERAN_MASTER);
 }
 
@@ -231,19 +237,22 @@ fn ship_heals_at_its_owner_cost_by_its_train_time() {
     let mut world = heal_world();
     let left = |share: f32| [100.0 - 90.0 * share, 100.0 - 30.0 * share, 100.0];
     assert_eq!(
-        healed(&mut world, (OTHER, GALLEY), 60.0, 3.0, World::heal),
+        healed(&mut world, OTHER, GALLEY, 60.0, 3.0, World::heal),
         (RepairOutcome::Healed, 66.0, left(0.5 * 6.0 / 120.0))
     );
-    assert_eq!(world.players[1].attributes[1], Amount::new(100.0));
+    assert_eq!(
+        world.players[1].attributes[attribute::WOOD.index()],
+        Amount::new(100.0)
+    );
     let mut world = heal_world();
     assert_eq!(
-        healed(&mut world, (OTHER, GALLEY), 118.0, 3.0, World::heal),
+        healed(&mut world, OTHER, GALLEY, 118.0, 3.0, World::heal),
         (RepairOutcome::Full, 120.0, left(0.5 * 2.0 / 120.0))
     );
     let mut world = heal_world();
-    world.players[2].attributes[1] = Amount::ZERO;
+    world.players[2].attributes[attribute::WOOD.index()] = Amount::ZERO;
     assert_eq!(
-        healed(&mut world, (OTHER, GALLEY), 60.0, 3.0, World::heal),
+        healed(&mut world, OTHER, GALLEY, 60.0, 3.0, World::heal),
         (RepairOutcome::Unpaid, 60.0, [0.0, 100.0, 100.0])
     );
     let mut world = heal_world();
@@ -253,7 +262,7 @@ fn ship_heals_at_its_owner_cost_by_its_train_time() {
             .unwrap() = galley(None);
     }
     assert_eq!(
-        healed(&mut world, (OTHER, GALLEY), 60.0, 3.0, World::heal),
+        healed(&mut world, OTHER, GALLEY, 60.0, 3.0, World::heal),
         (RepairOutcome::Full, 120.0, left(0.5 * 60.0 / 120.0))
     );
 }
@@ -268,30 +277,19 @@ fn building_heals_at_its_owner_cost_with_population_tested() {
     let mut world = heal_world();
     let left = |share: f32| [100.0, 100.0, 100.0 - 100.0 * share];
     assert_eq!(
-        healed(
-            &mut world,
-            (PLAYER, CASTLE),
-            600.0,
-            2.0,
-            World::heal_building
-        ),
+        healed(&mut world, PLAYER, CASTLE, 600.0, 2.0, World::heal_building),
         (RepairOutcome::Healed, 640.0, left(0.5 * 40.0 / 800.0))
     );
     let mut world = heal_world();
     assert_eq!(
-        healed(
-            &mut world,
-            (PLAYER, CASTLE),
-            790.0,
-            2.0,
-            World::heal_building
-        ),
+        healed(&mut world, PLAYER, CASTLE, 790.0, 2.0, World::heal_building),
         (RepairOutcome::Full, 800.0, left(0.5 * 10.0 / 800.0))
     );
     let mut world = heal_world();
     let (answer, hp, held) = healed(
         &mut world,
-        (PLAYER, CASTLE),
+        PLAYER,
+        CASTLE,
         f32::NAN,
         2.0,
         World::heal_building,
@@ -302,27 +300,15 @@ fn building_heals_at_its_owner_cost_with_population_tested() {
     );
     assert!(hp.is_nan());
     let mut world = heal_world();
-    world.players[1].attributes[2] = Amount::new(1.0);
+    world.players[1].attributes[attribute::STONE.index()] = Amount::new(1.0);
     assert_eq!(
-        healed(
-            &mut world,
-            (PLAYER, CASTLE),
-            600.0,
-            2.0,
-            World::heal_building
-        ),
+        healed(&mut world, PLAYER, CASTLE, 600.0, 2.0, World::heal_building),
         (RepairOutcome::Unpaid, 600.0, [100.0, 100.0, 1.0])
     );
     let mut world = heal_world();
     world.players[1].attributes[attribute::POPULATION_CAP.index()] = Amount::new(2.0);
     assert_eq!(
-        healed(
-            &mut world,
-            (PLAYER, CASTLE),
-            600.0,
-            2.0,
-            World::heal_building
-        ),
+        healed(&mut world, PLAYER, CASTLE, 600.0, 2.0, World::heal_building),
         (RepairOutcome::Unpaid, 600.0, [100.0; 3])
     );
 }

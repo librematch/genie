@@ -3,6 +3,7 @@
 //! the repair by the villagers inside, and a foundation completed in its update, which runs none.
 
 use crate::combat::damage::ArmorPair;
+use crate::construction::repair::BUILDING_REPAIR_COST;
 use crate::map::GridSize;
 use crate::map::Position;
 use crate::objects::HitPoints;
@@ -53,7 +54,8 @@ const CASTLE_MASTER: MasterId = MasterId::named(82);
 /// `time` seconds.
 fn master(
     id: i16,
-    (kind, class): (MasterKind, ClassId),
+    kind: MasterKind,
+    class: ClassId,
     hit_points: i16,
     stone: i16,
     time: i16,
@@ -89,9 +91,9 @@ fn garrison_world(state: ObjectState, inside: &[i32]) -> World {
             garrison_repair_rate: HitPoints::new(1.0),
             ..BuildingMaster::default()
         }),
-        ..master(82, (MasterKind::BUILDING, class::BUILDING), 800, 100, 40)
+        ..master(82, MasterKind::BUILDING, class::BUILDING, 800, 100, 40)
     };
-    let villager = || master(83, (MasterKind::COMBAT, class::VILLAGER), 25, 0, 25);
+    let villager = || master(83, MasterKind::COMBAT, class::VILLAGER, 25, 0, 25);
     let at = |x| Position::new(x, 2.5, 0.0);
     let mut world = Scene::open(GridSize::new(16, 16))
         .players(2)
@@ -103,7 +105,7 @@ fn garrison_world(state: ObjectState, inside: &[i32]) -> World {
         .object(SceneObject::new(
             SOLDIER,
             PLAYER,
-            master(4, (MasterKind::COMBAT, ClassId::named(6)), 40, 0, 21),
+            master(4, MasterKind::COMBAT, ClassId::named(6), 40, 0, 21),
             at(2.5),
         ))
         .object(SceneObject::new(VILLAGER, ALLY, villager(), at(3.5)))
@@ -111,13 +113,13 @@ fn garrison_world(state: ObjectState, inside: &[i32]) -> World {
         .object(SceneObject::new(
             WALKER,
             PLAYER,
-            master(300, (MasterKind::MOVING, ClassId::named(99)), 20, 0, 1),
+            master(300, MasterKind::MOVING, ClassId::named(99), 20, 0, 1),
             at(5.5),
         ))
         .object(SceneObject::new(
             TOWER,
             PLAYER,
-            master(79, (MasterKind::BUILDING, class::TOWER), 100, 50, 10),
+            master(79, MasterKind::BUILDING, class::TOWER, 100, 50, 10),
             Position::new(12.0, 12.0, 0.0),
         ))
         .build();
@@ -128,7 +130,7 @@ fn garrison_world(state: ObjectState, inside: &[i32]) -> World {
     for player in &mut world.players {
         player.attributes = vec![Amount::ZERO; 280];
         player.attributes[attribute::STONE.index()] = Amount::new(100.0);
-        player.attributes[271] = Amount::new(0.5);
+        player.attributes[BUILDING_REPAIR_COST] = Amount::new(0.5);
     }
     let castle = world.live_index(PLAYER, object_id(CASTLE)).unwrap();
     world.players[1].objects[castle].garrison = inside.iter().map(|&id| object_id(id)).collect();
@@ -171,7 +173,7 @@ fn castle_seconds(world: &mut World) -> (f32, f32) {
     .unwrap();
     (
         hp(world, PLAYER, CASTLE),
-        world.players[1].attributes[2].get(),
+        world.players[1].attributes[attribute::STONE.index()].get(),
     )
 }
 
@@ -261,7 +263,10 @@ fn villagers_inside_repair_building_at_its_owner_cost() {
         let mut world = garrison_world(ObjectState::Alive, inside);
         *hp_mut(&mut world, PLAYER, CASTLE) = HitPoints::new(600.0);
         let castle = castle_seconds(&mut world);
-        (castle, world.players[2].attributes[2].get())
+        (
+            castle,
+            world.players[2].attributes[attribute::STONE.index()].get(),
+        )
     };
     assert_eq!(
         repaired(&[VILLAGER]),

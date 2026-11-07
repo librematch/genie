@@ -248,8 +248,13 @@ pub fn cost_test(
     Ok(true)
 }
 
-/// [`pay_with`] without the population's test ([`PopulationTest::Skipped`], `param_4` 1), as
-/// every caller of `FUN_14162fb60` but a building's heal at a cost passes it.
+/// [`pay_with`] without the population's test ([`PopulationTest::Skipped`], `param_4` 1), for
+/// the callers of `FUN_14162fb60` that pass 1: `0x140a8aa60`, `0x140a8b140`, `0x140acf0a0`,
+/// `0x1411cbc40`, `0x1411d37d0`, `0x1412143b0`, `0x141616540`, `0x141617130` and a combat
+/// object's heal at a cost (`FUN_141213b10`). Five callers pass 0 and test the population
+/// ([`PopulationTest::Tested`]): a building's heal at a cost (`FUN_1411d33e0`), BUILD
+/// (`FUN_140e7a400`) and the walls (`FUN_140e7f670`, `FUN_140e7f3a0`), whose test is
+/// `World::affords`, and the ability's action (`FUN_140a942e0`, not ported).
 ///
 /// # Errors
 ///

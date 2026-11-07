@@ -1,7 +1,6 @@
 //! A building's heal of its units inside and its repair by the villagers inside: the end of
 //! `TRIBE_Building_Object::update`'s whole seconds (`0x1411c9000`).
 
-use crate::GenieError;
 use crate::GenieResult;
 use crate::combat::damage::ArmorPair;
 use crate::combat::damage::heal_base_hp;
@@ -94,11 +93,7 @@ impl Unit {
         }
         // the villagers' count as the game's int converts it (`CVTDQ2PS`)
         let amount = HitPoints::new(villagers as f32 * rate.get());
-        let (player, id) = (step.player, self.id);
-        let _ = step.lend((&mut *self, &mut *actions), |world| {
-            let list_index = world.live_index(player, id).ok_or_else(|| {
-                GenieError::unreachable("a lent building left its list").with("object", id)
-            })?;
+        let _ = step.lend_at((&mut *self, &mut *actions), |world, player, list_index| {
             world.heal_building(player, list_index, amount)
         })?;
         Ok(())

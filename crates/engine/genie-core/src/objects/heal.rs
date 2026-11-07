@@ -24,14 +24,6 @@ use crate::world::World;
 use crate::world::layer::ClassRoles;
 use crate::world::slots::PlayerSlotsExt;
 
-/// The classes whose heal costs (`FUN_141213b10`'s 2, 20, 21, 22 and 53: the trade boat, the
-/// transport, the fishing ship, the warship and the boarding ship).
-const HEALED_AT_COST: ClassRoles = ClassRoles::TRADE_BOAT
-    .union(ClassRoles::TRANSPORT)
-    .union(ClassRoles::FISHING_SHIP)
-    .union(ClassRoles::WARSHIP)
-    .union(ClassRoles::BOARDING_SHIP);
-
 /// The hit points a heal at a cost makes of `amount` (`FUN_141213b10`, `FUN_1411d33e0`): the
 /// master's hit points times `amount` over its first train location's time (`+0x898`'s first
 /// entry's `+2`, read live; 0 without one, a division by 0.0 as the game's).
@@ -49,15 +41,16 @@ fn costed_heal(master: &Master, amount: HitPoints) -> HitPoints {
 
 impl World {
     /// Slot 0x110 of a combat object (`FUN_141213b10`, types 70 and 80) at `list_index` of
-    /// `player` by `amount`. A master of a class of the ships' (2, 20, 21, 22, 53) heals at a cost
-    /// first: the hit points of [`costed_heal`], at most what its hit points with its powerup's
-    /// room (slot 0xc0) lack of its most (slot 200, [`most_hp`]; `COMISS`, `JBE`: a NaN takes
-    /// no less), then its master's hit points less its own; its owner's attribute 270
-    /// ([`UNIT_REPAIR_COST`]) times them over its most pays that share of its master's costs
-    /// ([`pay_with`] with `param_4` 1), and an owner who cannot pay heals nothing
-    /// ([`RepairOutcome::Unpaid`], 2). Then it heals (`FUN_141193b30`, [`heal_hp`]): its slot
-    /// 0xb8 runs its hit point transforms' test at once ([`World::transform_by_hit_points`]); full
-    /// is 1 ([`RepairOutcome::Full`]), else 0.
+    /// `player` by `amount`. A master of a class whose heal costs
+    /// ([`ClassRoles::HEALED_AT_COST`]: the ships' 2, 20, 21, 22, 53) heals at a cost first: the
+    /// hit points of [`costed_heal`], at most what its hit points with its powerup's room (slot
+    /// 0xc0) lack of its most (slot 200, [`most_hp`]; `COMISS`, `JBE`: a NaN takes no less), then
+    /// its master's hit points less its own; its owner's attribute 270 ([`UNIT_REPAIR_COST`])
+    /// times them over its most pays that share of its master's costs ([`pay_with`] with
+    /// `param_4` 1), and an owner who cannot pay heals nothing ([`RepairOutcome::Unpaid`], 2).
+    /// Then it heals (`FUN_141193b30`, [`heal_hp`]): its slot 0xb8 runs its hit point
+    /// transforms' test at once ([`World::transform_by_hit_points`]); full is 1
+    /// ([`RepairOutcome::Full`]), else 0.
     ///
     /// # Errors
     ///
@@ -80,7 +73,7 @@ impl World {
             .model
             .roles
             .of_class(master.class)
-            .intersects(HEALED_AT_COST)
+            .contains(ClassRoles::HEALED_AT_COST)
         {
             let combat = self.parts.combat_of(id);
             let most = most_hp(combat.hp_stinger, master.hit_points, combat.hp_powerup);

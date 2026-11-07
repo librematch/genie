@@ -135,6 +135,7 @@ const CLASS_ROLES: [(usize, ClassRoles); 65] = [
         ClassRoles::BOAT
             .union(ClassRoles::CATEGORY_LIST_TARGET)
             .union(ClassRoles::CIVILIAN_COUNT)
+            .union(ClassRoles::HEALED_AT_COST)
             .union(ClassRoles::REPAIRED_AT_SHORE)
             .union(ClassRoles::REPAIR_COSTED)
             .union(ClassRoles::TRADER)
@@ -264,6 +265,7 @@ const CLASS_ROLES: [(usize, ClassRoles); 65] = [
         ClassRoles::BOAT
             .union(ClassRoles::CATEGORY_LIST_TARGET)
             .union(ClassRoles::CIVILIAN_COUNT)
+            .union(ClassRoles::HEALED_AT_COST)
             .union(ClassRoles::MILITARY_KEY)
             .union(ClassRoles::REPAIRED_AT_SHORE)
             .union(ClassRoles::REPAIR_COSTED)
@@ -275,12 +277,14 @@ const CLASS_ROLES: [(usize, ClassRoles); 65] = [
             .union(ClassRoles::CATEGORY_LIST_TARGET)
             .union(ClassRoles::CIVILIAN_COUNT)
             .union(ClassRoles::FISHING_SHIP)
+            .union(ClassRoles::HEALED_AT_COST)
             .union(ClassRoles::REPAIRED_AT_SHORE)
             .union(ClassRoles::REPAIR_COSTED),
     ),
     (
         22,
         ClassRoles::BOAT
+            .union(ClassRoles::HEALED_AT_COST)
             .union(ClassRoles::LEAST_HIT)
             .union(ClassRoles::MILITARY_COUNT)
             .union(ClassRoles::MILITARY_KEY)
@@ -536,6 +540,7 @@ const CLASS_ROLES: [(usize, ClassRoles); 65] = [
         ClassRoles::BOARDING_SHIP
             .union(ClassRoles::BOAT)
             .union(ClassRoles::FAITHFUL)
+            .union(ClassRoles::HEALED_AT_COST)
             .union(ClassRoles::MILITARY_COUNT)
             .union(ClassRoles::MILITARY_KEY)
             .union(ClassRoles::REPAIRED_AT_SHORE)
