@@ -1339,6 +1339,59 @@ fn tile_list_keeps_the_game_order() {
     );
 }
 
+/// `new_position` of an object whose x and y were written first ([`Spatial::set_written_position`],
+/// `FUN_14119d610` before slot 0x58): it leaves the list of the tile it holds, but
+/// `FUN_140f5f560` writes that list's tall count at the new tile, whose list then counts again
+/// (`FUN_140f5f0a0`): the old tile keeps its count. A move within its tile keeps its slot; a new
+/// place off the map writes no count and joins no list.
+#[test]
+fn written_move_leaves_the_old_tile_its_tall_count() {
+    let mut spatial = Spatial::with_tiles(
+        GridSize::new(4, 4),
+        Tiles::new(GridSize::new(4, 4), vec![4; 16]),
+    );
+    for id in [1, 2, 3] {
+        spatial.insert(object_id(id), villager(1.5, 1.5));
+    }
+    let write = |spatial: &mut Spatial, id: i32, x: f32, y: f32| {
+        spatial
+            .set_written_position(
+                object_id(id),
+                Position::new(x, y, 0.0),
+                &roles(),
+                tuning().visibility,
+            )
+            .unwrap();
+    };
+    write(&mut spatial, 1, 1.2, 1.8);
+    assert_eq!(
+        spatial.tiles().list(Tile::new(1, 1)),
+        [object_id(1), object_id(2), object_id(3)]
+    );
+    write(&mut spatial, 1, 2.5, 1.5);
+    assert_eq!(
+        spatial.tiles().list(Tile::new(1, 1)),
+        [object_id(3), object_id(2)]
+    );
+    assert_eq!(spatial.tiles().list(Tile::new(2, 1)), [object_id(1)]);
+    assert_eq!(
+        (
+            spatial.tiles().tall(Tile::new(1, 1)),
+            spatial.tiles().tall(Tile::new(2, 1))
+        ),
+        (Some(3), Some(1))
+    );
+    write(&mut spatial, 2, -3.0, 1.5);
+    assert_eq!(spatial.tiles().list(Tile::new(1, 1)), [object_id(3)]);
+    assert_eq!(
+        (
+            spatial.tiles().tall(Tile::new(1, 1)),
+            spatial.tiles().tall(Tile::new(0, 1))
+        ),
+        (Some(3), Some(0))
+    );
+}
+
 /// `FUN_140f5f0a0`: a tile of 250 objects takes no more and keeps its tall count;
 /// `FUN_140f5f560`: an object not on the list leaves nothing changed (no recount).
 #[test]

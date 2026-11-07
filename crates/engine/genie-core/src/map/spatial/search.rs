@@ -158,6 +158,61 @@ impl Spatial {
         Ok(())
     }
 
+    /// [`Spatial::set_position`] of an object whose x and y already hold `position` when its
+    /// `new_position` runs (`FUN_14119d610` first, as `FUN_1411e7220` writes them): it leaves its
+    /// old tile's list by the tile it holds (its record's place), but each read of its place reads
+    /// the new one. On a new tile `FUN_140f5f560` writes the old list's tall count at the new
+    /// tile, whose list counts again (`FUN_140f5f0a0`), so the old tile keeps its count; its sight
+    /// leaves from the new place before it comes there ([`Visibility::moved_written`]); its
+    /// registry records stay where they were (`FUN_14108c320` reads no move).
+    ///
+    /// # Errors
+    ///
+    /// The sight's unsupported cases.
+    ///
+    /// [`Visibility::moved_written`]: crate::vision::visibility::Visibility::moved_written
+    pub fn set_written_position(
+        &mut self,
+        id: ObjectId,
+        position: Position,
+        roles: &Roles,
+        visibility_tuning: VisibilityTuning,
+    ) -> GenieResult<()> {
+        let Some(record) = self.objects.get_mut(id) else {
+            return Ok(());
+        };
+        let from = record.position;
+        record.position = position;
+        let (old, new) = (self.tiles.tile_of(from), self.tiles.tile_of(position));
+        if old != new {
+            let objects = &self.objects;
+            if let Some(tile) = old {
+                self.tiles.take_off_counting_at(tile, new, id, |object_id| {
+                    Self::is_tall(objects, object_id)
+                });
+            }
+            if let Some(tile) = new {
+                self.tiles
+                    .append(tile, id, |object_id| Self::is_tall(objects, object_id));
+            }
+        }
+        self.refile(id);
+        let Some(placed) = self.objects.get(id) else {
+            return Ok(());
+        };
+        if let Some(visibility) = self.sight.as_mut() {
+            visibility.moved_written(
+                id,
+                from,
+                position,
+                placed.radius,
+                roles,
+                visibility_tuning,
+            )?;
+        }
+        Ok(())
+    }
+
     /// Fails when a frozen object of `player` that may have moved sees, or saw, near `rect`: the
     /// player's visible map there, and the registry's records the objects' masks keep, may differ
     /// from the game's (its sight, plus a tile, beyond what it may have moved).

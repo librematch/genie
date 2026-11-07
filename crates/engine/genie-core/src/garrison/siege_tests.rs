@@ -1,14 +1,19 @@
 //! A siege unit's count of the infantry inside it, and a ranged unit's reload as it leaves one.
 
 use crate::garrison::ContainerId;
+use crate::garrison::LetOut;
+use crate::garrison::NO_POINT;
+use crate::garrison::tests::standing;
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::GridSize;
+use crate::map::Point;
 use crate::map::Position;
 use crate::movement::Speed;
 use crate::objects::ObjectId;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::CombatPart;
+use crate::objects::masters::GarrisonCapacity;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
@@ -141,4 +146,41 @@ fn full_siege_unit_counts_infantry_its_room_test_kept_out() {
     assert_eq!(world.parts.combat_of(object(7)).infantry_inside.get(), 1);
     let unit = world.object(object(8)).unwrap().1;
     assert_eq!(unit.life.inside, None);
+}
+
+/// `FUN_1411e7220` tests no class: a building of the siege class (13) lets an infantry unit of
+/// range 4 out as any building does, and its slot 0x1a8 (`FUN_141213120`) ends as a siege
+/// unit's: the building's count of the infantry inside goes back to 0 (slot 0x1b0 with −1), and
+/// the unit leaves with its attack timer at its full reload.
+#[test]
+fn siege_class_building_lets_infantry_out_reloaded() {
+    let workshop = Master {
+        kind: MasterKind::BUILDING,
+        garrison: GarrisonCapacity::of_data(5),
+        ..combat_master(1258, class::SIEGE, 0.0)
+    };
+    let infantry = Master {
+        move_stats: Some(standing()),
+        ..combat_master(1259, INFANTRY, 4.0)
+    };
+    let mut world = siege_world(workshop, infantry);
+    enter(&mut world);
+    assert_eq!(world.parts.combat_of(object(7)).infantry_inside.get(), 1);
+    let building = world.live_index(PLAYER, object(7)).unwrap();
+    assert_eq!(
+        world.let_out(
+            PLAYER,
+            building,
+            object(8),
+            Point::new(NO_POINT, NO_POINT),
+            (None, false)
+        ),
+        Ok(LetOut::Out)
+    );
+    assert_eq!(world.object(object(8)).unwrap().1.life.inside, None);
+    assert_eq!(world.parts.combat_of(object(7)).infantry_inside.get(), 0);
+    assert_eq!(
+        world.parts.combat_of(object(8)).attack_timer,
+        Seconds::new(2.0)
+    );
 }

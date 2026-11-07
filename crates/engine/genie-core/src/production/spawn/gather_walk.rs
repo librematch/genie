@@ -31,16 +31,6 @@ use crate::world::layer::ClassRoles;
 /// (10, `FUN_140ace9c0`'s test) or fewer than its capacity.
 const FORCED_ENTRY_BELOW: InsideCount = InsideCount::new(10);
 
-/// Whether a gather point's walk asks the unit's garrison finder first (a new unit's) or goes to
-/// slot 0x128 at once (an unloaded unit's).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub(crate) enum FinderUse {
-    /// It asks the finder.
-    Asks,
-    /// It skips it.
-    Skips,
-}
-
 impl World {
     /// `FUN_140ace9c0` with a gather point without a target, and an unloaded unit's move
     /// (`FUN_1411e7220`): the unit waits to move (slot 0x2a0 with 1) and takes slot 0x128 with no
@@ -216,14 +206,14 @@ impl World {
     }
 
     /// The new unit's walk to the gather point of its building `building` (`FUN_140ace9c0` with a
-    /// point or a target): a point is a move; a target that is gone is looked for again
+    /// point or a target), and a let-out unit's to a target the world holds (`FUN_1411e7220`): a
+    /// point is a move; a target that is gone is looked for again
     /// ([`World::lost_gather_target`]). The unit waits to move (slot 0x2a0 with 1); on a building
     /// its own task list's garrison finder (filter 3, [`World::garrison_task_found`]) decides: a
     /// task found is worked at once (slot 0x7e8 with filter 3, outside slot 0x128: `+0xa14` 1);
-    /// else, and for any other target, slot 0x128 works it (`source`, any task). An unloaded
-    /// unit's caller goes to slot 0x128 at once ([`FinderUse::Skips`]). A gather point on its own
-    /// building takes the unit in at once ([`World::enter_forced`]) while the building holds
-    /// fewer than 10 or fewer than its capacity.
+    /// else, and for any other target, slot 0x128 works it (`source`, any task). A gather point on
+    /// its own building takes the unit in at once ([`World::enter_forced`]) while the building
+    /// holds fewer than 10 or fewer than its capacity.
     pub(crate) fn gather(
         &mut self,
         player_id: PlayerId,
@@ -231,7 +221,6 @@ impl World {
         gather_point: GatherPoint,
         building: ObjectId,
         source: OrderSource,
-        finder: FinderUse,
     ) -> GenieResult<()> {
         // the walk's place is the point on the ground (height 0)
         let at = gather_point.point.with_z(0.0);
@@ -253,7 +242,7 @@ impl World {
         let Some(target) = self.gather_target(player_id, new, gather_point)? else {
             return self.gather_move(player_id, new, at, source);
         };
-        self.gather_work(player_id, new, target, at, source, finder)
+        self.gather_work(player_id, new, target, at, source)
     }
 
     /// [`World::gather`]'s target: the gather point's while the world holds it, else the one
@@ -292,7 +281,6 @@ impl World {
         target: ObjectId,
         at: Position,
         source: OrderSource,
-        finder: FinderUse,
     ) -> GenieResult<()> {
         // both of the target's sources answer a target the world holds
         let (owner, unit) = self.object(target).ok_or(GenieError::unreachable(
@@ -302,9 +290,7 @@ impl World {
         if let Some(mover) = self.parts.mover_mut(self.players.live(player_id, new)?.id) {
             mover.waiting = 1;
         }
-        let garrison = finder == FinderUse::Asks
-            && on_building
-            && self.garrison_task_found(player_id, new, target, at)?;
+        let garrison = on_building && self.garrison_task_found(player_id, new, target, at)?;
         // the garrison task found: slot 0x7e8 with the garrison filter, outside slot 0x128
         if garrison {
             let work = Work {

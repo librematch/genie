@@ -14,6 +14,7 @@ use crate::map::spatial::Spatial;
 use crate::movement::MoveState;
 use crate::objects::ObjectId;
 use crate::pathing::Pathing;
+use crate::vision::SightLayer;
 use genie_diff::Diff;
 
 mod action;
@@ -79,6 +80,30 @@ impl Static {
         world.set_position(id, at, roles, visibility_tuning)?;
         if let (Some(pathing), Some(placed)) = (pathing, world.get(id)) {
             pathing.moved(id, placed, moving);
+        }
+        Ok(())
+    }
+
+    /// `FUN_14119d610` (x, y and z written as they are), then `new_position` at the same place, as
+    /// `FUN_1411e7220` moves a unit on the map: [`Static::new_position`] whose every read of the
+    /// object's place reads `at` already ([`Spatial::set_written_position`]); the mesh shape
+    /// follows, standing.
+    ///
+    /// # Errors
+    ///
+    /// The sight's unsupported cases.
+    pub(crate) fn new_position_written(
+        &mut self,
+        id: ObjectId,
+        at: Position,
+        world: &mut Spatial,
+        pathing: &mut Pathing,
+        sight: SightLayer<'_>,
+    ) -> GenieResult<()> {
+        self.position = at;
+        world.set_written_position(id, at, sight.roles, sight.visibility_tuning)?;
+        if let Some(placed) = world.get(id) {
+            pathing.moved(id, placed, MoveState::Standing);
         }
         Ok(())
     }

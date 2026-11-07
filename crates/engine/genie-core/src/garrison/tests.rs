@@ -55,9 +55,11 @@ use crate::objects::SpriteId;
 use crate::objects::Voice;
 use crate::objects::facing::SpriteFacets;
 use crate::objects::layers::Animated;
+use crate::objects::layers::CommandCount;
 use crate::objects::layers::Speedup;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::ActionPart;
+use crate::objects::masters::AnimatedPart;
 use crate::objects::masters::BuildableOn;
 use crate::objects::masters::BuildingMaster;
 use crate::objects::masters::ClassAmount;
@@ -84,6 +86,7 @@ use crate::orders::OrderSource;
 use crate::orders::Work;
 use crate::orders::town_bell::BellShelter;
 use crate::orders::town_bell::{BackToWork, TownBell};
+use crate::ownership::CaptureKind;
 use crate::pathing::Pathing;
 use crate::players::Amount;
 use crate::players::ByPlayer;
@@ -92,7 +95,6 @@ use crate::players::PlayerKind;
 use crate::players::Relation;
 use crate::players::attribute::AttributeId;
 use crate::players::relation_row;
-use crate::production::spawn::FinderUse;
 use crate::test_ids::carrying;
 use crate::test_ids::class_of;
 use crate::test_ids::group_id;
@@ -119,9 +121,12 @@ use crate::unit_ai::UnitAiKind;
 use crate::unit_ai::UnitStance;
 use crate::unit_ai::task_finder::{DropSite, DropTarget};
 use crate::unit_ai::{NotifyKind, OrderPriority, QueuedOrder, UnitAi};
+use crate::vision::SightLayer;
 use crate::vision::TileCount;
 use crate::vision::VisionBits;
-use crate::vision::visibility::{Visibility, VisibleMap};
+use crate::vision::registry::{Registry, UnitUpdate};
+use crate::vision::visibility::{Seer, Visibility, VisibleMap};
+use crate::vision::{SightCentre, SightShape};
 use crate::world::FrameSeed;
 use crate::world::Millis;
 use crate::world::Player;
@@ -2195,7 +2200,7 @@ fn unload_picks_the_units_its_flag_names_of_any_player() {
 }
 
 /// A unit's movement as the spot test reads it: terrain restriction 0, no speed.
-fn standing() -> MoveStats {
+pub(crate) fn standing() -> MoveStats {
     MoveStats {
         fly_mode: FlyMode::GROUND,
         speed: Speed::ZERO,
@@ -2336,7 +2341,6 @@ fn gather_point_on_its_own_building_takes_the_new_unit_in() {
             gather_point,
             object_id(100),
             OrderSource::Direct,
-            FinderUse::Asks,
         )
         .unwrap();
     let unit = &world.players[1].objects[idx];
@@ -4758,6 +4762,98 @@ fn unit_on_the_map_let_out_moves_beside_the_building() {
     );
 }
 
+/// `FUN_1411e7220` writes the unit's x, y and z (`FUN_14119d610`) before its slot 0x58 reads
+/// them. A unit on the map (an effect's new unit) still leaves its old tile's list by the tile
+/// it holds (`FUN_1411a58b0`), but every read of its place reads the spot: its old tile keeps
+/// its tall count (`FUN_140f5f560` writes the old list's count at the spot's tile, whose list
+/// counts again), its sight leaves from the spot before it comes there (slots 0x1d8 and 0x1d0
+/// at the spot: the tiles where it stood stay seen), and its registry records stay where it
+/// stood (`FUN_14108c320` sees no move).
+#[test]
+fn unit_on_the_map_let_out_leaves_its_counts_where_it_stood() {
+    let mut world = let_out_world();
+    let tc_at = world.players[1].objects[ListIndex::new(0)].position();
+    walker(&mut world, PlayerId::new(1), 1000, VILLAGER, tc_at.ground());
+    let mut registry = Registry::new(4, 65);
+    registry
+        .update_unit(UnitUpdate {
+            id: object_id(1000),
+            owner: PlayerId::new(1),
+            position: tc_at.ground(),
+            radii: Footprint::new(0.2, 0.2),
+            class: class::VILLAGER,
+            old: VisionBits::NONE,
+            new: VisionBits::visible(PlayerId::new(2)),
+        })
+        .unwrap();
+    let visibility = world.spatial.sight.as_mut().unwrap();
+    visibility.registry = Some(registry);
+    visibility.add_seer(
+        object_id(1000),
+        Seer {
+            player: PlayerId::new(1),
+            master: VILLAGER,
+            los: Distance::new(1.0),
+            los_powerup: Distance::ZERO,
+            state: ObjectState::Alive,
+            explored: true,
+            building: None,
+            umv: 0,
+            capture: CaptureKind::None,
+            kind: MasterKind::COMBAT,
+        },
+    );
+    let _ = visibility
+        .sight_on(
+            object_id(1000),
+            tc_at,
+            Footprint::new(0.2, 0.2),
+            SightShape::Circle,
+            SightCentre::Tile,
+            SightLayer {
+                roles: &roles(),
+                visibility_tuning: tuning().visibility,
+            },
+        )
+        .unwrap();
+    let centre = Tile::new(10, 10);
+    let tall_before = world.spatial.tiles().tall(centre);
+    assert_eq!(tall_before, Some(2));
+    assert_eq!(
+        world.let_out(
+            PlayerId::new(1),
+            ListIndex::new(0),
+            object_id(1000),
+            Point::new(NO_POINT, NO_POINT),
+            (None, false)
+        ),
+        Ok(LetOut::Out)
+    );
+    let spot = world.object(object_id(1000)).unwrap().1.position();
+    let spot_tile = Tile::new(spot.x() as i32, spot.y() as i32);
+    assert_ne!(spot_tile, centre);
+    assert_eq!(world.spatial.tile_list(centre), [object_id(100)]);
+    assert_eq!(world.spatial.tile_list(spot_tile), [object_id(1000)]);
+    assert_eq!(
+        (
+            world.spatial.tiles().tall(centre),
+            world.spatial.tiles().tall(spot_tile)
+        ),
+        (tall_before, Some(1))
+    );
+    let visibility = world.spatial.sight.as_ref().unwrap();
+    let count = |tile: Tile| visibility.maps[1].counts[(tile.y() * 20 + tile.x()) as usize];
+    assert_eq!((count(centre), count(spot_tile)), (1, 1));
+    let records = &visibility.registry.as_ref().unwrap().lists[2][class::VILLAGER.index().unwrap()];
+    assert_eq!(
+        records
+            .iter()
+            .map(|record| (record.id, record.at))
+            .collect::<Vec<_>>(),
+        [(object_id(1000), tc_at.ground())]
+    );
+}
+
 #[test]
 fn buildings_count_takes_relics_in_and_leaves_raiders_out() {
     // FUN_1411d0ce0 = FUN_141213500 (the +0x2f8 count and +0x9a8) less +0xc2c, which counts
@@ -5078,13 +5174,12 @@ fn let_out_beside_second_centre(
     (let_out, world)
 }
 
-/// The end of a let-out with a target ([`World::came_out`]): `GO_BACK_TO_WORK`'s object (the
-/// second town centre) gets the unit's work command at the point (slot 0x128, `+0xa14` 0: the
-/// unit AI keeps its target). A gather point on the second centre, with no point given, makes
-/// the unit AI forget its target first (`FUN_140c5e1e0`), then gives the same work command.
-/// Without the garrison filter (3) the villager's tasks give no action on a centre.
+/// The end of a let-out with an object to work on ([`World::came_out`]): `GO_BACK_TO_WORK`'s
+/// object (the second town centre) gets the unit's work command at the point given (slot
+/// 0x128, `+0xa14` 0: the unit AI keeps its target). Without the garrison filter (3) the
+/// villager's tasks give no action on a centre.
 #[test]
-fn unit_let_out_works_its_record_or_the_gather_point_target() {
+fn unit_let_out_works_its_record_at_the_point_given() {
     let (let_out, game) =
         let_out_beside_second_centre(|_| (), Point::new(4.5, 4.5), Some(object_id(101)));
     assert_eq!(let_out, Ok(LetOut::Out));
@@ -5098,22 +5193,40 @@ fn unit_let_out_works_its_record_or_the_gather_point_target() {
         Some(Some(object_id(77)))
     );
     assert_eq!(game.parts.actions_of(object_id(1000)).top_action(), None);
-    let gather = |world: &mut World| {
+}
+
+/// Town centre 100's gather point on `target` at (16, 4), of state 1.
+fn gather_on(target: i32, target_master: MasterId) -> impl FnOnce(&mut World) {
+    move |world: &mut World| {
         let id = world.players[1].objects[ListIndex::new(0)].id;
         world
             .set_part(
                 id,
                 Part::GatherPoint(Some(GatherPoint {
                     state: GatherPointState::Point,
-                    target: Some(object_id(101)),
+                    target: Some(object_id(target)),
                     point: Position::new(16.0, 4.0, 0.0),
-                    target_master: Some(TC),
+                    target_master: Some(target_master),
                 })),
             )
             .unwrap();
+    }
+}
+
+/// `FUN_1411e7220` with a gather point on the second centre (a building, type 80) and no point
+/// given: the unit AI forgets its target 77 (`FUN_140c5e1e0`), the unit waits to move (slot
+/// 0x2a0 with 1), and its master's task finder (`+0x788`'s slot 0x10 with filter 3) finds its
+/// garrison task on the centre, so slot 0x7e8 with filter 3 works it outside slot 0x128: the
+/// villager enters the centre, its work's notify (`+0xa14` 1) tells the unit AI its target, and
+/// no command is counted (slot 0x128's `FUN_14106c590`).
+#[test]
+fn gather_point_on_building_sends_let_out_unit_into_it() {
+    let building = |world: &mut World| {
+        moving_villager(world);
+        gather_on(101, TC)(world);
     };
     let (let_out, world) =
-        let_out_beside_second_centre(gather, Point::new(NO_POINT, NO_POINT), None);
+        let_out_beside_second_centre(building, Point::new(NO_POINT, NO_POINT), None);
     assert_eq!(let_out, Ok(LetOut::Out));
     let unit = world.object(object_id(1000)).unwrap().1;
     assert_eq!(unit.life.inside, None);
@@ -5123,9 +5236,98 @@ fn unit_let_out_works_its_record_or_the_gather_point_target() {
             .unit_ai
             .get(unit.id)
             .map(|unit_ai| unit_ai.current_target),
-        Some(None)
+        Some(Some(object_id(101)))
     );
-    assert_eq!(world.parts.actions_of(object_id(1000)).top_action(), None);
+    assert_eq!(
+        world.parts.motion.mover(unit.id).map(|mover| mover.waiting),
+        Some(1)
+    );
+    let actions = world.parts.actions_of(object_id(1000));
+    assert_eq!(
+        (
+            actions.list.enter().map(|enter_action| enter_action.target),
+            actions.commands
+        ),
+        (Some(Some(container_id(101))), CommandCount::ZERO)
+    );
+}
+
+/// The villager's master of every player moves (speed 1), and villager 1000 with it.
+fn moving_villager(world: &mut World) {
+    let mut walker = tests_walker();
+    walker.stats = standing();
+    world.parts.put_mover(object_id(1000), Some(walker));
+    for masters in &mut world.model.masters {
+        if let Some(villager) = Arc::make_mut(masters).get_mut(VILLAGER) {
+            villager.animated = Some(AnimatedPart {
+                max_speed: Speed::new(1.0),
+            });
+        }
+    }
+}
+
+/// `FUN_1411e7220` with a gather point on a transport ship (type 70), on which the villager has
+/// a garrison task: the task finder runs only for a target of type 80, so slot 0x128 works the
+/// ship with any task (the finder lets a transport through to its garrison task): the villager
+/// enters the ship, and slot 0x128 counts its command (`FUN_14106c590`), which the finder's slot
+/// 0x7e8 would not.
+#[test]
+fn gather_point_on_unit_skips_the_task_finder() {
+    let ship = |world: &mut World| {
+        moving_villager(world);
+        let mut ship = unit(102, SHIP, HitPoints::new(100.0));
+        ship.place_for_test(Position::new(16.0, 4.0, 0.0));
+        let _ = world.push_live(PlayerId::new(1), ship).unwrap();
+        let placed = *world.spatial.get(object_id(100)).unwrap();
+        world.spatial.insert(
+            object_id(102),
+            Placed {
+                position: Position::new(16.0, 4.0, 0.0),
+                radius: Footprint::new(0.5, 0.5),
+                class: class::TRANSPORT,
+                master: SHIP,
+                obstruction: None,
+                ..placed
+            },
+        );
+        gather_on(102, SHIP)(world);
+    };
+    let (let_out, world) = let_out_beside_second_centre(ship, Point::new(NO_POINT, NO_POINT), None);
+    assert_eq!(let_out, Ok(LetOut::Out));
+    assert_eq!(world.object(object_id(1000)).unwrap().1.life.inside, None);
+    let actions = world.parts.actions_of(object_id(1000));
+    assert_eq!(
+        (
+            actions.list.enter().map(|enter_action| enter_action.target),
+            actions.commands
+        ),
+        (Some(Some(container_id(102))), CommandCount::of_data(1))
+    );
+}
+
+/// `FUN_1411e7220` with a gather point whose target the world no longer holds: the game looks
+/// for no other (`FUN_1415417a0` finds none), so the unit moves to the point, though Gaia's
+/// centre 300 of the target's master stands there, which a new unit's walk would take
+/// (`FUN_140ace9c0`'s search, [`World::lost_gather_target`]).
+#[test]
+fn gather_point_with_lost_target_moves_let_out_unit_to_it() {
+    let lost = |world: &mut World| {
+        moving_villager(world);
+        let mut centre = unit(300, TC, HitPoints::new(2400.0));
+        centre.place_for_test(Position::new(16.0, 4.0, 0.0));
+        let _ = world.push_live(PlayerId::GAIA, centre).unwrap();
+        gather_on(555, TC)(world);
+    };
+    let (let_out, world) = let_out_beside_second_centre(lost, Point::new(NO_POINT, NO_POINT), None);
+    assert_eq!(let_out, Ok(LetOut::Out));
+    let actions = world.parts.actions_of(object_id(1000));
+    assert_eq!(
+        actions
+            .list
+            .move_to()
+            .map(|move_to| (move_to.point, move_to.target)),
+        Some((Position::new(16.0, 4.0, 0.0), None))
+    );
 }
 
 /// A gather point of state 0xff (SET GATHER STATE's) replaces the point a unit is let out toward

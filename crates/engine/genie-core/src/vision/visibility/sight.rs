@@ -346,42 +346,74 @@ impl Visibility {
         roles: &Roles,
         visibility_tuning: VisibilityTuning,
     ) -> GenieResult<()> {
+        if self.same_tile(from, to) {
+            return Ok(());
+        }
+        let sight = SightLayer {
+            roles,
+            visibility_tuning,
+        };
+        self.retile(id, from, to, radius, sight)
+    }
+
+    /// [`Visibility::moved`] of an object whose x and y already held `to` (`FUN_14119d610` before
+    /// `new_position`, as `FUN_1411e7220` writes them): its slot 0x1d8 reads the new place too, so
+    /// on a new tile its sight leaves from `to` (a tile that counts it nowhere stays at 0) before
+    /// it comes there, and the tiles about `from` stay seen.
+    pub fn moved_written(
+        &mut self,
+        id: ObjectId,
+        from: Position,
+        to: Position,
+        radius: Footprint,
+        roles: &Roles,
+        visibility_tuning: VisibilityTuning,
+    ) -> GenieResult<()> {
+        if self.same_tile(from, to) {
+            return Ok(());
+        }
+        let sight = SightLayer {
+            roles,
+            visibility_tuning,
+        };
+        self.retile(id, to, to, radius, sight)
+    }
+
+    /// Whether `from` and `to` lie on one tile as `new_position` files an object.
+    fn same_tile(&self, from: Position, to: Position) -> bool {
         let tile = |position: Position| {
             [
                 tile_of(position.x(), self.size.width()),
                 tile_of(position.y(), self.size.height()),
             ]
         };
-        if tile(from) == tile(to) {
-            return Ok(());
-        }
+        tile(from) == tile(to)
+    }
+
+    /// `new_position`'s sight on a new tile: slot 0x1d8 at `off` (whatever the object's state),
+    /// then in state 2 slot 0x1d0 at `on`.
+    fn retile(
+        &mut self,
+        id: ObjectId,
+        off: Position,
+        on: Position,
+        radius: Footprint,
+        sight: SightLayer<'_>,
+    ) -> GenieResult<()> {
         self.sight_off(
             id,
-            from,
+            off,
             radius,
             SightShape::Circle,
             SightCentre::Tile,
-            SightLayer {
-                roles,
-                visibility_tuning,
-            },
+            sight,
         )?;
         if self
             .seers
             .get(id)
             .is_some_and(|seer| seer.state == ObjectState::Alive)
         {
-            let _ = self.sight_on(
-                id,
-                to,
-                radius,
-                SightShape::Circle,
-                SightCentre::Tile,
-                SightLayer {
-                    roles,
-                    visibility_tuning,
-                },
-            )?;
+            let _ = self.sight_on(id, on, radius, SightShape::Circle, SightCentre::Tile, sight)?;
         }
         Ok(())
     }

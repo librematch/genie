@@ -37,5 +37,5 @@ without an entry reads an empty layer or the game's defaults (below type 40, 50 
 ## How it connects
 
 <!-- uses -->
-- Uses: [`combat`](../../combat/), [`construction`](../../construction/), [`garrison`](../../garrison/), [`gathering`](../../gathering/), [`map`](../../map/), [`movement`](../../movement/), [`orders`](../../orders/), [`ownership`](../../ownership/), [`pathing`](../../pathing/), [`players`](../../players/), [`testing`](../../testing/), [`world`](../../world/).
+- Uses: [`combat`](../../combat/), [`construction`](../../construction/), [`garrison`](../../garrison/), [`gathering`](../../gathering/), [`map`](../../map/), [`movement`](../../movement/), [`orders`](../../orders/), [`ownership`](../../ownership/), [`pathing`](../../pathing/), [`players`](../../players/), [`testing`](../../testing/), [`vision`](../../vision/), [`world`](../../world/).
 <!-- /uses -->

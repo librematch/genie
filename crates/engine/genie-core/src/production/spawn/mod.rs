@@ -11,7 +11,6 @@
 
 mod combat_setup;
 mod gather_walk;
-pub(crate) use self::gather_walk::FinderUse;
 mod make_action;
 mod near;
 mod new_unit;

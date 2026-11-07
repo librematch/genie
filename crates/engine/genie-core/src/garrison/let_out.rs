@@ -10,7 +10,7 @@ use crate::garrison::GarrisonCounts;
 use crate::garrison::Kept;
 use crate::garrison::LetOut;
 use crate::garrison::RaiderCountdown;
-use crate::garrison::{INSIDE_SIGHT, NO_POINT, SIEGE_UNLOAD, attack_rate, share};
+use crate::garrison::{INSIDE_SIGHT, NO_POINT, attack_rate, share};
 use crate::map::Point;
 use crate::map::Position;
 use crate::map::spatial::Obstruction;
@@ -27,7 +27,6 @@ use crate::orders::OrderSource;
 use crate::orders::Work;
 use crate::orders::set_stance;
 use crate::players::PlayerId;
-use crate::production::spawn::FinderUse;
 use crate::unit_ai::StopOrder;
 use crate::vision::SightCentre;
 use crate::vision::SightLayer;
@@ -87,7 +86,6 @@ impl World {
     ) -> GenieResult<LetOut> {
         let live = self.players.live(player, building)?;
         let bid = live.id;
-        let bm = live.master(self.master_tables(), player)?.clone();
         let gather = self.parts.gather_point.get(bid).copied();
         // the spot's goal (`FUN_1411d12d0` with x −1): without a gather point the first location
         // of the building unit AI's command queue (slot 0x218, then slot 0x220), else a gather
@@ -119,23 +117,19 @@ impl World {
         let Some(spot) = self.spot_beside(player, building, &made, toward)? else {
             return Ok(LetOut::Stayed);
         };
-        // The class of siege weapons, whose own place an Enter's point keeps (`FUN_140a85f30`, the
-        // short `0xd`).
-        if self
-            .model
-            .roles
-            .of_class(bm.class)
-            .contains(ClassRoles::SIEGE)
-        {
-            return Err(SIEGE_UNLOAD);
-        }
         let z = self.players.live(player, building)?.position().z();
         let at = spot.with_height(z);
         // slot 0x1a8 (`FUN_141213120`) does its part only for a unit inside an object (`+0x2f0`):
         // a new unit an effect could not take in (`FUN_1416136f0`) comes out from where it stands
         let inside = self.players.live(up, ui)?.life.inside.is_some();
         if !inside {
-            return self.let_out_from_the_map(up, ui, (&made, at), (point, gather, bid, work_on));
+            return self.let_out_from_the_map(
+                up,
+                ui,
+                made.class,
+                at,
+                (point, gather, bid, work_on),
+            );
         }
         self.leave_container((player, building), (up, ui), &made, at)?;
         self.came_out(up, ui, made.class, (point, gather, bid, work_on))
@@ -360,15 +354,10 @@ impl World {
                     if let Some(ai) = self.parts.unit_ai.get_mut(self.players.live(up, ui)?.id) {
                         ai.remove_target();
                     }
-                    // slot 0x128 with `+0xa14` 0: the unit AI keeps its notifies
-                    self.gather(
-                        up,
-                        ui,
-                        gather_point,
-                        bid,
-                        OrderSource::Queued,
-                        FinderUse::Skips,
-                    )?;
+                    // slot 0x2a0 with 1; on a building (type 80) the master's task finder
+                    // (`+0x788`'s slot 0x10, filter 3) and on a find slot 0x7e8 with filter 3;
+                    // else slot 0x128 with `+0xa14` 0: the unit AI keeps its notifies
+                    self.gather(up, ui, gather_point, bid, OrderSource::Queued)?;
                     return Ok(LetOut::Out);
                 }
                 gather_point.point.ground()
@@ -403,56 +392,43 @@ impl World {
     }
 
     /// [`World::let_out`] for a unit that is not inside an object (a new unit an effect could not
-    /// take in, `FUN_1416136f0`): slot 0x1a8 does nothing, then slot 0x58 moves it from where it
-    /// stands to the spot `at` (`new_position`: its tile's list, its obstruction record, the mesh,
-    /// its sight moved), then [`World::came_out`].
+    /// take in, `FUN_1416136f0`), of master class `class`: `FUN_14119d610` writes its x, y and z
+    /// at the spot `at`, slot 0x1a8 does nothing, and slot 0x58 moves it there (`new_position`,
+    /// which reads the spot for every read of its place: [`Static::new_position_written`]; its
+    /// tile's list, its tall counts, the mesh, its sight; its registry records stay), then
+    /// [`World::came_out`].
     ///
     /// # Errors
     ///
-    /// A unit without a place, and what [`World::came_out`] does not model.
+    /// The sight's unsupported cases, and what [`World::came_out`] does not model.
+    ///
+    /// [`Static::new_position_written`]: crate::objects::layers::Static::new_position_written
     pub(super) fn let_out_from_the_map(
         &mut self,
         up: PlayerId,
         ui: ListIndex,
-        (made, at): (&Master, Position),
+        class: ClassId,
+        at: Position,
         rest: (Point, Option<GatherPoint>, ObjectId, Option<ObjectId>),
     ) -> GenieResult<LetOut> {
-        let id = self.players.live(up, ui)?.id;
-        let mut placed = *self
-            .spatial
-            .get(id)
-            .ok_or(GenieError::unsupported("a unit let out without a place"))?;
-        let from = placed.position;
-        self.pathing.removed(id);
-        self.spatial.remove(id);
-        let solid = 0.0 < made.radius.x() && 0.0 < made.radius.y() && made.is_tall();
-        placed.obstruction =
-            (made.obstruction_kind != ObstructionKind::NONE && solid).then_some(Obstruction {
-                kind: made.obstruction_kind,
-                class: made.obstruction_class,
-            });
         let world_time = self.world_time;
         let unit = self.players.live_mut(up, ui)?;
-        let placed = unit
-            .place
-            .put_down(id, at, placed, (&mut self.spatial, &mut self.pathing));
-        self.pathing.tiles_changed(self.spatial.take_changes());
-        if let Some(visibility) = self.spatial.sight.as_mut() {
-            visibility.moved(
-                id,
-                from,
-                at,
-                placed.radius,
-                &self.model.roles,
-                self.model.tuning.visibility,
-            )?;
-            visibility.registry_moved(id, placed.class, from, at);
-        }
-        let unit = self.players.live_mut(up, ui)?;
-        if let Some(mover) = self.parts.mover_mut(unit.id) {
+        let id = unit.id;
+        unit.place.new_position_written(
+            id,
+            at,
+            &mut self.spatial,
+            &mut self.pathing,
+            SightLayer {
+                roles: &self.model.roles,
+                visibility_tuning: self.model.tuning.visibility,
+            },
+        )?;
+        // the position setter's end: a place off where it last moved to is a move
+        if let Some(mover) = self.parts.mover_mut(id) {
             mover.mark_move(at, world_time);
         }
-        self.came_out(up, ui, made.class, rest)
+        self.came_out(up, ui, class, rest)
     }
 }
 

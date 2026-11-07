@@ -388,6 +388,18 @@ impl Tiles {
     /// The object leaves tile `tile` (`FUN_140f5f560`): one not on the list changes nothing; else
     /// the last object takes its slot and the tall count is redone over the list.
     fn take_off(&mut self, tile: usize, id: ObjectId, tall: impl Fn(ObjectId) -> bool) {
+        self.take_off_counting_at(tile, Some(tile), id, tall);
+    }
+
+    /// [`Tiles::take_off`] whose tall count goes to tile `cell`: `FUN_140f5f560` writes it at the
+    /// tile of the object's x and y, which its caller can have changed first (none off the map).
+    fn take_off_counting_at(
+        &mut self,
+        tile: usize,
+        cell: Option<usize>,
+        id: ObjectId,
+        tall: impl Fn(ObjectId) -> bool,
+    ) {
         let Some(list) = self.lists.get_mut(tile) else {
             return;
         };
@@ -395,12 +407,19 @@ impl Tiles {
             return;
         };
         let _ = list.swap_remove(slot);
-        self.recount(tile, tall);
+        if let Some(cell) = cell {
+            self.count_into(tile, cell, tall);
+        }
     }
 
     /// Tile `tile`'s tall count over its list, each object by `tall` (a byte, as the game counts).
     fn recount(&mut self, tile: usize, tall: impl Fn(ObjectId) -> bool) {
-        let (Some(list), Some(count)) = (self.lists.get(tile), self.tall.get_mut(tile)) else {
+        self.count_into(tile, tile, tall);
+    }
+
+    /// The tall count over tile `tile`'s list, written as tile `cell`'s.
+    fn count_into(&mut self, tile: usize, cell: usize, tall: impl Fn(ObjectId) -> bool) {
+        let (Some(list), Some(count)) = (self.lists.get(tile), self.tall.get_mut(cell)) else {
             return;
         };
         *count = list.iter().filter(|&&object_id| tall(object_id)).count() as u8;
