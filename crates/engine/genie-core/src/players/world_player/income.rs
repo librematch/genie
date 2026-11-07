@@ -234,8 +234,9 @@ impl World {
     /// [`ResourceShare::Shared`]) on a unit's load of `amount` of `kind`, which player `player_id`
     /// gains with its gathered total: a gatherer's, a hunter's or a builder's drop
     /// (`FUN_140aadc50`), the load a unit takes into a building (`FUN_140a867b0`), a villager's
-    /// at its upgrade and a generation's. The statistics (slot 0xb8) and the local player's
-    /// tracker (`FUN_14097daf0`) are not held.
+    /// at its upgrade, a generation's and a farm's bonus (`FUN_1411c66a0`,
+    /// [`World::give_farm_bonus`]). The statistics (slot 0xb8) and the local player's tracker
+    /// (`FUN_14097daf0`) are not held.
     ///
     /// # Errors
     ///

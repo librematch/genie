@@ -117,7 +117,7 @@ impl World {
     ///
     /// # Errors
     ///
-    /// An attribute a player lacks.
+    /// [`World::count_kill_of`]'s.
     pub(crate) fn credit_burns(
         &mut self,
         player_id: PlayerId,

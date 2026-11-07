@@ -26,8 +26,6 @@ use crate::objects::masters::{Master, player_master};
 use crate::objects::unit::Unit;
 use crate::orders::lock_gate;
 use crate::players::PlayerId;
-use crate::players::ResourceStat;
-use crate::players::world_player::ResourceShare;
 use crate::production::spawn::Facing;
 use crate::unit_ai::QueuedOrder;
 use crate::unit_ai::unit_ai_kind;
@@ -119,9 +117,9 @@ impl World {
 
     /// `FUN_1411c66a0`'s farm bonus ([`FirstPart::farm_bonus`]) of the building `id` of
     /// `owner`: the farm owes it to its Make (`+0xcac`, [`Building::owes_bonus`]), then its owner
-    /// gains what `gain` names (slot 0xf8 with 1 and 1, [`World::add_resource`]: its gathered
-    /// total, its escrow and its sharing too), nothing for an attribute its add does not hold
-    /// ([`FarmBonusGain::Nothing`]).
+    /// gains what `gain` names (slot 0xf8 with 1 and 1 as a load's, [`World::give_load`]: its
+    /// gathered total, its escrow and its sharing too), nothing for an attribute its add does not
+    /// hold ([`FarmBonusGain::Nothing`]).
     ///
     /// [`FirstPart::farm_bonus`]: crate::construction::build::FirstPart::farm_bonus
     /// [`Building::owes_bonus`]: crate::objects::layers::Building::owes_bonus
@@ -137,13 +135,7 @@ impl World {
     ) -> GenieResult<()> {
         self.parts.building_mut(id)?.owes_bonus = true;
         match gain {
-            FarmBonusGain::Attribute(kind, amount) => self.add_resource(
-                owner,
-                kind,
-                amount,
-                ResourceStat::Gathered,
-                ResourceShare::Shared,
-            ),
+            FarmBonusGain::Attribute(kind, amount) => self.give_load(owner, kind, amount),
             FarmBonusGain::Nothing => Ok(()),
         }
     }

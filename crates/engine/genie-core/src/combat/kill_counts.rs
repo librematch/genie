@@ -25,7 +25,7 @@ impl World {
     ///
     /// # Errors
     ///
-    /// A computer player's object, and an attribute a player lacks.
+    /// A computer player's object ([`World::count_owner_loss`]), and [`World::count_kill_of`]'s.
     pub(crate) fn count_kills(
         &mut self,
         player_id: PlayerId,
@@ -62,7 +62,7 @@ impl World {
     ///
     /// # Errors
     ///
-    /// A computer player's object, and an attribute a player lacks.
+    /// A computer player's object (its AI's slot 0x2f0), and a player the world does not hold.
     pub(crate) fn count_owner_loss(
         &mut self,
         player_id: PlayerId,
@@ -115,8 +115,8 @@ impl World {
     ///
     /// # Errors
     ///
-    /// An object the slice does not hold, and an attribute whose change the slice does not
-    /// model.
+    /// An object the world does not hold or whose master it lacks, and
+    /// [`World::count_kill_of`]'s.
     pub(crate) fn count_kill(&mut self, id: ObjectId, killer: PlayerId) -> GenieResult<()> {
         let (player_id, unit) = self.object(id).ok_or(NOT_HELD)?;
         let killed = KilledMaster::of(unit.master(self.master_tables(), player_id)?);
@@ -128,6 +128,13 @@ impl World {
     /// (`FUN_141188b20`) `ap` counts a kill (attribute 20) and `player_id` a loss (154); `ap`
     /// counts it against `player_id` (300 + `player_id`) and `player_id` against `ap` (325 + `ap`);
     /// both count its paid cost (170 and 152, and 400 + `player_id`).
+    ///
+    /// # Errors
+    ///
+    /// A player the world does not hold, and a count by player whose attribute number runs past
+    /// the attributes' range ([`AttributeId::offset`]).
+    ///
+    /// [`AttributeId::offset`]: crate::players::attribute::AttributeId::offset
     pub(crate) fn count_kill_of(
         &mut self,
         player_id: PlayerId,

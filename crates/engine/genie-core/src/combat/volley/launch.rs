@@ -83,12 +83,7 @@ impl Unit {
     ) -> GenieResult<()> {
         // the player's masters table (an `Arc`: no table is copied) held beside the world, whose
         // slot 0xf8 the missile's storage calls while its master is read
-        let table = step
-            .world
-            .model
-            .masters
-            .get(step.player.index())
-            .map(Arc::clone);
+        let table = step.world.model.masters.shared(step.player).map(Arc::clone);
         let made = table
             .as_deref()
             .and_then(|masters| masters.get(shot.made))

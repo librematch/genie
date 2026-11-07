@@ -110,13 +110,22 @@ pub trait PlayersMastersExt {
     /// Player `player`'s masters, none where the world holds no table for it.
     fn of(&self, player: PlayerId) -> Option<&Masters>;
 
+    /// Player `player`'s masters as the world shares them (the table's `Arc`), for a reader
+    /// that holds its table across a write to the world; none where the world holds no table
+    /// for it.
+    fn shared(&self, player: PlayerId) -> Option<&Arc<Masters>>;
+
     /// Player `player`'s masters, to change.
     fn of_mut(&mut self, player: PlayerId) -> Option<&mut Masters>;
 }
 
 impl PlayersMastersExt for [Arc<Masters>] {
     fn of(&self, player: PlayerId) -> Option<&Masters> {
-        self.get(player.index()).map(|masters| &**masters)
+        self.shared(player).map(|masters| &**masters)
+    }
+
+    fn shared(&self, player: PlayerId) -> Option<&Arc<Masters>> {
+        self.get(player.index())
     }
 
     fn of_mut(&mut self, player: PlayerId) -> Option<&mut Masters> {

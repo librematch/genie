@@ -327,7 +327,7 @@ impl Player {
 
     /// The base player's attribute add (`FUN_14165d040`) on this player alone: within its count
     /// (`+0x90`) attribute `kind` grows by `amount`, nothing past it. A computer player's
-    /// (`+0x10` 3) resource sets part of it aside ([`escrow_add`]). The players it shares its
+    /// (`+0x10` 3) resource sets part of it aside ([`escrow_after`]). The players it shares its
     /// resources with are the world's ([`World::add_resource`]), as are slot 0xf8's branches
     /// (`FUN_141616820`) before it: a resource's gathered totals, gold's counter and the side
     /// effects of attributes 50, 183 and 196. So a slot 0xf8 call of a kind the data names (a
@@ -350,7 +350,7 @@ impl Player {
                 self.escrow_percentage.get(index),
             )
         {
-            escrow_add(escrow, share, amount, held);
+            *escrow = escrow_after(*escrow, share, amount, held);
         }
     }
 
@@ -374,20 +374,23 @@ impl Player {
     }
 }
 
-/// `FUN_14165d040`'s escrow of a computer player's resource add of `amount`, after which the
-/// resource holds `held`: an amount above 0 with a `share` above 0 (`COMISS`, `JBE`: a NaN sets
-/// nothing aside) adds the share times it to `escrow` (`+0x6dc`; `MULSS`, then `ADDSS` onto the
-/// escrow); an escrow above the resource (`JBE`: not with a NaN) falls to it, or to 0 when the
-/// resource is below 0.
-fn escrow_add(escrow: &mut Amount, share: EscrowShare, amount: Amount, held: Amount) {
-    if !at_most_or_unordered(amount.get(), 0.0) && !at_most_or_unordered(share.get(), 0.0) {
-        *escrow = share.of(amount) + *escrow;
-    }
-    if !at_most_or_unordered(escrow.get(), held.get()) {
-        *escrow = if at_most_or_unordered(0.0, held.get()) {
-            held
+/// `FUN_14165d040`'s escrow (`+0x6dc`) after a computer player's resource add of `amount`, from
+/// the `escrow` before it, after which the resource holds `held`: an amount above 0 with a
+/// `share` above 0 (`COMISS`, `JBE`: a NaN sets nothing aside) adds the share times it to the
+/// escrow (`MULSS`, then `ADDSS` onto the escrow); an escrow above the resource (`JBE`: not with
+/// a NaN) falls to it, or to 0 when the resource is below 0.
+fn escrow_after(escrow: Amount, share: EscrowShare, amount: Amount, held: Amount) -> Amount {
+    let added =
+        if !at_most_or_unordered(amount.get(), 0.0) && !at_most_or_unordered(share.get(), 0.0) {
+            share.of(amount) + escrow
         } else {
-            Amount::ZERO
+            escrow
         };
+    if at_most_or_unordered(added.get(), held.get()) {
+        added
+    } else if at_most_or_unordered(0.0, held.get()) {
+        held
+    } else {
+        Amount::ZERO
     }
 }

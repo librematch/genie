@@ -1976,6 +1976,24 @@ fn the_world_masters_are_looked_up_by_player() {
     assert!(every.of_mut(PlayerId::new(2)).is_none());
 }
 
+/// The world's masters as it shares them: a player's own table's `Arc`, which a reader holds
+/// without a copy, none beyond the tables.
+#[test]
+fn the_world_masters_are_lent_shared_by_player() {
+    use crate::objects::masters::PlayersMastersExt;
+    let every = [Masters::new([house()]), Masters::new([])].map(Arc::new);
+    let held = every.shared(PlayerId::new(0)).map(Arc::clone);
+    assert!(
+        held.as_ref()
+            .is_some_and(|masters| Arc::ptr_eq(masters, &every[0]))
+    );
+    assert!(
+        held.as_deref()
+            .is_some_and(|masters| masters.get(house().id).is_some())
+    );
+    assert!(every.shared(PlayerId::new(2)).is_none());
+}
+
 /// A master's objects move ([`Master::moves`], `FUN_14123bb20`'s test of the master's slot
 /// 0xe8, its speed `+0x740`): a moving master whose speed is above 0; one of speed 0 and a
 /// master without a moving part do not.

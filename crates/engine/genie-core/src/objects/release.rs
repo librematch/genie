@@ -137,7 +137,8 @@ impl World {
     ///
     /// # Errors
     ///
-    /// A slot the player's list does not hold, and an attribute a player lacks.
+    /// A slot the player's list does not hold, and what its kill counts and its transforms fail
+    /// on ([`World::count_kills`], [`World::transform_by_hit_points`]).
     pub(crate) fn regenerate_object(
         &mut self,
         slot: (PlayerId, ListIndex, ObjectId),

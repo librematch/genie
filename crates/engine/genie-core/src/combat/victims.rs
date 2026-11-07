@@ -420,7 +420,9 @@ fn decay_stopped(step: &mut Step<'_>, victim: &Victim) -> GenieResult<()> {
 ///
 /// # Errors
 ///
-/// What the kill does not model, or an attribute a player lacks.
+/// [`World::kill_left`]'s for another object's kill; for its own, a master the world lacks, what
+/// the kill does not model ([`World::count_kills`], [`Unit::ai_change_owner`]) and a player the
+/// world does not hold.
 pub(crate) fn file_kill(
     step: &mut Step<'_>,
     (me, actions): (&mut Unit, &mut Action),
@@ -495,7 +497,9 @@ impl World {
     ///
     /// # Errors
     ///
-    /// What the kill does not model, or an attribute a player lacks.
+    /// An object of a slot the player's list does not hold or whose master the world lacks, what
+    /// the kill does not model ([`World::count_kills`], [`World::give_gaia`]) and a player the
+    /// world does not hold.
     pub(crate) fn kill_left(&mut self, left: &KillLeft) -> GenieResult<()> {
         let Some(Place::Live(player_id, list_index)) = self.place(left.id) else {
             return Ok(());
@@ -516,7 +520,7 @@ impl World {
     ///
     /// # Errors
     ///
-    /// An attribute a player lacks.
+    /// A player the world does not hold.
     pub(crate) fn count_razed(&mut self, razed: &[Razed]) -> GenieResult<()> {
         for razed in razed {
             if let Some(kind) = razed.event {
