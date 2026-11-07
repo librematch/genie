@@ -922,6 +922,52 @@ fn failed_move_walks_again_once_then_waits_and_wait_walks_again() {
     );
 }
 
+/// Master `master`'s room becomes `units` in every player's table.
+pub(crate) fn give_room(world: &mut World, master: MasterId, units: u8) {
+    for masters in &mut world.model.masters {
+        if let Some(found) = Arc::make_mut(masters).get_mut(master) {
+            found.garrison = GarrisonCapacity::of_data(units);
+        }
+    }
+}
+
+/// Puts unit `id` of player `player_id` inside object `container`, as one unit of what it
+/// holds (slot 0x498 counts the objects whose `+0x2f0` names it).
+fn held_by(world: &mut World, player_id: PlayerId, id: i32, container: i32) {
+    let mut held = unit(id, VILLAGER, HitPoints::new(25.0));
+    held.life.inside = Some(container_id(container));
+    let _ = world.push_live(player_id, held).unwrap();
+}
+
+/// The update's room test (`FUN_140a87a80`'s start, on what `FUN_140a85f30` reads: the target's
+/// slot 0x198 with the unit, `FUN_1412169b0`) counts what the entering unit holds: town centre
+/// 100 of room 2 with a villager inside has room for villager 1000 (1 + 1), and none once a
+/// unit is inside the villager (1 + 1 + 1), which is state 11, not modelled; slot 0x198 with
+/// no unit would find room for one more (1 + 1).
+#[test]
+fn enter_update_room_counts_what_entering_unit_holds() {
+    let walking = || {
+        let failed = EnterAction::new(
+            ContainerId::new(object_id(100)),
+            Position::new(10.0, 10.0, 0.0),
+            &enter_task(Distance::new(1.0), class::BUILDING),
+        )
+        .walking(MoveTo::Failed);
+        let mut world = entering(Point::new(5.5, 5.5), Point::new(5.5, 30.5), failed);
+        give_room(&mut world, TC, 2);
+        inside_tc(&mut world, PlayerId::new(1), 1001, VILLAGER);
+        world
+    };
+    let mut world = walking();
+    assert_eq!(enter_update(&mut world, 500), Ok(HeadCode::Keeps));
+    let mut holding = walking();
+    held_by(&mut holding, PlayerId::new(1), 1002, 1000);
+    assert_eq!(
+        enter_update(&mut holding, 500).map_err(|error| error.reason().to_owned()),
+        Err("an Enter whose building has no room (state 11)".to_owned())
+    );
+}
+
 /// A transport target, room for the unit, 1.0 tiles off its point on y.
 fn moved_ship(y: f32) -> EnterTarget {
     EnterTarget {
@@ -2440,7 +2486,9 @@ fn enters_the_centre(setup: impl FnOnce(&mut World)) -> (GenieResult<()>, World)
 /// that takes it as a drop site gives the load first (food and the food gathered, attribute
 /// 166) and carries nothing after; without the drop-site entry it keeps the load. A centre at
 /// a fifth of its hit points or less (480 of 2400) and a master that transforms into the
-/// centre (task 0x88) are not modelled, nor is the Enter's state 11 for a full centre.
+/// centre (task 0x88) are not modelled, nor is the Enter's state 11 for a full centre: full
+/// by the start's room test (slot 0x198 with the unit, `FUN_1412169b0`), which counts what the
+/// villager holds too.
 #[test]
 fn an_enter_gives_its_load_to_drop_site_and_needs_room() {
     let with_food = |world: &mut World| {
@@ -2505,13 +2553,25 @@ fn an_enter_gives_its_load_to_drop_site_and_needs_room() {
         reason(transforms),
         "an enter of a master that transforms (task 0x88)"
     );
-    let full: fn(&mut World) = |world| {
-        for masters in &mut world.model.masters {
-            Arc::make_mut(masters).get_mut(TC).unwrap().garrison = GarrisonCapacity::of_data(0);
-        }
-    };
+    let full: fn(&mut World) = |world| give_room(world, TC, 0);
     assert_eq!(
         reason(full),
+        "an Enter into a building without room (state 11)"
+    );
+    // the start's slot 0x198 with the unit counts what the unit holds: a centre of room 2 with
+    // an ally's villager inside takes villager 400 (1 + 1), and not with a unit inside it
+    let crowded: fn(&mut World) = |world| {
+        give_room(world, TC, 2);
+        inside_tc(world, PlayerId::new(2), 2000, VILLAGER);
+    };
+    assert_eq!(enters_the_centre(crowded).0, Ok(()));
+    let holding: fn(&mut World) = |world| {
+        give_room(world, TC, 2);
+        inside_tc(world, PlayerId::new(2), 2000, VILLAGER);
+        held_by(world, PlayerId::new(2), 2001, 400);
+    };
+    assert_eq!(
+        reason(holding),
         "an Enter into a building without room (state 11)"
     );
 }

@@ -8,6 +8,7 @@ use crate::garrison::InsideCount;
 use crate::garrison::LetOut;
 use crate::garrison::NO_POINT;
 use crate::garrison::NestedCount;
+use crate::garrison::tests::give_room;
 use crate::map::Footprint;
 use crate::map::GridSize;
 use crate::map::Point;
@@ -25,7 +26,6 @@ use crate::testing::class;
 use crate::testing::scene::{PLAYER, Scene, SceneObject, move_by, walking};
 use crate::unit_ai::UnitAi;
 use crate::world::World;
-use std::sync::Arc;
 
 /// The building (type 80, room for 10) the units enter.
 const BUILDING: i32 = 7;
@@ -255,15 +255,6 @@ fn let_out_takes_unit_out_with_its_units() {
     );
 }
 
-/// Master `master`'s room becomes `units` in every player's table.
-fn give_room(world: &mut World, master: i16, units: u8) {
-    for masters in &mut world.model.masters {
-        if let Some(found) = Arc::make_mut(masters).get_mut(MasterId::named(master)) {
-            found.garrison = GarrisonCapacity::of_data(units);
-        }
-    }
-}
-
 /// Unit `id` enters the building as an Enter does (`FUN_140a867b0`), its room test that of
 /// slot 0x1a0 (`FUN_1411921d0`: slot 0x198 with no unit).
 fn enter_as_enter(world: &mut World, id: i32) -> EnterOutcome {
@@ -288,9 +279,9 @@ fn room_counts_what_units_inside_hold() {
         let (bp, building) = world.object(object_id(BUILDING)).unwrap();
         world.has_room(bp, building, None).unwrap()
     };
-    give_room(&mut world, 109, 3);
+    give_room(&mut world, MasterId::named(109), 3);
     assert!(!room(&world));
     assert_eq!(enter_as_enter(&mut world, THIRD), EnterOutcome::NoRoom);
-    give_room(&mut world, 109, 4);
+    give_room(&mut world, MasterId::named(109), 4);
     assert!(room(&world));
 }
