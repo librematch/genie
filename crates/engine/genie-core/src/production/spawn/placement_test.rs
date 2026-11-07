@@ -476,9 +476,13 @@ pub struct PlacementCall {
 /// (the map's edge, then per tile of the box the terrain restriction and the explored tiles,
 /// then the objects overlapping), then its own scan of the objects overlapping, which reports
 /// the first one. Both scans pass over the call's object (`[0x58]`); the own scan passes over
-/// the units where the call says so (`[0x60]` 1). The editor's case (the game's mode 4), the
-/// placement terrains, the hill modes, the zone test (`FUN_1415c6400`, the world's `+0x820`
-/// mode 1) and the moving objects' own check (`DAT_143f01833`, probed 0) are not modelled.
+/// the units where the call says so (`[0x60]` 1). With `[0x50]` set (`param_11`, every call of
+/// genie's), a master whose radii (`+0x5d8`, `+0x5dc`) are both at most 0 is free whatever
+/// `FUN_141123f80` found: off the map, on a forbidden terrain, unexplored. A NaN radius is not
+/// at most 0: it takes both scans, whose overlap test it fails. The editor's case (the game's
+/// mode 4), the hill modes, the zone test (`FUN_1415c6400`, the world's `+0x820` mode 1), the
+/// call's `[0x60]` 2 (the units whose slot 0x1f8 is above 0 passed) and the moving objects' own
+/// check (`DAT_143f01833`, probed 0) are not modelled.
 pub(crate) fn placement(
     me: &Placing<'_>,
     map: &WorldMap<'_>,
@@ -489,6 +493,11 @@ pub(crate) fn placement(
 ) -> GenieResult<Tested> {
     let (x, y) = (point.x(), point.y());
     let (rx, ry) = (me.radius.x(), me.radius.y());
+    // without radii the slot answers free whatever FUN_141123f80 found; its `COMISS` of
+    // `0.0 < rx` jumps on the unordered case (`JC`), so a NaN radius takes the scans
+    if rx <= 0.0 && ry <= 0.0 {
+        return Ok(Tested::Free);
+    }
     let size = map.size();
     let (width, height) = (size.width(), size.height());
     let (far_x, far_y) = (
@@ -527,7 +536,8 @@ pub(crate) fn placement(
         }
         if !passable || !seen {
             false
-        } else if 0.0 < rx || 0.0 < ry {
+        } else {
+            // its scan's gate is the slot's, which a NaN radius passes too (`JC`)
             if call.zones == ZoneTest::Tested {
                 return Err(GenieError::unsupported("a placement test in a zone mode"));
             }
@@ -551,8 +561,6 @@ pub(crate) fn placement(
             };
             base_blocker = first(&found);
             base_blocker.is_none()
-        } else {
-            true
         }
     };
     // slot 0x50's own scan
@@ -573,7 +581,7 @@ pub(crate) fn placement(
             || (near.kind == MasterKind::BUILDING && near.obstruction_kind.recorded());
         listed.then_some(tall && me.tall)
     };
-    let found = if me.tall && (0.0 < rx || 0.0 < ry) {
+    let found = if me.tall {
         overlapping(map, point, me.radius, &counts, spawn_tuning)?
     } else {
         Vec::new()

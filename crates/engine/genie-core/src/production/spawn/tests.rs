@@ -559,6 +559,73 @@ fn placement_of_mule_cart_passes_over_the_units_in_its_own_scan() {
     assert_eq!(at(UnitScan::Passed), Tested::Blocked { stays: true });
 }
 
+/// The master's slot 0x50 with `[0x50]` set (`param_11`, every call of genie's) answers 0 for a
+/// master whose radii are both at most 0, whatever `FUN_141123f80` found: off the map, on a
+/// terrain its restriction forbids, on a map its player never explored, in a hill mode and on
+/// the sheep.
+#[test]
+fn master_without_radii_is_free_wherever_it_stands() {
+    let passable = Restriction::new(vec![1.0, 0.0]);
+    let forbidden = Restriction::new(vec![0.0, 0.0]);
+    let sheep_world = Scene::open(GridSize::new(120, 120)).object(sheep()).build();
+    let unexplored = Scene::open(GridSize::new(120, 120))
+        .sight(TileSight::Unknown)
+        .build();
+    let at = |placing: &Placing<'_>, world: &World, x, y| {
+        placement(
+            placing,
+            &WorldMap { turns: world },
+            Point::new(x, y),
+            COUNTED,
+            &roles(),
+            &tuning().spawn,
+        )
+        .unwrap()
+    };
+    let villager_of = |restriction, radius| Placing {
+        radius,
+        ..placed_villager(restriction)
+    };
+    for radius in [Footprint::ZERO, Footprint::new(-0.5, 0.0)] {
+        let villager = villager_of(&passable, radius);
+        assert_eq!(at(&villager, &sheep_world, -5.0, 47.5), Tested::Free);
+        assert_eq!(at(&villager, &sheep_world, 106.5, 47.5), Tested::Free);
+        assert_eq!(at(&villager, &unexplored, 60.5, 60.5), Tested::Free);
+        assert_eq!(
+            at(&villager_of(&forbidden, radius), &sheep_world, 60.5, 60.5),
+            Tested::Free
+        );
+        let on_hills = Placing {
+            hill_mode: HillMode::ONE_STEP,
+            ..villager
+        };
+        assert_eq!(at(&on_hills, &sheep_world, 60.5, 60.5), Tested::Free);
+    }
+}
+
+/// A NaN radius is not at most 0: the slot's `COMISS` of `0.0 < rx` jumps on the unordered
+/// case (`JC`) into its scan, so it answers `FUN_141123f80`'s code, here the map's edge (7).
+#[test]
+fn master_of_nan_radius_answers_the_static_test() {
+    let restriction = Restriction::new(vec![1.0, 0.0]);
+    let villager = Placing {
+        radius: Footprint::new(f32::NAN, 0.0),
+        ..placed_villager(&restriction)
+    };
+    let world = Scene::open(GridSize::new(120, 120)).build();
+    assert_eq!(
+        placement(
+            &villager,
+            &WorldMap { turns: &world },
+            Point::new(60.5, -1.0),
+            COUNTED,
+            &roles(),
+            &tuning().spawn,
+        ),
+        Ok(Tested::Blocked { stays: false })
+    );
+}
+
 /// `FUN_140ad0240` at the forage world's town centre 700: a villager (master 83) spawns beside
 /// it and stands idle; attribute 81 lowers by its population and the centre's unit AI hears
 /// that its make action completed (0x1fa with 0x26b). With the centre's command queue the
