@@ -593,18 +593,12 @@ impl World {
         idx: ListIndex,
         target: ContainerId,
     ) -> GenieResult<()> {
-        let inside = self
-            .players
-            .iter()
-            .flat_map(|player| player.objects.iter().chain(&player.sleeping))
-            .filter(|target_unit| target_unit.life.inside == Some(target))
-            .count();
         let Some(Place::Live(..)) = self.place(target) else {
             return Err(ENTER_SLEEPING);
         };
         let roles = self.model.roles.clone();
         self.run_on_step(player, idx, |unit, actions, step| {
-            if unit.enter_building(actions, step, target, inside, &roles)? == EnterOutcome::NoRoom {
+            if unit.enter_building(actions, step, target, &roles)? == EnterOutcome::NoRoom {
                 return Err(GenieError::unsupported(
                     "an Enter in reach that did not get in",
                 ));

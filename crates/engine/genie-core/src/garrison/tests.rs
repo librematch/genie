@@ -4720,21 +4720,21 @@ fn buildings_count_takes_relics_in_and_leaves_raiders_out() {
         unit.life.inside = Some(ContainerId::new(object_id(100)));
         let _ = world.push_live(PlayerId::new(player), unit).unwrap();
     }
-    assert_eq!(world.garrisoned(object_id(100)), Ok(InsideCount::new(3)));
+    assert_eq!(world.garrisoned(object_id(100)), InsideCount::new(3));
     // a raider inside a building: the building's +0xc2c, not the unit's countdown, leaves it out
     world
         .parts
         .combat_mut(object_id(1000))
         .unwrap()
         .raider_countdown = RaiderCountdown::of_data(20);
-    assert_eq!(world.garrisoned(object_id(100)), Ok(InsideCount::new(3)));
+    assert_eq!(world.garrisoned(object_id(100)), InsideCount::new(3));
     world
         .parts
         .building_mut(object_id(100))
         .unwrap()
         .garrison_counts
         .raiders = InsideCount::ONE;
-    assert_eq!(world.garrisoned(object_id(100)), Ok(InsideCount::new(2)));
+    assert_eq!(world.garrisoned(object_id(100)), InsideCount::new(2));
     // a transport has no +0xc2c term
     let mut unit = unit(3000, VILLAGER, HitPoints::new(25.0));
     unit.life.inside = Some(ContainerId::new(object_id(200)));
@@ -4744,7 +4744,7 @@ fn buildings_count_takes_relics_in_and_leaves_raiders_out() {
         .combat_mut(object_id(3000))
         .unwrap()
         .raider_countdown = RaiderCountdown::of_data(20);
-    assert_eq!(world.garrisoned(object_id(200)), Ok(InsideCount::ONE));
+    assert_eq!(world.garrisoned(object_id(200)), InsideCount::ONE);
 }
 
 /// [`coast_world`] with its ship 200 at `ship`, the mesh built, after UNLOAD to `to`; `set` then

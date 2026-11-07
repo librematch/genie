@@ -1,5 +1,6 @@
 //! A building's test whether it takes a unit in (`FUN_14120eb10`), its room and what it holds.
 
+use crate::GenieResult;
 use crate::construction::MAIN_BUILDING_GONE;
 use crate::garrison::ContainerId;
 use crate::garrison::InsideCount;
@@ -25,7 +26,6 @@ use crate::world::World;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
-use crate::{GenieError, GenieResult};
 
 /// `FUN_1411205e0`: whether a master's class (`+0x410`, the short `MOVSX` widens) has one of
 /// `flags` in the class-flags table: a class below 0 or not below the table's count
@@ -159,11 +159,10 @@ impl World {
         unit: Option<ObjectId>,
     ) -> GenieResult<bool> {
         let capacity = building.master(self.master_tables(), bp)?.garrison;
-        let with = match unit {
-            Some(object_id) => self.garrisoned(object_id)?.plus(InsideCount::ONE),
-            None => InsideCount::ONE,
-        };
-        Ok(self.garrisoned(building.id)?.plus(with).within(capacity))
+        let with = unit.map_or(InsideCount::ONE, |object_id| {
+            self.garrisoned(object_id).plus(InsideCount::ONE)
+        });
+        Ok(self.garrisoned(building.id).plus(with).within(capacity))
     }
 }
 
@@ -269,47 +268,25 @@ impl World {
         Ok(unchecked || self.has_room(bp, building, None)?)
     }
 
-    /// Slot 0x498 of the object `id`: the objects inside it (`+0x2f8`'s count, relics too) and
-    /// what its own `+0x9a8` (`inside_garrison_count`, a saved byte) adds (`FUN_141213500`); a
-    /// building (`FUN_1411d0ce0`) less its raiders (`+0xc2c`, the units of type 70 that came in
-    /// with their `raider_build_countdown` set, [`crate::garrison::GarrisonCounts`]). Not
-    /// modelled: an object inside that holds others (the slice reads no `+0x9a8`).
-    pub(crate) fn garrisoned(&self, building: ObjectId) -> GenieResult<InsideCount> {
-        let holds = |id: ObjectId| {
-            self.players.iter().any(|player| {
-                player
-                    .objects
-                    .iter()
-                    .chain(&player.sleeping)
-                    .any(|unit| unit.life.inside.key() == Some(id))
-            })
-        };
-        let is_building = self
-            .object(building)
-            .map(|(bp, unit)| {
-                unit.master(self.master_tables(), bp)
-                    .map(|master| master.kind == MasterKind::BUILDING)
-            })
-            .transpose()?
-            .unwrap_or(false);
-        let mut count = 0;
-        let objects = self
+    /// Slot 0x498 of the object `id`: the objects inside it (`FUN_141193110`, `+0x2f8`'s count,
+    /// relics too; every type's), what they hold (`FUN_141213500`: its `+0x9a8`,
+    /// `inside_garrison_count`, [`crate::garrison::NestedCount`], types 70 and 80) less a
+    /// building's raiders (`FUN_1411d0ce0`: its `+0xc2c`, the units of type 70 that came in with
+    /// their `raider_build_countdown` set, [`crate::garrison::GarrisonCounts`]). An object below
+    /// type 70 holds neither column (0: only a container of type 70 or more counts what its units
+    /// hold, only a building its raiders), so the one sum serves every type. It counts the objects
+    /// that name `id` as their container (`+0x2f0`), which its list holds, so it counts a
+    /// container taken out of its list while it updates too.
+    pub(crate) fn garrisoned(&self, id: ObjectId) -> InsideCount {
+        let inside = self
             .players
             .iter()
-            .flat_map(|player| player.objects.iter().chain(&player.sleeping));
-        for unit in objects.filter(|unit| unit.life.inside.key() == Some(building)) {
-            if holds(unit.id) {
-                return Err(GenieError::unsupported(
-                    "an object inside a building that holds others (+0x9a8)",
-                ));
-            }
-            count += 1;
-        }
-        let raiders = if is_building {
-            self.parts.building_of(building).garrison_counts.raiders
-        } else {
-            InsideCount::ZERO
-        };
-        Ok(InsideCount::new(count).minus(raiders))
+            .flat_map(|player| player.objects.iter().chain(&player.sleeping))
+            .filter(|unit| unit.life.inside.key() == Some(id))
+            .count();
+        // a list's count is an int (`+0x2f8`'s `+8`)
+        InsideCount::new(inside as i32)
+            .plus(self.parts.combat_of(id).nested.count())
+            .minus(self.parts.building_of(id).garrison_counts.raiders)
     }
 }

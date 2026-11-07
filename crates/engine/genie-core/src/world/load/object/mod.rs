@@ -19,6 +19,7 @@ use crate::combat::stingers::ActiveStinger;
 use crate::construction::Annexes;
 use crate::construction::BuilderCount;
 use crate::construction::MainBuildingId;
+use crate::garrison::NestedCount;
 use crate::garrison::RaiderCountdown;
 use crate::gathering::DecayTimer;
 use crate::gathering::PastureId;
@@ -384,6 +385,9 @@ fn row(
                 tribe_combat_object.raider_build_countdown
             }),
         ),
+        nested: NestedCount::of_data(object.combat().map_or(0, |tribe_combat_object| {
+            tribe_combat_object.inside_garrison_count
+        })),
         locked_down: LockdownCount::of_data(object.combat().map_or(0, |tribe_combat_object| {
             tribe_combat_object.locked_down_count
         })),

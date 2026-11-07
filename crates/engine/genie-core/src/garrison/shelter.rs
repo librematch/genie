@@ -112,7 +112,7 @@ impl World {
                 Shelters {
                     buildings: Vec::new(),
                     transports: vec![ContainerId::new(target)],
-                    counts: vec![self.garrisoned(target)?],
+                    counts: vec![self.garrisoned(target)],
                 }
             } else {
                 let building = match target_annex {
@@ -132,7 +132,7 @@ impl World {
                 Shelters {
                     buildings: vec![ContainerId::new(building)],
                     transports: Vec::new(),
-                    counts: vec![self.garrisoned(building)?],
+                    counts: vec![self.garrisoned(building)],
                 }
             }
         };
@@ -207,7 +207,7 @@ impl World {
         let counts = buildings
             .iter()
             .map(|&role_id| self.garrisoned(role_id.id()))
-            .collect::<GenieResult<Vec<_>>>()?;
+            .collect();
         let shelters = Shelters {
             buildings,
             transports: Vec::new(),
@@ -254,7 +254,7 @@ impl World {
             {
                 shelters.buildings.push(ContainerId::new(id));
             }
-            shelters.counts.push(self.garrisoned(id)?);
+            shelters.counts.push(self.garrisoned(id));
         }
         Ok(shelters)
     }

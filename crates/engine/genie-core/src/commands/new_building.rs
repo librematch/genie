@@ -12,6 +12,7 @@ use crate::construction::build::Construction;
 use crate::construction::build::{NO_CONSTRUCTION, NOT_HELD};
 use crate::construction::{Annexes, BuilderCount, FootprintWaits, FoundationId, MainBuildingId};
 use crate::garrison::GarrisonCounts;
+use crate::garrison::NestedCount;
 use crate::garrison::RaiderCountdown;
 use crate::gathering::SalvageAmounts;
 use crate::groups::GroupLink;
@@ -281,6 +282,7 @@ impl World {
             ability: AbilityTimer::default(),
             reload_worldtime: WorldTime::ZERO,
             raider_countdown: RaiderCountdown::NONE,
+            nested: NestedCount::ZERO,
             locked_down: LockdownCount::ZERO,
             attack_timer: Seconds::ZERO,
             abilities: Abilities::default(),

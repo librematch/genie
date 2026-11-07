@@ -81,19 +81,21 @@ fn stopped_player_is_listed_and_compared_no_more() {
 /// the unsaved ones.
 #[test]
 fn the_scope_widens_the_compared_fields() {
-    let object = |attack_count, idle_variant| Object {
-        unit: Unit {
-            id: object_id(1),
-            idle_variant,
-            ..Unit::default()
-        },
-        parts: ObjectParts {
-            combat: Combat {
-                attack_count: AttackCount::of_data(attack_count),
+    let object = |attack_count, idle_variant| {
+        // the layer's crate-private columns leave no struct update to another crate
+        let mut combat = Combat::default();
+        combat.attack_count = AttackCount::of_data(attack_count);
+        Object {
+            unit: Unit {
+                id: object_id(1),
+                idle_variant,
+                ..Unit::default()
+            },
+            parts: ObjectParts {
+                combat,
                 ..Default::default()
             },
-            ..Default::default()
-        },
+        }
     };
     let (slice, game) = ([object(1, 1)], [object(0, 0)]);
     let fields = |scope| -> Vec<String> {

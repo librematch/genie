@@ -1,6 +1,7 @@
 use crate::combat::AttackCount;
 use crate::combat::missile::ShooterId;
 use crate::construction::Annexes;
+use crate::garrison::NestedCount;
 use crate::movement::explore::EXPLORE;
 use crate::objects::ObjectId;
 use crate::objects::layers::{DefaultTask, UnreadDefault, Unstartable};
@@ -320,6 +321,29 @@ fn the_back_to_work_actions_import_as_their_kinds() {
         Some(crate::ErrorKind::InvalidInput)
     );
     assert_eq!(whole.parts.town_bell, TownBell::default());
+}
+
+/// A combat object's `inside_garrison_count` (`+0x9a8`, read at `0x141220585` into the
+/// object's byte) imports as its count of what the units inside it hold; an object without the
+/// TRIBE combat part (below type 70) holds none.
+#[test]
+fn inside_garrison_count_imports_as_nested_count() {
+    let mut object = combat_object(5, 4);
+    combat_mut(&mut object).inside_garrison_count = 3;
+    let whole = |object: &genie_save::Object| {
+        saved_unit_object(
+            object,
+            &PlayerObjects::default(),
+            &[],
+            CivId::GAIA,
+            None,
+            PLAYERS,
+            &missile_tuning(),
+        )
+    };
+    assert_eq!(whole(&object).parts.combat.nested, NestedCount::of_data(3));
+    object.tribe_combat_object = None;
+    assert_eq!(whole(&object).parts.combat.nested, NestedCount::ZERO);
 }
 
 /// The save's linked object ids fill a main building's four annex slots in their order, −1 an

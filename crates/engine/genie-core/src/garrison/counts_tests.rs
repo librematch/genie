@@ -178,10 +178,7 @@ fn building_counts_entering_villagers_and_raiders() {
     enter(&mut world, RAIDER, BUILDING);
     enter(&mut world, SOLDIER, BUILDING);
     assert_eq!(counts(&world, BUILDING), (1, 1));
-    assert_eq!(
-        world.garrisoned(object_id(BUILDING)),
-        Ok(InsideCount::new(2))
-    );
+    assert_eq!(world.garrisoned(object_id(BUILDING)), InsideCount::new(2));
 }
 
 /// The building's slot 0x1c8 (`FUN_1411d6ad0`) counts them out by the countdown as it leaves,
@@ -201,10 +198,7 @@ fn building_counts_leaving_units_by_their_countdown_then() {
     count_down(&mut world, SOLDIER, 5);
     leave(&mut world, SOLDIER, BUILDING);
     assert_eq!(counts(&world, BUILDING), (1, -1));
-    assert_eq!(
-        world.garrisoned(object_id(BUILDING)),
-        Ok(InsideCount::new(2))
-    );
+    assert_eq!(world.garrisoned(object_id(BUILDING)), InsideCount::new(2));
     leave(&mut world, VILLAGER, BUILDING);
     assert_eq!(counts(&world, BUILDING), (0, -1));
 }
@@ -219,7 +213,7 @@ fn transport_counts_nothing() {
     assert_eq!(counts(&world, TRANSPORT), (0, 0));
     leave(&mut world, RAIDER, TRANSPORT);
     assert_eq!(counts(&world, TRANSPORT), (0, 0));
-    assert_eq!(world.garrisoned(object_id(TRANSPORT)), Ok(InsideCount::ONE));
+    assert_eq!(world.garrisoned(object_id(TRANSPORT)), InsideCount::ONE);
 }
 
 /// The load sets neither count (its constructor's 0); its re-link enters each unit inside
@@ -251,9 +245,6 @@ fn load_counts_the_units_inside_again() {
     assert_eq!(garrison(TRANSPORT), [object_id(CARRIED)]);
     assert_eq!(counts(&world, BUILDING), (1, 1));
     assert_eq!(counts(&world, TRANSPORT), (0, 0));
-    assert_eq!(
-        world.garrisoned(object_id(BUILDING)),
-        Ok(InsideCount::new(2))
-    );
-    assert_eq!(world.garrisoned(object_id(TRANSPORT)), Ok(InsideCount::ONE));
+    assert_eq!(world.garrisoned(object_id(BUILDING)), InsideCount::new(2));
+    assert_eq!(world.garrisoned(object_id(TRANSPORT)), InsideCount::ONE);
 }

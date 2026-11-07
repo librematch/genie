@@ -19,8 +19,6 @@ use crate::movement::Me;
 use crate::movement::move_to::MoveDefaults;
 use crate::movement::move_to::Patience;
 use crate::objects::HitPoints;
-use crate::objects::ObjectId;
-use crate::objects::ObjectKey;
 use crate::objects::ObjectState;
 use crate::objects::layers::Action;
 use crate::objects::masters::ActionKind;
@@ -66,14 +64,6 @@ use crate::{GenieError, GenieResult};
 const ENTERED_NOT_HELD: GenieError =
     GenieError::unreachable("an enter into a building the world does not hold");
 
-/// The units inside object `id`, any player's (its slot 0x498).
-fn units_inside(others: OthersRef<'_>, id: ObjectId) -> usize {
-    others
-        .every()
-        .filter(|unit| unit.life.inside.key() == Some(id))
-        .count()
-}
-
 impl Unit {
     /// The Enter's update ([`crate::garrison::EnterAction::update`]) with what it reads as it
     /// starts ([`Unit::enter_reads`]), on the Enter copied out of the action list and put back
@@ -103,15 +93,18 @@ impl Unit {
     }
 
     /// What the Enter's update reads as it starts: its target, one of its own player's or an
-    /// ally's (another player's is not modelled), with room for the unit (its count, the units
-    /// of the player inside it, below its master's capacity) and the rest of
+    /// ally's (another player's is not modelled), with room for the unit (slot 0x198 with the
+    /// unit, [`World::has_room`]: what the target and the unit hold, and the unit, within the
+    /// target's capacity) and the rest of
     /// [`crate::garrison::enter_view`]; the `MoveTo`'s give-up (a human player's villager waits,
     /// by its unit AI's stance) and the sprites its constructors take for none
     /// (`FUN_140aa0d30`, `FUN_140aa0df0`).
     ///
     /// # Errors
     ///
-    /// The target's master's and [`crate::garrison::enter_view`]'s.
+    /// The target's master's, the room test's and [`crate::garrison::enter_view`]'s.
+    ///
+    /// [`World::has_room`]: crate::world::World::has_room
     fn enter_reads(
         &self,
         step: &mut Step<'_>,
@@ -133,7 +126,8 @@ impl Unit {
                     MasterTables::new(&step.world.model.masters, &step.world.parts.own_master),
                     tp,
                 )?;
-                let room = units_inside(others, unit.id) < master.garrison.units();
+                // slot 0x198 with the unit (`FUN_140a85f30`)
+                let room = step.world.has_room(tp, unit, Some(self.id))?;
                 let target_speed = step.world.top_speed(tp, unit)?;
                 let (mut view, start) = enter_view(
                     &mut step.world.spatial,
@@ -196,11 +190,7 @@ impl Unit {
         target: ContainerId,
         roles: &Roles,
     ) -> GenieResult<()> {
-        let inside = units_inside(
-            OthersRef::of(&step.world.players, &step.world.index, step.player)?,
-            target.id(),
-        );
-        if self.enter_building(actions, step, target, inside, roles)? == EnterOutcome::NoRoom {
+        if self.enter_building(actions, step, target, roles)? == EnterOutcome::NoRoom {
             return Err(GenieError::unsupported(
                 "an Enter that did not get in (state 2)",
             ));
@@ -269,33 +259,38 @@ impl Unit {
     }
 
     /// The enter (`FUN_140a867b0`) into `target`, one of the unit's player's buildings: a building
-    /// that takes what the unit carries (`FUN_140fdd190`, as a drop site) takes its load first (the
-    /// resource for kinds 15 to 17 is food, 0 to 3 and 56 their own, others none: [`give_load`];
-    /// the unit carries nothing after, `FUN_14119d310` with −1). A building at no more than a fifth
-    /// of its master's hit points (in floats) and a master with a transform task (0x88) on the
-    /// building's are not modelled. Then slot 0x1a0 (`FUN_141212e10` -> `FUN_141084b30` ->
-    /// `FUN_1411921d0`): with room in the building, the unit's sight goes from its tile (slot
-    /// 0x1d8), it leaves its tile's list (`FUN_140f5f560`), the obstruction manager
-    /// (`FUN_141055b40`) and the mesh (`+0x660`, `FUN_141053840`), a member of a unit group leaves
-    /// it (`FUN_14102c160`, the caller's) and stands (slot 0x560), and it joins the building's
-    /// (slot 0x1c0, `FUN_1411cb850` -> `FUN_14118c890`: `+0x2f0`, at the building's x and y); its
-    /// records leave the registry's lists (`FUN_14128a1d0` from its mask to 0); the building's
-    /// sight takes a circle of 5 (slot 0x1d0 with 5) and the villager's town-bell flag follows the
-    /// garrison (`FUN_1412067f0` with 3). Then notify 0x1fa with the enter action value and
-    /// `set_state(1)` ([`Unit::entered`]). The building's firepower (`+0xa00`), its counts
-    /// (`+0xba8`, `+0xc2c`), its relics and livestock (`+0xc20`, `+0xc28`) follow the units in
-    /// ([`Unit::join_building`]); the sound, the tracker and a Gaia building's capture (slot 0x70)
-    /// are not held. [`EnterOutcome::NoRoom`] without room in the building.
+    /// that takes what the unit carries (`FUN_140fdd190`, as a drop site) takes its load first
+    /// ([`Unit::hand_in_load`]). A building at no more than a fifth of its master's hit points
+    /// (in floats) and a master with a transform task (0x88) on the building's are not
+    /// modelled. Then slot 0x1a0 (`FUN_141212e10` -> `FUN_141084b30` ->
+    /// `FUN_1411921d0`): with room in the building (slot 0x198 with no unit, [`World::has_room`]:
+    /// what the building holds and one more within its capacity), the unit's sight goes from its
+    /// tile (slot 0x1d8), it leaves its tile's list (`FUN_140f5f560`), the obstruction manager
+    /// (`FUN_141055b40`) and the mesh (`+0x660`, `FUN_141053840`), a member of a unit group
+    /// leaves it (`FUN_14102c160`, the caller's) and stands (slot 0x560), and it joins the
+    /// building's (slot 0x1c0, `FUN_1411cb850` -> `FUN_14118c890`: `+0x2f0`, at the building's x
+    /// and y); its records leave the registry's lists (`FUN_14128a1d0` from its mask to 0); the
+    /// building's sight takes a circle of 5 (slot 0x1d0 with 5) and the villager's town-bell flag
+    /// follows the garrison (`FUN_1412067f0` with 3). Then notify 0x1fa with the enter action
+    /// value and `set_state(1)` ([`Unit::entered`]). The building's firepower (`+0xa00`), its
+    /// counts (`+0xba8`, `+0xc2c`), its relics and livestock (`+0xc20`, `+0xc28`) follow the
+    /// units in ([`Unit::join_building`]), and its `+0x9a8` what they hold ([`World::nest_in`]);
+    /// the sound, the tracker and a Gaia building's capture (slot 0x70) are not held.
+    /// [`EnterOutcome::NoRoom`] without room in the building.
+    ///
+    /// [`World::has_room`]: crate::world::World::has_room
+    /// [`World::nest_in`]: crate::world::World::nest_in
     pub(crate) fn enter_building(
         &mut self,
         actions: &mut Action,
         step: &mut Step<'_>,
         target: ContainerId,
-        inside: usize,
         roles: &Roles,
     ) -> GenieResult<EnterOutcome> {
         // the callers found it: the Enter's update in its reads, `World::enter_now` by its place
         let (tp, building) = step.world.object(target).ok_or(ENTERED_NOT_HELD)?;
+        // slot 0x1a0's room test (slot 0x198 with no unit): nothing before it changes the count
+        let room = step.world.has_room(tp, building, None)?;
         let own = step.world.model.masters.of(step.player);
         let masters = own.ok_or(NO_MASTERS)?;
         // copies: going inside changes the unit and the world, which hold them
@@ -312,59 +307,7 @@ impl Unit {
                 Some(masters),
             ))?
             .clone();
-        let owner = step.world.players.player(step.player)?;
-        let actor = Actor {
-            id: self.id,
-            master: &me,
-            player: step.player,
-            held: self.life.held(),
-            attribute_95: Amount::new(
-                owner
-                    .attributes
-                    .get(95)
-                    .copied()
-                    .unwrap_or(Amount::ZERO)
-                    .get(),
-            ),
-            civ: owner.civ,
-        };
-        if drops_at(&step.world.model.drop_sites, bm.id, &actor)
-            && Amount::ZERO < self.life.amount
-            && bm.kind == MasterKind::BUILDING
-        {
-            // the building takes food for the foods a unit carries (15 to 17), the four resources
-            // and the ore themselves, nothing else
-            let resource = self.life.attribute_kind.and_then(|kind| {
-                if !roles.of_attribute(kind).contains(AttributeRoles::FOOD) && kind.is_food_load() {
-                    Some(step.world.model.slots.attribute.food)
-                } else {
-                    (kind.is_resource() || roles.of_attribute(kind).contains(AttributeRoles::ORE))
-                        .then_some(kind)
-                }
-            });
-            if let Some(resource) = resource {
-                // the building takes the load: the owner's attributes gain it at once
-                let mut adds = Vec::new();
-                give_load(
-                    (
-                        &step.world.spatial.relations,
-                        owner.ally_sharing.contains(AllySharing::RESOURCES),
-                    ),
-                    step.player,
-                    &mut adds,
-                    resource,
-                    self.life.amount,
-                    roles,
-                    step.world.model.slots,
-                )?;
-                step.world
-                    .players
-                    .player_mut(step.player)?
-                    .add_attributes(adds)?;
-                self.life.attribute_kind = None;
-                self.life.amount = Amount::ZERO;
-            }
-        }
+        self.hand_in_load(step, &me, &bm, roles)?;
         if bm.kind == MasterKind::BUILDING
             && hp
                 <= HitPoints::new(
@@ -387,9 +330,8 @@ impl Unit {
                 "an enter of a master that transforms (task 0x88)",
             ));
         }
-        if bm.garrison.units() <= inside {
-            // slot 0x1a0's room test (`FUN_1411921d0`) keeps the unit out; its tail runs all the
-            // same
+        if !room {
+            // slot 0x1a0's room test keeps the unit out; its tail runs all the same
             self.enter_tail(step, target, &me, &bm, roles)?;
             return Ok(EnterOutcome::NoRoom);
         }
@@ -403,6 +345,79 @@ impl Unit {
         Ok(EnterOutcome::Inside)
     }
 
+    /// [`Unit::enter_building`]'s load: a building (of master `bm`) that takes what the unit (of
+    /// master `me`) carries as a drop site (`FUN_140fdd190`) takes its load (the resource for
+    /// kinds 15 to 17 is food, 0 to 3 and 56 their own, others none: [`give_load`]); the unit
+    /// carries nothing after (`FUN_14119d310` with −1). Nothing for any other.
+    ///
+    /// # Errors
+    ///
+    /// A player the world does not hold, and the load's.
+    fn hand_in_load(
+        &mut self,
+        step: &mut Step<'_>,
+        me: &Master,
+        bm: &Master,
+        roles: &Roles,
+    ) -> GenieResult<()> {
+        let owner = step.world.players.player(step.player)?;
+        let actor = Actor {
+            id: self.id,
+            master: me,
+            player: step.player,
+            held: self.life.held(),
+            attribute_95: Amount::new(
+                owner
+                    .attributes
+                    .get(95)
+                    .copied()
+                    .unwrap_or(Amount::ZERO)
+                    .get(),
+            ),
+            civ: owner.civ,
+        };
+        let takes = drops_at(&step.world.model.drop_sites, bm.id, &actor)
+            && Amount::ZERO < self.life.amount
+            && bm.kind == MasterKind::BUILDING;
+        if !takes {
+            return Ok(());
+        }
+        // the building takes food for the foods a unit carries (15 to 17), the four resources and
+        // the ore themselves, nothing else
+        let resource = self.life.attribute_kind.and_then(|kind| {
+            if !roles.of_attribute(kind).contains(AttributeRoles::FOOD) && kind.is_food_load() {
+                Some(step.world.model.slots.attribute.food)
+            } else {
+                (kind.is_resource() || roles.of_attribute(kind).contains(AttributeRoles::ORE))
+                    .then_some(kind)
+            }
+        });
+        let Some(resource) = resource else {
+            return Ok(());
+        };
+        // the building takes the load: the owner's attributes gain it at once
+        let mut adds = Vec::new();
+        give_load(
+            (
+                &step.world.spatial.relations,
+                owner.ally_sharing.contains(AllySharing::RESOURCES),
+            ),
+            step.player,
+            &mut adds,
+            resource,
+            self.life.amount,
+            roles,
+            step.world.model.slots,
+        )?;
+        step.world
+            .players
+            .player_mut(step.player)?
+            .add_attributes(adds)?;
+        self.life.attribute_kind = None;
+        self.life.amount = Amount::ZERO;
+        Ok(())
+    }
+
     /// The unit's slot 0x1a0 into building `target` (`FUN_141212e10`; the room test, slot 0x198, is
     /// the caller's), the unit's master `me` and the building's `bm`: its sight goes from its tile,
     /// it leaves its tile's list, the obstruction manager and the mesh; a member of a unit group
@@ -410,10 +425,13 @@ impl Unit {
     /// 0, [`crate::world::World::remove_unit`] at once on the unit lent back to its slot;
     /// `FUN_14152ff40`) and stands; it joins the building's (slot 0x1c0: the building's list, for a
     /// unit of type 70 its volleys' share, a building's counts and its relics and livestock,
-    /// [`Unit::join_building`]); its records leave the registry's lists; the building's sight takes
-    /// a circle of 5 and the villager's town-bell flag follows the garrison and a siege unit counts
-    /// its infantry ([`Unit::enter_tail`]). The building's `+0x9a8` (the units inside the unit) is
-    /// not modelled.
+    /// [`Unit::join_building`]); its records leave the registry's lists; a container of type 70
+    /// or more takes what a unit of type 70 or 80 holds on its `+0x9a8` (`FUN_141212e10` after
+    /// `FUN_141084b30`, [`World::nest_in`]); the building's sight takes a circle of 5 and the
+    /// villager's town-bell flag follows the garrison and a siege unit counts its infantry
+    /// ([`Unit::enter_tail`]).
+    ///
+    /// [`World::nest_in`]: crate::world::World::nest_in
     pub(crate) fn go_inside(
         &mut self,
         actions: &mut Action,
@@ -426,12 +444,6 @@ impl Unit {
         let id = self.id;
         if self.life.inside.is_some() {
             return Err(GenieError::unsupported("an enter of a unit inside another"));
-        }
-        // the building's `+0x9a8` takes the units inside the unit (slot 0x498)
-        if !self.garrison.is_empty() {
-            return Err(GenieError::unsupported(
-                "an enter of a unit with units inside it",
-            ));
         }
         let placed = step
             .world
@@ -479,6 +491,8 @@ impl Unit {
             .map_or(bm.radius, |target_placed| target_placed.radius);
         self.life.inside = Some(target);
         self.join_building(actions, step, target, bp, me, bm)?;
+        // the registry and the sight below read nothing of the count
+        step.world.nest_in(id, me.kind, target.id(), bm.kind)?;
         self.enter_sight(step, target, at, building_radius, placed, bm)?;
         self.enter_tail(step, target, me, bm, roles)
     }

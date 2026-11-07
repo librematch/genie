@@ -118,7 +118,7 @@ impl World {
                 units.push(id);
             } else if kind == MasterKind::BUILDING && takes_villagers && near(self)? {
                 shelters.buildings.push(ContainerId::new(id));
-                shelters.counts.push(self.garrisoned(id)?);
+                shelters.counts.push(self.garrisoned(id));
                 self.parts.set_town_bell_flag(id, BellShelter::Sheltered);
             }
         }

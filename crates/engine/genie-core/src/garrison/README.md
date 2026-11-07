@@ -12,6 +12,9 @@ Units go into buildings and transports, and come out again. This folder holds bo
   and, in a building, its counts of the villagers and raiders inside (`counts.rs`) and of the
   relics and livestock (`relics.rs`: a relic also counts in its player's relics held, and its
   leave takes back the technologies paid in more relics than are left).
+- `nested.rs` holds what a unit with units inside brings in and takes out: a container of type
+  70 or more counts the units its units hold (`+0x9a8`), and its slot 0x498 (`garrisoned` in
+  `takes_in.rs`) adds them to the units inside.
 - `unload.rs` and `let_out.rs` hold UNLOAD, `GO_BACK_TO_WORK` and a unit's leave.
 - `firepower.rs` holds a unit's attack rate and firepower, and its share of a building's volleys.
 - `transport/` holds the Transport action: a transport's sail and its unload ashore.
@@ -40,6 +43,8 @@ Units go into buildings and transports, and come out again. This folder holds bo
 | [`let_out.rs`](let_out.rs) | A unit's leave of the building or the transport it is inside (`FUN_1411e7220`), or its place on the map. |
 | [`meeting.rs`](meeting.rs) | Where an Enter meets its target (`FUN_140a85f30`): the landing tile, the walled-off test, the meeting point and the reach. |
 | [`mod.rs`](mod.rs) | Units inside other objects: the garrison order, the Enter action, the unloads and the Transport action. |
+| [`nested.rs`](nested.rs) | The units inside the units inside a container (`+0x9a8`, `NestedCount`): what a unit holds comes in with it (slot 0x1a0) and goes out with it (slot 0x1a8). |
+| [`nested_tests.rs`](nested_tests.rs) | Tests: What the units inside a unit come in and go out with (`+0x9a8`, `NestedCount`): the container's count as a unit that holds others enters (slot 0x1a0, `FUN_141212e10`) and leaves (slot 0x1a8, `FUN_141213120`), and slot 0x498 that adds it (`FUN_141213500`). |
 | [`outcomes.rs`](outcomes.rs) | What a unit's way out of a building (`LetOut`), its way in (`EnterOutcome`) and its way back to work after the town bell (`WorkReturn`) answer. |
 | [`raider_countdown.rs`](raider_countdown.rs) | A combat object's raider countdown. |
 | [`relics.rs`](relics.rs) | A building's relics and livestock inside it (`FUN_1411cb850`, `FUN_1411d6ad0`): their counts, the relics its player holds and the researched technologies paid in relics. |

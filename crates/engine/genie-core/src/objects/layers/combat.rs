@@ -13,6 +13,7 @@ use crate::combat::{
     AbilityTimer, AttackBonus, AttackCount, Firepower, MissileCount, SpecialSprite,
 };
 use crate::construction::BuilderCount;
+use crate::garrison::NestedCount;
 use crate::garrison::RaiderCountdown;
 use crate::gathering::DecayTimer;
 use crate::gathering::SalvageAmounts;
@@ -67,6 +68,9 @@ pub struct Combat {
     /// A combat object's `raider_build_countdown` (`+0x9a0`): the seconds it may stay inside a
     /// building.
     pub raider_countdown: RaiderCountdown,
+    /// `inside_garrison_count` (`+0x9a8`, saved): what the units inside it hold
+    /// ([`NestedCount`]).
+    pub(crate) nested: NestedCount,
     /// `locked_down_count` (`+0xa08`): the locks that hold it in place, its top speed 0 while
     /// any holds ([`LockdownCount`]).
     pub locked_down: LockdownCount,
@@ -179,6 +183,7 @@ impl Combat {
         salvage: SalvageAmounts::NONE,
         decay_timer: DecayTimer::ZERO,
         raider_countdown: RaiderCountdown::NONE,
+        nested: NestedCount::ZERO,
         locked_down: LockdownCount::ZERO,
         regen_timer: Seconds::ZERO,
         builders: BuilderCount::NONE,

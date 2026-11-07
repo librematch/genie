@@ -23,6 +23,7 @@ mod inside_count;
 mod let_out;
 pub(crate) use self::let_out::HOUSED_NOT_LIVE;
 mod meeting;
+mod nested;
 mod outcomes;
 mod raider_countdown;
 mod relics;
@@ -45,6 +46,7 @@ pub use self::inside_count::InsideCount;
 use self::meeting::{HALF_TILE, UNPLACED};
 pub use self::meeting::{LandingWalk, MeetAt, MeetingTarget, Walls, meet_at, walled_off};
 pub(crate) use self::meeting::{UNREACHED, enter_view, ship_reaches};
+pub use self::nested::NestedCount;
 pub use self::outcomes::{EnterOutcome, LetOut, WorkReturn};
 pub use self::raider_countdown::RaiderCountdown;
 pub use self::scope::{GarrisonScope, ShelterReach};
@@ -91,6 +93,8 @@ const CLASS_FLAGS: [u32; 64] = GARRISON_CLASS_FLAGS;
 
 #[cfg(test)]
 mod counts_tests;
+#[cfg(test)]
+mod nested_tests;
 #[cfg(test)]
 mod relics_tests;
 #[cfg(test)]

@@ -129,11 +129,6 @@ impl World {
         {
             return Err(SIEGE_UNLOAD);
         }
-        if !self.players.live(up, ui)?.garrison.is_empty() {
-            return Err(GenieError::unsupported(
-                "a unit with units inside leaving a building",
-            ));
-        }
         let z = self.players.live(player, building)?.position().z();
         let at = spot.with_height(z);
         // slot 0x1a8 (`FUN_141213120`) does its part only for a unit inside an object (`+0x2f0`):
@@ -151,11 +146,12 @@ impl World {
     /// (`FUN_141217910`, a building's `FUN_1411d6ad0`, [`Unit::let_go`]) takes the unit's share off
     /// its volleys, lets it out of its list and a building counts it out of its villagers and
     /// raiders, then out of the relics or livestock it keeps ([`Kept::of_unit`],
-    /// [`World::keep_out`]); a building's sight lets the circle of 5 go (slot 0x1d8 with 5); the
-    /// unit's countdown to its raid (`+0x9a0`) ends; a container of type 70 or more takes off its
-    /// `+0x9a8` what the unit holds inside (slot 0x498), none in the slice. Slot 0x58 puts the unit
-    /// on the map at `at` (`new_position`: its tile's list, its obstruction record, the mesh, its
-    /// sight); its sprites (`FUN_14118a8f0`) are the interface's.
+    /// [`World::keep_out`]); a container of type 70 or more gives back on its `+0x9a8` what a unit
+    /// of type 70 or 80 holds ([`World::nest_out`]); a building's sight lets the circle of 5 go
+    /// (slot 0x1d8 with 5); the unit's countdown to its raid (`+0x9a0`) ends. Slot 0x58 puts the
+    /// unit on the map at `at` (`new_position`: its tile's list, its obstruction record, the mesh,
+    /// its sight); the units inside it stay inside it where they are (`FUN_1411a58b0` moves no
+    /// object it holds). Its sprites (`FUN_14118a8f0`) are the interface's.
     ///
     /// # Errors
     ///
@@ -196,6 +192,7 @@ impl World {
         {
             self.keep_out(bid, player, kept)?;
         }
+        self.nest_out(id, made.kind, bid, bm.kind)?;
         // a building's sight lets the circle of 5 go (slot 0x1d8 with 5)
         if bm.kind == MasterKind::BUILDING
             && let Some(visibility) = self.spatial.sight.as_mut()

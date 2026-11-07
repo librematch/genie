@@ -156,6 +156,7 @@ impl<'world> OthersRef<'world> {
 
     /// The other players' live and sleeping objects with their players: the players in their
     /// order, each one's live list before its sleeping one, then the list `left` names.
+    #[cfg(test)]
     pub(crate) fn foreign_iter(
         &self,
     ) -> impl Iterator<Item = (PlayerId, &'world Unit)> + use<'world> {
@@ -181,8 +182,8 @@ impl<'world> OthersRef<'world> {
         lists.chain(left)
     }
 
-    /// Another player's live or sleeping object `id`, with that player
-    /// ([`OthersRef::foreign_iter`]'s first).
+    /// Another player's live or sleeping object `id`, with that player: the first in the
+    /// players' order, each one's live list before its sleeping one, then the list `left` names.
     pub(crate) fn foreign(&self, id: impl ObjectKey) -> Option<(PlayerId, &'world Unit)> {
         if !self.index.scans() {
             let (player_id, _, unit) = self.held(id)?;
@@ -210,12 +211,6 @@ impl<'world> OthersRef<'world> {
             .or_else(|| {
                 left.and_then(|(player_id, list)| list.by_id(id).map(|unit| (player_id, unit)))
             })
-    }
-
-    /// Every object the view holds: the owner's, then the other players'.
-    pub(crate) fn every(&self) -> impl Iterator<Item = &'world Unit> + use<'world> {
-        self.own_iter()
-            .chain(self.foreign_iter().map(|(_, unit)| unit))
     }
 
     /// Object `id` with its owner: the owner's own, else another player's.
@@ -637,18 +632,6 @@ mod tests {
                 (PlayerId::new(0), 2),
                 (PlayerId::new(2), 20),
                 (PlayerId::new(2), 12)
-            ]
-        );
-        let every: Vec<ObjectId> = others_ref.every().map(|unit| unit.id).collect();
-        assert_eq!(
-            every,
-            [
-                object_id(10),
-                object_id(12),
-                object_id(1),
-                object_id(2),
-                object_id(20),
-                object_id(12)
             ]
         );
         assert!(

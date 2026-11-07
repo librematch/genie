@@ -245,7 +245,7 @@ impl World {
             && let Some((bp, building_unit)) = self.object(building)
         {
             let room = building_unit.master(self.master_tables(), bp)?.garrison;
-            let held = self.garrisoned(building_unit.id)?;
+            let held = self.garrisoned(building_unit.id);
             if held < FORCED_ENTRY_BELOW || held.below(room) {
                 return self.enter_forced(player_id, new, ContainerId::new(building));
             }
