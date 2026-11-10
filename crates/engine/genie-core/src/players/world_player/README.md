@@ -36,5 +36,5 @@ A monastery's own update gives its player the goods of its relics through the sa
 ## How it connects
 
 <!-- uses -->
-- Uses: [`map`](../../map/), [`math`](../../math/), [`objects`](../../objects/), [`technology`](../../technology/), [`world`](../../world/).
+- Uses: [`map`](../../map/), [`math`](../../math/), [`objects`](../../objects/), [`technology`](../../technology/), [`unit_ai`](../../unit_ai/), [`world`](../../world/).
 <!-- /uses -->

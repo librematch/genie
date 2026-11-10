@@ -306,14 +306,17 @@ impl World {
     /// `FUN_1411d0e90`, and the shared kind's every building, `FUN_1411c3fd0`, are not modelled); a
     /// building of master type 80 alive (state 2) whose master is among the technology's locations,
     /// with the technology in state 1 or repeatable, and without a top action of 0x7b to 0x7d
-    /// (`FUN_141227a00`), queues it ([`World::queue_research`]); queued, its unit AI takes the
-    /// action value 0x26c. A technology of `linkedTechs.json`
+    /// (`FUN_141227a00`), queues it ([`World::queue_research`]). Queued, Castle Age (0x66) in
+    /// game mode 16 (the options' `+0x34`) marks the world's treaty monitor when it has one
+    /// (`+0x820`'s `+0x17`, [`TreatyMonitor::castle_age`]: its next update ends the treaty), and
+    /// the building's unit AI takes the action value 0x26c. A technology of `linkedTechs.json`
     /// ([`Model::linked_techs`](genie_model::model::Model::linked_techs), the game settings' table
     /// `FUN_140f39f40` looks up) is not modelled (`FUN_140f3a0f0`, `FUN_140f39e80`). Not held: the
     /// interface's view and selection (`FUN_140e6de20`), the local player's statistics flag. Not
     /// modelled: the computer players' parts (`player+0x7a8`, `FUN_1411d5520`), the player's
-    /// `+0x648` (0 for every player probed), Castle Age queued in game mode 16 (the world's treaty
-    /// monitor's `+0x17`; no other game mode marks it).
+    /// `+0x648` (0 for every player probed).
+    ///
+    /// [`TreatyMonitor::castle_age`]: crate::players::treaty::TreatyMonitor::castle_age
     pub(crate) fn research(
         &mut self,
         research_command: &ResearchCommand,
@@ -360,12 +363,11 @@ impl World {
         if self.queue_research(player, list_index, tech_id, research_command.shift)?
             == QueueOutcome::Queued
         {
-            // Castle Age queued in game mode 16 marks the world's treaty monitor (`+0x820`, its
-            // `+0x17`), which the slice does not hold; any other game mode leaves it
-            if tech_id == TechId::CASTLE_AGE && self.settings.game_mode == GameMode::OneUnit {
-                return Err(GenieError::unsupported(
-                    "RESEARCH of Castle Age in game mode 16 (the treaty monitor's +0x17)",
-                ));
+            if tech_id == TechId::CASTLE_AGE
+                && self.settings.game_mode == GameMode::OneUnit
+                && let Some(monitor) = self.treaty.as_mut()
+            {
+                monitor.castle_age = true;
             }
             let building = self.players.live_mut(player, list_index)?;
             if let Some(ai) = self.parts.unit_ai.get_mut(building.id) {

@@ -1,6 +1,6 @@
 //! The treaty monitor's zones: their walk over the players' town centres (`FUN_141461c00`), a
-//! town centre's sweep of the foundations about it (`FUN_1411c7ae0`) and the no-build test
-//! (`FUN_141461400`).
+//! town centre's sweep of the foundations about it (`FUN_1411c7ae0`), the no-build test
+//! (`FUN_141461400`) and the clear of a player's first zone (`FUN_1414615d0`).
 
 use crate::GenieResult;
 use crate::construction::build::NO_CONSTRUCTION;
@@ -84,6 +84,23 @@ pub(crate) fn zone_about(at: Point, margin: WholeDistance, map: GridSize) -> Til
 }
 
 impl TreatyMonitor {
+    /// `FUN_1414615d0`, for a town centre's owner `player` on its delete or destroy: its first
+    /// zone (`+0x0`..`+0xc`, two qword stores) takes 0 and its flag (`+0x20`) is cleared, so the
+    /// next walk draws it again; its second zone (`+0x10`..`+0x1c`) stays. The interface's list
+    /// of the drawn zones loses the player's entries (`FUN_1414d2060`), which is not
+    /// simulation.
+    ///
+    /// # Errors
+    ///
+    /// Gaia, whose index the game takes as `0 − 1` unsigned and writes far past the monitor, or
+    /// a player past the nine zones.
+    pub(crate) fn clear_zone(&mut self, player: PlayerId) -> GenieResult<()> {
+        let zone = self.zone_mut(player)?;
+        zone.first = TileRect::default();
+        zone.set = false;
+        Ok(())
+    }
+
     /// `FUN_141461400` (HD's `TreatyMode::IsWithinNoBuildZone`): whether a footprint of player
     /// `owner` at `at` with radii `radius` overlaps a zone ([`TileRect::overlaps`]) of a player
     /// past Gaia whom `players` shows not allied with it (`FUN_141663dc0` with its flag 0; in

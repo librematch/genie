@@ -104,7 +104,8 @@ impl World {
     }
 
     /// `FUN_1416397d0`: player `player`'s stance toward `player_id` takes `stance`; one that makes
-    /// a relation ([`Stance::relation`]) sets it ([`World::set_relation`]).
+    /// a relation while the world's treaty monitor stands as it does ([`Stance::relation`]: an
+    /// enemy's stance makes relation 4 while the treaty holds) sets it ([`World::set_relation`]).
     pub(crate) fn set_stance(
         &mut self,
         player: PlayerId,
@@ -115,9 +116,11 @@ impl World {
             .player_mut(player)?
             .diplomacy
             .set(player_id, stance);
-        stance.relation().map_or(Ok(()), |relation| {
-            self.set_relation(player, player_id, relation)
-        })
+        stance
+            .relation(self.treaty.as_ref())
+            .map_or(Ok(()), |relation| {
+                self.set_relation(player, player_id, relation)
+            })
     }
 
     /// `FUN_141676b80`: player `player`'s relation toward `player_id` (`+0x260`, which the walk's
@@ -421,10 +424,12 @@ const NO_POINT: f32 = DIPLOMACY_NO_POINT;
 mod tests {
     use super::*;
     use crate::players::Amount;
+    use crate::players::treaty::{NomadTreaty, TreatyMinutes, TreatyMonitor, TreatyState};
     #[cfg(test)]
     use crate::players::{ByPlayer, UnitDiplomacy, relation_row};
     #[cfg(test)]
     use crate::world::FrameSeed;
+    use crate::world::GameMode;
     use crate::world::Millis;
     use crate::world::Player;
     use crate::world::WorldTime;
@@ -575,6 +580,51 @@ mod tests {
             .set_diplomacy(PlayerId::new(1), PlayerId::new(9), Stance::Ally)
             .unwrap();
         assert_eq!(world.players, before);
+    }
+
+    /// `FUN_1416397d0` while the world's treaty holds: an enemy's stance makes relation 4, which
+    /// the queries take for an ally's; once the treaty ended, it makes an enemy again.
+    #[test]
+    fn enemy_stance_during_the_treaty_makes_relation_4() {
+        let mut world = world();
+        let mut monitor = TreatyMonitor::new(
+            TreatyMinutes::of_byte(10),
+            NomadTreaty::NotForced,
+            GameMode::RandomMap,
+        );
+        monitor.state = TreatyState::Holds;
+        world.treaty = Some(monitor);
+        let queries_kind = |world: &World| {
+            world
+                .spatial
+                .unit_diplomacy
+                .get(PlayerId::new(1))
+                .and_then(|by_player| by_player.get(PlayerId::new(2)))
+                .copied()
+        };
+        world
+            .set_stance(PlayerId::new(1), PlayerId::new(2), Stance::Enemy1)
+            .unwrap();
+        assert_eq!(
+            world.players[1].relations.get(PlayerId::new(2)),
+            Some(&Relation::Relation4)
+        );
+        assert_eq!(
+            queries_kind(&world),
+            Some(UnitDiplomacy::from(UnitRelation::Ally))
+        );
+        world.treaty.as_mut().unwrap().state = TreatyState::Ended;
+        world
+            .set_stance(PlayerId::new(1), PlayerId::new(2), Stance::Enemy)
+            .unwrap();
+        assert_eq!(
+            world.players[1].relations.get(PlayerId::new(2)),
+            Some(&Relation::Enemy)
+        );
+        assert_eq!(
+            queries_kind(&world),
+            Some(UnitDiplomacy::from(UnitRelation::Enemy))
+        );
     }
 
     /// The world's teams: two players allied both ways with allied victory at 1 form team 2;

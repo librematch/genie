@@ -16,6 +16,7 @@ use crate::players::ResourceStat;
 use crate::players::attribute::AttributeId;
 use crate::players::tracker::ListKey;
 use crate::players::world_player::{EARLY_SCOUTING_MS, MINUTE, SECOND, get, set};
+use crate::unit_ai::task_finder::allied as task_finder_allied;
 use crate::world::AllySharing;
 use crate::world::ClockSeconds;
 use crate::world::Seconds;
@@ -339,33 +340,22 @@ impl World {
         Ok(())
     }
 
-    /// `FUN_14165d040`'s test of the players a sharing player `own` gives to: player `other` is not
-    /// Gaia and one of the world's, `own` counts it as an ally (relation 0 or 4), and `other`
-    /// counts `own` as one (its relation to `own` 0 or 4, `& 0xfb`). A relation 1 would count both
-    /// ways while the world's treaty holds (`FUN_1415e8e10`: `world+0x820`'s `+0x10` is 1), which
-    /// the slice does not model.
+    /// `FUN_14165d040`'s test of the players a sharing player `own` gives to: the ally test with
+    /// its flag both ways, inlined twice (`FUN_141663dc0`, [`task_finder_allied`] on the world's
+    /// treaty monitor): `own` counts `other` as its own or allied, and `other` counts `own` so.
+    /// So Gaia and a player past the world's count never share, relations 0 and 4 count, and
+    /// relation 1 counts while the world's treaty holds (`FUN_1415e8e10`). A player counts
+    /// itself: the base add's walk passes over its own player (a pointer compare) before the
+    /// test.
     #[must_use]
     pub fn shares_with(&self, own: PlayerId, other: PlayerId) -> bool {
-        let count = self.players.len();
-        if other == PlayerId::GAIA || count <= other.index() || own == other {
-            return false;
-        }
-        let mine = self
-            .players
-            .player(own)
-            .ok()
-            .and_then(|pl| pl.relations.get(other).copied());
-        if !mine.is_some_and(|relation| relation.allied(AllyTest::WithRelation4)) {
-            return false;
-        }
-        own != PlayerId::GAIA
-            && own.index() < count
-            && self
-                .players
-                .player(other)
-                .ok()
-                .and_then(|pl| pl.relations.get(own))
-                .is_some_and(|relation| relation.allied(AllyTest::WithRelation4))
+        let treaty = self.treaty.as_ref();
+        let allied = |from: PlayerId, to: PlayerId| {
+            self.players.player(from).is_ok_and(|player| {
+                task_finder_allied(&player.relations, treaty, from, to, AllyTest::WithRelation4)
+            })
+        };
+        allied(own, other) && allied(other, own)
     }
 
     /// `WorldPlayer::update` after `WorldPlayerBase::update`: player `player_id`'s scout map

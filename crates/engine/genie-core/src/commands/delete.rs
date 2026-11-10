@@ -239,7 +239,7 @@ impl World {
             .of_master(master.id)
             .contains(MasterRoles::TOWN_CENTRE_621)
         {
-            self.clear_treaty_zones()?;
+            self.clear_treaty_zones(owner)?;
         }
         self.remove_building(owner, id)
     }
@@ -323,7 +323,7 @@ impl World {
                 .contains(MasterRoles::TOWN_CENTRE_621)
                 && !self.has_town_centre(owner)
             {
-                self.clear_treaty_zones()?;
+                self.clear_treaty_zones(owner)?;
             }
         }
         if MasterKind::ACTION <= master.kind
@@ -338,22 +338,20 @@ impl World {
         Ok(())
     }
 
-    /// `FUN_1414615d0` on the world's treaty monitor (`+0x820`) for a town centre's owner: its
-    /// zones (`+0x18 + (owner − 1) × 0x24`: two rectangles and a flag) go to 0, and the game
-    /// screen's list of them (`FUN_1414d2060`, `Game/ui/GameScreenPC.cpp`) loses its entries. Only
-    /// a treaty fills the zones (`FUN_141461c00`), so without one they are 0 already.
+    /// The town centre's delete and destroy (`FUN_1411cd780`, `FUN_1411cfb30`) on the world's
+    /// treaty monitor (`+0x820`) for the town centre's owner `owner`: a monitor in any state
+    /// clears the owner's first zone (`FUN_1414615d0`, [`TreatyMonitor::clear_zone`]); without
+    /// one (a null pointer) nothing happens.
     ///
     /// # Errors
     ///
-    /// A game with a treaty ([`crate::world::settings::Settings::treaty_length`]), whose zones the slice
-    /// does not hold.
-    const fn clear_treaty_zones(&self) -> GenieResult<()> {
-        if self.settings.treaty_length.holds() {
-            return Err(GenieError::unsupported(
-                "a deleted town centre 621 during a treaty (its owner's treaty zones)",
-            ));
-        }
-        Ok(())
+    /// The clear's: Gaia's town centre, and an owner past the monitor's zones.
+    ///
+    /// [`TreatyMonitor::clear_zone`]: crate::players::treaty::TreatyMonitor::clear_zone
+    fn clear_treaty_zones(&mut self, owner: PlayerId) -> GenieResult<()> {
+        self.treaty
+            .as_mut()
+            .map_or(Ok(()), |monitor| monitor.clear_zone(owner))
     }
 
     /// `FUN_1416597e0(owner, 0)`: the owner's tracker files a town centre the world holds
@@ -620,6 +618,7 @@ mod tests {
     use crate::map::Distance;
     use crate::map::GridSize;
     use crate::map::Snow;
+    use crate::map::TileRect;
     use crate::map::spatial::Obstruction;
     use crate::objects::MasterHitPoints;
     #[cfg(test)]
@@ -630,6 +629,9 @@ mod tests {
     use crate::objects::masters::ObstructionKind;
     use crate::objects::masters::{Master, Masters};
     use crate::objects::unit::Unit;
+    use crate::players::treaty::{
+        NomadTreaty, TreatyMinutes, TreatyMonitor, TreatyState, TreatyZone,
+    };
     use crate::test_ids::costs;
     use crate::test_ids::master_id;
     use crate::test_ids::object_id;
@@ -640,13 +642,13 @@ mod tests {
     use crate::testing::ids::TOWN_CENTRE_621;
     use crate::vision::visibility::Seer;
     use crate::vision::visibility::Visibility;
+    use crate::world::FrameSeed;
+    use crate::world::GameMode;
     use crate::world::Millis;
     use crate::world::Player;
     use crate::world::Seconds;
     use crate::world::WholeSeconds;
     use crate::world::WorldTime;
-    #[cfg(test)]
-    use crate::world::{FrameSeed, TreatyLength};
     use std::sync::Arc;
 
     /// Gaia and two players: player 1's villager 10, house foundation 11 (build time 25, cost 25
@@ -879,37 +881,75 @@ mod tests {
         );
     }
 
-    /// A town-centre foundation (master 621) deleted, and destroyed at once: both clear its
-    /// owner's treaty zones in the world's treaty monitor (`+0x820`, `FUN_1414615d0`, from
-    /// `FUN_1411cd780` and `FUN_1411cfb30`), which only a treaty fills (`FUN_141461c00`): without
-    /// one the delete is any building's; with one the zones are not held.
+    /// A town-centre foundation (master 621) deleted, and destroyed at once: without a treaty
+    /// monitor (`+0x820`) the delete is any building's.
     #[test]
-    fn deleted_town_centre_foundation_clears_no_zones_without_treaty() {
-        let town_centre = |world: &mut World| {
-            for masters in &mut world.model.masters {
-                let mut tc = masters.get(ids::HOUSE).unwrap().clone();
-                tc.id = TOWN_CENTRE_621;
-                *masters = Arc::new(Masters::new(masters.iter().cloned().chain([tc])));
-            }
-            world.players[1].objects[ListIndex::new(1)].life.master_id = TOWN_CENTRE_621;
-        };
+    fn deleted_town_centre_foundation_without_monitor_is_any_building() {
         let mut world = game(0.0, true);
-        town_centre(&mut world);
+        as_town_centre(&mut world);
         world.delete(player_id(1), object_id(11)).unwrap();
-        let tc = &world.players[1].objects[ListIndex::new(1)].life;
+        let foundation = &world.players[1].objects[ListIndex::new(1)].life;
         assert_eq!(
-            (world.players[1].attributes[1], tc.hp, tc.state),
+            (
+                world.players[1].attributes[1],
+                foundation.hp,
+                foundation.state
+            ),
             (Amount::new(25.0), HitPoints::ZERO, ObjectState::Removed)
         );
-        let mut world = game(0.0, true);
-        town_centre(&mut world);
-        world.settings.treaty_length = TreatyLength::of_minutes(10);
+    }
+
+    /// The delete of a town-centre foundation (`FUN_1411cd780`) and its destroy while its owner
+    /// has no town centre (`FUN_1411cfb30`) each clear the owner's first zone and its flag in the
+    /// world's treaty monitor (`FUN_1414615d0`), whatever the monitor's state; its second zone
+    /// and the other players' zones stay.
+    #[test]
+    fn deleted_town_centre_foundation_clears_its_owner_first_zone() {
+        let drawn = TreatyZone {
+            first: TileRect::new(1, 2, 30, 40),
+            second: TileRect::new(5, 6, 70, 80),
+            set: true,
+        };
+        let zoned = |progress: f32, state: TreatyState| {
+            let mut world = game(progress, false);
+            as_town_centre(&mut world);
+            let mut monitor = TreatyMonitor::new(
+                TreatyMinutes::of_byte(10),
+                NomadTreaty::NotForced,
+                GameMode::RandomMap,
+            );
+            monitor.state = state;
+            monitor.zones[..2].fill(drawn);
+            world.treaty = Some(monitor);
+            world
+        };
+        let cleared = TreatyZone {
+            first: TileRect::default(),
+            set: false,
+            ..drawn
+        };
+        let zones = |world: &World| world.treaty.as_ref().unwrap().zones[..2].to_vec();
+        let mut world = zoned(0.0, TreatyState::Holds);
+        world.delete(player_id(1), object_id(11)).unwrap();
+        // the foundation, not desolid, stays: only the delete cleared
         assert_eq!(
-            world.delete(player_id(1), object_id(11)),
-            Err(GenieError::unsupported(
-                "a deleted town centre 621 during a treaty (its owner's treaty zones)"
-            ))
+            world.players[1].objects[ListIndex::new(1)].life.state,
+            ObjectState::Foundation
         );
+        assert_eq!(zones(&world), [cleared, drawn]);
+        let mut world = zoned(0.0, TreatyState::Ended);
+        world.destroy(player_id(1), object_id(11)).unwrap();
+        assert_eq!(zones(&world), [cleared, drawn]);
+    }
+
+    /// Master 621 for player 1's house foundation 11.
+    fn as_town_centre(world: &mut World) {
+        for masters in &mut world.model.masters {
+            let mut town_centre = masters.get(ids::HOUSE).unwrap().clone();
+            town_centre.id = TOWN_CENTRE_621;
+            *masters = Arc::new(Masters::new(masters.iter().cloned().chain([town_centre])));
+        }
+        world.players[1].objects[ListIndex::new(1)].life.master_id = TOWN_CENTRE_621;
     }
 }
 

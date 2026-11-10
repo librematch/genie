@@ -27,6 +27,7 @@ use crate::players::game_status::GameStatus;
 use crate::players::history::HistoryUpdates;
 use crate::players::relation_row;
 use crate::players::tracker::Key;
+use crate::players::treaty::{NomadTreaty, TreatyMinutes, TreatyMonitor, TreatyState};
 use crate::players::world_player::ResourceShare;
 use crate::technology::ResearchState;
 use crate::technology::TechState;
@@ -434,6 +435,45 @@ fn the_income_fills_computer_escrow_and_goes_to_mutual_allies() {
             && !world.shares_with(PlayerId::new(1), PlayerId::new(3))
             && !world.shares_with(PlayerId::new(1), PlayerId::new(0))
     );
+}
+
+/// `FUN_14165d040`'s sharing test is the ally test with its flag both ways (`FUN_141663dc0`
+/// inlined twice): while the world's treaty holds, a neutral (relation 1) counts both ways and
+/// takes its share; one way, or once the treaty ended, it takes none.
+#[test]
+fn neutrals_share_resources_both_ways_while_the_treaty_holds() {
+    let mut world = world();
+    world.players[1]
+        .ally_sharing
+        .set(AllySharing::RESOURCES, true);
+    world.players[1].relations = relation_row([1, 0, 1, 1]);
+    world.players[2].relations = relation_row([1, 1, 0, 3]);
+    world.players[3].relations = relation_row([1, 3, 3, 0]);
+    let mut monitor = TreatyMonitor::new(
+        TreatyMinutes::of_byte(10),
+        NomadTreaty::NotForced,
+        GameMode::RandomMap,
+    );
+    monitor.state = TreatyState::Holds;
+    world.treaty = Some(monitor);
+    let share = |world: &mut World| {
+        world
+            .add_resource(
+                PlayerId::new(1),
+                attribute::WOOD,
+                Amount::new(4.0),
+                ResourceStat::Gathered,
+                ResourceShare::Shared,
+            )
+            .unwrap();
+        [2, 3].map(|player| world.players[player].attributes[1].get())
+    };
+    assert!(world.shares_with(PlayerId::new(1), PlayerId::new(2)));
+    assert!(!world.shares_with(PlayerId::new(1), PlayerId::new(3)));
+    assert_eq!(share(&mut world), [4.0, 0.0]);
+    world.treaty.as_mut().unwrap().state = TreatyState::Ended;
+    assert!(!world.shares_with(PlayerId::new(1), PlayerId::new(2)));
+    assert_eq!(share(&mut world), [4.0, 0.0]);
 }
 
 /// The base add's escrow (`FUN_14165d040`, [`Player::add_attribute`]): a computer player's

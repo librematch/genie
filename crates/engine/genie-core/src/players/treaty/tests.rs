@@ -256,6 +256,38 @@ fn players_past_gaia_hold_the_nine_zones() {
     assert!(monitor.zone_mut(player(10)).is_err());
 }
 
+/// `FUN_1414615d0`: a player's first zone takes 0 and its flag is cleared, its second zone
+/// and the other players' stay; Gaia's index lies outside the monitor, as one past the nine.
+#[test]
+fn zone_clear_leaves_second_zone_and_refuses_gaia() {
+    let mut monitor = TreatyMonitor::new(
+        TreatyMinutes(5),
+        NomadTreaty::NotForced,
+        GameMode::RandomMap,
+    );
+    let drawn = TreatyZone {
+        first: TileRect::new(1, 2, 3, 4),
+        second: TileRect::new(5, 6, 7, 8),
+        set: true,
+    };
+    monitor.zones.fill(drawn);
+    monitor.clear_zone(player(2)).unwrap();
+    assert_eq!(
+        monitor.zones[..3],
+        [
+            drawn,
+            TreatyZone {
+                first: TileRect::new(0, 0, 0, 0),
+                second: drawn.second,
+                set: false,
+            },
+            drawn
+        ]
+    );
+    assert_eq!(monitor.clear_zone(PlayerId::GAIA), Err(NO_ZONE));
+    assert!(monitor.clear_zone(player(10)).is_err());
+}
+
 /// `FUN_1415e8e10` and `FUN_1415c8150`: a monitor in state 1 holds and gives its seconds left;
 /// none, or one in another state, holds none and gives 0.
 #[test]

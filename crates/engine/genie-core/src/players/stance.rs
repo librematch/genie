@@ -1,6 +1,8 @@
 //! A player's stance toward another as one type: `diplomacy[i]` (`+0xe12`).
 
 use crate::players::Relation;
+use crate::players::treaty::TreatyMonitor;
+use crate::players::treaty::treaty_holds;
 
 /// A player's stance toward player i (`diplomacy[i]`, `+0xe12`, saved), which a diplomacy
 /// change sets (`FUN_141639690`) and which makes the relation (`FUN_1416397d0`). Every byte is
@@ -74,13 +76,14 @@ impl Stance {
         }
     }
 
-    /// `FUN_1416397d0`'s relation for the stance: 1 and 2 an enemy's (relation 4 while
-    /// `FUN_1415e8e10` holds: the world's `+0x820` object in its state 1, which the slice does
-    /// not hold, as the task finder's [`crate::unit_ai::task_finder::allied`]), 3 a neutral's,
-    /// 4 and 5 an ally's; another none.
+    /// `FUN_1416397d0`'s relation for the stance while the world's treaty monitor is `treaty`
+    /// (`+0x820`, none for its null pointer): 1 and 2 an enemy's, relation 4 while the treaty
+    /// holds (`FUN_1415e8e10`, [`treaty_holds`]); 3 a neutral's, 4 and 5 an ally's; another
+    /// none.
     #[must_use]
-    pub const fn relation(self) -> Option<Relation> {
+    pub fn relation(self, treaty: Option<&TreatyMonitor>) -> Option<Relation> {
         match self.raw() {
+            1 | 2 if treaty_holds(treaty) => Some(Relation::Relation4),
             1 | 2 => Some(Relation::Enemy),
             3 => Some(Relation::Neutral),
             4 | 5 => Some(Relation::Ally),
@@ -104,12 +107,15 @@ impl genie_diff::Diff for Stance {
 
 #[cfg(test)]
 mod tests {
+    use crate::players::treaty::{NomadTreaty, TreatyMinutes, TreatyMonitor, TreatyState};
     use crate::players::{Relation, Stance};
+    use crate::world::GameMode;
 
-    /// `FUN_1416397d0`'s relations: 1, 2 an enemy's, 3 a neutral's, 4, 5 an ally's, others none.
+    /// `FUN_1416397d0`'s relations without a treaty monitor: 1, 2 an enemy's, 3 a neutral's,
+    /// 4, 5 an ally's, others none.
     #[test]
     fn stance_makes_its_relation() {
-        let relation = |byte: u8| Stance::from(byte).relation();
+        let relation = |byte: u8| Stance::from(byte).relation(None);
         assert_eq!(relation(0), None);
         assert_eq!(relation(1), Some(Relation::Enemy));
         assert_eq!(relation(2), Some(Relation::Enemy));
@@ -118,6 +124,44 @@ mod tests {
         assert_eq!(relation(5), Some(Relation::Ally));
         assert_eq!(relation(6), None);
         assert_eq!(Stance::Ally.get(), 4);
+    }
+
+    /// `FUN_1416397d0` reads the world's treaty (`FUN_1415e8e10`): while its monitor holds, the
+    /// stances 1 and 2 make relation 4; a new or an ended monitor leaves them an enemy's, and the
+    /// other stances keep their relation.
+    #[test]
+    fn enemy_stances_make_relation_4_while_the_treaty_holds() {
+        let mut monitor = TreatyMonitor::new(
+            TreatyMinutes::of_byte(10),
+            NomadTreaty::NotForced,
+            GameMode::RandomMap,
+        );
+        let relations = |monitor: &TreatyMonitor| {
+            [0, 1, 2, 3, 4, 5].map(|byte| Stance::from(byte).relation(Some(monitor)))
+        };
+        let outside = [
+            None,
+            Some(Relation::Enemy),
+            Some(Relation::Enemy),
+            Some(Relation::Neutral),
+            Some(Relation::Ally),
+            Some(Relation::Ally),
+        ];
+        assert_eq!(relations(&monitor), outside);
+        monitor.state = TreatyState::Holds;
+        assert_eq!(
+            relations(&monitor),
+            [
+                None,
+                Some(Relation::Relation4),
+                Some(Relation::Relation4),
+                Some(Relation::Neutral),
+                Some(Relation::Ally),
+                Some(Relation::Ally),
+            ]
+        );
+        monitor.state = TreatyState::Ended;
+        assert_eq!(relations(&monitor), outside);
     }
 
     /// GAME's diplomacy: relation 0 an ally's stance, 1 a neutral's, 3 and 4 an enemy's, 2 and

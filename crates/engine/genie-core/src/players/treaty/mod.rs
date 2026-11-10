@@ -216,8 +216,8 @@ pub struct TreatyMonitor {
     /// `+0x16`: a forced nomad treaty shorter than five minutes took five; it ends once its
     /// zones stand.
     pub(crate) lengthened: bool,
-    /// `+0x17`: game mode 16's Castle Age was queued (RESEARCH, `FUN_141630d10`); the next
-    /// update ends the treaty.
+    /// `+0x17`: game mode 16's Castle Age was queued (RESEARCH, `0x140e7e270`,
+    /// [`World::research`]); the next update ends the treaty.
     pub(crate) castle_age: bool,
     /// `+0x18`: each player's zones, player 1 first.
     pub(crate) zones: [TreatyZone; ZONES],
