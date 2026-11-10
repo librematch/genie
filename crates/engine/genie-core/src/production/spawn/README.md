@@ -50,5 +50,5 @@ five seconds and tries again.
 ## How it connects
 
 <!-- uses -->
-- Uses: [`combat`](../../combat/), [`commands`](../../commands/), [`garrison`](../../garrison/), [`gathering`](../../gathering/), [`map`](../../map/), [`math`](../../math/), [`movement`](../../movement/), [`objects`](../../objects/), [`orders`](../../orders/), [`players`](../../players/), [`technology`](../../technology/), [`unit_ai`](../../unit_ai/), [`vision`](../../vision/), [`world`](../../world/).
+- Uses: [`combat`](../../combat/), [`commands`](../../commands/), [`construction`](../../construction/), [`garrison`](../../garrison/), [`gathering`](../../gathering/), [`map`](../../map/), [`math`](../../math/), [`movement`](../../movement/), [`objects`](../../objects/), [`orders`](../../orders/), [`players`](../../players/), [`technology`](../../technology/), [`unit_ai`](../../unit_ai/), [`vision`](../../vision/), [`world`](../../world/).
 <!-- /uses -->

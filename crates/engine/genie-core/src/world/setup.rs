@@ -21,6 +21,7 @@ use crate::players::market::Market;
 #[cfg(test)]
 use crate::testing::build_158041::build_158041;
 use crate::trace::new_object;
+use crate::world::FeatureFlags;
 use crate::world::Millis;
 use crate::world::Seconds;
 use crate::world::WorldTime;
@@ -88,6 +89,7 @@ impl World {
             teams: [Team::ALONE; 8],
             instant_work: 0,
             treaty: None,
+            feature_flags: FeatureFlags::Off,
         }
     }
 }

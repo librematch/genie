@@ -29,8 +29,8 @@ use crate::objects::{Facet, FacetCount};
 use crate::players::PlayerId;
 use crate::production::spawn::ZoneTest;
 use crate::production::spawn::{
-    Facing, NOT_MOVING, PlacementCall, Placing, Site, SpawnTest, UnitScan, WorldMap, corner_tiles,
-    placement, spawn_point,
+    Facing, NOT_MOVING, PlacementCall, PlacementRadii, Placing, Site, SpawnTest, UnitScan,
+    WorldMap, corner_tiles, placement, spawn_point,
 };
 use crate::unit_ai::unit_ai_kind;
 use crate::vision::SightCentre;
@@ -109,6 +109,7 @@ impl World {
         let placing = Placing {
             player: player_id,
             radius: made.radius,
+            clearance: made.clearance,
             tall: made.is_tall(),
             class: made.class,
             restriction,
@@ -140,6 +141,7 @@ impl World {
                     &map,
                     spot,
                     PlacementCall {
+                        radii: PlacementRadii::Size,
                         zones: ZoneTest::Skipped,
                         passed,
                         units,

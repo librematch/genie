@@ -148,8 +148,9 @@ impl World {
     /// `FUN_141009760` of `formation` for group `group` without the settings' flag `DAT_143f01834`
     /// (the world's saved `mUseFeatureFlags` being 1, which `World::load_world` hands to
     /// `FUN_140ecabe0`; 0 in every recording of this build), with which the game takes the
-    /// feature's assignment instead ([`World::assign_slots_by_variance`]; the slice holds
-    /// neither the flag nor that routine's process-global costs yet). The transformed active
+    /// feature's assignment instead ([`World::assign_slots_by_variance`]; the slice reads
+    /// neither the flag, [`crate::world::FeatureFlags`], nor holds that routine's process-global
+    /// costs yet). The transformed active
     /// slots in use take the closest units of their sub-formation and type
     /// ([`World::closest_unit`]), none taken twice. Two orders are measured first, as the sum of
     /// the ground distances (slot to unit) and the count found: the slots in order, and the same

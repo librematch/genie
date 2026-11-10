@@ -26,7 +26,7 @@ use crate::pathing::zones::{NO_TERRAIN, UNKNOWN_RESTRICTION};
 use crate::players::PlayerId;
 use crate::production::spawn::ZoneTest;
 use crate::production::spawn::{
-    NOT_MOVING, PlacementCall, Placing, Tested, UnitScan, WorldMap, placement,
+    NOT_MOVING, PlacementCall, PlacementRadii, Placing, Tested, UnitScan, WorldMap, placement,
 };
 use crate::unit_ai::alert_owner;
 use crate::world::layer::ClassRoles;
@@ -418,12 +418,11 @@ impl World {
     /// transport at (`player_id`, `list_index`) ([`DropDraws`] on the Object stream, the place
     /// `last` across the caller's units): the first place on the map in the zone ([`in_zone`] on
     /// the transport's zone map) that is free. A place is free where the unit's master may stand
-    /// for the transport's owner (its slot 0x50, [`crate::production::spawn::placement`] with no
-    /// blocker reported, no object passed over and the units counted, [`PlacementCall`]; its
-    /// `[0x48]` 1, where the spawn passes 0, changes nothing: the scans' overlap needs the master's
-    /// height either way) and
-    /// the unit could stand (its slot 0x278, [`crate::map::spatial::Spatial::point_clear`] by its
-    /// radius and its restriction's mask).
+    /// for the transport's owner (its slot 0x50, [`crate::production::spawn::placement`] by its
+    /// radii, with no blocker reported, no object passed over and the units counted,
+    /// [`PlacementCall`]; its `[0x48]` 1, where the spawn passes 0, changes nothing: the scans'
+    /// overlap needs the master's height either way) and the unit could stand (its slot 0x278,
+    /// [`crate::map::spatial::Spatial::point_clear`] by its radius and its restriction's mask).
     pub(crate) fn drop_location(
         &mut self,
         (player_id, list_index): (PlayerId, ListIndex),
@@ -489,6 +488,7 @@ impl World {
                 let placing = Placing {
                     player: player_id,
                     radius: made.radius,
+                    clearance: made.clearance,
                     tall: made.is_tall(),
                     class: made.class,
                     restriction: values,
@@ -501,6 +501,7 @@ impl World {
                     &map,
                     spot,
                     PlacementCall {
+                        radii: PlacementRadii::Size,
                         zones: ZoneTest::Skipped,
                         passed: None,
                         units: UnitScan::Counted,

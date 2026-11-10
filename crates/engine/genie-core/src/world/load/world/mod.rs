@@ -17,6 +17,7 @@ use crate::players::game_status::VictoryState;
 use crate::players::{
     Amount, Chance, CivId, CivNameOverride, Culture, EscrowShare, LotVolume, Team,
 };
+use crate::world::FeatureFlags;
 use crate::world::FrameSeed;
 use crate::world::Millis;
 use crate::world::Model;
@@ -358,6 +359,7 @@ pub fn saved_world(
     turns.local_player = PlayerId::try_from(usize::try_from(world.local_player_index).unwrap_or(0))
         .unwrap_or_default();
     turns.alliance_locked = world.alliance_locked;
+    turns.feature_flags = FeatureFlags::of_saved(header.world.use_feature_flags);
     // the world's teams (+0x984, `playerTeams[player_id]`, saved as bytes)
     for (team, &saved) in turns.teams.iter_mut().zip(&header.world.player_teams) {
         *team = Team::of_data(i32::from(saved));

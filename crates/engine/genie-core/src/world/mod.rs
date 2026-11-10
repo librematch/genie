@@ -65,6 +65,7 @@ pub use genie_model::model::Model;
 
 mod after_step;
 mod ai_values;
+mod feature_flags;
 use genie_model::world::clock;
 mod forced;
 mod frame_seed;
@@ -80,6 +81,7 @@ mod world_update;
 
 pub use self::ai_values::{LureDestination, Percent, TargetingMode, VillagerGarrison};
 pub use self::clock::{ClockSeconds, Millis, Seconds, WholeSeconds, WorldTime};
+pub use self::feature_flags::FeatureFlags;
 pub use self::forced::GameState;
 pub use self::frame_seed::FrameSeed;
 pub use self::mode_680::Mode680;
@@ -310,6 +312,9 @@ pub struct World {
     /// ([`World::treaty_step`]). The save does not hold it. The oracle's walks read it as the
     /// systems do (the ally test's).
     pub treaty: Option<TreatyMonitor>,
+    /// The game's feature flags for experimental bug fixes ([`FeatureFlags`]), from the world's
+    /// saved `mUseFeatureFlags` (`+0x857`).
+    pub(crate) feature_flags: FeatureFlags,
 }
 
 /// The objects of recyclable masters (`+0x680`, the `.dat`'s `recyclable`): a new one takes the

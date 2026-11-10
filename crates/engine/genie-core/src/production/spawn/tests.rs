@@ -2,6 +2,7 @@ use super::*;
 use crate::GenieResult;
 use crate::commands::GatherPoint;
 use crate::commands::GatherPointState;
+use crate::construction::MainBuildingId;
 use crate::gathering::hunt::tests::walker;
 use crate::map::Distance;
 use crate::map::GridSize;
@@ -46,6 +47,7 @@ use crate::orders::town_bell::BellShelter;
 use crate::players::Amount;
 use crate::players::PlayerKind;
 use crate::production::spawn::NearFlags;
+use crate::production::spawn::PlacementRadii;
 use crate::production::spawn::SiteChecks;
 use crate::production::spawn::ZoneTest;
 use crate::production::spawn::new_unit::SpawnOutcome;
@@ -68,6 +70,7 @@ use crate::unit_ai::UnitAi;
 use crate::unit_ai::UnitAiKind;
 use crate::unit_ai::{OrderPriority, QueuedOrder};
 use crate::vision::VisionBits;
+use crate::world::FeatureFlags;
 use crate::world::Millis;
 use crate::world::Seconds;
 use crate::world::WorldTime;
@@ -281,6 +284,7 @@ fn near_sheep(state: ObjectState) -> Near {
         fog_mask: None,
         hp: HitPoints::new(7.0),
         outline: Radii::ZERO,
+        main_building: None,
     }
 }
 
@@ -413,6 +417,7 @@ fn the_sheep_blocks_the_villager_where_their_boxes_overlap() {
     let villager = Placing {
         player: PlayerId::new(1),
         radius: Footprint::new(0.2, 0.2),
+        clearance: Footprint::new(0.2, 0.2),
         tall: true,
         class: class::VILLAGER,
         restriction: &Restriction::new(vec![1.0, 0.0]),
@@ -449,6 +454,7 @@ fn the_first_object_of_tile_list_reports_the_block() {
     let villager = Placing {
         player: PlayerId::new(1),
         radius: Footprint::new(0.2, 0.2),
+        clearance: Footprint::new(0.2, 0.2),
         tall: true,
         class: class::VILLAGER,
         restriction: &Restriction::new(vec![1.0, 0.0]),
@@ -482,12 +488,13 @@ fn the_first_object_of_tile_list_reports_the_block() {
     assert_eq!(at(soldier(), sheep()), Tested::Blocked { stays: false });
 }
 
-/// The villager the sheep tests place: radius 0.2, tall, on a map whose terrain 0 it may stand
-/// on.
+/// The villager the sheep tests place: radius and clearance 0.2, tall, on a map whose terrain 0
+/// it may stand on.
 fn placed_villager(restriction: &Restriction) -> Placing<'_> {
     Placing {
         player: PlayerId::new(1),
         radius: Footprint::new(0.2, 0.2),
+        clearance: Footprint::new(0.2, 0.2),
         tall: true,
         class: class::VILLAGER,
         restriction,
@@ -623,6 +630,176 @@ fn master_of_nan_radius_answers_the_static_test() {
             &tuning().spawn,
         ),
         Ok(Tested::Blocked { stays: false })
+    );
+}
+
+/// A call of `[0x60]` 2: the slot's own scan passes over the units in motion (their slot 0x1f8,
+/// the animation speed `+0x7b8`, above 0), so a walking soldier first on the tile no longer
+/// reports the block and the house after it does; a soldier at rest and one of a NaN speed
+/// (`COMISS`, `JA` at 0x14126523f) still report it.
+#[test]
+fn placement_passing_units_in_motion_passes_over_walking_soldier_only() {
+    let restriction = Restriction::new(vec![1.0, 0.0]);
+    let villager = placed_villager(&restriction);
+    let at = |speed: f32| {
+        let soldier = Master {
+            id: master_id(4),
+            class: class::CLASS_6,
+            ..sheep_master()
+        };
+        let mut world = Scene::open(GridSize::new(120, 120))
+            .object(SceneObject::new(
+                9521,
+                PlayerId::GAIA,
+                soldier,
+                Position::new(106.6, 47.2, 0.0),
+            ))
+            .object(SceneObject::new(
+                500,
+                PlayerId::GAIA,
+                house_master(),
+                Position::new(106.5, 47.9, 0.0),
+            ))
+            .build();
+        world
+            .parts
+            .set_anim_speed(object_id(9521), Speed::new(speed));
+        placement(
+            &villager,
+            &WorldMap { turns: &world },
+            Point::new(106.5, 47.5),
+            PlacementCall {
+                units: UnitScan::InMotionPassed,
+                ..COUNTED
+            },
+            &roles(),
+            &tuning().spawn,
+        )
+        .unwrap()
+    };
+    assert_eq!(at(0.7), Tested::Blocked { stays: true });
+    assert_eq!(at(0.0), Tested::Blocked { stays: false });
+    assert_eq!(at(f32::NAN), Tested::Blocked { stays: false });
+}
+
+/// A call of `[0x40]` 1 measures by the master's clearance radii (`+0x5fc`, `+0x600`) in the
+/// slot's gate, `FUN_141123f80`'s box and both scans: the villager's clearance of 0.6 meets the
+/// sheep from (106.5, 46.5), which its radius of 0.2 misses, and leaves the map at x 0.5; a
+/// clearance of 0 is free on the sheep.
+#[test]
+fn placement_by_clearance_measures_the_clearance_radii() {
+    let restriction = Restriction::new(vec![1.0, 0.0]);
+    let world = Scene::open(GridSize::new(120, 120)).object(sheep()).build();
+    let at = |clearance, radii, x, y| {
+        placement(
+            &Placing {
+                clearance,
+                ..placed_villager(&restriction)
+            },
+            &WorldMap { turns: &world },
+            Point::new(x, y),
+            PlacementCall { radii, ..COUNTED },
+            &roles(),
+            &tuning().spawn,
+        )
+        .unwrap()
+    };
+    let wide = Footprint::new(0.6, 0.6);
+    assert_eq!(at(wide, PlacementRadii::Size, 106.5, 46.5), Tested::Free);
+    assert_eq!(
+        at(wide, PlacementRadii::Clearance, 106.5, 46.5),
+        Tested::Blocked { stays: true }
+    );
+    assert_eq!(at(wide, PlacementRadii::Size, 0.5, 60.5), Tested::Free);
+    assert_eq!(
+        at(wide, PlacementRadii::Clearance, 0.5, 60.5),
+        Tested::Blocked { stays: false }
+    );
+    assert_eq!(
+        at(Footprint::ZERO, PlacementRadii::Size, 106.5, 47.5),
+        Tested::Blocked { stays: true }
+    );
+    assert_eq!(
+        at(Footprint::ZERO, PlacementRadii::Clearance, 106.5, 47.5),
+        Tested::Free
+    );
+}
+
+/// Under the feature flags (`DAT_143f01833`, [`FeatureFlags::On`]) the slot's own scan passes
+/// over a building annexed to its call's object (`[0x58]`, the annex's `+0xbb8`): the house 501,
+/// an annex of the building 600 and first on the tile, reports the block without the flags or
+/// without a passed object; with both, the soldier after it does.
+#[test]
+fn placement_under_feature_flags_passes_over_annex_of_passed_building() {
+    let restriction = Restriction::new(vec![1.0, 0.0]);
+    let villager = placed_villager(&restriction);
+    let soldier = Master {
+        id: master_id(4),
+        class: class::CLASS_6,
+        ..sheep_master()
+    };
+    let mut world = Scene::open(GridSize::new(120, 120))
+        .object(SceneObject::new(
+            600,
+            PlayerId::GAIA,
+            house_master(),
+            Position::new(20.5, 20.5, 0.0),
+        ))
+        .object(SceneObject {
+            annex_of: Some(MainBuildingId::new(object_id(600))),
+            ..SceneObject::new(
+                501,
+                PlayerId::GAIA,
+                house_master(),
+                Position::new(106.5, 47.9, 0.0),
+            )
+        })
+        .object(SceneObject::new(
+            9521,
+            PlayerId::GAIA,
+            soldier,
+            Position::new(106.6, 47.2, 0.0),
+        ))
+        .build();
+    let at = |world: &World, passed| {
+        placement(
+            &villager,
+            &WorldMap { turns: world },
+            Point::new(106.5, 47.5),
+            PlacementCall { passed, ..COUNTED },
+            &roles(),
+            &tuning().spawn,
+        )
+        .unwrap()
+    };
+    let main = Some(object_id(600));
+    assert_eq!(at(&world, main), Tested::Blocked { stays: true });
+    world.feature_flags = FeatureFlags::On;
+    assert_eq!(at(&world, None), Tested::Blocked { stays: true });
+    assert_eq!(at(&world, main), Tested::Blocked { stays: false });
+}
+
+/// A master without a height (`+0x5e0` at most 0) is free on the sheep: each object's test in
+/// both scans needs that height, so the call's `[0x48]` (`param_10`), which lets the scans run
+/// without it, changes nothing.
+#[test]
+fn master_without_height_is_free_on_the_sheep() {
+    let restriction = Restriction::new(vec![1.0, 0.0]);
+    let villager = Placing {
+        tall: false,
+        ..placed_villager(&restriction)
+    };
+    let world = Scene::open(GridSize::new(120, 120)).object(sheep()).build();
+    assert_eq!(
+        placement(
+            &villager,
+            &WorldMap { turns: &world },
+            Point::new(106.5, 47.5),
+            COUNTED,
+            &roles(),
+            &tuning().spawn,
+        ),
+        Ok(Tested::Free)
     );
 }
 
@@ -1206,6 +1383,7 @@ fn tried_by(tried: &[(Point, SpawnTest)], spawn_test: SpawnTest) -> Vec<Point> {
 
 /// The arguments of the spawn's placement test for a unit other than the mule cart.
 const COUNTED: PlacementCall = PlacementCall {
+    radii: PlacementRadii::Size,
     zones: ZoneTest::Skipped,
     passed: None,
     units: UnitScan::Counted,

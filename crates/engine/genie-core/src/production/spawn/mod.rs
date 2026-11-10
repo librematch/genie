@@ -29,7 +29,7 @@ pub(crate) use self::build_placement_test::build_placement;
 pub use self::placement_code::PlacementCode;
 pub(crate) use self::placement_test::NOT_MOVING;
 pub(crate) use self::placement_test::placement;
-pub use self::placement_test::{PlacementCall, Placing, UnitScan, ZoneTest};
+pub use self::placement_test::{PlacementCall, PlacementRadii, Placing, UnitScan, ZoneTest};
 use self::search::corner_tiles;
 pub use self::search::spawn_point;
 #[cfg(test)]

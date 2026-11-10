@@ -2,6 +2,7 @@
 //! objects near a candidate. BUILD's call of it is in
 //! [`crate::production::spawn::build_placement_test`].
 
+use crate::construction::MainBuildingId;
 use crate::map::Footprint;
 use crate::map::GridSize;
 use crate::map::Point;
@@ -18,6 +19,7 @@ use crate::players::PlayerId;
 use crate::production::spawn::WorldMap;
 use crate::production::spawn::{Near, NearFlags};
 use crate::production::spawn::{Tested, placement_terrains};
+use crate::world::FeatureFlags;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
 use crate::world::layer::generated::SpawnTuning;
@@ -38,8 +40,11 @@ pub(super) const UNLISTED_TERRAIN: GenieError =
 pub struct Placing<'world> {
     /// The unit's player.
     pub(crate) player: PlayerId,
-    /// Its master's radii.
+    /// Its master's radii (`+0x5d8`, `+0x5dc`).
     pub(crate) radius: Footprint,
+    /// Its master's clearance radii (`+0x5fc`, `+0x600`), which a call of `[0x40]` 1 measures by
+    /// ([`PlacementRadii::Clearance`]).
+    pub(crate) clearance: Footprint,
     /// Its master's height radius is above 0.
     pub(crate) tall: bool,
     /// Its master's class.
@@ -114,18 +119,60 @@ pub enum ZoneTest {
 
 /// Whether the master's slot 0x50 counts the units (type 70) its own scan meets: its argument
 /// `[0x60]` (`param_13`), 1 for a mule cart's spot (`FUN_1411c5b60`), 0 for the spawn's rings
-/// and the transport's drop (`FUN_141192d10`).
+/// and the transport's drop (`FUN_141192d10`). No call of the slice passes 2. `FUN_141123f80`'s
+/// scan before it counts the units whatever the call passes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum UnitScan {
-    /// 0: every object its scan meets counts.
+    /// 0 (and any value but 1 and 2): every object its scan meets counts.
     Counted,
-    /// 1: its scan passes over the units; `FUN_141123f80`'s scan before it still counts them.
+    /// 1: its scan passes over the units.
     Passed,
+    /// 2: its scan passes over the units in motion ([`NearFlags::IN_MOTION`]: their slot 0x1f8,
+    /// the animation speed, above 0; `COMISS`, `JA` at 0x14126523f, so a NaN speed counts).
+    InMotionPassed,
+}
+
+impl UnitScan {
+    /// Whether the slot's own scan passes over `near` for this argument: only a unit, and only
+    /// one in motion for 2.
+    fn passes(self, near: &Near) -> bool {
+        near.kind == MasterKind::COMBAT
+            && match self {
+                Self::Counted => false,
+                Self::Passed => true,
+                Self::InMotionPassed => near.flags.contains(NearFlags::IN_MOTION),
+            }
+    }
+}
+
+/// The master's radii a call of the master's slot 0x50 measures by: its argument `[0x40]`
+/// (`param_9`), which the slot and `FUN_141123f80` read alike.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PlacementRadii {
+    /// 0: its radii (`+0x5d8`, `+0x5dc`), the spawn's and the transport's calls.
+    Size,
+    /// 1: its clearance radii (`+0x5fc`, `+0x600`), BUILD's call through the building master's
+    /// slot ([`build_placement`]).
+    ///
+    /// [`build_placement`]: crate::production::spawn::build_placement
+    Clearance,
+}
+
+impl Placing<'_> {
+    /// The master's radii that `radii` chooses.
+    const fn measured(&self, radii: PlacementRadii) -> Footprint {
+        match radii {
+            PlacementRadii::Size => self.radius,
+            PlacementRadii::Clearance => self.clearance,
+        }
+    }
 }
 
 /// The arguments of a call of the master's slot 0x50 that change what [`placement`] answers.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PlacementCall {
+    /// `[0x40]` (`param_9`): the master's radii it measures by.
+    pub(crate) radii: PlacementRadii,
     /// Whether it runs the zone test.
     pub(crate) zones: ZoneTest,
     /// `[0x58]` (`param_12`): the object both scans pass over (the inner ring's building), none
@@ -138,14 +185,19 @@ pub struct PlacementCall {
 /// The master's slot 0x50 (`0x141264db0`) with the arguments of `call`: `FUN_141123f80`'s test
 /// (the map's edge, then per tile of the box the terrain restriction and the explored tiles,
 /// then the objects overlapping), then its own scan of the objects overlapping, which reports
-/// the first one. Both scans pass over the call's object (`[0x58]`); the own scan passes over
-/// the units where the call says so (`[0x60]` 1). With `[0x50]` set (`param_11`, every call of
-/// genie's), a master whose radii (`+0x5d8`, `+0x5dc`) are both at most 0 is free whatever
-/// `FUN_141123f80` found: off the map, on a forbidden terrain, unexplored. A NaN radius is not
-/// at most 0: it takes both scans, whose overlap test it fails. The editor's case (the game's
-/// mode 4), the hill modes, the zone test (`FUN_1415c6400`, the world's `+0x820` mode 1), the
-/// call's `[0x60]` 2 (the units whose slot 0x1f8 is above 0 passed) and the moving objects' own
-/// check (`DAT_143f01833`, probed 0) are not modelled.
+/// the first one. Both measure by the radii the call chooses (`[0x40]`). Both scans pass over
+/// the call's object (`[0x58]`); the own scan passes over the units where the call says so
+/// (`[0x60]` 1, or 2 for those in motion), and under the world's feature flags
+/// (`DAT_143f01833`, [`crate::world::FeatureFlags`]) over a building annexed to the call's
+/// object (its `+0xbb8`). With `[0x50]` set (`param_11`, every call of genie's), a master whose
+/// radii are both at most 0 is free whatever `FUN_141123f80` found: off the map, on a forbidden
+/// terrain, unexplored. A NaN radius is not at most 0: it takes both scans, whose overlap test
+/// it fails. The call's `[0x48]` (`param_10`) lets both scans run for a master without a height
+/// (`+0x5e0` at most 0 or NaN: `COMISS`, `JBE` at 0x141264fac); each object's test of either
+/// scan still needs that height (0x1412653ad), so they find nothing and the argument changes
+/// nothing the slot answers: the port takes none. The editor's case (the game's mode 4), the
+/// hill modes and the zone test (`FUN_1415c6400`, the world's `+0x820` mode 1) are not
+/// modelled.
 pub(crate) fn placement(
     me: &Placing<'_>,
     map: &WorldMap<'_>,
@@ -155,10 +207,11 @@ pub(crate) fn placement(
     spawn_tuning: &SpawnTuning,
 ) -> GenieResult<Tested> {
     let (x, y) = (point.x(), point.y());
-    let (rx, ry) = (me.radius.x(), me.radius.y());
+    let radius = me.measured(call.radii);
+    let (rx, ry) = (radius.x(), radius.y());
     // without radii the slot answers free whatever FUN_141123f80 found; a NaN radius takes
     // the scans
-    if !me.radius.has_radii() {
+    if !radius.has_radii() {
         return Ok(Tested::Free);
     }
     let size = map.size();
@@ -204,21 +257,9 @@ pub(crate) fn placement(
             if call.zones == ZoneTest::Tested {
                 return Err(GenieError::unsupported("a placement test in a zone mode"));
             }
-            let counts = |near: &Near| {
-                let listed = call.passed != Some(near.id)
-                    && near.state < ObjectState::Removed
-                    && !near.buildable_on.passed()
-                    && (near.kind != MasterKind::BUILDING
-                        || !near.flags.contains(NearFlags::DESOLID));
-                let tall = near.flags.contains(NearFlags::TALL)
-                    || (roles.of_class(me.class).contains(ClassRoles::TREE)
-                        && roles.of_class(near.class).contains(ClassRoles::FARM))
-                    || (near.kind == MasterKind::BUILDING
-                        && near.obstruction_kind != ObstructionKind::NONE);
-                listed.then_some(tall && me.tall)
-            };
+            let counts = |near: &Near| static_scan_reads(near, me, call.passed, roles);
             let found = if me.tall {
-                overlapping(map, point, me.radius, &counts, spawn_tuning)?
+                overlapping(map, point, radius, &counts, spawn_tuning)?
             } else {
                 Vec::new()
             };
@@ -227,25 +268,10 @@ pub(crate) fn placement(
         }
     };
     // slot 0x50's own scan
-    let counts = |near: &Near| {
-        let listed = call.passed != Some(near.id)
-            && !(call.units == UnitScan::Passed && near.kind == MasterKind::COMBAT)
-            && near.state < ObjectState::Removed
-            && !near.buildable_on.passed()
-            && (near.kind != MasterKind::BUILDING
-                || roles
-                    .of_class(near.class)
-                    .contains(ClassRoles::PACKED_TREBUCHET)
-                || roles
-                    .of_class(near.class)
-                    .contains(ClassRoles::UNPACKED_TREBUCHET)
-                || !near.flags.contains(NearFlags::DESOLID));
-        let tall = near.flags.contains(NearFlags::TALL)
-            || (near.kind == MasterKind::BUILDING && near.obstruction_kind.recorded());
-        listed.then_some(tall && me.tall)
-    };
+    let feature_flags = map.turns.feature_flags;
+    let counts = |near: &Near| own_scan_reads(near, me, call, feature_flags, roles);
     let found = if me.tall {
-        overlapping(map, point, me.radius, &counts, spawn_tuning)?
+        overlapping(map, point, radius, &counts, spawn_tuning)?
     } else {
         Vec::new()
     };
@@ -256,4 +282,58 @@ pub(crate) fn placement(
     Ok(Tested::Blocked {
         stays: blocker.is_some_and(|near| near.stays(roles)),
     })
+}
+
+/// What `FUN_141123f80`'s scan reads of object `near` for `me`: none for one it passes over (the
+/// call's object `passed`, one from state 7 on, one buildable on, a desolid building), else
+/// whether its box has a height (its master's, a farm's for a tree, an obstructing building's)
+/// where `me`'s has one too.
+fn static_scan_reads(
+    near: &Near,
+    me: &Placing<'_>,
+    passed: Option<ObjectId>,
+    roles: &Roles,
+) -> Option<bool> {
+    let listed = passed != Some(near.id)
+        && near.state < ObjectState::Removed
+        && !near.buildable_on.passed()
+        && (near.kind != MasterKind::BUILDING || !near.flags.contains(NearFlags::DESOLID));
+    let tall = near.flags.contains(NearFlags::TALL)
+        || (roles.of_class(me.class).contains(ClassRoles::TREE)
+            && roles.of_class(near.class).contains(ClassRoles::FARM))
+        || (near.kind == MasterKind::BUILDING && near.obstruction_kind != ObstructionKind::NONE);
+    listed.then_some(tall && me.tall)
+}
+
+/// What the slot's own scan reads of object `near` for `me` under the call `call` and the world's
+/// `feature_flags`: none for one it passes over (the call's object, one from state 7 on, one
+/// buildable on, a desolid building but of classes 51 and 54, the units the call passes, and
+/// under the feature flags a building annexed to the call's object), else whether its box has a
+/// height (its master's, an obstructing building's) where `me`'s has one too.
+fn own_scan_reads(
+    near: &Near,
+    me: &Placing<'_>,
+    call: PlacementCall,
+    feature_flags: FeatureFlags,
+    roles: &Roles,
+) -> Option<bool> {
+    // 0x1412651fa: the flags' test of an annex needs the call's object
+    let annex_passed = feature_flags == FeatureFlags::On
+        && call.passed.is_some()
+        && near.main_building.map(MainBuildingId::id) == call.passed;
+    let listed = call.passed != Some(near.id)
+        && near.state < ObjectState::Removed
+        && !near.buildable_on.passed()
+        && (near.kind != MasterKind::BUILDING
+            || roles
+                .of_class(near.class)
+                .contains(ClassRoles::PACKED_TREBUCHET)
+            || roles
+                .of_class(near.class)
+                .contains(ClassRoles::UNPACKED_TREBUCHET)
+            || !(near.flags.contains(NearFlags::DESOLID) || annex_passed))
+        && !call.units.passes(near);
+    let tall = near.flags.contains(NearFlags::TALL)
+        || (near.kind == MasterKind::BUILDING && near.obstruction_kind.recorded());
+    listed.then_some(tall && me.tall)
 }

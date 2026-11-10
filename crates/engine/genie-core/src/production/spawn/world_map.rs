@@ -148,6 +148,14 @@ impl WorldMap<'_> {
                             Speed::ZERO < master.animated_part().max_speed,
                         );
                         flags.set(
+                            NearFlags::IN_MOTION,
+                            // slot 0x1f8: the animation speed (`+0x7b8`)
+                            world
+                                .parts
+                                .anim_speed_of(id)
+                                .is_some_and(|speed| Speed::ZERO < speed),
+                        );
+                        flags.set(
                             NearFlags::HOLDS,
                             Amount::ZERO < unit.life.amount
                                 && unit.life.attribute_kind.is_some_and(|attribute_id| {
@@ -187,6 +195,7 @@ impl WorldMap<'_> {
                     }),
                     hp: unit.life.hp,
                     outline: master.outline.with_height(master.outline_height.get()),
+                    main_building: world.parts.building_of(id).annex_of,
                 })
             })
             .collect()

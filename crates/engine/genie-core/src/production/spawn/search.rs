@@ -56,8 +56,8 @@ pub(super) fn try_spot(
 /// ([`outer_ring`], cases 11 to 14), then the points inside its footprint ([`inner_ring`],
 /// cases 15 to 18, `FUN_1411d0b20`), which keep the point whose tile holds the fewest objects
 /// (`tile_objects`, none off the map) for want of a free one. None when even they find
-/// nothing: the game's 0. Its first test under `DAT_143f01833` (`FUN_1411c52f0`, probed 0) is
-/// not modelled.
+/// nothing: the game's 0. Its first test under the world's feature flags (`DAT_143f01833`,
+/// [`crate::world::FeatureFlags`]; `FUN_1411c52f0`) is not modelled.
 ///
 /// # Errors
 ///

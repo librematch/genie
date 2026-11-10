@@ -1,5 +1,6 @@
 //! An object near a candidate ([`Near`]), as the placement test and the blocker test read it.
 
+use crate::construction::MainBuildingId;
 use crate::map::Footprint;
 use crate::map::Position;
 use crate::map::Radii;
@@ -36,6 +37,9 @@ bitflags::bitflags! {
         /// The terrain of its tile (`+0x2e8`, taken as the tile it stands on) is a forest
         /// ([`crate::map::terrain::TerrainKind::forest`]).
         const FOREST_TILE = 1 << 5;
+        /// Its animation speed (its slot 0x1f8: `+0x7b8`, 0 for a static object) is above 0: it
+        /// is in motion. A NaN speed is not.
+        const IN_MOTION = 1 << 6;
     }
 }
 
@@ -48,7 +52,7 @@ pub struct Near {
     pub(crate) position: Position,
     /// Its master's radii on the ground and whether its height radius is above 0.
     pub(crate) radius: Footprint,
-    /// Its height, auto-gather, desolid, moving, holding and forest reads.
+    /// Its height, auto-gather, desolid, moving, holding, forest and in-motion reads.
     pub(crate) flags: NearFlags,
     /// Its master's type (`+0x8`), class, id, `can_be_built_on` (`+0x5e9`), `obstruction_type`
     /// (`+0x651`) and `enable_auto_gather` (`+0x681`).
@@ -75,6 +79,8 @@ pub struct Near {
     /// Its master's outline radii and height (`+0x688`, `+0x68c`, `+0x690`), BUILD's box for
     /// obstruction types 11 to 13.
     pub(crate) outline: Radii,
+    /// An annex's main building (`+0xbb8`), none for another object.
+    pub(crate) main_building: Option<MainBuildingId>,
 }
 
 impl Near {
