@@ -30,6 +30,7 @@ use crate::world::layer::Roles;
 use crate::world::layer::Slots;
 use crate::world::layer::generated::MoveToTuning;
 use crate::world::lets::take;
+use crate::world::motions::BesideParts;
 use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlotsExt;
 use crate::world::step::Step;
@@ -233,7 +234,12 @@ impl Unit {
         let top_speed = step.world.top_speed_terms(step.player, self)?;
         let (mover, by_id) = step.world.parts.lend_mover(
             self.id,
-            (&step.world.players, &step.world.index, &step.world.model),
+            BesideParts {
+                players: &step.world.players,
+                index: &step.world.index,
+                model: &step.world.model,
+                treaty: step.world.treaty.as_ref(),
+            },
         );
         let drop_world = DropWorld {
             top_speed,

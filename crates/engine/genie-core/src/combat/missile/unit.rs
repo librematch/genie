@@ -351,6 +351,7 @@ impl Unit {
                 &step.world.parts,
                 &step.world.model.roles,
                 &step.world.model.tuning,
+                step.world.treaty.as_ref(),
             ),
         })?;
         let mut met = Vec::new();

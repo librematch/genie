@@ -74,6 +74,7 @@ impl World {
         for other in PlayerId::each(count).skip(1) {
             if allied(
                 &self.players.player(buyer)?.relations,
+                self.treaty.as_ref(),
                 buyer,
                 other,
                 AllyTest::AlliesOnly,
@@ -102,6 +103,7 @@ impl World {
             for player_id in PlayerId::each(count).skip(1) {
                 if allied(
                     &self.players.player(buyer)?.relations,
+                    self.treaty.as_ref(),
                     buyer,
                     player_id,
                     AllyTest::AlliesOnly,

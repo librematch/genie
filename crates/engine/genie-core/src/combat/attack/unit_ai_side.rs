@@ -419,6 +419,7 @@ impl UnitView<'_, '_> {
             player: self.player,
             relations: &self.step.world.players.player(self.player)?.relations,
             foreign: view.players(),
+            treaty: self.step.world.treaty.as_ref(),
             drop_sites: &self.step.world.model.drop_sites,
         };
         Ok(Some(victim_in(

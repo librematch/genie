@@ -2690,6 +2690,7 @@ fn slot_0x820_search_takes_the_own_task_else_the_first_master_of_the_swap_group(
     .unwrap();
     let world = TaskWorld {
         players: &sent_off_world.players,
+        treaty: None,
         drop_sites: &[],
     };
     let search = |own: &Master| {
@@ -2868,6 +2869,7 @@ fn unit_side_reads_the_other_players_relations_around_its_own() {
         player: PlayerId::new(1),
         relations: &ByPlayer::new(vec![Relation::Neutral, Relation::Neutral, Relation::Ally]),
         foreign,
+        treaty: None,
         drop_sites: &[],
     };
     assert!(world.allied(PlayerId::new(1), PlayerId::new(2), AllyTest::AlliesOnly));
@@ -21608,6 +21610,7 @@ fn drop_site_sought(
             &forage_world.parts,
             &forage_world.model.roles,
             &forage_world.model.tuning,
+            forage_world.treaty.as_ref(),
         ),
     )
 }

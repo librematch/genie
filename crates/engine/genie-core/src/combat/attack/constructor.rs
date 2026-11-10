@@ -50,6 +50,7 @@ use crate::world::layer::Roles;
 use crate::world::layer::generated::AttackTuning;
 use crate::world::layer::generated::MoveToTuning;
 use crate::world::layer::generated::SpriteTuning;
+use crate::world::motions::BesideParts;
 use crate::world::objects_ref::ObjectsRef;
 use crate::world::step::Step;
 use crate::{GenieError, GenieResult};
@@ -240,7 +241,12 @@ impl Attack {
         )?;
         let (mover, by_id) = step.world.parts.lend_mover(
             unit.id,
-            (&step.world.players, &step.world.index, &step.world.model),
+            BesideParts {
+                players: &step.world.players,
+                index: &step.world.index,
+                model: &step.world.model,
+                treaty: step.world.treaty.as_ref(),
+            },
         );
         let mover = mover.ok_or(ATTACKER_UNMOVING)?;
         let (mut attack, begun, mut posted) =
@@ -260,7 +266,12 @@ impl Attack {
             let ready = cmd.ready.as_ref().ok_or(ATTACK_TARGET_NOT_LIVE)?;
             let (motion, by_id) = step.world.parts.lend_motion(
                 unit.id,
-                (&step.world.players, &step.world.index, &step.world.model),
+                BesideParts {
+                    players: &step.world.players,
+                    index: &step.world.index,
+                    model: &step.world.model,
+                    treaty: step.world.treaty.as_ref(),
+                },
             );
             let mut ground = Ground {
                 map: &step.world.spatial,

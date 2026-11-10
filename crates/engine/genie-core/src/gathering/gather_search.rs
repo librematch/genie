@@ -770,6 +770,7 @@ mod tests {
             &world.parts,
             &world.model.roles,
             &world.model.tuning,
+            world.treaty.as_ref(),
         );
         let (owner, unit, _) = objects
             .with_master(id)?
@@ -863,6 +864,7 @@ mod tests {
             &world.parts,
             &world.model.roles,
             &world.model.tuning,
+            world.treaty.as_ref(),
         );
         let planner = world
             .pathing

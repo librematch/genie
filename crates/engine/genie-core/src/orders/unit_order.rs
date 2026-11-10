@@ -32,6 +32,7 @@ use crate::world::World;
 use crate::world::index::Place;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
+use crate::world::motions::BesideParts;
 use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlotsExt;
 use crate::{GenieError, GenieResult};
@@ -446,9 +447,15 @@ impl World {
         // its action layer goes out of the table with it, as the updating object's
         let mut actions = self.parts.take_actions(unit.id);
         let player = &self.players.player(player_id)?;
-        let (mover, by_id) = self
-            .parts
-            .lend_mover(unit.id, (&self.players, &self.index, &self.model));
+        let (mover, by_id) = self.parts.lend_mover(
+            unit.id,
+            BesideParts {
+                players: &self.players,
+                index: &self.index,
+                model: &self.model,
+                treaty: self.treaty.as_ref(),
+            },
+        );
         let world = DropWorld {
             top_speed,
             masters: by_id.masters().of(player_id),

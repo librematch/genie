@@ -87,14 +87,14 @@ impl Mover {
             };
             // slot 0x5f0 with the walker's player's view of the hit's (FUN_141663d90 with the
             // ally flag): an ally pauses 0.1, anyone else 0.5 (Gaia counts for no one)
-            let allied = world.allied_with(player, other.player);
+            let allied = world.allied_with(by_id.treaty(), player, other.player);
             if outranks && by_id.gait(id).is_some_and(|gait| gait.pause.is_some()) {
                 self.pauses.push((id, hit_pause(allied, movement_tuning)));
             }
             // a hit that neither counts the other an ally, of the walked level's target's
             // master, notifies the walker's unit AI (0x215)
             if !allied
-                && !world.allied_with(other.player, player)
+                && !world.allied_with(by_id.treaty(), other.player, player)
                 && let Some(object_id) = level.target.filter(|object_id| !object_id.is_recyclable())
             {
                 let target = world.get(object_id).map(|placed| placed.master);

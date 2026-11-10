@@ -926,6 +926,7 @@ mod tests {
             &world.parts,
             &world.model.roles,
             &world.model.tuning,
+            world.treaty.as_ref(),
         );
         assert_eq!(by_id.unread(id), Some(&why));
         world.check_parts().unwrap();

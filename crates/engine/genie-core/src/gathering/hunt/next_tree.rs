@@ -106,7 +106,13 @@ impl Unit {
             state: unit.life.state,
             player: tp,
             amount: unit.life.amount,
-            allied: allied(own, step.player, tp, AllyTest::WithRelation4),
+            allied: allied(
+                own,
+                step.world.treaty.as_ref(),
+                step.player,
+                tp,
+                AllyTest::WithRelation4,
+            ),
             top_action: step.world.parts.actions_of(unit.id).top_action_kind(),
             drop_site: false,
         };

@@ -104,7 +104,13 @@ impl WorldPicker<'_> {
                 let mut flags = FoundFlags::empty();
                 flags.set(
                     FoundFlags::ALLIED,
-                    allied(self.relations, self.player, owner, AllyTest::WithRelation4),
+                    allied(
+                        self.relations,
+                        self.by_id.treaty(),
+                        self.player,
+                        owner,
+                        AllyTest::WithRelation4,
+                    ),
                 );
                 flags.set(FoundFlags::HAS_AI, self.parts.unit_ai.contains(unit.id));
                 flags.set(FoundFlags::INSIDE, unit.life.inside.is_some());

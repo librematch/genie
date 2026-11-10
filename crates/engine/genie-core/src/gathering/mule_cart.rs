@@ -217,6 +217,7 @@ impl World {
                         &self.parts,
                         &self.model.roles,
                         &self.model.tuning,
+                        self.treaty.as_ref(),
                     ),
                     &self.model.roles,
                 )?;

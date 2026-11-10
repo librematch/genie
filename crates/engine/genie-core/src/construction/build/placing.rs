@@ -421,6 +421,7 @@ impl BuildAction {
             &step.world.parts,
             &step.world.model.roles,
             &step.world.model.tuning,
+            step.world.treaty.as_ref(),
         );
         let mover = step
             .world
@@ -509,7 +510,7 @@ fn site_occupants(
     Ok(step
         .world
         .spatial
-        .footprint_occupants(site, placed, &reads.looks)?
+        .footprint_occupants(site, placed, &reads.looks, step.world.treaty.as_ref())?
         .into_iter()
         .filter(|id| !cleared.contains(id))
         .collect())

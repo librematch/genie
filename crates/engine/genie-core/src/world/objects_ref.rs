@@ -14,6 +14,7 @@ use crate::objects::unit::Unit;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute::AttributeId;
+use crate::players::treaty::TreatyMonitor;
 #[cfg(test)]
 use crate::testing::static_roles;
 #[cfg(test)]
@@ -41,8 +42,8 @@ pub type PartTables<'world> = (
 
 /// The world's objects by id, to read, beside the parts a caller holds apart (a walk holds the
 /// spatial index and the planners): the players' lists, the table by id, the players' masters,
-/// the objects' parts and the build's roles of their classes and masters. An object out for its
-/// update is none.
+/// the objects' parts, the build's roles of their classes and masters and the world's treaty
+/// monitor, which the players' ally test reads. An object out for its update is none.
 #[derive(Clone, Copy, Debug)]
 pub struct ObjectsRef<'world> {
     players: &'world [Player],
@@ -55,12 +56,14 @@ pub struct ObjectsRef<'world> {
     motions: Lent<'world, Motion>,
     roles: &'world Roles,
     tuning: &'world Tuning,
+    treaty: Option<&'world TreatyMonitor>,
 }
 
 impl<'world> ObjectsRef<'world> {
     /// The objects of `players`, which the world's table `index` finds, with the players'
     /// `masters`, the objects' `parts` (their own masters, their building, combat and motion
-    /// layers), the build's `roles` and its `tuning`.
+    /// layers), the build's `roles` and its `tuning`, and the world's treaty monitor `treaty`
+    /// (`+0x820`).
     #[must_use]
     pub fn new(
         players: &'world [Player],
@@ -69,6 +72,7 @@ impl<'world> ObjectsRef<'world> {
         parts: &'world Parts,
         roles: &'world Roles,
         tuning: &'world Tuning,
+        treaty: Option<&'world TreatyMonitor>,
     ) -> Self {
         Self::of_tables(
             players,
@@ -83,6 +87,7 @@ impl<'world> ObjectsRef<'world> {
             ),
             roles,
             tuning,
+            treaty,
         )
     }
 
@@ -91,7 +96,8 @@ impl<'world> ObjectsRef<'world> {
     /// layers `buildings`, the combat layers `combats`, the action layers `actions`, the objects
     /// the load could not read whole `unread` and the motion layers `motions` (one of them lent
     /// out to a walk,
-    /// [`crate::world::parts::PartTable::lend`]), the build's `roles` and its `tuning`.
+    /// [`crate::world::parts::PartTable::lend`]), the build's `roles` and its `tuning`, and the
+    /// world's treaty monitor `treaty`.
     #[must_use]
     pub const fn of_tables(
         players: &'world [Player],
@@ -100,6 +106,7 @@ impl<'world> ObjectsRef<'world> {
         (buildings, combats, actions, unread, motions): PartTables<'world>,
         roles: &'world Roles,
         tuning: &'world Tuning,
+        treaty: Option<&'world TreatyMonitor>,
     ) -> Self {
         Self {
             players,
@@ -112,6 +119,7 @@ impl<'world> ObjectsRef<'world> {
             motions,
             roles,
             tuning,
+            treaty,
         }
     }
 
@@ -148,6 +156,13 @@ impl<'world> ObjectsRef<'world> {
         self.tuning
     }
 
+    /// The world's treaty monitor (`+0x820`), which the ally test reads
+    /// ([`crate::unit_ai::task_finder::allied`]).
+    #[must_use]
+    pub const fn treaty(&self) -> Option<&'world TreatyMonitor> {
+        self.treaty
+    }
+
     /// No objects but the players' `masters`: a test's reader of masters through the objects'
     /// records, which have no masters of their own.
     #[cfg(test)]
@@ -159,6 +174,7 @@ impl<'world> ObjectsRef<'world> {
             no_parts(),
             static_roles(),
             tuning(),
+            None,
         )
     }
 
@@ -172,6 +188,7 @@ impl<'world> ObjectsRef<'world> {
             no_parts(),
             static_roles(),
             tuning(),
+            None,
         )
     }
 

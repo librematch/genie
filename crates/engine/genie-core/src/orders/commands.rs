@@ -411,7 +411,13 @@ impl World {
     pub(crate) fn mutual_allies(&self, first: PlayerId, second: PlayerId) -> bool {
         let allied = |from: PlayerId, to: PlayerId| {
             self.players.get(from.index()).is_some_and(|player| {
-                task_finder_allied(&player.relations, from, to, AllyTest::WithRelation4)
+                task_finder_allied(
+                    &player.relations,
+                    self.treaty.as_ref(),
+                    from,
+                    to,
+                    AllyTest::WithRelation4,
+                )
             })
         };
         allied(first, second) && allied(second, first)

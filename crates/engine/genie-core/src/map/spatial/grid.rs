@@ -15,6 +15,7 @@ use crate::objects::ObjectId;
 use crate::objects::masters::ObstructionKind;
 use crate::players::AllyTest;
 use crate::players::PlayerId;
+use crate::players::treaty::TreatyMonitor;
 use crate::players::{NO_RELATIONS, PlayerSet};
 use crate::unit_ai::task_finder::allied as task_finder_allied;
 use crate::world::objects_ref::ObjectsRef;
@@ -37,7 +38,8 @@ pub struct WalkQuery<'world> {
     pub(crate) player: Option<PlayerId>,
     /// The objects the query ignores.
     pub(crate) ignore: &'world [RecordId],
-    /// The world's objects, whose gaits the query reads ([`ObjectsRef::moving`]).
+    /// The world's objects, whose gaits the query reads ([`ObjectsRef::moving`]), with the
+    /// world's treaty monitor, which its ally test reads ([`ObjectsRef::treaty`]).
     pub(crate) objects: ObjectsRef<'world>,
 }
 
@@ -226,25 +228,37 @@ impl Spatial {
         }
     }
 
-    /// `FUN_141663dc0` with the ally flag ([`Spatial::allied`]), for the walk's avoidance.
+    /// `FUN_141663dc0` with the ally flag ([`Spatial::allied`]) while the world's treaty
+    /// monitor is `treaty` (`+0x820`), for the walk's avoidance.
     #[must_use]
-    pub fn allied_with(&self, from: PlayerId, to: PlayerId) -> bool {
-        self.allied(from, to)
+    pub fn allied_with(
+        &self,
+        treaty: Option<&TreatyMonitor>,
+        from: PlayerId,
+        to: PlayerId,
+    ) -> bool {
+        self.allied(treaty, from, to)
     }
 
-    /// The players `from` counts as allies ([`Spatial::allied_with`]), of the 32 a set holds.
+    /// The players `from` counts as allies while the world's treaty monitor is `treaty`
+    /// ([`Spatial::allied_with`]), of the 32 a set holds.
     #[must_use]
-    pub fn allies_of(&self, from: PlayerId) -> PlayerSet {
+    pub fn allies_of(&self, treaty: Option<&TreatyMonitor>, from: PlayerId) -> PlayerSet {
         PlayerId::each(32)
-            .filter(|&to| self.allied(from, to))
+            .filter(|&to| self.allied(treaty, from, to))
             .collect()
     }
 
-    /// `FUN_141663dc0` with the ally flag: `to` counts for `from` when it is `from`, or `from`
-    /// stands to it in relation 0 or 4; Gaia counts for no one else.
-    pub(super) fn allied(&self, from: PlayerId, to: PlayerId) -> bool {
+    /// `FUN_141663dc0` with the ally flag ([`crate::unit_ai::task_finder::allied`]) on `from`'s
+    /// relation row as the walk's copy holds it, while the world's treaty monitor is `treaty`.
+    pub(super) fn allied(
+        &self,
+        treaty: Option<&TreatyMonitor>,
+        from: PlayerId,
+        to: PlayerId,
+    ) -> bool {
         let relations = self.relations.get(from).unwrap_or(&NO_RELATIONS);
-        task_finder_allied(relations, from, to, AllyTest::WithRelation4)
+        task_finder_allied(relations, treaty, from, to, AllyTest::WithRelation4)
     }
 
     /// `FUN_1410562e0` on the obstruction manager: its ignore list becomes `ids` (none for an
@@ -288,8 +302,9 @@ impl Spatial {
     /// except the `ignore`d objects', in the cells the query visits ([`Spatial::visits`], `rect`
     /// grown by `grow`), whose box, grown by `grow` (the walker's radius), meets the step's
     /// rectangle `rect` and whose grown box meets the step `from` -> `to`
-    /// (`FUN_1410512f0`; a circle's, kind 5, `FUN_141051630`, alike). A moving object of
-    /// `player` or an ally grows by `grow × ally_factor` instead (`+0x84`, the walker's master's
+    /// (`FUN_1410512f0`; a circle's, kind 5, `FUN_141051630`, alike). A moving object whose
+    /// player counts `player` allied ([`Spatial::allied`], `FUN_141663dc0` with the ally flag at
+    /// `0x141051f8f`) grows by `grow × ally_factor` instead (`+0x84`, the walker's master's
     /// `min_collision_size_multiplier`). The ids hit, in id order; the game's are in its grid's,
     /// which no caller reads yet. A rectangle that, grown, leaves the map meets the map edge's
     /// records first ([`Spatial::edge_records`], `FUN_141057290`). Both its callers
@@ -342,7 +357,7 @@ impl Spatial {
             }
             let distance = if by_id.moving(id) {
                 let player = player.ok_or(WALKER_UNPLACED)?;
-                if self.allied(placed.player, player) {
+                if self.allied(by_id.treaty(), placed.player, player) {
                     ally_factor * grow
                 } else {
                     grow

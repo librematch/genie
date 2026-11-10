@@ -114,7 +114,15 @@ impl TreatyMonitor {
                 let exempt = if game_mode == GameMode::DefendTheWonder {
                     player_id == owner
                 } else {
-                    allied(&player.relations, player_id, owner, AllyTest::AlliesOnly)
+                    // the ally test reads the world's monitor (`world+0x820`) again: this one,
+                    // whose test runs
+                    allied(
+                        &player.relations,
+                        Some(self),
+                        player_id,
+                        owner,
+                        AllyTest::AlliesOnly,
+                    )
                 };
                 let first = zone.first;
                 !exempt

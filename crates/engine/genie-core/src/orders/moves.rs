@@ -459,6 +459,7 @@ impl World {
     ) -> GenieResult<Option<(bool, bool)>> {
         let world = TaskWorld {
             players: &self.players,
+            treaty: self.treaty.as_ref(),
             drop_sites: &self.model.drop_sites,
         };
         Ok(match target {

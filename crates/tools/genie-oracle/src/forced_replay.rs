@@ -123,6 +123,7 @@ pub fn old_pather_paths(
                     &turns.parts,
                     &turns.model.roles,
                     &turns.model.tuning,
+                    turns.treaty.as_ref(),
                 ),
             ),
             id,

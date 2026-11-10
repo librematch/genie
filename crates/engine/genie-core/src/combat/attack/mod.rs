@@ -540,6 +540,7 @@ impl World {
                     tuning,
                     ..
                 },
+            treaty,
             ..
         } = self;
         let (object, sprite) = streams.object_and_sprite();
@@ -563,6 +564,7 @@ impl World {
                 ),
                 roles,
                 tuning,
+                treaty.as_ref(),
             ),
             motion: MotionMut::new(motion),
         }

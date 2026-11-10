@@ -169,6 +169,7 @@ impl Unit {
             &step.world.parts,
             &step.world.model.roles,
             &step.world.model.tuning,
+            step.world.treaty.as_ref(),
         );
         let others = OthersRef::of(&step.world.players, &step.world.index, step.player)?;
         let (carry_to, class) = (hunt.carry_to, i32::from(ClassId::field(hunt.target_class)));
@@ -511,6 +512,7 @@ impl Unit {
             &step.world.parts,
             &step.world.model.roles,
             &step.world.model.tuning,
+            step.world.treaty.as_ref(),
         );
         let mut reach = |spatial: &mut Spatial, id: ObjectId, range: Distance| {
             mover.reaches_object((at, &me), (spatial, by_id), &mut plan, id, range, master_id)

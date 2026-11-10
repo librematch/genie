@@ -206,6 +206,7 @@ impl World {
                     &self.parts,
                     &self.model.roles,
                     &self.model.tuning,
+                    self.treaty.as_ref(),
                 ),
             )? {
                 return Ok(at);
@@ -304,6 +305,7 @@ impl World {
             &self.parts,
             &self.model.roles,
             &self.model.tuning,
+            self.treaty.as_ref(),
         );
         let Some(unit_group) = self.groups.get(group) else {
             return Ok(());

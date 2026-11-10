@@ -304,6 +304,7 @@ impl World {
         let relations = &self.players.player(building.player)?.relations;
         Ok(allied(
             relations,
+            self.treaty.as_ref(),
             building.player,
             object.player,
             AllyTest::WithRelation4,

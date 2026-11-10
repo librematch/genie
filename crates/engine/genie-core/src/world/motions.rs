@@ -10,6 +10,7 @@ use crate::objects::ObjectId;
 use crate::objects::layers::{Building, Combat};
 use crate::objects::layers::{Motion, MotionMut};
 use crate::objects::masters::MasterTables;
+use crate::players::treaty::TreatyMonitor;
 use crate::world::Player;
 use crate::world::index::ObjectIndex;
 use crate::world::objects_ref::ObjectsRef;
@@ -130,6 +131,21 @@ impl PartTable<Motion> {
     }
 }
 
+/// What a lent motion layer's view of the world's objects reads beside the parts
+/// ([`Parts::lend_motion`]): the players' lists, the table by id, the model and the world's
+/// treaty monitor (`+0x820`).
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct BesideParts<'world> {
+    /// The players' lists.
+    pub(crate) players: &'world [Player],
+    /// The world's table by id.
+    pub(crate) index: &'world ObjectIndex,
+    /// The model: the players' masters, the build's roles and tuning.
+    pub(crate) model: &'world Model,
+    /// The world's treaty monitor, which the ally test reads.
+    pub(crate) treaty: Option<&'world TreatyMonitor>,
+}
+
 impl Parts {
     /// Object `id`'s mover, none for an object that does not move (or that the table does not
     /// hold: a static object).
@@ -178,14 +194,20 @@ impl Parts {
     }
 
     /// Object `id`'s motion layer lent out of the table to change ([`MotionMut`], none for a
-    /// static object) and the world's objects by id beside it (`players`, `index` and
-    /// the other parts' tables and the `model`'s masters, roles and tuning), which read the
-    /// others' motion.
+    /// static object) and the world's objects by id beside it (the other parts' tables and
+    /// `beside`'s players, table by id, the model's masters, roles and tuning and the treaty
+    /// monitor), which read the others' motion.
     pub(crate) fn lend_motion<'world>(
         &'world mut self,
         id: ObjectId,
-        (players, index, model): (&'world [Player], &'world ObjectIndex, &'world Model),
+        beside: BesideParts<'world>,
     ) -> (MotionMut<'world>, ObjectsRef<'world>) {
+        let BesideParts {
+            players,
+            index,
+            model,
+            treaty,
+        } = beside;
         let (motion, motions) = self.motion.lend(id);
         (
             MotionMut::new(motion),
@@ -202,6 +224,7 @@ impl Parts {
                 ),
                 &model.roles,
                 &model.tuning,
+                treaty,
             ),
         )
     }
@@ -212,9 +235,9 @@ impl Parts {
     pub(crate) fn lend_mover<'world>(
         &'world mut self,
         id: ObjectId,
-        tables: (&'world [Player], &'world ObjectIndex, &'world Model),
+        beside: BesideParts<'world>,
     ) -> (Option<&'world mut Mover>, ObjectsRef<'world>) {
-        let (motion, by_id) = self.lend_motion(id, tables);
+        let (motion, by_id) = self.lend_motion(id, beside);
         (motion.into_mover(), by_id)
     }
 

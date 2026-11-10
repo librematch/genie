@@ -197,6 +197,7 @@ impl World {
         };
         let world = TaskWorld {
             players: &self.players,
+            treaty: self.treaty.as_ref(),
             drop_sites: &self.model.drop_sites,
         };
         let owner = world.players.player(player_id)?;
@@ -445,6 +446,7 @@ impl World {
             .ok_or(GenieError::unsupported("a build order: no master table"))?;
         let world = TaskWorld {
             players: &self.players,
+            treaty: self.treaty.as_ref(),
             drop_sites: &self.model.drop_sites,
         };
         let owner = world.players.player(player)?;

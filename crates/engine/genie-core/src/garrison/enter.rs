@@ -402,6 +402,7 @@ impl World {
             &self.parts,
             &self.model.roles,
             &self.model.tuning,
+            self.treaty.as_ref(),
         );
         let id = self.players.live(player, idx)?.id;
         let (tp, target_unit) = self.object(target).ok_or(UNPLACED)?;
@@ -450,6 +451,7 @@ impl World {
             &self.parts,
             &self.model.roles,
             &self.model.tuning,
+            self.treaty.as_ref(),
         );
         let (tp, target) = self.object(action.target).ok_or(UNPLACED)?;
         let master = target.master(self.master_tables(), tp)?.clone();
@@ -500,6 +502,7 @@ impl World {
             &self.parts,
             &self.model.roles,
             &self.model.tuning,
+            self.treaty.as_ref(),
         );
         let id = self.players.live(player, idx)?.id;
         let (tp, target_unit) = self.object(target).ok_or(UNPLACED)?;
@@ -540,6 +543,7 @@ impl World {
             &self.parts,
             &self.model.roles,
             &self.model.tuning,
+            self.treaty.as_ref(),
         );
         let Some(Place::Live(tp, ti)) = self.place(transport) else {
             return Err(UNREACHED);

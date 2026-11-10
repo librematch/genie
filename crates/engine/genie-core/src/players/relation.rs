@@ -15,18 +15,20 @@ pub enum Relation {
     Neutral,
     /// An enemy (3, the stances 1 and 2).
     Enemy,
-    /// The relation the stances 1 and 2 make while `FUN_1415e8e10` holds (the world's `+0x820`
-    /// object in its state 1): the queries take it for an ally's, the task finder only with
-    /// its ally flag.
+    /// The relation the stances 1 and 2 make while the world's treaty holds (`FUN_1415e8e10`,
+    /// [`crate::players::treaty::treaty_holds`]): the queries take it for an ally's, the ally
+    /// test only with its ally flag.
     Relation4,
     /// A value the game names nowhere, as the save or the game holds it.
     Other(Unnamed),
 }
 
-/// Which relations the alliance test (`FUN_141663dc0`'s `with_ally` flag) counts as allied.
+/// Which relations the ally test (`FUN_141663dc0`'s `with_ally` flag,
+/// [`crate::unit_ai::task_finder::allied`]) counts as allied.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum AllyTest {
-    /// An ally's and relation 4 (the flag set).
+    /// The flag set: an ally's and relation 4, and the ally test's relation 1 while the world's
+    /// treaty holds.
     WithRelation4,
     /// An ally's alone.
     AlliesOnly,
@@ -66,8 +68,9 @@ impl Relation {
         self.raw()
     }
 
-    /// Whether the relation counts as allied (`FUN_141663dc0`): an ally always, relation 4 by
-    /// `test`.
+    /// Whether the relation is an ally's or, by `test`, relation 4: what the ally test counts
+    /// outside a treaty (`FUN_141663dc0`, [`crate::unit_ai::task_finder::allied`]), and what the
+    /// sharing test (`FUN_14165d040`) and the queries' kind of objects (`FUN_141676b80`) count.
     #[must_use]
     pub const fn allied(self, test: AllyTest) -> bool {
         self.raw() == Self::Ally.raw()

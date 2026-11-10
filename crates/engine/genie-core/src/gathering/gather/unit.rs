@@ -509,6 +509,7 @@ impl Unit {
             &step.world.parts,
             &step.world.model.roles,
             &step.world.model.tuning,
+            step.world.treaty.as_ref(),
         );
         let others = OthersRef::of(&step.world.players, &step.world.index, step.player)?;
         let (carry_to, class, state) = (gather.carry_to, gather.target_class, gather.state);

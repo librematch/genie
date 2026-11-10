@@ -234,6 +234,7 @@ fn repairee_of(
         owner: player_id,
         allied: allied(
             &step.world.players.player(step.player)?.relations,
+            step.world.treaty.as_ref(),
             step.player,
             player_id,
             AllyTest::WithRelation4,

@@ -288,6 +288,7 @@ impl World {
             ),
             &self.model.roles,
             &self.model.tuning,
+            self.treaty.as_ref(),
         );
         let mut plan = Planning {
             pathing: &mut self.pathing,

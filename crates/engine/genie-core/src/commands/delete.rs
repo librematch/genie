@@ -82,7 +82,9 @@ impl World {
             return Ok(());
         };
         let mutual = |one: PlayerId, other: PlayerId| {
-            self.spatial.allied_with(one, other) && self.spatial.allied_with(other, one)
+            let treaty = self.treaty.as_ref();
+            self.spatial.allied_with(treaty, one, other)
+                && self.spatial.allied_with(treaty, other, one)
         };
         // The buildings' master type, whose slot 0x8b8 is the building's.
         // The first master type whose slot 0xd0 is the action object's (`FUN_14106c420`), and the

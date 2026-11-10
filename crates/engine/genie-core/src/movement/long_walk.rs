@@ -172,9 +172,9 @@ pub(crate) fn long_path_for(
         lowered,
         within_range: false,
         near_player: false,
-        allies: world
-            .get(walker.id)
-            .map_or(PlayerSet::NONE, |placed| world.allies_of(placed.player)),
+        allies: world.get(walker.id).map_or(PlayerSet::NONE, |placed| {
+            world.allies_of(by_id.treaty(), placed.player)
+        }),
     };
     let player = world.get(walker.id).map(|placed| placed.player);
     let gates = |tile| {

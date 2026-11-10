@@ -381,6 +381,7 @@ impl RepairAction {
             &step.world.parts,
             &step.world.model.roles,
             &step.world.model.tuning,
+            step.world.treaty.as_ref(),
         );
         let spatial = &mut step.world.spatial;
         let terrain = spatial.terrain.as_ref().ok_or(NO_TERRAIN)?;

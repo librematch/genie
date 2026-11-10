@@ -123,6 +123,7 @@ pub fn gate_lets_pass(
                 owner,
                 player,
                 spatial,
+                objects.treaty(),
                 roles,
             ));
         }

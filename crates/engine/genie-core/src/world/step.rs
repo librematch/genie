@@ -102,6 +102,7 @@ impl World {
                     tuning,
                     ..
                 },
+            treaty,
             ..
         } = self;
         let (object, sprite_rng) = streams.object_and_sprite();
@@ -132,6 +133,7 @@ impl World {
                 ),
                 roles,
                 tuning,
+                treaty.as_ref(),
             ),
         };
         let beside = Beside {
@@ -306,6 +308,7 @@ impl Step<'_> {
                     ),
                     &self.world.model.roles,
                     &self.world.model.tuning,
+                    self.world.treaty.as_ref(),
                 ),
             },
             sprite,

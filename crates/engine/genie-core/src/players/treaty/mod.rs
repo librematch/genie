@@ -258,6 +258,12 @@ impl TreatyMonitor {
         }
     }
 
+    /// The treaty holds: the monitor in its state 1 (`FUN_1415e8e10`'s `CMP [RAX + 0x10], 1`).
+    #[must_use]
+    pub fn holds(&self) -> bool {
+        self.state == TreatyState::Holds
+    }
+
     /// Player `player`'s zones (`+0x18 + (player − 1) × 0x24`).
     ///
     /// # Errors
@@ -285,13 +291,21 @@ impl TreatyMonitor {
     }
 }
 
+/// `FUN_1415e8e10` over the world's treaty monitor `monitor` (`+0x820`, none for its null
+/// pointer): a monitor stands and its treaty holds ([`TreatyMonitor::holds`]). A reader that
+/// holds no world (the ally test, [`crate::unit_ai::task_finder::allied`]) takes the world's
+/// monitor as it stands.
+#[must_use]
+pub fn treaty_holds(monitor: Option<&TreatyMonitor>) -> bool {
+    monitor.is_some_and(TreatyMonitor::holds)
+}
+
 impl World {
-    /// `FUN_1415e8e10`: the world's treaty holds, its monitor (`+0x820`) in its state 1.
+    /// `FUN_1415e8e10`: the world's treaty holds, its monitor (`+0x820`) in its state 1
+    /// ([`treaty_holds`]).
     #[must_use]
     pub fn treaty_holds(&self) -> bool {
-        self.treaty
-            .as_ref()
-            .is_some_and(|monitor| monitor.state == TreatyState::Holds)
+        treaty_holds(self.treaty.as_ref())
     }
 
     /// `FUN_1415c8150` (HD's `World::TreatyTimeLeftInSeconds`): the seconds left of the treaty
@@ -300,7 +314,7 @@ impl World {
     pub fn treaty_seconds_left(&self) -> TreatySeconds {
         self.treaty
             .as_ref()
-            .filter(|monitor| monitor.state == TreatyState::Holds)
+            .filter(|monitor| monitor.holds())
             .map_or(TreatySeconds::ZERO, |monitor| monitor.seconds_left)
     }
 

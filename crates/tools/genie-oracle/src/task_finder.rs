@@ -82,10 +82,11 @@ pub struct FinderObject {
 
 impl Diplomacy for FinderWorld {
     /// [`genie_core::unit_ai::task_finder::allied`] with `from`'s relations: a player without
-    /// them counts only itself.
+    /// them counts only itself. No treaty monitor: the save holds none, and a load makes it from
+    /// the save's treaty length (`World::load_treaty`), which this reader does not run.
     fn allied(&self, from: PlayerId, to: PlayerId, test: AllyTest) -> bool {
         self.relations.get(from).map_or(from == to, |by_player| {
-            task_finder_allied(by_player, from, to, test)
+            task_finder_allied(by_player, None, from, to, test)
         })
     }
 

@@ -243,6 +243,7 @@ impl UnitView<'_, '_> {
             &self.step.world.parts,
             &self.step.world.model.roles,
             &self.step.world.model.tuning,
+            self.step.world.treaty.as_ref(),
         );
         let mut resource_world = ResourceWorld {
             player: self.player,
@@ -353,6 +354,7 @@ impl Unit {
             &step.world.parts,
             &step.world.model.roles,
             &step.world.model.tuning,
+            step.world.treaty.as_ref(),
         );
         let others = OthersRef::of(&step.world.players, &step.world.index, step.player)?;
         let current = step

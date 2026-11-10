@@ -34,7 +34,10 @@ use crate::objects::masters::{Master, Task};
 use crate::players::AllyTest;
 use crate::players::Amount;
 use crate::players::PlayerId;
+use crate::players::Relation;
 use crate::players::attribute::AttributeId;
+use crate::players::treaty::TreatyMonitor;
+use crate::players::treaty::treaty_holds;
 use crate::players::{CivId, Relations};
 use crate::unit_ai::task_finder::target_steps::on_target;
 use crate::{GenieError, GenieResult};
@@ -112,22 +115,50 @@ pub struct TaskOn<'target, 'master> {
     pub terrain: Option<TerrainId>,
 }
 
-/// What the finder reads of the world: the players' relations (`FUN_141663dc0`: whether `from`
-/// counts `to` as its own or allied by the game's `with_ally` flag) and the drop sites.
-/// `FUN_141663dc0` for a player of diplomacy `relations` (`player+0x260`): one's own player
-/// counts; Gaia never does; else relation 0 does, and 4 by `test`; relation 1 counts only
-/// under allied victory (`FUN_1415e8e10`), which the slice does not model.
+/// `FUN_141663dc0`: player `from`, of relation row `relations` (`player+0x260`), counts player
+/// `to` as its own or allied by `test` (the game's `with_ally` flag) while the world's treaty
+/// monitor is `treaty` (`+0x820`). Its own player counts (`+0x718`); Gaia does not, nor a player
+/// past the row: the world's player count (`FUN_14152fe10`, an unsigned compare), as a load
+/// gives each player a row of the world's players and a relation change names only those. Else
+/// relation 0 counts, relation 4 by `test`, and relation 1 by `test` while the treaty holds
+/// ([`treaty_holds`]). The routine's second compare of `to` with its own player, after the
+/// count's, answers false and is never reached: the first answered true.
 #[must_use]
-pub fn allied(relations: &Relations, from: PlayerId, to: PlayerId, test: AllyTest) -> bool {
+pub fn allied(
+    relations: &Relations,
+    treaty: Option<&TreatyMonitor>,
+    from: PlayerId,
+    to: PlayerId,
+    test: AllyTest,
+) -> bool {
     if from == to {
         return true;
     }
     if to == PlayerId::GAIA {
         return false;
     }
-    relations
-        .get(to)
-        .is_some_and(|relation| relation.allied(test))
+    relations.get(to).is_some_and(|&relation| {
+        relation.allied(test)
+            || (test == AllyTest::WithRelation4
+                && relation == Relation::Neutral
+                && treaty_holds(treaty))
+    })
+}
+
+/// `FUN_141663d90`: player `from` counts the player `to` as its own or allied by `test`, as
+/// [`allied`] on its id (`+0x718`); no player (the game's null pointer) counts for no one. The
+/// game's callers hand it an object's player (`+0x138`) or a world's player by number
+/// (`FUN_14152fe40`, none past the count); genie's callers that hold the player's id call
+/// [`allied`] with it.
+#[must_use]
+pub fn allied_player(
+    relations: &Relations,
+    treaty: Option<&TreatyMonitor>,
+    from: PlayerId,
+    to: Option<PlayerId>,
+    test: AllyTest,
+) -> bool {
+    to.is_some_and(|to| allied(relations, treaty, from, to, test))
 }
 
 /// The players' relations and the drop sites, as the task finder reads them.

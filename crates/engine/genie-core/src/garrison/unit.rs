@@ -116,6 +116,7 @@ impl Unit {
             &step.world.parts,
             &step.world.model.roles,
             &step.world.model.tuning,
+            step.world.treaty.as_ref(),
         );
         let others = OthersRef::of(&step.world.players, &step.world.index, step.player)?;
         let (target, start) = match others.find(enter.target) {
@@ -142,6 +143,7 @@ impl Unit {
                 view.allied = tp == PlayerId::GAIA
                     || allied(
                         &step.world.players.player(step.player)?.relations,
+                        step.world.treaty.as_ref(),
                         step.player,
                         tp,
                         AllyTest::WithRelation4,

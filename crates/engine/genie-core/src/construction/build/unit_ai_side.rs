@@ -150,6 +150,7 @@ impl UnitView<'_, '_> {
                 self.new_owner,
             )?
             .players(),
+            treaty: self.step.world.treaty.as_ref(),
             drop_sites: &self.step.world.model.drop_sites,
         };
         // slot 0x820's point: the foundation's place
@@ -236,6 +237,7 @@ impl UnitView<'_, '_> {
             &self.step.world.parts,
             &self.step.world.model.roles,
             &self.step.world.model.tuning,
+            self.step.world.treaty.as_ref(),
         );
         let unit = &*self.unit;
         let master = unit.master(

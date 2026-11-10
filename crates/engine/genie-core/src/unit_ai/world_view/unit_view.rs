@@ -84,6 +84,7 @@ impl UnitView<'_, '_> {
                 &self.step.world.parts,
                 &self.step.world.model.roles,
                 &self.step.world.model.tuning,
+                self.step.world.treaty.as_ref(),
             ),
             restriction: None,
             unit: &*self.unit,

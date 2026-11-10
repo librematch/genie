@@ -265,8 +265,15 @@ impl World {
         owner: PlayerId,
     ) -> GenieResult<Option<Bystander>> {
         let relations = &self.players.player(owner)?.relations;
-        let allied =
-            |player_id: PlayerId| allied(relations, owner, player_id, AllyTest::WithRelation4);
+        let allied = |player_id: PlayerId| {
+            allied(
+                relations,
+                self.treaty.as_ref(),
+                owner,
+                player_id,
+                AllyTest::WithRelation4,
+            )
+        };
         if let Some((player_id, unit)) = self.object(id) {
             let master = unit.master(self.master_tables(), player_id)?;
             return Ok(Some(Bystander {

@@ -262,6 +262,7 @@ fn players_past_gaia_hold_the_nine_zones() {
 fn only_monitor_in_state_1_holds_and_gives_its_seconds_left() {
     let mut world = world_of(2, Vec::new(), &[]);
     assert!(!world.treaty_holds());
+    assert!(!treaty_holds(None));
     assert_eq!(world.treaty_seconds_left(), TreatySeconds::ZERO);
     assert!(world.treaty_monitor().is_err());
     assert!(world.treaty_monitor_mut().is_err());
@@ -279,9 +280,47 @@ fn only_monitor_in_state_1_holds_and_gives_its_seconds_left() {
     ] {
         monitor_mut(&mut world).state = state;
         assert_eq!(world.treaty_holds(), holds);
+        assert_eq!(treaty_holds(world.treaty.as_ref()), holds);
+        assert_eq!(monitor(&world).holds(), holds);
         let left = if holds { 42 } else { 0 };
         assert_eq!(world.treaty_seconds_left(), TreatySeconds(left));
     }
+}
+
+/// The ally test's readers take the world's monitor as it stands (`FUN_141663dc0` with the ally
+/// flag): while the treaty holds, two neutrals count each other allied in the walk's grid and as
+/// mutual allies (`FUN_1416642c0`); once it ended, they do not.
+#[test]
+fn neutrals_count_allied_while_the_world_treaty_holds() {
+    let mut world = world_of(2, Vec::new(), &[]);
+    for (from, to) in [(1, 2), (2, 1)] {
+        world
+            .set_relation(player(from), player(to), Relation::Neutral)
+            .unwrap();
+    }
+    world.treaty = Some(TreatyMonitor::new(
+        TreatyMinutes(20),
+        NomadTreaty::NotForced,
+        GameMode::RandomMap,
+    ));
+    world.start_treaty_at(WorldTime::ZERO).unwrap();
+    let walk_allied = |world: &World| {
+        world
+            .spatial
+            .allied_with(world.treaty.as_ref(), player(1), player(2))
+    };
+    assert!(walk_allied(&world));
+    assert!(
+        world
+            .spatial
+            .allies_of(world.treaty.as_ref(), player(1))
+            .holds(player(2))
+    );
+    assert!(world.mutual_allies(player(1), player(2)));
+    world.end_treaty().unwrap();
+    assert_eq!(relation(&world, 1, 2), Relation::Neutral);
+    assert!(!walk_allied(&world));
+    assert!(!world.mutual_allies(player(1), player(2)));
 }
 
 /// `FUN_141461620`: a new monitor turns relation 3 into 4 between the players past Gaia and has

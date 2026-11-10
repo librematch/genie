@@ -857,6 +857,7 @@ impl Rig {
                 ),
                 static_roles(),
                 tuning(),
+                None,
             ),
             map: spatial,
             sprite_rng: sprite,

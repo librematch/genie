@@ -32,7 +32,7 @@ use crate::pathing::hull_path::HullPather;
 use crate::pathing::tile_path::{Found, Path, Request};
 use crate::players::AllyTest;
 use crate::players::NO_RELATIONS;
-use crate::unit_ai::task_finder::allied as task_finder_allied;
+use crate::unit_ai::task_finder::allied_player;
 use crate::world::Seconds;
 use crate::world::WorldTime;
 use crate::world::layer::ClassRoles;
@@ -263,10 +263,16 @@ impl Mover {
                 if !self.start_blocked(world, plan, target_placed, line)? {
                     continue;
                 }
-                let allied = owner.is_some_and(|player_id| {
-                    let relations = world.relations.get(placed.player).unwrap_or(&NO_RELATIONS);
-                    task_finder_allied(relations, placed.player, player_id, AllyTest::WithRelation4)
-                });
+                // FUN_141663d90 with the ally flag (0x14114f0d9): the hit's player counts the
+                // unit's, none without its place
+                let relations = world.relations.get(placed.player).unwrap_or(&NO_RELATIONS);
+                let allied = allied_player(
+                    relations,
+                    by_id.treaty(),
+                    placed.player,
+                    owner,
+                    AllyTest::WithRelation4,
+                );
                 let gap = footprint_gap_squared(
                     placed.position,
                     placed.radius,

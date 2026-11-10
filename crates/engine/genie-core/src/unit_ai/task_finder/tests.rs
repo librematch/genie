@@ -16,6 +16,7 @@ use crate::orders::GARRISON;
 use crate::players::CivId;
 use crate::players::attribute::AttributeId;
 use crate::players::relation_row;
+use crate::players::treaty::{NomadTreaty, TreatyMinutes, TreatyMonitor, TreatyState};
 use crate::test_ids::carrying;
 use crate::test_ids::master_id;
 use crate::test_ids::object_id;
@@ -28,6 +29,7 @@ use crate::testing::roles;
 use crate::testing::slots;
 use crate::unit_ai::task_finder::target_steps::{drop_off_finding, garrison_into, repair_finding};
 use crate::unit_ai::task_finder::world::TaskWorld;
+use crate::world::GameMode;
 use crate::world::player::Player;
 use std::sync::LazyLock;
 
@@ -50,6 +52,7 @@ static FOOD_AT_562: LazyLock<[DropSite; 1]> = LazyLock::new(|| {
 fn alone() -> TaskWorld<'static> {
     TaskWorld {
         players: &[],
+        treaty: None,
         drop_sites: &*FOOD_AT_562,
     }
 }
@@ -124,8 +127,97 @@ static TEAMS: LazyLock<Vec<Player>> = LazyLock::new(|| {
 fn teams() -> TaskWorld<'static> {
     TaskWorld {
         players: &TEAMS,
+        treaty: None,
         drop_sites: &[],
     }
+}
+
+/// A treaty monitor of the world (`+0x820`) in state `state`.
+fn monitor(state: TreatyState) -> TreatyMonitor {
+    TreatyMonitor {
+        state,
+        ..TreatyMonitor::new(
+            TreatyMinutes::of_byte(20),
+            NomadTreaty::NotForced,
+            GameMode::RandomMap,
+        )
+    }
+}
+
+/// `FUN_141663dc0`: its own player counts, Gaia never; past the row (the world's player count)
+/// no player counts; relation 0 counts; relation 4 only with the ally flag; relation 1 only with
+/// the flag while the world's treaty holds (its monitor in state 1), never without a monitor or
+/// in another state; relation 3 and an unnamed one never.
+#[test]
+fn ally_flag_counts_neutral_only_while_treaty_holds() {
+    let holds = monitor(TreatyState::Holds);
+    let ended = monitor(TreatyState::Ended);
+    let new = monitor(TreatyState::New);
+    let treaties = [None, Some(&holds), Some(&ended), Some(&new)];
+    let row = relation_row([3, 0, 1, 4, 3, 2]);
+    let me = PlayerId::new(1);
+    let ally_test = |treaty, to: u8, test| allied(&row, treaty, me, PlayerId::new(to), test);
+    for treaty in treaties {
+        for test in [AllyTest::WithRelation4, AllyTest::AlliesOnly] {
+            assert!(ally_test(treaty, 1, test), "its own player");
+            assert!(!ally_test(treaty, 0, test), "Gaia");
+            assert!(!ally_test(treaty, 4, test), "relation 3");
+            assert!(!ally_test(treaty, 5, test), "an unnamed relation");
+            assert!(!ally_test(treaty, 6, test), "at the player count");
+            assert!(!ally_test(treaty, 255, test), "past the player count");
+        }
+        assert!(
+            ally_test(treaty, 3, AllyTest::WithRelation4),
+            "relation 4 with the flag"
+        );
+        assert!(
+            !ally_test(treaty, 3, AllyTest::AlliesOnly),
+            "relation 4 without"
+        );
+        assert!(
+            !ally_test(treaty, 2, AllyTest::AlliesOnly),
+            "relation 1 without the flag"
+        );
+    }
+    assert!(ally_test(Some(&holds), 2, AllyTest::WithRelation4));
+    assert!(!ally_test(None, 2, AllyTest::WithRelation4));
+    assert!(!ally_test(Some(&ended), 2, AllyTest::WithRelation4));
+    assert!(!ally_test(Some(&new), 2, AllyTest::WithRelation4));
+    // its own player counts even past its row, as the game compares `to` with its id first
+    assert!(allied(
+        &row,
+        None,
+        PlayerId::new(7),
+        PlayerId::new(7),
+        AllyTest::AlliesOnly
+    ));
+}
+
+/// `FUN_141663d90`: no player counts for no one, its own player not either; a player is
+/// [`allied`] on its id.
+#[test]
+fn ally_test_on_no_player_is_false() {
+    let holds = monitor(TreatyState::Holds);
+    let row = relation_row([3, 0, 1]);
+    let me = PlayerId::new(1);
+    for test in [AllyTest::WithRelation4, AllyTest::AlliesOnly] {
+        assert!(!allied_player(&row, Some(&holds), me, None, test));
+        assert!(allied_player(&row, None, me, Some(me), test));
+    }
+    assert!(allied_player(
+        &row,
+        Some(&holds),
+        me,
+        Some(PlayerId::new(2)),
+        AllyTest::WithRelation4
+    ));
+    assert!(!allied_player(
+        &row,
+        None,
+        me,
+        Some(PlayerId::new(2)),
+        AllyTest::WithRelation4
+    ));
 }
 
 /// `FUN_1411a8620`, a task's own test on a target: a holder's task wants the target to hold

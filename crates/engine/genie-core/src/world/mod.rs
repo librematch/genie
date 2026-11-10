@@ -307,8 +307,9 @@ pub struct World {
     pub(crate) instant_work: i32,
     /// The world's treaty monitor (`+0x820`, HD's `TreatyMode`), none without a treaty: the
     /// load makes it ([`World::load_treaty`]), the update runs it and lets it go
-    /// ([`World::treaty_step`]). The save does not hold it.
-    pub(crate) treaty: Option<TreatyMonitor>,
+    /// ([`World::treaty_step`]). The save does not hold it. The oracle's walks read it as the
+    /// systems do (the ally test's).
+    pub treaty: Option<TreatyMonitor>,
 }
 
 /// The objects of recyclable masters (`+0x680`, the `.dat`'s `recyclable`): a new one takes the

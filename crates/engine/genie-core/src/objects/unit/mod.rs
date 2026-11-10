@@ -284,7 +284,9 @@ pub(crate) fn missed_passes(
         return true;
     }
     let other = Some(id) != target;
-    step.world.spatial.allied_with(step.player, player)
+    step.world
+        .spatial
+        .allied_with(step.world.treaty.as_ref(), step.player, player)
         || (other && player == PlayerId::new(0) && MasterKind::TREE < kind)
         || (other && !blast_level.reaches(level))
 }

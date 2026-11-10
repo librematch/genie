@@ -153,6 +153,7 @@ impl BuildAction {
                     player,
                     relations: &step.world.players.player(step.player)?.relations,
                     foreign,
+                    treaty: step.world.treaty.as_ref(),
                     drop_sites: &step.world.model.drop_sites,
                 };
                 // slot 0x820's point: x, y and z −1, no terrain

@@ -261,6 +261,7 @@ fn after_its_actions_the_units_walk_met_take_their_pauses() {
                     &step.world.parts,
                     &step.world.model.roles,
                     &step.world.model.tuning,
+                    step.world.treaty.as_ref(),
                 )
                 .gait(object_id(600))
                 .and_then(|gait| gait.pause),

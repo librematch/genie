@@ -56,6 +56,7 @@ impl World {
         let master = unit.master(self.master_tables(), player_id)?;
         let world = TaskWorld {
             players: &self.players,
+            treaty: self.treaty.as_ref(),
             drop_sites: &self.model.drop_sites,
         };
         Ok(Some(victim_in(
@@ -245,6 +246,7 @@ pub(crate) fn victim(
         player: step.player,
         relations: &step.world.players.player(step.player)?.relations,
         foreign: view.players(),
+        treaty: step.world.treaty.as_ref(),
         drop_sites: &step.world.model.drop_sites,
     };
     Ok(Some(victim_in(

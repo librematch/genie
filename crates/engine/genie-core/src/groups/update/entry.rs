@@ -252,7 +252,11 @@ impl World {
         let most =
             HitPoints::of_master(unit.master(self.master_tables(), player_id)?.hit_points).get();
         Ok(below_or_unordered(unit.life.hp.get(), most)
-            && self.spatial.allied_with(owner, player_id)
-            && self.spatial.allied_with(player_id, owner))
+            && self
+                .spatial
+                .allied_with(self.treaty.as_ref(), owner, player_id)
+            && self
+                .spatial
+                .allied_with(self.treaty.as_ref(), player_id, owner))
     }
 }

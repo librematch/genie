@@ -163,6 +163,7 @@ fn villagers() -> Masters {
 /// Every player on its own (the world holds no player, so none has an ally), no drop sites.
 const ALONE: TaskWorld<'static> = TaskWorld {
     players: &[],
+    treaty: None,
     drop_sites: &[],
 };
 

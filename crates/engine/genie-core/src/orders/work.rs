@@ -285,6 +285,7 @@ impl World {
         };
         let world = TaskWorld {
             players: &self.players,
+            treaty: self.treaty.as_ref(),
             drop_sites: &self.model.drop_sites,
         };
         let (task_target, general) = match target {
@@ -470,6 +471,7 @@ impl World {
         };
         let world = TaskWorld {
             players: &self.players,
+            treaty: self.treaty.as_ref(),
             drop_sites: &self.model.drop_sites,
         };
         let task_target = self.task_target(target, 1)?;

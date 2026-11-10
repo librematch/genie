@@ -10,6 +10,7 @@ use crate::map::{Tile, TileRect};
 use crate::math::fmath::BVector;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::players::treaty::TreatyMonitor;
 use crate::world::slots::CheckedIndexExt;
 use std::collections::BTreeMap;
 
@@ -152,7 +153,7 @@ impl Spatial {
     /// [`crate::objects::masters::ObstructionKind::recorded`] false) only those that do not move
     /// ([`Placed::moves`], the master's slot 0xe8); a desolid building foundation (`+0xc60`) only
     /// of a player that and the site's count each other allied (`FUN_141663d90` with the ally flag,
-    /// both ways); not those the site may be built over (`can_be_built_on` 1); with all three
+    /// both ways, while the world's treaty monitor is `treaty`); not those the site may be built over (`can_be_built_on` 1); with all three
     /// radii. An object `looks` does not hold (the owner's sleeping objects, which the unit's view
     /// does not hold: of types below 30, alive, in state 2 or 6) passes the state and foundation
     /// tests.
@@ -161,6 +162,7 @@ impl Spatial {
         site_id: FoundationId,
         site: &Placed,
         looks: &BTreeMap<ObjectId, ClearLook>,
+        treaty: Option<&TreatyMonitor>,
     ) -> GenieResult<Vec<ObjectId>> {
         use crate::objects::masters::MasterKind;
         let obstructs = site.obstruction_kind.recorded();
@@ -175,8 +177,8 @@ impl Spatial {
                 let foundation = clear_look.kind == MasterKind::BUILDING && clear_look.desolid;
                 alive
                     && (!foundation
-                        || (self.allied(site.player, placed.player)
-                            && self.allied(placed.player, site.player)))
+                        || (self.allied(treaty, site.player, placed.player)
+                            && self.allied(treaty, placed.player, site.player)))
             })
         };
         Ok(self

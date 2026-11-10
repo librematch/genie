@@ -100,15 +100,15 @@ impl WorldMap<'_> {
         terrain.shapes.get(index).copied()
     }
 
-    /// Player `first` counts player `second` as an ally (`FUN_141663dc0`): itself; never Gaia;
-    /// relation 0, or by `test` relation 4 too (the zone mode's relation 1 is not modelled).
+    /// Player `first` counts player `second` as an ally (`FUN_141663dc0`,
+    /// [`crate::unit_ai::task_finder::allied`] on the world's treaty monitor).
     pub(crate) fn allied(&self, first: PlayerId, second: PlayerId, test: AllyTest) -> bool {
         let relations = self
             .turns
             .players
             .player(first)
             .map_or(&NO_RELATIONS, |player| &player.relations);
-        task_finder_allied(relations, first, second, test)
+        task_finder_allied(relations, self.turns.treaty.as_ref(), first, second, test)
     }
 
     /// The objects on `tile` (their centre there), in the tile list's order.

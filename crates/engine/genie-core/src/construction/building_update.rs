@@ -154,6 +154,7 @@ impl Unit {
             &step.world.parts,
             &step.world.model.roles,
             &step.world.model.tuning,
+            step.world.treaty.as_ref(),
         );
         // the count only reads the parts: the layer holds `gate` still, written back before the
         // toggle

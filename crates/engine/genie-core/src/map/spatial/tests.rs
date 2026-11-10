@@ -1719,7 +1719,8 @@ fn the_footprint_occupants_are_the_objects_whose_centre_is_on_it() {
         spatial.footprint_occupants(
             FoundationId::new(object_id(10028)),
             &house,
-            &BTreeMap::new()
+            &BTreeMap::new(),
+            None
         ),
         Ok(vec![object_id(9175)])
     );
@@ -1728,7 +1729,8 @@ fn the_footprint_occupants_are_the_objects_whose_centre_is_on_it() {
         spatial.footprint_occupants(
             FoundationId::new(object_id(10028)),
             &house,
-            &BTreeMap::new()
+            &BTreeMap::new(),
+            None
         ),
         Ok(vec![object_id(9175)])
     );
@@ -1774,7 +1776,12 @@ fn foundation_not_allied_both_ways_or_dead_object_occupies_no_footprint() {
         ])
     };
     let occupants = |spatial: &Spatial, wall| {
-        spatial.footprint_occupants(FoundationId::new(object_id(10028)), &house, &looks(wall))
+        spatial.footprint_occupants(
+            FoundationId::new(object_id(10028)),
+            &house,
+            &looks(wall),
+            None,
+        )
     };
     assert_eq!(
         occupants(
@@ -1827,7 +1834,8 @@ fn foundation_not_allied_both_ways_or_dead_object_occupies_no_footprint() {
         records.footprint_occupants(
             FoundationId::new(object_id(10028)),
             &house,
-            &BTreeMap::new()
+            &BTreeMap::new(),
+            None
         ),
         Ok(vec![object_id(9175), object_id(33990)])
     );
@@ -2211,7 +2219,8 @@ fn frozen_object_may_be_anywhere_its_speed_could_take_it() {
             .footprint_occupants(
                 FoundationId::new(object_id(10028)),
                 &house,
-                &BTreeMap::new()
+                &BTreeMap::new(),
+                None
             )
             .is_ok()
     );
@@ -2223,7 +2232,8 @@ fn frozen_object_may_be_anywhere_its_speed_could_take_it() {
             .footprint_occupants(
                 FoundationId::new(object_id(10028)),
                 &house,
-                &BTreeMap::new()
+                &BTreeMap::new(),
+                None
             )
             .is_ok()
     );
@@ -2233,6 +2243,7 @@ fn frozen_object_may_be_anywhere_its_speed_could_take_it() {
             FoundationId::new(object_id(10028)),
             &house,
             &BTreeMap::new(),
+            None,
         )
         .unwrap_err();
     assert_eq!(error.context().next(), Some(("object", "9656")));

@@ -198,6 +198,7 @@ impl World {
             &self.parts,
             &self.model.roles,
             &self.model.tuning,
+            self.treaty.as_ref(),
         );
         self.spatial.point_clear_among(
             rounder.id,
@@ -389,6 +390,7 @@ impl World {
             &self.parts,
             &self.model.roles,
             &self.model.tuning,
+            self.treaty.as_ref(),
         );
         let mut plan = Planning {
             pathing: &mut self.pathing,
@@ -453,6 +455,7 @@ impl World {
                 &self.parts,
                 &self.model.roles,
                 &self.model.tuning,
+                self.treaty.as_ref(),
             ),
         )
     }

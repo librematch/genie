@@ -486,6 +486,7 @@ impl Unit {
                 main: step.world.parts.building_of(unit.id).annex_of,
                 allied: allied(
                     view.relations(step.world)?,
+                    step.world.treaty.as_ref(),
                     view.player,
                     owner,
                     AllyTest::WithRelation4,

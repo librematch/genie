@@ -346,6 +346,7 @@ impl World {
             let tm = target_unit.master(self.master_tables(), tp)?;
             let world = TaskWorld {
                 players: &self.players,
+                treaty: self.treaty.as_ref(),
                 drop_sites: &self.model.drop_sites,
             };
             (tm.kind == MasterKind::BUILDING

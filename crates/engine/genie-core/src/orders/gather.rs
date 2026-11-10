@@ -362,6 +362,7 @@ impl World {
         let target_master = unit.master(self.master_tables(), tp)?;
         let world = TaskWorld {
             players: &self.players,
+            treaty: self.treaty.as_ref(),
             drop_sites: &self.model.drop_sites,
         };
         Ok(Quarry {

@@ -149,6 +149,7 @@ impl UnitView<'_, '_> {
             player,
             relations: &self.step.world.players.player(self.player)?.relations,
             foreign,
+            treaty: self.step.world.treaty.as_ref(),
             drop_sites: &self.step.world.model.drop_sites,
         };
         let found = task_search(
@@ -287,6 +288,7 @@ impl UnitView<'_, '_> {
             player,
             relations: &self.step.world.players.player(self.player)?.relations,
             foreign,
+            treaty: self.step.world.treaty.as_ref(),
             drop_sites: &self.step.world.model.drop_sites,
         };
         // slot 0x820's point: the target's place

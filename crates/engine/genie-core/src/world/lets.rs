@@ -21,6 +21,7 @@ use crate::orders::object_gone;
 use crate::players::AllyTest;
 use crate::players::PlayerId;
 use crate::players::tracker::Tracker;
+use crate::players::treaty::TreatyMonitor;
 use crate::players::{NO_RELATIONS, Relations};
 use crate::unit_ai::Notify;
 use crate::unit_ai::UnitAi;
@@ -34,13 +35,15 @@ use crate::world::{Player, World};
 use crate::{GenieError, GenieResult};
 
 /// What the calls on the objects let go and taken reach besides the view: the updating player
-/// and its relations (whether a taker or releaser is allied), every player's masters and the
+/// and its relations and the world's treaty monitor (whether a taker or releaser is allied), every player's masters and the
 /// unit lines (a wake's tracker key), the updating player's tracker, and the notifies for the
 /// updating object's own unit AI while the AI runs (taken out of the unit, it is posted them,
 /// with the unit's state, when its side's call returns: [`crate::objects::unit::Unit::with_side`]).
 pub(crate) struct Lets<'world> {
     pub(crate) player: PlayerId,
     pub(crate) relations: &'world Relations,
+    /// The world's treaty monitor (`+0x820`), which the ally test reads.
+    pub(crate) treaty: Option<&'world TreatyMonitor>,
     pub(crate) masters: MasterTables<'world>,
     /// The units' AIs ([`crate::world::parts::Parts::unit_ai`]).
     pub(crate) ais: &'world mut PartTable<UnitAi>,
@@ -117,6 +120,7 @@ impl World {
         let mut lets = Lets {
             player,
             relations,
+            treaty: self.treaty.as_ref(),
             masters: MasterTables::new(&self.model.masters, &self.parts.own_master),
             ais: &mut self.parts.unit_ai,
             buildings: &mut self.parts.building,
@@ -423,6 +427,6 @@ impl Lets<'_> {
             let other = view.players().player(from);
             other.map_or(&NO_RELATIONS, |player| &player.relations)
         };
-        task_finder_allied(relations, from, to, AllyTest::WithRelation4)
+        task_finder_allied(relations, self.treaty, from, to, AllyTest::WithRelation4)
     }
 }

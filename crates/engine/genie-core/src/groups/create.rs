@@ -291,6 +291,7 @@ impl World {
             &self.parts,
             &self.model.roles,
             &self.model.tuning,
+            self.treaty.as_ref(),
         );
         let mut scratch = take(&mut self.groups.unit_kinds_scratch);
         let left =
@@ -427,6 +428,7 @@ impl World {
             &self.parts,
             &self.model.roles,
             &self.model.tuning,
+            self.treaty.as_ref(),
         );
         let mut scratch = take(&mut self.groups.unit_kinds_scratch);
         let unit_group = self.groups.held_mut(group)?;

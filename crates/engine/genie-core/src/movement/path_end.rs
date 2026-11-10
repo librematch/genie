@@ -222,9 +222,9 @@ impl Mover {
             lowered,
             within_range: false,
             near_player: false,
-            allies: world
-                .get(me.id)
-                .map_or(PlayerSet::NONE, |placed| world.allies_of(placed.player)),
+            allies: world.get(me.id).map_or(PlayerSet::NONE, |placed| {
+                world.allies_of(by_id.treaty(), placed.player)
+            }),
         };
         let player = world.get(me.id).map(|placed| placed.player);
         let gates = |tile| {

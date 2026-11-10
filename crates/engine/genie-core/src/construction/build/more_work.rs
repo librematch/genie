@@ -15,10 +15,29 @@ use crate::orders::Work;
 use crate::unit_ai::task_finder::drop_site;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
+use crate::world::layer::generated::GatherSearchTuning;
 use crate::world::objects_ref::ObjectsRef;
 use crate::world::slots::PlayerSlotsExt;
 use crate::world::step::Step;
 use crate::{GenieError, GenieResult};
+
+/// The reach a line of sight below the floor takes (the Build's immediate 4.0).
+const REACH_LOW: f32 = 4.0;
+
+/// The reach of the Build's search for more work about a building of line of sight `los`
+/// ([`Unit::more_work`]): below the tuning's floor the Build's 4.0, at most the tuning's cap.
+fn more_work_reach(los: f32, gather_search_tuning: &GatherSearchTuning) -> f32 {
+    let held = if gather_search_tuning.reach_floor <= los {
+        los
+    } else {
+        REACH_LOW
+    };
+    if held <= gather_search_tuning.reach_cap {
+        held
+    } else {
+        gather_search_tuning.reach_cap
+    }
+}
 
 impl Unit {
     /// The Build's case 0xdf once its work ended without queued orders (`0x140ab0b43`): the
@@ -41,8 +60,6 @@ impl Unit {
     ) -> GenieResult<Option<Work>> {
         use crate::gathering::gather_search::{self, Candidate, Candidates};
         use crate::gathering::gather_search::{gather_group, more_work as gather_search_more_work};
-        /// The reach a line of sight below the floor takes (the Build's immediate 4.0).
-        const REACH_LOW: f32 = 4.0;
         let masters =
             step.world
                 .model
@@ -65,17 +82,10 @@ impl Unit {
             master.class,
             step.world.players.player(step.player)?.civ,
         );
-        let los = site.line_of_sight.get();
-        let held = if step.world.model.tuning.gather_search.reach_floor <= los {
-            los
-        } else {
-            REACH_LOW
-        };
-        let reach = if held <= step.world.model.tuning.gather_search.reach_cap {
-            held
-        } else {
-            step.world.model.tuning.gather_search.reach_cap
-        };
+        let reach = more_work_reach(
+            site.line_of_sight.get(),
+            &step.world.model.tuning.gather_search,
+        );
         let builder = gather_search::Builder {
             position: self.position(),
             radius: Distance::new(master.radius.x()),
@@ -91,6 +101,7 @@ impl Unit {
             &step.world.parts,
             &step.world.model.roles,
             &step.world.model.tuning,
+            step.world.treaty.as_ref(),
         );
         // the builder out of its slot while it updates, as it stands
         let me = Candidate::of(

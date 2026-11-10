@@ -118,6 +118,7 @@ impl World {
             &self.parts,
             &self.model.roles,
             &self.model.tuning,
+            self.treaty.as_ref(),
         );
         let unit = &self.players.live(player_id, idx)?;
         let master = unit.master(self.master_tables(), player_id)?;

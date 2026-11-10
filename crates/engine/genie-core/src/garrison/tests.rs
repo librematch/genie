@@ -1324,6 +1324,7 @@ fn the_reach_tile_test_counts_buildings_where_the_unit_cannot_stand() {
                 &parts,
                 static_roles(),
                 tuning(),
+                None,
             )
         ),
         Ok(true)

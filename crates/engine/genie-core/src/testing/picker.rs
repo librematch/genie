@@ -34,6 +34,7 @@ pub(crate) fn with_picker<R>(
         settings,
         world_time,
         mode_680,
+        treaty,
         ..
     } = world;
     let owner = players.player(player).expect("the unit's player");
@@ -80,6 +81,7 @@ pub(crate) fn with_picker<R>(
             parts,
             &model.roles,
             &model.tuning,
+            treaty.as_ref(),
         ),
         restriction: master.terrain_restriction,
         unit,

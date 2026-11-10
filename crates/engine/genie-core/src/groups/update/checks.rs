@@ -316,7 +316,11 @@ impl World {
         if most < target.state() || target.inside() {
             return Ok(false);
         }
-        if group.current_command != BUILD && self.spatial.allied_with(owner, target.player()) {
+        if group.current_command != BUILD
+            && self
+                .spatial
+                .allied_with(self.treaty.as_ref(), owner, target.player())
+        {
             return Ok(false);
         }
         self.sees_object(target, owner)

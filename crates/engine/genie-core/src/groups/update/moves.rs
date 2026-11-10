@@ -28,6 +28,7 @@ use crate::pathing::DelayCount;
 use crate::world::Millis;
 use crate::world::World;
 use crate::world::index::Place;
+use crate::world::motions::BesideParts;
 use crate::world::slots::{CheckedIndexExt, PlayerSlotsExt};
 use crate::world::{IN_THE_WAY, WALKER_UNMOVING};
 use crate::{GenieError, GenieResult};
@@ -444,9 +445,15 @@ impl World {
         // the member is out of its slot for its step, as the updating object is
         let mut unit = self.take_out(player_id, idx)?;
         let me = unit.me(self.parts.actions_of(unit.id), top_speed);
-        let (mover, by_id) = self
-            .parts
-            .lend_mover(unit.id, (&self.players, &self.index, &self.model));
+        let (mover, by_id) = self.parts.lend_mover(
+            unit.id,
+            BesideParts {
+                players: &self.players,
+                index: &self.index,
+                model: &self.model,
+                treaty: self.treaty.as_ref(),
+            },
+        );
         let stepped = match mover {
             Some(mover) => {
                 let mut plan = Planning {

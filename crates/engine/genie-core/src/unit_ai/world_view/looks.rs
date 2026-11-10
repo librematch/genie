@@ -196,6 +196,7 @@ impl UnitView<'_, '_> {
             main: self.step.world.parts.building_of(unit.id).annex_of,
             allied: allied(
                 &self.step.world.players.player(self.player)?.relations,
+                self.step.world.treaty.as_ref(),
                 self.player,
                 owner,
                 AllyTest::WithRelation4,
@@ -302,6 +303,7 @@ impl UnitView<'_, '_> {
             &self.step.world.parts,
             &self.step.world.model.roles,
             &self.step.world.model.tuning,
+            self.step.world.treaty.as_ref(),
         );
         self.step.world.spatial.point_clear(
             unit.id,
@@ -348,6 +350,7 @@ impl UnitView<'_, '_> {
             &self.step.world.parts,
             &self.step.world.model.roles,
             &self.step.world.model.tuning,
+            self.step.world.treaty.as_ref(),
         );
         mover.reaches_object(
             (unit.position(), &walker),

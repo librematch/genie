@@ -102,6 +102,7 @@ impl UnitView<'_, '_> {
                 &self.step.world.parts,
                 &self.step.world.model.roles,
                 &self.step.world.model.tuning,
+                self.step.world.treaty.as_ref(),
             ),
             restriction: self
                 .unit
@@ -138,6 +139,7 @@ impl UnitView<'_, '_> {
             &self.step.world.parts,
             &self.step.world.model.roles,
             &self.step.world.model.tuning,
+            self.step.world.treaty.as_ref(),
         );
         let mut reach = |spatial: &mut Spatial, id: ObjectId, range: Distance| {
             // slot 0x3d0 of an object that does not move (types 10 to 25) is
@@ -323,7 +325,13 @@ impl UnitView<'_, '_> {
             if !gaia_attacker && roles.of_class(master.class).contains(ClassRoles::VILLAGER) {
                 continue;
             }
-            if owner != self.player && !self.step.world.spatial.allied_with(owner, self.player) {
+            if owner != self.player
+                && !self.step.world.spatial.allied_with(
+                    self.step.world.treaty.as_ref(),
+                    owner,
+                    self.player,
+                )
+            {
                 continue;
             }
             let gap = footprint_gap_squared(

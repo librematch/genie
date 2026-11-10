@@ -15,6 +15,7 @@ use crate::objects::masters::{Master, OwnerMasters};
 use crate::objects::unit::Unit;
 use crate::objects::{ObjectId, ObjectKey};
 use crate::players::PlayerId;
+use crate::players::treaty::TreatyMonitor;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
 use crate::world::objects_ref::ObjectsRef;
@@ -27,13 +28,14 @@ use crate::{GenieError, GenieResult};
 /// `player` pass. It does below state
 /// 3, as a gate (class 39) whose master transforms (`+0x9ba`) and that is not locked (`+0xc7c`),
 /// when its owner counts the player as an ally (`FUN_141663dc0`) and the player its owner
-/// (`FUN_141663d90`), each with the ally flag.
+/// (`FUN_141663d90`), each with the ally flag while the world's treaty monitor is `treaty`.
 #[must_use]
 pub fn lets_pass(
     (gate, layer, master): (&Unit, &Building, &Master),
     owner: PlayerId,
     player: PlayerId,
     spatial: &Spatial,
+    treaty: Option<&TreatyMonitor>,
     roles: &Roles,
 ) -> bool {
     let transforms = master
@@ -45,8 +47,8 @@ pub fn lets_pass(
         && roles.of_class(master.class).contains(ClassRoles::GATE)
         && transforms
         && !layer.gate.is_some_and(|gate| gate.locked)
-        && spatial.allied_with(owner, player)
-        && spatial.allied_with(player, owner)
+        && spatial.allied_with(treaty, owner, player)
+        && spatial.allied_with(treaty, player, owner)
 }
 
 /// The units in gate `gate` (`FUN_1411d0570`): the obstruction manager's query from its first
@@ -57,7 +59,7 @@ pub fn lets_pass(
 /// still, and either moving or not Gaia's count, at most 25 (the game reads the object's top
 /// speed, slot 0x208: not 0 and at least [`crate::world::GATE_EPSILON`] just when its master moves,
 /// [`crate::map::spatial::Placed::moves`], for every speed the data gives); the second answer is how many of them are of a player the gate's counts an ally
-/// (`FUN_141663d90` with the ally flag).
+/// (`FUN_141663d90` with the ally flag, on the treaty monitor `by_id` holds).
 pub(crate) fn gate_units(
     spatial: &mut Spatial,
     gate: ObjectId,
@@ -119,7 +121,7 @@ pub(crate) fn gate_units(
             && (placed.moves || placed.player != PlayerId::GAIA);
         if counts {
             units.push(id);
-            if spatial.allied_with(owner, placed.player) {
+            if spatial.allied_with(by_id.treaty(), owner, placed.player) {
                 allied += 1;
             }
         }
@@ -172,6 +174,7 @@ impl World {
             gate_owner,
             unit_owner,
             &self.spatial,
+            self.treaty.as_ref(),
             &self.model.roles,
         ))
     }
@@ -194,8 +197,12 @@ impl World {
         for (player_id, is_open) in PlayerId::each(players).zip(open.iter_mut()).skip(1) {
             if *is_open
                 || (player_id != gate_owner
-                    && !(self.spatial.allied_with(gate_owner, player_id)
-                        && self.spatial.allied_with(player_id, gate_owner)))
+                    && !(self
+                        .spatial
+                        .allied_with(self.treaty.as_ref(), gate_owner, player_id)
+                        && self
+                            .spatial
+                            .allied_with(self.treaty.as_ref(), player_id, gate_owner)))
             {
                 continue;
             }
@@ -244,8 +251,11 @@ impl World {
                 continue;
             }
             if next.is_some_and(|player_id| {
-                self.spatial.allied_with(player_id, other)
-                    && self.spatial.allied_with(other, player_id)
+                self.spatial
+                    .allied_with(self.treaty.as_ref(), player_id, other)
+                    && self
+                        .spatial
+                        .allied_with(self.treaty.as_ref(), other, player_id)
             }) {
                 continue;
             }

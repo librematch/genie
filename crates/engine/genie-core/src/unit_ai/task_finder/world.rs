@@ -19,6 +19,7 @@ use crate::objects::unit::Unit;
 use crate::objects::unit::UnitFlags;
 use crate::players::AllyTest;
 use crate::players::PlayerId;
+use crate::players::treaty::TreatyMonitor;
 use crate::players::{NO_RELATIONS, Relations};
 use crate::unit_ai::task_finder::{Actor, Diplomacy, DropSite, TaskOn, TaskTarget};
 use crate::unit_ai::task_finder::{
@@ -40,9 +41,12 @@ pub(crate) fn point_terrain(map: Option<&Terrain>, point: Position) -> Option<Te
     map.and_then(|terrain| terrain.at_task_point(point.ground()))
 }
 
-/// The players' relations and the drop sites, as the task finder reads them.
+/// The players' relations, the world's treaty monitor and the drop sites, as the task finder
+/// reads them.
 pub(crate) struct TaskWorld<'world> {
     pub(crate) players: &'world [Player],
+    /// The world's treaty monitor (`+0x820`), which the ally test reads.
+    pub(crate) treaty: Option<&'world TreatyMonitor>,
     pub(crate) drop_sites: &'world [DropSite],
 }
 
@@ -53,7 +57,7 @@ impl Diplomacy for TaskWorld<'_> {
             .players
             .player(from)
             .map_or(&NO_RELATIONS, |player| &player.relations);
-        task_finder_allied(relations, from, to, test)
+        task_finder_allied(relations, self.treaty, from, to, test)
     }
 
     fn drops_at(&self, building: MasterId, actor: &Actor<'_>) -> bool {
@@ -61,13 +65,15 @@ impl Diplomacy for TaskWorld<'_> {
     }
 }
 
-/// The players' relations and the drop sites as the task finder reads them while a unit's owner's
-/// list is out for its update ([`UnitView`](crate::unit_ai::world_view::UnitView)): the owner's
-/// relations, the others'.
+/// The players' relations, the world's treaty monitor and the drop sites as the task finder
+/// reads them while a unit's owner's list is out for its update
+/// ([`UnitView`](crate::unit_ai::world_view::UnitView)): the owner's relations, the others'.
 pub(crate) struct SideWorld<'world> {
     pub(crate) player: PlayerId,
     pub(crate) relations: &'world Relations,
     pub(crate) foreign: Foreign<'world>,
+    /// The world's treaty monitor (`+0x820`), which the ally test reads.
+    pub(crate) treaty: Option<&'world TreatyMonitor>,
     pub(crate) drop_sites: &'world [DropSite],
 }
 
@@ -81,7 +87,7 @@ impl Diplomacy for SideWorld<'_> {
                 .player(from)
                 .map_or(&NO_RELATIONS, |player| &player.relations)
         };
-        task_finder_allied(relations, from, to, test)
+        task_finder_allied(relations, self.treaty, from, to, test)
     }
 
     fn drops_at(&self, building: MasterId, actor: &Actor<'_>) -> bool {
