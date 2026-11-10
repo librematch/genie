@@ -6,6 +6,8 @@ use crate::construction::build::BUILDER_UNMOVING;
 use crate::construction::build::BUILDING_UNPLACED;
 use crate::map::Distance;
 use crate::map::spatial::Spatial;
+use crate::math::conversions::cvttss2si;
+use crate::math::fmath::at_most_or_unordered;
 use crate::objects::ObjectId;
 use crate::objects::layers::Action;
 use crate::objects::masters::MasterId;
@@ -21,21 +23,24 @@ use crate::world::slots::PlayerSlotsExt;
 use crate::world::step::Step;
 use crate::{GenieError, GenieResult};
 
-/// The reach a line of sight below the floor takes (the Build's immediate 4.0).
-const REACH_LOW: f32 = 4.0;
+/// The reach a line of sight below the floor takes (the Build's immediate 4.0, `0x140ab0b5a`).
+const REACH_LOW: Distance = Distance::new(4.0);
 
-/// The reach of the Build's search for more work about a building of line of sight `los`
-/// ([`Unit::more_work`]): below the tuning's floor the Build's 4.0, at most the tuning's cap.
-fn more_work_reach(los: f32, gather_search_tuning: &GatherSearchTuning) -> f32 {
-    let held = if gather_search_tuning.reach_floor <= los {
-        los
+/// The Build's case 0xdf (`0x140ab0b52..0x140ab0bb8`): the reach of its search for more work
+/// about a building of line of sight `line_of_sight` ([`Unit::more_work`]). Below the tuning's
+/// floor the reach is the Build's 4.0, and it is at most the tuning's cap. A NaN line of sight
+/// passes both compares: the `CMOVBE` after `COMISS floor, los` takes it, and the `JA` after
+/// `COMISS reach, cap` is not taken.
+fn more_work_reach(line_of_sight: Distance, gather_search_tuning: &GatherSearchTuning) -> Distance {
+    let held = if at_most_or_unordered(gather_search_tuning.reach_floor, line_of_sight.get()) {
+        line_of_sight
     } else {
         REACH_LOW
     };
-    if held <= gather_search_tuning.reach_cap {
+    if at_most_or_unordered(held.get(), gather_search_tuning.reach_cap) {
         held
     } else {
-        gather_search_tuning.reach_cap
+        Distance::new(gather_search_tuning.reach_cap)
     }
 }
 
@@ -82,15 +87,12 @@ impl Unit {
             master.class,
             step.world.players.player(step.player)?.civ,
         );
-        let reach = more_work_reach(
-            site.line_of_sight.get(),
-            &step.world.model.tuning.gather_search,
-        );
+        let reach = more_work_reach(site.line_of_sight, &step.world.model.tuning.gather_search);
         let builder = gather_search::Builder {
             position: self.position(),
             radius: Distance::new(master.radius.x()),
             building: at.position,
-            range: reach as i32 as i16,
+            range: cvttss2si(reach.get()) as i16,
         };
         let mover = step.world.parts.mover_of(self.id).ok_or(BUILDER_UNMOVING)?;
         let restriction = mover.stats.restriction;
@@ -154,3 +156,6 @@ impl Unit {
         Ok(Some(Work::on(Some(target), point)))
     }
 }
+
+#[cfg(test)]
+mod tests;

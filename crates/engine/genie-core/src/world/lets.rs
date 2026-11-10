@@ -35,10 +35,11 @@ use crate::world::{Player, World};
 use crate::{GenieError, GenieResult};
 
 /// What the calls on the objects let go and taken reach besides the view: the updating player
-/// and its relations and the world's treaty monitor (whether a taker or releaser is allied), every player's masters and the
-/// unit lines (a wake's tracker key), the updating player's tracker, and the notifies for the
-/// updating object's own unit AI while the AI runs (taken out of the unit, it is posted them,
-/// with the unit's state, when its side's call returns: [`crate::objects::unit::Unit::with_side`]).
+/// and its relations and the world's treaty monitor (whether a taker or releaser is allied),
+/// every player's masters and the unit lines (a wake's tracker key), the updating player's
+/// tracker, and the notifies for the updating object's own unit AI while the AI runs (taken out
+/// of the unit, it is posted them, with the unit's state, when its side's call returns:
+/// [`crate::objects::unit::Unit::with_side`]).
 pub(crate) struct Lets<'world> {
     pub(crate) player: PlayerId,
     pub(crate) relations: &'world Relations,

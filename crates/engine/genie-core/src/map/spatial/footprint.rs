@@ -153,10 +153,10 @@ impl Spatial {
     /// [`crate::objects::masters::ObstructionKind::recorded`] false) only those that do not move
     /// ([`Placed::moves`], the master's slot 0xe8); a desolid building foundation (`+0xc60`) only
     /// of a player that and the site's count each other allied (`FUN_141663d90` with the ally flag,
-    /// both ways, while the world's treaty monitor is `treaty`); not those the site may be built over (`can_be_built_on` 1); with all three
-    /// radii. An object `looks` does not hold (the owner's sleeping objects, which the unit's view
-    /// does not hold: of types below 30, alive, in state 2 or 6) passes the state and foundation
-    /// tests.
+    /// both ways, while the world's treaty monitor is `treaty`); not those the site may be built
+    /// over (`can_be_built_on` 1); with all three radii. An object `looks` does not hold (the
+    /// owner's sleeping objects, which the unit's view does not hold: of types below 30, alive, in
+    /// state 2 or 6) passes the state and foundation tests.
     pub fn footprint_occupants(
         &self,
         site_id: FoundationId,

@@ -47,6 +47,7 @@ build time completes the building.
 | [`walk_ends.rs`](walk_ends.rs) | The ends of the builder's walk: at its end, failed, its foundation lost; the walk to a point (state 11). |
 | [`walks.rs`](walks.rs) | The Build's `MoveTo`s (`0x140aae200` cases 4, 8, 11 and 223) through `MoveToReads`: the one to its foundation, and the sub-action list's update. |
 | [`world_side.rs`](world_side.rs) | The construction's parts that run on the whole world (`crate::world::World`), outside a builder's update: a building's work and completion, its storage's leave, the built object's stacking and its new objects. |
+| [`more_work/`](more_work/) | The search for more work's tests. |
 <!-- /files -->
 
 ## How it connects
