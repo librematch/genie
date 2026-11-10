@@ -50,20 +50,18 @@ const UPDATE_COUNTDOWN: Countdown = Countdown {
     short: TreatySeconds(60),
 };
 
-/// The second of the countdown's next message for a treaty ending at `end` with `left` seconds
-/// left: `countdown`'s long lead before the end while more than it is left, else its short lead
-/// while more than that is left, else the end.
-const fn next_message(
-    end: TreatySeconds,
-    left: TreatySeconds,
-    countdown: Countdown,
-) -> TreatySeconds {
-    if left.0 > countdown.long.0 {
-        end.less(countdown.long)
-    } else if left.0 > countdown.short.0 {
-        end.less(countdown.short)
-    } else {
-        end
+impl Countdown {
+    /// The second of its next message for a treaty ending at `end` with `left` seconds left: its
+    /// long lead before the end while more than that is left, else its short lead while more
+    /// than that is left, else the end.
+    const fn next_message(self, end: TreatySeconds, left: TreatySeconds) -> TreatySeconds {
+        if left.0 > self.long.0 {
+            end.less(self.long)
+        } else if left.0 > self.short.0 {
+            end.less(self.short)
+        } else {
+            end
+        }
     }
 }
 
@@ -118,7 +116,7 @@ impl World {
                 self.turn_relations(Relation::Enemy, Relation::Relation4)?;
                 let monitor = self.treaty_monitor_mut()?;
                 let left = monitor.end.less(TreatySeconds::at(time));
-                monitor.next_message = next_message(monitor.end, left, START_COUNTDOWN);
+                monitor.next_message = START_COUNTDOWN.next_message(monitor.end, left);
                 monitor.seconds_left = left;
             }
             TreatyState::Ended => self.turn_relations(Relation::Enemy, Relation::Relation4)?,
@@ -210,7 +208,7 @@ impl World {
             self.treaty_monitor_mut()?.seconds_left = TreatySeconds::ZERO;
         } else if monitor.next_message < now {
             monitor.next_message =
-                next_message(monitor.end, monitor.end.less(now), UPDATE_COUNTDOWN);
+                UPDATE_COUNTDOWN.next_message(monitor.end, monitor.end.less(now));
         }
         Ok(())
     }

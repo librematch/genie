@@ -1,29 +1,37 @@
 use super::*;
 use crate::construction::BuilderCount;
 use crate::construction::build::Construction;
+use crate::construction::build::NOT_HELD;
+use crate::groups::formation::tests::ghost_at;
 use crate::map::Footprint;
 use crate::map::GridSize;
 use crate::map::Point;
 use crate::map::Position;
 use crate::map::Snow;
+use crate::map::Tile;
 use crate::map::spatial::Obstruction;
 use crate::objects::MasterHitPoints;
 use crate::objects::ObjectState;
 use crate::objects::layers::Building;
+use crate::objects::masters::GhostMode;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
+use crate::objects::masters::Masters;
 use crate::objects::masters::ObstructionClass;
 use crate::objects::masters::ObstructionKind;
+use crate::objects::masters::RecycleMode;
 use crate::players::Relation;
-use crate::players::treaty::zones::zone_span;
+use crate::players::treaty::zones::zone_about;
 use crate::test_ids::object_id;
 use crate::testing::class;
 use crate::testing::ids;
 use crate::testing::scene::{Scene, SceneObject};
+use crate::vision::VisionBits;
 use crate::world::Seconds;
 use crate::world::TreatyLength;
 use crate::world::WholeSeconds;
+use std::sync::Arc;
 
 /// Player `index`.
 const fn player(index: u8) -> PlayerId {
@@ -616,17 +624,27 @@ fn no_build_test_reads_the_zones_of_players_not_allied() {
     assert!(!test(&monitor, GameMode::RandomMap, 75.0, 75.0));
 }
 
-/// A zone's span: the margin before the centre, at least 0, to the margin less 1 past it while
-/// below the map's last tile, else the last tile; a NaN's place wraps as the ints do.
+/// The zone about a town centre: on each axis from its tile less the margin, at least 0, to its
+/// tile plus the margin less 1 while below the map's last tile, else the last tile; each axis by
+/// its own side of the map; a NaN's place (`CVTTSS2SI`'s `i32::MIN`) wraps as the ints do.
 #[test]
-fn zone_span_keeps_to_the_map() {
-    let span = zone_span;
-    assert_eq!(span(50, 20, 120), (30, 69));
-    assert_eq!(span(10, 20, 120), (0, 29));
-    assert_eq!(span(110, 20, 120), (90, 119));
-    assert_eq!(span(100, 20, 120), (80, 119));
-    assert_eq!(span(99, 20, 120), (79, 118));
-    assert_eq!(span(i32::MIN, 20, 120), (i32::MAX - 19, i32::MIN + 19));
+fn zone_about_town_centre_keeps_to_the_map() {
+    let margin = WholeDistance::of_data(20);
+    let map = GridSize::new(120, 80);
+    let zone = |x: f32, y: f32| zone_about(Point::new(x, y), margin, map);
+    assert_eq!(zone(50.9, 40.2), TileRect::new(30, 20, 69, 59));
+    // the low side clamps at 0
+    assert_eq!(zone(10.5, 20.5), TileRect::new(0, 0, 29, 39));
+    assert_eq!(zone(20.5, 21.5), TileRect::new(0, 1, 39, 40));
+    // the high side clamps at the last tile, the width's on x, the height's on y
+    assert_eq!(zone(110.5, 70.5), TileRect::new(90, 50, 119, 79));
+    assert_eq!(zone(100.5, 60.5), TileRect::new(80, 40, 119, 79));
+    assert_eq!(zone(99.5, 59.5), TileRect::new(79, 39, 118, 78));
+    // a NaN's place cuts to i32::MIN: its low side wraps past 0, its high side below the map
+    assert_eq!(
+        zone(f32::NAN, f32::NAN),
+        TileRect::new(i32::MAX - 19, i32::MAX - 19, i32::MIN + 19, i32::MIN + 19)
+    );
 }
 
 /// A world of two enemies whose town centres stand at `first` and `second` on y 30.5 with
@@ -775,6 +793,84 @@ fn town_centre_in_an_enemy_zone_sweeps_the_foundations_about_it() {
         })
         .collect();
     assert_eq!(removed, [10, 15, 18]);
+}
+
+/// The world's master tables with the ghosts' master (243, type 25, recycled) besides.
+fn with_ghost_master(world: &mut World) {
+    let ghost = Master {
+        id: ids::DOPPELGANGER,
+        kind: MasterKind::DOPPELGANGER,
+        recyclable: RecycleMode::RECYCLED,
+        ..Master::default()
+    };
+    world.model.masters = world
+        .model
+        .masters
+        .iter()
+        .map(|masters| Arc::new(Masters::new(masters.iter().cloned().chain([ghost.clone()]))))
+        .collect();
+}
+
+/// The sweep walks a tile's list as each removal leaves it (`+0x28` and its count `+0x1b` read
+/// again): a removed foundation stays on its tile, so all three on one tile go, and the ghost
+/// each leaves for a player who explored the tile and does not see it joins the list's end and
+/// is passed over, as a ghost lying on a swept tile before is. The sweep ends without an error
+/// and the ghosts stay.
+#[test]
+fn sweep_walks_the_tile_list_as_its_removals_leave_it() {
+    let mut house = building(ids::HOUSE);
+    house.ghost_on_death = GhostMode::LEAVES;
+    let on_one_tile = [(20, 50.2), (21, 50.5), (22, 50.8)].map(|(id, x)| {
+        let mut object = standing(id, player(1), house.clone(), x, 40.5);
+        object.state = ObjectState::Foundation;
+        object.desolid = true;
+        object
+    });
+    let mut world = zoned_world(30.5, 45.5, on_one_tile.into(), &[]);
+    with_ghost_master(&mut world);
+    let tile = Tile::new(50, 40);
+    let sight = world.spatial.sight.as_mut().unwrap();
+    let index = sight.size.index(tile).unwrap();
+    sight.unified[index] = VisionBits::explored(player(2));
+    let lying = ghost_at(-50, 52.5, 40.5);
+    world.spatial.insert_ghost(lying.id, lying.position);
+    world.players[1].ghosts = vec![lying];
+    assert_eq!(
+        world.draw_treaty_zones(GameScreen::Shown),
+        Ok(Borders::Drawn)
+    );
+    for id in 20..=22 {
+        let (_, unit) = world.object(object_id(id)).unwrap();
+        assert_eq!(
+            (unit.life.state, unit.life.hp.get()),
+            (ObjectState::Removed, 0.0)
+        );
+    }
+    let list = world.spatial.tile_list(tile);
+    assert_eq!(list[..3], [object_id(20), object_id(21), object_id(22)]);
+    assert_eq!(list.len(), 6);
+    for &id in &list[3..] {
+        assert_eq!(world.ghost(id).map(|(viewer, _)| viewer), Some(player(2)));
+    }
+    assert_eq!(world.spatial.tile_list(Tile::new(52, 40)), [object_id(-50)]);
+    assert!(world.ghost(object_id(-50)).is_some());
+}
+
+/// An id on a swept tile that the world holds neither as an object nor as a ghost stops the
+/// sweep.
+#[test]
+fn sweep_stops_at_id_the_world_does_not_hold() {
+    let mut world = zoned_world(30.5, 45.5, Vec::new(), &[]);
+    world
+        .spatial
+        .insert_ghost(object_id(-50), Position::new(52.5, 40.5, 0.0));
+    assert_eq!(
+        world
+            .draw_treaty_zones(GameScreen::Shown)
+            .unwrap_err()
+            .reason(),
+        NOT_HELD.reason()
+    );
 }
 
 /// Player 1's own sweep finds player 2's zone unset and removes nothing; the zones far apart

@@ -63,46 +63,34 @@ impl ZoneCentre {
     }
 }
 
-/// A zone's span on one axis about a town centre at `centre` (`CVTTSS2SI` of its place) with
-/// `margin` on a map of `size` tiles: from `margin` before it, at least 0 (`CMOVG`), to
-/// `margin` − 1 past it while that stays below the map's last tile (`CMOVL`, signed), else to
-/// the map's last tile; wrapping as the int arithmetic does.
-pub(crate) const fn zone_span(centre: i32, margin: i32, size: i32) -> (i32, i32) {
-    let before = centre.wrapping_sub(margin);
-    let low = if before > 0 { before } else { 0 };
-    let past = centre.wrapping_add(margin);
-    let high = if past.wrapping_sub(1) < size.wrapping_sub(1) {
-        past
-    } else {
-        size
-    };
-    (low, high.wrapping_sub(1))
-}
-
 /// The zone about a town centre at `at` with `margin` on a map of `map`'s tiles
-/// ([`zone_span`] on each axis).
-fn zone_about(at: Point, margin: WholeDistance, map: GridSize) -> TileRect {
-    let (x0, x1) = zone_span(cvttss2si(at.x()), margin.get(), map.width());
-    let (y0, y1) = zone_span(cvttss2si(at.y()), margin.get(), map.height());
-    TileRect::new(x0, y0, x1, y1)
-}
-
-/// Whether `zone` meets `footprint`'s tiles: on each axis its low side at most the footprint's
-/// high side and its high side at least the footprint's low side.
-const fn meets(zone: TileRect, footprint: TileRect) -> bool {
-    zone.x0() <= footprint.x1()
-        && footprint.x0() <= zone.x1()
-        && zone.y0() <= footprint.y1()
-        && footprint.y0() <= zone.y1()
+/// (`FUN_141461c00`). On each axis it runs from the centre's tile ([`Point::tile`], a NaN's
+/// `i32::MIN`) less the margin, at least 0 (`CMOVG`), to that tile plus the margin less 1 while
+/// that lies below the map's last tile (`CMOVL`, signed), else to the map's last tile; the int
+/// arithmetic wraps.
+pub(crate) fn zone_about(at: Point, margin: WholeDistance, map: GridSize) -> TileRect {
+    let [x, y] = at.tile().get();
+    let margin = margin.get();
+    TileRect::new(
+        x.wrapping_sub(margin).max(0),
+        y.wrapping_sub(margin).max(0),
+        x.wrapping_add(margin)
+            .wrapping_sub(1)
+            .min(map.width().wrapping_sub(1)),
+        y.wrapping_add(margin)
+            .wrapping_sub(1)
+            .min(map.height().wrapping_sub(1)),
+    )
 }
 
 impl TreatyMonitor {
     /// `FUN_141461400` (HD's `TreatyMode::IsWithinNoBuildZone`): whether a footprint of player
-    /// `owner` at `at` with radii `radius` meets a zone of a player past Gaia whom `players`
-    /// shows not allied with it (`FUN_141663dc0` with its flag 0; in game mode 7 every other
-    /// player). Its tiles run from the place less the radii to the place plus the radii less 1
-    /// (`CVTTSS2SI`). A player's first zone counts only where its low corner lies below its high
-    /// one on both axes; its second, then, only once the second zones are on.
+    /// `owner` at `at` with radii `radius` overlaps a zone ([`TileRect::overlaps`]) of a player
+    /// past Gaia whom `players` shows not allied with it (`FUN_141663dc0` with its flag 0; in
+    /// game mode 7 every other player). Its tiles run from the place less the radii to the place
+    /// plus the radii less 1 (`CVTTSS2SI`). A player's first zone counts only where its low
+    /// corner lies below its high one on both axes; its second, then, only once the second zones
+    /// are on.
     #[must_use]
     pub(crate) fn in_no_build_zone(
         &self,
@@ -132,8 +120,8 @@ impl TreatyMonitor {
                 !exempt
                     && first.x0() < first.x1()
                     && first.y0() < first.y1()
-                    && (meets(first, footprint)
-                        || (self.second_zones && meets(zone.second, footprint)))
+                    && (first.overlaps(footprint)
+                        || (self.second_zones && zone.second.overlaps(footprint)))
             })
     }
 }

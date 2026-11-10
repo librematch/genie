@@ -123,6 +123,16 @@ impl TileRect {
             && self.0[1] <= tile.y()
             && tile.y() <= self.0[3]
     }
+
+    /// Whether it and `other` share a tile, edges included: `x0 <= other.x1`,
+    /// `other.x0 <= x1`, then the same on y.
+    #[must_use]
+    pub const fn overlaps(self, other: Self) -> bool {
+        self.0[0] <= other.0[2]
+            && other.0[0] <= self.0[2]
+            && self.0[1] <= other.0[3]
+            && other.0[1] <= self.0[3]
+    }
 }
 
 impl From<[i32; 4]> for TileRect {
@@ -270,5 +280,33 @@ mod tests {
         assert!(!tile_rect.holds(Tile::new(0, 3)) && !tile_rect.holds(Tile::new(2, 5)));
         assert_eq!(TileRect::of(Tile::new(5, 6)), TileRect::new(5, 6, 5, 6));
         assert_eq!(TileRect::from([1, 2, 3, 4]), tile_rect);
+    }
+
+    /// Two tile boxes overlap while they share a tile on both axes, a shared edge included.
+    #[test]
+    fn tile_boxes_overlap_while_they_share_tile() {
+        let tile_rect = TileRect::new(10, 10, 20, 20);
+        for other in [
+            TileRect::new(20, 20, 30, 30),
+            TileRect::new(0, 0, 10, 10),
+            TileRect::new(12, 0, 14, 40),
+            TileRect::new(0, 15, 40, 15),
+        ] {
+            assert!(
+                tile_rect.overlaps(other) && other.overlaps(tile_rect),
+                "{other:?}"
+            );
+        }
+        for other in [
+            TileRect::new(21, 10, 30, 20),
+            TileRect::new(0, 10, 9, 20),
+            TileRect::new(10, 21, 20, 30),
+            TileRect::new(10, 0, 20, 9),
+        ] {
+            assert!(
+                !tile_rect.overlaps(other) && !other.overlaps(tile_rect),
+                "{other:?}"
+            );
+        }
     }
 }
