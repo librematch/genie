@@ -60,7 +60,8 @@ The schedule, generated from `world/schedule.rs` (`just schedule`):
 | 17 | `Victory` | once | The victory check (`TRIBE_World` slot 0x68, `FUN_1415c9480`). |
 | 18 | `FrameSeed` | once | The world stream draws the next update's frame seed (`rand15` at `0x141551bd7`). |
 | 19 | `LastRandoms` | once | The multiplayer sync's draws of four streams (`setLastRandoms`, `0x140d3ce20`). |
-| 20 | `Vision` | once | The players' vision masks again (`World::update`'s slot 0x78, `FUN_1415e92b0`). |
+| 20 | `Treaty` | once | The treaty monitor's update while the update has time (`World::update` at `0x1415e8e90`, `World::treaty_step`). |
+| 21 | `Vision` | once | The players' vision masks again (`World::update`'s slot 0x78, `FUN_1415e92b0`). |
 <!-- /schedule -->
 
 In the `Objects` step every live object of the player updates, in list order
@@ -131,7 +132,7 @@ source files it comes from. The file names are those that the HD edition's debug
 | [`production/`](../crates/engine/genie-core/src/production/) | A building's production queue and a trained unit's spawn | `TRIBE_Action_Make_Obj`, `TRIBE_Action_Make_Tech` | `t_b_obj.cpp`, `tact_mob.cpp` |
 | [`technology/`](../crates/engine/genie-core/src/technology/) | Technologies, their effects, and an object's upgrade to another master | `TRIBE_Player_Tech`, `TRIBE_Effects` | `tech.cpp`, `techtree.cpp`, `effects.cpp`, `teffects.cpp` |
 | [`ownership/`](../crates/engine/genie-core/src/ownership/) | Objects that change hands: captures, the Artifact action of livestock, ownership changes | `TRIBE_Action_Artifact` | `tact_cap.cpp`, `tact_art.cpp`, `tact_cnv.cpp` |
-| [`players/`](../crates/engine/genie-core/src/players/) | The players beside their objects: game status, diplomacy, tribute, treason, the market, history, the object tracker, the world player's update | `WorldPlayer`, `WorldPlayerGaia`, `TRIBE_History_Info` | `player.cpp`, `tplayer.cpp`, `t_histry.cpp`, `victory.cpp`, `tvictory.cpp`, `VictoryConditions.cpp` |
+| [`players/`](../crates/engine/genie-core/src/players/) | The players beside their objects: game status, diplomacy, tribute, treason, the treaty, the market, history, the object tracker, the world player's update | `WorldPlayer`, `WorldPlayerGaia`, `TRIBE_History_Info`, `TreatyMode` | `player.cpp`, `tplayer.cpp`, `t_histry.cpp`, `victory.cpp`, `tvictory.cpp`, `VictoryConditions.cpp` |
 | [`math/`](../crates/engine/genie-core/src/math/) | The bit-for-bit foundations: the game's f32 math, its random generators, the MSVC algorithms whose order shows, the image's constants | the random generators, `BVector` | `math3d.cpp`, the C runtime |
 
 `lib.rs` declares the systems. `trace.rs` holds what the engine tells a

@@ -87,6 +87,7 @@ impl World {
             alliance_locked: 0,
             teams: [Team::ALONE; 8],
             instant_work: 0,
+            treaty: None,
         }
     }
 }

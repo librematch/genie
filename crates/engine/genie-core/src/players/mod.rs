@@ -1,6 +1,6 @@
 //! The players beside their objects: their game status (playing, won, lost), diplomacy,
-//! tribute, treason, the market, their history, their object trackers, and the world player's
-//! own update.
+//! tribute, treason, the treaty, the market, their history, their object trackers, and the
+//! world player's own update.
 
 pub mod ai_module;
 use genie_model::players::amount;
@@ -27,6 +27,7 @@ mod stance;
 mod team;
 pub mod tracker;
 pub mod treason;
+pub mod treaty;
 pub mod tribute;
 mod tribute_fee;
 mod unit_relation;

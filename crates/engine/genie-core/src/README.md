@@ -36,7 +36,7 @@ Start with these files:
 | [`orders/`](orders/) | The orders a command gives its units: INTERACT and its splitter into loose units and groups, the moves, patrols and follows, the work, gather, hunt and build orders, the drop-offs, the town bell and the Empire Wars start. |
 | [`ownership/`](ownership/) | Objects that change hands: the Artifact action of livestock, which a unit of another player takes over, and an ownership change with what it carries along (a building's annexes, its garrison, the attributes it counts). |
 | [`pathing/`](pathing/) | Finding a way: the planners of the paths that units walk, from the tile pathfinder over the whole map to the short pathers around the obstructions near a unit. |
-| [`players/`](players/) | The players beside their objects: their game status (playing, won, lost), diplomacy, tribute, treason, the market, their history, their object trackers, and the world player's own update. |
+| [`players/`](players/) | The players beside their objects: their game status (playing, won, lost), diplomacy, tribute, treason, the treaty, the market, their history, their object trackers, and the world player's own update. |
 | [`production/`](production/) | Training units and researching technologies: a building's production queue, the actions that work it off, and a trained unit's spawn. |
 | [`technology/`](technology/) | Technologies and upgrades: the players' technologies, a research's effects and an object's upgrade to another master. |
 | [`testing/`](testing/) | What genie-core's tests build their game data from: each build's layer as the generated fixture states it (FD-046-D08), so a test needs no Nickel, and the classes, masters and player attributes the tests name. |

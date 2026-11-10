@@ -430,6 +430,12 @@ pub mod transport {
     pub const NONE: f32 = f32::from_bits(0xbf80_0000);
 }
 
+/// The values the `treaty` port reads.
+pub mod treaty {
+    /// 1.0
+    pub const ONE: f32 = f32::from_bits(0x3f80_0000);
+}
+
 /// The values the `turn` port reads.
 pub mod turn {
     /// -1.0

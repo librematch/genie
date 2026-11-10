@@ -81,9 +81,9 @@ pub struct Settings {
     /// else 0); the load reads the value alone and the kind stays 0, as the object's
     /// constructor and `FUN_14130f2b0` leave it.
     pub selected_content_mode: ContentMode,
-    /// `mTreatyLength`: the treaty's minutes, 0 for none. The world's treaty monitor (`+0x820`,
-    /// `FUN_141461190`) fills its players' zones only while a treaty holds (`FUN_141461c00`);
-    /// the slice holds no treaty.
+    /// `mTreatyLength`: the treaty's minutes, 0 for none. The world's load writes it from the
+    /// save's `treatyLength` byte outside game mode 16 (`FUN_14130f950`), beside the world's
+    /// treaty monitor (`+0x820`, `FUN_141461190`; genie-core's `players::treaty`).
     pub treaty_length: TreatyLength,
     /// `mStartingAge` (`+0x3c`): 0 the mode's default, 2 to 6 the ages.
     pub starting_age: Age,

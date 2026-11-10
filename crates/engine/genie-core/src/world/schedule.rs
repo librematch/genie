@@ -41,6 +41,9 @@ pub enum WorldStep {
     FrameSeed,
     /// The multiplayer sync's draws of four streams (`setLastRandoms`, `0x140d3ce20`).
     LastRandoms,
+    /// The treaty monitor's update while the update has time (`World::update` at `0x1415e8e90`,
+    /// [`World::treaty_step`]).
+    Treaty,
     /// The players' vision masks again (`World::update`'s slot 0x78, `FUN_1415e92b0`).
     Vision,
 }
@@ -96,7 +99,7 @@ pub const EACH_PLAYER: [PlayerStep; 10] = [
 ];
 
 /// The steps after the players' (the rest of `BaseWorld::update`, then `World::update`'s).
-pub const AFTER_PLAYERS: [WorldStep; 9] = [
+pub const AFTER_PLAYERS: [WorldStep; 10] = [
     WorldStep::Draw,
     WorldStep::Ghosts,
     WorldStep::Watched,
@@ -105,6 +108,7 @@ pub const AFTER_PLAYERS: [WorldStep; 9] = [
     WorldStep::Victory,
     WorldStep::FrameSeed,
     WorldStep::LastRandoms,
+    WorldStep::Treaty,
     WorldStep::Vision,
 ];
 
@@ -280,6 +284,7 @@ impl World {
             WorldStep::LastRandoms => {
                 let _ = self.streams.set_last_randoms();
             }
+            WorldStep::Treaty => self.treaty_step()?,
             // World::update's last step (0x1415e9266), whatever dt: the world's slot 0x78 with 1
             // (FUN_1415e92b0): the players' masks again and the town centres' flares
             // (FUN_141552df0, [`World::rebuild_vision`]); its UI refresh is not simulation. Masks
@@ -363,7 +368,7 @@ mod tests {
     }
 
     /// The number of world steps: [`world_place`]'s arms.
-    const WORLD_STEPS: usize = 10;
+    const WORLD_STEPS: usize = 11;
 
     /// Each world step's place in the update; the match fails to compile for a new step.
     const fn world_place(step: WorldStep) -> usize {
@@ -377,7 +382,8 @@ mod tests {
             WorldStep::Victory => 6,
             WorldStep::FrameSeed => 7,
             WorldStep::LastRandoms => 8,
-            WorldStep::Vision => 9,
+            WorldStep::Treaty => 9,
+            WorldStep::Vision => 10,
         }
     }
 

@@ -9,6 +9,7 @@ use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::PlayersMastersExt;
 use crate::objects::masters::player_master;
+use crate::objects::unit::Unit;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::tracker::ListKey;
@@ -48,6 +49,12 @@ impl World {
     /// (`FUN_14104f560`, `FUN_14104f4b0`: the first list, then the second).
     #[must_use]
     pub fn town_centre_at(&self, player_id: PlayerId, nth: usize) -> Option<ObjectId> {
+        self.town_centre_unit_at(player_id, nth).map(|unit| unit.id)
+    }
+
+    /// [`World::town_centre_at`]'s object.
+    #[must_use]
+    pub(crate) fn town_centre_unit_at(&self, player_id: PlayerId, nth: usize) -> Option<&Unit> {
         let tracker = &self.players.get(player_id.index())?.tracker;
         // a queued unit's place (−1) names no object the world holds
         town_centres(self.model.slots.master)
@@ -59,8 +66,35 @@ impl World {
                     .copied()
                     .flatten()
             })
-            .filter(|&id| self.object(id).is_some())
+            .filter_map(|id| self.object(id).map(|(_, unit)| unit))
             .nth(nth)
+    }
+
+    /// `FUN_1416598b0`: player `player_id`'s first foundation (state 0) among the objects the
+    /// world holds (`FUN_1415417a0`) of the ids its tracker files under master 109's pending
+    /// list (`FUN_14104fa50`, key + 90000), in the list's order.
+    #[must_use]
+    pub(crate) fn town_centre_foundation(&self, player_id: PlayerId) -> Option<&Unit> {
+        let tracker = &self.players.get(player_id.index())?.tracker;
+        let pending = ListKey::master(town_centres(self.model.slots.master)[0]).pending();
+        tracker
+            .list(pending)
+            .iter()
+            .flatten()
+            .filter_map(|&id| self.object(id).map(|(_, unit)| unit))
+            .find(|unit| unit.life.state == ObjectState::Foundation)
+    }
+
+    /// `FUN_141659650`: the entries of player `player_id`'s tracker lists of masters 109 and 444
+    /// (`FUN_14104ecf0` with the two keys: each list's count, its −1 entries too).
+    #[must_use]
+    pub(crate) fn town_centre_entries(&self, player_id: PlayerId) -> usize {
+        self.players.get(player_id.index()).map_or(0, |player| {
+            town_centres(self.model.slots.master)
+                .iter()
+                .map(|&master_id| player.tracker.list(ListKey::master(master_id)).len())
+                .sum()
+        })
     }
 
     /// `FUN_141658a30`: player `player_id`'s town centres not dying (state below 3): those its

@@ -49,6 +49,7 @@ use crate::pathing::zones::{ZoneMap, Zones};
 use crate::pathing::{Pathing, PlanBudget, PlanCap, PlanCount};
 use crate::players::PlayerId;
 use crate::players::tracker::Tracker;
+use crate::players::treaty::NomadTreaty;
 use crate::players::world_player::VictoryTimes;
 use crate::players::{PlayerKind, PlayerSet, Posture, Relations, Stance};
 use crate::vision::VisionBits;
@@ -511,6 +512,14 @@ pub fn saved_world(
     if masters.is_some()
         && let Err(error) = turns.load_trackers().and_then(|()| turns.rebuild_vision())
     {
+        stop_all(&mut turns, &error);
+    }
+    // the treaty monitor, which the load makes from the treaty's byte and the forced nomad flag
+    // (`World::load_world` at 0x1415d4a35) and the save does not hold
+    if let Err(error) = turns.load_treaty(
+        header.world.treaty_length,
+        NomadTreaty::of_byte(header.world.gb_force_nomad_treaty),
+    ) {
         stop_all(&mut turns, &error);
     }
     // the spatial index's views of the loaded annexes, relations and task 0x99 masters

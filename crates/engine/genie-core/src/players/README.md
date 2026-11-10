@@ -8,6 +8,8 @@ A player has more than its objects. This folder holds the rest:
 - `diplomacy.rs` holds a change of stance toward another player, and what follows from it.
 - `tribute.rs` holds a tribute of resources to another player.
 - `treason.rs` holds treason: the allies see the enemy kings.
+- `treaty/` holds the world's treaty monitor: the treaty's countdown, relation 4 while it holds
+  and the no-build zones about the town centres.
 - `market.rs` holds the market's prices and the trades.
 - `history.rs` holds the player's history: the population over time and the events.
 - `tracker.rs` holds the object tracker: the player's objects by master and class.
@@ -30,7 +32,7 @@ A player has more than its objects. This folder holds the rest:
 | [`escrow_share.rs`](escrow_share.rs) | The share of a resource's income a computer player sets aside. |
 | [`market.rs`](market.rs) | The market: the world's commodity prices (`+0x868`..`+0x8a0`, saved) and the two commands that trade at them, `TRIBE_COMMAND_SELL_COMMODITY` (0x7a, `FUN_141639310`) and `TRIBE_COMMAND_BUY_COMMODITY` (0x7b, `FUN_141618390`). |
 | [`market_values.rs`](market_values.rs) | The market's values: a commodity's price, its swing and its net trades. |
-| [`mod.rs`](mod.rs) | The players beside their objects: their game status (playing, won, lost), diplomacy, tribute, treason, the market, their history, their object trackers, and the world player's own update. |
+| [`mod.rs`](mod.rs) | The players beside their objects: their game status (playing, won, lost), diplomacy, tribute, treason, the treaty, the market, their history, their object trackers, and the world player's own update. |
 | [`player_id.rs`](player_id.rs) | A player's number as one type: the player a command comes from or names, and the index of the world's players. |
 | [`player_kind.rs`](player_kind.rs) | A player's type as one type: `player+0x10`, the save's class byte. |
 | [`player_set.rs`](player_set.rs) | A set of players, one bit each (`PlayerSet`). |
@@ -49,6 +51,7 @@ A player has more than its objects. This folder holds the rest:
 | [`culture/`](culture/) | The culture's tests. |
 | [`game_status/`](game_status/) | The players' game status (`+0x89`: playing, won, lost) and what changes it: RESIGN (`FUN_140d25af0`), the world's victory check after every update (`TRIBE_World` slot 0x68, `FUN_1415c9480`, whose tail `FUN_14152e3d0` decides who won), and the status setter (`WorldPlayer` slot 1, `FUN_141639860`) with a defeated player's stop of its objects (`FUN_141613ed0`): its villagers, fishing boats and explorers stop and stand, its buildings stop and give back their queues, and every unit AI's orders go. |
 | [`history/`](history/) | The player's history (`TRIBE_History_Info`, TribeHistoryInfo.cpp; player `+0xdb8`, saved with the player): a population entry each history period and a list of events, newest first. |
+| [`treaty/`](treaty/) | The world's treaty monitor (`world+0x820`, HD's `TreatyMode`, 0x160 bytes): a treaty's countdown, and the no-build zones about the players' town centres while it holds. |
 | [`world_player/`](world_player/) | The world player's own update (`WorldPlayer::update`, `0x14163b100`, slot 0x100) and Gaia's (`WorldPlayerGaia::update`, `0x141681cd0`, its slot 0x100). |
 <!-- /files -->
 

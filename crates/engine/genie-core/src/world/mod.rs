@@ -99,6 +99,7 @@ use crate::players::Team;
 use crate::players::ai_module::AiModules;
 use crate::players::history::HistoryUpdates;
 use crate::players::market::Market;
+use crate::players::treaty::TreatyMonitor;
 
 /// What every building holds of a gate: `mGateLocked` (`+0xc7c`; a lock also sets the
 /// building's last move time, [`Mover::last_move`], slot 0x670, `FUN_1411dba30`), `mFirstUpdate`
@@ -304,6 +305,10 @@ pub struct World {
     /// cheat (GAME 4), 0 without; while it is not 0 every work is done at once, which the work
     /// actions do not model (they take it as 0).
     pub(crate) instant_work: i32,
+    /// The world's treaty monitor (`+0x820`, HD's `TreatyMode`), none without a treaty: the
+    /// load makes it ([`World::load_treaty`]), the update runs it and lets it go
+    /// ([`World::treaty_step`]). The save does not hold it.
+    pub(crate) treaty: Option<TreatyMonitor>,
 }
 
 /// The objects of recyclable masters (`+0x680`, the `.dat`'s `recyclable`): a new one takes the
