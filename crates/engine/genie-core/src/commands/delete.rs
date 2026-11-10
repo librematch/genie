@@ -629,6 +629,7 @@ mod tests {
     use crate::objects::masters::ObstructionKind;
     use crate::objects::masters::{Master, Masters};
     use crate::objects::unit::Unit;
+    use crate::players::tracker::Key;
     use crate::players::treaty::{
         NomadTreaty, TreatyMinutes, TreatyMonitor, TreatyState, TreatyZone,
     };
@@ -902,7 +903,9 @@ mod tests {
     /// The delete of a town-centre foundation (`FUN_1411cd780`) and its destroy while its owner
     /// has no town centre (`FUN_1411cfb30`) each clear the owner's first zone and its flag in the
     /// world's treaty monitor (`FUN_1414615d0`), whatever the monitor's state; its second zone
-    /// and the other players' zones stay.
+    /// and the other players' zones stay. While the owner holds a town centre
+    /// (`FUN_1416597e0(owner, 0)`) the destroy leaves the zones, and the delete, which asks no
+    /// such thing, clears them still.
     #[test]
     fn deleted_town_centre_foundation_clears_its_owner_first_zone() {
         let drawn = TreatyZone {
@@ -940,6 +943,36 @@ mod tests {
         let mut world = zoned(0.0, TreatyState::Ended);
         world.destroy(player_id(1), object_id(11)).unwrap();
         assert_eq!(zones(&world), [cleared, drawn]);
+        let mut world = zoned(0.0, TreatyState::Holds);
+        add_town_centre(&mut world);
+        world.destroy(player_id(1), object_id(11)).unwrap();
+        assert_eq!(zones(&world), [drawn, drawn]);
+        let mut world = zoned(0.0, TreatyState::Holds);
+        add_town_centre(&mut world);
+        world.delete(player_id(1), object_id(11)).unwrap();
+        assert_eq!(zones(&world), [cleared, drawn]);
+    }
+
+    /// Player 1's built town centre 13 (master 109), filed in its tracker's done list of master
+    /// 109: its owner holds a town centre.
+    fn add_town_centre(world: &mut World) {
+        let mut town_centre = Unit {
+            id: object_id(13),
+            ..Unit::default()
+        };
+        town_centre.life.master_id = ids::TOWN_CENTRE;
+        world.players[1].objects.push(town_centre);
+        world.reindex();
+        world.players[1].tracker.add(
+            object_id(13),
+            Key {
+                master: Some(ids::TOWN_CENTRE),
+                class: Some(class::BUILDING),
+                pending: false,
+                military: false,
+            },
+        );
+        assert_eq!(world.town_centre_at(player_id(1), 0), Some(object_id(13)));
     }
 
     /// Master 621 for player 1's house foundation 11.

@@ -11587,54 +11587,96 @@ fn research_check_refuses_another_player_buildings() {
 
 /// RESEARCH (`0x140e7e270`) of Castle Age (0x66) at the town centre: queued as any technology;
 /// only in game mode 16 does the queued research mark the world's treaty monitor (`+0x820`'s
-/// `+0x17`), whose next update then ends the treaty; a world without a monitor, another game
-/// mode and a research not queued mark nothing.
+/// `+0x17`), whose next update then ends the treaty. A world without a monitor, another game
+/// mode, another age (Feudal Age, 0x65), a packet whose queue id is not −1 (the command's first
+/// return) and a research the queue refuses (`FUN_1411d70f0` queues none) mark nothing.
 #[test]
 fn research_of_castle_age_marks_the_treaty_in_game_mode_16() {
-    use crate::players::treaty::{NomadTreaty, TreatyMinutes, TreatyMonitor};
-    use crate::technology::{Location, TechDef, TechState};
-    let castle = |mode, monitor: bool, queue_id: i32| {
-        let mut world = one_player(vec![centre(9)], [1000.0; 4]);
-        world.settings.game_mode = mode;
-        world.treaty = monitor
-            .then(|| TreatyMonitor::new(TreatyMinutes::UNTIMED, NomadTreaty::NotForced, mode));
-        world.model.techs = Arc::new(vec![TechDef::default(); 0x67]);
-        let mut techs = vec![TechState::default(); 0x67];
-        techs[0x66] = TechState {
-            state: ResearchState::Available,
-            research_cap: ResearchCap::of_data(-1),
-            building_master: None,
-            locations: vec![Location {
-                building: Some(ids::TOWN_CENTRE),
-                time: WholeSeconds::of_data(160),
-                button: LocationButton::of_data(1),
-                adjustment: Seconds::ZERO,
-            }],
-            ..TechState::default()
-        };
-        world.players[0].techs = techs;
-        let at = ResearchCommand {
-            player: player_id(0),
-            building: Some(object_id(9)),
-            count: 1,
-            buildings: vec![],
-            tech: TechId::of_data(0x66),
-            queue_id: QueueId::of_data(queue_id),
-            shift: false,
-        };
-        research_listed(&mut world, &at).unwrap();
-        let queued = world
-            .parts
-            .production
-            .get(world.players[0].objects[ListIndex::new(0)].id)
-            .map_or(0, |production| production.queue.total.get());
-        (queued, world.treaty.map(|monitor| monitor.castle_age))
-    };
     let one_unit = GameMode::OneUnit;
-    assert_eq!(castle(GameMode::of_data(0), true, -1), (1, Some(false)));
-    assert_eq!(castle(one_unit, true, -1), (1, Some(true)));
-    assert_eq!(castle(one_unit, false, -1), (1, None));
-    assert_eq!(castle(one_unit, true, 0), (0, Some(false)));
+    let castle_age = |world| research_marks(world, TechId::CASTLE_AGE, -1);
+    assert_eq!(
+        castle_age(castle_age_world(GameMode::of_data(0), 0)),
+        (1, Some(false))
+    );
+    assert_eq!(castle_age(castle_age_world(one_unit, 0)), (1, Some(true)));
+    let mut world = castle_age_world(one_unit, 0);
+    world.treaty = None;
+    assert_eq!(castle_age(world), (1, None));
+    assert_eq!(
+        research_marks(castle_age_world(one_unit, 0), TechId::FIRST_AGE, -1),
+        (1, Some(false))
+    );
+    assert_eq!(
+        research_marks(castle_age_world(one_unit, 0), TechId::CASTLE_AGE, 0),
+        (0, Some(false))
+    );
+    // 2000 food, of which the player holds 1000: the payment fails, the queue takes none
+    assert_eq!(
+        castle_age(castle_age_world(one_unit, 2000)),
+        (0, Some(false))
+    );
+}
+
+/// [`one_player`]'s town centre 9 in game mode `mode`, with a treaty monitor (`+0x820`): Feudal
+/// Age (0x65) and Castle Age (0x66), each available at the town centre for `food` food (the
+/// player holds 1000).
+fn castle_age_world(mode: GameMode, food: i16) -> World {
+    use crate::players::treaty::{NomadTreaty, TreatyMinutes, TreatyMonitor};
+    use crate::technology::{Cost, Location, TechDef, TechState};
+    let mut world = one_player(vec![centre(9)], [1000.0; 4]);
+    world.settings.game_mode = mode;
+    world.treaty = Some(TreatyMonitor::new(
+        TreatyMinutes::UNTIMED,
+        NomadTreaty::NotForced,
+        mode,
+    ));
+    let mut techs = vec![TechDef::default(); 0x67];
+    let available = TechState {
+        state: ResearchState::Available,
+        research_cap: ResearchCap::of_data(-1),
+        building_master: None,
+        locations: vec![Location {
+            building: Some(ids::TOWN_CENTRE),
+            time: WholeSeconds::of_data(160),
+            button: LocationButton::of_data(1),
+            adjustment: Seconds::ZERO,
+        }],
+        ..TechState::default()
+    };
+    let mut states = vec![TechState::default(); 0x67];
+    for tech in [0x65, 0x66] {
+        techs[tech].costs[0] = Cost {
+            attribute: Some(attribute::FOOD),
+            amount: CostAmount::of_data(food),
+            paid: CostPaid::PLAYER,
+        };
+        states[tech] = available.clone();
+    }
+    world.model.techs = Arc::new(techs);
+    world.players[0].techs = states;
+    world
+}
+
+/// RESEARCH (`0x140e7e270`, [`research_listed`]) of technology `tech` at `world`'s town centre 9
+/// with the packet's queue id `queue_id`: the researches its queue holds and the treaty
+/// monitor's mark (`+0x17`), none without a monitor.
+fn research_marks(mut world: World, tech: TechId, queue_id: i32) -> (i16, Option<bool>) {
+    let at = ResearchCommand {
+        player: player_id(0),
+        building: Some(object_id(9)),
+        count: 1,
+        buildings: vec![],
+        tech: Some(tech),
+        queue_id: QueueId::of_data(queue_id),
+        shift: false,
+    };
+    research_listed(&mut world, &at).unwrap();
+    let queued = world
+        .parts
+        .production
+        .get(world.players[0].objects[ListIndex::new(0)].id)
+        .map_or(0, |production| production.queue.total.get());
+    (queued, world.treaty.map(|monitor| monitor.castle_age))
 }
 
 /// [`one_player`]'s town centre 9 with a unit AI and technology 5, available (state 1) at the
