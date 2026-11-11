@@ -34,9 +34,9 @@ use self::search::corner_tiles;
 pub use self::search::spawn_point;
 #[cfg(test)]
 use self::search::{Spot, try_spot};
-use self::terrains::hill_fails;
 pub(crate) use self::terrains::placement_terrains;
 pub use self::terrains::{BuildSite, SiteChecks};
+use self::terrains::{hill_base, hill_fails};
 pub(crate) use self::world_map::WorldMap;
 use crate::combat::missile::grounded;
 use crate::map::Footprint;

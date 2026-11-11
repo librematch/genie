@@ -52,6 +52,7 @@ use crate::production::spawn::SiteChecks;
 use crate::production::spawn::ZoneTest;
 use crate::production::spawn::new_unit::SpawnOutcome;
 use crate::production::spawn::objects::RECYCLABLE_NEW_OBJECT;
+use crate::production::spawn::placement_test::UNLISTED_TERRAIN;
 use crate::production::{Entry, MakeObj, MakeObjState, Making, Production, SPOT_RETRY};
 use crate::test_ids::master_id;
 use crate::test_ids::object_id;
@@ -629,6 +630,166 @@ fn master_of_nan_radius_answers_the_static_test() {
             &roles(),
             &tuning().spawn,
         ),
+        Ok(Tested::Blocked { stays: false })
+    );
+}
+
+/// A unit of radii 1 in hill mode `hill_mode` on terrain 0, which `restriction` rates: at
+/// (50, 50) its box is the tiles 49 and 50 of both axes, whose first column's last row is
+/// (49, 50).
+fn hill_unit(restriction: &Restriction, hill_mode: HillMode) -> Placing<'_> {
+    Placing {
+        radius: Footprint::new(1.0, 1.0),
+        clearance: Footprint::new(1.0, 1.0),
+        hill_mode,
+        ..placed_villager(restriction)
+    }
+}
+
+/// The spawn's placement test of `placing` at (50, 50) under the call `call`, on a map of 120
+/// by 120 tiles at elevation 3 that `scene` changes.
+fn on_hills(
+    placing: &Placing<'_>,
+    call: PlacementCall,
+    scene: impl FnOnce(Scene) -> Scene,
+) -> GenieResult<Tested> {
+    let world = scene(Scene::open(GridSize::new(120, 120)).elevation(3)).build();
+    placement(
+        placing,
+        &WorldMap { turns: &world },
+        Point::new(50.0, 50.0),
+        call,
+        &roles(),
+        &tuning().spawn,
+    )
+}
+
+/// The tiles of column 48 from row 40 to row 59 lie a step up: the box's first column (49)
+/// takes the side slope with its west up (shape 5).
+fn west_slope(scene: Scene) -> Scene {
+    scene.elevation_on((40..60).map(|y| Tile::new(48, y)), 4)
+}
+
+/// Hill mode 1 takes the box's side slopes (`FUN_141123f80`'s `+0x604` 1): its first column on
+/// the west slope passes, a corner (shape 9: the tile south west of (49, 50) up) fails (code 3).
+#[test]
+fn placement_in_hill_mode_1_takes_side_slopes_but_no_corner() {
+    let restriction = Restriction::new(vec![1.0, 0.0]);
+    let unit = hill_unit(&restriction, HillMode::SIDE_SLOPES);
+    let corner = |scene: Scene| scene.elevation_on([Tile::new(48, 51)], 4);
+    let shape = |scene: fn(Scene) -> Scene| {
+        let world = scene(Scene::open(GridSize::new(120, 120)).elevation(3)).build();
+        WorldMap { turns: &world }.shape(Tile::new(49, 50))
+    };
+    assert_eq!((shape(west_slope), shape(corner)), (Some(5), Some(9)));
+    assert_eq!(on_hills(&unit, COUNTED, |scene| scene), Ok(Tested::Free));
+    assert_eq!(on_hills(&unit, COUNTED, west_slope), Ok(Tested::Free));
+    assert_eq!(
+        on_hills(&unit, COUNTED, corner),
+        Ok(Tested::Blocked { stays: false })
+    );
+}
+
+/// Hill mode 2 takes flat ground alone: the box on the west slope fails (code 3).
+#[test]
+fn placement_in_hill_mode_2_takes_flat_ground_alone() {
+    let restriction = Restriction::new(vec![1.0, 0.0]);
+    let unit = hill_unit(&restriction, HillMode::FLAT);
+    assert_eq!(on_hills(&unit, COUNTED, |scene| scene), Ok(Tested::Free));
+    assert_eq!(
+        on_hills(&unit, COUNTED, west_slope),
+        Ok(Tested::Blocked { stays: false })
+    );
+}
+
+/// Hill mode 3 measures the box's first column and last row against the elevation of the
+/// first column's last row (49, 50), read before the tiles: (50, 50) a step above that corner
+/// passes and (49, 49) a step below it too, though two below (50, 50); (49, 49) two steps above
+/// the corner fails (code 3); the tile (50, 49), on neither, passes at any elevation.
+#[test]
+fn placement_in_hill_mode_3_keeps_the_edge_within_one_step_of_its_corner() {
+    let restriction = Restriction::new(vec![1.0, 0.0]);
+    let unit = hill_unit(&restriction, HillMode::ONE_STEP);
+    let raised = |tiles: &'static [([i32; 2], u8)]| {
+        move |scene: Scene| {
+            tiles.iter().fold(scene, |scene, &(tile, elevation)| {
+                scene.elevation_on([Tile::from(tile)], elevation)
+            })
+        }
+    };
+    assert_eq!(
+        on_hills(&unit, COUNTED, raised(&[([49, 50], 4), ([50, 50], 5)])),
+        Ok(Tested::Free)
+    );
+    assert_eq!(
+        on_hills(&unit, COUNTED, raised(&[([49, 49], 5)])),
+        Ok(Tested::Blocked { stays: false })
+    );
+    assert_eq!(
+        on_hills(&unit, COUNTED, raised(&[([50, 49], 9)])),
+        Ok(Tested::Free)
+    );
+}
+
+/// `FUN_141123f80` tests the box's tiles column by column, each tile's terrain before its hill
+/// mode: (49, 50) in a corner fails before the terrain 5, which the restriction does not list,
+/// of (50, 49) is read; that terrain on (49, 50) itself is read first.
+#[test]
+fn placement_tests_the_hill_mode_by_columns_after_the_terrain() {
+    let restriction = Restriction::new(vec![1.0, 0.0]);
+    let unit = hill_unit(&restriction, HillMode::SIDE_SLOPES);
+    let unlisted_on = |tile: Tile| {
+        move |scene: Scene| {
+            scene
+                .elevation_on([Tile::new(48, 51)], 4)
+                .terrain_on([tile], TerrainId::named(5))
+        }
+    };
+    assert_eq!(
+        on_hills(&unit, COUNTED, unlisted_on(Tile::new(50, 49))),
+        Ok(Tested::Blocked { stays: false })
+    );
+    assert_eq!(
+        on_hills(&unit, COUNTED, unlisted_on(Tile::new(49, 50)))
+            .unwrap_err()
+            .reason(),
+        UNLISTED_TERRAIN.reason()
+    );
+}
+
+/// A tile the hill mode refuses ends `FUN_141123f80` before its zone test and its scan: a zone
+/// mode raises nothing, and the sheep on the box, which only that scan counts where the slot's
+/// own passes over the units (`[0x60]` 1), no longer reports the block.
+#[test]
+fn placement_hill_failure_skips_the_zone_test_and_the_static_scan() {
+    let restriction = Restriction::new(vec![1.0, 0.0]);
+    let unit = hill_unit(&restriction, HillMode::FLAT);
+    let zoned = PlacementCall {
+        zones: ZoneTest::Tested,
+        ..COUNTED
+    };
+    assert_eq!(
+        on_hills(&unit, zoned, west_slope),
+        Ok(Tested::Blocked { stays: false })
+    );
+    let sheep_on_box = |scene: Scene| {
+        scene.object(SceneObject {
+            at: Position::new(50.3, 50.3, 0.0),
+            ..sheep()
+        })
+    };
+    let passing_units = PlacementCall {
+        units: UnitScan::Passed,
+        ..COUNTED
+    };
+    assert_eq!(
+        on_hills(&unit, passing_units, sheep_on_box),
+        Ok(Tested::Blocked { stays: true })
+    );
+    assert_eq!(
+        on_hills(&unit, passing_units, |scene| west_slope(sheep_on_box(
+            scene
+        ))),
         Ok(Tested::Blocked { stays: false })
     );
 }
@@ -1988,6 +2149,37 @@ fn build_static_test_answers_the_map_edge_terrain_and_exploration() {
             .reason(),
         "BUILD's placement test in a zone mode"
     );
+}
+
+/// BUILD's hill mode 3 measures the box's first column and last row against the elevation of
+/// the first column's last row (49, 50) of the house's box at (50, 50), as the spawn's does:
+/// (50, 50) a step above that corner passes, (49, 49) two steps above it answers 3.
+#[test]
+fn build_static_test_measures_hill_mode_3_by_the_corner() {
+    use crate::production::spawn::build_placement_test::build_static_test;
+    let values = Restriction::new(vec![1.0]);
+    let site = BuildSite {
+        hill_mode: HillMode::ONE_STEP,
+        ..house_site(&values, true)
+    };
+    let code = |raised: &[([i32; 2], u8)]| {
+        let world = raised
+            .iter()
+            .fold(
+                Scene::open(GridSize::new(120, 120)).elevation(3),
+                |scene, &(tile, elevation)| scene.elevation_on([Tile::from(tile)], elevation),
+            )
+            .build();
+        build_static_test(
+            &site,
+            &WorldMap { turns: &world },
+            Point::new(50.0, 50.0),
+            &tuning().spawn,
+        )
+        .map(|placement_code| placement_code.map(PlacementCode::code))
+    };
+    assert_eq!(code(&[([49, 50], 4), ([50, 50], 5)]), Ok(None));
+    assert_eq!(code(&[([49, 49], 5)]), Ok(Some(3)));
 }
 
 /// BUILD's zone test runs behind the gate of `COMISS 0, rx; JC; COMISS 0, ry; JNC`

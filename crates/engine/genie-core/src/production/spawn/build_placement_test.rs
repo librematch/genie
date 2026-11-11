@@ -6,7 +6,6 @@ use crate::map::{Tile, TileRect};
 use crate::objects::HitPoints;
 use crate::objects::ObjectState;
 use crate::objects::masters::FogVisibility;
-use crate::objects::masters::HillMode;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObstructionKind;
 use crate::players::AllyTest;
@@ -15,8 +14,7 @@ use crate::production::spawn::PlacementCode;
 use crate::production::spawn::SiteChecks;
 use crate::production::spawn::WorldMap;
 use crate::production::spawn::placement_test::{UNLISTED_TERRAIN, overlapping};
-use crate::production::spawn::terrains::NO_ELEVATIONS;
-use crate::production::spawn::{BuildSite, hill_fails, placement_terrains};
+use crate::production::spawn::{BuildSite, hill_base, hill_fails, placement_terrains};
 use crate::production::spawn::{Near, NearFlags};
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
@@ -207,12 +205,7 @@ pub(super) fn build_static_test(
     if !placement_terrains(site.placement, map, point, TileRect::new(x0, y0, x1, y1))? {
         return Ok(Some(PlacementCode::PlacementTerrain));
     }
-    // hill mode 3 measures the box's edge against the elevation of its first column's last row
-    let base = if site.hill_mode == HillMode::ONE_STEP {
-        Some(map.elevation(Tile::new(x0, y1)).ok_or(NO_ELEVATIONS)?)
-    } else {
-        None
-    };
+    let base = hill_base(site.hill_mode, map, Tile::new(x0, y1))?;
     for tx in x0..=x1 {
         for ty in y0..=y1 {
             let tile = Tile::new(tx, ty);

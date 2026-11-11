@@ -18,7 +18,7 @@ use crate::production::spawn::WorldMap;
 use crate::{GenieError, GenieResult};
 
 /// A hill mode's test where the map's elevations are not known.
-pub(crate) const NO_ELEVATIONS: GenieError =
+const NO_ELEVATIONS: GenieError =
     GenieError::unsupported("a hill mode where the elevations are not known");
 
 bitflags::bitflags! {
@@ -60,6 +60,25 @@ pub struct BuildSite<'world> {
     /// The objects the scan passes over (`p12` and, for a building, its annexes, `FUN_14123d090`):
     /// none for BUILD, a reseeding gatherer's old target ([`crate::world::World::reseed`]).
     pub(crate) own: &'world [ObjectId],
+}
+
+/// The base elevation of the hill mode's test ([`hill_fails`]): `FUN_141123f80` reads the
+/// elevation (`+0x14`) of the box's first column's last row, `corner`, before its tiles. Only mode
+/// 3 measures by it, so for the others the port reads none.
+///
+/// # Errors
+///
+/// Mode 3 where the map's elevations are not known.
+pub(super) fn hill_base(
+    mode: HillMode,
+    map: &WorldMap<'_>,
+    corner: Tile,
+) -> GenieResult<Option<u8>> {
+    if mode == HillMode::ONE_STEP {
+        Ok(Some(map.elevation(corner).ok_or(NO_ELEVATIONS)?))
+    } else {
+        Ok(None)
+    }
 }
 
 /// The hill mode's test of a tile of the box (`FUN_141123f80`'s `p7` part, the master's
