@@ -19,6 +19,7 @@ use crate::math::image::farm_queue::{
 };
 use crate::math::rng::Stream;
 use crate::objects::ListIndex;
+use crate::objects::RoleId;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
@@ -31,6 +32,7 @@ use crate::production::Payment;
 use crate::production::PopulationTest;
 use crate::production::QueueOutcome;
 use crate::production::Refund;
+use crate::production::spawn::PassedObject;
 use crate::production::{cost_test, pay, refund_master};
 use crate::unit_ai::unit_ai_kind;
 use crate::world::AutoQueues;
@@ -323,27 +325,24 @@ impl World {
         };
         // the farm's scan passes over the old target and, for a building, its annexes; the fish
         // trap's over nothing
-        let mut own = Vec::new();
-        if queue == Queue::Farms
-            && let Some(target) = gather.target
-        {
-            own.push(target.id());
-            let is_building = match self.object(target) {
-                Some((player_id, unit)) => {
-                    unit.master(self.master_tables(), player_id)?.kind == MasterKind::BUILDING
-                }
-                None => false,
-            };
-            if is_building {
-                let mut index = 0;
-                while let Some(&object_id) = own.get(index) {
-                    own.extend(self.objects().annexes(object_id).ids());
-                    index += 1;
-                }
+        let old_target = gather
+            .target
+            .filter(|_| queue == Queue::Farms)
+            .map(RoleId::id);
+        let annexes = match old_target.and_then(|id| self.object(id)) {
+            Some((player_id, unit))
+                if unit.master(self.master_tables(), player_id)?.kind == MasterKind::BUILDING =>
+            {
+                self.objects().annex_tree(unit.id)
             }
-        }
+            _ => Vec::new(),
+        };
+        let passed = old_target.map(|id| PassedObject {
+            id,
+            annexes: &annexes,
+        });
         if !self
-            .placement_code_beside(owner, master, farm, true, &own)?
+            .placement_code_beside(owner, master, farm, true, passed)?
             .is_allowed()
         {
             return Ok(Reseed::NotMade);

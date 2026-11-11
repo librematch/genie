@@ -22,6 +22,7 @@ use crate::objects::ObjectId;
 use crate::objects::layers::Action;
 use crate::objects::masters::MasterTables;
 use crate::objects::unit::Unit;
+use crate::production::spawn::PassedObject;
 use crate::world::Seconds;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
@@ -108,10 +109,14 @@ impl BuildAction {
         let parts = self.part_tests(step, builder, actions, (site.id(), &cleared_ids), reads)?;
         // the foundation's placement test (its master's slot 0x50, FUN_14123aee0): one that may
         // not stay, or follows a part that may not, sends no unit off
-        let own = with_annexes(step, site.id());
+        let annexes = step.world.objects().annex_tree(site.id());
+        let passed = PassedObject {
+            id: site.id(),
+            annexes: &annexes,
+        };
         // the builder lent to its slot, where the tests' scans meet it (FD-045-D32)
         let code = self.lend(step, builder, actions, |world, _, _| {
-            world.foundation_code(&placed, true, &own)
+            world.foundation_code(&placed, true, passed)
         })?;
         let stays = parts.stay && code.is_allowed();
         let others: Vec<ObjectId> = occupants
@@ -188,7 +193,11 @@ impl BuildAction {
         };
         for part in parts {
             let placed = *step.world.spatial.get_known(part)?.ok_or(SITE_GONE)?;
-            let own = with_annexes(step, part);
+            let annexes = step.world.objects().annex_tree(part);
+            let passed = PassedObject {
+                id: part,
+                annexes: &annexes,
+            };
             let (_, unit) = step.world.object(part).ok_or(SITE_GONE)?;
             let desolid = step
                 .world
@@ -197,7 +206,7 @@ impl BuildAction {
                 .construction
                 .is_some_and(|construction| construction.desolid);
             let code = self.lend(step, builder, actions, |world, _, _| {
-                world.foundation_code(&placed, desolid, &own)
+                world.foundation_code(&placed, desolid, passed)
             })?;
             if !code.is_allowed() {
                 tests.stay = false;
@@ -478,18 +487,6 @@ struct PartTests {
     stay: bool,
     /// Units stood on a part that may stay (`bVar21`).
     occupied: bool,
-}
-
-/// The objects a placement test of building `id` passes over (`p12`): the building and its
-/// annexes, theirs too (`FUN_14123d090`, through the four slots `+0xbc0` to `+0xbe0`).
-fn with_annexes(step: &Step<'_>, id: ObjectId) -> Vec<ObjectId> {
-    let mut own = vec![id];
-    let mut next = 0;
-    while let Some(&part) = own.get(next) {
-        own.extend(step.world.objects().annexes(part).ids());
-        next += 1;
-    }
-    own
 }
 
 /// The units the game counts on `site`'s footprint ([`Spatial::footprint_occupants`]) but those

@@ -273,6 +273,21 @@ impl<'world> ObjectsRef<'world> {
             .map_or(Annexes::NONE, |building| building.annexes)
     }
 
+    /// The annexes of the building `main` and theirs, each building's in slot order before the
+    /// next level's: the objects `FUN_14123d090` finds through the slots `+0xbc0` to `+0xbd8`,
+    /// depth first, which the building master's placement scan passes over. None for an object
+    /// without annexes.
+    #[must_use]
+    pub fn annex_tree(&self, main: ObjectId) -> Vec<ObjectId> {
+        let mut tree: Vec<ObjectId> = self.annexes(main).ids().collect();
+        let mut next = 0;
+        while let Some(&annex) = tree.get(next) {
+            tree.extend(self.annexes(annex).ids());
+            next += 1;
+        }
+        tree
+    }
+
     /// The obstruction query's ignore list for `ids` (−1 for none), as `FUN_14114e8a0` adds each
     /// object: its id, then a building's annexes (`+0xbc0`..`+0xbd8`, in slot order).
     #[must_use]

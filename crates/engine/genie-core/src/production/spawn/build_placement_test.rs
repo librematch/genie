@@ -12,8 +12,10 @@ use crate::players::AllyTest;
 use crate::players::PlayerId;
 use crate::production::spawn::PlacementCode;
 use crate::production::spawn::SiteChecks;
+use crate::production::spawn::UnitScan;
 use crate::production::spawn::WorldMap;
 use crate::production::spawn::placement_test::{UNLISTED_TERRAIN, overlapping};
+use crate::production::spawn::placement_test::{own_scan_reads, static_scan_reads};
 use crate::production::spawn::{BuildSite, hill_base, hill_fails, placement_terrains};
 use crate::production::spawn::{Near, NearFlags};
 use crate::world::layer::ClassRoles;
@@ -23,19 +25,21 @@ use crate::{GenieError, GenieResult};
 
 /// BUILD's placement test (`FUN_140e7a400`'s call of the master's slot 0x50, the building master's
 /// `FUN_14123aee0` with BUILD's flags: `p6` human, `p7`, `p8`, `p9` 1, `p10` 0, `p11` 1, no object
-/// of its own, `p13` 0, `p14` 1): 0 when the foundation may go to `point`, else the game's code.
+/// to pass over, `p13` 0, `p14` 1): 0 when the foundation may go to `point`, else the game's code.
 /// First the unit master's slot 0x50 ([`build_slot_test`]; its scans run only for the Build's
 /// test, [`SiteChecks::SCANS`]) over the box of the site's radii: off the map 7; per tile,
 /// columns then rows, a terrain the restriction forbids 2 (`DAT_142eb7e5c`'s threshold, the
 /// spawn's); a human who explored none of the tiles 5; a hill mode's tile ([`hill_fails`]) 3. Then
 /// the building master's scan of the tiles within 8 (rows, then columns; each tile's objects in its
-/// list's order): an object the player sees, or on a tile it never explored (the test's explored
-/// flag `+0x730` is set by then), or in the fog with a fog visibility, and only its own in the fog
-/// without one, that is below state 3 (another type below 7), standing (or the master obstructs, or
-/// it is below type 30), not a wall under its own gate, a desolid building only of an ally both
-/// ways, not a moving unit of the player, Gaia or a mutual ally, not a felled tree off a forest (at
-/// most 1 hit point; `+0x2e8` taken as its own tile), not buildable on, whose box with a height
-/// overlaps the clearance box: 6. Not modelled: the placement terrains, hill modes, the zone test
+/// list's order), past the site's object to pass over and that building's annexes
+/// ([`crate::production::spawn::PassedObject::passes`], `FUN_14123d090`): an object the player
+/// sees, or on a tile it never explored (the test's explored flag `+0x730` is set by then), or in
+/// the fog with a fog visibility, and only its own in the fog without one, that is below state 3
+/// (another type below 7), standing (or the master obstructs, or it is below type 30), not a wall
+/// under its own gate, a desolid building only of an ally both ways, not a moving unit of the
+/// player, Gaia or a mutual ally, not a felled tree off a forest (at most 1 hit point; `+0x2e8`
+/// taken as its own tile), not buildable on, whose box with a height overlaps the clearance box:
+/// 6. Not modelled: the placement terrains, hill modes, the zone test
 /// (`FUN_1415c6400`), the editor (game mode 4), a fogged object of fog visibility 3, game type 7's
 /// test of allies.
 pub(crate) fn build_placement(
@@ -62,7 +66,7 @@ pub(crate) fn build_placement(
             let tile = Tile::new(tx, ty);
             let sight = (map.explored(player, tile), map.visible(player, tile));
             for near in map.objects(tile)? {
-                if site.own.contains(&near.id) {
+                if site.passed.is_some_and(|passed| passed.passes(near.id)) {
                     continue;
                 }
                 if build_sees(site, map, &near, sight, roles)?
@@ -117,11 +121,11 @@ fn build_slot_test(
     Ok(code)
 }
 
-/// `FUN_141123f80`'s scan in the Build's test: over the tiles within `SpawnTuning::reach` (rows,
-/// then columns; each tile's objects in its list's order), an object other than the site's own
-/// (`p12`), below state 7, not buildable on, no desolid building, with a height (a tree's farm
-/// and an obstructing building have one), whose box overlaps the site's: true when one does (the
-/// game's code 6).
+/// `FUN_141123f80`'s scan in the Build's test ([`static_scan_reads`]): over the tiles within
+/// `SpawnTuning::reach` (rows, then columns; each tile's objects in its list's order), an object
+/// other than the site's object to pass over (`p12`; its annexes count), below state 7, not
+/// buildable on, no desolid building, with a height (a tree's farm and an obstructing building
+/// have one), whose box overlaps the site's: true when one does (the game's code 6).
 fn base_scan_finds(
     site: &BuildSite<'_>,
     map: &WorldMap<'_>,
@@ -129,26 +133,18 @@ fn base_scan_finds(
     roles: &Roles,
     spawn_tuning: &SpawnTuning,
 ) -> GenieResult<bool> {
-    let counts = |near: &Near| {
-        let listed = !site.own.contains(&near.id)
-            && near.state < ObjectState::Removed
-            && !near.buildable_on.passed()
-            && (near.kind != MasterKind::BUILDING || !near.flags.contains(NearFlags::DESOLID));
-        let tall = near.flags.contains(NearFlags::TALL)
-            || (roles.of_class(site.class).contains(ClassRoles::TREE)
-                && roles.of_class(near.class).contains(ClassRoles::FARM))
-            || (near.kind == MasterKind::BUILDING
-                && near.obstruction_kind != ObstructionKind::NONE);
-        listed.then_some(tall)
-    };
+    let passed = site.passed.map(|passed| passed.id);
+    let counts = |near: &Near| static_scan_reads(near, site.class, passed, roles);
     Ok(!overlapping(map, point, site.radius, &counts, spawn_tuning)?.is_empty())
 }
 
-/// `FUN_141264db0`'s own scan in the Build's test (`p13` 1): over the tiles within
-/// `SpawnTuning::reach` (rows, then columns; each tile's objects in its list's order), an object
-/// other than the site's own (`p12`), not a unit (type 70), below state 7, not buildable on, no
-/// desolid building but of classes 51 and 54, with a height (an obstructing building has one),
-/// whose box overlaps the site's: true when one does (the game's code 6).
+/// `FUN_141264db0`'s own scan in the Build's test (`p13` 1, [`own_scan_reads`]): over the tiles
+/// within `SpawnTuning::reach` (rows, then columns; each tile's objects in its list's order), an
+/// object other than the site's object to pass over (`p12`; its annexes count but, under the
+/// world's feature flags, `DAT_143f01833`, a building annexed to it), not a unit (type 70), below
+/// state 7, not buildable on, no desolid building but of classes 51 and 54, with a height (an
+/// obstructing building has one), whose box overlaps the site's: true when one does (the game's
+/// code 6).
 fn own_scan_finds(
     site: &BuildSite<'_>,
     map: &WorldMap<'_>,
@@ -156,23 +152,9 @@ fn own_scan_finds(
     roles: &Roles,
     spawn_tuning: &SpawnTuning,
 ) -> GenieResult<bool> {
-    let counts = |near: &Near| {
-        let listed = !site.own.contains(&near.id)
-            && near.state < ObjectState::Removed
-            && !near.buildable_on.passed()
-            && near.kind != MasterKind::COMBAT
-            && (near.kind != MasterKind::BUILDING
-                || roles
-                    .of_class(near.class)
-                    .contains(ClassRoles::PACKED_TREBUCHET)
-                || roles
-                    .of_class(near.class)
-                    .contains(ClassRoles::UNPACKED_TREBUCHET)
-                || !near.flags.contains(NearFlags::DESOLID));
-        let tall = near.flags.contains(NearFlags::TALL)
-            || (near.kind == MasterKind::BUILDING && near.obstruction_kind.recorded());
-        listed.then_some(tall)
-    };
+    let passed = site.passed.map(|passed| passed.id);
+    let feature_flags = map.turns.feature_flags;
+    let counts = |near: &Near| own_scan_reads(near, passed, UnitScan::Passed, feature_flags, roles);
     Ok(!overlapping(map, point, site.radius, &counts, spawn_tuning)?.is_empty())
 }
 

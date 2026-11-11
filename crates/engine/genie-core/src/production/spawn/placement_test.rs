@@ -261,7 +261,7 @@ pub(crate) fn placement(
         if call.zones == ZoneTest::Tested {
             return Err(GenieError::unsupported("a placement test in a zone mode"));
         }
-        let counts = |near: &Near| static_scan_reads(near, me, call.passed, roles);
+        let counts = |near: &Near| static_scan_reads(near, me.class, call.passed, roles);
         let found = if me.tall {
             overlapping(map, point, radius, &counts, spawn_tuning)?
         } else {
@@ -272,7 +272,7 @@ pub(crate) fn placement(
     };
     // slot 0x50's own scan
     let feature_flags = map.turns.feature_flags;
-    let counts = |near: &Near| own_scan_reads(near, me, call, feature_flags, roles);
+    let counts = |near: &Near| own_scan_reads(near, call.passed, call.units, feature_flags, roles);
     let found = if me.tall {
         overlapping(map, point, radius, &counts, spawn_tuning)?
     } else {
@@ -330,13 +330,14 @@ fn tiles_pass(
     Ok(seen || call.explored == ExploredTest::Skipped)
 }
 
-/// What `FUN_141123f80`'s scan reads of object `near` for `me`: none for one it passes over (the
-/// call's object `passed`, one from state 7 on, one buildable on, a desolid building), else
-/// whether its box has a height (its master's, a farm's for a tree, an obstructing building's)
-/// where `me`'s has one too.
-fn static_scan_reads(
+/// What `FUN_141123f80`'s scan reads of object `near` for a master of class `class` with a
+/// height (the scan runs for no other): none for one it passes over (the call's object `passed`,
+/// `lVar16 != param_12`, and no other; one from state 7 on, one buildable on, a desolid
+/// building), else whether its box has a height (its master's, a farm's for a tree, an
+/// obstructing building's).
+pub(super) fn static_scan_reads(
     near: &Near,
-    me: &Placing<'_>,
+    class: ClassId,
     passed: Option<ObjectId>,
     roles: &Roles,
 ) -> Option<bool> {
@@ -345,29 +346,30 @@ fn static_scan_reads(
         && !near.buildable_on.passed()
         && (near.kind != MasterKind::BUILDING || !near.flags.contains(NearFlags::DESOLID));
     let tall = near.flags.contains(NearFlags::TALL)
-        || (roles.of_class(me.class).contains(ClassRoles::TREE)
+        || (roles.of_class(class).contains(ClassRoles::TREE)
             && roles.of_class(near.class).contains(ClassRoles::FARM))
         || (near.kind == MasterKind::BUILDING && near.obstruction_kind != ObstructionKind::NONE);
-    listed.then_some(tall && me.tall)
+    listed.then_some(tall)
 }
 
-/// What the slot's own scan reads of object `near` for `me` under the call `call` and the world's
-/// `feature_flags`: none for one it passes over (the call's object, one from state 7 on, one
-/// buildable on, a desolid building but of classes 51 and 54, the units the call passes, and
-/// under the feature flags a building annexed to the call's object), else whether its box has a
-/// height (its master's, an obstructing building's) where `me`'s has one too.
-fn own_scan_reads(
+/// What the slot's own scan reads of object `near` for a master with a height (the scan runs for
+/// no other) under the call's object `passed` (`[0x58]`), its `units` (`[0x60]`) and the world's
+/// `feature_flags`: none for one it passes over (the call's object, `plVar7 != param_12`, and no
+/// other but under the feature flags a building annexed to it; one from state 7 on, one
+/// buildable on, a desolid building but of classes 51 and 54, the units the call passes), else
+/// whether its box has a height (its master's, an obstructing building's).
+pub(super) fn own_scan_reads(
     near: &Near,
-    me: &Placing<'_>,
-    call: PlacementCall,
+    passed: Option<ObjectId>,
+    units: UnitScan,
     feature_flags: FeatureFlags,
     roles: &Roles,
 ) -> Option<bool> {
     // 0x1412651fa: the flags' test of an annex needs the call's object
     let annex_passed = feature_flags == FeatureFlags::On
-        && call.passed.is_some()
-        && near.main_building.map(MainBuildingId::id) == call.passed;
-    let listed = call.passed != Some(near.id)
+        && passed.is_some()
+        && near.main_building.map(MainBuildingId::id) == passed;
+    let listed = passed != Some(near.id)
         && near.state < ObjectState::Removed
         && !near.buildable_on.passed()
         && (near.kind != MasterKind::BUILDING
@@ -378,8 +380,8 @@ fn own_scan_reads(
                 .of_class(near.class)
                 .contains(ClassRoles::UNPACKED_TREBUCHET)
             || !(near.flags.contains(NearFlags::DESOLID) || annex_passed))
-        && !call.units.passes(near);
+        && !units.passes(near);
     let tall = near.flags.contains(NearFlags::TALL)
         || (near.kind == MasterKind::BUILDING && near.obstruction_kind.recorded());
-    listed.then_some(tall && me.tall)
+    listed.then_some(tall)
 }

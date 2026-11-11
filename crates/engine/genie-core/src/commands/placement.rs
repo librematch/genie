@@ -16,6 +16,7 @@ use crate::objects::masters::cost_entries;
 use crate::objects::masters::player_master;
 use crate::players::Amount;
 use crate::players::PlayerId;
+use crate::production::spawn::PassedObject;
 use crate::production::spawn::PlacementCode;
 use crate::production::spawn::SiteChecks;
 use crate::production::spawn::{BuildSite, WorldMap, build_placement};
@@ -128,18 +129,18 @@ impl World {
         at: Point,
         human: bool,
     ) -> GenieResult<PlacementCode> {
-        self.placement_code_beside(player, master, at, human, &[])
+        self.placement_code_beside(player, master, at, human, None)
     }
 
-    /// [`World::placement_code`] whose scan passes over the objects `own` (the test's `p12` and
-    /// its annexes).
+    /// [`World::placement_code`] whose scan passes over the object `passed` (the test's `p12`)
+    /// and its annexes.
     pub(crate) fn placement_code_beside(
         &self,
         player: PlayerId,
         master: MasterId,
         at: Point,
         human: bool,
-        own: &[ObjectId],
+        passed: Option<PassedObject<'_>>,
     ) -> GenieResult<PlacementCode> {
         let site = self.master(player, master)?;
         let build = BuildSite {
@@ -156,7 +157,7 @@ impl World {
             restriction: self.site_restriction(site)?,
             hill_mode: site.hill_mode,
             placement: site.placement,
-            own,
+            passed,
         };
         let map = WorldMap { turns: self };
         build_placement(
@@ -170,13 +171,13 @@ impl World {
 
     /// The Build's placement test of the building `placed` (`0x140aae200` case 7: its master's slot
     /// 0x50, `FUN_14123aee0`, with `p6` 0, `p7` 0, `p8` 0, `p9` 0, `p10` 1, `p11` 1, the building
-    /// as `p12`, `p13` 1, `p14` 1): by the master's size radii, without the explored test and the
-    /// hill mode, with the static scans
-    /// ([`SiteChecks::SCANS`](crate::production::spawn::SiteChecks::SCANS)); the scans pass over
-    /// `own` (the building and its annexes); the updating builder must be lent to its slot for them
-    /// ([`crate::world::step::Step::lend`]). A `desolid` building's master is its copy without a
-    /// height (`FUN_1411cf770` writes `+0x5e0` 0), so the static scans do not run for it. 0 when
-    /// the building may stay, else the game's code.
+    /// `passed` as `p12`, `p13` 1, `p14` 1): by the master's size radii, without the explored test
+    /// and the hill mode, with the static scans
+    /// ([`SiteChecks::SCANS`](crate::production::spawn::SiteChecks::SCANS)); they pass over the
+    /// building alone, the building master's scan over its annexes too; the updating builder must
+    /// be lent to its slot for them ([`crate::world::step::Step::lend`]). A `desolid` building's
+    /// master is its copy without a height (`FUN_1411cf770` writes `+0x5e0` 0), so the static
+    /// scans do not run for it. 0 when the building may stay, else the game's code.
     ///
     /// # Errors
     ///
@@ -185,7 +186,7 @@ impl World {
         &self,
         placed: &Placed,
         desolid: bool,
-        own: &[ObjectId],
+        passed: PassedObject<'_>,
     ) -> GenieResult<PlacementCode> {
         let player = placed.player;
         let site = self.master(player, placed.master)?;
@@ -199,7 +200,7 @@ impl World {
             restriction: self.site_restriction(site)?,
             hill_mode: HillMode::ANY,
             placement: site.placement,
-            own,
+            passed: Some(passed),
         };
         let map = WorldMap { turns: self };
         let at = placed.position.ground();

@@ -42,7 +42,7 @@ pub use self::search::spawn_point;
 #[cfg(test)]
 use self::search::{Spot, try_spot};
 pub(crate) use self::terrains::placement_terrains;
-pub use self::terrains::{BuildSite, SiteChecks};
+pub use self::terrains::{BuildSite, PassedObject, SiteChecks};
 use self::terrains::{hill_base, hill_fails};
 pub(crate) use self::world_map::WorldMap;
 use crate::combat::missile::grounded;

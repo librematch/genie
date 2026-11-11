@@ -368,7 +368,7 @@ fn fogged_building_blocks_build_by_its_visibility_mask() {
         restriction: &Restriction::new(vec![1.0, 0.0]),
         hill_mode: HillMode::ANY,
         placement: PlacementTerrains::NONE,
-        own: &[],
+        passed: None,
     };
     let test = |owner, seen_by| {
         let house = SceneObject {
@@ -2094,7 +2094,7 @@ const fn house_site(restriction: &Restriction, human: bool) -> BuildSite<'_> {
         restriction,
         hill_mode: HillMode::ANY,
         placement: PlacementTerrains::NONE,
-        own: &[],
+        passed: None,
     }
 }
 
@@ -2535,9 +2535,10 @@ fn build_blockers_are_the_standing_objects_whose_box_overlaps() {
     assert!(!blocks(&site, outlined(Radii::new(1.0, 1.0, -1.0))));
 }
 
-/// The Build's test ([`BuildSite::scans`]) runs the static scans for a site with a height: they
+/// The Build's test ([`SiteChecks::SCANS`]) runs the static scans for a site with a height: they
 /// find player 2's dying house 600 at (21.5, 21.5) (state 4) that BUILD's own scan passes over,
-/// but not one of the site's own, a desolid foundation, or anything for a site without a height.
+/// but not the test's object (`p12`), a desolid foundation, or anything for a site without a
+/// height.
 #[test]
 fn the_build_static_scans_find_dying_house_build_passes_over() {
     let house = |desolid| SceneObject {
@@ -2577,7 +2578,10 @@ fn the_build_static_scans_find_dying_house_build_passes_over() {
     assert_eq!(
         test(
             &BuildSite {
-                own: &[object_id(600)],
+                passed: Some(PassedObject {
+                    id: object_id(600),
+                    annexes: &[],
+                }),
                 ..scans
             },
             house(false)
@@ -2680,6 +2684,109 @@ fn build_own_scan_answers_over_the_map_edge() {
     assert_eq!(test(SiteChecks::empty(), true, &house), 7);
     assert_eq!(test(SiteChecks::SCANS, false, &house), 7);
     assert_eq!(test(SiteChecks::SCANS, true, &[]), 7);
+}
+
+/// Player 2's house 600 at (60.5, 60.5) and its annex, the house 601 at `annex_at`, on a map of
+/// 120 by 120 tiles.
+fn annexed_house(annex_at: Position) -> World {
+    Scene::open(GridSize::new(120, 120))
+        .players(2)
+        .object(SceneObject::new(
+            600,
+            PlayerId::new(2),
+            house_master(),
+            Position::new(60.5, 60.5, 0.0),
+        ))
+        .object(SceneObject {
+            annex_of: Some(MainBuildingId::new(object_id(600))),
+            ..SceneObject::new(601, PlayerId::new(2), house_master(), annex_at)
+        })
+        .build()
+}
+
+/// The static scans pass over the test's object (`p12`) alone (`FUN_141123f80`'s
+/// `lVar16 != param_12`, `FUN_141264db0`'s `plVar7 != param_12`), not its annexes, which only the
+/// building master's own scan passes over (`FUN_14123d090`): player 2's house 601 at
+/// (21.5, 21.5), an annex of the house 600 the Build's test passes over, answers 6 there, under
+/// the feature flags too (they spare an annex in the slot's own scan only); BUILD's test, without
+/// the static scans, passes over it, and finds it once the annexes are not passed.
+#[test]
+fn build_static_scans_count_annex_of_passed_building() {
+    let values = Restriction::new(vec![1.0]);
+    let mut world = annexed_house(Position::new(21.5, 21.5, 0.0));
+    let test = |world: &World, checks, passed| {
+        let site = BuildSite {
+            checks,
+            tall: true,
+            passed,
+            ..house_site(&values, false)
+        };
+        build_placement(
+            &site,
+            &WorldMap { turns: world },
+            Point::new(21.0, 21.0),
+            &roles(),
+            &tuning().spawn,
+        )
+        .unwrap()
+        .code()
+    };
+    let annexes = [object_id(601)];
+    let main = Some(PassedObject {
+        id: object_id(600),
+        annexes: &annexes,
+    });
+    let main_alone = Some(PassedObject {
+        id: object_id(600),
+        annexes: &[],
+    });
+    assert_eq!(test(&world, SiteChecks::SCANS, main), 6);
+    assert_eq!(test(&world, SiteChecks::empty(), main), 0);
+    assert_eq!(test(&world, SiteChecks::empty(), main_alone), 6);
+    world.feature_flags = FeatureFlags::On;
+    assert_eq!(test(&world, SiteChecks::SCANS, main), 6);
+}
+
+/// Under the feature flags (`DAT_143f01833`) the slot's own scan passes over a building annexed
+/// to the test's object (its `+0xbb8`, `p12` not null) in the Build's test as in the spawn's:
+/// player 2's house 601, an annex of the house 600, overlaps a site past the map's west edge and
+/// answers 6 without the flags; with them the edge's 7 stays, whatever annexes the test passes
+/// over, unless the test has no object.
+#[test]
+fn build_own_scan_under_feature_flags_passes_over_annex_of_passed_building() {
+    let values = Restriction::new(vec![1.0]);
+    let mut world = annexed_house(Position::new(1.5, 21.5, 0.0));
+    let test = |world: &World, passed| {
+        let site = BuildSite {
+            checks: SiteChecks::SCANS,
+            tall: true,
+            passed,
+            ..house_site(&values, false)
+        };
+        build_placement(
+            &site,
+            &WorldMap { turns: world },
+            Point::new(0.5, 21.0),
+            &roles(),
+            &tuning().spawn,
+        )
+        .unwrap()
+        .code()
+    };
+    let annexes = [object_id(601)];
+    let main = Some(PassedObject {
+        id: object_id(600),
+        annexes: &annexes,
+    });
+    let main_alone = Some(PassedObject {
+        id: object_id(600),
+        annexes: &[],
+    });
+    assert_eq!(test(&world, main), 6);
+    world.feature_flags = FeatureFlags::On;
+    assert_eq!(test(&world, main), 7);
+    assert_eq!(test(&world, main_alone), 7);
+    assert_eq!(test(&world, None), 6);
 }
 
 /// A NaN in either radius passes the static scans' gates (`JC` at 0x141124d8b and

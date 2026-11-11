@@ -233,6 +233,7 @@ use crate::test_ids::costs;
 use crate::test_ids::group_id;
 use crate::test_ids::master_id;
 use crate::test_ids::object_id;
+use crate::test_ids::object_id_list;
 use crate::test_ids::object_ids;
 use crate::test_ids::opt_master;
 use crate::test_ids::order_kind;
@@ -249,7 +250,7 @@ use crate::testing::ids;
 use crate::testing::ids::VILLAGER_FEMALE;
 use crate::testing::ids::VILLAGER_MALE;
 use crate::testing::roles;
-use crate::testing::scene::{move_by, moving_master, walking};
+use crate::testing::scene::{Scene, SceneObject, move_by, moving_master, walking};
 use crate::testing::slots;
 use crate::testing::static_roles;
 use crate::testing::tuning;
@@ -16905,6 +16906,37 @@ fn an_annex_follows_its_dying_main_building_into_state_4() {
         None
     );
     assert_eq!(world.objects().annexes(object_id(7228)).ids().count(), 0);
+}
+
+/// The annex tree of a building (the objects `FUN_14123d090` finds): its annexes in slot order,
+/// then theirs; an annex's tree holds only its own annexes, and an object without annexes has
+/// none.
+#[test]
+fn annex_tree_holds_annexes_then_theirs() {
+    let building = Master {
+        id: master_id(70),
+        kind: MasterKind::BUILDING,
+        class: class::BUILDING,
+        ..Master::default()
+    };
+    let at = Position::new(10.5, 10.5, 0.0);
+    let annex = |id, main| SceneObject {
+        annex_of: Some(MainBuildingId::new(object_id(main))),
+        ..SceneObject::new(id, PlayerId::GAIA, building.clone(), at)
+    };
+    let world = Scene::open(GridSize::new(20, 20))
+        .object(SceneObject::new(600, PlayerId::GAIA, building.clone(), at))
+        .object(annex(601, 600))
+        .object(annex(602, 600))
+        .object(annex(603, 601))
+        .build();
+    let objects = world.objects();
+    assert_eq!(
+        objects.annex_tree(object_id(600)),
+        object_id_list([601, 602, 603])
+    );
+    assert_eq!(objects.annex_tree(object_id(601)), object_id_list([603]));
+    assert_eq!(objects.annex_tree(object_id(603)), []);
 }
 
 /// 428799090's palisade gate foundation (34600, master 800) dies at no hit points in update 2674

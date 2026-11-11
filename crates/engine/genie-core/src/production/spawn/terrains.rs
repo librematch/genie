@@ -57,9 +57,28 @@ pub struct BuildSite<'world> {
     pub(crate) hill_mode: HillMode,
     /// The placement terrains (`+0x5f2`..`+0x5f8`, [`placement_terrains`]).
     pub(crate) placement: PlacementTerrains,
-    /// The objects the scan passes over (`p12` and, for a building, its annexes, `FUN_14123d090`):
-    /// none for BUILD, a reseeding gatherer's old target ([`crate::world::World::reseed`]).
-    pub(crate) own: &'world [ObjectId],
+    /// The object the test passes over (`p12`) with its annexes: none for BUILD, the building
+    /// for the Build's test, a reseeding gatherer's old target ([`crate::world::World::reseed`]).
+    pub(crate) passed: Option<PassedObject<'world>>,
+}
+
+/// The object a placement test passes over (`p12`) with its annexes: every scan passes over the
+/// object, and only the building master's own scan (`FUN_14123aee0`) over its annexes.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PassedObject<'world> {
+    /// The object (`p12`).
+    pub(crate) id: ObjectId,
+    /// Its annexes and theirs, which `FUN_14123d090` finds for a building
+    /// ([`crate::world::objects_ref::ObjectsRef::annex_tree`]): none for another object.
+    pub(crate) annexes: &'world [ObjectId],
+}
+
+impl PassedObject<'_> {
+    /// Whether the building master's own scan passes over object `id` (`FUN_14123aee0`): the
+    /// object or one of its annexes.
+    pub(super) fn passes(&self, id: ObjectId) -> bool {
+        self.id == id || self.annexes.contains(&id)
+    }
 }
 
 /// The base elevation of the hill mode's test ([`hill_fails`]): `FUN_141123f80` reads the
