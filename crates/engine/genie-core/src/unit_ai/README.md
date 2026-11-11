@@ -77,6 +77,7 @@ show in checkpoint word 9.
 | [`unit_stance.rs`](unit_stance.rs) | A unit's stance: how far it goes after what it sees. |
 | [`update.rs`](update.rs) | The full update: its order's tail, its target's block and the hunters' and gatherers' searches. |
 | [`best_target/`](best_target/) | `UnitAIModule::bestUnitToAttack` (158041 `0x140c44680`) and what it keeps: the attack categories (`FUN_140c4c8e0`) by which a unit AI's order history weighs its choice. |
+| [`order_slots/`](order_slots/) | The order slots' tests. |
 | [`task_finder/`](task_finder/) | The task finder (`TRIBE_Task_List` slot 2, `FUN_1412784d0`, with the `RGE_Task_List` finder `FUN_1411a8ba0` and its test of a task on a target, slot 4 `FUN_1411a8620`): which task of a master's task list a unit does on a target object. |
 | [`world_view/`](world_view/) | The views a unit's update and its unit AI read the world through (`UnitView`, `Step`, `Foreign`, `OwnerView`, the pickers). |
 <!-- /files -->

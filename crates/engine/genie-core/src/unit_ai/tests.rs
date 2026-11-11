@@ -136,7 +136,7 @@ fn no_surroundings() -> Surroundings {
     }
 }
 
-fn idle(ai_kind: UnitAiKind) -> UnitAi {
+pub(crate) fn idle(ai_kind: UnitAiKind) -> UnitAi {
     UnitAi {
         ai_kind,
         current_order: None,
@@ -740,7 +740,7 @@ fn unit_sent_off_footprint_keeps_its_move_aside_through_the_update() {
 /// 9 before the attack command that follows them, whose Attack the stop would have cleared.
 #[test]
 fn the_unit_ai_calls_reach_the_unit_in_their_order() {
-    let enemy = order_target(70, player_id(2), class::CLASS_6);
+    let enemy = order_target(70, player_id(2));
     let mut world = order_world(
         order_unit(order_soldier(), idle(UnitAiKind::Soldier)),
         &[enemy],
@@ -7861,7 +7861,7 @@ fn an_immediate_attack_roundup_keeps_the_target_until_it_attacks_the_next() {
         ready: true,
         ..QueuedOrder::default()
     };
-    let enemy = order_target(51, player_id(2), class::CLASS_6);
+    let enemy = order_target(51, player_id(2));
     let mut world = order_world(order_unit(order_soldier(), attacking()), from_ref(&enemy));
     let answer = run_ai(
         &mut world,
@@ -8617,7 +8617,7 @@ fn ship_or_livestock_may_attack_anything_and_building_nothing() {
         (UnitAiKind::Livestock, Some(object_id(9800))),
         (UnitAiKind::Building, None),
     ] {
-        let enemy = order_target(9800, player_id(2), class::CLASS_6);
+        let enemy = order_target(9800, player_id(2));
         let mut world = order_world(order_unit(order_soldier(), idle(ai_kind)), &[enemy]);
         let run_ai = run_ai(
             &mut world,
@@ -10736,7 +10736,7 @@ fn the_base_attack_check_lets_every_kind_without_its_own_attack() {
         UnitAiKind::Artifact,
         UnitAiKind::SiegeTower,
     ] {
-        let enemy = order_target(77, player_id(2), class::CLASS_6);
+        let enemy = order_target(77, player_id(2));
         let mut world = order_world(order_unit(order_soldier(), idle(ai_kind)), &[enemy]);
         let answer = run_ai(
             &mut world,
@@ -12251,7 +12251,7 @@ fn busy_villager_on_the_attack_order_runs_its_full_update() {
 }
 
 /// An order of value `order` on `target` at (12.7, 30.2, 0.5) within 3, priority 40, ready.
-fn queued(order: OrderKind, target: i32) -> QueuedOrder {
+pub(crate) fn queued(order: OrderKind, target: i32) -> QueuedOrder {
     QueuedOrder {
         issuer: Some(Issuer::Player(player_id(1))),
         order,
@@ -12267,7 +12267,7 @@ fn queued(order: OrderKind, target: i32) -> QueuedOrder {
 }
 
 /// Player 1's unit 9 of master `master` at (5, 6), on its sprite, its unit AI `ai`.
-fn order_unit(master: Master, ai: UnitAi) -> SceneObject {
+pub(crate) fn order_unit(master: Master, ai: UnitAi) -> SceneObject {
     SceneObject {
         ai: Some(ai),
         sprite: Some(STANDING.id),
@@ -12277,7 +12277,7 @@ fn order_unit(master: Master, ai: UnitAi) -> SceneObject {
 
 /// A map of 100 by 100 with unit 9 (`unit`, [`order_unit`]) on it and the `others`, each in
 /// player 1's lists. The AI stream is seeded with 0, as [`rng`] is.
-fn order_world(unit: SceneObject, others: &[SceneObject]) -> World {
+pub(crate) fn order_world(unit: SceneObject, others: &[SceneObject]) -> World {
     order_world_on(&[], unit, others)
 }
 
@@ -12300,7 +12300,7 @@ fn order_world_on(water: &[Tile], unit: SceneObject, others: &[SceneObject]) -> 
 }
 
 /// A villager on its sprite whose tasks gather and hunt trees (wood, within 0.5).
-fn order_gatherer() -> Master {
+pub(crate) fn order_gatherer() -> Master {
     let on_trees = |action_kind| Task {
         action_kind,
         object_group: Some(class::TREE),
@@ -12318,11 +12318,11 @@ fn order_gatherer() -> Master {
     }
 }
 
-/// Gaia's tree 70 (master 349) at (10, 20), holding 100 wood.
-fn order_tree() -> SceneObject {
+/// Gaia's oak 70 (master 349, a static object of class 15) at (10, 20), holding 100 wood.
+pub(crate) fn order_tree() -> SceneObject {
     resource(
         (70, 349, class::TREE),
-        (MasterKind::TREE, GatherGroup::WOOD),
+        (MasterKind::STATIC, GatherGroup::WOOD),
         (10.0, 20.0),
         (attribute::WOOD, 100.0),
     )
@@ -12352,17 +12352,17 @@ fn orders(world: &mut World, queued_order: &QueuedOrder) -> GenieResult<OrderOut
 }
 
 /// Unit 9's unit AI in `world`.
-fn ai_9(world: &World) -> &UnitAi {
+pub(crate) fn ai_9(world: &World) -> &UnitAi {
     world.parts.unit_ai.get(object_id(9)).unwrap()
 }
 
 /// Unit 9's top action's kind in `world`, none without one.
-fn top_9(world: &World) -> Option<ActionKind> {
+pub(crate) fn top_9(world: &World) -> Option<ActionKind> {
     world.parts.actions.of(object_id(9)).top_action_kind()
 }
 
 /// The target of unit 9's Attack in `world`, none without one.
-fn attacks_9(world: &World) -> Option<ObjectId> {
+pub(crate) fn attacks_9(world: &World) -> Option<ObjectId> {
     world
         .parts
         .actions
@@ -12373,28 +12373,34 @@ fn attacks_9(world: &World) -> Option<ObjectId> {
         .map(AttackTargetId::id)
 }
 
-/// The order tests' soldier: master 4 of class 6, standing on [`STANDING`], weapon range 1.
-fn order_soldier() -> Master {
+/// The order tests' soldier: the militia (master 74, class 6), standing on [`STANDING`],
+/// weapon range 1.
+pub(crate) fn order_soldier() -> Master {
     Master {
         standing_sprite: Some(STANDING.id),
         combat: Some(CombatPart {
             weapon_range: Distance::new(1.0),
             ..CombatPart::default()
         }),
-        ..walker(4, class::CLASS_6)
+        ..walker(74, class::CLASS_6)
     }
 }
 
-/// Object `id` of `owner` and class `class` (master 5 of its class) at (10, 20), idle.
-fn order_target(id: i32, owner: PlayerId, class: ClassId) -> SceneObject {
+/// Swordsman `id` of `owner` (master 75, class 6) at (10, 20), its soldier's unit AI idle.
+pub(crate) fn order_target(id: i32, owner: PlayerId) -> SceneObject {
     SceneObject {
-        ai: Some(idle(UnitAiKind::Civilian)),
-        ..SceneObject::new(id, owner, walker(5, class), Position::new(10.0, 20.0, 0.0))
+        ai: Some(idle(UnitAiKind::Soldier)),
+        ..SceneObject::new(
+            id,
+            owner,
+            walker(75, class::CLASS_6),
+            Position::new(10.0, 20.0, 0.0),
+        )
     }
 }
 
 /// The point unit 9's `MoveTo` of `world` walks to and its range, none without one.
-fn walk_9(world: &World) -> Option<(Position, Distance)> {
+pub(crate) fn walk_9(world: &World) -> Option<(Position, Distance)> {
     world
         .parts
         .actions
@@ -12402,6 +12408,80 @@ fn walk_9(world: &World) -> Option<(Position, Distance)> {
         .list
         .move_to()
         .map(|move_to_action| (move_to_action.point, move_to_action.range))
+}
+
+/// A walk to (30, 6) on its way: a `MoveTo` that moves.
+pub(crate) fn order_walk() -> Action {
+    Action {
+        list: ActionList::default().with_move_to(Some(MoveToAction {
+            point: Position::new(30.0, 6.0, 0.0),
+            ..MoveToAction::sub_in(MoveTo::Moving)
+        })),
+        ..Action::default()
+    }
+}
+
+/// Player 1's house 70 (master 70, radius 1, 550 hit points whole) at (10, 20) with `hp`.
+pub(crate) fn order_house(hp: f32) -> SceneObject {
+    let (house, _) = house_and_tree();
+    SceneObject {
+        hp: HitPoints::new(hp),
+        ..SceneObject::new(70, player_id(1), house, Position::new(10.0, 20.0, 0.0))
+    }
+}
+
+/// A villager on its sprite whose one task repairs anything (work value 0.5).
+pub(crate) fn order_repairer() -> Master {
+    Master {
+        standing_sprite: Some(STANDING.id),
+        action: Some(ActionPart {
+            tasks: vec![Task {
+                action_kind: REPAIR,
+                work_val1: WorkValue::new(0.5),
+                ..Task::default()
+            }],
+            ..ActionPart::default()
+        }),
+        ..villager_master()
+    }
+}
+
+/// Player 1's house 70 at (10, 20) with room for 5 villagers.
+pub(crate) fn order_shelter() -> SceneObject {
+    let (house, _) = house_and_tree();
+    let shelter = Master {
+        garrison: GarrisonCapacity::of_data(5),
+        building: Some(BuildingMaster {
+            garrison_kind: GarrisonKinds::VILLAGERS,
+            ..BuildingMaster::default()
+        }),
+        ..house
+    };
+    SceneObject::new(70, player_id(1), shelter, Position::new(10.0, 20.0, 0.0))
+}
+
+/// A villager on its sprite whose one task garrisons it in buildings (class 3).
+pub(crate) fn order_garrisoner() -> Master {
+    Master {
+        standing_sprite: Some(STANDING.id),
+        action: Some(ActionPart {
+            tasks: vec![Task {
+                action_kind: GARRISON,
+                object_group: Some(class::BUILDING),
+                ..Task::default()
+            }],
+            ..ActionPart::default()
+        }),
+        ..villager_master()
+    }
+}
+
+/// The transport ship (master 545, class 20) on its sprite.
+pub(crate) fn order_ship() -> Master {
+    Master {
+        standing_sprite: Some(STANDING.id),
+        ..walker(545, class::TRANSPORT)
+    }
 }
 
 #[test]
@@ -12446,7 +12526,7 @@ fn patrolling_group_unit_on_the_hero_power_does_not_patrol() {
 /// real attack command answers no only for such a target).
 #[test]
 fn the_attack_order_attacks_by_the_unit_ai_kind_and_becomes_the_ai_s() {
-    let enemy = order_target(70, player_id(2), class::CLASS_6);
+    let enemy = order_target(70, player_id(2));
     let mut world = order_world(
         order_unit(order_soldier(), idle(UnitAiKind::Soldier)),
         from_ref(&enemy),
@@ -12528,7 +12608,7 @@ fn the_attack_order_attacks_by_the_unit_ai_kind_and_becomes_the_ai_s() {
         (unit_ai.current_order, unit_ai.current_action, top_9(&world)),
         (Some(OrderKind::Attack), Some(AiAction::Hunt), Some(HUNT))
     );
-    let other = order_target(72, player_id(2), class::CLASS_6);
+    let other = order_target(72, player_id(2));
     let mut world = order_world(
         order_unit(hunter, idle(UnitAiKind::Civilian)),
         from_ref(&other),
@@ -12584,7 +12664,7 @@ fn the_attack_order_attacks_by_the_unit_ai_kind_and_becomes_the_ai_s() {
 /// unit of master 128, takes none.
 #[test]
 fn the_defend_order_keeps_near_its_target_or_its_point() {
-    let friend = order_target(70, player_id(1), class::CLASS_6);
+    let friend = order_target(70, player_id(1));
     let moving = UnitAi {
         current_action: Some(AiAction::Move),
         ..idle(UnitAiKind::Soldier)
@@ -12669,16 +12749,6 @@ fn the_defend_order_keeps_near_its_target_or_its_point() {
 /// target its last. An undamaged house finds no repair task: nothing changes.
 #[test]
 fn the_heal_conversion_and_repair_orders_give_the_unit_commands() {
-    let (house, _) = house_and_tree();
-    let target = |hp| SceneObject {
-        hp: HitPoints::new(hp),
-        ..SceneObject::new(
-            70,
-            player_id(1),
-            house.clone(),
-            Position::new(10.0, 20.0, 0.0),
-        )
-    };
     let monk = Master {
         standing_sprite: Some(STANDING.id),
         ..walker(125, class::MONK)
@@ -12686,7 +12756,7 @@ fn the_heal_conversion_and_repair_orders_give_the_unit_commands() {
     for order in [OrderKind::Heal, OrderKind::Convert] {
         let mut world = order_world(
             order_unit(monk.clone(), idle(UnitAiKind::Priest)),
-            &[target(300.0)],
+            &[order_house(300.0)],
         );
         assert_eq!(
             orders(&mut world, &queued(order, 70)),
@@ -12694,18 +12764,7 @@ fn the_heal_conversion_and_repair_orders_give_the_unit_commands() {
             "{order:?}"
         );
     }
-    let repairer = Master {
-        standing_sprite: Some(STANDING.id),
-        action: Some(ActionPart {
-            tasks: vec![Task {
-                action_kind: REPAIR,
-                work_val1: WorkValue::new(0.5),
-                ..Task::default()
-            }],
-            ..ActionPart::default()
-        }),
-        ..villager_master()
-    };
+    let repairer = order_repairer();
     let working = UnitAi {
         current_target: Some(object_id(5)),
         target_class: class_of(9),
@@ -12713,7 +12772,7 @@ fn the_heal_conversion_and_repair_orders_give_the_unit_commands() {
     };
     let mut world = order_world(
         order_unit(repairer.clone(), working.clone()),
-        &[target(300.0)],
+        &[order_house(300.0)],
     );
     assert_eq!(
         orders(&mut world, &queued(OrderKind::Repair, 70)),
@@ -12749,7 +12808,7 @@ fn the_heal_conversion_and_repair_orders_give_the_unit_commands() {
         (Some(object_id(5)), class_of(9))
     );
     // undamaged: no repair task, nothing changes
-    let mut world = order_world(order_unit(repairer, working.clone()), &[target(550.0)]);
+    let mut world = order_world(order_unit(repairer, working.clone()), &[order_house(550.0)]);
     assert_eq!(
         orders(&mut world, &queued(OrderKind::Repair, 70)),
         Ok(OrderOutcome::NotTaken)
@@ -12825,15 +12884,8 @@ fn the_stop_order_stops_and_ends_the_order() {
         current_target: Some(object_id(70)),
         ..idle(UnitAiKind::Soldier)
     };
-    let walk = Action {
-        list: ActionList::default().with_move_to(Some(MoveToAction {
-            point: Position::new(30.0, 6.0, 0.0),
-            ..MoveToAction::sub_in(MoveTo::Moving)
-        })),
-        ..Action::default()
-    };
     let unit = SceneObject {
-        actions: Some(walk),
+        actions: Some(order_walk()),
         ..order_unit(order_soldier(), unit_ai)
     };
     let mut world = order_world(unit, &[]);
@@ -13020,7 +13072,7 @@ fn the_follow_order_follows_and_moves_to_target_beyond_its_range() {
     let follow = queued(OrderKind::Follow, 70);
     let near = SceneObject {
         at: Position::new(6.0, 7.0, 0.0),
-        ..order_target(70, player_id(1), class::CLASS_6)
+        ..order_target(70, player_id(1))
     };
     let mut world = order_world(
         order_unit(order_soldier(), idle(UnitAiKind::Soldier)),
@@ -13044,7 +13096,7 @@ fn the_follow_order_follows_and_moves_to_target_beyond_its_range() {
         )
     );
     // beyond it: the move to the object
-    let far = order_target(70, player_id(1), class::CLASS_6);
+    let far = order_target(70, player_id(1));
     let mut world = order_world(
         order_unit(order_soldier(), idle(UnitAiKind::Soldier)),
         &[far],
@@ -13081,11 +13133,7 @@ fn the_follow_order_follows_and_moves_to_target_beyond_its_range() {
 /// unit's height; the unit itself the target.
 #[test]
 fn the_transport_enter_and_unload_orders_give_the_unit_commands() {
-    let ship = Master {
-        standing_sprite: Some(STANDING.id),
-        terrain_restriction: Some(RestrictionId::named(7)),
-        ..walker(4, class::TRANSPORT)
-    };
+    let ship = order_ship();
     for order in [OrderKind::Transport, OrderKind::UnloadOverWall] {
         let mut world = order_world(order_unit(ship.clone(), idle(UnitAiKind::Transport)), &[]);
         assert_eq!(
@@ -13095,28 +13143,8 @@ fn the_transport_enter_and_unload_orders_give_the_unit_commands() {
         );
     }
     // the enter
-    let (house, _) = house_and_tree();
-    let house = Master {
-        garrison: GarrisonCapacity::of_data(5),
-        building: Some(BuildingMaster {
-            garrison_kind: GarrisonKinds::VILLAGERS,
-            ..BuildingMaster::default()
-        }),
-        ..house
-    };
-    let villager = Master {
-        standing_sprite: Some(STANDING.id),
-        action: Some(ActionPart {
-            tasks: vec![Task {
-                action_kind: GARRISON,
-                object_group: Some(class::BUILDING),
-                ..Task::default()
-            }],
-            ..ActionPart::default()
-        }),
-        ..villager_master()
-    };
-    let target = SceneObject::new(70, player_id(1), house, Position::new(10.0, 20.0, 0.0));
+    let villager = order_garrisoner();
+    let target = order_shelter();
     let enter = OrderKind::Enter;
     let mut world = order_world(
         order_unit(villager.clone(), idle(UnitAiKind::Soldier)),
@@ -13209,7 +13237,7 @@ fn the_transport_enter_and_unload_orders_give_the_unit_commands() {
 /// Explore at once) without a target.
 #[test]
 fn seek_and_destroy_attacks_and_explore_and_destroy_explores_at_tiles() {
-    let enemy = order_target(70, player_id(2), class::CLASS_6);
+    let enemy = order_target(70, player_id(2));
     let soldier = || order_unit(order_soldier(), idle(UnitAiKind::Soldier));
     let seek = OrderKind::SeekAndDestroy;
     let mut world = order_world(soldier(), &[enemy]);
@@ -13309,7 +13337,7 @@ fn the_wait_order_waits_and_leaves_patrol_order() {
 /// (its Attack at once), and the order becomes 700, leaving a patrol order.
 #[test]
 fn the_attack_roundup_passes_its_own_target_and_one_it_cannot_reach() {
-    let enemy = order_target(70, player_id(2), class::CLASS_6);
+    let enemy = order_target(70, player_id(2));
     let roundup = queued(OrderKind::AttackRoundup, 70);
     let own = UnitAi {
         current_target: Some(object_id(70)),

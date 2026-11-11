@@ -586,3 +586,6 @@ impl UnitAi {
         )
     }
 }
+
+#[cfg(test)]
+mod tests;
