@@ -58,6 +58,8 @@ use crate::testing::class::NO_CLASS;
 use crate::testing::roles;
 use crate::testing::slots;
 use crate::testing::tuning;
+use crate::unit_ai::Answer;
+use crate::unit_ai::OrderForce;
 use crate::unit_ai::UnitAi;
 use crate::world::Seconds;
 use crate::world::World;
@@ -361,9 +363,15 @@ fn the_actions_update_runs_the_action_held() {
             .wait_solidify(),
         None
     );
-    world
-        .gather_command(PlayerId::new(1), ListIndex::new(0), object_id(600))
-        .unwrap();
+    assert_eq!(
+        world.gather_command(
+            PlayerId::new(1),
+            ListIndex::new(0),
+            object_id(600),
+            OrderForce::Forced
+        ),
+        Ok(Answer::Taken)
+    );
     let before = world
         .parts
         .actions_of(world.players[1].objects[ListIndex::new(0)].id)
@@ -406,9 +414,15 @@ fn gone_foundation() -> WaitSolidify {
 #[test]
 fn the_list_update_stops_at_an_action_below_its_head() {
     let mut world = forage_world();
-    world
-        .gather_command(PlayerId::new(1), ListIndex::new(0), object_id(600))
-        .unwrap();
+    assert_eq!(
+        world.gather_command(
+            PlayerId::new(1),
+            ListIndex::new(0),
+            object_id(600),
+            OrderForce::Forced
+        ),
+        Ok(Answer::Taken)
+    );
     let unit = &mut world.players[1].objects[ListIndex::new(0)];
     world
         .parts
@@ -449,9 +463,15 @@ fn the_list_update_stops_at_an_action_below_its_head() {
 #[test]
 fn an_object_inside_another_runs_its_inside_update() {
     let mut world = forage_world();
-    world
-        .gather_command(PlayerId::new(1), ListIndex::new(0), object_id(600))
-        .unwrap();
+    assert_eq!(
+        world.gather_command(
+            PlayerId::new(1),
+            ListIndex::new(0),
+            object_id(600),
+            OrderForce::Forced
+        ),
+        Ok(Answer::Taken)
+    );
     let at = world.players[1].objects[ListIndex::new(0)].position();
     world.players[1].objects[ListIndex::new(0)].life.inside =
         Some(ContainerId::new(object_id(700)));

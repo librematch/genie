@@ -258,6 +258,7 @@ use crate::unit_ai::AiCommand;
 use crate::unit_ai::AiLayer;
 use crate::unit_ai::Answer;
 use crate::unit_ai::Attackers;
+use crate::unit_ai::GatheringCommand;
 use crate::unit_ai::Issuer;
 use crate::unit_ai::NotifyKind;
 use crate::unit_ai::OrderForce;
@@ -4046,9 +4047,15 @@ fn work_command_on_bush_starts_gather_and_another_moves_it() {
 #[test]
 fn the_unit_ai_gather_command_starts_gather_or_retargets_its_own() {
     let mut world = forage_world();
-    world
-        .gather_command(PlayerId::new(1), ListIndex::new(0), object_id(600))
-        .unwrap();
+    assert_eq!(
+        world.gather_command(
+            PlayerId::new(1),
+            ListIndex::new(0),
+            object_id(600),
+            OrderForce::Forced
+        ),
+        Ok(Answer::Taken)
+    );
     let unit = &world.players[1].objects[ListIndex::new(0)];
     assert_eq!(unit.life.master_id, master_id(120));
     let gather = world
@@ -4070,9 +4077,15 @@ fn the_unit_ai_gather_command_starts_gather_or_retargets_its_own() {
         world.parts.unit_ai.get(unit.id).map(|ai| ai.current_order),
         Some(None)
     );
-    world
-        .gather_command(PlayerId::new(1), ListIndex::new(0), object_id(601))
-        .unwrap();
+    assert_eq!(
+        world.gather_command(
+            PlayerId::new(1),
+            ListIndex::new(0),
+            object_id(601),
+            OrderForce::Forced
+        ),
+        Ok(Answer::Taken)
+    );
     assert_eq!(
         world
             .parts
@@ -4089,11 +4102,15 @@ fn the_unit_ai_gather_command_starts_gather_or_retargets_its_own() {
         ),
         (WorkerCount::of_data(0), WorkerCount::of_data(1))
     );
-    // an object the world does not hold fails the command
-    assert!(
-        world
-            .gather_command(PlayerId::new(1), ListIndex::new(0), object_id(4444))
-            .is_err()
+    // an object the world does not hold is not taken
+    assert_eq!(
+        world.gather_command(
+            PlayerId::new(1),
+            ListIndex::new(0),
+            object_id(4444),
+            OrderForce::Forced
+        ),
+        Ok(Answer::NotTaken)
     );
 }
 
@@ -4154,9 +4171,15 @@ fn loaded_forager_sent_to_its_town_centre_carries_its_load_there() {
         .unwrap();
     assert_eq!(carries(&world), loaded_to_700);
     let mut world = loaded();
-    world
-        .gather_command(PlayerId::new(1), ListIndex::new(0), object_id(600))
-        .unwrap();
+    assert_eq!(
+        world.gather_command(
+            PlayerId::new(1),
+            ListIndex::new(0),
+            object_id(600),
+            OrderForce::Forced
+        ),
+        Ok(Answer::Taken)
+    );
     world
         .parts
         .actions
@@ -4275,9 +4298,15 @@ fn work_command_without_task_moves_the_unit_there() {
 #[test]
 fn gather_takes_move_toward_an_object_as_its_point_or_drop_site() {
     let mut world = forage_world();
-    world
-        .gather_command(PlayerId::new(1), ListIndex::new(0), object_id(600))
-        .unwrap();
+    assert_eq!(
+        world.gather_command(
+            PlayerId::new(1),
+            ListIndex::new(0),
+            object_id(600),
+            OrderForce::Forced
+        ),
+        Ok(Answer::Taken)
+    );
     world
         .parts
         .actions
@@ -4717,9 +4746,15 @@ fn the_unit_ai_unforced_explore_leaves_explore_on_top_as_it_is() {
 fn the_unit_ai_explore_replaces_actions_without_explore_on_top() {
     for force in [OrderForce::Forced, OrderForce::Unforced] {
         let mut world = forage_world();
-        world
-            .gather_command(PlayerId::new(1), ListIndex::new(0), object_id(600))
-            .unwrap();
+        assert_eq!(
+            world.gather_command(
+                PlayerId::new(1),
+                ListIndex::new(0),
+                object_id(600),
+                OrderForce::Forced
+            ),
+            Ok(Answer::Taken)
+        );
         assert_eq!(
             world.players[0].objects[ListIndex::new(0)].workers,
             WorkerCount::of_data(1)
@@ -4747,9 +4782,15 @@ fn the_unit_ai_explore_replaces_actions_without_explore_on_top() {
 #[test]
 fn the_unit_ai_explore_of_dying_unit_clears_its_actions_without_new_explore() {
     let mut world = forage_world();
-    world
-        .gather_command(PlayerId::new(1), ListIndex::new(0), object_id(600))
-        .unwrap();
+    assert_eq!(
+        world.gather_command(
+            PlayerId::new(1),
+            ListIndex::new(0),
+            object_id(600),
+            OrderForce::Forced
+        ),
+        Ok(Answer::Taken)
+    );
     world.players[1].objects[ListIndex::new(0)].life.state = ObjectState::Dying;
     let walk = explore_effect(Point::new(40.0, 90.0), OrderForce::Forced);
     with_effects(&mut world, vec![walk]).unwrap();
@@ -4789,9 +4830,15 @@ fn the_unit_ai_explore_of_unread_unit_stops_with_import_error() {
 fn the_unit_ai_moves_and_works_apply_in_order() {
     use crate::unit_ai::Effect;
     let mut world = forage_world();
-    world
-        .gather_command(PlayerId::new(1), ListIndex::new(0), object_id(600))
-        .unwrap();
+    assert_eq!(
+        world.gather_command(
+            PlayerId::new(1),
+            ListIndex::new(0),
+            object_id(600),
+            OrderForce::Forced
+        ),
+        Ok(Answer::Taken)
+    );
     world.players[1].objects[ListIndex::new(0)].last_human_order = WorldTime::from_millis(900);
     with_effects(
         &mut world,
@@ -4860,8 +4907,8 @@ fn the_unit_ai_moves_and_works_apply_in_order() {
     );
 }
 
-/// The unit AI's hunt and build commands and its order on a target, as its effects give them
-/// after the run: `HuntObject` hunts the deer (the hunt command, `FUN_1412151f0`); `BuildObject`
+/// The unit AI's hunt and build commands and its order on a target, as its calls give them in
+/// its run: `HuntObject` hunts the deer (the hunt command, `FUN_1412151f0`); `BuildObject`
 /// sends the villager to build its foundation (the build command, slot 0x380, as the builder);
 /// `OrderOnTarget` works on the foundation with the order's priority, at once, a second one
 /// again. An AI move of a master the slice does not have is not modelled; a restored patrol
@@ -4870,11 +4917,19 @@ fn the_unit_ai_moves_and_works_apply_in_order() {
 fn the_unit_ai_hunt_build_and_target_orders_apply_after_its_run() {
     use crate::unit_ai::{AiMove, Effect, QueuedOrder};
     let mut hunt_world = hunt_world();
-    with_effects(
-        &mut hunt_world,
-        vec![Effect::Command(AiCommand::HuntObject(object_id(500)))],
-    )
-    .unwrap();
+    hunt_world
+        .run_unit_ai(
+            (PlayerId::new(1), ListIndex::new(0)),
+            |ai, _, side, _, rng| {
+                let command = GatheringCommand::Hunt {
+                    target: Some(object_id(500)),
+                    force: OrderForce::Forced,
+                };
+                assert_eq!(side.gathering_command(command, ai, rng)?, Answer::Taken);
+                Ok(())
+            },
+        )
+        .unwrap();
     assert_eq!(
         hunt_world
             .parts
@@ -5068,9 +5123,15 @@ fn an_order_on_target_and_the_rest_after_it_run_inside_the_one_update() {
 #[test]
 fn unit_sent_off_foundation_finds_the_spot_beside_it() {
     let mut world = forage_world();
-    world
-        .gather_command(PlayerId::new(1), ListIndex::new(0), object_id(600))
-        .unwrap();
+    assert_eq!(
+        world.gather_command(
+            PlayerId::new(1),
+            ListIndex::new(0),
+            object_id(600),
+            OrderForce::Forced
+        ),
+        Ok(Answer::Taken)
+    );
     let mut found = None;
     world
         .run_unit_ai((PlayerId::new(1), ListIndex::new(0)), |_, _, side, _, _| {
@@ -5864,9 +5925,15 @@ pub(crate) fn hunt_world() -> World {
 #[test]
 fn work_command_on_another_deer_moves_the_hunt_there() {
     let mut world = hunt_world();
-    world
-        .hunt_command(PlayerId::new(1), ListIndex::new(0), object_id(500))
-        .unwrap();
+    assert_eq!(
+        world.hunt_command(
+            PlayerId::new(1),
+            ListIndex::new(0),
+            Some(object_id(500)),
+            OrderForce::Forced
+        ),
+        Ok(Answer::Taken)
+    );
     let work = Work {
         target: Some(object_id(501)),
         point: Position::new(36.5, 89.5, 0.0),
@@ -5935,9 +6002,15 @@ fn work_command_on_another_deer_moves_the_hunt_there() {
 #[test]
 fn hunt_takes_move_toward_an_object_as_its_point_or_drop_site() {
     let mut world = hunt_world();
-    world
-        .hunt_command(PlayerId::new(1), ListIndex::new(0), object_id(500))
-        .unwrap();
+    assert_eq!(
+        world.hunt_command(
+            PlayerId::new(1),
+            ListIndex::new(0),
+            Some(object_id(500)),
+            OrderForce::Forced
+        ),
+        Ok(Answer::Taken)
+    );
     let point = Position::new(36.0, 89.0, 0.0);
     assert_eq!(
         world.move_to_object(PlayerId::new(1), ListIndex::new(0), object_id(501), point,),
@@ -6052,9 +6125,15 @@ pub(crate) fn in_update_filed<R>(
 /// [`hunt_world`]'s hunter on deer 500 (the hunt command's), its hunt then set by `set`.
 fn hunter_in(set: impl FnOnce(&mut HuntAction)) -> World {
     let mut world = hunt_world();
-    world
-        .hunt_command(PlayerId::new(1), ListIndex::new(0), object_id(500))
-        .unwrap();
+    assert_eq!(
+        world.hunt_command(
+            PlayerId::new(1),
+            ListIndex::new(0),
+            Some(object_id(500)),
+            OrderForce::Forced
+        ),
+        Ok(Answer::Taken)
+    );
     set(world
         .parts
         .actions
@@ -6777,9 +6856,15 @@ fn shepherd_world(x: f32) -> World {
         livestock: true,
         ..DropSite::default()
     }]);
-    world
-        .hunt_command(PlayerId::new(1), ListIndex::new(0), object_id(510))
-        .unwrap();
+    assert_eq!(
+        world.hunt_command(
+            PlayerId::new(1),
+            ListIndex::new(0),
+            Some(object_id(510)),
+            OrderForce::Forced
+        ),
+        Ok(Answer::Taken)
+    );
     let hunt_action = world
         .parts
         .actions
@@ -6981,9 +7066,15 @@ fn lumber_world(near: f32) -> World {
         );
     }
     world.spatial.relations = ByPlayer::new(vec![relation_row([0, 3]), relation_row([3, 0])]);
-    world
-        .hunt_command(PlayerId::new(1), ListIndex::new(0), object_id(500))
-        .unwrap();
+    assert_eq!(
+        world.hunt_command(
+            PlayerId::new(1),
+            ListIndex::new(0),
+            Some(object_id(500)),
+            OrderForce::Forced
+        ),
+        Ok(Answer::Taken)
+    );
     let unit = &mut world.players[1].objects[ListIndex::new(0)];
     let here = unit.position();
     let hunt_action = world
@@ -9359,9 +9450,9 @@ fn the_ai_move_at_once_matches_the_one_after_the_update() {
     assert_eq!(now.streams, later.streams);
 }
 
-/// The hunt command at once from the unit AI's run (`UnitView::effect_now` with
-/// `Effect::HuntObject`: a requeued hunt order's, which a following attack command replaces) does
-/// what `HuntObject`'s unit part after the update does: the stopAction's standing sprite, the
+/// The hunt command at once from the unit AI's run (`UnitView::gathering_command` with
+/// `GatheringCommand::Hunt`: a requeued hunt order's, which a following attack command replaces)
+/// does what the hunt command outside the unit AI's run does: the stopAction's standing sprite, the
 /// switch to the hunter (122) whose task hunts deer (class 9), the Hunt on the deer, which it
 /// takes.
 #[test]
@@ -9438,17 +9529,24 @@ fn the_hunt_command_at_once_matches_the_one_after_the_update() {
         Some(walker()),
     );
     let mut now = later.clone();
-    later
-        .hunt_command(PlayerId::new(1), ListIndex::new(0), object_id(500))
-        .unwrap();
+    assert_eq!(
+        later.hunt_command(
+            PlayerId::new(1),
+            ListIndex::new(0),
+            Some(object_id(500)),
+            OrderForce::Forced
+        ),
+        Ok(Answer::Taken)
+    );
     now.run_unit_ai(
         (PlayerId::new(1), ListIndex::new(0)),
         |ai, _, side, _, rng| {
-            side.effect_now(
-                Effect::Command(AiCommand::HuntObject(object_id(500))),
-                ai,
-                rng,
-            )
+            let command = GatheringCommand::Hunt {
+                target: Some(object_id(500)),
+                force: OrderForce::Forced,
+            };
+            assert_eq!(side.gathering_command(command, ai, rng)?, Answer::Taken);
+            Ok(())
         },
     )
     .unwrap();
@@ -21009,9 +21107,15 @@ pub(crate) fn foraging() -> World {
         .mover_mut(world.players[1].objects[ListIndex::new(0)].id)
         .unwrap()
         .moved_at = Position::new(29.5, 89.5, 0.0);
-    world
-        .gather_command(PlayerId::new(1), ListIndex::new(0), object_id(600))
-        .unwrap();
+    assert_eq!(
+        world.gather_command(
+            PlayerId::new(1),
+            ListIndex::new(0),
+            object_id(600),
+            OrderForce::Forced
+        ),
+        Ok(Answer::Taken)
+    );
     world.build_mesh().unwrap();
     world
 }
@@ -22348,9 +22452,15 @@ fn hunted_without_deer(setup: impl FnOnce(&mut Action, &mut UnitAi)) -> World {
                 .search_radius,
         ) = (Distance::new(4.0), Distance::new(4.0));
     }
-    world
-        .hunt_command(PlayerId::new(1), ListIndex::new(0), object_id(500))
-        .unwrap();
+    assert_eq!(
+        world.hunt_command(
+            PlayerId::new(1),
+            ListIndex::new(0),
+            Some(object_id(500)),
+            OrderForce::Forced
+        ),
+        Ok(Answer::Taken)
+    );
     world.build_mesh().unwrap();
     let mut registry = Registry::new(2, 65);
     for (id, x) in [(500, 32.5), (501, 36.5)] {
@@ -24359,10 +24469,11 @@ fn dying_building_lets_its_annexes_go_in_its_own_update() {
 }
 
 /// The unit AI's orders of a step reach the unit and the units they name: a `GatherObject`'s
-/// gather command takes the bush at once (the Gather is the unit's while its update runs); the
-/// Gather's reseed without a farm lets it go and its build command gives the builder its Build,
-/// both within the update; a drop elsewhere sends the unit to the drop site with the order back
-/// to its target queued, and a move off a footprint gives it a `MoveTo` at once.
+/// gather command (`UnitView::gathering_command`'s unit part) takes the bush at once (the Gather
+/// is the unit's while its update runs); the Gather's reseed without a farm lets it go and its
+/// build command gives the builder its Build, both within the update; a drop elsewhere sends the
+/// unit to the drop site with the order back to its target queued, and a move off a footprint
+/// gives it a `MoveTo` at once.
 #[test]
 fn the_unit_ai_orders_reach_the_unit_and_the_units_they_name() {
     use crate::gathering::gather::Next;
@@ -24378,6 +24489,23 @@ fn the_unit_ai_orders_reach_the_unit_and_the_units_they_name() {
                     unit.run_effect(actions, effect, None, step, &roles())?;
                 }
                 Ok(actions.top_action_kind())
+            },
+        )
+        .map_err(|error| error.reason().to_owned())
+    };
+    // the gather command on the bush in the unit's step, its answer and the top action after it
+    let gathered = |world: &mut World| {
+        in_update(
+            world,
+            (PlayerId::new(1), ListIndex::new(0)),
+            50,
+            |unit, actions, step| {
+                let command = GatheringCommand::Gather {
+                    target: object_id(600),
+                    force: OrderForce::Forced,
+                };
+                let answer = unit.gathering_command(actions, command, step)?;
+                Ok((answer, actions.top_action_kind()))
             },
         )
         .map_err(|error| error.reason().to_owned())
@@ -24415,13 +24543,7 @@ fn the_unit_ai_orders_reach_the_unit_and_the_units_they_name() {
         .map_err(|error| error.reason().to_owned())
     };
     let mut world = house_builder();
-    assert_eq!(
-        applied(
-            &mut world,
-            vec![Effect::Command(AiCommand::GatherObject(object_id(600)))]
-        ),
-        Ok(Some(GATHER))
-    );
+    assert_eq!(gathered(&mut world), Ok((Answer::Taken, Some(GATHER))));
     let gatherer = &world.players[1].objects[ListIndex::new(0)];
     assert_eq!(
         (
@@ -24464,13 +24586,7 @@ fn the_unit_ai_orders_reach_the_unit_and_the_units_they_name() {
         .unwrap()
         .list
         .set_build(None);
-    assert!(
-        applied(
-            &mut world,
-            vec![Effect::Command(AiCommand::GatherObject(object_id(600)))]
-        )
-        .is_ok()
-    );
+    assert_eq!(gathered(&mut world), Ok((Answer::Taken, Some(GATHER))));
     world
         .parts
         .actions

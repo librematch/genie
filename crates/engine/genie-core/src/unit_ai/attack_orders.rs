@@ -215,7 +215,8 @@ impl UnitAi {
     /// The civilian's `AttackObject` (slot 0xb8, `FUN_140c17370`) with its force flag 1, as every
     /// caller in the slice passes it (the damage notify and the unit in the way): an object the
     /// world does not hold (`FUN_1415417a0`) gets nothing (not taken); an animal or a tree (classes 9,
-    /// 10 and 15) is hunted (slot 0xc8, [`UnitAi::hunt_object`]); any other goes to the base
+    /// 10 and 15) is hunted (a jump to slot 0xc8 with the force, [`UnitAi::hunt_object`], whose
+    /// answer is the slot's); any other goes to the base
     /// `AttackObject` by its own rules and the group flag 1 ([`UnitAi::attack_object`]). Taken when
     /// it hunts or attacks.
     pub(super) fn civilian_attack(
@@ -237,15 +238,7 @@ impl UnitAi {
             .of_class(target_unit_seen.class)
             .intersects(ClassRoles::PREY | ClassRoles::PREDATOR | ClassRoles::TREE)
         {
-            self.hunt_object(
-                target,
-                target_unit_seen.class,
-                target_unit_seen.position,
-                at,
-                side,
-                rng,
-            )?;
-            return Ok(Answer::Taken);
+            return self.hunt_object(Some(target), OrderForce::Forced, at, side, rng);
         }
         self.attack_object(target, OrderForce::Forced, TargetRules::Own, at, side, rng)
     }

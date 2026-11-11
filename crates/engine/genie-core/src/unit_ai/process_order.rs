@@ -91,7 +91,7 @@ impl UnitAi {
     /// - `0x2c2`, the stop: the target goes (`FUN_140c5e1e0`), the action stops (slot 0xb0 with
     ///   1), and the tail ends the order.
     /// - `0x2c3`, run away: slot 0x160 with 1 and no unit ([`UnitAi::run_away`]).
-    /// - `0x2c5`, the gather: slot 0xd0 ([`UnitAi::gather_order`]).
+    /// - `0x2c5`, the gather: slot 0xd0 ([`UnitAi::gather_object`]).
     /// - `0x2c6`, the move, and `0x2d4`, the group gather: slot 0x130 to the order's point within
     ///   its range, forced and walking (a move's unit then shows its points, slot 0x2d8, not
     ///   held).
@@ -99,7 +99,7 @@ impl UnitAi {
     ///   names: 0.
     /// - `0x2c8`, the follow: slot 0x168 on the target within the order's range
     ///   ([`UnitAi::follow_object`]).
-    /// - `0x2c9`, the hunt, and `0x322`, the auto boar luring: slot 0xc8 ([`UnitAi::hunt_order`]);
+    /// - `0x2c9`, the hunt, and `0x322`, the auto boar luring: slot 0xc8 ([`UnitAi::hunt_object`]);
     ///   whatever it gave, the luring then holds the action value `0x2be`, the one before the
     ///   last.
     /// - `0x2ca`, the transport: slot 0x128 to the order's point ([`UnitAi::transport_to`]).
@@ -333,7 +333,7 @@ impl UnitAi {
     ) -> GenieResult<Answer> {
         let (at, _) = world.ok_or(OUTSIDE_ORDER)?;
         // an order on no target (−1): each case's lookup finds nothing, so it takes no order;
-        // the hunt's stops the unit (`hunt_order`)
+        // the hunt's stops the unit first (`hunt_object`)
         Ok(match (queued_order.order, queued_order.target) {
             (OrderKind::Build, Some(target)) => {
                 self.build_object(FoundationId::new(target), OrderForce::Forced, at, side, rng)?
@@ -346,9 +346,11 @@ impl UnitAi {
                 };
                 self.work_object(target, OrderForce::Forced, (action, command), (at, side))?
             }
-            (OrderKind::Gather, Some(object)) => self.gather_order(object, at, side, rng)?,
+            (OrderKind::Gather, Some(object)) => {
+                self.gather_object(object, OrderForce::Forced, at, side, rng)?
+            }
             (OrderKind::Hunt | OrderKind::AutoBoarLuring, target) => {
-                let hunts = self.hunt_order(target, at, side, rng)?;
+                let hunts = self.hunt_object(target, OrderForce::Forced, at, side, rng)?;
                 if queued_order.order == OrderKind::AutoBoarLuring {
                     self.set_action(Some(AiAction::BoarLuring));
                 }

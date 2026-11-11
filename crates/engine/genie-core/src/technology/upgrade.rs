@@ -610,6 +610,8 @@ mod tests {
     use crate::testing::ids;
     use crate::testing::roles;
     use crate::testing::tuning;
+    use crate::unit_ai::Answer;
+    use crate::unit_ai::OrderForce;
     use crate::vision::TileCount;
     use crate::vision::VisionBits;
     #[cfg(test)]
@@ -1140,9 +1142,15 @@ mod tests {
             ..Task::default()
         };
         let mut world = forage_world();
-        world
-            .gather_command(PlayerId::new(1), ListIndex::new(0), object_id(600))
-            .unwrap();
+        assert_eq!(
+            world.gather_command(
+                PlayerId::new(1),
+                ListIndex::new(0),
+                object_id(600),
+                OrderForce::Forced
+            ),
+            Ok(Answer::Taken)
+        );
         let mut old = world.model.masters[1].get(master_id(120)).unwrap().clone();
         old.action
             .get_or_insert_with(Default::default)
@@ -1518,9 +1526,15 @@ mod tests {
     #[test]
     fn an_upgrade_stops_top_action_the_new_master_has_no_task_for() {
         let mut world = forage_world();
-        world
-            .gather_command(PlayerId::new(1), ListIndex::new(0), object_id(600))
-            .unwrap();
+        assert_eq!(
+            world.gather_command(
+                PlayerId::new(1),
+                ListIndex::new(0),
+                object_id(600),
+                OrderForce::Forced
+            ),
+            Ok(Answer::Taken)
+        );
         let old = world.model.masters[1].get(master_id(120)).unwrap().clone();
         let bare = Master {
             id: master_id(121),

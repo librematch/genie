@@ -1,10 +1,14 @@
-//! The work command's Build and Repair, their retakes and targets, and the unit AI's repair
-//! command.
+//! The work command's Build and Repair, their retakes and targets, and the unit AI's repair,
+//! gather and hunt commands.
 
 use super::*;
 use crate::construction::BuilderCount;
 use crate::construction::build::BuildState;
 use crate::construction::repair::REPAIR;
+use crate::gathering::HuntTargetId;
+use crate::gathering::gather::{GatherAction, GatherState};
+use crate::gathering::hunt::{HuntAction, HuntState};
+use crate::map::Distance;
 use crate::objects::WorkerCount;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::MasterId;
@@ -12,7 +16,9 @@ use crate::players::PlayerKind;
 use crate::test_ids::object_id;
 use crate::testing::class;
 use crate::testing::ids;
-use crate::world::tests::{house_builder, repair_world, repairer_world, sent_off_world};
+use crate::world::tests::{
+    forage_world, house_builder, hunt_world, repair_world, repairer_world, sent_off_world,
+};
 
 /// The house 10028 of [`repair_world`] and [`sent_off_world`].
 const HOUSE: ObjectId = object_id(10028);
@@ -328,4 +334,166 @@ fn new_repair_takes_target_and_installs_nothing() {
     );
     assert_eq!(repair_of(&world), None);
     assert_eq!(workers(&world, HOUSE), WorkerCount::of_data(1));
+}
+
+/// The bush 600 of [`forage_world`].
+const BUSH: ObjectId = object_id(600);
+/// The deer 500 and 501 of [`hunt_world`].
+const DEER: [ObjectId; 2] = [object_id(500), object_id(501)];
+
+/// The villager's Gather.
+fn gather_of(world: &World) -> Option<GatherAction> {
+    world.parts.actions_of(VILLAGER).list.gather().copied()
+}
+
+/// The villager's Hunt.
+fn hunt_of(world: &World) -> Option<HuntAction> {
+    world.parts.actions_of(VILLAGER).list.hunt().copied()
+}
+
+/// The unit's gather command (slot 0x368, `FUN_141085030`) and its hunt command (slot 0x360,
+/// `FUN_1412151f0`) answer 0 for an object the world does not hold (`FUN_1415417a0`) and for
+/// one slot 0x820 finds no task on (the town centre 700); the hunt's for none too. The
+/// villager's actions stay as they were.
+#[test]
+fn gathering_commands_refuse_object_not_held_or_without_task() {
+    for target in [object_id(99), object_id(700)] {
+        let mut world = forage_world();
+        let before = world.parts.actions_of(VILLAGER).clone();
+        assert_eq!(
+            world.gather_command(PLAYER, SLOT, target, OrderForce::Forced),
+            Ok(Answer::NotTaken),
+            "{target:?}"
+        );
+        assert_eq!(world.parts.actions_of(VILLAGER), &before);
+    }
+    for target in [Some(object_id(99)), Some(object_id(700)), None] {
+        let mut world = hunt_world();
+        let before = world.parts.actions_of(VILLAGER).clone();
+        assert_eq!(
+            world.hunt_command(PLAYER, SLOT, target, OrderForce::Forced),
+            Ok(Answer::NotTaken),
+            "{target:?}"
+        );
+        assert_eq!(world.parts.actions_of(VILLAGER), &before);
+    }
+}
+
+/// [`forage_world`]'s villager on the bush 600 (the gather command's new Gather), at work
+/// (state 6) with its work done this update (`+0x80`).
+fn working_gatherer() -> World {
+    let mut world = forage_world();
+    assert_eq!(
+        world.gather_command(PLAYER, SLOT, BUSH, OrderForce::Forced),
+        Ok(Answer::Taken)
+    );
+    let gather = world
+        .parts
+        .actions
+        .of_mut(VILLAGER)
+        .unwrap()
+        .list
+        .gather_mut()
+        .unwrap();
+    (gather.state, gather.worked) = (GatherState::Work, true);
+    world
+}
+
+/// The gather command unforced on the target of the Gather on top ("I'm already gathering Unit
+/// #%d.") answers 1 at once: the Gather stays as it was. Forced, the Gather on the task found
+/// takes the target (its slot 0x48), which a Gather at work keeps but for its work done
+/// (`+0x80`), cleared; 1 again.
+#[test]
+fn gather_command_on_top_gather_target_answers_at_once_only_unforced() {
+    let mut world = working_gatherer();
+    let gather = gather_of(&world).unwrap();
+    assert_eq!(
+        world.gather_command(PLAYER, SLOT, BUSH, OrderForce::Unforced),
+        Ok(Answer::Taken)
+    );
+    assert_eq!(gather_of(&world), Some(gather));
+    assert_eq!(
+        world.gather_command(PLAYER, SLOT, BUSH, OrderForce::Forced),
+        Ok(Answer::Taken)
+    );
+    assert_eq!(
+        gather_of(&world),
+        Some(GatherAction {
+            worked: false,
+            ..gather
+        })
+    );
+}
+
+/// [`hunt_world`]'s villager hunting the deer 500 (the hunt command's new Hunt), facing it
+/// (state 6).
+fn deer_hunter() -> World {
+    let mut world = hunt_world();
+    assert_eq!(
+        world.hunt_command(PLAYER, SLOT, Some(DEER[0]), OrderForce::Forced),
+        Ok(Answer::Taken)
+    );
+    world
+        .parts
+        .actions
+        .of_mut(VILLAGER)
+        .unwrap()
+        .list
+        .hunt_mut()
+        .unwrap()
+        .state = HuntState::Face;
+    world
+}
+
+/// The hunt command on the target of the Hunt on top answers 1 and the Hunt stays as it was:
+/// unforced at once, forced through the Hunt's slot 0x48 (slot 9, [`World::retarget_hunt`]),
+/// for which its own target changes nothing, where a new Hunt would start over.
+#[test]
+fn hunt_command_on_top_hunt_target_keeps_hunt() {
+    for force in [OrderForce::Unforced, OrderForce::Forced] {
+        let mut world = deer_hunter();
+        let hunt = hunt_of(&world).unwrap();
+        assert_eq!(
+            world.hunt_command(PLAYER, SLOT, Some(DEER[0]), force),
+            Ok(Answer::Taken),
+            "{force:?}"
+        );
+        assert_eq!(hunt_of(&world), Some(hunt), "{force:?}");
+    }
+}
+
+/// The hunt command on another target, forced or not, with a Hunt on top: the Hunt's slot 0x48
+/// (slot 9, [`World::retarget_hunt`]) takes the deer 501 and chases it (its Attack, state 12),
+/// keeping its task (`+0x48`, here a work range of 0.75), which a new Hunt would take anew from
+/// the master (0.5); 1.
+#[test]
+fn hunt_command_with_top_hunt_retargets_it() {
+    for force in [OrderForce::Unforced, OrderForce::Forced] {
+        let mut world = deer_hunter();
+        world
+            .parts
+            .actions
+            .of_mut(VILLAGER)
+            .unwrap()
+            .list
+            .hunt_mut()
+            .unwrap()
+            .task
+            .range = Distance::new(0.75);
+        assert_eq!(
+            world.hunt_command(PLAYER, SLOT, Some(DEER[1]), force),
+            Ok(Answer::Taken),
+            "{force:?}"
+        );
+        let hunt = hunt_of(&world).unwrap();
+        assert_eq!(
+            (hunt.target, hunt.state.bare(), hunt.task.range),
+            (
+                Some(HuntTargetId::new(DEER[1])),
+                HuntState::Attack { attack: None },
+                Distance::new(0.75)
+            ),
+            "{force:?}"
+        );
+    }
 }

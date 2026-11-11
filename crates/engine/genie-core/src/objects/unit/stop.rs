@@ -16,7 +16,7 @@ use crate::objects::sprite::new_sprite;
 use crate::objects::unit::STOPPED_SPRITE_LACKING;
 use crate::objects::unit::Unit;
 use crate::orders::Work;
-use crate::unit_ai::{AiCommand, Effect};
+use crate::unit_ai::{AiCommand, Answer, Effect, GatheringCommand};
 use crate::world::Unread;
 use crate::world::layer::Roles;
 use crate::world::layer::generated::SpriteTuning;
@@ -283,9 +283,8 @@ impl Unit {
     }
 
     /// The unit's own command its unit AI gives ([`AiCommand`]), at once on the unit lent back
-    /// to its slot ([`Step::lend_at`]): a move off a footprint, `HuntObject`'s hunt command,
-    /// `GatherObject`'s gather command, a work (slot 0x7e8), `BuildObject`'s build
-    /// command or a drop elsewhere.
+    /// to its slot ([`Step::lend_at`]): a move off a footprint, a work (slot 0x7e8),
+    /// `BuildObject`'s build command or a drop elsewhere.
     ///
     /// # Errors
     ///
@@ -300,14 +299,6 @@ impl Unit {
             AiCommand::MoveAside(ai_move) => step.lend_at(
                 (&mut *self, &mut *actions),
                 |world, player_id, list_index| world.move_aside(player_id, list_index, ai_move),
-            ),
-            AiCommand::HuntObject(target) => step.lend_at(
-                (&mut *self, &mut *actions),
-                |world, player_id, list_index| world.hunt_command(player_id, list_index, target),
-            ),
-            AiCommand::GatherObject(target) => step.lend_at(
-                (&mut *self, &mut *actions),
-                |world, player_id, list_index| world.gather_command(player_id, list_index, target),
             ),
             AiCommand::WorkOn { target, point } => {
                 let work = Work::on(Some(target), point);
@@ -337,5 +328,35 @@ impl Unit {
                 },
             ),
         }
+    }
+
+    /// The unit's gather or hunt command its unit AI's `GatherObject` or `HuntObject` gives
+    /// ([`GatheringCommand`]), at once on the unit lent back to its slot ([`Step::lend_at`],
+    /// [`World::gather_command`], [`World::hunt_command`]): taken when the unit takes it (the
+    /// slot's 1).
+    ///
+    /// # Errors
+    ///
+    /// The command's and the lend's.
+    ///
+    /// [`World::gather_command`]: crate::world::World::gather_command
+    /// [`World::hunt_command`]: crate::world::World::hunt_command
+    pub(crate) fn gathering_command(
+        &mut self,
+        actions: &mut Action,
+        command: GatheringCommand,
+        step: &mut Step<'_>,
+    ) -> GenieResult<Answer> {
+        step.lend_at(
+            (&mut *self, &mut *actions),
+            |world, player_id, list_index| match command {
+                GatheringCommand::Gather { target, force } => {
+                    world.gather_command(player_id, list_index, target, force)
+                }
+                GatheringCommand::Hunt { target, force } => {
+                    world.hunt_command(player_id, list_index, target, force)
+                }
+            },
+        )
     }
 }

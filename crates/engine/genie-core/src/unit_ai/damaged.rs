@@ -2,7 +2,6 @@
 
 use crate::construction::FoundationId;
 use crate::map::Distance;
-use crate::map::Position;
 use crate::math::fmath::at_most_or_unordered;
 use crate::math::image::unit_ai::ATTACKER_FAR;
 use crate::math::rng::Well512;
@@ -10,14 +9,12 @@ use crate::movement::Speed;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::WorkerCount;
-use crate::objects::masters::ClassId;
 use crate::objects::masters::CombatLevel;
 use crate::orders::Dispatch;
 use crate::players::PlayerId;
 use crate::players::PlayerKind;
 use crate::players::QueryRelation;
 use crate::unit_ai::AiAction;
-use crate::unit_ai::AiCommand;
 use crate::unit_ai::AiLayer;
 use crate::unit_ai::GroupState;
 use crate::unit_ai::Issuer;
@@ -35,8 +32,8 @@ use crate::unit_ai::UnitAiKind;
 use crate::unit_ai::attack_orders::OrderNow;
 use crate::unit_ai::world_view::UnitView;
 use crate::unit_ai::{
-    BREAK, DEAD, Effect, FISHING_BUILD_FAR, FISHING_BUILDS, FISHING_CARED, GO_ON, Memory,
-    NO_ANIM_SPEED, Notify, Pick, QueuedOrder, Search, Surroundings, UnitAi, UnitSeen, alert_owner,
+    BREAK, DEAD, FISHING_BUILD_FAR, FISHING_BUILDS, FISHING_CARED, GO_ON, Memory, NO_ANIM_SPEED,
+    Notify, Pick, QueuedOrder, Search, Surroundings, UnitAi, UnitSeen, alert_owner,
     civilian_search_radius, closest_undiscovered_tile, held_action_state,
 };
 use crate::world::Millis;
@@ -370,6 +367,8 @@ impl UnitAi {
     /// `UnitAiTuning::foundation_reach` (slot 0x3d0) it builds (slot 0xf0 with 1, [`AiCommand::BuildObject`]) and
     /// the processing breaks. Else a human player's ship goes on (2); a computer player's posts
     /// itself its build's completion (slot 0x328: `0x1fa` with `0x25a`) first.
+    ///
+    /// [`AiCommand::BuildObject`]: crate::unit_ai::AiCommand::BuildObject
     pub(super) fn fishing_builder_search(
         &mut self,
         at: &Surroundings,
@@ -528,27 +527,6 @@ impl UnitAi {
             best = (distance_squared.get(), Some(id));
         }
         best.1
-    }
-
-    /// `HuntObject` (slot 0xc8, `FUN_140c4e220`) forced on `target` (its master's `class` and its
-    /// `point`): the current action stops at once (slot 0xb0 with 1, [`UnitAi::stop_current`]),
-    /// then the unit's hunt command runs on the target ([`AiCommand::HuntObject`]); taken as done
-    /// (the caller stops on a failure): the hunt action value (`0x265`) becomes current, the
-    /// stopped one the last, the target with its class and point (the last ones kept).
-    pub(super) fn hunt_object(
-        &mut self,
-        target: ObjectId,
-        class: ClassId,
-        point: Position,
-        at: &Surroundings,
-        side: &mut UnitView<'_, '_>,
-        rng: &mut Well512,
-    ) -> GenieResult<()> {
-        self.stop_current(StopOrder::Keep, at, side, rng)?;
-        side.effect_now(Effect::Command(AiCommand::HuntObject(target)), self, rng)?;
-        self.set_action(Some(AiAction::Hunt));
-        self.set_target(Some(target), class.or_none(), point);
-        Ok(())
     }
 
     /// Slot 0x30 with the current order, immediate and in front (`FUN_140c55c90` as the

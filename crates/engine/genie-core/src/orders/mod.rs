@@ -267,13 +267,6 @@ type SplitPath<'env> =
 /// The action's point on neither axis (`DAT_14330ec20`).
 const NO_POINT: f32 = GARRISON_NO_POINT;
 
-/// A hunt command on an object the world does not hold.
-pub(crate) const HUNT_TARGET_GONE: GenieError =
-    GenieError::unsupported("a hunt command on an object the world does not hold");
-/// A hunt command whose unit has no task for its target.
-pub(crate) const NO_HUNT_TASK: GenieError =
-    GenieError::unsupported("a hunt command without a task");
-
 const TROPHIES: RangeInclusive<i16> = 1650..=1653;
 
 /// An object that a caller found or was given, which the world does not hold.

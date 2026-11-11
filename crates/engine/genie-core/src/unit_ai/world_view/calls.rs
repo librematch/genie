@@ -1,17 +1,22 @@
 //! The unit's calls its unit AI makes through its view, each at once where the game's AI calls
 //! the unit's slot: the attack command, the under-attack flag, an [`Effect`], the notify its
-//! owner hears, the order slots' commands, the wait for a foundation and the stop of a soldier
-//! in a group. The long answers live in their systems as `UnitView` methods (FD-041-D09): the
-//! attack command in `combat/attack/unit_ai_side.rs` and the wait for a foundation in
+//! owner hears, the order slots' commands (the gather and hunt commands in the AI's frame), the
+//! wait for a foundation and the stop of a soldier in a group. The long answers live in their
+//! systems as `UnitView` methods (FD-041-D09): the attack command in
+//! `combat/attack/unit_ai_side.rs` and the wait for a foundation in
 //! `construction/wait_solidify.rs`.
 
 use crate::math::rng::{Stream, Well512};
 use crate::objects::ObjectId;
-use crate::objects::unit::UnitFlags;
+use crate::objects::layers::Action;
+use crate::objects::unit::{Unit, UnitFlags};
 use crate::unit_ai::Answer;
 use crate::unit_ai::OrderForce;
 use crate::unit_ai::world_view::UnitView;
-use crate::unit_ai::{Attacked, Effect, Notify, UNMODELLED_COMMAND, UnitAi, UnitCommand};
+use crate::unit_ai::{
+    Attacked, Effect, GatheringCommand, Notify, UNMODELLED_COMMAND, UnitAi, UnitCommand,
+};
+use crate::world::step::Step;
 use crate::{GenieError, GenieResult};
 use std::mem::{swap, take};
 
@@ -41,11 +46,8 @@ impl UnitView<'_, '_> {
     }
 
     /// The unit's call its unit AI makes ([`Effect`]: its stop, a move, a command of its own), at
-    /// once where the game's AI calls the unit's slot ([`Unit::run_effect`]). The call runs on
-    /// the unit holding its AI as it stands (`ai`, which the call reads and changes as the
-    /// game's does) and with the AI stream (`rng`), from which the routines it runs draw as the
-    /// game's do. The notifies held for the AI are posted to it first, as the game posted them
-    /// where they happened.
+    /// once where the game's AI calls the unit's slot ([`Unit::run_effect`]), in the AI's frame
+    /// ([`UnitView::in_ai_frame`]).
     ///
     /// # Errors
     ///
@@ -59,22 +61,56 @@ impl UnitView<'_, '_> {
         rng: &mut Well512,
     ) -> GenieResult<()> {
         let roles = &self.step.world.model.roles.clone();
+        self.in_ai_frame(ai, rng, |unit, actions, step| {
+            let class = unit
+                .master(step.world.master_tables(), step.player)
+                .map(|master| master.class)?;
+            unit.run_effect(actions, effect, Some(class), step, roles)
+        })
+    }
+
+    /// The unit's gather or hunt command its unit AI's `GatherObject` or `HuntObject` gives
+    /// ([`GatheringCommand`]), at once in the AI's frame ([`UnitView::in_ai_frame`],
+    /// [`Unit::gathering_command`]): taken when the unit takes it (the slot's 1).
+    ///
+    /// # Errors
+    ///
+    /// What the command does not model.
+    ///
+    /// [`Unit::gathering_command`]: crate::objects::unit::Unit::gathering_command
+    pub(crate) fn gathering_command(
+        &mut self,
+        command: GatheringCommand,
+        ai: &mut UnitAi,
+        rng: &mut Well512,
+    ) -> GenieResult<Answer> {
+        self.in_ai_frame(ai, rng, |unit, actions, step| {
+            unit.gathering_command(actions, command, step)
+        })
+    }
+
+    /// Runs `call` on the unit, its actions and the update's step in the frame of the AI's call
+    /// of a unit's slot: the call runs on the unit holding its AI as it stands (`ai`, which the
+    /// call reads and changes as the game's does) and with the AI stream (`rng`), from which the
+    /// routines it runs draw as the game's do. The notifies held for the AI are posted to it
+    /// first, as the game posted them where they happened.
+    ///
+    /// # Errors
+    ///
+    /// `call`'s, and a notify the AI's queue does not take.
+    fn in_ai_frame<R>(
+        &mut self,
+        ai: &mut UnitAi,
+        rng: &mut Well512,
+        call: impl FnOnce(&mut Unit, &mut Action, &mut Step<'_>) -> GenieResult<R>,
+    ) -> GenieResult<R> {
         let held = self.step.side_notifies.take().unwrap_or_default();
         let posted = held
             .into_iter()
             .try_for_each(|(notify, state)| ai.post(notify, state));
         self.step.world.return_unit_ai(self.unit.id, take(ai));
         swap(self.step.world.streams.get_mut(Stream::Ai), rng);
-        let class = self
-            .unit
-            .master(self.step.world.master_tables(), self.step.player)
-            .map(|master| master.class);
-        let done = class.and_then(|class| {
-            posted.and_then(|()| {
-                self.unit
-                    .run_effect(self.actions, effect, Some(class), self.step, roles)
-            })
-        });
+        let done = posted.and_then(|()| call(self.unit, self.actions, self.step));
         swap(self.step.world.streams.get_mut(Stream::Ai), rng);
         self.step.side_notifies = Some(Vec::new());
         *ai = self.step.world.lend_unit_ai(self.unit.id).ok_or_else(|| {

@@ -15,6 +15,7 @@ use crate::players::PlayerKind;
 use crate::players::QueryRelation;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::AiCommand;
+use crate::unit_ai::Answer;
 use crate::unit_ai::IdleOutcome;
 use crate::unit_ai::OrderForce;
 use crate::unit_ai::OrderKind;
@@ -390,11 +391,12 @@ impl UnitAi {
     /// owner, not held). Of a class the civilian's slot 0x1b0 gives no kind, `ClosestObject`
     /// (every relation, below one worker for class 49) over the civilian's search
     /// ([`civilian_search_radius`]) names the next target, which it hunts (`HuntObject`, slot 0xc8
-    /// with 1, [`UnitAi::hunt_object`]) and the processing breaks; finding none, a human player's
-    /// villager does nothing more. A class the slot names a kind of searches by it (slot 0x80,
-    /// `ClosestResourceObject` from the notify's drop site, its third parameter: kind 0 below 2
-    /// workers, the others any; [`UnitView::closest_resource`]). A farm found (class 49) the unit
-    /// works ([`UnitAi::task_to_farm`]). A computer player's villager that found nothing is not
+    /// with 1, [`UnitAi::hunt_object`]) and the processing breaks; a hunt not taken stops the
+    /// villager ([`UnitAi::search_failed`]); finding none, a human player's villager does nothing
+    /// more. A class the slot names a kind of searches by it (slot 0x80, `ClosestResourceObject`
+    /// from the notify's drop site, its third parameter: kind 0 below 2 workers, the others any;
+    /// [`UnitView::closest_resource`]). A farm found (class 49) the unit works
+    /// ([`UnitAi::task_to_farm`]). A computer player's villager that found nothing is not
     /// modelled.
     pub(super) fn hunter_search(
         &mut self,
@@ -477,7 +479,10 @@ impl UnitAi {
         if roles.of_class(class).contains(ClassRoles::FARM) {
             return self.task_to_farm(found.id, at, side, rng);
         }
-        self.hunt_object(found.id, found.class, found.position, at, side, rng)?;
+        if self.hunt_object(Some(found.id), OrderForce::Forced, at, side, rng)? == Answer::NotTaken
+        {
+            return self.search_failed(notify, at, side, rng);
+        }
         Ok(BREAK)
     }
 
@@ -519,9 +524,10 @@ impl UnitAi {
     /// site (its third parameter), below 4 workers for stone and gold (groups 3 and 4); a class
     /// without a group takes `ClosestObject` (every relation, any workers) over the civilian's
     /// search ([`civilian_search_radius`]). What it finds it gathers (`GatherObject`, slot 0xd0
-    /// with 1, [`UnitAi::gather_object`]) and the processing breaks; finding nothing, a human
-    /// player's villager does nothing more, a computer player's stops as above. For a farm (the
-    /// notify's class 49) `ClosestObject`'s ninth argument is 0: friends' farms pass.
+    /// with 1, [`UnitAi::gather_object`]) and the processing breaks; a gather not taken stops the
+    /// villager ([`UnitAi::search_failed`]); finding nothing, a human player's villager does
+    /// nothing more, a computer player's stops as above. For a farm (the notify's class 49)
+    /// `ClosestObject`'s ninth argument is 0: friends' farms pass.
     pub(super) fn gatherer_search(
         &mut self,
         notify: Notify,
@@ -597,28 +603,10 @@ impl UnitAi {
             }
             return Ok(GO_ON);
         };
-        self.gather_object(found, side, rng)?;
+        if self.gather_object(found.id, OrderForce::Forced, at, side, rng)? == Answer::NotTaken {
+            return self.search_failed(notify, at, side, rng);
+        }
         Ok(BREAK)
-    }
-
-    /// `GatherObject` (slot 0xd0, `FUN_140c4dd50`) forced on what the search found: the unit's
-    /// gather command runs on it ([`AiCommand::GatherObject`]); taken as done (the caller stops on a
-    /// failure): the gather action value (`0x261`) becomes current, the last the one before, the
-    /// target with its class and place (the last ones kept).
-    pub(super) fn gather_object(
-        &mut self,
-        found: Gatherable,
-        side: &mut UnitView<'_, '_>,
-        rng: &mut Well512,
-    ) -> GenieResult<()> {
-        side.effect_now(
-            Effect::Command(AiCommand::GatherObject(found.id)),
-            self,
-            rng,
-        )?;
-        self.set_action(Some(AiAction::Gather));
-        self.set_target(Some(found.id), found.class.or_none(), found.position);
-        Ok(())
     }
 
     /// The target block's attack whose target died (`0x140c66b10`): processIdle (slot 0x240 with

@@ -5,14 +5,16 @@ use crate::construction::build::{BuildAction, BuildTask};
 use crate::construction::repair::RepairState;
 use crate::construction::repair::{RepairAction, RepairTask, SHIP_REPAIR};
 use crate::construction::{FoundationId, RepairTargetId};
-use crate::gathering::gather::GATHER;
+use crate::gathering::gather::GatherAction;
 use crate::gathering::hunt::HuntTask;
+use crate::gathering::{GatherTargetId, HuntTargetId};
 use crate::map::Position;
 use crate::math::rng::Stream;
 use crate::movement::footprint_gap;
 use crate::movement::move_to::{MoveToReads, WalkTo};
 use crate::objects::ListIndex;
 use crate::objects::Voice;
+use crate::objects::actions::Action;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::Task;
@@ -20,10 +22,11 @@ use crate::objects::{ObjectId, ObjectKey};
 use crate::orders::ActionsOnChange;
 use crate::orders::MasterSwap;
 use crate::orders::gather::HuntOrder;
-use crate::orders::{HUNT_TARGET_GONE, NO_HUNT_TASK};
 use crate::players::PlayerId;
 use crate::unit_ai::AiAction;
+use crate::unit_ai::Answer;
 use crate::unit_ai::Notifies;
+use crate::unit_ai::OrderForce;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::world_view::RepairOrder;
 use crate::world::World;
@@ -43,25 +46,42 @@ const FOUNDATION_NOT_HELD: GenieError =
     GenieError::unsupported("a Build's foundation the slice does not hold");
 
 impl World {
-    /// `HuntObject`'s unit part (`FUN_140c4e220`, [`crate::unit_ai::AiCommand::HuntObject`], after
-    /// the AI's stop, slot 0xb0 with 1, which stopped the unit at once): its hunt command (object
-    /// slot 0x360, `FUN_1412151f0`, forced): with no action left slot 0x820 finds the task
-    /// ([`World::find_work_task`] with any filter and the master switch) and a new Hunt on it,
-    /// whatever its action type or requirement (`FUN_140ac2dd0`), replaces the unit's actions
-    /// ([`World::start_hunt`] without the unit AI's notify: `HuntObject` set the AI itself). A
-    /// target the world does not hold or no task would fail the command, which the unit AI took
-    /// as done: not modelled.
+    /// The unit's hunt command (object slot 0x360, `FUN_1412151f0`) on `target` with `force`, as
+    /// the unit AI's `HuntObject` runs it after its stop ([`GatheringCommand::Hunt`]): an object
+    /// the world does not hold (`FUN_1415417a0`; none, −1) is 0. A Hunt on top on the target is 1
+    /// at once unforced; else the Hunt on top takes the target (its slot 0x48 with the target's
+    /// place, slot 9: [`World::retarget_hunt`]): 1. Without one slot 0x820 finds the task
+    /// ([`World::find_work_task`] with any filter, `0xffff`, and the master switch): none is 0,
+    /// else a new Hunt on it, whatever its action type or requirement (`FUN_140ac2dd0`), replaces
+    /// the unit's actions (`FUN_140a98620`, slot 0x808: [`World::start_hunt`] without the unit
+    /// AI's notify, as `HuntObject` sets the AI itself): 1. The constructor's null, an allocation
+    /// that failed, cannot happen here.
+    ///
+    /// [`GatheringCommand::Hunt`]: crate::unit_ai::GatheringCommand::Hunt
     pub(crate) fn hunt_command(
         &mut self,
         player: PlayerId,
         idx: ListIndex,
-        target: ObjectId,
-    ) -> GenieResult<()> {
-        let (_, unit) = self.object(target).ok_or(HUNT_TARGET_GONE)?;
-        let point = unit.position();
-        let task = self
-            .find_work_task(player, idx, target, None, MasterSwap::Change)?
-            .ok_or(NO_HUNT_TASK)?;
+        target: Option<ObjectId>,
+        force: OrderForce,
+    ) -> GenieResult<Answer> {
+        let Some((_, target_unit)) = self.object(target) else {
+            return Ok(Answer::NotTaken);
+        };
+        let (target, point) = (target_unit.id, target_unit.position());
+        let unit = self.players.live(player, idx)?;
+        if let Some(Action::Hunt(hunt_action)) = self.parts.actions_of(unit.id).list.head() {
+            if force == OrderForce::Unforced
+                && hunt_action.target.map(HuntTargetId::id) == Some(target)
+            {
+                return Ok(Answer::Taken);
+            }
+            self.retarget_hunt(player, idx, target)?;
+            return Ok(Answer::Taken);
+        }
+        let Some(task) = self.find_work_task(player, idx, target, None, MasterSwap::Change)? else {
+            return Ok(Answer::NotTaken);
+        };
         self.start_hunt(HuntOrder {
             player,
             index: idx,
@@ -70,48 +90,65 @@ impl World {
             point,
             notifies: Notifies::Kept,
             notify: false,
-        })
+        })?;
+        Ok(Answer::Taken)
     }
 
-    /// The unit's gather command (object slot 0x368, `FUN_141085030`) forced on `target`, as the
-    /// unit AI's `GatherObject` runs it ([`crate::unit_ai::AiCommand::GatherObject`], after the
-    /// unit's update): slot 0x820 finds the task ([`World::find_work_task`] with any filter and
-    /// the master switch);
-    /// the unit's top Gather on the task found takes the target (its slot 0x48 with the target's
-    /// place, [`World::retarget_gather`]; what it answers the command passes over); else a new
-    /// Gather on the task replaces the unit's actions (`FUN_140a88310`, `FUN_140a98620`, slot
-    /// 0x808: [`World::start_gather`] without the unit AI's notify), whatever the task's action
-    /// type (a farm's foundation: the builder's Build task). A target the world does not hold or
-    /// no task would fail the command, which the unit AI took as done: not modelled.
+    /// The unit's gather command (object slot 0x368, `FUN_141085030`) on `target` with `force`, as
+    /// the unit AI's `GatherObject` runs it ([`GatheringCommand::Gather`]): an object the world
+    /// does not hold (`FUN_1415417a0`) is 0. Unforced, a Gather on top on the target ("I'm already
+    /// gathering Unit #%d.") is 1 at once. Else slot 0x820 finds the task
+    /// ([`World::find_work_task`] with any filter, `0xffff`, and the master switch): a Gather on
+    /// top on the task found takes the target (its slot 0x48 with the target's place,
+    /// [`World::retarget_gather`]; what it answers the command passes over): 1. No task is 0
+    /// ("Can't find a task for the gather, cancelling."); else a new Gather on the task replaces
+    /// the unit's actions (`FUN_140a88310`, `FUN_140a98620`, slot 0x808: [`World::start_gather`]
+    /// without the unit AI's notify), whatever the task's action type (a farm's foundation: the
+    /// builder's Build task): 1. The constructor's null, an allocation that failed, cannot happen
+    /// here.
+    ///
+    /// [`GatheringCommand::Gather`]: crate::unit_ai::GatheringCommand::Gather
     pub(crate) fn gather_command(
         &mut self,
         player: PlayerId,
         idx: ListIndex,
         target: ObjectId,
-    ) -> GenieResult<()> {
+        force: OrderForce,
+    ) -> GenieResult<Answer> {
         if self.object(target).is_none() {
-            return Err(GenieError::unsupported(
-                "a gather command on an object the world does not hold",
-            ));
+            return Ok(Answer::NotTaken);
         }
-        let task = self
-            .find_work_task(player, idx, target, None, MasterSwap::Change)?
-            .ok_or(GenieError::unsupported("a gather command without a task"))?;
-        let unit = &self.players.live(player, idx)?;
-        if self.parts.actions_of(unit.id).top_action_kind() == Some(GATHER)
-            && self
-                .parts
-                .actions_of(unit.id)
-                .list
-                .gather()
-                .is_some_and(|gather_action| gather_action.task.id == task.id)
+        if force == OrderForce::Unforced
+            && self.top_gather(player, idx)?.is_some_and(|gather_action| {
+                gather_action.target.map(GatherTargetId::id) == Some(target)
+            })
+        {
+            return Ok(Answer::Taken);
+        }
+        let Some(task) = self.find_work_task(player, idx, target, None, MasterSwap::Change)? else {
+            return Ok(Answer::NotTaken);
+        };
+        // the top action read again: slot 0x820's master switch clears the actions
+        if self
+            .top_gather(player, idx)?
+            .is_some_and(|gather_action| gather_action.task.id == task.id)
         {
             let _ = self.retarget_gather(player, idx, target)?;
-            return Ok(());
+            return Ok(Answer::Taken);
         }
         // FUN_140a88310 makes a Gather on whatever task it found (a farm's foundation gives the
         // builder's Build task)
-        self.start_gather(player, idx, target, &task, None)
+        self.start_gather(player, idx, target, &task, None)?;
+        Ok(Answer::Taken)
+    }
+
+    /// The unit's top action as a Gather (`FUN_140a986f0`, its type 5), none for another or none.
+    fn top_gather(&self, player: PlayerId, idx: ListIndex) -> GenieResult<Option<&GatherAction>> {
+        let unit = self.players.live(player, idx)?;
+        Ok(match self.parts.actions_of(unit.id).list.head() {
+            Some(Action::Gather(gather_action)) => Some(gather_action),
+            _ => None,
+        })
     }
 
     /// The work command's Build (its task of action type 101, the factory `FUN_140aca4b0` case

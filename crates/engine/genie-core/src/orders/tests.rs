@@ -114,6 +114,7 @@ use crate::unit_ai::Answer;
 use crate::unit_ai::Issuer;
 use crate::unit_ai::Notifies;
 use crate::unit_ai::NotifyKind;
+use crate::unit_ai::OrderForce;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::UnitAiKind;
 use crate::unit_ai::UnitStance;
@@ -5489,9 +5490,15 @@ fn move_of_whole_group_keeps_it() {
 #[test]
 fn gather_takes_farm_but_no_other_building() {
     let mut forage_world = forage_world();
-    forage_world
-        .gather_command(PlayerId::new(1), ListIndex::new(0), object_id(600))
-        .unwrap();
+    assert_eq!(
+        forage_world.gather_command(
+            PlayerId::new(1),
+            ListIndex::new(0),
+            object_id(600),
+            OrderForce::Forced
+        ),
+        Ok(Answer::Taken)
+    );
     forage_world.model.masters[1] = Arc::new(Masters::new(
         forage_world.model.masters[1]
             .iter()
@@ -6043,9 +6050,15 @@ fn work_command_finds_its_master_and_task_on_target() {
 #[test]
 fn work_command_retargets_gather_or_hunt_on_its_task() {
     let mut forage_world = forage_world();
-    forage_world
-        .gather_command(PlayerId::new(1), ListIndex::new(0), object_id(600))
-        .unwrap();
+    assert_eq!(
+        forage_world.gather_command(
+            PlayerId::new(1),
+            ListIndex::new(0),
+            object_id(600),
+            OrderForce::Forced
+        ),
+        Ok(Answer::Taken)
+    );
     let took = forage_world
         .retarget_gather_work(
             PlayerId::new(1),
@@ -6083,9 +6096,15 @@ fn work_command_retargets_gather_or_hunt_on_its_task() {
         )
     );
     let mut world = hunt_world();
-    world
-        .hunt_command(PlayerId::new(1), ListIndex::new(0), object_id(500))
-        .unwrap();
+    assert_eq!(
+        world.hunt_command(
+            PlayerId::new(1),
+            ListIndex::new(0),
+            Some(object_id(500)),
+            OrderForce::Forced
+        ),
+        Ok(Answer::Taken)
+    );
     world
         .retarget_hunt_work(
             PlayerId::new(1),
@@ -6150,9 +6169,15 @@ fn work_command_retarget_to_its_player_master_84_fails() {
         world
     };
     let mut world = with_84(forage_world());
-    world
-        .gather_command(PlayerId::new(1), ListIndex::new(0), object_id(600))
-        .unwrap();
+    assert_eq!(
+        world.gather_command(
+            PlayerId::new(1),
+            ListIndex::new(0),
+            object_id(600),
+            OrderForce::Forced
+        ),
+        Ok(Answer::Taken)
+    );
     let answer = world.retarget_gather_work(
         PlayerId::new(1),
         ListIndex::new(0),
@@ -6167,9 +6192,15 @@ fn work_command_retarget_to_its_player_master_84_fails() {
         Some("a gather sent to its player's master 84")
     );
     let mut world = with_84(hunt_world());
-    world
-        .hunt_command(PlayerId::new(1), ListIndex::new(0), object_id(500))
-        .unwrap();
+    assert_eq!(
+        world.hunt_command(
+            PlayerId::new(1),
+            ListIndex::new(0),
+            Some(object_id(500)),
+            OrderForce::Forced
+        ),
+        Ok(Answer::Taken)
+    );
     let retarget_hunt_work = world.retarget_hunt_work(
         PlayerId::new(1),
         ListIndex::new(0),
@@ -6215,9 +6246,15 @@ fn work_command_task_is_retaken_by_the_action_on_top() {
         ),
         Ok(Answer::NotTaken)
     );
-    world
-        .gather_command(PlayerId::new(1), ListIndex::new(0), object_id(600))
-        .unwrap();
+    assert_eq!(
+        world.gather_command(
+            PlayerId::new(1),
+            ListIndex::new(0),
+            object_id(600),
+            OrderForce::Forced
+        ),
+        Ok(Answer::Taken)
+    );
     assert_eq!(
         world.retake_task(
             PlayerId::new(1),

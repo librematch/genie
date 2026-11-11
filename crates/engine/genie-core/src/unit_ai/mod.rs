@@ -116,8 +116,8 @@ pub(crate) use self::process_order::{OrderSite, TakenAs};
 pub use self::queue_end::QueueEnd;
 pub(crate) use self::side::UNMODELLED_COMMAND;
 pub use self::side::{
-    Gatherable, NO_POINT, Named, NearestAttacker, OffFootprint, ResourceSearch, TargetFlags,
-    UnitCommand,
+    Gatherable, GatheringCommand, NO_POINT, Named, NearestAttacker, OffFootprint, ResourceSearch,
+    TargetFlags, UnitCommand,
 };
 pub use self::stop_order::StopOrder;
 pub(crate) use self::surroundings::FOUND_WITHOUT_POSITION;
@@ -347,14 +347,6 @@ pub enum AiCommand {
     /// Slot 0x148 (`FUN_140c4d0d0`) forced: the unit's slot 0x340 to the point
     /// ([`crate::world::World::move_aside`]).
     MoveAside(AiMove),
-    /// `HuntObject`'s unit part (`FUN_140c4e220`), after the AI's stop (slot 0xb0 with 1, the
-    /// unit's `stopAction` at once): its hunt command on the target (object slot 0x360,
-    /// `FUN_1412151f0`, forced; [`crate::world::World::hunt_command`]).
-    HuntObject(ObjectId),
-    /// `GatherObject`'s unit part (slot 0xd0, `FUN_140c4dd50`, forced): the unit's gather command
-    /// on the target (object slot 0x368, `FUN_141085030`, forced;
-    /// [`crate::world::World::gather_command`]).
-    GatherObject(ObjectId),
     /// `BuildObject`'s unit part (the AI's slot 0xf0, `FUN_140c47d80`): the unit's build command
     /// (slot 0x380) on the foundation ([`crate::world::World::build_command`]); the AI's part,
     /// the build action and the foundation as its target, is its own ([`UnitAi::build_object`]).

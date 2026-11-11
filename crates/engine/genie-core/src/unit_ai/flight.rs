@@ -382,9 +382,7 @@ impl UnitAi {
     /// closest undiscovered tile ([`closest_undiscovered_tile`]). The shepherd's search (action
     /// `0x278`: `ClosestObject` for livestock, then slot 600) and the search for the class of
     /// an invalidated gather or hunt (`p[0]` `0x261` or `0x265`, `p[1]` not 10) are not
-    /// modelled. Else any notify but 0x202, off the actions `0x278` and `0x26a`, makes the
-    /// target go (`FUN_140c5e1e0`) and the action stop (slot 0xb0 with 1; slot 0x48 hands the
-    /// notify to the owner, not held); it returns 2.
+    /// modelled. Else the search's tail ([`UnitAi::search_tail`]).
     pub(super) fn villager_search(
         &mut self,
         notify: Notify,
@@ -440,6 +438,34 @@ impl UnitAi {
                 VILLAGER_NOTIFY.with("notify", format!("{:#x} {:?}", notify.kind, notify.params))
             );
         }
+        self.search_tail(notify, at, side, rng)
+    }
+
+    /// The villager's search whose `GatherObject` or `HuntObject` answered 0 (`0x140c23da4`): the
+    /// target goes (`FUN_140c5e1e0`) and the action stops (slot 0xb0 with 1; slot 0x48 hands the
+    /// notify to the owner, not held), then the search's tail ([`UnitAi::search_tail`]).
+    pub(super) fn search_failed(
+        &mut self,
+        notify: Notify,
+        at: &Surroundings,
+        side: &mut UnitView<'_, '_>,
+        rng: &mut Well512,
+    ) -> GenieResult<u32> {
+        self.remove_target();
+        self.stop_current(StopOrder::Keep, at, side, rng)?;
+        self.search_tail(notify, at, side, rng)
+    }
+
+    /// The villager's search's tail (`0x140c23dc9`): any notify but 0x202, off the actions
+    /// `0x278` and `0x26a`, makes the target go (`FUN_140c5e1e0`) and the action stop (slot 0xb0
+    /// with 1; slot 0x48 hands the notify to the owner, not held); it returns 2.
+    fn search_tail(
+        &mut self,
+        notify: Notify,
+        at: &Surroundings,
+        side: &mut UnitView<'_, '_>,
+        rng: &mut Well512,
+    ) -> GenieResult<u32> {
         if notify.kind != NotifyKind::REQUIRES_SEARCH
             && !matches!(
                 self.current_action,

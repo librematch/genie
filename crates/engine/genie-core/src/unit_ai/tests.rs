@@ -1465,6 +1465,69 @@ fn gatherer_without_class_stops_and_one_on_farm_searches_for_another() {
     );
 }
 
+/// The gatherer of [`gatherer_master`] without its tasks on deer (class 9) and trees (class 15).
+fn gatherer_without_deer_or_trees() -> Master {
+    let mut master = gatherer_master();
+    let deer_or_trees = [Some(class_id(9)), Some(class_id(15))];
+    if let Some(action) = master.action.as_mut() {
+        action
+            .tasks
+            .retain(|task| !deer_or_trees.contains(&task.object_group));
+    }
+    master
+}
+
+/// A `HuntObject` or `GatherObject` that fails in the villager's search (their slots' 0: the
+/// gatherer has no task on what it found, the deer 40 or the oak 28600) goes where a computer
+/// player's villager that found nothing goes (`0x140c23da4`): the target goes and the action
+/// stops (slot 0xb0 with 1; slot 0x48 hands the notify to the owner, not held); then the
+/// search's tail (`0x140c23dc9`): on 0x202 nothing more, on another notify (0x1fb) the target
+/// goes and the action stops again, the stopped none then the last action. Both return 2.
+#[test]
+fn search_whose_gathering_command_fails_stops_villager() {
+    let run = |kind: NotifyKind, action: AiAction, (class, found): (i32, SceneObject)| {
+        let mut world = gather_world(
+            (gatherer_without_deer_or_trees(), civilian(action, -1, -1)),
+            from_ref(&found),
+        );
+        let notify = Notify::own(object_id(31237), kind, [action.value(), class, 31247]);
+        let searched = gatherer_searches(&mut world, notify, action == AiAction::Hunt);
+        let last = world
+            .parts
+            .unit_ai
+            .get(object_id(31237))
+            .unwrap()
+            .last_action;
+        (searched, gatherer_state(&world), last)
+    };
+    let deer = (9, gaia_deer(40, (23.0, 20.0)));
+    let oak = (
+        15,
+        resource(
+            (28600, 349, class::TREE),
+            (MasterKind::TREE, GatherGroup::WOOD),
+            (22.0, 20.0),
+            (attribute::WOOD, 100.0),
+        ),
+    );
+    let stopped = (None, None, None, None);
+    for kind in [NotifyKind::REQUIRES_SEARCH, NotifyKind::ACTION_INVALIDATED] {
+        assert_eq!(
+            run(kind, AiAction::Hunt, deer.clone()),
+            (Ok(GO_ON), stopped, None),
+            "{kind:?}"
+        );
+    }
+    assert_eq!(
+        run(NotifyKind::REQUIRES_SEARCH, AiAction::Gather, oak.clone()),
+        (Ok(GO_ON), stopped, Some(AiAction::Gather))
+    );
+    assert_eq!(
+        run(NotifyKind::ACTION_INVALIDATED, AiAction::Gather, oak),
+        (Ok(GO_ON), stopped, None)
+    );
+}
+
 /// Player 1's house foundation 10028 at `at` (desolid, no build points).
 fn house_foundation((x, y): (f32, f32)) -> SceneObject {
     let (house, _) = house_and_tree();
@@ -8639,6 +8702,38 @@ fn villager_hunts_an_animal_and_attacks_another_object() {
     assert_eq!(
         (answer, attacks),
         (Ok(Answer::Taken), Some(object_id(9802)))
+    );
+}
+
+/// The civilian's `AttackObject` (slot 0xb8, `FUN_140c17370`) jumps to `HuntObject` (slot 0xc8)
+/// on an animal and answers what it answers: a villager without a task on the boar 9731 stops
+/// (slot 0xb0 with 1), its hunt command answers 0 (slot 0x360: slot 0x820 finds no task), and
+/// the attack is not taken.
+#[test]
+fn villager_attack_on_animal_answers_what_hunt_answers() {
+    let mut world = civilian_world(0);
+    for masters in &mut world.model.masters {
+        if let Some(action) = Arc::make_mut(masters)
+            .get_mut(ids::VILLAGER_MALE)
+            .and_then(|villager| villager.action.as_mut())
+        {
+            action.tasks.clear();
+        }
+    }
+    let answer = run_ai(
+        &mut world,
+        (player_id(1), object_id(10041)),
+        |ai, at, side, _, rng| ai.civilian_attack(object_id(9731), at, side, rng),
+    );
+    assert_eq!(answer, Ok(Answer::NotTaken));
+    let unit_ai = world.parts.unit_ai.get(object_id(10041)).unwrap();
+    assert_eq!(
+        (
+            world.parts.actions.of(object_id(10041)).top_action_kind(),
+            unit_ai.current_action,
+            unit_ai.current_target
+        ),
+        (None, None, None)
     );
 }
 

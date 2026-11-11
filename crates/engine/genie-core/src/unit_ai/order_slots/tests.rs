@@ -307,72 +307,136 @@ fn work_object_takes_target_once_the_unit_command_takes_it() {
     );
 }
 
-/// `GatherObject` (slot 0xd0, `FUN_140c4dd50`) forced on Gaia's oak 70: the unit's gather
-/// command (slot 0x368: its Gather at once), then the gather's action value (`0x261`), the old
-/// one the last, and 70 the target at its place with its class, the old target and class the
-/// last ones. An object the world does not hold is not taken, and nothing changes.
-#[test]
-fn gather_order_gathers_object_the_world_holds() {
-    let gather = |target| {
-        let mut world = order_world(
-            order_unit(order_gatherer(), moving(UnitAiKind::Civilian)),
-            &[order_tree()],
-        );
-        let answer = slot_9(&mut world, |ai, at, side, rng| {
-            ai.gather_order(object_id(target), at, side, rng)
-        });
-        (answer, world)
+/// A unit AI of the civilian's with `action` as its action value, else [`resting`].
+fn civilian_on(action: AiAction) -> UnitAi {
+    UnitAi {
+        current_action: Some(action),
+        ..resting(UnitAiKind::Civilian)
+    }
+}
+
+/// The gatherer unit 9 with the unit AI `unit_ai` on its walk ([`order_walk`]), beside Gaia's oak
+/// 70 and player 1's swordsman 71, which the gatherer has no task on.
+fn gather_world(unit_ai: UnitAi) -> World {
+    let walker = SceneObject {
+        actions: Some(order_walk()),
+        ..order_unit(order_gatherer(), unit_ai)
     };
-    let (answer, world) = gather(70);
-    assert_eq!(answer, Ok(Answer::Taken));
-    assert_eq!(top_9(&world), Some(GATHER));
-    let unit_ai = ai_9(&world);
-    assert_eq!(
-        actions(unit_ai),
-        (Some(AiAction::Gather), Some(AiAction::Move))
-    );
-    assert_eq!(
-        Targets::of(unit_ai),
-        Targets::taken(70, 15, Position::new(10.0, 20.0, 0.0))
-    );
-    let (answer, world) = gather(99);
+    order_world(walker, &[order_tree(), order_target(71, player_id(1))])
+}
+
+/// `GatherObject` (slot 0xd0, `FUN_140c4dd50`) on Gaia's oak 70, forced on the gather's action
+/// value or unforced on another (the move's): the unit's gather command (slot 0x368: its Gather
+/// at once, which replaces the walk), then the gather's action value (`0x261`), the old one the
+/// last, and 70 the target at its place with its class as the world holds it after the command,
+/// the old target and class the last ones.
+#[test]
+fn gather_object_forced_or_off_gather_value_gathers_object() {
+    for (force, action) in [
+        (OrderForce::Forced, AiAction::Gather),
+        (OrderForce::Unforced, AiAction::Move),
+    ] {
+        let mut world = gather_world(civilian_on(action));
+        let answer = slot_9(&mut world, |ai, at, side, rng| {
+            ai.gather_object(object_id(70), force, at, side, rng)
+        });
+        assert_eq!(answer, Ok(Answer::Taken), "{force:?}");
+        assert_eq!(top_9(&world), Some(GATHER));
+        let unit_ai = ai_9(&world);
+        assert_eq!(actions(unit_ai), (Some(AiAction::Gather), Some(action)));
+        assert_eq!(
+            Targets::of(unit_ai),
+            Targets::taken(70, 15, Position::new(10.0, 20.0, 0.0))
+        );
+    }
+}
+
+/// `GatherObject` (slot 0xd0, `FUN_140c4dd50`) unforced on the gather's action value answers 0
+/// before the unit's gather command: the AI stays as it was and the unit keeps its walk.
+#[test]
+fn gather_object_unforced_on_gather_value_gives_no_command() {
+    let mut world = gather_world(civilian_on(AiAction::Gather));
+    let answer = slot_9(&mut world, |ai, at, side, rng| {
+        ai.gather_object(object_id(70), OrderForce::Unforced, at, side, rng)
+    });
     assert_eq!(answer, Ok(Answer::NotTaken));
     assert_eq!(
         (ai_9(&world), top_9(&world)),
-        (&moving(UnitAiKind::Civilian), None)
+        (&civilian_on(AiAction::Gather), Some(MOVE_TO))
     );
 }
 
-/// `HuntObject` (slot 0xc8, `FUN_140c4e220`) forced on Gaia's oak 70 by a unit on its walk: the
-/// action stops first (slot 0xb0 with 1), then the unit's hunt command (slot 0x360: its Hunt at
-/// once, which replaces the walk), the hunt's action value (`0x265`) with the none the stop
-/// left the last, and 70 the target at its place with its class, the old target and class the
-/// last ones. On an object the world does not hold, or on none, the stop stays (its walk gone,
-/// the move the last action, the target kept) and the order is not taken.
+/// `GatherObject` (slot 0xd0, `FUN_140c4dd50`) forced where the unit's gather command answers 0
+/// (slot 0x368: an object the world does not hold, `FUN_1415417a0`; the swordsman 71, on which
+/// slot 0x820 finds no task): the AI stays as it was and the unit keeps its walk.
 #[test]
-fn hunt_order_stops_then_hunts_object_the_world_holds() {
-    let hunt = |target| {
-        let walker = SceneObject {
-            actions: Some(order_walk()),
-            ..order_unit(order_gatherer(), moving(UnitAiKind::Civilian))
-        };
-        let mut world = order_world(walker, &[order_tree()]);
+fn gather_object_takes_nothing_gather_command_refuses() {
+    for target in [99, 71] {
+        let mut world = gather_world(moving(UnitAiKind::Civilian));
         let answer = slot_9(&mut world, |ai, at, side, rng| {
-            ai.hunt_order(target, at, side, rng)
+            ai.gather_object(object_id(target), OrderForce::Forced, at, side, rng)
         });
-        (answer, world)
-    };
-    let (answer, world) = hunt(Some(object_id(70)));
-    assert_eq!(answer, Ok(Answer::Taken));
-    assert_eq!(top_9(&world), Some(HUNT));
-    let unit_ai = ai_9(&world);
-    assert_eq!(actions(unit_ai), (Some(AiAction::Hunt), None));
+        assert_eq!(answer, Ok(Answer::NotTaken), "{target}");
+        assert_eq!(
+            (ai_9(&world), top_9(&world)),
+            (&moving(UnitAiKind::Civilian), Some(MOVE_TO))
+        );
+    }
+}
+
+/// `HuntObject` (slot 0xc8, `FUN_140c4e220`) on Gaia's oak 70, forced on the hunt's action value
+/// or unforced on another (the move's), by a unit on its walk: the action stops first (slot 0xb0
+/// with 1), then the unit's hunt command (slot 0x360: its Hunt at once), the hunt's action value
+/// (`0x265`) with the none the stop left the last, and 70 the target at its place with its
+/// class as the world holds it after the command, the old target and class the last ones.
+#[test]
+fn hunt_object_forced_or_off_hunt_value_stops_then_hunts_object() {
+    for (force, action) in [
+        (OrderForce::Forced, AiAction::Hunt),
+        (OrderForce::Unforced, AiAction::Move),
+    ] {
+        let mut world = gather_world(civilian_on(action));
+        let answer = slot_9(&mut world, |ai, at, side, rng| {
+            ai.hunt_object(Some(object_id(70)), force, at, side, rng)
+        });
+        assert_eq!(answer, Ok(Answer::Taken), "{force:?}");
+        assert_eq!(top_9(&world), Some(HUNT));
+        let unit_ai = ai_9(&world);
+        assert_eq!(actions(unit_ai), (Some(AiAction::Hunt), None));
+        assert_eq!(
+            Targets::of(unit_ai),
+            Targets::taken(70, 15, Position::new(10.0, 20.0, 0.0))
+        );
+    }
+}
+
+/// `HuntObject` (slot 0xc8, `FUN_140c4e220`) unforced on the hunt's action value answers 0 before
+/// the stop (`"UAIMod::HuntObject failed because uncon is FALSE."`): the AI stays as it was and the
+/// unit keeps its walk.
+#[test]
+fn hunt_object_unforced_on_hunt_value_neither_stops_nor_hunts() {
+    let mut world = gather_world(civilian_on(AiAction::Hunt));
+    let answer = slot_9(&mut world, |ai, at, side, rng| {
+        ai.hunt_object(Some(object_id(70)), OrderForce::Unforced, at, side, rng)
+    });
+    assert_eq!(answer, Ok(Answer::NotTaken));
     assert_eq!(
-        Targets::of(unit_ai),
-        Targets::taken(70, 15, Position::new(10.0, 20.0, 0.0))
+        (ai_9(&world), top_9(&world)),
+        (&civilian_on(AiAction::Hunt), Some(MOVE_TO))
     );
-    for target in [Some(object_id(99)), None] {
-        let (answer, world) = hunt(target);
+}
+
+/// `HuntObject` (slot 0xc8, `FUN_140c4e220`) forced where the unit's hunt command answers 0
+/// (slot 0x360: an object the world does not hold, none, `FUN_1415417a0`; the swordsman 71, on
+/// which slot 0x820 finds no task): the stop stays (the walk gone, the move the last action,
+/// the target kept) and the order is not taken (`"UAIMod::HuntObject: returning FALSE."`).
+#[test]
+fn hunt_object_stops_without_hunting_what_hunt_command_refuses() {
+    for target in [Some(object_id(99)), None, Some(object_id(71))] {
+        let mut world = gather_world(moving(UnitAiKind::Civilian));
+        let answer = slot_9(&mut world, |ai, at, side, rng| {
+            ai.hunt_object(target, OrderForce::Forced, at, side, rng)
+        });
         assert_eq!(answer, Ok(Answer::NotTaken), "{target:?}");
         assert_eq!(top_9(&world), None);
         let unit_ai = ai_9(&world);
@@ -382,6 +446,28 @@ fn hunt_order_stops_then_hunts_object_the_world_holds() {
             Targets::of(&moving(UnitAiKind::Civilian))
         );
     }
+}
+
+/// The target a command's slot takes after the command (`FUN_140c64be0`'s inline form): an object
+/// the world does not hold (`FUN_1415417a0` null) is the target with class −1 at (0, 0, 0), the
+/// old target and class the last ones.
+#[test]
+fn held_target_of_object_not_held_takes_origin_without_class() {
+    let mut world = gather_world(resting(UnitAiKind::Civilian));
+    slot_9(&mut world, |ai, at, side, _| {
+        ai.take_held_target(Some(object_id(99)), at, side)
+    })
+    .unwrap();
+    assert_eq!(
+        Targets::of(ai_9(&world)),
+        Targets {
+            target: Some(object_id(99)),
+            class: None,
+            point: Position::ORIGIN,
+            last: Some(object_id(5)),
+            last_class: class_of(9),
+        }
+    );
 }
 
 /// Slot 0x168 (`FUN_140c4dab0`) on player 1's swordsman 70 at (6, 7), forced with an action

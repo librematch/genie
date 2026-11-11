@@ -16,6 +16,7 @@ use crate::objects::{ObjectState, WorkerCount};
 use crate::ownership::CaptureKind;
 use crate::players::PlayerId;
 use crate::players::PlayerKind;
+use crate::unit_ai::OrderForce;
 
 /// What a defend target's unit AI names as its nearest attacker
 /// ([`UnitView::defended_attacker`](crate::unit_ai::world_view::UnitView::defended_attacker)): the
@@ -58,6 +59,33 @@ pub enum UnitCommand {
         to: Position,
         /// Over a wall.
         over_wall: bool,
+    },
+}
+
+/// The unit's gather and hunt commands that the unit AI's `GatherObject` (slot 0xd0) and
+/// `HuntObject` (slot 0xc8) give
+/// ([`UnitView::gathering_command`](crate::unit_ai::world_view::UnitView::gathering_command)),
+/// each the unit's slot of `TRIBE_Combat_Object` with the slot's force (its argument 3): taken
+/// when the unit takes it (the slot's 1). Each finds its task (slot 0x820) and its new action
+/// draws from the AI stream, so it runs as an [`Effect`](crate::unit_ai::Effect) runs, the AI
+/// back in its unit.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum GatheringCommand {
+    /// The gather of an object (slot 0x368, `FUN_141085030`,
+    /// [`World::gather_command`](crate::world::World::gather_command)).
+    Gather {
+        /// The object.
+        target: ObjectId,
+        /// The slot's force.
+        force: OrderForce,
+    },
+    /// The hunt of an object (slot 0x360, `FUN_1412151f0`,
+    /// [`World::hunt_command`](crate::world::World::hunt_command)).
+    Hunt {
+        /// The object, none for −1.
+        target: Option<ObjectId>,
+        /// The slot's force.
+        force: OrderForce,
     },
 }
 

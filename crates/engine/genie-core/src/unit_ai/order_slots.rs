@@ -28,7 +28,7 @@ use crate::unit_ai::UnitAiKind;
 use crate::unit_ai::attack_orders::OrderNow;
 use crate::unit_ai::world_view::UnitView;
 use crate::unit_ai::{
-    AiMove, Effect, Gatherable, QueuedOrder, ResourceSearch, Seen, Surroundings, UnitAi,
+    AiMove, Effect, GatheringCommand, QueuedOrder, ResourceSearch, Seen, Surroundings, UnitAi,
     UnitCommand, civilian_kind,
 };
 use crate::world::layer::ClassRoles;
@@ -109,14 +109,7 @@ impl UnitAi {
         }
         side.effect_now(Effect::Command(AiCommand::BuildObject(target)), self, rng)?;
         self.set_action(Some(AiAction::Build));
-        match Self::world_object(target, at, side)? {
-            Some(unit_seen) => self.set_target(
-                Some(target.id()),
-                unit_seen.class.or_none(),
-                unit_seen.position,
-            ),
-            None => self.set_target(Some(target.id()), None, Position::ORIGIN),
-        }
+        self.take_held_target(Some(target.id()), at, side)?;
         Ok(Answer::Taken)
     }
 
@@ -140,62 +133,93 @@ impl UnitAi {
             return Ok(Answer::NotTaken);
         }
         self.set_action(Some(action));
-        match Self::world_object(target, at, side)? {
-            Some(unit_seen) => {
-                self.set_target(Some(target), unit_seen.class.or_none(), unit_seen.position);
-            }
-            None => self.set_target(Some(target), None, Position::ORIGIN),
-        }
+        self.take_held_target(Some(target), at, side)?;
         Ok(Answer::Taken)
     }
 
-    /// `GatherObject` (slot 0xd0, `FUN_140c4dd50`) forced on the order's `target`: the unit's
-    /// gather command (slot 0x368, `FUN_141085030`) takes no object the world does not hold (0);
-    /// on one it holds it runs after the update ([`AiCommand::GatherObject`], which fails without a
-    /// task: the caller stops then) and the AI holds the gather ([`UnitAi::gather_object`]).
-    pub(super) fn gather_order(
+    /// `GatherObject` (slot 0xd0, `FUN_140c4dd50`) on object `target`, `force`d or off the
+    /// gather's action value (`0x261`): the unit's gather command with the force (slot 0x368,
+    /// [`GatheringCommand::Gather`]); on its 1 the gather's action value (the last keeping the
+    /// old) and the target as the world then holds it ([`UnitAi::take_held_target`]). Taken when
+    /// the unit gathers.
+    ///
+    /// # Errors
+    ///
+    /// What the gather command does not model.
+    pub(super) fn gather_object(
         &mut self,
         target: ObjectId,
+        force: OrderForce,
         at: &Surroundings,
         side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
     ) -> GenieResult<Answer> {
-        let Some(unit_seen) = Self::world_object(target, at, side)? else {
+        if force == OrderForce::Unforced && self.current_action == Some(AiAction::Gather) {
             return Ok(Answer::NotTaken);
-        };
-        self.gather_object(
-            Gatherable {
-                id: target,
-                position: unit_seen.position,
-                class: unit_seen.class,
-            },
-            side,
-            rng,
-        )?;
+        }
+        let command = GatheringCommand::Gather { target, force };
+        if side.gathering_command(command, self, rng)? == Answer::NotTaken {
+            return Ok(Answer::NotTaken);
+        }
+        self.set_action(Some(AiAction::Gather));
+        self.take_held_target(Some(target), at, side)?;
         Ok(Answer::Taken)
     }
 
-    /// `HuntObject` (slot 0xc8, `FUN_140c4e220`) forced on the order's `target`: the action stops
-    /// first (slot 0xb0 with 1); the unit's hunt command (slot 0x360, `FUN_1412151f0`) takes no
-    /// object the world does not hold, nor none (0, the stop made); on one it holds,
-    /// [`UnitAi::hunt_object`].
-    pub(super) fn hunt_order(
+    /// `HuntObject` (slot 0xc8, `FUN_140c4e220`) on object `target` (none for −1), `force`d or off
+    /// the hunt's action value (`0x265`; `"UAIMod::HuntObject failed because uncon is FALSE."`):
+    /// the current action stops at once (slot 0xb0 with 1, [`UnitAi::stop_current`]), then the
+    /// unit's hunt command with the force (slot 0x360, [`GatheringCommand::Hunt`]); on its 1 the
+    /// hunt's action value (the last the stopped none) and the target as the world then holds it
+    /// ([`UnitAi::take_held_target`]). Taken when the unit hunts; else the stop stays
+    /// (`"UAIMod::HuntObject: returning FALSE."`).
+    ///
+    /// # Errors
+    ///
+    /// What the stop and the hunt command do not model.
+    pub(super) fn hunt_object(
+        &mut self,
+        target: Option<ObjectId>,
+        force: OrderForce,
+        at: &Surroundings,
+        side: &mut UnitView<'_, '_>,
+        rng: &mut Well512,
+    ) -> GenieResult<Answer> {
+        if force == OrderForce::Unforced && self.current_action == Some(AiAction::Hunt) {
+            return Ok(Answer::NotTaken);
+        }
+        self.stop_current(StopOrder::Keep, at, side, rng)?;
+        let command = GatheringCommand::Hunt { target, force };
+        if side.gathering_command(command, self, rng)? == Answer::NotTaken {
+            return Ok(Answer::NotTaken);
+        }
+        self.set_action(Some(AiAction::Hunt));
+        self.take_held_target(target, at, side)?;
+        Ok(Answer::Taken)
+    }
+
+    /// The target a slot takes once the unit's command took it (`FUN_140c64be0`'s inline form
+    /// after `FUN_1415417a0`): object `target` (none for −1) with its master's class and its place
+    /// as the world holds it, else class −1 at (0, 0, 0); the target and class before become the
+    /// last ones.
+    ///
+    /// # Errors
+    ///
+    /// The unit's own master the slice does not hold, for a target that is the unit, and what the
+    /// side's lookup does not model ([`UnitView::seen_unit`]).
+    pub(super) fn take_held_target(
         &mut self,
         target: Option<ObjectId>,
         at: &Surroundings,
-        side: &mut UnitView<'_, '_>,
-        rng: &mut Well512,
-    ) -> GenieResult<Answer> {
-        let held = match target {
-            Some(id) => Self::world_object(id, at, side)?.map(|unit_seen| (id, unit_seen)),
-            None => None,
-        };
-        let Some((target, unit_seen)) = held else {
-            self.stop_current(StopOrder::Keep, at, side, rng)?;
-            return Ok(Answer::NotTaken);
-        };
-        self.hunt_object(target, unit_seen.class, unit_seen.position, at, side, rng)?;
-        Ok(Answer::Taken)
+        side: &UnitView<'_, '_>,
+    ) -> GenieResult<()> {
+        match Self::world_object(target, at, side)? {
+            Some(unit_seen) => {
+                self.set_target(target, unit_seen.class.or_none(), unit_seen.position);
+            }
+            None => self.set_target(target, None, Position::ORIGIN),
+        }
+        Ok(())
     }
 
     /// Slot 0x168 (`FUN_140c4dab0`, "GOT A FOLLOW ORDER"), the follow of object `target` within
