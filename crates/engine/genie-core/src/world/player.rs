@@ -302,8 +302,12 @@ impl Player {
     }
 
     /// Attribute `attribute` set to `amount` straight, with no slot 0xf0 and so no computer's
-    /// escrow ([`Player::store_attribute`]). A technology's payment (`FUN_1413d4370`) and the
-    /// refunds (`FUN_141630530`, `FUN_141630770`, `FUN_1413d15e0`, `FUN_1413ccc00`) write so.
+    /// escrow ([`Player::store_attribute`]). A technology's payment (`FUN_1413d4370`), the
+    /// refunds (`FUN_141630530`, `FUN_141630770`, `FUN_1413d15e0`, `FUN_1413ccc00`) and slot
+    /// 0xf0's spread of attribute 0xc4 to the other players (`FUN_14162d610` at `0x14162d834`,
+    /// [`World::set_player_attribute`]) write so.
+    ///
+    /// [`World::set_player_attribute`]: crate::world::World::set_player_attribute
     ///
     /// # Errors
     ///

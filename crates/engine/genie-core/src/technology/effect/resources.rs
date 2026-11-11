@@ -83,11 +83,13 @@ impl World {
     /// Slot 0xf0 (`FUN_14162d610`) of player `player`: attribute `attribute` takes `amount`
     /// (the store, [`Player::store_attribute`]), with its side effects: 0x32 turns the allied
     /// vision on first ([`World::allied_vision_on`]); 0xc4 changes nothing for a player above 0
-    /// and spreads to the others at most 0 ([`AttributeRoles::SPREAD_ATTRIBUTE`]); 0xb7 rebuilds
-    /// the masks after; 0x21 above 0 calls the scripts' `EffectFunction<amount>` (the XS runtime
-    /// is not modelled).
+    /// and spreads to the others at most 0 (`COMISS`, `JC`: not a NaN;
+    /// [`AttributeRoles::SPREAD_ATTRIBUTE`]), each other player's attribute written straight
+    /// with no store ([`Player::set_attribute`]); 0xb7 rebuilds the masks after; 0x21 above 0
+    /// calls the scripts' `EffectFunction<amount>` (the XS runtime is not modelled).
     ///
     /// [`Player::store_attribute`]: crate::world::Player::store_attribute
+    /// [`Player::set_attribute`]: crate::world::Player::set_attribute
     pub(crate) fn set_player_attribute(
         &mut self,
         player: PlayerId,
@@ -110,11 +112,10 @@ impl World {
                         && self.attribute_of(player_id, self.model.slots.attribute.spread_attribute)
                             <= Amount::ZERO
                     {
-                        self.players.player_mut(player_id)?.store_attribute(
-                            self.model.slots.attribute.spread_attribute,
-                            amount,
-                            &self.model.roles,
-                        );
+                        // straight into the attribute, no store (`0x14162d834`)
+                        self.players
+                            .player_mut(player_id)?
+                            .set_attribute(self.model.slots.attribute.spread_attribute, amount)?;
                     }
                 }
             } else if held.contains(AttributeRoles::EFFECT_FUNCTION) && (Amount::ZERO < amount) {

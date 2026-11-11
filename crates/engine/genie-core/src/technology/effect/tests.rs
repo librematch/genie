@@ -89,6 +89,7 @@ use crate::vision::visibility::LosSight;
 use crate::vision::visibility::{Seer, Visibility, VisibleMap};
 use crate::world::AllySharing;
 use crate::world::Millis;
+use crate::world::NO_ATTRIBUTE;
 use crate::world::Player;
 use crate::world::Seconds;
 use crate::world::WholeSeconds;
@@ -1390,6 +1391,31 @@ fn the_resource_commands_side_effects() {
         world
             .do_effect(PlayerId::new(1), &[attribute(1, 0x21, 0, -1, 7.0)], None)
             .is_err()
+    );
+}
+
+/// Slot 0xf0's spread of attribute 0xc4 (`FUN_14162d610`) writes each other player's attribute
+/// straight (`0x14162d834`), with no store and so no store's count check: another player whose
+/// attributes stop before 0xc4 is an error, where the store would skip it.
+#[test]
+fn resource_spread_writes_other_players_straight() {
+    let player = |count: usize| Player {
+        attributes: vec![Amount::ZERO; count],
+        ..Player::default()
+    };
+    let mut world = World::new(
+        WorldTime::ZERO,
+        FrameSeed::of_data(0),
+        PlayerId::new(0),
+        vec![Millis::ZERO; 3],
+        vec![player(300), player(300), player(100)],
+    );
+    assert_eq!(
+        world
+            .do_effect(PlayerId::new(1), &[attribute(1, 0xc4, 0, -1, 7.0)], None)
+            .unwrap_err()
+            .reason(),
+        NO_ATTRIBUTE.reason()
     );
 }
 
