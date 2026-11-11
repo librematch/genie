@@ -14,7 +14,7 @@ use crate::map::Snow;
 use crate::map::Tile;
 use crate::movement::Speed;
 use crate::objects::MasterHitPoints;
-use crate::objects::masters::{BuildingMaster, MasterId, Masters};
+use crate::objects::masters::{BuildingMaster, ClassId, MasterId, Masters};
 use crate::objects::masters::{ObstructionClass, ObstructionKind};
 use crate::players::tracker::ListKey;
 use crate::technology::{ResearchCap, ResearchState, TechDef, TechState};
@@ -318,12 +318,16 @@ fn building_new_owner_lacks_master_of_stays_with_old_owner() {
     );
 }
 
-/// [`hands_scene`] whose building's master makes a stack unit `stack` (`+0x986`) and researches
-/// technology 0 (`+0x98c`) when built, each player's tree holding it available.
-fn stack_scene(id: MasterId, stack: MasterId) -> World {
+/// [`hands_scene`] whose building's master `id` of class `building_class` makes a stack unit
+/// `stack` (`+0x986`) and researches technology 0 (`+0x98c`) when built, each player's tree
+/// holding it available. The tables also hold `stack` as a static object of class 0 and the
+/// mangrove pasture (the build layer's slot, 1893) as build 158041's `.dat` gives it: a building
+/// of class 49.
+fn stack_scene(id: MasterId, building_class: ClassId, stack: MasterId) -> World {
     let mut world = hands_scene(
         building(|object| {
             object.master.id = id;
+            object.master.class = building_class;
             if let Some(building_master) = object.master.building.as_mut() {
                 building_master.stack_unit = Some(stack);
                 building_master.tech = Some(tech_id(0));
@@ -331,14 +335,20 @@ fn stack_scene(id: MasterId, stack: MasterId) -> World {
         }),
         Vec::new(),
     );
-    let stacked = |id| Master {
-        id,
+    let stacked = Master {
+        id: stack,
         kind: MasterKind::STATIC,
         class: class::CLASS_0,
         ..Master::default()
     };
-    let mangrove = world.model.slots.master.pasture_mangrove;
-    with_masters(&mut world, &[stacked(STACK), stacked(mangrove)]);
+    let mangrove = Master {
+        id: world.model.slots.master.pasture_mangrove,
+        kind: MasterKind::BUILDING,
+        class: class::FARM,
+        building: Some(BuildingMaster::default()),
+        ..Master::default()
+    };
+    with_masters(&mut world, &[stacked, mangrove]);
     world.model.techs = Arc::new(vec![TechDef::default()]);
     for player in &mut world.players {
         player.techs = vec![TechState {
@@ -366,7 +376,7 @@ fn made_masters(world: &World, player: usize) -> Vec<MasterId> {
 /// (`FUN_1413cdcd0`).
 #[test]
 fn built_building_makes_stack_unit_and_research_for_new_owner() {
-    let mut world = stack_scene(BUILDING, STACK);
+    let mut world = stack_scene(BUILDING, class::BUILDING, STACK);
     world
         .building_changes_hands(PlayerId::new(1), object_id(50), PlayerId::new(2), false)
         .unwrap();
@@ -394,7 +404,7 @@ fn built_building_makes_stack_unit_and_research_for_new_owner() {
 #[test]
 fn pasture_on_rice_makes_mangrove_stack_unit() {
     let made = |rice| {
-        let mut world = stack_scene(ids::PASTURE_1889, STACK);
+        let mut world = stack_scene(ids::PASTURE_1889, class::FARM, STACK);
         world.parts.building_mut(object_id(50)).unwrap().rice = rice;
         world
             .building_changes_hands(PlayerId::new(1), object_id(50), PlayerId::new(2), false)
@@ -598,8 +608,9 @@ fn foundation_sight_moves_to_new_owner_map() {
     assert_eq!((seen(&world, 1), seen(&world, 2)), (0, 1));
 }
 
-/// A sheep's master ([`ids::SHEEP`], the `.dat`'s 594 SHEEPG: class 58, line of sight 3): storage
-/// flags 1, 4 and 8 on food, wood and stone; its death spawns master `dead`.
+/// A sheep's master ([`ids::SHEEP`], 594, class 58) in every table, with Gaia's line of sight 3
+/// (the `.dat`'s SHEEPG; the other civilisations' SHEEP sees 2): storage flags 1, 4 and 8 on
+/// food, wood and stone; its death spawns master `dead`.
 fn sheep_master(dead: Option<MasterId>) -> Master {
     Master {
         id: ids::SHEEP,

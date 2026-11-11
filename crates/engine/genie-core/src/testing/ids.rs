@@ -166,7 +166,8 @@ pub const BOARDING_GALLEY: MasterId = MasterId::named(535);
 pub const LUMBER_CAMP: MasterId = MasterId::named(562);
 /// Master 584, as the `.dat` numbers it.
 pub const MINING_CAMP: MasterId = MasterId::named(584);
-/// The sheep (`.dat` SHEEPG, master 594, class 58): a livestock of type 70.
+/// The sheep (master 594, class 58): a livestock of type 70, SHEEPG of line of sight 3 in Gaia's
+/// civilisation and SHEEP of line of sight 2 in the others (build 158041's `.dat`).
 pub const SHEEP: MasterId = MasterId::named(594);
 /// Master 618, as the `.dat` numbers it.
 pub const TOWN_CENTRE_618: MasterId = MasterId::named(618);

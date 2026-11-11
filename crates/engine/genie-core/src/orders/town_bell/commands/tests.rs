@@ -279,8 +279,9 @@ fn mule_cart(world: &World) -> MasterId {
 }
 
 /// [`sized_world`] of `width` × `height` tiles whose tables also hold the [`mule_cart`] (a
-/// villager's copy of class 0), [`VILLAGER_WALKER`] (one of type 30) and the house, a building
-/// that takes no units in.
+/// villager's copy of type 80 and class 3, as build 158041's `.dat` gives its 1808 MULECART,
+/// with a building master that takes no units in), [`VILLAGER_WALKER`] (one of type 30) and the
+/// house, a building that takes no units in.
 fn bell_world(width: i32, height: i32) -> World {
     let mut world = sized_world(width, height);
     let mule_cart_id = mule_cart(&world);
@@ -288,7 +289,9 @@ fn bell_world(width: i32, height: i32) -> World {
         let villager = masters.get(VILLAGER).unwrap().clone();
         let mule_cart = Master {
             id: mule_cart_id,
-            class: class::CLASS_0,
+            kind: MasterKind::BUILDING,
+            class: class::BUILDING,
+            building: Some(BuildingMaster::default()),
             ..villager.clone()
         };
         let walker = Master {
