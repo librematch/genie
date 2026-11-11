@@ -31,12 +31,11 @@ use std::sync::Arc;
 
 /// The building's master in [`hands_scene`]: the castle's id.
 const BUILDING: MasterId = ids::CASTLE;
-/// A stack unit, a static object: the market's id.
-const STACK: MasterId = ids::MARKET;
+/// A stand-in stack unit, a static object: master 384, which build 158041's `.dat` leaves empty
+/// in every civilisation.
+const STACK: MasterId = MasterId::named(384);
 /// A villager, a combat object of class 4: the male villager's id.
 const VILLAGER: MasterId = ids::VILLAGER_MALE;
-/// The master of [`sheep_master`]: the `.dat`'s 705, a livestock master (class 58).
-const SHEEP: MasterId = MasterId::named(705);
 
 /// The building's master: a building of footprint 1.5 whose record is a building's, storing wood
 /// 5 while built (flag 4), stone 7 for a new owner (flag 8) and gold 3 as any object does
@@ -599,11 +598,11 @@ fn foundation_sight_moves_to_new_owner_map() {
     assert_eq!((seen(&world, 1), seen(&world, 2)), (0, 1));
 }
 
-/// A sheep's master (705, class 58, line of sight 3): storage flags 1, 4, 8, 16 and 32 on food,
-/// wood, stone, gold and attribute 4; its death spawns master `dead`.
+/// A sheep's master ([`ids::SHEEP`], the `.dat`'s 594 SHEEPG: class 58, line of sight 3): storage
+/// flags 1, 4 and 8 on food, wood and stone; its death spawns master `dead`.
 fn sheep_master(dead: Option<MasterId>) -> Master {
     Master {
-        id: SHEEP,
+        id: ids::SHEEP,
         kind: MasterKind::COMBAT,
         class: class::LIVESTOCK,
         radius: Footprint::new(0.2, 0.2),
@@ -668,7 +667,7 @@ fn object_given_to_gaia_joins_gaia_list_end() {
     let key = |world: &World, player: usize| {
         world.players[player]
             .tracker
-            .list(ListKey::master(SHEEP))
+            .list(ListKey::master(ids::SHEEP))
             .to_vec()
     };
     assert_eq!(
@@ -701,7 +700,7 @@ fn object_gaia_lacks_master_of_stays_with_owner() {
         ..Master::default()
     };
     let mut world = sheep_scene(sheep_master(Some(dead.id)));
-    without_master(&mut world, 0, SHEEP);
+    without_master(&mut world, 0, ids::SHEEP);
     world.give_gaia(PlayerId::new(1), ListIndex::FIRST).unwrap();
     assert_eq!(
         (ids(&world, 1), ids(&world, 0)),
@@ -811,7 +810,7 @@ fn dead_master_reads_own_master_first() {
 #[test]
 fn change_to_owner_lacking_master_moves_records_only() {
     let mut world = sheep_scene(sheep_master(None));
-    without_master(&mut world, 2, SHEEP);
+    without_master(&mut world, 2, ids::SHEEP);
     let mut unit = world.take_out(PlayerId::new(1), ListIndex::FIRST).unwrap();
     let mut actions = Action::default();
     let changed = change_hands(

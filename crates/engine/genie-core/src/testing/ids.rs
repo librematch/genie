@@ -166,6 +166,8 @@ pub const BOARDING_GALLEY: MasterId = MasterId::named(535);
 pub const LUMBER_CAMP: MasterId = MasterId::named(562);
 /// Master 584, as the `.dat` numbers it.
 pub const MINING_CAMP: MasterId = MasterId::named(584);
+/// The sheep (`.dat` SHEEPG, master 594, class 58): a livestock of type 70.
+pub const SHEEP: MasterId = MasterId::named(594);
 /// Master 618, as the `.dat` numbers it.
 pub const TOWN_CENTRE_618: MasterId = MasterId::named(618);
 /// Master 619, as the `.dat` numbers it.

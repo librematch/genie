@@ -9,7 +9,6 @@ use crate::objects::WorkerCount;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::MasterId;
 use crate::players::PlayerKind;
-use crate::test_ids::master_id;
 use crate::test_ids::object_id;
 use crate::testing::class;
 use crate::testing::ids;
@@ -235,14 +234,14 @@ fn repair_command_retakes_top_repair_without_notify() {
 fn repair_command_switches_master_then_starts_repair_on_task_found() {
     let started = |found: bool| {
         let mut world = repairer_world(vec![], true);
-        let task = task_of(&world, master_id(156), REPAIR);
+        let task = task_of(&world, ids::VILLAGER_REPAIRER_MALE, REPAIR);
         world
             .repair_order(
                 PLAYER,
                 SLOT,
                 RepairOrder::Start {
                     target: HOUSE,
-                    switches: [Some(master_id(156)), None],
+                    switches: [Some(ids::VILLAGER_REPAIRER_MALE), None],
                     task: found.then_some(task),
                 },
             )
@@ -254,9 +253,12 @@ fn repair_command_switches_master_then_starts_repair_on_task_found() {
     };
     assert_eq!(
         started(true),
-        (master_id(156), Some(Some(RepairTargetId::new(HOUSE))))
+        (
+            ids::VILLAGER_REPAIRER_MALE,
+            Some(Some(RepairTargetId::new(HOUSE)))
+        )
     );
-    assert_eq!(started(false), (master_id(156), None));
+    assert_eq!(started(false), (ids::VILLAGER_REPAIRER_MALE, None));
 }
 
 /// `FUN_140ab1b30` on the Build's own foundation while a computer player's builder walks there

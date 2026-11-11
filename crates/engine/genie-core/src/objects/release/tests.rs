@@ -14,16 +14,25 @@ use crate::objects::HpPowerup;
 use crate::objects::MasterHitPoints;
 use crate::objects::Regeneration;
 use crate::objects::lifecycle::Lifecycle;
-use crate::objects::masters::{CreatablePart, Master};
+use crate::objects::masters::{CreatablePart, Master, MasterId};
 use crate::players::Amount;
 use crate::test_ids::master_id;
 use crate::test_ids::object_id;
 use crate::testing::class;
+use crate::testing::ids;
 use crate::testing::scene::{Scene, SceneObject, moving_master, walking};
 use crate::unit_ai::Attackers;
 use crate::vision::VisionBits;
 use crate::vision::ghost::{Cell, Watched};
 use crate::world::parts::Part;
+
+/// A stand-in static object (type 10) of the villager's class: master 379, which build 158041's
+/// `.dat` leaves empty in every civilisation.
+const STATIC_POST: MasterId = MasterId::named(379);
+/// A stand-in missile (type 60) of the villager's class: master 382, empty in the `.dat` too.
+const KEPT_MISSILE: MasterId = MasterId::named(382);
+/// A stand-in walker (type 30): master 383, empty in the `.dat` too.
+const WALKER: MasterId = MasterId::named(383);
 
 /// The villager 40 of player 1 that lets its target go.
 const VILLAGER_RELEASER: Releaser = Releaser {
@@ -231,7 +240,7 @@ fn released_posts_notify_699_to_unit_ai() {
 /// watches each.
 fn leaving_world() -> World {
     let master = |id, kind| Master {
-        id: master_id(id),
+        id,
         kind,
         class: class::VILLAGER,
         ..Master::default()
@@ -241,19 +250,19 @@ fn leaving_world() -> World {
         .object(SceneObject::new(
             9,
             PlayerId::new(1),
-            master(83, MasterKind::COMBAT),
+            master(ids::VILLAGER_MALE, MasterKind::COMBAT),
             at(2.5),
         ))
         .object(SceneObject::new(
             8,
             PlayerId::new(1),
-            master(84, MasterKind::STATIC),
+            master(STATIC_POST, MasterKind::STATIC),
             at(4.5),
         ))
         .object(SceneObject::new(
             7,
             PlayerId::new(1),
-            master(85, MasterKind::MISSILE),
+            master(KEPT_MISSILE, MasterKind::MISSILE),
             at(6.5),
         ))
         .build();
@@ -331,7 +340,7 @@ fn leaving_missile_of_kept_master_stays_out_of_pool() {
 /// of a master that regains 60 hit points a minute.
 fn regenerating_world() -> World {
     let master = |id, kind| Master {
-        id: master_id(id),
+        id,
         kind,
         hit_points: MasterHitPoints::of_data(20),
         creatable: Some(CreatablePart {
@@ -345,13 +354,13 @@ fn regenerating_world() -> World {
         .object(SceneObject::new(
             9,
             PlayerId::new(1),
-            master(4, MasterKind::COMBAT),
+            master(master_id(4), MasterKind::COMBAT),
             at(2.5),
         ))
         .object(SceneObject::new(
             8,
             PlayerId::new(1),
-            master(5, MasterKind::MOVING),
+            master(WALKER, MasterKind::MOVING),
             at(4.5),
         ))
         .build();

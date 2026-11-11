@@ -268,8 +268,9 @@ fn all_back_to_work_lets_the_villagers_out_and_sends_the_others_back_leaving_the
     );
 }
 
-/// A villager below the combat type (type 30), which the bell passes over.
-const VILLAGER_WALKER: MasterId = MasterId::named(97);
+/// A stand-in villager below the combat type (type 30), which the bell passes over: master 273,
+/// which build 158041's `.dat` leaves empty in every civilisation.
+const VILLAGER_WALKER: MasterId = MasterId::named(273);
 
 /// The mule cart's master in `world`: the build layer's slot (1808), which answers the bell
 /// besides the villagers.
