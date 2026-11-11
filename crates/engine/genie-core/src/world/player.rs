@@ -380,8 +380,15 @@ impl Player {
     /// (`FUN_141616820`) before it: a resource's gathered totals, gold's counter and the side
     /// effects of attributes 50, 183 and 196. So a slot 0xf8 call of a kind the data names (a
     /// storage's, a cost's, a load's) adds through the world; a slot of the build layer that
-    /// none of the branches names (a count, a statistic) adds here. Attribute 11's peak
-    /// (`+0x6fc`, unsaved) is not held.
+    /// none of the branches names (a count, a statistic) adds here.
+    ///
+    /// The add keeps attribute 11's peak, the current population's (`+0x6fc`, unsaved): a new
+    /// value above it (`COMISS`, `JBE`: not a NaN) is the new peak. genie does not hold it, as
+    /// only the platform's statistics read it: the online service's timed events
+    /// (`TComm_TimedEvents_RL` slot 0x48, `FUN_140e402e0`: the peak, and whether it reached
+    /// 200) and `FUN_140d9fca0` (from `FUN_140da0210`: the peak as a whole number). Besides the
+    /// add, only the constructors write it: the new player's (`FUN_14163d330`) 0, the load's
+    /// (`FUN_14163e970`) attribute 11 as loaded.
     ///
     /// [`World::add_resource`]: crate::world::World::add_resource
     pub fn add_attribute(&mut self, kind: AttributeId, amount: Amount) {
@@ -389,7 +396,8 @@ impl Player {
         let Some(attribute) = self.attributes.get_mut(index) else {
             return;
         };
-        *attribute += amount;
+        // the game's operand order: the amount (`MOVAPS`), then the attribute onto it (`ADDSS`)
+        *attribute = amount + *attribute;
         let held = *attribute;
         if self.kind == PlayerKind::Computer
             && kind.is_resource()
