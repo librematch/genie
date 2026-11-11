@@ -1648,7 +1648,7 @@ const fn house_site(restriction: &Restriction, human: bool) -> BuildSite<'_> {
 /// modelled.
 #[test]
 fn build_static_test_answers_the_map_edge_terrain_and_exploration() {
-    use crate::production::spawn::placement_test::build_static_test;
+    use crate::production::spawn::build_placement_test::build_static_test;
     let open_values = Restriction::new(vec![1.0]);
     let open = house_site(&open_values, true);
     let seen = plain(TileSight::Seen);
@@ -1707,7 +1707,7 @@ fn build_static_test_answers_the_map_edge_terrain_and_exploration() {
 /// modelled), radii both at most 0 pass over it.
 #[test]
 fn nan_radius_takes_the_build_zone_test() {
-    use crate::production::spawn::placement_test::build_static_test;
+    use crate::production::spawn::build_placement_test::build_static_test;
     let values = Restriction::new(vec![1.0]);
     let seen = plain(TileSight::Seen);
     let flat = WorldMap { turns: &seen };
@@ -1736,7 +1736,7 @@ fn nan_radius_takes_the_build_zone_test() {
 /// BUILD's scan reads 8 tiles either way of the point, from 0 to the map's last tile.
 #[test]
 fn build_scan_reads_eight_tiles_either_way_within_the_map() {
-    use crate::production::spawn::placement_test::build_scan_range;
+    use crate::production::spawn::build_placement_test::build_scan_range;
     assert_eq!(build_scan_range(50.5, 120, &tuning().spawn), (42, 58));
     assert_eq!(build_scan_range(2.0, 120, &tuning().spawn), (0, 10));
     assert_eq!(build_scan_range(115.0, 120, &tuning().spawn), (107, 119));
@@ -1747,7 +1747,7 @@ fn build_scan_reads_eight_tiles_either_way_within_the_map() {
 /// a fogged object of fog visibility 3 is not modelled.
 #[test]
 fn build_scan_counts_what_the_player_sees_of_tile() {
-    use crate::production::spawn::placement_test::build_sees;
+    use crate::production::spawn::build_placement_test::build_sees;
     let site_values = Restriction::new(vec![1.0]);
     let site = house_site(&site_values, true);
     let seen = plain(TileSight::Seen);
@@ -1828,7 +1828,7 @@ fn build_scan_counts_what_the_player_sees_of_tile() {
 /// (not one of class 51); it keeps a standing house.
 #[test]
 fn build_scan_ignores_the_dead_the_moving_own_walls_and_foreign_foundations() {
-    use crate::production::spawn::placement_test::build_ignores;
+    use crate::production::spawn::build_placement_test::build_ignores;
     let site_values = Restriction::new(vec![1.0]);
     let site = house_site(&site_values, true);
     let seen = plain(TileSight::Seen);
@@ -1908,7 +1908,7 @@ fn build_scan_ignores_the_dead_the_moving_own_walls_and_foreign_foundations() {
 /// buildable on, and a felled tree off a forest but not on one or with more hit points.
 #[test]
 fn build_scan_passes_over_moving_friends_buildable_ground_and_felled_trees() {
-    use crate::production::spawn::placement_test::build_passes;
+    use crate::production::spawn::build_placement_test::build_passes;
     let site_values = Restriction::new(vec![1.0]);
     let site = house_site(&site_values, true);
     let seen = plain(TileSight::Seen);
@@ -1970,7 +1970,7 @@ fn build_scan_passes_over_moving_friends_buildable_ground_and_felled_trees() {
 /// box; an object of obstruction type 11 is not modelled.
 #[test]
 fn build_blockers_are_the_standing_objects_whose_box_overlaps() {
-    use crate::production::spawn::placement_test::blocks_build;
+    use crate::production::spawn::build_placement_test::blocks_build;
     let site_values = Restriction::new(vec![1.0]);
     let site = house_site(&site_values, true);
     let seen = plain(TileSight::Seen);

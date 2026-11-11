@@ -9,6 +9,7 @@
 //! where it is (a building, a dead tree, a relic, a resting animal ...) ends; another blocker
 //! lets the spot try its next candidate.
 
+mod build_placement_test;
 mod combat_setup;
 mod gather_walk;
 mod make_action;
@@ -24,10 +25,11 @@ mod search;
 mod terrains;
 mod world_map;
 
+pub(crate) use self::build_placement_test::build_placement;
 pub use self::placement_code::PlacementCode;
 pub(crate) use self::placement_test::NOT_MOVING;
+pub(crate) use self::placement_test::placement;
 pub use self::placement_test::{PlacementCall, Placing, UnitScan, ZoneTest};
-pub(crate) use self::placement_test::{build_placement, placement};
 use self::search::corner_tiles;
 pub use self::search::spawn_point;
 #[cfg(test)]

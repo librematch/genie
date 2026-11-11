@@ -10,7 +10,8 @@ five seconds and tries again.
 - `make_action.rs` holds the production list and the make action.
 - `search.rs` holds the spawn point search, `rings.rs` its later rings about the building's edge
   and inside its footprint.
-- `placement_test.rs`, `terrains.rs` and `world_map.rs` hold the placement test and what it
+- `placement_test.rs` holds the placement test as the spawn and the transport call it,
+  `build_placement_test.rs` BUILD's call of it; `terrains.rs` and `world_map.rs` hold what it
   reads.
 - `new_unit.rs` makes the unit, gives it its command queue and its unit AI.
 - `gather_walk.rs` sends the new unit to its building's gather point.
@@ -27,6 +28,7 @@ five seconds and tries again.
 <!-- files -->
 | File | What it holds |
 | --- | --- |
+| [`build_placement_test.rs`](build_placement_test.rs) | BUILD's placement test: the unit master's slot 0x50 as the building master's `FUN_14123aee0` calls it, then that routine's scan of the objects near the foundation. |
 | [`combat_setup.rs`](combat_setup.rs) | The combat setup (`FUN_14121df60`): what a new combat object (a unit or a building) takes from its master and its player, and what its player's attributes count of it. |
 | [`gather_walk.rs`](gather_walk.rs) | A new unit's walk to its building's gather point (`FUN_140ace9c0`). |
 | [`make_action.rs`](make_action.rs) | A building's production list and its make action (`TRIBE_Action_Make_Obj`). |
@@ -35,7 +37,7 @@ five seconds and tries again.
 | [`new_unit.rs`](new_unit.rs) | A made unit's spawn, the command queue it takes, its unit AI and the combat unit's constructor. |
 | [`objects.rs`](objects.rs) | A spot beside a building, the remains a death leaves, a plain object, the flares and a building a death makes. |
 | [`placement_code.rs`](placement_code.rs) | What a building's placement test answers. |
-| [`placement_test.rs`](placement_test.rs) | The master's placement test (slot 0x50): the objects near a candidate, BUILD's placement test and the spawn's. |
+| [`placement_test.rs`](placement_test.rs) | The master's placement test (slot 0x50) as the spawn and the transport call it, and the objects near a candidate. |
 | [`research.rs`](research.rs) | The research action (`TRIBE_Action_Make_Tech`): its technology, its update, its end and its destructor. |
 | [`rings.rs`](rings.rs) | The spawn search's later rings (`FUN_1411d12d0`'s cases 11 to 18): the points about the building's edge, then the points inside its footprint (`FUN_1411d0b20`). |
 | [`search.rs`](search.rs) | The spawn point search (`FUN_1411d12d0`): the building's sides in segments, each spot's candidates (`FUN_1411c5b60`) and the corners' wall checks. |
