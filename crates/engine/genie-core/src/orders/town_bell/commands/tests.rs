@@ -11,6 +11,7 @@ use crate::orders::town_bell::tests::{bell, set_bell};
 use crate::test_ids::object_id;
 use crate::test_ids::player_id;
 use crate::testing::class;
+use crate::testing::ids;
 use std::sync::Arc;
 
 /// The building villager `id`'s Enter takes it to, if it has one.
@@ -267,21 +268,25 @@ fn all_back_to_work_lets_the_villagers_out_and_sends_the_others_back_leaving_the
     );
 }
 
-/// The mule cart's master (1808), which answers the bell besides the villagers.
-const MULE_CART: MasterId = MasterId::named(1808);
 /// A villager below the combat type (type 30), which the bell passes over.
 const VILLAGER_WALKER: MasterId = MasterId::named(97);
-/// A house: a building that takes no units in.
-const HOUSE: MasterId = MasterId::named(70);
 
-/// [`sized_world`] of `width` × `height` tiles whose tables also hold the mule cart (a villager's
-/// copy of class 0), [`VILLAGER_WALKER`] (one of type 30) and [`HOUSE`].
+/// The mule cart's master in `world`: the build layer's slot (1808), which answers the bell
+/// besides the villagers.
+fn mule_cart(world: &World) -> MasterId {
+    world.model.slots.master.mule_cart
+}
+
+/// [`sized_world`] of `width` × `height` tiles whose tables also hold the [`mule_cart`] (a
+/// villager's copy of class 0), [`VILLAGER_WALKER`] (one of type 30) and the house, a building
+/// that takes no units in.
 fn bell_world(width: i32, height: i32) -> World {
     let mut world = sized_world(width, height);
+    let mule_cart_id = mule_cart(&world);
     for masters in &mut world.model.masters {
         let villager = masters.get(VILLAGER).unwrap().clone();
         let mule_cart = Master {
-            id: MULE_CART,
+            id: mule_cart_id,
             class: class::CLASS_0,
             ..villager.clone()
         };
@@ -291,7 +296,7 @@ fn bell_world(width: i32, height: i32) -> World {
             ..villager
         };
         let house = Master {
-            id: HOUSE,
+            id: ids::HOUSE,
             kind: MasterKind::BUILDING,
             class: class::BUILDING,
             building: Some(BuildingMaster::default()),
@@ -356,18 +361,19 @@ fn flagged(world: &World, id: i32) -> bool {
 #[test]
 fn bell_sends_mule_carts_in_reach() {
     let mut world = bell_world(60, 60);
+    let mule_cart = mule_cart(&world);
     walker(
         &mut world,
         PlayerId::new(1),
         1000,
-        MULE_CART,
+        mule_cart,
         Point::new(5.5, 5.5),
     );
     walker(
         &mut world,
         PlayerId::new(1),
         1001,
-        MULE_CART,
+        mule_cart,
         Point::new(45.5, 45.5),
     );
     world
@@ -412,7 +418,7 @@ fn bell_flags_live_buildings_in_reach_that_take_villagers() {
     building_at(&mut world, 101, TC, Point::new(16.0, 10.0), None);
     building_at(&mut world, 102, TC, Point::new(60.0, 60.0), None);
     building_at(&mut world, 103, TC, Point::new(10.0, 16.0), None);
-    building_at(&mut world, 104, HOUSE, Point::new(4.0, 10.0), None);
+    building_at(&mut world, 104, ids::HOUSE, Point::new(4.0, 10.0), None);
     world.object_mut(object_id(103)).unwrap().1.life.state = ObjectState::Dying;
     world
         .town_bell(player_id(1), object_id(100), Bell::Ring)
@@ -469,13 +475,14 @@ fn bells_end_beyond_reach_drops_flag_and_keeps_units_inside() {
 #[test]
 fn bells_end_lets_out_villagers_and_mule_carts_of_combat_kind_only() {
     let mut world = bell_world(40, 40);
+    let mule_cart = mule_cart(&world);
     set_bell(&mut world, 100, |town_bell| {
         town_bell.flag = BellShelter::Sheltered;
     });
     for (id, master) in [
         (1000, VILLAGER),
         (1001, ARCHER),
-        (1002, MULE_CART),
+        (1002, mule_cart),
         (1003, VILLAGER_WALKER),
     ] {
         sheltered(&mut world, 100, id, master, Point::new(4.5, 4.5));
@@ -494,18 +501,19 @@ fn bells_end_lets_out_villagers_and_mule_carts_of_combat_kind_only() {
 #[test]
 fn bells_end_sends_tracked_mule_carts_back() {
     let mut world = bell_world(40, 40);
+    let mule_cart = mule_cart(&world);
     walker(
         &mut world,
         PlayerId::new(1),
         1001,
-        MULE_CART,
+        mule_cart,
         Point::new(5.5, 5.5),
     );
     set_bell(&mut world, 1001, |town_bell| {
         town_bell.flag = BellShelter::Sheltered;
         town_bell.work.point = Point::new(3.5, 3.5);
     });
-    tracked(&mut world, MULE_CART, &[1001]);
+    tracked(&mut world, mule_cart, &[1001]);
     world
         .town_bell(player_id(1), object_id(100), Bell::End)
         .unwrap();

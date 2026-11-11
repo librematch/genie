@@ -15,7 +15,7 @@ use crate::testing::class;
 use crate::testing::ids;
 use crate::world::tests::{house_builder, repair_world, repairer_world, sent_off_world};
 
-/// The house 10028 of [`repair_world`] and [`sent_off_world`], and its point.
+/// The house 10028 of [`repair_world`] and [`sent_off_world`].
 const HOUSE: ObjectId = object_id(10028);
 /// The villager 9175 at slot 0 of player 1.
 const VILLAGER: ObjectId = object_id(9175);

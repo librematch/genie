@@ -22,18 +22,21 @@ use crate::test_ids::object_id;
 use crate::test_ids::tech_id;
 use crate::testing::attribute;
 use crate::testing::class;
+use crate::testing::ids;
 use crate::testing::scene::{Scene, SceneObject, walking};
 use crate::vision::VisionBits;
 use crate::vision::ghost::{Cell, Watched};
 use crate::world::WholeSeconds;
 use std::sync::Arc;
 
-/// The building's master in [`hands_scene`].
-const BUILDING: MasterId = MasterId::named(82);
-/// A stack unit: a static object.
-const STACK: MasterId = MasterId::named(84);
-/// A villager: a combat object of class 4.
-const VILLAGER: MasterId = MasterId::named(83);
+/// The building's master in [`hands_scene`]: the castle's id.
+const BUILDING: MasterId = ids::CASTLE;
+/// A stack unit, a static object: the market's id.
+const STACK: MasterId = ids::MARKET;
+/// A villager, a combat object of class 4: the male villager's id.
+const VILLAGER: MasterId = ids::VILLAGER_MALE;
+/// The master of [`sheep_master`]: the `.dat`'s 705, a livestock master (class 58).
+const SHEEP: MasterId = MasterId::named(705);
 
 /// The building's master: a building of footprint 1.5 whose record is a building's, storing wood
 /// 5 while built (flag 4), stone 7 for a new owner (flag 8) and gold 3 as any object does
@@ -127,7 +130,7 @@ fn without_master(world: &mut World, player: usize, id: MasterId) {
     ));
 }
 
-/// Building `id`'s construction: built for `build_time` seconds of its 10.
+/// Building `id`'s construction: built for `progress` seconds of its 10.
 fn construction(world: &mut World, id: ObjectId, progress: f32) {
     world.parts.building_mut(id).unwrap().construction = Some(Construction {
         progress: Seconds::new(progress),
@@ -391,16 +394,15 @@ fn built_building_makes_stack_unit_and_research_for_new_owner() {
 /// (1893, `0x765`) instead of its own; off rice it makes its own.
 #[test]
 fn pasture_on_rice_makes_mangrove_stack_unit() {
-    let pasture = MasterId::named(1889);
     let made = |rice| {
-        let mut world = stack_scene(pasture, STACK);
+        let mut world = stack_scene(ids::PASTURE_1889, STACK);
         world.parts.building_mut(object_id(50)).unwrap().rice = rice;
         world
             .building_changes_hands(PlayerId::new(1), object_id(50), PlayerId::new(2), false)
             .unwrap();
         made_masters(&world, 2)
     };
-    assert_eq!(made(true), [MasterId::named(1893)]);
+    assert_eq!(made(true), [ids::PASTURE_MANGROVE]);
     assert_eq!(made(false), [STACK]);
 }
 
@@ -601,7 +603,7 @@ fn foundation_sight_moves_to_new_owner_map() {
 /// wood, stone, gold and attribute 4; its death spawns master `dead`.
 fn sheep_master(dead: Option<MasterId>) -> Master {
     Master {
-        id: MasterId::named(705),
+        id: SHEEP,
         kind: MasterKind::COMBAT,
         class: class::LIVESTOCK,
         radius: Footprint::new(0.2, 0.2),
@@ -666,7 +668,7 @@ fn object_given_to_gaia_joins_gaia_list_end() {
     let key = |world: &World, player: usize| {
         world.players[player]
             .tracker
-            .list(ListKey::master(MasterId::named(705)))
+            .list(ListKey::master(SHEEP))
             .to_vec()
     };
     assert_eq!(
@@ -699,7 +701,7 @@ fn object_gaia_lacks_master_of_stays_with_owner() {
         ..Master::default()
     };
     let mut world = sheep_scene(sheep_master(Some(dead.id)));
-    without_master(&mut world, 0, MasterId::named(705));
+    without_master(&mut world, 0, SHEEP);
     world.give_gaia(PlayerId::new(1), ListIndex::FIRST).unwrap();
     assert_eq!(
         (ids(&world, 1), ids(&world, 0)),
@@ -809,7 +811,7 @@ fn dead_master_reads_own_master_first() {
 #[test]
 fn change_to_owner_lacking_master_moves_records_only() {
     let mut world = sheep_scene(sheep_master(None));
-    without_master(&mut world, 2, MasterId::named(705));
+    without_master(&mut world, 2, SHEEP);
     let mut unit = world.take_out(PlayerId::new(1), ListIndex::FIRST).unwrap();
     let mut actions = Action::default();
     let changed = change_hands(

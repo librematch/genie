@@ -94,10 +94,12 @@ fn static_object_sleeps_only_without_workers_left() {
     );
 }
 
-/// `FUN_141197d00`'s `COMISS hp, 0` and `JNC`: an object alive (state 2) at 0 hit points goes to
-/// sleep, one below 0 stays awake.
+/// `FUN_141197d00`'s `COMISS hp, 0` and `JNC` (`0x141197d6c`): an object alive (state 2) at 0
+/// hit points goes to sleep, one below 0 stays awake, and so does one of NaN hit points, whose
+/// unordered compare falls through to the test of state 6. An undead object of NaN hit points
+/// goes to sleep.
 #[test]
-fn static_object_sleeps_at_zero_hit_points_but_not_below() {
+fn static_object_sleeps_at_zero_hit_points_but_not_below_or_at_nan() {
     assert_eq!(
         static_let_go(target(ObjectState::Alive, 0.0, 1)),
         (WorkerCount::ZERO, true)
@@ -105,6 +107,14 @@ fn static_object_sleeps_at_zero_hit_points_but_not_below() {
     assert_eq!(
         static_let_go(target(ObjectState::Alive, -0.5, 1)),
         (WorkerCount::ZERO, false)
+    );
+    assert_eq!(
+        static_let_go(target(ObjectState::Alive, f32::NAN, 1)),
+        (WorkerCount::ZERO, false)
+    );
+    assert_eq!(
+        static_let_go(target(ObjectState::Undead, f32::NAN, 1)),
+        (WorkerCount::ZERO, true)
     );
 }
 
