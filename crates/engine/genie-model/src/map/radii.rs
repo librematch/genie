@@ -125,6 +125,16 @@ impl Footprint {
         self.0.iter().all(|&radius| 0.0 < radius)
     }
 
+    /// The radii gate of `FUN_141123f80`'s zone test and scan and of `FUN_141264db0`'s scan: one
+    /// is above 0, or one is a NaN. Each gate is `COMISS 0, rx` with a `JC` into the test
+    /// (0x141124d8b, 0x141264f01), then `COMISS 0, ry` with a `JNC` past it (0x141124d91) or a
+    /// `JC` into it (0x141264f07): the unordered case takes the test, where the C reads
+    /// `0.0 < rx || 0.0 < ry`.
+    #[must_use]
+    pub fn has_radii(self) -> bool {
+        !(self.0[0] <= 0.0 && self.0[1] <= 0.0)
+    }
+
     /// The footprint with x `x`.
     #[must_use]
     pub const fn with_x(self, x: f32) -> Self {
@@ -191,6 +201,24 @@ mod tests {
         assert!(Footprint::new(0.5, 0.5).sized());
         assert!(!Footprint::new(0.5, -0.0).sized());
         assert!(!Footprint::new(f32::NAN, 0.5).sized());
+    }
+
+    /// A footprint has radii unless both are at most 0: a NaN in either axis is not at most 0,
+    /// as the gates' `COMISS` and `JC` let the unordered case through.
+    #[test]
+    fn footprint_has_radii_unless_both_are_at_most_zero() {
+        for radius in [0.0, -0.0, -0.5] {
+            assert!(!Footprint::new(radius, 0.0).has_radii());
+            assert!(!Footprint::new(0.0, radius).has_radii());
+        }
+        for radius in [0.5, f32::NAN] {
+            assert!(Footprint::new(radius, 0.0).has_radii());
+            assert!(Footprint::new(0.0, radius).has_radii());
+            assert!(Footprint::new(radius, -0.5).has_radii());
+            assert!(Footprint::new(-0.5, radius).has_radii());
+        }
+        assert!(!Footprint::new(-0.5, -0.5).has_radii());
+        assert!(Footprint::new(0.5, f32::NAN).has_radii());
     }
 
     /// A footprint keeps its components' bits and takes a height to three radii.
