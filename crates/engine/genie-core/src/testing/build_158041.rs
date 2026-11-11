@@ -897,7 +897,9 @@ const ATTRIBUTE_ROLES: [(usize, AttributeRoles); 19] = [
     (7, AttributeRoles::RELICS_HELD),
     (
         11,
-        AttributeRoles::ALIVE_STORAGE.union(AttributeRoles::MAGNITUDE_STORAGE),
+        AttributeRoles::ALIVE_STORAGE
+            .union(AttributeRoles::MAGNITUDE_STORAGE)
+            .union(AttributeRoles::POPULATION_PEAK),
     ),
     (15, AttributeRoles::HUNTED_LOAD),
     (16, AttributeRoles::FARM_FOOD),

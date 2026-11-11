@@ -533,9 +533,11 @@ impl World {
                     .add_event(kind, razed.owner.index() as f32, 0.0, 0, now);
             }
             for &(player_id, attribute, amount) in &razed.adds {
-                self.players
-                    .player_mut(player_id)?
-                    .add_attribute(attribute, amount);
+                self.players.player_mut(player_id)?.add_attribute(
+                    attribute,
+                    amount,
+                    &self.model.roles,
+                );
             }
         }
         Ok(())

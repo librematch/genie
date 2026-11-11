@@ -114,6 +114,7 @@ impl World {
         owner.add_attribute(
             self.model.slots.attribute.queued,
             -pop * f32::from(count.get()),
+            &self.model.roles,
         );
         Ok(())
     }
@@ -282,7 +283,7 @@ impl World {
         let pop = master.as_ref().map_or(Amount::ZERO, |master| {
             population(&master.storage, &self.model.roles)
         });
-        owner.add_attribute(self.model.slots.attribute.queued, -pop);
+        owner.add_attribute(self.model.slots.attribute.queued, -pop, &self.model.roles);
         Ok(())
     }
 

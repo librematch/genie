@@ -486,32 +486,33 @@ fn neutrals_share_resources_both_ways_while_the_treaty_holds() {
 /// takes nothing.
 #[test]
 fn computer_player_sets_aside_its_share_of_each_resource_add() {
+    let roles = static_roles();
     let mut computer = Player {
         kind: PlayerKind::Computer,
         escrow_percentage: [0.5, 0.25, f32::NAN, 0.0].map(EscrowShare::of_data),
         ..human()
     };
-    computer.add_attribute(attribute::FOOD, Amount::new(10.0));
+    computer.add_attribute(attribute::FOOD, Amount::new(10.0), roles);
     assert_eq!(
         (computer.attributes[0], computer.escrow[0]),
         (Amount::new(10.0), Amount::new(5.0))
     );
-    computer.add_attribute(attribute::FOOD, Amount::new(-7.0));
+    computer.add_attribute(attribute::FOOD, Amount::new(-7.0), roles);
     assert_eq!(computer.escrow[0], Amount::new(3.0));
-    computer.add_attribute(attribute::FOOD, Amount::new(-5.0));
+    computer.add_attribute(attribute::FOOD, Amount::new(-5.0), roles);
     assert_eq!(
         (computer.attributes[0], computer.escrow[0]),
         (Amount::new(-2.0), Amount::ZERO)
     );
     computer.escrow[1] = Amount::new(1.0);
-    computer.add_attribute(attribute::WOOD, Amount::new(f32::NAN));
+    computer.add_attribute(attribute::WOOD, Amount::new(f32::NAN), roles);
     // a NaN resource is not below its escrow
     assert_eq!(computer.escrow[1], Amount::new(1.0));
-    computer.add_attribute(attribute::STONE, Amount::new(8.0));
-    computer.add_attribute(attribute::GOLD, Amount::new(8.0));
+    computer.add_attribute(attribute::STONE, Amount::new(8.0), roles);
+    computer.add_attribute(attribute::GOLD, Amount::new(8.0), roles);
     assert_eq!([computer.escrow[2], computer.escrow[3]], [Amount::ZERO; 2]);
-    computer.add_attribute(attribute::HEADROOM, Amount::new(8.0));
-    computer.add_attribute(AttributeId::named(300), Amount::new(1.0));
+    computer.add_attribute(attribute::HEADROOM, Amount::new(8.0), roles);
+    computer.add_attribute(AttributeId::named(300), Amount::new(1.0), roles);
     assert_eq!(
         (computer.attributes[4], computer.attributes.len()),
         (Amount::new(8.0), 300)
@@ -520,8 +521,69 @@ fn computer_player_sets_aside_its_share_of_each_resource_add() {
         escrow_percentage: [0.5; 4].map(EscrowShare::of_data),
         ..human()
     };
-    person.add_attribute(attribute::FOOD, Amount::new(10.0));
+    person.add_attribute(attribute::FOOD, Amount::new(10.0), roles);
     assert_eq!(person.escrow, [Amount::ZERO; 4]);
+}
+
+/// The base add's population peak (`FUN_14165d040`, [`Player::add_attribute`], `+0x6fc`): an
+/// add that takes the population above its peak (`COMISS`, `JBE`) raises the peak; an add to at
+/// most the peak leaves it, so a population of 0 keeps a peak of −0, and so does a NaN
+/// population. Another attribute's add above the peak leaves it, as does a population past the
+/// count.
+#[test]
+fn population_add_above_its_peak_raises_the_peak() {
+    let roles = static_roles();
+    let mut person = human();
+    person.add_attribute(POPULATION, Amount::new(3.0), roles);
+    assert_eq!(person.population_peak, Amount::new(3.0));
+    person.add_attribute(POPULATION, Amount::new(-1.0), roles);
+    person.add_attribute(attribute::FOOD, Amount::new(10.0), roles);
+    assert_eq!(
+        (person.attributes[11], person.population_peak),
+        (Amount::new(2.0), Amount::new(3.0))
+    );
+    person.add_attribute(POPULATION, Amount::new(f32::NAN), roles);
+    assert!(person.attributes[11].get().is_nan());
+    assert_eq!(person.population_peak, Amount::new(3.0));
+    let mut negative_zero_peak = Player {
+        population_peak: Amount::new(-0.0),
+        ..human()
+    };
+    negative_zero_peak.add_attribute(POPULATION, Amount::ZERO, roles);
+    assert_eq!(
+        negative_zero_peak.population_peak.get().to_bits(),
+        (-0.0_f32).to_bits()
+    );
+    let mut without_population = Player {
+        attributes: vec![Amount::ZERO; 11],
+        ..human()
+    };
+    without_population.add_attribute(POPULATION, Amount::new(5.0), roles);
+    assert_eq!(
+        (
+            without_population.attributes.len(),
+            without_population.population_peak
+        ),
+        (11, Amount::ZERO)
+    );
+}
+
+/// Slot 0xf8's call of a storage's entries ([`World::add_player_attribute`]) reaches the base
+/// add's peak with the world's roles: the population's add raises its player's peak alone.
+#[test]
+fn player_attribute_add_raises_its_player_population_peak() {
+    let mut world = world();
+    world
+        .add_player_attribute(PlayerId::new(2), POPULATION, Amount::new(4.0))
+        .unwrap();
+    assert_eq!(
+        world
+            .players
+            .iter()
+            .map(|player| player.population_peak)
+            .collect::<Vec<_>>(),
+        amounts([0.0, 0.0, 4.0, 0.0])
+    );
 }
 
 /// The base store's escrow (`FUN_1416674b0`, [`Player::store_attribute`]): a computer player's

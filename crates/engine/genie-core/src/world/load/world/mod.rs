@@ -301,6 +301,11 @@ pub fn saved_world(
                     .map(EscrowShare::of_data),
                 // not saved: the constructor's (`FUN_14163d330`), no override
                 civ_name_override: CivNameOverride::None,
+                // not saved: the population as loaded (`FUN_14163e970`'s read of attribute
+                // 11), the constructor's 0 for a player without attributes
+                population_peak: attributes
+                    .get(build.slots.attribute.population.index())
+                    .map_or(Amount::ZERO, |&amount| Amount::new(amount)),
                 sudden_death_eliminable: player_section
                     .world_player()
                     .sudden_death_can_be_eliminated

@@ -116,10 +116,12 @@ impl World {
             owner.add_attribute(
                 self.model.slots.attribute.techs_researched,
                 Amount::new(1.0),
+                &self.model.roles,
             );
             owner.add_attribute(
                 self.model.slots.attribute.research_spent,
                 Amount::new(spent),
+                &self.model.roles,
             );
         }
         let age = match index {

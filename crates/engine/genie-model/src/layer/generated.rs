@@ -488,18 +488,20 @@ bitflags! {
         const MAGNITUDE_STORAGE = 1 << 11;
         /// The ore (0x38): a commodity the market's price reads know (none of its commands trades it), and a load a drop-off takes as itself beside the four resources and the trade goods (`FUN_140fdd4f0`).
         const ORE = 1 << 12;
+        /// The population (11, `cAttributePopulation`) whose peak the base add keeps (`FUN_14165d040`): a new value above the player's `+0x6fc` (`COMISS`, `JBE`) is its new peak, which only the platform's statistics read.
+        const POPULATION_PEAK = 1 << 13;
         /// A relic, as a monk carries it (`+0x308` 0x39): the monk tasks for carried relics; a unit carrying one never attacks.
-        const RELIC = 1 << 13;
+        const RELIC = 1 << 14;
         /// The relics the player holds (7): a research paid in them (`FUN_1413d0e70`), and a researched one paid in more than are left after a relic left a building (`FUN_1411d6ad0`).
-        const RELICS_HELD = 1 << 14;
+        const RELICS_HELD = 1 << 15;
         /// The attribute that shares every player's sight (0xb7): the masks are rebuilt.
-        const SHARED_VISION = 1 << 15;
+        const SHARED_VISION = 1 << 16;
         /// The attribute of the town centres' flare reveal across the players (0xc4, Spies' "Treason"): a player with it above 0 changes nothing; else each other player with it at most 0 takes the amount too.
-        const SPREAD_ATTRIBUTE = 1 << 16;
+        const SPREAD_ATTRIBUTE = 1 << 17;
         /// Stone.
-        const STONE = 1 << 17;
+        const STONE = 1 << 18;
         /// Wood.
-        const WOOD = 1 << 18;
+        const WOOD = 1 << 19;
     }
 }
 
@@ -612,7 +614,7 @@ pub struct AttributeSlots {
     pub current_age: AttributeId,
     /// The relics the player holds (7, `player+0x100`'s `+0x38`): a building of a player of a culture counts a relic in and out (`FUN_1411cb850`, `FUN_1411d6ad0`), and a researched technology paid in more relics than are left goes back.
     pub relics_held: AttributeId,
-    /// The population.
+    /// The current population (11, `cAttributePopulation`). Among its readers, the load sets the player's population peak (`+0x6fc`) to it as loaded (`FUN_14163e970`).
     pub population: AttributeId,
     /// The units owned.
     pub units_owned: AttributeId,

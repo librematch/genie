@@ -326,7 +326,7 @@ impl World {
         if player.attribute(kind).is_none() {
             return Ok(());
         }
-        player.add_attribute(kind, amount);
+        player.add_attribute(kind, amount, &self.model.roles);
         if share == ResourceShare::Shared
             && player.ally_sharing.contains(AllySharing::RESOURCES)
             && kind.is_resource()

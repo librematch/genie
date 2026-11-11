@@ -297,7 +297,9 @@ impl World {
                 now,
             );
         }
-        self.players.player_mut(player_id)?.add_attributes(counts);
+        self.players
+            .player_mut(player_id)?
+            .add_attributes(counts, &self.model.roles);
         Ok(())
     }
 }

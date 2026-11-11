@@ -108,13 +108,14 @@ impl World {
             self.add_player_attribute(to, kind, given)?;
             self.add_player_attribute(from, kind, -paid)?;
             let slots = self.model.slots.attribute;
+            let roles = &self.model.roles;
             let giver = self.players.player_mut(from)?;
-            giver.add_attribute(slots.tribute_given, given);
-            giver.add_attribute(slots.tribute_paid, paid);
-            giver.add_attribute(slots.tribute_to.offset(to.index())?, given);
+            giver.add_attribute(slots.tribute_given, given, roles);
+            giver.add_attribute(slots.tribute_paid, paid, roles);
+            giver.add_attribute(slots.tribute_to.offset(to.index())?, given, roles);
             let receiver = self.players.player_mut(to)?;
-            receiver.add_attribute(slots.tribute_received, given);
-            receiver.add_attribute(slots.tribute_from.offset(from.index())?, given);
+            receiver.add_attribute(slots.tribute_received, given, roles);
+            receiver.add_attribute(slots.tribute_from.offset(from.index())?, given, roles);
             if receiver.kind.is_computer() {
                 return Err(GenieError::unsupported(
                     "a computer player's AI told of a tribute (0x20a, slot 0x3c8)",

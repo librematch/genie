@@ -148,6 +148,26 @@ fn the_load_takes_the_worlds_and_the_players_fields() {
     assert_eq!(turns.model.masters.len(), 0);
 }
 
+/// The load sets a player's population peak (`+0x6fc`, not saved) to its population as loaded
+/// (`FUN_14163e970`'s read of attribute 11); a player without attributes keeps the
+/// constructor's 0.
+#[test]
+fn the_load_sets_the_population_peak_to_the_population() {
+    let mut player = human(Vec::new());
+    let mut population = vec![0.0; 12];
+    population[11] = 37.0;
+    human_mut(&mut player).base.attributes = population;
+    let turns = saved_world(&header(vec![gaia(Vec::new()), player]), None, layer()).unwrap();
+    assert_eq!(
+        turns
+            .players
+            .iter()
+            .map(|player| player.population_peak.get().to_bits())
+            .collect::<Vec<_>>(),
+        [0.0_f32, 37.0].map(f32::to_bits)
+    );
+}
+
 /// A resign is the flag without the drop's bit.
 #[test]
 fn resign_is_not_drop() {

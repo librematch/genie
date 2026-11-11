@@ -135,7 +135,11 @@ impl World {
         let new = self.combat_object(player_id, master, &made, point.with_height(position.z()))?;
         let class = self.tracker_key(player_id, master).class;
         let owner = self.players.player_mut(player_id)?;
-        owner.add_attribute(self.model.slots.attribute.in_production, -pop);
+        owner.add_attribute(
+            self.model.slots.attribute.in_production,
+            -pop,
+            &self.model.roles,
+        );
         // its queue place goes (FUN_14104fb00 with -1, FUN_14104f330)
         owner.tracker.count_queued(QueuedUnits::ONE.negated());
         owner.tracker.unplace(Some(master), class);

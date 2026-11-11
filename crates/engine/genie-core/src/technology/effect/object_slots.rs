@@ -330,13 +330,21 @@ impl World {
             // its magnitude.
             let held = self.model.roles.of_some_attribute(kind);
             if held.contains(AttributeRoles::HEADROOM) {
-                owner.add_attribute(self.model.slots.attribute.headroom, amount.abs());
-                owner.add_attribute(self.model.slots.attribute.headroom, Amount::new(value));
+                owner.add_attribute(
+                    self.model.slots.attribute.headroom,
+                    amount.abs(),
+                    &self.model.roles,
+                );
+                owner.add_attribute(
+                    self.model.slots.attribute.headroom,
+                    Amount::new(value),
+                    &self.model.roles,
+                );
             } else if held.contains(AttributeRoles::MAGNITUDE_STORAGE)
                 && let Some(kind) = kind
             {
-                owner.add_attribute(kind, -amount);
-                owner.add_attribute(kind, Amount::new(value.abs()));
+                owner.add_attribute(kind, -amount, &self.model.roles);
+                owner.add_attribute(kind, Amount::new(value.abs()), &self.model.roles);
             }
         }
         Ok(())

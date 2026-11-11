@@ -245,6 +245,13 @@ pub struct Player {
     /// not saved, none after a load): the store of the civilisation name override's attribute
     /// names a string ([`Player::store_attribute`]).
     pub(crate) civ_name_override: CivNameOverride,
+    /// The population's peak (`+0x6fc`, not saved). An add that takes the population above it
+    /// raises it ([`Player::add_attribute`]). The load sets it to the population as loaded
+    /// (`FUN_14163e970`), and a new player's is 0 (`FUN_14163d330`). Only the platform's
+    /// statistics read it: the online service's timed events (`TComm_TimedEvents_RL` slot 0x48,
+    /// `FUN_140e402e0`: the peak, and whether it reached 200) and `FUN_140d9fca0` (from
+    /// `FUN_140da0210`: the peak as a whole number when the game settings' `+0x5c` is 200).
+    pub(crate) population_peak: Amount,
     /// `mSuddenDeathCanBeEliminated` (`+0x1380`, saved): under the sudden death rule the player
     /// had a town centre, and loses without one.
     pub(crate) sudden_death_eliminable: bool,
@@ -382,16 +389,12 @@ impl Player {
     /// storage's, a cost's, a load's) adds through the world; a slot of the build layer that
     /// none of the branches names (a count, a statistic) adds here.
     ///
-    /// The add keeps attribute 11's peak, the current population's (`+0x6fc`, unsaved): a new
-    /// value above it (`COMISS`, `JBE`: not a NaN) is the new peak. genie does not hold it, as
-    /// only the platform's statistics read it: the online service's timed events
-    /// (`TComm_TimedEvents_RL` slot 0x48, `FUN_140e402e0`: the peak, and whether it reached
-    /// 200) and `FUN_140d9fca0` (from `FUN_140da0210`: the peak as a whole number). Besides the
-    /// add, only the constructors write it: the new player's (`FUN_14163d330`) 0, the load's
-    /// (`FUN_14163e970`) attribute 11 as loaded.
+    /// The add keeps the population's peak (`+0x6fc`, [`Player::population_peak`]): a kind of
+    /// `roles`' [`AttributeRoles::POPULATION_PEAK`] (the game's `CMP` with 11) whose new value is
+    /// above the peak (`COMISS`, `JBE`: not a NaN, not an equal value) is the new peak.
     ///
     /// [`World::add_resource`]: crate::world::World::add_resource
-    pub fn add_attribute(&mut self, kind: AttributeId, amount: Amount) {
+    pub fn add_attribute(&mut self, kind: AttributeId, amount: Amount, roles: &Roles) {
         let index = kind.index();
         let Some(attribute) = self.attributes.get_mut(index) else {
             return;
@@ -399,6 +402,13 @@ impl Player {
         // the game's operand order: the amount (`MOVAPS`), then the attribute onto it (`ADDSS`)
         *attribute = amount + *attribute;
         let held = *attribute;
+        if roles
+            .of_attribute(kind)
+            .contains(AttributeRoles::POPULATION_PEAK)
+            && !at_most_or_unordered(held.get(), self.population_peak.get())
+        {
+            self.population_peak = held;
+        }
         if self.kind == PlayerKind::Computer
             && kind.is_resource()
             && let (Some(escrow), Some(&share)) = (
@@ -415,16 +425,20 @@ impl Player {
     /// layer outside the branches of slots 0xf8 and 0xf0 ([`Player::add_attribute`],
     /// [`Player::store_attribute`] with `roles`).
     pub fn take_at_least_zero(&mut self, kind: AttributeId, amount: Amount, roles: &Roles) {
-        self.add_attribute(kind, -amount);
+        self.add_attribute(kind, -amount, roles);
         if self.attribute(kind).is_some_and(|left| left < Amount::ZERO) {
             self.store_attribute(kind, Amount::ZERO, roles);
         }
     }
 
-    /// [`Player::add_attribute`] for each of `adds`, in order.
-    pub fn add_attributes(&mut self, adds: impl IntoIterator<Item = (AttributeId, Amount)>) {
+    /// [`Player::add_attribute`] with `roles` for each of `adds`, in order.
+    pub fn add_attributes(
+        &mut self,
+        adds: impl IntoIterator<Item = (AttributeId, Amount)>,
+        roles: &Roles,
+    ) {
         for (kind, amount) in adds {
-            self.add_attribute(kind, amount);
+            self.add_attribute(kind, amount, roles);
         }
     }
 }

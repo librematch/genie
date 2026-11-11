@@ -66,12 +66,18 @@ impl Unit {
             return Ok(());
         }
         let slots = step.world.model.slots.attribute;
+        let roles = &step.world.model.roles;
         let owner = step.world.players.player_mut(step.player)?;
         owner.add_attribute(
             slots.villager_idle_seconds,
             Amount::new(idle.idle.seconds().get()),
+            roles,
         );
-        owner.add_attribute(slots.villager_idles, Amount::new(idle.count.as_f32()));
+        owner.add_attribute(
+            slots.villager_idles,
+            Amount::new(idle.count.as_f32()),
+            roles,
+        );
         idle.idle = Millis::ZERO;
         idle.count = IdleCount::ZERO;
         Ok(())
