@@ -2992,7 +2992,7 @@ fn the_work_on_an_annex_goes_to_its_main_building_after_its_annexes_start() {
 /// The world of [`sent_off_world`] with the house built and damaged (300 of its 550 hit
 /// points), the villager a builder (118) with a Repair task on any object (work value 0.5) and
 /// a weapon range of 0.5.
-fn repair_world() -> World {
+pub(crate) fn repair_world() -> World {
     let mut world = sent_off_world(vec![]);
     let unit = &mut world.players[1].objects[ListIndex::new(0)];
     unit.life.master_id = ids::BUILDER;
@@ -7627,7 +7627,7 @@ fn hunt_whose_attack_failed_takes_near_tree_or_searches() {
 
 /// [`sent_off_world`] with the queue `orders`, the house built and damaged (300 hit points), and
 /// with `repairer` the repairer master 156 (the villager's with the Repair task 4, range 0.5).
-fn repairer_world(orders: Vec<QueuedOrder>, repairer: bool) -> World {
+pub(crate) fn repairer_world(orders: Vec<QueuedOrder>, repairer: bool) -> World {
     let mut world = sent_off_world(orders);
     let house = &mut world.players[1].objects[ListIndex::new(1)];
     house.life.state = ObjectState::Alive;

@@ -32,6 +32,9 @@ use crate::world::layer::ClassRoles;
 use crate::world::slots::PlayerSlotsExt;
 use crate::{GenieError, GenieResult};
 
+#[cfg(test)]
+mod tests;
+
 /// A Repair's target the world does not hold where the work command starts or retargets it.
 const REPAIR_TARGET_GONE: GenieError =
     GenieError::unreachable("a Repair's target the world does not hold");

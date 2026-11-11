@@ -24,6 +24,9 @@ use crate::world::parts::Object;
 use crate::world::slots::PlayerSlotsExt;
 use crate::world::step::Step;
 
+#[cfg(test)]
+mod tests;
+
 /// The object whose action lets its target go (the target's slot 0x180 takes it): its id, its
 /// master's class and its owner.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

@@ -1,0 +1,19 @@
+# `orders/tasks`: the work tasks' tests
+
+The tests of the work command's Build and Repair (`../tasks.rs`). They cover the start of each
+without a unit AI, the retake of the action on top and what the unit AI hears of it, the Repair's
+constructor and the unit AI's repair command.
+
+## Files
+
+<!-- files -->
+| File | What it holds |
+| --- | --- |
+| [`tests.rs`](tests.rs) | Tests: The work command's Build and Repair, their retakes and targets, and the unit AI's repair command. |
+<!-- /files -->
+
+## How it connects
+
+<!-- uses -->
+- Uses: no other system.
+<!-- /uses -->

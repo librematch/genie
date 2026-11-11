@@ -39,6 +39,9 @@ use crate::world::layer::Roles;
 use crate::world::layer::generated::VisibilityTuning;
 use crate::world::parts::Part;
 
+#[cfg(test)]
+mod tests;
+
 impl World {
     /// Slot 0x70 ([`change_hands`]) to Gaia of the object at `j` of player `player_id`, from
     /// outside its update: once Gaia has its master it leaves `player_id`'s list (`FUN_141630930`,

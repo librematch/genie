@@ -22,6 +22,9 @@ use crate::world::layer::{ClassRoles, MasterRoles};
 use crate::world::settings::OptionFlags;
 use crate::world::slots::PlayerSlotsExt;
 
+#[cfg(test)]
+mod tests;
+
 impl World {
     /// `TOWN_BELL` (0x7f, `do_command`): the object `id` (none for −1, `FUN_140e6bad0`) of the
     /// commanding `player`, or of any player while players may order each other's

@@ -12,6 +12,7 @@ record holds (`town_bell.rs`).
 | File | What it holds |
 | --- | --- |
 | [`commands.rs`](commands.rs) | The town bell's commands: `TOWN_BELL` (0x7f) rings a town centre's bell or ends it, and the back-to-work command sends the owner's villagers back without the bell's flags. |
+| [`commands/`](commands/) | The town bell commands' tests. |
 <!-- /files -->
 
 ## How it connects

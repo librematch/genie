@@ -29,6 +29,7 @@ unit, a player loses a building with its garrison.
 | [`change.rs`](change.rs) | An ownership change (slot 0x70, `FUN_14120f800`): to Gaia, a building's with its foundation, annexes and garrison, and the attributes and storage it moves. |
 | [`mod.rs`](mod.rs) | Objects that change hands: the Artifact action of livestock, which a unit of another player takes over, and an ownership change with what it carries along (a building's annexes, its garrison, the attributes it counts). |
 | [`tests.rs`](tests.rs) | Tests. |
+| [`change/`](change/) | The ownership change's tests. |
 <!-- /files -->
 
 ## How it connects

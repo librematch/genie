@@ -52,6 +52,7 @@ The files hold the orders by kind:
 | [`unit_order.rs`](unit_order.rs) | An artifact's and a herd's take, an order's cancel and a unit's order. |
 | [`work.rs`](work.rs) | A kept attack, the garrison task and the work command and its task. |
 | [`gather/`](gather/) | The work command's Hunt. |
+| [`tasks/`](tasks/) | The work tasks' tests. |
 | [`town_bell/`](town_bell/) | The town bell's commands. |
 | [`work/`](work/) | The work command's parts. |
 <!-- /files -->
