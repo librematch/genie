@@ -1807,3 +1807,417 @@ fn forager_gathers_until_its_load_is_full() {
     assert_eq!(gather(&mut rig, &mut target(100.0)), Ok(Next::Drop));
     assert_eq!(rig.load().amount, Amount::new(9.9));
 }
+
+/// The graphic of sprite `id`: one frame of one facet.
+pub(crate) const fn one_frame(id: i16) -> Graphic {
+    Graphic {
+        id: SpriteId::named(id),
+        frames: Frame::of_data(1),
+        facets: FacetCount::of_data(1),
+        speed_multiplier: SpeedMultiplier::ONE,
+        frame_duration: Seconds::new(0.1),
+        replay_delay: Seconds::ZERO,
+        flags: SpriteFlags::NONE,
+    }
+}
+
+/// The sprites of a forager that carries with sprite 4 and stands with sprite 1.
+fn carrying_reads() -> GatherReads {
+    GatherReads {
+        sprites: HuntSprites {
+            carrying: Some(one_frame(4)),
+            standing: Some(one_frame(1)),
+            ..HuntSprites::default()
+        },
+        ..reads()
+    }
+}
+
+/// `0x140a8e1d0`'s cases 3, 5 and 7: the farmers (masters 259, 214, 1891 and 1892) wait for
+/// another farm (`set_state(0xf3)`) whatever their target type; the fishing ships (masters 13,
+/// 2356 and 2171) only on target type 49 (a fish trap's); any other gatherer searches.
+#[test]
+fn farmers_wait_for_farm_and_fishing_ships_only_at_farm_class() {
+    let roles = roles();
+    for farmer in [259, 214, 1891, 1892] {
+        assert!(waits_for_farm(master_id(farmer), None, &roles));
+        assert!(waits_for_farm(
+            master_id(farmer),
+            Some(class::CLASS_7),
+            &roles
+        ));
+    }
+    for fishing_ship in [13, 2356, 2171] {
+        assert!(waits_for_farm(
+            master_id(fishing_ship),
+            Some(class::FARM),
+            &roles
+        ));
+        assert!(!waits_for_farm(
+            master_id(fishing_ship),
+            Some(class::CLASS_7),
+            &roles
+        ));
+        assert!(!waits_for_farm(master_id(fishing_ship), None, &roles));
+    }
+    assert!(!waits_for_farm(
+        ids::VILLAGER_MALE,
+        Some(class::FARM),
+        &roles
+    ));
+}
+
+/// `FUN_140a8b6b0`: the task's carrying sprite while the unit holds at least 1 (truncated) of
+/// the task's resource; else the master's standing sprite: below 1, another resource, a task
+/// without a resource, a task without a carrying sprite, or an amount that is not a number.
+#[test]
+fn gatherer_stands_with_carrying_sprite_while_it_holds_one_of_task_resource() {
+    let gather_action =
+        GatherAction::new(task(), &bush(), FarmMode::Fixed, rate(), &roles()).unwrap();
+    let stand = |gather_action: &GatherAction,
+                 gather_reads: &GatherReads,
+                 kind: Option<AttributeId>,
+                 amount: f32| {
+        let mut unit = Unit::default();
+        (unit.life.attribute_kind, unit.life.amount) = (kind, Amount::new(amount));
+        gather_action
+            .stand_sprite(&unit, gather_reads)
+            .map(|graphic| graphic.id)
+    };
+    let berries = Some(AttributeId::named(17));
+    let (carrying, standing) = (Some(SpriteId::named(4)), Some(SpriteId::named(1)));
+    let gather_reads = carrying_reads();
+    assert_eq!(stand(&gather_action, &gather_reads, berries, 1.0), carrying);
+    assert_eq!(
+        stand(&gather_action, &gather_reads, berries, 0.99),
+        standing
+    );
+    assert_eq!(
+        stand(&gather_action, &gather_reads, berries, f32::NAN),
+        standing
+    );
+    assert_eq!(
+        stand(&gather_action, &gather_reads, Some(attribute::STONE), 5.0),
+        standing
+    );
+    let without_resource = GatherAction {
+        task: HuntTask {
+            resource: None,
+            ..task()
+        },
+        ..gather_action
+    };
+    assert_eq!(stand(&without_resource, &gather_reads, None, 5.0), standing);
+    let without_carrying = GatherReads {
+        sprites: HuntSprites {
+            carrying: None,
+            ..gather_reads.sprites
+        },
+        ..reads()
+    };
+    assert_eq!(
+        stand(&gather_action, &without_carrying, berries, 5.0),
+        standing
+    );
+}
+
+/// A gatherer walking to its target with its timer at 2 and its point at (5, 6).
+fn walking_with_point() -> GatherAction {
+    GatherAction {
+        state: GatherState::Walk {
+            move_to: Some(MoveToAction::sub_in(MoveTo::Moving)),
+        },
+        timer: Seconds::new(2.0),
+        point: Position::new(5.0, 6.0, 0.0),
+        ..GatherAction::new(task(), &bush(), FarmMode::Fixed, rate(), &roles()).unwrap()
+    }
+}
+
+/// `set_state(11)` (`0x140a8cd40` case 0xb): the sub-actions go (the `MoveTo`'s teardown stops
+/// the unit), the timer clears and a quiet `MoveTo` (`+0x61` 0) walks to the point within the
+/// target's radius plus the task's range; state 8's end without a target passes no radius.
+#[test]
+fn walk_back_walks_to_its_point_within_radius_and_task_range() {
+    let walk = |radius: Distance, set: bool| {
+        let mut gather_action = walking_with_point();
+        let mut mover = walker();
+        let walks = walks(Held::default());
+        let walked = if set {
+            gather_action.set_walk_back(radius, &mut mover, &walks, &tuning().move_to)
+        } else {
+            gather_action.walk_back(radius, &mut mover, &walks, &tuning().move_to)
+        };
+        assert_eq!(walked, Ok(()));
+        assert_eq!(mover.animated.speed, Speed::ZERO);
+        assert_eq!(
+            (gather_action.state.bare(), gather_action.timer),
+            (GatherState::WalkBack { move_to: None }, Seconds::ZERO)
+        );
+        gather_action.state.move_to().copied()
+    };
+    let to_point = |range| {
+        Some(MoveToAction::sub_to_point(
+            Position::new(5.0, 6.0, 0.0),
+            range,
+            None,
+        ))
+    };
+    assert_eq!(
+        walk(Distance::new(1.5), true),
+        to_point(Distance::new(1.5) + task().range)
+    );
+    assert_eq!(walk(Distance::ZERO, false), to_point(task().range));
+}
+
+/// The walk of states 11 and 0xf2 (`0x140a8cd40` case 0xb) takes the state its caller names,
+/// with the walk's `MoveTo` in it.
+#[test]
+fn walk_to_point_goes_into_state_its_caller_names() {
+    let mut gather_action = walking_with_point();
+    let mut mover = walker();
+    assert_eq!(
+        gather_action.walk_to_point(
+            |move_to| GatherState::ReseedWalk { move_to },
+            Distance::new(0.5),
+            &mut mover,
+            &walks(Held::default()),
+            &tuning().move_to,
+        ),
+        Ok(())
+    );
+    assert_eq!(
+        gather_action.state,
+        GatherState::ReseedWalk {
+            move_to: Some(MoveToAction::sub_to_point(
+                Position::new(5.0, 6.0, 0.0),
+                Distance::new(0.5) + task().range,
+                None,
+            ))
+        }
+    );
+}
+
+/// `set_state(0xf2)` (`0x140a8cd40` case 0xf2): the point takes `mGatherX`, `mGatherY` unless
+/// `mGatherX` is −1 (a `UCOMISS`: a part that is not a number takes them), its height kept;
+/// then case 0xb's walk there within the radius plus the task's range.
+#[test]
+fn reseed_walk_goes_to_where_it_gathered_unless_none() {
+    let reseed = |gather_at: Point| {
+        let mut gather_action = GatherAction {
+            gather_at,
+            point: Position::new(5.0, 6.0, 2.0),
+            ..walking_with_point()
+        };
+        let mut mover = walker();
+        assert_eq!(
+            gather_action.begin_reseed_walk(
+                Distance::new(1.0),
+                &mut mover,
+                &walks(Held::default()),
+                &tuning().move_to,
+            ),
+            Ok(())
+        );
+        assert_eq!(
+            (gather_action.state.bare(), gather_action.timer),
+            (GatherState::ReseedWalk { move_to: None }, Seconds::ZERO)
+        );
+        gather_action
+    };
+    let gathered = reseed(Point::new(112.0, 173.0));
+    assert_eq!(gathered.point, Position::new(112.0, 173.0, 2.0));
+    assert_eq!(
+        gathered.state.move_to().copied(),
+        Some(MoveToAction::sub_to_point(
+            Position::new(112.0, 173.0, 2.0),
+            Distance::new(1.0) + task().range,
+            None,
+        ))
+    );
+    assert_eq!(
+        reseed(Point::new(-1.0, 173.0)).point,
+        Position::new(5.0, 6.0, 2.0)
+    );
+    let unordered = reseed(Point::new(f32::NAN, 173.0)).point;
+    assert!(unordered.x().is_nan());
+    assert_eq!((unordered.y(), unordered.z()), (173.0, 2.0));
+}
+
+/// `set_state(0xf3)` and `set_state(3)` (`0x140a8cd40` cases 0xf3 and 3): the sub-actions go,
+/// the timer waits a second or ten, the unit stands with its carrying sprite (it holds 3 of
+/// the task's resource) and the caller posts the unit AI's notify; `set_state(1)` clears the
+/// timer and shows the sprite too. Its sub-actions' teardown is its caller's
+/// ([`GatherAction::update_moved`] tears the walk down first), so its case leaves the stop out.
+#[test]
+fn farm_wait_search_and_done_set_timer_and_stand_unit() {
+    type Begin = fn(&mut GatherAction, &mut Step<'_>, &mut Unit, &GatherReads) -> Next;
+    let begin = |begin: Begin| {
+        let mut rig = Rig::on_the_path();
+        let mut gather_action = walking_with_point();
+        let gather_reads = carrying_reads();
+        let next = rig.run(gather_action.state, 100, |step, unit, _, _| {
+            Ok(begin(&mut gather_action, step, unit, &gather_reads))
+        });
+        let shown = rig
+            .unit()
+            .sprite
+            .map(|active_sprite| active_sprite.graphic.id);
+        (
+            next,
+            gather_action.state,
+            gather_action.timer,
+            shown,
+            rig.anim_stopped(),
+        )
+    };
+    let carrying = Some(SpriteId::named(4));
+    assert_eq!(
+        begin(|gather_action, step, unit, gather_reads| gather_action
+            .begin_farm_wait(step, unit, gather_reads)
+            .unwrap()),
+        (
+            Ok(Next::Search),
+            GatherState::FarmWait,
+            Seconds::new(-1.0),
+            carrying,
+            true
+        )
+    );
+    assert_eq!(
+        begin(|gather_action, step, unit, gather_reads| gather_action
+            .begin_search(step, unit, gather_reads)
+            .unwrap()),
+        (
+            Ok(Next::Search),
+            GatherState::Search,
+            Seconds::new(-10.0),
+            carrying,
+            true
+        )
+    );
+    let (next, state, timer, shown, _) = begin(|gather_action, step, unit, gather_reads| {
+        gather_action.set_done(step, unit, gather_reads);
+        Next::Stay
+    });
+    assert_eq!(
+        (next, state, timer, shown),
+        (Ok(Next::Stay), GatherState::Done, Seconds::ZERO, carrying)
+    );
+}
+
+/// State 0xf3's update (`0x140a8e1d0` case 0xf2) on `gather_action` with `target`, the world's
+/// dt `dt` ms, called alone.
+fn farm_wait(
+    gather_action: &mut GatherAction,
+    target: Option<&Victim>,
+    dt: u32,
+) -> GenieResult<Next> {
+    let mut rig = Rig::on_the_path();
+    rig.set_load(None, 0.0);
+    let gather_reads = GatherReads {
+        master: master_id(259),
+        ..reads()
+    };
+    rig.run(gather_action.state, dt, |step, unit, _, _| {
+        gather_action.update_farm_wait(step, unit, target, &gather_reads, &roles())
+    })
+}
+
+/// A fish trap (master 199, class 49, radii 1) that `workers` work.
+fn fish_trap(workers: i32) -> Victim {
+    Victim {
+        id: object_id(12557),
+        amount: Amount::new(175.0),
+        state: ObjectState::Alive,
+        class: class::FARM,
+        master_id: ids::FISH_TRAP,
+        radius: Footprint::new(1.0, 1.0),
+        workers: WorkerCount::of_data(workers),
+        ..Victim::default()
+    }
+}
+
+/// State 0xf3's timer counts the world's dt up while below 0; once at 0 the walks take the
+/// target's radius on x, none for a farm of stops (masters 50 and 1187, `0x140a8cd40` case
+/// 0xb): a farmer that gathered walks back to reseed within it, one that never gathered walks
+/// back to search only at a farm (target type 49) that another farmer works too (`+0x644`
+/// above 1), and idles otherwise.
+#[test]
+fn farm_wait_walks_within_target_radius_or_idles() {
+    let mut gather_action = waiting(true);
+    assert_eq!(farm_wait(&mut gather_action, None, 400), Ok(Next::Stay));
+    assert_eq!(
+        (gather_action.state.bare(), gather_action.timer),
+        (GatherState::FarmWait, Seconds::new(-1.0 + 0.4))
+    );
+    let range = |gather_action: &GatherAction| {
+        gather_action
+            .state
+            .move_to()
+            .map(|move_to_action| move_to_action.range)
+    };
+    let mut gather_action = waiting(true);
+    assert_eq!(
+        farm_wait(&mut gather_action, Some(&fish_trap(1)), 1000),
+        Ok(Next::Stay)
+    );
+    assert_eq!(
+        (gather_action.state.bare(), range(&gather_action)),
+        (
+            GatherState::ReseedWalk { move_to: None },
+            Some(Distance::new(1.0) + task().range)
+        )
+    );
+    let farm = Victim {
+        master_id: ids::FARM,
+        radius: Footprint::new(1.5, 1.5),
+        ..fish_trap(1)
+    };
+    let mut gather_action = waiting(true);
+    assert_eq!(
+        farm_wait(&mut gather_action, Some(&farm), 1000),
+        Ok(Next::Stay)
+    );
+    assert_eq!(range(&gather_action), Some(task().range));
+    // never gathered: at a fish trap two work, the walk back within its radius, the target gone
+    let mut gather_action = waiting(false);
+    gather_action.target = Some(GatherTargetId::new(object_id(12557)));
+    assert_eq!(
+        farm_wait(&mut gather_action, Some(&fish_trap(2)), 1000),
+        Ok(Next::Stay)
+    );
+    assert_eq!(
+        (
+            gather_action.state.bare(),
+            range(&gather_action),
+            gather_action.target
+        ),
+        (
+            GatherState::WalkBack { move_to: None },
+            Some(Distance::new(1.0) + task().range),
+            None
+        )
+    );
+    // one worker, or a target type other than 49: the farmer idles
+    for (target_class, workers) in [(class::FARM, 1), (class::CLASS_7, 2)] {
+        let mut gather_action = waiting(false);
+        gather_action.target_class = Some(target_class);
+        gather_action.target = Some(GatherTargetId::new(object_id(12557)));
+        assert_eq!(
+            farm_wait(&mut gather_action, Some(&fish_trap(workers)), 1000),
+            Ok(Next::Stay)
+        );
+        assert_eq!(
+            (gather_action.state.bare(), gather_action.target),
+            (GatherState::Idle, None)
+        );
+    }
+    // a timer at 0 waits on
+    let mut gather_action = waiting(true);
+    gather_action.timer = Seconds::ZERO;
+    assert_eq!(farm_wait(&mut gather_action, None, 1000), Ok(Next::Stay));
+    assert_eq!(
+        (gather_action.state.bare(), gather_action.timer),
+        (GatherState::FarmWait, Seconds::ZERO)
+    );
+}

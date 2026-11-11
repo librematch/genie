@@ -261,3 +261,6 @@ impl World {
         self.work_at(player_id, idx, target, point)
     }
 }
+
+#[cfg(test)]
+mod tests;

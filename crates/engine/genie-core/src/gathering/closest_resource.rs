@@ -409,3 +409,6 @@ impl Unit {
         .map(|(id, _)| id)
     }
 }
+
+#[cfg(test)]
+mod tests;

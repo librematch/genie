@@ -5142,7 +5142,7 @@ fn the_unit_ai_resource_search_finds_the_nearest_bush_it_reaches() {
 /// [`forage_world`] with player 1's mule cart 750 (master 1808: a building of a task of action
 /// type 0x99 on class 7, berries) at (24.5, 89.5), moving and with a unit AI; the bushes gather
 /// by themselves as group 1.
-fn cart_world() -> World {
+pub(crate) fn cart_world() -> World {
     let mut world = forage_world();
     for masters in &mut world.model.masters {
         let bush = Arc::make_mut(masters).get_mut(master_id(59)).unwrap();
@@ -20797,7 +20797,7 @@ fn queued_unit_goes_to_the_least_loaded_building_with_room() {
 
 /// [`forage_world`]'s forager on bush 600 (the unit AI's gather command), its last move at its
 /// place, the load's mesh built.
-fn foraging() -> World {
+pub(crate) fn foraging() -> World {
     let mut world = forage_world();
     world
         .parts
@@ -21020,7 +21020,7 @@ fn forager_without_its_bush_after_the_drop_takes_the_next_one() {
 
 /// [`foraging`] up to the forager's drop at its town centre without a target (bush 600 gone
 /// on the way, `setup` run before), after which the Gather's state follows.
-fn dropped_without_bush(setup: impl FnOnce(&mut World)) -> World {
+pub(crate) fn dropped_without_bush(setup: impl FnOnce(&mut World)) -> World {
     let mut foraging = foraging();
     let carries = |world: &World| {
         world

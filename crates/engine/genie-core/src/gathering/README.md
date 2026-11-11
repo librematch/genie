@@ -58,9 +58,12 @@ food to its Make (`pasture.rs`, `World::hand_livestock_food_to_make`, from
 | [`pasture_id.rs`](pasture_id.rs) | A pasture's id as its own type: the building whose livestock a unit is in or tends. |
 | [`queue_count.rs`](queue_count.rs) | The count of farms or fish traps a queue paid for. |
 | [`salvage_amounts.rs`](salvage_amounts.rs) | What a salvage pile holds of six attributes. |
+| [`closest_resource/`](closest_resource/) | The resource search's tests. |
+| [`drop_off/`](drop_off/) | The drop-off's tests. |
 | [`gather/`](gather/) | The Gather action (`RGE_Action_Gather`, type 5, vtable `0x142ed4f28`): a forager sent to a resource walks to it (state 4, a quiet `MoveTo`), faces it (6), gathers (7), takes the load to a drop site (8) and walks back to the resource (4). |
 | [`gather_search/`](gather_search/) | The resource search's passes. |
 | [`hunt/`](hunt/) | The Hunt action (`TRIBE_Action_Hunt`, type 110, vtable `0x142ed70f8`): a villager sent to a tree (or an animal) with a gather task attacks it first (state 12, an `Attack` sub-action); once it is dead the villager walks to it (state 4, a `MoveTo` sub-action), faces it (6) and gathers (7), then carries the load to a drop site (8). |
+| [`mule_cart/`](mule_cart/) | The mule cart's tests. |
 <!-- /files -->
 
 ## How it connects
