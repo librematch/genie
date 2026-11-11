@@ -2,11 +2,14 @@
 //! candidates (`FUN_1411c5b60`) and the corners' wall checks.
 
 use crate::GenieResult;
+use crate::commands::GatherPoint;
 use crate::map::Footprint;
 use crate::map::GroundOffset;
 use crate::map::Point;
 use crate::map::Position;
 use crate::map::{Tile, TileOffset};
+use crate::objects::ObjectId;
+use crate::production::spawn::closest_spot::closest_spot;
 use crate::production::spawn::rings::{inner_ring, outer_ring};
 use crate::production::spawn::{NONE, Site, SpawnTest, Tested};
 use crate::world::layer::generated::SpawnTuning;
@@ -47,21 +50,23 @@ pub(super) fn try_spot(
     Ok(None)
 }
 
-/// `FUN_1411d12d0`: the spawn point beside `site` for a unit of radii `unit`. The segments of
-/// the sides facing the gather point come first (the top side's left part, the left side's top
-/// part, the top's right part, the left's lower part; then the right side down; then the bottom
-/// side), each only where no wall closes its corner; a second pass tries every open side
-/// ([`Frame::segments`]). Without a gather point there is one pass. Each spot's candidates go
-/// to `test` as [`SpawnTest::Spot`]. Then the later rings: the points about the building's edge
+/// `FUN_1411d12d0`: the spawn point beside `site` for a unit of radii `unit`. Under the world's
+/// feature flags with a goal for it ([`Site::closest_goal`], at 0x1411d1343) the first test is the
+/// square's point nearest that goal ([`closest_spot`], `FUN_1411c52f0`); its miss leaves the
+/// search as it was (the out x and y it restores were never written). Then the segments of the
+/// sides facing the search's goal ([`Site::goal`]: the top side's left part, the left side's
+/// top part, the top's right part, the left's lower part; then the right side down; then the
+/// bottom side), each only where no wall closes its corner; a second pass tries every open side
+/// ([`Frame::segments`]). Without a goal's x there is one pass. Each spot's candidates go to
+/// `test` as [`SpawnTest::Spot`]. Then the later rings: the points about the building's edge
 /// ([`outer_ring`], cases 11 to 14), then the points inside its footprint ([`inner_ring`],
 /// cases 15 to 18, `FUN_1411d0b20`), which keep the point whose tile holds the fewest objects
 /// (`tile_objects`, none off the map) for want of a free one. None when even they find
-/// nothing: the game's 0. Its first test under the world's feature flags (`DAT_143f01833`,
-/// [`crate::world::FeatureFlags`]; `FUN_1411c52f0`) is not modelled.
+/// nothing: the game's 0. The logs under `DAT_143f09024` change no state.
 ///
 /// # Errors
 ///
-/// The tests' and the tile counts'.
+/// The tests', the closest test's sort's and the tile counts'.
 pub fn spawn_point(
     site: &Site,
     unit: Footprint,
@@ -69,6 +74,11 @@ pub fn spawn_point(
     tile_objects: &dyn Fn(Tile) -> GenieResult<Option<u8>>,
     spawn_tuning: &SpawnTuning,
 ) -> GenieResult<Option<Point>> {
+    if let Some(goal) = site.closest_goal
+        && let Some(point) = closest_spot(site, unit, goal, test, spawn_tuning)?
+    {
+        return Ok(Some(point));
+    }
     let frame = Frame::new(site, unit, spawn_tuning);
     for pass in [SearchPass::First, SearchPass::Second] {
         for segment in frame.segments(pass, spawn_tuning) {
@@ -88,6 +98,29 @@ pub fn spawn_point(
         return Ok(Some(point));
     }
     inner_ring(site, frame.step, test, tile_objects, spawn_tuning)
+}
+
+/// `FUN_1411d12d0`'s goal (its out x and y as it reads them after its first test): the caller's
+/// point `from`; or, without its x ([`NONE`]; `UCOMISS`, so a NaN is a point), the first
+/// location of the building's unit AI's command queue (`queue_first`, slots 0x218 and 0x220,
+/// a building's or a tower's) when the building has no gather point (`+0xc30` 0), or its gather
+/// point (`+0xc34`, `+0xc38`) when that is not on the building itself (`building`, `+0xc40`);
+/// else the caller's point stands. None for a point whose coordinates are both none.
+pub(super) fn search_goal(
+    from: Point,
+    gather: Option<GatherPoint>,
+    building: ObjectId,
+    queue_first: Option<Point>,
+) -> Option<Point> {
+    if from.x() == NONE {
+        let found = gather.map_or(queue_first, |gather_point| {
+            (gather_point.target != Some(building)).then_some(gather_point.point.ground())
+        });
+        if let Some(point) = found {
+            return Some(point);
+        }
+    }
+    (from != Point::new(NONE, NONE)).then_some(from)
 }
 
 /// Where a run's spots lie and which way each tries its next point: above the building (up),
@@ -121,8 +154,8 @@ struct Run {
 
 /// The frame about the building the search walks: the unit's step (its radii, a small unit's
 /// doubled plus `SpawnTuning::gap`), the building's half sizes and centre, the frame's sides, the walled
-/// corners (left top, right top, right bottom, left bottom), and the gather point and its
-/// distances from the centre (the axes the gather point lacks: [`NONE`]).
+/// corners (left top, right top, right bottom, left bottom), and the search's goal and its
+/// distances from the centre (the axes the goal lacks: [`NONE`]).
 struct Frame {
     step: GroundOffset,
     half: Footprint,
@@ -132,14 +165,14 @@ struct Frame {
     top: f32,
     bottom: f32,
     walls: [bool; 4],
-    gather: Point,
+    goal: Point,
     away: GroundOffset,
     no_x: bool,
     no_y: bool,
 }
 
-/// A pass of the spawn search's frame: the first (each side toward the gather point), or the
-/// second (every open side).
+/// A pass of the spawn search's frame: the first (each side toward the goal), or the second
+/// (every open side).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 enum SearchPass {
     /// The first pass.
@@ -159,7 +192,7 @@ impl Frame {
         let (bx, by) = (site.radius.x(), site.radius.y());
         let (x, y) = (site.position.x(), site.position.y());
         let (gx, gy) = {
-            let point = site.gather.unwrap_or(Point::new(NONE, NONE));
+            let point = site.goal.unwrap_or(Point::new(NONE, NONE));
             (point.x(), point.y())
         };
         Self {
@@ -171,7 +204,7 @@ impl Frame {
             top: y + by + sy,
             bottom: y - (by + sy),
             walls: site.walls,
-            gather: Point::new(gx, gy),
+            goal: Point::new(gx, gy),
             away: GroundOffset::new((x - gx).abs(), (y - gy).abs()),
             no_x: gx == NONE,
             no_y: gy == NONE,
@@ -188,8 +221,8 @@ impl Frame {
         let (x, y, gx, gy) = (
             self.centre.x(),
             self.centre.y(),
-            self.gather.x(),
-            self.gather.y(),
+            self.goal.x(),
+            self.goal.y(),
         );
         let (dx, dy) = (self.away.x(), self.away.y());
         let mut out = Vec::new();
@@ -228,15 +261,15 @@ impl Frame {
 
     /// Below an open top left corner: (1) the top side's left part, (2) the left side's top
     /// part, (3) the top side's right part (without a wall at the top right), (4) the left
-    /// side's lower part (without one at the bottom left), each toward the gather point or on
-    /// the second pass.
+    /// side's lower part (without one at the bottom left), each toward the goal or on the
+    /// second pass.
     fn top_left(&self, pass: SearchPass, out: &mut Vec<Vec<Run>>, spawn_tuning: &SpawnTuning) {
         let [_, right_top, _, left_bottom] = self.walls;
         let (x, y, gx, gy) = (
             self.centre.x(),
             self.centre.y(),
-            self.gather.x(),
-            self.gather.y(),
+            self.goal.x(),
+            self.goal.y(),
         );
         let (dx, dy) = (self.away.x(), self.away.y());
         let (sx, sy) = (self.step.x(), self.step.y());
@@ -277,13 +310,13 @@ impl Frame {
         }
     }
 
-    /// The right side down: (5) its top half (toward a gather point above, or on the second
-    /// pass), (6) its lower half without a wall at the bottom right.
+    /// The right side down: (5) its top half (toward a goal above, or on the second pass), (6)
+    /// its lower half without a wall at the bottom right.
     fn right_side(&self, pass: SearchPass, out: &mut Vec<Vec<Run>>) {
         let y = self.centre.y();
         let (sy, by) = (self.step.y(), self.half.y());
         let (right, top) = (self.right, self.top);
-        if self.no_y || pass == SearchPass::Second || y < self.gather.y() {
+        if self.no_y || pass == SearchPass::Second || y < self.goal.y() {
             out.push(vec![run(
                 Side::Right,
                 (top, -sy, top - by),
@@ -302,13 +335,13 @@ impl Frame {
         }
     }
 
-    /// The bottom side: (7) its left half (toward a gather point on the left, or on the second
-    /// pass), (8) its right half without a wall at the bottom right.
+    /// The bottom side: (7) its left half (toward a goal on the left, or on the second pass),
+    /// (8) its right half without a wall at the bottom right.
     fn bottom_side(&self, pass: SearchPass, out: &mut Vec<Vec<Run>>) {
         let x = self.centre.x();
         let (sx, bx) = (self.step.x(), self.half.x());
         let (left, bottom) = (self.left, self.bottom);
-        if self.no_x || pass == SearchPass::Second || self.gather.x() < x {
+        if self.no_x || pass == SearchPass::Second || self.goal.x() < x {
             out.push(vec![run(
                 Side::Down,
                 (left, sx, left + bx),

@@ -11,8 +11,9 @@ fn site(radius: f32) -> Site {
     Site {
         position: Position::new(10.0, 10.0, 0.0),
         radius: Footprint::new(radius, radius),
-        gather: None,
+        goal: None,
         walls: [false; 4],
+        closest_goal: None,
     }
 }
 

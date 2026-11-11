@@ -10,6 +10,7 @@
 //! lets the spot try its next candidate.
 
 mod build_placement_test;
+mod closest_spot;
 mod combat_setup;
 mod gather_walk;
 mod make_action;
@@ -26,11 +27,17 @@ mod terrains;
 mod world_map;
 
 pub(crate) use self::build_placement_test::build_placement;
+use self::closest_spot::closest_goal;
+#[cfg(test)]
+use self::closest_spot::closest_spot;
 pub use self::placement_code::PlacementCode;
 pub(crate) use self::placement_test::NOT_MOVING;
 pub(crate) use self::placement_test::placement;
-pub use self::placement_test::{PlacementCall, PlacementRadii, Placing, UnitScan, ZoneTest};
+pub use self::placement_test::{
+    ExploredTest, HillTest, PlacementCall, PlacementRadii, Placing, UnitScan, ZoneTest,
+};
 use self::search::corner_tiles;
+use self::search::search_goal;
 pub use self::search::spawn_point;
 #[cfg(test)]
 use self::search::{Spot, try_spot};
@@ -52,7 +59,9 @@ use crate::objects::masters::player_master;
 use crate::players::PlayerId;
 use crate::world::World;
 
-/// No gather point (`DAT_14330ec20`).
+/// A coordinate of none (`DAT_14330ec20`): the search (`FUN_1411d12d0`) and its first test
+/// (`FUN_1411c52f0`) compare each coordinate of the caller's point with it (`UCOMISS`) to choose
+/// their goals ([`search_goal`], [`closest_goal`]).
 const NONE: f32 = SPAWN_NONE;
 
 /// How a new plain object ([`World::plain_object`]) that moves faces.
@@ -74,12 +83,18 @@ pub struct Site {
     pub(crate) position: Position,
     /// Its master's radii.
     pub(crate) radius: Footprint,
-    /// Its gather point (`+0xc34`, `+0xc38`), when it has one (`+0xc30`) that is not on itself
-    /// (`+0xc40`).
-    pub(crate) gather: Option<Point>,
+    /// The search's goal ([`search_goal`]): the point the search is asked from, the first
+    /// location of its unit AI's command queue, or its gather point (`+0xc34`, `+0xc38`) when
+    /// it has one (`+0xc30`) that is not on itself (`+0xc40`); a coordinate of [`NONE`] is
+    /// none.
+    pub(crate) goal: Option<Point>,
     /// A wall at its corners (both tiles beside each: left top, right top, right bottom, left
     /// bottom), which closes the sides that meet there.
     pub(crate) walls: [bool; 4],
+    /// The goal of the search's first test under the world's feature flags (`DAT_143f01833`,
+    /// [`crate::world::FeatureFlags`]; `FUN_1411c52f0`, [`closest_goal`]): none with the flags
+    /// off, without a gather point or with one on the building itself.
+    pub(crate) closest_goal: Option<Point>,
 }
 
 /// Which of the spawn search's tests asks the unit master's slot 0x50 about a point: each
@@ -95,6 +110,10 @@ pub enum SpawnTest {
     /// A point inside the building's footprint (`FUN_1411d0b20`, cases 15 to 18): no blocker
     /// reported, the building passed over, the units counted.
     Inner,
+    /// A point of the square about the building under the world's feature flags
+    /// (`FUN_1411c52f0`): no blocker reported, no object passed over, the units counted, and
+    /// neither the player's explored tiles nor the master's hill mode tested.
+    Closest,
 }
 
 /// What the placement test found at a candidate.

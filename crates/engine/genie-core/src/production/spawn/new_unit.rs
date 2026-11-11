@@ -4,6 +4,7 @@
 use crate::commands::GatherPointState;
 use crate::garrison::ContainerId;
 use crate::map::Distance;
+use crate::map::Point;
 use crate::map::Position;
 use crate::map::spatial::{Obstruction, Placed};
 use crate::math::Angle;
@@ -50,6 +51,15 @@ use crate::vision::visibility::{Seer, capture_kind};
 use crate::world::World;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
+
+/// The point `FUN_140ace630` asks the spawn search from: its own immediates −1 for x and y
+/// (`MOV dword ptr [RSP + 0x44], 0xbf800000` at 0x140ace670 and `[RSP + 0x40]` at 0x140ace678),
+/// which the search reads as none, as it reads the coordinates equal to the spawn's [`NONE`]
+/// (`DAT_14330ec20`). The resource search keeps a constant of its own for its point of none,
+/// of the same value ([`crate::unit_ai::NO_POINT`]).
+///
+/// [`NONE`]: crate::production::spawn::NONE
+const NO_POINT: Point = Point::new(-1.0, -1.0);
 
 /// What a make action's spawn did (`FUN_140ad0240`'s answer).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -108,8 +118,8 @@ impl World {
         if made.recyclable.recycled() {
             return Err(RECYCLABLE_NEW_OBJECT);
         }
-        // the building unit AI's command queue (`+0x1f0`, saved as `savedOrder`): without a
-        // gather point its first location is the spot's goal (FUN_1411d12d0, slot 0x220)
+        // the building unit AI's command queue (`+0x1f0`, saved as `savedOrder`), which the new
+        // unit takes
         let queue = self
             .parts
             .unit_ai
@@ -118,16 +128,11 @@ impl World {
             .unwrap_or_default();
         let gather = self.parts.gather_point.get(building.id).copied();
         let position = building.position();
-        let toward = match (gather, queue.first()) {
-            (None, Some(first)) => Some(first.point.ground()),
-            _ => gather
-                .filter(|gather_point| gather_point.target != Some(building.id))
-                .map(|gather_point| gather_point.point.ground()),
-        };
         if made.move_stats.is_none() {
             return Err(NEW_UNIT_UNMOVING);
         }
-        let Some(point) = self.spot_beside(player_id, list_index, &made, toward)? else {
+        // `FUN_140ace630` asks from no point: the search reads its goal itself
+        let Some(point) = self.spot_beside(player_id, list_index, &made, NO_POINT)? else {
             // `FUN_140ace630`'s 0: the make action waits for a spot (its caller's
             // `set_state(10)`); the game's event (`FUN_140c898a0` with 0x68) is the interface's
             return Ok(SpawnOutcome::NoSpot);

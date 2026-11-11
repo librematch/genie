@@ -21,6 +21,7 @@ use crate::movement::move_to::TargetMoved;
 use crate::objects::HitPoints;
 use crate::objects::ListIndex;
 use crate::objects::MasterHitPoints;
+use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::SpeedMultiplier;
 use crate::objects::SpriteFlags;
@@ -217,8 +218,9 @@ fn the_tc_spawns_its_villager_below_the_sheep_on_its_right() {
     let site = Site {
         position: Position::new(104.0, 47.0, 0.0),
         radius: Footprint::new(2.0, 2.0),
-        gather: Some(Point::new(107.2451, 46.075_863)),
+        goal: Some(Point::new(107.2451, 46.075_863)),
         walls: [false; 4],
+        closest_goal: None,
     };
     let mut tried = Vec::new();
     let spawn_point = spawn_point(
@@ -1654,6 +1656,8 @@ fn tried_by(tried: &[(Point, SpawnTest)], spawn_test: SpawnTest) -> Vec<Point> {
 
 /// The arguments of the spawn's placement test for a unit other than the mule cart.
 const COUNTED: PlacementCall = PlacementCall {
+    explored: ExploredTest::Tested,
+    hills: HillTest::Tested,
     radii: PlacementRadii::Size,
     zones: ZoneTest::Skipped,
     passed: None,
@@ -1671,8 +1675,9 @@ fn spawn_search_without_gather_point_walks_the_eight_segments_once() {
     let site = Site {
         position: Position::new(10.0, 10.0, 0.0),
         radius: Footprint::new(1.0, 1.0),
-        gather: None,
+        goal: None,
         walls: [false; 4],
+        closest_goal: None,
     };
     let (tried, point) = all_blocked(&site);
     let top = [
@@ -1748,8 +1753,9 @@ fn second_pass_between_walled_corners_tries_the_bottom_right_corner() {
     let site = Site {
         position: Position::new(10.0, 10.0, 0.0),
         radius: Footprint::new(1.0, 1.0),
-        gather: Some(Point::new(20.0, 5.0)),
+        goal: Some(Point::new(20.0, 5.0)),
         walls: [false, true, false, true],
+        closest_goal: None,
     };
     let (tried, point) = all_blocked(&site);
     assert_eq!(
@@ -2848,4 +2854,460 @@ fn master_placement_terrains_test_the_point_and_the_tiles_beside() {
         }),
         Ok(false)
     );
+}
+
+/// The building of the closest spot's tests: at (10, 10), of x radius 1 (its y radius 3 is not
+/// read).
+fn closest_site() -> Site {
+    Site {
+        position: Position::new(10.0, 10.0, 0.0),
+        radius: Footprint::new(1.0, 3.0),
+        goal: None,
+        closest_goal: None,
+        walls: [false; 4],
+    }
+}
+
+/// Every point of `FUN_1411c52f0`'s square about [`closest_site`] for a unit of radii `unit`
+/// toward `goal`, in the order it tests them, all blocked.
+fn closest_tried(unit: Footprint, goal: Point) -> Vec<Point> {
+    let mut tried = Vec::new();
+    let found = closest_spot(
+        &closest_site(),
+        unit,
+        goal,
+        &mut |point, spawn_test| {
+            assert_eq!(spawn_test, SpawnTest::Closest);
+            tried.push(point);
+            Ok(Tested::Blocked { stays: true })
+        },
+        &tuning().spawn,
+    );
+    assert_eq!(found, Ok(None));
+    tried
+}
+
+/// `FUN_1411c52f0` about a building at (10, 10) of x radius 1 (its y radius not read) for a unit
+/// of radius 0.5: the square at 1 + 0.5 + the gap from the centre, each side walked in halves (a
+/// step of the unit's radius): the bottom from the left, the right from the top, the top from
+/// the right, the left from the bottom. Sorted by the squared distance from the goal far to the
+/// right, the right side comes first; a corner two sides share keeps the walk's order
+/// (`std::sort`'s insertion sort below 33 points).
+#[test]
+fn closest_spot_tries_square_points_nearest_goal_first() {
+    let reach = 1.0 + 0.5 + tuning().spawn.gap;
+    let (left, right, low, high) = (10.0 - reach, 10.0 + reach, 10.0 - reach, 10.0 + reach);
+    let middle = |from: f32, to: f32| (to - from) * 0.5 + from;
+    let tried = closest_tried(Footprint::new(0.5, 0.5), Point::new(100.0, 10.3));
+    assert_eq!(
+        tried,
+        [
+            Point::new(right, middle(high, low)),
+            Point::new(right, high),
+            Point::new(right, high),
+            Point::new(right, low),
+            Point::new(right, low),
+            Point::new(middle(right, left), high),
+            Point::new(middle(left, right), low),
+            Point::new(left, middle(low, high)),
+            Point::new(left, high),
+            Point::new(left, high),
+            Point::new(left, low),
+            Point::new(left, low),
+        ]
+    );
+}
+
+/// The step is the unit's x radius but at least 0.1 (`std::max`; a NaN radius takes 0.1), and a
+/// side's shares go on while at most 1: a step of 0.1 sums to 1.0000001 after ten points, so
+/// each side has ten; a step of 2 leaves each side its first corner alone.
+#[test]
+fn closest_spot_steps_by_unit_radius_but_at_least_tenth() {
+    let goal = Point::new(100.0, 10.3);
+    assert_eq!(closest_tried(Footprint::new(0.05, 0.05), goal).len(), 40);
+    assert_eq!(
+        closest_tried(Footprint::new(f32::NAN, 0.05), goal).len(),
+        40
+    );
+    let reach = 1.0 + 2.0 + tuning().spawn.gap;
+    let (low, high) = (10.0 - reach, 10.0 + reach);
+    assert_eq!(
+        closest_tried(Footprint::new(2.0, 0.05), goal),
+        [
+            Point::new(high, high),
+            Point::new(high, high),
+            Point::new(low, low),
+            Point::new(low, low),
+        ]
+    );
+}
+
+/// The first free point of the sorted square ends the test with it.
+#[test]
+fn closest_spot_takes_first_free_point() {
+    let mut calls = 0;
+    let found = closest_spot(
+        &closest_site(),
+        Footprint::new(0.5, 0.5),
+        Point::new(100.0, 10.3),
+        &mut |point, _| {
+            calls += 1;
+            Ok(if point.y() < 9.0 {
+                Tested::Free
+            } else {
+                Tested::Blocked { stays: true }
+            })
+        },
+        &tuning().spawn,
+    );
+    let reach = 1.0 + 0.5 + tuning().spawn.gap;
+    assert_eq!(found, Ok(Some(Point::new(10.0 + reach, 10.0 - reach))));
+    assert_eq!(calls, 4);
+}
+
+/// Under the world's feature flags with a goal (`FUN_1411d12d0` at 0x1411d1343), the search
+/// tests the closest spot's square first, then, all of it blocked, walks its segments and rings
+/// as without the flags; a free point of the square ends the search there.
+#[test]
+fn spawn_search_under_feature_flags_tests_closest_square_first() {
+    let goal = Point::new(100.0, 10.3);
+    let site = Site {
+        closest_goal: Some(goal),
+        ..closest_site()
+    };
+    let (tried, found) = all_blocked(&site);
+    let (without, _) = all_blocked(&closest_site());
+    assert_eq!(found, Ok(None));
+    let square = closest_tried(Footprint::new(0.5, 0.5), goal);
+    assert_eq!(tried_by(&tried, SpawnTest::Closest), square);
+    assert_eq!(tried.get(square.len()..), Some(&without[..]));
+    let mut asked = Vec::new();
+    let found = spawn_point(
+        &site,
+        Footprint::new(0.5, 0.5),
+        &mut |_, spawn_test| {
+            asked.push(spawn_test);
+            Ok(Tested::Free)
+        },
+        &|_| Ok(None),
+        &tuning().spawn,
+    );
+    assert_eq!(found, Ok(square.first().copied()));
+    assert_eq!(asked, [SpawnTest::Closest]);
+}
+
+/// The gather point of the goals' tests, on `target`.
+const fn goal_gather(target: Option<ObjectId>) -> GatherPoint {
+    GatherPoint {
+        state: GatherPointState::Point,
+        point: Position::new(50.0, 60.0, 0.0),
+        target,
+        target_master: None,
+    }
+}
+
+/// `FUN_1411d12d0`'s goal: the caller's point; without its x the first location of the building
+/// unit AI's command queue when the building has no gather point, or its gather point when that
+/// is not on the building; else the caller's point stands (a coordinate of [`NONE`] none). A
+/// NaN x is not none (`UCOMISS`, `JP` at 0x1411d1774): the caller's point stands, its bits kept.
+#[test]
+fn search_goal_is_caller_point_queue_or_gather_point() {
+    let building = object_id(700);
+    let none = Point::new(NONE, NONE);
+    let queued = Some(Point::new(30.0, 40.0));
+    let given = Point::new(5.0, 6.0);
+    assert_eq!(
+        search_goal(given, Some(goal_gather(None)), building, queued),
+        Some(given)
+    );
+    let half = Point::new(5.0, NONE);
+    assert_eq!(search_goal(half, None, building, queued), Some(half));
+    assert_eq!(search_goal(none, None, building, queued), queued);
+    assert_eq!(search_goal(none, None, building, None), None);
+    assert_eq!(
+        search_goal(none, Some(goal_gather(None)), building, queued),
+        Some(Point::new(50.0, 60.0))
+    );
+    assert_eq!(
+        search_goal(none, Some(goal_gather(Some(building))), building, queued),
+        None
+    );
+    let only_y = Point::new(NONE, 6.0);
+    assert_eq!(
+        search_goal(only_y, Some(goal_gather(Some(building))), building, queued),
+        Some(only_y)
+    );
+    assert_eq!(
+        search_goal(
+            Point::new(f32::NAN, NONE),
+            Some(goal_gather(None)),
+            building,
+            queued
+        )
+        .map(|goal| goal.get().map(f32::to_bits)),
+        Some([f32::NAN.to_bits(), NONE.to_bits()])
+    );
+}
+
+/// `FUN_1411c52f0`'s goal: none without a gather point (`+0xc30` 0) or with one on the building
+/// (`+0xc40`); else each coordinate the caller's, or where it is none ([`NONE`]) the first
+/// location of the building's unit AI's command queue, or without a queue the gather point's. A
+/// NaN coordinate is not none (`UCOMISS`, `JP` at 0x1411c53e0 for x and 0x1411c540b for y): it
+/// stays, its bits kept, and the other coordinate is filled.
+#[test]
+fn closest_goal_needs_gather_point_off_building_and_fills_each_coordinate() {
+    let building = object_id(700);
+    let none = Point::new(NONE, NONE);
+    let queued = Some(Point::new(30.0, 40.0));
+    assert_eq!(closest_goal(none, None, building, queued), None);
+    assert_eq!(
+        closest_goal(none, Some(goal_gather(Some(building))), building, queued),
+        None
+    );
+    assert_eq!(
+        closest_goal(none, Some(goal_gather(Some(object_id(9)))), building, None),
+        Some(Point::new(50.0, 60.0))
+    );
+    assert_eq!(
+        closest_goal(none, Some(goal_gather(None)), building, queued),
+        Some(Point::new(30.0, 40.0))
+    );
+    assert_eq!(
+        closest_goal(
+            Point::new(5.0, NONE),
+            Some(goal_gather(None)),
+            building,
+            queued
+        ),
+        Some(Point::new(5.0, 40.0))
+    );
+    assert_eq!(
+        closest_goal(
+            Point::new(NONE, 6.0),
+            Some(goal_gather(None)),
+            building,
+            None
+        ),
+        Some(Point::new(50.0, 6.0))
+    );
+    let bits_of = |from| {
+        closest_goal(from, Some(goal_gather(None)), building, queued)
+            .map(|goal| goal.get().map(f32::to_bits))
+    };
+    assert_eq!(
+        bits_of(Point::new(f32::NAN, NONE)),
+        Some([f32::NAN.to_bits(), 40.0_f32.to_bits()])
+    );
+    assert_eq!(
+        bits_of(Point::new(NONE, f32::NAN)),
+        Some([30.0_f32.to_bits(), f32::NAN.to_bits()])
+    );
+}
+
+/// The call's `[0x28]` (`param_6`) and `[0x30]` (`param_7`): `FUN_141123f80` needs a tile of the
+/// box the player explored (its code 5) and tests the master's hill mode (its code 3) only where
+/// the call asks for each. `FUN_1411c52f0`'s call asks for neither: a villager on a map its
+/// player never explored is free there, and so is one of hill mode 2 on a slope. Without the hill
+/// test the port reads no base elevation, which a map without its elevations cannot give.
+#[test]
+fn placement_tests_explored_tiles_and_hill_mode_only_where_its_call_asks() {
+    let restriction = Restriction::new(vec![1.0, 0.0]);
+    let villager = placed_villager(&restriction);
+    let unexplored = Scene::open(GridSize::new(120, 120))
+        .sight(TileSight::Unknown)
+        .build();
+    let at = |call| {
+        placement(
+            &villager,
+            &WorldMap { turns: &unexplored },
+            Point::new(60.5, 60.5),
+            call,
+            &roles(),
+            &tuning().spawn,
+        )
+    };
+    let closest = PlacementCall {
+        explored: ExploredTest::Skipped,
+        hills: HillTest::Skipped,
+        ..COUNTED
+    };
+    let explored = PlacementCall {
+        explored: ExploredTest::Tested,
+        ..closest
+    };
+    let hills = PlacementCall {
+        hills: HillTest::Tested,
+        ..closest
+    };
+    assert_eq!(at(explored), Ok(Tested::Blocked { stays: false }));
+    assert_eq!(at(hills), Ok(Tested::Free));
+    assert_eq!(at(closest), Ok(Tested::Free));
+    let flat = hill_unit(&restriction, HillMode::FLAT);
+    assert_eq!(
+        on_hills(&flat, hills, west_slope),
+        Ok(Tested::Blocked { stays: false })
+    );
+    assert_eq!(on_hills(&flat, explored, west_slope), Ok(Tested::Free));
+    let one_step = hill_unit(&restriction, HillMode::ONE_STEP);
+    let mut without_elevations = Scene::open(GridSize::new(120, 120)).build();
+    without_elevations
+        .spatial
+        .terrain
+        .as_mut()
+        .unwrap()
+        .elevations
+        .clear();
+    let elevations_unknown = |call| {
+        placement(
+            &one_step,
+            &WorldMap {
+                turns: &without_elevations,
+            },
+            Point::new(50.0, 50.0),
+            call,
+            &roles(),
+            &tuning().spawn,
+        )
+    };
+    assert_eq!(elevations_unknown(closest), Ok(Tested::Free));
+    assert_eq!(
+        elevations_unknown(hills).map_err(|error| error.reason()),
+        Err("a hill mode where the elevations are not known")
+    );
+}
+
+/// The forage world's town centre 700 (at (20, 89.5), radii 2) with its gather point at (40, 80)
+/// on `target` (state 0xff, so the new unit stays where it spawns), under the world's feature
+/// flags `feature_flags`; the villager it spawns has its standing sprite.
+fn centre_with_gather_point(feature_flags: FeatureFlags, target: Option<ObjectId>) -> World {
+    let mut world = forage_world();
+    world.feature_flags = feature_flags;
+    for masters in &mut world.model.masters {
+        Arc::make_mut(masters)
+            .get_mut(ids::VILLAGER_MALE)
+            .unwrap()
+            .standing_sprite = Some(SpriteId::named(300));
+    }
+    let _ = Arc::make_mut(&mut world.model.graphics).insert(
+        SpriteId::named(300),
+        Graphic {
+            id: SpriteId::named(300),
+            frames: Frame::of_data(10),
+            facets: FacetCount::of_data(8),
+            speed_multiplier: SpeedMultiplier::ONE,
+            frame_duration: Seconds::new(0.1),
+            replay_delay: Seconds::ZERO,
+            flags: SpriteFlags::ANIMATED,
+        },
+    );
+    world.players[1].attributes[attribute::IN_PRODUCTION.index()] = Amount::new(3.0);
+    let centre = world.players[1].objects[ListIndex::new(2)].id;
+    assert_eq!(centre, object_id(700));
+    let gather = Some(GatherPoint {
+        state: GatherPointState::Kept,
+        point: Position::new(40.0, 80.0, 0.0),
+        target,
+        target_master: None,
+    });
+    world.set_part(centre, Part::GatherPoint(gather)).unwrap();
+    world
+}
+
+/// The place of the villager the town centre of `world` ([`centre_with_gather_point`]) spawns.
+fn spawned(mut world: World) -> Position {
+    assert_eq!(
+        world
+            .spawn(
+                PlayerId::new(1),
+                ListIndex::new(2),
+                ids::VILLAGER_MALE,
+                Amount::new(1.0),
+            )
+            .unwrap(),
+        SpawnOutcome::Made
+    );
+    world.players[1].objects.last().unwrap().position()
+}
+
+/// `FUN_140ad0240` under the world's feature flags: the spawn search's first test
+/// (`FUN_1411c52f0`) puts the villager on the square about the centre (2 + its radius + the gap
+/// out) at the point nearest the gather point, or nearest the first location of the centre's
+/// command queue where it has one (a building's or a tower's unit AI), which is free on the
+/// open map, whether the player explored it or not and whatever the villager's hill mode (its
+/// call tests neither). Without the flags, or with the gather point on the centre, the search
+/// walks its segments.
+#[test]
+fn feature_flags_spawn_villager_on_square_point_nearest_gather_point() {
+    let radius = forage_world()
+        .master(PlayerId::new(1), ids::VILLAGER_MALE)
+        .unwrap()
+        .radius;
+    let site = Site {
+        position: Position::new(20.0, 89.5, 0.0),
+        radius: Footprint::new(2.0, 2.0),
+        goal: None,
+        walls: [false; 4],
+        closest_goal: None,
+    };
+    let nearest = closest_spot(
+        &site,
+        radius,
+        Point::new(40.0, 80.0),
+        &mut |_, _| Ok(Tested::Free),
+        &tuning().spawn,
+    )
+    .unwrap()
+    .unwrap();
+    let flagged = spawned(centre_with_gather_point(FeatureFlags::On, None));
+    assert_eq!(flagged.ground(), nearest);
+    let nearest_queued = closest_spot(
+        &site,
+        radius,
+        Point::new(10.0, 95.0),
+        &mut |_, _| Ok(Tested::Free),
+        &tuning().spawn,
+    )
+    .unwrap()
+    .unwrap();
+    assert_ne!(nearest_queued, nearest);
+    // the building unit AI's slots 0x218 and 0x220 and the tower unit AI's twins read the queue
+    for ai_kind in [UnitAiKind::Building, UnitAiKind::Tower] {
+        let mut queued = centre_with_gather_point(FeatureFlags::On, None);
+        queued.parts.set_unit_ai(
+            object_id(700),
+            Some(UnitAi {
+                ai_kind,
+                building_orders: vec![QueuedOrder {
+                    point: Position::new(10.0, 95.0, 0.0),
+                    ..queued_move()
+                }],
+                ..UnitAi::default()
+            }),
+        );
+        assert_eq!(spawned(queued).ground(), nearest_queued, "{ai_kind:?}");
+    }
+    let plain = spawned(centre_with_gather_point(FeatureFlags::Off, None));
+    assert_ne!(plain.ground(), nearest);
+    let on_centre = Some(object_id(700));
+    assert_eq!(
+        spawned(centre_with_gather_point(FeatureFlags::On, on_centre)),
+        spawned(centre_with_gather_point(FeatureFlags::Off, on_centre))
+    );
+    let mut unexplored = centre_with_gather_point(FeatureFlags::On, None);
+    unexplored
+        .spatial
+        .sight
+        .as_mut()
+        .unwrap()
+        .unified
+        .fill(VisionBits::empty());
+    assert_eq!(spawned(unexplored).ground(), nearest);
+    let mut on_hills = centre_with_gather_point(FeatureFlags::On, None);
+    for masters in &mut on_hills.model.masters {
+        Arc::make_mut(masters)
+            .get_mut(ids::VILLAGER_MALE)
+            .unwrap()
+            .hill_mode = HillMode::ONE_STEP;
+    }
+    assert_eq!(spawned(on_hills).ground(), nearest);
 }

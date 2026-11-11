@@ -25,6 +25,7 @@ use crate::pathing::zones::ZoneId;
 use crate::pathing::zones::{NO_TERRAIN, UNKNOWN_RESTRICTION};
 use crate::players::PlayerId;
 use crate::production::spawn::ZoneTest;
+use crate::production::spawn::{ExploredTest, HillTest};
 use crate::production::spawn::{
     NOT_MOVING, PlacementCall, PlacementRadii, Placing, Tested, UnitScan, WorldMap, placement,
 };
@@ -40,6 +41,18 @@ use crate::{GenieError, GenieResult};
 /// An unloading ship without the Transport it was lent with: the unload runs on a ship whose
 /// Transport `TransportAction::unload` wrote back to its list before the lend.
 const NO_TRANSPORT: GenieError = GenieError::unreachable("an unloading ship without a Transport");
+
+/// The drop's call of the unit master's slot 0x50 (`FUN_141192d10`'s, with `0, 1, 1, 1, 0, 1, 1,
+/// 0, 0, 1` from `[0x20]`): the explored tiles and the hill mode tested, its radii, no zone test,
+/// no object passed over, the units counted.
+const DROP_CALL: PlacementCall = PlacementCall {
+    explored: ExploredTest::Tested,
+    hills: HillTest::Tested,
+    radii: PlacementRadii::Size,
+    zones: ZoneTest::Skipped,
+    passed: None,
+    units: UnitScan::Counted,
+};
 
 /// The transports' parts that reach the world: the unload command's install, the unload and the
 /// units put ashore.
@@ -500,12 +513,7 @@ impl World {
                     &placing,
                     &map,
                     spot,
-                    PlacementCall {
-                        radii: PlacementRadii::Size,
-                        zones: ZoneTest::Skipped,
-                        passed: None,
-                        units: UnitScan::Counted,
-                    },
+                    DROP_CALL,
                     &self.model.roles,
                     &self.model.tuning.spawn,
                 )? == Tested::Free

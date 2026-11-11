@@ -1,15 +1,17 @@
 # `production/spawn`: a trained unit's spawn
 
-When the make action finishes a unit, the unit needs a place beside its building. The spawn point
-search walks the building's sides in segments and tries each spot through the master's placement
-test: the map's edge, the terrain, the explored tiles and the objects in the way. When no spot is
-free, it tries a ring about the building's edge, then the points inside its footprint, where it
-keeps the point whose tile holds the fewest objects. When even that fails, the make action waits
+When the make action finishes a unit, the unit needs a place beside its building. Under the world's
+feature flags the spawn point search first tests the points of a square about the building, nearest
+the first test's goal first: the first location of the building's command queue, else its gather
+point. Then it walks the building's sides in segments and tries each spot through the master's
+placement test: the map's edge, the terrain, the explored tiles and the objects in the way. When no
+spot is free, it tries a ring about the building's edge, then the points inside its footprint, where
+it keeps the point whose tile holds the fewest objects. When even that fails, the make action waits
 five seconds and tries again.
 
 - `make_action.rs` holds the production list and the make action.
-- `search.rs` holds the spawn point search, `rings.rs` its later rings about the building's edge
-  and inside its footprint.
+- `search.rs` holds the spawn point search, `closest_spot.rs` its first test under the world's
+  feature flags, `rings.rs` its later rings about the building's edge and inside its footprint.
 - `placement_test.rs` holds the placement test as the spawn and the transport call it,
   `build_placement_test.rs` BUILD's call of it; `terrains.rs` and `world_map.rs` hold what it
   reads.
@@ -29,6 +31,7 @@ five seconds and tries again.
 | File | What it holds |
 | --- | --- |
 | [`build_placement_test.rs`](build_placement_test.rs) | BUILD's placement test: the unit master's slot 0x50 as the building master's `FUN_14123aee0` calls it, then that routine's scan of the objects near the foundation. |
+| [`closest_spot.rs`](closest_spot.rs) | The spawn search's first test under the world's feature flags (`FUN_1411c52f0`): the free point nearest its goal (`closest_goal`) on the square about the building. |
 | [`combat_setup.rs`](combat_setup.rs) | The combat setup (`FUN_14121df60`): what a new combat object (a unit or a building) takes from its master and its player, and what its player's attributes count of it. |
 | [`gather_walk.rs`](gather_walk.rs) | A new unit's walk to its building's gather point (`FUN_140ace9c0`). |
 | [`make_action.rs`](make_action.rs) | A building's production list and its make action (`TRIBE_Action_Make_Obj`). |

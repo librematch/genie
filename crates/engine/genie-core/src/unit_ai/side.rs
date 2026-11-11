@@ -99,7 +99,9 @@ pub struct ResourceSearch {
     pub(crate) min_state: ObjectState,
 }
 
-/// [`ResourceSearch::point`]'s (−1, −1): the unit's own place (`DAT_14330ec20`).
+/// [`ResourceSearch::point`]'s (−1, −1): the unit's own place (`DAT_14330ec20`). The spawn keeps
+/// a constant of its own for its point of none, of the same value: `FUN_140ace630`'s immediates
+/// (`NO_POINT` of `production::spawn::new_unit`).
 pub const NO_POINT: Point = Point::new(-1.0, -1.0);
 
 /// What the unit AI's `ClosestResourceObject` found

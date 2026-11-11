@@ -88,25 +88,6 @@ impl World {
         let live = self.players.live(player, building)?;
         let bid = live.id;
         let gather = self.parts.gather_point.get(bid).copied();
-        // the spot's goal (`FUN_1411d12d0` with x −1): without a gather point the first location
-        // of the building unit AI's command queue (slot 0x218, then slot 0x220), else a gather
-        // point that is not on the building, else none
-        let queue_first = self
-            .parts
-            .unit_ai
-            .get(live.id)
-            .and_then(|unit_ai| unit_ai.building_orders.first())
-            .map(|queued_order| queued_order.point.ground());
-        let toward = if point.x() == NO_POINT {
-            match (gather, queue_first) {
-                (None, Some(point)) => Some(point),
-                _ => gather
-                    .filter(|bid_gather_point| bid_gather_point.target != Some(bid))
-                    .map(|gather_point| gather_point.point.ground()),
-            }
-        } else {
-            Some(point)
-        };
         // the unit is any player's (an ally's too): its own player's masters and orders
         let (up, ui) = self.live_inside(id)?;
         let made = self
@@ -115,7 +96,8 @@ impl World {
             .master(self.master_tables(), up)?
             .clone();
         // no spot answers 0 before anything changes
-        let Some(spot) = self.spot_beside(player, building, &made, toward)? else {
+        // the search reads its goal from the point itself (`FUN_1411d12d0`)
+        let Some(spot) = self.spot_beside(player, building, &made, point)? else {
             return Ok(LetOut::Stayed);
         };
         let z = self.players.live(player, building)?.position().z();

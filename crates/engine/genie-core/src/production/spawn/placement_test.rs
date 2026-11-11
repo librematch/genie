@@ -146,6 +146,26 @@ impl UnitScan {
     }
 }
 
+/// Whether a placement needs a tile of its box that the player explored: the call's `[0x28]`
+/// (`param_6`), which `FUN_141123f80` reads (its code 5 when none is).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ExploredTest {
+    /// 1: the spawn's spots and rings and the transport's drop.
+    Tested,
+    /// 0: the spawn search's first test under the feature flags (`FUN_1411c52f0`).
+    Skipped,
+}
+
+/// Whether a placement tests its box's elevations by the master's hill mode: the call's `[0x30]`
+/// (`param_7`), which `FUN_141123f80` reads (its code 3).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum HillTest {
+    /// 1: the spawn's spots and rings and the transport's drop.
+    Tested,
+    /// 0: the spawn search's first test under the feature flags (`FUN_1411c52f0`).
+    Skipped,
+}
+
 /// The master's radii a call of the master's slot 0x50 measures by: its argument `[0x40]`
 /// (`param_9`), which the slot and `FUN_141123f80` read alike.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -172,6 +192,10 @@ impl Placing<'_> {
 /// The arguments of a call of the master's slot 0x50 that change what [`placement`] answers.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PlacementCall {
+    /// `[0x28]` (`param_6`): whether it needs a tile the player explored.
+    pub(crate) explored: ExploredTest,
+    /// `[0x30]` (`param_7`): whether it tests the master's hill mode.
+    pub(crate) hills: HillTest,
     /// `[0x40]` (`param_9`): the master's radii it measures by.
     pub(crate) radii: PlacementRadii,
     /// Whether it runs the zone test.
@@ -184,21 +208,23 @@ pub struct PlacementCall {
 }
 
 /// The master's slot 0x50 (`0x141264db0`) with the arguments of `call`: `FUN_141123f80`'s test
-/// (the map's edge, the placement terrains, then per tile of the box the terrain restriction,
-/// the explored tiles and the hill mode, [`tiles_pass`], then the objects overlapping), then its
-/// own scan of the objects overlapping, which reports the first one. Both measure by the radii
-/// the call chooses (`[0x40]`). Both scans pass over the call's object (`[0x58]`); the own scan
-/// passes over the units where the call says so (`[0x60]` 1, or 2 for those in motion), and
-/// under the world's feature flags (`DAT_143f01833`, [`crate::world::FeatureFlags`]) over a
-/// building annexed to the call's object (its `+0xbb8`). With `[0x50]` set (`param_11`, every
-/// call of genie's), a master whose radii are both at most 0 is free whatever `FUN_141123f80`
-/// found: off the map, on a forbidden terrain, unexplored, on a tile its hill mode refuses. A
-/// NaN radius is not at most 0: it takes both scans, whose overlap test it fails. The call's
-/// `[0x48]` (`param_10`) lets both scans run for a master without a height (`+0x5e0` at most 0
-/// or NaN: `COMISS`, `JBE` at 0x141264fac); each object's test of either scan still needs that
-/// height (0x1412653ad), so they find nothing and the argument changes nothing the slot
-/// answers: the port takes none. The editor's case (the game's mode 4) and the zone test
-/// (`FUN_1415c6400`, the world's `+0x820` mode 1) are not modelled.
+/// (the map's edge, the placement terrains, then per tile of the box the terrain restriction
+/// and, where the call asks, the explored tiles and the hill mode ([`tiles_pass`]), then the
+/// objects overlapping), then its own scan of the objects overlapping, which reports the first
+/// one. Both measure by the radii the call chooses (`[0x40]`). Both scans pass over the call's
+/// object (`[0x58]`); the own scan passes over the units where the call says so (`[0x60]` 1, or 2
+/// for those in motion), and under the world's feature flags (`DAT_143f01833`,
+/// [`crate::world::FeatureFlags`]) over a building annexed to the call's object (its `+0xbb8`).
+/// With `[0x50]` set (`param_11`, every call of genie's), a master whose radii are both at most 0
+/// is free whatever `FUN_141123f80` found: off the map, on a forbidden terrain, unexplored, on a
+/// tile its hill mode refuses. A NaN radius is not at most 0: it takes both scans, whose overlap
+/// test it fails. The call's `[0x48]` (`param_10`) lets both scans run for a master without a
+/// height (`+0x5e0` at most 0 or NaN: `COMISS`, `JBE` at 0x141264fac); each object's test of
+/// either scan still needs that height (0x1412653ad), so they find nothing and the argument
+/// changes nothing the slot answers: the port takes none; nor does `[0x38]` (`param_8`), which
+/// neither reads, nor `[0x68]` (`param_14`, the terrain restriction's test), 1 in every call of
+/// genie's. The editor's case (the game's mode 4) and the zone test (`FUN_1415c6400`, the world's
+/// `+0x820` mode 1) are not modelled.
 pub(crate) fn placement(
     me: &Placing<'_>,
     map: &WorldMap<'_>,
@@ -227,7 +253,7 @@ pub(crate) fn placement(
     let tiles = TileRect::new((x - rx) as i32, (y - ry) as i32, far_x as i32, far_y as i32);
     let base_free = if off_map
         || !placement_terrains(me.placement, map, point, tiles)?
-        || !tiles_pass(me, map, tiles, spawn_tuning)?
+        || !tiles_pass(me, map, call, tiles, spawn_tuning)?
     {
         false
     } else {
@@ -262,10 +288,11 @@ pub(crate) fn placement(
 }
 
 /// `FUN_141123f80`'s tests of each tile of the box `tiles` for `me`, column by column and each
-/// column's rows in turn: the terrain restriction (the game's code 2), the player's explored
-/// tiles, then the hill mode ([`hill_fails`], code 3) measured against the elevation of the box's
-/// first column's last row ([`hill_base`], read before the tiles). True when every tile passes and
-/// the player explored one of them (else code 5).
+/// column's rows in turn: the terrain restriction (the game's code 2), with the call's `[0x28]`
+/// ([`ExploredTest::Tested`]) the player's explored tiles, then with its `[0x30]`
+/// ([`HillTest::Tested`]) the hill mode ([`hill_fails`], code 3) measured against the elevation of
+/// the box's first column's last row ([`hill_base`], read before the tiles). True when every tile
+/// passes and, where the call tests them, the player explored one of them (else code 5).
 ///
 /// # Errors
 ///
@@ -273,11 +300,15 @@ pub(crate) fn placement(
 fn tiles_pass(
     me: &Placing<'_>,
     map: &WorldMap<'_>,
+    call: PlacementCall,
     tiles: TileRect,
     spawn_tuning: &SpawnTuning,
 ) -> GenieResult<bool> {
     let corner = Tile::new(tiles.x0(), tiles.y1());
-    let base = hill_base(me.hill_mode, map, corner)?;
+    let base = match call.hills {
+        HillTest::Tested => hill_base(me.hill_mode, map, corner)?,
+        HillTest::Skipped => None,
+    };
     let mut seen = false;
     for tx in tiles.x0()..=tiles.x1() {
         for ty in tiles.y0()..=tiles.y1() {
@@ -287,13 +318,16 @@ fn tiles_pass(
             if value <= spawn_tuning.passable {
                 return Ok(false);
             }
-            seen = seen || map.explored(me.player, tile);
-            if hill_fails(me.hill_mode, map, tile, corner, base)? {
+            if call.explored == ExploredTest::Tested {
+                seen = seen || map.explored(me.player, tile);
+            }
+            if call.hills == HillTest::Tested && hill_fails(me.hill_mode, map, tile, corner, base)?
+            {
                 return Ok(false);
             }
         }
     }
-    Ok(seen)
+    Ok(seen || call.explored == ExploredTest::Skipped)
 }
 
 /// What `FUN_141123f80`'s scan reads of object `near` for `me`: none for one it passes over (the

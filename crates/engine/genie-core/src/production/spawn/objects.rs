@@ -2,6 +2,7 @@
 //! building a death makes.
 
 use crate::map::Distance;
+use crate::map::Footprint;
 use crate::map::Point;
 use crate::map::Position;
 use crate::map::Rect;
@@ -29,14 +30,15 @@ use crate::objects::{Facet, FacetCount};
 use crate::players::PlayerId;
 use crate::production::spawn::ZoneTest;
 use crate::production::spawn::{
-    Facing, NOT_MOVING, PlacementCall, PlacementRadii, Placing, Site, SpawnTest, UnitScan,
-    WorldMap, corner_tiles, placement, spawn_point,
+    ExploredTest, Facing, HillTest, NOT_MOVING, PlacementCall, PlacementRadii, Placing, Site,
+    SpawnTest, UnitScan, WorldMap, closest_goal, corner_tiles, placement, search_goal, spawn_point,
 };
 use crate::unit_ai::unit_ai_kind;
 use crate::vision::SightCentre;
 use crate::vision::SightLayer;
 use crate::vision::SightShape;
 use crate::vision::visibility::{Seer, capture_kind};
+use crate::world::FeatureFlags;
 use crate::world::World;
 use crate::world::layer::ClassRoles;
 use crate::world::parts::{Object, ObjectParts};
@@ -49,54 +51,31 @@ pub(crate) const RECYCLABLE_NEW_OBJECT: GenieError =
 
 impl World {
     /// `FUN_1411d12d0` for a unit of `made` beside the building at `list_index` of player
-    /// `player_id`, `toward` the point the search faces (its gather point's, or the command's):
-    /// [`spawn_point`] with the walls at the building's corners (class 27 on both tiles beside
-    /// each), the master's placement test at each point ([`placement`] with each test's
-    /// arguments, [`SpawnTest`]) and the object count of a tile on the map (its list's length,
-    /// the map tile's `+0x1b` byte). None when no spot is free: the game's 0.
+    /// `player_id`, from the caller's point `from` (its x and y, [`NONE`] for none; the spawn's
+    /// `FUN_140ace630` passes none): [`spawn_point`] over the building's site
+    /// ([`World::spawn_site`]: its goals and the walls at its corners), the master's placement
+    /// test at each point ([`placement`] with each test's arguments, [`SpawnTest`]) and the object
+    /// count of a tile on the map (its list's length, the map tile's `+0x1b` byte). None when no
+    /// spot is free: the game's 0.
     ///
     /// # Errors
     ///
     /// A building the world does not hold, a unit master that does not move or whose terrain
     /// restriction the data file lacks, a place the frozen objects make unknown, and the
     /// placement test's.
+    ///
+    /// [`NONE`]: crate::production::spawn::NONE
     pub(crate) fn spot_beside(
         &self,
         player_id: PlayerId,
         list_index: ListIndex,
         made: &Master,
-        toward: Option<Point>,
+        from: Point,
     ) -> GenieResult<Option<Point>> {
         let building = &self.players.live(player_id, list_index)?;
         let site_master = building.master(self.master_tables(), player_id)?;
-        let (building_id, position) = (building.id, building.position());
-        let mut walls = [false; 4];
-        for (wall, tiles) in walls.iter_mut().zip(corner_tiles(
-            position,
-            site_master.radius,
-            made.radius,
-            &self.model.tuning.spawn,
-        )) {
-            for tile in &tiles {
-                let (fx, fy) = (tile.x() as f32, tile.y() as f32);
-                self.spatial
-                    .check_known(Rect::new(fx, fy, fx + 1.0, fy + 1.0))?;
-            }
-            *wall = tiles.iter().all(|tile| {
-                self.spatial.object_on_tile(*tile, |placed| {
-                    self.model
-                        .roles
-                        .of_class(placed.class)
-                        .contains(ClassRoles::WALL)
-                })
-            });
-        }
-        let site = Site {
-            position,
-            radius: site_master.radius,
-            gather: toward,
-            walls,
-        };
+        let building_id = building.id;
+        let site = self.spawn_site(building, site_master.radius, made.radius, from)?;
         let moving = made.move_stats.ok_or(NOT_MOVING)?;
         let restriction = self
             .spatial
@@ -131,9 +110,16 @@ impl World {
                 let (x, y) = (spot.x(), spot.y());
                 let (rx, ry) = (made.radius.x(), made.radius.y());
                 spatial.check_known(Rect::new(x - rx, y - ry, x + rx, y + ry))?;
+                // the calls' `[0x28]` and `[0x30]`: 0 for the closest test alone
+                let (explored, hills) = match spawn_test {
+                    SpawnTest::Closest => (ExploredTest::Skipped, HillTest::Skipped),
+                    SpawnTest::Spot | SpawnTest::Outer | SpawnTest::Inner => {
+                        (ExploredTest::Tested, HillTest::Tested)
+                    }
+                };
                 let (passed, units) = match spawn_test {
                     SpawnTest::Spot => (None, spot_units),
-                    SpawnTest::Outer => (None, UnitScan::Counted),
+                    SpawnTest::Outer | SpawnTest::Closest => (None, UnitScan::Counted),
                     SpawnTest::Inner => (Some(building_id), UnitScan::Counted),
                 };
                 placement(
@@ -141,6 +127,8 @@ impl World {
                     &map,
                     spot,
                     PlacementCall {
+                        explored,
+                        hills,
                         radii: PlacementRadii::Size,
                         zones: ZoneTest::Skipped,
                         passed,
@@ -161,6 +149,66 @@ impl World {
             },
             &self.model.tuning.spawn,
         )
+    }
+
+    /// The building `building` of radii `radius` as the spawn search reads it for a unit of radii
+    /// `unit` from the caller's point `from`: the search's goal ([`search_goal`]); under the
+    /// world's feature flags (`DAT_143f01833`) its first test's ([`closest_goal`]), none with
+    /// them off; both read its gather point and the first location of its unit AI's command
+    /// queue (slots 0x218 and 0x220 at index 0: the building unit AI's `FUN_140c16d70` and
+    /// `FUN_140c16830`, or the tower unit AI's twins `FUN_140c16da0` and `FUN_140c168a0`, each
+    /// over its own queue at `+0x1f0`; every other kind's `FUN_140c16dd0` and `FUN_140c16910`
+    /// hold none); and the walls at its corners (class 27 on both tiles beside each).
+    ///
+    /// # Errors
+    ///
+    /// A corner's tile the frozen objects make unknown.
+    fn spawn_site(
+        &self,
+        building: &Unit,
+        radius: Footprint,
+        unit: Footprint,
+        from: Point,
+    ) -> GenieResult<Site> {
+        let (building_id, position) = (building.id, building.position());
+        let mut walls = [false; 4];
+        for (wall, tiles) in walls.iter_mut().zip(corner_tiles(
+            position,
+            radius,
+            unit,
+            &self.model.tuning.spawn,
+        )) {
+            for tile in &tiles {
+                let (fx, fy) = (tile.x() as f32, tile.y() as f32);
+                self.spatial
+                    .check_known(Rect::new(fx, fy, fx + 1.0, fy + 1.0))?;
+            }
+            *wall = tiles.iter().all(|tile| {
+                self.spatial.object_on_tile(*tile, |placed| {
+                    self.model
+                        .roles
+                        .of_class(placed.class)
+                        .contains(ClassRoles::WALL)
+                })
+            });
+        }
+        let gather = self.parts.gather_point.get(building_id).copied();
+        let queue_first = self
+            .parts
+            .unit_ai
+            .get(building_id)
+            .and_then(|unit_ai| unit_ai.building_orders.first())
+            .map(|queued_order| queued_order.point.ground());
+        Ok(Site {
+            position,
+            radius,
+            goal: search_goal(from, gather, building_id, queue_first),
+            walls,
+            closest_goal: match self.feature_flags {
+                FeatureFlags::On => closest_goal(from, gather, building_id, queue_first),
+                FeatureFlags::Off => None,
+            },
+        })
     }
 
     /// `FUN_1411a4e90`: the remains a dying sprite's end leaves for player `player_id`: the
