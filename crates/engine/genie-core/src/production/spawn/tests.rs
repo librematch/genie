@@ -683,9 +683,10 @@ fn placement_passing_units_in_motion_passes_over_walking_soldier_only() {
 }
 
 /// A call of `[0x40]` 1 measures by the master's clearance radii (`+0x5fc`, `+0x600`) in the
-/// slot's gate, `FUN_141123f80`'s box and both scans: the villager's clearance of 0.6 meets the
-/// sheep from (106.5, 46.5), which its radius of 0.2 misses, and leaves the map at x 0.5; a
-/// clearance of 0 is free on the sheep.
+/// slot's gate and `FUN_141123f80`'s box: the villager's clearance of 0.6 meets the sheep from
+/// (106.5, 46.5), which its radius of 0.2 misses, and leaves the map at x 0.5. A clearance of 0
+/// is free on the sheep's own spot, where a box of no size still overlaps the sheep: only the
+/// gate on the chosen radii frees it.
 #[test]
 fn placement_by_clearance_measures_the_clearance_radii() {
     let restriction = Restriction::new(vec![1.0, 0.0]);
@@ -715,13 +716,80 @@ fn placement_by_clearance_measures_the_clearance_radii() {
         at(wide, PlacementRadii::Clearance, 0.5, 60.5),
         Tested::Blocked { stays: false }
     );
+    let (sheep_x, sheep_y) = (sheep().at.x(), sheep().at.y());
     assert_eq!(
-        at(Footprint::ZERO, PlacementRadii::Size, 106.5, 47.5),
+        at(Footprint::ZERO, PlacementRadii::Size, sheep_x, sheep_y),
         Tested::Blocked { stays: true }
     );
     assert_eq!(
-        at(Footprint::ZERO, PlacementRadii::Clearance, 106.5, 47.5),
+        at(Footprint::ZERO, PlacementRadii::Clearance, sheep_x, sheep_y),
         Tested::Free
+    );
+}
+
+/// `FUN_141123f80`'s scan measures by the clearance of a call of `[0x40]` 1: with the slot's own
+/// scan passing over the units (`[0x60]` 1), only that scan's box of 0.6 finds the sheep from
+/// (106.5, 46.5), where the radius of 0.2 finds nothing.
+#[test]
+fn placement_by_clearance_measures_static_scan_by_the_clearance() {
+    let restriction = Restriction::new(vec![1.0, 0.0]);
+    let villager = Placing {
+        clearance: Footprint::new(0.6, 0.6),
+        ..placed_villager(&restriction)
+    };
+    let world = Scene::open(GridSize::new(120, 120)).object(sheep()).build();
+    let at = |radii| {
+        placement(
+            &villager,
+            &WorldMap { turns: &world },
+            Point::new(106.5, 46.5),
+            PlacementCall {
+                radii,
+                units: UnitScan::Passed,
+                ..COUNTED
+            },
+            &roles(),
+            &tuning().spawn,
+        )
+        .unwrap()
+    };
+    assert_eq!(at(PlacementRadii::Size), Tested::Free);
+    assert_eq!(
+        at(PlacementRadii::Clearance),
+        Tested::Blocked { stays: true }
+    );
+}
+
+/// The slot's own scan measures by the clearance of a call of `[0x40]` 1: on a box that meets a
+/// water tile, which the villager's restriction forbids, `FUN_141123f80` answers 2 without its
+/// scan, and only the own scan's box of 0.6 makes the sheep the blocker from (106.5, 46.5), so
+/// the block stays.
+#[test]
+fn placement_by_clearance_measures_own_scan_by_the_clearance() {
+    let restriction = Restriction::new(vec![1.0, 0.0]);
+    let villager = Placing {
+        clearance: Footprint::new(0.6, 0.6),
+        ..placed_villager(&restriction)
+    };
+    let world = Scene::open(GridSize::new(120, 120))
+        .water([Tile::new(106, 46)])
+        .object(sheep())
+        .build();
+    let at = |radii| {
+        placement(
+            &villager,
+            &WorldMap { turns: &world },
+            Point::new(106.5, 46.5),
+            PlacementCall { radii, ..COUNTED },
+            &roles(),
+            &tuning().spawn,
+        )
+        .unwrap()
+    };
+    assert_eq!(at(PlacementRadii::Size), Tested::Blocked { stays: false });
+    assert_eq!(
+        at(PlacementRadii::Clearance),
+        Tested::Blocked { stays: true }
     );
 }
 
