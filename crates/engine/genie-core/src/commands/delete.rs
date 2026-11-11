@@ -479,7 +479,7 @@ impl World {
         if new == ObjectState::Dying && state == ObjectState::Alive {
             for (kind, amount) in refund_of(master, main, &self.model.roles, self.model.slots) {
                 let player = self.players.player_mut(owner)?;
-                player.take_at_least_zero(kind, amount);
+                player.take_at_least_zero(kind, amount, &self.model.roles);
             }
         }
         self.base_set_state(owner, id, new, master)
@@ -575,7 +575,7 @@ impl World {
         if let Some(kind) = death.building.count {
             self.players
                 .player_mut(owner)?
-                .take_at_least_zero(kind, Amount::new(1.0));
+                .take_at_least_zero(kind, Amount::new(1.0), &roles);
         }
         if let Some((master_id, tech)) = death.building.tech {
             self.withdraw_tech(owner, master_id, tech)?;

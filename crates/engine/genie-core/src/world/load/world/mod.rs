@@ -14,7 +14,9 @@ use crate::objects::ListIndex;
 use crate::players::game_status::Fealty;
 use crate::players::game_status::GameStatus;
 use crate::players::game_status::VictoryState;
-use crate::players::{Amount, Chance, CivId, Culture, EscrowShare, LotVolume, Team};
+use crate::players::{
+    Amount, Chance, CivId, CivNameOverride, Culture, EscrowShare, LotVolume, Team,
+};
 use crate::world::FrameSeed;
 use crate::world::Millis;
 use crate::world::Model;
@@ -296,6 +298,8 @@ pub fn saved_world(
                     .base
                     .escrow_percentage
                     .map(EscrowShare::of_data),
+                // not saved: the constructor's (`FUN_14163d330`), no override
+                civ_name_override: CivNameOverride::None,
                 sudden_death_eliminable: player_section
                     .world_player()
                     .sudden_death_can_be_eliminated

@@ -16,7 +16,8 @@ use crate::players::history::History;
 use crate::players::tracker::Tracker;
 use crate::players::world_player::VictoryTimes;
 use crate::players::{
-    ByPlayer, Chance, CivId, Culture, EscrowShare, LotVolume, PlayerKind, Relations, Stance,
+    ByPlayer, Chance, CivId, CivNameOverride, Culture, EscrowShare, LotVolume, PlayerKind,
+    Relations, Stance, StringId,
 };
 use crate::technology::{Attributes, TechState};
 use crate::trace::{player_stops, player_unsupported};
@@ -24,6 +25,7 @@ use crate::vision::ghost::{Ghost, Watched};
 use crate::world::Seconds;
 use crate::world::World;
 use crate::world::layer::Slots;
+use crate::world::layer::{AttributeRoles, Roles};
 use crate::world::slots::PlayerSlotsExt;
 use crate::world::{LureDestination, Percent, TargetingMode, Tick, VillagerGarrison};
 use crate::{GenieError, GenieResult};
@@ -239,6 +241,10 @@ pub struct Player {
     /// `escrow_percentage` (`+0x6ec`, saved): the shares of its income a computer player sets
     /// aside.
     pub(crate) escrow_percentage: [EscrowShare; 4],
+    /// The name the interface gives its civilisation in place of its own (`+0x628`..`+0x640`,
+    /// not saved, none after a load): the store of the civilisation name override's attribute
+    /// names a string ([`Player::store_attribute`]).
+    pub(crate) civ_name_override: CivNameOverride,
     /// `mSuddenDeathCanBeEliminated` (`+0x1380`, saved): under the sudden death rule the player
     /// had a town centre, and loses without one.
     pub(crate) sudden_death_eliminable: bool,
@@ -295,8 +301,9 @@ impl Player {
         self.attributes.get(attribute.index()).copied()
     }
 
-    /// Attribute `attribute` set to `amount`, as a refund and a technology's payment write it (no
-    /// side effects).
+    /// Attribute `attribute` set to `amount` straight, with no slot 0xf0 and so no computer's
+    /// escrow ([`Player::store_attribute`]). A technology's payment (`FUN_1413d4370`) and the
+    /// refunds (`FUN_141630530`, `FUN_141630770`, `FUN_1413d15e0`, `FUN_1413ccc00`) write so.
     ///
     /// # Errors
     ///
@@ -323,6 +330,43 @@ impl Player {
     pub fn construction_rate(&self, slots: Slots) -> Amount {
         self.attribute(slots.attribute.construction_rate)
             .unwrap_or(Amount::ZERO)
+    }
+
+    /// The base player's slot 0xf0 (`FUN_1416674b0`, the attribute's store) on this player alone:
+    /// within its count (`+0x90`) attribute `attribute` takes `amount`, nothing past it. The
+    /// civilisation name override's attribute (0x106, `roles`'
+    /// [`AttributeRoles::CIV_NAME_OVERRIDE`]) names the string of the value, the text cleared
+    /// (`FUN_140930a50` with 0, [`CivNameOverride::String`]). A computer player's (`+0x10` 3)
+    /// resource sets its escrow to its share of the value ([`escrow_set_to`]). Slot 0xf0's
+    /// branches before it (`FUN_14162d610`) are the world's ([`World::set_player_attribute`]).
+    ///
+    /// [`World::set_player_attribute`]: crate::world::World::set_player_attribute
+    pub(crate) fn store_attribute(
+        &mut self,
+        attribute: AttributeId,
+        amount: Amount,
+        roles: &Roles,
+    ) {
+        let index = attribute.index();
+        let Some(stored) = self.attributes.get_mut(index) else {
+            return;
+        };
+        *stored = amount;
+        if roles
+            .of_attribute(attribute)
+            .contains(AttributeRoles::CIV_NAME_OVERRIDE)
+        {
+            self.civ_name_override = CivNameOverride::String(StringId::of_amount(amount));
+        }
+        if self.kind == PlayerKind::Computer
+            && attribute.is_resource()
+            && let (Some(escrow), Some(&share)) = (
+                self.escrow.get_mut(index),
+                self.escrow_percentage.get(index),
+            )
+        {
+            *escrow = escrow_set_to(*escrow, share, amount);
+        }
     }
 
     /// The base player's attribute add (`FUN_14165d040`) on this player alone: within its count
@@ -355,14 +399,13 @@ impl Player {
     }
 
     /// Takes `amount` of attribute `kind`, at least 0 left (slot 0xf8 with the amount negated,
-    /// then slot 0xf0 with 0 below 0), for a slot of the build layer outside slot 0xf8's branches
-    /// ([`Player::add_attribute`]).
-    pub fn take_at_least_zero(&mut self, kind: AttributeId, amount: Amount) {
+    /// then below 0, `COMISS` and `JBE`: not a NaN, slot 0xf0 with 0), for a slot of the build
+    /// layer outside the branches of slots 0xf8 and 0xf0 ([`Player::add_attribute`],
+    /// [`Player::store_attribute`] with `roles`).
+    pub fn take_at_least_zero(&mut self, kind: AttributeId, amount: Amount, roles: &Roles) {
         self.add_attribute(kind, -amount);
-        if let Some(amount) = self.attributes.get_mut(kind.index())
-            && *amount < Amount::ZERO
-        {
-            *amount = Amount::ZERO;
+        if self.attribute(kind).is_some_and(|left| left < Amount::ZERO) {
+            self.store_attribute(kind, Amount::ZERO, roles);
         }
     }
 
@@ -375,19 +418,43 @@ impl Player {
 }
 
 /// `FUN_14165d040`'s escrow (`+0x6dc`) after a computer player's resource add of `amount`, from
-/// the `escrow` before it, after which the resource holds `held`: an amount above 0 with a
-/// `share` above 0 (`COMISS`, `JBE`: a NaN sets nothing aside) adds the share times it to the
-/// escrow (`MULSS`, then `ADDSS` onto the escrow); an escrow above the resource (`JBE`: not with
-/// a NaN) falls to it, or to 0 when the resource is below 0.
+/// the `escrow` before it, after which the resource holds `held`: an amount that sets some aside
+/// ([`sets_aside`]) adds the share times it to the escrow (`MULSS`, then `ADDSS` onto the
+/// escrow), and the escrow is held to the resource ([`escrow_held`]).
 fn escrow_after(escrow: Amount, share: EscrowShare, amount: Amount, held: Amount) -> Amount {
-    let added =
-        if !at_most_or_unordered(amount.get(), 0.0) && !at_most_or_unordered(share.get(), 0.0) {
-            share.of(amount) + escrow
-        } else {
-            escrow
-        };
-    if at_most_or_unordered(added.get(), held.get()) {
-        added
+    let added = if sets_aside(share, amount) {
+        share.of(amount) + escrow
+    } else {
+        escrow
+    };
+    escrow_held(added, held)
+}
+
+/// `FUN_1416674b0`'s escrow (`+0x6dc`) after a computer player's resource set to `amount`, from
+/// the `escrow` before it: a value that sets some aside ([`sets_aside`]) sets the escrow to the
+/// share times it (`MULSS`, then a store, where [`escrow_after`] adds onto it), and the escrow is
+/// held to the resource, now `amount` ([`escrow_held`]).
+fn escrow_set_to(escrow: Amount, share: EscrowShare, amount: Amount) -> Amount {
+    let set = if sets_aside(share, amount) {
+        share.of(amount)
+    } else {
+        escrow
+    };
+    escrow_held(set, amount)
+}
+
+/// A computer player's resource change of `amount` sets its `share` of it aside: both above 0
+/// (`FUN_14165d040`'s and `FUN_1416674b0`'s `COMISS` with 0 and `JBE`: a NaN sets nothing aside).
+fn sets_aside(share: EscrowShare, amount: Amount) -> bool {
+    !at_most_or_unordered(amount.get(), 0.0) && !at_most_or_unordered(share.get(), 0.0)
+}
+
+/// An `escrow` held to the resource's `held`, as `FUN_14165d040` and `FUN_1416674b0` end: above
+/// it (`COMISS`, `JBE`: not with a NaN) it falls to the resource, or to 0 when the resource is
+/// below 0 (`COMISS` 0 with the resource, `JBE`).
+fn escrow_held(escrow: Amount, held: Amount) -> Amount {
+    if at_most_or_unordered(escrow.get(), held.get()) {
+        escrow
     } else if at_most_or_unordered(0.0, held.get()) {
         held
     } else {

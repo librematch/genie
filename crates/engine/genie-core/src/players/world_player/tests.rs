@@ -18,10 +18,12 @@ use crate::objects::masters::MasterKind;
 use crate::objects::masters::{BuildingMaster, Master, Masters};
 use crate::objects::unit::Unit;
 use crate::players::CivId;
+use crate::players::CivNameOverride;
 use crate::players::EscrowShare;
 use crate::players::PlayerId;
 use crate::players::PlayerKind;
 use crate::players::ResourceStat;
+use crate::players::StringId;
 use crate::players::attribute::AttributeId;
 use crate::players::game_status::GameStatus;
 use crate::players::history::HistoryUpdates;
@@ -39,6 +41,7 @@ use crate::testing::attribute::POPULATION;
 use crate::testing::class;
 use crate::testing::ids;
 use crate::testing::ids::BUILDER;
+use crate::testing::static_roles;
 use crate::vision::TileCount;
 use crate::vision::VisionBits;
 use crate::vision::visibility::{Visibility, VisibleMap};
@@ -519,6 +522,117 @@ fn computer_player_sets_aside_its_share_of_each_resource_add() {
     };
     person.add_attribute(attribute::FOOD, Amount::new(10.0));
     assert_eq!(person.escrow, [Amount::ZERO; 4]);
+}
+
+/// The base store's escrow (`FUN_1416674b0`, [`Player::store_attribute`]): a computer player's
+/// resource set above 0 sets its escrow to its share of the value, not onto it, and an escrow
+/// above the resource falls to it, or to 0 below 0; a NaN value or share and a share of 0 set
+/// nothing aside, and a NaN resource keeps its escrow; a computer's other attribute takes no
+/// escrow, and an attribute past the count takes nothing.
+#[test]
+fn computer_player_store_sets_its_escrow_to_its_share_of_the_resource() {
+    let roles = static_roles();
+    let mut computer = Player {
+        kind: PlayerKind::Computer,
+        escrow: amounts([4.0, 1.0, 2.0, 6.0]),
+        escrow_percentage: [0.5, 2.0, f32::NAN, 0.0].map(EscrowShare::of_data),
+        ..human()
+    };
+    computer.store_attribute(attribute::FOOD, Amount::new(10.0), roles);
+    assert_eq!(
+        (computer.attributes[0], computer.escrow[0]),
+        (Amount::new(10.0), Amount::new(5.0))
+    );
+    // a share of 2 sets aside twice the resource: the escrow falls to it
+    computer.store_attribute(attribute::WOOD, Amount::new(3.0), roles);
+    assert_eq!(computer.escrow[1], Amount::new(3.0));
+    // a set of 0 sets nothing aside, and the escrow falls to the resource
+    computer.store_attribute(attribute::FOOD, Amount::ZERO, roles);
+    assert_eq!(computer.escrow[0], Amount::ZERO);
+    computer.escrow[0] = Amount::new(5.0);
+    computer.store_attribute(attribute::FOOD, Amount::new(-4.0), roles);
+    assert_eq!(
+        (computer.attributes[0], computer.escrow[0]),
+        (Amount::new(-4.0), Amount::ZERO)
+    );
+    // a NaN value sets nothing aside, and a NaN resource is not below its escrow
+    computer.store_attribute(attribute::WOOD, Amount::new(f32::NAN), roles);
+    assert!(computer.attributes[1].get().is_nan());
+    assert_eq!(computer.escrow[1], Amount::new(3.0));
+    // a NaN share and a share of 0 set nothing aside, and the escrows stay below the resources
+    computer.store_attribute(attribute::STONE, Amount::new(8.0), roles);
+    computer.store_attribute(attribute::GOLD, Amount::new(8.0), roles);
+    assert_eq!(
+        [computer.escrow[2], computer.escrow[3]],
+        amounts([2.0, 6.0])
+    );
+    computer.store_attribute(attribute::STONE, Amount::new(1.0), roles);
+    assert_eq!(computer.escrow[2], Amount::new(1.0));
+    computer.store_attribute(attribute::HEADROOM, Amount::new(8.0), roles);
+    computer.store_attribute(AttributeId::named(300), Amount::new(1.0), roles);
+    assert_eq!(
+        (computer.attributes[4], computer.attributes.len()),
+        (Amount::new(8.0), 300)
+    );
+    assert_eq!(computer.escrow, amounts([0.0, 3.0, 1.0, 6.0]));
+}
+
+/// The base store takes no escrow for a human player: its resource set leaves an escrow above
+/// the resource as it was.
+#[test]
+fn human_player_store_keeps_its_escrow() {
+    let mut person = Player {
+        escrow: amounts([4.0, 0.0, 0.0, 0.0]),
+        escrow_percentage: [0.5; 4].map(EscrowShare::of_data),
+        ..human()
+    };
+    person.store_attribute(attribute::FOOD, Amount::new(1.0), static_roles());
+    assert_eq!(
+        (person.attributes[0], person.escrow[0]),
+        (Amount::new(1.0), Amount::new(4.0))
+    );
+}
+
+/// The store of the civilisation name override (`FUN_1416674b0`'s 0x106,
+/// [`Player::store_attribute`]): the attribute takes the value, and the player's civilisation
+/// takes the string of the value truncated, each store again; another attribute's store leaves
+/// the name, and a player without the attribute takes nothing.
+#[test]
+fn civ_name_override_store_names_the_string_of_its_value() {
+    let roles = static_roles();
+    let mut person = human();
+    person.store_attribute(attribute::HEADROOM, Amount::new(7.0), roles);
+    assert_eq!(person.civ_name_override, CivNameOverride::None);
+    person.store_attribute(attribute::CIV_NAME_OVERRIDE, Amount::new(10_271.6), roles);
+    assert_eq!(
+        (person.attributes[262], person.civ_name_override),
+        (
+            Amount::new(10_271.6),
+            CivNameOverride::String(StringId::of_amount(Amount::new(10_271.0)))
+        )
+    );
+    person.store_attribute(attribute::CIV_NAME_OVERRIDE, Amount::new(-2.0), roles);
+    assert_eq!(
+        person.civ_name_override,
+        CivNameOverride::String(StringId::of_amount(Amount::new(-2.0)))
+    );
+    person.store_attribute(attribute::FOOD, Amount::new(3.0), roles);
+    assert_eq!(
+        person.civ_name_override,
+        CivNameOverride::String(StringId::of_amount(Amount::new(-2.0)))
+    );
+    let mut without_attribute = Player {
+        attributes: vec![Amount::ZERO; 262],
+        ..human()
+    };
+    without_attribute.store_attribute(attribute::CIV_NAME_OVERRIDE, Amount::new(5.0), roles);
+    assert_eq!(
+        (
+            without_attribute.attributes.len(),
+            without_attribute.civ_name_override
+        ),
+        (262, CivNameOverride::None)
+    );
 }
 
 /// Slot 0xf8's escrow takes the share of each add, the shared ones too: a computer ally that

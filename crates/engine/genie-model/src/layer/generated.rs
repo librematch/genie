@@ -466,38 +466,40 @@ bitflags! {
         const ALIVE_STORAGE = 1 << 0;
         /// The attribute that turns the allied vision on (`FUN_141616820`'s and `FUN_14162d610`'s 0x32): the player's `allied_LOS_Enable` (`+0x2cc`) takes 1, the world's masks are rebuilt (its slot 0x78, `World::rebuild_vision`) and the player's map files every tile its masks reach as new (`World::refill_tiles`, `FUN_141285cb0`).
         const ALLIED_VISION = 1 << 1;
+        /// The civilisation name override (262, `cAttributeCivNameOverride`): its store (`FUN_1416674b0`) names the string of the value truncated as the player's civilisation name for the interface (`+0x628` 1, `+0x62c`, the text `+0x630` cleared).
+        const CIV_NAME_OVERRIDE = 1 << 2;
         /// A task whose `attribute_type4` is this (`0x124`) stops its target's decay under player attribute 292 (`FUN_140ac44b0`).
-        const DECAY_TASK = 1 << 2;
+        const DECAY_TASK = 1 << 3;
         /// The attribute whose set above 0 calls the scripts' `EffectFunction<n>` (0x21, `FUN_14162d610`).
-        const EFFECT_FUNCTION = 1 << 3;
+        const EFFECT_FUNCTION = 1 << 4;
         /// A load of a farm's food: a farmer's, and what a Make of a farm holds.
-        const FARM_FOOD = 1 << 4;
+        const FARM_FOOD = 1 << 5;
         /// The food the farms hold (Farm Food Amount, `player+0x100` at `+0x120`: 36), which `set_state(6)` of a farm's Make reads and an effect's change grows (`FUN_141615270`).
-        const FARM_FOOD_AMOUNT = 1 << 5;
+        const FARM_FOOD_AMOUNT = 1 << 6;
         /// Food: the first of the four resources (food, wood, stone, gold: 0 to 3).
-        const FOOD = 1 << 6;
+        const FOOD = 1 << 7;
         /// Gold: a sale gives it and a purchase costs it, the treason costs it.
-        const GOLD = 1 << 7;
+        const GOLD = 1 << 8;
         /// The population headroom (`+0x308` 4): a building's held amount gives it, and a cost check skips it (`FUN_141618db0` with its fifth argument 1).
-        const HEADROOM = 1 << 8;
+        const HEADROOM = 1 << 9;
         /// The loads whose drop-off works with the hunt's task filter (`FUN_14161e370`'s list: meat 15, wood 1, food 0).
-        const HUNTED_LOAD = 1 << 9;
+        const HUNTED_LOAD = 1 << 10;
         /// A storage the population attribute (110) moves by its magnitude (`FUN_1412163c0`): the current population (11) and attribute 19 take the old amount's negation, then the new value's magnitude.
-        const MAGNITUDE_STORAGE = 1 << 10;
+        const MAGNITUDE_STORAGE = 1 << 11;
         /// The ore (0x38): a commodity the market's price reads know (none of its commands trades it), and a load a drop-off takes as itself beside the four resources and the trade goods (`FUN_140fdd4f0`).
-        const ORE = 1 << 11;
+        const ORE = 1 << 12;
         /// A relic, as a monk carries it (`+0x308` 0x39): the monk tasks for carried relics; a unit carrying one never attacks.
-        const RELIC = 1 << 12;
+        const RELIC = 1 << 13;
         /// The relics the player holds (7): a research paid in them (`FUN_1413d0e70`), and a researched one paid in more than are left after a relic left a building (`FUN_1411d6ad0`).
-        const RELICS_HELD = 1 << 13;
+        const RELICS_HELD = 1 << 14;
         /// The attribute that shares every player's sight (0xb7): the masks are rebuilt.
-        const SHARED_VISION = 1 << 14;
+        const SHARED_VISION = 1 << 15;
         /// The attribute of the town centres' flare reveal across the players (0xc4, Spies' "Treason"): a player with it above 0 changes nothing; else each other player with it at most 0 takes the amount too.
-        const SPREAD_ATTRIBUTE = 1 << 15;
+        const SPREAD_ATTRIBUTE = 1 << 16;
         /// Stone.
-        const STONE = 1 << 16;
+        const STONE = 1 << 17;
         /// Wood.
-        const WOOD = 1 << 17;
+        const WOOD = 1 << 18;
     }
 }
 

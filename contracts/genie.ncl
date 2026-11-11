@@ -31,7 +31,7 @@
     touch | Number | doc "The squared reach of an attack without a range (`DAT_142ed48e4`): `0x3c23d70b`, which is `0.1f * 0.1f`, one ULP above `0.01f`.\n\n`attack::TOUCH`: 0.010000001 in build 158041.",
   },
   AttributeId | doc "A player's attribute number (`player+0x100`'s array, the `.dat`'s attribute types, an effect's\nattribute argument): 0 or more. The first four are the resources (food, wood, stone, gold).\nThe engine names the ones it tells apart in the build layer (`Slots::attribute`, the\nattributes' roles); any other is a number the data holds ([`AttributeId::named`]). A field\nthat holds −1 for none is `Option<AttributeId>`." = std.contract.from_predicate (fun x => std.is_number x && x % 1 == 0 && -32768 <= x && x <= 32767),
-  AttributeRoles = [| 'ALIVE_STORAGE, 'ALLIED_VISION, 'DECAY_TASK, 'EFFECT_FUNCTION, 'FARM_FOOD, 'FARM_FOOD_AMOUNT, 'FOOD, 'GOLD, 'HEADROOM, 'HUNTED_LOAD, 'MAGNITUDE_STORAGE, 'ORE, 'RELIC, 'RELICS_HELD, 'SHARED_VISION, 'SPREAD_ATTRIBUTE, 'STONE, 'WOOD |],
+  AttributeRoles = [| 'ALIVE_STORAGE, 'ALLIED_VISION, 'CIV_NAME_OVERRIDE, 'DECAY_TASK, 'EFFECT_FUNCTION, 'FARM_FOOD, 'FARM_FOOD_AMOUNT, 'FOOD, 'GOLD, 'HEADROOM, 'HUNTED_LOAD, 'MAGNITUDE_STORAGE, 'ORE, 'RELIC, 'RELICS_HELD, 'SHARED_VISION, 'SPREAD_ATTRIBUTE, 'STONE, 'WOOD |],
   AttributeSlots | doc "The attribute ids the engine names, one field each." = {
     food | AttributeId | doc "Food: the first of the four resources (food, wood, stone, gold: 0 to 3).",
     gold | AttributeId | doc "Gold: a sale gives it and a purchase costs it, the treason costs it.",

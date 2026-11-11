@@ -13,7 +13,7 @@ use crate::technology::effect::attribute_modifier::EffectHook;
 use crate::world::AllySharing;
 use crate::world::World;
 use crate::world::layer::AttributeRoles;
-use crate::world::slots::{CheckedIndexExt, PlayerSlotsExt};
+use crate::world::slots::PlayerSlotsExt;
 use crate::{GenieError, GenieResult};
 
 impl World {
@@ -80,29 +80,14 @@ impl World {
         Ok(())
     }
 
-    /// `FUN_1416674b0`, the attribute's store: within the player's attributes' count it takes
-    /// `amount`. A computer player's resource peaks (`+0x6dc`) and attribute 262's fields
-    /// (`+0x628`..`+0x630`) are not held.
-    pub(super) fn store_attribute(
-        &mut self,
-        player_id: PlayerId,
-        attribute: AttributeId,
-        amount: Amount,
-    ) -> GenieResult<()> {
-        let player = self.players.player_mut(player_id)?;
-        let index = attribute.index();
-        if player.attributes.len() <= index {
-            return Ok(());
-        }
-        *player.attributes.checked_mut(index)? = amount;
-        Ok(())
-    }
-
     /// Slot 0xf0 (`FUN_14162d610`) of player `player`: attribute `attribute` takes `amount`
-    /// ([`World::store_attribute`]), with its side effects: 0x32 turns the allied vision on first
-    /// ([`World::allied_vision_on`]); 0xc4 changes nothing for a player above 0 and spreads to the
-    /// others at most 0 ([`AttributeRoles::SPREAD_ATTRIBUTE`]); 0xb7 rebuilds the masks after; 0x21
-    /// above 0 calls the scripts' `EffectFunction<amount>` (the XS runtime is not modelled).
+    /// (the store, [`Player::store_attribute`]), with its side effects: 0x32 turns the allied
+    /// vision on first ([`World::allied_vision_on`]); 0xc4 changes nothing for a player above 0
+    /// and spreads to the others at most 0 ([`AttributeRoles::SPREAD_ATTRIBUTE`]); 0xb7 rebuilds
+    /// the masks after; 0x21 above 0 calls the scripts' `EffectFunction<amount>` (the XS runtime
+    /// is not modelled).
+    ///
+    /// [`Player::store_attribute`]: crate::world::Player::store_attribute
     pub(crate) fn set_player_attribute(
         &mut self,
         player: PlayerId,
@@ -125,11 +110,11 @@ impl World {
                         && self.attribute_of(player_id, self.model.slots.attribute.spread_attribute)
                             <= Amount::ZERO
                     {
-                        self.store_attribute(
-                            player_id,
+                        self.players.player_mut(player_id)?.store_attribute(
                             self.model.slots.attribute.spread_attribute,
                             amount,
-                        )?;
+                            &self.model.roles,
+                        );
                     }
                 }
             } else if held.contains(AttributeRoles::EFFECT_FUNCTION) && (Amount::ZERO < amount) {
@@ -138,7 +123,9 @@ impl World {
                 ));
             }
         }
-        self.store_attribute(player, attribute, amount)?;
+        self.players
+            .player_mut(player)?
+            .store_attribute(attribute, amount, &self.model.roles);
         if self
             .model
             .roles

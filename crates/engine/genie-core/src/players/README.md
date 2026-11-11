@@ -27,6 +27,7 @@ A player has more than its objects. This folder holds the rest:
 | --- | --- |
 | [`by_player.rs`](by_player.rs) | One value per player, looked up by the player (`ByPlayer`). |
 | [`chance.rs`](chance.rs) | A computer player's chance setting: the percent a unit AI's draw is held against. |
+| [`civ_name.rs`](civ_name.rs) | A player's civilisation name override, which the civilisation name override's attribute sets. |
 | [`culture.rs`](culture.rs) | A player's culture: its civilisation's icon set, which a building's counts of the relics and the livestock inside it test. |
 | [`diplomacy.rs`](diplomacy.rs) | A player's diplomacy change (the world player's slot 0x30, `FUN_141639690`, which GAME's sub-command 0 runs): its stance toward another player (`diplomacy[i]`, `+0xe12`), the relation it makes (`relation[i]`, `+0x260`) and what its queries make of that player's objects (`unit_diplomacy[i]`, `+0x278`); its objects hear of it (slot 0x120: units inside a building or siege tower of a player no longer allied leave it); the players' sight masks and tile lists are made again; then the world's teams (`FUN_1415e23f0`) and the units the players reveal (`FUN_14152bcb0`). |
 | [`escrow_share.rs`](escrow_share.rs) | The share of a resource's income a computer player sets aside. |

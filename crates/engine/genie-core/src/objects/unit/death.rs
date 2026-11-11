@@ -68,7 +68,7 @@ impl Unit {
             step.world
                 .players
                 .player_mut(step.player)?
-                .take_at_least_zero(kind, Amount::new(1.0));
+                .take_at_least_zero(kind, Amount::new(1.0), &step.world.model.roles);
         }
         Ok(death.building.tech)
     }
@@ -145,7 +145,7 @@ impl Unit {
                 roles,
                 step.world.model.slots,
             ) {
-                owner.take_at_least_zero(kind, cost);
+                owner.take_at_least_zero(kind, cost, roles);
             }
         }
         if let Some((master_id, tech_id)) = tech {

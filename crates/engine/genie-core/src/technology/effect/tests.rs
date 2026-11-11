@@ -1435,6 +1435,49 @@ fn technology_resource_add_reaches_sharing_allies() {
     );
 }
 
+/// A technology's resource set is slot 0xf0 (`FUN_14162d610`), whose store (`FUN_1416674b0`)
+/// sets a computer player's escrow to its share of the value, held to the resource; a human's
+/// stays as it was.
+#[test]
+fn technology_resource_set_sets_computer_escrow() {
+    let player = |kind: PlayerKind| Player {
+        kind,
+        attributes: vec![Amount::ZERO; 300],
+        escrow: [Amount::new(40.0); 4],
+        escrow_percentage: [0.5; 4].map(EscrowShare::of_data),
+        ..Player::default()
+    };
+    let mut world = World::new(
+        WorldTime::ZERO,
+        FrameSeed::of_data(0),
+        PlayerId::new(0),
+        vec![Millis::ZERO; 2],
+        vec![player(PlayerKind::Computer), player(PlayerKind::Human)],
+    );
+    for player_id in [0, 1].map(PlayerId::new) {
+        world
+            .do_effect(player_id, &[attribute(1, 1, 0, -1, 30.0)], None)
+            .unwrap();
+        world
+            .do_effect(player_id, &[attribute(1, 2, 0, -1, 30.0)], None)
+            .unwrap();
+        world
+            .do_effect(player_id, &[attribute(6, 2, -1, -1, 0.5)], None)
+            .unwrap();
+    }
+    assert_eq!(
+        [0, 1].map(|player| (
+            world.players[player].attributes[1],
+            world.players[player].escrow[1],
+            world.players[player].escrow[2]
+        )),
+        [
+            (Amount::new(30.0), Amount::new(15.0), Amount::new(7.5)),
+            (Amount::new(30.0), Amount::new(40.0), Amount::new(40.0))
+        ]
+    );
+}
+
 /// A technology at the barracks (master 12, 30 seconds in the `.dat`) in state 1 with 20
 /// seconds of work done.
 fn barracks_tech() -> World {

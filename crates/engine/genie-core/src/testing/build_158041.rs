@@ -888,7 +888,7 @@ const MASTER_ROLES: [(usize, MasterRoles); 90] = [
 const TECH_ROLES: [(usize, TechRoles); 0] = [];
 
 /// The attribute roles by id.
-const ATTRIBUTE_ROLES: [(usize, AttributeRoles); 18] = [
+const ATTRIBUTE_ROLES: [(usize, AttributeRoles); 19] = [
     (0, AttributeRoles::FOOD.union(AttributeRoles::HUNTED_LOAD)),
     (1, AttributeRoles::HUNTED_LOAD.union(AttributeRoles::WOOD)),
     (2, AttributeRoles::STONE),
@@ -909,6 +909,7 @@ const ATTRIBUTE_ROLES: [(usize, AttributeRoles); 18] = [
     (57, AttributeRoles::RELIC),
     (183, AttributeRoles::SHARED_VISION),
     (196, AttributeRoles::SPREAD_ATTRIBUTE),
+    (262, AttributeRoles::CIV_NAME_OVERRIDE),
     (292, AttributeRoles::DECAY_TASK),
 ];
 

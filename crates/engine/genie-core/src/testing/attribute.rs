@@ -92,6 +92,9 @@ pub const TECHS_RESEARCHED: AttributeId = AttributeId::named(0x15);
 pub const RESEARCH_SPENT: AttributeId = AttributeId::named(0x63);
 /// The attribute that scales research times above 0 (`+0x2b0`: 86).
 pub const RESEARCH_TIME_MODIFIER: AttributeId = AttributeId::named(86);
+/// The civilisation name override (262, `cAttributeCivNameOverride`): its store names the
+/// player's civilisation by the string of its value.
+pub const CIV_NAME_OVERRIDE: AttributeId = AttributeId::named(262);
 /// The attribute naming the world's effect a player gets after each research (`+0x868`: 269).
 pub const WORLD_EFFECT: AttributeId = AttributeId::named(269);
 /// The buildings' paid costs (247), which the combat setup adds for a building with a train
