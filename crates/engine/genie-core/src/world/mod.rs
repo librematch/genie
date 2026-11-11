@@ -338,4 +338,6 @@ pub struct Recycling {
 }
 
 #[cfg(test)]
+mod feature_flags_tests;
+#[cfg(test)]
 pub(crate) mod tests;

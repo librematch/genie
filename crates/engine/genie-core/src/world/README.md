@@ -40,6 +40,7 @@ moves it on. The behaviours that a tick runs live in their systems. Many of them
 | [`checkpoint.rs`](checkpoint.rs) | The per-player 11-word state block that recorded games checkpoint every N syncs. |
 | [`combat_parts.rs`](combat_parts.rs) | The combat object's parts (FD-045-D51): its combat layer (`RGE_Combat_Object`, types 50 and up) and a building's layer (`TRIBE_Building_Object`, type 80) by id in the world's tables (`Parts::combat`, `Parts::building`), a new object's where a table holds none, and the repairers or builders that one of the two holds. |
 | [`feature_flags.rs`](feature_flags.rs) | The game's feature flags for experimental bug fixes. |
+| [`feature_flags_tests.rs`](feature_flags_tests.rs) | Tests: The game's feature flags for experimental bug fixes: the load turns them on for a saved 1 alone. |
 | [`forced.rs`](forced.rs) | The forced replay (dev only): the game's state after a tick (`GameState`) and the step that forces it on the world. |
 | [`frame_seed.rs`](frame_seed.rs) | The world's frame seed. |
 | [`index.rs`](index.rs) | The world's table by id (`FUN_1415417a0`: `world+0x168` for ids 0 and up, `+0x178` for the recycled ones, FD-045-D49): where each object is, a player's live or sleeping slot. |

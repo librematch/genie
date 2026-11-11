@@ -779,6 +779,48 @@ fn placement_under_feature_flags_passes_over_annex_of_passed_building() {
     assert_eq!(at(&world, main), Tested::Blocked { stays: false });
 }
 
+/// Under the feature flags the slot's test of an annex needs its call's object (`[0x58]`,
+/// `TEST RBP, RBP` at 0x14126520c): without one, the house 501, no annex and first on the
+/// tile, still reports the block, as it does beside a passed object it is no annex of.
+#[test]
+fn placement_under_feature_flags_without_passed_object_counts_building_that_is_no_annex() {
+    let restriction = Restriction::new(vec![1.0, 0.0]);
+    let villager = placed_villager(&restriction);
+    let soldier = Master {
+        id: master_id(4),
+        class: class::CLASS_6,
+        ..sheep_master()
+    };
+    let mut world = Scene::open(GridSize::new(120, 120))
+        .object(SceneObject::new(
+            501,
+            PlayerId::GAIA,
+            house_master(),
+            Position::new(106.5, 47.9, 0.0),
+        ))
+        .object(SceneObject::new(
+            9521,
+            PlayerId::GAIA,
+            soldier,
+            Position::new(106.6, 47.2, 0.0),
+        ))
+        .build();
+    world.feature_flags = FeatureFlags::On;
+    let at = |passed| {
+        placement(
+            &villager,
+            &WorldMap { turns: &world },
+            Point::new(106.5, 47.5),
+            PlacementCall { passed, ..COUNTED },
+            &roles(),
+            &tuning().spawn,
+        )
+        .unwrap()
+    };
+    assert_eq!(at(None), Tested::Blocked { stays: true });
+    assert_eq!(at(Some(object_id(600))), Tested::Blocked { stays: true });
+}
+
 /// A master without a height (`+0x5e0` at most 0) is free on the sheep: each object's test in
 /// both scans needs that height, so the call's `[0x48]` (`param_10`), which lets the scans run
 /// without it, changes nothing.
