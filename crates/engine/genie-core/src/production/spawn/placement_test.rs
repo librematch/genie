@@ -104,8 +104,8 @@ pub(super) fn overlapping(
 /// BUILD's placement test (`FUN_140e7a400`'s call of the master's slot 0x50, the building master's
 /// `FUN_14123aee0` with BUILD's flags: `p6` human, `p7`, `p8`, `p9` 1, `p10` 0, `p11` 1, no object
 /// of its own, `p13` 0, `p14` 1): 0 when the foundation may go to `point`, else the game's code.
-/// First the static test (`FUN_141123f80` through `FUN_141264db0`; their scans run only for the
-/// Build's test, [`SiteChecks::SCANS`]) over the box of the site's radii: off the map 7; per tile,
+/// First the unit master's slot 0x50 ([`build_slot_test`]; its scans run only for the Build's
+/// test, [`SiteChecks::SCANS`]) over the box of the site's radii: off the map 7; per tile,
 /// columns then rows, a terrain the restriction forbids 2 (`DAT_142eb7e5c`'s threshold, the
 /// spawn's); a human who explored none of the tiles 5; a hill mode's tile ([`hill_fails`]) 3. Then
 /// the building master's scan of the tiles within 8 (rows, then columns; each tile's objects in its
@@ -125,13 +125,9 @@ pub(crate) fn build_placement(
     roles: &Roles,
     spawn_tuning: &SpawnTuning,
 ) -> GenieResult<PlacementCode> {
-    if let Some(code) = build_static_test(site, map, point, spawn_tuning)? {
+    let code = build_slot_test(site, map, point, roles, spawn_tuning)?;
+    if !code.is_allowed() {
         return Ok(code);
-    }
-    if site.checks.contains(SiteChecks::SCANS)
-        && static_scans_find(site, map, point, roles, spawn_tuning)?
-    {
-        return Ok(PlacementCode::Blocked);
     }
     // FUN_14123aee0's scan
     let size = map.size();
@@ -160,26 +156,66 @@ pub(crate) fn build_placement(
     Ok(PlacementCode::Allowed)
 }
 
-/// The static scans of the Build's test (`p11` and `p13` 1, [`SiteChecks::SCANS`]), for a master
-/// with a height ([`BuildSite::tall`]) and radii: `FUN_141123f80`'s, then `FUN_141264db0`'s, each
-/// over the tiles within `SpawnTuning::reach` (rows, then columns; each tile's objects in its
-/// list's order) for an object other than the site's own (`p12`), below state 7, not buildable on,
-/// no desolid building (`FUN_141264db0`'s passes classes 51 and 54), with a height
-/// (`FUN_141123f80`'s gives a tree's farm and an obstructing building one, `FUN_141264db0`'s an
-/// obstructing building; the latter passes over the units, type 70), whose box overlaps the site's:
-/// true when one does (the game's code 6).
-fn static_scans_find(
+/// The unit master's slot 0x50 (`0x141264db0`) as BUILD's placement test calls it (`p10` 0,
+/// `p11` the scans, [`SiteChecks::SCANS`]): `FUN_141123f80`'s test, its static test
+/// ([`build_static_test`]), then for a site with a height its scan behind the zone test's gate
+/// ([`base_scan_finds`]). With the scans, the slot answers 0 for a site whose radii are both at
+/// most 0, whatever `FUN_141123f80` found (`XOR AL, AL` at 0x141264f09); for one with a height,
+/// its own scan ([`own_scan_finds`]) answers 6 over that code. A NaN radius passes both gates
+/// ([`has_radii`]) and the scans find nothing for it. The editor's code 9 is not modelled.
+fn build_slot_test(
+    site: &BuildSite<'_>,
+    map: &WorldMap<'_>,
+    point: Point,
+    roles: &Roles,
+    spawn_tuning: &SpawnTuning,
+) -> GenieResult<PlacementCode> {
+    let scans = site.checks.contains(SiteChecks::SCANS);
+    let code = if let Some(code) = build_static_test(site, map, point, spawn_tuning)? {
+        code
+    } else if scans
+        && site.tall
+        && has_radii(site.radius)
+        && base_scan_finds(site, map, point, roles, spawn_tuning)?
+    {
+        PlacementCode::Blocked
+    } else {
+        PlacementCode::Allowed
+    };
+    if !scans {
+        return Ok(code);
+    }
+    if !has_radii(site.radius) {
+        return Ok(PlacementCode::Allowed);
+    }
+    if site.tall && own_scan_finds(site, map, point, roles, spawn_tuning)? {
+        return Ok(PlacementCode::Blocked);
+    }
+    Ok(code)
+}
+
+/// Whether the radii `radius` pass the gate of `FUN_141123f80`'s zone test and scan and of
+/// `FUN_141264db0`'s scan: one is above 0, or one is a NaN. Each gate is `COMISS 0, rx` with a
+/// `JC` into the test (0x141124d8b, 0x141264f01), then `COMISS 0, ry` with a `JNC` past it
+/// (0x141124d91) or a `JC` into it (0x141264f07): the unordered case takes the test, where the
+/// C reads `0.0 < rx || 0.0 < ry`.
+fn has_radii(radius: Footprint) -> bool {
+    !(radius.x() <= 0.0 && radius.y() <= 0.0)
+}
+
+/// `FUN_141123f80`'s scan in the Build's test: over the tiles within `SpawnTuning::reach` (rows,
+/// then columns; each tile's objects in its list's order), an object other than the site's own
+/// (`p12`), below state 7, not buildable on, no desolid building, with a height (a tree's farm
+/// and an obstructing building have one), whose box overlaps the site's: true when one does (the
+/// game's code 6).
+fn base_scan_finds(
     site: &BuildSite<'_>,
     map: &WorldMap<'_>,
     point: Point,
     roles: &Roles,
     spawn_tuning: &SpawnTuning,
 ) -> GenieResult<bool> {
-    let (rx, ry) = (site.radius.x(), site.radius.y());
-    if !site.tall || !(0.0 < rx || 0.0 < ry) {
-        return Ok(false);
-    }
-    let first = |near: &Near| {
+    let counts = |near: &Near| {
         let listed = !site.own.contains(&near.id)
             && near.state < ObjectState::Removed
             && !near.buildable_on.passed()
@@ -191,10 +227,22 @@ fn static_scans_find(
                 && near.obstruction_kind != ObstructionKind::NONE);
         listed.then_some(tall)
     };
-    if !overlapping(map, point, site.radius, &first, spawn_tuning)?.is_empty() {
-        return Ok(true);
-    }
-    let second = |near: &Near| {
+    Ok(!overlapping(map, point, site.radius, &counts, spawn_tuning)?.is_empty())
+}
+
+/// `FUN_141264db0`'s own scan in the Build's test (`p13` 1): over the tiles within
+/// `SpawnTuning::reach` (rows, then columns; each tile's objects in its list's order), an object
+/// other than the site's own (`p12`), not a unit (type 70), below state 7, not buildable on, no
+/// desolid building but of classes 51 and 54, with a height (an obstructing building has one),
+/// whose box overlaps the site's: true when one does (the game's code 6).
+fn own_scan_finds(
+    site: &BuildSite<'_>,
+    map: &WorldMap<'_>,
+    point: Point,
+    roles: &Roles,
+    spawn_tuning: &SpawnTuning,
+) -> GenieResult<bool> {
+    let counts = |near: &Near| {
         let listed = !site.own.contains(&near.id)
             && near.state < ObjectState::Removed
             && !near.buildable_on.passed()
@@ -211,13 +259,14 @@ fn static_scans_find(
             || (near.kind == MasterKind::BUILDING && near.obstruction_kind.recorded());
         listed.then_some(tall)
     };
-    Ok(!overlapping(map, point, site.radius, &second, spawn_tuning)?.is_empty())
+    Ok(!overlapping(map, point, site.radius, &counts, spawn_tuning)?.is_empty())
 }
 
-/// BUILD's static test (`FUN_141123f80` through `FUN_141264db0`) over the clearance box at `point`:
-/// off the map 7; the placement terrains 1; per tile, columns then rows, a terrain the
+/// BUILD's static test (`FUN_141123f80`'s, through [`build_slot_test`]) over the clearance box at
+/// `point`: off the map 7; the placement terrains 1; per tile, columns then rows, a terrain the
 /// restriction forbids 2; a hill mode's tile 3; a human who explored none of the tiles 5. None
-/// when the box passes; a zone mode is not modelled.
+/// when the box passes; a zone mode, whose test runs behind the gate of [`has_radii`] (a NaN
+/// radius passes it), is not modelled.
 pub(super) fn build_static_test(
     site: &BuildSite<'_>,
     map: &WorldMap<'_>,
@@ -264,7 +313,7 @@ pub(super) fn build_static_test(
     if site.checks.contains(SiteChecks::HUMAN) && !explored {
         return Ok(Some(PlacementCode::Unexplored));
     }
-    if (0.0 < rx || 0.0 < ry) && site.checks.contains(SiteChecks::ZONES) {
+    if has_radii(site.radius) && site.checks.contains(SiteChecks::ZONES) {
         return Err(GenieError::unsupported(
             "BUILD's placement test in a zone mode",
         ));
@@ -493,9 +542,9 @@ pub(crate) fn placement(
 ) -> GenieResult<Tested> {
     let (x, y) = (point.x(), point.y());
     let (rx, ry) = (me.radius.x(), me.radius.y());
-    // without radii the slot answers free whatever FUN_141123f80 found; its `COMISS` of
-    // `0.0 < rx` jumps on the unordered case (`JC`), so a NaN radius takes the scans
-    if rx <= 0.0 && ry <= 0.0 {
+    // without radii the slot answers free whatever FUN_141123f80 found; a NaN radius takes
+    // the scans
+    if !has_radii(me.radius) {
         return Ok(Tested::Free);
     }
     let size = map.size();

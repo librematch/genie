@@ -1702,6 +1702,37 @@ fn build_static_test_answers_the_map_edge_terrain_and_exploration() {
     );
 }
 
+/// BUILD's zone test runs behind the gate of `COMISS 0, rx; JC; COMISS 0, ry; JNC`
+/// (0x141124d87): a NaN in either radius takes it (an error, as the zone mode is not
+/// modelled), radii both at most 0 pass over it.
+#[test]
+fn nan_radius_takes_the_build_zone_test() {
+    use crate::production::spawn::placement_test::build_static_test;
+    let values = Restriction::new(vec![1.0]);
+    let seen = plain(TileSight::Seen);
+    let flat = WorldMap { turns: &seen };
+    let zone_test = |radius| {
+        let zoned = BuildSite {
+            checks: SiteChecks::ZONES,
+            radius,
+            ..house_site(&values, false)
+        };
+        build_static_test(&zoned, &flat, Point::new(50.0, 50.0), &tuning().spawn)
+            .map(|placement_code| placement_code.map(PlacementCode::code))
+            .map_err(|error| error.reason())
+    };
+    for radius in [Footprint::new(f32::NAN, 0.0), Footprint::new(0.0, f32::NAN)] {
+        assert_eq!(
+            zone_test(radius),
+            Err("BUILD's placement test in a zone mode"),
+            "{radius:?}"
+        );
+    }
+    for radius in [Footprint::ZERO, Footprint::new(-0.5, 0.0)] {
+        assert_eq!(zone_test(radius), Ok(None), "{radius:?}");
+    }
+}
+
 /// BUILD's scan reads 8 tiles either way of the point, from 0 to the map's last tile.
 #[test]
 fn build_scan_reads_eight_tiles_either_way_within_the_map() {
@@ -2078,6 +2109,131 @@ fn the_build_static_scans_find_dying_house_build_passes_over() {
         ),
         0
     );
+}
+
+/// The Build's test of a site whose radii are both at most 0 answers 0 whatever
+/// `FUN_141123f80` found (`XOR AL, AL` at 0x141264f09), here off the map (7), which BUILD's
+/// test without the scans keeps; a NaN in either radius is not at most 0 and keeps the code.
+#[test]
+fn build_scans_free_site_without_radii_off_the_map() {
+    let values = Restriction::new(vec![1.0]);
+    let world = Scene::open(GridSize::new(120, 120)).build();
+    let test = |checks, radius, x, y| {
+        let site = BuildSite {
+            checks,
+            radius,
+            tall: true,
+            ..house_site(&values, false)
+        };
+        build_placement(
+            &site,
+            &WorldMap { turns: &world },
+            Point::new(x, y),
+            &roles(),
+            &tuning().spawn,
+        )
+        .unwrap()
+        .code()
+    };
+    for radius in [Footprint::ZERO, Footprint::new(-0.5, 0.0)] {
+        assert_eq!(test(SiteChecks::SCANS, radius, -5.0, 50.0), 0, "{radius:?}");
+        assert_eq!(
+            test(SiteChecks::empty(), radius, -5.0, 50.0),
+            7,
+            "{radius:?}"
+        );
+    }
+    assert_eq!(
+        test(SiteChecks::SCANS, Footprint::new(f32::NAN, 0.0), 50.0, -1.0),
+        7
+    );
+    assert_eq!(
+        test(SiteChecks::SCANS, Footprint::new(0.0, f32::NAN), -1.0, 50.0),
+        7
+    );
+}
+
+/// The slot's own scan (`FUN_141264db0`) runs whatever `FUN_141123f80` answered: a house that
+/// overlaps a site past the map's west edge answers 6 in the Build's test, while BUILD's test
+/// keeps the edge's 7, and so does the Build's test of a site without a height or without the
+/// house.
+#[test]
+fn build_own_scan_answers_over_the_map_edge() {
+    let values = Restriction::new(vec![1.0]);
+    let test = |checks, tall, houses: &[SceneObject]| {
+        let world = houses
+            .iter()
+            .cloned()
+            .fold(
+                Scene::open(GridSize::new(120, 120)).players(2),
+                Scene::object,
+            )
+            .build();
+        let site = BuildSite {
+            checks,
+            tall,
+            ..house_site(&values, false)
+        };
+        build_placement(
+            &site,
+            &WorldMap { turns: &world },
+            Point::new(0.5, 21.0),
+            &roles(),
+            &tuning().spawn,
+        )
+        .unwrap()
+        .code()
+    };
+    let house = [SceneObject::new(
+        600,
+        PlayerId::new(2),
+        house_master(),
+        Position::new(1.5, 21.5, 0.0),
+    )];
+    assert_eq!(test(SiteChecks::SCANS, true, &house), 6);
+    assert_eq!(test(SiteChecks::empty(), true, &house), 7);
+    assert_eq!(test(SiteChecks::SCANS, false, &house), 7);
+    assert_eq!(test(SiteChecks::SCANS, true, &[]), 7);
+}
+
+/// A NaN in either radius passes the static scans' gates (`JC` at 0x141124d8b and
+/// 0x141264f01), and their overlap tests (`JBE` at 0x141125240 and 0x1412654a1) find nothing for
+/// it: the dying house 600 at (21.5, 21.5) that both find for radii 1 does not block it.
+#[test]
+fn nan_radius_static_scans_find_nothing() {
+    let values = Restriction::new(vec![1.0, 0.0]);
+    let world = Scene::open(GridSize::new(120, 120))
+        .players(2)
+        .object(SceneObject {
+            state: ObjectState::DyingSprite,
+            ..SceneObject::new(
+                600,
+                PlayerId::new(2),
+                house_master(),
+                Position::new(21.5, 21.5, 0.0),
+            )
+        })
+        .build();
+    let test = |radius| {
+        let site = BuildSite {
+            checks: SiteChecks::SCANS,
+            radius,
+            tall: true,
+            ..house_site(&values, false)
+        };
+        build_placement(
+            &site,
+            &WorldMap { turns: &world },
+            Point::new(21.0, 21.0),
+            &roles(),
+            &tuning().spawn,
+        )
+        .unwrap()
+        .code()
+    };
+    assert_eq!(test(Footprint::new(1.0, 1.0)), 6);
+    assert_eq!(test(Footprint::new(f32::NAN, 1.0)), 0);
+    assert_eq!(test(Footprint::new(1.0, f32::NAN)), 0);
 }
 
 /// A 3×3 map whose tile `index` (row by row) is of terrain `kinds[index]` and whose terrain `kind`
