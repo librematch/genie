@@ -381,31 +381,97 @@ const CHOP: HuntTask = HuntTask {
     kind4: None,
 };
 
+/// A Hunt with [`CHOP`] on `target` ([`HuntAction::new`]) that the install started (slot 5
+/// with 1) for human player 2's hunter `mover` carrying `held`, with the settings that keep a
+/// load of another resource.
+fn started(target: &Quarry, held: &mut Held, mover: &mut Mover) -> HuntAction {
+    let mut hunt = HuntAction::new(CHOP, target);
+    let _ = hunt
+        .start(
+            HuntStart {
+                target,
+                player: PlayerId::new(2),
+                player_kind: PlayerKind::Human,
+                carry_rule: false,
+                held,
+                walks: walks(Held::default()),
+            },
+            &engagement(),
+            ARMS,
+            mover,
+            BeginLayer {
+                roles: &roles(),
+                attack_tuning: &tuning().attack,
+                move_to_tuning: &tuning().move_to,
+            },
+            &tuning().hunt,
+        )
+        .unwrap();
+    hunt
+}
+
+/// The constructor (`FUN_140ac2dd0`) holds its target up to state 6, with the target's place as
+/// the point (`+0x38`..`+0x40`) and its class as the target type (`+0x68`). Past state 6
+/// `FUN_140a7a230` drops the target (`+0x20` null, `+0x30` −1), and the point and the target type
+/// stay −1. Either way the Hunt is in state 0 on its task, its timer 0, without a drop site for
+/// livestock (`+0x70` −1) or a second target, its lead at (−1, −1) (`+0x78`, `+0x7c`).
+#[test]
+fn hunt_constructor_holds_its_target_only_up_to_state_6() {
+    let fresh = |target, point, target_class| HuntAction {
+        target,
+        state: HuntState::New,
+        point,
+        target_class,
+        task: CHOP,
+        drop_site: None,
+        carry_to: None,
+        timer: Seconds::ZERO,
+        lead: Lead {
+            moved: false,
+            still_time: 0,
+            start: Point::new(-1.0, -1.0),
+        },
+    };
+    for byte in 0..=8 {
+        let state = ObjectState::of_byte(byte).unwrap();
+        let quarry = Quarry { state, ..tree() };
+        let expected = if byte <= 6 {
+            fresh(
+                Some(HuntTargetId::new(quarry.id)),
+                quarry.position,
+                Some(class::TREE),
+            )
+        } else {
+            fresh(None, Position::new(-1.0, -1.0, -1.0), None)
+        };
+        assert_eq!(HuntAction::new(CHOP, &quarry), expected, "{state:?}");
+    }
+}
+
+/// The constructor's target type (`+0x68`) is the held target's master class as an `int`: a
+/// master without one (−1) leaves it −1, which the search's notify passes on.
+#[test]
+fn hunt_constructor_takes_no_class_from_classless_target() {
+    let classless = Quarry {
+        class: ClassId::of_master(-1),
+        ..tree()
+    };
+    let hunt = HuntAction::new(CHOP, &classless);
+    assert_eq!(
+        (hunt.target, hunt.point, hunt.target_class),
+        (
+            Some(HuntTargetId::new(classless.id)),
+            classless.position,
+            None
+        )
+    );
+}
+
 #[test]
 fn villager_sent_to_tree_attacks_it_first_and_walks_there() {
     let mut mover = walker();
     let mut held = Held::default();
-    let (hunt, _) = HuntAction::start(
-        HuntStart {
-            task: CHOP,
-            target: &tree(),
-            player: PlayerId::new(2),
-            player_kind: PlayerKind::Human,
-            carry_rule: false,
-            held: &mut held,
-            walks: walks(Held::default()),
-        },
-        &engagement(),
-        ARMS,
-        &mut mover,
-        BeginLayer {
-            roles: &roles(),
-            attack_tuning: &tuning().attack,
-            move_to_tuning: &tuning().move_to,
-        },
-        &tuning().hunt,
-    )
-    .unwrap();
+    let hunt = started(&tree(), &mut held, &mut mover);
     assert_eq!(hunt.state.bare(), HuntState::Attack { attack: None });
     let attack = hunt.state.attack().copied().unwrap();
     assert_eq!(
@@ -443,27 +509,7 @@ fn villager_sent_to_tree_attacks_it_first_and_walks_there() {
 fn hunt_retargeted_to_tree_beside_it_starts_its_attack_arrived() {
     let mut mover = walker();
     let mut held = Held::default();
-    let (mut hunt, _) = HuntAction::start(
-        HuntStart {
-            task: CHOP,
-            target: &tree(),
-            player: PlayerId::new(2),
-            player_kind: PlayerKind::Human,
-            carry_rule: false,
-            held: &mut held,
-            walks: walks(Held::default()),
-        },
-        &engagement(),
-        ARMS,
-        &mut mover,
-        BeginLayer {
-            roles: &roles(),
-            attack_tuning: &tuning().attack,
-            move_to_tuning: &tuning().move_to,
-        },
-        &tuning().hunt,
-    )
-    .unwrap();
+    let mut hunt = started(&tree(), &mut held, &mut mover);
     let retarget =
         |hunt: &mut HuntAction, quarry: &Quarry, engagement: &Engagement, mover: &mut Mover| {
             hunt.retarget(
@@ -532,27 +578,7 @@ fn hunt_retargeted_to_tree_beside_it_starts_its_attack_arrived() {
 fn hunt_new_target_clears_its_lead() {
     let mut mover = walker();
     let mut held = Held::default();
-    let (mut hunt, _) = HuntAction::start(
-        HuntStart {
-            task: CHOP,
-            target: &tree(),
-            player: PlayerId::new(2),
-            player_kind: PlayerKind::Human,
-            carry_rule: false,
-            held: &mut held,
-            walks: walks(Held::default()),
-        },
-        &engagement(),
-        ARMS,
-        &mut mover,
-        BeginLayer {
-            roles: &roles(),
-            attack_tuning: &tuning().attack,
-            move_to_tuning: &tuning().move_to,
-        },
-        &tuning().hunt,
-    )
-    .unwrap();
+    let mut hunt = started(&tree(), &mut held, &mut mover);
     let led = Lead {
         moved: true,
         still_time: 3,
@@ -614,27 +640,27 @@ fn hunt_new_target_clears_its_lead() {
 fn hunter_keeps_another_food_it_carries_and_drops_the_rest_by_the_settings() {
     let start = |held: Held, carry_rule: bool| {
         let mut held = held;
-        let _ = HuntAction::start(
-            HuntStart {
-                task: CHOP,
-                target: &tree(),
-                player: PlayerId::new(2),
-                player_kind: PlayerKind::Human,
-                carry_rule,
-                held: &mut held,
-                walks: walks(Held::default()),
-            },
-            &engagement(),
-            ARMS,
-            &mut walker(),
-            BeginLayer {
-                roles: &roles(),
-                attack_tuning: &tuning().attack,
-                move_to_tuning: &tuning().move_to,
-            },
-            &tuning().hunt,
-        )
-        .unwrap();
+        let _ = HuntAction::new(CHOP, &tree())
+            .start(
+                HuntStart {
+                    target: &tree(),
+                    player: PlayerId::new(2),
+                    player_kind: PlayerKind::Human,
+                    carry_rule,
+                    held: &mut held,
+                    walks: walks(Held::default()),
+                },
+                &engagement(),
+                ARMS,
+                &mut walker(),
+                BeginLayer {
+                    roles: &roles(),
+                    attack_tuning: &tuning().attack,
+                    move_to_tuning: &tuning().move_to,
+                },
+                &tuning().hunt,
+            )
+            .unwrap();
         held
     };
     assert_eq!(
@@ -766,27 +792,7 @@ fn hunt_on_live_ally_fails() {
         ..tree()
     };
     let mut held = Held::default();
-    let (hunt, _) = HuntAction::start(
-        HuntStart {
-            task: CHOP,
-            target: &ally,
-            player: PlayerId::new(2),
-            player_kind: PlayerKind::Human,
-            carry_rule: false,
-            held: &mut held,
-            walks: walks(Held::default()),
-        },
-        &engagement(),
-        ARMS,
-        &mut walker(),
-        BeginLayer {
-            roles: &roles(),
-            attack_tuning: &tuning().attack,
-            move_to_tuning: &tuning().move_to,
-        },
-        &tuning().hunt,
-    )
-    .expect("a hunt");
+    let hunt = started(&ally, &mut held, &mut walker());
     assert_eq!(
         (hunt.state, hunt.timer, hunt.target),
         (
@@ -813,27 +819,7 @@ fn hunt_walks_to_dead_target_or_its_own_livestock() {
     };
     for (quarry, range) in [(dead, CHOP.range), (sheep, Distance::new(1.5))] {
         let mut held = Held::default();
-        let (hunt, _) = HuntAction::start(
-            HuntStart {
-                task: CHOP,
-                target: &quarry,
-                player: PlayerId::new(2),
-                player_kind: PlayerKind::Human,
-                carry_rule: false,
-                held: &mut held,
-                walks: walks(Held::default()),
-            },
-            &engagement(),
-            ARMS,
-            &mut walker(),
-            BeginLayer {
-                roles: &roles(),
-                attack_tuning: &tuning().attack,
-                move_to_tuning: &tuning().move_to,
-            },
-            &tuning().hunt,
-        )
-        .unwrap();
+        let hunt = started(&quarry, &mut held, &mut walker());
         // a quiet MoveTo to the target that asks again when it moves (`+0x61` 1)
         let walk = hunt.state.move_to().copied().map(|move_to_action| {
             (

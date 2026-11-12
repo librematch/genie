@@ -20,6 +20,7 @@ use crate::movement::move_to::WalkTo;
 use crate::movement::{Me, Mover};
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::actions::LAST_TAKEN;
 use crate::objects::lifecycle::Held;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::MasterKind;
@@ -68,9 +69,7 @@ pub enum PointWalk {
 /// What a hunt's start takes besides its attack and its mover ([`HuntAction::start`]'s arguments).
 #[derive(Debug)]
 pub struct HuntStart<'world> {
-    /// The task.
-    pub(crate) task: HuntTask,
-    /// The target.
+    /// The target the Hunt holds.
     pub(crate) target: &'world Quarry,
     /// The owner.
     pub(crate) player: PlayerId,
@@ -130,30 +129,74 @@ pub struct HuntMove<'world> {
 }
 
 impl HuntAction {
-    /// The factory's constructor (`FUN_140ac2dd0`; its target's add, slot 0x178, is the caller's)
-    /// and the install's start (slot 5 with 1, `0x140ac49b0`): a hunter carrying another food
-    /// keeps the amount as the task's kind (`FUN_14119d310` on `held`); a loaded hunter sent to
-    /// one of its own drop sites carries the load there (`set_state` 8); else `set_state(4)`. A
-    /// target of another, unallied player (or of class 49) that is not dead yet is attacked first
-    /// (`set_state` 12). `player_type` is the owner's type (`FUN_141659cf0` tests it); `carry_rule` the
-    /// game settings' test `FUN_141302150`, with which a hunter drops another resource it carries
-    /// (a computer player's does when it carries none). With the hunt, how its Attack's `MoveTo`
-    /// started (a walk to a drop site is under way).
+    /// The constructor (`FUN_140ac2dd0`), the hunt command's (`FUN_1412151f0`) and the factory's
+    /// (`FUN_140aca4b0` case 0x6e with a target): a Hunt in state 0 on `task` (the base
+    /// constructor `FUN_140a73e90` with 1: no second target, no sub-action, the timer 0), no drop
+    /// site for livestock (`+0x70` −1) and the lead [`Lead::NEW`]. It holds `target`
+    /// (`FUN_140a7a230`) unless it is past [`LAST_TAKEN`]; the take of a held target (slot 0x178)
+    /// is the caller's. Only a held target gives the point (`+0x38`..`+0x40`) its place and the
+    /// target type (`+0x68`) its master's class; else both stay −1, and the install's start
+    /// searches ([`Unit::hunt_begin_search`]).
+    ///
+    /// The routine also takes a null target, which leaves the point and the target type −1 as
+    /// one past state 6 does. No caller passes one: the hunt command makes the Hunt only on an
+    /// object the world holds, and the factory calls this constructor only with a target; without
+    /// one it calls another.
+    ///
+    /// [`Unit::hunt_begin_search`]: crate::objects::unit::Unit::hunt_begin_search
+    #[must_use]
+    pub fn new(task: HuntTask, target: &Quarry) -> Self {
+        let (point, target_class, target) = if target.state <= LAST_TAKEN {
+            let id = HuntTargetId::new(target.id);
+            (target.position, target.class.or_none(), Some(id))
+        } else {
+            (Position::from([-1.0; 3]), None, None)
+        };
+        Self {
+            target,
+            state: HuntState::New,
+            point,
+            target_class,
+            task,
+            drop_site: None,
+            carry_to: None,
+            timer: Seconds::ZERO,
+            lead: Lead::NEW,
+        }
+    }
+
+    /// The install's start (slot 5 with 1, `0x140ac49b0`) of a Hunt that holds `target` (the
+    /// constructor's, [`HuntAction::new`]): a hunter carrying another food keeps the amount as the
+    /// task's kind (`FUN_14119d310` on `held`); one carrying another resource drops it when the
+    /// game settings' test `FUN_141302150` (`carry_rule`) says so or it is a computer player's
+    /// (`player_kind`, `FUN_141659cf0`) carrying nothing; a target holding nothing changes no
+    /// load. A loaded hunter sent to one of its own drop sites carries the load there
+    /// (`set_state` 8); else `set_state(4)` ([`HuntAction::chase`]): a target of another, unallied
+    /// player (or of class 49) that is not dead yet is attacked first (`set_state` 12). How its
+    /// Attack's `MoveTo` started (a walk to a drop site is under way). A Hunt whose constructor
+    /// held no target does not start here: the slot then only searches (`set_state(3)`), which
+    /// reads the hunter's step ([`Unit::hunt_begin_search`]).
+    ///
+    /// [`Unit::hunt_begin_search`]: crate::objects::unit::Unit::hunt_begin_search
+    ///
+    /// # Errors
+    ///
+    /// What the walks and the Attack do not model.
     pub(crate) fn start(
+        &mut self,
         start: HuntStart<'_>,
         attack: &Engagement,
         arms: Arms,
         mover: &mut Mover,
         layer: BeginLayer<'_>,
         hunt_tuning: &HuntTuning,
-    ) -> GenieResult<(Self, MoveStart)> {
+    ) -> GenieResult<MoveStart> {
         let BeginLayer {
             roles,
             attack_tuning,
             move_to_tuning,
         } = layer;
         let HuntStart {
-            task,
             target,
             player,
             player_kind,
@@ -161,19 +204,8 @@ impl HuntAction {
             held,
             walks,
         } = start;
-        let mut hunt = Self {
-            target: Some(HuntTargetId::new(target.id)),
-            state: HuntState::New,
-            point: target.position,
-            target_class: Some(target.class),
-            task,
-            drop_site: None,
-            carry_to: None,
-            timer: Seconds::ZERO,
-            lead: Lead::NEW,
-        };
         if Amount::ZERO < target.amount {
-            let kind = task.resource;
+            let kind = self.task.resource;
             let both_food = both_food(kind, held.kind);
             let drops = player_kind.is_computer() && held.amount == Amount::ZERO;
             if held.kind != kind {
@@ -191,25 +223,25 @@ impl HuntAction {
             held: *held,
             ..walks
         };
-        // the start (slot 5 with 1): an own target among the hunter's master's drop sites
-        // (`+0x7a0`, FUN_14109d4f0; a building annex's main building) takes a load there: it
-        // becomes the second target (FUN_140a7a190), the target goes (slot 0x68 with none; the
-        // caller takes and releases it), the point and `+0x68` clear, `set_state(8)`; a hunter
-        // carrying nothing does not get there
+        // an own target among the hunter's master's drop sites (`+0x7a0`, FUN_14109d4f0; a
+        // building annex's main building) takes a load there: it becomes the second target
+        // (FUN_140a7a190), the target goes (slot 0x68 with none; the caller takes and releases
+        // it), the point and `+0x68` clear, `set_state(8)`; a hunter carrying nothing does not
+        // get there
         if target.player == player && target.drop_site && Amount::ZERO < held.amount {
-            hunt.set_target(None);
-            hunt.point = Position::from([-1.0; 3]);
-            hunt.target_class = None;
-            hunt.carry_to = Some(DropSiteId::new(target.id));
-            hunt.set_drop(target.position, attack.gap, mover, &walks, move_to_tuning)?;
-            return Ok((hunt, MoveStart::UnderWay));
+            self.set_target(None);
+            self.point = Position::from([-1.0; 3]);
+            self.target_class = None;
+            self.carry_to = Some(DropSiteId::new(target.id));
+            self.set_drop(target.position, attack.gap, mover, &walks, move_to_tuning)?;
+            return Ok(MoveStart::UnderWay);
         }
         let chase = HuntChase {
             target,
             player,
             walks: &walks,
         };
-        let move_start = hunt.chase(
+        self.chase(
             chase,
             attack,
             arms,
@@ -220,8 +252,7 @@ impl HuntAction {
                 move_to_tuning,
             },
             hunt_tuning,
-        )?;
-        Ok((hunt, move_start))
+        )
     }
 
     /// `set_state(4)` (`0x140ac60e0` case 4): the sub-actions go (an Attack's `MoveTo` stops the

@@ -3,7 +3,7 @@
 use crate::GenieResult;
 use crate::combat::attack::BeginLayer;
 use crate::gathering::gather::unit::WalkSprites;
-use crate::gathering::hunt::{HuntAction, HuntStart, HuntTask, Quarry};
+use crate::gathering::hunt::{HuntAction, HuntStart, Quarry};
 use crate::math::rng::Stream;
 use crate::movement::MoveStart;
 use crate::movement::Speed;
@@ -21,9 +21,10 @@ use crate::world::slots::PlayerSlotsExt;
 use crate::world::{HUNTER_UNMOVING, NO_STANDING_SPRITE};
 
 impl World {
-    /// The Hunt from the factory (`FUN_140aca4b0` case 0x6e): the action takes its target (slot
-    /// 0x178); the work command's unit AI notify (`FUN_14106e4e0`, `notify`) sets the hunt order;
-    /// the install (`FUN_14106e990`) clears the action list and starts the hunt.
+    /// The Hunt from the factory (`FUN_140aca4b0` case 0x6e): the constructor
+    /// ([`HuntAction::new`]) takes its target (slot 0x178) where it holds it (none past state 6);
+    /// the work command's unit AI notify (`FUN_14106e4e0`, `notify`) sets the hunt order; the
+    /// install (`FUN_14106e990`) clears the action list and starts the hunt.
     pub(in crate::orders) fn start_hunt(&mut self, order: HuntOrder) -> GenieResult<()> {
         let HuntOrder {
             player,
@@ -36,7 +37,10 @@ impl World {
         } = order;
         let mut quarry = self.quarry(player, target)?;
         quarry.drop_site = self.drops_at_main(player, idx, target)?;
-        self.take(target, self.releaser(player, idx)?)?;
+        let hunt = HuntAction::new(task, &quarry);
+        if hunt.target.is_some() {
+            self.take(target, self.releaser(player, idx)?)?;
+        }
         let unit = self.players.live_mut(player, idx)?;
         if let Some(ai) = self.parts.unit_ai.get_mut(unit.id).filter(|_| notify) {
             ai.notify_work(
@@ -50,12 +54,17 @@ impl World {
             self.remember_order(player, idx, (Some(OrderKind::Hunt), Some(AiAction::Hunt)))?;
         }
         self.clear_actions(player, idx)?;
-        self.begin_hunt(player, idx, (task, &quarry))
+        self.begin_hunt(player, idx, hunt, &quarry)
     }
 
-    /// [`World::start_hunt`]'s start of the Hunt action itself, once the unit's actions are
-    /// cleared: the engagement and arms, the action's start and its first sprite, and a load to its
-    /// own drop site.
+    /// [`World::start_hunt`]'s start of the Hunt action `hunt` itself (slot 5 with 1,
+    /// `0x140ac49b0`), once the unit's actions are cleared. A Hunt whose constructor held no
+    /// target searches (`set_state(3)`) on the hunter's step ([`Unit::hunt_begin_search`]): the
+    /// start reads no load's kind without a target, and the engagement reads the target's place.
+    /// Else the engagement and arms, the action's start on `quarry` and its first sprite, and a
+    /// load to its own drop site.
+    ///
+    /// [`Unit::hunt_begin_search`]: crate::objects::unit::Unit::hunt_begin_search
     ///
     /// # Errors
     ///
@@ -64,11 +73,17 @@ impl World {
         &mut self,
         player: PlayerId,
         idx: ListIndex,
-        (task, quarry): (HuntTask, &Quarry),
+        mut hunt: HuntAction,
+        quarry: &Quarry,
     ) -> GenieResult<()> {
+        if hunt.target.is_none() {
+            return self.run_on_step(player, idx, |unit, actions, step| {
+                unit.hunt_begin_search(hunt, actions, step)
+            });
+        }
         let target = quarry.id;
         let engagement = self.engagement(player, idx, target)?;
-        let arms = self.arms(player, idx, &task)?;
+        let arms = self.arms(player, idx, &hunt.task)?;
         let player_kind = self.players.player(player)?.kind;
         let carry_rule = self.settings.carry_rule();
         let top_speed = self.top_speed_terms(player, self.players.live(player, idx)?)?;
@@ -86,9 +101,8 @@ impl World {
         )?;
         let mover = self.parts.mover_mut(unit.id).ok_or(HUNTER_UNMOVING)?;
         let mut held = unit.life.held();
-        let (hunt, move_start) = HuntAction::start(
+        let move_start = hunt.start(
             HuntStart {
-                task,
                 target: quarry,
                 player,
                 player_kind,

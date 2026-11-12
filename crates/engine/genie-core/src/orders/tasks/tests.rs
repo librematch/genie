@@ -11,6 +11,7 @@ use crate::gathering::HuntTargetId;
 use crate::gathering::gather::{GatherAction, GatherState};
 use crate::gathering::hunt::{HuntAction, HuntState};
 use crate::map::Distance;
+use crate::objects::ObjectState;
 use crate::objects::WorkerCount;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::MasterId;
@@ -20,6 +21,8 @@ use crate::players::PlayerKind;
 use crate::test_ids::object_id;
 use crate::testing::class;
 use crate::testing::ids;
+use crate::unit_ai::NotifyKind;
+use crate::world::Seconds;
 use crate::world::tests::{
     forage_world, house_builder, hunt_world, repair_world, repairer_world, sent_off_world,
 };
@@ -497,6 +500,80 @@ fn gather_command_unforced_on_recyclable_top_target_retakes_it() {
             ..gather
         })
     );
+}
+
+/// The hunt command's new Hunt (`FUN_140ac2dd0`) holds a deer up to state 6: the deer is taken
+/// (slot 0x178, a worker), its place is the point and the start walks to the dead deer
+/// (`set_state` 4). A deer past state 6 `FUN_140a7a230` drops: nothing is taken, the point and
+/// the target type stay −1, and the install's start (slot 5 with no target) searches at once
+/// (`set_state(3)`): the unit AI hears notify 0x202 with the hunt, no class and the closest drop
+/// site (the town centre 700), and the timer starts at −10 s.
+#[test]
+fn hunt_command_on_deer_past_state_6_searches_without_it() {
+    for state in [ObjectState::Undead, ObjectState::Removed, ObjectState::Gone] {
+        let mut world = hunt_world();
+        world.object_mut(DEER[0]).unwrap().1.life.state = state;
+        assert_eq!(
+            world.hunt_command(PLAYER, SLOT, Some(DEER[0]), OrderForce::Forced),
+            Ok(Answer::Taken),
+            "{state:?}"
+        );
+        let hunt = hunt_of(&world).unwrap();
+        let heard: Vec<_> = world
+            .parts
+            .unit_ai
+            .get(VILLAGER)
+            .unwrap()
+            .notifies
+            .iter()
+            .map(|notify| (notify.kind, notify.params))
+            .collect();
+        if state == ObjectState::Undead {
+            assert_eq!(
+                (
+                    hunt.target,
+                    hunt.point,
+                    hunt.state.bare(),
+                    workers(&world, DEER[0])
+                ),
+                (
+                    Some(HuntTargetId::new(DEER[0])),
+                    Position::new(32.5, 89.5, 0.0),
+                    HuntState::Walk { move_to: None },
+                    WorkerCount::ONE
+                )
+            );
+            assert_eq!(heard, Vec::new());
+        } else {
+            assert_eq!(
+                (
+                    hunt.target,
+                    hunt.point,
+                    hunt.target_class,
+                    hunt.state,
+                    hunt.timer,
+                    workers(&world, DEER[0])
+                ),
+                (
+                    None,
+                    Position::new(-1.0, -1.0, -1.0),
+                    None,
+                    HuntState::Search,
+                    Seconds::new(-10.0),
+                    WorkerCount::ZERO
+                ),
+                "{state:?}"
+            );
+            assert_eq!(
+                heard,
+                [(
+                    NotifyKind::REQUIRES_SEARCH,
+                    [AiAction::Hunt.value(), -1, TOWN_CENTRE.get()]
+                )],
+                "{state:?}"
+            );
+        }
+    }
 }
 
 /// [`hunt_world`]'s villager hunting the deer 500 (the hunt command's new Hunt), facing it

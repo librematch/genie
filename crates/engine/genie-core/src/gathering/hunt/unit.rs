@@ -77,6 +77,25 @@ impl Unit {
         self.hunt_search_state(hunt, actions, step, roles)
     }
 
+    /// The install's start (slot 5 with 1, `0x140ac49b0`) of a `hunt` whose constructor held no
+    /// target (one past state 6, [`HuntAction::new`]): it changes no load, which reads the
+    /// target's amount, and searches (`set_state(3)`, [`Unit::hunt_search_state`]). The list
+    /// holds it from then on.
+    ///
+    /// # Errors
+    ///
+    /// The search's.
+    pub(crate) fn hunt_begin_search(
+        &mut self,
+        mut hunt: HuntAction,
+        actions: &mut Action,
+        step: &mut Step<'_>,
+    ) -> GenieResult<()> {
+        let roles = &step.world.model.roles.clone();
+        hunt.state = HuntState::Search;
+        self.hunt_search_state(&mut hunt, actions, step, roles)
+    }
+
     /// The Hunt's `set_state(3)` itself (`0x140ac60e0` case 3; its target stays): the unit AI is
     /// told ([`Unit::hunt_search_notify`]), the unit takes the sprite it stands with and the timer
     /// starts at −10 s. A human player's hunt of class 10 is done instead (`set_state` 2: the
