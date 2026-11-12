@@ -137,23 +137,26 @@ impl ExploreAction {
 
     /// Its first (slot 0x28, `0x140a87e10`, which reads no argument) as the action list adds it
     /// (`FUN_140a977e0`) and as its deletion restarts it at the head (`FUN_140a98e20`,
-    /// [`Unit::restart_explore`]): state 3 for a point x of −1, else 11 (`UCOMISS`, `JP`: a NaN
-    /// walks), whose `MoveTo` is made from `walk` ([`ExploreAction::set_state`]).
+    /// [`Unit::restart_explore`]): state 3 for a point x of −1, which reads nothing of the unit
+    /// ([`ExploreAction::wait_for_point`]), else 11 (`UCOMISS`, `JP`: a NaN walks), whose
+    /// `MoveTo` is made from the view that `walk` builds then ([`ExploreAction::set_state`]).
     ///
     /// # Errors
     ///
-    /// A sprite the table lacks.
-    pub fn first(
+    /// The view's, and a sprite the table lacks.
+    pub fn first<'graphics>(
         &mut self,
-        walk: &ExploreMove<'_>,
+        walk: impl FnOnce() -> GenieResult<ExploreMove<'graphics>>,
         move_to_tuning: &MoveToTuning,
     ) -> GenieResult<Owner> {
-        let state = if self.point.x() == NO_POINT {
-            ExploreState::Wait
-        } else {
-            ExploreState::Walk { move_to: None }
-        };
-        self.set_state(state, walk, move_to_tuning)
+        if self.point.x() == NO_POINT {
+            return Ok(self.wait_for_point());
+        }
+        self.set_state(
+            ExploreState::Walk { move_to: None },
+            &walk()?,
+            move_to_tuning,
+        )
     }
 
     /// A new Explore to `point` ([`ExploreAction::new`]) after its first
@@ -165,7 +168,7 @@ impl ExploreAction {
         move_to_tuning: &MoveToTuning,
     ) -> GenieResult<(Self, Owner)> {
         let mut explore_action = Self::new(point);
-        let owner = explore_action.first(walk, move_to_tuning)?;
+        let owner = explore_action.first(|| Ok(*walk), move_to_tuning)?;
         Ok((explore_action, owner))
     }
 
@@ -219,21 +222,26 @@ impl ExploreAction {
     }
 
     /// The point (slot 0x48, `0x140a881a0`): one on the map's quarter (both coordinates at least
-    /// 0) becomes its point and it walks there from `walk` (`set_state` 11); any other makes it
-    /// wait for one (`set_state` 3), a NaN coordinate too (`COMISS` with 0, then `JC`).
+    /// 0) becomes its point and it walks there from the view that `walk` builds then
+    /// (`set_state` 11); any other makes it wait for one (`set_state` 3, which reads nothing of
+    /// the unit), a NaN coordinate too (`COMISS` with 0, then `JC`).
     ///
     /// # Errors
     ///
-    /// A sprite the table lacks.
-    pub fn take_point(
+    /// The view's, and a sprite the table lacks.
+    pub fn take_point<'graphics>(
         &mut self,
         point: Position,
-        walk: &ExploreMove<'_>,
+        walk: impl FnOnce() -> GenieResult<ExploreMove<'graphics>>,
         move_to_tuning: &MoveToTuning,
     ) -> GenieResult<Owner> {
         if 0.0 <= point.x() && 0.0 <= point.y() {
             self.point = point;
-            return self.set_state(ExploreState::Walk { move_to: None }, walk, move_to_tuning);
+            return self.set_state(
+                ExploreState::Walk { move_to: None },
+                &walk()?,
+                move_to_tuning,
+            );
         }
         Ok(self.wait_for_point())
     }
@@ -798,7 +806,9 @@ mod tests {
         let first = |x: f32| {
             let mut explore_action = ExploreAction::new(Position::new(x, 5.0, 0.0));
             assert_eq!(explore_action.state, ExploreState::New);
-            let owner = explore_action.first(&walk, &tuning().move_to).unwrap();
+            let owner = explore_action
+                .first(|| Ok(walk), &tuning().move_to)
+                .unwrap();
             (
                 matches!(
                     explore_action.state,
@@ -810,6 +820,31 @@ mod tests {
         assert_eq!(first(-1.0), (false, Owner::WantsPoint));
         assert_eq!(first(5.0), (true, Owner::Nothing));
         assert_eq!(first(f32::NAN), (true, Owner::Nothing));
+    }
+
+    /// Only state 11 reads the unit: its first for a point x of −1 and its point off the map's
+    /// quarter wait (`set_state(3)`) without the walk's view, so a view that cannot be built
+    /// stops only a walk.
+    #[test]
+    fn first_and_take_point_build_the_walk_view_only_to_walk() {
+        const UNBUILT: GenieError = GenieError::unreachable("the walk's view");
+        let unbuilt = || -> GenieResult<ExploreMove<'static>> { Err(UNBUILT) };
+        let move_to_tuning = &tuning().move_to;
+        let mut waiting = ExploreAction::new(Position::new(-1.0, 5.0, 0.0));
+        assert_eq!(
+            waiting.first(unbuilt, move_to_tuning),
+            Ok(Owner::WantsPoint)
+        );
+        assert_eq!(
+            waiting.take_point(Position::new(-1.0, 9.0, 0.0), unbuilt, move_to_tuning),
+            Ok(Owner::WantsPoint)
+        );
+        assert_eq!(
+            waiting.take_point(Position::new(9.0, 9.0, 0.0), unbuilt, move_to_tuning),
+            Err(UNBUILT)
+        );
+        let mut walking = ExploreAction::new(Position::new(5.0, 5.0, 0.0));
+        assert_eq!(walking.first(unbuilt, move_to_tuning), Err(UNBUILT));
     }
 
     /// An Explore without a point waits for one; a point makes the quiet `MoveTo` to it (range
@@ -827,7 +862,11 @@ mod tests {
         );
         let walking = WALKING;
         assert_eq!(
-            explore_action.take_point(Position::new(19.0, 84.0, 0.0), &walk, &tuning().move_to),
+            explore_action.take_point(
+                Position::new(19.0, 84.0, 0.0),
+                || Ok(walk),
+                &tuning().move_to
+            ),
             Ok(Owner::Nothing)
         );
         let made = MoveToAction {
@@ -850,7 +889,11 @@ mod tests {
         assert_eq!(explore_action.after_walk(SubCode::Done), Owner::WantsPoint);
         assert_eq!(explore_action.state, ExploreState::Wait);
         assert_eq!(
-            explore_action.take_point(Position::new(-1.0, 5.0, 0.0), &walk, &tuning().move_to),
+            explore_action.take_point(
+                Position::new(-1.0, 5.0, 0.0),
+                || Ok(walk),
+                &tuning().move_to
+            ),
             Ok(Owner::WantsPoint)
         );
         // a unit without speed fails its MoveTo (13), one in state 3 or later adds none
@@ -886,7 +929,7 @@ mod tests {
             let (mut explore_action, _) =
                 ExploreAction::started(before, &walk, &tuning().move_to).unwrap();
             let owner = explore_action
-                .take_point(point, &walk, &tuning().move_to)
+                .take_point(point, || Ok(walk), &tuning().move_to)
                 .unwrap();
             (
                 explore_action.state.get(),

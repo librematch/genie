@@ -456,9 +456,12 @@ impl Unit {
                 // "I'm already exploring, returning TRUE": the Explore keeps its point
                 return Ok(());
             }
-            let walk = self.explore_move(step, roles)?;
             let walked = explore_action.state.move_to().is_some();
-            let owner = explore_action.take_point(at, &walk, &step.world.model.tuning.move_to)?;
+            let owner = explore_action.take_point(
+                at,
+                || self.explore_move(step, roles),
+                &step.world.model.tuning.move_to,
+            )?;
             if walked {
                 stop_mover(step.world.parts.mover_mut(self.id))?;
             }
@@ -470,8 +473,10 @@ impl Unit {
             else {
                 return Ok(());
             };
-            let walk = self.explore_move(step, roles)?;
-            let owner = explore_action.first(&walk, &step.world.model.tuning.move_to)?;
+            let owner = explore_action.first(
+                || self.explore_move(step, roles),
+                &step.world.model.tuning.move_to,
+            )?;
             actions.list.set_explore(Some(explore_action));
             owner
         };
@@ -481,9 +486,9 @@ impl Unit {
     /// The Explore's slot 0x28 with 0 (`0x140a87e10`, which reads no argument), as the action
     /// list's deletion restarts it at the head (`FUN_140a98e20`): its first again
     /// ([`ExploreAction::first`]), state 11 to its point from what the unit reads where it
-    /// stands, or state 3 for a point x of −1. A `MoveTo` it walked goes and stops the unit (its
-    /// teardown, slot 0x5d0), then what the new state asks of the unit follows at once
-    /// ([`Unit::explore_owner`]).
+    /// stands, or state 3 for a point x of −1, which reads nothing of it. A `MoveTo` it walked
+    /// goes and stops the unit (its teardown, slot 0x5d0), then what the new state asks of the
+    /// unit follows at once ([`Unit::explore_owner`]).
     ///
     /// # Errors
     ///
@@ -494,8 +499,10 @@ impl Unit {
         step: &mut Step<'_>,
     ) -> GenieResult<()> {
         let walked = explore_action.state.move_to().is_some();
-        let walk = self.explore_move(step, &step.world.model.roles)?;
-        let owner = explore_action.first(&walk, &step.world.model.tuning.move_to)?;
+        let owner = explore_action.first(
+            || self.explore_move(step, &step.world.model.roles),
+            &step.world.model.tuning.move_to,
+        )?;
         if walked {
             stop_mover(step.world.parts.mover_mut(self.id))?;
         }
@@ -503,7 +510,8 @@ impl Unit {
     }
 
     /// What an Explore's `MoveTo` reads of this unit ([`ExploreMove`]), its top speed slot
-    /// 0x208 where it stands.
+    /// 0x208 where it stands. Only state 11 reads it: [`ExploreAction::first`] and
+    /// [`ExploreAction::take_point`] build it only to walk.
     ///
     /// # Errors
     ///
