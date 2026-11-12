@@ -54,7 +54,7 @@ mod work;
 pub use self::gather_state::GatherState;
 pub use self::point_walks::waits_for_farm;
 pub use self::start::{
-    GatherRetarget, GatherStart, GatherStarted, MoveTarget, StopRate, productivity_of, stop_point,
+    GatherOpening, GatherRetarget, GatherStart, MoveTarget, StopRate, productivity_of, stop_point,
 };
 pub use self::walks::Walks;
 #[cfg(test)]

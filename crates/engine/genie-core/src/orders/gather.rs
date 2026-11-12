@@ -10,7 +10,7 @@ use crate::gathering::gather::unit::WalkSprites;
 use crate::gathering::gather::{
     GatherAction, GatherState, MoveTarget, Resource, StopRate, productivity_of,
 };
-use crate::gathering::gather::{GatherRetarget, GatherStart, GatherStarted};
+use crate::gathering::gather::{GatherOpening, GatherRetarget, GatherStart};
 use crate::gathering::hunt::HUNTER_STATE_LACKING;
 use crate::gathering::hunt::{HuntMove, HuntTask, Quarry};
 use crate::map::Position;
@@ -480,7 +480,7 @@ impl World {
         let mover = self.parts.mover_mut(unit.id).ok_or(GATHERER_UNMOVING)?;
         let mut held = unit.life.held();
         let rng = self.streams.get_mut(Stream::Action);
-        let started = gather.start(
+        let opening = gather.start(
             GatherStart {
                 target: resource,
                 player,
@@ -498,7 +498,7 @@ impl World {
             kind: unit.life.attribute_kind,
             amount: unit.life.amount,
         } = held;
-        if started == GatherStarted::Searches {
+        if opening == GatherOpening::Searches {
             return self.run_on_step(player, idx, |unit, actions, step| {
                 unit.gather_begin_search(gather, actions, step)
             });

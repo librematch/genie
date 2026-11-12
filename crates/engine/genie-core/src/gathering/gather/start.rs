@@ -58,13 +58,14 @@ pub struct GatherStart<'world> {
     pub(crate) walks: Walks<'world>,
 }
 
-/// What the Gather's start ([`GatherAction::start`], `0x140a8b3a0`) leaves to its caller.
+/// How the Gather opens: what its start ([`GatherAction::start`], `0x140a8b3a0`) leaves to its
+/// caller.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[must_use]
-pub enum GatherStarted {
-    /// It walks: to its target (`set_state(4)`), with its load to its drop site (8) or to a
-    /// farm's point (11).
-    Walks,
+pub enum GatherOpening {
+    /// It approaches: walks to its target (`set_state(4)`), with its load to its drop site (8)
+    /// or to a farm's point (11).
+    Approaches,
     /// It holds no target: `set_state(3)`, the search, which reads the gatherer's step
     /// ([`Unit::gather_begin_search`]).
     Searches,
@@ -251,7 +252,7 @@ impl GatherAction {
     /// the target. A farm another farmer works (with this one, two or more) is walked to only as
     /// a point (`set_state(11)`, [`GatherAction::set_walk_back`]) and let go. A Gather whose
     /// constructor held no target (one past state 6) searches (`set_state(3)`), which the caller
-    /// runs on the gatherer's step ([`GatherStarted::Searches`]).
+    /// runs on the gatherer's step ([`GatherOpening::Searches`]).
     ///
     /// # Errors
     ///
@@ -263,7 +264,7 @@ impl GatherAction {
         rng: &mut Well512,
         roles: &Roles,
         tuning: &Tuning,
-    ) -> GenieResult<GatherStarted> {
+    ) -> GenieResult<GatherOpening> {
         let move_to_tuning = &tuning.move_to;
         let GatherStart {
             target,
@@ -288,7 +289,7 @@ impl GatherAction {
         }
         // the farm's test and the walks read the target: without one, set_state(3)
         if self.target.is_none() {
-            return Ok(GatherStarted::Searches);
+            return Ok(GatherOpening::Searches);
         }
         let walks = Walks {
             held: *held,
@@ -312,17 +313,17 @@ impl GatherAction {
             };
             self.set_walk_back(Distance::new(radius), mover, &walks, move_to_tuning)?;
             self.target = None;
-            return Ok(GatherStarted::Walks);
+            return Ok(GatherOpening::Approaches);
         }
         if target.player == player && target.drop_site && Amount::ZERO < held.amount {
             self.target = None;
             self.point = Position::from([-1.0; 3]);
             self.carry_to = Some(DropSiteId::new(target.id));
             self.set_drop(target.position, target.gap, mover, &walks, move_to_tuning)?;
-            return Ok(GatherStarted::Walks);
+            return Ok(GatherOpening::Approaches);
         }
         self.set_walk(target.walk_to(), target.radius, mover, rng, &walks, tuning)?;
-        Ok(GatherStarted::Walks)
+        Ok(GatherOpening::Approaches)
     }
 
     /// Slot 0x48 (`0x140a903a0`) on the work command's new `target` (one the world holds that is

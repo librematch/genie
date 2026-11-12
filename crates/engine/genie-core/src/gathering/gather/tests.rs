@@ -491,7 +491,7 @@ fn gather_start_without_target_searches() {
         GatherAction::new(task(), &removed, FarmMode::Walkable, rate(), &roles());
     let mut held = carrying(Some(attribute::MEAT), 3.0);
     let carried = walks(held);
-    let started = gather_action
+    let opening = gather_action
         .start(
             GatherStart {
                 target: &removed,
@@ -507,7 +507,7 @@ fn gather_start_without_target_searches() {
             tuning(),
         )
         .unwrap();
-    assert_eq!(started, GatherStarted::Searches);
+    assert_eq!(opening, GatherOpening::Searches);
     assert_eq!(held, carrying(Some(AttributeId::named(17)), 3.0));
     assert_eq!(
         (
@@ -1712,7 +1712,7 @@ fn forager_walks_to_its_bush() {
     );
     let mut held = carrying(Some(attribute::STONE), 0.0);
     let carried = walks(held);
-    let started = gather_action.start(
+    let opening = gather_action.start(
         GatherStart {
             target: &bush(),
             player: PlayerId::new(7),
@@ -1726,7 +1726,7 @@ fn forager_walks_to_its_bush() {
         &roles(),
         tuning(),
     );
-    assert_eq!(started, Ok(GatherStarted::Walks));
+    assert_eq!(opening, Ok(GatherOpening::Approaches));
     // a quiet MoveTo to the bush that asks again when it moves
     let to_bush = MoveToAction {
         point: Position::new(23.5, 93.5, 0.0),
@@ -1752,7 +1752,7 @@ fn forager_walks_to_its_bush() {
         GatherAction::new(task(), &bush(), FarmMode::Walkable, rate(), &roles());
     let mut held = carrying(Some(attribute::MEAT), 3.0);
     let carried = walks(held);
-    let started = gather_action.start(
+    let opening = gather_action.start(
         GatherStart {
             target: &bush(),
             player: PlayerId::new(7),
@@ -1766,7 +1766,7 @@ fn forager_walks_to_its_bush() {
         &roles(),
         tuning(),
     );
-    assert_eq!(started, Ok(GatherStarted::Walks));
+    assert_eq!(opening, Ok(GatherOpening::Approaches));
     assert_eq!(held, carrying(Some(AttributeId::named(17)), 3.0));
 }
 
