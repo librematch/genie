@@ -11,8 +11,8 @@ use crate::math::rng::Stream;
 use crate::movement::MoveStart;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
-use crate::objects::ObjectState;
 use crate::objects::Voice;
+use crate::objects::actions::LAST_TAKEN;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::FogVisibility;
 use crate::objects::masters::MasterKind;
@@ -412,7 +412,7 @@ impl World {
         let Some((_, unit)) = self.object(new) else {
             return Ok(None);
         };
-        if ObjectState::Removed <= unit.life.state {
+        if LAST_TAKEN < unit.life.state {
             return Ok(None);
         }
         if voice.is_loud() {

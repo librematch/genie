@@ -4114,6 +4114,58 @@ fn the_unit_ai_gather_command_starts_gather_or_retargets_its_own() {
     );
 }
 
+/// The gather command on a bush past state 6 (`FUN_141085030`): the constructor
+/// (`FUN_140a88310`) holds no target (`FUN_140a7a230`: no take, the bush counts no worker) but
+/// keeps the bush's place and class, so the start searches at once (`0x140a8b3a0`:
+/// `set_state(3)`): the timer at −10 s and the unit AI's notify 0x202 with the gather action,
+/// the target type 7 and the drop site, 0: a human player's search goes by path, and without a
+/// tile planner it finds none.
+#[test]
+fn gather_command_on_removed_bush_searches_at_once() {
+    let mut world = forage_world();
+    world.players[0].objects[ListIndex::new(0)].life.state = ObjectState::Removed;
+    assert_eq!(
+        world.gather_command(
+            PlayerId::new(1),
+            ListIndex::new(0),
+            object_id(600),
+            OrderForce::Forced
+        ),
+        Ok(Answer::Taken)
+    );
+    let gather = world
+        .parts
+        .actions_of(world.players[1].objects[ListIndex::new(0)].id)
+        .list
+        .gather()
+        .copied()
+        .unwrap();
+    assert_eq!(
+        (
+            gather.target,
+            gather.state,
+            gather.timer,
+            gather.point,
+            gather.target_class
+        ),
+        (
+            None,
+            GatherState::Search,
+            Seconds::new(-10.0),
+            Position::new(32.5, 89.5, 0.0),
+            Some(class::CLASS_7)
+        )
+    );
+    assert_eq!(
+        world.players[0].objects[ListIndex::new(0)].workers,
+        WorkerCount::of_data(0)
+    );
+    assert_eq!(
+        notified(&world, NotifyKind::REQUIRES_SEARCH),
+        [[AiAction::Gather.value(), 7, 0]]
+    );
+}
+
 /// A loaded forager's work command on its own town centre, a drop site of its master: the task
 /// finder's drop-off gives the Gather task for what it carries, and the Gather started on the
 /// centre carries the load there (`0x140a8b3a0`: state 8, the centre its second target, no
@@ -13603,7 +13655,7 @@ fn deaths_world() -> World {
         capacity: Amount::new(10.0),
         productivity: Amount::new(1.0),
     };
-    let gather = GatherAction::new(chop, &tree, FarmMode::Fixed, rate, &roles()).unwrap();
+    let gather = GatherAction::new(chop, &tree, FarmMode::Fixed, rate, &roles());
     let villagers = vec![
         dead(object_id(40)),
         dead(object_id(41)),
@@ -17951,7 +18003,7 @@ fn an_ai_move_hands_the_point_to_the_gather() {
         capacity: Amount::new(10.0),
         productivity: Amount::new(1.0),
     };
-    let mut gather = GatherAction::new(task, &bush, FarmMode::Fixed, rate, &roles()).unwrap();
+    let mut gather = GatherAction::new(task, &bush, FarmMode::Fixed, rate, &roles());
     gather.state = GatherState::Idle;
     let (mut unit, mut actions, mut motion) = mover_unit(31139);
     actions.list.set_gather(Some(gather));
@@ -19434,7 +19486,7 @@ fn reseed_world() -> World {
         state: GatherState::ReseedWalk { move_to: None },
         target: None,
         worked: true,
-        ..GatherAction::new(task, &farm, FarmMode::Fixed, rate, &roles()).unwrap()
+        ..GatherAction::new(task, &farm, FarmMode::Fixed, rate, &roles())
     };
     let farmer = Object::with_actions(
         Unit {

@@ -141,6 +141,30 @@ impl Unit {
         Ok(())
     }
 
+    /// The start of the Gather `gather` without a target (`0x140a8b3a0`: its constructor held
+    /// none, one past state 6) on the gatherer's step, as the install adds it to `actions`:
+    /// `set_state(3)` ([`GatherAction::begin_search`] with what its update reads,
+    /// [`Unit::gather_reads`]), then the unit AI's notify ([`Unit::gather_search`]).
+    ///
+    /// # Errors
+    ///
+    /// A gatherer whose master the slice lacks, and what the search does not model.
+    pub(crate) fn gather_begin_search(
+        &mut self,
+        mut gather: GatherAction,
+        actions: &mut Action,
+        step: &mut Step<'_>,
+    ) -> GenieResult<()> {
+        let reads = self.gather_reads(step, &gather, &step.world.model.roles)?;
+        let next = gather.begin_search(step, self, &reads);
+        actions.list.set_gather(Some(gather));
+        // set_state(3) asks for the unit AI's notify, as in the update
+        if next? == Next::Search {
+            self.gather_search(&gather, actions, step)?;
+        }
+        Ok(())
+    }
+
     /// What the Gather's `MoveTo` constructors read of this gatherer with its mover `mover` and
     /// what its slot 0x208 reads `top_speed` (`player`'s, whose masters are `every`): the
     /// sprites' table `graphics` with the defaults of its master and terrain look `look`, and

@@ -21,6 +21,7 @@ use crate::movement::move_to::{TargetMoved, WalkTo};
 use crate::objects::ObjectId;
 use crate::objects::WorkRate;
 use crate::objects::WorkerCount;
+use crate::objects::actions::LAST_TAKEN;
 use crate::objects::lifecycle::Held;
 use crate::objects::masters::WorkValue;
 use crate::objects::unit::Unit;
@@ -55,6 +56,18 @@ pub struct GatherStart<'world> {
     pub(crate) held: &'world mut Held,
     /// What its `MoveTo`s' constructors read of the gatherer; its load is `held`'s.
     pub(crate) walks: Walks<'world>,
+}
+
+/// What the Gather's start ([`GatherAction::start`], `0x140a8b3a0`) leaves to its caller.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[must_use]
+pub enum GatherStarted {
+    /// It walks: to its target (`set_state(4)`), with its load to its drop site (8) or to a
+    /// farm's point (11).
+    Walks,
+    /// It holds no target: `set_state(3)`, the search, which reads the gatherer's step
+    /// ([`Unit::gather_begin_search`]).
+    Searches,
 }
 
 /// What a gather's retarget takes besides its mover and stream ([`GatherAction::retarget`]'s
@@ -168,22 +181,29 @@ pub fn stop_point(
 }
 
 impl GatherAction {
-    /// The factory's constructor with a target (`FUN_140a88310`; the target's add, slot 0x178, is
-    /// the caller's): the target's place is the point and its class the target type; a farm (class
-    /// 49) or masters 357 and 1188 keep their place as the farm's. One stop, `mGatherX` and
-    /// `mGatherY` at −1. A farm of master 50 or 1187 with the game's farm setting has four stops,
-    /// each [`StopRate::time_per_stop`] long.
+    /// The constructor with a target (`FUN_140a88310`), the gather command's
+    /// (`FUN_141085030`) and the factory's (`FUN_140a97e00` case 5): an empty Gather in state 0
+    /// (the base constructor `FUN_140a73e90` with 1: no target, no sub-action) on `task`. It
+    /// holds `target` (`FUN_140a7a230`) unless it is past [`LAST_TAKEN`]; the take of a held
+    /// target (slot 0x178) is the caller's. Held or not, the target's place is the point and its
+    /// class the target type (`+0x68`); a farm (class 49) or masters 357 and 1188 keep their
+    /// place as the farm's (`+0x84`, else the allocation's 0). One stop, `mGatherX` and
+    /// `mGatherY` at −1. A farm of master 50 or 1187 with the game's farm setting has four
+    /// stops, each [`StopRate::time_per_stop`] long.
     ///
-    /// # Errors
-    ///
-    /// None yet.
+    /// The routine also takes a null target, which leaves the point, the farm's place and the
+    /// target type (−1) unset, and a null task, which keeps one stop. No caller passes either:
+    /// the gather command makes the Gather only on an object the world holds and a task slot
+    /// 0x820 found, and the factory calls this constructor only with a target, its task the one
+    /// it switches on (`+0xe`); without a target it calls `FUN_140a88260`.
+    #[must_use]
     pub fn new(
         task: HuntTask,
         target: &Resource,
         farm_mode: FarmMode,
         rate: StopRate,
         roles: &Roles,
-    ) -> GenieResult<Self> {
+    ) -> Self {
         let farm = if roles.of_class(target.class).contains(ClassRoles::FARM)
             || roles
                 .of_master(target.master)
@@ -203,8 +223,8 @@ impl GatherAction {
         } else {
             (FarmStops::ONE, Seconds::ZERO)
         };
-        Ok(Self {
-            target: Some(GatherTargetId::new(target.id)),
+        Self {
+            target: (target.state <= LAST_TAKEN).then_some(GatherTargetId::new(target.id)),
             carry_to: None,
             state: GatherState::New,
             point: target.position,
@@ -219,7 +239,7 @@ impl GatherAction {
             worked: false,
             farm,
             gather_at: Point::from([-1.0; 2]),
-        })
+        }
     }
 
     /// The install's start (slot 5 with 1, `0x140a8b3a0`): a gatherer carrying another food keeps
@@ -229,7 +249,9 @@ impl GatherAction {
     /// load there: the target becomes the second target (the caller takes it, then releases it as
     /// the first), the point clears and `set_state(8)` walks there. Else `set_state(4)` walks to
     /// the target. A farm another farmer works (with this one, two or more) is walked to only as
-    /// a point (`set_state(11)`, [`GatherAction::set_walk_back`]) and let go.
+    /// a point (`set_state(11)`, [`GatherAction::set_walk_back`]) and let go. A Gather whose
+    /// constructor held no target (one past state 6) searches (`set_state(3)`), which the caller
+    /// runs on the gatherer's step ([`GatherStarted::Searches`]).
     ///
     /// # Errors
     ///
@@ -241,7 +263,7 @@ impl GatherAction {
         rng: &mut Well512,
         roles: &Roles,
         tuning: &Tuning,
-    ) -> GenieResult<()> {
+    ) -> GenieResult<GatherStarted> {
         let move_to_tuning = &tuning.move_to;
         let GatherStart {
             target,
@@ -263,6 +285,10 @@ impl GatherAction {
                 kind,
                 amount: Amount::ZERO,
             };
+        }
+        // the farm's test and the walks read the target: without one, set_state(3)
+        if self.target.is_none() {
+            return Ok(GatherStarted::Searches);
         }
         let walks = Walks {
             held: *held,
@@ -286,15 +312,17 @@ impl GatherAction {
             };
             self.set_walk_back(Distance::new(radius), mover, &walks, move_to_tuning)?;
             self.target = None;
-            return Ok(());
+            return Ok(GatherStarted::Walks);
         }
         if target.player == player && target.drop_site && Amount::ZERO < held.amount {
             self.target = None;
             self.point = Position::from([-1.0; 3]);
             self.carry_to = Some(DropSiteId::new(target.id));
-            return self.set_drop(target.position, target.gap, mover, &walks, move_to_tuning);
+            self.set_drop(target.position, target.gap, mover, &walks, move_to_tuning)?;
+            return Ok(GatherStarted::Walks);
         }
-        self.set_walk(target.walk_to(), target.radius, mover, rng, &walks, tuning)
+        self.set_walk(target.walk_to(), target.radius, mover, rng, &walks, tuning)?;
+        Ok(GatherStarted::Walks)
     }
 
     /// Slot 0x48 (`0x140a903a0`) on the work command's new `target` (one the world holds that is

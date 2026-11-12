@@ -38,6 +38,7 @@ use crate::movement::move_to::MOVE_TO;
 use crate::movement::move_to::MoveToAction;
 use crate::objects::ActionState;
 use crate::objects::ObjectId;
+use crate::objects::ObjectState;
 use crate::objects::RoleId;
 use crate::objects::masters::ActionKind;
 use crate::ownership::artifact::ARTIFACT_KIND;
@@ -182,6 +183,11 @@ impl Action {
         })
     }
 }
+
+/// The last object state an action takes as its target (the base's slot 0x68, `FUN_140a7a230`:
+/// `CMP byte [+0x640], 7` and `JC` at `0x140a7a290`). An object past it is not held: the
+/// target stays none (`+0x30` −1) and is not taken (slot 0x178).
+pub(crate) const LAST_TAKEN: ObjectState = ObjectState::Undead;
 
 /// `FUN_140a78450`: the object an action's target (`target`, `+0x30`) names, as `find` looks
 /// it up in the world's table (`FUN_1415417a0`); none without a target, and for a target below 0

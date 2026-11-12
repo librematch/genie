@@ -299,9 +299,13 @@ fn each_action_with_its_own_stop_halts_and_answers_true() {
             ..Unit::default()
         },
         Action {
-            list: ActionList::default().with_gather(Some(
-                GatherAction::new(task, &bush, FarmMode::Fixed, rate, &roles()).unwrap(),
-            )),
+            list: ActionList::default().with_gather(Some(GatherAction::new(
+                task,
+                &bush,
+                FarmMode::Fixed,
+                rate,
+                &roles(),
+            ))),
             ..Default::default()
         },
     ));

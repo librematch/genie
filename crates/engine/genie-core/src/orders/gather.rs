@@ -10,7 +10,7 @@ use crate::gathering::gather::unit::WalkSprites;
 use crate::gathering::gather::{
     GatherAction, GatherState, MoveTarget, Resource, StopRate, productivity_of,
 };
-use crate::gathering::gather::{GatherRetarget, GatherStart};
+use crate::gathering::gather::{GatherRetarget, GatherStart, GatherStarted};
 use crate::gathering::hunt::HUNTER_STATE_LACKING;
 use crate::gathering::hunt::{HuntMove, HuntTask, Quarry};
 use crate::map::Position;
@@ -381,11 +381,12 @@ impl World {
 
     /// The work command's Gather (its task of action type 5, the base factory `FUN_140a97e00` case
     /// 5 with a target): the constructor ([`crate::gathering::gather::GatherAction::new`]) takes
-    /// its target (slot 0x178); the unit AI's notify (slot 0x828: the gather order and action, the
-    /// target with its class, the work's point; `notify`'s point and clearing, None for the gather
-    /// command's, which has none); the install (slot 0x808) clears the action list and starts the
-    /// Gather ([`crate::gathering::gather::GatherAction::start`]). A load to its own drop site
-    /// takes the target as the second target, then lets it go as the first.
+    /// its target (slot 0x178) where it holds it (none past state 6); the unit AI's notify (slot
+    /// 0x828: the gather order and action, the target with its class, the work's point;
+    /// `notify`'s point and clearing, None for the gather command's, which has none); the
+    /// install (slot 0x808) clears the action list and starts the Gather
+    /// ([`crate::gathering::gather::GatherAction::start`]). A load to its own drop site takes the
+    /// target as the second target, then lets it go as the first.
     pub(super) fn start_gather(
         &mut self,
         player: PlayerId,
@@ -433,8 +434,10 @@ impl World {
             self.settings.farm_mode,
             rate,
             &self.model.roles,
-        )?;
-        self.take(target, self.releaser(player, idx)?)?;
+        );
+        if gather.target.is_some() {
+            self.take(target, self.releaser(player, idx)?)?;
+        }
         if let Some(notify) = notify {
             self.notify_gather(player, idx, (target, resource.class), notify)?;
         }
@@ -445,7 +448,8 @@ impl World {
     /// [`World::start_gather`]'s install (slot 0x808) after the list's clearing: the `gather`'s
     /// start on `resource` with the gatherer's walks (its top speed's terms, slot 0x208) and
     /// load; a load to its own drop site takes `target` as the second target, then lets it go
-    /// as the first, as a farm another farmer works is let go.
+    /// as the first, as a farm another farmer works is let go. A Gather without a target
+    /// searches on the gatherer's step ([`Unit::gather_begin_search`]).
     ///
     /// # Errors
     ///
@@ -476,7 +480,7 @@ impl World {
         let mover = self.parts.mover_mut(unit.id).ok_or(GATHERER_UNMOVING)?;
         let mut held = unit.life.held();
         let rng = self.streams.get_mut(Stream::Action);
-        gather.start(
+        let started = gather.start(
             GatherStart {
                 target: resource,
                 player,
@@ -494,6 +498,11 @@ impl World {
             kind: unit.life.attribute_kind,
             amount: unit.life.amount,
         } = held;
+        if started == GatherStarted::Searches {
+            return self.run_on_step(player, idx, |unit, actions, step| {
+                unit.gather_begin_search(gather, actions, step)
+            });
+        }
         let drops = gather.target.is_none() && gather.carry_to.key() == Some(target);
         // a farm another farmer works: the start let it go (set_state 11, then slot 0x68)
         let waits = gather.target.is_none() && gather.carry_to.key() != Some(target);

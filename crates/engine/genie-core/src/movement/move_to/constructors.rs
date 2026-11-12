@@ -18,6 +18,7 @@ use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::SpriteId;
 use crate::objects::Voice;
+use crate::objects::actions::LAST_TAKEN;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterTables;
 use crate::objects::unit::Unit;
@@ -25,10 +26,6 @@ use crate::players::PlayerId;
 use crate::world::World;
 use crate::world::layer::Roles;
 use crate::world::layer::generated::MoveToTuning;
-
-/// The last object state a `MoveTo` takes as its target (`FUN_140a7a230`: one above is refused,
-/// its id −1).
-const LAST_TAKEN: ObjectState = ObjectState::Undead;
 
 /// The point a `MoveTo` without a target walks to (`FUN_140aa0df0` leaves its zeroed `+0x38`).
 const NO_TARGET_POINT: Position = Position::ORIGIN;

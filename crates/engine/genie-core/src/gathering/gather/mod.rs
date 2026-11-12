@@ -54,7 +54,7 @@ mod work;
 pub use self::gather_state::GatherState;
 pub use self::point_walks::waits_for_farm;
 pub use self::start::{
-    GatherRetarget, GatherStart, MoveTarget, StopRate, productivity_of, stop_point,
+    GatherRetarget, GatherStart, GatherStarted, MoveTarget, StopRate, productivity_of, stop_point,
 };
 pub use self::walks::Walks;
 #[cfg(test)]
@@ -198,7 +198,8 @@ pub struct Resource {
     /// The footprint gap between the gatherer and it (`FUN_14118f680`), which the `MoveTo`'s start
     /// reads.
     pub(crate) gap: Distance,
-    /// Its object state (`+0x640`), which a `MoveTo` to it reads (`FUN_140a7a230`).
+    /// Its object state (`+0x640`), which the constructor and a `MoveTo` to it read
+    /// (`FUN_140a7a230`).
     pub(crate) state: ObjectState,
     /// Its master's radii (`+0x5d8`, `+0x5dc`), over which a farm's stops spread.
     pub(crate) radius: Footprint,
