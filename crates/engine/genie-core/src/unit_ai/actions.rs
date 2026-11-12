@@ -18,6 +18,7 @@ use crate::unit_ai::OrderForce;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::OrderOutcome;
 use crate::unit_ai::OrderPriority;
+use crate::unit_ai::OrderSite;
 use crate::unit_ai::Pace;
 use crate::unit_ai::QueueEnd;
 use crate::unit_ai::StopOrder;
@@ -261,11 +262,12 @@ impl UnitAi {
     }
 
     /// Slot 0xb0 (`FUN_140c64ed0`), stopping the current action: it becomes the last action; with
-    /// [`StopOrder::End`] or an action of the order (action + 100 = order) the order ends too
-    /// (its priority with it), the state position taking the unit's place but for class 18. Then
-    /// the unit's stopAction (slot 0x3c0), no action, and `+0x1a8` cleared. A patrol order (711,
-    /// 733) ends however `order` stands, its secondary timer capped; the redraw of an
-    /// adjusted idle timeout of exactly 750 (the AI stream's) is not modelled here.
+    /// [`StopOrder::End`], an action of the order (action + 100 = order) or a patrol order (711,
+    /// 733) the order ends too (its priority with it), the state position taking the unit's place
+    /// but for class 18. A patrol order leaves its timers first ([`UnitAi::leave_patrol_timers`]:
+    /// an adjusted idle timeout of exactly 750 redrawn from the AI stream, slot 0x1a8, and the
+    /// secondary timer capped at 750). Then the unit's stopAction (slot 0x3c0), no action, and
+    /// `+0x1a8` cleared.
     pub(super) fn stop_current(
         &mut self,
         order: StopOrder,
@@ -274,44 +276,34 @@ impl UnitAi {
         rng: &mut Well512,
     ) -> GenieResult<()> {
         let roles = &at.roles;
-        self.stop_with(
-            order,
-            Some((at.position.ground(), at.class)),
-            side,
-            rng,
-            roles,
-        )
+        self.stop_with(order, (at.position.ground(), at.class), side, rng, roles)
     }
 
     /// [`UnitAi::stop_current`] with the unit's position and master's class (`place`), which only
-    /// an order the stop ends reads (None: the caller knows it does not end one).
+    /// an order the stop ends reads, and the AI stream `rng`.
+    ///
+    /// # Errors
+    ///
+    /// What the unit's stopAction does not model.
     pub(crate) fn stop_with(
         &mut self,
         order: StopOrder,
-        place: Option<(Point, Option<ClassId>)>,
+        place: (Point, Option<ClassId>),
         side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
         roles: &Roles,
     ) -> GenieResult<()> {
-        let action = self.current_action;
+        let (position, class) = place;
         let current = self.current_order;
-        if self.patrol_redraws() {
-            return Err(GenieError::unsupported("a stop on a patrol order"));
-        }
-        self.last_action = action;
+        self.last_action = self.current_action;
         if order == StopOrder::End
-            || current.is_some_and(|order_kind| order_kind.owns(action))
+            || current.is_some_and(|order_kind| order_kind.owns(self.current_action))
             || matches!(current, Some(OrderKind::Patrol | OrderKind::AttackMove))
         {
-            self.cap_patrol_secondary();
+            self.leave_patrol_timers(rng);
             self.last_order = current;
             self.current_order = None;
             self.order_priority = OrderPriority::NONE;
-            let (position, class) = place.ok_or(GenieError::unsupported(
-                "a stop ending an order without the unit's place",
-            ))?;
-            // The class whose busy units skip the idle check (`-0xe98` raw).
-            // The class of the attackers and targets a villager's damage notify looks at (`-0xea2` raw).
             // The class whose stop leaves the state position (`-0xe9a` raw, slot 0xb0).
             if !roles.of_some_class(class).contains(ClassRoles::MONK) {
                 self.state_position = position;
@@ -552,8 +544,7 @@ impl UnitAi {
             let order = *self.orders.checked(index)?;
             let order_outcome = self.process_order(
                 &order,
-                Some((at, player_kind)),
-                None,
+                OrderSite::Surroundings(at, player_kind),
                 ai,
                 side,
                 AiLayer {

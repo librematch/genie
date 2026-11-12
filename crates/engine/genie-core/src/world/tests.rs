@@ -263,6 +263,7 @@ use crate::unit_ai::NotifyKind;
 use crate::unit_ai::OrderForce;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::OrderOutcome;
+use crate::unit_ai::OrderSite;
 use crate::unit_ai::OrderTargetKind;
 use crate::unit_ai::Pace;
 use crate::unit_ai::StopOrder;
@@ -8824,8 +8825,7 @@ fn queued_build_order_builds_and_leaves_patrol_order() {
             |ai, at, side, _, rng| {
                 let order_outcome = ai.process_order(
                     &order,
-                    Some((at, PlayerKind::Human)),
-                    None,
+                    OrderSite::Surroundings(at, PlayerKind::Human),
                     rng,
                     side,
                     AiLayer {
@@ -8934,10 +8934,16 @@ fn world_routine_unit_ai_calls_run_on_the_unit_at_once() {
         .unwrap()
         .list
         .set_explore(Some(explore));
+    let place = (
+        world.players[1].objects[ListIndex::new(0)]
+            .position()
+            .ground(),
+        None,
+    );
     let seen = world
         .run_ai_calls((PlayerId::new(1), ListIndex::new(0)), |ai, side, rng| {
             let before = side.busy_now();
-            ai.stop_with(StopOrder::Keep, None, side, rng, &roles())?;
+            ai.stop_with(StopOrder::Keep, place, side, rng, &roles())?;
             Ok((before, side.busy_now()))
         })
         .unwrap();

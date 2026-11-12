@@ -357,7 +357,7 @@ impl World {
             if self.parts.unit_ai.contains(unit.id) {
                 let roles = self.model.roles.clone();
                 self.run_ai_calls((up, ui), |ai, side, rng| {
-                    ai.stop_with(StopOrder::Keep, Some(place), side, rng, &roles)?;
+                    ai.stop_with(StopOrder::Keep, place, side, rng, &roles)?;
                     ai.remove_target();
                     let stance = ai.stance;
                     set_stance(ai, stance, place, side, rng, &roles)

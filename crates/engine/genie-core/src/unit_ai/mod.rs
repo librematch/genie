@@ -112,7 +112,7 @@ pub use self::order_outcome::{
     Answer, IdleOutcome, MiscEnd, OrderOutcome, RetargetCheck, WalkBack,
 };
 pub use self::order_priority::OrderPriority;
-pub(crate) use self::process_order::TakenAs;
+pub(crate) use self::process_order::{OrderSite, TakenAs};
 pub use self::queue_end::QueueEnd;
 pub(crate) use self::side::UNMODELLED_COMMAND;
 pub use self::side::{

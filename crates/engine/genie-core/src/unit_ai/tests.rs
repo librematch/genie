@@ -107,6 +107,7 @@ use crate::unit_ai::Notifies;
 use crate::unit_ai::OrderForce;
 use crate::unit_ai::OrderHistory;
 use crate::unit_ai::OrderKind;
+use crate::unit_ai::OrderSite;
 use crate::unit_ai::OrderTest;
 use crate::unit_ai::Pace;
 use crate::unit_ai::QueueEnd;
@@ -755,7 +756,13 @@ fn the_unit_ai_calls_reach_the_unit_in_their_order() {
         (player_id(1), object_id(9)),
         |ai, at, side, _, rng| {
             ai.cap_human_order(side, rng)?;
-            ai.stop_with(StopOrder::Keep, None, side, rng, &at.roles)?;
+            ai.stop_with(
+                StopOrder::Keep,
+                (at.position.ground(), at.class),
+                side,
+                rng,
+                &at.roles,
+            )?;
             ai.attack_command(object_id(70), OrderForce::Forced, at, side, rng)
         },
     );
@@ -884,8 +891,7 @@ fn the_build_order_builds_and_takes_the_order_at_once() {
         |ai, at, side, kind, rng| {
             ai.process_order(
                 &build,
-                Some((at, kind)),
-                None,
+                OrderSite::Surroundings(at, kind),
                 rng,
                 side,
                 AiLayer {
@@ -3844,8 +3850,7 @@ fn hunter_world(others: &[SceneObject]) -> World {
         |ai, at, side, kind, rng| {
             ai.process_order(
                 &hunt,
-                Some((at, kind)),
-                None,
+                OrderSite::Surroundings(at, kind),
                 rng,
                 side,
                 AiLayer {
@@ -7795,9 +7800,8 @@ fn an_immediate_order_in_front_keeps_the_current_order_behind_it() {
                 OrderNow {
                     order,
                     keep_from: Some(object_id(50)),
-                    place: Some((at.position.ground(), at.class)),
                 },
-                None,
+                OrderSite::Place(at.position.ground(), at.class),
                 rng,
                 side,
                 AiLayer {
@@ -7898,9 +7902,8 @@ fn an_immediate_attack_roundup_keeps_the_target_until_it_attacks_the_next() {
                 OrderNow {
                     order: roundup,
                     keep_from: None,
-                    place: None,
                 },
-                Some((at, kind)),
+                OrderSite::Surroundings(at, kind),
                 rng,
                 side,
                 AiLayer {
@@ -10221,22 +10224,30 @@ fn an_attack_move_not_busy_ends_and_patrol_stays() {
     assert_eq!(unit_ai.current_order, Some(OrderKind::Patrol));
 }
 
+/// Slot 0xb0 (`FUN_140c64ed0`) with `order` on unit 50 of [`lone_unit`] at (30, 30), on its
+/// way to (40, 30), its unit AI `unit_ai`, the unit's place (3, 4) of class 6, the AI stream
+/// seeded with 0: the answer, the unit AI after it, the AI stream's draws and whether the unit
+/// stopped.
+fn stop_lone(unit_ai: UnitAi, order: StopOrder) -> (GenieResult<()>, UnitAi, u32, bool) {
+    let soldier = lone_unit(player_id(1), unit_ai, Position::new(30.0, 30.0, 0.0));
+    let mut world = lone_world(on_its_way(soldier, Position::new(40.0, 30.0, 0.0)), &[]);
+    world.streams.get_mut(Stream::Ai).set_seed(0);
+    let place = (Point::new(3.0, 4.0), Some(class::CLASS_6));
+    let answer = run_ai(
+        &mut world,
+        (player_id(1), object_id(50)),
+        |ai, at, side, _, rng| ai.stop_with(order, place, side, rng, &at.roles),
+    );
+    let unit_ai = world.parts.unit_ai.get(object_id(50)).unwrap().clone();
+    let draws = world.streams.get_mut(Stream::Ai).draws;
+    (answer, unit_ai, draws, lone_stopped(&world))
+}
+
 /// Slot 0xb0 (`FUN_140c64ed0`) on a patrol order: the order ends even when the stop keeps
-/// orders, its secondary timer capped at 750; with an adjusted idle timeout of exactly 750
-/// the redraw (the AI stream's) is not modelled here.
+/// orders, its secondary timer capped at 750 and the unit's place the state position; an
+/// adjusted idle timeout other than 750 stays, the AI stream undrawn.
 #[test]
 fn stop_ends_patrol_order_with_its_secondary_timer_capped() {
-    let stop = |unit_ai: UnitAi, place: Option<(Point, Option<ClassId>)>| {
-        let soldier = lone_unit(player_id(1), unit_ai, Position::new(30.0, 30.0, 0.0));
-        let mut world = lone_world(on_its_way(soldier, Position::new(40.0, 30.0, 0.0)), &[]);
-        let answer = run_ai(
-            &mut world,
-            (player_id(1), object_id(50)),
-            |ai, at, side, _, rng| ai.stop_with(StopOrder::Keep, place, side, rng, &at.roles),
-        );
-        let unit_ai = world.parts.unit_ai.get(object_id(50)).unwrap().clone();
-        (answer, unit_ai, lone_stopped(&world))
-    };
     let patrolling = UnitAi {
         current_order: Some(OrderKind::Patrol),
         current_action: Some(AiAction::Move),
@@ -10244,26 +10255,117 @@ fn stop_ends_patrol_order_with_its_secondary_timer_capped() {
         secondary_timer: Millis::new(900),
         ..idle(UnitAiKind::Soldier)
     };
-    let (answer, unit_ai, stopped) = stop(
-        patrolling,
-        Some((Point::new(3.0, 4.0), Some(class::CLASS_6))),
-    );
-    assert_eq!((answer, stopped), (Ok(()), true));
+    let (answer, unit_ai, draws, stopped) = stop_lone(patrolling, StopOrder::Keep);
+    assert_eq!((answer, draws, stopped), (Ok(()), 0, true));
     assert_eq!(
         (
             unit_ai.current_order,
             unit_ai.last_order,
-            unit_ai.secondary_timer
+            unit_ai.secondary_timer,
+            unit_ai.adjusted_idle_timeout
         ),
-        (None, Some(OrderKind::Patrol), Millis::new(750))
+        (
+            None,
+            Some(OrderKind::Patrol),
+            Millis::new(750),
+            Millis::new(2600)
+        )
+    );
+    assert_eq!(
+        (unit_ai.current_action, unit_ai.last_action),
+        (None, Some(AiAction::Move))
     );
     assert_eq!(unit_ai.state_position, Point::new(3.0, 4.0));
-    let attack_moving = UnitAi {
-        current_order: Some(OrderKind::AttackMove),
+}
+
+/// Slot 0xb0 (`FUN_140c64ed0`) on a patrol order (711) or an attack move (733) whose adjusted
+/// idle timeout is exactly 750: slot 0x1a8 redraws it from the AI stream's first draw, before
+/// the order ends; a secondary timer at most 750 stays. A hunted animal's slot 0x1a8
+/// (`0x140c17170`) takes 5/4 of the idle timeout and draws nothing.
+#[test]
+fn stop_on_patrol_order_redraws_adjusted_idle_timeout_of_750() {
+    for order in [OrderKind::Patrol, OrderKind::AttackMove] {
+        let patrolling = UnitAi {
+            current_order: Some(order),
+            idle_timeout: Millis::new(3000),
+            adjusted_idle_timeout: Millis::new(750),
+            secondary_timer: Millis::new(700),
+            ..idle(UnitAiKind::Soldier)
+        };
+        let (answer, unit_ai, draws, stopped) = stop_lone(patrolling, StopOrder::Keep);
+        let redrawn = adjusted_idle_timeout(Millis::new(3000), &mut rng());
+        assert_eq!((answer, draws, stopped), (Ok(()), 1, true));
+        assert_eq!(
+            (
+                unit_ai.adjusted_idle_timeout,
+                unit_ai.secondary_timer,
+                unit_ai.current_order,
+                unit_ai.last_order
+            ),
+            (redrawn, Millis::new(700), None, Some(order))
+        );
+    }
+    let hunted = UnitAi {
+        current_order: Some(OrderKind::Patrol),
+        idle_timeout: Millis::new(3000),
         adjusted_idle_timeout: Millis::new(750),
-        ..idle(UnitAiKind::Soldier)
+        ..idle(UnitAiKind::Hunted)
     };
-    assert!(stop(attack_moving, None).0.is_err());
+    let (answer, unit_ai, draws, _) = stop_lone(hunted, StopOrder::Keep);
+    assert_eq!(
+        (answer, draws, unit_ai.adjusted_idle_timeout),
+        (Ok(()), 0, Millis::new(3750))
+    );
+}
+
+/// A unit AI on the move order (`0x2c6`) whose action is an explore (`0x25d`, the explore
+/// order's), its adjusted idle timeout 750 and its secondary timer 900.
+fn exploring_on_move_order() -> UnitAi {
+    UnitAi {
+        current_order: Some(OrderKind::Move),
+        current_action: Some(AiAction::Explore),
+        adjusted_idle_timeout: Millis::new(750),
+        secondary_timer: Millis::new(900),
+        ..idle(UnitAiKind::Soldier)
+    }
+}
+
+/// Slot 0xb0 (`FUN_140c64ed0`) with 0 (it ends any order) on an order that is no patrol: the
+/// order ends and the unit's place becomes the state position, but an adjusted idle timeout of
+/// 750 and a secondary timer above it stay, the AI stream undrawn.
+#[test]
+fn stop_ending_other_order_leaves_its_timers() {
+    let (answer, unit_ai, draws, _) = stop_lone(exploring_on_move_order(), StopOrder::End);
+    assert_eq!((answer, draws), (Ok(()), 0));
+    assert_eq!(
+        (
+            unit_ai.current_order,
+            unit_ai.last_order,
+            unit_ai.adjusted_idle_timeout,
+            unit_ai.secondary_timer
+        ),
+        (
+            None,
+            Some(OrderKind::Move),
+            Millis::new(750),
+            Millis::new(900)
+        )
+    );
+    assert_eq!(unit_ai.state_position, Point::new(3.0, 4.0));
+}
+
+/// Slot 0xb0 (`FUN_140c64ed0`) with 1 on an order that is no patrol and an action not of it
+/// (action + 100 is not the order): the action stops, but the order stays and the state
+/// position does not take the unit's place.
+#[test]
+fn stop_keeping_orders_keeps_order_of_another_action() {
+    let (answer, unit_ai, draws, stopped) = stop_lone(exploring_on_move_order(), StopOrder::Keep);
+    assert_eq!((answer, draws, stopped), (Ok(()), 0, true));
+    assert_eq!(
+        (unit_ai.current_order, unit_ai.current_action),
+        (Some(OrderKind::Move), None)
+    );
+    assert_ne!(unit_ai.state_position, Point::new(3.0, 4.0));
 }
 
 /// The order's tail (`LAB_140c5d611`) and the Build's end (`FUN_140c64b60` with −1): leaving
@@ -12340,8 +12442,7 @@ fn orders(world: &mut World, queued_order: &QueuedOrder) -> GenieResult<OrderOut
         |ai, at, side, kind, rng| {
             ai.process_order(
                 queued_order,
-                Some((at, kind)),
-                None,
+                OrderSite::Surroundings(at, kind),
                 rng,
                 side,
                 AiLayer {
@@ -13878,8 +13979,7 @@ fn other_load_world(with_camp: bool) -> World {
         |ai, at, side, kind, rng| {
             ai.process_order(
                 &gather,
-                Some((at, kind)),
-                None,
+                OrderSite::Surroundings(at, kind),
                 rng,
                 side,
                 AiLayer {

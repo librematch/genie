@@ -40,6 +40,36 @@ pub(crate) enum TakenAs {
     Attack,
 }
 
+/// Where an order runs ([`UnitAi::order_now`], [`UnitAi::process_order`]): beside the unit AI's
+/// update, with the unit's surroundings and its owner's type, or from a command outside it
+/// ([`UnitAi::take_order_now`]), with only the unit's place.
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum OrderSite<'at> {
+    /// The unit's surroundings and its owner's type.
+    Surroundings(&'at Surroundings, PlayerKind),
+    /// The unit's position (x, y) and its master's class.
+    Place(Point, Option<ClassId>),
+}
+
+impl<'at> OrderSite<'at> {
+    /// The unit's surroundings and its owner's type, which only [`OrderSite::Surroundings`]
+    /// holds.
+    pub(crate) const fn world(self) -> Option<(&'at Surroundings, PlayerKind)> {
+        match self {
+            Self::Surroundings(at, player_kind) => Some((at, player_kind)),
+            Self::Place(..) => None,
+        }
+    }
+
+    /// The unit's position (x, y) and its master's class, which the stop reads.
+    pub(crate) const fn place(self) -> (Point, Option<ClassId>) {
+        match self {
+            Self::Surroundings(at, _) => (at.position.ground(), at.class),
+            Self::Place(position, class) => (position, class),
+        }
+    }
+}
+
 impl UnitAi {
     /// Slot 0x230 (`FUN_140c5c170`, every type's) on the order `queued_order`: one not ready
     /// returns 0xe. Each case runs its slot, forced (its force argument 1); a slot that does not
@@ -91,10 +121,10 @@ impl UnitAi {
     ///   ([`UnitAi::wait_for_foundation`]); whatever it gave, the action value `0x27a`, the one
     ///   before the last.
     ///
-    /// `world` is the unit's surroundings and its owner's type, which the full update and the
-    /// queue between turns pass; [`UnitAi::take_order_now`] passes none but the unit's
-    /// `place` (its x and y and its master's class), as its own order (`AUTO_SCOUT`'s stop or
-    /// auto scout order) is the one that runs.
+    /// `site` is the unit's surroundings and its owner's type, which the full update and the
+    /// queue between turns pass; [`UnitAi::take_order_now`] passes only the unit's place (its x
+    /// and y and its master's class, [`OrderSite::Place`]), as its own order (`AUTO_SCOUT`'s
+    /// stop or auto scout order) is the one that runs.
     #[expect(
         clippy::too_many_lines,
         reason = "slot 0x230 (`FUN_140c5c170`) ported as one function, one case per order in the game's order"
@@ -102,8 +132,7 @@ impl UnitAi {
     pub(crate) fn process_order(
         &mut self,
         queued_order: &QueuedOrder,
-        world: Option<(&Surroundings, PlayerKind)>,
-        place: Option<(Point, Option<ClassId>)>,
+        site: OrderSite<'_>,
         ai: &mut Well512,
         side: &mut UnitView<'_, '_>,
         layer: AiLayer<'_>,
@@ -116,11 +145,9 @@ impl UnitAi {
         if !queued_order.ready {
             return Ok(OrderOutcome::NotReady);
         }
-        let place = world
-            .as_ref()
-            .map(|(at, _)| (at.position.ground(), at.class))
-            .or(place);
-        let class = place.and_then(|(_, class)| class);
+        let world = site.world();
+        let place = site.place();
+        let (_, class) = place;
         // `bVar2`: the attack move's attack, whose tail makes the order 700
         let mut taken_as = TakenAs::Order;
         let taken = match queued_order.order {

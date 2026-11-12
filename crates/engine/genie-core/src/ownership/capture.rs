@@ -159,7 +159,7 @@ impl Unit {
             let place = (self.place.position().ground(), Some(class));
             // slot 0xb0 with 0, its stopAction a call on the unit at once
             self.run_calls(actions, step, |ai, side, rng| {
-                ai.stop_with(StopOrder::End, Some(place), side, rng, roles)?;
+                ai.stop_with(StopOrder::End, place, side, rng, roles)?;
                 ai.forget_targets();
                 Ok(())
             })?;

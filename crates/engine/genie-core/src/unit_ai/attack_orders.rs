@@ -1,12 +1,10 @@
 //! The orders a unit AI takes at once and its attack commands.
 
-use crate::map::Point;
 use crate::map::Position;
 use crate::math::rng::Well512;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::ClassId;
-use crate::players::PlayerKind;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::AiLayer;
 use crate::unit_ai::Answer;
@@ -14,6 +12,7 @@ use crate::unit_ai::Issuer;
 use crate::unit_ai::OrderForce;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::OrderOutcome;
+use crate::unit_ai::OrderSite;
 use crate::unit_ai::OrderTargetKind;
 use crate::unit_ai::QueueEnd;
 use crate::unit_ai::StopOrder;
@@ -29,16 +28,14 @@ use crate::world::layer::ClassRoles;
 use crate::world::slots::CheckedIndexExt;
 use crate::{GenieError, GenieResult};
 
-/// The order [`UnitAi::order_now`] runs at once: the order, the unit that keeps the current
-/// order in front of the queue (inFront 1) and the unit's place for the stop.
+/// The order [`UnitAi::order_now`] runs at once: the order and the unit that keeps the current
+/// order in front of the queue (inFront 1).
 #[derive(Clone, Copy, Debug)]
 pub(super) struct OrderNow {
     /// The order.
     pub(super) order: QueuedOrder,
     /// The unit whose current order goes in front of the queue first.
     pub(super) keep_from: Option<ObjectId>,
-    /// The unit's position (x, y) and master's class, for the stop.
-    pub(super) place: Option<(Point, Option<ClassId>)>,
 }
 
 impl UnitAi {
@@ -50,24 +47,20 @@ impl UnitAi {
     /// new order's shown point and ready flag. Then the order goes in front. But for an attack
     /// roundup (`0x2d9`, "so I'm not stopping the object") the target goes (`FUN_140c5e1e0`) and
     /// the action stops (slot 0xb0 with 1, which ends an order of its action and reads the
-    /// unit's `place` for it). The notifies end (`FUN_140c5dc10` with 0; outside the full update
-    /// without `world`, where a completion it would stop on is not modelled), the queue's first
-    /// order runs at once (slot 0x230, [`UnitAi::process_order`] with `world`, the surroundings
-    /// and the unit) and, unless it was not ready, leaves the queue (`FUN_140c5e280`).
+    /// unit's place in `site` for it). The notifies end (`FUN_140c5dc10` with 0; outside the full
+    /// update, with only the unit's place, where a completion it would stop on is not modelled),
+    /// the queue's first order runs at once (slot 0x230, [`UnitAi::process_order`] at `site`) and,
+    /// unless it was not ready, leaves the queue (`FUN_140c5e280`).
     pub(super) fn order_now(
         &mut self,
         now: OrderNow,
-        world: Option<(&Surroundings, PlayerKind)>,
+        site: OrderSite<'_>,
         ai: &mut Well512,
         side: &mut UnitView<'_, '_>,
         layer: AiLayer<'_>,
     ) -> GenieResult<()> {
         let AiLayer { roles, .. } = layer;
-        let OrderNow {
-            order,
-            keep_from,
-            place,
-        } = now;
+        let OrderNow { order, keep_from } = now;
         if let Some(unit) = keep_from
             && let Some(current) = self.current_order
         {
@@ -88,14 +81,14 @@ impl UnitAi {
         self.insert_order(order, QueueEnd::Front);
         if order.order != OrderKind::AttackRoundup {
             self.remove_target();
-            self.stop_with(StopOrder::Keep, place, side, ai, roles)?;
+            self.stop_with(StopOrder::Keep, site.place(), side, ai, roles)?;
         }
-        match &world {
-            Some((at, _)) => self.end_notifies(Millis::ZERO, at, side, ai)?,
-            None => self.clear_notifies(Millis::ZERO)?,
+        match site {
+            OrderSite::Surroundings(at, _) => self.end_notifies(Millis::ZERO, at, side, ai)?,
+            OrderSite::Place(..) => self.clear_notifies(Millis::ZERO)?,
         }
         let front = *self.orders.checked(0)?;
-        if self.process_order(&front, world, place, ai, side, layer)? != OrderOutcome::NotReady {
+        if self.process_order(&front, site, ai, side, layer)? != OrderOutcome::NotReady {
             let _ = self.orders.remove(0);
         }
         Ok(())

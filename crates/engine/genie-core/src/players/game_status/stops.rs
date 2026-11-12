@@ -170,7 +170,7 @@ impl World {
         // slot 0xb0 with 0, its stopAction a call on the unit at once
         let roles = self.model.roles.clone();
         self.run_ai_calls((player_id, idx), |ai, side, rng| {
-            ai.stop_with(StopOrder::End, Some(place), side, rng, &roles)?;
+            ai.stop_with(StopOrder::End, place, side, rng, &roles)?;
             ai.forget_targets();
             Ok(())
         })

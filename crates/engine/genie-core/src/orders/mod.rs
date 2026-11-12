@@ -521,7 +521,7 @@ pub(crate) fn set_stance(
         && (ai.current_order == Some(OrderKind::Attack)
             || ai.current_action == Some(AiAction::Attack))
     {
-        ai.stop_with(StopOrder::Keep, Some(place), side, rng, roles)?;
+        ai.stop_with(StopOrder::Keep, place, side, rng, roles)?;
         ai.remove_target();
     }
     Ok(())

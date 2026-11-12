@@ -20,6 +20,7 @@ use crate::unit_ai::AiLayer;
 use crate::unit_ai::Answer;
 use crate::unit_ai::OrderForce;
 use crate::unit_ai::OrderOutcome;
+use crate::unit_ai::OrderSite;
 use crate::unit_ai::Pace;
 use crate::unit_ai::StopOrder;
 use crate::unit_ai::TakenAs;
@@ -541,12 +542,12 @@ impl UnitAi {
         if ObjectState::Alive < unit_state {
             return Ok(());
         }
+        let (position, class) = place;
         let now = OrderNow {
             order,
             keep_from: None,
-            place: Some(place),
         };
-        self.order_now(now, None, ai, side, layer)
+        self.order_now(now, OrderSite::Place(position, class), ai, side, layer)
     }
 
     /// Slot 0x28 (`FUN_140c55c90`) with Immediate set and inFront clear, from outside the unit
@@ -569,15 +570,13 @@ impl UnitAi {
         if ObjectState::Alive < at.state {
             return Ok(());
         }
-        let place = (at.position.ground(), at.class);
         let now = OrderNow {
             order,
             keep_from: None,
-            place: Some(place),
         };
         self.order_now(
             now,
-            Some((at, player_kind)),
+            OrderSite::Surroundings(at, player_kind),
             ai,
             side,
             AiLayer {

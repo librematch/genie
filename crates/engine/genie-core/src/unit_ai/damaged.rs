@@ -26,6 +26,7 @@ use crate::unit_ai::OrderForce;
 use crate::unit_ai::OrderHistory;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::OrderPriority;
+use crate::unit_ai::OrderSite;
 use crate::unit_ai::OrderTargetKind;
 use crate::unit_ai::QueueEnd;
 use crate::unit_ai::StopOrder;
@@ -583,15 +584,13 @@ impl UnitAi {
             ready: true,
             target_kind: self.target_class.and_then(OrderTargetKind::of_class),
         };
-        let place = (at.position.ground(), at.class);
         let now = OrderNow {
             order: record,
             keep_from: Some(at.id),
-            place: Some(place),
         };
         self.order_now(
             now,
-            Some((at, player_kind)),
+            OrderSite::Surroundings(at, player_kind),
             ai,
             side,
             AiLayer {

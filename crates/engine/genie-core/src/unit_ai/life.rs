@@ -395,7 +395,8 @@ impl UnitAi {
     }
 
     /// `UpdateAdjustedIdleTimeout` (slot 0x1a8): the base draws around the idle timeout
-    /// (`0x140c41e00`); a deer's or fox's (factory type 2, `FUN_140c17170`) is 5/4 of it.
+    /// (`0x140c41e00`); a deer's or fox's (factory type 2, `0x140c17170`) is 5/4 of it (`LEA`
+    /// times 5, then `SHR` by 2 on the unsigned value), set through `0x140c41bb0` (`+0x164`).
     pub(super) fn update_adjusted_idle_timeout(&mut self, ai: &mut Well512) {
         self.adjusted_idle_timeout = if self.ai_kind == UnitAiKind::Hunted {
             Millis::new(self.idle_timeout.get().wrapping_mul(5) >> 2)
