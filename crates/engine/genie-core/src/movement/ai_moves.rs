@@ -463,7 +463,7 @@ impl Unit {
     /// [`crate::movement::move_to::object_range`]), showing the master's running sprite (the
     /// walking one without it), takes the target it holds (`FUN_140aa0df0`, quiet 0: slot 0x178,
     /// [`crate::movement::move_to::holds_object`]), then replaces its action list (`FUN_140a98620`,
-    /// [`Unit::clear_own_actions`]: the old actions' teardowns let their targets go) and starts
+    /// [`Unit::delete_own_actions`]: the old actions' teardowns let their targets go) and starts
     /// ([`MoveToAction::to_object`]).
     pub(crate) fn move_to_object(
         &mut self,
@@ -492,20 +492,11 @@ impl Unit {
             .get_known(target)?
             .ok_or(TARGET_LACKING)?
             .master;
-        let by = self.releaser(step)?;
         if holds_object(livestock, master, state, roles) {
+            let by = self.releaser(step)?;
             take(step, self, target, by, roles)?;
         }
-        let (mut releases, mut leaves) = (Vec::new(), Vec::new());
-        let top = step.world.top_speed(step.player, self)?;
-        self.clear_own_actions(
-            actions,
-            (step.world.parts.motion_mut(self.id), top),
-            &mut releases,
-            &mut leaves,
-            by,
-        )?;
-        torn_down(step, self, (leaves, releases))?;
+        self.delete_own_actions(actions, step)?;
         let own = self.master(step.world.master_tables(), step.player)?;
         let range = object_range(range, Some(own), &step.world.model.tuning.order);
         let sprite = ai_sprite(own, Pace::Run)

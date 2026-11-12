@@ -22,8 +22,10 @@ use crate::movement::move_to::{MoveTo, Shows};
 use crate::movement::step::VelocityStep;
 use crate::movement::stop_mover;
 use crate::movement::{GroupSpeed, Me};
+use crate::objects::ObjectState;
 use crate::objects::SpriteId;
 use crate::objects::UpdateCode;
+use crate::objects::actions::Action as ActionsAction;
 use crate::objects::layers::Action;
 use crate::objects::layers::Speedup;
 use crate::objects::masters::OwnerMasters;
@@ -36,6 +38,7 @@ use crate::objects::unit::Unit;
 use crate::objects::unit::object_master;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::NotifyKind;
+use crate::unit_ai::OrderForce;
 use crate::unit_ai::UnitAi;
 use crate::unit_ai::UnitStance;
 use crate::world::NO_ATTRIBUTE;
@@ -418,22 +421,40 @@ impl Unit {
 }
 
 impl Unit {
-    /// The unit's explore (slot 0x398, `FUN_141084db0` with its argument 4 set) to the point at
-    /// its own height: its top Explore takes the point (slot 0x48), else a new Explore
-    /// (`FUN_140a87d30`) becomes its only action (`set_only_action`, `FUN_14106e990`: the actions
-    /// it had go, `FUN_140a98620`, and the new one starts, `FUN_140a977e0`). A `MoveTo` of the
-    /// Explore that goes stops the unit (its teardown, slot 0x5d0); other actions it would
-    /// replace are not modelled.
+    /// The unit's explore (slot 0x398, `FUN_141084db0`) to the point at its own height, `force`
+    /// its argument 4. Unforced, an Explore on top (the list's head, `FUN_140a986f0`) answers at
+    /// once ("I'm already exploring") and keeps its point. Forced, that Explore takes the point
+    /// (slot 0x48 with no target), and a `MoveTo` of it that goes stops the unit (its teardown,
+    /// slot 0x5d0). Without an Explore on top, a new Explore to the point (`FUN_140a87d30`) takes
+    /// the place of the unit's actions: they go (`FUN_140a98620`, [`Unit::delete_own_actions`]),
+    /// then slot 0x808 (`FUN_14106e990`, `set_only_action`) installs it: the Explore's slot 0x70
+    /// does nothing (`0x140a78050`), the empty list is cleared again, and the list adds and
+    /// starts it (`FUN_140a977e0`). A unit in state 3 or later takes no action: the list
+    /// deletes the new Explore, which holds no target and no sub-action. The game's answer is 1
+    /// but for a failed allocation, so this returns none.
+    ///
+    /// # Errors
+    ///
+    /// A unit the load could not read whole ([`Unread::error`]), its teardowns' and its walk's.
     pub(crate) fn explore_to(
         &mut self,
         actions: &mut Action,
         point: Point,
+        force: OrderForce,
         step: &mut Step<'_>,
         roles: &Roles,
     ) -> GenieResult<()> {
+        // the game reads the head and deletes the list, which the load did not read
+        if let Some(unread) = step.world.parts.unread.get(self.id) {
+            return Err(unread.error());
+        }
         let at = Position::new(point.x(), point.y(), self.position().z());
-        let walk = self.explore_move(step, roles)?;
-        let owner = if let Some(explore_action) = actions.list.explore_mut() {
+        let owner = if let Some(ActionsAction::Explore(explore_action)) = actions.list.head_mut() {
+            if force == OrderForce::Unforced {
+                // "I'm already exploring, returning TRUE": the Explore keeps its point
+                return Ok(());
+            }
+            let walk = self.explore_move(step, roles)?;
             let walked = explore_action.state.move_to().is_some();
             let owner = explore_action.take_point(at, &walk, &step.world.model.tuning.move_to)?;
             if walked {
@@ -441,11 +462,12 @@ impl Unit {
             }
             owner
         } else {
-            if actions.top_action().is_some() || step.world.parts.unread.contains(self.id) {
-                return Err(GenieError::unsupported(
-                    "an Explore replacing another action",
-                ));
+            self.delete_own_actions(actions, step)?;
+            if ObjectState::Dying <= self.life.state {
+                // `FUN_140a977e0` deletes the new Explore unstarted
+                return Ok(());
             }
+            let walk = self.explore_move(step, roles)?;
             let (explore_action, owner) =
                 ExploreAction::new(at, &walk, &step.world.model.tuning.move_to)?;
             actions.list.set_explore(Some(explore_action));

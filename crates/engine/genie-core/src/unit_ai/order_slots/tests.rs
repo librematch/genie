@@ -5,7 +5,11 @@ use crate::construction::RepairTargetId;
 use crate::garrison::transport::TransportState;
 use crate::gathering::gather::GATHER;
 use crate::gathering::hunt::HUNT;
+use crate::movement::explore::ExploreAction;
+use crate::movement::explore::ExploreState;
 use crate::movement::move_to::MOVE_TO;
+use crate::objects::actions::ActionList;
+use crate::objects::layers::Action;
 use crate::objects::masters::Master;
 use crate::test_ids::class_of;
 use crate::test_ids::object_id;
@@ -678,6 +682,54 @@ fn explore_slots_explore_tile_corner_without_target() {
             (ai_9(&world), explores_9(&world)),
             (&moving(UnitAiKind::Soldier), None)
         );
+    }
+}
+
+/// The explore slots to tile (12, 30) of unit 9 at height 1.5 whose Explore on top waits at
+/// (40, 50). Forced with an action value, the unit's explore (slot 0x398, `FUN_141084db0`) gives
+/// the Explore the tile's corner (its slot 0x48). Unforced without an action value, the unit's
+/// explore answers 1 at once ("I'm already exploring") and the Explore keeps its point. Either
+/// way the slot takes the order: its action value, the old one the last, and no target at the
+/// tile at height 1, the old target and class the last ones.
+#[test]
+fn explore_slots_unforced_leave_explore_on_top_its_point() {
+    let waiting = Action {
+        list: ActionList::default().with_explore(Some(ExploreAction {
+            state: ExploreState::Wait,
+            point: Position::new(40.0, 50.0, 1.5),
+            task: None,
+        })),
+        ..Action::default()
+    };
+    let explore = |unit_ai: UnitAi, slot: ExploreSlot, force: OrderForce| {
+        let explorer = SceneObject {
+            actions: Some(waiting.clone()),
+            ..raised_unit(order_soldier(), unit_ai)
+        };
+        let mut world = order_world(explorer, &[]);
+        let answer = slot_9(&mut world, |ai, at, side, rng| {
+            slot(ai, Tile::new(12, 30), force, side, rng, &at.unit_ai_tuning)
+        });
+        (answer, world)
+    };
+    let slots: [(AiAction, ExploreSlot); 2] = [
+        (AiAction::ExploreAndDestroy, UnitAi::explore_and_destroy),
+        (AiAction::Explore, UnitAi::explore_at),
+    ];
+    for (action, slot) in slots {
+        for (force, unit_ai, last) in takers(UnitAiKind::Soldier) {
+            let (answer, world) = explore(unit_ai, slot, force);
+            assert_eq!(answer, Ok(Answer::Taken), "{action:?} {force:?}");
+            let point = match force {
+                OrderForce::Forced => Position::new(12.0, 30.0, 1.5),
+                OrderForce::Unforced => Position::new(40.0, 50.0, 1.5),
+            };
+            assert_eq!(explores_9(&world), Some(point), "{action:?} {force:?}");
+            let unit_ai = ai_9(&world);
+            assert_eq!(actions(unit_ai), (Some(action), last));
+            let tile_point = Position::new(12.0, 30.0, tuning().unit_ai.explore_z);
+            assert_eq!(Targets::of(unit_ai), Targets::pointed(tile_point));
+        }
     }
 }
 

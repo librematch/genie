@@ -11908,7 +11908,10 @@ fn the_tail_reads_the_top_target_the_update_commands_left() {
     // a move to a point, a stop or an explore left no object to test
     for pending in [
         Effect::Stop,
-        Effect::Explore(Point::new(1.0, 2.0)),
+        Effect::Explore {
+            point: Point::new(1.0, 2.0),
+            force: OrderForce::Forced,
+        },
         Effect::Move(AiMove {
             point: Position::new(1.0, 2.0, 0.0),
             range: Distance::ZERO,

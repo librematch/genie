@@ -4637,38 +4637,38 @@ fn with_effects(world: &mut World, effects: Vec<Effect>) -> GenieResult<()> {
     )
 }
 
-/// The unit AI's explore (slot 0x398, `FUN_141084db0`) of the idle forager: a new Explore to
-/// the point at its height walks there (state 11, its `MoveTo` starting); a point off the map's
-/// quarter for the Explore on top makes it wait (state 3), its walk stopped, and ask its unit
-/// AI for a point (notify 0x202 with the explore's action). An Explore replacing a Gather is
-/// not modelled.
-#[test]
-fn the_unit_ai_explore_walks_to_its_point_or_asks_for_one() {
-    use crate::movement::explore::ExploreState;
-    use crate::unit_ai::Effect;
-    let mut world = forage_world();
-    with_effects(&mut world, vec![Effect::Explore(Point::new(40.0, 90.0))]).unwrap();
-    let explore_action = world
+/// The unit AI's explore (slot 0x398, `FUN_141084db0`) of its unit to `point` with `force`.
+fn explore_effect(point: Point, force: OrderForce) -> Effect {
+    Effect::Explore { point, force }
+}
+
+/// The forager's (unit 0 of player 1) actions in `world`.
+fn forager_actions(world: &World) -> &ActionList {
+    &world
         .parts
         .actions_of(world.players[1].objects[ListIndex::new(0)].id)
         .list
-        .explore()
-        .copied()
-        .unwrap();
+}
+
+/// The unit AI's explore (slot 0x398, `FUN_141084db0`) of the idle forager: a new Explore to
+/// the point at its height walks there (state 11, its `MoveTo` starting); a point off the map's
+/// quarter for the Explore on top makes it wait (state 3), its walk stopped, and ask its unit
+/// AI for a point (notify 0x202 with the explore's action).
+#[test]
+fn the_unit_ai_explore_walks_to_its_point_or_asks_for_one() {
+    let mut world = forage_world();
+    let walk = explore_effect(Point::new(40.0, 90.0), OrderForce::Forced);
+    with_effects(&mut world, vec![walk]).unwrap();
+    let explore_action = forager_actions(&world).explore().copied().unwrap();
     assert!(matches!(
         explore_action.state,
         ExploreState::Walk { move_to: Some(_) }
     ));
     assert_eq!(explore_action.point, Position::new(40.0, 90.0, 0.0));
-    with_effects(&mut world, vec![Effect::Explore(Point::new(-1.0, 90.0))]).unwrap();
+    let off_map = explore_effect(Point::new(-1.0, 90.0), OrderForce::Forced);
+    with_effects(&mut world, vec![off_map]).unwrap();
     let unit = &world.players[1].objects[ListIndex::new(0)];
-    let explore_action = world
-        .parts
-        .actions_of(unit.id)
-        .list
-        .explore()
-        .copied()
-        .unwrap();
+    let explore_action = forager_actions(&world).explore().copied().unwrap();
     assert_eq!(explore_action.state, ExploreState::Wait);
     let notifies = &world.parts.unit_ai.get(unit.id).unwrap().notifies;
     assert_eq!(
@@ -4678,11 +4678,106 @@ fn the_unit_ai_explore_walks_to_its_point_or_asks_for_one() {
             [AiAction::Explore.value(), 0, 0]
         ))
     );
+}
+
+/// The unit AI's explore unforced (slot 0x398, `FUN_141084db0` with its argument 4 at 0) of the
+/// forager whose Explore on top walks to (40, 90): "I'm already exploring", the Explore keeps
+/// its point and its walk, and the unit AI hears nothing. Forced, the Explore takes the new
+/// point (slot 0x48).
+#[test]
+fn the_unit_ai_unforced_explore_leaves_explore_on_top_as_it_is() {
+    let mut world = forage_world();
+    let walk = explore_effect(Point::new(40.0, 90.0), OrderForce::Forced);
+    with_effects(&mut world, vec![walk]).unwrap();
+    let id = world.players[1].objects[ListIndex::new(0)].id;
+    let heard = |world: &World| world.parts.unit_ai.get(id).unwrap().notifies.clone();
+    let before = (forager_actions(&world).clone(), heard(&world));
+    let other = Point::new(50.0, 90.0);
+    with_effects(
+        &mut world,
+        vec![explore_effect(other, OrderForce::Unforced)],
+    )
+    .unwrap();
+    assert_eq!((forager_actions(&world).clone(), heard(&world)), before);
+    with_effects(&mut world, vec![explore_effect(other, OrderForce::Forced)]).unwrap();
+    assert_eq!(
+        forager_actions(&world)
+            .explore()
+            .map(|explore_action| explore_action.point),
+        Some(Position::new(50.0, 90.0, 0.0))
+    );
+}
+
+/// The unit AI's explore of the forager on its Gather of bush 600, forced or unforced: the head
+/// is no Explore, so a new Explore to (40, 90) (`FUN_140a87d30`) takes the place of its actions
+/// (`FUN_140a98620`: the Gather lets the bush go) and walks there (slot 0x808, `FUN_140a977e0`
+/// for a unit below state 3).
+#[test]
+fn the_unit_ai_explore_replaces_actions_without_explore_on_top() {
+    for force in [OrderForce::Forced, OrderForce::Unforced] {
+        let mut world = forage_world();
+        world
+            .gather_command(PlayerId::new(1), ListIndex::new(0), object_id(600))
+            .unwrap();
+        assert_eq!(
+            world.players[0].objects[ListIndex::new(0)].workers,
+            WorkerCount::of_data(1)
+        );
+        let walk = explore_effect(Point::new(40.0, 90.0), force);
+        with_effects(&mut world, vec![walk]).unwrap();
+        let list = forager_actions(&world);
+        assert_eq!(list.iter().count(), 1, "{force:?}");
+        let explore_action = list.explore().copied().unwrap();
+        assert_eq!(explore_action.point, Position::new(40.0, 90.0, 0.0));
+        assert!(matches!(
+            explore_action.state,
+            ExploreState::Walk { move_to: Some(_) }
+        ));
+        assert_eq!(
+            world.players[0].objects[ListIndex::new(0)].workers,
+            WorkerCount::of_data(0)
+        );
+    }
+}
+
+/// The unit AI's explore of the dying forager (state 3) on its Gather of bush 600: its actions
+/// go (`FUN_140a98620`: the Gather lets the bush go), but its action list adds no action to a
+/// unit in state 3 or later (`FUN_140a977e0` deletes the new Explore).
+#[test]
+fn the_unit_ai_explore_of_dying_unit_clears_its_actions_without_new_explore() {
     let mut world = forage_world();
     world
         .gather_command(PlayerId::new(1), ListIndex::new(0), object_id(600))
         .unwrap();
-    assert!(with_effects(&mut world, vec![Effect::Explore(Point::new(40.0, 90.0))]).is_err());
+    world.players[1].objects[ListIndex::new(0)].life.state = ObjectState::Dying;
+    let walk = explore_effect(Point::new(40.0, 90.0), OrderForce::Forced);
+    with_effects(&mut world, vec![walk]).unwrap();
+    assert!(forager_actions(&world).is_empty());
+    assert_eq!(
+        world.players[0].objects[ListIndex::new(0)].workers,
+        WorkerCount::of_data(0)
+    );
+}
+
+/// The explore (slot 0x398, `FUN_141084db0`) of a forager the load could not read whole
+/// ([`Unread`]): its action list is not known, so the explore stops the run with the import's
+/// error.
+#[test]
+fn the_unit_ai_explore_of_unread_unit_stops_with_import_error() {
+    let mut world = forage_world();
+    let id = world.players[1].objects[ListIndex::new(0)].id;
+    let why = GenieError::unsupported("a test's action");
+    let _ = world.parts.unread.insert(id, Unread::new(why.clone()));
+    let explored = in_update(
+        &mut world,
+        (PlayerId::new(1), ListIndex::new(0)),
+        50,
+        |unit, actions, step| {
+            let point = Point::new(40.0, 90.0);
+            unit.explore_to(actions, point, OrderForce::Unforced, step, &roles())
+        },
+    );
+    assert_eq!(explored, Err(why));
 }
 
 /// The unit AI's move to an object (slot 0x348, `FUN_141086440`): the forager's Gather goes (its
@@ -22020,7 +22115,13 @@ fn an_explore_move_to_shows_the_master_walking_sprite_as_it_starts() {
         (PlayerId::new(1), ListIndex::new(0)),
         50,
         |unit, actions, step| {
-            unit.explore_to(actions, Point::new(40.5, 89.5), step, &roles())?;
+            unit.explore_to(
+                actions,
+                Point::new(40.5, 89.5),
+                OrderForce::Forced,
+                step,
+                &roles(),
+            )?;
             let me = Me {
                 human_order: WorldTime::ZERO,
                 id: unit.id,

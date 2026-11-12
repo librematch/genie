@@ -348,9 +348,9 @@ impl UnitAi {
     }
 
     /// Slot 0x188 (`FUN_140c4d9b0`), explore and destroy to the tile `tile`, `force`d or without
-    /// an action value: the unit's explore there (slot 0x398, [`Effect::Explore`], which takes
-    /// it), then the action value `0x26f` (the last keeping the old) and no target at the tile
-    /// (as floats) at height 1.
+    /// an action value: the unit's explore there with `force` (slot 0x398, [`Effect::Explore`];
+    /// unforced, an Explore on top keeps its point), which takes it, then the action value
+    /// `0x26f` (the last keeping the old) and no target at the tile (as floats) at height 1.
     pub(super) fn explore_and_destroy(
         &mut self,
         tile: Tile,
@@ -363,7 +363,7 @@ impl UnitAi {
             return Ok(Answer::NotTaken);
         }
         let point = Point::new(tile.x() as f32, tile.y() as f32);
-        side.effect_now(Effect::Explore(point), self, rng)?;
+        side.effect_now(Effect::Explore { point, force }, self, rng)?;
         self.set_action(Some(AiAction::ExploreAndDestroy));
         self.target_at(None, None, point.with_height(unit_ai_tuning.explore_z));
         Ok(Answer::Taken)
@@ -498,9 +498,11 @@ impl UnitAi {
     }
 
     /// Slot 0x100 (`FUN_140c4d910`), forced (its argument 4) or without an action value:
-    /// the unit's explore to `tile`'s corner (slot 0x398, [`Effect::Explore`], which takes it); the AI
-    /// then holds the explore's action value and the point without a target (`FUN_140c64c10`
-    /// with −1, which leaves the target class), at height `UnitAiTuning::explore_z`.
+    /// the unit's explore to `tile`'s corner with `force` (slot 0x398, [`Effect::Explore`];
+    /// unforced, an Explore on top keeps its point), which takes it; the AI then holds the
+    /// explore's action value and the point without a target (`FUN_140c64c10` with −1, which
+    /// leaves the target class), at height `UnitAiTuning::explore_z`. The unit AI's unit is a
+    /// combat object (`TRIBE_Combat_Object` holds it), whose slot 0x398 always answers 1.
     pub(super) fn explore_at(
         &mut self,
         tile: Tile,
@@ -513,7 +515,7 @@ impl UnitAi {
             return Ok(Answer::NotTaken);
         }
         let point = tile.corner();
-        side.effect_now(Effect::Explore(point), self, rng)?;
+        side.effect_now(Effect::Explore { point, force }, self, rng)?;
         self.last_action = self.current_action.replace(AiAction::Explore);
         self.target_at(None, None, point.with_height(unit_ai_tuning.explore_z));
         Ok(Answer::Taken)

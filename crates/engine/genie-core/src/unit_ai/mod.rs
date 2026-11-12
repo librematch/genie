@@ -303,10 +303,17 @@ pub enum Effect {
     /// then the order's priority becomes the AI's (`World::order_on_target`, on the unit back in
     /// its slot); the full update's rest then reads what it gave the AI ([`AfterOrder`]).
     OrderOnTarget(QueuedOrder),
-    /// The unit's explore (slot 0x398, `FUN_141084db0`, with its argument 4 set) to the point
-    /// (x, y): its Explore takes the point (slot 0x48), else a new Explore to it (`FUN_140a87d30`
-    /// at the unit's height) replaces its actions (`FUN_140a98620`, slot 0x808).
-    Explore(Point),
+    /// The unit's explore (slot 0x398, `FUN_141084db0`) to the point (x, y), with the explore
+    /// slot's force as its argument 4: unforced, an Explore on top keeps its own point; else
+    /// that Explore takes the point (slot 0x48), and a unit without one on top gets a new
+    /// Explore to it (`FUN_140a87d30` at the unit's height) in place of its actions
+    /// (`FUN_140a98620`, slot 0x808).
+    Explore {
+        /// The point (x, y).
+        point: Point,
+        /// The explore slot's force (its argument 4), which the unit's explore takes on.
+        force: OrderForce,
+    },
     /// The AI's move to an object (slot 0x138, `FUN_140c55490`, with its fourth argument 1): the
     /// unit's slot 0x348 (`FUN_141086440`, forced) replaces its actions (`FUN_140a98620`) with a
     /// `MoveTo` to the target within `range` showing the master's running sprite (the walking one

@@ -179,6 +179,31 @@ impl Unit {
         Ok(())
     }
 
+    /// The action list's deletion (`FUN_140a98620`) on the unit's own list
+    /// ([`Unit::clear_own_actions`]), what its teardowns let go applied at once
+    /// ([`crate::world::lets::torn_down`]).
+    ///
+    /// # Errors
+    ///
+    /// The deletion's, and what it lets go.
+    pub(crate) fn delete_own_actions(
+        &mut self,
+        actions: &mut Action,
+        step: &mut Step<'_>,
+    ) -> GenieResult<()> {
+        let by = self.releaser(step)?;
+        let top = step.world.top_speed(step.player, self)?;
+        let (mut releases, mut leaves) = (Vec::new(), Vec::new());
+        self.clear_own_actions(
+            actions,
+            (step.world.parts.motion_mut(self.id), top),
+            &mut releases,
+            &mut leaves,
+            by,
+        )?;
+        torn_down(step, self, (leaves, releases))
+    }
+
     /// `FUN_140a98e20` on the unit's own list ([`ActionList::delete_head`]): the head's
     /// destructor, what it lets go applied at once
     /// ([`crate::objects::teardown::TornDown::let_go`]).
@@ -248,7 +273,7 @@ impl Unit {
             ),
             Effect::Command(command) => self.ai_command(actions, command, step),
             Effect::ChangeOwner(new) => self.ai_change_owner(actions, new, step, roles),
-            Effect::Explore(point) => self.explore_to(actions, point, step, roles),
+            Effect::Explore { point, force } => self.explore_to(actions, point, force, step, roles),
             Effect::MoveToObject {
                 target,
                 state,
