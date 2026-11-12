@@ -27,7 +27,7 @@ use crate::unit_ai::StopOrder;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
 use crate::world::layer::Slots;
-use crate::world::lets::{release, torn_down};
+use crate::world::lets::release;
 use crate::world::others::OthersRef;
 use crate::world::parts::Part;
 use crate::world::step::Step;
@@ -133,16 +133,8 @@ impl Unit {
         } else {
             // any other top action's slot 0x38 is the base's false for what an animal or an
             // artifact holds (a `MoveTo` of its own), and the list goes
-            let (mut releases, mut leaves) = (Vec::new(), Vec::new());
             let top = step.world.top_speed(step.player, self)?;
-            self.tear_down_actions(
-                (actions, step.world.parts.unread.get(self.id)),
-                (step.world.parts.motion.layer_mut(self.id), top),
-                &mut releases,
-                &mut leaves,
-                by,
-            )?;
-            torn_down(step, self, (leaves, releases))?;
+            self.tear_down_actions(actions, step, top, by)?;
         }
         let trading = actions.top_action_kind() == Some(TRADE_ACTION)
             && below_or_unordered(0.0, self.life.amount.get())

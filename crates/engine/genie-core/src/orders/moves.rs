@@ -282,8 +282,11 @@ impl World {
     }
 
     /// The unit's slot 0x340 from its unit AI's move off a footprint (slot 0x148,
-    /// [`crate::objects::unit::Unit::ai_move_with`]); then what its actions let go: a counted builder
-    /// leaves its building ([`World::leave_builders`]), the targets go ([`World::release`]).
+    /// [`crate::objects::unit::Unit::ai_move_with`]): a list whose head declines the point is
+    /// deleted ([`World::clear_actions`]: a deleted head's restart at once) for the unit's `MoveTo`
+    /// ([`crate::objects::unit::Unit::install_ai_move`]); a Transport sails
+    /// ([`World::transport_move`]); then what the head let go: a counted repairer leaves its
+    /// building ([`World::leave_builders`]), the targets go ([`World::release`]).
     pub(crate) fn move_aside(
         &mut self,
         player: PlayerId,
@@ -296,30 +299,48 @@ impl World {
         let id = self.players.live(player, idx)?.id;
         let top_speed = self.top_speed_terms(player, unit)?;
         let (mut releases, mut builder_leaves) = (Vec::new(), Vec::new());
-        let sails = self.players.live_mut(player, idx)?.ai_move_with(
+        let sails = self.players.live(player, idx)?.ai_move_with(
             (self.parts.actions.of_mut(id)?, self.parts.unread.get(id)),
             self.parts.motion.layer_mut(id),
             ai_move,
             (class, player),
             (&mut releases, &mut builder_leaves, by),
-            (
-                MoveSprites {
-                    masters: OwnerMasters::new(
-                        &self.parts.own_master,
-                        self.model.masters.of(player),
-                    ),
-                    graphics: &self.model.graphics,
-                    look: self.parts.combat.of(id).abilities.look.as_ref(),
-                    roles: &self.model.roles,
-                    sprite_tuning: self.model.tuning.sprite,
-                    move_to_tuning: &self.model.tuning.move_to,
-                    top_speed,
-                },
-                self.streams.get_mut(Stream::Sprite),
-            ),
+            MoveSprites {
+                masters: OwnerMasters::new(&self.parts.own_master, self.model.masters.of(player)),
+                graphics: &self.model.graphics,
+                look: self.parts.combat.of(id).abilities.look.as_ref(),
+                roles: &self.model.roles,
+                sprite_tuning: self.model.tuning.sprite,
+                move_to_tuning: &self.model.tuning.move_to,
+                top_speed,
+            },
         )?;
-        if let MoveWith::Sails(transport_action) = sails {
-            self.transport_move((player, idx), transport_action, ai_move.point)?;
+        match sails {
+            MoveWith::Sails(transport_action) => {
+                self.transport_move((player, idx), transport_action, ai_move.point)?;
+            }
+            MoveWith::Replaces => {
+                self.clear_actions(player, idx)?;
+                self.players.live_mut(player, idx)?.install_ai_move(
+                    self.parts.actions.of_mut(id)?,
+                    self.parts.motion.layer_mut(id),
+                    ai_move,
+                    MoveSprites {
+                        masters: OwnerMasters::new(
+                            &self.parts.own_master,
+                            self.model.masters.of(player),
+                        ),
+                        graphics: &self.model.graphics,
+                        look: self.parts.combat.of(id).abilities.look.as_ref(),
+                        roles: &self.model.roles,
+                        sprite_tuning: self.model.tuning.sprite,
+                        move_to_tuning: &self.model.tuning.move_to,
+                        top_speed,
+                    },
+                    self.streams.get_mut(Stream::Sprite),
+                )?;
+            }
+            MoveWith::Walks => {}
         }
         for id in builder_leaves {
             self.leave_builders(Some(id))?;

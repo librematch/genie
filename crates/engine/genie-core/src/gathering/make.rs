@@ -65,9 +65,8 @@ pub struct MakeAction {
 impl MakeAction {
     /// The default task's start (slot 0x7f0, `FUN_14106eb40`): the factory's action
     /// (`FUN_140a99430`), then `set_only_action` (slot 0x808, `FUN_14106e990`), whose push
-    /// (`FUN_140a977e0`) runs `first_in_stack` (`FUN_140a99980`): `set_state(6)`, then a task
-    /// resource other than the farm's own holding (`life`'s `+0x308`) replaces it, with nothing
-    /// held (`FUN_14119d310` with 0).
+    /// (`FUN_140a977e0`) runs `first_in_stack` ([`MakeAction::first`]) on the farm's lifecycle
+    /// `life`.
     #[must_use]
     pub fn start(
         task: Task,
@@ -84,12 +83,27 @@ impl MakeAction {
             total: Amount::new(120.0),
             task,
         };
-        make.set_state(MakeState::Making, attributes, roles, slots);
-        if task.attribute_kind.is_some() && life.attribute_kind != task.attribute_kind {
-            life.attribute_kind = task.attribute_kind;
+        make.first(attributes, life, roles, slots);
+        make
+    }
+
+    /// `first_in_stack` (slot 0x28, `FUN_140a99980`), which reads no argument: its start (with 1)
+    /// and its restart under a deleted head (with 0, [`crate::objects::unit::Unit::restart_head`])
+    /// alike. `set_state(6)` ([`MakeAction::set_state`] with the owner's `attributes`), then a task
+    /// resource (`task+0x20`, none below 0) other than the unit's holding (`life`'s `+0x308`)
+    /// replaces it, with nothing held (`FUN_14119d310` with 0).
+    pub(crate) fn first(
+        &mut self,
+        attributes: &[Amount],
+        life: &mut Lifecycle,
+        roles: &Roles,
+        slots: Slots,
+    ) {
+        self.set_state(MakeState::Making, attributes, roles, slots);
+        if self.task.attribute_kind.is_some() && life.attribute_kind != self.task.attribute_kind {
+            life.attribute_kind = self.task.attribute_kind;
             life.amount = Amount::ZERO;
         }
-        make
     }
 
     /// `set_state` (`FUN_140a99d60`): state 6 takes the player's food to make (attribute 36 for

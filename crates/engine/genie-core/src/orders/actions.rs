@@ -3,6 +3,7 @@
 
 use crate::construction::gates::gate_units;
 use crate::map::Distance;
+use crate::movement::Speed;
 use crate::objects::HitPoints;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
@@ -10,7 +11,7 @@ use crate::objects::actions::Action;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::release::Releaser;
-use crate::objects::teardown::TornDown;
+use crate::objects::teardown::{NextHead, TornDown, admit};
 use crate::orders::ActionsOnChange;
 use crate::orders::TROPHIES;
 use crate::players::Amount;
@@ -128,30 +129,62 @@ impl World {
         Ok(())
     }
 
-    /// The action list's clearing (`FUN_140a98620`) of object `idx` of player `player`: each
-    /// action's teardown ([`ActionList::delete_all`]), then what they leave to the world
-    /// ([`World::let_go_torn`]). A building's production is a list of its own, which stays.
+    /// The action list's deletion (`FUN_140a98620`) of object `idx` of player `player`
+    /// ([`World::delete_actions`] with the unit's top speed and the unit as the releaser). A
+    /// building's production is a list of its own, which stays.
     ///
-    /// [`ActionList::delete_all`]: crate::objects::actions::ActionList::delete_all
+    /// # Errors
+    ///
+    /// The deletion's.
     pub(crate) fn clear_actions(&mut self, player: PlayerId, idx: ListIndex) -> GenieResult<()> {
         let by = self.releaser(player, idx)?;
         let top = self.top_speed(player, self.players.live(player, idx)?)?;
-        let unit = self.players.live(player, idx)?;
-        let torn = self.parts.actions.of_mut(unit.id)?.list.delete_all(
-            self.parts.motion.layer_mut(unit.id),
-            top,
-            unit.life.state,
-        )?;
-        self.let_go_torn(torn, by)
+        self.delete_actions(player, idx, top, by)
     }
 
-    /// `set_only_action` (slot 0x808, `FUN_14106e990`, [`ActionList::set_only`]) of object `idx`
-    /// of player `player`: the action list's deletion, then the new `action` back to start and
-    /// hold below state 3, else deleted unstarted; what the destructors left applies as in
-    /// [`World::clear_actions`]. None for a null `action` and for one the list deleted. Every
-    /// installer of a new action calls it, its start after.
+    /// `FUN_140a98620` from the world on object `idx` of player `player`, its top speed `top`
+    /// (slot 0x208 as the deletion starts) and `by` its releaser: until the list is empty, the
+    /// head's destructor ([`ActionList::delete_head`]), what it left applied at once
+    /// ([`World::let_go_torn`]: the game's slot 0x180 inside slot 0), then, with another action at
+    /// the head of a unit below state 3, that action's slot 0x28 with 0 on the unit's step
+    /// ([`World::run_on_step`], [`Unit::restart_head`]).
     ///
-    /// [`ActionList::set_only`]: crate::objects::actions::ActionList::set_only
+    /// [`ActionList::delete_head`]: crate::objects::actions::ActionList::delete_head
+    /// [`Unit::restart_head`]: crate::objects::unit::Unit::restart_head
+    ///
+    /// # Errors
+    ///
+    /// A unit the list does not hold, the destructors', what they let go and the restarts'.
+    fn delete_actions(
+        &mut self,
+        player: PlayerId,
+        idx: ListIndex,
+        top: Speed,
+        by: Releaser,
+    ) -> GenieResult<()> {
+        let id = self.players.live(player, idx)?.id;
+        while !self.parts.actions_of(id).list.is_empty() {
+            let state = self.players.live(player, idx)?.life.state;
+            let (torn, next) = self.parts.actions.of_mut(id)?.list.delete_head(
+                self.parts.motion.layer_mut(id),
+                top,
+                state,
+            )?;
+            self.let_go_torn(torn, by)?;
+            if next == NextHead::Restarts {
+                self.run_on_step(player, idx, |unit, actions, step| {
+                    unit.restart_head(actions, step)
+                })?;
+            }
+        }
+        Ok(())
+    }
+
+    /// `set_only_action` (slot 0x808, `FUN_14106e990`) of object `idx` of player `player`: the
+    /// action list's deletion ([`World::delete_actions`]), then its add ([`admit`]): the new
+    /// `action` back to start and hold below state 3, else deleted unstarted, what its destructor
+    /// left applied as the deletion's. None for a null `action` and for one the list deleted.
+    /// Every installer of a new action calls it, its start after.
     ///
     /// # Errors
     ///
@@ -164,8 +197,12 @@ impl World {
     ) -> GenieResult<Option<A>> {
         let by = self.releaser(player, idx)?;
         let top = self.top_speed(player, self.players.live(player, idx)?)?;
+        self.delete_actions(player, idx, top, by)?;
+        let Some(action) = action else {
+            return Ok(None);
+        };
         let unit = self.players.live(player, idx)?;
-        let (action, torn) = self.parts.actions.of_mut(unit.id)?.list.set_only(
+        let (action, torn) = admit(
             action,
             self.parts.motion.layer_mut(unit.id),
             top,

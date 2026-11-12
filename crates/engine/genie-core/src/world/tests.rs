@@ -60,6 +60,7 @@ use crate::gathering::hunt::TreeSearch;
 use crate::gathering::hunt::tests::{hunting, walker};
 use crate::gathering::hunt::{HUNT, HuntAction, HuntTask};
 use crate::gathering::make::MAKE;
+use crate::gathering::make::MakeAction;
 use crate::gathering::make::MakeState;
 use crate::gathering::pasture::tests::{make, master_of_kind, pasture_food, pasture_world};
 use crate::gathering::{GatherTargetId, HuntTargetId};
@@ -91,6 +92,7 @@ use crate::movement::Speed;
 use crate::movement::TopSpeed;
 use crate::movement::TurnRate;
 use crate::movement::ai_moves::MoveSprites;
+use crate::movement::ai_moves::MoveWith;
 use crate::movement::ai_moves::PointMove;
 use crate::movement::explore::{ExploreAction, ExploreState, InfluenceMap, bare_walk};
 use crate::movement::fly::FLY;
@@ -177,6 +179,7 @@ use crate::objects::object_list::ObjectList;
 use crate::objects::release::{Releaser, released};
 use crate::objects::sprite::ActiveSprite;
 use crate::objects::sprite::Graphic;
+use crate::objects::teardown::{NEXT_HEAD, NextHead};
 use crate::objects::unit::Presence;
 use crate::objects::unit::UnitFlags;
 use crate::objects::unit::{Outcome, TAKEN_OUT};
@@ -13624,6 +13627,270 @@ fn clearing_the_actions_tears_the_artifact_fly_enter_and_build_down() {
     );
 }
 
+/// The teardown world ([`teardown_world`]) whose villager 40 (player 1, slot 2) holds `list`,
+/// food of 15 and the state `state`; player 1's farm food to make (the build's slot) is 175.
+fn villager_holding(list: ActionList, state: ObjectState) -> World {
+    let mut world = teardown_world();
+    world.parts.actions.of_mut(object_id(40)).unwrap().list = list;
+    let mut attributes = vec![Amount::ZERO; 300];
+    attributes[slots().attribute.farm_food_amount.index()] = Amount::new(175.0);
+    world.players[1].attributes = attributes;
+    let villager = &mut world.players[1].objects[ListIndex::new(2)];
+    villager.life.state = state;
+    (villager.life.attribute_kind, villager.life.amount) =
+        (Some(attribute::FOOD), Amount::new(15.0));
+    world
+}
+
+/// The villager's walk to town centre 9149, its target (one worker).
+fn walk_to_town_centre() -> MoveToAction {
+    MoveToAction {
+        target: Some(object_id(9149)),
+        ..MoveToAction::to_point(
+            Position::new(20.0, 20.0, 0.0),
+            Distance::ZERO,
+            None,
+            Speed::new(1.0),
+        )
+    }
+}
+
+/// A Make of farm food that is done (state 1), nothing left to make.
+fn made_farm_food() -> MakeAction {
+    MakeAction {
+        state: MakeState::Done,
+        remaining: Amount::ZERO,
+        total: Amount::ZERO,
+        task: Task {
+            action_kind: MAKE,
+            attribute_kind: Some(attribute::FARM_FOOD),
+            ..Task::default()
+        },
+    }
+}
+
+/// An Enter of the villager into town centre 9150, its target (one worker).
+fn enter_town_centre() -> EnterAction {
+    EnterAction {
+        target: Some(ContainerId::new(object_id(9150))),
+        state: EnterState::Wait,
+        point: Position::new(20.0, 20.0, 0.0),
+        timer: Seconds::ZERO,
+        retry: true,
+        task_class: Some(class_id(0)),
+        task: Task::default(),
+    }
+}
+
+/// `FUN_140a98e20` from the villager's step ([`Unit::delete_own_head`]) with its own top speed
+/// and as the releaser.
+fn delete_villager_head(world: &mut World) -> GenieResult<()> {
+    world.run_on_step(
+        PlayerId::new(1),
+        ListIndex::new(2),
+        |unit, actions, step| {
+            let by = unit.releaser(step)?;
+            let top = step.world.top_speed(step.player, unit)?;
+            unit.delete_own_head(actions, step, top, by)
+        },
+    )
+}
+
+/// The workers of town centres 9149 and 9150 and the villager's holding.
+fn town_workers_and_holding(world: &World) -> (i32, i32, Option<AttributeId>, Amount) {
+    let objects = &world.players[1].objects;
+    let villager = &objects[ListIndex::new(2)];
+    (
+        objects[ListIndex::new(3)].workers.get(),
+        objects[ListIndex::new(4)].workers.get(),
+        villager.life.attribute_kind,
+        villager.life.amount,
+    )
+}
+
+/// A deleted head lets its target go at once, then the action under it restarts (slot 0x28 with
+/// 0): the Artifact's (`0x140aac960`) acts only with 1 and the wait for a foundation's
+/// (`0x140ae87c0`) is empty, so each stays as it was.
+#[test]
+fn deleted_head_lets_go_and_leaves_artifact_or_wait_under_it_as_it_was() {
+    let artifact = Artifact {
+        target: Some(object_id(9150)),
+        ..Artifact::new(PlayerId::new(1), None)
+    };
+    let wait = WaitSolidify::new(Task::default(), FoundationId::new(object_id(10028)));
+    for under in [
+        ActionList::default().with_artifact(Some(artifact)),
+        ActionList::default().with_wait_solidify(Some(wait)),
+    ] {
+        let mut world = villager_holding(
+            under.clone().with_move_to(Some(walk_to_town_centre())),
+            ObjectState::Alive,
+        );
+        delete_villager_head(&mut world).unwrap();
+        assert_eq!(world.parts.actions_of(object_id(40)).list, under);
+        assert_eq!(
+            town_workers_and_holding(&world),
+            (0, 1, Some(attribute::FOOD), Amount::new(15.0))
+        );
+    }
+}
+
+/// A deleted head over a Make starts the Make again (`0x140a99980`): state 6 with the owner's
+/// farm food to make, and the task's resource as the unit's holding, from nothing.
+#[test]
+fn deleted_head_over_make_starts_the_make() {
+    let mut world = villager_holding(
+        ActionList::default()
+            .with_make(Some(made_farm_food()))
+            .with_move_to(Some(walk_to_town_centre())),
+        ObjectState::Alive,
+    );
+    delete_villager_head(&mut world).unwrap();
+    let make = world.parts.actions_of(object_id(40)).list.make().copied();
+    assert_eq!(
+        make.map(|make| (make.state, make.remaining, make.total)),
+        Some((MakeState::Making, Amount::new(175.0), Amount::new(175.0)))
+    );
+    assert_eq!(
+        town_workers_and_holding(&world),
+        (0, 1, Some(attribute::FARM_FOOD), Amount::ZERO)
+    );
+}
+
+/// `FUN_140a98620` over three actions, from the world ([`World::clear_actions`]: the restart on
+/// the unit's step) and from the unit's step ([`Unit::delete_own_actions`]): the walk lets town
+/// centre 9149 go, the Make restarts and goes, the Artifact restarts and lets town centre 9150
+/// go; the list is empty after.
+#[test]
+fn clearing_three_actions_restarts_the_second_and_the_third() {
+    let three = ActionList::default()
+        .with_artifact(Some(Artifact {
+            target: Some(object_id(9150)),
+            ..Artifact::new(PlayerId::new(1), None)
+        }))
+        .with_make(Some(made_farm_food()))
+        .with_move_to(Some(walk_to_town_centre()));
+    let mut world = villager_holding(three.clone(), ObjectState::Alive);
+    world
+        .clear_actions(PlayerId::new(1), ListIndex::new(2))
+        .unwrap();
+    let mut stepped = villager_holding(three, ObjectState::Alive);
+    stepped
+        .run_on_step(
+            PlayerId::new(1),
+            ListIndex::new(2),
+            Unit::delete_own_actions,
+        )
+        .unwrap();
+    for cleared in [world, stepped] {
+        assert!(cleared.parts.actions_of(object_id(40)).list.is_empty());
+        assert_eq!(
+            town_workers_and_holding(&cleared),
+            (0, 0, Some(attribute::FARM_FOOD), Amount::ZERO)
+        );
+    }
+}
+
+/// Each restart comes after the teardown before it let go, and before the next deletion: an
+/// Enter whose restart is not ported stops the deletion at the head after the walk let town
+/// centre 9149 go (and, with a Make between them, after the Make restarted), its own target still
+/// taken; from the world and from the unit's step alike.
+#[test]
+fn each_restart_follows_the_teardown_before_it() {
+    let enter = ActionList::default().with_enter(Some(enter_town_centre()));
+    for (list, holding) in [
+        (
+            enter.clone().with_move_to(Some(walk_to_town_centre())),
+            (Some(attribute::FOOD), Amount::new(15.0)),
+        ),
+        (
+            enter
+                .clone()
+                .with_make(Some(made_farm_food()))
+                .with_move_to(Some(walk_to_town_centre())),
+            (Some(attribute::FARM_FOOD), Amount::ZERO),
+        ),
+    ] {
+        let mut world = villager_holding(list.clone(), ObjectState::Alive);
+        let error = world
+            .clear_actions(PlayerId::new(1), ListIndex::new(2))
+            .unwrap_err();
+        let mut stepped = villager_holding(list, ObjectState::Alive);
+        let step_error = stepped
+            .run_on_step(
+                PlayerId::new(1),
+                ListIndex::new(2),
+                Unit::delete_own_actions,
+            )
+            .unwrap_err();
+        for (stopped, error) in [(world, error), (stepped, step_error)] {
+            assert_eq!(error.reason(), NEXT_HEAD);
+            assert_eq!(stopped.parts.actions_of(object_id(40)).list, enter);
+            assert_eq!(
+                town_workers_and_holding(&stopped),
+                (0, 1, holding.0, holding.1)
+            );
+        }
+    }
+}
+
+/// A unit in state 3 or later restarts no head: the deletion of the head leaves the Enter under
+/// it untouched, and the whole list goes without a restart.
+#[test]
+fn unit_in_state_3_or_later_restarts_no_head() {
+    let list = ActionList::default()
+        .with_enter(Some(enter_town_centre()))
+        .with_move_to(Some(walk_to_town_centre()));
+    let mut world = villager_holding(list.clone(), ObjectState::Dying);
+    delete_villager_head(&mut world).unwrap();
+    assert_eq!(
+        world.parts.actions_of(object_id(40)).list,
+        ActionList::default().with_enter(Some(enter_town_centre()))
+    );
+    let mut world = villager_holding(list, ObjectState::Dying);
+    world
+        .clear_actions(PlayerId::new(1), ListIndex::new(2))
+        .unwrap();
+    assert!(world.parts.actions_of(object_id(40)).list.is_empty());
+    assert_eq!(
+        town_workers_and_holding(&world),
+        (0, 0, Some(attribute::FOOD), Amount::new(15.0))
+    );
+}
+
+/// Slot 0x808 deletes the list as `FUN_140a98620` does, its restarts included, from the world
+/// ([`World::set_only_action`]) and from the unit's step ([`Unit::set_only_own_action`]): a null
+/// action only deletes it; a new one comes back to start after the Make under the walk
+/// restarted and went.
+#[test]
+fn set_only_action_deletes_the_list_with_its_restarts() {
+    let list = ActionList::default()
+        .with_make(Some(made_farm_food()))
+        .with_move_to(Some(walk_to_town_centre()));
+    let mut world = villager_holding(list.clone(), ObjectState::Alive);
+    let none = world
+        .set_only_action(PlayerId::new(1), ListIndex::new(2), None::<MakeAction>)
+        .unwrap();
+    let mut stepped = villager_holding(list, ObjectState::Alive);
+    let new = stepped
+        .run_on_step(
+            PlayerId::new(1),
+            ListIndex::new(2),
+            |unit, actions, step| {
+                unit.set_only_own_action(actions, Some(enter_town_centre()), step)
+            },
+        )
+        .unwrap();
+    assert_eq!((none, new), (None, Some(enter_town_centre())));
+    for cleared in [world, stepped] {
+        assert!(cleared.parts.actions_of(object_id(40)).list.is_empty());
+        assert_eq!(
+            town_workers_and_holding(&cleared),
+            (0, 1, Some(attribute::FARM_FOOD), Amount::ZERO)
+        );
+    }
+}
+
 /// `FUN_1411e63f0` then `FUN_1411e6580` at a built building's death: each storage entry of mode
 /// 4 with an attribute and an amount above 0 leaves its owner (negated), then the population
 /// the object holds itself (attribute 4: it holds nothing after); each entry of mode 16 (a flag
@@ -17891,7 +18158,9 @@ fn own_attack(target: i32, target2: i32, state: AttackState) -> Attack {
 }
 
 /// The unit's slot 0x340 ([`Unit::ai_move_with`]) for the unit of class `class` of player 1:
-/// what it let go, or why it stopped.
+/// what it let go, or why it stopped. A list the head declines the point for goes as the step's
+/// deletion takes a list of one (`FUN_140a98620`: no head left to restart), then the `MoveTo`
+/// ([`Unit::install_ai_move`]).
 fn ai_move_of(
     (unit, actions, motion): (&mut Unit, &mut Action, &mut Motion),
     ai_move: AiMove,
@@ -17905,25 +18174,35 @@ fn ai_move_of(
     let (mut releases, mut leaves) = (Vec::new(), Vec::new());
     let mut rng = Well512::default();
     let (masters, graphics) = scout_sprites();
-    let _ = unit.ai_move_with(
+    let sprites = MoveSprites {
+        masters: OwnerMasters::new(no_own_masters(), Some(&masters)),
+        graphics: &graphics,
+        look: None,
+        roles: static_roles(),
+        sprite_tuning: tuning().sprite,
+        move_to_tuning: &tuning().move_to,
+        top_speed: TopSpeed::Own,
+    };
+    let moves = unit.ai_move_with(
         (actions, None),
         motion.lent(),
         ai_move,
         (class, PlayerId::new(1)),
         (&mut releases, &mut leaves, by),
-        (
-            MoveSprites {
-                masters: OwnerMasters::new(no_own_masters(), Some(&masters)),
-                graphics: &graphics,
-                look: None,
-                roles: static_roles(),
-                sprite_tuning: tuning().sprite,
-                move_to_tuning: &tuning().move_to,
-                top_speed: TopSpeed::Own,
-            },
-            &mut rng,
-        ),
+        sprites,
     )?;
+    if moves == MoveWith::Replaces {
+        let top = TopSpeed::Own.of_object(motion.mover(), unit.position().ground());
+        while !actions.list.is_empty() {
+            let (torn, next) = actions
+                .list
+                .delete_head(motion.lent(), top, unit.life.state)?;
+            assert_eq!(next, NextHead::Stays);
+            releases.extend(torn.releases.into_iter().map(|object_id| (object_id, by)));
+            leaves.extend(torn.builder_leaves);
+        }
+        unit.install_ai_move(actions, motion.lent(), ai_move, sprites, &mut rng)?;
+    }
     assert!(releases.iter().all(|&(_, releaser)| releaser == by));
     Ok(releases
         .into_iter()

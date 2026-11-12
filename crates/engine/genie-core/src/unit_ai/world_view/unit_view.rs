@@ -19,7 +19,7 @@ use crate::unit_ai::world_view::owner_view;
 use crate::unit_ai::world_view::{UnitView, WorldPicker};
 use crate::unit_ai::{Seeker, can_attack};
 use crate::world::layer::Roles;
-use crate::world::lets::{release as lets_release, take as lets_take, torn_down as lets_torn_down};
+use crate::world::lets::{release as lets_release, take as lets_take};
 use crate::world::objects_ref::ObjectsRef;
 use crate::world::slots::PlayerSlotsExt;
 
@@ -246,7 +246,8 @@ impl UnitView<'_, '_> {
 
 impl UnitView<'_, '_> {
     /// Slot 0x90 with 0 from `own` to master `next` (a task's switch, a villager's swap): the
-    /// action list clears (the old actions' teardowns), then the master change at once, the unit
+    /// action list clears (the old actions' teardowns, [`Unit::tear_down_actions`]: what they let
+    /// go applied at once, a next head restarted), then the master change at once, the unit
     /// lent back to its slot ([`World::change_master`](crate::world::World::change_master): the
     /// master's unit part, what it gives and takes of the owner's attributes and the tracker's
     /// promotion). The teardowns read the unit's top speed with the running unit AI's target
@@ -266,19 +267,12 @@ impl UnitView<'_, '_> {
             class: Some(own.class),
             player: self.player,
         };
-        let (mut releases, mut leaves) = (Vec::new(), Vec::new());
         let top = self
             .step
             .world
             .top_speed_with(self.player, self.unit, ai_target)?;
-        self.unit.tear_down_actions(
-            (self.actions, self.step.world.parts.unread.get(self.unit.id)),
-            (self.step.world.parts.motion.layer_mut(self.unit.id), top),
-            &mut releases,
-            &mut leaves,
-            by,
-        )?;
-        self.torn_down((leaves, releases))?;
+        self.unit
+            .tear_down_actions(self.actions, self.step, top, by)?;
         self.step.lend_at(
             (&mut *self.unit, &mut *self.actions),
             |world, player_id, list_index| {
@@ -308,19 +302,5 @@ impl UnitView<'_, '_> {
     /// [`crate::world::lets::release`]'s.
     pub(crate) fn release(&mut self, id: ObjectId, by: Releaser) -> GenieResult<()> {
         lets_release(self.step, self.unit, id, by)
-    }
-
-    /// What the unit's action list's teardown left the world, at once
-    /// ([`crate::world::lets::torn_down`]): the buildings its counted builders leave, then the
-    /// targets it lets go.
-    ///
-    /// # Errors
-    ///
-    /// [`crate::world::lets::torn_down`]'s.
-    pub(crate) fn torn_down(
-        &mut self,
-        (leaves, releases): (Vec<ObjectId>, Vec<(ObjectId, Releaser)>),
-    ) -> GenieResult<()> {
-        lets_torn_down(self.step, self.unit, (leaves, releases))
     }
 }

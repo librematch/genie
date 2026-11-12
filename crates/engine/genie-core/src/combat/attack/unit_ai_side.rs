@@ -294,19 +294,12 @@ impl UnitView<'_, '_> {
             class: Some(class),
             player: self.player,
         };
-        let (mut releases, mut leaves) = (Vec::new(), Vec::new());
         let top = self
             .step
             .world
             .top_speed_with(self.player, self.unit, ai_target)?;
-        self.unit.tear_down_actions(
-            (self.actions, self.step.world.parts.unread.get(self.unit.id)),
-            (self.step.world.parts.motion.layer_mut(self.unit.id), top),
-            &mut releases,
-            &mut leaves,
-            by,
-        )?;
-        self.torn_down((leaves, releases))?;
+        self.unit
+            .tear_down_actions(self.actions, self.step, top, by)?;
         Ok(by)
     }
 

@@ -24,7 +24,6 @@ use crate::unit_ai::task_finder::world::wait_progress;
 use crate::world::layer::Roles;
 use crate::world::layer::Slots;
 use crate::world::layer::generated::WaitSolidifyTuning;
-use crate::world::lets::torn_down;
 use crate::world::others::OthersRef;
 use crate::world::parts::PartTable;
 use crate::world::step::Step;
@@ -188,7 +187,7 @@ impl Unit {
 
     /// What follows the head's update (its `code`): the idle update of the actions below it
     /// ([`BELOW_HEAD`]), then `RGE_Action_Object::update`'s deletion of a head whose code is 1 or
-    /// 3 ([`Unit::delete_own_head`]).
+    /// 3 ([`Unit::delete_own_head`] with the unit's own top speed and as the releaser).
     ///
     /// # Errors
     ///
@@ -203,7 +202,9 @@ impl Unit {
             return Err(GenieError::unreachable(BELOW_HEAD));
         }
         if code == HeadCode::Deletes {
-            self.delete_own_head(actions, step)?;
+            let by = self.releaser(step)?;
+            let top = step.world.top_speed(step.player, self)?;
+            self.delete_own_head(actions, step, top, by)?;
         }
         Ok(())
     }
@@ -306,17 +307,7 @@ impl Unit {
             return Err(error);
         }
         if loses_actions(&self.life, &step.world.model.roles) {
-            let by = self.releaser(step)?;
-            let top = step.world.top_speed(step.player, self)?;
-            let (mut releases, mut leaves) = (Vec::new(), Vec::new());
-            self.clear_own_actions(
-                actions,
-                (step.world.parts.motion.layer_mut(self.id), top),
-                &mut releases,
-                &mut leaves,
-                by,
-            )?;
-            torn_down(step, self, (leaves, releases))?;
+            self.delete_own_actions(actions, step)?;
         }
         Ok(())
     }
