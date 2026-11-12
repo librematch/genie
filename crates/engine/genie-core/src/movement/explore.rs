@@ -12,7 +12,6 @@ use crate::map::GridSize;
 use crate::map::Point;
 use crate::map::Position;
 use crate::map::{Tile, TileOffset};
-use crate::math::rng::Stream;
 use crate::movement::Me;
 use crate::movement::move_to::{GiveUp, MoveToReads, Patience};
 use crate::movement::move_to::{ListUpdate, SubCode, update_sub_actions};
@@ -24,7 +23,6 @@ use crate::objects::masters::PlayersMastersExt;
 use crate::objects::masters::Task;
 use crate::objects::unit::{Unit, object_master};
 use crate::players::PlayerKind;
-use crate::unit_ai::AiAction;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::UnitStance;
 use crate::world::slots::PlayerSlotsExt;
@@ -48,9 +46,6 @@ use crate::movement::stop_mover;
 use crate::objects::Graphics;
 #[cfg(test)]
 use crate::objects::ObjectState;
-use crate::objects::layers::Action;
-use crate::objects::sprite::new_sprite;
-use crate::unit_ai::NotifyKind;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
 use crate::world::layer::generated::MoveToTuning;
@@ -585,114 +580,6 @@ pub(crate) fn beyond_sight(
         }
     }
     Ok(None)
-}
-
-impl Unit {
-    /// The unit's explore (slot 0x398, `FUN_141084db0` with its argument 4 set) to the point at
-    /// its own height: its top Explore takes the point (slot 0x48), else a new Explore
-    /// (`FUN_140a87d30`) becomes its only action (`set_only_action`, `FUN_14106e990`: the actions
-    /// it had go, `FUN_140a98620`, and the new one starts, `FUN_140a977e0`). A `MoveTo` of the
-    /// Explore that goes stops the unit (its teardown, slot 0x5d0); other actions it would
-    /// replace are not modelled.
-    pub(crate) fn explore_to(
-        &mut self,
-        actions: &mut Action,
-        point: Point,
-        step: &mut Step<'_>,
-        roles: &Roles,
-    ) -> GenieResult<()> {
-        let at = Position::new(point.x(), point.y(), self.position().z());
-        let walk = self.explore_move(step, roles)?;
-        let owner = if let Some(explore_action) = actions.list.explore_mut() {
-            let walked = explore_action.state.move_to().is_some();
-            let owner = explore_action.take_point(at, &walk, &step.world.model.tuning.move_to)?;
-            if walked {
-                stop_mover(step.world.parts.mover_mut(self.id))?;
-            }
-            owner
-        } else {
-            if actions.top_action().is_some() || step.world.parts.unread.contains(self.id) {
-                return Err(GenieError::unsupported(
-                    "an Explore replacing another action",
-                ));
-            }
-            let (explore_action, owner) =
-                ExploreAction::new(at, &walk, &step.world.model.tuning.move_to)?;
-            actions.list.set_explore(Some(explore_action));
-            owner
-        };
-        self.explore_owner(owner, step)
-    }
-
-    /// What an Explore's `MoveTo` reads of this unit ([`ExploreMove`]), its top speed slot
-    /// 0x208 where it stands.
-    ///
-    /// # Errors
-    ///
-    /// A unit whose master the world lacks.
-    fn explore_move<'graphics>(
-        &self,
-        step: &'graphics Step<'_>,
-        roles: &Roles,
-    ) -> GenieResult<ExploreMove<'graphics>> {
-        let master = object_master(
-            step.world.parts.own_master.get(self.id),
-            (self.id, self.life.master_id),
-            step.world.model.masters.of(step.player),
-        )?;
-        Ok(ExploreMove::of(
-            (self, step.world.top_speed(step.player, self)?),
-            master,
-            (
-                &step.world.model.graphics,
-                step.world.parts.combat_of(self.id).abilities.look.as_ref(),
-            ),
-            roles,
-        ))
-    }
-
-    /// What an Explore's `set_state` asks of its unit ([`crate::movement::explore::Owner`]): its notify 0x202
-    /// with the explore's action value to the unit AI, and the standing sprite (slot 0x68 with
-    /// the master's `+0x470`) where the slice holds the unit's sprite. `Set_state` 2's slots are
-    /// not modelled.
-    pub(crate) fn explore_owner(&mut self, owner: Owner, step: &mut Step<'_>) -> GenieResult<()> {
-        use crate::movement::explore::Owner;
-        match owner {
-            Owner::Nothing => return Ok(()),
-            Owner::Stopped => {
-                return Err(GenieError::unsupported(
-                    "an Explore's set_state 2 (slots 0x68)",
-                ));
-            }
-            Owner::WantsPoint => self.post_own(
-                &mut step.world.parts.unit_ai,
-                NotifyKind::REQUIRES_SEARCH,
-                [AiAction::Explore.value(), 0, 0],
-            )?,
-            Owner::Standing => {}
-        }
-        let standing = self
-            .master(step.world.master_tables(), step.player)?
-            .standing_sprite
-            .and_then(|sprite_id| step.world.model.graphics.get(sprite_id))
-            .copied();
-        if let Some(mover) = step.world.parts.mover_mut(self.id) {
-            mover.shows(standing.as_ref());
-        }
-        if self.sprite.is_some() {
-            let standing = standing.ok_or(GenieError::unsupported(
-                "an explorer without its standing sprite",
-            ))?;
-            new_sprite(
-                &mut self.sprite,
-                step.world.parts.move_stats_mut(self.id),
-                standing,
-                step.world.streams.get_mut(Stream::Sprite),
-                step.world.model.tuning.sprite,
-            );
-        }
-        Ok(())
-    }
 }
 
 /// The sprites' table of a world without sprites.

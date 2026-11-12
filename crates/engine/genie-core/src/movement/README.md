@@ -33,7 +33,8 @@ in a second and the farthest it may act, whatever its state. The frozen check re
 a stopped player's unit may have done since it froze.
 
 `unit.rs` is the unit's part: the velocity step in the unit's update, the speed-up's drop, and
-the update of its own `MoveTo`, its Explore and its Fly.
+the update of its own `MoveTo`, its Explore and its Fly. It also holds the unit's explore
+(slot 0x398), which the unit AI's explore orders call, and what an Explore asks of its unit.
 
 `ai_moves.rs` holds the moves that a unit AI asks of its unit.
 
@@ -78,7 +79,7 @@ If the object's action walks, the action runs the motion step. The planners that
 | [`step.rs`](step.rs) | The velocity step, a new object's setup, the position setter and the motion step's loop. |
 | [`tests.rs`](tests.rs) | Tests. |
 | [`top_speed.rs`](top_speed.rs) | A moving object's top speed (object slot 0x208, `maximumSpeed`): RGE's (`FUN_14114d1d0`, its own speed with a speed-up building's share) and a TRIBE combat object's (`FUN_141202c70`): none while a lock holds it, else its own speed plus its speed powerup and stinger, and the run of a ready charge of special attack 3 (`FUN_1412161b0`) near its target. |
-| [`unit.rs`](unit.rs) | The movement actions in a unit's update: the velocity step, the unit's own `MoveTo`, its Explore and a bird's Fly. |
+| [`unit.rs`](unit.rs) | The movement actions in a unit's update: the velocity step, the unit's own `MoveTo`, its Explore and a bird's Fly; and the unit's side of its Explore: the unit's explore (slot 0x398) and what an Explore asks of its unit. |
 | [`walk.rs`](walk.rs) | The walk: its kept hits, the obstruction query's ends, the facets, the steering and the speed control. |
 | [`waypoint.rs`](waypoint.rs) | A reached waypoint and what follows it: the next waypoint, a level's end and the moving state. |
 | [`waypoint_index.rs`](waypoint_index.rs) | A waypoint's place in a level's path. |
