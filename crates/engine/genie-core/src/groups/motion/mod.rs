@@ -119,7 +119,8 @@ impl LeadGroup {
 impl World {
     /// Slot 0x280 (`FUN_141082d60`): the id of the object the top action of unit `id` targets
     /// (`FUN_140a78450`, [`Action::top_action_object`]: an id above -1 that the world holds),
-    /// else none.
+    /// else none. The unit's gather and hunt commands (slots 0x368 and 0x360) compare the same
+    /// reads with their object unforced.
     ///
     /// [`Action::top_action_object`]: crate::objects::layers::Action::top_action_object
     pub(crate) fn top_target_object(&self, id: ObjectId) -> Option<ObjectId> {

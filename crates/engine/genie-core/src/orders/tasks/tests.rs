@@ -5,6 +5,8 @@ use super::*;
 use crate::construction::BuilderCount;
 use crate::construction::build::BuildState;
 use crate::construction::repair::REPAIR;
+use crate::gathering::DropSiteId;
+use crate::gathering::GatherTargetId;
 use crate::gathering::HuntTargetId;
 use crate::gathering::gather::{GatherAction, GatherState};
 use crate::gathering::hunt::{HuntAction, HuntState};
@@ -12,6 +14,8 @@ use crate::map::Distance;
 use crate::objects::WorkerCount;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::MasterId;
+use crate::objects::unit::Unit;
+use crate::players::Amount;
 use crate::players::PlayerKind;
 use crate::test_ids::object_id;
 use crate::testing::class;
@@ -338,8 +342,12 @@ fn new_repair_takes_target_and_installs_nothing() {
 
 /// The bush 600 of [`forage_world`].
 const BUSH: ObjectId = object_id(600);
+/// The bush 601 of [`forage_world`].
+const OTHER_BUSH: ObjectId = object_id(601);
 /// The deer 500 and 501 of [`hunt_world`].
 const DEER: [ObjectId; 2] = [object_id(500), object_id(501)];
+/// The town centre 700 of [`forage_world`] and [`hunt_world`], player 1's.
+const TOWN_CENTRE: ObjectId = object_id(700);
 
 /// The villager's Gather.
 fn gather_of(world: &World) -> Option<GatherAction> {
@@ -425,6 +433,72 @@ fn gather_command_on_top_gather_target_answers_at_once_only_unforced() {
     );
 }
 
+/// The gather command unforced on an object other than the Gather's target answers 1 through
+/// slot 0x820: it finds the Gather's task on the bush 601, and the Gather on top takes the bush
+/// (its slot 0x48).
+#[test]
+fn gather_command_unforced_on_another_target_retargets_top_gather() {
+    let mut world = working_gatherer();
+    let gather = gather_of(&world).unwrap();
+    assert_eq!(
+        world.gather_command(PLAYER, SLOT, OTHER_BUSH, OrderForce::Unforced),
+        Ok(Answer::Taken)
+    );
+    let retargeted = gather_of(&world).unwrap();
+    assert_ne!(retargeted, gather);
+    assert_eq!(
+        (retargeted.target, retargeted.task.id),
+        (Some(GatherTargetId::new(OTHER_BUSH)), gather.task.id)
+    );
+}
+
+/// A recyclable object's id (a negative one, [`ObjectId::is_recyclable`]).
+const RECYCLED: ObjectId = object_id(-602);
+
+/// `world` with a copy of object `original` under the id [`RECYCLED`]: in its owner's live list,
+/// on the map at its place.
+fn recycled_copy(world: &mut World, original: ObjectId) {
+    let (owner, unit) = world.object(original).unwrap();
+    let copy = Unit {
+        id: RECYCLED,
+        ..unit.clone()
+    };
+    let record = *world.spatial.get(original).unwrap();
+    let _ = world.push_live(owner, copy).unwrap();
+    world.spatial.insert(RECYCLED, record);
+}
+
+/// The gather command unforced on the Gather's own target with a recyclable id does not answer
+/// at once: `FUN_140a78450` finds no object for an id below 0, so the top action's target never
+/// equals the command's object. The Gather on the task found takes the target again (its slot
+/// 0x48), which clears its work done (`+0x80`); 1.
+#[test]
+fn gather_command_unforced_on_recyclable_top_target_retakes_it() {
+    let mut world = working_gatherer();
+    recycled_copy(&mut world, BUSH);
+    let gather = world
+        .parts
+        .actions
+        .of_mut(VILLAGER)
+        .unwrap()
+        .list
+        .gather_mut()
+        .unwrap();
+    gather.target = Some(GatherTargetId::new(RECYCLED));
+    let gather = *gather;
+    assert_eq!(
+        world.gather_command(PLAYER, SLOT, RECYCLED, OrderForce::Unforced),
+        Ok(Answer::Taken)
+    );
+    assert_eq!(
+        gather_of(&world),
+        Some(GatherAction {
+            worked: false,
+            ..gather
+        })
+    );
+}
+
 /// [`hunt_world`]'s villager hunting the deer 500 (the hunt command's new Hunt), facing it
 /// (state 6).
 fn deer_hunter() -> World {
@@ -496,4 +570,34 @@ fn hunt_command_with_top_hunt_retargets_it() {
             "{force:?}"
         );
     }
+}
+
+/// The hunt command unforced on the Hunt's own target with a recyclable id does not answer at
+/// once (`FUN_140a78450` finds no object for an id below 0): the Hunt takes the target again (its
+/// slot 0x48, slot 9). A loaded hunter's target of its own player's drop site (a town centre)
+/// takes the Hunt there to unload (`+0x34`) without a target, where the answer at once would
+/// leave the Hunt as it was.
+#[test]
+fn hunt_command_unforced_on_recyclable_top_target_retargets_hunt() {
+    let mut world = deer_hunter();
+    recycled_copy(&mut world, TOWN_CENTRE);
+    world.object_mut(VILLAGER).unwrap().1.life.amount = Amount::new(5.0);
+    world
+        .parts
+        .actions
+        .of_mut(VILLAGER)
+        .unwrap()
+        .list
+        .hunt_mut()
+        .unwrap()
+        .target = Some(HuntTargetId::new(RECYCLED));
+    assert_eq!(
+        world.hunt_command(PLAYER, SLOT, Some(RECYCLED), OrderForce::Unforced),
+        Ok(Answer::Taken)
+    );
+    let hunt = hunt_of(&world).unwrap();
+    assert_eq!(
+        (hunt.target, hunt.carry_to),
+        (None, Some(DropSiteId::new(RECYCLED)))
+    );
 }

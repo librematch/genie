@@ -7,7 +7,6 @@ use crate::construction::repair::{RepairAction, RepairTask, SHIP_REPAIR};
 use crate::construction::{FoundationId, RepairTargetId};
 use crate::gathering::gather::GatherAction;
 use crate::gathering::hunt::HuntTask;
-use crate::gathering::{GatherTargetId, HuntTargetId};
 use crate::map::Position;
 use crate::math::rng::Stream;
 use crate::movement::footprint_gap;
@@ -49,13 +48,14 @@ impl World {
     /// The unit's hunt command (object slot 0x360, `FUN_1412151f0`) on `target` with `force`, as
     /// the unit AI's `HuntObject` runs it after its stop ([`GatheringCommand::Hunt`]): an object
     /// the world does not hold (`FUN_1415417a0`; none, −1) is 0. A Hunt on top on the target is 1
-    /// at once unforced; else the Hunt on top takes the target (its slot 0x48 with the target's
-    /// place, slot 9: [`World::retarget_hunt`]): 1. Without one slot 0x820 finds the task
-    /// ([`World::find_work_task`] with any filter, `0xffff`, and the master switch): none is 0,
-    /// else a new Hunt on it, whatever its action type or requirement (`FUN_140ac2dd0`), replaces
-    /// the unit's actions (`FUN_140a98620`, slot 0x808: [`World::start_hunt`] without the unit
-    /// AI's notify, as `HuntObject` sets the AI itself): 1. The constructor's null, an allocation
-    /// that failed, cannot happen here.
+    /// at once unforced, the top action's target as `FUN_140a78450` finds it
+    /// ([`World::top_target_object`]: never one with a recyclable id); else the Hunt on top takes
+    /// the target (its slot 0x48 with the target's place, slot 9: [`World::retarget_hunt`]): 1.
+    /// Without one slot 0x820 finds the task ([`World::find_work_task`] with any filter, `0xffff`,
+    /// and the master switch): none is 0, else a new Hunt on it, whatever its action type or
+    /// requirement (`FUN_140ac2dd0`), replaces the unit's actions (`FUN_140a98620`, slot 0x808:
+    /// [`World::start_hunt`] without the unit AI's notify, as `HuntObject` sets the AI itself): 1.
+    /// The constructor's null, an allocation that failed, cannot happen here.
     ///
     /// [`GatheringCommand::Hunt`]: crate::unit_ai::GatheringCommand::Hunt
     pub(crate) fn hunt_command(
@@ -69,11 +69,9 @@ impl World {
             return Ok(Answer::NotTaken);
         };
         let (target, point) = (target_unit.id, target_unit.position());
-        let unit = self.players.live(player, idx)?;
-        if let Some(Action::Hunt(hunt_action)) = self.parts.actions_of(unit.id).list.head() {
-            if force == OrderForce::Unforced
-                && hunt_action.target.map(HuntTargetId::id) == Some(target)
-            {
+        let unit_id = self.players.live(player, idx)?.id;
+        if let Some(Action::Hunt(_)) = self.parts.actions_of(unit_id).list.head() {
+            if force == OrderForce::Unforced && self.top_target_object(unit_id) == Some(target) {
                 return Ok(Answer::Taken);
             }
             self.retarget_hunt(player, idx, target)?;
@@ -97,9 +95,10 @@ impl World {
     /// The unit's gather command (object slot 0x368, `FUN_141085030`) on `target` with `force`, as
     /// the unit AI's `GatherObject` runs it ([`GatheringCommand::Gather`]): an object the world
     /// does not hold (`FUN_1415417a0`) is 0. Unforced, a Gather on top on the target ("I'm already
-    /// gathering Unit #%d.") is 1 at once. Else slot 0x820 finds the task
-    /// ([`World::find_work_task`] with any filter, `0xffff`, and the master switch): a Gather on
-    /// top on the task found takes the target (its slot 0x48 with the target's place,
+    /// gathering Unit #%d.") is 1 at once, the top action's target as `FUN_140a78450` finds it
+    /// ([`World::top_target_object`]: never one with a recyclable id). Else slot 0x820 finds the
+    /// task ([`World::find_work_task`] with any filter, `0xffff`, and the master switch): a Gather
+    /// on top on the task found takes the target (its slot 0x48 with the target's place,
     /// [`World::retarget_gather`]; what it answers the command passes over): 1. No task is 0
     /// ("Can't find a task for the gather, cancelling."); else a new Gather on the task replaces
     /// the unit's actions (`FUN_140a88310`, `FUN_140a98620`, slot 0x808: [`World::start_gather`]
@@ -119,9 +118,8 @@ impl World {
             return Ok(Answer::NotTaken);
         }
         if force == OrderForce::Unforced
-            && self.top_gather(player, idx)?.is_some_and(|gather_action| {
-                gather_action.target.map(GatherTargetId::id) == Some(target)
-            })
+            && self.top_gather(player, idx)?.is_some()
+            && self.top_target_object(self.players.live(player, idx)?.id) == Some(target)
         {
             return Ok(Answer::Taken);
         }
