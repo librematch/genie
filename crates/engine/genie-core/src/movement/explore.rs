@@ -219,7 +219,7 @@ impl ExploreAction {
 
     /// The point (slot 0x48, `0x140a881a0`): one on the map's quarter (both coordinates at least
     /// 0) becomes its point and it walks there from `walk` (`set_state` 11); any other makes it
-    /// wait for one (`set_state` 3).
+    /// wait for one (`set_state` 3), a NaN coordinate too (`COMISS` with 0, then `JC`).
     ///
     /// # Errors
     ///
@@ -870,6 +870,39 @@ mod tests {
             ExploreAction::started(Position::new(5.0, 5.0, 0.0), &stuck, &tuning().move_to)
                 .unwrap();
         assert_eq!(explore_action.state, ExploreState::Walk { move_to: None });
+    }
+
+    /// Its point (slot 0x48, `0x140a881a0`: `COMISS` of x, then of y, with 0, each `JC` to the
+    /// wait): a NaN coordinate is unordered and sets the carry, so a NaN or a negative x or y
+    /// makes the walking Explore wait (state 3) with its point as it was. −0.0 compares equal to
+    /// 0 and walks (state 11) to the point as given, its z too.
+    #[test]
+    fn take_point_waits_for_nan_or_negative_coordinate_and_walks_from_zero() {
+        let table = Graphics::from([(SpriteId::named(7), WALKING)]);
+        let walk = walk_of(&table, Some(SpriteId::named(7)));
+        let before = Position::new(5.0, 5.0, 0.0);
+        let take = |point: Position| {
+            let (mut explore_action, _) =
+                ExploreAction::started(before, &walk, &tuning().move_to).unwrap();
+            let owner = explore_action
+                .take_point(point, &walk, &tuning().move_to)
+                .unwrap();
+            (
+                explore_action.state.get(),
+                explore_action.point.get().map(f32::to_bits),
+                owner,
+            )
+        };
+        let waits = (3, before.get().map(f32::to_bits), Owner::WantsPoint);
+        assert_eq!(take(Position::new(f32::NAN, 9.0, 0.0)), waits);
+        assert_eq!(take(Position::new(9.0, f32::NAN, 0.0)), waits);
+        assert_eq!(take(Position::new(-1.0, 9.0, 0.0)), waits);
+        assert_eq!(take(Position::new(9.0, -1.0, 0.0)), waits);
+        let zero = Position::new(-0.0, -0.0, 3.0);
+        assert_eq!(
+            take(zero),
+            (11, zero.get().map(f32::to_bits), Owner::Nothing)
+        );
     }
 
     fn rng() -> Well512 {
