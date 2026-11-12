@@ -1,11 +1,12 @@
-//! The unit's Transport: the action's update on the step and a sail to a point.
+//! The unit's Transport: the action's update on the step, a sail to a point and its restart.
 
 use crate::GenieResult;
 use crate::combat::abilities::Look;
+use crate::garrison::transport::action::stand;
 use crate::garrison::transport::{MapShore, Ship, TransportAction, TransportReads};
 use crate::map::Position;
 use crate::map::spatial::Spatial;
-use crate::math::rng::Well512;
+use crate::math::rng::{Stream, Well512};
 use crate::movement::Me;
 use crate::movement::TopSpeed;
 use crate::movement::move_to::MoveDefaults;
@@ -82,6 +83,35 @@ impl Unit {
             *own = transport_action;
         }
         Ok(HeadCode::of(code?))
+    }
+
+    /// The Transport's slot 5 with 0 (`FUN_140aa3e10`), as the action list's deletion restarts it
+    /// at the head (`FUN_140a98e20`): it idles ([`TransportAction::restart`]), then what that
+    /// leaves follows at once ([`stand`]): its `MoveTo`'s teardown stops the unit, which shows its
+    /// master's standing sprite (`+0x470`).
+    ///
+    /// # Errors
+    ///
+    /// A unit whose master the world lacks, the stop's, and a unit whose sprite the slice holds
+    /// without its standing sprite.
+    pub(crate) fn restart_transport(
+        &mut self,
+        transport_action: &mut TransportAction,
+        step: &mut Step<'_>,
+    ) -> GenieResult<()> {
+        let changed = transport_action.restart();
+        let standing = self
+            .master(step.world.master_tables(), step.player)?
+            .standing_sprite
+            .and_then(|sprite_id| step.world.model.graphics.get(sprite_id))
+            .copied();
+        let id = self.id;
+        stand(
+            (self, step.world.parts.motion.layer_mut(id)),
+            changed,
+            (standing, step.world.streams.get_mut(Stream::Sprite)),
+            step.world.model.tuning.sprite,
+        )
     }
 
     /// The Transport's slot 8 on a move to `point`

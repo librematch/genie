@@ -478,6 +478,30 @@ impl Unit {
         self.explore_owner(owner, step)
     }
 
+    /// The Explore's slot 0x28 with 0 (`0x140a87e10`, which reads no argument), as the action
+    /// list's deletion restarts it at the head (`FUN_140a98e20`): its first again
+    /// ([`ExploreAction::first`]), state 11 to its point from what the unit reads where it
+    /// stands, or state 3 for a point x of −1. A `MoveTo` it walked goes and stops the unit (its
+    /// teardown, slot 0x5d0), then what the new state asks of the unit follows at once
+    /// ([`Unit::explore_owner`]).
+    ///
+    /// # Errors
+    ///
+    /// A unit whose master the world lacks, a sprite the table lacks, and the stop's.
+    pub(crate) fn restart_explore(
+        &mut self,
+        explore_action: &mut ExploreAction,
+        step: &mut Step<'_>,
+    ) -> GenieResult<()> {
+        let walked = explore_action.state.move_to().is_some();
+        let walk = self.explore_move(step, &step.world.model.roles)?;
+        let owner = explore_action.first(&walk, &step.world.model.tuning.move_to)?;
+        if walked {
+            stop_mover(step.world.parts.mover_mut(self.id))?;
+        }
+        self.explore_owner(owner, step)
+    }
+
     /// What an Explore's `MoveTo` reads of this unit ([`ExploreMove`]), its top speed slot
     /// 0x208 where it stands.
     ///

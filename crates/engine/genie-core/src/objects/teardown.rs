@@ -296,17 +296,22 @@ impl Unit {
     /// list of a unit below state 3 ([`NextHead::Restarts`]), on the unit where it stands (its
     /// action layer `actions`, its step): the Artifact's (`0x140aac960`) acts only with 1, the
     /// wait for a foundation's (`0x140ae87c0`) is empty, and the Make's (`0x140a99980`) starts it
-    /// again ([`MakeAction::first`] with its owner's attributes). Nothing for an empty list.
+    /// again ([`MakeAction::first`] with its owner's attributes). The Explore's (`0x140a87e10`)
+    /// starts it again too ([`Unit::restart_explore`]: to its point, or waiting for one); the
+    /// Transport's (`FUN_140aa3e10`) idles ([`Unit::restart_transport`]) and the missile's
+    /// (`0x140a9c5b0`) flies ([`MissileAction::restart`]). Nothing for an empty list.
     ///
     /// [`MakeAction::first`]: crate::gathering::make::MakeAction::first
+    /// [`MissileAction::restart`]: crate::combat::missile::MissileAction::restart
     ///
     /// # Errors
     ///
-    /// An owner the world lacks, and the restart of any other kind, which is not ported.
+    /// An owner the world lacks, the Explore's and the Transport's, and the restart of any other
+    /// kind, which is not ported.
     pub(crate) fn restart_head(
         &mut self,
         actions: &mut LayersAction,
-        step: &Step<'_>,
+        step: &mut Step<'_>,
     ) -> GenieResult<()> {
         match actions.list.head_mut() {
             None | Some(Action::Artifact(_) | Action::WaitSolidify(_)) => Ok(()),
@@ -317,6 +322,14 @@ impl Unit {
                     &step.world.model.roles,
                     step.world.model.slots,
                 );
+                Ok(())
+            }
+            Some(Action::Explore(explore_action)) => self.restart_explore(explore_action, step),
+            Some(Action::Transport(transport_action)) => {
+                self.restart_transport(transport_action, step)
+            }
+            Some(Action::Missile(missile_action)) => {
+                missile_action.restart();
                 Ok(())
             }
             Some(head) => Err(GenieError::unreachable(NEXT_HEAD).with("kind", head.kind())),

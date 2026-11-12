@@ -3,7 +3,6 @@
 
 use crate::GenieResult;
 use crate::combat::abilities::Look;
-use crate::garrison::transport::StartCall;
 use crate::garrison::transport::TransportMode;
 use crate::garrison::transport::TransportState;
 use crate::garrison::transport::TransportTarget;
@@ -70,25 +69,22 @@ impl TransportAction {
         }
     }
 
-    /// Slot 5 (`FUN_140aa3e10`), the start: [`StartCall::Added`] (the action list's add) with a
-    /// point not below 0 on either axis (`COMISS`/`JA`, `JBE`: a NaN is not) sails there
-    /// (`set_state(11)`); else it idles (`set_state(2)`).
+    /// Slot 5 (`FUN_140aa3e10`) with 1, the action list's add: a point not below 0 on either
+    /// axis (`COMISS`/`JA`, `JBE`: a NaN is not) sails there (`set_state(11)`); else it idles
+    /// (`set_state(2)`). With 0 it idles ([`TransportAction::restart`]).
     ///
     /// # Errors
     ///
     /// A sprite the table lacks.
     pub fn start(
         &mut self,
-        call: StartCall,
         ship: &Ship<'_>,
         shore: &mut MapShore<'_>,
         transport_tuning: &TransportTuning,
         move_to_tuning: &MoveToTuning,
     ) -> GenieResult<Changed> {
         let (x, y) = (self.point.x(), self.point.y());
-        let sails = call == StartCall::Added
-            && at_most_or_unordered(0.0, x)
-            && at_most_or_unordered(0.0, y);
+        let sails = at_most_or_unordered(0.0, x) && at_most_or_unordered(0.0, y);
         self.set_state(
             if sails {
                 TransportState::Sail { move_to: None }
@@ -102,9 +98,29 @@ impl TransportAction {
         )
     }
 
+    /// Slot 5 (`FUN_140aa3e10`) with 0, as the action list's deletion restarts the next head
+    /// (`FUN_140a98e20`): it idles (`set_state(2)`, [`TransportAction::idle`]), whatever its
+    /// point.
+    pub const fn restart(&mut self) -> Changed {
+        self.idle()
+    }
+
+    /// `set_state(2)` (slot 16, `FUN_140aa42a0`), which reads nothing of the unit: its
+    /// sub-actions go (`FUN_140a98620`: a `MoveTo`'s teardown stops the unit,
+    /// [`Changed::stopped`]), then the unit shows its master's standing sprite
+    /// ([`Changed::stands`]).
+    const fn idle(&mut self) -> Changed {
+        let stopped = self.state.take_move_to().is_some();
+        self.state = TransportState::Idle;
+        Changed {
+            stopped,
+            stands: true,
+        }
+    }
+
     /// `set_state` (slot 16, `FUN_140aa42a0`): its sub-actions go first (`FUN_140a98620`: a
     /// `MoveTo`'s teardown stops the unit, [`Changed::stopped`]), then the state. State 2 shows
-    /// the master's standing sprite ([`Changed::stands`]). States 4 and 11 sail: the point
+    /// the master's standing sprite ([`TransportAction::idle`]). States 4 and 11 sail: the point
     /// becomes the shore point on the way from the unit's place ([`MapShore::shore_point`]) when
     /// there is one; then a quiet `MoveTo` to the point within `TransportTuning::move_range` (`FUN_140aa0d30`
     /// with no task: the master's `+0x748` sprite; `FUN_140a7a170` with 1) joins the list
@@ -123,13 +139,15 @@ impl TransportAction {
         transport_tuning: &TransportTuning,
         move_to_tuning: &MoveToTuning,
     ) -> GenieResult<Changed> {
-        let mut changed = Changed {
+        if state == TransportState::Idle {
+            return Ok(self.idle());
+        }
+        let changed = Changed {
             stopped: self.state.take_move_to().is_some(),
             stands: false,
         };
         self.state = state.bare();
         match self.state {
-            TransportState::Idle => changed.stands = true,
             TransportState::SailToUnload { .. } | TransportState::Sail { .. } => {
                 if let Some(shore_at) =
                     shore.shore_point(ship.position.ground(), self.point.ground())?

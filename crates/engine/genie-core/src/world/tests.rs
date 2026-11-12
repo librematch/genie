@@ -8,6 +8,7 @@ use crate::combat::damage::ArmorPair;
 use crate::combat::damage::{Kill, KillCount, Razed, Victim};
 use crate::combat::missile::ShooterId;
 use crate::combat::missile::SmartMode;
+use crate::combat::missile::{HitMode, MissileAction, MissileTargetId, Origin};
 use crate::combat::missile::{MissSpread, Missile, MissileState, ProjectileKind, StrikeResult};
 use crate::combat::victims::{KillLeft, file_kill, write_back};
 use crate::combat::volley::Aimed;
@@ -43,6 +44,7 @@ use crate::construction::{Annexes, BuilderCount, RepairTargetId};
 use crate::garrison::ContainerId;
 use crate::garrison::GarrisonScope;
 use crate::garrison::tests::enter_task;
+use crate::garrison::transport::{TransportAction, TransportState};
 use crate::garrison::{ENTER, EnterAction, EnterState, RaiderCountdown, UNREACHED};
 use crate::gathering::DropSiteId;
 use crate::gathering::PastureId;
@@ -86,6 +88,7 @@ use crate::map::terrain::{Terrain, TerrainKind};
 use crate::math::Angle;
 use crate::math::fmath::BVector;
 use crate::math::rng::{Stream, Streams, Well512};
+use crate::movement::Acceleration;
 use crate::movement::MoveAlgorithm;
 use crate::movement::PathFlags;
 use crate::movement::Speed;
@@ -13889,6 +13892,230 @@ fn set_only_action_deletes_the_list_with_its_restarts() {
             (0, 1, Some(attribute::FARM_FOOD), Amount::ZERO)
         );
     }
+}
+
+/// The villager holding `list` ([`villager_holding`], alive), with a unit AI and, while it walks,
+/// its top speed off its base 0.8 (1.3) and its animation speed 1.0: what its standing sprite
+/// (the base again) and a stop (an animation speed of 0) change shows.
+fn walking_villager_holding(list: ActionList) -> World {
+    let mut world = villager_holding(list, ObjectState::Alive);
+    world
+        .parts
+        .set_unit_ai(object_id(40), Some(UnitAi::default()));
+    world.parts.mover_mut(object_id(40)).unwrap().stats.speed = Speed::new(1.3);
+    world.parts.set_anim_speed(object_id(40), Speed::new(1.0));
+    world
+}
+
+/// `under` with a wait for foundation 10028 at its head: a head whose destructor stops nothing
+/// and lets nothing go, so the restart alone changes the villager.
+fn wait_over(under: ActionList) -> ActionList {
+    under.with_wait_solidify(Some(WaitSolidify::new(
+        Task::default(),
+        FoundationId::new(object_id(10028)),
+    )))
+}
+
+/// The villager's top speed with its sprite and its animation speed.
+fn villager_speeds(world: &World) -> (Speed, Speed) {
+    let mover = world.parts.mover_of(object_id(40)).unwrap();
+    (mover.stats.speed, mover.animated.speed)
+}
+
+/// The notifies the villager's unit AI heard.
+fn villager_heard(world: &World) -> Vec<(NotifyKind, [i32; 3])> {
+    world
+        .parts
+        .unit_ai
+        .get(object_id(40))
+        .unwrap()
+        .notifies
+        .iter()
+        .map(|notify| (notify.kind, notify.params))
+        .collect()
+}
+
+/// A deleted head over an Explore with a point (x not −1) restarts it (`0x140a87e10`, which
+/// reads no argument): it walks to its point (state 11, a new quiet `MoveTo` there) and asks
+/// nothing of its unit; a `MoveTo` it walked goes and stops the unit (slot 0x5d0), one it did
+/// not leaves the unit moving. A NaN x walks too (`UCOMISS`, `JP`).
+#[test]
+fn deleted_head_over_explore_with_point_walks_there() {
+    let point = Position::new(14.0, 12.0, 0.0);
+    let walking = MoveToAction::sub_to_point(Position::new(3.0, 4.0, 0.0), Distance::ZERO, None);
+    for (state, at, stopped) in [
+        (ExploreState::Wait, point, Speed::new(1.0)),
+        (
+            ExploreState::Walk {
+                move_to: Some(walking),
+            },
+            point,
+            Speed::ZERO,
+        ),
+        (
+            ExploreState::Wait,
+            Position::new(f32::NAN, 12.0, 0.0),
+            Speed::new(1.0),
+        ),
+    ] {
+        let explore_action = ExploreAction {
+            state,
+            point: at,
+            task: None,
+        };
+        let mut world = walking_villager_holding(wait_over(
+            ActionList::default().with_explore(Some(explore_action)),
+        ));
+        delete_villager_head(&mut world).unwrap();
+        let restarted = world
+            .parts
+            .actions_of(object_id(40))
+            .list
+            .explore()
+            .copied();
+        let walk = restarted.and_then(|explore_action| explore_action.state.move_to().copied());
+        assert_eq!(
+            walk.map(|move_to_action| (move_to_action.point.y(), move_to_action.voice)),
+            Some((12.0, Voice::Quiet)),
+            "{state:?}"
+        );
+        assert_eq!(
+            villager_speeds(&world),
+            (Speed::new(1.3), stopped),
+            "{state:?}"
+        );
+        assert_eq!(villager_heard(&world), Vec::new());
+    }
+}
+
+/// A deleted head over an Explore without a point (x −1) restarts it waiting for one (state 3):
+/// its unit AI hears 0x202 with the explore's action value 605 and the unit shows its standing
+/// sprite (its top speed back to the base); a `MoveTo` it walked goes and stops the unit.
+#[test]
+fn deleted_head_over_explore_without_point_waits_for_one() {
+    let walking = MoveToAction::sub_to_point(Position::new(3.0, 4.0, 0.0), Distance::ZERO, None);
+    for (state, stopped) in [
+        (ExploreState::Wait, Speed::new(1.0)),
+        (
+            ExploreState::Walk {
+                move_to: Some(walking),
+            },
+            Speed::ZERO,
+        ),
+    ] {
+        let explore_action = ExploreAction {
+            state,
+            point: Position::new(-1.0, 5.0, 0.0),
+            task: None,
+        };
+        let mut world = walking_villager_holding(wait_over(
+            ActionList::default().with_explore(Some(explore_action)),
+        ));
+        delete_villager_head(&mut world).unwrap();
+        assert_eq!(
+            world
+                .parts
+                .actions_of(object_id(40))
+                .list
+                .explore()
+                .map(|explore_action| explore_action.state),
+            Some(ExploreState::Wait)
+        );
+        assert_eq!(
+            villager_heard(&world),
+            [(
+                NotifyKind::REQUIRES_SEARCH,
+                [AiAction::Explore.value(), 0, 0]
+            )]
+        );
+        assert_eq!(
+            villager_speeds(&world),
+            (Speed::new(0.8), stopped),
+            "{state:?}"
+        );
+    }
+}
+
+/// A deleted head over a Transport restarts it with 0 (`FUN_140aa3e10`): it idles
+/// (`set_state(2)`, its point where it was): its `MoveTo` goes and stops the unit, and the unit
+/// shows its standing sprite; a Transport without a `MoveTo` leaves the unit moving.
+#[test]
+fn deleted_head_over_transport_idles() {
+    let point = Position::new(14.0, 12.0, 0.0);
+    let sailing = MoveToAction::sub_to_point(point, Distance::ZERO, None);
+    for (state, stopped) in [
+        (
+            TransportState::Sail {
+                move_to: Some(sailing),
+            },
+            Speed::ZERO,
+        ),
+        (TransportState::Unload, Speed::new(1.0)),
+    ] {
+        let transport_action = TransportAction {
+            state,
+            ..TransportAction::new(point)
+        };
+        let mut world = walking_villager_holding(wait_over(
+            ActionList::default().with_transport(Some(transport_action)),
+        ));
+        delete_villager_head(&mut world).unwrap();
+        assert_eq!(
+            world
+                .parts
+                .actions_of(object_id(40))
+                .list
+                .transport()
+                .copied(),
+            Some(TransportAction {
+                state: TransportState::Idle,
+                ..TransportAction::new(point)
+            })
+        );
+        assert_eq!(
+            villager_speeds(&world),
+            (Speed::new(0.8), stopped),
+            "{state:?}"
+        );
+    }
+}
+
+/// A deleted head over a missile restarts it with 0 (`0x140a9c5b0`): `set_state(4)`, which
+/// writes only its state: it flies, its target and its point as they were.
+#[test]
+fn deleted_head_over_missile_flies() {
+    let missile_action = MissileAction {
+        state: MissileState::New,
+        target: Some(MissileTargetId::new(object_id(9150))),
+        fired_from: None,
+        point: Position::new(-1.0, -1.0, 0.0),
+        timer: Distance::ZERO,
+        direction: Offset::ZERO,
+        ballistic_velocity: Speed::ZERO,
+        ballistic_acceleration: Acceleration::ZERO,
+        distance: Distance::ZERO,
+        hit_mode: HitMode::TARGET_ALONE,
+        result: StrikeResult::None,
+        origin: Origin::NONE,
+        met: Vec::new(),
+    };
+    let mut world = walking_villager_holding(wait_over(
+        ActionList::default().with_missile(Some(missile_action.clone())),
+    ));
+    delete_villager_head(&mut world).unwrap();
+    assert_eq!(
+        world
+            .parts
+            .actions_of(object_id(40))
+            .list
+            .missile()
+            .cloned(),
+        Some(MissileAction {
+            state: MissileState::Flying,
+            ..missile_action
+        })
+    );
+    assert_eq!(villager_speeds(&world), (Speed::new(1.3), Speed::new(1.0)));
 }
 
 /// `FUN_1411e63f0` then `FUN_1411e6580` at a built building's death: each storage entry of mode

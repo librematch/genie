@@ -26,7 +26,7 @@ ashore, the transport sails to a random point near the old one and tries again.
 | [`tests.rs`](tests.rs) | Tests. |
 | [`transport_mode.rs`](transport_mode.rs) | How a Transport was last ordered (`TransportMode`). |
 | [`transport_state.rs`](transport_state.rs) | A Transport's state: the steps of its update from the sail to the unload; each sail with its `MoveTo`. |
-| [`unit.rs`](unit.rs) | The unit's Transport: the action's update on the step and a sail to a point. |
+| [`unit.rs`](unit.rs) | The unit's Transport: the action's update on the step, a sail to a point and its restart. |
 | [`unload.rs`](unload.rs) | The Transport in the world: what it reads of its unit, the unload command, a move, the unload and the units put ashore. |
 | [`work.rs`](work.rs) | The work command's Transport: a transport's task of type 12 (a beach, the only terrain task in the game's data) makes or retakes it. |
 <!-- /files -->

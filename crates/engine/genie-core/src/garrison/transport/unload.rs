@@ -2,7 +2,6 @@
 //! unload and the units put ashore.
 
 use crate::garrison::SIEGE_UNLOAD;
-use crate::garrison::transport::StartCall;
 use crate::garrison::transport::TransportState;
 use crate::garrison::transport::TransportTarget;
 use crate::garrison::transport::unit::SailWorld;
@@ -140,7 +139,6 @@ impl World {
         } else {
             let mut transport_action = TransportAction::new(ship.position);
             let started = transport_action.start(
-                StartCall::Added,
                 &ship,
                 &mut shore,
                 &self.model.tuning.transport,

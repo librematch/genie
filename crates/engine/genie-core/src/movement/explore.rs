@@ -135,9 +135,10 @@ impl ExploreAction {
         }
     }
 
-    /// Its first (slot 0x28, `0x140a87e10`) as the action list adds it (`FUN_140a977e0`): state 3
-    /// for a point x of −1, else 11 (`!=`: a NaN walks), whose `MoveTo` is made from `walk`
-    /// ([`ExploreAction::set_state`]).
+    /// Its first (slot 0x28, `0x140a87e10`, which reads no argument) as the action list adds it
+    /// (`FUN_140a977e0`) and as its deletion restarts it at the head (`FUN_140a98e20`,
+    /// [`Unit::restart_explore`]): state 3 for a point x of −1, else 11 (`UCOMISS`, `JP`: a NaN
+    /// walks), whose `MoveTo` is made from `walk` ([`ExploreAction::set_state`]).
     ///
     /// # Errors
     ///

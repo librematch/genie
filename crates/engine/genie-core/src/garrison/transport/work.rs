@@ -2,7 +2,6 @@
 //! in the game's data) makes or retakes it.
 
 use crate::GenieResult;
-use crate::garrison::transport::StartCall;
 use crate::garrison::transport::TransportTarget;
 use crate::garrison::transport::{Changed, MapShore, Ship, TransportAction};
 use crate::map::Position;
@@ -52,15 +51,7 @@ impl World {
             player_id,
             list_index,
             transport_action.task,
-            |ship, shore| {
-                transport_action.start(
-                    StartCall::Added,
-                    ship,
-                    shore,
-                    &transport_tuning,
-                    &move_to_tuning,
-                )
-            },
+            |ship, shore| transport_action.start(ship, shore, &transport_tuning, &move_to_tuning),
         )?;
         self.parts
             .actions_mut(self.players.live(player_id, list_index)?.id)?

@@ -368,6 +368,14 @@ pub fn aim(
 }
 
 impl MissileAction {
+    /// Slot 5 (`0x140a9c5b0`) with 0, as the action list's deletion restarts the next head
+    /// (`FUN_140a98e20`): `set_state(4)` (`FUN_140a9de70`), which writes only the state: it
+    /// flies. With 1 (the list's add) the slot aims and launches it, which the volley does
+    /// itself ([`aim`], [`MissileAction::launch`]).
+    pub const fn restart(&mut self) {
+        self.state = MissileState::Flying;
+    }
+
     /// `set_state(3)` (`FUN_140a9de70` case 3) from `from` toward the aimed point: the way left
     /// (its length), a straight missile's unit direction (projectile type 0; type 3 keeps the
     /// way itself) with the object's angle on it (slot 0x158: `atan2f` of y over x, returned),
