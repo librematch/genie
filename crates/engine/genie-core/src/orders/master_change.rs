@@ -16,6 +16,7 @@ use crate::objects::layers::Combat;
 use crate::objects::layers::MotionMut;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
+use crate::objects::masters::MasterKind;
 use crate::objects::task_change::{Looks, action_take_master};
 use crate::objects::unit::Unit;
 use crate::orders::damage_share;
@@ -53,6 +54,32 @@ pub(crate) enum ShownOnChange {
 }
 
 impl World {
+    /// Slot 0x90 (`RGE_Static_Object::transform`) on object `idx` of player `player`, its new
+    /// master `new` and `actions` its third argument: the override of the object's class, which
+    /// its master's type names. A building's ([`World::transform_building`]), else the combat
+    /// unit's ([`World::change_master`]). The overrides of the types 40 to 60
+    /// (`FUN_14106fe70`, `FUN_14108c990`) are parts of the combat unit's and not ported apart:
+    /// such an object takes the combat unit's (no player's master in the data is of type 40 or
+    /// 50, and no missile's master changes).
+    ///
+    /// # Errors
+    ///
+    /// An object the world does not hold live, and the master change's.
+    pub(crate) fn transform(
+        &mut self,
+        player: PlayerId,
+        idx: ListIndex,
+        new: MasterId,
+        actions: ActionsOnChange,
+    ) -> GenieResult<()> {
+        let unit = self.players.live(player, idx)?;
+        if unit.master(self.master_tables(), player)?.kind == MasterKind::BUILDING {
+            self.transform_building(player, idx, new, actions)
+        } else {
+            self.change_master(player, idx, new, actions)
+        }
+    }
+
     /// A building's slot 0x90 (`FUN_1411e6d90`, with `actions` its third argument): its master
     /// change ([`World::change_master`]), then in state 2 its build points (`+0xc50`) take the
     /// new master's build time (its first train location's time, 0 without one). The slice holds

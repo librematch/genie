@@ -23,6 +23,7 @@ use crate::objects::masters::BlastDefense;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::player_masters;
 use crate::objects::unit::{Unit, missed_passes};
+use crate::orders::ActionsOnChange;
 use crate::players::PlayerId;
 use crate::unit_ai::NotifyKind;
 use crate::{GenieError, GenieResult};
@@ -465,7 +466,8 @@ impl Unit {
         // the masters the shooter's hit point transforms gave it in the hit (a retaliation's
         // loss), before its write-back
         for new in take(&mut own.master_changes) {
-            step.world.transform_into(player_id, shooter_slot, new)?;
+            step.world
+                .transform(player_id, shooter_slot, new, ActionsOnChange::Keep)?;
         }
         let World {
             players,

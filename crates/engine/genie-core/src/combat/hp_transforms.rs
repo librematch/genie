@@ -11,7 +11,6 @@ use crate::objects::layers::Action;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
-use crate::objects::masters::MasterKind;
 use crate::objects::masters::Masters;
 use crate::objects::masters::Task;
 use crate::objects::masters::player_masters;
@@ -221,10 +220,10 @@ impl World {
     /// `FUN_141204450`, the hit point transforms of object `idx` of player `player` (a combat
     /// unit or building, types 70 and 80): the first of its master's transforms
     /// ([`hp_transforms`]) whose test holds gives it that master, its actions kept (slot 0x90
-    /// with 1: [`ActionsOnChange::Keep`], a building's [`World::transform_building`]). The
-    /// interface's note (`FUN_140a50690`), the sprite the renderer attaches and the sounds
-    /// (slot 0x4d0, `FUN_14106abd0`) are not the simulation's; slot 0x8a8's caches (slot 277)
-    /// are read from the master where they are needed.
+    /// with 1, [`World::transform`]: [`ActionsOnChange::Keep`], a building's
+    /// [`World::transform_building`]). The interface's note (`FUN_140a50690`), the sprite the
+    /// renderer attaches and the sounds (slot 0x4d0, `FUN_14106abd0`) are not the simulation's;
+    /// slot 0x8a8's caches (slot 277) are read from the master where they are needed.
     ///
     /// # Errors
     ///
@@ -250,31 +249,7 @@ impl World {
         let Some(new) = into else {
             return Ok(());
         };
-        self.transform_into(player, idx, new)
-    }
-
-    /// Slot 0x90 with 1 (a hit point transform's) on object `idx` of player `player`, its new
-    /// master `new`: its actions kept ([`ActionsOnChange::Keep`]), a building's through its own
-    /// slot 0x90 ([`World::transform_building`]). A hit's victim takes it at its write-back, for
-    /// each master its hit gave it ([`Victim::master_changes`]).
-    ///
-    /// # Errors
-    ///
-    /// An object the world does not hold live, and the master change's.
-    pub(crate) fn transform_into(
-        &mut self,
-        player: PlayerId,
-        idx: ListIndex,
-        new: MasterId,
-    ) -> GenieResult<()> {
-        let unit = self.players.live(player, idx)?;
-        let kind = unit.master(self.master_tables(), player)?.kind;
-        // slot 0x90 is the object's: a building's, else the combat unit's
-        if kind == MasterKind::BUILDING {
-            self.transform_building(player, idx, new, ActionsOnChange::Keep)
-        } else {
-            self.change_master(player, idx, new, ActionsOnChange::Keep)
-        }
+        self.transform(player, idx, new, ActionsOnChange::Keep)
     }
 }
 
@@ -282,8 +257,8 @@ impl Unit {
     /// The masters a hit's own part took ([`Victim::master_changes`]: an attacker that a
     /// retaliation or reflected damage transformed in the hit), given to the updating object
     /// (`self` with its action layer `actions`) lent to the world ([`Step::lend_at`],
-    /// [`World::transform_into`]), before its write-back ([`Unit::hit_back`]) gives it the hit's
-    /// hit points.
+    /// [`World::transform`] with [`ActionsOnChange::Keep`]), before its write-back
+    /// ([`Unit::hit_back`]) gives it the hit's hit points.
     ///
     /// # Errors
     ///
@@ -301,7 +276,7 @@ impl Unit {
         step.lend_at((self, actions), |world, player, idx| {
             changes
                 .iter()
-                .try_for_each(|&new| world.transform_into(player, idx, new))
+                .try_for_each(|&new| world.transform(player, idx, new, ActionsOnChange::Keep))
         })
     }
 }

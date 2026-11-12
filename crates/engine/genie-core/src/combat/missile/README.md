@@ -31,5 +31,5 @@ The volleys that fire missiles are in `combat/volley.rs`.
 ## How it connects
 
 <!-- uses -->
-- Uses: [`commands`](../../commands/), [`map`](../../map/), [`math`](../../math/), [`movement`](../../movement/), [`objects`](../../objects/), [`players`](../../players/), [`testing`](../../testing/), [`unit_ai`](../../unit_ai/), [`world`](../../world/).
+- Uses: [`commands`](../../commands/), [`map`](../../map/), [`math`](../../math/), [`movement`](../../movement/), [`objects`](../../objects/), [`orders`](../../orders/), [`players`](../../players/), [`testing`](../../testing/), [`unit_ai`](../../unit_ai/), [`world`](../../world/).
 <!-- /uses -->

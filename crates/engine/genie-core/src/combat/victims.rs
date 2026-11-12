@@ -14,6 +14,7 @@ use crate::objects::masters::Master;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::player_masters;
 use crate::objects::unit::Unit;
+use crate::orders::ActionsOnChange;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::unit_ai::Notify;
@@ -360,9 +361,10 @@ pub(crate) fn write_back(
 }
 
 /// The masters a hit's victim took ([`Victim::master_changes`]: slot 22's hit point transforms in
-/// the hit), given to the object in their order ([`World::transform_into`]) before its write-back
-/// gives it the hit's hit points: each change's share of them is the hit's own. Only a combat
-/// unit or building transforms, and neither sleeps.
+/// the hit), given to the object in their order ([`World::transform`] with
+/// [`ActionsOnChange::Keep`]) before its write-back gives it the hit's hit points: each change's
+/// share of them is the hit's own. Only a combat unit or building transforms, and neither
+/// sleeps.
 ///
 /// # Errors
 ///
@@ -377,7 +379,7 @@ pub(crate) fn change_masters_of_hit(world: &mut World, victim: &mut Victim) -> G
     };
     changes
         .iter()
-        .try_for_each(|&new| world.transform_into(player, idx, new))
+        .try_for_each(|&new| world.transform(player, idx, new, ActionsOnChange::Keep))
 }
 
 /// A hit's victim with master changes that the world does not hold live.
