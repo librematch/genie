@@ -67,9 +67,9 @@ use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::ObstructionClass;
 use crate::objects::masters::ObstructionKind;
 use crate::objects::masters::TargetOwner;
-use crate::objects::masters::TaskGroup;
 use crate::objects::masters::TaskId;
 use crate::objects::masters::TaskSprites;
+use crate::objects::masters::TaskTerrain;
 use crate::objects::masters::{Masters, Task, WorkValue};
 use crate::objects::sprite::{ActiveSprite, Graphic};
 use crate::objects::unit::UnitFlags;
@@ -579,6 +579,51 @@ fn unit_order_drop_off_sends_carrying_builder_to_the_table_drop_site() {
         game.players[0].objects[ListIndex::new(2)].workers,
         WorkerCount::of_data(1)
     );
+    // its slot 0x820 asks at no point (x, y and z −1): a task for the terrain under the mill
+    // is not found, and the walk keeps the Build task's range
+    let mut game = world();
+    game.model.drop_sites = Arc::new(vec![DropSite {
+        building: master_id(68),
+        worker_class: Some(class::VILLAGER),
+        resource_kinds: vec![attribute::WOOD],
+        ..DropSite::default()
+    }]);
+    game.spatial.terrain = Some(Terrain::new(
+        GridSize::new(20, 20),
+        vec![TileTerrain::of_save(0, 255, -1); 400],
+        vec![TerrainKind {
+            shown: true,
+            flags: TerrainFlags::LAND,
+            forest: false,
+        }],
+        vec![Restriction::new(vec![1.0])],
+    ));
+    Arc::make_mut(&mut game.model.masters[0])
+        .get_mut(ids::VILLAGER_MALE)
+        .unwrap()
+        .action = Some(ActionPart {
+        tasks: vec![Task {
+            action_kind: ActionKind::named(99),
+            terrain: TaskTerrain::of_data(0),
+            work_range: Distance::new(2.0),
+            ..Task::default()
+        }],
+        ..ActionPart::default()
+    });
+    game.unit_order(
+        player_id(0),
+        &object_ids([10]),
+        UnitOrderAction::DropOffAndBack,
+    )
+    .unwrap();
+    let walk_range = game
+        .parts
+        .actions_of(game.players[0].objects[ListIndex::new(0)].id)
+        .list
+        .build()
+        .and_then(|build_action| build_action.state.move_to().copied())
+        .map(|walk| walk.range);
+    assert_eq!(walk_range, Some(Distance::new(0.1)));
     // no table entry for wood: back to the foundation
     let mut game = world();
     game.unit_order(
@@ -3887,106 +3932,6 @@ fn shutting_gate_kills_the_units_in_it_but_the_spared() {
         [(11, 0.0), (12, 10.0), (13, 10.0), (14, 0.0), (15, 0.0)]
     );
     assert_eq!(world.players[1].sleeping.len(), 0);
-}
-
-/// `FUN_14106c6a0`: a villager's own master without a task for its player's foundation
-/// takes the first master of its class, type and swap group with one, searched with any
-/// filter, and becomes it only with the change; one with its own task keeps its master.
-#[test]
-fn slot_0x820_takes_the_first_master_of_the_swap_group_with_task() {
-    let units = [(11, 83, Point::new(20.0, 20.0))];
-    let mut world = soldiers(&units, &[]);
-    let task = |action_kind, object_id| Task {
-        action_kind,
-        object_group: None,
-        object_id,
-        work_val1: WorkValue::new(1.0),
-        ..Task::default()
-    };
-    let villager = |id, tasks| Master {
-        id,
-        kind: MasterKind::COMBAT,
-        class: class::VILLAGER,
-        hit_points: MasterHitPoints::of_data(25),
-        action: Some(ActionPart {
-            task_by_group: TaskGroup::MALE_VILLAGERS,
-            tasks,
-            ..ActionPart::default()
-        }),
-        ..Master::default()
-    };
-    world.model.masters[1] = Arc::new(Masters::new([
-        villager(ids::VILLAGER_MALE, vec![task(GATHER, Some(master_id(53)))]),
-        villager(ids::BUILDER, vec![task(ActionKind::BUILD, None)]),
-        Master {
-            id: ids::HOUSE,
-            kind: MasterKind::BUILDING,
-            class: class::BUILDING,
-            hit_points: MasterHitPoints::of_data(550),
-            ..Master::default()
-        },
-    ]));
-    world.players[1].objects[ListIndex::new(0)].life.hp = HitPoints::new(25.0);
-    let _ = world
-        .push_live(
-            PlayerId::new(1),
-            Unit {
-                id: object_id(60),
-                life: Lifecycle {
-                    master_id: ids::HOUSE,
-                    state: ObjectState::Foundation,
-                    hp: HitPoints::new(550.0),
-                    ..Lifecycle::default()
-                },
-                ..Unit::default()
-            },
-        )
-        .unwrap();
-    let found = world
-        .find_work_task(
-            PlayerId::new(1),
-            ListIndex::new(0),
-            object_id(60),
-            Some(GARRISON),
-            MasterSwap::Keep,
-        )
-        .unwrap();
-    assert_eq!(found.map(|task| task.action_kind), Some(ActionKind::BUILD));
-    assert_eq!(
-        world.players[1].objects[ListIndex::new(0)].life.master_id,
-        ids::VILLAGER_MALE
-    );
-    let found = world
-        .find_work_task(
-            PlayerId::new(1),
-            ListIndex::new(0),
-            object_id(60),
-            None,
-            MasterSwap::Change,
-        )
-        .unwrap();
-    assert_eq!(found.map(|task| task.action_kind), Some(ActionKind::BUILD));
-    assert_eq!(
-        world.players[1].objects[ListIndex::new(0)].life.master_id,
-        ids::BUILDER
-    );
-    // 118's own task: no change
-    assert!(
-        world
-            .find_work_task(
-                PlayerId::new(1),
-                ListIndex::new(0),
-                object_id(60),
-                None,
-                MasterSwap::Change
-            )
-            .unwrap()
-            .is_some()
-    );
-    assert_eq!(
-        world.players[1].objects[ListIndex::new(0)].life.master_id,
-        ids::BUILDER
-    );
 }
 
 /// `0x140ac60e0` case 6 and `FUN_140ac4c60`: the hunt's own sheep goes to the drop site, and

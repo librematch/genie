@@ -17,11 +17,9 @@ use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::ActionKind;
-use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
-use crate::objects::masters::MasterKind;
 use crate::objects::masters::Task;
-use crate::objects::masters::TaskGroup;
+use crate::objects::masters::player_masters;
 use crate::objects::masters::work_master;
 use crate::orders::ActionsOnChange;
 use crate::orders::gather::HuntOrder;
@@ -33,18 +31,20 @@ use crate::unit_ai::AiAction;
 use crate::unit_ai::Answer;
 use crate::unit_ai::Notifies;
 use crate::unit_ai::OrderKind;
+use crate::unit_ai::task_finder::TaskOn;
 use crate::unit_ai::task_finder::world::TaskWorld;
 use crate::unit_ai::task_finder::world::point_terrain;
+use crate::unit_ai::task_finder::world::task_search;
 use crate::unit_ai::task_finder::{Actor, enabled};
-use crate::unit_ai::task_finder::{TaskOn, find_task};
 use crate::world::World;
 use crate::world::layer::ClassRoles;
-use crate::world::slots::CheckedIndexExt;
 use crate::world::slots::PlayerSlotsExt;
 use crate::{GenieError, GenieResult};
 
 mod garrison;
 mod retarget;
+#[cfg(test)]
+mod tests;
 
 /// A task of an object's action (Enter, Attack, Hunt, Build, Repair, Gather) that the task
 /// finder gave a work command without a target, for the terrain at its point: the game starts
@@ -440,30 +440,34 @@ impl World {
         Ok(())
     }
 
-    /// The unit's slot 0x820 (`FUN_14106c6a0`) on `target` (its place the point): the task its
-    /// master's list gives for the target with `filter` (the list's slot 0x10, [`find_task`] in
-    /// mode 0); without one, a master with a task swap group (`+0x7b8` not 0) tries each of its
-    /// player's masters by id of the same class, type and group, its own too, with any filter; the
-    /// first with a task gives it, and with [`MasterSwap::Change`] the unit takes that master (slot
-    /// 0x90, [`World::change_master`], or [`World::transform_building`] for a building) though it
-    /// be its own. None: no task. The terrain under the point, which only a task for a terrain
-    /// reads, is not passed.
+    /// The unit's slot 0x820 (`RGE_Action_Object::getTask`, `FUN_14106c6a0`) on `target` at
+    /// `point`, the x, y and z its caller passes (the target's place, or −1 each for the Build's
+    /// drop-off): [`task_search`] with `filter` on the target, the target its general search reads
+    /// and the terrain under the point ([`World::task_terrain`]). Its own master's list answers
+    /// with the filter (the list's slot 0x10 in mode 0); without a task, a master with a task swap
+    /// group (`+0x7b8` not 0) asks its player's masters by id of its class, type and group, its
+    /// own too, with any filter (`0xffff`). With [`MasterSwap::Change`], the unit takes the master
+    /// whose list answered there, though it be its own (slot 0x90 with 0: [`World::transform`],
+    /// [`ActionsOnChange::Clear`]). None: no task.
     ///
-    /// [`find_task`]: crate::unit_ai::task_finder::find_task
+    /// # Errors
+    ///
+    /// A unit or a target the world does not hold, a player without a masters table, and the
+    /// task finder's and the master change's.
     pub(crate) fn find_work_task(
         &mut self,
         player: PlayerId,
         idx: ListIndex,
         target: ObjectId,
+        point: Position,
         filter: Option<ActionKind>,
         swap: MasterSwap,
     ) -> GenieResult<Option<Task>> {
         let unit = &self.players.live(player, idx)?;
-        let own = unit.master(self.master_tables(), player)?;
         let owner = &self.players.player(player)?;
         let actor = Actor {
             id: unit.id,
-            master: own,
+            master: unit.master(self.master_tables(), player)?,
             player,
             held: unit.life.held(),
             attribute_95: owner.attributes.get(95).copied().unwrap_or(Amount::ZERO),
@@ -476,56 +480,27 @@ impl World {
         };
         let task_target = self.task_target(target, 1)?;
         let general = self.task_target(target, 2)?;
-        // slot 0x820's point: the target's place
-        let at = self
-            .object(target)
-            .map_or(Position::ORIGIN, |(_, unit)| unit.position());
-        let terrain = self.task_terrain(at);
-        let find = |list: &Master, filter: Option<ActionKind>| {
-            find_task(
-                list,
-                &actor,
-                &TaskOn {
-                    target: Some(&task_target),
-                    general: Some(&general),
-                    terrain,
-                },
-                filter,
-                &world,
-                self.model.slots,
-                &self.model.roles,
-            )
-            .map(Option::<&Task>::copied)
+        let on = TaskOn {
+            target: Some(&task_target),
+            general: Some(&general),
+            terrain: self.task_terrain(point),
         };
-        if let Some(task) = find(own, filter)? {
-            return Ok(Some(task));
-        }
-        if own.action_part().task_by_group == TaskGroup::NONE {
-            return Ok(None);
-        }
-        let mut found = None;
-        // the master table exists: master_of found the unit's own in it
-        for candidate in self.model.masters.checked(player.index())?.iter() {
-            if candidate.class != own.class
-                || candidate.kind != own.kind
-                || candidate.action_part().task_by_group != own.action_part().task_by_group
-            {
-                continue;
-            }
-            if let Some(task) = find(candidate, None)? {
-                found = Some((candidate.id, task));
-                break;
-            }
-        }
-        let Some((with, task)) = found else {
+        let found = task_search(
+            player_masters(&self.model.masters, player)?,
+            &actor,
+            &on,
+            filter,
+            &world,
+            self.model.slots,
+            &self.model.roles,
+        )?;
+        let Some((task, swapped)) = found else {
             return Ok(None);
         };
-        if swap == MasterSwap::Change {
-            if self.master(player, with)?.kind == MasterKind::BUILDING {
-                self.transform_building(player, idx, with, ActionsOnChange::Clear)?;
-            } else {
-                self.change_master(player, idx, with, ActionsOnChange::Clear)?;
-            }
+        if swap == MasterSwap::Change
+            && let Some(new) = swapped.map(|master| master.id)
+        {
+            self.transform(player, idx, new, ActionsOnChange::Clear)?;
         }
         Ok(Some(task))
     }

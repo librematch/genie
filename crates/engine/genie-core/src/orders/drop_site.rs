@@ -15,6 +15,7 @@ use crate::gathering::hunt::HUNT;
 use crate::map::Distance;
 use crate::map::Point;
 use crate::map::Position;
+use crate::math::image::build::NO_POINT as BUILD_NO_POINT;
 use crate::math::rng::Stream;
 use crate::objects::ActionState;
 use crate::objects::ListIndex;
@@ -220,8 +221,8 @@ impl World {
     /// (`player_id`, `idx`), on the builder's step ([`World::run_on_step`]): a builder that carries
     /// something (`+0x310` above 0, COMISS: not a NaN) searches the drop-site table
     /// ([`World::table_drop_site`] for what it carries and its class) and its slot 0x820 the task
-    /// on the site found (any action type, no switch,
-    /// [`World::find_work_task`]: its range, else the Build task's); then
+    /// on the site found (at no point, any action type, no switch, [`World::find_work_task`]: its
+    /// range, else the Build task's); then
     /// [`crate::construction::build::BuildAction::set_drop`]: a counted builder leaves its
     /// foundation's builders, the second targets go and come at once, notify 0x203 goes to the
     /// unit AI. `build` is the Build on top that the order's ask found ([`World::drop_off_ask`]):
@@ -245,8 +246,16 @@ impl World {
             match self.table_drop_site(player_id, at, held, class)? {
                 None => DropSearch::Nothing,
                 Some(id) => {
-                    let found =
-                        self.find_work_task(player_id, idx, id.id(), None, MasterSwap::Keep)?;
+                    // slot 0x820's point: x, y and z −1 (0x140aafec2), no terrain
+                    let point = Position::new(BUILD_NO_POINT, BUILD_NO_POINT, BUILD_NO_POINT);
+                    let found = self.find_work_task(
+                        player_id,
+                        idx,
+                        id.id(),
+                        point,
+                        None,
+                        MasterSwap::Keep,
+                    )?;
                     let range = found.map_or(task_range, |task| task.work_range);
                     let sprite = found.and_then(|task| task.sprites.carrying);
                     DropSearch::Site { id, range, sprite }

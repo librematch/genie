@@ -77,7 +77,9 @@ impl World {
             self.retarget_hunt(player, idx, target)?;
             return Ok(Answer::Taken);
         }
-        let Some(task) = self.find_work_task(player, idx, target, None, MasterSwap::Change)? else {
+        let Some(task) =
+            self.find_work_task(player, idx, target, point, None, MasterSwap::Change)?
+        else {
             return Ok(Answer::NotTaken);
         };
         self.start_hunt(HuntOrder {
@@ -114,7 +116,7 @@ impl World {
         target: ObjectId,
         force: OrderForce,
     ) -> GenieResult<Answer> {
-        // slot 0x48 takes the target's place (x, y and z, 0x141085288)
+        // slots 0x820 and 0x48 take the target's place (x, y and z, 0x14108512b, 0x141085288)
         let Some(place) = self.object(target).map(|(_, unit)| unit.position()) else {
             return Ok(Answer::NotTaken);
         };
@@ -124,7 +126,9 @@ impl World {
         {
             return Ok(Answer::Taken);
         }
-        let Some(task) = self.find_work_task(player, idx, target, None, MasterSwap::Change)? else {
+        let Some(task) =
+            self.find_work_task(player, idx, target, place, None, MasterSwap::Change)?
+        else {
             return Ok(Answer::NotTaken);
         };
         // the top action read again: slot 0x820's master switch clears the actions

@@ -119,9 +119,10 @@ impl World {
         target: ObjectId,
         force: OrderForce,
     ) -> GenieResult<Answer> {
-        if self.object(target).is_none() {
+        // slot 0x820 takes the target's place (x, y and z, 0x14108490f)
+        let Some(place) = self.object(target).map(|(_, unit)| unit.position()) else {
             return Ok(Answer::NotTaken);
-        }
+        };
         let unit = self.players.live(player, idx)?;
         let top = self.parts.actions_of(unit.id).top_action_kind();
         if force == OrderForce::Unforced
@@ -130,8 +131,14 @@ impl World {
         {
             return Ok(Answer::Taken);
         }
-        let Some(task) =
-            self.find_work_task(player, idx, target, Some(GARRISON), MasterSwap::Change)?
+        let Some(task) = self.find_work_task(
+            player,
+            idx,
+            target,
+            place,
+            Some(GARRISON),
+            MasterSwap::Change,
+        )?
         else {
             return Ok(Answer::NotTaken);
         };

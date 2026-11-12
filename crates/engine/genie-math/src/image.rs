@@ -38,6 +38,8 @@ pub mod best_target {
 pub mod build {
     /// 1.0000000116860974e-07
     pub const EPSILON: f32 = f32::from_bits(0x33d6_bf95);
+    /// -1.0
+    pub const NO_POINT: f32 = f32::from_bits(0xbf80_0000);
 }
 
 /// The values the `combat_update` port reads.

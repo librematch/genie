@@ -167,10 +167,9 @@ pub(crate) fn task_target_with<'world>(
 /// of its class, type and group, its own too, with any filter, and the first with a task gives
 /// it. The task, with the master that gave it when the swap group did: with its `param_7` the
 /// routine switches the unit to that master (slot 0x90 with 0), its own too, which is the
-/// caller's. None: no task. The terrain: the terrain under the point the caller passes, the
-/// target's place ([`point_terrain`]), which only a task for a terrain reads (as
-/// `World::find_work_task`, the same routine's port in `crate::orders`, which this module cannot
-/// call).
+/// caller's. None: no task. The terrain: the terrain under the point the caller passes
+/// ([`point_terrain`]; none for the Build's drop-off's −1), which only a task for a terrain
+/// reads. `World::find_work_task` in `crate::orders` runs it with the switch.
 pub(crate) fn task_search<'masters>(
     masters: &'masters Masters,
     actor: &Actor<'_>,

@@ -15,6 +15,7 @@ new target with that action.
 | --- | --- |
 | [`garrison.rs`](garrison.rs) | The garrison finder's view of a unit: the task finder's actor and whether its own task list holds a garrison task on a target. |
 | [`retarget.rs`](retarget.rs) | A worker's action already on the task the work found takes the new target itself (`retake_task`): a Hunt or a Gather retargets, a Build or a Repair takes the target again. |
+| [`tests.rs`](tests.rs) | Tests: The unit's task search (slot 0x820, `World::find_work_task`). |
 | [`retarget/`](retarget/) | The work command's retake's tests. |
 <!-- /files -->
 
