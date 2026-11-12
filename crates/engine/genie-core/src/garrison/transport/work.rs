@@ -25,8 +25,9 @@ impl World {
     /// The work command's Transport (its task of action type 12, the factory `FUN_140aca4b0`
     /// case 0xc: [`TransportAction::on_task`] at the work's `point`); the unit AI's notify
     /// (`FUN_14106e4e0` kind 0xc: the transport order 0x2ca and action 0x266, the target with
-    /// its class, none for a point, the work's point); the install (slot 0x808, `FUN_14106e990`)
-    /// clears the action list, then the list's add starts it ([`TransportAction::start`] with 1).
+    /// its class, none for a point, the work's point); the install (slot 0x808,
+    /// [`World::set_only_action`]) clears the action list, then the list's add starts it
+    /// ([`TransportAction::start`] with 1), or deletes it for a ship in state 3 or later.
     ///
     /// # Errors
     ///
@@ -39,8 +40,12 @@ impl World {
         notifies: Notifies,
     ) -> GenieResult<()> {
         self.notify_transport((player_id, list_index), (target, point), notifies)?;
-        self.clear_actions(player_id, list_index)?;
-        let mut transport_action = TransportAction::on_task(Some(*task), point);
+        let transport_action = TransportAction::on_task(Some(*task), point);
+        let Some(mut transport_action) =
+            self.set_only_action(player_id, list_index, Some(transport_action))?
+        else {
+            return Ok(());
+        };
         let move_to_tuning = self.model.tuning.move_to;
         let transport_tuning = self.model.tuning.transport;
         let changed = self.with_shore(

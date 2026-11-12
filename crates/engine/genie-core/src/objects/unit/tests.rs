@@ -659,7 +659,7 @@ fn every_kind_of_top_action_shows_its_sub_action() {
     let mut attack = own_attack(7, AttackState::Move { move_to: None }, Distance::new(0.5));
     *attack.state.walk_mut().unwrap() = Some(MoveToAction::sub_in(MoveTo::Moving));
     assert_eq!(of(Action::Attack(attack)), walking);
-    let (mut explore, _) = ExploreAction::new(
+    let (mut explore, _) = ExploreAction::started(
         Position::new(1.0, 2.0, 0.0),
         &bare_walk(),
         &tuning().move_to,

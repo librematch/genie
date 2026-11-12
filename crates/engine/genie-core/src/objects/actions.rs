@@ -44,6 +44,7 @@ use crate::objects::masters::ActionKind;
 use crate::ownership::artifact::ARTIFACT_KIND;
 use crate::ownership::artifact::Artifact;
 use crate::ownership::artifact::ArtifactSub;
+use derive_more::From;
 use genie_diff::Diff;
 use std::mem::discriminant;
 use std::slice::{Iter, IterMut};
@@ -52,8 +53,9 @@ use std::slice::{Iter, IterMut};
 macro_rules! action_kinds {
     ($($(#[$doc:meta])* $variant:ident($ty:ty) => $get:ident, $get_mut:ident, $take:ident,
         $set:ident, $with:ident;)*) => {
-        /// One action of an object's list, by its kind.
-        #[derive(Clone, Debug, PartialEq, Diff)]
+        /// One action of an object's list, by its kind; each kind's action converts into it
+        /// (`From`).
+        #[derive(Clone, Debug, PartialEq, Diff, From)]
         pub enum Action {
             $($(#[$doc])* $variant($ty),)*
         }

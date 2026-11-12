@@ -124,29 +124,47 @@ impl ExploreAction {
             .or(walk.given)
     }
 
-    /// `FUN_140a87d30` as the explore command calls it (`FUN_141084db0`, its task none), then its
-    /// first (slot 0x28, `0x140a87e10`) as the action list adds it: state 3 without a point, else
-    /// 11, whose `MoveTo` is made from `walk` ([`ExploreAction::set_state`]).
+    /// `FUN_140a87d30` as the explore command calls it (`FUN_141084db0`, its task none): its
+    /// point, state 0 until its first ([`ExploreAction::first`]).
+    #[must_use]
+    pub const fn new(point: Position) -> Self {
+        Self {
+            state: ExploreState::New,
+            point,
+            task: None,
+        }
+    }
+
+    /// Its first (slot 0x28, `0x140a87e10`) as the action list adds it (`FUN_140a977e0`): state 3
+    /// for a point x of −1, else 11 (`!=`: a NaN walks), whose `MoveTo` is made from `walk`
+    /// ([`ExploreAction::set_state`]).
     ///
     /// # Errors
     ///
     /// A sprite the table lacks.
-    pub fn new(
-        point: Position,
+    pub fn first(
+        &mut self,
         walk: &ExploreMove<'_>,
         move_to_tuning: &MoveToTuning,
-    ) -> GenieResult<(Self, Owner)> {
-        let mut explore_action = Self {
-            state: ExploreState::New,
-            point,
-            task: None,
-        };
-        let state = if explore_action.point.x() == NO_POINT {
+    ) -> GenieResult<Owner> {
+        let state = if self.point.x() == NO_POINT {
             ExploreState::Wait
         } else {
             ExploreState::Walk { move_to: None }
         };
-        let owner = explore_action.set_state(state, walk, move_to_tuning)?;
+        self.set_state(state, walk, move_to_tuning)
+    }
+
+    /// A new Explore to `point` ([`ExploreAction::new`]) after its first
+    /// ([`ExploreAction::first`]), as the tests start one.
+    #[cfg(test)]
+    pub(crate) fn started(
+        point: Position,
+        walk: &ExploreMove<'_>,
+        move_to_tuning: &MoveToTuning,
+    ) -> GenieResult<(Self, Owner)> {
+        let mut explore_action = Self::new(point);
+        let owner = explore_action.first(walk, move_to_tuning)?;
         Ok((explore_action, owner))
     }
 
@@ -669,7 +687,8 @@ mod tests {
         let sprite = |given| {
             let walk = walk_of(&table, given);
             let (explore_action, _) =
-                ExploreAction::new(Position::new(5.0, 5.0, 0.0), &walk, &tuning().move_to).unwrap();
+                ExploreAction::started(Position::new(5.0, 5.0, 0.0), &walk, &tuning().move_to)
+                    .unwrap();
             explore_action
                 .state
                 .move_to()
@@ -769,6 +788,29 @@ mod tests {
         );
     }
 
+    /// Its first (`0x140a87e10`: `UCOMISS` with −1, `JP` then `JZ`): a point x of −1 waits
+    /// (state 3) and asks for a point; any other x walks (state 11), a NaN too.
+    #[test]
+    fn first_waits_only_for_minus_one_and_walks_for_nan() {
+        let table = Graphics::from([(SpriteId::named(7), WALKING)]);
+        let walk = walk_of(&table, Some(SpriteId::named(7)));
+        let first = |x: f32| {
+            let mut explore_action = ExploreAction::new(Position::new(x, 5.0, 0.0));
+            assert_eq!(explore_action.state, ExploreState::New);
+            let owner = explore_action.first(&walk, &tuning().move_to).unwrap();
+            (
+                matches!(
+                    explore_action.state,
+                    ExploreState::Walk { move_to: Some(_) }
+                ),
+                owner,
+            )
+        };
+        assert_eq!(first(-1.0), (false, Owner::WantsPoint));
+        assert_eq!(first(5.0), (true, Owner::Nothing));
+        assert_eq!(first(f32::NAN), (true, Owner::Nothing));
+    }
+
     /// An Explore without a point waits for one; a point makes the quiet `MoveTo` to it (range
     /// 0, the sprite its maker resolved, a new wait), which a code of 1 drops again.
     #[test]
@@ -776,7 +818,8 @@ mod tests {
         let table = Graphics::from([(SpriteId::named(7), WALKING)]);
         let walk = walk_of(&table, Some(SpriteId::named(7)));
         let (mut explore_action, owner) =
-            ExploreAction::new(Position::new(-1.0, -1.0, 0.0), &walk, &tuning().move_to).unwrap();
+            ExploreAction::started(Position::new(-1.0, -1.0, 0.0), &walk, &tuning().move_to)
+                .unwrap();
         assert_eq!(
             (explore_action.state, owner),
             (ExploreState::Wait, Owner::WantsPoint)
@@ -813,7 +856,8 @@ mod tests {
         let mut stuck = walk;
         stuck.reads.speed = Speed::ZERO;
         let (explore, _) =
-            ExploreAction::new(Position::new(5.0, 5.0, 0.0), &stuck, &tuning().move_to).unwrap();
+            ExploreAction::started(Position::new(5.0, 5.0, 0.0), &stuck, &tuning().move_to)
+                .unwrap();
         assert_eq!(
             explore
                 .state
@@ -823,7 +867,8 @@ mod tests {
         );
         stuck.reads.state = ObjectState::Dying;
         let (explore_action, _) =
-            ExploreAction::new(Position::new(5.0, 5.0, 0.0), &stuck, &tuning().move_to).unwrap();
+            ExploreAction::started(Position::new(5.0, 5.0, 0.0), &stuck, &tuning().move_to)
+                .unwrap();
         assert_eq!(explore_action.state, ExploreState::Walk { move_to: None });
     }
 

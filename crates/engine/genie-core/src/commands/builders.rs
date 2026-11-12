@@ -354,20 +354,21 @@ impl World {
         }
         // the install (slot 0x808): the action list clears (its actions' teardowns), then
         // holds the Build
-        self.clear_actions(player, idx)?;
-        self.parts
-            .actions_mut(self.players.live(player, idx)?.id)?
-            .list
-            .set_build(Some(build));
+        if let Some(build) = self.set_only_action(player, idx, Some(build))? {
+            self.parts
+                .actions_mut(self.players.live(player, idx)?.id)?
+                .list
+                .set_build(Some(build));
+        }
         Ok(())
     }
 
     /// The unit's slot 0x388 (`FUN_141226fc0`) after its unit AI's update, with what it found
     /// there ([`Wait`]): slot 0x820's switch to the master its swap group gave (slot 0x90 with 0,
     /// [`World::change_master`]; a villager's candidates are of its own type, never a
-    /// building's), the action list cleared (`FUN_140a98620`, [`World::clear_actions`]; a wait
-    /// it held goes too, its teardown the base one's) and the new wait in it (slot 0x808,
-    /// `FUN_14106e990`: the wait's slot 0x70 with no action and its start both do nothing).
+    /// building's), the action list cleared (`FUN_140a98620`; a wait it held goes too, its
+    /// teardown the base one's) and the new wait in it (slot 0x808, [`World::set_only_action`],
+    /// whose own deletion then finds the list empty; the wait's start does nothing).
     pub(crate) fn wait_for_foundation(
         &mut self,
         player: PlayerId,
@@ -377,11 +378,13 @@ impl World {
         if let Some(master) = wait.switch {
             self.change_master(player, idx, master, ActionsOnChange::Clear)?;
         }
-        self.clear_actions(player, idx)?;
-        self.parts
-            .actions_mut(self.players.live(player, idx)?.id)?
-            .list
-            .set_wait_solidify(Some(WaitSolidify::new(wait.task, wait.target)));
+        let wait = WaitSolidify::new(wait.task, wait.target);
+        if let Some(wait) = self.set_only_action(player, idx, Some(wait))? {
+            self.parts
+                .actions_mut(self.players.live(player, idx)?.id)?
+                .list
+                .set_wait_solidify(Some(wait));
+        }
         Ok(())
     }
 
@@ -390,9 +393,10 @@ impl World {
     /// 0x48, [`World::build_take`]); without one its slot 0x820 with any action type and the switch
     /// ([`task_search`] on the foundation and its main building; the switch, slot 0x90 with 0,
     /// [`World::change_master`]) finds a task, and a Build action on it (`FUN_140aad4e0` with that
-    /// task, whatever its type) replaces the unit's actions. [`Answer::Taken`] when it builds (slot
-    /// 0x380's 1); [`Answer::NotTaken`] for the foundation gone or no task (its 0, which the
-    /// Gather's `set_state(6)` ignores and `BuildObject` reads first,
+    /// task, whatever its type) replaces the unit's actions (slot 0x808,
+    /// [`World::set_only_action`]). [`Answer::Taken`] when it builds (slot 0x380's 1);
+    /// [`Answer::NotTaken`] for the foundation gone or no task (its 0, which the Gather's
+    /// `set_state(6)` ignores and `BuildObject` reads first,
     /// [`crate::unit_ai::world_view::UnitView::builds`]).
     #[expect(
         clippy::too_many_lines,
@@ -507,12 +511,13 @@ impl World {
             self.change_master(player, idx, master_id, ActionsOnChange::Clear)?;
         }
         self.take(foundation.id(), self.releaser(player, idx)?)?;
-        self.clear_actions(player, idx)?;
-        self.parts
-            .actions
-            .of_mut(self.players.live(player, idx)?.id)?
-            .list
-            .set_build(Some(build));
+        if let Some(build) = self.set_only_action(player, idx, Some(build))? {
+            self.parts
+                .actions
+                .of_mut(self.players.live(player, idx)?.id)?
+                .list
+                .set_build(Some(build));
+        }
         Ok(Answer::Taken)
     }
 }

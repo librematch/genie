@@ -13,6 +13,7 @@ use crate::movement::footprint_gap;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::actions::Action;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
@@ -204,9 +205,9 @@ impl World {
     }
 
     /// Slot 0x48 on its player's foundation or pasture `main` at `at` (`0x140a905f7`): slot 0x808
-    /// with none empties the gatherer's action list, its Gather too ([`World::clear_actions`]),
-    /// and slot 0x7e8 works `main` at its place with the flag 1, any task (`0xffff`) and the
-    /// byte 0 ([`World::order_work`]). 1.
+    /// with none empties the gatherer's action list, its Gather too
+    /// ([`World::set_only_action`]), and slot 0x7e8 works `main` at its place with the flag 1,
+    /// any task (`0xffff`) and the byte 0 ([`World::order_work`]). 1.
     ///
     /// # Errors
     ///
@@ -218,7 +219,7 @@ impl World {
         main: ObjectId,
         at: Position,
     ) -> GenieResult<Answer> {
-        self.clear_actions(player, idx)?;
+        let _ = self.set_only_action(player, idx, None::<Action>)?;
         self.order_work(player, idx, &Work::on(Some(main), at))?;
         Ok(Answer::Taken)
     }

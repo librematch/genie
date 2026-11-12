@@ -99,6 +99,23 @@ fn build_start_without_unit_ai_installs_build_on_foundation() {
     assert_eq!(workers(&world, HOUSE), WorkerCount::of_data(1));
 }
 
+/// The work command's Build of a builder in state 3 (`Dying`): the Build takes its foundation
+/// (slot 0x178), but the install (slot 0x808, `FUN_140a977e0`) deletes it unstarted, which lets
+/// the foundation go again: no action, no worker.
+#[test]
+fn build_start_of_dying_builder_deletes_new_build_and_lets_foundation_go() {
+    let mut world = sent_off_world(vec![]);
+    let villager = world.object_mut(VILLAGER).unwrap().1;
+    (villager.life.master_id, villager.life.state) = (ids::BUILDER, ObjectState::Dying);
+    world.parts.set_unit_ai(VILLAGER, None);
+    let task = task_of(&world, ids::BUILDER, ActionKind::BUILD);
+    world
+        .start_build(PLAYER, SLOT, HOUSE, &task, Position::ORIGIN, Notifies::Kept)
+        .unwrap();
+    assert!(world.parts.actions_of(VILLAGER).list.is_empty());
+    assert_eq!(workers(&world, HOUSE), WorkerCount::ZERO);
+}
+
 /// The work command's Repair (`FUN_140aca4b0` case 0x6a) of a villager without a unit AI: no
 /// notify, but the Repair takes its target and replaces the villager's actions, walking to it.
 #[test]
@@ -118,6 +135,21 @@ fn repair_start_without_unit_ai_installs_repair_on_target() {
         )
     );
     assert_eq!(workers(&world, HOUSE), WorkerCount::of_data(1));
+}
+
+/// The work command's Repair of a repairer in state 3: the install deletes the new Repair
+/// unstarted (`FUN_140a977e0`), its target let go again.
+#[test]
+fn repair_start_of_dying_repairer_deletes_new_repair_and_lets_target_go() {
+    let mut world = repair_world();
+    world.parts.set_unit_ai(VILLAGER, None);
+    world.object_mut(VILLAGER).unwrap().1.life.state = ObjectState::Dying;
+    let task = task_of(&world, ids::BUILDER, REPAIR);
+    world
+        .start_repair(PLAYER, SLOT, HOUSE, &task, Position::ORIGIN, Notifies::Kept)
+        .unwrap();
+    assert_eq!(repair_of(&world), None);
+    assert_eq!(workers(&world, HOUSE), WorkerCount::ZERO);
 }
 
 /// [`repair_world`] with the villager's Repair on the house walking to it (state 4), counted
@@ -242,7 +274,8 @@ fn repair_command_retakes_top_repair_without_notify() {
 
 /// The unit AI's repair command without a Repair on top switches the villager to the masters it
 /// names (slot 0x90 with 0), then a Repair on the task found replaces its actions; without a task
-/// it only switches.
+/// it only switches. A villager in state 3 takes its new Repair, but the install (slot 0x808,
+/// `FUN_140a977e0`) deletes it, the house let go again.
 #[test]
 fn repair_command_switches_master_then_starts_repair_on_task_found() {
     let started = |found: bool| {
@@ -272,6 +305,24 @@ fn repair_command_switches_master_then_starts_repair_on_task_found() {
         )
     );
     assert_eq!(started(false), (ids::VILLAGER_REPAIRER_MALE, None));
+    let mut world = repairer_world(vec![], true);
+    world.object_mut(VILLAGER).unwrap().1.life.state = ObjectState::Dying;
+    let task = task_of(&world, ids::VILLAGER_REPAIRER_MALE, REPAIR);
+    world
+        .repair_order(
+            PLAYER,
+            SLOT,
+            RepairOrder::Start {
+                target: HOUSE,
+                switches: [Some(ids::VILLAGER_REPAIRER_MALE), None],
+                task: Some(task),
+            },
+        )
+        .unwrap();
+    assert_eq!(
+        (repair_of(&world), workers(&world, HOUSE)),
+        (None, WorkerCount::ZERO)
+    );
 }
 
 /// `FUN_140ab1b30` on the Build's own foundation while a computer player's builder walks there
@@ -388,6 +439,30 @@ fn gathering_commands_refuse_object_not_held_or_without_task() {
         );
         assert_eq!(world.parts.actions_of(VILLAGER), &before);
     }
+}
+
+/// The gather command of a forager in state 3 on the bush 600 and the hunt command of a hunter
+/// in state 3 on the deer 500: the new action takes its target (slot 0x178), the install (slot
+/// 0x808) deletes it unstarted (`FUN_140a977e0`), which lets the target go again; the command
+/// answers 1, no action stays.
+#[test]
+fn gathering_commands_of_dying_unit_delete_new_action_and_let_target_go() {
+    let mut world = forage_world();
+    world.object_mut(VILLAGER).unwrap().1.life.state = ObjectState::Dying;
+    assert_eq!(
+        world.gather_command(PLAYER, SLOT, BUSH, OrderForce::Forced),
+        Ok(Answer::Taken)
+    );
+    assert!(world.parts.actions_of(VILLAGER).list.is_empty());
+    assert_eq!(workers(&world, BUSH), WorkerCount::ZERO);
+    let mut world = hunt_world();
+    world.object_mut(VILLAGER).unwrap().1.life.state = ObjectState::Dying;
+    assert_eq!(
+        world.hunt_command(PLAYER, SLOT, Some(DEER[0]), OrderForce::Forced),
+        Ok(Answer::Taken)
+    );
+    assert!(world.parts.actions_of(VILLAGER).list.is_empty());
+    assert_eq!(workers(&world, DEER[0]), WorkerCount::ZERO);
 }
 
 /// [`forage_world`]'s villager on the bush 600 (the gather command's new Gather), at work

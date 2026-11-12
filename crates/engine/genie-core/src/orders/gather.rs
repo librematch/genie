@@ -273,9 +273,10 @@ impl World {
     /// its target (slot 0x178) where it holds it (none past state 6); the unit AI's notify (slot
     /// 0x828: the gather order and action, the target with its class, the work's point;
     /// `notify`'s point and clearing, None for the gather command's, which has none); the
-    /// install (slot 0x808) clears the action list and starts the Gather
-    /// ([`crate::gathering::gather::GatherAction::start`]). A load to its own drop site takes the
-    /// target as the second target, then lets it go as the first.
+    /// install (slot 0x808, [`World::set_only_action`]) clears the action list and starts the
+    /// Gather ([`crate::gathering::gather::GatherAction::start`]), or deletes it unstarted for a
+    /// gatherer in state 3 or later (the target it took let go). A load to its own drop site
+    /// takes the target as the second target, then lets it go as the first.
     pub(super) fn start_gather(
         &mut self,
         player: PlayerId,
@@ -330,15 +331,17 @@ impl World {
         if let Some(notify) = notify {
             self.notify_gather(player, idx, (target, resource.class), notify)?;
         }
-        self.clear_actions(player, idx)?;
+        let Some(gather) = self.set_only_action(player, idx, Some(gather))? else {
+            return Ok(());
+        };
         self.install_gather(player, idx, target, gather, &resource)
     }
 
-    /// [`World::start_gather`]'s install (slot 0x808) after the list's clearing: the `gather`'s
-    /// start on `resource` with the gatherer's walks (its top speed's terms, slot 0x208) and
-    /// load; a load to its own drop site takes `target` as the second target, then lets it go
-    /// as the first, as a farm another farmer works is let go. A Gather without a target
-    /// searches on the gatherer's step ([`Unit::gather_begin_search`]).
+    /// [`World::start_gather`]'s start after the install (slot 0x808) cleared the list: the
+    /// `gather`'s start on `resource` with the gatherer's walks (its top speed's terms, slot
+    /// 0x208) and load; a load to its own drop site takes `target` as the second target, then
+    /// lets it go as the first, as a farm another farmer works is let go. A Gather without a
+    /// target searches on the gatherer's step ([`Unit::gather_begin_search`]).
     ///
     /// [`Unit::gather_begin_search`]: crate::objects::unit::Unit::gather_begin_search
     ///

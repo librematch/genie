@@ -6,6 +6,7 @@ use crate::movement::Speed;
 use crate::objects::Graphics;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::actions::Action as ActionsAction;
 use crate::objects::layers::Action;
 use crate::objects::layers::MotionMut;
 use crate::objects::masters::ClassId;
@@ -149,9 +150,8 @@ impl Unit {
         Ok(())
     }
 
-    /// The action list's deletion (`FUN_140a98620`, [`ActionList::delete_all`]), the one every
-    /// caller shares (the unit's death, its stops and commands,
-    /// [`crate::world::World::clear_actions`]): each action's destructor
+    /// The action list's deletion (`FUN_140a98620`, [`ActionList::delete_all`]) as the unit's
+    /// death, its stops and its commands share it: each action's destructor
     /// ([`crate::objects::actions::Action::tear_down`], on `motion`: the motion layer and the
     /// unit's top speed) in the list's order. The targets they let go go into `releases` with the
     /// unit as `by`, the buildings a counted builder or repairer
@@ -225,6 +225,34 @@ impl Unit {
                 .list
                 .delete_head(step.world.parts.motion_mut(self.id), top, self.life.state)?;
         torn.let_go(step, self, by)
+    }
+
+    /// `set_only_action` (slot 0x808, `FUN_14106e990`) on the unit's own list from its update
+    /// ([`ActionList::set_only`], as [`crate::world::World::set_only_action`] outside one): the
+    /// new `action` back to start and hold below state 3, else deleted unstarted; what the
+    /// destructors left applied at once ([`crate::objects::teardown::TornDown::let_go`]).
+    ///
+    /// [`ActionList::set_only`]: crate::objects::actions::ActionList::set_only
+    ///
+    /// # Errors
+    ///
+    /// The deletions' and what they let go.
+    pub(crate) fn set_only_own_action<A: Into<ActionsAction>>(
+        &mut self,
+        actions: &mut Action,
+        action: Option<A>,
+        step: &mut Step<'_>,
+    ) -> GenieResult<Option<A>> {
+        let by = self.releaser(step)?;
+        let top = step.world.top_speed(step.player, self)?;
+        let (action, torn) = actions.list.set_only(
+            action,
+            step.world.parts.motion_mut(self.id),
+            top,
+            self.life.state,
+        )?;
+        torn.let_go(step, self, by)?;
+        Ok(action)
     }
 
     /// A call its unit AI makes on it ([`Effect`]), at once where the AI makes it

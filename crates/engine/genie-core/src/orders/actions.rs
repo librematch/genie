@@ -6,9 +6,11 @@ use crate::map::Distance;
 use crate::objects::HitPoints;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
+use crate::objects::actions::Action;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::release::Releaser;
+use crate::objects::teardown::TornDown;
 use crate::orders::ActionsOnChange;
 use crate::orders::TROPHIES;
 use crate::players::Amount;
@@ -127,28 +129,60 @@ impl World {
     }
 
     /// The action list's clearing (`FUN_140a98620`) of object `idx` of player `player`: each
-    /// action's teardown ([`Unit::clear_own_actions`]), then what they leave to the world: a
-    /// counted builder leaves its building (`FUN_140aadbf0` before its base teardown,
-    /// [`World::leave_builders`]), then the targets go (slot 0x180, [`World::release`]). A
-    /// building's production is a list of its own, which stays.
+    /// action's teardown ([`ActionList::delete_all`]), then what they leave to the world
+    /// ([`World::let_go_torn`]). A building's production is a list of its own, which stays.
     ///
-    /// [`Unit::clear_own_actions`]: crate::objects::unit::Unit::clear_own_actions
+    /// [`ActionList::delete_all`]: crate::objects::actions::ActionList::delete_all
     pub(crate) fn clear_actions(&mut self, player: PlayerId, idx: ListIndex) -> GenieResult<()> {
         let by = self.releaser(player, idx)?;
-        let (mut releases, mut builder_leaves) = (Vec::new(), Vec::new());
         let top = self.top_speed(player, self.players.live(player, idx)?)?;
-        let unit = self.players.live_mut(player, idx)?;
-        unit.clear_own_actions(
-            self.parts.actions.of_mut(unit.id)?,
-            (self.parts.motion.layer_mut(unit.id), top),
-            &mut releases,
-            &mut builder_leaves,
-            by,
+        let unit = self.players.live(player, idx)?;
+        let torn = self.parts.actions.of_mut(unit.id)?.list.delete_all(
+            self.parts.motion.layer_mut(unit.id),
+            top,
+            unit.life.state,
         )?;
-        for id in builder_leaves {
+        self.let_go_torn(torn, by)
+    }
+
+    /// `set_only_action` (slot 0x808, `FUN_14106e990`, [`ActionList::set_only`]) of object `idx`
+    /// of player `player`: the action list's deletion, then the new `action` back to start and
+    /// hold below state 3, else deleted unstarted; what the destructors left applies as in
+    /// [`World::clear_actions`]. None for a null `action` and for one the list deleted. Every
+    /// installer of a new action calls it, its start after.
+    ///
+    /// [`ActionList::set_only`]: crate::objects::actions::ActionList::set_only
+    ///
+    /// # Errors
+    ///
+    /// The deletions' and what they let go.
+    pub(crate) fn set_only_action<A: Into<Action>>(
+        &mut self,
+        player: PlayerId,
+        idx: ListIndex,
+        action: Option<A>,
+    ) -> GenieResult<Option<A>> {
+        let by = self.releaser(player, idx)?;
+        let top = self.top_speed(player, self.players.live(player, idx)?)?;
+        let unit = self.players.live(player, idx)?;
+        let (action, torn) = self.parts.actions.of_mut(unit.id)?.list.set_only(
+            action,
+            self.parts.motion.layer_mut(unit.id),
+            top,
+            unit.life.state,
+        )?;
+        self.let_go_torn(torn, by)?;
+        Ok(action)
+    }
+
+    /// What an action list's destructors left (`torn`) applied by `by`: a counted builder leaves
+    /// its building (`FUN_140aadbf0` before its base teardown, [`World::leave_builders`]), then
+    /// the targets go (slot 0x180, [`World::release`]).
+    fn let_go_torn(&mut self, torn: TornDown, by: Releaser) -> GenieResult<()> {
+        for id in torn.builder_leaves {
             self.leave_builders(Some(id))?;
         }
-        for (id, by) in releases {
+        for id in torn.releases {
             self.release(id, by)?;
         }
         Ok(())

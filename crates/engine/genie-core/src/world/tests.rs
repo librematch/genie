@@ -2483,6 +2483,62 @@ fn direct_build_empties_its_builder_order_queue() {
     assert_eq!((orders(9175), orders(9181)), (0, 1));
 }
 
+/// BUILD's direct path for a builder in state 3: the Build takes its new foundation, but the
+/// install (slot 0x808, `FUN_140a977e0`) deletes it unstarted, which lets the foundation go
+/// again; the builder holds no action.
+#[test]
+fn direct_build_of_dying_builder_holds_no_build() {
+    let mut world = build_world();
+    world.object_mut(object_id(9175)).unwrap().1.life.state = ObjectState::Dying;
+    world.run(&Command::Build(BuildCommand {
+        player: player_id(1),
+        master: master_id(70),
+        position: Point::new(30.0, 88.0),
+        queue_id: QueueId::of_data(-1),
+        sprite_override: SpriteOverride::of_data(-1),
+        builders: unit_list(object_ids([9175])),
+        queued: false,
+        commits: false,
+        frame: Frame::of_data(0),
+    }));
+    assert!(world.parts.actions_of(object_id(9175)).list.is_empty());
+    let foundations: Vec<_> = world.players[1]
+        .objects
+        .iter()
+        .filter(|unit| unit.life.master_id == master_id(70))
+        .map(|unit| unit.workers)
+        .collect();
+    assert_eq!(foundations, [WorkerCount::ZERO]);
+}
+
+/// The unit AI's wait for a foundation (slot 0x388, `FUN_141226fc0`) and the build command
+/// (slot 0x380, `FUN_14120d410`) of a villager in state 3: the install (slot 0x808,
+/// `FUN_140a977e0`) deletes the new wait and the new Build unstarted, the Build's foundation let
+/// go again; the build command still answers 1.
+#[test]
+fn dying_villager_holds_no_new_wait_or_build() {
+    let mut world = sent_off_world(vec![]);
+    let (player, slot) = (PlayerId::new(1), ListIndex::new(0));
+    world.players[1].objects[slot].life.state = ObjectState::Dying;
+    let id = world.players[1].objects[slot].id;
+    let wait = Wait {
+        target: FoundationId::new(object_id(10028)),
+        task: task(ActionKind::BUILD),
+        switch: None,
+    };
+    world.wait_for_foundation(player, slot, wait).unwrap();
+    assert!(world.parts.actions_of(id).list.is_empty());
+    assert_eq!(
+        world.build_command(player, slot, FoundationId::new(object_id(10028))),
+        Ok(Answer::Taken)
+    );
+    assert!(world.parts.actions_of(id).list.is_empty());
+    assert_eq!(
+        world.object(object_id(10028)).unwrap().1.workers,
+        WorkerCount::ZERO
+    );
+}
+
 /// census v5's 257 stops "a builder of another player or a sleeping one": BUILD's last
 /// loop (`FUN_140e7a400`) takes the packet's units the world holds whatever their player: a
 /// queued BUILD puts the build order into another player's villager's queue, issued by its
@@ -9148,7 +9204,7 @@ fn build_command_without_its_foundation_or_task_does_nothing() {
 #[test]
 fn world_routine_unit_ai_calls_run_on_the_unit_at_once() {
     let mut world = sent_off_world(vec![]);
-    let (explore, _) = ExploreAction::new(
+    let (explore, _) = ExploreAction::started(
         Position::new(10.0, 10.0, 0.0),
         &bare_walk(),
         &tuning().move_to,
@@ -22299,7 +22355,7 @@ fn explored(set: impl FnOnce(&mut ExploreAction)) -> Explored {
         0,
     );
     world.build_mesh().unwrap();
-    let (mut explore, _) = ExploreAction::new(
+    let (mut explore, _) = ExploreAction::started(
         Position::new(40.5, 89.5, 0.0),
         &bare_walk(),
         &tuning().move_to,

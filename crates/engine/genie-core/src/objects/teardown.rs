@@ -1,5 +1,6 @@
-//! The action list's deletions (`FUN_140a98620`, `FUN_140a98e20`) and each action's destructor
-//! (its slot 0): what they leave the unit's world to apply.
+//! The action list's deletions (`FUN_140a98620`, `FUN_140a98e20`), its install (slot 0x808,
+//! `FUN_14106e990`) and each action's destructor (its slot 0): what they leave the unit's world
+//! to apply.
 
 use crate::combat::missile::ShooterId;
 use crate::construction::FoundationId;
@@ -35,6 +36,12 @@ impl TornDown {
         if let Some(target) = target.key() {
             self.releases.push(target);
         }
+    }
+
+    /// What a later destructor left, `later`, after this one's.
+    fn append(&mut self, later: Self) {
+        self.releases.extend(later.releases);
+        self.builder_leaves.extend(later.builder_leaves);
     }
 
     /// What the destructors left, applied at once from the update
@@ -252,11 +259,43 @@ impl ActionList {
     ) -> GenieResult<TornDown> {
         let mut all = TornDown::default();
         while !self.is_empty() {
-            let torn = self.delete_head(motion.reborrow(), top, state)?;
-            all.releases.extend(torn.releases);
-            all.builder_leaves.extend(torn.builder_leaves);
+            all.append(self.delete_head(motion.reborrow(), top, state)?);
         }
         Ok(all)
+    }
+
+    /// `set_only_action` (slot 0x808, `FUN_14106e990`; no class overrides it) on the list of a
+    /// unit in `state`, on its motion layer and top speed (`motion`, `top`: slot 0x208 as the
+    /// deletion starts). The new `action`'s slot 0x70 with the old head (`FUN_140a986f0`) comes
+    /// first and does nothing for every kind the list holds: the base's (`FUN_140a78050`); only
+    /// `TRIBE_Action_Convert`'s (`0x140ab7860`) copies an old Convert's `+0x70` and `+0x88`, and
+    /// genie holds no Convert. Then the list's deletion ([`ActionList::delete_all`]), then its
+    /// add (`FUN_140a977e0`): below state 3 the action comes back, and the caller's start (its
+    /// slot 0x28 with 1) holds it as the head of the emptied list; in state 3 or later the list
+    /// deletes it unstarted, its destructor (slot 0 with 1, [`Action::tear_down`]) after the old
+    /// actions'. None (a null action) only deletes the list. With what the destructors left, in
+    /// their order. The debug log around it (`DAT_143f09029`) reads the world time and changes
+    /// nothing.
+    ///
+    /// # Errors
+    ///
+    /// The deletion's and the new action's destructor's.
+    pub(crate) fn set_only<A: Into<Action>>(
+        &mut self,
+        action: Option<A>,
+        mut motion: MotionMut<'_>,
+        top: Speed,
+        state: ObjectState,
+    ) -> GenieResult<(Option<A>, TornDown)> {
+        let mut torn = self.delete_all(motion.reborrow(), top, state)?;
+        let Some(action) = action else {
+            return Ok((None, torn));
+        };
+        if state < ObjectState::Dying {
+            return Ok((Some(action), torn));
+        }
+        torn.append(action.into().tear_down(motion, top)?);
+        Ok((None, torn))
     }
 }
 
@@ -303,6 +342,11 @@ mod tests {
 
     /// A Build of foundation 10028 at its edge (gap 0).
     fn build() -> BuildAction {
+        build_on(object_id(10028))
+    }
+
+    /// A Build of foundation `foundation` at its edge (gap 0).
+    fn build_on(foundation: ObjectId) -> BuildAction {
         let task = BuildTask {
             range: Distance::ZERO,
             work_value: WorkValue::new(1.0),
@@ -313,7 +357,7 @@ mod tests {
             sprites: TaskSprites::NONE,
         };
         started(
-            object_id(10028),
+            foundation,
             Position::new(30.0, 88.0, 0.0),
             Distance::ZERO,
             task,
@@ -460,5 +504,110 @@ mod tests {
             Ok(vec![])
         );
         assert_eq!(dying.iter().count(), 1);
+    }
+
+    /// A `MoveTo` to (5, 5) without a target.
+    fn walk_to_point() -> MoveToAction {
+        MoveToAction::to_point(
+            Position::new(5.0, 5.0, 0.0),
+            Distance::ZERO,
+            None,
+            Speed::new(1.0),
+        )
+    }
+
+    /// Slot 0x808 with a null action (`FUN_14106e990`) only deletes the list
+    /// (`FUN_140a98620`): the Build lets its foundation go, and nothing comes back to start.
+    #[test]
+    fn set_only_without_action_only_deletes_the_list() {
+        let mut motion = moving();
+        let mut list = ActionList::default().with_build(Some(build()));
+        let (action, torn) = list
+            .set_only(
+                None::<Action>,
+                motion.lent(),
+                Speed::new(1.0),
+                ObjectState::Alive,
+            )
+            .unwrap();
+        assert_eq!(action, None);
+        assert_eq!(torn.releases, [object_id(10028)]);
+        assert!(list.is_empty());
+    }
+
+    /// Slot 0x808 on a unit below state 3: the old Build goes first (its foundation let go), and
+    /// the new Build comes back untouched for its start (`FUN_140a977e0`'s slot 0x28 with 1),
+    /// the list empty until the start holds it; its foundation stays taken.
+    #[test]
+    fn set_only_below_state_3_hands_back_the_new_action_after_the_deletion() {
+        for state in [ObjectState::Foundation, ObjectState::Alive] {
+            let mut motion = moving();
+            let mut list = ActionList::default().with_build(Some(build()));
+            let (action, torn) = list
+                .set_only(
+                    Some(build_on(object_id(10030))),
+                    motion.lent(),
+                    Speed::new(1.0),
+                    state,
+                )
+                .unwrap();
+            assert_eq!(action, Some(build_on(object_id(10030))), "{state:?}");
+            assert_eq!(torn.releases, [object_id(10028)], "{state:?}");
+            assert!(list.is_empty(), "{state:?}");
+        }
+    }
+
+    /// Slot 0x808 on a unit in state 3 or later: the list deletes the new action unstarted
+    /// (`FUN_140a977e0`: its destructor, slot 0 with 1), after the old actions; its foundation is
+    /// let go after the old one's, and nothing comes back to start.
+    #[test]
+    fn set_only_in_state_3_or_later_deletes_the_new_action_after_the_old_ones() {
+        for state in [ObjectState::Dying, ObjectState::Dead, ObjectState::Gone] {
+            let mut motion = moving();
+            let mut list = ActionList::default().with_build(Some(build()));
+            let (action, torn) = list
+                .set_only(
+                    Some(build_on(object_id(10030))),
+                    motion.lent(),
+                    Speed::new(1.0),
+                    state,
+                )
+                .unwrap();
+            assert_eq!(action, None, "{state:?}");
+            assert_eq!(
+                torn.releases,
+                [object_id(10028), object_id(10030)],
+                "{state:?}"
+            );
+            assert!(list.is_empty(), "{state:?}");
+        }
+    }
+
+    /// The new action's destructor runs on the unit's motion: a new `MoveTo` that a unit in state
+    /// 3 cannot take stops it (`FUN_140aa1f30`, slot 0x5d0), where a unit below state 3 keeps
+    /// moving with an empty list deleted.
+    #[test]
+    fn set_only_deleting_new_move_to_stops_the_unit() {
+        let mut motion = moving();
+        let (action, _) = ActionList::default()
+            .set_only(
+                Some(walk_to_point()),
+                motion.lent(),
+                Speed::new(1.0),
+                ObjectState::Alive,
+            )
+            .unwrap();
+        assert_eq!(action, Some(walk_to_point()));
+        assert!(moves(&motion));
+        let (action, torn) = ActionList::default()
+            .set_only(
+                Some(walk_to_point()),
+                motion.lent(),
+                Speed::new(1.0),
+                ObjectState::Dying,
+            )
+            .unwrap();
+        assert_eq!((action, torn), (None, TornDown::default()));
+        assert!(!moves(&motion));
     }
 }

@@ -153,9 +153,12 @@ impl World {
     /// The work command's Build (its task of action type 101, the factory `FUN_140aca4b0` case
     /// 0x65): the action takes its foundation (slot 0x178); the unit AI's notify
     /// (`FUN_14106e4e0` kind 0x65: the build order and action, the foundation with its class, the
-    /// work's point); the install (slot 0x808) clears the action list and holds the Build
-    /// ([`crate::construction::build::BuildAction::start`] with the footprints' gap, the task's range and work
-    /// value, the master's work rate with the unit's powerup), as BUILD's builders take it.
+    /// work's point); the install (slot 0x808, [`World::set_only_action`]) clears the action
+    /// list and holds the Build ([`crate::construction::build::BuildAction::start`] with the
+    /// footprints' gap, the task's range and work value, the master's work rate with the unit's
+    /// powerup), as BUILD's builders take it. A builder in state 3 or later holds none: the list
+    /// deletes the Build, which lets its foundation go (a unit in state 3 adds no sub-action, so
+    /// the started Build holds no `MoveTo` and tears down as the unstarted one).
     pub(super) fn start_build(
         &mut self,
         player: PlayerId,
@@ -204,11 +207,12 @@ impl World {
             )?;
             self.remember_order(player, idx, (Some(OrderKind::Build), Some(AiAction::Build)))?;
         }
-        self.clear_actions(player, idx)?;
-        self.parts
-            .actions_mut(self.players.live(player, idx)?.id)?
-            .list
-            .set_build(Some(build));
+        if let Some(build) = self.set_only_action(player, idx, Some(build))? {
+            self.parts
+                .actions_mut(self.players.live(player, idx)?.id)?
+                .list
+                .set_build(Some(build));
+        }
         Ok(())
     }
 
@@ -262,7 +266,8 @@ impl World {
     /// The work command's Repair (its task of action type 106, the factory `FUN_140aca4b0` case
     /// 0x6a, [`World::new_repair`]); the unit AI's notify (`FUN_14106e4e0` kind 0x6a: the repair
     /// order 0x2ce and action 0x26a, the target with its class, the work's point); the install
-    /// (slot 0x808) clears the action list and holds the Repair.
+    /// (slot 0x808, [`World::set_only_action`]) clears the action list and holds the Repair, or
+    /// deletes it for a repairer in state 3 or later, its target let go.
     pub(super) fn start_repair(
         &mut self,
         player: PlayerId,
@@ -290,18 +295,20 @@ impl World {
                 (Some(OrderKind::Repair), Some(AiAction::Repair)),
             )?;
         }
-        self.clear_actions(player, idx)?;
-        self.parts
-            .actions_mut(self.players.live(player, idx)?.id)?
-            .list
-            .set_repair(Some(repair));
+        if let Some(repair) = self.set_only_action(player, idx, Some(repair))? {
+            self.parts
+                .actions_mut(self.players.live(player, idx)?.id)?
+                .list
+                .set_repair(Some(repair));
+        }
         Ok(())
     }
 
     /// The unit's repair command its unit AI gave ([`crate::unit_ai::world_view::RepairOrder`]), after the
     /// update: the Repair on top takes the target ([`World::repair_retarget`]); else the master
     /// switches (slot 0x90 with 0, [`World::change_master`]), then a Repair on the task found
-    /// ([`World::new_repair`]) replaces the unit's actions (`FUN_140a98620`, slot 0x808).
+    /// ([`World::new_repair`]) replaces the unit's actions (slot 0x808,
+    /// [`World::set_only_action`]).
     ///
     /// # Errors
     ///
@@ -327,11 +334,12 @@ impl World {
                 }
                 if let Some(task) = task {
                     let (repair, _) = self.new_repair(player, idx, target, &task)?;
-                    self.clear_actions(player, idx)?;
-                    self.parts
-                        .actions_mut(self.players.live(player, idx)?.id)?
-                        .list
-                        .set_repair(Some(repair));
+                    if let Some(repair) = self.set_only_action(player, idx, Some(repair))? {
+                        self.parts
+                            .actions_mut(self.players.live(player, idx)?.id)?
+                            .list
+                            .set_repair(Some(repair));
+                    }
                 }
             }
         }

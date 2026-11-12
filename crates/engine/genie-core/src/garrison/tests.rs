@@ -3773,6 +3773,34 @@ fn work_at(target: i32, point: Position) -> Work {
     }
 }
 
+/// The work command's Transport (`FUN_140aca4b0` case 0xc) of a ship in state 3 on a land
+/// point: the install (slot 0x808, `FUN_140a977e0`) deletes the new Transport unstarted, and
+/// the ship holds no action. The ship's own slot 0x7e8 ignores a unit past state 2, so the test
+/// starts the Transport itself.
+#[test]
+fn transport_start_of_dying_ship_holds_no_transport() {
+    let (mut world, idx) = transport_task_world();
+    world.object_mut(object_id(200)).unwrap().1.life.state = ObjectState::Dying;
+    let task = world.model.masters[1]
+        .get(SHIP)
+        .unwrap()
+        .action_part()
+        .tasks
+        .iter()
+        .find(|task| task.id == task_id(7))
+        .copied()
+        .unwrap();
+    world
+        .start_transport(
+            (PlayerId::new(1), idx),
+            (None, Position::new(17.5, 10.5, 0.0)),
+            &task,
+            Notifies::Kept,
+        )
+        .unwrap();
+    assert!(world.parts.actions_of(object_id(200)).list.is_empty());
+}
+
 /// The work command (`FUN_14106ff70`) of a transport on a point: the finder's general search
 /// gives the task for the terrain under the point (`FUN_1411a8ba0`), whose Transport
 /// (`FUN_140aa3ab0` on the task at the point) starts (`set_state(11)`: it sails toward the

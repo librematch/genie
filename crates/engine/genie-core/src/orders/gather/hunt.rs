@@ -24,7 +24,9 @@ impl World {
     /// The Hunt from the factory (`FUN_140aca4b0` case 0x6e): the constructor
     /// ([`HuntAction::new`]) takes its target (slot 0x178) where it holds it (none past state 6);
     /// the work command's unit AI notify (`FUN_14106e4e0`, `notify`) sets the hunt order; the
-    /// install (`FUN_14106e990`) clears the action list and starts the hunt.
+    /// install (slot 0x808, [`World::set_only_action`]) clears the action list and starts the
+    /// hunt ([`World::begin_hunt`]), or deletes it unstarted for a hunter in state 3 or later
+    /// (the target it took let go).
     pub(in crate::orders) fn start_hunt(&mut self, order: HuntOrder) -> GenieResult<()> {
         let HuntOrder {
             player,
@@ -53,16 +55,18 @@ impl World {
             )?;
             self.remember_order(player, idx, (Some(OrderKind::Hunt), Some(AiAction::Hunt)))?;
         }
-        self.clear_actions(player, idx)?;
+        let Some(hunt) = self.set_only_action(player, idx, Some(hunt))? else {
+            return Ok(());
+        };
         self.begin_hunt(player, idx, hunt, &quarry)
     }
 
     /// [`World::start_hunt`]'s start of the Hunt action `hunt` itself (slot 5 with 1,
-    /// `0x140ac49b0`), once the unit's actions are cleared. A Hunt whose constructor held no
-    /// target searches (`set_state(3)`) on the hunter's step ([`Unit::hunt_begin_search`]): the
-    /// start reads no load's kind without a target, and the engagement reads the target's place.
-    /// Else the engagement and arms, the action's start on `quarry` and its first sprite, and a
-    /// load to its own drop site.
+    /// `0x140ac49b0`), once the install cleared the unit's actions. A Hunt whose constructor held
+    /// no target searches (`set_state(3)`) on the hunter's step ([`Unit::hunt_begin_search`]):
+    /// the start reads no load's kind without a target, and the engagement reads the target's
+    /// place. Else the engagement and arms, the action's start on `quarry` and its first sprite,
+    /// and a load to its own drop site.
     ///
     /// [`Unit::hunt_begin_search`]: crate::objects::unit::Unit::hunt_begin_search
     ///

@@ -22,7 +22,6 @@ use crate::movement::move_to::{MoveTo, Shows};
 use crate::movement::step::VelocityStep;
 use crate::movement::stop_mover;
 use crate::movement::{GroupSpeed, Me};
-use crate::objects::ObjectState;
 use crate::objects::SpriteId;
 use crate::objects::UpdateCode;
 use crate::objects::actions::Action as ActionsAction;
@@ -428,11 +427,11 @@ impl Unit {
     /// its argument 4. Unforced, an Explore on top (the list's head, `FUN_140a986f0`) answers at
     /// once ("I'm already exploring") and keeps its point. Forced, that Explore takes the point
     /// (slot 0x48 with no target), and a `MoveTo` of it that goes stops the unit (its teardown,
-    /// slot 0x5d0). Without an Explore on top, a new Explore to the point (`FUN_140a87d30`) takes
-    /// the place of the unit's actions: they go (`FUN_140a98620`, [`Unit::delete_own_actions`]),
-    /// then slot 0x808 (`FUN_14106e990`, `set_only_action`) installs it: the Explore's slot 0x70
-    /// does nothing (`0x140a78050`), the empty list is cleared again, and the list adds and
-    /// starts it (`FUN_140a977e0`). A unit in state 3 or later takes no action: the list
+    /// slot 0x5d0). Without an Explore on top, a new Explore to the point
+    /// ([`ExploreAction::new`], `FUN_140a87d30`) takes the place of the unit's actions: they go
+    /// (`FUN_140a98620`), then slot 0x808 installs it ([`Unit::set_only_own_action`], whose own
+    /// deletion finds the list empty, so one deletion does both), and the list adds and starts
+    /// it ([`ExploreAction::first`]). A unit in state 3 or later takes no action: the list
     /// deletes the new Explore, which holds no target and no sub-action. The game's answer is 1
     /// but for a failed allocation, so this returns none.
     ///
@@ -465,14 +464,14 @@ impl Unit {
             }
             owner
         } else {
-            self.delete_own_actions(actions, step)?;
-            if ObjectState::Dying <= self.life.state {
-                // `FUN_140a977e0` deletes the new Explore unstarted
+            let explore_action = ExploreAction::new(at);
+            let Some(mut explore_action) =
+                self.set_only_own_action(actions, Some(explore_action), step)?
+            else {
                 return Ok(());
-            }
+            };
             let walk = self.explore_move(step, roles)?;
-            let (explore_action, owner) =
-                ExploreAction::new(at, &walk, &step.world.model.tuning.move_to)?;
+            let owner = explore_action.first(&walk, &step.world.model.tuning.move_to)?;
             actions.list.set_explore(Some(explore_action));
             owner
         };

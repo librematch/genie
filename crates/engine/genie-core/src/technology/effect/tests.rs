@@ -2698,7 +2698,7 @@ fn standing_sprite_change_shows_on_the_master_idle_units() {
     let exploring = shown(3, 0);
     let mut layer = Action::default();
     layer.list.set_explore(Some(
-        ExploreAction::new(
+        ExploreAction::started(
             Position::new(5.0, 5.0, 0.0),
             &bare_walk(),
             &tuning().move_to,
