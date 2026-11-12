@@ -6,7 +6,7 @@ new target with that action.
 
 - `garrison.rs` holds the unit as the finder's actor and that test.
 - `retarget.rs` holds the action that takes the new target: a Hunt or a Gather retargets, a
-  Build or a Repair takes the target again.
+  Build or a Repair takes the target again. `retarget/` holds its tests.
 
 ## Files
 
@@ -15,6 +15,7 @@ new target with that action.
 | --- | --- |
 | [`garrison.rs`](garrison.rs) | The garrison finder's view of a unit: the task finder's actor and whether its own task list holds a garrison task on a target. |
 | [`retarget.rs`](retarget.rs) | A worker's action already on the task the work found takes the new target itself (`retake_task`): a Hunt or a Gather retargets, a Build or a Repair takes the target again. |
+| [`retarget/`](retarget/) | The work command's retake's tests. |
 <!-- /files -->
 
 ## How it connects

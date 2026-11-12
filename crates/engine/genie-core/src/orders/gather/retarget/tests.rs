@@ -342,6 +342,97 @@ fn gather_tests_annex_by_its_main_building_class() {
     );
 }
 
+/// An annex is built by its main building (`+0xbb8`): an alive annex of its player's house
+/// foundation answers 1, the Gather goes, and slot 0x7e8 works the house at the house's place
+/// (30, 88), not the annex at its own (26.5, 89.5): the Build's target and the unit AI's target
+/// and point.
+#[test]
+fn gather_builds_annex_main_foundation_at_its_place() {
+    let annex = object_id(832);
+    let mut world = holding(
+        gathering(),
+        PLAYER,
+        building(annex, ANNEX_MASTER, ObjectState::Alive, Some(HOUSE)),
+    );
+    assert_eq!(
+        world.retarget_gather(PLAYER, SLOT, Some(annex), POINT),
+        Ok(Answer::Taken)
+    );
+    assert_eq!(gather_of(&world), None);
+    let built = world
+        .parts
+        .actions_of(FORAGER)
+        .list
+        .build()
+        .and_then(|build_action| build_action.target);
+    let ai = world.parts.unit_ai.get(FORAGER).unwrap();
+    assert_eq!(
+        (built, ai.current_target, ai.target_point),
+        (
+            Some(FoundationId::new(HOUSE)),
+            Some(HOUSE),
+            Position::new(30.0, 88.0, 0.0)
+        )
+    );
+}
+
+/// The build test reads the main building's state and master, not the annex's: an annex in
+/// state 0 and an annex of the pasture master 1897, both of the alive farm, are gathered (the
+/// Gather's target), not built.
+#[test]
+fn gather_tests_main_building_state_and_master_not_annex() {
+    for (annex, master, state) in [
+        (object_id(833), ANNEX_MASTER, ObjectState::Foundation),
+        (object_id(834), ids::PASTURE, ObjectState::Alive),
+    ] {
+        let mut world = holding(
+            gathering(),
+            PLAYER,
+            building(annex, master, state, Some(FARM)),
+        );
+        assert_eq!(
+            world.retarget_gather(PLAYER, SLOT, Some(annex), POINT),
+            Ok(Answer::Taken),
+            "{annex:?}"
+        );
+        assert_eq!(
+            gather_of(&world).map(|gather_action| gather_action.target),
+            Some(Some(GatherTargetId::new(annex))),
+            "{annex:?}"
+        );
+        assert_eq!(
+            world.parts.actions_of(FORAGER).list.build(),
+            None,
+            "{annex:?}"
+        );
+    }
+}
+
+/// The build test compares the main building's player (`+0x138`), not the annex's: an annex of
+/// the gatherer's player on another player's house foundation is not built but refused, as a
+/// house is no farm (0), and the Gather stays on the bush.
+#[test]
+fn gather_compares_main_building_player() {
+    let (foundation, annex) = (object_id(820), object_id(835));
+    let mut world = holding(
+        holding(
+            gathering(),
+            PlayerId::new(0),
+            building(foundation, ids::HOUSE, ObjectState::Foundation, None),
+        ),
+        PLAYER,
+        building(annex, ANNEX_MASTER, ObjectState::Alive, Some(foundation)),
+    );
+    assert_eq!(
+        world.retarget_gather(PLAYER, SLOT, Some(annex), POINT),
+        Ok(Answer::NotTaken)
+    );
+    assert_eq!(
+        gather_of(&world).map(|gather_action| gather_action.target),
+        Some(Some(GatherTargetId::new(BUSH)))
+    );
+}
+
 /// The drop test (`FUN_14109d4f0`) reads an annex's main building's master: a loaded forager
 /// whose master drops at farms carries its load to an annex of the farm (`set_state(8)`, the
 /// annex its second target). With object flag 0x20 the annex is tested as itself: its own master

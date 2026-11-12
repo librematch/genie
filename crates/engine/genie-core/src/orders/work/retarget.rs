@@ -179,10 +179,17 @@ impl World {
 
     /// The work command's notify once the action on top took the new target (`0x1410707b7`):
     /// the unit AI hears the order and action of the action on top now (the head
-    /// `FUN_140a986f0`, its type `FUN_140a7be70`: [`work_orders`]; slot 0x828,
-    /// `FUN_14106e4e0`, where an Attack also sets the last retarget time to the world's) on the
-    /// target `told` with its class (none: −1) at `point`. A Gather that built its player's
-    /// foundation left another action on top.
+    /// `FUN_140a986f0`, its type `FUN_140a7be70`) on the target `told` with its class (none:
+    /// −1) at `point`. A Gather that built its player's foundation left another action on top.
+    ///
+    /// The game calls the unit's slot 0x828 with the type (`0x1410707ee`). A gatherer is a
+    /// `TRIBE_Combat_Object` (type 70), whose slot 0x828 is `FUN_14121c890`. It handles the
+    /// types `0x7a`, `0x84`, `0x87` and `0x88` itself (order `0x2db`, action `0x277`), and
+    /// `0x95`, the Shepherd (order `0x2dc`, action `0x278`). For these it sets the target twice
+    /// (`FUN_140c64be0`), so the target becomes its own last target too. genie's action list
+    /// holds no action of these types, so that branch cannot run here. Every other type goes to
+    /// `RGE_Combat_Object`'s slot 0x828 (`FUN_14106e4e0`): [`work_orders`], where an Attack also
+    /// sets the last retarget time to the world's.
     ///
     /// # Errors
     ///
@@ -224,3 +231,6 @@ impl World {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests;
