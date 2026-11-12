@@ -2,15 +2,12 @@
 
 use crate::combat::attack::{Arms, Engagement};
 use crate::combat::attack::{arms as attack_arms, engagement as attack_engagement};
-use crate::construction::MAIN_BUILDING_GONE;
 use crate::construction::MainBuildingId;
 use crate::gathering::gather::GATHERER_STATE_LACKING;
 use crate::gathering::gather::GATHERER_UNMOVING;
 use crate::gathering::gather::unit::WalkSprites;
-use crate::gathering::gather::{
-    GatherAction, GatherState, MoveTarget, Resource, StopRate, productivity_of,
-};
-use crate::gathering::gather::{GatherOpening, GatherRetarget, GatherStart};
+use crate::gathering::gather::{GatherAction, MoveTarget, Resource, StopRate, productivity_of};
+use crate::gathering::gather::{GatherOpening, GatherStart};
 use crate::gathering::hunt::HUNTER_STATE_LACKING;
 use crate::gathering::hunt::{HuntMove, HuntTask, Quarry};
 use crate::map::Position;
@@ -19,14 +16,10 @@ use crate::movement::footprint_gap;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectKey;
-use crate::objects::ObjectState;
 use crate::objects::lifecycle::Held;
-use crate::objects::masters::ActionKind;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::ObjectFlags;
-use crate::objects::masters::{ClassId, Master, MasterTables, Task};
+use crate::objects::masters::{ClassId, MasterTables, Task};
 use crate::objects::release::Releaser;
-use crate::objects::unit::Unit;
 use crate::players::AllyTest;
 use crate::players::Amount;
 use crate::players::PlayerId;
@@ -37,8 +30,6 @@ use crate::unit_ai::OrderKind;
 use crate::unit_ai::task_finder::Diplomacy;
 use crate::unit_ai::task_finder::world::TaskWorld;
 use crate::world::World;
-use crate::world::layer::ClassRoles;
-use crate::world::layer::MasterRoles;
 use crate::world::slots::PlayerSlotsExt;
 use crate::world::{ATTACKER_UNPLACED, TARGET_UNPLACED};
 use crate::{GenieError, GenieResult};
@@ -51,6 +42,7 @@ const HUNT_TARGET_NOT_HELD: GenieError =
     GenieError::unsupported("a hunt's target the slice does not hold");
 
 mod hunt;
+mod retarget;
 
 /// The Hunt a work command starts ([`World::start_hunt`]'s arguments).
 #[derive(Clone, Copy, Debug)]
@@ -72,109 +64,6 @@ pub(super) struct HuntOrder {
 }
 
 impl World {
-    /// The Gather's slot 0x48 (`0x140a903a0`) on the work command's new target
-    /// ([`crate::gathering::gather::GatherAction::retarget`]): not taken for for a building
-    /// (type 80 without object flag 0x20) other than a farm, so the work command makes a new
-    /// action. The targets that changed are let go (slot 0x180) and taken (slot 0x178). Not
-    /// modelled: a building packing or unpacking (its top action 0x7d), a foundation or master
-    /// 1893 or 1897 of the unit's player (slots 0x808 and 0x7e8: its build).
-    pub(super) fn retarget_gather(
-        &mut self,
-        player: PlayerId,
-        idx: ListIndex,
-        target: ObjectId,
-    ) -> GenieResult<Answer> {
-        let (tp, target_unit) = self.object(target).ok_or(GATHER_TARGET_NOT_HELD)?;
-        let tm = target_unit.master(self.master_tables(), tp)?;
-        if !self.gatherable_building(player, (tp, target_unit), tm)? {
-            return Ok(Answer::NotTaken);
-        }
-        let owner = self.players.player(player)?;
-        let unit = owner.live(idx)?;
-        let me = unit.master(self.master_tables(), player)?;
-        let resource = Resource {
-            id: target,
-            position: target_unit.position(),
-            class: tm.class,
-            master: tm.id,
-            player: tp,
-            workers: target_unit.workers,
-            drop_site: self.drops_at_main(player, idx, target)?,
-            gap: footprint_gap(
-                unit.position(),
-                me.radius,
-                target_unit.position(),
-                tm.radius,
-            ),
-            state: target_unit.life.state,
-            radius: tm.radius,
-        };
-        let player_kind = owner.kind;
-        let farm_mode = self.settings.farm_mode;
-        let by = self.releaser(player, idx)?;
-        // a stop farm's time per stop: the gatherer's work rate (its master's plus its powerup),
-        // capacity and the task's productivity attribute (none: 1.0)
-        let productivity = self
-            .parts
-            .actions_of(unit.id)
-            .list
-            .gather()
-            .and_then(|gather_action| gather_action.task.productivity);
-        let rate = StopRate {
-            work_rate: self.parts.combat_of(unit.id).work_rate_powerup + me.action_part().work_rate,
-            capacity: Amount::of_master(me.capacity),
-            productivity: productivity_of(
-                productivity,
-                &owner.attributes,
-                &self.model.tuning.gather,
-            ),
-        };
-        // the sprites its MoveTos' constructors take for none (FUN_140aa0d30, FUN_140aa0df0)
-        let walks = unit.move_walks(
-            self.parts.mover_of(unit.id),
-            self.top_speed_terms(player, unit)?,
-            WalkSprites {
-                every: MasterTables::new(&self.model.masters, &self.parts.own_master),
-                player,
-                graphics: &self.model.graphics,
-                look: self.parts.combat_of(unit.id).abilities.look.as_ref(),
-            },
-            &self.model.roles,
-        )?;
-        let unit = self.players.live_mut(player, idx)?;
-        let (Some(gather), Some(mover)) = (
-            self.parts.actions.of_mut(unit.id)?.list.gather_mut(),
-            self.parts.motion.mover_mut(unit.id),
-        ) else {
-            return Err(GATHERER_STATE_LACKING);
-        };
-        let old = gather.targets();
-        let rng = self.streams.get_mut(Stream::Action);
-        gather.retarget(
-            GatherRetarget {
-                target: &resource,
-                player,
-                player_kind,
-                walks,
-                farm_mode,
-                rate,
-            },
-            mover,
-            rng,
-            &self.model.roles,
-            &self.model.tuning,
-        )?;
-        let new = gather.targets();
-        // a farm another farmer works: taken (slot 0x68) and let go again (set_state 11)
-        let waits = matches!(gather.state, GatherState::WalkBack { .. }) && new[0].is_none();
-        self.exchange_gather_targets(old, new, by)?;
-        if waits && old[0] != Some(target) {
-            self.take(target, by)?;
-            self.release(target, by)?;
-        }
-        Ok(Answer::Taken)
-    }
-
     /// The Gather's targets that changed (its target and its second target, `old` and `new`): the
     /// old one is let go (slot 0x180) and the new one taken (slot 0x178), each pair in order.
     fn exchange_gather_targets(
@@ -451,6 +340,8 @@ impl World {
     /// as the first, as a farm another farmer works is let go. A Gather without a target
     /// searches on the gatherer's step ([`Unit::gather_begin_search`]).
     ///
+    /// [`Unit::gather_begin_search`]: crate::objects::unit::Unit::gather_begin_search
+    ///
     /// # Errors
     ///
     /// A gatherer without movement state, and what the start does not model.
@@ -589,59 +480,5 @@ impl World {
             them,
             self.world_time,
         )
-    }
-
-    /// [`World::retarget_gather`]'s test of a target that is a building: whether the gather goes
-    /// on (a building it can gather from, or a farm).
-    ///
-    /// # Errors
-    ///
-    /// A building with an action, a foundation of the unit's player, or an annex whose main
-    /// building is gone: not modelled.
-    fn gatherable_building(
-        &self,
-        player: PlayerId,
-        (tp, unit): (PlayerId, &Unit),
-        tm: &Master,
-    ) -> GenieResult<bool> {
-        if tm.kind == MasterKind::BUILDING {
-            // The action type of a packed siege unit unpacking (an Unpack, 125, `0x7d`), whose target a gather drops
-            // (`FUN_140a903a0`).
-            if self.parts.actions_of(unit.id).top_action_kind() == Some(ActionKind::UNPACK)
-                || self.parts.unread.contains(unit.id)
-            {
-                return Err(GenieError::unsupported(
-                    "a gather retargeted to a building with an action (packing)",
-                ));
-            }
-            if !tm.object_flags.contains(ObjectFlags::GATHERED_BUILDING) {
-                let (mp, main) = match self.parts.building_of(unit.id).annex_of {
-                    Some(role_id) => self.object(role_id).ok_or(MAIN_BUILDING_GONE)?,
-                    None => (tp, unit),
-                };
-                let main_master = main.master(self.master_tables(), mp)?.id;
-                if (main.life.state < ObjectState::Alive
-                    || self
-                        .model
-                        .roles
-                        .of_master(main_master)
-                        .intersects(MasterRoles::PASTURE_MANGROVE | MasterRoles::PASTURE))
-                    && mp == player
-                {
-                    return Err(GenieError::unsupported(
-                        "a gather retargeted to its player's foundation (its build)",
-                    ));
-                }
-                if !self
-                    .model
-                    .roles
-                    .of_class(tm.class)
-                    .contains(ClassRoles::FARM)
-                {
-                    return Ok(false);
-                }
-            }
-        }
-        Ok(true)
     }
 }

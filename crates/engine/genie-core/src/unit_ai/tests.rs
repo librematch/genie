@@ -4281,6 +4281,42 @@ fn work_notify_sets_the_order_and_redraws_timeout_left_by_order_711() {
     assert_ne!(unit_ai.adjusted_idle_timeout, Millis::new(750));
 }
 
+/// `FUN_14106e4e0`'s switch over the type of the action on top: each type it names gives its
+/// order and action (the values `FUN_140c64b60` and `FUN_140c64b50` take), any other none.
+#[test]
+fn work_notify_takes_order_and_action_of_each_kind_its_switch_names() {
+    let named = [
+        (1, OrderKind::Move, AiAction::Move),
+        (3, OrderKind::Enter, AiAction::Enter),
+        (4, OrderKind::Explore, AiAction::Explore),
+        (5, OrderKind::Gather, AiAction::Gather),
+        (9, OrderKind::Attack, AiAction::Attack),
+        (0xc, OrderKind::Transport, AiAction::Transport),
+        (0xe, OrderKind::UnloadOverWall, AiAction::UnloadOverWall),
+        (0x65, OrderKind::Build, AiAction::Build),
+        (0x68, OrderKind::Convert, AiAction::Convert),
+        (0x69, OrderKind::Heal, AiAction::Heal),
+        (0x6a, OrderKind::Repair, AiAction::Repair),
+        (0x6e, OrderKind::Hunt, AiAction::Hunt),
+        (0x6f, OrderKind::Trade, AiAction::Trade),
+        (0x7e, OrderKind::HeroPower, AiAction::HeroPower),
+    ];
+    for (kind, order, action) in named {
+        assert_eq!(
+            work_orders(ActionKind::named(kind)),
+            (Some(order), Some(action)),
+            "type {kind:#x}"
+        );
+    }
+    for kind in [0, 2, 6, 7, 8, 0xa, 0xd, 0x15, 0x6b, 0x7d, 0x9a] {
+        assert_eq!(
+            work_orders(ActionKind::named(kind)),
+            (None, None),
+            "type {kind:#x}"
+        );
+    }
+}
+
 /// records/425906646's update 1404: player 8's unit on the defend stance (1). Within 5 tiles of
 /// its state position (from its footprint of 0.5) it goes on to the retarget check; 5.1 tiles
 /// off it stops, forgets its target and walks back to its state position (`FUN_140c5e7d0`),

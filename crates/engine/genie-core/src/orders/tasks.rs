@@ -114,9 +114,10 @@ impl World {
         target: ObjectId,
         force: OrderForce,
     ) -> GenieResult<Answer> {
-        if self.object(target).is_none() {
+        // slot 0x48 takes the target's place (x, y and z, 0x141085288)
+        let Some(place) = self.object(target).map(|(_, unit)| unit.position()) else {
             return Ok(Answer::NotTaken);
-        }
+        };
         if force == OrderForce::Unforced
             && self.top_gather(player, idx)?.is_some()
             && self.top_target_object(self.players.live(player, idx)?.id) == Some(target)
@@ -131,7 +132,7 @@ impl World {
             .top_gather(player, idx)?
             .is_some_and(|gather_action| gather_action.task.id == task.id)
         {
-            let _ = self.retarget_gather(player, idx, target)?;
+            let _ = self.retarget_gather(player, idx, Some(target), place)?;
             return Ok(Answer::Taken);
         }
         // FUN_140a88310 makes a Gather on whatever task it found (a farm's foundation gives the

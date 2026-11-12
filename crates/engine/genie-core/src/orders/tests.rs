@@ -5482,137 +5482,6 @@ fn move_of_whole_group_keeps_it() {
     );
 }
 
-/// The Gather's slot 0x48 on a building (`0x140a903a0`, [`World::retarget_gather`]): its
-/// player's farm in state 2 (class 49) it takes, walking there; its player's farm foundation
-/// (the task finder's build), a building at work (packing) and an annex whose main building is
-/// gone are not modelled; another building it does not take (false), so the work command makes
-/// a new action.
-#[test]
-fn gather_takes_farm_but_no_other_building() {
-    let mut forage_world = forage_world();
-    assert_eq!(
-        forage_world.gather_command(
-            PlayerId::new(1),
-            ListIndex::new(0),
-            object_id(600),
-            OrderForce::Forced
-        ),
-        Ok(Answer::Taken)
-    );
-    forage_world.model.masters[1] = Arc::new(Masters::new(
-        forage_world.model.masters[1]
-            .iter()
-            .cloned()
-            .chain([Master {
-                id: ids::FARM,
-                kind: MasterKind::BUILDING,
-                class: class::FARM,
-                radius: Footprint::new(1.5, 1.5),
-                ..Master::default()
-            }]),
-    ));
-    let farm = |id, state, annex_of| {
-        Object::with_building(
-            Unit {
-                id,
-                place: Static::at(Position::new(26.5, 89.5, 0.0)),
-                life: Lifecycle {
-                    state,
-                    master_id: ids::FARM,
-                    ..Lifecycle::default()
-                },
-                pasture: None,
-                my_pasture: None,
-                ..Unit::default()
-            },
-            Building {
-                annex_of,
-                ..Default::default()
-            },
-        )
-    };
-    let _ = forage_world
-        .push_live(
-            PlayerId::new(1),
-            farm(object_id(800), ObjectState::Alive, None),
-        )
-        .unwrap();
-    let _ = forage_world
-        .push_live(
-            PlayerId::new(1),
-            farm(object_id(801), ObjectState::Foundation, None),
-        )
-        .unwrap();
-    let _ = forage_world
-        .push_live(
-            PlayerId::new(1),
-            farm(
-                object_id(802),
-                ObjectState::Alive,
-                Some(MainBuildingId::new(object_id(4444))),
-            ),
-        )
-        .unwrap();
-    let world = forage_world.clone();
-    assert_eq!(
-        forage_world.retarget_gather(PlayerId::new(1), ListIndex::new(0), object_id(800)),
-        Ok(Answer::Taken)
-    );
-    let gather_action = forage_world
-        .parts
-        .actions_of(forage_world.players[1].objects[ListIndex::new(0)].id)
-        .list
-        .gather()
-        .copied()
-        .unwrap();
-    assert_eq!(
-        (
-            gather_action.target,
-            gather_action.state.bare(),
-            gather_action.point
-        ),
-        (
-            Some(GatherTargetId::new(object_id(800))),
-            GatherState::Walk { move_to: None },
-            Position::new(26.5, 89.5, 0.0)
-        )
-    );
-    assert_eq!(
-        (
-            forage_world.players[0].objects[ListIndex::new(0)].workers,
-            forage_world.players[1].objects[ListIndex::new(3)].workers
-        ),
-        (WorkerCount::of_data(0), WorkerCount::of_data(1))
-    );
-    let mut game = world.clone();
-    assert!(
-        game.retarget_gather(PlayerId::new(1), ListIndex::new(0), object_id(801))
-            .is_err()
-    );
-    assert!(
-        game.retarget_gather(PlayerId::new(1), ListIndex::new(0), object_id(802))
-            .is_err()
-    );
-    game.set_unread(
-        game.players[1].objects[ListIndex::new(3)].id,
-        GenieError::unsupported("a pack"),
-    );
-    assert!(
-        game.retarget_gather(PlayerId::new(1), ListIndex::new(0), object_id(800))
-            .is_err()
-    );
-    let mut world = world;
-    assert_eq!(
-        world.retarget_gather(PlayerId::new(1), ListIndex::new(0), object_id(700)),
-        Ok(Answer::NotTaken)
-    );
-    assert!(
-        world
-            .retarget_gather(PlayerId::new(1), ListIndex::new(0), object_id(4444))
-            .is_err()
-    );
-}
-
 /// [`crate::world::tests::forage_world`]'s forager 9175 carrying 6 berries (kind 17), its
 /// Gather on bush 600 from a work command, its player holding 10 attributes.
 fn foraging() -> World {
@@ -6063,11 +5932,9 @@ fn work_command_retargets_gather_or_hunt_on_its_task() {
         .retarget_gather_work(
             PlayerId::new(1),
             ListIndex::new(0),
-            (
-                object_id(601),
-                Position::new(36.5, 89.5, 0.0),
-                Notifies::Cleared,
-            ),
+            Some(object_id(601)),
+            Position::new(36.5, 89.5, 0.0),
+            Notifies::Cleared,
         )
         .unwrap();
     let players = &forage_world.players[1].objects[ListIndex::new(0)];
@@ -6181,11 +6048,9 @@ fn work_command_retarget_to_its_player_master_84_fails() {
     let answer = world.retarget_gather_work(
         PlayerId::new(1),
         ListIndex::new(0),
-        (
-            object_id(800),
-            Position::new(33.5, 89.5, 0.0),
-            Notifies::Cleared,
-        ),
+        Some(object_id(800)),
+        Position::new(33.5, 89.5, 0.0),
+        Notifies::Cleared,
     );
     assert_eq!(
         answer.err().map(|error| error.reason()),

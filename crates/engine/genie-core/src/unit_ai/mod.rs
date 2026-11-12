@@ -104,7 +104,7 @@ use self::ids::{
 pub use self::ids::{HUMAN_ORDER_CAP, NewObject, factory_kind, unit_ai_kind};
 pub(crate) use self::ids::{alert_owner, helper_answers, searches_on_class};
 pub use self::issuer::Issuer;
-pub use self::life::{Notifies, OrderHistory};
+pub use self::life::{Notifies, OrderHistory, work_orders};
 pub use self::notifies::{AiLayer, Inbox};
 pub use self::notify_kind::NotifyKind;
 pub use self::order_kind::OrderKind;

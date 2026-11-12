@@ -1,14 +1,23 @@
 //! A unit AI's construction, its order and target, its patrol and its moves.
 
+use crate::combat::attack::ATTACK;
+use crate::construction::repair::REPAIR;
+use crate::garrison::ENTER;
+use crate::garrison::transport::{TRANSPORT, TRANSPORT_OVER_WALL};
+use crate::gathering::gather::GATHER;
+use crate::gathering::hunt::HUNT;
 use crate::groups::FormationKind;
 use crate::map::Point;
 use crate::map::Position;
 use crate::math::fmath::{at_most_or_unordered, sqrt};
 use crate::math::rng::Well512;
 use crate::movement::PathAsk;
+use crate::movement::explore::EXPLORE;
+use crate::movement::move_to::MOVE_TO;
 use crate::movement::{PathFlags, WaypointIndex};
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
+use crate::objects::masters::ActionKind;
 use crate::objects::masters::ClassId;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::AlertMode;
@@ -578,4 +587,32 @@ impl UnitAi {
         }
         Ok(())
     }
+}
+
+/// The unit AI's order and action that the work command's notify (`FUN_14106e4e0`, object slot
+/// 0x828) sets for the type `kind` of the action on top ([`UnitAi::notify_work`]). Its switch
+/// names the `MoveTo` (1), the Enter (3), the Explore (4), the Gather (5), the Attack (9), the
+/// Transport (`0xc`), the transport over a wall (`0xe`), the Build (`0x65`), the Convert
+/// (`0x68`), the Heal (`0x69`), the Repair (`0x6a`), the Hunt (`0x6e`), the Trade (`0x6f`) and
+/// the type `0x7e` (the hero power); any other type sets none (−1).
+#[must_use]
+pub const fn work_orders(kind: ActionKind) -> (Option<OrderKind>, Option<AiAction>) {
+    let (order, action) = match kind {
+        MOVE_TO => (OrderKind::Move, AiAction::Move),
+        ENTER => (OrderKind::Enter, AiAction::Enter),
+        EXPLORE => (OrderKind::Explore, AiAction::Explore),
+        GATHER => (OrderKind::Gather, AiAction::Gather),
+        ATTACK => (OrderKind::Attack, AiAction::Attack),
+        TRANSPORT => (OrderKind::Transport, AiAction::Transport),
+        TRANSPORT_OVER_WALL => (OrderKind::UnloadOverWall, AiAction::UnloadOverWall),
+        ActionKind::BUILD => (OrderKind::Build, AiAction::Build),
+        ActionKind::CONVERT => (OrderKind::Convert, AiAction::Convert),
+        ActionKind::HEAL => (OrderKind::Heal, AiAction::Heal),
+        REPAIR => (OrderKind::Repair, AiAction::Repair),
+        HUNT => (OrderKind::Hunt, AiAction::Hunt),
+        ActionKind::TRADE => (OrderKind::Trade, AiAction::Trade),
+        ActionKind::ACTION_126 => (OrderKind::HeroPower, AiAction::HeroPower),
+        _ => return (None, None),
+    };
+    (Some(order), Some(action))
 }

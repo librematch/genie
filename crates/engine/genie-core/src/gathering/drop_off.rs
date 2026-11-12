@@ -258,10 +258,7 @@ impl Unit {
             found,
         )?;
         let master = self.master(step.world.master_tables(), step.player)?;
-        let (player_kind, farm_mode) = (
-            step.world.players.player(step.player)?.kind,
-            step.world.settings.farm_mode,
-        );
+        let farm_mode = step.world.settings.farm_mode;
         let walks = self.move_walks(
             step.world.parts.mover_of(self.id),
             step.world.top_speed_terms(step.player, self)?,
@@ -293,12 +290,14 @@ impl Unit {
             return Err(GATHERER_STATE_LACKING);
         };
         let old = gather.targets();
+        // slot 0x48 first clears `+0x80`; the Gather holds no target, so it keeps none
+        // (GatherAction::keeps)
+        gather.worked = false;
         let rng = step.world.streams.get_mut(Stream::Action);
         gather.retarget(
             GatherRetarget {
                 target: &resource,
                 player: step.player,
-                player_kind,
                 walks,
                 farm_mode,
                 rate,

@@ -79,8 +79,6 @@ pub struct GatherRetarget<'world> {
     pub(crate) target: &'world Resource,
     /// The owner.
     pub(crate) player: PlayerId,
-    /// The owner's type (`player+0x10`; [`PlayerKind::is_computer`] is `FUN_141659cf0`).
-    pub(crate) player_kind: PlayerKind,
     /// What the gatherer carries and the sprites its `MoveTo`s take for none.
     pub(crate) walks: Walks<'world>,
     /// The game's farm setting: walkable, a stop farm or a fish trap keeps its place as the
@@ -326,21 +324,35 @@ impl GatherAction {
         Ok(GatherOpening::Approaches)
     }
 
-    /// Slot 0x48 (`0x140a903a0`) on the work command's new `target` (one the world holds that is
-    /// no building, or a farm; the caller's tests): the gathering is not started any more
-    /// (`+0x80` cleared first, whatever follows). Its present target in state 6, 7 or 15, or in
-    /// 4 or 11 for a computer player, it keeps as it is. A loaded gatherer (`held`) sent to one of
-    /// its player's drop sites carries its load there: the timer clears, the target goes (slot
-    /// 0x68 with none) with the point, the drop site becomes the second target (`FUN_140a7a190`)
-    /// and `set_state(8)` walks there. Any other target becomes the target (slot 0x68) with its
-    /// place as the point and its class as the target type, the second target goes and
-    /// `set_state(4)` walks to it; the caller takes and lets go the targets that changed. With
-    /// the game's farm setting a fish trap (master 199) keeps its place as the farm's, and a stop
-    /// farm (masters 50, 1187) too, with its four stops from the first and the time per stop of
-    /// `rate`, its time at the stop cleared. A farm another farmer works (with this one, two or
-    /// more) is walked to as a point (`set_state(11)`) and let go again (slot 0x68 with none, then
-    /// `FUN_140a7a190` with none): the caller takes it and lets it go. The gather always
-    /// takes the target.
+    /// Slot 0x48's test of its present target (`0x140a90496`): whether the Gather keeps `target`
+    /// as it is, its target (`+0x20`) in state 6, 7 or 15, or in state 4 or 11 for a computer
+    /// player (`player_kind`).
+    #[must_use]
+    pub fn keeps(&self, target: ObjectId, player_kind: PlayerKind) -> bool {
+        self.target.map(GatherTargetId::id) == Some(target)
+            && match self.state {
+                GatherState::Face | GatherState::Work | GatherState::Moved { .. } => true,
+                GatherState::Walk { .. } | GatherState::WalkBack { .. } => {
+                    player_kind.is_computer()
+                }
+                _ => false,
+            }
+    }
+
+    /// Slot 0x48 (`0x140a903a0`) on a new `target` that its tests let through (the caller's:
+    /// none and an Unpack's building walk to a point, a target it keeps stays, a building other
+    /// than a farm is refused, its player's foundation is built). A loaded gatherer (`held`) sent
+    /// to one of its player's drop sites carries its load there: the timer clears, the target goes
+    /// (slot 0x68 with none) with the point, the drop site becomes the second target
+    /// (`FUN_140a7a190`) and `set_state(8)` walks there. Any other target becomes the target
+    /// (slot 0x68: none past [`LAST_TAKEN`]) with its place as the point and its class as the
+    /// target type, the second target goes and `set_state(4)` walks to it; the caller takes and
+    /// lets go the targets that changed. With the game's farm setting a fish trap (master 199)
+    /// keeps its place as the farm's, and a stop farm (masters 50, 1187) too, with its four stops
+    /// from the first and the time per stop of `rate`, its time at the stop cleared. A farm
+    /// another farmer works (with this one, two or more) is walked to as a point
+    /// (`set_state(11)`) and let go again (slot 0x68 with none, then `FUN_140a7a190` with none):
+    /// the caller takes it and lets it go.
     ///
     /// # Errors
     ///
@@ -357,26 +369,12 @@ impl GatherAction {
         let GatherRetarget {
             target,
             player,
-            player_kind,
             walks,
             farm_mode,
             rate,
         } = retarget;
         let held = walks.held.amount;
-        self.worked = false;
-        if self.target.map(GatherTargetId::id) == Some(target.id) {
-            match self.state {
-                GatherState::Face | GatherState::Work | GatherState::Moved { .. } => {
-                    return Ok(());
-                }
-                GatherState::Walk { .. } | GatherState::WalkBack { .. }
-                    if player_kind.is_computer() =>
-                {
-                    return Ok(());
-                }
-                _ => {}
-            }
-        }
+        // COMISS and JBE at 0x140a907f9: a NaN load takes the target
         if target.player == player && target.drop_site && Amount::ZERO < held {
             self.timer = Seconds::ZERO;
             self.target = None;
@@ -385,10 +383,10 @@ impl GatherAction {
             self.set_drop(target.position, target.gap, mover, &walks, move_to_tuning)?;
             return Ok(());
         }
-        // slot 0x68 takes the target: its workers count it once it is new
-        let taken = GatherTargetId::new(target.id);
-        let workers = target.workers.plus(i32::from(Some(taken) != self.target));
-        self.target = Some(taken);
+        // slot 0x68 takes the target, none past state 6: its workers count it once it is new
+        let taken = (target.state <= LAST_TAKEN).then_some(GatherTargetId::new(target.id));
+        let workers = target.workers.plus(i32::from(taken != self.target));
+        self.target = taken;
         self.point = target.position;
         self.target_class = target.class.or_none();
         if farm_mode == FarmMode::Walkable {
@@ -408,7 +406,10 @@ impl GatherAction {
                 self.farm = target.position.ground();
             }
         }
-        if roles.of_class(target.class).contains(ClassRoles::FARM) && WorkerCount::ONE < workers {
+        if roles.of_class(target.class).contains(ClassRoles::FARM)
+            && taken.is_some()
+            && WorkerCount::ONE < workers
+        {
             let radius = if roles
                 .of_master(target.master)
                 .contains(MasterRoles::STOP_FARM)
@@ -521,8 +522,8 @@ impl GatherAction {
     /// (nothing changes when that is already the drop site it walks to in state 8): the target
     /// goes (slot 0x68 with none) with the point, the site becomes the second target
     /// (`FUN_140a7a190`) and `set_state(8)` walks there. Any other move becomes the point: the
-    /// target goes and `set_state(15)` walks there ([`GatherAction::set_moved`]). Always taken
-    /// (it returns 1); the caller takes and lets go the targets that changed.
+    /// target goes and `set_state(15)` walks there ([`GatherAction::walk_to_moved_point`]).
+    /// Always taken (it returns 1); the caller takes and lets go the targets that changed.
     ///
     /// # Errors
     ///
@@ -558,12 +559,28 @@ impl GatherAction {
                     move_to_tuning,
                 )
             }
-            None => {
-                self.point = point;
-                self.target = None;
-                self.set_moved(mover, walks, move_to_tuning)
-            }
+            None => self.walk_to_moved_point(point, mover, walks, move_to_tuning),
         }
+    }
+
+    /// The Gather walks to `point` without a target: the point becomes `point`, the target goes
+    /// (slot 0x68 with none; the caller lets it go) and `set_state(15)` walks there
+    /// ([`GatherAction::set_moved`]). Slot 0x40 does so on a move to no drop site, slot 0x48
+    /// (`0x140a90440`) without a target or on a building under its Unpack.
+    ///
+    /// # Errors
+    ///
+    /// A sprite the table lacks.
+    pub fn walk_to_moved_point(
+        &mut self,
+        point: Position,
+        mover: &mut Mover,
+        walks: &Walks<'_>,
+        move_to_tuning: &MoveToTuning,
+    ) -> GenieResult<()> {
+        self.point = point;
+        self.target = None;
+        self.set_moved(mover, walks, move_to_tuning)
     }
 
     /// `set_state(15)` (`0x140a8cd40` case 0xf, as 11): the sub-actions go, the timer clears and

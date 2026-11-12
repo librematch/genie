@@ -47,6 +47,9 @@ use crate::objects::masters::Task;
 
 /// The Transport action's type, which word 9 adds.
 pub const TRANSPORT: ActionKind = ActionKind::named(12);
+/// `RGE_Action_TransportOverWall`'s type (14, its constructor `FUN_140aa4b20`), which the list
+/// does not hold: the work command's notify names it ([`crate::unit_ai::work_orders`]).
+pub const TRANSPORT_OVER_WALL: ActionKind = ActionKind::named(0xe);
 /// A ship whose Transport its unload took (the lend of [`TransportAction::unload`]).
 pub(crate) const NO_TRANSPORT: GenieError =
     GenieError::unreachable("a Transport that its own unload took");

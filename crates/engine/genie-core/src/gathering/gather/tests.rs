@@ -1771,31 +1771,17 @@ fn forager_walks_to_its_bush() {
 }
 
 /// Slot 0x48 on the work command's target: the 4v4's forager 31156 walking to bush 28222 (state
-/// 4) is sent to it again in update 5026 and walks to it anew (`set_state(4)`); facing or
-/// gathering it, it keeps on; a computer player's walking one too. A loaded one sent to its
-/// player's drop site takes its load there (`set_state(8)`, the site its second target).
+/// 4) is sent to it again in update 5026 and walks to it anew (`set_state(4)`). A loaded one sent
+/// to its player's drop site takes its load there (`set_state(8)`, the site its second target).
 #[test]
 fn gatherer_sent_again_to_its_bush_walks_to_it_anew() {
     let mut mover = walker();
-    // a walk holds its MoveTo; facing or working, the gatherer holds none
-    let walking = |state| {
-        let mut gather_action = GatherAction {
-            state,
-            worked: true,
-            ..GatherAction::new(task(), &bush(), FarmMode::Walkable, rate(), &roles())
-        };
-        if let Some(move_to_action) = gather_action.state.walk_mut() {
-            *move_to_action = Some(MoveToAction::sub_in(MoveTo::Moving));
-        }
-        gather_action
-    };
     let mut gather_action = walking(GatherState::Walk { move_to: None });
     assert_eq!(
         gather_action.retarget(
             GatherRetarget {
                 target: &bush(),
                 player: PlayerId::new(7),
-                player_kind: PlayerKind::Human,
                 walks: walks(carrying(Some(AttributeId::named(17)), 0.0)),
                 farm_mode: FarmMode::Walkable,
                 rate: rate()
@@ -1832,41 +1818,6 @@ fn gatherer_sent_again_to_its_bush_walks_to_it_anew() {
             class_of(7)
         )
     );
-    // the gathering is not started any more (+0x80 cleared first)
-    assert!(!gather_action.worked);
-    for (state, player_kind) in [
-        (GatherState::Face, PlayerKind::Human),
-        (GatherState::Work, PlayerKind::Human),
-        (GatherState::Walk { move_to: None }, PlayerKind::Computer),
-    ] {
-        let mut state_gather_action = walking(state);
-        assert_eq!(
-            state_gather_action.retarget(
-                GatherRetarget {
-                    target: &bush(),
-                    player: PlayerId::new(7),
-                    player_kind,
-                    walks: walks(carrying(Some(AttributeId::named(17)), 0.0)),
-                    farm_mode: FarmMode::Walkable,
-                    rate: rate()
-                },
-                &mut mover,
-                &mut Well512::default(),
-                &roles(),
-                tuning()
-            ),
-            Ok(())
-        );
-        // it keeps on: the walk keeps its MoveTo (facing or working, it holds none)
-        let kept = matches!(state, GatherState::Walk { .. });
-        assert_eq!(
-            (
-                state_gather_action.state.bare(),
-                state_gather_action.state.move_to().copied()
-            ),
-            (state, kept.then_some(MoveToAction::sub_in(MoveTo::Moving)))
-        );
-    }
     let mill = Resource {
         id: object_id(500),
         player: PlayerId::new(7),
@@ -1879,7 +1830,6 @@ fn gatherer_sent_again_to_its_bush_walks_to_it_anew() {
             GatherRetarget {
                 target: &mill,
                 player: PlayerId::new(7),
-                player_kind: PlayerKind::Human,
                 walks: walks(carrying(Some(AttributeId::named(17)), 3.0)),
                 farm_mode: FarmMode::Walkable,
                 rate: rate()
@@ -1903,6 +1853,99 @@ fn gatherer_sent_again_to_its_bush_walks_to_it_anew() {
             None,
             Some(DropSiteId::new(object_id(500))),
             Position::from([-1.0; 3])
+        )
+    );
+}
+
+/// The forager on bush 28222 in `state`, its work done (`+0x80`); a walk holds its `MoveTo`,
+/// facing or working it holds none.
+fn walking(state: GatherState) -> GatherAction {
+    let mut gather_action = GatherAction {
+        state,
+        worked: true,
+        ..GatherAction::new(task(), &bush(), FarmMode::Walkable, rate(), &roles())
+    };
+    if let Some(move_to_action) = gather_action.state.walk_mut() {
+        *move_to_action = Some(MoveToAction::sub_in(MoveTo::Moving));
+    }
+    gather_action
+}
+
+/// Slot 0x48's test of its present target (`0x140a90496`): facing it, gathering it or walking to
+/// the point it was moved to (states 6, 7, 15) the Gather keeps its target, a computer player's
+/// walking to it or to a farm's point too (4, 11); a human's walking one does not, nor any Gather
+/// sent to another object or one in another state (the drop, 8).
+#[test]
+fn gather_keeps_its_target_facing_working_or_moved_and_computer_walking() {
+    let bush = object_id(28222);
+    let moved = GatherState::Moved { move_to: None };
+    let walk = GatherState::Walk { move_to: None };
+    let walk_back = GatherState::WalkBack { move_to: None };
+    for state in [GatherState::Face, GatherState::Work, moved] {
+        assert!(walking(state).keeps(bush, PlayerKind::Human), "{state:?}");
+        assert!(!walking(state).keeps(object_id(601), PlayerKind::Human));
+    }
+    for state in [walk, walk_back] {
+        assert!(
+            walking(state).keeps(bush, PlayerKind::Computer),
+            "{state:?}"
+        );
+        assert!(!walking(state).keeps(bush, PlayerKind::Human), "{state:?}");
+    }
+    let drop = GatherState::Drop { move_to: None };
+    assert!(!walking(drop).keeps(bush, PlayerKind::Computer));
+    assert!(!walking(GatherState::Search).keeps(bush, PlayerKind::Computer));
+}
+
+/// Slot 0x68 in slot 0x48 holds no target past state 6 (`LAST_TAKEN`): the Gather sent to a
+/// removed bush (state 7) holds none, keeps its place as the point and its class, and its walk to
+/// it is the walk without a target. A removed farm another farmer works is no farm it holds
+/// (`+0x20` null at `0x140a90bc3`): it walks to it as to the bush, not back to its point.
+#[test]
+fn gather_retargeted_to_removed_bush_holds_no_target() {
+    let retarget = |target: &Resource| {
+        let mut gather_action = walking(GatherState::Work);
+        let walked = gather_action.retarget(
+            GatherRetarget {
+                target,
+                player: PlayerId::new(7),
+                walks: walks(carrying(Some(AttributeId::named(17)), 0.0)),
+                farm_mode: FarmMode::Walkable,
+                rate: rate(),
+            },
+            &mut walker(),
+            &mut Well512::default(),
+            &roles(),
+            tuning(),
+        );
+        (walked.map_err(|error| error.reason()), gather_action)
+    };
+    let (walked, gather_action) = retarget(&Resource {
+        state: ObjectState::Removed,
+        ..bush()
+    });
+    assert_eq!(
+        walked,
+        Err("a gather's walk without its target (set_state 13)")
+    );
+    assert_eq!(
+        (
+            gather_action.target,
+            gather_action.point,
+            gather_action.target_class
+        ),
+        (None, Position::new(23.5, 93.5, 0.0), class_of(7))
+    );
+    let (walked, gather_action) = retarget(&Resource {
+        state: ObjectState::Removed,
+        workers: WorkerCount::of_data(2),
+        ..farm()
+    });
+    assert_eq!(
+        (walked, gather_action.state.bare()),
+        (
+            Err("a gather's walk without its target (set_state 13)"),
+            GatherState::Walk { move_to: None }
         )
     );
 }
