@@ -161,7 +161,8 @@ impl Seeker<'_, '_> {
     }
 
     /// The place `FUN_1411671e0` searches from instead of the point: for a villager, the farm
-    /// (class 49) its top action targets (slot 0x190), if that is one.
+    /// (class 49) its top action targets (slot 0x190, [`Action::top_action_object`]: a
+    /// recyclable target is none), if that is one.
     ///
     /// # Errors
     ///
@@ -170,12 +171,14 @@ impl Seeker<'_, '_> {
         if !roles.of_class(self.class).contains(ClassRoles::VILLAGER) {
             return Ok(None);
         }
-        let Some(target) = self.actions.top_action_object(self.unread)? else {
-            return Ok(None);
-        };
-        Ok(self
-            .spatial
-            .get_known(target)?
+        if let Some(unread) = self.unread {
+            return Err(unread.error());
+        }
+        let found = self
+            .actions
+            .top_action_object(|target| self.spatial.get_known(target).transpose())
+            .transpose()?;
+        Ok(found
             .filter(|placed| roles.of_class(placed.class).contains(ClassRoles::FARM))
             .map(|placed| placed.position.ground()))
     }
@@ -581,6 +584,26 @@ mod tests {
         let mut unmodelled = villager(None);
         unmodelled.parts.unread = Some(Unread::new(GenieError::unsupported("an action")));
         assert!(search(&sites(), &unmodelled, class::VILLAGER, at, &near_tc).is_err());
+    }
+
+    /// Slot 0x190 finds no object for a recyclable target (`FUN_140a78450`'s sign test): a
+    /// villager building the farm −5, which the map holds where the farm 800 stands, searches by
+    /// path as without a target.
+    #[test]
+    fn villager_on_recyclable_farm_searches_by_path() {
+        let at = Position::new(20.0, 20.0, 0.0);
+        let mut map = spatial(Point::new(20.0, 17.0));
+        let farm = map.get(object_id(800)).copied().unwrap();
+        map.insert(object_id(-5), farm);
+        assert_eq!(
+            search(&sites(), &villager(Some(-5)), class::VILLAGER, at, &map),
+            Ok(None)
+        );
+        assert_eq!(
+            search(&sites(), &villager(Some(800)), class::VILLAGER, at, &map),
+            Ok(Some(DropSiteId::new(object_id(700)))),
+            "the farm's own id measures from the farm"
+        );
     }
 
     /// The point (−1, −1) takes the first object of the masters in state 2, before the zones and

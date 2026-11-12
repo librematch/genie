@@ -87,19 +87,20 @@ impl Unit {
     }
 
     /// A hunt whose target went on the walk to it (state 4: its quiet `MoveTo`'s first check
-    /// finds the target it holds past state 6, code 5), or whose `MoveTo` failed (code 3), and
-    /// whose class is a tree's: it searches for the next tree (`FUN_140ac4670` with 8 and -1
-    /// both times).
+    /// finds the target it holds past state 6, code 5, [`World::target_state`]), or whose
+    /// `MoveTo` failed (code 3), and whose class is a tree's: it searches for the next tree
+    /// (`FUN_140ac4670` with 8 and -1 both times).
+    ///
+    /// [`World::target_state`]: crate::world::World::target_state
     pub(crate) fn tree_lost(&self, hunt: &HuntAction, step: &Step<'_>, roles: &Roles) -> bool {
         matches!(hunt.state, HuntState::Walk { .. })
             && Seconds::ZERO <= hunt.timer
             && hunt.state.move_to().is_some_and(|move_to_action| {
                 move_to_action.state == MoveTo::Failed
-                    || move_to_action.target.is_some_and(|object_id| {
-                        step.world
-                            .object_state(object_id)
-                            .is_some_and(|object_state| ObjectState::Undead < object_state)
-                    })
+                    || step
+                        .world
+                        .target_state(move_to_action.target)
+                        .is_some_and(|object_state| ObjectState::Undead < object_state)
             })
             && step.world.parts.unit_ai.get(self.id).is_some_and(|ai| {
                 let class = ai.target_class.or(hunt.target_class);

@@ -427,40 +427,43 @@ fn attack_share_replaces_powerup_by_share_of_shown_attack() {
 }
 
 /// With an Attack on top, the shown attack adds the bonus damage against its target: 3 for each
-/// half of the attacker's full hit points.
+/// half of the attacker's full hit points. A target of a recyclable id (−8, which the world
+/// holds) is no object to `FUN_141085c70`'s read (`FUN_140a78450`) and adds none.
 #[test]
 fn attack_share_counts_bonus_damage_against_attack_target() {
-    let attacking = Action {
-        list: ActionList::default().with_attack(Some(own_attack(
-            8,
-            AttackState::New,
-            Distance::new(1.0),
-        ))),
-        ..Action::default()
+    let shared = |target_id: i32| {
+        let attacking = Action {
+            list: ActionList::default().with_attack(Some(own_attack(
+                target_id,
+                AttackState::New,
+                Distance::new(1.0),
+            ))),
+            ..Action::default()
+        };
+        let target = Master {
+            id: MasterId::named(902),
+            ..soldier()
+        };
+        let mut world = Scene::open(GridSize::new(8, 8))
+            .object(SceneObject {
+                actions: Some(attacking),
+                ..SceneObject::new(7, PLAYER, fighter(true), Position::new(2.5, 2.5, 0.0))
+            })
+            .object(SceneObject::new(
+                target_id,
+                PLAYER,
+                target,
+                Position::new(3.5, 2.5, 0.0),
+            ))
+            .build();
+        let share = powerup(PowerupAttribute::ATTACK, 0.5, PowerupShare::MasterShare);
+        world.apply_powerup(seven(), share).unwrap();
+        world.parts.combat_of(seven()).attack_powerup
     };
-    let target = Master {
-        id: MasterId::named(902),
-        ..soldier()
-    };
-    let mut world = Scene::open(GridSize::new(8, 8))
-        .object(SceneObject {
-            actions: Some(attacking),
-            ..SceneObject::new(7, PLAYER, fighter(true), Position::new(2.5, 2.5, 0.0))
-        })
-        .object(SceneObject::new(
-            8,
-            PLAYER,
-            target,
-            Position::new(3.5, 2.5, 0.0),
-        ))
-        .build();
-    let share = powerup(PowerupAttribute::ATTACK, 0.5, PowerupShare::MasterShare);
-    world.apply_powerup(seven(), share).unwrap();
     // (6 + 0 + 2 × 3) − 0, times 0.5
-    assert_eq!(
-        world.parts.combat_of(seven()).attack_powerup,
-        AttackBonus::new(6.0)
-    );
+    assert_eq!(shared(8), AttackBonus::new(6.0));
+    // (6 + 0) − 0, times 0.5
+    assert_eq!(shared(-8), AttackBonus::new(3.0));
 }
 
 /// The line of sight's powerup goes through the seer (a share of the master's 6 tiles), and the

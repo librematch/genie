@@ -553,11 +553,12 @@ impl World {
             },
             roles,
         )?;
+        // FUN_141085c70's own read of an attacking top action's target object (FUN_140a78450)
         let actions = self.parts.actions_of(unit.id);
         let attacked = (actions.top_action_kind() == Some(ATTACK))
-            .then(|| actions.top_target())
+            .then(|| actions.top_action_object(|target_id| self.object(target_id)))
             .flatten();
-        let target = match attacked.and_then(|target_id| self.object(target_id)) {
+        let target = match attacked {
             Some((target_player, target)) => {
                 let target_master = target.master(self.master_tables(), target_player)?;
                 Some(victim_of(

@@ -106,15 +106,15 @@ impl UnitView<'_, '_> {
     }
 
     /// Slot 400 (`FUN_14106d090`) as the full update's tail reads it: the target of the unit's
-    /// top action as it stands now (`FUN_140a78450`, [`Action::top_target`]: an object the world
-    /// holds), the commands the unit took inside the update included (its attack command,
-    /// [`UnitView::attack`]; a wait for a foundation and a Transport hold none); None without
-    /// one.
+    /// top action as it stands now ([`Action::top_action_object`], `FUN_140a78450`: an object
+    /// of an id of 0 or more the world holds), the commands the unit took inside the update
+    /// included (its attack command, [`UnitView::attack`]; a wait for a foundation and a
+    /// Transport hold none); None without one.
     ///
-    /// [`Action::top_target`]: crate::objects::layers::Action::top_target
+    /// [`Action::top_action_object`]: crate::objects::layers::Action::top_action_object
     pub(crate) fn top_target_now(&self) -> Option<ObjectId> {
-        let target = self.actions.top_target();
-        target.filter(|&object_id| self.step.world.spatial.get(object_id).is_some())
+        self.actions
+            .top_action_object(|target| self.step.world.spatial.get(target).map(|_| target))
     }
 
     /// What the full update's tail tests of object `id`, the target of its unit's top action

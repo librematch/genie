@@ -486,17 +486,17 @@ fn repair_write_back(
 
 impl Action {
     /// Slot 400 (`FUN_14106d090`) as the unit AI reads it: its top action's target as the world
-    /// holds it (its owner's other objects as they stand, the other players' lists), with its
+    /// holds it ([`Action::top_action_object`], `FUN_140a78450`: an id of 0 or more, found
+    /// among its owner's other objects as they stand and the other players' lists), with its
     /// type, place and its master's radii; None without one.
     pub(crate) fn top_target_seen(
         &self,
         step: &Step<'_>,
         others: OthersRef<'_>,
     ) -> GenieResult<Option<TopTarget>> {
-        let Some(id) = self.top_target() else {
-            return Ok(None);
-        };
-        let Some((owner, unit)) = others.find(id) else {
+        let Some((id, (owner, unit))) =
+            self.top_action_object(|id| others.find(id).map(|found| (id, found)))
+        else {
             return Ok(None);
         };
         let master = unit.master(step.world.master_tables(), owner)?;

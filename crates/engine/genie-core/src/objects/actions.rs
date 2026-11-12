@@ -183,10 +183,21 @@ impl Action {
     }
 }
 
+/// `FUN_140a78450`: the object an action's target (`target`, `+0x30`) names, as `find` looks
+/// it up in the world's table (`FUN_1415417a0`); none without a target, and for a target below 0
+/// (`JL`): the table holds a recyclable object (a missile, a ghost) by its negative id, but no
+/// action's target names one. Each reader passes its own view of the table.
+pub(crate) fn target_object<T>(
+    target: Option<ObjectId>,
+    find: impl FnOnce(ObjectId) -> Option<T>,
+) -> Option<T> {
+    target.filter(|id| !id.is_recyclable()).and_then(find)
+}
+
 impl Action {
-    /// Slot 0x190's read of the action's target (`+0x30`), none for an action without one (an
-    /// Artifact not moving to an object, a Fly, an Explore, a Transport, a Make, a wait for a
-    /// foundation, which keeps the foundation at `+0x68`).
+    /// The action's target (`+0x30`), the id [`target_object`] looks up; none for an action
+    /// without one (an Artifact not moving to an object, a Fly, an Explore, a Transport, a Make,
+    /// a wait for a foundation, which keeps the foundation at `+0x68`).
     #[must_use]
     pub fn target(&self) -> Option<ObjectId> {
         match self {
@@ -369,6 +380,23 @@ mod tests {
 
     fn other() -> Action {
         Action::Artifact(Artifact::new(PlayerId::GAIA, None))
+    }
+
+    /// `FUN_140a78450` looks a target of 0 or more up (`JL` skips a negative one): a
+    /// recyclable id (−3), which the world's table holds, and none find no object.
+    #[test]
+    fn target_object_looks_up_only_targets_of_zero_or_more() {
+        use crate::test_ids::object_id;
+        let found = |target| target_object(target, |id: ObjectId| Some(id.get()));
+        assert_eq!(found(Some(object_id(0))), Some(0));
+        assert_eq!(found(Some(object_id(7))), Some(7));
+        assert_eq!(found(Some(object_id(-3))), None, "a recyclable target");
+        assert_eq!(found(None), None, "no target");
+        assert_eq!(
+            target_object(Some(object_id(7)), |_| None::<i32>),
+            None,
+            "a target the table does not hold"
+        );
     }
 
     #[test]

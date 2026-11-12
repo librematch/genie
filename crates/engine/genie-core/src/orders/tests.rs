@@ -2496,6 +2496,41 @@ fn an_action_object_works_and_moves_without_emptying_its_order_queue() {
     assert_eq!(queue_source_count(&world), (1, OrderSource::Direct, 3));
 }
 
+/// The town-bell record (`FUN_141206a20`) takes its top action's target by slot 400
+/// (`FUN_140a78450`): the berry bush 600 the villager walks to is its target; the recyclable
+/// −600 (a copy the world holds) is none, and no other source names one.
+#[test]
+fn town_bell_record_skips_recyclable_top_target() {
+    let run = |target: i32| {
+        let mut world = forage_world();
+        let bush = world.players[0]
+            .objects
+            .iter()
+            .find(|unit| unit.id == object_id(600))
+            .unwrap();
+        let mut copy = bush.clone();
+        copy.id = object_id(-600);
+        world.players[0].objects.push(copy);
+        world.reindex();
+        world.parts.put_actions(
+            object_id(9175),
+            Action {
+                list: ActionList::default().with_move_to(Some(MoveToAction {
+                    target: Some(object_id(target)),
+                    ..MoveToAction::sub_in(MoveTo::Moving)
+                })),
+                ..Action::default()
+            },
+        );
+        world
+            .record_town_bell(PlayerId::new(1), ListIndex::new(0))
+            .unwrap();
+        world.parts.town_bell_of(object_id(9175)).work.target
+    };
+    assert_eq!(run(600), Some(object_id(600)));
+    assert_eq!(run(-600), None);
+}
+
 /// Slot 0x138's start (`FUN_141216f10`): a villager is no longer under the town bell.
 #[test]
 fn villager_move_drops_its_town_bell_flag() {

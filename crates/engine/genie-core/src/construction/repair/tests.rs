@@ -12,6 +12,7 @@ use crate::math::rng::Well512;
 use crate::movement::Me;
 use crate::movement::Speed;
 use crate::movement::TopSpeed;
+use crate::movement::move_to::MoveWaitState;
 use crate::movement::move_to::TargetMoved;
 use crate::movement::move_to::{
     MoveDefaults, MoveTo, MoveToAction, MoveToReads, MoveWait, SpriteReads, WalkTo,
@@ -807,6 +808,41 @@ fn repair_whose_move_to_target_died_lets_go_and_ends() {
     );
     assert_eq!(heard(&world), [NotifyKind::ACTION_COMPLETED]);
     assert_eq!(the_house(&world).2, 0, "the house let go");
+}
+
+/// A dying `MoveTo` target of a recyclable id (−777) is no target object to its first check
+/// (`FUN_140a78450`): the waiting `MoveTo` forgets it and waits on, and the Repair goes on
+/// moving.
+#[test]
+fn repair_whose_move_to_target_is_recyclable_walks_on() {
+    let mut world = repair_at(NEAR, |repair_action| {
+        repair_action.state = RepairState::Move {
+            move_to: Some(MoveToAction {
+                target: Some(object_id(-777)),
+                wait: MoveWait {
+                    state: MoveWaitState::Waiting,
+                    timer: Seconds::ZERO,
+                    delay: Seconds::new(60.0),
+                },
+                ..MoveToAction::sub_in(MoveTo::Waiting)
+            }),
+        };
+    });
+    let mut dying = Unit {
+        id: object_id(-777),
+        ..Unit::default()
+    };
+    dying.life.state = ObjectState::Removed;
+    let _ = world.push_live(PlayerId::new(1), dying).unwrap();
+    assert_eq!(repaired(&mut world), Ok(HeadCode::Keeps));
+    let repair_action = repair_of(&world);
+    assert_eq!(
+        (
+            repair_action.state.move_to().map(|move_to| move_to.target),
+            heard(&world)
+        ),
+        (Some(None), vec![])
+    );
 }
 
 /// Gaia's object is repaired: the repairer faces it, then works and joins its repairers.

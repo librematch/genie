@@ -387,13 +387,12 @@ impl World {
                 "a town-bell record of an action not held",
             ));
         }
-        // an id below 0 names none (`JL`)
+        // an id below 0 names none (`JL`), as slot 400's `FUN_140a78450` does
         let held = |id: ObjectId| (!id.is_recyclable()).then(|| self.object(id)).flatten();
         let mut found = self
             .parts
             .actions_of(unit.id)
-            .top_target()
-            .and_then(held)
+            .top_action_object(|id| self.object(id))
             .map(|(_, unit)| unit);
         if let Some(target) = found
             && let Some(pasture) = target.pasture

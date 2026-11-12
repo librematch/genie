@@ -118,12 +118,14 @@ impl LeadGroup {
 
 impl World {
     /// Slot 0x280 (`FUN_141082d60`): the id of the object the top action of unit `id` targets
-    /// (`FUN_140a78450`: an id above -1 that the world holds), else none.
+    /// (`FUN_140a78450`, [`Action::top_action_object`]: an id above -1 that the world holds),
+    /// else none.
+    ///
+    /// [`Action::top_action_object`]: crate::objects::layers::Action::top_action_object
     pub(crate) fn top_target_object(&self, id: ObjectId) -> Option<ObjectId> {
         self.parts
             .actions_of(id)
-            .top_target()
-            .filter(|&object_id| !object_id.is_recyclable() && self.object(object_id).is_some())
+            .top_action_object(|target| self.object(target).map(|_| target))
     }
 }
 

@@ -418,9 +418,7 @@ impl World {
         let target = target.or_else(|| {
             self.parts
                 .actions_of(unit.id)
-                .top_target()
-                .filter(|&object_id| !object_id.is_recyclable())
-                .and_then(|object_id| self.world_object(object_id))
+                .top_action_object(|object_id| self.world_object(object_id))
         });
         let Some(world_object) = target else {
             return Ok(range);
@@ -712,6 +710,44 @@ mod tests {
             range(&searched_world, Some(object_id(20))),
             Distance::new(1.0)
         );
+    }
+
+    /// Without a target given, `FUN_14108d9b0` reads the top action's target (slot 0x190,
+    /// `FUN_140a78450`): its enemy 20 takes the ready charge's range, the recyclable −20 the
+    /// world holds there too is no object and leaves the weapon range alone.
+    #[test]
+    fn range_against_top_action_target_skips_recyclable_one() {
+        use crate::movement::move_to::{MoveTo, MoveToAction};
+        use crate::objects::actions::ActionList;
+        use crate::objects::layers::Action;
+        let mut world = searched_world();
+        let master = Arc::make_mut(&mut world.model.masters[1])
+            .get_mut(master_id(4))
+            .unwrap();
+        let creatable_part = master.creatable.get_or_insert_with(Default::default);
+        (creatable_part.charge_kind, creatable_part.charge_event) =
+            (ChargeKind::of_data(6), ChargeEvent::of_data(2));
+        world.parts.combat_mut(object_id(10)).unwrap().charge = Charge::new(1.0);
+        let mut recycled = world.players[2].objects[ListIndex::new(0)].clone();
+        recycled.id = object_id(-20);
+        world.players[2].objects.push(recycled);
+        world.reindex();
+        let range = |world: &mut World, target: i32| {
+            world.parts.put_actions(
+                object_id(10),
+                Action {
+                    list: ActionList::default().with_move_to(Some(MoveToAction {
+                        target: Some(object_id(target)),
+                        ..MoveToAction::sub_in(MoveTo::Moving)
+                    })),
+                    ..Action::default()
+                },
+            );
+            let me = world.world_object(object_id(10)).unwrap();
+            world.range_against(me, None).unwrap()
+        };
+        assert_eq!(range(&mut world, 20), Distance::new(3.0));
+        assert_eq!(range(&mut world, -20), Distance::new(1.0));
     }
 
     /// Player 1's soldier 10 (master 4, class 6) at (5, 5) in group 1; player 2 (its enemy)

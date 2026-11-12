@@ -977,6 +977,47 @@ fn keshik_makes_gold_while_it_fights_target_of_its_task_class() {
     assert_eq!(world.players[1].generated[3], Amount::ZERO);
 }
 
+/// The Keshik's top action's target is slot 400's object (`FUN_140a78450`): its Attack on the
+/// recyclable −77, which the world holds with a master of the task's class, works on no target
+/// and makes no gold.
+#[test]
+fn keshik_on_recyclable_target_makes_no_gold() {
+    let mut world = world();
+    keshik(&mut world);
+    give_master(
+        &mut world,
+        master_id(4),
+        MasterKind::COMBAT,
+        class::CLASS_0,
+        Vec::new(),
+    );
+    put(
+        &mut world,
+        PlayerId::new(2),
+        -77,
+        master_id(4),
+        HitPoints::new(30.0),
+        Point::new(6.5, 5.5),
+    );
+    world
+        .parts
+        .actions
+        .of_mut(object_id(60))
+        .unwrap()
+        .list
+        .attack_mut()
+        .unwrap()
+        .target = Some(AttackTargetId::new(object_id(-77)));
+    run(&mut world, PlayerId::new(1), 60);
+    assert_eq!(
+        (
+            world.players[1].attributes[3],
+            world.players[1].generated[3]
+        ),
+        (Amount::ZERO, Amount::new(0.999))
+    );
+}
+
 /// A combat unit of master 9 at (5.5, 5.5) moving east, with a movement damage of range 2,
 /// 5 hit points and a timer of 3 s.
 fn trampler(world: &mut World) {

@@ -134,11 +134,12 @@ impl UnitView<'_, '_> {
     /// check before its owner's test; neither changes what the other reads): a helper in no group
     /// helps only when idle (no action value, no action, no order, an empty queue and no target:
     /// "He has a `UnitAIaction`"), one in a group only when the group patrols (`FUN_141017c30` or
-    /// `FUN_141017c40`); then its top action's target within its range (slot 400, slot 0x1e8: the
-    /// footprints' squared gap between the least and the weapon range squared) keeps it, but a
-    /// building whose master has no attack for a patrolling group's member; then its unit AI's
-    /// attack check (slot 0xa0 with 0, [`crate::unit_ai::can_attack`]) on the attacker. True for a
-    /// helper that answers. The asking unit's unit AI runs with the target `ai_target`.
+    /// `FUN_141017c40`); then its top action's target within its range (slot 400,
+    /// [`Action::top_action_object`]: an id of 0 or more; slot 0x1e8: the footprints' squared
+    /// gap between the least and the weapon range squared) keeps it, but a building whose master
+    /// has no attack for a patrolling group's member; then its unit AI's attack check (slot 0xa0
+    /// with 0, [`crate::unit_ai::can_attack`]) on the attacker. True for a helper that answers.
+    /// The asking unit's unit AI runs with the target `ai_target`.
     pub(crate) fn helper_free(
         &self,
         helper: Helper<'_>,
@@ -183,7 +184,7 @@ impl UnitView<'_, '_> {
             Some(group) if group.patrols() => true,
             Some(_) => return Ok(false),
         };
-        if let Some((tq, unit)) = actions.top_target().and_then(find) {
+        if let Some((tq, unit)) = actions.top_action_object(find) {
             let tm = unit.master(self.step.world.master_tables(), tq)?;
             let gap =
                 footprint_gap_squared(helper.position(), master.radius, unit.position(), tm.radius);

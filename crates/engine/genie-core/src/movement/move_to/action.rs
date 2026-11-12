@@ -561,13 +561,15 @@ impl MoveToAction {
     }
 
     /// The update's first check of its target object (`0x140aa2a70`, before its state's case),
-    /// with the target's object state (`state`, `+0x640`; None when the world holds no object of
-    /// its id). A target the world no longer holds is cleared (`FUN_140a78450` finds none: slot
-    /// 0x68 with none releases nothing, as its lookup fails) and the `MoveTo` walks on to its
-    /// point. A held one in a state above 6 is let go (slot 0x68 with none, `FUN_140a7a230`; a
-    /// `MoveTo` that is not quiet owes it the release, slot 0x180, its caller's) and the update
-    /// ends there: 5 when quiet, else 4 after notify 0x1fb through `inbox` (the move action
-    /// value, the id let go, −1, and 0). Returns that code.
+    /// with the target's object state (`state`, `+0x640`; None where `FUN_140a78450` finds no
+    /// object: the world holds none of its id, or the id is recyclable,
+    /// [`crate::world::World::target_state`]). A target it does not find is cleared (slot 0x68
+    /// with none, `FUN_140a7a230`) and the `MoveTo` walks on to its point; slot 0x68's own
+    /// lookup releases one of a recyclable id the world holds (slot 0x180 from a `MoveTo` that
+    /// is not quiet, its caller's) and nothing else. A held one in a state above 6 is let go
+    /// (slot 0x68 with none; a `MoveTo` that is not quiet owes it the release, slot 0x180, its
+    /// caller's) and the update ends there: 5 when quiet, else 4 after notify 0x1fb through
+    /// `inbox` (the move action value, the id let go, −1, and 0). Returns that code.
     ///
     /// # Errors
     ///

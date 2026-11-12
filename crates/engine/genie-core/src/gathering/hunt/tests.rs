@@ -2294,13 +2294,14 @@ fn move_to_that_lost_its_target_ends_the_drop_off_and_the_point_walk() {
 
 /// A hunt of a tree's class searches for the next tree when its `MoveTo` failed (code 3) or its
 /// first check finds the target it holds past state 6 (code 5); a target the world no longer
-/// holds is not a loss (the `MoveTo` walks on to its point), and nor is a `MoveTo` on its way.
+/// holds is not a loss (the `MoveTo` walks on to its point), nor is one of a recyclable id
+/// (`FUN_140a78450` finds none), and nor is a `MoveTo` on its way.
 #[test]
 fn hunt_of_tree_searches_on_failed_walk_or_target_let_go() {
-    let tree_lost = |state: ObjectState, move_to: MoveTo, holding: bool| {
+    let tree_lost_of = |target: i32, state: ObjectState, move_to: MoveTo, holding: bool| {
         let mut rig = Rig::on_the_path(Victim::default());
         if holding {
-            rig = rig.holding(10028, PlayerId::new(0));
+            rig = rig.holding(target, PlayerId::new(0));
             rig.world.players[0]
                 .objects
                 .iter_mut()
@@ -2312,7 +2313,10 @@ fn hunt_of_tree_searches_on_failed_walk_or_target_let_go() {
         }));
         rig.actions_mut().list.set_hunt(Some(HuntAction {
             state: HuntState::Walk {
-                move_to: Some(to_house(move_to, Distance::ZERO)),
+                move_to: Some(MoveToAction {
+                    target: Some(object_id(target)),
+                    ..to_house(move_to, Distance::ZERO)
+                }),
             },
             ..hunting(-1)
         }));
@@ -2320,6 +2324,13 @@ fn hunt_of_tree_searches_on_failed_walk_or_target_let_go() {
             Ok(unit.tree_lost(actions.list.hunt().unwrap(), step, &roles()))
         })
     };
+    let tree_lost = |state: ObjectState, move_to: MoveTo, holding: bool| {
+        tree_lost_of(10028, state, move_to, holding)
+    };
+    assert_eq!(
+        tree_lost_of(-10028, ObjectState::Removed, MoveTo::Moving, true),
+        Ok(false)
+    );
     assert_eq!(
         tree_lost(ObjectState::Removed, MoveTo::Moving, true),
         Ok(true)

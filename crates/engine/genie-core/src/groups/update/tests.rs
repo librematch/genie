@@ -645,6 +645,48 @@ fn kept_apart_units_leave_unless_busy() {
     assert_eq!(world.groups.get(group_id(1)).unwrap().objects, Vec::new());
 }
 
+/// The kept-apart attacker looks for a member's top action's target of an id of 0 or more only
+/// (slot 0x190, `FUN_140a78450`): a member on the ally's 30 beside it finds it (the check that
+/// follows is not modelled), one on the recyclable −30 there, which the world holds, finds none,
+/// and the attacker leaves.
+#[test]
+fn kept_apart_attacker_skips_recyclable_member_target() {
+    use crate::movement::move_to::{MoveTo, MoveToAction};
+    use crate::objects::actions::ActionList;
+    use crate::objects::layers::Action;
+    let run = |target: i32| {
+        let mut world = world();
+        let attacker = soldier(17, 4.5, 5.0);
+        world.parts.put_mover(attacker.id, Some(walking()));
+        let attacker_ai = UnitAi {
+            current_action: Some(AiAction::Attack),
+            ..soldier_ai()
+        };
+        world
+            .extend_live(PlayerId::new(1), [Object::with_ai(attacker, attacker_ai)])
+            .unwrap();
+        world
+            .extend_live(PlayerId::new(3), [Object::from(soldier(-30, 4.5, 4.5))])
+            .unwrap();
+        world.parts.put_actions(
+            object_id(10),
+            Action {
+                list: ActionList::default().with_move_to(Some(MoveToAction {
+                    target: Some(object_id(target)),
+                    ..MoveToAction::sub_in(MoveTo::Moving)
+                })),
+                ..Action::default()
+            },
+        );
+        world.groups.get_mut(group_id(1)).unwrap().objects = vec![object_id(17)];
+        world
+            .keep_apart(group_id(1))
+            .map(|()| world.groups.get(group_id(1)).unwrap().objects.clone())
+    };
+    assert!(run(30).is_err());
+    assert_eq!(run(-30), Ok(Vec::new()));
+}
+
 /// The group's deletion: its held members whose link names it leave it; an idle one stands
 /// and shows standing, a busy one walks on. A group without members goes at its update.
 #[test]

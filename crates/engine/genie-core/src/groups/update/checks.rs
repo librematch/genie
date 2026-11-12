@@ -219,9 +219,7 @@ impl World {
         Ok(self
             .parts
             .actions_of(unit.id)
-            .top_target()
-            .filter(|&object_id| !object_id.is_recyclable())
-            .and_then(|object_id| self.world_object(object_id)))
+            .top_action_object(|object_id| self.world_object(object_id)))
     }
 
     /// `FUN_14118f8c0` of `object` and `world_object`: the squared gap of their footprints (their

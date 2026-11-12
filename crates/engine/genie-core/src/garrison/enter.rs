@@ -103,7 +103,8 @@ impl World {
 
     /// Slot 0x3a0 (`FUN_1410847e0`, the enter command) of the unit at `idx` of `player` on
     /// `target`, `force` its third argument: a target the world does not hold is not taken;
-    /// unforced, a unit entering the target already (its top action an Enter on it) is taken.
+    /// unforced, a unit entering the target already (its top action an Enter on it,
+    /// `FUN_140a78450`, [`World::top_target_object`]: never a recyclable target) is taken.
     /// Slot 0x820 ([`World::find_work_task`]) looks for a task on the target with the garrison
     /// filter (3) and the switch (the unit takes the master that gave it, slot 0x90): none is
     /// not taken; else its Enter ([`World::enter_with`]): taken.
@@ -125,7 +126,7 @@ impl World {
         let top = self.parts.actions_of(unit.id).top_action_kind();
         if force == OrderForce::Unforced
             && top == Some(ENTER)
-            && self.parts.actions_of(unit.id).top_target() == Some(target)
+            && self.top_target_object(unit.id) == Some(target)
         {
             return Ok(Answer::Taken);
         }

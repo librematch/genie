@@ -59,9 +59,10 @@ pub(crate) enum RecordDrop {
 
 impl World {
     /// `FUN_14123bb20`'s sending off (with `DAT_1439e60e2` 1) of the units on `foundation`'s
-    /// footprint: each of type 30 or more in state 2 whose top action is not on the foundation,
-    /// that stands (`FUN_14114f740`: Gaia's of classes 9 and 10, or not walking, its animation
-    /// speed `+0x7b8` at most 0, and its path level `+0x858` absent or in state 0 or 6) and
+    /// footprint: each of type 30 or more in state 2 whose top action is not on the foundation
+    /// (slot 400, [`World::top_target_object`]: a recyclable target is none), that stands
+    /// (`FUN_14114f740`: Gaia's of classes 9 and 10, or not walking, its animation speed
+    /// `+0x7b8` at most 0, and its path level `+0x858` absent or in state 0 or 6) and
     /// whose unit AI's action is not 0x2bf or 0x2c0 (moving off already) is sent off: its unit AI
     /// gets notify 0x216 (slot 0x38) with the foundation master's radii times 100 (truncated) and
     /// the foundation ([`crate::unit_ai::NotifyKind::SENT_OFF`]). The foundation owner's own units of type 70
@@ -90,7 +91,7 @@ impl World {
             let master = unit.master(self.master_tables(), owner)?;
             if master.kind < MasterKind::MOVING
                 || unit.life.state != ObjectState::Alive
-                || self.parts.actions_of(unit.id).top_target() == Some(foundation.id())
+                || self.top_target_object(unit.id) == Some(foundation.id())
             {
                 continue;
             }

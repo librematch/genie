@@ -563,9 +563,95 @@ fn house_and_tree() -> (Master, Master) {
 /// vectors' x and height.
 #[test]
 fn unit_sent_off_footprint_walks_to_the_spot_and_comes_back_to_its_work() {
-    let (house, tree) = house_and_tree();
+    let mut world = sent_off_world(600);
+    let notify = Notify::own(object_id(9175), NotifyKind::SENT_OFF, [100, 150, 10028]);
+    let answer = run_ai(
+        &mut world,
+        (player_id(1), object_id(9175)),
+        |ai, _, side, _, rng| ai.sent_off(notify, side, rng, &roles(), &tuning().unit_ai),
+    );
+    assert_eq!(answer, Ok(GO_ON));
+    let me = object_id(9175);
+    let walk = world
+        .parts
+        .actions
+        .of(me)
+        .list
+        .move_to()
+        .map(|move_to_action| (move_to_action.point, move_to_action.target));
+    assert_eq!(walk, Some((Position::new(28.5, 89.5, 0.0), None)));
+    let ai = world.parts.unit_ai.get(me).unwrap();
+    assert_eq!(
+        (ai.current_action, ai.last_action),
+        (Some(AiAction::MoveAside), Some(AiAction::Gather))
+    );
+    assert_eq!(
+        sent_off_orders(&world),
+        vec![
+            (
+                OrderKind::Foundation,
+                Some(object_id(10028)),
+                Position::new(30.0, 0.0, 0.0),
+                100,
+                true
+            ),
+            (OrderKind::Move, None, Position::ORIGIN, 0, false),
+            (
+                OrderKind::OnTarget,
+                Some(object_id(600)),
+                Position::new(33.5, 0.0, 0.0),
+                100,
+                true
+            ),
+        ]
+    );
+}
+
+/// The sent-off villager's work on the tree −7 (a recyclable id, which the world holds) has no
+/// target object (`FUN_140a78450`'s sign test): it walks off the footprint but queues no orders.
+#[test]
+fn unit_sent_off_footprint_off_recyclable_target_queues_nothing() {
+    let mut world = sent_off_world(-7);
+    let notify = Notify::own(object_id(9175), NotifyKind::SENT_OFF, [100, 150, 10028]);
+    let answer = run_ai(
+        &mut world,
+        (player_id(1), object_id(9175)),
+        |ai, _, side, _, rng| ai.sent_off(notify, side, rng, &roles(), &tuning().unit_ai),
+    );
+    assert_eq!(answer, Ok(GO_ON));
+    assert_eq!(
+        sent_off_orders(&world),
+        vec![(OrderKind::Move, None, Position::ORIGIN, 0, false)]
+    );
+}
+
+/// Villager 9175's queued orders: order, target, point, priority and whether ready.
+fn sent_off_orders(world: &World) -> Vec<(OrderKind, Option<ObjectId>, Position, i32, bool)> {
+    world
+        .parts
+        .unit_ai
+        .get(object_id(9175))
+        .unwrap()
+        .orders
+        .iter()
+        .map(|queued_order| {
+            (
+                queued_order.order,
+                queued_order.target,
+                queued_order.point,
+                queued_order.priority.get(),
+                queued_order.ready,
+            )
+        })
+        .collect()
+}
+
+/// Player 1's villager 9175 at (29.6, 89.6) on the way to the tree `tree` at (33.5, 95.5),
+/// beside the house foundation 10028 at (30, 90).
+fn sent_off_world(tree: i32) -> World {
+    let (house, tree_master) = house_and_tree();
     let to_tree = MoveToAction {
-        target: Some(object_id(600)),
+        target: Some(object_id(tree)),
         point: Position::new(33.5, 95.5, 0.0),
         ..MoveToAction::sub_in(MoveTo::Moving)
     };
@@ -590,7 +676,7 @@ fn unit_sent_off_footprint_walks_to_the_spot_and_comes_back_to_its_work() {
             Position::new(29.6, 89.6, 0.0),
         )
     };
-    let mut world = Scene::open(GridSize::new(120, 120))
+    Scene::open(GridSize::new(120, 120))
         .object(villager)
         .object(SceneObject {
             desolid: true,
@@ -598,66 +684,12 @@ fn unit_sent_off_footprint_walks_to_the_spot_and_comes_back_to_its_work() {
             ..SceneObject::new(10028, player_id(1), house, Position::new(30.0, 90.0, 0.0))
         })
         .object(SceneObject::new(
-            600,
-            player_id(0),
             tree,
+            player_id(0),
+            tree_master,
             Position::new(33.5, 95.5, 0.0),
         ))
-        .build();
-    let notify = Notify::own(object_id(9175), NotifyKind::SENT_OFF, [100, 150, 10028]);
-    let answer = run_ai(
-        &mut world,
-        (player_id(1), object_id(9175)),
-        |ai, _, side, _, rng| ai.sent_off(notify, side, rng, &roles(), &tuning().unit_ai),
-    );
-    assert_eq!(answer, Ok(GO_ON));
-    let me = object_id(9175);
-    let walk = world
-        .parts
-        .actions
-        .of(me)
-        .list
-        .move_to()
-        .map(|move_to_action| (move_to_action.point, move_to_action.target));
-    assert_eq!(walk, Some((Position::new(28.5, 89.5, 0.0), None)));
-    let ai = world.parts.unit_ai.get(me).unwrap();
-    assert_eq!(
-        (ai.current_action, ai.last_action),
-        (Some(AiAction::MoveAside), Some(AiAction::Gather))
-    );
-    let orders: Vec<_> = ai
-        .orders
-        .iter()
-        .map(|queued_order| {
-            (
-                queued_order.order,
-                queued_order.target,
-                queued_order.point,
-                queued_order.priority.get(),
-                queued_order.ready,
-            )
-        })
-        .collect();
-    assert_eq!(
-        orders,
-        vec![
-            (
-                OrderKind::Foundation,
-                Some(object_id(10028)),
-                Position::new(30.0, 0.0, 0.0),
-                100,
-                true
-            ),
-            (OrderKind::Move, None, Position::ORIGIN, 0, false),
-            (
-                OrderKind::OnTarget,
-                Some(object_id(600)),
-                Position::new(33.5, 0.0, 0.0),
-                100,
-                true
-            ),
-        ]
-    );
+        .build()
 }
 
 /// 426049848's deer 14054 (Gaia's, unit-AI type 2, no actions) in update 685: a town centre's
@@ -10120,6 +10152,44 @@ fn soldier_idle_check_holds_its_target_with_retargeting_off() {
     };
     let mut world = soldier_world((healer, unit_ai), walk, &[]);
     assert!(soldier_idle_500(&mut world).is_err());
+}
+
+/// Slot 400 finds no object for a recyclable target (`FUN_140a78450`'s sign test): a top
+/// action on the unit −5 in range gives no target at the update's start
+/// ([`Surroundings::top_target`], [`Action::top_target_seen`]) nor as the update stands
+/// ([`UnitView::top_target_now`]), though the world holds the unit.
+///
+/// [`Action::top_target_seen`]: crate::objects::layers::Action::top_target_seen
+/// [`UnitView::top_target_now`]: crate::unit_ai::world_view::UnitView::top_target_now
+#[test]
+fn soldier_top_action_on_recyclable_unit_has_no_target() {
+    let unit_ai = UnitAi {
+        current_order: None,
+        ..patroller(0)
+    };
+    let world = |target: i32| {
+        soldier_world(
+            (soldier_master(), unit_ai.clone()),
+            Some((Point::new(21.0, 20.0), Some(target))),
+            &[walker_unit(target, player_id(2), Point::new(21.0, 20.0))],
+        )
+    };
+    let read = |world: &mut World| {
+        run_ai(
+            world,
+            (player_id(1), object_id(500)),
+            |_, at, side, _, _| {
+                Ok((
+                    at.top_target.map(|top_target| top_target.id),
+                    side.top_target_now(),
+                    UnitAi::top_target_in_range(at, side)?,
+                ))
+            },
+        )
+    };
+    let fifty = Some(object_id(50));
+    assert_eq!(read(&mut world(50)), Ok((fifty, fifty, fifty)));
+    assert_eq!(read(&mut world(-5)), Ok((None, None, None)));
 }
 
 /// A stop earlier in the update (a failed Enter's notify, slot 0xb0) empties the action list

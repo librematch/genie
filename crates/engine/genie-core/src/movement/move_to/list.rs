@@ -37,7 +37,7 @@ pub(crate) fn update_sub_actions(
     let Some(move_to) = list else {
         return Ok(SubCode::Done);
     };
-    let held = step.world.object_state(move_to.target);
+    let held = step.world.target_state(move_to.target);
     let (mut walk, beside) = step.world.walk_beside(step.pace()?, &mut unit.place, me);
     let shown = (move_to.state == MoveTo::Start).then_some(Shown {
         sprite: &mut unit.sprite,

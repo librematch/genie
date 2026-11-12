@@ -26,6 +26,7 @@ use crate::movement::{Me, PathData};
 use crate::objects::ActionState;
 use crate::objects::ListIndex;
 use crate::objects::MasterHitPoints;
+use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::SleepCheck;
 use crate::objects::SpeedMultiplier;
@@ -64,7 +65,7 @@ use crate::world::objects_ref::ObjectsRef;
 use crate::world::others::OthersRef;
 use crate::world::parts::Part;
 use crate::world::tests::{forage_world, in_update};
-use crate::world::{Millis, OBJECT_MASTER, Unread, WorldTime};
+use crate::world::{Millis, OBJECT_MASTER, WorldTime};
 use std::iter::once;
 use std::sync::Arc;
 
@@ -489,8 +490,9 @@ fn an_object_inside_another_runs_its_inside_update() {
     );
 }
 
-/// Slot 0x190 (`FUN_14106d090`, `FUN_140a78450`): the object the top action targets, none for an
-/// action without one (a wait for a foundation) or without an action, and an error for an action the slice does not hold.
+/// Slot 0x190 (`FUN_14106d090`, `FUN_140a78450`): the object the top action targets as the
+/// lookup finds it, none for an action without one (a wait for a foundation), without an
+/// action, for a recyclable target and for a target the lookup does not find.
 #[test]
 fn the_top_action_object_is_its_target_unless_it_has_none() {
     use crate::construction::build::BuildTask;
@@ -503,16 +505,27 @@ fn the_top_action_object_is_its_target_unless_it_has_none() {
         key: task_key(ActionKind::BUILD),
         sprites: TaskSprites::NONE,
     };
-    let building = Action {
+    let building = |target: i32| Action {
         list: ActionList::default().with_build(Some(started(
-            object_id(800),
+            object_id(target),
             Position::new(1.0, 2.0, 0.0),
             Distance::ZERO,
             task,
         ))),
         ..Default::default()
     };
-    assert_eq!(building.top_action_object(None), Ok(Some(object_id(800))));
+    let every = |id: ObjectId| Some(id);
+    assert_eq!(building(800).top_action_object(every), Some(object_id(800)));
+    assert_eq!(
+        building(-5).top_action_object(every),
+        None,
+        "a recyclable target"
+    );
+    assert_eq!(
+        building(800).top_action_object(|_| None::<i32>),
+        None,
+        "a target the world does not hold"
+    );
     // a wait for a foundation keeps it at +0x68, its +0x30 is −1
     let waiting = Action {
         list: ActionList::default().with_wait_solidify(Some(WaitSolidify::new(
@@ -521,11 +534,8 @@ fn the_top_action_object_is_its_target_unless_it_has_none() {
         ))),
         ..Default::default()
     };
-    assert_eq!(waiting.top_action_object(None), Ok(None));
-    assert_eq!(Action::default().top_action_object(None), Ok(None));
-    // an object the load could not read whole: its top action is unknown
-    let unread = Unread::new(GenieError::unsupported("an action"));
-    assert!(building.top_action_object(Some(&unread)).is_err());
+    assert_eq!(waiting.top_action_object(every), None);
+    assert_eq!(Action::default().top_action_object(every), None);
 }
 
 /// The top action's sub-action: a Hunt's `MoveTo` with its state number, else its Attack; a

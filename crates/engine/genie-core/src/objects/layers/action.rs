@@ -11,6 +11,7 @@ use crate::objects::ActionState;
 use crate::objects::ObjectId;
 use crate::objects::actions;
 use crate::objects::actions::ActionList;
+use crate::objects::actions::target_object;
 use crate::objects::layers::CommandCount;
 use crate::objects::layers::DefaultTask;
 use crate::objects::layers::{IdleTime, Speedup};
@@ -56,20 +57,14 @@ impl Action {
         commands: CommandCount::ZERO,
     };
 
-    /// Its slot 0x190 (`FUN_14106d090`, then `FUN_140a78450`): the object its top action targets
-    /// (the action's `+0x30` when not −1); none without a top action. `unread`: the load could
-    /// not read the object whole ([`Unread`]).
-    ///
-    /// # Errors
-    ///
-    /// A top action the slice does not model.
-    pub fn top_action_object(&self, unread: Option<&Unread>) -> GenieResult<Option<ObjectId>> {
-        if unread.is_some() {
-            return Err(GenieError::unsupported(
-                "slot 0x190 of an action the slice does not model",
-            ));
-        }
-        Ok(self.top_target())
+    /// Its slot 0x190 (`FUN_14106d090`): the object its top action's target names
+    /// ([`target_object`], `FUN_140a78450`: a target of 0 or more), as `find` looks it up in the
+    /// world's table; none without a top action.
+    pub(crate) fn top_action_object<T>(
+        &self,
+        find: impl FnOnce(ObjectId) -> Option<T>,
+    ) -> Option<T> {
+        target_object(self.top_target(), find)
     }
 
     /// Its top action's slots 0x190 and 0x288 (`FUN_14106d090`, `FUN_141082dc0`): the action has
@@ -201,8 +196,9 @@ impl Action {
         }
     }
 
-    /// The target of its top action ([`Action::top_action`], [`actions::Action::target`]); None without an
-    /// action the slice holds or without a target.
+    /// The target id of its top action ([`Action::top_action`], [`actions::Action::target`]), as
+    /// the action holds it; None without an action the slice holds or without a target. A reader of
+    /// the object it names asks [`Action::top_action_object`], which passes over a recyclable id.
     #[must_use]
     pub fn top_target(&self) -> Option<ObjectId> {
         self.list.head().and_then(actions::Action::target)

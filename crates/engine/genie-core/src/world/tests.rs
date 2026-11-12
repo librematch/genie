@@ -5444,6 +5444,54 @@ fn the_units_on_new_foundation_are_sent_off_it() {
     );
 }
 
+/// `FUN_14123bb20` passes over a unit whose top action is on the foundation by slot 400's
+/// object (`FUN_140a78450`): a foundation of a recyclable id (−10028, a copy the world holds) is
+/// no such object, so the forager working on it is sent off all the same.
+#[test]
+fn unit_on_recyclable_foundation_is_sent_off_it() {
+    use crate::movement::move_to::{MoveTo, MoveToAction};
+    let sent = |world: &World| {
+        world
+            .parts
+            .unit_ai
+            .get(object_id(9175))
+            .unwrap()
+            .notifies
+            .iter()
+            .filter(|notify| notify.kind == NotifyKind::SENT_OFF)
+            .map(|notify| notify.params)
+            .collect::<Vec<_>>()
+    };
+    let run = |foundation: i32| {
+        let mut world = footprint_world();
+        let index = world.players[1]
+            .objects
+            .iter()
+            .position(|unit| unit.id == object_id(10028))
+            .unwrap();
+        let mut copy = world.players[1].objects[ListIndex::new(index)].clone();
+        copy.id = object_id(-10028);
+        world.players[1].objects.push(copy);
+        world.reindex();
+        world.parts.put_actions(
+            object_id(9175),
+            Action {
+                list: ActionList::default().with_move_to(Some(MoveToAction {
+                    target: Some(object_id(foundation)),
+                    ..MoveToAction::sub_in(MoveTo::Moving)
+                })),
+                ..Action::default()
+            },
+        );
+        world
+            .evacuate(FoundationId::new(object_id(foundation)), &[object_id(9175)])
+            .unwrap();
+        sent(&world)
+    };
+    assert_eq!(run(10028), Vec::<[i32; 3]>::new());
+    assert_eq!(run(-10028), [[100, 100, -10028]]);
+}
+
 /// `FUN_14123bb20`'s owner's units of a formation category on the footprint go together
 /// (`FUN_1411566b0` with 1, then `FUN_1416123a0`): the farthest free spot beside the footprint
 /// from the first, and the forager the splitter leaves loose takes the action of moving off a
@@ -8119,6 +8167,42 @@ fn the_enter_command_enters_or_keeps_the_enter_on_its_target() {
             .timer,
         first.timer
     );
+}
+
+/// Unforced, slot 0x3a0 keeps an Enter only on the object `FUN_140a78450` finds
+/// ([`World::top_target_object`]): an Enter on the recyclable −77 (a copy of the villager, which
+/// the world holds) is none, so the command looks for a task on it, finds none and is not taken.
+#[test]
+fn the_enter_command_keeps_no_enter_on_recyclable_target() {
+    let mut world = enter_world(vec![], 5);
+    let run = |world: &mut World, target: i32| {
+        world.enter_command(
+            PlayerId::new(1),
+            ListIndex::new(0),
+            object_id(target),
+            OrderForce::Unforced,
+        )
+    };
+    assert_eq!(run(&mut world, 10028), Ok(Answer::Taken));
+    let mut copy = world.players[1].objects[ListIndex::new(0)].clone();
+    copy.id = object_id(-77);
+    world.players[1].objects.push(copy);
+    world.reindex();
+    let villager = world.players[1].objects[ListIndex::new(0)].id;
+    let on = |world: &mut World, target: i32| {
+        world
+            .parts
+            .actions
+            .of_mut(villager)
+            .unwrap()
+            .list
+            .enter_mut()
+            .unwrap()
+            .target = Some(container_id(target));
+        run(world, target)
+    };
+    assert_eq!(on(&mut world, 10028), Ok(Answer::Taken), "kept");
+    assert_eq!(on(&mut world, -77), Ok(Answer::NotTaken));
 }
 
 /// The Enter's start (`FUN_140a86f20`) of a unit inside an object: `set_state(13)`, its
@@ -13843,11 +13927,15 @@ fn move_to_an_object_lets_it_go_when_it_ends_or_its_unit_dies() {
 /// A `MoveTo` of its own checks its target first (`0x140aa2a70`,
 /// [`MoveToAction::check_held`]): a dying one (state 7) is let go and released (slot 0x180: the
 /// tree counts a worker less), and the list keeps the `MoveTo` (code 4), now to its point; one
-/// the world no longer holds is cleared, with nothing released.
+/// the world no longer holds is cleared, with nothing released. A live tree of a recyclable id
+/// (−50) is cleared too (`FUN_140a78450` finds none) and released (slot 0x68's own lookup,
+/// `FUN_1415417a0`, finds it), and the `MoveTo` walks on. A quiet `MoveTo` releases neither.
 #[test]
 fn move_to_of_its_own_lets_dying_target_go_and_forgets_lost_one() {
-    let run = |target: i32, tree_state: ObjectState| {
+    let run_with = |tree: i32, target: i32, tree_state: ObjectState, voice: Voice| {
         let mut world = deaths_world();
+        world.players[0].objects[ListIndex::new(0)].id = object_id(tree);
+        world.reindex();
         world.players[0].objects[ListIndex::new(0)].workers = WorkerCount::of_data(2);
         world.players[0].objects[ListIndex::new(0)].life.state = tree_state;
         let mover = walker();
@@ -13871,7 +13959,7 @@ fn move_to_of_its_own_lets_dying_target_go_and_forgets_lost_one() {
                     target: ObjectId::of_field(target),
                     range: Distance::ZERO,
                     sprite: None,
-                    voice: Voice::Loud,
+                    voice,
                     on_target_moved: TargetMoved::Follows,
                     wait: MoveWait {
                         state: MoveWaitState::Waiting,
@@ -13899,6 +13987,7 @@ fn move_to_of_its_own_lets_dying_target_go_and_forgets_lost_one() {
             workers,
         )
     };
+    let run = |target: i32, tree_state: ObjectState| run_with(50, target, tree_state, Voice::Loud);
     assert_eq!(
         run(50, ObjectState::Removed),
         (Some((MoveTo::Waiting, -1)), WorkerCount::of_data(1))
@@ -13910,6 +13999,14 @@ fn move_to_of_its_own_lets_dying_target_go_and_forgets_lost_one() {
     assert_eq!(
         run(50, ObjectState::Alive),
         (Some((MoveTo::Waiting, 50)), WorkerCount::of_data(2))
+    );
+    assert_eq!(
+        run_with(-50, -50, ObjectState::Alive, Voice::Loud),
+        (Some((MoveTo::Waiting, -1)), WorkerCount::of_data(1))
+    );
+    assert_eq!(
+        run_with(-50, -50, ObjectState::Alive, Voice::Quiet),
+        (Some((MoveTo::Waiting, -1)), WorkerCount::of_data(2))
     );
 }
 
@@ -18580,9 +18677,9 @@ fn helper_scout(helper: UnitAi, own: Option<&Attack>) -> Object {
 }
 
 /// `AskForHelp`'s world: the scout 123's view (player 1, master 448, at (10, 10)) with the
-/// `helper` among its owner's other objects, Gaia's wolf 50 at (10.5, 10), the lists the last
-/// search left (`searched`, none before any) and the world's unit groups `groups`; `work` runs on
-/// the view.
+/// `helper` among its owner's other objects, Gaia's wolves 50 and −51 (a recyclable id) at
+/// (10.5, 10), the lists the last search left (`searched`, none before any) and the world's unit
+/// groups `groups`; `work` runs on the view.
 fn help_view<R>(
     helper: Object,
     searched: Option<ByRelation<Vec<Record>>>,
@@ -18629,21 +18726,23 @@ fn help_view<R>(
         object_id(124),
         placed(10.3, class::CLASS_47, PlayerId::new(1), ids::ID_448),
     );
-    spatial.insert(
-        object_id(50),
-        placed(10.5, class::PREDATOR, PlayerId::new(0), master_id(126)),
-    );
+    let wolf_unit = |id: i32| Unit {
+        id: object_id(id),
+        place: Static::at(Position::new(10.5, 10.0, 0.0)),
+        life: Lifecycle {
+            master_id: master_id(126),
+            ..Lifecycle::default()
+        },
+        ..Unit::default()
+    };
+    for id in [50, -51] {
+        spatial.insert(
+            object_id(id),
+            placed(10.5, class::PREDATOR, PlayerId::new(0), master_id(126)),
+        );
+    }
     let gaia = Player {
-        objects: vec![Unit {
-            id: object_id(50),
-            place: Static::at(Position::new(10.5, 10.0, 0.0)),
-            life: Lifecycle {
-                master_id: master_id(126),
-                ..Lifecycle::default()
-            },
-            ..Unit::default()
-        }]
-        .into(),
+        objects: vec![wolf_unit(50), wolf_unit(-51)].into(),
         ..Player::default()
     };
     if let Some(lists) = searched {
@@ -18748,8 +18847,9 @@ fn ask_for_help_asks_only_an_idle_helper_that_may_attack() {
 
 /// `AskForHelp`'s helper in a group answers whatever it does while its group patrols, and not
 /// while it does not; a patrolling helper whose own Attack's target lies within its range keeps
-/// it. A unit without a unit AI never answers; the helper of another player than the asker's
-/// answers as one of its own.
+/// it, but not a target of a recyclable id (slot 400, `FUN_140a78450`: no object). A unit
+/// without a unit AI never answers; the helper of another player than the asker's answers as
+/// one of its own.
 #[test]
 fn helper_in_group_answers_only_while_its_group_patrols() {
     let idle = UnitAi {
@@ -18790,12 +18890,16 @@ fn helper_in_group_answers_only_while_its_group_patrols() {
         in_group(Some(group_id(8)), None),
         &groups
     ));
+    let on_wolf = own_attack(50, -1, AttackState::Move { move_to: None });
     assert!(!helper_free_of(
         PlayerId::new(1),
-        in_group(
-            Some(group_id(7)),
-            Some(&own_attack(50, -1, AttackState::Move { move_to: None }))
-        ),
+        in_group(Some(group_id(7)), Some(&on_wolf)),
+        &groups
+    ));
+    let on_recyclable = own_attack(-51, -1, AttackState::Move { move_to: None });
+    assert!(helper_free_of(
+        PlayerId::new(1),
+        in_group(Some(group_id(7)), Some(&on_recyclable)),
         &groups
     ));
     let mut thoughtless = helper_scout(idle.clone(), None);

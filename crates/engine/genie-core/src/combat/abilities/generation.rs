@@ -144,18 +144,17 @@ impl World {
             }
             match self.parts.actions_of(unit.id).top_action() {
                 Some(top_action) => {
-                    // FUN_140a78450: an id below 0 names no object; the target only matters
-                    // to an action of the test's at work
+                    // the target (FUN_140a78450) only matters to an action of the test's at
+                    // work
                     let works =
                         WORKING_ACTIONS.contains(&top_action.kind) && top_action.state == WORKING;
-                    let target = match self
-                        .parts
-                        .actions_of(unit.id)
-                        .top_target()
-                        .filter(|object_id| works && !object_id.is_recyclable())
-                    {
-                        Some(object_id) => self.work_target(object_id)?,
-                        None => None,
+                    let target = if works {
+                        self.parts
+                            .actions_of(unit.id)
+                            .top_action_object(|object_id| self.work_target(object_id).transpose())
+                            .transpose()?
+                    } else {
+                        None
                     };
                     Some(TopWork {
                         kind: top_action.kind,
@@ -191,8 +190,9 @@ impl World {
         self.give_load(owner, out, give)
     }
 
-    /// What a generation task's test reads of the object `id` its top action works on, as the
-    /// world holds it; None for an object the world does not hold.
+    /// What a generation task's test reads of the object `id` its top action works on (slot
+    /// 0x190's lookup, [`crate::objects::layers::Action::top_action_object`]), as the world holds
+    /// it; None for an object the world does not hold.
     pub(super) fn work_target(&self, id: ObjectId) -> GenieResult<Option<WorkTarget>> {
         let Some((player_id, unit)) = self.object(id) else {
             return Ok(None);

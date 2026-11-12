@@ -296,8 +296,10 @@ impl WorldPicker<'_> {
     /// shows an attack below 5 (slot 0x878, [`crate::combat::damage::shown_attack`]; below 4, or with
     /// its master's hit points below `UnitAiTuning::harmless_hp`), a melee armor below 1 (slot 0x868) and a
     /// range of at most `UnitAiTuning::harmless_range` (slot 0x880, `COMISS` with `JNC`: not a NaN), is
-    /// fought back as Gaia's attackers are. Its attack's target (an Attack's, `FUN_14107cc30`)
-    /// counts when the world holds it.
+    /// fought back as Gaia's attackers are. Its attack's target (an Attack's, `FUN_14107cc30`,
+    /// [`Action::top_action_object`]: an id of 0 or more) counts when the world holds it.
+    ///
+    /// [`Action::top_action_object`]: crate::objects::layers::Action::top_action_object
     pub(crate) fn harmless(
         &self,
         spatial: &Spatial,
@@ -324,27 +326,29 @@ impl WorldPicker<'_> {
             },
             roles,
         )?;
-        let attacked = (self.actions_of(other_unit.id).top_action_kind() == Some(ATTACK))
-            .then(|| self.actions_of(other_unit.id).top_target())
-            .flatten();
+        let actions = self.actions_of(other_unit.id);
+        let attacked = if actions.top_action_kind() == Some(ATTACK) {
+            actions
+                .top_action_object(|object_id| self.held(object_id).transpose())
+                .transpose()?
+        } else {
+            None
+        };
         let target = match attacked {
-            Some(object_id) => match self.held(object_id)? {
-                Some((tq, unit, ta, tm)) => Some(victim_of(
-                    VictimView {
-                        unit,
-                        layers: VictimLayers::of(self.parts, unit.id, self.actions_of(unit.id)),
-                        master: tm,
-                        charge_of: ChargeOf(&|with| self.special_charge(unit, with)),
-                        player: tq,
-                        masters: player_masters(self.every.players, tq)?,
-                        attributes: ta,
-                        terrain,
-                        mode_680: self.mode_680,
-                    },
-                    roles,
-                )?),
-                None => None,
-            },
+            Some((tq, unit, ta, tm)) => Some(victim_of(
+                VictimView {
+                    unit,
+                    layers: VictimLayers::of(self.parts, unit.id, self.actions_of(unit.id)),
+                    master: tm,
+                    charge_of: ChargeOf(&|with| self.special_charge(unit, with)),
+                    player: tq,
+                    masters: player_masters(self.every.players, tq)?,
+                    attributes: ta,
+                    terrain,
+                    mode_680: self.mode_680,
+                },
+                roles,
+            )?),
             None => None,
         };
         let shown = Shown {

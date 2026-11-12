@@ -82,6 +82,15 @@ fn the_attacks_sum_is_the_positive_ones() {
 /// master has object flag 0x10, is its own copy and shows an attack below 5 (4 only below 60
 /// hit points), no melee armor and a range of at most 0.5.
 fn harmless(master: Master) -> bool {
+    harmless_on(master, None)
+}
+
+/// [`harmless`], with unit 50 (25 hit points) attacking player 2's object `attacked` (of master
+/// 902, 25 hit points) where there is one.
+fn harmless_on(master: Master, attacked: Option<i32>) -> bool {
+    use crate::combat::attack::AttackState;
+    use crate::combat::attack::tests::own_attack;
+    use crate::objects::actions::ActionList;
     let me = Unit {
         id: object_id(123),
         life: Lifecycle {
@@ -90,17 +99,42 @@ fn harmless(master: Master) -> bool {
         },
         ..Unit::default()
     };
-    let enemy = Player {
-        objects: vec![Unit {
-            id: object_id(50),
-            life: Lifecycle {
-                master_id: master.id,
-                state: ObjectState::Alive,
-                ..Lifecycle::default()
+    let enemy_unit = |id: i32, master_id| Unit {
+        id: object_id(id),
+        life: Lifecycle {
+            master_id,
+            state: ObjectState::Alive,
+            hp: HitPoints::new(25.0),
+            ..Lifecycle::default()
+        },
+        ..Unit::default()
+    };
+    let mut parts = Parts::default();
+    let mut objects = vec![enemy_unit(50, master.id)];
+    let mut masters = vec![master];
+    if let Some(target) = attacked {
+        let target_master = Master {
+            id: master_id(902),
+            kind: MasterKind::COMBAT,
+            hit_points: MasterHitPoints::of_data(25),
+            ..Master::default()
+        };
+        objects.push(enemy_unit(target, target_master.id));
+        masters.push(target_master);
+        parts.put_actions(
+            object_id(50),
+            Action {
+                list: ActionList::default().with_attack(Some(own_attack(
+                    target,
+                    AttackState::New,
+                    Distance::new(1.0),
+                ))),
+                ..Action::default()
             },
-            ..Unit::default()
-        }]
-        .into(),
+        );
+    }
+    let enemy = Player {
+        objects: objects.into(),
         ..Player::default()
     };
     let (gaia, after) = (Player::default(), [enemy]);
@@ -108,7 +142,7 @@ fn harmless(master: Master) -> bool {
     let every = [
         Masters::default(),
         Masters::default(),
-        Masters::new([master]),
+        Masters::new(masters),
     ]
     .map(Arc::new);
     let spatial = Spatial::new(GridSize::new(120, 120));
@@ -154,7 +188,7 @@ fn harmless(master: Master) -> bool {
         others: OthersRef::new(PlayerId::new(1), &none, foreign, ObjectIndex::scanning()),
         foreign,
         every: MasterTables::new(&every, no_own_masters()),
-        parts: no_parts(),
+        parts: &parts,
         restriction: None,
         unit: &me,
         actions: &Action::default(),
@@ -305,6 +339,44 @@ fn ward_nearest_attacker_is_its_closest_held_one() {
             )
             .is_err()
     );
+}
+
+/// The attacker's shown attack counts its Attack's target (`FUN_14107cc30`, `FUN_140a78450`): a
+/// bonus damage task of 3 for each half of its hit points against master 902 makes an attacker of
+/// 902's 50 fearsome, and one on the recyclable −51 of 902, which the world holds, harmless.
+#[test]
+fn attacker_on_recyclable_target_shows_no_bonus_damage() {
+    use crate::combat::damage::BONUS_DAMAGE;
+    use crate::objects::masters::{ActionPart, Task, WorkValue};
+    use crate::players::attribute::AttributeId;
+    let villager = Master {
+        id: ids::VILLAGER_MALE,
+        copy_id: Some(ids::VILLAGER_MALE),
+        kind: MasterKind::COMBAT,
+        class: class::VILLAGER,
+        object_flags: ObjectFlags::SCOUT,
+        hit_points: MasterHitPoints::of_data(25),
+        combat: Some(CombatPart {
+            weapons: vec![ClassAmount::new(4, 3)],
+            weapon_range: Distance::ZERO,
+            ..CombatPart::default()
+        }),
+        action: Some(ActionPart {
+            tasks: vec![Task {
+                action_kind: BONUS_DAMAGE,
+                object_id: Some(master_id(902)),
+                attribute_kind4: Some(AttributeId::named(0)),
+                work_val1: WorkValue::new(3.0),
+                work_val2: WorkValue::new(0.5),
+                ..Task::default()
+            }],
+            ..ActionPart::default()
+        }),
+        ..Master::default()
+    };
+    assert!(harmless(villager.clone()));
+    assert!(!harmless_on(villager.clone(), Some(60)));
+    assert!(harmless_on(villager, Some(-51)));
 }
 
 #[test]

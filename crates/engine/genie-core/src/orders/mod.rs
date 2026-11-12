@@ -20,6 +20,7 @@ use crate::objects::MasterHitPoints;
 use crate::objects::ObjectId;
 use crate::objects::ObjectKey;
 use crate::objects::ObjectState;
+use crate::objects::actions::target_object;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
@@ -317,10 +318,18 @@ impl World {
     }
 
     /// The object state (`+0x640`) of the object `id`, live or sleeping, None for −1 or an id the
-    /// world no longer holds: what a `MoveTo`'s first check reads of its target
-    /// ([`crate::movement::move_to::MoveToAction::check_held`]).
+    /// world no longer holds: what a new `MoveTo` reads of the object it takes (slot 0x68,
+    /// [`crate::movement::move_to::WalkTo`]).
     pub(crate) fn object_state(&self, id: impl ObjectKey) -> Option<ObjectState> {
         self.object(id).map(|(_, unit)| unit.life.state)
+    }
+
+    /// The object state (`+0x640`) of the object an action's `target` names (`FUN_140a78450`,
+    /// [`target_object`]: None for a recyclable target, for none and for one the world no longer
+    /// holds): what a `MoveTo`'s first check reads of its target
+    /// ([`crate::movement::move_to::MoveToAction::check_held`]).
+    pub(crate) fn target_state(&self, target: Option<ObjectId>) -> Option<ObjectState> {
+        target_object(target, |id| self.object(id)).map(|(_, unit)| unit.life.state)
     }
 
     /// The object `id`, live or sleeping, to change (`FUN_1415417a0`'s object).

@@ -222,8 +222,10 @@ impl UnitView<'_, '_> {
 
     /// The base handler's case 0x216: the unit's closest spot beside the foundation `site`
     /// ([`Spatial::spot_off`] with the notify's radii; none without the foundation), its height
-    /// and class, its owner, the foundation and its current action's target as orders name them.
+    /// and class, its owner, the foundation and its current action's target as orders name them
+    /// (`FUN_140a78450`, [`Action::top_action_object`]: none for a recyclable one).
     ///
+    /// [`Action::top_action_object`]: crate::objects::layers::Action::top_action_object
     /// [`Spatial::spot_off`]: crate::map::spatial::Spatial::spot_off
     pub(crate) fn spot_off_footprint(
         &mut self,
@@ -288,7 +290,6 @@ impl UnitView<'_, '_> {
             }
             None => None,
         };
-        let target = self.actions.top_target();
         Ok(OffFootprint {
             spot,
             z: unit.position().z(),
@@ -296,7 +297,7 @@ impl UnitView<'_, '_> {
             player_kind: self.player_kind,
             player,
             site: named(site.id()),
-            action_target: target.and_then(named),
+            action_target: self.actions.top_action_object(named),
         })
     }
 }

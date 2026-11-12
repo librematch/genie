@@ -285,10 +285,13 @@ impl Unit {
     }
 
     /// The own `MoveTo`'s first check of its target (`0x140aa2a70`, [`MoveToAction::check_held`])
-    /// by the target's state as the world holds it: a target let go is released at once (slot
-    /// 0x180 from slot 0x68: an own `MoveTo` is not quiet). Returns the update's code when it
-    /// ends there (4: the list keeps it).
+    /// by the target's state as the world holds it ([`World::target_state`]): a target let go is
+    /// released at once (slot 0x180 from slot 0x68 with none, `FUN_140a7a230`, of a `MoveTo`
+    /// that is not quiet), one past state 6 and one of a recyclable id, which `FUN_140a78450`
+    /// passes over but slot 0x68's own lookup (`FUN_1415417a0`) finds; a target the world no
+    /// longer holds is not. Returns the update's code when it ends there (4: the list keeps it).
     ///
+    /// [`World::target_state`]: crate::world::World::target_state
     /// [`MoveToAction::check_held`]: crate::movement::move_to::MoveToAction::check_held
     fn own_move_held(
         &mut self,
@@ -299,10 +302,10 @@ impl Unit {
             return Ok(None);
         };
         let target = move_to.target;
-        let state = step.world.object_state(target);
+        let state = step.world.target_state(target);
         let mut inbox = step.world.parts.unit_ai.inbox(self.id, self.life.state);
         let code = move_to.check_held(state, &mut inbox)?;
-        let releases = code.is_some() && move_to.voice.is_loud();
+        let releases = (code.is_some() || state.is_none()) && move_to.voice.is_loud();
         if releases && let Some(target) = target {
             let by = self.releaser(step)?;
             release(step, self, target, by)?;
